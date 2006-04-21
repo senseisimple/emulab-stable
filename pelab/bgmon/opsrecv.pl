@@ -18,10 +18,14 @@ use libtbdb;
 use event;
 use Getopt::Std;
 use strict;
+use Socket;
 
 # node and site id caches
 my %nodeids;
 my %siteids;
+
+# ipaddr cache, since nodes are addressed via IP in the event system.
+my %ipaddrs;
 
 # Batch up insertions. Simple string.
 my $insertions = "";
@@ -154,9 +158,9 @@ sub callbackFunc($$$) {
 	my $tstamp = event_notification_get_string($handle,
 						   $notification,
 						   "tstamp");
-#	my $scheduler = event_notification_get_string($handle,
-#						      $notification,
-#						      "SCHEDULER");
+	my $index = event_notification_get_string($handle,
+						  $notification,
+						  "index");
 
 	#change values and/or initialize
 	if ( $debug && $eventtype eq "RESULT" ){
@@ -167,6 +171,7 @@ sub callbackFunc($$$) {
 	      "linkdest=$linkdest\n".
 	      "testtype =$testtype\n".
 	      "result=$result\n".
+	      "index=$index\n".
 	      "tstamp=$tstamp\n")
 	    if ($debug);
 
@@ -176,11 +181,46 @@ sub callbackFunc($$$) {
 		     result    => $result,
 		     tstamp    => $tstamp );
 
+	if (!exists($ipaddrs{$linksrc})) {
+	    my (undef,undef,undef,undef,@ips) = gethostbyname("$linksrc");
 
-#	if (event_unregister($handle) == 0) {
-#	    die "Unable to unregister with event system\n";
-#	}
-#	exit(0);
+	    if (!@ips) {
+		warn "Could not map $linksrc to its ipaddr\n";
+		return;
+	    }
+	    $ipaddrs{$linksrc} = inet_ntoa($ips[0]);
+	}
+	my $ipaddr = $ipaddrs{$linksrc};
+
+	my $tuple = address_tuple_alloc();
+	if (!$tuple) {
+	    warn "Could not allocate an address tuple for reply to $linksrc\n";
+	    return;
+	}
+	%$tuple = ( objtype   => "BGMON",
+		    objname   => "ops",
+		    eventtype => "ACK",
+		    expt      => "__none",
+		    host      => "$ipaddr",
+		   );
+
+	my $reply_notification = event_notification_alloc($handle, $tuple);
+	if (!$reply_notification) {
+	    warn "Could not allocate notification for reply to $linksrc\n";
+	    return;
+	}
+
+	# So the sender knows which one we actually got.
+	event_notification_put_string($handle,
+				      $reply_notification, "index", "$index");
+
+	print "Sending ack event to $ipaddr\n"
+	    if ($debug);
+	
+	if (!event_notify($handle, $reply_notification)) {
+	    warn("could not send reply notification to $linksrc");
+	}
+	event_notification_free($handle, $reply_notification);
 }
 
 #############################################################################

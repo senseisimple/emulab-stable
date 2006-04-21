@@ -34,6 +34,7 @@ use event;
 use Getopt::Std;
 use strict;
 use DB_File;
+use Socket;
 
 sub usage {
 	warn "Usage: $0 [hostname] -d [workingdir]\n";
@@ -50,8 +51,9 @@ my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.1);
 #MARK_RELIABLE
 # each result waiting to be acked has an id number and corresponding file
-my $resultDBlimit = 100;
-my $resIndex = 0;
+my $resultDBlimit = 1000;
+my %reslist       = ();
+my $magic         = "0xDeAdBeAf";
 
 my %testevents = ();
 
@@ -106,6 +108,19 @@ if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
 	die "Could not subscribe to event\n";
 }
 
+# This is for our ack from ops.
+$tuple = address_tuple_alloc();
+if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+%$tuple = ( objname   => "ops",
+	    eventtype => "ACK",
+	    expt      => "__none",
+	    objtype   => "BGMON");
+
+if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
+	die "Could not subscribe to ack event\n";
+}
+
 #this call will reconnect event system if it has failed
 sendBlankNotification();
 
@@ -115,6 +130,16 @@ sendBlankNotification();
 # a wacky way to get usleep() )
 #############################################################################
 #main()
+
+#
+# At startup, look for any old results that did not get acked. Add them to
+# the reslist so they get resent below.
+#
+for (my $i = 0; $i < $resultDBlimit; $i++) {
+    if (-e createDBfilename($i)) {
+	$reslist{$i} = createDBfilename($i);
+    }
+}
 
 while (1) {
 
@@ -188,14 +213,14 @@ while (1) {
 		     "destaddr" => $destaddr,
 		     "testtype" => $testtype,
 		     "result" => $parsedData,
-		     "tstamp" => $testevents{$destaddr}{$testtype}
-		               {"tstamp"} );
+		     "tstamp" => $testevents{$destaddr}{$testtype}{"tstamp"},
+		     "magic"  => "$magic",
+		     );
 		#MARK_RELIABLE
 		#save result to local DB
-		saveTestToLocalDB(\%results);
+		my $index = saveTestToLocalDB(\%results);
 		#send result to remote DB
-		sendResults(\%results, $resIndex);
-		$resIndex = ($resIndex+1) % $resultDBlimit;
+		sendResults(\%results, $index);
 
 		#reset flags
 		$testevents{$destaddr}{$testtype}{"flag_finished"} = 0;
@@ -253,24 +278,60 @@ while (1) {
 	}
     }
 
-    #MARK_RELIABLE
-    #check for results that could not be sent due to error
-    # TODO: horribly inefficient...
-    for( my $i=0; $i < $resultDBlimit; $i++ ){
-	if( -e createDBfilename($i) ){
-	    #resend
-	    my %results;
-	    my %db;
-	    tie( %db, "DB_File", createDBfilename($i) ) 
-		 or die "cannot open db file";
-	    for my $key (keys %db ){
-		$results{$key} = $db{$key};
-	    }
-	    untie %db;
-	    sendResults(\%db,$i);
+    #
+    # Check for results that could not be sent due to error. We want to wait
+    # a little while though to avoid resending data that has yet to be
+    # acked cause the network is slow or down.
+    #
+    my $count    = 0;
+    my $maxcount = 5;	# Wake up and send only this number at once.
+    
+    for (my $index = 0; $index < $resultDBlimit; $index++) {
+	next
+	    if (!exists($reslist{$index}));
+	
+	my $filename = $reslist{$index};
+
+	if (! -e $filename) {
+	    # Hmm, something went wrong!
+	    delete($reslist{$index});
+	    next;
+	}
+
+	# Stat file to get create time.
+	my (undef,undef,undef,undef,undef,undef,undef,undef,
+	    undef,undef,$ctime) = stat($filename);
+
+	next
+	    if ((time() - $ctime) < 10);
+
+	#resend
+	my %results;
+	my %db;
+	tie(%db, "DB_File", $filename) 
+	    or die "cannot open db file";
+	for my $key (keys %db ){
+	    $results{$key} = $db{$key};
+	}
+	untie(%db);
+
+	# Verify results in case the file was scrogged.
+	if (!exists($results{"magic"}) || $results{"magic"} ne $magic) {
+	    # Hmm, something went wrong!
+	    print "Old results for index $index are scrogged; deleting!\n";
+	    delete($reslist{$index});
+	    unlink($filename);
+	    next;
+	}
+	sendResults(\%results, $index);
+	sleep(1);
+	$count++;
+	if ($count > $maxcount) {
+	    print "Delaying a bit before sending more old results!\n";
+	    sleep(2);
+	    last;
 	}
     }
-
 }
 
 #############################################################################
@@ -299,7 +360,19 @@ sub callbackFunc($$$) {
 
 #	print "EVENT: $time $objtype $eventtype\n";
 
-
+	# Ack from ops.
+	if ($eventtype eq "ACK") {
+	    my $index = event_notification_get_string($handle,
+						      $notification,
+						      "index");
+	    
+	    print "Ack for index $index. Deleting backup file\n";
+	    if (exists($reslist{$index})) {
+		unlink($reslist{$index});
+		delete($reslist{$index});
+	    }
+	    return;
+	}
 
 	#change values and/or initialize
 	if( $eventtype eq "EDIT" ){
@@ -535,23 +608,36 @@ sub printTimeEvents {
 #MARK_RELIABLE
 sub saveTestToLocalDB($)
 {
+    #
+    # Find an unused index. Leave zero unused to indicate we ran out.
+    #
+    my $index;
+    
+    for ($index = 1; $index < $resultDBlimit; $index++) {
+	last
+	    if (!exists($reslist{$index}));
+    }
+    return 0
+	if ($index == $resultDBlimit);
+
     #save result to DB's in files.
     my $results = $_[0];
     my %db;
-    my $filename = createDBfilename($resIndex);
+    my $filename = createDBfilename($index);
     tie( %db, "DB_File", $filename ) or die "cannot create db file";
     for my $key (keys %$results ){
 	$db{$key} = $$results{$key};
     }
     untie %db;
+
+    $reslist{$index} = createDBfilename($index);
+    return $index;
 }
 
 #############################################################################
 sub sendResults($$){
     my $results = $_[0];
     my $index = $_[1];
-
-    my $f_success = 1; #flag to indicate error during send
 
     my $tuple_res = address_tuple_alloc();
     if (!$tuple_res) { warn "Could not allocate an address tuple\n"; }
@@ -597,27 +683,17 @@ sub sendResults($$){
 					    "tstamp",
 					    $results->{tstamp} ) )
     { warn "Could not add attribute to notification\n"; }
-    
-    #MARK_RELIABLE
-    #send notification, and check for send error from event system
+
+    if( 0 == event_notification_put_string( $handle,
+					    $notification_res,
+					    "index",
+					    "$index" ) )
+    { warn "Could not add attribute to notification\n"; }
+
+    print "Sending results to ops. Index: $index\n";
+
     if (!event_notify($handle, $notification_res)) {
 	warn("could not send test event notification");
-	$f_success = 0;
-    }
-
-
-#    if (!event_notify(undef, $notification_res)) {
-#	warn("could not send test event notification");
-#	$f_success = 0;
-#    }
-
-    #MARK_RELIABLE
-    #check for successful send
-    if( $f_success == 1 ){
-	#delete file of event result
-	print " successful send: ";
-	print "$results->{testtype}=$results->{result}";
-	unlink( createDBfilename($index) );
     }
 
     if( event_notification_free( $handle, $notification_res ) == 0 ){
