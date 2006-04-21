@@ -12,16 +12,13 @@ my @expnodes;
 
 sub usage 
 {
-    warn "Usage: $0 <input_file> [-s server] [-p port] [-a]\n";
+    warn "Usage: $0 <input_file> [-s server] [-p port] [-e pid/eid] [-l latency period] [-b bandwidth period] [-a]\n";
     return 1;
 }
 
 if( scalar(@ARGV) < 1 ){ exit &usage; }
 
 #*****************************************
-#my $filename_defaults = "expnodes.txt";
-my $filename_defaults = $ARGV[0];
-#my $filename_defaults = "destlist";
 my %DEF_PER = (
 #	       "latency" => 300,
 	       "latency" => 600,
@@ -34,18 +31,29 @@ my %DEF_PER = (
 #	       "bw"=>200
 	       );
 my %settings;  #misc options
-$settings{"allpairs"} = 1;  #if 0 interprets input nodes as pairs
+$settings{"allpairs"} = 0;  #if 0 interprets input nodes as pairs
+$settings{"expt"} = "__none";
 my @expnodes;
 #*****************************************
 
 my %opt = ();
-getopt(\%opt,"s:p:h:a");
+getopts("s:p:h:e:l:b:a", \%opt);
 
 if ($opt{h}) { exit &usage; }
-#if ($opt{a}) { 
+if ($opt{e}) { $settings{"expt"} = $opt{e}; }
+if ($opt{a}) { $settings{"allpairs"} = 1; }
+
+# XXX: We should transfer the defaults into the %settings hash, then
+#      override here.  However, the rest of the code references DEF_PER
+#      and I am not inclined to fix that up right now.
+if ($opt{l}) { $DEF_PER{"latency"} = $opt{l}; }
+if ($opt{b}) { $DEF_PER{"bw"} = $opt{b}; }
+
 if (@ARGV > 1) { exit &usage; }
 
-
+#my $filename_defaults = "destlist";
+#my $filename_defaults = "expnodes.txt";
+my $filename_defaults = $ARGV[0];
 
 #read the experiment nodes
 open FILE, "< $filename_defaults" 
@@ -101,7 +109,7 @@ sub tmp
 	%$tuple = ( objtype   => "BGMON",
 		    objname   => $node,
 		    eventtype => "INIT",
-		    expt      => "__none");
+		    expt      => $settings{"expt"});
 	my $notification = event_notification_alloc($handle,$tuple);
 	if (!$notification) { die "Could not allocate notification\n"; }
 
@@ -267,7 +275,7 @@ sub initnode($$$$)
     %$tuple = ( objtype   => "BGMON",
 		objname   => $node,
 		eventtype => "INIT",
-		expt      => "__none" );
+		expt      => $settings{"expt"} );
     my $notification = event_notification_alloc($handle,$tuple);
     if (!$notification) { die "Could not allocate notification\n"; }
 
@@ -310,7 +318,7 @@ sub stopnode($)
     %$tuple = ( objtype   => "BGMON",
 		objname   => $node,
 		eventtype => "STOPALL",
-		expt      => "__none" );
+		expt      => $settings{"expt"} );
     my $notification = event_notification_alloc($handle,$tuple);
     if (!$notification) { die "Could not allocate notification\n"; }
     #send notification

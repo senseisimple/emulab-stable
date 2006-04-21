@@ -37,7 +37,7 @@ use DB_File;
 use Socket;
 
 sub usage {
-	warn "Usage: $0 [hostname] -d [workingdir]\n";
+	warn "Usage: $0 [-s server] [-p port] [-e pid/eid] -d <working_dir> [hostname]\n";
 	return 1;
 }
 
@@ -69,10 +69,16 @@ my %waitq = ( latency => [],
 
 my %opt = ();
 #getopt(\%opt,"s:p:h");
-getopt("s:p:h:d",\%opt,);
+getopts("s:p:e:d:h",\%opt);
 
 #if ($opt{h}) { exit &usage; }
 #if (@ARGV > 1) { exit &usage; }
+
+my ($server,$port,$evexpt,$workingdir);
+if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
+if ($opt{p}) { $port = $opt{p}; }
+if ($opt{e}) { $evexpt = $opt{e}; } else { $evexpt = "__none"; }
+if( $opt{d}) { $workingdir = $opt{d}; `cd $workingdir`; }
 
 my $thismonaddr;
 if( defined  $ARGV[0] ){
@@ -83,12 +89,6 @@ if( defined  $ARGV[0] ){
     $thismonaddr = "plab$1";
 }
 print "thismonaddr = $thismonaddr\n";
-
-
-my ($server,$port,$workingdir);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
-if ($opt{p}) { $port = $opt{p}; }
-if( $opt{d}) { $workingdir = $opt{d}; `cd $workingdir`; }
 
 print "server=$server\n";
 
@@ -102,7 +102,8 @@ if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
 %$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
 	    objtype   => "BGMON",
-	    objname   => $thismonaddr);
+	    objname   => $thismonaddr,
+            expt      => $evexpt);
 
 if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
 	die "Could not subscribe to event\n";
@@ -645,7 +646,7 @@ sub sendResults($$){
     %$tuple_res = ( objtype   => "BGMON",
 		    objname   => "ops",
 		    eventtype => "RESULT"
-		    , expt      => "__none"
+		    , expt      => $evexpt
 		    , scheduler => 1
 		    );
 
@@ -738,7 +739,7 @@ sub sendBlankNotification
     %$tuple_res = ( objtype   => "NOTHING",
 		    objname   => "no_name",
 		    eventtype => "no_event"
-		    , expt      => "__none"
+		    , expt      => $evexpt
 		    , scheduler => 1
 		    );
 

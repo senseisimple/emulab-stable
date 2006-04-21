@@ -40,16 +40,24 @@ my $lastinsert = 0;	# Timestamp.
 $| = 1;
 
 sub usage {
-	warn "Usage: $0 ";
+	print "Usage: $0 [-s server] [-p port] [-e pid/eid] [-d] [-i]\n";
 	return 1;
 }
+
 my $debug    = 0;
 my $impotent = 0;
+my $evexpt   = "__none";
 
 my %opt = ();
-getopt(\%opt,"s:p:h");
+if (!getopts("s:p:e:dih", \%opt)) {
+    exit &usage;
+}
 
-#if ($opt{h}) { exit &usage; }
+if ($opt{h}) { exit &usage; }
+if ($opt{e}) { $evexpt = $opt{e}; }
+if ($opt{d}) { $debug = 1; }
+if ($opt{i}) { $impotent = 1; } 
+
 if (@ARGV !=0) { exit &usage; }
 
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
@@ -91,7 +99,7 @@ if (!$tuple) { die "Could not allocate an address tuple\n"; }
 %$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
 	    objtype   => "BGMON",
 	    objname   => "ops"
-	    , expt      => "__none"
+	    , expt      => $evexpt
 	    , scheduler => 1
 	    );
 

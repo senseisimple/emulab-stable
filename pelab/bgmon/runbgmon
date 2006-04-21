@@ -1,21 +1,41 @@
 #!/usr/bin/perl
 
-#!/bin/bash
+use Getopt::Std;
 
-#echo `pwd`
-#exec `perl -mevent -I. -I/usr/testbed/lib bgmon.pl`
+my $expt;
 
-#use Cwd;
-#print "cwd = ".getcwd."\n";
-
-#print "Argc = $ARGC\n";
-if( @ARGV < 1 ){
-    die "usage: <path_to_bgmon.pl>";
+sub usage {
+	warn "Usage: $0 [-e pid/eid] <bin_path>\n";
+	return 1;
 }
 
+my %opt = ();
+
+if (!getopts("e:", \%opt)) {
+    exit &usage;
+}
+
+if ($opt{e}) { 
+    $expt = $opt{e}; 
+} else {
+    open(NID, "</var/emulab/boot/nickname")
+        or die "Can't open nodeid file!";
+    my $nid = <NID>;
+    close(NID);
+    chomp $nid;
+    my (undef, $eid, $pid) = split /\./, $nid;
+    $expt = "$pid/$eid";
+}
+
+if( @ARGV < 1 ){
+    exit &usage;
+}
+
+my $path = $ARGV[0];
 
 #system "sudo perl -mevent -I. -I/usr/testbed/lib -d $ARGV[0]bgmon.pl &";
-system "perl $ARGV[0]bgmon.pl -d $ARGV[0] &";
+system "perl $path/bgmon.pl -e $expt -d $path/ &";
 system "sudo rm iperfd.out iperfd.err";
-system "sudo $ARGV[0]iperfd -s -p 5002 >& $ARGV[0]iperfd.err > $ARGV[0]iperfd.out &";
+system "sudo $path/iperfd -s -p 5002 >& $path/iperfd.err > $path/iperfd.out &";
 
+exit 0;
