@@ -53,7 +53,7 @@ if (defined($options{"s"})) {
     if ($stub_cmdargs eq $UNKNOWN) {
 	$stub_cmdargs = $options{"s"};
     } else {
-	$stub_cmdargs .= " " . $options{"s"};
+	$stub_cmdargs = " " . $options{"s"};
     }
 }
 if (defined($options{"M"})) {

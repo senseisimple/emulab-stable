@@ -482,7 +482,8 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 			perror("getsockopt() TCP_INFO");
 			clean_exit(1);
 		    }
-		    bandwidth = (info.tcpi_snd_cwnd * info.tcpi_snd_mss * 8)
+		    bandwidth = (info.tcpi_unacked/*tcpi_snd_cwnd*/
+				 * info.tcpi_snd_mss * 8)
 			/ base_rtt[path_id];
 		    if (bandwidth > max_throughput[path_id])
 		    {
@@ -490,8 +491,9 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		    }
 		    logWrite(DELAY_DETAIL, NULL,
 			     "Kernel RTT: %lu, Kernel Losses: %lu, "
-			     "Receive Window: %lu",
-			     info.tcpi_rtt, info.tcpi_lost, tp->window);
+			     "Receive Window: %lu, Kernel packets out: %lu",
+			     info.tcpi_rtt, info.tcpi_lost, tp->window,
+			     info.tcpi_unacked);
 		    logWrite(DELAY_DETAIL, NULL,
 			     "Tput: %lu, cwnd: %lu, snd_MSS: %lu bytes, "
 			     "Base RTT: %lu",

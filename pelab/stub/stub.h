@@ -77,6 +77,49 @@ typedef void (*handle_index)(int);
 // This returns 1 for success and 0 for failure.
 typedef int (*send_to_monitor)(int, int);
 
+// Information about each write that is going to happen.
+typedef struct
+{
+  long size;
+  // delta is a time difference in milliseconds
+  long delta;
+} pending_write;
+
+// The total number of writes we will queue up before discarding.
+enum { PENDING_SIZE = 40 };
+
+// The data structure which hold the writes pending for a particular connection
+typedef struct
+{
+  // This should start out false. If it is false, then the rest of the
+  // data in this struct is undefined.
+  int is_pending;
+  // When is the earliest moment at which we should try a write?
+  struct timeval deadline;
+  // When did the last write occur? Used to determine inter-write times.
+  struct timeval last_write;
+  // The list of the actual writes themselves. This is a circular
+  // queue. When it runs out of room it overwrites the oldest pending
+  // write.
+  pending_write writes[PENDING_SIZE];
+  // The index of the current write under consideration. 
+  int current_index;
+  // The index of the next free slot. This may be the same as
+  // 'current_index'. If this is so, then the write indexed by
+  // 'current_index' is the oldest write pending and is to be
+  // overridden if another write comes along.
+  int free_index;
+} pending_list;
+
+// Initializes the pending write structure.
+void init_pending_list(int index, long size, struct timeval time);
+
+// Adds a pending write onto the tail of the list.
+void push_pending_write(int index, pending_write current);
+
+// Removes the oldest pending write.
+void pop_pending_write(int index);
+
 typedef struct {
   short  valid;
   int    sockfd;
@@ -85,7 +128,7 @@ typedef struct {
   unsigned short source_port;
   unsigned short dest_port;
   time_t last_usetime; //last monitor access time
-  int pending; // How many bytes are pending to this peer?
+  pending_list pending; // What writes are pending?
 } connection;
 typedef struct {
   struct timeval captime;

@@ -59,7 +59,7 @@ void init_connection(connection * conn)
     conn->source_port = 0;
     conn->dest_port = 0;
     conn->last_usetime = time(NULL);
-    conn->pending = 0;
+    conn->pending.is_pending = 0;
   }
 }
 
@@ -100,7 +100,7 @@ int replace_sender_by_stub_port(unsigned long ip, unsigned short stub_port,
     // There is already a connection. Get rid of the old connection.
     int index = pos->second;
     snddb[index].last_usetime = now;
-    snddb[index].pending = 0;
+    snddb[index].pending.is_pending = 0;
     if (snddb[index].sockfd != -1)
     {
 	FD_CLR(snddb[index].sockfd, read_fds);
@@ -134,7 +134,7 @@ int replace_sender_by_stub_port(unsigned long ip, unsigned short stub_port,
     }
     snddb[index].sockfd = sockfd;
     snddb[index].last_usetime = now;
-    snddb[index].pending = 0;
+    snddb[index].pending.is_pending = 0;
     result = index;
   }
   return result;
@@ -382,7 +382,6 @@ void clear_pending(int index, fd_set * write_fds)
   {
     pending_receivers.erase(index);
     FD_CLR(rcvdb[index].sockfd, write_fds);
-    rcvdb[index].pending = 0;
   }
 }
 
@@ -403,6 +402,7 @@ void remove_index(int index, fd_set * write_fds)
       close(rcvdb[index].sockfd);
       rcvdb[index].sockfd = -1;
     }
+    rcvdb[index].pending.is_pending = 0;
   }
 }
 

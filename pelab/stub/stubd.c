@@ -314,45 +314,138 @@ void clean_exit(int code){
   exit(code);
 }
 
-void remove_pending(int index)
-{
-    if (rcvdb[index].pending == 0)
-    {
-	clear_pending(index, &write_fds);
-    }
-}
-
-void add_pending(int index, int size)
-{
-    if (rcvdb[index].pending == 0 && size > 0)
-    {
-	set_pending(index, &write_fds);
-    }
-    rcvdb[index].pending += size;
-}
+int send_with_reconnect(int index, int size);
 
 void try_pending(int index)
 {
-    int size = 0;
-    int error = 0;
-    if (rcvdb[index].pending > LOW_WATER_MARK)
+  pending_list * pending = &rcvdb[index].pending;
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  if (pending->is_pending
+      && (pending->deadline.tv_sec < now.tv_sec ||
+	  (pending->deadline.tv_sec == now.tv_sec
+	   && pending->deadline.tv_usec < now.tv_usec)))
+  {
+    int size = pending->writes[pending->current_index].size;
+    int error = send_with_reconnect(index, size);
+
+    if (error == 0)
     {
-	size = LOW_WATER_MARK;
+      // Complete success in writing.
+      pop_pending_write(index);
+    }
+    else if (error > 0)
+    {
+      // Partial success in writing.
+      pending->writes[pending->current_index].size = error;
     }
     else
     {
-	size = rcvdb[index].pending;
+      // Disconnected and cannot reconnect.
+      // Do nothing. We don't care about this connection anymore.
     }
-    error = send(rcvdb[index].sockfd, random_buffer, size, MSG_DONTWAIT);
-    logWrite(PEER_WRITE, NULL, "Wrote %d pending bytes", error);
-    if (error == -1)
+  }
+}
+
+void init_pending_list(int index, long size, struct timeval time)
+{
+  pending_list * pending = &(rcvdb[index].pending);
+  if (! pending->is_pending)
+  {
+    pending->is_pending = 1;
+    pending->deadline = time;
+    pending->last_write = time;
+    pending->writes[0].size = size;
+    pending->writes[0].delta = 0;
+    pending->current_index = 0;
+    pending->free_index = 1;
+
+    set_pending(index, &write_fds);
+  }
+}
+
+void push_pending_write(int index, pending_write current)
+{
+  pending_list * pending = &(rcvdb[index].pending);
+  if (pending->is_pending)
+  {
+    int used_buffer = 0;
+    if (pending->free_index < pending->current_index)
     {
-	perror("try_pending");
-	clean_exit(1);
+      used_buffer = PENDING_SIZE -
+	(pending->current_index - pending->free_index);
     }
-    rcvdb[index].pending -= error;
-    total_size += error;
-    remove_pending(index);
+    else
+    {
+      used_buffer = pending->free_index - pending->current_index;
+    }
+    logWrite(PEER_WRITE, NULL, "Pending insert. Used buffer: %d", used_buffer);
+    // If free_index is equal to current_index, then we are out of
+    // space and we want to delete the cell at current_index.
+    if (pending->free_index == pending->current_index)
+    {
+//      pop_pending_write(index);
+
+//      pending->current_index = (pending->current_index + PENDING_SIZE/2)
+//	% PENDING_SIZE;
+
+      int delta = pending->writes[(pending->current_index + 1)
+				  %PENDING_SIZE].delta
+	- pending->writes[pending->current_index].delta;
+      pending->deadline.tv_usec += delta * 1000;
+      while (pending->deadline.tv_usec < 0)
+      {
+	pending->deadline.tv_sec -= 1;
+	pending->deadline.tv_usec += 1000000;
+      }
+      while (pending->deadline.tv_usec >= 1000000)
+      {
+	pending->deadline.tv_sec += 1;
+	pending->deadline.tv_usec -= 1000000;
+      }
+
+      pending->current_index = (pending->current_index + 1) % PENDING_SIZE;
+
+    }
+    pending->writes[pending->free_index] = current;
+    pending->free_index = (pending->free_index + 1) % PENDING_SIZE;
+  }
+}
+
+void pop_pending_write(int index)
+{
+  pending_list * pending = &(rcvdb[index].pending);
+  if (pending->is_pending)
+  {
+    pending->current_index = (pending->current_index + 1) % PENDING_SIZE;
+    if (pending->free_index == pending->current_index)
+    {
+      pending->is_pending = 0;
+      clear_pending(index, &write_fds);
+    }
+    else
+    {
+      long seconds = pending->writes[pending->current_index].delta / 1000;
+      long millis = pending->writes[pending->current_index].delta % 1000;
+      pending->deadline.tv_usec += millis * 1000;
+      pending->deadline.tv_sec += seconds
+	+ (pending->deadline.tv_usec / 1000000);
+      pending->deadline.tv_usec %= 1000000;
+    }
+  }
+}
+
+// Updates the last_write time on the pending_list structure and
+// returns the difference in millisecond betweeen the old time and the
+// new time.
+long update_write_time(int index, struct timeval deadline)
+{
+  long result = deadline.tv_usec / 1000
+    - rcvdb[index].pending.last_write.tv_usec / 1000;
+  result += deadline.tv_sec * 1000
+    - rcvdb[index].pending.last_write.tv_sec * 1000;
+  rcvdb[index].pending.last_write = deadline;
+  return result;
 }
 
 void print_header(char *buf){
@@ -417,7 +510,27 @@ void receive_sender(int i) {
 }
 
 
-void send_receiver(int index, int packet_size, fd_set * write_fds_copy){
+void send_receiver(int index, int packet_size, struct timeval deadline)
+{
+  if (rcvdb[index].pending.is_pending)
+  {
+    pending_write next;
+    next.size = packet_size;
+    next.delta = update_write_time(index, deadline);
+    push_pending_write(index, next);
+  }
+  else
+  {
+    int error = send_with_reconnect(index, packet_size);
+    if (error > 0)
+    {
+      // This means that there was a successful write, but
+      // incomplete. So we need to set up a pending write.
+      init_pending_list(index, error, deadline);
+    }
+  }
+
+/*
   int sockfd;
   int error = 1, retry=0;
   struct in_addr addr;
@@ -464,19 +577,92 @@ void send_receiver(int index, int packet_size, fd_set * write_fds_copy){
 //    printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
     add_pending(index, packet_size - error);
   }
+*/
+}
+
+// Returns the number of bytes remaining. This means a 0 if everything
+// goes OK, and a positive number if some of the bytes couldn't be
+// written. Returns -1 if the connection was reset and reconnection failed.
+int send_with_reconnect(int index, int size)
+{
+  int result = 0;
+  int bytes_remaining = size;
+  int done = 0;
+  int error = 0;
+  int sockfd = rcvdb[index].sockfd;
+  if (bytes_remaining <= 0)
+  {
+    bytes_remaining = 1;
+  }
+
+  while (!done && bytes_remaining > 0)
+  {
+    int retry = 0;
+    int write_size = bytes_remaining;
+    if (write_size > MAX_PAYLOAD_SIZE)
+    {
+      write_size = MAX_PAYLOAD_SIZE;
+    }
+
+    error = send(sockfd, random_buffer, write_size, MSG_DONTWAIT);
+    logWrite(PEER_WRITE, NULL, "Wrote %d bytes", error);
+    // Handle failed connection
+    while (error == -1 && errno == ECONNRESET && retry < 3) {
+      reconnect_receiver(index);
+      sockfd= rcvdb[index].sockfd;
+      error = send(sockfd, random_buffer, size, MSG_DONTWAIT);
+      logWrite(PEER_WRITE, NULL, "Wrote %d reconnected bytes", error);
+      retry++;
+    }
+    //if still disconnected, reset
+    if (error == -1 && errno == ECONNRESET) {
+      remove_index(index, &write_fds);
+      printf("Error: send_receiver() - failed send to %s three times. \n", ipToString(rcvdb[index].ip)); 
+      result = -1;
+    }
+    else if (error == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+      result = bytes_remaining;
+      done = 1;
+    }
+    else if (error == -1) {
+      perror("send_receiver: send");
+      clean_exit(1);
+    }
+    else {
+      total_size += error;
+      bytes_remaining -= error;
+      if (error < write_size)
+      {
+	done = 1;
+      }
+      result = bytes_remaining;
+//    printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
+    }
+  }
+  return result;
 }
 
 void change_socket_buffer_size(int sockfd, int optname, int value)
 {
+  int newSize = 0;
+  int newSizeLength = sizeof(newSize);
   int error = setsockopt(sockfd, SOL_SOCKET, optname, &value, sizeof(value));
   if (error == -1)
   {
     perror("setsockopt");
     clean_exit(1);
   }
+  error = getsockopt(sockfd, SOL_SOCKET, optname, &newSize, &newSizeLength);
+  if (error == -1)
+  {
+    perror("getsockopt verifying setsockopt");
+    clean_exit(1);
+  }
+  logWrite(CONTROL_RECEIVE | DELAY_DETAIL, NULL,
+	   "Socket buffer size is now %d", newSize);
 }
 
-void process_control_packet(packet_info packet, fd_set * write_fds_copy){
+void process_control_packet(packet_info packet, struct timeval deadline){
   int index = -1;
   int sockfd = -1;
 
@@ -491,15 +677,16 @@ void process_control_packet(packet_info packet, fd_set * write_fds_copy){
   {
   case PACKET_WRITE:
     logWrite(CONTROL_RECEIVE, NULL, "Told to write %d bytes", packet.value);
-    send_receiver(index, packet.value, write_fds_copy);
+    send_receiver(index, packet.value, deadline);
     break;
   case PACKET_SEND_BUFFER:
-    logWrite(CONTROL_RECEIVE, NULL, "Told to set send buffer to %d bytes",
-	     packet.value);
+    logWrite(CONTROL_RECEIVE | DELAY_DETAIL, NULL,
+	     "Told to set SEND buffer to %d bytes", packet.value);
     change_socket_buffer_size(sockfd, SO_SNDBUF, packet.value);
     break;
   case PACKET_RECEIVE_BUFFER:
-    logWrite(CONTROL_RECEIVE, NULL, "Told to set receive buffer to %d bytes",
+    logWrite(CONTROL_RECEIVE | DELAY_DETAIL, NULL,
+	     "Told to set RECEIVE buffer to %d bytes",
 	     packet.value);
     change_socket_buffer_size(sockfd, SO_RCVBUF, packet.value);
     break;
@@ -873,7 +1060,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 //    printf("Sending packet to %s of size %ld\n", inet_ntoa(debug_temp),
 //           packet.size);
 
-    process_control_packet(packet, write_fds_copy);
+    process_control_packet(packet, *deadline);
 
     packet_buffer_advance();
     if (packet_buffer_more())

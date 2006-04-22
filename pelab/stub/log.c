@@ -87,8 +87,8 @@ static void logPrefix(int flags, struct timeval const * timestamp)
       gettimeofday(&now, NULL);
       timeptr = &now;
     }
-    fprintf(logFile, "%d.%d ", (int)(timeptr->tv_sec),
-	    (int)((timeptr->tv_usec)/1000));
+    fprintf(logFile, "%f ", (double)(timeptr->tv_sec) +
+	    ((timeptr->tv_usec)/1000)/1000.0);
   }
   fprintf(logFile, ": ");
 }
