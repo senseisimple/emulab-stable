@@ -46,8 +46,8 @@ if ($opt{a}) { $settings{"allpairs"} = 1; }
 # XXX: We should transfer the defaults into the %settings hash, then
 #      override here.  However, the rest of the code references DEF_PER
 #      and I am not inclined to fix that up right now.
-if ($opt{l}) { $DEF_PER{"latency"} = $opt{l}; }
-if ($opt{b}) { $DEF_PER{"bw"} = $opt{b}; }
+if (defined($opt{l})) { $DEF_PER{"latency"} = $opt{l}; }
+if (defined($opt{b})) { $DEF_PER{"bw"} = $opt{b}; }
 
 if (@ARGV > 1) { exit &usage; }
 

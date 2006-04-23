@@ -3,6 +3,7 @@
 use Getopt::Std;
 
 my $expt;
+my $iperfport = 5002;
 
 sub usage {
 	warn "Usage: $0 [-e pid/eid] <bin_path>\n";
@@ -11,9 +12,11 @@ sub usage {
 
 my %opt = ();
 
-if (!getopts("e:", \%opt)) {
+if (!getopts("e:i:", \%opt)) {
     exit &usage;
 }
+
+if ($opt{i}) { $iperfport = $opt{i}; }
 
 if ($opt{e}) { 
     $expt = $opt{e}; 
@@ -34,8 +37,8 @@ if( @ARGV < 1 ){
 my $path = $ARGV[0];
 
 #system "sudo perl -mevent -I. -I/usr/testbed/lib -d $ARGV[0]bgmon.pl &";
-system "perl $path/bgmon.pl -e $expt -d $path/ &";
-system "sudo rm iperfd.out iperfd.err";
-system "sudo $path/iperfd -s -p 5002 >& $path/iperfd.err > $path/iperfd.out &";
+system "perl $path/bgmon.pl -e $expt -i $iperfport -d $path/ &";
+system "sudo rm $path/iperfd.out $path/iperfd.err";
+system "sudo $path/iperfd -s -p $iperfport >& $path/iperfd.err > $path/iperfd.out &";
 
 exit 0;

@@ -69,16 +69,17 @@ my %waitq = ( latency => [],
 
 my %opt = ();
 #getopt(\%opt,"s:p:h");
-getopts("s:p:e:d:h",\%opt);
+getopts("s:p:e:d:i:h",\%opt);
 
 #if ($opt{h}) { exit &usage; }
 #if (@ARGV > 1) { exit &usage; }
 
-my ($server,$port,$evexpt,$workingdir);
+my ($server,$port,$evexpt,$workingdir,$iperfport);
 if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{e}) { $evexpt = $opt{e}; } else { $evexpt = "__none"; }
-if( $opt{d}) { $workingdir = $opt{d}; `cd $workingdir`; }
+if ($opt{d}) { $workingdir = $opt{d}; `cd $workingdir`; }
+if ($opt{i}) { $iperfport = $opt{i}; } else { $iperfport = 5002; }
 
 my $thismonaddr;
 if( defined  $ARGV[0] ){
@@ -523,9 +524,9 @@ sub spawnTest($$)
 	      #command line for "BANDWIDTH TEST"
 #	      print "###########bwtest\n";
 #	      exec "eval $workingdir".
-#		   "iperf -c $linkdest -t 10 -p 5002 >$filename"
+#		   "iperf -c $linkdest -t 10 -p $iperfport >$filename"
 	      exec "$workingdir".
-		  "iperf -c $linkdest -t 10 -p 5002 >$filename"
+		  "iperf -c $linkdest -t 10 -p $iperfport >$filename"
 		      or die "can't exec: $!";
 	  }else{
 	      warn "bad testtype: $testtype";
