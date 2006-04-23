@@ -6,9 +6,11 @@ use Getopt::Std;
 my $TEVC = "/usr/testbed/bin/tevc";
 my $LOGHOLE = "/usr/testbed/bin/loghole";
 my $PYTHON = "/usr/local/bin/python";
+my $PERL = "/usr/bin/perl";
 my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
 
 my $realplab = 0;
+my $initelab = 0;
 
 my $UNKNOWN = "<unknown>";
 my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
@@ -16,18 +18,21 @@ my $stub_cmdargs = $UNKNOWN;
 my $mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
 my $mon_cmdargs = $UNKNOWN;
 
+sub get_cmdargs($$);
+
 sub usage()
 {
     print "Usage: $0 [-C] [ -S command-line ] [ -s command-args ] pid eid\n".
-	  "  -p                 monitor real planetlab nodes\n".
-	  "  -S command-line    replace the current stub command arguments\n".
-	  "  -s command-args    append args to stub command line\n".
-	  "  -M command-line    replace the current monitor command arguments\n".
-	  "  -m command-args    append args to monitor command line\n".
-	  "  -C                 show current command line(s)\n";
+	  "  -p              monitor real planetlab nodes\n".
+	  "  -i              initialize elab nodes with historic plab data\n". 
+	  "  -S command-line replace the current stub command arguments\n".
+	  "  -s command-args append args to stub command line\n".
+	  "  -M command-line replace the current monitor command arguments\n".
+	  "  -m command-args append args to monitor command line\n".
+	  "  -C              show current command line(s)\n";
     exit(1);
 }
-my $optlist = "CS:s:M:m:p";
+my $optlist = "CS:s:M:m:pi";
 
 #
 # Parse command arguments.
@@ -53,7 +58,7 @@ if (defined($options{"s"})) {
     if ($stub_cmdargs eq $UNKNOWN) {
 	$stub_cmdargs = $options{"s"};
     } else {
-	$stub_cmdargs = " " . $options{"s"};
+	$stub_cmdargs .= " " . $options{"s"};
     }
 }
 if (defined($options{"M"})) {
@@ -86,6 +91,11 @@ if (defined($options{"p"})) {
     } else {
 	$mon_cmdargs .= " " . "-p";
     }
+}
+if (defined($options{"i"})) {
+    $initelab = 1;
+    print "WARNING: -i only makes sense with -p\n"
+	if (!$realplab);
 }
 
 #
@@ -147,6 +157,13 @@ if (system "$EVENTSYS -e $pid,$eid replay") {
 
 print "##### Waiting for event system to start\n";
 sleep(10);
+
+if ($initelab) {
+    print "##### Initializing Emulab link characteristics\n";
+    if (system "$PERL init-elabnodes.pl $pid $eid") {
+	die "Error initializing Emulab links\n";
+    }
+}
 
 print "##### Restarting servers\n";
 if (system "$TEVC -e $pid/$eid now allservers stop") {
