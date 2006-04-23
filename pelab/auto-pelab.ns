@@ -205,7 +205,7 @@ set tfhosts [$ns event-group $tflist]
 # Fake 'Internet' cloud for fake plab nodes
 #
 if {$fake_plab} {
-    set plabc [$ns make-lan "$plan_string" $cloud_bw $cloud_delay]
+    set plabc [$ns make-cloud "$plan_string" $cloud_bw $cloud_delay]
     tb-set-ip-lan $plab(1) $plabc 10.1.0.1
     $plabc trace
 }
