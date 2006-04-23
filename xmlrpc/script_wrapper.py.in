@@ -490,7 +490,7 @@ class node_list:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "pvhe:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "pvhme:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -514,6 +514,9 @@ class node_list:
                 pass
             elif opt == "-h":
                 which = "pphys";
+                pass
+            elif opt == "-m":
+                which = "mapping";
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -542,6 +545,9 @@ class node_list:
                 pass
             elif which == "pphys":
                 print val["pnode"], " ",
+                pass
+            elif which == "mapping":
+                print "%s=%s" % (node, val["pnode"]),
                 pass
             pass
         print "";
