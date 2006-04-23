@@ -285,9 +285,9 @@ sub saveTestToDB()
     my $testtype = $results{'testtype'};
     my $result   = $results{'result'};
     my $tstamp   = $results{'tstamp'};
-    my $latency  = ($testtype eq "latency" ? "$result" : "0");
-    my $loss     = ($testtype eq "loss"    ? "$result" : "0");
-    my $bw       = ($testtype eq "bw"      ? "$result" : "0");
+    my $latency  = ($testtype eq "latency" ? "$result" : NULL);
+    my $loss     = ($testtype eq "loss"    ? "$result" : NULL);
+    my $bw       = ($testtype eq "bw"      ? "$result" : NULL);
 
     if ($bw eq "") {
 	my $src = $results{'linksrc'};
