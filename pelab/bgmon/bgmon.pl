@@ -46,7 +46,7 @@ sub usage {
 my %MAX_SIMU_TESTS = (latency => "10",
 		      bw      => "1");
 
-# a ratio of testing period to wait after a test failure
+# ratio of testing period to wait after a test process abnormally exits
 my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.1);
 #MARK_RELIABLE
@@ -65,6 +65,12 @@ my %testevents = ();
 # such as during a network timeout with iperf
 my %waitq = ( latency => [],
 	      bw      => [] );
+
+my %ERRID;
+$ERRID{timeout} = -1;
+$ERRID{ttlexceed} = -2;
+$ERRID{unknown} = -3;
+
 #*****************************************
 
 my %opt = ();
@@ -518,13 +524,12 @@ sub spawnTest($$)
 	  if( $testtype eq "latency" ){
 	      #command line for "LATENCY TEST"
 #	      print "##########latTest\n";
-	      exec "ping -c 1 $linkdest >$filename"
+	      # one ping, with timeout of 60 sec
+	      exec "ping -c 1 -t 60 $linkdest >$filename"
 		  or die "can't exec: $!\n";
 	  }elsif( $testtype eq "bw" ){
 	      #command line for "BANDWIDTH TEST"
 #	      print "###########bwtest\n";
-#	      exec "eval $workingdir".
-#		   "iperf -c $linkdest -t 10 -p $iperfport >$filename"
 	      exec "$workingdir".
 		  "iperf -c $linkdest -t 10 -p $iperfport >$filename"
 		      or die "can't exec: $!";
@@ -570,8 +575,16 @@ sub parsedata($$)
     #############################
     #latency test
     if( $type eq "latency" ){
-	/time=(.*) ms/;
-	$parsed = "$1";
+	if( /time=(.*) ms/ ){
+	    $parsed = "$1";
+	}elsif( /0 packets received/ ){
+	    $parsed = $ERRID{timeout};
+	}elsif( /Time to live exceeded/ ){
+	    $parsed = $ERRID{ttlexceed};
+	}else{
+	    $parsed = $ERRID{unknown};
+	}
+	
     }elsif( $type eq "bw" ){
 	/\s+(\S*)\s+([MK])bits\/sec/;
 	$parsed = $1;
