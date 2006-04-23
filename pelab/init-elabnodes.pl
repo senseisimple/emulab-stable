@@ -24,6 +24,13 @@ use lib '/usr/testbed/lib';
 use libtbdb;
 use Socket;
 
+my $showonly = 0;
+
+# default values
+my $DEF_BW = 10000;	# Kbits/sec
+my $DEF_DEL = 0;	# ms
+my $DEF_PLR = 0.0;	# prob.
+
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
@@ -115,7 +122,8 @@ foreach my $vnode (keys(%node_mapping)) {
 #
 # ...and send events to set the characteristics
 #
-send_events();
+send_events()
+    if (!$showonly);
 
 exit(0);
 
@@ -126,11 +134,11 @@ sub send_events()
 	    my ($dst,$bw,$del,$plr) = @{$rec};
 	    my $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY ".
 		"DEST=$dst BANDWIDTH=$bw DELAY=$del PLR=$plr";
-	    print "$cmd... ";
+	    print "elabc-$src: DEST=$dst BANDWIDTH=$bw DELAY=$del PLR=$plr...";
 	    if (system("$cmd") != 0) {
-		print "FAILED\n";
+		print "[FAILED]\n";
 	    } else {
-		print "OK\n";
+		print "[OK]\n";
 	    }
 	}
     }
@@ -153,25 +161,45 @@ sub get_plabinfo($)
 	my $dst       = $ip_mapping{$node_mapping{$dstvnode}};
 	my $src_site  = $site_mapping{$node_mapping{$srcvnode}};
 	my $dst_site  = $site_mapping{$node_mapping{$dstvnode}};
+	my $dstix     = $ix_mapping{$dstvnode};
 
+	my ($del,$plr,$bw);
 	my $query_result =
 	    DBQueryFatal("select latency,loss,bw from pair_data ".
 			 "where srcsite_idx='$src_site' and ".
 			 "      dstsite_idx='$dst_site' ".
-			 "order by unixstamp desc");
+			 "order by unixstamp desc limit 5");
 
 	if (!$query_result->numrows) {
-	    warn("Could not get pair data for ".
-		 "$srcvnode ($src_site) --> $dstvnode ($dst_site)\n");
-	    next;
+	    warn("*** Could not get pair data for ".
+		 "$srcvnode ($src_site) --> $dstvnode ($dst_site)\n".
+		 "    defaulting to ".
+		 "${DEF_BW}bps, ${DEF_DEL}ms, ${DEF_PLR}plr\n");
+	    ($del,$plr,$bw) = ($DEF_DEL, $DEF_PLR, $DEF_BW);
+	} else {
+	    my @vals;
+
+	    print "elab-$srcix -> elab-$dstix (on behalf of $dst):\n"
+		if ($showonly);
+	    while (($del,$plr,$bw) = $query_result->fetchrow_array()) {
+		print "  ($del, $plr, $bw)\n"
+		    if ($showonly);
+		push(@vals, [ $del, $plr, $bw ]);
+	    }
+
+	    #
+	    # XXX This needs to be modified!
+	    #
+	    ($del,$plr,$bw) = @{$vals[0]};
+	    $bw = $DEF_BW
+		if ($bw == 0);
 	}
 
-	#
-	# XXX This needs to be modified!
-	#
-	my ($del,$plr,$bw) = $query_result->fetchrow_array();
+	print "elab-$srcix -> elab-$dstix: ".
+	    "real=$dst, bw=$bw, del=$del, plr=$plr\n";
 
-	print "elab-$srcix: $dst, $bw, $del, $plr\n";
+	# XXX need to lookup "elab-$dstix"
+	$dst = "10.0.0.$dstix";
 	
 	push(@{$shapeinfo{"elab-$srcix"}}, [ $dst, $bw, $del, $plr ]);
     }
