@@ -31,6 +31,7 @@ delay_record delay_records[CONCURRENT_RECEIVERS]; //delay list is calculated at 
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 int last_through[CONCURRENT_RECEIVERS]; 
+int buffer_full[CONCURRENT_RECEIVERS];
 int flag_testmode=0;
 int bandwidth_method = BANDWIDTH_VEGAS;
 enum {TEST_NOTTESTING, TEST_NOTSTARTED, TEST_RUNNING, TEST_DONE } test_state;
@@ -768,6 +769,10 @@ int receive_monitor(int sockfd, struct timeval * deadline) {
   }
   free(packet_buffer);
   gettimeofday(deadline, NULL);
+  while (write_buffer[write_buffer_index].type != PACKET_WRITE)
+  {
+    write_buffer_index = (write_buffer_index + 1) % write_buffer_size;
+  }
   logWrite(CONTROL_RECEIVE, NULL, "Finished processing buffer from monitor");
 #endif
   
@@ -889,9 +894,15 @@ int send_bandwidth_to_monitor(int monitor, int index)
   } else if (bandwidth_method == BANDWIDTH_MAX
 	     || bandwidth_method == BANDWIDTH_VEGAS) {
     bandwidth = max_throughput[index];
+  } else if (bandwidth_method == BANDWIDTH_BUFFER) {
+    bandwidth = throughputTick(&throughput[index]);
+    if (buffer_full[index] != 1 && bandwidth <= last_through[index])
+    {
+      bandwidth = last_through[index];
+    }
   }
 
-  if (bandwidth != 0) {
+  if (bandwidth != 0 && bandwidth != last_through[index]) {
     // Insert the address info
     char * buf = save_receiver_address(outbuf, index);
 
@@ -924,6 +935,7 @@ int send_bandwidth_to_monitor(int monitor, int index)
 		 now.tv_sec + now.tv_usec/1000000000.0,
 		 hostBand*1000/8);
     }
+    last_through[index] = bandwidth;
   }
   max_throughput[index] = 0;
   return 1;
@@ -1092,6 +1104,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
   packet_info packet;
   gettimeofday(&now, NULL);
   int index = 0;
+  int error = 0;
 
 #ifdef USE_PACKET_BUFFER
   if (packet_buffer_more())
@@ -1136,7 +1149,12 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 	clean_exit(1);
       }
       logWrite(CONTROL_RECEIVE, NULL, "Told to write %d bytes", packet.value);
-      send_with_reconnect(index, packet.value);
+      error = send_with_reconnect(index, packet.value);
+      if (error > 0)
+      {
+	// There are bytes that were unwritten.
+	buffer_full[index] = 1;
+      }
   
       write_buffer_index = (write_buffer_index + 1) % write_buffer_size;
       packet = write_buffer[write_buffer_index];
@@ -1193,7 +1211,8 @@ void usage() {
                  "                                (Averaged out over each quantum).\n");
   fprintf(stderr,"                     max -- the maximum instantaneous goodput measurement\n"
                  "                            (Maximum over each quantum).\n");
-  fprintf(stderr,"                     vegas -- the optimization based on vegas measurement. Default.\n"); 
+  fprintf(stderr,"                     vegas -- the optimization based on vegas measurement. Default.\n");
+  fprintf(stderr,"                     buffer -- Use the average goodput measurement. Include only measurements when the buffer is full or when the measurements are high.\n");
   fprintf(stderr,"       -r:  Enable replay mode. This also turns on standalone mode. The device is now used as a filename.\n");
   fprintf(stderr,"       -s:  Enable standalone mode\n");
   fprintf(stderr,"       -t:  Enable testing mode\n");
@@ -1256,9 +1275,9 @@ int main(int argc, char *argv[]) {
 	  bandwidth_method = BANDWIDTH_MAX;
 	} else if (strcmp(optarg, "vegas") == 0) {
 	  bandwidth_method = BANDWIDTH_VEGAS;
-	}
-	else
-	{
+	} else if (strcmp(optarg, "buffer") == 0) {
+	  bandwidth_method = BANDWIDTH_BUFFER;
+	} else {
 	  fprintf(stderr, "Unknown bandwidth method\n");
 	  usage();
 	  exit(1);

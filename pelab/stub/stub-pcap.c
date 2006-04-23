@@ -500,7 +500,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 			     bandwidth, info.tcpi_snd_cwnd, info.tcpi_snd_mss,
 			     base_rtt[path_id]);
 		}
-	        if (bandwidth_method == BANDWIDTH_MAX)
+	        else if (bandwidth_method == BANDWIDTH_MAX)
 	        {
 		  int goodput = 0;
 		  goodput = throughputTick(&throughput[path_id]);

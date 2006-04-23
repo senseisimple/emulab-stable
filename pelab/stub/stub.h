@@ -62,6 +62,7 @@ extern "C"
 #define BANDWIDTH_AVERAGE 0
 #define BANDWIDTH_MAX 1
 #define BANDWIDTH_VEGAS 2
+#define BANDWIDTH_BUFFER 3
 
 #define MONITOR_RECORD_SIZE (sizeof(long)*3 + sizeof(unsigned short)*3)
 
@@ -171,6 +172,9 @@ extern loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at t
 extern unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 extern delay_record delay_records[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 extern int is_live;
+
+extern int last_through[CONCURRENT_RECEIVERS]; 
+extern int buffer_full[CONCURRENT_RECEIVERS];
 
 extern unsigned long max_throughput[CONCURRENT_RECEIVERS];
 extern unsigned long base_rtt[CONCURRENT_RECEIVERS];
