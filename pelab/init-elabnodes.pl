@@ -191,8 +191,12 @@ sub get_plabinfo($)
 	    # XXX This needs to be modified!
 	    #
 	    ($del,$plr,$bw) = @{$vals[0]};
+	    $del = $DEF_DEL
+		if (!defined($del));
+	    $plr = $DEF_PLR
+		if (!defined($plr));
 	    $bw = $DEF_BW
-		if ($bw == 0);
+		if ($bw == 0);	# undef or zero--zero BW is not very useful
 	}
 
 	print "elab-$srcix -> elab-$dstix: ".
