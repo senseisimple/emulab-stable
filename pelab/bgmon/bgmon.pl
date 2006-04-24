@@ -26,6 +26,19 @@ eventtype => <COMMAND> where COMMAND is any of:
           Notification must contain the following attributues:
            "linkdest" = destination node of the test. Example, "node10"
            "testtype" = type of test to run. Examples, "latency" or "bw"
+  STOPALL: stop all tests, running or pending.
+
+OPERATION NUANCES:
+- If a ping test is scheduled to have a period shorter than the normal
+  latency to the destination, pings will be run sequentially one after
+  the other. There will be no simultaneous tests of the same type to the same
+  destination.
+- If a node's latency is longer than 60 seconds, an error value is reported
+  instead of a latency (milliseconds) value. See %ERRID
+- If a testing process abnormally exits with a value not 0 (say, iperf dies),
+  then the test is rescheduled to be run at a future time. This time is
+  the normal period times the %TEST_FAIL_RETRY ratio. (TODO: add error
+  reporting here.)
 =cut
 
 
@@ -198,7 +211,7 @@ while (1) {
 		}		
 	    }
 
-	    #timeOfNextRun for finished events
+	    #check for finished events
 	    if( $testevents{$destaddr}{$testtype}{"flag_finished"} == 1 ){
 		#read raw results from temp file
 		my $filename = createtmpfilename($destaddr, $testtype);
@@ -289,7 +302,7 @@ while (1) {
     #
     # Check for results that could not be sent due to error. We want to wait
     # a little while though to avoid resending data that has yet to be
-    # acked cause the network is slow or down.
+    # acked because the network is slow or down.
     #
     my $count    = 0;
     my $maxcount = 5;	# Wake up and send only this number at once.
