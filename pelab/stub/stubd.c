@@ -1200,7 +1200,21 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 	  }
 	}
       }
-      delta += packet.delta;
+      if (packet.delta == 0)
+      {
+	++delta;
+      }
+      else
+      {
+	delta += packet.delta;
+      }
+      if (delta <= 0)
+      {
+	fprintf(stderr, "Delta is below 0! delta: %d, packet.delta %d"
+		", write_delta_total: %d\n",
+		delta, packet.delta, write_delta_total);
+	clean_exit(1);
+      }
       deadline->tv_usec += delta * 1000;
       if (deadline->tv_usec > 1000000)
       { 
