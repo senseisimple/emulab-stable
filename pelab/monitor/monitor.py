@@ -145,7 +145,10 @@ def get_next_packet():
       if not size_given:
           size = 0
       total_size = total_size + size
-      return (ipaddr, localport, remoteport, time, size, event_code)
+      if emulated_to_real.has_key(ipaddr):
+        return (ipaddr, localport, remoteport, time, size, event_code)
+      else:
+        return None
   elif ((netmon_output_version == 2) and cmatch):
       #
       # Watch for new or closed connections
@@ -167,7 +170,10 @@ def get_next_packet():
         sys.stdout.write('Packet send buffer was set to: ' + str(value) + '\n')
       else:
         return None
-      return (ipaddr, localport, remoteport, 0, value, event_code)
+      if emulated_to_real.has_key(ipaddr):
+        return (ipaddr, localport, remoteport, 0, value, event_code)
+      else:
+        return None
   else:
       sys.stdout.write('skipped line in the wrong format: ' + line)
       return None
