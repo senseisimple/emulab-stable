@@ -23,4 +23,4 @@ export LIBNETMON_OUTPUTFILE="/local/logs/libnetmon.out"
 #
 echo "Running PID $$"
 echo "Starting stubd on $PLAB_IFACE ($PLAB_IP) Extra arguments: $*"
-exec $AS_ROOT $NETMON_DIR/instrument-standalone.sh $STUB_DIR/$STUBD -lcontrol-send -lmain-loop $* $PLAB_IFACE
+exec $AS_ROOT $NETMON_DIR/instrument-standalone.sh $STUB_DIR/$STUBD -lcontrol-send -lmain-loop -bbuffer $* $PLAB_IFACE
