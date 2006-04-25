@@ -194,6 +194,7 @@ if (!$debug) {
     if (TBBackGround("/dev/null")) {
 	exit(0);
     }
+    TBdbfork();
 }
 # set up syslog
 if (! $nolog) {

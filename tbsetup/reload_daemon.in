@@ -586,5 +586,6 @@ sub daemonize()
     open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
     open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
 
+    TBdbfork();
     return 0;
 }
