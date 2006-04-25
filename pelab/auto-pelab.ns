@@ -27,7 +27,7 @@ set real_plab 0
 # If set to 1, we run tcpdump on all end nodes (in addition to all delay
 # nodes) and transfer that data back.
 #
-set trace_end_nodes 0
+set trace_end_nodes 1
 set tcpdump_args ""
 
 #
@@ -67,7 +67,8 @@ set plabnodes {}
 #       /proj/tbres/
 #   Put the path to your tarball in this variable
 #
-set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+#set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+set pelab_tar "/proj/tbres/mike/pelab-bin.tar.gz"
 
 
 #
@@ -112,8 +113,8 @@ set clientprog "/usr/bin/iperf -t 60 -c "
 #
 # -DNODE has fixes but is not as heavily tested
 #
-set delay_os FBSD54-FUTURE
-#set delay_os FBSD54-DNODE
+#set delay_os FBSD54-FUTURE
+set delay_os FBSD54-DNODE
 
 tb-set-delay-os $delay_os
 
