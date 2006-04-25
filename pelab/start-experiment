@@ -127,6 +127,15 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
 }
 
 #
+# Smack down host tcpdumps
+#
+print "##### Stopping host tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now tdhosts stop") {
+    die "Error running tevc\n";
+}
+
+
+#
 # Restart the server program
 
 #
@@ -178,6 +187,14 @@ if (system "$TEVC -e $pid/$eid now allservers start") {
 #
 print "##### Starting link tracing\n";
 if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
+    die "Error running tevc\n";
+}
+
+#
+# Start host tcpdumps
+#
+print "##### Starting host tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now tdhosts start") {
     die "Error running tevc\n";
 }
 

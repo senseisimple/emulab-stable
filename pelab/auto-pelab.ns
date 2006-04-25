@@ -24,6 +24,13 @@ set fake_plab 1
 set real_plab 0
 
 #
+# If set to 1, we run tcpdump on all end nodes (in addition to all delay
+# nodes) and transfer that data back.
+#
+set trace_end_nodes 0
+set tcpdump_args ""
+
+#
 # If you want to get specific real planetlab nodes, ask for them here by site
 # or by emulab node ID. 
 # NOTES:
@@ -61,6 +68,7 @@ set plabnodes {}
 #   Put the path to your tarball in this variable
 #
 set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+
 
 #
 # When using a fake plab, these are the parameters for the fake Internet
@@ -101,7 +109,20 @@ set clientprog "/usr/bin/iperf -t 60 -c "
 # End of user-settable options
 ##########
 
-tb-set-delay-os FBSD54-FUTURE
+#
+# -DNODE has fixes but is not as heavily tested
+#
+set delay_os FBSD54-FUTURE
+#set delay_os FBSD54-DNODE
+
+tb-set-delay-os $delay_os
+
+#
+# XXX temporary: cannot delay plab and elab nodes with the same delay node
+#
+if {$fake_plab && $delay_os != "FBSD54-DNODE"} {
+    tb-set-delay-capacity 1
+}
 
 #
 # Tarballs and RPMs we install on all nodes
@@ -120,11 +141,13 @@ set planetservers {}
 set serverlist {}
 set clientlist {}
 set tflist {}
+set tdlist {}
 
 #
 # Create all of the nodes
 #
 set tfix 1
+set tdix 1
 for {set i 1} {$i <= $num_pcs} {incr i} {
 
     if {$real_plab} {
@@ -163,6 +186,12 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
         set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
+
+        if {$trace_end_nodes} {
+	    set tcpdump($tdix) [$plab($i) program-agent -command "/bin/sh /local/pelab/run-tcpdump.sh plab $i $tcpdump_args"]
+	    lappend tdlist $tcpdump($tdix)
+	    incr tdix
+        }
     }
 
     set elab($i) [$ns node]
@@ -182,6 +211,12 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
     lappend tflist $tfupdate($tfix)
     incr tfix
+
+    if {$trace_end_nodes} {
+	set tcpdump($tdix) [$elab($i) program-agent -command "/bin/sh /local/pelab/run-tcpdump.sh elab $i $tcpdump_args"]
+	lappend tdlist $tcpdump($tdix)
+	incr tdix
+    }
 }
 
 #
@@ -200,6 +235,9 @@ set allservers [$ns event-group $serverlist]
 set allclients [$ns event-group $clientlist]
 
 set tfhosts [$ns event-group $tflist]
+if {$trace_end_nodes} {
+    set tdhosts [$ns event-group $tdlist]
+}
 
 #
 # Fake 'Internet' cloud for fake plab nodes
@@ -244,4 +282,3 @@ if {$fake_plab} {
 }
 
 $ns run
-

@@ -52,6 +52,14 @@ if (system "$TEVC -e $pid/$eid now elabc-tracemon stop") {
 }
 
 #
+# Smack down host tcpdumps
+#
+print "##### Stopping host tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now tdhosts stop") {
+    die "Error running tevc\n";
+}
+
+#
 # Stop running servers
 #
 print "##### Stopping servers\n";
