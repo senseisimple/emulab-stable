@@ -30,8 +30,6 @@ plab203	plab2.nec-labs.com	NECLabs	pcplabinet
 plab204	plab1.nec-labs.com	NECLabs	pcplabinet
 plab403	planetlab1.poly.edu	Polytechnic	pcplabinet
 plab404	planetlab2.poly.edu	Polytechnic	pcplabinet
-plab576	system19.ncl-ext.net	University-of-Newcastle	pcplabinet
-plab577	system18.ncl-ext.net	University-of-Newcastle	pcplabinet
 
 
 Commodity Inet DSL:
@@ -357,6 +355,8 @@ plab271	pli1-br-1.hpl.hp.com	HP-Labs-Bristol	pcplabintl
 plab269	pli1-br-2.hpl.hp.com	HP-Labs-Bristol	pcplabintl
 plab235	planetlab1.cambridge.intel-research.net	IRC	pcplabintl
 plab236	planetlab3.cambridge.intel-research.net	IRC	pcplabintl
+plab576	system19.ncl-ext.net	University-of-Newcastle	pcplabinet
+plab577	system18.ncl-ext.net	University-of-Newcastle	pcplabinet
 
 
 South America:
