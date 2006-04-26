@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -56,12 +56,16 @@ if (! TBvalid_uid($target_uid)) {
 SUBPAGESTART();
 SUBMENUSTART("More Options");
 WRITESUBMENUBUTTON("Create a Mailman List", "newmmlist.php3");
+
+if ($isadmin) {
+    WRITESUBMENUBUTTON("Show User Lists", "showmmlists.php3?showallmm=1");
+}
 SUBMENUEND();
 
 #
 # Ask the mailman server for the users lists. 
 #
-SUEXEC($uid, "nobody", "webmmlistmembership $uid", SUEXEC_ACTION_DIE);
+SUEXEC($uid, "nobody", "webmmlistmembership $target_uid", SUEXEC_ACTION_DIE);
 
 #
 # Parse the suexec output into a table.
@@ -106,7 +110,7 @@ if (count($suexec_output_array)) {
 #
 # See if the target is the owner of any lists.
 #
-if ($isadmin && !isset($target_uid)) {
+if ($isadmin && isset($showallmm)) {
     $query_result =
 	DBQueryFatal("select mm.* from mailman_listnames as mm ".
 		     "order by $order");
@@ -123,9 +127,15 @@ else {
 
 if (mysql_num_rows($query_result)) {
     echo "<br>
-           <center><font size=+1>
-          You are the administrator for the following Mailman lists
-          </font></center><br>\n";
+           <center><font size=+1>";
+
+    if ($showallmm) {
+	echo "User-Created Mailman lists";
+    }
+    else {
+	echo "You are the administrator for the following Mailman lists";
+    }
+    echo "</font></center><br>\n";
     
     echo "<table border=2 cellpadding=0 cellspacing=2
            align='center'>\n";
