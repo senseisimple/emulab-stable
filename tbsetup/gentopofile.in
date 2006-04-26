@@ -417,7 +417,7 @@ if ($query_result->numrows) {
     #
     $query_result =
 	DBQueryFatal("select v.member,v.vname,i.mac,ve.mac,l.iface".
-		     " from reserved as r, virt_lans as v".
+		     " from (reserved as r, virt_lans as v)".
 		     " left join interfaces as i".
 		     "  on v.ip=i.IP and r.node_id=i.node_id".
 		     " left join linkdelays as l".
