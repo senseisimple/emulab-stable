@@ -24,15 +24,17 @@ sub usage()
 	  "-t   - Specify timeout in seconds.\n".
 	  "-o   - Specify output file for linktest results.\n".
 	  "-m   - Send email to swapper if linktest fails.\n".
+	  "-r   - Report results only, don't flag errors.\n".
 	  "-d   - Turn on debugging output.\n");
     exit(-1);
 }
-my $optlist  = "dkl:o:t:mf";
+my $optlist  = "dkl:o:t:mfr";
 my $debug    = 2;
 my $cancel   = 0;
 my $sendmail = 0;
 my $hosed    = 0;
 my $forcerun = 0;
+my $reportonly = 0;
 my $timeout;
 my $level;
 my $output;
@@ -85,6 +87,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"m"})) {
     $sendmail = 1;
+}
+if (defined($options{"r"})) {
+    $reportonly = 1;
 }
 if (defined($options{"f"})) {
     $forcerun = 1;
@@ -377,6 +382,8 @@ push(@cmdargs, ("-g", $unix_gidname));
 push(@cmdargs, ("-u", $dbuid));
 push(@cmdargs, ("-e", "$pid/$eid"));
 push(@cmdargs, ("-o", $errlog));
+push(@cmdargs, "-r")
+    if ($reportonly);
 
 print "Running '@cmdargs'\n"
     if ($debug);

@@ -17,17 +17,19 @@ use POSIX;
 sub usage()
 {
     print "Usage: run_linktest.pl ".
-	  "[-q] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
+	  "[-q] [-r] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
 	  "Use -q for quick termination mode, which skips the Bandwidth test\n".
+	  "Use -r to report results, but not errors\n" .
           "Use -v for verbose feedback messages\n" .
 	  "Use -t <time> to set a timeout in seconds\n";
 	     
     exit(1);
 }
-my $optlist = "vqd:s:p:k:e:L:l:o:t:";
+my $optlist = "vqrd:s:p:k:e:L:l:o:t:";
 my $debug   = 0;
 my $verbose = 0;
 my $timeout = 0;
+my $reportonly = 0;
 my $server;
 my $keyfile;
 my $port;
@@ -171,6 +173,9 @@ if (defined($options{"p"})) {
 	    "    Bad data in port: $port\n");
     }
 }
+if (defined($options{"r"})) {
+    $reportonly = 1;
+}
 if (defined($options{"e"})) {
     ($pid,$eid) = split(/\//, $options{"e"});
 }
@@ -221,6 +226,8 @@ $args .=  " -x START";
 $args .= " STARTAT=$startAt STOPAT=$stopAt";
 $args .= " DEBUG=$debug"
     if ($debug);
+$args .= " REPORTONLY=1"
+    if ($reportonly);
 
 system($args);
 if ($?) {
