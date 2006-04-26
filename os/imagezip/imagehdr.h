@@ -24,6 +24,7 @@
 #define COMPRESSED_V1			(COMPRESSED_MAGIC_BASE+0)
 #define COMPRESSED_V2			(COMPRESSED_MAGIC_BASE+1)
 #define COMPRESSED_V3			(COMPRESSED_MAGIC_BASE+2)
+#define COMPRESSED_V4			(COMPRESSED_MAGIC_BASE+3)
 
 #define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V3
 
@@ -64,6 +65,45 @@ struct blockhdr_V2 {
 };
 
 /*
+ * Version 3 of the block descriptor adds support for integrety protection
+ * and encryption.
+ * A checksum is now mandatory - otherwise, an attacker could modify
+ * the header to just turn it off, and since we wouldn't check the checksum,
+ * we'd never check! So, you MUST fill in the checksum. All implementations
+ * are required to support SHA1, support for others are optional.
+ */
+struct blockhdr_V4 {
+	uint32_t	magic;		/* magic/version */
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
+	/* V2 follows */
+	uint32_t	firstsect;	/* first sector described by block */
+	uint32_t	lastsect;	/* last sector described by block */
+	int32_t		reloccount;	/* number of reloc entries */
+        /* V4 follows */
+        uint32_t        enc_cipher;     /* Which cipher was used to encrypt */
+        uint32_t        enc_iv    ;     /* Initialization vector */
+        uint32_t        checksumtype;   /* Which checksum was used */
+        unsigned char   checksum[64];   /* Checksum, leave room for 512 bits */
+        /* TODO: Some signature field needs to go here */
+};
+
+/*
+ * Checksums supported
+ */
+/* Required to be supported by all versions */
+#define CHECKSUM_SHA1   0
+
+/*
+ * Ciphers supported
+ */
+#define ENCRYPTION_NULL 0
+#define ENCRYPTION_BLOWFISH_CBC 1
+
+/*
  * Relocation descriptor.
  * Certain data structures like BSD disklabels and LILO boot blocks require
  * absolute block numbers.  This descriptor tells the unzipper what the
@@ -89,7 +129,7 @@ struct blockreloc {
 #define RELOC_XOR16CKSUM	101	/* 16-bit XOR checksum */
 #define RELOC_CKSUMRANGE	102	/* range of previous checksum */
 
-typedef struct blockhdr_V2 blockhdr_t;
+typedef struct blockhdr_V4 blockhdr_t;
 
 /*
  * This little struct defines the pair. Each number is in sectors. An array
