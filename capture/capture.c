@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -311,7 +311,7 @@ main(int argc, char **argv)
 		case 'c':
 		        certfile = optarg;
 		        break;
-#endif  WITHSSL
+#endif  /* WITHSSL */
 		case 'b':
 			Bossnode = optarg;
 			break;
