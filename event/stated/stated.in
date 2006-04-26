@@ -515,7 +515,7 @@ sub getTriggers() {
 
     # Grab global triggers (including any-mode)
     my $result =
-      DBQueryFatal("SELECT op_mode, state, trigger " .
+      DBQueryFatal("SELECT op_mode, state, `trigger` " .
 		   "FROM state_triggers where node_id='$TBANYMODE' ".
 		   "order by op_mode,state");
     my %t;
@@ -527,7 +527,7 @@ sub getTriggers() {
 
     # Grab per-node triggers (including any-mode)
     $result =
-      DBQueryFatal("SELECT node_id, op_mode, state, trigger " .
+      DBQueryFatal("SELECT node_id, op_mode, state, `trigger` " .
 		   "FROM state_triggers where node_id!='$TBANYMODE' ".
 		   "order by op_mode,state");
     while (my ($n, $mode, $state, $trig) = $result->fetchrow()) {
@@ -1293,7 +1293,7 @@ sub AddNodeTrigger( $$$@ ) {
     }
     my $triglist = join(",",@{$triggers{"$node:$mode:$state"}});
     DBQueryFatal("replace into state_triggers ".
-		 "(node_id,op_mode,state,trigger) values ".
+		 "(node_id,op_mode,state,`trigger`) values ".
 		 "('$node','$mode','$state','$triglist')");
     return 0;
 }
