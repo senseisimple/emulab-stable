@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -60,6 +60,7 @@
 #include <sys/socket.h>
 #include <mysql/mysql.h>
 #include <zlib.h>
+#include "tbdb.h"
 
 /*
  * This is the NFS mountpoint where users:/var is mounted.
@@ -77,7 +78,6 @@
 
 static char		*progname;
 static int		debug = 0;
-static int		mydb_update(char *query, ...);
 static int		doit(gzFile *infp);
 static char		opshostname[MAXHOSTNAMELEN];
 static jmp_buf		deadline;
@@ -127,6 +127,11 @@ main(int argc, char **argv)
 
 	openlog("genlastlog", LOG_PID, LOG_TESTBED);
 	syslog(LOG_NOTICE, "genlastlog starting");
+
+	if (!dbinit()) {
+		syslog(LOG_ERR, "Could not connect to DB!");
+		exit(1);
+	}
 
 	/*
 	 * We need the canonical hostname for the usersnode so that we can
@@ -315,7 +320,7 @@ doit(gzFile *infp)
 				"values ('%s', '%s', "
 				"        FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
 				"        FROM_UNIXTIME(%ld, '%%T')) ",
-				user, node, ll_time, ll_time) < 0)
+				user, node, ll_time, ll_time) == 0)
 			break;
 
 		if (strncmp(node, opshostname, strlen(node)) == 0 ||
@@ -325,7 +330,7 @@ doit(gzFile *infp)
 					"values ('%s', "
 					"  FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
 					"  FROM_UNIXTIME(%ld, '%%T')) ",
-					user, ll_time, ll_time) < 0)
+					user, ll_time, ll_time) == 0)
 				break;
 		}
 		else {
@@ -334,50 +339,9 @@ doit(gzFile *infp)
 					"values ('%s', '%s', "
 					"  FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
 					"  FROM_UNIXTIME(%ld, '%%T')) ",
-					node, user, ll_time, ll_time) < 0)
+					node, user, ll_time, ll_time) == 0)
 				break;
 		}
 	}
 	return 0;
 }
-
-static int
-mydb_update(char *query, ...)
-{
-	static MYSQL	db;
-	static int	inited;
-	char		querybuf[BUFSIZ];
-	va_list		ap;
-	int		n;
-
-	va_start(ap, query);
-	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
-		syslog(LOG_ERR, "query too long for buffer");
-		return 1;
-	}
-
-	if (debug) {
-		printf("%s\n", querybuf);
-		return 0;
-	}
-
-	if (! inited) {
-	    mysql_init(&db);
-	    if (mysql_real_connect(&db, 0, "genlastlog",
-				   0, TBDBNAME, 0, 0, 0) == 0) {
-		    syslog(LOG_ERR, "%s: connect failed: %s",
-			   TBDBNAME, mysql_error(&db));
-		    return -1;
-	    }
-	    inited = 1;
-	}
-
-	if (mysql_real_query(&db, querybuf, n) != 0) {
-		syslog(LOG_ERR, "%s: query failed: %s",
-			TBDBNAME, mysql_error(&db));
-		return -1;
-	}
-	return 0;
-}
-
