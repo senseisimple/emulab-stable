@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#include <sha.h>
 
 #include "imagehdr.h"
 #include "sliceinfo.h"
@@ -370,7 +371,7 @@ main(int argc, char *argv[])
 	extern char build_info[];
 
 	gettimeofday(&sstamp, 0);
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:H:M")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:H:Me:k:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -456,6 +457,12 @@ main(int argc, char *argv[])
 			break;
 		case 'M':
 			metaoptimize++;
+			break;
+		case 'e':
+                        // Encryption cipher
+                        break;
+                case 'k':
+                        // Encryption key
 			break;
 		case 'h':
 		case '?':
@@ -888,6 +895,10 @@ char *usagestr =
  " -s slice       Compress a particular slice (DOS numbering 1-4)\n"
  " image | device The input image or a device special file (ie: /dev/ad0)\n"
  " outputfilename The output file ('-' for stdout)\n"
+ "\n"
+ " Encryption options\n"
+ " -e cipher      Set the cipher to be used for encryption\n"
+ " -k key         Encryption key\n"
  "\n"
  " Advanced options\n"
  " -z level       Set the compression level.  Range 0-9 (0==none, default==4)\n"
@@ -1564,6 +1575,9 @@ static long long bytescompressed;
 static off_t	compress_chunk(off_t, off_t, int *, uint32_t *);
 static int	compress_finish(uint32_t *subblksize);
 static void	compress_status(int sig);
+static void     checksum_start(blockhdr_t *hdr);
+static void     checksum_chunk(uint8_t *buf, off_t size);
+static void     checksum_finish(blockhdr_t *hdr);
 
 /*
  * Loop through the image, compressing the allocated ranges.
@@ -1722,8 +1736,10 @@ compress_image(void)
 		 * Go back and stick in the block header and the region
 		 * information.
 		 */
+                /* XXX - Provide a way to do V2 or V3 images */
 		blkhdr->magic = oldstyle ? COMPRESSED_V1 :
-			(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
+                                           COMPRESSED_MAGIC_CURRENT;
+			//(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
 		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
@@ -1768,6 +1784,16 @@ compress_image(void)
 			       numrelocs * sizeof(struct blockreloc));
 			freerelocs();
 		}
+
+                /*
+                 * Checksum chunk. This is done with a few seperate functions so
+                 * that, in the future, we might be able to checksum right
+                 * after compression, which probably has better cache behavior.
+                 */
+                checksum_start(blkhdr);
+                checksum_chunk(output_buffer, sizeof(output_buffer));
+                checksum_finish(blkhdr);
+
 
 		/*
 		 * Write out the finished chunk to disk.
@@ -1822,8 +1848,10 @@ compress_image(void)
 	if (curregion != regions) {
 		compress_finish(&blkhdr->size);
 		
+                /* XXX - Provide a way to do V2 or V3 images */
 		blkhdr->magic = oldstyle ? COMPRESSED_V1 :
-			(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
+                                           COMPRESSED_MAGIC_CURRENT;
+		//	(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
 		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
@@ -1858,6 +1886,10 @@ compress_image(void)
 			       numrelocs * sizeof(struct blockreloc));
 			freerelocs();
 		}
+
+                checksum_start(blkhdr);
+                checksum_chunk(output_buffer, sizeof(output_buffer));
+                checksum_finish(blkhdr);
 
 		/*
 		 * Write out the finished chunk to disk, and
@@ -1964,6 +1996,7 @@ compress_status(int sig)
 #define BSIZE		(128 * 1024)
 static char		inbuf[BSIZE];
 static			int subblockleft = SUBBLOCKMAX;
+static                  int newblock = 0;
 static z_stream		d_stream;	/* Compression stream */
 
 #define CHECK_ZLIB_ERR(err, msg) { \
@@ -1984,6 +2017,11 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 	 * compression subblock needs to be started.
 	 */
 	if (subblockleft == SUBBLOCKMAX) {
+                newblock = 1;
+        } else {
+                newblock = 0;
+        }
+        if (newblock == 1) {
 		d_stream.zalloc = (alloc_func)0;
 		d_stream.zfree  = (free_func)0;
 		d_stream.opaque = (voidpf)0;
@@ -2171,4 +2209,42 @@ compress_finish(uint32_t *subblksize)
 	buffer_offset += subblockleft;
 	subblockleft = SUBBLOCKMAX;
 	return 1;
+}
+
+/*
+ * Checksum functions
+ */
+SHA_CTX sha_ctx;
+void checksum_start(blockhdr_t *hdr) {
+        /*
+         * Start with the checksum zeroed out - this way, we can put the
+         * checksum in the header, but don't have to worry about skipping over
+         * it.
+         */
+        memset(hdr->checksum, 0, sizeof(hdr->checksum));
+
+        SHA1_Init(&sha_ctx);
+}
+
+void
+checksum_chunk(uint8_t *buf, off_t size) {
+        /*
+         * Easy, just call the update function
+         */
+        SHA1_Update(&sha_ctx,buf,size);
+}
+
+void
+checksum_finish(blockhdr_t *hdr) {
+        int i;
+
+        /*
+         * Important! The digest field in the header MUST be big enough to hold
+         * the digest output by the finalizing function!
+         */
+        SHA1_Final(hdr->checksum, &sha_ctx);
+        printf("Checksum: 0x");
+        for (i = 0; i < sizeof(hdr->checksum); i++) {
+                printf("%02x",hdr->checksum[i]);
+        }
 }
