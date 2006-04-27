@@ -224,7 +224,6 @@ use vars qw(@ISA @EXPORT);
 	 TBRobotLabExpt
 
 	 TBExptContainsNodeCT
-
 	 );
 
 # Must come after package declaration!
@@ -234,8 +233,9 @@ use English;
 use File::Basename;
 use POSIX qw(strftime);
 require Mysql;
-use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES @EXPORT_OK @virtualTables
-	    @physicalTables);
+use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
+	    $DBCONN_EXITONERR $DBQUERY_RECONNECT
+	    @EXPORT_OK @virtualTables @physicalTables);
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -269,9 +269,12 @@ else {
 # to the DB in the child.
 #
 my @DB;
-$DBQUERY_MAXTRIES = 1;
-$DBCONN_MAXTRIES  = 5;
-@EXPORT_OK        = qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES);
+$DBQUERY_MAXTRIES  = 1;
+$DBQUERY_RECONNECT = 1;
+$DBCONN_MAXTRIES   = 5;
+$DBCONN_EXITONERR  = 1;
+@EXPORT_OK         = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
+			$DBCONN_EXITONERR $DBCONN_MAXTRIES);
 
 sub TBDBConnect($)
 {
@@ -294,28 +297,41 @@ sub TBDBConnect($)
 	    last;
 	}
 	$maxtries--;
-	sleep(1);
+	if ($maxtries) {
+	    print STDERR "Cannot connect to DB; trying again in 5 seconds!\n";
+	    sleep(5);
+	}
     }
     if (!defined($DB[$dbnum])) {
-	print STDERR "Cannot connect to DB after several attempts!\n";
-	# Ensure consistent error value. 
+	print STDERR
+	    "Cannot connect to DB after $DBQUERY_MAXTRIES attempts!\n";
+	return -1
+	    if (! $DBCONN_EXITONERR);
 	exit(-1);
     }
     $DB[$dbnum]->{'dbh'}->{'PrintError'} = 0;
     $Mysql::QUIET = 1;
+    return 0;
 }
 TBDBConnect(0);
 
+# Old version. Should be renamed or just eventfork.
 sub TBdbfork()
 {
-    select(undef, undef, undef, 0.3);
-    for (my $i = 0; $i < @DB; $i++) {
-	undef($DB[$i]);
-	TBDBConnect($i);
-    }
     if ($EVENTSYS) {
 	EventFork();
     }
+}
+
+# New version.
+sub TBDBReconnect()
+{
+    for (my $i = 0; $i < @DB; $i++) {
+	undef($DB[$i]);
+	return -1
+	    if (TBDBConnect($i) != 0);
+    }
+    return 0;
 }
 
 # To avoid keeping a mysql connection around.
@@ -324,7 +340,7 @@ sub TBDBDisconnect()
     for (my $i = 0; $i < @DB; $i++) {
 	undef($DB[$i]);
     }
-    select(undef, undef, undef, 0.3);
+    select(undef, undef, undef, 0.2);
 }
 
 # Create a new DB handle and return the handle number
@@ -4385,27 +4401,11 @@ sub TBExptGetSwapoutAction($$$) {
 # the error string from the DB module. Use DBFatal (below) to print/email
 # that string, and then exit.
 #
-sub DBQueryOld($)
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB[0]->query($query);
-
-    if (! $result) {
-	$DBErrorString =
-	    "  Query: $query\n".
-	    "  Error: " . $DB[0]->errstr;
-    }
-    return $result;
-}
-
 sub DBQueryN($$)
 {
     my($dbnum, $query)   = @_;
     my $maxtries = $DBQUERY_MAXTRIES;
     my $result;
-    my $db = $DB[$dbnum];
 
     # Not really forever :-)
     if (!$maxtries) {
@@ -4413,7 +4413,11 @@ sub DBQueryN($$)
     }
 
     while ($maxtries) {
+	# Get this each time through the loop since we try reconnect below.
+	my $db = $DB[$dbnum];
+
 	$result = $db->query($query);
+
 	if (! defined($result)) {
 	    my $err = $db->err;
 
@@ -4427,8 +4431,36 @@ sub DBQueryN($$)
 	    last;
 	}
 
+	#
+	# If we lose the connection to mysqld; lets try to reconnect. 
+	#
+	if ($db->err == 2006 || $db->err == 2013) {
+	    # This is really just for the mysqld watchdog daemon.
+	    return undef
+		if (! $DBQUERY_RECONNECT);
+	    
+	    # Do not want to exit if this fails. 
+	    $DBCONN_EXITONERR = 0;
+	    # And we want to keep trying for a long time!
+	    $DBCONN_MAXTRIES  = 1000;
+
+	    my $reconnected = TBDBReconnect();
+
+	    $DBCONN_EXITONERR = 1;
+	    $DBCONN_MAXTRIES  = 1;
+	    
+	    if ($reconnected < 0) {
+		$DBErrorString =
+		    "  Query: $query\n".
+		    "  Error: Could not reconnect to mysqld";
+
+		return undef;
+	    }
+	    next;
+	}
+
 	$maxtries--;
-	DBWarn("mysqld went away. $maxtries tries left", 0);
+	DBWarn("mysqld went away in process $PID. $maxtries tries left", 0);
 	sleep(1);
     }
     return $result;
