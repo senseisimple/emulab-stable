@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,6 +19,7 @@
 #include "tbdb.h"
 #include "log.h"
 #include "config.h"
+#include <mysql/errmsg.h>
 
 /*
  * DB stuff
@@ -26,22 +27,50 @@
 static MYSQL	db;
 static char    *dbname = TBDBNAME;
 
-int
-dbinit(void)
+static int
+mydb_connect()
 {
 	mysql_init(&db);
 	if (mysql_real_connect(&db, 0, 0, 0,
 			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
-		error("%s: connect failed: %s", dbname, mysql_error(&db));
+		error("%s: connect failed: %s\n", dbname, mysql_error(&db));
 		return 0;
 	}
 	return 1;
 }
 
+static int
+mydb_reconnect()
+{
+	while (1) {
+		warning("Lost connection to DB; Attempting to reconnect ...");
+		
+		if (mydb_connect())
+			return 1;
+
+		sleep(5);
+	}
+}
+
+static void
+mydb_disconnect()
+{
+	mysql_close(&db);
+}
+
+/*
+ * This is the exported function. Sheesh.
+ */
+int
+dbinit(void)
+{
+	return mydb_connect();
+}
+
 void
 dbclose(void)
 {
-	mysql_close(&db);
+	mydb_disconnect();
 }
 
 MYSQL_RES *
@@ -58,9 +87,22 @@ mydb_query(char *query, int ncols, ...)
 		error("query too long for buffer");
 		return (MYSQL_RES *) 0;
 	}
-
+ again:
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		error("%s: query failed: %s", dbname, mysql_error(&db));
+
+		/*
+		 * Auto reconnect when the server goes away; we treat it
+		 * as a transient error that we want to recover from if
+		 * at all possible. This has the potential to block the
+		 * caller for a long time, but there are very few clients
+		 * of this library, so should not matter.
+		 */
+		if (mysql_errno(&db) == CR_SERVER_LOST ||
+		    mysql_errno(&db) == CR_SERVER_GONE_ERROR) {
+			if (mydb_reconnect())
+				goto again;
+		}
 		return (MYSQL_RES *) 0;
 	}
 
@@ -93,8 +135,22 @@ mydb_update(char *query, ...)
 		error("query too long for buffer");
 		return 0;
 	}
+ again:
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		error("%s: query failed: %s", dbname, mysql_error(&db));
+
+		/*
+		 * Auto reconnect when the server goes away; we treat it
+		 * as a transient error that we want to recover from if
+		 * at all possible. This has the potential to block the
+		 * caller for a long time, but there are very few clients
+		 * of this library, so should not matter.
+		 */
+		if (mysql_errno(&db) == CR_SERVER_LOST ||
+		    mysql_errno(&db) == CR_SERVER_GONE_ERROR) {
+			if (mydb_reconnect())
+				goto again;
+		}
 		return 0;
 	}
 	return 1;
