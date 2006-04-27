@@ -231,7 +231,7 @@ sub read_schema($) {
 		    die "Found a key without a name: $key\n";
 		}
 
-	    } elsif (/^\s*(`?\w+`?)\s+(.+[^,\s]),?\s*$/) {
+	    } elsif (/^\s*`?(\w+)`?\s+(.+[^,\s]),?\s*$/) {
 
 		# A column definition
 		my ($name, $definition) = ($1, $2);
