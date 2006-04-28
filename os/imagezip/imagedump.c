@@ -17,12 +17,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <zlib.h>
+#include <sha.h>
 #include <sys/stat.h>
 #include "imagehdr.h"
 
 static int detail = 0;
 static int dumpmap = 0;
 static int ignorev1 = 0;
+static int checksums = 0; // On by default?
 static int infd = -1;
 static char *chkpointdev;
 
@@ -33,7 +35,7 @@ static uint32_t relocs;
 static unsigned long long relocbytes;
 
 static void usage(void);
-static void dumpfile(char *name, int fd);
+static int dumpfile(char *name, int fd);
 static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
 
 #ifdef WITH_SHD
@@ -49,8 +51,9 @@ main(int argc, char **argv)
 {
 	int ch, version = 0;
 	extern char build_info[];
+        int errors = 0;
 
-	while ((ch = getopt(argc, argv, "C:dimv")) != -1)
+	while ((ch = getopt(argc, argv, "C:dimvc")) != -1)
 		switch(ch) {
 		case 'd':
 			detail++;
@@ -68,6 +71,9 @@ main(int argc, char **argv)
 		case 'v':
 			version++;
 			break;
+                case 'c':
+                        checksums++;
+                        break;
 		case 'h':
 		case '?':
 		default:
@@ -96,14 +102,14 @@ main(int argc, char **argv)
 		} else
 			infd = fileno(stdin);
 
-		dumpfile(isstdin ? "<stdin>" : argv[0], infd);
+		errors = dumpfile(isstdin ? "<stdin>" : argv[0], infd);
 
 		if (!isstdin)
 			close(infd);
 		argc--;
 		argv++;
 	}
-	exit(0);
+	exit(errors);
 }
 
 static void
@@ -112,7 +118,8 @@ usage(void)
 	fprintf(stderr, "usage: "
 		"imagedump options <image filename> ...\n"
 		" -v              Print version info and exit\n"
-		" -d              Turn on progressive levels of detail\n");
+		" -d              Turn on progressive levels of detail\n"
+		" -c              Once: check checksums, Twice: print too\n");
 	exit(1);
 }	
 
@@ -123,7 +130,7 @@ static uint32_t nextsector;
 static uint32_t fmax, fmin, franges, amax, amin, aranges;
 static uint32_t adist[8]; /* <4k, <8k, <16k, <32k, <64k, <128k, <256k, >=256k */
 
-static void
+static int
 dumpfile(char *name, int fd)
 {
 	unsigned long long tbytes, dbytes, cbytes;
@@ -131,6 +138,7 @@ dumpfile(char *name, int fd)
 	off_t filesize;
 	int isstdin;
 	char *bp;
+        int errors = 0;
 
 	isstdin = (fd == fileno(stdin));
 	wasted = sectinuse = sectfree = 0;
@@ -148,7 +156,7 @@ dumpfile(char *name, int fd)
 
 		if (fstat(fd, &st) < 0) {
 			perror(name);
-			return;
+			return 1;
 		}
 		if ((st.st_size % SUBBLOCKSIZE) != 0)
 			printf("%s: WARNING: "
@@ -161,14 +169,14 @@ dumpfile(char *name, int fd)
 	for (chunkno = 0; ; chunkno++) {
 		bp = chunkbuf;
 
-		if (isstdin)
+		if (isstdin || checksums)
 			count = sizeof(chunkbuf);
 		else {
 			count = DEFAULTREGIONSIZE;
 			if (lseek(infd, (off_t)chunkno*sizeof(chunkbuf),
 				  SEEK_SET) < 0) {
 				perror("seeking on zipped image");
-				return;
+				return 1;
 			}
 		}
 
@@ -184,7 +192,7 @@ dumpfile(char *name, int fd)
 				if (cc == 0)
 					goto done;
 				perror("reading zipped image");
-				return;
+				return 1;
 			}
 			count -= cc;
 			bp += cc;
@@ -196,8 +204,14 @@ dumpfile(char *name, int fd)
 			if (magic < COMPRESSED_MAGIC_BASE ||
 			    magic > COMPRESSED_MAGIC_CURRENT) {
 				printf("%s: bad version %x\n", name, magic);
-				return;
+				return 1;
 			}
+
+                        if (checksums && magic < COMPRESSED_V4) {
+                            printf("%s: WARNING: -c given, but file version "
+                                    "doesn't support checksums!\n",name);
+                            checksums = 0;
+                        }
 
 			if (ignorev1) {
 				chunkcount = 0;
@@ -243,8 +257,10 @@ dumpfile(char *name, int fd)
 				checkindex = 0;
 		}
 
-		if (dumpchunk(name, chunkbuf, chunkno, checkindex))
+		if (dumpchunk(name, chunkbuf, chunkno, checkindex)) {
+                        errors++;
 			break;
+                }
 	}
  done:
 
@@ -298,6 +314,8 @@ dumpfile(char *name, int fd)
 		if (adist[i])
 			printf("    >= %dk bytes: %d\n", maxsz/1024, adist[i]);
 	}
+
+        return errors;
 }
 
 static int
@@ -305,8 +323,12 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 {
 	blockhdr_t *hdr;
 	struct region *reg;
+        uint8_t *stored_digest = NULL;
+        uint8_t *calc_digest = NULL;
+        uint32_t digest_len = 0;
 	uint32_t count;
 	int i;
+        SHA_CTX sha_ctx;
 
 	hdr = (blockhdr_t *)buf;
 
@@ -317,6 +339,28 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 	case COMPRESSED_V2:
 	case COMPRESSED_V3:
 		reg = (struct region *)((struct blockhdr_V2 *)hdr + 1);
+		break;
+	case COMPRESSED_V4:
+		reg = (struct region *)((struct blockhdr_V4 *)hdr + 1);
+                if (checksums) {
+                         if (hdr->checksumtype
+                                           != CHECKSUM_SHA1) {
+                                  printf("%s: unsupported checksum type %d in "
+                                         "chunk %d", name,
+                                         hdr->checksumtype,
+                                         chunkno);
+                        return 1;
+                    }
+                    digest_len = CHECKSUM_LEN_SHA1;
+                    /*
+                     * We save the digest (checksum) away, because we have to
+                     * zero it out in the chunk to check
+                     */
+                    stored_digest = malloc(digest_len);
+                    calc_digest = malloc(digest_len);
+                    memcpy(stored_digest,hdr->checksum,
+                           digest_len);
+                }
 		break;
 	default:
 		printf("%s: bad magic (%x!=%x) in chunk %d\n",
@@ -356,6 +400,13 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		}
 		printf("%d regions\n", hdr->regioncount);
 	}
+        if (checksums >= 2) {
+                 printf("  Chunk %d: checksum 0x",chunkno);
+                 for (i = 0; i < digest_len; i++) {
+                          printf("%02x",stored_digest[i]);
+                 }
+                 printf("\n");
+        }
 	if (hdr->regionsize != DEFAULTREGIONSIZE)
 		printf("  WARNING: "
 		       "unexpected region size (%d!=%d) in chunk %d\n",
@@ -520,6 +571,28 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			       reloc->sectoff + reloc->size);
 		}
 	}
+
+        if (checksums) {
+                 /*
+                  * Checksum this image. Note: We first zero-out the checksum
+                  * field of the header, because this is what it looked like
+                  * when the checksum was taken
+                  * Assumes SHA1, because we check for this above
+                  */
+                 memset(hdr->checksum,0,sizeof(hdr->checksum));
+                 SHA1_Init(&sha_ctx);
+                 SHA1_Update(&sha_ctx,buf,SUBBLOCKSIZE);
+                 SHA1_Final(calc_digest,&sha_ctx);
+                 for (i = 0; i < digest_len; i++) {
+                          if (calc_digest[i] != stored_digest[i]) {
+                                   printf("ERROR: chunk %d fails checksum!\n",
+                                          chunkno);
+                                   return 1;
+                          }
+                 }
+                 free(calc_digest);
+                 free(stored_digest);
+        }
 
 	return 0;
 }
