@@ -52,6 +52,7 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	lthread.[23]:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
+	mysqlhotcopy:${PORTSDIR}/databases/mysql323-scripts \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
 	vin4.2:${PORTSDIR}/misc/libelvin \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp

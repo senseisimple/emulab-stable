@@ -59,7 +59,8 @@ LIB_DEPENDS= lthread.[23]:${PORTSDIR}/devel/linuxthreads \
 
 .if ${OSMAJOR} >= 5
 LIB_DEPENDS+= mhash.2:${PORTSDIR}/security/mhash \
-	mysqlclient.10:${PORTSDIR}/databases/mysql323-client
+	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
+	mysqlhotcopy:${PORTSDIR}/databases/mysql323-scripts
 .endif
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
