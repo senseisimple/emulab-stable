@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -31,11 +31,15 @@ my $TBOPS       = "@TBOPSEMAIL@";
 
 my $BACKUPDIR	= "$TB/backup";
 my $LOGDIR	= "$TB/log/mysql";
+my $HOTCOPY     = "/usr/local/bin/mysqlhotcopy";
+my $MYSQLDUMP   = "/usr/local/bin/mysqldump";
+my $TAR         = "/usr/bin/tar";
 my $BASE	= "base";
 my $UPD		= "update";
 my $SLOW	= "slowqueries";
 my $BACK	= "tbdb";
 my $extension;
+my $dohotcopy   = 0;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -107,6 +111,21 @@ while (<IDX>) {
 close(IDX);
 print "Extension:        $extension\n";
 
+#
+# Use mysqlhotcopy if installed.
+#
+if ($dohotcopy) {
+    #
+    # We use hotcopy, so make sure the target directory we are going to use
+    # does not already exist.
+    #
+    if (-e "tbdb") {
+	system("/bin/rm -r tbdb") == 0
+	    or fatal("Could not remove old backup directory!");
+    }
+    $BACK .= ".tgz";
+}
+
 my $backname  = "$BACK.$extension";
 my $basename  = "$BASE.$extension";
 my $updname   = "$UPD.$extension";
@@ -131,18 +150,36 @@ if (-e "$LOGDIR/$SLOW") {
     }
 }
 
-#
-# Do a mysqldump. This will reset the log files.
-#
-if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
-    fatal("mysqldump failed!");
-}
+if ($dohotcopy) {
+    #
+    # Do a hotcopy. This will reset the log files.
+    #
+    if (system("$HOTCOPY --noindices --flushlog $DBNAME $BACKUPDIR")) {
+	fatal("$HOTCOPY failed!");
+    }
 
-#
-# Compress the files.
-# 
-if (system("nice gzip $backname")) {
-    fatal("gzip $backname failed!");
+    #
+    # Tar and compress the directory.
+    # 
+    if (system("$TAR -zcf $backname $DBNAME")) {
+	fatal("$TAR -zcf $backname failed!");
+    }
+}
+else {
+    #
+    # Do a mysqldump. This will reset the log files.
+    #
+    if (system("$MYSQLDUMP --all ".
+	       "--flush-logs --lock-tables $DBNAME > $backname")) {
+	fatal("mysqldump failed!");
+    }
+
+    #
+    # Compress the files.
+    # 
+    if (system("nice gzip $backname")) {
+	fatal("gzip $backname failed!");
+    }
 }
 
 # Should do this too, but right now I do it by hand ...
@@ -173,8 +210,15 @@ if (0) {
 	   "-mtime +35 -print -delete");
 }
 
+# Do this now that the backup is complete.
+if ($dohotcopy && -e "$BACKUPDIR/tbdb") {
+    system("/bin/rm -r $BACKUPDIR/tbdb") == 0
+	or fatal("Could not remove old backup directory!");
+}
+
 #SENDMAIL("stoller@flux.utah.edu",
 #	 "DB Backup Finished", "", undef, undef, ($logname));
+
 unlink("$logname");
 exit 0;
 
