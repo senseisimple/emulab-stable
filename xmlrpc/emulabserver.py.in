@@ -902,9 +902,15 @@ class osid:
             pass
 
         # This is now represented as a "set" which the xmlrpc marshaller
-        # does not handle. Just kill it; the caller is not interested.
-        if osid["osfeatures"] and len(osid["osfeatures"]) != 0:
-            del osid["osfeatures"]
+        # does not handle. 
+        if osid["osfeatures"]:
+            features = {}
+            
+            for feature in osid["osfeatures"]:
+                features[feature] = feature
+                pass
+
+            osid["osfeatures"] = features
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
