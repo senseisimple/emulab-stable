@@ -44,7 +44,7 @@ else
 
 # If $PERLVERS is null, then we are running the old 5.005 version under
 # FreeBSD 4.X
-ifndef ($(PERLVERS))
+ifeq ($(strip $(PERLVERS)),)
 PCORE  = -I/usr/libdata/perl/5.00503/mach/CORE
 else
 PCORE  = -I/usr/local/lib/perl5/$(PERLVERS)/mach/CORE
