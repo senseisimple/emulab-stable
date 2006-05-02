@@ -15,7 +15,9 @@ remote Windows Desktop using the Remote Desktop Protocol (RDP).  </p>
 <ul>
 
   <li> There is a nice open-source RDP client for Unix and Linux at 
-       <a href="http://www.rdesktop.org/">www.rdesktop.org</a>.</li>
+       <a href="http://www.rdesktop.org/">www.rdesktop.org</a>.
+       It may already be installed on your computer: to find out, try:
+       <pre>which rdesktop</pre></li>
 
   <li> There is a Microsoft RDC (Remote Desktop Client) installed in
        Windows XP.  You can also install it from a Windows XP
@@ -26,12 +28,12 @@ remote Windows Desktop using the Remote Desktop Protocol (RDP).  </p>
 </ul>
 
 <p>Clicking "RDP to Node" in the Node Options page will send your
-browser a "text/x-testbed-rdp" ".tbrdp" file. <ul>
+browser a MimeType "text/x-testbed-rdp" file with extension ".tbrdp". <ul>
 <li> In FreeBSD or Linux, you
      can save the file and pass it as an argument to
      <code>rdp-mime.pl</code> or associate it with <code>rdp-mime.pl</code>
      in your web browser. You can download the <code>rdp-mime.pl </code><a
-     href="rdp-mime.pl">Perl program here</a>.</li>
+     href="rdp-mime.pl">Perl program here</a>.</li> <br>
 <li> In Windows XP or 2000, you have the same choice to save and open the
      .tbrdp file with a script, or associate it with the script in the browser
      so you can just click.  See the installation directions <a
@@ -106,6 +108,21 @@ push your windows around to fit in the smaller space.  </p>
   </ul>
   </li>
 
+  <li><font size='+1'><b>Linux/FreeBSD and Firefox:</b></font>
+      <ul>
+          <li>Click on a node RDP icon in the Node Options page.
+	      An <code>Opening...</code> dialog will appear.</li>
+
+	  <li>Go to the <code>Open with</code> line and select the radio
+	      button.</li> 
+	  <li><code>Browse...</code> to the <code>rdp-mime.pl</code> script
+	      you installed above.</li> 
+	  <li>Click <code>OK</code>.</li>
+	  <li>Once this is working, you can click the
+	      <code>Do this automatically</code> check box.</li>
+      </ul>
+  </li>
+
   <li><font size='+1'><b>Linux/FreeBSD and Opera:</b></font>
   <ul>
   <li>Choose <code>preferences</code> from the <code>File</code> menu.</li>
@@ -138,8 +155,8 @@ push your windows around to fit in the smaller space.  </p>
    	 <a href="http://the.earth.li/~sgtatham/putty/latest/x86/putty-0.56-installer.exe">
    	 free download.</a> </li>
      <li>This all depends on at having least a basic installation of 
-   	 <a href="www.cygwin.org">CygWin</a> as well.</li>
-     <li>You can select Perl within CygWin, or install another 
+   	 <a href="www.cygwin.org">Cygwin</a> as well.</li>
+     <li>You can select Perl within Cygwin, or install another 
    	 <a href="http://www.perl.org/">Perl port</a>.</li>
   </ul>
   <li>Unpack the Emulab exe's and pl's into an install directory of your
@@ -148,10 +165,10 @@ push your windows around to fit in the smaller space.  </p>
   <li>You can copy putty.exe into that directory as well, or make sure the
       system path contains the PuTTY install directory.</li>
   <li>Make sure that the install directory, and also the Perl directory, are on
-      your Windows system path, not just your CygWin shell path.  Look in
+      your Windows system path, not just your Cygwin shell path.  Look in
       <code>Control Panel / System / Advanced / Environment Variables</code>
-      and double-click on Path in the lower System Variables pane to
-      edit.</li>
+      and double-click on <code>Path</code> in the lower <code>System Variables</code>
+      pane to edit.</li>
   <li><font size='+1'><b>Windows and Mozilla/Firefox:</b></font>
       To associate the handler with the .tbrdp file type in Mozilla/Firefox:
       <ul>
@@ -160,8 +177,8 @@ push your windows around to fit in the smaller space.  </p>
 	      <code>Other...</code> from the pull-down list.</li>
 	  <li>Browse to the rdp-mime-winxp.exe application you installed 
 	      above.</li>
-	  <li>Once this is working, you can click 
-	      <code>Do this automatically<code>.</li>
+	  <li>Once this is working, you can click the
+	      <code>Do this automatically</code> check box.</li>
       </ul>
   <li><font size='+1'><b>Windows and Internet Explorer:</b></font>
       To associate the handler with the .tbrdp file type in Windows:
