@@ -239,7 +239,8 @@ will always be one enabled <a
 href="../tutorial/docwrapper.php3?docname=tutorial.html#ControlNet"> control
 net </a> interface on the 155.98.36 network.  The others are disabled if not
 used in your experiment.  (See file
-<code>/var/emulab/boot/ipconfig-cache</code> for a full listing.)  <p>
+<code>/var/emulab/boot/ipconfig-cache</code> for a full listing from boot
+time, including the interfaces that were later disabled.)  <p>
 
 If you specified links or LANs in your experiment <a
 href="../tutorial/docwrapper.php3?docname=tutorial.html#Designing"> network
@@ -299,26 +300,41 @@ href="../tutorial/docwrapper.php3?docname=firewall.html#Use"> style keyword
     $fw set-style basic
 </pre>
 
-<div style="margin-left: 40px;"> <b>NOTE:</b> There is currently a problem
-which makes swapping-in Windows nodes behind a control-net firewall take
-longer or fail, especially on the pc850's.  <p>
+<div style="margin-left: 40px;"> <b>NOTE:</b> There are some problems
+which make swapping-in Windows nodes behind a control-net firewall take
+longer than they should, or fail.
 
-Details: DHCP packets aren't passed until the firewall node is loaded with
-FreeBSD and started up.  That takes 3-4 minutes on a pc850 and leaves the
-Windows nodes in the FreeBSD PXE-loader image waiting for DHCP.  Periodically,
-they time-out and reload the PXE-loader, which adds up to another minute after
-the firewall node is up, if you're unlucky.  <p>
+  <ul>
+    <li> DHCP packets aren't passed until the firewall node is loaded with
+	 FreeBSD and started up.  The OS image loading process starts with a
+	 FreeBSD PXE-loader that requires DHCP information.  To minimize the
+	 impact of this, we hold rebooting the experiment nodes into the
+	 PXE-loader until the firewall is up.
+    </li> <br>
+    <li> During the Frisbee OS image loading process, all of the image data
+	 passes through the control-net firewall.  This can be a bottleneck:
+	 if it is allocated to a pc600 node; if you are loading several
+	 different Windows images in the experiment; or if there are multicast
+	 congestion problems in the Cisco router.  Windows nodes are more
+	 subject to all of these issues, only because the Windows images are
+	 larger.  <p>
 
-After 10 minutes in the reloading state, Emulab gives up and reboots the node
-to try again, even if Frisbee is working hard and nearly done.  5-6 minutes is
-hardly enough time to Frisbee a WINXP image into a pc850.  Either the image
-load time-out needs to be extended in experiments that have a firewall
-configured, or the load timer shouldn't start ticking until the firewall is
-up. </div>
+	 After 10 minutes in the <code>reloading</code> state, Emulab gives up
+	 and reboots the node to try again, even if Frisbee is working hard
+	 and nearly done.  We could extend the time-out when the nodes are
+	 behind a control-net firwall, or change to accept some slowdown as
+	 long as the image load is making progress rather than using a fixed
+	 time-out.
+    </li>
+  </ul>
+</div>
 
 The <i>Windows Firewall</i> software is installed in WINXP-SP2 and
-WINXP-UPDATE images, but disabled to allow RDP and SSH access to Windows
-nodes.  <p>
+WINXP-UPDATE images, but disabled with the <code>netsh firewall set opmode
+DISABLE</code> command, to allow RDP and SSH access to Windows nodes.  There
+is an XP display bug related to this: sometimes the "Security Center" that
+shows at RDP login indicates that the Windows Firewall is turned on.  Clicking
+through to the firewall settings shows that it is really off.  <p>
 
 <h4><a name="Boots_twice"> </a> Windows nodes boot twice </h4>
 
