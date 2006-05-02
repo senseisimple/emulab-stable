@@ -1931,6 +1931,19 @@ compress_image(void)
 			freerelocs();
 		}
 
+#ifdef WITH_CRYPTO
+                if (do_encrypt) {
+                        encrypt_start(blkhdr);
+                        encrypt_chunk(output_buffer + DEFAULTREGIONSIZE, blkhdr->size);
+                        encrypt_finish(output_buffer + DEFAULTREGIONSIZE);
+                } else 
+#endif
+                        /*
+                         * Zero out the IV so we don't end up with random data
+                         * in there
+                         */
+                        memset(blkhdr->enc_iv,0,sizeof(blkhdr->enc_iv));
+
                 checksum_start(blkhdr);
                 checksum_chunk(output_buffer, sizeof(output_buffer));
                 checksum_finish(blkhdr);
