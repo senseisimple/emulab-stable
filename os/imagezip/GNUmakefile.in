@@ -79,7 +79,7 @@ endif
 # Necessary sometimes.
 #PTHREADCFLAGS	+= -DCONDVARS_WORK
 
-CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) -static
+CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) -static -DWITH_CRYPTO
 LIBS 		= -lz
 ZIPCFLAGS	= $(CFLAGS) -Wall
 ZIPLIBS		= 

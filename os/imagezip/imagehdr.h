@@ -85,7 +85,8 @@ struct blockhdr_V4 {
 	int32_t		reloccount;	/* number of reloc entries */
         /* V4 follows */
         uint32_t        enc_cipher;     /* Which cipher was used to encrypt */
-        uint32_t        enc_iv    ;     /* Initialization vector */
+        //uint32_t        enc_iv    ;     /* Initialization vector */
+        int8_t          enc_iv[8];      /* Initialization vector */
         uint32_t        checksumtype;   /* Which checksum was used */
         unsigned char   checksum[64];   /* Checksum, leave room for 512 bits */
         /* TODO: Some signature field needs to go here */

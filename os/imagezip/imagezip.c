@@ -12,6 +12,11 @@
  *	and overlapping IO with compression.  Maybe a third thread for
  *	doing output.
  */
+#ifdef WITH_CRYPTO
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#endif
 #include <ctype.h>
 #include <err.h>
 #include <fcntl.h>
@@ -26,7 +31,10 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#ifndef WITH_CRYPTO
 #include <sha.h>
+#endif
+
 
 #include "imagehdr.h"
 #include "sliceinfo.h"
@@ -53,6 +61,7 @@ int	badsectors= 0;
 int	retrywrites= 1;
 int	dorelocs  = 1;
 int	metaoptimize = 0;
+int     do_encrypt = 0;
 off_t	datawritten;
 partmap_t ignore, forceraw;
 
@@ -459,7 +468,14 @@ main(int argc, char *argv[])
 			metaoptimize++;
 			break;
 		case 'e':
+#ifdef WITH_CRYPTO
                         // Encryption cipher
+                        // XXX : Accept cipher name
+                        do_encrypt++;
+#else
+			fprintf(stderr, "'e' option not supported\n");
+			usage();
+#endif
                         break;
                 case 'k':
                         // Encryption key
@@ -520,6 +536,14 @@ main(int argc, char *argv[])
 		perror(infilename);
 		exit(1);
 	}
+
+#ifdef WITH_CRYPTO
+        /*
+        if (!RAND_load_file("/dev/urandom",1024)) {
+                fprintf(stderr,"Error getting random seed\n");
+        }
+        */
+#endif
 
 #if 0
 	/*
@@ -1578,6 +1602,11 @@ static void	compress_status(int sig);
 static void     checksum_start(blockhdr_t *hdr);
 static void     checksum_chunk(uint8_t *buf, off_t size);
 static void     checksum_finish(blockhdr_t *hdr);
+#ifdef WITH_CRYPTO
+void encrypt_start(blockhdr_t *hdr);
+void encrypt_chunk(uint8_t *buf, off_t size);
+void encrypt_finish(uint8_t *outbuf);
+#endif
 
 /*
  * Loop through the image, compressing the allocated ranges.
@@ -1786,6 +1815,22 @@ compress_image(void)
 		}
 
                 /*
+                 * Encrypt the chunk, if we've been asked to
+                 */
+#ifdef WITH_CRYPTO
+                if (do_encrypt) {
+                        encrypt_start(blkhdr);
+                        encrypt_chunk(output_buffer + DEFAULTREGIONSIZE, blkhdr->size);
+                        encrypt_finish(output_buffer + DEFAULTREGIONSIZE);
+                } else 
+#endif
+                        /*
+                         * Zero out the IV so we don't end up with random data
+                         * in there
+                         */
+                        memset(blkhdr->enc_iv,0,sizeof(blkhdr->enc_iv));
+
+                /*
                  * Checksum chunk. This is done with a few seperate functions so
                  * that, in the future, we might be able to checksum right
                  * after compression, which probably has better cache behavior.
@@ -1793,7 +1838,6 @@ compress_image(void)
                 checksum_start(blkhdr);
                 checksum_chunk(output_buffer, sizeof(output_buffer));
                 checksum_finish(blkhdr);
-
 
 		/*
 		 * Write out the finished chunk to disk.
@@ -2215,7 +2259,8 @@ compress_finish(uint32_t *subblksize)
  * Checksum functions
  */
 SHA_CTX sha_ctx;
-void checksum_start(blockhdr_t *hdr) {
+void
+checksum_start(blockhdr_t *hdr) {
         /*
          * Start with the checksum zeroed out - this way, we can put the
          * checksum in the header, but don't have to worry about skipping over
@@ -2236,15 +2281,125 @@ checksum_chunk(uint8_t *buf, off_t size) {
 
 void
 checksum_finish(blockhdr_t *hdr) {
-        int i;
 
         /*
          * Important! The digest field in the header MUST be big enough to hold
          * the digest output by the finalizing function!
          */
         SHA1_Final(hdr->checksum, &sha_ctx);
-        printf("Checksum: 0x");
-        for (i = 0; i < sizeof(hdr->checksum); i++) {
-                printf("%02x",hdr->checksum[i]);
-        }
 }
+
+#ifdef WITH_CRYPTO
+/*
+ * Encryption functions
+ */
+static EVP_CIPHER_CTX cipher_ctx;
+static const EVP_CIPHER *cipher;
+/* XXX: the size of the IV may have to change with different ciphers */
+static uint8_t iv[8];
+static uint8_t key[EVP_MAX_KEY_LENGTH];
+
+/*
+ * For the time being, at least, we have to encrypt into a seperate buffer
+ */
+static uint8_t  encryption_buffer[SUBBLOCKSIZE];
+static uint8_t  *ebuffer_current;
+static uint32_t encrypted_bytes;
+
+void
+encrypt_start(blockhdr_t *hdr) {
+        static int first_chunk = 1;
+        int i;
+
+        /*
+         * Pick our cipher - currently, only Blowfish in CBC mode is supported
+         */
+        EVP_CIPHER_CTX_init(&cipher_ctx);
+        cipher = EVP_bf_cbc();
+
+        /*
+         * If this is the first chunk, generate a new IV. Otherwise, we use the CBC
+         * residue from the last chunk as the IV for this chunk. This way, the
+         * decryptor can tell that both chunks are from the same file
+         */
+        if (first_chunk) {
+                first_chunk = 0;
+                /*
+                if (!RAND_bytes(iv,sizeof(iv))) {
+                        fprintf(stderr,"Unable to generate random IV\n");
+                        exit(1);
+                }
+                */
+                /*
+                 * Zero IV for debugging
+                 */
+                memset(iv,0,sizeof(iv));
+
+                /*
+                 * Initialize the cipher, which includes giving it a key
+                 * XXX - we generate a key, we need to also support taking one
+                 * on the command line
+                 */
+                if (!RAND_bytes(key, sizeof(key))) {
+                        fprintf(stderr,"Unable to generate random key\n");
+                        exit(1);
+                }
+                printf("Key: 0x");
+                for (i = 0; i < EVP_MAX_KEY_LENGTH; i++) {
+                        printf("%02x",key[i]);
+                }
+                printf("\n");
+
+        } else {
+                /*
+                 * TODO: Figure out how to get CBC residue!
+                 */
+                memset(iv,0,sizeof(iv));
+        }
+
+        /*
+         * Set the cipher and IV
+         */
+        EVP_EncryptInit(&cipher_ctx,cipher,NULL,iv);
+
+        /*
+         * Bump up the key length and set the key
+         */
+        EVP_CIPHER_CTX_set_key_length(&cipher_ctx,EVP_MAX_KEY_LENGTH);
+        EVP_EncryptInit(&cipher_ctx,NULL,key,NULL);
+
+        /*
+         * Copy the IV into the header
+         */
+        memcpy(hdr->enc_iv,iv,sizeof(hdr->enc_iv));
+
+        /*
+         * Prepare the buffer! (Preparing the buffer!)
+         */
+        ebuffer_current = encryption_buffer;
+        encrypted_bytes = 0;
+
+}
+
+void
+encrypt_chunk(uint8_t *buf, off_t size) {
+    int encrypted_this_round = 0;
+    EVP_EncryptUpdate(&cipher_ctx, ebuffer_current, &encrypted_this_round, buf,
+            size);
+    encrypted_bytes += encrypted_this_round;
+    ebuffer_current = encryption_buffer + encrypted_bytes;
+}
+
+void
+encrypt_finish(uint8_t *outbuf) {
+    int encrypted_this_round = 0;
+    EVP_EncryptFinal(&cipher_ctx, ebuffer_current, &encrypted_this_round);
+    encrypted_bytes += encrypted_this_round;
+    /* 
+     * Copy the encrypted buffer back to the chunk buffer
+     * XXX - check for going off off the end of the chunk buffer
+     */
+    memcpy(outbuf,encryption_buffer,encrypted_bytes);
+}
+
+#endif
