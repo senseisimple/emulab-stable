@@ -26,7 +26,7 @@
 #define COMPRESSED_V3			(COMPRESSED_MAGIC_BASE+2)
 #define COMPRESSED_V4			(COMPRESSED_MAGIC_BASE+3)
 
-#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V3
+#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V4
 
 /*
  * Each compressed block of the file has this little header on it.
@@ -96,6 +96,11 @@ struct blockhdr_V4 {
  */
 /* Required to be supported by all versions */
 #define CHECKSUM_SHA1   0
+
+/*
+ * Length of the checksum field (in bytes) for various checksum types
+ */
+#define CHECKSUM_LEN_SHA1 20
 
 /*
  * Ciphers supported
