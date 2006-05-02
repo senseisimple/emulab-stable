@@ -46,7 +46,7 @@ sub new($$;$) {
     SNMP::initMib();              # parses default list of Mib modules
     $SNMP::use_enums = 1;         #use enum values instead of only ints
     print "Opening SNMP session to $devicename..." if $debug;
-    my $sess =new SNMP::Session(DestHost => $devicename, Community => 'private');
+    my $sess =new SNMP::Session(DestHost => $devicename, Community => 'private', Version => '1');
     if (!defined($sess)) {
 	warn("ERROR: Unable to connect to $devicename via SNMP\n");
 	return undef;
