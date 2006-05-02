@@ -3417,7 +3417,8 @@ sub TBNodeSubNodes($)
     my $result = DBQueryFatal("SELECT n.node_id FROM nodes AS n " .
 			      "LEFT JOIN node_types " .
 			      "    AS nt ON n.type = nt.type " .
-			      "WHERE n.phys_nodeid='$node' and nt.issubnode");
+			      "WHERE n.phys_nodeid='$node' and ".
+			      "      nt.issubnode!=0");
     
     if (! $result or $result->numrows == 0) {
 	return ();
