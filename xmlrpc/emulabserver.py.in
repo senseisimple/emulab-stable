@@ -900,6 +900,12 @@ class osid:
         if not osid["OS"] or len(osid["OS"]) == 0:
             osid["OS"] = "(None)"
             pass
+
+        # This is now represented as a "set" which the xmlrpc marshaller
+        # does not handle. Just kill it; the caller is not interested.
+        if osid["osfeatures"] and len(osid["osfeatures"]) != 0:
+            del osid["osfeatures"]
+            pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=scrubdict(osid),
