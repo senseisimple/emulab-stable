@@ -966,9 +966,13 @@ sub doSwapin($) {
     # If user specified -reboot to update,
     # and we are successfully performing the update,
     # then mark all nodes in experiment so os_setup will reboot them.
+    # We must reboot nodes on a RETRY as well, since assign has been rerun
+    # and may have remapped interfaces on the nodes.
     #
-    if (($type == UPDATE) &&
-	($updateReboot || $updateReconfig)) {
+    if ($type == RETRY ||
+	($type == UPDATE && ($updateReboot || $updateReconfig))) {
+	my $needreboot = ($type == RETRY || $updateReboot);
+
 	print STDERR "Marking nodes for reboot/reconfig.\n";
 	$db_result =
 	    DBQueryFatal("select r.node_id,n.allocstate from reserved as r ".
@@ -984,7 +988,7 @@ sub doSwapin($) {
 	    #
 	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
 		TBSetNodeAllocState($node,
-				    ($updateReboot ?
+				    ($needreboot ?
 				     TBDB_ALLOCSTATE_RES_INIT_DIRTY() :
 				     TBDB_ALLOCSTATE_RES_RECONFIG()));
 	    }
