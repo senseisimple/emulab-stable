@@ -143,7 +143,7 @@ push(@cmdandargs, ("-t", $timeout))
 push(@cmdandargs, ("-o", $output))
     if (defined($output));
 push(@cmdandargs, "-r")
-    if (defined($reportonly));
+    if ($reportonly);
 
 exec(@cmdandargs);
 die("*** $0:\n".
