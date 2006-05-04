@@ -971,9 +971,10 @@ sub doSwapin($) {
     #
     if ($type == RETRY ||
 	($type == UPDATE && ($updateReboot || $updateReconfig))) {
-	my $needreboot = ($type == RETRY || $updateReboot);
+	my $needreboot = ($type == RETRY || $updateReboot) ? 1 : 0;
 
-	print STDERR "Marking nodes for reboot/reconfig.\n";
+	print STDERR "Marking nodes for ",
+		     $needreboot ? "reboot" : "reconfig", ".\n";
 	$db_result =
 	    DBQueryFatal("select r.node_id,n.allocstate from reserved as r ".
 			 "left join nodes as n on n.node_id=r.node_id ".
