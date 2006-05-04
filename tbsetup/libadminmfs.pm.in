@@ -29,6 +29,13 @@ use libdb;
 use libtestbed;
 use StateWait;
 
+#
+# Function prototypes
+#
+sub TBAdminMfsBoot($$@);
+sub TBAdminMfsSelect($$@);
+sub TBAdminMfsRunCmd($$@);
+
 # Configure variables
 my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
