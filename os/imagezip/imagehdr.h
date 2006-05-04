@@ -64,6 +64,8 @@ struct blockhdr_V2 {
 	int32_t		reloccount;	/* number of reloc entries */
 };
 
+#define CHECKSUM_LEN_MAX 64
+
 /*
  * Version 3 of the block descriptor adds support for integrety protection
  * and encryption.
@@ -88,8 +90,9 @@ struct blockhdr_V4 {
         //uint32_t        enc_iv    ;     /* Initialization vector */
         int8_t          enc_iv[8];      /* Initialization vector */
         uint32_t        checksumtype;   /* Which checksum was used */
-        unsigned char   checksum[64];   /* Checksum, leave room for 512 bits */
+        unsigned char   checksum[CHECKSUM_LEN_MAX]; /* Checksum, leave room for 512 bits */
         /* TODO: Some signature field needs to go here */
+        unsigned char signature[CHECKSUM_LEN_MAX];
 };
 
 /*

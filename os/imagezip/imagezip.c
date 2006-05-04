@@ -1836,7 +1836,11 @@ compress_image(void)
                  * after compression, which probably has better cache behavior.
                  */
                 checksum_start(blkhdr);
-                checksum_chunk(output_buffer, sizeof(output_buffer));
+                checksum_chunk(output_buffer,
+			       blkhdr->size + blkhdr->regionsize);
+                /* TODO: Remove me JD: This is the wrong size. We
+                /* don't want to hash the padding at the end:
+                /* sizeof(output_buffer)*/
                 checksum_finish(blkhdr);
 
 		/*

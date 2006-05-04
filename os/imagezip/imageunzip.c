@@ -10,6 +10,12 @@
  * Writes the uncompressed data to stdout.
  */
 
+#ifdef WITH_CRYPTO
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#endif
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -26,6 +32,9 @@
 #include "queue.h"
 #ifndef NOTHREADS
 #include <pthread.h>
+#endif
+#ifndef WITH_CRYPTO
+#include <sha.h>
 #endif
 
 /*
@@ -178,6 +187,64 @@ static volatile int	writebufwanted;
 /* stats */
 unsigned long		maxbufsalloced, maxmemalloced;
 unsigned long		splits;
+
+/* security */
+static int use_checksum = 0;
+// TODO: Turn this into a signature key.
+static char checksum_master_key[CHECKSUM_LEN_MAX];
+
+char hex_to_char(char in)
+{
+    if (isdigit(in))
+    {
+	return in - '0';
+    }
+    else if (islower(in))
+    {
+	return in - 'a';
+    }
+    else /* isupper(in) */
+    {
+	return in - 'A';
+    }
+}
+
+/*
+ * Read a string of hexadecimal digits and write out bytes to a
+ * string. Returns 0 if there are any non-hex characters, or there are
+ * less than 2*memsize characters in the source null-terminated string.
+ */
+int hex_to_mem(char * dest, char * source, int memsize)
+{
+    int result = 1;
+    int i = 0;
+    for (i = 0; i < memsize && result; i++)
+    {
+	if (isxdigit(source[2*i]) && isxdigit(source[2*i + 1]))
+	{
+	    dest[i] = (hex_to_char(source[2*i]) << 4) |
+		hex_to_char(source[2*i + 1]);
+	}
+	else
+	{
+	    result = 0;
+	}
+    }
+    return result;
+}
+
+/*
+ * Read memsize bytes from dest and write the hexadecimal equivalent
+ * into source. source must have 2*memsize + 1 bytes available.
+ */
+void mem_to_hex(char * dest, char * source, int memsize)
+{
+    int i = 0;
+    for (i = 0; i < memsize; i++)
+    {
+	sprintf(&dest[2*i], "%02x", source[i]);
+    }
+}
 
 #ifndef CONDVARS_WORK
 int fsleep(unsigned int usecs);
@@ -504,7 +571,9 @@ usage(void)
 		" -n              Single threaded (slow) mode\n"
 		" -d              Turn on progressive levels of debugging\n"
 		" -r retries      Number of image read retries to attempt\n"
-		" -W size         MB of memory to use for write buffering\n");
+		" -W size         MB of memory to use for write buffering\n"
+	        " -c key          Key used to authenticate a checksum (hex number)\n"
+	        " -k key          Key used for encryption/decryption (hex number)\n");
 	exit(1);
 }	
 
@@ -518,7 +587,7 @@ main(int argc, char *argv[])
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:c:k:")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -577,7 +646,18 @@ main(int argc, char *argv[])
 			maxwritebufmem *= (1024 * 1024);
 			break;
 #endif
-
+		case 'c':
+		        if (!hex_to_mem(checksum_master_key, optarg,
+					CHECKSUM_LEN_SHA1)) {
+			    use_checksum = 0;
+			    usage();
+			} else {
+			    use_checksum = 1;
+			}
+		        break;
+/*		case 'k':
+		        hex_to_mem(encryption_key, optarg, some_size);
+		        break;*/
 		case 'h':
 		case '?':
 		default:
@@ -1042,6 +1122,36 @@ write_subblock(int chunkno, const char *chunkbufp)
 }
 #endif
 
+static void
+verify_checksum(const blockhdr_t *blockhdr, const char *bodybufp)
+{
+    SHA_CTX       sum_context;
+    unsigned char alleged_sum[CHECKSUM_LEN_MAX];
+    unsigned char calculated_sum[CHECKSUM_LEN_MAX];
+
+    /* initialize checksum state */
+    memcpy(alleged_sum, blockhdr->checksum, CHECKSUM_LEN_MAX);
+    memset(blockhdr->checksum, '\0', CHECKSUM_LEN_MAX);
+    memset(calculated_sum, '\0', CHECKSUM_LEN_MAX);
+    SHA1_Init(&sum_context);
+
+    /* calculate the checksum */
+    SHA1_Update(&sum_context, bodybufp, blockhdr->size + blockhdr->regionsize);
+
+    /* save the checksum */
+    SHA1_Final(calculated_sum, &sum_context);
+
+    if (memcmp(alleged_sum, calculated_sum, CHECKSUM_LEN_SHA1) != 0)
+    {
+	char sumstr[CHECKSUM_LEN_SHA1*2 + 1];
+	fprintf(stderr, "Checksums do not match:\n");
+	mem_to_hex(sumstr, alleged_sum, CHECKSUM_LEN_SHA1);
+	fprintf(stderr, "  Alleged: 0x%s\n", sumstr);
+	mem_to_hex(sumstr, calculated_sum, CHECKSUM_LEN_SHA1);
+	fprintf(stderr, "  Calculated: 0x%s\n", sumstr);
+    }
+}
+
 static int
 inflate_subblock(const char *chunkbufp)
 {
@@ -1087,6 +1197,11 @@ inflate_subblock(const char *chunkbufp)
 		break;
 	}
 
+	case COMPRESSED_V4:
+	        if (use_checksum) {
+		        verify_checksum(blockhdr,
+					(const unsigned char *) blockhdr);
+		}
 	case COMPRESSED_V2:
 	case COMPRESSED_V3:
 		imageversion = 2;
