@@ -2323,7 +2323,7 @@ checksum_finish(blockhdr_t *hdr) {
 static EVP_CIPHER_CTX cipher_ctx;
 static const EVP_CIPHER *cipher;
 /* XXX: the size of the IV may have to change with different ciphers */
-static uint8_t iv[8];
+static uint8_t iv[EVP_MAX_KEY_LENGTH];
 static uint8_t key[EVP_MAX_KEY_LENGTH];
 
 /*

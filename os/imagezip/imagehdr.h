@@ -90,7 +90,7 @@ struct blockhdr_V4 {
         /* V4 follows */
         uint32_t        enc_cipher;     /* Which cipher was used to encrypt */
         //uint32_t        enc_iv    ;     /* Initialization vector */
-        int8_t          enc_iv[8];      /* Initialization vector */
+        int8_t          enc_iv[EVP_MAX_KEY_LENGTH];      /* Initialization vector */
         uint32_t        checksumtype;   /* Which checksum was used */
         unsigned char   checksum[SIGNATURE_KEY_LENGTH]; /* Checksum, leave room for 512 bits */
 };

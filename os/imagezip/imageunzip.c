@@ -203,11 +203,11 @@ char hex_to_char(char in)
     }
     else if (islower(in))
     {
-	return in - 'a';
+	return in - 'a' + 10;
     }
     else /* isupper(in) */
     {
-	return in - 'A';
+	return in - 'A' + 10;
     }
 }
 
@@ -216,7 +216,7 @@ char hex_to_char(char in)
  * string. Returns 0 if there are any non-hex characters, or there are
  * less than 2*memsize characters in the source null-terminated string.
  */
-int hex_to_mem(char * dest, char * source, int memsize)
+int hex_to_mem(unsigned char * dest, const unsigned char * source, int memsize)
 {
     int result = 1;
     int i = 0;
@@ -239,7 +239,8 @@ int hex_to_mem(char * dest, char * source, int memsize)
  * Read memsize bytes from dest and write the hexadecimal equivalent
  * into source. source must have 2*memsize + 1 bytes available.
  */
-void mem_to_hex(unsigned char * dest, unsigned char * source, int memsize)
+void mem_to_hex(unsigned char * dest, const unsigned char * source,
+		int memsize)
 {
     int i = 0;
     for (i = 0; i < memsize; i++)
@@ -1192,7 +1193,12 @@ decrypt_buffer(char * dest, const char * source, const blockhdr_t * header)
 			     &decrypted_count);
     if (!error)
     {
-	fprintf(stderr, "Padding was incorrect on decryption.\n");
+	char keystr[EVP_MAX_KEY_LENGTH*2 + 1];
+	fprintf(stderr, "Padding was incorrect.\n");
+	mem_to_hex(keystr, encryption_key, EVP_MAX_KEY_LENGTH);
+	fprintf(stderr, "  Key: %s\n", keystr);
+	mem_to_hex(keystr, header->enc_iv, EVP_MAX_KEY_LENGTH);
+	fprintf(stderr, "  IV:  %s\n", keystr);
 	exit(1);
     }
 }
