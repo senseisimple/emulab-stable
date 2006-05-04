@@ -800,15 +800,16 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	$FORMAT_NAME = 'vlanlist2';
 }
 
-    foreach $vlan_id (sort {tbsort($a,$b)} keys %vlans) {
+    foreach my $vid (sort {tbsort($a,$b)} keys %vlans) {
+        $vlan_id = $vid;
 	my $memberref;
-	($ddep,$memberref) = @{$vlans{$vlan_id}};
+	($ddep,$memberref) = @{$vlans{$vid}};
 
 	#
 	# Find which, if any, experiment this VLAN belongs to.
 	#
 	my $result = DBQueryFatal("select pid, eid, virtual from " .
-				  "vlans where id='$vlan_id'");
+				  "vlans where id='$vid'");
 	my ($eid,$pid);
 	($pid,$eid,$vname) = $result->fetchrow();
 
