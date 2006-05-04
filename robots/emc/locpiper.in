@@ -13,6 +13,17 @@ use Errno qw(ESRCH);
 use Time::HiRes qw(gettimeofday);
 
 #
+# Function Prototypes
+#
+sub callbackFunc($$$);
+sub SendBatteryData($);
+sub SendDynObstacles();
+sub ForwardEvent($$;$);
+sub Cleanup();
+sub fatal($);
+sub KillThePiper();
+
+#
 # Piper
 #
 sub usage()
