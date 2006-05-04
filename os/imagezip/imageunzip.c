@@ -190,8 +190,10 @@ unsigned long		splits;
 
 /* security */
 static int use_checksum = 0;
+static int do_decrypt = 0;
 // TODO: Turn this into a signature key.
-static char checksum_master_key[CHECKSUM_LEN_MAX];
+static unsigned char checksum_master_key[CHECKSUM_LEN_MAX];
+static unsigned char encryption_key[EVP_MAX_KEY_LENGTH];
 
 char hex_to_char(char in)
 {
@@ -648,16 +650,22 @@ main(int argc, char *argv[])
 #endif
 		case 'c':
 		        if (!hex_to_mem(checksum_master_key, optarg,
-					CHECKSUM_LEN_SHA1)) {
+					1)) {
 			    use_checksum = 0;
 			    usage();
 			} else {
 			    use_checksum = 1;
 			}
 		        break;
-/*		case 'k':
-		        hex_to_mem(encryption_key, optarg, some_size);
-		        break;*/
+		case 'k':
+		        if (!hex_to_mem(encryption_key, optarg,
+					EVP_MAX_KEY_LENGTH)) {
+			    do_decrypt = 0;
+			    usage();
+			} else {
+			    do_decrypt = 1;
+			}
+		        break;
 		case 'h':
 		case '?':
 		default:
@@ -1123,7 +1131,7 @@ write_subblock(int chunkno, const char *chunkbufp)
 #endif
 
 static void
-verify_checksum(const blockhdr_t *blockhdr, const char *bodybufp)
+verify_checksum(blockhdr_t *blockhdr, const char *bodybufp)
 {
     SHA_CTX       sum_context;
     unsigned char alleged_sum[CHECKSUM_LEN_MAX];
@@ -1140,15 +1148,46 @@ verify_checksum(const blockhdr_t *blockhdr, const char *bodybufp)
 
     /* save the checksum */
     SHA1_Final(calculated_sum, &sum_context);
+    memcpy(blockhdr->checksum, alleged_sum, CHECKSUM_LEN_MAX);
 
-    if (memcmp(alleged_sum, calculated_sum, CHECKSUM_LEN_SHA1) != 0)
+//    if (memcmp(alleged_sum, calculated_sum, CHECKSUM_LEN_SHA1) != 0)
     {
 	char sumstr[CHECKSUM_LEN_SHA1*2 + 1];
-	fprintf(stderr, "Checksums do not match:\n");
+//	fprintf(stderr, "Checksums do not match:\n");
 	mem_to_hex(sumstr, alleged_sum, CHECKSUM_LEN_SHA1);
 	fprintf(stderr, "  Alleged: 0x%s\n", sumstr);
 	mem_to_hex(sumstr, calculated_sum, CHECKSUM_LEN_SHA1);
 	fprintf(stderr, "  Calculated: 0x%s\n", sumstr);
+//	exit(1);
+    }
+}
+
+static void
+decrypt_buffer(char * dest, const char * source, const blockhdr_t * header)
+{
+    /* init */
+    int decrypted_count = 0;
+    int error = 0;
+    EVP_CIPHER_CTX context;
+    EVP_CIPHER const *cipher;
+
+    EVP_CIPHER_CTX_init(&context);
+    cipher = EVP_bf_cbc();
+
+    EVP_DecryptInit(&context, cipher, NULL, header->enc_iv);
+    EVP_CIPHER_CTX_set_key_length(&context, EVP_MAX_KEY_LENGTH);
+    EVP_DecryptInit(&context, NULL, encryption_key, NULL);
+
+    /* decrypt */
+    EVP_DecryptUpdate(&context, dest, &decrypted_count, source, header->size);
+
+    /* cleanup */
+    error = EVP_DecryptFinal(&context, dest + decrypted_count,
+			     &decrypted_count);
+    if (!error)
+    {
+	fprintf(stderr, "Padding was incorrect on decryption.\n");
+	exit(1);
     }
 }
 
@@ -1163,6 +1202,7 @@ inflate_subblock(const char *chunkbufp)
 	off_t		offset, size;
 	char		resid[SECSIZE];
 	writebuf_t	*wbuf;
+	char            plaintext[SUBBLOCKMAX];
 	
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
@@ -1199,9 +1239,15 @@ inflate_subblock(const char *chunkbufp)
 
 	case COMPRESSED_V4:
 	        if (use_checksum) {
-		        verify_checksum(blockhdr,
+		        verify_checksum((blockhdr_t *)blockhdr,
 					(const unsigned char *) blockhdr);
 		}
+#ifdef WITH_CRYPTO
+		if (do_decrypt) {
+		        decrypt_buffer(plaintext, chunkbufp, blockhdr);
+			chunkbufp = plaintext;
+		}
+#endif
 	case COMPRESSED_V2:
 	case COMPRESSED_V3:
 		imageversion = 2;
@@ -1236,6 +1282,7 @@ inflate_subblock(const char *chunkbufp)
 	/*
 	 * Start with the first region. 
 	 */
+	fprintf(stderr, "start: %d, size: %d\n", curregion->start, curregion->size);
 	offset = sectobytes(curregion->start);
 	size   = sectobytes(curregion->size);
 	assert(size > 0);

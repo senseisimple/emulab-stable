@@ -92,7 +92,6 @@ struct blockhdr_V4 {
         uint32_t        checksumtype;   /* Which checksum was used */
         unsigned char   checksum[CHECKSUM_LEN_MAX]; /* Checksum, leave room for 512 bits */
         /* TODO: Some signature field needs to go here */
-        unsigned char signature[CHECKSUM_LEN_MAX];
 };
 
 /*
