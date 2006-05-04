@@ -1169,11 +1169,13 @@ verify_checksum(blockhdr_t *blockhdr, const char *bodybufp)
     }
 }
 
-static void
+/* returns the number of characters decrypted */
+static int
 decrypt_buffer(char * dest, const char * source, const blockhdr_t * header)
 {
     /* init */
-    int decrypted_count = 0;
+    int update_count = 0;
+    int final_count = 0;
     int error = 0;
     EVP_CIPHER_CTX context;
     EVP_CIPHER const *cipher;
@@ -1186,11 +1188,11 @@ decrypt_buffer(char * dest, const char * source, const blockhdr_t * header)
     EVP_DecryptInit(&context, NULL, encryption_key, NULL);
 
     /* decrypt */
-    EVP_DecryptUpdate(&context, dest, &decrypted_count, source, header->size);
+    EVP_DecryptUpdate(&context, dest, &update_count, source, header->size);
 
     /* cleanup */
-    error = EVP_DecryptFinal(&context, dest + decrypted_count,
-			     &decrypted_count);
+    error = EVP_DecryptFinal(&context, dest + update_count,
+			     &final_count);
     if (!error)
     {
 	char keystr[EVP_MAX_KEY_LENGTH*2 + 1];
@@ -1201,6 +1203,7 @@ decrypt_buffer(char * dest, const char * source, const blockhdr_t * header)
 	fprintf(stderr, "  IV:  %s\n", keystr);
 	exit(1);
     }
+    return update_count + final_count;
 }
 
 static int
@@ -1256,7 +1259,9 @@ inflate_subblock(const char *chunkbufp)
 		}
 #ifdef WITH_CRYPTO
 		if (do_decrypt) {
-		        decrypt_buffer(plaintext, chunkbufp, blockhdr);
+			((blockhdr_t *)blockhdr)->size
+			    = decrypt_buffer(plaintext, chunkbufp,
+					     blockhdr);
 			chunkbufp = plaintext;
 		}
 #endif
