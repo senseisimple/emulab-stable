@@ -77,6 +77,49 @@ char	*hashfile;
     (sizeof(blockhdr_t) + \
     (reg) * sizeof(struct region) + (rel) * sizeof(struct blockreloc))
 
+
+static uint8_t key[EVP_MAX_KEY_LENGTH];
+int keyprovided = 0;
+char hex_to_char(char in)
+{
+    if (isdigit(in))
+    {
+	return in - '0';
+    }
+    else if (islower(in))
+    {
+	return in - 'a' + 10;
+    }
+    else /* isupper(in) */
+    {
+	return in - 'A' + 10;
+    }
+}
+
+/*
+ * Read a string of hexadecimal digits and write out bytes to a
+ * string. Returns 0 if there are any non-hex characters, or there are
+ * less than 2*memsize characters in the source null-terminated string.
+ */
+int hex_to_mem(unsigned char * dest, const unsigned char * source, int memsize)
+{
+    int result = 1;
+    int i = 0;
+    for (i = 0; i < memsize && result; i++)
+    {
+	if (isxdigit(source[2*i]) && isxdigit(source[2*i + 1]))
+	{
+	    dest[i] = (hex_to_char(source[2*i]) << 4) |
+		hex_to_char(source[2*i + 1]);
+	}
+	else
+	{
+	    result = 0;
+	}
+    }
+    return result;
+}
+
 /*
  * We want to be able to compress slices by themselves, so we need
  * to know where the slice starts when reading the input file for
@@ -479,6 +522,11 @@ main(int argc, char *argv[])
                         break;
                 case 'k':
                         // Encryption key
+		        if (!hex_to_mem(key, optarg,
+					EVP_MAX_KEY_LENGTH)) {
+                            usage();
+                        }
+                        keyprovided = 1;
 			break;
 		case 'h':
 		case '?':
@@ -1605,7 +1653,7 @@ static void     checksum_finish(blockhdr_t *hdr);
 #ifdef WITH_CRYPTO
 void encrypt_start(blockhdr_t *hdr);
 void encrypt_chunk(uint8_t *buf, off_t size);
-void encrypt_finish(uint8_t *outbuf);
+void encrypt_finish(uint8_t *outbuf, uint32_t *out_size);
 #endif
 
 /*
@@ -1821,7 +1869,7 @@ compress_image(void)
                 if (do_encrypt) {
                         encrypt_start(blkhdr);
                         encrypt_chunk(output_buffer + DEFAULTREGIONSIZE, blkhdr->size);
-                        encrypt_finish(output_buffer + DEFAULTREGIONSIZE);
+                        encrypt_finish(output_buffer + DEFAULTREGIONSIZE, &(blkhdr->size));
                 } else 
 #endif
                         /*
@@ -1939,7 +1987,7 @@ compress_image(void)
                 if (do_encrypt) {
                         encrypt_start(blkhdr);
                         encrypt_chunk(output_buffer + DEFAULTREGIONSIZE, blkhdr->size);
-                        encrypt_finish(output_buffer + DEFAULTREGIONSIZE);
+                        encrypt_finish(output_buffer + DEFAULTREGIONSIZE, &(blkhdr->size));
                 } else 
 #endif
                         /*
@@ -2324,7 +2372,6 @@ static EVP_CIPHER_CTX cipher_ctx;
 static const EVP_CIPHER *cipher;
 /* XXX: the size of the IV may have to change with different ciphers */
 static uint8_t iv[EVP_MAX_KEY_LENGTH];
-static uint8_t key[EVP_MAX_KEY_LENGTH];
 
 /*
  * For the time being, at least, we have to encrypt into a seperate buffer
@@ -2367,9 +2414,11 @@ encrypt_start(blockhdr_t *hdr) {
                  * XXX - we generate a key, we need to also support taking one
                  * on the command line
                  */
-                if (!RAND_bytes(key, sizeof(key))) {
-                        fprintf(stderr,"Unable to generate random key\n");
-                        exit(1);
+                if (!keyprovided) {
+                    if (!RAND_bytes(key, sizeof(key))) {
+                            fprintf(stderr,"Unable to generate random key\n");
+                            exit(1);
+                    }
                 }
                 printf("Key: 0x");
                 for (i = 0; i < EVP_MAX_KEY_LENGTH; i++) {
@@ -2418,7 +2467,7 @@ encrypt_chunk(uint8_t *buf, off_t size) {
 }
 
 void
-encrypt_finish(uint8_t *outbuf) {
+encrypt_finish(uint8_t *outbuf, uint32_t *out_size) {
     int encrypted_this_round = 0;
     EVP_EncryptFinal(&cipher_ctx, ebuffer_current, &encrypted_this_round);
     encrypted_bytes += encrypted_this_round;
@@ -2427,6 +2476,8 @@ encrypt_finish(uint8_t *outbuf) {
      * XXX - check for going off off the end of the chunk buffer
      */
     memcpy(outbuf,encryption_buffer,encrypted_bytes);
+    assert(encrypted_bytes + DEFAULTREGIONSIZE <= SUBBLOCKSIZE);
+    *out_size = encrypted_bytes;
 }
 
 #endif
