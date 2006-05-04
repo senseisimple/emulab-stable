@@ -239,7 +239,7 @@ int hex_to_mem(char * dest, char * source, int memsize)
  * Read memsize bytes from dest and write the hexadecimal equivalent
  * into source. source must have 2*memsize + 1 bytes available.
  */
-void mem_to_hex(char * dest, char * source, int memsize)
+void mem_to_hex(unsigned char * dest, unsigned char * source, int memsize)
 {
     int i = 0;
     for (i = 0; i < memsize; i++)
@@ -649,6 +649,7 @@ main(int argc, char *argv[])
 			break;
 #endif
 		case 'c':
+#ifdef SIGN_CHECKSUM
 		        if (!hex_to_mem(checksum_master_key, optarg,
 					1)) {
 			    use_checksum = 0;
@@ -656,7 +657,11 @@ main(int argc, char *argv[])
 			} else {
 			    use_checksum = 1;
 			}
+#else
+			use_checksum = 1;
+#endif
 		        break;
+#ifdef WITH_CRYPTO
 		case 'k':
 		        if (!hex_to_mem(encryption_key, optarg,
 					EVP_MAX_KEY_LENGTH)) {
@@ -666,6 +671,7 @@ main(int argc, char *argv[])
 			    do_decrypt = 1;
 			}
 		        break;
+#endif
 		case 'h':
 		case '?':
 		default:
@@ -1150,15 +1156,15 @@ verify_checksum(blockhdr_t *blockhdr, const char *bodybufp)
     SHA1_Final(calculated_sum, &sum_context);
     memcpy(blockhdr->checksum, alleged_sum, CHECKSUM_LEN_MAX);
 
-//    if (memcmp(alleged_sum, calculated_sum, CHECKSUM_LEN_SHA1) != 0)
+    if (memcmp(alleged_sum, calculated_sum, CHECKSUM_LEN_SHA1) != 0)
     {
 	char sumstr[CHECKSUM_LEN_SHA1*2 + 1];
-//	fprintf(stderr, "Checksums do not match:\n");
+	fprintf(stderr, "Checksums do not match:\n");
 	mem_to_hex(sumstr, alleged_sum, CHECKSUM_LEN_SHA1);
-	fprintf(stderr, "  Alleged: 0x%s\n", sumstr);
+	fprintf(stderr, "  Alleged:    0x%s\n", sumstr);
 	mem_to_hex(sumstr, calculated_sum, CHECKSUM_LEN_SHA1);
 	fprintf(stderr, "  Calculated: 0x%s\n", sumstr);
-//	exit(1);
+	exit(1);
     }
 }
 
@@ -1248,6 +1254,10 @@ inflate_subblock(const char *chunkbufp)
 			chunkbufp = plaintext;
 		}
 #endif
+		imageversion = 4;
+		curregion = (struct region *) (blockhdr + 1);
+		getrelocinfo(blockhdr);
+		break;
 	case COMPRESSED_V2:
 	case COMPRESSED_V3:
 		imageversion = 2;
@@ -1282,7 +1292,6 @@ inflate_subblock(const char *chunkbufp)
 	/*
 	 * Start with the first region. 
 	 */
-	fprintf(stderr, "start: %d, size: %d\n", curregion->start, curregion->size);
 	offset = sectobytes(curregion->start);
 	size   = sectobytes(curregion->size);
 	assert(size > 0);

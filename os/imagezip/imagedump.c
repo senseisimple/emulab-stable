@@ -581,7 +581,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
                   */
                  memset(hdr->checksum,0,sizeof(hdr->checksum));
                  SHA1_Init(&sha_ctx);
-                 SHA1_Update(&sha_ctx,buf,SUBBLOCKSIZE);
+                 SHA1_Update(&sha_ctx,buf,hdr->size + hdr->regionsize);
                  SHA1_Final(calc_digest,&sha_ctx);
                  for (i = 0; i < digest_len; i++) {
                           if (calc_digest[i] != stored_digest[i]) {

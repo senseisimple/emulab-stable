@@ -1836,11 +1836,11 @@ compress_image(void)
                  * after compression, which probably has better cache behavior.
                  */
                 checksum_start(blkhdr);
-                checksum_chunk(output_buffer, sizeof(output_buffer)
-			       /*blkhdr->size + blkhdr->regionsize*/);
+                checksum_chunk(output_buffer,
+			       blkhdr->size + blkhdr->regionsize);
                 /* TODO: Remove me JD: This is the wrong size. We
-                /* don't want to hash the padding at the end:
-                /* sizeof(output_buffer)*/
+                 * don't want to hash the padding at the end:
+                 * sizeof(output_buffer)*/
                 checksum_finish(blkhdr);
 
 		/*
@@ -1949,8 +1949,8 @@ compress_image(void)
                         memset(blkhdr->enc_iv,0,sizeof(blkhdr->enc_iv));
 
                 checksum_start(blkhdr);
-                checksum_chunk(output_buffer, sizeof(output_buffer)
-			       /*blkhdr->size + blkhdr->regionsize*/);
+                checksum_chunk(output_buffer,
+			       blkhdr->size + blkhdr->regionsize);
                 checksum_finish(blkhdr);
 
 		/*
@@ -2277,6 +2277,7 @@ compress_finish(uint32_t *subblksize)
  * Checksum functions
  */
 SHA_CTX sha_ctx;
+RSA signature_key;
 void
 checksum_start(blockhdr_t *hdr) {
         /*
@@ -2304,7 +2305,15 @@ checksum_finish(blockhdr_t *hdr) {
          * Important! The digest field in the header MUST be big enough to hold
          * the digest output by the finalizing function!
          */
-        SHA1_Final(hdr->checksum, &sha_ctx);
+#ifdef SIGN_CHECKSUM
+        unsigned char checksum[CHECKSUM_LEN_SHA1];
+        SHA1_Final(checksum, &sha_ctx);
+
+	RSA_public_encrypt(CHECKSUM_SHA1, checksum, hdr->checksum,
+			   &signature_key, RSA_PKCS1_OAEP_PADDING);
+#else
+	SHA1_Final(hdr->checksum, &sha_ctx);
+#endif
 }
 
 #ifdef WITH_CRYPTO

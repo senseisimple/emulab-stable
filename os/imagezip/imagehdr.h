@@ -65,6 +65,8 @@ struct blockhdr_V2 {
 };
 
 #define CHECKSUM_LEN_MAX 64
+/* SIGNATURE_KEY_LENGTH must be greater than CHECKSUM_LEN_MAX + 41 */
+#define SIGNATURE_KEY_LENGTH 256
 
 /*
  * Version 3 of the block descriptor adds support for integrety protection
@@ -90,8 +92,7 @@ struct blockhdr_V4 {
         //uint32_t        enc_iv    ;     /* Initialization vector */
         int8_t          enc_iv[8];      /* Initialization vector */
         uint32_t        checksumtype;   /* Which checksum was used */
-        unsigned char   checksum[CHECKSUM_LEN_MAX]; /* Checksum, leave room for 512 bits */
-        /* TODO: Some signature field needs to go here */
+        unsigned char   checksum[SIGNATURE_KEY_LENGTH]; /* Checksum, leave room for 512 bits */
 };
 
 /*
