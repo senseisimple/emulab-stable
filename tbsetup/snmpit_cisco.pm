@@ -1941,7 +1941,7 @@ sub writeConfigTFTP($$$) {
 #
 # Usage: debug($self, $message, $level)
 #
-sub debug($$:$) {
+sub debug($$;$) {
     my $self = shift;
     my $string = shift;
     my $debuglevel = shift;
