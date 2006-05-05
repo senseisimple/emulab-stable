@@ -465,9 +465,17 @@ TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 # Okay, we can spit back a header now that there is no worry of redirect.
 PAGEHEADER("Create an Experiment Template");
 
-echo "<b>Starting template creation!</b> ... ";
-echo "this will take a few moments; please be patient.";
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
+
+echo "<center>\n";
+echo "<b>Starting template creation!</b> ...<br>\n";
+echo "This will take a few moments; please be patient.<br>\n";
 echo "<br><br>\n";
+echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
+echo "<br><br>\n";
+echo "</center>\n";
 flush();
 
 # And run that script!
@@ -479,6 +487,11 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 if ($deletensfile) {
     unlink($thensfile);
 }
+
+/* Clear the various 'loading' indicators. */
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "ClearLoadingIndicators();\n";
+echo "</script>\n";
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -494,10 +507,20 @@ if ($retval) {
     return;
 }
 
+unset($guid);
+if (TBPidTid2Template($pid, $tid, $guid, $version)) {
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
+    echo "</script>\n";
+}
+
+#
+# In case the above fails.
+#
 echo "Done!";
 echo "<br><br>\n";
 
-if (TBPidTid2Template($pid, $tid, $guid, $version)) {
+if (isset($guid)) {
     SHOWTEMPLATE($guid, $version);
 }
 

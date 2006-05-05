@@ -227,6 +227,10 @@ if (count($errors)) {
     exit(1);
 }
 
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
+
 #
 # Generate a unique and hard to guess filename, and write NS to it.
 #
@@ -242,9 +246,13 @@ chmod($nsfile, 0666);
 # Need this for running scripts.
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
-echo "<b>Starting template modification!</b> ... ";
-echo "this will take a few moments; please be patient.";
+echo "<center>\n";
+echo "<b>Starting template modification!</b> ...<br>\n";
+echo "This will take a few moments; please be patient.<br>\n";
 echo "<br><br>\n";
+echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
+echo "<br><br>\n";
+echo "</center>\n";
 flush();
 
 # And run that script!
@@ -254,6 +262,11 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 SUEXEC_ACTION_IGNORE);
 
 unlink($nsfile);
+
+/* Clear the various 'loading' indicators. */
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "ClearLoadingIndicators();\n";
+echo "</script>\n";
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -269,10 +282,20 @@ if ($retval) {
     return;
 }
 
+unset($guid);
+if (TBPidTid2Template($pid, $tid, $guid, $version)) {
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
+    echo "</script>\n";
+}
+
+#
+# In case the above redirect fails.
+#
 echo "Done!";
 echo "<br><br>\n";
 
-if (TBPidTid2Template($pid, $tid, $guid, $version)) {
+if (isset($guid)) {
     SHOWTEMPLATE($guid, $version);
 }
 
