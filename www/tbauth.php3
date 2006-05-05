@@ -130,7 +130,7 @@ function CHECKLOGIN($uid) {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $CHECKLOGIN_NODETYPES;
     global $CHECKLOGIN_WIKINAME, $TBOPSPID;
-    global $EXPOSEARCHIVE;
+    global $EXPOSEARCHIVE, $EXPOSETEMPLATES;
     global $nocookieauth;
     #
     # If we already figured this out, do not duplicate work!
