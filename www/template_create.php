@@ -259,6 +259,7 @@ if (!isset($create)) {
     }
 
     SPITFORM($defaults, 0);
+    PAGEFOOTER();
     return;
 }
 elseif (! isset($formfields)) {
