@@ -24,6 +24,7 @@ include("showlogfile_sup.php3");
 # Used below
 unset($parameter_xmlfile);
 $deletexmlfile = 0;
+$batchmode     = 0;
 
 #
 # Spit the form out using the array of data.
@@ -38,7 +39,7 @@ function SPITFORM($formfields, $parameters, $errors)
     echo "<center>\n";
     SHOWTEMPLATE($guid, $version);
     echo "</center>\n";
-    echo "<br><br>\n";
+    echo "<br>\n";
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -60,6 +61,14 @@ function SPITFORM($formfields, $parameters, $errors)
                   </tr>\n";
 	}
 	echo "</table><br>\n";
+    }
+    else {
+	echo "<blockquote><blockquote><font size=+1>";
+	echo "Template Instantiation will map your template onto actual ".
+	    "testbed hardware. This used to be known as ".
+	    "<em>experiment swapin</em> ".
+	    "but we decided we like <em>instantiation</em> better.";
+	echo "</font></blockquote></blockquote><br>\n";
     }
 
     echo "<form action=template_swapin.php?guid=$guid&version=$version ".
@@ -208,6 +217,25 @@ function SPITFORM($formfields, $parameters, $errors)
 	echo "</td></tr>\n";
 	echo "</table></td></tr>";
     }
+
+    #
+    # Batch Experiment?
+    #
+    echo "<tr>
+	      <td class='pad4' colspan=2>
+	      <input type=checkbox name='formfields[batched]' value='Yep'";
+
+    if (isset($formfields[batched]) &&
+	strcmp($formfields[batched], "Yep") == 0) {
+	echo " checked='1'";
+    }
+    echo ">\n";
+    echo "Batch Mode Instantiation &nbsp;
+	  <font size='-1'>(See
+          <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+          for more information)</font>
+	  </td>
+	  </tr>\n";
 
     echo "<tr>
               <td class='pad4' align=center colspan=2>
@@ -477,6 +505,14 @@ if (count($parameter_masterlist)) {
     $command_options .= " -p $parameter_xmlfile";
 }
 
+#
+# Batchmode
+#
+if (isset($formfields[batched]) && $formfields[batched] == "Yep") {
+    $command_options .= " -b";
+    $batchmode = 1;
+}
+
 if (count($errors)) {
     SPITFORM($formfields, $parameters, $errors);
     PAGEFOOTER();
@@ -532,7 +568,24 @@ if ($retval) {
     return;
 }
 
-STARTLOG($pid, $eid);
+#
+# This does both the log output, and the state change watcher popup
+#
+if ($batchmode) {
+    echo "You template instantation has been queued and will run when
+          enough resources become available. This might happen
+          immediately, or it may take hours or days; you will be
+          notified via email when insantiation is complete, and again when
+          your experiment has completed.  In the meantime, you can check the
+          progress on the <A href='showexp.php3?pid=$pid&eid=$eid'>web page</A>
+          to see how many attempts have been made, and when the
+          last attempt was.\n";
+  
+    STARTWATCHER($pid, $eid);
+}
+else {
+    STARTLOG($pid, $eid);
+}
 
 #
 # Standard Testbed Footer

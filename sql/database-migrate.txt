@@ -3309,5 +3309,5 @@ last_net_act,last_cpu_act,last_ext_act);
 4.54: Minor changes to schema; add some quotes around field names that
       are now reserved words mysql 5.X. Skip to the next entry ...
 
-
+4.55: Changes to templates.sql. Skip this revision for now.
 

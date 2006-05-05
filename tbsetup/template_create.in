@@ -71,8 +71,9 @@ my $guid;
 my $version = 1;
 my $archive_idx = 0;
 # For the END block below.
-my $cleaning   = 0;
+my $cleaning    = 0;
 my $exptcreated = 0;
+my $justexit    = 1;
 
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
@@ -257,6 +258,33 @@ if (libTemplates::NewTemplateRecord(\%args) < 0) {
 # Now safe to unlock; the tid/eid is reserved;
 DBQueryFatal("unlock tables");
 
+#
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
+#
+# The description is versioned metadata the user can modify.
+#
+libTemplates::NewTemplateMetadata($guid, $version,
+				  "description", $description) == 0
+    or fatal(-1, "Failed to insert metadata record for description");
+
+#
+# The TID is versioned metadata the user can modify.
+#
+libTemplates::NewTemplateMetadata($guid, $version, "TID", $tid) == 0
+    or fatal(-1, "Failed to insert metadata record for description");
+
+#
+# Copy the rest of the metadata.
+#
+if ($modify) {
+    libTemplates::CopyTemplateMetadata($parent_guid, $parent_vers, $version)
+	== 0 or fatal(-1, "Failed to copy metadata records");
+}
+
 # Now invoke batchexp to preload the experiment. Note special -x option.
 system("$batchexp ". 
        "-x " . ($modify ? "T${parent_guid}-${parent_vers}" : "-") . " " .
@@ -307,6 +335,35 @@ $args{'archive_idx'} = $archive_idx;
 libTemplates::UpdateTemplateRecord($guid, $version, \%args) == 0
     or fatal(-1, "Could not update template record!");
 
+#
+# Copy the virt_parameters table to the formal parameters table.
+# I am not sure about the need for this table yet, but the only way
+# to get the parameters is via the parser, but we want to save this
+# info forever (after the underlying experiment is terminated).
+#
+$query_result =
+    DBQueryWarn("select name,value from virt_parameters ".
+              "where pid='$pid' and eid='$eid'");
+
+fatal(-1, "Could not get virt_parameters for $pid/$eid")
+    if (! $query_result);
+
+while (my ($name, $value) = $query_result->fetchrow_array()) {
+    if (defined($value)) {
+      $value = DBQuoteSpecial($value);
+    }
+    else {
+      $value = "NULL";
+    }
+    
+    DBQueryWarn("insert into experiment_template_parameters set ".
+		"  parent_guid='$guid', ".
+		"  parent_vers='$version', ".
+		"  pid='$pid', tid='$tid', ".
+		"  name='$name', value=$value")
+	or fatal(-1, "Could not set formal parameter for $pid/$eid")
+}
+    
 #
 # Generate the graph for the template.
 #
@@ -490,7 +547,7 @@ sub fatal($$)
 
 END {
     # Normal exit, nothing to do.
-    if (!$?) {
+    if (!$? || $justexit) {
 	return;
     }
     my $saved_exitcode = $?;

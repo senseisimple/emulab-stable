@@ -252,7 +252,9 @@ Node instproc unknown {m args} {
 Simulator instproc connect {src dst} {
 }
 
-Simulator instproc define-template-parameter {name args} {
+Simulator instproc define-template-parameter {name value} {
+    # install the name/value in the outer environment.
+    uplevel 1 set \{$name\} \{$value\}
 }
 
 LanNode instproc trace {args} {

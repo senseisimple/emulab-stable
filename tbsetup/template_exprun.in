@@ -307,11 +307,13 @@ if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
     fatal(-1, "Could not update experiment instance record!");
 }
 
-done:
-# Stop the web interface from spewing.
-TBExptCloseLogFile($pid, $eid)
-    if (defined($logname));
+#
+# Restart the event stream from the beginning.
+#
+system("$eventcontrol replay $pid $eid") == 0
+    or fatal(-1, "Could not restart the event system!");
 
+done:
 exit(0);
 
 #

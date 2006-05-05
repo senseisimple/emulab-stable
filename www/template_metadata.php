@@ -28,6 +28,12 @@ function SPITFORM($action, $formfields, $errors)
     
     PAGEHEADER("Manage Template Metadata");
 
+    if ($action == "add") {
+	echo "<center>";
+	echo "<h3>Use this page to attach metadata to your template.</h3>";
+	echo "</center><br>\n";
+    }
+
     if ($errors) {
 	echo "<table class=nogrid
                      align=center border=0 cellpadding=6 cellspacing=0>
@@ -122,29 +128,6 @@ function SPITFORM($action, $formfields, $errors)
 }
 
 #
-# In "show" mode, spit a single entry out with a menu.
-#
-function SPITMETADATA($guid, $version)
-{
-    global $template_guid, $template_vers;
-
-    SUBPAGESTART();
-    SUBMENUSTART("Options");
-
-    WRITESUBMENUBUTTON("Modify Metadata Item",
-		       "template_metadata.php?action=modify&".
-		       "guid=$guid&version=$version");
-
-    WRITESUBMENUBUTTON("Add New Metadata",
-		       "template_metadata.php?action=add&".
-		       "guid=$template_guid&version=$template_vers");
-
-    SUBMENUEND();
-    SHOWMETADATAITEM($guid, $version);
-    SUBPAGEEND();
-}
-
-#
 # On first load, display virgin form and exit.
 #
 if (!isset($submit)) {
@@ -153,11 +136,11 @@ if (!isset($submit)) {
     # 
     if (!isset($guid) ||
 	strcmp($guid, "") == 0) {
-	USERERROR("You must provide a Template ID.", 1);
+	USERERROR("You must provide a GUID.", 1);
     }
     if (!isset($version) ||
 	strcmp($version, "") == 0) {
-	USERERROR("You must provide a Template version", 1);
+	USERERROR("You must provide a version", 1);
     }
     if (!TBvalid_guid($guid)) {
 	PAGEARGERROR("Invalid characters in GUID!");
@@ -166,16 +149,45 @@ if (!isset($submit)) {
 	PAGEARGERROR("Invalid characters in version!");
     }
 
-    if ($action == "modify" || $action == "show") {
+    #
+    # In show mode, we can show any metadata entry, but it cannot be modified
+    # unless its in the context of a template. That might change later?
+    #
+    if ($action == "show") {
 	$metadata_guid = $guid;
 	$metadata_vers = $version;
 
 	#
-	# Find template associated with this metadata item.
+	# Find template associated with this metadata item (for perm check).
 	#
-	if (! TBMetadata2Template($guid, $version,
-				  $template_guid, $template_vers)) {
-	    USERERROR("Invalid metadata guid/version", 1);
+	if (! TBMetadataTemplate($guid, $version, $template_guid)) {
+	    USERERROR("Invalid metadata $guid/$version", 1);
+	}
+    }
+    elseif ($action == "modify") {
+	$template_guid = $guid;
+	$template_vers = $version;
+
+	# Must get the metadata guid and vers we want to change.
+	if (!isset($metadata_guid) || $metadata_guid == "") {
+	    USERERROR("You must provide a metadata GUID", 1);
+	}
+	if (!isset($metadata_vers) || $metadata_vers == "") {
+	    USERERROR("You must provide a metadata version", 1);
+	}
+	if (!TBvalid_guid($metadata_guid)) {
+	    PAGEARGERROR("Invalid characters in GUID!");
+	}
+	if (!TBvalid_integer($metadata_vers)) {
+	    PAGEARGERROR("Invalid characters in metadata version!");
+	}
+
+	#
+	# Verify this metadata is attached to the template.
+	#
+	if (! TBValidTemplateMetadata($metadata_guid, $metadata_vers,
+				      $template_guid, $template_vers)) {
+	    USERERROR("Invalid metadata $guid/$version", 1);
 	}
     }
     else {
@@ -195,16 +207,16 @@ if (!isset($submit)) {
     # Verify Permission.
     #
     if (! TBExptTemplateAccessCheck($uid, $template_guid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to modify experiment template ".
-		  "$template_guid/$template_vers!", 1);
+	USERERROR("You do not have permission to $action metadata in ".
+		  " template $template_guid!", 1);
     }
 
     #
     # For plain show ...
     #
     if ($action == "show") {
-	PAGEHEADER("Manage Template Metadata");
-	SPITMETADATA($metadata_guid, $metadata_vers);
+	PAGEHEADER("Show Metadata");
+	SHOWMETADATAITEM($guid, $version);	
 	PAGEFOOTER();
 	return;
     }
@@ -251,13 +263,25 @@ if ($action == "modify") {
     if (!TBvalid_integer($metadata_vers)) {
 	PAGEARGERROR("Invalid characters in version!");
     }
-
+    if (!isset($template_guid) || $template_guid == "") {
+	USERERROR("You must provide a Template GUID.", 1);
+    }
+    if (!isset($template_vers) || $template_vers == "") {
+	USERERROR("You must provide a Template version", 1);
+    }
+    if (!TBvalid_guid($template_guid)) {
+	PAGEARGERROR("Invalid characters in GUID!");
+    }
+    if (!TBvalid_integer($template_vers)) {
+	PAGEARGERROR("Invalid characters in version!");
+    }
+    
     #
-    # Find template associated with this metadata item.
+    # Verify this metadata is attached to the template.
     #
-    if (! TBMetadata2Template($metadata_guid, $metadata_vers,
-			      $template_guid, $template_vers)) {
-	USERERROR("Invalid metadata guid/version", 1);
+    if (! TBValidTemplateMetadata($metadata_guid, $metadata_vers,
+				  $template_guid, $template_vers)) {
+	USERERROR("Invalid metadata $guid/$version", 1);
     }
 
     # Need this below.
@@ -331,6 +355,22 @@ if ($action == "modify" &&
     $errors["Metadata Value"] = "New value identical to old value";
 }
 
+#
+# XXX Some metadata is special ...
+#
+if ($action == "modify") {
+    if ($formfields[name] == "TID") {
+	if (!TBvalid_eid($formfields[value])) {
+	    $errors["TID"] = TBFieldErrorString();
+	}
+    }
+    elseif ($formfields[name] == "description") {
+	if (!TBvalid_template_description($formfields[value])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+}
+
 if (count($errors)) {
     SPITFORM($action, $formfields, $errors);
     PAGEFOOTER();
@@ -345,30 +385,66 @@ $value = addslashes($formfields[value]);
 
 if ($action == "modify") {
     $query_result =
-	DBQueryFatal("select MAX(vers) from experiment_template_metadata ".
-		     "   as maxvers ".
+	DBQueryFatal("select MAX(vers) ".
+		     " from experiment_template_metadata_items as maxvers ".
 		     "where guid='$metadata_guid'");
 
     $row  = mysql_fetch_array($query_result);
     $maxvers = $row[0];
     $extrastuff = "parent_guid='$metadata_guid',parent_vers='$metadata_vers',";
-    $metadata_vers = $maxvers + 1;
+    $metadata_newvers = $maxvers + 1;
 }
 else {
     TBNewGUID($metadata_guid);
-    $metadata_vers = 1;
+    $metadata_newvers = 1;
     $extrastuff = "";
 }
-DBQueryFatal("insert into experiment_template_metadata set ".
-	     "     guid='$metadata_guid',vers='$metadata_vers', ".
+
+#
+# Insert new item and get back the index.
+#
+DBQueryFatal("insert into experiment_template_metadata_items set ".
+	     "     guid='$metadata_guid',vers='$metadata_newvers', ".
 	     "     template_guid='$template_guid', ".
-	     "     template_vers='$template_vers', ".
 	     $extrastuff .
 	     "     name='$name', value='$value', created=now()");
+
+#
+# Now we can insert (or update) the record for the template.
+#
+if ($action == "modify") {
+    DBQueryFatal("update experiment_template_metadata ".
+		 "  set metadata_vers='$metadata_newvers' ".
+		 "where metadata_guid='$metadata_guid' and ".
+		 "      metadata_vers='$metadata_vers'");		 
+}
+else {
+    DBQueryFatal("insert into experiment_template_metadata set ".
+		 "   metadata_guid='$metadata_guid', ".
+		 "   metadata_vers='$metadata_newvers', ".
+		 "   parent_guid='$template_guid', ".
+		 "   parent_vers='$template_vers'");
+}
+
+#
+# XXX Some metadata is special ...
+#
+if ($action == "modify") {
+    if ($name == "TID") {
+	DBQueryFatal("update experiment_templates set tid='$value' ".
+		     "where guid='$template_guid' and ".
+		     "      vers='$template_vers'");
+    }
+    elseif ($name == "description") {
+	DBQueryFatal("update experiment_templates set description='$value' ".
+		     "where guid='$template_guid' and ".
+		     "      vers='$template_vers'");
+    }
+}
 
 #
 # Zap back to this page, but with show option.
 #
 header("Location: ".
        "template_metadata.php?action=show&guid=$metadata_guid".
-       "&version=$metadata_vers");
+       "&version=$metadata_newvers");

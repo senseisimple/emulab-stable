@@ -31,6 +31,7 @@ sub usage()
 	  "         [-S reason] [-L reason] [-a <time>] [-l <time>] ".
 	  "-e <eid> <guid/vers>\n".
 	  "switches and arguments:\n".
+	  "-b       - batchmode; insert into batch queue\n".
 	  "-w       - wait for template to be instantiated\n".
 	  "-q       - be less chatty\n".
 	  "-p <file>- XML file of parameter bindings\n".
@@ -44,10 +45,11 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:p:";
+my $optlist	 = "qwe:S:L:na:l:se:p:b";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
+my $batchmode    = 0;
 my $foreground   = 0;
 my $paramfile;
 my %parameters   = ();
@@ -73,14 +75,17 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
+my $BOSSNODE    = "@BOSSNODE@";
 
 # Locals
 my $user_name;
 my $user_email;
 my $dbuid;
+my $EVhandle;
 my $logname;
 my $exptidx;
 my $runidx;
+my @ExptStates  = ();
 # For the END block below.
 my $cleaning    = 0;
 my $exptcreated = 0;
@@ -96,6 +101,7 @@ my $endexp      = "$TB/bin/endexp";
 sub ParseArgs();
 sub fatal($$);
 sub sighandler($);
+sub SetupEventHandler();
 
 #
 # Testbed Support libraries
@@ -105,6 +111,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libTemplates;
+use event;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -278,12 +285,14 @@ my $copyeid = "${pid},T${guid}-${version}";
 # Note special -x option.
 #
 my @arguments =
-    ($batchexp, "-x", "T${guid}-${version}", "-y", $instidx, "-q", "-i", "-f",
+    ($batchexp, "-x", "T${guid}-${version}", "-y", $instidx, "-q", "-f",
      "-p", $pid, "-e", $eid, "-g", $gid,
      "-E", "'Experiment Template Instantiation $guid/$version' ",
      "-c" , $copyeid);
 
-# All all the other goo.
+# All the other goo.
+push(@arguments, "-i")
+    if (!$batchmode);
 push(@arguments, "-s")
     if (defined($options{"s"}));
 push(@arguments, "-n")
@@ -311,6 +320,20 @@ if (! TBExptIDX($pid, $eid, \$exptidx)) {
     fatal(-1, "Could not get experiment index for $pid,$eid!");
 }
 
+#
+# Update the Instance
+#
+%args = ();
+$args{'exptidx'}     = $exptidx;
+
+if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
+					       $instidx, 0, \%args) < 0) {
+    fatal(-1, "Could not update experiment instance record $instidx!");
+}
+
+# Event connect now that experiment is created.
+SetupEventHandler();
+
 my $workdir = TBExptWorkDir($pid, $eid);
 my $userdir = TBExptUserDir($pid, $eid);
 
@@ -331,9 +354,12 @@ $SIG{TERM} = \&sighandler;
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $foreground) {
-    $logname = TBExptCreateLogFile($pid, $eid, "swapin");
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    $logname = TBExptCreateLogFile($pid, $eid, "instantiate");
+
+    if (! $batch) {
+	TBExptSetLogFile($pid, $eid, $logname);
+	TBExptOpenLogFile($pid, $eid);
+    }
 
     if (my $childpid = TBBackGround($logname)) {
 	#
@@ -343,12 +369,19 @@ if (! $foreground) {
 	$justexit = 1;
 
 	if (!$waitmode) {
-	    print("Experiment $pid/$eid is now being $action.\n".
-		  "You will be notified via email when the this is done.\n")
-		if (! $quiet);
+	    if ($batch) {
+		print("Experiment $pid/$eid has entered the batch system.\n".
+		      "You will be notified when it is fully instantiated.\n")
+		    if (! $quiet);
+	    }
+	    else {
+		print("Experiment $pid/$eid is now being instantiated.\n".
+		      "You will be notified via email when this is done.\n")
+		    if (! $quiet);
+	    }
 	    exit(0);
 	}
-	print("Waiting for experiment $eid to finish its swap${action}\n")
+	print("Waiting for experiment $eid to fully instantiate.\n")
 	    if (! $quiet);
 	    
 	if (isatty(STDIN) && !$quiet) {
@@ -389,13 +422,65 @@ if ($waitmode) {
 }
 
 #
-# Now do the swapin.
+# Now do the swapin (or it gets queued if a batch experiment).
 #
 @arguments = ($swapexp, "-q", "-x", "-s", "in", $pid, $eid);
 
 system(@arguments);
 fatal($? >> 8, "Could not instantiate the experiment")
     if ($?);
+
+#
+# We will spew forth info to the user each time the batch daemon tries to
+# swap it in. 
+#
+if ($batchmode) {
+    #
+    # Spin waiting for the state to change in swapexp. We are waiting for
+    # it to swapin or go back to swapped.
+    #
+    my $queued = 0;
+    
+    while (1) {
+	@ExptStates = ();
+	event_poll_blocking($EVhandle, 500);
+
+	next
+	    if (! @ExptStates);
+
+	foreach my $state (@ExptStates) {
+	    print "$state\n";
+	    
+	    if ($state eq EXPTSTATE_ACTIVATING()) {
+		print "Experiment is starting a swapin attempt ...\n";
+	    }
+	    elsif ($state eq EXPTSTATE_ACTIVE()) {
+		print "Experiment swapped in!\n";
+		goto done;
+	    }
+	    elsif ($state eq EXPTSTATE_QUEUED()) {
+		# Failed to swapin; still queued in the batch system.
+		if (! $queued) {
+		    print "Experiment has entered the batch system\n";
+		    $queued = 1;
+		}
+		else {
+		    print "Experiment swapin attempt failed.\n";
+		}
+	    }
+	    elsif ($state eq EXPTSTATE_SWAPPED()) {
+		# Dumped out of the batch system for some reason.
+		print "Experiment ha been removed from the batch queue.\n";
+
+		#
+		# We are done; remove record of this attempt and exit.
+		#
+		fatal(1, "Experiment has been removed from the batch queue");
+	    }
+	}
+    }
+  done:
+}
 
 #
 # All instances currently start with a default run.
@@ -412,8 +497,7 @@ if (libTemplates::NewTemplateExerimentRunRecord(\%args, \$runidx) < 0) {
 # Update the Instance
 #
 %args = ();
-$args{'exptidx'}     = $exptidx;
-$args{'runidx'}      = $runidx;
+$args{'runidx'} = $runidx;
 
 if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
 					       $instidx, 1, \%args) < 0) {
@@ -442,7 +526,7 @@ if ($paramfile) {
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)
-    if (defined($logname));
+    if (defined($logname) && !$batch);
 
 exit(0);
 
@@ -496,6 +580,9 @@ sub ParseArgs()
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
+    }
+    if (defined($options{"b"})) {
+	$batchmode = 1;
     }
     if (defined($options{"S"})) {
 	if ($options{"S"} =~ /^(.*)$/) {
@@ -568,6 +655,54 @@ sub ParseArgs()
 }
 
 #
+# Subscribe to experiment state change events.
+#
+sub SetupEventHandler()
+{
+    my $port = @BOSSEVENTPORT@;
+    my $URL  = "elvin://localhost:$port";
+    
+    # Connect to the event system, and subscribe the the events we want
+    $EVhandle = event_register($URL, 0);
+    
+    if (!$EVhandle) {
+	tbdie("Unable to register with event system\n");
+    }
+
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	tbdie("Could not allocate an address tuple\n");
+    }
+
+    %$tuple = ( objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
+		objname   => "$pid/$eid",
+		expt      => "$pid/$eid",
+		host      => $BOSSNODE,
+	      );
+    
+    if (!event_subscribe($EVhandle, \&EventHandler, $tuple)) {
+	tbdie("Could not subscribe to events\n");
+    }
+}
+
+#
+# Callback for above.
+#
+sub EventHandler($$$) {
+    my ($handle,$notification,undef) = @_;
+    
+    my $objname   = event_notification_get_objname($handle,$notification);
+    my $eventtype = event_notification_get_eventtype($handle,$notification);
+
+    print "$objname, $eventtype\n";
+
+    return
+	if ($objname ne "$pid/$eid");
+
+    push(@ExptStates, $eventtype);
+}
+
+#
 # Cleanup the mess.
 #
 sub cleanup()
@@ -582,14 +717,12 @@ sub cleanup()
 	exit(-1)
 	    if ($?);
     }
-    libTemplates::DeleteTemplateExerimentRunRecord($exptidx, $runidx)
-	if (defined($runidx));
+    libTemplates::DeleteTemplateInstanceRecord($guid, $version, $instidx)
+	if (defined($instidx));
 
-    if (defined($instidx)) {
-	libTemplates::DeleteTemplateInstanceBindingRecords($guid,
-							   $version, $instidx);
-	libTemplates::DeleteTemplateInstanceRecord($guid, $version, $instidx);
-    }
+    # Stop the web interface from spewing.
+    TBExptCloseLogFile($pid, $eid)
+	if (defined($logname) && !$batch);
 }
 
 sub fatal($$)

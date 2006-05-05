@@ -915,7 +915,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 
         echo "<tr>
                 <td>Status: </td>
-                <td class=\"left\">$exp_state $expt_locked</td>
+                <td id=exp_state class=\"left\">$exp_state $expt_locked</td>
               </tr>\n";
 
 	if ($err_cause) {

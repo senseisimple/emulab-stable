@@ -595,18 +595,30 @@ CREATE TABLE experiment_template_instances (
 --
 
 CREATE TABLE experiment_template_metadata (
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  metadata_guid varchar(16) NOT NULL default '',
+  metadata_vers smallint(5) unsigned NOT NULL default '0',
+  internal tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (parent_guid, parent_vers, metadata_guid, metadata_vers)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_metadata_items`
+--
+
+CREATE TABLE experiment_template_metadata_items (
   guid varchar(16) NOT NULL default '',
   vers smallint(5) unsigned NOT NULL default '0',
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned NOT NULL default '0',
   template_guid varchar(16) NOT NULL default '',
-  template_vers smallint(5) unsigned NOT NULL default '0',
   name varchar(64) NOT NULL default '',
   value tinytext,
   created datetime default NULL,
-  PRIMARY KEY  (guid,vers,name),
-  KEY parent_guid (parent_guid,parent_vers),
-  KEY template_guid (template_guid,template_vers)
+  PRIMARY KEY (guid, vers),
+  KEY parent (parent_guid,parent_vers),
+  KEY template (template_guid)
 ) TYPE=MyISAM;
 
 --

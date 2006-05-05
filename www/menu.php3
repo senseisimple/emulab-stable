@@ -10,6 +10,7 @@ $login_uid        = 0;
 $drewheader       = 0;
 $noheaders	  = 0;
 $autorefresh      = 0;
+$currentusage     = 1;
 
 #
 # This has to be set so we can spit out http or https paths properly!
@@ -658,7 +659,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     global $TBDIR, $WWW;
     global $MAINPAGE;
     global $TBDOCBASE;
-    global $autorefresh;
+    global $autorefresh, $currentusage;
 
     $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/");
 
@@ -708,10 +709,12 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
                  <area shape=rect coords=\"0,0,339,100\"
                        href='$TBDOCBASE/index.php3'>
               </map>
-            <div class='bannercell'>
-	       <iframe src=$BASEPATH/currentusage.php3 class='usageframe'
-                 scrolling=no frameborder=0></iframe></td>
-              <img height=100 border=0 usemap=\"#overlaymap\" ";
+            <div class='bannercell'>\n";
+	if ($currentusage) {
+	    echo "<iframe src=$BASEPATH/currentusage.php3 class='usageframe'
+                          scrolling=no frameborder=0></iframe>\n";
+	}
+	echo "<img height=100 border=0 usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
 	    echo "width=239 ";

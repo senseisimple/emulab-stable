@@ -5,8 +5,9 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
-include("template_defs.php");
+require("Sajax.php");
+sajax_init();
+sajax_export("GetExpState");
 
 #
 # Only known and logged in users can look at experiments.
@@ -53,6 +54,27 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 }
 
 #
+# For the Sajax Interface
+#
+function GetExpState($a, $b)
+{
+    global $pid, $eid;
+    
+    $expstate = TBExptState($pid, $eid);
+
+    return $expstate;
+}
+#
+# See if this request is to the above function. Does not return
+# if it is. Otherwise return and continue on.
+#
+sajax_handle_client_request();
+
+# Faster to do this after the sajax stuff
+include("showstuff.php3");
+include("template_defs.php");
+
+#
 # Need some DB info.
 #
 $query_result =
@@ -86,6 +108,13 @@ if ($isinstance) {
 # Standard Testbed Header.
 #
 PAGEHEADER("$tag ($pid/$eid)");
+
+echo "<script type='text/javascript' language='javascript' src='showexp.js'>";
+echo "</script>\n";
+echo "<script type='text/javascript' language='javascript'>\n";
+sajax_show_javascript();
+echo "StartStateChangeWatch('$pid', '$eid', '$expstate');\n";
+echo "</script>\n";
 
 #
 # Get a list of node types and classes in this experiment

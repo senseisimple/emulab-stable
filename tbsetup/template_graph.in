@@ -13,17 +13,19 @@ use Getopt::Std;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_graph <guid>\n".
+	  "Usage: template_graph [-a] <guid>\n".
 	  "switches and arguments:\n".
 	  "-v          - be more chatty\n".
+	  "-a          - Show all templates (ignore hidden bit)\n".
 	  "-p <prefix> - prefix for output files.\n".
 	  "<guid>      - GUID to graph\n");
     exit(-1);
 }
-my $optlist	 = "vp:";
+my $optlist	 = "vap:";
 my %options      = ();
 my $verbose      = 0;
 my $prefix       = "/tmp/dot$$";
+my $showall      = 0;
 my $guid;
 
 #
@@ -88,29 +90,109 @@ my $giffile	= "$prefix.gif";
 # Grab all the parent pointers.
 #
 my $query_result =
-    DBQueryFatal("select vers, parent_vers from experiment_templates ".
+    DBQueryFatal("select vers,parent_vers,hidden,tid ".
+		 "  from experiment_templates ".
 		 "where guid='$guid' ".
 		 "order by vers");
 
+#
+# If nothing left, remove the graph entry.
+#
+if (! $query_result->num_rows) {
+    print "Clearing graph entry for template $guid ...\n";
+    
+    DBQueryFatal("delete from experiment_template_graphs ".
+		 "where parent_guid='$guid'");
+    exit(0);
+}
+
+#
+# Build up lists of children.
+#
+my %hidden	= ();
+my %tids        = ();
+my %children    = ();
+my $rootnode    = 1;	# XXX
+
+while (my ($vers,$parent_vers,$hidden,$tid) =
+       $query_result->fetchrow_array()) {
+    $tids{$vers}   = $tid;
+    $hidden{$vers} = $hidden;
+
+    next
+	if (!defined($parent_vers));
+
+    $children{$parent_vers} = []
+	if (!exists($children{$parent_vers}));
+    push(@{ $children{$parent_vers} }, $vers);
+}
+
+#
+# If the root node is hidden (a silly thing to do), then we are done.
+#
+if ($hidden{$rootnode}) {
+    print "Root node hidden; clearing graph entry for template $guid ...\n";
+    
+    DBQueryFatal("delete from experiment_template_graphs ".
+		 "where parent_guid='$guid'");
+    exit(0);
+}
+
 open(DOT, "> $dotfile") or
-    tbdie("Could not opern $dotfile!");
+    tbdie("Could not open $dotfile!");
 
 print DOT "digraph TemplateGraph {\n";
-print DOT "  node [shape=ellipse]\n";
+print DOT "  size=\"8,8\"\n";
+print DOT "  fontname=\"Courier\"\n";
+print DOT "  node [shape=rectangle,fontsize=10,height=0.3,width=0.8,fixedsize=true]\n";
 print DOT "  edge [fontsize=8]\n";
 print DOT "  subgraph guid {\n";
 print DOT "    label = \"$guid\";\n";
 
-while (my ($vers, $parent_vers) = $query_result->fetchrow_array()) {
+# Start with root and decend all children where hidden=0.
+my @kids = ($rootnode);
+
+while (@kids) {
+    my $vers = shift(@kids);
+
+    my $tid = $tids{$vers};
     my $url = "$TBBASE/template_show.php?guid=$guid&version=$vers";
+
+    my $query_result =
+	DBQueryFatal("select name,value from experiment_template_parameters ".
+		     "where parent_guid='$guid' and parent_vers='$vers'");
+
+    my $table = "<table cellpadding=0 cellspacing=0 border=0> ".
+	"<tr><td>Version:</td><td>$vers</td></tr>".
+	"<tr><td>TID:</td><td>$tid</td></tr>";
+
+    if ($query_result->num_rows) {
+	$table .= "<tr><td>Parameters:</td>".
+	    "<td><table cellpadding=0 cellspacing=0 border=0>";
+
+	while (my ($name, $value) = $query_result->fetchrow_array()) {
+	    $table .= "<tr><td>$name</td><td>$value</td></tr>";
+	}
+	$table .= "</table></td>";
+    }
+
+    $table .= "</table>";
+	
+    my $tooltip = "return escape(\'$table\')";
 	
     if (!exists($versions{"$vers"})) {
-	print DOT "    $vers [label=\"$vers\",href=\"$url\"];\n";
+	print DOT "    $vers [label=\"$tid\",href=\"$url\",".
+	    "tooltip=\"$tooltip\"];\n";
 	$versions{"$vers"} = $vers;
     }
-    print DOT "    $parent_vers -> $vers;\n"
-	if (defined($parent_vers));
-    
+
+    foreach my $kid (@{ $children{$vers} }) {
+	next
+	    if ($hidden{$kid});
+
+	print DOT "    $vers -> $kid;\n";
+	push(@kids, $kid);
+    }
 }
 print DOT "  }\n";
 print DOT "}\n";
@@ -127,6 +209,13 @@ system("$DOT -Tcmapx -o $imapfile $dotfile");
 #
 my $gifdata = `cat $giffile`;
 my $imapdata = `cat $imapfile`;
+
+#
+# Massage the mapfile; tooltips --> onmouseovers
+#
+$imapdata =~ s/title=/onmouseover=/g;
+
+print "$imapdata\n";
 
 $gifdata = DBQuoteSpecial($gifdata);
 $imapdata = DBQuoteSpecial($imapdata);
@@ -174,5 +263,8 @@ sub ParseArgs()
 	else {
 	    tbdie("Bad data in argument: $prefix");
 	}
+    }
+    if (defined($options{"a"})) {
+	$showall = 1;
     }
 }

@@ -53,6 +53,7 @@ if ($UID) {
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libTemplates;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -65,6 +66,9 @@ my $avail    = "$TB/sbin/avail";
 my $batchlog = "$TB/log/batchlog";
 my $projroot = "/proj";
 my $debug    = 0;
+
+# New template stuff.
+my $template_swapout  = "$TB/bin/template_swapout";
 
 my $BSTATE_POSTED	= EXPTSTATE_QUEUED;
 my $BSTATE_ACTIVATING	= EXPTSTATE_ACTIVATING;
@@ -88,6 +92,9 @@ my $userdir;
 my $workdir;
 my $user_name  = "Testbed Operations";
 my $user_email = "$TBOPS";
+my $istemplate;
+my $guid;
+my $version;
 
 #
 # Turn off line buffering on output
@@ -349,6 +356,18 @@ sub dosomething($$)
     $logname = TBExptCreateLogFile($pid, $eid, "${dowhat}-batch");
 
     #
+    # If this is a template instantiation, then do not set the logfile.
+    # We still generate the log file, but it is not available via the
+    # web interface. Needs more thought.
+    #
+    my $exptidx = $exphash->{'idx'};
+    $istemplate = libTemplates::IsTemplateInstanceExperiment($exptidx);
+    if ($istemplate) {
+	libTemplates::MapExptidxtoTemplate($exptidx, \$guid, \$version) == 0
+	    or fatal("Error template info the experiment $pid/$eid");
+    }
+
+    #
     # Start up a child to run the guts. The parent waits. If the
     # experiment configures okay, the parent can return to try something
     # else.
@@ -574,7 +593,12 @@ sub swapexp($;$)
     my $running   = ($exphash->{'state'} eq EXPTSTATE_ACTIVE);
 
     if ($running) {
-	system("$swapexp -b -s out $pid $eid");
+	if ($istemplate) {
+	    system("$template_swapout -b -e $eid $guid/$version");
+	}
+	else {
+	    system("$swapexp -b -s out $pid $eid");
+	}
 	if ($?) {
 	    #
 	    # TB admin is going to have to clean up. 
@@ -613,7 +637,12 @@ sub cancelexp($)
     # It does not matter if the experiment is running; endexp does the
     # right thing.
     # 
-    system("$endexp -b $pid $eid");
+    if ($istemplate) {
+	system("$template_swapout -b -e $eid $guid/$version");
+    }
+    else {
+	system("$endexp -b $pid $eid");
+    }
     if ($?) {
 	#
 	# TB admin is going to have to clean up. 
@@ -756,13 +785,3 @@ sub donotify($$$)
 	     ($logname, "assign.log", $nsfile));
 }
 
-sub TBBatchUnLockExp($$;$)
-{
-    my($pid, $eid, $newstate) = @_;
-
-    DBQueryWarn("update experiments set expt_locked=NULL, ".
-		"       batchstate='$BSTATE_UNLOCKED' ".
-		(defined($newstate) ? ",state='$newstate' " : "") .
-		"where eid='$eid' and pid='$pid'");
-    return 1;
-}

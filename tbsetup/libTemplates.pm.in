@@ -175,13 +175,22 @@ sub DeleteTemplateRecord($$)
 {
     my ($guid, $vers) = @_;
 
+    DeleteTemplateMetadata($guid, $vers) == 0
+	or return -1;
+
     # Make sure the experiment_templates table is always last, in case
     # something goes wrong. 
-    my @tables = ("experiment_templates");
+    my @tables = ("experiment_templates", "experiment_template_parameters");
 
     foreach my $table (@tables) {
-	DBQueryFatal("delete from $table ".
-		     "where guid='$guid' and vers='$vers'");
+        if ($table eq "experiment_templates") {
+            DBQueryFatal("delete from $table ".
+                         "where guid='$guid' and vers='$vers'");
+        }
+        else {
+            DBQueryFatal("delete from $table ".
+                         "where parent_guid='$guid' and parent_vers='$vers'");
+        }
     }
 }
 
@@ -213,9 +222,39 @@ sub DeleteTemplateInstanceRecord($$$)
 {
     my ($guid, $vers, $idx) = @_;
 
-    DBQueryFatal("delete from experiment_template_instances ".
-		 "where parent_guid='$guid' and parent_vers='$vers' and ".
-		 "      idx='$idx'");
+    #
+    # Delete the run records first since they will not mean much after
+    # this record is gone.
+    #
+    my $query_result =
+	DBQueryWarn("select exptidx from experiment_template_instances ".
+		    "where parent_guid='$guid' and parent_vers='$vers' and ".
+		    "      idx='$idx'");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($exptidx) = $query_result->fetchrow_array()) {
+	DBQueryWarn("delete from experiment_run_bindings ".
+		    "where exptidx='$exptidx'")
+	    or return -1;
+
+	DBQueryWarn("delete from experiment_runs ".
+		    "where exptidx='$exptidx'")
+	    or return -1;
+    }
+
+    #
+    # Also delete the binding records for the instance.
+    #
+    DeleteTemplateInstanceBindingRecords($guid, $vers, $idx) == 0
+	or return -1;
+
+    # And finally the instance record.
+    DBQueryWarn("delete from experiment_template_instances ".
+		"where parent_guid='$guid' and parent_vers='$vers' and ".
+		"      idx='$idx'")
+	or return -1;
 
     return 0;
 }
@@ -351,9 +390,10 @@ sub DeleteTemplateInstanceBindingRecords($$$)
 {
     my ($guid, $vers, $idx) = @_;
 
-    DBQueryFatal("delete from experiment_template_instance_bindings ".
-		 "where parent_guid='$guid' and parent_vers='$vers' and ".
-		 "      instance_idx='$idx'");
+    DBQueryWarn("delete from experiment_template_instance_bindings ".
+		"where parent_guid='$guid' and parent_vers='$vers' and ".
+		"      instance_idx='$idx'")
+	or return -1;
 
     return 0;
 }
@@ -450,22 +490,26 @@ sub DeleteExperimentRunBindingRecords($$)
 #
 # Utility routine to get the pid,tid,gid of a template.
 #
-sub TemplateInfo($$$$;$)
+sub TemplateInfo($$;$$$$)
 {
-    my ($guid, $version, $ppid, $ptid, $pgid) = @_;
+    my ($guid, $version, $ppid, $ptid, $pgid, $peid) = @_;
 
     my $query_result =
-	DBQueryWarn("select pid,tid,gid from experiment_templates ".
+	DBQueryWarn("select pid,tid,gid,eid from experiment_templates ".
 		    "where guid='$guid' and vers='$version'");
 
     return -1
 	if (!$query_result || !$query_result->numrows);
 
-    my ($pid, $tid, $gid) = $query_result->fetchrow_array();
-    $$ppid = $pid;
-    $$ptid = $tid;
+    my ($pid, $tid, $gid, $eid) = $query_result->fetchrow_array();
+    $$ppid = $pid
+	if (defined($ppid));
+    $$ptid = $tid
+	if (defined($ptid));
     $$pgid = $gid
 	if (defined($pgid));
+    $$peid = $eid
+	if (defined($peid));
     return 0;
 }
 
@@ -612,6 +656,140 @@ sub DeleteTemplateInputFiles($$)
     
     return -1
 	if (! $query_result);
+
+    return 0;
+}
+
+#
+# Add a metadata record. This is used for new templates.
+#
+sub NewTemplateMetadata($$$$)
+{
+    my ($template_guid, $template_version, $name, $value) = @_;
+    my $guid;
+    my $version = 1;
+
+    return -1
+	if (libTemplates::NewGUID(\$guid) < 0);
+
+    $name  = DBQuoteSpecial($name);
+    $value = DBQuoteSpecial($value);
+
+    my $query_result =
+	DBQueryWarn("insert into experiment_template_metadata_items set ".
+		    "   guid='$guid', vers='$version', ".
+		    "   template_guid='$template_guid', ".
+		    "   name=$name, value=$value, created=now()");
+    return -1
+	if (!$query_result);
+
+    DBQueryWarn("insert into experiment_template_metadata set ".
+		"   parent_guid='$template_guid', ".
+		"   parent_vers='$template_version', ".
+		"   metadata_guid='$guid', ".
+		"   metadata_vers='$version', ".
+		"   internal=1")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Delete all template metadata; thats all we need here at the moment
+#
+sub DeleteTemplateMetadata($$)
+{
+    my ($template_guid, $template_version) = @_;
+
+    my $query_result =
+	DBQueryWarn("select metadata_guid ".
+		    "    from experiment_template_metadata ".
+		    "where parent_guid='$template_guid' and ".
+		    "      parent_vers='$template_version'");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($metadata_guid) = $query_result->fetchrow_array()) {
+	my @versions = ();
+
+	#
+	# Delete all versions for each record. This is wrong if we ever
+	# want to share entries between templates.
+	#
+	my $metadata_result =
+	    DBQueryWarn("select vers from experiment_template_metadata_items ".
+			"where guid='$metadata_guid'");
+
+	return -1
+	    if (!$metadata_result);
+
+	next
+	    if (!$metadata_result->numrows);
+
+	while (my ($metadata_vers) = $metadata_result->fetchrow_array()) {
+	    push(@versions, $metadata_vers);
+	}
+
+	my $clause = join(" or ", map("vers='$_'", @versions));
+
+	DBQueryWarn("delete from experiment_template_metadata_items ".
+		    "where guid='$metadata_guid' and ($clause)")
+	    or return -1;
+    }
+    DBQueryWarn("delete from experiment_template_metadata ".
+		"where parent_guid='$template_guid' and ".
+		"      parent_vers='$template_version'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Copy exiting template metadata to a child. This is likely to change
+# since we probably want to share at some point.
+#
+sub CopyTemplateMetadata($$$)
+{
+    my ($from_guid, $from_version, $to_version) = @_;
+
+    #
+    # Copy the toplevel items.
+    #
+    my $query_result =
+	DBQueryWarn("select name,value ".
+		    "  from experiment_template_metadata as m ".
+		    "left join experiment_template_metadata_items as i on ".
+		    "     i.guid=m.metadata_guid and ".
+		    "     i.vers=m.metadata_vers ".
+		    "where m.parent_guid='$from_guid' and ".
+		    "      m.parent_vers='$from_version' and m.internal=0")
+	or return -1;
+
+    while (my ($name, $value) = $query_result->fetchrow_array()) {
+	my $guid;
+	my $version = 1;
+	
+	$name   = DBQuoteSpecial($name);
+	$value  = DBQuoteSpecial($value);
+
+	return -1
+	    if (libTemplates::NewGUID(\$guid) < 0);
+
+	DBQueryWarn("insert into experiment_template_metadata set ".
+		    "   parent_guid='$from_guid', ".
+		    "   parent_vers='$to_version', ".
+		    "   metadata_guid='$guid', ".
+		    "   metadata_vers='$version', ".
+		    "   internal=0")
+	    or return -1;
+
+	DBQueryWarn("insert into experiment_template_metadata_items set ".
+		    "   guid='$guid', vers='$version', ".
+		    "   template_guid='$from_guid', ".
+		    "   name=$name, value=$value, created=now()")
+	    or return -1;
+    }
 
     return 0;
 }

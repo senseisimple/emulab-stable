@@ -7,17 +7,6 @@
 include("defs.php3");
 include("template_defs.php");
 
-require("Sajax.php");
-sajax_init();
-sajax_export("GetTemplates", "SearchTemplates");
-
-# If this call is to client request function, then turn off interactive mode.
-# All errors will go to above function and get reported back through the
-# Sajax interface.
-if (sajax_client_request()) {
-    $session_interactive = 0;
-}
-
 #
 # Only known and logged in users ...
 #
@@ -28,13 +17,15 @@ $isadmin = ISADMIN($uid);
 # Need these below, set in CheckArguments.
 $pid = "";
 $eid = "";
+$gid = "";
 
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
-    global $uid, $pid, $eid;
-#
-# Verify page arguments.
-# 
+    global $uid, $pid, $eid, $gid;
+
+    #
+    # Verify page arguments.
+    # 
     if (!isset($guid) ||
 	strcmp($guid, "") == 0) {
 	USERERROR("You must provide a template GUID.", 1);
@@ -51,18 +42,18 @@ function CheckArguments($guid, $version) {
 	PAGEARGERROR("Invalid characters in version!");
     }
     
-#
-# Check to make sure this is a valid template.
-#
+    #
+    # Check to make sure this is a valid template.
+    #
     if (! TBValidExperimentTemplate($guid, $version)) {
 	USERERROR("The experiment template $guid/$version is not a ".
 		  "valid experiment template!", 1);
     }
     TBTemplatePidEid($guid, $version, $pid, $eid);
-    
-#
-# Verify Permission.
-#
+  
+    #
+    # Verify Permission.
+    #
     if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view experiment ".
 		  "template $guid/$version!", 1);
@@ -165,10 +156,6 @@ function SearchTemplates($guid, $terms) {
     return $retval;
 }
 
-# See if this request is to one of the above functions. Does not return
-# if it is. Otherwise return and continue on.
-sajax_handle_client_request();
-
 CheckArguments($guid, $version);
 
 if (isset($action)) {
@@ -180,153 +167,25 @@ if (isset($action)) {
 	DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
 		     "WHERE guid='$guid' and vers='$version'");
     }
+    else if ($action == "showall") {
+	DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
+		     "WHERE guid='$guid'");
+    }
+
+    if (! TBGuid2PidGid($guid, $pid, $gid)) {
+	TBERROR("Could not get template pid,gid for template $guid", 1);
+    }
+    # Need to update the template graph.
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $guid",
+	   SUEXEC_ACTION_DIE);
 }
 
 #
 # Standard Testbed Header after argument checking.
 #
 PAGEHEADER("Experiment Template: $guid/$version");
-
-?>
-
-<head>
-<style>
-@import url("timetree/timetree.css");
-@import url("logger.css");
-@import url("dragview.css");
-
-#fvlogger {
-  position: fixed;
-  height: 25%;
-  bottom: 5px;
-}
-</style>
-</head>
-
-<body onunload="ClientStateFunctions.saveState()">
-
-<div id="fvlogger2"></div>
-
-<script language="javascript" type="text/javascript" src="logger.js">
-</script>
-<script language="javascript" type="text/javascript" src="json.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/cookieLib.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/clientstate.js">
-</script>
-<script language="javascript" type="text/javascript">
-ClientStateFunctions.loadState();
-</script>
-
-<script language="javascript" type="text/javascript" src="js/prototype.js">
-</script>
-<script language="javascript" type="text/javascript" src="timetree/timetree.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/behaviour.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/dragview.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/template.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/delaybox.js">
-</script>
-<script language="javascript" type="text/javascript" src="js/activity.js">
-</script>
-
-<div id="ttmenucontainer">
-<div id="viewcontrols">
-<label id="showall"><input id="ttshowall" type="checkbox">Show All</label>
-<label id="zoom"><input id="ttzoom" type="checkbox">Zoom</label>
-</div>
-<label id="search">Search:<input id="ttsearch" type="text"></label>
-<span id="matchdisp"><span id="matchcount">0</span> matches</span>
-</div>
-
-<div id="ttviewport" class="dragviewport">
-  <div id="ttsubstrate" class="dragsubstrate nodrag">
-    <div id="templatetree"></div>
-  </div>
-</div>
-
-<script language="javascript" type="text/javascript">
-
-<?php sajax_show_javascript(); ?>
-
-$("ttshowall").checked = ClientState.Template.SHOW_ALL;
-
-Template.GUID = "<?php echo $guid ?>";
-Template.vers = "<?php echo $version ?>";
-tds = new Template.DataSource();
-
-sai = new Activity.Indicator($("search"), "url('spinner.gif')");
-
-ttv = new TimeTree.View($("templatetree"), tds);
-ttv.delegate = new Template.Delegate();
-ttv.updateDOM(0, 0);
-
-dvc = new DragView.Controller($("ttviewport"), $("ttsubstrate"), ttv.bounds);
-sc = new DelayBox.Controller();
-sc.callback = function(matches) {
-    $("matchcount").innerHTML = "" + matches.length;
-    Template.updateSearch(matches);
-    ttv.reloadData();
-    ttv.updateDOM(0, 0);
-    sai.decrement();
-};
-sc.handler = function() {
-    sai.increment();
-    ClientState.SEARCH_VALUE = $F("ttsearch");
-    if (ClientState.SEARCH_VALUE == "") {
-        this.callback([]);
-    }
-    else {
-        x_SearchTemplates(Template.GUID, ClientState.SEARCH_VALUE, this.callback);
-    }
-};
-
-var myrules = {
-    "#ttsearch" : sc.behaviour,
-    "#ttshowall" : function(element) {
-	element.onclick = function() {
-	    ClientState.Template.SHOW_ALL = $("ttshowall").checked;
-	    ttv.reloadData();
-	    ttv.updateDOM(0, 0);
-	};
-    },
-    "#ttzoom" : function(element) {
-	element.onclick = function() {
-	    ClientState.ZOOMED = $("ttzoom").checked;
-	    dvc.zoom(ClientState.ZOOMED);
-	};
-    }
-};
-
-Behaviour.register(myrules);
-
-x_GetTemplates(Template.GUID, function(dbstate) {
-    Template.DBtoNode(dbstate);
-    Template.tracePath(Template.vers2node[<?php echo $version ?>]);
-    ttv.reloadData();
-    ttv.updateDOM(0, 0);
-    sc.handler();
-});
-
-if ("SEARCH_VALUE" in ClientState && ClientState.SEARCH_VALUE != "") {
-    $("ttsearch").value = ClientState.SEARCH_VALUE;
-}
-else {
-    ClientState.SEARCH_VALUE = "";
-}
-
-if (!("ZOOMED" in ClientState))
-    ClientState.ZOOMED = false;
-$("ttzoom").checked = ClientState.ZOOMED;
-dvc.zoom(ClientState.ZOOMED);
-
-</script>
-
-<?php
 
 SUBPAGESTART();
 
@@ -371,18 +230,81 @@ echo "<br>
       <img border=1 alt='template visualization'
            src='showthumb.php3?idx=$rsrcidx'>";
 
+if (TemplateInstanceCount($guid, $version)) {
+    SHOWTEMPLATEINSTANCES($guid, $version);
+}
+
 SUBMENUEND_2B();
 
-SHOWTEMPLATE($guid, $version);
-SHOWTEMPLATEMETADATA($guid, $version);
-SUBPAGEEND();
-
-if (SHOWTEMPLATEPARAMETERS($guid, $version)) {
-    echo "<br>\n";
-}
-SHOWTEMPLATEINSTANCES($guid, $version);
+echo "<script type='text/javascript' src='js/wz_dragdrop.js'></script>";
 
 SHOWTEMPLATEGRAPH($guid);
+
+#
+# Define the zoom buttons. This should go elsewhere.
+#
+echo "<script type=text/javascript>
+      function ZoomOut() {
+      }
+      function ZoomIn() {
+      }
+      function ShowAll() {
+          open('template_show.php?guid=$guid&version=$version&action=showall',
+               '_self');
+      }
+      </script>\n";
+
+echo "<center>\n";
+echo "<button name=showall type=button onClick='ShowAll();'>";
+echo " Show All Templates</button></a>&nbsp &nbsp ";
+echo "<button name=zoomout type=button onClick='ZoomOut();'>";
+echo " Zoom Out</button>\n";
+echo "<button name=zoomin type=button onClick='ZoomIn();'>";
+echo "Zoom In</button>\n";
+echo "</center>\n";
+
+SUBPAGEEND();
+
+echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
+
+$paramcount = TemplateParameterCount($guid, $version);
+$metacount  = TemplateMetadataCount($guid, $version);
+$rowspan    = (($paramcount && $metacount) ? 2 : 1);
+
+echo "<center>\n";
+echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
+     " cellpadding=0 cellspacing=0>\n";
+echo "<tr valign=top><td rowspan=$rowspan class=stealth align=center>\n";
+
+SHOWTEMPLATE($guid, $version);
+
+echo "</td>\n";
+
+if ($paramcount || $metacount) {
+    echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
+    echo "<td align=center class=stealth> \n";
+    
+    if ($paramcount && $metacount) {
+	SHOWTEMPLATEPARAMETERS($guid, $version);
+	echo "</td>\n";
+	echo "</tr>\n";
+	echo "<tr valign=top>";
+	echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
+	echo "<td class=stealth align=center>\n";
+	SHOWTEMPLATEMETADATA($guid, $version);
+    }
+    elseif ($paramcount) {
+	SHOWTEMPLATEPARAMETERS($guid, $version);
+    }
+    else {
+	SHOWTEMPLATEMETADATA($guid, $version);
+    }
+    echo "</td>\n";
+}
+
+echo "</tr>\n";
+echo "</table>\n";
+echo "</center>\n";
 
 #
 # Standard Testbed Footer

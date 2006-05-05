@@ -156,26 +156,42 @@ CREATE TABLE experiment_template_settings (
 ) TYPE=MyISAM;
 
 #
-# This is versioned metadata that goes with each template. Not sure what
-# goes into this table yet ...
+# This is versioned metadata that goes with each template. We store the
+# guid and version of the corresponding record in the table below.
 #
 CREATE TABLE experiment_template_metadata (
-  -- Globally Unique ID. Okay, how global is global? 
+  -- Globally Unique ID of the ExperimentTemplate this record belongs to.
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  -- GUID of the metadata item.
+  metadata_guid varchar(16) NOT NULL default '',
+  metadata_vers smallint(5) unsigned NOT NULL default '0',
+  -- Internal metadata items, handled specially.
+  internal tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (parent_guid, parent_vers, metadata_guid, metadata_vers)
+) TYPE=MyISAM;
+
+#
+# The actual versioned metadata.
+#
+CREATE TABLE experiment_template_metadata_items (
+  -- Globally Unique ID. 
   guid varchar(16) NOT NULL default '',
   -- Version number for tracking modifications
   vers smallint(5) unsigned NOT NULL default '0',
   -- Backlink to the previous version of this metadata item.
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned NOT NULL default '0',
-  -- Backlink to the template this metadata item belongs to.
+  -- Record the template GUID this metadata associated with. This is for
+  -- permission checks and for deletion.
   template_guid varchar(16) NOT NULL default '',
-  template_vers smallint(5) unsigned NOT NULL default '0',
+  -- Key/Value pairs.
   name varchar(64) NOT NULL default '',
   value tinytext,
   created datetime default NULL,
-  PRIMARY KEY  (guid, vers, name),
-  KEY  (parent_guid,parent_vers),
-  KEY  (template_guid,template_vers)
+  PRIMARY KEY (guid, vers),
+  KEY parent (parent_guid,parent_vers),
+  KEY template (template_guid)
 ) TYPE=MyISAM;
 
 #

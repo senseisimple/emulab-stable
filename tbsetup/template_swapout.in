@@ -33,11 +33,11 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwaie:";
+my $optlist	 = "qwaie:b";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
-my $foreground   = 0;
+my $batchmode    = 0;	# Called from the batch daemon.
 my $pid;
 my $eid;
 my $tid;
@@ -171,7 +171,7 @@ $SIG{TERM} = \&sighandler;
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (! $foreground) {
+if (! $batchmode) {
     $logname = TBExptCreateLogFile($pid, $eid, "swapout");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
@@ -234,13 +234,17 @@ if ($waitmode) {
 #
 # Note special -x option.
 #
-my @arguments = ($endexp, "-x", "-q", $pid, $eid);
+my @arguments = ($endexp, "-x", "-q");
+push(@arguments, "-b")
+    if ($batchmode);
+push(@arguments, ($pid, $eid));
 
 # Now invoke.
 system(@arguments);
 fatal($? >> 8, "Could not terminate template instance")
     if ($?);
 
+# Reminder; instance records are not deleted!
 libTemplates::FinalizeTemplateInstanceRecord($guid, $version, $instidx) == 0 
     or fatal(-1, "Could not finalize experiment instance record!");
 
@@ -296,6 +300,9 @@ sub ParseArgs()
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
+    }
+    if (defined($options{"b"})) {
+	$batchmode = 1;
     }
 }
 

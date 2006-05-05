@@ -187,22 +187,53 @@ function SHOWTEMPLATE($guid, $version)
     $row = mysql_fetch_array($query_result);
 
     #
+    # We need the metadata guid/version for the TID and description since
+    # they are mungable metadata.
+    #
+    if (! TBTemplateMetadataLookupGUID($guid, $version, "TID",
+				       &$tid_guid, &$tid_version)) {
+	TBERROR("Could not find TID guid/vers for $guid/$version", 1);
+    }
+    if (! TBTemplateMetadataLookupGUID($guid, $version, "description",
+				       &$desc_guid, &$desc_version)) {
+	TBERROR("Could not find description guid/vers for $guid/$version", 1);
+    }
+    
+    #
     # Generate the table.
     #
+    echo "<center>
+           <h3>Details</h3>
+          </center>\n";
+
     echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
     
     ShowItem("GUID",
 	     MakeLink("template",
 		      "guid=$guid&version=$version", "$guid/$version"));
-    ShowItem("ID",          $row['tid']);
+    ShowItem("ID",
+	     MakeLink("metadata",
+		      "action=modify&guid=$guid&version=$version".
+		      "&metadata_guid=$tid_guid&metadata_vers=$tid_version",
+		      $row['tid']));
     ShowItem("Project",
 	     MakeLink("project", "pid=" . $row['pid'], $row['pid']));
     ShowItem("Group",       $row['gid']);
     ShowItem("Creator",
 	     MakeLink("user", "target_uid=" . $row['uid'], $row['uid']));
     ShowItem("Created",     $row['created']);
-    ShowItem("Modified",    $row['modified']);
-    ShowItem("Description", $row['description']);
+
+    if (strlen($row['description']) > 40) {
+	$row['description'] = substr($row['description'], 0, 40) .
+	    " <b>... </b>";
+    }
+    
+    ShowItem("Description", 
+	     MakeLink("metadata",
+		      "action=modify&guid=$guid&version=$version".
+		      "&metadata_guid=$desc_guid&metadata_vers=$desc_version",
+		      $row['description']));
+    
     if (isset($row['parent_guid'])) {
 	$parent_guid = $row['parent_guid'];
 	$parent_vers = $row['parent_vers'];
@@ -228,7 +259,7 @@ function SHOWTEMPLATEPARAMETERS($guid, $version)
 
     if (mysql_num_rows($query_result)) {
 	echo "<center>
-               <h3>Template Parameters</h3>
+               <h3>Parameters</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -261,13 +292,15 @@ function SHOWTEMPLATEPARAMETERS($guid, $version)
 function SHOWTEMPLATEMETADATA($guid, $version)
 {
     $query_result =
-	DBQueryFatal("select * from experiment_template_metadata ".
-		     "where template_guid='$guid' and ".
-		     "      template_vers='$version'");
+	DBQueryFatal("select i.* from experiment_template_metadata as m ".
+		     "left join experiment_template_metadata_items as i on ".
+		     "     m.metadata_guid=i.guid and m.metadata_vers=i.vers ".
+		     "where m.parent_guid='$guid' and ".
+		     "      m.parent_vers='$version' and m.internal=0");
 
     if (mysql_num_rows($query_result)) {
 	echo "<center>
-               <h3>Template Metadata</h3>
+               <h3>Metadata</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -285,14 +318,24 @@ function SHOWTEMPLATEMETADATA($guid, $version)
 	    if (!isset($value)) {
 		$value = "&nbsp";
 	    }
+	    elseif (strlen($value) > 40) {
+		$value = substr($value, 0, 40) . " <b>... </b>";
+	    }
 
 	    echo "<tr>
    	           <td align=center>
                      <a href='template_metadata.php?action=modify".
-		        "&guid=$metadata_guid&version=$metadata_vers'>
+		        "&guid=$guid&version=$version".
+		        "&metadata_guid=$metadata_guid".
+		        "&metadata_vers=$metadata_vers'>
                      <img border=0 alt='modify' src='greenball.gif'></A></td>
                    <td>$name</td>
-                   <td>$value</td>
+                   <td>
+                       <a href='template_metadata.php?action=modify".
+		          "&guid=$guid&version=$version".
+		          "&metadata_guid=$metadata_guid".
+		          "&metadata_vers=$metadata_vers'>
+                         $value</a></td>
                   </tr>\n";
   	}
 	echo "</table>\n";
@@ -433,15 +476,14 @@ function SHOWTEMPLATEINSTANCES($guid, $version)
 
     if (mysql_num_rows($query_result)) {
 	echo "<center>
-               <h3>Template Instances for $guid/$version</h3>
+               <h3>Template Instances</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
 	echo "<tr>
                <th>EID</th>
                <th>State</th>
-               <th align=center>Nodes [1]</th>
-               <th align=center>Hours Idle [2]</th>
+               <th align=center>Nodes</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -483,7 +525,6 @@ function SHOWTEMPLATEINSTANCES($guid, $version)
                    <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
   		   <td>$state</td>
                    <td align=center>$nodes</td>
-                   <td align=center>$idlestr</td>
                  </tr>\n";
 	}
 	echo "</table>\n";
@@ -493,7 +534,7 @@ function SHOWTEMPLATEINSTANCES($guid, $version)
 #
 # Show the historical instance list for a template.
 #
-function SHOWTEMPLATEHISTORY($guid, $version)
+function SHOWTEMPLATEHISTORY($guid, $version, $expand)
 {
     $query_result =
 	DBQueryFatal("select * from experiment_template_instances as i ".
@@ -510,6 +551,7 @@ function SHOWTEMPLATEHISTORY($guid, $version)
 	echo "<tr>
                <th align=center>Expand</th>
                <th>EID</th>
+               <th>IDX</th>
                <th>UID</th>
                <th>Start Time</th>
                <th>Stop Time</th>
@@ -526,18 +568,34 @@ function SHOWTEMPLATEHISTORY($guid, $version)
 	    $start     = $row['start_time'];
 	    $stop      = $row['stop_time'];
 	    $exptidx   = $row['exptidx'];
+	    $idx       = $row['idx'];
 
 	    if (! isset($stop)) {
 		$stop = "&nbsp";
 	    }
+
+	    $expandit = ((isset($expand) && $expand == $idx) ? 1 : 0);
 	    
 	    echo "<tr>\n";
+	    echo " <td align=center>";
+	    if ($expandit) {
+		echo "<a href=template_history.php".
+                         "?guid=$guid&version=$version>".
+		         "<img border=0 alt='c' src='/icons/down.png'></a>\n";
+	    }
+	    else {
+ 		echo "<a href=template_history.php".
+                         "?guid=$guid&version=$version&expand=$idx#$idx>".
+		         "<img border=0 alt='e' src='/icons/right.png'></a>\n";
+	    }
+	    echo " </td>
+                   <td>$eid</td>\n";
+	    
 	    echo " <td align=center>".
  		    MakeLink("instance",
 			     "guid=$guid&version=$version&exptidx=$exptidx",
-			     "<img border=0 alt='i' src='greenball.gif'>");
+			     "$idx");
 	    echo " </td>
-                   <td>$eid</td>
   		   <td>$uid</td>
                    <td>$start</td>
                    <td>$stop</td>
@@ -545,6 +603,16 @@ function SHOWTEMPLATEHISTORY($guid, $version)
                      <a href=cvsweb/cvswebwrap.php3/$exptidx/?exptidx=$exptidx>
                      <img border=0 alt='i' src='greenball.gif'></a></td>
                  </tr>\n";
+
+	    if ($expandit) {
+		echo "<tr>\n";
+		echo " <a NAME=$idx></a>\n";
+		echo "<td>&nbsp</td>\n";
+		echo " <td colspan=6>\n";
+		SHOWTEMPLATEINSTANCERUNS($guid, $version, $exptidx, 0);
+		echo " </td>\n";
+		echo "</tr>\n";
+	    }
 	}
 	echo "</table>\n";
     }
@@ -646,6 +714,68 @@ function SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, $withruns)
 }
 
 #
+# Show the run list for an instance.
+#
+function SHOWTEMPLATEINSTANCERUNS($guid, $version, $exptidx, $withheader)
+{
+    $query_result =
+	DBQueryFatal("select * from experiment_runs ".
+		     "where exptidx='$exptidx'");
+
+    if (mysql_num_rows($query_result)) {
+	if ($withheader) {
+	    echo "<center>
+                    <h3>Instance History (Runs)</h3>
+                  </center> \n";
+	}
+	echo "<table align=center border=1 cellpadding=5 cellspacing=2>\n";
+
+	echo "<tr>
+               <th align=center>Expand</th>
+               <th align=center>Archive</th>
+               <th>RunID</th>
+               <th>ID</th>
+               <th>Start Time</th>
+               <th>Stop Time</th>
+               <th>Description</th>
+              </tr>\n";
+
+	while ($rrow = mysql_fetch_array($query_result)) {
+	    $runidx    = $rrow['idx'];
+	    $runid     = $rrow['runid'];
+	    $start     = $rrow['start_time'];
+	    $stop      = $rrow['stop_time'];
+	    $exptidx   = $rrow['exptidx'];
+	    $description = $rrow['description'];
+
+	    if (! isset($stop)) {
+		$stop = "&nbsp";
+	    }
+	    
+	    echo "<tr>\n";
+	    echo " <td align=center>".
+		    MakeLink("run",
+			     "guid=$guid&version=$version".
+			     "&exptidx=$exptidx&runidx=$runidx",
+			     "<img border=0 alt='i' src='greenball.gif'>");
+	    echo " </td>
+                    <td align=center>
+                        <a href=cvsweb/cvswebwrap.php3".
+			   "/$exptidx/history/$runid/?exptidx=$exptidx>
+                        <img border=0 alt='i'
+                             src='greenball.gif'></a></td>
+                    <td>$runid</td>
+  		    <td>$runidx</td>
+                    <td>$start</td>
+                    <td>$stop</td>
+                    <td>$description</td>
+                   </tr>\n";
+	}
+	echo "</table>\n";
+    }
+}
+
+#
 # Show the historical instance list for a template.
 #
 function SHOWEXPERIMENTRUN($exptidx, $runidx)
@@ -721,17 +851,35 @@ function SHOWEXPERIMENTRUN($exptidx, $runidx)
 #
 # Display a metadata item in its own table.
 #
-function SHOWMETADATAITEM($guid, $version)
+function SHOWMETADATAITEM($metadata_guid, $metadata_version)
 {
+    #
+    # See if this item is a current template item.
+    #
+    unset($template_guid);
+    unset($template_vers);
+    
     $query_result =
 	DBQueryFatal("select * from experiment_template_metadata ".
-		     "where guid='$guid' and vers='$version'");
+		     "where metadata_guid='$metadata_guid' and ".
+		     "      metadata_vers='$metadata_version'");
+    
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_array($query_result);
+	$template_guid = $row['parent_guid'];
+	$template_vers = $row['parent_vers'];
+    }
+
+    # Now the metadata info.
+    $query_result =
+	DBQueryFatal("select * from experiment_template_metadata_items ".
+		     "where guid='$metadata_guid' and ".
+		     "      vers='$metadata_version'");
 
     if (!mysql_num_rows($query_result)) {
 	USERERROR("Experiment Template Metadata $guid/$version is no longer ".
-		  "a valid template!", 1);
+		  "a valid metadata item!", 1);
     }
-
     $row = mysql_fetch_array($query_result);
 
     #
@@ -739,20 +887,16 @@ function SHOWMETADATAITEM($guid, $version)
     #
     echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
     
-    ShowItem("GUID",
-	     MakeLink("metadata",
-		      "action=show&guid=$guid&version=$version",
-		      "$guid/$version"));
+    ShowItem("GUID",       "$metadata_guid/$metadata_version");
     ShowItem("Name",        $row['name']);
-    ShowItem("Value",       $row['value']);
     ShowItem("Created",     $row['created']);
 
-    $template_guid = $row['template_guid'];
-    $template_vers = $row['template_vers'];
-    ShowItem("Template",
-	     MakeLink("template",
-		      "guid=$template_guid&version=$template_vers",
-		      "$template_guid/$template_vers"));
+    if (isset($template_guid)) {
+	ShowItem("Template",
+		 MakeLink("template",
+			  "guid=$template_guid&version=$template_vers",
+			  "$template_guid/$template_vers"));
+    }
     
     if (isset($row['parent_guid'])) {
 	$parent_guid = $row['parent_guid'];
@@ -762,6 +906,23 @@ function SHOWMETADATAITEM($guid, $version)
 			  "action=show&guid=$parent_guid&version=$parent_vers",
 			  "$parent_guid/$parent_vers"));
     }
+
+    echo "<tr>
+              <td align=center colspan=2>
+               Metadata Value
+              </td>
+          </tr>
+          <tr>
+              <td colspan=2 align=center class=left>
+                  <textarea readonly
+                    rows=10 cols=80>" .
+	            ereg_replace("\r", "", $row['value']) .
+	           "</textarea>
+              </td>
+          </tr>\n";
+
+
+    
     echo "</table>\n";
 }
 
@@ -782,11 +943,23 @@ function SHOWTEMPLATEGRAPH($guid)
 
     $imap = $row['imap'];
 
-    echo "<center>
-           <h3>Template Graph</h3>\n";
+    echo "<center>";
+#    echo "<h3>Template Graph</h3>\n";
+    echo "<div id=fee style='display: block; overflow: hidden; position: relative; z-index:1010; height: 400px; width: 600px; border: 2px solid black;'>\n";
+    echo "<div id=\"D$guid\" style='position:relative;'>\n";
+
     echo $imap;
-    echo "<img border=1 usemap=\"#TemplateGraph\" ";
-    echo "     src='template_graph.php?guid=$guid'>\n";
+    echo "<img id=\"G$guid\" border=0 usemap=\"#TemplateGraph\" ";
+    echo "      src='template_graph.php?guid=$guid'>\n";
+    echo "</div>\n";
+    echo "</div>\n";
+
+    echo "<script type='text/javascript'>
+           <!--
+             SET_DHTML(\"D$guid\");
+           //-->
+          </script>\n";
+    
     echo "</center>\n";
 }
 
@@ -986,13 +1159,30 @@ function TBPidEid2Template($pid, $eid, &$guid, &$version, &$instidx)
 }
 
 #
-# Map metadata to its template
+# Map metadata to its template. This must be a current item associated with
+# a template.
 #
-function TBMetadata2Template($metadata_guid, $metadata_version,
-			     &$template_guid, &$template_version)
+function TBValidTemplateMetadata($metadata_guid, $metadata_version,
+				 $template_guid, $template_version)
 {
     $query_result =
-	DBQueryFatal("select * from experiment_template_metadata ".
+	DBQueryFatal("select internal from experiment_template_metadata ".
+		     "where parent_guid='$template_guid' and ".
+		     "      parent_vers='$template_version' and ".
+		     "      metadata_guid='$metadata_guid' and ".
+		     "      metadata_vers='$metadata_version'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
+# Map metadata to its template GUID only, as for permission purposes.
+#
+function TBMetadataTemplate($metadata_guid, $metadata_version, &$template_guid)
+{
+    $query_result =
+	DBQueryFatal("select template_guid ".
+		     "    from experiment_template_metadata_items ".
 		     "where guid='$metadata_guid' and ".
 		     "      vers='$metadata_version'");
 
@@ -1000,19 +1190,17 @@ function TBMetadata2Template($metadata_guid, $metadata_version,
 	return 0;
     }
     $row = mysql_fetch_array($query_result);
-    $template_guid    = $row['template_guid'];
-    $template_version = $row['template_vers'];
+    $template_guid = $row['template_guid'];
     return 1;
 }
 
-
 #
-# Return array of metadata data.
+# Return array of metadata data. 
 #
 function TBMetadataData($metadata_guid, $metadata_version, &$metadata_data)
 {
     $query_result =
-	DBQueryFatal("select * from experiment_template_metadata ".
+	DBQueryFatal("select * from experiment_template_metadata_items ".
 		     "where guid='$metadata_guid' and ".
 		     "      vers='$metadata_version'");
 
@@ -1030,16 +1218,43 @@ function TBTemplateMetadataLookup($template_guid, $template_version,
 				  $metadata_name, &$metadata_value)
 {
     $query_result =
-	DBQueryFatal("select value from experiment_template_metadata ".
-		     "where template_guid='$template_guid' and ".
-		     "      template_vers='$template_version' and ".
-		     "      name='$metadata_name'");
+	DBQueryFatal("select i.value from experiment_template_metadata as m ".
+		     "left join experiment_template_metadata_items as i on ".
+		     "     i.guid=m.metadata_guid and i.vers=m.metadata_vers ".
+		     "where m.parent_guid='$template_guid' and ".
+		     "      m.parent_vers='$template_version' and ".
+		     "      i.name='$metadata_name'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
     $row = mysql_fetch_array($query_result);
     $metadata_value = $row['value'];
+    return 1;
+}
+
+#
+# Get a metadata guid/version given a name and a template. 
+#
+function TBTemplateMetadataLookupGUID($template_guid, $template_version,
+				      $metadata_name,
+				      &$metadata_guid, &$metadata_version)
+{
+    $query_result =
+	DBQueryFatal("select i.guid,i.vers ".
+		     "    from experiment_template_metadata as m ".
+		     "left join experiment_template_metadata_items as i on ".
+		     "     i.guid=m.metadata_guid and i.vers=m.metadata_vers ".
+		     "where m.parent_guid='$template_guid' and ".
+		     "      m.parent_vers='$template_version' and ".
+		     "      i.name='$metadata_name'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $metadata_guid    = $row['guid'];
+    $metadata_version = $row['vers'];
     return 1;
 }
 
@@ -1123,6 +1338,47 @@ function TBValidExperimentRun($exptidx, $runidx)
     $query_result =
 	DBQueryFatal("select * from experiment_runs ".
 		     "where exptidx='$exptidx' and idx='$runidx'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
+# Return number of parameters.
+#
+function TemplateParameterCount($guid, $version)
+{
+    if (!TBTemplatePidEid($guid, $version, &$pid, &$eid))
+	return;
+    
+    $query_result =
+	DBQueryFatal("select * from virt_parameters ".
+		     "where pid='$pid' and eid='$eid'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
+# Return number of metadata items
+#
+function TemplateMetadataCount($guid, $version)
+{
+    $query_result =
+	DBQueryFatal("select internal from experiment_template_metadata as m ".
+		     "where m.parent_guid='$guid' and ".
+		     "      m.parent_vers='$version' and m.internal=0");
+
+    return mysql_num_rows($query_result);
+}
+
+#
+# Return number of instances
+#
+function TemplateInstanceCount($guid, $version)
+{
+    $query_result =
+	DBQueryFatal("select * from experiment_template_instances as i ".
+		     "where (i.parent_guid='$guid' and ".
+		     "       i.parent_vers='$version')");
 
     return mysql_num_rows($query_result);
 }

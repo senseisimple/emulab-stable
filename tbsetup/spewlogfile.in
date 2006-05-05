@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -142,7 +142,7 @@ my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
 # but not sure what else to do.
 #
 if ($fromweb && $isopen && $size < 1024) {
-    for ($i = $size; $i < 1024; $i++) {
+    for ($i = $size; $i <= 1024; $i++) {
 	print " ";
     }
     print "\n";

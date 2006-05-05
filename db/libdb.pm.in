@@ -173,7 +173,9 @@ use vars qw(@ISA @EXPORT);
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
-	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
+	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
+	 TBExptIsElabInElab TBBatchUnLockExp TBExptIsBatchExp
+	 
 	 TBExptFirewall TBNodeFirewall TBExptFirewallAndPort
 	 TBSetExptFirewallVlan TBClearExptFirewallVlan
 	 TBNodeConsoleTail TBExptGetSwapoutAction TBExptGetSwapState
@@ -1603,6 +1605,35 @@ sub TBUnLockExp($$;$)
 	$query_result->numrows == 0) {
 	return 0;
     }
+    if ($EVENTSYS && defined($newstate)) {
+	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		      objname   => "$pid/$eid",
+		      eventtype => $newstate,
+		      expt      => "$pid/$eid",
+		      host      => $BOSSNODE);
+    }
+    return 1;
+}
+
+#
+# Helper function for batch system.
+#
+sub TBBatchUnLockExp($$;$)
+{
+    my($pid, $eid, $newstate) = @_;
+    my $BSTATE_UNLOCKED       = BATCHSTATE_UNLOCKED;
+    
+    my $query_result =
+	DBQueryWarn("update experiments set expt_locked=NULL, ".
+		    "       batchstate='$BSTATE_UNLOCKED' ".
+		    (defined($newstate) ? ",state='$newstate' " : "") .
+		    "where eid='$eid' and pid='$pid'");
+    
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    
     if ($EVENTSYS && defined($newstate)) {
 	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
 		      objname   => "$pid/$eid",
@@ -3749,6 +3780,25 @@ sub TBExptIsElabInElab($$$;$)
     $$elabinelab     = $row[0];
     $$elabinelab_eid = (defined($row[1]) ? $row[1] : undef)
 	if (defined($elabinelab_eid));
+    return 1;
+}
+
+#
+# Similar function for batchmode.
+#
+sub TBExptIsBatchExp($$$)
+{
+    my ($pid, $eid, $batchmode) = @_;
+
+    my $query_result =
+	DBQueryFatal("select batchmode from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    $$batchmode     = $row[0];
     return 1;
 }
 

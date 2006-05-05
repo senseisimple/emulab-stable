@@ -1,0 +1,292 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+
+#
+# Delete an experiment template (and optionally its children).
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_delete [-q] [-w] [-r] <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-w          - wait for template to be instantiated\n".
+	  "-q          - be less chatty\n".
+	  "-r          - Delete recursively\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qwdr";
+my $quiet        = 0;
+my $waitmode     = 0;
+my $debug        = 0;
+my $recursive    = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $PROJROOT	= "/proj";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL	= "@USERNODE@";
+
+# Programs we need
+my $endexp      = "$TB/bin/endexp";
+my $makegraph   = "$TB/bin/template_graph";
+
+# Locals
+my $guid;
+my $version;
+my $dbuid;
+my $logname;
+my $user_name;
+my $user_email;
+my @versionlist = ();
+my %instances   = ();
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libTemplates;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    tbdie("Cannot determine your name and email address.");
+}
+
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
+
+#
+# Grab template info.
+#
+if (libTemplates::TemplateInfo($guid, $version) < 0) {
+    tbdie("Could not get info for template $guid/$version!");
+}
+
+#
+# In recursive mode, build up a list of all of the children of this
+# template.
+#
+if ($recursive) {
+    #
+    # Get the entire list of templates
+    #
+    my %children  = ();
+    my @kids      = ($version);
+    
+    my $query_result =
+	DBQueryFatal("select vers,parent_vers from experiment_templates ".
+		     "where parent_guid='$guid' ".
+		     "order by vers desc");
+
+    while (my ($vers, $parent_vers) = $query_result->fetchrow_array()) {
+	$children{$parent_vers} = []
+	    if (!exists($children{$parent_vers}));
+
+	# List of all children for the parent.
+	push(@{ $children{$parent_vers} }, $vers);
+    }
+
+    # Descend the tree getting all children recursively.
+    while (@kids) {
+	my $kid   = pop(@kids);
+
+	# New kid to delete.
+	push(@versionlist, $kid);
+
+	# New children of kid
+	unshift(@kids, @{ $children{$kid} })
+	    if (exists($children{$kid}));
+    }
+    # Remove most recent templates first.
+    @versionlist = sort {$b <=> $a} @versionlist;
+}
+else {
+    # Just one.
+    @versionlist = ($version);
+}
+
+print STDERR "Looking at @versionlist\n"
+    if ($debug);
+
+#
+# Now look at each template and confirm there are no instantiations that
+# are currently active (there will be old ones since we do not delete them).
+# We also want to find out the instance ids and the experiment ids so we
+# can get the other tables. 
+#
+my $active = 0;
+
+foreach my $vers (@versionlist) {
+    my $query_result =
+	DBQueryFatal("select i.idx,i.exptidx,e.idx ".
+		     "  from experiment_template_instances as i ".
+		     "left join experiments as e on e.idx=i.exptidx ".
+		     "where i.parent_guid='$guid' and i.parent_vers='$vers'");
+
+    while (my ($i_idx,$i_exptidx,$exptidx) = $query_result->fetchrow_array()) {
+	if (defined($exptidx)) {
+	    tbwarn("Template $guid/$vers in still instantiated! ".
+		   "Please terminate experiment $exptidx.");
+	}
+	$instances{$vers} = []
+	    if (!exists($instances{$vers}));
+
+	# List of all instances for this version of the template.
+	push(@{ $instances{$vers} }, $i_idx);
+
+	print STDERR "Will remove instance $i_idx ($i_exptidx)\n"
+	    if ($debug);
+    }
+}
+exit(1)
+    if ($active);
+
+#
+# Okay, delete the instance records. 
+#
+foreach my $vers (@versionlist) {
+    foreach my $instance (@{ $instances{$vers} }) {
+	print "Deleting template instance $guid, $vers, $instance ... \n";
+	
+	libTemplates::DeleteTemplateInstanceRecord($guid, $vers, $instance)
+	    == 0 or exit(-1);
+    }
+
+    #
+    # And then the template experiment.
+    #
+    my ($pid, $eid);
+
+    libTemplates::TemplateInfo($guid, $vers, \$pid, undef, undef, \$eid) == 0
+	or exit(-1);
+		
+    system("$endexp -x -q -w $pid $eid");
+    exit(-1)
+	if ($?);
+
+    # And delete all the other stuff?
+    libTemplates::DeleteTemplateInputFiles($guid, $vers) == 0
+	or exit(-1);
+    
+    libTemplates::DeleteTemplateRecord($guid, $vers) == 0
+	or exit(-1);
+}
+
+#
+# Recreate the graph.
+#
+system("$makegraph $guid");
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"r"})) {
+	$recursive = 1;
+    }
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"w"})) {
+	$waitmode = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
+}

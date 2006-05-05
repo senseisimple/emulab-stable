@@ -306,6 +306,7 @@ else {
 	    echo "Your experiment has been dequeued. You may requeue your
 		  experiment at any time.\n";
 	}
+	STARTWATCHER($pid, $eid);
     }
     else {
 	echo "<div>";

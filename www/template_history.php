@@ -21,7 +21,6 @@ if (!isset($guid) ||
     strcmp($guid, "") == 0) {
     USERERROR("You must provide a template GUID.", 1);
 }
-
 if (!isset($version) ||
     strcmp($version, "") == 0) {
     USERERROR("You must provide a template version number", 1);
@@ -31,6 +30,14 @@ if (!TBvalid_guid($guid)) {
 }
 if (!TBvalid_integer($version)) {
     PAGEARGERROR("Invalid characters in version!");
+}
+if (isset($expand) && $expand != "") {
+    if (!TBvalid_integer($expand)) {
+	PAGEARGERROR("Invalid characters in expand index!");
+    }
+}
+else {
+    unset($expand);
 }
 
 #
@@ -60,7 +67,7 @@ echo "<font size=+2>Experiment Template <b>" .
       "</b></font>\n";
 echo "<br><br>\n";
 
-SHOWTEMPLATEHISTORY($guid, $version);
+SHOWTEMPLATEHISTORY($guid, $version, $expand);
 
 #
 # Standard Testbed Footer

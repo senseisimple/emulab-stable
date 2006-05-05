@@ -1,12 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
-require("Sajax.php");
+require_once("Sajax.php");
 sajax_init();
-sajax_export("GetPNodes");
+sajax_export("GetPNodes", "GetExpState");
 
 # If this call is to client request function, then turn off interactive mode.
 # All errors will go to above function and get reported back through the
@@ -66,9 +66,31 @@ function GetPNodes($pid, $eid) {
     return $retval;
 }
 
+function GetExpState($pid, $eid)
+{
+    CHECKPAGEARGS($pid, $eid);
+    
+    $expstate = TBExptState($pid, $eid);
+
+    return $expstate;
+}
+
+function STARTWATCHER($pid, $eid)
+{
+    echo "<script type='text/javascript' language='javascript'
+                  src='showexp.js'></script>\n";
+    
+    echo "<script type='text/javascript' language='javascript'>\n";
+    sajax_show_javascript();
+    echo "StartStateChangeWatch('$pid', '$eid', 'unimportant');\n";
+    echo "</script>\n";
+}
+
 function STARTLOG($pid, $eid)
 {
     global $BASEPATH;
+
+    STARTWATCHER($pid, $eid);
     
     echo "<script type='text/javascript' language='javascript'>\n";
     echo "function SetupOutputArea() {
@@ -121,8 +143,6 @@ function STARTLOG($pid, $eid)
     echo "<script type='text/javascript' language='javascript'>\n";
 
     echo "SetupOutputArea();\n"; 
-
-    sajax_show_javascript();
 
     echo "exp_pid = \"$pid\";\n";
     echo "exp_eid = \"$eid\";\n";

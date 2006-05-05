@@ -51,8 +51,11 @@ sub ExitWithStatus($$)
     if ($status < 0) {
 	tbdie($message);
     }
-    else {
+    elsif ($status > 0) {
 	tbnotice($message);
+    }
+    else {
+	tbinfo($message);
     }
     exit($status);
 }

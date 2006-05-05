@@ -359,17 +359,15 @@ body  	{ background-image: url("wallpaper1.png"); }
 
 a { color: #2222BB; text-decoration: underline; }
 
-a:plain   { color: #2222BB; text-decoration: none; }
 a:link    { color: #2222BB; text-decoration: none; }
 a:visited { color: #662299; text-decoration: none; }
-a:hover   { co2lor: #4444DD; text-decoration: underline; }
+a:hover   { text-decoration: underline; }
 a:active  { color: #5555EE; text-decoration: underline; }
 a.whitelink { color: #FFFFFF; }
 
-a.static:plain   { color: #2222BB; text-decoration: none; }
 a.static:link    { color: #2222BB; text-decoration: none; }
 a.static:visited { color: #2222BB; text-decoration: none; }
-a.static:hover   { co2lor: #4444DD; text-decoration: underline; }
+a.static:hover   { text-decoration: underline; }
 a.static:active  { color: #5555EE; text-decoration: underline; }
 
 a2  { padding: 4px; }
