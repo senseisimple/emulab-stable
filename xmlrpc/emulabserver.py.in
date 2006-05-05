@@ -4507,6 +4507,8 @@ def nfspath(value):
 
     return retval
 
+from sets import Set
+
 ##
 # Scrub a dictionary returned by an SQL query so that it can be sent through
 # the XML-RPC marshaller without error.
@@ -4524,6 +4526,9 @@ def scrubdict(retval, prunelist=[], defaultvals={}):
             else:
                 del retval[key]
                 pass
+            pass
+        elif isinstance(retval[key], Set):
+            retval[key] = list(retval[key])
             pass
         elif isinstance(retval[key], datetime.datetime):
             retval[key] = xmlrpclib.DateTime(
