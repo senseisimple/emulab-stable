@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -335,6 +335,7 @@ function CHECKLOGIN($uid) {
     # XXX Temporary.
     if ($stud) {
 	$EXPOSEARCHIVE = 1;
+	$EXPOSETEMPLATES = 1;
     }
     return $CHECKLOGIN_STATUS;
 }
