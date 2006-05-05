@@ -86,7 +86,7 @@ $formfields = $foo[0];
 # Validate the arguments.
 #
 # Some local variables.
-$nsfilelocale    = 0;
+$nsfilelocale    = "";
 $thensfile       = 0;
 $deletensfile    = 0;
 $nonsfile        = 0;
