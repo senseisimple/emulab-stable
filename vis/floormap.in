@@ -452,13 +452,13 @@ writefiles($images->[0], @areamaps);
 ## Append the component images in the shell, until the Perl function is fixed.
 dprint "Last image is $img_n.\n";
 if ($img_n > 0) {
-    my @args = ("convert", "${prefix}.jpg.*", "-append", "${prefix}.jpg");
+    my @args = ("convert", "${prefix}-*.jpg*", "-append", "${prefix}.jpg");
     dprint "@args\n";
     system(@args) == 0
 	or die "system @args failed: $?";
 
     ## Clean up the component image files.
-    @args = ("/bin/sh", "-c", "rm ${prefix}.jpg.*");
+    @args = ("/bin/sh", "-c", "rm ${prefix}-*.jpg");
     dprint "@args\n";
     system(@args) == 0
 	or die "system @args failed: $?";
