@@ -442,9 +442,16 @@ if ($action == "modify") {
     }
 }
 
-#
-# Zap back to this page, but with show option.
-#
-header("Location: ".
-       "template_metadata.php?action=show&guid=$metadata_guid".
-       "&version=$metadata_newvers");
+if (isset($template_guid) && isset($template_vers)) {
+    header("Location: ".
+	   "template_show.php?guid=$template_guid&version=$template_vers");
+}
+else {
+    #
+    # Zap back to this page, but with show option.
+    #
+    header("Location: ".
+	   "template_metadata.php?action=show&guid=$metadata_guid".
+	   "&version=$metadata_newvers");
+}
+
