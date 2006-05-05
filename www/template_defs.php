@@ -75,6 +75,26 @@ function TBIsExperimentTemplateHidden($guid, $version)
 }
 
 #
+# Check if a template is the root template (cannot be hidden)
+#
+# usage TBIsRootTemplate($guid, $version)
+#       returns 1 if hidden
+#       returns 0 if visible
+#
+function TBIsRootTemplate($guid, $version)
+{
+    $guid    = addslashes($guid);
+    $version = addslashes($version);
+
+    $query_result =
+	DBQueryFatal("select parent_guid from experiment_templates ".
+		     "where guid='$guid' and vers='$version' and ".
+		     "      parent_guid is null");
+
+    return mysql_num_rows($query_result);
+}
+
+#
 # Experiment Template permission checks; using the experiment access checks.
 #
 # Usage: TBExptTemplateAccessCheck($uid, $guid, $access_type)

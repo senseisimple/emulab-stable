@@ -197,13 +197,19 @@ WRITESUBMENUBUTTON("Show NS File &nbsp &nbsp",
 WRITESUBMENUBUTTON("Modify Template",
 		   "template_modify.php?guid=$guid&version=$version");
 
-if (TBIsExperimentTemplateHidden($guid, $version)) {
-    WRITESUBMENUBUTTON("Show Template",
-		       "template_show.php?guid=$guid&version=$version&action=show");
-}
-else {
-    WRITESUBMENUBUTTON("Hide Template",
-		       "template_show.php?guid=$guid&version=$version&action=hide");
+if (! TBIsRootTemplate($guid, $version)) {
+    $hidden = TBIsExperimentTemplateHidden($guid, $version);
+    
+    if ($hidden) {
+	WRITESUBMENUBUTTON("Show Template",
+			   "template_show.php?guid=$guid".
+			   "&version=$version&action=show");
+    }
+    else {
+	WRITESUBMENUBUTTON("Hide Template",
+			   "template_show.php?guid=$guid".
+			   "&version=$version&action=hide");
+    }
 }
 
 WRITESUBMENUBUTTON("Instantiate Template",
