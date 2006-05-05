@@ -143,7 +143,8 @@ event_register_withkeydata_withretry(char *name, int threaded,
      * Testbed Event System. 
      */
     if (! (he = gethostbyname(hostname))) {
-	ERROR("could not get IP address from hostname: %s", hostname);
+	ERROR("could not get IP address from hostname: %s\n", hostname);
+	return 0;
     }
     memcpy((char *)&myip, he->h_addr, he->h_length);
     strcpy(ipaddr, inet_ntoa(myip));
