@@ -437,8 +437,7 @@ function ISADMIN($uid = 1) {
     global $CHECKLOGIN_STATUS;
     
     if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
-	$uid=GETUID();
-	TBERROR("ISADMIN: $uid is not logged in!", 1);
+	return 0;
     }
 
     return (($CHECKLOGIN_STATUS &
