@@ -796,7 +796,6 @@ REPLACE INTO table_regex VALUES ('virt_node_motelog','logfileid','text','regex',
 REPLACE INTO table_regex VALUES ('virt_node_motelog','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_motelog','eid','text','redirect','experiments:eid',0,0,NULL);
 
-
 --
 -- Dumping data for table `testsuite_preentables`
 --

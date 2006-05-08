@@ -490,8 +490,8 @@ sub tblog_set_info ( $$$ )
 	DBQuerySingleFatal("select idx from experiments where pid='$pid' and eid='$eid'");
     $ENV{'TBLOG_UID'} = $uid;
     DBQueryFatal
-	sprintf('update log set exptidx=%d,uid=%s where session=%s',
-		$ENV{TBLOG_EXPTIDX}, $ENV{TBLOG_UID}, $ENV{TBLOG_SESSION});
+	sprintf('replace into session_info values(%d,%d,%d)',
+		$ENV{TBLOG_SESSION}, $ENV{TBLOG_EXPTIDX}, $ENV{TBLOG_UID});
 }
 
 =item tblog_set_default_cause CAUSE
@@ -600,10 +600,8 @@ sub dblog_real ( $$@ ) {
 	  unless defined $cause;
 
 	my $query = 
-	  sprintf('insert into log (stamp,exptidx,uid,session,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
-		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
-		  $ENV{TBLOG_EXPTIDX}, 
-		  $ENV{TBLOG_UID},
+	  sprintf('insert into log (stamp,session,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
+		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
 		  $ENV{TBLOG_SESSION}, 
 		  $ENV{TBLOG_PARENT_INVOCATION}, 
 		  $ENV{TBLOG_INVOCATION},

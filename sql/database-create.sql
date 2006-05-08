@@ -1225,8 +1225,6 @@ CREATE TABLE location_info (
 CREATE TABLE log (
   seq int(10) unsigned NOT NULL auto_increment,
   stamp int(10) unsigned NOT NULL default '0',
-  exptidx int(11) NOT NULL default '0',
-  uid int(11) default NULL,
   session int(10) unsigned NOT NULL default '0',
   invocation int(10) unsigned NOT NULL default '0',
   parent int(10) unsigned NOT NULL default '0',
@@ -2114,6 +2112,17 @@ CREATE TABLE scripts (
   script_name varchar(24) NOT NULL default '',
   PRIMARY KEY  (script),
   UNIQUE KEY id (script_name)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `session_info`
+--
+
+CREATE TABLE session_info (
+  session int(11) NOT NULL default '0',
+  uid int(11) NOT NULL default '0',
+  exptidx int(11) NOT NULL default '0',
+  PRIMARY KEY  (session)
 ) TYPE=MyISAM;
 
 --

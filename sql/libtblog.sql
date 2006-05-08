@@ -3,8 +3,6 @@
 CREATE TABLE log (
   seq int unsigned NOT NULL auto_increment,
   stamp int unsigned NOT NULL,   -- timestamp
-  exptidx int NOT NULL,          -- unique experment id
-  uid  int default NULL,         -- numeric user id
   session int unsigned NOT NULL, -- session id (1)
   invocation int unsigned NOT NULL, -- invocation id - unique id for a 
                                  --   particular execution of a script (1)
@@ -38,6 +36,13 @@ CREATE TABLE log (
   KEY (session)
 );
 
+CREATE TABLE session_info (
+  session int NOT NULL,         -- session id (1)
+  uid int default NULL,         -- numeric user id
+  exptidx int NOT NULL,         -- unique experment id
+  PRIMARY KEY  (session)
+);
+
 -- (1) These ids are equal to the sequence number of the "entering" log
 --     message
 -- (2) Due to a number of factors every "exiting" message in not 
@@ -47,8 +52,7 @@ CREATE TABLE log (
 --     multiple exiting messages.  (2) If "exec" is used the script
 --     will not have an exiting message.
 
--- NOTE: It may be beneficial to split this table into three:
---   session pidx uid
+-- NOTE: It may be beneficial to factor out "invocation" specific info:
 --   invocation session parent script level 
 --   seq stamp [session] invocation priority inferred cause type relevant mesg
 -- ...

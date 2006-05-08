@@ -3311,3 +3311,30 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.55: Changes to templates.sql. Skip this revision for now.
 
+4.56: Refactor "log" table to move some stuff into a new table.
+
+      CREATE TABLE session_info (
+        session int(11) NOT NULL default '0',
+        uid int(11) NOT NULL default '0',
+        exptidx int(11) NOT NULL default '0',
+        PRIMARY KEY  (session)
+      );
+
+      lock tables log write;
+
+      insert into session_info
+        select session, uid, exptidx from log 
+        where uid != 0 or exptidx != 0
+        group by session;
+
+      [If either of the above queries failed.  Stop now and fix it as
+       the next will destroy the information.]
+
+      alter table log
+        drop column uid,
+        drop column exptidx;
+
+      [Now install the new code, do it before you unlock the table, as
+       the last statement made an incompatible change to the "log" table]
+
+      unlock tables;
