@@ -8,10 +8,18 @@
 # BEFORE: DAEMON
 # KEYWORD: shutdown
 
+isvers5=`mysql -V | egrep 'Distrib 5.'`
+
+if [ $? -eq 0 ]; then
+	safeprog=/usr/local/bin/mysqld_safe
+else
+	safeprog=/usr/local/bin/safe_mysqld
+fi
+
 case "$1" in
 	start|faststart)
-		if [ -x /usr/local/bin/safe_mysqld ]; then
-			/usr/local/bin/safe_mysqld --pid-file=/var/run/mysqld.pid --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-bin=@prefix@/log/mysql/update --log-slow-queries=@prefix@/log/mysql/slowqueries -O max_connections=300 -O long_query_time=2 -O key_buffer=32M -O table_cache=256 -O sort_buffer=4M -O record_buffer=1M > /dev/null 2>&1 &
+		if [ -x $safeprog ]; then
+			$safeprog --pid-file=/var/db/mysql/mysqld.pid --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-bin=@prefix@/log/mysql/update --log-slow-queries=@prefix@/log/mysql/slowqueries -O max_connections=300 -O long_query_time=2 -O key_buffer=32M -O table_cache=256 -O sort_buffer=4M -O record_buffer=1M > /dev/null 2>&1 &
 			echo -n ' mysqld'
 		fi
 		;;
