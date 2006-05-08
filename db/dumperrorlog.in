@@ -14,8 +14,9 @@ sub usage() {
     print STDOUT "Usage: dumperrorlog [-d]\n";
     exit(-1);
 }
-my $optlist  = "d";
+my $optlist  = "df";
 my $debug    = 0;
+my $force    = 0;
 my $tempfile = "/var/tmp/testbed_dumperrorlog_tempfile";
 
 #
@@ -73,6 +74,9 @@ if (@ARGV) {
 if (defined($options{"d"})) {
     $debug++;
 }
+if (defined($options{"f"})) {
+    $force++;
+}
 
 #
 # Reopen both stdout and stderr so that we can record all the output for
@@ -84,7 +88,7 @@ if (! $debug) {
 }
 
 #
-# Get the last index we archived out.
+# Get the last log index we archived out.
 #
 my $query_result =
     DBQueryFatal("select idx from emulab_indicies ".
@@ -94,6 +98,26 @@ if (!defined($lastseq)) {
     DBQueryFatal("insert into emulab_indicies (name, idx) ".
 		 "values ('lastlog_seqnum', 0)");
     $lastseq = 0;
+}
+
+#
+# And the last experiment index we sent over.
+#
+$query_result =
+    DBQueryFatal("select idx from emulab_indicies ".
+		 "where name='lastlog_exptidx'");
+my ($exptidx_min) = $query_result->fetchrow_array();
+if (!defined($exptidx_min)) {
+    DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		 "values ('lastlog_exptidx', 0)");
+    $exptidx_min = 0;
+}
+# And the current largest one.
+$query_result =
+    DBQueryFatal("select MAX(exptidx) from experiment_stats");
+my ($exptidx_max) = $query_result->fetchrow_array();
+if (!defined($exptidx_max)) {
+    fatal("Could not get largest experiment index!");
 }
 
 #
@@ -178,8 +202,8 @@ if ($ISMAINSITE) {
     #
     foreach my $tablename ("scripts", "priorities", "causes", "session_info",
 			   "errors", "users", "experiments") {
-	if ($tablename eq "errors" ||
-	    $tablename eq "session_info") {
+	if (($tablename eq "errors" ||
+	     $tablename eq "session_info") && !$force) {
 	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
@@ -188,19 +212,9 @@ if ($ISMAINSITE) {
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
 	elsif ($tablename eq "experiments") {
-	    next
-		if (! defined($lastseq));
-	    
-	    #
-	    # Grab the min,max experiment indexes for dumping stat table below.
-	    #
-	    $query_result =
-		DBQueryFatal("select MIN(exptidx),MAX(exptidx) from log ".
-			     "where (seq > $firstseq and seq <= $lastseq) ".
-			     "      and exptidx!=0");
-
-	    my ($exptidx_min,$exptidx_max) = $query_result->fetchrow_array();
-	    
+	    next if
+		($exptidx_max == $exptidx_min);
+		
 	    DBQueryFatal("select exptidx,pid,eid from experiment_stats ".
 			 "where exptidx >  $exptidx_min and ".
 			 "      exptidx <= $exptidx_max ".
@@ -229,6 +243,10 @@ if ($ISMAINSITE) {
 	unlink("${tempfile}.${tablename}");
     }
 }
+
+# Okay, now that we have really sent over the experiment_stats stuff.
+DBQueryFatal("update emulab_indicies set idx='$exptidx_max' ".
+		     "where name='lastlog_exptidx'");
 
 #
 # And then age out entries.
