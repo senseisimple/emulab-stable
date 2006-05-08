@@ -77,9 +77,13 @@ my $last_notitles = 0;  # This says there were no titles around the previous ima
 # The image produced for each floor will be this size, except when
 # using thumbnails.
 #
-# XXX What is this! 
+# Try to make a standard-sized output image.
+# (XXX Should fit the browser window size instead.)
 my $out_width  = 792;
 my $out_height = 492;
+# We may have a smaller thumbnail image, and/or add header/trailer.
+my $real_out_width;
+my $real_out_height;
 
 # Max x,y of image to go into state file.
 my $max_x = 0;
@@ -452,7 +456,17 @@ writefiles($images->[0], @areamaps);
 ## Append the component images in the shell, until the Perl function is fixed.
 dprint "Last image is $img_n.\n";
 if ($img_n > 0) {
-    my @args = ("convert", "${prefix}-*.jpg*", "-append", "${prefix}.jpg");
+    ## Do the cropping here too.
+    for ( my $i = 0; $i <= $img_n; $i++ ) {
+	my @args = ("convert",
+		    "-crop", "$real_out_width"."x$real_out_height+0+0",
+		    "${prefix}-$i.jpg", "${prefix}-c$i.jpg");
+	dprint "@args\n";
+	system(@args) == 0
+	    or die "system @args failed: $?";
+    }
+
+    my @args = ("convert","-append", "${prefix}-c*.jpg", "${prefix}.jpg");
     dprint "@args\n";
     system(@args) == 0
 	or die "system @args failed: $?";
@@ -938,8 +952,13 @@ sub dofloor($$)
         # Border adds to both the top and the bottom.  Crop some of it away.
         my $y1 = $head_height + $this_height;
         my $y2 = $y1 + $tail_height;
-        $err = $baseimage->Crop(width=>$this_width, height=>$y2);
-        warn "$err" if "$err";
+        ## This Crop stopped working inside Perl, so do it in the shell instead.
+        ## (It started making smaller images at higher zoom factors.)
+        $real_out_width = $this_width;
+        $real_out_height = $y2;
+        ##$err = $baseimage->Crop(width=>$this_width, height=>$y2);
+        ##warn "$err" if "$err";
+
         # Fill in a black rectangle at the bottom for a separator.
         $err = $baseimage->Draw(fill=>'black', primitive=>'rectangle',
                                 points=>"0,$y1, $this_width,$y2");
