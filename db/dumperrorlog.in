@@ -176,9 +176,10 @@ if ($ISMAINSITE) {
     #
     # Now the other tables Kevin needs
     #
-    foreach my $tablename ("scripts", "priorities", "causes",
+    foreach my $tablename ("scripts", "priorities", "causes", "session_info",
 			   "errors", "users", "experiments") {
-	if ($tablename eq "errors") {
+	if ($tablename eq "errors" ||
+	    $tablename eq "session_info") {
 	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
