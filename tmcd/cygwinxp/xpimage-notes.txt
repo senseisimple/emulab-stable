@@ -1247,7 +1247,7 @@ Making single images
     
         # [On boss.]
         set pc=98 img=SP1 image=SP1-pc850_2005-09-30
-        set pc=72 img=SP0 image=SP0_2005-08-22
+        set pc=67 img=SP0 image=SP0-sysprep_2006-04-04
         set pc=167 img=UPDATE image=UPDATE-pc850_2006-02-13
 
         set pc=210 img=BASE-pc3000 image=BASE-pc3000_2005-08-31
@@ -1300,7 +1300,7 @@ Making single images
           ls -l /{proj,usr}/testbed/images/WIN*
         ls -l /proj/testbed/images/WINXP-TMP.ndz /usr/testbed/images/WINXP-$image.ndz
         df -m /usr/testbed/images
-        cp /{proj,usr}/testbed/images/WINXP-TMP.ndz
+        cp -p /{proj,usr}/testbed/images/WINXP-TMP.ndz
         # Check.
         ls -l /{proj,usr}/testbed/images/WINXP-TMP.ndz
         cksum /usr/testbed/images/WINXP-TMP.ndz & ssh ops cksum /proj/testbed/images/WINXP-TMP.ndz
@@ -1433,6 +1433,7 @@ Updating a set of existing images.
 
         #[On Boss.]
         set date=2006-04-04
+          script $rdf$date-sysprep
           script $rdf$date-pc850
           script $rdf$date-pc3000
           # Do the date again inside the script shell...
@@ -1440,9 +1441,11 @@ Updating a set of existing images.
         set nodes="SP0 SP1 SP2 UPDATE"
 
         # Choose ONE of the following hardware types:
+          # sysprep, hardware-independent but made on the pc850.
+          set hw=pc850 img=sysprep disk=/dev/ad0
+
           # pc850, IDE disk (pc41 - pc178)
           set hw=pc850 img=pc850 disk=/dev/ad0
-          set hw=pc850 img=sysprep disk=/dev/ad0
 
           # pc3000, SCSI disk. (pc201 - pc360)
           set hw=pc3000 disk=/dev/da0
@@ -1805,7 +1808,8 @@ Updating a set of existing images.
            if ( -l $link ) rm -f $link
            ln -s $file $link
          end
-         v WINXP-{SP[012],UPDATE}$pctype-new.ndz           
+         v WINXP-{SP[012],UPDATE}$pctype-new.ndz
+         v -L WINXP-{SP[012],UPDATE}$pctype-new.ndz
            # Upward compatability from -pc3000 images to -sysprep images.
            set hw=pc3000 img=sysprep pctype=-pc3000
 
@@ -1842,7 +1846,10 @@ Updating a set of existing images.
            if ( -l $link ) rm -f $link
            ln -s $file $link
          end
-         v WINXP-{SP[012],UPDATE}$pctype.ndz           
+         v WINXP-{SP[012],UPDATE}$pctype.ndz
+         v -L WINXP-{SP[012],UPDATE}$pctype.ndz
+           # Upward compatability from -pc3000 images to -sysprep images.
+           set hw=pc3000 img=sysprep pctype=-pc3000
 
          # Update the dates in the image ID's.
          ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz
