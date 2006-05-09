@@ -519,7 +519,7 @@ CREATE TABLE experiment_stats (
 
 CREATE TABLE experiment_template_graphs (
   parent_guid varchar(16) NOT NULL default '',
-  scale float(10,3) NOT NULL default '1.0',
+  scale float(10,3) NOT NULL default '1.000',
   image mediumblob,
   imap mediumtext,
   PRIMARY KEY  (parent_guid)

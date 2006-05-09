@@ -3341,3 +3341,4 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.57: Changes to templates.sql. Skip this revision for now.
 
+4.58: Fix to the schema in last revision; Skip to next extry.
