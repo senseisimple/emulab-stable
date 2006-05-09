@@ -3338,3 +3338,6 @@ last_net_act,last_cpu_act,last_ext_act);
        the last statement made an incompatible change to the "log" table]
 
       unlock tables;
+
+4.57: Changes to templates.sql. Skip this revision for now.
+

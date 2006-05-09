@@ -405,7 +405,7 @@ else {
 #
 DBQueryFatal("insert into experiment_template_metadata_items set ".
 	     "     guid='$metadata_guid',vers='$metadata_newvers', ".
-	     "     template_guid='$template_guid', ".
+	     "     template_guid='$template_guid', uid='$uid', ".
 	     $extrastuff .
 	     "     name='$name', value='$value', created=now()");
 

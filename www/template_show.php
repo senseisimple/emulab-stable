@@ -158,18 +158,27 @@ function SearchTemplates($guid, $terms) {
 
 CheckArguments($guid, $version);
 
-if (isset($action)) {
-    if ($action == "hide") {
-	DBQueryFatal("UPDATE experiment_templates SET hidden=1 ".
-		     "WHERE guid='$guid' and vers='$version'");
+if (isset($action) || isset($zoomin) || isset($zoomout)) {
+    if (isset($action)) {
+	if ($action == "hide") {
+	    DBQueryFatal("UPDATE experiment_templates SET hidden=1 ".
+			 "WHERE guid='$guid' and vers='$version'");
+	}
+	else if ($action == "show") {
+	    DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
+			 "WHERE guid='$guid' and vers='$version'");
+	}
+	else if ($action == "showall") {
+	    DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
+			 "WHERE guid='$guid'");
+	}
     }
-    else if ($action == "show") {
-	DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
-		     "WHERE guid='$guid' and vers='$version'");
+    $optarg = "";
+    if (isset($zoomin) && $zoomin == "zoomin") {
+	$optarg = "-z in";
     }
-    else if ($action == "showall") {
-	DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
-		     "WHERE guid='$guid'");
+    elseif (isset($zoomout) && $zoomout == "zoomout") {
+	$optarg = "-z out";
     }
 
     if (! TBGuid2PidGid($guid, $pid, $gid)) {
@@ -178,7 +187,7 @@ if (isset($action)) {
     # Need to update the template graph.
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
-    SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $guid",
+    SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
 	   SUEXEC_ACTION_DIE);
 }
 
@@ -249,24 +258,16 @@ SHOWTEMPLATEGRAPH($guid);
 #
 # Define the zoom buttons. This should go elsewhere.
 #
-echo "<script type=text/javascript>
-      function ZoomOut() {
-      }
-      function ZoomIn() {
-      }
-      function ShowAll() {
-          open('template_show.php?guid=$guid&version=$version&action=showall',
-               '_self');
-      }
-      </script>\n";
-
 echo "<center>\n";
-echo "<button name=showall type=button onClick='ShowAll();'>";
+echo "<form action='template_show.php?guid=$guid&version=$version'
+            method=post>\n";
+echo "<button name=action type=submit value=showall>";
 echo " Show All Templates</button></a>&nbsp &nbsp ";
-echo "<button name=zoomout type=button onClick='ZoomOut();'>";
+echo "<button name=zoomout type=submit value=zoomout>";
 echo " Zoom Out</button>\n";
-echo "<button name=zoomin type=button onClick='ZoomIn();'>";
+echo "<button name=zoomin type=submit value=zoomin>";
 echo "Zoom In</button>\n";
+echo "</form>\n";
 echo "</center>\n";
 
 SUBPAGEEND();

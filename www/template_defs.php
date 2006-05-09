@@ -965,7 +965,7 @@ function SHOWTEMPLATEGRAPH($guid)
 
     echo "<center>";
 #    echo "<h3>Template Graph</h3>\n";
-    echo "<div id=fee style='display: block; overflow: hidden; position: relative; z-index:1010; height: 400px; width: 600px; border: 2px solid black;'>\n";
+    echo "<div id=fee style='display: block; overflow: hidden; position: relative; z-index:1010; height: 400px; width: 700px; border: 2px solid black;'>\n";
     echo "<div id=\"D$guid\" style='position:relative;'>\n";
 
     echo $imap;

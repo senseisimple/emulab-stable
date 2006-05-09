@@ -663,9 +663,9 @@ sub DeleteTemplateInputFiles($$)
 #
 # Add a metadata record. This is used for new templates.
 #
-sub NewTemplateMetadata($$$$)
+sub NewTemplateMetadata($$$$$)
 {
-    my ($template_guid, $template_version, $name, $value) = @_;
+    my ($template_guid, $template_version, $name, $value, $creator) = @_;
     my $guid;
     my $version = 1;
 
@@ -677,7 +677,7 @@ sub NewTemplateMetadata($$$$)
 
     my $query_result =
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
-		    "   guid='$guid', vers='$version', ".
+		    "   guid='$guid', vers='$version', uid='$creator', ".
 		    "   template_guid='$template_guid', ".
 		    "   name=$name, value=$value, created=now()");
     return -1
@@ -749,9 +749,9 @@ sub DeleteTemplateMetadata($$)
 # Copy exiting template metadata to a child. This is likely to change
 # since we probably want to share at some point.
 #
-sub CopyTemplateMetadata($$$)
+sub CopyTemplateMetadata($$$$)
 {
-    my ($from_guid, $from_version, $to_version) = @_;
+    my ($from_guid, $from_version, $to_version, $copier) = @_;
 
     #
     # Copy the toplevel items.
@@ -785,7 +785,7 @@ sub CopyTemplateMetadata($$$)
 	    or return -1;
 
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
-		    "   guid='$guid', vers='$version', ".
+		    "   guid='$guid', vers='$version', uid='$copier', ".
 		    "   template_guid='$from_guid', ".
 		    "   name=$name, value=$value, created=now()")
 	    or return -1;

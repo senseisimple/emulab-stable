@@ -59,6 +59,8 @@ CREATE TABLE experiment_templates (
 CREATE TABLE experiment_template_graphs (
   -- Backlink to the template the input belongs to.
   parent_guid varchar(16) NOT NULL default '',
+  -- Current scale factor. 
+  scale float(10,3) NOT NULL default '1.0',
   image mediumblob,
   imap mediumtext,
   PRIMARY KEY  (parent_guid)
@@ -185,6 +187,8 @@ CREATE TABLE experiment_template_metadata_items (
   -- Record the template GUID this metadata associated with. This is for
   -- permission checks and for deletion.
   template_guid varchar(16) NOT NULL default '',
+  -- Creator of this record
+  uid varchar(8) NOT NULL default '',
   -- Key/Value pairs.
   name varchar(64) NOT NULL default '',
   value tinytext,

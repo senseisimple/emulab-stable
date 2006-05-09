@@ -268,20 +268,21 @@ $justexit = 0;
 # The description is versioned metadata the user can modify.
 #
 libTemplates::NewTemplateMetadata($guid, $version,
-				  "description", $description) == 0
+				  "description", $description, $dbuid) == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 #
 # The TID is versioned metadata the user can modify.
 #
-libTemplates::NewTemplateMetadata($guid, $version, "TID", $tid) == 0
+libTemplates::NewTemplateMetadata($guid, $version, "TID", $tid, $dbuid) == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 #
 # Copy the rest of the metadata.
 #
 if ($modify) {
-    libTemplates::CopyTemplateMetadata($parent_guid, $parent_vers, $version)
+    libTemplates::CopyTemplateMetadata($parent_guid,
+				       $parent_vers, $version, $dbuid)
 	== 0 or fatal(-1, "Failed to copy metadata records");
 }
 

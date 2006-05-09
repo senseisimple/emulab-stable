@@ -12,7 +12,7 @@ var WindowTimer;
 var StateChangeTimer;
 
 // Number of minutes (in ms of course) before we kill the popup.
-var POPUPTIME = (2 * 60000);
+var POPUPTIME = (5 * 60000);
 
 // Experiment being watched.
 var pid;

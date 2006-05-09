@@ -21,11 +21,13 @@ sub usage()
 	  "<guid>      - GUID to graph\n");
     exit(-1);
 }
-my $optlist	 = "vap:";
+my $optlist	 = "vap:z:";
 my %options      = ();
 my $verbose      = 0;
 my $prefix       = "/tmp/dot$$";
 my $showall      = 0;
+my $scale        = 1.0;
+my $zoom;
 my $guid;
 
 #
@@ -138,14 +140,58 @@ if ($hidden{$rootnode}) {
     exit(0);
 }
 
+# Defaults;
+my $size     = 8;
+my $fontsize = 10;
+my $bwidth   = 0.75;
+my $bheight  = 0.25;
+my $arrowsize= 0.7;
+my $nodesep  = 0.25;
+my $ranksep  = 0.50;
+
+#
+# Grab the current scale so we know what to do.
+#
+$query_result =
+    DBQueryFatal("select scale from experiment_template_graphs ".
+		 "where parent_guid='$guid'");
+
+exit(-1)
+    if (!$query_result->num_rows);
+
+my ($curscale) = $query_result->fetchrow_array();
+
+#
+# Change scale if zooming and then recalc the defaults.
+#
+if (defined($zoom)) {
+    if ($zoom eq "in") {
+	$scale = $curscale * 1.25;
+    }
+    else {
+	$scale = $curscale / 1.25;
+    }
+}
+else {
+    $scale = $curscale;
+}
+$bwidth    = $bwidth  * $scale;
+$bheight   = $bheight * $scale;
+$arrowsize = $arrowsize * $scale;
+$nodesep   = $nodesep * $scale;
+$ranksep   = $ranksep * $scale;
+
 open(DOT, "> $dotfile") or
     tbdie("Could not open $dotfile!");
 
 print DOT "digraph TemplateGraph {\n";
-print DOT "  size=\"8,8\"\n";
+print DOT "  rankdir=\"LR\"\n";
+print DOT "  nodesep=$nodesep\n";
+print DOT "  ranksep=$ranksep\n";
 print DOT "  fontname=\"Courier\"\n";
-print DOT "  node [shape=rectangle,fontsize=10,height=0.3,width=0.8,fixedsize=true]\n";
-print DOT "  edge [fontsize=8]\n";
+print DOT "  node [shape=rectangle,fontsize=$fontsize,".
+            "height=$bheight,width=$bwidth,fixedsize=true]\n";
+print DOT "  edge [arrowsize=$arrowsize]\n";
 print DOT "  subgraph guid {\n";
 print DOT "    label = \"$guid\";\n";
 
@@ -179,10 +225,24 @@ while (@kids) {
     $table .= "</table>";
 	
     my $tooltip = "return escape(\'$table\')";
+
+    #
+    # Figure out a point size that makes the label fit inside. We do not
+    # want to go too big of course.
+    #
+    # Target labelwidth is 80% of the box, converted to points.
+    my $labelwidth = ($bwidth * 0.80) / 0.0139;
+
+    # And the fontsize ... I made this up.
+    my $fontsize   = int((($labelwidth / length($tid)) * 1.8) + 0.5);
+
+    # But we do not want the font arbitrarily large.
+    $fontsize = 10
+	if ($fontsize > 10);
 	
     if (!exists($versions{"$vers"})) {
-	print DOT "    $vers [label=\"$tid\",href=\"$url\",".
-	    "tooltip=\"$tooltip\"];\n";
+	print DOT "    $vers [fontsize=$fontsize,".
+	    "label=\"$tid\",href=\"$url\",tooltip=\"$tooltip\"];\n";
 	$versions{"$vers"} = $vers;
     }
 
@@ -215,17 +275,18 @@ my $imapdata = `cat $imapfile`;
 #
 $imapdata =~ s/title=/onmouseover=/g;
 
-print "$imapdata\n";
+#print "$imapdata\n";
 
 $gifdata = DBQuoteSpecial($gifdata);
 $imapdata = DBQuoteSpecial($imapdata);
 
 DBQueryFatal("replace into experiment_template_graphs set ".
 	     "    parent_guid='$guid', ".
+	     "    scale='$scale', ".
 	     "    image=$gifdata, ".
 	     "    imap=$imapdata");
 
-#unlink($dotfile, $gifdata, $imapdata);
+#unlink($dotfile, $giffile, $imapfile);
 exit(0);
 
 
@@ -266,5 +327,12 @@ sub ParseArgs()
     }
     if (defined($options{"a"})) {
 	$showall = 1;
+    }
+    if (defined($options{"z"})) {
+	$zoom = $options{"z"};
+
+	if ($zoom ne "in" && $zoom ne "out") {
+	    die("Improper zoom request: $zoom!\n");
+	}
     }
 }

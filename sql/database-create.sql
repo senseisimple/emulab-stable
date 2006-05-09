@@ -519,6 +519,7 @@ CREATE TABLE experiment_stats (
 
 CREATE TABLE experiment_template_graphs (
   parent_guid varchar(16) NOT NULL default '',
+  scale float(10,3) NOT NULL default '1.0',
   image mediumblob,
   imap mediumtext,
   PRIMARY KEY  (parent_guid)
@@ -613,6 +614,7 @@ CREATE TABLE experiment_template_metadata_items (
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned NOT NULL default '0',
   template_guid varchar(16) NOT NULL default '',
+  uid varchar(8) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext,
   created datetime default NULL,
