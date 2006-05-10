@@ -1,0 +1,101 @@
+#! /bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+function usage () {
+  echo "Usage: netbt [-r] off|on"
+  exit
+}
+
+# The NetBT (Netbios over TCP) protocol is used to announce shared directories
+# (folders) from one Windows machine to others.  (See the Name and Session
+# services in http://en.wikipedia.org/wiki/Netbios)
+# 
+# The SMB (Server Message Block) protocol is used to actually serve
+# files. (See http://en.wikipedia.org/wiki/Server_Message_Block)
+# 
+# In Emulab, we normally disable NetBT on experiment nodes, because it
+# chatters and messes up slothd network idle detection, and is not needed for
+# the usual SMB mounts of /users, /proj, and /share dirs, which are served
+# from a Samba service on "fs".
+# 
+# However, NetBT *does* have to be enabled on the experiment nodes if you want
+# to make Windows file shares between them.  The netbt script sets the registry
+# keys on the Windows interface objects.  Run it on the server nodes (the ones
+# containing directories which you want to share) and reboot them afterwards
+# to activate.  There is an optional -r argument to reboot the node.
+# 
+# If you use netbt to turn on NetBT, it persists across reboots.
+# 
+# No reboot is necessary if you use Network Connections in the Control Panel
+# to turn on NetBT.  It takes effect immediately, but is turned off at reboot.
+#   Right-click Local Area Connection (or the name of another connection, if
+#   appropriate), click Properties, click Internet Protocol (TCP/IP), and then
+#   click the Properties button.  On the Internet Protocol (TCP/IP) Properties
+#   page, click the Advanced button, and click the WINS tab.  Select Enable or
+#   Disable NetBIOS over TCP/IP.
+# 
+# "ipconfig /all" reports "NetBIOS over Tcpip . . . : Disabled" on interfaces
+# where NetBT is disabled, and says nothing where NetBT is enabled.
+# 
+# To start sharing a directory, on the node, use the "net share" command, or
+# turn on network sharing on the Sharing tab of the Properties of a directory
+# (folder.)  On XP-SP2 or above, when you first do this, the "Network sharing
+# and security" subdialog says:
+#   As a security measure, Windows has disabled remote
+#   access to this computer.  However, you can enable
+#   remote access and safely share files by running
+#   the _Network_Setup_Wizard_.
+#   
+#   _If_you_understand_the_security_risks_but_want_to_share_
+#   _files_without_running_the_wizard,_click_here._"
+# Skip the wizard and click the latter link. Then click "Just enable file
+# sharing", and "OK".  Then you finally get the click-box to "Share this
+# folder on the network".
+# 
+# The machine names for UNC paths sharing are the same as in shell prompts:
+# pcXXX, where XXX is the machine number.  These will show up in My Network
+# Places / Entire Network / Microsoft Windows Network / Emulab .
+# 
+# IP addresses can also be used, giving you a way to share across experimental
+# network links.  LMHOSTS file lookup will be implemented soon, to provide the
+# usual node aliases within an experiment.
+
+ccs=/HKLM/SYSTEM/CurrentControlSet svcs=$ccs/Services cntl=$ccs/Control
+nbtp=$svcs/NetBT/Parameters nbtif=$nbtp/Interfaces
+
+if (( "$#" == 0 )); then
+  usage
+fi
+
+if (( "$#" >= 1 )); then
+  if [ "$1" == "-r" ]; then
+    reboot=1
+    shift
+  fi
+fi
+
+if (( "$#" > 1 )); then
+  usage
+fi
+
+# Set or unset a regkey to make it persistent.
+if [ "$1" == "on" ]; then
+  able=1
+  regtool set -i $nbtp/EmulabOn 1
+elif [ "$1" == "off" ]; then
+  able=2
+  regtool unset -q $nbtp/EmulabOn
+else
+  usage
+fi
+
+for ifc in `regtool list $nbtif`; do
+     # Set the NetBT interface NetbiosOptions to Enable (1) or Disable (2.)
+     regtool set -i $nbtif/$ifc/NetbiosOptions $able
+done
+
+if [ $reboot ]; then /usr/local/etc/emulab/rc/rc.reboot; fi

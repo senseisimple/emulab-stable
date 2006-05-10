@@ -129,22 +129,24 @@ else
 fi
 
 # NetBT (Netbios over TCP) chatters, messes up slothd, and is not needed for
-# SMB, so disable it.  This doesn't take effect until TCP/IP is restarted, so
-# do it before the computer name change below, which reboots the first time.
+# SMB, so disable it by default.  This doesn't take effect until TCP/IP is
+# restarted, so do it before the computer name change below, which reboots the
+# first time.
 ccs=/HKLM/SYSTEM/CurrentControlSet svcs=$ccs/Services cntl=$ccs/Control
-pi=Parameters/Interfaces nbtif=$svcs/NetBT/$pi
+nbtp=$svcs/NetBT/Parameters nbtif=$nbtp/Interfaces
 for ifc in `regtool list $nbtif`; do
-     # Set the NetBT interface NetbiosOptions to Disable (2.)
-     regtool set -i $nbtif/$ifc/NetbiosOptions 2
-     # Also turn off outgoing DNS registration traffic.
-     regtool set -i $nbtif/$ifc/DisableDynamicUpdate 1
+    # Set the NetBT interface NetbiosOptions to Disable (2) or Enable (1.)
+    if regtool get -q $nbtp/EmulabOn; then able=1; else able=2; fi
+    regtool set -i $nbtif/$ifc/NetbiosOptions $able
+
+    # Also turn off outgoing DNS registration traffic.
+    regtool set -i $nbtif/$ifc/DisableDynamicUpdate 1
 done
 
-# Turn off LMHOSTS lookup to make sure NetBT is not active.
-# Sometimes we get errors like this trying to reboot below:
-#      Error 53 The network path was not found.
-nbtp=$svcs/NetBT/Parameters
-regtool set -i $nbtp/EnableLMHOSTS 0
+# Enable LMHOSTS file lookup on the client side, in case the user runs "netbt"
+# to turn NetBT back on again on a server node to share files between nodes.
+# rc.lmhosts transforms the /etc/hosts file into a Windows lmhosts file.
+regtool set -i $nbtp/EnableLMHOSTS 1
 
 # Turn on IP forwarding if there is more than one experimental net interface.
 # Also requires a reboot to take effect.
