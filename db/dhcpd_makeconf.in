@@ -49,7 +49,7 @@ my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
 my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
 my $lockfile	    = "/var/tmp/testbed_dhcpd_lockfile";
-my %bossnodes	    = ();
+my %servernodes	    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
 my $OUT		    = *STDOUT; 
@@ -174,9 +174,9 @@ while (<IF>) {
 		my $query_result =
 		    DBQueryWarn("select n.node_id,n.pxe_boot_path, ".
 				"       t.pxe_boot_path as nt_pxe_boot_path, ".
-				"       i.IP,i.MAC,r.pid,r.eid, ".
-				"       r.vname,r.inner_elab_role, ".
-				"       r.inner_elab_boot ".
+				"       i.IP,i.MAC,r.pid,r.eid,r.vname, ".
+				"       r.inner_elab_role,r.inner_elab_boot, ".
+				"       r.plab_role,r.plab_boot ".
 				"from nodes as n ".
 				"left join interfaces as i on ".
 				"     n.node_id=i.node_id ".
@@ -192,17 +192,20 @@ while (<IF>) {
 		}
 
 		#
-		# First go through and find any boss nodes. We need these
-		# to create the next-server line for elabinelab.
+		# First go through and find any server (boss or plc) nodes.
+		# We need these to create the next-server line for elabinelab
+		# and plabinelab nodes.
 		#
 		while (my %row = $query_result->fetchhash()) {
 		    if (defined($row{"pid"}) &&
-			defined($row{"inner_elab_role"}) &&
-			($row{"inner_elab_role"} eq "boss" ||
-			 $row{"inner_elab_role"} eq "boss+router")) {
+			((defined($row{"inner_elab_role"}) &&
+			  ($row{"inner_elab_role"} eq "boss" ||
+			   $row{"inner_elab_role"} eq "boss+router")) ||
+			 (defined($row{"plab_role"}) &&
+			  $row{"plab_role"} eq "plc"))) {
 			my $tag = $row{"pid"} . ":" . $row{"eid"};
 			
-			$bossnodes{$tag} = $row{"IP"};
+			$servernodes{$tag} = $row{"IP"};
 		    }
 		}
 		$query_result->dataseek(0);
@@ -224,14 +227,20 @@ while (<IF>) {
 		    }
 
 		    if (defined($row{"pid"}) &&
-			$row{"inner_elab_boot"} == 1 &&
-			defined($row{"inner_elab_role"}) &&
-			$row{"inner_elab_role"} eq "node") {
+			(($row{"inner_elab_boot"} == 1 &&
+			  defined($row{"inner_elab_role"}) &&
+			  $row{"inner_elab_role"} eq "node") ||
+			 ($row{"plab_boot"} == 1 &&
+			  defined($row{"plab_role"}) &&
+			  $row{"plab_role"} eq "node"))) {
 			my $tag = $row{"pid"} . ":" . $row{"eid"};
 			
 			$next_server = "${spaces}\tnext-server " .
-			    $bossnodes{$tag} . ";\n";
-			$dns = "${spaces}\toption domain-name-servers 1.1.1.1;\n";
+			    $servernodes{$tag} . ";\n";
+			if ($row{"inner_elab_boot"} == 1) {
+			    $dns = "${spaces}\toption domain-name-servers ".
+				"1.1.1.1;\n";
+			}
 		    }
 		    else {
 			$hostname =

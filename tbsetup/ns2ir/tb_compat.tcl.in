@@ -1492,6 +1492,21 @@ proc tb-set-node-inner-elab-role {node role} {
 }
 
 #
+# Set a plab role for a node.
+#
+proc tb-set-node-plab-role {node role} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-plab-role] $node is not a node."
+	return
+    }
+    if {[lsearch -exact {plc node none} $role] == -1} {
+	perror "\[tb-set-node-plab-role] type must be one of plc|node|none"
+	return
+    }
+    $node set plab_role $role
+}
+
+#
 # Set security level.
 #
 proc tb-set-security-level {level} {

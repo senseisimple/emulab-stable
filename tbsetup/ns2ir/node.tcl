@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -76,6 +76,7 @@ Node instproc init {s} {
     $self set tarfiles ""
     $self set failureaction "fatal"
     $self set inner_elab_role ""
+    $self set plab_role "none"
     $self set fixed ""
     $self set nseconfig ""
 
@@ -143,6 +144,7 @@ Node instproc updatedb {DB} {
     $self instvar tarfiles
     $self instvar failureaction
     $self instvar inner_elab_role
+    $self instvar plab_role
     $self instvar routertype
     $self instvar fixed
     $self instvar agentlist
@@ -261,6 +263,11 @@ Node instproc updatedb {DB} {
     if { $inner_elab_role != "" } {
 	lappend fields "inner_elab_role"
 	lappend values $inner_elab_role
+    }
+
+    if { $plab_role != "none" } {
+	lappend fields "plab_role"
+	lappend values $plab_role
     }
 
     if { $numeric_id != {} } {

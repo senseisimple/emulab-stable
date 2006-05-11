@@ -258,6 +258,7 @@ sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
 sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
 sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
 sub virtnodeelabrole($) { return $virt_nodes{$_[0]}->{"inner_elab_role"}; }
+sub virtnodeplabrole($) { return $virt_nodes{$_[0]}->{"plab_role"}; }
 sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
 sub virtnodesetosid($$) { return $virt_nodes{$_[0]}->{"__osid"} = $_[1]; }
 sub virtnodeparent($)   { return $virt_nodes{$_[0]}->{"__parent"}; }
@@ -2672,6 +2673,7 @@ sub InitPnode($$)
     my $role;
     my $simhost_violation;
     my $inner_elab_role;
+    my $plab_role;
 
     # XXX NSE hack: 
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
@@ -2790,6 +2792,7 @@ sub InitPnode($$)
 	$vname = $vnode;
 	$role  = TBDB_RSRVROLE_NODE;
 	$inner_elab_role = virtnodeelabrole($vnode);
+	$plab_role = virtnodeplabrole($vnode);
 
 	if ((!defined($cmdline) || $cmdline eq "")) {
 	    # If the user hasn't overridden the command line, try to find a
@@ -2838,6 +2841,8 @@ sub InitPnode($$)
 	if (defined($simhost_violation));
     push(@sets, "inner_elab_role='$inner_elab_role'")
 	if (defined($inner_elab_role));
+    push(@sets, "plab_role='$plab_role'")
+	if (defined($plab_role));
 
     if (@sets) {
 	my $setstr = join(",", @sets);

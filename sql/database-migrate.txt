@@ -3342,3 +3342,15 @@ last_net_act,last_cpu_act,last_ext_act);
 4.57: Changes to templates.sql. Skip this revision for now.
 
 4.58: Fix to the schema in last revision; Skip to next extry.
+
+4.59: Add reserved table plab_role field to distinguish nodes in an
+      "inner planetlab".
+
+      alter table reserved add plab_role enum('plc','node','none') \
+	NOT NULL default 'none' after inner_elab_boot;
+
+      alter table reserved add plab_boot tinyint(1) \
+	default '0' after plab_role;
+
+      alter table virt_nodes add plab_role enum('plc','node','none') \
+	NOT NULL default 'none' after inner_elab_role;

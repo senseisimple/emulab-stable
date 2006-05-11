@@ -2088,6 +2088,8 @@ CREATE TABLE reserved (
   cnet_vlan int(11) default NULL,
   inner_elab_role enum('boss','boss+router','router','ops','ops+fs','fs','node') default NULL,
   inner_elab_boot tinyint(1) default '0',
+  plab_role enum('plc','node','none') NOT NULL default 'none',
+  plab_boot tinyint(1) default '0',
   mustwipe tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname),
@@ -2730,6 +2732,7 @@ CREATE TABLE virt_nodes (
   routertype enum('none','ospf','static','manual','static-ddijk','static-old') NOT NULL default 'none',
   fixed text NOT NULL,
   inner_elab_role enum('boss','boss+router','router','ops','ops+fs','fs','node') default NULL,
+  plab_role enum('plc','node','none') NOT NULL default 'none',
   numeric_id int(11) default NULL,
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
