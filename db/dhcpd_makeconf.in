@@ -235,9 +235,18 @@ while (<IF>) {
 			  $row{"plab_role"} eq "node"))) {
 			my $tag = $row{"pid"} . ":" . $row{"eid"};
 			
-			$next_server = "${spaces}\tnext-server " .
-			    $servernodes{$tag} . ";\n";
-			if ($row{"inner_elab_boot"} == 1) {
+			#
+			# XXX it is not yet completely clear what all we
+			# need to do, or not do, for plab nodes.
+			#
+			if ($row{"plab_boot"} == 1) {
+			    $hostname =
+				"${spaces}\toption host-name \"$node_id\";\n";
+			    $next_server = "${spaces}\tnext-server " .
+				$servernodes{$tag} . ";\n";
+			} else {
+			    $next_server = "${spaces}\tnext-server " .
+				$servernodes{$tag} . ";\n";
 			    $dns = "${spaces}\toption domain-name-servers ".
 				"1.1.1.1;\n";
 			}

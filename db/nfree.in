@@ -139,6 +139,8 @@ if (@ARGV) {
     }
 }
 
+my $mustmakeconf = 0;
+
 ######################################################################
 # Step 1
 #
@@ -203,6 +205,18 @@ foreach my $n (@nodes) {
 	    print "*** WARNING: Error locking down node $n!\n";
 	    next;
 	}
+
+	# Any node that was part of an elabinelab or plabinelab experiment
+	# that is freed requires that we remake the dhcpd.conf file.
+	if ($rowref->{'inner_elab_boot'} || $rowref->{'plab_boot'}) {
+	    if (!DBQueryWarn("update reserved " .
+			     "set inner_elab_boot=0, plab_boot=0 " .
+			     "where node_id='$n'")) {
+		print "*** WARNING: Error clearing elab/plab boot on $n!\n";
+	    }
+	    $mustmakeconf = 1;
+	}
+
 	push(@freed_nodes, $n);
     }
 
@@ -234,9 +248,12 @@ if (@freed_nodes > 0) {
     if ($result->num_rows()) {
 	DBQueryFatal("update nodes set pxe_boot_path=NULL where ".
 		     "node_id in $nodelist");
-	system("$makeconf -i -r") == 0 ||
-	    print STDERR "WARNING: $makeconf failed!\n";
+	$mustmakeconf = 1;
     }
+}
+if ($mustmakeconf) {
+    system("$makeconf -i -r") == 0 ||
+	print STDERR "WARNING: $makeconf failed!\n";
 }
 
 ######################################################################
