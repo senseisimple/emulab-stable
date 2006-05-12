@@ -5,8 +5,9 @@
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
-use POSIX qw(isatty setsid);
+use POSIX qw(setsid);
 use POSIX qw(strftime);
 use Errno qw(EDQUOT);
 use XML::Simple;
@@ -52,17 +53,10 @@ my $waitmode     = 0;
 my $batchmode    = 0;
 my $foreground   = 0;
 my $paramfile;
-my %parameters   = ();
-my $pid;
-my $tid;
-my $eid;
-my $gid;
 my $guid;
 my $version;
-my $inputfile;
-# For modify.
-my $parent_guid;
-my $parent_vers;
+my $eid;
+my %parameters   = ();
 
 #
 # Configure variables
@@ -82,9 +76,10 @@ my $user_name;
 my $user_email;
 my $dbuid;
 my $EVhandle;
-my $logname;
 my $exptidx;
-my $runidx;
+my $template;
+my $instance;
+my $logname;
 my @ExptStates  = ();
 # For the END block below.
 my $cleaning    = 0;
@@ -110,7 +105,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use Template;
 use event;
 
 # Be careful not to exit on transient error
@@ -171,16 +166,16 @@ if ($waitmode) {
 }
 
 #
-# Grab template info.
+# Grab template and do access check.
 #
-if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
-    tbdie("Could not get info for template $guid/$version!");
-}
+$template = Template->Lookup($guid, $version);
 
-#
-# Make sure UID is allowed to create experiments in this project.
-#
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! TBProjAccessCheck($dbuid,
+			$template->pid(), $template->gid(),
+			TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to instantiate template ".
 	    "$guid/$version");
     exit(1);
@@ -229,14 +224,8 @@ if (defined($paramfile)) {
 # Generate a new template instance record, and get back its index.
 # We will finish updating it later.
 #
-my %args = ();
-$args{'parent_guid'} = $guid;
-$args{'parent_vers'} = $version;
-$args{'pid'}         = $pid;
-$args{'eid'}         = $eid;
-$args{'uid'}         = $dbuid;
-
-if (libTemplates::NewTemplateInstanceRecord(\%args, \$instidx) < 0) {
+$instance = $template->NewInstance($eid, $dbuid);
+if (!defined($instance)) {
     fatal(-1, "Could not insert new experiment instance record!");
 }
 
@@ -253,19 +242,8 @@ if ($paramfile) {
     foreach my $name (keys(%parameters)) {
 	my $value = $parameters{$name};
 
-	my %args = ();
-    
-	$args{'parent_guid'} = $guid;
-	$args{'parent_vers'} = $version;
-	$args{'pid'}         = $pid;
-	$args{'eid'}         = $eid;
-	$args{'instance_idx'}= $instidx;
-	$args{'name'}        = $name;
-	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
-	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
-    
-	libTemplates::NewTemplateInstanceBindingRecord(\%args) == 0
-	    or tbdie("Error inserting binding into DB!");
+	$instance->NewBinding($name, $value) == 0
+	    or fatal(-1, "Error inserting binding into DB!");
     }
 }
 
@@ -274,7 +252,8 @@ if ($paramfile) {
 # a copy of the existing preload associated with the template. This will
 # certainly change later.
 #
-my $copyeid = "${pid},T${guid}-${version}";
+my $pid    = $template->pid();
+my $copyid = $template->pid() . "," . $template->eid();
 
 #
 # Build up arguments to batchexp. I do not want to bother with shell
@@ -285,10 +264,10 @@ my $copyeid = "${pid},T${guid}-${version}";
 # Note special -x option.
 #
 my @arguments =
-    ($batchexp, "-x", "T${guid}-${version}", "-y", $instidx, "-q", "-f",
-     "-p", $pid, "-e", $eid, "-g", $gid,
+    ($batchexp, "-x", $template->eid(), "-y", $instance->idx(), "-q", "-f",
+     "-p", $pid, "-e", $eid, "-g", $template->gid(),
      "-E", "'Experiment Template Instantiation $guid/$version' ",
-     "-c" , $copyeid);
+     "-c" , $copyid);
 
 # All the other goo.
 push(@arguments, "-i")
@@ -323,13 +302,11 @@ if (! TBExptIDX($pid, $eid, \$exptidx)) {
 #
 # Update the Instance
 #
-%args = ();
-$args{'exptidx'}     = $exptidx;
+my %args = ();
+$args{'exptidx'} = $exptidx;
 
-if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
-					       $instidx, 0, \%args) < 0) {
-    fatal(-1, "Could not update experiment instance record $instidx!");
-}
+$instance->Update(0, \%args) == 0
+    or fatal(-1, "Could not update experiment instance record!");
 
 # Event connect now that experiment is created.
 SetupEventHandler();
@@ -356,7 +333,7 @@ $SIG{TERM} = \&sighandler;
 if (! $foreground) {
     $logname = TBExptCreateLogFile($pid, $eid, "instantiate");
 
-    if (! $batch) {
+    if (! $batchmode) {
 	TBExptSetLogFile($pid, $eid, $logname);
 	TBExptOpenLogFile($pid, $eid);
     }
@@ -369,7 +346,7 @@ if (! $foreground) {
 	$justexit = 1;
 
 	if (!$waitmode) {
-	    if ($batch) {
+	    if ($batchmode) {
 		print("Experiment $pid/$eid has entered the batch system.\n".
 		      "You will be notified when it is fully instantiated.\n")
 		    if (! $quiet);
@@ -384,7 +361,7 @@ if (! $foreground) {
 	print("Waiting for experiment $eid to fully instantiate.\n")
 	    if (! $quiet);
 	    
-	if (isatty(STDIN) && !$quiet) {
+	if (-t STDIN && !$quiet) {
 	    print("You may type ^C at anytime; you will be notified via email.".
 		  "\n".
 		  "You will not actually interrupt the experiment itself.\n");
@@ -485,24 +462,8 @@ if ($batchmode) {
 #
 # All instances currently start with a default run.
 #
-%args = ();
-$args{'exptidx'}     = $exptidx;
-$args{'runid'}       = $eid;
-
-if (libTemplates::NewTemplateExerimentRunRecord(\%args, \$runidx) < 0) {
-    fatal(-1, "Could not insert experiment run record!");
-}
-
-#
-# Update the Instance
-#
-%args = ();
-$args{'runidx'} = $runidx;
-
-if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
-					       $instidx, 1, \%args) < 0) {
-    fatal(-1, "Could not update experiment instance record $instidx!");
-}
+$instance->NewRun($eid) == 0
+    or fatal(-1, "Could not insert experiment new run record!");
 
 #
 # And the bindings for the default run ...
@@ -511,22 +472,16 @@ if ($paramfile) {
     foreach my $name (keys(%parameters)) {
 	my $value = $parameters{$name};
 
-	my %args = ();
-    
-	$args{'exptidx'}     = $exptidx;
-	$args{'runidx'}      = $runidx;
-	$args{'name'}        = $name;
-	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
-	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
-    
-	libTemplates::NewExperimentRunBindingRecord(\%args) == 0
-	    or tbdie("Error inserting run binding into DB!");
+	$instance->NewRunBinding($name, $value) == 0
+	    or fatal(-1, "Error inserting run binding into DB!");
     }
 }
+$instance->Start() == 0
+    or fatal(-1, "Could not update start time in instance record!");
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)
-    if (defined($logname) && !$batch);
+    if (defined($logname) && !$batchmode);
 
 exit(0);
 
@@ -708,8 +663,6 @@ sub EventHandler($$$) {
 sub cleanup()
 {
     if ($exptcreated) {
-	my $exptidx;
-
 	exit(-1)
 	    if (!TBExptIDX($pid, $eid, \$exptidx));
 		
@@ -717,12 +670,12 @@ sub cleanup()
 	exit(-1)
 	    if ($?);
     }
-    libTemplates::DeleteTemplateInstanceRecord($guid, $version, $instidx)
-	if (defined($instidx));
+    $instance->Delete()
+	if (defined($instance));
 
     # Stop the web interface from spewing.
     TBExptCloseLogFile($pid, $eid)
-	if (defined($logname) && !$batch);
+	if (defined($logname) && !$batchmode);
 }
 
 sub fatal($$)
@@ -760,8 +713,8 @@ END {
 	# We are screwed; a recursive error. Someone will have to clean
 	# up by hand. 
 	#
-	SENDMAIL(TBOPS, 
-		 "Template Creation Failure: $pid/$tid",
+	SENDMAIL($TBOPS, 
+		 "Template Creation Failure: $pid/$eid",
 		 "Recursive error in cleanup! This is very bad.");
 	$? = $saved_exitcode;
 	return;

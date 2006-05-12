@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
@@ -49,16 +50,11 @@ my $paramfile;
 my %parameters   = ();
 my $action;
 my $description;
-my $pid;
-my $tid;
+my $runid;
 my $eid;
-my $gid;
 my $guid;
 my $version;
 my $inputfile;
-my $exptidx;
-my $instidx;
-my $runid;
 
 #
 # Configure variables
@@ -76,9 +72,10 @@ my $CONTROL	= "@USERNODE@";
 my $user_name;
 my $user_email;
 my $dbuid;
-my $logname;
-my $runidx;
-my $currunidx;
+my $pid;
+my $exptidx;
+my $template;
+my $instance;
 # For the END block below.
 my $cleaning    = 0;
 my $justexit    = 1;
@@ -86,6 +83,7 @@ my $justexit    = 1;
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
 my $archcontrol = "$TB/bin/archive_control";
+my $eventcontrol= "$TB/bin/eventsys_control";
 
 # Protos
 sub ParseArgs();
@@ -99,7 +97,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use Template;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -159,42 +157,37 @@ if ($waitmode) {
 }
 
 #
-# Grab template info.
+# Grab template and do access check.
 #
-if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
-    tbdie("Could not get info for template $guid/$version!");
-}
-# This is the instance IDX ...
-if (! TBExptIDX($pid, $eid, \$exptidx)) {
-    fatal(-1, "Could not get experiment index for $pid,$eid!");
-}
-#
-# Make sure it is valid and actually running.
-#
-if (! libTemplates::IsTemplateInstanceExperiment($exptidx)) {
-    tberror("No such template instance experiment $exptidx!");
-    exit(1);
-}
+$template = Template->Lookup($guid, $version);
 
-#
-# And get the instance info,
-#
-if (libTemplates::TemplateInstanceInfoByExptidx($exptidx, \$currunidx,
-						undef, \$instidx) < 0) {
-    fatal(-1, "Could not get current experiment run index!");
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
 }
-
-if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
-    tberror("Template instance experiment $exptidx in not active!");
-    exit(1);
-}
-
-#
-# Make sure UID is allowed to create experiments in this project.
-#
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+if (! TBProjAccessCheck($dbuid,
+			$template->pid(), $template->gid(),
+			TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to instantiate template ".
 	    "$guid/$version");
+    exit(1);
+}
+$pid = $template->pid();
+
+#
+# Grab Instance.
+#
+if (! TBExptIDX($pid, $eid, \$exptidx)) {
+    tbdie("Could not get experiment index for $pid,$eid!");
+}
+
+$instance = Template::Instance->LookupByExptidx($exptidx);
+
+if (!defined($instance)) {
+    tbdie("Experiment instance $eid in $guid/$version does not exist!");
+}
+   
+if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
+    tberror("Template instance experiment $pid/$eid in not active!");
     exit(1);
 }
 
@@ -238,20 +231,10 @@ if (defined($paramfile)) {
 }
 
 #
-# At this point, we need to force a cleanup no matter how we exit.
-# See the END block below.
-#
-$justexit = 0;
-
-#
 # Finalize running experiment.
 #
-if (defined($currunidx)) {
-    if (libTemplates::FinalizeTemplateExerimentRunRecord($exptidx,
-							 $currunidx) < 0) {
-	fatal(-1, "Could not finalize experiment run index $currunidx!");
-    }
-}
+$instance->FinalizeCurrentRun() == 0
+    or fatal(-1, "Could not finalize experiment run for $instance!");
 
 #
 # Commit the archive. 
@@ -264,17 +247,14 @@ goto done
 #
 # Generate a new run.
 #
-my %args = ();
-$args{'exptidx'}     = $exptidx;
-$args{'runid'}       = $runid;
-if (defined($description)) {
-    $args{'description'} = DBQuoteSpecial($description);
-    $args{'description'} =~ s/^\'(.*)\'$/$1/;
-}
+$instance->NewRun($runid, $description) == 0
+    or fatal(-1, "Could not create new experiment run for $instance!");
 
-if (libTemplates::NewTemplateExerimentRunRecord(\%args, \$runidx) < 0) {
-    fatal(-1, "Could not insert experiment run record!");
-}
+#
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
 
 #
 # And the bindings for the run ...
@@ -283,28 +263,10 @@ if ($paramfile) {
     foreach my $name (keys(%parameters)) {
 	my $value = $parameters{$name};
 
-	my %args = ();
-    
-	$args{'exptidx'}     = $exptidx;
-	$args{'runidx'}      = $runidx;
-	$args{'name'}        = $name;
-	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
-	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
-    
-	libTemplates::NewExperimentRunBindingRecord(\%args) == 0
-	    or tbdie("Error inserting run binding into DB!");
+	$instance->NewRunBinding($name, $value) == 0
+	    or fatal(-1, "Could not create new experiment run binding ".
+		     "for $instance!");
     }
-}
-
-#
-# Update the instance record to point to the new current run.
-#
-%args = ();
-$args{'runidx'}      = $runidx;
-
-if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
-					       $instidx, 0, \%args) < 0) {
-    fatal(-1, "Could not update experiment instance record!");
 }
 
 #
@@ -454,8 +416,8 @@ sub ParseArgs()
 #
 sub cleanup()
 {
-    libTemplates::DeleteTemplateExerimentRunRecord($exptidx, $runidx)
-	if (defined($runidx));
+    $instance->DeleteCurrentRun()
+	if (defined($instance));
 }
 
 sub fatal($$)
@@ -493,8 +455,8 @@ END {
 	# We are screwed; a recursive error. Someone will have to clean
 	# up by hand. 
 	#
-	SENDMAIL(TBOPS, 
-		 "Template Creation Failure: $pid/$tid",
+	SENDMAIL($TBOPS, 
+		 "Template Creation Failure: $pid/$eid",
 		 "Recursive error in cleanup! This is very bad.");
 	$? = $saved_exitcode;
 	return;

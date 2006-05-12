@@ -1,0 +1,234 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+
+#
+# Add metadata to a template.
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_metadata -a <action> -f <file> ".
+	  "<name> <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-a <action>    - add or modify\n".
+	  "-f <file>      - file of metadata value\n".
+	  "<name>         - Metadata name\n".
+	  "<guid/vers>    - GUID and version of template\n");
+    exit(-1);
+}
+my $optlist	 = "a:f:";
+my %options      = ();
+my $action;
+my $template_guid;
+my $template_vers;
+my $metadata_name;
+my $metadata_value;
+my $inputfile;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+
+# Locals
+my $dbuid;
+my $template;
+my $instance;
+# For the END block below.
+my $cleaning    = 0;
+my $justexit    = 1;
+
+# Protos
+sub ParseArgs();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# Grab template and do access check.
+#
+$template = Template->Lookup($template_guid, $template_vers);
+
+if (!defined($template)) {
+    tbdie("Experiment template $template_guid/$template_vers does not exist!");
+}
+if (! TBProjAccessCheck($dbuid,
+			$template->pid(), $template->gid(),
+			TB_PROJECT_CREATEEXPT)) {
+    tberror("You do not have permission to add metadata to template ".
+	    "$template_guid/$template_vers");
+    exit(1);
+}
+
+$metadata_value = `cat $inputfile`;
+
+if (! TBcheck_dbslot($metadata_value,
+		     "experiment_template_metadata", "value",
+		     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+    tbdie("Improper characters in metadata value!");
+}
+
+my $already_exists = $template->LookupMetadata($metadata_name);
+tbdie("Could not lookup metadata name '$metadata_name'")
+    if ($already_exists < 0);
+
+if ($action eq "add") {
+    tbdie("Metadata name '$metadata_name' already in use!")
+	if ($already_exists);
+    
+    $template->NewMetadata($metadata_name, $metadata_value, $dbuid) == 0
+	or tbdie("Could not add new metadata item '$metadata_name'");
+}
+else {
+    tbdie("Metadata name '$metadata_name' does not exist!")
+	if (!$already_exists);
+    
+    $template->ModifyMetadata($metadata_name, $metadata_value, $dbuid) == 0
+	or tbdie("Could not modify metadata item '$metadata_name'");
+}
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    my %options;
+    
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 2) {
+	usage();
+    }
+
+    #
+    # Pick up metadata name and untaint.
+    #
+    $metadata_name = shift(@ARGV);
+
+    if (! TBcheck_dbslot($metadata_name,
+			 "experiment_template_metadata", "name",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	tbdie("Improper metadata name!");
+    }
+    
+    #
+    # Pick up guid/version and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$template_guid = $1;
+	$template_vers = $2;
+    }
+    else {
+	usage();
+    }
+
+    if (!defined($options{"a"})) {
+	tbdie("Must supply -a option");
+    }
+    $action = $options{"a"};
+    usage()
+	if ($action ne "add" && $action ne "modify");
+
+    if (defined($options{"f"})) {
+	$inputfile = $options{"f"};
+
+	# Note different taint check (allow /).
+	if ($inputfile =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data in metadata file: $inputfile");
+	}
+
+	#
+	# Called from ops interactively. Make sure NS file in /proj or /users.
+	#
+	# Use realpath to resolve any symlinks.
+	#
+	my $translated = `realpath $inputfile`;
+	if ($translated =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data returned by realpath: $translated");
+	}
+
+	tbdie("$inputfile does not exist")
+	    if (! -f $inputfile);
+
+	#
+	# The file must reside in /proj, /groups, or /users. Since this script
+	# runs as the caller, regular file permission checks ensure its a file
+	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
+	# since this script is invoked directly from web interface.
+	#
+	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.txt/) &&
+	    ! ($inputfile =~ /^\/tmp\/\d+\.txt/) &&
+	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
+	    ! ($inputfile =~ /^\/proj/) &&
+	    ! ($inputfile =~ /^\/groups/) &&
+	    ! ($inputfile =~ /^\/users/)) {
+	    tberror("$inputfile does not resolve to an allowed directory!");
+	    # Note positive status; so error goes to user not tbops.
+	    exit(1);
+	}
+    }
+    else {
+	usage();
+    }
+}
+

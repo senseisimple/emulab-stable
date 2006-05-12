@@ -215,7 +215,7 @@ if ($expstate) {
     }
 
     if ($isinstance && $expstate == $TB_EXPTSTATE_ACTIVE) {
-	WRITESUBMENUBUTTON("Start Experiment Run",
+	WRITESUBMENUBUTTON("Start New Experiment Run",
 			   "template_exprun.php?action=start&guid=$guid".
 			   "&version=$version&eid=$exp_eid");
     }

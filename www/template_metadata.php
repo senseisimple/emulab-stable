@@ -324,21 +324,31 @@ if (! TBExptTemplateAccessCheck($uid, $template_guid, $TB_EXPT_MODIFY)) {
 # Okay, validate form arguments.
 #
 $errors = array();
+$command_opts = "";
 
 #
 # Name
 #
+if (!isset($formfields[name]) || $formfields[name] == "") {
+    $errors["Metadata Name"] = "Missing Field";
+}
+elseif (!TBvalid_template_metadata_name($formfields[name])) {
+    $errors["Metadata Name"] = TBFieldErrorString();
+}
+
 if ($action == "add") {
-    if (!isset($formfields[name]) || $formfields[name] == "") {
-	$errors["Metadata Name"] = "Missing Field";
+    if (TBTemplateMetadataLookup($template_guid, $template_vers,
+				 $formfields[name], $metadata_value)) {
+	$errors["Metadata Name"] = "Name already in use";
     }
-    elseif (!TBvalid_template_metadata_name($formfields[name])) {
-	$errors["Metadata Name"] = TBFieldErrorString();
+    $command_opts .= "-a add " . escapeshellarg($formfields[name]);
+}
+else {
+    if (!TBTemplateMetadataLookup($template_guid, $template_vers,
+				  $formfields[name], $metadata_value)) {
+	$errors["Metadata Name"] = "Name does not exist to modify";
     }
-    elseif (TBTemplateMetadataLookup($template_guid, $template_vers,
-				     $formfields[name], $metadata_value)) {
-	$errors["Metadata Name"] = "Name already in use"; 
-    }
+    $command_opts .= "-a modify " . escapeshellarg($formfields[name]);
 }
 
 #
@@ -378,80 +388,50 @@ if (count($errors)) {
 }
 
 #
-# Insert the new record.
+# Generate a temporary file and write in the data.
 #
-$name  = addslashes($formfields[name]);
-$value = addslashes($formfields[value]);
+list($usec, $sec) = explode(' ', microtime());
+srand((float) $sec + ((float) $usec * 100000));
+$foo = rand();
 
-if ($action == "modify") {
-    $query_result =
-	DBQueryFatal("select MAX(vers) ".
-		     " from experiment_template_metadata_items as maxvers ".
-		     "where guid='$metadata_guid'");
+$datafile = "/tmp/$uid-$foo.txt";
 
-    $row  = mysql_fetch_array($query_result);
-    $maxvers = $row[0];
-    $extrastuff = "parent_guid='$metadata_guid',parent_vers='$metadata_vers',";
-    $metadata_newvers = $maxvers + 1;
-}
-else {
-    TBNewGUID($metadata_guid);
-    $metadata_newvers = 1;
-    $extrastuff = "";
+if (! ($fp = fopen($datafile, "w"))) {
+    TBERROR("Could not create temporary file $datafile", 1);
 }
 
-#
-# Insert new item and get back the index.
-#
-DBQueryFatal("insert into experiment_template_metadata_items set ".
-	     "     guid='$metadata_guid',vers='$metadata_newvers', ".
-	     "     template_guid='$template_guid', uid='$uid', ".
-	     $extrastuff .
-	     "     name='$name', value='$value', created=now()");
+fwrite($fp, $formfields[value]);
+fclose($fp);
+chmod($datafile, 0666);
 
 #
-# Now we can insert (or update) the record for the template.
+# The backend does the actual work.
 #
-if ($action == "modify") {
-    DBQueryFatal("update experiment_template_metadata ".
-		 "  set metadata_vers='$metadata_newvers' ".
-		 "where metadata_guid='$metadata_guid' and ".
-		 "      metadata_vers='$metadata_vers'");		 
+if (!TBGuid2PidGid($template_guid, $pid, $gid)) {
+    TBERROR("Could not determine pid/gid of template $template_guid", 1);
 }
-else {
-    DBQueryFatal("insert into experiment_template_metadata set ".
-		 "   metadata_guid='$metadata_guid', ".
-		 "   metadata_vers='$metadata_newvers', ".
-		 "   parent_guid='$template_guid', ".
-		 "   parent_vers='$template_vers'");
-}
+TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+$retval = SUEXEC($uid, "$pid,$unix_gid",
+		 "webtemplate_metadata -f $datafile ".
+		 "$command_opts $template_guid/$template_vers",
+		 SUEXEC_ACTION_IGNORE);
+
+unlink($datafile);
 
 #
-# XXX Some metadata is special ...
-#
-if ($action == "modify") {
-    if ($name == "TID") {
-	DBQueryFatal("update experiment_templates set tid='$value' ".
-		     "where guid='$template_guid' and ".
-		     "      vers='$template_vers'");
-    }
-    elseif ($name == "description") {
-	DBQueryFatal("update experiment_templates set description='$value' ".
-		     "where guid='$template_guid' and ".
-		     "      vers='$template_vers'");
-    }
+# Fatal Error. Report to the user, even though there is not much he can
+# do with the error. Also reports to tbops.
+# 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 }
 
-if (isset($template_guid) && isset($template_vers)) {
-    header("Location: ".
-	   "template_show.php?guid=$template_guid&version=$template_vers");
-}
-else {
-    #
-    # Zap back to this page, but with show option.
-    #
-    header("Location: ".
-	   "template_metadata.php?action=show&guid=$metadata_guid".
-	   "&version=$metadata_newvers");
+# User error. Tell user and exit.
+if ($retval) {
+    SUEXECERROR(SUEXEC_ACTION_USERERROR);
+    return;
 }
 
+header("Location: ".
+       "template_show.php?guid=$template_guid&version=$template_vers");

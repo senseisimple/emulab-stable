@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
@@ -38,9 +39,7 @@ my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
 my $batchmode    = 0;	# Called from the batch daemon.
-my $pid;
 my $eid;
-my $tid;
 my $guid;
 my $version;
 
@@ -57,14 +56,14 @@ my $TBBASE	= "@TBBASE@";
 # Locals
 my $user_name;
 my $user_email;
+my $pid;
 my $dbuid;
 my $logname;
 my $exptidx;
-my $runidx;
-my $instidx;
+my $template;
+my $instance;
 # For the END block below.
 my $cleaning    = 0;
-my $exptcreated = 0;
 my $justexit    = 1;
 
 # Programs we need
@@ -82,7 +81,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use Template;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -133,30 +132,36 @@ if ($waitmode) {
 }
 
 #
-# Grab template info.
+# Grab template info and do access check.
 #
-if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
-    tbdie("Could not get info for template $guid/$version!");
-}
+$template = Template->Lookup($guid, $version);
 
-if (! TBExptIDX($pid, $eid, \$exptidx)) {
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! TBProjAccessCheck($dbuid,
+			$template->pid(), $template->gid(),
+			TB_PROJECT_CREATEEXPT)) {
+    tberror("You do not have permission to terminate template instance ".
+	    "$eid in template $guid/$version");
+    exit(1);
+}
+$pid = $template->pid();
+
+#
+# Now we need to find the experiment index so we can find the instance.
+# This is wrong, but necessary cause of how templates are layered over
+# the existing experiment structure.
+#
+if (! TBExptIDX($template->pid(), $eid, \$exptidx)) {
     fatal(-1, "Could not get experiment index for $pid,$eid!");
 }
 
-if (libTemplates::TemplateInstanceInfoByExptidx($exptidx,
-						\$runidx, undef, \$instidx)
-    < 0) {
-    fatal(-1, "Could not get experiment run index for $exptidx!");
+$instance = Template::Instance->LookupByExptidx($exptidx);
+if (!defined($instance)) {
+    fatal(-1, "Could not get instance record for experiment $exptidx!");
 }
 
-#
-# Make sure UID is allowed to create experiments in this project.
-#
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    tberror("You do not have permission to instantiate template ".
-	    "$guid/$version");
-    exit(1);
-}
 #
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
@@ -192,7 +197,7 @@ if (! $batchmode) {
 	print("Waiting for template instance to terminate.\n")
 	    if (! $quiet);
 	    
-	if (isatty(STDIN) && !$quiet) {
+	if (-f STDIN && !$quiet) {
 	    print("You may type ^C at anytime; you will be notified via email.".
 		  "\n".
 		  "You will not actually interrupt the experiment itself.\n");
@@ -245,7 +250,7 @@ fatal($? >> 8, "Could not terminate template instance")
     if ($?);
 
 # Reminder; instance records are not deleted!
-libTemplates::FinalizeTemplateInstanceRecord($guid, $version, $instidx) == 0 
+$instance->Finalize() == 0
     or fatal(-1, "Could not finalize experiment instance record!");
 
 exit(0);
@@ -348,8 +353,8 @@ END {
 	# We are screwed; a recursive error. Someone will have to clean
 	# up by hand. 
 	#
-	SENDMAIL(TBOPS, 
-		 "Instance Termination Failure: $pid/$tid",
+	SENDMAIL($TBOPS, 
+		 "Instance Termination Failure: $pid/$eid",
 		 "Recursive error in cleanup! This is very bad.");
 	$? = $saved_exitcode;
 	return;

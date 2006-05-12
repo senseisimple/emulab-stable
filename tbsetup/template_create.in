@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
@@ -44,12 +45,12 @@ my $description  = "";
 my $modify       = 0;
 my $pid;
 my $tid;
-my $eid;
 my $gid;
 my $inputfile;
 # For modify.
 my $parent_guid;
 my $parent_vers;
+my $parent_template;
 
 #
 # Configure variables
@@ -66,9 +67,11 @@ my $CONTROL	= "@USERNODE@";
 # Locals
 my $user_name;
 my $user_email;
+my $template;
 my $dbuid;
 my $guid;
-my $version = 1;
+my $vers;
+my $eid;
 my $archive_idx = 0;
 # For the END block below.
 my $cleaning    = 0;
@@ -93,7 +96,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libArchive;
-use libTemplates;
+use Template;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 120;
@@ -163,78 +166,20 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
 # On modify, must check access to the parent template.
 #
 if ($modify) {
-    if (!libTemplates::TBValidExperimentTemplate($parent_guid, $parent_vers)) {
+    $parent_template = Template->Lookup($parent_guid, $parent_vers);
+
+    if (!defined($parent_template)) {
 	tbdie("Experiment template $parent_guid/$parent_vers does not exist!");
     }
-    if (!libTemplates::TBExptTemplateAccessCheck($dbuid,
-						 $parent_guid,
-						 TB_EXPT_READINFO)) {
+
+    if (!$parent_template->AccessCheck($dbuid, TB_EXPT_READINFO)) {
 	tbdie("You do not have permission to modify experiment template ".
 	      "$parent_guid/$parent_vers");
     }
-
-    # Hmm, this is redundant in the table. 
-    $guid = $parent_guid;
-}
-else {
-    #
-    # Otherwise, grab new guid before tables are locked.
-    #
-    if (libTemplates::NewGUID(\$guid) < 0) {
-	tbdie("Could not get a new GUID!");
-    }
 }
 
 #
-# Create a template record; the tid has to be unique within the project,
-# across both the experiments and template tables, since there will be
-# two paths to experiment creation for the near term. See corresponding
-# code in batchexp.
-#
-DBQueryFatal("lock tables experiments write, ".
-	     "            experiment_templates write");
-
-my $query_result =
-    DBQueryFatal("select pid,tid from experiment_templates ".
-		 "where tid='$tid' and pid='$pid'");
-
-if ($query_result->numrows) {
-    DBQueryWarn("unlock tables");
-    tbdie("Template ID $tid in project $pid is already in use!");
-}
-
-#
-# Find unused version number now that tables are locked. 
-#
-if ($modify) {
-    $query_result =
-	DBQueryFatal("select MAX(vers) from experiment_templates ".
-		     "where guid='$guid'");
-
-    $version = ($query_result->fetchrow_array())[0];
-    $version++;
-}
-
-# Currently, we make up an eid using the guid and version. This will
-# change later.
-$eid = "T${guid}-${version}";
-
-#
-# Sanity check; make sure this eid is not in use. Tables are still locked.
-#
-$query_result =
-    DBQueryFatal("select pid,eid from experiments ".
-		 "where eid='$eid' and pid='$pid'");
-
-if ($query_result->numrows) {
-    DBQueryWarn("unlock tables");
-    tbdie("Experiment ID $eid in project $pid is already in use!");
-}
-
-#
-# Create a template record to "reserve" the tid. We pass the rest of
-# it off to the normal experiment path right now (too much stuff to
-# duplicate with a deadline looming right around the corner).
+# Create a template record. 
 #
 my %args = ();
 
@@ -242,21 +187,16 @@ if ($modify) {
     $args{'parent_guid'} = $parent_guid;
     $args{'parent_vers'} = $parent_vers;
 }
-$args{'guid'}        = $guid;
-$args{'vers'}        = $version;
 $args{'pid'}         = $pid;
 $args{'gid'}         = $gid;
 $args{'tid'}         = $tid;
-$args{'eid'}         = $eid;
 $args{'uid'}         = $dbuid;
 $args{'description'} = DBQuoteSpecial($description);
 $args{'description'} =~ s/^\'(.*)\'$/$1/;
 
-if (libTemplates::NewTemplateRecord(\%args) < 0) {
+if (! ($template = Template->Create(\%args))) {
     tbdie("Could not create a new template record!");
 }
-# Now safe to unlock; the tid/eid is reserved;
-DBQueryFatal("unlock tables");
 
 #
 # At this point, we need to force a cleanup no matter how we exit.
@@ -267,29 +207,32 @@ $justexit = 0;
 #
 # The description is versioned metadata the user can modify.
 #
-libTemplates::NewTemplateMetadata($guid, $version,
-				  "description", $description, $dbuid) == 0
+$template->NewMetadata("description", $description, $dbuid) == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 #
 # The TID is versioned metadata the user can modify.
 #
-libTemplates::NewTemplateMetadata($guid, $version, "TID", $tid, $dbuid) == 0
+$template->NewMetadata("TID", $tid, $dbuid) == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 #
-# Copy the rest of the metadata.
+# Copy the rest of the metadata from parent to child
 #
 if ($modify) {
-    libTemplates::CopyTemplateMetadata($parent_guid,
-				       $parent_vers, $version, $dbuid)
-	== 0 or fatal(-1, "Failed to copy metadata records");
+    $template->CopyMetadata($parent_template, $dbuid) == 0
+	or fatal(-1, "Failed to copy metadata records");
 }
+
+# Grab stuff we need out of the template.
+$guid = $template->guid();
+$vers = $template->vers();
+$eid  = $template->eid();
 
 # Now invoke batchexp to preload the experiment. Note special -x option.
 system("$batchexp ". 
-       "-x " . ($modify ? "T${parent_guid}-${parent_vers}" : "-") . " " .
-       "-q -i -f -E 'Experiment Template Preload $guid/$version' ".
+       "-x " . ($modify ? $parent_template->eid() : "-") . " " .
+       "-q -i -f -E 'Experiment Template Preload $guid/$vers' ".
        "-p $pid -e $eid $inputfile");
 fatal($? >> 8, "Oops")
     if ($?);
@@ -298,8 +241,9 @@ fatal($? >> 8, "Oops")
 $exptcreated = 1;
 
 # Input files are kept in the DB, with the template.
-exit(-1)
-    if (libTemplates::AddTemplateInputFile($guid, $version, $inputfile) < 0);
+fatal(-1, "Could not add NS file to template store")
+    if ($template->AddInputFile($inputfile) < 0);
+
 #
 # Grab archive index for new templates.
 #
@@ -317,14 +261,14 @@ else {
     # Grab the archive index for the parent; the archive is shared.
     #
     libArchive::TBExperimentArchiveInfo($pid,
-					"T${parent_guid}-${parent_vers}",
+					$parent_template->eid(),
 					\$archive_idx, undef)
 	>= 0 or fatal(-1, "Could not get archive index for parent!");
       
     # Do a commit point on the template archive since it does not actually
     # change after it is created (instances are branches).
     libArchive::TBCommitExperimentArchive($pid,
-					  "T${parent_guid}-${parent_vers}",
+					  $parent_template->eid(),
 					  "TemplateCreate")
 	>= 0 or fatal(-1, "Failed to commit experiment archive!");
 }
@@ -333,7 +277,7 @@ else {
 %args = ();
 $args{'archive_idx'} = $archive_idx;
 
-libTemplates::UpdateTemplateRecord($guid, $version, \%args) == 0
+$template->Update(\%args) == 0
     or fatal(-1, "Could not update template record!");
 
 #
@@ -342,7 +286,7 @@ libTemplates::UpdateTemplateRecord($guid, $version, \%args) == 0
 # to get the parameters is via the parser, but we want to save this
 # info forever (after the underlying experiment is terminated).
 #
-$query_result =
+my $query_result =
     DBQueryWarn("select name,value from virt_parameters ".
               "where pid='$pid' and eid='$eid'");
 
@@ -350,18 +294,7 @@ fatal(-1, "Could not get virt_parameters for $pid/$eid")
     if (! $query_result);
 
 while (my ($name, $value) = $query_result->fetchrow_array()) {
-    if (defined($value)) {
-      $value = DBQuoteSpecial($value);
-    }
-    else {
-      $value = "NULL";
-    }
-    
-    DBQueryWarn("insert into experiment_template_parameters set ".
-		"  parent_guid='$guid', ".
-		"  parent_vers='$version', ".
-		"  pid='$pid', tid='$tid', ".
-		"  name='$name', value=$value")
+    $template->NewFormalParameter($name, $value) == 0
 	or fatal(-1, "Could not set formal parameter for $pid/$eid")
 }
     
@@ -526,11 +459,8 @@ sub cleanup()
 
 	# And delete all the other stuff?
     }
-    libTemplates::DeleteTemplateInputFiles($guid, $version)
-	if (defined($guid));
-    
-    libTemplates::DeleteTemplateRecord($guid, $version)
-	if (defined($guid));
+    $template->Delete()
+	if (defined($template));
 }
 
 sub fatal($$)
@@ -558,7 +488,7 @@ END {
 	# We are screwed; a recursive error. Someone will have to clean
 	# up by hand. 
 	#
-	SENDMAIL(TBOPS, 
+	SENDMAIL($TBOPS, 
 		 "Template Creation Failure: $pid/$tid",
 		 "Recursive error in cleanup! This is very bad.");
 	$? = $saved_exitcode;

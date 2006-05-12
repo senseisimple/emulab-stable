@@ -776,6 +776,8 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
     $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "":"s");
 
+    $isinstance = (TBIsTemplateInstanceExperiment($exptidx) ? 1 : 0);
+
     if ($swappable)
 	$swappable = "Yes";
     else
@@ -861,6 +863,17 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
             <td class=\"left\">
               <a href='showuser.php3?target_uid=$exp_head'>$exp_head</a></td>
           </tr>\n";
+
+    if ($isinstance) {
+	TBPidEid2Template($pid, $eid, $guid, $version, $instance_idx);
+	
+	echo "<tr>
+                <td>Template: </td>
+                <td class=\"left\">
+                    <a href='template_show.php?guid=$guid&version=$version'>
+                       $guid/$version</a></td>
+              </tr>\n";
+    }
 
     if (!$short) {
 	echo "<tr>
@@ -1073,9 +1086,19 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 #
 # Show a listing of experiments by user/pid/gid
 #
-function SHOWEXPLIST($type,$fromuid,$id,$gid = "") {
+function SHOWEXPLIST($type, $fromuid, $id, $gid = "") {
+    global $EXPOSETEMPLATES;
+
+    if ($EXPOSETEMPLATES) {
+	showexplist_internal(1, $type, $fromuid, $id, $gid);
+    }
+    showexplist_internal(0, $type, $fromuid, $id, $gid);
+}
+
+
+function showexplist_internal($templates_only, $type, $fromuid, $id, $gid) {
     global $TB_EXPTSTATE_SWAPPED, $TB_EXPTSTATE_SWAPPING;
-    
+
     if ($type == "USER") {
 	$where = "expt_head_uid='$id'";
 	$title = "Current";
@@ -1092,13 +1115,9 @@ function SHOWEXPLIST($type,$fromuid,$id,$gid = "") {
 	$title = "Bad id '$id'!";
     }
 
-    global $EXPOSETEMPLATES;
-    $template_join   = "";
     $template_clause = "";
-    if ($EXPOSETEMPLATES) {
-	$template_join   = "left join experiment_templates as t on ".
-	                   "     t.pid=e.pid and t.eid=e.eid ";
-	$template_clause = " and t.guid is null ";
+    if ($templates_only) {
+	$template_clause = " and i.idx is not null ";
     }
 
     if (ISADMIN()) {
@@ -1106,30 +1125,37 @@ function SHOWEXPLIST($type,$fromuid,$id,$gid = "") {
 	    DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
 			 "round(e.minimum_nodes+.1,0) as min_nodes ".
 			 "from experiments as e ".
-			 $template_join .
+			 "left join experiment_templates as t on ".
+			 "     t.pid=e.pid and t.eid=e.eid ".
+			 "left join experiment_template_instances as i on ".
+			 "     i.exptidx=e.idx " .
 			 "left join reserved as r on e.pid=r.pid and ".
 			 "     e.eid=r.eid ".
-			 "where ($where) $template_clause ".
+			 "where ($where) and t.guid is null $template_clause ".
 			 "group by e.pid,e.eid order by e.state,e.eid");
     }
     else {
 	$query_result =
 	    DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
-			 "round(e.minimum_nodes+.1,0) as min_nodes ".
-			 "from experiments as e ".
-			 $template_join .
+	 		 "round(e.minimum_nodes+.1,0) as min_nodes ".
+ 			 "from experiments as e ".
+			 "left join experiment_templates as t on ".
+			 "     t.pid=e.pid and t.eid=e.eid ".
+			 "left join experiment_template_instances as i on ".
+			 "     i.exptidx=e.idx " .
 			 "left join reserved as r on e.pid=r.pid and ".
 			 "     e.eid=r.eid ".
-			 "left join group_membership as g on g.pid=e.pid and ".
-			 "     g.gid=e.gid and g.uid='$fromuid' ".
+ 			 "left join group_membership as g on g.pid=e.pid and ".
+	 		 "     g.gid=e.gid and g.uid='$fromuid' ".
 			 "where g.uid is not null and ($where) ".
-			 $template_clause .
+			 "      and t.guid is null $template_clause " .
 			 "group by e.pid,e.eid order by e.state,e.eid");
     }
     
     if (mysql_num_rows($query_result)) {
 	echo "<center>
-          <h3>$title Experiments</h3>
+          <h3>$title ".
+	    ($templates_only ? "Template Instances" : "Experiments") . "</h3>
           </center>
           <table align=center border=1 cellpadding=2 cellspacing=2>\n";
 

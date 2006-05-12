@@ -53,7 +53,7 @@ if ($UID) {
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-use libTemplates;
+use Template;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -92,9 +92,7 @@ my $userdir;
 my $workdir;
 my $user_name  = "Testbed Operations";
 my $user_email = "$TBOPS";
-my $istemplate;
-my $guid;
-my $version;
+my $template;
 
 #
 # Turn off line buffering on output
@@ -360,11 +358,10 @@ sub dosomething($$)
     # We still generate the log file, but it is not available via the
     # web interface. Needs more thought.
     #
-    my $exptidx = $exphash->{'idx'};
-    $istemplate = libTemplates::IsTemplateInstanceExperiment($exptidx);
-    if ($istemplate) {
-	libTemplates::MapExptidxtoTemplate($exptidx, \$guid, \$version) == 0
-	    or fatal("Error template info the experiment $pid/$eid");
+    my $exptidx  = $exphash->{'idx'};
+    my $instance = Template::Instance->LookupByExptidx($exptidx);
+    if (defined($instance)) {
+	$template = $instance->template();
     }
 
     #
@@ -593,8 +590,11 @@ sub swapexp($;$)
     my $running   = ($exphash->{'state'} eq EXPTSTATE_ACTIVE);
 
     if ($running) {
-	if ($istemplate) {
-	    system("$template_swapout -b -e $eid $guid/$version");
+	if (defined($template)) {
+	    my $guid = $template->guid();
+	    my $vers = $template->vers();
+	    
+	    system("$template_swapout -b -e $eid $guid/$vers");
 	}
 	else {
 	    system("$swapexp -b -s out $pid $eid");
@@ -637,8 +637,11 @@ sub cancelexp($)
     # It does not matter if the experiment is running; endexp does the
     # right thing.
     # 
-    if ($istemplate) {
-	system("$template_swapout -b -e $eid $guid/$version");
+    if (defined($template)) {
+	my $guid = $template->guid();
+	my $vers = $template->vers();
+	
+	system("$template_swapout -b -e $eid $guid/$vers");
     }
     else {
 	system("$endexp -b $pid $eid");

@@ -1237,6 +1237,8 @@ function TBMetadataData($metadata_guid, $metadata_version, &$metadata_data)
 function TBTemplateMetadataLookup($template_guid, $template_version,
 				  $metadata_name, &$metadata_value)
 {
+    $metadata_name = addslashes($metadata_name);
+    
     $query_result =
 	DBQueryFatal("select i.value from experiment_template_metadata as m ".
 		     "left join experiment_template_metadata_items as i on ".
@@ -1260,6 +1262,8 @@ function TBTemplateMetadataLookupGUID($template_guid, $template_version,
 				      $metadata_name,
 				      &$metadata_guid, &$metadata_version)
 {
+    $metadata_name = addslashes($metadata_name);
+
     $query_result =
 	DBQueryFatal("select i.guid,i.vers ".
 		     "    from experiment_template_metadata as m ".

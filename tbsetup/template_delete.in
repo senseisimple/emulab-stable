@@ -5,8 +5,9 @@
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
-use POSIX qw(isatty setsid);
+use POSIX qw(setsid);
 use POSIX qw(strftime);
 
 #
@@ -61,8 +62,9 @@ my $dbuid;
 my $logname;
 my $user_name;
 my $user_email;
-my @versionlist = ();
-my %instances   = ();
+my $template;
+my @templates   = ();
+my %instances   = ();	# Indexed by vers.
 
 # Protos
 sub ParseArgs();
@@ -76,7 +78,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use Template;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -130,118 +132,100 @@ if ($waitmode) {
 #
 # Grab template info.
 #
-if (libTemplates::TemplateInfo($guid, $version) < 0) {
-    tbdie("Could not get info for template $guid/$version!");
+$template = Template->Lookup($guid, $version);
+
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! TBProjAccessCheck($dbuid,
+			$template->pid(), $template->gid(),
+			TB_PROJECT_CREATEEXPT)) {
+    tberror("You do not have permission to delete template $guid/$version");
+    exit(1);
 }
 
 #
-# In recursive mode, build up a list of all of the children of this
-# template.
+# Ask for the children. If not in recursive mode, there better not be any!
 #
+my @children;
+
+$template->Children(\@children) == 0
+    or tbdie("Could not construct list of child templates for $guid/$version");
+
 if ($recursive) {
-    #
-    # Get the entire list of templates
-    #
-    my %children  = ();
-    my @kids      = ($version);
-    
-    my $query_result =
-	DBQueryFatal("select vers,parent_vers from experiment_templates ".
-		     "where parent_guid='$guid' ".
-		     "order by vers desc");
-
-    while (my ($vers, $parent_vers) = $query_result->fetchrow_array()) {
-	$children{$parent_vers} = []
-	    if (!exists($children{$parent_vers}));
-
-	# List of all children for the parent.
-	push(@{ $children{$parent_vers} }, $vers);
-    }
-
-    # Descend the tree getting all children recursively.
-    while (@kids) {
-	my $kid   = pop(@kids);
-
-	# New kid to delete.
-	push(@versionlist, $kid);
-
-	# New children of kid
-	unshift(@kids, @{ $children{$kid} })
-	    if (exists($children{$kid}));
-    }
-    # Remove most recent templates first.
-    @versionlist = sort {$b <=> $a} @versionlist;
+    @templates = @children;
 }
 else {
+    tbdie("Cannot delete template $template cause it has children @children")
+	if (@children);
+
     # Just one.
-    @versionlist = ($version);
+    @templates = ($template);
 }
 
-print STDERR "Looking at @versionlist\n"
-    if ($debug);
+if ($debug) {
+    print STDERR "Looking at @templates\n"
+	if ($debug);
+}
 
 #
-# Now look at each template and confirm there are no instantiations that
-# are currently active (there will be old ones since we do not delete them).
-# We also want to find out the instance ids and the experiment ids so we
-# can get the other tables. 
+# Now get the instance lists for each template and see if any are active.
 #
 my $active = 0;
 
-foreach my $vers (@versionlist) {
-    my $query_result =
-	DBQueryFatal("select i.idx,i.exptidx,e.idx ".
-		     "  from experiment_template_instances as i ".
-		     "left join experiments as e on e.idx=i.exptidx ".
-		     "where i.parent_guid='$guid' and i.parent_vers='$vers'");
+foreach my $template (@templates) {
+    my @instance_list;
 
-    while (my ($i_idx,$i_exptidx,$exptidx) = $query_result->fetchrow_array()) {
-	if (defined($exptidx)) {
-	    tbwarn("Template $guid/$vers in still instantiated! ".
-		   "Please terminate experiment $exptidx.");
+    $template->InstanceList(1, \@instance_list) == 0
+	or tbdie("Could not get instance list for $template!");
+
+    print STDERR "Instances for $template: @instance_list\n"
+	if ($debug);
+
+    # Check each instance to make sure its not a current instance.
+    foreach my $instance (@instance_list) {
+	my $current = $instance->Instantiated();
+	exit(-1)
+	    if ($current < 0);
+    
+	if ($current) {
+	    tberror("Instance $instance is still instantiated!");
+	    $active++;
 	}
-	$instances{$vers} = []
-	    if (!exists($instances{$vers}));
-
-	# List of all instances for this version of the template.
-	push(@{ $instances{$vers} }, $i_idx);
-
-	print STDERR "Will remove instance $i_idx ($i_exptidx)\n"
-	    if ($debug);
     }
+    $instances{$template->vers()} = [ @instance_list ];
 }
 exit(1)
     if ($active);
 
 #
-# Okay, delete the instance records. 
+# Okay, do the deletions.
 #
-foreach my $vers (@versionlist) {
-    foreach my $instance (@{ $instances{$vers} }) {
-	print "Deleting template instance $guid, $vers, $instance ... \n";
-	
-	libTemplates::DeleteTemplateInstanceRecord($guid, $vers, $instance)
-	    == 0 or exit(-1);
+foreach my $template (@templates) {
+    my @instance_list = @{ $instances{$template->vers()} };
+
+    print STDERR "Deleting instances: @instance_list\n"
+	if ($debug && @instance_list);
+
+    foreach my $instance (@instance_list) {
+	print "Deleting template instance $instance ... \n";
+
+	$instance->Delete() == 0
+	    or tbdie("Could not delete instance $instance");
+    }
+    my $pid = $template->pid();
+    my $eid = $template->eid();
+
+    # This is the hidden experiment under the template.
+    if (ExpState($pid, $eid)) {
+	system("$endexp -x -q -w $pid $eid");
+	exit(-1)
+	    if ($?);
     }
 
-    #
-    # And then the template experiment.
-    #
-    my ($pid, $eid);
-
-    libTemplates::TemplateInfo($guid, $vers, \$pid, undef, undef, \$eid) == 0
-	or exit(-1);
-		
-    system("$endexp -x -q -w $pid $eid");
-    exit(-1)
-	if ($?);
-
-    # And delete all the other stuff?
-    libTemplates::DeleteTemplateInputFiles($guid, $vers) == 0
-	or exit(-1);
-    
-    libTemplates::DeleteTemplateRecord($guid, $vers) == 0
-	or exit(-1);
+    # And finally the template record.
+    $template->Delete() == 0
+	or tbdie("Could not delete template $template");
 }
 
 #
@@ -257,6 +241,8 @@ exit(0);
 #
 sub ParseArgs()
 {
+    my %options;
+    
     if (! getopts($optlist, \%options)) {
 	usage();
     }

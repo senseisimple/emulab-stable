@@ -36,7 +36,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
-use libTemplates;
+use Template;
 
 # Locals.
 my $idleswap   = 0;
@@ -162,13 +162,10 @@ $EUID = $UID    = $unix_uid;
 $ENV{'USER'}    = $creator;
 $ENV{'LOGNAME'} = $creator;
 
-if (libTemplates::IsTemplateInstanceExperiment($exptidx)) {
-    my ($guid, $vers);
-    
-    if (libTemplates::MapExptidxtoTemplate($exptidx, \$guid, \$vers) < 0) {
-	die("*** $0:\n".
-	    "    Error mapping experiment to its template!\n");
-    }
+if (my $instance = Template::Instance->LookupByExptidx($exptidx)) {
+    my $guid = $instance->guid();
+    my $vers = $instance->vers();
+
     exec "$template_swapout -e $eid $guid/$vers";
 }
 else {
