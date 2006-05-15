@@ -232,6 +232,7 @@ COMMAND_PROTOTYPE(dotmcctest);
 COMMAND_PROTOTYPE(dofwinfo);
 COMMAND_PROTOTYPE(dohostinfo);
 COMMAND_PROTOTYPE(doemulabconfig);
+COMMAND_PROTOTYPE(doeplabconfig);
 COMMAND_PROTOTYPE(dolocalize);
 COMMAND_PROTOTYPE(dobooterrno);
 COMMAND_PROTOTYPE(dobootlog);
@@ -323,6 +324,7 @@ struct command {
         { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
         { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
 	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
+	{ "eplabconfig",  FULLCONFIG_NONE, F_ALLOCATED, doeplabconfig},
 	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
 	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
@@ -5748,6 +5750,94 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	    }
 	}
 	mysql_free_result(res);
+	client_writeback(sock, buf, strlen(buf), tcp);
+	return 0;
+}
+
+/*
+ * Return the config for an emulated ("inner") planetlab
+ */
+COMMAND_PROTOTYPE(doeplabconfig)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
+	int		nrows;
+
+	/*
+	 * We only respond if we are a PLC node
+	 */
+	res = mydb_query("select node_id from reserved "
+			 "where pid='%s' and eid='%s' and plab_role='plc'",
+			 1, reqp->pid, reqp->eid);
+	if (!res) {
+		error("EPLABCONFIG: %s: DB Error getting plab_role\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if (!mysql_num_rows(res)) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row = mysql_fetch_row(res);
+	if (!row[0] || strcmp(row[0], reqp->nodeid) != 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	mysql_free_result(res);
+
+	/*
+	 * NAME=<name> ROLE=<role> IP=<IP> MAC=<MAC> 
+	 */
+	res = mydb_query("select r.vname,r.plab_role,i.IP,i.mac "
+			 "  from reserved as r join interfaces as i "
+			 "  where r.node_id=i.node_id and "
+			 "    i.role='ctrl' and r.pid='%s' and r.eid='%s'",
+			 4, reqp->pid, reqp->eid);
+
+	if (!res || mysql_num_rows(res) == 0) {
+		error("EMULABCONFIG: %s: DB Error getting plab_in_elab info\n",
+		      reqp->nodeid);
+		if (res)
+			mysql_free_result(res);
+		return 1;
+	}
+	nrows = (int)mysql_num_rows(res);
+	
+	/*
+	 * Spit out the PLC node first just cuz
+	 */
+	bzero(buf, sizeof(buf));
+	while (nrows--) {
+		row = mysql_fetch_row(res);
+
+		if (!strcmp(row[1], "plc")) {
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       "NAME=%s ROLE=%s IP=%s MAC=%s\n",
+				       row[0], row[1], row[2], row[3]);
+			break;
+		}
+	}
+
+	/*
+	 * Then all the nodes
+	 */
+	mysql_data_seek(res, 0);
+	nrows = (int)mysql_num_rows(res);
+
+	while (nrows--) {
+		row = mysql_fetch_row(res);
+
+		if (!strcmp(row[1], "plc"))
+			continue;
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "NAME=%s ROLE=%s IP=%s MAC=%s\n",
+			       row[0], row[1], row[2], row[3]);
+	}
+	mysql_free_result(res);
+
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
