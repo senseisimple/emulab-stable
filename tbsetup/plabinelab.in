@@ -1,0 +1,310 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+
+#
+# Do things necessary for setting up inner elab experiment. 
+#
+sub usage()
+{
+    print STDOUT "Usage: plabinelab [-d] [-u] pid eid\n";
+    print STDOUT "       plabinelab [-d] [-k] pid eid\n";
+    print STDOUT "       plabinelab [-d] -r pid eid [node ...]\n";
+ 
+    exit(-1);
+}
+my $optlist  = "dkur";
+my $debug    = 1;
+my $killmode = 0;
+my $update   = 0;
+my $remove   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $makeconf    = "$TB/sbin/dhcpd_makeconf";
+
+# PXE boot path
+my $pxeboot     = "/tftpboot/pxelinux.0";
+
+# Locals
+my $plabinelab;
+
+# Protos
+sub SetUp();
+sub TearDown();
+sub RemoveNodes(@);
+sub AddNodes();
+sub RestartDHCPD();
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+# Locals
+my $dbuid;
+my $user_name;
+my $user_email;
+my $query_result;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
+}
+if (defined($options{"u"})) {
+    $update = 1;
+}
+if (defined($options{"r"})) {
+    $remove = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+my ($pid,$eid,@nodelist) = @ARGV;
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
+}
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+	"    Cannot determine your name and email address.\n");
+}
+
+TBDebugTimeStampsOn();
+TBDebugTimeStamp("PlabInElab setup starting");
+
+#
+# Get plabinelab status to make sure, and to see if we need to fire off
+# an experiment inside once its setup.
+#
+if (!TBExptIsPlabInElab($pid, $eid, \$plabinelab)) {
+    die("*** $0:\n".
+	"    Could not get plabinelab status for experiment $pid/$eid\n");
+}
+exit(0)
+    if (!$plabinelab);
+
+#
+# Get a list of the nodes involved.  Not all nodes in the experiment
+# have to be part of the plab (plab_role == 'none') and one node is the
+# distinguished PLC node (plab_role == 'plc').
+#
+my $plcnode;
+my @plabnodes = ();
+$query_result =
+    DBQueryFatal("select node_id,plab_role from reserved ".
+		 "where pid='$pid' and eid='$eid' and plab_role!='none'");
+while (my ($node,$role) = $query_result->fetchrow_array()) {
+    if ($role eq "plc") {
+	$plcnode = $node;
+    } else {
+	push(@plabnodes, $node);	
+    }
+}
+
+my $rv;
+if ($killmode) {
+    $rv = TearDown();
+} elsif ($remove) {
+    $rv = RemoveNodes(@nodelist);
+} elsif ($update) {
+    $rv = AddNodes();
+} else {
+    $rv = SetUp();
+}
+
+TBDebugTimeStamp("PlabInElab setup done");
+exit($rv);
+
+sub SetUp()
+{
+    if ($plcnode || @plabnodes > 0) {
+	#
+	# Currently we jigger the pxe_boot_path field for inner plab nodes
+	# so that they run pxelinux when rebooted.  pxelinux is the easiest
+	# way of downloading a "Linux MFS".  Maybe someday we'll do it with
+	# pxeboot.
+	#
+	if (@plabnodes > 0) {
+	    DBQueryFatal("update nodes set pxe_boot_path='$pxeboot' ".
+			 "where (".
+			 join(" or ", map("node_id='$_'", @plabnodes)) . ")");
+	}
+	
+	#
+	# Now mark all plab involved nodes as being ready to boot inside,
+	# so that dhcpd_makeconf knows what nodes to change the entries for.
+	#
+	push(@plabnodes, $plcnode);
+	DBQueryFatal("update reserved set plab_boot=1 ".
+		     "where pid='$pid' and eid='$eid' and (".
+		     join(" or ", map("node_id='$_'", @plabnodes)) . ")");
+	
+	#
+	# Now that we are done fixing up the DB with info that affects the
+	# DHCPD config file, we can restart DHCPD.
+	#
+	RestartDHCPD();
+    }
+}
+
+#
+# Take down all inner plab nodes.
+#
+# In theory, nfree will clean up nodes.pxe_boot_path and
+# the reserved table as well as recreating the DHCPD config file.
+# However, a lot can happen between now and nfree (e.g., forcing a
+# node into the MFS which would fail due to pxe_boot_path) so we do
+# it ourselves to be safe.
+# 
+sub TearDown()
+{
+    #
+    # Reset the PXE boot
+    #
+    if ($plcnode || @plabnodes > 0) {
+	if (@plabnodes > 0) {
+	    DBQueryFatal("update nodes set pxe_boot_path=NULL ".
+			 "where (".
+			 join(" or ", map("node_id='$_'", @plabnodes)) . ")");
+	}
+
+	#
+	# Update the reserved table to mark nodes as no longer part
+	# of the plab.
+	#
+	DBQueryFatal("update reserved set plab_role='none',plab_boot=0 ".
+		     "where pid='$pid' and eid='$eid'");
+
+	#
+	# and restart DHCPD
+	#
+	RestartDHCPD();
+    }
+
+    return 0;
+}
+
+#
+# Remove some nodes from an inner plab (on tbswap UPDATE).
+# Tricky because the user could remove the PLC node as well.
+# 
+sub RemoveNodes(@)
+{
+    my @newnodes   = @_;
+    my @nodes      = ();
+
+    #
+    # Grab the list of nodes. We want to clear the reserved table bits so
+    # that we can regen the DHCPD file. 
+    #
+    foreach my $node (@newnodes) {
+	# Untaint the nodes.
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Tainted node name: $node\n");
+	}
+	if (($node eq $plcnode) && @plabnodes > 0) {
+	    tbwarn "Removing PLC node, expect problems!";
+	}
+	push(@nodes, $node);
+    }
+    return 0
+	if (!@nodes);
+
+    #
+    # Reset pxe_boot_path
+    #
+    DBQueryFatal("update nodes set pxe_boot_path=NULL ".
+		 "where (".
+		 join(" or ", map("node_id='$_'", @nodes)) . ")");
+
+    #
+    # Update the reserved table
+    #
+    DBQueryFatal("update reserved set plab_role='none',plab_boot=0 ".
+		 "where pid='$pid' and eid='$eid' and (".
+		 join(" or ", map("node_id='$_'", @nodes)) . ")");
+
+    #
+    # and restart DHCPD
+    #
+    RestartDHCPD();
+
+    return 0;
+}
+
+#
+# Add some nodes as part of a tbswap UPDATE
+# No different than a first-time setup right now.
+# 
+sub AddNodes()
+{
+    return SetUp();
+}
+
+sub RestartDHCPD()
+{
+    print "Regenerating DHCPD config file and restarting daemon.\n";
+    system("$makeconf -i -r");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Failed to reconfig/restart DHCPD.\n");
+    }
+}

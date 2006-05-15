@@ -33,7 +33,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic repos_daemon node_attributes \
-		  nfstrace 
+		  nfstrace plabinelab
 
 CTRLBIN_STUFF   = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy

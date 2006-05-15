@@ -90,6 +90,7 @@ my $dolastload  = 1;
 # Protos
 sub SetupReload($$$);
 sub FirewallSetup($);
+sub os_setup_one($$$);
 				  
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -183,10 +184,19 @@ my $firewallimageid;
 # Ditto ElabinElab.
 #
 my $elabinelab;
-
 if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
     die("*** $0:\n".
 	"    Could not get elabinelab status for experiment $pid/$eid\n");
+}
+
+#
+# Ditto PlabinElab.
+#
+my $plabinelab = 0;
+my $plcnode;
+my $plcimageid;
+if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
+    $plabinelab = 1;
 }
 
 #
@@ -567,6 +577,44 @@ if ($firewalled) {
 }
 
 #
+# Likewise, setup a PLC node before other plabinelab nodes.
+# XXX right now, we setup PLC before ANY other node, whether it is
+# part of the inner plab or not.
+#
+if ($plabinelab) {
+    my $node = $plcnode;
+
+    TBDebugTimeStamp("rebooting/reloading PLC node");
+    if (!os_setup_one($node, $plcimageid, "PLC")) {
+	tbwarn "PLC node $node failed to boot".
+	    "This has been reported to testbed-ops.";
+	SENDMAIL($TBOPS, "1 node is down",
+		 "Node:\n".
+		 "  $node\n".
+		 "in pid/eid $pid/$eid failed to boot after loading OS.\n\n".
+		 "The nodes have been freed.\n");
+	$failed++;
+	goto tballdone;
+    }
+
+    #
+    # Check for cancelation.  PLC setup may have taken awhile.
+    #
+    if (!$canceled) {
+	TBGetCancelFlag($pid, $eid, \$canceled);
+	if ($canceled) {
+	    tbnotice "Swap canceled; will terminate os_setup early!";
+	    goto tballdone;
+	}
+    }
+
+    #
+    # remove it from the nodelist
+    #
+    delete $nodes{$node};
+}
+
+#
 # We need to issue the reboots and the reloads in parallel.
 #
 TBDebugTimeStamp("rebooting/reloading nodes started");
@@ -702,6 +750,25 @@ if (!$TESTMODE) {
     }
 }
 TBDebugTimeStamp("rebooting/reloading finished");
+
+#
+# XXX declare the inner plab nodes as UP since we won't be hearing from
+# them again (they are talking only to their PLC).
+#
+if ($plabinelab) {
+    my @plabnodes = ();
+    TBExptPlabInElabNodes($pid, $eid, \@plabnodes);
+    foreach my $node (@plabnodes) {
+	if (exists($nodes{$node})) {
+	    tbnotice "Not waiting for emulated plab node $node";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
+	    TBSetNodeEventState($node, TBDB_NODESTATE_ISUP());
+	    delete($nodes{$node});
+	}
+    }
+}
 
 #
 # Remaining nodes we need to wait for. Why do we wait in the face of errors
@@ -1156,6 +1223,10 @@ sub SetupReload($$$)
 	# XXX firewall is treated special
 	if ($firewalled && ($node eq $firewall)) {
 	    $firewallimageid = $imageid;
+	}
+	# as is a plabinelab PLC node
+	elsif ($plabinelab && ($node eq $plcnode)) {
+	    $plcimageid = $imageid;
 	} elsif (!defined($reloads{$imageid})) {
 	    $reloads{$imageid} = [ $node ];
 	} else {
@@ -1188,37 +1259,44 @@ sub ForkCmd($) {
 }
 
 #
-# A firewall has booted up. Might need to do something.
-#
-sub FirewallBoot()
-{
-    #
-    # The only case that currently matters is if the experiment is
-    # elabinelab. In this case we want to turn off the firewall so 
-    # the nodes can boot/reload normally. Later, after we set up the
-    # inner elab, we turn the firewall back on.
-    #
-    return 1
-	if (!$elabinelab);
-
-    #
-    # We use the elabinelab program to do this, since it knows what it
-    # might want to do (and helpfully, is setuid so it can ssh over). 
-    #
-    system("$elab_setup -f $pid $eid");
-    return 0
-	if ($?);
-    
-    return 1;
-}
-
-#
-# This is a scaled-down version of what the rest of os_setup does.
-# We don't have to do all the asychronous hoohaw here.
+# Setup the firewall node before anything else.
 #
 sub FirewallSetup($)
 {
     my ($node) = @_;
+
+    if (os_setup_one($node, $firewallimageid, "Firewall")) {
+	#
+	# Firewall has booted, perform any final actions.
+	#
+	# The only case that currently matters is if the experiment is
+	# elabinelab. In this case we want to turn off the firewall so 
+	# the nodes can boot/reload normally. Later, after we set up the
+	# inner elab, we turn the firewall back on.
+	#
+	if ($elabinelab) {
+	    #
+	    # We use the elabinelab program to do this, since it knows what it
+	    # might want to do (and helpfully, is setuid so it can ssh over). 
+	    #
+	    system("$elab_setup -f $pid $eid");
+	    if ($?) {
+		tbwarn "Firewall Boot Setup failed!";
+		return 0;
+	    }
+	}
+	return 1;
+    }
+    return 0;
+}
+
+#
+# Setup a single node, waiting for completion (reload, reboot)
+# before returning.
+#
+sub os_setup_one($$$)
+{
+    my ($node,$imageid,$msgstr) = @_;
 
     #
     # XXX this is probably not entirely right.
@@ -1230,7 +1308,7 @@ sub FirewallSetup($)
     #
     # Reload the node if necessary
     #
-    if (defined($firewallimageid)) {
+    if (defined($imageid)) {
 	delete $reboots{$node};
 	delete $reconfigs{$node};
 
@@ -1243,7 +1321,7 @@ sub FirewallSetup($)
 
 	$reload_args{'debug'}    = $dbg;
 	$reload_args{'waitmode'} = 1;
-	$reload_args{'imageid'}  = $firewallimageid;
+	$reload_args{'imageid'}  = $imageid;
 	$reload_args{'nodelist'} = [ @nodelist ];
 
 	if (osload(\%reload_args, $reload_failures) != 0) {
@@ -1254,7 +1332,7 @@ sub FirewallSetup($)
 	# Gak!  waitmode in osload only waits for the reload to complete
 	# in the frisbee MFS, the node still has to reboot after that.
 	#
-	TBDebugTimeStamp("firewall reload done, waiting for reboot");
+	TBDebugTimeStamp("$msgstr reload done, waiting for reboot");
 	my $wstart = time;
 	my $actual_state;
 	my $waittime = (60 * 7);
@@ -1266,7 +1344,7 @@ sub FirewallSetup($)
 	if (!TBNodeStateWait($node, $wstart, $waittime, \$actual_state,
 			     (TBDB_NODESTATE_TBFAILED, TBDB_NODESTATE_ISUP))) {
 	    if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
-		tbwarn "Firewall $node reported a TBFAILED event";
+		tbwarn "$msgstr $node reported a TBFAILED event";
 		return 0;
 	    }
 	    print "$node is alive and well\n";
@@ -1274,7 +1352,7 @@ sub FirewallSetup($)
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	} else {
-	    tbwarn "Firewall $node reload timed-out";
+	    tbwarn "$msgstr $node reload timed-out";
 	    return 0;
 	}
     }
@@ -1324,14 +1402,6 @@ sub FirewallSetup($)
 	if (nodereboot(\%reboot_args, $reboot_failures) != 0) {
 	    return 0;
 	}
-    }
-
-    #
-    # Firewall has booted, perform any final actions.
-    # 
-    if (!FirewallBoot()) {
-	tbwarn "Firewall Boot Setup failed!";
-	return 0;
     }
 
     return 1;

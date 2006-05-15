@@ -100,6 +100,7 @@ my $updateReboot   = 0;
 my $updateReconfig = 1;
 my $update_Eventsys_restart = 0;
 my $elabinelab     = 0;
+my $plabinelab     = 0;
 my $force  = 0;
 my $errors = 0;
 my $updatehosed = 0;
@@ -214,6 +215,17 @@ if (!$force) {
 # Get elabinelab status. See below.
 if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
     tbdie("Could not get elabinelab status for experiment $pid/$eid");
+}
+# and plabinelab status.
+if (! TBExptIsPlabInElab($pid, $eid, \$plabinelab)) {
+    tbdie("Could not get plabinelab status for experiment $pid/$eid");
+}
+if ($elabinelab && $plabinelab) {
+    tberror "Cannot get my head around Plab in Elab in Elab!\n";
+    print "Failingly finished swap-$swapop for $pid/$eid. " .
+	TBTimeStamp() . "\n";
+    TBDebugTimeStamp("tbswap $swapop finished (failed)");
+    exit(1);
 }
 
 #
@@ -475,6 +487,19 @@ sub doSwapout($) {
 
     if ($type >= CLEANUP) {
 	#
+	# Undo plab in elab specialness.
+	# No need to worry about VLANs here, as all the special abilities
+	# involve the control network.
+	#
+	if (! $TESTMODE && $plabinelab) {
+	    print "Tearing down plabinelab.\n";
+	    if (system("plabinelab -k $pid $eid")) {
+		tberror "Failed to teardown plabinelab!";
+		$swapout_errors = 1;
+	    }
+	}
+
+	#
 	# We're not attempting a retry;
 	#
 	# Stop all of the vnodes.
@@ -578,6 +603,17 @@ sub doSwapout($) {
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("vnode_setup -k finished");
+	}
+
+	#
+	# Undo plabinelab setup
+	#
+	if (!$TESTMODE && $plabinelab && @failedpnodes > 0) {
+	    print "Removing failed nodes from inner plab.\n";
+	    if (system("plabinelab -r $pid $eid @failedpnodes")) {
+		tberror "Failed to remove inner nodes!";
+		$swapout_errors = 1;
+	    }
 	}
 
 	#
@@ -832,6 +868,12 @@ sub doSwapin($) {
 			tberror "Failed to remove inner nodes!";
 			return 1;
 		    }
+		} elsif ($plabinelab) {
+		    print "Removing nodes from inner plab.\n";
+		    if (system("plabinelab -r $pid $eid @physnodes")) {
+			tberror "Failed to remove inner nodes!";
+			return 1;
+		    }
 		}
 
 		#
@@ -963,6 +1005,24 @@ sub doSwapin($) {
     }
 
     #
+    # PlabinElab setup.  This is currently just tweaking out the dhcpd.conf
+    # file and that must be done before os_setup (i.e., before nodes are
+    # rebooted).
+    #
+    if ($plabinelab && !$TESTMODE && $type > UPDATE_RECOVER) {
+	# for UPDATE and RETRY we pass in the -u to pick up new nodes
+	my $optarg = ($type == REAL ? "" : "-u");
+	
+	print "Setting up plabinelab.\n";
+	TBDebugTimeStamp("plabinelab setup started");
+	if (system("plabinelab $optarg $pid $eid")) {
+	    tberror "Failed to setup plabinelab!";
+	    return 1;
+	}
+	TBDebugTimeStamp("plabinelab setup finished");
+    }
+
+    #
     # If user specified -reboot to update,
     # and we are successfully performing the update,
     # then mark all nodes in experiment so os_setup will reboot them.
@@ -1010,7 +1070,7 @@ sub doSwapin($) {
     TBDebugTimeStamp("gentopofile finished");
 
     # XXX fer now hack
-    if (0 && !$firewalled && !$elabinelab &&
+    if (0 && !$firewalled && !$elabinelab && !$plabinelab &&
 	($pid eq "testbed" || $pid eq "tbres")) {
 	DBQueryWarn("update experiments set ".
 		    "    savedisk=1 where pid='$pid' and eid='$eid'");

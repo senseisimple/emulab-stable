@@ -174,7 +174,9 @@ use vars qw(@ISA @EXPORT);
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
-	 TBExptIsElabInElab TBBatchUnLockExp TBExptIsBatchExp
+	 TBExptIsElabInElab TBExptIsPlabInElab
+	 TBExptPlabInElabPLC TBExptPlabInElabNodes
+	 TBBatchUnLockExp TBExptIsBatchExp
 	 
 	 TBExptFirewall TBNodeFirewall TBExptFirewallAndPort
 	 TBSetExptFirewallVlan TBClearExptFirewallVlan
@@ -1922,7 +1924,8 @@ sub TBBootWhat($;$)
     # WARNING!!!
     #
     # DO NOT change this function without making corresponding changes to
-
+    # pxe/bootinfo_mysql.c.
+    #
     # ALWAYS find exactly the same resulting OSID given the same inputs.
     #
     my $query_result =
@@ -3781,6 +3784,71 @@ sub TBExptIsElabInElab($$$;$)
     $$elabinelab_eid = (defined($row[1]) ? $row[1] : undef)
 	if (defined($elabinelab_eid));
     return 1;
+}
+
+#
+# Get plabinelab info for an experiment. Returns 1 in plabinelab
+# if any node in the experiment is either a plab 'plc' or 'node'.
+#
+# usage TBExptIsPlabInElab(char *pid, char *eid, int \*plabinelab)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBExptIsPlabInElab($$$)
+{
+    my ($pid, $eid, $plabinelab) = @_;
+
+    my $query_result =
+	DBQueryFatal("select plab_role from virt_nodes ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "and plab_role!='none'");
+
+    if ($query_result->numrows == 0) {
+	$$plabinelab = 0;
+    } else {
+	$$plabinelab = 1;
+    }
+    return 1;
+}
+
+#
+# Return the PLC node for a swapped in plabinelab experiment.
+# Returns 0 if no PLC.  Returns 1 and the name of the node otherwise.
+#
+sub TBExptPlabInElabPLC($$$)
+{
+    my ($pid, $eid, $plcnode) = @_;
+
+    my $query_result =
+	DBQueryFatal("select node_id from reserved ".
+		     "where pid='$pid' and eid='$eid' and plab_role='plc'");
+    if ($query_result->numrows > 0) {
+	my @row = $query_result->fetchrow_array();
+	if (defined($row[0])) {
+	    $$plcnode = $row[0];
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+#
+# Return a list of inner plab nodes for a swapped in plabinelab experiment.
+# Returns 0 on failure.  Returns 1 and a list of nodes otherwise.
+#
+sub TBExptPlabInElabNodes($$$)
+{
+    my ($pid, $eid, $nodes) = @_;
+
+    my $query_result =
+	DBQueryFatal("select node_id from reserved ".
+		     "where pid='$pid' and eid='$eid' and plab_role='node'");
+
+    while (my @row = $query_result->fetchrow_array()) {
+	push(@{$nodes}, $row[0]);
+    }
+
+    return 0;
 }
 
 #
