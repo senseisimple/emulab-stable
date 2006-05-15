@@ -9,6 +9,7 @@
 #
 # Functions to dump out various things.  
 #
+include_once("template_defs.php");
 
 #
 # A project
