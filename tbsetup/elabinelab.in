@@ -55,6 +55,8 @@ my $elabinelab_eid;
 
 # Protos
 sub TearDownEmulab();
+sub RemoveNodes();
+sub UpdateEmulab();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
