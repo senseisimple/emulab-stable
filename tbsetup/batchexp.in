@@ -111,6 +111,7 @@ my $errorstat=-1;
 my $user_name;
 my $user_email;
 my $dbuid;
+my $exptidx;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -275,6 +276,7 @@ if ($waitmode) {
 DBQueryFatal("lock tables experiments write, ".
 	     "            experiment_stats write, ".
 	     "            experiment_resources write, ".
+	     "            emulab_indicies write, ".
 	     "            testbed_stats read");
 
 $query_result =
@@ -292,10 +294,27 @@ if ($query_result->numrows) {
 # it will reuse indicies that are crossed referenced in the other two
 # tables.
 #
-$query_result =
-    DBQueryFatal("select MAX(exptidx) from experiment_stats");
-my ($exptidx) = $query_result->fetchrow_array();
-$exptidx++;
+$query_result = 
+    DBQueryFatal("select idx from emulab_indicies ".
+		 "where name='next_exptidx'");
+
+# Seed with a proper value.
+if (! $query_result->num_rows) {
+    $query_result =
+	DBQueryFatal("select MAX(exptidx) + 1 from experiment_stats");
+    
+    ($exptidx) = $query_result->fetchrow_array();
+
+    DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		 "values ('next_exptidx', $exptidx)");
+}
+else {
+    ($exptidx) = $query_result->fetchrow_array();
+}
+my $nextidx = $exptidx + 1;
+    
+DBQueryFatal("update emulab_indicies set idx='$nextidx' ".
+	     "where name='next_exptidx'");
 
 #
 # Lets be really sure!
