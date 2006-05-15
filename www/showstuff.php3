@@ -9,7 +9,6 @@
 #
 # Functions to dump out various things.  
 #
-include_once("template_defs.php");
 
 #
 # A project
@@ -777,8 +776,6 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
     $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "":"s");
 
-    $isinstance = (TBIsTemplateInstanceExperiment($exptidx) ? 1 : 0);
-
     if ($swappable)
 	$swappable = "Yes";
     else
@@ -865,18 +862,20 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
               <a href='showuser.php3?target_uid=$exp_head'>$exp_head</a></td>
           </tr>\n";
 
-    if ($isinstance) {
-	TBPidEid2Template($pid, $eid, $guid, $version, $instance_idx);
-	
-	echo "<tr>
-                <td>Template: </td>
-                <td class=\"left\">
-                    <a href='template_show.php?guid=$guid&version=$version'>
-                       $guid/$version</a></td>
-              </tr>\n";
-    }
-
     if (!$short) {
+	$isinstance = (TBIsTemplateInstanceExperiment($exptidx) ? 1 : 0);
+
+	if ($isinstance) {
+	    TBPidEid2Template($pid, $eid, $guid, $version, $instance_idx);
+	
+	    echo "<tr>
+                    <td>Template: </td>
+                    <td class=\"left\">
+                       <a href='template_show.php?guid=$guid&version=$version'>
+                          $guid/$version</a></td>
+                  </tr>\n";
+	}
+
 	echo "<tr>
                 <td>Created: </td>
                 <td class=\"left\">$exp_created</td>
