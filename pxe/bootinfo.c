@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -199,6 +199,12 @@ main(int argc, char **argv)
 					bievent_send(client.sin_addr,
 						     TBDB_NODESTATE_PXEWAIT);
 					break;
+
+				case BIBOOTWHAT_TYPE_REBOOT:
+					bievent_send(client.sin_addr,
+						     TBDB_NODESTATE_REBOOTING);
+					break;
+
 				default:
 					error("%s: invalid boot directive: %d\n",
 					      inet_ntoa(client.sin_addr),
@@ -347,6 +353,9 @@ log_bootwhat(struct in_addr ipaddr, boot_what_t *bootinfo)
 		break;
 	case BIBOOTWHAT_TYPE_MFS:
 		info("%s: REPLY: boot from mfs %s\n", ipstr, bootinfo->what.mfs);
+		break;
+	case BIBOOTWHAT_TYPE_REBOOT:
+		info("%s: REPLY: reboot (alternate PXE boot)\n", ipstr);
 		break;
 	}
 	if (bootinfo->cmdline[0]) {

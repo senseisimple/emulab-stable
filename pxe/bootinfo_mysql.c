@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -72,6 +72,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 #define NEXT_BOOT_MFS		12
 #define NEXT_BOOT_PARTITION	13
 #define PID			14
+#define PXE_BOOT_PATH		15
 #define DEFINED(x)		(row[(x)] != NULL && row[(x)][0] != '\0')
 #define TOINT(x)		(atoi(row[(x)]))
 
@@ -81,7 +82,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			 "        otemp.path, otemp.mfs, ptemp.partition, "
 			 "       n.next_boot_osid, n.next_boot_cmd_line, "
 			 "        onext.path, onext.mfs, pnext.partition, "
-			 "       r.pid "
+			 "       r.pid,n.pxe_boot_path "
 			 " from interfaces as i "
 			 "left join nodes as n on i.node_id=n.node_id "
 			 "left join reserved as r on i.node_id=r.node_id "
@@ -100,7 +101,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			 "     n.next_boot_osid=pnext.osid "
 			 "left join os_info as onext on "
 			 "     onext.osid=n.next_boot_osid "
-			 "where i.IP='%s'", 15, inet_ntoa(ipaddr));
+			 "where i.IP='%s'", 16, inet_ntoa(ipaddr));
 
 	if (!res) {
 		error("Query failed for host %s\n", ipstr);
@@ -127,6 +128,20 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 	 */
 	if (version >= 1 && row[PID] == (char *) NULL) {
 		info->type = BIBOOTWHAT_TYPE_WAIT;
+		goto done;
+	}
+
+	/*
+	 * If we received a query from a node whose PXE boot program is
+	 * not pxeboot, then it must be coming out of PXEWAIT and we need
+	 * to tell it to reboot again to pick up the new PXE boot program.
+	 *
+	 * XXX if "pxeboot" occurs in the string anywhere we assume it is
+	 * a varient of our pxeboot and we don't do the reboot.
+	 */
+	if (DEFINED(PXE_BOOT_PATH) &&
+	    strstr(row[PXE_BOOT_PATH], "pxeboot") == NULL) {
+		info->type = BIBOOTWHAT_TYPE_REBOOT;
 		goto done;
 	}
 
