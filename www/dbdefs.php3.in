@@ -877,10 +877,13 @@ function TBUserInfo($uid, &$user_name, &$user_email)
 #
 function TBCurrentUser($uid)
 {
-    $query_result =
+    $current_result =
 	DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$uid'");
 
-    return mysql_num_rows($query_result);
+    $deleted_result =
+	DBQueryFatal("SELECT usr_name FROM deleted_users WHERE uid='$uid'");
+
+    return mysql_num_rows($current_result) + mysql_num_rows($deleted_result);
 }
 
 #
