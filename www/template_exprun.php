@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -28,7 +28,7 @@ $deletexmlfile = 0;
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($formfields, $parameters, $errors)
+function SPITFORM($instance, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
     global $guid, $version, $eid;
@@ -36,7 +36,8 @@ function SPITFORM($formfields, $parameters, $errors)
     PAGEHEADER("Start an Experiment Run");
 
     echo "<center>\n";
-    SHOWTEMPLATE($guid, $version);
+    $template = $instance->template();
+    $template->Show();
     echo "</center>\n";
     echo "<br><br>\n";
 
@@ -171,38 +172,33 @@ if (!TBvalid_eid($eid)) {
 }
 
 #
-# Check to make sure this is a valid template.
+# Check to make sure this is a valid template and user has permission.
 #
-if (! TBValidExperimentTemplate($guid, $version)) {
+$template = Template::Lookup($guid, $version);
+if (!$template) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
-
-# Need this below.
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get template pid,gid for template $guid", 1);
+if (! $template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to modify experiment template ".
+	      "$guid/$version!", 1);
 }
+
+# Need these below.
+$pid = $template->pid();
+$gid = $template->gid();
+
 if (($exptidx = TBExptIndex($pid, $eid)) < 0) {
-    TBERROR("Could not instance IDX for template instance $guid/$eid", 1);
+    TBERROR("No such experiment '$eid' for template $guid/$version/$eid", 1);
 }
 
 #
 # Check to make sure and a valid instance that is actually swapped in.
 #
-if (! TBValidExperimentTemplateInstance($guid, $version, $exptidx)) {
-    USERERROR("Experiment Template Instance $guid/$version/$exptidx is not ".
-              "a valid experiment template instance!", 1);
-}
-TBTemplateInstanceIndex($guid, $version, $exptidx, $instance_idx);
-
-# We need the eid for passing to the shell.
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_UPDATE)) {
-    USERERROR("You do not have permission to instantiate experiment template ".
-	      "$guid/$version!", 1);
+$instance = TemplateInstance::LookupByExptidx($exptidx);
+if (!$instance) {
+    TBERROR("Template Instance $guid/$version/$exptidx is not ".
+	    "a valid experiment template instance!", 1);
 }
 
 #
@@ -212,14 +208,12 @@ if (!isset($exprun)) {
     #
     # 
     #
-    TBTemplateNextExperimentRun($guid, $version, $exptidx, $nextidx);
-    
-    $defaults['runid'] = "T${nextidx}";
+    $defaults['runid'] = $instance->NextRunID();
 
     #
     # Get the current bindings for the template instance.
     #
-    TBTemplateInstanceBindings($guid, $version, $instance_idx, $bindings);
+    $instance->Bindings($bindings);
     
     #
     # Allow formfields that are already set to override defaults
@@ -230,17 +224,12 @@ if (!isset($exprun)) {
 	}
     }
 
-    SPITFORM($defaults, $bindings, 0);
+    SPITFORM($instance, $defaults, $bindings, 0);
     PAGEFOOTER();
     return;
 }
 elseif (! isset($formfields)) {
     PAGEARGERROR();
-}
-
-# Need this below.
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get template pid,gid for template $guid", 1);
 }
 
 #
@@ -283,7 +272,7 @@ else {
 #
 # Parameters. The XML file overrides stuff in the form. 
 #
-TBTemplateFormalParameters($guid, $version, $parameter_masterlist);
+$template->FormalParameters($parameter_masterlist);
 if (count($parameter_masterlist)) {
     if (isset($formfields[parameter_xmlfile]) &&
 	$formfields[parameter_xmlfile] != "") {
@@ -338,7 +327,7 @@ if (count($parameter_masterlist)) {
 }
 
 if (count($errors)) {
-    SPITFORM($formfields, $parameters, $errors);
+    SPITFORM($instance, $formfields, $parameters, $errors);
     PAGEFOOTER();
     exit(1);
 }
@@ -346,9 +335,6 @@ if (count($errors)) {
 #
 # Grab the unix GID for running scripts.
 #
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get template pid,gid for template $guid", 1);
-}
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 #
@@ -365,8 +351,17 @@ echo "<font size=+2>Experiment Template <b>" .
       "</b></font>\n";
 echo "<br><br>\n";
 
-echo "<b>Starting Experiment run</b> ... ";
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
+
+echo "<center>\n";
+echo "<b>Starting experiment run!</b> ...<br>\n";
+echo "This will take a few moments; please be patient.<br>\n";
 echo "<br><br>\n";
+echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
+echo "<br><br>\n";
+echo "</center>\n";
 flush();
 
 #
@@ -375,6 +370,11 @@ flush();
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webtemplate_exprun $command_options $guid/$version",
 		 SUEXEC_ACTION_IGNORE);
+
+/* Clear the 'loading' indicators above */
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "ClearLoadingIndicators();\n";
+echo "</script>\n";
 
 if ($deletexmlfile) {
     unlink($parameter_xmlfile);
@@ -394,7 +394,15 @@ if ($retval) {
     return;
 }
 
-STARTLOG($pid, $eid);
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
+echo "</script>\n";
+
+#
+# In case the above fails.
+#
+echo "<center><b>Done!</b></center>";
+echo "<br><br>\n";
 
 #
 # Standard Testbed Footer

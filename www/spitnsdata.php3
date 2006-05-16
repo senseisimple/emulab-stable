@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can begin experiments.
@@ -109,19 +109,17 @@ if (isset($guid) && isset($version)) {
     if (!TBvalid_tinyint($version)) {
 	PAGEARGERROR("Invalid GUID version");
     }
+
     #
-    # Check to make sure this is a valid template.
+    # Check to make sure this is a valid template and user has permission.
     #
-    if (! TBValidExperimentTemplate($guid, $version)) {
+    $template = Template::Lookup($guid, $version);
+    if (!$template) {
 	USERERROR("The experiment template $guid/$version is not a valid ".
 		  "experiment template!", 1);
     }
-
-    #
-    # Verify Permission.
-    #
-    if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view experiment template ".
+    if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to modify experiment template ".
 		  "$guid/$version!", 1);
     }
     header("Content-Type: text/plain");

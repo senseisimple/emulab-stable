@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -16,7 +16,7 @@ include("template_defs.php");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$isadmin  = ISADMIN($uid);
 
 #
 # Spit the form out using the array of data.
@@ -127,6 +127,10 @@ function SPITFORM($action, $formfields, $errors)
         </table>\n";
 }
 
+# Objects
+$metadata = NULL;
+$template = NULL;
+
 #
 # On first load, display virgin form and exit.
 #
@@ -158,11 +162,29 @@ if (!isset($submit)) {
 	$metadata_vers = $version;
 
 	#
-	# Find template associated with this metadata item (for perm check).
+	# Find this metadata item.
 	#
-	if (! TBMetadataTemplate($guid, $version, $template_guid)) {
+	$metadata = TemplateMetadata::Lookup($metadata_guid, $metadata_vers);
+	
+	if (! $metadata) {
 	    USERERROR("Invalid metadata $guid/$version", 1);
 	}
+
+        #
+        # Verify Permission. Need permission for the template, any version.
+        #
+	$template = Template::Lookup($metadata->template_guid(), 1);
+
+	if (!$template ||
+	    !$template->AccessCheck($uid, $TB_EXPT_READINFO)) {
+	    USERERROR("You do not have permission to view metadata in ".
+		      " template $template_guid!", 1);
+	}
+
+	PAGEHEADER("Show Metadata");
+	$metadata->Show();
+	PAGEFOOTER();
+	return;
     }
     elseif ($action == "modify") {
 	$template_guid = $guid;
@@ -185,9 +207,17 @@ if (!isset($submit)) {
 	#
 	# Verify this metadata is attached to the template.
 	#
-	if (! TBValidTemplateMetadata($metadata_guid, $metadata_vers,
-				      $template_guid, $template_vers)) {
-	    USERERROR("Invalid metadata $guid/$version", 1);
+	$template = Template::Lookup($template_guid, $template_vers);
+
+	if (!$template) {
+	    USERERROR("Invalid template $template_guid/$template_vers", 1);
+	}
+
+	$metadata = $template->LookupMetadataByGUID($metadata_guid,
+						    $metadata_vers);
+
+	if (!$template) {
+	    USERERROR("Invalid metadat $metadata_guid/$metadata_vers", 1);
 	}
     }
     else {
@@ -197,37 +227,24 @@ if (!isset($submit)) {
         #
         # Check to make sure this is a valid template.
         #
-	if (! TBValidExperimentTemplate($guid, $version)) {
-	    USERERROR("The experiment template $guid/$version is not a valid ".
-		      "experiment template!", 1);
+	$template = Template::Lookup($template_guid, $template_vers);
+
+	if (!$template) {
+	    USERERROR("Invalid template $template_guid/$template_vers", 1);
 	}
     }
-    
-    #
-    # Verify Permission.
-    #
-    if (! TBExptTemplateAccessCheck($uid, $template_guid, $TB_EXPT_MODIFY)) {
+
+    # Perm check for add/modify to the template.
+    if (!$template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
 	USERERROR("You do not have permission to $action metadata in ".
 		  " template $template_guid!", 1);
     }
 
-    #
-    # For plain show ...
-    #
-    if ($action == "show") {
-	PAGEHEADER("Show Metadata");
-	SHOWMETADATAITEM($guid, $version);	
-	PAGEFOOTER();
-	return;
-    }
-
+    # Defaults from the form come from the DB.
+    $defaults = array();
     if ($action == "modify") {
-	if (! TBMetadataData($metadata_guid, $metadata_vers, $defaults)) {
-	    USERERROR("Could not retrieve metadata data", 1);
-	}
-    }
-    else {
-	$defaults = array();
+	$defaults["name"]  = $metadata->name();
+	$defaults["value"] = $metadata->value();
     }
     
     #
@@ -279,14 +296,16 @@ if ($action == "modify") {
     #
     # Verify this metadata is attached to the template.
     #
-    if (! TBValidTemplateMetadata($metadata_guid, $metadata_vers,
-				  $template_guid, $template_vers)) {
-	USERERROR("Invalid metadata $guid/$version", 1);
+    $template = Template::Lookup($template_guid, $template_vers);
+
+    if (!$template) {
+	USERERROR("Invalid template $template_guid/$template_vers", 1);
     }
 
-    # Need this below.
-    if (! TBMetadataData($metadata_guid, $metadata_vers, $metadata_data)) {
-	USERERROR("Could not retrieve metadata data", 1);
+    $metadata = $template->LookupMetadataByGUID($metadata_guid,$metadata_vers);
+
+    if (!$template) {
+	USERERROR("Invalid metadat $metadata_guid/$metadata_vers", 1);
     }
 }
 else {
@@ -306,18 +325,17 @@ else {
     #
     # Check to make sure this is a valid template.
     #
-    if (! TBValidExperimentTemplate($template_guid, $template_vers)) {
-	USERERROR("The experiment template $template_guid/$template_vers ".
-		  "is not a valid experiment template!", 1);
+    $template = Template::Lookup($template_guid, $template_vers);
+    
+    if (!$template) {
+	USERERROR("Invalid template $template_guid/$template_vers", 1);
     }
 }
 
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $template_guid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to modify experiment template ".
-	      "$template_guid/$template_vers!", 1);
+# Perm check for add/modify to the template.
+if (!$template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to $action metadata in ".
+	      " template $template_guid!", 1);
 }
 
 #
@@ -337,17 +355,13 @@ elseif (!TBvalid_template_metadata_name($formfields[name])) {
 }
 
 if ($action == "add") {
-    if (TBTemplateMetadataLookup($template_guid, $template_vers,
-				 $formfields[name], $metadata_value)) {
+    if ($template->LookupMetadataByName($formfields[name])) {
 	$errors["Metadata Name"] = "Name already in use";
     }
     $command_opts .= "-a add " . escapeshellarg($formfields[name]);
 }
 else {
-    if (!TBTemplateMetadataLookup($template_guid, $template_vers,
-				  $formfields[name], $metadata_value)) {
-	$errors["Metadata Name"] = "Name does not exist to modify";
-    }
+    # Had to already exist above. 
     $command_opts .= "-a modify " . escapeshellarg($formfields[name]);
 }
 
@@ -407,9 +421,8 @@ chmod($datafile, 0666);
 #
 # The backend does the actual work.
 #
-if (!TBGuid2PidGid($template_guid, $pid, $gid)) {
-    TBERROR("Could not determine pid/gid of template $template_guid", 1);
-}
+$pid = $template->pid();
+$gid = $template->gid();
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 $retval = SUEXEC($uid, "$pid,$unix_gid",

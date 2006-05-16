@@ -5,12 +5,11 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # This script generates the contents of an image. No headers or footers,
-# just spit back an image. The thumbs are public, so no checking is done.
-# To obfuscate, do not use pid/eid, but rather use the resource index. 
+# just spit back an image. 
 #
 
 #
@@ -39,38 +38,31 @@ function SPITERROR()
     readfile("coming-soon-thumb.gif");
 }
 
-function SPITGRAPH($guid)
+function SPITGRAPH($template)
 {
-    #
-    # Get the data from the DB.
-    #
-    $query_result =
-	DBQueryWarn("select image from experiment_template_graphs ".
-		    "where parent_guid='$guid'");
+    $data = NULL;
 
-    if (!$query_result || !mysql_num_rows($query_result)) {
-        # No Data. Spit back a stub image.
+    if ($template->GraphImage($data) != 0 || $data == NULL || $data == "") {
 	SPITERROR();
-	return;
     }
-    $row  = mysql_fetch_array($query_result);
-    $data = $row['image'];
-
-    if ($data != "") {
+    else {
 	header("Content-type: image/png");
 	echo "$data";
     }
-    else {
-	SPITERROR();
-    }
 }
-    
+
+$template = Template::LookupRoot($guid);
+if (!$template) {
+# Bad template; spit back a stub image.
+    SPITERROR();
+    return;
+}
 
 #
 # If the request did not specify a zoom, return whatever we have.
 #
 if (!isset($zoom)) {
-    SPITGRAPH($guid);
+    SPITGRAPH($template);
     return;
 }
 
@@ -79,10 +71,8 @@ if (!isset($zoom)) {
 #
 $optarg = "-z " . ($zoom == "in" ? "in" : "out");
 
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get template pid,gid for template $guid", 0);
-    SPITERROR();
-}
+$pid = $template->pid();
+$gid = $template->gid();
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 $retval = SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
@@ -92,7 +82,7 @@ if ($retval) {
     SPITERROR();
 }
 else {
-    SPITGRAPH();
+    SPITGRAPH($template);
 }
 
 #

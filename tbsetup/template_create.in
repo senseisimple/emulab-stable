@@ -34,7 +34,7 @@ sub usage()
 	  "-E <str> - A pithy sentence describing the template\n".
 	  "-g <gid> - The group in which to create the experiment\n".
 	  "<pid>    - The project in which to create the experiment\n".
-	  "<tid>    - The template name (unique, alphanumeric, no blanks)\n".
+	  "<tid>    - The template name (alphanumeric, no blanks)\n".
 	  "<input>  - Input file for experiment.\n");
     exit(-1);
 }
@@ -305,6 +305,9 @@ system("$makegraph $guid");
 fatal(-1, "Error generating template graph.")
     if ($?);
 
+# Web interface depends on this line. Bad; need another way to send
+# back the newly generated guid/version.
+print "Template $guid/$vers has been created\n";
 exit(0);
 
 #

@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -29,17 +29,19 @@ $batchmode     = 0;
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($formfields, $parameters, $errors)
+function SPITFORM($template, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
-    global $guid, $version;
 
     PAGEHEADER("Instantiate an Experiment Template");
 
     echo "<center>\n";
-    SHOWTEMPLATE($guid, $version);
+    $template->Show();
     echo "</center>\n";
     echo "<br>\n";
+
+    $guid = $template->guid();
+    $version = $template->vers();
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -266,17 +268,14 @@ if (!TBvalid_integer($version)) {
 }
 
 #
-# Check to make sure this is a valid template.
+# Check to make sure this is a valid template and enough permission.
 #
-if (! TBValidExperimentTemplate($guid, $version)) {
+$template = Template::Lookup($guid, $version);
+if (!$template) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_UPDATE)) {
+if (! $template->AccessCheck($uid, $TB_EXPT_UPDATE)) {
     USERERROR("You do not have permission to instantiate experiment template ".
 	      "$guid/$version!", 1);
 }
@@ -285,9 +284,7 @@ if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_UPDATE)) {
 # On first load, display virgin form and exit.
 #
 if (!isset($swapin)) {
-    TBTemplateTid($guid, $version, $tid);
-    
-    $defaults[eid]		     = $tid;
+    $defaults[eid]		     = $template->tid();
     $defaults[exp_swappable]         = "1";
     $defaults[exp_noswap_reason]     = "";
     $defaults[exp_idleswap]          = "1";
@@ -298,7 +295,7 @@ if (!isset($swapin)) {
     #
     # Look for formal parameters that the user can specify.
     #
-    TBTemplateFormalParameters($guid, $version, $parameters);
+    $template->FormalParameters($parameters);
     
     #
     # Allow formfields that are already set to override defaults
@@ -309,7 +306,7 @@ if (!isset($swapin)) {
 	}
     }
 
-    SPITFORM($defaults, $parameters, 0);
+    SPITFORM($template, $defaults, $parameters, 0);
     PAGEFOOTER();
     return;
 }
@@ -318,9 +315,8 @@ elseif (! isset($formfields)) {
 }
 
 # Need this below.
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get template pid,gid for template $guid", 1);
-}
+$pid = $template->pid();
+$gid = $template->gid();
 
 #
 # Okay, validate form arguments.
@@ -451,7 +447,7 @@ if (isset($formfields[exp_savedisk]) &&
 #
 # Parameters. The XML file overrides stuff in the form. 
 #
-TBTemplateFormalParameters($guid, $version, $parameter_masterlist);
+$template->FormalParameters($parameter_masterlist);
 if (count($parameter_masterlist)) {
     if (isset($formfields[parameter_xmlfile]) &&
 	$formfields[parameter_xmlfile] != "") {
@@ -514,7 +510,7 @@ if (isset($formfields[batched]) && $formfields[batched] == "Yep") {
 }
 
 if (count($errors)) {
-    SPITFORM($formfields, $parameters, $errors);
+    SPITFORM($template, $formfields, $parameters, $errors);
     PAGEFOOTER();
     exit(1);
 }
@@ -538,9 +534,17 @@ echo "<font size=+2>Experiment Template <b>" .
       "</b></font>\n";
 echo "<br><br>\n";
 
-echo "<b>Starting template instantiation!</b> ... ";
-echo "this will take several minutes at least; please be patient.";
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
+
+echo "<center>\n";
+echo "<b>Starting template instantiation!</b> ...<br>\n";
+echo "This will take several minutes; please be patient.<br>\n";
 echo "<br><br>\n";
+echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
+echo "<br><br>\n";
+echo "</center>\n";
 flush();
 
 #
@@ -549,6 +553,11 @@ flush();
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webtemplate_swapin $command_options -e $eid $guid/$version",
 		 SUEXEC_ACTION_IGNORE);
+
+/* Clear the 'loading' indicators above */
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "ClearLoadingIndicators();\n";
+echo "</script>\n";
 
 if ($deletexmlfile) {
     unlink($parameter_xmlfile);

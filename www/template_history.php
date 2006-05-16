@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can look at experiments.
@@ -46,17 +46,14 @@ else {
 PAGEHEADER("Experiment Template History");
 
 #
-# Check to make sure this is a valid template.
+# Check to make sure this is a valid template and user has permission.
 #
-if (! TBValidExperimentTemplate($guid, $version)) {
+$template = Template::Lookup($guid, $version);
+if (!$template) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
+if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
 	      "$guid/$version!", 1);
 }
@@ -67,7 +64,7 @@ echo "<font size=+2>Experiment Template <b>" .
       "</b></font>\n";
 echo "<br><br>\n";
 
-SHOWTEMPLATEHISTORY($guid, $version, $expand);
+$template->ShowHistory($expand);
 
 #
 # Standard Testbed Footer

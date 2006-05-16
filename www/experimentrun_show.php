@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users ...
@@ -52,26 +52,24 @@ if (!TBvalid_integer($runidx)) {
 PAGEHEADER("Experiment Run");
 
 #
-# Check to make sure this is a valid template.
+# Check to make sure this is a valid template and user has permission.
 #
-if (! TBValidExperimentTemplate($guid, $version)) {
+$template = Template::Lookup($guid, $version);
+if (!$template) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
-if (! TBIsTemplateInstanceExperiment($exptidx)) {
+if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment template ".
+	      "$guid/$version!", 1);
+}
+$instance = TemplateInstance::LookupByExptidx($exptidx);
+if (!$instance) {
     USERERROR("The instance $exptidx is not a valid instance in ".
               "template $guid/$version!", 1);
 }
-if (! TBValidExperimentRun($exptidx, $runidx)) {
+if (! $instance->ValidRun($runidx)) {
     USERERROR("The run $runidx is not a valid experiment run!", 1);
-}
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view experiment template ".
-	      "$guid/$version!", 1);
 }
 
 echo "<font size=+2>Experiment Run<b> " .
@@ -82,7 +80,7 @@ echo "<font size=+2>Experiment Run<b> " .
 echo "<br><br>\n";
 
 
-SHOWEXPERIMENTRUN($exptidx, $runidx);
+$instance->ShowRun($runidx);
 
 #
 # Standard Testbed Footer

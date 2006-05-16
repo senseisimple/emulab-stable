@@ -72,7 +72,7 @@ sajax_handle_client_request();
 
 # Faster to do this after the sajax stuff
 include("showstuff.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Need some DB info.
@@ -97,11 +97,15 @@ $panic_date = $row["panic_date"];
 $lockdown   = $row["lockdown"];
 
 # Template Instance Experiments get special treatment in this page.
-$isinstance = ($EXPOSETEMPLATES &&
-	       TBIsTemplateInstanceExperiment($expindex) ? 1 : 0);
-if ($isinstance) {
-    $tag = "Template Instance";
-    TBPidEid2Template($pid, $eid, $guid, $version, $instance_idx);
+$instance = NULL;
+if ($EXPOSETEMPLATES) {
+     $instance = TemplateInstance::LookupByExptidx($expindex);
+
+     if (! is_null($instance)) {
+	 $tag = "Template Instance";
+	 $guid = $instance->guid();
+	 $vers = $instance->vers();
+     }
 }
 
 #
@@ -189,7 +193,7 @@ if ($expstate) {
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
 		    ($expstate == $TB_EXPTSTATE_PANICED && $isadmin)) {
-		WRITESUBMENUBUTTON(($isinstance ?
+		WRITESUBMENUBUTTON(($instance ?
 				    "Terminate Instance" :
 				    "Swap Experiment Out"),
 			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
@@ -201,23 +205,23 @@ if ($expstate) {
 	    }
 	}
     
-	if (!$isinstance && $expstate != $TB_EXPTSTATE_PANICED) {
+	if (!$instance && $expstate != $TB_EXPTSTATE_PANICED) {
 	    WRITESUBMENUBUTTON("Terminate Experiment",
 			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
 
         # Batch experiments can be modifed only when paused.
-	if (!$isinstance && ($expstate == $TB_EXPTSTATE_SWAPPED ||
+	if (!$instance && ($expstate == $TB_EXPTSTATE_SWAPPED ||
 	    (!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE))) {
 	    WRITESUBMENUBUTTON("Modify Experiment",
 			       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
     }
 
-    if ($isinstance && $expstate == $TB_EXPTSTATE_ACTIVE) {
+    if ($instance && $expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Start New Experiment Run",
 			   "template_exprun.php?action=start&guid=$guid".
-			   "&version=$version&eid=$exp_eid");
+			   "&version=$vers&eid=$exp_eid");
     }
     
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
@@ -293,7 +297,7 @@ WRITESUBMENUDIVIDER();
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
-if (!$isinstance && STUDLY()) {
+if (!$instance && STUDLY()) {
     WRITESUBMENUBUTTON("Duplicate Experiment",
 		       "beginexp_html.php3?copyid=${exp_pid},${exp_eid}");
 }
@@ -408,11 +412,11 @@ if (TBExptFirewall($exp_pid, $exp_eid) &&
 }
 SUBPAGEEND();
 
-if ($isinstance &&
+if ($instance &&
     ($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_PANICED ||
      $expstate == $TB_EXPTSTATE_ACTIVATING)) {
-    SHOWTEMPLATEINSTANCEBINDINGS($guid, $version, $instance_idx);
+    $instance->ShowBindings();
 }
 
 #

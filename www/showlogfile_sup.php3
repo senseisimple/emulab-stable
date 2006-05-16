@@ -129,7 +129,10 @@ function STARTLOG($pid, $eid)
           </script>\n";
 
     echo "<br>\n";
-    echo "<img id='busy' src='busy.gif'><span id='loading'> Loading...</span>";
+    echo "<center>\n";
+    echo "<img id='busy' src='busy.gif'>
+                   <span id='loading'> Working ...</span>";
+    echo "</center>\n";
     echo "<br>\n";
     
     echo "<div><iframe id='outputframe' src='busy.gif' ".

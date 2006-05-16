@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users ...
@@ -18,10 +18,11 @@ $isadmin = ISADMIN($uid);
 $pid = "";
 $eid = "";
 $gid = "";
+$template = NULL;
 
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
-    global $uid, $pid, $eid, $gid;
+    global $uid, $pid, $eid, $gid, $template;
 
     #
     # Verify page arguments.
@@ -45,115 +46,21 @@ function CheckArguments($guid, $version) {
     #
     # Check to make sure this is a valid template.
     #
-    if (! TBValidExperimentTemplate($guid, $version)) {
+    if (($template = new Template($guid, $version)) == NULL) {
 	USERERROR("The experiment template $guid/$version is not a ".
 		  "valid experiment template!", 1);
     }
-    TBTemplatePidEid($guid, $version, $pid, $eid);
+    $pid = $template->pid();
+    $gid = $template->gid();
+    $eid = $template->eid();
   
     #
     # Verify Permission.
     #
-    if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
+    if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view experiment ".
 		  "template $guid/$version!", 1);
     }
-}
-
-/**
- * Get the template versions associated with the given GUID.
- *
- * @param $guid The template GUID.
- * @return An array of template "objects".
- */
-function GetTemplates($guid) {
-    CheckArguments($guid, 1); /* XXX bogus version number. */
-
-    $query_result =
-	DBQueryFatal("SELECT vers,parent_vers,tid,hidden ".
-		     "FROM experiment_templates ".
-		     "WHERE guid='$guid' ".
-		     "ORDER BY vers");
-
-    $retval = array();
-    while ($row = mysql_fetch_array($query_result)) {
-	$metadata_result =
-	    DBQueryFatal("SELECT name,value ".
-			 "FROM experiment_template_metadata ".
-			 "WHERE template_guid='$guid' and ".
-			 "      template_vers='$row[vers]' ".
-			 "ORDER BY created DESC");
-
-	$metadata = array();
-	while ($mrow = mysql_fetch_array($metadata_result)) {
-	    $metadata[$mrow[name]] = $mrow[value];
-	}
-
-	if (count($metadata) > 0) {
-	    $row[metadata] = $metadata;
-	}
-	
-	if (TBTemplatePidEid($guid, $row[vers], &$pid, &$eid)) {
-	    $parameter_result =
-		DBQueryFatal("SELECT name,value FROM virt_parameters ".
-			     "WHERE pid='$pid' and eid='$eid'");
-	    
-	    $parameters = array();
-	    while ($prow = mysql_fetch_array($parameter_result)) {
-		$parameters[$prow[name]] = $prow[value];
-	    }
-	    
-	    if (count($parameters) > 0) {
-		$row[parameters] = $parameters;
-	    }
-	}
-	
-	$retval[] = $row;
-    }
-    
-    return $retval;
-}
-
-function queryFilter($v) {
-    return ($v != "");
-}
-
-function SearchTemplates($guid, $terms) {
-    /* XXX */
-    CheckArguments($guid, 1);
-
-    $matches = array();
-    $retval = array();
-
-    $terms = split(" ", $terms);
-    $terms = array_filter($terms, "queryFilter");
-
-    foreach ($terms as $term) {
-	$term = "'%" . mysql_real_escape_string($term) . "%'";
-
-	$query_result =
-	    DBQueryFatal("SELECT template_vers ".
-			 "FROM experiment_template_metadata ".
-			 "WHERE template_guid='$guid' and ".
-			 "      (name like ". $term . " or " .
-			 "       value like ". $term . ") " .
-			 "GROUP BY template_vers");
-
-	while ($row = mysql_fetch_array($query_result)) {
-	    if (!isset($matches[$row[template_vers]])) {
-		$matches[$row[template_vers]] = 0;
-	    }
-	    $matches[$row[template_vers]] += 1;
-	}
-    }
-
-    foreach ($matches as $key => $match) {
-	if ($match == count($terms)) {
-	    $retval[] = $key;
-	}
-    }
-
-    return $retval;
 }
 
 CheckArguments($guid, $version);
@@ -181,9 +88,6 @@ if (isset($action) || isset($zoomin) || isset($zoomout)) {
 	$optarg = "-z out";
     }
 
-    if (! TBGuid2PidGid($guid, $pid, $gid)) {
-	TBERROR("Could not get template pid,gid for template $guid", 1);
-    }
     # Need to update the template graph.
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
@@ -206,10 +110,8 @@ WRITESUBMENUBUTTON("Show NS File &nbsp &nbsp",
 WRITESUBMENUBUTTON("Modify Template",
 		   "template_modify.php?guid=$guid&version=$version");
 
-if (! TBIsRootTemplate($guid, $version)) {
-    $hidden = TBIsExperimentTemplateHidden($guid, $version);
-    
-    if ($hidden) {
+if (! $template->IsRoot()) {
+    if ($template->IsHidden()) {
 	WRITESUBMENUBUTTON("Show Template",
 			   "template_show.php?guid=$guid".
 			   "&version=$version&action=show");
@@ -245,15 +147,15 @@ echo "<br>
       <img border=1 alt='template visualization'
            src='showthumb.php3?idx=$rsrcidx'>";
 
-if (TemplateInstanceCount($guid, $version)) {
-    SHOWTEMPLATEINSTANCES($guid, $version);
+if ($template->InstanceCount()) {
+    $template->ShowInstances();
 }
 
 SUBMENUEND_2B();
 
 echo "<script type='text/javascript' src='js/wz_dragdrop.js'></script>";
 
-SHOWTEMPLATEGRAPH($guid);
+$template->ShowGraph();
 
 #
 # Define the zoom buttons. This should go elsewhere.
@@ -274,8 +176,8 @@ SUBPAGEEND();
 
 echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
 
-$paramcount = TemplateParameterCount($guid, $version);
-$metacount  = TemplateMetadataCount($guid, $version);
+$paramcount = $template->ParameterCount();
+$metacount  = $template->MetadataCount();
 $rowspan    = (($paramcount && $metacount) ? 2 : 1);
 
 echo "<center>\n";
@@ -283,7 +185,7 @@ echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
      " cellpadding=0 cellspacing=0>\n";
 echo "<tr valign=top><td rowspan=$rowspan class=stealth align=center>\n";
 
-SHOWTEMPLATE($guid, $version);
+$template->Show();
 
 echo "</td>\n";
 
@@ -292,19 +194,19 @@ if ($paramcount || $metacount) {
     echo "<td align=center class=stealth> \n";
     
     if ($paramcount && $metacount) {
-	SHOWTEMPLATEPARAMETERS($guid, $version);
+	$template->ShowParameters();
 	echo "</td>\n";
 	echo "</tr>\n";
 	echo "<tr valign=top>";
 	echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
 	echo "<td class=stealth align=center>\n";
-	SHOWTEMPLATEMETADATA($guid, $version);
+	$template->ShowMetadata();
     }
     elseif ($paramcount) {
-	SHOWTEMPLATEPARAMETERS($guid, $version);
+	$template->ShowParameters();
     }
     else {
-	SHOWTEMPLATEMETADATA($guid, $version);
+	$template->ShowMetadata();
     }
     echo "</td>\n";
 }

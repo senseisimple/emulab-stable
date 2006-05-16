@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users ...
@@ -45,23 +45,21 @@ if (!TBvalid_integer($exptidx)) {
 PAGEHEADER("Template Instance");
 
 #
-# Check to make sure this is a valid template.
+# Check to make sure this is a valid template and user has permission.
 #
-if (! TBValidExperimentTemplate($guid, $version)) {
+$template = Template::Lookup($guid, $version);
+if (!$template) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
-if (! TBIsTemplateInstanceExperiment($exptidx)) {
-    USERERROR("The instance $exptidx is not a valid instance in ".
-              "template $guid/$version!", 1);
-}
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
+if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
 	      "$guid/$version!", 1);
+}
+$instance = TemplateInstance::LookupByExptidx($exptidx);
+if (!$instance) {
+    USERERROR("The instance $exptidx is not a valid instance in ".
+              "template $guid/$version!", 1);
 }
 
 echo "<font size=+2>Template Instance <b>" .
@@ -70,7 +68,7 @@ echo "<font size=+2>Template Instance <b>" .
       "</b></font>\n";
 echo "<br><br>\n";
 
-SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, 1);
+$instance->Show(1);
 
 #
 # Standard Testbed Footer

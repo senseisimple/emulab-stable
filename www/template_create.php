@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -310,9 +310,6 @@ if (!isset($formfields[tid]) || $formfields[tid] == "") {
 elseif (!TBvalid_eid($formfields[tid])) {
     $errors["Template ID"] = TBFieldErrorString();
 }
-elseif (TBValidExperimentTemplate($formfields[pid], $formfields[tid])) {
-    $errors["Template ID"] = "Already in use";
-}
 
 #
 # Description:
@@ -507,22 +504,25 @@ if ($retval) {
     return;
 }
 
-unset($guid);
-if (TBPidTid2Template($pid, $tid, $guid, $version)) {
+#
+# Parse the last line of output. Ick.
+#
+if (preg_match("/^Template\s+(\w+)\/(\w+)\s+/",
+	       $suexec_output_array[count($suexec_output_array)-1],
+	       $matches)) {
+    $guid = $matches[1];
+    $vers = $matches[2];
+    
     echo "<script type='text/javascript' language='javascript'>\n";
-    echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
+    echo "PageReplace('template_show.php?guid=$guid&version=$vers');\n";
     echo "</script>\n";
 }
 
 #
 # In case the above fails.
 #
-echo "Done!";
+echo "<center><b>Done!</b></center>";
 echo "<br><br>\n";
-
-if (isset($guid)) {
-    SHOWTEMPLATE($guid, $version);
-}
 
 #
 # Standard Testbed Footer

@@ -6,7 +6,7 @@
 #
 include("defs.php3");
 include("showstuff.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can do this.

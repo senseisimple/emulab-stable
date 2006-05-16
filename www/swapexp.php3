@@ -6,7 +6,7 @@
 #
 include("defs.php3");
 include("showstuff.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can end experiments.
@@ -100,9 +100,13 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 }
 
 # Template Instance Experiments get special treatment in this page.
-$isinstance = $EXPOSETEMPLATES && TBIsTemplateInstanceExperiment($exptidx);
-if ($isinstance && $inout != "out") {
-    PAGEARGERROR("Invalid action for template instance");
+$instance = NULL;
+if ($EXPOSETEMPLATES) {
+     $instance = TemplateInstance::LookupByExptidx($exptidx);
+
+     if (! is_null($instance) && $inout != "out") {
+	 PAGEARGERROR("Invalid action for template instance");
+     }
 }
 
 # Convert inout to informative text.
@@ -133,7 +137,7 @@ elseif (!strcmp($inout, "restart")) {
     $action = "restart";
 }
 
-if ($isinstance) {
+if ($instance) {
     echo "<font size=+2>Template Instance <b>";
 }
 else {
@@ -162,7 +166,7 @@ if (!$confirmed) {
     if ($force) {
 	echo "<font color=red><br>forcibly</br></font> ";
     }
-    if ($isinstance) {
+    if ($instance) {
 	echo "terminate template instance";
     }
     else {
@@ -226,10 +230,10 @@ if (!$confirmed) {
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
-if ($isinstance) {
-    if (! TBPidEid2Template($exp_pid, $exp_eid, $guid, $version, $instidx)) {
-	TBERROR("Could not map $pid/$eid to its template!", 1);
-    }
+if ($instance) {
+    $guid = $instance->guid();
+    $version = $instance->vers();
+    
     echo "<br>\n";
     echo "<b>Terminating template instance!</b> ... ";
     echo "this will take a few minutes; please be patient.";
@@ -253,7 +257,7 @@ $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 $retval = SUEXEC($uid, "$exp_pid,$unix_gid",
 		  ($force ?
 		   "webidleswap $args $exp_pid $exp_eid" :
-		   ($isinstance ?
+		   ($instance ?
 		    "webtemplate_swapout -e $exp_eid $guid/$version" :
 		    "webswapexp -s $inout $exp_pid $exp_eid")),
 		 SUEXEC_ACTION_IGNORE);
@@ -279,7 +283,7 @@ if ($retval) {
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    if ($isinstance) {
+    if ($instance) {
 	STARTLOG($pid, $eid);
     }
     elseif ($isbatch) {

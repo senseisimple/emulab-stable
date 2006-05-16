@@ -9,6 +9,7 @@
 #
 # Functions to dump out various things.  
 #
+include_once("template_defs.php");
 
 #
 # A project
@@ -863,16 +864,17 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
           </tr>\n";
 
     if (!$short) {
-	$isinstance = (TBIsTemplateInstanceExperiment($exptidx) ? 1 : 0);
+	$instance = TemplateInstance::LookupByExptidx($exptidx);
 
-	if ($isinstance) {
-	    TBPidEid2Template($pid, $eid, $guid, $version, $instance_idx);
+	if (! is_null($instance)) {
+	    $guid = $instance->guid();
+	    $vers = $instance->vers();
 	
 	    echo "<tr>
                     <td>Template: </td>
                     <td class=\"left\">
-                       <a href='template_show.php?guid=$guid&version=$version'>
-                          $guid/$version</a></td>
+                       <a href='template_show.php?guid=$guid&version=$vers'>
+                          $guid/$vers</a></td>
                   </tr>\n";
 	}
 

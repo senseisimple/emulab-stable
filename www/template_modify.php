@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users.
@@ -126,17 +126,14 @@ if (!TBvalid_integer($version)) {
 }
 
 #
-# Check to make sure this is a valid template.
+# Check to make sure this is a valid template and user has permission.
 #
-if (! TBValidExperimentTemplate($guid, $version)) {
+$template = Template::Lookup($guid, $version);
+if (!$template) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_MODIFY)) {
+if (! $template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to modify experiment template ".
 	      "$guid/$version!", 1);
 }
@@ -148,12 +145,11 @@ if (! isset($modify)) {
     #
     # Grab NS file for the template.
     #
-    $input_list  = TBTemplateInputFiles($guid, $version);
-    TBTemplateDescription($guid, $version, $description);
+    $input_list  = $template->InputFiles();
 
     $defaults = array();
     $defaults["nsdata"] = $input_list[0];
-    $defaults["description"] = $description;
+    $defaults["description"] = $template->description();
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     exit();
@@ -176,11 +172,10 @@ srand((float) $sec + ((float) $usec * 100000));
 $foo = rand();
 
 #
-# Get template group so we can get the unix_gid.
+# Need these below,
 #
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get pid,gid for experiment template $guid/$version", 1);
-}
+$pid = $template->pid();
+$gid = $template->gid();
     
 #
 # TID
@@ -193,9 +188,6 @@ if (!isset($formfields[tid]) || $formfields[tid] == "") {
 }
 elseif (!TBvalid_eid($formfields[tid])) {
     $errors["Template ID"] = TBFieldErrorString();
-}
-elseif (TBValidExperimentTemplate($pid, $formfields[tid])) {
-    $errors["Template ID"] = "Already in use";
 }
 else {
     $tid = $formfields[tid];
@@ -282,22 +274,25 @@ if ($retval) {
     return;
 }
 
-unset($guid);
-if (TBPidTid2Template($pid, $tid, $guid, $version)) {
+#
+# Parse the last line of output. Ick.
+#
+if (preg_match("/^Template\s+(\w+)\/(\w+)\s+/",
+	       $suexec_output_array[count($suexec_output_array)-1],
+	       $matches)) {
+    $guid = $matches[1];
+    $vers = $matches[2];
+    
     echo "<script type='text/javascript' language='javascript'>\n";
-    echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
+    echo "PageReplace('template_show.php?guid=$guid&version=$vers');\n";
     echo "</script>\n";
 }
 
 #
 # In case the above redirect fails.
 #
-echo "Done!";
+echo "<center><b>Done!</b></center>";
 echo "<br><br>\n";
-
-if (isset($guid)) {
-    SHOWTEMPLATE($guid, $version);
-}
 
 #
 # Standard Testbed Footer
