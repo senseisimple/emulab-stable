@@ -165,13 +165,39 @@ if ($install) {
     $OUT = *OF;
 }
 
+#
+# Locate all the "alternate server" nodes (inner elab boss nodes or
+# inner plab PLC nodes).  We do this now rather than in the per-nodetype
+# query below because the server may not be of the same type as the nodes
+# they serve!
+#
+my $query_result =
+    DBQueryWarn("select r.node_id,i.IP,r.pid,r.eid ".
+		"from reserved as r ".
+                "left join interfaces as i on ".
+                "     r.node_id=i.node_id ".
+                "where (r.inner_elab_role='boss' or ".
+		"       r.inner_elab_role='boss+router' or ".
+		"       r.plab_role='plc') and ".
+		"      i.role='$CRTLTAG' ");
+if (! $query_result) {
+    fatal("Could not dhcpd data from DB!");
+}
+while (my %row = $query_result->fetchhash()) {
+    if (defined($row{"pid"}) && defined($row{"eid"})) {
+	my $tag = $row{"pid"} . ":" . $row{"eid"};
+	$servernodes{$tag} = $row{"IP"};
+    }
+}
+
 open(IF,"<$template") or
     fatal("Unable to open $template for reading");
 while (<IF>) {
 	if (/^(\s*)\%\%nodetype=(\w+)/) {
 		my $spaces = $1;
 		my $nodetype = $2;
-		my $query_result =
+
+		$query_result =
 		    DBQueryWarn("select n.node_id,n.pxe_boot_path, ".
 				"       t.pxe_boot_path as nt_pxe_boot_path, ".
 				"       i.IP,i.MAC,r.pid,r.eid,r.vname, ".
@@ -191,25 +217,6 @@ while (<IF>) {
 		    fatal("Could not dhcpd data from DB!");
 		}
 
-		#
-		# First go through and find any server (boss or plc) nodes.
-		# We need these to create the next-server line for elabinelab
-		# and plabinelab nodes.
-		#
-		while (my %row = $query_result->fetchhash()) {
-		    if (defined($row{"pid"}) &&
-			((defined($row{"inner_elab_role"}) &&
-			  ($row{"inner_elab_role"} eq "boss" ||
-			   $row{"inner_elab_role"} eq "boss+router")) ||
-			 (defined($row{"plab_role"}) &&
-			  $row{"plab_role"} eq "plc"))) {
-			my $tag = $row{"pid"} . ":" . $row{"eid"};
-			
-			$servernodes{$tag} = $row{"IP"};
-		    }
-		}
-		$query_result->dataseek(0);
-		
 		while (my %row = $query_result->fetchhash()) {
 		    my $ip  = $row{"IP"};
 		    my $mac = $row{"MAC"};
