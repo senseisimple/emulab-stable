@@ -226,14 +226,18 @@ while (<IF>) {
 			$node_id = $row{"node_id"};
 		    }
 
-		    if (defined($row{"pid"}) &&
+		    my $tag;
+		    if (defined($row{"pid"})) {
+			$tag = $row{"pid"} . ":" . $row{"eid"};
+		    }
+
+		    if (defined($tag) && defined($servernodes{$tag}) &&
 			(($row{"inner_elab_boot"} == 1 &&
 			  defined($row{"inner_elab_role"}) &&
 			  $row{"inner_elab_role"} eq "node") ||
 			 ($row{"plab_boot"} == 1 &&
 			  defined($row{"plab_role"}) &&
 			  $row{"plab_role"} eq "node"))) {
-			my $tag = $row{"pid"} . ":" . $row{"eid"};
 			
 			#
 			# XXX it is not yet completely clear what all we
