@@ -1262,34 +1262,14 @@ default images as a base, goes like this:
      good idea to reboot the node and make sure that everything is
      running as you want it to when it comes up.
 
-<li> When we make global images for everybody (like WINXP-SP1,
-     FBSD410-STD, RHL90-STD, and FC4-STD), the final thing we do before 
+<li> If you are creating a <em>Windows</em> based image, you <b>must</b>
+     "prepare" the node. The final thing to do before 
      grabbing the image is to login on the <a
      href="../faq.php3?#node-consoles">console</a>, drop to single user mode,
-     and run the <code>prepare</code> script:
-
-<pre>
-     $ sudo shutdown now
-     ...
-     $ /usr/local/etc/emulab/prepare
-</pre>
-
-     It
-     cleans out all of the other user accounts and per-experiment stuff
-     so a clean image is saved.  Then at experiment swap-in time, the
-     Emulab management scripts create all of the accounts with
-     information drawn from the Emulab database.
-     <p>
-
-     This step is optional while creating custom images, except for
+     and run the <code>prepare</code> script. This is described in
+     detail in the
      <a href="../doc/docwrapper.php3?docname=windows.html#Custom_images"> 
-     custom Windows images</a>, where the TCP/IP network setup depends on
-     doing it.  Custom user images are limited to use within a
-     particular project, so it's a bit of an optimization for the
-     project user accounts to be already created in the custom image.
-     The saved stale account information is then overwritten by an
-     Emulab mechanism for updating the account information continuously
-     in an image.
+     custom Windows images</a> section of the Windows tutorial.
 
 <li> Note the physical (pcXX) name of the machine used!
 
