@@ -300,7 +300,7 @@ DBQueryFatal("replace into experiment_template_graphs set ".
 	     "    image=$gifdata, ".
 	     "    imap=$imapdata");
 
-#unlink($dotfile, $giffile, $imapfile);
+unlink($dotfile, $giffile, $imapfile);
 exit(0);
 
 
