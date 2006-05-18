@@ -23,22 +23,24 @@ use Getopt::Std;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_metadata -a <action> -f <file> ".
+	  "Usage: template_metadata -a <action> -f <file> [-t type] ".
 	  "<name> <guid/vers>\n".
 	  "switches and arguments:\n".
-	  "-a <action>    - add or modify\n".
+	  "-a <action>    - add, delete or modify\n".
+	  "-t <type>      - type if not generic user metadata (add only)\n".
 	  "-f <file>      - file of metadata value\n".
 	  "<name>         - Metadata name\n".
 	  "<guid/vers>    - GUID and version of template\n");
     exit(-1);
 }
-my $optlist	 = "a:f:";
+my $optlist	 = "a:f:t:";
 my %options      = ();
 my $action;
 my $template_guid;
 my $template_vers;
 my $metadata_name;
 my $metadata_value;
+my $metadata_type;
 my $inputfile;
 
 #
@@ -108,23 +110,33 @@ if (! TBProjAccessCheck($dbuid,
     exit(1);
 }
 
-$metadata_value = `cat $inputfile`;
+if ($action ne "delete") {
+    $metadata_value = `cat $inputfile`;
 
-if (! TBcheck_dbslot($metadata_value,
-		     "experiment_template_metadata", "value",
-		     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-    tbdie("Improper characters in metadata value!");
+    if (! TBcheck_dbslot($metadata_value,
+			 "experiment_template_metadata", "value",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	tbdie("Improper characters in metadata value!");
+    }
 }
 
 my $already_exists = $template->LookupMetadata($metadata_name);
 tbdie("Could not lookup metadata name '$metadata_name'")
     if ($already_exists < 0);
 
-if ($action eq "add") {
+if ($action eq "delete") {
+    tbdie("Metadata name '$metadata_name' does not exist!")
+	if (!$already_exists);
+    
+    $template->DeleteMetadata($metadata_name, $dbuid) == 0
+	or tbdie("Could not delete metadata item '$metadata_name'");
+}
+elsif ($action eq "add") {
     tbdie("Metadata name '$metadata_name' already in use!")
 	if ($already_exists);
     
-    $template->NewMetadata($metadata_name, $metadata_value, $dbuid) == 0
+    $template->NewMetadata($metadata_name, $metadata_value,
+			   $dbuid, $metadata_type) == 0
 	or tbdie("Could not add new metadata item '$metadata_name'");
 }
 else {
@@ -181,7 +193,17 @@ sub ParseArgs()
     }
     $action = $options{"a"};
     usage()
-	if ($action ne "add" && $action ne "modify");
+	if ($action ne "add" && $action ne "modify" && $action ne "delete");
+
+    if (defined($options{"t"})) {
+	$metadata_type = $options{"t"};
+
+	if (! TBcheck_dbslot($metadata_type,
+			     "experiment_template_metadata", "metadata_type",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper metadata type!");
+	}
+    }
 
     if (defined($options{"f"})) {
 	$inputfile = $options{"f"};
@@ -227,7 +249,7 @@ sub ParseArgs()
 	    exit(1);
 	}
     }
-    else {
+    elsif ($action ne "delete") {
 	usage();
     }
 }

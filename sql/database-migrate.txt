@@ -3354,3 +3354,21 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table virt_nodes add plab_role enum('plc','node','none') \
 	NOT NULL default 'none' after inner_elab_role;
+
+4.60: Various changes to templates.
+
+      alter table experiment_template_metadata_items \
+               change value value mediumtext;
+
+      alter table experiment_template_metadata \
+               add hidden tinyint(1) NOT NULL default '0';
+
+      alter table experiment_template_metadata \
+               add metadata_type enum('tid','template_description',\
+                        'parameter_description') default NULL;
+
+      alter table experiment_template_parameters add \
+               metadata_guid varchar(16) default NULL;
+      alter table experiment_template_parameters add \
+               metadata_vers smallint(5) unsigned NOT NULL default '0';
+

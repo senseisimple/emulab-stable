@@ -153,8 +153,6 @@ if ($template->InstanceCount()) {
 
 SUBMENUEND_2B();
 
-echo "<script type='text/javascript' src='js/wz_dragdrop.js'></script>";
-
 $template->ShowGraph();
 
 #
@@ -173,8 +171,6 @@ echo "</form>\n";
 echo "</center>\n";
 
 SUBPAGEEND();
-
-echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
 
 $paramcount = $template->ParameterCount();
 $metacount  = $template->MetadataCount();
@@ -214,6 +210,8 @@ if ($paramcount || $metacount) {
 echo "</tr>\n";
 echo "</table>\n";
 echo "</center>\n";
+
+echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
 
 #
 # Standard Testbed Footer

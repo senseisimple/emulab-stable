@@ -170,6 +170,10 @@ CREATE TABLE experiment_template_metadata (
   metadata_vers smallint(5) unsigned NOT NULL default '0',
   -- Internal metadata items, handled specially.
   internal tinyint(1) NOT NULL default '0',
+  -- Hidden metadata items
+  hidden tinyint(1) NOT NULL default '0',
+  -- A type descriptor for the metadata, when not user generated.
+  metadata_type enum('tid','template_description','parameter_description') default NULL,
   PRIMARY KEY  (parent_guid, parent_vers, metadata_guid, metadata_vers)
 ) TYPE=MyISAM;
 
@@ -191,7 +195,7 @@ CREATE TABLE experiment_template_metadata_items (
   uid varchar(8) NOT NULL default '',
   -- Key/Value pairs.
   name varchar(64) NOT NULL default '',
-  value tinytext,
+  value mediumtext,
   created datetime default NULL,
   PRIMARY KEY (guid, vers),
   KEY parent (parent_guid,parent_vers),
@@ -231,6 +235,9 @@ CREATE TABLE experiment_template_parameters (
   tid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext,
+  -- These point to the optional metadata description.
+  metadata_guid varchar(16) default NULL,
+  metadata_vers smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (parent_guid, parent_vers, name),
   KEY pidtid (pid,tid)
 ) TYPE=MyISAM;

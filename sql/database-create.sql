@@ -601,6 +601,8 @@ CREATE TABLE experiment_template_metadata (
   metadata_guid varchar(16) NOT NULL default '',
   metadata_vers smallint(5) unsigned NOT NULL default '0',
   internal tinyint(1) NOT NULL default '0',
+  hidden tinyint(1) NOT NULL default '0',
+  metadata_type enum('tid','template_description','parameter_description') default NULL,
   PRIMARY KEY  (parent_guid, parent_vers, metadata_guid, metadata_vers)
 ) TYPE=MyISAM;
 
@@ -616,7 +618,7 @@ CREATE TABLE experiment_template_metadata_items (
   template_guid varchar(16) NOT NULL default '',
   uid varchar(8) NOT NULL default '',
   name varchar(64) NOT NULL default '',
-  value tinytext,
+  value mediumtext,
   created datetime default NULL,
   PRIMARY KEY (guid, vers),
   KEY parent (parent_guid,parent_vers),
@@ -634,6 +636,8 @@ CREATE TABLE experiment_template_parameters (
   tid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext,
+  metadata_guid varchar(16) default NULL,
+  metadata_vers smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (parent_guid,parent_vers,name),
   KEY pidtid (pid,tid)
 ) TYPE=MyISAM;

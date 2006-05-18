@@ -67,7 +67,7 @@ function SPITFORM($formfields, $errors)
                          value=\"" . $formfields[tid] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
-              &nbsp (optional; we will generate one for you).
+              &nbsp (optionally change this to something informative).
               </td>
           </tr>\n";
 
@@ -148,6 +148,7 @@ if (! isset($modify)) {
     $input_list  = $template->InputFiles();
 
     $defaults = array();
+    $defaults["tid"] = $template->NextTID();
     $defaults["nsdata"] = $input_list[0];
     $defaults["description"] = $template->description();
     SPITFORM($defaults, 0);
@@ -182,9 +183,9 @@ $gid = $template->gid();
 #
 if (!isset($formfields[tid]) || $formfields[tid] == "") {
     #
-    # Generate a unique one.
+    # Generate a new one.
     #
-    $tid = "T" . substr(md5(uniqid($foo, true)), 0, 10);
+    $tid = $template->NextTID();
 }
 elseif (!TBvalid_eid($formfields[tid])) {
     $errors["Template ID"] = TBFieldErrorString();

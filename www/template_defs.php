@@ -174,10 +174,6 @@ class Template
 	$created     = $this->created();
 	$description = $this->description();
 
-	if (strlen($description) > 40) {
-	    $description = substr($description, 0, 40) . " <b>... </b>";
-	}
-	
         #
         # We need the metadata guid/version for the TID and description since
         # they are mungable metadata.
@@ -220,10 +216,15 @@ class Template
 	ShowItem("Creator", MakeLink("user", "target_uid=$uid", $uid));
 	ShowItem("Created", $created);
 
+	$onmouseover = MakeMouseOver($description);
+	if (strlen($description) > 40) {
+	    $description = substr($description, 0, 40) . " <b>... </b>";
+	}
 	ShowItem("Description", 
 		 MakeLink("metadata",
 			  "action=modify&guid=$guid&version=$vers".
-			  "&metadata_guid=$desc_guid&metadata_vers=$desc_vers",
+			  "&metadata_guid=$desc_guid&metadata_vers=$desc_vers".
+			  " $onmouseover",
 			  $description));
     
 	if (! $this->IsRoot()) {
@@ -246,11 +247,16 @@ class Template
 	$vers = $this->vers();
 	
 	$query_result =
-	    DBQueryFatal("select name,value ".
-			 "   from experiment_template_parameters ".
-			 "where parent_guid='$guid' and ".
-			 "      parent_vers='$vers'");
-
+	    DBQueryFatal("select p.name,p.value, ".
+			 "       p.metadata_guid,p.metadata_vers, ".
+			 "       m.value as description ".
+			 "   from experiment_template_parameters as p ".
+			 "left join experiment_template_metadata_items as m ".
+			 "  on m.guid=p.metadata_guid and ".
+			 "     m.vers=p.metadata_vers ".
+			 "where p.parent_guid='$guid' and ".
+			 "      p.parent_vers='$vers'");
+    
 	if (!$query_result ||
 	    !mysql_num_rows($query_result))
 	    return 0;
@@ -263,24 +269,48 @@ class Template
  	echo "<tr>
                 <th>Name</th>
                 <th>Default Value</th>
+                <th>Description</th>
               </tr>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
-	    $name	= $row['name'];
-	    $value	= $row['value'];
+	    $name	   = $row['name'];
+	    $value	   = $row['value'];
+	    $metadata_guid = $row['metadata_guid'];
+	    $metadata_vers = $row['metadata_vers'];
+	    $description   = $row['description'];
+	    
 	    if (!isset($value)) {
 		$value = "&nbsp";
 	    }
 
 	    echo "<tr>
                    <td>$name</td>
-                   <td>$value</td>
-                  </tr>\n";
-  	}
+                   <td>$value</td>";
+
+	    if (is_null($description)) {
+		echo "<td>".
+		     "<a href=template_metadata.php?action=add&".
+		     "guid=$guid&version=$vers&type=parameter_description&".
+		     "formfields[name]=${name}>Click to add</a></td>\n";
+	    }
+	    else {
+		$onmouseover = MakeMouseOver($description);
+		if (strlen($description) > 30) {
+		    $description =
+			substr($description, 0, 30) . " <b>... </b>";
+		}
+		echo "<td><a href='template_metadata.php?action=modify".
+		     "&guid=$guid&version=$vers".
+		     "&metadata_guid=$metadata_guid".
+		     "&metadata_vers=$metadata_vers' $onmouseover>".
+  		     "$description</a></td>\n";
+	    }
+	    echo "</tr>\n";
+	    }
 	echo "</table>\n";
 	return 1;
     }
-
+	
     #
     # Display template metadata and values in a table
     #
@@ -293,7 +323,8 @@ class Template
 		     "left join experiment_template_metadata_items as i on ".
 		     "     m.metadata_guid=i.guid and m.metadata_vers=i.vers ".
 		     "where m.parent_guid='$guid' and ".
-		     "      m.parent_vers='$vers' and m.internal=0");
+		     "      m.parent_vers='$vers' and ".
+		     "      m.internal=0 and m.hidden=0");
 
 	if (! mysql_num_rows($query_result))
 	    return 0;
@@ -305,6 +336,7 @@ class Template
 
  	echo "<tr>
                 <th>Edit</th>
+                <th>Delete</th>
                 <th>Name</th>
                 <th>Value</th>
               </tr>\n";
@@ -314,11 +346,17 @@ class Template
 	    $value	   = $row['value'];
 	    $metadata_guid = $row['guid'];
 	    $metadata_vers = $row['vers'];
-	    if (!isset($value)) {
+	    $onmouseover   = "";
+	    
+	    if (!isset($value) || $value == "") {
 		$value = "&nbsp";
 	    }
-	    elseif (strlen($value) > 40) {
-		$value = substr($value, 0, 40) . " <b>... </b>";
+	    else {
+		$onmouseover = MakeMouseOver($value);
+		
+		if (strlen($value) > 40) {
+		    $value = substr($value, 0, 40) . "<b> ... </b></a>";
+		}
 	    }
 
 	    echo "<tr>
@@ -328,13 +366,14 @@ class Template
 		        "&metadata_guid=$metadata_guid".
 		        "&metadata_vers=$metadata_vers'>
                      <img border=0 alt='modify' src='greenball.gif'></A></td>
+   	           <td align=center>
+                     <a href='template_metadata.php?action=delete".
+		        "&guid=$guid&version=$vers".
+		        "&metadata_guid=$metadata_guid".
+		        "&metadata_vers=$metadata_vers'>
+                     <img border=0 alt='delete' src='redball.gif'></A></td>
                    <td>$name</td>
-                   <td>
-                       <a href='template_metadata.php?action=modify".
-		          "&guid=$guid&version=$vers".
-		          "&metadata_guid=$metadata_guid".
-		          "&metadata_vers=$metadata_vers'>
-                         $value</a></td>
+                   <td $onmouseover>$value</td>
                   </tr>\n";
   	}
 	echo "</table>\n";
@@ -515,6 +554,7 @@ class Template
     #
     function ShowGraph() {
 	$guid = $this->guid();
+	$vers = $this->vers();
 
 	$query_result =
 	    DBQueryFatal("select imap from experiment_template_graphs ".
@@ -526,11 +566,19 @@ class Template
 	$row  = mysql_fetch_array($query_result);
 	$imap = $row['imap'];
 
+	echo "<script type='text/javascript' ".
+	            "src='js/wz_dragdrop.js'></script>";
+
 	echo "<center>";
 	echo "<div id=fee style='display: block; overflow: hidden; ".
 	    "position: relative; z-index:1010; height: 400px; ".
 	    "width: 700px; border: 2px solid black;'>\n";
 	echo "<div id=\"D$guid\" style='position:relative;'>\n";
+
+	echo "<div id='CurrentTemplate' style='display: block; opacity: 1; ".
+	    "visibility: hidden; ".
+	    "position: absolute; z-index:1020; left: 0px; top: 0px;".
+	    "height: 0px; width: 0px; border: 2px solid red;'></div>\n";
 
 	echo $imap;
 	echo "<img id=\"G$guid\" border=0 usemap=\"#TemplateGraph\" ";
@@ -545,6 +593,13 @@ class Template
               </script>\n";
     
 	echo "</center>\n";
+	echo "<script type='text/javascript' src='template_sup.js'></script>";
+	echo "\n";
+
+	echo "<script type='text/javascript'>
+	       SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
+				 \"Tarea${vers}\");
+              </script>\n";
     }
 
     #
@@ -601,7 +656,8 @@ class Template
 	    DBQueryFatal("select internal ".
 			 "  from experiment_template_metadata as m ".
 			 "where m.parent_guid='$guid' and ".
-			 "      m.parent_vers='$vers' and m.internal=0");
+			 "      m.parent_vers='$vers' and ".
+			 "      m.internal=0 and m.hidden=0");
 
 	return mysql_num_rows($query_result);
     }
@@ -672,6 +728,25 @@ class Template
 	    $parameters[$name] = $value;
 	}
 	return 0;
+    }
+
+    #
+    # Find next candidate for a template (modify) TID
+    #
+    function NextTID() {
+	$tid  = $this->tid();
+	$guid = $this->guid();
+
+	$query_result =
+	    DBQueryFatal("select MAX(vers) from experiment_templates ".
+			 "where guid='$guid'");
+
+	if (mysql_num_rows($query_result) == 0) {
+	    return "T" . substr(md5(uniqid($foo, true)), 0, 10);
+	}
+	$row = mysql_fetch_array($query_result);
+	$foo = $row[0] + 1;
+	return "${tid}-V${foo}"; 
     }
 }
 
@@ -1194,6 +1269,10 @@ class TemplateMetadata
     function value() {
 	return (is_null($this->metadata) ? -1 : $this->metadata['value']);
     }
+    function type() {
+	return (is_null($this->metadata) ? -1 :
+		$this->metadata['metadata_type']);
+    }
     function parent_guid() {
 	return (is_null($this->metadata) ? -1 :
 		$this->metadata['parent_guid']);
@@ -1222,11 +1301,15 @@ class TemplateMetadata
 	$created        = $this->created();
 	$metadata_name  = $this->name();
 	$metadata_value = $this->value();
+	$metadata_type  = $this->type();
 
 	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
 	
 	ShowItem("GUID",     "$metadata_guid/$metadata_vers");
 	ShowItem("Name",     $metadata_name);
+	if (ISADMIN() && isset($metadata_type)) {
+	    ShowItem("Type",     $metadata_type);
+	}
 	ShowItem("Created",  $created);
 
 	if (! is_null($this->template)) {
@@ -1385,6 +1468,10 @@ function TBvalid_guid($token) {
     return TBcheck_dbslot($token, "experiment_templates", "guid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_template_parameter_description($token) {
+    return TBcheck_dbslot($token, "experiment_templates", "description",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
 function TBvalid_template_metadata_name($token) {
     return TBcheck_dbslot($token, "experiment_template_metadata", "name",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
@@ -1392,6 +1479,20 @@ function TBvalid_template_metadata_name($token) {
 function TBvalid_template_metadata_value($token) {
     return TBcheck_dbslot($token, "experiment_template_metadata", "value",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_template_metadata_type($token) {
+    return TBcheck_dbslot($token, "experiment_template_metadata",
+			  "metadata_type",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+
+function MakeMouseOver($string)
+{
+    $string = ereg_replace("\n", "<br>", $string);
+    $string = ereg_replace("\r", "", $string);
+    $string = htmlentities($string);
+
+    return "onmouseover=\"return escape('$string')\"";
 }
 
 ?>

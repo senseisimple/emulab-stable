@@ -153,7 +153,7 @@ $template->Children(\@children) == 0
     or tbdie("Could not construct list of child templates for $guid/$version");
 
 if ($recursive) {
-    @templates = @children;
+    @templates = (@children, $template);
 }
 else {
     tbdie("Cannot delete template $template cause it has children @children")

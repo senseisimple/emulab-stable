@@ -26,6 +26,7 @@ use overload ('""' => 'Stringify');
 # Configure variables
 my $TB		= "@prefix@";
 my $MD5         = "/sbin/md5";
+my $makegraph   = "$TB/bin/template_graph";
 
 # Cache of template instances to avoid regenerating them.
 my %templates   = ();
@@ -279,7 +280,7 @@ sub Delete($)
     my $guid = $self->guid();
     my $vers = $self->vers();
 
-    DeleteMetadata($self) == 0
+    DeleteAllMetadata($self) == 0
 	or return -1;
 
     DeleteInputFiles($self) == 0
@@ -582,12 +583,13 @@ sub DeleteInputFiles($)
 #
 # Add a metadata record. 
 #
-sub NewMetadata($$$$)
+sub NewMetadata($$$$;$)
 {
-    my ($self, $name, $value, $creator) = @_;
+    my ($self, $name, $value, $creator, $type) = @_;
     my $guid;
     my $version  = 1;
     my $internal = 0;
+    my $metadata_type;
 
     # Must be a real reference. 
     return -1
@@ -601,16 +603,30 @@ sub NewMetadata($$$$)
 
     # Special ...
     $internal = 1
-	if ($name eq "TID" || $name eq "description");
+	if (defined($type));
 
-    $name  = DBQuoteSpecial($name);
-    $value = DBQuoteSpecial($value);
+    # Current set of allowed types;
+    my @okay_types = ("tid", "template_description", "parameter_description");
+
+    if (defined($type)) {
+	if (! grep {$_ eq $type} @okay_types) {
+	    tberror("Illegal metadata type: $type");
+	    return -1;
+	}
+	$metadata_type = "'$type'";
+    }
+    else {
+	$metadata_type = "NULL";
+    }
+
+    my $safename  = DBQuoteSpecial($name);
+    my $safevalue = DBQuoteSpecial($value);
 
     my $query_result =
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
 		    "   guid='$guid', vers='$version', uid='$creator', ".
 		    "   template_guid='$template_guid', ".
-		    "   name=$name, value=$value, created=now()");
+		    "   name=$safename, value=$safevalue, created=now()");
     return -1
 	if (!$query_result);
 
@@ -619,8 +635,22 @@ sub NewMetadata($$$$)
 		"   parent_vers='$template_vers', ".
 		"   metadata_guid='$guid', ".
 		"   metadata_vers='$version', ".
+		"   metadata_type=$metadata_type, ".
 		"   internal=$internal")
 	or return -1;
+
+    # Some metadata is special ...
+    if (defined($type)) {
+	if ($type eq "parameter_description") {
+	    $query_result =
+		DBQueryWarn("update experiment_template_parameters set ".
+			    "   metadata_guid='$guid', ".
+			    "   metadata_vers='$version' ".
+			    "where name=$safename");
+	    return -1
+		if (!$query_result);
+	}
+    }
     
     return 0;
 }
@@ -628,9 +658,9 @@ sub NewMetadata($$$$)
 #
 # Lookup a metadata value by name, optionally returning guid/vers.
 #
-sub LookupMetadata($$;$$)
+sub LookupMetadata($$;$$$)
 {
-    my ($self, $name, $pguid, $pvers) = @_;
+    my ($self, $name, $pguid, $pvers, $ptype) = @_;
 
     # Must be a real reference. 
     return -1
@@ -642,7 +672,7 @@ sub LookupMetadata($$;$$)
     $name = DBQuoteSpecial($name);
 
     my $query_result =
-	DBQueryWarn("select metadata_guid,metadata_vers ".
+	DBQueryWarn("select metadata_guid,metadata_vers,metadata_type ".
 		    "   from experiment_template_metadata as m ".
 		    "left join experiment_template_metadata_items as i on ".
 		    "     m.metadata_guid=i.guid and m.metadata_vers=i.vers ".
@@ -655,11 +685,14 @@ sub LookupMetadata($$;$$)
     return 0
 	if (!$query_result->numrows);
 
-    my ($metadata_guid, $metadata_vers) = $query_result->fetchrow_array();
+    my ($metadata_guid, $metadata_vers, $metadata_type) =
+	$query_result->fetchrow_array();
     $$pguid = $metadata_guid
 	if (defined($pguid));
     $$pvers = $metadata_vers
 	if (defined($pvers));
+    $$ptype = $metadata_type
+	if (defined($ptype));
     
     return 1;
 }
@@ -681,8 +714,10 @@ sub ModifyMetadata($$$$)
     my $template_vers = $self->vers();
     my $parent_guid;
     my $parent_vers;
+    my $metadata_type;
     my $already_exists =
-	$self->LookupMetadata($name, \$parent_guid, \$parent_vers);
+	$self->LookupMetadata($name,
+			      \$parent_guid, \$parent_vers, \$metadata_type);
     return -1
 	if ($already_exists <= 0);
 
@@ -729,17 +764,32 @@ sub ModifyMetadata($$$$)
     #
     # XXX Some metadata is special ...
     #
-    if ($name eq "'TID'") {
-	DBQueryWarn("update experiment_templates set tid=$value ".
-		    "where guid='$template_guid' and ".
-		    "      vers='$template_vers'");
-	Refresh($self);	
-    }
-    elsif ($name eq "'description'") {
-	DBQueryWarn("update experiment_templates set description=$value ".
-		    "where guid='$template_guid' and ".
-		    "      vers='$template_vers'");
-	Refresh($self);	
+    if (defined($metadata_type)) {
+	if ($metadata_type eq "tid") {
+	    DBQueryWarn("update experiment_templates set tid=$value ".
+			"where guid='$template_guid' and ".
+			"      vers='$template_vers'")
+		or return -1;
+	    
+	    Refresh($self);
+	    # This can fail; it is not critical.
+	    system("$makegraph $template_guid");
+	}
+	elsif ($metadata_type eq "template_description") {
+	    DBQueryWarn("update experiment_templates set description=$value ".
+			"where guid='$template_guid' and ".
+			"      vers='$template_vers'")
+		or return -1;
+	    
+	    Refresh($self);	
+	}
+	elsif ($metadata_type eq "parameter_description") {
+	    DBQueryWarn("update experiment_template_parameters set ".
+			"   metadata_guid='$parent_guid', ".
+			"   metadata_vers='$metadata_vers' ".
+			"where name=$name")
+		or return -1
+	}
     }
     return 0;
 }
@@ -778,9 +828,9 @@ sub NewFormalParameter($$$)
 }
 
 #
-# Delete all template metadata; thats all we need here at the moment
+# Delete (all) template metadata
 #
-sub DeleteMetadata($)
+sub DeleteAllMetadata($)
 {
     my ($self) = @_;
 
@@ -836,40 +886,109 @@ sub DeleteMetadata($)
 }
 
 #
+# Delete a specific template metadata item from the template, but we leave
+# actual items behind. 
+#
+sub DeleteMetadata($$)
+{
+    my ($self, $name) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $template_guid = $self->guid();
+    my $template_vers = $self->vers();
+    $name = DBQuoteSpecial($name);
+
+    my $query_result =
+	DBQueryWarn("select metadata_guid,metadata_vers ".
+		    "   from experiment_template_metadata as m ".
+		    "left join experiment_template_metadata_items as i on ".
+		    "     m.metadata_guid=i.guid and m.metadata_vers=i.vers ".
+		    "where m.parent_guid='$template_guid' and ".
+		    "      m.parent_vers='$template_vers' and ".
+		    "      i.name=$name");
+    
+    return -1
+	if (!$query_result);
+    return -1
+	if (!$query_result->numrows);
+
+    my ($metadata_guid, $metadata_vers) = $query_result->fetchrow_array();
+    
+    DBQueryWarn("update experiment_template_metadata set hidden=1 ".
+		"where parent_guid='$template_guid' and ".
+		"      parent_vers='$template_vers' and ".
+		"      metadata_guid='$metadata_guid' and ".
+		"      metadata_vers='$metadata_vers'")
+	or return -1;
+
+    return 0;
+}
+
+#
 # Copy exiting template metadata to a child. This is likely to change
 # since we probably want to share at some point.
 #
 sub CopyMetadata($$$)
 {
-    my ($self, $target, $copier) = @_;
+    my ($self, $parent, $copier) = @_;
 
     # Must be a real reference. 
     return -1
-	if (! (ref($self) && ref($target)));
+	if (! (ref($self) && ref($parent)));
 
-    my $from_guid = $self->guid();
-    my $from_vers = $self->vers();
-    my $to_vers   = $target->vers();
+    my $from_guid = $parent->guid();
+    my $from_vers = $parent->vers();
+    my $to_vers   = $self->vers();
 
     #
     # Copy the toplevel items.
     #
     my $query_result =
-	DBQueryWarn("select name,value ".
+	DBQueryWarn("select name,value,metadata_type,internal ".
 		    "  from experiment_template_metadata as m ".
 		    "left join experiment_template_metadata_items as i on ".
 		    "     i.guid=m.metadata_guid and ".
 		    "     i.vers=m.metadata_vers ".
 		    "where m.parent_guid='$from_guid' and ".
-		    "      m.parent_vers='$from_vers' and m.internal=0")
+		    "      m.parent_vers='$from_vers'")
 	or return -1;
 
-    while (my ($name, $value) = $query_result->fetchrow_array()) {
+    while (my ($name,$value,$type,$internal) =
+	   $query_result->fetchrow_array()) {
+
 	my $guid;
 	my $version = 1;
+	my $metadata_type = "NULL";
 	
 	$name   = DBQuoteSpecial($name);
 	$value  = DBQuoteSpecial($value);
+
+	#
+	# XXX Some metadata is special ...
+	#
+	if (defined($type)) {
+	    # XXX Skip the tid and template descriptions.
+	    next
+		if ($type eq "tid" or $type eq "template_description");
+
+	    # XXX Skip parameters that were deleted.
+	    if ($type eq "parameter_description") {
+		my $param_result = 
+		    DBQueryWarn("select * ".
+				"   from experiment_template_parameters ".
+				"where name=$name");
+
+		return -1
+		    if (!$param_result);
+		
+		next
+		    if (!$param_result->numrows);
+	    }
+	    $metadata_type = "'$type'";
+	}
 
 	return -1
 	    if (NewGUID(\$guid) < 0);
@@ -879,7 +998,8 @@ sub CopyMetadata($$$)
 		    "   parent_vers='$to_vers', ".
 		    "   metadata_guid='$guid', ".
 		    "   metadata_vers='$version', ".
-		    "   internal=0")
+		    "   metadata_type=$metadata_type, ".
+		    "   internal=$internal")
 	    or return -1;
 
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
@@ -887,8 +1007,20 @@ sub CopyMetadata($$$)
 		    "   template_guid='$from_guid', ".
 		    "   name=$name, value=$value, created=now()")
 	    or return -1;
-    }
 
+	#
+	# XXX Some metadata is special ...
+	#
+	if (defined($type)) {
+	    if ($type eq "parameter_description") {
+		DBQueryWarn("update experiment_template_parameters set ".
+			    "   metadata_guid='$guid', ".
+			    "   metadata_vers='$version' ".
+			    "where name=$name")
+		    or return -1
+		}
+	}
+    }
     return 0;
 }
 

@@ -287,6 +287,7 @@ my $imapdata = `cat $imapfile`;
 # Massage the mapfile; tooltips --> onmouseovers
 #
 $imapdata =~ s/title=/onmouseover=/g;
+$imapdata =~ s/version=(\d*)\"/version=$1\" id=Tarea${1}/g;
 
 #print "$imapdata\n";
 

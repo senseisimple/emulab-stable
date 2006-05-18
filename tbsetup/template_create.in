@@ -207,22 +207,15 @@ $justexit = 0;
 #
 # The description is versioned metadata the user can modify.
 #
-$template->NewMetadata("description", $description, $dbuid) == 0
+$template->NewMetadata("description", $description,
+		       $dbuid, "template_description") == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 #
 # The TID is versioned metadata the user can modify.
 #
-$template->NewMetadata("TID", $tid, $dbuid) == 0
+$template->NewMetadata("TID", $tid, $dbuid, "tid") == 0
     or fatal(-1, "Failed to insert metadata record for description");
-
-#
-# Copy the rest of the metadata from parent to child
-#
-if ($modify) {
-    $template->CopyMetadata($parent_template, $dbuid) == 0
-	or fatal(-1, "Failed to copy metadata records");
-}
 
 # Grab stuff we need out of the template.
 $guid = $template->guid();
@@ -297,7 +290,16 @@ while (my ($name, $value) = $query_result->fetchrow_array()) {
     $template->NewFormalParameter($name, $value) == 0
 	or fatal(-1, "Could not set formal parameter for $pid/$eid")
 }
-    
+
+#
+# Copy the rest of the metadata from parent to child.
+# XXX This has to be done after the previous step (virt_parameters)
+#
+if ($modify) {
+    $template->CopyMetadata($parent_template, $dbuid) == 0
+	or fatal(-1, "Failed to copy metadata records");
+}
+   
 #
 # Generate the graph for the template.
 #

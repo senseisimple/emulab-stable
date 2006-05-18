@@ -24,13 +24,18 @@ $isadmin  = ISADMIN($uid);
 function SPITFORM($action, $formfields, $errors)
 {
     global $template_guid, $template_vers;
-    global $metadata_guid, $metadata_vers;
+    global $metadata_guid, $metadata_vers, $metadata_type;
     
     PAGEHEADER("Manage Template Metadata");
 
     if ($action == "add") {
 	echo "<center>";
-	echo "<h3>Use this page to attach metadata to your template.</h3>";
+	echo "<h3>Attach metadata to your template.</h3>";
+	echo "</center><br>\n";
+    }
+    elseif ($action == "delete") {
+	echo "<center>";
+	echo "<h3>Are you sure you want to delete this item?</h3>";
 	echo "</center><br>\n";
     }
 
@@ -70,18 +75,21 @@ function SPITFORM($action, $formfields, $errors)
     echo "<input type=hidden name=template_guid value=$template_guid>\n";
     echo "<input type=hidden name=template_vers value=$template_vers>\n";
 
-    if ($action == "modify") {
+    if ($action == "modify" || $action == "delete") {
 	echo "<tr>
                   <td class='pad4'>Metadata GUID:</td>
                   <td class='pad4' class=left>
                       $metadata_guid/$metadata_vers</td>\n";
 	echo "</tr>\n";
 	echo "<input type=hidden name=metadata_guid value=$metadata_guid>\n";
-	echo "<input type=hidden name=metadata_vers
-                                 value=$metadata_vers>\n";
+	echo "<input type=hidden name=metadata_vers value=$metadata_vers>\n";
+    }
+    if (isset($metadata_type) && $metadata_type != "") {
+	echo "<input type=hidden name=metadata_type value=$metadata_type>\n";
     }
 
-    $readonly = ($action == "modify" ? "readonly" : "");
+    $readonly_name  = ($action == "add"    ? "" : "readonly");
+    $readonly_value = ($action == "delete" ? "readonly" : "");
 
     #
     # Name of the item
@@ -90,7 +98,7 @@ function SPITFORM($action, $formfields, $errors)
               <td>*Name:<br>
                   (something short and pithy)</td>
               <td class=pad4 class=left>
-	          <input type=text $readonly
+	          <input type=text $readonly_name
                          name=\"formfields[name]\"
                          value=\"" . $formfields[name] . "\"
 	                 size=64>
@@ -104,7 +112,7 @@ function SPITFORM($action, $formfields, $errors)
           </tr>
           <tr>
               <td colspan=2 align=center class=left>
-                  <textarea name=\"formfields[value]\"
+                  <textarea $readonly_value name=\"formfields[value]\"
                     rows=10 cols=80>" .
 	            ereg_replace("\r", "", $formfields[value]) .
 	           "</textarea>
@@ -113,6 +121,9 @@ function SPITFORM($action, $formfields, $errors)
 
     if ($action == "modify") {
 	$tag = "Modify Metadata";
+    }
+    elseif ($action == "delete") {
+	$tag = "Delete Metadata";
     }
     else {
 	$tag = "Add Metadata";
@@ -186,7 +197,7 @@ if (!isset($submit)) {
 	PAGEFOOTER();
 	return;
     }
-    elseif ($action == "modify") {
+    elseif ($action == "modify" || $action == "delete") {
 	$template_guid = $guid;
 	$template_vers = $version;
 
@@ -217,12 +228,24 @@ if (!isset($submit)) {
 						    $metadata_vers);
 
 	if (!$template) {
-	    USERERROR("Invalid metadat $metadata_guid/$metadata_vers", 1);
+	    USERERROR("Invalid metadata $metadata_guid/$metadata_vers", 1);
 	}
+	$metadata_type = $metadata->type();
     }
     else {
 	$template_guid = $guid;
 	$template_vers = $version;
+
+	if (isset($type) && $type != "") {
+	    if (!TBvalid_template_metadata_type($type)) {
+		PAGEARGERROR("Invalid characters in metadata type!");
+	    }
+	    $metadata_type = $type;
+	}
+	else {
+	    unset($type);
+	    unset($metadata_type);
+	}
 
         #
         # Check to make sure this is a valid template.
@@ -240,9 +263,9 @@ if (!isset($submit)) {
 		  " template $template_guid!", 1);
     }
 
-    # Defaults from the form come from the DB.
+    # Defaults for the form come from the DB.
     $defaults = array();
-    if ($action == "modify") {
+    if ($action == "modify" || $action == "delete") {
 	$defaults["name"]  = $metadata->name();
 	$defaults["value"] = $metadata->value();
     }
@@ -267,7 +290,7 @@ elseif (! isset($formfields)) {
 #
 # Verify page arguments, which depend on action.
 #
-if ($action == "modify") {
+if ($action == "modify" || $action == "delete") {
     if (!isset($metadata_guid) || $metadata_guid == "") {
 	USERERROR("You must provide a Metadata GUID.", 1);
     }
@@ -305,8 +328,10 @@ if ($action == "modify") {
     $metadata = $template->LookupMetadataByGUID($metadata_guid,$metadata_vers);
 
     if (!$template) {
-	USERERROR("Invalid metadat $metadata_guid/$metadata_vers", 1);
+	USERERROR("Invalid metadata $metadata_guid/$metadata_vers", 1);
     }
+    # For checks below;
+    $metadata_type = $metadata->type();
 }
 else {
     if (!isset($template_guid) || $template_guid == "") {
@@ -320,6 +345,14 @@ else {
     }
     if (!TBvalid_integer($template_vers)) {
 	PAGEARGERROR("Invalid characters in version!");
+    }
+    if (isset($metadata_type) && $metadata_type != "") {
+	if (!TBvalid_template_metadata_type($metadata_type)) {
+	    PAGEARGERROR("Invalid characters in metadata type!");
+	}
+    }
+    else {
+	unset($metadata_type);
     }
 
     #
@@ -358,7 +391,13 @@ if ($action == "add") {
     if ($template->LookupMetadataByName($formfields[name])) {
 	$errors["Metadata Name"] = "Name already in use";
     }
+    if (isset($metadata_type)) {
+	$command_opts .= "-t $metadata_type ";
+    }
     $command_opts .= "-a add " . escapeshellarg($formfields[name]);
+}
+elseif ($action == "delete") {
+    $command_opts .= "-a delete " . escapeshellarg($formfields[name]);
 }
 else {
     # Had to already exist above. 
@@ -367,29 +406,42 @@ else {
 
 #
 # Value:
-# 
-if (!isset($formfields[value]) || $formfields[value] == "") {
-    $errors["Metadata Value"] = "Missing Field";
-}
-elseif (!TBvalid_template_metadata_value($formfields[value])) {
-    $errors["Metadata Value"] = TBFieldErrorString();
-}
-if ($action == "modify" &&
-    $formfields[value] == $metadata_data[value]) {
-    $errors["Metadata Value"] = "New value identical to old value";
+#
+if ($action != "delete") {
+    if (!isset($formfields[value]) || $formfields[value] == "") {
+	$errors["Metadata Value"] = "Missing Field";
+    }
+    elseif (!TBvalid_template_metadata_value($formfields[value])) {
+	$errors["Metadata Value"] = TBFieldErrorString();
+    }
+    if ($action == "modify" &&
+	$formfields[value] == $metadata_data[value]) {
+	$errors["Metadata Value"] = "New value identical to old value";
+    }
 }
 
 #
 # XXX Some metadata is special ...
 #
-if ($action == "modify") {
-    if ($formfields[name] == "TID") {
-	if (!TBvalid_eid($formfields[value])) {
+if (isset($metadata_type)) {
+    if ($metadata_type == "tid") {
+	if ($action == "delete") {
+	    $errors["TID"] = "Not allowed to delete this";
+	}
+	elseif (!TBvalid_eid($formfields[value])) {
 	    $errors["TID"] = TBFieldErrorString();
 	}
     }
-    elseif ($formfields[name] == "description") {
-	if (!TBvalid_template_description($formfields[value])) {
+    elseif ($metadata_type == "template_description") {
+	if ($action == "delete") {
+	    $errors["Description"] = "Not allowed to delete this";
+	}
+	elseif (!TBvalid_template_description($formfields[value])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "parameter_description") {
+	if (!TBvalid_template_parameter_description($formfields[value])) {
 	    $errors["Description"] = TBFieldErrorString();
 	}
     }
@@ -404,19 +456,23 @@ if (count($errors)) {
 #
 # Generate a temporary file and write in the data.
 #
-list($usec, $sec) = explode(' ', microtime());
-srand((float) $sec + ((float) $usec * 100000));
-$foo = rand();
+if ($action != "delete") {
+    list($usec, $sec) = explode(' ', microtime());
+    srand((float) $sec + ((float) $usec * 100000));
+    $foo = rand();
 
-$datafile = "/tmp/$uid-$foo.txt";
+    $datafile = "/tmp/$uid-$foo.txt";
 
-if (! ($fp = fopen($datafile, "w"))) {
-    TBERROR("Could not create temporary file $datafile", 1);
+    if (! ($fp = fopen($datafile, "w"))) {
+	TBERROR("Could not create temporary file $datafile", 1);
+    }
+
+    fwrite($fp, $formfields[value]);
+    fclose($fp);
+    chmod($datafile, 0666);
+
+    $command_opts = " -f $datafile $command_opts";
 }
-
-fwrite($fp, $formfields[value]);
-fclose($fp);
-chmod($datafile, 0666);
 
 #
 # The backend does the actual work.
@@ -426,11 +482,13 @@ $gid = $template->gid();
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_metadata -f $datafile ".
+		 "webtemplate_metadata ".
 		 "$command_opts $template_guid/$template_vers",
 		 SUEXEC_ACTION_IGNORE);
 
-unlink($datafile);
+if ($action != "delete") {
+    unlink($datafile);
+}
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
