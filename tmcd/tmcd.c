@@ -4556,7 +4556,7 @@ COMMAND_PROTOTYPE(doplabconfig)
 	char		buf[MYBUFSIZE];
         char            *bufp = buf, *ebufp = &buf[MYBUFSIZE];
 
-	if (!reqp->isvnode) {
+	if (!reqp->isplabdslice) {
 		/* Silent error is fine */
 		return 0;
 	}
