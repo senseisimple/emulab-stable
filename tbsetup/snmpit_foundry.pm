@@ -164,6 +164,40 @@ sub new($$$;$) {
     return $self;
 }
 
+# Attempt to repeat an action until it succeeds
+
+sub hammer($$$;$) {
+    my ($self, $closure, $id, $retries) = @_;
+
+    if (!defined($retries)) { $retries = 8; }
+    for my $i (1 .. $retries) {
+	my $result = $closure->();
+	if (defined($result) || ($retries == 1)) { return $result; }
+	if (defined($id)) { warn $id . " ... will try again\n"; }
+	sleep 1;
+    }
+    if (defined($id)) { warn $id . " .. giving up\n"; }
+    return undef;
+}
+
+# shorthand
+
+sub get1($$$) {
+    my ($self, $obj, $instance) = @_;
+    my $id = "nortel::snmpitGetOnePersistently of $obj, $instance";
+    my $closure = sub () {
+	my $RetVal = snmpitGet($self->{SESS}, [$obj, $instance], 1);
+	if (!defined($RetVal)) { sleep 2;}
+	return $RetVal;
+    };
+    my $RetVal = $self->hammer($closure, $id, 10);
+    if (!defined($RetVal)) {
+	warn "$id failed - $snmpit_lib::snmpitErrorString\n";
+    }
+    return $RetVal;
+}
+
+
 #
 # Set a variable associated with a port. The commands to execute are given
 # in the cmdOIs hash above
@@ -290,10 +324,30 @@ sub convertPortFormat($$@) {
     return undef;
 
 }
+# 
+# Check to see if the given 802.1Q VLAN tag exists on the switch
+#
+# usage: vlanNumberExists($self, $vlan_number)
+#        returns 1 if the VLAN exists, 0 otherwise
+#
+sub vlanNumberExists($$) {
+    my ($self, $vlan_number) = @_;
+
+    my $obj = "snVLanByPortCfgVLanName.$vlan_number";
+    my $rv = $self->{SESS}->get($obj);
+    if (!defined($rv) || !$rv || ($rv eq "NOSUCHINSTANCE")) {
+	sleep 1;
+	$rv = $self->{SESS}->get($obj);
+	if (defined($rv) && $rv && ($rv ne "NOSUCHINSTANCE")) {
+	    return 1;
+	} else { return 0; }
+    }
+    return 1;
+}
 
 #
 # Given VLAN indentifiers from the database, finds the 802.1Q VLAN
-# number for them. If not VLAN id is given, returns mappings for the entire
+# number for them. If no VLAN id is given, returns mappings for the entire
 # switch.
 # 
 # usage: findVlans($self, @vlan_ids)
@@ -304,9 +358,9 @@ sub findVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
     my %mapping = ();
-    my ($count, $name, $id, $vlan_number, $vlan_name) = ( scalar (@vlan_ids));
+    my ($name, $id, $vlan_number, $vlan_name);
 
-    if ($count == 0) {
+    if (!@vlan_ids) {
 	while ( ($id, $name) = each %{$self->{NEW_NAMES}} ) {
 		$mapping{$id} = $name;
 	}
@@ -315,7 +369,6 @@ sub findVlans($@) {
 	foreach $id (@vlan_ids) {
 	    if (defined($self->{NEW_NAMES}->{$id})) {
 		$mapping{$id} = $self->{NEW_NAMES}->{$id};
-		if (--$count == 0) { return %mapping };
 	    }
 	}
     }
@@ -326,19 +379,16 @@ sub findVlans($@) {
     $self->{SESS}->getnext($field);
     do {
 	($name,$vlan_number,$vlan_name) = @{$field};
-	$self->debug("findVlan: Got $name $vlan_number $vlan_name\n",2);
+	$self->debug("foundry::findVlans: $name $vlan_number $vlan_name\n",2);
 
 	#
 	# We only want the names - we ignore everything else
 	#
 	if ($name =~ /snVLanByPortCfgVLanName/) {
-	    if (($count <= 0) || exists $mapping{$vlan_name}) {
+	    if (!@vlan_ids || exists $mapping{$vlan_name}) {
 		$self->debug("Putting in mapping from $vlan_name to " .
 		    "$vlan_number\n",2);
-		$id = $mapping{$vlan_name};
 		$mapping{$vlan_name} = $vlan_number;
-		if (!defined($id) && (--$count == 0))
-			{ return %mapping };
 	    }
 	}
 
@@ -389,7 +439,7 @@ sub findVlan($$;$) {
 	}
     }
  }
-    $self->debug("Leaving device findVlan of $vlan_id \n");
+    $self->debug("Leaving device findVlan of $vlan_id \n",2);
     return $vlan_number;
 }
 
@@ -448,6 +498,7 @@ sub setPortVlan($$@) {
 
     my $errors = 0;
     my $vlan_id = $self->{NEW_NUMBERS}->{$vlan_number};
+    my %BumpedVlans = ();
            
     #
     # Run the port list through portmap to find the ports on the switch that
@@ -475,11 +526,16 @@ sub setPortVlan($$@) {
 	    $RetVal = $self->{SESS}->get(["snSwPortInfoTagMode",$portIndex]);
 	    $self->debug("TagMode for portIndex $portIndex is $RetVal\n");
 	    if (defined($RetVal) && ($RetVal eq "untagged")) {
-		$self->debug("2nd chance at $port return $RetVal\n");
-		$self->clearAllVlansOnTrunk($port);
-		$RetVal = $self->{SESS}->set( $obj, 4);
-		if (defined ($RetVal) && $RetVal ) {
-			next;
+		$self->debug("2nd chance at $port\n");
+		$RetVal = $self->{SESS}->get(["snSwPortVlanId",$portIndex]);
+		if (defined($RetVal)) {
+		    $BumpedVlans{$RetVal} = 1;
+		    my $ok = $self->setVlansOnTrunk($port,0,$RetVal);
+		    $self->debug("sVOT( $port, 0, $RetVal) returned $ok\n");
+		    $RetVal = $self->{SESS}->set( $obj, 4);
+		    if (defined ($RetVal) && $RetVal ) {
+			    next;
+		    }
 		}
 	    }
 	    print STDERR "VLAN change for index $port failed\n";
@@ -502,8 +558,8 @@ sub setPortVlan($$@) {
     #
 
     if (defined($vlan_id)) {
-#	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-#		"$self->{NAME} ... ";
+	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
+		"$self->{NAME} ... ";
 	my $obj = "snVLanByPortCfgStpMode";
 	my $RetVal = $self->{SESS}->set( [$obj, $vlan_number,0,"INTEGER"]);
 	if (!$RetVal) {
@@ -517,6 +573,16 @@ sub setPortVlan($$@) {
 	    $errors++;
 	}
 	print "",($RetVal? "Succeeded":"Failed"), ".\n";
+    }
+
+    #
+    # When removing things from the control vlan for a firewall,
+    # need to tell stack to shake things up to flush FDB on neighboring
+    # switches.
+    #
+    my @bumpedlist = keys ( %BumpedVlans );
+    if (@bumpedlist) {
+	@{$self->{DISPLACED_VLANS}} = @bumpedlist;
     }
 
     return $errors;
@@ -665,6 +731,22 @@ sub UpdateField($$$@) {
 
     }
     return $result;
+}
+
+#
+# Determine if a VLAN has any members 
+# (Used by stack->switchesWithPortsInVlan())
+#
+sub vlanHasPorts($$) {
+    my ($self, $vlan_number) = @_;
+
+    my $portset = $self->get1("snVLanByPortPortList",$vlan_number);
+    if (defined($portset)) {
+	my @ports = unpack "C*", $portset;
+	$self->debug("foundry::vlanHasPorts got @ports \n");
+	if (@ports) { return 1; }
+    }
+    return 0;
 }
 
 #
@@ -939,6 +1021,51 @@ sub getStats ($) {
 }
 
 #
+# Used to flush FDB entries easily
+#
+sub resetVlanIfOnTrunk($$$) {
+    my ($self, $modport, $vlan) = @_;
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
+    my $obj = "snVLanByPortMemberRowStatus.$vlan.$ifIndex";
+    my $RetVal = $self->{SESS}->get($obj);
+
+    if ($self->{DEBUG} > 0) {
+	print $self->{NAME} . ":resetVlanIfOnTrunk got $RetVal for $obj\n";
+    }
+    if (defined($RetVal) && ($RetVal eq "valid")) {
+	$self->setVlansOnTrunk($modport,0,$vlan);
+	$self->setVlansOnTrunk($modport,1,$vlan);
+    }
+    return 0;
+}
+#
+# Get the ifindex for an EtherChannel (trunk given as a list of ports)
+#
+# usage: getChannelIfIndex(self, ports)
+#        Returns: undef if more than one port is given, and no channel is found
+#           an ifindex if a channel is found and/or only one port is given
+#
+# N.B. by Sklower - cisco's use this and so it gets called from _stack.pm
+#
+sub getChannelIfIndex($@) {
+    my $self = shift;
+    my @ports = @_;
+    my @ifIndexes = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
+
+    my $ifindex = undef;
+
+    #
+    # Try to get a channel number for each one of the ports in turn - we'll
+    # take the first one we get
+    #
+    foreach my $port (@ifIndexes) {
+        if ($port) { $ifindex = $port; last; }
+    }
+    return $ifindex;
+}
+
+
+#
 # Enable, or disable,  port on a trunk
 #
 # usage: setVlansOnTrunk(self, modport, value, vlan_numbers)
@@ -1075,6 +1202,7 @@ sub enablePortTrunking($$$) {
 	warn "ERROR: Unable to set native VLAN on trunk\n";
 	return 0;
     }
+    return 1;
 }
 
 #
