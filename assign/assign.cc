@@ -540,6 +540,8 @@ int mapping_precheck() {
 	// Keep track of which link types had how many 'hits', so that we can
 	// tell which type(s) caused this node to fail
 	tb_vnode::link_counts_map matched_link_counts;
+        hash_map<fstring,int> max_links;
+        hash_map<fstring,int> desired_links;
 	map<fstring,bool> matched_links;
 
 	tb_vclass *vclass = v->vclass;
@@ -643,10 +645,14 @@ int mapping_precheck() {
                       vit++) {
                     fstring type = vit->first;
                     int count = vit->second;
+                    desired_links[type] = count;
                     if (pnode->link_counts.find(type) !=
                           pnode->link_counts.end()) {
                       // Found at least one link of this type
                       matched_links[type] = true;
+                      if (pnode->link_counts[type] > max_links[type]) {
+                        max_links[type] = pnode->link_counts[type];
+                      }
                       if (pnode->link_counts[type] >= count) {
                         // Great, there are enough, too
                         matched_link_counts[type]++;
@@ -691,11 +697,13 @@ nosuchtype:
 		lit++) {
 	      fstring type = lit->first;
 	      if (!matched_links[type]) {
-		cout << "      No links of type " << type << " found!" << endl;
+		cout << "      No links of type " << type << " found! (" <<
+                  desired_links[type] << " requested)" << endl;
 	      } else {
 		if (!matched_link_counts[type]) {
-		  cout << "      Too many links of type " << type << "!"
-		    << endl;
+		  cout << "      Too many links of type " << type << "! (" <<
+                    desired_links[type] << " requested, " << max_links[type] <<
+                    " found)" << endl;
 		}
 	      }
 	    }
