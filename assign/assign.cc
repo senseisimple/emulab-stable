@@ -632,26 +632,32 @@ int mapping_precheck() {
 		    }
 		}
 		
-		// Check link types
-		tb_vnode::link_counts_map::iterator vit;
-		for (vit = v->link_counts.begin(); vit != v->link_counts.end();
-		    vit++) {
-		  fstring type = vit->first;
-		  int count = vit->second;
-		  if (pnode->link_counts.find(type) !=
-			pnode->link_counts.end()) {
-		    // Found at least one link of this type
-		    matched_links[type] = true;
-		    if (pnode->link_counts[type] >= count) {
-		      // Great, there are enough, too
-		      matched_link_counts[type]++;
-		    } else {
-		      potential_match = false;
-		    }
-		  } else {
-		    potential_match = false;
-		  }
-		}
+		// Check link types - right now, we treat LANs specially, which
+                // I am not happy about, but it seems to be necessary.
+                // Otherwise, we can get a false negative when there are few
+                // ports on a switch available, but we could map by using
+                // the trunk links
+                if (this_type != "lan") {
+                  tb_vnode::link_counts_map::iterator vit;
+                  for (vit = v->link_counts.begin(); vit != v->link_counts.end();
+                      vit++) {
+                    fstring type = vit->first;
+                    int count = vit->second;
+                    if (pnode->link_counts.find(type) !=
+                          pnode->link_counts.end()) {
+                      // Found at least one link of this type
+                      matched_links[type] = true;
+                      if (pnode->link_counts[type] >= count) {
+                        // Great, there are enough, too
+                        matched_link_counts[type]++;
+                      } else {
+                        potential_match = false;
+                      }
+                    } else {
+                      potential_match = false;
+                    }
+                  }
+                }
 
 		if (potential_match) {
 		    vec->push_back(*it);
