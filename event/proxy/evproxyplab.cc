@@ -159,9 +159,6 @@ main(int argc, char **argv)
         /* Create nodeid string from pnode id passed in. */
 	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
 
-        /* Register with the remote event system. */
-        do_remote_register(server);
-
 	/* Register with the event system on the local node */
 	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
 	localhandle = event_register(buf, 0);
@@ -182,7 +179,7 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on local server");
 	}
 
-        info("Successfully setup initial event subscriptions.\n");
+        info("Successfully connected to local.\n");
 
 	/*
 	 * Stash the pid away.
@@ -206,15 +203,27 @@ main(int argc, char **argv)
 	/* Begin the event loop, waiting to receive event notifications */
         info("Entering main event loop.\n");
         while (1) {
+          /* 
+           * Register with the remote event system.
+           * Keep trying until we get a connection.
+           */
+          while (do_remote_register(server) == 0) {
+            event_unregister(bosshandle); /* just to be safe... */
+            error("Failed to register with remote event system!\n"
+                  "Sleeping for a bit before trying again...\n");
+            sleep(10);
+          }
+          info("Remote elvind registration complete.");
+          /* Jump into the main event loop. */
           event_main(bosshandle);
-          /* If we drop out of the event loop, it's because there was/is
+          /* 
+           * If we drop out of the event loop, it's because there was/is
            * some kind of problem with the connection to the remote elvind.
            * So, clean up and re-register (re-subscribe).
            */
-          info("exited event_main\n");
+          error("exited event_main: retrying remote registration.\n");
           event_unregister(bosshandle);
           exptmap.clear(); /* clear our list of subs - it's invalid now. */
-          do_remote_register(server);
         }
 
 	/* Unregister with the remote event system: */
@@ -251,7 +260,7 @@ int do_remote_register(char *server) {
         /* Setup a status callback to watch the remote connection. */
         if (!elvin_handle_set_status_cb(bosshandle->server, status_callback,
                                         server, bosshandle->status)) {
-          fatal("Could not register status callback!");
+          error("Could not register status callback!");
         }
 
 	/*
@@ -273,7 +282,8 @@ int do_remote_register(char *server) {
 	/* Subscribe to the test event: */
 	if (! event_subscribe(bosshandle, callback, tuple, 
 			      (void *)"event received")) {
-		fatal("could not subscribe to events on remote server");
+		error("could not subscribe to events on remote server");
+                return 0;
         }
 
         /* Setup the global event passthru */
@@ -288,7 +298,8 @@ int do_remote_register(char *server) {
 
 	if (! event_subscribe(bosshandle, expt_callback, tuple, 
 			      NULL)) {
-		fatal("could not subscribe to events on remote server");
+		error("could not subscribe to events on remote server");
+                return 0;
         }
 
         schedule_updateevent();
@@ -514,8 +525,6 @@ void async_callback(event_handle_t handle,  int result,
 void status_callback(elvin_handle_t handle, char *url, 
                      elvin_status_event_t event, void *data,
                      elvin_error_t status) {
-
-  char *server = (char*) data;
 
   switch(event) {
 
