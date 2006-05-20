@@ -5788,13 +5788,13 @@ COMMAND_PROTOTYPE(doeplabconfig)
 	mysql_free_result(res);
 
 	/*
-	 * NAME=<name> ROLE=<role> IP=<IP> MAC=<MAC> 
+	 * VNAME=<vname> PNAME=<FQpname> ROLE=<role> CNETIP=<IP> CNETMAC=<MAC> 
 	 */
-	res = mydb_query("select r.vname,r.plab_role,i.IP,i.mac "
+	res = mydb_query("select r.node_id,r.vname,r.plab_role,i.IP,i.mac "
 			 "  from reserved as r join interfaces as i "
 			 "  where r.node_id=i.node_id and "
 			 "    i.role='ctrl' and r.pid='%s' and r.eid='%s'",
-			 4, reqp->pid, reqp->eid);
+			 5, reqp->pid, reqp->eid);
 
 	if (!res || mysql_num_rows(res) == 0) {
 		error("EMULABCONFIG: %s: DB Error getting plab_in_elab info\n",
@@ -5812,10 +5812,11 @@ COMMAND_PROTOTYPE(doeplabconfig)
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
-		if (!strcmp(row[1], "plc")) {
+		if (!strcmp(row[2], "plc")) {
 			bufp += OUTPUT(bufp, ebufp - bufp,
-				       "NAME=%s ROLE=%s IP=%s MAC=%s\n",
-				       row[0], row[1], row[2], row[3]);
+				       "VNAME=%s PNAME=%s.%s ROLE=%s CNETIP=%s CNETMAC=%s\n",
+				       row[1], row[0], OURDOMAIN, row[2],
+				       row[3], row[4]);
 			break;
 		}
 	}
@@ -5833,7 +5834,38 @@ COMMAND_PROTOTYPE(doeplabconfig)
 			continue;
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
-			       "NAME=%s ROLE=%s IP=%s MAC=%s\n",
+			       "VNAME=%s PNAME=%s.%s ROLE=%s CNETIP=%s CNETMAC=%s\n",
+			       row[1], row[0], OURDOMAIN, row[2],
+			       row[3], row[4]);
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Now report all the configured experimental interfaces:
+	 *
+	 * VNAME=<vname> IP=<IP> NETMASK=<mask> MAC=<MAC>
+	 */
+	res = mydb_query("select vl.vnode,i.IP,i.mask,i.mac from reserved as r"
+			 "  left join virt_lans as vl"
+			 "    on r.pid=vl.pid and r.eid=vl.eid"
+			 "  left join interfaces as i"
+			 "    on vl.ip=i.IP and r.node_id=i.node_id"
+			 "  where r.pid='%s' and r.eid='%s' and"
+			 "    r.plab_role!='none'"
+			 "    and i.IP!='' and i.role='expt'",
+			 4, reqp->pid, reqp->eid);
+
+	if (!res) {
+		error("EMULABCONFIG: %s: DB Error getting plab_in_elab info\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	nrows = (int)mysql_num_rows(res);
+	while (nrows--) {
+		row = mysql_fetch_row(res);
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "VNAME=%s IP=%s NETMASK=%s MAC=%s\n",
 			       row[0], row[1], row[2], row[3]);
 	}
 	mysql_free_result(res);
