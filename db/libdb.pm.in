@@ -273,6 +273,7 @@ else {
 # to the DB in the child.
 #
 my @DB;
+my $DB_PID;
 $DBQUERY_MAXTRIES  = 1;
 $DBQUERY_RECONNECT = 1;
 $DBCONN_MAXTRIES   = 5;
@@ -315,6 +316,7 @@ sub TBDBConnect($)
     }
     $DB[$dbnum]->{'dbh'}->{'PrintError'} = 0;
     $Mysql::QUIET = 1;
+    $DB_PID = $PID;
     return 0;
 }
 TBDBConnect(0);
@@ -328,13 +330,32 @@ sub TBdbfork()
 }
 
 # New version.
-sub TBDBReconnect()
+sub TBDBReconnect($)
 {
+    my ($retry) = @_;
+    my ($exitonerr,$maxtries);
+    
+    if ($retry) {
+	$exitonerr = $DBCONN_EXITONERR;
+	$DBCONN_EXITONERR = 0;
+	
+	# And we want to keep trying for a long time!
+	$maxtries = $DBCONN_MAXTRIES;
+	$DBCONN_MAXTRIES  = 10000;
+    }
+
     for (my $i = 0; $i < @DB; $i++) {
 	undef($DB[$i]);
 	return -1
 	    if (TBDBConnect($i) != 0);
     }
+
+    if ($retry) {
+	$DBCONN_EXITONERR = $exitonerr;
+	$DBCONN_MAXTRIES  = $maxtries;
+    }
+    #print "Reconnected to DB in process $PID\n";
+   
     return 0;
 }
 
@@ -4531,6 +4552,16 @@ sub DBQueryN($$)
 	$maxtries = 100000;
     }
 
+    # Reconnect to mysqld in child of fork.
+    if (defined($DB_PID) && $DB_PID != $PID) {
+	if (TBDBReconnect(1) != 0) {
+	    $DBErrorString =
+		"  Query: $query\n".
+		"  Error: Could not reconnect to mysqld";
+	    return undef;
+	}
+    }
+
     while ($maxtries) {
 	# Get this each time through the loop since we try reconnect below.
 	my $db = $DB[$dbnum];
@@ -4554,21 +4585,11 @@ sub DBQueryN($$)
 	# If we lose the connection to mysqld; lets try to reconnect. 
 	#
 	if ($db->err == 2006 || $db->err == 2013) {
-	    # This is really just for the mysqld watchdog daemon.
+	    # This is just for the mysqld watchdog daemon.
 	    return undef
 		if (! $DBQUERY_RECONNECT);
-	    
-	    # Do not want to exit if this fails. 
-	    $DBCONN_EXITONERR = 0;
-	    # And we want to keep trying for a long time!
-	    $DBCONN_MAXTRIES  = 1000;
 
-	    my $reconnected = TBDBReconnect();
-
-	    $DBCONN_EXITONERR = 1;
-	    $DBCONN_MAXTRIES  = 1;
-	    
-	    if ($reconnected < 0) {
+	    if (TBDBReconnect(1) != 0) {
 		$DBErrorString =
 		    "  Query: $query\n".
 		    "  Error: Could not reconnect to mysqld";

@@ -60,7 +60,7 @@ if (!$debug) {
     }
 }
 # Restablish connection in child to avoid transient startup error.
-libdb::TBDBReconnect();
+libdb::TBDBReconnect(1);
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES  = 0;
@@ -147,7 +147,8 @@ sub TryQuery()
 	$libdb::DBCONN_MAXTRIES  = 2;
 
 	# Must always do this in the child.
-	libdb::TBDBReconnect();
+	exit(1)
+	    if (libdb::TBDBReconnect(0) != 0);
 	
 	if (!DBQueryWarn("show full processlist")) {
 	    exit(1);
