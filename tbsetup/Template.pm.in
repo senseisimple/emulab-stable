@@ -101,6 +101,8 @@ sub pid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'pid'}); }
 sub gid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'gid'}); }
 sub eid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'eid'}); }
 sub tid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'tid'}); }
+sub archive_idx($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'archive_idx'}); }
 
 #
 # Lookup a template given an experiment index.
@@ -1276,9 +1278,35 @@ sub Start($)
 
     return $self->Update(1);
 }
+# Set the stop time ...
+sub Stop($;$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    #
+    # Do the Run record first
+    #
+    my $runidx = $self->runidx();
+
+    return -1
+	if (defined($runidx) && StopCurrentRun($self) < 0);
+
+    # And then the instance.
+    DBQueryWarn("update experiment_template_instances set stop_time=now() ".
+		"where idx='$idx'")
+	or return -1;
+    
+    return Refresh($self);
+}
 
 #
-# Finalize a template instance record.
+# Finalize.
 #
 sub Finalize($;$)
 {
@@ -1298,19 +1326,6 @@ sub Finalize($;$)
     return -1
 	if (defined($runidx) && FinalizeCurrentRun($self) < 0);
 
-    # And then the instance.
-    my $query = "update experiment_template_instances set stop_time=now() ";
-
-    if (defined($argref) && scalar(keys%{$argref})) {
-	$query .= ",";
-	$query .= join(",",
-		       map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
-    }
-    $query .= " where idx='$idx'";
-
-    return -1
-	if (! DBQueryWarn($query));
-    
     return Refresh($self);
 }
 
@@ -1507,6 +1522,31 @@ sub DeleteCurrentRun($)
 }
 
 #
+# Stop the current experiment run,
+#
+sub StopCurrentRun($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx     = $self->idx();
+    my $runidx  = $self->runidx();
+    my $exptidx = $self->exptidx();
+
+    return -1
+	if (!defined($runidx));
+
+    DBQueryWarn("update experiment_runs set stop_time=now() ".
+		"where exptidx='$exptidx' and idx='$runidx'")
+	or return -1;
+
+    return Refresh($self);
+}
+
+#
 # Finalize the current experiment run record.
 #
 sub FinalizeCurrentRun($)
@@ -1524,7 +1564,21 @@ sub FinalizeCurrentRun($)
     return -1
 	if (!defined($runidx));
 
-    DBQueryWarn("update experiment_runs set stop_time=now() ".
+    #
+    # Grab the current archive tag. This will correspond to the commit
+    # done at the end of the run.
+    #
+    my $query_result =
+	DBQueryWarn("select r.archive_tag from experiment_stats as s ".
+		    "left join experiment_resources as r on ".
+		    "     r.idx=s.rsrcidx ".
+		    "where s.exptidx='$exptidx'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    my ($archive_tag) = $query_result->fetchrow_array();
+
+    DBQueryWarn("update experiment_runs set archive_tag='$archive_tag' ".
 		"where exptidx='$exptidx' and idx='$runidx'")
 	or return -1;
 

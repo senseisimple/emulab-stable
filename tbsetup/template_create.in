@@ -238,32 +238,17 @@ fatal(-1, "Could not add NS file to template store")
     if ($template->AddInputFile($inputfile) < 0);
 
 #
-# Grab archive index for new templates.
+# Grab archive index for new templates. 
 #
 if (!$modify) {
     libArchive::TBExperimentArchiveInfo($pid, $eid, \$archive_idx, undef)
 	>= 0 or fatal(-1, "Could not get archive index for new template!");
-
-    # Do a commit point on the template archive since it does not actually
-    # change after it is created (instances are branches).
-    libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
-	>= 0 or fatal(-1, "Failed to commit experiment archive!");
 }
 else {
     #
     # Grab the archive index for the parent; the archive is shared.
     #
-    libArchive::TBExperimentArchiveInfo($pid,
-					$parent_template->eid(),
-					\$archive_idx, undef)
-	>= 0 or fatal(-1, "Could not get archive index for parent!");
-      
-    # Do a commit point on the template archive since it does not actually
-    # change after it is created (instances are branches).
-    libArchive::TBCommitExperimentArchive($pid,
-					  $parent_template->eid(),
-					  "TemplateCreate")
-	>= 0 or fatal(-1, "Failed to commit experiment archive!");
+    $archive_idx = $parent_template->archive_idx();
 }
 
 # And update the record.
@@ -272,6 +257,15 @@ $args{'archive_idx'} = $archive_idx;
 
 $template->Update(\%args) == 0
     or fatal(-1, "Could not update template record!");
+
+#
+# When creating a template, the archive is created (or forked) in batchexp
+# but it is not committed. We need to do that now cause this experiment
+# is never actually swapped in. Instead each instance is a new fork, and if
+# the archive were not committed, it would not look correct.
+#
+libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
+    >= 0 or fatal(-1, "Failed to commit experiment archive!");
 
 #
 # Copy the virt_parameters table to the formal parameters table.

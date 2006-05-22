@@ -35,6 +35,7 @@ sub usage()
 	  "-b       - batchmode; insert into batch queue\n".
 	  "-w       - wait for template to be instantiated\n".
 	  "-q       - be less chatty\n".
+	  "-E <str> - A pithy sentence describing the instance\n".
 	  "-p <file>- XML file of parameter bindings\n".
 	  "-S <str> - Instance cannot be swapped; must provide reason\n".
 	  "-L <str> - Instance cannot be IDLE swapped; must provide reason\n".
@@ -46,12 +47,13 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:p:b";
+my $optlist	 = "qwe:S:L:na:l:se:p:bE:";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
 my $batchmode    = 0;
 my $foreground   = 0;
+my $description;
 my $paramfile;
 my $guid;
 my $version;
@@ -462,7 +464,7 @@ if ($batchmode) {
 #
 # All instances currently start with a default run.
 #
-$instance->NewRun($eid) == 0
+$instance->NewRun($eid, $description) == 0
     or fatal(-1, "Could not insert experiment new run record!");
 
 #
@@ -606,6 +608,15 @@ sub ParseArgs()
 	    exit(1);
 	}
 	$paramfile = $inputfile;
+    }
+
+    if (defined($options{"E"})) {
+	if (! TBcheck_dbslot($options{"E"},
+			     "experiment_templates", "description",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template description!");
+	}
+	$description = $options{"E"};
     }
 }
 

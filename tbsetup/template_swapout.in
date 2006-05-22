@@ -234,6 +234,10 @@ if ($waitmode) {
     POSIX::setsid();
 }
 
+# This sets the stop time.
+$instance->Stop() == 0
+    or fatal(-1, "Could not stop experiment instance!");
+
 #
 # Now do the swapout.
 #
@@ -251,7 +255,7 @@ fatal($? >> 8, "Could not terminate template instance")
 
 # Reminder; instance records are not deleted!
 $instance->Finalize() == 0
-    or fatal(-1, "Could not finalize experiment instance record!");
+    or fatal(-1, "Could not finalize experiment instance!");
 
 exit(0);
 

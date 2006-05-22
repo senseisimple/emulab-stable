@@ -86,7 +86,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 
     echo "<tr>
               <td colspan=2>
-               Use this text area to (optionally) describe your experiment:
+               Use this text area for an (optional) description:
               </td>
           </tr>
           <tr>

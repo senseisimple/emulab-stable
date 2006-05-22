@@ -936,6 +936,8 @@ function PAGEFOOTER($view = NULL) {
     # Plug the home site from all others.
     echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
+    # This has to be after all the tooltip definitions.
+    echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
     echo "</body></html>\n";
 }
 

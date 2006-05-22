@@ -34,7 +34,7 @@ sub usage()
 	  "-a <action> - start or stop\n".
 	  "-w          - wait for template to be instantiated\n".
 	  "-q          - be less chatty\n".
-	  "-E <str>    - A pithy sentence describing the template\n".
+	  "-E <str>    - A pithy sentence describing the run\n".
 	  "-r <runid>  - A token ... we will make on up for you\n".
 	  "-p <file>   - XML file of parameter bindings\n".
 	  "-e <eid>    - The instance name\n".
@@ -230,16 +230,18 @@ if (defined($paramfile)) {
 	if ($donebad);
 }
 
-#
-# Finalize running experiment.
-#
-$instance->FinalizeCurrentRun() == 0
-    or fatal(-1, "Could not finalize experiment run for $instance!");
+# This sets the stop time.
+$instance->StopCurrentRun() == 0
+    or fatal(-1, "Could not stop experiment run for $instance!");
 
 #
 # Commit the archive. 
 #
 system("$archcontrol -t $runid commit $pid $eid");
+
+# This has to be done after the archive commit, so we can find the tag.
+$instance->FinalizeCurrentRun() == 0
+    or fatal(-1, "Could not finalize experiment run for $instance!");
 
 goto done
     if ($action eq "stop");

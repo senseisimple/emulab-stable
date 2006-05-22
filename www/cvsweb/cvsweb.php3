@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -115,8 +115,10 @@ elseif (isset($exptidx) && $exptidx != "") {
     # Need the pid/eid/gid. Access the stats table since we want to provide
     # cvs access to terminated experiments via the archive.
     $query_result =
-	DBQueryFatal("select pid,eid,gid,archive_idx from experiment_stats ".
-		     "where exptidx='$exptidx'");
+	DBQueryFatal("select s.pid,s.eid,s.gid,s.archive_idx,a.archived ".
+		     "   from experiment_stats as s ".
+		     "left join archives as a on a.idx=s.archive_idx ".
+		     "where s.exptidx='$exptidx'");
     if (!mysql_num_rows($query_result)) {
 	USERERROR("Experiment '$exptidx' is not a valid experiment", 1);
     }
@@ -124,12 +126,13 @@ elseif (isset($exptidx) && $exptidx != "") {
     $pid = $row[0];
     $eid = $row[1];
     $gid = $row[2];
-    $repoidx = $row[3];
+    $repoidx  = $row[3];
+    $archived = $row[4];
 
-    # If a current experiment, check usual permissions.
-    if (TBValidExperiment($pid, $eid)) {
+    # Lets do group level check since it might not be a current experiment.
+    if (!$archived) {
 	if (! ISADMIN($uid) &&
-	    ! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	    ! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
 	    USERERROR("Not enough permission to view '$pid/$eid'", 1);
 	}
 	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";

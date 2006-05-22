@@ -209,6 +209,14 @@ sub ArchiveCreate(;$$$)
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${tag}-branch")
 	== 0 or goto bad;
+
+    # Create a tag in the history directory for the commit. The
+    # history directory has just the commit tags, so its easy to go
+    # back in time.
+    mysystem("$SVN copy $svnopt -m 'ArchiveCreate' ".
+	     "          file://$repodir/$view/trunk ".
+	     "          file://$repodir/$view/history/${tag}")
+	== 0 or goto bad;
     
     # Now check it out. This creates the $checkouts/$view directory.
     mysystem("cd $checkouts; ".
@@ -830,6 +838,14 @@ sub ArchiveFork($$;$$$)
     mysystem("$SVN copy $svnopt -m 'ArchiveFork Branch' ".
 	     "          file://$repodir/$newview/trunk ".
 	     "          file://$repodir/$newview/tags/${newtag}-branch")
+	== 0 or goto bad;
+
+    # Create a tag in the history directory for the commit. The
+    # history directory has just the commit tags, so its easy to go
+    # back in time.
+    mysystem("$SVN copy $svnopt -m 'ArchiveFork Branch' ".
+	     "          file://$repodir/$newview/trunk ".
+	     "          file://$repodir/$newview/history/${newtag}")
 	== 0 or goto bad;
     
     # Now check it out. This creates the checkouts/$newview directory.

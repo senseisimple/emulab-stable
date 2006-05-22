@@ -211,8 +211,6 @@ echo "</tr>\n";
 echo "</table>\n";
 echo "</center>\n";
 
-echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
-
 #
 # Standard Testbed Footer
 # 

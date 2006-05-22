@@ -221,6 +221,23 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     }
 
     #
+    # Description
+    #
+    echo "<tr>
+              <td colspan=2>
+               Use this text area for an (optional) description:
+              </td>
+          </tr>
+          <tr>
+              <td colspan=2 align=center class=left>
+                  <textarea name=\"formfields[description]\"
+                    rows=5 cols=80>" .
+	            ereg_replace("\r", "", $formfields[description]) .
+	           "</textarea>
+              </td>
+          </tr>\n";
+
+    #
     # Batch Experiment?
     #
     echo "<tr>
@@ -499,6 +516,19 @@ if (count($parameter_masterlist)) {
 	chmod($parameter_xmlfile, 0666);
     }
     $command_options .= " -p $parameter_xmlfile";
+}
+
+#
+# Description:
+# 
+if (!isset($formfields[description]) || $formfields[description] == "") {
+    $errors["Description"] = "Missing Field";
+}
+elseif (!TBvalid_template_description($formfields[description])) {
+    $errors["Description"] = TBFieldErrorString();
+}
+else {
+    $command_options .= " -E " . escapeshellarg($formfields[description]);
 }
 
 #

@@ -465,7 +465,12 @@ class Template
 	$vers = $this->vers();
 
 	$query_result =
-	    DBQueryFatal("select * from experiment_template_instances as i ".
+	    DBQueryFatal("select i.*,r.archive_tag ".
+			 "  from experiment_template_instances as i ".
+			 "left join experiment_stats as s on ".
+			 "     s.exptidx=i.exptidx ".
+			 "left join experiment_resources as r on ".
+			 "     r.idx=s.rsrcidx ".
 			 "where (i.parent_guid='$guid' and ".
 			 "       i.parent_vers='$vers') ".
 			 "order by i.start_time");
@@ -481,10 +486,10 @@ class Template
 	echo "<tr>
                <th align=center>Expand</th>
                <th>EID</th>
-               <th>IDX</th>
                <th>UID</th>
                <th>Start Time</th>
                <th>Stop Time</th>
+               <th align=center>Show</th>
                <th align=center>Archive</th>
               </tr>\n";
 
@@ -499,6 +504,7 @@ class Template
 	    $stop      = $row['stop_time'];
 	    $exptidx   = $row['exptidx'];
 	    $idx       = $row['idx'];
+	    $tag       = $row['archive_tag'];
 
 	    if (! isset($stop)) {
 		$stop = "&nbsp";
@@ -521,17 +527,21 @@ class Template
 	    echo " </td>
                    <td>$eid</td>\n";
 	    
+	    echo " <td>$uid</td>
+                   <td>$start</td>
+                   <td>$stop</td>\n";
+
 	    echo " <td align=center>".
  		    MakeLink("instance",
 			     "guid=$guid&version=$vers&exptidx=$exptidx",
-			     "$idx");
+			     "<img border=0 alt='Show' src='greenball.gif'>");
+
+	    echo " <td align=center>
+                     <a href=cvsweb/cvswebwrap.php3/$exptidx/history/$tag/".
+		        "?exptidx=$exptidx>
+                     <img border=0 alt='i' src='greenball.gif'></a></td>";
+	    
 	    echo " </td>
-  		   <td>$uid</td>
-                   <td>$start</td>
-                   <td>$stop</td>
-                   <td align=center>
-                     <a href=cvsweb/cvswebwrap.php3/$exptidx/?exptidx=$exptidx>
-                     <img border=0 alt='i' src='greenball.gif'></a></td>
                  </tr>\n";
 
 	    if ($expandit) {
@@ -835,18 +845,26 @@ class TemplateInstance
     #
     # Show an instance.
     #
-    function Show($withruns) {
+    function Show($detailed) {
 	$exptidx = $this->exptidx();
-	$runidx   = $this->runidx();
+	$runidx  = $this->runidx();
 	$guid    = $this->guid();
 	$vers    = $this->vers();
 	$pid     = $this->pid();
 	$uid     = $this->uid();
 	$start   = $this->start_time();
 	$stop    = $this->stop_time();
-	
+	$template= $this->template();
+	$pcount  = $template->ParameterCount();
+
+	if ($detailed && $pcount) {
+	    echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
+		 " cellpadding=0 cellspacing=0 align=center>\n";
+            echo "<tr valign=top>";
+	    echo "<td class=stealth align=center>\n";
+	}
 	echo "<center>
-               <h3>Template Instance</h3>
+               <h3>Template Details</h3>
              </center>\n";
 
 	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
@@ -857,66 +875,22 @@ class TemplateInstance
 	ShowItem("ID",          $exptidx);
 	ShowItem("Project",     MakeLink("project", "pid=$pid", $pid));
 	ShowItem("Creator",     MakeLink("user", "target_uid=$uid", $uid));
-	ShowItem("Started",     $start_time);
-	ShowItem("Stopped",     (isset($stop_time) ? $stop_time : "&nbsp"));
+	ShowItem("Started",     $start);
+	ShowItem("Stopped",     (isset($stop) ? $stop : "&nbsp"));
 	ShowItem("Current Run", (isset($runidx) ? $runidx : "&nbsp"));
 	echo "</table>\n";
 
-	if ($withruns) {
-	    $query_result =
-		DBQueryFatal("select * from experiment_runs ".
-			     "where exptidx='$exptidx'");
+	if ($detailed && $pcount) {
+	    echo "</td>";
+	    echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
+	    echo "<td class=stealth align=center>\n";
+	    $this->ShowBindings();
+	    echo "</tr>";
+	    echo "</table>\n";
+	}
 
-	    if (mysql_num_rows($query_result)) {
-		echo "<center>
-                        <h3>Instance History (Runs)</h3>
-                      </center> 
-                      <table align=center border=1
-                             cellpadding=5 cellspacing=2>\n";
-
-		echo "<tr>
-                       <th align=center>Expand</th>
-                       <th align=center>Archive</th>
-                       <th>RunID</th>
-                       <th>ID</th>
-                       <th>Start Time</th>
-                       <th>Stop Time</th>
-                       <th>Description</th>
-                      </tr>\n";
-
-		while ($rrow = mysql_fetch_array($query_result)) {
-		    $runidx    = $rrow['idx'];
-		    $runid     = $rrow['runid'];
-		    $start     = $rrow['start_time'];
-		    $stop      = $rrow['stop_time'];
-		    $exptidx   = $rrow['exptidx'];
-		    $description = $rrow['description'];
-
-		    if (! isset($stop)) {
-			$stop = "&nbsp";
-		    }
-	    
-		    echo "<tr>\n";
-		    echo " <td align=center>".
-			MakeLink("run",
-				 "guid=$guid&version=$vers".
-				 "&exptidx=$exptidx&runidx=$runidx",
-				 "<img border=0 alt='i' src='greenball.gif'>");
-		    echo " </td>
-                            <td align=center>
-                                <a href=cvsweb/cvswebwrap.php3".
-			           "/$exptidx/history/$runid/?exptidx=$exptidx>
-                                <img border=0 alt='i'
-                                     src='greenball.gif'></a></td>
-                            <td>$runid</td>
-  		            <td>$runidx</td>
-                            <td>$start</td>
-                            <td>$stop</td>
-                            <td>$description</td>
-                           </tr>\n";
-		}
-		echo "</table>\n";
-	    }
+	if ($detailed) {
+	    $this->ShowRunList(1);
 	}
     }
     
@@ -934,7 +908,7 @@ class TemplateInstance
 	    return 0;
 
 	echo "<center>
-               <h3>Template Instance Bindings</h3>
+               <h3>Instance Bindings</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -982,7 +956,7 @@ class TemplateInstance
 	echo "<table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
 	echo "<tr>
-               <th align=center>Expand</th>
+               <th align=center>Show</th>
                <th align=center>Archive</th>
                <th>RunID</th>
                <th>ID</th>
@@ -997,10 +971,32 @@ class TemplateInstance
 	    $start     = $rrow['start_time'];
 	    $stop      = $rrow['stop_time'];
 	    $exptidx   = $rrow['exptidx'];
+	    $tag       = $rrow['archive_tag'];
 	    $description = $rrow['description'];
+	    $onmouseover = "";
 
 	    if (! isset($stop)) {
 		$stop = "&nbsp";
+	    }
+
+	    if (isset($description) && $description != "") {
+		$onmouseover = MakeMouseOver($description);
+		if (strlen($description) > 30) {
+		    $description = substr($description, 0, 30) . " <b>...</b>";
+		}
+	    }
+	    else {
+		$description = "&nbsp ";
+	    }
+
+	    if (isset($tag) && $tag != "") {
+		$archive_link =
+		    "<a href=cvsweb/cvswebwrap.php3".
+		    "/$exptidx/history/$tag/?exptidx=$exptidx>".
+		    "<img border=0 alt='i' src='greenball.gif'></a>";
+	    }
+	    else {
+		$archive_link = "&nbsp ";
 	    }
 	    
 	    echo "<tr>\n";
@@ -1010,16 +1006,12 @@ class TemplateInstance
 			     "&exptidx=$exptidx&runidx=$runidx",
 			     "<img border=0 alt='i' src='greenball.gif'>");
 	    echo " </td>
-                    <td align=center>
-                        <a href=cvsweb/cvswebwrap.php3".
-			   "/$exptidx/history/$runid/?exptidx=$exptidx>
-                        <img border=0 alt='i'
-                             src='greenball.gif'></a></td>
+                    <td align=center>$archive_link</td>
                     <td>$runid</td>
   		    <td>$runidx</td>
                     <td>$start</td>
                     <td>$stop</td>
-                    <td>$description</td>
+                    <td $onmouseover>$description</td>
                    </tr>\n";
 	}
 	echo "</table>\n";
@@ -1060,6 +1052,7 @@ class TemplateInstance
 	$row   = mysql_fetch_array($query_result);
 	$start = $row['start_time'];
 	$stop  = $row['stop_time'];
+	$description = $row['description'];
 
 	if (!isset($stop))
 	    $stop = "&nbsp";
@@ -1081,6 +1074,21 @@ class TemplateInstance
 	ShowItem("Started",     $start);
 	ShowItem("Stopped",     $stop);
 
+	if (isset($description) && $description != "") {
+	    echo "<tr>
+                     <td align=center colspan=2>
+                      Description
+                     </td>
+                  </tr>
+                  <tr>
+                     <td colspan=2 align=center class=left>
+                         <textarea readonly
+                            rows=5 cols=50>" .
+		            ereg_replace("\r", "", $description) .
+		         "</textarea>
+                  </td>
+              </tr>\n";
+	}
 	echo "</table>\n";
 
 	$query_result =
