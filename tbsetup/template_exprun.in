@@ -193,11 +193,15 @@ if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
 
 #
 # If we have a parameter file, we need to copyin the values and store
-# them in the DB for this experiment.
+# them in the DB for this experiment. Note that these override existing
+# values, so we start with those first.
 #
 # XXX Do we keep these values in the DB forever? Or just keep the XML file
 # around and archived? 
 #
+$instance->BindingList(\%parameters) == 0
+    or tbdie("Could not get binding list for $instance");
+
 if (defined($paramfile)) {
     my $donebad = 0;
     

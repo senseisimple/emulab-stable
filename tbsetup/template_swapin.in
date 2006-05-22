@@ -185,11 +185,15 @@ if (! TBProjAccessCheck($dbuid,
 
 #
 # If we have a parameter file, we need to copyin the values and store
-# them in the DB for this experiment.
+# them in the DB for this experiment. Note that these override existing
+# values, so we start with those first.
 #
 # XXX Do we keep these values in the DB forever? Or just keep the XML file
 # around and archived? 
 #
+$template->FormalParameterList(\%parameters) == 0
+    or tbdie("Could not get formal parameter list for $template");
+
 if (defined($paramfile)) {
     my $donebad = 0;
     
@@ -398,6 +402,27 @@ if (! $foreground) {
 #
 if ($waitmode) {
     POSIX::setsid();
+}
+
+#
+# Hmm. Before we actually swapin, copy the parameters to the environment
+# table so that they are available to the program agent when it starts up
+# on the nodes. Note that we destructively modify a virt_ table, but thats
+# okay for now. Of course, it has to be done *before* the swapin so that
+# the values are in place when the nodes boot!
+#
+foreach my $name (keys(%parameters)) {
+    my $value = $parameters{$name};
+
+    if (defined($value)) {
+	$value = DBQuoteSpecial($value);
+    }
+    else {
+	$value = "''";
+    }
+    DBQueryFatal("replace into virt_user_environment set ".
+		 "   name='$name', value=$value, ".
+		 "   pid='$pid', eid='$eid'");
 }
 
 #
