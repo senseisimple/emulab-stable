@@ -33,7 +33,7 @@ OPERATION NUANCES:
   latency to the destination, pings will be run sequentially one after
   the other. There will be no simultaneous tests of the same type to the same
   destination.
-- If a node's latency is longer than 60 seconds, an error value is reported
+- If a path latency is longer than 60 seconds, an error value is reported
   instead of a latency (milliseconds) value. See %ERRID
 - If a testing process abnormally exits with a value not 0 (say, iperf dies),
   then the test is rescheduled to be run at a future time. This time is
@@ -59,7 +59,8 @@ sub usage {
 my %MAX_SIMU_TESTS = (latency => "10",
 		      bw      => "1");
 
-# ratio of testing period to wait after a test process abnormally exits
+# percentage of testing period to wait after a test process abnormally exits
+# note: 0.1 = 10%
 my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.1);
 #MARK_RELIABLE
@@ -162,20 +163,40 @@ for (my $i = 0; $i < $resultDBlimit; $i++) {
     }
 }
 
+my $subtimer_reset = 100;
+my $subtimer = $subtimer_reset;  #decrement every poll-loop.
+
 while (1) {
+
+    $subtimer--;
 
     #check for pending received events
     event_poll_blocking($handle,100);
 
-    #TODO: this loop shouldn't be run every poll loop.
+    #re-try wait Q every $subtimer_reset times through poll loop
     #try to run tests on queue
-    foreach my $testtype (keys %waitq){
-	my $arrlen = scalar(@{$waitq{$testtype}});
-	#DONOT use "foreach" here, since the call to spawnTest may add to waitq
-	for( my $i = 0; $i < $arrlen; $i++ ){
-	    my $destnode = pop @{$waitq{$testtype}};
-#	    print "WAIT Q: REMOVED $destnode \n";
-	    spawnTest( $destnode, $testtype );
+    if( $subtimer == 0 ){
+	foreach my $testtype (keys %waitq){
+	    my $arrlen = scalar(@{$waitq{$testtype}});
+	    #DONOT use "foreach" here, since the call to spawnTest 
+	    #  may add to waitq
+	    for( my $i = 0; $i < $arrlen; $i++ ){
+		#get oldest element. (take off, but put right back until
+                #  sure it got processed)
+		my $destnode = pop @{$waitq{$testtype}};
+		push @{$waitq{$testtype}}, $destnode;
+		if( -1 != spawnTest( $destnode, $testtype ) ){
+		    pop @{$waitq{$testtype}}; #sent successfully, so pop node
+		}
+	    }
+#	    print "QW-".$testtype."_len=".scalar(@{$waitq{$testtype}})."\n";
+	    if( scalar(@{$waitq{$testtype}}) != 0 ){
+		print time_all()." $testtype ";
+		foreach my $node (@{$waitq{$testtype}}){
+		    print "$node ";
+		}
+		print "\n";
+	    }
 	}
     }
 
@@ -279,7 +300,8 @@ while (1) {
 #	    print "pid=".$testevents{$destaddr}{$testtype}{"pid"}."\n";
 
 	    #check for new tests ready to run
-	    if( scalar(@{$waitq{bw}}) == 0 &&
+#WRONG?	    if( scalar(@{$waitq{bw}}) == 0 &&
+	    if(
 		$testevents{$destaddr}{$testtype}{"timeOfNextRun"} 
 		                                           <= time_all() &&
 		$testevents{$destaddr}{$testtype}{"flag_scheduled"} == 1 &&
@@ -352,6 +374,10 @@ while (1) {
 	    sleep(2);
 	    last;
 	}
+    }
+
+    if( $subtimer == 0 ){
+	$subtimer = $subtimer_reset;
     }
 }
 
@@ -496,7 +522,6 @@ sub spawnTest($$)
     
     use Errno qw(EAGAIN);
 
-
     #exit and don't fork if the max number of tests is already being run
     if( getRunningTestsCnt($testtype) >= $MAX_SIMU_TESTS{$testtype} ){
 #	print "Testcnt = ".getRunningTestsCnt($testtype);
@@ -515,7 +540,7 @@ sub spawnTest($$)
 #	    print "WAIT Q: ADDED $linkdest \n";
 	}
 
-	return 0;
+	return -1;
     }
 
   FORK:{
@@ -556,6 +581,7 @@ sub spawnTest($$)
 	  redo FORK;
       }else{ die "can't fork: $!\n";}
   }
+    return 0;
 }
 
 sub getRunningTestsCnt($)
