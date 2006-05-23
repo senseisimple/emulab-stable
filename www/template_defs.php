@@ -537,7 +537,7 @@ class Template
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 
 	    echo " <td align=center>
-                     <a href=cvsweb/cvswebwrap.php3/$exptidx/history/$tag/".
+                     <a href=archive_view.php3/$exptidx/history/$tag/".
 		        "?exptidx=$exptidx>
                      <img border=0 alt='i' src='greenball.gif'></a></td>";
 	    
@@ -991,7 +991,7 @@ class TemplateInstance
 
 	    if (isset($tag) && $tag != "") {
 		$archive_link =
-		    "<a href=cvsweb/cvswebwrap.php3".
+		    "<a href=archive_view.php3".
 		    "/$exptidx/history/$tag/?exptidx=$exptidx>".
 		    "<img border=0 alt='i' src='greenball.gif'></a>";
 	    }

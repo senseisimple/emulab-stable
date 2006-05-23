@@ -1362,6 +1362,22 @@ function TBExptIndex($pid, $eid)
     return $idx;
 }
 
+function TBExptidx2PidEid($exptidx, &$pid, &$eid, &$gid)
+{
+    $query_result =
+	DBQueryFatal("select pid,eid,gid from experiments ".
+		     "where idx='$exptidx'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $pid   = $row[pid];
+    $eid   = $row[eid];
+    $gid   = $row[gid];
+    return 0;
+}
+
 function TBrsrcIndex($pid, $eid)
 {
     $query_result =

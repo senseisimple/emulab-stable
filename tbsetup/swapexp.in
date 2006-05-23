@@ -1079,17 +1079,38 @@ TBSaveExpLogFiles($pid, $eid);
 #
 system("cp -Rfp $workdir/ $userdir/tbdata/");
 
-# Now add that copy to the archive. 
-if (defined($logname)) {
-    libArchive::TBExperimentArchiveAddFile($pid, $eid,
-					   "$userdir/tbdata/" . EXPTLOGNAME());
+#
+# Copy out some files to the archive directory so that they get saved later.
+#
+$archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
+
+if (! -e "$archivedir/tbdata") {
+    mkdir("$archivedir/tbdata")
+	or fatal("Failed to mkdir $archivedir/tbdata");
+}
+if (! -e "$archivedir/nsdata") {
+    mkdir("$archivedir/nsdata")
+	or fatal("Failed to mkdir $archivedir/nsdata");
 }
 
-# Always copy the NS file into the archive.
-system("cp -p $workdir/$eid.ns $userdir/archive/$eid.ns");
-libArchive::TBExperimentArchiveAddFile($pid, $eid,
-				       "$userdir/archive/$eid.ns") == 0 or
-    fatal("Failed to add $userdir/$eid.ns to the archive!");
+if ($inout eq "modify") {
+    system("cp -p $workdir/$eid.ns $archivedir/nsdata/nsfile.ns") == 0
+	or fatal("Failed to copy nsfile to $archivedir/tbdata");
+}
+
+if (defined($logname)) {
+    system("cp -p $logname $archivedir/tbdata/log.$tag") == 0
+    or fatal("Failed to copy logfile to $archivedir/tbdata");
+}
+
+if (-e $repfile) {
+    system("cp -p $workdir/$repfile $archivedir/tbdata/tbreport.$tag") == 0
+	or fatal("Failed to copy nsfile to $archivedir/tbdata");
+}
+
+# And tell the archive library about the above files.
+libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
+    or fatal("Failed to add user archive files to the archive!");
 
 #
 # The archive gets different treatment when doing a swapmod.

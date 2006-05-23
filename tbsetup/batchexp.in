@@ -700,20 +700,34 @@ TBSaveExpLogFiles($pid, $eid);
 #
 system("cp -Rfp $workdir/ $userdir/tbdata");
 
-# Now add that copy to the archive. 
-if (defined($logname)) {
-    libArchive::TBExperimentArchiveAddFile($pid, $eid,
-					   "$userdir/tbdata/" . EXPTLOGNAME());
-}
-libArchive::TBExperimentArchiveAddFile($pid, $eid, "$userdir/tbdata/$repfile");
+#
+# Copy out some files to the archive directory so that they get saved later.
+#
+my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
 
-#
-# Make a copy of the NS file where we can get at it easily. Then add it.
-#
-system("cp -p $workdir/$nsfile $userdir/archive/$nsfile");
-libArchive::TBExperimentArchiveAddFile($pid, $eid,
-				       "$userdir/archive/$nsfile") == 0 or
-    fatal("Failed to add $userdir/archive/$nsfile to the archive!");
+if (! -e "$archivedir/tbdata") {
+    mkdir("$archivedir/tbdata")
+	or fatal("Failed to mkdir $archivedir/tbdata");
+}
+if (! -e "$archivedir/nsdata") {
+    mkdir("$archivedir/nsdata")
+	or fatal("Failed to mkdir $archivedir/nsdata");
+}
+
+system("cp -p $workdir/$nsfile $archivedir/nsdata/nsfile.ns") == 0
+    or fatal("Failed to copy nsfile to $archivedir/tbdata");
+
+if (defined($logname)) {
+    system("cp -p $logname $archivedir/tbdata/log.batchexp") == 0
+    or fatal("Failed to copy logfile to $archivedir/tbdata");
+}
+
+system("cp -p $workdir/$repfile $archivedir/tbdata/tbreport.batchexp") == 0
+    or fatal("Failed to copy nsfile to $archivedir/tbdata");
+
+# And tell the archive library about the above files.
+libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
+    or fatal("Failed to add user archive files to the archive!");
 
 #
 # Do a SavePoint on the experiment files.
@@ -1223,14 +1237,14 @@ sub CopyInArchive()
     return 0
 	if (!defined($copyarg));
 
-    my $dstdir = "$userdir/archive";
+    my $dstdir = "$userdir/archive/nsdata";
 
     if ($copyfrom eq "exp") {
 	#
 	# Copy in from a current experiment. This is probably a bad thing
 	# to do, but hey. 
 	#
-	my $srcdir = TBExptUserDir($copypid, $copyeid) . "/archive";
+	my $srcdir = TBExptUserDir($copypid, $copyeid) . "/archive/nsdata";
 
 	if (-e $srcdir) {
 	    print "Copying experiment archive from ${srcdir}\n";
@@ -1239,19 +1253,12 @@ sub CopyInArchive()
 		fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
 	    }
 	}
-	# This is for backwards compatability, and the mv below.
-	if (! -e "$dstdir/$copyeid.ns") {
-	    my $srcfile = TBExptUserDir($copypid, $copyeid) .
-		"/tbdata/$copyeid.ns";
-	    
-	    system("/bin/cp -p $srcfile $dstdir/$copyeid.ns");
-	}
     }
     else {
 	#
 	# Ask for a checkout of the archive. 
 	#
-	my $subdir = "/proj/$copypid/exp/$copyeid/archive";
+	my $subdir = "/archive/nsdata";
 
 	print "Checking out experiment archive to $dstdir\n";
         libArchive::TBCheckoutExperimentArchivebyExptIDX($copyidx,
@@ -1260,12 +1267,6 @@ sub CopyInArchive()
 							 $subdir)
 	    == 0 or fatal("CopyInArchive: Checking out archive");
     }
-    # The directory contains the old NS file. Move that out of the way
-    # and set the tempnsfile.
-    system("/bin/mv -f $dstdir/$copyeid.ns $dstdir/nsfile.ns") == 0
-	or fatal("CopyInArchive: ".
-		 "Could not mv $dstdir/$copyeid.ns $dstdir/nsfile.ns");
-    
     $tempnsfile = "$dstdir/nsfile.ns";
 }
 

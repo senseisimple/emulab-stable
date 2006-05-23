@@ -301,13 +301,11 @@ elsif ($action eq "list" ||
 
     if ($action eq "missing") {
 	#
-	# Figure out what files were accessed by NFS, but not from the
+	# Figure out what files were accessed by NFS, but are not in
 	# archive directory. 
 	#
-	my $userdir  = TBExptUserDir($pid, $eid);
-	
 	# This is special by convention;
-	$subdir = "$userdir/archive";
+	$subdir = "/archive";
     }
     elsif (@ARGV) {
 	$subdir = $ARGV[0];
