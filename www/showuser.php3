@@ -232,6 +232,9 @@ if ($isadmin) {
     WRITESUBMENUBUTTON("Delete User",
 		       "deleteuser.php3?target_uid=$target_uid");
 
+    WRITESUBMENUBUTTON("SU as User",
+		       "suuser.php?target_uid=$target_uid");
+
     if (! strcmp($userstatus, TBDB_USERSTATUS_NEWUSER) ||
 	! strcmp($userstatus, TBDB_USERSTATUS_UNVERIFIED)) {
 	WRITESUBMENUBUTTON("Resend Verification Key",

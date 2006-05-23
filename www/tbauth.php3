@@ -655,90 +655,10 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 			 "where uid='$uid'");
             break;
         }
-        #
-        # Pass! Insert a record in the login table for this uid with
-        # the new hash value. If the user is already logged in, thats
-        # okay; just update it in place with a new hash and timeout. 
-        #
-	$timeout = $now + $TBAUTHTIMEOUT;
-	$hashkey = GENHASH();
-        $query_result =
-	    DBQueryFatal("SELECT timeout FROM login WHERE uid='$uid'");
-	
-	if (mysql_num_rows($query_result)) {
-	    DBQueryFatal("UPDATE login set ".
-			 "timeout='$timeout', hashkey='$hashkey' ".
-			 "WHERE uid='$uid'");
-	}
-	else {
-	    DBQueryFatal("INSERT into login (uid, hashkey, timeout) ".
-			 "VALUES ('$uid', '$hashkey', '$timeout')");
-	}
+	#
+	# Pass!
+	#
 
-	#
-	# Usage stats. 
-	#
-	DBQueryFatal("update user_stats set ".
-		     " weblogin_count=weblogin_count+1, ".
-		     " weblogin_last=now() ".
-		     "where uid_idx='$uid_idx'");
-
-	#
-	# Issue the cookie requests so that subsequent pages come back
-	# with the hash value and auth usr embedded.
-
-	#
-	# For the hashkey, we use a zero timeout so that the cookie is
-	# a session cookie; killed when the browser is exited. Hopefully this
-	# keeps the key from going to disk on the client machine. The cookie
-	# lives as long as the browser is active, but we age the cookie here
-	# at the server so it will become invalid at some point.
-	#
-	setcookie($TBAUTHCOOKIE, $hashkey, 0, "/",
-                  $TBAUTHDOMAIN, $TBSECURECOOKIES);
-
-	#
-	# Another cookie, to help in menu generation. See above in
-	# checklogin. This cookie is a simple hash of the real hash,
-	# intended to indicate if the current browser holds a real hash.
-	# All this does is change the menu options presented, imparting
-	# no actual privs. 
-	#
-	$crc = bin2hex(mhash(MHASH_CRC32, $hashkey));
-	setcookie($TBLOGINCOOKIE, $crc, 0, "/", $TBAUTHDOMAIN, 0);
-
-	#
-	# We give this a really long timeout. We want to remember who the
-	# the user was each time they load a page, and more importantly,
-	# each time they come back to the main page so we can fill in their
-	# user name. NOTE: This cookie is integral to authorization, since
-	# we do not pass around the UID anymore, but look for it in the
-	# cookie.
-	# 
-	$timeout = $now + (60 * 60 * 24 * 32);
-	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
-
-	#
-	# Clear the existing Wiki cookie so that there is not an old one
-	# for a different user, sitting in the brower. 
-	# 
-	if ($WIKISUPPORT) {
-	    $flushtime = time() - 1000000;
-	    
-	    setcookie($WIKICOOKIENAME, "", $flushtime, "/",
-		      $TBAUTHDOMAIN, $TBSECURECOOKIES);
-	}
-	
-	#
-	# Ditto for bugdb
-	# 
-	if ($BUGDBSUPPORT) {
-	    $flushtime = time() - 1000000;
-	    
-	    setcookie($BUGDBCOOKIENAME, "", $flushtime, "/",
-		      $TBAUTHDOMAIN, $TBSECURECOOKIES);
-	}
-	
 	#
 	# Set adminoff on new logins, unless user requested to be
 	# logged in as admin (and is an admin of course!). This is
@@ -750,9 +670,21 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	if ($adminmode && $isadmin) {
 	    $adminoff = 0;
 	}
-	DBQueryFatal("update users set adminoff=$adminoff, ".
-		     "       weblogin_failcount=0,weblogin_failstamp=0 ".
-		     "where uid='$uid'");
+
+        #
+        # Insert a record in the login table for this uid.
+	#
+	if (DOLOGIN_MAGIC($uid, $adminoff) < 0) {
+	    return -1;
+	}
+
+	#
+	# Usage stats. 
+	#
+	DBQueryFatal("update user_stats set ".
+		     " weblogin_count=weblogin_count+1, ".
+		     " weblogin_last=now() ".
+		     "where uid_idx='$uid_idx'");
 
 	# Clear IP record since we have a sucessful login from the IP.
 	if (isset($IP)) {
@@ -806,6 +738,102 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     return -1;
 }
 
+function DOLOGIN_MAGIC($uid, $adminoff = 1)
+{
+    global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
+    global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
+    global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
+    global $WIKISUPPORT, $WIKICOOKIENAME;
+    global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
+    
+    # Caller makes these checks too.
+    if (!TBvalid_uid($uid)) {
+	return -1;
+    }
+    $now = time();
+
+    #
+    # Insert a record in the login table for this uid with
+    # the new hash value. If the user is already logged in, thats
+    # okay; just update it in place with a new hash and timeout. 
+    #
+    $timeout = $now + $TBAUTHTIMEOUT;
+    $hashkey = GENHASH();
+    $query_result =
+	DBQueryFatal("SELECT timeout FROM login WHERE uid='$uid'");
+	
+    if (mysql_num_rows($query_result)) {
+	DBQueryFatal("UPDATE login set ".
+		     "timeout='$timeout', hashkey='$hashkey' ".
+		     "WHERE uid='$uid'");
+    }
+    else {
+	DBQueryFatal("INSERT into login (uid, hashkey, timeout) ".
+		     "VALUES ('$uid', '$hashkey', '$timeout')");
+    }
+
+    #
+    # Issue the cookie requests so that subsequent pages come back
+    # with the hash value and auth usr embedded.
+
+    #
+    # For the hashkey, we use a zero timeout so that the cookie is
+    # a session cookie; killed when the browser is exited. Hopefully this
+    # keeps the key from going to disk on the client machine. The cookie
+    # lives as long as the browser is active, but we age the cookie here
+    # at the server so it will become invalid at some point.
+    #
+    setcookie($TBAUTHCOOKIE, $hashkey, 0, "/",
+	      $TBAUTHDOMAIN, $TBSECURECOOKIES);
+
+    #
+    # Another cookie, to help in menu generation. See above in
+    # checklogin. This cookie is a simple hash of the real hash,
+    # intended to indicate if the current browser holds a real hash.
+    # All this does is change the menu options presented, imparting
+    # no actual privs. 
+    #
+    $crc = bin2hex(mhash(MHASH_CRC32, $hashkey));
+    setcookie($TBLOGINCOOKIE, $crc, 0, "/", $TBAUTHDOMAIN, 0);
+
+    #
+    # We give this a really long timeout. We want to remember who the
+    # the user was each time they load a page, and more importantly,
+    # each time they come back to the main page so we can fill in their
+    # user name. NOTE: This cookie is integral to authorization, since
+    # we do not pass around the UID anymore, but look for it in the
+    # cookie.
+    # 
+    $timeout = $now + (60 * 60 * 24 * 32);
+    setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
+
+    #
+    # Clear the existing Wiki cookie so that there is not an old one
+    # for a different user, sitting in the brower. 
+    # 
+    if ($WIKISUPPORT) {
+	$flushtime = time() - 1000000;
+	    
+	setcookie($WIKICOOKIENAME, "", $flushtime, "/",
+		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    }
+	
+    #
+    # Ditto for bugdb
+    # 
+    if ($BUGDBSUPPORT) {
+	$flushtime = time() - 1000000;
+	    
+	setcookie($BUGDBCOOKIENAME, "", $flushtime, "/",
+		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    }
+	
+    DBQueryFatal("update users set adminoff=$adminoff, ".
+		 "       weblogin_failcount=0,weblogin_failstamp=0 ".
+		 "where uid='$uid'");
+
+    return 0;
+}
 
 #
 # Verify a password
