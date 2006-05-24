@@ -648,7 +648,9 @@ sub NewMetadata($$$$;$)
 		DBQueryWarn("update experiment_template_parameters set ".
 			    "   metadata_guid='$guid', ".
 			    "   metadata_vers='$version' ".
-			    "where name=$safename");
+			    "where parent_guid='$template_guid' and ".
+			    "      parent_vers='$template_vers' and ".
+			    "      name=$safename");
 	    return -1
 		if (!$query_result);
 	}
@@ -789,7 +791,9 @@ sub ModifyMetadata($$$$)
 	    DBQueryWarn("update experiment_template_parameters set ".
 			"   metadata_guid='$parent_guid', ".
 			"   metadata_vers='$metadata_vers' ".
-			"where name=$name")
+			"where parent_guid='$template_guid' and ".
+			"      parent_vers='$template_vers' and ".
+			"      name=$name")
 		or return -1
 	}
     }
@@ -1048,7 +1052,9 @@ sub CopyMetadata($$$)
 		DBQueryWarn("update experiment_template_parameters set ".
 			    "   metadata_guid='$guid', ".
 			    "   metadata_vers='$version' ".
-			    "where name=$name")
+			    "where parent_guid='$from_guid' and ".
+			    "      parent_vers='$to_vers' and ".
+			    "      name=$name")
 		    or return -1
 		}
 	}
