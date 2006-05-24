@@ -686,9 +686,9 @@ depends on <code>prepare</code> being run.
 
 	   <div style="margin-left: 40px;"> <b>NOTE:</b> Currently,
 	   hardware-independent images must be made on a pc850, and will then
-	   run on the pc600 and pc3000 as well.  There is an unresolved
-	   boot-time problem going the other direction, from the pc3000 to a
-	   pc850 or pc600. </div> <br>
+	   run on the pc600, pc3000, and pc3000w as well.  There is an
+	   unresolved boot-time problem going the other direction, from the
+	   pc3000 to a pc850 or pc600. </div> <br>
 
 	 Windows normally casts some aspects of the NT image into concrete at
 	 the first boot after installation, including the specific boot disk
@@ -1165,6 +1165,13 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
     Notes:
     <ul>
       <li>
+	Currently, hardware-independent images must be made on a pc850, and
+	will then run on the pc600, pc3000, and pc3000w as well.  There is an
+	unresolved boot-time problem going the other direction, from the
+	pc3000 to a pc850 or pc600.
+      </li><br>
+
+      <li>
 	The WINXP-SP0 image is almost pure from the 2001 XP CD, but has a 2002
 	SP1a <u>pci.sys</u> .  This is needed to boot on the pc3000's which
 	have a newer PCI chipset.
@@ -1180,7 +1187,7 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
       </li><br>
 
       <li>
-	Note of these images will boot on the <u>pc2000</u> nodes.  It's
+	None of these images will boot on the <u>pc2000</u> nodes.  It's
 	probably a boot disk driver error under Mini-Setup for the ATA100 IDE
 	controller.
       </li><br>
