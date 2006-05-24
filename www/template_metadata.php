@@ -227,7 +227,7 @@ if (!isset($submit)) {
 	$metadata = $template->LookupMetadataByGUID($metadata_guid,
 						    $metadata_vers);
 
-	if (!$template) {
+	if (!$metadata) {
 	    USERERROR("Invalid metadata $metadata_guid/$metadata_vers", 1);
 	}
 	$metadata_type = $metadata->type();
