@@ -438,7 +438,8 @@ int type_precheck(int round) {
 	tb_ptype_map::iterator ptype_it = ptypes.find(vtype_it->first);
 	if (ptype_it == ptypes.end()) {
 	    cout << "  *** No " << round_str << " physical nodes of type "
-                << vtype_it->first << " found" << endl;
+                << vtype_it->first << " found (" << vtype_it->second
+                << " requested)" << endl;
 	    ok = false;
 	} else {
 	    // Okay, there are some - are there enough?
