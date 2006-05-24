@@ -39,7 +39,7 @@ make.nfsdump:
 	cd $(SRCDIR)/nfsdump2/ && ./config.status
 	cd $(SRCDIR)/nfsdump2 && $(MAKE)
 
-clean.nfsdump:
+clean.nfsdump: $(SRCDIR)/nfsdump2/config.status
 	cd $(SRCDIR)/nfsdump2/ && ./config.status
 	cd $(SRCDIR)/nfsdump2 && $(MAKE) clean
 
