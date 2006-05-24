@@ -5817,6 +5817,7 @@ COMMAND_PROTOTYPE(doeplabconfig)
 				       "VNAME=%s PNAME=%s.%s ROLE=%s CNETIP=%s CNETMAC=%s\n",
 				       row[1], row[0], OURDOMAIN, row[2],
 				       row[3], row[4]);
+			client_writeback(sock, buf, strlen(buf), tcp);
 			break;
 		}
 	}
@@ -5829,6 +5830,7 @@ COMMAND_PROTOTYPE(doeplabconfig)
 
 	while (nrows--) {
 		row = mysql_fetch_row(res);
+		bufp = buf;
 
 		if (!strcmp(row[1], "plc"))
 			continue;
@@ -5837,6 +5839,7 @@ COMMAND_PROTOTYPE(doeplabconfig)
 			       "VNAME=%s PNAME=%s.%s ROLE=%s CNETIP=%s CNETMAC=%s\n",
 			       row[1], row[0], OURDOMAIN, row[2],
 			       row[3], row[4]);
+		client_writeback(sock, buf, strlen(buf), tcp);
 	}
 	mysql_free_result(res);
 
@@ -5863,14 +5866,15 @@ COMMAND_PROTOTYPE(doeplabconfig)
 	nrows = (int)mysql_num_rows(res);
 	while (nrows--) {
 		row = mysql_fetch_row(res);
+		bufp = buf;
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "VNAME=%s IP=%s NETMASK=%s MAC=%s\n",
 			       row[0], row[1], row[2], row[3]);
+		client_writeback(sock, buf, strlen(buf), tcp);
 	}
 	mysql_free_result(res);
 
-	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
 
