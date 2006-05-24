@@ -11,6 +11,7 @@ $drewheader       = 0;
 $noheaders	  = 0;
 $autorefresh      = 0;
 $currentusage     = 1;
+$bodyclosestring  = "";
 
 #
 # This has to be set so we can spit out http or https paths properly!
@@ -889,7 +890,7 @@ function ENDPAGE() {
 #
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH;
-    global $TBMAINSITE, $SSL_PROTOCOL;
+    global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring;
 
     if (!$view) {
 	$view = GETUSERVIEW();
@@ -938,6 +939,8 @@ function PAGEFOOTER($view = NULL) {
 
     # This has to be after all the tooltip definitions.
     echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
+    echo $bodyclosestring;
+    echo "\n";
     echo "</body></html>\n";
 }
 

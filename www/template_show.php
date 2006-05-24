@@ -213,6 +213,10 @@ echo "</tr>\n";
 echo "</table>\n";
 echo "</center>\n";
 
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
+
 #
 # Standard Testbed Footer
 # 

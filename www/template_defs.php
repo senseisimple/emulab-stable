@@ -563,6 +563,8 @@ class Template
     # Dump the image map for a template to the output.
     #
     function ShowGraph() {
+	global $bodyclosestring;
+	
 	$guid = $this->guid();
 	$vers = $this->vers();
 
@@ -596,17 +598,13 @@ class Template
 	echo "</div>\n";
 	echo "</div>\n";
 
-	echo "<script type='text/javascript'>
-               <!--
-                 SET_DHTML(\"D$guid\");
-               //-->
-              </script>\n";
-    
-	echo "</center>\n";
-	echo "<script type='text/javascript' src='template_sup.js'></script>";
-	echo "\n";
-
-	echo "<script type='text/javascript'>
+	#
+	# This has to happen ...
+	#
+	$bodyclosestring =
+	    "<script type='text/javascript'>
+               SET_DHTML(\"D$guid\");
+        
 	       SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
 				 \"Tarea${vers}\");
               </script>\n";
