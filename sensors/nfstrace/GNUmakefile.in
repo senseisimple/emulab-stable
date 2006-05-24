@@ -39,6 +39,10 @@ make.nfsdump:
 	cd $(SRCDIR)/nfsdump2/ && ./config.status
 	cd $(SRCDIR)/nfsdump2 && $(MAKE)
 
+clean.nfsdump:
+	cd $(SRCDIR)/nfsdump2/ && ./config.status
+	cd $(SRCDIR)/nfsdump2 && $(MAKE) clean
+
 $(SRCDIR)/nfsdump2/nfsdump: $(SRCDIR)/nfsdump2/config.status make.nfsdump
 
 nfsdump: $(SRCDIR)/nfsdump2/nfsdump
@@ -142,5 +146,5 @@ else
 fs-install install:
 endif
 
-clean:
+clean:	clean.nfsdump
 	rm -f *.o core nfstrace.proxy nfsdump nfstrace.init
