@@ -1497,6 +1497,7 @@ function MakeMouseOver($string)
     $string = ereg_replace("\n", "<br>", $string);
     $string = ereg_replace("\r", "", $string);
     $string = htmlentities($string);
+    $string = preg_replace("/\'/", "\&\#039;", $string);
 
     return "onmouseover=\"return escape('$string')\"";
 }

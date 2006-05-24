@@ -889,7 +889,7 @@ function ENDPAGE() {
 # Spit out a vanilla page footer.
 #
 function PAGEFOOTER($view = NULL) {
-    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH;
+    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
     global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring;
 
     if (!$view) {
@@ -938,7 +938,8 @@ function PAGEFOOTER($view = NULL) {
     echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
     # This has to be after all the tooltip definitions.
-    echo "<script type='text/javascript' src='js/wz_tooltip.js'></script>";
+    echo "<script type='text/javascript' src='${TBBASE}/js/wz_tooltip.js'>".
+	"</script>";
     echo $bodyclosestring;
     echo "\n";
     echo "</body></html>\n";
