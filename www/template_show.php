@@ -19,6 +19,7 @@ $pid = "";
 $eid = "";
 $gid = "";
 $template = NULL;
+$exptidx  = 0;
 
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
@@ -53,7 +54,8 @@ function CheckArguments($guid, $version) {
     $pid = $template->pid();
     $gid = $template->gid();
     $eid = $template->eid();
-  
+    $exptidx = TBExptIndex($pid, $eid);
+    
     #
     # Verify Permission.
     #
@@ -131,7 +133,7 @@ WRITESUBMENUBUTTON("Add Metadata",
 		   "guid=$guid&version=$version");
 
 WRITESUBMENUBUTTON("Template Archive",
-		   "archive_view.php3?pid=$pid&eid=$eid");
+		   "archive_view.php3?exptidx=$exptidx");
 
 WRITESUBMENUBUTTON("Template History",
 		   "template_history.php?guid=$guid&version=$version");

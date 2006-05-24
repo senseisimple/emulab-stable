@@ -72,7 +72,7 @@ if (@ARGV < 3) {
     usage();
 }
 if (defined($options{"d"})) {
-    $debug = 1;
+    $debug = 2;
 }
 if (defined($options{"f"})) {
     $force = 1;
@@ -115,17 +115,8 @@ if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_UPDATE)) {
     fatal("You do not have permission to control the archive for $pid/$eid!");
 }
 
-#
-# Do not allow an archive system to be controlled if the experiment is not
-# active or swapped. Will probably be changed later.
-#
-if ($expstate ne EXPTSTATE_ACTIVE && 
-    $expstate ne EXPTSTATE_SWAPPED) {
-    fatal("Experiment $pid/$eid must be active or swapped!");
-}
-
 # Temporary
-libArchive::setdebug(2);
+libArchive::setdebug($debug);
 
 # Do not audit this operation.
 if ($action eq "checktag") {
@@ -144,6 +135,15 @@ if ($action eq "checktag") {
 	if (libArchive::TBIsTaqUnique($pid, $eid, $tag, \$unique) < 0);
 
     exit(($unique ? 0 : 1));
+}
+
+#
+# Do not allow an archive system to be controlled if the experiment is not
+# active or swapped. Will probably be changed later.
+#
+if ($expstate ne EXPTSTATE_ACTIVE && 
+    $expstate ne EXPTSTATE_SWAPPED) {
+    fatal("Experiment $pid/$eid must be active or swapped!");
 }
 
 #
@@ -187,7 +187,7 @@ if ($action eq "commit") {
 	}
     }
     
-    if ($NFSTRACESUPPORT) {
+    if (0 && $NFSTRACESUPPORT) {
 	#
 	# This program asks the nodes for the trace results.
 	#
@@ -357,6 +357,8 @@ elsif ($action eq "list" ||
 		     "LEFT JOIN accessed_files as af on af.idx=fr.fileidx ".
 		     "WHERE fr.rsrcidx=$rsrcidx and fr.type!='l'");
     while (my ($fn) = $query_result->fetchrow_array()) {
+	#print "Accessed: $fn\n";
+	
 	if ($fn =~ /^\/share/ ||
 	    $fn =~ /\/tbdata\// ||
 	    $fn =~ /^<u:/) {

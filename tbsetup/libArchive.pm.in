@@ -995,10 +995,10 @@ sub ArchiveCheckout($$;$$$)
 # I intend this to be run only when an experiment is terminated.
 # No need to have two copies.
 #
-sub ArchiveArchive($$)
+sub ArchiveArchive($)
 {
-    my ($archive_idx, $dirpath) = @_;
-    my $target = "$dirpath/Archive";
+    my ($archive_idx) = @_;
+    my $target = "$ARCHIVEDIR/Archive/$archive_idx";
 
     #
     # See if the archive exists and if it does, get the pathname to it.
@@ -1052,7 +1052,6 @@ sub ArchiveArchive($$)
 	    return -1;
 	}
     }    
-
     #
     # Tar up the whole thing and move it across.
     #
@@ -1978,7 +1977,7 @@ sub TBArchiveExperimentArchive($$)
     return -1
 	if ($rval < 0);
 
-    return ArchiveArchive($archive_idx, TBExptLogDir($pid, $eid));
+    return ArchiveArchive($archive_idx);
 }
 
 #
@@ -2097,9 +2096,11 @@ sub TBIsTaqUnique($$$$)
 #
 sub TBListExperimentArchive($$$;$$)
 {
-    my ($pid, $eid, $prval, $tag, $subdir) = @_;
+    my ($pid, $eid, $prval, $tag, $root, $subdir) = @_;
     my ($archive_idx, $view);
     my @filelist = ();
+    my $sourcepoint = "";
+    my $expstate = ExpState($pid, $eid);
 
     @$prval = @filelist;
     return 0
@@ -2111,7 +2112,16 @@ sub TBListExperimentArchive($$$;$$)
     return -1
 	if ($rval < 0);
 
-    my $sourcepoint = (defined($tag) ? "tags/$tag" : "trunk");
+    # If the experiment is active, use the savepoint.
+    if (defined($tag)) {
+	$sourcepoint = "tags/$tag";
+    }
+    elsif ($expstate && $expstate eq EXPTSTATE_ACTIVE()) {
+	$sourcepoint = "savepoint";
+    }
+    else {
+	$sourcepoint = "trunk";
+    }
     $sourcepoint = "$sourcepoint/$subdir"
 	if (defined($subdir));
 

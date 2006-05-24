@@ -141,7 +141,7 @@ elseif (isset($exptidx) && $exptidx != "") {
 	if (! ISADMIN($uid)) {
 	    USERERROR("Must be administrator to view historical archives!", 1);
 	}
-	$repodir = "$TBDIR/expinfo/${pid}-${eid}.${exptidx}/Archive/repo";
+	$repodir = "/usr/testbed/exparchive/Archive/$repoidx/repo/";
     }
     $use_viewvc = 1;
 }

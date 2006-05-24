@@ -16,34 +16,32 @@ $isadmin = ISADMIN($uid);
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
+#
+# An experiment idx.
+if (! isset($exptidx) || $exptidx == "") {
+    USERERROR("Must supply an experiment index!", 1);
 }
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid project ID.");
-}
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid experiment ID.");
-}
-$exptidx = TBExptIndex($pid, $eid);
-if ($exptidx < 0) {
-    TBERROR("Could not map $pid/$eid to ID!", 1);
-}
-if (!TBExptGroup($pid, $eid, $gid)) {
-    TBERROR("Could not get experiment gid for $pid/$eid!", 1);
+if (!TBvalid_integer($exptidx)) {
+    USERERROR("Invalid characters in $exptidx!", 1);
 }
 
-if (!$isadmin) {
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view missing files for ".
-		  "experiment $pid/$eid!", 1);
-    }
+#
+# We get an index. Must map that to a pid/gid to do a group level permission
+# check, since it might not be an current experiment.
+#
+unset($pid);
+unset($eid);
+unset($gid);
+if (TBExptidx2PidEid($exptidx, $pid, $eid, $gid) < 0) {
+    USERERROR("No such experiment index $exptidx!", 1);
+}
+if (!TBCurrentExperiment($exptidx)) {
+    USERERROR("Experiment index $exptidx is not a current experiment!", 1);
+}
+if (!$isadmin &&
+    !TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+    USERERROR("You do not have permission to view missing files for ".
+	      "archive in $pid/$gid ($exptidx)!", 1);
 }
 
 #
@@ -65,7 +63,7 @@ if (isset($movesome)) {
 	   "webarchive_control addtoarchive $pid $eid $fileargs",
 	   SUEXEC_ACTION_DUPDIE);
     
-    header("Location: archive_missing.php3?pid=$pid&eid=$eid");
+    header("Location: archive_missing.php3?exptidx=$exptidx");
     return;
 }
 
@@ -131,7 +129,7 @@ if (count($suexec_output_array)) {
     echo "</b><br><br>";
 
     echo "<table border=1>\n";
-    echo "<form action='archive_missing.php3?pid=$pid&eid=$eid'
+    echo "<form action='archive_missing.php3?exptidx=$exptidx'
                 onsubmit=\"return false;\"
                 name=form1 method=post>\n";
     echo "<input type=hidden name=movesome value=Submit>\n";    

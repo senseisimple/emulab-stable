@@ -16,30 +16,42 @@ $isadmin = ISADMIN($uid);
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
+#
+if (! isset($exptidx) || $exptidx == "") {
+    USERERROR("Must supply an experiment to view!", 1);
 }
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
+if (!TBvalid_integer($exptidx)) {
+    USERERROR("Invalid characters in $exptidx!", 1);
 }
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid project ID.");
+
+#
+# We get an index. Must map that to a pid/gid to do a group level permission
+# check, since it might not be an current experiment.
+#
+unset($pid);
+unset($eid);
+unset($gid);
+if (TBExptidx2PidEid($exptidx, $pid, $eid, $gid) < 0) {
+    USERERROR("No such experiment index $exptidx!", 1);
 }
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid experiment ID.");
+
+if (!$isadmin &&
+    !TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+    USERERROR("You do not have permission to view tags for ".
+	      "archive in $pid/$gid ($exptidx)!", 1);
+}
+if (!TBCurrentExperiment($exptidx)) {
+    USERERROR("Experiment index $exptidx is not a current experiment!", 1);
 }
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $pid, $eid, $TBDB_ARCHIVE_TAGLEN;
+    global $isadmin, $exptidx, $TBDB_ARCHIVE_TAGLEN;
 
     #
     # Standard Testbed Header
     #
-    PAGEHEADER("Commit/Tag archive for experiment $pid/$eid");
+    PAGEHEADER("Commit/Tag archive for experiment $exptidx");
 
     echo "<center>
           Commit/Tag Archive
@@ -68,7 +80,7 @@ function SPITFORM($formfields, $errors)
     }
 
     echo "<table align=center border=1> 
-          <form action=archive_tag.php3?pid=$pid&eid=$eid method=post>\n";
+          <form action=archive_tag.php3?exptidx=$exptidx method=post>\n";
 
     echo "<tr>
               <td align=center>
@@ -196,10 +208,6 @@ if (count($errors)) {
     return;
 }
 
-if (!TBExptGroup($pid, $eid, $gid)) {
-    TBERROR("Could not get experiment gid for $pid/$eid!", 1);
-}
-
 #
 # First lets make sure the tag is unique. 
 #
@@ -226,5 +234,5 @@ SUEXEC($uid, "$pid,$gid",
        "webarchive_control $tagarg $message commit $pid $eid",
        SUEXEC_ACTION_DIE);
 
-header("Location: archive_view.php3?pid=$pid&eid=$eid");
+header("Location: archive_view.php3/$exptidx/?exptidx=$exptidx");
 ?>

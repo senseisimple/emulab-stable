@@ -304,7 +304,7 @@ if (!$instance && STUDLY()) {
 
 if ($EXPOSEARCHIVE) {
     WRITESUBMENUBUTTON("Experiment File Archive",
-		       "archive_view.php3?pid=$exp_pid&eid=$exp_eid");
+		       "archive_view.php3?exptidx=$expindex");
 }
 
 if ($types['garcia'] || $types['static-mica2'] || $types['robot']) {

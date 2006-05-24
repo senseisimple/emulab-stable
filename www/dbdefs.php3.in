@@ -1140,6 +1140,19 @@ function TBValidExperiment($pid, $eid)
     return 1;
 }
 
+function TBCurrentExperiment($exptidx)
+{
+    $exptidx = addslashes($exptidx);
+
+    $query_result =
+	DBQueryFatal("select eid from experiments where idx='$exptidx'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
 #
 # Confirm a valid node name.
 #
@@ -1365,8 +1378,8 @@ function TBExptIndex($pid, $eid)
 function TBExptidx2PidEid($exptidx, &$pid, &$eid, &$gid)
 {
     $query_result =
-	DBQueryFatal("select pid,eid,gid from experiments ".
-		     "where idx='$exptidx'");
+	DBQueryFatal("select pid,eid,gid from experiment_stats ".
+		     "where exptidx='$exptidx'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return -1;
