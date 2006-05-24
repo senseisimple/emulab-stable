@@ -113,6 +113,8 @@ install-mkdirs:
 	-chmod 777 $(INSTALL_TOPDIR)/expinfo
 	-mkdir -p $(INSTALL_TOPDIR)/exparchive
 	-chmod 777 $(INSTALL_TOPDIR)/exparchive
+	-mkdir -p $(INSTALL_TOPDIR)/exparchive/Archive
+	-chmod 777 $(INSTALL_TOPDIR)/exparchive/Archive
 	-mkdir -p $(INSTALL_TOPDIR)/images
 	-chmod 775 $(INSTALL_TOPDIR)/images
 	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
