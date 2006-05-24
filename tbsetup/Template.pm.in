@@ -1015,7 +1015,9 @@ sub CopyMetadata($$$)
 		my $param_result = 
 		    DBQueryWarn("select * ".
 				"   from experiment_template_parameters ".
-				"where name=$name");
+				"where parent_guid='$from_guid' and ".
+				"      parent_vers='$to_vers' and ".
+				"      name=$name");
 
 		return -1
 		    if (!$param_result);
