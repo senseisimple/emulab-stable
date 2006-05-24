@@ -48,6 +48,7 @@ set lan_string ""
 for {set i 1} {$i <= $num_pcs} {incr i} { 
   set node($i) [$ns node]
   tb-set-node-plab-role $node($i) node
+  tb-set-hardware $node($i) <HWType />
   append lan_string "$node($i) "
 }
 
