@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<!DOCTYPE nstemplate SYSTEM "nstemplate.dtd">
+<!--
+    XML NS template for making a single-node PlanetLab DevBox experiment
+-->
+<nstemplate name="PlanetLab In A Box" author="Robert Ricci"
+            authormail="ricci@cs.utah.edu" authoruid="ricci">
+    <description>
+        This template is for creating a private PlanetLab using the
+        "PlanetLab in a Box" code. The only thing you may want to edit
+        is the number of nodes.
+    </description>
+    <variable name="Count" default="2" descr="Number of nodes (not including PLC)" />
+    <variable name="PLCHWType" default="pc3000" descr="Hardware Type for PLC" />
+    <variable name="HWType" default="pc" descr="Hardware Type for nodes" />
+    <!-- This hard-codes the image name, but it seems like we have to do
+         that somewhere... -->
+    <variable name="ImageName" default="PLAB-PLBOX" descr = "Disk Image for PLC" />
+    <nstext>
+        <section><![CDATA[
+# plinabox.ns - NS script to make a private PlanetLab on Emulab
+#
+# May 24, 2006
+#
+# Questions and comments to testbed-ops@emulab.net
+
+#
+# Boilerplate
+#
+source tb_compat.tcl
+set ns [new Simulator]
+
+set num_pcs <Count />
+
+#
+# Create the PLC
+#
+set plc [$ns node]
+tb-set-node-os $plc <ImageName />
+tb-set-node-plab-role $plc plc
+tb-set-hardware $plc <PLCHWType />
+
+
+# 
+# Create the nodes
+#
+set lan_string ""
+for {set i 1} {$i <= $num_pcs} {incr i} { 
+  set node($i) [$ns node]
+  tb-set-node-plab-role $node($i) node
+  append lan_string "$node($i) "
+}
+
+set lan [$ns make-lan $lan_string 100Mb 0ms]
+
+#
+# Boilerplate
+#
+$ns rtproto Static
+$ns run
+        ]]></section>
+    </nstext>
+</nstemplate>
+
