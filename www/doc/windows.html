@@ -684,6 +684,12 @@ depends on <code>prepare</code> being run.
 	   down the network.  <code>prepare -s</code> refuses to run from an
 	   SSH or RDP login. </div> <br>
 
+	   <div style="margin-left: 40px;"> <b>NOTE:</b> Currently,
+	   hardware-independent images must be made on a pc850, and will then
+	   run on the pc600 and pc3000 as well.  There is an unresolved
+	   boot-time problem going the other direction, from the pc3000 to a
+	   pc850 or pc600. </div> <br>
+
 	 Windows normally casts some aspects of the NT image into concrete at
 	 the first boot after installation, including the specific boot disk
 	 driver to be used by the NT loader (IDE, SCSI, or SATA.)
