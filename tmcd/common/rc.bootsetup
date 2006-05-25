@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -87,11 +87,17 @@ if ($action eq "boot" || $action eq "reconfig") {
     # This open implicitly forks a child, which goes on to execute the rest
     # of the script. The parent is going to sit in this loop and capture the
     # output of the child, writing it to the logfile and to the console.
-    # 
-    if (open(FOO, "-|")) {
+    #
+    my $pid = open(FOO, "-|");
+    BootFatal($? >> 8, "Boot Failure; popen failed!")
+	if (!defined($pid));
+    
+    if ($pid) {
 	while (<FOO>) {
 	    print LOG $_;
-	    print "$_";
+	    if ($action ne "reconfig") {
+		print "$_";
+	    }
 	}
 	close(LOG);
 	close(FOO);
@@ -100,6 +106,9 @@ if ($action eq "boot" || $action eq "reconfig") {
 	}
 	exit(0);
     }
+
+    # Need this or ssh will hang, even though it was called with -n option.
+    open(STDIN, "</dev/null");
     open(STDERR, ">&STDOUT");
 }
 
