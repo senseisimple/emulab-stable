@@ -296,7 +296,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave _NEW here about 2 weeks
-	WRITESIDEBARBUTTON("Papers and Talks (Feb 22)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Papers and Talks (May 1)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software (Jul 18)",
 			       $TBDOCBASE, "software.php3");
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
@@ -304,7 +304,12 @@ function WRITESIDEBAR() {
 
 	echo "<li><a href=\"$TBDOCBASE/people.php3\">People</a> and " .
 	     "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>" .
-	     "&nbsp;<img src=\"/new.gif\" /></li>";
+	     "</li>";
+# with New!
+#	echo "<li><a href=\"$TBDOCBASE/people.php3\">People</a> and " .
+#	     "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>" .
+#	     "&nbsp;<img src=\"/new.gif\" />" .
+#	     "</li>";
 
 	echo "<li>Emulab <a href=\"$TBDOCBASE/doc/docwrapper.php3? " .
 	     "docname=users.html\">Users</a> and " .
