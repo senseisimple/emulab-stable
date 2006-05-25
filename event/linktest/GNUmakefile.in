@@ -108,20 +108,21 @@ control-install:	binaries
 
 client: all
 	$(MAKE) -C iperf client
+	$(MAKE) -C rude client
 
 client-install: client
-	@if test ! -x '/usr/local/bin/rude$(EXE)' -o \
-	    	 ! -x '/usr/local/bin/crude$(EXE)' -o \
-		 ! -x '/usr/local/bin/emulab-iperf$(EXE)'; then \
+	@if test ! -x '$(CLIENT_BINDIR)/emulab-rude$(EXE)' -o \
+	    	 ! -x '$(CLIENT_BINDIR)/emulab-crude$(EXE)' -o \
+		 ! -x '$(CLIENT_BINDIR)/emulab-iperf$(EXE)'; then \
 	  echo "**********************************************************"; \
 	  echo "*                                                        *"; \
 	  echo "* WARNING: Some tools needed by linktest were not found. *"; \
 	  echo "*                                                        *"; \
 	  echo "* Make sure the following executables are installed:     *"; \
 	  echo "*                                                        *"; \
-	  echo "*   /usr/local/bin/rude$(EXE)                            *"; \
-	  echo "*   /usr/local/bin/crude$(EXE)                           *"; \
-	  echo "*   /usr/local/bin/emulab-iperf$(EXE)                    *"; \
+	  echo "*   $(CLIENT_BINDIR)/emulab-rude$(EXE)                   *"; \
+	  echo "*   $(CLIENT_BINDIR)/emulab-crude$(EXE)                  *"; \
+	  echo "*   $(CLIENT_BINDIR)/emulab-iperf$(EXE)                  *"; \
 	  echo "*                                                        *"; \
 	  echo "**********************************************************"; \
 	fi
@@ -130,7 +131,9 @@ client-install: client
 	$(INSTALL_PROGRAM) $(SCRIPT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
 	$(MAKE) -C iperf client-install
+	$(MAKE) -C rude client-install
 
 clean:
 	rm -f *.o $(TESTS) $(SCRIPT) $(SCRIPT_RUN) weblinktest linktest_control
 	-$(MAKE) -C iperf clean
+	-$(MAKE) -C rude clean

@@ -1,3 +1,33 @@
+Mike's immediate list:
+-------
+ * Now that a "physical" topology map is provided, the error messages,
+   at least the ones that involve completely failed links, should include
+   info like "eth3 on pc38 could not send packets to eth2 on pc53".  This
+   would make debugging sooo much easier.
+
+ * Resolve the "minimum of 1ms latency for dummynet" problem.  I think
+   this is technically a bug, but fixing it has the unintended side-effect
+   of making delays less accurate.  To wit: having every packet get put
+   on a BW queue has the effect of ensuring that every packet then gets
+   fed into a delay queue at exactly a tick boundary thus ensuring that
+   the delay is "exactly" the specified number of ticks (I'm talking
+   linkdelays here where 1 tick == 1ms).  If packets are allowed to bypass
+   the bandwidth queue (because the current tick BW "credit" has not been
+   exceeded) then it will get put on a delay queue sometime in the middle
+   of a tick.  That tick counts in the delay calculation, so the delay
+   will be, on average, 1/2 a tick short of the indicated value.
+
+   So the trade-off is no delay for packet for which only BW/loss shaping
+   are intended vs. more accurate delay values in general.  I favor the
+   former.  But this will require that linktest be recalibrated for latency.
+
+ * Investigate BW inaccuracies further.
+
+ * Investigate unexpected losses further.
+
+ * Can we do a partial linktest using just nodes that are marked as
+   linktest-able?
+-------
 
 > Linktest needs its own tb_compat.tcl because the linktest version of
 > tb_compat.tcl overrides function definitions in order to parse out the

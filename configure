@@ -1902,6 +1902,7 @@ else
 		    event/stated/GNUmakefile event/stated/stated \
 		    event/linktest/GNUmakefile \
 		    event/linktest/iperf/GNUmakefile \
+		    event/linktest/rude/GNUmakefile \
 		    event/linktest/linktest.pl \
 		    event/linktest/weblinktest event/linktest/linktest.proxy \
 		    event/linktest/linktest_control \
