@@ -381,6 +381,26 @@ static int do_reset(simulator_agent_t sa, char *args)
 	return retval;
 }
 
+static int do_snapshot(simulator_agent_t sa, char *args)
+{
+	char *loghole_args;
+	int retval = 0;
+
+	assert(sa != NULL);
+	assert(args != NULL);
+	
+	if (event_arg_get(args, "LOGHOLE_ARGS", &loghole_args) <= 0) {
+		loghole_args = "";
+	}
+	
+	if (systemf("loghole --port=%d sync %s",
+		    DEFAULT_RPC_PORT, loghole_args) != 0) {
+		error("failed to sync log holes\n");
+	}
+
+	return retval;
+}
+
 static int strreltime(char *buf, size_t buflen, time_t secs)
 {
     int hours, mins, retval = 0;
@@ -503,12 +523,16 @@ static void *simulator_agent_looper(void *arg)
 			else if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0) {
 				do_reset(sa, argsbuf);
 			}
+			else if (strcmp(evtype, TBDB_EVENTTYPE_SNAPSHOT) == 0){
+				do_snapshot(sa, argsbuf);
+			}
 			else {
 				error("cannot handle SIMULATOR event %s.",
 				      evtype);
 			}
 			if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_REPORT) == 0 ||
+			    strcmp(evtype, TBDB_EVENTTYPE_SNAPSHOT) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_MODIFY) == 0) {
 				event_do(handle,
 					 EA_Experiment, pideid,

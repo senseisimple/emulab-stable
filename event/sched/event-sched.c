@@ -546,6 +546,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 	static char *simulator_completes[] = {
 		TBDB_EVENTTYPE_REPORT,
 		TBDB_EVENTTYPE_MODIFY,
+		TBDB_EVENTTYPE_SNAPSHOT,
 		NULL
 	};
 
