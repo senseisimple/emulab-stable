@@ -1434,7 +1434,7 @@ function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
 
     if (mysql_num_rows($query_result)) {
 	echo "<center>
-               <h3>Experiment Templates</h3>
+               <h3>$title Templates</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 

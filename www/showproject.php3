@@ -6,6 +6,7 @@
 #
 include("defs.php3");
 include("showstuff.php3");
+include_once("template_defs.php");
 
 #
 # Standard Testbed Header
@@ -111,6 +112,11 @@ while ($row = mysql_fetch_array($query_result)) {
 echo "</table>\n";
 echo "</td></table>\n";
 echo "</center>\n";
+
+# Project wide Templates.
+if ($EXPOSETEMPLATES) {
+    SHOWTEMPLATELIST("PROJ", 0, $uid, $pid);
+}
 
 #
 # A list of project experiments.
