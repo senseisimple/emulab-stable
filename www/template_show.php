@@ -23,7 +23,7 @@ $exptidx  = 0;
 
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
-    global $uid, $pid, $eid, $gid, $template;
+    global $uid, $pid, $eid, $gid, $template, $exptidx;
 
     #
     # Verify page arguments.
