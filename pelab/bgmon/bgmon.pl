@@ -58,7 +58,8 @@ sub usage {
 #*****************************************
 my %MAX_SIMU_TESTS = (latency => "10",
 		      bw      => "1");
-
+my $iperfduration = 10;
+my $iperftimeout = 30;   #kill an iperf process lasting longer than this.
 # percentage of testing period to wait after a test process abnormally exits
 # note: 0.1 = 10%
 my %TEST_FAIL_RETRY= (latency => 0.3,
@@ -88,7 +89,6 @@ $ERRID{unknown} = -3;
 #*****************************************
 
 my %opt = ();
-#getopt(\%opt,"s:p:h");
 getopts("s:p:e:d:i:h",\%opt);
 
 #if ($opt{h}) { exit &usage; }
@@ -163,7 +163,7 @@ for (my $i = 0; $i < $resultDBlimit; $i++) {
     }
 }
 
-my $subtimer_reset = 100;
+my $subtimer_reset = 100;  # subtimer reaches 0 this many times thru poll loop
 my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 
 while (1) {
@@ -177,19 +177,7 @@ while (1) {
     #try to run tests on queue
     if( $subtimer == 0 ){
 	foreach my $testtype (keys %waitq){
-	    my $arrlen = scalar(@{$waitq{$testtype}});
-	    #DONOT use "foreach" here, since the call to spawnTest 
-	    #  may add to waitq
-	    for( my $i = 0; $i < $arrlen; $i++ ){
-		#get oldest element. (take off, but put right back until
-                #  sure it got processed)
-		my $destnode = pop @{$waitq{$testtype}};
-		push @{$waitq{$testtype}}, $destnode;
-		if( -1 != spawnTest( $destnode, $testtype ) ){
-		    pop @{$waitq{$testtype}}; #sent successfully, so pop node
-		}
-	    }
-#	    print "QW-".$testtype."_len=".scalar(@{$waitq{$testtype}})."\n";
+
 	    if( scalar(@{$waitq{$testtype}}) != 0 ){
 		print time_all()." $testtype ";
 		foreach my $node (@{$waitq{$testtype}}){
@@ -197,6 +185,9 @@ while (1) {
 		}
 		print "\n";
 	    }
+	    #
+	    # Run next scheduled test
+	    spawnTest( undef, $testtype );
 	}
     }
 
@@ -208,8 +199,8 @@ while (1) {
 	    my $pid = $testevents{$destaddr}{$testtype}{"pid"};
 	    if( $pid != 0 ){
 		use POSIX ":sys_wait_h";
-		my $cnt = waitpid( $pid, &WNOHANG );
-		if( $cnt != 0 )
+		my $kid = waitpid( $pid, &WNOHANG );
+		if( $kid != 0 )
 		{
 		    if( $? == 0 ){
 			#process finished, so mark it's "finished" flag
@@ -229,7 +220,20 @@ while (1) {
 			my $filename = createtmpfilename($destaddr, $testtype);
 			unlink($filename) or warn "can't delete temp file";
 		    }
-		}		
+		}
+
+		#TODO: if this process is bandwidth, kill it if it has
+                #      been running too long (iperf has a looong timeout)
+		elsif( $testtype eq "bw" &&
+			 time_all() >
+			 $testevents{$destaddr}{$testtype}{"tstamp"} + 
+			 $iperftimeout )
+		{
+		    kill 'TERM', $pid;
+		    print time_all()." killed $destaddr, pid=$pid\n";
+		}
+
+
 	    }
 
 	    #check for finished events
@@ -423,7 +427,6 @@ sub callbackFunc($$$) {
 
 	#change values and/or initialize
 	if( $eventtype eq "EDIT" ){
-	    print "EDIT\n";
 	    my $linkdest = event_notification_get_string($handle,
 							 $notification,
 							 "linkdest");
@@ -437,12 +440,13 @@ sub callbackFunc($$$) {
 	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 0;
 	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all();
 
+	    print( "EDIT:\n");
 	    print( "linkdest=$linkdest\n".
 		   "testype =$testtype\n".
 		   "testper=$testper\n" );
 	}
 	elsif( $eventtype eq "INIT" ){
-	    print "INIT\n";
+	    print "INIT: ";
 	    my $testtype = event_notification_get_string($handle,
 							 $notification,
 							 "testtype");
@@ -475,6 +479,7 @@ sub callbackFunc($$$) {
 			time_all();
 		}
 	    }
+	    print " $testtype  $testper\n";
 	}
 	elsif( $eventtype eq "SINGLE" ){
 	    print "SINGLE\n";
@@ -516,20 +521,22 @@ sub callbackFunc($$$) {
 
 #############################################################################
 
+#
+# Run a test with the oldest destination on the Q.
+#  destination given in parameters is added to Q.
+#  if undef is given for destination, just run dest at head of Q.
+#
 sub spawnTest($$)
 {
     my ($linkdest, $testtype) = @_;
     
     use Errno qw(EAGAIN);
 
-    #exit and don't fork if the max number of tests is already being run
-    if( getRunningTestsCnt($testtype) >= $MAX_SIMU_TESTS{$testtype} ){
-#	print "Testcnt = ".getRunningTestsCnt($testtype);
-#	print "Too many running tests of type $testtype\n";
-	
-	#add this to queue if it doesn't exist already
-	#this seach is inefficient... use a hash? sparse array? sorted list?
-	my $flag_duplicate = 0;	
+    #
+    #Add to queue if it doesn't exist already
+    #  this seach is inefficient... use a hash? sparse array? sorted list?
+    my $flag_duplicate = 0;
+    if( $linkdest ne undef ){
 	foreach my $element ( @{$waitq{$testtype}} ){
 	    if( $element eq $linkdest ){
 		$flag_duplicate = 1;
@@ -537,11 +544,21 @@ sub spawnTest($$)
 	}
 	if( $flag_duplicate == 0 ){
 	    unshift @{$waitq{$testtype}}, $linkdest;
-#	    print "WAIT Q: ADDED $linkdest \n";
+#	    print time_all()." added $linkdest to Q $testtype\n";
 	}
+    }
 
+    #exit and don't fork if the max number of tests is already being run
+    if( getRunningTestsCnt($testtype) >= $MAX_SIMU_TESTS{$testtype} ){
 	return -1;
     }
+
+    #set the destination to be head of Q.
+    if( scalar @{$waitq{$testtype}} == 0 ){
+	return 0;
+    }
+    $linkdest = pop @{$waitq{$testtype}};
+    print time_all()." running $linkdest / $testtype\n";
 
   FORK:{
       if( my $pid = fork ){
@@ -569,7 +586,7 @@ sub spawnTest($$)
 	      #command line for "BANDWIDTH TEST"
 #	      print "###########bwtest\n";
 	      exec "$workingdir".
-		  "iperf -c $linkdest -t 10 -p $iperfport >$filename"
+		  "iperf -c $linkdest -t $iperfduration -p $iperfport >$filename"
 		      or die "can't exec: $!";
 	  }else{
 	      warn "bad testtype: $testtype";
