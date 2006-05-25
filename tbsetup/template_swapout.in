@@ -238,6 +238,11 @@ if ($waitmode) {
 $instance->Stop() == 0
     or fatal(-1, "Could not stop experiment instance!");
 
+# This runs loghole.
+print "Asking loghole to sync the logfiles ... this will take a minute.\n";
+$instance->LogHole() == 0
+    or fatal(-1, "Loghole failed");
+
 #
 # Now do the swapout.
 #

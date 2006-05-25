@@ -32,7 +32,7 @@ sub usage()
 	  "-a <action> -e <eid> <guid/vers>\n".
 	  "switches and arguments:\n".
 	  "-a <action> - start or stop\n".
-	  "-w          - wait for template to be instantiated\n".
+	  "-w          - wait for run to start\n".
 	  "-q          - be less chatty\n".
 	  "-E <str>    - A pithy sentence describing the run\n".
 	  "-r <runid>  - A token ... we will make on up for you\n".
@@ -41,11 +41,11 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwp:E:a:r:e:";
+my $optlist	 = "qwp:E:a:r:e:d";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
-my $foreground   = 0;
+my $debug        = 0;
 my $paramfile;
 my %parameters   = ();
 my $action;
@@ -71,6 +71,7 @@ my $CONTROL	= "@USERNODE@";
 # Locals
 my $user_name;
 my $user_email;
+my $logname;
 my $dbuid;
 my $pid;
 my $exptidx;
@@ -97,6 +98,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use libArchive;
 use Template;
 
 # Be careful not to exit on transient error
@@ -234,9 +236,80 @@ if (defined($paramfile)) {
 	if ($donebad);
 }
 
+#
+# Catch this so we can clean up.
+#
+$SIG{TERM} = \&sighandler;
+
+#
+# If not in batch mode, go into the background. Parent exits.
+#
+if (! $debug) {
+    $logname = TBExptCreateLogFile($pid, $eid, "newrun");
+
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
+
+    if (my $childpid = TBBackGround($logname)) {
+	#
+	# Parent exits normally, unless in waitmode. We have to set
+	# justexit to make sure the END block below does not run.
+	#
+	$justexit = 1;
+
+	if (!$waitmode) {
+	    print("A new run is being started for $pid/$eid.\n")
+		if (! $quiet);
+	    exit(0);
+	}
+	print("Waiting for new run to start.\n")
+	    if (! $quiet);
+	    
+	if (-t STDIN && !$quiet) {
+	    print("You may type ^C at anytime.".
+		  "\n".
+		  "You will not actually interrupt the experiment itself.\n");
+	}
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n")
+	    if (! $quiet);
+	exit($? >> 8);
+    }
+    TBdbfork();
+}
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
+}
+
 # This sets the stop time.
 $instance->StopCurrentRun() == 0
     or fatal(-1, "Could not stop experiment run for $instance!");
+
+# This runs loghole.
+print "Asking loghole to sync the logfiles ... this will take a minute.\n";
+$instance->LogHole() == 0
+    or fatal(-1, "Loghole failed");
 
 #
 # Commit the archive. 
@@ -278,10 +351,16 @@ if ($paramfile) {
 #
 # Restart the event stream from the beginning.
 #
+print "Asking the event system to replay events ...\n";
 system("$eventcontrol replay $pid $eid") == 0
     or fatal(-1, "Could not restart the event system!");
 
 done:
+
+# Stop the web interface from spewing.
+TBExptCloseLogFile($pid, $eid)
+    if (defined($logname));
+
 exit(0);
 
 #
@@ -364,6 +443,9 @@ sub ParseArgs()
     if (defined($options{"w"})) {
 	$waitmode = 1;
     }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"},
 			     "experiment_templates", "description",
@@ -433,6 +515,10 @@ sub fatal($$)
     tberror $msg;
     tbinfo "Cleaning up and exiting with status $errorstat ...";
 
+    # Stop the web interface from spewing.
+    TBExptCloseLogFile($pid, $eid)
+	if (defined($logname));
+
     #
     # This exit will drop into the END block below.
     # 
@@ -446,7 +532,7 @@ sub sighandler ($) {
     my $pgrp = getpgrp(0);
     kill('TERM', -$pgrp);
     sleep(1);
-    fatal(-1, "Caught SIG${signame}! Killing experiment setup ...");
+    fatal(-1, "Caught SIG${signame}!");
 }
 
 END {

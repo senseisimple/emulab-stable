@@ -242,7 +242,7 @@ TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 echo "<center>\n";
 echo "<b>Starting template modification!</b> ...<br>\n";
 echo "This will take a few moments; please be patient.<br>\n";
-echo "<br><br>\n";
+echo "<br>\n";
 echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
 echo "<br><br>\n";
 echo "</center>\n";

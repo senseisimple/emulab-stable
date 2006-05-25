@@ -469,7 +469,7 @@ echo "</script>\n";
 echo "<center>\n";
 echo "<b>Starting template creation!</b> ...<br>\n";
 echo "This will take a few moments; please be patient.<br>\n";
-echo "<br><br>\n";
+echo "<br>\n";
 echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
 echo "<br><br>\n";
 echo "</center>\n";

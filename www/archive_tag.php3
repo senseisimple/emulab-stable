@@ -231,7 +231,7 @@ if ($retval) {
 }
 
 SUEXEC($uid, "$pid,$gid",
-       "webarchive_control $tagarg $message commit $pid $eid",
+       "webarchive_control $tagarg $message -u commit $pid $eid",
        SUEXEC_ACTION_DIE);
 
 header("Location: archive_view.php3/$exptidx/?exptidx=$exptidx");

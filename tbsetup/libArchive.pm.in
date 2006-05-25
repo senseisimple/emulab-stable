@@ -495,7 +495,7 @@ sub ArchiveSavePoint($;$$$)
     }
     mysystem("$IMPORTER -no_user_input file://$repodir ".
 	     "          $view/savepoint . " .
-	     ($debug < 2 ? "> /dev/null" : ""))
+	     ($debug < 2 ? "> /dev/null 2>&1" : ""))
 	== 0 or goto bad;
 
     #

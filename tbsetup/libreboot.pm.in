@@ -596,7 +596,7 @@ sub RebootNode {
 
 	if ($syspid) {
 	    local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	    alarm 20;
+	    alarm 30;
 	    waitpid($syspid, 0);
 	    alarm 0;
 

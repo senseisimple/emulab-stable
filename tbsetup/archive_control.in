@@ -13,12 +13,12 @@ use Getopt::Std;
 sub usage()
 {
     print STDERR
-	"Usage: archive_control [-f] [-t tag] [-m file] commit <pid> <eid>\n".
+	"Usage: archive_control [-f] [-t tag [-u]] [-m file] commit <pid> <eid>\n".
 	"       archive_control [-f] [-a] addfile <pid> <eid> [files ...]\n".
 	"       archive_control checktag <pid> <eid> <tag>\n";
     exit(-1);
 }
-my $optlist = "dfat:m:";
+my $optlist = "dfat:m:u";
 my $debug   = 0;
 my $force   = 0;
 my $dbuid;
@@ -150,18 +150,10 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
 # Allow the user to force a commit of the archive.
 #
 if ($action eq "commit") {
-    my $tag     = "user_commit";
+    my $tag     = "commit";
+    my $usertag = 0;
     my $mfile   = undef;
 
-    #
-    # Audit this operation for now.
-    #
-    if (AuditStart(0)) {
-	#
-	# Parent exits normally
-	#
-	exit(0);
-    }
     if (defined($options{"t"})) {
 	$tag = $options{"t"};
 
@@ -172,7 +164,12 @@ if ($action eq "commit") {
 	# Force a taint check; the library will escape it for the shell.
 	$tag =~ /(.*)/;
 	$tag = $1;
+
+	if (defined($options{"u"})) {
+	    $usertag = 1;
+	}
     }
+    
     if (defined($options{"m"})) {
 	#
 	# Argument is a pathname to a tempfile.
@@ -221,7 +218,7 @@ if ($action eq "commit") {
     # And commit the archive.
     print "Doing a commit on the experiment archive ...\n";
     if (libArchive::TBCommitExperimentArchive($pid, $eid, $tag,
-					      1, $mfile) < 0) {
+					      $usertag, $mfile) < 0) {
 	  fatal("Failed to commit experiment archive!");
     }
 }
@@ -300,6 +297,14 @@ elsif ($action eq "list" ||
     }
 
     if ($action eq "missing") {
+	#
+	# This program asks the nodes for the trace results.
+	#
+	if ($expstate ne EXPTSTATE_ACTIVE) {
+	    print "Getting files accessed via NFS.\n";
+	    system("$NFSTRACE transfer $pid $eid");
+	}
+ 
 	#
 	# Figure out what files were accessed by NFS, but are not in
 	# archive directory. 

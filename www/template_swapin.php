@@ -521,14 +521,13 @@ if (count($parameter_masterlist)) {
 #
 # Description:
 # 
-if (!isset($formfields[description]) || $formfields[description] == "") {
-    $errors["Description"] = "Missing Field";
-}
-elseif (!TBvalid_template_description($formfields[description])) {
-    $errors["Description"] = TBFieldErrorString();
-}
-else {
-    $command_options .= " -E " . escapeshellarg($formfields[description]);
+if (isset($formfields[description]) && $formfields[description] != "") {
+    if (!TBvalid_template_description($formfields[description])) {
+	$errors["Description"] = TBFieldErrorString();
+    }
+    else {
+	$command_options .= " -E " . escapeshellarg($formfields[description]);
+    }
 }
 
 #
@@ -571,9 +570,9 @@ echo "</script>\n";
 echo "<center>\n";
 echo "<b>Starting template instantiation!</b> ...<br>\n";
 echo "This will take several minutes; please be patient.<br>\n";
-echo "<br><br>\n";
+echo "<br>\n";
 echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
-echo "<br><br>\n";
+echo "<br>\n";
 echo "</center>\n";
 flush();
 

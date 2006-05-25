@@ -79,10 +79,12 @@ function STARTWATCHER($pid, $eid)
 {
     echo "<script type='text/javascript' language='javascript'
                   src='showexp.js'></script>\n";
+
+    $currentstate = TBExptState($pid, $eid);
     
     echo "<script type='text/javascript' language='javascript'>\n";
     sajax_show_javascript();
-    echo "StartStateChangeWatch('$pid', '$eid', 'unimportant');\n";
+    echo "StartStateChangeWatch('$pid', '$eid', '$currentstate');\n";
     echo "</script>\n";
 }
 

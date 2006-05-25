@@ -259,14 +259,13 @@ else {
 #
 # Description:
 # 
-if (!isset($formfields[description]) || $formfields[description] == "") {
-    $errors["Description"] = "Missing Field";
-}
-elseif (!TBvalid_template_description($formfields[description])) {
-    $errors["Description"] = TBFieldErrorString();
-}
-else {
-    $command_options .= " -E " . escapeshellarg($formfields[description]);
+if (isset($formfields[description]) && $formfields[description] != "") {
+    if (!TBvalid_template_description($formfields[description])) {
+	$errors["Description"] = TBFieldErrorString();
+    }
+    else {
+	$command_options .= " -E " . escapeshellarg($formfields[description]);
+    }
 }
 
 #
@@ -358,9 +357,9 @@ echo "</script>\n";
 echo "<center>\n";
 echo "<b>Starting experiment run!</b> ...<br>\n";
 echo "This will take a few moments; please be patient.<br>\n";
-echo "<br><br>\n";
+echo "<br>\n";
 echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
-echo "<br><br>\n";
+echo "<br>\n";
 echo "</center>\n";
 flush();
 
@@ -394,15 +393,7 @@ if ($retval) {
     return;
 }
 
-echo "<script type='text/javascript' language='javascript'>\n";
-echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
-echo "</script>\n";
-
-#
-# In case the above fails.
-#
-echo "<center><b>Done!</b></center>";
-echo "<br><br>\n";
+STARTLOG($pid, $eid);
 
 #
 # Standard Testbed Footer

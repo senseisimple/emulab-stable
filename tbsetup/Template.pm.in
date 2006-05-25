@@ -27,6 +27,7 @@ use overload ('""' => 'Stringify');
 my $TB		= "@prefix@";
 my $MD5         = "/sbin/md5";
 my $makegraph   = "$TB/bin/template_graph";
+my $TEVC	= "$TB/bin/tevc";
 
 # Cache of template instances to avoid regenerating them.
 my %templates   = ();
@@ -1144,6 +1145,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use English;
+use libArchive;
 use overload ('""' => 'Stringify');
 
 #
@@ -1693,6 +1695,36 @@ sub NewRunBinding($$$)
 		 "   name='$name', value=$value, ".
 		 "   pid='$pid', eid='$eid'");
     
+    return 0;
+}
+
+#
+# Use tevc to tell loghole to sync. We have to send a bunch of extra args
+# to get loghole to do what we want.
+#
+sub LogHole($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid     = $self->pid();
+    my $eid     = $self->eid();
+
+    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
+    my $logdir     = "$archivedir/logs";
+
+    if (! -e $logdir) {
+	mkdir($logdir)
+	    or return -1;
+    }
+
+    system("$TEVC -w -t 60 -e $pid/$eid now ns SNAPSHOT ".
+	   "    LOGHOLE_ARGS='-l $logdir -P -s'") == 0
+       or return -1;
+
     return 0;
 }
 
