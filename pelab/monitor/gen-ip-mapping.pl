@@ -17,9 +17,9 @@ open(HOSTS,"/etc/hosts") or die "Unable to open /etc/hosts: $!\n";
 while (<HOSTS>) {
     my ($IP,@names) = split /\s+/;
     my $firstname = shift @names;
-    if ($firstname =~ /^(.+)-(elink|elan|ecloud|elabc)/) {
+    if ($firstname =~ /^(.+)-(elink|elan|ecloud|elabc)$/) {
         $elabips{$1} = $IP;
-    } elsif ($firstname =~ /^(.+)-(plink|plan|pcloud|plabc)/) {
+    } elsif ($firstname =~ /^(.+)-(plink|plan|pcloud|plabc)$/) {
         $plabips{$1} = $IP;
     }
 }
