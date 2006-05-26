@@ -138,14 +138,20 @@ elseif (!strcmp($inout, "restart")) {
 }
 
 if ($instance) {
-    echo "<font size=+2>Template Instance <b>";
+    $guid = $instance->guid();
+    $version = $instance->vers();
+    
+    echo "<font size=+2>Template <b>" .
+          MakeLink("template",
+		   "guid=$guid&version=$version", "$guid/$version") .
+	"</b>, Instance <b>";
 }
 else {
     echo "<font size=+2>Experiment <b>";
 }
-echo "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
-echo "<br>\n";
+echo MakeLink("project", "pid=$pid", $pid) . "/" .
+     MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
+echo "</b></font><br>\n";
 flush();
 
 # A locked down experiment means just that!
@@ -233,11 +239,13 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 if ($instance) {
     $guid = $instance->guid();
     $version = $instance->vers();
-    
+
     echo "<br>\n";
-    echo "<b>Terminating template instance!</b> ... ";
-    echo "this will take a few minutes; please be patient.";
+    echo "<center>\n";
+    echo "<b>Terminating template instance!</b> ... <br>\n";
+    echo "This will take a few minutes; please be patient.<br>\n";
     echo "<br>\n";
+    echo "</center>\n";
     flush();
 }
 

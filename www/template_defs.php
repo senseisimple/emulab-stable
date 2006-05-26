@@ -1387,6 +1387,9 @@ function MakeLink($which, $args, $text)
     elseif ($which == "run") {
 	$page = "experimentrun_show.php";
     }
+    elseif ($which == "experiment") {
+	$page = "showexp.php";
+    }
     return "<a href=${page}?${args}>$text</a>";
 }
 

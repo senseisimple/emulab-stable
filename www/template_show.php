@@ -135,7 +135,7 @@ WRITESUBMENUBUTTON("Add Metadata",
 WRITESUBMENUBUTTON("Template Archive",
 		   "archive_view.php3?exptidx=$exptidx");
 
-WRITESUBMENUBUTTON("Template History",
+WRITESUBMENUBUTTON("Template Record",
 		   "template_history.php?guid=$guid&version=$version");
 
 SUBMENUEND_2A();

@@ -103,7 +103,9 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 	# Table of inputs.
 	#
 	echo "<tr>
-		  <td class='pad4'>Formal Parameters:</td>
+		  <td class='pad4'>Formal Parameters:<br>
+                             <font color=red>(Currently Ignored!)</font>
+                    </td>
 		  <td>
  		    <table cellpadding=0 cellspacing=0 border=0>\n";
 	
