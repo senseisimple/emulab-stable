@@ -490,7 +490,7 @@ sub tblog_set_info ( $$$ )
 	DBQuerySingleFatal("select idx from experiments where pid='$pid' and eid='$eid'");
     $ENV{'TBLOG_UID'} = $uid;
     DBQueryFatal
-	sprintf('replace into session_info values(%d,%d,%d)',
+	sprintf('replace into session_info (session, exptidx, uid) values(%d,%d,%d)',
 		$ENV{TBLOG_SESSION}, $ENV{TBLOG_EXPTIDX}, $ENV{TBLOG_UID});
 }
 

@@ -18,6 +18,43 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20060525:
+      No schema changes, but due to a bug in libtblog.pm.in the uid &
+      exptidx columns got swapped for new values inserted into the
+      session_info table after the 4.56 schema change.  This is fixed
+      in revision number 2.14 of libtblog.pm.in.
+
+      The values of session_info are currently not used by any testbed
+      code.  However, it is still a good idea to fix the existing data
+      in the database.  To do so determine the "session" where the
+      values got swapped.  For emulab.net that was 9359824:
+
+      +---------+-------+---------+
+      | session | uid   | exptidx |
+      +---------+-------+---------+
+      | 9359747 | 31359 | 24893   |
+      | 9359824 | 24893 | 31359   |
+      +---------+-------+---------+
+
+      Once this is determined, lock the session_info table, swap
+      the columns, install the fix, than unlock the table:
+
+        lock tables session_info write;
+      
+        create temporary table session_info_wk as select * from session_info
+          where session >=SESSION;
+        replace into session_info select session,exptidx,uid 
+          from session_info_wk;
+        drop table session_info_wk;
+
+        [Now install the new code]
+  
+        unlock tables;
+
+      Where SESSION is the session number where the values where first 
+      swapped, 9359824, for emulab.net.
+
+
 20060322: Before installing tbsetup/ns2ir/sim.tcl.in rev 1.109 (3/22/06).
 
 	This revision introduces a new features/desire pair called
