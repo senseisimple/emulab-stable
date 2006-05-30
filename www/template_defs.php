@@ -556,7 +556,7 @@ class Template
 		echo "<tr>\n";
 		echo " <a NAME=$idx></a>\n";
 		echo "<td>&nbsp</td>\n";
-		echo " <td colspan=6>\n";
+		echo " <td colspan=7>\n";
 		$instance->ShowRunList(0);
 		echo " </td>\n";
 		echo "</tr>\n";
