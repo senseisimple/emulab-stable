@@ -865,6 +865,40 @@ sub FormalParameterList($$)
 }
 
 #
+# Get description for formal parameters; this needs to be its own object.
+#
+sub FormalParameterDescription($$)
+{
+    my ($self, $name, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $result = undef;
+    my $template_guid = $self->guid();
+    my $template_vers = $self->vers();
+    $name = DBQuoteSpecial($name);
+
+    my $query_result =
+	DBQueryWarn("select m.value from experiment_template_parameters as p ".
+		    "left join experiment_template_metadata_items as m on ".
+		    "     m.guid=p.metadata_guid and m.vers=p.metadata_vers ".
+		    "where p.parent_guid='$template_guid' and ".
+		    "      p.parent_vers='$template_vers' and ".
+		    "      p.name=$name");
+
+    return -1
+	if (!$query_result);
+
+    if ($query_result->numrows) {
+	($result) = $query_result->fetchrow_array();
+    }
+    $$prval = $result;
+    return 0;
+}
+
+#
 # Delete (all) template metadata
 #
 sub DeleteAllMetadata($)
@@ -1062,6 +1096,51 @@ sub CopyMetadata($$$)
 		}
 	}
     }
+    return 0;
+}
+
+#
+# Return a list of metadata. This should be its own object.
+#
+sub MetadataList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %results = ();
+
+    my $template_guid = $self->guid();
+    my $template_vers = $self->vers();
+
+    #
+    # Copy the toplevel items.
+    #
+    my $query_result =
+	DBQueryWarn("select i.* from experiment_template_metadata as m ".
+		    "left join experiment_template_metadata_items as i on ".
+		    "     i.guid=m.metadata_guid and ".
+		    "     i.vers=m.metadata_vers ".
+		    "where m.parent_guid='$template_guid' and ".
+		    "      m.parent_vers='$template_vers' and ".
+		    "      m.hidden=0 and m.metadata_type is null")
+	or return -1;
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $name	= $rowref->{"name"};
+	my $value       = $rowref->{"value"};
+	my $guid	= $rowref->{"guid"};
+	my $vers	= $rowref->{"vers"};
+
+	my $ref = {'name'   => $name,
+		   'value'  => $value,
+		   'guid'   => "$guid/$vers"};
+
+	$results{$name} = $ref;
+    }
+    %$prval = %results;
     return 0;
 }
 
@@ -1633,24 +1712,17 @@ sub FinalizeCurrentRun($)
     my $idx     = $self->idx();
     my $runidx  = $self->runidx();
     my $exptidx = $self->exptidx();
+    my $archive_tag;
 
     return -1
 	if (!defined($runidx));
 
     #
-    # Grab the current archive tag. This will correspond to the commit
-    # done at the end of the run.
+    # Grab the current archive tag.
     #
-    my $query_result =
-	DBQueryWarn("select r.archive_tag from experiment_stats as s ".
-		    "left join experiment_resources as r on ".
-		    "     r.idx=s.rsrcidx ".
-		    "where s.exptidx='$exptidx'");
     return -1
-	if (!$query_result || !$query_result->numrows);
-
-    my ($archive_tag) = $query_result->fetchrow_array();
-
+	if (ArchiveTag($self, \$archive_tag) < 0);
+    
     DBQueryWarn("update experiment_runs set archive_tag='$archive_tag' ".
 		"where exptidx='$exptidx' and idx='$runidx'")
 	or return -1;
@@ -1660,6 +1732,36 @@ sub FinalizeCurrentRun($)
 	or return -1;
     
     return Refresh($self);
+}
+
+#
+# Need to make "run" its own object ...
+#
+# Return an array of runs, indexed by its idx.
+#
+sub RunList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %results = ();
+    my $exptidx = $self->exptidx();
+
+    my $query_result =
+	DBQueryWarn("select * from experiment_runs ".
+		    "where exptidx='$exptidx'");
+
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	$results{$rowref->{'idx'}} = $rowref;
+    }
+    %$prval = %results;
+    return 0;
 }
 
 #
@@ -1727,6 +1829,44 @@ sub LogHole($)
 
     return 0;
 }
+
+#
+# Grab the current archive tag. I think this info belongs in the instance
+# record.
+#
+sub ArchiveTag($$)
+{
+    my ($self, $ptag) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+
+    #
+    # Grab the current archive tag. This will correspond to the commit
+    # done at the end of the run.
+    #
+    my $query_result =
+	DBQueryWarn("select r.archive_tag from experiment_stats as s ".
+		    "left join experiment_resources as r on ".
+		    "     r.idx=s.rsrcidx ".
+		    "where s.exptidx='$exptidx'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    my ($archive_tag) = $query_result->fetchrow_array();
+
+    return -1
+	if (!defined($archive_tag));
+
+    $$ptag = $archive_tag;
+
+    return 0;
+}
+
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 

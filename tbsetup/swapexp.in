@@ -1250,6 +1250,18 @@ sub cleanup()
     #
     if ($inout eq "in") {
 	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, $errorstat);
+
+	#
+	# Must clean up the experiment if it managed to swap in.
+	#
+	$estate = ExpState($pid, $eid);
+	
+	if ($estate eq EXPTSTATE_ACTIVE) {
+	    print "Running 'tbswap out -force $pid $eid'\n";
+	    if (system("$tbbindir/tbswap out -force $pid $eid") != 0) {
+		print "tbswap out failed!\n";
+	    }
+	}
     }
     elsif ($inout eq "out") {
 	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $errorstat);

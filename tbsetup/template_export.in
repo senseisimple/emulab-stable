@@ -1,0 +1,332 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Export a template.
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_export [-q] [-s] -i <exptidx> <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-q           - be less chatty\n".
+	  "-s           - spew to stdout (as for web page).\n".
+	  "-i <exptidx> - Instance index to export\n".
+	  "<guid/vers>  - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qi:ds";
+my %options      = ();
+my $spew         = 0;
+my $quiet        = 0;
+my $debug        = 0;
+my $eid;
+my $exptidx;
+my $guid;
+my $version;
+my %bindings;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL     = "@USERNODE@";
+my $checkquota  = "$TB/sbin/checkquota";
+my $TAR         = "/usr/bin/tar";
+
+# Locals
+my $dbuid;
+my $template;
+my $instance;
+my $archive_tag;
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub cleanup();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+# In libdb
+my $projroot = PROJROOT();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+# Now parse arguments.
+ParseArgs();
+
+# Temporary
+libArchive::setdebug($debug);
+
+#
+# Grab template info and do access check.
+#
+$template = Template->Lookup($guid, $version);
+
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! TBProjAccessCheck($dbuid,
+			$template->pid(), $template->gid(),
+			TB_PROJECT_READINFO)) {
+    tberror("You do not have permission to export template $guid/$version");
+    exit(1);
+}
+my $pid = $template->pid();
+
+$instance = Template::Instance->LookupByExptidx($exptidx);
+if (!defined($instance)) {
+    fatal(-1, "Could not get instance record for experiment $exptidx!");
+}
+
+if ($instance->ArchiveTag(\$archive_tag) < 0) {
+    fatal(-1, "Could not get current archive tag for instance $exptidx!");
+}
+
+if (system("$checkquota $dbuid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; please cleanup!");
+    exit(1);
+}
+
+#
+# Checkout to the project tree.
+#
+my $checkout = "$projroot/$pid/export/$guid/$version/$exptidx";
+
+# Cleanup existing goo.
+if (-e $checkout) {
+    system("/bin/rm -rf $checkout");
+}
+system("mkdir -p $checkout") == 0
+    or fatal(-1, "Could not mkdir $checkout");
+
+if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
+						     $checkout,
+						     $archive_tag) < 0) {
+    fatal(-1, "Could not checkout $archive_tag to $pid/.checkouts/$$");
+}
+
+#
+# Since that worked, lets create the XML representation of it and stash
+# to a file.
+#
+my $root = {};
+
+$root->{"guid"} = $instance->guid() . "/" . $instance->vers();
+$root->{"pid"}  = $instance->pid();
+$root->{"eid"}  = $instance->eid();
+$root->{"uid"}  = $instance->uid();
+
+# Fill in the bindings
+$instance->BindingList(\%bindings) == 0
+    or fatal(-1, "Could not get bindings for $instance");
+if (keys(%bindings)) {
+    $root->{"bindings"} = {};
+    foreach my $name (keys(%bindings)) {
+	my $value = $bindings{$name};
+	my $description;
+
+	$template->FormalParameterDescription($name, \$description);
+	
+	$root->{"bindings"}->{$name} = {'value' => $value,
+					'description' => $description};
+    }
+}
+
+# Fill in the runs.
+my %runlist;
+$instance->RunList(\%runlist) == 0
+    or fatal(-1, "Could not get runlist for $instance");
+if (keys(%runlist)) {
+    $root->{"runs"} = {};
+    foreach my $name (keys(%runlist)) {
+	my $value = $runlist{$name};
+	
+	$root->{"runs"}->{$name} = $value;
+    }
+}
+
+# Fill in the metadata
+my %mlist;
+$template->MetadataList(\%mlist) == 0
+    or fatal(-1, "Could not get Metadata list for $instance");
+if (keys(%mlist)) {
+    $root->{"metadata"} = {};
+    foreach my $name (keys(%mlist)) {
+	my $value = $mlist{$name};
+	
+	$root->{"metadata"}->{$name} = $value;
+    }
+}
+
+if ($debug) {
+    print Dumper($root);
+    print "\n";
+}
+
+my %xmloptions = ('RootName' => 'instance',
+		  'SuppressEmpty' => undef,
+		  'NoAttr' => 1);
+
+my $xml = XMLout($root, %xmloptions);
+
+if ($debug) {
+    print "$xml\n";
+
+    $root = XMLin($xml, KeyAttr => "name",
+		  "ForceArray" => ["metadata", "runs", "bindings"]);
+    print Dumper($root);
+    print "\n";
+}
+
+#
+# Stash this into the checkout directory we created above. 
+#
+open(DUMP, ">$checkout/export.xml")
+    or fatal(-1, "Could not open $checkout/export.xml for writing");
+print DUMP "$xml\n";
+close(DUMP);
+
+if ($spew) {
+    system("$TAR zcf - -C $checkout .");
+    cleanup();
+}
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"i"})) {
+	$exptidx = $options{"i"};
+    
+	if (! TBcheck_dbslot($exptidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment index!");
+	}
+	# real check.
+	if ($exptidx =~ /^([\w]*)$/) {
+	    $exptidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $exptidx");
+	}
+    }
+    else {
+	tbdie("You must supply the -i option!");
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"s"})) {
+	$spew = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 2;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+    if (defined($checkout) && -e $checkout) {
+	system("/bin/rm -rf $checkout");
+    }
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+
+    exit($errorstat);
+}
+

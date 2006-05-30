@@ -491,6 +491,7 @@ class Template
                <th>Stop Time</th>
                <th align=center>Show</th>
                <th align=center>Archive</th>
+               <th align=center>Export</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -535,12 +536,17 @@ class Template
  		    MakeLink("instance",
 			     "guid=$guid&version=$vers&exptidx=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
+	    echo " </td>\n";
 
-	    echo " <td align=center>
+ 	    echo " <td align=center>
                      <a href=archive_view.php3/$exptidx/history/$tag/".
 		        "?exptidx=$exptidx>
                      <img border=0 alt='i' src='greenball.gif'></a></td>";
 	    
+	    echo " <td align=center>".
+ 		    MakeLink("export",
+			     "guid=$guid&version=$vers&exptidx=$exptidx",
+			     "<img border=0 alt='Show' src='greenball.gif'>");
 	    echo " </td>
                  </tr>\n";
 
@@ -1389,6 +1395,9 @@ function MakeLink($which, $args, $text)
     }
     elseif ($which == "experiment") {
 	$page = "showexp.php3";
+    }
+    elseif ($which == "export") {
+	$page = "template_export.php";
     }
     return "<a href=${page}?${args}>$text</a>";
 }
