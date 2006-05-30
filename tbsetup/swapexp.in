@@ -1098,17 +1098,17 @@ if (! -e "$archivedir/nsdata") {
 }
 
 if ($inout eq "modify") {
-    system("cp -p $workdir/$eid.ns $archivedir/nsdata/nsfile.ns") == 0
+    system("cp -fp $workdir/$eid.ns $archivedir/nsdata/nsfile.ns") == 0
 	or fatal("Failed to copy nsfile to $archivedir/tbdata");
 }
 
 if (defined($logname)) {
-    system("cp -p $logname $archivedir/tbdata/log.$tag") == 0
+    system("cp -fp $logname $archivedir/tbdata/log.$tag") == 0
     or fatal("Failed to copy logfile to $archivedir/tbdata");
 }
 
 if (-e $repfile) {
-    system("cp -p $workdir/$repfile $archivedir/tbdata/tbreport.$tag") == 0
+    system("cp -fp $workdir/$repfile $archivedir/tbdata/tbreport.$tag") == 0
 	or fatal("Failed to copy nsfile to $archivedir/tbdata");
 }
 

@@ -714,15 +714,15 @@ if (! -e "$archivedir/nsdata") {
 	or fatal("Failed to mkdir $archivedir/nsdata");
 }
 
-system("cp -p $workdir/$nsfile $archivedir/nsdata/nsfile.ns") == 0
+system("cp -fp $workdir/$nsfile $archivedir/nsdata/nsfile.ns") == 0
     or fatal("Failed to copy nsfile to $archivedir/tbdata");
 
 if (defined($logname)) {
-    system("cp -p $logname $archivedir/tbdata/log.batchexp") == 0
+    system("cp -fp $logname $archivedir/tbdata/log.batchexp") == 0
     or fatal("Failed to copy logfile to $archivedir/tbdata");
 }
 
-system("cp -p $workdir/$repfile $archivedir/tbdata/tbreport.batchexp") == 0
+system("cp -fp $workdir/$repfile $archivedir/tbdata/tbreport.batchexp") == 0
     or fatal("Failed to copy nsfile to $archivedir/tbdata");
 
 # And tell the archive library about the above files.
