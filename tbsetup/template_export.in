@@ -176,6 +176,8 @@ $root->{"guid"} = $instance->guid() . "/" . $instance->vers();
 $root->{"pid"}  = $instance->pid();
 $root->{"eid"}  = $instance->eid();
 $root->{"uid"}  = $instance->uid();
+$root->{"start_time"} = $instance->start_time();
+$root->{"stop_time"}  = $instance->stop_time();
 
 # Fill in the bindings
 $instance->BindingList(\%bindings) == 0

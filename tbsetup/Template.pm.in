@@ -1315,6 +1315,8 @@ sub pid($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'pid'}); }
 sub eid($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'eid'}); }
 sub uid($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'uid'}); }
 sub runidx($)  { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'runidx'}); }
+sub start_time { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'start_time'}); }
+sub stop_time  { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'stop_time'}); }
 sub template($){ return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
 
 #

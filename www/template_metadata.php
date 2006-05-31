@@ -30,7 +30,8 @@ function SPITFORM($action, $formfields, $errors)
 
     if ($action == "add") {
 	echo "<center>";
-	echo "<h3>Attach metadata to your template.</h3>";
+	echo "<font size=+1>
+                  Attach metadata[<b>1</b>] to your template.</font>";
 	echo "</center><br>\n";
     }
     elseif ($action == "delete") {
@@ -136,6 +137,16 @@ function SPITFORM($action, $formfields, $errors)
          </tr>
         </form>
         </table>\n";
+
+    echo "<blockquote><blockquote>
+          <ol>
+            <li> Metadata can be any arbitrary name/value pair that you want
+                 to associate with your template. The name can include
+                 any printable ascii character including spaces, but
+                 not newlines. The value can include any printable ascii
+                 character and my be multiline.
+          </ol>
+          </blockquote></blockquote>\n";
 }
 
 # Objects

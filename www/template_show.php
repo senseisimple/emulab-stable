@@ -106,8 +106,16 @@ SUBPAGESTART();
 
 SUBMENUSTART("Template Options");
 
-WRITESUBMENUBUTTON("Show NS File &nbsp &nbsp",
-		   "spitnsdata.php3?guid=$guid&version=$version");
+if (!isset($show) || $show == "graph") {
+    WRITESUBMENUBUTTON("Show NS File &nbsp &nbsp",
+		       "template_show.php?guid=$guid".
+		       "&version=$version&show=nsfile");
+}
+else {
+    WRITESUBMENUBUTTON("Show Graph &nbsp &nbsp",
+		       "template_show.php?guid=$guid".
+		       "&version=$version&show=graph");
+}
 
 WRITESUBMENUBUTTON("Modify Template",
 		   "template_modify.php?guid=$guid&version=$version");
@@ -155,22 +163,27 @@ if ($template->InstanceCount()) {
 
 SUBMENUEND_2B();
 
-$template->ShowGraph();
+if (!isset($show) || $show == "graph") {
+    $template->ShowGraph();
 
-#
-# Define the zoom buttons. This should go elsewhere.
-#
-echo "<center>\n";
-echo "<form action='template_show.php?guid=$guid&version=$version'
-            method=post>\n";
-echo "<button name=action type=submit value=showall>";
-echo " Show All Templates</button></a>&nbsp &nbsp ";
-echo "<button name=zoomout type=submit value=zoomout>";
-echo " Zoom Out</button>\n";
-echo "<button name=zoomin type=submit value=zoomin>";
-echo "Zoom In</button>\n";
-echo "</form>\n";
-echo "</center>\n";
+    #
+    # Define the zoom buttons. This should go elsewhere.
+    #
+    echo "<center>\n";
+    echo "<form action='template_show.php?guid=$guid&version=$version'
+                method=post>\n";
+    echo "<button name=action type=submit value=showall>";
+    echo " Show All Templates</button></a>&nbsp &nbsp ";
+    echo "<button name=zoomout type=submit value=zoomout>";
+    echo " Zoom Out</button>\n";
+    echo "<button name=zoomin type=submit value=zoomin>";
+    echo "Zoom In</button>\n";
+    echo "</form>\n";
+    echo "</center>\n";
+}
+else {
+    $template->ShowNS();
+}
 
 SUBPAGEEND();
 

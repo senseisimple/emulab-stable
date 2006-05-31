@@ -212,6 +212,14 @@ function SPITFORM($formfields, $errors)
          </tr>
         </form>
         </table>\n";
+
+    echo "<blockquote><blockquote>
+          <ol>
+            <li> Please read this
+                <a href=kb-show.php3?xref_tag=template_parameters>KB entry</a>
+                to see what NS extensions are available for templates.
+          </ol>
+          </blockquote></blockquote>\n";
 }
 
 #

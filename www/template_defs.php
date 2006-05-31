@@ -617,6 +617,20 @@ class Template
     }
 
     #
+    # Dump the NS file into its own iframe.
+    #
+    function ShowNS() {
+	$guid = $this->guid();
+	$vers = $this->vers();
+
+	echo "<center>";
+	echo "<iframe width=700 height=400 scrolling=auto
+                      src='spitnsdata.php3?guid=$guid&version=$vers'
+                      border=2></iframe>\n";
+	echo "</center>";
+    }
+
+    #
     # Grab array of input files for a template, indexed by input_idx.
     #
     function InputFiles() {

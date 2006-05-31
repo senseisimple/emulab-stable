@@ -80,10 +80,10 @@ if ($current) {
     echo "<input type=hidden name=exptidx value='$exptidx'>";
     echo "</form>";
 } 
-echo "</center><br>\n";
 
 echo "<iframe width=100% height=800 scrolling=yes src='$url' border=2>".
      "</iframe>\n";
+echo "</center><br>\n";
 
 #
 # Standard Testbed Footer
