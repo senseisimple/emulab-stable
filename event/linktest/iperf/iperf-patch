@@ -1,10 +1,58 @@
+Index: include/Settings.hpp
+===================================================================
+RCS file: /flux/CVS/emulab-iperf/include/Settings.hpp,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Settings.hpp
+*** include/Settings.hpp	24 Oct 2005 15:18:32 -0000	1.1.1.1
+--- include/Settings.hpp	31 May 2006 17:18:00 -0000
+***************
+*** 125,130 ****
+--- 125,131 ----
+      int mBufLen;                    // -l
+      int mMSS;                       // -M
+      int mTCPWin;                    // -w
++     int mAckTimo;		    // -A
+      /*   flags is a BitMask of old bools
+          bool   mBufLenSet;              // -l
+          bool   mCompat;                 // -C
+***************
+*** 282,287 ****
+--- 283,289 ----
+  
+  
+  #define HEADER_VERSION1 0x80000000
++ #define HEADER_VERSION2 0x40000000
+  #define RUN_NOW         0x00000001
+  
+  // used to reference the 4 byte ID number we place in UDP datagrams
+***************
+*** 327,332 ****
+--- 329,335 ----
+      int32_t bufferlen;
+      int32_t mWinBand;
+      int32_t mAmount;
++     int32_t mAckTimo;
+  #else
+      signed int flags      : 32;
+      signed int numThreads : 32;
+***************
+*** 334,339 ****
+--- 337,343 ----
+      signed int bufferlen  : 32;
+      signed int mWinBand   : 32;
+      signed int mAmount    : 32;
++     signed int mAckTimo   : 32;
+  #endif
+  } client_hdr;
+  
 Index: include/headers.h
 ===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/include/headers.h,v
+RCS file: /flux/CVS/emulab-iperf/include/headers.h,v
 retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 headers.h
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
 *** include/headers.h	24 Oct 2005 15:18:33 -0000	1.1.1.1
---- include/headers.h	24 Oct 2005 16:06:09 -0000
+--- include/headers.h	24 Oct 2005 16:11:28 -0000	1.2
 ***************
 *** 180,186 ****
 --- 180,190 ----
@@ -20,9 +68,12 @@ diff -c -r1.1.1.1 headers.h
   /* in case the OS doesn't have these, we provide our own implementations */
   #include "gettimeofday.h"
 Index: src/Client.cpp
-diff -c src/Client.cpp:1.1 src/Client.cpp:1.3
-*** src/Client.cpp:1.1	Mon Oct 24 09:18:33 2005
---- src/Client.cpp	Tue Nov  8 17:10:42 2005
+===================================================================
+RCS file: /flux/CVS/emulab-iperf/src/Client.cpp,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Client.cpp
+*** src/Client.cpp	24 Oct 2005 15:18:33 -0000	1.1.1.1
+--- src/Client.cpp	31 May 2006 17:18:00 -0000
 ***************
 *** 216,228 ****
           // perform write 
@@ -55,13 +106,175 @@ diff -c src/Client.cpp:1.1 src/Client.cpp:1.3
           
           if ( delay > 0 ) {
               delay_loop( delay ); 
+***************
+*** 341,346 ****
+--- 344,350 ----
+      struct timeval timeout; 
+  
+      int count = 0; 
++     int timo = (mSettings->mAckTimo < 0) ? 250 : mSettings->mAckTimo;
+      while ( count < 10 ) {
+          count++; 
+  
+***************
+*** 350,357 ****
+          // wait until the socket is readable, or our timeout expires 
+          FD_ZERO( &readSet ); 
+          FD_SET( mSettings->mSock, &readSet ); 
+!         timeout.tv_sec  = 0; 
+!         timeout.tv_usec = 250000; // quarter second, 250 ms 
+  
+          rc = select( mSettings->mSock+1, &readSet, NULL, NULL, &timeout ); 
+          FAIL_errno( rc == SOCKET_ERROR, "select", mSettings ); 
+--- 354,361 ----
+          // wait until the socket is readable, or our timeout expires 
+          FD_ZERO( &readSet ); 
+          FD_SET( mSettings->mSock, &readSet ); 
+!         timeout.tv_sec  = (timo / 1000);
+!         timeout.tv_usec = (timo % 1000) * 1000;
+  
+          rc = select( mSettings->mSock+1, &readSet, NULL, NULL, &timeout ); 
+          FAIL_errno( rc == SOCKET_ERROR, "select", mSettings ); 
+***************
+*** 373,378 ****
+          } 
+      } 
+  
+!     fprintf( stderr, warn_no_ack, mSettings->mSock, count ); 
+  } 
+  // end write_UDP_FIN 
+--- 377,382 ----
+          } 
+      } 
+  
+!     fprintf( stderr, warn_no_ack, mSettings->mSock, count, timo ); 
+  } 
+  // end write_UDP_FIN 
+Index: src/Locale.c
+===================================================================
+RCS file: /flux/CVS/emulab-iperf/src/Locale.c,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Locale.c
+*** src/Locale.c	24 Oct 2005 15:18:33 -0000	1.1.1.1
+--- src/Locale.c	31 May 2006 17:18:00 -0000
+***************
+*** 331,337 ****
+  "WARNING: Path MTU Discovery may not be enabled.\n";
+  
+  const char warn_no_ack[]=
+! "[%3d] WARNING: did not receive ack of last datagram after %d tries.\n";
+  
+  const char warn_ack_failed[]=
+  "[%3d] WARNING: ack of last datagram failed after %d tries.\n";
+--- 331,337 ----
+  "WARNING: Path MTU Discovery may not be enabled.\n";
+  
+  const char warn_no_ack[]=
+! "[%3d] WARNING: did not receive ack of last datagram after %d tries of %d ms.\n";
+  
+  const char warn_ack_failed[]=
+  "[%3d] WARNING: ack of last datagram failed after %d tries.\n";
+Index: src/Settings.cpp
+===================================================================
+RCS file: /flux/CVS/emulab-iperf/src/Settings.cpp,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Settings.cpp
+*** src/Settings.cpp	24 Oct 2005 15:18:33 -0000	1.1.1.1
+--- src/Settings.cpp	31 May 2006 17:18:00 -0000
+***************
+*** 105,110 ****
+--- 105,111 ----
+  {"reportstyle",required_argument, NULL, 'y'},
+  
+  // more esoteric options
++ {"ack_timeout",required_argument, NULL, 'A'},
+  {"bind",       required_argument, NULL, 'B'},
+  {"compatibility",    no_argument, NULL, 'C'},
+  {"daemon",           no_argument, NULL, 'D'},
+***************
+*** 167,173 ****
+  
+  #define SHORT_OPTIONS()
+  
+! const char short_options[] = "1b:c:df:hi:l:mn:o:p:rst:uvw:x:y:B:CDF:IL:M:NP:RS:T:UVW";
+  
+  /* -------------------------------------------------------------------
+   * defaults
+--- 168,174 ----
+  
+  #define SHORT_OPTIONS()
+  
+! const char short_options[] = "1b:c:df:hi:l:mn:o:p:rst:uvw:x:y:A:B:CDF:IL:M:NP:RS:T:UVW";
+  
+  /* -------------------------------------------------------------------
+   * defaults
+***************
+*** 214,219 ****
+--- 215,221 ----
+      //main->mTCPWin       = 0;           // -w,  ie. don't set window
+  
+      // more esoteric options
++     main->mAckTimo        = -1;          // -A,  -1 means default 250 ms
+      //main->mLocalhost    = NULL;        // -B,  none
+      //main->mCompat     = false;         // -C,  run in Compatibility mode
+      //main->mDaemon     = false;         // -D,  run as a daemon
+***************
+*** 540,545 ****
+--- 542,551 ----
+  
+  
+              // more esoteric options
++         case 'A': // ms of delay between UDP Ack resends
++             mExtSettings->mAckTimo = atoi( optarg );
++             break;
++ 
+          case 'B': // specify bind address
+              mExtSettings->mLocalhost = new char[ strlen( optarg ) + 1 ];
+              strcpy( mExtSettings->mLocalhost, optarg );
+***************
+*** 790,795 ****
+--- 796,804 ----
+                         (*client)->mHost, REPORT_ADDRLEN);
+          }
+  #endif
++ 	if ( (flags & HEADER_VERSION2) != 0 ) {
++ 	    (*client)->mAckTimo = ntohl(hdr->mAckTimo);
++ 	}
+      } else {
+          *client = NULL;
+      }
+***************
+*** 804,809 ****
+--- 813,821 ----
+  void Settings_GenerateClientHdr( thread_Settings *client, client_hdr *hdr ) {
+      if ( client->mMode != kTest_Normal ) {
+          hdr->flags  = htonl(HEADER_VERSION1);
++ 	if ( hdr->mAckTimo >= 0 ) {
++ 	    hdr->flags  |= htonl(HEADER_VERSION2);
++ 	}
+      } else {
+          hdr->flags  = 0;
+      }
+***************
+*** 829,834 ****
+--- 841,849 ----
+          hdr->mAmount    = htonl((long)client->mAmount);
+          hdr->mAmount &= htonl( 0x7FFFFFFF );
+      }
++     if ( hdr->mAckTimo >= 0 ) {
++         hdr->mAckTimo = htonl(client->mAckTimo);
++     }
+      if ( client->mMode == kTest_DualTest ) {
+          hdr->flags |= htonl(RUN_NOW);
+      }
 Index: src/main.cpp
 ===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/main.cpp,v
+RCS file: /flux/CVS/emulab-iperf/src/main.cpp,v
 retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 main.cpp
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
 *** src/main.cpp	24 Oct 2005 15:18:34 -0000	1.1.1.1
---- src/main.cpp	24 Oct 2005 16:06:10 -0000
+--- src/main.cpp	24 Oct 2005 16:11:28 -0000	1.2
 ***************
 *** 163,168 ****
 --- 163,173 ----
@@ -78,11 +291,12 @@ diff -c -r1.1.1.1 main.cpp
            || ext_gSettings->mThreadMode == kMode_Listener ) {
 Index: src/stdio.c
 ===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/stdio.c,v
+RCS file: /flux/CVS/emulab-iperf/src/stdio.c,v
 retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 stdio.c
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
 *** src/stdio.c	24 Oct 2005 15:18:34 -0000	1.1.1.1
---- src/stdio.c	24 Oct 2005 16:06:10 -0000
+--- src/stdio.c	24 Oct 2005 16:11:28 -0000	1.2
 ***************
 *** 255,262 ****
    * ------------------------------------------------------------------- */
