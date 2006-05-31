@@ -10,6 +10,9 @@
 
 namespace eval GLOBALS {
     variable security_level 0
+    variable pid {}
+    variable gid {}
+    variable eid {}
 }
 
 proc tb-set-ip {node ip} {}
