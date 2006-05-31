@@ -69,6 +69,9 @@ use constant IPERF_DAT => "/tmp/iperf.dat";
 # Packet size for iperf (1470 default).  Reduce to avoid problems with veths
 use constant IPERF_PKTSIZE => 1450;
 
+# max time to run iperf
+use constant BW_TEST_MAXDURATION => 10;
+
 # iperf test limits.
 use constant LIMIT_BW_HI  => 100000000;
 use constant LIMIT_BW_MED =>  10000000;
@@ -1106,6 +1109,11 @@ sub bw_test {
     my @edge_copy	= @links;
     my $trun = 1;
 
+    # lower expectations for windows
+    my $bw_error_low = (($platform =~ /CYGWIN/) ? 
+			INSIGNIFICANT_BW_ERROR_LO_Windows : 
+			INSIGNIFICANT_BW_ERROR_LO);
+
     #
     # all nodes will execute the same reductions on the edge list
     # on their own so that the number of barriers is the same.
@@ -1197,6 +1205,61 @@ sub bw_test {
 		    # node doing the throttling. 
 		    my $bw = $bw + int($bw * 0.10);
 
+		    #
+		    # Even without packet loss, there is a good chance that
+		    # iperf's end-of-stream (FIN) will be lost since we are
+		    # over-driving the link.  The ACK for that FIN needs to
+		    # be received before iperf's timer stops, so a long
+		    # timeout (for resending the FIN) on a short duration
+		    # run will lower the BW reading considerably.  So we
+		    # attempt to keep the timeout as short as possible,
+		    # taking into account the round-trip latency of the link.
+		    # We may also need to adjust the run time of the test
+		    # upward, but we do not exceed the indicated max duration. 
+		    #
+		    # 250 ms is the default timeout value for iperf.  We
+		    # start with a candidate value of 50 ms which is chosen
+		    # as it is sufficient for the 3% BW error on min duration
+		    # (3 second) tests.  You should not pick a base acktime
+		    # less than the resolution of the clock (10ms or 1ms).
+		    #
+		    my $acktime = 50;
+		    my $clockres = ($edge->dstyle eq "linkdelay") ? 1 : 10;
+		    my $minacktime = $edge->delay + $redge->delay;
+		    if ($minacktime < $clockres) {
+			$minacktime = $clockres;
+		    }
+
+		    # must not be less than RTT or clock resolution
+		    if ($acktime < $minacktime) {
+			$acktime = $minacktime;
+		    }
+
+		    #
+		    # If a single timeout would result in exceeding the
+		    # target BW error, try lowering the timeout or lengthening
+		    # the test.
+		    #
+		    my $maxacktime = $bw_error_low * $duration * 1000.0;
+		    if ($acktime > $maxacktime) {
+			$acktime = $minacktime;
+			if ($acktime > $maxacktime) {
+			    # compute duration necessary to achieve minacktime
+			    my $dur = int(($minacktime + $bw_error_low*1000.0-1)
+					  / ($bw_error_low * 1000.0) + 0.5);
+
+			    # still doesn't fit, warn and try anyway
+			    if ($dur > BW_TEST_MAXDURATION) {
+				&debug("May see BW errors for " .
+				       &print_link($edge) . "\n");
+				&info("*** May see BW errors for " .
+				      &print_link($edge) . "\n");
+			    } else {
+				$duration = $dur;
+			    }
+			}
+		    }
+
 		    # So we know what was sent in the analysis below.
 		    $edge->testbw($bw);
 		    $redge->testbw($bw);
@@ -1207,14 +1270,14 @@ sub bw_test {
 			&schedlog("iperf to " . $edge->src .
 				  " on " . $edge->name .
 				  " (bw=${bw}bps, time=${duration}s," .
-				  " sbsize=200000)");
+				  " sbsize=200000, acktime=${acktime}ms)");
 		    } else {
 			&my_system(PATH_NICE, "-n", "-10", PATH_IPERF,
 				   "-c", $edge->src . "-" . $edge->name,
 				   "-t", "$duration", "-f", "b",
 				   "-r", "-u", "-w", "200000",
 				   "-l", IPERF_PKTSIZE, "-b", "$bw",
-				   "-x", "s", "-y", "c",
+				   "-x", "s", "-y", "c", "-A", $acktime,
 				   "-L", "4444", "-o", IPERF_DAT);
 		    }
 		}
@@ -1365,10 +1428,7 @@ sub bw_test {
 			}
 		    }
 		    elsif ($bw < $adjusted) {
-			if ($diff > ($adjusted * 
-				     (($platform =~ /CYGWIN/) ? 
-				      INSIGNIFICANT_BW_ERROR_LO_Windows : 
-				      INSIGNIFICANT_BW_ERROR_LO))) {
+			if ($diff > ($adjusted * $bw_error_low)) {
 			    $error = "lower";
 			}
 		    }
