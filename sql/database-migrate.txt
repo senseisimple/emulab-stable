@@ -3381,7 +3381,7 @@ last_net_act,last_cpu_act,last_ext_act);
 4.62:
 4.63: Add a slot to the hold the name of optional per-experiment DB.
 
-      alter table experiments add dpdb tinyint(1) NOT NULL default '0',
+      alter table experiments add dpdb tinyint(1) NOT NULL default '0';
       alter table experiments add dpdbname varchar(64) default NULL;
       alter table experiment_stats add dpdbname varchar(64) default NULL;
 
@@ -3392,4 +3392,6 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table experiment_runs change archive_tag \
           archive_tag varchar(64) NOT NULL default '';
+
+4.65: Minor fix; skip to next entry;
 

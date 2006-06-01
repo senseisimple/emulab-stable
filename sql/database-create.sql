@@ -446,7 +446,7 @@ CREATE TABLE experiment_resources (
   delay_capacity tinyint(3) unsigned default NULL,
   batchmode tinyint(1) unsigned default '0',
   archive_tag varchar(64) NOT NULL default '',
-  opsdbname varchar(64) default NULL,
+  dpdbname varchar(64) default NULL,
   thumbnail mediumblob,
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
