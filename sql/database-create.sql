@@ -803,6 +803,7 @@ CREATE TABLE experiments (
   locpiper_pid int(11) default '0',
   locpiper_port int(11) default '0',
   instance_idx int(10) unsigned NOT NULL default '0',
+  dpdb tinyint(1) NOT NULL default '0',
   dpdbname varchar(64) default NULL,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
