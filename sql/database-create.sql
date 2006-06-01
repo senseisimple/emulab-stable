@@ -445,12 +445,11 @@ CREATE TABLE experiment_resources (
   maxlinks tinyint(3) unsigned default '0',
   delay_capacity tinyint(3) unsigned default NULL,
   batchmode tinyint(1) unsigned default '0',
-  archive_tag varchar(32) NOT NULL default '',
+  archive_tag varchar(64) NOT NULL default '',
   opsdbname varchar(64) default NULL,
   thumbnail mediumblob,
   PRIMARY KEY  (idx),
-
-KEY exptidx (exptidx),
+  KEY exptidx (exptidx),
   KEY lastidx (lastidx)
 ) TYPE=MyISAM;
 
@@ -475,7 +474,7 @@ CREATE TABLE experiment_runs (
   idx int(10) unsigned NOT NULL auto_increment,
   runid varchar(32) NOT NULL default '',
   description tinytext,
-  archive_tag varchar(32) default NULL,
+  archive_tag varchar(64) default NULL,
   start_time datetime default NULL,
   stop_time datetime default NULL,
   PRIMARY KEY  (exptidx,idx)

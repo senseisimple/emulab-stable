@@ -3385,4 +3385,11 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiments add dpdbname varchar(64) default NULL;
       alter table experiment_stats add dpdbname varchar(64) default NULL;
 
-4.64:
+4.64: Fix archive tags to be proper size.
+
+      alter table experiment_resources change archive_tag \
+          archive_tag varchar(64) NOT NULL default '';
+
+      alter table experiment_runs change archive_tag \
+          archive_tag varchar(64) NOT NULL default '';
+
