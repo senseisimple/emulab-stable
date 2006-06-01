@@ -305,6 +305,9 @@ if (! $query_result->num_rows) {
     
     ($exptidx) = $query_result->fetchrow_array();
 
+    $exptidx = 1
+	if (!defined($exptidx));
+
     DBQueryFatal("insert into emulab_indicies (name, idx) ".
 		 "values ('next_exptidx', $exptidx)");
 }
