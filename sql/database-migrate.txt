@@ -3376,7 +3376,7 @@ last_net_act,last_cpu_act,last_ext_act);
       corresponding spot in the archive.
 
       alter table experiment_runs add \
-            archive_tag varchar(32) NULL after description;
+            archive_tag varchar(32) default NULL after description;
 
 4.62:
 4.63: Add a slot to the hold the name of optional per-experiment DB.
@@ -3388,10 +3388,11 @@ last_net_act,last_cpu_act,last_ext_act);
 4.64: Fix archive tags to be proper size.
 
       alter table experiment_resources change archive_tag \
-          archive_tag varchar(64) NOT NULL default '';
+          archive_tag varchar(64) default NULL;
 
       alter table experiment_runs change archive_tag \
-          archive_tag varchar(64) NOT NULL default '';
+          archive_tag varchar(64) default NULL;
 
 4.65: Minor fix; skip to next entry;
+4.66: More fixes; skip to next entry;
 
