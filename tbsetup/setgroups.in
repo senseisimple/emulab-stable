@@ -47,8 +47,10 @@ my $ADMINGRP= "@TBADMINGROUP@";
 my $ELABINELAB    = @ELABINELAB@;
 my $WIKISUPPORT   = @WIKISUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
+my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
 my $SETBUGDBGROUPS= "$TB/sbin/setbugdbgroups";
+my $OPSDBCONTROL  = "$TB/sbin/opsdb_control";
 
 my $SSH     = "$TB/bin/sshtb";
 my $USERMOD = "/usr/sbin/pw usermod";
@@ -386,7 +388,7 @@ $UID  = $SAVEUID;
 $EUID = $UID;
 
 # and the twiki.
-if ($WIKISUPPORT || $BUGDBSUPPORT) {
+if ($WIKISUPPORT || $BUGDBSUPPORT || $OPSDBSUPPORT) {
     foreach $user (@userlist) {
 	if ($WIKISUPPORT) {
 	    system("$SETWIKIGROUPS $optarg $user") == 0 or
@@ -396,6 +398,11 @@ if ($WIKISUPPORT || $BUGDBSUPPORT) {
 	    system("$SETBUGDBGROUPS $optarg $user") == 0 or
 		fatal("$SETBUGDBGROUPS $user failed!");
 	}
+	if ($OPSDBSUPPORT) {
+	    system("$OPSDBCONTROL $optarg setgroups $user") == 0 or
+		fatal("$OPSDBCONTROL setgroups $user failed!");
+	}
+	
     }
 }
 

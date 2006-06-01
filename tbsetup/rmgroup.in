@@ -49,6 +49,8 @@ my $CONTROL  = "@USERNODE@";
 my $BOSSNODE = "@BOSSNODE@";
 my $ELABINELAB    = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
+my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
@@ -56,6 +58,7 @@ my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
 my $DELMMLIST= "$TB/sbin/delmmlist";
 my $MODGROUPS= "$TB/sbin/modgroups";
+my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
 
 #
 # Untaint the path
@@ -221,6 +224,14 @@ if ($MAILMANSUPPORT && !$ELABINELAB) {
     $EUID = $UID;
     system("$DELMMLIST -a $listname") == 0 or
 	fatal("$DELMMLIST -a $listname failed!");
+    $EUID = 0;
+}
+
+if ($OPSDBSUPPORT && !$ELABINELAB) {
+    # For perl
+    $EUID = $UID;
+    system("$OPSDBCONTROL delgroup $pid $gid") == 0 or
+	fatal("$OPSDBCONTROL delgroup $pid $gid failed!");
     $EUID = 0;
 }
 

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,23 +20,25 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches cvsinit checkquota \
-		  spewconlog
+		  spewconlog opsdb_control
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
                   websetdest spewsource weblinkmon_ctl webcvsweb \
 		  webspewconlog xlogin webviewvc
+CTRLSBIN_SCRIPTS= opsdb_control.proxy
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(SUBDIRS) \
-	firstuser setbuildinfo
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(CTRLSBIN_SCRIPTS) \
+	$(SUBDIRS) firstuser setbuildinfo
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_SCRIPTS)) \
 	subdir-install
 	$(INSTALL_PROGRAM) loghole $(INSTALL_DIR)/opsdir/bin/loghole
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
@@ -55,6 +57,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/checkquota
 	chown root $(INSTALL_SBINDIR)/spewconlog
 	chmod u+s $(INSTALL_SBINDIR)/spewconlog
+	chown root $(INSTALL_SBINDIR)/opsdb_control
+	chmod u+s $(INSTALL_SBINDIR)/opsdb_control
 	chown root $(INSTALL_LIBEXECDIR)/xlogin
 	chmod u+s $(INSTALL_LIBEXECDIR)/xlogin
 
@@ -73,3 +77,9 @@ clean:	subdir-clean
 
 subdir-clean:
 	@$(MAKE) -C nsgen clean
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+

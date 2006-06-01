@@ -52,6 +52,7 @@ CVSSUPPORT=1
 CHATSUPPORT=1
 NFSTRACESUPPORT=1
 ARCHIVESUPPORT=1
+OPSDBSUPPORT=1
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.

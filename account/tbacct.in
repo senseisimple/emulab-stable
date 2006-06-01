@@ -42,6 +42,7 @@ my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 my $CHATSUPPORT = @CHATSUPPORT@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $PROTOUSER   = 'elabman';
@@ -71,6 +72,7 @@ my $DELCHATUSER = "$TB/sbin/deljabberuser";
 my $MMMODIFYUSER= "$TB/sbin/mmmodifymember";
 my $ADDMMUSER   = "$TB/sbin/addmmuser";
 my $DELMMUSER   = "$TB/sbin/delmmuser";
+my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -370,6 +372,10 @@ sub AddUser()
     system("$ADDBUGDBUSER $user")
 	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
 
+    # And to the OPS db if enabled.
+    system("$OPSDBCONTROL adduser $user")
+	if ($OPSDBSUPPORT && $user ne $PROTOUSER);
+
     # And to the chat server if enabled.
     system("$ADDCHATUSER $user")
 	if ($CHATSUPPORT && $user ne $PROTOUSER);
@@ -510,6 +516,11 @@ sub UpdatePassword()
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER -m $user")
 	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
+
+    # And to the OPS db if enabled.
+    system("$OPSDBCONTROL adduser $user")
+	if ($OPSDBSUPPORT && $user ne $PROTOUSER);
+  
     $EUID = 0;
     
     return 0;

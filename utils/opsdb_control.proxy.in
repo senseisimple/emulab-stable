@@ -1,0 +1,383 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+use strict;
+    
+#
+# A wrapper for messing with the OPS DB from boss.
+#
+sub usage()
+{
+    print "Usage: bugdbproxy adduser [-m] <uid> or\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $OURDOMAIN= "@OURDOMAIN@";
+my $DBCONF   = "/usr/testbed/etc/mysqld.pwd";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname = "mysql";
+my $dbuser = "root";
+my $dbpass;
+
+# Protos
+sub AddUser(@);
+sub DelUser(@);
+sub AddDB(@);
+sub DelDB(@);
+sub SetDBs(@);
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+
+#
+# The DB passwd is stored in the config file, hopefully not world
+# readable. Open and parse that file, then open a connection to the
+# DB.
+#
+if (`cat $DBCONF` =~ /^([\w]*)$/) {
+    $dbpass = $1;
+}
+else {
+    fatal("Bad characters in password!");
+}
+
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal("Could not connect to ops database!");
+}
+
+my $action = shift(@ARGV);
+
+if ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
+elsif ($action eq "adddb") {
+    exit(AddDB(@ARGV));
+}
+elsif ($action eq "deldb") {
+    exit(DelDB(@ARGV));
+}
+elsif ($action eq "setdbs") {
+    exit(SetDBs(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Utility function to see if a DB already exists.
+#
+sub DBExists($)
+{
+    my ($dbname) = @_;
+
+    my $query_result =
+	DBQueryWarn("show databases like '$dbname'");
+
+    return -1
+	if (! $query_result);
+    return $query_result->numrows;
+}
+
+#
+# Utility function to see if a DB is an emulab DB
+#
+sub IsEmulabDB($)
+{
+    my ($dbname) = @_;
+
+    my $query_result =
+	DBQueryWarn("select * from emulab_dbs where dbname='$dbname'");
+
+    return -1
+	if (! $query_result);
+    
+    return $query_result->numrows;
+}
+
+#
+# Add user.
+#
+sub AddUser(@)
+{
+    my ($uid) = @_;
+    my ($password);
+
+    usage()
+	if (@_ != 1);
+    
+    # Password comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*)$/) {
+	$password   = $1;
+    }
+    else {
+	fatal("AddUser: Bad line in input: $_");
+    }
+
+    #
+    # Default for users is no privs on anything. They get privs later
+    # on a per-db basis.
+    #
+    DBQueryFatal("replace into user (Host, User, Password) ".
+		 "values ('localhost','$uid', PASSWORD('$password'))")
+	or return -1;
+
+    # Eventually, we want to allow remote access.
+    DBQueryFatal("replace into user (Host, User, Password) ".
+		 "values ('%.${OURDOMAIN}','$uid', PASSWORD('$password'))")
+	or return -1;
+
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Delete user.
+#
+sub DelUser(@)
+{
+    my ($uid) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    DBQueryFatal("delete from db where User='$uid'")
+	or return -1;
+    
+    DBQueryFatal("delete from user where User='$uid'")
+	or return -1;
+    
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Add a DB
+#
+sub AddDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    #
+    # We do not want to create a DB if there already is one of that
+    # name, and its not in the emulab DB table. That means its a
+    # pre-existing DB and we are screwed. 
+    #
+    if ($exists && !$isemulab) {
+	print "DB '$dbname' already exists! Must be a conflict.\n";
+	return -1;
+    }
+
+    DBQueryFatal("create database if not exists `$dbname`")
+	or return -1;
+
+    # This table tells us what belongs to Emulab.
+    DBQueryFatal("replace into emulab_dbs values ('$dbname')")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Remove a DB. 
+#
+sub DelDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    #
+    # We do not want to remove a DB if there is no entry in the emulab_dbs
+    # table; it belongs to someone else!
+    #
+    if ($exists && !$isemulab) {
+	print "DB '$dbname' is not an Emulab DB! Not removing!\n";
+	return -1;
+    }
+
+    DBQueryFatal("drop database if exists `$dbname`")
+	or return -1;
+
+    # Remove any dangling entries in the Db table ...
+    DBQueryFatal("delete from db where Db='$dbname'")
+	or return -1;
+
+    # This table tells us what belongs to Emulab. Delete as last step.
+    DBQueryFatal("delete from emulab_dbs where dbname='$dbname'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Set DBs that a user may access.
+#
+sub SetDBs(@)
+{
+    my $uid;
+    my %newglist = ();
+    my %oldglist = ();
+
+    usage()
+	if (@_ < 1);
+
+    $uid = shift(@_);
+
+    # List of new DBs to grant access to.
+    foreach my $db (@_) {
+	$newglist{$db} = $db;
+    }
+
+    my $query_result =
+	DBQueryFatal("select * from user where User='$uid'");
+    return -1
+	if (!$query_result);
+
+    if (!$query_result->numrows) {
+	print "User $uid does not exist in the user table!\n";
+	return 0;
+    }
+
+    # Generate existing DB access list.
+    $query_result =
+	DBQueryFatal("select Db from db where User='$uid'");
+    while (my ($db) = $query_result->fetchrow_array()) {
+	$oldglist{$db} = $db;
+    }
+
+    # First do deletions.
+    foreach my $db (keys(%oldglist)) {
+	next
+	    if (exists($newglist{$db}));
+
+	# Do not delete user if not an Emulab created DB.
+	my $isemulab = IsEmulabDB($db);
+	return -1
+	    if ($isemulab < 0);
+	next
+	    if (!$isemulab);
+
+	DBQueryFatal("delete from db where User='$uid' and Db='$db'")
+	    or return -1;
+    }
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    # Then do additions.
+    foreach my $db (keys(%newglist)) {
+	next
+	    if (exists($oldglist{$db}));
+
+	# Do not add user if not an Emulab created DB.
+	my $isemulab = IsEmulabDB($db);
+	return -1
+	    if ($isemulab < 0);
+	next
+	    if (!$isemulab);
+
+	DBQueryFatal("grant all on `${db}`.* to '$uid'\@'localhost'")
+	    or return -1;
+
+	# Eventually, we want to allow remote access.
+	DBQueryFatal("grant all on `${db}`.* to '$uid'\@'%.${OURDOMAIN}'")
+	    or return -1;
+    }
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

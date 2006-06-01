@@ -36,10 +36,13 @@ my $CONTROL     = "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $ELABINELAB  = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 my $PROJROOT    = "/proj";
 my $GRPROOT     = "/groups";
 my $SSH         = "$TB/bin/sshtb";
 my $ADDMMLIST   = "$TB/sbin/addmmlist";
+my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
 my $GROUPADD    = "/usr/sbin/pw groupadd";
 my @DIRLIST     = ("exp", "images", "logs", "tarfiles", "rpms", "tiplogs");
 my $SAVEUID     = $UID;
@@ -265,11 +268,19 @@ if ($pid ne $gid) {
 	}
     }
 
-    if ($MAILMANSUPPORT && !$ELABINELAB) {
+    if (($MAILMANSUPPORT || $OPSDBSUPPORT) && !$ELABINELAB) {
 	$UID  = $SAVEUID;
 	$EUID = $UID;
-	system("$ADDMMLIST -a ${pid}-${gid}-users") == 0 or
-	    fatal("$ADDMMLIST -a ${pid}-${gid}-users failed!");
+
+	if ($MAILMANSUPPORT) {
+	    system("$ADDMMLIST -a ${pid}-${gid}-users") == 0 or
+		fatal("$ADDMMLIST -a ${pid}-${gid}-users failed!");
+	}
+
+	if ($OPSDBSUPPORT) {
+	    system("$OPSDBCONTROL addgroup $pid $gid") == 0 or
+		fatal("$OPSDBCONTROL addgroup $pid $gid failed!");
+	}
 	$EUID = 0;
     }
 }

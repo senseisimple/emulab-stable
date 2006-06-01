@@ -32,12 +32,14 @@ my $CHOWN    = "/usr/sbin/chown";
 my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
 my $WIKISUPPORT   = @WIKISUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
+my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 my $CVSSUPPORT    = @CVSSUPPORT@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
 my $ADDBUGDBPROJ= "$TB/sbin/addbugdbproj";
 my $ADDMMLIST   = "$TB/sbin/addmmlist";
-
+my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
+	  
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
@@ -145,6 +147,10 @@ if ($WIKISUPPORT) {
 if ($BUGDBSUPPORT) {
     system("$ADDBUGDBPROJ $pid") == 0 or
 	fatal("$ADDBUGDBPROJ $pid failed!");
+}
+if ($OPSDBSUPPORT) {
+    system("$OPSDBCONTROL addproj $pid") == 0 or
+	fatal("$OPSDBCONTROL addproj $pid failed!");
 }
 if ($MAILMANSUPPORT) {
     system("$ADDMMLIST -a ${pid}-users") == 0 or
