@@ -446,9 +446,11 @@ CREATE TABLE experiment_resources (
   delay_capacity tinyint(3) unsigned default NULL,
   batchmode tinyint(1) unsigned default '0',
   archive_tag varchar(32) NOT NULL default '',
+  opsdbname varchar(64) default NULL,
   thumbnail mediumblob,
   PRIMARY KEY  (idx),
-  KEY exptidx (exptidx),
+
+KEY exptidx (exptidx),
   KEY lastidx (lastidx)
 ) TYPE=MyISAM;
 
@@ -509,6 +511,7 @@ CREATE TABLE experiment_stats (
   security_level tinyint(1) NOT NULL default '0',
   archive_idx int(10) unsigned default NULL,
   last_error int(10) unsigned default NULL,
+  dpdbname varchar(64) default NULL,
   PRIMARY KEY  (eid,pid,exptidx),
   KEY exptidx (exptidx),
   KEY rsrcidx (rsrcidx)
@@ -800,6 +803,7 @@ CREATE TABLE experiments (
   locpiper_pid int(11) default '0',
   locpiper_port int(11) default '0',
   instance_idx int(10) unsigned NOT NULL default '0',
+  dpdbname varchar(64) default NULL,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode),
