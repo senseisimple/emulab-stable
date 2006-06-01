@@ -1258,7 +1258,7 @@ sub cleanup()
 	
 	if ($estate eq EXPTSTATE_ACTIVE) {
 	    print "Running 'tbswap out -force $pid $eid'\n";
-	    if (system("$tbbindir/tbswap out -force $pid $eid") != 0) {
+	    if (system("$tbdir/tbswap out -force $pid $eid") != 0) {
 		print "tbswap out failed!\n";
 	    }
 	}
