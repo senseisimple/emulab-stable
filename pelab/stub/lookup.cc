@@ -257,6 +257,8 @@ int insert_fake(unsigned long ip, unsigned short port)
     throughput[index].isValid = 0;
     last_through[index] = 0;
     buffer_full[index] = 0;
+    max_delay[index] = 0;
+    last_max_delay[index] = 0;
     loss_records[index].loss_counter=0;
     loss_records[index].total_counter=0;
     last_loss_rates[index]=0;
@@ -335,11 +337,16 @@ void reconnect_receiver(int index)
   sniff_rcvdb[index].start = 0;
   sniff_rcvdb[index].end = 0;
   throughput[index].isValid = 0;
+  last_through[index] = 0;
+  buffer_full[index] = 0;
+  max_delay[index] = 0;
+  last_max_delay[index] = 0;
   loss_records[index].loss_counter=0;
   loss_records[index].total_counter=0;
   last_loss_rates[index]=0;
   delays[index]=0;
   last_delays[index]=0;
+  delay_count[index]=0;
   max_throughput[index] = 0;
   base_rtt[index] = LONG_MAX;
 //  remove_delay_samples(index);

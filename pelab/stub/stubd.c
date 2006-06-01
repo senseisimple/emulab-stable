@@ -32,6 +32,8 @@ loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the send
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 int last_through[CONCURRENT_RECEIVERS]; 
 int buffer_full[CONCURRENT_RECEIVERS];
+int max_delay[CONCURRENT_RECEIVERS];
+int last_max_delay[CONCURRENT_RECEIVERS];
 int flag_testmode=0;
 int bandwidth_method = BANDWIDTH_VEGAS;
 enum {TEST_NOTTESTING, TEST_NOTSTARTED, TEST_RUNNING, TEST_DONE } test_state;
@@ -814,22 +816,62 @@ char * save_receiver_address(char * buf, int index)
   return buf;
 }
 
-int send_delay_to_monitor(int monitor, int index)
+int send_simple_record_to_monitor(int monitor, int index, unsigned long type,
+				  unsigned long value)
 {
   int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
   char outbuf_delay[buffer_size];
-  unsigned long delay = 0;
-  unsigned long tmpulong;
 
-//  delay = delays[index];
-//  if (delay_count[index] > 0)
-//  {
-//      delay /= delay_count[index];
-//  }
-//  else
-//  {
-//      delay = last_delays[index];
-//  }
+  // Insert the address info
+  char * buf = save_receiver_address(outbuf_delay, index);
+
+  logWrite(CONTROL_SEND, NULL,
+	   "Sending type(%d) value(%d) about stream(%hu:%s:%hu)",
+	   type, value, rcvdb[index].source_port,
+	   ipToString(rcvdb[index].ip), rcvdb[index].dest_port);
+
+  // Insert the code number for delay
+  type = htonl(type);
+  memcpy(buf, &type, SIZEOF_LONG);
+  buf += SIZEOF_LONG;
+
+  // Insert the delay value
+  value = htonl(value);
+  memcpy(buf, &value, SIZEOF_LONG);
+  buf += SIZEOF_LONG;
+
+  return send_all(monitor, outbuf_delay, buffer_size) != 0;
+}
+
+int send_max_delay_to_monitor(int monitor, int index)
+{
+  int result = 1;
+  int delay = 0;
+
+  delay = max_delay[index];
+  if (delay == 0 || buffer_full[index] == 0)
+  {
+    delay = last_max_delay[index];
+  }
+  if (delay != last_max_delay[index])
+  {
+    result = send_simple_record_to_monitor(monitor, index, CODE_MAX_DELAY,
+					   delay);
+    if (result)
+    {
+      logWrite(CONTROL_SEND, NULL, "Successfully sent max_delay measurement");
+    }
+  }
+  last_max_delay[index] = delay;
+  max_delay[index] = 0;
+
+  return result;
+}
+
+int send_delay_to_monitor(int monitor, int index)
+{
+  int result = 1;
+  unsigned long delay = 0;
 
   delay = base_rtt[index];
   if (delay_count[index] == 0)
@@ -837,63 +879,39 @@ int send_delay_to_monitor(int monitor, int index)
       delay = last_delays[index];
   }
 
-  // If measurement changed since last send
-//  if (abs((long)delays[index] - (long)last_delays[index])
-//      > (long)(last_delays[index]/5)) {
   if (delay != last_delays[index])
   {
-    // Insert the address info
-    char * buf = save_receiver_address(outbuf_delay, index);
-
-    logWrite(CONTROL_SEND, NULL, "Sending delay(%d) about stream(%hu:%s:%hu)",
-	     delay, rcvdb[index].source_port,
-	     ipToString(rcvdb[index].ip), rcvdb[index].dest_port);
-
-    // Insert the code number for delay
-    tmpulong = htonl(CODE_DELAY);
-    memcpy(buf, &tmpulong, SIZEOF_LONG);
-    buf += SIZEOF_LONG;
-
-    // Insert the delay value
-    tmpulong = htonl(delay);
-    memcpy(buf, &tmpulong, SIZEOF_LONG);
-    buf += SIZEOF_LONG;
-
-    if (send_all(monitor, outbuf_delay, buffer_size) == 0){
-      return 0;
-    }
-
-    logWrite(CONTROL_SEND, NULL, "Sending delay success");
-
+    result = send_simple_record_to_monitor(monitor, index, CODE_DELAY, delay);
+    if (result)
     {
-	static struct timeval earlier = {0, 0};
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	if (earlier.tv_sec != 0)
-	{
-	    logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
-	    logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
-		     earlier.tv_sec + earlier.tv_usec/1000000000.0,
-		     last_delays[index],
-		     now.tv_sec + now.tv_usec/1000000000.0,
-		     last_delays[index]);
-	}
+      static struct timeval earlier = {0, 0};
+      struct timeval now;
+      logWrite(CONTROL_SEND, NULL, "Successfully sent delay measurement");
+      gettimeofday(&now, NULL);
+      if (earlier.tv_sec != 0)
+      {
 	logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
 	logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
-		 now.tv_sec + now.tv_usec/1000000000.0,
+		 earlier.tv_sec + earlier.tv_usec/1000000000.0,
 		 last_delays[index],
 		 now.tv_sec + now.tv_usec/1000000000.0,
-		 delay);
-	earlier = now;
+		 last_delays[index]);
+      }
+      logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
+      logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
+	       now.tv_sec + now.tv_usec/1000000000.0,
+	       last_delays[index],
+	       now.tv_sec + now.tv_usec/1000000000.0,
+	       delay);
+      earlier = now;
     }
-//  printf("Sent delay: %ld\n", delays[i]);
+    last_delays[index] = delay;
+    delays[index] = 0;
+    delay_count[index] = 0;
+    base_rtt[index] = LONG_MAX;
   }
-  last_delays[index] = delay;
-  delays[index] = 0;
-  delay_count[index] = 0;
-  base_rtt[index] = LONG_MAX;
 
-  return 1;
+  return result;
 }
 
 int send_bandwidth_to_monitor(int monitor, int index)
@@ -910,7 +928,7 @@ int send_bandwidth_to_monitor(int monitor, int index)
     bandwidth = max_throughput[index];
   } else if (bandwidth_method == BANDWIDTH_BUFFER) {
     bandwidth = throughputTick(&throughput[index]);
-    if (buffer_full[index] != 1 && bandwidth <= last_through[index])
+    if (buffer_full[index] == 0 && bandwidth <= last_through[index])
     {
       bandwidth = last_through[index];
     }
@@ -1051,6 +1069,9 @@ int send_monitor(int sockfd) {
 //  if (result == 1) {
 //    result = for_each_to_monitor(send_delay_list_to_monitor, sockfd);
 //  }
+  if (result == 1) {
+    result = for_each_to_monitor(send_max_delay_to_monitor, sockfd);
+  }
   return result;
 }
 
@@ -1169,6 +1190,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
       {
 	// There are bytes that were unwritten.
 	buffer_full[index] = 1;
+	logWrite(DELAY_DETAIL, NULL, "Buffer Full");
       }
   
       ++write_buffer_index;
@@ -1210,7 +1232,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
       }
       if (delta <= 0)
       {
-	fprintf(stderr, "Delta is below 0! delta: %d, packet.delta %d"
+	fprintf(stderr, "Delta is below 0! delta: %d, packet.delta %ld"
 		", write_delta_total: %d\n",
 		delta, packet.delta, write_delta_total);
 	clean_exit(1);

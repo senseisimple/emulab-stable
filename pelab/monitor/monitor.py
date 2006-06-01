@@ -18,6 +18,7 @@ CODE_BANDWIDTH = 1
 CODE_DELAY = 2
 CODE_LOSS = 3
 CODE_LIST_DELAY = 4
+CODE_MAX_DELAY = 5
 
 PACKET_WRITE = 1
 PACKET_SEND_BUFFER = 2
@@ -206,6 +207,9 @@ def receive_characteristic(conn):
       buffer = conn.recv(value*8)
       # Dummynet isn't quite set up to deal with this yet, so ignore it.
       sys.stdout.write('Ignoring delay list of size: ' + str(value) + '\n')
+    elif command == CODE_MAX_DELAY:
+      sys.stdout.write('Max Delay: ' + str(value) + '\n');
+      set_max_delay(value, dest);
     else:
       sys.stdout.write('Other: ' + str(command) + ', ' + str(value) + '\n');
     return True
@@ -237,6 +241,12 @@ def set_delay(milliseconds, dest):
 
 def set_loss(probability, dest):
   return set_link(this_ip, dest, 'plr=' + str(probability))
+
+def set_max_delay(delay, dest):
+  hertz = 10000.0
+  milliseconds = 1000.0
+  return set_link(this_ip, dest, 'MAXINQ=' + str(int(
+    (hertz/milliseconds)*delay )))
 
 def set_link(source, dest, ending):
   command = ('/usr/testbed/bin/tevc -e ' + this_experiment + ' now '

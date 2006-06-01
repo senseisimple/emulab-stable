@@ -458,6 +458,30 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	    if (record_id != -1) { //new ack received
               int delay = 0;
 	      struct tcp_info info;
+	      int info_size = sizeof(info);
+	      int error = 0;
+
+	      if (is_live)
+	      {
+		error = getsockopt(rcvdb[path_id].sockfd,
+				   SOL_TCP, TCP_INFO, &info,
+				       &info_size);
+		if (error == -1)
+		{
+		  perror("getsockopt() TCP_INFO");
+		  clean_exit(1);
+		}
+		if (info.tcpi_snd_cwnd < info.tcpi_snd_ssthresh
+		  && bandwidth_method == BANDWIDTH_BUFFER)
+		{
+		  // We are in slow start. This means that even if the
+		  // socket buffer is full, we are still not sending
+		  // at the ABW rate.
+		  buffer_full[path_id] = 0;
+		  last_through[path_id] = INT_MAX;
+		  logWrite(DELAY_DETAIL, NULL, "Buffer Clear");
+		}
+	      }
 
               msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
               delay = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
@@ -467,21 +491,18 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		(delay_count[path_id])++;
 		if (delay < base_rtt[path_id])
 		{
-		    base_rtt[path_id] = delay;
+		  base_rtt[path_id] = delay;
+		}
+		logWrite(DELAY_DETAIL, NULL, "delay: %d, max_delay: %d",
+			 delay, max_delay[path_id]);
+		if (delay > max_delay[path_id])
+		{
+		  max_delay[path_id] = delay + delay/10 + 1;
 		}
 		if (is_live && delay_count[path_id] > 0
 		    && bandwidth_method == BANDWIDTH_VEGAS)
 		{
 		    int bandwidth = 0;
-		    int info_size = sizeof(info);
-		    int error = getsockopt(rcvdb[path_id].sockfd,
-					   SOL_TCP, TCP_INFO, &info,
-					   &info_size);
-		    if (error == -1)
-		    {
-			perror("getsockopt() TCP_INFO");
-			clean_exit(1);
-		    }
 		    bandwidth = (info.tcpi_unacked/*tcpi_snd_cwnd*/
 				 * info.tcpi_snd_mss * 8)
 			/ base_rtt[path_id];

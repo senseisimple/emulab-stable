@@ -52,6 +52,7 @@ extern "C"
 #define CODE_DELAY      0x00000002 
 #define CODE_LOSS       0x00000003 
 #define CODE_LIST_DELAY 0x00000004
+#define CODE_MAX_DELAY  0x00000005
 
 //magic numbers for alternative algorithms
 #define BANDWIDTH_AVERAGE 0
@@ -173,6 +174,9 @@ extern int buffer_full[CONCURRENT_RECEIVERS];
 
 extern unsigned long max_throughput[CONCURRENT_RECEIVERS];
 extern unsigned long base_rtt[CONCURRENT_RECEIVERS];
+
+extern int max_delay[CONCURRENT_RECEIVERS];
+extern int last_max_delay[CONCURRENT_RECEIVERS];
 
 extern void sniff(void);
 extern void init_pcap(int to_ms, unsigned short port, char * device);
