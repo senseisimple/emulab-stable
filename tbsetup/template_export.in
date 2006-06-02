@@ -160,12 +160,6 @@ if (-e $checkout) {
 system("mkdir -p $checkout") == 0
     or fatal(-1, "Could not mkdir $checkout");
 
-if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-						     $checkout,
-						     $archive_tag) < 0) {
-    fatal(-1, "Could not checkout $archive_tag to $pid/.checkouts/$$");
-}
-
 #
 # Since that worked, lets create the XML representation of it and stash
 # to a file.
@@ -248,6 +242,41 @@ open(DUMP, ">$checkout/export.xml")
     or fatal(-1, "Could not open $checkout/export.xml for writing");
 print DUMP "$xml\n";
 close(DUMP);
+
+
+#
+# Now dump a checkout of each run, in its own directory. Eventually we
+# need to allow for sending out the actual repo instead of checkouts.
+#
+if (keys(%runlist)) {
+    $root->{"runs"} = {};
+    foreach my $name (keys(%runlist)) {
+	my $rowref = $runlist{$name};
+	my $runidx = $rowref->{"idx"};
+	my $dir    = "$checkout/run${runidx}";
+	my $tag    = $rowref->{"archive_tag"};
+
+	# This could happen if template still instantiated (last run).
+	next
+	    if (!defined($tag) || $tag eq "");
+	
+	system("mkdir -p $dir") == 0
+	    or fatal(-1, "Could not mkdir $dir");
+
+	if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
+							     $dir, $tag) < 0) {
+	    fatal(-1, "Could not checkout $tag to $dir");
+	}
+    }
+}
+else {
+    # This would be silly; exporting an instance with no runs.
+    if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
+							 $checkout,
+							 $archive_tag) < 0) {
+	fatal(-1, "Could not checkout $archive_tag to $checkout");
+    }
+}
 
 if ($spew) {
     system("$TAR zcf - -C $checkout .");
