@@ -1513,12 +1513,30 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
+		/^OPSDBSUPPORT$/ && do {
+		    if ($FBSD_VERSION == 6) {
+			print OUTDEFS "OPSDBSUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "OPSDBSUPPORT=0\n";
+		    }
+		    last SWITCH;
+		};
 		/^WIKISUPPORT$/ && do {
 		    if ($FBSD_VERSION == 6) {
 			print OUTDEFS "WIKISUPPORT=1\n";
 		    }
 		    else {
 			print OUTDEFS "WIKISUPPORT=0\n";
+		    }
+		    last SWITCH;
+		};
+		/^ARCHSUPPORT$/ && do {
+		    if ($FBSD_VERSION == 6) {
+			print OUTDEFS "ARCHSUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "ARCHSUPPORT=0\n";
 		    }
 		    last SWITCH;
 		};
