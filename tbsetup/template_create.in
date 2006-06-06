@@ -97,6 +97,7 @@ use libtestbed;
 use libtblog;
 use libArchive;
 use Template;
+use libaudit;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 120;
@@ -177,6 +178,9 @@ if ($modify) {
 	      "$parent_guid/$parent_vers");
     }
 }
+
+# Use the logonly option to audit so that we get a record mailed.
+LogStart(0);
 
 #
 # Create a template record. 
@@ -303,6 +307,7 @@ fatal(-1, "Error generating template graph.")
 
 # Web interface depends on this line. Bad; need another way to send
 # back the newly generated guid/version.
+LogEnd();
 print "Template $guid/$vers has been created\n";
 exit(0);
 
