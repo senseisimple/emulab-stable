@@ -8,9 +8,9 @@
 </center>
 
 The <b>loghole</b> utility downloads log files from certain directories on the
-experimental nodes (e.g. "/local/logs") to the Emulab users machine.  After
-downloading, it can also be used to produce and manage archives of the log
-files.  <p>
+experimental nodes (e.g. <b><code>/local/logs</code></b>) to the Emulab users
+machine.  After downloading, it can also be used to produce and manage
+archives of the log files.  <p>
 
 Using this utility to manage an experiment's log files is encouraged
 because it will transfer the logs in a network-friendly manner and is already
@@ -19,6 +19,14 @@ the Emulab event-system will have their standard output/error automatically
 placed in the "/local/logs" directory.  The tool can also be used to preserve
 multiple trials of an experiment by producing and managing zip archives of the
 logs.  <p>
+
+You can use the <b><code>loghole sync -r <i>remotedir</i></code></b> option to
+pull from extra logging directories you create on the experiment nodes, as
+described below, or symlink these directories into <b><code>/local/logs</code></b>.
+
+If you want a <b>lot</b> of log space on the nodes, see 
+<a href="../kb-show.php3?xref_tag=local-space">
+local-space in the Knowledge Base</a> to allocate an extra disk partition. <p>
 
 You can learn more about the <b>loghole</b> utility by reading its man page on
 <i>users.emulab.net</i>, included below.
