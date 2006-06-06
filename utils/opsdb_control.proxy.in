@@ -27,6 +27,8 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $OURDOMAIN= "@OURDOMAIN@";
 my $DBCONF   = "/usr/testbed/etc/mysqld.pwd";
+my $MYSQLDUMP= "/usr/local/bin/mysqldump";
+my $GZIP     = "/usr/bin/gzip";
 
 #
 # Turn off line buffering on output
@@ -66,6 +68,7 @@ sub DelUser(@);
 sub AddDB(@);
 sub DelDB(@);
 sub SetDBs(@);
+sub DumpDB(@);
 sub fatal($);
 
 #
@@ -115,6 +118,9 @@ elsif ($action eq "deldb") {
 }
 elsif ($action eq "setdbs") {
     exit(SetDBs(@ARGV));
+}
+elsif ($action eq "dumpdb") {
+    exit(DumpDB(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -370,6 +376,38 @@ sub SetDBs(@)
     }
     DBQueryFatal("flush privileges")
 	or return -1;
+
+    return 0;
+}
+
+#
+# Dump a DB to a file.
+#
+sub DumpDB(@)
+{
+    my ($dbname, $filename) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+
+    open(DUMP, "| $MYSQLDUMP -u root -p -a -e $dbname | $GZIP > $filename") or
+	fatal("Could not start $MYSQLDUMP!");
+    print DUMP "$dbpass\n";
+    close(DUMP) or
+	fatal($! ? "Error closing $MYSQLDUMP pipe: $!"
+	         : "Exit status $? from $MYSQLDUMP");
 
     return 0;
 }

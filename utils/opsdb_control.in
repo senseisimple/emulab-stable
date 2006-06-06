@@ -55,6 +55,7 @@ sub DelGroup(@);
 sub SetGroups(@);
 sub AddExpDB(@);
 sub DelExpDB(@);
+sub DumpExpDB(@);
 sub DoOpsStuff($;$);
 sub Initialize();
 sub fatal($);
@@ -133,6 +134,9 @@ elsif ($action eq "addexpdb") {
 }
 elsif ($action eq "delexpdb") {
     exit(DelExpDB(@ARGV));
+}
+elsif ($action eq "dumpexpdb") {
+    exit(DumpExpDB(@ARGV));
 }
 elsif ($action eq "setup") {
     exit(Initialize());
@@ -465,6 +469,7 @@ sub AddExpDB(@)
 
     return 0;
 }
+
 sub DelExpDB(@)
 {
     my ($pid, $eid) = @_;
@@ -516,6 +521,62 @@ sub DelExpDB(@)
     # No need to do a setgroups here since the proxy on ops removed the
     # DB and any user entries for that DB.
     #
+    return 0;
+}
+
+sub DumpExpDB(@)
+{
+    my ($pid, $eid, $filename) = @_;
+
+    usage()
+	if (@_ != 3);
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Bad data in pid: $pid");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die("Bad data in eid: $eid");
+    }
+    if ($filename =~ /^([-\w\/\.\+,]+)$/) {
+	$filename = $1;
+    }
+    else {
+	die("Bad data in filename: $filename");
+    }
+    my $gid = ExpGroup($pid, $eid);
+    my $exptidx;
+
+    #
+    # Check to see if the experiment actually wants its own DB.
+    #
+    my $query_result =
+	DBQueryFatal("select dpdbname from experiments ".
+		     "where pid='$pid' and eid='$eid' and dpdb!=0");
+    return 0
+	if (!$query_result->numrows);
+    
+    my ($dbname) = $query_result->fetchrow_array();
+
+    return -1
+	if (!defined($dbname));
+
+    return -1
+	if (!TBExptIDX($pid, $eid, \$exptidx));
+    
+    print "Dumping mysql DB '$dbname' to $filename on $CONTROL.\n";
+    my $retval = DoOpsStuff("dumpdb $dbname $filename");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
     return 0;
 }
 

@@ -31,11 +31,13 @@ my $state;
 #
 my $TBROOT   = "@prefix@";
 my $TESTMODE = @TESTMODE@;
-my $TBLOGS = "@TBLOGSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 my $wrapper  = "$TBROOT/libexec/assign_wrapper";
 my $batchexp = "$TBROOT/bin/batchexp";
 my $template = "$TBROOT/lib/ns2ir/elabinelab.ns";
 my $endexp   = "$TBROOT/bin/endexp";
+my $dbcontrol= "$TBROOT/sbin/opsdb_control";
 my $exptidx;
 
 # Untaint the path
@@ -276,6 +278,14 @@ print "Generating topomap ...\n";
 
 if (system("gentopofile $pid $eid")) {
     fatal("gentopofile failed!");
+}
+
+if ($OPSDBSUPPORT) {
+    TBDebugTimeStamp("opsdb_control started");
+    
+    if (system("$dbcontrol addexpdb $pid $eid")) {
+	fatal("$dbcontrol addexpdb failed!");
+    }
 }
 
 if (!$elabinelab) {

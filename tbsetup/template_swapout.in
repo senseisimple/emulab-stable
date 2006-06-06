@@ -243,6 +243,10 @@ print "Asking loghole to sync the logfiles ... this will take a minute.\n";
 $instance->LogHole() == 0
     or fatal(-1, "Loghole failed");
 
+print "Dumping the instance database ... this will take a minute.\n";
+$instance->DumpDB() == 0
+    or fatal(-1, "Dump Database failed");
+
 #
 # Now do the swapout.
 #
