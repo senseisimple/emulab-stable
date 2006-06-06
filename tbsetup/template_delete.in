@@ -25,17 +25,15 @@ use POSIX qw(strftime);
 sub usage()
 {
     print(STDERR
-	  "Usage: template_delete [-q] [-w] [-r] <guid/vers>\n".
+	  "Usage: template_delete [-q] [-r] <guid/vers>\n".
 	  "switches and arguments:\n".
-	  "-w          - wait for template to be instantiated\n".
 	  "-q          - be less chatty\n".
 	  "-r          - Delete recursively\n".
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwdr";
+my $optlist	 = "qdr";
 my $quiet        = 0;
-my $waitmode     = 0;
 my $debug        = 0;
 my $recursive    = 0;
 
@@ -119,15 +117,6 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 
 # Now parse arguments.
 ParseArgs();
-
-#
-# In wait mode, block SIGINT until we spin off the background process.
-#
-if ($waitmode) {
-    $SIG{QUIT} = 'IGNORE';
-    $SIG{TERM} = 'IGNORE';
-    $SIG{INT}  = 'IGNORE';
-}
 
 #
 # Grab template info.
@@ -268,9 +257,6 @@ sub ParseArgs()
     }
     if (defined($options{"q"})) {
 	$quiet = 1;
-    }
-    if (defined($options{"w"})) {
-	$waitmode = 1;
     }
     if (defined($options{"d"})) {
 	$debug = 1;
