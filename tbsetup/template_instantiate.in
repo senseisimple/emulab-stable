@@ -271,7 +271,7 @@ my $copyid = $template->pid() . "," . $template->eid();
 #
 my @arguments =
     ($batchexp, "-x", $template->eid(), "-y", $instance->idx(), "-q", "-f",
-     "-p", $pid, "-e", $eid, "-g", $template->gid(),
+     "-m", "-p", $pid, "-e", $eid, "-g", $template->gid(),
      "-E", "'Experiment Template Instantiation $guid/$version' ",
      "-c" , $copyid);
 
