@@ -293,6 +293,10 @@ if test -n "$FSDIR_SHARE"; then
 fi
 AC_DEFINE_UNQUOTED(BOSSEVENTPORT, "$BOSSEVENTPORT")
 
+if test $OPSDBSUPPORT -eq 1; then
+    AC_DEFINE_UNQUOTED(OPSDBSUPPORT, 1)
+fi
+
 if test $PLABSUPPORT -eq 1; then
     if test "$PLAB_ROOTBALL" = "change.me"; then
         AC_MSG_ERROR([plab support included but PLAB_ROOTBALL not defined.])
