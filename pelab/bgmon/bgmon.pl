@@ -41,7 +41,6 @@ OPERATION NUANCES:
   reporting here.)
 =cut
 
-
 use lib '/usr/testbed/lib';
 use event;
 use Getopt::Std;
@@ -115,7 +114,12 @@ print "server=$server\n";
 
 my $URL = "elvin://$server";
 if ($port) { $URL .= ":$port"; }
-my $handle = event_register($URL,0);
+#TOTAL HACK - bug in event library: after unregister, segfault if assigning
+#  a val to $handle
+my @handles =();
+push @handles, event_register($URL,0);
+my $handle = $handles[$#handles];
+
 if (!$handle) { die "Unable to register with event system\n"; }
 print "registered with $server\n";
 my $tuple = address_tuple_alloc();
@@ -166,12 +170,23 @@ for (my $i = 0; $i < $resultDBlimit; $i++) {
 my $subtimer_reset = 100;  # subtimer reaches 0 this many times thru poll loop
 my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 
+
 while (1) {
 
     $subtimer--;
 
     #check for pending received events
-    event_poll_blocking($handle,100);
+    eval{
+	event_poll_blocking($handle,100);
+	die "forced dieing..\n";
+    };
+    if( $@ ){
+	#event_poll died... reconnect
+	print "event_poll had a fatal error:$@\n";
+#	if( $subtimer == 0 ){
+	    reconnect_eventsys();
+#	}
+    }
 
     #re-try wait Q every $subtimer_reset times through poll loop
     #try to run tests on queue
@@ -427,6 +442,7 @@ sub callbackFunc($$$) {
 
 	#change values and/or initialize
 	if( $eventtype eq "EDIT" ){
+
 	    my $linkdest = event_notification_get_string($handle,
 							 $notification,
 							 "linkdest");
@@ -508,12 +524,7 @@ sub callbackFunc($$$) {
 	    %testevents = ();
 	}
 
-#	if (event_unregister($handle) == 0) {
-#	    die "Unable to unregister with event system\n";
-#	}
-#	exit(0);
-
-	#TODO: Why does this segfault?
+	# Should this be freed here? It segfaults if it is...
 #	if( event_notification_free( $handle, $notification ) == 0 ){
 #	    die "Unable to free notification";
 #	}
@@ -841,4 +852,57 @@ sub detectHang($)
     }
     
     return "nohang";
+}
+
+
+sub reconnect_eventsys()
+{
+    print time_all()." Reconnecting to event system\n";
+    print "handle = $handle\n";
+    print "unregistering\n";
+    eval{
+	if (event_unregister(pop @handles) == 0) {
+	    die "Unable to unregister with event system\n";
+	};
+    };
+    if( $@ ){
+	print "unsubscribe had a fatal error:$@\n";
+    }
+
+    eval{
+
+	print "registering\n";
+	my $tmp = event_register($URL,0);
+#	push @handles, event_register($URL,0);
+	print "registered\n";
+	$handle = $handles[$#handles];
+	if (!$handle) { die "Unable to register with event system\n"; }
+
+	print "allocating tuple\n";
+	$tuple = address_tuple_alloc();
+	if (!$tuple) { die "Could not allocate an address tuple\n"; }
+	%$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
+		    objtype   => "BGMON",
+		    objname   => $thismonaddr,
+		    expt      => $evexpt);
+	print "subscribing to control events\n";
+	if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
+	    die "Could not subscribe to event\n";
+	}
+
+	$tuple = address_tuple_alloc();
+	%$tuple = ( objname   => "ops",
+		    eventtype => "ACK",
+		    expt      => "__none",
+		    objtype   => "BGMON");
+	print "subscribing to ACK events\n";
+	if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
+	    die "Could not subscribe to event\n";
+	}
+    };
+    if( $@ ){
+	print "re-register had a fatal error:$@\n";
+    }
+
+    print "exiting reconnect\n";
 }
