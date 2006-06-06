@@ -493,8 +493,9 @@ sub ArchiveSavePoint($;$$$)
 	print STDERR "ArchiveSavePoint: Cannot chdir to $checkin!\n";
 	goto bad;
     }
-    mysystem("$IMPORTER -no_user_input file://$repodir ".
-	     "          $view/savepoint . " .
+    # Avoid a core file from svn.
+    mysystem("ulimit -c 0; $IMPORTER -no_user_input file://$repodir ".
+	     "                 $view/savepoint . " .
 	     ($debug < 2 ? "> /dev/null 2>&1" : ""))
 	== 0 or goto bad;
 
@@ -1052,12 +1053,9 @@ sub ArchiveArchive($)
 	    return -1;
 	}
     }    
-    #
-    # Tar up the whole thing and move it across.
-    #
-    mysystem("$TAR cf - -C $directory repo | tar xf - -C $target");
+    mysystem("$RSYNC -a --delete $directory/repo $target");
     if ($?) {
-	print STDERR "ArchiveArchive: Could not copy in $directory\n";
+	print STDERR "ArchiveArchive: Could not copy $directory/repo.\n";
 	return -1;
     }
 
