@@ -18,6 +18,11 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20060606:
+
+      Be sure to firewall the mysql port (3306) from access to your ops
+      node. 
+
 20060525:
       No schema changes, but due to a bug in libtblog.pm.in the uid &
       exptidx columns got swapped for new values inserted into the
