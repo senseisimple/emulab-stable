@@ -47,12 +47,8 @@ function GetPNodes_cb(data) {
 function ml_loadFinished() {
     clearInterval(upInterval);
 
-    var busyimg = document.getElementById('busy');
-    var loadingspan = document.getElementById('loading');
+    ClearLoadingIndicators("<center><b>Done!</b></center>");
 
-    loadingspan.innerHTML = "";
-    busyimg.style.display = "none";
-    busyimg.src = "1px.gif";
     nextState = LOG_STATE_LOADED;
 }
 

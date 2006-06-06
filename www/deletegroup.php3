@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -91,31 +91,16 @@ if (!$confirmed) {
 #
 TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
-echo "<br>
-      Group '$gid' in project '$pid' is being removed!<br><br>
-      This will take a minute or two. <b>Please</b> do not click the Stop
-      button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.<br>\n";
-flush();
+STARTBUSY("Group '$gid' in project '$pid' is being removed!");
 
 #
 # Run the script. They will remove the group directory and the unix group,
 # and the DB state.
 #
-SUEXEC($uid, $unix_gid, "webrmgroup $pid $gid", 1);
+SUEXEC($uid, $unix_gid, "webrmgroup $pid $gid", SUEXEC_ACTION_DIE);
+STOPBUSY();
 
-#
-# Warm fuzzies.
-#
-echo "<br>
-      <b>Done!</b>
-      <br>\n";
-
-#
-# Back to ...
-# 
-echo "<br>
-       <A href='showproject.php3?pid=$pid'>Back to Project page</a>\n";
+PAGEREPLACE("showproject.php3?pid=$pid");
 
 #
 # Standard Testbed Footer

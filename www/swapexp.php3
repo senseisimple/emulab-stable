@@ -240,13 +240,7 @@ if ($instance) {
     $guid = $instance->guid();
     $version = $instance->vers();
 
-    echo "<br>\n";
-    echo "<center>\n";
-    echo "<b>Terminating template instance!</b> ... <br>\n";
-    echo "This will take a few minutes; please be patient.<br>\n";
-    echo "<br>\n";
-    echo "</center>\n";
-    flush();
+    STARTBUSY("Terminating template instance!");
 }
 
 #
@@ -269,6 +263,10 @@ $retval = SUEXEC($uid, "$exp_pid,$unix_gid",
 		    "webtemplate_swapout -e $exp_eid $guid/$version" :
 		    "webswapexp -s $inout $exp_pid $exp_eid")),
 		 SUEXEC_ACTION_IGNORE);
+
+if ($instance) {
+    CLEARBUSY();
+}
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -349,6 +347,7 @@ else {
 	echo "<br><br>
               While you are waiting, you can watch the log in realtime:<br>\n";
 	echo "</div>";
+	echo "<br>\n";
 	STARTLOG($pid, $eid);
     }
 }

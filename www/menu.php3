@@ -11,6 +11,7 @@ $drewheader       = 0;
 $noheaders	  = 0;
 $autorefresh      = 0;
 $currentusage     = 1;
+$currently_busy   = 0;
 $bodyclosestring  = "";
 
 #
@@ -263,11 +264,10 @@ function WRITESIDEBAR() {
 	}
     }
 
-?>
-  <script type='text/javascript' language='javascript' src='textbox.js'></script>
-    <h3 class="menuheader">Information</h3>
-  <ul class="menu">
-<?php
+    echo "<script type='text/javascript' language='javascript'
+                  src='${BASEPATH}/textbox.js'></script>\n";
+    echo "<h3 class=menuheader>Information</h3><ul class=menu>\n";
+
     if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
 	$rootEmulab = 1;
     } else {
@@ -708,6 +708,9 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     if ($autorefresh) {
 	echo "<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"$autorefresh\">\n";
     }
+    echo "<script type='text/javascript' language='javascript'
+                  src='${BASEPATH}/emulab_sup.js'></script>\n";
+
     if (! $nobanner ) {
 	echo "<map name=overlaymap>
                  <area shape=rect coords=\"100,60,339,100\"
@@ -895,7 +898,12 @@ function ENDPAGE() {
 #
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
-    global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring;
+    global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring; $currently_busy;
+
+    if ($currently_busy) {
+	CLEARBUSY();
+	$currently_busy = 0;
+    }
 
     if (!$view) {
 	$view = GETUSERVIEW();
@@ -953,8 +961,9 @@ function PAGEFOOTER($view = NULL) {
 function PAGEERROR($msg) {
     global $drewheader, $noheaders;
 
-    if (! $drewheader && ! $noheaders)
+    if (! $drewheader && ! $noheaders) {
 	PAGEHEADER("Page Error");
+    }
 
     echo "$msg\n";
 
@@ -1076,6 +1085,59 @@ function GETUSERVIEW() {
 	# Most users get the default view
 	return array();
     }
+}
+
+function STARTBUSY($msg) {
+    global $currently_busy;
+
+    # Allow for a repeated call; Do nothing.
+    if ($currently_busy)
+	return;
+    
+    echo "<center>\n";
+    echo "<b>$msg</b> ...<br>\n";
+    echo "This will take a few moments; please be <em>patient</em>.<br>\n";
+    echo "<br>\n";
+    echo "<img id='busy' src='busy.gif'>".
+	   "<span id='loading'> Working ...</span>";
+    echo "<br><br>\n";
+    echo "</center>\n";
+    flush();
+    $currently_busy = 1;
+}
+
+function STOPBUSY() {
+    global $currently_busy;
+
+    if (!$currently_busy)
+	return;
+
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "ClearBusyIndicators('<center><b>Done!</b></center>');\n";
+    echo "</script>\n";
+    flush();
+    $currently_busy = 0;
+    sleep(1);
+}
+
+function CLEARBUSY() {
+    global $currently_busy;
+    
+    if (!$currently_busy)
+	return;
+
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "ClearBusyIndicators('');\n";
+    echo "</script>\n";
+    flush();
+    $currently_busy = 0;
+}
+
+function PAGEREPLACE($newpage) {
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "PageReplace('$newpage');\n";
+    echo "</script>\n";
+    flush();
 }
 
 ?>

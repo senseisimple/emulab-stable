@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -146,25 +146,19 @@ if (!$confirmed_twice) {
     return;
 }
 
-echo "<br>
-      User '$target_uid' is being ${tag}!<br><br>
-      This will take a minute or two. <b>Please</b> do not click the Stop
-      button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.\n";
-flush();
-
 DBQueryFatal("update users set status='$dbaction' ".
 	     "where uid='$target_uid'");
+
+STARTBUSY("User '$target_uid' is being ${tag}!");
 
 #
 # All the real work is done in the script.
 #
-SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid", 1);
+SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid",
+       SUEXEC_ACTION_DIE);
 
-#
-# Warm fuzzies.
-#
-echo "<br><br><b>Done</b><br>\n";
+/* Clear indicators */
+STOPBUSY();
 
 #
 # Standard Testbed Footer

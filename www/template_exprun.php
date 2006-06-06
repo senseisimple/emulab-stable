@@ -344,26 +344,22 @@ TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 set_time_limit(0);
 
 # Okay, we can spit back a header now that there is no worry of redirect.
-PAGEHEADER("Start Experiment Template");
+PAGEHEADER("Start Experiment Run");
 
-echo "<font size=+2>Experiment Template <b>" .
+echo "<font size=+2>Template <b>" .
         MakeLink("template",
-		 "guid=$guid&version=$version", "$guid/$version") . 
-      "</b></font>\n";
+		 "guid=$guid&version=$version", "$guid/$version") .
+        "</b>, Instance <b>" .
+        MakeLink("project", "pid=$pid", $pid) . "/" .
+        MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
+echo "</b></font>\n";
 echo "<br><br>\n";
 
 echo "<script type='text/javascript' language='javascript' ".
      "        src='template_sup.js'>\n";
 echo "</script>\n";
 
-echo "<center>\n";
-echo "<b>Starting experiment run!</b> ...<br>\n";
-echo "This will take a few moments; please be patient.<br>\n";
-echo "<br>\n";
-echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
-echo "<br>\n";
-echo "</center>\n";
-flush();
+STARTBUSY("Starting experiment run!");
 
 #
 # Run the backend script.
@@ -372,10 +368,7 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webtemplate_exprun $command_options $guid/$version",
 		 SUEXEC_ACTION_IGNORE);
 
-/* Clear the 'loading' indicators above */
-echo "<script type='text/javascript' language='javascript'>\n";
-echo "ClearLoadingIndicators();\n";
-echo "</script>\n";
+CLEARBUSY();
 
 if ($deletexmlfile) {
     unlink($parameter_xmlfile);

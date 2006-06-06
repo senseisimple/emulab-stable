@@ -474,14 +474,7 @@ echo "<script type='text/javascript' language='javascript' ".
      "        src='template_sup.js'>\n";
 echo "</script>\n";
 
-echo "<center>\n";
-echo "<b>Starting template creation!</b> ...<br>\n";
-echo "This will take a few moments; please be patient.<br>\n";
-echo "<br>\n";
-echo "<img id='busy' src='busy.gif'><span id='loading'> Working ...</span>";
-echo "<br><br>\n";
-echo "</center>\n";
-flush();
+STARTBUSY("Starting template creation!");
 
 # And run that script!
 $retval = SUEXEC($uid, "$pid,$unix_gid",
@@ -494,9 +487,7 @@ if ($deletensfile) {
 }
 
 /* Clear the various 'loading' indicators. */
-echo "<script type='text/javascript' language='javascript'>\n";
-echo "ClearLoadingIndicators();\n";
-echo "</script>\n";
+STOPBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -520,17 +511,9 @@ if (preg_match("/^Template\s+(\w+)\/(\w+)\s+/",
 	       $matches)) {
     $guid = $matches[1];
     $vers = $matches[2];
-    
-    echo "<script type='text/javascript' language='javascript'>\n";
-    echo "PageReplace('template_show.php?guid=$guid&version=$vers');\n";
-    echo "</script>\n";
-}
 
-#
-# In case the above fails.
-#
-echo "<center><b>Done!</b></center>";
-echo "<br><br>\n";
+    PAGEREPLACE("template_show.php?guid=$guid&version=$vers");
+}
 
 #
 # Standard Testbed Footer

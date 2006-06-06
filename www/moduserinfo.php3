@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -617,6 +617,8 @@ if (count($errors)) {
     return;
 }
 
+PAGEHEADER("Modify User Information");
+
 $usr_name     = addslashes($formfields[usr_name]);
 $usr_email    = $formfields[usr_email];
 $password1    = $formfields[password1];
@@ -663,6 +665,8 @@ if (strcmp($usr_email, $dbusr_email)) {
     DBQueryFatal("update users set usr_email='$usr_email' ".
 		 "where uid='$target_uid'");
 }
+
+STARTBUSY("Making user profile changes");
 
 #
 # Now see if the user is requesting to change the password. We checked
@@ -719,7 +723,8 @@ if ((isset($password1) && strcmp($password1, "")) &&
 	}
     }
     elseif (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
-	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid", 1);
+	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid",
+	       SUEXEC_ACTION_DIE);
     }
 }
 
@@ -843,10 +848,16 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     }
 }
 
+STOPBUSY();
+
 #
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 # 
-header("Location: showuser.php3?target_uid=$target_uid#PROFILE");
+PAGEREPLACE("showuser.php3?target_uid=$target_uid#PROFILE");
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

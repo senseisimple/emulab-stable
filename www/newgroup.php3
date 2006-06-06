@@ -1,15 +1,20 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
 
 #
-# No header since we issue a redirect later.
+# Standard Header
 #
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Create a Project Group");
+
 ignore_user_abort(1);
 
 #
@@ -133,6 +138,8 @@ DBQueryFatal("INSERT INTO group_stats ".
 #
 TBGroupUnixInfo($group_pid, $group_pid, $unix_gid, $unix_name);
 
+STARTBUSY("Creating project group $group_id.");
+
 #
 # Run the script. This will make the group directory, set the perms, etc.
 #
@@ -143,6 +150,8 @@ SUEXEC($uid, $unix_gid, "webmkgroup $group_pid $group_id", 1);
 # 
 SUEXEC($uid, $unix_gid,
        "webmodgroups -a $group_pid:$group_id:group_root $group_leader", 1);
+
+STOPBUSY();
 
 #
 # Send an email message with a join link.
@@ -165,10 +174,12 @@ TBMAIL("$group_leader_name '$group_leader' <$group_leader_email>",
        "Errors-To: $TBMAIL_WWW");
 
 #
-# Spit out a redirect so that the history does not include a post
-# in it. The back button skips over the post and to the form.
-# 
-header("Location: showgroup.php3?pid=$group_pid&gid=$group_id");
+# Redirect back to project page.
+#
+PAGEREPLACE("showgroup.php3?pid=$group_pid&gid=$group_id");
 
-# No Testbed footer.
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

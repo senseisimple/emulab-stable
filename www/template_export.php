@@ -138,15 +138,7 @@ if (! $spew) {
 	"        src='template_sup.js'>\n";
     echo "</script>\n";
 
-    echo "<center>\n";
-    echo "<b>Starting export!</b> ...<br>\n";
-    echo "This will take a few moments; please be patient.<br>\n";
-    echo "<br>\n";
-    echo "<img id='busy' src='busy.gif'>
-                <span id='loading'> Working ...</span>";
-    echo "<br>\n";
-    echo "</center>\n";
-    flush();
+    STARTBUSY("Starting export");
     sleep(1);
 }
 
@@ -207,11 +199,12 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "-i $exptidx $guid/$version",
 		 SUEXEC_ACTION_IGNORE);
 
-if (! $spew) {
-    /* Clear the 'loading' indicators above */
-    echo "<script type='text/javascript' language='javascript'>\n";
-    echo "ClearLoadingIndicators();\n";
-    echo "</script>\n";
+/* Clear the 'loading' indicators above */
+if ($retval) {
+    CLEARBUSY();
+}
+else {
+    STOPBUSY();
 }
 
 #
@@ -228,9 +221,8 @@ if ($retval) {
     return;
 }
 
-echo "<script type='text/javascript' language='javascript'>\n";
-echo "PageReplace('template_show.php?guid=$guid&version=$version');\n";
-echo "</script>\n";
+# Zap back to template page.
+PAGEREPLACE("template_show.php?guid=$guid&version=$version");
 
 #
 # In case the above fails.

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -235,14 +235,7 @@ if (!$confirmed_twice) {
     return;
 }
 
-echo "<br>
-      User '$target_uid' is being removed" .
-      (isset($target_pid) ? " from project '$target_pid' " : "") . 
-      "!<br><br>
-      This will take a minute or two. <b>Please</b> do not click the Stop
-      button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.<br>\n";
-flush();
+STARTBUSY("User '$target_uid' is being removed!");
 
 #
 # All the real work is done in the script.
@@ -250,12 +243,9 @@ flush();
 SUEXEC($uid, $TBADMINGROUP,
        "webrmuser " . (isset($target_pid) ? "-p $target_pid " : " ") .
        "$target_uid",
-       1);
+       SUEXEC_ACTION_DIE);
 
-#
-# Warm fuzzies.
-#
-echo "<br><br><b>Done</b><br><br>\n";
+STOPBUSY();
 
 #
 # If a user was removed from a project, and that user no longer has
