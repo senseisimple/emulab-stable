@@ -3396,3 +3396,5 @@ last_net_act,last_cpu_act,last_ext_act);
 4.65: Minor fix; skip to next entry;
 4.66: More fixes; skip to next entry;
 
+4.67: Add a foreign_admin field to the users table for testbed-admins elsewhere.
+       alter table users add column foreign_admin tinyint(4) default '0' after admin;

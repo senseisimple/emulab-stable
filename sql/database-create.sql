@@ -2473,6 +2473,7 @@ CREATE TABLE users (
   unix_uid smallint(5) unsigned NOT NULL default '0',
   status enum('newuser','unapproved','unverified','active','frozen','other') NOT NULL default 'newuser',
   admin tinyint(4) default '0',
+  foreign_admin tinyint(4) default '0',
   dbedit tinyint(4) default '0',
   stud tinyint(4) default '0',
   webonly tinyint(4) default '0',
