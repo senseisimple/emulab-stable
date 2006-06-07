@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -205,6 +205,13 @@ void handle_link_modify(char * linkname, int l_index,
     get_new_link_params(l_index, handle, notification, &p_which);
 }
 
+/* link field changed in 6.1 */
+#if __FreeBSD_version > 600000
+#define DN_PIPE_NEXT(p)	((p)->next.sle_next)
+#else
+#define DN_PIPE_NEXT(p)	((p)->next)
+#endif
+
 /****************** get_link_params ***************************
 for both the pipes of the duplex link, get the pipe params
 sing getsockopt and store these params in the link map
@@ -263,7 +270,7 @@ int get_link_params(int l_index)
     for ( ; num_bytes >= sizeof(*p) ; p = (struct dn_pipe *)next ) {
        
      
-       if ( p->next != (struct dn_pipe *)DN_IS_PIPE )
+       if ( DN_PIPE_NEXT(p) != (struct dn_pipe *)DN_IS_PIPE )
 	  break ;
 
        l = sizeof(*p) + p->fs.rq_elements * sizeof(*q) ;
