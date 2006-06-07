@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,7 +28,6 @@ use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES @EXPORT_OK);
 # Configure variables
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSNODE    = "@BOSSNODE@";
 my $SCRIPTNAME  = "Unknown";
 
 # Untainted scriptname for email below.
@@ -53,11 +52,12 @@ $DBCONN_MAXTRIES  = 5;
 #
 my $tbdbname;
 my $tbdbuser;
+my $tbdbhost   = "localhost";
 my $tbdbpasswd = "none";
 
-sub TBDBConnect($;$$)
+sub TBDBConnect($;$$$)
 {
-    my ($dbname, $dbuser, $dbpasswd) = @_;
+    my ($dbname, $dbuser, $dbpasswd, $dbhost) = @_;
     my $maxtries = $DBCONN_MAXTRIES;
 
     #
@@ -75,9 +75,11 @@ sub TBDBConnect($;$$)
     $tbdbuser   = $dbuser;
     $tbdbpasswd = $dbpasswd
 	if (defined($dbpasswd));
+    $tbdbhost   = $dbhost
+	if (defined($dbhost));
 
     while ($maxtries) {
-	$DB = Mysql->connect("localhost", $tbdbname, $tbdbuser, $tbdbpasswd);
+	$DB = Mysql->connect($tbdbhost, $tbdbname, $tbdbuser, $tbdbpasswd);
 	if (defined($DB)) {
 	    last;
 	}
@@ -201,8 +203,8 @@ sub DBWarn($;$)
 
     print STDERR "*** $text";
 
-    if (! defined($nomail)) {
-      libtestbed::SENDMAIL($TBOPS, "DBError - $message", $text);
+    if (! defined($nomail) && (exists($INC{'libtestbed.pm'}))) {
+        libtestbed::SENDMAIL($TBOPS, "DBError - $message", $text);
     }
 }
 
