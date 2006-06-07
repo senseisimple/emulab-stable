@@ -585,6 +585,30 @@ class user:
                               value=result,
                               output=str(result))
 
+    #
+    # Return collab password,
+    #
+    def collabpassword(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        res = DBQueryFatal("select mailman_password from users where uid=%s",
+                           (self.uid,))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such user!")
+
+        passwd = res[0][0]
+        return EmulabResponse(RESPONSE_SUCCESS, value=passwd)
+
     pass
 
 
