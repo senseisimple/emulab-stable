@@ -237,7 +237,24 @@ ID  Name                            Members of VLAN
 
     http://www.cisco.com/univercd/cc/td/doc/product/lan/cat6000/12_1e/swconfig/span.htm
 
-13. Good reference for making nodes boot quickly (ensuring that port spanning,
+13. Stuck 1000/100/10 ports [ ISI - faber@isi.edu ]
+
+    Occasionally Gigabit switch ports seem to get stuck in a state where
+    they do not output packets to the host connected to them.  We're not
+    sure why this happens (we're looking), but there is a fix.  Simply
+    toggle the speed using 
+    
+    	set port speed module/port 1000
+
+   and then back to whatever speed it was originally set for.  Of course
+   if it was originally 1000 Mb/s the first set should be to 100 and
+   then back to 1000.  We have seen ports lock up this way configured to
+   both 1000 and 100 Mb/sec.
+
+   You may have to both toggle the switch speed and re-ifconfig the host
+   NICs to re-establish connectivity.
+
+14. Good reference for making nodes boot quickly (ensuring that port spanning,
    trunking, etc. are off on the switch port):
 
    http://www.cisco.com/warp/public/473/12.html
@@ -250,7 +267,7 @@ ID  Name                            Members of VLAN
    (combining multiple ports to make a fast link) and trunking (a single
    port serving multiple VLANs).
 
-14. Good reference for how IGMP snooping (used for multicast) works:
+15. Good reference for how IGMP snooping (used for multicast) works:
 
     http://www.cisco.com/warp/public/473/22.html
 
@@ -258,11 +275,11 @@ ID  Name                            Members of VLAN
     heading "IGMP Snooping", and some more in "Practical Example of IGMP
     Snooping"
 
-15. IOS for guys who know CatOS: (ie. me)
+16. IOS for guys who know CatOS: (ie. me)
 
     http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/tech/cat65_wp.htm
 
-16. For into on how the switches do load balancing on etherchannel
+17. For into on how the switches do load balancing on etherchannel
     (aka "trunk") links:
 
     http://www.cisco.com/warp/public/473/4.html
