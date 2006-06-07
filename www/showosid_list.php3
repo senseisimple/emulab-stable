@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -112,7 +112,7 @@ if (mysql_num_rows($query_result)) {
     
     while ($row = mysql_fetch_array($query_result)) {
         $osname  = $row[osname];
-        $osid    = $row[osid];
+        $osid    = urlencode($row[osid]);
         $descrip = stripslashes($row[description]);
         $pid     = $row[pid];
     
