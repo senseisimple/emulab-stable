@@ -56,6 +56,8 @@ static void enqueue(event_handle_t handle,
 		    void *data);
 static void dequeue(event_handle_t handle);
 static int  handle_completeevent(event_handle_t handle, sched_event_t *eventp);
+static void RecordEvent(sched_event_t *eventp, char *eventtype,
+			char *parent, char *arguments);
 
 static char	*progname;
 char	pideid[BUFSIZ];
@@ -63,6 +65,12 @@ char	*pid, *eid;
 static int	get_static_events(event_handle_t handle);
 int	debug;
 const char *XMLRPC_ROOT = TBROOT;
+
+/* Dynamic event recording */
+static int	recordevents;
+static char	*recordevents_filename;
+static void	RecordEventsInit(void);
+
 
 expt_state_t expt_state;
 
@@ -189,6 +197,7 @@ usage(void)
 		"  -h          Print this message\n"
 		"  -V          Print version information\n"
 		"  -d          Turn on debugging\n"
+		"  -t filename Record dynamic events to file as they arrive\n"
 		"  -s server   Specify location of elvind server. "
 		"(Default: localhost)\n"
 		"  -r          Use the standard RPC path. (Current: %s)\n"
@@ -233,7 +242,7 @@ main(int argc, char *argv[])
 	if ((primary_simulator_agent = create_simulator_agent()) == NULL)
 		fatal("cannot allocate simulator agent");
 
-	while ((c = getopt(argc, argv, "hVrs:p:dl:k:")) != -1) {
+	while ((c = getopt(argc, argv, "hVrs:p:dl:k:t:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
@@ -259,6 +268,10 @@ main(int argc, char *argv[])
 			break;
 		case 'k':
 			keyfile = optarg;
+			break;
+		case 't':
+			recordevents = 1;
+			recordevents_filename = optarg;
 			break;
 		default:
 			usage();
@@ -294,6 +307,10 @@ main(int argc, char *argv[])
 
 	if (RPC_metadata(pid, eid)) {
 		fatal("could not get experiment metadata");
+	}
+
+	if (recordevents) {
+		RecordEventsInit();
 	}
 
 	/*
@@ -796,7 +813,17 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 					     "TOKEN",
 					     next_token);
 		next_token += 1;
-		
+
+		if (recordevents) {
+			char	argsbuf[BUFSIZ] = "";
+			event_notification_get_arguments(handle,
+							 event.notification,
+							 argsbuf,
+							 sizeof(argsbuf));
+			
+			RecordEvent(&event, eventtype, timeline, argsbuf);
+		}
+
 		/*
 		 * Enqueue the event notification for resending at the
 		 * indicated time:
@@ -1551,4 +1578,42 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 	}
 	
 	return 1;
+}
+
+/*
+ * Record events to DB
+ */
+static FILE	*recordevents_fp;
+
+static void
+RecordEventsInit(void)
+{
+	/*
+	 * Open up file and write a header that describes the format.
+	 */
+	if ((recordevents_fp = fopen(recordevents_filename, "w")) == NULL) {
+		fatal("Could not open recordevents_filename for writing");
+	}
+
+	fprintf(recordevents_fp,
+		"arrivaltime,firetime,vnode,objname,objecttype,eventtype,"
+		"parent,arguments\n");
+	fflush(recordevents_fp);
+}
+
+static void
+RecordEvent(sched_event_t *eventp, char *eventtype, char *parent, char *args)
+{
+	struct timeval now;
+	struct agent *agentp = eventp->agent.s;
+
+	gettimeofday(&now, NULL);
+
+	fprintf(recordevents_fp,
+		"%ld:%ld,%ld:%ld,%s,%s,%s,%s,%s,%s\n",
+		now.tv_sec, now.tv_usec,
+		eventp->time.tv_sec, eventp->time.tv_usec,
+		agentp->vnode, agentp->name, agentp->objtype, eventtype,
+		parent, args);
+	fflush(recordevents_fp);
 }
