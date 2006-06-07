@@ -1030,7 +1030,7 @@ sub resetVlanIfOnTrunk($$$) {
     my $RetVal = $self->{SESS}->get($obj);
 
     if ($self->{DEBUG} > 0) {
-	print $self->{NAME} . ":resetVlanIfOnTrunk got $RetVal for $obj\n";
+	print $self->{NAME} . "::resetVlanIfOnTrunk got $RetVal for $obj\n";
     }
     if (defined($RetVal) && ($RetVal eq "valid")) {
 	$self->setVlansOnTrunk($modport,0,$vlan);

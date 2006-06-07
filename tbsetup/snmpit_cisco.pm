@@ -1166,6 +1166,37 @@ sub UpdateField($$$@) {
 }
 
 #
+# Determine if a VLAN has any ports on this switch
+#
+# usage: vlanHasPorts($self, $vlan_number)
+# returns 1 if the vlan exists and has ports
+#
+sub vlanHasPorts($$) {
+    my ($self, $vlan_number)= @_;
+
+    if ($self->vlanNumberExists($vlan_number)) {
+
+	my $VlanPortVlan;
+	if ($self->{OSTYPE} eq "CatOS") {
+	    $VlanPortVlan = ["vlanPortVlan"]; #index is ifIndex
+	} elsif ($self->{OSTYPE} eq "IOS") {
+	    $VlanPortVlan = ["vmVlan"]; #index is ifIndex
+	}
+	#
+	# Walk the tree for the VLAN members
+	#
+	my ($rows) = snmpitBulkwalkFatal($self->{SESS},$VlanPortVlan);
+	$self->debug("Vlan members walk got " . scalar(@$rows) . " rows\n");
+	foreach my $rowref (@$rows) {
+	    my ($name,$modport,$number) = @$rowref;
+	    $self->debug("Got $name $modport $number\n",3);
+	    if ($number == $vlan_number) { return 1; }
+	}
+	return 0;
+    }
+}
+
+#
 # List all VLANs on the device
 #
 # usage: listVlans($self)

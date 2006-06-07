@@ -1190,7 +1190,7 @@ sub getStats ($) {
 sub resetVlanIfOnTrunk($$$) {
     my ($self, $modport, $vlan) = @_;
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
-    $self->debug($self->{NAME} . ":resetVlansIfOnTrunk m $modport "
+    $self->debug($self->{NAME} . "::resetVlanIfOnTrunk m $modport "
 		    . "vlan $vlan ifIndex $ifIndex\n",1);
     my $vlans = $self->get1("rcVlanPortVlanIds", $ifIndex);
     if (defined($vlans)) {
@@ -1216,7 +1216,6 @@ sub getChannelIfIndex($@) {
     my $self = shift;
     my @ports = @_;
     my @ifIndexes = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
-
     my $ifindex = undef;
 
     #

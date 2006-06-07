@@ -361,13 +361,13 @@ sub setPortVlan($$@) {
 	    my $dev = $self->{DEVICES}{$devicename};
 	    foreach my $neighbor (keys %{$trunks{$devicename}}) {
 		my $trunkIndex = $dev->getChannelIfIndex(
-				    @{$trunks{$devicename}{neighbor}});
+				    @{$trunks{$devicename}{$neighbor}});
 		if (!defined($trunkIndex)) {
 		    warn "unable to find channel information on $devicename ".
 			 "for $devicename-$neighbor EtherChannel\n";
 		    $errors += 1;
 		} else {
-		    $dev->resetVlansIfOnTrunk($trunkIndex,$vlan);
+		    $dev->resetVlanIfOnTrunk($trunkIndex,$vlan);
 		}
 	    }
 	}
@@ -985,7 +985,7 @@ sub lock($) {
     my $stackid = $self->{STACKID};
     my $token = "snmpit_$stackid";
     my $old_umask = umask(0);
-    die if (TBScriptLock($token) != TBSCRIPTLOCK_OKAY());
+    die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
     umask($old_umask);
 }
 
