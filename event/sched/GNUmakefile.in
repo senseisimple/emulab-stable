@@ -25,7 +25,7 @@ CFLAGS   += `elvin-config --cflags vin4mt`
 LDFLAGS  += -pthread
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
-LIBS     += -levent_r -ltb -lcipher -lz
+LIBS     += -levent_r -ltb -lz
 
 ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
 CXXFLAGS += -pthread -O $(ULXRINC) -I$(OBJDIR) -I$(TESTBED_SRCDIR)/lib/libtb
