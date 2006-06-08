@@ -6,6 +6,10 @@
 #
 require("defs.php3");
 
+# Some Knowledge Base entries are visible only to admins.
+$uid = GETLOGIN();
+$admin_access = ISADMIN($uid) || ISFOREIGN_ADMIN($uid);
+
 # Page arguments.
 $printable = $_GET['printable'];
 if (!isset($printable))
@@ -34,10 +38,12 @@ else {
 }
 
 #
-# Get all entries.
+# Get all entries.  Only admins see section='Testbed Operations'.
 # 
 $search_result =
     DBQueryFatal("select * from knowledge_base_entries ".
+		 ($admin_access ? "" : 
+		  "where section != 'Testbed Operations' ").
 		 "order by section,date_created");
 
 if (! mysql_num_rows($search_result)) {

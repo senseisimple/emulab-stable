@@ -46,7 +46,8 @@ define("CHECKLOGIN_WEBONLY",		0x040000);
 define("CHECKLOGIN_PLABUSER",		0x080000);
 define("CHECKLOGIN_STUDLY",		0x100000);
 define("CHECKLOGIN_WIKIONLY",		0x200000);
-define("CHECKLOGIN_OPSGUY",		0x400000);	# member of emulab-ops
+define("CHECKLOGIN_OPSGUY",		0x400000);	# Member of emulab-ops.
+define("CHECKLOGIN_ISFOREIGN_ADMIN",	0x800000);	# Admin of another Emulab. 
 
 #
 # Constants for tracking possible login attacks.
@@ -156,7 +157,7 @@ function CHECKLOGIN($uid) {
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
 		     "       user_interface,n.type,u.stud,u.wikiname, ".
-		     "       u.wikionly,g.pid " .
+		     "       u.wikionly,g.pid,u.foreign_admin " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -202,6 +203,10 @@ function CHECKLOGIN($uid) {
 	if ($pid == $TBOPSPID) {
 	    $opsguy = 1;
 	}
+
+	# Set foreign_admin=1 for admins of another Emulab.
+	$foreign_admin   = $row[15];
+
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
 
@@ -323,6 +328,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_WIKINAME = $wikiname;
     if ($opsguy)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_OPSGUY;
+    if ($foreign_admin)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_ISFOREIGN_ADMIN;
 
     #
     # Set the magic enviroment variable, if appropriate, for the sake of
@@ -443,6 +450,21 @@ function ISADMIN($uid = 1) {
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINOFF)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
+}
+
+
+# Is this user an admin of another Emulab.
+function ISFOREIGN_ADMIN($uid = 1) {
+    global $CHECKLOGIN_STATUS;
+
+    # Definitely not, if not logged in.
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
+	return 0;
+    }
+
+    return (($CHECKLOGIN_STATUS &
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISFOREIGN_ADMIN)) ==
+	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISFOREIGN_ADMIN));
 }
 
 function STUDLY() {
