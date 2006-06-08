@@ -984,7 +984,7 @@ proc tb-set-node-startcmd {node command} {
 	perror "\[tb-set-node-startcmd] $node is not a node."
 	return
     }
-    set command "($command ; /usr/local/etc/emulab/startcmddone \$?)"
+    set command "{($command ; /usr/local/etc/emulab/startcmddone \$?)}"
     set newprog [$node start-command $command]
 
     return $newprog
