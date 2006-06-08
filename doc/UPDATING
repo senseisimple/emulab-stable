@@ -20,10 +20,13 @@ earliest time one of the steps needs to occur.
 
 20060606:
 
-      Be sure to firewall the mysql port (3306) from access to your ops
-      node. 
+      Be sure to firewall the mysql port (3306) at your router so that
+      outside networks cannot access that port on your ops node (we now
+      run mysqld on ops).
 
-20060525:
+20060525:  Do this before installing tbsetup/libtblog.pm.in rev 2.14
+      It would be best if your Emulab was down during this change.
+
       No schema changes, but due to a bug in libtblog.pm.in the uid &
       exptidx columns got swapped for new values inserted into the
       session_info table after the 4.56 schema change.  This is fixed
