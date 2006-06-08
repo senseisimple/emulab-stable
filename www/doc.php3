@@ -54,8 +54,14 @@ PAGEHEADER("Documentation");
               Emulab Advanced Tutorial</a></b>
 <li><b><a href="tutorial/docwrapper.php3?docname=advanced.html">
               Emulab Advanced Example</a></b>
-<li><b><a href="kb-search.php3">
-              Search or Browse the Emulab Knowledge Base</a></b>
+<?php
+# Link to kb-search through $TBBASE (https:), not $TBDOCBASE (http:).
+# On https:, the browser sends HashCookie, so we get CHECKLOGIN_LOGGEDIN
+# status.  Going via http:, we get CHECKLOGIN_MAYBEVALID, and can't know
+# whether to show admin KB entries.
+echo "<li><b><a href=\"$TBBASE/kb-search.php3\">\n
+              Search or Browse the Emulab Knowledge Base</a></b>\n";
+?>
 <li><b><a href="tutorial/docwrapper.php3?docname=nscommands.html">
               Emulab-specific NS Extensions Reference Manual</a></b>
 <li><b><a href = "xmlrpcapi.php3">Emulab's XML-RPC interface reference</a></b>

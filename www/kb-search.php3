@@ -6,6 +6,10 @@
 #
 if (!isset($embedded)) {
     require("defs.php3");
+
+    # Some Knowledge Base entries are visible only to admins.
+    $uid = GETLOGIN();
+    $admin_access = ISADMIN($uid) || ISFOREIGN_ADMIN($uid);
 }
 
 #
@@ -17,6 +21,8 @@ if (!isset($embedded)) {
 
 function SPITFORM($query, $query_type, $query_which, $error)
 {
+    global $TBBASE;
+
     echo "<table align=center border=1>
           <form action=kb-search.php3 method=get>\n";
 
@@ -97,8 +103,12 @@ function SPITFORM($query, $query_type, $query_which, $error)
     echo "</form>
           </table><br>\n";
 
+    # Link to kb-browse through $TBBASE (https:), not $TBDOCBASE (http:).
+    # On https:, the browser sends HashCookie, so we get CHECKLOGIN_LOGGEDIN
+    # status.  Going via http:, we get CHECKLOGIN_MAYBEVALID, and can't know
+    # whether to show admin KB entries.
     echo "<center>".
-	 "You may also <a href=kb-browse.php3>
+	 "You may also <a href=$TBBASE/kb-browse.php3>
 	     browse the entire Knowledge Base</a>.".
          "</center>\n";
 }
@@ -161,6 +171,8 @@ if ($query == "*" ||
     preg_match("/^\s+$/", $query)) {
     $search_result =
 	DBQueryFatal("select * from knowledge_base_entries ".
+		     ($admin_access ? "" :
+		      "where section != 'Testbed Operations' ").
 		     "order by section,date_created");
 }
 else {
@@ -224,6 +236,8 @@ else {
     $search_result =
 	DBQueryFatal("select * from knowledge_base_entries ".
 		     "$clause ".
+		     ($admin_access ? "" : 
+		      "and section != 'Testbed Operations' ").
 		     "order by section,date_created");
 }
 
