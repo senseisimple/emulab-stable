@@ -289,7 +289,7 @@ CREATE TABLE experiment_template_instances (
   PRIMARY KEY  (idx),
   KEY  (exptidx),
   KEY  (parent_guid,parent_vers),
-  KEY  (pid,eid),
+  KEY  (pid,eid)
 ) TYPE=MyISAM;
 
 #

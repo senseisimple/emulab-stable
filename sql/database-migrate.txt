@@ -3320,7 +3320,7 @@ last_net_act,last_cpu_act,last_ext_act);
         PRIMARY KEY  (session)
       );
 
-      lock tables log write;
+      lock tables log write, session_info write;
 
       insert into session_info
         select session, uid, exptidx from log 
@@ -3355,7 +3355,7 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table virt_nodes add plab_role enum('plc','node','none') \
 	NOT NULL default 'none' after inner_elab_role;
 
-4.60: Various changes to templates.
+4.60: Various changes to templates. 
 
       alter table experiment_template_metadata_items \
                change value value mediumtext;
