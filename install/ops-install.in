@@ -894,6 +894,12 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
 	}
     };
+    Phase "my-server2", "Removing $RCDIR/mysql-server", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server");
+	if (!unlink "$RCDIR/mysql-server") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server: $!");
+	}
+    };
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
         Phase "elvind.sh", "Removing port version of elvind.sh", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");

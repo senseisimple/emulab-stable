@@ -493,6 +493,12 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
 	}
     };
+    Phase "my-server2", "Removing $RCDIR/mysql-server", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server");
+	if (!unlink "$RCDIR/mysql-server") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server: $!");
+	}
+    };
     Phase "snmpd", "Removing snmpd startup script",  sub {
 	DoneIfDoesntExist("$RCDIR/snmpd.sh");
 	if (!unlink "$RCDIR/snmpd.sh") {
@@ -717,12 +723,19 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 };
 
 #
-# New version perl does not appear to require this anymore.
+# New version perl does not appear to require this anymore. In fact, it
+# seems to break things if it is!
 #
 if ($FBSD_VERSION == 4) {
     Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
 	PhaseSkip("Already done") if (-u $SUIDPERL);
 	ExecQuietFatal("$CHMOD u+s $SUIDPERL");
+    };
+}
+else {
+    Phase "suidperl", "UnSetting the suid bit on $SUIDPERL", sub {
+	PhaseSkip("Already done") if (! -u $SUIDPERL);
+	ExecQuietFatal("$CHMOD u-s $SUIDPERL");
     };
 }
 
