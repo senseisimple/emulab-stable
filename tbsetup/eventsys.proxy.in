@@ -21,10 +21,10 @@ use POSIX ":sys_wait_h";
 sub usage()
 {
     print "Usage: eventsys.proxy -u user -g gid -e pid/eid -k keyfile ".
-	"-l logfile start|stop|replay\n";
+	"-l logfile -t record_file start|stop|replay\n";
     exit(-1);
 }
-my $optlist = "u:e:k:dl:g:";
+my $optlist = "u:e:k:dl:g:t:";
 my $debug   = 0;
 my $user;
 my $pid;
@@ -32,6 +32,7 @@ my $eid;
 my $gid;
 my $keyfile;
 my $logfile;
+my $recordfile;
 my $action;
 
 #
@@ -90,6 +91,9 @@ if (! defined($options{"u"}) ||
 	    
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"t"})) {
+    $recordfile = $options{"t"};
 }
 
 $logfile    = $options{"l"};
@@ -220,7 +224,9 @@ $ENV{'USER'}    = $user;
 $ENV{'LOGNAME'} = $user;
 
 # And run it.
-exec("$sched " . ($debug ? "-d" : "") . " -s localhost -k $keyfile $pid $eid");
+exec("$sched " . ($debug ? "-d" : "") .
+     ($recordfile ? " -t $recordfile" : "") .
+     " -s localhost -k $keyfile $pid $eid");
 die("*** $0:\n".
     "    Could not exec $sched!");
 

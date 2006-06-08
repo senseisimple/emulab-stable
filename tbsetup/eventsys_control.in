@@ -62,6 +62,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use Template;
 
 #
 # Turn off line buffering on output
@@ -76,6 +77,7 @@ my $proxy	= "$TB/sbin/eventsys.proxy";
 my $debug	= 1;
 my $force       = 0;
 my $expstate;
+my $exptidx;
 my $dbuid;
 
 #
@@ -174,6 +176,11 @@ if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gidname)) {
     tbdie("Could not get unix group info for $pid/$gid!");
 }
 
+# Need this to see if its a template experiment.
+if (! TBExptIDX($pid, $eid, \$exptidx)) {
+    tbdie("Could not get experiment index for $pid/$gid!");
+}
+
 #
 # Pase the whole thing off to the proxy, which might be local when running
 # in UNIFIED_BOSS_AND_OPS mode. Become real root either way; the proxy will
@@ -182,6 +189,8 @@ if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gidname)) {
 my $cmd = $proxy;
 $cmd .= " -d"
     if ($debug);
+$cmd .= " -t " . TBExptUserDir($pid, $eid) . "/archive/events"
+    if (Template::Instance->LookupByExptidx($exptidx));
 $cmd .= " -l " . TBExptUserDir($pid, $eid) . "/logs/event-sched.log";
 $cmd .= " -k " . TBDB_EVENTKEY($pid, $eid);
 $cmd .= " -g " . $unix_gidname;
