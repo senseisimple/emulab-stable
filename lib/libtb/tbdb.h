@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -15,6 +15,8 @@
  * Generic interface.
  */
 int		dbinit(void);
+int		dbinit_withparams(char *host,
+				  char *user, char *passwd, char *name);
 void		dbclose(void);
 
 /*

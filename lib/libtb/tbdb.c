@@ -26,12 +26,15 @@
  */
 static MYSQL	db;
 static char    *dbname = TBDBNAME;
+static char    *dbuser = (char *) NULL;
+static char    *dbpass = (char *) NULL;
+static char    *dbhost = (char *) NULL;
 
 static int
 mydb_connect()
 {
 	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0,
+	if (mysql_real_connect(&db, dbhost, dbuser, dbpass,
 			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
 		error("%s: connect failed: %s\n", dbname, mysql_error(&db));
 		return 0;
@@ -64,6 +67,16 @@ mydb_disconnect()
 int
 dbinit(void)
 {
+	return mydb_connect();
+}
+
+int
+dbinit_withparams(char *host, char *user, char *passwd, char *name)
+{
+	dbhost = host;
+	dbuser = user;
+	dbname = name;
+	dbpass = passwd;
 	return mydb_connect();
 }
 
