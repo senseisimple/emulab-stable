@@ -11,7 +11,7 @@ SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh 2.elvind.sh 1.named.sh \
+RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh 2.elvind.sh \
 		  2.dhcpd.sh 1.mysql-client.sh
 OPS_SCRIPTS     = 2.elvind.sh 3.and.sh 1.mysql-client.sh 1.mysql-server.sh
 
@@ -23,6 +23,8 @@ ifeq ($(WINSUPPORT),1)
 OPS_SCRIPTS += silly.sh
 endif
 endif
+else
+RC_SCRIPTS  += 1.named.sh
 endif
 
 #

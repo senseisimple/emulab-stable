@@ -707,19 +707,28 @@ Phase "database", "Setting up database", sub {
 
 Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
     DoneIfEdited($RCCONF);
-    AppendToFileFatal($RCCONF,
-        qq|rpcbind_enable="YES"|,
-        qq|mountd_enable="YES"|,
-	qq|nfs_server_enable="YES"|,
-	qq|nfs_server_flags="-u -t -n 16"|,
-	qq|nfs_client_enable="YES"|,
-	qq|inetd_enable="YES"|,
-	qq|inetd_flags="-wW -R 0"|,
-	qq|named_enable="NO"|,
-	qq|xntpd_enable="YES"|,
-	qq|syslogd_flags=""|,
-	qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|,
-    	qq|apache_enable="YES"|);
+    my @strings = (qq|rpcbind_enable="YES"|,
+		   qq|mountd_enable="YES"|,
+		   qq|nfs_server_enable="YES"|,
+		   qq|nfs_server_flags="-u -t -n 16"|,
+		   qq|nfs_client_enable="YES"|,
+		   qq|inetd_enable="YES"|,
+		   qq|inetd_flags="-wW -R 0"|,
+		   qq|xntpd_enable="YES"|,
+		   qq|syslogd_flags=""|,
+		   qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|,
+		   qq|apache_enable="YES"|);
+
+    # Starting at 6.1 we use the default version of bind, not the port.
+    if ($FBSD_VERSION <= 6.0) {
+	push(@strings, qq|named_enable="NO"|);
+    }
+    else {
+	push(@strings, (qq|named_enable="YES"|,
+			qq|named_chrootdir=""|,
+			qq|named_uid="root"|));
+    }
+    AppendToFileFatal($RCCONF, @strings);
 };
 
 #
@@ -1067,15 +1076,32 @@ Phase "named", "Setting up initial named configuration", sub {
     Phase "generating", "Generating named zone files", sub {
 	ExecQuietFatal("$NAMED_SETUP -norestart");
     };
+    
+    # Starting at 6.1 we use the default version of bind, not the port.
+    my $named_control = ($FBSD_VERSION <= 6.0 ?
+			 "$RCDIR/1.named.sh" : "/etc/rc.d/named");
+    
     Phase "stopping", "Stopping named", sub {
 	if (ExecQuiet("killall -s named")) {
 	    PhaseSkip("named not running");
 	}
-	ExecQuietFatal("$RCDIR/1.named.sh stop");
+	ExecQuietFatal("$named_control stop");
     };
     Phase "starting", "Starting named", sub {
-	ExecQuietFatal("$RCDIR/1.named.sh start");
+	ExecQuietFatal("$named_control start");
     };
+
+    # Lets make sure that old file is gone!
+    if ($FBSD_VERSION >= 6.1) {
+	Phase "cleanup", "Cleaning up old files", sub {
+	    DoneIfDoesntExist("$RCDIR/1.named.sh");
+	
+	    if (!unlink "$RCDIR/1.named.sh") {
+		PhaseFail("Unable to remove $RCDIR/1.named.sh: $!");
+	    }
+	};
+    }
+    
     Phase "copying", "Copying resolv.conf over to ops", sub {
  	ExecQuietFatal("$SCP $TOP_OBJDIR/named/resolv.conf.ops ".
 		       "     ${USERNODE}:/etc/resolv.conf");
