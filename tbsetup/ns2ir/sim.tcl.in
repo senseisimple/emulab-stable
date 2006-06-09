@@ -1509,6 +1509,9 @@ Simulator instproc make_event {outer event} {
 			    set args "${args}TIMEOUT={$to} "
 			}
 		    }
+		    # Put the command last so the program-agent can assume everything
+		    # up to the end of the string is part of the command and we don't
+		    # have to deal with quoting...  XXX
 		    if {$(-command) != {}} {
 			set args "${args}COMMAND=$(-command)"
 		    }
