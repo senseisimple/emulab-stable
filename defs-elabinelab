@@ -16,6 +16,7 @@ TBTESTSUITEEMAIL=testbed-testsuite@changeme
 TBAUTOMAILEMAIL=testbed-automail@changeme
 TBACTIVEARCHIVE=testbed-active-users-archive@changeme
 TBUSERSARCHIVE=testbed-users-archive@changeme
+TBCOOKIESUFFIX=changeme
 JAILIPBASE=172.17.0.0
 JAILIPMASK=255.240.0.0
 DELAYCAPACITY=1

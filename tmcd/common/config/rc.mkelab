@@ -1554,6 +1554,10 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
+		/^TBCOOKIESUFFIX$/ && do {
+		    print OUTDEFS "TBCOOKIESUFFIX=\"$eid\"\n";
+		    last SWITCH;
+		};
 		
 		print OUTDEFS $_;
 	    }
