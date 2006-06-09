@@ -111,7 +111,7 @@ my $PHP4_PKG = "php4-extensions-1.0";
 
 # Version of FreeBSD.
 my $FBSD_VERSION = 4;
-if (`uname -r` =~ /^(\d)/) {
+if (`uname -r` =~ /^(\d\.\d*)/) {
     $FBSD_VERSION = $1;
 }
 else {
@@ -249,7 +249,7 @@ sub doboot()
     }
 
     # XXX Temporary
-    if ($FBSD_VERSION == 5) {    
+    if ($FBSD_VERSION == 5.4) {    
 	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/5.4/packages";
 	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/5.4/packages";
 	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/5.4/packages";
@@ -257,10 +257,18 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
     }
-    elsif ($FBSD_VERSION == 6) {
+    elsif ($FBSD_VERSION == 6.0) {
 	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/6.0/packages";
 	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/6.0/packages";
 	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/6.0/packages";
+	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
+    }
+    elsif ($FBSD_VERSION == 6.1) {
+	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/6.1/packages";
+	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/6.1/packages";
+	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/6.1/packages";
 	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
@@ -723,6 +731,9 @@ sub SetupOpsNode($)
     if (!$emulabconfig{OPS_PKG_DIR} || !$emulabconfig{OPS_PKG}) {
 	SetupFatal("Could not get package info from Emulab!");
     }
+    print "Removing conflicting packages.\n";
+    mysystem("pkg_delete -r -x mysql-client");
+    
     print "Installing the ops metaport.\n";
 
     # Make sure /usr/ports is not a symlink to RO shared space
@@ -1073,6 +1084,9 @@ sub SetupBossNode()
     if (!$emulabconfig{BOSS_PKG_DIR} || !$emulabconfig{BOSS_PKG}) {
 	SetupFatal("Could not get package info from Emulab!");
     }
+    print "Removing conflicting packages.\n";
+    mysystem("pkg_delete -r -x mysql-client");
+    
     print "Installing the boss metaport.\n";
 
     # Make sure /usr/ports is not a symlink to RO shared space
@@ -1487,7 +1501,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^MAILMANSUPPORT$/ && do {
-		    if ($FBSD_VERSION == 6) {
+		    if ($FBSD_VERSION >= 6) {
 			print OUTDEFS "MAILMANSUPPORT=1\n";
 		    }
 		    else {
@@ -1496,7 +1510,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^CVSSUPPORT$/ && do {
-		    if ($FBSD_VERSION == 6) {
+		    if ($FBSD_VERSION >= 6) {
 			print OUTDEFS "CVSSUPPORT=1\n";
 		    }
 		    else {
@@ -1505,7 +1519,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^BUGDBSUPPORT$/ && do {
-		    if ($FBSD_VERSION == 6) {
+		    if ($FBSD_VERSION >= 6) {
 			print OUTDEFS "BUGDBSUPPORT=1\n";
 		    }
 		    else {
@@ -1514,7 +1528,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^OPSDBSUPPORT$/ && do {
-		    if ($FBSD_VERSION == 6) {
+		    if ($FBSD_VERSION >= 6) {
 			print OUTDEFS "OPSDBSUPPORT=1\n";
 		    }
 		    else {
@@ -1523,7 +1537,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^WIKISUPPORT$/ && do {
-		    if ($FBSD_VERSION == 6) {
+		    if ($FBSD_VERSION >= 6) {
 			print OUTDEFS "WIKISUPPORT=1\n";
 		    }
 		    else {
@@ -1532,7 +1546,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^ARCHSUPPORT$/ && do {
-		    if ($FBSD_VERSION == 6) {
+		    if ($FBSD_VERSION >= 6) {
 			print OUTDEFS "ARCHSUPPORT=1\n";
 		    }
 		    else {
