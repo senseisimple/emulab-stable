@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,6 +39,8 @@ use strict;
 use English;
 use Getopt::Std;
 use POSIX qw(strftime);
+
+sub dostatus(@);
 
 sub usage() {
     print << "END";
