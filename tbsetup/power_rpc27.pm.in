@@ -245,7 +245,7 @@ sub syncandsend($$$) {
     # prompt.  So allow some time for the RPC to digest everything before
     # we feed it the command.
     #
-    sleep(1);
+    sleep(2);
 
     if ($debug) {
 	print "Sending '$cmd' to $controller\n";
