@@ -22,9 +22,9 @@ ifeq ($(FBSDVERSION),FreeBSD6)
 ifeq ($(WINSUPPORT),1)
 OPS_SCRIPTS += silly.sh
 endif
-endif
 else
 RC_SCRIPTS  += 1.named.sh
+endif
 endif
 
 #
