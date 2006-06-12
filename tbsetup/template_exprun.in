@@ -90,7 +90,7 @@ my $eventcontrol= "$TB/bin/eventsys_control";
 sub ParseArgs();
 sub fatal($$);
 sub sighandler($);
-
+sub SendNewEnv();
 #
 # Testbed Support libraries
 #
@@ -100,6 +100,7 @@ use libtestbed;
 use libtblog;
 use libArchive;
 use Template;
+use event;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -302,27 +303,32 @@ if ($waitmode) {
     POSIX::setsid();
 }
 
-# This sets the stop time.
-$instance->StopCurrentRun() == 0
-    or fatal(-1, "Could not stop experiment run for $instance!");
-
-# This runs loghole.
-print "Asking loghole to sync the logfiles ... this will take a minute.\n";
-$instance->LogHole() == 0
-    or fatal(-1, "Loghole failed");
-
-print "Dumping the instance database ... this will take a minute.\n";
-$instance->DumpDB() == 0
-    or fatal(-1, "Dump Database failed");
-
 #
-# Commit the archive. 
+# Might not be a current run, which is okay.
 #
-system("$archcontrol -t $runid commit $pid $eid");
+if (defined($instance->runidx())) {
+    # This sets the stop time.
+    $instance->StopCurrentRun() == 0
+	or fatal(-1, "Could not stop experiment run for $instance!");
 
-# This has to be done after the archive commit, so we can find the tag.
-$instance->FinalizeCurrentRun() == 0
-    or fatal(-1, "Could not finalize experiment run for $instance!");
+    # This runs loghole.
+    print "Asking loghole to sync the logfiles ... this will take a minute.\n";
+    $instance->LogHole() == 0
+	or fatal(-1, "Loghole failed");
+
+    print "Dumping the instance database ... this will take a minute.\n";
+    $instance->DumpDB() == 0
+	or fatal(-1, "Dump Database failed");
+
+    #
+    # Commit the archive. 
+    #
+    system("$archcontrol -t $runid commit $pid $eid");
+
+    # This has to be done after the archive commit, so we can find the tag.
+    $instance->FinalizeCurrentRun() == 0
+	or fatal(-1, "Could not finalize experiment run for $instance!");
+}
 
 goto done
     if ($action eq "stop");
@@ -349,7 +355,23 @@ if ($paramfile) {
 	$instance->NewRunBinding($name, $value) == 0
 	    or fatal(-1, "Could not create new experiment run binding ".
 		     "for $instance!");
+
+        #
+        # Hmm. Before we actually swapin, copy the parameters to the
+        # environment table so that they are available to the program
+        # agent when it starts up on the nodes (say, on reboot).
+	#
+	if (defined($value)) {
+	    $value = DBQuoteSpecial($value);
+	}
+	else {
+	    $value = "''";
+	}
+	DBQueryFatal("replace into virt_user_environment set ".
+		     "   name='$name', value=$value, ".
+		     "   pid='$pid', eid='$eid'");	
     }
+    SendNewEnv();
 }
 
 #
@@ -529,7 +551,7 @@ sub fatal($$)
     exit($errorstat);
 }
 
-sub sighandler ($) {
+sub sighandler($) {
     my ($signame) = @_;
     
     $SIG{TERM} = 'IGNORE';
@@ -537,6 +559,53 @@ sub sighandler ($) {
     kill('TERM', -$pgrp);
     sleep(1);
     fatal(-1, "Caught SIG${signame}!");
+}
+
+#
+# Send the new environement strings to the program agents as an event.
+# This bypasses the scheduler and goes directly. Not sure if this is the
+# best approach, but I like it better then restarting the agents and having
+# them contact tmcd.
+#
+sub SendNewEnv()
+{
+    my $URL     = "elvin://" . TB_EVENTSERVER();
+    my $keyfile = TBDB_EVENTKEY($pid, $eid);
+    my $handle  = event_register_withkeyfile($URL, 0, $keyfile);
+
+    fatal(-1, "Could not connect to event system!")
+	if (!$handle);
+    
+    my $tuple = address_tuple_alloc();
+    fatal(-1, "Could not allocate an address tuple\n")
+	if (!$tuple);
+   
+    %$tuple = (host      => $event::ADDRESSTUPLE_ALL,
+	       objtype   => "PROGRAM",
+	       objname   => $event::ADDRESSTUPLE_ALL,
+	       eventtype => "RELOAD",
+	       expt      => "$pid/$eid");
+
+    my $notification = event_notification_alloc($handle, $tuple);
+    fatal(-1, "Could not allocate a notification\n")
+	if (!$notification);
+
+    # Add in the new environ strings.
+    my $binding_string = "";
+    
+    foreach my $name (keys(%parameters)) {
+	my $value = $parameters{$name};
+
+	$binding_string .= "$name=$value\n";
+    }
+
+    if (! event_notification_put_string($handle, $notification,
+					"environment", $binding_string)) {
+	fatal(-1, "Could not add environment strings to notification\n")
+    }
+    if (!event_notify($handle, $notification)) {
+	fatal(-1, "could not send environment event notification!");
+    }
 }
 
 END {

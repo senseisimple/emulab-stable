@@ -181,6 +181,18 @@ static void	start_callback(event_handle_t handle,
 			       void *data);
 
 /**
+ * Handler for the RELOAD event, which tells the program agent to reload
+ * its environment, and includes the new environment strings.
+ *
+ * @param handle The connection to the event system.
+ * @param notification The start event.
+ * @param data NULL
+ */
+static void	newenv_callback(event_handle_t handle,
+			       event_notification_t notification,
+			       void *data);
+
+/**
  * Start a program.
  *
  * @param pinfo The proginfo to attempt to start.
@@ -719,6 +731,17 @@ main(int argc, char **argv)
 		fatal("could not subscribe to event");
 	}
 
+	tuple->objtype   = TBDB_OBJECTTYPE_PROGRAM;
+	tuple->objname   = ADDRESSTUPLE_ALL;
+	tuple->eventtype = TBDB_EVENTTYPE_RELOAD;
+
+	/*
+	 * Subscribe to the RELOAD start event we specified above.
+	 */
+	if (! event_subscribe(handle, newenv_callback, tuple, NULL)) {
+		fatal("could not subscribe to event");
+	}
+
 	/*
 	 * Begin the event loop, waiting to receive event notifications:
 	 */
@@ -731,6 +754,10 @@ main(int argc, char **argv)
 			got_siginfo = 0;
 		}
 #endif
+		if (got_sigterm) {
+			sigterm_handler();
+			/* Does not return */
+		}
 	}
 
 	elvin_sync_remove_io_handler(eih, elvin_error);
@@ -978,6 +1005,46 @@ start_callback(event_handle_t handle,
 			}
 			closedir(dir);
 			dir = NULL;
+		}
+	}
+}
+
+static void
+newenv_callback(event_handle_t handle,
+		event_notification_t notification,
+		void *data)
+{
+	char		envdata[2*BUFSIZ], buf[BUFSIZ];
+	char		*bp, *cp;
+	FILE		*file;
+
+	assert(handle != NULL);
+	assert(notification != NULL);
+	assert(data == NULL);
+
+	event_notification_get_string(handle, notification,
+				      "environment", envdata, sizeof(envdata));
+
+	warning("New Environment received!\n");
+	warning("%s\n", envdata);
+
+        bp = cp = envdata;
+	while ((bp = strsep(&cp, "\n")) != NULL) {
+		
+		/* XXX Kind of a stupid way to eval any variables. */
+		if ((file = popenf("echo %s", "r", bp)) != NULL) {
+			if (fgets(buf, sizeof(buf), file) != NULL) {
+				char *idx;
+
+				if ((idx = strchr(buf, '\n')) != NULL)
+					*idx = '\0';
+				if ((idx = strchr(buf, '=')) != NULL) {
+					*idx = '\0';
+					setenv(strdup(buf), idx + 1, 1);
+				}
+			}
+			pclose(file);
+			file = NULL;
 		}
 	}
 }
