@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -305,7 +305,7 @@ function SPITFORM($formfields, $errors)
     }
     echo "       </select>";
     echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
-	"docname=linktest.html'><b>Whats this?</b></a>)";
+	"docname=linktest.html'><b>What is this?</b></a>)";
     echo "    </td>
           </tr>\n";
     }

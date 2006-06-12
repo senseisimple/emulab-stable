@@ -645,7 +645,7 @@ function SPITFORM($formfields, $errors)
     }
     echo "       </select>";
     echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
-	"docname=linktest.html'><b>Whats this?</b></a>)";
+	"docname=linktest.html'><b>What is this?</b></a>)";
     echo "    </td>
           </tr>\n";
       }
