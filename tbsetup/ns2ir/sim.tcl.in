@@ -254,6 +254,11 @@ Simulator instproc make-lan {nodelist bw delay args} {
     # Convert bandwidth and delay
     set rbw [parse_bw $bw]
     set rdelay [parse_delay $delay]
+
+    # Warn about potential rounding of delay values due to implementation
+    if { ($rdelay % 2) == 1 } {
+	puts stderr "*** WARNING: due to delay implementation, odd delay value $rdelay for LAN may be rounded up"
+    }
     
     Lan $curlan $self $nodelist $rbw $rdelay {}
     set lanlink_list($curlan) {}
