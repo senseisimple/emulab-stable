@@ -598,8 +598,10 @@ proc tb-set-node-lan-delay {node lan delay} {
 	perror "\[tb-set-node-lan-delay] $node is not in $lan."
 	return
     }
-    $lan set delay([list $node $port]) [parse_delay $delay]
-    $lan set rdelay([list $node $port]) [parse_delay $delay]
+
+    set rdelay [parse_delay $delay]
+    $lan set delay([list $node $port]) $rdelay
+    $lan set rdelay([list $node $port]) $rdelay
 }
 
 
@@ -640,16 +642,16 @@ proc tb-set-node-lan-est-bandwidth {node lan bw} {
 proc tb-set-node-lan-loss {node lan loss} {
     var_import ::TBCOMPAT::FLOAT
     if {[$node info class] != "Node"} {
-	perror "\[tb-set-node-lan-delay] $node is not a node."
+	perror "\[tb-set-node-lan-loss] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "\[tb-set-node-lan-delay] $lan is not a lan."
+	perror "\[tb-set-node-lan-loss] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "\[tb-set-node-lan-delay] $node is not in $lan."
+	perror "\[tb-set-node-lan-loss] $node is not in $lan."
 	return
     }
     if {([regexp $FLOAT $loss] == 0) ||
@@ -774,16 +776,16 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
 proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {
     var_import ::TBCOMPAT::FLOAT
     if {[$node info class] != "Node"} {
-	perror "\[tb-set-node-lan-delay] $node is not a node."
+	perror "\[tb-set-lan-simplex-params] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "\[tb-set-node-lan-delay] $lan is not a lan."
+	perror "\[tb-set-lan-simplex-params] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "\[tb-set-node-lan-delay] $node is not in $lan."
+	perror "\[tb-set-lan-simplex-params] $node is not in $lan."
 	return
     }
     if {([regexp $FLOAT $toloss] == 0) || ($toloss > 1.0)} {
