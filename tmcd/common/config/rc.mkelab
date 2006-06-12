@@ -732,7 +732,7 @@ sub SetupOpsNode($)
 	SetupFatal("Could not get package info from Emulab!");
     }
     print "Removing conflicting packages.\n";
-    mysystem("pkg_delete -r -x mysql-client");
+    mysystem("pkg_delete -f -r -x mysql-client");
     
     print "Installing the ops metaport.\n";
 
@@ -1085,7 +1085,7 @@ sub SetupBossNode()
 	SetupFatal("Could not get package info from Emulab!");
     }
     print "Removing conflicting packages.\n";
-    mysystem("pkg_delete -r -x mysql-client");
+    mysystem("pkg_delete -f -r -x mysql-client");
     
     print "Installing the boss metaport.\n";
 
