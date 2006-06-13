@@ -206,7 +206,7 @@ void handle_link_modify(char * linkname, int l_index,
 }
 
 /* link field changed in 6.1 */
-#if __FreeBSD_version > 600000
+#if __FreeBSD_version >= 601000
 #define DN_PIPE_NEXT(p)	((p)->next.sle_next)
 #else
 #define DN_PIPE_NEXT(p)	((p)->next)
