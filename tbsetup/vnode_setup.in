@@ -427,10 +427,9 @@ while (1) {
 	#
 	# Kill of the oldest if it gets too old while we're waiting.
 	#
-	local $SIG{ALRM} = 
-            sub { print "*** $0: timeout (alarm clock) waiting for ".
-                        "vnode: $oldestvnode\n";
-                  kill("TERM", $oldestpid); };
+        my $alarmed = 0;
+	local $SIG{ALRM} = sub { $alarmed = 1; };
+
 	if ($waittime <= 0) {
             print "*** $0: timeout waiting for vnode: $oldestvnode\n";
 	    kill("TERM",$oldestpid);
@@ -438,10 +437,18 @@ while (1) {
 	    alarm($waittime);
 	}
 
-	my $childpid = wait();
+      WAITCHILD: 
+        my $childpid = wait();
 	my $exitstatus = $?;
-
 	alarm 0;
+
+        if ($alarmed) {
+            print "*** $0: timeout (alarm clock) waiting for ".
+                "vnode: $oldestvnode\n";
+            $alarmed = 0;
+            kill("TERM", $oldestpid);
+            goto WAITCHILD;
+        }
 
 	#
 	# Another sanity check
