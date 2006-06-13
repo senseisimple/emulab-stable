@@ -72,6 +72,9 @@ sub fatal($);
 $ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+# Avoid quota and out of space on /tmp.
+$ENV{'TMPDIR'} = "/var/tmp";
+
 #
 # Only real root, cause the script has to read/write a pid file that
 # cannot be accessed by the user.
