@@ -321,14 +321,6 @@ sleep(int(rand(5)));
 &debug_top();
 
 #
-# If there are no links to test, there is nothing to do!
-#
-if (@links == 0) {
-    &debug("No links to test!\n");
-    exit(0);
-}
-
-#
 # If it has been determined that we are not a part of the run,
 # exit now so we don't screw up the barrier synchs.
 #
@@ -353,6 +345,20 @@ if (!$synserv || !exists($hostmap{$synserv})) {
     $synserv = $hosts[0];
 }
 &debug("Synch master is $synserv\n");
+
+#
+# If there are no links to test, there is nothing to do!
+# Do this after we have identified the synch server.
+#
+if (@links == 0) {
+    &debug("No links to test!\n");
+
+    my $msg = "Linktest skipped, no links";
+    &sim_event(EVENT_LOG,$msg);
+    &debug("\n$msg\n\n");
+    &post_event(EVENT_COMPLETE,"ERROR=0 CTOKEN=$token");
+    exit(EXIT_OK);
+}
 
 #
 # If the current node is the special node, do some housekeeping
@@ -752,6 +758,7 @@ sub loss_test {
 	    &info("    Loss result on $hostname for " .
 		  &print_edge($edge) .
 		  ": sent/recv = $sent/$received\n");
+	    next;
 	}
 
 	if(!defined($received)) {
@@ -1325,9 +1332,10 @@ sub bw_test {
 
 		if ($stuff[6] =~ /^([\d.]+)-([\d.]+)$/) {
 		    $duration = abs($2 - $1);
-		    # Trim off excess; this is wrong.
-		    $duration = int($duration) * 1.0
-			if ($edge->loss > .10);
+		    # This was likely fixed by adding the -A option to iperf
+		    ## Trim off excess; this is wrong.
+		    #$duration = int($duration) * 1.0
+		    #    if ($edge->loss > .10);
 		}
 
 		#
