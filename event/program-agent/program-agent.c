@@ -754,10 +754,6 @@ main(int argc, char **argv)
 			got_siginfo = 0;
 		}
 #endif
-		if (got_sigterm) {
-			sigterm_handler();
-			/* Does not return */
-		}
 	}
 
 	elvin_sync_remove_io_handler(eih, elvin_error);
