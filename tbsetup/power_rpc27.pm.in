@@ -196,7 +196,7 @@ sub syncandsend($$$) {
     my ($controller,$TIP,$cmd,$statusp) = @_;
 
     #
-    # Send a couple of newlines to get the command prompt, and then wait
+    # Send a newline to get the command prompt, and then wait
     # for it to print out the command prompt. This loop is set for a small
     # number since if it cannot get the prompt quickly, then something has
     # gone wrong.
@@ -206,7 +206,7 @@ sub syncandsend($$$) {
     for (my $i = 0; $i < 20; $i++) {
 	my $line;
 
-	if (syswrite($TIP, "\r\n") == 0) {
+	if (syswrite($TIP, "\r") == 0) {
 	    print STDERR
 		"*** Power control sync write failed ($controller/$outlet)\n";
 	    return 1;
@@ -239,20 +239,20 @@ sub syncandsend($$$) {
     #
     # These things have an annoying tendency to fail sometimes by losing
     # the command part of the string (e.g., "6" instead of "reboot 6").
-    # I think we are overrunning the UART with "\r\n" since we put out
+    # I think we are overrunning the UART with "\r" since we put out
     # a pair after every line we read that is not a prompt and when the
     # RPC puts out its banner, it is a good 10 lines before we see the
     # prompt.  So allow some time for the RPC to digest everything before
     # we feed it the command.
     #
-    sleep(2);
+    sleep(1);
 
     if ($debug) {
 	print "Sending '$cmd' to $controller\n";
     }
 
     # Okay, got a prompt. Send it the string:
-    if (syswrite($TIP, "$cmd\r\n") == 0) {
+    if (syswrite($TIP, "$cmd\r") == 0) {
     	print STDERR "*** Power control write failed ($controller/$outlet)\n";
     	return 1;
     }
