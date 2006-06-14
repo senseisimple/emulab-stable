@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -187,8 +187,6 @@ echo "<br><br>\n";
 
 echo "<b>Starting experiment configuration!</b> " . $results[message];
 echo "<br><br>\n";
-echo "While you are waiting, you can watch the log
-      in realtime:<br>\n";
 echo "</font>\n";
 STARTLOG($exp_pid, $exp_id);
 

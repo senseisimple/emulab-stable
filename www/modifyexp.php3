@@ -342,7 +342,7 @@ else {
 	"reasonable amount time, please contact $TBMAILADDR. ".
 	"<br><br>".
 	"While you are waiting, you can watch the log of experiment ".
-	"modification in realtime:<br>\n";
+	"modification in realtime:<br><br>\n";
     STARTLOG($pid, $eid);    
 }
 
