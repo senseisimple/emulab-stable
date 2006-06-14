@@ -425,29 +425,28 @@ while (1) {
 	my $waittime = ($oldest + $childwait) - time();
 
 	#
-	# Kill of the oldest if it gets too old while we're waiting.
+	# Kill off the oldest if it gets too old while we're waiting.
 	#
-        my $alarmed = 0;
-	local $SIG{ALRM} = sub { $alarmed = 1; };
+        my $childpid = -1;
+        my $exitstatus = -1;
 
-	if ($waittime <= 0) {
-            print "*** $0: timeout waiting for vnode: $oldestvnode\n";
-	    kill("TERM",$oldestpid);
-	} else {
-	    alarm($waittime);
-	}
+        eval {
+            local $SIG{ALRM} = sub { die "alarm clock" };
 
-      WAITCHILD: 
-        my $childpid = wait();
-	my $exitstatus = $?;
-	alarm 0;
+            if ($waittime <= 0) {
+                print "*** $0: timeout waiting for vnode: $oldestvnode\n";
+                kill("TERM",$oldestpid);
+            } else {
+                alarm($waittime);
+            }
 
-        if ($alarmed) {
-            print "*** $0: timeout (alarm clock) waiting for ".
-                "vnode: $oldestvnode\n";
-            $alarmed = 0;
-            kill("TERM", $oldestpid);
-            goto WAITCHILD;
+            $childpid = wait();
+            alarm 0;
+            $exitstatus = $?;
+        };
+        if ($@) {
+            die unless $@ =~ /alarm clock/;
+            next;
         }
 
 	#
