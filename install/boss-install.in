@@ -720,7 +720,7 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 		   qq|apache_enable="YES"|);
 
     # Starting at 6.1 we use the default version of bind, not the port.
-    if ($FBSD_VERSION <= 6.0) {
+    if ($FBSD_VERSION < 6.0) {
 	push(@strings, qq|named_enable="NO"|);
     }
     else {
