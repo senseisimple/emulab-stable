@@ -41,7 +41,7 @@ define("CHECKLOGIN_FROZEN",		0x002000);
 define("CHECKLOGIN_ISADMIN",		0x004000);
 define("CHECKLOGIN_TRUSTED",		0x008000);
 define("CHECKLOGIN_CVSWEB",		0x010000);
-define("CHECKLOGIN_ADMINOFF",		0x020000);
+define("CHECKLOGIN_ADMINON",		0x020000);
 define("CHECKLOGIN_WEBONLY",		0x040000);
 define("CHECKLOGIN_PLABUSER",		0x080000);
 define("CHECKLOGIN_STUDLY",		0x100000);
@@ -148,6 +148,30 @@ function CHECKLOGIN($uid) {
     } else {
 	$curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
     }
+    $hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+
+    #
+    # We have to get at least one of the hashes. The Java applets do not
+    # send it, but web browsers will.
+    #
+    if (!isset($curhash) && !isset($hashhash)) {
+	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	return $CHECKLOGIN_STATUS;
+    }
+    if (isset($curhash) &&
+	! preg_match("/^[\w]+$/", $curhash)) {
+	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	return $CHECKLOGIN_STATUS;
+    }
+    if (isset($hashhash) &&
+	! preg_match("/^[\w]+$/", $hashhash)) {
+	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	return $CHECKLOGIN_STATUS;
+    }
+    
+    $safe_curhash  = addslashes($curhash);
+    $safe_hashhash = addslashes($hashhash);
+    $safe_uid      = addslashes($uid);
     
     #
     # Note that we get multiple rows back because of the group_membership
@@ -155,14 +179,17 @@ function CHECKLOGIN($uid) {
     # 
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
-		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
+		     "       status,admin,cvsweb,g.trust,l.adminon,webonly, " .
 		     "       user_interface,n.type,u.stud,u.wikiname, ".
 		     "       u.wikionly,g.pid,u.foreign_admin " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
-		     "left join nodetypeXpid_permissions as n on g.pid=n.pid " .
-		     "where u.uid='$uid'");
+		     "left join nodetypeXpid_permissions as n on g.pid=n.pid ".
+		     "where u.uid='$safe_uid' and ".
+		     (isset($curhash) ?
+		      "l.hashkey='$safe_curhash'" :
+		      "l.hashhash='$safe_hashhash'"));
 
     # No such user.
     if (! mysql_num_rows($query_result)) { 
@@ -189,7 +216,7 @@ function CHECKLOGIN($uid) {
 	    ! strcmp($row[6], "group_root")) {
 	    $trusted = 1;
 	}
-	$adminoff = $row[7];
+	$adminon  = $row[7];
 	$webonly  = $row[8];
 	$interface= $row[9];
 
@@ -222,7 +249,7 @@ function CHECKLOGIN($uid) {
     # Check for frozen account. Might do something interesting later.
     #
     if (! strcmp($status, TBDB_USERSTATUS_FROZEN)) {
-	DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
+	DBQueryFatal("DELETE FROM login WHERE uid='$safe_uid'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 	return $CHECKLOGIN_STATUS;
     }
@@ -232,7 +259,7 @@ function CHECKLOGIN($uid) {
     # kill the entry anyway so the user is officially logged out.
     #
     if (time() > $timeout) {
-	DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
+	DBQueryFatal("DELETE FROM login WHERE uid='$safe_uid'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_TIMEDOUT;
 	return $CHECKLOGIN_STATUS;
     }
@@ -277,8 +304,6 @@ function CHECKLOGIN($uid) {
 	# of the real hash, and simply tells us what menu to draw, but does
 	# not impart any privs!
 	#
-	$hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
-	
 	if (isset($hashhash) &&
 	    $hashhash == bin2hex(mhash(MHASH_CRC32, $hashkey))) {
             #
@@ -302,8 +327,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_PSWDEXPIRED;
     if ($admin)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ISADMIN;
-    if ($adminoff)
-	$CHECKLOGIN_STATUS |= CHECKLOGIN_ADMINOFF;
+    if ($adminon)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_ADMINON;
     if ($webonly)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_WEBONLY;
     if ($wikionly)
@@ -336,7 +361,7 @@ function CHECKLOGIN($uid) {
     # any processes we might spawn. We prepend an HTTP_ on the front of
     # the variable name, so that it will get through suexec.
     #
-    if ($admin && !$adminoff) {
+    if ($admin && $adminon) {
     	putenv("HTTP_WITH_TB_ADMIN_PRIVS=1");
     }
     # XXX Temporary.
@@ -448,8 +473,8 @@ function ISADMIN($uid = 1) {
     }
 
     return (($CHECKLOGIN_STATUS &
-	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINOFF)) ==
-	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINON)) ==
+	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINON));
 }
 
 
@@ -516,6 +541,30 @@ function ISADMINISTRATOR() {
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
+}
+
+#
+# Toggle current login admin bit. Must be an administrator of course!
+#
+function SETADMINMODE($uid, $onoff) {
+    global $HTTP_COOKIE_VARS, $TBAUTHCOOKIE;
+    
+    # This makes sure the user is actually logged in secure (https).
+    if (! ISADMINISTRATOR())
+	return;
+
+    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+
+    if (!isset($curhash) ||
+	!preg_match("/^[\w]+$/", $curhash)) {
+	return;
+    }
+    $onoff   = addslashes($onoff);
+    $curhash = addslashes($curhash);
+    $uid     = addslashes($uid);
+    
+    DBQueryFatal("update login set adminon='$onoff' ".
+		 "where uid='$uid' and hashkey='$curhash'");
 }
 
 # Is this user a planetlab user? Returns 1 if they are, 0 if not.
@@ -682,21 +731,21 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	#
 
 	#
-	# Set adminoff on new logins, unless user requested to be
+	# Set adminmode off on new logins, unless user requested to be
 	# logged in as admin (and is an admin of course!). This is
 	# primarily to bypass the nologins directive which makes it
 	# impossible for an admin to login when the web interface is
 	# turned off. 
 	#
-	$adminoff = 1;
+	$adminon = 0;
 	if ($adminmode && $isadmin) {
-	    $adminoff = 0;
+	    $adminon = 1;
 	}
 
         #
         # Insert a record in the login table for this uid.
 	#
-	if (DOLOGIN_MAGIC($uid, $adminoff) < 0) {
+	if (DOLOGIN_MAGIC($uid, $adminon) < 0) {
 	    return -1;
 	}
 
@@ -760,7 +809,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     return -1;
 }
 
-function DOLOGIN_MAGIC($uid, $adminoff = 1)
+function DOLOGIN_MAGIC($uid, $adminon = 0)
 {
     global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
@@ -781,18 +830,10 @@ function DOLOGIN_MAGIC($uid, $adminoff = 1)
     #
     $timeout = $now + $TBAUTHTIMEOUT;
     $hashkey = GENHASH();
-    $query_result =
-	DBQueryFatal("SELECT timeout FROM login WHERE uid='$uid'");
-	
-    if (mysql_num_rows($query_result)) {
-	DBQueryFatal("UPDATE login set ".
-		     "timeout='$timeout', hashkey='$hashkey' ".
-		     "WHERE uid='$uid'");
-    }
-    else {
-	DBQueryFatal("INSERT into login (uid, hashkey, timeout) ".
-		     "VALUES ('$uid', '$hashkey', '$timeout')");
-    }
+    $crc     = bin2hex(mhash(MHASH_CRC32, $hashkey));
+
+    DBQueryFatal("replace into login (uid,hashkey,hashhash,timeout,adminon) ".
+		 "values ('$uid', '$hashkey', '$crc', '$timeout', $adminon)");
 
     #
     # Issue the cookie requests so that subsequent pages come back
@@ -815,7 +856,6 @@ function DOLOGIN_MAGIC($uid, $adminoff = 1)
     # All this does is change the menu options presented, imparting
     # no actual privs. 
     #
-    $crc = bin2hex(mhash(MHASH_CRC32, $hashkey));
     setcookie($TBLOGINCOOKIE, $crc, 0, "/", $TBAUTHDOMAIN, 0);
 
     #
@@ -850,7 +890,7 @@ function DOLOGIN_MAGIC($uid, $adminoff = 1)
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
     }
 	
-    DBQueryFatal("update users set adminoff=$adminoff, ".
+    DBQueryFatal("update users set ".
 		 "       weblogin_failcount=0,weblogin_failstamp=0 ".
 		 "where uid='$uid'");
 
@@ -889,28 +929,40 @@ function VERIFYPASSWD($uid, $password) {
 #
 function DOLOGOUT($uid) {
     global $CHECKLOGIN_STATUS, $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
-    global $WIKISUPPORT, $WIKICOOKIENAME;
+    global $WIKISUPPORT, $WIKICOOKIENAME, $HTTP_COOKIE_VARS;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
 
     # Pedantic check.
     if (!TBvalid_uid($uid)) {
 	return 1;
     }
-
     $CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 
-    $query_result =
-	DBQueryFatal("SELECT hashkey timeout FROM login WHERE uid='$uid'");
-
-    # Not logged in.
-    if (($row = mysql_fetch_array($query_result)) == 0) {
+    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+    $hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+    
+    #
+    # We have to get at least one of the hashes. 
+    #
+    if (!isset($curhash) && !isset($hashhash)) {
 	return 1;
     }
+    if (isset($curhash) &&
+	! preg_match("/^[\w]+$/", $curhash)) {
+	return 1;
+    }
+    if (isset($hashhash) &&
+	! preg_match("/^[\w]+$/", $hashhash)) {
+	return 1;
+    }
+    $safe_curhash  = addslashes($curhash);
+    $safe_hashhash = addslashes($hashhash);
 
-    $hashkey = $row[hashkey];
-    $timeout = time() - 1000000;
-
-    DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
+    DBQueryFatal("delete from login ".
+		 " where uid='$uid' and ".
+		 (isset($curhash) ?
+		  "hashkey='$safe_curhash'" :
+		  "hashhash='$safe_hashhash'"));
 
     #
     # Issue a cookie request to delete the cookies. 

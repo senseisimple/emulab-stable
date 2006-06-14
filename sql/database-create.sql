@@ -1258,9 +1258,12 @@ CREATE TABLE log (
 
 CREATE TABLE login (
   uid varchar(10) NOT NULL default '',
-  hashkey tinytext,
+  hashkey varchar(64) NOT NULL default '',
+  hashhash varchar(64) NOT NULL default '',
   timeout varchar(10) NOT NULL default '',
-  PRIMARY KEY  (uid)
+  adminon tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (uid,hashkey),
+  UNIQUE KEY hashhash (uid,hashhash)
 ) TYPE=MyISAM;
 
 --

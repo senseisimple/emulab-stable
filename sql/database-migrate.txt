@@ -3404,3 +3404,22 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.67: Add a foreign_admin field to the users table for testbed-admins elsewhere.
        alter table users add column foreign_admin tinyint(4) default '0' after admin;
+
+4.68: Changes to the login table to allow users to be logged in from
+      more then one browser at a time.
+
+      drop table login;
+
+      CREATE TABLE login (
+        uid varchar(10) NOT NULL default '',
+        hashkey varchar(64) NOT NULL default '',
+        hashhash varchar(64) NOT NULL default '',
+        timeout varchar(10) NOT NULL default '',
+        adminon tinyint(1) NOT NULL default '0',
+        PRIMARY KEY  (uid,hashkey),
+        UNIQUE KEY hashhash (uid,hashhash)
+      ) TYPE=MyISAM;
+
+      This immediately logs everyone out from the web interface. but
+      thats not really a big deal.
+

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -23,18 +23,18 @@ LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
 # List of valid toggles
-$toggles = array("adminoff", "webfreeze", "cvsweb", "lockdown",
+$toggles = array("adminon", "webfreeze", "cvsweb", "lockdown",
 		 "cvsrepo_public");
 
 # list of valid values for each toggle
-$values  = array("adminoff"       => array(0,1),
+$values  = array("adminon"        => array(0,1),
 		 "webfreeze"      => array(0,1),
 		 "cvsweb"         => array(0,1),
 		 "lockdown"       => array(0,1),
 		 "cvsrepo_public" => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
-$optargs = array("adminoff"       => array("target_uid" => 0),
+$optargs = array("adminon"        => array(),
 		 "webfreeze"      => array("target_uid" => 1),
 		 "cvsweb"         => array("target_uid" => 1),
 		 "lockdown"       => array("pid" => 1, "eid" => 1),
@@ -72,20 +72,14 @@ while (list ($arg, $required) = each ($optargs[$type])) {
 #
 # Permissions checks, and do the toggle...
 #
-if ($type == "adminoff") {
+if ($type == "adminon") {
     # must be admin
     # Do not check if they are admin mode (ISADMIN), check if they
     # have the power to change to admin mode!
     if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
-    # Admins can change status for other users.
-    if (!isset($target_uid))
-	$target_uid = $uid;
-    elseif (!TBCurrentUser($target_uid)) {
-	    PAGEARGERROR("Target user '$target_uid' is not a valid user!");
-    }
-    DBQueryFatal("update users set adminoff='$value' where uid='$target_uid'");
+    SETADMINMODE($uid, $value);
 }
 elseif ($type == "webfreeze") {
     # must be admin

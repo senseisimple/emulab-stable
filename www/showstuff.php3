@@ -493,7 +493,6 @@ function SHOWUSER($uid) {
     $usr_affil   = $row[usr_affil];
     $status      = $row[status];
     $admin       = $row[admin];
-    $adminoff    = $row[adminoff];
     $notes       = $row[notes];
     $frozen      = $row['weblogin_frozen'];
     $failcount   = $row['weblogin_failcount'];
@@ -635,13 +634,9 @@ function SHOWUSER($uid) {
     }
 
     if ($admin) {
-	$onoff = ($adminoff ? "Off" : "On");
-	$flip  = ($adminoff ? 0 : 1);
 	echo "<tr>
-              <td>Admin (on/off):</td>
-              <td>Yes
-              <a href=toggle.php?target_uid=$uid&type=adminoff&value=$flip>
-              ($onoff)</td>
+                  <td>Administrator:</td>
+                  <td>Yes</td>
               </tr>\n";
     }
     
