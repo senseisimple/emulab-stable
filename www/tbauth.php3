@@ -383,8 +383,15 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
 
     # If our login is not valid, then the uid is already set to "",
     # so refresh it to the cookie value. Then we can pass the right
-    # uid to hcecklogin, so we can give the right error message.
-    if ($uid=="") { $uid=$HTTP_COOKIE_VARS[$TBNAMECOOKIE]; }
+    # uid to checklogin, so we can give the right error message.
+    if ($uid == "") {
+	$uid = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
+
+        # Verify valid string (no special chars like single/double quotes!).
+	if (! preg_match("/^[-\w]+$/", $uid)) {
+	    TBERROR("LOGGEDINORDIE: Illegal characters in $uid", 1);
+	}
+    }
 
     #
     # Allow the caller to specify a different URL to direct the user
