@@ -921,7 +921,13 @@ sub SetupOpsNode($)
     # that means we have to restart nfsd so it can register.
     #
     if ($FBSD_VERSION >= 5) {
-	mysystem("/etc/rc.d/nfsd stop");
+	#
+	# The nfsd script will try to kill all nfsd processes, but once
+	# the master is killed, it kills all children itself.  Thus the
+	# nfsd script may fail to kill the children if they are already
+	# dead.  "forcestop" tells the script to ignore errors.
+	#
+	mysystem("/etc/rc.d/nfsd forcestop");
 	mysystem("killall rpcbind");
 	mysystem("rpcbind");
 	mysystem("/etc/rc.d/nfsd start");
