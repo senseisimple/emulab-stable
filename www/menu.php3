@@ -898,7 +898,7 @@ function ENDPAGE() {
 #
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
-    global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring; $currently_busy;
+    global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring, $currently_busy;
 
     if ($currently_busy) {
 	CLEARBUSY();
