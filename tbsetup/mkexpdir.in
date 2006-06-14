@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,7 +40,7 @@ my $projroot = PROJROOT();
 my $grouproot= GROUPROOT();
 
 my $tbdata   = "tbdata";
-my @dirlist  = ($tbdata, "bin", "tmp", "logs", "archive",
+my @dirlist  = ($tbdata, "bin", "tmp", "logs", "archive", "datastore",
 		"tftpboot", "swapinfo");
 my $exitval;
 

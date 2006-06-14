@@ -82,6 +82,7 @@ my $exptidx;
 my $template;
 my $instance;
 my $logname;
+my $template_tag;
 my @ExptStates  = ();
 # For the END block below.
 my $cleaning    = 0;
@@ -306,10 +307,19 @@ if (! TBExptIDX($pid, $eid, \$exptidx)) {
 }
 
 #
+# Need the current archive tag so we know how to find the datastore that
+# corresponds to this instance, at some later date.
+#
+libArchive::TBExperimentArchiveTag($template->pid(),
+				   $template->eid(), \$template_tag) == 0
+    or fatal(-1, "Could not get current tag for $template");
+
+#
 # Update the Instance
 #
 my %args = ();
-$args{'exptidx'} = $exptidx;
+$args{'exptidx'}      = $exptidx;
+$args{'template_tag'} = $template_tag;
 
 $instance->Update(0, \%args) == 0
     or fatal(-1, "Could not update experiment instance record!");
@@ -424,6 +434,21 @@ foreach my $name (keys(%parameters)) {
 		 "   name='$name', value=$value, ".
 		 "   pid='$pid', eid='$eid'");
 }
+
+#
+# Copy the datastore into the experiment directory. This really needs
+# to be a checkout, and it really needs to go someplace other then the
+# exp directory. Anyway, once that is done, add an environment
+# variable the user can reference for finding files in the datastore.
+#
+my $instance_path = TBExptUserDir($pid, $eid);
+$instance->CopyDataStore($template_tag,
+			 "$instance_path/template_datastore") == 0
+    or fatal(-1, "Could not copy datastore ($template_tag) to instance");
+
+DBQueryFatal("replace into virt_user_environment set ".
+	     "   name='DATASTORE', value='$instance_path/template_datastore',".
+	     "   pid='$pid', eid='$eid'");
 
 #
 # Now do the swapin (or it gets queued if a batch experiment).

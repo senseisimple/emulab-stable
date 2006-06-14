@@ -1097,10 +1097,8 @@ if (! -e "$archivedir/nsdata") {
 	or fatal("Failed to mkdir $archivedir/nsdata");
 }
 
-if ($inout eq "modify") {
-    system("cp -fp $workdir/$eid.ns $archivedir/nsdata/nsfile.ns") == 0
-	or fatal("Failed to copy nsfile to $archivedir/tbdata");
-}
+system("cp -fp $workdir/$eid.ns $archivedir/nsdata/nsfile.ns") == 0
+    or fatal("Failed to copy nsfile to $archivedir/tbdata");
 
 if (defined($logname)) {
     system("cp -fp $logname $archivedir/tbdata/log.$tag") == 0

@@ -587,6 +587,7 @@ CREATE TABLE experiment_template_instances (
   start_time datetime default NULL,
   stop_time datetime default NULL,
   runidx int(10) unsigned default NULL,
+  template_tag varchar(64) default NULL,
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
   KEY parent_guid (parent_guid,parent_vers),

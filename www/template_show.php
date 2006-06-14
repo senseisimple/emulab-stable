@@ -140,8 +140,9 @@ WRITESUBMENUBUTTON("Add Metadata",
 		   "template_metadata.php?action=add&".
 		   "guid=$guid&version=$version");
 
+# We show the user the datastore for the template; the rest of it is not important.
 WRITESUBMENUBUTTON("Template Archive",
-		   "archive_view.php3?exptidx=$exptidx");
+		   "archive_view.php3/$exptidx/trunk?exptidx=$exptidx");
 
 WRITESUBMENUBUTTON("Template Record",
 		   "template_history.php?guid=$guid&version=$version");

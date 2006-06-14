@@ -8,6 +8,11 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
+# Standard Testbed Header
+#
+PAGEHEADER("Commit and Tag");
+
+#
 # Only known and logged in users can look at experiments.
 #
 $uid = GETLOGIN();
@@ -46,12 +51,7 @@ if (!TBCurrentExperiment($exptidx)) {
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $exptidx, $TBDB_ARCHIVE_TAGLEN;
-
-    #
-    # Standard Testbed Header
-    #
-    PAGEHEADER("Commit/Tag archive for experiment $exptidx");
+    global $isadmin, $exptidx, $TBDB_ARCHIVE_TAGLEN, $referrer;
 
     echo "<center>
           Commit/Tag Archive
@@ -82,6 +82,10 @@ function SPITFORM($formfields, $errors)
     echo "<table align=center border=1> 
           <form action=archive_tag.php3?exptidx=$exptidx method=post>\n";
 
+    if (isset($referrer)) {
+	echo "<input type=hidden name=referrer value=$referrer>\n";
+    }
+    
     echo "<tr>
               <td align=center>
                <b>Please enter a tag[<b>1</b>]</b>
@@ -138,6 +142,9 @@ function SPITFORM($formfields, $errors)
 #
 if (! $submit) {
     $defaults = array();
+    if (!isset($referrer))
+	$referrer = $_SERVER['HTTP_REFERER'];
+    
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -208,12 +215,19 @@ if (count($errors)) {
     return;
 }
 
+STARTBUSY("Committing and Tagging!");
+
 #
 # First lets make sure the tag is unique. 
 #
 $retval = SUEXEC($uid, "$pid,$gid",
 		 "webarchive_control checktag $pid $eid $tag",
 		 SUEXEC_ACTION_IGNORE);
+
+/* Clear the various 'loading' indicators. */
+if ($retval) 
+    STOPBUSY();
+
 #
 # Fatal Error. 
 # 
@@ -234,5 +248,15 @@ SUEXEC($uid, "$pid,$gid",
        "webarchive_control $tagarg $message -u commit $pid $eid",
        SUEXEC_ACTION_DIE);
 
-header("Location: archive_view.php3/$exptidx/?exptidx=$exptidx");
+STOPBUSY();
+
+if (!isset($referrer))
+    $referrer = "archive_view.php3/$exptidx/?exptidx=$exptidx";
+
+PAGEREPLACE($referrer);
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

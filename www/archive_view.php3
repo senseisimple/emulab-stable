@@ -6,6 +6,7 @@
 #
 include("defs.php3");
 include("showstuff.php3");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can look at experiments.
@@ -45,13 +46,17 @@ if (!$isadmin &&
     USERERROR("You do not have permission to view tags for ".
 	      "archive in $pid/$gid ($exptidx)!", 1);
 }
-$current = TBCurrentExperiment($exptidx);
+$current  = TBCurrentExperiment($exptidx);
+$template = Template::LookupbyEid($pid, $eid);
 
 $url = preg_replace("/archive_view/", "cvsweb/cvsweb",
 		    $_SERVER['REQUEST_URI']);
 
 # This is how you get forms to align side by side across the page.
-if ($current) {
+if ($template) {
+    $style = 'style="float:left; width:50%;"';
+}
+elseif ($current) {
     $style = 'style="float:left; width:33%;"';
 }
 else {
@@ -59,10 +64,23 @@ else {
 }
 
 echo "<center>\n";
-echo "<font size=+1>
-        This is the Subversion archive for experiment $exptidx.<br></font>";
+echo "<font size=+1>";
 
-if ($current) {
+if ($template) {
+    $guid = $template->guid();
+    $vers = $template->vers();
+    $path = $template->path();
+    
+    echo "This is the (Subversion) datastore for Template $guid/$vers<br>";
+    echo "(located at $USERNODE:$path)\n";
+}
+else {
+    echo "This is the (Subversion) archive for experiment $exptidx.";
+}
+
+echo "<br><br></font>";
+
+if ($current || $template) {
     echo "<form action='${TBBASE}/archive_tag.php3' $style method=get>\n";
     echo "<b><input type=submit name=tag value='Tag Archive'></b>";
     echo "<input type=hidden name=exptidx value='$exptidx'>";
@@ -74,7 +92,7 @@ echo "<b><input type=submit name=tag value='Show Tags'></b>";
 echo "<input type=hidden name=exptidx value='$exptidx'>";
 echo "</form>";
 
-if ($current) {
+if ($current && !$template) {
     echo "<form action='${TBBASE}/archive_missing.php3' $style method=get>";
     echo "<b><input type=submit name=missing value='Show Missing Files'></b>";
     echo "<input type=hidden name=exptidx value='$exptidx'>";

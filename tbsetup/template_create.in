@@ -258,6 +258,8 @@ else {
 # And update the record.
 %args = ();
 $args{'archive_idx'} = $archive_idx;
+# The archive code below requires this be set!
+$args{'path'}        = TBExptUserDir($pid, $eid);
 
 $template->Update(\%args) == 0
     or fatal(-1, "Could not update template record!");
@@ -267,7 +269,28 @@ $template->Update(\%args) == 0
 # but it is not committed. We need to do that now cause this experiment
 # is never actually swapped in. Instead each instance is a new fork, and if
 # the archive were not committed, it would not look correct.
+# Before we do that though, we want to copy the datastore directory to the
+# child since we *do* want that stuff shared.
 #
+if ($modify) {
+    print "Committing archive before copying data store\n";
+    libArchive::TBCommitExperimentArchive($pid, $eid, "template_modify")
+	>= 0 or fatal(-1, "Failed to commit experiment archive!");
+    
+    $template->CopyDataStore($parent_template, $dbuid) == 0
+	or fatal(-1, "Failed to copy data store");
+
+    # and tell the archive library about the above files.
+    print "Add new files\n";
+    libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
+	or fatal(-1, "Failed to add datastore files to the archive!");
+
+    # and then do a savepoint prior to the commit below.
+    print "Doing another savepoint\n";
+    libArchive::TBExperimentArchiveSavePoint($pid, $eid, "CopyDataStore") >= 0
+	or fatal(-1, "Failed to do a savepoint on the experiment archive!");
+}
+print "Doing final commit\n";
 libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
     >= 0 or fatal(-1, "Failed to commit experiment archive!");
 

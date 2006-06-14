@@ -254,10 +254,13 @@ namespace eval TBCOMPAT {
     # @param url The URL to check.
     # @return True if "url" looks like a URL.
     #
+    # What is xxx:// you might ask? Its part of experimental template code.
+    #
     proc verify-url {url} {
 	if {[string match "http://*" $url] ||
 	    [string match "https://*" $url] ||
-	    [string match "ftp://*" $url]} {
+	    [string match "ftp://*" $url] ||
+	    [string match "xxx://*" $url]} {
 	    set retval 1
 	} else {
 	    set retval 0

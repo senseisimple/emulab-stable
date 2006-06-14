@@ -346,7 +346,12 @@ sub ArchiveAdd($$;$$$)
     
     if ($special) {
 	#
-	# Last parth of path must be a directory.
+	# What does this do? 
+	# Basically, we copy the last part (directory) to / of the checkin.
+	# eg: cp /proj/pid/exp/eid/archive/... /archive of the checkins.
+	# This avoids pid/eid tokens in the archive.
+	#
+	# Last part of path must be a directory.
 	#
 	if (! -d $pathname) {
 	    print STDERR "ArchiveAdd: Must be a direcotory: $pathname\n";
@@ -354,10 +359,6 @@ sub ArchiveAdd($$;$$$)
 	}
 	my ($filename,$directory,undef) = fileparse($pathname);
 
-	#
-	# Basically, copy the last part (directory) to / of the checkin.
-	# eg: cp /proj/pid/exp/eid/archive/... /archive of the checkins.
-	#
 	$rootdir    = $filename;
 	$sourcedir  = $directory;
 	$sourcefile = $filename . "/";
@@ -1309,6 +1310,32 @@ sub TBExperimentArchiveInfo($$$$)
 }
 
 #
+# Grab the current tag for an experiment.
+#
+sub TBExperimentArchiveTag($$$)
+{
+    my ($pid, $eid, $tagp) = @_;
+
+    my $query_result =
+	DBQueryWarn("select r.archive_tag from experiments as e ".
+		    "left join experiment_stats as s on s.exptidx=e.idx ".
+		    "left join experiment_resources as r on r.idx=s.rsrcidx ".
+		    "where e.pid='$pid' and e.eid='$eid'");
+
+    return -1
+	if (!$query_result || $query_result->numrows == 0);
+
+    my ($archive_tag) = $query_result->fetchrow_array();
+
+    # Need to deal with no archive yet!
+    return 1
+	if (!defined($archive_tag));
+
+    $$tagp = $archive_tag;
+    return 0;
+}
+
+#
 # Create a new archive for an experiment. This has to update the
 # experiment_stats table with the newly created archive index.
 # Then we have to set the current tag for the experiment in the
@@ -1479,6 +1506,17 @@ sub TBExperimentArchiveAddUserFiles($$)
 	return $rval
 	    if ($rval != 0);
     }
+
+    # Another special directory ... specifically for templates.
+    my $userstore = "$userdir/datastore";
+
+    if (-e $userstore) {
+	$rval = ArchiveAdd($archive_idx, $userstore, $view, 1, 1);
+
+	return $rval
+	    if ($rval != 0);
+    }
+    
     return 0;
 }
 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -79,6 +79,8 @@ use lib "@prefix@/lib";
 use libtestbed;
 use libdb;
 use libtblog;
+use Template;
+use libArchive;
 
 if (@ARGV != 2) {
     usage();
@@ -86,6 +88,8 @@ if (@ARGV != 2) {
 my ($pid, $eid) = @ARGV;
 
 my $dbuid;
+my %tofetch   = ();
+my %toarchive = ();
 
 #
 # Verify user and get his DB uid.
@@ -115,6 +119,11 @@ my $expdir = TBExptUserDir($pid,$eid);
 if (!$expdir) {
     tbdie("Unable to get experiment directory");
 }
+
+# Need this below for template specific code.
+my $exptidx;
+TBExptIDX($pid, $eid, \$exptidx) or
+    tbdie("unable to get experiment index!");
 
 #
 # Get a list of all RPMs and tarballs to fetch
@@ -171,7 +180,34 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    # will be uploaded to the nodes table
 	    #
 	    $tofetch{$URL} = $localfile;
+	    $toarchive{$localfile} = $localfile;
 	    $rpms =~ s/$URL/$localfile/g;
+	}
+	elsif ($rpm =~ /^xxx:\/\/(.*)$/) {
+	    #
+	    # XXX (well, what else did you expect!). This is a template
+	    # "url" that refers to a file in the template datastore tree.
+	    #
+	    my $instance = Template::Instance->LookupByExptidx($exptidx);
+	    if (!defined($instance)) {
+		tbdie("Invalid RPM URL for non-template experiment: $rpm");
+	    }
+	    my $localfile = $instance->template()->path() . "/datastore/" . $1;
+
+	    tbdie("$rpm cannot be found; $localfile does not exist")
+		if (! -e $localfile);
+
+	    # no need to archive these since they are saved in the template
+	    $rpms =~ s/$rpm/$localfile/g;
+	}
+	else {
+	    #
+	    # Should be a regular path.
+	    #
+	    tbdie("$rpm cannot be found; local file does not exist")
+		if (! -e $rpm);
+
+	    $toarchive{$rpm} = $rpm;
 	}
     }
     
@@ -195,8 +231,36 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    $ext =~ /(\.tar|\.tar\.Z|\.tar\.gz|\.tgz|\.tar\.bz2)$/;
 	    $ext = $1;
 	    my $localfile = $expdir . "/" . $md5 . $ext;
+	    $toarchive{$localfile} = $localfile;
 	    $tofetch{$URL} = $localfile;
 	    $tarfiles =~ s/$URL/$localfile/g;
+	}
+	elsif ($tarfile =~ /^xxx:\/\/(.*)$/) {
+	    #
+	    # XXX (well, what else did you expect!). This is a template
+	    # "url" that refers to a file in the template datastore tree.
+	    #
+	    my $instance = Template::Instance->LookupByExptidx($exptidx);
+	    if (!defined($instance)) {
+		tbdie("Invalid tarball URL for non-template experiment: ".
+		      "$tarfile");
+	    }
+	    my $localfile = $instance->template()->path() . "/datastore/" . $1;
+
+	    tbdie("$tarfile cannot be found; $localfile does not exist")
+		if (! -e $localfile);
+
+	    # no need to archive these since they are saved in the template
+	    $tarfiles =~ s/$tarfile/$localfile/g;
+	}
+	else {
+	    #
+	    # Should be a regular path.
+	    #
+	    tbdie("$tarfile cannot be found; local file does not exist")
+		if (! -e $tarfile);
+
+	    $toarchive{$tarfile} = $tarfile;
 	}
     }
 
@@ -245,6 +309,14 @@ while (my ($URL, $localfile) = each %tofetch) {
     if ($?) {
 	tbdie("Fetch of Tarball/RPM failed!");
     }
+}
+
+#
+# Now add to the archive.
+#
+while (my ($localfile, $ignored) = each %toarchive) {
+    libArchive::TBExperimentArchiveAddFile($pid, $eid, $localfile) == 0 or
+	tbdie("Failed to add $localfile to the archive!");
 }
 
 #

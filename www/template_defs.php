@@ -11,6 +11,7 @@
 class Template
 {
     var	$template;
+    var $experiment;
     
     function Template($guid, $vers) {
 	$guid = addslashes($guid);
@@ -25,6 +26,22 @@ class Template
 	    return;
 	}
 	$this->template = mysql_fetch_array($query_result);
+
+	# 
+	# Underlying experiment for easy access. Experiment should be its own class!
+	#
+	$pid = $this->pid();
+	$eid = $this->eid();
+	
+	$query_result =
+	    DBQueryWarn("select * from experiments ".
+			"where pid='$pid' and eid='$eid'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    $this->template = NULL;
+	    return;
+	}
+	$this->experiment = mysql_fetch_array($query_result);
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -43,6 +60,25 @@ class Template
     # Do class level lookup for the root template.
     function LookupRoot($guid) {
 	$foo = new Template($guid, 1); 
+
+	if ($foo->IsValid())
+	    return $foo;
+	return null;
+    }
+    # Look up by pid,eid is which also unique across templates.
+    function LookupbyEid($pid, $eid) {
+	$query_result =
+	    DBQueryWarn("select guid,vers from experiment_templates  ".
+			"where pid='$pid' and eid='$eid'");
+
+	if (!$query_result || !mysql_num_rows($query_result))
+	    return null;
+	
+	$row = mysql_fetch_array($query_result);
+	$guid = $row['guid'];
+	$vers = $row['vers'];
+	
+	$foo = new Template($guid, $vers); 
 
 	if ($foo->IsValid())
 	    return $foo;
@@ -92,6 +128,9 @@ class Template
     }
     function uid() {
 	return (is_null($this->template) ? -1 : $this->template['uid']);
+    }
+    function path() {
+	return (is_null($this->template) ? -1 :	$this->experiment['path']);
     }
     function IsHidden() {
 	return (is_null($this->template) ? -1 : $this->template['hidden']);

@@ -3423,3 +3423,10 @@ last_net_act,last_cpu_act,last_ext_act);
       This immediately logs everyone out from the web interface. but
       thats not really a big deal.
 
+4.69: Add template_tag to experiment_template_instances table.
+
+      **** Skip this if you just did 4.41 above.
+
+      	alter table experiment_template_instances add \
+		template_tag varchar(64) default NULL;
+
