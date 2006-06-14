@@ -387,9 +387,14 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     if ($uid == "") {
 	$uid = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
 
-        # Verify valid string (no special chars like single/double quotes!).
-	if (! preg_match("/^[-\w]+$/", $uid)) {
-	    TBERROR("LOGGEDINORDIE: Illegal characters in $uid", 1);
+	if ($uid == "") {
+		$uid = FALSE;
+	}
+	else {
+            # Verify valid string (no special chars like single/double quotes!)
+	    if (! preg_match("/^[-\w]+$/", $uid)) {
+		TBERROR("LOGGEDINORDIE: Illegal characters in $uid", 1);
+	    }
 	}
     }
 
