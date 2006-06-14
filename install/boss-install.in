@@ -719,8 +719,8 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 		   qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|,
 		   qq|apache_enable="YES"|);
 
-    # Starting at 6.1 we use the default version of bind, not the port.
-    if ($FBSD_VERSION < 6.0) {
+    # Starting at FreeBSD 6 we use the default version of bind, not the port.
+    if ($FBSD_VERSION < 6) {
 	push(@strings, qq|named_enable="NO"|);
     }
     else {
@@ -1078,8 +1078,8 @@ Phase "named", "Setting up initial named configuration", sub {
 	ExecQuietFatal("$NAMED_SETUP -norestart");
     };
     
-    # Starting at 6.1 we use the default version of bind, not the port.
-    my $named_control = ($FBSD_VERSION < 6.0 ?
+    # Starting at 6.0 we use the default version of bind, not the port.
+    my $named_control = ($FBSD_VERSION < 6 ?
 			 "$RCDIR/1.named.sh" : "/etc/rc.d/named");
     
     Phase "stopping", "Stopping named", sub {
@@ -1093,7 +1093,7 @@ Phase "named", "Setting up initial named configuration", sub {
     };
 
     # Lets make sure that old file is gone!
-    if ($FBSD_VERSION >= 6.1) {
+    if ($FBSD_VERSION >= 6) {
 	Phase "cleanup", "Cleaning up old files", sub {
 	    DoneIfDoesntExist("$RCDIR/1.named.sh");
 	
