@@ -35,8 +35,8 @@ my $USERNAME    = "Unknown";
 my $GCOS        = "Unknown";
 my @SAVEARGV	= @ARGV;
 my $SAVEPID	= $PID;
-my $SAVE_STDOUT;
-my $SAVE_STDERR;
+my $SAVE_STDOUT = 0;
+my $SAVE_STDERR = 0;
 
 # Indicates, this script is being audited.
 my $auditing	= 0;
@@ -92,11 +92,11 @@ sub AuditStart($;$$)
     # "what was done" message to the audit list, and CC it to tbops if it
     # exits with an error. But the log is the responsibility of the user.
     #
-    if (!$daemon && isatty(STDIN)) {
-	$auditing = 1;
-	$ENV{'TBAUDITON'} = "$SCRIPTNAME:$USERNAME";
-	return;
-    }
+#    if (!$daemon && isatty(STDIN)) {
+#	$auditing = 1;
+#	$ENV{'TBAUDITON'} = "$SCRIPTNAME:$USERNAME";
+#	return;
+#    }
 
     if (!defined($logname)) {
 	$logfile = TBMakeLogname("$SCRIPTNAME");
@@ -144,10 +144,12 @@ sub AuditStart($;$$)
     }
 
     # Save old stderr and stdout.
-    open(OLDOUT, ">&", \*STDOUT);
-    $SAVE_STDOUT = *OLDOUT;
-    open(OLDERR, ">&", \*STDERR);
-    $SAVE_STDERR = *OLDERR;
+    if ($PERL_VERSION >= 5.008) {
+	eval("open(OLDOUT, \">&\", \*STDOUT); ".
+	     "\$libaudit::SAVE_STDOUT = *OLDOUT; ".
+	     "open(OLDERR, \">&\", \*STDERR); ".
+	     "\$libaudit::SAVE_STDERR = *OLDERR;");
+    }
 
     open(STDOUT, ">> $logfile") or
 	die("opening $logfile for STDOUT: $!");
@@ -244,6 +246,11 @@ sub SendAuditMail($)
 	# Avoid duplicate messages.
 	$auditing = 0;
 
+	if ($PERL_VERSION >= 5.008) {
+	    eval("open(STDOUT, \">&\", \$libaudit::SAVE_STDOUT); ".
+		 "open(STDERR, \">&\", \$libaudit::SAVE_STDERR);");
+	}
+
 	my $subject  = "$SCRIPTNAME @SAVEARGV";
 	if ($?) {
 	    $subject = "Failed: $subject";
@@ -287,9 +294,6 @@ sub SendAuditMail($)
 	    unlink($logfile)
 		if (defined($logfile));
 	}
-
-	open(STDOUT, ">&", $SAVE_STDOUT);
-	open(STDERR, ">&", $SAVE_STDERR);
     }
 }
 
