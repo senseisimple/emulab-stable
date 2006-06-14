@@ -925,9 +925,10 @@ sub SetupOpsNode($)
 	# The nfsd script will try to kill all nfsd processes, but once
 	# the master is killed, it kills all children itself.  Thus the
 	# nfsd script may fail to kill the children if they are already
-	# dead.  "forcestop" tells the script to ignore errors.
+	# dead and return non-zero.  So we ignore the return value of
+	# the script by using system rather than mysystem.
 	#
-	mysystem("/etc/rc.d/nfsd forcestop");
+	system("/etc/rc.d/nfsd stop");
 	mysystem("killall rpcbind");
 	mysystem("rpcbind");
 	mysystem("/etc/rc.d/nfsd start");
