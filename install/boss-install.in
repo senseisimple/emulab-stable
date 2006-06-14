@@ -1078,7 +1078,7 @@ Phase "named", "Setting up initial named configuration", sub {
     };
     
     # Starting at 6.1 we use the default version of bind, not the port.
-    my $named_control = ($FBSD_VERSION <= 6.0 ?
+    my $named_control = ($FBSD_VERSION < 6.0 ?
 			 "$RCDIR/1.named.sh" : "/etc/rc.d/named");
     
     Phase "stopping", "Stopping named", sub {
