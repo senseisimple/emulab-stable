@@ -726,6 +726,7 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
     else {
 	push(@strings, (qq|named_enable="YES"|,
 			qq|named_chrootdir=""|,
+			qq|named_flags=""|,
 			qq|named_uid="root"|));
     }
     AppendToFileFatal($RCCONF, @strings);
