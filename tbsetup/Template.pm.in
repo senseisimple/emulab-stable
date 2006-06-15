@@ -33,6 +33,7 @@ my $RSYNC	= "/usr/local/bin/rsync";
 
 # Cache of template instances to avoid regenerating them.
 my %templates   = ();
+my $debug	= 0;
 
 #
 # Grab a new GUID for a template. We do not have to use it of course.
@@ -66,6 +67,16 @@ sub NewGUID($)
 
     $$pidx = $idx;
     return 0;
+}
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
 }
 
 #
@@ -781,7 +792,7 @@ sub ModifyMetadata($$$$)
 	    
 	    Refresh($self);
 	    # This can fail; it is not critical.
-	    system("$makegraph $template_guid");
+	    Template::mysystem("$makegraph $template_guid");
 	}
 	elsif ($metadata_type eq "template_description") {
 	    DBQueryWarn("update experiment_templates set description=$value ".
@@ -1234,7 +1245,8 @@ sub CopyDataStore($$$)
     my $from_path = $parent->path();
     my $to_path   = $self->path();
 
-    system("cd $from_path; $RSYNC -rtgoDlz datastore $to_path") == 0
+    Template::mysystem("cd $from_path; ".
+		       "   $RSYNC -rtgoDlz datastore $to_path") == 0
 	or return -1;
 
     return 0;
@@ -1848,8 +1860,8 @@ sub LogHole($)
 	    or return -1;
     }
 
-    system("$TEVC -w -t 60 -e $pid/$eid now ns SNAPSHOT ".
-	   "    LOGHOLE_ARGS='-l $logdir -P -s'") == 0
+    Template::mysystem("$TEVC -w -t 60 -e $pid/$eid now ns SNAPSHOT ".
+		       "    LOGHOLE_ARGS='-l $logdir -P -s'") == 0
        or return -1;
 
     return 0;
@@ -1873,7 +1885,7 @@ sub DumpDB($)
     # The file is a gzipped.
     my $dumpfile   = "$archivedir/dbdump.gz";
 
-    system("$DBCONTROL dumpexpdb $pid $eid $dumpfile") == 0
+    Template::mysystem("$DBCONTROL dumpexpdb $pid $eid $dumpfile") == 0
 	or return -1;
 
     return 0;
@@ -1933,7 +1945,7 @@ sub CopyDataStore($$$)
 	or return -1;
 
     if (! -e $to_path) {
-	system("mkdir -p $to_path") == 0
+	Template::mysystem("mkdir -p $to_path") == 0
 	    or return -1;
     }
 
