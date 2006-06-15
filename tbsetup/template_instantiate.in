@@ -47,7 +47,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:p:bE:";
+my $optlist	 = "qwe:S:L:na:l:se:p:bE:t:";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -448,6 +448,9 @@ $instance->CopyDataStore($template_tag,
 
 DBQueryFatal("replace into virt_user_environment set ".
 	     "   name='DATASTORE', value='$instance_path/template_datastore',".
+	     "   pid='$pid', eid='$eid'");
+DBQueryFatal("replace into virt_user_environment set ".
+	     "   name='ARCHIVE', value='$instance_path/archive',".
 	     "   pid='$pid', eid='$eid'");
 
 #
