@@ -15,6 +15,8 @@ $CHECKLOGIN_UID			= 0;
 $CHECKLOGIN_NOLOGINS		= -1;
 $CHECKLOGIN_WIKINAME            = "";
 $CHECKLOGIN_IDLETIME            = 0;
+$CHECKLOGIN_HASHKEY             = null;
+$CHECKLOGIN_HASHHASH            = null;
 
 #
 # New Mapping. 
@@ -132,7 +134,9 @@ function CHECKLOGIN($uid) {
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $CHECKLOGIN_NODETYPES;
     global $CHECKLOGIN_WIKINAME, $TBOPSPID;
     global $EXPOSEARCHIVE, $EXPOSETEMPLATES;
+    global $CHECKLOGIN_HASHKEY, $CHECKLOGIN_HASHHASH;
     global $nocookieauth;
+    
     #
     # If we already figured this out, do not duplicate work!
     #
@@ -168,10 +172,14 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 	return $CHECKLOGIN_STATUS;
     }
-    
-    $safe_curhash  = addslashes($curhash);
-    $safe_hashhash = addslashes($hashhash);
-    $safe_uid      = addslashes($uid);
+
+    if (isset($curhash)) {
+	$CHECKLOGIN_HASHKEY = $safe_curhash = addslashes($curhash);
+    }
+    if (isset($hashhash)) {
+	$CHECKLOGIN_HASHHASH = $safe_hashhash = addslashes($hashhash);
+    }
+    $safe_uid = addslashes($uid);
     
     #
     # Note that we get multiple rows back because of the group_membership
@@ -379,7 +387,7 @@ function CHECKLOGIN($uid) {
 #
 function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     global $TBBASE, $BASEPATH, $HTTP_COOKIE_VARS, $TBNAMECOOKIE;
-    global $TBAUTHTIMEOUT;
+    global $TBAUTHTIMEOUT, $CHECKLOGIN_HASHKEY;
 
     # If our login is not valid, then the uid is already set to "",
     # so refresh it to the cookie value. Then we can pass the right
@@ -433,9 +441,12 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
 	# logout further into the future. This avoids timing them
 	# out just when they are doing useful work.
         #
-	$timeout = time() + $TBAUTHTIMEOUT;
+	if (! is_null($CHECKLOGIN_HASHKEY)) {
+	    $timeout = time() + $TBAUTHTIMEOUT;
 
-	DBQueryFatal("UPDATE login set timeout='$timeout' where uid='$uid'");
+	    DBQueryFatal("UPDATE login set timeout='$timeout' ".
+			 "where uid='$uid' and hashkey='$CHECKLOGIN_HASHKEY'");
+	}
 	break;
     default:
 	TBERROR("LOGGEDINORDIE failed mysteriously", 1);

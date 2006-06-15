@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -208,6 +208,8 @@ while ($row = mysql_fetch_array($query_result)) {
     # List of projects.
     reset($projmemb_array);
     if (isset($projmemb_array[$thisuid])) {
+	reset($projmemb_array[$thisuid]);
+	
 	echo "<td> ";
 	while (list ($idx, $pid) = each($projmemb_array[$thisuid])) {
 	    echo "<A href='showproject.php3?pid=$pid'>$pid</A>";
