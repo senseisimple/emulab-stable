@@ -273,6 +273,11 @@ if (isset($target_pid)) {
                      that we delete this user from the testbed</a></b>\n";
 	}
     }
+    else {
+	if (isset($target_pid)) {
+	    PAGEREPLACE("showgroup.php3?pid=$target_pid&gid=$target_pid");
+	}
+    }
 }
 
 #
