@@ -1,32 +1,37 @@
 #!/usr/bin/perl
 
-#TODO!! Result index numbers... window size 2x > buffer size???
-# (1/30/06) No Ack's, just trust that sent data gets there.
-# Q: how to determine if OPS receives it correctly?
-#    (1/31) Just checking if "send notification" is successful
-#
-# (2/3/06): CLEANUP ALLOCATED MEMORY using .._free() functions
-# (3/20/06): Look into usefullness of "nohang()"... did not get tested,
-#            and may not be needed
+#TODO!! Result index numbers for ACKs?... window size 2x > buffer size???
 
 =pod
-HOW TO USE:
-Send a notification to this node to perform a desired action by:
-objtype   => BGMON
-objname   => plabxxx   where plabxxx is the this node address
-eventtype => <COMMAND> where COMMAND is any of:
-  EDIT: Modify a specific link test to specific destination node.
+
+Send a UDP message to this node, containing a Storable::freeze hash
+with the following key/value pairs:
+
+cmdtype => EDIT or INIT or SINGLE or STOPALL
+and the following for each of the above cmdtypes:
+EDIT:
+dstnode  => plab2
+testtype => latency or bw
+testper  => 30
+INIT:
+  ** todo **
+destnodes => "plab1 plab2"
+SINGLE:
+dstnode => plabxxx
+testtype => latency or bw
+
+where,
+EDIT: Modify a specific link test to specific destination node.
+INIT: Initialize the link tests with default destination nodes and frequency.
+SINGLE: Perform a single link test to a specifc destination node.
         Notification must contain the following attributues:
-          "linkdest" = destination node of the test. Example, "node10"
-          "testtype" = type of test to run. Examples, "latency" or "bw"
-          "testper"  = period of time between successive tests.
-  INIT: Initialize the link tests with default destination nodes and frequency.
-        **todo** ^^needs updating 
-  SINGLE: Perform a single link test to a specifc destination node.
-          Notification must contain the following attributues:
-           "linkdest" = destination node of the test. Example, "node10"
-           "testtype" = type of test to run. Examples, "latency" or "bw"
-  STOPALL: stop all tests, running or pending.
+dstnode = destination node of the test. Example, node10
+testtype = type of test to run. Examples, latency or bw
+testper  = period of time between successive tests.
+
+
+TODO: ACK documentation?
+
 
 OPERATION NUANCES:
 - If a ping test is scheduled to have a period shorter than the normal
@@ -41,15 +46,16 @@ OPERATION NUANCES:
   reporting here.)
 =cut
 
-use lib '/usr/testbed/lib';
-use event;
 use Getopt::Std;
 use strict;
 use DB_File;
-use Socket;
+use IO::Socket::INET;
+use IO::Select;
+
+$| = 1;
 
 sub usage {
-	warn "Usage: $0 [-s server] [-p port] [-e pid/eid] -d <working_dir> [hostname]\n";
+	warn "Usage: $0 [-s server] [-c cmdport] [-a ackport] [-p sendport] [-e pid/eid] -d <working_dir> [hostname]\n";
 	return 1;
 }
 
@@ -63,9 +69,11 @@ my $iperftimeout = 30;   #kill an iperf process lasting longer than this.
 # note: 0.1 = 10%
 my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.1);
+my $rcvBufferSize = 2048;  #max size for an incoming UDP message
+my %outsockets = ();       #sockets keyed by dest node
 #MARK_RELIABLE
 # each result waiting to be acked has an id number and corresponding file
-my $resultDBlimit = 1000;
+my $resultDBlimit = 100;
 my %reslist       = ();
 my $magic         = "0xDeAdBeAf";
 
@@ -88,15 +96,18 @@ $ERRID{unknown} = -3;
 #*****************************************
 
 my %opt = ();
-getopts("s:p:e:d:i:h",\%opt);
+getopts("s:a:p:e:d:i:h",\%opt);
 
 #if ($opt{h}) { exit &usage; }
 #if (@ARGV > 1) { exit &usage; }
 
-my ($server,$port,$evexpt,$workingdir,$iperfport);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
-if ($opt{p}) { $port = $opt{p}; }
-if ($opt{e}) { $evexpt = $opt{e}; } else { $evexpt = "__none"; }
+my ($server, $cmdport, $cmdackport, $sendport, $ackport,$expid,$workingdir,$iperfport);
+
+if ($opt{s}) { $server = $opt{s}; } else { $server = "ops"; }
+if ($opt{c}) { $cmdport = $opt{c}; } else { $cmdport = 5060; }
+if ($opt{a}) { $ackport = $opt{a}; } else { $ackport = 5050; }
+if ($opt{p}) { $sendport = $opt{p}; } else { $sendport = 5051; }
+if ($opt{e}) { $expid = $opt{e}; } else { $expid = "none"; }
 if ($opt{d}) { $workingdir = $opt{d}; `cd $workingdir`; }
 if ($opt{i}) { $iperfport = $opt{i}; } else { $iperfport = 5002; }
 
@@ -110,52 +121,26 @@ if( defined  $ARGV[0] ){
 }
 print "thismonaddr = $thismonaddr\n";
 
-print "server=$server\n";
+# Create a UDP socket to receive commands on
+my $socket_cmd = IO::Socket::INET->new( LocalPort => $cmdport,
+					Proto    => 'udp' )
+    or die "Couldn't create socket on $cmdport\n";
+# Create a UDP socket to receive acks on
+my $socket_ack = IO::Socket::INET->new( LocalPort => $ackport,
+					Proto    => 'udp' )
+    or die "Couldn't create socket on $ackport\n";
 
-my $URL = "elvin://$server";
-if ($port) { $URL .= ":$port"; }
-#TOTAL HACK - bug in event library: after unregister, segfault if assigning
-#  a val to $handle
-my @handles =();
-push @handles, event_register($URL,0);
-my $handle = $handles[$#handles];
+print time()." creating socket\n";
+my $socket_snd = IO::Socket::INET->new( PeerPort => $sendport,
+					Proto    => 'udp',
+					PeerAddr => $server );
+print time()." end creating socket\n";
 
-if (!$handle) { die "Unable to register with event system\n"; }
-print "registered with $server\n";
-my $tuple = address_tuple_alloc();
-if (!$tuple) { die "Could not allocate an address tuple\n"; }
+#create Select object.
+my $sel = IO::Select->new();
+$sel->add($socket_cmd);
+$sel->add($socket_ack);
 
-%$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
-	    objtype   => "BGMON",
-	    objname   => $thismonaddr,
-            expt      => $evexpt);
-
-if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
-	die "Could not subscribe to event\n";
-}
-
-# This is for our ack from ops.
-$tuple = address_tuple_alloc();
-if (!$tuple) { die "Could not allocate an address tuple\n"; }
-
-%$tuple = ( objname   => "ops",
-	    eventtype => "ACK",
-	    expt      => "__none",
-	    objtype   => "BGMON");
-
-if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
-	die "Could not subscribe to ack event\n";
-}
-
-#this call will reconnect event system if it has failed
-sendBlankNotification();
-
-#############################################################################
-# Note a difference from tbrecv.c - we don't yet have event_main() functional
-# in perl, so we have to poll. (Nothing special about the select, it's just
-# a wacky way to get usleep() )
-#############################################################################
-#main()
 
 #
 # At startup, look for any old results that did not get acked. Add them to
@@ -171,26 +156,110 @@ my $subtimer_reset = 100;  # subtimer reaches 0 this many times thru poll loop
 my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 
 
+sub handleincomingmsgs()
+{
+    my $inmsg;
+
+    #check for pending received events
+    my @ready = $sel->can_read(0.1);  #wait max of 0.1 sec. Don't want to
+                                      #have 0 here, or CPU usage goes high
+    foreach my $handle (@ready){
+	$handle->recv( $inmsg, $rcvBufferSize );
+#	print "received msg: $inmsg\n";
+
+#	my %udpin = %{ Storable::thaw $inmsg};
+	my %udpin = %{ deserialize_hash($inmsg) };
+	my $cmdtype = $udpin{cmdtype};
+	if( !defined($cmdtype) ){
+	    warn "bad message format\n";
+	    return 0;  #bad message
+	}
+	if( $udpin{expid} ne $expid ){
+	    return 0;  #not addressed to this experiment
+	}
+	if( $cmdtype eq "ACK" ){
+	    my $index = $udpin{index};
+	    print time()." Ack for index $index. Deleting backup file\n";
+	    if (exists($reslist{$index})) {
+		unlink($reslist{$index});
+		delete($reslist{$index});
+	    }
+	}
+	elsif( $cmdtype eq "EDIT" ){
+	    my $linkdest = $udpin{dstnode};
+	    my $testtype = $udpin{testtype};
+	    my $testper = $udpin{testper};
+	    $testevents{$linkdest}{$testtype}{"testper"} = $testper;
+	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 0;
+	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all();
+	    print( "EDIT:\n");
+	    print( "linkdest=$linkdest\n".
+		   "testype =$testtype\n".
+		   "testper=$testper\n" );
+	}
+	elsif( $cmdtype eq "INIT" ){
+	    print "INIT: ";
+	    my $testtype = $udpin{testtype};
+	    my @destnodes 
+		= split(" ",$udpin{destnodes});
+	    my $testper = $udpin{testper};
+	    #TOOD: Add a start time offset, so as to schedule the initial test
+            #      from the manager/controller	    
+            foreach my $linkdest (@destnodes){
+		#be smart about adding tests
+		# don't want to change already running tests
+		# only change those tests which have been updated
+		if( defined($testevents{$linkdest}{$testtype}{"testper"}) &&
+		    $testper == $testevents{$linkdest}{$testtype}{"testper"} )
+		{
+		    # do nothing... keep test as it is
+		}else{
+		    # update test
+		    $testevents{$linkdest}{$testtype}{"testper"} =$testper;
+		    $testevents{$linkdest}{$testtype}{"flag_scheduled"} =0;
+		    # TODO? be smart about when the first test should run?
+		    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} =
+			time_all();
+		}
+	    }
+	    print " $testtype  $testper\n";
+	}
+	elsif( $cmdtype eq "SINGLE" ){
+	    my $linkdest = $udpin{dstnode};
+	    my $testtype = $udpin{testtype};
+	    $testevents{$linkdest}{$testtype}{"testper"} = 0;
+	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all()-1;
+	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 1;
+	    $testevents{$linkdest}{$testtype}{"pid"} = 0;
+
+	    print( "SINGLE\n".
+		   "linkdest=$linkdest\n".
+		   "testype =$testtype\n");
+	}
+	elsif( $cmdtype eq "STOPALL" ){
+	    print "STOPALL\n";
+	    %testevents = ();
+	    %waitq = ();
+	}
+    }
+}
+
+#
+#  MAIN POLL LOOP
+#    check for newly sent commands, checks for finished tests,
+#    starts new tests, etc..
+#
 while (1) {
 
     $subtimer--;
 
-    #check for pending received events
-    eval{
-	event_poll_blocking($handle,100);
-	die "forced dieing..\n";
-    };
-    if( $@ ){
-	#event_poll died... reconnect
-	print "event_poll had a fatal error:$@\n";
-#	if( $subtimer == 0 ){
-	    reconnect_eventsys();
-#	}
-    }
+    handleincomingmsgs();
 
     #re-try wait Q every $subtimer_reset times through poll loop
     #try to run tests on queue
     if( $subtimer == 0 ){
+	sendOldResults();
+
 	foreach my $testtype (keys %waitq){
 
 	    if( scalar(@{$waitq{$testtype}}) != 0 ){
@@ -209,6 +278,7 @@ while (1) {
     #iterate through all event structures
     for my $destaddr ( keys %testevents ) {
 	for my $testtype ( keys %{ $testevents{$destaddr} } ){
+
 	    #mark flags of finished tests
 	    #check if process is running
 	    my $pid = $testevents{$destaddr}{$testtype}{"pid"};
@@ -221,6 +291,7 @@ while (1) {
 			#process finished, so mark it's "finished" flag
 			$testevents{$destaddr}{$testtype}{"flag_finished"} = 1;
 			$testevents{$destaddr}{$testtype}{"pid"} = 0;
+#			print "test $destaddr / $testtype finished\n";
 		    }else{
 			#process exited abnormally
 			#reset pid
@@ -277,9 +348,11 @@ while (1) {
 		     "tstamp" => $testevents{$destaddr}{$testtype}{"tstamp"},
 		     "magic"  => "$magic",
 		     );
+
 		#MARK_RELIABLE
 		#save result to local DB
 		my $index = saveTestToLocalDB(\%results);
+
 		#send result to remote DB
 		sendResults(\%results, $index);
 
@@ -329,7 +402,8 @@ while (1) {
 		#run test
 		spawnTest( $destaddr, $testtype );
 	    }
-	}
+
+	}#end loop
 
 	# may not be needed, but may help detect errors
 	my $hangres = detectHang($destaddr);
@@ -340,13 +414,20 @@ while (1) {
 	}
     }
 
+    if( $subtimer == 0 ){
+	$subtimer = $subtimer_reset;
+    }
+}
+
+sub sendOldResults()
+{
     #
     # Check for results that could not be sent due to error. We want to wait
     # a little while though to avoid resending data that has yet to be
     # acked because the network is slow or down.
     #
     my $count    = 0;
-    my $maxcount = 5;	# Wake up and send only this number at once.
+    my $maxcount = 10;	# Wake up and send only this number at once.
     
     for (my $index = 0; $index < $resultDBlimit; $index++) {
 	next
@@ -389,146 +470,20 @@ while (1) {
 	sleep(1);
 	$count++;
 	if ($count > $maxcount) {
-	    print "Delaying a bit before sending more old results!\n";
-	    sleep(2);
+#	    print "Delaying a bit before sending more old results!\n";
+#	    sleep(2);
 	    last;
 	}
     }
 
-    if( $subtimer == 0 ){
-	$subtimer = $subtimer_reset;
-    }
 }
 
 #############################################################################
 
-if (event_unregister($handle) == 0) {
-    die "Unable to unregister with event system\n";
-}
 
 exit(0);
 
 
-sub callbackFunc($$$) {
-	my ($handle,$notification,$data) = @_;
-
-	my $time      = time_all();
-	my $site      = event_notification_get_site($handle, $notification);
-	my $expt      = event_notification_get_expt($handle, $notification);
-	my $group     = event_notification_get_group($handle, $notification);
-	my $host      = event_notification_get_host($handle, $notification);
-	my $objtype   = event_notification_get_objtype($handle, $notification);
-	my $objname   = event_notification_get_objname($handle, $notification);
-	my $eventtype = event_notification_get_eventtype($handle,
-							 $notification);
-#	print "Event: $time $site $expt $group $host $objtype $objname " .
-#		"$eventtype\n";
-
-#	print "EVENT: $time $objtype $eventtype\n";
-
-	# Ack from ops.
-	if ($eventtype eq "ACK") {
-	    my $index = event_notification_get_string($handle,
-						      $notification,
-						      "index");
-	    
-	    print "Ack for index $index. Deleting backup file\n";
-	    if (exists($reslist{$index})) {
-		unlink($reslist{$index});
-		delete($reslist{$index});
-	    }
-	    return;
-	}
-
-	#change values and/or initialize
-	if( $eventtype eq "EDIT" ){
-
-	    my $linkdest = event_notification_get_string($handle,
-							 $notification,
-							 "linkdest");
-	    my $testtype = event_notification_get_string($handle,
-							 $notification,
-							 "testtype");
-	    my $testper = event_notification_get_string($handle,
-							$notification,
-							"testper");
-	    $testevents{$linkdest}{$testtype}{"testper"} = $testper;
-	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 0;
-	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all();
-
-	    print( "EDIT:\n");
-	    print( "linkdest=$linkdest\n".
-		   "testype =$testtype\n".
-		   "testper=$testper\n" );
-	}
-	elsif( $eventtype eq "INIT" ){
-	    print "INIT: ";
-	    my $testtype = event_notification_get_string($handle,
-							 $notification,
-							 "testtype");
-	    my @destnodes 
-		= split(" ", event_notification_get_string($handle,
-							   $notification,
-							   "destnodes"));
-            my $testper = event_notification_get_string($handle,
-							$notification,
-							"testper");
-#	    print "$testtype*$@destnodes*$testper\n";
-
-	    #TOOD: Add a start time offset, so as to schedule the initial test
-            #      from the manager/controller
-	    
-            foreach my $linkdest (@destnodes){
-		#be smart about adding tests
-		# don't want to change already running tests
-		# only change those tests which have been updated
-		if( defined($testevents{$linkdest}{$testtype}{"testper"}) &&
-		    $testper == $testevents{$linkdest}{$testtype}{"testper"} )
-		{
-		    # do nothing... keep test as it is
-		}else{
-		    # update test
-		    $testevents{$linkdest}{$testtype}{"testper"} =$testper;
-		    $testevents{$linkdest}{$testtype}{"flag_scheduled"} =0;
-		    # TODO? be smart about when the first test should run?
-		    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} =
-			time_all();
-		}
-	    }
-	    print " $testtype  $testper\n";
-	}
-	elsif( $eventtype eq "SINGLE" ){
-	    print "SINGLE\n";
-	    #schedule a single test run NOW (this time, minus 1 second)
-	    my $linkdest = event_notification_get_string($handle,
-							 $notification,
-							 "linkdest");
-	    my $testtype = event_notification_get_string($handle,
-							 $notification,
-							 "testtype");
-	    my $testper = event_notification_get_string($handle,
-							$notification,
-							"testper");
-	    $testevents{$linkdest}{$testtype}{"testper"} = 0;
-	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all()-1;
-	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 1;
-	    $testevents{$linkdest}{$testtype}{"pid"} = 0;
-
-	    print( "linkdest=$linkdest\n".
-		   "testype =$testtype\n".
-		   "testper=$testper\n" );
-	    
-	}
-	elsif( $eventtype eq "STOPALL" ){
-	    print "STOPALL\n";
-	    %testevents = ();
-	}
-
-	# Should this be freed here? It segfaults if it is...
-#	if( event_notification_free( $handle, $notification ) == 0 ){
-#	    die "Unable to free notification";
-#	}
-}
 
 #############################################################################
 
@@ -706,7 +661,11 @@ sub saveTestToLocalDB($)
     my $results = $_[0];
     my %db;
     my $filename = createDBfilename($index);
-    tie( %db, "DB_File", $filename ) or die "cannot create db file";
+    tie( %db, "DB_File", $filename ) or 
+	eval {
+	    warn time()." cannot create db file";
+	    return -1;
+	};
     for my $key (keys %$results ){
 	$db{$key} = $$results{$key};
     }
@@ -718,69 +677,22 @@ sub saveTestToLocalDB($)
 
 #############################################################################
 sub sendResults($$){
-    my $results = $_[0];
-    my $index = $_[1];
+    my ($results, $index) = @_;
 
-    my $tuple_res = address_tuple_alloc();
-    if (!$tuple_res) { warn "Could not allocate an address tuple\n"; }
-    
-    %$tuple_res = ( objtype   => "BGMON",
-		    objname   => "ops",
-		    eventtype => "RESULT"
-		    , expt      => $evexpt
-		    , scheduler => 1
-		    );
+    my %result = ( expid    => $expid,
+		   linksrc  => $results->{sourceaddr},
+		   linkdest => $results->{destaddr},
+		   testtype => $results->{testtype},
+		   result   => $results->{result},
+		   tstamp   => $results->{tstamp},
+		   index    => $index );
+#    my $result_serial = Storable::freeze \%result ;
+    my $result_serial = serialize_hash( \%result );
 
-    my $notification_res = event_notification_alloc($handle,$tuple_res);
-    if (!$notification_res) { warn "Could not allocate notification\n"; }
+#    print time()." sending results\n";
+    $socket_snd->send($result_serial);
+#    print time()." end sending results\n";
 
-
-    if( 0 == event_notification_put_string( $handle,
-					    $notification_res,
-					    "linksrc",
-					    $results->{sourceaddr} ) )
-    { warn "Could not add attribute to notification\n"; }
-
-
-    if( 0 == event_notification_put_string( $handle,
-					    $notification_res,
-					    "linkdest",
-					    $results->{destaddr} ) )
-    { warn "Could not add attribute to notification\n"; }
-    
-    if( 0 == event_notification_put_string( $handle,
-					    $notification_res,
-					    "testtype",
-					    $results->{testtype} ) )
-    { warn "Could not add attribute to notification\n"; }
-
-    if( 0 == event_notification_put_string( $handle,
-					    $notification_res,
-					    "result",
-					    $results->{result} ) )
-    { warn "Could not add attribute to notification\n"; }
-
-    if( 0 == event_notification_put_string( $handle,
-					    $notification_res,
-					    "tstamp",
-					    $results->{tstamp} ) )
-    { warn "Could not add attribute to notification\n"; }
-
-    if( 0 == event_notification_put_string( $handle,
-					    $notification_res,
-					    "index",
-					    "$index" ) )
-    { warn "Could not add attribute to notification\n"; }
-
-    print "Sending results to ops. Index: $index\n";
-
-    if (!event_notify($handle, $notification_res)) {
-	warn("could not send test event notification");
-    }
-
-    if( event_notification_free( $handle, $notification_res ) == 0 ){
-	die "unable to free notification_res";
-    }
 }
 
 #############################################################################
@@ -811,33 +723,6 @@ sub createDBfilename($)
 
 #############################################################################
 
-#send a dummy event to reconnect the event system if the node has lost it
-sub sendBlankNotification
-{
-    my $tuple_res = address_tuple_alloc();
-    if (!$tuple_res) { warn "Could not allocate an address tuple\n"; }
-    
-    %$tuple_res = ( objtype   => "NOTHING",
-		    objname   => "no_name",
-		    eventtype => "no_event"
-		    , expt      => $evexpt
-		    , scheduler => 1
-		    );
-
-    my $notification_res = event_notification_alloc($handle,$tuple_res);
-
-    #send notification
-    if (!event_notify($handle, $notification_res)) {
-	warn("could not send test event notification");
-    }
-
-    if( event_notification_free( $handle, $notification_res ) == 0 ){
-	die "unable to free notification_res";
-    }
-}
-
-#############################################################################
-
 sub detectHang($)
 {
     my ($nodeid) = @_;
@@ -855,54 +740,37 @@ sub detectHang($)
 }
 
 
-sub reconnect_eventsys()
+#############################################################################
+
+#
+# Custom sub to turn a hash into a string. Hashes must not contain
+# the substring of $separator anywhere!!!
+#
+sub serialize_hash($)
 {
-    print time_all()." Reconnecting to event system\n";
-    print "handle = $handle\n";
-    print "unregistering\n";
-    eval{
-	if (event_unregister(pop @handles) == 0) {
-	    die "Unable to unregister with event system\n";
-	};
-    };
-    if( $@ ){
-	print "unsubscribe had a fatal error:$@\n";
+    my ($hashref) = @_;
+    my %hash = %$hashref;
+    my $separator = "::";
+    my $out = "";
+
+    for my $key (keys %hash){
+	$out .= $separator if( $out ne "" );
+	$out .= $key.$separator.$hash{$key};
     }
+    return $out;
+}
 
-    eval{
+sub deserialize_hash($)
+{
+    my ($string) = @_;
+    my $separator = "::";
+    my %hashout;
 
-	print "registering\n";
-	my $tmp = event_register($URL,0);
-#	push @handles, event_register($URL,0);
-	print "registered\n";
-	$handle = $handles[$#handles];
-	if (!$handle) { die "Unable to register with event system\n"; }
+    my @tokens = split( /$separator/, $string );
 
-	print "allocating tuple\n";
-	$tuple = address_tuple_alloc();
-	if (!$tuple) { die "Could not allocate an address tuple\n"; }
-	%$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
-		    objtype   => "BGMON",
-		    objname   => $thismonaddr,
-		    expt      => $evexpt);
-	print "subscribing to control events\n";
-	if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
-	    die "Could not subscribe to event\n";
-	}
-
-	$tuple = address_tuple_alloc();
-	%$tuple = ( objname   => "ops",
-		    eventtype => "ACK",
-		    expt      => "__none",
-		    objtype   => "BGMON");
-	print "subscribing to ACK events\n";
-	if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
-	    die "Could not subscribe to event\n";
-	}
-    };
-    if( $@ ){
-	print "re-register had a fatal error:$@\n";
+    for( my $i=0; $i<@tokens; $i+=2 ){
+	$hashout{$tokens[$i]} = $tokens[$i+1];
+	print "setting $tokens[$i] => $tokens[$i+1]\n";
     }
-
-    print "exiting reconnect\n";
+    return \%hashout;
 }
