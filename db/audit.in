@@ -298,6 +298,12 @@ if ($query_result->numrows) {
 }
 
 #
+# Age any login entries that have timed out.
+#
+DBQueryWarn("delete from login ".
+	    "where (unix_timestamp(now()) - timeout) > (12 * 60 * 60)");
+
+#
 # Send email if anything was reported.
 #
 if (!$debug && -s $logname) {
