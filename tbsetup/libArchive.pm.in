@@ -975,9 +975,10 @@ sub ArchiveCheckout($$;$$$)
     $sourcepoint = $sourcepoint . "/$subdir"
 	if (defined($subdir));
 
-    # Now check it out. This creates the $checkouts/$view directory.
+    # Now check it out, although we actually use export to avoid .svn files.
     mysystem("cd $target; ".
-	     "$SVN checkout $svnopt file://$repodir/$view/$sourcepoint .")
+	     "$SVN export $svnopt ".
+	     "    --force file://$repodir/$view/$sourcepoint .")
 	== 0 or goto bad;
   okay:
     TBScriptUnlock();
