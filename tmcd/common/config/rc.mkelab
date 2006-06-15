@@ -1327,6 +1327,9 @@ sub SetupBossNode()
     #
     # Ditto for named config.
     #
+    if ($FBSD_VERSION == 6.0) {
+	mysystem("rm -f /usr/local/sbin/rndc");	# XXX
+    }
     mysystem("/usr/testbed/sbin/named_setup");
 
   skipsetup:    
