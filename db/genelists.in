@@ -475,6 +475,11 @@ sub genelist($$$$)
 	if (! defined($user_email)) {
 	    next;
 	}
+	# HACK! These special accounts should be flagged in the DB
+	next 
+	    if ($usemailman && ($uid eq "elabman" || $uid eq "elabckup" ||
+				$uid eq "operator"));
+	    
 	if ($usemailman && $MAILMANSUPPORT) {
 	    print LIST "$uid $user_email $mailman_password '$user_name'\n";
 	}
