@@ -710,11 +710,11 @@ system("cp -Rfp $workdir/ $userdir/tbdata");
 my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
 
 if (! -e "$archivedir/tbdata") {
-    mkdir("$archivedir/tbdata")
+    mkdir("$archivedir/tbdata", 0775)
 	or fatal("Failed to mkdir $archivedir/tbdata");
 }
 if (! -e "$archivedir/nsdata") {
-    mkdir("$archivedir/nsdata")
+    mkdir("$archivedir/nsdata", 0775)
 	or fatal("Failed to mkdir $archivedir/nsdata");
 }
 
