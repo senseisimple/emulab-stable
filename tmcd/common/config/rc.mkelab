@@ -1226,6 +1226,16 @@ sub SetupBossNode()
 	if ($emulabconfig{"OPSIP"} ne $emulabconfig{"FSIP"});
 
     #
+    # XXX Remove conflicting package installed by boss-install.
+    # This can go away when the emulab-boss port has been updated.
+    #
+    if ($FBSD_VERSION >= 6) {
+	print "Removing conflicting bind package.\n";
+	mysystem("pkg_delete -r -x bind9")
+	    if (-e "/usr/local/sbin/rndc");
+    }
+
+    #
     # Unpack the tftpboot directory. It would be nice if this was part
     # of boss install too. 
     #
@@ -1327,9 +1337,6 @@ sub SetupBossNode()
     #
     # Ditto for named config.
     #
-    if ($FBSD_VERSION == 6.0) {
-	mysystem("rm -f /usr/local/sbin/rndc");	# XXX
-    }
     mysystem("/usr/testbed/sbin/named_setup");
 
   skipsetup:    
