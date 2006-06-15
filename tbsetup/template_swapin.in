@@ -446,12 +446,27 @@ $instance->CopyDataStore($template_tag,
 			 "$instance_path/template_datastore") == 0
     or fatal(-1, "Could not copy datastore ($template_tag) to instance");
 
+#
+# Ick, Ick, Ick. I want these to be at the beginning of the enviroment
+# strings so they are set in case the user has used any OPT variables
+# in the NS file (and they refer to $DATASTORE or $ARCHIVE).
+#
+my $query_result =
+    DBQueryFatal("select MAX(idx) from virt_user_environment ".
+		 "where pid='$pid' and eid='$eid'");
+my ($maxenv) = $query_result->fetchrow_array();
+for (my $idx = $maxenv; $idx > 0; $idx--) {
+    my $newidx = $idx + 2;
+    
+    DBQueryFatal("update virt_user_environment set idx=$newidx ".
+		 "where idx='$idx' and pid='$pid' and eid='$eid'");
+}
 DBQueryFatal("replace into virt_user_environment set ".
 	     "   name='DATASTORE', value='$instance_path/template_datastore',".
-	     "   pid='$pid', eid='$eid'");
+	     "   idx=1, pid='$pid', eid='$eid'");
 DBQueryFatal("replace into virt_user_environment set ".
 	     "   name='ARCHIVE', value='$instance_path/archive',".
-	     "   pid='$pid', eid='$eid'");
+	     "   idx=2, pid='$pid', eid='$eid'");
 
 #
 # Now do the swapin (or it gets queued if a batch experiment).
