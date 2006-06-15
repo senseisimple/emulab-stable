@@ -57,7 +57,7 @@ rootball:	$(ROOTBALLNAME)
 
 $(ROOTBALLNAME): copyfiles mkhosts
 	chown -R 0:0 plabroot
-	tar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
+	gtar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
 
 copyfiles: $(ALLSCRIPTS) $(ALLCONFS) $(ALLCERTS) $(PKGSRCTREE) mkdirtree
 	(cd ../common/config; $(MAKE) script-install DESTDIR=$(THISDIR)/plabroot)
