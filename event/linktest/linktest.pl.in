@@ -347,20 +347,6 @@ if (!$synserv || !exists($hostmap{$synserv})) {
 &debug("Synch master is $synserv\n");
 
 #
-# If there are no links to test, there is nothing to do!
-# Do this after we have identified the synch server.
-#
-if (@links == 0) {
-    &debug("No links to test!\n");
-
-    my $msg = "Linktest skipped, no links";
-    &sim_event(EVENT_LOG,$msg);
-    &debug("\n$msg\n\n");
-    &post_event(EVENT_COMPLETE,"ERROR=0 CTOKEN=$token");
-    exit(EXIT_OK);
-}
-
-#
 # If the current node is the special node, do some housekeeping
 # and initialize the barrier count.
 #
@@ -392,6 +378,20 @@ if(&is_special_node()) {
 
     $barr_count = @hosts;
     $barr_count--;
+}
+
+#
+# If there are no links to test, there is nothing to do!
+# Do this after we have identified the synch server.
+#
+if (@links == 0) {
+    &debug("No links to test!\n");
+
+    my $msg = "Linktest skipped, no links";
+    &sim_event(EVENT_LOG,$msg);
+    &debug("\n$msg\n\n");
+    &post_event(EVENT_COMPLETE,"ERROR=0 CTOKEN=$token");
+    exit(EXIT_OK);
 }
 
 #
