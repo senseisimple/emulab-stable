@@ -294,11 +294,13 @@ sub sendcmd($$)
 	    select(undef, undef, undef, 0.2);
 	    $max_tries--;
 	}
+    }while( $f_success != 1 && $max_tries != 0 );
 
     if( $f_success == 0 && $max_tries == 0 ){
 	$deadnodes{$node} = 1;
     }
 }
+
 
 
 sub updatenodes
