@@ -559,7 +559,7 @@ Node instproc program-agent {args} {
     set curprog [new Program [$self set sim]]
     $curprog set node $self
     $curprog set command $(-command)
-    $curprog set dir $(-dir)
+    $curprog set dir "{$(-dir)}"
     $curprog set expected-exit-code $(-expected-exit-code)
     if {$(-timeout) != {}} {
 	set to [::GLOBALS::reltime-to-secs $(-timeout)]
