@@ -16,7 +16,7 @@
 # installation script/directions should take care of this now.
 #
 
-for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /+/ {print $1}'`
+for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /\+/ {print $1}'`
 do
 (
 # feel free to change this message!!!
