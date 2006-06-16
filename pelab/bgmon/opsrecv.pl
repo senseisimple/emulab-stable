@@ -142,24 +142,26 @@ sub handleincomingmsgs()
 	    my %ack = ( expid   => $expid,
 			cmdtype => "ACK",
 			index   => $index );
-#	    my $ack_serial = Storable::freeze \%ack;
-	    my $ack_serial = serialize_hash( \%ack );
-	    $socket_snd->send($ack_serial);
-       	    print "**SENT ACK**\n";
+	    if( defined %ack && defined $socket_snd ){
+		my $ack_serial = serialize_hash( \%ack );
+		$socket_snd->send($ack_serial);
+		print "**SENT ACK**\n";	    
 #=pod
-	    if( !defined $lasttimestamp{$linksrc}{$index} ||
-		$tstamp ne $lasttimestamp{$linksrc}{$index} )
-	    {
-		saveTestToDB(linksrc   => $linksrc,
-			     linkdest  => $linkdest,
-			     testtype  => $testtype,
-			     result    => $result,
-			     tstamp    => $tstamp );
-	    }else{
-		print "++++++duplicate data\n";
-	    }
-	    $lasttimestamp{$linksrc}{$index} = $tstamp;
+		if( !defined $lasttimestamp{$linksrc}{$index} ||
+		    $tstamp ne $lasttimestamp{$linksrc}{$index} )
+		{
+		    saveTestToDB(linksrc   => $linksrc,
+				 linkdest  => $linkdest,
+				 testtype  => $testtype,
+				 result    => $result,
+				 tstamp    => $tstamp );
+		}else{
+		    print "++++++duplicate data\n";
+		}
+		$lasttimestamp{$linksrc}{$index} = $tstamp;
 #=cut
+	    }
+
 	}
 
     }

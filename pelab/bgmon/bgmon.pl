@@ -121,20 +121,22 @@ if( defined  $ARGV[0] ){
 }
 print "thismonaddr = $thismonaddr\n";
 
-# Create a UDP socket to receive commands on
+# Create a TCP socket to receive commands on
 my $socket_cmd = IO::Socket::INET->new( LocalPort => $cmdport,
-					Proto    => 'udp' )
+					LocalHost => $thismonaddr,
+					Proto    => 'tcp',
+					Blocking => 0,
+					Listen   => 1,
+					ReuseAddr=> 1 )
     or die "Couldn't create socket on $cmdport\n";
 # Create a UDP socket to receive acks on
 my $socket_ack = IO::Socket::INET->new( LocalPort => $ackport,
 					Proto    => 'udp' )
     or die "Couldn't create socket on $ackport\n";
 
-print time()." creating socket\n";
 my $socket_snd = IO::Socket::INET->new( PeerPort => $sendport,
 					Proto    => 'udp',
 					PeerAddr => $server );
-print time()." end creating socket\n";
 
 #create Select object.
 my $sel = IO::Select->new();
@@ -159,26 +161,35 @@ my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 sub handleincomingmsgs()
 {
     my $inmsg;
+    my $cmdHandle;
 
     #check for pending received events
     my @ready = $sel->can_read(0.1);  #wait max of 0.1 sec. Don't want to
                                       #have 0 here, or CPU usage goes high
     foreach my $handle (@ready){
-	$handle->recv( $inmsg, $rcvBufferSize );
+
+	if( $handle eq $socket_ack ){
+	    $handle->recv( $inmsg, $rcvBufferSize );
+	}elsif( $handle eq $socket_cmd ){
+	    my $cmdHandle = $handle->accept();
+	    $inmsg = <$cmdHandle>;
+	    chomp $inmsg;
+	    print $cmdHandle "ACK\n";
+	    close $cmdHandle;
+	}
 #	print "received msg: $inmsg\n";
 
-#	my %udpin = %{ Storable::thaw $inmsg};
-	my %udpin = %{ deserialize_hash($inmsg) };
-	my $cmdtype = $udpin{cmdtype};
+	my %sockIn = %{ deserialize_hash($inmsg) };
+	my $cmdtype = $sockIn{cmdtype};
 	if( !defined($cmdtype) ){
 	    warn "bad message format\n";
 	    return 0;  #bad message
 	}
-	if( $udpin{expid} ne $expid ){
+	if( $sockIn{expid} ne $expid ){
 	    return 0;  #not addressed to this experiment
 	}
 	if( $cmdtype eq "ACK" ){
-	    my $index = $udpin{index};
+	    my $index = $sockIn{index};
 	    print time()." Ack for index $index. Deleting backup file\n";
 	    if (exists($reslist{$index})) {
 		unlink($reslist{$index});
@@ -186,23 +197,23 @@ sub handleincomingmsgs()
 	    }
 	}
 	elsif( $cmdtype eq "EDIT" ){
-	    my $linkdest = $udpin{dstnode};
-	    my $testtype = $udpin{testtype};
-	    my $testper = $udpin{testper};
+	    my $linkdest = $sockIn{dstnode};
+	    my $testtype = $sockIn{testtype};
+	    my $testper = $sockIn{testper};
 	    $testevents{$linkdest}{$testtype}{"testper"} = $testper;
 	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 0;
 	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all();
-	    print( "EDIT:\n");
+	    print time()." EDIT:\n";
 	    print( "linkdest=$linkdest\n".
 		   "testype =$testtype\n".
 		   "testper=$testper\n" );
 	}
 	elsif( $cmdtype eq "INIT" ){
-	    print "INIT: ";
-	    my $testtype = $udpin{testtype};
+	    print time()." INIT: ";
+	    my $testtype = $sockIn{testtype};
 	    my @destnodes 
-		= split(" ",$udpin{destnodes});
-	    my $testper = $udpin{testper};
+		= split(" ",$sockIn{destnodes});
+	    my $testper = $sockIn{testper};
 	    #TOOD: Add a start time offset, so as to schedule the initial test
             #      from the manager/controller	    
             foreach my $linkdest (@destnodes){
@@ -225,19 +236,19 @@ sub handleincomingmsgs()
 	    print " $testtype  $testper\n";
 	}
 	elsif( $cmdtype eq "SINGLE" ){
-	    my $linkdest = $udpin{dstnode};
-	    my $testtype = $udpin{testtype};
+	    my $linkdest = $sockIn{dstnode};
+	    my $testtype = $sockIn{testtype};
 	    $testevents{$linkdest}{$testtype}{"testper"} = 0;
 	    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} = time_all()-1;
 	    $testevents{$linkdest}{$testtype}{"flag_scheduled"} = 1;
 	    $testevents{$linkdest}{$testtype}{"pid"} = 0;
 
-	    print( "SINGLE\n".
+	    print( time()." SINGLE\n".
 		   "linkdest=$linkdest\n".
 		   "testype =$testtype\n");
 	}
 	elsif( $cmdtype eq "STOPALL" ){
-	    print "STOPALL\n";
+	    print time()." STOPALL\n";
 	    %testevents = ();
 	    %waitq = ();
 	}
@@ -770,7 +781,7 @@ sub deserialize_hash($)
 
     for( my $i=0; $i<@tokens; $i+=2 ){
 	$hashout{$tokens[$i]} = $tokens[$i+1];
-	print "setting $tokens[$i] => $tokens[$i+1]\n";
+#	print "setting $tokens[$i] => $tokens[$i+1]\n";
     }
     return \%hashout;
 }

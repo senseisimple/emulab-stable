@@ -1,18 +1,18 @@
 #!/usr/bin/perl
 
-use lib '/usr/testbed/lib';
-use event;
 use Getopt::Std;
 use strict;
-
+use IO::Socket::INET;
+use IO::Select;
 
 # A node from each site to take part in the measurements
 my @expnodes;
 
+my %deadnodes;
 
 sub usage 
 {
-    warn "Usage: $0 <input_file> [-s server] [-p port] [-e pid/eid] [-l latency period] [-b bandwidth period] [-a]\n";
+    warn "Usage: $0 <input_file> [-p port] [-e pid/eid] [-l latency period] [-b bandwidth period] [-a]\n";
     return 1;
 }
 
@@ -20,10 +20,12 @@ if( scalar(@ARGV) < 1 ){ exit &usage; }
 
 #*****************************************
 my %DEF_PER = (
+#	       "latency" => 5,
 #	       "latency" => 300,
 	       "latency" => 600,
 #	       "latency" => 0.4,
 #	       "latency" => 0,
+#	       "bw"=>120,
 #	       "bw"=>2450  # start any test every 50 sec, * ~49 connections.
 	       "bw"=>7850  # start any test every 50 sec, * ~157 connections.
 #	       "bw"=>0
@@ -55,6 +57,8 @@ if (@ARGV > 1) { exit &usage; }
 #my $filename_defaults = "expnodes.txt";
 my $filename_defaults = $ARGV[0];
 
+my $sel = IO::Select->new();
+
 #read the experiment nodes
 open FILE, "< $filename_defaults" 
     or die "can't open file $filename_defaults";
@@ -66,20 +70,10 @@ while( <FILE> ){
 }
 close FILE;
 
-my ($server,$port);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
-if ($opt{p}) { $port = $opt{p}; }
+my ($port);
+if ($opt{p}) { $port = $opt{p}; } else{ $port = 5060; }
 
-my $URL = "elvin://$server";
-if ($port) { $URL .= ":$port"; }
-
-my $handle = event_register($URL,0);
-if (!$handle) { die "Unable to register with event system\n"; }
-
-my $tuple = address_tuple_alloc();
-if (!$tuple) { die "Could not allocate an address tuple\n"; }
-
-
+my $socket;
 
 #MAIN
 #TODO: Control Loop
@@ -88,6 +82,7 @@ while( $cmd ne "q" )
 {
     $cmd = <STDIN>;
     chomp $cmd;
+
   SWITCH: {
       if( $cmd eq "start" ){ start(); last SWITCH; }
       if( $cmd eq "stop" ){ stop(); last SWITCH; }
@@ -98,53 +93,8 @@ while( $cmd ne "q" )
       if( $cmd eq "auto"){ setAutoNodes(); last SWITCH; }
       my $nothing = 1;
   }
+    outputErrors();
 }
-
-
-=pod
-sub tmp
-{
-#    @expnodes = ("plab231","plab231","plab71","plab122");
-    foreach my $node (@expnodes){
-	%$tuple = ( objtype   => "BGMON",
-		    objname   => $node,
-		    eventtype => "INIT",
-		    expt      => $settings{"expt"});
-	my $notification = event_notification_alloc($handle,$tuple);
-	if (!$notification) { die "Could not allocate notification\n"; }
-
-	#build string of destination nodes
-	my $destnodes;
-	foreach my $dest (@expnodes){
-	    #add destination nodes to this source node, but not "self"
-	    if( $dest ne $node ){
-		$destnodes = $destnodes." ".$dest;
-	    }
-	}
-	if( 0 == event_notification_put_string( $handle,
-						$notification,
-						"destnodes",
-						$destnodes ) )
-	{ warn "Could not add attribute to notification\n"; }
-
-	#build string of test types and defaults
-	my $testdefs;
-	foreach my $key (keys %DEF_PER){
-	    $testdefs = $testdefs." ".$key." ".$DEF_PER{$key};
-	}
-	if( 0 == event_notification_put_string( $handle,
-						$notification,
-						"testdefs",
-						$testdefs ) )
-	{ warn "Could not add attribute to notification\n"; }
-
-	#send notification
-	if (!event_notify($handle, $notification)) {
-	    die("could not send test event notification");
-	}
-    }
-}
-=cut
 
 
 #START
@@ -272,39 +222,23 @@ sub initnode($$$$)
 {
     my ($node, $destnodes, $testper, $testtype) = @_;
     print "SENDING INIT: *$node*$destnodes*$testper*$testtype*\n";
-    %$tuple = ( objtype   => "BGMON",
-		objname   => $node,
-		eventtype => "INIT",
-		expt      => $settings{"expt"} );
-    my $notification = event_notification_alloc($handle,$tuple);
-    if (!$notification) { die "Could not allocate notification\n"; }
 
-    #add destination nodes attribute
-    if( 0 == event_notification_put_string( $handle,
-					    $notification,
-					    "destnodes",
-					    $destnodes ) )
-    { warn "Could not add attribute to notification\n"; }
+    my %cmd = ( expid     => $settings{expt},
+		cmdtype   => "INIT",
+		destnodes => $destnodes,
+		testtype  => $testtype,
+		testper   => $testper
+		);
 
-    #add tests and their default values
-    if( 0 == event_notification_put_string( $handle,
-					    $notification,
-					    "testper",
-					    $testper ) )
-    { warn "Could not add attribute to notification\n"; }
-
-    #add test type
-    if( 0 == event_notification_put_string( $handle,
-					    $notification,
-					    "testtype",
-					    $testtype ) )
-    { warn "Could not add attribute to notification\n"; }
-
-
-    #send notification
-    if (!event_notify($handle, $notification)) {
-	die("could not send test event notification");
-    }
+    sendcmd($node,\%cmd);
+=pod    
+    $socket = IO::Socket::INET->new( PeerPort => $port,
+				     Proto    => 'udp',
+				     PeerAddr => $node );
+#    my $sercmd = Storable::freeze \%cmd ;
+    my $sercmd = serialize_hash( \%cmd );
+    $socket->send($sercmd);
+=cut
 
     print "sent initnode to $node\n";
     print "destnodes = $destnodes\n";
@@ -315,18 +249,54 @@ sub initnode($$$$)
 sub stopnode($)
 {
     my ($node) = @_;
-    %$tuple = ( objtype   => "BGMON",
-		objname   => $node,
-		eventtype => "STOPALL",
-		expt      => $settings{"expt"} );
-    my $notification = event_notification_alloc($handle,$tuple);
-    if (!$notification) { die "Could not allocate notification\n"; }
-    #send notification
-    if (!event_notify($handle, $notification)) {
-	die("could not send test event notification");
-    }
+    my %cmd = ( expid    => $settings{expt},
+		cmdtype  => "STOPALL" );
+    sendcmd($node,\%cmd);
 }
 
+sub sendcmd($$)
+{
+    my $node = $_[0];
+    my $hashref = $_[1];
+    my %cmd = %$hashref;
+
+    my $sercmd = serialize_hash( \%cmd );
+    my $f_success = 0;
+    my $max_tries = 5;
+    do{
+	$socket = IO::Socket::INET->new( PeerPort => $port,
+					 Proto    => 'tcp',
+					 PeerAddr => $node );
+	$sel->add($socket);
+	if( defined $socket ){	    
+	    print $socket "$sercmd\n";
+	    #todo: wait for ack;
+	    # timeout period?
+	    $sel->add($socket);
+	    my ($ready) = $sel->can_read(1);
+	    if( $ready eq $socket ){
+		my $ack = <$ready>;
+		chomp $ack;
+		if( $ack eq "ACK" ){
+		    $f_success = 1;
+#		    print "Got ACK from $node for command\n";
+		    close $socket;
+		}else{
+		    $max_tries--;
+		}
+	    }
+	    $sel->remove($socket);
+	    close($socket);
+	}else{
+	    select(undef, undef, undef, 0.2);
+	    $max_tries--;
+	}
+    }while( $f_success != 1 && $max_tries != 0 );
+
+    if( $max_tries == 0 ){
+	$deadnodes{$node} = 1;
+    }
+}
 
 
 sub updatenodes
@@ -354,3 +324,34 @@ sub adjsettings
     }
     $settings{$settingcmd[0]} = $settingcmd[1];
 }
+
+
+sub outputErrors()
+{
+    print "Nodes not responding to Command:\n";
+    foreach my $node (keys %deadnodes){
+	print "$node  ";
+    }
+    print "\n";
+}
+
+
+#
+# Custom sub to turn a hash into a string. Hashes must not contain
+# the substring of $separator anywhere!!!
+#
+sub serialize_hash($)
+{
+    my ($hashref) = @_;
+    my %hash = %$hashref;
+    my $separator = "::";
+    my $out = "";
+
+    for my $key (keys %hash){
+	$out .= $separator if( $out ne "" );
+	$out .= $key.$separator.$hash{$key};
+    }
+    return $out;
+}
+
+
