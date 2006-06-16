@@ -266,9 +266,10 @@ sub sendcmd($$)
     do{
 	$socket = IO::Socket::INET->new( PeerPort => $port,
 					 Proto    => 'tcp',
-					 PeerAddr => $node );
-	$sel->add($socket);
-	if( defined $socket ){	    
+					 PeerAddr => $node,
+					 Timeout  => 1);
+	if( defined $socket ){
+	    $sel->add($socket);
 	    print $socket "$sercmd\n";
 	    #todo: wait for ack;
 	    # timeout period?
@@ -279,11 +280,13 @@ sub sendcmd($$)
 		chomp $ack;
 		if( $ack eq "ACK" ){
 		    $f_success = 1;
-#		    print "Got ACK from $node for command\n";
+		    print "Got ACK from $node for command\n";
 		    close $socket;
 		}else{
 		    $max_tries--;
 		}
+	    }else{
+		$max_tries--;
 	    }
 	    $sel->remove($socket);
 	    close($socket);
@@ -291,9 +294,8 @@ sub sendcmd($$)
 	    select(undef, undef, undef, 0.2);
 	    $max_tries--;
 	}
-    }while( $f_success != 1 && $max_tries != 0 );
 
-    if( $max_tries == 0 ){
+    if( $f_success == 0 && $max_tries == 0 ){
 	$deadnodes{$node} = 1;
     }
 }
