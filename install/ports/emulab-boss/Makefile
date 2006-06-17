@@ -6,7 +6,7 @@
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 
 PORTNAME=	emulab-boss
-.if ${OSMAJOR} >= 5
+.if ${OSMAJOR} >= 6
 PORTVERSION=	2.0
 .else
 PORTVERSION=	1.7
@@ -51,8 +51,7 @@ MAINTAINER=	ricci@cs.utah.edu
 LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	lthread.[23]:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
-	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
-	mysqlhotcopy:${PORTSDIR}/databases/mysql323-scripts \
+	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
 	vin4.2:${PORTSDIR}/misc/libelvin \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
@@ -64,9 +63,9 @@ RUN_DEPENDS=	\
 	rsync:${PORTSDIR}/net/rsync \
 	neato:${PORTSDIR}/graphics/graphviz \
         swish-e:${PORTSDIR}/www/swish-e \
-	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql323-server \
+	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql50-server \
 	anytopnm:${PORTSDIR}/graphics/netpbm \
-	tclsh8.3:${PORTSDIR}/lang/tcl83 \
+	tclsh8.4:${PORTSDIR}/lang/tcl84 \
 	otclsh:${PORTSDIR}/lang/otcl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/misc/p5-GD-old \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net-mgmt/p5-SNMP \
@@ -78,9 +77,8 @@ RUN_DEPENDS=	\
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
 	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind \
-	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	sudo:${PORTSDIR}/security/sudo \
-	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9 \
+	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
@@ -90,21 +88,22 @@ RUN_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
-	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb
+	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
+	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
-.if ${OSMAJOR} >= 5
+.if ${OSMAJOR} >= 6
 RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
-	swig:${PORTSDIR}/devel/swig13 \
-	svn:${PORTSDIR}/devel/subversion-python
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
+	swig:${PORTSDIR}/devel/swig13
 .else
 RUN_DEPENDS+= cvsup:${PORTSDIR}/net/cvsup-without-gui \
 	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/www/mod_php4 \
 	${LOCALBASE}/include/php/ext/openssl/php_openssl.h:${PORTSDIR}/lang/php4-extensions \
 	${LOCALBASE}/lib/tcl8.4/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI-137 \
-	swig1.1:${PORTSDIR}/devel/swig11
+	swig1.1:${PORTSDIR}/devel/swig11 \
+	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9
 .endif
 
 USE_PERL5=	yes

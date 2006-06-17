@@ -6,7 +6,7 @@
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 
 PORTNAME=	emulab-ops
-.if ${OSMAJOR} >= 5
+.if ${OSMAJOR} >= 6
 PORTVERSION=	2.0
 .else
 PORTVERSION=	1.4
@@ -57,10 +57,9 @@ LIB_DEPENDS= lthread.[23]:${PORTSDIR}/devel/linuxthreads \
 	vin4.2:${PORTSDIR}/misc/libelvin \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
-.if ${OSMAJOR} >= 5
+.if ${OSMAJOR} >= 6
 LIB_DEPENDS+= mhash.2:${PORTSDIR}/security/mhash \
-	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
-	mysqlhotcopy:${PORTSDIR}/databases/mysql323-scripts
+	mysqlclient.15:${PORTSDIR}/databases/mysql50-client
 .endif
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
@@ -71,27 +70,26 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto
+	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
 
-.if ${OSMAJOR} >= 5
+.if ${OSMAJOR} >= 6
 RUN_DEPENDS+= \
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
-	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql323-server \
+	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql50-server \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/CGI/Session.pm:${PORTSDIR}/www/p5-CGI-Session \
-        curl:${PORTSDIR}/ftp/curl
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/CGI/Session.pm:${PORTSDIR}/www/p5-CGI-Session \
+        ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd \
+        ${LOCALBASE}/share/adodb/adodb.inc.php:${PORTSDIR}/databases/adodb \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/HTML/Parser.pm:${PORTSDIR}/www/p5-HTML-Parser \
+	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
+        curl:${PORTSDIR}/ftp/curl \
+	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 .else
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
-.endif
-
-.if ${OSMAJOR} >= 6
-RUN_DEPENDS+= ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd \
-              ${LOCALBASE}/share/adodb/adodb.inc.php:${PORTSDIR}/databases/adodb \
-	      ${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/HTML/Parser.pm:${PORTSDIR}/www/p5-HTML-Parser
 .endif
 
 NO_BUILD=	yes
