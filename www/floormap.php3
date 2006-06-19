@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,7 +9,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Wireless Node Map");
+PAGEHEADER("Wireless PC Map");
 
 #
 # Only logged in people at the moment; might open up at some point.
@@ -35,7 +35,7 @@ if (isset($building) && $building != "") {
     }
 }
 else {
-    unset($building);
+    $building = "MEB";
     unset($floor);
 }
 
@@ -215,7 +215,9 @@ $query_result =
     DBQueryFatal("select loc.*,s.capval,r.pid,r.eid from location_info as loc ".
 		 "left join interface_settings as s on ".
 		 "     s.node_id=loc.node_id and s.capkey='channel' ".
-		 "left join reserved as r on r.node_id=loc.node_id");
+		 "left join reserved as r on r.node_id=loc.node_id ".
+		 "where loc.building='$building' ".
+		 (isset($floor) ? "and loc.floor='$floor'" : ""));
 
 while ($row = mysql_fetch_array($query_result)) {
     $channel   = $row["capval"];
