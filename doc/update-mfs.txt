@@ -1,13 +1,11 @@
 On occasion, you may need to update the Emulab software in the disk loader
 ("frisbee") and admin ("freebsd") MFSes.  Here is how you do that.
 
-1. Allocate a FreeBSD 4.7 node from which to do the build/install.
-   Currently the MFSes are based on FreeBSD 4.7 (see note below) so you
-   really should do the software build and install from a 4.7 machine.
-   While I have encountered no problems with installing 4.10 versions
-   of the few Emulab binaries on to the MFS with a 4.7 kernel, it is
-   better to stick with all 4.7 if possible.  So allocate a test node
-   with a 4.7 image, call it pc1 in the following.
+1. Allocate a FreeBSD X node from which to do the build/install.
+   'X' depends on the version of the MFS you are using, and will be either
+   4.7, or 5.3 (actually 5.4).  If you don't have the appropriate disk
+   image, contact Utah.  Allocate a test node with the appropriate image,
+   we'll call it pc1 in the following.
 
 2. Copy over the MFSes from boss:
 
@@ -24,17 +22,29 @@ On occasion, you may need to update the Emulab software in the disk loader
 
 4. Now login to pc1 and update the freebsd (admin) MFS as follows:
 
+   FreeBSD 4.x:
 	sudo vnconfig vn0 /tmp/mfsroot.freebsd
 	sudo mount /dev/vn0c /mnt
+	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
+	sudo make mfs-install
+
+   FreeBSD 5.x:
+        sudo mdconfig -a -t vnode -f /tmp/mfsroot.freebsd -u 1
+	sudo mount /dev/md1 /mnt
 	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
 	sudo make mfs-install
 
    this should update the scripts and binaries in the tree rooted at
    /mnt.  Unmount and unconfig it:
 
+   FreeBSD 4.x:
 	sudo umount /dev/vn0c
 	sudo vnconfig -u vn0
 
+   FreeBSD 5.x:
+        sudo umount /dev/md1
+	sudo mdconfig -d -u 1
+	
    and scp /tmp/mfsroot.freebsd back into place on boss
    (/tftpboot/freebsd/boot/mfsroot).  Be sure to save the old mfsroot
    off to mfsroot.bak or something first, in case anything goes wrong.
@@ -43,16 +53,28 @@ On occasion, you may need to update the Emulab software in the disk loader
 
 5. Do the same for the frisbee (diskloader) MFS:
 
+   FreeBSD 4.x:
 	sudo vnconfig vn0 /tmp/mfsroot.frisbee
 	sudo mount /dev/vn0c /mnt
+	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
+	sudo make frisbee-mfs-install
+
+   FreeBSD 5.x:
+        sudo mdconfig -a -t vnode -f /tmp/mfsroot.frisbee -u 1
+	sudo mount /dev/md1 /mnt
 	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
 	sudo make frisbee-mfs-install
 
    Note the make target is different!  This install is different than
    that for the other MFS for historical reasons.  Unmount and unconfig it:
 
+   FreeBSD 4.x:
 	sudo umount /dev/vn0c
 	sudo vnconfig -u vn0
+
+   FreeBSD 5.x:
+        sudo umount /dev/md1
+	sudo mdconfig -d -u 1
 
    and scp it back into place on boss.  Again, remember to save the
    old MFS and run the prepare script in /tftpboot/frisbee/boot.
@@ -79,14 +101,13 @@ On occasion, you may need to update the Emulab software in the disk loader
 
 Note about FreeBSD 4.10 and the MFSes:
 
-   I tried updating them to FreeBSD 4.10 but encountered occasional data
+   Early versions of the MFS tarball we distributed included a FreeBSD
+   4.10 version of the MFSes.  However, we encountered occasional data
    corruption on machines with older IDE chipsets (specifically, the
    venerable Intel BX chipset).  The problem would manifest itself as
    machines that wouldn't boot or that had filesystem problems, shortly
    after loading their disks with a FreeBSD 4.10 frisbee MFS.  Machines
-   with newer chipsets had no such problems.  Lacking the time to chase
-   after this, I stuck with 4.7 instead.
+   with newer chipsets had no such problems.  So use the 5.x MFSes if
+   you have them, otherwise stick with 4.7.
 
-   I have not seen this problem with limited testing on a FreeBSD 5.3
-   based MFS, which is where I hope to move RSN.
 
