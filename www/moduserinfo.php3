@@ -814,7 +814,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     # Only to user. We care about password and email changes only.
     $BCC = "";
     if (strcmp($usr_email, $dbusr_email)) {
-	$BCC = "Bcc: $TBMAIL_AUDIT\n";
+	$BCC = "\nBcc: $TBMAIL_AUDIT";
     }
     
     TBMAIL("$usr_name <$usr_email>",
@@ -836,7 +836,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 	   "Title:             $usr_title\n".
 	   "Shell:             $usr_shell\n",
 	   "WikiOnly:	       $wikionly\n",
-	   "From: $TBMAIL_OPS\n".
+	   "From: $TBMAIL_OPS".
 	   $BCC .
 	   "Errors-To: $TBMAIL_WWW");
 
