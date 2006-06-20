@@ -97,6 +97,7 @@ function STARTLOG($pid, $eid)
     echo "<script type='text/javascript' language='javascript'>\n";
     echo "function SetupOutputArea() {
               var Iframe = document.getElementById('outputframe');
+	      var IframeDoc = IframeDocument('outputframe');
               var winheight = 0;
               var yoff = 0;
 
@@ -114,9 +115,9 @@ function STARTLOG($pid, $eid)
               // Now get the Y offset of the outputframe.
               yoff = Iframe.offsetTop;
 
-	      Iframe.contentWindow.document.open();
-	      Iframe.contentWindow.document.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
- 	      Iframe.contentWindow.document.close();
+	      IframeDoc.open();
+	      IframeDoc.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
+ 	      IframeDoc.close();
 
               if (winheight != 0)
                   // Now calculate how much room is left and make the iframe

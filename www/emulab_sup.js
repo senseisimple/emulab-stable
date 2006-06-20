@@ -24,3 +24,13 @@ function PageReplace(URL)
     window.location.replace(URL);
 }
 
+function IframeDocument(id) 
+{
+    var oIframe = document.getElementById(id);
+    var oDoc    = (oIframe.contentWindow || oIframe.contentDocument);
+
+    if (oDoc.document) {
+	oDoc = oDoc.document;
+    }
+    return oDoc;
+}

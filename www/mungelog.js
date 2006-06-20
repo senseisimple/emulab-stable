@@ -162,9 +162,9 @@ function ml_getScrollHeight() {
  */
 function ml_handleReadyState(state) {
     var Iframe = document.getElementById('outputframe');
-    var idoc   = Iframe.contentWindow.document;
-    var oa = Iframe.contentWindow.document.getElementById('outputarea');
-    var dl = document.getElementById('downloader');
+    var idoc   = IframeDocument('outputframe');
+    var oa     = idoc.getElementById('outputarea');
+    var dl     = document.getElementById('downloader');
 
     if ((rt = ml_getBodyText(dl)) == null) {
 	/* 
@@ -353,8 +353,8 @@ function ml_handleReadyState(state) {
 
 	/* See if we should scroll the window down. */
 	if ((h - (y + ih)) < (y == 0 ? 200 : 10)) {
-	    Iframe.contentWindow.document.documentElement.scrollTop = nh;
-	    Iframe.contentWindow.document.body.scrollTop = nh;
+	    idoc.documentElement.scrollTop = nh;
+	    idoc.body.scrollTop = nh;
 	}
     }
 }
