@@ -424,7 +424,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	    if (!ExecQuiet("$PKG_INFO -x subversion")) {
 		PhaseSkip("subversion already installed");
 	    }
-	    my $pname = GetPackage("subversion", $packagedir);
+	    my $pname = GetPackage("subversion-python", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
