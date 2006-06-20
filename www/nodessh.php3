@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -28,7 +28,8 @@ if (!isset($node_id) ||
 $query_result =
     DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
 		 "       r.vname,r.pid,r.eid, ".
-		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, oi.OS ".
+		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, ".
+		 "       t.issubnode,t.class,oi.OS ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
@@ -50,6 +51,8 @@ $isvirt   = $row[isvirtnode];
 $iswindowsnode = $row[OS]=='Windows';
 $isremote = $row[isremotenode];
 $isplab   = $row[isplabdslice];
+$issubnode = $row[issubnode];
+$class    = $row['class'];
 
 if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);
@@ -85,6 +88,11 @@ if ($isvirt) {
 elseif ($ELABINELAB) {
     echo "gateway: $USERNODE\n";
 }
+elseif ($issubnode && $class == 'ixp') {
+    #
+    # IXP hack: pass <node-id>-gw as the gateway address
+    #
+    echo "gateway: $node_id-gw.$OURDOMAIN\n";
+}
 
 ?>
-
