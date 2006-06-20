@@ -31,7 +31,7 @@ $batchmode     = 0;
 #
 function SPITFORM($template, $formfields, $parameters, $errors)
 {
-    global $TBDB_EIDLEN;
+    global $TBDB_EIDLEN, $EXPOSELINKTEST, $EXPOSESTATESAVE;
 
     PAGEHEADER("Instantiate an Experiment Template");
 
@@ -256,6 +256,32 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	  </td>
 	  </tr>\n";
 
+    #
+    # Run linktest, and level. 
+    #
+    if (STUDLY() || $EXPOSELINKTEST) {
+	echo "<tr>
+              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
+	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><select name=\"formfields[exp_linktest]\">
+                          <option value=0>Skip Linktest </option>\n";
+
+	for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
+	    $selected = "";
+
+	    if (strcmp($formfields[exp_linktest], "$i") == 0)
+		$selected = "selected";
+	
+	    echo "        <option $selected value=$i>Level $i - " .
+		$linktest_levels[$i] . "</option>\n";
+	}
+	echo "       </select>";
+	echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
+	    "docname=linktest.html'><b>What is this?</b></a>)";
+	echo "    </td>
+              </tr>\n";
+    }
+
     echo "<tr>
               <td class='pad4' align=center colspan=2>
                 <b><input type=submit name=swapin value='Instantiate'></b>
@@ -305,6 +331,7 @@ if (!isset($swapin)) {
     $defaults[exp_swappable]         = "1";
     $defaults[exp_noswap_reason]     = "";
     $defaults[exp_idleswap]          = "1";
+    $defaults[exp_linktest]          = 3;    
     $defaults[exp_noidleswap_reason] = "";
     $defaults[exp_idleswap_timeout]  = TBGetSiteVar("idle/threshold");
     $defaults[exp_autoswap]          = TBGetSiteVar("general/autoswap_mode");
@@ -536,6 +563,19 @@ if (isset($formfields[description]) && $formfields[description] != "") {
 if (isset($formfields[batched]) && $formfields[batched] == "Yep") {
     $command_options .= " -b";
     $batchmode = 1;
+}
+
+#
+# LinkTest
+#
+if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
+    if (!preg_match("/^[\d]+$/", $formfields[exp_linktest]) ||
+	$formfields[exp_linktest] < 0 || $formfields[exp_linktest] > 4) {
+	$errors["Linktest Option"] = "Invalid level selection";
+    }
+    else {
+	$command_options .= " -t " . $formfields[exp_linktest];
+    }
 }
 
 if (count($errors)) {
