@@ -1142,18 +1142,26 @@ set_program(struct proginfo *pinfo, char *args)
 		char *value;
 		int rc;
 
-		if ((rc = event_arg_dup(args, "COMMAND", &value)) >= 0) {
+		/*
+		 * COMMAND is special. For backward compat it can contain
+		 * whitespace but need not be quoted.  In fact, if the string
+		 * is quoted, we just pass the quotes through to the program.
+		 */
+		if ((rc = event_arg_get(args, "COMMAND", &value)) > 0) {
 			if (pinfo->cmdline != NULL) {
-				if (pinfo->cmdline != pinfo->initial_cmdline)
+				if (pinfo->cmdline != pinfo->initial_cmdline) {
 					free(pinfo->cmdline);
+					pinfo->cmdline = NULL;
+				}
 			}
-			if (rc == 0) {
-				pinfo->cmdline = pinfo->initial_cmdline;
-			} else if (rc > 0) {
-				pinfo->cmdline = value;
-			} else {
-				assert(0);
-			}
+			/*
+			 * XXX event_arg_get will return a pointer beyond
+			 * any initial quote character.  We need to back the
+			 * pointer up if that is the case.
+			 */
+			if (value[-1] == '\'' || value[-1] == '{')
+				value--;
+			asprintf(&pinfo->cmdline, "%s", value);
 			value = NULL;
 		}
 		if ((rc = event_arg_dup(args, "DIR", &value)) >= 0) {
