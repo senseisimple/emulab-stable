@@ -188,9 +188,9 @@ static void	start_callback(event_handle_t handle,
  * @param notification The start event.
  * @param data NULL
  */
-static void	newenv_callback(event_handle_t handle,
-			       event_notification_t notification,
-			       void *data);
+static void	startrun_callback(event_handle_t handle,
+				  event_notification_t notification,
+				  void *data);
 
 /**
  * Start a program.
@@ -733,12 +733,12 @@ main(int argc, char **argv)
 
 	tuple->objtype   = TBDB_OBJECTTYPE_PROGRAM;
 	tuple->objname   = ADDRESSTUPLE_ALL;
-	tuple->eventtype = TBDB_EVENTTYPE_RELOAD;
+	tuple->eventtype = TBDB_EVENTTYPE_RELOAD "," TBDB_EVENTTYPE_STOP;
 
 	/*
-	 * Subscribe to the RELOAD start event we specified above.
+	 * Subscribe to the RELOAD/STOP start event we specified above.
 	 */
-	if (! event_subscribe(handle, newenv_callback, tuple, NULL)) {
+	if (! event_subscribe(handle, startrun_callback, tuple, NULL)) {
 		fatal("could not subscribe to event");
 	}
 
@@ -1006,18 +1006,41 @@ start_callback(event_handle_t handle,
 }
 
 static void
-newenv_callback(event_handle_t handle,
-		event_notification_t notification,
-		void *data)
+startrun_callback(event_handle_t handle,
+		  event_notification_t notification,
+		  void *data)
 {
 	char		envdata[2*BUFSIZ], buf[BUFSIZ];
 	char		*bp, *cp;
 	FILE		*file;
+	struct proginfo *pinfo;
+	char		event[TBDB_FLEN_EVEVENTTYPE];
 
 	assert(handle != NULL);
 	assert(notification != NULL);
 	assert(data == NULL);
 
+	if (! event_notification_get_eventtype(handle, notification,
+					       event, sizeof(event))) {
+		error("Could not get event from notification!\n");
+		return;
+	}
+
+	if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0) {
+		info("startrun_callback: Got a stop event.\n");
+		
+		/*
+		 * Stop all running programs so that their log files
+		 * are complete.
+		 */
+		for (pinfo = proginfos; pinfo != NULL; pinfo = pinfo->next) {
+			if (pinfo->pid != 0) {
+				stop_program(pinfo, NULL);
+			}
+		}
+		return;
+	}
+	
 	event_notification_get_string(handle, notification,
 				      "environment", envdata, sizeof(envdata));
 

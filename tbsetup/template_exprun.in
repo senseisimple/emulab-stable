@@ -55,6 +55,7 @@ my $eid;
 my $guid;
 my $version;
 my $inputfile;
+my $handle;
 
 #
 # Configure variables
@@ -90,7 +91,8 @@ my $eventcontrol= "$TB/bin/eventsys_control";
 sub ParseArgs();
 sub fatal($$);
 sub sighandler($);
-sub SendNewEnv();
+sub SignalProgAgents($);	       
+
 #
 # Testbed Support libraries
 #
@@ -307,6 +309,12 @@ if ($waitmode) {
 # Might not be a current run, which is okay.
 #
 if (defined($instance->runidx())) {
+    SignalProgAgents("STOP");
+
+    # Ug. I need to figure out how to hook into the event sequence
+    # mechanism so I can use a completion event.
+    sleep(2);
+    
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
 	or fatal(-1, "Could not stop experiment run for $instance!");
@@ -371,7 +379,7 @@ if ($paramfile) {
 		     "   name='$name', value=$value, ".
 		     "   pid='$pid', eid='$eid'");	
     }
-    SendNewEnv();
+    SignalProgAgents("RELOAD");
 }
 
 #
@@ -567,14 +575,19 @@ sub sighandler($) {
 # best approach, but I like it better then restarting the agents and having
 # them contact tmcd.
 #
-sub SendNewEnv()
+sub SignalProgAgents($)
 {
-    my $URL     = "elvin://" . TB_EVENTSERVER();
-    my $keyfile = TBDB_EVENTKEY($pid, $eid);
-    my $handle  = event_register_withkeyfile($URL, 0, $keyfile);
-
-    fatal(-1, "Could not connect to event system!")
-	if (!$handle);
+    my ($action) = @_;
+    
+    if (!defined($handle)) {
+	my $URL     = "elvin://" . TB_EVENTSERVER();
+	my $keyfile = TBDB_EVENTKEY($pid, $eid);
+	
+	$handle = event_register_withkeyfile($URL, 0, $keyfile);
+	
+	fatal(-1, "Could not connect to event system!")
+	    if (!$handle);
+    }
     
     my $tuple = address_tuple_alloc();
     fatal(-1, "Could not allocate an address tuple\n")
@@ -583,26 +596,29 @@ sub SendNewEnv()
     %$tuple = (host      => $event::ADDRESSTUPLE_ALL,
 	       objtype   => "PROGRAM",
 	       objname   => $event::ADDRESSTUPLE_ALL,
-	       eventtype => "RELOAD",
+	       eventtype => $action,
 	       expt      => "$pid/$eid");
 
     my $notification = event_notification_alloc($handle, $tuple);
     fatal(-1, "Could not allocate a notification\n")
 	if (!$notification);
 
-    # Add in the new environ strings.
-    my $binding_string = "";
+    if ($action eq "RELOAD") {
+	# Add in the new environ strings.
+	my $binding_string = "";
     
-    foreach my $name (keys(%parameters)) {
-	my $value = $parameters{$name};
+	foreach my $name (keys(%parameters)) {
+	    my $value = $parameters{$name};
 
-	$binding_string .= "$name=$value\n";
-    }
+	    $binding_string .= "$name=$value\n";
+	}
 
-    if (! event_notification_put_string($handle, $notification,
-					"environment", $binding_string)) {
-	fatal(-1, "Could not add environment strings to notification\n")
+	if (! event_notification_put_string($handle, $notification,
+					    "environment", $binding_string)) {
+	    fatal(-1, "Could not add environment strings to notification\n")
+	    }
     }
+    
     if (!event_notify($handle, $notification)) {
 	fatal(-1, "could not send environment event notification!");
     }
