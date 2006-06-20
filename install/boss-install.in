@@ -70,7 +70,6 @@ my $MYSQLINSTALL = "/usr/local/bin/mysql_install_db";
 my $MYSQLDBDIR = "/var/db/mysql";
 
 my $GMAKE      = "/usr/local/bin/gmake";
-my $RNDC_CONFGEN = "/usr/local/sbin/rndc-confgen";
 
 #
 # Some files we edit/create
@@ -107,8 +106,6 @@ my $PHP4_PATCH      = "$TOP_SRCDIR/patches/php4-Makefile.patch";
 my $INIT_PRIVKEY    = "$TOP_SRCDIR/install/identity";
 
 my $SSH_CONFIG      = "/etc/ssh/ssh_config";
-
-my $RNDC_KEY        = "/usr/local/etc/rndc.key";
 
 my $LOADER_CONF	    = "/boot/loader.conf";
 
@@ -922,6 +919,14 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 };
 
 Phase "rndc", "Setting up rndc for control of nameserver", sub {
+    my $RNDC_KEY     = "/etc/namedb/rndc.key";
+    my $RNDC_CONFGEN = "/usr/sbin/rndc-confgen";
+
+    # Bind9 port prior to FreeBSD6
+    if ($FBSD_VERSION < 6) {
+	$RNDC_KEY     = "/usr/local/etc/rndc.key";
+	$RNDC_CONFGEN = "/usr/local/sbin/rndc-confgen";
+    }
     DoneIfExists($RNDC_KEY);
     ExecQuietFatal("$RNDC_CONFGEN -a -r /dev/urandom");
 };
