@@ -467,9 +467,9 @@ sub GetPackage($$) {
     PhaseFail("Must provide -p (packagedir) argument!")
 	if (!$packagedir);
 
-    my $pname = `ls $packagedir/$prefix-*.tbz`;
+    my $pname = `ls $packagedir/$prefix-*.tbz 2>/dev/null`;
     if ($?) {
-	$pname = `ls $packagedir/$prefix-*.tgz`;
+	$pname = `ls $packagedir/$prefix-*.tgz 2>/dev/null`;
 	PhaseFail("Cannot find $prefix package in $packagedir!")
 	    if ($?);
     }
