@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -11,6 +11,18 @@
 #include <assert.h>
 
 #include "popenf.h"
+
+/*
+ * Define vfork to fork. Why? Well starting at 6.X FreeBSD switched
+ * its underlying pthread impl, and popen is broken in threaded apps,
+ * since it uses vfork. I have no understanding of any of this, only
+ * that avoiding vfork solves the problem.  We can back this change
+ * out once we figure out a real solution.
+ */
+int vfork()
+{
+  return fork();
+}
 
 FILE *vpopenf(const char *fmt, const char *type, va_list args)
 {
