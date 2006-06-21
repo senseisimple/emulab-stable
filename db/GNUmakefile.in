@@ -30,7 +30,7 @@ USERLIBS	= libtbdb.pm
 # configure if the .in file is changed.
 # 
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
-	$(USERSBINS) $(USERLIBS)
+	$(USERSBINS) $(USERLIBS) schemacheck
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

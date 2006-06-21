@@ -146,8 +146,14 @@ sub read_schema($) {
 	if (!$create_table) {
 	    if (/^\s*$/ || /^\s*#/ || /^--/ || /^INSERT INTO/) {
 		# An insert statement, a comment, or a blank line. Do nothing.
-	    } elsif (/^CREATE TABLE (\w+) \($/) {
-
+	    }
+	    elsif (/^\/\*.*\*\/[;]+$/) {
+		# Also a comment
+	    }
+	    elsif (/^DROP TABLE /) {
+		# mysql 5.0 add these now.
+	    }
+	    elsif (/^CREATE TABLE `?(\w+)`? \($/) {
 		# Start of a new table definition
 		$create_table = 1;
 		$table_name = $1;
@@ -176,7 +182,8 @@ sub read_schema($) {
 	    # what this line is trying to do...
 	    #
 
-	    if (/^\) TYPE\s*=\s*(\w+);/) {
+	    if (/^\) TYPE\s*=\s*(\w+);/ ||
+		/^\) ENGINE\s*=\s*(\w+)\s*DEFAULT\s*CHARSET=(\w+);/) {
 
 		# The end of the table definition
 		my $type = $1;
@@ -214,18 +221,22 @@ sub read_schema($) {
 		my $key = $1;
 		# Strip whitespace
 		$key =~ s/\s+//g;
+		# Strip backquotes
+		$key =~ s/\`//g;
 		debug("Putting primary key $key in table $table_name\n");
 		$tables{$table_name}{PRIMARY}{$key} = 1;
 
-	    } elsif (/^\s*(KEY|INDEX)\s+(\w+)?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*(UNIQUE)?\s+(KEY|INDEX)\s+`?(\w+)?`?\s+\((.+[^,])\),?$/) {
 
 		# A key/index (synonmyms)
 		my ($name, $key) = ($2, $3);
 		# Strip whitespace
 		$key =~ s/\s+//g;
-		debug("Putting key $key in table $table_name\n");
+		# Strip backquotes
+		$key =~ s/\`//g;
+  		debug("Putting key $key in table $table_name\n");
 
-		if ($name) {
+  	 	if ($name) {
 		    $tables{$table_name}{KEYS}{$name} = $key;
 		} else { 
 		    die "Found a key without a name: $key\n";
@@ -236,6 +247,11 @@ sub read_schema($) {
 		# A column definition
 		my ($name, $definition) = ($1, $2);
 		debug("Found column $name with type $definition\n");
+
+		# Change timestamp(14) to timestamp!
+		$definition =~ s/timestamp NOT NULL default.*/timestamp NOT NULL/g;
+		$definition =~ s/timestamp\(14\)/timestamp/g;
+		
 		$tables{$table_name}{COLUMNS}{$name} = $definition;
 
 		push @{ $tables{$table_name}{ORDERED_COLUMNS} },

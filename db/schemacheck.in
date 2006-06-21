@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -29,11 +29,14 @@ my $DBNAME         = "@TBDBNAME@";
 my $master_schema = "$testbed_srcdir/sql/database-create.sql";
 my $schemadiff = "$testbed_srcdir/utils/schemadiff";
 
+my $isvers5   = system("mysql -V | egrep 'Distrib 5.'") == 0;
+my $extraopts = ($isvers5 ? "--skip-quote-names" : "");
+
 #
 # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
 # assumption, but maybe not always
 #
-my $mysqldump = "mysqldump -d $DBNAME";
+my $mysqldump = "mysqldump -d $extraopts $DBNAME";
 
 #
 # We use Mysql module instead of the tesbed libraries, so that we can get
