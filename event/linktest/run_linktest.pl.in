@@ -229,6 +229,12 @@ $args .= " DEBUG=$debug"
 $args .= " REPORTONLY=1"
     if ($reportonly);
 
+#
+# XXX turn off the ARP test for now as it throws version 1.1 clients
+# out of synch.
+#
+$args .= " DOARP=0";
+
 system($args);
 if ($?) {
     die("*** $0:\n".
