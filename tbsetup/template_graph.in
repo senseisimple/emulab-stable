@@ -17,17 +17,15 @@ sub usage()
     print(STDERR
 	  "Usage: template_graph [-a] <guid>\n".
 	  "switches and arguments:\n".
-	  "-v          - be more chatty\n".
 	  "-a          - Show all templates (ignore hidden bit)\n".
 	  "-p <prefix> - prefix for output files.\n".
 	  "<guid>      - GUID to graph\n");
     exit(-1);
 }
-my $optlist	 = "vap:z:";
+my $optlist	 = "p:z:d";
 my %options      = ();
-my $verbose      = 0;
+my $debug	 = 0;
 my $prefix       = "/tmp/dot$$";
-my $showall      = 0;
 my $scale        = 1.0;
 my $zoom;
 my $guid;
@@ -46,6 +44,7 @@ my $CONTROL	= "@USERNODE@";
 
 # Protos
 sub ParseArgs();
+sub SetParent($@);
 
 # Locals
 my $DOT         = "/usr/local/bin/dot";
@@ -111,11 +110,12 @@ if (! $query_result->num_rows) {
 }
 
 #
-# Build up lists of children.
+# Build up lists of children (and associated stuff like hidden,description).
 #
 my %hidden	= ();
 my %tids        = ();
 my %children    = ();
+my %parents     = ();
 my %descriptions= ();
 my $rootnode    = 1;	# XXX
 
@@ -134,15 +134,11 @@ while (my ($vers,$parent_vers,$hidden,$tid,$description) =
 }
 
 #
-# If the root node is hidden (a silly thing to do), then we are done.
+# We overload the hidden bit on the root template. If its set, that means
+# to hide hidden templates, otherwise it means to show hidden templates.
 #
-if ($hidden{$rootnode}) {
-    print "Root node hidden; clearing graph entry for template $guid ...\n";
-    
-    DBQueryFatal("delete from experiment_template_graphs ".
-		 "where parent_guid='$guid'");
-    exit(0);
-}
+my $showall = ($hidden{$rootnode} == 0);
+$hidden{$rootnode} = 0;
 
 # Defaults;
 my $size     = 8;
@@ -197,14 +193,43 @@ print DOT "  edge [arrowsize=$arrowsize]\n";
 print DOT "  subgraph guid {\n";
 print DOT "    label = \"$guid\";\n";
 
-# Start with root and decend all children where hidden=0.
-my @kids = ($rootnode);
+#
+# Do a recursive decent to figure out the parent for each template.
+# We do this cause we want to skip hidden templates, but pick it up
+# again down the line when hidden=0.
+#
+sub SetParent($@)
+{
+    my ($parent, @kids) = @_;
 
-while (@kids) {
-    my $vers = shift(@kids);
+    foreach my $kid (@kids) {
+	if (!$showall && $hidden{$kid}) {
+	    # pass our parent to children, thereby skipping a level.
+	    SetParent($parent, @{ $children{$kid} })
+		if (exists($children{$kid}));
+	}
+	else {
+	    $parents{$kid} = $parent;
+	    SetParent($kid, @{ $children{$kid} })
+		if (exists($children{$kid}));
+	}
+    }
+}
+$parents{$rootnode} = undef;
+SetParent($rootnode, @{ $children{$rootnode} });
 
-    my $tid = $tids{$vers};
-    my $url = "$TBBASE/template_show.php?guid=$guid&version=$vers";
+#
+# The parents hash now has all the templates that are visible. 
+#
+foreach my $kid (sort {$a <=> $b} keys(%parents)) {
+    my $vers   = $kid;
+    my $parent = $parents{$vers};
+    my $tid    = $tids{$vers};
+    my $url    = "$TBBASE/template_show.php?guid=$guid&version=$vers";
+    my $color  = "black";
+
+    print DOT "    $parent -> $kid;\n"
+	if (defined($parent));
 
     # Shorten the description
     my $description = $descriptions{$vers};
@@ -252,19 +277,13 @@ while (@kids) {
     # But we do not want the font arbitrarily large.
     $fontsize = 12
 	if ($fontsize > 12);
+    $color = "blue"
+	if ($hidden{$vers});
 	
     if (!exists($versions{"$vers"})) {
-	print DOT "    $vers [fontsize=$fontsize,".
+	print DOT "    $vers [fontsize=$fontsize,color=$color,".
 	    "label=\"$tid\",href=\"$url\",tooltip=\"$tooltip\"];\n";
 	$versions{"$vers"} = $vers;
-    }
-
-    foreach my $kid (@{ $children{$vers} }) {
-	next
-	    if ($hidden{$kid});
-
-	print DOT "    $vers -> $kid;\n";
-	push(@kids, $kid);
     }
 }
 print DOT "  }\n";
@@ -300,9 +319,9 @@ DBQueryFatal("replace into experiment_template_graphs set ".
 	     "    image=$gifdata, ".
 	     "    imap=$imapdata");
 
-unlink($dotfile, $giffile, $imapfile);
+unlink($dotfile, $giffile, $imapfile)
+    if (!$debug);
 exit(0);
-
 
 #
 # Parse command arguments. Once we return from getopts, all that are
@@ -339,8 +358,8 @@ sub ParseArgs()
 	    tbdie("Bad data in argument: $prefix");
 	}
     }
-    if (defined($options{"a"})) {
-	$showall = 1;
+    if (defined($options{"d"})) {
+	$debug = 1;
     }
     if (defined($options{"z"})) {
 	$zoom = $options{"z"};

@@ -67,34 +67,59 @@ function CheckArguments($guid, $version) {
 
 CheckArguments($guid, $version);
 
-if (isset($action) || isset($zoomin) || isset($zoomout)) {
-    if (isset($action)) {
-	if ($action == "hide") {
-	    DBQueryFatal("UPDATE experiment_templates SET hidden=1 ".
-			 "WHERE guid='$guid' and vers='$version'");
-	}
-	else if ($action == "show") {
-	    DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
-			 "WHERE guid='$guid' and vers='$version'");
-	}
-	else if ($action == "showall") {
-	    DBQueryFatal("UPDATE experiment_templates SET hidden=0 ".
-			 "WHERE guid='$guid'");
-	}
-    }
-    $optarg = "";
-    if (isset($zoomin) && $zoomin == "zoomin") {
-	$optarg = "-z in";
-    }
-    elseif (isset($zoomout) && $zoomout == "zoomout") {
-	$optarg = "-z out";
-    }
+if (isset($show) || isset($hide) || isset($showhidden) || isset($hidehidden) ||
+    isset($zoomin) || isset($zoomout)) {
 
-    # Need to update the template graph.
+    # Need this for scripts.
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
-    SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
-	   SUEXEC_ACTION_DIE);
+    # Hide or show templates.
+    if (isset($show) || isset($hide) ||
+	isset($showhidden) || isset($hidehidden)) {
+
+	$optarg  = ((isset($recursive) && $recursive == "Yep") ? "-r" : "");
+	$reqarg  = "-a ";
+
+	if (isset($show)) {
+	    $reqarg .= "show";
+	}
+	elseif (isset($hide)) {
+	    $reqarg .= "hide";
+	}
+	elseif (isset($showhidden)) {
+	    $reqarg .= "showhidden";
+	}
+	elseif (isset($hidehidden)) {
+	    $reqarg .= "hidehidden";
+	}
+	$reqarg .= " $guid/";
+
+	if (isset($show) || isset($hide)) {
+	    $reqarg .= $version;
+	}
+	else {
+	    # Applies only to root template
+	    $reqarg .= 1;
+	}
+	
+	SUEXEC($uid, "$pid,$unix_gid",
+	       "webtemplate_control $reqarg $optarg",
+	       SUEXEC_ACTION_DIE);
+    }
+    else {
+	$optarg = "";
+	
+	if (isset($zoomin)) {
+	    $optarg = "-z in";
+	}
+	elseif (isset($zoomout)) {
+	    $optarg = "-z out";
+	}
+
+        # Need to update the template graph.
+	SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
+	       SUEXEC_ACTION_DIE);
+    }
 }
 
 #
@@ -119,19 +144,6 @@ else {
 
 WRITESUBMENUBUTTON("Modify Template",
 		   "template_modify.php?guid=$guid&version=$version");
-
-if (! $template->IsRoot()) {
-    if ($template->IsHidden()) {
-	WRITESUBMENUBUTTON("Show Template",
-			   "template_show.php?guid=$guid".
-			   "&version=$version&action=show");
-    }
-    else {
-	WRITESUBMENUBUTTON("Hide Template",
-			   "template_show.php?guid=$guid".
-			   "&version=$version&action=hide");
-    }
-}
 
 WRITESUBMENUBUTTON("Instantiate Template",
 		   "template_swapin.php?guid=$guid&version=$version");
@@ -168,13 +180,35 @@ if (!isset($show) || $show == "graph") {
     $template->ShowGraph();
 
     #
-    # Define the zoom buttons. This should go elsewhere.
+    # Define the control buttons.
     #
     echo "<center>\n";
     echo "<form action='template_show.php?guid=$guid&version=$version'
                 method=post>\n";
-    echo "<button name=action type=submit value=showall>";
-    echo " Show All Templates</button></a>&nbsp &nbsp ";
+
+    if (! $template->IsRoot()) {
+	if ($template->IsHidden()) {
+	    echo "<button name=show type=submit value=Show>";
+	    echo " Show Template</button></a>&nbsp ";
+	}
+	else {
+	    echo "<button name=hide type=submit value=Hide>";
+	    echo " Hide Template</button></a>&nbsp ";
+	}
+	echo "<input type=checkbox name=recursive value=Yep>Recursive? &nbsp ";
+	echo "&nbsp &nbsp &nbsp ";
+    }
+    $root = Template::LookupRoot($guid);
+
+    # We overload the hidden bit on the root.
+    if ($root->IsHidden()) {
+	echo "<button name=showhidden type=submit value=showhidden>";
+	echo " Show Hidden Templates</button></a>&nbsp &nbsp &nbsp &nbsp ";
+    }
+    else {
+	echo "<button name=hidehidden type=submit value=hidehidden>";
+	echo " Hide Hidden Templates</button></a>&nbsp &nbsp &nbsp &nbsp ";
+    }
     echo "<button name=zoomout type=submit value=zoomout>";
     echo " Zoom Out</button>\n";
     echo "<button name=zoomin type=submit value=zoomin>";

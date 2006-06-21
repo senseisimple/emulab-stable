@@ -118,6 +118,10 @@ sub tid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'tid'}); }
 sub path($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'path'}); }
 sub archive_idx($) {
     return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'archive_idx'}); }
+sub parent_guid($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'parent_guid'}); }
+sub IsRoot($) {
+    return ! defined($_[0]->{'TEMPLATE'}->{'parent_guid'}); }
 
 #
 # Lookup a template given an experiment index.
@@ -1249,6 +1253,116 @@ sub CopyDataStore($$$)
 		       "   $RSYNC -rtgoDlz datastore $to_path") == 0
 	or return -1;
 
+    return 0;
+}
+
+#
+# Hide Template, optionally hiding all children.
+#
+sub Hide($$)
+{
+    my ($self, $recursive) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    
+    DBQueryWarn("update experiment_templates set hidden=1 ".
+		"where guid='$guid' and ".
+		"      vers='$vers'")
+	or return -1;
+    
+    Refresh($self) == 0
+	or return -1;
+
+    if ($recursive) {
+	$self->Recurse("hidden=1") == 0
+	    or return -1;
+    }
+    # This can fail; it is not critical.
+    Template::mysystem("$makegraph $guid");
+    
+    return 0;
+}
+
+#
+# Show Template, optionally showing all children.
+#
+sub Show($$)
+{
+    my ($self, $recursive) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    
+    DBQueryWarn("update experiment_templates set hidden=0 ".
+		"where guid='$guid' and ".
+		"      vers='$vers'")
+	or return -1;
+    
+    Refresh($self) == 0
+	or return -1;
+
+    if ($recursive) {
+	$self->Recurse("hidden=0") == 0
+	    or return -1;
+    }
+    # This can fail; it is not critical.
+    Template::mysystem("$makegraph $guid");
+    
+    return 0;
+}
+
+# Improve this at some point.
+sub Recurse($$)
+{
+    my ($self, $string) = @_;
+    my %children = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $template_guid = $self->guid();
+    my $template_vers = $self->vers();
+    
+    my $query_result =
+	DBQueryWarn("select vers,parent_vers from experiment_templates ".
+		    "where guid='$template_guid' ".
+		    "order by vers");
+    return -1
+	if (!$query_result);
+
+    # Build up lists of childen.
+    while (my ($vers,$parent_vers) = $query_result->fetchrow_array()) {
+	next
+	    if (!defined($parent_vers));
+
+	$children{$parent_vers} = []
+	    if (!exists($children{$parent_vers}));
+	push(@{ $children{$parent_vers} }, $vers);
+    }
+
+    # Recurse through all the children of this template.
+    my @kids = @{ $children{$template_vers} };
+
+    while (@kids) {
+	my $kid     = shift(@kids);
+
+	DBQueryWarn("update experiment_templates set $string ".
+		    "where guid='$template_guid' and vers='$kid'")
+	    or return -1;
+
+	push(@kids, @{ $children{$kid} })
+	    if (exists($children{$kid}));
+    }
     return 0;
 }
 
