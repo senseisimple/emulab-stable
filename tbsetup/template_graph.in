@@ -238,7 +238,7 @@ foreach my $kid (sort {$a <=> $b} keys(%parents)) {
     }
 
     # Encode to avoid confusing things.
-    $description = encode_entities($description, '\r\n');
+    $description = encode_entities($description, '\'\r\n');
     $description = encode_entities($description);
 
     my $query_result =
