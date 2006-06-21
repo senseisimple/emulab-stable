@@ -321,15 +321,6 @@ sleep(int(rand(5)));
 &debug_top();
 
 #
-# If it has been determined that we are not a part of the run,
-# exit now so we don't screw up the barrier synchs.
-#
-if (!exists($hostmap{$hostname})) {
-    &debug("$hostname not participating in this linktest run.\n");
-    exit(0);
-}
-
-#
 # Finally, see who the master is for synchronization.
 # We prefer the synch server node for the experiment, but if that node
 # is not participating, we choose the first node on the host list.
@@ -341,7 +332,7 @@ if ($ssname) {
     ($synserv) = split/\./, $results[0];
     chomp $synserv;
 }
-if (!$synserv || !exists($hostmap{$synserv})) {
+if (@hosts > 0 && (!$synserv || !exists($hostmap{$synserv}))) {
     $synserv = $hosts[0];
 }
 &debug("Synch master is $synserv\n");
@@ -390,6 +381,19 @@ if (@links == 0) {
     my $msg = "Linktest skipped, no links";
     &sim_event(EVENT_LOG,$msg);
     &debug("\n$msg\n\n");
+    &post_event(EVENT_COMPLETE,"ERROR=0 CTOKEN=$token");
+    exit(EXIT_OK);
+}
+
+#
+# If it has been determined that we are not a part of the run,
+# exit now so we don't screw up the barrier synchs.  Note that post_event
+# will only happen if we are the synch server and we can only be the
+# synch server if no other node is participating in the run either.
+#
+if (!exists($hostmap{$hostname})) {
+    &debug("$hostname not participating in this linktest run.\n");
+    &sim_event(EVENT_LOG,"Linktest skipped, no nodes participating");
     &post_event(EVENT_COMPLETE,"ERROR=0 CTOKEN=$token");
     exit(EXIT_OK);
 }
