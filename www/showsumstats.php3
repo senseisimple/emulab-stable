@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -126,7 +126,7 @@ function showsummary ($showby, $sortby) {
 	    $which = "uid";
 	    $table = "user_stats";
 	    $title = "User Summary Stats (Epoch)";
-	    $link  = "showuser.php3?target_idx=";
+	    $link  = "showuser.php3?target_uid=";
 	    break;
         default:
 	    USERERROR("Invalid showby argument: $showby!", 1);
