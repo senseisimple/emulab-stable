@@ -1565,7 +1565,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^ARCHSUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6) {
+		    if ($FBSD_VERSION >= 6.1) {
 			print OUTDEFS "ARCHSUPPORT=1\n";
 		    }
 		    else {

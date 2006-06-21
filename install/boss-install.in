@@ -28,6 +28,7 @@ my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $BUGDBSUPPORT = @BUGDBSUPPORT@;
+my $ARCHSUPPORT = @ARCHSUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
 my $EXPOSETEMPLATES = $ELABINELAB;
 
@@ -417,13 +418,15 @@ Phase "portfixup", "Fixing up packages", sub {
 	    my $pname = GetPackage("p5-XML-Simple", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
-	Phase "Subversion", "Looking for Subversion", sub {
-	    if (!ExecQuiet("$PKG_INFO -x subversion")) {
-		PhaseSkip("subversion already installed");
-	    }
-	    my $pname = GetPackage("subversion-python", $packagedir);
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
-	};
+	if ($ARCHSUPPORT) {
+	    Phase "Subversion", "Looking for Subversion", sub {
+		if (!ExecQuiet("$PKG_INFO -x subversion")) {
+		    PhaseSkip("subversion already installed");
+		}
+		my $pname = GetPackage("subversion-python", $packagedir);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	    };
+	}
     }
     if ($WINSUPPORT) {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
