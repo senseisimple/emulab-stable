@@ -5,7 +5,7 @@
 # BEFORE: DAEMON
 # KEYWORD: shutdown
 
-isvers5=`mysql -V | egrep 'Distrib 5.'`
+isvers5=`/usr/local/bin/mysql -V | egrep -q -s 'Distrib 5.'`
 
 if [ $? -eq 0 ]; then
 	safeprog=/usr/local/bin/mysqld_safe
