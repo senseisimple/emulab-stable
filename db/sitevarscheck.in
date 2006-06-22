@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -30,11 +30,14 @@ my $DBNAME         = "@TBDBNAME@";
 my $master_sitevars = "$testbed_srcdir/sql/sitevars-create.sql";
 my $sitevarsdiff = "$testbed_srcdir/utils/sitevarsdiff";
 
+my $isvers5   = system("mysql -V | egrep 'Distrib 5.'") == 0;
+my $extraopts = ($isvers5 ? "--skip-opt" : "");
+
 #
 # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
 # assumption, but maybe not always
 #
-my $mysqldump = "mysqldump -t $DBNAME sitevariables";
+my $mysqldump = "mysqldump $extraopts -t $DBNAME sitevariables";
 
 #
 # We use Mysql module instead of the testbed libraries, so that we can get

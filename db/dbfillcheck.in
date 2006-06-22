@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -36,17 +36,23 @@ my $exitcode      = 0;
 # We sort(1) the text files so that we don't pick up differences in ordering,
 # which could be pretty random.
 #
-if (system("perl $export_tables | sort > $tempoldfile")) {
+if (system("perl $export_tables | ".
+	   "grep -E -v -e '^--.*\$' -e '^\\/\\*.*\\*\\/;\$' | ".
+	   "sed -e 's/INTO `\\(.*\\)`/INTO \\1/' | ".
+	   "sort > $tempoldfile")) {
     unlink($tempoldfile);
     die("*** $0:\n".
 	"    $export_tables failed!\n");
 }
-if (system("grep -E -v '^(LOCK|UNLOCK|DELETE) ' $master_fill | sort > $tempnewfile")) {
+if (system("grep -E -v '^(LOCK|UNLOCK|DELETE) ' $master_fill | ".
+	   "grep -E -v -e '^--.*\$' -e '^\\/\\*.*\\*\\/;\$' | ".
+	   "sed -e 's/INTO `\\(.*\\)`/INTO \\1/' | ".
+	   "sort > $tempnewfile")) {
     unlink($tempoldfile);
     die("*** $0:\n".
 	"    sort $master_fill failed!\n");
 }
-if (system("diff -b -B -I '^--.*\$' $tempoldfile $tempnewfile > $tempdifffile")
+if (system("diff -b -B $tempoldfile $tempnewfile > $tempdifffile")
 	== 2) {
     unlink($tempdifffile);
     die("*** $0:\n".
