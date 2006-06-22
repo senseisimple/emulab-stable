@@ -23,7 +23,7 @@ if (@ARGV && $ARGV[0] eq "-i") {
 #
 my $DBNAME = '@TBDBNAME@';
 
-my $isvers5   = system("mysql -V | egrep 'Distrib 5.'") == 0;
+my $isvers5   = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
 my $extraopts = ($isvers5 ? "--skip-opt" : "");
 my $mysqldump = "mysqldump $extraopts";
 

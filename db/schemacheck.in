@@ -29,7 +29,7 @@ my $DBNAME         = "@TBDBNAME@";
 my $master_schema = "$testbed_srcdir/sql/database-create.sql";
 my $schemadiff = "$testbed_srcdir/utils/schemadiff";
 
-my $isvers5   = system("mysql -V | egrep 'Distrib 5.'") == 0;
+my $isvers5   = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
 my $extraopts = ($isvers5 ? "--skip-quote-names" : "");
 
 #
