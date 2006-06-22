@@ -290,6 +290,10 @@ function TBvalid_node_id($token) {
     return TBcheck_dbslot($token, "nodes", "node_id",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_vnode_id($token) {
+    return TBcheck_dbslot($token, "virt_nodes", "vname",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
 function TBvalid_imageid($token) {
     return TBcheck_dbslot($token, "images", "imageid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -54,7 +54,7 @@ if (! TBvalid_linklanname($linklan)) {
 if (!isset($vnode) || strcmp($vnode, "") == 0) {
     USERERROR("You must provide a node name.", 1);
 }
-if (! TBvalid_node_id($vnode)) {
+if (! TBvalid_vnode_id($vnode)) {
     PAGEARGERROR("$vnode contains invalid characters!");
 }
 
