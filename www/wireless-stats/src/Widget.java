@@ -104,7 +104,11 @@ public class Widget {
             g2.setFont(newf);
             int avgCharSize = 6;
             int estTitleLen = title.length()*avgCharSize;
-            g2.drawString(this.title,this.x - estTitleLen/2,this.y - 16);
+	    int x = this.x - estTitleLen/2;
+	    if ( x < 0 ) x = 0;	// Left edge.
+	    int y = this.y - 16;
+	    if ( y < 16 ) y = this.y + 24; // Top edge.
+            g2.drawString(this.title,x,y);
             //g2.rotate(-0.52360);
             g2.setFont(oldf);
             g2.setColor(oldColor);

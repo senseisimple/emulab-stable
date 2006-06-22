@@ -20,7 +20,7 @@ public class ILEStats implements WirelessData {
         return null;
     }
     
-    private static ILEStats parseReader(BufferedReader br) throws Exception {
+    private static ILEStats parseReader(BufferedReader br, String nodeType) throws Exception {
         Hashtable stats = new Hashtable();
         Vector moteNames = new Vector();
         //Vector moteIDs = new Vector();
@@ -37,7 +37,7 @@ public class ILEStats implements WirelessData {
             while ((line = br.readLine()) != null) {
                 ++linecount;
                 // parse line: "added phs for mote id 102"
-                Pattern mote = Pattern.compile("added phs for mote id (\\d+)");
+                Pattern mote = Pattern.compile("added phs for "+nodeType+" id (\\d+)");
                 Matcher moteM = mote.matcher(line);
                 // parse line: "Data for power level 0x2"
                 Pattern power = Pattern.compile("Data for power level 0x" + 
@@ -56,8 +56,10 @@ public class ILEStats implements WirelessData {
                 if (moteM.matches()) {
                     Integer i = new Integer(Integer.parseInt(moteM.group(1)));
                     //moteIDs.add(i);
-                    if (!moteNames.contains("mote"+moteM.group(1))) {
-                        moteNames.add("mote"+moteM.group(1));
+                    String id = new String(nodeType+moteM.group(1));
+                    if (!moteNames.contains(id)) {
+                        moteNames.add(id);
+			System.out.println("node " + id);
                     }
                 }
                 else if (powerM.matches()) {
@@ -84,8 +86,8 @@ public class ILEStats implements WirelessData {
 //				       maxRSSI+","+avgRSSI+","+stddevRSSI+")");
                     
                     Hashtable r = null;
-                    String rNode = "mote"+recv;
-                    String sNode = "mote"+send;
+                    String rNode = nodeType+recv;
+                    String sNode = nodeType+send;
                     
                     if ((r = (Hashtable)(pLHash.get(rNode))) == null) {
                         r = new Hashtable();
@@ -101,7 +103,9 @@ public class ILEStats implements WirelessData {
                 }
                 
             }
-            
+            if (pLHash != null) {
+                    stats.put(new Integer(powerLevel),pLHash); // The last one.
+            }
         }
         catch (IOException e) {
             throw new Exception("file read failed");
@@ -112,16 +116,16 @@ public class ILEStats implements WirelessData {
         return new ILEStats(moteNames,stats);
     }
     
-    static ILEStats parseInputStream(InputStream is) 
+    static ILEStats parseInputStream(InputStream is, String nodeType) 
         throws java.io.IOException, Exception {
         BufferedReader br = null;
         
         br = new BufferedReader(new InputStreamReader(is));
         
-        return parseReader(br);
+        return parseReader(br, nodeType);
     }
     
-    static ILEStats parseDumpFile(String filename) 
+    static ILEStats parseDumpFile(String filename, String nodeType) 
         throws java.io.IOException, java.text.ParseException,
         java.lang.IllegalArgumentException, Exception {
         File f = null;
@@ -142,7 +146,7 @@ public class ILEStats implements WirelessData {
         
         try {
             br = new BufferedReader(new FileReader(f));
-            retval = parseReader(br);
+            retval = parseReader(br, nodeType);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -303,7 +307,7 @@ public class ILEStats implements WirelessData {
     
     
     public static void main(String args[]) throws Exception {
-        parseDumpFile(args[0]);
+        parseDumpFile(args[0], args[1]);
     }
     
     // old accessor methods...

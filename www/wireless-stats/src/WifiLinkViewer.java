@@ -10,14 +10,14 @@ import java.util.*;
 //    }
 //}
 
-public class MoteLinkViewer extends javax.swing.JFrame {
+public class WifiLinkViewer extends javax.swing.JFrame {
 
     private Image bgImage;
     private java.awt.image.ImageObserver io;
     private Hashtable datasets;
     private Hashtable mapImages;
     
-    public MoteLinkViewer() {
+    public WifiLinkViewer() {
         this.datasets = new Hashtable();
         this.mapImages = new Hashtable();
         
@@ -29,7 +29,7 @@ public class MoteLinkViewer extends javax.swing.JFrame {
             }
         };
         
-        bgImage = Toolkit.getDefaultToolkit().getImage("../floormap.jpg");
+        bgImage = Toolkit.getDefaultToolkit().getImage("../meb3fl-2.jpg");
         mapImages.put("Floor4/WSN",bgImage);
         
         try {
@@ -50,8 +50,9 @@ public class MoteLinkViewer extends javax.swing.JFrame {
         String defaultDatasetName = "Floor4/WSN";
         
         try {
-            defaultData = ILEStats.parseDumpFile("../nn_client.log", "mote");
-            defaultPositions = NodePositions.parseFile("../mote_positions");
+            //defaultData = ILEStats.parseDumpFile("../wifi_data.log", "pcwf");
+            defaultData = ILEStats.parseDumpFile("../wifi_test.log", "pcwf");
+            defaultPositions = NodePositions.parseFile("../wifi_positions");
             
             defaultModel = new MapDataModel(defaultData,defaultPositions);
             datasets.put(defaultDatasetName,defaultModel);
@@ -106,7 +107,7 @@ public class MoteLinkViewer extends javax.swing.JFrame {
     public static void main(final String args[]) {
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new MoteLinkViewer().setVisible(true);
+                new WifiLinkViewer().setVisible(true);
             }
         });
     }

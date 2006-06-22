@@ -167,7 +167,7 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 widgets.add(e1.nextElement());
                 ++count;
             }
-            System.out.println("added "+count+" links!");
+            //System.out.println("added "+count+" links!");
         }
         
 //        widgets.add(new LinkWidget((NodeWidget)nodeWidgets.get("mote111"),
@@ -258,7 +258,7 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
             if (bgImage != null) {
                 g2.setColor(java.awt.Color.WHITE);
                 g2.fillRect(0, 0, getWidth(), getHeight());
-                System.out.println("tried to draw bg!");
+                //System.out.println("tried to draw bg!");
                 g2.drawImage(bgImage,0,0,java.awt.Color.WHITE,null);
                 
                 
@@ -267,14 +267,14 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 // for the mote stuff, we could draw the obstacles and labels
                 // ourselves, but that wouldn't help for the wireless stuff...
                 
-//                Composite old = g2.getComposite();
-//                AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f);
-//                g2.setComposite(ac);
-//                
-//                g2.setColor(java.awt.Color.WHITE);
-//                g2.fillRect(0,0,getWidth(),getHeight());
-//                
-//                g2.setComposite(old);
+                Composite old = g2.getComposite();
+                AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.25f);
+                g2.setComposite(ac);
+                
+                g2.setColor(java.awt.Color.WHITE);
+                g2.fillRect(0,0,getWidth(),getHeight());
+                
+                g2.setComposite(old);
                 
             }
             else {
@@ -306,21 +306,24 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
         g2.dispose(); //clean up
     }
     
-    public void setBackgroundImage(Image bgImage) {
+    public void setBackgroundImage(final Image bgImage) {
         this.bgImage = bgImage;
         
         java.awt.image.ImageObserver io = new java.awt.Component() {
-            public boolean updateImage(Image img, int infoflags, int x, int y, int width, int height) {
-                System.out.println("w = "+width+",h = "+height);
-                
+            public boolean updateImage(Image img, int infoflags,
+                                       int x, int y, int width, int height) {
+                System.out.println("ImageObserver w = "+width+", h = "+height);
                 return true;
             }
         };
         
-        System.out.println("sbi: w = "+bgImage.getWidth(null)+", h = "+bgImage.getHeight(null));
-        //setPreferredSize(new Dimension(bgImage.getWidth(null),bgImage.getHeight(null)));
-        setPreferredSize(new Dimension(1025,1000));
-        this.revalidate();
+        int width = bgImage.getWidth(null);
+        int height = bgImage.getHeight(null);
+        System.out.println("sbi: width = "+width+", height = "+height);
+        setPreferredSize(new Dimension(width, height));
+        setMinimumSize(new Dimension(width, height));
+        revalidate();
+        repaint();
     }
     
 }

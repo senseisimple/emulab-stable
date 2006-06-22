@@ -128,7 +128,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                     // now try to parse the data
                     // every time we add a new kind of data file and an associated parser,
                     // we must add a try in here with it!
-                    data = ILEStats.parseInputStream(data_is);
+                    data = ILEStats.parseInputStream(data_is, "mote");
                     
                     int pLs[] = data.getPowerLevels();
                     System.out.print("power levels = ");
