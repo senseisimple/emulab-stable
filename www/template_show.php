@@ -67,23 +67,24 @@ function CheckArguments($guid, $version) {
 
 CheckArguments($guid, $version);
 
-if (isset($show) || isset($hide) || isset($showhidden) || isset($hidehidden) ||
+if (isset($showtemplate) || isset($hidetemplate) ||
+    isset($showhidden) || isset($hidehidden) ||
     isset($zoomin) || isset($zoomout)) {
 
     # Need this for scripts.
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
     # Hide or show templates.
-    if (isset($show) || isset($hide) ||
+    if (isset($showtemplate) || isset($hidetemplate) ||
 	isset($showhidden) || isset($hidehidden)) {
 
 	$optarg  = ((isset($recursive) && $recursive == "Yep") ? "-r" : "");
 	$reqarg  = "-a ";
 
-	if (isset($show)) {
+	if (isset($showtemplate)) {
 	    $reqarg .= "show";
 	}
-	elseif (isset($hide)) {
+	elseif (isset($hidetemplate)) {
 	    $reqarg .= "hide";
 	}
 	elseif (isset($showhidden)) {
@@ -94,7 +95,7 @@ if (isset($show) || isset($hide) || isset($showhidden) || isset($hidehidden) ||
 	}
 	$reqarg .= " $guid/";
 
-	if (isset($show) || isset($hide)) {
+	if (isset($showtemplate) || isset($hidetemplate)) {
 	    $reqarg .= $version;
 	}
 	else {
@@ -188,11 +189,11 @@ if (!isset($show) || $show == "graph") {
 
     if (! $template->IsRoot()) {
 	if ($template->IsHidden()) {
-	    echo "<button name=show type=submit value=Show>";
+	    echo "<button name=showtemplate type=submit value=Show>";
 	    echo " Show Template</button></a>&nbsp ";
 	}
 	else {
-	    echo "<button name=hide type=submit value=Hide>";
+	    echo "<button name=hidetemplate type=submit value=Hide>";
 	    echo " Hide Template</button></a>&nbsp ";
 	}
 	echo "<input type=checkbox name=recursive value=Yep>Recursive? &nbsp ";
