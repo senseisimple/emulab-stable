@@ -278,7 +278,7 @@ function WRITESIDEBAR() {
 
 
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON_NEW("Other Emulabs", $TBDOCBASE,
+	WRITESIDEBARBUTTON("Other Emulabs", $TBDOCBASE,
 			       "docwrapper.php3?docname=otheremulabs.html");
     } else {
 	WRITESIDEBARBUTTON_ABS("Utah Emulab", $TBDOCBASE,
