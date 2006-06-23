@@ -17,7 +17,7 @@ public class WifiLinkViewer extends javax.swing.JFrame {
     private Hashtable datasets;
     private Hashtable mapImages;
     
-    public WifiLinkViewer() {
+    public WifiLinkViewer(String dataFile) {
         this.datasets = new Hashtable();
         this.mapImages = new Hashtable();
         
@@ -50,8 +50,8 @@ public class WifiLinkViewer extends javax.swing.JFrame {
         String defaultDatasetName = "Floor4/WSN";
         
         try {
-            //defaultData = ILEStats.parseDumpFile("../wifi_data.log", "pcwf");
-            defaultData = ILEStats.parseDumpFile("../wifi_test.log", "pcwf");
+	    if ( dataFile == null ) dataFile = "../wifi_test.log"; // Default.
+            defaultData = ILEStats.parseDumpFile(dataFile, "pcwf");
             defaultPositions = NodePositions.parseFile("../wifi_positions");
             
             defaultModel = new MapDataModel(defaultData,defaultPositions);
@@ -107,7 +107,9 @@ public class WifiLinkViewer extends javax.swing.JFrame {
     public static void main(final String args[]) {
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new WifiLinkViewer().setVisible(true);
+		String dataFile = null;
+		if ( args.length > 0 ) dataFile = args[0];
+                new WifiLinkViewer(dataFile).setVisible(true);
             }
         });
     }
