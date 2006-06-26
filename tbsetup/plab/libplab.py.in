@@ -86,6 +86,10 @@ LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 # allowed nil/unknown values (sentinels).
 ATTR_NIL_VALUES = ('None',)
 
+# 'critical' node identifiers - those that are actually used to uniquely
+# identify a planetlab node
+ATTR_CRIT_KEYS = ('HNAME', 'IP', 'PLABID', 'MAC',)
+
 PLABNODE = "@prefix@/sbin/plabnode"
 SSH = "@prefix@/bin/sshtb"
 NAMED_SETUP = "@prefix@/sbin/named_setup"
@@ -147,6 +151,8 @@ class siteParser:
         self.parser.EndElementHandler = self.__site_end_elt
         self.__hosts = []
         self.__sitename = ""
+        self.__latitude = 0
+        self.__longitude = 0
         
     def getPlabNodeInfo(self):
                 
@@ -174,17 +180,27 @@ class siteParser:
         
         elif name == "SITE":
             self.__sitename = attrs['SHORT_SITE_NAME']
+            if attrs.has_key('LATITUDE'):
+                self.__latitude = attrs['LATITUDE']
+            else:
+                self.__latiturde = 0
+            if attrs.has_key('LONGITUDE'):
+                self.__longitude = attrs['LONGITUDE']
+            else:
+                self.__longitude = 0
             pass
         
         elif name == "HOST":
             if not attrs.has_key('MAC'):
                 attrs['MAC'] = "None"
                 pass
-            self.__hosts.append({'HNAME' : attrs['NAME'],
-                                 'IP'    : attrs['IP'],
-                                 'PLABID': attrs['NODE_ID'],
-                                 'MAC'   : attrs['MAC'],
-                                 'SITE'  : self.__sitename})
+            self.__hosts.append({'HNAME'     : attrs['NAME'],
+                                 'IP'        : attrs['IP'],
+                                 'PLABID'    : attrs['NODE_ID'],
+                                 'MAC'       : attrs['MAC'],
+                                 'SITE'      : self.__sitename,
+                                 'LATITUDE'  : self.__latitude,
+                                 'LONGITUDE' : self.__longitude})
             pass
         
         else:
@@ -197,6 +213,8 @@ class siteParser:
         
         if name == "SITE":
             self.__sitename = "Unknown"
+            self.__latitude = 0
+            self.__longitude = 0
             pass
         return
 
@@ -422,8 +440,12 @@ class Plab:
                     diff[attr] = (ent[attr], plabent[attr])
                     pass
                 pass
+            # Only consider these to be the same if at least one 'critical'
+            # attr is the same
             if len(same):
-                return (nid, diff)
+                for attr in same:
+                    if attr in ATTR_CRIT_KEYS:
+                        return (nid, diff)
             pass
         return ()
 
@@ -432,15 +454,23 @@ class Plab:
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
         """
-        res = DBQueryFatal("select node_id,plab_id,hostname,IP,mac"
-                           " from plab_mapping")
+        res = DBQueryFatal("select plab_mapping.node_id,plab_id,"
+                           "plab_mapping.hostname,IP,mac,site,latitude,"
+                           "longitude"
+                           " from plab_mapping"
+                           " left join widearea_nodeinfo on"
+                           "    plab_mapping.node_id = "
+                           "    widearea_nodeinfo.node_id")
         
         ret = {}
-        for nodeid, plabid, hostname, ip, mac in res:
-            ret[nodeid] = {'PLABID'  : plabid,
-                           'HNAME'   : hostname,
-                           'IP'      : ip,
-                           'MAC'     : mac}
+        for nodeid, plabid, hostname, ip, mac, site, latitude, longitude in res:
+            ret[nodeid] = {'PLABID'    : plabid,
+                           'HNAME'     : hostname,
+                           'IP'        : ip,
+                           'MAC'       : mac,
+                           'SITE'      : site,
+                           'LATITUDE'  : latitude,
+                           'LONGITUDE' : longitude}
             pass
         # Check for duplicate node attributes: report any that are found.
         dups = self.__findDuplicateAttrs(ret.values())
@@ -563,12 +593,17 @@ class Plab:
                   (nodeent['IP'], nodeid, priority)
             pass
 
+        haslatlong = (('LATITUDE' in nodeent and 'LONGITUDE' in nodeent) and
+            (nodeent['LATITUDE'] != 0 or nodeent['LONGITUDE'] != 0))
         try:
-            # XXX: Site is not checked for updates.
             DBQueryFatal("replace into widearea_nodeinfo"
-                         " (node_id, contact_uid, hostname, site)"
-                         " values (%s, %s, %s, %s)",
-                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE']))
+                         " (node_id, contact_uid, hostname, site, latitude, "
+                         "  longitude)"
+                         " values (%s, %s, %s, %s, %s, %s)",
+                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE'],
+                          # Poor man's ternary operator
+                          haslatlong and nodeent['LATITUDE'] or "NULL",
+                          haslatlong and nodeent['LONGITUDE'] or "NULL"))
 
             DBQueryFatal("replace into interfaces"
                          " (node_id, card, port, IP, interface_type,"
@@ -729,10 +764,23 @@ class Plab:
         """
         uid = os.getuid()
         dbuid = uid == 0 and "root" or UNIX2DBUID(uid)
-        attrmap = {'PLABID' : 'plab_id',
-                   'HNAME'  : 'hostname',
-                   'IP'     : 'IP',
-                   'MAC'    : 'mac'}
+        # mapping from attrs to which table they belong in
+        tablemap = {'PLABID'    : 'plab_mapping',
+                    'HNAME'     : 'plab_mapping',
+                    'IP'        : 'plab_mapping',
+                    'MAC'       : 'plab_mapping',
+                    'SITE'      : 'widearea_nodeinfo',
+                    'LATITUDE'  : 'widearea_nodeinfo',
+                    'LONGITUDE' : 'widearea_nodeinfo',}
+        # mapping from attrs to column names
+        attrmap = {'plab_mapping' : {'PLABID' : 'plab_id',
+                                     'HNAME'  : 'hostname',
+                                     'IP'     : 'IP',
+                                     'MAC'    : 'mac'},
+                   'widearea_nodeinfo' : {'SITE'      : 'site',
+                                          'LATITUDE'  : 'latitude',
+                                          'LONGITUDE' : 'longitude',}}
+
         nodeid, chattrs = updent
         
         if len(chattrs) > 2:
@@ -746,10 +794,19 @@ class Plab:
                      TBOPS)
             raise RuntimeError, errmsg # XXX: maybe don't raise an exception.
         
-        updstr = ",".join(map(lambda x: "%s='%s'" % (attrmap[x[0]],x[1][1]),
-                              chattrs.items()))
-        DBQueryFatal("update plab_mapping set " + updstr + " where node_id=%s",
-                     (nodeid))
+        # seperate out attrs by table
+        chattrs_by_table = {}
+        for attr in chattrs:
+            table = tablemap[attr]
+            if table not in chattrs_by_table:
+                chattrs_by_table[table] = []
+            chattrs_by_table[table].append(attr)
+
+        # update each table
+        for table in chattrs_by_table:
+            updstr = ",".join(map(lambda x: "%s='%s'" %
+                (attrmap[table][x[0]],x[1][1]), chattrs.items()))
+            DBQueryFatal("update %s set %s where node_id='%s'" % (table, updstr, nodeid))
         updmsg = "Plab node %s attributes updated:\n\n%s" % (nodeid, chattrs)
         TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, updmsg)
         # updateNodeEtries() already sends mail.
