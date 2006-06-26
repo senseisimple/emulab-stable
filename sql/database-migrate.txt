@@ -3430,3 +3430,7 @@ last_net_act,last_cpu_act,last_ext_act);
       	alter table experiment_template_instances add \
 		template_tag varchar(64) default NULL;
 
+4.70: Add latitude and longitude to the widearea_nodeinfo table.
+
+        alter table widearea_nodeinfo add latitude float(3,5);
+        alter table widearea_nodeinfo add longitude float(3,5);

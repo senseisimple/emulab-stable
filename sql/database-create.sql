@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.58-log
+-- Server version	3.23.59-nightly-20050301-log
 
 --
 -- Table structure for table `accessed_files`
@@ -606,7 +606,7 @@ CREATE TABLE experiment_template_metadata (
   internal tinyint(1) NOT NULL default '0',
   hidden tinyint(1) NOT NULL default '0',
   metadata_type enum('tid','template_description','parameter_description') default NULL,
-  PRIMARY KEY  (parent_guid, parent_vers, metadata_guid, metadata_vers)
+  PRIMARY KEY  (parent_guid,parent_vers,metadata_guid,metadata_vers)
 ) TYPE=MyISAM;
 
 --
@@ -623,7 +623,7 @@ CREATE TABLE experiment_template_metadata_items (
   name varchar(64) NOT NULL default '',
   value mediumtext,
   created datetime default NULL,
-  PRIMARY KEY (guid, vers),
+  PRIMARY KEY  (guid,vers),
   KEY parent (parent_guid,parent_vers),
   KEY template (template_guid)
 ) TYPE=MyISAM;
@@ -2185,7 +2185,7 @@ CREATE TABLE state_triggers (
   node_id varchar(32) NOT NULL default '',
   op_mode varchar(20) NOT NULL default '',
   state varchar(20) NOT NULL default '',
-  `trigger` tinytext NOT NULL,
+  trigger tinytext NOT NULL,
   PRIMARY KEY  (node_id,op_mode,state)
 ) TYPE=MyISAM;
 
@@ -2237,7 +2237,7 @@ CREATE TABLE table_regex (
   column_name varchar(64) NOT NULL default '',
   column_type enum('text','int','float') default NULL,
   check_type enum('regex','function','redirect') default NULL,
-  `check` tinytext NOT NULL,
+  check tinytext NOT NULL,
   min int(11) NOT NULL default '0',
   max int(11) NOT NULL default '0',
   comment tinytext,
@@ -2985,6 +2985,8 @@ CREATE TABLE widearea_nodeinfo (
   external_node_id tinytext,
   hostname varchar(255) default NULL,
   site varchar(255) default NULL,
+  latitude float(6,5) default NULL,
+  longitude float(6,5) default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -3034,7 +3036,7 @@ CREATE TABLE widearea_updates (
   roottag tinytext NOT NULL,
   update_requested datetime NOT NULL default '0000-00-00 00:00:00',
   update_started datetime default NULL,
-  `force` enum('yes','no') NOT NULL default 'no',
+  force enum('yes','no') NOT NULL default 'no',
   PRIMARY KEY  (IP)
 ) TYPE=MyISAM;
 
@@ -3072,3 +3074,4 @@ CREATE TABLE wires (
   KEY dest (node_id2,card2,port2),
   KEY src (node_id1,card1,port1)
 ) TYPE=MyISAM;
+
