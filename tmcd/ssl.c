@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -220,9 +220,9 @@ tmcd_client_sslinit(void)
  * is static and local to the process. 
  */
 int
-tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
+tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen, int ms)
 {
-	int	newsock, cc;
+	int	newsock, cc, err;
 
 	if ((newsock = accept(sock, addr, addrlen)) < 0)
 		return -1;
@@ -234,6 +234,21 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 		return newsock;
 
 	/*
+	 * Set timeout values to keep us from hanging due to a
+	 * malfunctioning or malicious client.
+	 */
+	if (ms > 0) {
+		struct timeval tv;
+
+		tv.tv_sec = ms / 1000;
+		tv.tv_usec = (ms % 1000) * 1000;
+		if (setsockopt(newsock, SOL_SOCKET, SO_RCVTIMEO,
+			       &tv, sizeof(tv)) < 0) {
+			errorc("setting SO_RCVTIMEO");
+		}
+	}
+
+	/*
 	 * Read the first bit. It indicates whether we need to SSL
 	 * handshake or not. Clear the buffer to avoid confusing
 	 * the last connection with this new connection. 
@@ -241,9 +256,14 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 	bzero(nosslbuf, strlen(SPEAKSSL));
 	      
 	if ((cc = read(newsock, nosslbuf, strlen(SPEAKSSL))) <= 0) {
-		error("sslaccept: reading request");
-		if (cc == 0)
-			errno = EIO;
+		if (cc < 0) {
+			err = errno;
+			if (err == EWOULDBLOCK)
+				error("sslaccept: timeout reading request");
+			else
+				error("sslaccept: error reading request");
+		} else if (cc == 0)
+			err = EIO;
 		goto badauth;
 	}
 	
@@ -262,17 +282,17 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 
 	if (! (ssl = SSL_new(ctx))) {
 		tmcd_sslerror();
-		errno = EIO;
+		err = EIO;
 		goto badauth;
 	}
 	if (! SSL_set_fd(ssl, newsock)) {
 		tmcd_sslerror();
-		errno = EIO;
+		err = EIO;
 		goto badauth;
 	}
 	if (SSL_accept(ssl) <= 0) {
 		tmcd_sslerror();
-		errno = EAUTH;
+		err = EAUTH;
 		goto badauth;
 	}
 	
@@ -281,6 +301,7 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 	error("sslaccept: error speaking to %s\n",
 	      inet_ntoa(((struct sockaddr_in *)addr)->sin_addr));
 	tmcd_sslclose(newsock);
+	errno = err;
 	return -1;
 }
 

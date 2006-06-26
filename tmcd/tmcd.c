@@ -61,6 +61,10 @@
 #define RUNASGROUP	"nobody"
 #define NTPSERVER       "ntp1"
 
+/* socket read/write timeouts in ms */
+#define READTIMO	3000
+#define WRITETIMO	3000
+
 #define TESTMODE
 #define DEFAULTNETMASK	"255.255.255.0"
 /* This can be tossed once all the changes are in place */
@@ -108,6 +112,10 @@ void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
 static int	safesymlink(char *name1, char *name2);
+
+/* socket timeouts */
+static int	readtimo = READTIMO;
+static int	writetimo = WRITETIMO;
 
 /* thread support */
 #define MAXCHILDREN	20
@@ -790,6 +798,32 @@ udpserver(int sock, int portnum)
 	exit(1);
 }
 
+int
+tmcd_accept(int sock, struct sockaddr *addr, socklen_t *addrlen, int ms)
+{
+	int	newsock;
+
+	if ((newsock = accept(sock, addr, addrlen)) < 0)
+		return -1;
+
+	/*
+	 * Set timeout value to keep us from hanging due to a
+	 * malfunctioning or malicious client.
+	 */
+	if (ms > 0) {
+		struct timeval tv;
+
+		tv.tv_sec = ms / 1000;
+		tv.tv_usec = (ms % 1000) * 1000;
+		if (setsockopt(newsock, SOL_SOCKET, SO_RCVTIMEO,
+			       &tv, sizeof(tv)) < 0) {
+			errorc("setting SO_RCVTIMEO");
+		}
+	}
+
+	return newsock;
+}
+
 /*
  * Listen for TCP requests.
  */
@@ -800,6 +834,7 @@ tcpserver(int sock, int portnum)
 	struct sockaddr_in	client;
 	int			length, cc, newsock;
 	unsigned int		nreq = 0;
+	struct timeval		tv;
 	
 	info("tcpserver starting: pid=%d sock=%d portnum=%d\n",
 	     mypid, sock, portnum);
@@ -810,9 +845,24 @@ tcpserver(int sock, int portnum)
 	while (1) {
 		setproctitle("TCP %d: %u done", portnum, nreq);
 		length  = sizeof(client);
-		newsock = ACCEPT(sock, (struct sockaddr *)&client, &length);
+		newsock = ACCEPT(sock, (struct sockaddr *)&client, &length,
+				 readtimo);
 		if (newsock < 0) {
 			errorc("accepting TCP connection");
+			continue;
+		}
+
+		/*
+		 * Set write timeout value to keep us from hanging due to a
+		 * malfunctioning or malicious client.
+		 * NOTE: ACCEPT function sets read timeout.
+		 */
+		tv.tv_sec = writetimo / 1000;
+		tv.tv_usec = (writetimo % 1000) * 1000;
+		if (setsockopt(newsock, SOL_SOCKET, SO_SNDTIMEO,
+			       &tv, sizeof(tv)) < 0) {
+			errorc("setting SO_SNDTIMEO");
+			CLOSE(newsock);
 			continue;
 		}
 
@@ -820,8 +870,12 @@ tcpserver(int sock, int portnum)
 		 * Read in the command request.
 		 */
 		if ((cc = READ(newsock, buf, sizeof(buf) - 1)) <= 0) {
-			if (cc < 0)
-				errorc("Reading TCP request");
+			if (cc < 0) {
+				if (errno == EWOULDBLOCK)
+					errorc("Timeout reading TCP request");
+				else
+					errorc("Error reading TCP request");
+			}
 			error("TCP connection aborted\n");
 			CLOSE(newsock);
 			continue;
@@ -5084,7 +5138,7 @@ COMMAND_PROTOTYPE(dorusage)
         /* We're going to store plab up/down data in a file for a while. */
         if (reqp->isplabsvc) {
             gettimeofday(&now, NULL);
-            tmnow = localtime(&now.tv_sec);
+            tmnow = localtime((time_t *)&now.tv_sec);
             strftime(timebuf, sizeof(timebuf), "%Y%m%d", tmnow);
             snprintf(pllogfname, sizeof(pllogfname), 
                      "%s/%s-isalive-%s", 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -10,7 +10,7 @@
 
 int		tmcd_server_sslinit(void);
 int		tmcd_client_sslinit(void);
-int		tmcd_sslaccept(int sock, struct sockaddr *, socklen_t *);
+int		tmcd_sslaccept(int sock, struct sockaddr *, socklen_t *, int);
 int		tmcd_sslconnect(int sock, const struct sockaddr *, socklen_t);
 int		tmcd_sslwrite(int sock, const void *buf, size_t nbytes);
 int		tmcd_sslread(int sock, void *buf, size_t nbytes);
@@ -44,13 +44,13 @@ inline int win_recv(SOCKET s, char FAR* buf, int len)
 {
         return recv(s,buf,len,0);
 }
-#define ACCEPT		accept
+#define ACCEPT		tmcd_accept
 #define CONNECT		connect
 #define WRITE		win_send
 #define READ		win_recv
 #define CLOSE		close
 #else
-#define ACCEPT		accept
+#define ACCEPT		tmcd_accept
 #define CONNECT		connect
 #define WRITE		write
 #define READ		read
