@@ -589,10 +589,20 @@ sub write_rude_cfg {
     my @contents;
     
     #
+    # Run for the desired time and then tell rude to not transmit, but
+    # wait, for the edge one-way latency time.  This way rude will not
+    # exit before the last packet has a chance to arrive at the destination.
+    # Delaying here simplifies the barrier synchronization (we don't have
+    # to do a sub-second delay in perl).  Note that a final, zero rate
+    # MODIFY like we use here only works in our modified version of rude!
+    # Stock rude will just exit after the last actual transmission; i.e.,
+    # prior to the final one-way latency wait.
+    #
     # START <when>
     # <start-offset-ms> <flowID> ON <src-port> \
     #    <dst-addr>:<dst-port> CONSTANT <packets per second> <packet size>
-    # <stop-offset-ms> <flowID> OFF
+    # <stop-offset-ms> <flowID> MODIFY CONSTANT 0 <XX>
+    # <stop-offset-ms+one-way-link-latency> <flowID> OFF
     #
     # For our purposes, the variables are:
     #	$sample_size	packet rate
@@ -602,6 +612,10 @@ sub write_rude_cfg {
     push @contents, "0000 $stream_id ON 3001 " 
 	. $edge->dst . "-" . $edge->name
 	    . ":10001 CONSTANT $sample_size 20\n";
+    if ($edge->delay) {
+	push @contents, "$millis $stream_id MODIFY CONSTANT 0 20\n";
+	$millis += int($edge->delay);
+    }
     push @contents, "$millis $stream_id OFF\n";
 
     &write_file(RUDE_CFG, @contents);
@@ -940,11 +954,20 @@ sub latency_test {
 	    if($hostname eq $edge->src ) {
 		# todo: consider ignoring latency if no delay node.
 		if(&valid_latency($edge) && &valid_latency($other_edge)) {
+
+		    #
+		    # Tell ping to wait at least one round-trip time.
+		    # XXX should be reconciled with expected values below.
+		    #
+		    my $ptimo = $edge->delay + $other_edge->delay;
+		    $ptimo = int(($ptimo + 500) / 1000) + 1;
+		    $ptimo = 3 if ($ptimo < 3);
+
 		    if ($printsched) {
 			&schedlog("ping " . schedprint_link($edge) .
 				  " (pkts=" . PING_SEND_COUNT .
 				  ", pps=" . (PING_SEND_COUNT/2) .
-				  ", timo=3s)");
+				  ", timo=${ptimo}s)");
 			next;
 		    }
 		    my $pid = fork();
@@ -952,7 +975,8 @@ sub latency_test {
 
 			# call ping_node with ttl=1
 			my ($result_cnt, $sample_avg, $sample_dev) =
-			    &ping_node($edge->dst . "-" . $edge->name,1);
+			    &ping_node($edge->dst . "-" . $edge->name,
+				       1, undef, $ptimo);
 			
 			if ($reportonly) {
 			    &info("    Latency result on $hostname for " .

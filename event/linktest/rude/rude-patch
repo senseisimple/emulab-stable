@@ -1,24 +1,11 @@
-diff -cr rude.orig/autoconf/configure.in rude/autoconf/configure.in
-*** rude.orig/autoconf/configure.in	Thu Jun 13 06:15:20 2002
---- rude/autoconf/configure.in	Wed Apr 12 12:31:38 2006
-***************
-*** 121,126 ****
-  ###################
-  # Make it happen. #
-  ###################
-! CFLAGS="$CFLAGS -I../include"
-  AC_OUTPUT(Makefile:autoconf/Makefile.in rude/Makefile crude/Makefile, \
-  	  echo timestamp > include/stamp.h)
---- 121,126 ----
-  ###################
-  # Make it happen. #
-  ###################
-! CFLAGS="$CFLAGS -I\$(srcdir)/../include -I../include"
-  AC_OUTPUT(Makefile:autoconf/Makefile.in rude/Makefile crude/Makefile, \
-  	  echo timestamp > include/stamp.h)
-diff -cr rude.orig/configure rude/configure
-*** rude.orig/configure	Thu Jun 27 03:44:09 2002
---- rude/configure	Wed Apr 12 12:31:46 2006
+Index: configure
+===================================================================
+RCS file: /flux/CVS/emulab-rude/configure,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+*** configure	27 Jun 2006 17:50:14 -0000	1.1.1.1
+--- configure	27 Jun 2006 18:26:14 -0000	1.2
 ***************
 *** 2062,2068 ****
   ###################
@@ -36,9 +23,35 @@ diff -cr rude.orig/configure rude/configure
   trap '' 1 2 15
   cat > confcache <<\EOF
   # This file is a shell script that caches the results of configure
-diff -cr rude.orig/crude/main.c rude/crude/main.c
-*** rude.orig/crude/main.c	Thu Jun 13 06:15:21 2002
---- rude/crude/main.c	Wed Apr 12 11:44:29 2006
+Index: autoconf/configure.in
+===================================================================
+RCS file: /flux/CVS/emulab-rude/autoconf/configure.in,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+***************
+*** 121,126 ****
+  ###################
+  # Make it happen. #
+  ###################
+! CFLAGS="$CFLAGS -I../include"
+  AC_OUTPUT(Makefile:autoconf/Makefile.in rude/Makefile crude/Makefile, \
+  	  echo timestamp > include/stamp.h)
+--- 121,126 ----
+  ###################
+  # Make it happen. #
+  ###################
+! CFLAGS="$CFLAGS -I\$(srcdir)/../include -I../include"
+  AC_OUTPUT(Makefile:autoconf/Makefile.in rude/Makefile crude/Makefile, \
+  	  echo timestamp > include/stamp.h)
+Index: crude/main.c
+===================================================================
+RCS file: /flux/CVS/emulab-rude/crude/main.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+*** crude/main.c	27 Jun 2006 17:50:15 -0000	1.1.1.1
+--- crude/main.c	27 Jun 2006 18:22:10 -0000	1.2
 ***************
 *** 294,302 ****
 --- 294,306 ----
@@ -87,9 +100,14 @@ diff -cr rude.orig/crude/main.c rude/crude/main.c
         printf("Delay: average = -%lld.%06llu   ", sec, usec);
       } else {
         printf("Delay: average = %lld.%06llu   ", sec, usec);
-diff -cr rude.orig/include/rude.h rude/include/rude.h
-*** rude.orig/include/rude.h	Mon Sep  2 08:28:01 2002
---- rude/include/rude.h	Wed Apr 12 10:03:36 2006
+Index: include/rude.h
+===================================================================
+RCS file: /flux/CVS/emulab-rude/include/rude.h,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+*** include/rude.h	27 Jun 2006 17:50:15 -0000	1.1.1.1
+--- include/rude.h	27 Jun 2006 18:22:18 -0000	1.2
 ***************
 *** 24,29 ****
 --- 24,30 ----
@@ -100,9 +118,14 @@ diff -cr rude.orig/include/rude.h rude/include/rude.h
   #include <netinet/in.h>  /* for struct sockaddr_in */
   #include <sys/time.h>    /* for struct timeval     */
   
-diff -cr rude.orig/rude/flow_txmit.c rude/rude/flow_txmit.c
-*** rude.orig/rude/flow_txmit.c	Thu Jun 13 06:15:21 2002
---- rude/rude/flow_txmit.c	Wed Apr 12 11:53:03 2006
+Index: rude/flow_txmit.c
+===================================================================
+RCS file: /flux/CVS/emulab-rude/rude/flow_txmit.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.3
+diff -c -r1.1.1.1 -r1.3
+*** rude/flow_txmit.c	27 Jun 2006 17:50:14 -0000	1.1.1.1
+--- rude/flow_txmit.c	27 Jun 2006 18:28:48 -0000	1.3
 ***************
 *** 43,58 ****
   extern struct udp_data *data;
@@ -197,9 +220,27 @@ diff -cr rude.orig/rude/flow_txmit.c rude/rude/flow_txmit.c
         continue;
       }
       return;
-diff -cr rude.orig/rude/main.c rude/rude/main.c
-*** rude.orig/rude/main.c	Thu Jun 13 06:15:21 2002
---- rude/rude/main.c	Wed Apr 12 11:37:37 2006
+***************
+*** 78,83 ****
+--- 137,146 ----
+    data->sequence_number = htonl(flow->sequence_nmbr);
+    wait_for_xmit(&flow->next_tx, &now);
+  
++   /* Emulab hack: this can happen for a final zero transmission */
++   if (p->rate == 0)
++     return;
++ 
+    /* ...and fill in the rest of the data */
+    data->tx_time_seconds  = htonl(now.tv_sec);
+    data->tx_time_useconds = htonl(now.tv_usec);
+Index: rude/main.c
+===================================================================
+RCS file: /flux/CVS/emulab-rude/rude/main.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+*** rude/main.c	27 Jun 2006 17:50:14 -0000	1.1.1.1
+--- rude/main.c	27 Jun 2006 18:22:23 -0000	1.2
 ***************
 *** 95,101 ****
       exit(1);
@@ -281,3 +322,23 @@ diff -cr rude.orig/rude/main.c rude/rude/main.c
     return;
   } /* print_results() */
   
+Index: rude/parse.c
+===================================================================
+RCS file: /flux/CVS/emulab-rude/rude/parse.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+*** rude/parse.c	27 Jun 2006 17:50:14 -0000	1.1.1.1
+--- rude/parse.c	27 Jun 2006 18:28:48 -0000	1.2
+***************
+*** 688,694 ****
+--- 688,696 ----
+        /* NEW in 0.50: Enable flow "stop" - ZERO transmission rate... */
+        if(temp->params.cbr.rate == 0){
+  	temp->next_tx = temp->flow_stop;
++ 	/* Emulab hack: make final zero transmission actually happen
+  	temp->next_tx.tv_sec++;
++ 	*/
+        }
+        break;
+      case(TRACE):

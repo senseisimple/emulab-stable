@@ -27,7 +27,7 @@ if [ ! -d rude-$version/src ]; then
     if [ -d rude -a ! -d rude-$version ]; then
         mv rude rude-$version
     fi
-    cd rude-$version && patch -p1 < ../rude-patch || {
+    cd rude-$version && patch -p0 < ../rude-patch || {
         echo "ERROR: rude-fetch.sh: patch failed"
 	exit 1
     }
