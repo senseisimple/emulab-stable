@@ -858,7 +858,7 @@ foreach $interconnect (keys(%interconnects)) {
 #
 # Fake switch. Hardwired for now. 
 #
-my @wireless_protos = ("80211", "80211a", "80211b", "80211g");
+my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
 print "node $fake_switch ", join(" ",map("*$_:*",@wireless_protos)), "\n";
 
