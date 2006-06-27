@@ -925,18 +925,6 @@ class osid:
             osid["OS"] = "(None)"
             pass
 
-        # This is now represented as a "set" which the xmlrpc marshaller
-        # does not handle. 
-        if osid["osfeatures"]:
-            features = {}
-            
-            for feature in osid["osfeatures"]:
-                features[feature] = feature
-                pass
-
-            osid["osfeatures"] = features
-            pass
-        
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=scrubdict(osid),
                               output=str(osid))
