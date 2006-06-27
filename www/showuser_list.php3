@@ -24,6 +24,9 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 
+# For "recent" stuff below.
+$dorecent = 0;
+
 if (! $isadmin) {
     USERERROR("You do not have permission to view the user list!", 1);
 }
@@ -81,6 +84,7 @@ elseif (! strcmp($showtype, "recent")) {
     $where   = "where l.timeout is null or l.timeout<unix_timestamp() ".
 	       "having webidle=1 ";
     $showtag = "recently logged in (yesterday)";
+    $dorecent= 1;
 }
 elseif (! strcmp($showtype, "widearea")) {
     $clause  = "left join widearea_accounts as w on u.uid=w.uid ";
@@ -122,7 +126,7 @@ else {
 }
 
 $query_result =
-    DBQueryFatal("SELECT u.*, ".
+    DBQueryFatal("SELECT " . ($dorecent ? "distinct" : "") . " u.*, ".
 		 " IF(ll.weblogin_last, ".
 		 "    TO_DAYS(CURDATE()) - TO_DAYS(ll.weblogin_last), ".
 		 "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
