@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,7 +23,9 @@ sub usage()
 #
 # Configure variables
 #
-my $TBROOT   = "@prefix@";
+my $TBROOT       = "@prefix@";
+my $OPSDBSUPPORT = @OPSDBSUPPORT@;
+my $dbcontrol    = "$TBROOT/sbin/opsdb_control";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -77,6 +79,9 @@ $errors += TBExptRemoveVirtualState( $pid, $eid );
 # This will kill a running prerender.
 print "Removing visualization data...\n";
 system("prerender -r $pid $eid");
+
+system("$dbcontrol delexpdb $pid $eid")
+    if ($OPSDBSUPPORT);
 
 print "Cleanup finished! " . TBTimeStamp() . "\n";
 
