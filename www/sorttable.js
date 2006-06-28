@@ -179,8 +179,15 @@ function ts_sort_numeric(a,b) {
 }
 
 function ts_sort_prefixed_numeric(a,b) { 
+    aa = ts_getInnerText(a.cells[SORT_COLUMN_INDEX]).replace(/[\d\.]+$/, "");
+    aa = aa.toLowerCase();
+    bb = ts_getInnerText(b.cells[SORT_COLUMN_INDEX]).replace(/[\d\.]+$/, "");
+    bb = bb.toLowerCase();
+    if (aa<bb) return -1;
+    if (aa>bb) return 1;
+
     aa = parseFloat(ts_getInnerText(a.cells[SORT_COLUMN_INDEX]).
-		    replace(/^[a-zA-Z]*/, ""));
+		    replace(/^[a-zA-Z]*/, "")); 
     if (isNaN(aa)) aa = 0;
     bb = parseFloat(ts_getInnerText(b.cells[SORT_COLUMN_INDEX]).
 		    replace(/^[a-zA-Z]*/, "")); 
