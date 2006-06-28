@@ -67,7 +67,7 @@ network experimentation.
 </p>
 
 <p>
-Emulab unifies all of tese environments under a common user interface,
+Emulab unifies all of these environments under a common user interface,
 and integrates the three into a common framework.  This framework
 provides abstractions, services, and namespaces common to all, such as
 allocation and naming of nodes and links.  By mapping the abstractions
@@ -95,7 +95,7 @@ this article</a>.
 <a href="tutorial/docwrapper.php3?docname=wireless.html">Fixed Wireless</a>
 testbed consists of PC nodes that contain 802.11 a/b/g wifi
 interfaces, and are scattered around our building at various
-locations on multiple floors. Experimentors can pick what nodes they
+locations on multiple floors. Experimenters can pick what nodes they
 want to use, and as with other fixed nodes, can replace the software
 that runs on the nodes, all the way down to operating system.
 <br><br>
