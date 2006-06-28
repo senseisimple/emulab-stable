@@ -395,6 +395,8 @@ Simulator instproc run {} {
     var_import ::GLOBALS::security_level
     var_import ::GLOBALS::explicit_firewall
     var_import ::GLOBALS::sourcefile_list
+    var_import ::GLOBALS::optarray_order
+    var_import ::GLOBALS::optarray_count
     
     if {$ran == 1} {
 	perror "The Simulator 'run' statement can only be run once."
@@ -647,7 +649,10 @@ Simulator instproc run {} {
     $self spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list "*" "slothd" $objtypes(SLOTHD) ]
     
     if {[array exists ::opt]} {
-	foreach {oname ovalue} [array get ::opt] {
+	for {set i 0} {$i < $optarray_count} {incr i} {
+	    set oname  $optarray_order($i)
+	    set ovalue $::opt($oname)
+	
 	    $self spitxml_data "virt_user_environment" [list "name" "value" ] [list "$oname" "$ovalue" ]
 	}
     }

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -274,6 +274,10 @@ namespace eval GLOBALS {
     # List of source files.
     variable sourcefile_list {}
 
+    variable optarray_order
+    array set optarray_order {}
+    variable optarray_count 0
+
     #
     # Named argument helper function.
     #
@@ -389,12 +393,21 @@ source ${GLOBALS::libdir}/topography.tcl
 rename set real_set
 proc set {args} {
     var_import GLOBALS::last_class
+    var_import GLOBALS::optarray_order
+    var_import GLOBALS::optarray_count
 
     # There are a bunch of cases where we just pass through to real set.
     if {[llength $args] == 1} {
 	return [uplevel real_set \{[lindex $args 0]\}]
     } elseif {($last_class == {})} {
-	return [uplevel real_set \{[lindex $args 0]\} \{[lindex $args 1]\}]
+	real_set var [lindex $args 0]
+	real_set val [lindex $args 1]
+
+	if {[regexp {^opt\((.*)\)} $var d optname]} {
+	    real_set optarray_order($optarray_count) $optname
+	    incr optarray_count
+	}
+	return [uplevel real_set \{$var\} \{$val\}]
     }
 
     real_set var [lindex $args 0]
