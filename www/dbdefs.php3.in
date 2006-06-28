@@ -1541,6 +1541,24 @@ function TBUserPCs($uid)
 }
 
 #
+# Return number of project PCs used.
+# 
+function TBProjPCs($pid)
+{
+    $query_result =
+	DBQueryFatal("select count(r.node_id) from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "where nt.class='pc' and r.pid='$pid'");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
+}
+
+#
 # Number of PCs reloading.
 #
 function TBReloadingPCs()

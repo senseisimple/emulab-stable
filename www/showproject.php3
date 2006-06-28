@@ -36,6 +36,9 @@ if (!isset($pid) ||
     strcmp($pid, "") == 0) {
     USERERROR("You must provide a project ID.", 1);
 }
+if (!TBvalid_pid($pid)) {
+    PAGEARGERROR("Invalid characters in $pid!");
+}
 
 #
 # Check to make sure thats this is a valid PID.
@@ -70,6 +73,18 @@ if ($isadmin) {
 }
 
 SUBMENUEND();
+
+#
+# Show number of PCS
+#
+$numpcs = TBProjPCs($pid);
+
+if ($numpcs) {
+    echo "<center><font color=Red size=+2>\n";
+    echo "Project $pid is using $numpcs PCs!\n";
+    echo "</font></center>\n";
+}
+
 SHOWPROJECT($pid, $uid);
 SUBPAGEEND();
 

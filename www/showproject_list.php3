@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,6 +31,7 @@ if (!isset($sortby))
     $sortby = "pid";
 $eorder = 0;
 $norder = 0;
+$porder = 0;
 
 if ($isadmin) {
     if (! $splitview) {
@@ -63,6 +64,10 @@ elseif (! strcmp($sortby, "nodes")) {
     $norder = 1;
     $order  = "p.pid";
 }
+elseif (! strcmp($sortby, "pcs")) {
+    $porder = 1;
+    $order  = "p.pid";
+}
 else 
     $order = "p.pid";
 
@@ -75,6 +80,7 @@ $allproj_result =
 #
 $ecounts = array();
 $ncounts = array();
+$pcounts = array();
 
 $query_result =
     DBQueryFatal("select e.pid, count(distinct e.eid) as ecount ".
@@ -99,6 +105,23 @@ while ($row = mysql_fetch_array($query_result)) {
     $ncounts[$pid] = $count;
 }
 
+# Here we get just the PC counts.
+
+$query_result =
+    DBQueryFatal("select r.pid,nt.class,count(distinct r.node_id) as ncount ".
+		 "  from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "left join node_types as nt on nt.type=n.type ".
+		 "where nt.class='pc' ".
+		 "group by r.pid,nt.class");
+
+while ($row = mysql_fetch_array($query_result)) {
+    $pid   = $row[0];
+    $count = $row[2];
+
+    $pcounts[$pid] = $count;
+}
+
 while ($projectrow = mysql_fetch_array($allproj_result)) {
     $pid = $projectrow[pid];
 
@@ -107,6 +130,9 @@ while ($projectrow = mysql_fetch_array($allproj_result)) {
 	    
     if (!isset($ncounts[$pid])) 
 	$ncounts[$pid] = 0;
+
+    if (!isset($pcounts[$pid])) 
+	$pcounts[$pid] = 0;
 }
 
 if ($eorder) 
@@ -114,6 +140,9 @@ if ($eorder)
 
 if ($norder) 
      arsort($ncounts, SORT_NUMERIC);
+
+if ($porder) 
+     arsort($pcounts, SORT_NUMERIC);
 
 if ($isadmin) {
     mysql_data_seek($allproj_result, 0);
@@ -154,6 +183,7 @@ if ($isadmin) {
 function GENPLIST ($query_result)
 {
     global $isadmin, $splitview, $eorder, $ecounts, $norder, $ncounts;
+    global $porder, $pcounts;
 
     echo "<table width='100%' border=2
                  cellpadding=2 cellspacing=2 align=center>
@@ -179,9 +209,11 @@ function GENPLIST ($query_result)
            <a href='showproject_list.php3?splitview=$splitview&sortby=running'>
               Run</a></th>\n";
 
-    echo "<th>
-             <a href='showproject_list.php3?splitview=$splitview&sortby=nodes'>
-             Nodes</a></th>\n";
+    echo "<th colspan=2>Nodes<br>
+           <a href='showproject_list.php3?splitview=$splitview&sortby=nodes'>
+              All</a>,
+           <a href='showproject_list.php3?splitview=$splitview&sortby=pcs'>
+              PCs</a></th>\n";
 
     #
     # This ordering stuff is a pain cause of the split joins, but a combined
@@ -198,6 +230,8 @@ function GENPLIST ($query_result)
 	$showby = $ecounts;
     if ($norder)
 	$showby = $ncounts;
+    if ($porder)
+	$showby = $pcounts;
 
     #
     # Admin users get other fields.
@@ -217,6 +251,7 @@ function GENPLIST ($query_result)
 	$idle       = $projectrow[idle];
 	$ecount     = $ecounts[$pid];
 	$ncount     = $ncounts[$pid];
+	$pcount     = $pcounts[$pid];
 
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -235,6 +270,7 @@ function GENPLIST ($query_result)
 	echo "<td>$expt_count</td>\n";
 	echo "<td>$ecount</td>\n";
 	echo "<td>$ncount</td>\n";
+	echo "<td>$pcount</td>\n";
 
 	if ($isadmin) {
 	    if ($public) {
