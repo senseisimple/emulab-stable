@@ -1963,9 +1963,9 @@ sub LogHole($)
     return -1
 	if (! ref($self));
 
-    my $pid     = $self->pid();
-    my $eid     = $self->eid();
-
+    my $pid        = $self->pid();
+    my $eid        = $self->eid();
+    my $userdir    = TBExptUserDir($pid, $eid);
     my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
     my $logdir     = "$archivedir/logs";
 
@@ -1974,6 +1974,16 @@ sub LogHole($)
 	    or return -1;
     }
 
+    #
+    # First copy the experiment logs directory into the archive. 
+    # 
+    Template::mysystem("cd $userdir; ".
+		       "   $RSYNC -rtgoDlz --delete logs $archivedir") == 0
+	or return -1;
+
+    #
+    # Now add the loghole results directly.
+    #
     Template::mysystem("$TEVC -w -t 60 -e $pid/$eid now ns SNAPSHOT ".
 		       "    LOGHOLE_ARGS='-l $logdir -P -s'") == 0
        or return -1;

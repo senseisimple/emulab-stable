@@ -141,7 +141,8 @@ if ($action eq "checktag") {
 # Do not allow an archive system to be controlled if the experiment is not
 # active or swapped. Will probably be changed later.
 #
-if ($expstate ne EXPTSTATE_ACTIVE && 
+if ($expstate ne EXPTSTATE_ACTIVE &&
+    $expstate ne EXPTSTATE_TERMINATING &&
     $expstate ne EXPTSTATE_SWAPPED) {
     fatal("Experiment $pid/$eid must be active or swapped!");
 }

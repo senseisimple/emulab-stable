@@ -84,9 +84,10 @@ use libArchive;
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
 
-my $tbdir    = "$TB/bin/";
-my $projroot = "/proj";
-my $tbdata   = "tbdata";
+my $tbdir       = "$TB/bin/";
+my $projroot    = "/proj";
+my $tbdata      = "tbdata";
+my $archcontrol = "$TB/bin/archive_control";
 my $nextstate;
 my $logname;
 my $dbuid;
@@ -458,17 +459,9 @@ if ($estate eq EXPTSTATE_ACTIVE) {
     #
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
 
-    # Do a SavePoint on the experiment files.
-    print "Doing a savepoint to the experiment archive ...\n";
-    if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "swapout") < 0) {
-	fatal("Failed to do a savepoint on the experiment archive!");
-    }
+    # Commit the archive after swapout. Easier to use the script. 
+    system("$archcontrol -t endexp commit $pid $eid");
 }
-
-# Commit the archive after swapout.
-print "Doing a final commit on the experiment archive ...\n";
-libArchive::TBCommitExperimentArchive($pid, $eid, "endexp") == 0 or
-    fatal("Could not commit experiment archive!");
 
 if ($estate eq EXPTSTATE_SWAPPED ||
     $estate eq EXPTSTATE_QUEUED) {
