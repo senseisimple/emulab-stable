@@ -594,22 +594,24 @@ sub GenDefsFile($)
     #
     # For Templates.
     #
-    $query_result =
-	DBQueryFatal("select instance_idx from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-    my ($instance_idx) = $query_result->fetchrow_array();
-    if ($instance_idx) {
-	print TCL "# Template goo\n";
-	
+    if (defined($pid)) {
 	$query_result =
-	   DBQueryFatal("select * from experiment_template_instance_bindings ".
-			"where instance_idx='$instance_idx'");
+	    DBQueryFatal("select instance_idx from experiments ".
+			 "where pid='$pid' and eid='$eid'");
+	my ($instance_idx) = $query_result->fetchrow_array();
+	if ($instance_idx) {
+	    print TCL "# Template goo\n";
+	
+	    $query_result =
+		DBQueryFatal("select * from experiment_template_instance_bindings ".
+			     "where instance_idx='$instance_idx'");
 
-	while (my %row = $query_result->fetchhash()) {
-	    my $name  = $row{'name'};
-	    my $value = $row{'value'};
+	    while (my %row = $query_result->fetchhash()) {
+		my $name  = $row{'name'};
+		my $value = $row{'value'};
 
-	    print TCL "set parameter_list_defaults($name) \"$value\"\n";
+		print TCL "set parameter_list_defaults($name) \"$value\"\n";
+	    }
 	}
     }
 
