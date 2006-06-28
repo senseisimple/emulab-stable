@@ -114,38 +114,29 @@ sub os_ifconfig_line($$$$$$$;$$)
     # Special handling for new style interfaces (which have settings).
     # This should all move into per-type modules at some point. 
     #
-    if (defined($settings) && exists($settings->{"protocol"}) &&
-	$settings->{"protocol"} ne "ethernet") {
+    if ($iface_type eq "ath" && defined($settings)) {
 
 	#
 	# Setting the protocol is special and appears to be card specific.
 	# How stupid is that!
 	#
 	my $protocol = $settings->{"protocol"};
-	my $privcmd  = "";
-	
-	if ($iface_type eq "ath") {
-	    $privcmd = "/sbin/iwpriv $iface mode ";
+        $privcmd = "/sbin/iwpriv $iface mode ";
 
-	    SWITCH1: for ($protocol) {
-		/^80211a$/ && do {
-		    $privcmd .= "1";
-		    last SWITCH1;
-		};
-		/^80211b$/ && do {
-		    $privcmd .= "2";
-		    last SWITCH1;
-		};
-		/^80211g$/ && do {
-		    $privcmd .= "3";
-		    last SWITCH1;
-		};
-	    }
-	}
-	else {
-	    warn("*** WARNING: Unsupported interface type $iface_type!\n");
-	    return undef;
-	}
+        SWITCH1: for ($protocol) {
+          /^80211a$/ && do {
+              $privcmd .= "1";
+              last SWITCH1;
+          };
+          /^80211b$/ && do {
+              $privcmd .= "2";
+              last SWITCH1;
+          };
+          /^80211g$/ && do {
+              $privcmd .= "3";
+              last SWITCH1;
+          };
+        }
 	 
 	#
 	# At the moment, we expect just the various flavors of 80211, and
@@ -226,6 +217,54 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines  .= $iwcmd;
 	$downlines = "$IFCONFIGBIN $iface down";
 	return ($uplines, $downlines);
+    }
+
+    #
+    # GNU Radio network interface on the flex900 daugherboard
+    #
+    if ($iface_type eq "flex900" && defined($settings)) {
+
+        my $tuncmd = 
+            "/bin/env PYTHONPATH=/usr/local/lib/python2.4/site-packages ".
+            "$BINDIR/tunnel.py";
+
+        if (!exists($settings->{"mac"})) {
+            warn("*** WARNING: No mac address provided for gnuradio ".
+                 "interface!\n");
+            return undef;
+        }
+
+        my $mac = $settings->{"mac"};
+
+        if (!exists($settings->{"protocol"}) || 
+            $settings->{"protocol"} ne "flex900") {
+            warn("*** WARNING: Unknown gnuradio protocol specified!\n");
+            return undef;
+        }
+
+        if (!exists($settings->{"frequency"})) {
+            warn("*** WARNING: No frequency specified for gnuradio ".
+                 "interface!\n");
+            return undef;
+        }
+
+        my $frequency = $settings->{"frequency"};
+        $tuncmd .= " -f $frequency";
+
+        if (!exists($settings->{"rate"})) {
+            warn("*** WARNING: No rate specified for gnuradio interface!\n");
+            return undef;
+        }
+
+        my $rate = $settings->{"rate"};
+        $tuncmd .= " -r $rate";
+
+        $uplines = $tuncmd . " > /dev/null 2>&1 &\n";
+        $uplines .= "sleep 5\n";
+        $uplines .= "$IFCONFIGBIN $iface hw ether $mac\n";
+        $uplines .= sprintf($IFCONFIG, $iface, $inet, $mask) . "\n";
+        $downlines = "$IFCONFIGBIN $iface down";
+        return ($uplines, $downlines);
     }
 
     #

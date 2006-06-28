@@ -537,6 +537,21 @@ sub getifconfig($)
 	    my $rtabid   = $9;
 	    my $lan      = $10;
 
+            #
+            # XXX GNU Radio hack
+            #
+            # The GNU Radio interface has a randomly generated MAC addr when
+            # it first comes up.  WE have to set it, so just tell the code
+            # the name of the interface explicitly to avoid trying to look
+            # it up (the iface doesn't even exist yet).
+            #
+            # We really need another interface flag, like 'ISGNURADIO' since
+            # the only current GR iface type is hardwired below (which is bad).
+            #
+            if ($ifacetype eq "flex900") {
+                $iface = "gr0";
+            }
+
 	    # The server can specify an iface.
 	    if ($iface eq "" &&
 		(! ($iface = findiface($mac)))) {

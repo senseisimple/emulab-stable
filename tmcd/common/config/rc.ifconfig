@@ -147,6 +147,18 @@ sub doboot()
 		$ifrtabid = $rtabid;
 	    }
 
+            #
+            # XXX: GNU Radio hack
+            #
+            # I don't want to have to change the os_ifconfig_line
+            # prototype to include the mac address yet.  It's probably
+            # the way to go, but will require changing the interface
+            # in all of the various liblocsetup.pm modules.
+            # 
+            if (defined($settings)) {
+                $settings->{'mac'} = $mac;
+            }
+
 	    my ($upline, $downline) =
 		os_ifconfig_line($iface, $inet, $mask,
 				 $speed, $duplex, $aliases,
