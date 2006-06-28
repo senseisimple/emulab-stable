@@ -88,6 +88,12 @@ if (!defined($hostname)) {
     die("Config file must specify a hostname\n");
 }
 if ($OSNAME eq "darwin") {
+    # Path is all screwey on the Mac.
+    $ENV{'PATH'} .= ":/usr/X11R6/bin";
+
+    # Cause its a folder action ...
+    system("/bin/rm -f $config");
+    
     DoOSX();
     exit(0);
 }
