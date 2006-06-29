@@ -497,7 +497,6 @@ sub setPortVlan($$@) {
     my @ports = @_;
 
     my $errors = 0;
-    my $vlan_id = $self->{NEW_NUMBERS}->{$vlan_number};
     my %BumpedVlans = ();
            
     #
@@ -556,24 +555,7 @@ sub setPortVlan($$@) {
     #
     # If this is a new vlan, need to set name and turn off STP.
     #
-
-    if (defined($vlan_id)) {
-	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-		"$self->{NAME} ... ";
-	my $obj = "snVLanByPortCfgStpMode";
-	my $RetVal = $self->{SESS}->set( [$obj, $vlan_number,0,"INTEGER"]);
-	if (!$RetVal) {
-	    print STDERR "can't defeat STP on vlan $vlan_number\n";
-	    $errors++;
-	}
-	$obj = "snVLanByPortCfgVLanName";
-	$RetVal = $self->{SESS}->set( [$obj, $vlan_number,"$vlan_id","OCTETSTR"]);
-	if (!defined($RetVal) || !$RetVal) {
-	    print STDERR "can't set name for vlan $vlan_number\n";
-	    $errors++;
-	}
-	print "",($RetVal? "Succeeded":"Failed"), ".\n";
-    }
+    $self->newNameNoStp($vlan_number, \$errors);
 
     #
     # When removing things from the control vlan for a firewall,
@@ -586,6 +568,39 @@ sub setPortVlan($$@) {
     }
 
     return $errors;
+}
+
+#
+# Set name and disable STP for a new vlan
+#
+sub newNameNoStp($$$)
+{
+    my ($self, $vlan_number, $eref) = @_;
+    my $vlan_id = $self->{NEW_NUMBERS}->{$vlan_number};
+    my $errors = 0;
+
+    if (defined($vlan_id)) {
+	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
+		"$self->{NAME} ... ";
+	my $obj = "snVLanByPortCfgVLanName";
+ 	my $RetVal = $self->{SESS}->
+		set([$obj, $vlan_number, "$vlan_id", "OCTETSTR"]);
+	if (!defined($RetVal) || !$RetVal) {
+	    print STDERR "can't set name for vlan $vlan_number\n";
+	    $$errors++;
+	}
+	$obj = "snVLanByPortCfgStpMode";
+	$RetVal = $self->{SESS}->set( [$obj, $vlan_number,0,"INTEGER"]);
+	if (!$RetVal) {
+	    print STDERR "can't defeat STP on vlan $vlan_number\n";
+	    $$errors++;
+	}
+	print "",($errors == 0 ? "Succeeded":"Failed"), ".\n";
+	if ($errors == 0) {
+	    delete $self->{NEW_NUMBERS}->{$vlan_number};
+	    delete $self->{NEW_NAMES}->{$vlan_id};
+	} else  { $$eref += $errors; }
+    }
 }
 
 #
@@ -1111,6 +1126,10 @@ sub setVlansOnTrunk($$$$) {
 		print STDERR "couldn't add/remove port $modport" .
 				"on vlan $vlan_number\n";
 	}
+	#
+	# If this is a new vlan, need to set name and turn off STP.
+	#
+	$self->newNameNoStp($vlan_number, \$errors);
     }
     return !$errors;
 }
