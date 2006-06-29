@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2005 University of Utah and the Flux Group.
+   Copyright (c) 2005, 2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -306,6 +306,7 @@ Constructor: <code>$node program-agent [-command <i>cmdline</i>]
 <ul>
 <li>-command "<i>cmdline</i>" - Specifies the command-line to run.  Defaults to
 the last command that was run or the command specified in the NS file.
+See <a href="#PROGRAM-CMDLINE">below</a>for additional notes on command lines.
 
 <li>-dir <i>directory</i> - Specifies the directory to run the command within.
 Defaults to the last directory that was specified, the directory in the NS
@@ -438,10 +439,54 @@ arguments as the <b>start</b> event.
 </ul>
 
 <br>
-<i>Notes:</i>
+
+<a name="PROGRAM-CMDLINE"></a>
+<h4>Notes on Command Lines</h4>
+In general, if you have complicated or multiple commands to execute,
+it is best to put them in a script and specify the script name in -command.
+But if you insist, here are some things to be aware of.
+<p>
+The command line is executed with "csh -c."  Yes, that is the Berkeley
+C-shell and not the Bourne shell or bash.  Sorry, it is an historical thing.
+So be aware of differences in redirection and expansion syntax (e.g.,
+">&" and "{}").  When in doubt, put your command in a script and set
+the command line to "sh -c myscript.sh".
+<p>
+Quoting is fragile and happens at a couple of levels:
+<ol>
+<li>Quoting for TCL.  Putting curly braces ({...}) or double quotes ("...")
+around the entire command line will quote the string to TCL (i.e., the NS
+script parser language).  Double quotes allows for TCL variable expansion,
+curly braces allow no expansion.  Thus, these quotes will be stripped off
+before the command line is given to csh.  Use this mechanism if your command
+line has white space (i.e., arguments to the command), otherwise the Emulab
+NS parser will flag an error.
+
+<li>Quoting for csh.  Recall that the program agent runs a shell to interpret
+your commands, so you may need additional quoting to get special characters
+past it.  For example, if one of your command arguments has an embedded space,
+you will need to quote it with single or double quotes.  Backslash quoting
+also works.
+</ol>
+<p>
+A sick example might look like this:
+<code><pre>
+  ... -command {echo arg{1,2} "arg3 has spaces" arg4\ has\ \'\ \'\ too}
+</pre></code>
+where the <code>echo</code> command would have four arguments:
+<code><pre>
+  arg1
+  arg2
+  arg3 has spaces
+  arg4 has ' ' too
+</pre></code>
+<p>
+To summarize: put your commands in a script.
+<br>
+<h4>Other Notes:</h4>
 <ol>
 <li> Many of the features described here are only available on recent
-FBSD410-STD and RHL90-STD disk images.
+FBSD{410,54,61}-STD, RHL90-STD, and FC4-STD disk images.
 
 <li> This page currently only covers the agent at a high-level, you
 can find some more detail in the <i>program-agent(8)</i> man page on ops or an
