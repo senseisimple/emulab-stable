@@ -171,7 +171,12 @@ Then define the 4 nodes in the topology.
 	set nodeB [$ns node]
 	set nodeC [$ns node]
 	set nodeD [$ns node]			</code></pre>
-</p>
+
+<code>nodeA</code> and so on are the virtual names (vnames) of the nodes in
+your topology.  When your experiment is swapped in, they will be assigned to
+physical node names like "pc45", probably different ones each time.
+(<b>NOTE:</b> It's a bad idea to pick vnames that clash with the physical node
+names in the testbed.) </p>
 
 <p>
 Next define the link and the LAN that connect the nodes. NS syntax
@@ -196,7 +201,7 @@ For example, you may specify what
 Operating System is booted on your nodes. We currently support FreeBSD
 4.10, RedHat Linux 9.0, Fedora Core 4, and 
 <a href="../doc/docwrapper.php3?docname=windows.html"> Windows&nbsp;XP</a>.
-<a href="../faq.php3?#SWS-WIN2K">Windows 2000</a> is not supported.  
+<a href="../kb-show.php3?xref_tag=SWS-WIN2K">Windows 2000</a> is not supported.  
 Fedora Core 2 (Linux 2.6)
 is available but unsupported.  We also support
 <a href="http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels on the
@@ -353,21 +358,21 @@ A few points should be noted:
      perspective, except for the fact that it adds latency, error,
      or reduced bandwidth. However, the information for the delay links
      are included so that you can
-     <a href="../faq.php3?#modify-traffic-shaping">modify the delay
-     parameters</a> after the experiment has been created. 
+     <a href="../kb-show.php3?xref_tag=modify-traffic-shaping">modify the delay
+     parameters</a> after the experiment has been created. </li> <br>
 
 <li> Delays of less than 2ms (per trip) are too small to be
      accurately modeled at this time, and will be silently ignored.
      A delay of 0ms can be used to indicate that you do not want
      added delay; the two interfaces will be "directly" connected to
-     each other. 
+     each other. </li> <br>
 
 <li> Each link in the "Virtual Lan/Link" section has its delay, etc.,
      split between two entries. One is for traffic coming into the
      link from the node, and the other is for traffic leaving the
      link to the node. In the case of links, the four entries often
      get optimized to two entries in the "Physical Lan/Link"
-     section.
+     section. </li> <br>
 
 <li> The names in the "Qualified Name" column refer to the control
      network interfaces for each of your allocated nodes. These names
@@ -376,16 +381,16 @@ A few points should be noted:
      worry about the actual physical node names that were chosen. In
      the names listed above, `myproj' is the name of the project that
      you chose to work in, and `myexp' is the name of the experiment
-     that you provided in the "Begin an Experiment" page.
+     that you provided in the "Begin an Experiment" page. </li> <br>
 
 <li> Please don't use the "Qualified Name" from within nodes in your
      experiment, since it will contact them over the control network,
      bypassing the link shaping we configured.
      (See also these two FAQ entries: 
-<a href="../faq.php3#no-traffic-shaping">
-here</a> and
-<a href="../faq.php3#node-naming">
-here</a>.)
+     <a href="../kb-show.php3?xref_tag=no-traffic-shaping">
+     here</a> and
+     <a href="../kb-show.php3?xref_tag=node-naming">
+     here</a>.) </li>
 
 </ul>
 
@@ -435,9 +440,9 @@ the node mapping, since the Emulab names refer to the control network
 LAN that is shared amongst all nodes in all experiments. It is only
 the experimental interfaces that are entirely private to your
 experiment. (See also these two FAQ entries: 
-<a href="../faq.php3#no-traffic-shaping">
+<a href="../kb-show.php3?xref_tag=no-traffic-shaping">
 here</a> and
-<a href="../faq.php3#node-naming">
+<a href="../kb-show.php3?xref_tag=node-naming">
 here</a>.)
 
 <p>
@@ -1271,7 +1276,7 @@ default images as a base, goes like this:
 <li> If you are creating a <em>Windows</em> based image, you <b>must</b>
      "prepare" the node. The final thing to do before 
      grabbing the image is to login on the <a
-     href="../faq.php3?#node-consoles">console</a>, drop to single user mode,
+     href="../kb-show.php3?xref_tag=node-consoles">console</a>, drop to single user mode,
      and run the <code>prepare</code> script. This is described in
      detail in the
      <a href="../doc/docwrapper.php3?docname=windows.html#Custom_images"> 
@@ -1326,7 +1331,7 @@ of your images or with one of the default images, you can use the
 This program will run in the foreground, waiting until the image has
 been loaded. At that point you should log in and make sure everything
 is working okay. You might want to watch the console line as well (see
-the <a href="../faq.php3?#node-consoles">FAQ</a>). If you want to load the
+the <a href="../kb-show.php3?xref_tag=node-consoles">FAQ</a>). If you want to load the
 default image, then simply run:
 
 	<code><pre>
