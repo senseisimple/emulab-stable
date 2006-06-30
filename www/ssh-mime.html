@@ -20,6 +20,11 @@ a "text/x-testbed-ssh" ".tbssh" file.
      .tbssh file with a script, or associate it with the script in the browser
      so you can just click.  See the installation directions <a
      href="#windows_install">below</a>.</li>
+<li> For <b>Mac OSX</b> you will need to configure a folder action for your
+     browser downloads directory. See the installation directions <a
+     href="#osx_install">below</a>. Both xterm and Terminal windows
+     are supported under OSX (if you are not running X11, an OSX Terminal
+     window is created).</li>
 </ul> 
 </p>
 
@@ -164,4 +169,60 @@ a "text/x-testbed-ssh" ".tbssh" file.
   <li>To avoid having to type a password to PuTTY, set up an SSH Agent key in 
       <code>pageant.</code></li>
 </ul>
+</p>
+
+<p>
+<font size='+1'><a name="osx_install"></a>
+   <b>Instructions for Mac OSX:</b></font>
+<ul>
+
+<li> You need to run an ssh-agent that starts up when you initially
+     login. We <b>strongly</b> suggest that you pick up <a
+     href=http://www.sshkeychain.org>SSHKeychain</a> and install it. The
+     instructions for using SSHKeychain are: 
+     <ul>
+     <li> Copy SSHKeychain (SSHKeychain.app) to your Applications
+          folder.
+     <li> Run SSHKeychain. This should open a dock item and a statusbar item.
+     <li> Click either the Statusbar Item, the Dock Item, or MainMenu and
+          open the Preferences.
+     <li> Open the Environment tab.
+     <li> Enable <code>Manage global environment variables.</code> This
+          will make SSHKeychain available for other applications.
+     <li> Open the keys tab and see if any of your keys are missing
+          (<code>~/.ssh/id_dsa</code> and <code>~/.ssh/identity</code>
+	  are the default).
+     <li> Add SSHKeychain to your Login Items in the System Preferences. 
+          This is located in the Accounts tab in the System
+          Preferences screen.
+     <li> Re-login to make the global variables work.
+     </ul>
+
+<li> Move the <a href="ssh-mime.pl"><code>ssh-mime.pl</code> script</a>
+     into your <code>~/bin</code> directory. 
+
+<li> <code> mkdir -p ~/Library/Scripts/Folder\ Action\ Scripts</code>
+
+<li> Move the <a href="ssh-mime.scpt"><code>ssh-mime.scpt</code>
+     AppleScript</a> to the above directory.
+
+<li> Start up Firefox or Safari and go into the Downloads menu to figure
+     out where files are being saved (typically <code>~/Desktop</code> or
+     <code>~/Documents/My Downloads</code>).
+
+<li> Go into the <code>Finder</code> and find that folder. Right Click on
+     the folder. (If you do not have a 3 button external mouse, then you
+     select the folder, and do Control-Click).
+
+<li> You will see an option to <code>Enable Folder Actions<code> in the
+     menu. Select that option.
+
+<li> Right click again on the folder, and select the <code>Attach Folder
+     Action</code> option. A <code>Finder</code> file chooser pops up.
+     Select <code>~/Library/Scripts/Folder\ Action\ Scripts/ssh-mime.scpt
+     </code>.
+
+<li> The first time you click on an <code>SSH To Node</code> button, your
+     browser ask you what to do. Choose the <code>Download</code> option
+     and select the <code>Do this automatically</code> button.
 </p>

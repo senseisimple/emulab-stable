@@ -51,6 +51,7 @@ FILES  += $(wildcard $(SRCDIR)/*.js)
 FILES  += $(wildcard $(SRCDIR)/*.htc)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml \
 	  $(SRCDIR)/ssh-mime.pl $(SRCDIR)/rdp-mime.pl \
+	  $(SRCDIR)/ssh-mime.scpt \
 	  $(SRCDIR)/ssh-mime-winxp.pl $(SRCDIR)/rdp-mime-winxp.pl \
 	  $(SRCDIR)/ssh-mime-winxp.c $(SRCDIR)/rdp-mime-winxp.c \
 	  $(SRCDIR)/ssh-mime-winxp.exe $(SRCDIR)/rdp-mime-winxp.exe \
