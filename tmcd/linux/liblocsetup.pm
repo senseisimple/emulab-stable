@@ -116,12 +116,17 @@ sub os_ifconfig_line($$$$$$$;$$)
     #
     if ($iface_type eq "ath" && defined($settings)) {
 
+        # Get a handle on the "VAP" interface we will create when
+        # setting up this interface.
+        my ($ifnum) = $iface =~ /wifi(\d+)/;
+        my $athiface = "ath" . $ifnum;
+
 	#
 	# Setting the protocol is special and appears to be card specific.
 	# How stupid is that!
 	#
 	my $protocol = $settings->{"protocol"};
-        $privcmd = "/sbin/iwpriv $iface mode ";
+        my $privcmd = "/usr/local/sbin/iwpriv $athiface mode ";
 
         SWITCH1: for ($protocol) {
           /^80211a$/ && do {
@@ -142,7 +147,9 @@ sub os_ifconfig_line($$$$$$$;$$)
 	# At the moment, we expect just the various flavors of 80211, and
 	# we treat them all the same, configuring with iwconfig and iwpriv.
 	#
-	my $iwcmd = "/sbin/iwconfig $iface ";
+	my $iwcmd = "/usr/local/sbin/iwconfig $athiface ";
+        my $wlccmd = "/usr/local/bin/wlanconfig $athiface create ".
+            "wlandev $iface ";
 
 	#
 	# We demand to be given an ssid.
@@ -206,16 +213,21 @@ sub os_ifconfig_line($$$$$$$;$$)
 	}
 	    
 	if (libsetup::findiface($accesspoint) eq $iface) {
+            $wlccmd .= " wlanmode ap";
 	    $iwcmd .= " mode Master";
 	}
 	else {
+            $wlccmd .= " wlanmode sta";
 	    $iwcmd .= " mode Managed ap $accesspointwdots";
 	}
 
-	$uplines   = sprintf($IFCONFIG, $iface, $inet, $mask) . "\n";
+        $uplines   = $wlccmd . "\n";
 	$uplines  .= $privcmd . "\n";
-	$uplines  .= $iwcmd;
-	$downlines = "$IFCONFIGBIN $iface down";
+	$uplines  .= $iwcmd . "\n";
+	$uplines  .= sprintf($IFCONFIG, $athiface, $inet, $mask);
+	$downlines  = "$IFCONFIGBIN $athiface down";
+	$downlines .= "/usr/local/bin/wlanconfig $athiface destroy";
+	$downlines .= "$IFCONFIGBIN $iface down";
 	return ($uplines, $downlines);
     }
 
