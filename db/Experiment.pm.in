@@ -1,0 +1,805 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Experiment;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use libtblog;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $EVENTSYS    = @EVENTSYS@;
+my $TEVC	= "$TB/bin/tevc";
+my $DBCONTROL   = "$TB/sbin/opsdb_control";
+my $RSYNC	= "/usr/local/bin/rsync";
+my $MKEXPDIR    = "$TB/libexec/mkexpdir";
+my $TBPRERUN    = "$TB/bin/tbprerun";
+my $TBSWAP      = "$TB/bin/tbswap";
+my $TBREPORT    = "$TB/bin/tbreport";
+my $TBEND       = "$TB/bin/tbend";
+
+# Hmm, this is silly. 
+if ($EVENTSYS) {
+    require event;
+    import event;
+}
+
+# Cache of instances to avoid regenerating them.
+my %experiments   = ();
+my $debug	  = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup an experiment and create a class instance to return.
+#
+sub Lookup($$$)
+{
+    my ($class, $pid, $eid) = @_;
+
+    # Look in cache first
+    return $experiments{"$pid/$eid"}
+        if (exists($experiments{"$pid/$eid"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'EXPT'}  = $query_result->fetchrow_hashref();
+
+    my $idx = $self->{'EXPT'}->{'idx'};
+
+    $query_result =
+	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
+	
+    return undef
+	if (!$query_result || !$query_result->numrows);
+    
+    $self->{'STATS'} = $query_result->fetchrow_hashref();
+    
+    # We get this lazily.
+    $self->{'RSRC'}  = undef;
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $experiments{"$pid/$eid"} = $self;
+    
+    return $self;
+}
+# accessors
+sub pid($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'pid'}); }
+sub gid($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'gid'}); }
+sub eid($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'eid'}); }
+sub idx($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'idx'}); }
+sub path($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'path'}); }
+sub state($) { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'state'}); }
+sub rsrcidx($) { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{'rsrcidx'});}
+
+sub Created($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'expt_created'});
+}
+
+#
+# Lookup a template given an experiment index.
+#
+sub LookupByIndex($$)
+{
+    my ($class, $exptidx) = @_;
+
+    my $query_result =
+	DBQueryWarn("select pid,eid from experiments ".
+		    "where idx='$exptidx'");
+
+    return undef
+	if (! $query_result || $query_result->numrows);
+
+    my ($pid, $eid) = $query_result->fetchrow_array();
+
+    return Experiment->Lookup($pid, $eid);
+}
+
+#
+# Create a new experiment. This installs the new record in the DB,
+# and returns an instance. There is some bookkeeping along the way.
+#
+sub Create($$$$)
+{
+    my ($class, $pid, $eid, $argref) = @_;
+    my $exptidx;
+
+    return undef
+	if (ref($class));
+
+    #
+    # The pid/eid has to be unique, so lock the table for the check/insert.
+    #
+    DBQueryWarn("lock tables experiments write, ".
+		"            experiment_stats write, ".
+		"            experiment_resources write, ".
+		"            emulab_indicies write, ".
+		"            testbed_stats read")
+	or return undef;
+
+    my $query_result =
+	DBQueryWarn("select pid,eid from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	tberror("Experiment $eid in project $pid already exists!");
+	return undef;
+    }
+
+    #
+    # Grab the next highest index to use. We used to use an auto_increment
+    # field in the table, but if the DB is ever "dropped" and recreated,
+    # it will reuse indicies that are crossed referenced in the other two
+    # tables.
+    #
+    $query_result = 
+	DBQueryWarn("select idx from emulab_indicies ".
+		    "where name='next_exptidx'");
+
+    if (!$query_result) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
+
+    # Seed with a proper value.
+    if (! $query_result->num_rows) {
+	$query_result =
+	    DBQueryWarn("select MAX(exptidx) + 1 from experiment_stats");
+
+	if (!$query_result) {
+	    DBQueryWarn("unlock tables");
+	    return undef;
+	}
+	($exptidx) = $query_result->fetchrow_array();
+
+	# First ever experiment!
+	$exptidx = 1
+	    if (!defined($exptidx));
+
+	if (! DBQueryWarn("insert into emulab_indicies (name, idx) ".
+			  "values ('next_exptidx', $exptidx)")) {
+	    DBQueryWarn("unlock tables");
+	    return undef;
+	}
+
+    }
+    else {
+	($exptidx) = $query_result->fetchrow_array();
+    }
+    my $nextidx = $exptidx + 1;
+    
+    if (! DBQueryWarn("update emulab_indicies set idx='$nextidx' ".
+		      "where name='next_exptidx'")) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
+
+    #
+    # Lets be really sure!
+    #
+    foreach my $table ("experiments", "experiment_stats",
+		       "experiment_resources", "testbed_stats") {
+
+	my $slot = (($table eq "experiments") ? "idx" : "exptidx");
+	
+	$query_result =
+	    DBQueryWarn("select * from $table where ${slot}=$exptidx");
+
+	if (! $query_result) {
+	    DBQueryWarn("unlock tables");
+	    return undef;
+	}
+	if ($query_result->numrows) {
+	    DBQueryWarn("unlock tables");
+	    tberror("Experiment index $exptidx exists in $table; ".
+		    "this is bad!");
+	    return undef;
+	}
+    }
+
+    #
+    # Insert the record. This reserves the pid/eid for us. 
+    #
+    # Some fields special cause of quoting.
+    #
+    my $description = DBQuoteSpecial($argref->{'expt_name'});
+    delete($argref->{'expt_name'});
+    my $noswap_reason = DBQuoteSpecial($argref->{'noswap_reason'});
+    delete($argref->{'noswap_reason'});
+    my $noidleswap_reason = DBQuoteSpecial($argref->{'noidleswap_reason'});
+    delete($argref->{'noidleswap_reason'});
+
+    print Dumper($argref);
+    
+    my $query = "insert into experiments set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    # Append the rest
+    $query .= ",expt_created=now(),expt_locked=now(),pid='$pid',eid='$eid'";
+    $query .= ",expt_name=$description";
+    $query .= ",noswap_reason=$noswap_reason";
+    $query .= ",noidleswap_reason=$noidleswap_reason";
+
+    if (! DBQueryWarn($query)) {
+	DBQueryWarn("unlock tables");
+	tberror("Error inserting experiment record for $pid/$eid!");	
+	return undef;
+    }
+
+    #
+    # Create an experiment_resources record for the above record.
+    #
+    $query_result =
+	DBQueryWarn("insert into experiment_resources (tstamp, exptidx) ".
+		    "values (now(), $exptidx)");
+
+    if (!$query_result) {
+	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
+	DBQueryWarn("unlock tables");
+	tberror("Error inserting experiment resources record for $pid/$eid!");
+	return undef;
+    }
+    my $rsrcidx   = $query_result->insertid;
+    my $creator   = $argref->{'expt_head_uid'};
+    my $gid       = $argref->{'gid'};
+    my $batchmode = $argref->{'batchmode'};
+
+    #
+    # Now create an experiment_stats record to match.
+    #
+    if (! DBQueryWarn("insert into experiment_stats ".
+		      "(eid, pid, creator, gid, created, ".
+		      " batch, exptidx, rsrcidx) ".
+		      "values('$eid', '$pid', '$creator', '$gid', now(), ".
+		      "$batchmode, $exptidx, $rsrcidx)")) {
+	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
+	DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
+	DBQueryWarn("unlock tables");
+	tberror("Error inserting experiment stats record for $pid/$eid!");
+	return undef;
+    }
+
+    #
+    # Safe to unlock; all tables consistent.
+    #
+    if (! DBQueryWarn("unlock tables")) {
+	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
+	DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
+	DBQueryWarn("delete from experiment_stats where exptidx=$exptidx");
+	tberror("Error unlocking tables!");
+	return undef
+    }
+
+    return Experiment->Lookup($pid, $eid);
+}
+
+#
+# Delete experiment. Optional purge argument says to remove all trace
+# (typically, the stats are kept).
+#
+sub Delete($;$)
+{
+    my ($self, $purge) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    $purge = 0
+	if (!defined($purge));
+
+    TBExptDestroy($pid, $eid);
+
+    return
+	if (! $purge);
+    
+    #
+    # Now we can clean up the stats records. 
+    #
+    my $exptidx = $self->idx();
+    my $rsrcidx = $self->rsrcidx();
+    
+    DBQueryWarn("DELETE from experiment_resources ".
+		"WHERE idx=$rsrcidx");
+	
+    DBQueryWarn("DELETE from testbed_stats ".
+		"WHERE exptidx=$exptidx");
+
+    # This must be last cause it provides the unique exptidx above.
+    DBQueryWarn("DELETE from experiment_stats ".
+		"WHERE eid='$eid' and pid='$pid' and exptidx=$exptidx");
+
+    return 0;
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    
+    my $query_result =
+	DBQueryWarn("select * from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'EXPT'}  = $query_result->fetchrow_hashref();
+
+    my $idx = $self->{'EXPT'}->{'idx'};
+
+    $query_result =
+	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
+	
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    
+    $self->{'STATS'} = $query_result->fetchrow_hashref();
+
+    # And this is lazy again.
+    $self->{'RSRC'}  = undef;
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+
+    return "[Experiment: $pid/$eid]";
+}
+
+#
+# Create the directory structure. 
+#
+sub CreateDirectory($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $gid = $self->gid();
+
+    mysystem("$MKEXPDIR $pid $gid $eid");
+    return -1
+	if ($?);
+    # mkexpdir sets the path in the DB. 
+    return Refresh($self)
+}
+
+#
+# Return the user and work directories. The workdir in on boss and where
+# scripts chdir to when they run. The userdir is across NFS on ops, and
+# where files are copied to. 
+#
+sub WorkDir($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return TBDB_EXPT_WORKDIR() . "/${pid}/${eid}";
+}
+sub UserDir($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return $self->path();
+}
+
+# Event/Web key filenames.
+sub EventKeyPath($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return UserDir($self) . "/tbdata/eventkey"; 
+}
+sub WebKeyPath($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return UserDir($self) . "/tbdata/webkey"; 
+}
+
+#
+# Experiment locking and state changes.
+#
+sub Unlock($;$)
+{
+    my ($self, $newstate) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $sclause = (defined($newstate) ? ",state='$newstate' " : "");
+
+    my $query_result =
+	DBQueryWarn("update experiments set expt_locked=NULL $sclause ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return -1;
+    }
+    
+    if (defined($newstate)) {
+	$self->{'EXPT'}->{'state'} = $newstate;
+
+	if ($EVENTSYS) {
+	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
+			  objname   => "$pid/$eid",
+			  eventtype => $newstate,
+			  expt      => "$pid/$eid",
+			  host      => $BOSSNODE);
+	}
+    }
+    
+    return 0;
+}
+
+sub SetState($$)
+{
+    my ($self, $newstate) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("update experiments set state='$newstate' ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return -1;
+    }
+    
+    if (defined($newstate)) {
+	$self->{'EXPT'}->{'state'} = $newstate;
+
+	if ($EVENTSYS) {
+	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
+			  objname   => "$pid/$eid",
+			  eventtype => $newstate,
+			  expt      => "$pid/$eid",
+			  host      => $BOSSNODE);
+	}
+    }
+    
+    return 0;
+}
+
+#
+# Logfiles. This all needs to change.
+#
+# Open a new logfile and return its name.
+#
+sub CreateLogFile($$$)
+{
+    my ($self, $prefix, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    # Need to deal with errors.
+    $$pref = TBExptCreateLogFile($pid, $eid, $prefix);
+    return 0;
+}
+
+#
+# Set the experiment to use the logfile. It becomes the "current" spew.
+#
+sub SetLogFile($$)
+{
+    my ($self, $logname) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    TBExptSetLogFile($pid, $eid, $logname);    
+    return 0;
+}
+
+#
+# Mark the log as open so that the spew keeps looking for more output.
+# 
+sub OpenLogFile($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    TBExptOpenLogFile($pid, $eid);    
+    return 0;
+}
+
+#
+# And close it ...
+#
+sub CloseLogFile($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    TBExptCloseLogFile($pid, $eid);    
+    return 0;
+}
+
+#
+# Run scripts over an experiment.
+#
+sub PreRun($;$$)
+{
+    my ($self, $nsfile, $options) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    $nsfile = ""
+	if (!defined($nsfile));
+    $options = ""
+	if (!defined($options));
+
+    print "Running 'tbprerun $options $pid $eid $nsfile'\n";
+    mysystem("$TBPRERUN $options $pid $eid $nsfile");
+    return -1
+	if ($?);
+    return 0;
+}
+
+sub Swap($;$$)
+{
+    my ($self, $direction, $options) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    $options = ""
+	if (!defined($options));
+
+    print "Running 'tbswap $direction $options $pid $eid'\n";
+    mysystem("$TBSWAP $direction $options $pid $eid");
+    return -1
+	if ($?);
+    return 0;
+}
+
+sub End($;$)
+{
+    my ($self, $options) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    $options = ""
+	if (!defined($options));
+
+    print "Running 'tbend $options $pid $eid'\n";
+    mysystem("$TBEND $options $pid $eid");
+    return -1
+	if ($?);
+    return 0;
+}
+
+sub Report($;$$)
+{
+    my ($self, $filename, $options) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    $options = ""
+	if (!defined($options));
+
+    mysystem("$TBREPORT $options $pid $eid 2>&1 > $filename");
+    return -1
+	if ($?);
+    return 0;
+}
+
+#
+# Return list of local nodes.
+# 
+sub LocalNodeList($$)
+{
+    my ($self, $lref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    @$lref = ExpNodes($pid, $eid, 1, 0);
+    return 0;
+}
+
+#
+# Copy log files to long term storage.
+#
+sub SaveLogFiles($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    TBSaveExpLogFiles($pid, $eid);
+    return 0;
+}
+
+#
+# Copy log files to user visible space. Maybe not such a good idea anymore?
+#
+sub CopyLogFiles($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $workdir = $self->WorkDir();
+    my $userdir = $self->UserDir();
+
+    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+    return 0;
+}
+
+#
+# Swapinfo accounting stuff.
+#
+sub SetSwapInfo($$)
+{
+    my ($self, $dbuid) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    
+    TBSetExpSwapTime($pid, $eid);
+    TBExptSetSwapUID($pid, $eid, $dbuid);
+    return $self->Refresh();
+}
+
+#
+# Set the cancel flag.
+#
+sub SetCancelFlag($$)
+{
+    my ($self, $flag) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    
+    TBSetCancelFlag($pid, $eid, $flag);
+    return $self->Refresh();
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
