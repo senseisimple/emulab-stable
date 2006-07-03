@@ -74,11 +74,12 @@ my $CHPASS	= "/usr/bin/chpass -p";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $IFCONFIGBIN = "/sbin/ifconfig";
 my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s %s %s";
-my $IFALIAS     = "$IFCONFIGBIN %s alias %s netmask 0xffffff00";
+my $IFALIAS     = "$IFCONFIGBIN %s alias %s netmask %s";
 my $IFC_1000MBS = "media 1000baseTX";
 my $IFC_100MBS  = "media 100baseTX";
 my $IFC_10MBS   = "media 10baseT/UTP";
 my $IFC_FDUPLEX = "mediaopt full-duplex";
+my $IFC_HDUPLEX = "mediaopt half-duplex";
 my $MKDIR	= "/bin/mkdir";
 my $GATED	= "/usr/local/sbin/gated";
 my $ROUTE	= "/sbin/route";
@@ -113,10 +114,10 @@ sub os_account_cleanup()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$$;$$)
+sub os_ifconfig_line($$$$$$$;$$%)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
-	$iface_type, $settings, $rtabid) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type,
+	$settings, $rtabid, $cookie) = @_;
     my $media    = "";
     my $mediaopt = "";
     my ($uplines, $downlines);
@@ -132,7 +133,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 	    $speed = $1 / 1000;
 	}
 	else {
-	    warn("*** Bad speed units in ifconfig!\n");
+	    warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
 	    $speed = 100;
 	}
 	if ($speed == 1000) {
@@ -145,12 +146,21 @@ sub os_ifconfig_line($$$$$$$;$$)
 	    $media = $IFC_10MBS;
 	}
 	else {
-	    warn("*** Bad Speed in ifconfig!\n");
+	    warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
+	    $speed = 100;
 	    $media = $IFC_100MBS;
 	}
     }
 
     if ($duplex eq "full") {
+	$mediaopt = $IFC_FDUPLEX;
+    }
+    elsif ($duplex eq "half") {
+	$mediaopt = $IFC_HDUPLEX;
+    }
+    else {
+	warn("*** Bad duplex $duplex in ifconfig, default to full\n");
+	$duplex = "full";
 	$mediaopt = $IFC_FDUPLEX;
     }
 
@@ -169,31 +179,24 @@ sub os_ifconfig_line($$$$$$$;$$)
 	}
 
 	# Config the interface.
-	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask, $media,$mediaopt);
-	$downlines  = "$IFCONFIGBIN $iface down\n";
-	
-	if ($aliases ne "") {
-	    # Must do this first to avoid lo0 routes.
-	    $uplines .= "\n    ".
-		"sysctl net.link.ether.inet.useloopback=0\n";
-
-	    foreach my $alias (split(',', $aliases)) {
-		my $ifalias = sprintf($IFALIAS, $iface, $alias);
-
-		$uplines   .= "$ifalias\n";
-		$downlines .= "$IFCONFIGBIN $iface -alias $alias\n";
-	    }
-	}
+	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask,
+			     $media, $mediaopt);
+	$downlines = "$IFCONFIGBIN $iface down";
     }
     return ($uplines, $downlines);
 }
 
 #
-# Specialized function for configing locally hacked veth devices.
+# Specialized function for configing virtual ethernet devices:
 #
-sub os_ifconfig_veth($$$$$;$$$)
+#	'veth'	locally hacked veth devices
+#	'vlan'	802.1q tagged vlan devices
+#	'alias'	IP aliases on physical interfaces
+#
+sub os_ifconfig_veth($$$$$;$$$$$)
 {
-    my ($iface, $inet, $mask, $id, $vmac, $rtabid, $encap, $vtag) = @_;
+    my ($iface, $inet, $mask, $id, $vmac,
+	$rtabid, $encap, $vtag, $itype, $cookie) = @_;
     my ($uplines, $downlines);
 
     #
@@ -205,31 +208,74 @@ sub os_ifconfig_veth($$$$$;$$$)
     require Socket;
     import Socket;
 
-    if (!defined($vtag)) {
-	# Need to derive a vlan tag. Just use the middle two octets.
-	my $vtag = (unpack("I", inet_aton($inet)) >> 8) & 0xffff;
-    }
-
-    if ($vmac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
-	$vmac = "$1:$2:$3:$4:$5:$6";
-    }
-    else {
-	warn("Bad vmac in veth config: $vmac\n");
+    if ($itype !~ /^(alias|vlan|veth)$/) {
+	warn("Unknown virtual interface type $itype\n");
 	return "";
     }
-    $uplines = "$IFCONFIGBIN veth${id} create\n    " .
-	       "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
-	       (defined($iface) ? " vethdev $iface\n    " : "\n    ");
+
+    #
+    # IP aliases
+    #
+    if ($itype eq "alias") {
+	# Must do this first to avoid lo0 routes.
+	if (!exists($cookie->{"alias"})) {
+	    $uplines =
+	      "sysctl net.link.ether.inet.useloopback=0 >/dev/null 2>&1\n    ";
+	    $cookie->{"alias"} = 1;
+	}
+	
+	$uplines   .= sprintf($IFALIAS, $iface, $inet, $mask);
+	$downlines .= "$IFCONFIGBIN $iface -alias $inet";
+
+	return ($uplines, $downlines);
+    }
+
+    #
+    # VLANs
+    #
+    if ($itype eq "vlan") {
+	if (!defined($vtag)) {
+	    warn("No vtag in veth config\n");
+	    return "";
+	}
+
+	$uplines = "$IFCONFIGBIN vlan${id} create link " .
+		   "vlan $vtag vlandev $iface\n    ";
+
+	$encap = 1;
+    }
+
+    #
+    # VETHs
+    #
+    else {
+	if (!defined($vtag)) {
+	    # Need to derive a vlan tag. Just use the middle two octets.
+	    my $vtag = (unpack("I", inet_aton($inet)) >> 8) & 0xffff;
+	}
+
+	if ($vmac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $vmac = "$1:$2:$3:$4:$5:$6";
+	}
+	else {
+	    warn("Bad vmac in veth config: $vmac\n");
+	    return "";
+	}
+
+	$uplines = "$IFCONFIGBIN veth${id} create\n    " .
+		   "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
+		       (defined($iface) ? " vethdev $iface\n    " : "\n    ");
+    }
 
     #
     # Must set route table id before assigning IP address so that interface
     # route winds up in the correct table.
     #
     if (defined($rtabid)) {
-	$uplines .= "$IFCONFIGBIN veth${id} rtabid $rtabid\n    ";
+	$uplines .= "$IFCONFIGBIN ${itype}${id} rtabid $rtabid\n    ";
     }
 
-    $uplines  .= "$IFCONFIGBIN veth${id} inet $inet netmask $mask";
+    $uplines .= "$IFCONFIGBIN ${itype}${id} inet $inet netmask $mask";
 
     #
     # link1 on the veth device implies no encapsulation
@@ -238,8 +284,8 @@ sub os_ifconfig_veth($$$$$;$$$)
 	$uplines .= " link1";
     }
 
-    $downlines = "$IFCONFIGBIN veth${id} down\n    ".
-	         "$IFCONFIGBIN veth${id} destroy";
+    $downlines = "$IFCONFIGBIN ${itype}${id} destroy";
+
     return ($uplines, $downlines);
 }
 

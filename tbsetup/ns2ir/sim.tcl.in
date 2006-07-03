@@ -380,7 +380,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::cpu_usage
     var_import ::GLOBALS::mem_usage
     var_import ::GLOBALS::fix_current_resources
-    var_import ::GLOBALS::veth_encapsulate
+    var_import ::GLOBALS::vlink_encapsulate
     var_import ::GLOBALS::jail_osname
     var_import ::GLOBALS::delay_osname
     var_import ::GLOBALS::delay_capacity
@@ -572,8 +572,8 @@ Simulator instproc run {} {
 	$tg updatedb "sql"
     }
 
-    set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
-    set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $veth_encapsulate $fix_current_resources]
+    set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "encap_style" "allowfixnode"]
+    set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $vlink_encapsulate $fix_current_resources]
 
     if { $multiplex_factor != {} } {
 	lappend fields "multiplex_factor"

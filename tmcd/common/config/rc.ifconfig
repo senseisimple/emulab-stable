@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -121,8 +121,9 @@ sub doboot()
     return 0
 	if (! @ifacelist);
 
+    my %oscookie = ();
     foreach my $ifconfig (@ifacelist) {
-	if (! $ifconfig->{ISVETH}) {
+	if (! $ifconfig->{ISVIRT}) {
 	    my $inet     = $ifconfig->{IPADDR};
 	    my $type     = $ifconfig->{TYPE};
 	    my $mask     = $ifconfig->{IPMASK};
@@ -162,22 +163,18 @@ sub doboot()
 	    my ($upline, $downline) =
 		os_ifconfig_line($iface, $inet, $mask,
 				 $speed, $duplex, $aliases,
-				 $type, $settings, $ifrtabid);
+				 $type, $settings, $ifrtabid, \%oscookie);
 		    
-	    $upcmds   .= "$upline\n    "
-		if (defined($upline));
-	    $upcmds   .= TMROUTECONFIG . " $inet up\n    "
-		if ($inet ne "");
+	    if (defined($upline) && $upline) {
+		$upcmds .= "$upline\n    ";
+		$upcmds .= TMROUTECONFIG . " $inet up\n    "
+		    if ($inet ne "");
+	    }
 		
-	    $downcmds .= TMROUTECONFIG . " $inet down\n    "
-		if ($inet ne "");
-	    $downcmds .= "$downline\n    "
-		if (defined($downline));
-
-	    # There could be routes for each alias.
-	    foreach my $alias (split(',', $aliases)) {
-		$upcmds   .= TMROUTECONFIG . " $alias up\n    ";
-		$downcmds .= TMROUTECONFIG . " $alias down\n    ";
+	    if (defined($downline)) {
+		$downcmds .= TMROUTECONFIG . " $inet down\n    "
+		    if ($inet ne "");
+		$downcmds .= "$downline\n    ";
 	    }
 
 	    # Trivially parsable map for users, which associate an IP
@@ -185,6 +182,7 @@ sub doboot()
 	    push(@ifacemap, "$iface $inet $mac");
 	}
 	else {
+	    my $itype	 = $ifconfig->{ITYPE};
 	    my $inet     = $ifconfig->{IPADDR};
 	    my $mask     = $ifconfig->{IPMASK};
 	    my $id       = $ifconfig->{ID};
@@ -218,14 +216,16 @@ sub doboot()
 
 	    my ($upline, $downline) =
 		os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,
-				 $ifrtabid, $encap, $vtag);
+				 $ifrtabid, $encap, $vtag, $itype, \%oscookie);
 		    
-	    $upcmds   .= "$upline\n    ";
-	    $upcmds   .= TMROUTECONFIG . " $inet up\n    ";
-		
-	    $downcmds .= TMROUTECONFIG . " $inet down\n    ";
-	    $downcmds .= "$downline\n    "
-		if (defined($downline));
+	    if (defined($upline) && $upline) {
+		$upcmds   .= "$upline\n    ";
+		$upcmds   .= TMROUTECONFIG . " $inet up\n    ";
+	    }
+	    if (defined($downline)) {
+		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
+		$downcmds .= "$downline\n    ";
+	    }
 	}
     }
 

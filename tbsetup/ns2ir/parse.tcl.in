@@ -239,8 +239,10 @@ namespace eval GLOBALS {
     # Flag to disable doing a fix-node
     variable fix_current_resources 1
 
-    # Control veth encapsulation
-    variable veth_encapsulate 1
+    # Control virtual link encapsulation
+    # XXX "default" is for backward compat so we can distinguish
+    # specified vs. unspecified in assign_wrapper
+    variable vlink_encapsulate "default"
 
     # Allow override of jail and delay osids.
     variable jail_osname {}

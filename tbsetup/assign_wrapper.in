@@ -20,9 +20,9 @@ sub AddVlan($$$;$);
 sub UploadVlans();
 sub CheckMaxConcurrent();
 sub UploadStats();
-sub NewVethIface($$$;$);
-sub AddVethPatch($$);
-sub PatchVeths();
+sub NewVirtIface($$$;$);
+sub AddVirtPatch($$);
+sub PatchVirts();
 sub newvname($$);
 sub newvname_simhost($);
 sub LoadPhysInfo();
@@ -316,7 +316,7 @@ sub virtnodesetneedslinkdelays($) {
 #                           emulated     => 0,
 #                           uselinkdelay => 0,
 #                           nobwshaping  => 0,
-#                           useveth      => 0,
+#                           encapstyle   => "default",
 #                           trivok       => 0
 #                          }
 #                 link1 => ...
@@ -332,7 +332,7 @@ sub virtlanemulated($)	{ return $virt_lans{$_[0]}->{"EMULATED"}; }
 sub virtlanlinkdelay($) { return $virt_lans{$_[0]}->{"USELINKDELAY"}; }
 sub virtlannobwshape($)	{ return $virt_lans{$_[0]}->{"NOBWSHAPING"}; }
 sub virtlantrivok($)	{ return $virt_lans{$_[0]}->{"TRIVIAL_OK"}; }
-sub virtlanuseveth($)	{ return $virt_lans{$_[0]}->{"USEVETH"}; }
+sub virtlanencapstyle($){ return $virt_lans{$_[0]}->{"ENCAPSTYLE"}; }
 sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
 sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
 sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
@@ -348,6 +348,11 @@ sub virtlanAP($)        {
         if (defined($virt_lans{$_[0]}->{"ACCESSPOINT"}));
     return undef;
 }
+sub virtlanusevirtiface($) {
+    my $encap = virtlanencapstyle($_[0]);
+    return ($encap eq "veth" || $encap eq "veth-ne" || $encap eq "vlan");
+}
+
 
 #
 # virt_vtypes: The virt_vtypes table in the DB, indexed by the vtype
@@ -493,6 +498,42 @@ my $experiment_idx;
 my $useprepass;
 my $delaycap_override;
 my $elabinelab = 0;
+
+#
+# Notes on virtual interfaces.
+#
+# If a link is EMULATED (virtlanemulated) then it will have an "encapsulation
+# style" (virtlanencapstyle).  That value is one of:
+#
+# "alias"	emulation is done with IP aliases on a physical interface;
+#		there is no packet encapsulation.
+#		Works on FreeBSD or Linux.
+#
+# "veth"	emulation is done with "veth" virtual devices;
+#		encapsulation is standard veth style.
+#		Works on FreeBSD only.
+#
+# "veth-ne"	emulation is done with "veth" devices;
+#		no encapsulation is used (uses made-up MAC addresses instead)
+#		Works on FreeBSD only.
+#
+# "vlan"	emulation is done with "vlan" devices;
+#		uses 802.1q VLAN tagging.
+#		Works on FreeBSD or Linux.
+#
+# "default"	emulation style was not explicitly set by the users;
+#		encap style depends on context ("veth" for vnode, "alias" ow)
+#
+# Note that the encapsulation style for "default" depends on the node type.
+# For non-vnodes the default is "alias".  For vnodes the default is "veth"
+# since they must always have some pseudo-device on which to hang a route
+# table ID; i.e., we cannot just do IP aliasing.
+#
+# Encapsulation can be specified per link.  The default link encapsulation
+# can also be specified by a per-experiment setting.  At the moment, only
+# the latter (global) is implemented.
+#
+my $encapstyle;
 
 #
 # Determine if a given link/lan uses linkdelays
@@ -1636,8 +1677,8 @@ if ($updating && !$impotent) {
 		     "where node_id='$pnode' and ".
 		     "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'");
 
-	# Clean the veth_interfaces table for this node too.
-	DBQueryFatal("delete from veth_interfaces where node_id='$pnode'");
+	# Clean the virtual interfaces table for this node too.
+	DBQueryFatal("delete from vinterfaces where node_id='$pnode'");
 	
 	# And interface settings.
 	DBQueryFatal("delete from interface_settings where node_id='$pnode'");
@@ -1800,12 +1841,12 @@ foreach $plink (keys(%plinks)) {
 	if (! $trivial) {
 	    AddVlan("link", $lan, $nodeportA, $nodeportB);
 
-	    if (virtlanuseveth($lan)) {
+	    if (virtlanusevirtiface($lan)) {
 		#
-		# Create some new veth devices.
+		# Create some new virtual devices.
 		#
-		$portA = NewVethIface($lan, $virtA, $nodeA, $portA);
-		$portB = NewVethIface($lan, $virtB, $nodeB, $portB);
+		$portA = NewVirtIface($lan, $virtA, $nodeA, $portA);
+		$portB = NewVirtIface($lan, $virtB, $nodeB, $portB);
 	    }
 	}
 	else {
@@ -1816,8 +1857,8 @@ foreach $plink (keys(%plinks)) {
 		# phys mapping for the port.
 		$nodeA = $v2pmap{(split(":", $virtA))[0]};
 		$nodeB = $v2pmap{(split(":", $virtB))[0]};
-		$portA = NewVethIface($lan, $virtA, $nodeA);
-		$portB = NewVethIface($lan, $virtB, $nodeB);
+		$portA = NewVirtIface($lan, $virtA, $nodeA);
+		$portB = NewVirtIface($lan, $virtB, $nodeB);
 	    } else {
 		# next plink
 		next;
@@ -1875,11 +1916,11 @@ foreach $plink (keys(%plinks)) {
 	if (! $trivial) {
 	    AddVlan("lan", $lan, $nodeportA);
 
-	    if (virtlanuseveth($lan)) {
+	    if (virtlanusevirtiface($lan)) {
 		#
 		# Create new veth device.
 		# 
-		$portA = NewVethIface($lan, $virtA, $nodeA, $portA);
+		$portA = NewVirtIface($lan, $virtA, $nodeA, $portA);
 
 		#
 		# If the "lannode" is placed on a node, and that node is
@@ -1889,7 +1930,7 @@ foreach $plink (keys(%plinks)) {
 		#
 		if ($nodeportA ne $nodeportB) {
 		    AddVlan("lan", $lan, $nodeportB);
-		    AddVethPatch($lan, $nodeportB);
+		    AddVirtPatch($lan, $nodeportB);
 		}
 	    }
 	}
@@ -1899,7 +1940,7 @@ foreach $plink (keys(%plinks)) {
 	    if (! virtlanallsim($lan) ) {
 		# No phys mapping. We create a veth, but there is no phys port.
 		$nodeA = $v2pmap{(split(":", $virtA))[0]};
-		$portA = NewVethIface($lan, $virtA, $nodeA);
+		$portA = NewVirtIface($lan, $virtA, $nodeA);
 	    } else {
 		# next plink
 		next;
@@ -1976,7 +2017,7 @@ UploadVlans();
 exit(0)
     if ($impotent);
 
-PatchVeths();
+PatchVirts();
 
 #
 # Seed the virt_agents table. This should probably be done elsewhere.
@@ -2218,12 +2259,12 @@ foreach $vnodeport (keys(%portmap)) {
     my $lan   = $memberof{$vnodeport};
     my $mask  = virtlannetmask($lan);
     
-    if (virtlanuseveth($lan)) {
+    if (virtlanusevirtiface($lan)) {
 	#
 	# Emulated links on local virtual nodes use the new veth device.
 	# This is still fuzzy. What about connections to non-bsd nodes?
 	#
-	# See NewVethIface() calls. Everything was set up then.
+	# See NewVirtIface() calls. Everything was set up then.
 	#
 	my $pnode = $v2pmap{$vnode};
 	my $ip    = $ips{$vnodeport};
@@ -2261,9 +2302,7 @@ foreach $vnodeport (keys(%portmap)) {
 	else {
 	    printdb("IP: $pnode:$pport $ip (alias)\n");
 	    
-	    DBQueryFatal("update interfaces set ".
-			 " IPaliases=CONCAT_WS(',', '$ip', IPaliases) ".
-			 "where node_id='$pnode' and iface='$pport'");
+	    NewVirtIface($lan, $vnodeport, $pnode, $pport);
 	}
     }
 }
@@ -3021,7 +3060,8 @@ sub AddVlan($$$;$)
 	}
 	printdb "  $lan, \[" . join(" ",@{$vlantable{$lan}}) . "\]\n";
     }
-    elsif (virtlanexists($lan) && virtlanemulated($lan)) {
+    elsif (virtlanexists($lan) && virtlanemulated($lan) &&
+	   virtlanencapstyle($lan) =~ /^veth/) {
 	#
 	# Like above, except that in this case, its a bunch of vlinks
 	# sharing a smaller set of physical links. Just mark it differently
@@ -3054,18 +3094,25 @@ sub UploadVlans()
 {
     #
     # Emulated vlans will result in node:port pairs being in more than
-    # one vlan since that link is shared for several lans. The hardware
-    # cannot support that of course, so we have to build merge the
-    # vlans into "supervlans". Must be done iteratively of course.
+    # one vlan since that link is shared for several lans. For hardware
+    # implemented 802.1q tagged vlans (type "vlan"), this is ok. But for
+    # "veth" implemented vlans, we have to merge the overlapping vlans
+    # into "supervlans". Must be done iteratively of course.
     # 
     printdb "Merging vlans.\n";
   again:
     foreach my $keyA (keys(%vlantable)) {
 	my @membersA = @{$vlantable{$keyA}};
 
+	if (virtlanexists($keyA) && virtlanencapstyle($keyA) eq "vlan") {
+	    next;
+	}
 	foreach my $keyB (keys(%vlantable)) {
 	    my @membersB = @{$vlantable{$keyB}};
 
+	    if (virtlanexists($keyB) && virtlanencapstyle($keyB) eq "vlan") {
+		next;
+	    }
 	    if ($keyA ne $keyB) {
 		foreach my $memberA (@membersA) {
 		    if (grep {$_ eq $memberA} @membersB) {
@@ -3143,8 +3190,8 @@ sub UploadStats()
 }
 
 #
-# Create a new veth interface. This sets up the entire veth slot,
-# including IP and mac. The veth_id is used in impotent mode only.
+# Create a new virtual interface. This sets up the entire vinterface slot,
+# including IP and mac. The ID is used in impotent mode only.
 #
 # XXX: Temp fix: This tracks what veths we create so that we can patch
 #      up lans that span trivial and real links.
@@ -3152,66 +3199,122 @@ sub UploadStats()
 my %veth_interfaces = ();
 my %veth_patches    = ();
 
-sub NewVethIface($$$;$)
+sub NewVirtIface($$$;$)
 {
     my ($lan, $vnodeport, $pnode, $pport) = @_;
     my ($vnode) = split(":", $vnodeport);
     my $ip      = $ips{$vnodeport};
-    my $vvnode  = "NULL";
-    my $newveth;
     my $mask    = virtlannetmask($lan);
-    my $rtabid = getrtabid($vnode, $pnode);
+    my $rtabid  = getrtabid($vnode, $pnode);
+    my $encap   = virtlanencapstyle($lan);
+    my $vvnode;
+    my $newvif;
+    my $isvnode;
+    my $isvdev;
+    my $type;
+    my $mac;
 
-    # to the nodes table entry for the virtnode. 
+    my $isveth = ($encap eq "veth" || $encap eq "veth-ne");
+
+    #
+    # Special actions for virtnodes (as opposed to just emulated links).
+    #
     if (virtnodeisjailed($vnode)) {
+	$isvnode = 1;
+
+	#
+	# XXX type should be either veth or vlan
+	#
+	$type = $encap;
+	if (!$isveth && $type ne "vlan") {
+	    tbwarn "whacked encap type '$type' for vnode, ".
+		   "setting to 'veth' instead";
+	    $type = "veth";
+	    $isveth = 1;
+	}
+	$isvdev = 1;
+
+	# to the nodes table entry for the virtnode. 
 	$vvnode = "'$v2vmap{$vnode}'";
+    } else {
+	$isvnode = 0;
+
+	#
+	# For multiplexed links, the default is no encapsulation,
+	# aka "alias".
+	#
+	$type = $encap;
+	if ($type eq "default" || $type eq "alias") {
+	    $type = "alias";
+	    $isvdev = 0;
+	} else {
+	    $isvdev = 1;
+	}
+
+	$vvnode  = "NULL";
+    }
+
+    if ($impotent) {
+	# Make up an id; its never used anyplace.
+	$newvif = $type . $veth_id++;
+	return $newvif;
     }
 
     #
-    # Not sure about the MAC yet. We need to create something, and
-    # for now it will be helpful for debugging if I use the IP.
-    # 
-    my $mac   = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
-
-    if ($impotent) {
-	# Make up one; its never used anyplace.
-	$newveth = "veth" . $veth_id++;
+    # Make up a MAC address.  For now, just derive it from the assigned
+    # IP address.  Note that this is only needed for "veth" type interfaces.
+    #
+    if ($isveth) {
+	$mac = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
+    } else {
+	$mac = "000000000000";
     }
-    else {
-	#
-	# Insert, and then get the id so we can form the name of
-	# the veth device. A null pport means no phys port.
-	#
-	my $query_result = 
-	    DBQueryFatal("insert into veth_interfaces ".
-			 "(node_id, veth_id, mac, IP, iface, vnode_id, mask, ".
-			 " rtabid) ".
-			 "values ('$pnode', 0, '$mac', '$ip', " .
-			          (defined($pport) ? "'$pport'" : "NULL") .
-			 "        , $vvnode, '$mask', '$rtabid')");
+
+    #
+    # Insert, and then get the id so we can form the name of
+    # the virtual device. A null pport means no phys port.
+    #
+    my $query_result = 
+	DBQueryFatal("insert into vinterfaces ".
+		     "(node_id, unit, mac, IP, mask, type, iface, ".
+		     " rtabid, vnode_id) ".
+		     "values ('$pnode', 0, '$mac', '$ip', '$mask', '$type', ".
+		     (defined($pport) ? "'$pport'" : "NULL") . ", ".
+		     "'$rtabid', $vvnode)");
+    
+    my $newid = $query_result->insertid;
+    $newvif = $type . $newid;
+    
+    #
+    # For veth and vlan interfaces, we need to set the characteristics
+    # of the underlying physical interface.
+    #
+    if (defined($pport) && $isvdev) {
+	my $speed = interfacespeedmbps(physinterfacetype($pnode, $pport),
+				       "ethernet");
 	
-	my $newid = $query_result->insertid;
-	$newveth = "veth" . $newid;
-
-	if (defined($pport)) {
-	    my $speed = interfacespeedmbps(physinterfacetype($pnode, $pport),
-					   "ethernet");
-
-	    DBQueryFatal("update interfaces set " .
-			 "   current_speed='$speed' " .
-			 "where node_id='$pnode' and iface='$pport'");
-	}
-	else {
-	    if (!defined($veth_interfaces{$lan})) {
-		$veth_interfaces{$lan} = {};
-	    }
-	    if (!defined($veth_interfaces{$lan}->{$pnode})) {
-		$veth_interfaces{$lan}->{$pnode} = [];
-	    }
-	    push(@{$veth_interfaces{$lan}->{$pnode}}, $newid);
-	}
+	DBQueryFatal("update interfaces set " .
+		     "   current_speed='$speed' " .
+		     "where node_id='$pnode' and iface='$pport'");
     }
-    return $newveth;
+
+    #
+    # XXX hackery that only Rob and Leigh understand.
+    # A LAN of vnodes split across multiple physical machines may
+    # not have the correct physical LAN info coming out of assign
+    # and may need to be patched up later.
+    #
+    if (!defined($pport) && $isvnode) {
+	if (!defined($veth_interfaces{$lan})) {
+	    $veth_interfaces{$lan} = {};
+	}
+	if (!defined($veth_interfaces{$lan}->{$pnode})) {
+	    $veth_interfaces{$lan}->{$pnode} = [];
+	}
+	push(@{$veth_interfaces{$lan}->{$pnode}}, $newid);
+    }
+
+    return $newvif;
 }
 
 #
@@ -3256,7 +3359,7 @@ sub SetUpTracing($$$$$)
 #
 # XXX Temporary until we figure out a solution.
 #
-sub AddVethPatch($$)
+sub AddVirtPatch($$)
 {
     my ($lan, $nodeport) = @_;
     my ($pnode, $pport) = split(":", $nodeport);
@@ -3264,7 +3367,7 @@ sub AddVethPatch($$)
     $veth_patches{$lan}->{$pnode} = $pport;
 }
 
-sub PatchVeths()
+sub PatchVirts()
 {
     foreach my $lan (keys(%veth_interfaces)) {
 	next
@@ -3277,10 +3380,10 @@ sub PatchVeths()
 	    my $pport = $veth_patches{$lan}->{$pnode};
 
 	    foreach my $vethid (@{$veth_interfaces{$lan}->{$pnode}}) {
-		printdb "Veth Path: $lan $pnode $vethid $pport\n";
+		printdb "Virt Patch: $lan $pnode $vethid $pport\n";
 
-		DBQueryFatal("update veth_interfaces set iface='$pport' ".
-			     "where node_id='$pnode' and veth_id='$vethid'");
+		DBQueryFatal("update vinterfaces set iface='$pport' ".
+			     "where node_id='$pnode' and unit='$vethid'");
 	    }
 	}
     }
@@ -3848,10 +3951,10 @@ sub LoadVirtLans()
 	my $isemulated     = $rowref->{"emulated"};
 	my $uselinkdelay   = $rowref->{"uselinkdelay"};
 	my $nobwshaping    = $rowref->{"nobwshaping"};
-	my $useveth        = $rowref->{"usevethiface"};
 	my $trivial_ok     = $rowref->{"trivial_ok"};
 	my $protocol       = $rowref->{"protocol"};
 	my $mustdelay      = $rowref->{"mustdelay"};
+	my $encap          = $rowref->{"encap_style"};
 
 	# Extend the DB info with this stuff:
 	#
@@ -3867,8 +3970,7 @@ sub LoadVirtLans()
         # force them to be such with delay nodes (leaves it up to the
         # user to moderate the bw).
 	$virt_lans{$vname}->{"NOBWSHAPING"}  = $nobwshaping;
-	# User has requested veth devices. Not typical.
-	$virt_lans{$vname}->{"USEVETH"}      = $useveth;
+	$virt_lans{$vname}->{"ENCAPSTYLE"}   = $encap;
 	# User has said that colocating is okay. Not typical.
 	$virt_lans{$vname}->{"TRIVIAL_OK"}   = $trivial_ok;
 	# Link is connected to a remote node, and gets a tunnel.
@@ -4078,12 +4180,13 @@ sub LoadExperiment()
 		     "       multiplex_factor,usewatunnels, ".
 		     "       cpu_usage,mem_usage,allowfixnode, ".
 		     "       jail_osname,delay_osname,idx, " .
-		     "       useprepass,delay_capacity,elab_in_elab " .
+		     "       useprepass,delay_capacity,elab_in_elab, " .
+		     "       encap_style " .
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx,
-	$o8,$delay_capacity,$eine) = $query_result->fetchrow_array();
+    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx,$o8,
+	$delay_capacity,$eine,$o9) = $query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
     $uselinkdelays = $o1
@@ -4102,6 +4205,8 @@ sub LoadExperiment()
 	if (!defined($fix_current_resources));
     $useprepass = $o8
 	if (!defined($useprepass));
+    $encapstyle = $o9
+	if (!defined($encapstyle));
     if (!defined($jail_osid) && defined($jail_osname)) {
 	if (! ($jail_osid = TBOSID($pid, $jail_osname)) &&
 	    ! ($jail_osid = TBOSID(TB_OPSPID, $jail_osname))) {
@@ -4157,6 +4262,7 @@ sub CreateTopFile()
     my $virtnode_count = 0;
     my $simnode_count  = 0;
     my %osdoesveth     = ();
+    my %osdoesvlan     = ();
     my %osdoesmlink    = ();
     my %osdoeslinkdelays = ();
     
@@ -4264,100 +4370,243 @@ sub CreateTopFile()
 	my $realnodes = 0;
 	my $virtnodes = 0;
 	my $nonvirtnodes = 0;
-	my $nonbsdnodes = 0;
+	my %nodesdo = ("alias"=>0, "veth"=>0, "vlan"=>0, "ldelay"=>0);
 	my $trivial_ok = 0;
 	my $emulated = virtlanemulated($lan);
         my $uselinkdelay = virtlanlinkdelay($lan);
 	my $mustdelay = virtlanmustdelay($lan);
 	my $nobwshaping = virtlannobwshape($lan);
 	my $protocol = virtlanprotocol($lan);
+	my $encap = virtlanencapstyle($lan);
 
 	#
 	# Count the types of nodes (simulated, virtual, real, etc.) in this
 	# LAN
 	#
 	foreach $member (@members) {
+	    my $osid;
 	    ($node) = (split(":",$member))[0];
 	    if (virtnodeissim($node)) {
 		$simnodes++;
+
+		# XXX apparently all simnodes can do veths
+		$osid = "<SIM>";
+		if (!exists($osdoesmlink{$osid})) {
+		    $osdoesmlink{$osid} = 0;
+		    $osdoesveth{$osid} = 1;
+		    $osdoesvlan{$osid} = 0;
+		    $osdoeslinkdelays{$osid} = 0;
+		}
 	    } else {
 		if (virtnodeisvirt($node)) {
 		    $virtnodes++;
+
+		    # XXX virtnodes are always BSD at the moment
+		    $osid = "<JAIL>";
+		    if (!exists($osdoesmlink{$osid})) {
+			$osdoesmlink{$osid} = 0;
+			$osdoesveth{$osid} = 1;
+			$osdoesvlan{$osid} = 1;
+			$osdoeslinkdelays{$osid} = 1;
+		    }
 		} else {
 		    $nonvirtnodes++;
 		    #
-		    # Check os feature list emulated/veth support.
+		    # Check os feature list emulated/veth/vlan support.
 		    #
 		    if (defined(virtnodeosid($node))) {
-			my $osid = virtnodeosid($node);
+			$osid = virtnodeosid($node);
 			
 			if (!exists($osdoesmlink{$osid})) {
 			    $osdoesmlink{$osid} =
 				OSFeatureSupported($osid, 'mlinks');
 			    $osdoesveth{$osid} =
 				OSFeatureSupported($osid, 'veths');
+			    $osdoesvlan{$osid} =
+				OSFeatureSupported($osid, 'vlans');
 			    # Need this for phys nodes requesting lindelays.
 			    $osdoeslinkdelays{$osid} =
 				OSFeatureSupported($osid, 'linkdelays');
 			}
-			# For simplicity, lets just say that a node needs
-			# both set.
-			if (! ($osdoesmlink{$osid} && $osdoesveth{$osid})) {
-			    $nonbsdnodes++;
-			}
 		    } else {
-			# XXX If the user doesn't explicitly set an OS on a PC,
-			# currently it defaults to Redhat. At this point, it is
-			# not possible to know until mapping if the default OS
-			# is indeed Redhat. Due to lack of information at this 
-			# point in the code, it would safe to assume non-BSD
-			# regardless of whether a future or different emulab is
-			# gonna make BSD as the default OS
-			$nonbsdnodes++;
+			# XXX If the user doesn't explicitly set an OS on a PC.
+			# Be conservative and assume minimum features.
+			$osid = "<DEFAULT>";
+			if (!exists($osdoesmlink{$osid})) {
+			    $osdoesmlink{$osid} = 0;
+			    $osdoesveth{$osid} = 0;
+			    $osdoesvlan{$osid} = 0;
+			    $osdoeslinkdelays{$osid} = 0;
+			}
 		    }
 		}
 		$realnodes++;
 	    }
+
+	    # Figure out how many nodes support a feature
+	    $nodesdo{"alias"}++
+		if ($osdoesmlink{$osid});
+	    $nodesdo{"veth"}++
+		if ($osdoesveth{$osid});
+	    $nodesdo{"vlan"}++
+		if ($osdoesvlan{$osid});
+	    $nodesdo{"ldelay"}++
+		if ($osdoeslinkdelays{$osid});
+	}
+	$nodesdo{"veth-ne"} = $nodesdo{"veth"};
+
+	printdb("$lan: members = ".
+		scalar(@members) .
+		" real/virt/sim = ".
+		"$nonvirtnodes/$virtnodes/$simnodes ".
+		"mlink/veth/vlan/ldelay = ".
+		$nodesdo{"alias"} . "/".
+		$nodesdo{"veth"} . "/".
+		$nodesdo{"vlan"} . "/".
+		$nodesdo{"ldelay"} . "\n");
+
+	#
+	# Determine the emulation/encapsulation style for the link.
+	# The goal is to come up with a compatible emulation style
+	# for all members of the virt_lan.  Note that it is not stictly
+	# necessary for all members of the virt_lan to emulate in the
+	# same way; e.g., one node could be doing an 802.1q tagged VLAN
+	# while another could just be doing IP aliasing or veths without
+	# encapsulation.  In fact, it is not even necesary in some cases
+	# for all vlinks on a physical link to use the same style!
+	# But we don't want to go there right now, so for simplicity,
+	# we require that the user specify identical values for all
+	# members of a virt_lan.  For now, we do this by ignoring per-link
+	# settings ($encap) and using only the global setting ($encapstyle)
+	# except for backward compat (see next paragraph).
+	#
+	# XXX this is made hideous by having both global and per-link
+	# encapsulation values that were previously used for two
+	# different purposes.  The per-link value was used to
+	# specify using "veth" devices for non-vnode emulated links
+	# (as opposed to using IP aliases).  The global value
+	# was used to specify using veth devices without encapsulation
+	# for vnode emulated links.
+	#
+	# So the simplified semantics look like:
+	#
+	# global  per-link  in vnode?  meaning
+	#
+	# default default   no         alias; non-vnode mpx links (historic)
+	# default alias     no         alias; non-vnode mpx links (historic)
+	# default veth      no         veth; non-vnode mpx links (historic)
+	#
+	# default default   yes        veth; vnode vlinks (historic)
+	# veth    default   yes        veth; vnode vlinks (historic)
+	# veth-ne default   yes        veth-noencap; vnode vlinks (historic)
+	#
+	# default *         yes        veth
+	# default *         no         alias
+	# alias   *         yes        ERROR; we could support this
+	# alias   *         no         alias
+	# veth    *         *          veth
+	# veth-ne *         *          veth-noencap
+	# vlan    *         *          vlan
+	#
+	my $encapval;
+
+	#
+	# Historic case O: if simulated nodes are involved, use veth
+	# as necessary.  XXX don't know if this is correct in all cases!
+	#
+	if ($simnodes > 0) {
+	    $encapval = "veth";
+	}
+	#
+	# Historic case I: non-vnode emulated links use IP aliases 
+	# unless per-link value is 'veth', in which case veths are used.
+	# This is currently the only place where we care about the
+	# per-link value.
+	#
+	elsif ($encapstyle eq "default" && $virtnodes == 0) {
+	    if ($encap eq "veth") {
+		$encapval = "veth";
+	    } else {
+		$encapval = "alias";
+	    }
+	}
+	#
+	# Historic case II: vnode emulated links use veth devices with
+	# encapsulation unless global encap is set to 'veth-ne'.
+	#
+	elsif ($encap eq "default" && $virtnodes > 0) {
+	    if ($encapstyle eq "default" || $encapstyle eq "veth") {
+		$encapval = "veth";
+	    } elsif ($encapstyle eq "veth-ne") {
+		$encapval = "veth-ne";
+	    }
 	}
 
+	if (!defined($encapval)) {
+	    if ($encapstyle eq "default") {
+		# must involve vnodes, non-vnodes handled in "case I" above
+		$encapval = "veth";
+	    } elsif ($encapstyle =~ /^(alias|veth|veth-ne|vlan)$/) {
+		$encapval = $encapstyle;
+	    } else {
+		tberror("unknown encapsulation style '$encapstyle'\n");
+		$toperrors++;
+	    }
+	    if ($encap ne "default" && $encap ne $encapval) {
+		tbwarn("per-link emulation style not supported right now".
+		       "'$encap' overridden by global '$encapval'");
+	    }
+	}
+
+	printdb("$lan: global/link = $encapstyle/$encap => $encapval\n");
+
+	#
+	# Ensure the per-link value is set correctly for emulated links.
+	#
+	if ($emulated) {
+	    $virt_lans{$lan}->{"ENCAPSTYLE"} = $encapval;
+	}
+
+	#
+	# For links involving virtnodes, we prefer to use virtual links.
+	# But we can only do this if all involved nodes support a common
+	# emulation style.
+	#
+	my $allnodes = $simnodes + $realnodes;
 	if ($virtnodes > 0) {
 	    $trivial_ok = virtlantrivok($lan);
-	    if ($nonvirtnodes == 0 || $nonbsdnodes == 0) {
-		# We use an emulated link if all members of the lan are
-	        # virtnodes. An emulated link can use a trivial link
-	        # too, if the user wanted it.
+
+	    if ($nodesdo{$encapval} == $allnodes) {
+		#
+		# All members support the encapsulation style, use it.
+		#
 		$emulated = 1;
 		$virt_lans{$lan}->{"EMULATED"} = 1;
-	        #
-	        # An emulated link/lan between containing any
-	        # virtnodes always uses veth devices. Note that remote
-	        # virtual nodes never go through this path cause they
-	        # get tunnels, so its only local virtual nodes.
-	        #
-	        $virt_lans{$lan}->{"USEVETH"} = 1;
+	        $virt_lans{$lan}->{"ENCAPSTYLE"} = $encapval;
 	    } else {
-		# We don't support EMULATED/USEVETH for lans/links that
-		# have non-bsd nodes (nodes running Linux or a non
-		# standard BSD). This means we'll turn off these
-		# options even if the user explicitly asked for them
-
+		#
+		# Not all members support the desired encapsulation.
+		# This means we have to turn off emulation options
+		# even if the user explicitly asked for them.
 		# If the user had explicitly asked for these, we
-		# print a warning
-		if (virtlanemulated($lan)) {
+		# print a warning.
+		#
+		if ($emulated) {
 		    tbwarn "tb-set-multiplexed not supported on ".
-			   "$lan since one of the nodes in $lan is ".
-			   "not running the standard FreeBSD image ".
-			   "(FBSD-STD)";
+			   "$lan since at least one of the nodes in $lan ".
+			   "does not support multiplexed links.";
 		}
-		if (virtlanuseveth($lan)) {
-		    tbwarn "tb-set-useveth not supported on ".
-	         	   "$lan since one of the nodes in $lan is ".
-	         	   "not running the standard FreeBSD image ".
-			   "(FBSD-STD)";
+		if (virtlanusevirtiface($lan)) {
+		    tbwarn "tb-set-vlink-emulation not supported on ".
+	         	   "$lan since at least one of the nodes in $lan ".
+			   "does not support '$encapval' link emulation\n";
 		}
 		$emulated = 0;
 		$virt_lans{$lan}->{"EMULATED"} = 0;
-	        $virt_lans{$lan}->{"USEVETH"} = 0;
+	        $virt_lans{$lan}->{"ENCAPSTYLE"} = "none";
+
+		# cannot do colocated vnode trivial links without veths
+		$trivial_ok = 0;
 	    }
 	}
 
@@ -4367,11 +4616,11 @@ sub CreateTopFile()
 	# members mapped to different physical nodes, we will use emulated links
 	# i.e. veth devices. 
 	#
-	if ($simnodes > 0 && $realnodes == 0) {
+	elsif ($simnodes > 0 && $realnodes == 0) {
 	    $trivial_ok = 1;
 	    $emulated = 1;
 	    $virt_lans{$lan}->{"EMULATED"} = 1;
-	    $virt_lans{$lan}->{"USEVETH"} = 1;
+	    $virt_lans{$lan}->{"ENCAPSTYLE"} = "veth";
 	    $virt_lans{$lan}->{"ALLSIM"} = 1;
 	}
 
@@ -5071,5 +5320,3 @@ sub LoadCurrent()
 	if ($reserved_simcount);
     printdb "Old Reserved Nodes: " . join(" ", keys %oldreservednodes) . "\n";
 }
-
-

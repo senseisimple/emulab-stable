@@ -173,7 +173,6 @@ typedef struct {
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[256];
-	int		veth_encapsulate;
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
 static int	checkdbredirect(tmcdreq_t *);
@@ -1315,15 +1314,43 @@ COMMAND_PROTOTYPE(doifconfig)
 				"INET=%s MASK=%s MAC=%s SPEED=%s%s DUPLEX=%s",
 				row[1], mask, row[2], speed, unit, duplex);
 
-			/* Tack on IPaliases */
-			if (vers >= 8) {
-				char *aliases = "";
+			/*
+			 * For older clients, we tack on IPaliases.
+			 * This used to be in the interfaces table as a
+			 * comma separated list, now we have to extract
+			 * it from the vinterfaces table.
+			 */
+			if (vers >= 8 && vers < 27) {
+				MYSQL_RES *res2;
+				MYSQL_ROW row2;
+				int nrows2;
 				
-				if (row[5] && row[5][0])
-					aliases = row[5];
+				res2 = mydb_query("select IP "
+						  "from vinterfaces "
+						  "where type='alias' "
+						  "and node_id='%s'",
+						  1, reqp->nodeid);
+				if (res2 == NULL)
+					goto adone;
 
+				nrows2 = (int)mysql_num_rows(res2);
 				bufp += OUTPUT(bufp, ebufp - bufp,
-					       " IPALIASES=\"%s\"", aliases);
+					       " IPALIASES=\"");
+				while (nrows2 > 0) {
+					nrows2--;
+					row2 = mysql_fetch_row(res2);
+					if (!row2 || !row2[0])
+						continue;
+					bufp += OUTPUT(bufp, ebufp - bufp,
+						       "%s", row2[0]);
+					if (nrows2 > 0)
+						bufp += OUTPUT(bufp,
+							       ebufp - bufp,
+							       ",");
+				}
+				bufp += OUTPUT(bufp, ebufp - bufp, "\"");
+				mysql_free_result(res2);
+			adone: ;
 			}
 
 			/*
@@ -1390,27 +1417,33 @@ COMMAND_PROTOTYPE(doifconfig)
 		mysql_free_result(res);
 	}
 
-	/* Veth interfaces are new. */
+	/*
+	 * Handle virtual interfaces for both physical nodes (multiplexed
+	 * links) and virtual nodes.  Veths (the first virtual interface type)
+	 * were added in rev 10.
+	 */
 	if (vers < 10)
 		return 0;
 
 	/*
-	 * First, return config info the physical interfaces so those can be
-	 * set up. We do this just for the physical node; no need to send it
-	 * back every single time!
+	 * First, return config info the physical interfaces underlying
+	 * the virtual interfaces so that those can be set up.
+	 *
+	 * For virtual nodes, we do this just for the physical node;
+	 * no need to send it back for every vnode!
 	 */
 	if (vers >= 18 && !reqp->isvnode) {
 		/*
-		 * First do phys interfaces underlying veth interfaces
+		 * First do phys interfaces underlying veth/vlan interfaces
 		 */
 		res = mydb_query("select distinct "
 				 "       i.interface_type,i.mac, "
 				 "       i.current_speed,i.duplex "
-				 "  from veth_interfaces as v "
+				 "  from vinterfaces as v "
 				 "left join interfaces as i on "
 				 "  i.node_id=v.node_id and i.iface=v.iface "
 				 "where v.iface is not null and "
-				 "      v.node_id='%s'",
+				 "      v.type!='alias' and v.node_id='%s'",
 				 4, reqp->pnodeid);
 		if (!res) {
 			error("IFCONFIG: %s: "
@@ -1426,10 +1459,13 @@ COMMAND_PROTOTYPE(doifconfig)
 			bufp += OUTPUT(bufp, ebufp - bufp,
 				       "INTERFACE IFACETYPE=%s "
 				       "INET= MASK= MAC=%s "
-				       "SPEED=%sMbps DUPLEX=%s "
-				       "IPALIASES=\"\" IFACE= "
-				       "RTABID= LAN=\n",
+				       "SPEED=%sMbps DUPLEX=%s ",
 				       row[0], row[1], row[2], row[3]);
+			if (vers < 27)
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       "IPALIASES=\"\" ");
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       "IFACE= RTABID= LAN=\n");
 
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -1488,10 +1524,11 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 
 	/*
-	 * Outside a vnode, return only those veths that have vnode=NULL,
-	 * which indicates its an emulated interface on a physical node. When
-	 * inside a vnode, only return veths for which vnode=curvnode,
-	 * which are the interfaces that correspond to a jail node.
+	 * Outside a vnode, return only those virtual devices that have
+	 * vnode=NULL, which indicates its an emulated interface on a
+	 * physical node. When inside a vnode, only return virtual devices
+	 * for which vnode=curvnode, which are the interfaces that correspond
+	 * to a jail node.
 	 */
 	if (reqp->isvnode)
 		sprintf(buf, "v.vnode_id='%s'", reqp->vnodeid);
@@ -1499,11 +1536,11 @@ COMMAND_PROTOTYPE(doifconfig)
 		strcpy(buf, "v.vnode_id is NULL");
 
 	/*
-	 * Find all the veth interfaces.
+	 * Find all the virtual interfaces.
 	 */
-	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       vl.vname,vll.idx "
-			 "  from veth_interfaces as v "
+	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
+			 "       v.type,vl.vname,vll.idx,vn.tag "
+			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lans as vl on "
@@ -1512,8 +1549,11 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "left join virt_lan_lans as vll on "
 			 "  vll.pid=vl.pid and vll.eid=vl.eid and "
 			 "  vll.vname=vl.vname "
+			 "left join vlans as vn on "
+			 "  vn.pid=vl.pid and vn.eid=vl.eid and "
+			 "  vn.virtual=vl.vname "
 			 "where v.node_id='%s' and %s",
-			 8, reqp->pid, reqp->eid, reqp->nickname,
+			 10, reqp->pid, reqp->eid, reqp->nickname,
 			 reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
@@ -1532,7 +1572,29 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 	while (nrows) {
 		char *bufp   = buf;
+		int isveth, doencap;
+
 		row = mysql_fetch_row(res);
+		nrows--;
+
+		if (strcmp(row[6], "veth") == 0) {
+			isveth = 1;
+			doencap = 1;
+		} else if (strcmp(row[6], "veth-ne") == 0) {
+			isveth = 1;
+			doencap = 0;
+		} else {
+			isveth = 0;
+			doencap = 0;
+		}
+
+		/*
+		 * Older clients only know how to deal with "veth" here.
+		 * "alias" is handled via IPALIASES= and "vlan" is unknown.
+		 * So skip all but isveth cases.
+		 */
+		if (vers < 27 && !isveth)
+			continue;
 
 		if (vers >= 16) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "INTERFACE ");
@@ -1544,36 +1606,44 @@ COMMAND_PROTOTYPE(doifconfig)
 		 * link).
 		 */
 		bufp += OUTPUT(bufp, ebufp - bufp,
-		       "IFACETYPE=veth "
-		       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
-		       row[1], CHECKMASK(row[4]), row[0], row[2],
-		       row[3] ? row[3] : "none");
+			       "IFACETYPE=%s "
+			       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
+			       isveth ? "veth" : row[6],
+			       row[1], CHECKMASK(row[4]), row[0], row[2],
+			       row[3] ? row[3] : "none");
 
 		if (vers >= 14) {
 			bufp += OUTPUT( bufp, ebufp - bufp,
-					" RTABID=%s", row[5] );
+					" RTABID=%s", row[5]);
 		}
 		if (vers >= 15) {
 			bufp += OUTPUT(bufp, ebufp - bufp,
-				       " ENCAPSULATE=%d",
-				       reqp->veth_encapsulate);
+				       " ENCAPSULATE=%d", doencap);
 		}
 		if (vers >= 17) {
-			bufp += OUTPUT(bufp, ebufp - bufp, " LAN=%s", row[6]);
+			bufp += OUTPUT(bufp, ebufp - bufp, " LAN=%s", row[7]);
 		}
 		/*
 		 * Return a VLAN tag.
-		 * XXX right now we compute this from the subnet.
+		 *
+		 * XXX for veth devices it comes out of the virt_lan_lans
+		 * table, for vlan devices it comes out of the vlans table,
+		 * for anything else it is zero.
 		 */
 		if (vers >= 20) {
-			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%s", row[7]);
+			char *tag = "0";
+			if (isveth)
+				tag = row[8];
+			else if (strcmp(row[6], "vlan") == 0)
+				tag = row[9];
+
+			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%s", tag);
 		}
 
 		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
 			info("IFCONFIG: %s", buf);
-		nrows--;
 	}
 	mysql_free_result(res);
 
@@ -2248,7 +2318,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	/*
 	 * Get link delay parameters for the machine. We store veth
 	 * interfaces in another dynamic table, so must join with both
-	 * interfaces and veth_interfaces to see which iface this link
+	 * interfaces and vinterfaces to see which iface this link
 	 * delay corresponds to. If there is a veth entry use that, else
 	 * use the normal interfaces entry. I do not like this much.
 	 * Maybe we should use the regular interfaces table, with type veth,
@@ -2267,7 +2337,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	else
 		strcpy(buf, "and v.vnode_id is NULL");
 
-	res = mydb_query("select i.MAC,type,vlan,vnode,d.ip,netmask, "
+	res = mydb_query("select i.MAC,d.type,vlan,vnode,d.ip,netmask, "
 		 "pipe,delay,bandwidth,lossrate, "
 		 "rpipe,rdelay,rbandwidth,rlossrate, "
 		 "q_red,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm, " 
@@ -2276,7 +2346,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
                  " from linkdelays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=d.iface "
-		 "left join veth_interfaces as v on "
+		 "left join vinterfaces as v on "
 		 " v.node_id=d.node_id and v.IP=d.ip "
 		 "where d.node_id='%s' %s",
 		 28, reqp->pnodeid, buf);
@@ -3898,7 +3968,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.sync_server,pt.class,pt.type, "
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,vt.isplabdslice, "
-				 " e.veth_encapsulate,ps.admin, "
+				 " ps.admin, "
 				 " e.elab_in_elab "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
@@ -3919,7 +3989,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " nk.node_id=nv.node_id "
 				 "where nv.node_id='%s' and "
 				 " (i.IP='%s' and i.role='ctrl') ",
-				 25, reqp->vnodeid, inet_ntoa(ipaddr));
+				 24, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -3929,7 +3999,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,0, "
-				 " e.veth_encapsulate,0,e.elab_in_elab "
+				 " 0,e.elab_in_elab "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3941,7 +4011,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=n.node_id "
 				 "where i.IP='%s' and i.role='ctrl'", /*XXX*/
-				 25, inet_ntoa(ipaddr));
+				 24, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3971,8 +4041,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
 	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);
 	reqp->isplabdslice = (! strcasecmp(row[21], "0") ? 0 : 1);
-	reqp->isplabsvc    = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
-	reqp->elab_in_elab = (row[24] && strcasecmp(row[24], "0")) ? 1 : 0;
+	reqp->isplabsvc    = (row[22] && strcasecmp(row[22], "0")) ? 1 : 0;
+	reqp->elab_in_elab = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
 
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
@@ -4012,9 +4082,6 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		/* event key for the experiment */
 		if (row[20]) 
 			strcpy(reqp->eventkey, row[20]);
-
-		/* Only meaningful when reserved to an experiment */
-		reqp->veth_encapsulate = (! strcasecmp(row[22], "0") ? 0 : 1);
 	}
 	
 	if (row[9])
@@ -6470,12 +6537,12 @@ COMMAND_PROTOTYPE(dotraceconfig)
 			   "       t.trace_type,t.trace_expr,t.trace_snaplen, "
 			   "       t.idx "
 			   "from traces as t "
-			   "left join veth_interfaces as i0 on "
+			   "left join vinterfaces as i0 on "
 			   " i0.vnode_id=t.node_id and "
-			   " i0.veth_id=SUBSTRING(t.iface0, 5) "
-			   "left join veth_interfaces as i1 on "
+			   " i0.unit=SUBSTRING(t.iface0, 5) "
+			   "left join vinterfaces as i1 on "
 			   " i1.vnode_id=t.node_id and "
-			   " i1.veth_id=SUBSTRING(t.iface1, 5) "
+			   " i1.unit=SUBSTRING(t.iface1, 5) "
 			   "left join reserved as r on r.vname=t.vnode and "
 			   "     r.pid='%s' and r.eid='%s' "
 			   "left join virt_lans as v on v.vname=t.linkvname  "

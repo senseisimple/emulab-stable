@@ -411,10 +411,10 @@ if ($query_result->numrows) {
 
     #
     # The MAC address is either in interfaces (for physical interfaces)
-    # or veth_interfaces (for virtual interfaces).
+    # or vinterfaces (for virtual interfaces).
     #
     # The multiplexing style is either "veth" if there is a row in the
-    # veth_interfaces table or "none" otherwise.  This is reflected in
+    # vinterfaces table or "none" otherwise.  This is reflected in
     # the following query as: style is "veth" if vmac!=NULL.
     #
     # Linkdelays are in use if the link has a row in the linkdelays table.
@@ -422,27 +422,38 @@ if ($query_result->numrows) {
     # We could look in the delays table to further distinguish unshaped
     # links, but at the moment, we don't need that info.
     #
+    # Argh...further complicated by the reserved table node_id being either
+    # a pnode or a vnode name while vinterfaces identifies a pnode with
+    # node_id if vnode_id==NULL and a vnode with vnode_id if vnode_id!=NULL.
+    #
     $query_result =
-	DBQueryFatal("select v.member,v.vname,i.mac,ve.mac,l.iface".
+	DBQueryFatal("select v.member,v.vname,i.mac,vi.mac,vi.type,l.iface".
 		     " from reserved as r join virt_lans as v".
 		     " left join interfaces as i".
 		     "  on v.ip=i.IP and r.node_id=i.node_id".
 		     " left join linkdelays as l".
 		     "  on r.pid=l.pid and r.eid=l.eid and".
 		     "   v.vname=l.vlan and v.vnode=l.vnode and v.ip=l.ip".
-		     " left join veth_interfaces as ve".
-		     "  on v.ip=ve.IP and r.node_id=ve.vnode_id".
+		     " left join vinterfaces as vi".
+		     "  on v.ip=vi.IP and".
+		     "    (vi.vnode_id is NULL and r.node_id=vi.node_id".
+		     "      or".
+		     "    vi.vnode_id is not NULL and r.node_id=vi.vnode_id)".
 		     " where".
 		     "  r.pid=v.pid and r.eid=v.eid and r.vname=v.vnode and".
 		     "  r.pid='$pid' and r.eid='$eid'");
     if ($query_result->numrows) {
-	while (my ($memb,$vlan,$imac,$vmac,$iface) =
+	while (my ($memb,$vlan,$imac,$vmac,$vtype,$iface) =
 	       $query_result->fetchrow_array) {
 	    if (exists($virt_lans{$vlan}->{"MEMBERS"}->{$memb})) {
 		my $member = $virt_lans{$vlan}->{"MEMBERS"}->{$memb};
 		if (defined($vmac)) {
 		    $member->{"mac"} = $vmac;
-		    $member->{"encap"} = "veth";
+		    if ($vtype eq "veth") {
+			$member->{"encap"} = "veth";
+		    } else {
+			$member->{"encap"} = "none";
+		    }
 		} else {
 		    $member->{"mac"} = $imac;
 		    $member->{"encap"} = "none";

@@ -49,6 +49,7 @@ proc tb-set-multiplexed {link onoff} {}
 proc tb-set-endnodeshaping {link onoff} {}
 proc tb-set-noshaping {link onoff} {}
 proc tb-set-useveth {link onoff} {}
+proc tb-set-link-encap {link style} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
 proc tb-set-sync-server {node} {}
@@ -57,6 +58,7 @@ proc tb-set-cpu-usage {usage} {}
 proc tb-bind-parent {sub phys} {}
 proc tb-fix-current-resources {onoff} {}
 proc tb-set-encapsulate {onoff} {}
+proc tb-set-vlink-emulation {style} {}
 proc tb-set-jail-os {os} {}
 proc tb-set-delay-os {os} {}
 proc tb-set-delay-capacity {cap} {}

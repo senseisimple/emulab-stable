@@ -67,6 +67,7 @@ my $GROUPADD	= "/usr/sbin/groupadd";
 my $GROUPDEL	= "/usr/sbin/groupdel";
 my $IFCONFIGBIN = "/sbin/ifconfig";
 my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s";
+my $VLANCONFIG  = "/sbin/vconfig";
 my $IFC_1000MBS  = "1000baseTx";
 my $IFC_100MBS  = "100baseTx";
 my $IFC_10MBS   = "10baseT";
@@ -103,10 +104,10 @@ sub os_account_cleanup()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$$;$$)
+sub os_ifconfig_line($$$$$$$;$$$)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
-	$iface_type, $settings, $rtabid) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type,
+	$settings, $rtabid, $cookie) = @_;
     my ($miirest, $miisleep, $miisetspd, $media);
     my ($uplines, $downlines);
 
@@ -344,30 +345,85 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines = "/sbin/mii-tool --force=$media $iface\n    ";
     }
 
-    if ($inet ne "") {
+    if ($inet eq "") {
+	$uplines .= "$IFCONFIGBIN $iface up";
+    }
+    else {
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
 	$downlines = "$IFCONFIGBIN $iface down";
-
-	# handle aliases
-	my $aix = 0;
-	foreach my $alias (split(',', $aliases)) {
-	    my $aif = "$iface:$aix";
-	    $uplines   .= "\n    ";
-	    $uplines   .= sprintf($IFCONFIG, $aif, $alias, $mask);
-	    $downlines .= "\n    $IFCONFIGBIN $aif down";
-	    $aix++;
-	}
     }
     
     return ($uplines, $downlines);
 }
 
 #
-# Specialized function for configing locally hacked veth devices.
+# Specialized function for configing virtual ethernet devices:
 #
-sub os_ifconfig_veth($$$$$;$$$)
+#	'veth'	locally hacked veth devices (not on Linux)
+#	'vlan'	802.1q tagged vlan devices
+#	'alias'	IP aliases on physical interfaces
+#
+sub os_ifconfig_veth($$$$$;$$$$%)
 {
-    return "";
+    my ($iface, $inet, $mask, $id, $vmac,
+	$rtabid, $encap, $vtag, $itype, $cookie) = @_;
+    my ($uplines, $downlines);
+
+    if ($itype !~ /^(alias|vlan)$/) {
+	if ($itype eq "veth") {
+	    warn("veth${id}: 'veth' not supported on Linux\n");
+	} else {
+	    warn("Unknown virtual interface type $itype\n");
+	}
+	return "";
+    }
+
+    #
+    # IP aliases
+    #
+    if ($itype eq "alias") {
+	my $aif = "$iface:$id";
+
+	$uplines   = sprintf($IFCONFIG, $aif, $inet, $mask);
+	$downlines = "$IFCONFIGBIN $aif down";
+
+	return ($uplines, $downlines);
+    }
+
+    #
+    # VLANs
+    #   insmod 8021q (once only)
+    #   vconfig set_name_type VLAN_PLUS_VID_NO_PAD (once only)
+    #
+    #	ifconfig eth0 up (should be done before we are ever called)
+    #	vconfig add eth0 601 
+    #   ifconfig vlan601 inet ...
+    #
+    #   ifconfig vlan601 down
+    #	vconfig rem vlan601
+    #
+    if ($itype eq "vlan") {
+	if (!defined($vtag)) {
+	    warn("No vtag in veth config\n");
+	    return "";
+	}
+
+	# one time stuff
+	if (!exists($cookie->{"vlan"})) {
+	    $uplines  = "/sbin/insmod 8021q >/dev/null 2>&1\n    ";
+	    $uplines .= "$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD\n    ";
+	    $cookie->{"vlan"} = 1;
+	}
+
+	my $vdev = "vlan$vtag";
+
+	$uplines   .= "$VLANCONFIG add $iface $vtag\n    ";
+	$uplines   .= sprintf($IFCONFIG, $vdev, $inet, $mask);
+	$downlines .= "$IFCONFIGBIN $vdev down\n    ";
+	$downlines .= "$VLANCONFIG rem $vdev";
+    }
+
+    return ($uplines, $downlines);
 }
 
 #

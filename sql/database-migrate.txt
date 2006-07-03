@@ -3434,3 +3434,49 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table widearea_nodeinfo add latitude float(3,5);
         alter table widearea_nodeinfo add longitude float(3,5);
+
+4.71: Support for 802.1q tagged VLAN based virtual interfaces.
+      First, generalize the encapsulation field.  For compatibility,
+      we create a new field, we'll delete the old veth_encapsulate at
+      some future time.  We also add a VLAN number field to the vlans
+      table, create
+
+        alter table experiments add encap_style \
+		enum('alias','veth','veth-ne','vlan','default') \
+		NOT NULL default 'default' after veth_encapsulate;
+	insert into table_regex values \
+		('experiments','encap_style','text','regex','^(alias|veth|veth-ne|vlan|default)$',0,0,NULL);
+	update experiments set encap_style='veth-ne' where veth_encapsulate=0;
+
+	alter table virt_lans add encap_style \
+		enum('alias','veth','veth-ne','vlan','default') \
+		NOT NULL default 'default' after usevethiface;
+	insert into table_regex values \
+		('virt_lans','encap_style','text','redirect','experiments:encap_style',0,0,NULL);
+	update virt_lans set encap_style='veth' where usevethiface=1;
+
+	alter table vlans add tag smallint(5) NOT NULL default '0' \
+		after id;
+        alter table vlans drop index pid;
+        alter table vlans add index pid (pid,eid,virtual);
+
+	alter table interfaces drop column IPalias;
+
+	CREATE TABLE vinterfaces (
+	  node_id varchar(32) NOT NULL default '',
+	  unit int(10) unsigned NOT NULL auto_increment,
+	  mac varchar(12) NOT NULL default '000000000000',
+	  IP varchar(15) default NULL,
+	  mask varchar(15) default NULL,
+	  type enum('alias','veth','veth-ne','vlan') NOT NULL default 'veth',
+	  iface varchar(10) default NULL,
+	  rtabid smallint(5) unsigned NOT NULL default '0',
+	  vnode_id varchar(32) default NULL,
+	  PRIMARY KEY (node_id, unit),
+	  KEY bynode (node_id, iface),
+	  KEY type (type)
+	) TYPE=MyISAM;
+
+      To populate the vinterfaces table run:
+
+        sudo ./initvinterfaces.pl

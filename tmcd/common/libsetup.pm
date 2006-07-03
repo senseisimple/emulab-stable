@@ -47,7 +47,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 26; };
+sub TMCD_VERSION()	{ 27; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -497,7 +497,7 @@ sub getifconfig($)
     }
     
     my $ethpat  = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
-    $ethpat    .= q(MAC=(\w*) SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)" );
+    $ethpat    .= q(MAC=(\w*) SPEED=(\w*) DUPLEX=(\w*) );
     $ethpat    .= q(IFACE=(\w*) RTABID=(\d*) LAN=([-\w\(\)]*));
 
     my $vethpat = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
@@ -532,10 +532,9 @@ sub getifconfig($)
 	    my $mac      = $4;
 	    my $speed    = $5; 
 	    my $duplex   = $6;
-	    my $aliases  = $7;
-	    my $iface    = $8;
-	    my $rtabid   = $9;
-	    my $lan      = $10;
+	    my $iface    = $7;
+	    my $rtabid   = $8;
+	    my $lan      = $9;
 
             #
             # XXX GNU Radio hack
@@ -559,14 +558,14 @@ sub getifconfig($)
 		next;
 	    }
 
-	    $ifconfig->{"ISVETH"}   = 0;
+	    $ifconfig->{"ISVIRT"}   = 0;
 	    $ifconfig->{"TYPE"}     = $ifacetype;
 	    $ifconfig->{"IPADDR"}   = $inet;
 	    $ifconfig->{"IPMASK"}   = $mask;
 	    $ifconfig->{"MAC"}      = $mac;
 	    $ifconfig->{"SPEED"}    = $speed;
 	    $ifconfig->{"DUPLEX"}   = $duplex;
-	    $ifconfig->{"ALIASES"}  = $aliases;
+	    $ifconfig->{"ALIASES"}  = "";	# gone as of version 27
 	    $ifconfig->{"IFACE"}    = $iface;
 	    $ifconfig->{"RTABID"}   = $rtabid;
 	    $ifconfig->{"LAN"}      = $lan;
@@ -575,6 +574,7 @@ sub getifconfig($)
 	    $ifacehash{$mac}        = $ifconfig;
 	}
 	elsif ($str =~ /$vethpat/) {
+	    my $ifacetype= $1;
 	    my $inet     = $2;
 	    my $mask     = $3;
 	    my $id       = $4;
@@ -613,7 +613,8 @@ sub getifconfig($)
 		}
 	    }
 
-	    $ifconfig->{"ISVETH"}   = 1;
+	    $ifconfig->{"ISVIRT"}   = 1;
+	    $ifconfig->{"ITYPE"}    = $ifacetype;
 	    $ifconfig->{"IPADDR"}   = $inet;
 	    $ifconfig->{"IPMASK"}   = $mask;
 	    $ifconfig->{"ID"}       = $id;
@@ -752,10 +753,17 @@ sub genhostsfile($@)
 
 #
 # Convert from MAC to iface name (eth0/fxp0/etc) using little helper program.
+#
+# If the optional second arg is set, it is an IP address with which we
+# validate the interface.  If the queries by MAC and IP return different
+# interfaces, we believe the latter.  We do this because some virtual
+# interfaces (like vlans and IP aliases on Linux) use the MAC address of
+# the underlying physical device.  Hence, look up by MAC on those will
+# return the physical interface.
 # 
-sub findiface($)
+sub findiface($;$)
 {
-    my($mac) = @_;
+    my($mac,$ip) = @_;
     my($iface);
 
     open(FIF, FINDIF . " $mac |")
@@ -768,6 +776,20 @@ sub findiface($)
     }
     
     $iface =~ s/\n//g;
+
+    if (defined($ip)) {
+	open(FIF, FINDIF . " -i $ip |")
+	    or die "Cannot start " . FINDIF . ": $!";
+	my $ipiface = <FIF>;
+	if (!close(FIF)) {
+	    return 0;
+	}
+	$ipiface =~ s/\n//g;
+	if ($ipiface ne "" && $ipiface ne $iface) {
+	    $iface = $ipiface;
+	}
+    }
+
     return $iface;
 }
 

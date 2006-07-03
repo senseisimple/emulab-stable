@@ -898,14 +898,54 @@ proc tb-set-noshaping {lanlink onoff} {
 
 #
 # For emulated links, allow veth device to be used. Not a user option.
+# XXX backward compat, use tb-set-link-encap now.
 # 
 proc tb-set-useveth {lanlink onoff} {
     if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
 	perror "\[tb-set-useveth] $link is not a link or a lan."
 	return
     }
-    $lanlink set useveth $onoff
+    if {$onoff == 0} {
+	$lanlink set encap "default"
+    } else {
+	$lanlink set encap "veth"
+    }
 }
+
+#
+# For emulated links, allow specifying encapsulation style.
+# Generalizes tb-set-useveth.
+# 
+proc tb-set-link-encap {lanlink style} {
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-link-encap] $link is not a link or a lan."
+	return
+    }
+
+    switch -- $style {
+	"alias" {
+	    set style "alias"
+	}
+	"veth" {
+	    set style "veth"
+	}
+	"veth-ne" {
+	    set style "veth-ne"
+	}
+	"vlan" {
+	    perror "\[tb-set-link-encap] 'vlan' encap not yet supported"
+	    return
+#	    set style "vlan"
+	}
+	default {
+	    perror "\[tb-set-link-encap] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
+	    return
+	}
+    }
+
+    $lanlink set encap $style
+}
+
 
 #
 # Control linkdelays for lans and links
@@ -1041,13 +1081,44 @@ proc tb-fix-current-resources {onoff} {
 # Control veth encapsulation. 
 # 
 proc tb-set-encapsulate {onoff} {
-    var_import ::GLOBALS::veth_encapsulate
+    var_import ::GLOBALS::vlink_encapsulate
 
-    if {$onoff < 0 || $onoff > 1} {
-	perror "\[tb-set-encapsulate] must be 0 or 1."
-	return
+    if {$onoff == 0} {
+	set vlink_encapsulate "veth-ne"
+    } elseif {$onoff == 1} {
+	set vlink_encapsulate "default"
+    } else {
+	perror "\[tb-set-encapsulate] $onoff must be 0/1"
     }
-    set veth_encapsulate $onoff
+}
+
+#
+# Control virtual link emulation style.
+# 
+proc tb-set-vlink-emulation {style} {
+    var_import ::GLOBALS::vlink_encapsulate
+
+    switch -- $style {
+	"alias" {
+	    set style "alias"
+	}
+	"veth" {
+	    set style "veth"
+	}
+	"veth-ne" {
+	    set style "veth-ne"
+	}
+	"vlan" {
+	    perror "\[tb-set-encapsulate] 'vlan' encap not yet supported"
+	    return
+#	    set style "vlan"
+	}
+	default {
+	    perror "\[tb-set-encapsulate] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
+	    return
+	}
+    }
+    set vlink_encapsulate $style
 }
 
 #

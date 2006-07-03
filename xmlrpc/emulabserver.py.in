@@ -1894,7 +1894,7 @@ class experiment:
                 result["interfaces"].append(scrubdict(intf))
                 pass
             dbres = DBQuery("SELECT i.* FROM reserved as r "
-                            "LEFT JOIN veth_interfaces as i "
+                            "LEFT JOIN vinterfaces as i "
                             " on r.node_id=i.node_id "
                             "WHERE r.pid=%s and r.eid=%s "
                             "and i.ip is not NULL and i.ip!=''",

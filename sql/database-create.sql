@@ -776,6 +776,7 @@ CREATE TABLE experiments (
   idx int(10) unsigned NOT NULL auto_increment,
   sim_reswap_count smallint(5) unsigned NOT NULL default '0',
   veth_encapsulate tinyint(4) NOT NULL default '1',
+  encap_style enum('alias','veth','veth-ne','vlan','default') NOT NULL default 'default',
   allowfixnode tinyint(4) NOT NULL default '1',
   jail_osname varchar(20) default NULL,
   delay_osname varchar(20) default NULL,
@@ -1100,7 +1101,6 @@ CREATE TABLE interfaces (
   port tinyint(3) unsigned NOT NULL default '0',
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
-  IPalias varchar(15) default NULL,
   IPaliases text,
   mask varchar(15) default NULL,
   interface_type varchar(30) default NULL,
@@ -2565,6 +2565,25 @@ CREATE TABLE veth_interfaces (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `vinterfaces`
+--
+
+CREATE TABLE vinterfaces (
+  node_id varchar(32) NOT NULL default '',
+  unit int(10) unsigned NOT NULL auto_increment,
+  mac varchar(12) NOT NULL default '000000000000',
+  IP varchar(15) default NULL,
+  mask varchar(15) default NULL,
+  type enum('alias','veth','veth-ne','vlan') NOT NULL default 'veth',
+  iface varchar(10) default NULL,
+  rtabid smallint(5) unsigned NOT NULL default '0',
+  vnode_id varchar(32) default NULL,
+  PRIMARY KEY  (node_id,unit),
+  KEY bynode (node_id,iface),
+  KEY type (type)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `virt_agents`
 --
 
@@ -2672,6 +2691,7 @@ CREATE TABLE virt_lans (
   nobwshaping tinyint(4) default '0',
   mustdelay tinyint(1) default '0',
   usevethiface tinyint(4) default '0',
+  encap_style enum('alias','veth','veth-ne','vlan','default') NOT NULL default 'default',
   trivial_ok tinyint(4) default '1',
   protocol varchar(30) NOT NULL default 'ethernet',
   is_accesspoint tinyint(4) default '0',
@@ -2893,8 +2913,9 @@ CREATE TABLE vlans (
   virtual varchar(64) default NULL,
   members text NOT NULL,
   id int(11) NOT NULL auto_increment,
+  tag smallint(5) NOT NULL default '0',
   PRIMARY KEY  (id),
-  KEY pid (pid,eid)
+  KEY pid (pid,eid,virtual)
 ) TYPE=MyISAM;
 
 --

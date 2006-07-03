@@ -172,10 +172,7 @@ sub LinkDelaySetup()
 	    
 	    $delay =~ /$pat/;
 
-	    #
-	    # tmcd returns the interfaces as MAC addrs.
-	    # 
-	    my $iface     = findiface($1);
+	    my $iface     = $1;
 	    my $type      = $2;
 	    my $linkname  = $3;
 	    my $vnode     = $4;
@@ -207,6 +204,14 @@ sub LinkDelaySetup()
 	    my $setbit    = $25;
 	    my $droptail  = $26;
 	    my $gentle    = $27;
+
+	    #
+	    # tmcd returns the interfaces as MAC addrs, so convert to
+	    # an interface name.  Note that we also use the given IP
+	    # address which is the unique characteristic for some forms
+	    # of virtual interface.
+	    # 
+	    $iface        = findiface($iface,$inet);
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
