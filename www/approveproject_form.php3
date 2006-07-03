@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -42,42 +42,35 @@ if (! TBValidProject($pid)) {
 }
 
 echo "<center><h3>You have the following choices:</h3></center>
-      <table align=center border=0>
+      <table class=stealth align=center border=0>
         <tr>
-            <td>Deny</td>
-            <td>-</td>
-            <td>Deny project application (kills project records)</td>
+            <td class=stealth>Deny</td>
+            <td class=stealth>-</td>
+            <td class=stealth>Deny project application (kills project records)</td>
         </tr>
 
         <tr>
-            <td>Destroy</td>
-            <td>-</td>
-            <td>Deny project application, and kill the user account</td>
+            <td class=stealth>Destroy</td>
+            <td class=stealth>-</td>
+            <td class=stealth>Deny project application, and kill the user account</td>
         </tr>
 
         <tr>
-            <td>Annihilate</td>
-            <td>-</td>
-            <td>Deny project application silently,
-                    and kill the user account silently</td>
+            <td class=stealth>Approve</td>
+            <td class=stealth>-</td>
+            <td class=stealth>Approve the project</td>
         </tr>
 
         <tr>
-            <td>Approve</td>
-            <td>-</td>
-            <td>Approve the project</td>
+            <td class=stealth>More Info</td>
+            <td class=stealth>-</td>
+            <td class=stealth>Ask for more info</td>
         </tr>
 
         <tr>
-            <td>More Info</td>
-            <td>-</td>
-            <td>Ask for more info</td>
-        </tr>
-
-        <tr>
-            <td>Postpone</td>
-            <td>-</td>
-            <td>Twiddle your thumbs some more</td>
+            <td class=stealth>Postpone</td>
+            <td class=stealth>-</td>
+            <td class=stealth>Twiddle your thumbs some more</td>
         </tr>
       </table>\n";
 
@@ -126,7 +119,6 @@ echo "
                       <option value='moreinfo'>More Info</option>
                       <option value='deny'>Deny</option>
                       <option value='destroy'>Destroy</option>
-                      <option value='annihilate'>Annihilate</option>
               </select>";
 if (!$approvable) {
 	echo "              <br><b>WARNING:</b> Project cannot be approved,";
@@ -134,6 +126,13 @@ if (!$approvable) {
 }
 echo "
           </td>
+       </tr>\n";
+
+echo "<tr>
+         <td align=center>
+	    <input type=checkbox value=Yep
+                     name=silent>Silent (no email sent for deny,destroy)
+	 </td>
        </tr>\n";
 
 #

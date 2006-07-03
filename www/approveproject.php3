@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -131,11 +131,15 @@ elseif (strcmp($approval, "moreinfo") == 0) {
           </h3>\n";
 }
 elseif ((strcmp($approval, "deny") == 0) ||
-	(strcmp($approval, "annihilate") == 0) ||
 	(strcmp($approval, "destroy") == 0)) {
     SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 1);
+
+    $sendemail = 1;
+    if (isset($silent) && $silent == "Yep") {
+	$sendemail = 0;
+    }
     
-    if (strcmp($approval, "annihilate")) {
+    if ($sendemail) {
 	TBMAIL("$headname '$headuid' <$headuid_email>",
 	       "Project '$pid' Denied",
 	       "\n".
@@ -153,11 +157,10 @@ elseif ((strcmp($approval, "deny") == 0) ||
     #
     # Well, if the "destroy" option was given, kill the users account.
     #
-    if ((strcmp($approval, "annihilate") == 0) ||
-	(strcmp($approval, "destroy") == 0)) {
+    if ($approval == "destroy") {
 	SUEXEC($uid, $TBADMINGROUP, "webrmuser $headuid", 1); 
 	
-	if (strcmp($approval, "annihilate")) {
+	if ($sendemail) {
 	    TBMAIL("$headname '$headuid' <$headuid_email>",
 		   "Account '$headuid' Terminated",
 		   "\n".
