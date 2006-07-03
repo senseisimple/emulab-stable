@@ -407,7 +407,7 @@ proc set {args} {
 	# This is the special OPT array, which we need to keep ordered
 	# when inserting into the DB.
 	#
-	if {[regexp {^opt\((.*)\)} $var d optname]} {
+	if {[regexp {^opt\(([-_0-9a-zA-Z]+)\)} $var d optname]} {
 	    real_set optarray_order($optarray_count) $optname
 	    incr optarray_count
 	}
