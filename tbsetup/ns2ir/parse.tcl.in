@@ -403,6 +403,10 @@ proc set {args} {
 	real_set var [lindex $args 0]
 	real_set val [lindex $args 1]
 
+	#
+	# This is the special OPT array, which we need to keep ordered
+	# when inserting into the DB.
+	#
 	if {[regexp {^opt\((.*)\)} $var d optname]} {
 	    real_set optarray_order($optarray_count) $optname
 	    incr optarray_count
