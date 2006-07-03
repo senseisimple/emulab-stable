@@ -97,17 +97,32 @@ sub Lookup($$$)
     return $self;
 }
 # accessors
-sub pid($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'pid'}); }
-sub gid($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'gid'}); }
-sub eid($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'eid'}); }
-sub idx($)   { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'idx'}); }
-sub path($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'path'}); }
-sub state($) { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'state'}); }
-sub rsrcidx($) { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{'rsrcidx'});}
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{$_[1]}); }
 
-sub Created($) {
-    return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{'expt_created'});
-}
+sub pid($)	    { return field($_[0], 'pid'); }
+sub gid($)	    { return field($_[0], 'gid'); }
+sub eid($)	    { return field($_[0], 'eid'); }
+sub idx($)	    { return field($_[0], 'idx'); }
+sub path($)	    { return field($_[0], 'path'); }
+sub state($)	    { return field($_[0], 'state'); }
+sub batchstate($)   { return field($_[0], 'batchstate'); }
+sub batchmode($)    { return field($_[0], 'batchmode'); }
+sub rsrcidx($)      { return field($_[0], 'rsrcidx'); }
+sub creator($)      { return field($_[0], 'expt_head_uid');}
+sub canceled($)     { return field($_[0], 'canceled'); }
+sub locked($)       { return field($_[0], 'expt_locked'); }
+sub elabinelab($)   { return field($_[0], 'elab_in_elab');}
+sub lockdown($)     { return field($_[0], 'lockdown'); }
+sub created($)      { return field($_[0], 'expt_created'); }
+sub swapper($)      { return field($_[0], 'expt_swap_uid');}
+sub swappable($)    { return field($_[0], 'swappable');}
+sub idleswap($)     { return field($_[0], 'idleswap');}
+sub autoswap($)     { return field($_[0], 'autoswap');}
+sub noswap_reason($){ return field($_[0], 'noswap_reason');}
+sub noidleswap_reason($){ return field($_[0], 'noidleswap_reason');}
+sub idleswap_timeout($) { return field($_[0], 'idleswap_timeout');}
+sub autoswap_timeout($) { return field($_[0], 'autoswap_timeout');}
+sub prerender_pid($)    { return field($_[0], 'prerender_pid');}
 
 #
 # Lookup a template given an experiment index.
@@ -126,6 +141,41 @@ sub LookupByIndex($$)
     my ($pid, $eid) = $query_result->fetchrow_array();
 
     return Experiment->Lookup($pid, $eid);
+}
+
+#
+# LockTables simple locks the given tables, and then refreshes the
+# experiment instance (thereby getting the data from the DB after
+# the tables are locked).
+#
+sub LockTables($;$)
+{
+    my ($self, $spec) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $spec  = "experiments write"
+	if (!defined($spec));
+    $spec .= ", experiment_stats read";
+    
+    DBQueryWarn("lock tables $spec")
+	or return -1;
+	
+    return $self->Refresh();
+}
+sub UnLockTables($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    DBQueryWarn("unlock tables")
+	or return -1;
+    return 0;
 }
 
 #
@@ -326,7 +376,7 @@ sub Delete($;$)
 
     TBExptDestroy($pid, $eid);
 
-    return
+    return 0
 	if (! $purge);
     
     #
@@ -396,6 +446,23 @@ sub Stringify($)
     my $eid   = $self->eid();
 
     return "[Experiment: $pid/$eid]";
+}
+
+#
+# Check permissions
+#
+sub AccessCheck($$$)
+{
+    my ($self, $uid, $access_type) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return TBExptAccessCheck($uid, $pid, $eid, $access_type);
 }
 
 #
@@ -510,6 +577,41 @@ sub Unlock($;$)
     return 0;
 }
 
+sub Lock(;$)
+{
+    my ($self, $newstate) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $sclause = (defined($newstate) ? ",state='$newstate' " : "");
+
+    my $query_result =
+	DBQueryWarn("update experiments set expt_locked=now() $sclause ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return -1;
+    }
+    
+    if (defined($newstate)) {
+	$self->{'EXPT'}->{'state'} = $newstate;
+
+	if ($EVENTSYS) {
+	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
+			  objname   => "$pid/$eid",
+			  eventtype => $newstate,
+			  expt      => "$pid/$eid",
+			  host      => $BOSSNODE);
+	}
+    }
+    return 0;
+}
+
 sub SetState($$)
 {
     my ($self, $newstate) = @_;
@@ -617,6 +719,24 @@ sub CloseLogFile($)
     my $eid = $self->eid();
 
     TBExptCloseLogFile($pid, $eid);    
+    return 0;
+}
+
+#
+# And clear it ...
+#
+sub ClearLogFile($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    TBExptClearLogFile($pid, $eid);    
     return 0;
 }
 
@@ -784,6 +904,42 @@ sub SetSwapInfo($$)
 }
 
 #
+# Just the swap uid,
+#
+sub SetSwapper($$)
+{
+    my ($self, $dbuid) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    
+    TBExptSetSwapUID($pid, $eid, $dbuid);
+    return $self->Refresh();
+}
+
+#
+# Just the swap time.
+#
+sub SetSwapTime($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    
+    TBSetExpSwapTime($pid, $eid);
+    return 0;
+}
+
+#
 # Set the cancel flag.
 #
 sub SetCancelFlag($$)
@@ -799,6 +955,128 @@ sub SetCancelFlag($$)
     
     TBSetCancelFlag($pid, $eid, $flag);
     return $self->Refresh();
+}
+
+#
+# Clear the panic bit.
+#
+sub ClearPanicBit($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    
+    TBExptClearPanicBit($pid, $eid);
+    return 0;
+}
+
+#
+# Is experiment firewalled?
+#
+sub IsFirewalled($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return TBExptFirewall($pid, $eid);
+}
+
+#
+# Update the idleswap timeout. Why?
+#
+sub UpdateIdleSwapTime($$)
+{
+    my ($self, $newtimeout) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    DBQueryWarn("update experiments set idleswap_timeout='$newtimeout' ".
+		"where eid='$eid' and pid='$pid'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Experiment tables.
+#
+sub BackupVirtualState($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (TBExptBackupVirtualState($pid, $eid));
+
+    return 0;
+}
+sub RemoveVirtualState($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (TBExptRemoveVirtualState($pid, $eid));
+
+    return 0;
+}
+sub RestoreVirtualState($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (TBExptRestoreVirtualState($pid, $eid));
+
+    return 0;
+}
+sub ClearBackupState($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    TBExptClearBackupState($pid, $eid);
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

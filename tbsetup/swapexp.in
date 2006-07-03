@@ -80,6 +80,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libArchive;
+use Experiment;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -221,8 +222,6 @@ else {
     tbdie("Tainted argument $eid!");
 }
 my $repfile = "$eid.report";
-my $workdir = TBExptWorkDir($pid, $eid);
-my $userdir = TBExptUserDir($pid, $eid);
 my $tempnsfile;
 my $modnsfile;
 my $nsfile;
@@ -275,6 +274,15 @@ if ($inout eq "modify" && @ARGV > 2) {
     $modnsfile = "${eid}-modify.ns";
 }
 
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid in the Emulab Database.\n");
+}
+
+my $workdir = $experiment->WorkDir();
+my $userdir = $experiment->UserDir();
+
 #
 # Verify user and get his DB uid.
 #
@@ -300,7 +308,7 @@ tblog_set_info($pid,$eid,$UID);
 # Note that any script down the line has to do an admin check also. 
 #
 if ($UID && !$isadmin &&
-    !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
+    ! $experiment->AccessCheck($dbuid, TB_EXPT_DESTROY)) {
     tbdie("You do not have permission to swap or modify this experiment!");
 }
 
@@ -330,7 +338,7 @@ if ($overquota) {
 # Temp fix; Disallow swapmod to firewalled experiments. This will come
 # out later.
 #
-my $firewalled = TBExptFirewall($pid, $eid);
+my $firewalled = $experiment->IsFirewalled();
 
 #
 # see if we've got a robot exp (this isn't the only check; if this is a
@@ -349,36 +357,31 @@ $robotexp =
 # terminating consists of a couple of different experiment states down inside
 # the tb scripts.
 #
-DBQueryFatal("lock tables experiments write");
+$experiment->LockTables("experiments write") == 0
+    or die("*** $0:\n".
+	   "    Could not lock experiment tables for $pid/$eid!\n");
 
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result->numrows) {
-    tbdie("No such experiment $pid/$eid exists!");
-}
-my %hashrow = $query_result->fetchhash();
-my $expt_head_login = $hashrow{'expt_head_uid'};
-my $last_swap_uid   = $hashrow{'expt_swap_uid'};
-my $estate          = $hashrow{'state'};
-my $batchstate      = $hashrow{'batchstate'};
-my $expt_path       = $hashrow{'path'};
-my $expt_locked     = $hashrow{'expt_locked'};
-my $isbatchexpt     = $hashrow{'batchmode'};
-my $canceled        = $hashrow{'canceled'};
-my $swappablebit= $hashrow{'swappable'};
-my $idleswapbit = $hashrow{'idleswap'};
-my $autoswapbit = $hashrow{'autoswap'};
-my $swappablestr= ( $swappablebit ? "Yes" : "No" );
-my $idleswapstr = ( $idleswapbit ? "Yes" : "No" );
-my $autoswapstr = ( $autoswapbit ? "Yes" : "No" );
-my $noswap      = $hashrow{'noswap_reason'};
-my $noidleswap  = $hashrow{'noidleswap_reason'};
-my $idleswaptime= $hashrow{'idleswap_timeout'} / 60.0;
-my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
-my $rendering   = $hashrow{'prerender_pid'};
-my $elabinelab  = $hashrow{'elab_in_elab'};
-my $lockdown    = $hashrow{'lockdown'};
+my $expt_head_login = $experiment->creator();
+my $estate          = $experiment->state();
+my $batchstate      = $experiment->batchstate();
+my $expt_path       = $experiment->path();
+my $isbatchexpt     = $experiment->batchmode();
+my $cancelflag      = $experiment->canceled();
+my $expt_locked     = $experiment->locked();
+my $elabinelab      = $experiment->elabinelab();
+my $lockdown        = $experiment->lockdown();
+my $last_swap_uid   = $experiment->swapper();
+my $swappablebit    = $experiment->swappable();
+my $idleswapbit     = $experiment->idleswap();
+my $autoswapbit     = $experiment->autoswap();
+my $swappablestr    = ( $swappablebit ? "Yes" : "No" );
+my $idleswapstr     = ( $idleswapbit ? "Yes" : "No" );
+my $autoswapstr     = ( $autoswapbit ? "Yes" : "No" );
+my $noswap          = $experiment->noswap_reason();
+my $noidleswap      = $experiment->noidleswap_reason();
+my $idleswaptime    = $experiment->idleswap_timeout() / 60.0;
+my $autoswaptime    = $experiment->autoswap_timeout() / 60.0;
+my $rendering       = $experiment->prerender_pid();
 
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
@@ -460,7 +463,7 @@ else {
 			   "over quota!\n")
 		if ($overquota);
 	    
-	    SetExpState($pid, $eid, EXPTSTATE_QUEUED);
+	    $experiment->SetState(EXPTSTATE_QUEUED);
 	}
 	elsif ($inout eq "out") {
 	    ExitWithStatus(1,
@@ -473,7 +476,7 @@ else {
 	    # Since the batch daemon has control, all we can do is set
 	    # the cancel bit.
 	    # 
-	    TBSetCancelFlag($pid, $eid, EXPTCANCEL_SWAP);
+	    $experiment->SetCancelFlag(EXPTCANCEL_SWAP);
 	}
 	elsif ($inout eq "pause") {
 	    ExitWithStatus(1,
@@ -487,7 +490,7 @@ else {
 	    # anyway. The error will be noticed later when startexp dies,
 	    # and the batch daemon gets the error back. This sucks.
 	    #
-	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+	    $experiment->SetState(EXPTSTATE_SWAPPED);
 	}
 	elsif ($inout eq "modify") {
 	    ExitWithStatus(1,
@@ -586,7 +589,7 @@ else {
 		      # All we can do is set the cancel flag and hope that
 		      # it gets noticed. We do not wait. 
 		      # 
-		      TBSetCancelFlag($pid, $eid, EXPTCANCEL_SWAP);
+		      $experiment->SetCancelFlag(EXPTCANCEL_SWAP);
 		      
 		      ExitWithStatus(0,
 				     "Experiment $pid/$eid swapin has been  ".
@@ -661,8 +664,8 @@ SWITCH: for ($inout) {
  
 # Update idleswap_timeout to whatever the current value is.
 if ($inout ne "out") {
-    DBQueryFatal("update experiments set idleswap_timeout='$idleswap_time' ".
-		 "where eid='$eid' and pid='$pid'");
+    $experiment->UpdateIdleSwapTime($idleswap_time) == 0
+	or tbdie("Could not update idleswap timeout for $pid/$eid");
 }
 
 #
@@ -671,7 +674,7 @@ if ($inout ne "out") {
 $termswapstate = $estate;
 
 # Lock the record, set the nextstate, and unlock the table.
-TBLockExp($pid, $eid, $nextswapstate)
+$experiment->Lock($nextswapstate) == 0
     or tbdie("Failed to set experiment state to $nextswapstate");
 
 #
@@ -680,7 +683,7 @@ TBLockExp($pid, $eid, $nextswapstate)
 #
 $justexit = 0;
 
-DBQueryFatal("unlock tables");
+$experiment->UnLockTables();
 
 #
 # XXX - At this point a failure is going to leave things in an
@@ -735,9 +738,11 @@ if ($inout eq "modify" && defined($modnsfile)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch && ! $template_mode) {
-    $logname = TBExptCreateLogFile($pid, $eid, "swapexp");
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    if ($experiment->CreateLogFile("swapexp", \$logname) != 0) {
+	fatal("Could not create logfile!");
+    }
+    $experiment->SetLogFile($logname);
+    $experiment->OpenLogFile($logname);
 
     if (my $childpid = TBBackGround($logname)) {
 	#
@@ -850,8 +855,7 @@ if ($inout ne "restart" && -e $repfile) {
 if ($inout eq "out") {
     my $optarg = (($force || $idleswap) ? "-force" : "");
 
-    print STDOUT "Running 'tbswap out $optarg $pid $eid'\n";
-    if (system("$tbdir/tbswap out $optarg $pid $eid") != 0) {
+    if ($experiment->Swap("out", $optarg) != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap out failed!");
     }
@@ -870,9 +874,11 @@ if ($inout eq "out") {
 	fatal("Failed to add user specified files to the experiment archive!");
     }
 
-    SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
+    $experiment->SetState(EXPTSTATE_SWAPPED) == 0
 	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
-    TBExptClearPanicBit($pid, $eid);
+    
+    $experiment->ClearPanicBit() == 0
+	or fatal("Failed to clear the panic bit!");
 }
 elsif ($inout eq "in") {
     GatherSwapStats($pid, $eid, $dbuid,
@@ -880,17 +886,17 @@ elsif ($inout eq "in") {
 
     # Set the swapper now so that nodes use the proper uid. If the swapin
     # fails, we leave the swapper as is, since its harmless and informative.
-    TBExptSetSwapUID($pid, $eid, $dbuid);
-    
-    print STDOUT "Running 'tbswap in $pid $eid'\n";
-    if (system("$tbdir/tbswap in $pid $eid") != 0) {
+    $experiment->SetSwapper($dbuid);
+
+    if ($experiment->Swap("in") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
     }
-    SetExpState($pid, $eid, EXPTSTATE_ACTIVE)
+    
+    $experiment->SetState(EXPTSTATE_ACTIVE) == 0
 	or fatal("Failed to set experiment state to " . EXPTSTATE_ACTIVE());
-
-    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+    
+    $experiment->Report($repfile, "-b");
 }
 elsif ($inout eq "modify") {
     my $modifyError;
@@ -912,9 +918,8 @@ elsif ($inout eq "modify") {
     }
 
     print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
-    if (TBExptBackupVirtualState($pid, $eid)) {
-	fatal("Could not backup experiment state; cannot safely continue!");
-    }
+    $experiment->BackupVirtualState() == 0
+	or fatal("Could not backup experiment state; cannot safely continue!");
 
     #
     # Rerun tbprerun if modifying, but only if new NS file provided.
@@ -922,14 +927,13 @@ elsif ($inout eq "modify") {
     # Note that tbprerun kills the renderer if its running.
     #
     if (defined($modnsfile)) {
-	print STDOUT "Running 'tbprerun $pid $eid $modnsfile'\n";
-	if (system("$tbdir/tbprerun $pid $eid $modnsfile") != 0) {
+	if ($experiment->PreRun($modnsfile) != 0) {
 	    print STDOUT "Modify Error: tbprerun failed.\n";
 	  FWHOSED:
 	    print STDOUT "Recovering experiment state...\n";
 
-	    if (TBExptRemoveVirtualState($pid, $eid) ||
-		TBExptRestoreVirtualState($pid, $eid)) {
+	    if ($experiment->RemoveVirtualState() ||
+		$experiment->RestoreVirtualState()) {
 		$modifyHosed = 1;
 		fatal("Experiment state could not be restored!");
 		# Never returns;
@@ -960,15 +964,18 @@ elsif ($inout eq "modify") {
     # Our next state depends on whether the experiment was active or swapped.
     #
     if ($estate eq EXPTSTATE_SWAPPED) {
-	SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+	$experiment->SetState(EXPTSTATE_SWAPPED) == 0
+	    or fatal("Failed to set experiment state to ".EXPTSTATE_SWAPPED());
     }
     else {
-	SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
+	$experiment->SetState(EXPTSTATE_MODIFY_RESWAP) == 0
+	    or fatal("Failed to set experiment state to " .
+		     EXPTSTATE_MODIFY_RESWAP());
 
 	# Set the swapper now so that nodes use the proper uid. If the
 	# swapin fails, we need to reset the swapper back so that he
 	# is charged appropriately.
-	TBExptSetSwapUID($pid, $eid, $dbuid);
+	$experiment->SetSwapper($dbuid);
 
 	my $optarg = "";
 	#
@@ -983,13 +990,14 @@ elsif ($inout eq "modify") {
 	    $optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
 	}
 
-	print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
-	if (system("$tbdir/tbswap update $optarg $pid $eid") == 0) {
+	if ($experiment->Swap("update", $optarg) == 0) {
 	    #
 	    # Success. Set the state back to active cause thats where it
 	    # started.
-	    # 
-	    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+	    #
+	    $experiment->SetState(EXPTSTATE_ACTIVE) == 0
+		or fatal("Failed to set experiment state to " .
+			 EXPTSTATE_ACTIVE());
 	    $estate = EXPTSTATE_ACTIVE;
 	}
 	else {
@@ -1012,14 +1020,14 @@ elsif ($inout eq "modify") {
 		$termswapstate = EXPTSTATE_SWAPPED;
 		$modifySwapped = 1;
                 # Old accounting info.
-		TBSetExpSwapTime($pid, $eid);
+		$experiment->SetSwapTime();
 		$modifyError = "Update aborted; experiment swapped out.";
 	    }
 	    else {
 		$modifyError = "Update aborted; old state restored.";
 
 		# Reset the swapper since the experiment is still running.
-		TBExptSetSwapUID($pid, $eid, $last_swap_uid);
+		$experiment->SetSwapper($last_swap_uid);
 	    }
 	}
     }
@@ -1051,15 +1059,16 @@ elsif ($inout eq "modify") {
 	}
     }
 
-    TBExptClearBackupState($pid, $eid);
-    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+    $experiment->ClearBackupState();
+    $experiment->Report($repfile, "-b");    
 }
 else { # $inout eq "restart" assumed.
     print STDOUT "Running 'tbrestart $pid $eid'\n";
     if (system("$tbdir/tbrestart $pid $eid") != 0) {
 	fatal("tbrestart failed!");
     }
-    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+    $experiment->SetState(EXPTSTATE_ACTIVE) == 0
+	or fatal("Failed to set experiment state to " . EXPTSTATE_ACTIVE());
 }
 
 # Latest log is always called the same thing.
@@ -1070,14 +1079,14 @@ if (defined($logname)) {
 #
 # Try to copy off the files for testbed information gathering.
 #
-TBSaveExpLogFiles($pid, $eid);
+$experiment->SaveLogFiles();
 
 #
 # Make a copy of the work dir in the user visible space so the user
 # can see the log files. This overwrites existing files of course,
 # but thats okay.
 #
-system("cp -Rfp $workdir/ $userdir/tbdata/");
+$experiment->CopyLogFiles();
 
 #
 # Copy out some files to the archive directory so that they get saved later.
@@ -1152,17 +1161,9 @@ elsif ($inout eq "out") {
 elsif ($inout eq "modify") {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0);
 }
-# Old accounting info.
-TBSetExpSwapTime($pid, $eid);
 
-#
-# Set the swapper on swapout, only after stats have been gathered, and
-# *only* on success (since on failure nodes might still be held).
-# See above for swapin/swapmod.
-#
-if ($inout eq "out") {
-    TBExptSetSwapUID($pid, $eid, $dbuid);
-}
+# Accounting info. For swapout, must be after its done with.
+$experiment->SetSwapInfo($dbuid);
 
 #
 # In batch mode, just exit without sending email or unlocking. The
@@ -1175,20 +1176,19 @@ if ($batch) {
 #
 # Clear the log file so the web page stops spewing. 
 #
-if (defined($logname)) {
-    TBExptCloseLogFile($pid, $eid);
-}
+$experiment->CloseLogFile()
+    if (defined($logname));
 
 #
 # Must unlock before exit.
 #
-TBUnLockExp($pid, $eid);
+$experiment->Unlock();
 
 #
 # Since the swap completed, clear the cancel flag. This must be done
 # after we change the experiment state (above). 
 #
-TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR);
+$experiment->SetCancelFlag(EXPTCANCEL_CLEAR);
 
 exit(0)
     if ($template_mode);
@@ -1252,11 +1252,10 @@ sub cleanup()
 	#
 	# Must clean up the experiment if it managed to swap in.
 	#
-	$estate = ExpState($pid, $eid);
+	$estate = $experiment->state();
 	
 	if ($estate eq EXPTSTATE_ACTIVE) {
-	    print "Running 'tbswap out -force $pid $eid'\n";
-	    if (system("$tbdir/tbswap out -force $pid $eid") != 0) {
+	    if ($experiment->Swap("out", "-force") != 0) {
 		print "tbswap out failed!\n";
 	    }
 	}
@@ -1282,7 +1281,7 @@ sub cleanup()
 	#
 	# Clear backup state since not needed anymore; experiment is toast.
 	#
-	TBExptClearBackupState($pid, $eid);
+	$experiment->ClearBackupState();
 
 	#
 	# Rollback the archive.
@@ -1300,20 +1299,16 @@ sub cleanup()
 	# Note: $estate is indeed still set appropriately!
 	#
 	if ($estate eq EXPTSTATE_ACTIVE) {
-	    my $optarg = "-force";
-    
-	    print "Running 'tbswap out $optarg $pid $eid'\n";
-	    if (system("$tbdir/tbswap out $optarg $pid $eid") != 0) {
+	    if ($experiment->Swap("out", "-force") != 0) {
 		print "tbswap out failed!\n";
 		$stat = $? >> 8;
 	    }
-	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+	    $experiment->SetState(EXPTSTATE_SWAPPED);
 	    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $stat);
 	}
 
 	$stat = 0;
-	print "Running 'tbend -force $pid $eid'\n";
-	if (system("$tbdir/tbend -force $pid $eid") != 0) {
+	if ($experiment->End("-force") != 0) {  
 	    print "tbend failed!\n";
 	    $stat = $? >> 8;
 	}
@@ -1327,10 +1322,10 @@ sub cleanup()
 	$termswapstate = EXPTSTATE_TERMINATED;
     }
     # Set proper state, which is typically the way we came in.
-    SetExpState($pid, $eid, $termswapstate);
+    $experiment->SetState($termswapstate);
 
     # Copy over the log files so the user can see them.
-    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+    $experiment->CopyLogFiles();    
 
     #
     # In batch mode, exit without sending the email or unlocking. The
@@ -1343,18 +1338,17 @@ sub cleanup()
     #
     # Clear the log file so the web page stops spewing.
     #
-    if (defined($logname)) {
-	TBExptCloseLogFile($pid, $eid);
-    }
+    $experiment->CloseLogFile()
+	if (defined($logname));
 
     # Unlock and reset state to its terminal value.
-    TBUnLockExp($pid, $eid);
+    $experiment->Unlock();
 
     #
     # Clear the cancel flag now that the operation is complete. Must be done
     # after we change the experiment state (above).
     #
-    TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR);
+    $experiment->SetCancelFlag(EXPTCANCEL_CLEAR);
 
     #
     # Figure out the error if possible
@@ -1391,7 +1385,7 @@ sub cleanup()
 	system("/bin/mv -f   $workdir ${workdir}-failed");
 	system("/bin/rm -rf  ${userdir}-failed");
 	system("/bin/mv -f   $userdir ${userdir}-failed");
-	TBExptDestroy($pid, $eid);
+	$experiment->Delete();
     }
     return;
 }
