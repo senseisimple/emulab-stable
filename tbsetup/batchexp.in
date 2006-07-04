@@ -567,7 +567,7 @@ if (! ($frontend || $batchmode)) {
     $experiment->SetState(EXPTSTATE_ACTIVATING) == 0
 	or fatal("Failed to set experiment state to ". EXPTSTATE_ACTIVATING());
 
-    if (! $experiment->Swap("in") != 0) {
+    if ($experiment->Swap("in") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
     }
