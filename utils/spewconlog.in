@@ -55,8 +55,9 @@ if ($UID == 0) {
 # Not yet ... need a xmlrpc hook.
 #
 if ($ELABINELAB) {
-    die("*** $0:\n".
-	"    Not supported in an inner Emulab, yet!\n");
+    print STDERR "*** $0:\n".
+	"    Not supported in an inner Emulab, yet!\n";
+    exit(0);
 }
 
 #
