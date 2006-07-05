@@ -1211,7 +1211,7 @@ foreach my $osid (sort keys %total_osid) {
     my ($osname, $pidofosid);
     my $user_image = 1;
 
-    if ($total_osid{$osid}{failed} > 0) {
+    if (defined $total_osid{$osid}{failed} && $total_osid{$osid}{failed} > 0) {
 
 	my $query_result = 
 	    DBQueryFatal("select osname,pid from os_info where osid='$osid'");
