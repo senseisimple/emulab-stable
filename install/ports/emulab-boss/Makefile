@@ -85,7 +85,7 @@ RUN_DEPENDS=	\
 	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50 \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
