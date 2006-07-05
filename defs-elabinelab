@@ -46,6 +46,7 @@ DISABLE_NSE=1
 ELABINELAB=1
 # The name of the outer boss for inner boss to request services from.
 OUTERBOSS_NODENAME=changeme
+TBCOOKIESUFFIX=changeme
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.
