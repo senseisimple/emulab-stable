@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.58-log
+-- Server version	3.23.59-nightly-20050301-log
 
 --
 -- Dumping data for table `causes`
@@ -15,6 +15,7 @@ REPLACE INTO causes VALUES ('internal','Internal Error');
 REPLACE INTO causes VALUES ('software','Software Problem');
 REPLACE INTO causes VALUES ('hardware','Hardware Problem');
 REPLACE INTO causes VALUES ('unknown','Cause Unknown');
+REPLACE INTO causes VALUES ('canceled','Canceled');
 
 --
 -- Dumping data for table `comments`

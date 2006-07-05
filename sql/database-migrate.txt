@@ -3434,7 +3434,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table widearea_nodeinfo add latitude float(3,5);
         alter table widearea_nodeinfo add longitude float(3,5);
-
+ 
 4.71: Support for 802.1q tagged VLAN based virtual interfaces.
       First, generalize the encapsulation field.  For compatibility,
       we create a new field, we'll delete the old veth_encapsulate at
@@ -3483,4 +3483,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.72: Re-add changes I made in revision 4.54 which got lost when Rob
       did revision 4.70. Skip to next entry please ...
+
+4.73: Add two columns for to "log" table for better error reporting:
+
+       alter table log
+          add attempt tinyint(1) not null default 0 after session,
+          add cleanup tinyint(1) not null default 0 after attempt;
 

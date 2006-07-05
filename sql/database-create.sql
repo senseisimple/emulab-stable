@@ -1237,6 +1237,8 @@ CREATE TABLE log (
   seq int(10) unsigned NOT NULL auto_increment,
   stamp int(10) unsigned NOT NULL default '0',
   session int(10) unsigned NOT NULL default '0',
+  attempt tinyint(1) NOT NULL default '0',
+  cleanup tinyint(1) NOT NULL default '0',
   invocation int(10) unsigned NOT NULL default '0',
   parent int(10) unsigned NOT NULL default '0',
   script smallint(3) NOT NULL default '0',

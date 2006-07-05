@@ -798,11 +798,6 @@ if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
 
 TBDebugTimeStamp("assign_loop started");
 while (1) {
-    # Check cancel flag before continuing. 
-    TBGetCancelFlag($pid, $eid, \$canceled);
-    fatal("Cancel flag set; aborting assign run!")
-	if ($canceled);
-
     print "Assign Run $currentrun\n";
 
     #
@@ -957,7 +952,7 @@ sub RunAssign ()
 		    kill('TERM', -$pgrp);
 		    waitpid($childpid, 0);
 
-		    print "Cancel flag set; aborting assign run!\n";
+		    fatal("Cancel flag set; aborting assign run!");
 		    return -1;
 		}
 		# Loop again to reap child above before exit.
@@ -977,7 +972,7 @@ sub RunAssign ()
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
     if ($canceled) {
-	tbnotice("Cancel flag set; aborting assign run!\n");
+	fatal("Cancel flag set; aborting assign run!");
 	return -1;
     }
 

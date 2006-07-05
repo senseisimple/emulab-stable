@@ -240,6 +240,7 @@ if ($swapop eq "out") {
     #
     # Swap out
     #
+    tblog_set_attempt(1);
     $errors = doSwapout(REAL);
 }
 elsif ($swapop eq "update") {
@@ -259,6 +260,9 @@ elsif ($swapop eq "update") {
     
     #
     # Update.
+    #
+    tblog_set_attempt(1);
+
     #
     # Phase One -- swap experiment partially out.
     #
@@ -351,7 +355,8 @@ elsif ($swapop eq "in") {
 	TBDebugTimeStamp("tbswap $swapop finished (failed)");
 	exit(1);
     }
-    
+
+    tblog_set_attempt(1);
     $errors = doSwapin(REAL);
 
     #
@@ -364,6 +369,7 @@ elsif ($swapop eq "in") {
     #
     while ($errors == 3 && $retries && !$canceled && !$TESTMODE) {
 	$retries--;
+	tblog_inc_attempt();
 
 	print STDERR "Cleaning up after errors; will try again.\n";
 	doSwapout(RETRY);
@@ -376,6 +382,14 @@ elsif ($swapop eq "in") {
 	    ($canceled ? "cancelation" : "errors") . ".\n";
 	doSwapout(CLEANUP);
     }
+}
+
+tblog_set_attempt(0);
+
+TBGetCancelFlag($pid, $eid, \$canceled);
+if ($canceled) {
+    tberror ({type=>'summary', cause=>'canceled'},
+	     "Experiment swap-$swapop canceled by user.");
 }
 
 #
@@ -412,6 +426,8 @@ exit(0);
 sub doSwapout($) {
     my $type = shift; # REAL==4, CLEANUP==3, RETRY==2, UPDATE==1.
     my $swapout_errors = 0;
+
+    tblog_set_cleanup(1) if $type == CLEANUP;
 
     #
     # wait for os_setup;
@@ -519,6 +535,7 @@ sub doSwapout($) {
 	# See undoFWNodes for details.
 	#
 	if ($firewalled && undoFWNodes($pid, $eid)) {
+	    tblog_set_cleanup(0);
 	    return 1;
 	}
 
@@ -543,6 +560,7 @@ sub doSwapout($) {
 	    TBExptGetSwapoutAction($pid, $eid, \%soaction);
 	}
 	if ($soaction{'command'} && doSwapoutAction($pid, $eid, %soaction)) {
+	    tblog_set_cleanup(0);
 	    return 1;
 	}
 
@@ -718,6 +736,7 @@ sub doSwapout($) {
 	TBExptRemovePhysicalState( $pid, $eid );
     }
 
+    tblog_set_cleanup(0);
     return $swapout_errors;
 }
 

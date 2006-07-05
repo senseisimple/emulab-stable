@@ -331,7 +331,8 @@ if ($waitmode) {
 my $overquota = system("$checkquota $dbuid");
 
 if ($overquota) {
-    tberror("You are over your disk quota on $CONTROL; please cleanup!");
+    tberror({cause => 'user'},
+	    "You are over your disk quota on $CONTROL; please cleanup!");
 }
 
 #

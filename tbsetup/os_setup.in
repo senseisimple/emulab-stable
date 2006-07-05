@@ -77,6 +77,12 @@ my %reboot_waittime = ();	# Indexed by osid.
 my %node_types  = ();		# Indexed by node_id.
 
 #
+# This variable keeps track of the failed nodes of all types.
+#   values = 'UNKNOWN' 'RELOAD', 'BOOT', 'OTHER'
+my %failed_nodes = (); 
+my %failed_nonfatal_nodes = ();
+
+#
 # Ah, Frisbee works so lets do auto reloading for nodes that do not have
 # the proper OS loaded on it. This will be a hash of lists; for each
 # imageid, a list of the nodes to pass to os_load for that imageid.
@@ -553,6 +559,7 @@ if ($firewalled) {
 		 "is resolved.\n");
 
 	$failed++;
+	$failed_nodes{$node} = 'UNKNOWN';
 	goto tballdone;
     }
 
@@ -591,6 +598,7 @@ if ($plabinelab) {
 		 "in pid/eid $pid/$eid failed to boot after loading OS.\n\n".
 		 "The nodes have been freed.\n");
 	$failed++;
+	$failed_nodes{$node} = 'UNKNOWN';
 	goto tballdone;
     }
 
@@ -739,6 +747,7 @@ if (!$TESTMODE) {
 	foreach my $node (@nodelist) {
 	    tbnotice "Not waiting for $node since its reload/reboot failed!";
 	    $failed++;
+	    $failed_nodes{$node} = 'UNKNOWN';
 	    delete($nodes{$node});
 
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
@@ -860,6 +869,7 @@ while ( @nodelist ) {
 
     if ($canfail{$node} && !($canceled || $noretry)) {
 	push(@informuser, $node);
+	$failed_nonfatal_nodes{$node} = 'UNKNOWN';
 	tbnotice "Continuing with experiment setup anyway ...";
 	next;
     }
@@ -887,6 +897,7 @@ while ( @nodelist ) {
     $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 
     $failed++;
+    $failed_nodes{$node} = 'UNKNOWN';
 }
 
 #
@@ -1099,6 +1110,7 @@ elsif (@vnodelist) {
 	if ($canfail{$node}) {
 	    # Send mail to testbed-ops and to the user about it.
 	    push(@informuser, $node);
+	    $failed_nonfatal_nodes{$node} = 'UNKNOWN';
 	    tbnotice "Continuing with experiment setup anyway ...";
 	    next;
 	}
@@ -1108,6 +1120,7 @@ elsif (@vnodelist) {
 	else {
 	    $failedvnodes++;
 	}
+	$failed_nodes{$node} = 'UNKNOWN';
     }
     TBDebugTimeStamp("Virtual node waiting finished");
 
@@ -1159,12 +1172,96 @@ if ($count > 0) {
 tballdone:
 
 tbinfo "OS Setup Done.";
-tberror "There were $failed failed nodes"
-    if ($failed);
-tberror "There were $failedvnodes failed virtual nodes"
-    if ($failedvnodes);
-tberror "There were $failedplab failed plab nodes"
-    if ($failedplab);
+
+my %tally;
+my $users_fought = 1;
+my %total_osid;
+my %total_type;
+my $summary = '';
+
+foreach (keys %failed_nodes) {
+    my $osid = $osids{$_};
+    my $type = $node_types{$_};
+    $total_osid{$osid}{failed}++;
+    $total_osid{$osid}{failed_fatal}++;
+    $total_osid{$osid}{total}++;
+    $total_type{$osid}{$type}{failed}++;
+    $total_type{$osid}{$type}{failed_fatal}++;
+    $total_type{$osid}{$type}{total}++;
+}
+foreach (keys %failed_nonfatal_nodes) {
+    my $osid = $osids{$_};
+    my $type = $node_types{$_};
+    $total_osid{$osid}{failed}++;
+    $total_osid{$osid}{failed_nonfatal}++;
+    $total_osid{$osid}{total}++;
+    $total_type{$osid}{$type}{failed}++;
+    $total_type{$osid}{$type}{failed_nonfatal}++;
+    $total_type{$osid}{$type}{total}++;
+}
+foreach ((keys %nodes), (keys %vnodes), (keys %plabvnodes)) {
+    next if $failed_nodes{$_} || $failed_nonfatal_nodes{$_};
+    my $osid = $osids{$_};
+    my $type = $node_types{$_};
+    $total_osid{$osid}{total}++;
+    $total_type{$osid}{$type}{total}++;
+}
+
+foreach my $osid (sort keys %total_osid) {
+    my ($osname, $pidofosid);
+    my $user_image = 1;
+
+    if ($total_osid{$osid}{failed} > 0) {
+
+	my $query_result = 
+	    DBQueryFatal("select osname,pid from os_info where osid='$osid'");
+
+	if ($query_result->num_rows > 0) {
+	    ($osname, $pidofosid) = $query_result->fetchrow_array();
+	    $user_image = 0 if $pidofosid eq TBOPSPID();
+	} else {
+	    $osname = $osid;
+	    $user_image = 0;
+	}
+
+	$users_fought = 0 if !$user_image;
+
+	my %d = %{$total_osid{$osid}};
+	$summary .= "$d{failed}/$d{total} nodes with a ";
+	$summary .= $user_image ? "user" : "system";
+	$summary .= " osid of \"$osname\" failed to boot";
+	if ($d{failed_nonfatal} > 0) {
+	    my $count = ($d{failed_nonfatal} == $d{failed}
+			 ? "all"
+			 : "$d{failed_nonfatal}/$d{failed}");
+	    $summary .= " ($count non-fatal)";
+	}
+	$summary .= ":\n";
+	
+	foreach my $type (sort keys %{$total_type{$osid}}) {
+	    my %d = %{$total_type{$osid}{$type}};
+	    $summary .= "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
+	    if ($d{failed_nonfatal} > 0) {
+		my $count = ($d{failed_nonfatal} == $d{failed}
+			     ? "all"
+			     : "$d{failed_nonfatal}/$d{failed}");
+		$summary .= " ($count non-fatal)";
+	    }
+	    $summary .= ".\n";
+	    $users_fought = 0 if $d{failed} < $d{total};
+	}
+    }
+}
+
+if ($failed || $failedvnodes || $failedplab) {
+    push @msg, "$failed failed nodes"               if $failed;
+    push @msg, "$failedvnodes failed virtual nodes" if $failedvnodes;
+    push @msg, "$failedplab failed plab nodes"      if $failedplab;
+    tberror ({type=>'summary', cause=>($users_fought ? 'user' : 'unknown')}, 
+	     "There were ", join(', ', @msg), ".\n\n", $summary);
+} elsif ($summary) {
+    tbwarn $summary;
+}
 
 #
 # If not failing for any reason, save off swap state.
@@ -1403,3 +1500,9 @@ sub os_setup_one($$$)
 
     return 1;
 }
+
+
+
+
+
+

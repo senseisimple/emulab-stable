@@ -64,6 +64,7 @@ of an error.  The current causes are:
     internal - software bug, should not happen
     software - software problem, like a bad image
     hardware - hardware problem
+    canceled - canceled
     unknown - default
 
 The cause for an error can be set directly when calling tberror by passing
@@ -209,6 +210,8 @@ use Exporter;
 	      tblog_start_capture tblog_stop_capture
 	      tblog_new_process tblog_init_process tblog_exit
 	      tblog_session tblog_lookup_error tblog_format_error
+	      tblog_set_attempt tblog_inc_attempt tblog_get_attempt
+	      tblog_set_cleanup tblog_get_cleanup
 	      copy_hash
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
 	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
@@ -263,6 +266,8 @@ sub check_env ()
     check_env_num 'TBLOG_INVOCATION';
     check_env_num 'TBLOG_PARENT_INVOCATION';
     check_env_num 'TBLOG_UID';
+    check_env_num 'TBLOG_ATTEMPT';
+    check_env_num 'TBLOG_CLEANUP';
     check_env_num 'TBLOG_SCRIPTNUM';
     check_env_def 'TBLOG_SCRIPTNAME';
     check_env_def 'TBLOG_BASE_SCRIPTNAME';
@@ -271,6 +276,7 @@ sub check_env ()
 my %CAUSE_MAP = (# Don't notify testbed-ops
 		 temp => 'temp', # resources temp unavailable
 		 user => 'user', # user error
+		 canceled => 'canceled', # canceled
 		 # Notify testbed-ops
 		 internal => 'internal', # software bug, should not happen
 		 software => 'software', # software problem, like a bad image
@@ -423,6 +429,8 @@ sub tblog_init_process(@) {
 	$ENV{TBLOG_LEVEL} = 0;
 	$ENV{TBLOG_EXPTIDX} = 0;
 	$ENV{TBLOG_UID} = 0;
+	$ENV{TBLOG_ATTEMPT} = 0;
+	$ENV{TBLOG_CLEANUP} = 0;
 	dblog($NOTICE, {type => 'entering'},
 	      'Entering "', join(' ', informative_scriptname(), @ARGV), '"')
 	  or die;
@@ -504,6 +512,66 @@ sub tblog_set_default_cause ( $ )
 {
     check_env();
     $ENV{TBLOG_CAUSE} = $_[0];
+}
+
+=item tblog_set_attempt NUM
+
+Set the attempt number to NUM
+
+=cut
+
+sub tblog_set_attempt ( $ )
+{
+    check_env();
+    $ENV{TBLOG_ATTEMPT} = $_[0];
+}
+
+=item tblog_inc_attempt
+
+Increment the attempt number
+
+=cut
+
+sub tblog_inc_attempt ()
+{
+    check_env();
+    $ENV{TBLOG_ATTEMPT}++;
+}
+
+=item tblog_get_attempt
+
+Get the attempt number
+
+=cut
+
+sub tblog_get_attempt ()
+{
+    check_env();
+    return $ENV{TBLOG_ATTEMPT};
+}
+
+=item tblog_set_cleanup BOOL
+
+Set the cleanup bit to BOOL.
+
+=cut
+
+sub tblog_set_cleanup ( $ )
+{
+    check_env();
+    $ENV{TBLOG_CLEANUP} = $_[0];
+}
+
+=item tblog_get_cleanup
+
+Get the value of the cleanup bit.
+
+=cut
+
+sub tblog_get_cleanup ()
+{
+    check_env();
+    return $ENV{TBLOG_CLEANUP};
 }
 
 =item tblog_exit
@@ -600,9 +668,11 @@ sub dblog_real ( $$@ ) {
 	  unless defined $cause;
 
 	my $query = 
-	  sprintf('insert into log (stamp,session,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
-		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
+	  sprintf('insert into log (stamp,session,attempt,cleanup,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
+		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
 		  $ENV{TBLOG_SESSION}, 
+		  $ENV{TBLOG_ATTEMPT},
+		  $ENV{TBLOG_CLEANUP},
 		  $ENV{TBLOG_PARENT_INVOCATION}, 
 		  $ENV{TBLOG_INVOCATION},
 		  $ENV{TBLOG_SCRIPTNUM}, 
@@ -698,11 +768,11 @@ sub tblog_find_error () {
 	my %lookup = (0 => $root);
 	my @log;
 	
-	my $query_result = DBQueryFatal "select seq,parent,invocation,sublevel,priority,mesg,cause,script_name,type from log natural join scripts where session = $session and priority <= $NOTICE order by seq";
+	my $query_result = DBQueryFatal "select seq,parent,invocation,sublevel,priority,mesg,cause,script_name,type,inferred from log natural join scripts where session = $session and priority <= $NOTICE and attempt <= 1 and not cleanup order by seq";
 	
 	for (my $i = 0; $i < $query_result->num_rows; $i++) {
 	    
-	    my ($seq, $parent, $invocation, $sublevel, $priority, $mesg, $cause, $script, $type) 
+	    my ($seq, $parent, $invocation, $sublevel, $priority, $mesg, $cause, $script, $type, $inferred) 
 		= $query_result->fetchrow;
 	    
 	    if (not exists $lookup{$invocation}) {
@@ -724,6 +794,7 @@ sub tblog_find_error () {
 						priority => $priority,
 						type => $type,
 						cause => $cause,
+						inferred => $inferred,
 						mesg => $mesg};
 	    
 	}
@@ -824,19 +895,10 @@ sub tblog_find_error () {
 	}
 
 	#
-	# From script determine confidence 
-	#
-	$confidence = 0.5;
-	if ($script =~ /^(assign|parse)/) {
-	    $confidence = 0.9;
-	} elsif ($script =~ /^(os_setup)/) {
-	    $confidence = 0.2;
-	}
-
-	#
 	# Figure out the cause;
 	#
 	my $type = '';
+	my $inferred = -1;
 
 	# Assumes that 'extra' info will come first
 	
@@ -844,12 +906,31 @@ sub tblog_find_error () {
 	    if (!$cause && $_->{cause}) {
 		$cause = $_->{cause};
 		$type = $_->{type};
-	    } elsif ($_->{cause} && 
+	    } elsif ($_->{cause} && $_->{type} ne 'extra' &&
 		     $_->{type} eq $type && $_->{cause} ne $cause) {
 		$cause = 'unknown';
 	    }
+	    $inferred = $_->{inferred} if $inferred < $_->{inferred};
 	}
 	$cause = 'unknown' unless $cause;
+
+	#
+	# From script determine confidence 
+	#
+	$confidence = 0.5;
+	if ($script =~ /^assign/ && ($cause eq 'temp' || $cause eq 'user')) {
+	    $confidence = 0.9;
+	} elsif ($script =~ /^parse/ && $cause eq 'user') {
+	    $confidence = 0.9;
+	} elsif ($script =~ /^os_setup/ && $type eq 'summary') {
+	    $confidence = 0.9;
+	} elsif ($inferred == 0) {
+	    $confidence = 0.7;
+	} elsif ($inferred == 1) {
+	    $confidence = 0.6;
+	} elsif ($cause ne 'unknown') {
+	    $confidence = 0.6;
+	}
 
 	# 
 	# Finally print/store the relevant errors
@@ -972,10 +1053,11 @@ sub tblog_email_error ( $$$$$$$@ ) {
     
     my ($d, $to, $what, $pideid, $from, $headers, $testbed_ops, @files) = @_;
 
-    my $threshold = 0.65;
+    my $threshold = 0.55;
 
     unless ($d->{confidence} > $threshold 
-	    && ($d->{cause} eq 'temp' || $d->{cause} eq 'user')) 
+	    && ($d->{cause} eq 'temp' || $d->{cause} eq 'user' 
+		|| $d->{cause} eq 'canceled'))
     {
 	$headers .= "\n" if defined $headers && length($headers) > 0;
 	$headers .= "$testbed_ops";
