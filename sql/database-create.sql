@@ -2185,7 +2185,7 @@ CREATE TABLE state_triggers (
   node_id varchar(32) NOT NULL default '',
   op_mode varchar(20) NOT NULL default '',
   state varchar(20) NOT NULL default '',
-  trigger tinytext NOT NULL,
+  `trigger` tinytext NOT NULL,
   PRIMARY KEY  (node_id,op_mode,state)
 ) TYPE=MyISAM;
 
@@ -2237,7 +2237,7 @@ CREATE TABLE table_regex (
   column_name varchar(64) NOT NULL default '',
   column_type enum('text','int','float') default NULL,
   check_type enum('regex','function','redirect') default NULL,
-  check tinytext NOT NULL,
+  `check` tinytext NOT NULL,
   min int(11) NOT NULL default '0',
   max int(11) NOT NULL default '0',
   comment tinytext,
@@ -3057,7 +3057,7 @@ CREATE TABLE widearea_updates (
   roottag tinytext NOT NULL,
   update_requested datetime NOT NULL default '0000-00-00 00:00:00',
   update_started datetime default NULL,
-  force enum('yes','no') NOT NULL default 'no',
+  `force` enum('yes','no') NOT NULL default 'no',
   PRIMARY KEY  (IP)
 ) TYPE=MyISAM;
 

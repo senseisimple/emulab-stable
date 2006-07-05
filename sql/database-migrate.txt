@@ -3480,3 +3480,7 @@ last_net_act,last_cpu_act,last_ext_act);
       To populate the vinterfaces table run:
 
         sudo ./initvinterfaces.pl
+
+4.72: Re-add changes I made in revision 4.54 which got lost when Rob
+      did revision 4.70. Skip to next entry please ...
+
