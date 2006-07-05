@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -26,6 +26,7 @@ my $cmd;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
 
@@ -48,6 +49,14 @@ if ($EUID != 0) {
 if ($UID == 0) {
     die("*** $0:\n".
 	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Not yet ... need a xmlrpc hook.
+#
+if ($ELABINELAB) {
+    die("*** $0:\n".
+	"    Not supported in an inner Emulab, yet!\n");
 }
 
 #
