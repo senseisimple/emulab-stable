@@ -4694,7 +4694,7 @@ sub DBQuoteSpecial($)
 {
     my($string) = $_[0];
 
-    $string = Mysql->quote($string);
+    $string = $DB[0]->quote($string);
 
     return $string;
 }
