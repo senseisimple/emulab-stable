@@ -246,7 +246,7 @@ some clients, and finally, stops the server.</font>
  set testseq [$ns event-sequence]
 
  foreach test $tests {
-     $testseq append "$prog0 -run \"$test\""
+     $testseq append "$prog0 run -command \"$test\""
  }
 </pre></code>
 </blockquote>
