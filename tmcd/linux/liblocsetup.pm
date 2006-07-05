@@ -225,10 +225,10 @@ sub os_ifconfig_line($$$$$$$;$$$)
         $uplines   = $wlccmd . "\n";
 	$uplines  .= $privcmd . "\n";
 	$uplines  .= $iwcmd . "\n";
-	$uplines  .= sprintf($IFCONFIG, $athiface, $inet, $mask);
-	$downlines  = "$IFCONFIGBIN $athiface down";
-	$downlines .= "/usr/local/bin/wlanconfig $athiface destroy";
-	$downlines .= "$IFCONFIGBIN $iface down";
+	$uplines  .= sprintf($IFCONFIG, $athiface, $inet, $mask) . "\n";
+	$downlines  = "$IFCONFIGBIN $athiface down\n";
+	$downlines .= "/usr/local/bin/wlanconfig $athiface destroy\n";
+	$downlines .= "$IFCONFIGBIN $iface down\n";
 	return ($uplines, $downlines);
     }
 
