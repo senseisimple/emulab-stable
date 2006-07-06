@@ -29,22 +29,46 @@ cnet_dhcp()
 	#
 	dhclient_flags=`echo $dhclient_flags | sed -e 's/-i [0-9][0-9]*//'`
 
-	for _if in $*; do
+	#
+	# Argh V2! FreeBSD >= 6 dhclient also allows only a single interface
+	# to be specified.  I tried to make this work by launching multiple,
+	# simultaneous dhclients, but that caused EEPROM read failures on
+	# em devices.  So we will use the "pure" port version if it is
+	# installed.
+	#
+	if [ -x /usr/local/sbin/dhclient ]; then
+	    echo "Using dhclient port..."
+	    dhclient_program="/usr/local/sbin/dhclient"
+	    ${dhclient_program} ${dhclient_flags} $*
+	else
+	    echo "Using default dhclient..."
+	    for _if in $*; do
 		${dhclient_program} ${dhclient_flags} -b $_if
-	done
-	wait
+	    done
+	    wait
+	fi
 }
 
 cnet_start()
 {
 	rm -f @CLIENT_VARDIR@/boot/controlif
 
+	#
 	# Find all the relevant networks IFs.
+	# Don't do loopback, funky tunnel devices
+	# (e.g., IP-over-string-and-cans).
+	#
+	# At Utah Emulab we also exclude wireless interfaces as our
+	# wireless machines are in a production ether and might get
+	# an answer!
+	#
 	_ifs=""
 	network_interfaces=`ifconfig -l | sed -e 's/lo0//'`
 	for _if in $network_interfaces; do
 	case $_if in
 	lo*|gif*|faith*|tun*|plip*)
+		;;
+	ath*)
 		;;
 	*)
 		_ifs="$_ifs $_if"
