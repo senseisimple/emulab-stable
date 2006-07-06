@@ -636,7 +636,7 @@ Phase "database", "Setting up database", sub {
 	ExecQuietFatal("$MYSQLINSTALL --ldata=${MYSQLDBDIR}");
 	ExecQuietFatal("$CHOWN -R mysql:mysql $MYSQLDBDIR");
     };
-    Phase "mysql", "Starting mysqls", sub {
+    Phase "mysql", "Starting mysqld", sub {
 	if (!ExecQuiet("$MYSQLADMIN ping")) {
 	    PhaseSkip("mysqld already running");
 	}
