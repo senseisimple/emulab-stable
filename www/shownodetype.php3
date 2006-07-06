@@ -223,7 +223,7 @@ if (mysql_num_rows($query_result)) {
     echo "</table>\n";
     echo "<br>
           <img src=\"/autostatus-icons/greenball.gif\" alt=free>&nbsp;Free
-          &nbsp &nbsp &nbsp
+          &nbsp; &nbsp; &nbsp;
           <img src=\"/autostatus-icons/redball.gif\" alt=free>&nbsp;Reserved
           </center>\n";
 }

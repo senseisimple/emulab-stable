@@ -131,7 +131,7 @@ function SPITFORM($formfields, $errors)
 	    strcmp($formfields[section], $section) == 0)
 	    $selected = "selected";
 
-	echo "<option $selected value='$section'>$section &nbsp </option>\n";
+	echo "<option $selected value='$section'>$section &nbsp; </option>\n";
     }
     echo "       </select>\n";
 

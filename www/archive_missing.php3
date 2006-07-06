@@ -136,7 +136,7 @@ if (count($suexec_output_array)) {
     echo "<tr><td align=center colspan=2>\n";
     echo "<input type=button name=movesome value='Move Selected'
                  onclick=\"NormalSubmit();\"></b>";
-    echo "&nbsp &nbsp &nbsp ";
+    echo "&nbsp;&nbsp;&nbsp; ";
     echo "<input type=button name=selectall value='Select All'
                  onclick=\"SelectAll();\"></b>";
     echo "</td></tr>\n";

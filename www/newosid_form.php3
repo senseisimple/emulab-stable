@@ -99,7 +99,7 @@ while (list ($os, $userokay) = each($osid_oslist)) {
     if (!$userokay && !$isadmin)
 	continue;
 
-    echo "<option value=$os>$os &nbsp </option>\n";
+    echo "<option value=$os>$os &nbsp; </option>\n";
 }
 echo "       </select>
           </td>
@@ -171,7 +171,7 @@ while (list ($op_mode, $userokay) = each($osid_opmodes)) {
 	$selected = "selected";
     }
 
-    echo "<option $selected value=$op_mode>$op_mode &nbsp </option>\n";
+    echo "<option $selected value=$op_mode>$op_mode &nbsp; </option>\n";
 }
 echo "       </select>
              <p>

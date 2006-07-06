@@ -81,7 +81,7 @@ function SHOWPROJECT($pid, $thisuid) {
     }
 
     if (!$expt_last) {
-	$expt_last = "&nbsp";
+	$expt_last = "&nbsp;";
     }
 
     #
@@ -277,7 +277,7 @@ function SHOWGROUP($pid, $gid, $thisuid) {
 	$mail = "$pid" . "-users@" . $OURDOMAIN;
 
     if (!$expt_last) {
-	$expt_last = "&nbsp";
+	$expt_last = "&nbsp;";
     }
 
     #
@@ -502,23 +502,23 @@ function SHOWUSER($uid) {
     $wikionly    = $row['wikionly'];
 
     if (!strcmp($usr_addr2, ""))
-	$usr_addr2 = "&nbsp";
+	$usr_addr2 = "&nbsp;";
     if (!strcmp($usr_city, ""))
-	$usr_city = "&nbsp";
+	$usr_city = "&nbsp;";
     if (!strcmp($usr_state, ""))
-	$usr_state = "&nbsp";
+	$usr_state = "&nbsp;";
     if (!strcmp($usr_zip, ""))
-	$usr_zip = "&nbsp";
+	$usr_zip = "&nbsp;";
     if (!strcmp($usr_country, ""))
-	$usr_country = "&nbsp";
+	$usr_country = "&nbsp;";
     if (!strcmp($notes, ""))
-	$notes = "&nbsp";
+	$notes = "&nbsp;";
 
     #
     # Last Login info.
     #
     if (($lastweblogin = LASTWEBLOGIN($uid)) == 0)
-	$lastweblogin = "&nbsp";
+	$lastweblogin = "&nbsp;";
     if (($lastuserslogininfo = TBUsersLastLogin($uid)) == 0)
 	$lastuserslogin = "N/A";
     else {
@@ -954,7 +954,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                  <td>Reserved Nodes: </td>
                  <td class=\"left\">\n";
 	while (list ($class, $count) = each($nodecounts)) {
-	    echo "$count ($class) &nbsp ";
+	    echo "$count ($class) &nbsp; ";
 	}
 	echo "   </td>
               </tr>\n";
@@ -1467,8 +1467,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                       <td>$wahost</td>\n";
             }
             elseif ($anyplab) {
-              echo "  <td>&nbsp</td>
-                      <td>&nbsp</td>\n";
+              echo "  <td>&nbsp;</td>
+                      <td>&nbsp;</td>\n";
             }
 
 	    if ($pid == $TBOPSPID)
@@ -1480,7 +1480,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 		echo "</td>\n";
 	    }
 	    else
-		echo "<td>&nbsp</td>\n";
+		echo "<td>&nbsp;</td>\n";
 
 	    if ($bootstate != "ISUP") {
 		echo "  <td>$status ($bootstate)</td>\n";
@@ -1504,7 +1504,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                     </td>\n";
 
 	    if ($isvirtnode || !isset($tipname) || $tipname = '') {
-		echo "<td>&nbsp</td>\n";
+		echo "<td>&nbsp;</td>\n";
 	    }
 	    else {
 		echo "  <td align=center>
@@ -1526,7 +1526,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                         </td>\n";
 	    }
 	    elseif ($anywindows) {
-		echo "  <td>&nbsp</td>\n";
+		echo "  <td>&nbsp;</td>\n";
 	    }
 
 	    echo "</tr>\n";
@@ -1570,21 +1570,21 @@ function SHOWOSINFO($osid) {
     $reboot_waittime= $osrow[reboot_waittime];
 
     if (!$os_description)
-	$os_description = "&nbsp";
+	$os_description = "&nbsp;";
     if (!$os_version)
-	$os_version = "&nbsp";
+	$os_version = "&nbsp;";
     if (!$os_path)
-	$os_path = "&nbsp";
+	$os_path = "&nbsp;";
     if (!$os_magic)
-	$os_magic = "&nbsp";
+	$os_magic = "&nbsp;";
     if (!$os_osfeatures)
-	$os_osfeatures = "&nbsp";
+	$os_osfeatures = "&nbsp;";
     if (!$os_op_mode)
-	$os_op_mode = "&nbsp";
+	$os_op_mode = "&nbsp;";
     if (!$created)
 	$created = "N/A";
     if (!$reboot_waittime)
-	$reboot_waittime = "&nbsp";
+	$reboot_waittime = "&nbsp;";
 
     #
     # Generate the table.
@@ -1746,13 +1746,13 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
     }
     else {
 	if (!$description)
-	    $description = "&nbsp";
+	    $description = "&nbsp;";
 	if (!$path)
-	    $path = "&nbsp";
+	    $path = "&nbsp;";
 	if (!$loadaddr)
-	    $loadaddr = "&nbsp";
+	    $loadaddr = "&nbsp;";
 	if (!$frisbee_pid)
-	    $frisbee_pid = "&nbsp";
+	    $frisbee_pid = "&nbsp;";
 	if (!$created)
 	    $created = "N/A";
     }
@@ -1891,11 +1891,11 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 	if (mysql_num_rows($types_result)) {
 	    while ($row = mysql_fetch_array($types_result)) {
 		$type = $row[type];
-		echo "$type &nbsp ";
+		echo "$type &nbsp; ";
 	    }
 	}
 	else {
-	    echo "&nbsp";
+	    echo "&nbsp;";
 	}
 	echo "  </td>
               </tr>\n";
@@ -2113,15 +2113,15 @@ function SHOWNODE($node_id, $flags = 0) {
     $reserved_pid       = $row[reserved_pid];
 
     if (!$def_boot_cmd_line)
-	$def_boot_cmd_line = "&nbsp";
+	$def_boot_cmd_line = "&nbsp;";
     if (!$next_boot_cmd_line)
-	$next_boot_cmd_line = "&nbsp";
+	$next_boot_cmd_line = "&nbsp;";
     if (!$rpms)
-	$rpms = "&nbsp";
+	$rpms = "&nbsp;";
     if (!$tarballs)
-	$tarballs = "&nbsp";
+	$tarballs = "&nbsp;";
     if (!$startupcmd)
-	$startupcmd = "&nbsp";
+	$startupcmd = "&nbsp;";
 
     if (!$short) {
 	#
@@ -2340,7 +2340,7 @@ function SHOWNODE($node_id, $flags = 0) {
 	    if ($next_boot_osid)
 		SPITOSINFOLINK($next_boot_osid);
 	    else
-		echo "&nbsp";
+		echo "&nbsp;";
 
 	    echo "    </td>
                   </tr>\n";
@@ -2357,7 +2357,7 @@ function SHOWNODE($node_id, $flags = 0) {
 	    if ($temp_boot_osid)
 		SPITOSINFOLINK($temp_boot_osid);
 	    else
-		echo "&nbsp";
+		echo "&nbsp;";
 
 	    echo "    </td>
                   </tr>\n";
@@ -2548,7 +2548,7 @@ function SHOWNODE($node_id, $flags = 0) {
 		$channel = "";
 
 	    echo "<tr>
-                      <td>$iface:&nbsp $channel</td>
+                      <td>$iface:&nbsp; $channel</td>
                       <td class=left>$type ($man $model; $protocols)</td>
                   </tr>\n";
 	}
@@ -2568,8 +2568,8 @@ function SHOWNODE($node_id, $flags = 0) {
 	    echo "<tr></tr><tr>
                     <td align=center colspan=2>Switch Info</td>
                   </tr>\n";
-	    echo "<tr><th>Iface:role &nbsp card,port</th>
-                      <th>Switch &nbsp card,port</th>\n";
+	    echo "<tr><th>Iface:role &nbsp; card,port</th>
+                      <th>Switch &nbsp; card,port</th>\n";
 		
 	    while ($row = mysql_fetch_array($query_result)) {
 		$iface       = $row["iface"];
@@ -2581,9 +2581,9 @@ function SHOWNODE($node_id, $flags = 0) {
 		$switch_port = $row["port2"];
 
 		echo "<tr>
-                      <td>$iface:$role &nbsp $card,$port</td>
+                      <td>$iface:$role &nbsp; $card,$port</td>
                       <td class=left>".
-		          "$switch: &nbsp $switch_card,$switch_port</td>
+		          "$switch: &nbsp; $switch_card,$switch_port</td>
                   </tr>\n";
 	    }
 	}

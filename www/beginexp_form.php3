@@ -461,9 +461,9 @@ function SPITFORM($formfields, $errors)
 	    if ($formfields[exp_branch] == "1") {
 		$checked = "checked=1";
 	    }
-	    echo "&nbsp <input type='checkbox' $checked
+	    echo "&nbsp; <input type='checkbox' $checked
 			 name='formfields[exp_branch]' value='1'> ";
-	    echo "&nbsp Branch?";
+	    echo "&nbsp; Branch?";
 	}
         echo "  </td>
                 <input type=hidden name=\"formfields[copyid]\" value='$copyid'>

@@ -479,7 +479,7 @@ for ($i = 0; $i < $num; $i++) {
 
 print "</table>\n" .
       "<input type=checkbox value=\"1\" name=modbase>
-              &nbsp <b>Save?</b> (Check this box if you want these settings to
+              &nbsp; <b>Save?</b> (Check this box if you want these settings to
                            be used next time the experiment is swapped in)".
       "<br><br>\n".
       "<input type=submit value='Execute'>\n" .

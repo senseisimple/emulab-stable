@@ -659,18 +659,18 @@ if ($thumb && !$idle) {
 	    $total += $count;
 	    echo "<tr>
                     <td align=right>${type}:</td>
-                    <td>&nbsp &nbsp &nbsp &nbsp</td>
+                    <td>&nbsp; &nbsp; &nbsp; &nbsp;</td>
                     <td align=center>$count</td>
                   </tr>\n";
     }
     echo "<tr>
              <td align=right><hr></td>
-             <td>&nbsp &nbsp &nbsp &nbsp</td>
+             <td>&nbsp; &nbsp; &nbsp; &nbsp;</td>
              <td align=center><hr></td>
           </tr>\n";
     echo "<tr>
              <td align=right><b>Total</b>:</td>
-             <td>&nbsp &nbsp &nbsp &nbsp</td>
+             <td>&nbsp; &nbsp; &nbsp; &nbsp;</td>
              <td align=center>$total</td>
           </tr>\n";
     

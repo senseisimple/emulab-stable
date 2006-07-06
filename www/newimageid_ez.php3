@@ -331,7 +331,7 @@ function SPITFORM($formfields, $errors)
 		strcmp($formfields[os_name], $os) == 0)
 		$selected = "selected";
 
-	    echo "<option $selected value=$os>$os &nbsp </option>\n";
+	    echo "<option $selected value=$os>$os &nbsp; </option>\n";
 	}
 	echo "       </select>
 		 </td>
@@ -441,7 +441,7 @@ function SPITFORM($formfields, $errors)
 		strcmp($formfields[op_mode], $mode) == 0)
 		$selected = "selected";
 
-	    echo "<option $selected value=$mode>$mode &nbsp </option>\n";
+	    echo "<option $selected value=$mode>$mode &nbsp; </option>\n";
 	}
 	echo "       </select>
 		 </td>

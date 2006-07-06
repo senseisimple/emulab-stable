@@ -860,7 +860,7 @@ object(s) yourself by restarting the
 on <tt>users.emulab.net</tt>:
 
 	<code><pre>
-	eventsys_control &lt;proj&gt &lt;expt&gt replay </code></pre>
+	eventsys_control &lt;proj&gt; &lt;expt&gt; replay </code></pre>
 
 You can also control each program object by sending it events, either
 with the NS "at" command:
@@ -1313,7 +1313,7 @@ default images as a base, goes like this:
      above). Recreate the image as needed:
 
      <code><pre>
-     create_image -p &lt;proj&gt &lt;imageid&gt &lt;node&gt  </pre></code>
+     create_image -p &lt;proj&gt; &lt;imageid&gt; &lt;node&gt;  </pre></code>
 
 <li> Once your image is working properly, you can use it in any NS
      file by using the <tt>tb-set-node-os</tt>. 
@@ -1326,7 +1326,7 @@ of your images or with one of the default images, you can use the
 <tt>os_load</tt> command. Log into <tt>users</tt> and run:
 
 	<code><pre>
-	os_load -p &lt;proj&gt -i &lt;imageid&gt &lt;node&gt </pre></code>
+	os_load -p &lt;proj&gt; -i &lt;imageid&gt; &lt;node&gt; </pre></code>
 	
 This program will run in the foreground, waiting until the image has
 been loaded. At that point you should log in and make sure everything
@@ -1335,4 +1335,4 @@ the <a href="../kb-show.php3?xref_tag=node-consoles">FAQ</a>). If you want to lo
 default image, then simply run:
 
 	<code><pre>
-	os_load &lt;node&gt </pre></code>
+	os_load &lt;node&gt; </pre></code>
