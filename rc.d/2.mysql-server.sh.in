@@ -5,9 +5,11 @@
 # BEFORE: DAEMON
 # KEYWORD: shutdown
 
-isvers5=`/usr/local/bin/mysql -V | egrep -q -s 'Distrib 5.'`
+# On FreeBSD 6.X we need to wrap the wrapper with daemon to prevent HUP signal
 fbsdvers=`uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/'`
 
+# Version 5.X uses a different name for the wrapper. Silly.
+/usr/local/bin/mysql -V | egrep -q -s 'Distrib 5.'
 if [ $? -eq 0 ]; then
 	safeprog=/usr/local/bin/mysqld_safe
 else
