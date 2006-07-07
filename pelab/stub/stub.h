@@ -25,32 +25,32 @@ extern "C"
 #include <netdb.h>
 #include <math.h>
 #include <pcap.h>
-#include <netinet/if_ether.h> 
+#include <netinet/if_ether.h>
 #include <net/ethernet.h>
-#include <netinet/ether.h> 
-#include <netinet/ip.h> 
+#include <netinet/ether.h>
+#include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
 
 #define STDIN 0 // file descriptor for standard input
 #define QUANTA 500    //feed-loop interval in msec
 #define MONITOR_PORT 4200 //the port the monitor connects to
-#define SENDER_PORT  3491 //the port the stub senders connect to 
-#define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold
-#define CONCURRENT_SENDERS   50	 //concurrent senders the stub maintains
-#define CONCURRENT_RECEIVERS 50	 //concurrent receivers the stub maintains
-#define MAX_PAYLOAD_SIZE     64000 //size of the traffic payload 
+#define SENDER_PORT  3491 //the port the stub senders connect to
+#define PENDING_CONNECTIONS  10  //the pending connections the queue will hold
+#define CONCURRENT_SENDERS   50  //concurrent senders the stub maintains
+#define CONCURRENT_RECEIVERS 50  //concurrent receivers the stub maintains
+#define MAX_PAYLOAD_SIZE     64000 //size of the traffic payload
 
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
 #define SNIFF_WINSIZE 131071 //from min(net.core.rmem_max, max(net.ipv4.tcp_rmem)) on Plab linux
-#define SNIFF_TIMEOUT 0 //in msec 
+#define SNIFF_TIMEOUT 0 //in msec
 
 //magic numbers
-#define CODE_BANDWIDTH  0x00000001 
-#define CODE_DELAY      0x00000002 
-#define CODE_LOSS       0x00000003 
+#define CODE_BANDWIDTH  0x00000001
+#define CODE_DELAY      0x00000002
+#define CODE_LOSS       0x00000003
 #define CODE_LIST_DELAY 0x00000004
 #define CODE_MAX_DELAY  0x00000005
 
@@ -99,7 +99,7 @@ typedef struct
   // queue. When it runs out of room it overwrites the oldest pending
   // write.
   pending_write writes[PENDING_SIZE];
-  // The index of the current write under consideration. 
+  // The index of the current write under consideration.
   int current_index;
   // The index of the next free slot. This may be the same as
   // 'current_index'. If this is so, then the write indexed by
@@ -169,7 +169,7 @@ extern unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 extern delay_record delay_records[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 extern int is_live;
 
-extern int last_through[CONCURRENT_RECEIVERS]; 
+extern int last_through[CONCURRENT_RECEIVERS];
 extern int buffer_full[CONCURRENT_RECEIVERS];
 
 extern unsigned long max_throughput[CONCURRENT_RECEIVERS];
@@ -181,7 +181,7 @@ extern int last_max_delay[CONCURRENT_RECEIVERS];
 extern void sniff(void);
 extern void init_pcap(int to_ms, unsigned short port, char * device);
 extern void append_delay_sample(int path_id, long sample_value,
-				struct timeval const * timestamp);
+                                struct timeval const * timestamp);
 extern void remove_delay_samples(int path_id);
 extern void clean_exit(int);
 extern void update_stats(void);
@@ -206,7 +206,7 @@ extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 // throughputTick() call.
 extern unsigned int throughputTick(ThroughputAckState * state);
 extern void throughputInit(ThroughputAckState * state, unsigned int sequence,
-			   struct timeval const * firstTime);
+                           struct timeval const * firstTime);
 extern unsigned int bytesThisTick(ThroughputAckState * state);
 
 // Add a potential sender to the pool.

@@ -103,8 +103,8 @@ int replace_sender_by_stub_port(unsigned long ip, unsigned short stub_port,
     snddb[index].pending.is_pending = 0;
     if (snddb[index].sockfd != -1)
     {
-	FD_CLR(snddb[index].sockfd, read_fds);
-	close(snddb[index].sockfd);
+        FD_CLR(snddb[index].sockfd, read_fds);
+        close(snddb[index].sockfd);
     }
     if (sockfd > maxfd)
     {
@@ -298,7 +298,7 @@ void reconnect_receiver(int index)
 //  int send_buf_size = 0;
 //  int int_size = sizeof(send_buf_size);
 //  getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &send_buf_size,
-//	     (socklen_t*)&int_size);
+//           (socklen_t*)&int_size);
 //  fprintf(stderr, "Socket buffer size: %d\n", send_buf_size);
 
   struct sockaddr_in source_addr;

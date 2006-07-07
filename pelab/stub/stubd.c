@@ -19,7 +19,7 @@ extern int optopt;
 extern int opterr;
 extern int optreset;
 
-//Global  
+//Global
 int is_live = 1;
 
 short  flag_debug, flag_standalone;
@@ -30,7 +30,7 @@ unsigned long delay_count[CONCURRENT_RECEIVERS];
 delay_record delay_records[CONCURRENT_RECEIVERS]; //delay list is calculated at the sender side
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
-int last_through[CONCURRENT_RECEIVERS]; 
+int last_through[CONCURRENT_RECEIVERS];
 int buffer_full[CONCURRENT_RECEIVERS];
 int max_delay[CONCURRENT_RECEIVERS];
 int last_max_delay[CONCURRENT_RECEIVERS];
@@ -170,15 +170,15 @@ packet_info packet_buffer_front(void)
   else
   {
     read_packet_info(&result,
-		     packet_buffer_head->buffer + packet_buffer_index);
+                     packet_buffer_head->buffer + packet_buffer_index);
   }
   if (thisAddress != lastAddress)
   {
       logWrite(PACKET_BUFFER_DETAIL, NULL,
-	       "Looking at packet: type(%hu) value(%lu) delta(%lu) "
-	       "source_port(%hu) dest_port(%hu) ip(%s)",
-	       result.type, result.value, result.delta, result.source_port,
-	       result.dest_port, ipToString(result.ip));
+               "Looking at packet: type(%hu) value(%lu) delta(%lu) "
+               "source_port(%hu) dest_port(%hu) ip(%s)",
+               result.type, result.value, result.delta, result.source_port,
+               result.dest_port, ipToString(result.ip));
   }
   lastAddress = thisAddress;
   return result;
@@ -225,7 +225,7 @@ void init_random_buffer(void)
 
 //Append a delay sample to the tail of the ith delay-record queue.
 void append_delay_sample(int path_id, long sample_value,
-			 struct timeval const * timestamp) {
+                         struct timeval const * timestamp) {
   delay_sample *sample = malloc(sizeof(delay_sample));
   if (sample == NULL) {
     perror("allocate");
@@ -274,7 +274,7 @@ void save_delay_samples(int path_id, char * buffer, int maxCount) {
     if (current != NULL)
     {
       unsigned long msecs = (current->time.tv_usec
-			     - previous->time.tv_usec)/1000;
+                             - previous->time.tv_usec)/1000;
       interval = (current->time.tv_sec - previous->time.tv_sec)*1000 + msecs;
     }
     ++count;
@@ -296,7 +296,7 @@ void remove_delay_samples(int path_id)
 
 void init(void) {
   int i;
-  
+
   for (i = 0; i < CONCURRENT_RECEIVERS; i++)
   {
       add_empty_receiver(i);
@@ -314,13 +314,13 @@ void clean_exit(int code){
 
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     if (rcvdb[i].valid == 1){
-      close(rcvdb[i].sockfd); 
-    } 
+      close(rcvdb[i].sockfd);
+    }
   }
   for (i=0; i<CONCURRENT_SENDERS; i++){
     if (snddb[i].valid == 1){
-      close(snddb[i].sockfd); 
-    } 
+      close(snddb[i].sockfd);
+    }
   }
   packet_buffer_cleanup();
   logCleanup();
@@ -340,8 +340,8 @@ void try_pending(int index)
   gettimeofday(&now, NULL);
   if (pending->is_pending
       && (pending->deadline.tv_sec < now.tv_sec ||
-	  (pending->deadline.tv_sec == now.tv_sec
-	   && pending->deadline.tv_usec < now.tv_usec)))
+          (pending->deadline.tv_sec == now.tv_sec
+           && pending->deadline.tv_usec < now.tv_usec)))
   {
     int size = pending->writes[pending->current_index].size;
     int error = send_with_reconnect(index, size);
@@ -390,7 +390,7 @@ void push_pending_write(int index, pending_write current)
     if (pending->free_index < pending->current_index)
     {
       used_buffer = PENDING_SIZE -
-	(pending->current_index - pending->free_index);
+        (pending->current_index - pending->free_index);
     }
     else
     {
@@ -404,21 +404,21 @@ void push_pending_write(int index, pending_write current)
 //      pop_pending_write(index);
 
 //      pending->current_index = (pending->current_index + PENDING_SIZE/2)
-//	% PENDING_SIZE;
+//      % PENDING_SIZE;
 
       int delta = pending->writes[(pending->current_index + 1)
-				  %PENDING_SIZE].delta
-	- pending->writes[pending->current_index].delta;
+                                  %PENDING_SIZE].delta
+        - pending->writes[pending->current_index].delta;
       pending->deadline.tv_usec += delta * 1000;
       while (pending->deadline.tv_usec < 0)
       {
-	pending->deadline.tv_sec -= 1;
-	pending->deadline.tv_usec += 1000000;
+        pending->deadline.tv_sec -= 1;
+        pending->deadline.tv_usec += 1000000;
       }
       while (pending->deadline.tv_usec >= 1000000)
       {
-	pending->deadline.tv_sec += 1;
-	pending->deadline.tv_usec -= 1000000;
+        pending->deadline.tv_sec += 1;
+        pending->deadline.tv_usec -= 1000000;
       }
 
       pending->current_index = (pending->current_index + 1) % PENDING_SIZE;
@@ -446,7 +446,7 @@ void pop_pending_write(int index)
       long millis = pending->writes[pending->current_index].delta % 1000;
       pending->deadline.tv_usec += millis * 1000;
       pending->deadline.tv_sec += seconds
-	+ (pending->deadline.tv_usec / 1000000);
+        + (pending->deadline.tv_usec / 1000000);
       pending->deadline.tv_usec %= 1000000;
     }
   }
@@ -485,7 +485,7 @@ int recv_all(int sockfd, char *buf, int size){
     if ((numbytes=recv(sockfd, next, nleft, 0)) == -1) {
       perror("recv_all(): recv");
       clean_exit(1);
-    }      
+    }
     if ( numbytes == 0) return 0;
     nleft -= numbytes;
     next  += numbytes;
@@ -494,24 +494,24 @@ int recv_all(int sockfd, char *buf, int size){
   return size;
 }
 
-int send_all(int sockfd, char *buf, int size) { 
-  int total = 0; // how many bytes we have sent 
-  int bytesleft = size; // how many we have left to send 
-  int n; 
+int send_all(int sockfd, char *buf, int size) {
+  int total = 0; // how many bytes we have sent
+  int bytesleft = size; // how many we have left to send
+  int n;
 
-  while(total < size) { 
-    if ((n = send(sockfd, buf+total, bytesleft, 0)) == -1) {   
+  while(total < size) {
+    if ((n = send(sockfd, buf+total, bytesleft, 0)) == -1) {
       if (errno == ECONNRESET) { //receivor closed the connection
-	return 0;
+        return 0;
       }
       perror("send_all(): send");
-      clean_exit(1);      
-    } 
-    total += n; 
-    bytesleft -= n; 
-  } 
+      clean_exit(1);
+    }
+    total += n;
+    bytesleft -= n;
+  }
   if (flag_debug) printf("send_all(): to sockfd %d \n", sockfd);
-  return size; 
+  return size;
 }
 
 void receive_sender(int i) {
@@ -580,7 +580,7 @@ void send_receiver(int index, int packet_size, struct timeval deadline)
   if (error == -1 && errno == ECONNRESET) {
     remove_index(index, &write_fds);
     addr.s_addr = rcvdb[index].ip;
-    printf("Error: send_receiver() - failed send to %s three times. \n", inet_ntoa(addr)); 
+    printf("Error: send_receiver() - failed send to %s three times. \n", inet_ntoa(addr));
   }
   else if (error == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
     add_pending(index, packet_size);
@@ -634,7 +634,7 @@ int send_with_reconnect(int index, int size)
     //if still disconnected, reset
     if (error == -1 && errno == ECONNRESET) {
       remove_index(index, &write_fds);
-      printf("Error: send_receiver() - failed send to %s three times. \n", ipToString(rcvdb[index].ip)); 
+      printf("Error: send_receiver() - failed send to %s three times. \n", ipToString(rcvdb[index].ip));
       result = -1;
     }
     else if (error == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
@@ -650,7 +650,7 @@ int send_with_reconnect(int index, int size)
       bytes_remaining -= error;
       if (error < write_size)
       {
-	done = 1;
+        done = 1;
       }
       result = bytes_remaining;
 //    printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
@@ -676,7 +676,7 @@ void change_socket_buffer_size(int sockfd, int optname, int value)
     clean_exit(1);
   }
   logWrite(CONTROL_RECEIVE | DELAY_DETAIL, NULL,
-	   "Socket buffer size is now %d", newSize);
+           "Socket buffer size is now %d", newSize);
 }
 
 void process_control_packet(packet_info packet
@@ -704,13 +704,13 @@ void process_control_packet(packet_info packet
     break;
   case PACKET_SEND_BUFFER:
     logWrite(CONTROL_RECEIVE | DELAY_DETAIL, NULL,
-	     "Told to set SEND buffer to %d bytes", packet.value);
+             "Told to set SEND buffer to %d bytes", packet.value);
     change_socket_buffer_size(sockfd, SO_SNDBUF, packet.value);
     break;
   case PACKET_RECEIVE_BUFFER:
     logWrite(CONTROL_RECEIVE | DELAY_DETAIL, NULL,
-	     "Told to set RECEIVE buffer to %d bytes",
-	     packet.value);
+             "Told to set RECEIVE buffer to %d bytes",
+             packet.value);
     change_socket_buffer_size(sockfd, SO_RCVBUF, packet.value);
     break;
   default:
@@ -775,7 +775,7 @@ int receive_monitor(int sockfd, struct timeval * deadline) {
   gettimeofday(deadline, NULL);
   write_buffer_index = 0;
   while ((write_buffer_index != write_buffer_size)
-	 && (write_buffer[write_buffer_index].type != PACKET_WRITE))
+         && (write_buffer[write_buffer_index].type != PACKET_WRITE))
   {
     ++write_buffer_index;
   }
@@ -791,8 +791,8 @@ int receive_monitor(int sockfd, struct timeval * deadline) {
   }
   logWrite(CONTROL_RECEIVE, NULL, "Finished processing buffer from monitor");
 #endif
-  
-  
+
+
   return 1;
 }
 
@@ -817,7 +817,7 @@ char * save_receiver_address(char * buf, int index)
 }
 
 int send_simple_record_to_monitor(int monitor, int index, unsigned long type,
-				  unsigned long value)
+                                  unsigned long value)
 {
   int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
   char outbuf_delay[buffer_size];
@@ -826,9 +826,9 @@ int send_simple_record_to_monitor(int monitor, int index, unsigned long type,
   char * buf = save_receiver_address(outbuf_delay, index);
 
   logWrite(CONTROL_SEND, NULL,
-	   "Sending type(%d) value(%d) about stream(%hu:%s:%hu)",
-	   type, value, rcvdb[index].source_port,
-	   ipToString(rcvdb[index].ip), rcvdb[index].dest_port);
+           "Sending type(%d) value(%d) about stream(%hu:%s:%hu)",
+           type, value, rcvdb[index].source_port,
+           ipToString(rcvdb[index].ip), rcvdb[index].dest_port);
 
   // Insert the code number for delay
   type = htonl(type);
@@ -856,7 +856,7 @@ int send_max_delay_to_monitor(int monitor, int index)
   if (delay != last_max_delay[index])
   {
     result = send_simple_record_to_monitor(monitor, index, CODE_MAX_DELAY,
-					   delay);
+                                           delay);
     if (result)
     {
       logWrite(CONTROL_SEND, NULL, "Successfully sent max_delay measurement");
@@ -890,19 +890,19 @@ int send_delay_to_monitor(int monitor, int index)
       gettimeofday(&now, NULL);
       if (earlier.tv_sec != 0)
       {
-	logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
-	logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
-		 earlier.tv_sec + earlier.tv_usec/1000000000.0,
-		 last_delays[index],
-		 now.tv_sec + now.tv_usec/1000000000.0,
-		 last_delays[index]);
+        logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
+        logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
+                 earlier.tv_sec + earlier.tv_usec/1000000000.0,
+                 last_delays[index],
+                 now.tv_sec + now.tv_usec/1000000000.0,
+                 last_delays[index]);
       }
       logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
       logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
-	       now.tv_sec + now.tv_usec/1000000000.0,
-	       last_delays[index],
-	       now.tv_sec + now.tv_usec/1000000000.0,
-	       delay);
+               now.tv_sec + now.tv_usec/1000000000.0,
+               last_delays[index],
+               now.tv_sec + now.tv_usec/1000000000.0,
+               delay);
       earlier = now;
     }
     last_delays[index] = delay;
@@ -924,7 +924,7 @@ int send_bandwidth_to_monitor(int monitor, int index)
   if (bandwidth_method == BANDWIDTH_AVERAGE) {
     bandwidth = throughputTick(&throughput[index]);
   } else if (bandwidth_method == BANDWIDTH_MAX
-	     || bandwidth_method == BANDWIDTH_VEGAS) {
+             || bandwidth_method == BANDWIDTH_VEGAS) {
     bandwidth = max_throughput[index];
   } else if (bandwidth_method == BANDWIDTH_BUFFER) {
     bandwidth = throughputTick(&throughput[index]);
@@ -939,9 +939,9 @@ int send_bandwidth_to_monitor(int monitor, int index)
     char * buf = save_receiver_address(outbuf, index);
 
     logWrite(CONTROL_SEND, NULL,
-	     "Sending bandwidth(%lukbps) about stream(%hu:%s:%hu)",
-	     bandwidth, rcvdb[index].source_port, ipToString(rcvdb[index].ip),
-	     rcvdb[index].dest_port);
+             "Sending bandwidth(%lukbps) about stream(%hu:%s:%hu)",
+             bandwidth, rcvdb[index].source_port, ipToString(rcvdb[index].ip),
+             rcvdb[index].dest_port);
 
     // Insert the code number for bandwidth
     memcpy(buf, &code, SIZEOF_LONG);
@@ -957,15 +957,15 @@ int send_bandwidth_to_monitor(int monitor, int index)
     }
 
     {
-	struct timeval now;
-	unsigned long hostBand = ntohl(bandwidth);
-	gettimeofday(&now, NULL);
-	logWrite(TCPTRACE_SEND, NULL, "BANDWIDTH!purple");
-	logWrite(TCPTRACE_SEND, NULL, "BANDWIDTH!line %.6f %d %.6f %d",
-		 now.tv_sec + now.tv_usec/1000000000.0,
-		 0,
-		 now.tv_sec + now.tv_usec/1000000000.0,
-		 hostBand*1000/8);
+        struct timeval now;
+        unsigned long hostBand = ntohl(bandwidth);
+        gettimeofday(&now, NULL);
+        logWrite(TCPTRACE_SEND, NULL, "BANDWIDTH!purple");
+        logWrite(TCPTRACE_SEND, NULL, "BANDWIDTH!line %.6f %d %.6f %d",
+                 now.tv_sec + now.tv_usec/1000000000.0,
+                 0,
+                 now.tv_sec + now.tv_usec/1000000000.0,
+                 hostBand*1000/8);
     }
     last_through[index] = bandwidth;
   }
@@ -985,7 +985,7 @@ int send_loss_to_monitor(int monitor, int index)
   } else {
     // Loss per billion
     loss_rate = floor(loss_records[index].loss_counter*1000000000.0f
-		      /loss_records[index].total_counter+0.5f);
+                      /loss_records[index].total_counter+0.5f);
   }
 
   // If measurement changed since last send
@@ -1005,11 +1005,11 @@ int send_loss_to_monitor(int monitor, int index)
 
     if (send_all(monitor, outbuf_loss, buffer_size) == 0){
       loss_records[index].loss_counter=0;
-      loss_records[index].total_counter=0;    
+      loss_records[index].total_counter=0;
       return 0;
     }
-    last_loss_rates[index] = loss_rate;	
-    printf("Sent loss: %d/%d=%ld \n", loss_records[index].loss_counter, loss_records[index].total_counter, loss_rate);	
+    last_loss_rates[index] = loss_rate;
+    printf("Sent loss: %d/%d=%ld \n", loss_records[index].loss_counter, loss_records[index].total_counter, loss_rate);
   }
   loss_records[index].loss_counter=0;
   loss_records[index].total_counter=0;
@@ -1033,8 +1033,8 @@ int send_delay_list_to_monitor(int monitor, int index)
     char * buf = save_receiver_address(outbuf, index);
 
     logWrite(CONTROL_SEND, NULL,
-	     "Sending delay list of size(%d) to monitor(%s)",
-	     delay_records[index].sample_number, ipToString(rcvdb[index].ip));
+             "Sending delay list of size(%d) to monitor(%s)",
+             delay_records[index].sample_number, ipToString(rcvdb[index].ip));
 
     memcpy(buf, &code, SIZEOF_LONG);
     buf += SIZEOF_LONG;
@@ -1046,7 +1046,7 @@ int send_delay_list_to_monitor(int monitor, int index)
 
     error = send_all(monitor, outbuf, sending_size) == 0;
     logWrite(CONTROL_SEND, NULL,
-	     "Sending delay list finished with code(%d)", error);
+             "Sending delay list finished with code(%d)", error);
   }
 
   remove_delay_samples(index);
@@ -1080,7 +1080,7 @@ void print_measurements(void) {
   int i;
 
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
-    if (rcvdb[i].valid == 1) {     
+    if (rcvdb[i].valid == 1) {
       // Note, this has to be done before throughputTick, since that
       // obliterates the byte count
       unsigned int bytes = bytesThisTick(&throughput[i]);
@@ -1108,29 +1108,29 @@ void print_measurements(void) {
 
       //print delay
       if (delays[i] != last_delays[i]) {
-	last_delays[i] = delays[i];	
-	if (print) printf("New delay: %ld\n", delays[i]);	
+        last_delays[i] = delays[i];
+        if (print) printf("New delay: %ld\n", delays[i]);
       } else {
-	if (flag_debug) printf("Unchanged delay: %ld\n", delays[i]);	
+        if (flag_debug) printf("Unchanged delay: %ld\n", delays[i]);
       }
 
       //print loss
       if (loss_records[i].total_counter == 0){
-	loss_rate = 0;
+        loss_rate = 0;
       } else {
-	loss_rate = (float)loss_records[i].loss_counter/loss_records[i].total_counter; //float loss
+        loss_rate = (float)loss_records[i].loss_counter/loss_records[i].total_counter; //float loss
       }
       if (loss_rate != last_loss_rates[i]) {
-	last_loss_rates[i] = loss_rate;	
-	if (print) printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
+        last_loss_rates[i] = loss_rate;
+        if (print) printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);
       } else {
-	if (flag_debug) printf("Unchanged loss: %f \n", loss_rate);     
+        if (flag_debug) printf("Unchanged loss: %f \n", loss_rate);
       }
       loss_records[i].loss_counter=0;
-      loss_records[i].total_counter=0;      
+      loss_records[i].total_counter=0;
 
     } //if connection is valid
-  } //for 
+  } //for
 }
 
 void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
@@ -1159,13 +1159,13 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
     packet_buffer_advance();
     if (packet_buffer_more())
     {
-      packet = packet_buffer_front(); 
+      packet = packet_buffer_front();
       deadline->tv_usec += packet.delta * 1000;
       if (deadline->tv_usec > 1000000)
-      { 
+      {
         deadline->tv_sec += deadline->tv_usec / 1000000;
-        deadline->tv_usec = deadline->tv_usec % 1000000; 
-      } 
+        deadline->tv_usec = deadline->tv_usec % 1000000;
+      }
     }
   }
 #else
@@ -1174,74 +1174,74 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
     packet = write_buffer[write_buffer_index];
 
     while (deadline->tv_sec < now.tv_sec ||
-	   (deadline->tv_sec == now.tv_sec && deadline->tv_usec < now.tv_usec))
+           (deadline->tv_sec == now.tv_sec && deadline->tv_usec < now.tv_usec))
     {
       int delta = 0;
       index = insert_by_address(packet.ip, packet.source_port,
-				packet.dest_port);
+                                packet.dest_port);
       if (index == -1)
       {
-	printf("No more connection slots.\n");
-	clean_exit(1);
+        printf("No more connection slots.\n");
+        clean_exit(1);
       }
       logWrite(CONTROL_RECEIVE, NULL, "Told to write %d bytes", packet.value);
       error = send_with_reconnect(index, packet.value);
       if (error > 0)
       {
-	// There are bytes that were unwritten.
-	buffer_full[index] = 1;
-	logWrite(DELAY_DETAIL, NULL, "Buffer Full");
+        // There are bytes that were unwritten.
+        buffer_full[index] = 1;
+        logWrite(DELAY_DETAIL, NULL, "Buffer Full");
       }
-  
+
       ++write_buffer_index;
       if (write_buffer_index == write_buffer_size)
       {
-	// If we are going to wraparound, then we need to add the
-	// delay of the remaining quanta time. This is to prevent a
-	// single write from causing link saturation, for instance.
-	write_buffer_index = 0;
-	delta = QUANTA - write_delta_total;
-	if (delta < 0)
-	{
-	  delta = 0;
-	}
+        // If we are going to wraparound, then we need to add the
+        // delay of the remaining quanta time. This is to prevent a
+        // single write from causing link saturation, for instance.
+        write_buffer_index = 0;
+        delta = QUANTA - write_delta_total;
+        if (delta < 0)
+        {
+          delta = 0;
+        }
       }
       while (write_buffer[write_buffer_index].type != PACKET_WRITE)
       {
-	++write_buffer_index;
-	if (write_buffer_index == write_buffer_size)
-	{
-	  // If we are going to wraparound, then we need to add the
-	  // delay of the remaining quanta time. This is to prevent a
-	  // single write from causing link saturation, for instance.
-	  write_buffer_index = 0;
-	  delta = QUANTA - write_delta_total;
-	  if (delta < 0)
-	  {
-	    delta = 0;
-	  }
-	}
+        ++write_buffer_index;
+        if (write_buffer_index == write_buffer_size)
+        {
+          // If we are going to wraparound, then we need to add the
+          // delay of the remaining quanta time. This is to prevent a
+          // single write from causing link saturation, for instance.
+          write_buffer_index = 0;
+          delta = QUANTA - write_delta_total;
+          if (delta < 0)
+          {
+            delta = 0;
+          }
+        }
       }
       if (packet.delta == 0)
       {
-	++delta;
+        ++delta;
       }
       else
       {
-	delta += packet.delta;
+        delta += packet.delta;
       }
       if (delta <= 0)
       {
-	fprintf(stderr, "Delta is below 0! delta: %d, packet.delta %ld"
-		", write_delta_total: %d\n",
-		delta, packet.delta, write_delta_total);
-	clean_exit(1);
+        fprintf(stderr, "Delta is below 0! delta: %d, packet.delta %ld"
+                ", write_delta_total: %d\n",
+                delta, packet.delta, write_delta_total);
+        clean_exit(1);
       }
       deadline->tv_usec += delta * 1000;
       if (deadline->tv_usec > 1000000)
-      { 
-	deadline->tv_sec += deadline->tv_usec / 1000000;
-	deadline->tv_usec = deadline->tv_usec % 1000000; 
+      {
+        deadline->tv_sec += deadline->tv_usec / 1000000;
+        deadline->tv_usec = deadline->tv_usec % 1000000;
       }
     }
   }
@@ -1270,7 +1270,7 @@ void usage() {
   fprintf(stderr,"       -f <filename>: Save logs into filename. By default, stderr is used.\n");
   fprintf(stderr,"       -l <option>:  Enable logging for a particular part of the stub. 'everything' eneables all logging 'nothing' disables all logging.\n");
   fprintf(stderr,"                     control-send -- Control messages sent from the stub to the monitor\n");
-  fprintf(stderr,"                     control-receive -- Control messages received from the monitor\n"); 
+  fprintf(stderr,"                     control-receive -- Control messages received from the monitor\n");
   fprintf(stderr,"                     tcptrace-send -- Control messages sent in xplot format (for comparison with tcptrace)\n");
   fprintf(stderr,"                     tcptrace-receive -- Control messages received in xplot format (for comparison with tcptrace)\n");
   fprintf(stderr,"                     sniff-send -- Outgoing packets detected by stub-pcap\n");
@@ -1294,8 +1294,8 @@ void usage() {
 }
 
 int main(int argc, char *argv[]) {
-  int sockfd_snd, sockfd_rcv_sender, sockfd_rcv_monitor, sockfd_monitor=-1;  
-  struct sockaddr_in my_addr;	// my address information
+  int sockfd_snd, sockfd_rcv_sender, sockfd_rcv_monitor, sockfd_monitor=-1;
+  struct sockaddr_in my_addr;   // my address information
   struct sockaddr_in their_addr; // connector's address information
   fd_set read_fds_copy, write_fds_copy;
   socklen_t sin_size;
@@ -1317,9 +1317,9 @@ int main(int argc, char *argv[]) {
   init();
 
   //set up debug flag
-  if (getenv("Debug")!=NULL) 
+  if (getenv("Debug")!=NULL)
     flag_debug=1;
-  else 
+  else
     flag_debug=0;
   flag_standalone = 0;
 
@@ -1331,104 +1331,104 @@ int main(int argc, char *argv[]) {
       case 'd':
         flag_debug = 1; break;
       case 'f':
-	if (logfile == NULL)
-	{
-	  logfile = fopen(optarg, "a");
-	  if (logfile == NULL)
-	  {
-	    perror("Log fopen()");
-	    exit(1);
-	  }
-	}
-	break;
+        if (logfile == NULL)
+        {
+          logfile = fopen(optarg, "a");
+          if (logfile == NULL)
+          {
+            perror("Log fopen()");
+            exit(1);
+          }
+        }
+        break;
       case 'b':
-	if (strcmp(optarg, "average") == 0)
-	{
-	  bandwidth_method = BANDWIDTH_AVERAGE;
-	} else if (strcmp(optarg, "max") == 0) {
-	  bandwidth_method = BANDWIDTH_MAX;
-	} else if (strcmp(optarg, "vegas") == 0) {
-	  bandwidth_method = BANDWIDTH_VEGAS;
-	} else if (strcmp(optarg, "buffer") == 0) {
-	  bandwidth_method = BANDWIDTH_BUFFER;
-	} else {
-	  fprintf(stderr, "Unknown bandwidth method\n");
-	  usage();
-	  exit(1);
-	}
-	break;
+        if (strcmp(optarg, "average") == 0)
+        {
+          bandwidth_method = BANDWIDTH_AVERAGE;
+        } else if (strcmp(optarg, "max") == 0) {
+          bandwidth_method = BANDWIDTH_MAX;
+        } else if (strcmp(optarg, "vegas") == 0) {
+          bandwidth_method = BANDWIDTH_VEGAS;
+        } else if (strcmp(optarg, "buffer") == 0) {
+          bandwidth_method = BANDWIDTH_BUFFER;
+        } else {
+          fprintf(stderr, "Unknown bandwidth method\n");
+          usage();
+          exit(1);
+        }
+        break;
       case 'l':
-	if (strcmp(optarg, "everything") == 0)
-	{
-	  logflags = LOG_EVERYTHING;
-	}
-	else if (strcmp(optarg, "nothing") == 0)
-	{
-	  logflags = LOG_NOTHING;
-	}
-	else if (strcmp(optarg, "control-send") == 0)
-	{
-	  logflags = logflags | CONTROL_SEND;
-	}
-	else if (strcmp(optarg, "control-receive") == 0)
-	{
-	  logflags = logflags | CONTROL_RECEIVE;
-	}
-	else if (strcmp(optarg, "tcptrace-send") == 0)
-	{
-	  logflags = logflags | TCPTRACE_SEND;
-	}
-	else if (strcmp(optarg, "tcptrace-receive") == 0)
-	{
-	  logflags = logflags | TCPTRACE_RECEIVE;
-	}
-	else if (strcmp(optarg, "sniff-send") == 0)
-	{
-	  logflags = logflags | SNIFF_SEND;
-	}
-	else if (strcmp(optarg, "sniff-receive") == 0)
-	{
-	  logflags = logflags | SNIFF_RECEIVE;
-	}
-	else if (strcmp(optarg, "peer-write") == 0)
-	{
-	  logflags = logflags | PEER_WRITE;
-	}
-	else if (strcmp(optarg, "peer-read") == 0)
-	{
-	  logflags = logflags | PEER_READ;
-	}
-	else if (strcmp(optarg, "main-loop") == 0)
-	{
-	  logflags = logflags | MAIN_LOOP;
-	}
-	else if (strcmp(optarg, "lookup-db") == 0)
-	{
-	  logflags = logflags | LOOKUP_DB;
-	}
-	else if (strcmp(optarg, "delay-detail") == 0)
-	{
-	    logflags = logflags | DELAY_DETAIL;
-	}
-	else if (strcmp(optarg, "packet-buffer-detail") == 0)
-	{
-	    logflags = logflags | PACKET_BUFFER_DETAIL;
-	}
-	else
-	{
-	    fprintf(stderr, "Unknown logging option %s\n", optarg);
-	    usage();
-	    exit(1);
-	}
-	break;
+        if (strcmp(optarg, "everything") == 0)
+        {
+          logflags = LOG_EVERYTHING;
+        }
+        else if (strcmp(optarg, "nothing") == 0)
+        {
+          logflags = LOG_NOTHING;
+        }
+        else if (strcmp(optarg, "control-send") == 0)
+        {
+          logflags = logflags | CONTROL_SEND;
+        }
+        else if (strcmp(optarg, "control-receive") == 0)
+        {
+          logflags = logflags | CONTROL_RECEIVE;
+        }
+        else if (strcmp(optarg, "tcptrace-send") == 0)
+        {
+          logflags = logflags | TCPTRACE_SEND;
+        }
+        else if (strcmp(optarg, "tcptrace-receive") == 0)
+        {
+          logflags = logflags | TCPTRACE_RECEIVE;
+        }
+        else if (strcmp(optarg, "sniff-send") == 0)
+        {
+          logflags = logflags | SNIFF_SEND;
+        }
+        else if (strcmp(optarg, "sniff-receive") == 0)
+        {
+          logflags = logflags | SNIFF_RECEIVE;
+        }
+        else if (strcmp(optarg, "peer-write") == 0)
+        {
+          logflags = logflags | PEER_WRITE;
+        }
+        else if (strcmp(optarg, "peer-read") == 0)
+        {
+          logflags = logflags | PEER_READ;
+        }
+        else if (strcmp(optarg, "main-loop") == 0)
+        {
+          logflags = logflags | MAIN_LOOP;
+        }
+        else if (strcmp(optarg, "lookup-db") == 0)
+        {
+          logflags = logflags | LOOKUP_DB;
+        }
+        else if (strcmp(optarg, "delay-detail") == 0)
+        {
+            logflags = logflags | DELAY_DETAIL;
+        }
+        else if (strcmp(optarg, "packet-buffer-detail") == 0)
+        {
+            logflags = logflags | PACKET_BUFFER_DETAIL;
+        }
+        else
+        {
+            fprintf(stderr, "Unknown logging option %s\n", optarg);
+            usage();
+            exit(1);
+        }
+        break;
       case 's':
         flag_standalone = 1; break;
       case 'r':
-	flag_standalone = 1;
-	is_live = 0;
-	break;
+        flag_standalone = 1;
+        is_live = 0;
+        break;
       case 't':
-	flag_testmode = 1; break;
+        flag_testmode = 1; break;
       default:
         fprintf(stderr,"Unknown option %c\n",ch);
         usage(); exit(1);
@@ -1489,16 +1489,16 @@ int main(int argc, char *argv[]) {
   if (setsockopt(sockfd_rcv_sender, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
     perror("setsockopt");
     exit(1);
-  }  
-  my_addr.sin_family = AF_INET;		  // host byte order
+  }
+  my_addr.sin_family = AF_INET;           // host byte order
   my_addr.sin_port = htons(SENDER_PORT);  // short, network byte order
   my_addr.sin_addr.s_addr = INADDR_ANY;   // automatically fill with my IP
 //  memset(&(my_addr.sin_zero), '\0', 8);   // zero the rest of the struct
-  if (flag_debug) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));  
+  if (flag_debug) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));
   if (bind(sockfd_rcv_sender, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
-  }  
+  }
   if (listen(sockfd_rcv_sender, PENDING_CONNECTIONS) == -1) {
     perror("listen");
     exit(1);
@@ -1512,16 +1512,16 @@ int main(int argc, char *argv[]) {
   if (setsockopt(sockfd_rcv_monitor, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
     perror("setsockopt");
     exit(1);
-  }  
-  my_addr.sin_family = AF_INET;		  // host byte order
+  }
+  my_addr.sin_family = AF_INET;           // host byte order
   my_addr.sin_port = htons(MONITOR_PORT); // short, network byte order
   my_addr.sin_addr.s_addr = INADDR_ANY;   // automatically fill with my IP
 //  memset(&(my_addr.sin_zero), '\0', 8);   // zero the rest of the struct
-  if (flag_debug) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));  
+  if (flag_debug) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));
   if (bind(sockfd_rcv_monitor, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
-  }  
+  }
   if (listen(sockfd_rcv_monitor, 1) == -1) {
     perror("listen");
     exit(1);
@@ -1551,23 +1551,23 @@ int main(int argc, char *argv[]) {
     logWrite(MAIN_LOOP, NULL, "Quantum %lu", quantum_no);
     if (is_live)
     {
-	update_stats();
-	logWrite(MAIN_LOOP, NULL, "PCAP Received: %u Dropped: %u",
-		 received_stat(), dropped_stat());
+        update_stats();
+        logWrite(MAIN_LOOP, NULL, "PCAP Received: %u Dropped: %u",
+                 received_stat(), dropped_stat());
     }
     quantum_no++;
 
     //while in a quanta
-    while(have_time(&start_tv, &left_tv)) {  
+    while(have_time(&start_tv, &left_tv)) {
       read_fds_copy  = read_fds;
       write_fds_copy = write_fds;
 
       select_count = select(maxfd+1, &read_fds_copy, &write_fds_copy, NULL,
-			    &left_tv);
+                            &left_tv);
       if (select_count == -1)
       {
-	perror("select"); 
-	clean_exit(1); 
+        perror("select");
+        clean_exit(1);
       }
 //      fprintf(stderr, "Select count: %d\n", select_count);
       // Send out packets to our peers if the deadline has passed.
@@ -1587,108 +1587,108 @@ int main(int argc, char *argv[]) {
 /*
       //receive from existent senders
       for (i=0; i<CONCURRENT_SENDERS; i++){
-	// Send pending data if it exists.
-	if (snddb[i].valid==1 && FD_ISSET(snddb[i].sockfd, &read_fds_copy)) {	
-	  receive_sender(i);
-	} 
+        // Send pending data if it exists.
+        if (snddb[i].valid==1 && FD_ISSET(snddb[i].sockfd, &read_fds_copy)) {
+          receive_sender(i);
+        }
       }
-*/    
-      //handle new senders 
-      if (FD_ISSET(sockfd_rcv_sender, &read_fds_copy)) { 
-	if ((sockfd_snd = accept(sockfd_rcv_sender, (struct sockaddr *)&their_addr, &sin_size)) == -1) { 
-	  perror("accept"); 
-	  continue;
-	} else {
-	  logWrite(MAIN_LOOP, NULL, "Accept new peer (%s)",
-		   inet_ntoa(their_addr.sin_addr));
-	  replace_sender_by_stub_port(their_addr.sin_addr.s_addr,
-				      ntohs(their_addr.sin_port), sockfd_snd,
-				      &read_fds);
-//	  insert_db(their_addr.sin_addr.s_addr, their_addr.sin_port,
-//		    SENDER_PORT, sockfd_snd, 1); //insert snddb
-//	  FD_SET(sockfd_snd, &read_fds); // add to master set 
-//	  if (sockfd_snd > maxfd) { // keep track of the maximum 
-//	    maxfd = sockfd_snd; 
-//	  } 
-	  if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
-	} 
+*/
+      //handle new senders
+      if (FD_ISSET(sockfd_rcv_sender, &read_fds_copy)) {
+        if ((sockfd_snd = accept(sockfd_rcv_sender, (struct sockaddr *)&their_addr, &sin_size)) == -1) {
+          perror("accept");
+          continue;
+        } else {
+          logWrite(MAIN_LOOP, NULL, "Accept new peer (%s)",
+                   inet_ntoa(their_addr.sin_addr));
+          replace_sender_by_stub_port(their_addr.sin_addr.s_addr,
+                                      ntohs(their_addr.sin_port), sockfd_snd,
+                                      &read_fds);
+//        insert_db(their_addr.sin_addr.s_addr, their_addr.sin_port,
+//                  SENDER_PORT, sockfd_snd, 1); //insert snddb
+//        FD_SET(sockfd_snd, &read_fds); // add to master set
+//        if (sockfd_snd > maxfd) { // keep track of the maximum
+//          maxfd = sockfd_snd;
+//        }
+          if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
+        }
       }
 
       //handle the new monitor
-      if (FD_ISSET(sockfd_rcv_monitor, &read_fds_copy)) {  
-	if ((sockfd_monitor = accept(sockfd_rcv_monitor, (struct sockaddr *)&their_addr, &sin_size)) == -1) { 
-	  perror("accept"); 
-	  continue;
-	} else {
-	  int nodelay = 1;
-	  int nodelay_error = setsockopt(sockfd_monitor, IPPROTO_TCP,
-					 TCP_NODELAY, &nodelay,
-					 sizeof(nodelay));
-	  if (nodelay_error == -1)
-	  {
-	    perror("setsockopt (TCP_NODELAY)");
-	    clean_exit(1);
-	  }
-	  logWrite(MAIN_LOOP, NULL, "Accept new monitor (%s)",
-		   inet_ntoa(their_addr.sin_addr));
+      if (FD_ISSET(sockfd_rcv_monitor, &read_fds_copy)) {
+        if ((sockfd_monitor = accept(sockfd_rcv_monitor, (struct sockaddr *)&their_addr, &sin_size)) == -1) {
+          perror("accept");
+          continue;
+        } else {
+          int nodelay = 1;
+          int nodelay_error = setsockopt(sockfd_monitor, IPPROTO_TCP,
+                                         TCP_NODELAY, &nodelay,
+                                         sizeof(nodelay));
+          if (nodelay_error == -1)
+          {
+            perror("setsockopt (TCP_NODELAY)");
+            clean_exit(1);
+          }
+          logWrite(MAIN_LOOP, NULL, "Accept new monitor (%s)",
+                   inet_ntoa(their_addr.sin_addr));
 
-	  FD_CLR(sockfd_rcv_monitor, &read_fds);  //allow only one monitor connection	  
-	  FD_SET(sockfd_monitor, &read_fds);  //check the monitor connection for read
-//	  FD_SET(sockfd_monitor, &write_fds); //check the monitor connection for write
-	  if (sockfd_monitor > maxfd) { //keep track of the maximum 
-	    maxfd = sockfd_monitor; 
-	  } 
-	  if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
-	} 
+          FD_CLR(sockfd_rcv_monitor, &read_fds);  //allow only one monitor connection
+          FD_SET(sockfd_monitor, &read_fds);  //check the monitor connection for read
+//        FD_SET(sockfd_monitor, &write_fds); //check the monitor connection for write
+          if (sockfd_monitor > maxfd) { //keep track of the maximum
+            maxfd = sockfd_monitor;
+          }
+          if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
+        }
       }
 
       //receive from the monitor
       if (sockfd_monitor!=-1 && FD_ISSET(sockfd_monitor, &read_fds_copy)) {
-	logWrite(MAIN_LOOP, NULL, "Receive control message from monitor");
-	if (receive_monitor(sockfd_monitor, &packet_deadline) == 0) { //socket_monitor closed by peer
-	  FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
-//	  FD_CLR(sockfd_monitor, &write_fds);
-	  sockfd_monitor = -1;
-	  FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
-	  if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum 
-	    maxfd = sockfd_rcv_monitor; 
-	  } 	 	  
-	} 
+        logWrite(MAIN_LOOP, NULL, "Receive control message from monitor");
+        if (receive_monitor(sockfd_monitor, &packet_deadline) == 0) { //socket_monitor closed by peer
+          FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
+//        FD_CLR(sockfd_monitor, &write_fds);
+          sockfd_monitor = -1;
+          FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
+          if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum
+            maxfd = sockfd_rcv_monitor;
+          }
+        }
       }
 
       //sniff packets
-      if (FD_ISSET(pcapfd, &read_fds_copy)) { 
-	logWrite(MAIN_LOOP, NULL, "Sniff packet stream");
-	sniff();     
+      if (FD_ISSET(pcapfd, &read_fds_copy)) {
+        logWrite(MAIN_LOOP, NULL, "Sniff packet stream");
+        sniff();
       }
 
     } //while in quanta
 
     //send measurements to the monitor once in each quanta
     if (sockfd_monitor!=-1)
-// && FD_ISSET(sockfd_monitor, &write_fds_copy)) {  	
+// && FD_ISSET(sockfd_monitor, &write_fds_copy)) {
     {
-	logWrite(MAIN_LOOP, NULL, "Send control message to monitor");
-	if (send_monitor(sockfd_monitor) == 0) { //socket_monitor closed by peer
-	    logWrite(MAIN_LOOP, NULL, "Message to monitor failed");
-	    FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
-//	  FD_CLR(sockfd_monitor, &write_fds);
-	    sockfd_monitor = -1;
-	    FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
-	    if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum 
-		maxfd = sockfd_rcv_monitor; 
-	    } 	 	  
-	} else {
-	    logWrite(MAIN_LOOP, NULL, "Message to monitor succeeded");
-//	  flag_send_monitor=1;
-	}
+        logWrite(MAIN_LOOP, NULL, "Send control message to monitor");
+        if (send_monitor(sockfd_monitor) == 0) { //socket_monitor closed by peer
+            logWrite(MAIN_LOOP, NULL, "Message to monitor failed");
+            FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
+//        FD_CLR(sockfd_monitor, &write_fds);
+            sockfd_monitor = -1;
+            FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
+            if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum
+                maxfd = sockfd_rcv_monitor;
+            }
+        } else {
+            logWrite(MAIN_LOOP, NULL, "Message to monitor succeeded");
+//        flag_send_monitor=1;
+        }
     }
-    
+
     // In testmode, we only start printing in the quanta we first see a packet
     if (flag_standalone) {
       print_measurements();
     }
-    
+
     // If running in testmode, and the test is over, exit!
     if (flag_testmode && test_state == TEST_DONE) {
       printf("Test done - total bytes transmitted: %llu\n",total_bytes);
@@ -1696,7 +1696,7 @@ int main(int argc, char *argv[]) {
     }
   } //while forever
 
-  packet_buffer_cleanup(); 
+  packet_buffer_cleanup();
 
   return 0;
 }

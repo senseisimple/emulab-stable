@@ -44,7 +44,7 @@ void logCleanup(void);
 // act just like a normal printf call. This is where you actually
 // write your message. It will be written to the logging file.
 void logWrite(int flags, struct timeval const * timestamp,
-	      char const * format, ...);
+              char const * format, ...);
 
 enum LOG_TYPE
 {

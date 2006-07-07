@@ -88,13 +88,13 @@ static void logPrefix(int flags, struct timeval const * timestamp)
       timeptr = &now;
     }
     fprintf(logFile, "%f ", (double)(timeptr->tv_sec) +
-	    ((timeptr->tv_usec)/1000)/1000.0);
+            ((timeptr->tv_usec)/1000)/1000.0);
   }
   fprintf(logFile, ": ");
 }
 
 void logWrite(int flags, struct timeval const * timestamp,
-	      char const * format, ...)
+              char const * format, ...)
 {
   va_list va;
   va_start(va, format);
