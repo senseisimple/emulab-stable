@@ -24,10 +24,6 @@ where,
 EDIT: Modify a specific link test to specific destination node.
 INIT: Initialize the link tests with default destination nodes and frequency.
 SINGLE: Perform a single link test to a specifc destination node.
-        Notification must contain the following attributues:
-dstnode = destination node of the test. Example, node10
-testtype = type of test to run. Examples, latency or bw
-testper  = period of time between successive tests.
 
 
 TODO: ACK documentation?
@@ -68,7 +64,7 @@ my $iperftimeout = 30;   #kill an iperf process lasting longer than this.
 # percentage of testing period to wait after a test process abnormally exits
 # note: 0.1 = 10%
 my %TEST_FAIL_RETRY= (latency => 0.3,
-		      bw      => 0.1);
+		      bw      => 0.5);
 my $rcvBufferSize = 2048;  #max size for an incoming UDP message
 my %outsockets = ();       #sockets keyed by dest node
 #MARK_RELIABLE
@@ -154,7 +150,7 @@ for (my $i = 0; $i < $resultDBlimit; $i++) {
     }
 }
 
-my $subtimer_reset = 100;  # subtimer reaches 0 this many times thru poll loop
+my $subtimer_reset = 50;  # subtimer reaches 0 this many times thru poll loop
 my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 
 
@@ -215,7 +211,12 @@ sub handleincomingmsgs()
 		= split(" ",$sockIn{destnodes});
 	    my $testper = $sockIn{testper};
 	    #TOOD: Add a start time offset, so as to schedule the initial test
-            #      from the manager/controller	    
+	    #distribute start times from offset 0 to testper/2
+	    my $offsetinc = 0;
+	    if( (scalar @destnodes) != 0 ){
+		$offsetinc = $testper/(scalar @destnodes)/2.0;
+	    }
+	    my $offset = 0;
             foreach my $linkdest (@destnodes){
 		#be smart about adding tests
 		# don't want to change already running tests
@@ -230,7 +231,8 @@ sub handleincomingmsgs()
 		    $testevents{$linkdest}{$testtype}{"flag_scheduled"} =0;
 		    # TODO? be smart about when the first test should run?
 		    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} =
-			time_all();
+			time_all() + $offset;
+		    $offset += $offsetinc;
 		}
 	    }
 	    print " $testtype  $testper\n";
@@ -274,7 +276,7 @@ while (1) {
 	foreach my $testtype (keys %waitq){
 
 	    if( scalar(@{$waitq{$testtype}}) != 0 ){
-		print time_all()." $testtype ";
+		print time_all()." $testtype QUEUE: ";
 		foreach my $node (@{$waitq{$testtype}}){
 		    print "$node ";
 		}
@@ -316,10 +318,23 @@ while (1) {
 			#delete tmp filename
 			my $filename = createtmpfilename($destaddr, $testtype);
 			unlink($filename) or warn "can't delete temp file";
+
+			# NEW: (TODO) - send errors to find down paths
+			my %results = 
+			    ("sourceaddr" => $thismonaddr,
+			     "destaddr" => $destaddr,
+			     "testtype" => $testtype,
+			     "result" => "$ERRID{unknown}",
+			     "tstamp" => 
+			     $testevents{$destaddr}{$testtype}{"tstamp"},
+			     "magic"  => "$magic",
+			     );
+#			sendResults(\%results, 0);  #0 is for a generic index
+			print time_all()." bw proc $pid exited abnormally\n";
 		    }
 		}
 
-		#TODO: if this process is bandwidth, kill it if it has
+		#If this process is bandwidth, kill it if it has
                 #      been running too long (iperf has a looong timeout)
 		elsif( $testtype eq "bw" &&
 			 time_all() >
@@ -327,7 +342,25 @@ while (1) {
 			 $iperftimeout )
 		{
 		    kill 'TERM', $pid;
-		    print time_all()." killed $destaddr, pid=$pid\n";
+		    print time_all()." bw timeout: killed $destaddr, ".
+			"pid=$pid\n";
+
+		    # NEW: (not tested below) - send an "outage" result
+		    $testevents{$destaddr}{$testtype}{"pid"} = 0;
+		    $testevents{$destaddr}{$testtype}{"flag_scheduled"} = 0;
+		    #delete tmp filename
+		    my $filename = createtmpfilename($destaddr, $testtype);
+		    unlink($filename) or warn "can't delete temp file";
+		    my %results = 
+			("sourceaddr" => $thismonaddr,
+			 "destaddr" => $destaddr,
+			 "testtype" => $testtype,
+			 "result" => "$ERRID{timeout}",
+			 "tstamp" => 
+			 $testevents{$destaddr}{$testtype}{"tstamp"},
+			 "magic"  => "$magic",
+			 );
+		    sendResults(\%results, 0);  #0 is for a generic index
 		}
 
 
@@ -376,10 +409,6 @@ while (1) {
 	    if( $testevents{$destaddr}{$testtype}{"flag_scheduled"} == 0 &&
 		$testevents{$destaddr}{$testtype}{"testper"} > 0 )
 	    {
-		#schedule next test
-#		$testevents{$destaddr}{$testtype}{"timeOfNextRun"} =
-#		    $testevents{$destaddr}{$testtype}{"testper"} + time_all();
-
 		if( time_all() < 
 		    $testevents{$destaddr}{$testtype}{"timeOfNextRun"}
 		    + $testevents{$destaddr}{$testtype}{"testper"} )
@@ -403,9 +432,7 @@ while (1) {
 #	    print "pid=".$testevents{$destaddr}{$testtype}{"pid"}."\n";
 
 	    #check for new tests ready to run
-#WRONG?	    if( scalar(@{$waitq{bw}}) == 0 &&
-	    if(
-		$testevents{$destaddr}{$testtype}{"timeOfNextRun"} 
+	    if( $testevents{$destaddr}{$testtype}{"timeOfNextRun"} 
 		                                           <= time_all() &&
 		$testevents{$destaddr}{$testtype}{"flag_scheduled"} == 1 &&
 		$testevents{$destaddr}{$testtype}{"pid"} == 0 )
@@ -429,6 +456,8 @@ while (1) {
 	$subtimer = $subtimer_reset;
     }
 }
+
+
 
 sub sendOldResults()
 {
@@ -697,13 +726,10 @@ sub sendResults($$){
 		   result   => $results->{result},
 		   tstamp   => $results->{tstamp},
 		   index    => $index );
-#    my $result_serial = Storable::freeze \%result ;
+
     my $result_serial = serialize_hash( \%result );
 
-#    print time()." sending results\n";
     $socket_snd->send($result_serial);
-#    print time()." end sending results\n";
-
 }
 
 #############################################################################
