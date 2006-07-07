@@ -1230,7 +1230,7 @@ foreach my $osid (sort keys %total_osid) {
 	$summary .= "$d{failed}/$d{total} nodes with a ";
 	$summary .= $user_image ? "user" : "system";
 	$summary .= " osid of \"$osname\" failed to boot";
-	if ($d{failed_nonfatal} > 0) {
+	if (defined $d{failed_nonfatal} && $d{failed_nonfatal} > 0) {
 	    my $count = ($d{failed_nonfatal} == $d{failed}
 			 ? "all"
 			 : "$d{failed_nonfatal}/$d{failed}");
@@ -1241,7 +1241,7 @@ foreach my $osid (sort keys %total_osid) {
 	foreach my $type (sort keys %{$total_type{$osid}}) {
 	    my %d = %{$total_type{$osid}{$type}};
 	    $summary .= "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
-	    if ($d{failed_nonfatal} > 0) {
+	    if (defined $d{failed_nonfatal} && $d{failed_nonfatal} > 0) {
 		my $count = ($d{failed_nonfatal} == $d{failed}
 			     ? "all"
 			     : "$d{failed_nonfatal}/$d{failed}");
