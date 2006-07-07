@@ -863,7 +863,7 @@ int send_max_delay_to_monitor(int monitor, int index)
     }
   }
   last_max_delay[index] = delay;
-  max_delay[index] = 0;
+//  max_delay[index] = 0;
 
   return result;
 }
@@ -908,7 +908,7 @@ int send_delay_to_monitor(int monitor, int index)
     last_delays[index] = delay;
     delays[index] = 0;
     delay_count[index] = 0;
-    base_rtt[index] = LONG_MAX;
+//    base_rtt[index] = LONG_MAX;
   }
 
   return result;

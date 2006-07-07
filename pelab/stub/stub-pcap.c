@@ -471,7 +471,10 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		  perror("getsockopt() TCP_INFO");
 		  clean_exit(1);
 		}
-		if (info.tcpi_snd_cwnd < info.tcpi_snd_ssthresh
+		if ((info.tcpi_snd_cwnd < info.tcpi_snd_ssthresh
+		     || ((unsigned int)(tp->window)
+			 << info.tcpi_rcv_wscale)
+		     <= (info.tcpi_unacked * 1448))
 		  && bandwidth_method == BANDWIDTH_BUFFER)
 		{
 		  // We are in slow start. This means that even if the
@@ -481,6 +484,10 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		  last_through[path_id] = INT_MAX;
 		  logWrite(DELAY_DETAIL, NULL, "Buffer Clear");
 		}
+		logWrite(DELAY_DETAIL, NULL, "receive_window: %u, unacked: %u",
+			 (unsigned int)(tp->window)
+			 << info.tcpi_rcv_wscale,
+			 info.tcpi_unacked * 1448);
 	      }
 
               msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
