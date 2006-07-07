@@ -122,20 +122,20 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                 System.exit(-1);
             }
             
-            WirelessData data = null;
+            GenericWirelessData data = null;
             if (data == null) {
                 try {
                     // now try to parse the data
                     // every time we add a new kind of data file and an associated parser,
                     // we must add a try in here with it!
-                    data = ILEStats.parseInputStream(data_is, "mote");
+                    data = GenericStats.parseInputStream(data_is);
                     
-                    int pLs[] = data.getPowerLevels();
-                    System.out.print("power levels = ");
-                    for (int j = 0; j < pLs.length; ++j) {
-                        System.out.print(""+pLs[j]+",");
-                    }
-                    System.out.println();
+//                    int pLs[] = data.getPowerLevels();
+//                    System.out.print("power levels = ");
+//                    for (int j = 0; j < pLs.length; ++j) {
+//                        System.out.print(""+pLs[j]+",");
+//                    }
+//                    System.out.println();
                 }
                 catch (Exception e) {
                     e.printStackTrace();

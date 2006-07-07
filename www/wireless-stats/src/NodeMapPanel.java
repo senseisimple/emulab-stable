@@ -120,7 +120,9 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
         }
         
         // now grab the links...
-        LinkStats links[] = model.getCurrentLinks();
+        GenericLinkStats links[] = model.getCurrentLinks();
+        String property = model.getCurrentProperty();
+        Float rangeDelta = model.getCurrentPropertyDelta();
         if (links != null) { // && false) {
             for (int i = 0; i < links.length; ++i) {
                 // here's how we're gonna handle this:
@@ -133,8 +135,8 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 // as the link widgets to draw, and append them to the
                 // widgets vector.
                 
-                String nodeA = links[i].getSrcNode();
-                String nodeB = links[i].getRecvNode();
+                String nodeA = links[i].getSender();
+                String nodeB = links[i].getReceiver();
                 // get corresponding nodeWidgets
                 NodeWidget wA = (NodeWidget)nodeWidgets.get(nodeA);
                 NodeWidget wB = (NodeWidget)nodeWidgets.get(nodeB);
@@ -142,8 +144,9 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 String rev_xyz = ""+nodeB+","+nodeA;
                 
                 LinkWidget bidiL = (LinkWidget)linkWidgets.get(rev_xyz);
+                Object lObj = links[i].getStat(property);
                 if (bidiL != null) {
-                    LinkWidget newBidiL = new LinkWidget(wB,wA,bidiL.getForwardQuality(),links[i].getPktPercent());
+                    LinkWidget newBidiL = new LinkWidget(wB,wA,bidiL.getForwardQuality(),lObj);
                     linkWidgets.put(rev_xyz,newBidiL);
                     // don't do this! it's not necessary and it will cause dupe drawing!
                     //linkWidgets.put(xyz, newBidiL);
@@ -155,7 +158,7 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
 //                    }
                     
                     // just do the forward dir for now...
-                    LinkWidget newL = new LinkWidget(wA,wB,links[i].getPktPercent());
+                    LinkWidget newL = new LinkWidget(wA,wB,lObj);
                     linkWidgets.put(xyz,newL);
                 }
                 
@@ -267,14 +270,14 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 // for the mote stuff, we could draw the obstacles and labels
                 // ourselves, but that wouldn't help for the wireless stuff...
                 
-                Composite old = g2.getComposite();
-                AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.25f);
-                g2.setComposite(ac);
-                
-                g2.setColor(java.awt.Color.WHITE);
-                g2.fillRect(0,0,getWidth(),getHeight());
-                
-                g2.setComposite(old);
+//                Composite old = g2.getComposite();
+//                AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f);
+//                g2.setComposite(ac);
+//                
+//                g2.setColor(java.awt.Color.WHITE);
+//                g2.fillRect(0,0,getWidth(),getHeight());
+//                
+//                g2.setComposite(old);
                 
             }
             else {
@@ -311,8 +314,10 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
         
         java.awt.image.ImageObserver io = new java.awt.Component() {
             public boolean updateImage(Image img, int infoflags,
-                                       int x, int y, int width, int height) {
-                System.out.println("ImageObserver w = "+width+", h = "+height);
+                                       int x, int y, 
+                                       int width, int height) {
+                System.out.println("ImageObserver w = "+width+",h = "+height);
+                
                 return true;
             }
         };

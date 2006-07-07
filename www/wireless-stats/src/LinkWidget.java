@@ -28,8 +28,8 @@ public class LinkWidget extends Widget {
     private java.awt.geom.Point2D.Float p2;
     private java.awt.geom.Point2D.Float pHalf;
     private float theta;
-    private float quality1To2;
-    private float quality2To1;
+    private Object quality1To2;
+    private Object quality2To1;
     private boolean bidi;
     
     private static int DEFAULT_BUFFER = 10;
@@ -38,16 +38,16 @@ public class LinkWidget extends Widget {
         return "LinkWidget["+theta+"]";
     }
     
-    public LinkWidget(NodeWidget nw1,NodeWidget nw2,float linkQuality1To2,float linkQuality2To1) {
+    public LinkWidget(NodeWidget nw1,NodeWidget nw2,Object linkQuality1To2,Object linkQuality2To1) {
         this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,linkQuality1To2,linkQuality2To1);
     }
     
-    public LinkWidget(NodeWidget nw1,NodeWidget nw2,float linkQuality) {
-        this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,linkQuality,-1.0f);
+    public LinkWidget(NodeWidget nw1,NodeWidget nw2,Object linkQuality) {
+        this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,linkQuality,null);
     }
     
     /** Creates a new instance of LinkWidget */
-    public LinkWidget(String title,int x1,int y1,int x2,int y2,int buffer,float quality1To2,float quality2To1) {
+    public LinkWidget(String title,int x1,int y1,int x2,int y2,int buffer,Object quality1To2,Object quality2To1) {
         super(title,0,0);
         
         
@@ -59,7 +59,7 @@ public class LinkWidget extends Widget {
         this.quality1To2 = quality1To2;
         //this.quality2To1 = -1.0f;
         this.quality2To1 = quality2To1;
-        this.bidi = (this.quality2To1 >= 0.0f && this.quality1To2 >= 0.0f)?true:false;
+        this.bidi = (this.quality2To1 != null && this.quality1To2 != null)?true:false;
         
         // calculate insets based on buffer size; buffer is actually more like swing's `Insets'
 //        if (x2 != x1) {
@@ -171,7 +171,8 @@ public class LinkWidget extends Widget {
             Color titleColor = null;
             
             if (!bidi) {
-                int color[] = getLinkColor(this.quality1To2);
+//                int color[] = getLinkColor(this.quality1To2);
+                int color[] = { 0,0,0 };
                 //g2.setColor(java.awt.Color.DARK_GRAY);
                 g2.setColor(new Color(color[0],color[1],color[2]));
                 // first draw the base line
@@ -186,12 +187,14 @@ public class LinkWidget extends Widget {
                 titleColor = new Color(color[0],color[1],color[2]);
             }
             else {
-                int color1To2[] = getLinkColor(this.quality1To2);
+//                int color1To2[] = getLinkColor(this.quality1To2);
+                int color1To2[] = { 0,0,0 };
                 g2.setColor(new Color(color1To2[0],color1To2[1],color1To2[2]));
                 g2.draw(linkLine1To2);
                 g2.fill(head2);
                 
-                int color2To1[] = getLinkColor(this.quality2To1);
+//                int color2To1[] = getLinkColor(this.quality2To1);
+                int color2To1[] = { 0,0,0 };
                 g2.setColor(new Color(color2To1[0],color2To1[1],color2To1[2]));
                 g2.draw(linkLine2To1);
                 g2.fill(head1);
@@ -206,11 +209,12 @@ public class LinkWidget extends Widget {
             int avgCharSize = 6;
             if (title == null) {
                 if (!bidi) {
-                    title = ""+(int)(Math.round(quality1To2*100))+" %";
+                    //title = ""+(int)(Math.round(quality1To2*100))+" %";
+                    title = quality1To2.toString();
                 }
                 else {
                     // gotta figure out which quality goes first:
-                    float one, two;
+                    Object one, two;
                     if (theta > 0) {
                         if (y1 > y2) {
                             one = quality1To2;
@@ -232,7 +236,8 @@ public class LinkWidget extends Widget {
                         }
                     }
                     //title = ""+(int)(Math.round(quality2To1*100))+" % / "+(int)(Math.round(quality1To2*100))+" %";
-                    title = ""+(int)(Math.round(one*100))+" % / "+(int)(Math.round(two*100))+" %";
+                    //title = ""+(int)(Math.round(one*100))+" % / "+(int)(Math.round(two*100))+" %";
+                    title = one.toString() + " / " + two.toString();
                 }
             }
             int estTitleLen = title.length()*avgCharSize;
@@ -279,11 +284,11 @@ public class LinkWidget extends Widget {
         return retvals;
     }
     
-    public float getForwardQuality() {
+    public Object getForwardQuality() {
         return quality1To2;
     }
     
-    public float getBackwardQuality() {
+    public Object getBackwardQuality() {
         return quality2To1;
     }
     

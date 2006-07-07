@@ -29,7 +29,7 @@ public class MoteLinkViewer extends javax.swing.JFrame {
             }
         };
         
-        bgImage = Toolkit.getDefaultToolkit().getImage("../floormap.jpg");
+        bgImage = Toolkit.getDefaultToolkit().getImage("/home/david/from_cvs/wireless-stats/floormap.jpg");
         mapImages.put("Floor4/WSN",bgImage);
         
         try {
@@ -44,14 +44,14 @@ public class MoteLinkViewer extends javax.swing.JFrame {
         
         // in the applet, we'll read in the possible datasets and 
         
-        WirelessData defaultData = null;
+        GenericWirelessData defaultData = null;
         NodePosition defaultPositions = null;
         MapDataModel defaultModel = null;
         String defaultDatasetName = "Floor4/WSN";
         
         try {
-            defaultData = ILEStats.parseDumpFile("../nn_client.log", "mote");
-            defaultPositions = NodePositions.parseFile("../mote_positions");
+            defaultData = GenericStats.parseDumpFile("/home/david/from_cvs/wireless-stats/nn_client.log");
+            defaultPositions = NodePositions.parseFile("/home/david/from_cvs/wireless-stats/mote_positions");
             
             defaultModel = new MapDataModel(defaultData,defaultPositions);
             datasets.put(defaultDatasetName,defaultModel);

@@ -33,16 +33,19 @@ public class MapDataModel {
     public static Boolean OPTION_SET = new Boolean(true);
     public static Boolean OPTION_UNSET = new Boolean(false);
     
-    private WirelessData data;
+    private GenericWirelessData data;
     private Vector selectionList;
-    private float threshold;
+    private Object threshold;
     private int neighborCount;
     private Vector changeListeners;
     private int mode;
     private int limit;
     private NodePosition positions;
     private java.awt.Image mapImage;
-    private int powerLevel;
+    
+    // new for generic...
+    private String[] currentIndexValues;
+    private String currentProperty;
     
     private Hashtable options;
     
@@ -51,19 +54,42 @@ public class MapDataModel {
         this(null,null);
     }
     
-    public MapDataModel(WirelessData data,NodePosition positions) {
+    public MapDataModel(GenericWirelessData data,NodePosition positions) {
         this.data = data;
         this.positions = positions;
         selectionList = new Vector();
-        threshold = 0.70f;
+        threshold = new Float(0);
         neighborCount = 3;
         changeListeners = new Vector();
-        this.powerLevel = -1;
+        
+        // set the currentIndexValues to the first value in each list of
+        // possible index values:
+        String[] ia = data.getIndices();
+        currentIndexValues = new String[ia.length];
+        for (int i = 0; i < ia.length; ++i) {
+            Vector tv = data.getIndexValues(ia[i]);
+            currentIndexValues[i] = (String)tv.firstElement();
+        }
+        
+        // set the currentProperty to the first value:
+        Vector tv = data.getProperties();
+        currentProperty = (String)tv.firstElement();
         
         mode = MODE_ALL;
         limit = LIMIT_NONE;
         this.options = new Hashtable();
         options.put(OPTION_NO_ZERO_LINKS,OPTION_SET);
+    }
+    
+    public Float getCurrentPropertyDelta() {
+        Object min = this.data.getMinPropertyValue(currentProperty);
+        Object max = this.data.getMaxPropertyValue(currentProperty);
+        if ((min != null && max != null) 
+            && (min instanceof Float && max instanceof Float)) {
+            return new Float(((Float)max).floatValue() - ((Float)min).floatValue());
+        }
+        
+        return null;
     }
     
     // this is a nice helpful method for the nodemappanel... so it doesn't have
@@ -72,8 +98,8 @@ public class MapDataModel {
         return data.getNodes();
     }
     
-    private LinkStats[] filterAccordingToLimit(LinkStats links[]) {
-        LinkStats retval[] = null;
+    private GenericLinkStats[] filterAccordingToLimit(GenericLinkStats links[]) {
+        GenericLinkStats retval[] = null;
         Vector tmp = new Vector();
         
         if (limit == LIMIT_NONE) {
@@ -83,15 +109,18 @@ public class MapDataModel {
         else if (limit == LIMIT_THRESHOLD) {
             // process out the chaff according to the limit
             for (int i = 0; i < links.length; ++i) {
-                if (links[i].getPktPercent() >= this.threshold) {
+                Object linkVal = links[i].getStat(this.currentProperty);
+                if (this.threshold.getClass() == linkVal.getClass()
+                    && linkVal instanceof Comparable
+                    && ((Comparable)linkVal).compareTo(this.threshold) >= 0) {
                     tmp.add(links[i]);
                 }
             }
             // dump back to array...
-            retval = new LinkStats[tmp.size()];
+            retval = new GenericLinkStats[tmp.size()];
             int i = 0;
             for (Enumeration e1 = tmp.elements(); e1.hasMoreElements(); ) {
-                retval[i] = (LinkStats)e1.nextElement();
+                retval[i] = (GenericLinkStats)e1.nextElement();
                 ++i;
             }
         }
@@ -111,11 +140,11 @@ public class MapDataModel {
             Hashtable tmpH = new Hashtable();
 
             for (int i = 0; i < links.length; ++i) {
-                String srcNode = links[i].getSrcNode();
-                if (links[i].getPktPercent() > 0.0f) {
-                    LinkStats klinks[] = (LinkStats[])tmpH.get(srcNode);
+                String srcNode = links[i].getSender();
+//                if (links[i].getPktPercent() > 0.0f) {
+                    GenericLinkStats klinks[] = (GenericLinkStats[])tmpH.get(srcNode);
                     if (klinks == null) {
-                        klinks = new LinkStats[this.neighborCount];
+                        klinks = new GenericLinkStats[this.neighborCount];
                         tmpH.put(srcNode,klinks);
                     }
 
@@ -125,15 +154,24 @@ public class MapDataModel {
 
                     for (int j = 0; j < klinks.length; ++j) {
                         if (klinks[j] != null) {
-                            float diff = Math.abs(links[i].getPktPercent() - klinks[j].getPktPercent());
-                            if (links[i].getPktPercent() > klinks[j].getPktPercent() && diff > maxDiff) {
-                                maxDiff = diff;
-                                maxDiffIdx = j;
+                            Object lObj = links[i].getStat(this.currentProperty);
+                            Object kObj = klinks[i].getStat(this.currentProperty);
+                            
+                            // this is the only way we can make a meaningful
+                            // comparison -- we have no way to take the "diff"
+                            // of strings, which are the only other object we allow.
+                            if (lObj instanceof Float && kObj instanceof Float) {
+                            
+                                float diff = ((Float)lObj).floatValue() - ((Float)kObj).floatValue();
+                                if (diff > 0 && diff > maxDiff) {
+                                    maxDiff = diff;
+                                    maxDiffIdx = j;
+                                }
                             }
-                        }
-                        else {
-                            nullIdx = j;
-                            break;
+                            else {
+                                nullIdx = j;
+                                break;
+                            }
                         }
                     }
 
@@ -145,13 +183,13 @@ public class MapDataModel {
                     }
 
 
-                }
+//                }
 
             }
 
             int count = 0;
             for (Enumeration e1 = tmpH.elements(); e1.hasMoreElements(); ) {
-                LinkStats klinks[] = (LinkStats[])e1.nextElement();
+                GenericLinkStats klinks[] = (GenericLinkStats[])e1.nextElement();
                 if (klinks != null) {
                     for (int j = 0; j < klinks.length; ++j) {
                         if (klinks[j] != null) {
@@ -163,15 +201,12 @@ public class MapDataModel {
             }
             //System.out.println("added "+count+" from tmpH!");
 
-            retval = new LinkStats[tmp.size()];
+            retval = new GenericLinkStats[tmp.size()];
             int i = 0;
             for (Enumeration e1 = tmp.elements(); e1.hasMoreElements(); ) {
-                retval[i] = (LinkStats)e1.nextElement();
+                retval[i] = (GenericLinkStats)e1.nextElement();
                 ++i;
             }
-        }
-        else {
-            retval = null;
         }
         
         // now try the options...
@@ -179,16 +214,18 @@ public class MapDataModel {
         if (val != null && val.booleanValue() && retval != null) {
             Vector opt = new Vector();
             for (int i = 0; i < retval.length; ++i) {
-                if (retval[i].getPktPercent() > 0) {
+                Object lObj = retval[i].getStat(this.currentProperty);
+                if ((lObj instanceof Float && ((Float)lObj).floatValue() > 0.0f) ||
+                    (lObj instanceof String && !((String)lObj).equals(""))) {
                     // add this one in
                     opt.add(retval[i]);
                 }
             }
             
-            LinkStats rtmp[] = new LinkStats[opt.size()];
+            GenericLinkStats rtmp[] = new GenericLinkStats[opt.size()];
             int i = 0;
             for (Enumeration e1 = opt.elements(); e1.hasMoreElements(); ) {
-                rtmp[i] = (LinkStats)e1.nextElement();
+                rtmp[i] = (GenericLinkStats)e1.nextElement();
                 ++i;
             }
             
@@ -198,14 +235,14 @@ public class MapDataModel {
         return retval;
     }
     
-    protected LinkStats[] getCurrentLinks() {
+    protected GenericLinkStats[] getCurrentLinks() {
         // this considers our current state and returns the appropriate 
         // linkstats objects to draw
-        LinkStats retval[] = null;
+        GenericLinkStats retval[] = null;
         
         if (mode == MODE_ALL) {
             Vector tmp = new Vector();
-            LinkStats links[] = data.getAllStatsAtPowerLevel(this.powerLevel);
+            GenericLinkStats links[] = data.getAllStatsAtIndexValues(this.currentIndexValues);
             
             if (links == null || links.length == 0) {
                 retval = null;
@@ -235,16 +272,18 @@ public class MapDataModel {
             
             for (Enumeration e1 = this.selectionList.elements(); e1.hasMoreElements(); ) {
                 String srcNode = (String)e1.nextElement();
-                LinkStats ls[] = (LinkStats[])data.getSendStatsAtPowerLevel(srcNode,this.powerLevel);
-                for (int i = 0; i < ls.length; ++i) {
-                    tmp.add(ls[i]);
+                GenericLinkStats ls[] = data.getSendStatsAtIndexValues(srcNode,this.currentIndexValues);
+                if (ls != null) {
+                    for (int i = 0; i < ls.length; ++i) {
+                        tmp.add(ls[i]);
+                    }
                 }
             }
             
-            retval = new LinkStats[tmp.size()];
+            retval = new GenericLinkStats[tmp.size()];
             int i = 0;
             for (Enumeration e1 = tmp.elements(); e1.hasMoreElements(); ) {
-                retval[i] = (LinkStats)e1.nextElement();
+                retval[i] = (GenericLinkStats)e1.nextElement();
                 ++i;
             }
             
@@ -256,16 +295,18 @@ public class MapDataModel {
             
             for (Enumeration e1 = this.selectionList.elements(); e1.hasMoreElements(); ) {
                 String recvNode = (String)e1.nextElement();
-                LinkStats ls[] = (LinkStats[])data.getRecvStatsAtPowerLevel(recvNode,this.powerLevel);
-                for (int i = 0; i < ls.length; ++i) {
-                    tmp.add(ls[i]);
+                GenericLinkStats ls[] = data.getRecvStatsAtIndexValues(recvNode,this.currentIndexValues);
+                if (ls != null) {
+                    for (int i = 0; i < ls.length; ++i) {
+                        tmp.add(ls[i]);
+                    }
                 }
             }
             
-            retval = new LinkStats[tmp.size()];
+            retval = new GenericLinkStats[tmp.size()];
             int i = 0;
             for (Enumeration e1 = tmp.elements(); e1.hasMoreElements(); ) {
-                retval[i] = (LinkStats)e1.nextElement();
+                retval[i] = (GenericLinkStats)e1.nextElement();
                 ++i;
             }
             
@@ -296,15 +337,19 @@ public class MapDataModel {
     }
     
     // accessor methods
-    public WirelessData getData() {
+    public GenericWirelessData getData() {
         return data;
+    }
+    
+    public String getCurrentProperty() {
+        return currentProperty;
     }
     
     public Vector getSelection() {
         return selectionList;
     }
     
-    public float getThreshold() {
+    public Object getThreshold() {
         return threshold;
     }
     
@@ -316,8 +361,8 @@ public class MapDataModel {
         return mode;
     }
     
-    public int getPowerLevel() {
-        return powerLevel;
+    public String[] getCurrentIndexValues() {
+        return this.currentIndexValues;
     }
     
     public int getLimit() {
@@ -377,18 +422,18 @@ public class MapDataModel {
     // outside parties should not call this for now!
     // just be a good little man and create a new object!
     // fear not the mighty garbage collector!
-    private void setData(WirelessData data) {
-        this.data = data;
-        // reset all mode/properties, to avoid nasty failures.
-        this.selectionList.clear();
-        this.threshold = 0.70f;
-        this.neighborCount = 3;
-        
-        this.mode = MODE_ALL;
-        this.limit = LIMIT_THRESHOLD;
-        
-        notifyChangeListeners();
-    }
+//    private void setData(GenericWirelessData data) {
+//        this.data = data;
+//        // reset all mode/properties, to avoid nasty failures.
+//        this.selectionList.clear();
+//        this.threshold = 0.70f;
+//        this.neighborCount = 3;
+//        
+//        this.mode = MODE_ALL;
+//        this.limit = LIMIT_THRESHOLD;
+//        
+//        notifyChangeListeners();
+//    }
     
     public void addNodeToSelection(String node) {
         if (!selectionList.contains(node)) {
@@ -409,15 +454,15 @@ public class MapDataModel {
         }
     }
     
-    public boolean setThreshold(float threshold) {
-        if (threshold < 0.0f || threshold > 1.0f) {
-            return false;
-        }
-        else {
+    public boolean setThreshold(Object threshold) {
+//        if (threshold < 0.0f || threshold > 1.0f) {
+//            return false;
+//        }
+//        else {
             this.threshold = threshold;
             notifyChangeListeners();
             return true;
-        }
+//        }
     }
     
     public boolean setNeighborCount(int count) {
@@ -432,8 +477,14 @@ public class MapDataModel {
         }
     }
     
-    public void setPowerLevel(int powerLevel) {
-        this.powerLevel = powerLevel;
+    public void setIndexValues(String[] indexValues) {
+        this.currentIndexValues = indexValues;
         notifyChangeListeners();
     }
+    
+    public void setCurrentProperty(String property) {
+        this.currentProperty = property;
+        notifyChangeListeners();
+    }
+    
 }
