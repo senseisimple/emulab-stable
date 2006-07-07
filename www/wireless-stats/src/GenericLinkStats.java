@@ -15,6 +15,7 @@ import java.util.*;
  */
 public class GenericLinkStats {
     
+    private GenericStats gs;
     private Hashtable stats;
     private Hashtable metaStats;
     private String recvNode;
@@ -22,6 +23,7 @@ public class GenericLinkStats {
     
     /** Creates a new instance of GenericLinkStats */
     public GenericLinkStats(String recvNode,String sendNode) {
+        this.gs = null;
         this.stats = new Hashtable();
         this.metaStats = new Hashtable();
         this.recvNode = recvNode;
@@ -40,6 +42,31 @@ public class GenericLinkStats {
             metaStats.put(statName,mst);
         }
         mst.put(metaName,stat);
+    }
+    
+    public void setParentGenericStats(GenericStats p) {
+        this.gs = p;
+    }
+    
+    public Float getPctOfPropertyRange(String statName) {
+        Object stat = getStat(statName);
+        if (stat != null && stat instanceof Float && gs != null) {
+            // since we have the parent, we know the min/max prop values.
+            // so, compute the range:
+            float min = ((Float)gs.getMinPropertyValue(statName)).floatValue();
+            float max = ((Float)gs.getMaxPropertyValue(statName)).floatValue();
+            float myValue = ((Float)stat).floatValue();
+            
+            // units of range per percent:
+            float myTicks = 100/(max-min);
+            float myPercent = (myValue - min)*myTicks;
+            
+            System.out.println("GPOPR: statName="+statName+"min="+min+",max="+max+",myValue="+myValue+",myTicks="+myTicks+"myPercent="+myPercent);
+            
+            return new Float(myPercent);
+        }
+        
+        return null;
     }
     
     public Hashtable getMetaStats(String statName) {

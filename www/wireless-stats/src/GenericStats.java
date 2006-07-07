@@ -213,6 +213,10 @@ public class GenericStats implements GenericWirelessData {
         Hashtable minPropValues = new Hashtable();
         Hashtable indexValues = new Hashtable();
         
+        // need this so I can easily go back and set the parent GenericStats
+        // for each GenericLinkStats after we've created the former.
+        Vector tmpAllGLS = new Vector();
+        
         int linecount = 0;
         
         try {
@@ -357,7 +361,7 @@ public class GenericStats implements GenericWirelessData {
                     // this should be a line.
                     String[] sa = line.split(":");
                     if (sa.length != 2) {
-                        System.err.println("line " + linecount + ": not even data line!");
+                        System.err.println("line " + linecount + ": not even data line: '"+line+"'!");
                     }
                     else {
                         //System.err.println("nodepatternline='" + sa[0] + "'");
@@ -371,6 +375,8 @@ public class GenericStats implements GenericWirelessData {
                             
                             GenericLinkStats gls = new GenericLinkStats(recvNode,sendNode);
                             dataset.addReceiverStats(recvNode,sendNode,gls);
+                            
+                            tmpAllGLS.add(gls);
                             
                             // add to nodes list if necessary:
                             if (!nodes.contains(recvNode)) {
@@ -535,10 +541,15 @@ public class GenericStats implements GenericWirelessData {
         
         System.out.println("GenericStats parsed "+linecount+" lines.");
         
-        return new GenericStats(indices,indexValues,
-                                nodes,properties,
-                                minPropValues,maxPropValues,
-                                mapping);
+        GenericStats retval = new GenericStats(indices,indexValues,
+                                               nodes,properties,
+                                               minPropValues,maxPropValues,
+                                               mapping);
+        for (Enumeration e1 = tmpAllGLS.elements(); e1.hasMoreElements(); ) {
+            ((GenericLinkStats)e1.nextElement()).setParentGenericStats(retval);
+        }
+        
+        return retval;
     }
     
     

@@ -155,7 +155,7 @@ public class MapDataModel {
                     for (int j = 0; j < klinks.length; ++j) {
                         if (klinks[j] != null) {
                             Object lObj = links[i].getStat(this.currentProperty);
-                            Object kObj = klinks[i].getStat(this.currentProperty);
+                            Object kObj = klinks[j].getStat(this.currentProperty);
                             
                             // this is the only way we can make a meaningful
                             // comparison -- we have no way to take the "diff"
@@ -163,15 +163,16 @@ public class MapDataModel {
                             if (lObj instanceof Float && kObj instanceof Float) {
                             
                                 float diff = ((Float)lObj).floatValue() - ((Float)kObj).floatValue();
+                                System.out.println("computed diff = "+diff);
                                 if (diff > 0 && diff > maxDiff) {
                                     maxDiff = diff;
                                     maxDiffIdx = j;
                                 }
                             }
-                            else {
-                                nullIdx = j;
-                                break;
-                            }
+                        }
+                        else {
+                            nullIdx = j;
+                            break;
                         }
                     }
 
@@ -180,6 +181,9 @@ public class MapDataModel {
                     }
                     else if (maxDiffIdx > -1) {
                         klinks[maxDiffIdx] = links[i];
+                    }
+                    else {
+                        System.out.println("waaah");
                     }
 
 
@@ -199,7 +203,7 @@ public class MapDataModel {
                     }
                 }
             }
-            //System.out.println("added "+count+" from tmpH!");
+            System.out.println("added "+count+" from tmpH!");
 
             retval = new GenericLinkStats[tmp.size()];
             int i = 0;
@@ -215,7 +219,7 @@ public class MapDataModel {
             Vector opt = new Vector();
             for (int i = 0; i < retval.length; ++i) {
                 Object lObj = retval[i].getStat(this.currentProperty);
-                if ((lObj instanceof Float && ((Float)lObj).floatValue() > 0.0f) ||
+                if ((lObj instanceof Float && ((Float)lObj).floatValue() != 0.0f) ||
                     (lObj instanceof String && !((String)lObj).equals(""))) {
                     // add this one in
                     opt.add(retval[i]);

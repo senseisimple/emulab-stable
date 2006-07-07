@@ -4,6 +4,7 @@ import java.awt.Image;
 import javax.swing.*;
 import javax.swing.event.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.beans.*;
 
 public class ControlPanel extends javax.swing.JPanel {
@@ -133,7 +134,7 @@ public class ControlPanel extends javax.swing.JPanel {
             
             // now create a single listener for these n comboboxen:
             //modelIndexComponents
-            datasetComboBox.addActionListener(new java.awt.event.ActionListener() {
+            ActionListener tal = new java.awt.event.ActionListener() {
                 JComboBox[] ijcArray = jcArray;
                 
                 public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -147,7 +148,11 @@ public class ControlPanel extends javax.swing.JPanel {
                     // condition for fast clicks... but shouldn't be bad ever.
                     currentModel.setIndexValues(newIndexValues);
                 }
-            });
+            };
+            
+            for (int i = 0; i < indices.length; ++i) {
+                jcArray[i].addActionListener(tal);
+            }
             
             
         }
@@ -158,6 +163,7 @@ public class ControlPanel extends javax.swing.JPanel {
         gc.insets = new Insets(2,16,2,2);
         gc.anchor = GridBagConstraints.NORTHWEST;
         gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.weightx = 1.0;
         
         for (Enumeration e1 = tv.elements(); e1.hasMoreElements(); ) {
             JComponent jc = (JComponent)e1.nextElement();

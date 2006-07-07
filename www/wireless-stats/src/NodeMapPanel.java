@@ -146,7 +146,10 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 LinkWidget bidiL = (LinkWidget)linkWidgets.get(rev_xyz);
                 Object lObj = links[i].getStat(property);
                 if (bidiL != null) {
-                    LinkWidget newBidiL = new LinkWidget(wB,wA,bidiL.getForwardQuality(),lObj);
+                    LinkWidget newBidiL = new LinkWidget(wB,wA,
+                                                         bidiL.getForwardPercent(),
+                                                         links[i].getPctOfPropertyRange(property),
+                                                         bidiL.getForwardQuality(),lObj);
                     linkWidgets.put(rev_xyz,newBidiL);
                     // don't do this! it's not necessary and it will cause dupe drawing!
                     //linkWidgets.put(xyz, newBidiL);
@@ -158,7 +161,7 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
 //                    }
                     
                     // just do the forward dir for now...
-                    LinkWidget newL = new LinkWidget(wA,wB,lObj);
+                    LinkWidget newL = new LinkWidget(wA,wB,links[i].getPctOfPropertyRange(property),lObj);
                     linkWidgets.put(xyz,newL);
                 }
                 
