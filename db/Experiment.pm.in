@@ -386,7 +386,7 @@ sub Delete($;$)
     my $rsrcidx = $self->rsrcidx();
     
     DBQueryWarn("DELETE from experiment_resources ".
-		"WHERE idx='$rsrcidx'")
+		"WHERE idx=$rsrcidx")
 	if (defined($rsrcidx) && $rsrcidx);
 	
     DBQueryWarn("DELETE from testbed_stats ".
