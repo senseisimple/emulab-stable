@@ -102,7 +102,7 @@ that runs on the nodes, all the way down to operating system.
 <li> <b>Emulab Classic</b>: a universally available
 time- and space-shared network emulator which achieves new levels of
 ease of use. Several hundred PCs in racks, combined with secure,
-user-friendly web-based tools, and driven by <it>ns</it>-compatible
+user-friendly web-based tools, and driven by <i>ns</i>-compatible
 scripts or a Java GUI, allow you to remotely configure and control
 machines and links down to the hardware level.  Packet loss, latency,
 bandwidth, queue sizes--all can be user-defined.  Even the OS disk
@@ -113,7 +113,7 @@ minutes.
 <br><br>
 Utah's local installation features high-speed Cisco switches connecting 5
 100Mbit interfaces on each of 328 PCs (now including <b>160</b>
-<a href=docwrapper.php3?docname=hardware.html>3GHz Dell PowerEdge 2850s</a>).
+<a href="docwrapper.php3?docname=hardware.html">3GHz Dell PowerEdge 2850s</a>).
 The PC nodes can be used as
 edge nodes running arbitrary programs, simulated routers,
 traffic-shaping nodes, or traffic generators.  While an "experiment"
@@ -126,7 +126,7 @@ compilers, linkers, and editors. Fundamentally, however,
 all the software you run on it, including all bits on the disks, is
 replaceable and entirely your choice.  The same applies to the network's
 characteristics, including its topology: configurable by users.
-</p>
+</li>
 </ul>
 
 
