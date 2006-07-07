@@ -69,8 +69,9 @@ my $lastupdated_numnodes = 0;
 my $socket;
 my $sel = IO::Select->new();
 
+#FORWARD DECL'S
 sub stopnode($);
-
+sub outputErrors();
 
 print "exp = $expid\n";
 #############################################################################
@@ -103,15 +104,31 @@ foreach my $node (@constrnodes){
 #
 # Main Loop
 #
+#my $f_firsttime = 1;
 while(1)
 {
+    %deadnodes = ();
+
     #update node list
+#    print "getnodeinfo\n";
     getnodeinfo();
+#    sleep(10);
+
+#    print "choosenodes\n";
     choosenodes();
+#    sleep(10);
+
+#    print "modifytests\n";
     modifytests();
+#    sleep(10);
+
 #    printchosennodes();
+
     outputErrors();
-    select(undef, undef, undef, 5.0);
+#   sleep( 10 );
+
+    sleep( 60 );
+#    $f_firsttime = 0;
 }
 
 
@@ -122,17 +139,26 @@ sub getnodeinfo
     #retrieve list of nodes
     my $rval = libxmlrpc::CallMethod($MODULE, $METHOD,
 				     {"class" => "pcplabphys"});
-    %allnodes = %$rval;
+    if( defined $rval ){
+	%allnodes = %$rval;
+    }else{ return; }
 
     #populate sitenodes
     foreach my $node (keys %allnodes){
 	my $siteid = $allnodes{$node}{site};
+ 	@{$sitenodes{$siteid}} = ();
 	push @{$sitenodes{$siteid}}, $node;
 #       print @{$sitenodes{$siteid}}."\n";
     }
 }
 
-
+sub printNodeInfo($)
+{
+    my ($node) = @_;
+    foreach my $key (keys %{$allnodes{$node}} ){
+	print "\t$key = $allnodes{$node}{$key}\n";
+    }
+}
 
 ########################################################
 #
@@ -142,61 +168,74 @@ sub choosenodes
 {
     foreach my $site (keys %sitenodes){
 #	print "site $site\n";
+#	my $bestnode = "NONE";
 	my $bestnode = choosebestnode($site);
-	if( "NONE" eq $bestnode ){	 
+	if( !defined $bestnode ){ print "BESTNODE NOT DEF!!!\n"; }
+	if( "NONE" ne $bestnode &&
+	    !defined $intersitenodes{$site} )
+	{
+	    print "SECTION 1: adding $bestnode at $site\n";
+	    # ** This section handles when a site is seen for the 1st time
+
+	    #set new node to represent this site		
+	    $intersitenodes{$site} = $bestnode;
+	}
+	elsif( ("NONE" eq $bestnode) && defined $intersitenodes{$site} )
+	{
+	    print "SECTION 2: removing tests to $site / ".
+		"$intersitenodes{$site} \n";
 	    # ** This section handles when a site has no nodes available
 
 	    #no available node at this site, so remove site from hash
-	    #(done?)TODO: send "stop" signals to all other nodes having this
-	    #  site as the destination
 	    foreach my $srcsite (keys %intersitenodes){
-		if( defined $intersitenodes{$site} ){
+		stoppairtest( $intersitenodes{$srcsite},
+			      $intersitenodes{$site} );
+	    }
+	    delete $intersitenodes{$site};
+	}
+	elsif( defined $intersitenodes{$site} &&
+	       $intersitenodes{$site} ne $bestnode
+	       #&& isnodeinconstrset($bestnode) 
+	       )
+	{
+	    print "SECTION 3: node change at $site from ".
+		"$intersitenodes{$site} to $bestnode\n";
+	    # ** This section handles when a "bestnode" at a site changes
+	    
+	    #  Stop sigs to other nodes using old "bestnode" value
+	    if( defined $intersitenodes{$site} ){
+		foreach my $srcsite (keys %intersitenodes){
 		    stoppairtest( $intersitenodes{$srcsite},
 				  $intersitenodes{$site} );
 		}
 	    }
-
-	    delete $intersitenodes{$site};
-	}
-	else{
-	    if( (!defined $intersitenodes{$site} || 
-		$intersitenodes{$site} ne $bestnode)
-		#&& isnodeinconstrset($bestnode) 
-		)
-	    {
-		# ** This section handles when a "bestnode" at a site changes
-
-		#(done?)TODO
-		#  Stop sigs to other nodes using old "bestnode" value
-		if( defined $intersitenodes{$site} ){
-		    foreach my $srcsite (keys %intersitenodes){
-			stoppairtest( $intersitenodes{$srcsite},
-				      $intersitenodes{$site} );
-		    }
-		}
-
-		#set new node to represent this site		
-		$intersitenodes{$site} = $bestnode;
-
-		#(done?)TODO: start other nodes using this new "bestnode"
-		#       (This uses the EDIT bgmon command - see bgmon.pl)
-		foreach my $srcsite (keys %intersitenodes){
-		    edittest( $intersitenodes{$srcsite},
-			      $intersitenodes{$site},
-			      $test_per{bw},
-			      "bw" );
-		}
-		#TODO: need to do this smartly...
-=pod
+	    
+	    #set new node to represent this site		
+	    $intersitenodes{$site} = $bestnode;
+	    
+	    foreach my $srcsite (keys %intersitenodes){
 		edittest( $intersitenodes{$srcsite},
 			  $intersitenodes{$site},
-			  $test_per{latency},
-			  "latency" );
-=cut
+			  $test_per{bw},
+			  "bw" );
+		my $r = rand;
+		if( $r <= .5 ){
+		    edittest( $intersitenodes{$srcsite},
+			      $intersitenodes{$site},
+			      $test_per{latency},
+			      "latency" );
+		}else{
+		    edittest( $intersitenodes{$site},
+			      $intersitenodes{$srcsite},
+			      $test_per{latency},
+			      "latency" );
+		}
 	    }
-        }
+	    
+	}
     }
 }
+
 
 
 #
@@ -239,6 +278,8 @@ sub choosebestnode($)
     my ($site) = @_;
 
     my $bestnode = "NONE";  #default to an error value
+   
+
 =pod
     print "$site ";
     foreach my $node ( @{$sitenodes{$site}} ){
@@ -255,17 +296,31 @@ sub choosebestnode($)
 	    }
 	    print "\n";
 	}
-=cut
-	if( $allnodes{$node}{free} == 1 && isnodeinconstrset($node) ) {
+=cut     
+        #this command acts like a bgmon "ping" - used to 
+        #determine if bgmon running correctly
+        my %cmd = ( expid    => $expid,
+		    cmdtype  => "EDIT",
+		    dstnode  => "NOADDR",
+		    testtype => "bw",
+		    testper  => 0 );
+	if( $allnodes{$node}{free} == 1 && 
+	    isnodeinconstrset($node) )
+	{
 #	    print "choosing best node for site $site\n";
 	    #first time thru loop...
 	    if( $bestnode eq "NONE" ){
 		#set this to be best node
 		$bestnode = $node;
 	    }else{
-		if( $allnodes{$node}{cpu} < $allnodes{$bestnode}{cpu}
-		    + $CPUUSAGETHRESHOLD)
+		if( ($allnodes{$node}{cpu} < $allnodes{$bestnode}{cpu}
+		    - $CPUUSAGETHRESHOLD) &&
+		    (edittest($node,"NOADDR",0,"bw") == 1) )
 		{
+		    print "setting new bestnode\n";
+		    print '$allnodes{$node}{cpu}'."  $allnodes{$node}{cpu}\n";
+		    print '$allnodes{$bestnode}{cpu}'.
+			"  $allnodes{$bestnode}{cpu}\n";
 		    $bestnode = $node;
 		}
 	    }
@@ -319,11 +374,29 @@ sub updateTests
 	    }
 	}
 	initnode($srcnode, $bw_destnodes, $test_per{bw}, "bw");
-
-	#TODO! Distribute initialization times evenly
     }
 
-    #TODO: LATENCY
+    #init latency: fully connected, but only one direction each path
+    my %initstrs;  #build init strings for each site node
+    my @sitekeys = keys %intersitenodes;
+    for( my $i = 0; $i < @sitekeys-1; $i++ ){
+	for( my $j = $i+1; $j < @sitekeys; $j++ ){
+	    my $r = rand;
+	    if( $r <= .5 ){
+		$initstrs{$intersitenodes{$sitekeys[$i]}} .= 
+		    "$intersitenodes{$sitekeys[$j]} ";
+	    }else{
+		$initstrs{$intersitenodes{$sitekeys[$j]}} .= 
+		    "$intersitenodes{$sitekeys[$i]} ";
+	    }
+	}
+    }
+    # now send the inits to all nodes
+    foreach my $srcsite (keys %intersitenodes){
+	$srcnode = $intersitenodes{$srcsite};
+	initnode($srcnode, $initstrs{$srcnode}, $test_per{latency}, "latency");
+    }
+    
 }
 
 #
@@ -336,6 +409,7 @@ sub stopnode($)
     if( isnodeinconstrset($node) ){
 	my %cmd = ( expid    => $expid,
 		    cmdtype  => "STOPALL" );
+	print "stopnode $node called\n";
 	sendcmd($node,\%cmd);
     }
 }
@@ -360,7 +434,7 @@ sub edittest($$$$)
 		testtype => $testtype,
 		testper  => $testper );
 
-    sendcmd($srcnode,\%cmd);
+    return sendcmd($srcnode,\%cmd);
 }
 
 #
@@ -411,7 +485,7 @@ sub sendcmd($$)
 
     my $sercmd = serialize_hash( \%cmd );
     my $f_success = 0;
-    my $max_tries = 5;
+    my $max_tries = 3;
     do{
 	$socket = IO::Socket::INET->new( PeerPort => $port,
 					 Proto    => 'tcp',
@@ -424,7 +498,7 @@ sub sendcmd($$)
 	    # timeout period?
 	    $sel->add($socket);
 	    my ($ready) = $sel->can_read(1);
-	    if( $ready eq $socket ){
+	    if( defined($ready) && $ready eq $socket ){
 		my $ack = <$ready>;
 		chomp $ack;
 		if( $ack eq "ACK" ){
@@ -447,20 +521,25 @@ sub sendcmd($$)
 
     if( $f_success == 0 && $max_tries == 0 ){
 	$deadnodes{$node} = 1;
+	print "DID NOT GET ACK from $node for command $sercmd\n";
+	return -1;
+    }elsif( $f_success == 1 ){
+	#success!
+	return 1;
     }
 
 }
 
 
-
-
 sub outputErrors()
 {
-    print "Nodes not responding to Command:\n";
-    foreach my $node (keys %deadnodes){
-	print "$node  ";
+    if( keys %deadnodes > 0 ){
+	print "Nodes not responding:\n";
+	foreach my $node (keys %deadnodes){
+	    print "$node  ";
+	}
+	print "\n";
     }
-    print "\n";
 }
 
 
