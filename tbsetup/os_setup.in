@@ -1174,7 +1174,7 @@ tballdone:
 tbinfo "OS Setup Done.";
 
 my %tally;
-my $users_fought = 1;
+my $users_fault = 1;
 my %total_osid;
 my %total_type;
 my $summary = '';
@@ -1208,10 +1208,13 @@ foreach ((keys %nodes), (keys %vnodes), (keys %plabvnodes)) {
 }
 
 foreach my $osid (sort keys %total_osid) {
+    # I want undefined to mean zero!
+    no warnings 'uninitialized';
+
     my ($osname, $pidofosid);
     my $user_image = 1;
 
-    if (defined $total_osid{$osid}{failed} && $total_osid{$osid}{failed} > 0) {
+    if ($total_osid{$osid}{failed} > 0) {
 
 	my $query_result = 
 	    DBQueryFatal("select osname,pid from os_info where osid='$osid'");
@@ -1224,31 +1227,44 @@ foreach my $osid (sort keys %total_osid) {
 	    $user_image = 0;
 	}
 
-	$users_fought = 0 if !$user_image;
+	$users_fault = 0 if !$user_image;
 
 	my %d = %{$total_osid{$osid}};
 	$summary .= "$d{failed}/$d{total} nodes with a ";
 	$summary .= $user_image ? "user" : "system";
 	$summary .= " osid of \"$osname\" failed to boot";
-	if (defined $d{failed_nonfatal} && $d{failed_nonfatal} > 0) {
+	if ($d{failed_nonfatal} > 0) {
 	    my $count = ($d{failed_nonfatal} == $d{failed}
 			 ? "all"
 			 : "$d{failed_nonfatal}/$d{failed}");
 	    $summary .= " ($count non-fatal)";
 	}
 	$summary .= ":\n";
+
+	my $byfailure = sub {
+	    # I want undefined to mean zero!
+	    my $cmp = $total_type{$osid}{$b}{failed} <=> $total_type{$osid}{$a}{failed};
+	    return $cmp if $cmp != 0;
+	    return $a cmp $b;
+	};
 	
-	foreach my $type (sort keys %{$total_type{$osid}}) {
+	foreach my $type (sort $byfailure keys %{$total_type{$osid}}) {
 	    my %d = %{$total_type{$osid}{$type}};
-	    $summary .= "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
-	    if (defined $d{failed_nonfatal} && $d{failed_nonfatal} > 0) {
-		my $count = ($d{failed_nonfatal} == $d{failed}
-			     ? "all"
-			     : "$d{failed_nonfatal}/$d{failed}");
+	    if ($d{failed} > 0) {
+		$summary .= "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
+		if ($d{failed_nonfatal} > 0) {
+		    my $count = ($d{failed_nonfatal} == $d{failed}
+				 ? "all"
+				 : "$d{failed_nonfatal}/$d{failed}");
 		$summary .= " ($count non-fatal)";
+		}
+		$summary .= ".\n";
+		$users_fault = 0 if $d{failed} < $d{total};
+	    } else {
+		$summary .= "  $d{total} ";
+		$summary .= $d{total} == 1 ? "$type" : "$type's";
+		$summary .= " with this os successfully booted.\n";
 	    }
-	    $summary .= ".\n";
-	    $users_fought = 0 if $d{failed} < $d{total};
 	}
     }
 }
@@ -1257,7 +1273,7 @@ if ($failed || $failedvnodes || $failedplab) {
     push @msg, "$failed failed nodes"               if $failed;
     push @msg, "$failedvnodes failed virtual nodes" if $failedvnodes;
     push @msg, "$failedplab failed plab nodes"      if $failedplab;
-    tberror ({type=>'summary', cause=>($users_fought ? 'user' : 'unknown')}, 
+    tberror ({type=>'summary', cause=>($users_fault ? 'user' : 'unknown')}, 
 	     "There were ", join(', ', @msg), ".\n\n", $summary);
 } elsif ($summary) {
     tbwarn $summary;
