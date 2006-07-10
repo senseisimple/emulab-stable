@@ -90,6 +90,10 @@ ATTR_NIL_VALUES = ('None',)
 # identify a planetlab node
 ATTR_CRIT_KEYS = ('HNAME', 'IP', 'PLABID', 'MAC',)
 
+# The amount by which latitude and longitude are allowed to differ before we
+# classify them ask changed
+LATLONG_DELTA = 0.001
+
 PLABNODE = "@prefix@/sbin/plabnode"
 SSH = "@prefix@/bin/sshtb"
 NAMED_SETUP = "@prefix@/sbin/named_setup"
@@ -433,6 +437,14 @@ class Plab:
             for attr in ent:
                 if ent[attr] in ATTR_NIL_VALUES:
                     continue
+                elif (attr == "LATITUDE") or (attr == "LONGITUDE"):
+                    # Special rules for latitude and longitude to avoid
+                    # FP errors
+                    if (ent[attr] != None and plabent[attr] != None) and (ent[attr] != "" and plabent[attr] != "") and ((float(ent[attr]) > (float(plabent[attr]) + LATLONG_DELTA)) or (float(ent[attr]) < (float(plabent[attr]) - LATLONG_DELTA))):
+                        diff[attr] = (ent[attr], plabent[attr])
+                    else:
+                        same[attr] = ent[attr]
+                        pass
                 elif ent[attr] == plabent[attr]:
                     same[attr] = ent[attr]
                     pass
