@@ -92,11 +92,11 @@ sub AuditStart($;$$)
     # "what was done" message to the audit list, and CC it to tbops if it
     # exits with an error. But the log is the responsibility of the user.
     #
-#    if (!$daemon && isatty(STDIN)) {
-#	$auditing = 1;
-#	$ENV{'TBAUDITON'} = "$SCRIPTNAME:$USERNAME";
-#	return;
-#    }
+    if (!$daemon && isatty(STDIN)) {
+	$auditing = 1;
+	$ENV{'TBAUDITON'} = "$SCRIPTNAME:$USERNAME";
+	return;
+    }
 
     if (!defined($logname)) {
 	$logfile = TBMakeLogname("$SCRIPTNAME");
