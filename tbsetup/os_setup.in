@@ -1262,7 +1262,7 @@ foreach my $osid (sort keys %total_osid) {
 		$users_fault = 0 if $d{failed} < $d{total};
 	    } else {
 		$summary .= "  $d{total} ";
-		$summary .= $d{total} == 1 ? "$type" : "$type's";
+		$summary .= $d{total} == 1 ? "$type" : "${type}'s";
 		$summary .= " with this os successfully booted.\n";
 	    }
 	}
