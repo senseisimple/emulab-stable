@@ -440,7 +440,12 @@ class Plab:
                 elif (attr == "LATITUDE") or (attr == "LONGITUDE"):
                     # Special rules for latitude and longitude to avoid
                     # FP errors
-                    if (ent[attr] != None and plabent[attr] != None) and (ent[attr] != "" and plabent[attr] != "") and ((float(ent[attr]) > (float(plabent[attr]) + LATLONG_DELTA)) or (float(ent[attr]) < (float(plabent[attr]) - LATLONG_DELTA))):
+                    if (ent[attr] != None and plabent[attr] != None) \
+                           and (ent[attr] != "" and plabent[attr] != "") \
+                           and ((float(ent[attr]) > \
+                                 (float(plabent[attr]) + LATLONG_DELTA)) \
+                                or (float(ent[attr]) < \
+                                    (float(plabent[attr]) - LATLONG_DELTA))):
                         diff[attr] = (ent[attr], plabent[attr])
                     else:
                         same[attr] = ent[attr]
