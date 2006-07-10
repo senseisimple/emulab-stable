@@ -9,6 +9,7 @@ public:
   Time();
   Time(struct timeval const & newData);
   long long toMilliseconds(void) const;
+  struct timeval * getTimeval(void);
   Time operator-(Time const & right) const;
   bool operator<(Time const & right) const;
   bool operator==(Time const & right) const;
@@ -16,5 +17,7 @@ public:
 private:
   struct timeval data;
 };
+
+Time getCurrentTime(void);
 
 #endif

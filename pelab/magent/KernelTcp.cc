@@ -1,7 +1,24 @@
 // KernelTcp.cc
 
 #include "lib.h"
+#include "log.h"
 #include "KernelTcp.h"
+
+using namespace std;
+
+void kernelTcp_init(void)
+{
+  int error = 0;
+  // Set up the peerAccept socket
+  address.sin_family = AF_INET;
+  address.sin_port = htons(SENDER_PORT);
+  address.sin_arrd.s_addr = INADDR_ANY;
+  error = bind(global::peerAccept,
+               reinterpret_cast<struct sockaddr *>(address),
+               sizeof(struct sockaddr))
+  // Set up the connectionModelExemplar
+  // Set up packet capture
+}
 
 void kernelTcp_addNewPeer(fd_set * readable)
 {
@@ -10,14 +27,16 @@ void kernelTcp_addNewPeer(fd_set * readable)
   {
     struct sockaddr_in remoteAddress;
     socklen_t addressSize = sizeof(remoteAddress);
-    int fd = accept(global::peerAccept, &remoteAddress, &addressSize);
+    int fd = accept(global::peerAccept,
+                    reinterpret_cast<struct sockaddr *>(&remoteAddress),
+                    &addressSize);
     if (fd != -1)
     {
       // Add the peer.
-      int flags = fctl(fd, F_GETFL);
+      int flags = fcntl(fd, F_GETFL);
       if (flags != -1)
       {
-        int error = fctl(fd, F_SETFL, flags | O_NONBLOCK);
+        int error = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
         if (error != -1)
         {
           global::peers.push_back(
@@ -25,7 +44,8 @@ void kernelTcp_addNewPeer(fd_set * readable)
           addDescriptor(fd);
           logWrite(PEER_CYCLE,
                    "Peer connection %d from %s was accepted normally.",
-                   global::peers.back().first, global::peers.back().second);
+                   global::peers.back().first,
+                   global::peers.back().second.c_str());
         }
         else
         {
@@ -49,8 +69,8 @@ void kernelTcp_addNewPeer(fd_set * readable)
 
 void kernelTcp_readFromPeers(fd_set * readable)
 {
-  list<int>::iterator pos = global::peers.begin();
-  while (pos != peers.end())
+  list< pair<int, string> >::iterator pos = global::peers.begin();
+  while (pos != global::peers.end())
   {
     if (FD_ISSET(pos->first, readable))
     {
@@ -61,9 +81,9 @@ void kernelTcp_readFromPeers(fd_set * readable)
       {
         logWrite(PEER_CYCLE,
                  "Peer connection %d from %s is closing normally.",
-                 pos->first, pos->second);
+                 pos->first, pos->second.c_str());
         close(pos->first);
-        list<int>::iterator temp = pos;
+        list< pair<int, string> >::iterator temp = pos;
         ++pos;
         global::peers.erase(temp);
       }
@@ -71,10 +91,10 @@ void kernelTcp_readFromPeers(fd_set * readable)
       {
         logWrite(EXCEPTION,
                  "Failed to read peer connection %d from %s so "
-                 "I'm shutting it down: %s", pos->first, pos->second,
+                 "I'm shutting it down: %s", pos->first, pos->second.c_str(),
                  strerror(errno));
         close(pos->first);
-        list<int>::iterator temp = pos;
+        list< pair<int, string> >::iterator temp = pos;
         ++pos;
         global::peers.erase(temp);
       }
@@ -88,4 +108,8 @@ void kernelTcp_readFromPeers(fd_set * readable)
       ++pos;
     }
   }
+}
+
+void kernelTcp_packetCapture(fd_set * readable)
+{
 }

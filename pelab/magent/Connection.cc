@@ -1,6 +1,7 @@
 // Connection.cc
 
 #include "lib.h"
+#include "log.h"
 #include "Connection.h"
 #include "Time.h"
 #include "ConnectionModel.h"
@@ -8,6 +9,36 @@
 #include "Sensor.h"
 
 using namespace std;
+
+Connection::Connection()
+  : isConnected(false)
+  , bufferFull(false)
+{
+}
+
+Connection::Connection(Connection const & right)
+  : peer(right.peer->clone())
+  , traffic(right.traffic->clone())
+  , measurements(right.measurements)
+  , isConnected(right.isConnected)
+  , bufferFull(right.bufferFull)
+  , nextWrite(right.nextWrite)
+{
+}
+
+Connection & Connection::operator=(Connection const & right)
+{
+  if (this != &right)
+  {
+    peer = right.peer->clone();
+    traffic = right.traffic->clone();
+    measurements = right.measurements;
+    isConnected = right.isConnected;
+    bufferFull = right.bufferFull;
+    nextWrite = right.nextWrite;
+  }
+  return *this;
+}
 
 void Connection::reset(Order const & newElab,
                        std::auto_ptr<ConnectionModel> newPeer)
@@ -34,15 +65,16 @@ void Connection::connect(void)
   }
 }
 
-void Connection::addTrafficWrite(TrafficWriteCommand const & newWrite
-                            std::multimap<Time, Connection *> const & schedule)
+void Connection::addTrafficWrite(TrafficWriteCommand const & newWrite,
+                                 multimap<Time, Connection *> & schedule)
 {
   if (traffic.get() != NULL)
   {
-    Time nextTime = traffic->addWrite(newWrite);
-    if (nextTime != Time())
+    Time temp = traffic->addWrite(newWrite, nextWrite);
+    if (temp != Time() && nextWrite == Time())
     {
-      schedule.insert(make_pair(nextTime, this));
+      nextWrite = temp;
+      schedule.insert(make_pair(nextWrite, this));
     }
   }
   else
@@ -89,18 +121,34 @@ Time Connection::writeToConnection(Time const & previousTime)
            && planet != result.planet)
   {
     global::planetMap.erase(planet);
-    planet = result;
+    planet = result.planet;
     global::planetMap.insert(make_pair(planet, this));
   }
   isConnected = result.isConnected;
   bufferFull = result.bufferFull;
+  nextWrite = result.nextWrite;
   return result.nextWrite;
 }
 
-void cleanup(void)
+void Connection::cleanup(std::multimap<Time, Connection *> & schedule)
 {
   if (isConnected)
   {
     global::planetMap.erase(planet);
+  }
+  if (nextWrite != Time())
+  {
+    std::multimap<Time, Connection *>::iterator pos
+      = schedule.lower_bound(nextWrite);
+    std::multimap<Time, Connection *>::iterator limit
+      = schedule.upper_bound(nextWrite);
+    for (; pos != limit; ++pos)
+    {
+      if (pos->second == this)
+      {
+        schedule.erase(pos);
+        break;
+      }
+    }
   }
 }

@@ -10,16 +10,17 @@
 #ifndef COMMAND_INPUT_H_STUB_2
 #define COMMAND_INPUT_H_STUB_2
 
-class Command;
+#include "Command.h"
 
 class CommandInput
 {
 public:
+  virtual ~CommandInput() {}
   virtual Command * getCommand(void)
   {
     return currentCommand.get();
   }
-  virtual void nextCommand(void)=0;
+  virtual void nextCommand(fd_set & readable)=0;
 protected:
   std::auto_ptr<Command> currentCommand;
 };

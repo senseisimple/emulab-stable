@@ -3,10 +3,15 @@
 #ifndef CONNECTION_H_STUB_2
 #define CONNECTION_H_STUB_2
 
+#include "SensorList.h"
+
 class Time;
 class ConnectionModel;
 class TrafficModel;
 class Sensor;
+class ConnectionModelCommand;
+class TrafficWriteCommand;
+class SensorCommand;
 
 class Connection
 {
@@ -29,7 +34,7 @@ public:
   void connect(void);
   // Notifies the traffic model of write information from the monitor.
   void addTrafficWrite(TrafficWriteCommand const & newWrite,
-                       std::multimap<Time, Connection *> const & schedule);
+                       std::multimap<Time, Connection *> & schedule);
   // Adds a particular kind of sensor when requested by the monitor.
   void addSensor(SensorCommand const & newSensor);
   // Notifies the sensors of a data packet which was sent.
@@ -42,7 +47,7 @@ public:
   // scheduler.
   Time writeToConnection(Time const & previousTime);
   // Called just before a connection is removed from the map.
-  void cleanup(void);
+  void cleanup(std::multimap<Time, Connection *> & schedule);
 private:
   // There are two kinds of ordering. One is for commands from
   // emulab. One is for the pcap analysis.
@@ -54,6 +59,7 @@ private:
   SensorList measurements;
   bool isConnected;
   bool bufferFull;
+  Time nextWrite;
 };
 
 #endif

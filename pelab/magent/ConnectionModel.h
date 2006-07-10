@@ -5,6 +5,10 @@
 
 class ConnectionModel
 {
+public:
+  virtual ~ConnectionModel() {}
+  virtual std::auto_ptr<ConnectionModel> clone(void)=0;
+  virtual void connect(void)=0;
 };
 
 #endif

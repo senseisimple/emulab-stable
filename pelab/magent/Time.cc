@@ -19,6 +19,12 @@ Time::Time(struct timeval const & newData)
 long long Time::toMilliseconds(void) const
 {
   long long result = data.tv_sec * 1000 + data.tv_usec / 1000;
+  return result;
+}
+
+struct timeval * Time::getTimeval(void)
+{
+  return &data;
 }
 
 Time Time::operator-(Time const & right) const
@@ -52,3 +58,9 @@ bool Time::operator!=(Time const & right) const
   return !(*this == right);
 }
 
+Time getCurrentTime(void)
+{
+  Time now;
+  gettimeofday(now.getTimeval(), NULL);
+  return now;
+}

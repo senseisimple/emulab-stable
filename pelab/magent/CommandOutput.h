@@ -11,12 +11,13 @@
 class CommandOutput
 {
 public:
-  void eventMessage(string const & message, ElabOrder const & key)
+  virtual ~CommandOutput() {}
+  void eventMessage(std::string const & message, Order const & key)
   {
     if (message.size() <= 0xffff && message.size() > 0)
     {
       writeHeader(EVENT_TO_MONITOR, message.size(), key);
-      writeMessage(message.c_str(), message.size(), key);
+      writeMessage(message.c_str(), message.size());
     }
     else
     {
@@ -26,19 +27,19 @@ public:
   }
 
 private:
-  void writeHeader(int type, unsigned short size, ElabOrder const & key)
+  void writeHeader(int type, unsigned short size, Order const & key)
   {
     int bufferSize = sizeof(unsigned char)*2 + sizeof(unsigned short)*3
       + sizeof(unsigned long);
     char buffer[bufferSize];
     char * pos = buffer;
 
-    pos += saveChar(pos, special);
-    pos += saveShort(pos, size);
-    pos += saveChar(pos, key.transport);
-    pos += saveInt(pos, key.ip);
-    pos += saveShort(pos, key.localPort);
-    pos += saveShort(pos, key.remotePort);
+    pos = saveChar(pos, type);
+    pos = saveShort(pos, size);
+    pos = saveChar(pos, key.transport);
+    pos = saveInt(pos, key.ip);
+    pos = saveShort(pos, key.localPort);
+    pos = saveShort(pos, key.remotePort);
     writeMessage(buffer, bufferSize);
   }
 
@@ -62,7 +63,7 @@ private:
     return buffer + sizeof(ordered);
   }
 protected:
-  virtual void writeMessage(char const * message, int count);
+  virtual void writeMessage(char const * message, int count)=0;
 };
 
 #endif

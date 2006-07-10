@@ -23,6 +23,7 @@ class KernelTcp : public ConnectionModel
     bool useNagles;
 };
 
+void kernelTcp_init(void);
 void kernelTcp_addNewPeer(fd_set * readable);
 void kernelTcp_readFromPeers(fd_set * readable);
 void kernelTcp_packetCapture(fd_set * readable);

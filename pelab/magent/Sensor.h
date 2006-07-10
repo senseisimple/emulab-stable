@@ -10,6 +10,7 @@
 class Sensor
 {
 public:
+  virtual ~Sensor() {}
   Sensor * getTail(void)
   {
       if (next.get() == NULL)
@@ -45,12 +46,12 @@ public:
           next->captureAck(packetTime, kernel, tcp, elab, bufferFull);
       }
   }
-  std::auto_ptr<Sensor> clone(void) const;
+  std::auto_ptr<Sensor> clone(void) const
   {
       std::auto_ptr<Sensor> result(localClone());
       if (next.get() != NULL)
       {
-          result.next = next->clone();
+          result->next = next->clone();
       }
       return result;
   }
@@ -65,7 +66,7 @@ protected:
                         struct tcp_info const * kernel,
                         struct tcphdr const * tcp, Order const & elab,
                         bool bufferFull)=0;
-  virtual std::auto_ptr<Sensor> clone(void) const=0;
+  virtual std::auto_ptr<Sensor> localClone(void) const=0;
 };
 
 #endif

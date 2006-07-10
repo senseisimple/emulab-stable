@@ -28,6 +28,15 @@
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
 
+#include <utility>
+#include <list>
+#include <map>
+#include <memory>
+#include <vector>
+#include <string>
+
+#include "Time.h"
+
 enum
 {
   NAGLES_ALGORITHM,
@@ -62,14 +71,25 @@ struct Order
   }
   bool operator<(Order const & right) const
   {
-    return make_pair(transport,
-                     make_pair(ip,
-                               make_pair(localPort,
-                                         remotePort)))
-      < make_pair(right.transport,
-                  make_pair(right.ip,
-                            make_pair(right.localPort,
-                                      right.remotePort)));
+    return std::make_pair(transport,
+                          std::make_pair(ip,
+                                         std::make_pair(localPort,
+                                                        remotePort)))
+      < std::make_pair(right.transport,
+                       std::make_pair(right.ip,
+                                      std::make_pair(right.localPort,
+                                                     right.remotePort)));
+  }
+  bool operator==(Order const & right) const
+  {
+    return transport == right.transport
+      && ip == right.ip
+      && localPort == right.localPort
+      && remotePort == right.remotePort;
+  }
+  bool operator!=(Order const & right) const
+  {
+    return !(*this == right);
   }
 };
 /*
@@ -96,25 +116,32 @@ enum
   CONNECTION_MODEL_KERNEL = 0
 };
 
+class ConnectionModel;
+class Connection;
+class CommandInput;
+class CommandOutput;
+
 namespace global
 {
   extern int connectionModelArg;
   extern int peerAccept;
-  extern std::list<int> peers;
   extern std::auto_ptr<ConnectionModel> connectionModelExemplar;
+  extern std::string interface;
+  // file descriptor, IP address string
+  extern std::list< std::pair<int, std::string> > peers;
 
-  extern std::list<Connection> connections;
-  extern std::map<Order, Connection> elabMap;
+  extern std::map<Order, Connection> connections;
   // A connection is in this map only if it is currently connected.
   extern std::map<Order, Connection *> planetMap;
 
   extern fd_set readers;
   extern int maxReader;
 
-  extern std::auto_ptr<ControlInput> input;
-  extern std::auto_ptr<ControlOutput> output;
+  extern std::auto_ptr<CommandInput> input;
+  extern std::auto_ptr<CommandOutput> output;
 }
 
 void addDescriptor(int fd);
+std::string ipToString(unsigned int ip);
 
 #endif

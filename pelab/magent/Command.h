@@ -3,94 +3,76 @@
 #ifndef COMMAND_H_STUB_2
 #define COMMAND_H_STUB_2
 
+#include "Connection.h"
+
 class Command
 {
 public:
   virtual void run(std::multimap<Time, Connection *> & schedule)
   {
-    std::multimap<ElabOrder, Connection>::iterator pos
+    std::map<Order, Connection>::iterator pos
       = global::connections.find(key);
     if (pos != global::connections.end())
     {
-      runConnect(&(pos->second));
+      runConnect(&(pos->second), schedule);
     }
   }
+  virtual ~Command() {}
 protected:
-  virtual void runConnect(Connection * conn)=0;
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> & schedule)=0;
 
   // We use a key here and look up the connection only on a run()
   // because some commands delete a connection and we don't want later
   // commands to keep the reference around.
-  ElabOrder key;
+  Order key;
 };
 
 class NewConnectionCommand : public Command
 {
 public:
-  virtual void run(std::multimap<Time, Connection *> &)
-  {
-    std::multimap<ElabOrder, Connection>::iterator pos
-      = global::connections.find(key);
-    if (pos == global::connections.end())
-    {
-      pos = global::connections.insert(make_pair(key, Command()));
-      pos->second.reset(elab, connectionModelExemplar.clone());
-    }
-  }
+  virtual void run(std::multimap<Time, Connection *> &);
 protected:
-  virtual void runConnect(Connection *)
-  {
-  }
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> &);
 };
 
 class TrafficModelCommand : public Command
 {
 protected:
-  virtual void runConnect(Connection * conn)
-  {
-  }
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> &);
 };
 
 class ConnectionModelCommand : public Command
 {
 protected:
-  virtual void runConnect(Connection * conn)
-  {
-    conn->addConnectionModelParam(*this);
-  }
-public:
-  int type;
-  unsigned int value;
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> &);
 };
 
 class SensorCommand : public Command
 {
 protected:
-  virtual void runConnect(Connection * conn)
-  {
-    conn->addSensor(*this);
-  }
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> &);
 public:
   int type;
-  vector<char> parameters;
+  std::vector<char> parameters;
 };
 
 class ConnectCommand : public Command
 {
 protected:
-  virtual void runConnect(Connection * conn)
-  {
-    conn->connect();
-  }
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> &);
 };
 
 class TrafficWriteCommand : public Command
 {
 protected:
-  virtual void runConnect(Connection * conn)
-  {
-    conn->addTrafficWrite(*this, schedule);
-  }
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> & schedule);
 public:
   unsigned int delta;
   unsigned int size;
@@ -99,20 +81,10 @@ public:
 class DeleteConnectionCommand : public Command
 {
 public:
-  virtual void run(std::multimap<Time, Connection *> & schedule)
-  {
-    std::multimap<ElabOrder, Connection>::iterator pos
-      = global::connections.find(key);
-    if (pos != global::connections.end())
-    {
-      pos->second.cleanup();
-      global::connections.erase(pos);
-    }
-  }
+  virtual void run(std::multimap<Time, Connection *> & schedule);
 protected:
-  virtual void runConnect(Connection * conn)
-  {
-  }
+  virtual void runConnect(Connection * conn,
+                          std::multimap<Time, Connection *> &);
 };
 
 #endif
