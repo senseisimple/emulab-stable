@@ -164,8 +164,14 @@ if ($expstate) {
 	WRITESUBMENUBUTTON("Visualization and NS File",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
-    WRITESUBMENUBUTTON("Download NS File",
-		       "spitnsdata.php3?pid=$exp_pid&eid=$exp_eid");
+    if (!isset($show) || $show == "details") {
+	WRITESUBMENUBUTTON("Show NS File",
+		 "showexp.php3?pid=$exp_pid&eid=$exp_eid&show=nsfile");
+    }
+    else {
+	WRITESUBMENUBUTTON("Hide NS File",
+		 "showexp.php3?pid=$exp_pid&eid=$exp_eid&show=details");
+    }
 
     WRITESUBMENUDIVIDER();
 
@@ -371,7 +377,16 @@ echo "<br>
 
 SUBMENUEND_2B();
 
-SHOWEXP($exp_pid, $exp_eid);
+if (!isset($show) || $show == "details") {
+    SHOWEXP($exp_pid, $exp_eid);
+}
+else {
+    echo "<center>";
+    echo "<iframe width=700 height=400 scrolling=auto
+                  src='spitnsdata.php3?pid=$exp_pid&eid=$exp_eid'
+                  border=2></iframe>\n";
+    echo "</center>";
+}
 
 if (TBExptFirewall($exp_pid, $exp_eid) &&
     ($expstate == $TB_EXPTSTATE_ACTIVE ||
