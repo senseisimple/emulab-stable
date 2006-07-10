@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
 <!DOCTYPE nstemplate SYSTEM "nstemplate.dtd">
 <!--
-    XML NS template for making a single-node PlanetLab DevBox experiment
+    XML NS template for making a Private Planetlab
 -->
-<nstemplate name="PlanetLab In A Box" author="Robert Ricci"
+<nstemplate name="Private PlanetLab" author="Robert Ricci"
             authormail="ricci@cs.utah.edu" authoruid="ricci">
     <description>
-        This template is for creating a private PlanetLab using the
-        "PlanetLab in a Box" code. The only thing you may want to edit
-        is the number of nodes.
+        This template is for creating a private PlanetLab.
+        The only thing you may want to edit is the number of nodes.
     </description>
     <variable name="Count" default="2" descr="Number of nodes (not including PLC)" />
     <variable name="PLCHWType" default="pc3000" descr="Hardware Type for PLC" />
     <variable name="HWType" default="pc" descr="Hardware Type for nodes" />
     <!-- This hard-codes the image name, but it seems like we have to do
          that somewhere... -->
-    <variable name="ImageName" default="PLAB-PLBOX" descr = "Disk Image for PLC" />
+    <variable name="ImageName" default="PLAB-PLC" descr = "Disk Image for PLC" />
     <nstext>
         <section><![CDATA[
 # plinabox.ns - NS script to make a private PlanetLab on Emulab
@@ -62,4 +61,3 @@ $ns run
         ]]></section>
     </nstext>
 </nstemplate>
-
