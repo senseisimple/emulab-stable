@@ -21,19 +21,117 @@ PAGEHEADER("Wireless/WSN Testbed Connectivity Statistics");
 ##
 ## need to find out what datasets exist
 ##
-$dbq = DBQueryFatal("select name from wireless_stats");
-$count = 0;
+$dbq = DBQueryFatal("select ws.name,ws.floor,ws.building," .
+		    "fi.scale,fi.pixels_per_meter " .
+		    "from wireless_stats as ws left join floorimages as fi " .
+		    "on fi.building=ws.building and ws.floor=fi.floor");
+
+## now, here's the method:
+## if there is more than one floor, only the primary should be listed.
+## now, when the applet scans the position data, if it sees more floors than
+## the primary, it calls up and downloads the maps it needs.  Thus, we want to
+## send a bit for each dataset in the following format:
+## "name,building,primary_floor,s1:s2:...:sN,f1:f2:...:fN,ppm1:ppm2:...:ppmN"
+## each of these strings is then separated by a ';'
+
+$count = -1;
+$lpc = 0;
 $strlist = "";
+
+$names = array();
+$floors = array();
+$buildings = array();
+$nameScales = array();
+$nameScaleFactors = array();
+$namePPMs = array();
 
 while ($row = mysql_fetch_array($dbq)) {
     $name = $row["name"];
-    if ($count > 0) {
-        $strlist = $strlist . ",";
-    }
-    ++$count;
 
-    $strlist = $strlist . $name;
+#    if ($name == 'SensorNet-MEB') {
+#        continue;
+#    }
+
+    $floor = $row["floor"];
+    $building = $row["building"];
+    $scale = $row["scale"];
+    $factor = 0;
+    if ($scale == 1) {
+        $factor = 1;
+    }
+    else if ($scale == 2) {
+        $factor = 1.5;
+    }
+    else {
+        $factor = $scale - 1;
+    }
+    $ppm = $row["pixels_per_meter"];
+
+    # there should only be floor and building per name (this is determined
+    # by the PRIMARY KEY  (building,floor,scale) in the floorimages table
+    if (!in_array($name,$names)) {
+        ++$count;
+        
+        $names[$count] = $name;
+        $floors[$count] = $floor;
+        $buildings[$count] = $building;
+
+        $nameScales[$count] = array();
+        $nameScaleFactors[$count] = array();
+        $namePPMs[$count] = array();
+        $lpc = 0;
+    }
+
+    # now, we *can* have more than one value for scale and ppm, but
+    # each corresponds to a building-floor-name tuple:
+    $nameScales[$count][$lpc] = $scale;
+    $nameScaleFactors[$count][$lpc] = $factor;
+    $namePPMs[$count][$lpc] = $ppm;
+    ++$lpc;
 }
+
+## now we print out the big list:
+$strlist = '';
+for ($i = 0; $i <= $count; ++$i) {
+    $n = $names[$i];
+    $f = $floors[$i];
+    $b = $buildings[$i];
+    $sa = $nameScales[$i];
+    $sf = $nameScaleFactors[$i];
+    $ppma = $namePPMs[$i];
+
+    if ($strlist != '') {
+        $strlist .= ";";
+    }
+
+    $strlist .= "$n,$b,$f,";
+
+    # now add the scales...
+    for ($j = 0; $j < count($sa); ++$j) {
+        if ($j != 0) {
+            $strlist .= ":";
+        }
+        $strlist .= $sa[$j];
+    }
+    $strlist .= ",";
+    # now add the scale factors...
+    for ($j = 0; $j < count($sf); ++$j) {
+        if ($j != 0) {
+            $strlist .= ":";
+        }
+        $strlist .= $sf[$j];
+    }
+    $strlist .= ",";
+    # now add the ppms...
+    for ($j = 0; $j < count($ppma); ++$j) {
+        if ($j != 0) {
+            $strlist .= ":";
+        }
+        $strlist .= $ppma[$j];
+    }
+
+}     
+
 
 $auth    = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
 
