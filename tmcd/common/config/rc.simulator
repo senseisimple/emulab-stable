@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -131,17 +131,60 @@ sub doboot()
     
     my @routelist = ();
 
-    if (tmcc(TMCCCMD_ROUTELIST, undef, \@routelist) < 0) {
-	fatal("Could not get routelist from server!");
-    }
-    if (open(RLIST, ">$ROUTELIST")) {
-	foreach my $route (@routelist) {
-	    print RLIST $route;
+    #
+    # XXX this will require more effort if it can even be made to work at all.
+    # The problem is that routelist needs to include all routes for the
+    # experiment, not just those for the "current" node.
+    #
+    # The implication is that we need to use static-old routing when NSE
+    # is involved.  This is not currently enforced.
+    #
+    if (0) {
+	my $type;
+	if (getrouterconfig(\@routelist, \$type)) {
+	    fatal("Could not get router configuration from libsetup!");
 	}
-	close(RLIST);
+	if ($type eq "gated" || $type eq "ospf") {
+	    fatal("Cannot do session routing in NSE!\n");
+	}
+
+	#
+	# produce route lines as expected by nseinput.tcl:
+	# ROUTE NODE=%s SRC=%s DEST=%s DESTTYPE=%s DESTMASK=%s NEXTHOP=%s COST=%s
+	#
+	if (open(RLIST, ">$ROUTELIST")) {
+	    foreach my $rconfig (@routelist) {
+		print RLIST "ROUTE",
+		" NODE=", $rconfig->{"??"},
+		" SRC=", $rconfig->{"SRCIPADDR"},
+		" DEST=", $rconfig->{"IPADDR"},
+		" DESTTYPE=", $rconfig->{"TYPE"},
+		" DESTMASK=", $rconfig->{"IPMASK"},
+		" NEXTHOP=", $rconfig->{"GATEWAY"},
+		" COST=", $rconfig->{"COST"},
+		"\n";
+	    }
+	    close(RLIST);
+	    undef(@routelist);
+	}
+	else {
+	    fatal("Cannot open file $ROUTELIST: $!");
+	}
     }
     else {
-	fatal("Cannot open file $ROUTELIST: $!");
+	if (tmcc(TMCCCMD_ROUTELIST, undef, \@routelist) < 0) {
+	    fatal("Could not get routelist from server!");
+	}
+	if (open(RLIST, ">$ROUTELIST")) {
+	    foreach my $route (@routelist) {
+		print RLIST $route;
+	    }
+	    close(RLIST);
+	    undef(@routelist);
+	}
+	else {
+	    fatal("Cannot open file $ROUTELIST: $!");
+	}
     }
 
     my @trafgens = ();
