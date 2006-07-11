@@ -49,14 +49,22 @@ public class MapDataModel {
     
     private Hashtable options;
     
+    private int currentFloor;
+    private int currentScale;
+    private int minScale;
+    private int maxScale;
+    
+    private Dataset dataset;
+    
     /** Creates a new instance of MapDataModel */
     private MapDataModel() {
-        this(null,null);
+        this(new Dataset());
     }
     
-    public MapDataModel(GenericWirelessData data,NodePosition positions) {
-        this.data = data;
-        this.positions = positions;
+    public MapDataModel(Dataset ds) {
+        this.dataset = ds;
+        this.data = ds.data;
+        this.positions = ds.positions;
         selectionList = new Vector();
         threshold = new Float(0);
         neighborCount = 3;
@@ -79,6 +87,32 @@ public class MapDataModel {
         limit = LIMIT_NONE;
         this.options = new Hashtable();
         options.put(OPTION_NO_ZERO_LINKS,OPTION_SET);
+        
+        // find min/max scale items:
+        int min = 65535;
+        this.minScale = -1;
+        for (int i = 0; i < ds.scale.length; ++i) {
+            if (ds.scale[i] < min) {
+                min = ds.scale[i];
+                this.minScale = min;
+            }
+        }
+        int max = -65535;
+        this.maxScale = -1;
+        for (int i = 0; i < ds.scale.length; ++i) {
+            if (ds.scale[i] > max) {
+                max = ds.scale[i];
+                this.maxScale = max;
+            }
+        }
+        this.currentScale = this.minScale;
+        System.err.println("model set minScale="+minScale+",maxScale"+maxScale+",currentScale="+currentScale);
+        System.err.println("model set min="+min+",max"+max);
+        // now set floor:
+        // just take the first one :-)
+        this.currentFloor = ds.floor[0];
+        System.err.println("model set currentFloor="+currentFloor);
+        
     }
     
     public Float getCurrentPropertyDelta() {
@@ -328,6 +362,10 @@ public class MapDataModel {
         return positions.getPoint(node);
     }
     
+    public Dataset getDataset() {
+        return this.dataset;
+    }
+    
     public void addChangeListener(ChangeListener listener) {
         if (listener != null && !changeListeners.contains(listener)) {
             changeListeners.add(listener);
@@ -381,6 +419,36 @@ public class MapDataModel {
         else {
             return false;
         }
+    }
+    
+    public void setFloor(int floor) {
+        this.currentFloor = floor;
+        notifyChangeListeners();
+    }
+    
+    public void setScale(int scale) {
+        this.currentScale = scale;
+        notifyChangeListeners();
+    }
+    
+    public int getFloor() {
+        return this.currentFloor;
+    }
+    
+    public int getScale() {
+        return this.currentScale;
+    }
+    
+    public int getMinScale() {
+        return this.minScale;
+    }
+    
+    public int getMaxScale() {
+        return this.maxScale;
+    }
+    
+    public float getScaleFactor() {
+        return this.dataset.getScaleFactor(this.currentScale);
     }
     
     private void notifyChangeListeners() {

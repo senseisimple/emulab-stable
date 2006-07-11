@@ -18,7 +18,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
     //private Image bgImage;
     private java.awt.image.ImageObserver io;
     private Hashtable datasets;
-    private Hashtable mapImages;
+    private Hashtable imageCache;
     
     public void init() {
         
@@ -38,7 +38,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
     
     private void setup() {
         this.datasets = new Hashtable();
-        this.mapImages = new Hashtable();
+        this.imageCache = new Hashtable();
         
         io = new java.awt.Component() {
             public boolean updateImage(Image img, int infoflags, int x, int y, int width, int height) {
@@ -63,8 +63,8 @@ public class WirelessMapApplet extends javax.swing.JApplet {
             System.err.println("No datasets!");
             System.exit(-1);
         }
-        else if (datasetStr.indexOf(",") > -1) {
-            fragDS = datasetStr.split(",");
+        else if (datasetStr.indexOf(";") > -1) {
+            fragDS = datasetStr.split(";");
         }
         else {
             fragDS = new String[1];
@@ -73,15 +73,102 @@ public class WirelessMapApplet extends javax.swing.JApplet {
         
         // now, for each dataset name, we have to grab the data and the appropriate image
         for (int i = 0; i < fragDS.length; ++i) {
+            String[] sa = fragDS[i].split(",");
+            // sa[i] should look like 'Wifi-MEB,MEB,3,1:2:3:4:5,1:1.5:2:3:4,7.180:10.770:14.360:17.950:21.540;'
+            if (sa.length != 6) {
+                System.err.println("bad dataset spec '"+sa[i]+"'!");
+                continue;
+            }
+            
+            String dataset = sa[0];
+            String building = sa[1];
+            String floor = sa[2];
+            String[] scales = sa[3].split(":");
+            String[] scaleFactors = sa[4].split(":");
+            String[] ppms = sa[5].split(":");
+        
+            Dataset ds = new Dataset();
+            ds.name = dataset;
+            ds.building = building;
+            ds.floor = new int[1];
+            ds.floor[0] = Integer.parseInt(floor);
+            ds.scale = new int[scales.length];
+            for (int j = 0; j < scales.length; ++j) {
+                ds.scale[j] = Integer.parseInt(scales[j]);
+            }
+            ds.scaleFactor = new float[scaleFactors.length];
+            for (int j = 0; j < scaleFactors.length; ++j) {
+                ds.scaleFactor[j] = Float.parseFloat(scaleFactors[j]);
+            }
+            ds.ppm = new float[ppms.length];
+            for (int j = 0; j < ppms.length; ++j) {
+                ds.ppm[j] = Float.parseFloat(ppms[j]);
+            }
+            
             //
-            // start with datafile -- may be zipped or plain text
+            // first grab the positions file:
             //
-            URL datafile = null;
-            InputStream data_is = null;
             try {
-                datafile = new URL(base,
+                InputStream posit_is = null;
+                System.err.println("base = "+base.toString());
+                URL positfile = new URL(base,
+                                    positurl +
+                                    "&dataset=" + URLEncoder.encode(dataset) + 
+                                    "&nocookieuid=" + URLEncoder.encode(uid) +
+                                    "&nocookieauth=" + URLEncoder.encode(auth)
+                                   );
+                URLConnection uc = positfile.openConnection();
+                Object content = uc.getContent();
+                
+                if (uc.getContentType().equalsIgnoreCase("text/plain")) {
+                    // in this case, content should be of type
+                    //  sun.net.www.content.text.PlainTextInputStream
+                    // ...
+                    posit_is = (InputStream)content;
+                }
+                else {
+                    System.err.println("Data type ("+uc.getContentType()+") not plain text!");
+                    System.exit(-3);
+                }
+                
+                // now try to parse the data
+                // every time we add a new kind of data file and an associated parser,
+                // we must add a try in here with it!
+                ds.positions = NodePositions.parseInputStream(posit_is);
+                
+                // now, check over the positions file and see if there are more floors
+                // than just the primary floor we received from the webserver in the params:
+                for (Enumeration e1 = ds.positions.getNodeList(); e1.hasMoreElements(); ) {
+                    String nn = (String)e1.nextElement();
+                    ds.addFloor(ds.positions.getPosition(nn).floor);
+                }
+                
+                System.err.println("Successfully parsed posit for dataset '"+dataset+"'");
+                
+            }
+//            catch (MalformedURLException e) {
+//                e.printStackTrace();
+//                System.exit(-1);
+//            }
+//            catch (IOException e) {
+//                e.printStackTrace();
+//                System.exit(-1);
+//            }
+            catch (Exception e) {
+                System.err.println("Could not successfully parse positfile for dataset '" +
+                                   dataset+"'!");
+                e.printStackTrace();
+                System.exit(-1);
+            }
+            
+            //
+            // do datafile -- may be zipped or plain text
+            //
+            try {
+                InputStream data_is = null;
+                URL datafile = new URL(base,
                                    dataurl + 
-                                   "&dataset=" + URLEncoder.encode(fragDS[i]) + 
+                                   "&dataset=" + URLEncoder.encode(dataset) + 
                                    "&nocookieuid=" + URLEncoder.encode(uid) + 
                                    "&nocookieauth=" + URLEncoder.encode(auth)
                                   );
@@ -108,178 +195,92 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                     System.exit(-3);
                 }
                 
-            }
-            catch (MalformedURLException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            
-            GenericWirelessData data = null;
-            if (data == null) {
-                try {
-                    // now try to parse the data
-                    // every time we add a new kind of data file and an associated parser,
-                    // we must add a try in here with it!
-                    data = GenericStats.parseInputStream(data_is);
-                    
-//                    int pLs[] = data.getPowerLevels();
-//                    System.out.print("power levels = ");
-//                    for (int j = 0; j < pLs.length; ++j) {
-//                        System.out.print(""+pLs[j]+",");
-//                    }
-//                    System.out.println();
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-            
-            // in future, add more to process other datafiles...
-            // XXX: add here:
-            
-            
-            if (data == null) {
-                System.err.println("Could not successfully parse datafile for dataset '" +
-                                   fragDS[i]+"'!");
-                System.exit(-4);
-            }
-            
-            //
-            // ok, now we need to grab the positions file:
-            //
-            URL positfile = null;
-            InputStream posit_is = null;
-            try {
-                System.err.println("base = "+base.toString());
-                positfile = new URL(base,
-                                    positurl +
-                                    "&dataset=" + URLEncoder.encode(fragDS[i]) + 
-                                    "&nocookieuid=" + URLEncoder.encode(uid) +
-                                    "&nocookieauth=" + URLEncoder.encode(auth)
-                                   );
-                URLConnection uc = positfile.openConnection();
-                Object content = uc.getContent();
-                
-                if (uc.getContentType().equalsIgnoreCase("text/plain")) {
-                    // in this case, content should be of type
-                    //  sun.net.www.content.text.PlainTextInputStream
-                    // ...
-                    posit_is = (InputStream)content;
-                }
-                else {
-                    System.err.println("Data type ("+uc.getContentType()+") not plain text!");
-                    System.exit(-3);
-                }
-                
-            }
-            catch (MalformedURLException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-            
-            NodePosition np_data = null;
-            try {
                 // now try to parse the data
                 // every time we add a new kind of data file and an associated parser,
                 // we must add a try in here with it!
-                np_data = NodePositions.parseInputStream(posit_is);
+                ds.data = GenericStats.parseInputStream(data_is);
+                System.err.println("Successfully parsed datafile for dataset '" +
+                                   dataset+"'");
+                
+            }
+            catch (MalformedURLException e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+                System.exit(-1);
             }
             catch (Exception e) {
+                System.err.println("Couldn't parse data file!");
                 e.printStackTrace();
-            }
-            
-            if (np_data == null) {
-                System.err.println("Could not successfully parse positfile for dataset '" +
-                                   fragDS[i]+"'!");
-                System.exit(-4);
+                System.exit(-1);
             }
             
             //
             // so, we've got the data -- what about the image?
+            // we now actually grab ALL the images we might need.
+            // for each tuple <floor,scale> we grab the image for this
+            // building.
+            // of course, we cache globally.  :-)
             //
-            URL imgfile = null;
-            Image img = null;
-            try {
-                imgfile = new URL(base,
-                                  mapurl +
-                                  "&dataset=" + URLEncoder.encode(fragDS[i]) + 
-                                  "&nocookieuid=" + URLEncoder.encode(uid) +
-                                  "&nocookieauth=" + URLEncoder.encode(auth)
-                                 );
-                img = this.getImage(imgfile);
-                MediaTracker tracker = new MediaTracker(this);
-                tracker.addImage(img,0);
-                tracker.waitForID(0);
-                System.out.println("got image for dataset '"+fragDS[i]+"'; w = "+img.getWidth(io)+", h = "+img.getHeight(io));
-                if (tracker.isErrorID(0)) {
-                    System.err.println("Errors with image!!!");
+            for (int j = 0; j < ds.floor.length; ++j) {
+                for (int k = 0; k < ds.scale.length; ++k) {
+                    
+                    String tag = ds.building + "-" + ds.floor[j] + "-" + ds.scale[k];
+                    
+                    Image img = null;
+                    if ((img = (Image)imageCache.get(tag)) == null) {
+                        try {
+
+                            URL imgfile = new URL(base,
+                                              mapurl +
+                                              "&dataset=" + URLEncoder.encode(dataset) + 
+                                              "&building=" + URLEncoder.encode(building) + 
+                                              "&floor=" + URLEncoder.encode(""+ds.floor[j]) + 
+                                              "&scale=" + URLEncoder.encode(""+ds.scale[k]) + 
+                                              "&nocookieuid=" + URLEncoder.encode(uid) +
+                                              "&nocookieauth=" + URLEncoder.encode(auth)
+                                             );
+                            img = this.getImage(imgfile);
+                            MediaTracker tracker = new MediaTracker(this);
+                            tracker.addImage(img,0);
+                            tracker.waitForID(0);
+                            System.out.println("got image for dataset '"+dataset+"'; w = "+img.getWidth(io)+", h = "+img.getHeight(io));
+                            if (tracker.isErrorID(0)) {
+                                System.err.println("Errors with image!!!");
+                                img = null;
+                            }
+                            else {
+                                System.err.println("Image had no errors!");
+                                imageCache.put(tag,img);
+                            }
+                        }
+                        catch (Exception e) {
+                            System.err.println("Could not download image for dataset '"+dataset+"'!");
+                            e.printStackTrace();
+                            System.exit(-5);
+                        }
+                    }
+                    
+                    //System.err.println("imageCache="+imageCache+",tag="+tag+",img="+img);
+                    //imageCache.put(tag,img);
+                    if (img != null) {
+                        ds.addImage(img,ds.floor[j],ds.scale[k]);
+                    }
+                    
+                    
+                    System.err.println("imageRun; dataset="+ds.name+",tag="+tag+",img="+img);
                 }
-                else {
-                    System.out.println("Image had no errors!");
-                }
-            }
-            catch (Exception e) {
-                System.err.println("Could not download image for dataset '"+fragDS[i]+"'!");
-                e.printStackTrace();
-                System.exit(-5);
             }
             
             //
             // all this crap was downloaded successfully... move on!
             //
-            MapDataModel model = new MapDataModel(data,np_data);
-            datasets.put(fragDS[i],model);
-            mapImages.put(fragDS[i],img);
+            ds.model = new MapDataModel(ds);
+            datasets.put(dataset,ds);
             
         }
-        
-//        bgImage = Toolkit.getDefaultToolkit().getImage("/home/david/work/java/floormap.jpg");
-//        mapImages.put("Floor4/WSN",bgImage);
-//        
-//        try {
-//            MediaTracker tracker = new MediaTracker(this);
-//            tracker.addImage(bgImage, 0);
-//            tracker.waitForID(0);
-//            //System.out.println("width = "+bgImage.getWidth(io));
-//        }
-//        catch (InterruptedException ex) {
-//            ex.printStackTrace();
-//        }
-//        
-//        // in the applet, we'll read in the possible datasets and 
-//        
-//        WirelessData defaultData = null;
-//        NodePosition defaultPositions = null;
-//        MapDataModel defaultModel = null;
-//        String defaultDatasetName = "Floor4/WSN";
-//        
-//        try {
-//            defaultData = ILEStats.parseDumpFile("/home/david/work/java/nn_client.log");
-//            defaultPositions = NodePositions.parseFile("/home/david/work/java/mote_positions");
-//            
-//            defaultModel = new MapDataModel(defaultData,defaultPositions);
-//            datasets.put(defaultDatasetName,defaultModel);
-//        }
-//        catch (Exception e) {
-//            e.printStackTrace();
-//            System.exit(-2);
-//        }
     }
     
     /** This method is called from within the init() method to
@@ -293,7 +294,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
 
         nodeMapPanelScrollPane = new javax.swing.JScrollPane();
         nodeMapPanel = new NodeMapPanel();
-        controlPanel = new ControlPanel(datasets,mapImages,nodeMapPanel);
+        controlPanel = new ControlPanel(datasets,nodeMapPanel);
 
         getContentPane().setLayout(new java.awt.GridBagLayout());
 
@@ -311,8 +312,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
         getContentPane().add(controlPanel, gridBagConstraints);
 
-    }
-    // </editor-fold>//GEN-END:initComponents
+    }// </editor-fold>//GEN-END:initComponents
     
     
     // Variables declaration - do not modify//GEN-BEGIN:variables

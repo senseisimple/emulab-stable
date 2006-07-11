@@ -32,7 +32,7 @@ public class NodePositions implements NodePosition {
     private static NodePositions parseReader(BufferedReader br) 
         throws IOException, java.text.ParseException  {
         
-        Hashtable p = new Hashtable();
+        Hashtable pH = new Hashtable();
         
         try {
             //br = new BufferedReader(new FileReader(f));
@@ -40,22 +40,41 @@ public class NodePositions implements NodePosition {
             String line = null;
             
             while ((line = br.readLine()) != null) {
-                // parse line: "mote101   350   708   0.2"
-                Pattern posit = Pattern.compile("([a-zA-Z0-9\\-_]+)\\s+(\\-*\\d+)\\s+(\\-*\\d+)\\s+(\\-*\\d+\\.\\d+E*\\-*\\d*)");
+                // parse line: "mote101   350   708   0.2   4"
+                // where line corresponds to "<nodename> <x> <y> <z> <floor>""
+                Pattern posit = Pattern.compile("([a-zA-Z0-9\\-_]+)\\s+(.+)\\s+(.+)\\s+(.+)\\s+(.+)");
                 Matcher positM = posit.matcher(line);
                 
                 if (positM.matches()) {
-                    float xyz[] = new float[3];
+                    float p[] = new float[3];
+                    int floor = -1;;
+                    try {
+                        p[0] = 0.0f;
+                        p[0] = Float.parseFloat(positM.group(2));
+                    }
+                    catch (Exception ex) { }
+                    try {
+                        p[1] = 0.0f;
+                        p[1] = Float.parseFloat(positM.group(3));
+                    }
+                    catch (Exception ex) { }
+                    try {
+                        p[2] = 0.0f;
+                        p[2] = Float.parseFloat(positM.group(4));
+                    }
+                    catch (Exception ex) { }
+                    try {
+                        floor = Integer.parseInt(positM.group(5));
+                    }
+                    catch (Exception ex) { }
                     
-                    xyz[0] = Float.parseFloat(positM.group(2));
-                    xyz[1] = Float.parseFloat(positM.group(3));
-                    xyz[2] = Float.parseFloat(positM.group(4));
+                    pH.put(positM.group(1),new Position(positM.group(1),p[0],p[1],p[2],floor));
                     
-                    p.put(positM.group(1),xyz);
-                    
-                    //System.out.println(""+positM.group(1)+" ("+xyz[0]+","+xyz[1]+","+xyz[2]+")");
+                    System.err.println(""+positM.group(1)+" ("+p[0]+","+p[1]+","+p[2]+"; "+floor+")");
                 }
-                
+                else {
+                    System.err.println("positline '"+line+"' did not match!");
+                }
             }
             
         }
@@ -64,8 +83,11 @@ public class NodePositions implements NodePosition {
             throw e;
         }
         
-        
-        return new NodePositions(p);
+        return new NodePositions(pH);
+    }
+    
+    public java.util.Enumeration getNodeList() {
+        return this.positions.keys();
     }
     
     public static NodePositions parseInputStream(InputStream is) 
@@ -101,18 +123,15 @@ public class NodePositions implements NodePosition {
         return parseReader(br);
     }
     
-    public float[] getPosition(String nodeName) {
-        float retval[] = null;
-        retval = (float[])(positions.get(nodeName));
-        return retval;
+    public Position getPosition(String nodeName) {
+        return (Position)positions.get(nodeName);
     }
     
     public java.awt.Point getPoint(String nodeName) {
         //System.out.println("looking for node '"+nodeName+"'");
-        float p[] = null;
-        p = (float[])(positions.get(nodeName));
+        Position p = (Position)(positions.get(nodeName));
         if (p != null) {
-            return new java.awt.Point((int)p[0],(int)p[1]);
+            return new java.awt.Point((int)p.x,(int)p.y);
         }
         else {
             return null;

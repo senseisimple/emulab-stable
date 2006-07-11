@@ -32,7 +32,7 @@ public class GenericLinkStats {
     
     public void addStat(String statName,Object stat) {
         stats.put(statName,stat);
-        System.out.println("GLS: added "+recvNode+" <- "+sendNode+", "+statName+"="+stat);
+        //System.out.println("GLS: added "+recvNode+" <- "+sendNode+", "+statName+"="+stat);
     }
     
     public void addMetaStat(String statName,String metaName,Object stat) {
@@ -61,7 +61,7 @@ public class GenericLinkStats {
             float myTicks = 100/(max-min);
             float myPercent = (myValue - min)*myTicks;
             
-            System.out.println("GPOPR: statName="+statName+"min="+min+",max="+max+",myValue="+myValue+",myTicks="+myTicks+"myPercent="+myPercent);
+            //System.out.println("GPOPR: statName="+statName+"min="+min+",max="+max+",myValue="+myValue+",myTicks="+myTicks+"myPercent="+myPercent);
             
             return new Float(myPercent);
         }

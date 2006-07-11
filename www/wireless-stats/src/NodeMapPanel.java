@@ -17,6 +17,7 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
     private Vector widgets;
     private MapDataModel model;
     private ControlPanel controlPanel;
+    private float scaleFactor;
     
     /**
      * Creates new form NodeMapPanel 
@@ -37,37 +38,6 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
         initComponents();
         
         //setOpaque(true);
-        
-//        NodeWidget nw1,nw2;
-//        nw1 = new NodeWidget("mote101",50,50);
-//        nw2 = new NodeWidget("mote102",100,150);
-//        widgets.add(nw1);
-//        widgets.add(nw2);
-//        widgets.add(new LinkWidget(nw1,nw2,0.75f,0.25f));
-//        
-//        nw1 = new NodeWidget("mote103",400,250);
-//        nw2 = new NodeWidget("mote104",200,50);
-//        widgets.add(nw1);
-//        widgets.add(nw2);
-//        widgets.add(new LinkWidget(nw1,nw2,0.20f,0.60f));
-//        
-//        nw1 = new NodeWidget("mote110",100,300);
-//        nw2 = new NodeWidget("mote111", 300, 100);
-//        widgets.add(nw1);
-//        widgets.add(nw2);
-//        widgets.add(new LinkWidget(nw1,nw2,0.25f,0.75f));
-//        
-//        nw1 = new NodeWidget("mote105",300,350);
-//        nw2 = new NodeWidget("mote106",100,480);
-//        widgets.add(nw1);
-//        widgets.add(nw2);
-//        widgets.add(new LinkWidget(nw1,nw2,0.85f,0.10f));
-//        
-//        widgets.add(new NodeWidget("mote107",100,100));
-//        widgets.add(new NodeWidget("mote108",300,200));
-//        widgets.add(new LinkWidget(null,100,100,300,200,12));
-        
-        
     }
     
     public void setModel(MapDataModel model) {
@@ -104,6 +74,8 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
 //            return;
 //        }
         
+        this.scaleFactor = this.model.getScaleFactor();
+        
         this.widgets.clear();
         this.nodeWidgets.clear();
         this.linkWidgets.clear();
@@ -111,9 +83,11 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
         String[] nodes = model.getNodes();
         if (nodes != null) {
             for (int i = 0; i < nodes.length; ++i) {
-                //System.out.println("nodes["+i+"] = '"+nodes[i]+"'");
+                System.out.println("nodes["+i+"] = '"+nodes[i]+"'");
                 Point posit = model.getPosition(nodes[i]);
-                NodeWidget nw = new NodeWidget(nodes[i],posit.x,posit.y);
+                NodeWidget nw = new NodeWidget(nodes[i],
+                                               (int)(posit.x*this.scaleFactor),
+                                               (int)(posit.y*this.scaleFactor));
                 this.widgets.add(nw);
                 this.nodeWidgets.put(nodes[i],nw);
             }
@@ -273,14 +247,14 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
                 // for the mote stuff, we could draw the obstacles and labels
                 // ourselves, but that wouldn't help for the wireless stuff...
                 
-//                Composite old = g2.getComposite();
-//                AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f);
-//                g2.setComposite(ac);
-//                
-//                g2.setColor(java.awt.Color.WHITE);
-//                g2.fillRect(0,0,getWidth(),getHeight());
-//                
-//                g2.setComposite(old);
+                Composite old = g2.getComposite();
+                AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f);
+                g2.setComposite(ac);
+                
+                g2.setColor(java.awt.Color.WHITE);
+                g2.fillRect(0,0,getWidth(),getHeight());
+                
+                g2.setComposite(old);
                 
             }
             else {
@@ -310,6 +284,10 @@ public class NodeMapPanel extends javax.swing.JPanel implements ChangeListener {
         }
         
         g2.dispose(); //clean up
+    }
+    
+    public void setScaleFactor(float f) {
+        this.scaleFactor = f;
     }
     
     public void setBackgroundImage(final Image bgImage) {

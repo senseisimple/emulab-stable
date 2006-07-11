@@ -13,7 +13,7 @@
  * @author david
  */
 public interface NodePosition {
-    public float[] getPosition(String nodeName);
-    
+    public Position getPosition(String nodeName);
+    public java.util.Enumeration getNodeList();
     public java.awt.Point getPoint(String nodeName);
 }

@@ -411,7 +411,10 @@ public class GenericStats implements GenericWirelessData {
                                             // so at least grabbing it as a string will work.
                                             obj = sdm.group(1);
                                             // try to take as float if possible...
-                                            obj = new Float(Float.parseFloat(sdm.group(2)));
+                                            float tf = Float.parseFloat(sdm.group(2));
+                                            int bf = (int)(tf*100.0);
+                                            tf = ((float)bf)/100.0f;
+                                            obj = new Float(tf);
                                         }
                                         catch (Exception ex) {
                                             ;
@@ -484,7 +487,10 @@ public class GenericStats implements GenericWirelessData {
                                             // so at least grabbing it as a string will work.
                                             obj = dm.group(1);
                                             // try to take as float if possible...
-                                            obj = new Float(Float.parseFloat(dm.group(2)));
+                                            float tf = Float.parseFloat(dm.group(2));
+                                            int bf = (int)(tf*100.0);
+                                            tf = ((float)bf)/100.0f;
+                                            obj = new Float(tf);
                                         }
                                         catch (Exception ex) {
                                             ;
@@ -539,7 +545,7 @@ public class GenericStats implements GenericWirelessData {
             throw new IOException("file read failed");
         }
         
-        System.out.println("GenericStats parsed "+linecount+" lines.");
+        System.err.println("GenericStats parsed "+linecount+" lines.");
         
         GenericStats retval = new GenericStats(indices,indexValues,
                                                nodes,properties,
@@ -589,7 +595,7 @@ public class GenericStats implements GenericWirelessData {
                 allStats.add(gls);
             //}
                 
-            System.out.println("GS.addReceiverStats: added '"+gls.toString()+"'!");
+            //System.out.println("GS.addReceiverStats: added '"+gls.toString()+"'!");
         }
         
         public GenericLinkStats getStats(String recvNode,String sendNode) {
