@@ -20,7 +20,7 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
-	 gettraceconfig genhostsfile getmotelogconfig
+	 gettraceconfig genhostsfile getmotelogconfig calcroutes
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -866,8 +866,195 @@ sub getrouterconfig($$)
 	    warn("*** WARNING: Bad route config line: $line\n");
 	}
     }
+
+    # Special case for distributed route calculation.
+    if ($type eq "static" || $type eq "static-ddijk") {
+	if (calcroutes(\@routes)) {
+	    warn("*** WARNING: Could not get routes from ddijkstra!\n");
+	    @$rptr  = ();
+	    $$ptype = undef;
+	    return -1;
+	}
+	$type = "static";
+    }
+
     @$rptr  = @routes;
     $$ptype = $type;
+    return 0;
+}
+
+#
+# Special case. If the routertype is "static-ddijk" then we run our
+# dijkstra program on the linkmap, and use that to feed the code
+# below (it outputs exactly the same goo).
+#
+# XXX: If we change the return from tmcd, the output of dijkstra will
+# suddenly be wrong. Yuck, need a better solution.
+#
+# We have to generate the input file from the topomap.
+#
+sub calcroutes ($)
+{
+    my ($rptr)	= @_;
+    my @routes  = ();
+    my $linkmap = CONFDIR() . "/linkmap";	# Happens outside jail.
+    my $topomap;
+    my ($pid, $eid, $myname) = check_nickname();
+
+    if (gettopomap(\$topomap)) {
+	warn("*** WARNING: Could not get topomap!\n");
+	return -1;
+    }
+
+    # Special case of experiment with no lans; no routes needed.
+    if (! scalar(@{ $topomap->{"lans"} })) {
+	@$rptr = ();
+	return 0;
+    }
+
+    # Gather up all the link info from the topomap
+    my %lans     = ();
+    my $nnodes   = 0;
+
+    # The nodes section tells us the name of each node, and all its links.
+    foreach my $noderef (@{ $topomap->{"nodes"} }) {
+	my $vname  = $noderef->{"vname"};
+	my $links  = $noderef->{"links"};
+
+	if (!defined($links)) {
+	    # If we have no links, there are no routes to compute.
+	    if ($vname eq $myname) {
+		@$rptr = ();
+		return 0;
+	    }
+	    next;
+	}
+
+	# Links is a string of "$lan1:$ip1 $lan2:$ip2 ..."
+	foreach my $link (split(" ", $links)) {
+	    my ($lan,$ip) = split(":", $link);
+	
+	    if (! defined($lans{$lan})) {
+		$lans{$lan} = {};
+		$lans{$lan}->{"members"} = {};
+	    }
+	    $lans{$lan}->{"members"}->{"$vname:$ip"} = $ip;
+	}
+
+	$nnodes++;
+    }
+
+    # The lans section tells us the masks and the costs.
+    foreach my $lanref (@{ $topomap->{"lans"} }) {
+	my $vname  = $lanref->{"vname"};
+	my $cost   = $lanref->{"cost"};
+	my $mask   = $lanref->{"mask"};
+
+	$lans{$vname}->{"cost"} = $cost;
+	$lans{$vname}->{"mask"} = $mask;
+    }
+    
+    #
+    # Construct input for Jon's dijkstra program.
+    #
+    if (! open(MAP, ">$linkmap")) {
+	warn("*** WARNING: Could not create $linkmap!\n");
+	@$rptr  = ();
+	return -1;
+    }
+
+    # Count edges, but just once each.
+    my $edges = 0;
+    foreach my $lan (keys(%lans)) {
+	my @members = sort(keys(%{ $lans{$lan}->{"members"} }));
+	
+	for (my $i = 0; $i < scalar(@members); $i++) {
+	    for (my $j = $i; $j < scalar(@members); $j++) {
+		my $member1 = $members[$i];
+		my $member2 = $members[$j];
+	    
+		$edges++
+		    if ($member1 ne $member2);
+	    }
+	}
+    }
+
+    # Header line for Jon. numnodes numedges
+    print MAP "$nnodes $edges\n";
+
+    # And then a list of edges: node1 ip1 node2 ip2 cost
+    foreach my $lan (keys(%lans)) {
+	my @members = sort(keys(%{ $lans{$lan}->{"members"} }));
+	my $cost    = $lans{$lan}->{"cost"};
+	my $mask    = $lans{$lan}->{"mask"};
+	
+	for (my $i = 0; $i < scalar(@members); $i++) {
+	    for (my $j = $i; $j < scalar(@members); $j++) {
+		my $member1 = $members[$i];
+		my $member2 = $members[$j];
+	    
+		if ($member1 ne $member2) {
+		    my ($node1,$ip1) = split(":", $member1);
+		    my ($node2,$ip2) = split(":", $member2);
+		
+		    print MAP "$node1 " . $ip1 . " " .
+			      "$node2 " . $ip2 . " $cost\n";
+		}
+	    }
+	}
+    }
+    close(MAP);
+    undef($topomap);
+    undef(%lans);
+
+    #
+    # Now run the dijkstra program on the input. 
+    # --compress generates "net" routes
+    # 
+    if (!open(DIJK, "cat $linkmap | $BINDIR/dijkstra --compress --source=$myname |")) {
+	warn("*** WARNING: Could not invoke dijkstra on linkmap!\n");
+	@$rptr  = ();
+	return -1;
+    }
+    my $pat = q(ROUTE DEST=([0-9\.]*) DESTTYPE=(\w*) DESTMASK=([0-9\.]*) );
+    $pat   .= q(NEXTHOP=([0-9\.]*) COST=([0-9]*) SRC=([0-9\.]*));
+    
+    while (<DIJK>) {
+	if ($_ =~ /ROUTERTYPE=(.+)/) {
+	    next;
+	}
+	if ($_ =~ /$pat/) {
+	    my $dip   = $1;
+	    my $rtype = $2;
+	    my $dmask = $3;
+	    my $gate  = $4;
+	    my $cost  = $5;
+	    my $sip   = $6;
+	    
+	    my $rconfig = {};
+	    $rconfig->{"IPADDR"}   = $dip;
+	    $rconfig->{"TYPE"}     = $rtype;
+	    $rconfig->{"IPMASK"}   = $dmask;
+	    $rconfig->{"GATEWAY"}  = $gate;
+	    $rconfig->{"COST"}     = $cost;
+	    $rconfig->{"SRCIPADDR"}= $sip;
+	    push(@routes, $rconfig);
+	}
+	else {
+	    warn("*** WARNING: Bad route config line: $_\n");
+	}
+    }
+    if (! close(DIJK)) {
+	if ($?) {
+	    warn("*** WARNING: dijkstra exited with status $?!\n");
+	}
+	else {
+	    warn("*** WARNING: Error closing dijkstra pipe: $!\n");
+	}
+	@$rptr  = ();
+	return -1;
+    }
+    @$rptr = @routes;
     return 0;
 }
 
