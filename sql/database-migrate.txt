@@ -3490,3 +3490,20 @@ last_net_act,last_cpu_act,last_ext_act);
           add attempt tinyint(1) not null default 0 after session,
           add cleanup tinyint(1) not null default 0 after attempt;
 
+4.74: Add new node_type_attributes table:
+
+	CREATE TABLE node_type_attributes (
+	  type varchar(30) NOT NULL default '',
+	  attrkey varchar(32) NOT NULL default '',
+	  attrvalue tinytext NOT NULL,
+	  attrtype enum('integer','float','boolean','string') default 'string',
+	  PRIMARY KEY  (type,attrkey),
+	  KEY node_id (type)
+	) TYPE=MyISAM;
+
+      To populate:
+
+         ./init_nodeattrs.pl
+
+
+	

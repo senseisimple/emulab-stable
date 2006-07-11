@@ -1564,6 +1564,19 @@ CREATE TABLE node_status (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `node_type_attributes`
+--
+
+CREATE TABLE node_type_attributes (
+  type varchar(30) NOT NULL default '',
+  attrkey varchar(32) NOT NULL default '',
+  attrvalue tinytext NOT NULL,
+  attrtype enum('integer','float','boolean','string') default 'string',
+  PRIMARY KEY  (type,attrkey),
+  KEY node_id (type)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `node_type_features`
 --
 
