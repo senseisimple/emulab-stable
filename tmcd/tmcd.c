@@ -3456,14 +3456,10 @@ COMMAND_PROTOTYPE(doloadinfo)
 	 */
 	disktype = DISKTYPE;
 	disknum = DISKNUM;
-
-	res = mydb_query("select attrkey,attrvalue from nodes as n "
-			 "left join node_type_attributes as a on "
-			 "     n.type=a.type "
-			 "where (a.attrkey='bootdisk_unit' or "
-			 "       a.attrkey='disktype') and "
-			 "      n.node_id='%s'", 2, reqp->nodeid);
-	
+	res = mydb_query("select disktype,bootdisk_unit from nodes as n "
+			 "left join node_types as nt on n.type = nt.type "
+			 "where n.node_id='%s'",
+			 2, reqp->nodeid);
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting disktype!\n",
 		      reqp->nodeid);
@@ -3471,21 +3467,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	}
 
 	if ((int)mysql_num_rows(res) > 0) {
-		int nrows = (int)mysql_num_rows(res);
-
-		while (nrows) {
-			row = mysql_fetch_row(res);
-
-			if (row[1] && row[1][0]) {
-				if (strcmp(row[0], "bootdisk_unit") == 0) {
-					disknum = atoi(row[1]);
-				}
-				else if (strcmp(row[0], "disktype") == 0) {
-					disktype = row[1];
-				}
-			}
-			nrows--;
-		}
+		row = mysql_fetch_row(res);
+		if (row[0] && row[0][0])
+			disktype = row[0];
+		if (row[1] && row[1][0])
+			disknum = atoi(row[1]);
 	}
 	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d ZFILL=%d\n",
 	       disktype, disknum, zfill);
@@ -4797,8 +4783,9 @@ COMMAND_PROTOTYPE(doixpconfig)
 	 */
 	res = mydb_query("select i1.IP,i1.iface,i2.iface,i2.mask,i2.IP "
 			 " from nodes as n "
+			 "left join node_types as nt on n.type=nt.type "
 			 "left join interfaces as i1 on i1.node_id=n.node_id "
-			 "     and i1.role='ctrl' "
+			 "     and i1.iface=nt.control_iface "
 			 "left join interfaces as i2 on i2.node_id='%s' "
 			 "     and i2.card=i1.card "
 			 "where n.node_id='%s'",
