@@ -230,10 +230,10 @@ $args .= " REPORTONLY=1"
     if ($reportonly);
 
 #
-# XXX turn off the ARP test for now as it throws version 1.1 clients
-# out of synch.
+# Remain compatible with older linktests.  This will turn off the ARP
+# test and force an otherwise pointless barrier synch.
 #
-$args .= " DOARP=0";
+$args .= " DOARP=0 COMPAT=1.1";
 
 system($args);
 if ($?) {

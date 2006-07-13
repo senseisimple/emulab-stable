@@ -30,11 +30,13 @@ sub usage()
     print("Usage: linktest.pl\n".
 	  " [STARTAT=<test step, 1-4>]\n".
 	  " [STOPAT=<test step, 1-4>]\n".
+	  " [COMPAT=<version or 0>]\n".
 	  " [DOARP=<1=yes, 0=no>]\n".
 	  " [REPORTONLY=<1=yes, 0=no>]\n".
 	  " [NODES=<n1,n2...>\n".
 	  " [DEBUG=<debugging level. 1=on, 0=off>]\n");
     print("    <test step>: 1=conn/latency, 2=routing, 3=loss, 4=BW\n".
+	  "    COMPAT=<version>: remain compatible with version <version> or earlier\n".
 	  "    DOARP=1: run a single-ping pass to create ARP entries\n".
 	  "    REPORTONLY=1: report stats only, do not pass judgement\n".
 	  "    NODES: comma-separated list of virtnames to run on\n");
@@ -194,6 +196,7 @@ my $debug_level = 0; # enable debug statements
 my $arpit = 1;	# do a single ping to force ARP exchange
 my $reportonly = 0; # just report the values seen, no pass/fail judgement
 my $printsched = 0; # just print the test schedule
+my $compat = 1.1;   # be compatible (wrt. synch) with old versions
 my $barriers_hit = 1;
 my $barr_count;   # used by synserv host, nubmer of hosts -1
 my $log_file;    # common logfile for information saved over time.
@@ -245,6 +248,9 @@ foreach my $arg (@ARGV) {
     if($arg =~ /STARTAT=(\d)/) {
 	$startat=$1;
     }
+    if($arg =~ /COMPAT=(\d(?:\.\d+))/) {
+	$compat=$1/1.0;
+    }
     if($arg =~ /DOARP=(\d)/) {
 	$arpit=$1;
     }
@@ -271,6 +277,14 @@ foreach my $arg (@ARGV) {
 	$swapper=$1;
 	(undef,undef,$swapperid,$swappergid) = getpwnam($swapper);
     }
+}
+
+$compat = 99
+    if ($compat == 0);
+
+# XXX no arp test in 1.1 and before
+if ($compat < 1.2) {
+    $arpit = 0;
 }
 
 #
@@ -668,6 +682,11 @@ sub loss_test {
     my $trun = 1;
     my $rude_arg = "";
 
+    # XXX version 1.1 compatibility; used to start crude here and wait
+    if ($compat < 1.2) {
+	&barrier();
+    }
+
     #
     # XXX "concession" to vnodes: the stock rude is, well..."rude",
     # when it comes to CPU usage.  It spins between time intervals
@@ -940,7 +959,6 @@ sub force_arp {
 	&schedlog("barrier $barriers_hit: arp: after test");
     }
     &barrier();
-
 }
 
 # For directly connected hosts, checks latency using Ping.
