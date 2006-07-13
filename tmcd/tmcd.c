@@ -1561,14 +1561,13 @@ COMMAND_PROTOTYPE(doifconfig)
 		return 1;
 	}
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-	  if (num_interfaces == 0) {
-		error("IFCONFIG: %s: No interfaces!\n", reqp->nodeid);
 		mysql_free_result(res);
-		return 1;
-	  } else {
-		mysql_free_result(res);
+		/* XXX not sure why this is ever an error? */
+		if (!reqp->isplabdslice && num_interfaces == 0) {
+			error("IFCONFIG: %s: No interfaces!\n", reqp->nodeid);
+			return 1;
+		}
 		return 0;
-	  }
 	}
 	while (nrows) {
 		char *bufp   = buf;
@@ -4025,11 +4024,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		return 1;
 	}
 	row = mysql_fetch_row(res);
-	mysql_free_result(res);
-
 	if (!row[0] || !row[1] || !row[2]) {
 		error("iptonodeid: %s: Malformed DB response!\n",
 		      inet_ntoa(ipaddr)); 
+		mysql_free_result(res);
 		return 1;
 	}
 	strncpy(reqp->class,  row[0],  sizeof(reqp->class));
@@ -4101,6 +4099,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		strcpy(reqp->nodeid,  reqp->vnodeid);
 	}
 	
+	mysql_free_result(res);
 	return 0;
 }
  
