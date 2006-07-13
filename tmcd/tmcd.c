@@ -4346,7 +4346,7 @@ COMMAND_PROTOTYPE(doisalive)
 	 * See db/node_status script, which uses this info (timestamps)
 	 * to determine when nodes are down.
 	 */
-	mydb_update("replace delayed into node_status "
+	mydb_update("replace into node_status "
 		    " (node_id, status, status_timestamp) "
 		    " values ('%s', 'up', now())",
 		    reqp->nodeid);
@@ -5175,19 +5175,19 @@ COMMAND_PROTOTYPE(dorusage)
 	 * XXX: Plab physnode status is reported from the management slice.
          *
 	 */
-	mydb_update("replace delayed into node_rusage "
+	mydb_update("replace into node_rusage "
 		    " (node_id, status_timestamp, "
 		    "  load_1min, load_5min, load_15min, disk_used) "
 		    " values ('%s', now(), %f, %f, %f, %f)",
 		    reqp->pnodeid, la1, la5, la15, dused);
 
 	if (reqp->isplabdslice) {
-		mydb_update("replace delayed into node_status "
+		mydb_update("replace into node_status "
 			    " (node_id, status, status_timestamp) "
 			    " values ('%s', 'up', now())",
 			    reqp->pnodeid);
 
-		mydb_update("replace delayed into node_status "
+		mydb_update("replace into node_status "
 			    " (node_id, status, status_timestamp) "
 			    " values ('%s', 'up', now())",
 			    reqp->vnodeid);

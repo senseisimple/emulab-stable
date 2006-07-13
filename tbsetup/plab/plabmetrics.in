@@ -251,10 +251,10 @@ sub InsertMetrics($%)
     }
 
     if (!$impotent) {
-	DBQueryWarn("replace delayed into node_features ".
+	DBQueryWarn("replace into node_features ".
 		    " (node_id, feature, weight) ".
 		    " values ('$nodeid', '+load', $scaled)");
-	DBQueryWarn("replace delayed into node_features ".
+	DBQueryWarn("replace into node_features ".
 		    " (node_id, feature, weight) ".
 		    " values ('$nodeid', '+disk', $disk)");
     }
