@@ -22,12 +22,6 @@ $| = 1;
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-# Only root.
-if ($EUID != 0) {
-    die("*** $0:\n".
-	"    Must be root to run this script!\n");
-}
-
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
@@ -35,6 +29,13 @@ if ($EUID != 0) {
 use libsetup;
 use libtmcc;
 use librc;
+
+# Only root.
+# XXX on Windows we let non-root run this since linktest does not run as root.
+if ($EUID != 0 && !WINDOWS()) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
 
 #
 # Not all clients support this.
