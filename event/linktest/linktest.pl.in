@@ -330,7 +330,7 @@ $ptopology_file = "@CLIENT_VARDIR@/boot/ltpmap";
 # the NFS server.
 #
 sleep(int(rand(5)));
-&my_system(PATH_RCTOPO);
+&my_system(PATH_RCTOPO, "reconfig");
 &get_topo($topology_file, $ptopology_file, 0);
 &debug_top();
 
@@ -684,6 +684,7 @@ sub loss_test {
 
     # XXX version 1.1 compatibility; used to start crude here and wait
     if ($compat < 1.2) {
+	&debug("performing barrier synch for backward compatibility\n");
 	&barrier();
     }
 
@@ -779,7 +780,6 @@ sub loss_test {
     my $result_count = @results;
     &debug("result_count from crude: $result_count\n");
     foreach (@results) {
-	#&debug("result from crude: $_");
 	if(/ID=(\d+) /) {
 	    $recv_cnt{$1}++;
 	}
