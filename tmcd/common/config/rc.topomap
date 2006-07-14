@@ -44,7 +44,7 @@ exit(0)
     if (MFS());
 
 # Protos.
-sub doboot();
+sub doboot($);
 sub doshutdown();
 sub doreconfig();
 sub docleanup();
@@ -65,7 +65,7 @@ if (@ARGV) {
 # Execute the action.
 SWITCH: for ($action) {
     /^boot$/i && do {
-	doboot();
+	doboot(0);
 	last SWITCH;
     };
     /^shutdown$/i && do {
@@ -90,11 +90,13 @@ sub dotopomap();
 #
 # Boot Action.
 #
-sub doboot()
+sub doboot($)
 {
+    my ($allowjails) = @_;
+
     # Handled elsewhere for other node types.
     dotopomap()
-	if (!PLAB() && !JAILED() && !IXP());
+	if (!PLAB() && ($allowjails || !JAILED()) && !IXP());
 }
 
 #
@@ -111,7 +113,7 @@ sub doshutdown()
 sub doreconfig()
 {
     doshutdown();
-    return doboot();
+    return doboot(1);
 }
 
 #
