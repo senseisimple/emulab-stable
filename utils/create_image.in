@@ -402,7 +402,7 @@ $needcleanup = 1;
 DBQueryFatal("delete from node_bootlogs where node_id='$node'");
 
 #
-# Reboot into admin more and run the command.
+# Reboot into admin mode and run the command.
 #
 my $me           = $0;
 my %args         = ();
