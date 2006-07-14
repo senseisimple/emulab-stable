@@ -19,7 +19,8 @@ use lib '@prefix@/lib';
 use libdb;
 
 if ($#ARGV < 0) {
-	print "Usage: mac2if <mac|if> <mac|if> <...>\n";
+	print "Usage: nodeip <node|mac|if> <node|mac|if> <...>\n";
+	print "<node> is in the form pcxxx\n";
 	print "<mac> is in the form xx:xx:xx:xx:xx:xx or xxxxxxxxxxxx\n";
 	print "<if> is in the form <node[:card]>\n";
 	exit(1);
