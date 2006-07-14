@@ -244,9 +244,10 @@ namespace eval GLOBALS {
     # specified vs. unspecified in assign_wrapper
     variable vlink_encapsulate "default"
 
-    # Allow override of jail and delay osids.
+    # Allow override of jail, delay, simnode osids.
     variable jail_osname {}
     variable delay_osname {}
+    variable sim_osname "FBSD-STD"
 
     # Allow override of delay capacity.
     variable delay_capacity {}

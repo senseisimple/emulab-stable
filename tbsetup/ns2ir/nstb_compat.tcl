@@ -59,6 +59,7 @@ proc tb-bind-parent {sub phys} {}
 proc tb-fix-current-resources {onoff} {}
 proc tb-set-encapsulate {onoff} {}
 proc tb-set-vlink-emulation {style} {}
+proc tb-set-sim-os {os} {}
 proc tb-set-jail-os {os} {}
 proc tb-set-delay-os {os} {}
 proc tb-set-delay-capacity {cap} {}

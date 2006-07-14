@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -339,11 +339,12 @@ Agent/TCP/FullTcp instproc connect {dst} {
     $self instvar application
     $self instvar destination
     $self instvar role
+    var_import ::GLOBALS::sim_osname
 
     $self set proto "tcp"
     $dst set proto "tcp"
-    $node set osid "FBSD-STD"
-    $dst set osid "FBSD-STD"
+    $node set osid $sim_osname
+    $dst set osid $sim_osname
 }
 
 # Agent/Null
