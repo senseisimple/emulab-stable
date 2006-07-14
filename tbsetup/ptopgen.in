@@ -622,18 +622,35 @@ foreach $node (keys(%nodes)) {
 # physnode. 
 #
 if ($widearea) {
+    #
+    # Set up 'the Internet' as a fake switch that all widearea nodes can
+    # talk to.
+    # Some day, it may make sense to connect control net ports to this
+    # switch.
+    #
+    my $fake_inet_switch = "internet";
+    my @inet_protos = ("ipv4");
+    print "node $fake_inet_switch ", join(" ",map("*$_:*",@inet_protos)), "\n";
+    
+    #
+    # Note - there is currently an assumption in this query that widearea nodes
+    # have only one interface.
+    #
     $result =
-	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site ".
+	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site,".
+                     "i.card,i.port,i.iface ".
 		     "from nodes as n ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
 		     "left join node_status as ns on ns.node_id=n.node_id ".
 		     "left join widearea_nodeinfo as wn on ".
 		     "     wn.node_id=n.node_id ".
+		     "left join interfaces as i on ".
+		     "     n.node_id=i.node_id ".
 		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
 		     "        nt.isvirtnode=0)");
     
-    while (($physnode,$ptype,$status,$mpid,$meid,$site)
+    while (($physnode,$ptype,$status,$mpid,$meid,$site,$card,$port,$iface)
 	   = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
@@ -697,6 +714,18 @@ if ($widearea) {
 		   " - " . join(" ",@flags);
 
 	print "$text\n";
+
+        #
+        # Print out a link to the 'internet'.
+        # Note - we make up a fake bandwidth. In the future, maybe we
+        # could put something real in there.
+        #
+        if ($iface) {
+            print "link link-$physnode:$iface-$fake_inet_switch:(null) ".
+                "$physnode:$physnode/$iface $fake_inet_switch:(null) " .
+                "100000 0 0 1 ".
+                join(" ",@inet_protos). "\n";
+        }
     }
 }
 

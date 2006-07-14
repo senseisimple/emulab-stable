@@ -397,7 +397,8 @@ LanLink instproc fill_ips {} {
 	}
     }
     if {$isremote && [$self info class] != "Link"} {
-	perror "Not allowed to use a remote node in lan $self!"
+        puts stderr "Warning: Remote nodes used in LAN $self - no IPs assigned"
+	#perror "Not allowed to use a remote node in lan $self!"
 	return
     }
     set widearea $isremote

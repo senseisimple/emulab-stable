@@ -451,6 +451,9 @@ sub physnodeinterface($$) { return $phys_node_interfaces{$_[0]}{$_[1]}; }
 sub physinterfacetype($$) {
     return $phys_node_interfaces{$_[0]}{$_[1]}{"interface_type"};
 }
+sub physinterfacerole($$) {
+    return $phys_node_interfaces{$_[0]}{$_[1]}{"role"};
+}
 
 #
 # More physical side data structures.
@@ -2288,11 +2291,21 @@ foreach $vnodeport (keys(%portmap)) {
 	if (! defined($IPaliases{"$pnode:$pport"})) {
 	    printdb("IP: $pnode:$pport $ip\n");
 
-	    DBQueryFatal("update interfaces set ".
-			 "   IP='$ip',IPaliases=NULL,mask='$mask',".
-			 "   vnode_id=$vvnode,rtabid='$rtabid' ".
-			 "where node_id='$pnode' and iface='$pport'");
-	    $IPaliases{"$pnode:$pport"} = 1;
+            #
+            # Never update control net interfaces. This is so that we can
+            # consider them for mapping purposes (ie. PlanetLab), but don't
+            # have to worry about their IPs getting changed, since that's
+            # important persistent state!
+            #
+            if (physinterfacerole($pnode,$pport) != TBDB_IFACEROLE_CONTROL) {
+                printdb("Not setting IP for control interface: $pnode:$pport\n");
+            } else {
+                DBQueryFatal("update interfaces set ".
+                             "   IP='$ip',IPaliases=NULL,mask='$mask',".
+                             "   vnode_id=$vvnode,rtabid='$rtabid' ".
+                             "where node_id='$pnode' and iface='$pport'");
+                $IPaliases{"$pnode:$pport"} = 1;
+            }
 	}
 	else {
 	    printdb("IP: $pnode:$pport $ip (alias)\n");
@@ -3500,12 +3513,17 @@ sub LoadPhysInfo()
     #
     # Now get interface speeds for each type/class. We use this for determining
     # if a delay node is required. Very hacky, quite wrong.
+    # XXX: PlanetLab hack - PlanetLab 'control' interfaces are also
+    # 'experimental' interfaces! We probably need a way to express this in the
+    # interfaces table or interface_types
     #
     $query_result =
 	DBQueryFatal("select distinct i.interface_type,n.type ".
 		     " from interfaces as i ".
 		     "left join nodes as n on n.node_id=i.node_id ".
-		     "where i.role='" . TBDB_IFACEROLE_EXPERIMENT . "'");
+		     "where i.role='" . TBDB_IFACEROLE_EXPERIMENT . "' ".
+                     " or (n.type='pcplabphys' and i.role='" .
+                         TBDB_IFACEROLE_CONTROL . "')");
 
     # XXX Special hack for sim nodes.
     $node_type_linkbw{"sim"} = {};
