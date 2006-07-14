@@ -626,7 +626,7 @@ class Plab:
                          " (node_id, card, port, IP, interface_type,"
                          " iface, role)"
                          " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (nodeid, 0, 1, nodeent['IP'], 'fxp',
+                         (nodeid, 0, 1, nodeent['IP'], 'plab_fake',
                           controliface, 'ctrl'))
 
             # Don't do anything else if we are only updating the node
