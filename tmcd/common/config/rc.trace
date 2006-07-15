@@ -49,7 +49,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || PLAB());
+    if (MFS());
 
 # Now safe to do this since MFS does not have full perl install.
 require Socket;
