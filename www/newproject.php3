@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -215,7 +215,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Title/Position:
 	# 
 	echo "<tr>
-                  <td colspan=2>*Title/Position:</td>
+                  <td colspan=2>*Job Title/Position:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
@@ -650,10 +650,10 @@ if (! $returning) {
     }
     if (!isset($formfields[usr_title]) ||
 	strcmp($formfields[usr_title], "") == 0) {
-	$errors["Title/Position"] = "Missing Field";
+	$errors["Job Title/Position"] = "Missing Field";
     }
     elseif (! TBvalid_title($formfields[usr_title])) {
-	$errors["Title/Position"] = TBFieldErrorString();
+	$errors["Job Title/Position"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_name]) ||
 	strcmp($formfields[usr_name], "") == 0) {
@@ -1155,7 +1155,7 @@ if ($returning || $FirstInitState) {
 	   "Why Not Public:  $proj_whynotpublic\n".
 	   "Link to Us?:     $proj_linked\n".
 	   "Funders:         $proj_funders\n".
-	   "Title:           $usr_title\n".
+	   "Job Title:       $usr_title\n".
 	   "Affiliation:     $usr_affil\n".
 	   "Address 1:       $usr_addr\n".
 	   "Address 2:       $usr_addr2\n".

@@ -114,7 +114,7 @@ function SPITFORM($formfields, $errors)
 	# Title/Position:
 	# 
 	echo "<tr>
-                  <td colspan=2>${optfield}Title/Position:</td>
+                  <td colspan=2>${optfield}Job Title/Position:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
@@ -487,7 +487,7 @@ if (!$wikionly) {
     # WikiOnly can leave these fields blank, but must error check them anyway.
     if (!isset($formfields[usr_title]) ||
 	strcmp($formfields[usr_title], "") == 0) {
-	$errors["Title/Position"] = "Missing Field";
+	$errors["Job Title/Position"] = "Missing Field";
     }
     if (!isset($formfields[usr_affil]) ||
 	strcmp($formfields[usr_affil], "") == 0) {
@@ -496,7 +496,7 @@ if (!$wikionly) {
 }
 if (isset($formfields[usr_title]) &&
     ! TBvalid_title($formfields[usr_title])) {
-    $errors["Title/Position"] = TBFieldErrorString();
+    $errors["Job Title/Position"] = TBFieldErrorString();
 }
 if (isset($formfields[usr_affil]) &&
     ! TBvalid_affiliation($formfields[usr_affil])) {
@@ -833,7 +833,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 	   "ZIP/Postal Code:   $usr_zip\n".
 	   "Country:           $usr_country\n".
 	   "Phone:             $usr_phone\n".
-	   "Title:             $usr_title\n".
+	   "Job Title:         $usr_title\n".
 	   "Shell:             $usr_shell\n",
 	   "WikiOnly:	       $wikionly\n",
 	   "From: $TBMAIL_OPS".
