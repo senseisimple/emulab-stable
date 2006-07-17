@@ -340,6 +340,7 @@ sub dosomething($$)
     $userdir = $exphash->{'path'};
     $workdir = TBExptWorkDir($pid, $eid);
     $nsfile  = "$eid.ns";
+    $template= undef;
     
     # Locals
     my $creator = $exphash->{'expt_head_uid'};
