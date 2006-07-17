@@ -52,7 +52,8 @@ int be_user(const char *user)
 	fclose(pwd_file);
 	if (matched) {
 		info("cygwin_logon_user: name %s, password '%s'...",
-		     pw->pw_name, password);
+		     pw->pw_name, 
+		     0 ? password : "(hidden)");
 		HANDLE hToken = cygwin_logon_user(pw, password);
 		if (hToken != INVALID_HANDLE_VALUE) {
 			info(" suceeded\n");
