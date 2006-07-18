@@ -2298,7 +2298,7 @@ foreach $vnodeport (keys(%portmap)) {
             # have to worry about their IPs getting changed, since that's
             # important persistent state!
             #
-            if (physinterfacerole($pnode,$pport) ne TBDB_IFACEROLE_CONTROL) {
+            if (physinterfacerole($pnode,$pport) eq TBDB_IFACEROLE_CONTROL) {
                 printdb("Not setting IP for control interface: $pnode:$pport\n");
             } else {
                 DBQueryFatal("update interfaces set ".
