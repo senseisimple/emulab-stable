@@ -2676,7 +2676,6 @@ sub getbandwidth($$$) {
     my $best = 10000000000;
 
     my $node_type  = virtnodetype($node);
-    my $node_class = nodetypeclass($node_type);
     my $protocol   = virtlanprotocol($lan);
 
     fatal("getbandwidth(): $node - invalid type/class $node_type/$node_class!")
@@ -2689,7 +2688,9 @@ sub getbandwidth($$$) {
 	}
     }
 
-    if ($node_class) {
+    if (nodetypeistype($node_type)) {
+	my $node_class = nodetypeclass($node_type);
+	
 	foreach my $bw (keys(%{ $node_type_linkbw{$node_class}{$protocol} })) {
 	    if (($bw >= $targetbw) && ($bw < $best)) {
 		$best = $bw;
@@ -3664,20 +3665,30 @@ sub requires_delay($$$)
 {
     my ($node, $lan, $targetbw) = @_;
     my $node_type  = virtnodetype($node);
-    my $node_class = nodetypeclass($node_type);
     my $protocol   = virtlanprotocol($lan);
+    my $node_class;
 
-    fatal("requires_delay(): $node - invalid type/class $node_type/$node_class!")
-	if (!exists($node_type_linkbw{$node_type}{$protocol}) &&
-	    !exists($node_type_linkbw{$node_class}{$protocol}));
+    print "requires_delay: $node $node_type\n";
+
+    fatal("requires_delay(): $node - invalid type $node_type!")
+	if (!exists($node_type_linkbw{$node_type}{$protocol}));
+
+    if (nodetypeistype($node_type)) {
+	$node_class = nodetypeclass($node_type);
+	
+	fatal("requires_delay(): $node - invalid class $node_class!")
+	    if (!exists($node_type_linkbw{$node_class}{$protocol}));
+    }
 
     foreach my $bw (keys(%{ $node_type_linkbw{$node_type}{$protocol} })) {
 	return 0
 	    if ($targetbw == $bw);
     }
-    foreach my $bw (keys(%{ $node_type_linkbw{$node_class}{$protocol} })) {
-	return 0
-	    if ($targetbw == $bw);
+    if (defined($node_class)) {
+	foreach my $bw (keys(%{ $node_type_linkbw{$node_class}{$protocol} })) {
+	    return 0
+		if ($targetbw == $bw);
+	}
     }
     return 1;
 }
