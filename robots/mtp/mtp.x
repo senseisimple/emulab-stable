@@ -53,12 +53,12 @@ enum mtp_opcode_t {
      */
     MTP_CONTROL_CLOSE		= 14,
 
-    
+
     /**
      * VMC configuration packet, sent in response to an MTP_CONTROL_INIT.
      */
     MTP_CONFIG_VMC		= 20,
-    
+
     /**
      * RMC configuration packet, sent in response to an MTP_CONTROL_INIT.
      */
@@ -69,18 +69,18 @@ enum mtp_opcode_t {
      */
     MTP_CONFIG_VMC_CLIENT	= 22,
 
-    
+
     /**
      * Request the current position of a given robot.
      */
     MTP_REQUEST_POSITION	= 30,
-    
+
     /**
      * Request the identity of a robot at a given position.
      */
     MTP_REQUEST_ID		= 31,
 
-    
+
     /**
      * Update the current position of a robot, can be sent in response to an
      * MTP_REQUEST_POSITION or spontaneously.
@@ -93,7 +93,7 @@ enum mtp_opcode_t {
      */
     MTP_UPDATE_ID		= 41,
 
-    
+
     /**
      * Move the robot to a specific position or orientation.
      */
@@ -113,7 +113,17 @@ enum mtp_opcode_t {
      * Start NULL primitive on robot
      */
      MTP_COMMAND_STARTNULL	= 53,
-     
+
+    /**
+     * Build a trajectory
+     */
+    MTP_COMMAND_BUILD_TRAJ = 54,
+
+    /**
+     * Start tracking a trajectory
+     */
+    MTP_COMMAND_TRACK_TRAJ = 55,
+
     /**
      * Telemetry from a robot.
      */
@@ -135,9 +145,9 @@ enum mtp_opcode_t {
     MTP_WIGGLE_STATUS		= 71,
 
     MTP_REQUEST_REPORT		= 80,
-    
+
     MTP_CONTACT_REPORT		= 81,
-    
+
     MTP_CREATE_OBSTACLE		= 90,
     MTP_UPDATE_OBSTACLE		= 91,
     MTP_REMOVE_OBSTACLE		= 92,
@@ -290,13 +300,23 @@ struct mtp_command_wheels {
     int robot_id;
     float vleft;
     float vright;
-}; /* DAN */
+};
 
 struct mtp_command_startnull {
     int command_id;
     int robot_id;
     float acceleration;
-}; /* DAN */
+};
+
+struct mtp_command_build_traj {
+    int command_id;
+    int robot_id;
+};
+
+struct mtp_command_track_traj {
+    int command_id;
+    int robot_id;
+};
 
 /**
  * The different types of robots that support telemetry.
@@ -390,6 +410,8 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_COMMAND_STOP:		mtp_command_stop	command_stop;
  case MTP_COMMAND_WHEELS:	mtp_command_wheels	command_wheels;
  case MTP_COMMAND_STARTNULL:	mtp_command_startnull	command_startnull;
+ case MTP_COMMAND_BUILD_TRAJ:   mtp_command_build_traj  command_build_traj;
+ case MTP_COMMAND_TRACK_TRAJ:   mtp_command_track_traj  command_track_traj;
  case MTP_TELEMETRY:		mtp_telemetry		telemetry;
  case MTP_WIGGLE_REQUEST:	mtp_wiggle_request	wiggle_request;
  case MTP_WIGGLE_STATUS:	mtp_wiggle_status	wiggle_status;
@@ -408,7 +430,7 @@ union mtp_payload switch (mtp_opcode_t opcode) {
 struct mtp_packet {
     short vers;
     short role;
-    
+
     mtp_payload data;
 };
 
