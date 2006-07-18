@@ -69,8 +69,11 @@ if (! count($projlist)) {
 # just in the node_types table. Limit by class if given.
 #
 $types_querystring = "select distinct n.type from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "where nt.imageable=1 ";
+    "left join node_types as nt on n.type=nt.type ".
+    "left join node_type_attributes as a on a.type=n.type ".
+    "where a.attrkey='imageable' and ".
+    "      a.attrvalue!='0'";
+
 if ($nodeclass) {
     $types_querystring .= " and nt.class='$nodeclass' ";
 }

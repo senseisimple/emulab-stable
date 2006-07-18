@@ -1,158 +1,230 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-#
-# A library for getting the physical (or jailed) node data out of the
-# DB, and caching it.  The intent is to place all of the data about a
-# node in one spot, and use that instead of querying the DB over and
-# over, with specific queries scattered around. I'm hoping this also
-# reduces the load on the DB. It remains to be seen if this approach
-# will work or will be any more convenient.
-#
-# Used like this:
-#
-#	my $pc1 = Node::Lookup("pc1");
-#	my $isvirt = $pc1->IsNodeVirtual();
-#       my $reserved = $pc1->IsNodeReserved();
-#
-# or:
-#	my $isvirt = Node::IsNodeVirtual("pc1");
-#       my $reserved = Node::IsNodeReserved("pc1");
-#
 package Node;
-require Exporter;
+
+use strict;
+use Exporter;
 use vars qw(@ISA @EXPORT);
 
-@ISA = qw( Exporter );
+@ISA    = "Exporter";
 @EXPORT = qw ( );
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
-use English;
 use libdb;
+use libtestbed;
+use NodeType;
+use Interface;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
 
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $EVENTSYS    = @EVENTSYS@;
 # XXX stinky hack detection
-my $ISUTAH = @TBMAINSITE@;
+my $ISUTAH	= @TBMAINSITE@;
+
+# Cache of instances to avoid regenerating them.
+my %nodes	= ();
+my $debug	= 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
 
 #
-# Cache the node structures to avoid repeated lookups. It is up to the
-# user to request nodes be synched with the DB if they think that is
-# necessary. 
+# Lookup a (physical) node and create a class instance to return.
 #
-my %nodes = ();
-
-#
-# Lookup and return a node structure. 
-#
-sub Lookup ($$) {
+sub Lookup($$)
+{
     my ($class, $nodeid) = @_;
 
-    if (exists($nodes{$nodeid})) {
-	return $nodes{$nodeid};
-    }
+    # Look in cache first
+    return $nodes{$nodeid}
+        if (exists($nodes{$nodeid}));
 
     my $query_result =
-	libdb::DBQueryFatal("select n.*,nt.*,r.vname from nodes as n ".
-			    "left join reserved as r on r.node_id=n.node_id ".
-			    "left join node_types as nt on nt.type=n.type ".
-			    "where n.node_id='$nodeid'");
+	DBQueryWarn("select * from nodes as n ".
+		    "where n.node_id='$nodeid'");
 
-    if (! $query_result->numrows) {
-	return undef;
-    }
-    my $self          = {};
-    $self->{"DBROW"}  = $query_result->fetchrow_hashref();
-    $self->{"NODEID"} = $nodeid;
-    bless($self);
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self            = {};
+    $self->{"DBROW"}    = $query_result->fetchrow_hashref();
+    $self->{"RSRV"}     = undef;
+    $self->{"TYPEINFO"} = undef;
+    bless($self, $class);
+
+    # Add to cache.
     $nodes{$nodeid} = $self;
     return $self;
 }
+# accessors
+sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
+sub node_id($)       { return field($_[0], 'node_id'); }
+sub type($)          { return field($_[0], 'type'); }
+sub eventstate($)    { return field($_[0], 'eventstate'); }
+sub jailflag($)      { return field($_[0], 'jailflag'); }
+sub phys_nodeid($)   { return field($_[0], 'phys_nodeid'); }
+sub def_boot_osid($) { return field($_[0], 'def_boot_osid'); }
 
 #
-# Poor man polysomething. These routines can be called as methods on an
-# instance, or as package functions on a "pcxxx" argument. That is:
+# Refresh a class instance by reloading from the DB.
 #
-#	$isvirt = Node::IsNodeVirtual("pc1");
-#	$isvirt = $pc1->IsNodeReserved();
-# 
-sub GetNode($)
+sub Refresh($)
 {
-    my $arg   = shift;
+    my ($self) = @_;
 
-    return $arg
-	if (ref($arg));
+    return -1
+	if (! ref($self));
 
-    return Node->Lookup($arg);
+    my $nodeid = $self->node_id();
+
+    my $query_result =
+	DBQueryWarn("select * from nodes as n ".
+		    "where n.node_id='$nodeid'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{"DBROW"}  = $query_result->fetchrow_hashref();
+    # Force reload
+    $self->{"RSRV"}     = undef;
+    $self->{"TYPEINFO"} = undef;
+    return 0;
 }
 
 #
-# Return the DB data. Maybe this should be a set of tables instead of
-# one big mess. 
-# 
-sub DBData ($)
+# Stringify for output.
+#
+sub Stringify($)
 {
-    my ($arg) = @_;
-    my $node  = GetNode($arg);
-    my $row   = $node->{"DBROW"};
+    my ($self) = @_;
+    
+    my $nodeid = $self->node_id();
 
-    return $row;
+    return "[Node: $nodeid]";
 }
 
 #
-# Throw away the current info, and reload from the DB.
-# 
-sub Sync ($)
+# Lazily load the reservation info.
+#
+sub IsReserved($)
 {
-    my ($arg) = @_;
-    my $node  = GetNode($arg);
+    my ($self) = @_;
 
-    delete($nodes{$node->{"NODEID"}});
-    Node->Lookup($node->{"NODEID"});
+    return -1
+	if (! ref($self));
 
-    return $row;
-}
+    if (! defined($self->{"RSRV"})) {
+	my $nodeid = $self->node_id();
+	
+	my $query_result =
+	    DBQueryWarn("select * from reserved " .
+			"where node_id='$nodeid'");
+	return -1
+	    if (!$query_result);
+	return 0
+	    if (!$query_result->numrows);
 
-sub IsVirtual ($)
-{
-    my ($arg) = @_;
-    my $node  = GetNode($arg);
-
-    return undef
-	if (!defined($node));
-
-    return $node->{"DBROW"}{"isvirtnode"};
-}
-
-sub IsReserved ($)
-{
-    my ($arg) = @_;
-    my $node  = GetNode($arg);
-
-    return undef
-	if (!defined($node));
-
-    return 0
-	if (!defined($node->{"DBROW"}{"vname"}));
-
+	$self->{"RSRV"} = $query_result->fetchrow_hashref();
+	return 1;
+    }
     return 1;
 }
 
-sub IsDynamic ($)
+#
+# Return type info. We cache this in the instance since node_type stuff
+# does not change much.
+#
+sub NodeTypeInfo($)
 {
-    my ($arg) = @_;
-    my $node  = GetNode($arg);
+    my ($self) = @_;
 
     return undef
-	if (!defined($node));
+	if (! ref($self));
 
-    return 0
-	if (!defined($node->{"DBROW"}{"isdynamic"}));
+    return $self->{"TYPEINFO"}
+        if (defined($self->{"TYPEINFO"}));
 
-    return 1;
+    my $type = $self->type();
+    my $nodetype = NodeType->Lookup($type);
+    
+    $self->{"TYPEINFO"} = $nodetype
+	if (defined($nodetype));
+    
+    return $nodetype;
+}
+
+#
+# Lookup a specific attribute in the nodetype info. 
+#
+sub NodeTypeAttribute($$$;$)
+{
+    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    
+    return -1
+	if (!ref($self));
+
+    my $typeinfo = $self->NodeTypeInfo();
+
+    return -1
+	if (!defined($typeinfo));
+
+    return $typeinfo->GetAttribute($attrkey, $pattrvalue, $pattrtype);
+}
+
+#
+# Shortcuts to "common" type information.
+# Later these might be overriden by node attributes.
+#
+sub class($)          { return NodeTypeInfo($_[0])->class(); }
+sub isvirtnode($)     { return NodeTypeInfo($_[0])->isvirtnode(); }
+sub isjailed($)       { return NodeTypeInfo($_[0])->isjailed(); }
+sub isdynamic($)      { return NodeTypeInfo($_[0])->isdynamic(); }
+sub isremotenode($)   { return NodeTypeInfo($_[0])->isremotenode(); }
+sub issubnode($)      { return NodeTypeInfo($_[0])->issubnode(); }
+sub isplabdslice($)   { return NodeTypeInfo($_[0])->isplabdslice(); }
+sub isplabphysnode($) { return NodeTypeInfo($_[0])->isplabphysnode(); }
+sub issimnode($)      { return NodeTypeInfo($_[0])->issimnode(); }
+
+#
+# And these are the less common attributes, but still common enough to
+# warrant shortcuts.
+#
+sub default_osid($;$) {
+    return NodeTypeInfo($_[0])->default_osid($_[1]);
+}
+sub imageable($;$) {
+    return NodeTypeInfo($_[0])->imageable($_[1]);
+}
+sub disksize($;$) {
+    return NodeTypeInfo($_[0])->disksize($_[1]);
+}
+sub disktype($;$) {
+    return NodeTypeInfo($_[0])->disktype($_[1]);
+}
+sub bootdisk_unit($;$) {
+    return NodeTypeInfo($_[0])->bootdisk_unit($_[1]);
+}
+sub control_iface($;$) {
+    return NodeTypeInfo($_[0])->control_iface($_[1]);
+}
+sub rebootable($;$) {
+    return NodeTypeInfo($_[0])->rebootable($_[1]);
 }
 
 #
@@ -424,7 +496,7 @@ sub CreateVnodes($$)
 
   bad:
     if (!$impotent) {
-	foreach my $vnodeid (@newnodes) {
+	foreach my $vnodeid (@created) {
 	    DBQueryWarn("delete from reserved where node_id='$vnodeid'");
 	    DBQueryWarn("delete from nodes where node_id='$vnodeid'");
 	    DBQueryWarn("delete from node_hostkeys where node_id='$vnodeid'");

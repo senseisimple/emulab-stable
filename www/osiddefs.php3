@@ -55,10 +55,17 @@ $osid_reboot_waitlist["Other"]		= 60;
 #
 # Helper function to write out a menu.
 #
-function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
+function WRITEOSIDMENU($caption, $value, $osid_result, $previous,
+		       $delete_varname = "", $delete_varvalue = "")
 {
-    echo "<tr>
-            <td>*$caption:</td>";
+    echo "<tr>";
+    if ($delete_varname != "") {
+	echo "<td align=center>
+                  <input type=checkbox value=checked
+                         name=\"$delete_varname\" $delete_varvalue>
+                </td>\n";
+    }
+    echo "  <td>*$caption:</td>";
     echo "  <td><select name=\"$value\">
                 <option value=X>Please Select </option>\n";
 
@@ -85,10 +92,17 @@ function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
           </tr>\n";
 }
 
-function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous)
+function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous,
+			  $delete_varname = "", $delete_varvalue = "")
 {
-    echo "<tr>
-            <td>*$caption:</td>";
+    echo "<tr>";
+    if ($delete_varname != "") {
+	echo "<td align=center>
+                  <input type=checkbox value=checked
+                         name=\"$delete_varname\" $delete_varvalue>
+                </td>\n";
+    }
+    echo "<td>*$caption:</td>";
     echo "  <td><select name=\"$value\">
                 <option value=X>Please Select </option>\n";
 

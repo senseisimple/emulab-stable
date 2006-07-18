@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -82,10 +82,14 @@ if (mysql_num_rows($query_result)) {
     $conflicts++;
 }
 
-# Ditto for node_types table.
+# Ditto for node_types ...
 $query_result =
-    DBQueryFatal("select class,type from node_types ".
-		 "where osid='$osid' or delay_osid='$osid'");
+    DBQueryFatal("select class,a.type from node_type_attributes as a ".
+		 "left join node_types as nt on nt.type=a.type ".
+		 "where (a.attrkey='default_osid' or ".
+		 "       a.attrkey='jail_osid' or ".
+		 "       a.attrkey='delay_osid') and ".
+		 "       a.attrvalue='$osid'");
 
 if (mysql_num_rows($query_result)) {
     echo "<br> <center>

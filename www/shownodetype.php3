@@ -50,27 +50,15 @@ echo "<font size=+2>".
 echo "<table border=2 cellpadding=0 cellspacing=2
              align=center>\n";
 
+# Stuff from the node types table.
 $class		= $noderow["class"];
-$proc		= $noderow["proc"];
-$speed		= $noderow["speed"];
-$RAM		= $noderow["RAM"];
-$HD		= $noderow["HD"];
-$max_interfaces = $noderow["max_interfaces"];
-$osid		= $noderow["osid"];
-$imageid	= $noderow["imageid"];
-$imageable	= $noderow["imageable"];
-$delay_capacity = $noderow["delay_capacity"];
-$virtnode_capacity = $noderow["virtnode_capacity"];
-$delay_osid	= $noderow["delay_osid"];
-$jail_osid	= $noderow["jail_osid"];
 $isvirtnode	= $noderow["isvirtnode"];
 $isremotenode	= $noderow["isremotenode"];
-$bios_waittime	= $noderow["bios_waittime"];
 
-TBOSInfo($osid, $osname, $pid);
-TBOSInfo($jail_osid, $jail_osname, $pid);
-TBOSInfo($delay_osid, $delay_osname, $pid);
-TBImageInfo($imageid, $imagename, $pid);
+# Grab the attributes for the type.
+$query_result = DBQueryFatal("select * from node_type_attributes ".
+			     "where type='$node_type' ".
+			     "order by attrkey");
 
 echo "<tr>
       <td>Type:</td>
@@ -96,68 +84,29 @@ if ($isvirtnode) {
               </tr>\n";
 }
 
-echo "<tr>
-      <td>Processor:</td>
-      <td class=left>$proc</td>
-          </tr>\n";
+#
+# And now all of the attributes ...
+#
+while ($row = mysql_fetch_array($query_result)) {
+    $key      = $row["attrkey"];
+    $val      = $row["attrvalue"];
+    $attrtype = $row["attrtype"];
 
-echo "<tr>
-      <td>Speed:</td>
-      <td class=left>$speed MHZ</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>RAM:</td>
-      <td class=left>$RAM MB</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Disk Size:</td>
-      <td class=left>$HD GB</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Interfaces:</td>
-      <td class=left>$max_interfaces</td>
-          </tr>\n";
-
-if (isset($bios_waittime)) {
-    echo "<tr>
-              <td>Bios Waittime:</td>
-              <td class=left>$bios_waittime</td>
-          </tr>\n";
+    if ($key == "default_osid" ||
+	$key == "jail_osid" ||
+	$key == "delay_osid") {
+	TBOSInfo($val, $osname, $pid);
+	$val = $osname;
+    }
+    elseif ($key == "default_imageid") {
+	TBImageInfo($val, $imagename, $pid);
+	$val = $imagename;
+    }
+    echo "<tr>\n";
+    echo "<td>$key:</td>\n";
+    echo "<td class=left>$val</td>\n";
+    echo "</tr>\n";
 }
-
-echo "<tr>
-      <td>Delay Capacity:</td>
-      <td class=left>$delay_capacity</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Jail Capacity:</td>
-      <td class=left>$virtnode_capacity</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Default OSID:</td>
-      <td class=left>$osname</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Jail OSID:</td>
-      <td class=left>$jail_osname</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Delay OSID:</td>
-      <td class=left>$delay_osname</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Default ImageID:</td>
-      <td class=left>$imagename</td>
-          </tr>\n";
-
 echo "</table>\n";
 
 #

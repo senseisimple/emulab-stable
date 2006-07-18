@@ -3505,5 +3505,34 @@ last_net_act,last_cpu_act,last_ext_act);
 
          ./init_nodeattrs.pl
 
+      Now it is safe to do this:
 
-	
+	create table node_types_save like node_types;
+	insert into node_types_save select * from node_types;
+	alter table node_types drop proc;
+	alter table node_types drop speed;
+	alter table node_types drop RAM;
+	alter table node_types drop HD;
+	alter table node_types drop max_interfaces;
+	alter table node_types drop osid;
+	alter table node_types drop control_net;
+	alter table node_types drop power_time;
+	alter table node_types drop imageid;
+	alter table node_types drop imageable;
+	alter table node_types drop delay_capacity;
+	alter table node_types drop virtnode_capacity;
+	alter table node_types drop control_iface;
+	alter table node_types drop disktype;
+	alter table node_types drop bootdisk_unit;
+	alter table node_types drop delay_osid;
+	alter table node_types drop jail_osid;
+	alter table node_types drop pxe_boot_path;
+	alter table node_types drop simnode_capacity;
+	alter table node_types drop trivlink_maxspeed;
+	alter table node_types drop isrebootable;
+	alter table node_types drop bios_waittime;
+	alter table node_types drop adminmfs_osid;
+	alter table node_types drop diskloadmfs_osid;
+
+      At some point you will want to drop the node_types_save table ...
+

@@ -208,9 +208,8 @@ mydb_nodeidtoip(char *nodeid, char *bufp)
 
 	res = mydb_query("select IP from nodes as n2 "
 			 "left join nodes as n1 on n1.node_id=n2.phys_nodeid "
-			 "left join node_types as nt on n1.type=nt.type "
 			 "left join interfaces as i on "
-			 "i.node_id=n1.node_id and i.iface=nt.control_iface "
+			 "     i.node_id=n1.node_id and i.role='ctrl' "
 			 "where n2.node_id='%s'", 1, nodeid);
 
 	if (!res) {

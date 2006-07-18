@@ -32,6 +32,7 @@ use power_mail;
 use power_whol;
 use snmpit_apc;
 use libtestbed;
+use NodeType;
 use strict;
 use English;
 use Getopt::Std;
@@ -188,7 +189,7 @@ foreach my $node (@machines) {
     }
 
     my $result = DBQueryFatal("select o.power_id, o.outlet, " .
-	"(CURRENT_TIMESTAMP - power_time > last_power) " .
+	"UNIX_TIMESTAMP(last_power), n.type " .
 	"from outlets as o left join nodes as n on " .
 	"(o.node_id = n.node_id) ".
 	# Shark hack
@@ -205,7 +206,10 @@ foreach my $node (@machines) {
 	next;
     }
 
-    my ($power_id, $outlet, $time_ok) = $result->fetchrow();
+    my ($power_id, $outlet, $last_power, $nodetype) = $result->fetchrow();
+    my $typeinfo    = NodeType->Lookup($nodetype);
+    my $power_delay = $typeinfo->power_delay();
+    my $time_ok     = (time() - $power_delay > $last_power ? 1 : 0);
 
     #
     # Check for rate-limiting, and update the last power cycle time

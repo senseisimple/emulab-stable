@@ -1655,10 +1655,8 @@ function TBGetVerificationKey($name) {
 function TBIPtoNodeID($ip) {
     $query_result =
 	DBQueryFatal("select n.node_id from interfaces as i ".
-		     "left join nodes as n on n.node_id=i.node_id ".
-		     "left join node_types as t ".
-		     "   on t.type=n.type and i.iface=t.control_iface ".
-		     "where i.IP='$ip'");
+		     "where i.IP='$ip' and ".
+		     "      i.role='" . TBDB_IFACEROLE_CONTROL . "'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
@@ -2097,6 +2095,25 @@ function TBGetVersionInfo(&$major, &$minor, &$build)
 	elseif ($name == "general/version/build")
 	    $build = $value;
     }
+    return 1;
+}
+
+#
+# Return a node_tye attribute entry.
+#
+function NodeTypeAttribute($type, $key, &$value)
+{
+    $query_result =
+	DBQueryFatal("select attrvalue from node_type_attributes ".
+		     "where type='$type' and attrkey='$key'");
+    
+    if (!mysql_num_rows($query_result)) {
+	$value = null;
+	return 0;
+    }
+
+    $row = mysql_fetch_row($query_result);
+    $value = $row[0];
     return 1;
 }
 

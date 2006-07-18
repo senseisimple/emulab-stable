@@ -21,6 +21,8 @@ use lib '@prefix@/lib';
 use libdb;
 use libreboot;
 use libtblog;
+use Node;
+use NodeType;
 use English;
 use File::stat;
 use IO::Handle;
@@ -583,14 +585,9 @@ sub WaitTillReloadDone($$$@)
 		# a really long time?
 		#
 		if ($reload_info->{$node}{'zerofree'}) {
-		    my $disksize;
-		    my $query_result =
-			DBQueryWarn("select HD from node_types,nodes ".
-				    "where nodes.type=node_types.type".
-				    " and node_id='$node'");
-		    if ($query_result && $query_result->numrows) {
-			($disksize) = $query_result->fetchrow_array();
-		    }
+		    my $nodeobject = Node->Lookup($node);
+		    my $disksize   = $nodeobject->disksize();
+
 		    $disksize = 20
 			if (!$disksize);
 		    $maxwait = ($disksize * 60);
@@ -846,7 +843,7 @@ sub osload_setupswapinfo($$;@)
     map { $nodeinfo{$_} = 0 } @nodelist;
 
     # XXX only know how to do this for local PCs right now
-    $clause .= " and nt.imageable!=0 and nt.class='pc' and nt.isremotenode=0";
+    $clause .= " and nt.class='pc' and nt.isremotenode=0";
 
     #
     # Note that we are using the def_boot_osid from the nodes table to identify
@@ -855,7 +852,7 @@ sub osload_setupswapinfo($$;@)
     # set to an MFS at other times.
     #
     my $query_result = DBQueryWarn(
-	"select r.node_id,r.vname,r.pid,r.eid,r.erole,n.osid,nt.disktype,nt.bootdisk_unit,p.partition,p.imageid,p.imagepid,i.loadpart,e.savedisk ".
+	"select r.node_id,r.vname,r.pid,r.eid,r.erole,n.osid,p.partition,p.imageid,p.imagepid,i.loadpart,e.savedisk ".
 	"from reserved as r ".
 	"left join nodes as n on n.node_id=r.node_id ".
 	"left join node_types as nt on nt.type=n.type ".
@@ -867,8 +864,18 @@ sub osload_setupswapinfo($$;@)
 	return 1;
     }
 
-    while (my ($node, $vname, $rpid, $reid, $erole, $osid, $dtype, $dunit, $part, $imageid, $imagepid, $lpart, $savedisk) =
+    while (my ($node, $vname, $rpid, $reid, $erole, $osid, $part, $imageid,
+	       $imagepid, $lpart, $savedisk) =
 	   $query_result->fetchrow_array()) {
+
+	my $nodeobject = Node->Lookup($node);
+
+	# If the node is not imageable, skip it.
+	next
+	    if (! $nodeobject->imageable());
+	
+	my $dtype = $nodeobject->disktype();
+	my $dunit = $nodeobject->bootdisk_unit();
 
 	#
 	# XXX not a disk-based OSID.  This can happen during frisbee loads

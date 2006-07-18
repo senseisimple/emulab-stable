@@ -1,0 +1,227 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Interface;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+# Cache of instances to avoid regenerating them.
+my %all_interfaces   = ();
+my %node_interfaces  = ();
+
+# Manual
+my $debug = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup interfaces for a node and create a list of class instances to return.
+#
+sub LookupAll($$)
+{
+    my ($class, $nodeid) = @_;
+
+    # Look in cache first
+    return @{ $node_interfaces{$nodeid} }
+        if (exists($node_interfaces{$nodeid}));
+
+    my $query_result =
+	DBQueryWarn("select * from interfaces ".
+		    "where node_id='$nodeid'");
+
+    return undef
+	if (!$query_result);
+    return ()
+	if (!$query_result->numrows);
+
+    my $results = [];
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $card  = $rowref->{'card'};
+	my $port  = $rowref->{'port'};
+	my $iface = $rowref->{'iface'};
+	my $interface;
+
+	#
+	# If we already have this in the interface cache, lets not create
+	# another one. Just use that one.
+	#
+	if (exists($all_interfaces{"$nodeid:$card:$port"})) {
+	    $interface = $all_interfaces{"$nodeid:$card:$port"};
+	}
+	else {
+	    $interface = {};
+	
+	    $interface->{"DBROW"}  = $rowref;
+	    bless($interface, $class);
+
+	    # Cache by card,port and by iface
+	    $all_interfaces{"$nodeid:$card:$port"} = $interface;
+	    $all_interfaces{"$nodeid:$iface"}      = $interface;
+	}
+	push(@{ $results }, $interface);
+    }
+    # Add to cache of node interfaces
+    $node_interfaces{$nodeid} = $results;
+    
+    return @{ $results };
+}
+# accessors
+sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
+sub node_id($) { return field($_[0], 'node_id'); }
+sub card($)    { return field($_[0], 'card'); }
+sub port($)    { return field($_[0], 'port'); }
+sub iface($)   { return field($_[0], 'iface'); }
+sub mac($)     { return field($_[0], 'mac'); }
+sub IP($)      { return field($_[0], 'IP'); }
+sub role($)    { return field($_[0], 'role'); }
+sub type($)    { return field($_[0], 'interface_type'); }
+sub mask($)    { return field($_[0], 'mask'); }
+
+#
+# Lookup by card,port
+#
+sub Lookup($$$$)
+{
+    my ($class, $nodeid, $card, $port) = @_;
+
+    # Look in cache first
+    return $all_interfaces{"$nodeid:$card:$port"}
+        if (exists($all_interfaces{"$nodeid:$card:$port"}));
+
+    my $query_result =
+	DBQueryWarn("select * from interfaces ".
+		    "where node_id='$nodeid' and ".
+		    "      card='$card' and port='$port'");
+
+    return undef
+	if (!$query_result);
+    return undef
+	if (!$query_result->numrows);
+
+    my $interface = {};
+	
+    $interface->{"DBROW"} = $query_result->fetchrow_hashref();
+    bless($interface, $class);
+
+    # Cache by card,port and by iface
+    my $iface = $interface->iface();
+    
+    $all_interfaces{"$nodeid:$card:$port"} = $interface;
+    $all_interfaces{"$nodeid:$iface"}      = $interface;
+    
+    return $interface;
+}
+
+#
+# Lookup by iface
+#
+sub LookupByIface($$$)
+{
+    my ($class, $nodeid, $iface) = @_;
+
+    # Look in cache first
+    return $all_interfaces{"$nodeid:$iface"}
+        if (exists($all_interfaces{"$nodeid:$iface"}));
+
+    my $query_result =
+	DBQueryWarn("select * from interfaces ".
+		    "where node_id='$nodeid' and iface='$iface'");
+
+    return undef
+	if (!$query_result);
+    return undef
+	if (!$query_result->numrows);
+
+    my $interface = {};
+	
+    $interface->{"DBROW"} = $query_result->fetchrow_hashref();
+    bless($interface, $class);
+
+    # Cache by card,port and by iface
+    my $card = $interface->card();
+    my $port = $interface->port();
+    
+    $all_interfaces{"$nodeid:$card:$port"} = $interface;
+    $all_interfaces{"$nodeid:$iface"}      = $interface;
+    
+    return $interface;
+}
+
+#
+# Lookup the control interface for a node, which is something we do a lot.
+#
+sub LookupControl($)
+{
+    my ($class, $nodeid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select * from interfaces ".
+		    "where node_id='$nodeid' and ".
+		    "      role='" . TBDB_IFACEROLE_CONTROL()  . "'");
+
+    return undef
+	if (!$query_result);
+    return undef
+	if (!$query_result->numrows);
+
+    my $interface = {};
+	
+    $interface->{"DBROW"} = $query_result->fetchrow_hashref();
+    bless($interface, $class);
+
+    # Cache by card,port and by iface
+    my $card  = $interface->card();
+    my $port  = $interface->port();
+    my $iface = $interface->iface();
+    
+    $all_interfaces{"$nodeid:$card:$port"} = $interface;
+    $all_interfaces{"$nodeid:$iface"}      = $interface;
+    
+    return $interface;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $nodeid = $self->node_id();
+    my $iface  = $self->iface();
+
+    return "[Interface: $nodeid:$iface]";
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;

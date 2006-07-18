@@ -31,18 +31,15 @@ sub AddAttr($$$$)
 while (my $rowref = $query_result->fetchrow_hashref()) {
     my $type = $rowref->{'type'};
 
-    my $auxtypes_result =
-	DBQueryFatal("select * from node_types_auxtypes ".
-		     "where type='$type'");
+    AddAttr($type, "default_osid", "string", $rowref->{'osid'})
+	if (defined($rowref->{'osid'}) && $rowref->{'osid'} ne "");
 
     next
 	if ($rowref->{'isvirtnode'} ||
 	    $rowref->{'isjailed'} ||
 	    $rowref->{'isdynamic'} ||
-	    $rowref->{'isremotenode'} ||
 	    $rowref->{'issubnode'} ||
 	    $rowref->{'isplabdslice'} ||
-	    $rowref->{'isplabphysnode'} ||
 	    $rowref->{'issimnode'});
 
     AddAttr($type, "processor", "string", $rowref->{'proc'})
@@ -51,13 +48,11 @@ while (my $rowref = $query_result->fetchrow_hashref()) {
 	if (defined($rowref->{'speed'}));
     AddAttr($type, "memory", "integer", $rowref->{'RAM'})
 	if (defined($rowref->{'RAM'}));
-    AddAttr($type, "diskspace", "float", $rowref->{'HD'})
+    AddAttr($type, "disksize", "float", $rowref->{'HD'})
 	if (defined($rowref->{'HD'}));
     # Kill this?
     AddAttr($type, "max_interfaces", "integer", $rowref->{'max_interfaces'})
 	if (defined($rowref->{'max_interfaces'}));
-    AddAttr($type, "default osid", "string", $rowref->{'osid'})
-	if (defined($rowref->{'osid'}) && $rowref->{'osid'} ne "");
     # Kill this?
     AddAttr($type, "control_network", "integer", $rowref->{'control_net'})
 	if (defined($rowref->{'control_net'}));
@@ -102,11 +97,4 @@ while (my $rowref = $query_result->fetchrow_hashref()) {
     AddAttr($type, "diskloadmfs_osid", "string", $rowref->{'diskloadmfs_osid'})
 	if (defined($rowref->{'diskloadmfs_osid'}));
 
-    my @auxtypes = ();
-
-    while (my ($auxtype,$type) = $auxtypes_result->fetchrow_array()) {
-	push(@auxtypes, $auxtype);
-    }
-    AddAttr($type, "auxtypes", "string", join(",", @auxtypes))
-	if (@auxtypes);
 }

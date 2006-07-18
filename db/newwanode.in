@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,6 +40,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use NodeType;
 
 #
 # This is run from the web page, but tbadmins can run it from the command
@@ -126,14 +127,21 @@ if (defined($nickname)) {
 #
 # Must be a valid type.
 #
-my $query_result =
-    DBQueryFatal("select osid,control_iface from node_types ".
-		 "where type='$nodetype'");
-if (! $query_result->numrows) {
+my $typeinfo = NodeType->Lookup($nodetype);
+if (!defined($typeinfo)) {
     fatal("*** $0:\n".
 	  "    No such nodetype $nodetype is defined in the DB!\n");
 }
-my ($defosid,$control_iface) = $query_result->fetchrow_array();
+my ($defosid,$control_iface);
+
+if ($typeinfo->default_osid(\$defosid) || !$defosid) {
+    fatal("*** $0:\n".
+	  "    No default OSID for $nodetype is defined in the DB!\n");
+}
+if ($typeinfo->control_interface(\$control_iface) || !$control_iface) {
+    fatal("*** $0:\n".
+	  "    No control interface for $nodetype is defined in the DB!\n");
+}
 
 #
 # For now, just pcwa/pcron is allowed until we have more DB state that says

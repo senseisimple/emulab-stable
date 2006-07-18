@@ -168,11 +168,9 @@ sub nodereboot($$)
     # replaced with the node_capabilities stuff or similar.
     my @temp = ();
     foreach my $node (@nodes) {
-	my $qr = DBQueryFatal("select nt.isrebootable from " .
-	    "nodes as n, node_types as nt " .
-	    "where n.node_id=\"$node\" and " .
-	    "n.type = nt.type");
-	my ($rebootable) = $qr->fetchrow_array();
+	my $nodeobject = Node->Lookup($node);
+	my $rebootable = $nodeobject->rebootable();
+
 	push(@temp,$node) if $rebootable;
     }
     @nodes = @temp;

@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -119,19 +119,27 @@ if ($research) {
     #
     # Get the MACs we are supposed to be looking for
     #
-    $query_result = DBQueryFatal("SELECT i.mac, i.new_node_id, n.node_id, " .
-	"i.card, i.card=t.control_net AS is_control " .
-	"FROM new_interfaces as i LEFT JOIN new_nodes as n " .
-	"ON i.new_node_id = n.new_node_id " .
-	"LEFT JOIN node_types as t on n.type = t.type " .
-	"WHERE $whereclause_qualified");
+    $query_result =
+	DBQueryFatal("select i.mac, i.new_node_id, n.node_id, i.card, n.type ".
+		     "   from new_interfaces as i ".
+		     "left join new_nodes as n on ".
+		     "    i.new_node_id = n.new_node_id " .
+		     "left join node_types as t on n.type = t.type " .
+		     "where $whereclause_qualified");
     $mac_list = array();
     while ($row = mysql_fetch_array($query_result)) {
+	$type  = $row["is_control"];
+	$card  = $row["card"];
+	$iface = "eth${card}";
+
+	# Figure out if this interface is the control interface for the type.
+	NodeTypeAttribute($type, "control_interface", $control_iface);
+	
         if ($ELABINELAB) {
             # See find_switch_macs().
             $class = NULL;
         }
-        elseif ($row["is_control"]) {
+        elseif ($iface == $control_iface) {
 	    $class = TBDB_IFACEROLE_CONTROL;
 	}
 	else {
@@ -306,16 +314,12 @@ if ($renumber) {
 #
 # Okay, now get the node information and display the form
 #
-$query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
-	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
-	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP, n.dmesg, " .
-	"n.identifier, n.building " .
-	"FROM new_nodes AS n " .
-	"LEFT JOIN node_types AS t on n.type=t.type " .
-	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
-	"    AND t.control_net = i.card " .
-	"ORDER BY n.new_node_id");
-
+$nodes_result =
+    DBQueryFatal("select n.new_node_id, node_id, n.type, IP, " .
+		 "    DATE_FORMAT(created,'%M %e %H:%i:%s') as created, ".
+		 "    n.temporary_IP, n.dmesg, n.identifier, n.building " .
+		 "  from new_nodes as n " .
+		 "order BY n.new_node_id");
 ?>
 
 <h3><a href="newnodes_list.php3">Refresh this page</a></h3>
@@ -355,28 +359,51 @@ function deselectAll(form) {
 
 <?
 
-while ($row = mysql_fetch_array($query_result)) {
+while ($row = mysql_fetch_array($nodes_result)) {
 	$id         = $row["new_node_id"];
 	$node_id    = $row["node_id"];
 	$type       = $row["type"];
 	$IP         = $row["IP"];
 	$created    = $row["created"];
-	$mac        = $row["MAC"];
 	$tempIP     = $row["temporary_IP"];
 	$dmesg      = $row["dmesg"];
 	$identifier = $row["identifier"];
 	$building   = $row["building"];
-	if ($row["switch_id"]) {
-	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
-	} else {
-	    $port = "unknown";
-	}
-	$checked = in_array($id,$selected_nodes) ? "checked" : "";
 
-        $iface_query_result = DBQueryFatal("SELECT COUNT(*) AS count " .
-	    "FROM new_interfaces WHERE new_node_id=$id");
-        $iface_row = mysql_fetch_array($iface_query_result);
-	$interfaces = $iface_row["count"];
+	# Get the control interface token for the type.
+	NodeTypeAttribute($type, "control_interface", $control_iface);
+
+	# Grab the interfaces for the node.
+	$ifaces_result =
+	    DBQueryFatal("select * from new_interfaces ".
+			 "where new_node_id='$id'");
+
+	# The total count ...
+	$interfaces = mysql_num_rows($ifaces_result);
+
+	# Search through to find the control interface.
+	while ($irow = mysql_fetch_array($ifaces_result)) {
+	    $card  = $irow["card"];
+	    $iface = "eth${card}";
+
+	    if ($iface == $control_iface) {
+		$mac = $irow["mac"];
+		
+		if ($irow["switch_id"]) {
+		    $switch_id   = $irow["switch_id"];
+		    $switch_card = $irow["switch_card"];
+		    $switch_port = $irow["switch_port"];
+			
+		    $port = "${switch_id}.${switch_card}/${switch_port}";
+		}
+		else {
+		    $port = "unknown";
+		}
+		break;
+	    }
+	}
+	
+	$checked = in_array($id,$selected_nodes) ? "checked" : "";
 
 	echo "	<tr>\n";
 	echo "		<td><input type=\"checkbox\" name=\"selected[]\" " .

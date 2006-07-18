@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -45,8 +45,9 @@ if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
 #
 $types_result =
     DBQueryFatal("select distinct n.type from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "where nt.imageable=1");
+		 "left join node_type_attributes as a on a.type=n.type ".
+		 "where a.attrkey='imageable' and ".
+		 "      a.attrvalue!='0'");
 
 #
 # Spit the form out using the array of data. 

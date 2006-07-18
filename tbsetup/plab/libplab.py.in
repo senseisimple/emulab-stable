@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -841,10 +841,16 @@ class Plab:
             if debug:
                 print "Getting node type info"
                 pass
-            res = DBQueryFatal("select osid, control_iface"
-                               " from node_types"
-                               " where type = 'pcplabphys'")
-            assert (len(res) == 1), "Failed to get node type info"
+
+            dbres = DBQueryFatal("select attrkey,attrvalue "
+                                 " from node_type_attributes as a "
+                                 " where type = 'pcplabphys' and "
+                                 "       (a.attrkey='default_osid' or "
+                                 "        a.attrkey='control_interface') "
+                                 " order by attrkey")
+            
+            assert (len(dbres) == 2), "Failed to get node type info"
+            res = (dbres[0][1], dbres[1][1])
             (self.__getNodetypeInfoCache, ) = res
             pass
         

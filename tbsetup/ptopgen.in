@@ -67,6 +67,7 @@ use lib '@prefix@/lib';
 require exitonwarn;
 use libdb;
 use libtblog;
+use NodeType;
 
 tblog_stop_capture('stdout');
 
@@ -143,25 +144,21 @@ usage()
 
 # Read class/type maps
 my $result =
-    DBQueryFatal("select class,type,delay_capacity,".
-		 "   virtnode_capacity,isvirtnode,simnode_capacity, " .
-		 "   speed, RAM, trivlink_maxspeed, imageable, osid ".
-		 "from node_types");
-while (($class,$type,$delaycapacity,
-	$virtcapacity,$isvirt,$simcapacity, $speed, $ram, $trivspeed,
-	$imageable, $osid)
-	    = $result->fetchrow_array) {
+    DBQueryFatal("select class,type,isvirtnode from node_types");
+
+while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
     $map = {};
     $map->{'CLASS'}    = $class;
-    $map->{'DELAYCAP'} = $delaycapacity;
-    $map->{'VIRTCAP'}  = $virtcapacity;
-    $map->{'SIMCAP'}   = $simcapacity;
     $map->{'ISVIRT'}   = $isvirt;
-    $map->{'SPEED'}    = $speed;
-    $map->{'RAM'}      = $ram;
-    $map->{'OSID'}     = $osid;
-    $map->{'IMAGEABLE'}= $imageable;
-    $map->{'TRIVSPEED'}= $trivspeed;
+    my $typeinfo       = NodeType->Lookup($type);
+    $map->{'DELAYCAP'} = $typeinfo->delay_capacity();
+    $map->{'VIRTCAP'}  = $typeinfo->virtnode_capacity();
+    $map->{'SIMCAP'}   = $typeinfo->simnode_capacity();
+    $map->{'SPEED'}    = $typeinfo->frequency();
+    $map->{'RAM'}      = $typeinfo->memory();
+    $map->{'OSID'}     = $typeinfo->default_osid();
+    $map->{'IMAGEABLE'}= $typeinfo->imageable();
+    $map->{'TRIVSPEED'}= $typeinfo->trivlink_maxspeed();
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
     $typemap{$type} = $map;

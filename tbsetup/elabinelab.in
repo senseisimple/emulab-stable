@@ -563,7 +563,7 @@ sub DumpDBGoo()
     #
     # These tables are dumped completely.
     #
-    my @FULLTABLES = ("node_types", "interface_types",
+    my @FULLTABLES = ("node_types", "node_type_attributes", "interface_types",
 		      "interface_capabilities",
 		      "switch_paths", "switch_stack_types", "switch_stacks",
 		      "node_type_features", "node_types_auxtypes", "osid_map",
@@ -594,10 +594,18 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not dump table $table\n");
 
-	if ($table eq "node_types") {
-	    DBQueryFatal("update temp_${table} set ".
-			 "delay_capacity=delay_capacity-1 ".
-			 "where delay_capacity>0");
+	if ($table eq "node_type_attributes") {
+	    my $attributes_result =
+		DBQueryFatal("select type,attrvalue temp_${table} ".
+			     "where attrkey='delay_capacity'");
+
+	    while (my ($ntype,$value) = $attributes_result->fetchrow_array()) {
+		my $newvalue = $value - 1;
+		
+		DBQueryFatal("update temp_${table} set ".
+			     "   attrvalue='$newvalue' ".
+			     "where type='$ntype'");
+	    }
 	}
 
 	DBQueryWarn("select * from temp_$table ".

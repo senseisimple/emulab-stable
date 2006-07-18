@@ -272,16 +272,29 @@ foreach my $n (@freed_nodes) {
     DBQueryWarn("delete from delays where node_id='$n'") || $error++;
 
     # Find the default values for its node type.
-    my $result =
-	DBQueryFatal("select nt.osid,n.eventstate, " .
-		     "       nt.isvirtnode, nt.imageable, o.mustclean, ".
-		     "       nt.isdynamic ".
-		     " from nodes as n " .
-		     "left join node_types as nt on n.type=nt.type " .
-		     "left join os_info as o on o.osid=n.def_boot_osid ".
-		     "where node_id='$n'");
-    my ($osid, $estate, $isvirt, $imageable, $clean, $isdynamic) =
-	$result->fetchrow_array();
+    my $node = Node->Lookup($n);
+    if (!defined($node)) {
+	print "*** Unable to Lookup node $n\n";
+	$error++;
+	next;
+    }
+    my $estate        = $node->eventstate();
+    my $isvirt        = $node->isvirtnode();
+    my $isdynamic     = $node->isdynamic();
+    my $def_boot_osid = $node->def_boot_osid();
+    my $osid;
+    my $imageable;
+
+    if ($node->default_osid(\$osid) ||
+	$node->imageable(\$imageable)) {
+
+	print "*** Unable to get necessary type attributes for $n\n";
+	$error++;
+	next;
+    }
+    my $result = DBQueryFatal("select mustclean from os_info ".
+			      "where osid='$def_boot_osid'");
+    my ($clean) = $result->fetchrow_array();    
 
     # See if the OS it was running was marked as mustclean or not. Basically,
     # this is an OSKit hack to avoid reloading disks that have not been
@@ -390,11 +403,11 @@ foreach my $n (@freed_nodes) {
 
     # If the node has a next_reserve entry, change the reservation.
     $result =
-	DBQueryFatal("select node_id,pid,eid from next_reserve ".
+	DBQueryFatal("select pid,eid from next_reserve ".
 		     "where node_id='$n'");
 
     if ($result->num_rows()) {
-	my ($node, $next_pid, $next_eid) = $result->fetchrow_array();
+	my ($next_pid, $next_eid) = $result->fetchrow_array();
 	
 	print "Moving $n to $next_pid/$next_eid.\n";
 

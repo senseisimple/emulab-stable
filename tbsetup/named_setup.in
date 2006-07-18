@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -98,7 +98,6 @@ if ((my $locked = TBScriptLock("named", 1)) != TBSCRIPTLOCK_OKAY()) {
 my $db_result =
     DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role ".
 		 "    from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.phys_nodeid=i.node_id ". 
 		 "where (n.role='testnode' or n.role='virtnode') ".
 		 "    and (i.IP is not null or n.jailip is not null) ".

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -51,7 +51,8 @@ $query_result1 =
 $query_result2 =
     DBQueryFatal("select * from scheduled_reloads where image_id='$imageid'");
 $query_result3 =
-    DBQueryFatal("select * from node_types where imageid='$imageid'");
+    DBQueryFatal("select * from node_type_attributes ".
+		 "where default_imageid='$imageid' limit 1");
 
 if (mysql_num_rows($query_result1)) {
     echo "$imageid is referenced in the current_reloads table!<br>";

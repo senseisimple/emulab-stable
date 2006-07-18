@@ -117,17 +117,6 @@ sub ReadTranslationTable {
 	print "Interfaces: $mac <==> $name\n" if $debug > 1;
     }
 
-    print "FILLING %Devices\n" if $debug;
-    $result = DBQueryFatal("select i.node_id,i.IP,n.type from interfaces as i ".
-	    "left join nodes as n on n.node_id=i.node_id ".
-	    "left join node_types as nt on n.type=nt.type ".
-	    "where n.role!='testnode' and i.iface=nt.control_iface");
-    while ( my ($name,$ip,$type) = $result->fetchrow_array()) {
-	$Devices{$name} = $ip;
-	$Devices{$ip} = $name;
-	print "Devices: $name ($type) <==> $ip\n" if $debug > 1;
-    }
-
     print "FILLING %Ports\n" if $debug;
     $result = DBQueryFatal("select node_id1,card1,port1,node_id2,card2,port2 ".
 	    "from wires;");

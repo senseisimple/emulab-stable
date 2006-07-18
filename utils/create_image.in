@@ -66,6 +66,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libadminmfs;
+use Node;
 
 #
 # Turn off line buffering on output
@@ -87,8 +88,10 @@ my $friskiller  = "$TB/sbin/frisbeelauncher";
 my $osselect    = "$TB/bin/os_select";
 my $checkquota  = "$TB/sbin/checkquota";
 my $imagehash	= "$TB/bin/imagehash";
-my $devtype	= "ad";
-my $devnum	= 0;
+my $def_devtype	= "ad";
+my $def_devnum	= 0;
+my $devtype;
+my $devnum;
 my $mereuser    = 0;
 my %imageid_row = ();
 my $debug       = 0;
@@ -307,13 +310,19 @@ close(FILE) or
 #
 # Get the disktype for this node
 #
-$db_result =
-    DBQueryFatal("select disktype,bootdisk_unit from nodes ".
-		 "left join node_types on nodes.type=node_types.type ".
-		 "where node_id='$node'");
-if ($db_result->numrows == 1) {
-    ($devtype,$devnum) = $db_result->fetchrow_array;
+my $nodeobject = Node->Lookup($node);
+if (!defined($nodeobject)) {
+    die("*** $0:\n".
+	"    Could not Lookup $node\n");
 }
+$nodeobject->disktype(\$devtype);
+$nodeobject->bootdisk_unit(\$devnum);
+
+$devtype = $def_devtype
+    if (!defined($devtype));
+$devnum = $def_devnum
+    if (!defined($devnum));
+
 my $device = "/dev/${devtype}${devnum}";
 
 #

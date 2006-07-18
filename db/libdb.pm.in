@@ -236,6 +236,8 @@ use libtblog_simple;
 use English;
 use File::Basename;
 use POSIX qw(strftime);
+require Node;
+require NodeType;
 require Mysql;
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT
@@ -1732,7 +1734,6 @@ sub ExpNodesOldReserved($$)
     my $query_result =
 	DBQueryWarn("select r.node_id from reserved as r ".
 		    "left join nodes as n on n.node_id=r.node_id ".
-		    "left join node_types as nt on nt.type=n.type ".
 		    "where (r.pid='$oldreserved_pid' and r.old_pid='$pid') ".
 		    "and (r.pid='$oldreserved_eid' and r.old_eid='$eid') ");
 
@@ -2093,7 +2094,7 @@ sub VnameToNodeid ($$$$) {
 
 
 #
-# Get the default ImageID for a particular node, from the node_types table.
+# Get the default ImageID for a particular node.
 #
 # usage: DefaultImageID(char *nodeid, \*imageid)
 #        returns 1 if the node is valid and has a default imageid.
@@ -2101,24 +2102,20 @@ sub VnameToNodeid ($$$$) {
 #        returns 0 if there are problems.
 #
 sub DefaultImageID ($$) {
-    my($nodeid,$imageid) = @_;
+    my ($nodeid, $imageid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select imageid from nodes as n ".
-		     "left join node_types as t on t.type=n.type ".
-		     "where n.node_id='$nodeid'");
+    my $node = Node->Lookup($nodeid);
 
-    if (! $query_result->num_rows) {
+    if (! $node) {
 	$$imageid = undef;
 	return 0;
     }
 
-    my ($res) = $query_result->fetchrow_array();
-    if (!defined($res) || $res eq "") {
+    if ($node->NodeTypeAttribute("default_imageid", $imageid) ||
+	$$imageid eq "") {
 	$$imageid = undef;
 	return 0;
     }
-    $$imageid = $res;
     return 1;
 }
 
@@ -2855,17 +2852,20 @@ sub TBIsNodeImageable($)
 {
     my ($nodeid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select nt.imageable from nodes as n ".
-		     "left join node_types as nt on nt.type=n.type ".
-		     "where n.node_id='$nodeid'");
+    my $node = Node->Lookup($nodeid);
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
+    return 0
+	if (!defined($node));
 
-    my @row = $query_result->fetchrow_array();
-    return($row[0]);
+    my $imageable;
+    
+    return 0
+	if ($node->NodeTypeAttribute("imageable", \$imageable) != 0);
+
+    $imageable = 0
+	if (!defined($imageable));
+
+    return $imageable;
 }
 
 #
@@ -3393,13 +3393,6 @@ sub TBExptContainsNodeCT($$$)
 			  "where v.pid='$pid' and v.eid='$eid' and " .
 			  "(nt.class='$ntc' or nt.type='$ntc')");
 
-
-#"select r.pid,r.eid,r.node_id from reserved as r " .
-#"left join nodes as n on n.node_id=r.node_id " . 
-#"left join node_types as nt on nt.type=n.type " . 
-#"where r.pid='$pid' and r.eid='$eid' and " . 
-#"(nt.class='$ntc' or nt.type='$ntc')");
-
     return 0 
 	if (!$dbq || !$dbq->numrows());
 
@@ -3527,39 +3520,41 @@ sub TBNodeType($)
 
 sub TBNodeAdminOSID($)
 {
-    my ($node) = @_;
+    my ($nodeid) = @_;
 
-    my $result = DBQueryFatal("SELECT nt.adminmfs_osid FROM nodes AS n ".
-			      "LEFT JOIN node_types as nt ".
-			      "on nt.type = n.type ".
-			      "WHERE n.node_id='$node'");
-    if ($result->num_rows() != 1) {
-	return undef;
-    }
+    my $node = Node->Lookup($nodeid);
+
+    return 0
+	if (!defined($node));
+
+    my $mfs;
     
-    my ($mfs) = $result->fetchrow();
-    if (!$mfs) {
-	$mfs = TB_OSID_FREEBSD_MFS();
-    }
+    return 0
+	if ($node->NodeTypeAttribute("adminmfs_osid", \$mfs) != 0);
+
+    $mfs = TB_OSID_FREEBSD_MFS()
+	if (!defined($mfs));
+
     return $mfs;
 }
 
 sub TBNodeDiskloadOSID($)
 {
-    my ($node) = @_;
+    my ($nodeid) = @_;
 
-    my $result = DBQueryFatal("SELECT nt.diskloadmfs_osid FROM nodes AS n ".
-			      "LEFT JOIN node_types as nt ".
-			      "on nt.type = n.type ".
-			      "WHERE n.node_id='$node'");
-    if ($result->num_rows() != 1) {
-	return undef;
-    }
+    my $node = Node->Lookup($nodeid);
+
+    return 0
+	if (!defined($node));
+
+    my $mfs;
     
-    my ($mfs) = $result->fetchrow();
-    if (!$mfs) {
-	$mfs = TB_OSID_FRISBEE_MFS();
-    }
+    return 0
+	if ($node->NodeTypeAttribute("diskloadmfs_osid", \$mfs) != 0);
+
+    $mfs = TB_OSID_FREEBSD_MFS()
+	if (!defined($mfs));
+
     return $mfs;
 }
 
@@ -3570,14 +3565,19 @@ sub TBNodeDiskloadOSID($)
 sub TBNodeTypeProcInfo($)
 {
     my ($type) = @_;
-    my $result = DBQueryFatal("SELECT proc, speed FROM node_types " .
-			      "WHERE type='$type'");
-    if ($result->num_rows() != 1) {
-	return undef;
-    }
-    
-    my ($proc, $speed) = $result->fetchrow();
-    return ($proc, $speed);
+
+    my $typeinfo = NodeType->Lookup($type);
+
+    return undef
+	if (!defined($typeinfo));
+
+    my ($processor, $frequency);
+
+    return undef
+	if ($typeinfo->processor(\$processor) ||
+	    $typeinfo->frequency(\$frequency));
+
+    return ($processor, $frequency);
 }
 
 #
@@ -3589,14 +3589,18 @@ sub TBNodeTypeProcInfo($)
 sub TBNodeTypeBiosWaittime($)
 {
     my ($type) = @_;
-    my $query_result = DBQueryFatal("SELECT bios_waittime FROM node_types " .
-				    "WHERE type='$type'");
-    if (! $query_result->num_rows) {
-	return 0;
-    }
 
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my $typeinfo = NodeType->Lookup($type);
+
+    return 0
+	if (!defined($typeinfo));
+
+    my $bios_waittime;
+
+    return 0
+	if ($typeinfo->bios_waittime(\$bios_waittime));
+
+    return $bios_waittime;
 }
 
 #
@@ -3905,9 +3909,9 @@ sub TBControlNetIP($$)
     my $query_result =
 	DBQueryFatal("select IP from nodes as n2 ".
 		     "left join nodes as n1 on n1.node_id=n2.phys_nodeid ".
-		     "left join node_types as nt on n1.type=nt.type ".
 		     "left join interfaces as i on ".
-		     "i.node_id=n1.node_id and i.iface=nt.control_iface ".
+		     "     i.node_id=n1.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "' " .
 		     "where n2.node_id='$nodeid'");
 
     if ($query_result->numrows == 0) {
@@ -3934,10 +3938,8 @@ sub TBIPtoNodeID($$)
 
     my $query_result =
 	DBQueryFatal("select n.node_id from interfaces as i ".
-		     "left join nodes as n on n.node_id=i.node_id ".
-		     "left join node_types as t ".
-		     "   on t.type=n.type and i.iface=t.control_iface ".
-		     "where i.IP='$ip'");
+		     "where i.IP='$ip' and ".
+		     "      role='" . TBDB_IFACEROLE_CONTROL() . "'");
 
     if ($query_result->numrows == 0) {
 	return 0;

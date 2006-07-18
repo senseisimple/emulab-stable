@@ -252,14 +252,14 @@ sub SendAuditMail($)
 	}
 
 	my $subject  = "$SCRIPTNAME @SAVEARGV";
-	if ($?) {
+	if ($exitstatus) {
 	    $subject = "Failed: $subject";
 	}
 
 	my $body     = "$SCRIPTNAME @SAVEARGV\n" .
 	               "Invoked by $USERNAME ($GCOS)";
-	if ($?) {
-	    $body   .= "\nExited with status: $?";
+	if ($exitstatus) {
+	    $body   .= "\nExited with status: $exitstatus";
 	}
 	my $FROM     = "$GCOS <${USERNAME}\@${OURDOMAIN}>";
 
@@ -281,9 +281,16 @@ sub SendAuditMail($)
 	my @FILES = ();
 	
 	if (defined($logfile) && -s $logfile) {
-	    $TO    = $TBLOGS;
 	    @FILES = ($logfile);
-	    $HDRS .= "\nCC: $TBOPS" if ($?);
+
+	    if ($logonly) {
+		$TO    = $FROM;
+		$HDRS .= "\nCC: ".  ($exitstatus ? $TBOPS : $TBLOGS);
+	    }
+	    else {
+		$TO    = $TBLOGS;
+		$HDRS .= "\nCC: $TBOPS" if ($exitstatus);
+	    }
 	}
 	else {
 	    $TO    = $TBOPS;

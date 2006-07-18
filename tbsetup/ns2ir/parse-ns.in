@@ -85,6 +85,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libtblog qw(dblog *SERR);
+use NodeType;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -402,51 +403,70 @@ sub GenDefsFile($)
     }
     print TCL "\n";
     
-    print TCL "# Node Types\n";
-    $query_result = DBQueryFatal(
-	"select type,class,isremotenode,isvirtnode,osname,issubnode ".
-	" from node_types as nt ".
-	"left join os_info as o on nt.osid=o.osid");
-    while (my ($type,$class,$isrem,$isvirt,$osid,$issubnode) =
-	   $query_result->fetchrow_array()) {
+    print TCL "# Node Types and Classes\n";
+    my @alltypes = NodeType->AllTypes();
+    foreach my $typeinfo (@alltypes) {
+	my $type   = $typeinfo->type();
+	my $class  = $typeinfo->class();
+	my $isrem  = $typeinfo->isremotenode();
+	my $isvirt = $typeinfo->isvirtnode();
+	my $issub  = $typeinfo->issubnode();
+	my $osid   = $typeinfo->default_osid();
+
 	print TCL "set hwtypes($type) 1\n";
 	print TCL "set hwtype_class($type) $class\n";
 	print TCL "set isremote($type) $isrem\n";
 	print TCL "set isvirt($type) $isvirt\n";
-	print TCL "set issubnode($type) $issubnode\n";
-	print TCL "set default_osids($type) \"$osid\"\n"
-	    if (defined($osid) && $osid ne "");
-    }
-    print TCL "\n";
-    
-    print TCL "# Node Classes\n";
-    $query_result =
-	DBQueryFatal("select class,isremotenode,isvirtnode,issubnode ".
-		     "from node_types");
-    while (my ($class,$isrem,$isvirt,$issubnode) =
-	   $query_result->fetchrow_array()) {
+	print TCL "set issubnode($type) $issub\n";
+
+	# Since there are multiple types per class, this is probably not
+	# the right thing to do.
 	print TCL "set hwtypes($class) 1\n";
 	print TCL "set isremote($class) $isrem\n";
 	print TCL "set isvirt($class) $isvirt\n";
-	print TCL "set issubnode($class) $issubnode\n";
+	print TCL "set issubnode($class) $issub\n";
+
+	if (defined($osid) && $osid ne "") {
+	    $query_result =
+		DBQueryFatal("select osname from os_info ".
+			     "where osid='$osid'");
+	    if ($query_result->numrows) {
+		my ($osname) = $query_result->fetchrow_array();
+
+		if ($osname) {
+		    print TCL "set default_osids($type) \"$osname\"\n"
+		}
+	    }
+	}
     }
     print TCL "\n";
-
+    
     print TCL "# Node Aux Types\n";
-    $query_result =
-	DBQueryFatal("select at.auxtype,".
-		     "       isremotenode,isvirtnode,osname,issubnode ".
-		     " from node_types_auxtypes as at ".
-		     "left join node_types as nt on nt.type=at.type ".
-		     "left join os_info as o on nt.osid=o.osid");
-    while (my ($type,$isrem,$isvirt,$osid,$issubnode) =
-	   $query_result->fetchrow_array()) {
+    my @auxtypes = NodeType->AuxTypes();
+    foreach my $typeinfo (@auxtypes) {
+	my $type   = $typeinfo->type();
+	my $isrem  = $typeinfo->isremotenode();
+	my $isvirt = $typeinfo->isvirtnode();
+	my $issub  = $typeinfo->issubnode();
+	my $osid   = $typeinfo->default_osid();
+
 	print TCL "set hwtypes($type) 1\n";
 	print TCL "set isremote($type) $isrem\n";
 	print TCL "set isvirt($type) $isvirt\n";
-	print TCL "set issubnode($type) $issubnode\n";
-	print TCL "set default_osids($type) \"$osid\"\n"
-	    if (defined($osid) && $osid ne "");
+	print TCL "set issubnode($type) $issub\n";
+
+	if (defined($osid) && $osid ne "") {
+	    $query_result =
+		DBQueryFatal("select osname from os_info ".
+			     "where osid='$osid'");
+	    if ($query_result->numrows) {
+		my ($osname) = $query_result->fetchrow_array();
+
+		if ($osname) {
+		    print TCL "set default_osids($type) \"$osname\"\n"
+		}
+	    }
+	}
     }
     print TCL "\n";
 

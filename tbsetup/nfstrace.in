@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -181,12 +181,11 @@ if ($cmd eq "gc" && defined($pid)) {
 	DBQueryFatal("select r.vname,i.IP from reserved as r ".
 		     "left join nodes on r.node_id=nodes.node_id ".
 		     "left join node_types on node_types.type=nodes.type ".
-		     "left join interfaces as i on i.node_id=r.node_id and ".
-		     "  i.card=node_types.control_net ".
-		     " where nodes.role='testnode' ".
+		     "left join interfaces as i on i.node_id=r.node_id ".
+		     "where nodes.role='testnode' ".
 		     "       and node_types.isvirtnode=0 ".
 		     "       and node_types.isremotenode=0 ".
-		     "       and node_types.control_net is not null ".
+		     "       and i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
 		     "       and pid='$pid' and eid='$eid'");
     
     while (my ($vname,$ip) = $nodes_result->fetchrow_array) {

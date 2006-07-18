@@ -111,6 +111,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use Node;
+use NodeType;
 use libadminctrl;
 use libtblog;
 use libtblog qw(*SOUT *SERR);
@@ -366,18 +367,18 @@ my %virt_vtypes = ();
 my %node_types = ();
 
 sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
-sub nodetypetype($)     { return $node_types{$_[0]}->{"type"}; }
-sub nodetypeclass($)    { return $node_types{$_[0]}->{"class"}; }
-sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
-sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
-sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
-sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
-sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
-sub nodetypeisdynamic($){ return $node_types{$_[0]}->{"isdynamic"}; }
-sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
-sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
-sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
-sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
+sub nodetypetype($)     { return $node_types{$_[0]}->type(); }
+sub nodetypeclass($)    { return $node_types{$_[0]}->class(); }
+sub nodedelayosid($)    { return $node_types{$_[0]}->delay_osid(); }
+sub nodejailosid($)     { return $node_types{$_[0]}->jail_osid(); }
+sub nodedefaultosid($)  { return $node_types{$_[0]}->default_osid(); }
+sub nodetypeisremote($) { return $node_types{$_[0]}->isremotenode(); }
+sub nodetypeisvirt($)   { return $node_types{$_[0]}->isvirtnode(); }
+sub nodetypeisdynamic($){ return $node_types{$_[0]}->isdynamic(); }
+sub nodetypeissub($)    { return $node_types{$_[0]}->issubnode(); }
+sub nodetypeisplab($)   { return $node_types{$_[0]}->isplabdslice(); }
+sub nodetypeissim($)    { return $node_types{$_[0]}->issimnode(); }
+sub nodetypesimcap($)   { return $node_types{$_[0]}->simnode_capacity(); }
 
 #
 # osids: Information from the os_info table from the DB, indexed by osid
@@ -419,12 +420,12 @@ my %node_type_linkbw = ();
 my %phys_nodes = ();
 
 sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
-sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
-sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailflag"}; }
-sub physnodeissubnode($) { return $phys_nodes{$_[0]}->{"issubnode"}; }
-sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{"phys_nodeid"}; }
-sub physnodecontroliface($){ return $phys_nodes{$_[0]}->{"control_iface"}; }
-sub physnodetype($)      { return $phys_nodes{$_[0]}->{"type"}; }
+sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{'p'}->isvirtnode();}
+sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{'p'}->jailflag(); }
+sub physnodeissubnode($) { return $phys_nodes{$_[0]}->{'p'}->issubnode(); }
+sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{'p'}->phys_nodeid(); }
+sub physnodecontroliface($){return $phys_nodes{$_[0]}->{'p'}->control_iface();}
+sub physnodetype($)      { return $phys_nodes{$_[0]}->{'p'}->type(); }
 sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
 sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
 sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
@@ -3479,20 +3480,19 @@ sub LoadPhysInfo()
     }
 
     # Node types table.
-    $query_result =
-	DBQueryFatal("select * from node_types");
+    my @alltypes = NodeType->AllTypes();
 
-    while (my $rowref = $query_result->fetchrow_hashref()) {
-	my $type  = $rowref->{"type"};
-	my $class = $rowref->{"class"};
+    foreach my $typeinfo (@alltypes) {
+	my $type  = $typeinfo->type();
+	my $class = $typeinfo->class();
 
 	#
 	# Stash the entire DB row reference. Note that we store it
 	# under both type and class since the user can set the type
 	# to either in the NS file. 
 	#
-	$node_types{$type}  = $rowref;
-	$node_types{$class} = $rowref;
+	$node_types{$type}  = $typeinfo;
+	$node_types{$class} = $typeinfo;
     }
 
     # Now get the auxtypes. We store a pointer to the row reference under
@@ -5085,32 +5085,24 @@ sub LoadPhysNode($)
     my ($pnode) = @_;
     
     if (! exists($phys_nodes{$pnode})) {
-	my $query_result =
-	    DBQueryFatal("select n.*,nt.* from nodes as n ".
-			 "left join node_types as nt on nt.type=n.type ".
-			 "where n.node_id='$pnode'");
+	$nodeobject = Node->Lookup($pnode);
 
-	if (!$query_result->num_rows) {
+	if (! $nodeobject) {
 	    return
 		if ($impotent);
 	    
 	    fatal("No such pnode $pnode in nodes table!")
 	}
-	my $rowref = $query_result->fetchrow_hashref();
 
 	#
-	# Stash the entire DB row reference. 
+	# Stash the instance and some other goo.
 	#
-	$phys_nodes{$pnode} = $rowref;
-
-	#
-	# Pnodes start in "reboot" state.
-	#
-	$rowref->{"__reuse"} = "reboot";
-	$rowref->{"__pipeno"} = "100";
-
-	# Routing table id for different vnodes on pnode
-	$rowref->{"__rtabid"} = 0;
+	$phys_nodes{$pnode} = { "p"        => $nodeobject,
+				# Start in "reboot" state
+				"__reuse"  => "reboot",
+				"__pipeno" => "100",
+				# Routing table id for each vnodes on a pnode
+				"__rtabid" => 0};
     }
     return;
 }

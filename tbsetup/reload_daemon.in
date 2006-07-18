@@ -49,6 +49,7 @@ my $FLOOR = 4;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use NodeType;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -245,7 +246,7 @@ while (1) {
     my $CLASSCLAUSE = "(n.class='pc' or n.class='pct')";
     
     $query_result =
-	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe,n.imageable ".
+	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe,a.type ".
 		    "from reserved as b ".
 		    "left join nodes as a on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
@@ -273,10 +274,11 @@ while (1) {
 	$pid  = $hrow{'pid'};
 	$eid  = $hrow{'eid'};
 	$mustwipe = $hrow{'mustwipe'};
-	$imageable = $hrow{'imageable'};
+	$type = $hrow{'type'};
+	$imageable = NodeType->LookupSync($type)->imageable();
 
 	# XXX Garcia Hack
-	if (!$imageable && TBNodeType($node) eq "garcia") {
+	if (!$imageable && $type eq "garcia") {
 	    $imageable = 1;
 	}
 	# XXX End Garcia Hack

@@ -44,11 +44,11 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use NodeType;
 
 my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
 my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
-my $lockfile	    = "/var/tmp/testbed_dhcpd_lockfile";
 my %servernodes	    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
@@ -96,66 +96,14 @@ if (defined($options{"t"})) {
 
 #
 # If we are going to actually install this file, must serialize to
-# avoid a trashed config file. Use a dummy file in /var/tmp, opened for
-# writing and flock'ed.
+# avoid a trashed config file. 
 #
 if ($install) {
-    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-    my $count = 0;
-    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-	#
-	# If we don't get it the first time, we wait for:
-	# 1) The lock to become free, in which case we do our thing
-	# 2) The time on the lock to change, in which case we wait for
-	#    that process to finish
-	#
-	my $oldlocktime = (stat(LOCK))[9];
-	my $gotlock = 0;
-	while (1) {
-	    print "Another dhcpd config update in progress, ".
-		"waiting for it to finish\n";
-	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		# OK, got the lock, we can do what we're supposed to
-		$gotlock = 1;
-		last;
-	    }
-	    my $locktime = (stat(LOCK))[9];
-	    if ($locktime != $oldlocktime) {
-		$oldlocktime = $locktime;
-		last;
-	    }
-	    if ($count++ > 30)  {
-		fatal("Could not get the lock after a long time!\n");
-	    }
-	    sleep(1);
-	}
-
-	$count = 0;
-	#
-	# If we didn't get the lock, wait for the processes that did to finish
-	#
-	if (!$gotlock) {
-	    while (1) {
-		if ((stat(LOCK))[9] != $oldlocktime) {
-		    exit(0);
-		}
-		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		    close(LOCK);
-		    exit(0);
-		}
-		if ($count++ > 30)  {
-		    fatal("Process with the lock didn't finish after a ".
-			  "long time!\n");
-		}
-		sleep(1); 
-	    }
-	}
+    if ((my $locked = TBScriptLock("dhcpd.conf", 1)) != TBSCRIPTLOCK_OKAY()) {
+	exit(0)
+	    if ($locked == TBSCRIPTLOCK_IGNORE);
+	fatal("Could not get the lock after a long time!\n");
     }
-    #
-    # Perl-style touch(1)
-    #
-    my $now = time;
-    utime $now, $now, $lockfile;
 
     #
     # Open temporary output file.
@@ -198,8 +146,7 @@ while (<IF>) {
 		my $nodetype = $2;
 
 		$query_result =
-		    DBQueryWarn("select n.node_id,n.pxe_boot_path, ".
-				"       t.pxe_boot_path as nt_pxe_boot_path, ".
+		    DBQueryWarn("select n.node_id,n.pxe_boot_path,n.type, ".
 				"       i.IP,i.MAC,r.pid,r.eid,r.vname, ".
 				"       r.inner_elab_role,r.inner_elab_boot, ".
 				"       r.plab_role,r.plab_boot ".
@@ -281,11 +228,23 @@ while (<IF>) {
 			    $filename = "${spaces}\tfilename \"$fn\";\n";
 			}
 		    }
-		    if (!$filename && defined($row{"nt_pxe_boot_path"})) {
-			my $fn = $row{"nt_pxe_boot_path"};
-			# make sure it is pretty constrained
-			if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
-			    $filename = "${spaces}\tfilename \"$fn\";\n";
+		    if (!$filename) {
+			# Get the type info for this type.
+			my $nodetype = NodeType->Lookup($row{"type"});
+			# Get the type specific version of pxe_boot_path
+			my $nt_pxe_boot_path;
+
+			$nodetype->pxe_boot_path(\$nt_pxe_boot_path) == 0
+                            or fatal("Could not get pxe_boot_path for ".
+				     "$node_id");
+						    
+			if (defined($nt_pxe_boot_path)) {
+			    my $fn = $nt_pxe_boot_path;
+			    
+			    # make sure it is pretty constrained
+			    if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+				$filename = "${spaces}\tfilename \"$fn\";\n";
+			    }
 			}
 		    }
 
@@ -333,6 +292,7 @@ if ($install) {
 	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
 	}
     }
+    TBScriptUnlock();
 }
 exit(0);
 
@@ -341,6 +301,11 @@ exit(0);
 #
 sub fatal {
     my $msg = $_[0];
-    die($msg);
+    
+    TBScriptUnlock()
+	if ($install);
+    
+    die("*** $0:\n".
+	"    $msg\n");
 }
 

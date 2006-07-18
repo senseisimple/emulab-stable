@@ -51,6 +51,7 @@ use libtestbed;
 use libtblog;
 use libArchive;
 use Template;
+use NodeType;
 
 TBDebugTimeStampsOn();
 
@@ -210,10 +211,9 @@ if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
 # Get the set of nodes, as well as the nodes table information for them.
 #
 my $db_result =
-    DBQueryFatal("select n.*,l.pid,nt.* from reserved as r ".
+    DBQueryFatal("select n.*,l.pid from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
-		 "left join node_types as nt on nt.type=n.type ".
 		 "where r.pid='$pid' and r.eid='$eid'");
 
 if ($db_result->numrows < 1) {
@@ -225,14 +225,15 @@ while (my %row = $db_result->fetchhash()) {
     my $node      = $row{'node_id'};
     my $osid      = $row{'def_boot_osid'};
     my $type      = $row{'type'};
-    my $class     = $row{'class'};
-    my $subnode   = $row{'issubnode'};
-    my $virtnode  = $row{'isvirtnode'};
-    my $imageable = $row{'imageable'};
     my $jailnode  = $row{'jailflag'};
-    my $plabnode  = $row{'isplabdslice'};
     my $failmode  = $row{'failureaction'};
-    my $bios_wait = $row{'bios_waittime'};
+    my $typeinfo  = NodeType->Lookup($type);
+    my $class     = $typeinfo->class();
+    my $subnode   = $typeinfo->issubnode();
+    my $virtnode  = $typeinfo->isvirtnode();
+    my $imageable = $typeinfo->imageable();
+    my $plabnode  = $typeinfo->isplabdslice();
+    my $bios_wait = $typeinfo->bios_waittime();
     my $bootpath  = 0;
 
     #

@@ -2057,11 +2057,13 @@ function SHOWNODE($node_id, $flags = 0) {
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join node_activity as na on n.node_id=na.node_id ".
 		     "left join node_types as t on t.type=n.type ".
-		     "left join interfaces as i on i.iface=t.control_iface ".
-		     " and i.node_id=n.node_id ".
-		     "left join interfaces as pi on pi.iface=t.control_iface ".
-		     " and pi.node_id=n.phys_nodeid ".
-		     "left join location_info as loc on loc.node_id=n.node_id ".
+		     "left join interfaces as i on i.node_id=n.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL . "' ".
+		     "left join interfaces as pi on ".
+		     "     pi.node_id=n.phys_nodeid and ".
+		     "     pi.role='" . TBDB_IFACEROLE_CONTROL . "' ".
+		     "left join location_info as loc on ".
+		     "     loc.node_id=n.node_id ".
 		     "where n.node_id='$node_id'");
     
     if (mysql_num_rows($query_result) == 0) {

@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -79,13 +79,18 @@ function guess_node_type($proc,$disk) {
     # but it's the best we got for now.
     #
     $node_type = "";
-    $query_result = DBQueryFatal("select type, speed, HD from node_types " .
-	"where !isvirtnode and !isremotenode");
+    $query_result = DBQueryFatal("select type from node_types " .
+				 "where !isvirtnode and !isremotenode");
     while ($row = mysql_fetch_array($query_result)) {
-        $speed = $row["speed"];
 	$type = $row["type"];
-	$HD = $row["HD"];
-	echo "Checking $speed vs $proc, $HD vs $disk\n";
+
+	NodeTypeAttribute($type, "frequency", $speed);
+	NodeTypeAttribute($type, "disksize", $HD);
+
+	if (is_null($speed) || is_null($HD))
+	    continue;
+
+	echo "Checking type $type: $speed vs $proc, $HD vs $disk\n";
 	if (($proc > ($speed * (1.0 - $fudge_factor))) &&
 	    ($proc < ($speed * (1.0 + $fudge_factor))) &&
 	    ($disk > ($HD * (1.0 - $fudge_factor))) &&
@@ -108,23 +113,30 @@ function guess_node_type($proc,$disk) {
 #
 # Create a new node type
 # XXX - Right now, this is really only meant for inserting a node_types entry
-# for ops. It misses doing a lot of important things, like setting the class and
-# default OSID for types other than ops
+# for ops. It misses doing a lot of important things, like setting the class 
+# and default OSID for types other than ops
 #
-function make_node_type($type,$proc,$disk) {
+function make_node_type($type,$speed,$disk) {
 
     #
     # Just insert a stub entry for this type
     #
-    $class = "";
+    $class = "unknown";
     $defosid = "";
     if (!strcmp($type,"ops")) {
 	$class = "misc";
 	$defosid = "emulab-ops-OPSNODE-BSD";
     }
-    DBQueryFatal("insert into node_types set type='$type', speed='$speed', " .
-	"HD='$disk', class='$class', osid='$defosid';");
-
+    DBQueryFatal("insert into node_types set type='$type', class='$class'");
+    DBQueryFatal("insert into node_type_attributes set type='$type', ".
+		 " attrkey='frequency',attrvalue='$speed',attrtype='integer'");
+    DBQueryFatal("insert into node_type_attributes set type='$type', ".
+		 " attrkey='disksize',attrvalue='$disk',attrtype='float'");
+    if ($defosid != "") {
+	DBQueryFatal("insert into node_type_attributes set type='$type', ".
+		     " attrkey='default_osid',attrvalue='$defosid', ".
+		     " attrtype='string'");
+    }
 }
 
 function guess_IP ($prefix, $number) {

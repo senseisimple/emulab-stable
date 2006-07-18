@@ -293,8 +293,6 @@ sub Create($$$$)
     my $noidleswap_reason = DBQuoteSpecial($argref->{'noidleswap_reason'});
     delete($argref->{'noidleswap_reason'});
 
-    print Dumper($argref);
-    
     my $query = "insert into experiments set ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
 

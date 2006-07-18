@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,6 +14,7 @@ use lib '@prefix@/lib';
 
 use libdb;
 use libxmlrpc;
+use NodeType;
 use English;
 use Getopt::Std;
 
@@ -176,14 +177,25 @@ NODE: foreach my $node_id (@node_ids) {
     # Make sure that the new node is of a valid type, and grab a few other
     # things to fill in as initial values
     #
-    $query_result = DBQueryFatal("SELECT control_iface,virtnode_capacity,adminmfs_osid ".
-				 "FROM node_types WHERE type='$type'");
-    if (!$query_result->num_rows()) {
-	warn "Node $node_id failed: Type $type does not exist!\n";
+    my $typeinfo = NodeType->Lookup($type);
+    if (!defined($typeinfo)) {
+	warn "No such nodetype $type is defined in the DB!\n";
 	next NODE;
     }
-    my ($control_iface,$virtnode_capacity,$admin_mfs) =
-	$query_result->fetchrow();
+    my ($control_iface,$virtnode_capacity,$admin_mfs);
+
+    if ($typeinfo->control_interface(\$control_iface) || !$control_iface) {
+	warn "No control interface for $type is defined in the DB!\n";
+	next NODE;
+    }
+    if ($typeinfo->virtnode_capacity(\$virtnode_capacity)) {
+	warn "Failure looking up virtnode_capacity for $type in the DB!\n";
+	next NODE;
+    }
+    if ($typeinfo->adminmfs_osid(\$admin_mfs)) {
+	warn "Failure looking up adminmfs_osid for $type in the DB!\n";
+	next NODE;
+    }
     $virtnode_capacity = 0
 	if (!defined($virtnode_capacity));
     $admin_mfs = $MFS_INITIAL
