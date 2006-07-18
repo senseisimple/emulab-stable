@@ -3,8 +3,7 @@
 <!--
     XML NS template for making a Private Planetlab
 -->
-<nstemplate name="Private PlanetLab" author="Robert Ricci"
-            authormail="ricci@cs.utah.edu" authoruid="ricci">
+<nstemplate name="Create a Private PlanetLab">
     <description>
         This template is for creating a private PlanetLab.
         The only thing you may want to edit is the number of nodes.
