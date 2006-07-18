@@ -3937,7 +3937,7 @@ sub TBIPtoNodeID($$)
     my ($ip, $pnodeid) = @_;
 
     my $query_result =
-	DBQueryFatal("select n.node_id from interfaces as i ".
+	DBQueryFatal("select i.node_id from interfaces as i ".
 		     "where i.IP='$ip' and ".
 		     "      role='" . TBDB_IFACEROLE_CONTROL() . "'");
 
