@@ -3668,8 +3668,6 @@ sub requires_delay($$$)
     my $protocol   = virtlanprotocol($lan);
     my $node_class;
 
-    print "requires_delay: $node $node_type\n";
-
     fatal("requires_delay(): $node - invalid type $node_type!")
 	if (!exists($node_type_linkbw{$node_type}{$protocol}));
 
