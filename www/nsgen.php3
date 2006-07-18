@@ -12,6 +12,7 @@ $TMPDIR        = "/tmp/";
 # Page arguments.
 $template = $_GET['template'];
 $advanced = $_GET['advanced'];
+$pid      = $_GET['pid'];
 
 if (!isset($template)) {
     PAGEARGERROR();
@@ -80,6 +81,24 @@ if ($submit == "Begin Experiment" || $submit == "Show NS File") {
 
     PAGEHEADER("Automatic NS file Generation");
 
+    #
+    # JavaScript for the Show NS option
+    #
+    echo "<script language=JavaScript>
+          <!--
+            function NormalSubmit() {
+              document.form1.target='_self';
+              document.form1.submit();
+            }
+            function ShowNS() {
+                var oldtarget = document.form1.target;
+                document.form1.target='nsgen';
+                document.form1.submit();
+                document.form1.target = oldtarget;
+            }
+          //-->
+          </script>\n";
+
     SPITFORM($advanced,$templatefields,$templateorder);
 
     PAGEFOOTER();
@@ -123,8 +142,8 @@ function SPITFORM($advanced,$templatefields,$templateorder) {
     }
 
     echo "<tr><th colspan=2><center>";
-    echo "<input type=submit name=submit value='Begin Experiment'>&nbsp;";
-    echo "<input type=submit name=submit value='Show NS File'>&nbsp;";
+    echo "<input type=submit name=submit value='Begin Experiment' onclick=\"NormalSubmit();\">&nbsp;";
+    echo "<input type=submit id=showns name=submit value='Show NS File' onclick=\"ShowNS();\">&nbsp;";
     echo "<input type=reset name=reset value='Reset'>";
     echo "</center></th></tr>\n";
 
