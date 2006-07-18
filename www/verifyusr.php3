@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -138,7 +138,7 @@ function INFORMLEADERS($uid) {
 		"Why Not Public:  $proj_whynotpublic\n".
 		"Linked to Us?:   $proj_linked\n".
 		"Funders:         $proj_funders\n".
-		"Title:           $usr_title\n".
+		"Job Title:       $usr_title\n".
 		"Affiliation:     $usr_affil\n".
 		"Address 1:       $usr_addr\n".
 		"Address 2:       $usr_addr2\n".
@@ -175,7 +175,7 @@ function INFORMLEADERS($uid) {
 		"Emulab ID:       $uid\n".
 		"Email:           $usr_email\n".
 		"User URL:        $usr_URL\n".
-		"Title:           $usr_title\n".
+		"Job Title:       $usr_title\n".
 		"Affiliation:     $usr_affil\n".
 		"Address 1:       $usr_addr\n".
 		"Address 2:       $usr_addr2\n".
