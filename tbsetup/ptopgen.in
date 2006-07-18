@@ -430,7 +430,7 @@ foreach $node (keys(%nodes)) {
 	push(@types, "$class:1");
     }
 
-    if ($delay_capacity > 0) {
+    if (defined($delay_capacity) && $delay_capacity > 0) {
 	# Comes from the NS file;
 	$delay_capacity = $delaycap_override
 	    if (defined($delaycap_override) &&
@@ -496,7 +496,7 @@ foreach $node (keys(%nodes)) {
         }
     }
 
-    if ($simstuff && $simnode_capacity > 0) {
+    if ($simstuff && defined($simnode_capacity) && $simnode_capacity > 0) {
 	#
 	# Use user specified multiplex factor
 	#
