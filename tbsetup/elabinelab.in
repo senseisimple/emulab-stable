@@ -596,7 +596,7 @@ sub DumpDBGoo()
 
 	if ($table eq "node_type_attributes") {
 	    my $attributes_result =
-		DBQueryFatal("select type,attrvalue temp_${table} ".
+		DBQueryFatal("select type,attrvalue from temp_${table} ".
 			     "where attrkey='delay_capacity'");
 
 	    while (my ($ntype,$value) = $attributes_result->fetchrow_array()) {
