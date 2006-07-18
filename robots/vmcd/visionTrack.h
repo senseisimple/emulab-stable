@@ -173,6 +173,8 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
  * smoothing after everything else will allow the current matching algorithms 
  * to continue to work.
  */
-void vtSmooth(struct lnMinList *tracks);
+void vtSmoothSMA(struct lnMinList *tracks);
+
+void vtSmoothEWMA(struct lnMinList *tracks);
 
 #endif

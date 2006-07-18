@@ -77,10 +77,18 @@ static struct lnMinList last_frame, current_frame, wiggle_frame;
 static struct robot_object *wiggle_bot = NULL;
 
 #define DEFAULT_SMOOTH_WINDOW 10
+#define DEFAULT_SMOOTH_ALPHA 0.10
  
 /* by default, smoothing is off */
-static int smoothing = 0;
+typedef enum { 
+    ST_NONE = 0, 
+    ST_SMA, 
+    ST_EWMA 
+} smoothing_t;
+
+static smoothing_t smoothing_type = ST_NONE;
 static int smoothing_window = DEFAULT_SMOOTH_WINDOW;
+double smoothing_alpha = DEFAULT_SMOOTH_ALPHA;
 
 static mtp_handle_t client_dump_handle = NULL;
 static mtp_handle_t frame_dump_handle = NULL;
@@ -319,6 +327,7 @@ static void usage(void)
             "  -P clientport\tSpecify the port the client is listening on\n"
 	    "  -w #samples\tSmooth over the last #samples positions (default "
 	    "             \tis %d)\n"
+	    "  -a alpha for EWMA\n"
             "\n"
             "Example:\n"
             "  $ vmcd -c foo -P 7070 -- -c foo -P 7071\n",
@@ -336,11 +345,15 @@ static int parse_client_options(int *argcp, char **argvp[])
     argc = *argcp;
     argv = *argvp;
     
-    while ((c = getopt(argc, argv, "hdSp:U:l:i:e:c:P:w:f:F:C:")) != -1) {
+    while ((c = getopt(argc, argv, "hdSEp:U:l:i:e:c:P:w:f:F:C:")) != -1) {
         switch (c) {
 	case 'S':
-	    smoothing = 1;
-	    fprintf(stdout,"DATA WILL BE SMOOTHED!\n");
+	    smoothing_type = ST_SMA;
+	    fprintf(stdout,"DATA WILL BE SMOOTHED with SMA!\n");
+	    break;
+	case 'E':
+	    smoothing_type = ST_EWMA;
+	    fprintf(stdout,"DATA WILL BE SMOOTHED with EWMA!\n");
 	    break;
 	case 'w':
 	    smoothing_window = atoi(optarg);
@@ -350,6 +363,16 @@ static int parse_client_options(int *argcp, char **argvp[])
 			" to default of %d.\n",
 			DEFAULT_SMOOTH_WINDOW);
 		smoothing_window = DEFAULT_SMOOTH_WINDOW;
+	    }
+	    break;
+	case 'a':
+	    smoothing_alpha = atof(optarg);
+	    if (smoothing_alpha <= 0.0) {
+		fprintf(stdout,
+			"WARNING: smoothing alpha must be greater than 0; "
+			"setting to default of %f.\n",
+			DEFAULT_SMOOTH_ALPHA);
+		smoothing_alpha = DEFAULT_SMOOTH_ALPHA;
 	    }
 	    break;
         case 'h':
@@ -426,6 +449,14 @@ static int parse_client_options(int *argcp, char **argvp[])
         default:
             break;
         }
+    }
+
+    if (smoothing_alpha < 0 && smoothing_type == ST_EWMA) {
+	/* pick a sane value and notify user. */
+	smoothing_alpha = 2/(double)(smoothing_window+1);
+	fprintf(stdout,
+		"WARNING: calculating EWMA alpha as 2/(window+1) = %f!\n",
+		smoothing_alpha);
     }
     
     if (vmc_clients[vmc_client_count].vc_port != 0) {
@@ -602,7 +633,7 @@ int main(int argc, char *argv[])
     
  
     /* set up smoothing */
-    if (smoothing) {
+    if (smoothing_type > ST_NONE) {
 	
 	for (lpc = 0; lpc < TRACK_POOL_SIZE; ++lpc) {
 #if 0
@@ -828,8 +859,11 @@ int main(int argc, char *argv[])
 
 
 	    /* (maybe) Smooth the matched bot posits */
-  	    if (smoothing) { 
-  		vtSmooth(&current_frame); 
+  	    if (smoothing_type == ST_SMA) { 
+  		vtSmoothSMA(&current_frame); 
+	    }
+	    else if (smoothing_type == ST_EWMA) {
+		vtSmoothEWMA(&current_frame);
 	    }
 
 
