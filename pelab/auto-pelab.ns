@@ -21,7 +21,7 @@ set fake_plab 1
 # If set to 1, we grab real PlanetLab nodes. Both this and fake_plab can be
 # set at the same time
 #
-set real_plab 0
+set real_plab 1
 
 #
 # If set to 1, we run tcpdump on all end nodes (in addition to all delay
@@ -133,6 +133,7 @@ set rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab
 
 set elan_string ""
 set plan_string ""
+set inet_string ""
 
 set stublist {}
 set planetstublist {}
@@ -154,6 +155,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     if {$real_plab} {
         set planet($i) [$ns node]
         tb-set-hardware $planet($i) pcplab
+        append inet_string "$planet(${i}) "
         set planetstub($i) [$planet($i) program-agent -command "/bin/sh /local/pelab/stub/auto-stub.sh"]
         lappend stublist $planetstub($i)
         lappend planetstublist $planetstub($i)
@@ -238,6 +240,14 @@ set allclients [$ns event-group $clientlist]
 set tfhosts [$ns event-group $tflist]
 if {$trace_end_nodes} {
     set tdhosts [$ns event-group $tdlist]
+}
+
+#
+# Real Internet cloud for real plab nodes
+#
+if {$real_plab} {
+    set internet [$ns make-lan "$inet_string" 100Mbps 0ms]
+    $internet trace
 }
 
 #
