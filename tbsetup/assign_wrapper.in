@@ -1989,7 +1989,7 @@ foreach $plink (keys(%plinks)) {
  	#
  	# Set up tracing on the end node (one direction cause its a lan).
  	#
- 	SetUpTracing($lan, $virtA, $nodeA, undef, $portA);
+ 	SetUpTracing($lan, $virtA, $physA, undef, $portA);
     }
     elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
 	   $plink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|) {
@@ -2003,8 +2003,6 @@ TBDebugTimeStamp("interpreting finished");
 
 ######################################################################
 # Step 4 - Upload to DB
-#
-# Nothing fancy.
 ######################################################################
 printdb "Uploading to DB\n";
 TBDebugTimeStamp("uploading started");
@@ -3335,8 +3333,12 @@ sub SetUpTracing($$$$$)
     my ($lan, $member, $pnode, $iface0, $iface1) = @_;
     my ($vnode) = split(":", $member);
 
-    if (virtnodeisjailed($vnode)) {
-	$pnode = "$v2vmap{$vnode}";
+    #
+    # Handle vnodes - in some cases (ie. PlanetLab), we have to look in v2vmap
+    # to find out which virtual node we got placed on.
+    #
+    if (defined($v2vmap{$vnode})) {
+        $pnode = "$v2vmap{$vnode}";
     }
 
     #
