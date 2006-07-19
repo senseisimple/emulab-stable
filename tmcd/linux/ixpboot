@@ -163,6 +163,8 @@ if (scalar(@tmccresults)) {
 
     close(RUN);
     chmod(0755, $bootscript);
+} else {
+    unlink($bootscript);
 }
 
 #
