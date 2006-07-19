@@ -145,11 +145,13 @@ sub doboot()
 	if (! -d "/local") {
 	    system("mkdir /local") == 0
 		or fatal("Could not mkdir /local");
-	    system("$BINDIR/mkextrafs.pl -f /local");
 	}
-	if (! -d "/local/local") {
-	    fatal("Could not create the /local filesystem");
-	}
+        if (! PLAB()) {
+            system("$BINDIR/mkextrafs.pl -f /local");
+            if (! -d "/local") {
+                fatal("Could not create the /local filesystem");
+            }
+        }
     }
     if (! -d "/local/logs") {
 	system("mkdir /local/logs") == 0
@@ -231,7 +233,7 @@ sub doboot()
 	    $optargs .= " -P " . (4442 + $idx);
 	}
 
-	if (! JAILED()) {
+	if (! JAILED() && ! PLAB() ) {
 	    #
 	    # Need the ethernet address for the vnode so we can create an ether
 	    # rule for tcpdump. We want to make sure that we get the correct
@@ -294,15 +296,23 @@ sub doboot()
 	    # run on the end node (as in a linkdelay or jail). In this case
 	    # there is no input interface to bolt the tcpdump to; we just
 	    # capture packets as they leave (after the ipfw dummynet pipe).
+            # But, if it's a PlanetLab node, we assume it has only one
+            # interface.
 	    #
 	    next
-		if (!defined($mac) || $mac eq "");
+		if ((!defined($mac) || $mac eq "") && ! PLAB());
 
-	    # convert to iface.
-	    if (! ($iface = findiface($mac))) {
-		print "*** WARNING: Could not map MAC $mac to an interface!\n";
-		next;
-	    }
+            if (PLAB()) {
+                # XXX - Hardcoding this works for now...
+                $iface = "eth0";
+            } else {
+                # convert to iface.
+                if (! ($iface = findiface($mac))) {
+                    print "*** WARNING: Could not map MAC $mac to an " .
+                        "interface!\n";
+                    next;
+                }
+            }
 	    push(@cmd, "-f");
 	    push(@cmd, $file);
 	    push(@args, $iface);
