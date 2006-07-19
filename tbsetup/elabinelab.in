@@ -601,10 +601,14 @@ sub DumpDBGoo()
 
 	    while (my ($ntype,$value) = $attributes_result->fetchrow_array()) {
 		my $newvalue = $value - 1;
+
+		next
+		    if ($newvalue < 0);
 		
 		DBQueryFatal("update temp_${table} set ".
 			     "   attrvalue='$newvalue' ".
-			     "where type='$ntype'");
+			     "where type='$ntype' and ".
+			     "      attrkey='delay_capacity'");
 	    }
 	}
 
