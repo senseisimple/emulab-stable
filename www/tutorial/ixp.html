@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2005 University of Utah and the Flux Group.
+   Copyright (c) 2000-2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -93,10 +93,12 @@ set myixp [$ns node]
 # Set its hardware type to ixp-bv (bridalveil)
 tb-set-hardware $myixp ixp-bv
 
-      # Optional: Create and bind the host that houses the IXP card.
-      # Emulab will generate these automatically if you don't.
-      #set host-myixp [$ns node] 
-      #tb-bind-parent $myixp $host-myixp
+# XXX temporary: explicitly name the IXP host, bind it to the IXP and
+# set its OS.  (We should automatically set the OS so these steps would
+# not be required.)
+set ixphost [$ns node]
+tb-bind-parent $myixp $ixphost
+tb-set-node-os $ixphost RHL73-IXPHOST
 
 # Create end nodes
 set n0 [$ns node] 
@@ -151,7 +153,7 @@ the following:
        <li>To telnet to the card, run 
        <p>
        <code><pre>
-       telnet myixp.myexp.myproj.emulab.net 
+       telnet -l root myixp.myexp.myproj.emulab.net 
        </code></pre>
        <p>
        where  myixp is the name of your
