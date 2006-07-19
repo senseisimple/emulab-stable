@@ -23,6 +23,7 @@ use strict;
 sub assemble_zonefile($);
 sub make_forward_zonefile($$$);
 sub isroutable($);
+sub process_nodes($);
 
 #
 # Configure variables
@@ -43,6 +44,7 @@ my $vnodesfile			= "$mapdir/vnodes.${OURDOMAIN}.db";
 my $vnodesback 			= "$mapdir/vnodes.${OURDOMAIN}.db.backup";
 my $reversedir			= "$mapdir/reverse";
 my $restart_named		= 1;
+my $sortem			= 0; # set to 1 to generated IP-sorted file
 my $dbg	= 0;
 my @row;
 
@@ -97,78 +99,32 @@ if ((my $locked = TBScriptLock("named", 1)) != TBSCRIPTLOCK_OKAY()) {
 #
 my $db_result =
     DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role ".
-		 "    from nodes as n ".
-		 "left join interfaces as i on n.phys_nodeid=i.node_id ". 
-		 "where (n.role='testnode' or n.role='virtnode') ".
+		 "    from nodes as n join interfaces as i ".
+		 "where (n.node_id=i.node_id and n.role='testnode' or ".
+		 "       n.phys_nodeid=i.node_id and n.role='virtnode') ".
 		 "    and (i.IP is not null or n.jailip is not null) ".
 		 "    and (i.card is null or ".
-		 "         i.role='" . TBDB_IFACEROLE_CONTROL() . "' or " .
-		 "         i.role='" . TBDB_IFACEROLE_GW() . "') ");
+		 "         i.role='" . TBDB_IFACEROLE_CONTROL() . "')");
 
-#
-# Sort out the routable and unroutable addresses, and make a map for reversing
-# them
-#
 my %routable;
 my %unroutable;
 my %reverse;
-while (my @row = $db_result->fetchrow_array()) {
-    my $node_id = $row[0];
-    my $nrole   = $row[1];
-    my $jailIP  = $row[2];
-    my $IP      = $row[3];
-    my $irole   = $row[4];
 
-    #
-    # For most nodes, we get the IP address from the interfaces table; but, for
-    # virtual nodes, we get it from the jailip column
-    #
-    if (defined($jailIP)) {
-	$IP = $jailIP;
-    }
-    if (!$IP) {
-	warn "named_setup: No IP for node $node_id!\n";
-	next;
-    }
+process_nodes($db_result);
 
-    #
-    # Special treatment for gateway interfaces - we give act as if they are a
-    # separate node
-    #
-    if ($irole && $irole eq TBDB_IFACEROLE_GW()) {
-	$node_id = "$node_id-gw";
-    }
-
-    #
-    # Make a little structure so that we can make decisions later about this
-    # node (ie. handling virt nodes differently)
-    #
-    my $node_rec = {
-	IP   => $IP,
-	role => $nrole
-    };
-
-    #
-    # Sort it into the right pile based on whether or not it's routable
-    #
-    if (isroutable($IP)) {
-	$routable{$node_id} = $node_rec;
-    } else {
-	$unroutable{$node_id} = $node_rec;
-    }
-
-    #
-    # Put it into a map so we can generate the reverse zone file later
-    #
-    $IP =~ /(\d+\.\d+\.\d+)\.(\d+)/;
-    if ($1 && $2) {
-	my $subnet = $1;
-	my $host = $2;
-	push @{$reverse{$subnet}}, [$host, $node_id];
-    } else {
-	warn "Poorly formed IP address $IP\n";
-    }
-}
+#
+# For IXPs we also need their gateway addresses as well
+#
+$db_result =
+    DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role ".
+		 "    from nodes as n ".
+		 "left join interfaces as i ".
+		 "on n.phys_nodeid=i.node_id and n.node_id!=i.node_id ". 
+		 "where n.role='testnode' ".
+		 "    and (i.IP is not null or n.jailip is not null) ".
+		 "    and (i.card is null or ".
+		 "         i.role='" . TBDB_IFACEROLE_GW() . "') ");
+process_nodes($db_result);
 
 #
 # Get the list of currently-reserved nodes so that we can make CNAMEs for them
@@ -252,6 +208,70 @@ TBScriptUnlock();
 exit(0);
 
 #
+# Sort out the routable and unroutable addresses from a DB query,
+# and make a map for reversing them
+#
+sub process_nodes($) {
+    while (my @row = $db_result->fetchrow_array()) {
+	my $node_id = $row[0];
+	my $nrole   = $row[1];
+	my $jailIP  = $row[2];
+	my $IP      = $row[3];
+	my $irole   = $row[4];
+
+	#
+	# For most nodes, we get the IP address from the interfaces table;
+	# but, for virtual nodes, we get it from the jailip column
+	#
+	if (defined($jailIP)) {
+	    $IP = $jailIP;
+	}
+	if (!$IP) {
+	    warn "named_setup: No IP for node $node_id!\n";
+	    next;
+	}
+
+	#
+	# Special treatment for gateway interfaces - we give act as if they
+	# are a separate node
+	#
+	if ($irole && $irole eq TBDB_IFACEROLE_GW()) {
+	    $node_id = "$node_id-gw";
+	}
+
+	#
+	# Make a little structure so that we can make decisions later about
+	# this node (ie. handling virt nodes differently)
+	#
+	my $node_rec = {
+	    IP   => $IP,
+	    role => $nrole
+	};
+
+	#
+	# Sort it into the right pile based on whether or not it's routable
+	#
+	if (isroutable($IP)) {
+	    $routable{$node_id} = $node_rec;
+	} else {
+	    $unroutable{$node_id} = $node_rec;
+	}
+
+	#
+	# Put it into a map so we can generate the reverse zone file later
+	#
+	$IP =~ /(\d+\.\d+\.\d+)\.(\d+)/;
+	if ($1 && $2) {
+	    my $subnet = $1;
+	    my $host = $2;
+	    push @{$reverse{$subnet}}, [$host, $node_id];
+	} else {
+	    warn "Poorly formed IP address $IP\n";
+	}
+    }
+}
+
+#
 # Die and tell someone about it
 #
 sub fatal {
@@ -319,6 +339,16 @@ sub assemble_zonefile($) {
     fatal("Failed to concat $mapfiletail to $mapfile\n");
 }
 
+my $laddrs;
+sub byip {
+    my @aa = split '\.', $$laddrs{$a}->{IP};
+    my @bb = split '\.', $$laddrs{$b}->{IP};
+    return $aa[0] <=> $bb[0] ||
+	$aa[1] <=> $bb[1] ||
+	    $aa[2] <=> $bb[2] ||
+		$aa[3] <=> $bb[3];
+}
+
 #
 # Make a forward zone file, from the given map of addresses and CNAMEs
 #
@@ -339,7 +369,13 @@ sub make_forward_zonefile($$$) {
     print MAP "; Nodes\n";
     print MAP ";\n";
     print MAP "\n";
-    while (my ($node_id, $node_rec) = each %$addresses) {
+    my @list = keys(%$addresses);
+    if ($sortem) {
+	$laddrs = $addresses;
+	@list = sort byip @list;
+    }
+    for my $node_id (@list) {
+	my $node_rec = $$addresses{$node_id};
 
 	#
 	# Special treatment for virtual nodes - we only bother to print them
