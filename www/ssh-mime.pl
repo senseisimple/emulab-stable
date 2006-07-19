@@ -19,6 +19,7 @@ use Getopt::Std;
 sub usage()
 {
     print(STDERR "ssh-mime.pl <control-file>\n");
+    exit(1);
 }
 my $optlist = "";
 my $config;
@@ -110,8 +111,15 @@ sub StartXterm()
 	    "\|\| read userinput";
     }
     else {
+	my $sshcmd = "ssh -o StrictHostKeyChecking=no $port";
+
+	# for IXPs at Utah Emulab
+	if ($gateway =~ /^ixp\d+-gw\.emulab\.net$/) {
+	    $sshcmd = "telnet -l root";
+	}
+
 	exec "xterm -T $hostname -e ssh $login -tt $gateway ".
-	    "ssh -o StrictHostKeyChecking=no $port $hostname ".
+	    "$sshcmd $hostname ".
 	    "\|\| read userinput";
     }
 }
@@ -156,8 +164,15 @@ sub StartOSXTerm()
 	$command = "ssh $port $login $hostname";
     }
     else {
+	my $sshcmd = "ssh -o StrictHostKeyChecking=no $port";
+
+	# for IXPs at Utah Emulab
+	if ($gateway =~ /^ixp\d+-gw\.emulab\.net$/) {
+	    $sshcmd = "telnet -l root";
+	}
+
 	$command = "ssh $login -tt $gateway ".
-	    "ssh -o StrictHostKeyChecking=no $port $hostname";
+	    "$sshcmd $hostname";
     }
     
     exec "osascript -e 'tell application \"Terminal\" \n".
