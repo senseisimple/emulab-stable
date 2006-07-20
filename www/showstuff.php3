@@ -1380,8 +1380,11 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	echo "
               <script type='text/javascript' language='javascript' src='sorttable.js'></script>
               <center>
-              <h3>Reserved Nodes</h3>
+              <br>
+              <a href=$REQUEST_URI#reserved_nodes>
+                <font size=+1 color=black><b>Reserved Nodes</b></font></a>
               </center>
+              <a NAME=reserved_nodes>
               <table class='sortable' id='nodetable' align=center border=1>
               <tr>
                 <th>Node ID</th>
