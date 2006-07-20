@@ -1046,7 +1046,7 @@ class Slice:
         try:
             qres = DBQueryFatal("select u.uid, u.usr_email from users as u "
                                 "left join experiments as e "
-                                "on u.uid = e.expt_head_uid "
+                                "on u.uid = e.expt_swap_uid "
                                 "where e.pid=%s and e.eid=%s",
                                 (self.pid, self.eid))
             if not len(qres):
