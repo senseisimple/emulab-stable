@@ -1989,7 +1989,7 @@ foreach $plink (keys(%plinks)) {
  	#
  	# Set up tracing on the end node (one direction cause its a lan).
  	#
- 	SetUpTracing($lan, $virtA, $physA, undef, $portA);
+ 	SetUpTracing($lan, $virtA, $nodeA, undef, $portA);
     }
     elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
 	   $plink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|) {
