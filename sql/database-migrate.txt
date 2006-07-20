@@ -3556,5 +3556,6 @@ last_net_act,last_cpu_act,last_ext_act);
       **** Skip this if you just did 4.41 above.
 
       alter table experiment_templates add \
-            active tinyint(1) NOT NULL default '0';
+            active tinyint(1) NOT NULL default '0.000';
 
+4.76: Change to previous revision; skip to next entry.

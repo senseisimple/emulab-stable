@@ -2912,7 +2912,7 @@ CREATE TABLE virt_vtypes (
 CREATE TABLE vis_graphs (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
-  zoom decimal(8,3) NOT NULL default '0',
+  zoom decimal(8,3) NOT NULL default '0.000',
   detail tinyint(2) NOT NULL default '0',
   image mediumblob,
   PRIMARY KEY  (pid,eid)
