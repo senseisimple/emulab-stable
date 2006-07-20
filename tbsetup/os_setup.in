@@ -1222,6 +1222,7 @@ sub list_failed_nodes ($%) {
     @nodes = map {"$vname{$_}($_)"} @nodes;
     my $line = join ' ', @nodes;
     if (length($line) > $max_length) {
+	$line = '';
 	$max_length -= 4;
 	my $length = 0;
 	foreach (@nodes) {
@@ -1229,7 +1230,7 @@ sub list_failed_nodes ($%) {
 	    last if $length > $max_length;
 	    $line .= "$_ ";
 	}
-	$line .= "...";
+	$line .= "..." if length > $max_length;
     }
     return "$line";
 }
