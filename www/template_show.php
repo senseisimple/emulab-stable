@@ -20,6 +20,9 @@ $eid = "";
 $gid = "";
 $template = NULL;
 $exptidx  = 0;
+if (!isset($show)) {
+    $show = "vis";
+}
 
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
@@ -67,53 +70,57 @@ function CheckArguments($guid, $version) {
 
 CheckArguments($guid, $version);
 
-if (isset($showtemplate) || isset($hidetemplate) ||
-    isset($showhidden) || isset($hidehidden) ||
-    isset($zoomin) || isset($zoomout)) {
+if ((isset($action) && $action != "" && $action != "none") ||
+    ($show == "graph" && isset($zoom) && $zoom != "none")) {
 
     # Need this for scripts.
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
     # Hide or show templates.
-    if (isset($showtemplate) || isset($hidetemplate) ||
-	isset($showhidden) || isset($hidehidden)) {
-
+    if (isset($action) && $action != "" && $action != "none") {
 	$optarg  = ((isset($recursive) && $recursive == "Yep") ? "-r" : "");
 	$reqarg  = "-a ";
+	$versarg = "$version";
 
-	if (isset($showtemplate)) {
+	if ($action == "showtemplate") {
 	    $reqarg .= "show";
 	}
-	elseif (isset($hidetemplate)) {
+	elseif ($action == "hidetemplate") {
 	    $reqarg .= "hide";
 	}
-	elseif (isset($showhidden)) {
+	elseif ($action == "showhidden") {
 	    $reqarg .= "showhidden";
+	    # Applies only to root template
+	    $versarg = "1";
 	}
-	elseif (isset($hidehidden)) {
+	elseif ($action == "hidehidden") {
 	    $reqarg .= "hidehidden";
+	    # Applies only to root template
+	    $versarg = "1";
 	}
-	$reqarg .= " $guid/";
-
-	if (isset($showtemplate) || isset($hidetemplate)) {
-	    $reqarg .= $version;
+	elseif ($action == "activate") {
+	    $reqarg .= "activate";
+	}
+	elseif ($action == "inactivate") {
+	    $reqarg .= "inactivate";
 	}
 	else {
-	    # Applies only to root template
-	    $reqarg .= 1;
+	    PAGEARGERROR("Invalid action $action");
+	    return;
 	}
+	$reqarg .= " $guid/$versarg";
 	
 	SUEXEC($uid, "$pid,$unix_gid",
 	       "webtemplate_control $reqarg $optarg",
 	       SUEXEC_ACTION_DIE);
     }
-    else {
+    elseif (isset($zoom) && ($zoom == "out" || $zoom == "in")) {
 	$optarg = "";
 	
-	if (isset($zoomin)) {
+	if ($zoom == "in") {
 	    $optarg = "-z in";
 	}
-	elseif (isset($zoomout)) {
+	else {
 	    $optarg = "-z out";
 	}
 
@@ -121,6 +128,7 @@ if (isset($showtemplate) || isset($hidetemplate) ||
 	SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
 	       SUEXEC_ACTION_DIE);
     }
+    $template->Refresh();
 }
 
 #
@@ -132,15 +140,15 @@ SUBPAGESTART();
 
 SUBMENUSTART("Template Options");
 
-if (!isset($show) || $show == "graph") {
-    WRITESUBMENUBUTTON("Show NS File &nbsp &nbsp",
+if ($template->IsActive()) {
+    WRITESUBMENUBUTTON("InActivate Template &nbsp &nbsp",
 		       "template_show.php?guid=$guid".
-		       "&version=$version&show=nsfile");
+		       "&version=$version&action=inactivate");
 }
 else {
-    WRITESUBMENUBUTTON("Show Graph &nbsp &nbsp",
+    WRITESUBMENUBUTTON("Activate Template &nbsp &nbsp",
 		       "template_show.php?guid=$guid".
-		       "&version=$version&show=graph");
+		       "&version=$version&action=activate");
 }
 
 WRITESUBMENUBUTTON("Modify Template",
@@ -177,24 +185,60 @@ if ($template->InstanceCount()) {
 
 SUBMENUEND_2B();
 
-if (!isset($show) || $show == "graph") {
-    $template->ShowGraph();
+#
+# The center area is a form that can show NS file, Template Graph, or Vis.
+# IE complicates this, although in retrospect, I could have used plain
+# input buttons instead of the fancy rendering kind of buttons, which do not
+# work as expected (violates the html spec) in IE. 
+#
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
+echo "<script type='text/javascript' language='javascript'>
+        function Show(which) {
+            document.form1['show'].value = which;
+            document.form1.submit();
+            return false;
+        }
+        function Zoom(howmuch) {
+            document.form1['zoom'].value = howmuch;
+            document.form1.submit();
+            return false;
+        }
+        function DoAction(action) {
+            document.form1['action'].value = action;
+            document.form1.submit();
+            return false;
+        }
+      </script>\n";
 
-    #
-    # Define the control buttons.
-    #
-    echo "<center>\n";
-    echo "<form action='template_show.php?guid=$guid&version=$version'
-                method=post>\n";
+echo "<center>\n";
+echo "<form action='template_show.php?guid=$guid&version=$version'
+            name=form1 method=post>\n";
+echo "<input type=hidden name=show   value=$show>\n";
+echo "<input type=hidden name=zoom   value='none'>\n";
+echo "<input type=hidden name=action value='none'>\n";
+
+echo "<button name=showns type=button value=ns onclick=\"Show('ns');\"
+        style='float:center; width:15%;'>NS File</button>\n";
+echo "<button name=showvis type=button value=vis onclick=\"Show('vis');\"
+        style='float:center; width:15%;'>Visualization</button>\n";
+echo "<button name=showgraph type=button value=graph onclick=\"Show('graph');\"
+        style='float:center; width:15%;'>Graph</button>\n";
+
+if ($show == "graph") {
+    $template->ShowGraph();
 
     if (! $template->IsRoot()) {
 	if ($template->IsHidden()) {
-	    echo "<button name=showtemplate type=submit value=Show>";
-	    echo " Show Template</button></a>&nbsp ";
+	    echo "<button name=showtemplate type=button value=Show";
+	    echo " onclick=\"DoAction('showtemplate');\">Show Template";
+	    echo "</button>&nbsp";
 	}
 	else {
-	    echo "<button name=hidetemplate type=submit value=Hide>";
-	    echo " Hide Template</button></a>&nbsp ";
+	    echo "<button name=hidetemplate type=button value=Hide";
+	    echo " onclick=\"DoAction('hidetemplate');\">Hide Template";
+	    echo "</button>&nbsp";
 	}
 	echo "<input type=checkbox name=recursive value=Yep>Recursive? &nbsp ";
 	echo "&nbsp &nbsp &nbsp ";
@@ -203,23 +247,48 @@ if (!isset($show) || $show == "graph") {
 
     # We overload the hidden bit on the root.
     if ($root->IsHidden()) {
-	echo "<button name=showhidden type=submit value=showhidden>";
-	echo " Show Hidden Templates</button></a>&nbsp &nbsp &nbsp &nbsp ";
+	echo "<button name=showhidden type=button value=showhidden";
+	echo " onclick=\"DoAction('showhidden');\">Show Hidden Templates ";
+	echo "</button>&nbsp &nbsp &nbsp &nbsp ";
     }
     else {
-	echo "<button name=hidehidden type=submit value=hidehidden>";
-	echo " Hide Hidden Templates</button></a>&nbsp &nbsp &nbsp &nbsp ";
+	echo "<button name=hidehidden type=button value=hidehidden";
+	echo " onclick=\"DoAction('hidehidden');\">Hide Hidden Templates ";
+	echo "</button>&nbsp &nbsp &nbsp &nbsp ";
     }
-    echo "<button name=zoomout type=submit value=zoomout>";
-    echo " Zoom Out</button>\n";
-    echo "<button name=zoomin type=submit value=zoomin>";
-    echo "Zoom In</button>\n";
-    echo "</form>\n";
-    echo "</center>\n";
+    echo "<button name=zoomout type=button value=out";
+    echo " onclick=\"Zoom('out');\">Zoom Out</button>\n";
+    echo "<button name=zoomin type=button value=in";
+    echo " onclick=\"Zoom('in');\">Zoom In</button>\n";
 }
-else {
+elseif ($show == "ns") {
     $template->ShowNS();
 }
+elseif ($show == "vis") {
+    # Default is whatever we have; to avoid regen of the image.
+    list ($newzoom, $newdetail) = $template->CurrentVisDetails();
+    
+    if (isset($zoom) && $zoom != "none")
+	$newzoom = $zoom;
+
+    # Sanity check but lets not worry about throwing an error.
+    if (!TBvalid_float($newzoom))
+	$newzoom = 1.25;
+    if (!TBvalid_integer($newdetail))
+	$newdetail = 1;
+    
+    $template->ShowVis($newzoom, $newdetail);
+
+    $zoomout = sprintf("%.2f", $newzoom / 1.25);
+    $zoomin  = sprintf("%.2f", $newzoom * 1.25);
+
+    echo "<button name=viszoomout type=button value=$zoomout";
+    echo " onclick=\"Zoom('$zoomout');\">Zoom Out</button>\n";
+    echo "<button name=viszoomin type=button value=$zoomin";
+    echo " onclick=\"Zoom('$zoomin');\">Zoom In</button>\n";
+}
+echo "</form>\n";
+echo "</center>\n";
 
 SUBPAGEEND();
 
@@ -262,9 +331,7 @@ echo "</tr>\n";
 echo "</table>\n";
 echo "</center>\n";
 
-echo "<script type='text/javascript' language='javascript' ".
-     "        src='template_sup.js'>\n";
-echo "</script>\n";
+print_r($HTTP_POST_VARS);
 
 #
 # Standard Testbed Footer

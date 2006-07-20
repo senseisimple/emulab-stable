@@ -3420,6 +3420,7 @@ sub TBExptContainsNodeCT($$$)
 		   # vis_nodes is locked during update in prerender, so we
 		   # will get a consistent dataset when we backup.
 		   "vis_nodes",
+		   "vis_graphs",
 		   "nseconfigs",
 		   "eventlist",
 		   "event_groups",

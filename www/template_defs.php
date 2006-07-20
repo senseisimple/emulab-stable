@@ -135,6 +135,9 @@ class Template
     function IsHidden() {
 	return (is_null($this->template) ? -1 : $this->template['hidden']);
     }
+    function IsActive() {
+	return (is_null($this->template) ? -1 : $this->template['active']);
+    }
     function created() {
 	return (is_null($this->template) ? -1 : $this->template['created']);
     }
@@ -626,6 +629,14 @@ class Template
 	echo "<script type='text/javascript' ".
 	            "src='js/wz_dragdrop.js'></script>";
 
+	echo "<script type='text/javascript'>
+               function G${guid}_loaded() {
+                   dd.recalc();
+  	           SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
+				     \"Tarea${vers}\");
+               }
+              </script>\n";
+
 	echo "<center>";
 	echo "<div id=fee style='display: block; overflow: hidden; ".
 	    "position: relative; z-index:1010; height: 400px; ".
@@ -639,6 +650,7 @@ class Template
 
 	echo $imap;
 	echo "<img id=\"G$guid\" border=0 usemap=\"#TemplateGraph\" ";
+	echo "      onLoad=\"setTimeout('G${guid}_loaded()', 200);\" ";
 	echo "      src='template_graph.php?guid=$guid'>\n";
 	echo "</div>\n";
 	echo "</div>\n";
@@ -649,9 +661,10 @@ class Template
 	$bodyclosestring =
 	    "<script type='text/javascript'>
                SET_DHTML(\"D$guid\");
-        
-	       SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
-				 \"Tarea${vers}\");
+
+               SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
+	  		         \"Tarea${vers}\");
+
               </script>\n";
     }
 
@@ -667,6 +680,61 @@ class Template
                       src='spitnsdata.php3?guid=$guid&version=$vers'
                       border=2></iframe>\n";
 	echo "</center>";
+    }
+
+    #
+    # Dump the visualization into its own iframe.
+    #
+    function ShowVis($zoom = 1.25, $detail = 1) {
+	global $bodyclosestring;
+
+	$guid = $this->guid();
+	$pid  = $this->pid();
+	$eid  = $this->eid();
+
+	echo "<script type='text/javascript' ".
+	            "src='js/wz_dragdrop.js'></script>";
+
+	echo "<center>";
+	echo "<div id=fee style='display: block; overflow: hidden; ".
+	    "position: relative; z-index:1010; height: 400px; ".
+	    "width: 700px; border: 2px solid black;'>\n";
+	echo "<div id=\"D$guid\" style='position:relative;'>\n";
+
+	echo "<img id=\"G$guid\" border=0 ";
+	echo "      onLoad=\"setTimeout('dd.recalc()', 1000);\" ";
+	echo "      src='top2image.php3?pid=$pid&eid=$eid".
+	    "&zoom=$zoom&detail=$detail'>\n";
+	echo "</div>\n";
+	echo "</div>\n";
+
+	#
+	# This has to happen ...
+	#
+	$bodyclosestring =
+	    "<script type='text/javascript'>
+               SET_DHTML(\"D$guid\");
+             </script>\n";
+    }
+
+    #
+    # Grab the zoom and detail for the current viz picture, as a default.
+    #
+    function CurrentVisDetails() {
+	$pid = $this->pid();
+	$eid = $this->eid();
+
+	$query_result =
+	    DBQueryFatal("select zoom,detail from vis_graphs ".
+			 "where pid='$pid' and eid='$eid'");
+
+	if (!mysql_num_rows($query_result)) {
+	    return array(1.15, 1);
+	}
+	$row    = mysql_fetch_array($query_result);
+	$zoom   = $row['zoom'];
+	$detail = $row['detail'];
+	return array($zoom, $detail);
     }
 
     #

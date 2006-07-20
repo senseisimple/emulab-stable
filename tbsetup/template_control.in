@@ -55,6 +55,8 @@ sub HideTemplate();
 sub ShowTemplate();
 sub ShowHidden();
 sub HideHidden();
+sub Activate();
+sub InActivate();
 
 #
 # Testbed Support libraries
@@ -121,6 +123,12 @@ elsif ($action eq "showhidden") {
 elsif ($action eq "hidehidden") {
     exit(HideHidden());
 }
+elsif ($action eq "activate") {
+    exit(Activate());
+}
+elsif ($action eq "inactivate") {
+    exit(InActivate());
+}
 usage();
 
 sub HideTemplate()
@@ -179,6 +187,21 @@ sub HideHidden()
     }
     # We overload the hidden bit on the root template
     $template->Hide(0) == 0
+	or return -1;
+   
+    return 0;
+}
+
+sub Activate()
+{
+    $template->Activate() == 0
+	or return -1;
+    
+    return 0;
+}
+sub InActivate()
+{
+    $template->InActivate() == 0
 	or return -1;
    
     return 0;

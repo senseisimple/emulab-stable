@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,10 +24,15 @@ if (!isset($pid) ||
     strcmp($pid, "") == 0) {
     USERERROR("You must provide a Project ID.", 1);
 }
-
 if (!isset($eid) ||
     strcmp($eid, "") == 0) {
     USERERROR("You must provide an Experiment ID.", 1);
+}
+if (!TBvalid_pid($pid)) {
+    PAGEARGERROR("Invalid project ID.");
+}
+if (!TBvalid_eid($eid)) {
+    PAGEARGERROR("Invalid experiment ID.");
 }
 $exp_eid = $eid;
 $exp_pid = $pid;
@@ -69,6 +74,24 @@ if (!$query_result || !mysql_num_rows($query_result)) {
     # No Data. Spit back a stub image.
     header("Content-type: image/gif");
     readfile("coming-soon-thumb.gif");
+    return;
+}
+
+#
+# See if we have a copy of the image in the desired zoom/detail level
+# cached in the DB. If so, that is what we return.
+#
+$query_result =
+    DBQueryFatal("select image from vis_graphs ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 "      zoom='$zoom' and detail='$detail'");
+
+if (mysql_num_rows($query_result)) {
+    $row   = mysql_fetch_array($query_result);
+    $image = $row['image'];
+    
+    header("Content-type: image/png");
+    echo $image;
     return;
 }
 

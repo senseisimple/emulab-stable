@@ -1320,6 +1320,54 @@ sub Show($$)
     return 0;
 }
 
+#
+# Activate/InActivate a template. What is an active template? Its one the
+# user is futzing with and wants at the top of the list. Inactive templates
+# are there but not considered important.
+#
+sub Activate($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    
+    DBQueryWarn("update experiment_templates set active=1 ".
+		"where guid='$guid' and ".
+		"      vers='$vers'")
+	or return -1;
+    
+    Refresh($self) == 0
+	or return -1;
+
+    return 0;
+}
+sub InActivate($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    
+    DBQueryWarn("update experiment_templates set active=0 ".
+		"where guid='$guid' and ".
+		"      vers='$vers'")
+	or return -1;
+    
+    Refresh($self) == 0
+	or return -1;
+
+    return 0;
+}
+
 # Improve this at some point.
 sub Recurse($$)
 {
@@ -1349,6 +1397,10 @@ sub Recurse($$)
 	    if (!exists($children{$parent_vers}));
 	push(@{ $children{$parent_vers} }, $vers);
     }
+
+    # A leaf node ...
+    return 0
+	if (!exists($children{$template_vers}));
 
     # Recurse through all the children of this template.
     my @kids = @{ $children{$template_vers} };

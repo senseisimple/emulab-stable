@@ -47,7 +47,10 @@ CREATE TABLE experiment_templates (
   logfile tinytext,
   logfile_open tinyint(4) NOT NULL default '0',
   prerender_pid int(11) default '0',
+  -- Hide this template in the graph.
   hidden tinyint(1) NOT NULL default '0',
+  -- Make this template an active template within its graph
+  active tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (guid, vers),
   KEY pidtid (pid,tid),
   KEY pideid (pid,eid)

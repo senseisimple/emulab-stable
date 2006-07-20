@@ -712,6 +712,7 @@ CREATE TABLE experiment_templates (
   logfile_open tinyint(4) NOT NULL default '0',
   prerender_pid int(11) default '0',
   hidden tinyint(1) NOT NULL default '0',
+  active tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (guid,vers),
   KEY pidtid (pid,tid),
   KEY pideid (pid,eid)
@@ -2902,6 +2903,19 @@ CREATE TABLE virt_vtypes (
   name varchar(12) NOT NULL default '',
   weight float(7,5) NOT NULL default '0.00000',
   members text
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `vis_graphs`
+--
+
+CREATE TABLE vis_graphs (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  zoom decimal(8,3) NOT NULL default '0',
+  detail tinyint(2) NOT NULL default '0',
+  image mediumblob,
+  PRIMARY KEY  (pid,eid)
 ) TYPE=MyISAM;
 
 --

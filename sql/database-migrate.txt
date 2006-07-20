@@ -3534,5 +3534,27 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table node_types drop adminmfs_osid;
 	alter table node_types drop diskloadmfs_osid;
 
-      At some point you will want to drop the node_types_save table ...
+      At some point you will want to drop the node_types_save table
+      ...
+
+4.75: Add table to cache last viewed visualization, to avoid
+      regeneration delays.
+  
+	CREATE TABLE vis_graphs (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  zoom decimal(8,3) NOT NULL default '0',
+	  detail tinyint(2) NOT NULL default '0',
+	  image mediumblob,
+	  PRIMARY KEY  (pid,eid)
+	) TYPE=MyISAM;
+
+
+      Also add a "active" flag to the experiment_template to use in
+      determining which templates the user is currently interested in.
+
+      **** Skip this if you just did 4.41 above.
+
+      alter table experiment_templates add \
+            active tinyint(1) NOT NULL default '0';
 

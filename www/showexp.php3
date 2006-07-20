@@ -16,6 +16,9 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 $tag = "Experiment";
+if (!isset($show)) {
+    $show = "details";
+}
 
 #
 # Verify page arguments.
@@ -73,6 +76,36 @@ sajax_handle_client_request();
 # Faster to do this after the sajax stuff
 include("showstuff.php3");
 include_once("template_defs.php");
+
+#
+# Dump the visualization into its own iframe.
+#
+function ShowVis($pid, $eid, $zoom = 1.25, $detail = 1) {
+    global $bodyclosestring;
+
+    echo "<script type='text/javascript' src='js/wz_dragdrop.js'></script>";
+
+    echo "<center>";
+    echo "<div id=fee style='display: block; overflow: hidden; ".
+	    "position: relative; z-index:1010; height: 380px; ".
+	    "width: 650px; border: 2px solid black;'>\n";
+    echo "<div id=myvisdiv style='position:relative;'>\n";
+
+    echo "<img id=myvisimg border=0 ";
+    echo "      onLoad=\"setTimeout('dd.recalc()', 1000);\" ";
+    echo "      src='top2image.php3?pid=$pid&eid=$eid".
+	"&zoom=$zoom&detail=$detail'>\n";
+    echo "</div>\n";
+    echo "</div>\n";
+ 
+    #
+    # This has to happen ...
+    #
+    $bodyclosestring =
+	    "<script type='text/javascript'>
+               SET_DHTML(\"myvisdiv\");
+             </script>\n";
+}
 
 #
 # Need some DB info.
@@ -157,22 +190,13 @@ if ($expstate) {
     }
 
     if ($state == $TB_EXPTSTATE_ACTIVE) {
-	WRITESUBMENUBUTTON("Visualization, NS File, Mapping",
+	WRITESUBMENUBUTTON("Details and Mapping",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
     else {
-	WRITESUBMENUBUTTON("Visualization and NS File",
+	WRITESUBMENUBUTTON("Experiment Details",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
-    if (!isset($show) || $show == "details") {
-	WRITESUBMENUBUTTON("Show NS File",
-		 "showexp.php3?pid=$exp_pid&eid=$exp_eid&show=nsfile");
-    }
-    else {
-	WRITESUBMENUBUTTON("Hide NS File",
-		 "showexp.php3?pid=$exp_pid&eid=$exp_eid&show=details");
-    }
-
     WRITESUBMENUDIVIDER();
 
     if (!$lockdown) {
@@ -377,16 +401,84 @@ echo "<br>
 
 SUBMENUEND_2B();
 
-if (!isset($show) || $show == "details") {
+#
+# The center area is a form that can show NS file, Details, or Vis.
+# IE complicates this, although in retrospect, I could have used plain
+# input buttons instead of the fancy rendering kind of buttons, which do not
+# work as expected (violates the html spec) in IE. 
+#
+echo "<script type='text/javascript' language='javascript'>
+        function Show(which) {
+            document.form1['show'].value = which;
+            document.form1.submit();
+            return false;
+        }
+        function Zoom(howmuch) {
+            document.form1['zoom'].value = howmuch;
+            document.form1.submit();
+            return false;
+        }
+      </script>\n";
+
+echo "<center>\n";
+echo "<form action='showexp.php3?pid=$pid&eid=$eid' name=form1 method=post>\n";
+echo "<input type=hidden name=show   value=$show>\n";
+echo "<input type=hidden name=zoom   value='none'>\n";
+
+echo "<button name=showns type=button value=ns onclick=\"Show('ns');\"
+        style='float:center; width:10%;'>NS File</button>\n";
+echo "<button name=showvis type=button value=vis onclick=\"Show('vis');\"
+        style='float:center; width:15%;'>Visualization</button>\n";
+echo "<button name=showdetails type=button value=details
+        onclick=\"Show('details');\"
+        style='float:center; width:10%;'>Settings</button>\n";
+echo "<br>\n";
+
+if ($show == "details") {
     SHOWEXP($exp_pid, $exp_eid);
 }
-else {
+elseif ($show == "ns") {
     echo "<center>";
-    echo "<iframe width=700 height=400 scrolling=auto
+    echo "<iframe width=650 height=380 scrolling=auto
                   src='spitnsdata.php3?pid=$exp_pid&eid=$exp_eid'
                   border=2></iframe>\n";
     echo "</center>";
 }
+elseif ($show == "vis") {
+    $newzoom   = 1.15;
+    $newdetail = 1;
+    
+    # Default is whatever we have; to avoid regen of the image.
+    $query_result =
+	DBQueryFatal("select zoom,detail from vis_graphs ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if (mysql_num_rows($query_result)) {
+	$row       = mysql_fetch_array($query_result);
+	$newzoom   = $row['zoom'];
+    }
+    
+    if (isset($zoom) && $zoom != "none")
+	$newzoom = $zoom;
+
+    # Sanity check but lets not worry about throwing an error.
+    if (!TBvalid_float($newzoom))
+	$newzoom = 1.25;
+    if (!TBvalid_integer($newdetail))
+	$newdetail = 1;
+    
+    ShowVis($pid, $eid, $newzoom, $newdetail);
+
+    $zoomout = sprintf("%.2f", $newzoom / 1.25);
+    $zoomin  = sprintf("%.2f", $newzoom * 1.25);
+
+    echo "<button name=viszoomout type=button value=$zoomout";
+    echo " onclick=\"Zoom('$zoomout');\">Zoom Out</button>\n";
+    echo "<button name=viszoomin type=button value=$zoomin";
+    echo " onclick=\"Zoom('$zoomin');\">Zoom In</button>\n";
+}
+echo "</form>\n";
+echo "</center>\n";
 
 if (TBExptFirewall($exp_pid, $exp_eid) &&
     ($expstate == $TB_EXPTSTATE_ACTIVE ||
