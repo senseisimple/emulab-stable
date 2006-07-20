@@ -68,8 +68,10 @@ RENEW_TIMEOUT = 1*60     # give the node manager a minute to respond to renew
 FREE_TIMEOUT  = 1*60     # give the node manager a minute to respond to free
 NODEPROBEINT  = 30
 
-TBOPS = "@TBOPSEMAIL@".replace("\\","")
+USERNODE = "@USERNODE@"
+TBOPS = "@TBOPSEMAIL_NOSLASH@"
 MAILTAG = "@THISHOMEBASE@"
+SLICE_ALIAS_DIR = "/etc/mail/plab-slice-addrs"
 
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "hwdown"       # start life in hwdown
@@ -1038,6 +1040,29 @@ class Slice:
                          (self.slicename,))
             raise
 
+        # Setup mailing alias for the slice.  All mail currently filters
+        # in via the 'emulabman' alias.  A procmail filter there will
+        # redirect it to the appropriate user.
+        try:
+            qres = DBQueryFatal("select u.uid, u.usr_email from users as u "
+                                "left join experiments as e "
+                                "on u.uid = e.expt_head_uid "
+                                "where e.pid=%s and e.eid=%s",
+                                (self.pid, self.eid))
+            if not len(qres):
+                raise RuntimeError, \
+                      "Didn't get any results while looking up user info " \
+                      "for experiment %s/%s" % (self.pid, self.eid)
+            (username, usremail) = qres[0]
+            command = "%s -host %s /bin/echo %s \> %s/%s" % \
+                      (SSH, USERNODE, usremail,
+                       SLICE_ALIAS_DIR, self.slicename)
+            os.system(command)
+        except:
+            print "Could not setup email alias for slice: %s!" % self.slicename
+            traceback.print_exc()
+            pass
+
         return res
 
     def _load(self):
@@ -1165,6 +1190,17 @@ class Slice:
                      "Slice deletion error:\n\n%s" % tbstr, TBOPS)
             enable_sigs(osigs)
             raise
+
+        try:
+            command = "%s -host %s /bin/rm -f %s/%s" % \
+                      (SSH, USERNODE, SLICE_ALIAS_DIR, self.slicename)
+            os.system(command)
+        except:
+            print "Could not remove email alias for slice: %s!" % \
+                  self.slicename
+            traceback.print_exc()
+            pass
+            
         
         enable_sigs(osigs)
 

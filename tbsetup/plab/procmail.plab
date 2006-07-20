@@ -1,0 +1,18 @@
+LOGFILE=/tmp/procmail-slice-plab.log
+VERBOSE=on
+SLICE_ALIAS_DIR=/etc/mail/plab-slice-addrs
+
+#
+# If the message contains a reference to an Emulab created slice
+# _anywhere_ inside it, forward the message on to the slice owner.
+#
+:0BH
+* .*\/utah_elab_[0-9]+
+* ? test -f $SLICE_ALIAS_DIR/$MATCH
+! `cat $SLICE_ALIAS_DIR/$MATCH`
+
+#
+# Otherwise, just dump it.
+#
+:0
+/dev/null
