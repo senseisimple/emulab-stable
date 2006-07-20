@@ -52,7 +52,8 @@ $query_result2 =
     DBQueryFatal("select * from scheduled_reloads where image_id='$imageid'");
 $query_result3 =
     DBQueryFatal("select * from node_type_attributes ".
-		 "where default_imageid='$imageid' limit 1");
+		 "where attrkey='default_imageid' and ".
+		 "      attrvalue='$imageid' limit 1");
 
 if (mysql_num_rows($query_result1)) {
     echo "$imageid is referenced in the current_reloads table!<br>";
