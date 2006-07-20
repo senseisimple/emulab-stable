@@ -425,13 +425,13 @@ echo "<form action='showexp.php3?pid=$pid&eid=$eid' name=form1 method=post>\n";
 echo "<input type=hidden name=show   value=$show>\n";
 echo "<input type=hidden name=zoom   value='none'>\n";
 
-echo "<button name=showns type=button value=ns onclick=\"Show('ns');\"
-        style='float:center; width:10%;'>NS File</button>\n";
+echo "<button name=showdetails type=button value=settings
+        onclick=\"Show('details');\"
+        style='float:center; width:11%;'>Settings</button>\n";
 echo "<button name=showvis type=button value=vis onclick=\"Show('vis');\"
         style='float:center; width:15%;'>Visualization</button>\n";
-echo "<button name=showdetails type=button value=details
-        onclick=\"Show('details');\"
-        style='float:center; width:10%;'>Settings</button>\n";
+echo "<button name=showns type=button value=ns onclick=\"Show('ns');\"
+        style='float:center; width:11%;'>NS File</button>\n";
 echo "<br>\n";
 
 if ($show == "details") {
