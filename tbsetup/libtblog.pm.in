@@ -1039,7 +1039,7 @@ sub tblog_lookup_error ( ;$ ) {
     }
 }    
 
-=item tblog_email_error DATA, TO, WHAT, EIDPID, FROM, HEADERS, TBOBS_HEADERS, @FILES
+=item tblog_email_error DATA, TO, WHAT, EIDPID, FROM, HEADERS, TBOBS_HEADERS, PREFIX, @FILES
 
 Email the user and possible testbed-ops the error.
 
@@ -1049,9 +1049,9 @@ WHAT is something like "Swap In Failure", "Swap Out Failure", etc.
 
 =cut
 
-sub tblog_email_error ( $$$$$$$@ ) {
+sub tblog_email_error ( $$$$$$$$@ ) {
     
-    my ($d, $to, $what, $pideid, $from, $headers, $testbed_ops, @files) = @_;
+    my ($d, $to, $what, $pideid, $from, $headers, $testbed_ops, $prefix, @files) = @_;
 
     my $threshold = 0.55;
 
@@ -1076,6 +1076,8 @@ sub tblog_email_error ( $$$$$$$@ ) {
     }
     
     my $body;
+
+    $body .= "$prefix\n\n" if $prefix;
 
     if ($d->{confidence} > $threshold) {
 

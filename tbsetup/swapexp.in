@@ -120,6 +120,8 @@ my $nextswapstate;
 my $termswapstate;
 my $isadmin  = 0;
 
+my $modifyError; # needed when emailing error
+
 # Protos
 sub fatal($);
 sub CheckFWinfo($);
@@ -900,8 +902,6 @@ elsif ($inout eq "in") {
     $experiment->Report($repfile, "-b");
 }
 elsif ($inout eq "modify") {
-    my $modifyError;
-
     #
     # Prepare the Archive for the swapmod, in case we have to "roll back".
     #
@@ -1374,6 +1374,7 @@ sub cleanup()
 		      ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 		      "Cc:  $expt_head_name <$expt_head_email> $rcops",
 		      "Cc:  $TBOPS $rcops",
+		      $modifyError,
 		      (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
 
     if ($modifyHosed) {

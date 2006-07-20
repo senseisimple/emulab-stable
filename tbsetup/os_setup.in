@@ -76,6 +76,7 @@ my %canfail     = ();
 my %bios_waittime   = ();	# Indexed by node_type.
 my %reboot_waittime = ();	# Indexed by osid.
 my %node_types  = ();		# Indexed by node_id.
+my %vname = ();                 # Indexed by node_id.
 
 #
 # This variable keeps track of the failed nodes of all types.
@@ -211,7 +212,7 @@ if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
 # Get the set of nodes, as well as the nodes table information for them.
 #
 my $db_result =
-    DBQueryFatal("select n.*,l.pid from reserved as r ".
+    DBQueryFatal("select n.*,l.pid,r.vname from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
 		 "where r.pid='$pid' and r.eid='$eid'");
@@ -227,6 +228,7 @@ while (my %row = $db_result->fetchhash()) {
     my $type      = $row{'type'};
     my $jailnode  = $row{'jailflag'};
     my $failmode  = $row{'failureaction'};
+    my $vname     = $row{'vname'};
     my $typeinfo  = NodeType->Lookup($type);
     my $class     = $typeinfo->class();
     my $subnode   = $typeinfo->issubnode();
@@ -268,6 +270,7 @@ while (my %row = $db_result->fetchhash()) {
     $osids{$node}         = $osid;
     $bios_waittime{$type} = $bios_wait;
     $node_types{$node}    = $type;
+    $vname{$node}         = $vname;
 
     #
     # Make sure the files specified in the paths exist. We mount the
@@ -1188,6 +1191,7 @@ foreach (keys %failed_nodes) {
     $total_osid{$osid}{total}++;
     $total_type{$osid}{$type}{failed}++;
     $total_type{$osid}{$type}{failed_fatal}++;
+    push @{$total_type{$osid}{$type}{failed_fatal_list}}, $_;
     $total_type{$osid}{$type}{total}++;
 }
 foreach (keys %failed_nonfatal_nodes) {
@@ -1198,6 +1202,7 @@ foreach (keys %failed_nonfatal_nodes) {
     $total_osid{$osid}{total}++;
     $total_type{$osid}{$type}{failed}++;
     $total_type{$osid}{$type}{failed_nonfatal}++;
+    push @{$total_type{$osid}{$type}{failed_nonfatal_list}}, $_;
     $total_type{$osid}{$type}{total}++;
 }
 foreach ((keys %nodes), (keys %vnodes), (keys %plabvnodes)) {
@@ -1206,6 +1211,37 @@ foreach ((keys %nodes), (keys %vnodes), (keys %plabvnodes)) {
     my $type = $node_types{$_};
     $total_osid{$osid}{total}++;
     $total_type{$osid}{$type}{total}++;
+}
+
+sub list_failed_nodes ($%) {
+    no warnings 'uninitialized';
+    my ($max_length,%d) = @_;
+    my $byvname = sub { $vname{$a} cmp $vname{$b} };
+    my @nodes = (sort $byvname @{$d{failed_fatal_list}}, 
+		 sort $byvname @{$d{failed_nonfatal_list}});
+    @nodes = map {"$vname{$_}($_)"} @nodes;
+    my $line = join ' ', @nodes;
+    if (length($line) > $max_length) {
+	$max_length -= 4;
+	my $length = 0;
+	foreach (@nodes) {
+	    $length += length($_);
+	    last if $length > $max_length;
+	    $line .= "$_ ";
+	}
+	$line .= "...";
+    }
+    return "$line";
+}
+
+sub add_failed_nodes ($$%) {
+    my ($line, $indent, %d) = @_;
+    my $nodes_line = list_failed_nodes(78 - $indent, %d);
+    if (length($line) + 2 + length($nodes_line) > 78) {
+	return "$line:\n".(' 'x$indent)."$nodes_line\n";
+    } else {
+	return "$line: $nodes_line\n";
+    }
 }
 
 foreach my $osid (sort keys %total_osid) {
@@ -1228,43 +1264,61 @@ foreach my $osid (sort keys %total_osid) {
 	    $user_image = 0;
 	}
 
-	$users_fault = 0 if !$user_image;
-
-	my %d = %{$total_osid{$osid}};
-	$summary .= "$d{failed}/$d{total} nodes with a ";
-	$summary .= $user_image ? "user" : "system";
-	$summary .= " osid of \"$osname\" failed to boot";
-	if ($d{failed_nonfatal} > 0) {
-	    my $count = ($d{failed_nonfatal} == $d{failed}
-			 ? "all"
-			 : "$d{failed_nonfatal}/$d{failed}");
-	    $summary .= " ($count non-fatal)";
-	}
-	$summary .= ":\n";
-
 	my $byfailure = sub {
-	    # I want undefined to mean zero!
 	    my $cmp = $total_type{$osid}{$b}{failed} <=> $total_type{$osid}{$a}{failed};
 	    return $cmp if $cmp != 0;
 	    return $a cmp $b;
 	};
-	
-	foreach my $type (sort $byfailure keys %{$total_type{$osid}}) {
+	my @node_types = sort $byfailure keys %{$total_type{$osid}};
+
+	$users_fault = 0 if !$user_image;
+	foreach my $type (@node_types) {
 	    my %d = %{$total_type{$osid}{$type}};
-	    if ($d{failed} > 0) {
-		$summary .= "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
-		if ($d{failed_nonfatal} > 0) {
-		    my $count = ($d{failed_nonfatal} == $d{failed}
-				 ? "all"
-				 : "$d{failed_nonfatal}/$d{failed}");
-		$summary .= " ($count non-fatal)";
+	    $users_fault = 0 if $d{failed} < $d{total};
+	}
+
+	my %d = %{$total_osid{$osid}};
+
+	my $what = @node_types > 1 ? 'nodes' : "$node_types[0]'s";
+	
+	my $line;
+	$line .= "$d{failed}/$d{total} $what with a ";
+	$line .= $user_image ? "user" : "system";
+	$line .= " osid of \"$osname\" failed to boot";
+	if ($d{failed_nonfatal} > 0) {
+	    my $count = ($d{failed_nonfatal} == $d{failed}
+			 ? "all"
+			 : "$d{failed_nonfatal}/$d{failed}");
+	    $line .= " ($count non-fatal)";
+	}
+
+	if (@node_types == 1) {
+
+	    my $type = $node_types[0];
+	    my %d = %{$total_type{$osid}{$type}};
+
+	    $summary .= add_failed_nodes($line, 2, %d);
+
+	} else {
+
+	    $summary .= "$line:\n";
+
+	    foreach my $type (@node_types) {
+		my %d = %{$total_type{$osid}{$type}};
+		if ($d{failed} > 0) {
+		    $line = "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
+		    if ($d{failed_nonfatal} > 0) {
+			my $count = ($d{failed_nonfatal} == $d{failed}
+				     ? "all"
+				     : "$d{failed_nonfatal}/$d{failed}");
+			$line .= " ($count non-fatal)";
+		    }
+		    $summary .= add_failed_nodes($line, 4, %d);
+		} else {
+		    $summary .= "  $d{total} ";
+		    $summary .= $d{total} == 1 ? "$type" : "${type}'s";
+		    $summary .= " with this os successfully booted.\n";
 		}
-		$summary .= ".\n";
-		$users_fault = 0 if $d{failed} < $d{total};
-	    } else {
-		$summary .= "  $d{total} ";
-		$summary .= $d{total} == 1 ? "$type" : "${type}'s";
-		$summary .= " with this os successfully booted.\n";
 	    }
 	}
     }

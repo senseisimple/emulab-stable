@@ -3184,7 +3184,8 @@ sub CheckMaxConcurrent()
 	my $count = $counts{$osid};
 
 	if (!TBOSLoadMaxOkay($osid, $count)) {
-	    fatal("Too many nodes are already running OSID $osid!");
+	    fatal({cause => 'temp'}, 
+                  "Too many nodes are already running OSID $osid!");
 	}
     }
 }
@@ -3867,7 +3868,8 @@ sub LoadVirtNodes()
 
 	    if (! ($osid = TBOSID($pid, $osname)) &&
 		! ($osid = TBOSID(TB_OPSPID, $osname))) {
-		fatal("Invalid OS $osname in project $pid!");
+		fatal({cause => 'user'}, 
+		      "Invalid OS $osname in project $pid!");
 	    }
 	    # Stash this in the virt_nodes data structure.
 	    $rowref->{"__osid"}	= $osid;
@@ -4234,13 +4236,13 @@ sub LoadExperiment()
     if (!defined($jail_osid) && defined($jail_osname)) {
 	if (! ($jail_osid = TBOSID($pid, $jail_osname)) &&
 	    ! ($jail_osid = TBOSID(TB_OPSPID, $jail_osname))) {
-	    fatal("Invalid OS $jail_osname in project $pid!");
+	    fatal({cause=>'user'}, "Invalid OS $jail_osname in project $pid!");
 	}
     }
     if (!defined($delay_osid) && defined($delay_osname)) {
 	if (! ($delay_osid = TBOSID($pid, $delay_osname)) &&
 	    ! ($delay_osid = TBOSID(TB_OPSPID, $delay_osname))) {
-	    fatal("Invalid OS $delay_osname in project $pid!");
+	    fatal({cause=>'user'}, "Invalid OS $delay_osname in project $pid!");
 	}
     }
     # Keep a desire string we can use to make sure that the node type picked
@@ -5336,3 +5338,4 @@ sub LoadCurrent()
 	if ($reserved_simcount);
     printdb "Old Reserved Nodes: " . join(" ", keys %oldreservednodes) . "\n";
 }
+
