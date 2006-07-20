@@ -89,7 +89,7 @@ class Template
     # Refresh a template instance by reloading from the DB.
     #
     function Refresh() {
-	if (! $this->IsValidTemplate())
+	if (! $this->IsValid())
 	    return -1;
 
 	$guid = $this->guid();
@@ -1528,8 +1528,6 @@ function MakeLink($which, $args, $text)
 #
 function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
 {
-    $extraclause = ($all ? "" : "and parent_guid is null");
-	
     if ($which == "USER") {
 	$where = "t.uid='$id'";
 	$title = "Current";
@@ -1553,16 +1551,18 @@ function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
     if (ISADMIN()) {
 	$query_result =
 	    DBQueryFatal("select t.* from experiment_templates as t ".
-			 "where ($where) $extraclause ".
-			 "order by t.pid,t.tid,t.created ");
+			 "where ($where) and ".
+			 "      (t.active!=0 or t.parent_guid is null) ".
+			 "order by t.pid,t.guid,vers desc");
     }
     else {
 	$query_result =
 	    DBQueryFatal("select t.* from experiment_templates as t ".
 			 "left join group_membership as g on g.pid=t.pid and ".
 			 "     g.gid=t.gid and g.uid='$myuid' ".
-			 "where g.uid is not null and ($where) $extraclause ".
-			 "order by t.pid,t.tid,t.created");
+			 "where g.uid is not null and ($where) and ".
+			 "      (t.active!=0 or t.parent_guid is null) ".
+			 "order by t.pid,t.guid,vers desc");
     }
 
     if (mysql_num_rows($query_result)) {
@@ -1577,12 +1577,19 @@ function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
                 <th>PID/GID</th>
               </tr>\n";
 
+	# Do not show root template if other templates are active for guid.
+	$lastguid = 0;
+
 	while ($row = mysql_fetch_array($query_result)) {
 	    $guid	= $row['guid'];
 	    $pid	= $row['pid'];
 	    $gid	= $row['gid'];
 	    $tid	= $row['tid'];
 	    $vers       = $row['vers'];
+
+	    if ($guid == $lastguid && $vers == 1)
+		continue;
+	    $lastguid = $guid;
 
 	    echo "<tr>
                    <td>" . MakeLink("template",
