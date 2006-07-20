@@ -1230,7 +1230,7 @@ sub list_failed_nodes ($%) {
 	    last if $length > $max_length;
 	    $line .= "$_ ";
 	}
-	$line .= "..." if length > $max_length;
+	$line .= "..." if $length > $max_length;
     }
     return "$line";
 }
