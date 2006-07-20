@@ -110,6 +110,52 @@ sub status {
 	}
 	%$statusp = %status;
     }
+
+    #
+    # We can retrieve the total amperage in use (in tenths of amps) 
+    # on an APC by retrieving the rPDULoadStatusLoad.  There are 
+    # entries for each of the phases of power that the device supports,
+    # and for each of the banks of power it provides.
+    #
+    # We could add either the phases or the banks, but since the phases
+    # come first, we use them.  We grab the number of phases supported,
+    # then use that as a limit on how many status load values we retrieve.
+    #
+    # The OID to retrieve the phases is:  ".1.3.6.1.4.1.318.1.1.12.2.1.2";
+    # the load status table OID is:  ".1.3.6.1.4.1.318.1.1.12.2.3.1.1.2".
+    #
+    my $phases;
+
+    $phases = $self->{SESS}->get([["rPDULoadDevNumPhases",0]]);
+    if (!$phases) {
+	# not all models support this MIB
+	print STDERR "Query phase: No answer from device\n" if $self->{DEBUG};
+	return 0;
+    }
+
+    print "Okay.\nPhase report was '$phases'\n" if $self->{DEBUG};
+    my ($varname, $index, $power, $val, $done);
+    my $oid = ["rPDULoadStatusLoad",1];
+
+    $self->{SESS}->get($oid);
+    while ($$oid[0] =~ /rPDULoad/) {
+        ($varname, $index, $val) = @{$oid};
+        if ($varname eq "rPDULoadStatusLoad") {
+            if ($index <= $phases) {
+    		print "Raw current value $val\n" if $self->{DEBUG};
+                $status{current} += $val;
+            }
+        }
+        $self->{SESS}->getnext($oid);
+    }
+
+    print "Total raw current is $status{current}\n" if $self->{DEBUG};
+    $status{current} /= 10;
+
+    if ($statusp) {
+       %$statusp = %status;
+    }
+
     return 0;
 }
 
