@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2005 University of Utah and the Flux Group.
+   Copyright (c) 2000-2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -807,16 +807,19 @@ tb-set-noshaping $lan1 1
 
 <dl>
   <dt><i>link-or-lan</i> - The link or LAN we are modifying.
-  <dt><i>enable</i> - Set to 1 to disable traffic shaping, 0 to enable.
+  <dt><i>enable</i> - Set to 1 to disable bandwidth shaping, 0 to enable.
 </dl>
 
 <p>Notes:
 <ul>
-<li>This command specifies whether link shaping should be enforced
-    on the specified link or LAN.  When enabled, no delay node or
-    end-node delay pipe will be associated with the link or LAN.
-<li>Disabled by default for all links and LANs.  That is, link shaping
-    is enforced on all links and LANs by default.
+<li>This command specifies whether link bandwidth shaping should be enforced
+    on the specified link or LAN.  When enabled, bandwidth limits indicated
+    for a link or LAN will not be enforced.
+<li>Disabled by default for all links and LANs.  That is, link bandwidth
+    shaping <i>is</i> enforced on all links and LANs by default.
+<li>If the delay and loss values for a <code>tb-set-noshaping</code>
+    link are zero (the default), then no delay node or end-node delay
+    pipe will be associated with the link or LAN.
 <li><b>This command is a hack and may go away at any time!</b>
     The primary purpose for this command is to subvert the topology
     mapper, <code>assign</code>).  <code>Assign</code> always observes
