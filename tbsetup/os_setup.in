@@ -1214,7 +1214,7 @@ foreach ((keys %nodes), (keys %vnodes), (keys %plabvnodes)) {
 }
 
 sub list_failed_nodes ($%) {
-    no warnings 'uninitialized';
+    local $^W = 0;
     my ($max_length,%d) = @_;
     my $byvname = sub { $vname{$a} cmp $vname{$b} };
     my @nodes = (sort $byvname @{$d{failed_fatal_list}}, 
@@ -1247,7 +1247,7 @@ sub add_failed_nodes ($$%) {
 
 foreach my $osid (sort keys %total_osid) {
     # I want undefined to mean zero!
-    no warnings 'uninitialized';
+    local $^W = 0;
 
     my ($osname, $pidofosid);
     my $user_image = 1;
