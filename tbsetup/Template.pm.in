@@ -2022,7 +2022,7 @@ sub LogHole($)
     my $logdir     = "$archivedir/logs";
 
     if (! -e $logdir) {
-	mkdir($logdir)
+	mkdir($logdir, 0775)
 	    or return -1;
     }
 
