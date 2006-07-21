@@ -125,7 +125,7 @@ sub autoswap_timeout($) { return field($_[0], 'autoswap_timeout');}
 sub prerender_pid($)    { return field($_[0], 'prerender_pid');}
 
 #
-# Lookup a template given an experiment index.
+# Lookup an experiment given an experiment index.
 #
 sub LookupByIndex($$)
 {
@@ -293,6 +293,10 @@ sub Create($$$$)
     my $noidleswap_reason = DBQuoteSpecial($argref->{'noidleswap_reason'});
     delete($argref->{'noidleswap_reason'});
 
+    # we override this below
+    delete($argref->{'idx'})
+	if (exists($argref->{'idx'}));
+
     my $query = "insert into experiments set ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
 
@@ -301,6 +305,7 @@ sub Create($$$$)
     $query .= ",expt_name=$description";
     $query .= ",noswap_reason=$noswap_reason";
     $query .= ",noidleswap_reason=$noidleswap_reason";
+    $query .= ",idx=$exptidx";
 
     if (! DBQueryWarn($query)) {
 	DBQueryWarn("unlock tables");
@@ -435,6 +440,31 @@ sub Refresh($)
 }
 
 #
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query = "update experiments set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where pid='$pid' and eid='$eid'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
 # Stringify for output.
 #
 sub Stringify($)
@@ -465,7 +495,10 @@ sub AccessCheck($$$)
 }
 
 #
-# Create the directory structure. 
+# Create the directory structure. A template_mode experiment is the one
+# that is created for the template wrapper, not one created for an
+# instance of the experiment. The path changes slightly, although that
+# happens down in the mkexpdir script.
 #
 sub CreateDirectory($)
 {
