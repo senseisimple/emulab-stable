@@ -328,13 +328,13 @@ function WRITESIDEBAR() {
     # The search box.  Placed in a table so the text input fills available
     # space.
     echo "<div id='searchrow'>
-        <FORM method=get ACTION=$newsBase/search.php3>
-        <table border=0 cellspacing=0 cellpadding=0><tr>
-             <td width=100%><input class='textInputEmpty' name=query
+        <form method='get' action='$newsBase/search.php3'>
+        <table border='0' cellspacing='0' cellpadding='0'><tr>
+             <td width='100%'><input class='textInputEmpty' name='query'
                         value='Search String' id='searchbox'
                         onfocus='focus_text(this, \"Search String\")'
                         onblur='blur_text(this, \"Search String\")' /></td>
-	     <td><input type=submit id='searchsub' value=Search /></td>
+	     <td><input type='submit' id='searchsub' value=Search /></td>
         </table>
         </form>
 	</div>\n";
@@ -377,14 +377,14 @@ function WRITESIDEBAR() {
 	if (!$firstinitstate) {
 	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
 	    echo "<img alt=\"Request Account\" border=0 ";
-	    echo "src=\"$BASEPATH/requestaccount.gif\" width=144 height=32></a>";
+	    echo "src=\"$BASEPATH/requestaccount.gif\" width=\"144\" height=\"32\"></a>";
 
 	    echo "<strong>or</strong>";
 	}
 
 	echo "<a href=\"$TBBASE/login.php3\">";
 	echo "<img alt=\"logon\" border=0 ";
-	echo "src=\"$BASEPATH/logon.gif\" width=144 height=32></a>\n";
+	echo "src=\"$BASEPATH/logon.gif\" width=\"144\" height=\"32\"></a>\n";
 
 	echo "</div>";
     }
@@ -414,7 +414,7 @@ function WRITESIDEBAR() {
     # Start Interaction section if going to spit out interaction options.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
 	echo "<h3 class='menuheader'>Experimentation</h3>
-              <ul class=menu>\n";
+              <ul class='menu'>\n";
     }
 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
@@ -552,7 +552,7 @@ function WRITESIDEBAR() {
 	($WIKISUPPORT || $MAILMANSUPPORT || $BUGDBSUPPORT ||
 	 $CVSSUPPORT  || $CHATSUPPORT)) {
 	echo "<h3 class='menuheader'>Collaboration</h3>
-              <ul class=menu>";
+              <ul class='menu'>";
 
 	if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
 	    $wikiname = $CHECKLOGIN_WIKINAME;
@@ -602,7 +602,7 @@ function WRITESIDEBAR() {
     # Optional ADMIN menu.
     if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN($login_uid)) {
 	echo "<h3 class='menuheader'>Administration</h3>
-              <ul class=menu>";
+              <ul class='menu'>";
 	
 	echo "<li>List <a " .
 	    " href=\"$TBBASE/showproject_list.php3\">" .
@@ -647,7 +647,7 @@ function WRITESIMPLESIDEBAR($menudefs) {
     $menutitle = $menudefs['title'];
     
     echo "<h3 class='menuheader'>$menutitle</h3>
-          <ul class=menu>";
+          <ul class='menu'>";
 
     each($menudefs);    
     while (list($key, $val) = each($menudefs)) {
@@ -677,7 +677,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
             <!--<link rel=\"SHORTCUT ICON\" HREF=\"netbed.ico\">-->
             <link rel=\"SHORTCUT ICON\" HREF=\"netbed.png\" TYPE=\"image/png\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
-	    <link REL='stylesheet' HREF='$BASEPATH/common-style.css' TYPE='text/css' />
+	    <link rel='stylesheet' href='$BASEPATH/common-style.css' type='text/css' />
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
@@ -690,13 +690,13 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     echo "</style>\n";
 
     if ($TBMAINSITE) {
-	echo "<meta NAME=\"keywords\" ".
-	           "CONTENT=\"network, emulation, internet, emulator, ".
+	echo "<meta name=\"keywords\" ".
+	           "content=\"network, emulation, internet, emulator, ".
 	           "mobile, wireless, robotic\">\n";
-	echo "<meta NAME=\"robots\" ".
-	           "CONTENT=\"NOARCHIVE\">\n";
-	echo "<meta NAME=\"description\" ".
-                   "CONTENT=\"emulab - network emulation testbed home\">\n";
+	echo "<meta name=\"robots\" ".
+	           "content=\"NOARCHIVE\">\n";
+	echo "<meta name=\"description\" ".
+                   "content=\"emulab - network emulation testbed home\">\n";
     }
     if ($extra_headers) {
         echo $extra_headers;
@@ -706,31 +706,31 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
              topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>\n";
     
     if ($autorefresh) {
-	echo "<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"$autorefresh\">\n";
+	echo "<meta HTTP-EQUIV=\"Refresh\" content=\"$autorefresh\">\n";
     }
     echo "<script type='text/javascript' language='javascript'
                   src='${BASEPATH}/emulab_sup.js'></script>\n";
 
     if (! $nobanner ) {
-	echo "<map name=overlaymap>
-                 <area shape=rect coords=\"100,60,339,100\"
+	echo "<map name='overlaymap'>
+                 <area shape=\"rect\" coords=\"100,60,339,100\"
                        href='http://www.emulab.net/index.php3'>
-                 <area shape=rect coords=\"0,0,339,100\"
+                 <area shape=\"rect\" coords=\"0,0,339,100\"
                        href='$TBDOCBASE/index.php3'>
               </map>
             <div class='bannercell'>\n";
 	if ($currentusage) {
-	    echo "<iframe src=$BASEPATH/currentusage.php3 class='usageframe'
-                          scrolling=no frameborder=0></iframe>\n";
+	    echo "<iframe src='$BASEPATH/currentusage.php3' class='usageframe'
+                          scrolling='no' frameborder='0'></iframe>\n";
 	}
-	echo "<img height=100 border=0 usemap=\"#overlaymap\" ";
+	echo "<img height='100' border='0' usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
-	    echo "width=239 ";
+	    echo "width='239' ";
 	    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
 	}
 	else {
-	    echo "width=339 ";
+	    echo "width='339' ";
 	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
 	}
 	echo "alt='$THISHOMEBASE - the network testbed'>\n";
@@ -870,12 +870,12 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     echo "<h2 class='contenttitle'>\n";
     if ($login_uid && ISADMINISTRATOR()) {
 	if (ISADMIN($login_uid)) {
-	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminon&value=0><img src='/redball.gif'
-                          border=0 alt='Admin On'></a>\n";
+	    echo "<a href=\"$TBBASE/toggle.php?target_uid=$login_uid&type=adminon&value=0\"><img src='/redball.gif'
+                          border='0' alt='Admin On'></a>\n";
 	}
 	else {
-	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminon&value=1><img src='/greenball.gif'
-                          border=0 alt='Admin Off'></a>\n";
+	    echo "<a href=\"$TBBASE/toggle.php?target_uid=$login_uid&type=adminon&value=1\"><img src='/greenball.gif'
+                          border='0' alt='Admin Off'></a>\n";
 	}
     }
     echo "$title</h2>\n";
@@ -919,7 +919,7 @@ function PAGEFOOTER($view = NULL) {
     }
 
     echo "
-              <div class=contentfooter>\n";
+              <div class='contentfooter'>\n";
     if (!$view['hide_copyright']) {
 	echo "
                 <ul class='navlist'>
@@ -1007,7 +1007,7 @@ function SUBPAGESTART() {
     echo "<table class=\"stealth\"
 	  cellspacing='0' cellpadding='0' width='100%' border='0'>\n
             <tr>\n
-              <td class=\"stealth\"valign=top>\n";
+              <td class=\"stealth\" valign=\"top\">\n";
 }
 
 function SUBPAGEEND() {
@@ -1034,7 +1034,7 @@ function SUBMENUEND() {
     </ul>
     <!-- end submenu -->
   </td>
-  <td class="stealth" valign=top align=left width='100%'>
+  <td class="stealth" valign='top' align='left' width='100%'>
 <?php
 }
 
@@ -1069,7 +1069,7 @@ function SUBMENUEND_2A() {
 function SUBMENUEND_2B() {
 ?>
   </td>
-  <td class="stealth" valign=top align=left width='85%'>
+  <td class="stealth" valign="top" align="left" width='85%'>
 <?php
 }
 
