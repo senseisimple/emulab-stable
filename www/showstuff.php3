@@ -101,14 +101,14 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "<tr>
               <td>Project Head: </td>
               <td class=\"left\">
-                <A href='showuser.php3?target_uid=$proj_head_uid'>
-                     $proj_head_uid</A></td>
+                <a href='showuser.php3?target_uid=$proj_head_uid'>
+                     $proj_head_uid</a></td>
           </tr>\n";
     
     echo "<tr>
               <td>URL: </td>
               <td class=\"left\">
-                  <A href='$proj_URL'>$proj_URL</A></td>
+                  <a href='$proj_URL'>$proj_URL</a></td>
           </tr>\n";
 
     if ($WIKISUPPORT && isset($wikiname)) {
@@ -117,7 +117,7 @@ function SHOWPROJECT($pid, $thisuid) {
 	echo "<tr>
                   <td>Project Wiki:</td>
                   <td class=\"left\">
-                      <A href='$wikiurl'>$wikiname</A></td>
+                      <a href='$wikiurl'>$wikiname</a></td>
               </tr>\n";
     }
     if ($CVSSUPPORT) {
@@ -127,7 +127,7 @@ function SHOWPROJECT($pid, $thisuid) {
 	echo "<tr>
                   <td>Project CVS Repository:</td>
                   <td class=\"left\">
-                      $cvsdir <A href='$cvsurl'>(CVSweb)</A></td>
+                      $cvsdir <a href='$cvsurl'>(CVSweb)</a></td>
               </tr>\n";
 
 	$YesNo = ($cvsrepo_public ? "Yes" : "No");
@@ -161,10 +161,10 @@ function SHOWPROJECT($pid, $thisuid) {
 	echo "<tr>
                   <td>Project Mailing List:</td>
                   <td class=\"left\">
-                      <A href='$mmurl'>${pid}-users</A> ";
+                      <a href='$mmurl'>${pid}-users</a> ";
 	if (ISADMIN()) {
 	    $mmurl .= "&wantadmin=1";
-	    echo "<A href='$mmurl'>(admin access)</A>";
+	    echo "<a href='$mmurl'>(admin access)</a>";
 	}
 	echo "    </td>
               </tr>\n";
@@ -313,7 +313,7 @@ function SHOWGROUP($pid, $gid, $thisuid) {
     echo "<tr>
               <td>Group Leader: </td>
               <td class=\"left\">
-                <A href='showuser.php3?target_uid=$leader'>$leader</A></td>
+                <a href='showuser.php3?target_uid=$leader'>$leader</a></td>
           </tr>\n";
     
     if ($MAILMANSUPPORT) {
@@ -322,11 +322,11 @@ function SHOWGROUP($pid, $gid, $thisuid) {
 	echo "<tr>
                   <td>Email List:</td>
                   <td class=\"left\">
-                      <A href='$mmurl'>$mail</A> ";
+                      <a href='$mmurl'>$mail</a> ";
 
 	if (ISADMIN()) {
 	    $mmurl .= "&wantadmin=1";
-	    echo "<A href='$mmurl'>(admin page)</A>";
+	    echo "<a href='$mmurl'>(admin page)</a>";
 	}
 	echo "    </td>
               </tr>\n";
@@ -404,8 +404,8 @@ function SHOWGROUPMEMBERS($pid, $gid, $prived = 0) {
 	    echo "<td>$usr_email</td>\n";
 	}
 	echo "    <td>
-                    <A href='showuser.php3?target_uid=$target_uid'>
-                       $target_uid</A>
+                    <a href='showuser.php3?target_uid=$target_uid'>
+                       $target_uid</a>
                   </td>\n";
 	
 	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
@@ -416,7 +416,7 @@ function SHOWGROUPMEMBERS($pid, $gid, $prived = 0) {
 	}
 	if ($showdel) {
 	    echo "<td align=center>
-		      <A href='deleteuser.php3?target_uid=$target_uid";
+		      <a href='deleteuser.php3?target_uid=$target_uid";
 	    echo         "&target_pid=$pid'>
                          <img alt=N src=redball.gif></td>\n";
 	}
@@ -553,7 +553,7 @@ function SHOWUSER($uid) {
 
     echo "<tr>
               <td>Home Page URL:</td>
-              <td><A href='$usr_URL'>$usr_URL</A></td>
+              <td><a href='$usr_URL'>$usr_URL</a></td>
           </tr>\n";
 
     if ($WIKISUPPORT && isset($wikiname)) {
@@ -562,7 +562,7 @@ function SHOWUSER($uid) {
 	echo "<tr>
                   <td>Emulab Wiki Page:</td>
                   <td class=\"left\">
-                      <A href='$wikiurl'>$wikiname</A></td>
+                      <a href='$wikiurl'>$wikiname</a></td>
               </tr>\n";
     }
     
@@ -1193,7 +1193,7 @@ function showexplist_internal($templates_only, $type, $fromuid, $id, $gid) {
 		$pidrow="";
 	    } else {
 		$pidrow="\n<td>".
-		    "<A href='showproject.php3?pid=$pid'>$pid</A></td>";
+		    "<a href='showproject.php3?pid=$pid'>$pid</a></td>";
 	    }
 
 	    $idlestr = $idlehours;
@@ -1203,7 +1203,7 @@ function showexplist_internal($templates_only, $type, $fromuid, $id, $gid) {
 	    } elseif ($idlehours == -1) { $idlestr = "&nbsp;"; }
 	    
 	    echo "<tr>$pidrow
-                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+                 <td><a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></td>
 		 <td>$state</td>
                  <td align=center>$nodes</td>
                  <td align=center>$idlestr</td>
@@ -1462,7 +1462,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    $count++;
 
 	    echo "<tr>
-                    <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>
+                    <td><a href='shownode.php3?node_id=$node_id'>$node_id</a></td>
                     <td>$vname</td>\n";
 
             if ($isplabdslice) {
@@ -1502,8 +1502,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    }
 
 	    echo "  <td align=center>
-                        <A href='nodessh.php3?node_id=$node_id'>
-                        <img src=\"ssh.gif\" alt=s></A>
+                        <a href='nodessh.php3?node_id=$node_id'>
+                        <img src=\"ssh.gif\" alt=s></a>
                     </td>\n";
 
 	    if ($isvirtnode || !isset($tipname) || $tipname = '') {
@@ -1511,21 +1511,21 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    }
 	    else {
 		echo "  <td align=center>
-                            <A href='nodetipacl.php3?node_id=$node_id'>
-                            <img src=\"console.gif\" alt=c></A>
+                            <a href='nodetipacl.php3?node_id=$node_id'>
+                            <img src=\"console.gif\" alt=c></a>
                         </td>\n";
 
 		echo "  <td align=center>
-                            <A href='showconlog.php3?node_id=$node_id".
+                            <a href='showconlog.php3?node_id=$node_id".
 		                  "&linecount=200'>
-                            <img src=\"/icons/f.gif\" alt='console log'></A>
+                            <img src=\"/icons/f.gif\" alt='console log'></a>
                         </td>\n";
 	    }
 
 	    if ($iswindowsnode) {
 		echo "  <td align=center>
-                            <A href='noderdp.php3?node_id=$node_id'>
-                            <img src=\"rdp.gif\" alt=r></A>
+                            <a href='noderdp.php3?node_id=$node_id'>
+                            <img src=\"rdp.gif\" alt=r></a>
                         </td>\n";
 	    }
 	    elseif ($anywindows) {
@@ -1538,9 +1538,9 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	echo "<h4><blockquote><blockquote><blockquote>
               <ol>
 	        <li>A $stalemark indicates that the data is stale, and
-	            the node has not reported on its proper schedule. 
+	            the node has not reported on its proper schedule.</li>
                 <li>Exit value of the node startup command. A value of
-                        666 indicates a testbed internal error.
+                        666 indicates a testbed internal error.</li>
               </ol>
               </blockquote></blockquote></blockquote></h4>\n";
     }
@@ -1697,7 +1697,7 @@ function SHOWOSINFO($osid) {
 	    echo "<tr>
                     <td>Next Osid: </td>
                     <td class=left>
-                        <A href='showosinfo.php3?osid=$nextosid'>$nextosid</A></td>
+                        <a href='showosinfo.php3?osid=$nextosid'>$nextosid</a></td>
                   </tr>\n";
     }
 
@@ -2175,7 +2175,7 @@ function SHOWNODE($node_id, $flags = 0) {
 	    echo "<tr>
                       <td>Phys ID:</td>
                       <td class=left>
-	   	          <A href='shownode.php3?node_id=$phys_nodeid'>
+	   	          <a href='shownode.php3?node_id=$phys_nodeid'>
                              $phys_nodeid</a></td>
                   </tr>\n";
 	}
@@ -2207,7 +2207,7 @@ function SHOWNODE($node_id, $flags = 0) {
     echo "<tr>
               <td>Node Type:</td>
               <td class=left>
-  	          <A href='shownodetype.php3?node_type=$type'>$type</td>
+  	          <a href='shownodetype.php3?node_type=$type'>$type</td>
           </tr>\n";
 
     $feat_result =
@@ -2816,8 +2816,8 @@ function SHOWNODELOG($node_id)
 
 	echo "<tr>
  	         <td align=center>
-                  <A href='deletenodelog.php3?node_id=$node_id&log_id=$log_id'>
-                     <img alt='o' src='redball.gif'></A></td>
+                  <a href='deletenodelog.php3?node_id=$node_id&log_id=$log_id'>
+                     <img alt='o' src='redball.gif'></a></td>
                  <td>$date</td>
                  <td>$log_id</td>
                  <td>$type</td>
@@ -2869,7 +2869,7 @@ function SPITOSINFOLINK($osid)
     if (! TBOSInfo($osid, $osname, $pid))
 	return;
     
-    echo "<A href='showosinfo.php3?osid=$osid'>$osname</A>\n";
+    echo "<a href='showosinfo.php3?osid=$osid'>$osname</a>\n";
 }
 
 #
@@ -2953,8 +2953,8 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
     echo "<tr>
               <td>Contact UID:</td>
               <td class=left>
-                  <A href='showuser.php3?target_uid=$contact_uid'>
-		     $contact_uid</A></td>
+                  <a href='showuser.php3?target_uid=$contact_uid'>
+		     $contact_uid</a></td>
           </tr>\n";
 
     echo "<tr>
