@@ -46,7 +46,7 @@ build-iperf: Makefile
 client: all
 
 iperf-install: build-iperf
-	$(INSTALL_PROGRAM) -s src/iperf $(CLIENT_BINDIR)/emulab-iperf
+	$(INSTALL_PROGRAM) -s src/iperf $(DESTDIR)$(CLIENT_BINDIR)/emulab-iperf
 
 client-install: $(ITARGETS)
 

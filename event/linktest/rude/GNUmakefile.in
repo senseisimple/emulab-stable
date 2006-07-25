@@ -49,10 +49,10 @@ build-rude: Makefile
 client: all
 
 rude-install: build-rude
-	$(INSTALL_PROGRAM) -s rude/rude $(CLIENT_BINDIR)/emulab-rude
+	$(INSTALL_PROGRAM) -s rude/rude $(DESTDIR)$(CLIENT_BINDIR)/emulab-rude
 
 crude-install: build-rude
-	$(INSTALL_PROGRAM) -s crude/crude $(CLIENT_BINDIR)/emulab-crude
+	$(INSTALL_PROGRAM) -s crude/crude $(DESTDIR)$(CLIENT_BINDIR)/emulab-crude
 
 client-install: $(ITARGETS)
 
