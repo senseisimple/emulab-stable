@@ -58,6 +58,7 @@ client: $(PROGRAMS)
 client-install: client
 	$(INSTALL_PROGRAM) program-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/program-agent$(EXE)
 	chmod u+s-w $(DESTDIR)$(CLIENT_BINDIR)/program-agent
+	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man8
 	$(INSTALL) -m 644 $(SRCDIR)/program-agent.8 $(DESTDIR)$(CLIENT_MANDIR)/man8/program-agent.8
 
 clean:

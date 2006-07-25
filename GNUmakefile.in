@@ -36,7 +36,7 @@ install:
 	@echo "Choose tipserv-install for dedicated tip server machines."
 
 #
-# For installation on boss node (okay, paper).
+# For installation on boss node
 # 
 boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
 		install-subdirs install-mkdirs install-setbuildinfo
@@ -130,6 +130,7 @@ tipserv-install:
 
 client-mkdirs:
 	-mkdir -p $(DESTDIR)$(CLIENT_BINDIR)
+	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)
 
 client:
 	@$(MAKE) -C lib/libtb client
@@ -157,6 +158,23 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
+
+TARBALLDESTDIR = /var/tmp/emulab-client
+
+client-tarball:
+	@if [ `id -u` -ne 0 ]; then \
+	    echo '*** Must run as root!'; \
+	    false; \
+	fi
+	@if [ -d "$(TARBALLDESTDIR)" ]; then \
+	    echo "$(TARBALLDESTDIR) already exists."; \
+	    echo "Remove it and try again."; \
+	    false; \
+	fi
+	echo "Building and installing client-side in $(TARBALLDESTDIR)..."
+	DESTDIR=$(TARBALLDESTDIR) $(MAKE) client-install
+	echo "Creating tarball..."
+	tar czf emulab-client.tar.gz -C $(TARBALLDESTDIR) .
 
 destdircheck:
 	@if [ -z "$(DESTDIR)" ]; then \
