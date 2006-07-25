@@ -70,7 +70,7 @@ dir-install:
 	ln -s emulab $(DESTDIR)/usr/local/etc/testbed
 
 common-install:	dir-install
-	(cd ../common; $(MAKE) local-install)
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile

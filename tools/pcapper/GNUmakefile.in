@@ -77,4 +77,4 @@ pcapper-noevents.o: pcapper.c
 client:	pcapper
 
 client-install: client
-	$(INSTALL_PROGRAM) pcapper $(DESTDIR)$(CLIENT_BINDIR)/pcapper
+	$(INSTALL_PROGRAM) -s pcapper $(DESTDIR)$(CLIENT_BINDIR)/pcapper

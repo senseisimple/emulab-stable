@@ -44,10 +44,10 @@ remote-install:		path-install remote-script-install
 control-install:	path-install control-script-install
 
 other-install:
-	(cd ../../os; $(MAKE) client-install)
-	(cd ../../event; $(MAKE) client-install)
-	(cd ../../sensors/slothd; $(MAKE) client-install)
-	(cd ../../tools; $(MAKE) client-install)
+	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../event; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../sensors/slothd; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../tools; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
@@ -81,7 +81,7 @@ common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/bootsubnodes $(BINDIR)/bootsubnodes
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
 	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
-	(cd config; $(MAKE) script-install)
+	(cd config; $(MAKE) DESTDIR=$(DESTDIR) script-install)
 
 symlinks:	dir-install
 	rm -f $(TBBINDIR)/tevc$(EXE)
