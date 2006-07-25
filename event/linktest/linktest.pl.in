@@ -221,6 +221,9 @@ my $error_count = 0;
 my $stage_error_count = 0;
 my $total_error_count = 0;
 
+my $warn_partial_test = 0;
+my $warn_unshaped_links = 0;
+
 my $listener_iperf;
 my $listener_crude;
 
@@ -331,7 +334,7 @@ $ptopology_file = "@CLIENT_VARDIR@/boot/ltpmap";
 #
 sleep(int(rand(5)));
 &my_system(PATH_RCTOPO, "reconfig");
-&get_topo($topology_file, $ptopology_file, 0);
+&get_topo($topology_file, $ptopology_file);
 &debug_top();
 
 #
@@ -467,6 +470,24 @@ my $msg = "Linktest Version $LINKTEST_VERSION";
 &sim_event(EVENT_LOG, $msg);
 &post_event(EVENT_REPORT, $msg);
 &debug("\n$msg\n\n");
+
+#
+# Print out any warnings that alter the behavior of the run
+#
+if ($warn_partial_test) {
+    my $msg = "*** WARNING: some hosts do not support linktest,".
+	      " skipping links between those hosts";
+    &sim_event(EVENT_LOG, $msg);
+    &post_event(EVENT_REPORT, $msg);
+    &debug("\n$msg\n\n");
+}
+if ($warn_unshaped_links && &dotest(TEST_BW)) {
+    my $msg = "*** WARNING: tb-set-noshaping used on one or more links,".
+	      " skipping BW tests for those links.";
+    &sim_event(EVENT_LOG, $msg);
+    &post_event(EVENT_REPORT, $msg);
+    &debug("\n$msg\n\n");
+}
 
 if (defined($rtproto) && $rtproto eq RTPROTO_SESSION) {
     my $msg = "Session routing active; waiting a bit to let routes stabilize";
@@ -1199,14 +1220,17 @@ sub bw_test {
 			&schedlog("skipping bandwidth test " .
 				  schedprint_link($edge));
 		    }
-		    &debug("Skipping bandwidth test on $hostname for " .
-			   &print_link($edge) . "\n");
-		    
-		    &info("*** Skipping bandwidth test on $hostname for " .
-			  &print_link($edge) . "\n");
-		    &info("*** Bandwidth is out of range ".
-			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
-			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
+		    if ($edge->bw != LIMIT_BW_HI+1) {
+			&debug("Skipping bandwidth test on $hostname for " .
+			       &print_link($edge) . "\n");
+
+			&info("*** Skipping bandwidth test on $hostname for " .
+			      &print_link($edge) . "\n");
+			&info("*** Bandwidth is out of range ".
+			      "(" . LIMIT_BW_LO . " <= BW <= " .
+			      LIMIT_BW_HI .") ". "or loss is too high (> " .
+			      LIMIT_BW_LOSS . ").\n");
+		    }
 		}
 		if (&valid_bw($redge)) {
 		    $bw = $redge->bw
@@ -1223,14 +1247,17 @@ sub bw_test {
 			&schedlog("skipping bandwidth test " .
 				  schedprint_link($redge));
 		    }
-		    &debug("Skipping bandwidth test on $hostname for " .
-			   &print_link($redge) . "\n");
+		    if ($redge->bw != LIMIT_BW_HI+1) {
+			&debug("Skipping bandwidth test on $hostname for " .
+			       &print_link($redge) . "\n");
 		    
-		    &info("*** Skipping bandwidth test on $hostname for " .
-			  &print_link($redge) . "\n");
-		    &info("*** Bandwidth is out of range ".
-			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
-			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
+			&info("*** Skipping bandwidth test on $hostname for " .
+			      &print_link($redge) . "\n");
+			&info("*** Bandwidth is out of range ".
+			      "(" . LIMIT_BW_LO . " <= BW <= " .
+			      LIMIT_BW_HI .") ". "or loss is too high (> " .
+			      LIMIT_BW_LOSS . ").\n");
+		    }
 		}
 
 		# Okay, start the test.
@@ -1726,7 +1753,7 @@ sub print_edge {
 # rather than en masse with read_file.
 #
 sub get_topo {
-    my ($top_file, $ptop_file, $master) = @_;
+    my ($top_file, $ptop_file) = @_;
 
     die "Attempted to open missing file $top_file\n" 
 	unless -e $top_file;
@@ -1760,7 +1787,7 @@ sub get_topo {
 	    my $qt = defined($7) ? $7 : "droptail";
 	    $newEdge->queuetype($qt);
 	    $newEdge->mpxstyle("none");
-	    $newEdge->dstyle("none");
+	    $newEdge->dstyle("dnode");
 	    $newEdge->symlanignore(0);
 	    push @links, $newEdge;
 
@@ -1832,6 +1859,21 @@ sub get_topo {
 			$edge->mac($row[4]);
 			$edge->mpxstyle($row[5]);
 			$edge->dstyle($row[6]);
+
+			#
+			# If the link is not doing BW shaping
+			# (tb-set-noshaping) then reflect this as best
+			# we can.  We set the BW above the max so that
+			# the test will be skipped.  We retain the base
+			# shaping style (dnode or linkdelays) for the
+			# benefit of other tests in the code.
+			#
+			if ($edge->dstyle =~ /(\w+)-nobw$/) {
+			    $edge->bw(LIMIT_BW_HI+1);
+			    $edge->dstyle($1);
+			    $warn_unshaped_links++;
+			}
+
 			last;
 		    }
 		}
@@ -1857,11 +1899,7 @@ sub get_topo {
 	    }
 	}
 	if (scalar(keys(%badhosts)) > 0) {
-	    if ($master) {
-		&info("WARNING: some hosts do not support linktest, " .
-		      "skipping links involving: " .
-		      join(" ", keys(%badhosts)) . "\n");
-	    }
+	    $warn_partial_test++;
 	    @hosts = @goodhosts;
 
 	    #
