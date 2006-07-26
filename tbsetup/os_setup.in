@@ -1374,7 +1374,7 @@ if (defined $tally{reload}) {
 	    foreach my $type (@node_types) {
 
 		add_defaults($d{$d_t{$type}});
-		my %d = %d{$d_t{$type}};
+		my %d = %{$d_t{$type}};
 		my $total = $total_t{$type};
 		
 		if ($d{failed} > 0) {
