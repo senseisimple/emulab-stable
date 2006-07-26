@@ -402,3 +402,57 @@ span.topbaroption { background-color:#E1E1EA; }
   display: block;
   white-space: nowrap;
 }
+
+/*
+ * showexp page topbar
+ */
+#topnavbar
+{
+  padding: 3px 0;
+  margin-left: 0;
+  border-bottom: 1px solid #778;
+  font: bold 12px Verdana, sans-serif;
+}
+		
+#topnavbar li
+{
+  list-style: none;
+  margin: 0;
+  display: inline;
+}
+	
+#topnavbar li a
+{
+  padding: 3px 0.5em;
+  margin-left: 3px;
+  border: 1px solid #778;
+  border-bottom: none;
+  background: #DDE;
+  text-decoration: none;
+}
+		
+#topnavbar li a:link { color: #448; }
+#topnavbar li a:visited { color: #667; }
+		
+#topnavbar li a:hover
+{
+  color: #000;
+  background: #AAE;
+  border-color: #227;
+}
+
+.showexp_codeblock
+{
+        width: 650px;
+        height: 400px;
+        overflow: auto;
+	color: #333;
+	background-color: #fff;
+	margin: 0 0 20px 30px;
+	padding: 10px;
+	border: 1px solid #666;
+	white-space: pre;
+	font-family: "Courier New", "Courier", monospace;
+        font-size: 9pt;
+	line-height: 110%;
+}
