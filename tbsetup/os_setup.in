@@ -80,9 +80,13 @@ my %vname = ();                 # Indexed by node_id.
 
 #
 # This variable keeps track of the failed nodes of all types.
-#   values = 'UNKNOWN' 'RELOAD', 'BOOT', 'OTHER'
-my %failed_nodes = (); 
-my %failed_nonfatal_nodes = ();
+#   values = ['boot'|'osload', 'fatal'|'nonfatal']
+my %failed_nodes = ();
+sub add_failed_node_fatal($)     {$failed_nodes{$_[0]} = ['boot', 'fatal']}
+sub add_failed_node_nonfatal($)  {$failed_nodes{$_[0]} = ['boot', 'nonfatal']}
+sub add_failed_node_reload($)    {$failed_nodes{$_[0]} = ['reload', 'fatal']}
+
+my @all_nodes; # list of all nodes before any are deleted from %nodes
 
 #
 # Ah, Frisbee works so lets do auto reloading for nodes that do not have
@@ -483,6 +487,17 @@ while (my %row = $db_result->fetchhash()) {
 	if $dbg;
 }
 
+@all_nodes = (keys %nodes, keys %vnodes, keys %plabvnodes);
+
+#
+# Perform some prechecks on the images.  This will also have the
+# effect of catching the info for the images for latter use
+#
+# FIXME: WRITEME
+#    Maybe this isn't a good idea since it will also attempt to fetch
+#    the image from the real boss in an inner-emulab.  This should
+#    really be done in parallel.
+
 #
 # Collect some info about vnodes.
 #
@@ -563,7 +578,7 @@ if ($firewalled) {
 		 "is resolved.\n");
 
 	$failed++;
-	$failed_nodes{$node} = 'UNKNOWN';
+	add_failed_node_fatal($node);
 	goto tballdone;
     }
 
@@ -602,7 +617,7 @@ if ($plabinelab) {
 		 "in pid/eid $pid/$eid failed to boot after loading OS.\n\n".
 		 "The nodes have been freed.\n");
 	$failed++;
-	$failed_nodes{$node} = 'UNKNOWN';
+	add_failed_node_fatal($node);
 	goto tballdone;
     }
 
@@ -751,7 +766,7 @@ if (!$TESTMODE) {
 	foreach my $node (@nodelist) {
 	    tbnotice "Not waiting for $node since its reload/reboot failed!";
 	    $failed++;
-	    $failed_nodes{$node} = 'UNKNOWN';
+	    add_failed_node_reload($node);
 	    delete($nodes{$node});
 
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
@@ -873,7 +888,7 @@ while ( @nodelist ) {
 
     if ($canfail{$node} && !($canceled || $noretry)) {
 	push(@informuser, $node);
-	$failed_nonfatal_nodes{$node} = 'UNKNOWN';
+	add_failed_node_nonfatal($node);
 	tbnotice "Continuing with experiment setup anyway ...";
 	next;
     }
@@ -901,7 +916,7 @@ while ( @nodelist ) {
     $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 
     $failed++;
-    $failed_nodes{$node} = 'UNKNOWN';
+    add_failed_node_fatal($node);
 }
 
 #
@@ -1114,7 +1129,7 @@ elsif (@vnodelist) {
 	if ($canfail{$node}) {
 	    # Send mail to testbed-ops and to the user about it.
 	    push(@informuser, $node);
-	    $failed_nonfatal_nodes{$node} = 'UNKNOWN';
+	    add_failed_node_nonfatal($node);
 	    tbnotice "Continuing with experiment setup anyway ...";
 	    next;
 	}
@@ -1124,7 +1139,7 @@ elsif (@vnodelist) {
 	else {
 	    $failedvnodes++;
 	}
-	$failed_nodes{$node} = 'UNKNOWN';
+	add_failed_node_fatal($node);
     }
     TBDebugTimeStamp("Virtual node waiting finished");
 
@@ -1177,40 +1192,46 @@ tballdone:
 
 tbinfo "OS Setup Done.";
 
-my %tally;
-my $users_fault = 1;
-my %total_osid;
-my %total_type;
-my $summary = '';
+#
+# Various helper function for summary report
+#
 
-foreach (keys %failed_nodes) {
-    my $osid = $osids{$_};
-    my $type = $node_types{$_};
-    $total_osid{$osid}{failed}++;
-    $total_osid{$osid}{failed_fatal}++;
-    $total_osid{$osid}{total}++;
-    $total_type{$osid}{$type}{failed}++;
-    $total_type{$osid}{$type}{failed_fatal}++;
-    push @{$total_type{$osid}{$type}{failed_fatal_list}}, $_;
-    $total_type{$osid}{$type}{total}++;
+# returns an array (osname, user_image)
+sub get_osname ($) {
+    my ($osid) = @_;
+
+    my ($osname, $pidofosid);
+    my $user_image = 1;
+
+    my $query_result =
+        DBQueryFatal("select osname,pid from os_info where osid='$osid'");
+
+    if ($query_result->num_rows > 0) {
+        ($osname, $pidofosid) = $query_result->fetchrow_array();
+        $user_image = 0 if $pidofosid eq TBOPSPID();
+    } else {
+        $osname = $osid;
+        $user_image = 0;
+    }
+ 
+    return ($osname, $user_image);
 }
-foreach (keys %failed_nonfatal_nodes) {
-    my $osid = $osids{$_};
-    my $type = $node_types{$_};
-    $total_osid{$osid}{failed}++;
-    $total_osid{$osid}{failed_nonfatal}++;
-    $total_osid{$osid}{total}++;
-    $total_type{$osid}{$type}{failed}++;
-    $total_type{$osid}{$type}{failed_nonfatal}++;
-    push @{$total_type{$osid}{$type}{failed_nonfatal_list}}, $_;
-    $total_type{$osid}{$type}{total}++;
+
+sub add_defaults($) {
+    my ($d) = (@_);
+    $d->{failed_fatal}    = 0 unless defined $d->{failed_fatal};
+    $d->{failed_nonfatal} = 0 unless defined $d->{failed_nonfatal};
 }
-foreach ((keys %nodes), (keys %vnodes), (keys %plabvnodes)) {
-    next if $failed_nodes{$_} || $failed_nonfatal_nodes{$_};
-    my $osid = $osids{$_};
-    my $type = $node_types{$_};
-    $total_osid{$osid}{total}++;
-    $total_type{$osid}{$type}{total}++;
+
+sub add_non_fatal($%) {
+    my ($line, %d) = @_;
+    if ($d{failed_nonfatal} > 0) {
+	my $count = ($d{failed_nonfatal} == $d{failed}
+		     ? "all"
+		     : "$d{failed_nonfatal}/$d{failed}");
+	$line .= " ($count non-fatal)";
+    }
+    return $line;
 }
 
 sub list_failed_nodes ($%) {
@@ -1232,7 +1253,7 @@ sub list_failed_nodes ($%) {
 	}
 	$line .= "..." if $length > $max_length;
     }
-    return "$line";
+    return $line;
 }
 
 sub add_failed_nodes ($$%) {
@@ -1245,87 +1266,135 @@ sub add_failed_nodes ($$%) {
     }
 }
 
-foreach my $osid (sort keys %total_osid) {
-    # I want undefined to mean zero!
-    local $^W = 0;
+#
+# Global variables need for the summary
+#
+my $users_fault;
+my %tally;
+my %total;
+my $summary = '';
 
-    my ($osname, $pidofosid);
-    my $user_image = 1;
+#
+# First gather stats
+#
+foreach (keys %failed_nodes) {
+    my $osid = $osids{$_};
+    my $type = $node_types{$_};
+    my ($what,$fatal)  = @{$failed_nodes{$_}};
 
-    if ($total_osid{$osid}{failed} > 0) {
+    $tally{$what}{$osid} = {} unless defined $tally{$what}{$osid};
+    my $t = $tally{$what}{$osid};
 
-	my $query_result = 
-	    DBQueryFatal("select osname,pid from os_info where osid='$osid'");
+    $t->{any_type}{failed}++;
+    $t->{any_type}{"failed_${fatal}"}++;
 
-	if ($query_result->num_rows > 0) {
-	    ($osname, $pidofosid) = $query_result->fetchrow_array();
-	    $user_image = 0 if $pidofosid eq TBOPSPID();
-	} else {
-	    $osname = $osid;
-	    $user_image = 0;
-	}
+    $t->{by_type}{$type}{failed}++;
+    $t->{by_type}{$type}{"failed_${fatal}"}++;
 
+    push @{$t->{any_type}{"failed_${fatal}_list"}}, $_;
+    push @{$t->{by_type}{$type}{"failed_${fatal}_list"}}, $_;
+}
+foreach (@all_nodes) {
+    my $osid = $osids{$_};
+    my $type = $node_types{$_};
+    $total{$osid}{any_type}++;
+    $total{$osid}{by_type}{$type}++;
+}
+
+{
+    use Data::Dumper;
+    print Dumper(\%tally, \%total);
+}
+
+#
+# Now report any failed nodes in a concise summary
+#
+if (defined $tally{reload}) {
+
+    $users_fault = 0;
+
+    foreach my $osid (sort keys %{$tally{reload}}) {
+	
+	my ($osname) = get_osname($osid);
+	
+	my %d     = %{$tally{reload}{$osid}{any_type}};
+	my $total = $total{$osid}{any_type};
+	
+	my $line;
+	$line = sprintf("%d/%d nodes failed to load the the os \"%s\"",
+			$d{failed}, $total, $osid);
+	$line = add_failed_nodes($line, 2, %d);
+	
+	$summary .= $line;
+    }
+
+} elsif (defined $tally{boot}) {
+
+    $users_fault = 1;
+
+    foreach my $osid (sort keys %{$tally{boot}}) {
+	
+	my ($osname, $user_image) = get_osname($osid);
+	
+	add_defaults($tally{boot}{$osid}{any_type});
+	my %d   = %{$tally{boot}{$osid}{any_type}};
+	my %d_t = %{$tally{boot}{$osid}{by_type}};
+	my $total   = $total{$osid}{any_type};
+	my %total_t = %{$total{$osid}{by_type}};
+	
 	my $byfailure = sub {
-	    my $cmp = $total_type{$osid}{$b}{failed} <=> $total_type{$osid}{$a}{failed};
+	    my $cmp = $d_t{$b}{failed} <=> $d_t{$a}{failed};
 	    return $cmp if $cmp != 0;
 	    return $a cmp $b;
 	};
-	my @node_types = sort $byfailure keys %{$total_type{$osid}};
-
+	my @node_types = sort $byfailure keys %d_t;
+	
 	$users_fault = 0 if !$user_image;
 	foreach my $type (@node_types) {
-	    my %d = %{$total_type{$osid}{$type}};
-	    $users_fault = 0 if $d{failed} < $d{total};
+	    $users_fault = 0 if $d_t{$type}{failed} < $total_t{$type};
 	}
-
-	my %d = %{$total_osid{$osid}};
-
-	my $what = @node_types > 1 ? 'nodes' : "$node_types[0]'s";
 	
-	my $line;
-	$line .= "$d{failed}/$d{total} $what with a ";
-	$line .= $user_image ? "user" : "system";
-	$line .= " osid of \"$osname\" failed to boot";
-	if ($d{failed_nonfatal} > 0) {
-	    my $count = ($d{failed_nonfatal} == $d{failed}
-			 ? "all"
-			 : "$d{failed_nonfatal}/$d{failed}");
-	    $line .= " ($count non-fatal)";
-	}
-
+	my $line = sprintf("%d/%d %s with a %s osid of \"%s\" failed to boot",
+			   $d{failed}, $total,
+			   @node_types == 1 ? "$node_types[0]'s" : "nodes",
+			   $user_image ? "user" : "system", 
+			   $osname);
+	$line = add_non_fatal($line, %d);
+	
 	if (@node_types == 1) {
-
+	    
 	    my $type = $node_types[0];
-	    my %d = %{$total_type{$osid}{$type}};
-
-	    $summary .= add_failed_nodes($line, 2, %d);
-
+	    
+	    $summary .= add_failed_nodes($line, 2, %{$d_t{$type}});
+	    
 	} else {
-
+	    
 	    $summary .= "$line:\n";
-
+	    
 	    foreach my $type (@node_types) {
-		my %d = %{$total_type{$osid}{$type}};
+
+		add_defaults($d{$d_t{$type}});
+		my %d = %d{$d_t{$type}};
+		my $total = $total_t{$type};
+		
 		if ($d{failed} > 0) {
-		    $line = "  $d{failed}/$d{total} ${type}'s with this os failed to boot";
-		    if ($d{failed_nonfatal} > 0) {
-			my $count = ($d{failed_nonfatal} == $d{failed}
-				     ? "all"
-				     : "$d{failed_nonfatal}/$d{failed}");
-			$line .= " ($count non-fatal)";
-		    }
-		    $summary .= add_failed_nodes($line, 4, %d);
+		    $line = sprintf("%d/%d %s with this os failed to boot",
+				    "${type}'s",
+				    $d{failed}, $total);
+		    $line = add_non_fatal($line, %d);
+		    $line = add_failed_nodes($line, 2, %d);
 		} else {
-		    $summary .= "  $d{total} ";
-		    $summary .= $d{total} == 1 ? "$type" : "${type}'s";
-		    $summary .= " with this os successfully booted.\n";
+		    $line = sprintf("%d %s with this os successfully booted.\n",
+				    $total,
+				    $total_t{$type} == 1 ? "$type" : "${type}'s");
 		}
+		$summary .= $line;
 	    }
 	}
     }
 }
-
 if ($failed || $failedvnodes || $failedplab) {
+    my @msg;
     push @msg, "$failed failed nodes"               if $failed;
     push @msg, "$failedvnodes failed virtual nodes" if $failedvnodes;
     push @msg, "$failedplab failed plab nodes"      if $failedplab;

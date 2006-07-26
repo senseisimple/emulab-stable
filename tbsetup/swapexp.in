@@ -947,7 +947,8 @@ elsif ($inout eq "modify") {
 	    system("prerender -t $pid $eid")
 		if ($rendering);
 
-	    fatal("Update aborted; old virtual state restored.");
+	    $modifyError = "Update aborted; old virtual state restored.";
+	    fatal($modifyError);
 	    # Never returns;
 	}
 	#
