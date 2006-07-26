@@ -158,7 +158,8 @@ sub osload ($$) {
 	#
 	# Create a pipe to read back results from the child we will create.
 	#
-	if (! pipe(PARENT_READER, CHILD_WRITER)) {
+	my $PARENT_READER = new IO::Handle; # Need a new handle for each child
+	if (! pipe($PARENT_READER, CHILD_WRITER)) {
 	    tberror "creating pipe: $!";
 	    return -1;
 	}
@@ -166,13 +167,13 @@ sub osload ($$) {
 
 	if (my $childpid = fork()) {
 	    close(CHILD_WRITER);
-	    $children{$childpid} = [ *PARENT_READER, $result ];
+	    $children{$childpid} = [ $PARENT_READER, $result ];
 	    return $childpid;
 	}
 	#
 	# Child keeps going. 
 	#
-	close(PARENT_READER);
+	close($PARENT_READER);
 	TBdbfork();
     }
 
@@ -209,6 +210,9 @@ sub osload ($$) {
 	    goto failednode;
 	}
 	$rowref = $imageinfo{$imageid};
+	if ($rowref eq 'BADIMAGE') {
+	    goto failednode;
+	}
 
 	my $loadpart       = $rowref->{'loadpart'};
 	my $loadlen        = $rowref->{'loadlength'};
@@ -481,7 +485,7 @@ sub osload ($$) {
 # (for the indicated node).  This info is cached for use by all other
 # nodes that require the image.  Returns 1 on success, 0 on failure.
 #
-sub GetImageInfo($$)
+sub GetImageInfo($;$)
 {
     my ($imageid, $node) = @_;
 
@@ -489,6 +493,7 @@ sub GetImageInfo($$)
 	DBQueryWarn("select * from images where imageid='$imageid'");
     if (! $query_result || $query_result->numrows < 1) {
 	tberror "Imageid $imageid is not defined!";
+	$imageinfo{$imageid} = 'BADIMAGE';
 	return 0;
     }
     $imageinfo{$imageid} = $query_result->fetchrow_hashref();
@@ -502,6 +507,7 @@ sub GetImageInfo($$)
     #
     if (!defined($imagepath)) {
 	tberror "No filename associated with $imageid!";
+	$imageinfo{$imageid} = 'BADIMAGE';
 	return 0;
     }
 
@@ -513,15 +519,18 @@ sub GetImageInfo($$)
 	    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
 	    if ($?) {
 		tberror "Frisbeelauncher ($imageid) failed!";
+		$imageinfo{$imageid} = 'BADIMAGE';
 		return 0;
 	    }
 	    if (! -R $imagepath) {
 		tberror	"Frisbeelauncher could not fetch $imagepath ($imageid)!";
+		$imageinfo{$imageid} = 'BADIMAGE';
 		return 0;
 	    }
 	}
 	else {
 	    tberror "$imagepath does not exist or cannot be read!";
+	    $imageinfo{$imageid} = 'BADIMAGE';
 	    return 0;
 	}
     }
