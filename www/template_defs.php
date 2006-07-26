@@ -215,6 +215,7 @@ class Template
 	$tid         = $this->tid();
 	$created     = $this->created();
 	$description = $this->description();
+	$path        = $this->path();
 
         #
         # We need the metadata guid/version for the TID and description since
@@ -257,6 +258,9 @@ class Template
 	ShowItem("Group",   $gid);
 	ShowItem("Creator", MakeLink("user", "target_uid=$uid", $uid));
 	ShowItem("Created", $created);
+
+	echo "<tr><td align=center colspan=2>Datastore Directory</td></tr>\n";
+	echo "<tr><td align=center colspan=2>$path</td></tr>\n";
 
 	$onmouseover = MakeMouseOver($description);
 	if (strlen($description) > 40) {
@@ -611,10 +615,9 @@ class Template
     # Dump the image map for a template to the output.
     #
     function ShowGraph() {
-	global $bodyclosestring;
-	
 	$guid = $this->guid();
 	$vers = $this->vers();
+	$now  = time();
 
 	$query_result =
 	    DBQueryFatal("select imap from experiment_template_graphs ".
@@ -626,22 +629,11 @@ class Template
 	$row  = mysql_fetch_array($query_result);
 	$imap = $row['imap'];
 
-	echo "<script type='text/javascript' ".
-	            "src='js/wz_dragdrop.js'></script>";
-
-	echo "<script type='text/javascript'>
-               function G${guid}_loaded() {
-                   dd.recalc();
-  	           SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
-				     \"Tarea${vers}\");
-               }
-              </script>\n";
-
 	echo "<center>";
 	echo "<div id=fee style='display: block; overflow: hidden; ".
 	    "position: relative; z-index:1010; height: 400px; ".
 	    "width: 700px; border: 2px solid black;'>\n";
-	echo "<div id=\"D$guid\" style='position:relative;'>\n";
+	echo "<div id=\"mygraphdiv\" style='position:relative;'>\n";
 
 	echo "<div id='CurrentTemplate' style='display: block; opacity: 1; ".
 	    "visibility: hidden; ".
@@ -649,23 +641,11 @@ class Template
 	    "height: 0px; width: 0px; border: 2px solid red;'></div>\n";
 
 	echo $imap;
-	echo "<img id=\"G$guid\" border=0 usemap=\"#TemplateGraph\" ";
-	echo "      onLoad=\"setTimeout('G${guid}_loaded()', 200);\" ";
-	echo "      src='template_graph.php?guid=$guid'>\n";
+	echo "<img id=\"mygraphimg\" border=0 usemap=\"#TemplateGraph\" ";
+	echo "      onLoad=\"setTimeout('ShowGraphInit();', 10);\" ";
+	echo "      src='template_graph.php?guid=$guid&now=$now'>\n";
 	echo "</div>\n";
 	echo "</div>\n";
-
-	#
-	# This has to happen ...
-	#
-	$bodyclosestring =
-	    "<script type='text/javascript'>
-               SET_DHTML(\"D$guid\");
-
-               SetActiveTemplate(\"G$guid\", \"CurrentTemplate\", 
-	  		         \"Tarea${vers}\");
-
-              </script>\n";
     }
 
     #
@@ -686,35 +666,22 @@ class Template
     # Dump the visualization into its own iframe.
     #
     function ShowVis($zoom = 1.25, $detail = 1) {
-	global $bodyclosestring;
-
 	$guid = $this->guid();
 	$pid  = $this->pid();
 	$eid  = $this->eid();
-
-	echo "<script type='text/javascript' ".
-	            "src='js/wz_dragdrop.js'></script>";
 
 	echo "<center>";
 	echo "<div id=fee style='display: block; overflow: hidden; ".
 	    "position: relative; z-index:1010; height: 400px; ".
 	    "width: 700px; border: 2px solid black;'>\n";
-	echo "<div id=\"D$guid\" style='position:relative;'>\n";
+	echo "<div id=\"myvisdiv\" style='position:relative;'>\n";
 
-	echo "<img id=\"G$guid\" border=0 ";
-	echo "      onLoad=\"setTimeout('dd.recalc()', 1000);\" ";
+	echo "<img id=\"myvizimg\" border=0 ";
+	echo "      onLoad=\"setTimeout('ShowVisInit();', 100);\" ";
 	echo "      src='top2image.php3?pid=$pid&eid=$eid".
 	    "&zoom=$zoom&detail=$detail'>\n";
 	echo "</div>\n";
 	echo "</div>\n";
-
-	#
-	# This has to happen ...
-	#
-	$bodyclosestring =
-	    "<script type='text/javascript'>
-               SET_DHTML(\"D$guid\");
-             </script>\n";
     }
 
     #

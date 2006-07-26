@@ -6,6 +6,9 @@
 #
 include("defs.php3");
 include_once("template_defs.php");
+require("Sajax.php");
+sajax_init();
+sajax_export("Show", "GraphChange");
 
 #
 # Only known and logged in users ...
@@ -20,9 +23,6 @@ $eid = "";
 $gid = "";
 $template = NULL;
 $exptidx  = 0;
-if (!isset($show)) {
-    $show = "vis";
-}
 
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
@@ -70,18 +70,141 @@ function CheckArguments($guid, $version) {
 
 CheckArguments($guid, $version);
 
-if ((isset($action) && $action != "" && $action != "none") ||
-    ($show == "graph" && isset($zoom) && $zoom != "none")) {
+#
+# For the Sajax Interface
+#
+function Show($which, $zoom, $detail)
+{
+    global $pid, $eid, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    global $template;
+    $html = "";
+
+    if ($which == "vis") {
+	if ($zoom == 0) {
+            # Default is whatever we have; to avoid regen of the image.
+	    list ($zoom, $detail) = $template->CurrentVisDetails();	    
+	}
+	else {
+            # Sanity check but lets not worry about throwing an error.
+	    if (!TBvalid_float($zoom))
+		$zoom = 1.25;
+	    if (!TBvalid_integer($detail))
+		$detail = 1;
+    	}
+
+	ob_start();
+	$template->ShowVis($zoom, $detail);
+	$html = ob_get_contents();
+	ob_end_clean();
+
+	$zoomout = sprintf("%.2f", $zoom / 1.25);
+	$zoomin  = sprintf("%.2f", $zoom * 1.25);
+
+	$html .= "<button name=viszoomout type=button value=$zoomout";
+	$html .= " onclick=\"VisChange('$zoomout', $detail);\">";
+	$html .= "Zoom Out</button>\n";
+	$html .= "<button name=viszoomin type=button value=$zoomin";
+	$html .= " onclick=\"VisChange('$zoomin', $detail);\">";
+	$html .= "Zoom In</button>\n";
+
+	if ($detail) {
+	    $html .= "<button name=hidedetail type=button value=0";
+	    $html .= " onclick=\"VisChange('$zoom', 0);\">";
+	    $html .= "Hide Details</button>\n";
+	}
+	else {
+	    $html .= "<button name=showdetail type=button value=1";
+	    $html .= " onclick=\"VisChange('$zoom', 1);\">";
+	    $html .= "Show Details</button>\n";
+	}
+    }
+    elseif ($which == "graph") {
+	ob_start();
+	$template->ShowGraph();
+	$html = ob_get_contents();
+	ob_end_clean();
+
+	if (! $template->IsRoot()) {
+	    if ($template->IsHidden()) {
+		$html .= "<button name=showtemplate type=button value=Show";
+		$html .= " onclick=\"GraphChange('showtemplate');\">";
+		$html .= "Show Template</button>&nbsp";
+	    }
+	    else {
+		$html .= "<button name=hidetemplate type=button value=Hide";
+		$html .= " onclick=\"GraphChange('hidetemplate');\">";
+		$html .= "Hide Template</button>&nbsp";
+	    }
+	    $html .= "<input id=recursive type=checkbox value=Yep> ";
+	    $html .= "Recursive? &nbsp &nbsp &nbsp &nbsp ";
+	}
+	$root = Template::LookupRoot($template->guid());
+
+        # We overload the hidden bit on the root.
+	if ($root->IsHidden()) {
+	    $html .= "<button name=showhidden type=button value=showhidden";
+	    $html .= " onclick=\"GraphChange('showhidden');\">";
+	    $html .= "Show Hidden Templates</button>&nbsp &nbsp &nbsp &nbsp ";
+	}
+	else {
+	    $html .= "<button name=hidehidden type=button value=hidehidden";
+	    $html .= " onclick=\"GraphChange('hidehidden');\"> ";
+	    $html .= "Hide Hidden Templates</button>&nbsp &nbsp &nbsp &nbsp ";
+	}
+	$html .= "<button name=zoomout type=button value=out";
+	$html .= " onclick=\"GraphChange('zoomout');\">Zoom Out</button>\n";
+	$html .= "<button name=zoomin type=button value=in";
+	$html .= " onclick=\"GraphChange('zoomin');\">Zoom In</button>\n";
+    }
+    elseif ($which == "nsfile") {
+	$nsdata = "";
+
+	$input_list = $template->InputFiles();
+
+	for ($i = 0; $i < count($input_list); $i++) {
+	    $nsdata .= htmlentities($input_list[$i]);
+	    $nsdata .= "\n\n";
+	}
+	$html = "<div align=left class=\"showexp_codeblock\">".
+	    "<pre>$nsdata</pre></div>\n";
+
+	$html .= "<button name=savens type=button value=1";
+	$html .= " onclick=\"SaveNS();\">";
+	$html .= "Save</button>\n";
+    }
+    return $html;
+}
+
+#
+# Sajax callback for operating on the template graph.
+#
+function GraphChange($action)
+{
+    global $pid, $gid, $eid, $uid, $guid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    global $template;
+    $html = "";
 
     # Need this for scripts.
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    
+    $reqarg  = "-a ";
+    $versarg = "$version";
 
-    # Hide or show templates.
-    if (isset($action) && $action != "" && $action != "none") {
-	$optarg  = ((isset($recursive) && $recursive == "Yep") ? "-r" : "");
-	$reqarg  = "-a ";
-	$versarg = "$version";
+    if ($action == "zoomout" || $action == "zoomin") {
+	$optarg = "";
+	
+	if ($action == "zoomin") {
+	    $optarg = "-z in";
+	}
+	else {
+	    $optarg = "-z out";
+	}
 
+        # Need to update the template graph.
+	SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
+	       SUEXEC_ACTION_DIE);
+    }
+    else {
 	if ($action == "showtemplate") {
 	    $reqarg .= "show";
 	}
@@ -114,22 +237,15 @@ if ((isset($action) && $action != "" && $action != "none") ||
 	       "webtemplate_control $reqarg $optarg",
 	       SUEXEC_ACTION_DIE);
     }
-    elseif (isset($zoom) && ($zoom == "out" || $zoom == "in")) {
-	$optarg = "";
-	
-	if ($zoom == "in") {
-	    $optarg = "-z in";
-	}
-	else {
-	    $optarg = "-z out";
-	}
-
-        # Need to update the template graph.
-	SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
-	       SUEXEC_ACTION_DIE);
-    }
     $template->Refresh();
+    return Show("graph", 0, 0);
 }
+
+#
+# See if this request is to the above function. Does not return
+# if it is. Otherwise return and continue on.
+#
+sajax_handle_client_request();
 
 #
 # Standard Testbed Header after argument checking.
@@ -187,108 +303,84 @@ SUBMENUEND_2B();
 
 #
 # The center area is a form that can show NS file, Template Graph, or Vis.
-# IE complicates this, although in retrospect, I could have used plain
-# input buttons instead of the fancy rendering kind of buttons, which do not
-# work as expected (violates the html spec) in IE. 
 #
-echo "<script type='text/javascript' language='javascript' ".
-     "        src='template_sup.js'>\n";
-echo "</script>\n";
+echo "<script type='text/javascript' src='template_sup.js'></script>\n";
 echo "<script type='text/javascript' language='javascript'>
+        var li_current = 'li_vis';
         function Show(which) {
-            document.form1['show'].value = which;
-            document.form1.submit();
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = '#DDE';
+            li.style.borderBottom = 'none';
+
+            li_current = 'li_' + which;
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = 'white';
+            li.style.borderBottom = '1px solid white';
+
+            x_Show(which, 0, 0, Show_cb);
             return false;
         }
-        function Zoom(howmuch) {
-            document.form1['zoom'].value = howmuch;
-            document.form1.submit();
+        function Show_cb(html) {
+	    visarea = getObjbyName('showexp_visarea');
+            if (visarea) {
+                visarea.innerHTML = html;
+            }
+        }
+        function ShowVisInit() {
+            ADD_DHTML(\"myvisdiv\");
+        }
+        function ShowGraphInit() {
+ 	    ADD_DHTML(\"mygraphdiv\");
+  	    SetActiveTemplate(\"mygraphimg\", \"CurrentTemplate\", 
+			      \"Tarea${version}\");
+        }
+        function VisChange(zoom, detail) {
+            x_Show('vis', zoom, detail, Show_cb);
             return false;
         }
-        function DoAction(action) {
-            document.form1['action'].value = action;
-            document.form1.submit();
+        function GraphChange(action) {
+            x_GraphChange(action, Show_cb);
             return false;
         }
-      </script>\n";
+        function SaveNS() {
+            window.open('spitnsdata.php3?guid=$guid&version=$version',
+                        'Save NS File','width=650,height=400,toolbar=no,".
+                        "resizeable=yes,scrollbars=yes,status=yes,".
+	                "menubar=yes');
+        }\n\n";
+sajax_show_javascript();
+echo "</script>\n";
+echo "<script type='text/javascript' src='js/wz_dragdrop.js'></script>";
 
-echo "<center>\n";
-echo "<form action='template_show.php?guid=$guid&version=$version'
-            name=form1 method=post>\n";
-echo "<input type=hidden name=show   value=$show>\n";
-echo "<input type=hidden name=zoom   value='none'>\n";
-echo "<input type=hidden name=action value='none'>\n";
+#
+# This has to happen for dragdrop to work.
+#
+$bodyclosestring = "<script type='text/javascript'>SET_DHTML();</script>\n";
 
-echo "<button name=showns type=button value=ns onclick=\"Show('ns');\"
-        style='float:center; width:15%;'>NS File</button>\n";
-echo "<button name=showvis type=button value=vis onclick=\"Show('vis');\"
-        style='float:center; width:15%;'>Visualization</button>\n";
-echo "<button name=showgraph type=button value=graph onclick=\"Show('graph');\"
-        style='float:center; width:15%;'>Graph</button>\n";
+#
+# This is the topbar
+#
+echo "<div width=\"100%\" align=center>\n";
+echo "<ul id=\"topnavbar\">\n";
+echo "<li>
+          <a href=\"#A\" style=\"background-color:white\" ".
+               "id=\"li_vis\" onclick=\"Show('vis');\">".
+               "Visualization</a></li>\n";
+echo "<li>
+          <a href=\"#B\" id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
+              "NS File</a></li>\n";
+echo "<li>
+          <a href=\"#C\" id=\"li_graph\" onclick=\"Show('graph');\">".
+              "Graph</a></li>\n";
+echo "</ul>\n";
 
-if ($show == "graph") {
-    $template->ShowGraph();
-
-    if (! $template->IsRoot()) {
-	if ($template->IsHidden()) {
-	    echo "<button name=showtemplate type=button value=Show";
-	    echo " onclick=\"DoAction('showtemplate');\">Show Template";
-	    echo "</button>&nbsp";
-	}
-	else {
-	    echo "<button name=hidetemplate type=button value=Hide";
-	    echo " onclick=\"DoAction('hidetemplate');\">Hide Template";
-	    echo "</button>&nbsp";
-	}
-	echo "<input type=checkbox name=recursive value=Yep>Recursive? &nbsp ";
-	echo "&nbsp &nbsp &nbsp ";
-    }
-    $root = Template::LookupRoot($guid);
-
-    # We overload the hidden bit on the root.
-    if ($root->IsHidden()) {
-	echo "<button name=showhidden type=button value=showhidden";
-	echo " onclick=\"DoAction('showhidden');\">Show Hidden Templates ";
-	echo "</button>&nbsp &nbsp &nbsp &nbsp ";
-    }
-    else {
-	echo "<button name=hidehidden type=button value=hidehidden";
-	echo " onclick=\"DoAction('hidehidden');\">Hide Hidden Templates ";
-	echo "</button>&nbsp &nbsp &nbsp &nbsp ";
-    }
-    echo "<button name=zoomout type=button value=out";
-    echo " onclick=\"Zoom('out');\">Zoom Out</button>\n";
-    echo "<button name=zoomin type=button value=in";
-    echo " onclick=\"Zoom('in');\">Zoom In</button>\n";
-}
-elseif ($show == "ns") {
-    $template->ShowNS();
-}
-elseif ($show == "vis") {
-    # Default is whatever we have; to avoid regen of the image.
-    list ($newzoom, $newdetail) = $template->CurrentVisDetails();
-    
-    if (isset($zoom) && $zoom != "none")
-	$newzoom = $zoom;
-
-    # Sanity check but lets not worry about throwing an error.
-    if (!TBvalid_float($newzoom))
-	$newzoom = 1.25;
-    if (!TBvalid_integer($newdetail))
-	$newdetail = 1;
-    
-    $template->ShowVis($newzoom, $newdetail);
-
-    $zoomout = sprintf("%.2f", $newzoom / 1.25);
-    $zoomin  = sprintf("%.2f", $newzoom * 1.25);
-
-    echo "<button name=viszoomout type=button value=$zoomout";
-    echo " onclick=\"Zoom('$zoomout');\">Zoom Out</button>\n";
-    echo "<button name=viszoomin type=button value=$zoomin";
-    echo " onclick=\"Zoom('$zoomin');\">Zoom In</button>\n";
-}
-echo "</form>\n";
-echo "</center>\n";
+#
+# Start out with Visualization ...
+#
+echo "<div align=center width=\"100%\" id=\"showexp_visarea\">\n";
+echo Show("vis", 0, 0);
+echo "</div>\n";
+echo "</div>\n";
 
 SUBPAGEEND();
 
@@ -330,8 +422,6 @@ if ($paramcount || $metacount) {
 echo "</tr>\n";
 echo "</table>\n";
 echo "</center>\n";
-
-print_r($HTTP_POST_VARS);
 
 #
 # Standard Testbed Footer
