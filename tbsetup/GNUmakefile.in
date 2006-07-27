@@ -34,12 +34,12 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic repos_daemon node_attributes \
-		  nfstrace plabinelab
+		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy
 
 CTRLBIN_STUFF   = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
 
-FSBIN_STUFF	= exports_setup.proxy
+FSBIN_STUFF	= exports_setup.proxy smbpasswd_setup.proxy
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \

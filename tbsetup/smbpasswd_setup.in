@@ -1,0 +1,127 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+
+#
+# smbpasswd_setup - Run this on Boss as root.
+# 
+# For each active user in the Emulab database, it sets their Samba password on
+# Fs to their Windows password, using the smbpasswd_setup.proxy .
+#
+# usage: smbpasswd_setup [debug_level]
+#
+
+my $dbg = 0;
+if ($#ARGV+1 > 0) {
+    # 0 = no debug, 1 = remote dbg, 2 = local dbg.
+    $dbg = $ARGV[0];
+}
+if ($dbg =~ /^([-\w]+)$/i) {
+    $dbg = $1;
+}
+else {
+    die("Tainted argument: $dbg\n");
+}
+
+#
+# Configure variables.
+#
+my $TB		= "@prefix@";
+my $FSNODE      = "@FSNODE@";
+my $WINSUPPORT  = @WINSUPPORT@;
+
+# Note no -n option to ssh.  We pipe stdin below.
+my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
+my $PROG	= "$TB/sbin/smbpasswd_setup.proxy";
+
+#
+# We don't want to run this script unless its the real version or local debug.
+#
+if ($EUID != 0 and $dbg < 2) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+die("*** $0:\n".
+    "    Nothing to do if no Windows support in this copy of Emulab.\n")
+    if (!$WINSUPPORT);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Testbed Support libraries
+# 
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+my $USERROOT  = USERROOT();
+
+# Just do active, login accounts with real (unstarred) passwords.
+# (The unix_pwd is set to "frozen" on frozen accounts.)
+my $users_result =
+    DBQueryFatal("select uid, usr_w_pswd, usr_pswd from users " .
+		 "where status = '" . USERSTATUS_ACTIVE() . "'" .
+		 "  and wikionly = '0' and webonly = '0'" . 
+		 "  and usr_pswd != '*'");
+
+{
+    local $SIG{PIPE} = sub { die "$PROG pipe broke" };
+
+    # Open a pipe to a proxy on Ops.
+    (open(PROXY, "| $SSH $PROG $dbg")
+     || fatal("Failed: '| $SSH $PROG $dbg' $! $?"))
+	if ($dbg < 2);
+
+    while (my @usersrow = $users_result->fetchrow_array) {
+	my $uid = $usersrow[0];
+	my $w_pwd = $usersrow[1];
+	my $unix_pwd = $usersrow[2];
+
+	# If there's no user Windows password set, use the initial random default
+	# for the Windows Password.  This based on the Unix encrypted password, in
+	# particular the random salt if it's an MD5 crypt, consisting of the 8
+	# characters after an initial "$1$" and followed by a "$".
+	if (! defined($w_pwd)) {
+	    # When there's no $ at the beginning, its not an MD5 hash.
+	    if ($unix_pwd !~ m/\$1\$/) {
+		$w_pwd = substr($unix_pwd,0,8);
+	    }
+	    else {
+		$w_pwd = substr($unix_pwd,3,8); # The MD5 salt string.
+	    }
+	}
+
+	if (-d "$USERROOT/$uid") {
+	    if ($dbg >= 2) {
+		print "$uid, $w_pwd, $unix_pwd\n";
+	    }
+	    else {
+		print PROXY "$uid $w_pwd\n";
+	    }
+	}
+	else {
+	    print STDERR "*** smbpasswd_setup: ".
+		"$USERROOT/$uid does not exist!\n";
+	}
+    }
+
+    (close(PROXY)
+     || fatal("Failed, closing: '| $SSH $PROG $dbg' $! $?"))
+	if ($dbg < 2);
+}
+
+exit(0);
