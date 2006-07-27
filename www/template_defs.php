@@ -696,7 +696,7 @@ class Template
 			 "where pid='$pid' and eid='$eid'");
 
 	if (!mysql_num_rows($query_result)) {
-	    return array(1.15, 1);
+	    return array(1.25, 1);
 	}
 	$row    = mysql_fetch_array($query_result);
 	$zoom   = $row['zoom'];

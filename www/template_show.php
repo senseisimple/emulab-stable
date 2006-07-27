@@ -178,7 +178,7 @@ function Show($which, $zoom, $detail)
 #
 # Sajax callback for operating on the template graph.
 #
-function GraphChange($action)
+function GraphChange($action, $no_output = 0)
 {
     global $pid, $gid, $eid, $uid, $guid, $TBSUEXEC_PATH, $TBADMINGROUP;
     global $template;
@@ -188,7 +188,7 @@ function GraphChange($action)
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
     
     $reqarg  = "-a ";
-    $versarg = "$version";
+    $versarg = $template->vers();
 
     if ($action == "zoomout" || $action == "zoomin") {
 	$optarg = "";
@@ -246,6 +246,13 @@ function GraphChange($action)
 # if it is. Otherwise return and continue on.
 #
 sajax_handle_client_request();
+
+#
+# Active/Inactive is a plain menu link.
+#
+if (isset($action) && ($action == "activate" || $action == "inactivate")) {
+    GraphChange($action, 1);
+}
 
 #
 # Standard Testbed Header after argument checking.
