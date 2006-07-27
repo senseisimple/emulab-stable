@@ -1247,7 +1247,7 @@ sub list_failed_nodes ($%) {
 	$max_length -= 4;
 	my $length = 0;
 	foreach (@nodes) {
-	    $length += length($_);
+	    $length += length($_) + 1;
 	    last if $length > $max_length;
 	    $line .= "$_ ";
 	}
@@ -1299,11 +1299,6 @@ foreach (@all_nodes) {
     my $type = $node_types{$_};
     $total{$osid}{any_type}++;
     $total{$osid}{by_type}{$type}++;
-}
-
-{
-    use Data::Dumper;
-    print Dumper(\%tally, \%total);
 }
 
 #
@@ -1373,18 +1368,18 @@ if (defined $tally{reload}) {
 	    
 	    foreach my $type (@node_types) {
 
-		add_defaults($d{$d_t{$type}});
+		add_defaults($d_t{$type});
 		my %d = %{$d_t{$type}};
 		my $total = $total_t{$type};
 		
 		if ($d{failed} > 0) {
-		    $line = sprintf("%d/%d %s with this os failed to boot",
-				    "${type}'s",
-				    $d{failed}, $total);
+		    $line = sprintf("  %d/%d %s with this os failed to boot",
+				    $d{failed}, $total,
+				    "${type}'s");
 		    $line = add_non_fatal($line, %d);
-		    $line = add_failed_nodes($line, 2, %d);
+		    $line = add_failed_nodes($line, 4, %d);
 		} else {
-		    $line = sprintf("%d %s with this os successfully booted.\n",
+		    $line = sprintf("  %d %s with this os successfully booted.\n",
 				    $total,
 				    $total_t{$type} == 1 ? "$type" : "${type}'s");
 		}
