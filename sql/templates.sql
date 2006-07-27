@@ -22,6 +22,9 @@ CREATE TABLE experiment_templates (
   -- Pointer to parent, for modification.
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned default NULL,
+  -- Pointer to most recent child, for modification.
+  child_guid varchar(16) default NULL,
+  child_vers smallint(5) unsigned default NULL,
   -- Project ID
   pid varchar(12) NOT NULL default '',
   -- Group ID

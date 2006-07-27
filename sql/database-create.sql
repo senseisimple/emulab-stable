@@ -694,6 +694,8 @@ CREATE TABLE experiment_templates (
   vers smallint(5) unsigned NOT NULL default '0',
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned default NULL,
+  child_guid varchar(16) default NULL,
+  child_vers smallint(5) unsigned default NULL,
   pid varchar(12) NOT NULL default '',
   gid varchar(16) NOT NULL default '',
   tid varchar(32) NOT NULL default '',

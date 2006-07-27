@@ -3559,3 +3559,15 @@ last_net_act,last_cpu_act,last_ext_act);
             active tinyint(1) NOT NULL default '0.000';
 
 4.76: Change to previous revision; skip to next entry.
+
+4.77: Add a child template pointer to experiment_templates to store
+      the guid of the most recent child (modification). Better then
+      passing this info back in a print statement to be parsed.
+
+      **** Skip this if you just did 4.41 above.
+
+      alter table experiment_templates add \
+          child_guid varchar(16) default NULL after parent_vers;
+      alter table experiment_templates add \
+          child_vers smallint(5) unsigned default NULL after child_guid;
+
