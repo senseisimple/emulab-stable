@@ -3,11 +3,16 @@
  *)
 let use_ortc = ref false;;
 let graphfile = ref None;;
+let o_n_reduction = ref false;;
 
 let argspec =
     [("-o",
       Arg.Set(use_ortc),
-      "Use the ORTC metric (RES default)")];;
+      "Use the ORTC metric (RES default)");
+     ("-n",
+      Arg.Set(o_n_reduction),
+      "Use the O(n) runtime reduction algorithm")
+    ];;
 
 Arg.parse argspec (fun x -> graphfile := Some(x)) "Usage";;
 
@@ -78,6 +83,13 @@ let size = Array.length hops;;
 
 let estimated_routes = ref (size * (size - 1));;
 
+(*
+ * If not using Jon's O(n) reduction technique, just make this an empty
+ * array
+ *)
+let adjacency_matrix = if !o_n_reduction then Array.make_matrix size size false
+                       else Array.make_matrix 0 0 false;;
+
 (* Keep bins of *)
 let bins = Mintree.make total_bits;;
 
@@ -108,11 +120,70 @@ let consider_combining (node_sets : 'a node_sets) (matrix : matrix)
     matrix.(a).(b) <- Some(remove_func)
 ;;
 
+let combine_with_all (node_sets : 'a node_sets) (matrix : matrix)
+        (hops : int array array) (heap : nodepair Heap.heap) (a : int) : unit =
+    let combine_with (b : int) : unit =
+        let (x,y) = if a < b then (a,b) else (b,a) in
+        consider_combining node_sets matrix hops heap x y
+    in
+    for i = 0 to a - 1 do
+        match node_sets.(i) with
+          None -> () (* Ignore nodes we've nuked *)
+        | Some(_) -> combine_with i
+    done;
+    for j = a + 1 to size - 1 do
+        match node_sets.(j) with
+          None -> () (* Ignore nodes we've nuked *)
+        | Some(_) -> combine_with j
+    done
+;;
+
+let combine_with_neighbors (node_sets : 'a node_sets) (matrix : matrix)
+        (hops : int array array) (heap : nodepair Heap.heap) (graph)
+        (a : int) : unit =
+    let combine_with (b : int) : unit =
+        let (x,y) = if a < b then (a,b) else (b,a) in
+        consider_combining node_sets matrix hops heap x y
+    in
+    let graphnode = Graph.find_node graph a in
+    let rec helper edges = 
+        match edges with
+          edge:: xs -> (
+            let otherend =
+                if (edge.Graph.src.Graph.node_contents = a) then a
+                else edge.Graph.dst.Graph.node_contents in
+            match node_sets.(otherend) with
+              None -> raise (Failure "Found a nuked node")
+            | Some(_) -> combine_with otherend;
+          helper xs )  
+        | [] -> ()
+    in
+    helper graphnode.Graph.node_edges
+;;
+
+let combine_with_relevant (node_sets : 'a node_sets) (matrix : matrix)
+        (hops : int array array) (heap : nodepair Heap.heap) (graph) 
+        (a : int) : unit =
+    if (!o_n_reduction) then
+        combine_with_all node_sets matrix hops heap a
+    else
+        combine_with_neighbors node_sets matrix hops heap graph a
+;;
+
+
 let initialize_heap (node_sets : 'a node_sets) (hops : int array array)
                     (bins : Mintree.bins_t) : (nodepair Heap.heap * matrix) =
     let heap = Heap.make_heap (-1,-1) in
     let (matrix : matrix) = Array.make_matrix size size None in
     debug "init_heap called";
+    for i = 0 to size - 1 do
+        combine_with_relevant node_sets matrix hops heap graph i;
+        (* Also add to the bins which count how many trees of each
+         * depth we have *)
+        debug "Calling add_to_bin";
+        Mintree.add_to_bin bins 0
+    done;
+    (*
     for i = 0 to size - 1 do
         for j = i + 1 to size - 1 do
             consider_combining node_sets matrix hops heap i j
@@ -122,6 +193,7 @@ let initialize_heap (node_sets : 'a node_sets) (hops : int array array)
         debug "Calling add_to_bin";
         Mintree.add_to_bin bins 0
     done;
+    *)
     (heap, matrix)
 ;;
 
@@ -153,24 +225,6 @@ let remove_from_sets (node_sets : 'a node_sets) (a : int) (b : int) : unit =
     node_sets.(b) <- None
 ;;
 
-let combine_with_all (node_sets : 'a node_sets) (matrix : matrix)
-        (hops : int array array) (heap : nodepair Heap.heap) (a : int) : unit =
-    let combine_with (b : int) : unit =
-        let (x,y) = if a < b then (a,b) else (b,a) in
-        consider_combining node_sets matrix hops heap x y
-    in
-    for i = 0 to a - 1 do
-        match node_sets.(i) with
-          None -> () (* Ignore nodes we've nuked *)
-        | Some(_) -> combine_with i
-    done;
-    for j = a + 1 to size - 1 do
-        match node_sets.(j) with
-          None -> () (* Ignore nodes we've nuked *)
-        | Some(_) -> combine_with j
-    done
-;;
-
 let combine (node_sets : 'a node_sets) (matrix : matrix)
         (hops : int array array) (heap : nodepair Heap.heap) (a : int)
         (b: int) : unit =
@@ -191,6 +245,9 @@ let combine (node_sets : 'a node_sets) (matrix : matrix)
     let d3 = (1 + max h1 h2) in
     let tree3 = Mintree.TreeNode(a, d3, tree1, tree2) in
     remove_from_matrix matrix a b;
+    let graph_a = Graph.find_node graph a in
+    let graph_b = Graph.find_node graph b in
+    Graph.combine_nodes graph graph_a graph_b;
     (*
             debug "Heap: ";
             Heap.iterw heap (fun x y -> let (a,b) = y in
@@ -199,7 +256,7 @@ let combine (node_sets : 'a node_sets) (matrix : matrix)
     *)
     remove_from_sets node_sets a b;
     node_sets.(a) <- Some(s3,blob3,tree3);
-    combine_with_all node_sets matrix hops heap a
+    combine_with_relevant node_sets matrix hops heap graph a
 ;;
 
 exception OutOfBits;;
