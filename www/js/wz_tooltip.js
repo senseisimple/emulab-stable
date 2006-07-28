@@ -99,6 +99,7 @@ tt_ie6 = tt_ie && parseFloat(tt_nv.substring(tt_nv.indexOf("MSIE")+5)) >= 5.5,
 tt_n4 = (document.layers && typeof document.classes != tt_u),
 tt_n6 = (!tt_op && document.defaultView && typeof document.defaultView.getComputedStyle != tt_u),
 tt_w3c = !tt_ie && !tt_n6 && !tt_op && document.getElementById;
+tt_ready = 0;
 
 function tt_Int(t_x)
 {
@@ -472,7 +473,24 @@ function tt_Init()
 			}
 		}
 	}
-	document.write(htm);
+        /*
+         * The point of tt_ready is so that tt_init() can be called
+         * after the page is loaded. Not exactly portable ...
+         */
+        if (! tt_ready) {
+	    document.write('<div id="tooltip_div">');
+        }
+        if (tt_ready) {
+	    var mydiv = tt_GetDiv('tooltip_div');
+            mydiv.innerHTML = htm;
+        }
+        else {
+  	    document.write(htm);
+        }
+        if (! tt_ready) {
+ 	    document.write('</div>');
+        }
 	if(document.getElementById) tt_ifrm = document.getElementById("TTiEiFrM");
+        tt_ready = 1;
 }
 tt_Init();

@@ -26,6 +26,9 @@ use overload ('""' => 'Stringify');
 # Configure variables
 my $TB		= "@prefix@";
 my $MD5         = "/sbin/md5";
+my $MKDIR       = "/bin/mkdir";
+my $RMDIR       = "/bin/rmdir";
+my $RM		= "/bin/rm";
 my $makegraph   = "$TB/bin/template_graph";
 my $TEVC	= "$TB/bin/tevc";
 my $DBCONTROL   = "$TB/sbin/opsdb_control";
@@ -33,7 +36,7 @@ my $RSYNC	= "/usr/local/bin/rsync";
 
 # Cache of template instances to avoid regenerating them.
 my %templates   = ();
-my $debug	= 0;
+my $debug	= 1;
 
 #
 # Grab a new GUID for a template. We do not have to use it of course.
@@ -122,6 +125,12 @@ sub parent_guid($) {
     return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'parent_guid'}); }
 sub IsRoot($) {
     return ! defined($_[0]->{'TEMPLATE'}->{'parent_guid'}); }
+sub child_guid($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'child_guid'}); }
+sub child_vers($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'child_vers'}); }
+sub description($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'description'}); }
 
 #
 # Lookup a template given an experiment index.
@@ -137,6 +146,26 @@ sub LookupByExptidx($$)
 	if (!defined($template_instance));
 
     return $template_instance->template();
+}
+
+#
+# Lookup a template given pid,eid. This refers to the template itself,
+# not an instance of the template.
+#
+sub LookupByPidEid($$$)
+{
+    my ($class, $pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select guid,vers from experiment_templates ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my ($guid,$vers) = $query_result->fetchrow_array();
+
+    return Template->Lookup($guid, $vers);
 }
 
 #
@@ -300,6 +329,12 @@ sub Delete($)
 
     my $guid = $self->guid();
     my $vers = $self->vers();
+    my $path = $self->path();
+
+    if (defined($path) && $path ne "" && -e $path) {
+	mysystem("$RM -rf $path") == 0
+	    or return -1;
+    }
 
     DeleteAllMetadata($self) == 0
 	or return -1;
@@ -1238,7 +1273,7 @@ sub InstanceList($$$)
 #
 # Copy the datastore from parent template to child template.
 #
-sub CopyDataStore($$$)
+sub CopyDataStore($$)
 {
     my ($self, $parent) = @_;
 
@@ -1251,6 +1286,26 @@ sub CopyDataStore($$$)
 
     Template::mysystem("cd $from_path; ".
 		       "   $RSYNC -rtgoDlz datastore $to_path") == 0
+	or return -1;
+
+    return 0;
+}
+
+#
+# Import datastore from a directory back into the template. Currently
+# used when creating a template from an instance.
+#
+sub ImportDataStore($$)
+{
+    my ($self, $from_path) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $to_path = $self->path();
+
+    Template::mysystem("$RSYNC -rtgoDlz ${from_path}/ $to_path/datastore") == 0
 	or return -1;
 
     return 0;
@@ -1418,6 +1473,91 @@ sub Recurse($$)
     return 0;
 }
 
+#
+# Create directory for template.
+#
+sub CreateDirectory($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    my $pid  = $self->pid();
+    my $eid  = $self->eid();
+    my $gid  = $self->gid();
+    my $rval = 0;
+    
+    my $projroot = PROJROOT();
+    my $guiddir  = "$projroot/$pid/templates/$guid";
+    my $versdir  = "$guiddir/$vers";
+
+    DBQueryWarn("update experiment_templates set ".
+		"  path='$versdir' ".
+		"where guid='$guid' and vers='$vers'")
+	or return -1;
+
+    # Or else the caller does not see the above change!
+    Refresh($self) == 0
+	or return -1;
+
+    my $unix_gid;
+    my $unix_name;
+    
+    if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
+	print "*** No info for project/group $pid/$gid!\n";
+	return -1;
+    }
+    if (! -e $guiddir) {
+	if (! mkdir($guiddir, 0770) ||
+	    ! chmod(0770, "$guiddir") ||
+	    ! chown($UID, $unix_gid, "$guiddir")) {
+	    $rval = $ERRNO;
+	    print "*** Could not create directory $guiddir: $!\n";
+	    mysystem("$RMDIR $guiddir")
+		if (-e $guiddir);
+	    return $rval;
+	}
+    }
+    if (! mkdir($versdir, 0775) ||
+	! chmod(0775, "$versdir") ||
+	! chown($UID, $unix_gid, "$versdir")) {
+	$rval = $ERRNO;
+	print "*** Could not create directory $versdir: $!\n";
+	return $rval;
+    }
+    foreach my $token ("tbdata", "archive", "datastore") {
+	my $dir = "$versdir/$token";
+	
+	if (! mkdir($dir, 0770) ||
+	    ! chmod(0770, "$dir")) {
+	    $rval = $ERRNO;
+	    print "*** Could not create directory $dir: $!\n";
+	    return $rval;
+	}
+    }
+
+    my $workdir = TBExptWorkDir($pid, $eid);
+
+    #
+    # We need this cause a template has an experiment sitting underneath it.
+    #
+    if (-e $workdir) {
+	print "*** $workdir already exists!\n";
+	return -1;
+    }
+    if (! mkdir($workdir, 0775) ||
+	! chown($UID, $unix_gid, "$workdir")) {
+	print "*** Could not create $workdir: $!\n";
+	return -1;
+    }
+    
+    return 0;
+}
+
 ############################################################################
 
 package Template::Instance;
@@ -1519,6 +1659,9 @@ sub runidx($)  { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'runidx'}); }
 sub start_time { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'start_time'}); }
 sub stop_time  { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'stop_time'}); }
 sub template($){ return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
+
+# The path is the path of the experiment.
+sub path($)    { return TBExptUserDir($_[0]->pid(), $_[0]->eid()); }
 
 #
 # Stringify for output.

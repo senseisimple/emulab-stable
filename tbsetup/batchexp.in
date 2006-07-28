@@ -103,6 +103,7 @@ use libtestbed;
 use libtblog;
 use libArchive;
 use Experiment;
+use Template;
 
 my $parser      = "$TB/libexec/parse-ns";
 my $checkquota  = "$TB/sbin/checkquota";
@@ -279,7 +280,6 @@ if ($waitmode) {
 #
 my %args = ();
 
-$args{'idx'}		   = $exptidx;
 $args{'gid'}	  	   = $gid;
 $args{'expt_head_uid'}	   = $dbuid;
 $args{'expt_swap_uid'}	   = $dbuid;
@@ -322,13 +322,32 @@ tblog_set_info($pid,$eid,$UID);
 
 #
 # Create a directory structure for the experiment.
+# There is no need to do this for the template wrapper experiment; it was
+# already done when the template was created.
 #
-if ($experiment->CreateDirectory() != 0) {
-    if (($? >> 8) == EDQUOT()) {
-	# Obey exit status protocol for web page; User should see this.
-	$errorstat = 1;
+if (!$template_mode || $instance_idx) {
+    if ($experiment->CreateDirectory() != 0) {
+	if (($? >> 8) == EDQUOT()) {
+	    # Obey exit status protocol for web page; User should see this.
+	    $errorstat = 1;
+	}
+	fatal("Failed to created experiment directory");
     }
-    fatal("Failed to created experiment directory");
+}
+else {
+    #
+    # But we do need to update the experiment record with the template path.
+    #
+    my $template = Template->LookupByPidEid($pid, $eid);
+
+    fatal("Could not find template record for $pid/$eid")
+	if (!defined($template));
+
+    my %args = ();
+    $args{'path'} = $template->path();
+    
+    $experiment->Update(\%args) == 0
+	or fatal("Could not update experiment record!");
 }
 
 #

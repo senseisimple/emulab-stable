@@ -89,12 +89,17 @@ function Show($which, $zoom, $detail)
 		       "webreport $flags $pid $eid",
 		       $output, $retval);
 
-	$html = "<div align=left class=\"showexp_codeblock\"><pre>";
+	$html = "<pre><div align=left id=\"showexp_details\" ".
+	    "class=\"showexp_codeblock\">";
 	for ($i = 0; $i < count($output); $i++) {
 	    $html .= htmlentities($output[$i]);
 	    $html .= "\n";
 	}
-	$html .= "</pre></div>\n";
+	$html .= "</div></pre>\n";
+
+	$html .= "<button name=savedetails type=button value=1";
+	$html .= " onclick=\"SaveDetails();\">";
+	$html .= "Save</button>\n";
     }
     elseif ($which == "vis") {
 	if ($zoom == 0) {
@@ -154,8 +159,8 @@ function Show($which, $zoom, $detail)
 	    $row    = mysql_fetch_array($query_result);
 	    $nsdata = htmlentities($row["nsfile"]);
 	}
-	$html = "<div align=left class=\"showexp_codeblock\">".
-	    "<pre>$nsdata</pre></div>\n";
+	$html = "<pre><div align=left class=\"showexp_codeblock\">".
+	    "$nsdata</div></pre>\n";
 
 	$html .= "<button name=savens type=button value=1";
 	$html .= " onclick=\"SaveNS();\">";
@@ -332,6 +337,10 @@ if ($expstate) {
 	WRITESUBMENUBUTTON("Start New Experiment Run",
 			   "template_exprun.php?action=start&guid=$guid".
 			   "&version=$vers&eid=$exp_eid");
+
+	WRITESUBMENUBUTTON("Create New Template",
+			   "template_commit.php?&guid=$guid".
+			   "&version=$vers&exptidx=$expindex");
     }
     
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
@@ -515,9 +524,16 @@ echo "<script type='text/javascript' language='javascript'>
             x_Show('vis', zoom, detail, Show_cb);
             return false;
         }
+        function SaveDetails() {
+            window.open('spitreport.php?pid=$pid&eid=$eid',
+                        '_blank','width=700,height=400,toolbar=no,".
+                        "resizeable=yes,scrollbars=yes,status=yes,".
+	                "menubar=yes');
+        }
+
         function SaveNS() {
             window.open('spitnsdata.php3?pid=$pid&eid=$eid',
-                        'Save NS File','width=650,height=400,toolbar=no,".
+                        '_blank','width=700,height=400,toolbar=no,".
                         "resizeable=yes,scrollbars=yes,status=yes,".
 	                "menubar=yes');
         }

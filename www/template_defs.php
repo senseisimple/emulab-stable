@@ -151,6 +151,9 @@ class Template
     function parent_vers() {
 	return (is_null($this->template) ? -1 :$this->template['parent_vers']);
     }
+    function child_vers() {
+	return (is_null($this->template) ? -1 :$this->template['child_vers']);
+    }
 
     # The root template has no parent guid.
     function IsRoot() {
@@ -617,6 +620,7 @@ class Template
     function ShowGraph() {
 	$guid = $this->guid();
 	$vers = $this->vers();
+	# Make the link unique to force reload on the client side.
 	$now  = time();
 
 	$query_result =
@@ -669,6 +673,8 @@ class Template
 	$guid = $this->guid();
 	$pid  = $this->pid();
 	$eid  = $this->eid();
+	# Make the link unique to force reload on the client side.
+	$now  = time();
 
 	echo "<center>";
 	echo "<div id=fee style='display: block; overflow: hidden; ".
@@ -679,7 +685,7 @@ class Template
 	echo "<img id=\"myvizimg\" border=0 ";
 	echo "      onLoad=\"setTimeout('ShowVisInit();', 100);\" ";
 	echo "      src='top2image.php3?pid=$pid&eid=$eid".
-	    "&zoom=$zoom&detail=$detail'>\n";
+	    "&zoom=$zoom&detail=$detail&now=$now'>\n";
 	echo "</div>\n";
 	echo "</div>\n";
     }
@@ -956,7 +962,7 @@ class TemplateInstance
 	    echo "<td class=stealth align=center>\n";
 	}
 	echo "<center>
-               <h3>Template Details</h3>
+               <h3>Instance Details</h3>
              </center>\n";
 
 	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";

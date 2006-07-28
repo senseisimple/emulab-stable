@@ -27,22 +27,23 @@ sub usage()
 {
     print(STDERR
 	  "Usage: create_expt_template [-q] [-w] [-E description]\n".
-	  "                [-g gid] <pid> <tid> <input file>\n".
+	  "          [-m guid/vers] [-g gid] <pid> <tid> <input file>\n".
 	  "switches and arguments:\n".
-	  "-w       - wait for template to be created.\n".
-	  "-q       - be less chatty\n".
-	  "-E <str> - A pithy sentence describing the template\n".
-	  "-g <gid> - The group in which to create the experiment\n".
-	  "<pid>    - The project in which to create the experiment\n".
-	  "<tid>    - The template name (alphanumeric, no blanks)\n".
-	  "<input>  - Input file for experiment.\n");
+	  "-w        - wait for template to be created.\n".
+	  "-m <guid> - Modify existing template.\n".
+	  "-q        - be less chatty\n".
+	  "-E <str>  - A pithy sentence describing the template\n".
+	  "-g <gid>  - The group in which to create the experiment\n".
+	  "<pid>     - The project in which to create the experiment\n".
+	  "<tid>     - The template name (alphanumeric, no blanks)\n".
+	  "<input>   - Input file for experiment.\n");
     exit(-1);
 }
 my $optlist	 = "qwE:g:m:";
 my $quiet        = 0;
 my $waitmode     = 0;
-my $description  = "";
 my $modify       = 0;
+my $description;
 my $pid;
 my $tid;
 my $gid;
@@ -177,6 +178,13 @@ if ($modify) {
 	tbdie("You do not have permission to modify experiment template ".
 	      "$parent_guid/$parent_vers");
     }
+
+    $description = $parent_template->description()
+	if (!defined($description));
+}
+else {
+    $description = "Created by $dbuid"
+	if (! defined($description));
 }
 
 # Use the logonly option to audit so that we get a record mailed.
@@ -207,6 +215,13 @@ if (! ($template = Template->Create(\%args))) {
 # See the END block below.
 #
 $justexit = 0;
+
+#
+# The template gets its own directory structure. 
+#
+if (my $rval = $template->CreateDirectory()) {
+    fatal($rval, "Failed to create directories for template");
+}
 
 #
 # The description is versioned metadata the user can modify.
@@ -258,8 +273,6 @@ else {
 # And update the record.
 %args = ();
 $args{'archive_idx'} = $archive_idx;
-# The archive code below requires this be set!
-$args{'path'}        = TBExptUserDir($pid, $eid);
 
 $template->Update(\%args) == 0
     or fatal(-1, "Could not update template record!");
@@ -281,7 +294,6 @@ if ($modify) {
 	or fatal(-1, "Failed to copy data store");
 
     # and tell the archive library about the above files.
-    print "Add new files\n";
     libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
 	or fatal(-1, "Failed to add datastore files to the archive!");
 
@@ -327,6 +339,19 @@ if ($modify) {
 system("$makegraph $guid");
 fatal(-1, "Error generating template graph.")
     if ($?);
+
+#
+# Update parent to point to most recent child.
+#
+if ($modify) {
+    %args = ();
+
+    $args{'child_guid'} = $template->guid();
+    $args{'child_vers'} = $template->vers();
+
+    $parent_template->Update(\%args) == 0
+	or fatal(-1, "Could not update parent template record!");
+}
 
 # Web interface depends on this line. Bad; need another way to send
 # back the newly generated guid/version.
@@ -456,9 +481,6 @@ sub ParseArgs()
 	    tbdie("Improper template description!");
 	}
 	$description = $options{"E"};
-    }
-    else {
-	$description = "Created by $dbuid";
     }
 
     if (defined($options{"q"})) {

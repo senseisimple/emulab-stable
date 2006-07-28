@@ -1,0 +1,285 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Commit/Modify a template.
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_export [-q] [-s] [-e eid] <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-q          - be less chatty\n".
+	  "-e <eid>    - Experiment instance to commit from\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qe:d";
+my %options      = ();
+my $quiet        = 0;
+my $debug        = 0;
+my $eid;
+my $guid;
+my $version;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL     = "@USERNODE@";
+my $checkquota  = "$TB/sbin/checkquota";
+my $modify      = "$TB/bin/template_create";
+my $archcontrol = "$TB/bin/archive_control";
+my $TAR         = "/usr/bin/tar";
+
+# Locals
+my $dbuid;
+my $template;
+my $child_template;
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+sub cleanup();
+sub CommitFromInstance();
+sub CommitFromTemplate();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use Experiment;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# Grab template info and do access check.
+#
+$template = Template->Lookup($guid, $version);
+
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! $template->AccessCheck($dbuid, TB_EXPT_MODIFY)) {
+    tberror("You do not have permission to commit template $guid/$version");
+    exit(1);
+}
+
+#
+# Catch this so we can clean up.
+#
+$SIG{TERM} = \&sighandler;
+
+if ($eid) {
+    CommitFromInstance();
+}
+else {
+    CommitFromTemplate();
+} 
+exit(0);
+
+#
+# Commit from an instance.
+#
+sub CommitFromInstance()
+{
+    my $pid = $template->pid();
+    
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	fatal(-1, "Could not get experiment record for experiment $pid/$eid!");
+    }
+
+    my $idx      = $experiment->idx();
+    my $instance = Template::Instance->LookupByExptidx($idx);
+    if (!defined($instance)) {
+	fatal(-1, "Could not get instance record for experiment index $idx!");
+    }
+
+    my $userdir = $instance->path();
+    my $nsfile  = "$userdir/archive/nsdata/nsfile.ns";
+
+    #
+    # The NS file is taken from the instance. 
+    #
+    fatal(1, "There is no NS file in $userdir/archive/nsdata!")
+	if (! -e $nsfile);
+
+    #
+    # Start with a plain template modify of the current template.
+    #
+    my $tid = $template->tid();
+    my $gid = $template->gid();
+    
+    system("$modify -m $guid/$version -w -g $gid $pid $tid $nsfile");
+    if ($?) {
+	fatal($? >> 8, "Failed to commit instance to template!");
+    }
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+
+    $child_template = Template->Lookup($template->child_guid(),
+				       $template->child_vers());
+    
+    if (!defined($child_template)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+
+    #
+    # Now "import" the datastore directory from the instance to the new
+    # template and commit the changes. 
+    #
+    if ($child_template->ImportDataStore("$userdir/datastore") != 0) {
+	fatal(-1, "Could not import datastore from instance to template!");
+    }
+
+    #
+    # Commit the archive. 
+    #
+    system("$archcontrol -t import commit $pid " . $child_template->eid());
+    if ($?) {
+	fatal(-1, "Could not commit archive!");
+    }
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"e"})) {
+	$eid = $options{"e"};
+
+	if ($eid =~ /^([-\w]+)$/) {
+	    $eid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $eid.");
+	}
+	if (! TBcheck_dbslot($eid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    else {
+	tberror("Must provide an experiment ID (-e option)!");
+	exit(1);
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 2;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+    $child_template->Delete()
+	if (defined($child_template));
+}
+
+sub sighandler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}! Cleaning up ...");
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+    cleanup();
+    exit($errorstat);
+}
+

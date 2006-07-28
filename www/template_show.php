@@ -135,7 +135,7 @@ function Show($which, $zoom, $detail)
 		$html .= " onclick=\"GraphChange('hidetemplate');\">";
 		$html .= "Hide Template</button>&nbsp";
 	    }
-	    $html .= "<input id=recursive type=checkbox value=Yep> ";
+	    $html .= "<input id=showexp_recursive type=checkbox value=Yep> ";
 	    $html .= "Recursive? &nbsp &nbsp &nbsp &nbsp ";
 	}
 	$root = Template::LookupRoot($template->guid());
@@ -165,8 +165,8 @@ function Show($which, $zoom, $detail)
 	    $nsdata .= htmlentities($input_list[$i]);
 	    $nsdata .= "\n\n";
 	}
-	$html = "<div align=left class=\"showexp_codeblock\">".
-	    "<pre>$nsdata</pre></div>\n";
+	$html = "<pre><div align=left class=\"showexp_codeblock\">".
+	    "$nsdata</div></pre>\n";
 
 	$html .= "<button name=savens type=button value=1";
 	$html .= " onclick=\"SaveNS();\">";
@@ -178,7 +178,7 @@ function Show($which, $zoom, $detail)
 #
 # Sajax callback for operating on the template graph.
 #
-function GraphChange($action, $no_output = 0)
+function GraphChange($action, $recursive = 0, $no_output = 0)
 {
     global $pid, $gid, $eid, $uid, $guid, $TBSUEXEC_PATH, $TBADMINGROUP;
     global $template;
@@ -205,6 +205,8 @@ function GraphChange($action, $no_output = 0)
 	       SUEXEC_ACTION_DIE);
     }
     else {
+	$optarg  = ($recursive ? "-r" : "");
+	
 	if ($action == "showtemplate") {
 	    $reqarg .= "show";
 	}
@@ -238,7 +240,12 @@ function GraphChange($action, $no_output = 0)
 	       SUEXEC_ACTION_DIE);
     }
     $template->Refresh();
-    return Show("graph", 0, 0);
+
+    $html = "";
+    if (! $no_output)
+	$html = Show("graph", 0, 0);
+    
+    return $html;
 }
 
 #
@@ -251,7 +258,7 @@ sajax_handle_client_request();
 # Active/Inactive is a plain menu link.
 #
 if (isset($action) && ($action == "activate" || $action == "inactivate")) {
-    GraphChange($action, 1);
+    GraphChange($action, 0, 1);
 }
 
 #
@@ -340,13 +347,21 @@ echo "<script type='text/javascript' language='javascript'>
  	    ADD_DHTML(\"mygraphdiv\");
   	    SetActiveTemplate(\"mygraphimg\", \"CurrentTemplate\", 
 			      \"Tarea${version}\");
+            tt_Init();
         }
         function VisChange(zoom, detail) {
             x_Show('vis', zoom, detail, Show_cb);
             return false;
         }
         function GraphChange(action) {
-            x_GraphChange(action, Show_cb);
+            recursive_flag = 0;
+
+	    recursive = getObjbyName('showexp_recursive');
+            if (recursive) {
+                recursive_flag = ((recursive.checked == true) ? 1 : 0);
+            }
+
+            x_GraphChange(action, recursive_flag, Show_cb);
             return false;
         }
         function SaveNS() {
