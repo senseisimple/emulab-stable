@@ -21,11 +21,6 @@ ifeq ($(host_cpu),arm)
 TARGETS =
 ITARGETS =
 else
-ifeq ($(SYSTEM),CYGWIN)
-# use standard version for Windows
-TARGETS =
-ITARGETS =
-endif
 TARGETS = src/emulab-rude
 ITARGETS = rude-install crude-install
 endif

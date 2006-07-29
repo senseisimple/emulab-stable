@@ -20,7 +20,7 @@ if [ ! -d rude-$version/src ]; then
 	 exit 1
     fi
     echo "Unpacking/patching $rude-version source ..."
-    tar xzf rude-$version.tar.gz || {
+    tar xzof rude-$version.tar.gz || {
         echo "ERROR: rude-fetch.sh: tar failed"
 	exit 1
     }

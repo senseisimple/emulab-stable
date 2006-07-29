@@ -29,6 +29,8 @@ RCS file: /flux/CVS/emulab-rude/autoconf/configure.in,v
 retrieving revision 1.1.1.1
 retrieving revision 1.2
 diff -c -r1.1.1.1 -r1.2
+*** autoconf/configure.in	27 Jun 2006 17:50:15 -0000	1.1.1.1
+--- autoconf/configure.in	27 Jun 2006 18:26:17 -0000	1.2
 ***************
 *** 121,126 ****
   ###################
@@ -48,13 +50,60 @@ Index: crude/main.c
 ===================================================================
 RCS file: /flux/CVS/emulab-rude/crude/main.c,v
 retrieving revision 1.1.1.1
-retrieving revision 1.2
-diff -c -r1.1.1.1 -r1.2
+retrieving revision 1.3
+diff -c -r1.1.1.1 -r1.3
 *** crude/main.c	27 Jun 2006 17:50:15 -0000	1.1.1.1
---- crude/main.c	27 Jun 2006 18:22:10 -0000	1.2
+--- crude/main.c	28 Jul 2006 23:55:12 -0000	1.3
 ***************
-*** 294,302 ****
---- 294,306 ----
+*** 35,42 ****
+--- 35,44 ----
+  #include <sys/stat.h>
+  #include <sys/socket.h>
+  #include <sys/time.h>
++ #ifndef __CYGWIN__
+  #include <sched.h>
+  #include <sys/mman.h>
++ #endif /* ifndef__CYGWIN__ */
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  #include <limits.h>
+***************
+*** 106,112 ****
+--- 108,116 ----
+    long temp1          = 0;
+    int ps_flag         = 0;
+    struct sigaction action;
++ #ifndef __CYGWIN__
+    struct sched_param p;
++ #endif /* ifndef__CYGWIN__ */
+    char *sptr, *eptr;
+    struct flow_stat *newflows;
+  
+***************
+*** 205,212 ****
+--- 209,220 ----
+        retval = -2;
+     }
+     if(user_id != 0){
++ #ifndef __CYGWIN__
+        fprintf(stderr,"crude: must be root to set the priority level\n");
+        retval = -2;
++ #else /* ifndef__CYGWIN__ */
++       fprintf(stderr,"crude: priority level is not supported on Cygwin\n");
++ #endif /* ifndef__CYGWIN__ */
+     }
+        } else {
+     RUDEBUG1("crude: invalid commandline arguments!\n");
+***************
+*** 288,302 ****
+--- 296,315 ----
+    /* (if retval < 0 -> ERROR or/and EXIT IMMEDIATELY) */
+    if(retval < 0){ goto crude_exit; }
+   
++ #ifndef __CYGWIN__
+    /*
+     * If this process is owned by root we can do some tricks to
+     * improve the performance... (the -P option)
      */
     if((user_id == 0) && (priority > 0)){
       /* Try to lock the memory to avoid paging delays */
@@ -69,18 +118,74 @@ diff -c -r1.1.1.1 -r1.2
       /* Switch to Round-Robin-Real-Time Scheduling */
       p.sched_priority = priority;
 ***************
-*** 346,353 ****
---- 350,359 ----
+*** 307,312 ****
+--- 320,326 ----
+      }
+      RUDEBUG7("crude: program priority set to %d\n", p.sched_priority);
+    }                                                                             
++ #endif /* ifndef__CYGWIN__ */
+   
+    /* Activate the signal handler(s) */
+    memset(&action, 0, sizeof(struct sigaction));
+***************
+*** 332,337 ****
+--- 346,352 ----
+  
+   crude_exit:
+    if (retval >= 0 && nflows > 0) { ps_flag = 1; }
++ #ifndef __CYGWIN__
+    /*
+     * Restore the tweaked settings...
+     */
+***************
+*** 346,354 ****
+        RUDEBUG7("crude: program priority restored\n");
+      }
+  
+      /* Release the locked memory */
+      munlockall();
+!   }                                                                             
+  
+    if(ps_flag){ print_stats(); }
+    if(main_file > 0){ close(main_file); }
+--- 361,372 ----
         RUDEBUG7("crude: program priority restored\n");
       }
   
 + #ifdef HAVE_MUNLOCKALL
       /* Release the locked memory */
       munlockall();
-+ #endif
-    }                                                                             
+! #endif
+!   }
+! #endif /* ifndef__CYGWIN__ */
   
     if(ps_flag){ print_stats(); }
+    if(main_file > 0){ close(main_file); }
+***************
+*** 384,392 ****
+--- 402,413 ----
+   */
+  void crude_handler(int value)
+  {
++ #ifndef __CYGWIN__
+    struct sched_param pri;
++ #endif /* ifndef__CYGWIN__ */
+    RUDEBUG7("\ncrude: SIGNAL caught - exiting...\n");
+   
++ #ifndef __CYGWIN__
+    /* Check & restore process priority */
+    if((getuid() == 0) && (sched_getscheduler(0) != SCHED_OTHER)){
+      pri.sched_priority = 0;
+***************
+*** 396,401 ****
+--- 417,423 ----
+        RUDEBUG7("crude_handler: crude priority restored\n");
+      }
+    }                                                                             
++ #endif /* ifndef__CYGWIN__ */
+  
+    if(nflows > 0){ print_stats(); }
+    if(main_file > 0){ close(main_file); }
 ***************
 *** 663,670 ****
   
@@ -91,7 +196,7 @@ diff -c -r1.1.1.1 -r1.2
         printf("Delay: average = -%lld.%06llu   ", sec, usec);
       } else {
         printf("Delay: average = %lld.%06llu   ", sec, usec);
---- 669,676 ----
+--- 685,692 ----
   
       /* print average delay as sign and absolute value */
       if ( (sec < 0) || (usec < 0) ) {
@@ -122,10 +227,23 @@ Index: rude/flow_txmit.c
 ===================================================================
 RCS file: /flux/CVS/emulab-rude/rude/flow_txmit.c,v
 retrieving revision 1.1.1.1
-retrieving revision 1.3
-diff -c -r1.1.1.1 -r1.3
+retrieving revision 1.4
+diff -c -r1.1.1.1 -r1.4
 *** rude/flow_txmit.c	27 Jun 2006 17:50:14 -0000	1.1.1.1
---- rude/flow_txmit.c	27 Jun 2006 18:28:48 -0000	1.3
+--- rude/flow_txmit.c	28 Jul 2006 23:55:13 -0000	1.4
+***************
+*** 29,36 ****
+--- 29,38 ----
+  #include <string.h>
+  #include <unistd.h>
+  #include <errno.h>
++ #ifndef __CYGWIN__
+  #include <sched.h>
+  #include <sys/mman.h>
++ #endif /* ifndef__CYGWIN__ */
+  #include <sys/time.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
 ***************
 *** 43,58 ****
   extern struct udp_data *data;
@@ -144,7 +262,7 @@ diff -c -r1.1.1.1 -r1.3
         continue;
       }
       return;
---- 43,117 ----
+--- 45,119 ----
   extern struct udp_data *data;
   extern char            *buffer;
   
@@ -222,7 +340,7 @@ diff -c -r1.1.1.1 -r1.3
       return;
 ***************
 *** 78,83 ****
---- 137,146 ----
+--- 139,148 ----
     data->sequence_number = htonl(flow->sequence_nmbr);
     wait_for_xmit(&flow->next_tx, &now);
   
@@ -237,10 +355,51 @@ Index: rude/main.c
 ===================================================================
 RCS file: /flux/CVS/emulab-rude/rude/main.c,v
 retrieving revision 1.1.1.1
-retrieving revision 1.2
-diff -c -r1.1.1.1 -r1.2
+retrieving revision 1.3
+diff -c -r1.1.1.1 -r1.3
 *** rude/main.c	27 Jun 2006 17:50:14 -0000	1.1.1.1
---- rude/main.c	27 Jun 2006 18:22:23 -0000	1.2
+--- rude/main.c	28 Jul 2006 23:55:13 -0000	1.3
+***************
+*** 31,42 ****
+  #include <string.h>
+  #include <unistd.h>
+  #include <fcntl.h>
+- #include <sys/mman.h>
+  #include <sys/time.h>
+  #include <sys/wait.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <sched.h>
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  
+--- 31,44 ----
+  #include <string.h>
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <sys/time.h>
+  #include <sys/wait.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
++ #ifndef __CYGWIN__
+  #include <sched.h>
++ #include <sys/mman.h>
++ #endif /* ifndef__CYGWIN__ */
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  
+***************
+*** 82,88 ****
+--- 84,92 ----
+    int retval            = 0;
+    uid_t user_id         = getuid();
+    struct sigaction action;
++ #ifndef __CYGWIN__
+    struct sched_param p;
++ #endif /* ifndef__CYGWIN__ */
+  
+    printf("rude version %s, Copyright (C) 1999 Juha Laine and Sampo Saaristo\n"
+  	 "rude comes with ABSOLUTELY NO WARRANTY!\n"
 ***************
 *** 95,101 ****
       exit(1);
@@ -250,7 +409,7 @@ diff -c -r1.1.1.1 -r1.2
       switch(opt_ret){
       case 'v':
         if((optind == 2) && (argc == 2)){
---- 95,101 ----
+--- 99,105 ----
       exit(1);
     }
   
@@ -259,8 +418,23 @@ diff -c -r1.1.1.1 -r1.2
       case 'v':
         if((optind == 2) && (argc == 2)){
 ***************
+*** 138,145 ****
+--- 142,153 ----
+  	  retval = -2;
+  	}
+  	if(user_id != 0){
++ #ifndef __CYGWIN__
+  	  fprintf(stderr,"rude: must be root to set the priority level\n");
+  	  retval = -2;
++ #else /* ifndef__CYGWIN__ */
++ 	  fprintf(stderr,"rude: priority level is not supported on Cygwin\n");
++ #endif /* ifndef__CYGWIN__ */
+  	}
+        } else {
+  	RUDEBUG1("rude: invalid commandline arguments!\n");
+***************
 *** 147,152 ****
---- 147,156 ----
+--- 155,164 ----
         }
         break;
   
@@ -272,8 +446,15 @@ diff -c -r1.1.1.1 -r1.2
         usage(argv[0]);
         retval = -2;
 ***************
-*** 204,212 ****
---- 208,220 ----
+*** 198,212 ****
+--- 210,229 ----
+      goto rude_exit1;
+    }
+  
++ #ifndef __CYGWIN__
+    /*
+     * If this process is owned by root we can do some tricks to
+     * improve the performance... (the -P option)
      */
     if((user_id == 0) && (priority > 0)){
       /* Try to lock the memory to avoid paging delays */
@@ -288,8 +469,28 @@ diff -c -r1.1.1.1 -r1.2
       /* Switch to Round-Robin-Real-Time Scheduling */
       p.sched_priority = priority;
 ***************
-*** 242,249 ****
---- 250,259 ----
+*** 217,222 ****
+--- 234,240 ----
+      }
+      RUDEBUG7("rude: program priority set to %d\n", p.sched_priority);
+    }
++ #endif /* ifndef__CYGWIN__ */
+  
+    /*
+     * All is fine - start looping & transmitting
+***************
+*** 229,234 ****
+--- 247,253 ----
+  
+   rude_exit:
+  
++ #ifndef __CYGWIN__
+    /*
+     * Restore the tweaked settings...
+     */
+***************
+*** 242,250 ****
+--- 261,272 ----
         RUDEBUG7("rude: program priority restored\n");
       }
   
@@ -298,23 +499,41 @@ diff -c -r1.1.1.1 -r1.2
       munlockall();
 + #endif
     }
++ #endif /* ifndef__CYGWIN__ */
   
    rude_exit1:
+  
+***************
+*** 262,270 ****
+--- 284,295 ----
+  void rude_handler(int value)
+  {
+    int ret_val = (value * (-1));
++ #ifndef __CYGWIN__
+    struct sched_param pri;
++ #endif /* ifndef__CYGWIN__ */
+    RUDEBUG7("\nrude_handler(): receiver SIGNAL %d - clean-up & exit\n",value);
+  
++ #ifndef __CYGWIN__
+    /* Check & restore process priority */
+    if((getuid() == 0) && (sched_getscheduler(0) != SCHED_OTHER)){
+      pri.sched_priority = 0;
 ***************
 *** 275,281 ****
---- 285,293 ----
+--- 300,309 ----
       }
     }
   
 + #ifdef HAVE_MUNLOCKALL
     munlockall();
 + #endif
++ #endif /* ifndef__CYGWIN__ */
     clean_up();
     exit(ret_val);
   } /* main() */
 ***************
 *** 414,419 ****
---- 426,432 ----
+--- 442,448 ----
       }
       flow = flow->next;
     }
@@ -342,3 +561,28 @@ diff -c -r1.1.1.1 -r1.2
         }
         break;
       case(TRACE):
+Index: rude/rude.8
+===================================================================
+RCS file: /flux/CVS/emulab-rude/rude/rude.8,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -c -r1.1.1.1 -r1.2
+*** rude/rude.8	27 Jun 2006 17:50:15 -0000	1.1.1.1
+--- rude/rude.8	28 Jul 2006 23:55:13 -0000	1.2
+***************
+*** 35,41 ****
+  The script 
+  .IB file 
+  describing the flows to be sent by the rude program. 
+! See ../rude/DOC/example.cfg, for an example. 
+  .IP \fB\-h 
+  Print a short help.
+  .IP \fB\-v
+--- 35,41 ----
+  The script 
+  .IB file 
+  describing the flows to be sent by the rude program. 
+! See /usr/share/doc/rude/DOC/example.cfg, for an example. 
+  .IP \fB\-h 
+  Print a short help.
+  .IP \fB\-v
