@@ -277,10 +277,10 @@ sub get_dev_map()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$$;$$)
+sub os_ifconfig_line($$$$$$$;$$%)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
-	$iface_type, $settings, $rtabid) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type,
+	$settings, $rtabid, $cookie) = @_;
     my ($uplines, $downlines);
 
     # Handle interfaces missing from ipconfig.
@@ -360,7 +360,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 #
 # Specialized function for configing locally hacked veth devices.
 #
-sub os_ifconfig_veth($$$$$;$$$)
+sub os_ifconfig_veth($$$$$;$$$$$)
 {
     return "";
 }
