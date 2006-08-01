@@ -120,6 +120,11 @@ authenticates using a plain-text user name and password, encrypted as they go
 across the network.  (These Windows Shares are then accessed by UNC paths
 under Cygwin mounts, <a href="#SMB_mounts">described below</a>.) <p>
 
+In Windows GUI programs, you can just type the UNC path into the Address bar
+or a file-open dialog with <b>backslashes</b>, e.g. <code>\\fs\share</code> or
+<code>\\fs\&lt;username&gt;</code>.  User and project shares are marked "not
+browsable", so just <code>\\fs</code> shows only <code>share</code>. <p>
+
 <h4><a name="Windows_Passwords"> </a> Windows Passwords </h4>
 
 A separate <b>Windows password</b> is kept for use only with experiment nodes
