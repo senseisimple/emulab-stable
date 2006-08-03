@@ -311,9 +311,9 @@ sub os_ifconfig_line($$$$$$$;$$%)
 	$uplines   .= qq{\n    #================================\n    };
 	$uplines   .= qq{echo "Enabling $iface on $inet"\n    };
 	#
-	# Re-enable device if necessary (getmac Transport is "Disconnected".)
+	# Re-enable device if necessary (getmac Transport is "Media disconnected".)
 	my $test   =  qq[getmac /v /fo csv | awk -F, '/^"$iface"/{print \$4}'];
-	$uplines   .= qq{if [ \`$test\` = '"Disconnected"' ]; then\n    };
+	$uplines   .= qq{if [ \`$test\` = '"Media disconnected"' ]; then\n    };
 	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
 	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .= qq{fi\n    };
