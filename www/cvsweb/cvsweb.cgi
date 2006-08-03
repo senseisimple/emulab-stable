@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.7 2006-02-27 15:58:14 stoller Exp $
+# $Id: cvsweb.cgi,v 1.8 2006-08-03 21:33:15 kwebb Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -623,7 +623,7 @@ if ($input{tarball}) {
 			print "Content-Type: application/x-gzip\r\n\r\n";
 
 			system
-			    "$CMD{tar} @tar_options -cf - -C $tmpexportdir $basedir | $CMD{gzip} @gzip_options -c"
+			    "$CMD{gtar} @tar_options -cf - -C $tmpexportdir $basedir | $CMD{gzip} @gzip_options -c"
 			    and @fatal =
 				("500 Internal Error",
 				 'tar zc failure: %s: %s',
