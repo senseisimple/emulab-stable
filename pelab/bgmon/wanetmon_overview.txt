@@ -1,0 +1,135 @@
+Wanetmon Architecture for PeLab
+ Dan Gebhardt
+ July 6, 2006
+
+
+(File Descriptions)
++ bgmon.pl - runs on each node participating in gathering measurements.
+Each receives "control" notifications from a central source (ops, in
+this case) to change: the destination nodes, the tests that are run
+(latency and/or bandwidth) to each dest node, and the period between
+tests. Tests are run by forking off other apps (ping and iperf) and
+parsing the result. A "result" notification is sent back to ops upon
+test completion.
+
++ manager.pl - a utility to be run on ops to start recording data on a
+set of nodes. Input is a file containing the node set. Based on input
+and parameters, it sends the appropriate notifications to the nodes.
+
++ automanage.pl - a mostly-finished utility to automatically maintain
+tests between given nodes/sites. It selects a node from each site based
+on availability, calculates the test period based on the number of
+testable nodes, etc...
+
++ opsrecv.pl - runs on ops and listens for "result" notifications sent
+by those nodes running bgmon.pl . Saves these results to the ops MySql
+DB.
+
++ runbgmon - startup script to get bgmon.pl going on the nodes at
+bootup.
+
++ packbgmon - stupid script to give me a bgmon tar that my experiments
+load onto nodes.
+
+
+(Overview - bgmon.pl)
+The API for bgmon is as follows. Commands are given to the bgmon through a TCP
+connection as a serialized hash (see code for details). Possible commands are
+"EDIT", "INIT", "SINGLE", and "STOPALL". EDIT starts/modifies a single
+measurement type to a specific destination by specifying destination, test type,
+and test period. INIT starts/modifies tests to a set of destination nodes of a
+particular test type with a testing frequency. SINGLE performs a single test to
+a given node of a given test type without recurrance. STOPALL removes all test
+scheduling information. The result from each test is sent to "ops" in a UDP
+message. The message contains the following fields: source node, destination
+node, test type, result (the actual value), timestamp of source node when test
+started, and a 'magic' ID (Leigh added this, but I think it reduces the chance
+of a random UDP message being interpreted as a wanetmon message). The receiving
+machine (ops, in this case) sends back an acknowledgement to the source machine
+to provide application-layer reliability.
+
+The settings for each path-to-test is stored in a multi-level hash structure
+called %testevents. The first key to access the hash is the destination node
+(ex: plab20). The second is the type of test to this node (ex: bw). The third
+references the desired value (ex: "testper", "timeOfNextRun", "flag_scheduled").
+
+Each instance of a test has a corresponding application that is run. The
+applications are ping and a modified iperf. (iperf is modified to exit with an
+error code) When a test is ready to be run, bgmon forks one of these test apps
+with its output redirected to a temporary file. When the test app exits, bgmon
+parses this file for a result. There is room for improvement for the
+implementation of handling a finished process: a child process of bgmon is
+probably not correctly reaped when it exits. Currently, a waitpid is called with
+the pid of each running test. A test app is finished, and the entry in
+%testevents is marked as such, when a 0 is returned.
+
+Program flow for bgmon revolves around a poll loop. Each iteration, it blocks on
+a select call for a number of seconds (0.1, currently) to check for ready
+sockets (to receive a command or ack). It then checks each entry in %testevents
+and performs any number of the following to that entry: handle a test app that
+has exited, send the result of a completed test, run a test that is ready, and
+schedule a new test to run in the future.
+
+A test result is cached in a file before being sent to ops. It is deleted when
+ops returns an ack message with the corresponding index. There is a limit for
+how many ack-pending files can exist. When the limit is reached, newly-completed
+tests are sent to ops, but not cached until an ack for an existing file is
+received. Every so many iterations (set by $subtimer) of the main poll loop, all
+cached results are sent to ops again.
+
+The scheduling algorithm does not guarantee completion of measurements with hard time bounds as a real-time system does. However, there are mechanisms in place to attempt best effort service. 
+There can be only one outstanding measurement to a single destination at a time. In other words, another test to the same destination cannot start until the previous one finishes.
+Each poll loop, the current system time is compared with timeOfNextRun for each schedulable test. If current time is greater, the test is started. However, if the maximum number of tests of that type is already being run, the pending test is put on a wait queue. The events in the wait queue are run every X times through the main poll loop.
+
+
+(Overview - automanage.pl)
+
+Automanage is one of many potential "manager" applications. A manager application is one which gives commands to one or more bgmon apps. Automanage attemps to choose a single node from each site to run measurements to/from, and do this without an operator's assistance.
+
+Data Structures:
+  %allnodes: filled with the latest status of each node from an XML-RPC call.
+%sitenodes: mapping from a given site (key) to a list of nodes (value).
+  %intersitenodes: list of nodes chosen to form a fully connected test with each
+site.
+  @constrnodes: list of nodes from which automanage can choose to form
+%intersitenodes. Sets a constraint on which nodes and sites are used.
+  %deadnodes: records what nodes seem to be non-responsive.
+
+Automanage periodically gets the status of planetlab nodes through the XML-RPC interface. For each unique site, a "bestnode" is chosen based on up/down status and load. The complexity of this application comes when sites and nodes change. All nodes at a site can go down, the bestnode at a site can change, or a new site can become available. Automanage handles each of these cases.
+
+The user API of automanage is entirely on the command line (for now?). The key parameters are the latency measurement period (in seconds), the bandwidth measurement duty-cycle (a fraction), and a node-constraint file. The duty-cycle refers to the amount of time that any one node is performing a bandwidth test. If a value of 0.1 was given, 10% of the time a particular node will be running iperf. This measurement frequency is specified in this manner to allow for automatic adjustments based on the number of sites included in the measuement set. The measurement set is constrained first by the nodes listed in the constraint file, then by the sites which have available nodes. An example bandwidth period calculation is as follows. Given: 150 sites, 0.1 duty-cycle, and 10 second iperf duration; each test frequency from a given node shall be (150 - 1) * 10 sec * (1/0.1) = 14900 seconds = 4 hours. Bandwidth tests should not be run at 100% duty cycle to avoid flooding the link.
+
+
+
+
+
+*******************************************************************************
+
+
+
+Wanetmon Features (TODO)
+
+(1) High Freq. period for latency test
+  - use fping. If so, use one process for each destination or one total
+(limiting tests to each dest to same period)?
+  - Q: separate app or include in bgmon.pl?
+  - Q: keep same test results format (one msg per ping? that's wasteful...)
+  - 
+
+
+(2) Determining paths that are down
+  - Current method being implemented: use failed bw path tests to indicate
+problematic paths. An error value is used in the "result" field of a bw result
+message going back to ops.
+
+(3) Security
+  - Currently everything controlled with unencrypted/authenticated UDP and TCP.
+ 
+(4) Duration of rate change specification (for temporary user-centric
+measurements)
+  - I'll just add another field to the EDIT command. "Old period" value and
+"time remaining" keys will be added to %testevents
+
+(5) Minimum Period saftey cap (prevents users from horrendously flooding a link)
+  - Just check each EDIT command for validity.
+  - Q: how to find this cap?
