@@ -175,7 +175,8 @@ my %experiment_fields = ("multiplex_factor"		=> 1,
 		         "elabinelab_eid"		=> 1,
 		         "elabinelab_cvstag"		=> 1,
 		         "security_level"		=> 1,
-		         "delay_capacity"		=> 1);
+		         "delay_capacity"		=> 1,
+			 "dpdb"				=> 1);
 
 # New parsing code state machine control.
 my $PARSING_NOTYET	= 0;

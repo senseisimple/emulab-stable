@@ -294,6 +294,8 @@ CREATE TABLE experiment_template_instances (
   runidx int(10) unsigned default NULL,
   -- The tag for the template at the time of instantiation.
   template_tag varchar(64) default NULL,
+  -- Date of last export.
+  export_time datetime default NULL,
   PRIMARY KEY  (idx),
   KEY  (exptidx),
   KEY  (parent_guid,parent_vers),

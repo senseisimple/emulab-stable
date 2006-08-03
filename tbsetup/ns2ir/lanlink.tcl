@@ -65,6 +65,7 @@ Queue instproc init {link type node} {
     $self set trace_expr {}
     $self set trace_snaplen 0
     $self set trace_endnode 0
+    $self set trace_mysql 0
 
     #
     # These are NS variables for queues (with NS defaults).
@@ -330,6 +331,35 @@ Link instproc trace_snaplen {len} {
     
     $toqueue set trace_snaplen $len
     $fromqueue set trace_snaplen $len
+}
+
+Lan instproc trace_mysql {onoff} {
+    var_import ::GLOBALS::dpdb
+    $self instvar nodelist
+    $self instvar linkq
+
+    foreach nodeport $nodelist {
+	set linkqueue $linkq($nodeport)
+	$linkqueue set trace_mysql $onoff
+    }
+
+    if {$onoff} {
+	set dpdb 1
+    }
+}
+
+Link instproc trace_mysql {onoff} {
+    var_import ::GLOBALS::dpdb
+
+    $self instvar toqueue
+    $self instvar fromqueue
+    
+    $toqueue set trace_mysql $onoff
+    $fromqueue set trace_mysql $onoff
+
+    if {$onoff} {
+	set dpdb 1
+    }
 }
 
 Lan instproc trace_endnode {onoff} {
@@ -723,6 +753,7 @@ Link instproc updatedb {DB} {
  	    lappend fields "trace_expr"
  	    lappend fields "trace_snaplen"
  	    lappend fields "trace_endnode"
+ 	    lappend fields "trace_db"
 	}
 
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip $mustdelay]
@@ -742,6 +773,7 @@ Link instproc updatedb {DB} {
 	    lappend values [$linkqueue set trace_expr]
 	    lappend values [$linkqueue set trace_snaplen]
 	    lappend values [$linkqueue set trace_endnode]
+	    lappend values [$linkqueue set trace_mysql]
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
@@ -870,6 +902,7 @@ Lan instproc updatedb {DB} {
  	    lappend fields "trace_expr"
  	    lappend fields "trace_snaplen"
  	    lappend fields "trace_endnode"
+ 	    lappend fields "trace_db"
 	}
 	
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
@@ -889,6 +922,7 @@ Lan instproc updatedb {DB} {
 	    lappend values [$linkqueue set trace_expr]
 	    lappend values [$linkqueue set trace_snaplen]
 	    lappend values [$linkqueue set trace_endnode]
+	    lappend values [$linkqueue set trace_mysql]
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values

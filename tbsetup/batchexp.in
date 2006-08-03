@@ -58,7 +58,7 @@ sub CheckCopyArgs();
 sub CopyInArchive();
 sub fatal($);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:m";	# Enough options?
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:";	# Enough options?
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -70,7 +70,6 @@ my $savestate= 0;
 my $template_mode  = 0;	# New stuff; experiment templates.
 my $instance_idx   = 0;	# New stuff; experiment templates.
 my $archive_eid;	# New stuff; experiment templates.
-my $dpdb	   = 0; # A per-experiment DB on ops.
 # All of these are for experiment dup and branch. Really mucks things up.
 # These globals are set when we parse the -c argument, but used later
 my $copybranch = 0;	# A branch instead of a duplicate
@@ -298,7 +297,6 @@ $args{'batchstate'}	   = $batchstate;
 $args{'linktest_level'}    = $linktest;
 $args{'savedisk'}	   = $savestate;
 $args{'instance_idx'}	   = $instance_idx;
-$args{'dpdb'}		   = $dpdb;
 # These are special; the library will DBQuote them. 
 $args{'expt_name'}	   = $description;
 $args{'noswap_reason'}	   = $noswap_reason;
@@ -947,9 +945,6 @@ sub ParseArgs()
     }
     if (defined($options{"q"})) {
 	$quiet = 1;
-    }
-    if (defined($options{"m"})) {
-	$dpdb = 1;
     }
     if (defined($options{"z"})) {
 	$zeemode = 1;

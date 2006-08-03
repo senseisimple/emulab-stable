@@ -588,6 +588,7 @@ CREATE TABLE experiment_template_instances (
   stop_time datetime default NULL,
   runidx int(10) unsigned default NULL,
   template_tag varchar(64) default NULL,
+  export_time datetime default NULL,
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
   KEY parent_guid (parent_guid,parent_vers),
@@ -2341,6 +2342,7 @@ CREATE TABLE traces (
   trace_type tinytext,
   trace_expr tinytext,
   trace_snaplen int(11) NOT NULL default '0',
+  trace_db tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (node_id,idx),
   KEY pid (pid,eid)
 ) TYPE=MyISAM;
@@ -2718,6 +2720,7 @@ CREATE TABLE virt_lans (
   trace_expr tinytext,
   trace_snaplen int(11) NOT NULL default '0',
   trace_endnode tinyint(1) NOT NULL default '0',
+  trace_db tinyint(1) NOT NULL default '0',
   KEY pid (pid,eid,vname),
   KEY vnode (pid,eid,vnode)
 ) TYPE=MyISAM;

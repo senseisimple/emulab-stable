@@ -10,11 +10,10 @@ use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
 use Errno qw(EDQUOT);
-use XML::Simple;
 use Data::Dumper;
 
 #
-# Export a template.
+# Setup analysis of a template record.
 #
 # Exit codes are important; they tell the web page what has happened so
 # it can say something useful to the user. Fatal errors are mostly done
@@ -31,21 +30,18 @@ sub usage()
 	  "Usage: template_export [-q] [-s] -i <exptidx> <guid/vers>\n".
 	  "switches and arguments:\n".
 	  "-q           - be less chatty\n".
-	  "-s           - spew to stdout (as for web page).\n".
-	  "-i <exptidx> - Instance index to export\n".
-	  "<guid/vers>  - GUID and version to swapin\n");
+	  "-i <exptidx> - Experiment index to work on\n".
+	  "<guid/vers>  - GUID and version\n");
     exit(-1);
 }
-my $optlist	 = "qi:ds";
+my $optlist	 = "qi:d";
 my %options      = ();
-my $spew         = 0;
 my $quiet        = 0;
 my $debug        = 0;
 my $eid;
 my $exptidx;
 my $guid;
 my $version;
-my %bindings;
 
 #
 # Configure variables
@@ -58,7 +54,7 @@ my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL     = "@USERNODE@";
 my $checkquota  = "$TB/sbin/checkquota";
-my $TAR         = "/usr/bin/tar";
+my $dbcontrol   = "$TB/sbin/opsdb_control";
 
 # Locals
 my $dbuid;
@@ -77,11 +73,9 @@ sub cleanup();
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libaudit;
 use libtblog;
 use Template;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 0;
 
 # In libdb
 my $projroot = PROJROOT();
@@ -133,6 +127,7 @@ if (! TBProjAccessCheck($dbuid,
     exit(1);
 }
 my $pid = $template->pid();
+my $gid = $template->gid();
 
 $instance = Template::Instance->LookupByExptidx($exptidx);
 if (!defined($instance)) {
@@ -148,6 +143,20 @@ if (system("$checkquota $dbuid") != 0) {
     exit(1);
 }
 
+# Get the the runs.
+my %runlist;
+$instance->RunList(\%runlist) == 0
+    or fatal(-1, "Could not get runlist for $instance");
+
+#
+# It is an error to analyze an instance with no runs; it sorta implies
+# the the initial run is still active.
+#
+if (! keys(%runlist)) {
+    tberror("There are no experiment runs in instance $instance!");
+    exit(1);
+}
+
 #
 # Checkout to the project tree.
 #
@@ -160,133 +169,54 @@ if (-e $checkout) {
 system("mkdir -p $checkout") == 0
     or fatal(-1, "Could not mkdir $checkout");
 
+# Use the logonly option to audit so that we get a record mailed.
+LogStart(0);
+
 #
-# Since that worked, lets create the XML representation of it and stash
-# to a file.
+# Now dump a checkout of the dbdata directory for each run, in its own
+# directory. 
 #
-my $root = {};
+foreach my $name (keys(%runlist)) {
+    my $rowref = $runlist{$name};
+    my $runidx = $rowref->{"idx"};
+    my $dir    = "$checkout/run${runidx}";
+    my $subdir = "archive/dbdata";
+    my $tag    = $rowref->{"archive_tag"};
+    my $dbdump = "$dir/dbdump.gz";
 
-$root->{"guid"} = $instance->guid() . "/" . $instance->vers();
-$root->{"pid"}  = $instance->pid();
-$root->{"eid"}  = $instance->eid();
-$root->{"uid"}  = $instance->uid();
-$root->{"start_time"} = $instance->start_time();
-$root->{"stop_time"}  = $instance->stop_time();
-
-# Fill in the bindings
-$instance->BindingList(\%bindings) == 0
-    or fatal(-1, "Could not get bindings for $instance");
-if (keys(%bindings)) {
-    $root->{"bindings"} = {};
-    foreach my $name (keys(%bindings)) {
-	my $value = $bindings{$name};
-	my $description;
-
-	$template->FormalParameterDescription($name, \$description);
+    # This could happen if template is still instantiated (last run).
+    next
+	if (!defined($tag) || $tag eq "");
 	
-	$root->{"bindings"}->{$name} = {'value' => $value,
-					'description' => $description};
+    system("mkdir -p $dir") == 0
+	or fatal(-1, "Could not mkdir $dir");
+
+    print "Checking out files from archive using tag $tag ...\n";
+    
+    libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx, $dir,
+						     $tag, $subdir) == 0 or
+        fatal(-1, "Could not checkout $tag to $dir");
+
+    #
+    # Now we need to create a DB on ops to hold the DB dump.
+    #
+    my $dbname = "${guid},${version}," . $instance->idx() . ",$runidx";
+
+    if (system("$dbcontrol deltempdb $dbname")) {
+	fatal(-1, "$dbcontrol deltempdb failed!");
+    }
+    if (system("$dbcontrol addtempdb $pid $gid $dbname")) {
+	fatal(-1, "$dbcontrol addtempdb failed!");
+    }
+
+    #
+    # Load it up.
+    #
+    if (system("$dbcontrol loadtempdb $dbname $dbdump")) {
+	fatal(-1, "$dbcontrol loadtempdb failed!");
     }
 }
-
-# Fill in the runs.
-my %runlist;
-$instance->RunList(\%runlist) == 0
-    or fatal(-1, "Could not get runlist for $instance");
-if (keys(%runlist)) {
-    $root->{"runs"} = {};
-    foreach my $name (keys(%runlist)) {
-	my $value = $runlist{$name};
-	
-	$root->{"runs"}->{$name} = $value;
-    }
-}
-
-# Fill in the metadata
-my %mlist;
-$template->MetadataList(\%mlist) == 0
-    or fatal(-1, "Could not get Metadata list for $instance");
-if (keys(%mlist)) {
-    $root->{"metadata"} = {};
-    foreach my $name (keys(%mlist)) {
-	my $value = $mlist{$name};
-	
-	$root->{"metadata"}->{$name} = $value;
-    }
-}
-
-if ($debug) {
-    print Dumper($root);
-    print "\n";
-}
-
-my %xmloptions = ('RootName' => 'instance',
-		  'SuppressEmpty' => undef,
-		  'NoAttr' => 1);
-
-my $xml = XMLout($root, %xmloptions);
-
-if ($debug) {
-    print "$xml\n";
-
-    $root = XMLin($xml, KeyAttr => "name",
-		  "ForceArray" => ["metadata", "runs", "bindings"]);
-    print Dumper($root);
-    print "\n";
-}
-
-#
-# Stash this into the checkout directory we created above. 
-#
-open(DUMP, ">$checkout/export.xml")
-    or fatal(-1, "Could not open $checkout/export.xml for writing");
-print DUMP "$xml\n";
-close(DUMP);
-
-
-#
-# Now dump a checkout of each run, in its own directory. Eventually we
-# need to allow for sending out the actual repo instead of checkouts.
-#
-if (keys(%runlist)) {
-    $root->{"runs"} = {};
-    foreach my $name (keys(%runlist)) {
-	my $rowref = $runlist{$name};
-	my $runidx = $rowref->{"idx"};
-	my $dir    = "$checkout/run${runidx}";
-	my $tag    = $rowref->{"archive_tag"};
-
-	# This could happen if template still instantiated (last run).
-	next
-	    if (!defined($tag) || $tag eq "");
-	
-	system("mkdir -p $dir") == 0
-	    or fatal(-1, "Could not mkdir $dir");
-
-	if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-							     $dir, $tag) < 0) {
-	    fatal(-1, "Could not checkout $tag to $dir");
-	}
-    }
-}
-else {
-    # This would be silly; exporting an instance with no runs.
-    if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-							 $checkout,
-							 $archive_tag) < 0) {
-	fatal(-1, "Could not checkout $archive_tag to $checkout");
-    }
-}
-
-#
-# Note the time this export was done.
-#
-$instance->UpdateExportTime();
-
-if ($spew) {
-    system("$TAR zcf - -C $checkout .");
-    cleanup();
-}
+LogEnd();
 exit(0);
 
 #
@@ -337,9 +267,6 @@ sub ParseArgs()
 
     if (defined($options{"q"})) {
 	$quiet = 1;
-    }
-    if (defined($options{"s"})) {
-	$spew = 1;
     }
     if (defined($options{"d"})) {
 	$debug = 2;

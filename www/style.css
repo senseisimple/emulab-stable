@@ -443,14 +443,16 @@ span.topbaroption { background-color:#E1E1EA; }
 
 .showexp_codeblock
 {
-        width: 650px;
-        height: 400px;
+	display: block;
+        position: relative;
+        width: 90%;
+        height: 380px;
         overflow: auto;
 	color: #333;
 	background-color: #fff;
 	margin: 0 0 20px 30px;
 	padding: 10px;
-	border: 1px solid #666;
+	border: 2px solid black;
 	white-space: pre;
 	line-height: 110%;
 }

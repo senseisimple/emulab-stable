@@ -607,7 +607,7 @@ class user:
                                   output="No such user!")
 
         passwd = res[0][0]
-        return EmulabResponse(RESPONSE_SUCCESS, value=passwd)
+        return EmulabResponse(RESPONSE_SUCCESS, value=passwd, output=passwd)
 
     pass
 
@@ -3085,6 +3085,47 @@ class experiment:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=`result`, value=result)
     
+    #
+    # Return DP info.
+    #
+    def dpinfo(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+        
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(self.uid,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        res = DBQuery("SELECT dpdb,dpdbname FROM experiments "
+                      "WHERE pid=%s and eid=%s",
+                      (argdict["proj"], argdict["exp"]));
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        result  = {}
+        result["dbname"] = res[0][1];
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output=str(result))
     pass
 
 #

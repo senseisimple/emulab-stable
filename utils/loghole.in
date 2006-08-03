@@ -66,8 +66,14 @@ DEFAULT_LOGHOLES = ["/var/emulab/logs", "/local/logs"]
 
 DELAYLOG2XPLOT = os.path.join(prefix, "bin", "delaylog2xplot")
 
+MERGECAP = "/usr/X11R6/bin/mergecap"
+TCPTRACE = "/usr/local/bin/tcptrace"
+
 PID = None
 EID = None
+
+COLLAB_PW = None
+DPDBNAME  = None
 
 try:
     pw = pwd.getpwuid(os.getuid())
@@ -1133,6 +1139,7 @@ def trace_post(link2trace):
         print_status("linktrace post processing %d/%d  " %
                      (lpc, len(link2trace)))
         args = {}
+        sql  = []
         os.chdir(linkvname)
         for filename in glob.glob("*.recv*"):
             base, ext = os.path.splitext(filename)
@@ -1141,13 +1148,21 @@ def trace_post(link2trace):
             al = args.get(ext, [])
             al.append(filename)
             args[ext] = al
+
+            stuff = base.split(".");
+            trace_db = link2trace[linkvname][stuff[0]]["trace_db"]
+            if trace_db != "0":
+                sql.append(linkvname + "/" + filename)
+                pass
             pass
         for ext in args.keys():
             if ext == ".recv":
                 continue
             dst = "__all.recv%s" % (ext,)
             print_status(".")
-            os.system("mergecap -w %s %s" % (dst, " ".join(args[ext])))
+            if os.path.exists(MERGECAP):
+                os.system(MERGECAP + " -w %s %s" % (dst, " ".join(args[ext])))
+                pass
             print_status(".")
             if ext != ".0":
                 if not os.path.exists(ext[1:]):
@@ -1156,7 +1171,9 @@ def trace_post(link2trace):
                 os.chdir(ext[1:])
                 dst = os.path.join(os.path.pardir, dst)
                 pass
-            os.system("tcptrace -y -G %s > .tcptrace.out" % (dst,))
+            if os.path.exists(TCPTRACE):
+                os.system(TCPTRACE + " -y -G %s > .tcptrace.out" % (dst,))
+                pass
             if ext != ".0":
                 os.chdir(os.path.pardir)
                 pass
@@ -1170,6 +1187,41 @@ def trace_post(link2trace):
         print_status("\n")
         pass
 
+    # Now do the DB enters.
+    if len(sql) != 0:
+        SNORTCONF  = ".snort.conf"
+        SNORTOUT   = ".snort.out"
+        USERRULES  = "snort.rules"
+        
+        print_status("Entering trace data into mysql DB %s" % DPDBNAME)
+
+        # snort needs a config file to do anything useful
+        os.system("/bin/rm -f %s %s" % (SNORTCONF, SNORTOUT))
+        
+        fp = open(SNORTCONF, 'w')
+        os.chmod(SNORTCONF, 0600)
+        fp.write("output database: log, mysql, dbname=%s password=%s\n" %
+                 (DPDBNAME, COLLAB_PW))
+
+        # Allow user to override default rules.
+        if os.path.exists(USERRULES):
+            fp.write("include ./%s" % (USERRULES,))
+            pass
+        else:
+            fp.write("log ip any any -> any any\n")
+            fp.write("log icmp any any -> any any\n")
+            pass
+        fp.close()
+        
+        for filename in sql:
+            print_status(".")
+            os.system("snort -l ./ -c ./%s -r %s > %s 2>&1" %
+                      (SNORTCONF, filename, SNORTOUT))
+            print_status(".")
+            pass
+        print_status("\n")
+        pass
+    
     return
 
 ##
@@ -1183,6 +1235,7 @@ def trace_post(link2trace):
 def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     from emulabclient import RESPONSE_SUCCESS
     global OSIDS, SERVER, DOT_LOGHOLES, JOB_PROGRESS_INDEX
+    global DPDBNAME, COLLAB_PW
     
     retval = 0
 
@@ -1270,6 +1323,8 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
         info_method = getattr(SERVER, "experiment.info")
         osinfo_method = getattr(SERVER, "osid.info")
         ssh_method = getattr(SERVER, "node.sshdescription")
+        collabpw_method = getattr(SERVER, "user.collabpassword")
+        dpinfo_method = getattr(SERVER, "experiment.dpinfo")
 
         # Get any bits of information we need from the RPC server.
         physical = info_method(PACKAGE_VERSION, {
@@ -1288,9 +1343,15 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
             "proj" : PID,
             "exp" : EID
             })
+
+        collab_data = collabpw_method(PACKAGE_VERSION, { })
+        dpinfo_data = dpinfo_method(PACKAGE_VERSION, { "proj" : PID,
+                                                       "exp" : EID, })
         
         if ((physical["code"] != RESPONSE_SUCCESS) or
             (traces["code"] != RESPONSE_SUCCESS) or
+            (collab_data["code"] != RESPONSE_SUCCESS) or
+            (dpinfo_data["code"] != RESPONSE_SUCCESS) or
             (ssh_data["code"] != RESPONSE_SUCCESS)):
             sys.stderr.write("error: xmlrpc failed - %s\n" %
                              (physical["output"],))
@@ -1300,6 +1361,8 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
             physical = physical["value"]
             traces = traces["value"]
             ssh_data = ssh_data["value"]
+            COLLAB_PW = collab_data["value"]
+            DPDBNAME  = dpinfo_data["value"]["dbname"]
 
             if snapshot_traces:
                 trace_pre(traces)
@@ -1507,9 +1570,9 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
             for trace in traces:
                 if trace["trace_type"] == "monitor":
                     continue
-                
-                tl = link2trace.get(trace["linkvname"], [])
-                tl.append(trace)
+
+                tl = link2trace.get(trace["linkvname"], {})
+                tl[trace["vnode"]] = trace
                 link2trace[trace["linkvname"]] = tl
                 
                 fullpath = os.path.join(logdir, trace["linkvname"])

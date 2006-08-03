@@ -3345,7 +3345,8 @@ sub SetUpTracing($$$$$)
     #
     # First see if this member of the lan wanted tracing. 
     #
-    my ($traced, $endnode, $trace_type, $trace_expr, $trace_snaplen) =
+    my ($traced, $endnode, $trace_type, $trace_expr,
+	$trace_snaplen, $trace_db) =
 	virtlantraceinfo($lan, $member);
 
     return
@@ -3362,11 +3363,12 @@ sub SetUpTracing($$$$$)
 
     DBQueryFatal("insert into traces ".
 		 " (node_id, idx, iface0, iface1, pid, eid, linkvname, ".
-		 "  vnode, trace_type, trace_expr, trace_snaplen) ".
+		 "  vnode, trace_type, trace_expr, trace_snaplen, trace_db) ".
 		 "values ".
 		 "  ('$pnode', 0, '$iface0', '$iface1', '$pid', '$eid', ".
 		 "   '$lan', '$vnode', ".
-		 "   '$trace_type', '$trace_expr', $trace_snaplen)");
+		 "   '$trace_type', '$trace_expr', $trace_snaplen, ".
+		 "   '$trace_db')");
 }
 
 #
@@ -4083,6 +4085,7 @@ sub LoadVirtLans()
  	      $rowref->{"trace_type"},
  	      $rowref->{"trace_expr"},
  	      $rowref->{"trace_snaplen"},
+ 	      $rowref->{"trace_db"},
 	    ];
 
 	#

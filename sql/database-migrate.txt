@@ -3571,3 +3571,18 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiment_templates add \
           child_vers smallint(5) unsigned default NULL after child_guid;
 
+4.78: Add trace_db flags to virt_lans and traces tables.
+
+      alter table virt_lans add \
+               trace_db tinyint(1) NOT NULL default '0';
+      alter table traces add \
+               trace_db tinyint(1) NOT NULL default '0';
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      Add timestamp the experiment_template_instances to note when the
+      last export was done. 
+       
+      alter table experiment_template_instances add \
+                export_time datetime default NULL;
+

@@ -123,6 +123,8 @@ sub noidleswap_reason($){ return field($_[0], 'noidleswap_reason');}
 sub idleswap_timeout($) { return field($_[0], 'idleswap_timeout');}
 sub autoswap_timeout($) { return field($_[0], 'autoswap_timeout');}
 sub prerender_pid($)    { return field($_[0], 'prerender_pid');}
+sub dpdb($)		{ return field($_[0], 'dpdb');}
+sub dpdbname($)         { return field($_[0], 'dpdbname');}
 
 #
 # Lookup an experiment given an experiment index.

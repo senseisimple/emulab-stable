@@ -1533,6 +1533,19 @@ proc tb-elab-in-elab {onoff} {
 	set elab_in_elab 0
     }
 }
+
+#
+# Mark this experiment as needing a per-experiment DB on ops.
+#
+proc tb-set-dpdb {onoff} {
+    var_import ::GLOBALS::dpdb
+
+    if {$onoff} {
+	set dpdb 1
+    } else {
+	set dpdb 0
+    }
+}
 #
 # Change the default topography.
 #

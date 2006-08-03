@@ -7,14 +7,15 @@
 use English;
 use Getopt::Std;
 use Errno;
+use File::Basename;
 use strict;
-    
+
 #
 # A wrapper for messing with the OPS DB from boss.
 #
 sub usage()
 {
-    print "Usage: bugdbproxy adduser [-m] <uid> or\n";
+    print "Usage: opsdb_control.proxy adduser [-m] <uid> or\n";
     exit(-1);
 }
 my $optlist = "d";
@@ -28,7 +29,9 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $OURDOMAIN= "@OURDOMAIN@";
 my $DBCONF   = "/usr/testbed/etc/mysqld.pwd";
 my $MYSQLDUMP= "/usr/local/bin/mysqldump";
+my $MYSQL    = "/usr/local/bin/mysql";
 my $GZIP     = "/usr/bin/gzip";
+my $TRACESCHEMA = "/usr/local/share/examples/snort/create_mysql";
 
 #
 # Turn off line buffering on output
@@ -69,6 +72,7 @@ sub AddDB(@);
 sub DelDB(@);
 sub SetDBs(@);
 sub DumpDB(@);
+sub LoadDB(@);
 sub fatal($);
 
 #
@@ -121,6 +125,9 @@ elsif ($action eq "setdbs") {
 }
 elsif ($action eq "dumpdb") {
     exit(DumpDB(@ARGV));
+}
+elsif ($action eq "loaddb") {
+    exit(LoadDB(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -227,12 +234,17 @@ sub DelUser(@)
 #
 # Add a DB
 #
+# The withtrace argument is a temp hack; need to figure out a better way
+# to do this.
+#
 sub AddDB(@)
 {
-    my ($dbname) = @_;
+    my ($dbname, $option) = @_;
+    my $withtrace = 0;
+    my $temporary = 0;
 
     usage()
-	if (@_ != 1);
+	if (@_ < 1 || @_ > 2);
 
     my $exists = DBExists($dbname);
     return -1
@@ -240,6 +252,14 @@ sub AddDB(@)
     my $isemulab = IsEmulabDB($dbname);
     return -1
 	if ($isemulab < 0);
+
+    # XXX use getopt ...
+    if (defined($option)) {
+	$withtrace = 1
+	    if ($option eq "-s");
+	$temporary = 1
+	    if ($option eq "-t");
+    }
 
     #
     # We do not want to create a DB if there already is one of that
@@ -255,8 +275,33 @@ sub AddDB(@)
 	or return -1;
 
     # This table tells us what belongs to Emulab.
-    DBQueryFatal("replace into emulab_dbs values ('$dbname')")
+    DBQueryFatal("replace into emulab_dbs (dbname, date_created, temporary) ".
+		 "  values ('$dbname', now(), $temporary)")
 	or return -1;
+
+    #
+    # If the DB is newly created and we are going to insert trace data,
+    # run the schema file into it. Sorta silly, I know.
+    #
+    if ($withtrace && !$exists) {
+	if (! open(INPUT, $TRACESCHEMA)) {
+	    print "Could not open schema file: $!\n";
+	    return -1;
+	}
+	open(SCHEMA, "| $MYSQL -u root -p $dbname >/dev/null") or
+	    fatal("Could not start $MYSQL!");
+	print SCHEMA "$dbpass\n";
+	# So as not to lose input while mysql resets the tty.
+	sleep(1);
+
+	while (<INPUT>) {
+	    print SCHEMA $_;
+	}
+	close(INPUT);
+	close(SCHEMA) or
+	    fatal($! ? "Error closing $MYSQL pipe: $!"
+		     : "Exit status $? from $MYSQL");
+    }
     
     return 0;
 }
@@ -302,80 +347,93 @@ sub DelDB(@)
 }
 
 #
-# Set DBs that a user may access.
+# Set DBs for a list of users.
 #
 sub SetDBs(@)
 {
-    my $uid;
-    my %newglist = ();
-    my %oldglist = ();
+    my @input    = ();
 
     usage()
-	if (@_ < 1);
+	if (@_ != 0);
 
-    $uid = shift(@_);
-
-    # List of new DBs to grant access to.
-    foreach my $db (@_) {
-	$newglist{$db} = $db;
+    #
+    # Grab all the input.
+    #
+    while (<STDIN>) {
+	push(@input, $_);
     }
 
-    my $query_result =
-	DBQueryFatal("select * from user where User='$uid'");
-    return -1
-	if (!$query_result);
+    foreach my $line (@input) {
+	my @tokens   = split(/\s/, $line);
+	my $uid      = shift(@tokens);
+	my %newglist = ();
+	my %oldglist = ();
 
-    if (!$query_result->numrows) {
-	print "User $uid does not exist in the user table!\n";
-	return 0;
-    }
+	print "Setting dbs for $uid to @tokens\n"
+	    if ($debug);
 
-    # Generate existing DB access list.
-    $query_result =
-	DBQueryFatal("select Db from db where User='$uid'");
-    while (my ($db) = $query_result->fetchrow_array()) {
-	$oldglist{$db} = $db;
-    }
-
-    # First do deletions.
-    foreach my $db (keys(%oldglist)) {
-	next
-	    if (exists($newglist{$db}));
-
-	# Do not delete user if not an Emulab created DB.
-	my $isemulab = IsEmulabDB($db);
+	# List of new DBs to grant access to.
+	foreach my $db (@tokens) {
+	    $newglist{$db} = $db;
+	}
+	
+	my $query_result =
+	    DBQueryFatal("select * from user where User='$uid'");
 	return -1
-	    if ($isemulab < 0);
-	next
-	    if (!$isemulab);
+	    if (!$query_result);
 
-	DBQueryFatal("delete from db where User='$uid' and Db='$db'")
+	if (!$query_result->numrows) {
+	    print "User $uid does not exist in the user table!\n";
+	    return 0;
+	}
+
+	# Generate existing DB access list.
+	$query_result =
+	    DBQueryFatal("select Db from db where User='$uid'");
+	while (my ($db) = $query_result->fetchrow_array()) {
+	    $oldglist{$db} = $db;
+	}
+
+	# First do deletions.
+	foreach my $db (keys(%oldglist)) {
+	    next
+		if (exists($newglist{$db}));
+
+	    # Do not delete user if not an Emulab created DB.
+	    my $isemulab = IsEmulabDB($db);
+	    return -1
+		if ($isemulab < 0);
+	    next
+		if (!$isemulab);
+
+	    DBQueryFatal("delete from db where User='$uid' and Db='$db'")
+		or return -1;
+	}
+	DBQueryFatal("flush privileges")
+	    or return -1;
+
+	# Then do additions.
+	foreach my $db (keys(%newglist)) {
+	    next
+		if (exists($oldglist{$db}));
+
+	    # Do not add user if not an Emulab created DB.
+	    my $isemulab = IsEmulabDB($db);
+	    return -1
+		if ($isemulab < 0);
+	    next
+		if (!$isemulab);
+
+	    DBQueryFatal("grant all on `${db}`.* to '$uid'\@'localhost'")
+		or return -1;
+
+	    # Eventually, we want to allow remote access.
+	    DBQueryFatal("grant all on `${db}`.* to '$uid'\@'%.${OURDOMAIN}'")
+		or return -1;
+	}
+	DBQueryFatal("flush privileges")
 	    or return -1;
     }
-    DBQueryFatal("flush privileges")
-	or return -1;
-
-    # Then do additions.
-    foreach my $db (keys(%newglist)) {
-	next
-	    if (exists($oldglist{$db}));
-
-	# Do not add user if not an Emulab created DB.
-	my $isemulab = IsEmulabDB($db);
-	return -1
-	    if ($isemulab < 0);
-	next
-	    if (!$isemulab);
-
-	DBQueryFatal("grant all on `${db}`.* to '$uid'\@'localhost'")
-	    or return -1;
-
-	# Eventually, we want to allow remote access.
-	DBQueryFatal("grant all on `${db}`.* to '$uid'\@'%.${OURDOMAIN}'")
-	    or return -1;
-    }
-    DBQueryFatal("flush privileges")
-	or return -1;
 
     return 0;
 }
@@ -408,6 +466,57 @@ sub DumpDB(@)
     close(DUMP) or
 	fatal($! ? "Error closing $MYSQLDUMP pipe: $!"
 	         : "Exit status $? from $MYSQLDUMP");
+
+    return 0;
+}
+
+#
+# Load a DB from a file
+#
+sub LoadDB(@)
+{
+    my ($dbname, $filename) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+
+    # Check to see if the file is a .gz file.
+    my $openwith = $filename;
+    my (undef,undef,$suffix) = fileparse($filename, ".gz");
+
+    if ($suffix eq ".gz") {
+	$openwith = "zcat $filename |";
+    }
+
+    if (! open(INPUT, $openwith)) {
+	print "Could not open '$openwith': $!\n";
+	return -1;
+    }
+    open(SQL, "| $MYSQL -u root -p $dbname >/dev/null") or
+	fatal("Could not start $MYSQL!");
+    print SQL "$dbpass\n";
+    # So as not to lose input while mysql resets the tty.
+    sleep(1);
+
+    while (<INPUT>) {
+	print SQL $_;
+    }
+    close(INPUT);
+    close(SQL) or
+	fatal($! ? "Error closing $MYSQL pipe: $!"
+	         : "Exit status $? from $MYSQL");
 
     return 0;
 }

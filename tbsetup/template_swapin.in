@@ -72,6 +72,7 @@ my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE    = "@BOSSNODE@";
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 
 # Locals
 my $user_name;
@@ -94,6 +95,7 @@ my $checkquota  = "$TB/sbin/checkquota";
 my $batchexp    = "$TB/bin/batchexp";
 my $swapexp     = "$TB/bin/swapexp";
 my $endexp      = "$TB/bin/endexp";
+my $dbcontrol   = "$TB/sbin/opsdb_control";
 
 # Protos
 sub ParseArgs();
@@ -109,6 +111,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Template;
+use Experiment;
 use event;
 
 # Be careful not to exit on transient error
@@ -272,7 +275,7 @@ my $copyid = $template->pid() . "," . $template->eid();
 #
 my @arguments =
     ($batchexp, "-x", $template->eid(), "-y", $instance->idx(), "-q", "-f",
-     "-m", "-p", $pid, "-e", $eid, "-g", $template->gid(),
+     "-p", $pid, "-e", $eid, "-g", $template->gid(),
      "-E", "'Experiment Template Instantiation $guid/$version' ",
      "-c" , $copyid);
 
@@ -302,8 +305,28 @@ fatal($? >> 8, "Could not pre-instantiate the experiment")
 # Need to kill the experiment if we fail after this point.
 $exptcreated = 1;
 
-if (! TBExptIDX($pid, $eid, \$exptidx)) {
-    fatal(-1, "Could not get experiment index for $pid,$eid!");
+# Grab the experiment record for below.
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal(-1, "Experiment $pid/$eid could not be found after creation!");
+}
+$exptidx = $experiment->idx();
+
+#
+# Templates always get a DB; override the NS file setting of dpdb, and
+# then call out to have it created.
+#
+if ($OPSDBSUPPORT) {
+    my %args = ();
+    
+    $args{'dpdb'} = 1;
+
+    $experiment->Update(\%args) == 0
+	or fatal(-1, "Could not update experiment record!");
+    
+    if (system("$dbcontrol addexpdb $pid $eid")) {
+	fatal(-1, "$dbcontrol addexpdb failed!");
+    }
 }
 
 #
@@ -327,8 +350,8 @@ $instance->Update(0, \%args) == 0
 # Event connect now that experiment is created.
 SetupEventHandler();
 
-my $workdir = TBExptWorkDir($pid, $eid);
-my $userdir = TBExptUserDir($pid, $eid);
+my $workdir = $experiment->WorkDir();
+my $userdir = $experiment->UserDir();
 
 #
 # Now we stash the parameter file.
@@ -441,7 +464,7 @@ foreach my $name (keys(%parameters)) {
 # exp directory. Anyway, once that is done, add an environment
 # variable the user can reference for finding files in the datastore.
 #
-my $instance_path = TBExptUserDir($pid, $eid);
+my $instance_path = $userdir;
 $instance->CopyDataStore($template_tag,
 			 "$instance_path/template_datastore") == 0
     or fatal(-1, "Could not copy datastore ($template_tag) to instance");

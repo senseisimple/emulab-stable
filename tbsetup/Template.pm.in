@@ -2283,6 +2283,26 @@ sub CopyDataStore($$$)
     return 0;
 }
 
+#
+# Update the export time.
+#
+sub UpdateExportTime($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx     = $self->idx();
+
+    DBQueryWarn("update experiment_template_instances set export_time=now() ".
+		"where idx='$idx'")
+	or return -1;
+    
+    return Refresh($self);
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 
 1;

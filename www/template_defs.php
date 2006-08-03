@@ -541,6 +541,7 @@ class Template
                <th align=center>Show</th>
                <th align=center>Archive</th>
                <th align=center>Export</th>
+               <th align=center>Analyze</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -594,6 +595,11 @@ class Template
 	    
 	    echo " <td align=center>".
  		    MakeLink("export",
+			     "guid=$guid&version=$vers&exptidx=$exptidx",
+			     "<img border=0 alt='Show' src='greenball.gif'>");
+
+	    echo " <td align=center>".
+ 		    MakeLink("analyze",
 			     "guid=$guid&version=$vers&exptidx=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 	    echo " </td>
@@ -1492,6 +1498,9 @@ function MakeLink($which, $args, $text)
     }
     elseif ($which == "export") {
 	$page = "template_export.php";
+    }
+    elseif ($which == "analyze") {
+	$page = "template_analyze.php";
     }
     return "<a href=${page}?${args}>$text</a>";
 }

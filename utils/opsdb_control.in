@@ -55,6 +55,9 @@ sub DelGroup(@);
 sub SetGroups(@);
 sub AddExpDB(@);
 sub DelExpDB(@);
+sub AddTempDB(@);
+sub LoadTempDB(@);
+sub DelTempDB(@);
 sub DumpExpDB(@);
 sub DoOpsStuff($;$);
 sub Initialize();
@@ -134,6 +137,15 @@ elsif ($action eq "addexpdb") {
 }
 elsif ($action eq "delexpdb") {
     exit(DelExpDB(@ARGV));
+}
+elsif ($action eq "addtempdb") {
+    exit(AddTempDB(@ARGV));
+}
+elsif ($action eq "deltempdb") {
+    exit(DelTempDB(@ARGV));
+}
+elsif ($action eq "loadtempdb") {
+    exit(LoadTempDB(@ARGV));
 }
 elsif ($action eq "dumpexpdb") {
     exit(DumpExpDB(@ARGV));
@@ -337,50 +349,56 @@ sub DelGroup(@)
 #
 sub SetGroups(@)
 {
-    my ($uid) = @_;
-    my @glist = ();
+    my @uids  = @_;
+    my $input = "";
 
     usage()
-	if (@_ != 1);
+	if (@_ < 1);
 
-    #
-    # Untaint args.
-    #
-    if ($uid =~ /^([-\w]+)$/) {
-	$uid = $1;
-    }
-    else {
-	die("Bad data in uid: $uid");
-    }
-
-    my $query_result =
-	DBQueryFatal("select p.pid,p.gid from group_membership as p ".
-		     "where p.uid='$uid' and p.trust!='none'");
-
-    while (my ($pid,$gid) = $query_result->fetchrow_array()) {
-	if ($pid eq $gid) {
-	    push(@glist, "$pid");
+    foreach my $uid (@uids) {
+	my @glist = ();
+	
+	#
+	# Untaint args.
+	#
+	if ($uid =~ /^([-\w]+)$/) {
+	    $uid = $1;
 	}
 	else {
-	    push(@glist, "$pid,$gid");
+	    die("Bad data in uid: $uid");
 	}
 
-	#
-	# Now get the per-experiment DBs inside this group.
-	#
-	my $experiment_result =
-	    DBQueryFatal("select dpdbname from experiments ".
-			 "where pid='$pid' and gid='$gid' and dpdb!=0");
+	my $query_result =
+	    DBQueryFatal("select p.pid,p.gid from group_membership as p ".
+			 "where p.uid='$uid' and p.trust!='none'");
 
-	while (my ($dbname) = $experiment_result->fetchrow_array()) {
-	    if (defined($dbname) && $dbname ne "") {
-		push(@glist, $dbname);
+	while (my ($pid,$gid) = $query_result->fetchrow_array()) {
+	    if ($pid eq $gid) {
+		push(@glist, "$pid");
+	    }
+	    else {
+		push(@glist, "$pid,$gid");
+	    }
+
+	    #
+	    # Now get the per-experiment DBs inside this group.
+	    #
+	    my $experiment_result =
+		DBQueryFatal("select dpdbname from experiments ".
+			     "where pid='$pid' and gid='$gid' and dpdb!=0");
+
+	    while (my ($dbname) = $experiment_result->fetchrow_array()) {
+		if (defined($dbname) && $dbname ne "") {
+		    push(@glist, $dbname);
+		}
 	    }
 	}
+	$input .= "$uid @glist\n";
     }
     
-    print "Setting user '$uid' DB access to @glist on $CONTROL.\n";
-    my $retval = DoOpsStuff("setdbs $uid @glist");
+    print "Setting DB access list for user(s) '@uids' on $CONTROL.\n"
+	if ($debug);
+    my $retval = DoOpsStuff("setdbs", $input);
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
@@ -389,14 +407,15 @@ sub SetGroups(@)
 
 #
 # Add and delete a DB for a specific experiment. We use the pid,gid of
-# the experiment to set the access list. 
-#
+# the experiment to set the access list.
+# 
 sub AddExpDB(@)
 {
     my ($pid, $eid) = @_;
+    my @uids = ();
 
     usage()
-	if (@_ != 2);
+	if (@_ < 2 || @_ > 3);
 
     #
     # Untaint args.
@@ -413,8 +432,9 @@ sub AddExpDB(@)
     else {
 	die("Bad data in eid: $eid");
     }
+    
     my $gid = ExpGroup($pid, $eid);
-    my $dbname = "$pid,$eid";
+    my $dbname = "${pid}+${eid}";
     my $exptidx;
 
     #
@@ -428,17 +448,22 @@ sub AddExpDB(@)
     
     my ($dpdbname) = $query_result->fetchrow_array();
 
-    if (!defined($dpdbname)) {
-	return -1
-	    if (!TBExptIDX($pid, $eid, \$exptidx));
-    }
-    else {
+    if (defined($dpdbname)) {
 	# Allow override.
 	$dbname = $dpdbname;
     }
+    return -1
+	if (!TBExptIDX($pid, $eid, \$exptidx));
+
+    #
+    # XXX See if there are any traced links. 
+    #
+    $query_result =
+	DBQueryFatal("select vname from virt_lans where trace_db!=0");
+    my $traceflag = ($query_result->numrows ? "-s" : "");
 
     print "Adding DB '$dbname' to mysql database on $CONTROL.\n";
-    my $retval = DoOpsStuff("adddb $dbname");
+    my $retval = DoOpsStuff("adddb $dbname $traceflag");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
@@ -463,9 +488,10 @@ sub AddExpDB(@)
   		     "      g.pid='$pid' and g.gid='$gid'");
 
     while (my ($uid) = $users_result->fetchrow_array()) {
-	SetGroups(($uid)) == 0
-	    or fatal("Could not set groups for $uid!");
+	push(@uids, $uid);
     }
+    SetGroups(@uids) == 0
+	or fatal("Could not set groups for @uids!");
 
     return 0;
 }
@@ -496,11 +522,11 @@ sub DelExpDB(@)
     my $exptidx;
 
     #
-    # Check to see if the experiment actually wants its own DB.
+    # Always do a DB removal if the experiment has a dbname set.
     #
     my $query_result =
 	DBQueryFatal("select dpdbname from experiments ".
-		     "where pid='$pid' and eid='$eid' and dpdb!=0");
+		     "where pid='$pid' and eid='$eid'");
     return 0
 	if (!$query_result->numrows);
     
@@ -580,27 +606,161 @@ sub DumpExpDB(@)
     return 0;
 }
 
+#
+# Add a temporary DB to ops.
+#
+sub AddTempDB(@)
+{
+    my ($pid, $gid, $dbname) = @_;
+    my @uids = ();
+
+    usage()
+	if (@_ != 3);
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Bad data in pid: $pid");
+    }
+    if ($gid =~ /^([-\w]+)$/) {
+	$gid = $1;
+    }
+    else {
+	die("Bad data in gid: $gid");
+    }
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+
+    print "Adding temporary DB '$dbname' to mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("adddb $dbname -t");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+
+    #
+    # Now we need to update the access list for everyone in the group.
+    #
+    my $users_result =
+	DBQueryFatal("select distinct g.uid ".
+		     "  from group_membership as g ".
+		     "left join users as u on u.uid=g.uid ".
+		     "where (u.status='active' or u.status='frozen') and ".
+		     "      g.trust!='none' and ".
+  		     "      g.pid='$pid' and g.gid='$gid'");
+
+    while (my ($uid) = $users_result->fetchrow_array()) {
+	push(@uids, $uid);
+    }
+    SetGroups(@uids) == 0
+	or fatal("Could not set groups for @uids!");
+    
+    return 0;
+}
+
+sub LoadTempDB(@)
+{
+    my ($dbname, $filename) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    #
+    # Untaint args.
+    #
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+    if ($filename =~ /^([-\w\/\.\+,]+)$/) {
+	$filename = $1;
+    }
+    else {
+	die("Bad data in filename: $filename");
+    }
+    
+    print "Loading mysql DB '$dbname' from $filename on $CONTROL.\n";
+    my $retval = DoOpsStuff("loaddb $dbname $filename");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Delete a temporary DB from ops.
+#
+sub DelTempDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    #
+    # Untaint args.
+    #
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+
+    print "Deleting temporary DB '$dbname' from mysql database on $CONTROL.\n"
+	if ($debug);
+    my $retval = DoOpsStuff("deldb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
 # Wrapper for ssh.
 sub DoOpsStuff($;$)
 {
     my ($remote_command, $input) = @_;
     my $retval = 0;
+    my $flag   = ($debug ? "-d" : "");
     my ($command);
     
     # For ssh.
     $UID = $EUID;
 
-    $command = "$SSH -host $CONTROL $OPSDBPROXY $remote_command";
-    # Echo to stuff to remote stdin
-    $command = "echo '$input' | $command"
-	if (defined($input) && $input ne "");
+    $command = "$SSH -host $CONTROL $OPSDBPROXY $flag $remote_command";
 
     print "Running command '$command'\n"
 	if ($debug);
-    
-    system($command);
-    if ($?) {
-	$retval = $? >> 8;
+
+    # Echo stuff to remote stdin
+    if (defined($input) && $input ne "") {
+	if (!open(OPS, "| $command")) {
+	    print "Could not start '$SSH'\n";
+	    $retval = -1;
+	}
+	else {
+	    print OPS $input;
+	    if (! close(OPS)) {
+		print(($! ? "Error closing pipe: $!\n"
+		          : "Exit status $? from pipe\n"));
+		$retval = -1;
+	    }
+	}
+    }
+    else {
+	system($command);
+	if ($?) {
+	    $retval = $? >> 8;
+	}
     }
     $EUID = $SAVEUID;
     
@@ -612,6 +772,8 @@ sub DoOpsStuff($;$)
 #
 sub Initialize()
 {
+    my @uids = ();
+    
     #
     # Initialize a mailman password for all users, just in case not set.
     #
@@ -668,9 +830,11 @@ sub Initialize()
     $users_result->dataseek(0);
     
     while (my ($uid) = $users_result->fetchrow_array()) {
-	SetGroups(($uid)) == 0
-	    or fatal("Could not setgroups for user $uid on $CONTROL");
+	push(@uids, $uid);
     }
+    SetGroups(@uids) == 0
+	or fatal("Could not set groups for @uids!");
+    
     return 0;
 }
 

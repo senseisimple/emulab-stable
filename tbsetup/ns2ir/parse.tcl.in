@@ -266,6 +266,9 @@ namespace eval GLOBALS {
     variable elabinelab_eid {}
     variable elabinelab_cvstag {}
 
+    # Does user want a per-experiment DB?
+    variable dpdb 0
+
     # Security level. Defaults to 0 ("green")
     # If explicit_firewall is set, then you cannot also give a security level.
     # security_level_diskzap is the level at which we need to zap the disk

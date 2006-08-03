@@ -175,7 +175,7 @@ function Show($which, $zoom, $detail)
 function ShowVis($pid, $eid, $zoom = 1.25, $detail = 1) {
     $html = "<div id=fee style='display: block; overflow: hidden; ".
 	    "     position: relative; z-index:1010; height: 380px; ".
-	    "     width: 650px; border: 2px solid black;'>\n".
+	    "     width: 90%; border: 2px solid black;'>\n".
             " <div id=myvisdiv style='position:relative;'>\n".
 	    "   <img id=myvisimg border=0 ".
 	    "        onLoad=\"setTimeout('ShowVisInit();', 10);\" ".

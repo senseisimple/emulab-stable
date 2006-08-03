@@ -397,6 +397,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::sourcefile_list
     var_import ::GLOBALS::optarray_order
     var_import ::GLOBALS::optarray_count
+    var_import ::GLOBALS::dpdb
     
     if {$ran == 1} {
 	perror "The Simulator 'run' statement can only be run once."
@@ -636,6 +637,11 @@ Simulator instproc run {} {
     if {$security_level} {
 	lappend fields "security_level"
 	lappend values $security_level
+    }
+
+    if {$dpdb} {
+	lappend fields "dpdb"
+	lappend values $dpdb
     }
     
     $self spitxml_data "experiments" $fields $values
