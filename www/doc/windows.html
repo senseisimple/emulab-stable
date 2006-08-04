@@ -13,7 +13,7 @@
   -->
 <h2>Windows XP in Emulab</h2>
 <div style="margin-left: 40px;">
-<a href="#Changes"> Latest change: 2006-04-04 hardware-independent images. </a>
+<a href="#Changes"> Latest change: 2006-07-28 Cygwin and Emulab update. </a>
 <img src="../new.gif" alt="&lt;NEW&gt;">
 </div>
 
@@ -22,6 +22,7 @@
   <li> <a href="#Overview"> Overview </a></li>
   <li> <a href="#Differences">Differences from FreeBSD and Linux in Emulab </a></li>
   <ul>
+    <li> <a href="#File_Sharing"> File Sharing </a></li>
     <li> <a href="#Windows_Passwords"> Windows Passwords </a></li>
     <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes </a></li>
     <li> <a href="#Network_config"> Network config </a></li>
@@ -30,6 +31,7 @@
     <li> <a href="#Boots_twice"> Windows nodes boot twice </a></li>
     <li> <a href="#Login_connections"> Login connections to Windows </a></li>
     <li> <a href="#RDP_details"> RDP details </a></li>
+    <li> <a href="#netbt_command"> The <code>netbt</code> command </a></li>
     <li> <a href="#Custom_images"> Making custom Windows OS images </a></li>
   </ul>
   <li> <a href="#Cygwin"> Cygwin </a> </li>
@@ -98,9 +100,9 @@ user's workstation screen to the experiment node.  SSH and Serial Console
 command-line connections are also supported.  <p>
 
 <i>Windows XP</i> installations are more hardware dependent than Linux or
-FreeBSD.  At present, this <i>Windows XP</i> image only runs on the Emulab <a
-href="../shownodetype.php3?node_type=pc850"> pc850 </a> and <a
-href="docwrapper.php3?docname=pc3000.html"> pc3000 </a>node types.  <p>
+FreeBSD.  At present, this <i>Windows XP</i> image runs on most of the Emulab
+<a href="../nodecontrol_list.php3"> pc </a> node types, including pc600,
+pc850, pc3000 and pc3000w (wifi) nodes. <p>
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Differences"></a> Differences from FreeBSD and Linux in Emulab </h3>
@@ -110,10 +112,14 @@ Cygwin layered on top, and Emulab management services added.  In particular,
 this is Windows XP (NT 5.1), with various levels of service packs and updates
 (see <a href="#Experiment_setup">below</a>.) <p>
 
+<h4><a name="File_Sharing"> </a> File Sharing </h4>
+
 The second-biggest difference is that shared directories are provided not by
 the NFS (Network File System) protocol, but instead by the <b>SMB</b> (Server
-Message Block) protocol, otherwise known as Windows File Sharing.  The Client
-for Microsoft Networks software contacts the SMB server, in this case
+Message Block) protocol, otherwise known as Windows File Sharing.  <p>
+
+The "Client
+for Microsoft Networks" software contacts the SMB server, in this case
 <b>Samba</b> running on the file server known as <b>Fs</b> (an alias for
 <b>Users</b>.)  The SMB protocol
 authenticates using a plain-text user name and password, encrypted as they go
@@ -124,6 +130,9 @@ In Windows GUI programs, you can just type the UNC path into the Address bar
 or a file-open dialog with <b>backslashes</b>, e.g. <code>\\fs\share</code> or
 <code>\\fs\&lt;username&gt;</code>.  User and project shares are marked "not
 browsable", so just <code>\\fs</code> shows only <code>share</code>. <p>
+
+If you want to serve files from one of your experiment nodes to others, see
+the section on <a href="#netbt_command"> The <code>netbt</code> command </a>.
 
 <h4><a name="Windows_Passwords"> </a> Windows Passwords </h4>
 
@@ -596,6 +605,83 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        screen and select "Task Manager".
   </li>
 </ul>
+
+<h4><a name="netbt_command"> </a> The <code>netbt</code> command </h4>
+
+The <b>NetBT</b> (Netbios over TCP) protocol is used to announce shared
+directories (folders) from one Windows machine to others.  (See the Name and
+Session services in <a href="http://en.wikipedia.org/wiki/Netbios">
+http://en.wikipedia.org/wiki/Netbios</a>.) <p>
+
+The <b>SMB</b> (Server Message Block) protocol is used to actually serve
+files. (See <a href="http://en.wikipedia.org/wiki/Server_Message_Block">
+http://en.wikipedia.org/wiki/Server_Message_Block</a>.) <p>
+
+In Emulab, we normally disable NetBT on experiment nodes, because it chatters
+and messes up slothd network idle detection, and is not needed for the usual
+SMB mounts of <code>/users</code>, <code>/proj</code>, and <code>/share</code>
+dirs, which are served from a Samba service on <b>fs</b>. <p>
+
+However, NetBT <i>does</i> have to be enabled on the experiment nodes if you
+want to make Windows file shares between them.  The <b><code>netbt</code></b>
+script sets the registry keys on the Windows network interface objects.  Run
+it on the server nodes (the ones containing directories which you want to
+share) and reboot them afterwards to activate.  There is an optional
+<code>-r</code> argument to reboot the node.
+
+<pre>    Usage: netbt [-r] off|on</pre>
+
+If you use <code>netbt</code> to turn on NetBT, it persists across reboots. <p>
+
+No reboot is necessary if you use Network Connections in the Control Panel
+to turn on NetBT.  It takes effect immediately, but is turned off at reboot
+unless you do <code>netbt on</code> afterward as well.
+<ul>
+  <li> Right-click Local Area Connection (or the name of another connection, if
+    appropriate), click Properties, click Internet Protocol (TCP/IP), and then
+    click the Properties button.  </li>
+
+  <li> On the Internet Protocol (TCP/IP) Properties
+    page, click the Advanced button, and click the WINS tab.  </li>
+
+  <li> Select Enable or Disable NetBIOS over TCP/IP.  </li>
+</ul>
+
+<code>ipconfig /all</code> reports "NetBIOS over Tcpip . . . : Disabled" on
+interfaces where NetBT is disabled, and says nothing where NetBT is
+enabled. <p>
+
+To start sharing a directory, on the node, use the <code>net share</code>
+command, or turn on network sharing on the Sharing tab of the Properties of a
+directory (folder.)  <ul> <li> On XP-SP2 or above, when you first do this, the
+"Network sharing and security" subdialog says: 
+<pre>    As a security measure, Windows has disabled remote access to this
+    computer.  However, you can enable remote access and safely share files by
+    running the _Network_Setup_Wizard_.
+
+    _If_you_understand_the_security_risks_but_want_to_share_
+    _files_without_running_the_wizard,_click_here._"</pre>  </li>
+
+  <li> Skip the wizard and click the latter ("I understand") link. Then click
+    "Just enable file sharing", and "OK".  </li>
+
+  <li> Then you finally get the click-box to "Share this
+    folder on the network".  </li>
+</ul>
+
+The machine names for UNC paths sharing are the same as in shell prompts:
+<code>pcXXX</code>, where <code>XXX</code> is the machine number.  These will
+show up in <code>My Network Places / Entire Network / Microsoft Windows
+Network / Emulab</code> once you have used them. <p>
+
+IP numbers can also be used in UNC paths, giving you a way to share files
+across experiment network links rather than the control network. <p>
+
+There is an Emulab-generated <b><code>LMHOSTS</code></b> file, to provide the
+usual node aliases within an experiment, but it is currently ignored even
+though "Enable LMHOSTS lookup" is turned on in the TCP/IP WINS settings.  Try
+<code>ntbtstat -c</code> and <code>ntbtstat -R</code> to experiment with
+this.<p>
 
 <h4><a name="Custom_images"> </a> Making custom Windows OS images </h4>
 
@@ -1143,6 +1229,35 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Changes"> </a> Change Log </h3>
+
+<b>2006-07-28</b>
+<ul>
+  <li> Updated the Cygwin and Emulab software to the latest versions, including:
+    <ul> <br>
+      <li> A new version of the Emulab <code>Linktest</code> program.  It does
+	a better job of finishing-up, so the last packet (number 401) tends to
+	make it through rather than getting dropped all the time.  Windows
+	still has more episodes of significant packet loss than either FreeBSD
+	or Linux.  </li> <br>
+
+      <li> Bug-fixes in the workarounds for Windows network-setup flakiness.
+	Setup is now pretty reliable, but Linktest level 4 (bandwith test)
+	reveals that Windows XP can't keep up with a 100 mb/s LAN link; 85mb/s
+	is about the best it'll do.  </li> <br>
+
+      <li> Added the <code>netbt</code> script to enable serving Windows file
+	   shares from an experiment node, see <a href="#netbt_command"> The
+	   <code>netbt</code> command </a>. </li> <br>
+
+      <li> The OpenSSH package is now version openssh-4.3p2-4 . </li> <br>
+
+      <li> Added the Cygwin "netcat" package for the <code>nc</code> program.
+        There's no man page, but see
+        <code>/usr/share/doc/netcat/README</code>.  </li>
+
+    </ul>
+  </li>
+</ul>
 
 <b>2006-04-04</b>
 <ul>
