@@ -1846,6 +1846,8 @@ Updating a set of existing images.
          v -L WINXP-{SP[012],UPDATE}$pctype-new.ndz
            # Upward compatability from -pc3000 images to -sysprep images.
            set hw=pc3000 img=sysprep pctype=-pc3000
+           # Restore.
+           set hw=pc850 img=sysprep disk=/dev/ad0 pctype=
 
          # Update the dates in the image ID's.
          ls -lLT WINXP-{SP[012],UPDATE}$pctype-new.ndz
@@ -1884,10 +1886,12 @@ Updating a set of existing images.
          v -L WINXP-{SP[012],UPDATE}$pctype.ndz
            # Upward compatability from -pc3000 images to -sysprep images.
            set hw=pc3000 img=sysprep pctype=-pc3000
+           # Restore.
+           set hw=pc850 img=sysprep disk=/dev/ad0 pctype=
 
          # Update the dates in the image ID's.
          ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz
-         ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz | awk '{ sq = "'"'"'"; \
+         ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz | gawk '{ sq = "'"'"'"; \
                 # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
                 "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
                 image = gensub("\.ndz", "", 1, $NF); \
