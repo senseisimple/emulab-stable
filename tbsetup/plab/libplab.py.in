@@ -855,11 +855,11 @@ class Plab:
             assert (len(dbres) == 2), "Failed to get node type info"
             attrdict = {}
             for attrkey, attrvalue in dbres:
-                attrdict{attrkey} = attrvalue;
+                attrdict[attrkey] = attrvalue;
                 pass
             self.__getNodetypeInfoCache = \
-                                        (attrdict{"default_osid"},
-                                         attrdict{"control_iface"})
+                                        (attrdict["default_osid"],
+                                         attrdict["control_interface"])
             pass
         
         return self.__getNodetypeInfoCache
