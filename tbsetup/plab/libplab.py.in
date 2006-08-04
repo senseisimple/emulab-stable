@@ -78,7 +78,8 @@ RESERVED_EID = "hwdown"       # start life in hwdown
 MONITOR_PID  = "emulab-ops"
 MONITOR_EID  = "plab-monitor"
 
-MAGIC_INET2_GATEWAYS = ("205.124.237.10",  "205.124.244.18", )
+MAGIC_INET2_GATEWAYS = ("205.124.237.10",  "205.124.244.18",
+                        "205.124.244.178", )
 MAGIC_INET_GATEWAYS =  ("205.124.244.150", "205.124.239.185",
                         "205.124.244.154", "205.124.244.138",
                         "205.124.244.130", )
@@ -578,8 +579,8 @@ class Plab:
         else:
             print "WARNING: Unknown gateway for host %s" % nodeent['IP']
 
-        # Must be plain 'ole Internet
-        nodeent['LINKTYPE'] = "pcplabinet"
+        # We don't know - must manually classify.
+        nodeent['LINKTYPE'] = "*Unknown*"
         return
 
     def __addNode(self, nodeent, updent = ()):
@@ -852,8 +853,13 @@ class Plab:
                                  " order by attrkey")
             
             assert (len(dbres) == 2), "Failed to get node type info"
-            res = (dbres[0][1], dbres[1][1])
-            (self.__getNodetypeInfoCache, ) = res
+            attrdict = {}
+            for attrkey, attrvalue in dbres:
+                attrdict{attrkey} = attrvalue;
+                pass
+            self.__getNodetypeInfoCache = \
+                                        (attrdict{"default_osid"},
+                                         attrdict{"control_iface"})
             pass
         
         return self.__getNodetypeInfoCache
