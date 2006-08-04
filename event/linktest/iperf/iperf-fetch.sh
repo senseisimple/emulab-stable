@@ -18,7 +18,7 @@ if [ ! -d iperf-2.0.2/src ]; then
 	 exit 1
     fi
     echo "Unpacking/patching iperf-2.0.2 source ..."
-    tar xzf iperf-2.0.2.tar.gz || {
+    tar xzof iperf-2.0.2.tar.gz || {
         echo "ERROR: iperf-fetch.sh: tar failed"
 	exit 1
     }
