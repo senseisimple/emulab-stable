@@ -776,6 +776,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'node_startloc'		=> [ 'node_id' ],
 	'node_history'		=> [ 'node_id' ],
 	'node_bootlogs'		=> [ 'node_id' ],
+        'plab_mapping'          => [ 'node_id' ],
     );
 }
 
