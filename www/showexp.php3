@@ -148,6 +148,10 @@ function Show($which, $zoom, $detail)
 	    $html .= " onclick=\"VisChange('$zoom', 1);\">";
 	    $html .= "Show Details</button>\n";
 	}
+	$html .= "&nbsp &nbsp &nbsp &nbsp &nbsp &nbsp ";
+	$html .= "<button name=fullscreenvis type=button value=1";
+	$html .= " onclick=\"FullScreenVis();\">";
+	$html .= "Full Screen</button>\n";
     }
     elseif ($which == "nsfile") {
 	$nsdata = "";
@@ -174,7 +178,7 @@ function Show($which, $zoom, $detail)
 #
 function ShowVis($pid, $eid, $zoom = 1.25, $detail = 1) {
     $html = "<div id=fee style='display: block; overflow: hidden; ".
-	    "     position: relative; z-index:1010; height: 380px; ".
+	    "     position: relative; z-index:1010; height: 450px; ".
 	    "     width: 90%; border: 2px solid black;'>\n".
             " <div id=myvisdiv style='position:relative;'>\n".
 	    "   <img id=myvisimg border=0 ".
@@ -530,12 +534,14 @@ echo "<script type='text/javascript' language='javascript'>
                         "resizeable=yes,scrollbars=yes,status=yes,".
 	                "menubar=yes');
         }
-
         function SaveNS() {
             window.open('spitnsdata.php3?pid=$pid&eid=$eid',
                         '_blank','width=700,height=400,toolbar=no,".
                         "resizeable=yes,scrollbars=yes,status=yes,".
 	                "menubar=yes');
+        }
+        function FullScreenVis() {
+	    window.location.replace('shownsfile.php3?pid=$pid&eid=$eid');
         }
       </script>\n";
 
