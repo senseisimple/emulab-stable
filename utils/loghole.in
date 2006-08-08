@@ -1200,8 +1200,8 @@ def trace_post(link2trace):
         
         fp = open(SNORTCONF, 'w')
         os.chmod(SNORTCONF, 0600)
-        fp.write("output database: log, mysql, dbname=%s password=%s\n" %
-                 (DPDBNAME, COLLAB_PW))
+        fp.write("output database: log, mysql, user=%s dbname=%s password=%s\n" %
+                 (USER, DPDBNAME, COLLAB_PW))
 
         # Allow user to override default rules.
         if os.path.exists(USERRULES):
@@ -1219,6 +1219,7 @@ def trace_post(link2trace):
             print_status(".")
             pass
         print_status("\n")
+        os.system("/bin/rm -f %s" % (SNORTCONF,))
         pass
     
     return
