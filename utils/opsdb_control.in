@@ -59,6 +59,7 @@ sub AddTempDB(@);
 sub LoadTempDB(@);
 sub DelTempDB(@);
 sub DumpExpDB(@);
+sub GraphDB(@);
 sub DoOpsStuff($;$);
 sub Initialize();
 sub fatal($);
@@ -69,6 +70,9 @@ sub fatal($);
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Locals
+my $dbuid;
 
 #
 # We don't want to run this script unless its the real version.
@@ -93,6 +97,14 @@ if ($UID == 0) {
 if (! $OPSDBSUPPORT) {
     print "OPS DB support is not enabled. Exiting ...\n";
     exit(0);
+}
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database!\n");
 }
 
 #
@@ -149,6 +161,9 @@ elsif ($action eq "loadtempdb") {
 }
 elsif ($action eq "dumpexpdb") {
     exit(DumpExpDB(@ARGV));
+}
+elsif ($action eq "graphdb") {
+    exit(GraphDB(@ARGV));
 }
 elsif ($action eq "setup") {
     exit(Initialize());
@@ -392,6 +407,20 @@ sub SetGroups(@)
 		    push(@glist, $dbname);
 		}
 	    }
+	    
+	    #
+	    # Now get additional temporary DBs.
+	    #
+	    my $databases_result =
+		DBQueryFatal("select dbname from datapository_databases ".
+			     "where pid='$pid' and gid='$gid'");
+
+	    while (my ($dbname) = $databases_result->fetchrow_array()) {
+		if (defined($dbname) && $dbname ne "") {
+		    push(@glist, $dbname);
+		}
+	    }
+	    
 	}
 	$input .= "$uid @glist\n";
     }
@@ -639,9 +668,20 @@ sub AddTempDB(@)
 	die("Bad data in dbname: $dbname");
     }
 
+    #
+    # Add DB record for it.
+    #
+    if (! DBQueryWarn("insert into datapository_databases set ".
+		      "  pid='$pid', gid='$gid', uid='$dbuid', ".
+		      "  dbname='$dbname', created=now()")) {
+	fatal("Failed to add temporary dbname to database");
+    }
+
     print "Adding temporary DB '$dbname' to mysql database on $CONTROL.\n";
     my $retval = DoOpsStuff("adddb $dbname -t");
     if ($retval) {
+	DBQueryWarn("delete from datapository_databases ".
+		    "where dbname='$dbname'");
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
 
@@ -719,6 +759,55 @@ sub DelTempDB(@)
     print "Deleting temporary DB '$dbname' from mysql database on $CONTROL.\n"
 	if ($debug);
     my $retval = DoOpsStuff("deldb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    DBQueryFatal("delete from datapository_databases ".
+		 "where dbname='$dbname'");
+    return 0;
+}
+
+#
+# Hack graph support.
+#
+sub GraphDB(@)
+{
+    my ($dbname, $which, $filename) = @_;
+
+    usage()
+	if (@_ < 2 || @_ > 3);
+
+    #
+    # Untaint args.
+    #
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+    if ($which =~ /^([\w]*)$/) {
+	$which = $1;
+    }
+    else {
+	die("Bad data in which: $which");
+    }
+    # Note different taint check (allow /).
+    if (defined($filename)) {
+	if ($filename =~ /^([-\w\.\/]+)$/) {
+	    $filename = $1;
+	}
+	else {
+	    tbdie("Bad data in filename: $filename");
+	}
+    }
+    else {
+	$filename = "";
+    }
+
+    print "Graphing DB '$dbname' from mysql database on $CONTROL.\n"
+	if ($debug);
+    my $retval = DoOpsStuff("graphdb $dbname $which $filename");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }

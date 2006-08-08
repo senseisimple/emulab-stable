@@ -25,7 +25,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  template_swapin template_swapout template_graph \
 		  template_exprun template_delete template_metadata \
 		  template_export template_control template_commit \
-		  template_analyze
+		  template_analyze template_linkgraph
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
@@ -56,7 +56,8 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  webnodeattributes webarchive_control webtemplate_create \
 		  webtemplate_swapin webtemplate_swapout webtemplate_exprun \
 		  webtemplate_graph webtemplate_metadata webtemplate_export \
-		  webtemplate_control webtemplate_commit webtemplate_analyze
+		  webtemplate_control webtemplate_commit webtemplate_analyze \
+		  webtemplate_linkgraph
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \

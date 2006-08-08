@@ -66,7 +66,7 @@ function GetExpState($a, $b)
     return $expstate;
 }
 
-function Show($which, $zoom, $detail)
+function Show($which, $arg1, $arg2)
 {
     global $pid, $eid, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
     $html = "";
@@ -101,7 +101,36 @@ function Show($which, $zoom, $detail)
 	$html .= " onclick=\"SaveDetails();\">";
 	$html .= "Save</button>\n";
     }
+    elseif ($which == "graphs") {
+	$graphtype = $arg1;
+
+	if (!isset($graphtype) || !$graphtype)
+	    $graphtype = "pps";
+	
+	$exptidx = TBExptIndex($pid, $eid);
+	# Make the link unique to force reload on the client side.
+	$now     = time();
+	
+	$html  = "";
+	$html .= "<div style='display: block; overflow: auto; ".
+	         "     position: relative; height: 450px; ".
+	         "     width: 90%; border: 2px solid black;'>\n";
+	$html .= "  <img border=0 ";
+	$html .= "       src='linkgraph_image.php?exptidx=$exptidx";
+	$html .= "&graphtype=$graphtype&now=$now'>\n";
+	$html .= "</div>\n";
+
+	$html .= "<button name=pps type=button value=1";
+	$html .= " onclick=\"GraphChange('pps');\">";
+	$html .= "Packets</button>\n";
+	$html .= "<button name=bps type=button value=1";
+	$html .= " onclick=\"GraphChange('bps');\">";
+	$html .= "Bytes</button>\n";
+    }
     elseif ($which == "vis") {
+	$zoom   = $arg1;
+	$detail = $arg2;
+	
 	if ($zoom == 0) {
             # Default is whatever we have; to avoid regen of the image.
 	    $query_result =
@@ -528,6 +557,10 @@ echo "<script type='text/javascript' language='javascript'>
             x_Show('vis', zoom, detail, Show_cb);
             return false;
         }
+        function GraphChange(which) {
+            x_Show('graphs', which, 0, Show_cb);
+            return false;
+        }
         function SaveDetails() {
             window.open('spitreport.php?pid=$pid&eid=$eid',
                         '_blank','width=700,height=400,toolbar=no,".
@@ -563,6 +596,12 @@ echo "<li>
 echo "<li>
           <a href=\"#D\" id=\"li_details\" onclick=\"Show('details');\">".
               "Details</a></li>\n";
+
+if ($instance && $expstate == $TB_EXPTSTATE_ACTIVE) {
+    echo "<li>
+              <a href=\"#E\" id=\"li_graphs\" onclick=\"Show('graphs');\">".
+                  "Graphs</a></li>\n";
+}
 echo "</ul>\n";
 
 #

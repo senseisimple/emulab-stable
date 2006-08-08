@@ -9,6 +9,7 @@ use Getopt::Std;
 use Errno;
 use File::Basename;
 use strict;
+use GD::Graph::lines;
 
 #
 # A wrapper for messing with the OPS DB from boss.
@@ -73,6 +74,7 @@ sub DelDB(@);
 sub SetDBs(@);
 sub DumpDB(@);
 sub LoadDB(@);
+sub GraphDB(@);
 sub fatal($);
 
 #
@@ -128,6 +130,9 @@ elsif ($action eq "dumpdb") {
 }
 elsif ($action eq "loaddb") {
     exit(LoadDB(@ARGV));
+}
+elsif ($action eq "graphdb") {
+    exit(GraphDB(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -518,6 +523,126 @@ sub LoadDB(@)
 	fatal($! ? "Error closing $MYSQL pipe: $!"
 	         : "Exit status $? from $MYSQL");
 
+    return 0;
+}
+
+#
+# Very hacky graphing support. Initially, I'm supporting a couple of
+# different kinds of graphs just to get the ball rolling. I have no
+# idea where this stuff is going to go.
+#
+sub SaveGraph($$)
+{
+    my ($gd, $filename) = @_;
+
+    # Spew to stdout.
+    if (!defined($filename)) {
+	binmode STDOUT;
+	print STDOUT $gd->gd->gif();
+	return 0;
+    }
+    
+    if (! open(OUT, ">$filename")) {
+	print "Could not open $filename for writing!\n";
+	return -1;
+    }
+    binmode OUT;
+    print OUT $gd->gd->gif();
+    close OUT;
+
+    return 0;
+}
+
+sub GraphDB(@)
+{
+    my ($dbname, $which, $filename) = @_;
+
+    usage()
+	if (@_ < 2 || @_ > 3);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+    my $gd = new GD::Graph::lines(700,425);
+    if (!$gd) {
+	print "Could not create a new graph object!\n";
+	return -1;
+    }
+    # This is called as root, so just switch to the proper DB.
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to $dbname database!");
+    }
+    my $xlabel;
+    my $ylabel;
+    my $title;
+    my @x_data = ();
+    my @y_data = ();
+
+    if ($which eq "pps") {
+	$xlabel = "Seconds Since Time Start";
+	$ylabel = "Packets per Second";
+	$title  = "Aggregate Packets per Second";
+    }
+    elsif ($which eq "bps") {
+	$xlabel = "Seconds Since Time Start";
+	$ylabel = "Bytes per Second";
+	$title  = "Aggregate Bytes per Second";
+    }
+    else {
+	print "Do not know how to graph $which!\n";
+	return -1;
+    }
+	
+    $gd->set(x_label       => $xlabel,
+	     y_label       => $ylabel,
+	     title         => $title,
+	     r_margin      => 30,
+	     y_tick_number => 'auto',
+	     x_tick_number => 'auto',
+	     box_axis      => 0,
+	     line_width    => 3,
+	     transparent   => 0,
+	     );
+
+    if ($which eq "pps" || $which eq "bps") {
+	my $query_result;
+
+	if ($which eq "pps") {
+	    $query_result =
+		DBQueryFatal("select UNIX_TIMESTAMP(timestamp),count(*) ".
+			     "  from event ".
+			     "group by timestamp order by timestamp");
+	}
+	else {
+	    $query_result =
+		DBQueryFatal("select UNIX_TIMESTAMP(timestamp),sum(ip_len) ".
+			     "  from event as e ".
+			     "left join iphdr as i on ".
+			     "  i.sid=e.sid and i.cid=e.cid ".
+			     "group by timestamp order by timestamp");
+	}
+	my ($tstart,$first) = $query_result->fetchrow_array();
+
+	@x_data = (0);
+	@y_data = ($first);
+
+	while (my ($timestamp, $count) = $query_result->fetchrow_array()) {
+	    push(@x_data, $timestamp - $tstart);
+	    push(@y_data, $count);
+	}
+    }
+    
+    my @data = ( \@x_data , \@y_data );
+    $gd->plot(\@data);
+    SaveGraph($gd, $filename);
     return 0;
 }
 
