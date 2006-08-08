@@ -3586,3 +3586,16 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiment_template_instances add \
                 export_time datetime default NULL;
 
+4.79: Add a table to record temporary databases created on ops, that
+      are not associated with an experiment (or a project/group). This
+      is to make it easier to generate the proper permission lists for
+      db access.
+       
+	CREATE TABLE datapository_databases (
+	  dbname varchar(64) default NULL,
+	  pid varchar(12) NOT NULL default '',
+	  gid varchar(16) NOT NULL default '',
+	  uid varchar(8) NOT NULL default '',
+	  created datetime default NULL,
+	  PRIMARY KEY  (dbname)
+	) TYPE=MyISAM;

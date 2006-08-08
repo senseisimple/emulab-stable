@@ -189,6 +189,19 @@ CREATE TABLE current_reloads (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `datapository_databases`
+--
+
+CREATE TABLE datapository_databases (
+  dbname varchar(64) default NULL,
+  pid varchar(12) NOT NULL default '',
+  gid varchar(16) NOT NULL default '',
+  uid varchar(8) NOT NULL default '',
+  created datetime default NULL,
+  PRIMARY KEY  (dbname)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `default_firewall_rules`
 --
 
