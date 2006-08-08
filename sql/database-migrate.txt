@@ -3592,10 +3592,13 @@ last_net_act,last_cpu_act,last_ext_act);
       db access.
        
 	CREATE TABLE datapository_databases (
-	  dbname varchar(64) default NULL,
+	  dbname varchar(64) NOT NULL default '',
 	  pid varchar(12) NOT NULL default '',
 	  gid varchar(16) NOT NULL default '',
 	  uid varchar(8) NOT NULL default '',
 	  created datetime default NULL,
 	  PRIMARY KEY  (dbname)
 	) TYPE=MyISAM;
+
+4.80: Fix to previous revision; Skip to next entry.
+

@@ -193,7 +193,7 @@ CREATE TABLE current_reloads (
 --
 
 CREATE TABLE datapository_databases (
-  dbname varchar(64) default NULL,
+  dbname varchar(64) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   gid varchar(16) NOT NULL default '',
   uid varchar(8) NOT NULL default '',
