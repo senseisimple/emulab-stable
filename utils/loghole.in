@@ -1209,13 +1209,12 @@ def trace_post(link2trace):
             pass
         else:
             fp.write("log ip any any -> any any\n")
-            fp.write("log icmp any any -> any any\n")
             pass
         fp.close()
         
         for filename in sql:
             print_status(".")
-            os.system("snort -l ./ -c ./%s -r %s > %s 2>&1" %
+            os.system("snort -k none -l ./ -c ./%s -r %s > %s 2>&1" %
                       (SNORTCONF, filename, SNORTOUT))
             print_status(".")
             pass
