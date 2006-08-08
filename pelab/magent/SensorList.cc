@@ -10,13 +10,18 @@ using namespace std;
 
 SensorList::SensorList()
 {
-  tail = NULL;
-  // Dependency = NULL here
+  reset();
 }
 
 SensorList::SensorList(SensorList const & right)
 {
-  *this = right;
+  if (right.head.get() != NULL)
+  {
+    logWrite(ERROR, "SensorList copy constructed after setup. "
+             "This shouldn't have been able to happen. "
+             "Sensors have been lost.");
+  }
+  reset();
 }
 
 SensorList & SensorList::operator=(SensorList const & right)
@@ -25,15 +30,11 @@ SensorList & SensorList::operator=(SensorList const & right)
   {
     if (right.head.get() != NULL)
     {
-      head = right.head->clone();
-      tail = head->getTail();
+      logWrite(ERROR, "SensorList assigned after setup. "
+               "This shouldn't have been able to happen. "
+               "Sensors have been lost.");
     }
-    else
-    {
-      head.reset(NULL);
-      tail = NULL;
-    }
-    // Copy dependency pointers here.
+    reset();
   }
   return *this;
 }
@@ -43,6 +44,9 @@ void SensorList::addSensor(SensorCommand const & newSensor)
   // Add dependency type demux here.
   switch(newSensor.type)
   {
+  case NULL_SENSOR:
+    pushNullSensor(newSensor);
+    break;
   default:
     logWrite(ERROR,
              "Incorrect sensor type (%d). Ignoring add sensor command.",
@@ -54,6 +58,14 @@ void SensorList::addSensor(SensorCommand const & newSensor)
 Sensor * SensorList::getHead(void)
 {
   return head.get();
+}
+
+void reset(void)
+{
+  head.reset(NULL);
+  tail = NULL;
+  // Dependency = NULL here
+  depNullSensor = NULL;
 }
 
 void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
@@ -71,3 +83,18 @@ void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
 
 // Add individual pushSensor functions here.
 
+void SensorList::pushNullSensor(SensorCommand const &)
+{
+  // Dependency list
+
+  // Example dependency check
+  if (depNullSensor == NULL)
+  {
+    NullSensor * newSensor = new NullSensor();
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depNullSensor = newSensor;
+  }
+}

@@ -20,9 +20,20 @@ public:
   {
     return currentCommand.get();
   }
-  virtual void nextCommand(fd_set & readable)=0;
+  virtual void nextCommand(fd_set * readable)=0;
+  virtual int getMonitorSocket(void)=0;
+  virtual void disconnect(void)=0;
 protected:
   std::auto_ptr<Command> currentCommand;
+};
+
+class NullCommandInput : public CommandInput
+{
+public:
+  virtual ~NullCommandInput() {}
+  virtual void nextCommand(fd_set *) {}
+  virtual int getMonitorSocket(void) { return -1; }
+  virtual void disconnect(void) {}
 };
 
 #endif

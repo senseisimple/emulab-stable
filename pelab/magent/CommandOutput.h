@@ -11,13 +11,33 @@
 class CommandOutput
 {
 public:
+  enum
+  {
+    SENDING_MESSAGE = 0,
+    DISCARDING_MESSAGE
+  }
+public:
   virtual ~CommandOutput() {}
-  void eventMessage(std::string const & message, Order const & key)
+  void eventMessage(std::string const & message, Order const & key,
+                    char direction)
   {
     if (message.size() <= 0xffff && message.size() > 0)
     {
-      writeHeader(EVENT_TO_MONITOR, message.size(), key);
-      writeMessage(message.c_str(), message.size());
+      Header prefix;
+      prefix.type = EVENT_TO_MONITOR;
+      prefix.size = message.size();
+      prefix.key = key;
+      char headerBuffer[Header::headerSize];
+      saveHeader(headerBuffer, prefix);
+      int result = startMessage(Header::headerSize + sizeof(direction)
+                                + message.size());
+      if (result == SENDING_MESSAGE)
+      {
+        writeMessage(headerBuffer, Header::headerSize);
+        writeMessage(&direction, sizeof(direction));
+        writeMessage(message.c_str(), message.size());
+        finishMessage();
+      }
     }
     else
     {
@@ -25,45 +45,20 @@ public:
                "Size: %ud", message.size());
     }
   }
-
-private:
-  void writeHeader(int type, unsigned short size, Order const & key)
-  {
-    int bufferSize = sizeof(unsigned char)*2 + sizeof(unsigned short)*3
-      + sizeof(unsigned long);
-    char buffer[bufferSize];
-    char * pos = buffer;
-
-    pos = saveChar(pos, type);
-    pos = saveShort(pos, size);
-    pos = saveChar(pos, key.transport);
-    pos = saveInt(pos, key.ip);
-    pos = saveShort(pos, key.localPort);
-    pos = saveShort(pos, key.remotePort);
-    writeMessage(buffer, bufferSize);
-  }
-
-  char * saveChar(char * buffer, unsigned char value)
-  {
-    memcpy(buffer, &value, sizeof(value));
-    return buffer + sizeof(value);
-  }
-
-  char * saveShort(char * buffer, unsigned short value)
-  {
-    unsigned short ordered = htons(value);
-    memcpy(buffer, &ordered, sizeof(ordered));
-    return buffer + sizeof(ordered);
-  }
-
-  char * saveInt(char * buffer, unsigned short value)
-  {
-    unsigned int ordered = htonl(value);
-    memcpy(buffer, &ordered, sizeof(ordered));
-    return buffer + sizeof(ordered);
-  }
 protected:
+  virtual int startMessage(int size)=0;
+  virtual void endMessage(void)=0;
   virtual void writeMessage(char const * message, int count)=0;
+};
+
+class NullCommandOutput : public CommandOutput
+{
+public:
+  virtual ~NullCommandOutput() {}
+protected:
+  virtual int startMessage(int size) { return DISCARDING_MESSAGE; }
+  virtual void endMessage(void) {}
+  virtual void writeMessage(char const *, int) {}
 };
 
 #endif

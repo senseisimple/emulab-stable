@@ -49,6 +49,8 @@ class ConnectionModelCommand : public Command
 protected:
   virtual void runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &);
+  int type;
+  int value;
 };
 
 class SensorCommand : public Command

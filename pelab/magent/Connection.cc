@@ -52,11 +52,33 @@ void Connection::setTraffic(std::auto_ptr<TrafficModel> newTraffic)
   traffic = newTraffic;
 }
 
+void Connection::addConnectionModelParam(ConnectionModelCommand const & param)
+{
+  if (peer.get() != NULL)
+  {
+    peer->addParam(param);
+  }
+  else
+  {
+    logWrite(ERROR, "Connection model has not been initialized before an "
+             "addConnectionModelParam call");
+  }
+}
+
 void Connection::connect(void)
 {
   if (peer.get() != NULL)
   {
-    peer->connect();
+    planet.transport = TCP_CONNECTION;
+    planet.ip = elab.ip;
+    planet.remotePort = global::peerServerPort;
+    // planet is modified by ConnectionModel::connect()
+    peer->connect(planet);
+    isConnected = peer->isConnected();
+    if (isConnected)
+    {
+      global::planetMap.insert(make_pair(planet, this));
+    }
   }
   else
   {
@@ -89,24 +111,30 @@ void Connection::addSensor(SensorCommand const & newSensor)
   measurements.addSensor(newSensor);
 }
 
-void Connection::captureSend(Time & packetTime, struct tcp_info * kernel,
-                             struct tcphdr * tcp)
+void Connection::captureSend(PacketInfo * packet)
 {
   Sensor * head = measurements.getHead();
   if (head != NULL && isConnected)
   {
-    head->captureSend(packetTime, kernel, tcp, elab, bufferFull);
+    packet->elab = elab;
+    packet->bufferFull = bufferFull;
+    head->captureSend(packet);
   }
 }
 
-void Connection::captureAck(Time & packetTime, struct tcp_info * kernel,
-                            struct tcphdr * tcp)
+void Connection::captureAck(PacketInfo * packet)
 {
   Sensor * head = measurements.getHead();
   if (head != NULL && isConnected)
   {
-    head->captureAck(packetTime, kernel, tcp, elab, bufferFull);
+    packet->elab = elab;
+    packet->bufferFull = bufferFull;
+    head->captureAck(packet);
   }
+}
+ConnectionModel const * Connection::getConnectionModel(void)
+{
+  return peer.get();
 }
 
 Time Connection::writeToConnection(Time const & previousTime)

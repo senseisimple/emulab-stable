@@ -16,6 +16,8 @@
 class Sensor;
 class SensorCommand;
 
+class NullSensor;
+
 class SensorList
 {
 public:
@@ -29,9 +31,13 @@ private:
   std::auto_ptr<Sensor> head;
   Sensor * tail;
 private:
-  // Functions for creating sensors and pushing them onto the list.
+  void reset(void);
   void pushSensor(std::auto_ptr<Sensor> newSensor);
+  // Functions for creating sensors and pushing them onto the list.
+  void pushNullSensor(SensorCommand const & command);
 private:
+  // Example dependency
+  NullSensor * depNullSensor;
   // Dependency pointers.
 };
 

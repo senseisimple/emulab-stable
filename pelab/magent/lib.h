@@ -55,6 +55,11 @@ enum TransportProtocol
   UDP_CONNECTION = 1
 };
 
+enum SensorType
+{
+  NULL_SENSOR
+};
+
 struct Order
 {
   TransportProtocol transport;
@@ -111,9 +116,35 @@ struct WriteResult
   Time nextWrite;
 };
 
+struct PacketInfo
+{
+  Time packetTime;
+  int packetLength;
+  struct tcp_info const * kernel;
+  IpHeader const * ip;
+  struct tcphdr const * tcp;
+  Order elab;
+  bool bufferFull;
+};
+
 enum
 {
-  CONNECTION_MODEL_KERNEL = 0
+  FORWARD_EDGE = 0,
+  BACKWARD_EDGE
+};
+
+enum
+{
+  CONNECTION_SEND_BUFFER_SIZE = 0,
+  CONNECTION_RECEIVE_BUFFER_SIZE,
+  CONNECTION_MAX_SEGMENT_SIZE,
+  CONNECTION_USE_NAGLES
+};
+
+enum
+{
+  CONNECTION_MODEL_NULL = 0,
+  CONNECTION_MODEL_KERNEL = 1
 };
 
 class ConnectionModel;
@@ -124,6 +155,9 @@ class CommandOutput;
 namespace global
 {
   extern int connectionModelArg;
+  extern unsigned short peerServerPort;
+  extern unsigned short monitorServerPort;
+
   extern int peerAccept;
   extern std::auto_ptr<ConnectionModel> connectionModelExemplar;
   extern std::string interface;
@@ -141,7 +175,8 @@ namespace global
   extern std::auto_ptr<CommandOutput> output;
 }
 
-void addDescriptor(int fd);
+void setDescriptor(int fd);
+void clearDescriptor(int fd);
 std::string ipToString(unsigned int ip);
 
 #endif

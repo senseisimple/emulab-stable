@@ -3,11 +3,6 @@
 #ifndef _LOG_H
 #define _LOG_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 // The logging framework. Use logInit() during initialization to set
 // up logging. Then use log() to generate messages. logCleanup()
 // should be called during program shutdown.
@@ -46,13 +41,10 @@ enum LOG_TYPE
   ERROR            = 0x01,
   EXCEPTION        = 0x02,
   PEER_CYCLE       = 0x04,
+  SENSOR           = 0x08,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x00,
-  LOG_EVERYTHING   = 0x07
+  LOG_EVERYTHING   = 0x0f
 };
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

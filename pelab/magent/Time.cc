@@ -27,6 +27,24 @@ struct timeval * Time::getTimeval(void)
   return &data;
 }
 
+Time Time::operator+(int const & right) const
+{
+  Time result;
+  result.data.tv_sec = data.tv_sec + right/1000;
+  result.data.tv_usec = data.tv_usec + (right%1000)*1000;
+  if (result.data.tv_usec < 0)
+  {
+    --(result.data.tv_sec);
+    result.data.tv_usec += 1000000;
+  }
+  if (result.data.tv_usec >= 1000000)
+  {
+    ++(result.data.tv_sec);
+    result.data.tv_usec -= 1000000;
+  }
+  return result;
+}
+
 Time Time::operator-(Time const & right) const
 {
   Time result;

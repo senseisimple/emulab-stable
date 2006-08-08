@@ -17,6 +17,9 @@ using namespace std;
 namespace global
 {
   int connectionModelArg = 0;
+  unsigned short peerServerPort = 0;
+  unsigned short monitorServerPort = 0;
+
   int peerAccept = -1;
   string interface;
   auto_ptr<ConnectionModel> connectionModelExemplar;
@@ -41,7 +44,7 @@ void addNewPeer(fd_set * readable);
 void readFromPeers(fd_set * readable);
 void packetCapture(fd_set * readable);
 
-int main(int /*argc*/, char * /*argv*/[])
+int main(int argc, char * argv[])
 {
   processArgs(argc, argv);
   init();
@@ -51,15 +54,21 @@ int main(int /*argc*/, char * /*argv*/[])
 
 void processArgs(int argc, char * argv[])
 {
-  // TODO: Add argument-processing code
+  global::connectionModelArg = CONNECTION_MODEL_NULL;
+  global::peerServerPort = 3491;
+  global::monitorServerPort = 4200;
 }
 
 void init(void)
 {
+  srandom(getpid());
   switch (global::connectionModelArg)
   {
+  case CONNECTION_MODEL_NULL:
+    ConnectionModelNull::init();
+    break;
   case CONNECTION_MODEL_KERNEL:
-    kernelTcp_init();
+    KernelTcp::init();
     break;
   default:
     logWrite(ERROR, "connectionModelArg is corrupt at initialization (%d)."
@@ -67,10 +76,10 @@ void init(void)
   }
 
   FD_ZERO(&global::readers);
-  maxReader = -1;
+  global::maxReader = -1;
 
-//  input = ;
-//  output = ;
+  global::input.reset(new NullCommandInput());
+  global::output.reset(new NullCommandOutput());
 }
 
 void mainLoop(void)
@@ -115,12 +124,12 @@ void mainLoop(void)
       }
     }
 
-    global::input->nextCommand(readable);
+    global::input->nextCommand(&readable);
     Command * current = global::input->getCommand();
     while (current != NULL)
     {
       current->run(schedule);
-      global::input->nextCommand(readable);
+      global::input->nextCommand(&readable);
       current = global::input->getCommand();
     }
     writeToConnections(schedule);
@@ -161,8 +170,11 @@ void addNewPeer(fd_set * readable)
 {
   switch (global::connectionModelArg)
   {
+  case CONNECTION_MODEL_NULL:
+    ConnectionModelNull::addNewPeer(readable);
+    break;
   case CONNECTION_MODEL_KERNEL:
-    kernelTcp_addNewPeer(readable);
+    KernelTcp::addNewPeer(readable);
     break;
   default:
     logWrite(ERROR, "connectionModelArg is corrupt (%d). "
@@ -175,8 +187,11 @@ void readFromPeers(fd_set * readable)
 {
   switch (global::connectionModelArg)
   {
+  case CONNECTION_MODEL_NULL:
+    ConnectionModelNull::readFromPeers(readable);
+    break;
   case CONNECTION_MODEL_KERNEL:
-    kernelTcp_readFromPeers(readable);
+    KernelTcp::readFromPeers(readable);
     break;
   default:
     logWrite(ERROR, "connectionModelArg is corrupt (%d). "
@@ -190,8 +205,11 @@ void packetCapture(fd_set * readable)
 {
   switch (global::connectionModelArg)
   {
+  case CONNECTION_MODEL_NULL:
+    ConnectionModelNull::packetCapture(readable);
+    break;
   case CONNECTION_MODEL_KERNEL:
-    kernelTcp_packetCapture(readable);
+    KernelTcp::packetCapture(readable);
     break;
   default:
     logWrite(ERROR, "connectionModelArg is corrupt (%d). "
@@ -201,9 +219,18 @@ void packetCapture(fd_set * readable)
   }
 }
 
-void addDescriptor(int fd)
+void setDescriptor(int fd)
 {
   FD_SET(fd, &(global::readers));
+  if (fd > global::maxReader)
+  {
+    global::maxReader = fd;
+  }
+}
+
+void clearDescriptor(int fd)
+{
+  FD_CLR(fd, &(global::readers));
   if (fd > global::maxReader)
   {
     global::maxReader = fd;

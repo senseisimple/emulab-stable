@@ -42,6 +42,10 @@ static void logPrefix(int flags)
   {
     fprintf(logFile, "PEER_CYCLE ");
   }
+  if (flags & SENSOR)
+  {
+    fprintf(logFile, "SENSOR ");
+  }
   if (logTimestamp)
   {
     struct timeval now;
