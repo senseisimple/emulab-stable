@@ -78,6 +78,7 @@ export PROJECT=`echo $NICKNAME | cut -d. -f3`;
 SCRIPT_LOCATION=`dirname $0`
 export BASE="${SCRIPT_LOCATION}/../";
 export STUB_DIR="${BASE}/stub/";
+export MAGENT_DIR="${BASE}/magent/";
 export NETMON_DIR="${BASE}/libnetmon/";
 export MONITOR_DIR="${BASE}/monitor/";
 export TMPDIR="/var/tmp/";
@@ -93,6 +94,7 @@ export IPMAP="/var/tmp/ip-mapping.txt"
 #
 export NETMOND="netmond"
 export STUBD="stubd"
+export MAGENT="magent"
 export MONITOR="monitor.py"
 export GENIPMAP="gen-ip-mapping.pl"
 export NETMON_LIB="libnetmon.so"
