@@ -1135,11 +1135,12 @@ def trace_pre(traces):
 #
 def trace_post(link2trace):
     lpc = 1
+    sql = []
+    
     for linkvname in link2trace.keys():
         print_status("linktrace post processing %d/%d  " %
                      (lpc, len(link2trace)))
         args = {}
-        sql  = []
         os.chdir(linkvname)
         for filename in glob.glob("*.recv*"):
             base, ext = os.path.splitext(filename)
