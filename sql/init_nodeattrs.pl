@@ -33,6 +33,8 @@ while (my $rowref = $query_result->fetchrow_hashref()) {
 
     AddAttr($type, "default_osid", "string", $rowref->{'osid'})
 	if (defined($rowref->{'osid'}) && $rowref->{'osid'} ne "");
+    AddAttr($type, "rebootable", "boolean", $rowref->{'isrebootable'})
+	if (defined($rowref->{'isrebootable'}));
 
     next
 	if ($rowref->{'isvirtnode'} ||
@@ -88,8 +90,6 @@ while (my $rowref = $query_result->fetchrow_hashref()) {
     AddAttr($type, "trivlink_maxspeed", "integer",
 	    $rowref->{'trivlink_maxspeed'})
 	if (defined($rowref->{'trivlink_maxspeed'}));
-    AddAttr($type, "rebootable", "boolean", $rowref->{'isrebootable'})
-	if (defined($rowref->{'isrebootable'}));
     AddAttr($type, "bios_waittime", "integer", $rowref->{'bios_waittime'})
 	if (defined($rowref->{'bios_waittime'}));
     AddAttr($type, "adminmfs_osid", "string", $rowref->{'adminmfs_osid'})
