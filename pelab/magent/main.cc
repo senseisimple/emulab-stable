@@ -12,7 +12,15 @@
 
 #include "KernelTcp.h"
 
+#include <iostream>
+
 using namespace std;
+
+// For option processing
+extern "C" {
+#include <getopt.h>
+#include <stdio.h>
+};
 
 namespace global
 {
@@ -36,6 +44,7 @@ namespace global
   std::auto_ptr<CommandOutput> output;
 }
 
+void usageMessage(char *progname);
 void processArgs(int argc, char * argv[]);
 void init(void);
 void mainLoop(void);
@@ -52,12 +61,97 @@ int main(int argc, char * argv[])
   return 0;
 }
 
+void usageMessage(char *progname) {
+  cerr << "Usage: " << progname << " [options]" << endl;
+  cerr << "  --connectionmodel=<null|kerneltcp> " << endl;
+  cerr << "  --peerserverport=<int> " << endl;
+  cerr << "  --monitorserverport=<int> " << endl;
+  cerr << "  --internface=<iface> " << endl;
+  logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
+}
+
 void processArgs(int argc, char * argv[])
 {
+  // Defaults, in case the user does not pass us explicit values
   global::connectionModelArg = CONNECTION_MODEL_NULL;
   global::peerServerPort = 3491;
   global::monitorServerPort = 4200;
   global::interface = "vnet";
+
+  // From the getopt library
+  // XXX - We might need to wrap this in 'extern "C"'
+  extern char *optarg;
+
+  static struct option longOptions[] = {
+    // If you modify this, make sure to modify the shortOptions string below
+    // too.
+    {"connectionmodel",   required_argument, NULL, 'c'},
+    {"peerserverport",    required_argument, NULL, 'p'},
+    {"monitorserverport", required_argument, NULL, 'm'},
+    {"interface",         required_argument, NULL, 'i'},
+    // Required so that getopt_long can find the end of the list
+    {NULL, 0, NULL, 0}
+  };
+
+  string shortOptions = "c:p:m:i:";
+
+  // Not used
+  int longIndex;
+
+  // Loop until all options have been handled
+  while (true) {
+    int ch =
+      getopt_long(argc, argv, shortOptions.c_str(), longOptions, &longIndex);
+
+    // Detect end of options
+    if (ch == -1) {
+      break;
+    }
+
+    int argIntVal;
+
+    // Make a copy of optarg that's more c++-y.
+    string optArg;
+    if (optarg != NULL) {
+        optArg = optarg;
+    }
+
+    switch ((char) ch) {
+      case 'c':
+        if (optArg == "null") {
+          global::connectionModelArg = CONNECTION_MODEL_NULL;
+        } else if (optArg == "kerneltcp") {
+          global::connectionModelArg = CONNECTION_MODEL_KERNEL;
+        } else {
+          usageMessage(argv[0]);
+          exit(1);
+        }
+        break;
+      case 'p':
+        if (sscanf(optarg,"%i",&argIntVal)) {
+          usageMessage(argv[0]);
+          exit(1);
+        } else {
+          global::peerServerPort = argIntVal;
+        }
+        break;
+      case 'm':
+        if (sscanf(optarg,"%i",&argIntVal)) {
+          usageMessage(argv[0]);
+          exit(1);
+        } else {
+          global::monitorServerPort = argIntVal;
+        }
+        break;
+      case 'i':
+        global::interface = optArg;
+        break;
+      case '?':
+      default:
+        usageMessage(argv[0]);
+        exit(1);
+    }
+  }
 }
 
 void init(void)
