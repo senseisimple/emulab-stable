@@ -3,7 +3,10 @@
 #ifndef LIB_H_PELAB_2
 #define LIB_H_PELAB_2
 
+extern "C"
+{
 #include <stdio.h>
+#include <getopt.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -27,6 +30,9 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
+
+extern char * optarg;
+}
 
 #include <utility>
 #include <list>
@@ -120,17 +126,7 @@ struct Order
     return !(*this == right);
   }
 };
-/*
-struct PlanetOrder
-{
-  unsigned long localPort;
 
-  bool operator<(PlanetOrder const & right) const
-  {
-    return localPort < right.localPort;
-  }
-};
-*/
 struct WriteResult
 {
   bool isConnected;

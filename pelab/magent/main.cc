@@ -16,12 +16,6 @@
 
 using namespace std;
 
-// For option processing
-extern "C" {
-#include <getopt.h>
-#include <stdio.h>
-};
-
 namespace global
 {
   int connectionModelArg = 0;
@@ -57,6 +51,12 @@ int main(int argc, char * argv[])
 {
   processArgs(argc, argv);
   init();
+  // Run with no change in directory, and no closing of standard files.
+  int error = daemon(1, 1);
+  if (error == -1)
+  {
+    logWrite(ERROR, "Daemonization failed: %s", strerror(errno));
+  }
   mainLoop();
   return 0;
 }
@@ -66,7 +66,7 @@ void usageMessage(char *progname) {
   cerr << "  --connectionmodel=<null|kerneltcp> " << endl;
   cerr << "  --peerserverport=<int> " << endl;
   cerr << "  --monitorserverport=<int> " << endl;
-  cerr << "  --internface=<iface> " << endl;
+  cerr << "  --interface=<iface> " << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
@@ -77,10 +77,6 @@ void processArgs(int argc, char * argv[])
   global::peerServerPort = 3491;
   global::monitorServerPort = 4200;
   global::interface = "vnet";
-
-  // From the getopt library
-  // XXX - We might need to wrap this in 'extern "C"'
-  extern char *optarg;
 
   static struct option longOptions[] = {
     // If you modify this, make sure to modify the shortOptions string below
