@@ -156,6 +156,7 @@ void processArgs(int argc, char * argv[])
 
 void init(void)
 {
+  logInit(stderr, LOG_EVERYTHING, true);
   srandom(getpid());
   switch (global::connectionModelArg)
   {
@@ -186,19 +187,23 @@ void mainLoop(void)
   {
     fd_set readable = global::readers;
     Time timeUntilWrite;
+    struct timeval * waitPeriod;
     Time now = getCurrentTime();
     multimap<Time, Connection *>::iterator nextWrite = schedule.begin();
     if (nextWrite != schedule.end() && now < nextWrite->first)
     {
       timeUntilWrite = nextWrite->first - now;
+      waitPeriod = timeUntilWrite.getTimeval();
     }
     else
     {
-      // otherwise we don't want to wait.
+      // otherwise we want to wait forever.
       timeUntilWrite = Time();
+      waitPeriod = NULL;
     }
+    logWrite(MAIN_LOOP, "Select");
     int error = select(global::maxReader + 1, &readable, NULL, NULL,
-                       timeUntilWrite.getTimeval());
+                       waitPeriod);
     if (error == -1)
     {
       switch (errno)

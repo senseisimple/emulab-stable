@@ -44,9 +44,10 @@ enum LOG_TYPE
   SENSOR           = 0x08,
   CONNECTION_MODEL = 0x10,
   ROBUST           = 0x20,
+  MAIN_LOOP        = 0x40,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x00,
-  LOG_EVERYTHING   = 0x3f
+  LOG_EVERYTHING   = 0x7f
 };
 
 #endif

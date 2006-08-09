@@ -54,6 +54,10 @@ static void logPrefix(int flags)
   {
     fprintf(logFile, "ROBUST ");
   }
+  if (flags & MAIN_LOOP)
+  {
+    fprintf(logFile, "MAIN_LOOP ");
+  }
   if (logTimestamp)
   {
     struct timeval now;
