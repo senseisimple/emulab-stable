@@ -141,7 +141,7 @@ while(1)
 
     outputErrors();
 
-    sleep( 60 );
+    sleep( 60*5 );
     $f_firsttime = 0;
 }
 
@@ -195,7 +195,7 @@ sub choosenodes
 	if( $bestnode ne "NONE" &&
 	    !defined $intersitenodes{$site} )
 	{
-	    print "SECTION 1: adding $bestnode at $site\n";
+	    print time()." SECTION 1: adding $bestnode at $site\n";
 	    # ** This section handles when a site is seen for the 1st time
 
 	    #set new node to represent this site
@@ -205,7 +205,7 @@ sub choosenodes
 	}
 	elsif( ("NONE" eq $bestnode) && defined $intersitenodes{$site} )
 	{
-	    print "SECTION 2: removing tests to $site / ".
+	    print time()." SECTION 2: removing tests to $site / ".
 		"$intersitenodes{$site} \n";
 	    # ** This section handles when a site has no nodes available
 
@@ -221,7 +221,7 @@ sub choosenodes
 	       #&& isnodeinconstrset($bestnode) 
 	       )
 	{
-	    print "SECTION 3: node change at $site from ".
+	    print time()." SECTION 3: node change at $site from ".
 		"$intersitenodes{$site} to $bestnode\n";
 	    # ** This section handles when a "bestnode" at a site changes
 	    
@@ -341,18 +341,9 @@ sub choosebestnode($)
 	    $flag_siteIncluded = 1;
 #	    print "SETTING SITEINCLUDED=1 for $node at $site\n";
 	}
-        #this command acts like a bgmon "ping" - used to 
-        #determine if bgmon running correctly
-=pod
-        my %cmd = ( expid    => $expid,
-		    cmdtype  => "EDIT",
-		    dstnode  => "NOADDR",
-		    testtype => "bw",
-		    testper  => 0,
-		    limitTime=> 0 );
-=cut
+
 	if( $allnodes{$node}{free} == 1 && isnodeinconstrset($node) ){
-	    print "choosebestnode: considering $node\n";
+#	    print "choosebestnode: considering $node\n";
 #	    print "choosing best node for site $site\n";
 	    #first time thru loop...
 	    if( $bestnode eq "NONE" ){
@@ -492,7 +483,7 @@ sub stoppairtest($$)
     foreach my $testtype (@testtypes){
 	edittest($srcnode, $destnode, 0, $testtype);
     }
-    print "stopping pair tests from $srcnode to $destnode\n";
+#    print "stopping pair tests from $srcnode to $destnode\n";
 }
 
 #

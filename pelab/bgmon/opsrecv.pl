@@ -43,22 +43,24 @@ my $duplicateKillThresh = 5; #kill node if this many duplicates occur per index
 $| = 1;
 
 sub usage {
-	print "Usage: $0 [-p receiveport] [-a sendport] [-e pid/eid] [-d] [-i]\n";
+	print "Usage: $0 [-p receiveport] [-a sendport] [-e pid/eid]".
+	    " [-d debuglevel] [-i]\n";
 	return 1;
 }
 
 my $debug    = 0;
 my $impotent = 0;
+my $debug = 0;
 my ($port, $sendport, $expid);
 my %opt = ();
-if (!getopts("p:a:e:dih", \%opt)) {
+if (!getopts("p:a:e:d:ih", \%opt)) {
     exit &usage;
 }
 if ($opt{p}) { $port = $opt{p}; } else { $port = 5051; }
 if ($opt{a}) { $sendport = $opt{a}; } else { $sendport = 5050; }
 if ($opt{h}) { exit &usage; }
 if ($opt{e}) { $expid = $opt{e}; } else { $expid = "none"; }
-if ($opt{d}) { $debug = 1; }
+if ($opt{d}) { $debug = $opt{d}; } else { $debug = 0; }
 if ($opt{i}) { $impotent = 1; } 
 
 if (@ARGV !=0) { exit &usage; }
@@ -133,13 +135,13 @@ sub handleincomingmsgs()
 	    return;
 	}
 
-	print "\n";
+	print "\n" if( $debug > 1 );
 	print("linksrc=$linksrc\n".
 	      "linkdest=$linkdest\n".
 	      "testtype =$testtype\n".
 	      "result=$result\n".
 	      "index=$index\n".
-	      "tstamp=$tstamp\n");
+	      "tstamp=$tstamp\n") if( $debug > 1 );
 
 	if( defined $linksrc ){
 	    my $socket_snd = 
@@ -153,7 +155,7 @@ sub handleincomingmsgs()
 	    if( defined %ack && defined $socket_snd ){
 		my $ack_serial = serialize_hash( \%ack );
 		$socket_snd->send($ack_serial);
-		print "**SENT ACK**\n";	    
+		print "**SENT ACK**\n" if( $debug > 1 );
 
 		if( !defined $lasttimestamp{$linksrc}{$index} ||
 		    $tstamp ne $lasttimestamp{$linksrc}{$index} )
@@ -163,16 +165,19 @@ sub handleincomingmsgs()
 				 testtype  => $testtype,
 				 result    => $result,
 				 tstamp    => $tstamp );
-		    #decrement duplicatecnt for corresponding result index
+		    #clear duplicatecnt for corresponding result index
 		    if( defined($duplicatecnt{$linksrc}{$index}) ){
-			$duplicatecnt{$linksrc}{$index}--
-			    if( $duplicatecnt{$linksrc}{$index} > 0 );
-		    }else{
-			$duplicatecnt{$linksrc}{$index} = 0;
+			delete $duplicatecnt{$linksrc}{$index};
 		    }
 		}else{
-		    print "++++++duplicate data\n";
-		    
+		    print("++++++duplicate data\n".
+		          "linksrc=$linksrc\n".
+			  "linkdest=$linkdest\n".
+			  "testtype =$testtype\n".
+			  "result=$result\n".
+			  "index=$index\n".
+			  "tstamp=$tstamp\n") if( $debug > 0);
+
 		    #increment duplicatecnt for this src and index number
 		    if( defined($duplicatecnt{$linksrc}{$index}) ){
 			$duplicatecnt{$linksrc}{$index}++;
@@ -181,7 +186,8 @@ sub handleincomingmsgs()
 			    > $duplicateKillThresh )
 			{
 			    killnode($linksrc);
-			    print "KILLING OFF BGMON at $linksrc\n";
+			    print "KILLING OFF BGMON at $linksrc".
+				" for index $index\n" if( $debug > 0 );
 			    delete $duplicatecnt{$linksrc};
 			}
 		    }else{
@@ -297,7 +303,7 @@ sub SendBatchedInserts()
 	DBQueryWarn($insertions)
 	    if (!$impotent);
 	print "$insertions\n"
-	    if ($debug);
+	    if ($debug > 2);
 	$lastinsert = time();
     }
     $batchsize  = 0;

@@ -10,7 +10,6 @@ use IO::Select;
 require Exporter;
 
 @ISA    = "Exporter";
-
 @EXPORT = qw ( 
 	       %deadnodes
 	       %ERRID
@@ -26,16 +25,24 @@ require Exporter;
 	       );
 
 
+# These errors define specifics of when a measurement value cannot be
+# reported due to some error in the network or at the remote end.
+our %ERRID;
+$ERRID{timeout} = -1;
+$ERRID{ttlexceed} = -2; # was an error for "ping", but is not seen in fping.
+$ERRID{unknown} = -3;   # general error, which cannot be classified into others
+$ERRID{unknownhost} = -4;
+$ERRID{ICMPunreachable} = -5;  #used for all ICMP errors (see fping.c for strs)
+$ERRID{iperfHostUnreachable} = -6;  #for iperf: error flagged by: write1 failed: Broken pipe
+
+our %deadnodes;
+
 my $socket;
 my $sel = IO::Select->new();
 my $port;
 my $expid;
-my %deadnodes;
 
-my %ERRID;
-$ERRID{timeout} = -1;
-$ERRID{ttlexceed} = -2;
-$ERRID{unknown} = -3;
+
 
 
 sub setcmdport($)
@@ -114,12 +121,10 @@ sub sendcmd($$)
 					 PeerAddr => $node,
 					 Timeout  => 1 );
 	if( defined $socket ){
-	    $sel->add($socket);
+#	    $sel->add($socket);
 	    print $socket "$sercmd\n";
-	    #todo: wait for ack;
-	    # timeout period?
 	    $sel->add($socket);
-	    my ($ready) = $sel->can_read(1);
+	    my ($ready) = $sel->can_read(2);  #timeout (seconds) (?)
 	    if( defined($ready) && $ready eq $socket ){
 		my $ack = <$ready>;
 #		chomp $ack;
