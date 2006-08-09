@@ -245,8 +245,8 @@ if {$trace_end_nodes} {
 # Real Internet cloud for real plab nodes
 #
 if {$real_plab} {
-    set internet [$ns make-lan "$inet_string" 100Mbps 0ms]
-    $internet trace
+    set realinternet [$ns make-lan "$inet_string" 100Mbps 0ms]
+    $realinternet trace
 }
 
 #
