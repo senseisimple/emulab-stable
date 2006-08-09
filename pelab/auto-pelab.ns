@@ -67,8 +67,7 @@ set plabnodes {}
 #       /proj/tbres/
 #   Put the path to your tarball in this variable
 #
-#set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
-set pelab_tar "/proj/tbres/mike/pelab-bin.tar.gz"
+set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
 
 
 #
