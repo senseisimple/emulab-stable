@@ -1433,6 +1433,8 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * no need to send it back for every vnode!
 	 */
 	if (vers >= 18 && !reqp->isvnode) {
+		char *aliasstr;
+
 		/*
 		 * First do phys interfaces underlying veth/vlan interfaces
 		 */
@@ -1451,6 +1453,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			      reqp->nodeid);
 			return 1;
 		}
+
+		if (vers < 27)
+			aliasstr = "IPALIASES=\"\" ";
+		else
+			aliasstr = "";
+
 		nrows = (int)mysql_num_rows(res);
 		while (nrows) {
 			char *bufp   = buf;
@@ -1459,13 +1467,10 @@ COMMAND_PROTOTYPE(doifconfig)
 			bufp += OUTPUT(bufp, ebufp - bufp,
 				       "INTERFACE IFACETYPE=%s "
 				       "INET= MASK= MAC=%s "
-				       "SPEED=%sMbps DUPLEX=%s ",
-				       row[0], row[1], row[2], row[3]);
-			if (vers < 27)
-				bufp += OUTPUT(bufp, ebufp - bufp,
-					       "IPALIASES=\"\" ");
-			bufp += OUTPUT(bufp, ebufp - bufp,
-				       "IFACE= RTABID= LAN=\n");
+				       "SPEED=%sMbps DUPLEX=%s "
+				       "%sIFACE= RTABID= LAN=\n",
+				       row[0], row[1], row[2], row[3],
+				       aliasstr);
 
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -1503,17 +1508,17 @@ COMMAND_PROTOTYPE(doifconfig)
 				       "INTERFACE IFACETYPE=%s "
 				       "INET= MASK= MAC=%s "
 				       "SPEED=%sMbps DUPLEX=%s "
-				       "IPALIASES=\"\" IFACE= "
-				       "RTABID= LAN=\n",
-				       row[0], row[1], row[2], row[3]);
+				       "%sIFACE= RTABID= LAN=\n",
+				       row[0], row[1], row[2], row[3],
+				       aliasstr);
 
 			bufp += OUTPUT(bufp, ebufp - bufp,
 				       "INTERFACE IFACETYPE=%s "
 				       "INET= MASK= MAC=%s "
 				       "SPEED=%sMbps DUPLEX=%s "
-				       "IPALIASES=\"\" IFACE= "
-				       "RTABID= LAN=\n",
-				       row[4], row[5], row[6], row[7]);
+				       "%sIFACE= RTABID= LAN=\n",
+				       row[4], row[5], row[6], row[7],
+				       aliasstr);
 
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
