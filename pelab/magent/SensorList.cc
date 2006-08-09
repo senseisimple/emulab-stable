@@ -6,6 +6,12 @@
 #include "Sensor.h"
 #include "Command.h"
 
+#include "PacketSensor.h"
+#include "DelaySensor.h"
+#include "MinDelaySensor.h"
+#include "MaxDelaySensor.h"
+#include "ThroughputSensor.h"
+
 using namespace std;
 
 SensorList::SensorList()
@@ -45,7 +51,22 @@ void SensorList::addSensor(SensorCommand const & newSensor)
   switch(newSensor.type)
   {
   case NULL_SENSOR:
-    pushNullSensor(newSensor);
+    pushNullSensor();
+    break;
+  case PACKET_SENSOR:
+    pushPacketSensor();
+    break;
+  case DELAY_SENSOR:
+    pushDelaySensor();
+    break;
+  case MIN_DELAY_SENSOR:
+    pushMinDelaySensor();
+    break;
+  case MAX_DELAY_SENSOR:
+    pushMaxDelaySensor();
+    break;
+  case THROUGHPUT_SENSOR:
+    pushThroughputSensor();
     break;
   default:
     logWrite(ERROR,
@@ -60,12 +81,15 @@ Sensor * SensorList::getHead(void)
   return head.get();
 }
 
-void reset(void)
+void SensorList::reset(void)
 {
   head.reset(NULL);
   tail = NULL;
   // Dependency = NULL here
   depNullSensor = NULL;
+  depPacketSensor = NULL;
+  depDelaySensor = NULL;
+  depThroughputSensor = NULL;
 }
 
 void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
@@ -83,7 +107,7 @@ void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
 
 // Add individual pushSensor functions here.
 
-void SensorList::pushNullSensor(SensorCommand const &)
+void SensorList::pushNullSensor(void)
 {
   // Dependency list
 
@@ -96,5 +120,73 @@ void SensorList::pushNullSensor(SensorCommand const &)
 
     // Example dependency set
     depNullSensor = newSensor;
+  }
+}
+
+void SensorList::pushPacketSensor(void)
+{
+  // Dependency list
+
+  // Example dependency check
+  if (depPacketSensor == NULL)
+  {
+    PacketSensor * newSensor = new PacketSensor();
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depPacketSensor = newSensor;
+  }
+}
+
+void SensorList::pushDelaySensor(void)
+{
+  // Dependency list
+  pushPacketSensor();
+
+  // Example dependency check
+  if (depDelaySensor == NULL)
+  {
+    DelaySensor * newSensor = new DelaySensor(depPacketSensor);
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depDelaySensor = newSensor;
+  }
+}
+
+void SensorList::pushMinDelaySensor(void)
+{
+  // Dependency list
+  pushDelaySensor();
+
+  std::auto_ptr<Sensor> current(new MinDelaySensor(depDelaySensor));
+  pushSensor(current);
+}
+
+void SensorList::pushMaxDelaySensor(void)
+{
+  // Dependency list
+  pushDelaySensor();
+
+  std::auto_ptr<Sensor> current(new MaxDelaySensor(depDelaySensor));
+  pushSensor(current);
+}
+
+void SensorList::pushThroughputSensor(void)
+{
+  // Dependency list
+  pushPacketSensor();
+
+  // Example dependency check
+  if (depThroughputSensor == NULL)
+  {
+    ThroughputSensor * newSensor = new ThroughputSensor(depPacketSensor);
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depThroughputSensor = newSensor;
   }
 }

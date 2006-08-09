@@ -46,6 +46,14 @@ static void logPrefix(int flags)
   {
     fprintf(logFile, "SENSOR ");
   }
+  if (flags & CONNECTION_MODEL)
+  {
+    fprintf(logFile, "CONNECTION_MODEL ");
+  }
+  if (flags & ROBUST)
+  {
+    fprintf(logFile, "ROBUST ");
+  }
   if (logTimestamp)
   {
     struct timeval now;

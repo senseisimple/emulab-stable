@@ -6,6 +6,7 @@
 #include "Connection.h"
 #include "ConnectionModel.h"
 #include "TrafficModel.h"
+#include "CircularTraffic.h"
 
 using namespace std;
 
@@ -30,6 +31,8 @@ void NewConnectionCommand::runConnect(Connection *,
 void TrafficModelCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
+  std::auto_ptr<TrafficModel> model(new CircularTraffic());
+  conn->setTraffic(model);
 }
 
 //-----------------------

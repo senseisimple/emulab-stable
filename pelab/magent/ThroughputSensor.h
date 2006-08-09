@@ -1,0 +1,26 @@
+// ThroughputSensor.h
+
+// For every ack, this calculates the
+
+#ifndef THROUGHPUT_SENSOR_H_STUB_2
+#define THROUGHPUT_SENSOR_H_STUB_2
+
+#include "Sensor.h"
+
+class PacketSensor;
+
+class ThroughputSensor : public Sensor
+{
+public:
+  ThroughputSensor(PacketSensor * newPacketHistory);
+  int getThroughputInKbps(void) const;
+protected:
+  virtual void localSend(PacketInfo * packet);
+  virtual void localAck(PacketInfo * packet);
+private:
+  int throughputInKbps;
+  Time lastAckTime;
+  PacketSensor * packetHistory;
+};
+
+#endif

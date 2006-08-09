@@ -12,38 +12,13 @@
 class Sensor
 {
 public:
-  virtual ~Sensor() {}
-  Sensor * getTail(void)
-  {
-    if (next.get() == NULL)
-    {
-      return this;
-    }
-    else
-    {
-      return next->getTail();
-    }
-  }
-  void addNode(std::auto_ptr<Sensor> node)
-  {
-    next = node;
-  }
-  void captureSend(PacketInfo * packet)
-  {
-    localSend(packet);
-    if (next.get() != NULL)
-    {
-      next->captureSend(packet);
-    }
-  }
-  void captureAck(PacketInfo * packet)
-  {
-    localAck(packet);
-    if (next.get() != NULL)
-    {
-      next->captureAck(packet);
-    }
-  }
+  bool isLinkSaturated(PacketInfo * packet);
+public:
+  virtual ~Sensor();
+  Sensor * getTail(void);
+  void addNode(std::auto_ptr<Sensor> node);
+  void captureSend(PacketInfo * packet);
+  void captureAck(PacketInfo * packet);
 private:
   std::auto_ptr<Sensor> next;
 protected:
@@ -54,16 +29,10 @@ protected:
 class NullSensor : public Sensor
 {
 public:
-  virtual ~NullSensor() {}
+  virtual ~NullSensor();
 protected:
-  virtual void localSend(PacketInfo *)
-  {
-    logWrite(SENSOR, "Send received");
-  }
-  virtual void localAck(PacketInfo *)
-  {
-    logWrite(SENSOR, "Ack received");
-  }
+  virtual void localSend(PacketInfo *);
+  virtual void localAck(PacketInfo *);
 };
 
 #endif

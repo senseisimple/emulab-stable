@@ -34,35 +34,58 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <sstream>
 
 #include "Time.h"
 
+// Enum of header types -- to-monitor (Events, etc.)
 enum
 {
-  NAGLES_ALGORITHM,
-  SEND_BUFFER,
-  RECEIVE_BUFFER
+  EVENT_FORWARD_PATH = 0,
+  EVENT_BACKWARD_PATH
+};
+
+// Enum of header types -- from-monitor (Commands)
+enum
+{
+  NEW_CONNECTION_COMMAND = 0,
+  TRAFFIC_MODEL_COMMAND,
+  CONNECTION_MODEL_COMMAND,
+  SENSOR_COMMAND,
+  CONNECT_COMMAND,
+  TRAFFIC_WRITE_COMMAND,
+  DELETE_CONNECTION_COMMAND
+};
+
+// This is used for the type field in a SensorCommand
+enum SensorType
+{
+  NULL_SENSOR = 0,
+  PACKET_SENSOR,
+  DELAY_SENSOR,
+  MIN_DELAY_SENSOR,
+  MAX_DELAY_SENSOR,
+  THROUGHPUT_SENSOR
+};
+
+// This is used for the type field in the ConnectionModelCommand.
+enum
+{
+  CONNECTION_SEND_BUFFER_SIZE = 0,
+  CONNECTION_RECEIVE_BUFFER_SIZE,
+  CONNECTION_MAX_SEGMENT_SIZE,
+  CONNECTION_USE_NAGLES
 };
 
 enum
-{
-  EVENT_TO_MONITOR = 0
-};
-
-enum TransportProtocol
 {
   TCP_CONNECTION = 0,
   UDP_CONNECTION = 1
 };
 
-enum SensorType
-{
-  NULL_SENSOR
-};
-
 struct Order
 {
-  TransportProtocol transport;
+  unsigned char transport;
   unsigned int ip;
   unsigned short localPort;
   unsigned short remotePort;
@@ -116,6 +139,25 @@ struct WriteResult
   Time nextWrite;
 };
 
+struct IpHeader
+{
+  unsigned char ip_vhl;         /* header length, version */
+#define IP_V(ip)        (((ip)->ip_vhl & 0xf0) >> 4)
+#define IP_HL(ip)       ((ip)->ip_vhl & 0x0f)
+  unsigned char ip_tos;         /* type of service */
+  unsigned short ip_len;         /* total length */
+  unsigned short ip_id;          /* identification */
+  unsigned short ip_off;         /* fragment offset field */
+#define IP_DF 0x4000                    /* dont fragment flag */
+#define IP_MF 0x2000                    /* more fragments flag */
+#define IP_OFFMASK 0x1fff               /* mask for fragmenting bits */
+  unsigned char ip_ttl;         /* time to live */
+  unsigned char ip_p;           /* protocol */
+  unsigned short ip_sum;         /* checksum */
+  struct in_addr ip_src;
+  struct in_addr ip_dst;  /* source and dest address */
+};
+
 struct PacketInfo
 {
   Time packetTime;
@@ -125,20 +167,6 @@ struct PacketInfo
   struct tcphdr const * tcp;
   Order elab;
   bool bufferFull;
-};
-
-enum
-{
-  FORWARD_EDGE = 0,
-  BACKWARD_EDGE
-};
-
-enum
-{
-  CONNECTION_SEND_BUFFER_SIZE = 0,
-  CONNECTION_RECEIVE_BUFFER_SIZE,
-  CONNECTION_MAX_SEGMENT_SIZE,
-  CONNECTION_USE_NAGLES
 };
 
 enum

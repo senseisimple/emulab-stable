@@ -42,9 +42,11 @@ enum LOG_TYPE
   EXCEPTION        = 0x02,
   PEER_CYCLE       = 0x04,
   SENSOR           = 0x08,
+  CONNECTION_MODEL = 0x10,
+  ROBUST           = 0x20,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x00,
-  LOG_EVERYTHING   = 0x0f
+  LOG_EVERYTHING   = 0x3f
 };
 
 #endif

@@ -22,6 +22,7 @@ protected:
   virtual void runConnect(Connection * conn,
                           std::multimap<Time, Connection *> & schedule)=0;
 
+public:
   // We use a key here and look up the connection only on a run()
   // because some commands delete a connection and we don't want later
   // commands to keep the reference around.
@@ -49,6 +50,7 @@ class ConnectionModelCommand : public Command
 protected:
   virtual void runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &);
+public:
   int type;
   int value;
 };
@@ -60,7 +62,7 @@ protected:
                           std::multimap<Time, Connection *> &);
 public:
   int type;
-  std::vector<char> parameters;
+//  std::vector<char> parameters;
 };
 
 class ConnectCommand : public Command

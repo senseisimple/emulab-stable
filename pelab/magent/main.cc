@@ -57,6 +57,7 @@ void processArgs(int argc, char * argv[])
   global::connectionModelArg = CONNECTION_MODEL_NULL;
   global::peerServerPort = 3491;
   global::monitorServerPort = 4200;
+  global::interface = "vnet";
 }
 
 void init(void)

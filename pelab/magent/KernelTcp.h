@@ -5,7 +5,6 @@
 
 #include "ConnectionModel.h"
 
-
 enum ConnectionState
 {
   DISCONNECTED,
@@ -38,10 +37,6 @@ public:
   static void addNewPeer(fd_set * readable);
   static void readFromPeers(fd_set * readable);
   static void packetCapture(fd_set * readable);
-
-private:
-  static bool changeSocket(int sockfd, int level, int optname, int value,
-                           std::string optstring)
 };
 
 #endif

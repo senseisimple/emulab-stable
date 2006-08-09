@@ -3,8 +3,27 @@
 #include "lib.h"
 #include "log.h"
 #include "KernelTcp.h"
+#include "Command.h"
 
 using namespace std;
+
+namespace
+{
+  bool changeSocket(int sockfd, int level, int optname, int value,
+                    string optstring);
+  void kernelTcpCallback(unsigned char *,
+                         struct pcap_pkthdr const * pcapInfo,
+                         unsigned char const * packet);
+  int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
+                   unsigned char const * packet);
+  void handleTcp(struct pcap_pkthdr const * pcapInfo,
+                 IpHeader const * ipPacket,
+                 struct tcphdr const * tcpPacket);
+  void handleKernel(Connection * conn, struct tcp_info * kernel);
+}
+
+pcap_t * KernelTcp::pcapDescriptor = NULL;
+int KernelTcp::pcapfd = -1;
 
 KernelTcp::KernelTcp()
   : state(DISCONNECTED)
@@ -27,11 +46,13 @@ KernelTcp::~KernelTcp()
 auto_ptr<ConnectionModel> KernelTcp::clone(void)
 {
   auto_ptr<KernelTcp> result(new KernelTcp());
-  result.sendBufferSize = sendBufferSize;
-  result.receiveBufferSize = receiveBufferSize;
-  result.maxSegmentSize = maxSegmentSize;
-  result.useNagles = useNagles;
-  return result;
+  result->sendBufferSize = sendBufferSize;
+  result->receiveBufferSize = receiveBufferSize;
+  result->maxSegmentSize = maxSegmentSize;
+  result->useNagles = useNagles;
+  result->state = state;
+  auto_ptr<ConnectionModel> modelResult(result.release());
+  return modelResult;
 }
 
 void KernelTcp::connect(Order & planet)
@@ -47,7 +68,7 @@ void KernelTcp::connect(Order & planet)
 
     // Set up all parameters
     if ((sendBufferSize != 0 && !changeSocket(sockfd, SOL_SOCKET, SO_SNDBUF,
-                                              sendBufferSize,  "SO_SNDBUF"))
+                                              sendBufferSize, "SO_SNDBUF"))
         || (receiveBufferSize != 0 && !changeSocket(sockfd, SOL_SOCKET,
                                                     SO_RCVBUF,
                                                     receiveBufferSize,
@@ -93,7 +114,7 @@ void KernelTcp::connect(Order & planet)
     }
 
     error = fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-    if (error == =1)
+    if (error == -1)
     {
       logWrite(EXCEPTION, "Cannot set fcntl flags (nonblocking) "
                "on a peer socket: %s", strerror(errno));
@@ -120,6 +141,12 @@ void KernelTcp::connect(Order & planet)
 
 void KernelTcp::addParam(ConnectionModelCommand const & param)
 {
+  if (state == CONNECTED)
+  {
+    logWrite(ERROR, "A ConnectionModelCommand was received after connection. "
+             "It will not be applied unless the connection dies and is "
+             "re-established.");
+  }
   switch (param.type)
   {
   case CONNECTION_SEND_BUFFER_SIZE:
@@ -137,28 +164,6 @@ void KernelTcp::addParam(ConnectionModelCommand const & param)
   default:
     logWrite(ERROR, "Invalid ConnectionModelCommand type: %d", param.type);
   }
-}
-
-bool KernelTcp::changeSocket(int sockfd, int optname, int value,
-                             string optstring)
-{
-  int error = setsockopt(sockfd, SOL_SOCKET, optname, &value, sizeof(value));
-  if (error == -1)
-  {
-    logWrite(ERROR, "Cannot set socket option %s", optstring.c_str());
-    return false;
-  }
-  int newValue = 0;
-  int newValueLength = sizeof(newValue);
-  error = getsockopt(sockfd, SOL_SOCKET, optname, &newValue, &newValueLength);
-  if (error == -1)
-  {
-    logWrite(ERROR, "Cannot read back socket option %s", optstring.c_str());
-    return false;
-  }
-  logWrite(CONNECTION_MODEL, "Socket option %s is now %d", optstring.c_str(),
-           newValue);
-  return true;
 }
 
 int KernelTcp::writeMessage(int size, WriteResult & result)
@@ -184,7 +189,7 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
       close(peersock);
       peersock = -1;
       state = DISCONNECTED;
-      result.fullBuffer = false;
+      result.bufferFull = false;
       result.isConnected = false;
       return 0;
     }
@@ -198,7 +203,7 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
       return error;
     }
   }
-  result.fullBuffer = false;
+  result.bufferFull = false;
   result.isConnected = false;
   return -1;
 }
@@ -206,6 +211,11 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
 bool KernelTcp::isConnected(void)
 {
   return state == CONNECTED;
+}
+
+int KernelTcp::getSock(void) const
+{
+  return peersock;
 }
 
 enum { SNIFF_WAIT = 10 };
@@ -232,7 +242,7 @@ void KernelTcp::init(void)
     if (error == -1)
     {
       logWrite(ERROR, "Unable to bind peer accept socket. "
-             "No incoming peer connections will ever be accepted: %s",,
+               "No incoming peer connections will ever be accepted: %s",
                strerror(errno));
       close(sockfd);
     }
@@ -247,7 +257,7 @@ void KernelTcp::init(void)
   global::connectionModelExemplar.reset(new KernelTcp());
 
   // Set up packet capture
-  char errorbuf[PCAP_ERRBUF_SIZE];
+  char errbuf[PCAP_ERRBUF_SIZE];
   struct bpf_program fp;      /* hold compiled program     */
   bpf_u_int32 maskp;          /* subnet mask               */
   bpf_u_int32 netp;           /* ip                        */
@@ -265,23 +275,28 @@ void KernelTcp::init(void)
   {
     logWrite(ERROR, "pcap_open_live() failed: %s", errbuf);
   }
-
   // Lets try and compile the program, optimized
-  else if(pcap_compile(pcapDescriptor, &fp, filter, 1, maskp) == -1)
+  else if(pcap_compile(pcapDescriptor, &fp,
+                       const_cast<char *>(filter.str().c_str()),
+                       1, maskp) == -1)
   {
-    logWrite(ERROR, "pcap_compile() failed");
+    logWrite(ERROR, "pcap_compile() failed: %s", pcap_geterr(pcapDescriptor));
+    pcap_close(pcapDescriptor);
   }
   // set the compiled program as the filter
   else if(pcap_setfilter(pcapDescriptor,&fp) == -1)
   {
-    logWrite(ERROR, "pcap_filter() failed");
+    logWrite(ERROR, "pcap_filter() failed: %s", pcap_geterr(pcapDescriptor));
+    pcap_close(pcapDescriptor);
   }
   else
   {
     pcapfd = pcap_get_selectable_fd(pcapDescriptor);
     if (pcapfd == -1)
     {
-      logWrite(ERROR, "Failed to get a selectable file descriptor for pcap");
+      logWrite(ERROR, "Failed to get a selectable file descriptor "
+               "for pcap: %s", pcap_geterr(pcapDescriptor));
+      pcap_close(pcapDescriptor);
     }
     else
     {
@@ -385,103 +400,102 @@ void KernelTcp::packetCapture(fd_set * readable)
   unsigned char * args = NULL;
   if (FD_ISSET(pcapfd, readable))
   {
-    pcap_dispatch(descr,-1,kernelTcpCallback,args);
+    pcap_dispatch(pcapDescriptor, -1, kernelTcpCallback, args);
   }
 }
 
-struct IpHeader
+namespace
 {
-  unsigned char ip_vhl;         /* header length, version */
-#define IP_V(ip)        (((ip)->ip_vhl & 0xf0) >> 4)
-#define IP_HL(ip)       ((ip)->ip_vhl & 0x0f)
-  unsigned char ip_tos;         /* type of service */
-  unsigned short ip_len;         /* total length */
-  unsigned short ip_id;          /* identification */
-  unsigned short ip_off;         /* fragment offset field */
-#define IP_DF 0x4000                    /* dont fragment flag */
-#define IP_MF 0x2000                    /* more fragments flag */
-#define IP_OFFMASK 0x1fff               /* mask for fragmenting bits */
-  unsigned char ip_ttl;         /* time to live */
-  unsigned char ip_p;           /* protocol */
-  unsigned short ip_sum;         /* checksum */
-  struct in_addr ip_src;
-  struct in_addr ip_dst;  /* source and dest address */
-};
-
-
-void kernelTcpCallback(unsigned char *,
-                       struct pcap_pkthdr const * pcapInfo,
-                       unsigned char const * packet)
-{
-  int packetType = getLinkLayer(pcapInfo, packet);
-  if (type == ETHERTYPE_IP)
+  bool changeSocket(int sockfd, int level, int optname, int value,
+                    string optstring)
   {
+    int error = setsockopt(sockfd, SOL_SOCKET, optname, &value, sizeof(value));
+    if (error == -1)
+    {
+      logWrite(ERROR, "Cannot set socket option %s", optstring.c_str());
+      return false;
+    }
+    int newValue = 0;
+    socklen_t newValueLength = sizeof(newValue);
+    error = getsockopt(sockfd, level, optname, &newValue,
+                       &newValueLength);
+    if (error == -1)
+    {
+      logWrite(ERROR, "Cannot read back socket option %s", optstring.c_str());
+    return false;
+    }
+    logWrite(CONNECTION_MODEL, "Socket option %s is now %d", optstring.c_str(),
+             newValue);
+    return true;
+  }
+
+  void kernelTcpCallback(unsigned char *,
+                         struct pcap_pkthdr const * pcapInfo,
+                         unsigned char const * packet)
+  {
+    int packetType = getLinkLayer(pcapInfo, packet);
+    if (packetType == -1)
+    {
+      // Error message already printed in getLinkLayer();
+      return;
+    }
+    if (packetType != ETHERTYPE_IP)
+    {
+      logWrite(ERROR, "Unknown link layer type: %d", packetType);
+      return;
+    }
     IpHeader const * ipPacket;
     struct tcphdr const * tcpPacket;
-    int bytesRemaining = pcapInfo->caplen - sizeof(struct ether_header);
+    size_t bytesRemaining = pcapInfo->caplen - sizeof(struct ether_header);
 
     ipPacket = reinterpret_cast<IpHeader const *>
       (packet + sizeof(struct ether_header));
-    if (bytesRemaining >= sizeof(IpHeader))
-    {
-      int ipLength = ipPacket->ip_len;
-      int ipHeaderLength = IP_HL(ipPacket);
-      int version = IP_V(ipPacket);
-      if (version == 4)
-      {
-        if (ipHeaderLength >= 5)
-        {
-          if (ipHeader->ip_p == IPPROTO_TCP)
-          {
-            // ipHeaderLength is multiplied by 4 because it is a
-            // length in 4-byte words.
-            tcpPacket = reinterpret_cast<struct tcphdr const *>
-              (packet + sizeof(struct ether_header)
-               + ipHeaderLength*4);
-            bytesRemaining -= ipHeaderLength*4;
-            if (bytesRemaining >= sizeof(struct tcphdr))
-            {
-              handleTcp(pcapInfo, ipPacket, tcpPacket);
-            }
-            else
-            {
-              logWrite(ERROR, "A captured packet was to short to contain "
-                       "a TCP header");
-            }
-          }
-          else
-          {
-            logWrite(ERROR, "A non TCP packet was captured");
-          }
-        }
-        else
-        {
-          logWrite(ERROR, "Bad IP header length: %d", ipHeaderLength);
-        }
-      }
-      else
-      {
-        logWrite(ERROR, "A non IPv4 packet was captured");
-      }
-    }
-    else
+    if (bytesRemaining < sizeof(IpHeader))
     {
       logWrite(ERROR, "A captured packet was too short to contain an "
                "IP header");
+      return;
     }
+    // ipHeaderLength and version are in a one byte field so
+    // endian-ness doesn't matter.
+    int ipHeaderLength = IP_HL(ipPacket);
+    int version = IP_V(ipPacket);
+    if (version != 4)
+    {
+      logWrite(ERROR, "A non IPv4 packet was captured");
+      return;
+    }
+    if (ipHeaderLength < 5)
+    {
+      logWrite(ERROR, "Bad IP header length: %d", ipHeaderLength);
+      return;
+    }
+    if (ipPacket->ip_p != IPPROTO_TCP)
+    {
+      logWrite(ERROR, "A non TCP packet was captured");
+      return;
+    }
+    // ipHeaderLength is multiplied by 4 because it is a
+    // length in 4-byte words.
+    tcpPacket = reinterpret_cast<struct tcphdr const *>
+      (packet + sizeof(struct ether_header)
+       + ipHeaderLength*4);
+    bytesRemaining -= ipHeaderLength*4;
+    if (bytesRemaining < sizeof(struct tcphdr))
+    {
+      logWrite(ERROR, "A captured packet was to short to contain "
+               "a TCP header");
+      return;
+    }
+    handleTcp(pcapInfo, ipPacket, tcpPacket);
   }
-  else if (type != -1)
-  {
-    logWrite(ERROR, "Unknown link layer type: %d", packetType);
-  }
-}
 
-int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
-                 unsigned char const * packet)
-{
+  int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
+                   unsigned char const * packet)
+  {
     unsigned int caplen = pcapInfo->caplen;
 
-    if (caplen < ETHER_HDRLEN)
+    if (caplen < sizeof(struct ether_header))
     {
       logWrite(ERROR, "A captured packet was too short to contain "
                "an ethernet header");
@@ -492,94 +506,96 @@ int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
       struct ether_header * etherPacket = (struct ether_header *) packet;
       return ntohs(etherPacket->ether_type);
     }
-}
-
-void handleTcp(struct pcap_pkthdr const * pcapInfo,
-               IpHeader const * ipPacket,
-               struct tcphdr const * tcpPacket)
-{
-  struct tcp_info kernelInfo;
-  bool isAck;
-  if (tcpPacket->ack & 0x0001)
-  {
-    isAck = true;
   }
-  else
-  {
-    isAck = false;
-  }
-  PacketInfo packet;
-  packet.packetTime = Time(pcapInfo->ts);
-  packet.packetLength = pcapInfo->len;
-  packet.kernel = &kernelInfo;
-  packet.ip = ipPacket;
-  packet.tcp = tcpPacket;
 
-  Order key;
-  // Assume that this is an outgoing packet.
-  key.transport = TCP_CONNECTION;
-  key.ip = ntohl(ipPacket->ip_dest);
-  key.localPort = ntohs(tcpPacket->source);
-  key.remotePort = ntohs(tcpPacket->dest);
-
-  map<Order, Connection *>::iterator pos;
-  pos = global::planetMap.find(key);
-  if (pos != global::planetMap.end())
+  void handleTcp(struct pcap_pkthdr const * pcapInfo,
+                 IpHeader const * ipPacket,
+                 struct tcphdr const * tcpPacket)
   {
-    // This is an outgoing packet.
-    if (!isAck)
+    struct tcp_info kernelInfo;
+    bool isAck;
+    if (tcpPacket->ack & 0x0001)
     {
-      // We only care about sent packets, not acked packets.
-      handleKernel(pos->second, &kernelInfo);
-      pos->second->captureSend(&packet);
+      isAck = true;
     }
-  }
-  else
-  {
-    // Assume that this is an incoming packet.
-    key.transport = TCP_CONNECTION;
-    key.ip = ntohl(ipPacket->ip_source);
-    key.localPort = ntohs(tcpPacket->dest);
-    key.remotePort = ntohs(tcpPacket->source);
+    else
+    {
+      isAck = false;
+    }
+    PacketInfo packet;
+    packet.packetTime = Time(pcapInfo->ts);
+    packet.packetLength = pcapInfo->len;
+    packet.kernel = &kernelInfo;
+    packet.ip = ipPacket;
+    packet.tcp = tcpPacket;
 
+    Order key;
+    // Assume that this is an outgoing packet.
+    key.transport = TCP_CONNECTION;
+    key.ip = ntohl(ipPacket->ip_dst.s_addr);
+    key.localPort = ntohs(tcpPacket->source);
+    key.remotePort = ntohs(tcpPacket->dest);
+
+    map<Order, Connection *>::iterator pos;
     pos = global::planetMap.find(key);
     if (pos != global::planetMap.end())
     {
-      // This is an incoming packet.
-      if (isAck)
+      // This is an outgoing packet.
+      if (!isAck)
       {
-        // We only care about ack packets, not sent packets.
+        // We only care about sent packets, not acked packets.
         handleKernel(pos->second, &kernelInfo);
-        pos->second->captureAck(&packet);
+        pos->second->captureSend(&packet);
+      }
+    }
+    else
+    {
+      // Assume that this is an incoming packet.
+      key.transport = TCP_CONNECTION;
+      key.ip = ntohl(ipPacket->ip_src.s_addr);
+      key.localPort = ntohs(tcpPacket->dest);
+      key.remotePort = ntohs(tcpPacket->source);
+
+      pos = global::planetMap.find(key);
+      if (pos != global::planetMap.end())
+      {
+        // This is an incoming packet.
+        if (isAck)
+        {
+          // We only care about ack packets, not sent packets.
+          handleKernel(pos->second, &kernelInfo);
+          pos->second->captureAck(&packet);
+        }
       }
     }
   }
-}
 
-void handleKernel(Connection * conn, struct tcp_info * kernel)
-{
-  // This is a filthy filthy hack. Basically, I need the fd in order
-  // to introspect the kernel for it. But I don't want that part of
-  // the main interface because we don't even know that a random
-  // connection model *has* a unique fd.
-  ConnectionModel const * genericModel = conn->getConnectionModel();
-  KernelTcp const * model = dynamic_cast<KernelTcp const *>(genericModel);
-  if (model != NULL)
+  void handleKernel(Connection * conn, struct tcp_info * kernel)
   {
-    int infoSize = sizeof(tcp_info);
-    int error = 0;
-    error = getsockopt(model->getSock(), SOL_TCP, TCP_INFO, kernel, infoSize);
-    if (error == -1)
+    // This is a filthy filthy hack. Basically, I need the fd in order
+    // to introspect the kernel for it. But I don't want that part of
+    // the main interface because we don't even know that a random
+    // connection model *has* a unique fd.
+    ConnectionModel const * genericModel = conn->getConnectionModel();
+    KernelTcp const * model = dynamic_cast<KernelTcp const *>(genericModel);
+    if (model != NULL)
     {
-      logWrite(ERROR, "Failed to get the kernel TCP info: %s",
-               strerror(errno));
+      socklen_t infoSize = sizeof(tcp_info);
+      int error = 0;
+      error = getsockopt(model->getSock(), SOL_TCP, TCP_INFO, kernel,
+                         &infoSize);
+      if (error == -1)
+      {
+        logWrite(ERROR, "Failed to get the kernel TCP info: %s",
+                 strerror(errno));
+      }
     }
-  }
-  else
-  {
-    logWrite(ERROR, "handleKernel() called for KernelTcp, but the "
-             "ConnectionModel on the actual connection wasn't of type "
-             "KernelTcp. This inconsistency will lead to "
-             "undefined/uninitialized behaviour"
+    else
+    {
+      logWrite(ERROR, "handleKernel() called for KernelTcp, but the "
+               "ConnectionModel on the actual connection wasn't of type "
+               "KernelTcp. This inconsistency will lead to "
+               "undefined/uninitialized behaviour");
+    }
   }
 }

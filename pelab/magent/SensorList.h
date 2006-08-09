@@ -17,6 +17,11 @@ class Sensor;
 class SensorCommand;
 
 class NullSensor;
+class PacketSensor;
+class DelaySensor;
+class MinDelaySensor;
+class MaxDelaySensor;
+class ThroughputSensor;
 
 class SensorList
 {
@@ -34,11 +39,19 @@ private:
   void reset(void);
   void pushSensor(std::auto_ptr<Sensor> newSensor);
   // Functions for creating sensors and pushing them onto the list.
-  void pushNullSensor(SensorCommand const & command);
+  void pushNullSensor(void);
+  void pushPacketSensor(void);
+  void pushDelaySensor(void);
+  void pushMinDelaySensor(void);
+  void pushMaxDelaySensor(void);
+  void pushThroughputSensor(void);
 private:
   // Example dependency
   NullSensor * depNullSensor;
   // Dependency pointers.
+  PacketSensor * depPacketSensor;
+  DelaySensor * depDelaySensor;
+  ThroughputSensor * depThroughputSensor;
 };
 
 #endif

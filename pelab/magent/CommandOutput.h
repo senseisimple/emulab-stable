@@ -8,6 +8,9 @@
 #ifndef COMMAND_OUTPUT_H_STUB_2
 #define COMMAND_OUTPUT_H_STUB_2
 
+#include "log.h"
+#include "saveload.h"
+
 class CommandOutput
 {
 public:
@@ -15,28 +18,38 @@ public:
   {
     SENDING_MESSAGE = 0,
     DISCARDING_MESSAGE
-  }
+  };
+  enum PathDirection
+  {
+    FORWARD_PATH,
+    BACKWARD_PATH
+  };
 public:
   virtual ~CommandOutput() {}
   void eventMessage(std::string const & message, Order const & key,
-                    char direction)
+                    PathDirection dir=FORWARD_PATH)
   {
     if (message.size() <= 0xffff && message.size() > 0)
     {
       Header prefix;
-      prefix.type = EVENT_TO_MONITOR;
+      if (dir == FORWARD_PATH)
+      {
+        prefix.type = EVENT_FORWARD_PATH;
+      }
+      else
+      {
+        prefix.type = EVENT_BACKWARD_PATH;
+      }
       prefix.size = message.size();
       prefix.key = key;
       char headerBuffer[Header::headerSize];
       saveHeader(headerBuffer, prefix);
-      int result = startMessage(Header::headerSize + sizeof(direction)
-                                + message.size());
+      int result = startMessage(Header::headerSize + message.size());
       if (result == SENDING_MESSAGE)
       {
         writeMessage(headerBuffer, Header::headerSize);
-        writeMessage(&direction, sizeof(direction));
         writeMessage(message.c_str(), message.size());
-        finishMessage();
+        endMessage();
       }
     }
     else
