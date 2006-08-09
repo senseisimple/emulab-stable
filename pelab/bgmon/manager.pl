@@ -1,9 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -W
 
 use Getopt::Std;
 use strict;
 use IO::Socket::INET;
 use IO::Select;
+use libwanetmon;
 
 # A node from each site to take part in the measurements
 my @expnodes;
@@ -12,7 +13,7 @@ my %deadnodes;
 
 sub usage 
 {
-    warn "Usage: $0 <input_file> [-p port] [-e pid/eid] [-l latency period] [-b bandwidth period] [-a]\n";
+    warn "Usage: $0 <input_file> [-p port] [-e pid/eid] [-l latency period] [-b bandwidth period] [-a] [-o outputport]\n";
     return 1;
 }
 
@@ -35,11 +36,11 @@ my %DEF_PER = (
 my %settings;  #misc options
 $settings{"allpairs"} = 0;  #if 0 interprets input nodes as pairs
 $settings{"expt"} = "__none";
-my @expnodes;
+
 #*****************************************
 
 my %opt = ();
-getopts("s:p:h:e:l:b:a", \%opt);
+getopts("s:p:o:h:e:l:b:a", \%opt);
 
 if ($opt{h}) { exit &usage; }
 if ($opt{e}) { $settings{"expt"} = $opt{e}; }
@@ -70,16 +71,25 @@ while( <FILE> ){
 }
 close FILE;
 
-my ($port);
-if ($opt{p}) { $port = $opt{p}; } else{ $port = 5060; }
-
+my ($port, $lport);
+if ($opt{p}) { $port = $opt{p}; } else{ $port = 5052; }
+if ($opt{o}) { $lport = $opt{o}; } else{ $lport = 5052; }
+print "using remote port $port and local port $lport\n";
+print "experiment $settings{expt}\n";
 my $socket;
+
+setcmdport($port);
+setexpid($settings{expt});
+
 
 #MAIN
 #TODO: Control Loop
-my $cmd;
+my $cmd = "";
 while( $cmd ne "q" )
 {
+
+    %deadnodes = ();
+    
     $cmd = <STDIN>;
     chomp $cmd;
 
@@ -231,77 +241,12 @@ sub initnode($$$$)
 		);
 
     sendcmd($node,\%cmd);
-=pod    
-    $socket = IO::Socket::INET->new( PeerPort => $port,
-				     Proto    => 'udp',
-				     PeerAddr => $node );
-#    my $sercmd = Storable::freeze \%cmd ;
-    my $sercmd = serialize_hash( \%cmd );
-    $socket->send($sercmd);
-=cut
 
     print "sent initnode to $node\n";
     print "destnodes = $destnodes\n";
     print "testper = $testper\n";
     print "testtype = $testtype\n";
 }
-
-sub stopnode($)
-{
-    my ($node) = @_;
-    my %cmd = ( expid    => $settings{expt},
-		cmdtype  => "STOPALL" );
-    sendcmd($node,\%cmd);
-}
-
-sub sendcmd($$)
-{
-    my $node = $_[0];
-    my $hashref = $_[1];
-    my %cmd = %$hashref;
-
-    my $sercmd = serialize_hash( \%cmd );
-    my $f_success = 0;
-    my $max_tries = 5;
-    do{
-	$socket = IO::Socket::INET->new( PeerPort => $port,
-					 Proto    => 'tcp',
-					 PeerAddr => $node,
-					 Timeout  => 1);
-	if( defined $socket ){
-	    $sel->add($socket);
-	    print $socket "$sercmd\n";
-	    #todo: wait for ack;
-	    # timeout period?
-	    $sel->add($socket);
-	    my ($ready) = $sel->can_read(1);
-	    if( $ready eq $socket ){
-		my $ack = <$ready>;
-		chomp $ack;
-		if( $ack eq "ACK" ){
-		    $f_success = 1;
-		    print "Got ACK from $node for command\n";
-		    close $socket;
-		}else{
-		    $max_tries--;
-		}
-	    }else{
-		$max_tries--;
-	    }
-	    $sel->remove($socket);
-	    close($socket);
-	}else{
-	    select(undef, undef, undef, 0.2);
-	    $max_tries--;
-	}
-    }while( $f_success != 1 && $max_tries != 0 );
-
-    if( $f_success == 0 && $max_tries == 0 ){
-	$deadnodes{$node} = 1;
-    }
-}
-
-
 
 sub updatenodes
 {
@@ -338,24 +283,4 @@ sub outputErrors()
     }
     print "\n";
 }
-
-
-#
-# Custom sub to turn a hash into a string. Hashes must not contain
-# the substring of $separator anywhere!!!
-#
-sub serialize_hash($)
-{
-    my ($hashref) = @_;
-    my %hash = %$hashref;
-    my $separator = "::";
-    my $out = "";
-
-    for my $key (keys %hash){
-	$out .= $separator if( $out ne "" );
-	$out .= $key.$separator.$hash{$key};
-    }
-    return $out;
-}
-
 
