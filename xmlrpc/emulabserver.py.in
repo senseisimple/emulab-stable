@@ -3124,6 +3124,9 @@ class experiment:
                                   output="No such experiment!")
         result  = {}
         result["dbname"] = res[0][1];
+        if result["dbname"] == None:
+            result["dbname"] = ""
+            pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=result, output=str(result))
     pass
