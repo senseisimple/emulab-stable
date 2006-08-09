@@ -8,7 +8,7 @@ ARGS=$*
 # Start up our own measurement agent
 #
 echo $SH ${MAGENT_DIR}/run-magent.sh $ARGS
-$SH ${MAGENT_DIR}/run-magent.sh $ARGS &
+$SH ${MAGENT_DIR}/run-magent.sh $ARGS 
 MAGENTPID=$!
 # Kill the agent if we get killed - TODO: harsher kill?
 trap "$AS_ROOT kill $MAGENTPID; $AS_ROOT killall $MAGENT" EXIT
