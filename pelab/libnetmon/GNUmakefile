@@ -1,7 +1,7 @@
 SYSTEM :=	$(shell uname -s)
 
 # I like using -pedantic, but it gives us some trouble with function pointers
-CFLAGS=-Wall -Werror
+CFLAGS=-Wall -Werror -std=c99
 
 ifeq ($(SYSTEM),Linux)
     LD_FLAGS=-ldl
