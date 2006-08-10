@@ -23,10 +23,18 @@ my $pprefix = "planet-";
 use lib '/usr/testbed/lib';
 use libtbdb;
 use Socket;
+use Getopt::Std;
 
+#
+# Every source host has a list of <dest-IP,bw,delay,plr> tuples, one
+# element per possible destination
+#
+my %shapeinfo;
+
+my $optlist  = "n";
 my $showonly = 0;
 
-# default values
+# Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10000;	# Kbits/sec
 my $DEF_DEL = 0;	# ms
 my $DEF_PLR = 0.0;	# prob.
@@ -34,6 +42,23 @@ my $DEF_PLR = 0.0;	# prob.
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"n"})) {
+    $showonly = 1;
+}
+if (@ARGV != 2) {
+    print STDERR "usage: init-elabnodes pid eid\n";
+    exit(1);
+}
+my ($pid,$eid) = @ARGV;
 
 # Get DB password and connect.
 my $DBPWD   = `cat $PWDFILE`;
@@ -45,18 +70,6 @@ else{
 }
 TBDBConnect($DBNAME, $DBUSER, $DBPWD) == 0
     or die("Could not connect to pelab database!\n");
-
-#
-# Every source host has a list of <dest-IP,bw,delay,plr> tuples, one
-# element per possible destination
-#
-my %shapeinfo;
-
-if (@ARGV != 2) {
-    print STDERR "usage: init-elabnodes pid eid\n";
-    exit(1);
-}
-my ($pid,$eid) = @ARGV;
 
 #
 # XXX figure out how many pairs there are, and for each, who the
@@ -197,6 +210,8 @@ sub get_plabinfo($)
 		if (!defined($plr));
 	    $bw = $DEF_BW
 		if ($bw == 0);	# undef or zero--zero BW is not very useful
+
+	    $del = int($del / 2);
 	}
 
 	print "elab-$srcix -> elab-$dstix: ".
