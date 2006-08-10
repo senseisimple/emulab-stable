@@ -6,6 +6,9 @@
 #
 include("defs.php3");
 include_once("template_defs.php");
+require("Sajax.php");
+sajax_init();
+sajax_export("GraphShow");
 
 #
 # Only known and logged in users ...
@@ -40,11 +43,6 @@ if (!TBvalid_integer($exptidx)) {
 }
 
 #
-# Standard Testbed Header after argument checking.
-#
-PAGEHEADER("Template Instance");
-
-#
 # Check to make sure this is a valid template and user has permission.
 #
 $template = Template::Lookup($guid, $version);
@@ -62,6 +60,31 @@ if (!$instance) {
               "template $guid/$version!", 1);
 }
 
+#
+# For the Sajax Interface
+#
+function GraphShow($which, $arg0, $arg1)
+{
+    global $template, $instance;
+
+    ob_start();
+    $instance->ShowGraphArea($which, -1, $arg0, $arg1);
+    $html = ob_get_contents();
+    ob_end_clean();
+    return $html;
+}
+
+#
+# See if this request is to the above function. Does not return
+# if it is. Otherwise return and continue on.
+#
+sajax_handle_client_request();
+
+#
+# Standard Testbed Header after argument checking.
+#
+PAGEHEADER("Template Instance");
+
 echo "<font size=+2>Template Instance <b>" .
          MakeLink("template",
 		  "guid=$guid&version=$version", "$guid/$version") . 
@@ -69,6 +92,18 @@ echo "<font size=+2>Template Instance <b>" .
 echo "<br><br>\n";
 
 $instance->Show(1);
+
+echo "<script type='text/javascript' language='javascript'>\n";
+sajax_show_javascript();
+echo "</script>\n";
+
+#
+# Throw up graph stuff.
+#
+echo "<center>\n";
+echo "<br>";
+$instance->ShowGraphArea("pps");
+echo "</center>\n";
 
 #
 # Standard Testbed Footer

@@ -1160,9 +1160,15 @@ class TemplateInstance
 
 	if (!isset($stop))
 	    $stop = "&nbsp";
+
+	echo "<center>\n";
+	echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
+	     " cellpadding=0 cellspacing=0>\n";
+	echo "<tr valign=top>";
+	echo "<td class=stealth align=center>\n";
 	
 	echo "<center>
-               <h3>Experiment Run</h3>
+               <h3>Details</h3>
              </center>\n";
 
 	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
@@ -1194,14 +1200,17 @@ class TemplateInstance
               </tr>\n";
 	}
 	echo "</table>\n";
+	echo "</td>\n";
 
 	$query_result =
 	    DBQueryFatal("select * from experiment_run_bindings ".
 			 "where exptidx='$exptidx' and runidx='$runidx'");
 
 	if (mysql_num_rows($query_result)) {
+	    echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
+	    echo "<td align=center class=stealth>\n";
 	    echo "<center>
-                   <h3>Experiment Run Bindings</h3>
+                   <h3>Bindings</h3>
                   </center> 
                   <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -1223,7 +1232,10 @@ class TemplateInstance
                       </tr>\n";
 	    }
 	    echo "</table>\n";
+	    echo "</td>\n";
 	}
+	echo "</tr>\n";
+	echo "</table>\n";
     }
 
     #
@@ -1268,6 +1280,117 @@ class TemplateInstance
 	    $bindings[$name] = $value;
 	}
 	return 0;
+    }
+    #
+    # Show graph stuff, either for entire instance or for a run. Very hacky.
+    #
+    function ShowGraph($graphtype = "pps",
+		       $runidx = -1, $src = "all", $dst = "all" ) {
+	$exptidx = $this->exptidx();
+	$runarg  = ($runidx >= 0 ? "&runidx=$runidx" : "");
+	$srcarg  = "";
+	$dstarg  = "";
+	# Make the link unique to force reload on the client side.
+	$now     = time();
+	$pid     = $this->pid();
+	$eid     = $this->eid();
+
+	#
+	# Lets check args!
+	#
+	if (! preg_match("/^[\w]*$/", $graphtype) ||
+	    ! preg_match("/^[-\d]*$/", $runidx) ||
+	    ! preg_match("/^[-\w\/]*$/", $src) ||
+	    ! preg_match("/^[-\w\/]*$/", $dst)) {
+	    return "";
+	}
+
+	# Pass along the src/dst args to the graphing page.
+	if ($src != "" && $src != "all")
+	    $srcarg = "&srcvnode=$src";
+	if ($dst != "" && $dst != "all")
+	    $dstarg = "&dstvnode=$dst";
+
+	#
+	# Grab a list of vnode names so that user can select a specific
+	# source and destination.
+	#
+	$query_result =
+	    DBQueryFatal("select vname,vnode from virt_lans ".
+			 "where pid='$pid' and eid='$eid' and trace_db!=0");
+	
+	$html  = "";
+	$html .= "<div style='display: block; overflow: auto; ".
+	         "     position: relative; height: 450px; ".
+	         "     width: 90%; border: 2px solid black;'>\n";
+
+	$html .= " <div id='loading'><br>";
+	$html .= "  <center>\n";
+	$html .= "   <img id='busy' src='busy.gif'><span> Working ...</span>";
+	$html .= "  </center>\n";
+	$html .= " </div>\n";
+	
+	$html .= "  <img border=0 ";
+	$html .= "       onLoad=\"ClearLoadingIndicators('');\" ";
+	$html .= "       src='linkgraph_image.php?exptidx=$exptidx";
+	$html .= "&graphtype=$graphtype&now=${now}${runarg}";
+	$html .= "${srcarg}${dstarg}'>\n";
+	$html .= "</div>\n";
+
+	$html .= "<button name=pps type=button value=1";
+	$html .= " onclick=\"GraphChange('pps');\">";
+	$html .= "Packets</button>\n";
+	$html .= "<button name=bps type=button value=1";
+	$html .= " onclick=\"GraphChange('bps');\">";
+	$html .= "Bytes</button>\n";
+	
+	$html .= "&nbsp &nbsp &nbsp &nbsp ";
+	$html .= "<select id=trace_srcvnode>";
+	$html .= " <option value='all'>Source &nbsp</option>\n";
+	$html .= " <option value='all'>All &nbsp</option>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $vname = $row["vname"];
+	    $vnode = $row["vnode"];
+	    $selected = "";
+
+	    if ($src == "$vname/$vnode")
+		$selected = "selected";
+	    
+	    $html .= " <option $selected value='$vname/$vnode'>";
+	    $html .= "$vname-$vnode </option>\n";
+	}
+	$html .= "</select>";
+
+	mysql_data_seek($query_result, 0);
+	
+	$html .= "&nbsp ";
+	$html .= "<select id=trace_dstvnode>";
+	$html .= " <option value='all'>Destination &nbsp</option>\n";
+	$html .= " <option value='all'>All &nbsp</option>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $vname = $row["vname"];
+	    $vnode = $row["vnode"];
+	    $selected = "";
+
+	    if ($dst == "$vname/$vnode")
+		$selected = "selected";
+	    
+	    $html .= " <option $selected value='$vname/$vnode'>";
+	    $html .= "$vname-$vnode </option>\n";
+	}
+	$html .= "</select>";
+	
+	echo $html;
+	return 0;
+    }
+    
+    function ShowGraphArea($graphtype = "pps",
+			   $runidx = -1, $src = "all", $dst = "all") {
+	echo "<div align=center width=\"100%\" id=\"grapharea\">\n";
+	$this->ShowGraph($graphtype, $runidx, $src, $dst);
+	echo "</div>\n";
     }
 }
 

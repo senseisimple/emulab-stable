@@ -555,10 +555,55 @@ sub SaveGraph($$)
 
 sub GraphDB(@)
 {
-    my ($dbname, $which, $filename) = @_;
-
     usage()
-	if (@_ < 2 || @_ > 3);
+	if (@_ < 2);
+
+    my $dbname   = shift(@_);
+    my $which    = shift(@_);
+    my $filename;
+    my $start;
+    my $stop;
+    my $srcip;
+    my $dstip;
+
+    # Parse the rest of the options.
+    while (@_) {
+	my $arg = shift(@_);
+
+	if ($arg eq "-f") {
+	    usage()
+		if (@_ == 0);
+	    $filename = shift(@_);
+	}
+	elsif ($arg eq "-r") {
+	    usage()
+		if (@_ == 0);
+
+	    $arg = shift(@_);
+	    if ($arg =~ /^(\d*):(\d*)$/) {
+		$start = $1;
+		if ($2) {
+		    $stop = $2;
+		}
+	    }
+	    else {
+		usage();
+	    }
+	}
+	elsif ($arg eq "-s") {
+	    usage()
+		if (@_ == 0);
+	    $srcip = shift(@_);
+	}
+	elsif ($arg eq "-t") {
+	    usage()
+		if (@_ == 0);
+	    $dstip = shift(@_);
+	}
+	else {
+	    usage();
+	}
+    }
 
     my $exists = DBExists($dbname);
     return -1
@@ -614,11 +659,49 @@ sub GraphDB(@)
 
     if ($which eq "pps" || $which eq "bps") {
 	my $query_result;
+	my $timeclause;
+	my $ipclause;
+	my $whereclause = "";
+
+	if (defined($start) && defined($stop)) {
+	    $timeclause = "(timestamp >= FROM_UNIXTIME('$start') and ".
+		"timestamp <= FROM_UNIXTIME('$stop')) ";
+	}
+	elsif (defined($start)) {
+	    $timeclause = "(timestamp >= FROM_UNIXTIME('$start')) ";
+	}
+	elsif (defined($stop)) {
+	    $timeclause = "(timestamp <= FROM_UNIXTIME('$stop')) ";
+	}
+
+	if (defined($srcip) && defined($dstip)) {
+	    $ipclause = "(ip_src=INET_ATON('$srcip') ".
+		"and ip_dst=INET_ATON('$dstip'))";
+	}
+	elsif (defined($srcip)) {
+	    $ipclause = "(ip_src=INET_ATON('$srcip'))";
+	}
+	elsif (defined($dstip)) {
+	    $ipclause = "(ip_dst=INET_ATON('$dstip'))";
+	}
+
+	if (defined($timeclause) && defined($ipclause)) {
+	    $whereclause = "where $timeclause and $ipclause ";
+	}
+	elsif (defined($timeclause)) {
+	    $whereclause = "where $timeclause ";
+	}
+	elsif (defined($ipclause)) {
+	    $whereclause = "where $ipclause ";
+	}
 
 	if ($which eq "pps") {
 	    $query_result =
 		DBQueryFatal("select UNIX_TIMESTAMP(timestamp),count(*) ".
-			     "  from event ".
+			     "  from event as e ".
+			     "left join iphdr as i on ".
+			     "     i.sid=e.sid and i.cid=e.cid ".
+			     $whereclause . " " .
 			     "group by timestamp order by timestamp");
 	}
 	else {
@@ -627,8 +710,12 @@ sub GraphDB(@)
 			     "  from event as e ".
 			     "left join iphdr as i on ".
 			     "  i.sid=e.sid and i.cid=e.cid ".
+			     $whereclause . " " .
 			     "group by timestamp order by timestamp");
 	}
+	return 0
+	    if (! $query_result->numrows);
+	
 	my ($tstart,$first) = $query_result->fetchrow_array();
 
 	@x_data = (0);

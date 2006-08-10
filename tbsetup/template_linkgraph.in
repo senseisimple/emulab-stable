@@ -7,8 +7,7 @@
 use English;
 use strict;
 use Getopt::Std;
-use POSIX qw(isatty setsid);
-use POSIX qw(strftime);
+use Date::Parse;
 use Errno qw(EDQUOT);
 use Data::Dumper;
 
@@ -46,6 +45,8 @@ my $runidx;
 my $guid;
 my $version;
 my $graphtype;
+my $srclan;
+my $dstlan;
 my $srcvnode;
 my $dstvnode;
 
@@ -165,6 +166,7 @@ if (! keys(%runlist)) {
 
 if ($instance->Instantiated()) {
     my $experiment = Experiment->Lookup($instance->pid(), $instance->eid());
+    my $eid        = $instance->eid();
     
     fatal(-1, "Could not get experiment object from $instance!")
 	if (!defined($experiment));
@@ -173,8 +175,51 @@ if ($instance->Instantiated()) {
 	if (! $experiment->dpdb() || !$experiment->dpdbname());
 
     my $dbname = $experiment->dpdbname();
+    my $optargs = "";
+
+    #
+    # For a specific run, figure out the start and end times of the run
+    # and pass those along as options to the graphing code.
+    #
+    if (defined($runidx)) {
+	my $rowref = $runlist{$runidx};
+	my $start  = $rowref->{"start_time"};
+	my $stop   = $rowref->{"stop_time"};
+
+	if (defined($stop)) {
+	    $optargs = "-r " . str2time($start) . ":" . str2time($stop);
+	}
+	else {
+	    $optargs = "-r " . str2time($start) . ":0";
+	}
+    }
+
+    if (defined($srcvnode)) {
+	my $query_result =
+	    DBQueryFatal("select ip from virt_lans ".
+			 "where vname='$srclan' and vnode='$srcvnode' and ".
+			 "      pid='$pid' and eid='$eid'");
+	if ($query_result->numrows) {
+	    my ($ip) = $query_result->fetchrow_array();
+	    
+	    $optargs .= " -s $ip";
+	}
+    }
     
-    system("$dbcontrol graphdb $dbname $graphtype") == 0 or
+    if (defined($dstvnode)) {
+	my $query_result =
+	    DBQueryFatal("select ip from virt_lans ".
+			 "where vname='$dstlan' and vnode='$dstvnode' and ".
+			 "      pid='$pid' and eid='$eid'");
+	if ($query_result->numrows) {
+	    my ($ip) = $query_result->fetchrow_array();
+	    
+	    $optargs .= " -t $ip";
+	}
+    }
+#    SENDMAIL($TBOPS, "foo", "$dbname $graphtype $optargs");
+    
+    system("$dbcontrol graphdb $dbname $graphtype $optargs") == 0 or
 	fatal(-1, "Failed to generate requested graph!");
 }
 exit(0);
@@ -244,33 +289,26 @@ sub ParseArgs()
 			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 	    tbdie("Improper run index!");
 	}
-	# real check.
-	if ($runidx =~ /^([\w]*)$/) {
-	    $runidx = $1;
-	}
-	else {
-	    tbdie("Bad data in argument: $runidx");
-	}
-    }
-    else {
-	tbdie("You must supply the -r option!");
     }
 
+    # These are really linkname/vnode ... so we can find exact IP addr.
     if (defined($options{"s"})) {
-	$srcvnode = $options{"s"};
+	my $tmp = $options{"s"};
 
-	if ($srcvnode =~ /^([-\w]+)$/) {
-	    $srcvnode = $1;
+	if ($tmp =~ /^([-\w]+)\/([-\w]+)$/) {
+	    $srclan   = $1;
+	    $srcvnode = $2;
 	}
 	else {
 	    tbdie("Bad srcvnode name: $srcvnode!");
 	}
     }
     if (defined($options{"t"})) {
-	$dstvnode = $options{"s"};
+	my $tmp = $options{"t"};
 
-	if ($dstvnode =~ /^([-\w]+)$/) {
-	    $dstvnode = $1;
+	if ($tmp =~ /^([-\w]+)\/([-\w]+)$/) {
+	    $dstlan   = $1;
+	    $dstvnode = $2;
 	}
 	else {
 	    tbdie("Bad dstvnode name: $dstvnode!");

@@ -772,10 +772,12 @@ sub DelTempDB(@)
 #
 sub GraphDB(@)
 {
-    my ($dbname, $which, $filename) = @_;
-
     usage()
-	if (@_ < 2 || @_ > 3);
+	if (@_ < 2);
+
+    my $dbname   = shift(@_);
+    my $which    = shift(@_);
+    my @optargs  = ();
 
     #
     # Untaint args.
@@ -792,22 +794,22 @@ sub GraphDB(@)
     else {
 	die("Bad data in which: $which");
     }
-    # Note different taint check (allow /).
-    if (defined($filename)) {
-	if ($filename =~ /^([-\w\.\/]+)$/) {
-	    $filename = $1;
+
+    # Check the rest of the args with a generic test.
+    foreach my $arg (@_) {
+	# Note different taint check (allow /).
+	if ($arg =~ /^([-\w\.\/\:]+)$/) {
+	    $arg = $1;
 	}
 	else {
-	    tbdie("Bad data in filename: $filename");
+	    tbdie("Bad data in argument: $arg");
 	}
-    }
-    else {
-	$filename = "";
+	push(@optargs, $arg);
     }
 
     print "Graphing DB '$dbname' from mysql database on $CONTROL.\n"
 	if ($debug);
-    my $retval = DoOpsStuff("graphdb $dbname $which $filename");
+    my $retval = DoOpsStuff("graphdb $dbname $which @optargs");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }

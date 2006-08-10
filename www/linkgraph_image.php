@@ -31,12 +31,42 @@ if (!$instance) {
     USERERROR("The instance $exptidx is not a valid instance!", 1);
 }
 
+# Optional runidx for graphing just a specific run.
+$runarg = "";
+$vnodes = "";
+
+if (isset($runidx) && $runidx != "") {
+    if (!TBvalid_integer($runidx)) {
+	PAGEARGERROR("Invalid characters in run index!");
+    }
+    else {
+	$runarg = "-r $runidx";
+    }
+}
+
+# Optional src and dst arguments.
+if (isset($srcvnode) && $srcvnode != "") {
+    if (! preg_match("/^[-\w\/]*$/", $srcvnode)) {
+	PAGEARGERROR("Invalid characters in src vnode!");
+    }
+    else {
+	$vnodes .= " -s " . escapeshellarg($srcvnode);
+    }
+}
+if (isset($dstvnode) && $dstvnode != "") {
+    if (! preg_match("/^[-\w\/]*$/", $dstvnode)) {
+	PAGEARGERROR("Invalid characters in dst vnode!");
+    }
+    else {
+	$vnodes .= " -t " . escapeshellarg($dstvnode);
+    }
+}
+
 #
 # Spit out the image with a content header.
 #
 $eid    = $instance->eid();
 $pid    = $instance->pid();
-$runidx = $instance->runidx();
 $guid   = $instance->guid();
 $vers   = $instance->vers();
 $which  = "pps";
@@ -57,7 +87,7 @@ if (!TBExptGroup($pid, $eid, $gid)) {
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 if ($fp = popen("$TBSUEXEC_PATH $uid $unix_name webtemplate_linkgraph " .
-		"-i $exptidx -r $runidx $guid/$vers $which", "r")) {
+		"-i $exptidx $runarg $vnodes $guid/$vers $which", "r")) {
     header("Content-type: image/gif");
     fpassthru($fp);
 }
