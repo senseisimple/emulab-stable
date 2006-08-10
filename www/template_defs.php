@@ -946,6 +946,17 @@ class TemplateInstance
 	return (is_null($this->instance) ? -1 : $this->template);
     }
 
+    # Is instance actually running (current experiment).
+    function Instantiated() {
+	$exptidx = $this->exptidx();
+
+	$query_result =
+	    DBQueryFatal("select pid,eid from experiments ".
+			 "where idx='$exptidx'");
+	
+	return mysql_num_rows($query_result);
+    }
+
     #
     # Show an instance.
     #
@@ -1293,7 +1304,14 @@ class TemplateInstance
 	# Make the link unique to force reload on the client side.
 	$now     = time();
 	$pid     = $this->pid();
-	$eid     = $this->eid();
+
+	if ($this->Instantiated()) {
+	    $eid = $this->eid();
+	}
+	else {
+	    $template = $this->template();
+	    $eid = $template->eid();
+	}
 
 	#
 	# Lets check args!

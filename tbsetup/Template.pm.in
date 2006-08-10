@@ -2126,6 +2126,29 @@ sub RunList($$)
 }
 
 #
+# Return the last run for an instance, after the instance is gone.
+#
+sub LastRun($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+
+    my $query_result =
+	DBQueryWarn("select * from experiment_runs ".
+		    "where exptidx='$exptidx' order by idx desc limit 1");
+
+    return undef
+	if (!$query_result);
+
+    return $query_result->fetchrow_hashref();
+}
+
+#
 # Binding records for each Run.
 #
 sub NewRunBinding($$$)

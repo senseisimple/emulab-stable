@@ -30,6 +30,7 @@ $instance = TemplateInstance::LookupByExptidx($exptidx);
 if (!$instance) {
     USERERROR("The instance $exptidx is not a valid instance!", 1);
 }
+$template = $instance->template();
 
 # Optional runidx for graphing just a specific run.
 $runarg = "";
@@ -67,6 +68,7 @@ if (isset($dstvnode) && $dstvnode != "") {
 #
 $eid    = $instance->eid();
 $pid    = $instance->pid();
+$gid    = $template->gid();
 $guid   = $instance->guid();
 $vers   = $instance->vers();
 $which  = "pps";
@@ -81,9 +83,6 @@ if (isset($graphtype) && $graphtype != "") {
     $which = $graphtype;
 }
 
-if (!TBExptGroup($pid, $eid, $gid)) {
-    TBERROR("No such experiment $pid/$eid!", 1);
-}     
 TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 if ($fp = popen("$TBSUEXEC_PATH $uid $unix_name webtemplate_linkgraph " .

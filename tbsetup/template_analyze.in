@@ -27,19 +27,20 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_export [-q] [-s] -i <exptidx> <guid/vers>\n".
+	  "Usage: template_analyze [-q] [-s] [-r runidx] -i <exptidx> <guid/vers>\n".
 	  "switches and arguments:\n".
 	  "-q           - be less chatty\n".
 	  "-i <exptidx> - Experiment index to work on\n".
 	  "<guid/vers>  - GUID and version\n");
     exit(-1);
 }
-my $optlist	 = "qi:d";
+my $optlist	 = "qi:dr:";
 my %options      = ();
 my $quiet        = 0;
 my $debug        = 0;
 my $eid;
 my $exptidx;
+my $runidx;
 my $guid;
 my $version;
 
@@ -178,8 +179,8 @@ LogStart(0);
 #
 foreach my $name (keys(%runlist)) {
     my $rowref = $runlist{$name};
-    my $runidx = $rowref->{"idx"};
-    my $dir    = "$checkout/run${runidx}";
+    my $idx    = $rowref->{"idx"};
+    my $dir    = "$checkout/run${idx}";
     my $subdir = "archive/dbdata";
     my $tag    = $rowref->{"archive_tag"};
     my $dbdump = "$dir/dbdump.gz";
@@ -187,6 +188,10 @@ foreach my $name (keys(%runlist)) {
     # This could happen if template is still instantiated (last run).
     next
 	if (!defined($tag) || $tag eq "");
+
+    # A specific run?
+    next
+	if (defined($runidx) && $runidx != $idx);
 	
     system("mkdir -p $dir") == 0
 	or fatal(-1, "Could not mkdir $dir");
@@ -200,7 +205,7 @@ foreach my $name (keys(%runlist)) {
     #
     # Now we need to create a DB on ops to hold the DB dump.
     #
-    my $dbname = "${guid},${version}," . $instance->idx() . ",$runidx";
+    my $dbname = "${guid},${version}," . $instance->idx() . ",$idx";
 
     if (system("$dbcontrol deltempdb $dbname")) {
 	fatal(-1, "$dbcontrol deltempdb failed!");
@@ -265,6 +270,22 @@ sub ParseArgs()
 	tbdie("You must supply the -i option!");
     }
 
+    if (defined($options{"r"})) {
+	$runidx = $options{"r"};
+    
+	if (! TBcheck_dbslot($exptidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper run index!");
+	}
+	# real check.
+	if ($runidx =~ /^([\w]*)$/) {
+	    $runidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runidx");
+	}
+    }
+    
     if (defined($options{"q"})) {
 	$quiet = 1;
     }

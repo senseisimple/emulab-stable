@@ -62,6 +62,7 @@ my $TBBASE	= "@TBBASE@";
 my $CONTROL     = "@USERNODE@";
 my $checkquota  = "$TB/sbin/checkquota";
 my $dbcontrol   = "$TB/sbin/opsdb_control";
+my $tempanalyze = "$TB/bin/template_analyze";
 
 # Locals
 my $dbuid;
@@ -164,9 +165,11 @@ if (! keys(%runlist)) {
     exit(1);
 }
 
+my $dbname;
+my $optargs = "";
+
 if ($instance->Instantiated()) {
     my $experiment = Experiment->Lookup($instance->pid(), $instance->eid());
-    my $eid        = $instance->eid();
     
     fatal(-1, "Could not get experiment object from $instance!")
 	if (!defined($experiment));
@@ -174,54 +177,88 @@ if ($instance->Instantiated()) {
     fatal(-1, "No experiment database in use!")
 	if (! $experiment->dpdb() || !$experiment->dpdbname());
 
-    my $dbname = $experiment->dpdbname();
-    my $optargs = "";
-
-    #
-    # For a specific run, figure out the start and end times of the run
-    # and pass those along as options to the graphing code.
-    #
-    if (defined($runidx)) {
-	my $rowref = $runlist{$runidx};
-	my $start  = $rowref->{"start_time"};
-	my $stop   = $rowref->{"stop_time"};
-
-	if (defined($stop)) {
-	    $optargs = "-r " . str2time($start) . ":" . str2time($stop);
-	}
-	else {
-	    $optargs = "-r " . str2time($start) . ":0";
-	}
-    }
-
-    if (defined($srcvnode)) {
-	my $query_result =
-	    DBQueryFatal("select ip from virt_lans ".
-			 "where vname='$srclan' and vnode='$srcvnode' and ".
-			 "      pid='$pid' and eid='$eid'");
-	if ($query_result->numrows) {
-	    my ($ip) = $query_result->fetchrow_array();
-	    
-	    $optargs .= " -s $ip";
-	}
-    }
-    
-    if (defined($dstvnode)) {
-	my $query_result =
-	    DBQueryFatal("select ip from virt_lans ".
-			 "where vname='$dstlan' and vnode='$dstvnode' and ".
-			 "      pid='$pid' and eid='$eid'");
-	if ($query_result->numrows) {
-	    my ($ip) = $query_result->fetchrow_array();
-	    
-	    $optargs .= " -t $ip";
-	}
-    }
-#    SENDMAIL($TBOPS, "foo", "$dbname $graphtype $optargs");
-    
-    system("$dbcontrol graphdb $dbname $graphtype $optargs") == 0 or
-	fatal(-1, "Failed to generate requested graph!");
+    $dbname = $experiment->dpdbname();
+    $eid    = $instance->eid();
 }
+else {
+    #
+    # We need to use a database from the archive. We do not want to check
+    # this out multiple times, so look to see if a temp DB already exists.
+    #
+    # Note that we just want the last run since that will include the
+    # accumulated data.
+    #
+    my $rowref = $instance->LastRun();
+    fatal(-1, "Could not get last run for instance $instance!")
+	if (! defined($rowref));
+
+    my $idx = $rowref->{'idx'};
+    $dbname = "${guid},${version}," . $instance->idx() . ",$idx";
+    
+    my $query_result =
+	DBQueryFatal("select * from datapository_databases ".
+		     "where dbname='$dbname'");
+    if (! $query_result->numrows) {
+	system("$tempanalyze -i $exptidx -r $idx $guid/$version") == 0 or
+	    fatal(-1, "Could not check out database for run $idx!");
+    }
+
+    #
+    # Since there is no current instance experiment, use the eid from the
+    # template for the lookups below. This is not quite correct though, since
+    # an instance might actually have a different topology or number of nodes, 
+    # or be different in some other manner. Needs more thought.
+    #
+    $eid    = $template->eid();
+}
+
+#
+# For a specific run, figure out the start and end times of the run
+# and pass those along as options to the graphing code.
+#
+if (defined($runidx)) {
+    my $rowref = $runlist{$runidx};
+    my $start  = $rowref->{"start_time"};
+    my $stop   = $rowref->{"stop_time"};
+
+    if (defined($stop)) {
+	$optargs = "-r " . str2time($start) . ":" . str2time($stop);
+    }
+    else {
+	$optargs = "-r " . str2time($start) . ":0";
+    }
+}
+
+# Specific source link/node
+if (defined($srcvnode)) {
+    my $query_result =
+	DBQueryFatal("select ip from virt_lans ".
+		     "where vname='$srclan' and vnode='$srcvnode' and ".
+		     "      pid='$pid' and eid='$eid'");
+    if ($query_result->numrows) {
+	my ($ip) = $query_result->fetchrow_array();
+	
+	$optargs .= " -s $ip";
+    }
+}
+    
+# Specific destination link/node
+if (defined($dstvnode)) {
+    my $query_result =
+	DBQueryFatal("select ip from virt_lans ".
+		     "where vname='$dstlan' and vnode='$dstvnode' and ".
+		     "      pid='$pid' and eid='$eid'");
+    if ($query_result->numrows) {
+	my ($ip) = $query_result->fetchrow_array();
+	
+	$optargs .= " -t $ip";
+    }
+}
+# SENDMAIL($TBOPS, "foo", "$dbname $graphtype $optargs");
+    
+system("$dbcontrol graphdb $dbname $graphtype $optargs") == 0 or
+    fatal(-1, "Failed to generate requested graph!");
+
 exit(0);
 
 #
@@ -288,6 +325,13 @@ sub ParseArgs()
 	if (! TBcheck_dbslot($runidx, "default", "int",
 			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 	    tbdie("Improper run index!");
+	}
+	# real check.
+	if ($runidx =~ /^([\w]*)$/) {
+	    $runidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runidx");
 	}
     }
 
