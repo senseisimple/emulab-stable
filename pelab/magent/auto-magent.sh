@@ -9,9 +9,10 @@ ARGS=$*
 #
 echo $SH ${MAGENT_DIR}/run-magent.sh $ARGS
 $SH ${MAGENT_DIR}/run-magent.sh $ARGS 
-MAGENTPID=$!
 # Kill the agent if we get killed - TODO: harsher kill?
-trap "$AS_ROOT kill $MAGENTPID; $AS_ROOT killall $MAGENT" EXIT
+# Because the magent backgrounds itself, it's harder to figure out
+# what its pid is, just just do a killall
+trap "$AS_ROOT killall $MAGENT" EXIT
 
 #
 # Give it time to come up
