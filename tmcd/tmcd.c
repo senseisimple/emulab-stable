@@ -4704,14 +4704,16 @@ COMMAND_PROTOTYPE(doplabconfig)
 	/*
 	 * Now need the sshdport for this node.
 	 */
-	res = mydb_query("select n.sshdport, ps.admin "
+	res = mydb_query("select n.sshdport, ps.admin, i.IP "
                          " from reserved as r "
                          " left join nodes as n " 
                          "  on n.node_id=r.node_id "
+                         " left join interfaces as i "
+                         "  on n.phys_nodeid=i.node_id "
                          " left join plab_slices as ps "
                          "  on r.pid=ps.pid and r.eid=ps.eid "
-                         " where r.node_id='%s'",
-			 2, reqp->nodeid);
+                         " where i.role='ctrl' and r.node_id='%s'",
+			 3, reqp->nodeid);
 
         /*
          * .. And the elvind port.
@@ -4735,8 +4737,9 @@ COMMAND_PROTOTYPE(doplabconfig)
         /* Add the sshd port (if any) to the output */
         if ((int)mysql_num_rows(res) > 0) {
             row = mysql_fetch_row(res);
-            bufp += OUTPUT(bufp, ebufp-bufp, "SSHDPORT=%d SVCSLICE=%d ", 
-                           atoi(row[0]), atoi(row[1]));
+            bufp += OUTPUT(bufp, ebufp-bufp, 
+                           "SSHDPORT=%d SVCSLICE=%d IPADDR=%s ", 
+                           atoi(row[0]), atoi(row[1]), row[2]);
         }
         mysql_free_result(res);
 
