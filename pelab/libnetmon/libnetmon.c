@@ -15,7 +15,7 @@
  * can continue to run.
  */
 #ifdef USE_VARARGS
-static void croak(char *format, ...) {
+static void croak(const char *format, ...) {
     va_list ap;
     fprintf(stderr,"*** ERROR\n    libnetmon: ");
     vfprintf(stderr,format, ap);
@@ -26,13 +26,13 @@ static void croak(char *format, ...) {
 #define croak0(fmt) croak(fmt)
 #define croak1(fmt,s1) croak(fmt,s1)
 #else
-static void croak0(char *format) {
+static void croak0(const char *format) {
     fprintf(stderr,"*** ERROR\n    libnetmon: ");
     fprintf(stderr,format);
     exit(1);
 }
 
-static void croak1(char *format, void *arg) {
+static void croak1(const char *format, const void *arg) {
     fprintf(stderr,"*** ERROR\n    libnetmon: ");
     fprintf(stderr,format,arg);
     exit(1);
@@ -474,6 +474,22 @@ void fprintID(FILE *f, int fd) {
 }
 
 /*
+ * Print out the current time in standard format
+ */
+void fprintTime(FILE *f) {
+    struct timeval time;
+    /*
+     * XXX - At some point, we may want to use something more precise than
+     * gettimeofday()
+     */
+    if (gettimeofday(&time,NULL)) {
+        croak0("Error in gettimeofday()\n");
+    }
+    fprintf(outstream,"%lu.%08lu",time.tv_sec, time.tv_usec);
+}
+
+
+/*
  * Handle a control message from netmond
  */
 void process_control_packet(generic_m *m) {
@@ -672,6 +688,8 @@ void informConnect(int fd) {
 	 */
 	fprintf(outstream,"New: ");
 	fprintID(outstream,fd);
+	fprintf(outstream," ");
+        fprintTime(outstream);
 	fprintf(outstream,"\n");
 
 	/*
@@ -684,6 +702,8 @@ void informConnect(int fd) {
 
 	fprintf(outstream,"Connected: ");
 	fprintID(outstream,fd);
+	fprintf(outstream," ");
+        fprintTime(outstream);
 	fprintf(outstream,"\n");
     }
 }

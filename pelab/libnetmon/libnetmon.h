@@ -158,6 +158,11 @@ static void stopWatchingAll();
 static void fprintID(FILE *, int);
 
 /*
+ * Print out the current time in standard format
+ */
+void fprintTime(FILE *);
+
+/*
  * Process a packet from the control socket
  */
 static void process_control_packet(generic_m *);
