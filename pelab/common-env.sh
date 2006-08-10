@@ -42,7 +42,10 @@ SH=/bin/sh
 SUDO="${BIN_PATH}/sudo"
 MKDIR="/bin/mkdir"
 CHMOD="/bin/chmod"
+
 SYNC="/usr/local/etc/emulab/emulab-sync"
+SYNCTIMO=120
+
 if [ "$UNAME" == "Linux" ]; then
     GREP="/bin/grep"
 elif [ "$UNAME" == "FreeBSD" ]; then
@@ -192,11 +195,15 @@ barrier_wait()
     if [ "$MASTER" == "1" ]; then
         # I know, this looks backwards. But it's right
         $SYNC -n $BARRIER 
+	_rval=$?
     else
         WAITERS=`expr $PEERS - 1`
-        echo "Waiting for $WAITERS clients"
-        $SYNC -n $BARRIER -i $WAITERS
+        echo "Waiting up to $SYNCTIMO seconds for $WAITERS clients"
+        sync_timeout $SYNCTIMO $SYNC -n $BARRIER -i $WAITERS
+	_rval=$?
     fi
+
+    return $_rval
 }
 
 #
@@ -209,6 +216,43 @@ log_output_background()
     CMD=$2
     $CMD 1> ${LOGDIR}/${PROGNAME}.stdout 2> ${LOGDIR}/${PROGNAME}.stderr &
     echo $!
+}
+
+#
+# If $SYNC command doesn't return within the indicated timeout period,
+# HUP the syncserver to force everyone out of a barrier.
+#
+sync_timeout()
+{
+    TIMO=$1
+    shift
+    CMDSTR=$*
+
+    if [ -r /var/run/syncd.pid ]; then
+        SYNCDPID=`cat /var/run/syncd.pid`
+    else
+        SYNCDPID=""
+    fi
+
+    # fire off the command
+    $CMDSTR & CMDPID=$!
+
+    # and a watchdog
+    if [ -n "$SYNCDPID" ]; then
+        (sleep $TIMO; echo '*** HUPing syncd'; $AS_ROOT kill -HUP $SYNCDPID) & DOGPID=$!
+    fi
+
+    # wait for the command to finish or be terminated
+    wait $CMDPID
+    RVAL=$?
+
+    # nuke the watchdog
+    if [ -n "$SYNCDPID" ]; then
+        kill $DOGPID >/dev/null 2>&1
+    fi
+
+    # and return the result
+    return $RVAL
 }
 
 fi # End of header guard

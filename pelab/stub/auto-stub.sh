@@ -22,13 +22,19 @@ sleep 1
 # Wait for all of the stubs to start
 #
 echo "Waiting for stubs to become ready";
-barrier_wait "stub";
+barrier_wait "stub"; _rval=$?
+if [ $_rval -ne 0 ]; then
+    echo "*** WARNING: not all stubs started ($_rval)"
+fi
 
 #
 # Wait for all the monitors to come up
 #
 echo "Waiting for monitors to become ready";
-barrier_wait "monitor";
+barrier_wait "monitor"; _rval=$?
+if [ $_rval -ne 0 ]; then
+    echo "*** WARNING: not all monitors started ($_rval)"
+fi
 
 echo "Running!";
 

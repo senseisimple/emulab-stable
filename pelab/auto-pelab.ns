@@ -68,6 +68,7 @@ set plabnodes {}
 #   Put the path to your tarball in this variable
 #
 set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+#set pelab_tar "/proj/tbres/mike/pelab-bin.tar.gz"
 
 
 #
@@ -88,7 +89,6 @@ set control_bw "100Mbps"
 #
 # These are the initial conditions for the 'elabc' cloud, the Emulab side of
 # a pelab experiment
-# NOTE: Currently ignored!
 #
 set ecloud_delay "0ms"
 set ecloud_bw "100Mbps"
