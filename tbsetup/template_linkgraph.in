@@ -254,7 +254,7 @@ if (defined($dstvnode)) {
 	$optargs .= " -t $ip";
     }
 }
-# SENDMAIL($TBOPS, "foo", "$dbname $graphtype $optargs");
+#SENDMAIL($TBOPS, "foo", "$dbname $graphtype $optargs");
     
 system("$dbcontrol graphdb $dbname $graphtype $optargs") == 0 or
     fatal(-1, "Failed to generate requested graph!");

@@ -721,9 +721,23 @@ sub GraphDB(@)
 	@x_data = (0);
 	@y_data = ($first);
 
+	my $last = 0;
+
 	while (my ($timestamp, $count) = $query_result->fetchrow_array()) {
-	    push(@x_data, $timestamp - $tstart);
+	    my $now = $timestamp - $tstart;
+
+	    #
+	    # Need to add explicit zero values for gaps.
+	    #
+	    $last++;
+	    while ($last < $now) {
+		push(@x_data, $last);
+		push(@y_data, 0);
+		$last++;
+	    }
+	    push(@x_data, $now);
 	    push(@y_data, $count);
+	    $last = $now;
 	}
     }
     

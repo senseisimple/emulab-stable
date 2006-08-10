@@ -1351,7 +1351,7 @@ class TemplateInstance
 	$html .= "  <img border=0 ";
 	$html .= "       onLoad=\"ClearLoadingIndicators('');\" ";
 	$html .= "       src='linkgraph_image.php?exptidx=$exptidx";
-	$html .= "&graphtype=$graphtype&now=${now}${runarg}";
+	$html .= "&graphtype=$graphtype${runarg}";
 	$html .= "${srcarg}${dstarg}'>\n";
 	$html .= "</div>\n";
 
