@@ -15,7 +15,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT =
     qw ( DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
-	 DBQuoteSpecial TBDBConnect
+	 DBQuoteSpecial TBDBConnect TBDBDisconnect
 	 );
 
 # Must come after package declaration!
@@ -94,6 +94,11 @@ sub TBDBConnect($;$$$)
     $DB->{'dbh'}->{'PrintError'} = 0;
     $Mysql::QUIET = 1;
     return 0;
+}
+
+sub TBDBDisconnect()
+{
+    undef($DB);
 }
 
 sub TBdbfork()
