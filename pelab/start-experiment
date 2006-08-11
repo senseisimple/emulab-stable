@@ -14,7 +14,7 @@ my $realplab = 0;
 my $initelab = 0;
 
 my $UNKNOWN = "<unknown>";
-my $stub_cmd = "/bin/sh /local/pelab/magent/auto-magent.sh";
+my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
 my $stub_cmdargs = $UNKNOWN;
 my $mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
 my $mon_cmdargs = $UNKNOWN;
@@ -26,6 +26,8 @@ sub usage()
     print "Usage: $0 [-C] [ -S command-line ] [ -s command-args ] pid eid\n".
 	  "  -p              monitor real planetlab nodes\n".
 	  "  -i              initialize elab nodes with historic plab data\n". 
+	  "  -N s|m          use new stub (s) or monitor (m)\n".
+	  "  -O s|m          use old stub (s) or monitor (m)\n".
 	  "  -S command-line replace the current stub command arguments\n".
 	  "  -s command-args append args to stub command line\n".
 	  "  -M command-line replace the current monitor command arguments\n".
@@ -33,7 +35,7 @@ sub usage()
 	  "  -C              show current command line(s)\n";
     exit(1);
 }
-my $optlist = "CS:s:M:m:pi";
+my $optlist = "CS:s:M:m:piN:O:";
 
 #
 # Parse command arguments.
@@ -97,6 +99,24 @@ if (defined($options{"i"})) {
     $initelab = 1;
     print "WARNING: -i only makes sense with -p\n"
 	if (!$realplab);
+}
+if (defined($options{"N"})) {
+    if ($options{"N"} eq "s") {
+	$stub_cmd = "/bin/sh /local/pelab/magent/auto-magent.sh";
+    } elsif ($options{"N"} eq "m") {
+	$mon_cmd = "/bin/sh /local/pelab/dbmonitor/auto-dbmonitor.sh";
+    } else {
+	die "Unknown -N type '", $options{"N"}, "'\n";
+    }
+}
+if (defined($options{"O"})) {
+    if ($options{"O"} eq "s") {
+	$stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
+    } elsif ($options{"O"} eq "m") {
+	$mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
+    } else {
+	die "Unknown -O type '", $options{"O"}, "'\n";
+    }
 }
 
 #
