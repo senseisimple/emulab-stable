@@ -83,6 +83,8 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	int			c;
 	struct in_addr		myip;
+        int                     o1, o2, o3, o4;
+        int                     scanres;
 	FILE			*fp;
 
 	progname = argv[0];
@@ -129,28 +131,38 @@ main(int argc, char **argv)
 	 * Get our IP address. Thats how we name this host to the
 	 * event System. 
 	 */
-        /* Try to get it from the control_ipaddr file first. */
-	snprintf(buf, sizeof(buf), "%s", IPADDRFILE);
-	fp = fopen(buf, "r");
-	if (fp != NULL) {
-		fgets(buf, sizeof(buf), fp);
-		(void) fclose(fp);
-                buf[strlen(buf)-1] = '\0';
-                strcpy(ipaddr, buf);
-	} else {
-                /* fall back to looking up the IP via the hostname. */
-                printf("Fetching IP from %s failed, "
-                       "falling back to hostname lookup.\n", IPADDRFILE);
-                if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
-                        fatal("could not get hostname: %s\n", strerror(errno));
-                }
-                if (! (he = gethostbyname(hostname))) {
-                        fatal("could not get IP address from hostname: %s", 
-                              hostname);
-                }
+        if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
+                fatal("could not get hostname: %s\n", strerror(errno));
+        }
+
+        if ((he = gethostbyname(hostname)) != NULL) {
                 memcpy((char *)&myip, he->h_addr, he->h_length);
                 strcpy(ipaddr, inet_ntoa(myip));
+        } else {
+                error("could not get IP address from hostname: %s\n"
+                      "Attempting to get it from local config file...\n", 
+                      hostname);
+                fp = fopen(IPADDRFILE, "r");
+                if (fp != NULL) {
+                        scanres = fscanf(fp, "%3u.%3u.%3u.%3u", 
+                                         &o1, &o2, &o3, &o4);
+                        (void) fclose(fp);
+                        if (scanres != 4) {
+                                fatal("IP address not found on first "
+                                      "line of file!\n");
+                        }
+                        if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+                                fatal("IP address inside file is "
+                                      "invalid!\n");
+                        }
+                        snprintf(ipaddr, sizeof(ipaddr), 
+                                 "%u.%u.%u.%u", o1, o2, o3, o4);
+                } else {
+                        fatal("could not get IP from local file %s either!", 
+                              IPADDRFILE);
+                }
         }
+
         if (debug) {
                 printf("My IP: %s\n", ipaddr);
         }
@@ -198,7 +210,7 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on local server");
 	}
 
-        info("Successfully connected to local.\n");
+        info("Successfully connected to local elvind.\n");
 
 	/*
 	 * Stash the pid away.
@@ -232,7 +244,7 @@ main(int argc, char **argv)
                   "Sleeping for a bit before trying again...\n");
             sleep(10);
           }
-          info("Remote elvind registration complete.");
+          info("Remote elvind registration complete.\n");
           /* Jump into the main event loop. */
           event_main(bosshandle);
           /* 
@@ -263,7 +275,7 @@ int do_remote_register(char *server) {
 	char			buf[BUFSIZ];
 
 	/* Register with the event system on boss */
-	while ((bosshandle = event_register(server, 0)) == NULL) {
+	while ((bosshandle = event_register(server, 0)) == 0) {
 		error("Could not register with remote event system\n"
                       "\tSleeping for a bit, then trying again.\n");
                 sleep(60);

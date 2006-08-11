@@ -34,6 +34,8 @@
 #define TRACE(fmt,...)
 #endif
 
+#define IPADDRFILE "/var/emulab/boot/myip"
+
 static int event_notification_check_hmac(event_handle_t handle,
 					  event_notification_t notification);
 
@@ -132,6 +134,9 @@ event_register_withkeydata_withretry(char *name, int threaded,
     elvin_error_t	status;
     struct hostent     *he;
     struct in_addr	myip;
+    unsigned int        o1, o2, o3, o4;
+    int                 scanres;
+    FILE               *fp;
 
     if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
         ERROR("could not get hostname: %s\n", strerror(errno));
@@ -142,12 +147,31 @@ event_register_withkeydata_withretry(char *name, int threaded,
      * Get our IP address. Thats how we name ourselves to the
      * Testbed Event System. 
      */
-    if (! (he = gethostbyname(hostname))) {
-	ERROR("could not get IP address from hostname: %s\n", hostname);
-	return 0;
+    if ((he = gethostbyname(hostname)) != NULL) {
+        memcpy((char *)&myip, he->h_addr, he->h_length);
+        strcpy(ipaddr, inet_ntoa(myip));
+    } else {
+	ERROR("could not get IP address from hostname: %s\n"
+              "Attempting to get IP from local file.\n", hostname);
+        /* Try getting the node's ID from BOOTDIR/myip before giving up. */
+	fp = fopen(IPADDRFILE, "r");
+	if (fp != NULL) {
+            scanres = fscanf(fp, "%3u.%3u.%3u.%3u", &o1, &o2, &o3, &o4);
+	    (void) fclose(fp);
+            if (scanres != 4) {
+                ERROR("IP address not found on first line of file!\n");
+                return 0;
+            }
+            if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+                ERROR("IP address inside file is invalid!\n");
+                return 0;
+            }
+            snprintf(ipaddr, sizeof(ipaddr), "%u.%u.%u.%u", o1, o2, o3, o4);
+        } else {
+            ERROR("could not get IP from local file %s either!", IPADDRFILE);
+            return 0;
+        }
     }
-    memcpy((char *)&myip, he->h_addr, he->h_length);
-    strcpy(ipaddr, inet_ntoa(myip));
 
     TRACE("registering with event system (hostname=\"%s\")\n", hostname);
 
