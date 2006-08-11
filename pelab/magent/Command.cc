@@ -69,7 +69,7 @@ void ConnectCommand::runConnect(Connection * conn,
 void TrafficWriteCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> & schedule)
 {
-  logWrite(COMMAND_INPUT, "Running TRAFFIC_WRITE_COMMAND");
+//  logWrite(COMMAND_INPUT, "Running TRAFFIC_WRITE_COMMAND");
   conn->addTrafficWrite(*this, schedule);
 }
 

@@ -159,7 +159,11 @@ ConnectionModel const * Connection::getConnectionModel(void)
 
 Time Connection::writeToConnection(Time const & previousTime)
 {
-  WriteResult result = traffic->writeToPeer(peer.get(), previousTime);
+  WriteResult result;
+  result.planet.transport = TCP_CONNECTION;
+  result.planet.ip = elab.ip;
+  result.planet.remotePort = global::peerServerPort;
+  traffic->writeToPeer(peer.get(), previousTime, result);
   if (!isConnected && result.isConnected)
   {
     planet = result.planet;

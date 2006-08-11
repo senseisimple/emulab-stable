@@ -54,26 +54,23 @@ Time CircularTraffic::addWrite(TrafficWriteCommand const & newWrite,
   }
 }
 
-WriteResult CircularTraffic::writeToPeer(ConnectionModel * peer,
-                                         Time const & previousTime)
+void CircularTraffic::writeToPeer(ConnectionModel * peer,
+                                  Time const & previousTime,
+                                  WriteResult & result)
 {
   if (usedCount > 0)
   {
-    WriteResult result;
     current = (current + 1) % usedCount;
     peer->writeMessage(writes[current].size, result);
     result.nextWrite = previousTime + writes[current].delta;
-    return result;
   }
   else
   {
     logWrite(ERROR, "writeToPeer() called without addWrite() being "
              "called first. This should be impossible.");
-    WriteResult result;
     result.isConnected = peer->isConnected();
     result.bufferFull = false;
     result.nextWrite = Time();
-    return result;
   }
 }
 

@@ -76,6 +76,7 @@ void KernelTcp::connect(Order & planet)
         || !changeSocket(sockfd, IPPROTO_TCP, TCP_NODELAY, !useNagles,
                          "TCP_NODELAY"))
     {
+      // Error message already printed
       close(sockfd);
       return;
     }
@@ -85,7 +86,6 @@ void KernelTcp::connect(Order & planet)
     destAddress.sin_family = AF_INET;
     destAddress.sin_port = htons(global::peerServerPort);
     destAddress.sin_addr.s_addr = htonl(planet.ip);
-
     int error = ::connect(sockfd, (struct sockaddr *)&destAddress,
                           sizeof(destAddress));
     if (error == -1)
@@ -134,6 +134,8 @@ void KernelTcp::connect(Order & planet)
     }
     planet.localPort = ntohs(sourceAddress.sin_port);
 
+    logWrite(CONNECTION_MODEL, "Connected to peer at %s:%d",
+             ipToString(htonl(planet.ip)).c_str(), global::peerServerPort);
     peersock = sockfd;
     state = CONNECTED;
   }
@@ -170,6 +172,8 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
 {
   if (state == DISCONNECTED)
   {
+    logWrite(CONNECTION_MODEL,
+             "writeMessage() called while disconnected from peer.");
     connect(result.planet);
   }
   if (state == CONNECTED)
@@ -195,7 +199,10 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
     }
     else if (error == -1)
     {
-      logWrite(EXCEPTION, "Failed write to peer: %s", strerror(errno));
+      if (errno != EWOULDBLOCK)
+      {
+        logWrite(EXCEPTION, "Failed write to peer: %s", strerror(errno));
+      }
       return -1;
     }
     else
@@ -226,6 +233,8 @@ void KernelTcp::init(void)
   global::peerAccept = createServer(global::peerServerPort,
                                     "Peer accept socket (No incoming peer "
                                     "connections will be accepted)");
+  logWrite(PEER_CYCLE, "Created peer server on port %d",
+           global::peerServerPort);
 
   // Set up the connectionModelExemplar
   global::connectionModelExemplar.reset(new KernelTcp());
@@ -316,6 +325,7 @@ void KernelTcp::readFromPeers(fd_set * readable)
                  "Peer connection %d from %s is closing normally.",
                  pos->first, pos->second.c_str());
         close(pos->first);
+        clearDescriptor(pos->first);
         list< pair<int, string> >::iterator temp = pos;
         ++pos;
         global::peers.erase(temp);
@@ -348,7 +358,7 @@ void KernelTcp::packetCapture(fd_set * readable)
   unsigned char * args = NULL;
   if (pcapfd != -1 && FD_ISSET(pcapfd, readable))
   {
-    pcap_dispatch(pcapDescriptor, -1, kernelTcpCallback, args);
+    pcap_dispatch(pcapDescriptor, 1, kernelTcpCallback, args);
   }
 }
 
@@ -370,7 +380,7 @@ namespace
     if (error == -1)
     {
       logWrite(ERROR, "Cannot read back socket option %s", optstring.c_str());
-    return false;
+      return false;
     }
     logWrite(CONNECTION_MODEL, "Socket option %s is now %d", optstring.c_str(),
              newValue);

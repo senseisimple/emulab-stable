@@ -15,8 +15,9 @@ public:
   virtual std::auto_ptr<TrafficModel> clone(void);
   virtual Time addWrite(TrafficWriteCommand const & newWrite,
                         Time const & deadline);
-  virtual WriteResult writeToPeer(ConnectionModel * peer,
-                                  Time const & previousTime);
+  virtual void writeToPeer(ConnectionModel * peer,
+                           Time const & previousTime,
+                           WriteResult & result);
 private:
   int begin;
   int usedCount;

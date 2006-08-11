@@ -165,6 +165,9 @@ void processArgs(int argc, char * argv[])
 
 void init(void)
 {
+  FD_ZERO(&global::readers);
+  global::maxReader = -1;
+
   logInit(stderr, LOG_EVERYTHING, true);
   srandom(getpid());
   switch (global::connectionModelArg)
@@ -180,9 +183,6 @@ void init(void)
       "Terminating program.", global::connectionModelArg);
   }
 
-  FD_ZERO(&global::readers);
-  global::maxReader = -1;
-
   global::input.reset(new DirectInput());
   global::output.reset(new TrivialCommandOutput());
 }
@@ -190,6 +190,8 @@ void init(void)
 void mainLoop(void)
 {
   multimap<Time, Connection *> schedule;
+  fd_set readable;
+  FD_ZERO(&readable);
 
   // Select on file descriptors
   while (true)
@@ -198,7 +200,7 @@ void mainLoop(void)
 //    debugTimeout.tv_sec = 0;
 //    debugTimeout.tv_usec = 100000;
 
-    fd_set readable = global::readers;
+    readable = global::readers;
     Time timeUntilWrite;
     struct timeval * waitPeriod;
     Time now = getCurrentTime();
@@ -214,11 +216,9 @@ void mainLoop(void)
       timeUntilWrite = Time();
       waitPeriod = NULL;
     }
-    logWrite(MAIN_LOOP, "Select");
     int error = select(global::maxReader + 1, &readable, NULL, NULL,
 //                       &debugTimeout);
                        waitPeriod);
-    logWrite(MAIN_LOOP, "After select");
     if (error == -1)
     {
       switch (errno)
@@ -239,25 +239,18 @@ void mainLoop(void)
       }
     }
 
-    logWrite(MAIN_LOOP, "Before command loop");
     global::input->nextCommand(&readable);
     Command * current = global::input->getCommand();
-    while (current != NULL)
+    if (current != NULL)
     {
-      logWrite(MAIN_LOOP, "Command Loop");
       current->run(schedule);
-      global::input->nextCommand(&readable);
-      current = global::input->getCommand();
+//      global::input->nextCommand(&readable);
+//      current = global::input->getCommand();
     }
-//    logWrite(MAIN_LOOP, "Before writeToConnections()");
     writeToConnections(schedule);
-//    logWrite(MAIN_LOOP, "Before addNewPeer()");
     addNewPeer(&readable);
-//    logWrite(MAIN_LOOP, "Before readFromPeers()");
     readFromPeers(&readable);
-//    logWrite(MAIN_LOOP, "Before packetCapture()");
     packetCapture(&readable);
-//    logWrite(MAIN_LOOP, "End of main loop");
   }
 }
 
@@ -403,7 +396,7 @@ int createServer(int port, string const & debugString)
   }
 
   struct sockaddr_in address;
-  address.sin_family = htons(AF_INET);
+  address.sin_family = AF_INET;
   address.sin_port = htons(port);
   address.sin_addr.s_addr = htonl(INADDR_ANY);
   error = bind(fd, reinterpret_cast<struct sockaddr *>(&address),

@@ -13,8 +13,9 @@ public:
   virtual std::auto_ptr<TrafficModel> clone(void)=0;
   virtual Time addWrite(TrafficWriteCommand const & newWrite,
                         Time const & deadline)=0;
-  virtual WriteResult writeToPeer(ConnectionModel * peer,
-                                  Time const & previousTime)=0;
+  virtual void writeToPeer(ConnectionModel * peer,
+                           Time const & previousTime,
+                           WriteResult & result)=0;
 };
 
 class NullTrafficModel : public TrafficModel
@@ -30,14 +31,13 @@ public:
   {
     return Time();
   }
-  virtual WriteResult writeToPeer(ConnectionModel * peer,
-                                  Time const & previousTime)
+  virtual void writeToPeer(ConnectionModel * peer,
+                           Time const & previousTime,
+                           WriteResult & result)
   {
-    WriteResult result;
     result.isConnected = false;
     result.bufferFull = false;
     result.nextWrite = Time();
-    return result;
   }
 };
 
