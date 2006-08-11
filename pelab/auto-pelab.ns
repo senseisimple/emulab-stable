@@ -257,6 +257,7 @@ if {$trace_end_nodes} {
 if {$real_plab} {
     set realinternet [$ns make-lan "$inet_string" 100Mbps 0ms]
     $realinternet trace
+    tb-set-lan-protocol $realinternet ipv4
 }
 
 #
