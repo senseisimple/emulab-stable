@@ -111,14 +111,22 @@ set clientprog "/usr/bin/iperf -t 60 -c "
 #
 set use_magent 0
 
+#
+# If non-zero, uses the DB-based "monitor" to control the cloud shaping
+#
+set use_dbmonitor 0
+
 # End of user-settable options
 ##########
 
-#
-# -DNODE has fixes but is not as heavily tested
-#
-#set delay_os FBSD54-FUTURE
+# XXX should really never use -FUTURE anymore.
 set delay_os FBSD54-DNODE
+#set delay_os FBSD54-FUTURE
+
+
+# XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
+set node_os  PLAB-DEVBOX-UPDATE
+#set node_os  PLAB-DEVBOX
 
 tb-set-delay-os $delay_os
 
@@ -138,6 +146,11 @@ if {$use_magent} {
     set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh"
 } else {
     set stubcommand "/bin/sh /local/pelab/stub/auto-stub.sh"
+}
+if {$use_dbmonitor} {
+    set moncommand "/bin/sh /local/pelab/dbmonitor/auto-dbmonitor.sh"
+} else {
+    set moncommand "/bin/sh /local/pelab/monitor/auto-monitor.sh"
 }
 
 set elan_string ""
@@ -186,7 +199,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
     if {$fake_plab} {
         set plab($i) [$ns node]
-        tb-set-node-os $plab($i) PLAB-DEVBOX
+        tb-set-node-os $plab($i) $node_os
         tb-set-hardware $plab($i) $hwtype
         append plan_string "$plab(${i}) "
         set plabstub($i) [$plab($i) program-agent -command $stubcommand]
@@ -207,10 +220,10 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     }
 
     set elab($i) [$ns node]
-    tb-set-node-os $elab($i) PLAB-DEVBOX
+    tb-set-node-os $elab($i) $node_os
     tb-set-hardware $elab($i) $hwtype
     append elan_string "$elab(${i}) "
-    set monitor($i) [$elab($i) program-agent -command "/bin/sh /local/pelab/monitor/auto-monitor.sh"]
+    set monitor($i) [$elab($i) program-agent -command $moncommand]
     lappend monitorlist $monitor($i)
 
     set server($i) [$elab($i) program-agent -command $serverprog]

@@ -84,6 +84,7 @@ export STUB_DIR="${BASE}/stub/";
 export MAGENT_DIR="${BASE}/magent/";
 export NETMON_DIR="${BASE}/libnetmon/";
 export MONITOR_DIR="${BASE}/monitor/";
+export DBMONITOR_DIR="${BASE}/dbmonitor/";
 export TMPDIR="/var/tmp/";
 export LOGDIR="/local/logs/"
 
@@ -99,6 +100,7 @@ export NETMOND="netmond"
 export STUBD="stubd"
 export MAGENT="magent"
 export MONITOR="monitor.py"
+export DBMONITOR="dbmonitor.pl"
 export GENIPMAP="gen-ip-mapping.pl"
 export NETMON_LIB="libnetmon.so"
 

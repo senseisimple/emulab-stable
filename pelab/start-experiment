@@ -8,6 +8,7 @@ my $LOGHOLE = "/usr/testbed/bin/loghole";
 my $PYTHON = "/usr/local/bin/python";
 my $PERL = "/usr/bin/perl";
 my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
+my $NODELIST = "/usr/testbed/bin/node_list";
 
 my $realplab = 0;
 my $initelab = 0;
@@ -15,7 +16,7 @@ my $initelab = 0;
 my $UNKNOWN = "<unknown>";
 my $stub_cmd = "/bin/sh /local/pelab/magent/auto-magent.sh";
 my $stub_cmdargs = $UNKNOWN;
-my $mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
+my $mon_cmd = "/bin/sh /local/pelab/dbmonitor/auto-dbmonitor.sh";
 my $mon_cmdargs = $UNKNOWN;
 
 sub get_cmdargs($$);
@@ -156,6 +157,15 @@ if (system "$PYTHON resetlinks.py $pid $eid") {
 }
 
 #
+# XXX stash node list for experiment since nodes don't have node_list
+# right now.  This is needed by the dbmonitor if it is in use.
+#
+print "##### Stashing node list for experiment\n";
+if (system "$NODELIST -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list") {
+    warn "Could not create node list for dbmonitor; it will fail if used\n";
+}
+
+#
 # Restart the event system so the 'create' event, necessary for pelab to work,
 # gets fired again
 #
@@ -205,7 +215,7 @@ my $startarg = "";
 print "##### Starting stubs";
 if ($stub_cmdargs ne $UNKNOWN) {
     print " with: '$stub_cmd $stub_cmdargs'";
-    $startarg = "'COMMAND={$stub_cmd $stub_cmdargs}'";
+    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
 }
 print "\n";
 if ($realplab) {
@@ -222,7 +232,7 @@ $startarg = "";
 print "##### Starting monitors\n";
 if ($mon_cmdargs ne $UNKNOWN) {
     print " with: '$mon_cmd $mon_cmdargs'";
-    $startarg = "'COMMAND={$mon_cmd $mon_cmdargs}'";
+    $startarg = "'COMMAND=$mon_cmd $mon_cmdargs'";
 }
 print "\n";
 if (system "$TEVC -e $pid/$eid now monitorgroup start $startarg") {
