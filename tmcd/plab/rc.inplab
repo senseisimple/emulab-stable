@@ -34,6 +34,7 @@ if ($EUID != 0) {
 my $RCDIR	 = "$BINDIR/rc";
 my $PLABCONFIG   = "$BOOTDIR/rc.plab";
 my $SVCFILE      = "$BOOTDIR/svcslice";
+my $IPADDRFILE    = "$BOOTDIR/myip";
 my $TMPLPWDFILE  = "/etc/passwd.tmpl";
 
 #
@@ -240,6 +241,7 @@ sub doplabconfig()
     # plabconfig defaults
     my $sshdport = 0;
     my $svcslice = 0;
+    my $ipaddr = "0.0.0.0";
 
     # parse the config line
     PLCONFPARSE: for ($plabconfig) {
@@ -250,6 +252,10 @@ sub doplabconfig()
         /SVCSLICE=(\d)/ && do {
             $svcslice = $1;
         };
+
+        /IPADDR=([\d\.]+)/ && do {
+            $ipaddr = $1;
+        };
     }
 
     # Create the svcslice file if this is the service sliver.
@@ -259,6 +265,12 @@ sub doplabconfig()
         print SVCFILE "$svcslice\n";
         close(SVCFILE);
     }
+
+    # Create the control_ipaddr file
+    open(IPADDR, ">$IPADDRFILE")
+        or fatal("Could not open $IPADDRFILE: $!");
+    print IPADDR "$ipaddr\n";
+    close(IPADDR);
 
     open(RC, ">$PLABCONFIG")
 	or fatal("Could not open $PLABCONFIG: $!");

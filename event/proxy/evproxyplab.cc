@@ -26,6 +26,8 @@
 #include <string>
 #include <iostream>
 
+#define IPADDRFILE "/var/emulab/boot/myip"
+
 static int debug = 0;
 static event_handle_t localhandle;
 static event_handle_t bosshandle;
@@ -127,14 +129,31 @@ main(int argc, char **argv)
 	 * Get our IP address. Thats how we name this host to the
 	 * event System. 
 	 */
-	if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
-		fatal("could not get hostname: %s\n", strerror(errno));
-	}
-	if (! (he = gethostbyname(hostname))) {
-		fatal("could not get IP address from hostname: %s", hostname);
-	}
-	memcpy((char *)&myip, he->h_addr, he->h_length);
-	strcpy(ipaddr, inet_ntoa(myip));
+        /* Try to get it from the control_ipaddr file first. */
+	snprintf(buf, sizeof(buf), "%s", IPADDRFILE);
+	fp = fopen(buf, "r");
+	if (fp != NULL) {
+		fgets(buf, sizeof(buf), fp);
+		(void) fclose(fp);
+                buf[strlen(buf)-1] = '\0';
+                strcpy(ipaddr, buf);
+	} else {
+                /* fall back to looking up the IP via the hostname. */
+                printf("Fetching IP from %s failed, "
+                       "falling back to hostname lookup.\n", IPADDRFILE);
+                if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
+                        fatal("could not get hostname: %s\n", strerror(errno));
+                }
+                if (! (he = gethostbyname(hostname))) {
+                        fatal("could not get IP address from hostname: %s", 
+                              hostname);
+                }
+                memcpy((char *)&myip, he->h_addr, he->h_length);
+                strcpy(ipaddr, inet_ntoa(myip));
+        }
+        if (debug) {
+                printf("My IP: %s\n", ipaddr);
+        }
 
 	/*
 	 * If server is not specified, then it defaults to EVENTSERVER.
