@@ -13,7 +13,7 @@ my $realplab = 0;
 my $initelab = 0;
 
 my $UNKNOWN = "<unknown>";
-my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
+my $stub_cmd = "/bin/sh /local/pelab/magent/auto-magent.sh";
 my $stub_cmdargs = $UNKNOWN;
 my $mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
 my $mon_cmdargs = $UNKNOWN;

@@ -14,24 +14,39 @@ Connection::Connection()
   : isConnected(false)
   , bufferFull(false)
 {
+  logWrite(CONNECTION, "Connection created");
 }
 
 Connection::Connection(Connection const & right)
-  : peer(right.peer->clone())
-  , traffic(right.traffic->clone())
-  , measurements(right.measurements)
+  : measurements(right.measurements)
   , isConnected(right.isConnected)
   , bufferFull(right.bufferFull)
   , nextWrite(right.nextWrite)
 {
+  logWrite(CONNECTION, "Connection copy constructed");
+  if (right.peer.get() != NULL)
+  {
+    peer = right.peer->clone();
+  }
+  if (right.traffic.get() != NULL)
+  {
+    traffic = right.traffic->clone();
+  }
 }
 
 Connection & Connection::operator=(Connection const & right)
 {
+  logWrite(CONNECTION, "Connection assigned");
   if (this != &right)
   {
-    peer = right.peer->clone();
-    traffic = right.traffic->clone();
+    if (right.peer.get() != NULL)
+    {
+      peer = right.peer->clone();
+    }
+    if (right.traffic.get() != NULL)
+    {
+      traffic = right.traffic->clone();
+    }
     measurements = right.measurements;
     isConnected = right.isConnected;
     bufferFull = right.bufferFull;
@@ -43,17 +58,20 @@ Connection & Connection::operator=(Connection const & right)
 void Connection::reset(Order const & newElab,
                        std::auto_ptr<ConnectionModel> newPeer)
 {
+  logWrite(CONNECTION, "Peer added to connection");
   elab = newElab;
   peer = newPeer;
 }
 
 void Connection::setTraffic(std::auto_ptr<TrafficModel> newTraffic)
 {
+  logWrite(CONNECTION, "Traffic Model added to connection");
   traffic = newTraffic;
 }
 
 void Connection::addConnectionModelParam(ConnectionModelCommand const & param)
 {
+  logWrite(CONNECTION, "Connection Model Parameter added to connection");
   if (peer.get() != NULL)
   {
     peer->addParam(param);
@@ -67,6 +85,7 @@ void Connection::addConnectionModelParam(ConnectionModelCommand const & param)
 
 void Connection::connect(void)
 {
+  logWrite(CONNECTION, "Connection connected");
   if (peer.get() != NULL)
   {
     planet.transport = TCP_CONNECTION;
@@ -108,6 +127,7 @@ void Connection::addTrafficWrite(TrafficWriteCommand const & newWrite,
 
 void Connection::addSensor(SensorCommand const & newSensor)
 {
+  logWrite(CONNECTION, "Sensor added to connection");
   measurements.addSensor(newSensor);
 }
 
@@ -160,6 +180,7 @@ Time Connection::writeToConnection(Time const & previousTime)
 
 void Connection::cleanup(std::multimap<Time, Connection *> & schedule)
 {
+  logWrite(CONNECTION, "Connection cleanup");
   if (isConnected)
   {
     global::planetMap.erase(planet);

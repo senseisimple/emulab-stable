@@ -58,6 +58,14 @@ static void logPrefix(int flags)
   {
     fprintf(logFile, "MAIN_LOOP ");
   }
+  if (flags & COMMAND_INPUT)
+  {
+    fprintf(logFile, "COMMAND_INPUT ");
+  }
+  if (flags & CONNECTION)
+  {
+    fprintf(logFile, "CONNECTION ");
+  }
   if (logTimestamp)
   {
     struct timeval now;

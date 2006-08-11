@@ -181,6 +181,7 @@ namespace global
   extern int connectionModelArg;
   extern unsigned short peerServerPort;
   extern unsigned short monitorServerPort;
+  extern bool doDaemonize;
 
   extern int peerAccept;
   extern std::auto_ptr<ConnectionModel> connectionModelExemplar;
@@ -202,5 +203,7 @@ namespace global
 void setDescriptor(int fd);
 void clearDescriptor(int fd);
 std::string ipToString(unsigned int ip);
-
+int createServer(int port, std::string const & debugString);
+int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
+                 std::string const & debugString);
 #endif

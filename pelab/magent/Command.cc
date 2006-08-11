@@ -12,6 +12,7 @@ using namespace std;
 
 void NewConnectionCommand::run(std::multimap<Time, Connection *> &)
 {
+  logWrite(COMMAND_INPUT, "Running NEW_CONNECTION_COMMAND");
   std::map<Order, Connection>::iterator pos
     = global::connections.find(key);
   if (pos == global::connections.end())
@@ -31,6 +32,7 @@ void NewConnectionCommand::runConnect(Connection *,
 void TrafficModelCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
+  logWrite(COMMAND_INPUT, "Running TRAFFIC_MODEL_COMMAND");
   std::auto_ptr<TrafficModel> model(new CircularTraffic());
   conn->setTraffic(model);
 }
@@ -40,6 +42,7 @@ void TrafficModelCommand::runConnect(Connection * conn,
 void ConnectionModelCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
+  logWrite(COMMAND_INPUT, "Running CONNECTION_MODEL_COMMAND");
   conn->addConnectionModelParam(*this);
 }
 
@@ -48,6 +51,7 @@ void ConnectionModelCommand::runConnect(Connection * conn,
 void SensorCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
+  logWrite(COMMAND_INPUT, "Running SENSOR_COMMAND");
   conn->addSensor(*this);
 }
 
@@ -56,6 +60,7 @@ void SensorCommand::runConnect(Connection * conn,
 void ConnectCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
+  logWrite(COMMAND_INPUT, "Running CONNECT_COMMAND");
   conn->connect();
 }
 
@@ -64,6 +69,7 @@ void ConnectCommand::runConnect(Connection * conn,
 void TrafficWriteCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> & schedule)
 {
+  logWrite(COMMAND_INPUT, "Running TRAFFIC_WRITE_COMMAND");
   conn->addTrafficWrite(*this, schedule);
 }
 
@@ -71,6 +77,7 @@ void TrafficWriteCommand::runConnect(Connection * conn,
 
 void DeleteConnectionCommand::run(std::multimap<Time, Connection *> & schedule)
 {
+  logWrite(COMMAND_INPUT, "Running DELETE_CONNECTION_COMMAND");
   std::map<Order, Connection>::iterator pos
     = global::connections.find(key);
   if (pos != global::connections.end())

@@ -14,12 +14,6 @@ if [ $_rval -ne 0 ]; then
 fi
 
 #
-# Potential race condition here? The monitor cannot connect to the
-# stub, and the problem is flaky -JD
-#
-sleep 1
-
-#
 # Start up our own monitor
 #
 echo $SH ${MONITOR_DIR}/run-monitor-libnetmon.sh $ARGS

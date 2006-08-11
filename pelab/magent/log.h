@@ -38,16 +38,18 @@ void logWrite(int flags, char const * format, ...);
 
 enum LOG_TYPE
 {
-  ERROR            = 0x01,
-  EXCEPTION        = 0x02,
-  PEER_CYCLE       = 0x04,
-  SENSOR           = 0x08,
-  CONNECTION_MODEL = 0x10,
-  ROBUST           = 0x20,
-  MAIN_LOOP        = 0x40,
+  ERROR            = 0x001,
+  EXCEPTION        = 0x002,
+  PEER_CYCLE       = 0x004,
+  SENSOR           = 0x008,
+  CONNECTION_MODEL = 0x010,
+  ROBUST           = 0x020,
+  MAIN_LOOP        = 0x040,
+  COMMAND_INPUT    = 0x080,
+  CONNECTION       = 0x100,
   // Shortcuts for common cases.
-  LOG_NOTHING      = 0x00,
-  LOG_EVERYTHING   = 0x7f
+  LOG_NOTHING      = 0x000,
+  LOG_EVERYTHING   = 0x1ff
 };
 
 #endif

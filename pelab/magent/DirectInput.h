@@ -14,6 +14,7 @@ public:
   virtual void nextCommand(fd_set * readable);
   virtual int getMonitorSocket(void);
   virtual void disconnect(void);
+  int checksum(void);
 private:
   enum MonitorState
   {

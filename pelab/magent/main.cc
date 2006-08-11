@@ -12,6 +12,9 @@
 
 #include "KernelTcp.h"
 
+#include "DirectInput.h"
+#include "TrivialCommandOutput.h"
+
 #include <iostream>
 
 using namespace std;
@@ -21,6 +24,7 @@ namespace global
   int connectionModelArg = 0;
   unsigned short peerServerPort = 0;
   unsigned short monitorServerPort = 0;
+  bool doDaemonize = false;
 
   int peerAccept = -1;
   string interface;
@@ -51,11 +55,14 @@ int main(int argc, char * argv[])
 {
   processArgs(argc, argv);
   init();
-  // Run with no change in directory, and no closing of standard files.
-  int error = daemon(1, 1);
-  if (error == -1)
+  if (global::doDaemonize)
   {
-    logWrite(ERROR, "Daemonization failed: %s", strerror(errno));
+    // Run with no change in directory, and no closing of standard files.
+    int error = daemon(1, 1);
+    if (error == -1)
+    {
+      logWrite(ERROR, "Daemonization failed: %s", strerror(errno));
+    }
   }
   mainLoop();
   return 0;
@@ -67,16 +74,18 @@ void usageMessage(char *progname) {
   cerr << "  --peerserverport=<int> " << endl;
   cerr << "  --monitorserverport=<int> " << endl;
   cerr << "  --interface=<iface> " << endl;
+  cerr << "  --daemonize " << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
 void processArgs(int argc, char * argv[])
 {
   // Defaults, in case the user does not pass us explicit values
-  global::connectionModelArg = CONNECTION_MODEL_NULL;
+  global::connectionModelArg = CONNECTION_MODEL_KERNEL;
   global::peerServerPort = 3491;
   global::monitorServerPort = 4200;
   global::interface = "vnet";
+  global::doDaemonize = false;
 
   static struct option longOptions[] = {
     // If you modify this, make sure to modify the shortOptions string below
@@ -85,11 +94,12 @@ void processArgs(int argc, char * argv[])
     {"peerserverport",    required_argument, NULL, 'p'},
     {"monitorserverport", required_argument, NULL, 'm'},
     {"interface",         required_argument, NULL, 'i'},
+    {"daemonize",         no_argument      , NULL, 'd'},
     // Required so that getopt_long can find the end of the list
     {NULL, 0, NULL, 0}
   };
 
-  string shortOptions = "c:p:m:i:";
+  string shortOptions = "c:p:m:i:d";
 
   // Not used
   int longIndex;
@@ -142,6 +152,9 @@ void processArgs(int argc, char * argv[])
       case 'i':
         global::interface = optArg;
         break;
+      case 'd':
+        global::doDaemonize = true;
+        break;
       case '?':
       default:
         usageMessage(argv[0]);
@@ -170,8 +183,8 @@ void init(void)
   FD_ZERO(&global::readers);
   global::maxReader = -1;
 
-  global::input.reset(new NullCommandInput());
-  global::output.reset(new NullCommandOutput());
+  global::input.reset(new DirectInput());
+  global::output.reset(new TrivialCommandOutput());
 }
 
 void mainLoop(void)
@@ -181,6 +194,10 @@ void mainLoop(void)
   // Select on file descriptors
   while (true)
   {
+//    struct timeval debugTimeout;
+//    debugTimeout.tv_sec = 0;
+//    debugTimeout.tv_usec = 100000;
+
     fd_set readable = global::readers;
     Time timeUntilWrite;
     struct timeval * waitPeriod;
@@ -199,14 +216,16 @@ void mainLoop(void)
     }
     logWrite(MAIN_LOOP, "Select");
     int error = select(global::maxReader + 1, &readable, NULL, NULL,
+//                       &debugTimeout);
                        waitPeriod);
+    logWrite(MAIN_LOOP, "After select");
     if (error == -1)
     {
       switch (errno)
       {
       case EBADF:
       case EINVAL:
-        logWrite(ERROR, "Select failed do to improper inputs. "
+        logWrite(ERROR, "Select failed due to improper inputs. "
                  "Unable to continue: %s", strerror(errno));
         exit(1);
         break;
@@ -220,18 +239,25 @@ void mainLoop(void)
       }
     }
 
+    logWrite(MAIN_LOOP, "Before command loop");
     global::input->nextCommand(&readable);
     Command * current = global::input->getCommand();
     while (current != NULL)
     {
+      logWrite(MAIN_LOOP, "Command Loop");
       current->run(schedule);
       global::input->nextCommand(&readable);
       current = global::input->getCommand();
     }
+//    logWrite(MAIN_LOOP, "Before writeToConnections()");
     writeToConnections(schedule);
+//    logWrite(MAIN_LOOP, "Before addNewPeer()");
     addNewPeer(&readable);
+//    logWrite(MAIN_LOOP, "Before readFromPeers()");
     readFromPeers(&readable);
+//    logWrite(MAIN_LOOP, "Before packetCapture()");
     packetCapture(&readable);
+//    logWrite(MAIN_LOOP, "End of main loop");
   }
 }
 
@@ -317,19 +343,35 @@ void packetCapture(fd_set * readable)
 
 void setDescriptor(int fd)
 {
-  FD_SET(fd, &(global::readers));
-  if (fd > global::maxReader)
+  if (fd > -1 && fd < FD_SETSIZE)
   {
-    global::maxReader = fd;
+    FD_SET(fd, &(global::readers));
+    if (fd > global::maxReader)
+    {
+      global::maxReader = fd;
+    }
+  }
+  else
+  {
+    logWrite(ERROR, "Invalid descriptor sent to setDescriptor: "
+             "%d (FDSET_SIZE=%d)", fd, FD_SETSIZE);
   }
 }
 
 void clearDescriptor(int fd)
 {
-  FD_CLR(fd, &(global::readers));
-  if (fd > global::maxReader)
+  if (fd > -1 && fd < FD_SETSIZE)
   {
-    global::maxReader = fd;
+    FD_CLR(fd, &(global::readers));
+    if (fd > global::maxReader)
+    {
+      global::maxReader = fd;
+    }
+  }
+  else
+  {
+    logWrite(ERROR, "Invalid descriptor sent to clearDescriptor: "
+             "%d (FDSET_SIZE=%d)", fd, FD_SETSIZE);
   }
 }
 
@@ -338,4 +380,118 @@ string ipToString(unsigned int ip)
   struct in_addr address;
   address.s_addr = ip;
   return string(inet_ntoa(address));
+}
+
+int createServer(int port, string const & debugString)
+{
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (fd == -1)
+  {
+    logWrite(ERROR, "socket(): %s: %s", debugString.c_str(), strerror(errno));
+    return -1;
+  }
+
+  int doesReuse = 1;
+  int error = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &doesReuse,
+                         sizeof(doesReuse));
+  if (error == -1)
+  {
+    logWrite(ERROR, "setsockopt(SO_REUSEADDR): %s: %s", debugString.c_str(),
+             strerror(errno));
+    close(fd);
+    return -1;
+  }
+
+  struct sockaddr_in address;
+  address.sin_family = htons(AF_INET);
+  address.sin_port = htons(port);
+  address.sin_addr.s_addr = htonl(INADDR_ANY);
+  error = bind(fd, reinterpret_cast<struct sockaddr *>(&address),
+               sizeof(address));
+  if (error == -1)
+  {
+    logWrite(ERROR, "bind(): %s: %s", debugString.c_str(), strerror(errno));
+    close(fd);
+    return -1;
+  }
+
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags == -1)
+  {
+    logWrite(ERROR, "fcntl(F_GETFL): %s: %s", debugString.c_str(),
+             strerror(errno));
+    close(fd);
+    return -1;
+  }
+
+  error = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+  if (error == -1)
+  {
+    logWrite(ERROR, "fcntl(F_SETFL): %s: %s", debugString.c_str(),
+             strerror(errno));
+    close(fd);
+    return -1;
+  }
+
+  error = listen(fd, 4);
+  if (error == -1)
+  {
+    logWrite(ERROR, "listen(): %s: %s", debugString.c_str(), strerror(errno));
+    close(fd);
+    return -1;
+  }
+
+  setDescriptor(fd);
+  return fd;
+}
+
+int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
+                 string const & debugString)
+{
+  struct sockaddr_in stackAddress;
+  struct sockaddr_in * address;
+  socklen_t addressSize = sizeof(struct sockaddr_in);
+  if (remoteAddress == NULL)
+  {
+    address = &stackAddress;
+  }
+  else
+  {
+    address = remoteAddress;
+  }
+
+  int resultfd = accept(acceptfd,
+                        reinterpret_cast<struct sockaddr *>(address),
+                        &addressSize);
+  if (resultfd == -1)
+  {
+    if (errno != EINTR && errno != EWOULDBLOCK && errno != ECONNABORTED
+        && errno != EPROTO)
+    {
+      logWrite(EXCEPTION, "accept(): %s: %s", debugString.c_str(),
+               strerror(errno));
+    }
+    return -1;
+  }
+
+  int flags = fcntl(resultfd, F_GETFL, 0);
+  if (flags == -1)
+  {
+    logWrite(EXCEPTION, "fcntl(F_GETFL): %s: %s", debugString.c_str(),
+             strerror(errno));
+    close(resultfd);
+    return -1;
+  }
+
+  int error = fcntl(resultfd, F_SETFL, flags | O_NONBLOCK);
+  if (error == -1)
+  {
+    logWrite(EXCEPTION, "fcntl(F_SETFL): %s: %s", debugString.c_str(),
+             strerror(errno));
+    close(resultfd);
+    return -1;
+  }
+
+  setDescriptor(resultfd);
+  return resultfd;
 }

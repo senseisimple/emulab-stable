@@ -222,36 +222,10 @@ enum { SNIFF_WAIT = 10 };
 
 void KernelTcp::init(void)
 {
-  int error = 0;
   // Set up the peerAccept socket
-  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd == -1)
-  {
-    logWrite(ERROR, "Unable to generate a peer accept socket. "
-             "No incoming peer connections will ever be accepted: %s",
-             strerror(errno));
-  }
-  else
-  {
-    struct sockaddr_in address;
-    address.sin_family = AF_INET;
-    address.sin_port = htons(global::peerServerPort);
-    address.sin_addr.s_addr = INADDR_ANY;
-    error = bind(sockfd, reinterpret_cast<struct sockaddr *>(&address),
-                 sizeof(struct sockaddr));
-    if (error == -1)
-    {
-      logWrite(ERROR, "Unable to bind peer accept socket. "
-               "No incoming peer connections will ever be accepted: %s",
-               strerror(errno));
-      close(sockfd);
-    }
-    else
-    {
-      setDescriptor(sockfd);
-      global::peerAccept = sockfd;
-    }
-  }
+  global::peerAccept = createServer(global::peerServerPort,
+                                    "Peer accept socket (No incoming peer "
+                                    "connections will be accepted)");
 
   // Set up the connectionModelExemplar
   global::connectionModelExemplar.reset(new KernelTcp());
@@ -311,43 +285,17 @@ void KernelTcp::addNewPeer(fd_set * readable)
       && FD_ISSET(global::peerAccept, readable))
   {
     struct sockaddr_in remoteAddress;
-    socklen_t addressSize = sizeof(remoteAddress);
-    int fd = accept(global::peerAccept,
-                    reinterpret_cast<struct sockaddr *>(&remoteAddress),
-                    &addressSize);
+    int fd = acceptServer(global::peerAccept, &remoteAddress,
+                          "Peer socket (Incoming peer connection was not "
+                          "accepted)");
     if (fd != -1)
     {
-      // Add the peer.
-      int flags = fcntl(fd, F_GETFL);
-      if (flags != -1)
-      {
-        int error = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-        if (error != -1)
-        {
-          global::peers.push_back(
-            make_pair(fd, ipToString(remoteAddress.sin_addr.s_addr)));
-          setDescriptor(fd);
-          logWrite(PEER_CYCLE,
-                   "Peer connection %d from %s was accepted normally.",
-                   global::peers.back().first,
-                   global::peers.back().second.c_str());
-        }
-        else
-        {
-          logWrite(EXCEPTION, "fctl(F_SETFL) failed: %s", strerror(errno));
-          close(fd);
-        }
-      }
-      else
-      {
-        logWrite(EXCEPTION, "fctl(F_GETFL) failed: %s", strerror(errno));
-        close(fd);
-      }
-    }
-    else
-    {
-      logWrite(EXCEPTION, "accept() called on a peer connection failed: %s",
-               strerror(errno));
+      global::peers.push_back(make_pair(fd, ipToString(
+        remoteAddress.sin_addr.s_addr)));
+      logWrite(PEER_CYCLE,
+               "Peer connection %d from %s was accepted normally.",
+               global::peers.back().first,
+               global::peers.back().second.c_str());
     }
   }
 }
@@ -357,7 +305,7 @@ void KernelTcp::readFromPeers(fd_set * readable)
   list< pair<int, string> >::iterator pos = global::peers.begin();
   while (pos != global::peers.end())
   {
-    if (FD_ISSET(pos->first, readable))
+    if (pos->first != -1 && FD_ISSET(pos->first, readable))
     {
       static const int bufferSize = 8096;
       static char buffer[bufferSize];
@@ -398,7 +346,7 @@ void KernelTcp::readFromPeers(fd_set * readable)
 void KernelTcp::packetCapture(fd_set * readable)
 {
   unsigned char * args = NULL;
-  if (FD_ISSET(pcapfd, readable))
+  if (pcapfd != -1 && FD_ISSET(pcapfd, readable))
   {
     pcap_dispatch(pcapDescriptor, -1, kernelTcpCallback, args);
   }

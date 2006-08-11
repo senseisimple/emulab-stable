@@ -14,15 +14,31 @@ import socket
 import select
 import re
 
-CODE_BANDWIDTH = 1
-CODE_DELAY = 2
-CODE_LOSS = 3
-CODE_LIST_DELAY = 4
-CODE_MAX_DELAY = 5
+EVENT_FORWARD_PATH = 0
+EVENT_BACKWARD_PATH = 1
 
-PACKET_WRITE = 1
-PACKET_SEND_BUFFER = 2
-PACKET_RECEIVE_BUFFER = 3
+NEW_CONNECTION_COMMAND = 0
+TRAFFIC_MODEL_COMMAND = 1
+CONNECTION_MODEL_COMMAND = 2
+SENSOR_COMMAND = 3
+CONNECT_COMMAND = 4
+TRAFFIC_WRITE_COMMAND = 5
+DELETE_CONNECTION_COMMAND = 6
+
+NULL_SENSOR = 0
+PACKET_SENSOR = 1
+DELAY_SENSOR = 2
+MIN_DELAY_SENSOR = 3
+MAX_DELAY_SENSOR = 4
+THROUGHPUT_SENSOR = 5
+
+CONNECTION_SEND_BUFFER_SIZE = 0
+CONNECTION_RECEIVE_BUFFER_SIZE = 1
+CONNECTION_MAX_SEGMENT_SIZE = 2
+CONNECTION_USE_NAGLES = 3
+
+TCP_CONNECTION = 0
+UDP_CONNECTION = 1
 
 emulated_to_real = {}
 real_to_emulated = {}
@@ -35,12 +51,12 @@ netmon_output_version = 2
 
 total_size = 0
 last_total = -1
+prev_time = 0.0
 
 def main_loop():
   global total_size, last_total
   # Initialize
   read_args()
-  quanta = 0.5# in seconds
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
   sys.stdout.write("stub_ip is %s\n" % stub_ip)
@@ -53,31 +69,26 @@ def main_loop():
 
   while not done:
     # Reset
-    packet_list = []
-    max_time = time.time() + quanta
+#    max_time = time.time() + quanta
 
     # Collect data until the next quanta boundary
-    while time.time() < max_time:
-      fdlist = poll.poll(max(max_time - time.time(), 0) * 1000)
-      for pos in fdlist:
-        if pos[0] == sys.stdin.fileno() and not done:
+    fdlist = poll.poll()
+    for pos in fdlist:
+      if pos[0] == sys.stdin.fileno() and (pos[1] & select.POLLIN) != 0 and not done:
           # A line of data from tcpdump is available.
           try:
-#            sys.stdout.write('get_next_packet()\n')
-            packet = get_next_packet()
+            sys.stdout.write('get_next_packet()\n')
+            get_next_packet(conn)
           except EOFError:
-#            sys.stdout.write('Done: Got EOF on stdin\n')
+            sys.stdout.write('Done: Got EOF on stdin\n')
             done = 1
-          if (packet):
-            packet_list = packet_list + [packet]
-        elif pos[0] == conn.fileno() and not done:
-          sys.stdout.write('receive_characteristic()\n')
-          # A record for change in link characteristics is available.
-          done = not receive_characteristic(conn)
-        elif not done:
-          sys.stdout.write('fd: ' + str(pos[0]) + ' conn-fd: ' + str(conn.fileno()) + '\n')
+      elif pos[0] == conn.fileno() and (pos[1] & select.POLLIN) != 0 and not done:
+        sys.stdout.write('receive_characteristic()\n')
+        # A record for change in link characteristics is available.
+        done = not receive_characteristic(conn)
+      elif not done:
+        sys.stdout.write('fd: ' + str(pos[0]) + ' conn-fd: ' + str(conn.fileno()) + '\n')
       # Update the stub
-    send_destinations(conn, packet_list)
     if total_size != last_total:
       sys.stdout.write('Total Size: ' + str(total_size) + '\n')
       last_total = total_size
@@ -106,9 +117,8 @@ def populate_ip_tables():
       emulated_to_interface[fields[0]] = fields[2]
     line = input.readline()
 
-def get_next_packet():
-  global total_size, last_total
-  event_code = PACKET_WRITE
+def get_next_packet(conn):
+  global total_size, last_total, prev_time
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
@@ -118,38 +128,39 @@ def get_next_packet():
   # Could move this elsewhere to avoid re-compiling, but I'd like to keep it
   # with this code for better readability
   if netmon_output_version == 1:
-      linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?')
+    linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?')
   elif netmon_output_version == 2:
-      linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
+    linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
 
   match = linexp.match(line)
-  conexp = re.compile('^(New|Closed|SO_RCVBUF|SO_SNDBUF): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) ((\d+))?')
+  conexp = re.compile('^(New|Connected|Closed|SO_RCVBUF|SO_SNDBUF): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)( ((?:\d+)(?:\.(?:\d+))?))?')
   cmatch = conexp.match(line)
   if match:
-      localport = 0 # We may not get this one
-      if netmon_output_version == 1:
-          time = float(match.group(1))
-          ipaddr = match.group(2)
-          remoteport = int(match.group(3))
-          size_given = match.group(4) != ''
-          size = int(match.group(5))
-      elif (netmon_output_version == 2):
-          time = float(match.group(1))
-          localport = int(match.group(2))
-          ipaddr = match.group(3)
-          remoteport = int(match.group(4))
-          size_given = match.group(5) != ''
-          size = int(match.group(6))
+    localport = 0 # We may not get this one
+    if netmon_output_version == 1:
+      time = float(match.group(1))
+      ipaddr = match.group(2)
+      remoteport = int(match.group(3))
+      size_given = match.group(4) != ''
+      size = int(match.group(5))
+    elif (netmon_output_version == 2):
+      time = float(match.group(1))
+      localport = int(match.group(2))
+      ipaddr = match.group(3)
+      remoteport = int(match.group(4))
+      size_given = match.group(5) != ''
+      size = int(match.group(6))
 
       #sys.stdout.write('dest: ' + ipaddr + ' destport: ' + str(remoteport) +
       #        ' srcport: ' + str(localport) + ' size: ' + str(size) + '\n')
       if not size_given:
-          size = 0
-      total_size = total_size + size
+        size = 0
       if emulated_to_real.has_key(ipaddr):
-        return (ipaddr, localport, remoteport, time, size, event_code)
-      else:
-        return None
+        total_size = total_size + size
+        send_command(conn, TRAFFIC_WRITE_COMMAND, TCP_CONNECTION, ipaddr,
+                     localport, remoteport,
+                     save_int(int((time - prev_time)*1000)) + save_int(size))
+        prev_time = time
   elif ((netmon_output_version == 2) and cmatch):
       #
       # Watch for new or closed connections
@@ -159,62 +170,69 @@ def get_next_packet():
       ipaddr = cmatch.group(3)
       remoteport = int(cmatch.group(4))
       value_given = cmatch.group(5) != ''
-      value = int(cmatch.group(6))
+      value = cmatch.group(6)
       if not value_given:
-        value = 0
+        value = '0'
 
-      sys.stdout.write("Got a connection event: " + event + "\n")
-      if event == 'SO_RCVBUF':
-        event_code = PACKET_RECEIVE_BUFFER
-      elif event == 'SO_SNDBUF':
-        event_code = PACKET_SEND_BUFFER
-        sys.stdout.write('Packet send buffer was set to: ' + str(value) + '\n')
-      else:
-        return None
       if emulated_to_real.has_key(ipaddr):
-        return (ipaddr, localport, remoteport, 0, value, event_code)
+        sys.stdout.write("Got a connection event: " + event + "\n")
+        if event == 'New':
+          send_command(conn, NEW_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
+                      localport, remoteport, '')
+          send_command(conn, TRAFFIC_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
+                       localport, remoteport, '')
+          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
+                       localport, remoteport, save_int(MIN_DELAY_SENSOR))
+        elif event == 'Closed':
+          send_command(conn, DELETE_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
+                      localport, remoteport, '')
+        elif event == 'Connected':
+          send_command(conn, CONNECT_COMMAND, TCP_CONNECTION, ipaddr,
+                      localport, remoteport, '')
+          prev_time = float(value)
+#        elif event == 'LocalPort':
+        elif event == 'SO_RCVBUF':
+          send_command(conn, CONNECTION_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
+                      localport, remoteport,
+                      save_int(CONNECTION_RECEIVE_BUFFER_SIZE)
+                      + save_int(int(value)))
+        elif event == 'SO_SNDBUF':
+          send_command(conn, CONNECTION_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
+                      localport, remoteport,
+                      save_int(CONNECTION_SEND_BUFFER_SIZE)
+                       + save_int(int(value)))
+        else:
+          sys.stdout.write('skipped line with an invalid event: '
+                           + event + '\n')
       else:
-        return None
+        sys.stdout.write('skipped line with an invalid destination: '
+                         + ipaddr + '\n')
   else:
       sys.stdout.write('skipped line in the wrong format: ' + line)
-      return None
     
 def receive_characteristic(conn):
-  buffer = conn.recv(16)
-  if len(buffer) == 16:
-    dest = real_to_emulated[int_to_ip(load_int(buffer[0:4]))]
-    source_port = load_short(buffer[4:6])
-    dest_port = load_short(buffer[6:8])
-    command = load_int(buffer[8:12])
-    value = load_int(buffer[12:16])
-#    sys.stdout.write('received: ' + str(dest) + ' ' + str(source_port) + ' '
-#                     + str(dest_port) + ' ' + str(command) + ' ' + str(value)
-#                     + '\n')
-    if command == CODE_BANDWIDTH:
-      # value is bandwidth in kbps
-      sys.stdout.write('Bandwidth: ' + str(value) + '\n');
-      set_bandwidth(value, dest)
-    elif command == CODE_DELAY:
-      # value is delay in milliseconds
-      sys.stdout.write('Delay: ' + str(value) + '\n');
-      set_delay(value, dest)
-    elif command == CODE_LOSS:
-      # value is packet loss in packets per billion
-      sys.stdout.write('Loss: ' + str(value) + '\n');
-      set_loss(value/1000000000.0, dest)
-    elif command == CODE_LIST_DELAY:
-      # value is the number of samples
-      buffer = conn.recv(value*8)
-      # Dummynet isn't quite set up to deal with this yet, so ignore it.
-      sys.stdout.write('Ignoring delay list of size: ' + str(value) + '\n')
-    elif command == CODE_MAX_DELAY:
-      sys.stdout.write('Max Delay: ' + str(value) + '\n');
-      set_max_delay(value, dest);
-    else:
-      sys.stdout.write('Other: ' + str(command) + ', ' + str(value) + '\n');
-    return True
-  elif len(buffer) == 0:
+  buf = conn.recv(12)
+  if len(buf) != 12:
+    sys.stdout.write('Event header is the wrong size. Length: '
+                     + str(len(buf)) + '\n')
     return False
+  eventType = load_char(buf[0:1]);
+  size = load_short(buf[1:3]);
+  transport = load_char(buf[3:4]);
+  dest = real_to_emulated[int_to_ip(load_int(buf[4:8]))]
+  source_port = load_short(buf[8:10])
+  dest_port = load_short(buf[10:12])
+  buf = conn.recv(size);
+  if len(buf) != size:
+    sys.stdout.write('Event body is the wrong size.\n')
+    return False
+  if (eventType == EVENT_FORWARD_PATH):
+    set_link(this_ip, dest, buf)
+  elif (eventType == EVENT_BACKWARD_PATH):
+    set_link(dest, this_ip, buf)
+  else:
+    sys.stdout.write('Other: ' + str(eventType) + ', ' + str(value) + '\n');
+  return True
 
 def set_bandwidth(kbps, dest):
 #  sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
@@ -255,6 +273,18 @@ def set_link(source, dest, ending):
   sys.stdout.write('event: ' + command + '\n')
   return os.system(command)
 
+def send_command(conn, command_id, protocol, ipaddr, localport, remoteport,
+                 command):
+  output = (save_char(command_id)
+            + save_short(len(command))
+            + save_char(protocol)
+            + save_int(ip_to_int(emulated_to_real[ipaddr]))
+            + save_short(localport)
+            + save_short(remoteport)
+            + command)
+  sys.stdout.write('Sending command: CHECKSUM=' + str(checksum(output)) + '\n')
+  conn.sendall(output)
+
 def send_destinations(conn, packet_list):
 #  sys.stdout.write('<send> total size:' + str(total_size) + ' packet count:' + str(len(packet_list)) + '\n')# + ' -- '
 #                   + str(packet_list) + '\n')
@@ -288,7 +318,13 @@ def load_short(str):
   return load_n(str, 2)
 
 def save_short(number):
-  return save_n(number, 2);
+  return save_n(number, 2)
+
+def load_char(str):
+  return load_n(str, 1)
+
+def save_char(number):
+  return save_n(number, 1)
 
 def load_n(str, n):
   result = 0
@@ -324,5 +360,13 @@ def int_to_ip(num):
     ip_list[3-index] = str(num & 0xff)
     num = num >> 8
   return '.'.join(ip_list)
+
+def checksum(buf):
+  total = 0
+  flip = 1
+  for index in range(len(buf)):
+    total += (ord(buf[index]) & 0xff) * flip
+#    flip *= -1
+  return total
 
 main_loop()

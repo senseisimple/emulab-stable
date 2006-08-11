@@ -51,7 +51,7 @@ TrivialCommandOutput.o: TrivialCommandOutput.cc lib.h log.h saveload.h CommandOu
 log.o: log.cc lib.h log.h
 	g++ -I. -g -Wall -c log.cc
 
-main.o: main.cc lib.h log.h CommandInput.h CommandOutput.h Command.h Time.h Connection.h Sensor.h TrafficModel.h KernelTcp.h saveload.h
+main.o: main.cc lib.h log.h CommandInput.h CommandOutput.h Command.h Time.h Connection.h Sensor.h TrafficModel.h KernelTcp.h saveload.h DirectInput.h TrivialCommandOutput.h
 	g++ -I. -g -Wall -c main.cc
 
 saveload.o: saveload.cc lib.h log.h saveload.h Command.h
