@@ -17,13 +17,13 @@
 
 my $TEVC = "/usr/testbed/bin/tevc";
 my $NLIST = "/usr/testbed/bin/node_list";
-my $pprefix = "planet-";
+#my $pprefix = "planet-";
+my $pprefix = "plab-";
 
 # XXX Need to configure this stuff!
 use lib '/usr/testbed/lib';
 use libtbdb;
 use Socket;
-<<<<<<< init-elabnodes.pl
 use Getopt::Std;
 use Class::Struct;
 use libxmlrpc;
@@ -42,17 +42,12 @@ struct( initvalres => {
     tstampLastSample => '$' } );
 #'################
 
-=======
-use Getopt::Std;
->>>>>>> 1.5
-
 #
 # Every source host has a list of <dest-IP,bw,delay,plr> tuples, one
 # element per possible destination
 #
 my %shapeinfo;
 
-my $optlist  = "n";
 my $showonly = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
@@ -68,8 +63,8 @@ my $DBUSER  = "pelab";
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
-if (! getopts($optlist, \%options)) {
+my %options = ();
+if (! getopts("n", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
@@ -116,12 +111,11 @@ libxmlrpc::Config({"server"  => $RPCSERVER,
 #
 my @nodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
 chomp(@nodelist);
-#TODO: uncomment after testing
-#my $nnodes = grep(/^${pprefix}/, @nodelist);
-#if ($nnodes == 0) {
-#    print STDERR "No planetlab nodes in $pid/$eid?!\n";
-#    exit(1);
-#}
+my $nnodes = grep(/^${pprefix}/, @nodelist);
+if ($nnodes == 0) {
+    print STDERR "No planetlab nodes in $pid/$eid?!\n";
+    exit(1);
+}
 
 # Preload the site indicies rather then doing fancy joins.
 my %site_mapping = ();
@@ -143,6 +137,8 @@ foreach my $mapping (@nodelist) {
 	    die("Could not map $pnode to its site index!\n");
 	}
 	my ($site_index) = $query_result->fetchrow_array();
+	
+	print "Mapping $vnode to $pnode\n";
 
 	$node_mapping{$vnode} = $pnode;
 	$site_mapping{$pnode} = $site_index;
