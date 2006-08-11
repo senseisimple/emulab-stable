@@ -17,8 +17,8 @@
 
 my $TEVC = "/usr/testbed/bin/tevc";
 my $NLIST = "/usr/testbed/bin/node_list";
-#my $pprefix = "planet-";
-my $pprefix = "plab-";
+my $pprefix = "planet-";
+#my $pprefix = "plab-";
 
 # XXX Need to configure this stuff!
 use lib '/usr/testbed/lib';
@@ -111,6 +111,7 @@ libxmlrpc::Config({"server"  => $RPCSERVER,
 #
 my @nodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
 chomp(@nodelist);
+print "NODELIST:\n@nodelist\n";
 my $nnodes = grep(/^${pprefix}/, @nodelist);
 if ($nnodes == 0) {
     print STDERR "No planetlab nodes in $pid/$eid?!\n";
@@ -192,6 +193,7 @@ sub send_events()
     }
 }
 
+
 #
 # Grab data from DB.
 #
@@ -218,11 +220,16 @@ sub get_plabinfo($)
 	     get_pathInitCond( $node_mapping{$srcvnode}, 
 			       $node_mapping{$dstvnode},
 			       24, 0.8 );
-	{ print "\nLATENCY\n";
-	  printInitValResStruct($initvalLat);
-	  print "\nBW\n";
-	  printInitValResStruct($initvalBw);
-	} #if ($showonly);
+	bless $initvalLat, "initvalres";
+#	print "initvalLat=$initvalLat\n";
+	bless $initvalBw, "initvalres";
+#	print "initvalBw=$initvalBw\n";
+=pod
+        print "\nLATENCY\n";
+	printInitValResStruct($initvalLat);
+	print "\nBW\n";
+	printInitValResStruct($initvalBw);
+=cut
 	#TODO: is this print statement wanted here? Should it be conditional
         #      on available path measurements, like in the original?
 	print "elab-$srcix -> elab-$dstix (on behalf of $dst):\n"
@@ -231,6 +238,8 @@ sub get_plabinfo($)
 	my ($del,$plr,$bw) = ($initvalLat->ave_exp,
 			   undef,  #TODO!!! LOSS RATE!!!
 			   $initvalBw->ave_exp);
+
+#	print "INIT COND: ($del,$plr,$bw)\n";
 
 	# handle a path with no available measurements
 	if($initvalLat->numSamples == $initvalLat->numErrValSamples){
@@ -450,7 +459,7 @@ sub get_pathInitCond($$$;$)
     printInitValResStruct($initvalBw);
 =cut
 
-    return [$initvalLat, $initvalBw];
+    return ($initvalLat, $initvalBw);
 }
 
 
