@@ -199,7 +199,11 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
     }
     else if (error == -1)
     {
-      if (errno != EWOULDBLOCK)
+      if (errno == EWOULDBLOCK)
+      {
+        result.bufferFull = true;
+      }
+      else
       {
         logWrite(EXCEPTION, "Failed write to peer: %s", strerror(errno));
       }
@@ -391,6 +395,7 @@ namespace
                          struct pcap_pkthdr const * pcapInfo,
                          unsigned char const * packet)
   {
+    logWrite(PCAP, "Captured a packet");
     int packetType = getLinkLayer(pcapInfo, packet);
     if (packetType == -1)
     {
@@ -470,6 +475,7 @@ namespace
                  IpHeader const * ipPacket,
                  struct tcphdr const * tcpPacket)
   {
+    logWrite(PCAP, "Captured a TCP packet");
     struct tcp_info kernelInfo;
     bool isAck;
     if (tcpPacket->ack & 0x0001)

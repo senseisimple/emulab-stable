@@ -44,6 +44,13 @@ extern char * optarg;
 
 #include "Time.h"
 
+void setDescriptor(int fd);
+void clearDescriptor(int fd);
+std::string ipToString(unsigned int ip);
+int createServer(int port, std::string const & debugString);
+int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
+                 std::string const & debugString);
+
 // Enum of header types -- to-monitor (Events, etc.)
 enum
 {
@@ -125,6 +132,20 @@ struct Order
   {
     return !(*this == right);
   }
+  std::string toString(void)
+  {
+    std::ostringstream buffer;
+    if (transport == TCP_CONNECTION)
+    {
+      buffer << "TCP,";
+    }
+    else
+    {
+      buffer << "UDP,";
+    }
+    buffer << localPort << ":" << ipToString(htonl(ip)) << ":" << remotePort;
+    return buffer.str();
+  }
 };
 
 struct WriteResult
@@ -199,11 +220,4 @@ namespace global
   extern std::auto_ptr<CommandInput> input;
   extern std::auto_ptr<CommandOutput> output;
 }
-
-void setDescriptor(int fd);
-void clearDescriptor(int fd);
-std::string ipToString(unsigned int ip);
-int createServer(int port, std::string const & debugString);
-int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
-                 std::string const & debugString);
 #endif

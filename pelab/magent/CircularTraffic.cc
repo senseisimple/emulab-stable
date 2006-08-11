@@ -63,6 +63,7 @@ void CircularTraffic::writeToPeer(ConnectionModel * peer,
     current = (current + 1) % usedCount;
     peer->writeMessage(writes[current].size, result);
     result.nextWrite = previousTime + writes[current].delta;
+    result.isConnected = peer->isConnected();
   }
   else
   {
@@ -73,4 +74,3 @@ void CircularTraffic::writeToPeer(ConnectionModel * peer,
     result.nextWrite = Time();
   }
 }
-

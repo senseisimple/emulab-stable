@@ -50,7 +50,7 @@ void PacketSensor::localSend(PacketInfo * packet)
   else
   {
     SentPacket record;
-    record.seqStart = ntohl(startSequence);
+    record.seqStart = startSequence;
     unsigned int sequenceLength = packet->packetLength -
       sizeof(struct ether_header) - IP_HL(packet->ip)*4 -
       sizeof(struct tcphdr);
@@ -112,16 +112,25 @@ void PacketSensor::localAck(PacketInfo * packet)
 
 bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
 {
+  logWrite(SENSOR,
+           "PacketSensor inSequencBlock(): Is %u between %u and %u?",
+           sequence, seqStart, seqEnd);
+  bool result = false;
   if (seqStart < seqEnd)
   {
-    return sequence >= seqStart && sequence < seqEnd;
+    result = sequence >= seqStart && sequence < seqEnd;
   }
   else if (seqStart > seqEnd)
   {
-    return sequence >= seqStart || sequence < seqEnd;
+    result = sequence >= seqStart || sequence < seqEnd;
+  }
+  if (result)
+  {
+    logWrite(SENSOR, "Yes!");
   }
   else
   {
-    return false;
+    logWrite(SENSOR, "No!");
   }
+  return result;
 }

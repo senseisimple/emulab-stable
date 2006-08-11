@@ -47,9 +47,10 @@ enum LOG_TYPE
   MAIN_LOOP        = 0x040,
   COMMAND_INPUT    = 0x080,
   CONNECTION       = 0x100,
+  PCAP             = 0x200,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x000,
-  LOG_EVERYTHING   = 0x1ff
+  LOG_EVERYTHING   = 0x3ff
 };
 
 #endif

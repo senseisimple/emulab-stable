@@ -96,6 +96,8 @@ void Connection::connect(void)
     isConnected = peer->isConnected();
     if (isConnected)
     {
+      logWrite(CONNECTION, "Inserting a connection with key %s",
+               planet.toString().c_str());
       global::planetMap.insert(make_pair(planet, this));
     }
   }
@@ -133,6 +135,7 @@ void Connection::addSensor(SensorCommand const & newSensor)
 
 void Connection::captureSend(PacketInfo * packet)
 {
+  logWrite(SENSOR, "Captured a send packet");
   Sensor * head = measurements.getHead();
   if (head != NULL && isConnected)
   {
@@ -144,6 +147,7 @@ void Connection::captureSend(PacketInfo * packet)
 
 void Connection::captureAck(PacketInfo * packet)
 {
+  logWrite(SENSOR, "Captured an ack packet");
   Sensor * head = measurements.getHead();
   if (head != NULL && isConnected)
   {
@@ -163,6 +167,10 @@ Time Connection::writeToConnection(Time const & previousTime)
   result.planet.transport = TCP_CONNECTION;
   result.planet.ip = elab.ip;
   result.planet.remotePort = global::peerServerPort;
+  if (isConnected)
+  {
+    result.planet.localPort = planet.localPort;
+  }
   traffic->writeToPeer(peer.get(), previousTime, result);
   if (!isConnected && result.isConnected)
   {
@@ -172,9 +180,11 @@ Time Connection::writeToConnection(Time const & previousTime)
   else if (isConnected && result.isConnected
            && planet != result.planet)
   {
+    logWrite(CONNECTION, "OldKey: %s", planet.toString().c_str());
     global::planetMap.erase(planet);
     planet = result.planet;
     global::planetMap.insert(make_pair(planet, this));
+    logWrite(CONNECTION, "NewKey: %s", planet.toString().c_str());
   }
   isConnected = result.isConnected;
   bufferFull = result.bufferFull;

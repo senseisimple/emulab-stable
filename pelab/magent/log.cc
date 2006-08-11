@@ -66,6 +66,10 @@ static void logPrefix(int flags)
   {
     fprintf(logFile, "CONNECTION ");
   }
+  if (flags & PCAP)
+  {
+    fprintf(logFile, "PCAP ");
+  }
   if (logTimestamp)
   {
     struct timeval now;
