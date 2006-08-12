@@ -18,9 +18,9 @@ UNAME=`uname -s`
 #
 # Different binary directories for FreeBSD/Linux
 #
-if [ "$UNAME" == "Linux" ]; then
+if [ "$UNAME" = "Linux" ]; then
     BIN_PATH="/usr/bin"
-elif [ "$UNAME" == "FreeBSD" ]; then
+elif [ "$UNAME" = "FreeBSD" ]; then
     BIN_PATH="/usr/local/bin"
 else
     echo "Unable to determine operating system"
@@ -46,10 +46,10 @@ CHMOD="/bin/chmod"
 SYNC="/usr/local/etc/emulab/emulab-sync"
 SYNCTIMO=120
 
-if [ "$UNAME" == "Linux" ]; then
+if [ "$UNAME" = "Linux" ]; then
     GREP="/bin/grep"
-elif [ "$UNAME" == "FreeBSD" ]; then
-    BIN_PATH="/usr/bin/grep"
+elif [ "$UNAME" = "FreeBSD" ]; then
+    GREP="/usr/bin/grep"
 else
     echo "Unable to determine operating system"
     exit -1
@@ -167,11 +167,11 @@ get_iface_addr() {
 #
 # $HOST_ROLE should be set by the calling script
 #
-if [ "$HOST_ROLE" == "monitor" ]; then
+if [ "$HOST_ROLE" = "monitor" ]; then
     export PELAB_IP=`lookup_ip_host $HOSTNAME $PELAB_LAN`
     export PELAB_IFACE=`ifacename $PELAB_IP`
-elif [ "$HOST_ROLE" == "stub" ]; then
-    if [ "$ON_ELAB" == "yes" ]; then
+elif [ "$HOST_ROLE" = "stub" ]; then
+    if [ "$ON_ELAB" = "yes" ]; then
         export PLAB_IP=`lookup_ip_host $HOSTNAME $EPLAB_LAN`
         export PLAB_IFACE=`ifacename $PLAB_IP`
     else
@@ -194,7 +194,7 @@ barrier_wait()
     #
     $SYNC -m
     MASTER=$?
-    if [ "$MASTER" == "1" ]; then
+    if [ "$MASTER" = "1" ]; then
         # I know, this looks backwards. But it's right
         $SYNC -n $BARRIER 
 	_rval=$?
