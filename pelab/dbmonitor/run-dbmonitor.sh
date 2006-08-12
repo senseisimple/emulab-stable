@@ -18,4 +18,7 @@ export HOST_ROLE="monitor"
 #
 echo "Running PID $$"
 echo "Starting dbmonitor, Extra arguments: $*"
-exec $AS_ROOT $DBMONITOR_DIR/$DBMONITOR $* $PID $EID
+
+# XXX cd is temporary until libtbdb.pm is in all images
+cd $DBMONITOR_DIR
+exec $AS_ROOT ./$DBMONITOR $* $PID $EID
