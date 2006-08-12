@@ -345,7 +345,7 @@ sub get_plabinfo($@)
 	    ($del,$plr,$bw) = ($DEF_DEL, $DEF_PLR, $DEF_BW);
 	    $del_stamp = $plr_stamp = $bw_stamp = time();
 	} else {
-	    print "$src_ename -> $dst_ename (on behalf of $dst_ip):\n"
+	    print "$src_ename ($me=$src_site) -> $dst_ename ($dstvnode=$dst_site):\n"
 		if ($showonly || $debug);
 
 	    while (my ($_del,$_plr,$_bw,$_stamp) =
@@ -385,22 +385,22 @@ sub get_plabinfo($@)
 
 	    #
 	    # Check for down links, reflected by either delay or bandwidth
-	    # being set to -1.  If only one is set to -1, look at the most
+	    # being set to < 0.  If only one is set negative, look at the most
 	    # recent of delay/bw to determine whether to mark the link as
 	    # down.
 	    #
-	    if ($del == -1 || $bw == -1) {
-		if (($del == -1 && $bw == -1) ||
-		    ($del == -1 && $del_stamp >= $bw_stamp) ||
-		    ($bw == -1 && $bw_stamp >= $del_stamp)) {
+	    if ($del < 0 || $bw < 0) {
+		if (($del < 0 && $bw < 0) ||
+		    ($del < 0 && $del_stamp >= $bw_stamp) ||
+		    ($bw < 0 && $bw_stamp >= $del_stamp)) {
 		    print STDERR "marking as down: bw=$bw($bw_stamp), del=$del($del_stamp)\n"
 			if ($debug);
 		    $plr = 1;
 		}
 		$del = $DEF_DEL
-		    if ($del == -1);
+		    if ($del < 0);
 		$bw = $DEF_BW
-		    if ($bw == -1);
+		    if ($bw < 0);
 	    }
 
 	    $del = int($del / 2 + 0.5);
