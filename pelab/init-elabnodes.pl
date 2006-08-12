@@ -256,7 +256,7 @@ sub get_plabinfo($)
 		 "    defaulting to ".
 		 "${DEF_PLR}plr\n" );
 	}
-	if($initvalBw->numSamples == $initvalLat->numErrValSamples){	 
+	if($initvalBw->numSamples == $initvalBw->numErrValSamples){	 
 	    $bw = $DEF_BW;
 	    warn("*** Could not get bandwidth ".
 		 "$srcvnode ($src_site) --> $dstvnode ($dst_site)\n".
