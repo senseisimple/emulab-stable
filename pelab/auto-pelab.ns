@@ -7,6 +7,11 @@ $ns rtproto Static
 # Beginning of user-settable options
 
 #
+# Run FreeBSD 6.1 on elab_ nodes.  Forces use of dbmonitor.
+#
+set do_bsd 0
+
+#
 # This control how many _pairs_ of PCs there are. ie. 2 gets you 2 monitors,
 # plus matching stubs
 #
@@ -102,9 +107,15 @@ set hwtype "pc"
 # Server and client to use for automated testing. If set, will automatically
 # be started by the 'start-experiment' script
 #
-set serverprog "/usr/bin/iperf -s "
-# NOTE: No client support for now, you'll have to run the client yourself
-set clientprog "/usr/bin/iperf -t 60 -c "
+if {$do_bsd} {
+    set serverprog "/usr/local/etc/emulab/emulab-iperf -s "
+    # NOTE: No client support for now, you'll have to run the client yourself
+    set clientprog "/usr/local/etc/emulab/emulab-iperf -t 60 -c "
+} else {
+    set serverprog "/usr/bin/iperf -s "
+    # NOTE: No client support for now, you'll have to run the client yourself
+    set clientprog "/usr/bin/iperf -t 60 -c "
+}
 
 #
 # If non-zero, uses the new stub (magent) instead of the old one
@@ -115,6 +126,9 @@ set use_magent 0
 # If non-zero, uses the DB-based "monitor" to control the cloud shaping
 #
 set use_dbmonitor 0
+if {$do_bsd} {
+    set use_dbmonitor 1
+}
 
 # End of user-settable options
 ##########
@@ -123,10 +137,13 @@ set use_dbmonitor 0
 set delay_os FBSD54-DNODE
 #set delay_os FBSD54-FUTURE
 
-
-# XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
-set node_os  PLAB-DEVBOX-UPDATE
-#set node_os  PLAB-DEVBOX
+if {$do_bsd} {
+    set node_os FBSD61-STD
+} else {
+    # XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
+    set node_os PLAB-DEVBOX-UPDATE
+    #set node_os PLAB-DEVBOX
+}
 
 tb-set-delay-os $delay_os
 
@@ -141,7 +158,13 @@ if {$fake_plab && $delay_os != "FBSD54-DNODE"} {
 # Tarballs and RPMs we install on all nodes
 #
 set tarfiles "/local $pelab_tar"
-set rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
+set plab_rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
+if {$do_bsd} {
+    set elab_rpms ""
+} else {
+    set elab_rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
+}
+
 if {$use_magent} {
     set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh"
 } else {
@@ -183,7 +206,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
         lappend planetstublist $planetstub($i)
 
         tb-set-node-tarfiles $planet($i) $tarfiles
-        tb-set-node-rpms $planet($i) $rpms
+        tb-set-node-rpms $planet($i) $plab_rpms
         set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
@@ -207,7 +230,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
         lappend plabstublist $plabstub($i)
 
         tb-set-node-tarfiles $plab($i) $tarfiles
-        tb-set-node-rpms $plab($i) $rpms
+        tb-set-node-rpms $plab($i) $plab_rpms
         set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
@@ -232,7 +255,9 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     lappend clientlist $client($i)
 
     tb-set-node-tarfiles $elab($i) $tarfiles
-    tb-set-node-rpms $elab($i) $rpms
+    if {$elab_rpms != ""} {
+        tb-set-node-rpms $elab($i) $elab_rpms
+    }
     set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
     lappend tflist $tfupdate($tfix)
     incr tfix
