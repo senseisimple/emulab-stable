@@ -323,95 +323,99 @@ sub get_plabinfo($@)
 	}
 
 	#
-	# BW and latency records are separate so we just grab the last 20
-	# and hope we get a legit value for both.
+	# BW and latency records are separate and there are, in general,
+	# a lot more latency measurements than BW measurements.  So we
+	# make two queries grabbing the latest of each.
 	# Note that there are no loss measurements right now.
 	#
 	my ($del,$plr,$bw);
 	my ($del_stamp,$plr_stamp,$bw_stamp);
 	my $query_result =
-	    DBQueryFatal("select latency,loss,bw,unixstamp from pair_data ".
+	    DBQueryFatal("select latency,unixstamp from pair_data ".
 			 " where ".
 			 "  srcsite_idx='$src_site' and ".
 			 "  dstsite_idx='$dst_site' and ".
-			 "   (latency is not null or ".
-			 "    loss is not null or bw is not null) ".
+			 "   latency is not null ".
 			 $dateclause .
-			 " order by unixstamp desc limit 20");
-
+			 " order by unixstamp desc limit 1");
 	if (!$query_result->numrows) {
-	    warn("*** Could not get pair data for ".
+	    warn("*** Could not get latency data for ".
 		 "$me ($src_site) --> $dstvnode ($dst_site)\n".
-		 "    defaulting to ".
-		 "${DEF_BW}bps, ${DEF_DEL}ms, ${DEF_PLR}plr\n");
-	    ($del,$plr,$bw) = ($DEF_DEL, $DEF_PLR, $DEF_BW);
-	    $del_stamp = $plr_stamp = $bw_stamp = time();
+		 "    defaulting to ${DEF_DEL}ms\n");
+	    ($del, $del_stamp) = ($DEF_DEL, time());
 	} else {
-	    print "$src_ename ($me=$src_site) -> $dst_ename ($dstvnode=$dst_site):\n"
-		if ($showonly || $debug);
-
-	    while (my ($_del,$_plr,$_bw,$_stamp) =
-		   $query_result->fetchrow_array()) {
-		print "  ($_del, $_plr, $_bw, $_stamp)\n"
-		    if ($showonly || $debug);
-		if (!defined($del) && defined($_del)) {
-		    $del = $_del;
-		    $del_stamp = $_stamp;
-		}
-		if (!defined($plr) && defined($_plr)) {
-		    $plr = $_plr;
-		    $plr_stamp = $_stamp;
-		}
-		if (!defined($bw) && defined($_bw)) {
-		    $bw = $_bw;
-		    $bw_stamp = $_stamp;
-		}
-	    }
-
-	    #
-	    # XXX This needs to be modified!
-	    #
-	    if (!defined($del)) {
-		$del = $DEF_DEL;
-		$del_stamp = time();
-	    }
-	    if (!defined($plr)) {
-		$plr = $DEF_PLR;
-		$plr_stamp = time();
-	    }
-	    # undef or zero--zero BW is not very useful
-	    if ($bw == 0) {
-		$bw = $DEF_BW;
-		$bw_stamp = time();
-	    }
-
-	    #
-	    # Check for down links, reflected by either delay or bandwidth
-	    # being set to < 0.  If only one is set negative, look at the most
-	    # recent of delay/bw to determine whether to mark the link as
-	    # down.
-	    #
-	    if ($del < 0 || $bw < 0) {
-		if (($del < 0 && $bw < 0) ||
-		    ($del < 0 && $del_stamp >= $bw_stamp) ||
-		    ($bw < 0 && $bw_stamp >= $del_stamp)) {
-		    print STDERR "marking as down: bw=$bw($bw_stamp), del=$del($del_stamp)\n"
-			if ($debug);
-		    $plr = 1;
-		}
-		$del = $DEF_DEL
-		    if ($del < 0);
-		$bw = $DEF_BW
-		    if ($bw < 0);
-	    }
-
-	    $del = int($del / 2 + 0.5);
+	    ($del, $del_stamp) = $query_result->fetchrow_array();
 	}
+	$query_result =
+	    DBQueryFatal("select bw,unixstamp from pair_data ".
+			 " where ".
+			 "  srcsite_idx='$src_site' and ".
+			 "  dstsite_idx='$dst_site' and ".
+			 "   bw is not null ".
+			 $dateclause .
+			 " order by unixstamp desc limit 1");
+	if (!$query_result->numrows) {
+	    warn("*** Could not get bandwidth data for ".
+		 "$me ($src_site) --> $dstvnode ($dst_site)\n".
+		 "    defaulting to ${DEF_BW}Kbps\n");
+	    ($bw, $bw_stamp) = ($DEF_BW, time());
+	} else {
+	    ($bw, $bw_stamp) = $query_result->fetchrow_array();
+	}
+
+	if ($showonly || $debug) {
+	    print "$src_ename ($me=$src_site) -> $dst_ename ($dstvnode=$dst_site):\n";
+	    print "  (del=$del\@$del_stamp, bw=$bw\@$bw_stamp)\n";
+	}
+
+	#
+	# XXX This needs to be modified!
+	#
+	if (!defined($del)) {
+	    $del = $DEF_DEL;
+	    $del_stamp = time();
+	}
+	if (!defined($plr)) {
+	    $plr = $DEF_PLR;
+	    $plr_stamp = time();
+	}
+	# undef or zero--zero BW is not very useful
+	if ($bw == 0) {
+	    $bw = $DEF_BW;
+	    $bw_stamp = time();
+	}
+
+	#
+	# Check for down links, reflected by either delay or bandwidth
+	# being set to < 0.  If only one is set negative, look at the most
+	# recent of delay/bw to determine whether to mark the link as
+	# down.
+	#
+	if ($del < 0 || $bw < 0) {
+	    if (($del < 0 && $bw < 0) ||
+		($del < 0 && $del_stamp >= $bw_stamp) ||
+		($bw < 0 && $bw_stamp >= $del_stamp)) {
+		print STDERR "marking as down: bw=$bw($bw_stamp), del=$del($del_stamp)\n"
+		    if ($debug);
+		$plr = 1;
+	    }
+	    $del = $DEF_DEL
+		if ($del < 0);
+	    $bw = $DEF_BW
+		if ($bw < 0);
+	}
+	
+	#
+	# Compensate for round-trip nature.
+	# XXX need to handle plr
+	#
+	$del = int($del / 2 + 0.5);
+	$bw = int($bw + 0.5);
 
 	print "$src_ename -> $dst_ename: ".
 	    "real=$dst_ip, bw=$bw, del=$del, plr=$plr\n"
 		if ($showonly || $debug);
-
+	
 	# XXX need to lookup "elab-$dst_ix"
 	$dst_ip = "10.0.0.$dst_ix";
 	
@@ -421,7 +425,7 @@ sub get_plabinfo($@)
 	    print STDERR "$src_pname->$dst_ip: old values: bw=$lbw, del=$ldel, plr=$lplr\n"
 		if ($debug);
 	} else {
-	    $lbw = $ldel = $lplr = -2;
+	    $lbw = $ldel = $lplr = -1;
 	}
 	    
 	my $doit;
