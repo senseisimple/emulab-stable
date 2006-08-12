@@ -1,18 +1,33 @@
 #!/usr/bin/perl -w
 
 use strict;
+use Getopt::Std;
 
 my $TEVC = "/usr/testbed/bin/tevc";
 my $LOGHOLE = "/usr/testbed/bin/loghole";
 
+my $optlist = "n";
+my $nologs = 0;
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (!getopts($optlist, \%options)) {
+    print "error: cannot parse options\n";
+    exit(1);
+}
 #
 # Require the pid and eid
 #
 if (@ARGV != 2) {
     die "Usage: $0 pid eid\n";
 }
-
 my ($pid, $eid) = @ARGV;
+
+if (defined($options{"n"})) {
+    $nologs = 1;
+}
 
 #
 # Stop the stubs and monitors
@@ -70,17 +85,21 @@ if (system "$TEVC -e $pid/$eid now allservers stop") {
 #
 # Grab logfiles
 #
-print "##### Gathering logfiles\n";
-if (system "$LOGHOLE -e $pid/$eid sync") {
-    die "Error running loghole\n";
-}
+if (!$nologs) {
+    print "##### Gathering logfiles\n";
+    if (system "$LOGHOLE -e $pid/$eid sync") {
+	die "Error running loghole\n";
+    }
 
-#
-# Create an archive containing these logfiles
-#
-print "##### Creating archive\n";
-if (system "$LOGHOLE -e $pid/$eid archive") {
-    die "Error running loghole\n";
+    #
+    # Create an archive containing these logfiles
+    #
+    print "##### Creating archive\n";
+    if (system "$LOGHOLE -e $pid/$eid archive") {
+	die "Error running loghole\n";
+    }
+} else {
+    print "##### Ignoring logfiles\n";
 }
 
 print "##### Done\n";
