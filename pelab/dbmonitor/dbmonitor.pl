@@ -28,6 +28,8 @@ use Socket;
 use Getopt::Std;
 use POSIX qw(strftime);
 
+$| = 1;
+
 #
 # Every source host has a list of <dest-IP,bw,delay,plr> tuples, one
 # element per possible destination
@@ -58,8 +60,8 @@ my $starttime = 0;
 my $timeskew = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
-my $DEF_BW = 10000;	# Kbits/sec
-my $DEF_DEL = 0;	# ms
+my $DEF_BW =  10;	# Kbits/sec
+my $DEF_DEL = 1000;	# ms
 my $DEF_PLR = 0.0;	# prob.
 
 my $PWDFILE = "/local/pelab/pelabdb.pwd";
