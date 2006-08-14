@@ -1,0 +1,94 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Do some analysis.
+#
+sub usage()
+{
+    print STDOUT "Usage: template_analyze <script> [args ...]\n";
+    exit(-1);
+}
+my $optlist = "";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+#
+# Need the pid/eid. 
+# 
+my ($pid, $eid, $vname) = check_nickname();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 1) {
+    usage();
+}
+my $scriptname = shift(@ARGV);
+
+#
+# Grab the user environment variables.
+#
+open(USRENV, "/var/emulab/boot/tmcc/userenv")
+    or die("Could not open user environment file!\n");
+
+while (<USRENV>) {
+    if ($_ =~ /^(.*)=(.*)$/) {
+	$ENV{$1} = $2;
+    }
+}
+
+#
+# Run the analysis.
+# If it completes okay then schedule an event for the current time.
+#
+my $now = time();
+my $childpid = fork();
+if (! $childpid) {
+    #
+    # Child runs command
+    #
+    exec $scriptname, @ARGV;
+    die("Could not exec $scriptname\n");
+}
+
+#
+# Wait until child exits or until user gets bored and types ^C.
+#
+waitpid($childpid, 0);
+if ($?) {
+    exit(-1);
+}
+
+#
+# Okay, ssh over to ops to run the xmlrpc client. SHould be installed locally.
+#
+system("ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no ops ".
+       "  /usr/testbed/bin/sslxmlrpc_client.py -m template addprogevent ".
+       "  proj=$pid exp=$eid vnode=$vname when=$now ".
+       "  cmd=\"'$scriptname @ARGV'\"");
+    
+exit 0;

@@ -259,6 +259,20 @@ def CheckIsAdmin(uid):
     return res[0][0];
 
 #
+# Template lookup, by exptidx of an experiment.
+#
+def TemplateLookup(exptidx):
+    res = DBQueryFatal("select parent_guid,parent_vers from "
+                       "   experiment_template_instances "
+                       "where exptidx=%s",
+                       (exptidx,))
+    
+    if len(res) == 0:
+        return None
+
+    return (res[0][0], res[0][1])
+
+#
 # This is a wrapper class so that you can invoke methods in dotted form.
 # For example experiment.swapexp(...).
 #
@@ -270,6 +284,7 @@ class EmulabServer:
         self.uid       = pwd.getpwuid(os.getuid())[0]
 
         self.instances["experiment"] = experiment(readonly=self.readonly);
+        self.instances["template"]   = template(readonly=self.readonly);
         if readonly:
             return
         
@@ -4404,6 +4419,83 @@ class elabinelab:
         result["interfaces"] = interfaces
         
         return EmulabResponse(RESPONSE_SUCCESS, result, output=str(result))
+    pass
+
+
+#
+# This class implements the server side of the XMLRPC interface to experiments.
+#
+class template:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self, readonly=0):
+        self.readonly = readonly;
+        self.VERSION  = VERSION
+        self.uid      = pwd.getpwuid(os.getuid())[0]
+        return
+
+    def addprogevent(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict,
+                                     ("proj", "exp", "when", "vnode", "cmd"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"]) and
+                re.match("^[-\w]*$", argdict["vnode"]) and
+                re.match("^[-\w]*$", argdict["when"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(self.uid,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        # Need to pass experiment index to script.
+        dbres = DBQueryFatal("SELECT idx FROM experiments "
+                             "WHERE pid=%s and eid=%s",
+                             (argdict["proj"], argdict["exp"]))
+        
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        exptidx = dbres[0][0]
+        (guid,version) = TemplateLookup(exptidx)
+        if guid == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such template instance")
+
+        argstr  = " -a addevent " + str(guid) + "/" + str(version)
+        argstr += " -i " + str(exptidx)
+        argstr += " -t " + str(argdict["when"])
+        argstr += " -n " + argdict["vnode"]
+        argstr += " -c " + escapeshellarg(argdict["cmd"])
+        
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_control " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
     pass
 
 #

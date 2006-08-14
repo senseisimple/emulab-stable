@@ -57,6 +57,7 @@ sub ShowHidden();
 sub HideHidden();
 sub Activate();
 sub InActivate();
+sub AddEvent();
 
 #
 # Testbed Support libraries
@@ -128,6 +129,9 @@ elsif ($action eq "activate") {
 }
 elsif ($action eq "inactivate") {
     exit(InActivate());
+}
+elsif ($action eq "addevent") {
+    exit(AddEvent());
 }
 usage();
 
@@ -204,6 +208,91 @@ sub InActivate()
     $template->InActivate() == 0
 	or return -1;
    
+    return 0;
+}
+
+#
+# Add a dynamic event.
+#
+sub AddEvent()
+{
+    my $timestamp;
+    my $commandline;
+    my $vnode;
+    my $exptidx;
+    
+    # Parse the rest of the options.
+    while (@ARGV) {
+	my $arg = shift(@ARGV);
+
+	if ($arg eq "-t") {
+	    usage()
+		if (@ARGV == 0);
+	    
+	    $timestamp = shift(@ARGV);
+
+	    if ("$timestamp" eq "now") {
+		$timestamp = time();
+	    }
+	    elsif ($timestamp =~ /^([\d]*)$/) {
+		$timestamp = $1;
+	    }
+	    else {
+		tbdie("Illegal characters in timestamp!");
+	    }
+	}
+	elsif ($arg eq "-c") {
+	    usage()
+		if (@ARGV == 0);
+
+	    $arg = shift(@ARGV);
+	    
+	    if (! TBcheck_dbslot($arg, 'eventlist','arguments',
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		tbdie("Illegal characters in commandline!");
+	    }
+	    $commandline = $arg;
+	}
+	elsif ($arg eq "-n") {
+	    usage()
+		if (@ARGV == 0);
+
+	    $arg = shift(@ARGV);
+	    
+	    if (! TBcheck_dbslot($arg, 'virt_nodes','vname',
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		tbdie("Illegal characters in node name!");
+	    }
+	    $vnode = $arg;
+	}
+	elsif ($arg eq "-i") {
+	    usage()
+		if (@ARGV == 0);
+
+	    $arg = shift(@ARGV);
+	    
+	    if (! TBcheck_dbslot($arg, "default", "int",
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		tbdie("Illegal characters in experiment index!");
+	    }
+	    $exptidx = $arg;
+	}
+	else {
+	    usage();
+	}
+    }
+    usage()
+	if (! (defined($timestamp) && defined($commandline) &&
+	       defined($vnode) && defined($exptidx)));
+
+    my $instance = $template->LookupInstance($exptidx);
+    if (!defined($instance)) {
+	tbdie("Could not get instance record for experiment $exptidx!");
+    }
+
+    $instance->AddEvent($timestamp, $vnode, $commandline) == 0
+	or tbdie("Could not add dynamic event to $instance!");
+    
     return 0;
 }
 

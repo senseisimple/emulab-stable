@@ -47,6 +47,7 @@ client-install: client
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_analyze $(LBINDIR)/template_analyze
 ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-swapimage $(LBINDIR)/

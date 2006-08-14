@@ -1629,6 +1629,11 @@ Simulator instproc make_event {outer event} {
 			set args "DIGESTER={$(-digester)}"
 		    }
 		}
+		"snapshot" {
+		    set otype SIMULATOR
+		    set etype SNAPSHOT
+		    set args "LOGHOLE_ARGS='-s'"
+		}		
 		"cleanlogs" {
 		    set otype SIMULATOR
 		    set etype RESET

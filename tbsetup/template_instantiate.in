@@ -469,6 +469,10 @@ $instance->CopyDataStore($template_tag,
 			 "$instance_path/template_datastore") == 0
     or fatal(-1, "Could not copy datastore ($template_tag) to instance");
 
+# Ditto for dynamic events.
+$instance->CopyTemplateEvents() == 0
+    or fatal(-1, "Could not copy template events to instance");
+
 #
 # Ick, Ick, Ick. I want these to be at the beginning of the enviroment
 # strings so they are set in case the user has used any OPT variables
@@ -490,6 +494,35 @@ DBQueryFatal("replace into virt_user_environment set ".
 DBQueryFatal("replace into virt_user_environment set ".
 	     "   name='ARCHIVE', value='$instance_path/archive',".
 	     "   idx=2, pid='$pid', eid='$eid'");
+
+if ($experiment->dpdb() && $experiment->dpdbname() ne '') {
+    my $dpdbname = $experiment->dpdbname();
+
+    DBQueryFatal("insert into virt_user_environment set ".
+		 "   name='DP_DBNAME', value='$dpdbname',".
+		 "   pid='$pid', eid='$eid'");
+
+    DBQueryFatal("insert into virt_user_environment set ".
+		 "   name='DP_HOST', value='$CONTROL',".
+		 "   pid='$pid', eid='$eid'");
+
+    #
+    # XXX This needs to change to a per-experiment user/password.
+    #
+    DBQueryFatal("insert into virt_user_environment set ".
+		 "   name='DP_USER', value='$dbuid',".
+		 "   pid='$pid', eid='$eid'");
+
+    my $query_result =
+	DBQueryFatal("select mailman_password from users where uid='$dbuid'");
+    my ($mailman_password) = $query_result->fetchrow_array();
+    
+    if (defined($mailman_password)) {
+	DBQueryFatal("insert into virt_user_environment set ".
+		     "   name='DP_PASSWORD', value='$mailman_password',".
+		     "   pid='$pid', eid='$eid'");
+    }
+}
 
 #
 # Now do the swapin (or it gets queued if a batch experiment).

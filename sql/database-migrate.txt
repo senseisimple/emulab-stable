@@ -3602,3 +3602,21 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.80: Fix to previous revision; Skip to next entry.
 
+4.81: Add a table to store dynamic template events. These events are
+      copied into the event stream when creating an instance (added to
+      the eventlist for the experiment).
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+	CREATE TABLE experiment_template_events (
+	  parent_guid varchar(16) NOT NULL default '',
+	  parent_vers smallint(5) unsigned NOT NULL default '0',
+	  vname varchar(64) NOT NULL default '',
+	  vnode varchar(32) NOT NULL default '',
+	  time float(10,3) NOT NULL default '0.000',
+	  objecttype smallint(5) unsigned NOT NULL default '0',
+	  eventtype smallint(5) unsigned NOT NULL default '0',
+	  arguments text,
+	  PRIMARY KEY  (parent_guid, parent_vers, vname)
+	) TYPE=MyISAM;
+

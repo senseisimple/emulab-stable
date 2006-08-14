@@ -616,7 +616,7 @@ sub GraphDB(@)
 	print "DB '$dbname' does not exist!\n";
 	return -1;
     }
-    my $gd = new GD::Graph::lines(700,425);
+    my $gd = new GD::Graph::lines(500,325);
     if (!$gd) {
 	print "Could not create a new graph object!\n";
 	return -1;

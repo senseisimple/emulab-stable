@@ -210,7 +210,7 @@ function ShowVis($pid, $eid, $zoom = 1.25, $detail = 1) {
 	    "     position: relative; z-index:1010; height: 450px; ".
 	    "     width: 90%; border: 2px solid black;'>\n".
             " <div id=myvisdiv style='position:relative;'>\n".
-	    "   <img id=myvisimg border=0 ".
+	    "   <img id=myvisimg border=0 style='cursor: move;' ".
 	    "        onLoad=\"setTimeout('ShowVisInit();', 10);\" ".
 	    "        src='top2image.php3?pid=$pid&eid=$eid".
 	    "&zoom=$zoom&detail=$detail'>\n".

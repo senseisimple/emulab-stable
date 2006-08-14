@@ -653,6 +653,7 @@ class Template
 	echo $imap;
 	echo "<img id=\"mygraphimg\" border=0 usemap=\"#TemplateGraph\" ";
 	echo "      onLoad=\"setTimeout('ShowGraphInit();', 10);\" ";
+	echo "      style='cursor: move;' ";
 	echo "      src='template_graph.php?guid=$guid&now=$now'>\n";
 	echo "</div>\n";
 	echo "</div>\n";
@@ -688,7 +689,7 @@ class Template
 	    "width: 700px; border: 2px solid black;'>\n";
 	echo "<div id=\"myvisdiv\" style='position:relative;'>\n";
 
-	echo "<img id=\"myvizimg\" border=0 ";
+	echo "<img id=\"myvizimg\" border=0 style='cursor: move;' ";
 	echo "      onLoad=\"setTimeout('ShowVisInit();', 100);\" ";
 	echo "      src='top2image.php3?pid=$pid&eid=$eid".
 	    "&zoom=$zoom&detail=$detail&now=$now'>\n";

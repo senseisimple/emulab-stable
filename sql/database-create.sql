@@ -529,6 +529,22 @@ CREATE TABLE experiment_stats (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `experiment_template_events`
+--
+
+CREATE TABLE experiment_template_events (
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  vname varchar(64) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  time float(10,3) NOT NULL default '0.000',
+  objecttype smallint(5) unsigned NOT NULL default '0',
+  eventtype smallint(5) unsigned NOT NULL default '0',
+  arguments text,
+  PRIMARY KEY  (parent_guid, parent_vers, vname)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `experiment_template_graphs`
 --
 

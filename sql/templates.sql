@@ -260,6 +260,25 @@ CREATE TABLE virt_parameters (
 ) TYPE=MyISAM;
 
 #
+# Events that are dynamically created by the user, as for analysis.
+# Assumed to be just program agent events; generalize later, perhaps.
+#
+CREATE TABLE experiment_template_events (
+  -- Globally Unique ID of the ExperimentTemplate this record belongs to.
+  parent_guid varchar(16) NOT NULL default '',
+  -- Version number for tracking modifications
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  -- stuff for the eventlist table
+  vname varchar(64) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  time float(10,3) NOT NULL default '0.000',
+  objecttype smallint(5) unsigned NOT NULL default '0',
+  eventtype smallint(5) unsigned NOT NULL default '0',
+  arguments text,
+  PRIMARY KEY  (parent_guid, parent_vers, vname)
+) TYPE=MyISAM;
+
+#
 # This table is a wrapper around the current experiments table, which will
 # continue to be the basic structure for the swapin. This includes all of
 # virt tables which are uniquely associated with an experiment record. So,

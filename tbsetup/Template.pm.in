@@ -1221,6 +1221,30 @@ sub NewInstance($$$)
 }
 
 #
+# Lookup specific instance by its exptidx. The point of this is to ensure
+# that the instance is really associated with the template, since by itself,
+# the exptidx is enough to find the instance record.
+#
+sub LookupInstance($$)
+{
+    my ($self, $exptidx) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $instance = Template::Instance->LookupByExptidx($exptidx);
+    return undef
+	if (!defined($instance));
+
+    return undef
+	if (! ($self->guid() == $instance->guid() &&
+	       $self->vers() == $instance->vers()));
+
+    return $instance;
+}
+
+#
 # Generate a list of instances for a template and save in the template
 # structure. The argument indicates whether you want just active, or all
 # of them (historical).
@@ -2339,6 +2363,178 @@ sub UpdateExportTime($)
 	or return -1;
     
     return Refresh($self);
+}
+
+#
+# Add a dynamic event. A total hack.
+#
+sub AddEvent($$$$)
+{
+    my ($self, $timestamp, $vnode, $commandline) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    my $pid  = $self->pid();
+    my $eid  = $self->eid();
+    my $cmd  = DBQuoteSpecial("COMMAND=$commandline");
+
+    # We assume program agent events right now. Change later.
+    my $query_result =
+	DBQueryWarn("select idx from event_objecttypes where type='PROGRAM'");
+    return -1
+	if (!$query_result || ! $query_result->numrows);
+    my ($event_objecttype) = $query_result->fetchrow_array();
+
+    # And its a start event of course.
+    $query_result =
+	DBQueryWarn("select idx from event_eventtypes where type='START'");
+    return -1
+	if (!$query_result || ! $query_result->numrows);
+    my ($event_eventtype) = $query_result->fetchrow_array();
+
+    #
+    # Need to convert the timestamp from absolute unixtime to relative time.
+    #
+    my $runidx  = $self->runidx();
+    my $exptidx = $self->exptidx();
+
+    $query_result =
+	DBQueryWarn("select UNIX_TIMESTAMP(start_time) from experiment_runs ".
+		    "where exptidx='$exptidx' and idx='$runidx'");
+    return -1
+	if (!$query_result || ! $query_result->numrows);
+    my ($starttime) = $query_result->fetchrow_array();
+    my $firetime    = $timestamp - $starttime;
+
+    # Make up a vname.
+    my $vname = "dprog" . $firetime;
+
+    #
+    # Add the event to the static event stream for the instance experiment.
+    #
+    $query_result = 
+	DBQueryWarn("insert into eventlist set ".
+		    "  pid='$pid', eid='$eid', time='$firetime', ".
+		    "  vnode='$vnode', vname='$vname', ".
+		    "  objecttype='$event_objecttype', ".
+		    "  eventtype='$event_eventtype', ".
+		    "  atstring='', arguments=$cmd");
+    return -1
+	if (!$query_result || ! $query_result->numrows);
+
+    # Grab the new idx just in case we need to delete.
+    my $eventidx = $query_result->insertid;
+
+    # Need a virt_agent entry.
+    if (!DBQueryWarn("insert into virt_agents set ".
+		     "  pid='$pid', eid='$eid', ".
+		     "  vnode='$vnode', vname='$vname', ".
+		     "  objecttype='$event_objecttype'")) {
+	DBQueryWarn("delete from eventlist ".
+		    "where pid='$pid' and eid='$eid' and idx='$eventidx'");
+	return -1;
+    }
+
+    # Need a virt_programs entry.
+    if (!DBQueryWarn("insert into virt_programs set ".
+		     "  pid='$pid', eid='$eid', ".
+		     "  vnode='$vnode', vname='$vname', ".
+		     "  dir='', timeout=0, expected_exit_code=0, ".
+		     "  command=$cmd")) {
+	DBQueryWarn("delete from virt_programs ".
+		    "where pid='$pid' and eid='$eid' and ".
+		    "      vnode='$vnode' and vname='$vname'");
+	DBQueryWarn("delete from eventlist ".
+		    "where pid='$pid' and eid='$eid' and idx='$eventidx'");
+	return -1;
+    }
+
+    # Add to template event list; we will need to hand copy these into
+    # the eventlist for new instances as they are created.
+    if (!DBQueryWarn("insert into experiment_template_events set ".
+		     "  parent_guid='$guid', parent_vers='$vers', ".
+		     "  time='$firetime', ".
+		     "  vnode='$vnode', vname='$vname', ".
+		     "  objecttype='$event_objecttype', ".
+		     "  eventtype='$event_eventtype', ".
+		     "  arguments=$cmd")) {
+	DBQueryWarn("delete from eventlist ".
+		    "where pid='$pid' and eid='$eid' and idx='$eventidx'");
+	DBQueryWarn("delete from virt_agents ".
+		    "where pid='$pid' and eid='$eid' and ".
+		    "      vnode='$vnode' and vname='$vname'");
+	DBQueryWarn("delete from virt_programs ".
+		    "where pid='$pid' and eid='$eid' and ".
+		    "      vnode='$vnode' and vname='$vname'");
+	return -1;
+    }
+
+    return 0;
+}
+
+#
+# Copy the events from the template to the instance.
+#
+sub CopyTemplateEvents($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+    my $pid  = $self->pid();
+    my $eid  = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select * from experiment_template_events ".
+		    "where parent_guid='$guid' and parent_vers='$vers'");
+    
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $vnode            = $rowref->{"vnode"};
+	my $firetime         = $rowref->{"time"};
+	my $vname            = $rowref->{"vname"};
+	my $event_objecttype = $rowref->{"objecttype"};
+	my $event_eventtype  = $rowref->{"eventtype"};
+	my $cmd              = DBQuoteSpecial($rowref->{"arguments"});
+
+	#
+	# Any failure and and the instance will be killed by the
+	# caller, so no need to clean up any mess created below.
+	#
+	DBQueryWarn("insert into eventlist set ".
+		    "  pid='$pid', eid='$eid', time='$firetime', ".
+		    "  vnode='$vnode', vname='$vname', ".
+		    "  objecttype='$event_objecttype', ".
+		    "  eventtype='$event_eventtype', ".
+		    "  atstring='', arguments=$cmd")
+	    or return -1;
+
+	# Need a virt_agent entry.
+	DBQueryWarn("insert into virt_agents set ".
+		    "  pid='$pid', eid='$eid', ".
+		    "  vnode='$vnode', vname='$vname', ".
+		    "  objecttype='$event_objecttype'")
+	    or return -1;
+	    
+	# Need a virt_programs entry.
+	DBQueryWarn("insert into virt_programs set ".
+		    "  pid='$pid', eid='$eid', ".
+		    "  vnode='$vnode', vname='$vname', ".
+		    "  dir='', timeout=0, expected_exit_code=0, ".
+		    "  command=$cmd")
+	    or return -1;
+    }
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
