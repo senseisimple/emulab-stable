@@ -74,6 +74,13 @@ sub SENDMAIL($$$;$$@)
     my($To, $Subject, $Message, $From, $Headers, @Files) = @_;
     my $tag = uc($MAILTAG);
 
+    #
+    # Untaint the path locally
+    # 
+    local %ENV = %ENV;
+    $ENV{PATH} = "/bin:/usr/bin";
+    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
     if (! open(MAIL, "|/usr/sbin/sendmail -t")) {
 	print STDERR "SENDMAIL: Could not start sendmail: $!\n";
 	return 0;

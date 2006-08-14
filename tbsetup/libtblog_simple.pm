@@ -87,6 +87,13 @@ while (my ($n,$v) = each %PRIORITY_MAP_TO_STR) {
 }
 
 #
+# tbreport related constants
+#
+
+# FILLMEIN: Be sure that any exported constants don't conflict with
+#   tblog ones
+
+#
 # Utility functions
 #
 
@@ -179,9 +186,21 @@ sub tbdie( @ ) {
     $parms = shift if ref $_[0] eq 'HASH';
     my $mesg = join('',@_);
 
-    dblog($ERR, $parms, $mesg);
-    tblog_stop_capture() if exists $INC{'libtblog.pm'};
-    die format_message(scriptname(), $ERR, $mesg);
+    if ($^S) {
+	# Handle case when we are in an eval block special:
+	#   1) downgrade error to warning as it may not be fatal
+	#   2) Call tblog (not just dblog) to print the error since 
+        #      the message may never actually appear. 
+	#   3) Don't stop capturing as we are not trully dying
+	#   4) Don't format message as it may be modified latter
+	tblog($WARNING, $parms, $mesg);
+	$mesg .= "\n" unless $mesg =~ /\n$/;
+	die $mesg;
+    } else {
+	dblog($ERR, $parms, $mesg);
+	tblog_stop_capture() if exists $INC{'libtblog.pm'};
+	die format_message(scriptname(), $ERR, $mesg);
+    }
 }
 
 #

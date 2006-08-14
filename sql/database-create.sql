@@ -1267,7 +1267,7 @@ CREATE TABLE location_info (
 --
 
 CREATE TABLE log (
-  seq int(10) unsigned NOT NULL auto_increment,
+  seq int(10) unsigned NOT NULL default '0',
   stamp int(10) unsigned NOT NULL default '0',
   session int(10) unsigned NOT NULL default '0',
   attempt tinyint(1) NOT NULL default '0',
@@ -1280,7 +1280,7 @@ CREATE TABLE log (
   priority smallint(3) NOT NULL default '0',
   inferred tinyint(1) NOT NULL default '0',
   cause varchar(16) NOT NULL default '',
-  type enum('normal','entering','exiting','thecause','extra','summary') NOT NULL default 'normal',
+  type enum('normal','entering','exiting','thecause','extra','summary','primary','secondary') default 'normal',
   relevant tinyint(1) NOT NULL default '0',
   mesg text NOT NULL,
   PRIMARY KEY  (seq),
@@ -2118,6 +2118,58 @@ CREATE TABLE projects (
   KEY approved (approved),
   KEY approved_2 (approved),
   KEY pcremote_ok (pcremote_ok)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `report_assign_violation`
+--
+
+CREATE TABLE `report_assign_violation` (
+  `seq` int(10) unsigned NOT NULL,
+  `unassigned` int(11) default NULL,
+  `pnode_load` int(11) default NULL,
+  `no_connect` int(11) default NULL,
+  `link_users` int(11) default NULL,
+  `bandwidth` int(11) default NULL,
+  `desires` int(11) default NULL,
+  `vclass` int(11) default NULL,
+  `delay` int(11) default NULL,
+  `trivial_mix` int(11) default NULL,
+  `subnodes` int(11) default NULL,
+  `max_types` int(11) default NULL,
+  `endpoints` int(11) default NULL,
+  PRIMARY KEY  (`seq`)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `report_context`
+--
+
+CREATE TABLE `report_context` (
+  `seq` int(10) unsigned NOT NULL,
+  `i0` int(11) default NULL,
+  `i1` int(11) default NULL,
+  `i2` int(11) default NULL,
+  `vc0` varchar(255) default NULL,
+  `vc1` varchar(255) default NULL,
+  `vc2` varchar(255) default NULL,
+  PRIMARY KEY  (`seq`)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `report_error`
+--
+
+CREATE TABLE `report_error` (
+  `seq` int(10) unsigned NOT NULL,
+  `stamp` int(10) unsigned NOT NULL,
+  `session` int(10) unsigned NOT NULL,
+  `attempt` tinyint(1) NOT NULL,
+  `severity` smallint(3) NOT NULL,
+  `script` smallint(3) NOT NULL,
+  `error_type` varchar(255) NOT NULL,
+  PRIMARY KEY  (`seq`),
+  KEY `session` (`session`)
 ) TYPE=MyISAM;
 
 --

@@ -3334,6 +3334,8 @@ last_net_act,last_cpu_act,last_ext_act);
         drop column uid,
         drop column exptidx;
 
+      lock tables log read, session_info read;
+
       [Now install the new code, do it before you unlock the table, as
        the last statement made an incompatible change to the "log" table]
 
@@ -3619,4 +3621,31 @@ last_net_act,last_cpu_act,last_ext_act);
 	  arguments text,
 	  PRIMARY KEY  (parent_guid, parent_vers, vname)
 	) TYPE=MyISAM;
+
+4.82: Add Support For Mike Kasick Reporter Mechanism.  This need to be
+      done in two parts.
+  
+      1) Add report_* tables:
+
+         mysql tbdb < tbreport.sql
+
+      2) Modify exiting tables:     
+
+         lock tables log write, emulab_indicies write;
+
+         insert into emulab_indicies (name,idx) 
+             select 'cur_log_seq', max(seq) from log;
+
+         alter table log 
+            change seq seq int unsigned not null default '0', 
+            change type type enum('normal','entering','exiting','thecause',
+                                  'extra','summary','primary','secondary') 
+                             default 'normal';
+
+         lock tables log read, emulab_indicies read;
+
+         [Now install the new code, do it before you unlock the table, 
+          otherwise risk cur_log_seq getting out if sync.]
+
+         unlock tables;
 

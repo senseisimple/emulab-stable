@@ -4664,11 +4664,11 @@ sub DBWarn($;$)
 #
 # usage: DBFatal(char *message);
 #
-sub DBFatal($)
+sub DBFatal($;$)
 {
-    my($message) = $_[0];
+    my($message,$nomail) = $_[0];
     
-    DBError(\&tbdie, $message);
+    DBError(\&tbdie, $message, $nomail);
 }
 
 #

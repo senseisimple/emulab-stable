@@ -205,7 +205,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
-	      tbdie tblog_set_info tblog_set_default_cause
+	      tbdie tbreport tblog_set_info tblog_set_default_cause
 	      tblog_sub_process tblog_find_error tblog_email_error
 	      tblog_start_capture tblog_stop_capture
 	      tblog_new_process tblog_init_process tblog_exit
@@ -301,6 +301,15 @@ sub indent ( $$ ) {
     return $res;
 }
 
+sub add_prefix ( $$ ) {
+    my ($prefix, $mesg) = @_;
+    if ($mesg =~ /\n./) {
+	return "$prefix:\n$mesg";
+    } else {
+	return "$prefix: $mesg";
+    }
+}
+
 #
 #
 #
@@ -324,6 +333,27 @@ sub DBQuerySingleFatal ( $ )
 	unless $query_result->numrows > 0;
     my @row = $query_result->fetchrow_array();
     return $row[0];
+}
+
+#
+# Convert the script name to a number
+#
+sub script_name_to_num( $ ) {
+    my ($scriptname) = @_;
+    my $scriptnum;
+
+    my $query_result = DBQueryFatal
+	sprintf("select script from scripts where script_name=%s",
+		DBQuoteSpecial $scriptname);
+    if ($query_result->num_rows > 0) {
+	$scriptnum = ($query_result->fetchrow_array())[0];
+    } else {
+	DBQueryFatal 
+	    sprintf("insert into scripts (script_name) values (%s)",
+		    DBQuoteSpecial $scriptname);
+	$scriptnum = DBQuerySingleFatal 'select LAST_INSERT_ID()';
+    }
+    return $scriptnum;
 }
 
 #
@@ -398,17 +428,7 @@ sub tblog_init_process(@) {
 
     # Get script number
 
-    my $query_result = DBQueryFatal
-	sprintf("select script from scripts where script_name=%s",
-		DBQuoteSpecial $ENV{TBLOG_SCRIPTNAME});
-    if ($query_result->num_rows > 0) {
-	$ENV{TBLOG_SCRIPTNUM} = ($query_result->fetchrow_array())[0];
-    } else {
-	DBQueryFatal 
-	    sprintf("insert into scripts (script_name) values (%s)",
-		    DBQuoteSpecial $ENV{TBLOG_SCRIPTNAME});
-	$ENV{TBLOG_SCRIPTNUM} = DBQuerySingleFatal 'select LAST_INSERT_ID()';
-    }
+    $ENV{TBLOG_SCRIPTNUM} = script_name_to_num($ENV{TBLOG_SCRIPTNAME});
 
     # ...
 
@@ -416,10 +436,10 @@ sub tblog_init_process(@) {
 	check_env();
 	$ENV{TBLOG_LEVEL}++;
 	$ENV{TBLOG_PARENT_INVOCATION} = $ENV{TBLOG_INVOCATION};
-	dblog($NOTICE, {type => 'entering'},
-	      'Entering "', join(' ', informative_scriptname(), @argv), '"')
+	my $id = dblog
+	    ($NOTICE, {type => 'entering'},
+	     'Entering "', join(' ', informative_scriptname(), @argv), '"')
 	  or die;
-	my $id = DBQuerySingleFatal 'select LAST_INSERT_ID()';
 	$ENV{TBLOG_INVOCATION} = $id;
 	DBQueryFatal("update log set invocation=$id where seq=$id");
     } else {
@@ -431,10 +451,10 @@ sub tblog_init_process(@) {
 	$ENV{TBLOG_UID} = 0;
 	$ENV{TBLOG_ATTEMPT} = 0;
 	$ENV{TBLOG_CLEANUP} = 0;
-	dblog($NOTICE, {type => 'entering'},
-	      'Entering "', join(' ', informative_scriptname(), @ARGV), '"')
+	my $id = dblog
+	    ($NOTICE, {type => 'entering'},
+	     'Entering "', join(' ', informative_scriptname(), @ARGV), '"')
 	  or die;
-	my $id = DBQuerySingleFatal 'select LAST_INSERT_ID()';
 	# set SESSION in database
 	$ENV{TBLOG_SESSION} = $id;
 	$ENV{TBLOG_INVOCATION} = $id;
@@ -642,10 +662,36 @@ not exactly like die as the message must be specified.
 #
 
 #
+# new_seq_num
+#
+my $sent_cur_log_seq_error_mail = 0;
+sub new_seq_num (;$) {
+    my ($failure_action) = @_;
+    $failure_action = sub {DBFatal("DB Query failed")} unless defined $failure_action;
+    my $result;
+    $result = DBQuery("UPDATE emulab_indicies SET idx=LAST_INSERT_ID(idx+1) WHERE name = 'cur_log_seq'");
+    if (!$result) {
+	&$failure_action; 
+	return;
+    } elsif ($result->affectedrows <= 0) {
+	my $subject = "Row \"cur_log_seq\" does not exist in emulab_indicies.";
+	my $message = "$subject\n";
+	$message .= "Please see \"database-migrate.txt\".";
+	SENDMAIL(TB_OPSEMAIL, "DBError - $subject", $message)
+	    unless $sent_cur_log_seq_error_mail;
+	$sent_cur_log_seq_error_mail = 1;
+	die "$subject\n";
+	return;
+    }
+    my $seq = $result->insertid();
+    return $seq;
+}
+
+#
 # dblog(priority, {parm=>value,...}, mesg, ...)
 #   Internal function.  Logs a message to the database.  Doesn't print
 #   anything. Will not die, instead return 0 on error, with the error
-#   message in $@.
+#   message in $@.  Otherwise will return the seq number.
 #   Valid parms: sublevel, cause, type
 #
 my $in_dblog = 0; # Used to avoid an infinite recursion when
@@ -655,6 +701,7 @@ my $in_dblog = 0; # Used to avoid an infinite recursion when
 sub dblog_real ( $$@ ) {
     my ($priority, $parms, @mesg) = @_;
     my $mesg = join('',@mesg);
+    my $seq;
     #print SERR "===$priority $parms @mesg\n";
     return if $ENV{TBLOG_OFF} || $in_dblog;
     $in_dblog = 1;
@@ -667,47 +714,93 @@ sub dblog_real ( $$@ ) {
 	$cause = $priority <= $WARNING ? $ENV{TBLOG_CAUSE} : '' 
 	  unless defined $cause;
 
-	my $query = 
-	  sprintf('insert into log (stamp,session,attempt,cleanup,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
-		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
-		  $ENV{TBLOG_SESSION}, 
-		  $ENV{TBLOG_ATTEMPT},
-		  $ENV{TBLOG_CLEANUP},
-		  $ENV{TBLOG_PARENT_INVOCATION}, 
-		  $ENV{TBLOG_INVOCATION},
-		  $ENV{TBLOG_SCRIPTNUM}, 
-		  $ENV{TBLOG_LEVEL},
-		  if_defined($parms->{sublevel}, 0),
-		  $priority,
-		  if_defined($parms->{inferred}, 0),
-		  DBQuoteSpecial $cause,
-		  DBQuoteSpecial if_defined($parms->{type}, 'normal'),
-		  DBQuoteSpecial $mesg);
-
+	my $failure_action;
+	local $DBQUERY_MAXTRIES;
 	if ($priority <= $NOTICE) {
-	    local $DBQUERY_MAXTRIES = 3;
-	    my $result = DBQuery($query);
-	    DBWarn("Could not log entry to DB, tblog_find_error may report incorrect results") unless $result;
+	    $DBQUERY_MAXTRIES = 3;
+	    $failure_action = sub {
+		DBFatal("Could not log entry to DB, tblog_find_error may report incorrect results");
+	    };
 	} else {
-	    my $result = DBQuery($query);
-	    DBWarn("Could not log entry to DB", 1) unless $result;
+	    $DBQUERY_MAXTRIES = 1;
+	    $failure_action = sub {
+	        DBFatal("Could not log entry to DB", 1);
+	    };
 	}
+	
+	$seq = new_seq_num($failure_action);
+	my $result = DBQuery
+	    (sprintf('insert into log (seq,stamp,session,attempt,cleanup,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
+		     'VALUES (%d,UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
+		     $seq,
+		     $ENV{TBLOG_SESSION}, 
+		     $ENV{TBLOG_ATTEMPT},
+		     $ENV{TBLOG_CLEANUP},
+		     $ENV{TBLOG_PARENT_INVOCATION}, 
+		     $ENV{TBLOG_INVOCATION},
+		     $ENV{TBLOG_SCRIPTNUM}, 
+		     $ENV{TBLOG_LEVEL},
+		     if_defined($parms->{sublevel}, 0),
+		     $priority,
+		     if_defined($parms->{inferred}, 0),
+		     DBQuoteSpecial $cause,
+		     DBQuoteSpecial if_defined($parms->{type}, 'normal'),
+		     DBQuoteSpecial $mesg));
+	&$failure_action unless $result;
     };
     $in_dblog = 0;
     # Print a warning on failure but don't log the results to the database
     # as that is likely to fail also
-    print SERR format_message(scriptname(), $WARNING, $@) if $@;
+    print SERR format_message(scriptname(), $WARNING, 
+			      add_prefix("dblog failed", $@)) if $@;
     return 0 if $@;
-    return 1;
+    if ($parms->{error}) {
+	tbreport($parms->{severity},
+		 {seq => $seq, script => $parms->{real_script}},
+		 @{$parms->{error}});
+    }
+    return $seq;
 }
 {
   local $^W = 0;
   *dblog = \&dblog_real;
 }
 
+#
+# FILLMEIN
+#
+sub tbreport( $@ ) {
+    my ($severity) = shift;
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
+    my ($error_type, @context) = @_;
+    my $seq = $parms->{seq};
+
+    eval {
+	local $DBQUERY_MAXTRIES = 3;
+	check_env();
+
+	my $script_num = $ENV{TBLOG_SCRIPTNUM};
+	$script_num = script_name_to_num($parms->{script})
+	    if defined $parms->{script};
+
+	$seq = new_seq_num() unless defined $seq;
+	
+	my $session = $ENV{TBLOG_SESSION};
+
+	# FILLMEIN: Put your code here
+	print STDERR "IN TBREPORT\n";
+    };
+    # Print a warning on failure but don't log the results to the database
+    # as that is likely to fail also
+    print SERR format_message(scriptname(), $WARNING, 
+			      add_prefix("tbreport failed", $@)) if $@;
+    return 0 if $@;
+    return $seq;
+}
 
 =item tblog_find_error
-
+    
 Attempts to find the relevant error.
 
 Will act in a way that is safe to use in an END block, that is (1)
@@ -984,7 +1077,6 @@ sub tblog_find_error () {
 	DBQueryFatal
 	  sprintf("update log set relevant=1 where seq in (%s)",
 		  join(',', map {$_->{seq}} @relevant))         if @relevant;
-	
     };
 
     my $err;
@@ -999,7 +1091,7 @@ sub tblog_find_error () {
 		       "\n".
 		       "$err\n")};
 
-	eval {tblog $WARNING, "tblog_find_error failed: $err" };
+	eval {tblog $WARNING, add_prefix("tblog_find_error failed", $err)};
     }
     
     $? = $saved_exitcode;
