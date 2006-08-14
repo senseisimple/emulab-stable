@@ -201,10 +201,18 @@ if ($ISMAINSITE) {
     # Now the other tables Kevin needs
     #
     foreach my $tablename ("scripts", "priorities", "causes", "session_info",
-			   "errors", "users", "experiments") {
+			   "errors", "users", "experiments",
+			   "report_error", "report_context",
+			   "report_assign_violation") {
 	if (($tablename eq "errors" ||
 	     $tablename eq "session_info") && !$force) {
 	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
+			 "into outfile '${tempfile}.${tablename}' ");
+	}
+	elsif ($tablename eq "report_error" ||
+	       $tablename eq "report_context" ||
+	       $tablename eq "report_assign_violation") {
+	    DBQueryFatal("select * from $tablename where seq>=$firstseq ".
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
 	elsif ($tablename eq "users") {
