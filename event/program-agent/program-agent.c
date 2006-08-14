@@ -1010,9 +1010,6 @@ startrun_callback(event_handle_t handle,
 		  event_notification_t notification,
 		  void *data)
 {
-	char		envdata[2*BUFSIZ], buf[BUFSIZ];
-	char		*bp, *cp;
-	FILE		*file;
 	struct proginfo *pinfo;
 	char		event[TBDB_FLEN_EVEVENTTYPE];
 
@@ -1038,33 +1035,10 @@ startrun_callback(event_handle_t handle,
 				stop_program(pinfo, NULL);
 			}
 		}
-		return;
-	}
-	
-	event_notification_get_string(handle, notification,
-				      "environment", envdata, sizeof(envdata));
-
-	warning("New Environment received!\n");
-	warning("%s\n", envdata);
-
-        bp = cp = envdata;
-	while ((bp = strsep(&cp, "\n")) != NULL) {
-		
-		/* XXX Kind of a stupid way to eval any variables. */
-		if ((file = popenf("echo %s", "r", bp)) != NULL) {
-			if (fgets(buf, sizeof(buf), file) != NULL) {
-				char *idx;
-
-				if ((idx = strchr(buf, '\n')) != NULL)
-					*idx = '\0';
-				if ((idx = strchr(buf, '=')) != NULL) {
-					*idx = '\0';
-					setenv(strdup(buf), idx + 1, 1);
-				}
-			}
-			pclose(file);
-			file = NULL;
-		}
+		/*
+		 * Wrapper will restart us.
+		 */
+		exit(45);
 	}
 }
 
