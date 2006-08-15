@@ -446,8 +446,8 @@ sub createVlan($$$;$$$) {
 	my ($res, $devicename, $device);
 	$vlan_number = $self->newVlanNumber($vlan_id);
 	if ($vlan_number == 0) { last LOCKBLOCK;}
-	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-                 "$self->{STACKID} ... ";
+	print "Creating VLAN $vlan_id as VLAN #$vlan_number on stack " .
+                 "$self->{STACKID} ... \n";
 	if ($self->{ALLVLANSONLEADER}) {
 		$res = $self->{LEADER}->createVlan($vlan_id, $vlan_number);
 		$self->unlock();
@@ -465,7 +465,7 @@ sub createVlan($$$;$$$) {
 		# Ooops, failed. Don't try any more
 		#
 		$vlan_number = 0;
-		print " Failed\n";
+		print "Failed\n";
 		last LOCKBLOCK;
 	    }
 	}
@@ -479,7 +479,7 @@ sub createVlan($$$;$$$) {
 		goto failed;
 	    }
 	}
-	print " Succeeded\n";
+	print "Succeeded\n";
 
     }
     $self->unlock();
