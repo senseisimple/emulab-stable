@@ -1303,12 +1303,15 @@ sub listVlans($) {
 	my ($name,$ifIndex,$status) = @$rowref;
 	$self->debug("Got $name $ifIndex $status\n",3);
 	if ($status ne "trunking") { next;}
-	my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$ifIndex);
-	if (!$node) {
-	    my ($modport) = $self->convertPortFormat($PORT_FORMAT_MODPORT,$ifIndex);
-	    $modport =~ s/\./\//;
-	    $node = $self->{NAME} . ".$modport";
-	}
+        # XXX: This should really print out something more useful, like the
+        # other end of the trunk
+        my $node = $self->{NAME} . ".trunk$ifIndex";
+        #my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$ifIndex);
+        #if (!$node) {
+        #    my ($modport) = $self->convertPortFormat($PORT_FORMAT_MODPORT,$ifIndex);
+        #    $modport =~ s/\./\//;
+        #    $node = $self->{NAME} . ".$modport";
+        #}
 
 	# Get the existing bitfield for allowed VLANs on this trunk
 	my $vlan_number = -1;
