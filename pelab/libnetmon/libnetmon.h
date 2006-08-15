@@ -63,6 +63,11 @@ static void lnm_control();
 static void lnm_control_wait();
 
 /*
+ * Parse a list of reports
+ */
+static void lnm_parse_reportopt(char *s);
+
+/*
  * Allocate space for the monitorFDs - increases the allocation by
  * FD_ALLOC_SIZE slots.
  */
@@ -176,6 +181,17 @@ static void control_query();
  * Which version of the output format are we using?
  */
 static unsigned int output_version;
+
+/*
+ * These describe which things we need to report on. report_all is sort of a
+ * meta-option - at the end of initialization, if it's set, we turn on the
+ * rest of the options, but it's not used after that. This is to cut down
+ * on the number of places we have to remember all of them...
+ */
+static bool report_all;
+static bool report_io;
+static bool report_sockopt;
+static bool report_connect;
 
 /*
  * Prototypes for the real library functions - just makes it easier to declare

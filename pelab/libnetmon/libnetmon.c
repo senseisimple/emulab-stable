@@ -48,7 +48,9 @@ void lnm_init() {
 
     static bool intialized = false;
     char *sockpath;
+    char *ctrl_sockpath;
     char *filepath;
+    char *std_netmond;
 
     if (intialized == false) {
         DEBUG(printf("Initializing\n"));
@@ -82,6 +84,18 @@ void lnm_init() {
           }
 
         /*
+         * Default to reporting on everything - the individual reporting
+         * options will get turned on later if report_all is true
+         */
+        report_io = report_sockopt = report_connect = false;
+        report_all = true;
+        char *reports_s;
+        reports_s = getenv("LIBNETMON_REPORTS");
+        if (reports_s) {
+            lnm_parse_reportopt(reports_s);
+        }
+
+        /*
          * Find the real versions of the library functions we're going to wrap
          */
         FIND_REAL_FUN(socket);
@@ -98,7 +112,20 @@ void lnm_init() {
         /*
          * Connect to netmond if we've been asked to
          */
-        sockpath = getenv("LIBNETMON_SOCKPATH");
+
+        /*
+         * If this is set at all, use the standard data and control sockets for
+         * netmond - it's a PITA to set them by hand
+         */
+        std_netmond = getenv("LIBNETMON_NETMOND");
+        if (std_netmond) {
+            sockpath = SOCKPATH;
+            ctrl_sockpath = CONTROLSOCK;
+        } else {
+            sockpath = getenv("LIBNETMON_SOCKPATH");
+            ctrl_sockpath = getenv("LIBNETMON_CONTROL_SOCKPATH");
+        }
+
         filepath = getenv("LIBNETMON_OUTPUTFILE");
         if (sockpath) {
             int sockfd;
@@ -142,11 +169,10 @@ void lnm_init() {
         /*
          * Connect to the netmond's control socket if we've been asked to
          */
-        sockpath = getenv("LIBNETMON_CONTROL_SOCKPATH");
-        if (sockpath) {
+        if (ctrl_sockpath) {
             struct sockaddr_un servaddr;
 
-            DEBUG(printf("Opening control socket at path %s\n",sockpath));
+            DEBUG(printf("Opening control socket at path %s\n",ctrl_sockpath));
             
             controlfd = real_socket(AF_LOCAL, SOCK_STREAM, 0);
             if (!controlfd) {
@@ -154,7 +180,7 @@ void lnm_init() {
             }
 
             servaddr.sun_family = AF_LOCAL;
-            strcpy(servaddr.sun_path,sockpath);
+            strcpy(servaddr.sun_path,ctrl_sockpath);
 
             if (real_connect(controlfd, (struct sockaddr*) &servaddr,
                              sizeof(servaddr))) {
@@ -186,6 +212,14 @@ void lnm_init() {
 
         } else {
             controlfd = -1;
+        }
+
+        /*
+         * If we got all the way through that with report_all set, turn on the
+         * others now
+         */
+        if (report_all) {
+            report_io = report_sockopt = report_connect = true;
         }
 
         /*
@@ -340,7 +374,9 @@ void nameFD(int fd, const struct sockaddr *localname,
     monitorFDs[fd].local_port = ntohs(localaddr->sin_port);
 
     monitorFDs[fd].connected = true;
-    informConnect(fd);
+    if (report_connect) {
+        informConnect(fd);
+    }
 
 }
 
@@ -434,7 +470,7 @@ void stopFD(int fd) {
     /*
      * Let the monitor know we're done with it
      */
-    if (output_version == 2) {
+    if (output_version >= 2 && report_connect) {
         fprintf(outstream,"Closed: ");
         fprintID(outstream,fd);
         fprintf(outstream,"\n");
@@ -495,6 +531,7 @@ void fprintTime(FILE *f) {
 void process_control_packet(generic_m *m) {
     max_socket_m *maxmsg;
     out_ver_m *vermsg;
+    reports_m *reportmsg;
 
     DEBUG(printf("Processing control packet\n"));
         
@@ -530,6 +567,23 @@ void process_control_packet(generic_m *m) {
             DEBUG(printf("Set output version to %i\n", output_version));
 
             break;
+        case CM_REPORTS:
+            /*
+             * The server told us which things it wants us to report
+             */
+            reportmsg = (reports_m *)m;
+
+            /*
+             * Just for the heck of it, null out the last character to prevent
+             * any dumb string functions from going off the end
+             */
+            reportmsg->reports[CONTROL_MESSAGE_PAYLOAD_SIZE - 1] = '\0';
+
+            DEBUG(printf("Setting reports to %s\n", reportmsg->reports));
+
+            lnm_parse_reportopt(reportmsg->reports);
+
+            break;
         default:
             croak1("Got an unexepected control message type: %i\n",
 		   (void *)m->type);
@@ -558,6 +612,57 @@ void control_query() {
     return;
 
 }
+
+/*
+ * Parse a list of reports, setting the appropriate flags
+ */
+static void lnm_parse_reportopt(char *s) {
+    char *p = s;
+
+    /*
+     * Turn 'all' off, since if they ask for specific ones, we only
+     * give them those - but, we might set it back to true if they
+     * say 'all'...
+     */
+    report_all = false;
+
+    while (p != NULL && *p != '\0') {
+
+        /*
+         * Find out how many chars before the next option or end of
+         * string, whichever comes first
+         */
+        int numchars;
+        char* nextcomma = strchr(p,',');
+        if (nextcomma == NULL) {
+            numchars = strlen(p);
+        } else {
+            numchars = nextcomma - p;
+        }
+
+        /*
+         * Not-so-fancy parsing
+         */
+        if (!strncmp(p,"all",numchars)) {
+            report_all = true;
+        } else if (!strncmp(p,"io",numchars)) {
+            report_io = true;
+        } else if (!strncmp(p,"connect",numchars)) {
+            report_connect = true;
+        } else if (!strncmp(p,"sockopt",numchars)) {
+            report_sockopt = true;
+        } else {
+            croak1("Bad report: %s\n",p);
+        }
+
+        if (nextcomma) {
+            p = nextcomma + 1;
+        } else {
+            p = NULL;
+        }
+    }
+}
+
 
 void allocFDspace() {
     fdRecord *allocRV;
@@ -615,6 +720,9 @@ bool connectedFD_p(int whichFD) {
  * Let the user know that a packet has been sent.
  */
 void log_packet(int fd, size_t len) {
+    if (!report_io) {
+        return;
+    }
     struct timeval time;
     /*
      * XXX - At some point, we may want to use something more precise than
@@ -648,7 +756,7 @@ void log_packet(int fd, size_t len) {
  * Inform the user that the nodelay flag has been changed
  */
 void informNodelay(int fd) {
-    if (output_version == 2) {
+    if (output_version >= 2) {
 	fprintf(outstream,"TCP_NODELAY: ");
 	fprintID(outstream,fd);
 	fprintf(outstream," %i\n",monitorFDs[fd].tcp_nodelay);
@@ -656,7 +764,7 @@ void informNodelay(int fd) {
 }
 
 void informMaxseg(int fd) {
-    if (output_version == 2) {
+    if (output_version >= 2) {
 	fprintf(outstream,"TCP_MAXSEG: ");
 	fprintID(outstream,fd);
 	fprintf(outstream," %i\n",monitorFDs[fd].tcp_maxseg);
@@ -665,7 +773,7 @@ void informMaxseg(int fd) {
 
 void informBufsize(int fd, int which) {
     int bufsize;
-    if (output_version == 2) {
+    if (output_version >= 2) {
 	/* TODO: Handle bad which parameter */
 	if (which == SO_SNDBUF) {
 	    bufsize = monitorFDs[fd].sndbuf;
@@ -682,7 +790,7 @@ void informBufsize(int fd, int which) {
 }
 
 void informConnect(int fd) {
-    if (output_version == 2) {
+    if (output_version >= 2) {
 	/*
 	 * Let the monitor know about it
 	 */
@@ -695,16 +803,20 @@ void informConnect(int fd) {
 	/*
 	 * Some things we report on for every connection
 	 */
-	informNodelay(fd);
-	informMaxseg(fd);
-	informBufsize(fd, SO_RCVBUF);
-	informBufsize(fd, SO_SNDBUF);
+        if (report_sockopt) {
+            informNodelay(fd);
+            informMaxseg(fd);
+            informBufsize(fd, SO_RCVBUF);
+            informBufsize(fd, SO_SNDBUF);
+        }
 
-	fprintf(outstream,"Connected: ");
-	fprintID(outstream,fd);
-	fprintf(outstream," ");
-        fprintTime(outstream);
-	fprintf(outstream,"\n");
+        if (report_connect) {
+            fprintf(outstream,"Connected: ");
+            fprintID(outstream,fd);
+            fprintf(outstream," ");
+            fprintTime(outstream);
+            fprintf(outstream,"\n");
+        }
     }
 }
 
@@ -813,9 +925,11 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
         }
         int local_port = ntohs(localaddr.sin_port);
 
-        fprintf(outstream,"LocalPort: ");
-        fprintID(outstream,sockfd);
-        fprintf(outstream," %i\n",local_port);
+        if (report_connect) {
+            fprintf(outstream,"LocalPort: ");
+            fprintID(outstream,sockfd);
+            fprintf(outstream," %i\n",local_port);
+        }
     } else {
         /*
          * Do this in case the connection really did fail
@@ -850,9 +964,11 @@ int accept(int s, struct sockaddr * addr,
          */
         startFD(rv);
         nameFD(rv,addr,NULL);
-        fprintf(outstream,"LocalPort: ");
-        fprintID(outstream,rv);
-        fprintf(outstream," %i\n",ntohs(((struct sockaddr_in*)addr)->sin_port));
+        if (report_connect) {
+            fprintf(outstream,"LocalPort: ");
+            fprintID(outstream,rv);
+            fprintf(outstream," %i\n",ntohs(((struct sockaddr_in*)addr)->sin_port));
+        }
     }
 
     return rv;
@@ -990,7 +1106,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 	     * not be exactly what the user asked for
 	     */
 	    getNewSockbuf(s,optname);
-	    if (connectedFD_p(s)) {
+	    if (connectedFD_p(s) && report_sockopt) {
 		informBufsize(s,optname);
 	    }
 	}
@@ -1002,7 +1118,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 	    if (optname == TCP_NODELAY) {
 		monitorFDs[s].tcp_nodelay = *((int *)optval);
 
-		if (connectedFD_p(s)) {
+		if (connectedFD_p(s) && report_sockopt) {
 		     /* If connected, inform user of this call */
 		    informNodelay(s);
 		}
@@ -1010,7 +1126,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 	    if (optname == TCP_MAXSEG) {
 		monitorFDs[s].tcp_maxseg = *((int *)optval);
 
-		if (connectedFD_p(s)) {
+		if (connectedFD_p(s) && report_sockopt) {
 		    /* If connected, inform user of this call */
 		    informMaxseg(s);
 		}

@@ -26,6 +26,7 @@ typedef enum {
      */
     CM_MAXSOCKSIZE = 0,
     CM_OUTPUTVER,
+    CM_REPORTS,
 
     CM_SOCKSIZE = 64,
     CM_QUERY
@@ -65,6 +66,14 @@ typedef struct {
     unsigned int type;
     unsigned int version;
 } out_ver_m;
+
+/*
+ * Report, err, report. Okay, bad name.
+ */
+typedef struct {
+    unsigned int type;
+    unsigned char reports[CONTROL_MESSAGE_PAYLOAD_SIZE];
+} reports_m;
 
 /*
  * Socket size change report

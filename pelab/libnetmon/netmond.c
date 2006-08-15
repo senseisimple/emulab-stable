@@ -6,6 +6,13 @@
  * monitored with libnetmon tell us on a unix-domian socket
  */
 
+/*
+ * Get unitstd.h on Linux to declare getopt()
+ */
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -16,6 +23,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include "netmon.h"
 
@@ -44,6 +52,11 @@ unsigned int max_socksize = 0;
 unsigned int forced_socksize = 0;
 
 /*
+ * Only enable a specific set of reports
+ */
+char *reports = NULL;
+
+/*
  * Give a client a report on what settings it should use.
  *
  * Returns non-zero if it gets an error - probably means the client should
@@ -53,6 +66,7 @@ unsigned int write_status(int fd) {
     generic_m message;
     max_socket_m *sockrep;
     out_ver_m *verrep;
+    reports_m *reprep;
 
     /*
      * Report on the maximum socket size
@@ -91,6 +105,21 @@ unsigned int write_status(int fd) {
         return 1;
     }
 
+    /*
+     *  Report on which reports we want
+     */
+    if (reports != NULL) {
+        reprep = (reports_m *)&(message);
+        reprep-> type = CM_REPORTS;
+        strcpy(reprep->reports,reports);
+        reprep->reports[strlen(reports)] = '\0';
+
+        if (write(fd,&message,CONTROL_MESSAGE_SIZE) != CONTROL_MESSAGE_SIZE) {
+            /* Client probably disconnected */
+            return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -99,6 +128,7 @@ void usage() {
     fprintf(stderr,"    -v version      Specify output version (default is 2)\n");
     fprintf(stderr,"    -l size         Maximum socket buffer size\n");
     fprintf(stderr,"    -f size         Force a socket buffer size\n");
+    fprintf(stderr,"    -r reports      Enable listed reports\n");
     exit(-1);
 }
 
@@ -117,7 +147,7 @@ int main(int argc, char **argv) {
     /*
      * Process command-line args
      */
-    while ((ch = getopt(argc, argv, "f:l:v:")) != -1) {
+    while ((ch = getopt(argc, argv, "f:l:v:r:")) != -1) {
         switch(ch) {
             case 'f':
                 if (sscanf(optarg,"%i",&forced_socksize) != 1) {
@@ -133,6 +163,10 @@ int main(int argc, char **argv) {
                 if (sscanf(optarg,"%i",&output_version) != 1) {
                     usage();
                 }
+                break;
+            case 'r':
+                reports = (char*)malloc(strlen(optarg) + 1);
+                strcpy(reports,optarg);
                 break;
             default:
                 usage();
