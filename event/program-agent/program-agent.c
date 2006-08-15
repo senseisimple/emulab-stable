@@ -599,8 +599,22 @@ main(int argc, char **argv)
 	}
 	setenv("NODE", buf, 1);
 	if ((he = gethostbyname(buf)) == NULL) {
-	    warning("warning: cannot get hostname for '%s', "
-		    "assuming no network links available\n", buf);
+		/* XXX should not be hardwired */
+		char *ipfile = "/var/emulab/boot/myip";
+
+		warning("warning: cannot resolve hostname '%s' to obtain IP address,"
+			" reading IP from %s instead\n", buf, ipfile);
+		fp = fopen(ipfile, "r");
+		if (fp == NULL)
+		    warning("warning: cannot get IP address for hostname '%s',"
+			    " assuming no network links available\n", buf);
+		else {
+		    fgets(buf, sizeof(buf), fp);
+		    (void) fclose(fp);
+		    if ((idx = strchr(buf, '\n')) != NULL)
+			*idx = '\0';
+		    setenv("NODEIP", buf, 1);	    
+		}
 	}
 	else {
 	    struct in_addr ia;

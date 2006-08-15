@@ -151,8 +151,8 @@ event_register_withkeydata_withretry(char *name, int threaded,
         memcpy((char *)&myip, he->h_addr, he->h_length);
         strcpy(ipaddr, inet_ntoa(myip));
     } else {
-	ERROR("could not get IP address from hostname: %s\n"
-              "Attempting to get IP from local file.\n", hostname);
+	ERROR("could not get IP address from hostname: %s, "
+              "reading IP from %s.\n", hostname, IPADDRFILE);
         /* Try getting the node's ID from BOOTDIR/myip before giving up. */
 	fp = fopen(IPADDRFILE, "r");
 	if (fp != NULL) {
