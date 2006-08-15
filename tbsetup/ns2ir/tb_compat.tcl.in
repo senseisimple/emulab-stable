@@ -933,9 +933,7 @@ proc tb-set-link-encap {lanlink style} {
 	    set style "veth-ne"
 	}
 	"vlan" {
-	    perror "\[tb-set-link-encap] 'vlan' encap not yet supported"
-	    return
-#	    set style "vlan"
+	    set style "vlan"
 	}
 	default {
 	    perror "\[tb-set-link-encap] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
@@ -1109,9 +1107,7 @@ proc tb-set-vlink-emulation {style} {
 	    set style "veth-ne"
 	}
 	"vlan" {
-	    perror "\[tb-set-encapsulate] 'vlan' encap not yet supported"
-	    return
-#	    set style "vlan"
+	    set style "vlan"
 	}
 	default {
 	    perror "\[tb-set-encapsulate] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
