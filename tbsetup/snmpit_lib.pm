@@ -173,9 +173,9 @@ sub getExperimentTrunks($$) {
     my ($pid, $eid) = @_;
     my @ports;
 
-    my $query = "select distinct r.node_id,v.iface from reserved as r" .
-		  "left join vinterfaces as v on v.node_id=r.node_id" .
-		  "where r.pid='$pid' and r.eid='$eid' and v.type='vlan' and" .
+    my $query = "select distinct r.node_id,v.iface from reserved as r " .
+		  "left join vinterfaces as v on v.node_id=r.node_id " .
+		  "where r.pid='$pid' and r.eid='$eid' and v.type='vlan' and " .
 		  "v.iface is not NULL";
 
 #    $query = "select node_id , iface from trunk_test";

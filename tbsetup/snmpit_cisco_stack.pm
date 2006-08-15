@@ -975,7 +975,7 @@ sub switchesWithPortsInVlan($$) {
     my @switches = ();
     foreach my $devicename (keys %{$self->{DEVICES}}) {
         my $device = $self->{DEVICES}{$devicename};
-	if ($device->vlanHasPorts($vlan_mumber)) {
+	if ($device->vlanHasPorts($vlan_number)) {
 	    push @switches, $devicename;
         }
     }
