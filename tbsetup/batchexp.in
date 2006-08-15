@@ -1169,6 +1169,7 @@ sub CopyInArchive()
 	if (!defined($copyarg));
 
     my $dstdir = "$userdir/archive/nsdata";
+    $tempnsfile = "$dstdir/nsfile.ns";
 
     if ($copyfrom eq "exp") {
 	#
@@ -1184,6 +1185,33 @@ sub CopyInArchive()
 		fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
 	    }
 	}
+	else {
+	    #
+	    # This is a really old experiment with no archive yet.
+	    # Get the old experiment nsfile from the db.
+	    #
+	    my $query_result =
+		DBQueryFatal("select nsfile from nsfiles ".
+			     "where pid='$copypid' and eid='$copyeid'");
+	    tbdie("No such experiment in DB for $copypid/$copyeid\n")
+		if (!$query_result->numrows);
+	    my ($nsfile) = $query_result->fetchrow_array();
+	    tbdie("No nsfile in DB for $copypid/$copyeid\n")
+		if (!defined($nsfile) || $nsfile eq "");
+
+	    if (! -e "$dstdir") {
+		mkdir("$dstdir", 0775)
+		    or fatal("Failed to mkdir $dstdir for copy");
+	    }
+
+	    open(NS, "> $tempnsfile")
+		or tbdie("Could not write ns code to $tempnsfile!\n");
+	    $nsfile =~ s/\r//g;
+	    print NS $nsfile;
+	    print NS "\n";
+	    close(NS);
+	    chmod(0664, "$tempnsfile");
+        }
     }
     else {
 	#
@@ -1198,7 +1226,6 @@ sub CopyInArchive()
 							 $subdir)
 	    == 0 or fatal("CopyInArchive: Checking out archive");
     }
-    $tempnsfile = "$dstdir/nsfile.ns";
 }
 
 #
