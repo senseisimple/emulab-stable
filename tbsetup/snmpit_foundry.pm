@@ -1101,9 +1101,6 @@ sub setVlansOnTrunk($$$$) {
     if (($value != 1) && ($value != 0)) {
 	die "Invalid value $value passed to setVlansOnTrunk\n";
     }
-    if (grep(/^1$/,@vlan_numbers)) {
-	die "VLAN 1 passed to setVlansOnTrunk\n";
-    }
     $self->debug("foundry::setVlansOnTrunk" .
 		"m $modport v $value nums @vlan_numbers\n");
     ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
@@ -1119,6 +1116,7 @@ sub setVlansOnTrunk($$$$) {
     }
     foreach my $vlan_number (@vlan_numbers) {
 	my $action = ($value == 1) ? "create" : "delete" ;
+	if ($vlan_number == 1) { next ; }
 	$RetVal = $self->{SESS}->set(
 		"snVLanByPortMemberRowStatus.$vlan_number.$ifIndex",$action);
 	if (!$RetVal) {
@@ -1181,14 +1179,13 @@ sub clearAllVlansOnTrunk($$) {
 #
 # Enable trunking on a port
 #
-# usage: enablePortTrunking(self, modport, nativevlan)
+# usage: enablePortTrunking2(self, modport, nativevlan, equaltrunk)
 #        modport: module.port of the trunk to operate on
 #        nativevlan: VLAN number of the native VLAN for this trunk
 #        Returns 1 on success, 0 otherwise
 #
-sub enablePortTrunking($$$) {
-    my $self = shift;
-    my ($port,$native_vlan) = @_;
+sub enablePortTrunking2($$$$) {
+    my ($self, $port, $native_vlan, $equaltrunking) = @_;
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
     my $portIndex = $self->{PORTINDEX}{$ifIndex};
@@ -1212,6 +1209,7 @@ sub enablePortTrunking($$$) {
 	return 0;
     } 
 
+    if ($equaltrunking) { return 1; }
     #
     # Set the native VLAN for this trunk
     #

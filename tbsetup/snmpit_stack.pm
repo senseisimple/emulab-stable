@@ -71,6 +71,11 @@ sub new($$$@) {
     #
     @{$self->{DEVICENAMES}} = @devicenames;
 
+    # The following line will let snmpit_stack be used interchangeably
+    # with snmpit_cisco_stack
+    # $self->{ALLVLANSONLEADER} = 1;
+    $self->{ALLVLANSONLEADER} = 0;
+
     #
     # The following two lines will let us inherit snmpit_cisco_stack
     # (someday), (and can help pare down lines of diff in the meantime)
@@ -237,7 +242,9 @@ sub setPortVlan($$@) {
     #
     my $vlan_number = $self->findVlan($vlan_id);
     if (!$vlan_number) {
-	print STDERR "ERROR: VLAN with identifier $vlan_id does not exist!\n";
+	print STDERR
+	"ERROR: VLAN with identifier $vlan_id does not exist on stack " .
+	$self->{STACKID} . "\n" ;
 	return 1;
     }
 
@@ -389,13 +396,18 @@ sub setPortVlan($$@) {
 sub newVlanNumber($$) {
     my $self = shift;
     my $vlan_id = shift;
+    my %vlans;
 
     $self->debug("stack::newVlanNumber $vlan_id\n");
-    my %vlans = $self->findVlans();
+    if ($self->{ALLVLANSONLEADER}) {
+	%vlans = $self->{LEADER}->findVlans();
+    } else {
+	%vlans = $self->findVlans();
+    }
     my $number = $vlans{$vlan_id};
 
     if (defined($number)) { return 0; }
-    my @numbers = values %vlans;
+    my @numbers = sort values %vlans;
     $self->debug("newVlanNumbers: numbers ". "@numbers" . " \n");
     $number = $self->{MIN_VLAN}-1;
     my $lim = $self->{MAX_VLAN};
@@ -419,7 +431,7 @@ sub createVlan($$$;$$$) {
     my $vlan_id = shift;
     my @ports = @{shift()};
     my @otherargs = @_;
-    my $okay = 1;
+    my $vlan_number;
     my %map;
 
 
@@ -431,22 +443,30 @@ sub createVlan($$$;$$$) {
 	#
 	# We need to create the VLAN on all pertinent devices
 	#
-	my ($vlan_number, $res, $devicename, $device);
+	my ($res, $devicename, $device);
 	$vlan_number = $self->newVlanNumber($vlan_id);
 	if ($vlan_number == 0) { last LOCKBLOCK;}
 	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
                  "$self->{STACKID} ... ";
+	if ($self->{ALLVLANSONLEADER}) {
+		$res = $self->{LEADER}->createVlan($vlan_id, $vlan_number);
+		$self->unlock();
+		if (!$res) { goto failed; }
+	}
 	%map = mapPortsToDevices(@ports);
 	foreach $devicename (sort {tbsort($a,$b)} keys %map) {
+	    if ($self->{ALLVLANSONLEADER} &&
+		($devicename eq $self->{LEADERNAME})) { next; }
 	    $device = $self->{DEVICES}{$devicename};
 	    $res = $device->createVlan($vlan_id, $vlan_number);
 	    if (!$res) {
+	    failed:
 		#
 		# Ooops, failed. Don't try any more
 		#
-		$okay = 0;
+		$vlan_number = 0;
 		print " Failed\n";
-		last;
+		last LOCKBLOCK;
 	    }
 	}
 
@@ -454,16 +474,16 @@ sub createVlan($$$;$$$) {
 	# We need to populate each VLAN on each switch.
 	#
 	$self->debug( "adding ports @ports to VLAN $vlan_id \n");
-	if ($okay && @ports) {
+	if (@ports) {
 	    if ($self->setPortVlan($vlan_id,@ports)) {
-		$okay = 0;
+		goto failed;
 	    }
 	}
 	print " Succeeded\n";
 
     }
     $self->unlock();
-    return $okay;
+    return $vlan_number;
 }
 
 #
@@ -696,14 +716,18 @@ sub getStats($) {
 #
 # Turns on trunking on a given port, allowing only the given VLANs on it
 #
-# usage: enableTrunking(self, port, vlan identifier list)
+# usage: enableTrunking2(self, port, equaltrunking, vlan identifier list)
+#
+# formerly was enableTrunking() without the predicate to decline to put
+# the port in dual mode.
 #
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub enableTrunking($$@) {
+sub enableTrunking2($$$@) {
     my $self = shift;
     my $port = shift;
+    my $equaltrunking = shift;
     my @vlan_ids = @_;
 
     #
@@ -716,34 +740,38 @@ sub enableTrunking($$@) {
 	warn "ERROR: Unable to find device entry for $devicename\n";
 	return 0;
     }
-    my %devVlans = $device->findVlans(@vlan_ids);
     #
-    # The first VLAN given becomes the native VLAN for the trunk
+    # If !equaltrunking, the first VLAN given becomes the PVID for the trunk
     #
-    my $native_vlan_id = shift @vlan_ids;
-    if (!$native_vlan_id) {
-	warn "ERROR: No native VLAN passed to enableTrunking()!\n";
-	return 0;
+    my ($native_vlan_id, $vlan_number);
+    if ($equaltrunking) {
+	$native_vlan_id = "default";
+	$vlan_number = 1;
+    } else {
+	$native_vlan_id = shift @vlan_ids;
+	if (!$native_vlan_id) {
+	    warn "ERROR: No VLAN passed to enableTrunking()!\n";
+	    return 0;
+	}
+	#
+	# Grab the VLAN number for the native VLAN
+	#
+	$vlan_number = $device->findVlan($native_vlan_id);
+	if (!$vlan_number) {
+	    warn "Native VLAN $native_vlan_id was not on $devicename";
+	    # This is painful
+	    my $error = $self->setPortVlan($native_vlan_id,$port);
+	    if ($error) {
+		    warn ", and couldn't add it\n"; return 0;
+	    } else { warn "\n"; } 
+	}
     }
-    #
-    # Grab the VLAN number for the native VLAN
-    #
-    my $vlan_number = $devVlans{$native_vlan_id};
-    if (!$vlan_number) {
-	warn "Native VLAN $native_vlan_id was not on $devicename";
-	# This is painful
-	my $error = $self->setPortVlan($native_vlan_id,$port);
-	if ($error) {
-		warn ", and couldn't add it\n"; return 0;
-	} else { warn "\n"; } 
-    }
-
     #
     # Simply make the appropriate call on the device
     #
     print "Enable trunking: Port is $port, native VLAN is $native_vlan_id\n"
 	if ($self->{DEBUG});
-    my $rv = $device->enablePortTrunking($port, $vlan_number);
+    my $rv = $device->enablePortTrunking2($port, $vlan_number, $equaltrunking);
 
     #
     # If other VLANs were given, add them to the port too
@@ -752,30 +780,19 @@ sub enableTrunking($$@) {
 	my @vlan_numbers;
 	foreach my $vlan_id (@vlan_ids) {
 	    #
-	    # First, make sure that the VLAN really does exist
+	    # setPortVlan makes sure that the VLAN really does exist
+	    # and will set up intervening trunks as well as adding the
+	    # trunked port to that VLAN
 	    #
-	    my $vlan_number = $devVlans{$vlan_id};
-	    if (!$vlan_number) {
-		warn "ERROR: VLAN $vlan_id not found on $devicename";
-		# This is also painful
-		my $error = $self->setPortVlan($native_vlan_id,$port);
-		if ($error) {
-			warn ", and couldn't add it\n"; return 0;
-		} else { warn "\n"; } 
-	    } else {
-		push @vlan_numbers, $vlan_number;
+	    my $error = $self->setPortVlan($vlan_id,$port);
+	    if ($error) {
+		warn "ERROR: could not add VLAN $vlan_id to trunk $port\n";
+		next;
 	    }
-	}
-	print "  add VLANs " . join(",",@vlan_numbers) . " to trunk\n"
-	    if ($self->{DEBUG});
-	if (@vlan_numbers && !$device->setVlansOnTrunk($port,1,@vlan_numbers)) {
-	    warn "ERROR: could not add VLANs " .
-		join(",",@vlan_numbers) . " to trunk";
+	    push @vlan_numbers, $vlan_number;
 	}
     }
-
     return $rv;
-
 }
 
 #
@@ -807,7 +824,6 @@ sub disableTrunking($$) {
     my $rv = $device->disablePortTrunking($port);
 
     return $rv;
-
 }
 
 #
@@ -980,6 +996,8 @@ sub debug($$;$) {
     }
 }
 
+my $lock_held = 0;
+
 sub lock($) {
     my $self = shift;
     my $stackid = $self->{STACKID};
@@ -987,10 +1005,11 @@ sub lock($) {
     my $old_umask = umask(0);
     die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
     umask($old_umask);
+    $lock_held = 1;
 }
 
 sub unlock($) {
-	TBScriptUnlock();
+	if ($lock_held) { TBScriptUnlock(); $lock_held = 0;}
 }
 
 

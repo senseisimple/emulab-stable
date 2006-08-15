@@ -22,6 +22,7 @@ use English;
 use SNMP;
 use snmpit_lib;
 use Socket;
+use libtestbed;
 
 #
 # These are the commands that can be passed to the portControl function
@@ -898,7 +899,8 @@ sub setPortVlan($$@) {
     my $errors = 0;
 
     if (!$self->vlanNumberExists($vlan_number)) {
-	print STDERR "ERROR: VLAN $vlan_number does not exist\n";
+	print STDERR "ERROR: VLAN $vlan_number does not exist on switch"
+	. $self->{NAME} . "\n";
 	return 1;
     }
 
@@ -936,32 +938,58 @@ sub setPortVlan($$@) {
     }
 
     #
-    # Convert ports from the format the were passed in to the correct format
-    #
-    my @portlist = $self->convertPortFormat($format,@ports);
-
-    #
     # We'll keep track of which ports suceeded, so that we don't try to
     # enable/disable, etc. ports that failed.
     #
     my @okports = ();
-    foreach my $port (@portlist) {
+    my ($index, $retval);
+    my %BumpedVlans = ();
 
-	# 
-	# Make sure the port didn't get mangled in conversion
+    foreach my $port (@ports) {
+	$self->debug("Putting port $port in VLAN $vlan_number\n");
 	#
-	if (!defined $port) {
-	    print STDERR "Port not found, skipping\n";
+	# Check to see if it's a trunk ....
+	#
+	($index) = $self->convertPortFormat($PORT_FORMAT_IFINDEX, $port);
+	$retval = snmpitGetWarn($self->{SESS},
+			["vlanTrunkPortDynamicState",$index]);
+	if (!$retval) {
 	    $errors++;
 	    next;
 	}
-	$self->debug("Putting port $port in VLAN $vlan_number\n");
+	if (!(($retval eq "on") || ($retval eq "onNoNegotiate"))) {
+	    #
+	    # Convert ports to the correct format
+	    #
+	    ($index) = $self->convertPortFormat($format, $port);
 
-	#
-	# Do the acutal SNMP command
-	#
-	my $snmpvar = [$PortVlanMemb,$port,$vlan_number,'INTEGER'];
-	my $retval = snmpitSetWarn($self->{SESS},$snmpvar);
+	    # 
+	    # Make sure the port didn't get mangled in conversion
+	    #
+	    if (!defined $index) {
+		print STDERR "Port not found, skipping\n";
+		$errors++;
+		next;
+	    }
+	    my $snmpvar = [$PortVlanMemb,$index,$vlan_number,'INTEGER'];
+	    #
+	    # Check to see if we are already in a VLAN
+	    #
+	    $retval = snmpitGet($self->{SESS},[$PortVlanMemb,$index]);
+	    if (($retval ne "NOSUCHINSTANCE") &&
+		("$retval" ne "$vlan_number") && ("$retval" ne "1")) {
+		$BumpedVlans{$retval} = 1;
+	    }
+	    #
+	    # Do the acutal SNMP command
+	    #
+	    $retval = snmpitSetWarn($self->{SESS},$snmpvar);
+	} else {
+	    #
+	    # We're here if it a trunk
+	    #
+	    $retval = $self->setVlansOnTrunk($port, 1, $vlan_number);
+	}
 	if (!$retval) {
 	    $errors++;
 	    next;
@@ -986,6 +1014,15 @@ sub setPortVlan($$@) {
 	    print STDERR "Port enable had $rv failures.\n";
 	    $errors += $rv;
 	}
+    }
+
+    # When removing things from the control vlan for a firewall,
+    # need to tell stack to shake things up to flush FDB on neighboring
+    # switches.
+    #
+    my @bumpedlist = keys ( %BumpedVlans );
+    if (@bumpedlist) {
+	@{$self->{DISPLACED_VLANS}} = @bumpedlist;
     }
 
     return $errors;
@@ -1258,6 +1295,38 @@ sub listVlans($) {
     }
 
     #
+    # Walk trunks for the VLAN members
+    #
+    ($rows) = snmpitBulkwalkFatal($self->{SESS},["vlanTrunkPortDynamicStatus"]);
+    $self->debug("Trunk members walk returned " . scalar(@$rows) . " rows\n");
+    foreach my $rowref (@$rows) {
+	my ($name,$ifIndex,$status) = @$rowref;
+	$self->debug("Got $name $ifIndex $status\n",3);
+	if ($status ne "trunking") { next;}
+	my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$ifIndex);
+	if (!$node) {
+	    my ($modport) = $self->convertPortFormat($PORT_FORMAT_MODPORT,$ifIndex);
+	    $modport =~ s/\./\//;
+	    $node = $self->{NAME} . ".$modport";
+	}
+
+	# Get the existing bitfield for allowed VLANs on this trunk
+	my $vlan_number = -1;
+	my $bitfield = snmpitGetFatal($self->{SESS},
+		["vlanTrunkPortVlansEnabled",$ifIndex]);
+	my $unpacked = unpack("B*",$bitfield);
+	# Put this into an array of 1s and 0s for easy manipulation
+	foreach my $bit (split //,$unpacked) {
+	    $vlan_number++;
+	    if ($bit == 0) { next; }
+	    $self->debug("got vlan $vlan_number on trunk $node\n",3);
+	    if ($Names{$vlan_number}) {
+		push @{$Members{$vlan_number}}, $node;
+	    }
+	}
+    }
+
+    #
     # Build a list from the name and membership lists
     #
     my @list = ();
@@ -1500,7 +1569,14 @@ sub setVlansOnTrunk($$$$) {
 
     #
     # Get the existing bitfield for allowed VLANs on the trunk
+    # If two snmpit process were manipulating trunks at the same
+    # time there is a potential race in which they would both
+    # retrieve the same bit vector, compute different results
+    # and then the trunk would not be correct, so we lock
+    # in the file system on boss, as that is likely to be faster
+    # than using the vlan lock buffer on the switch.
     #
+    $self->lock();
     my $bitfield = snmpitGetFatal($self->{SESS},
 	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
     my $unpacked = unpack("B*",$bitfield);
@@ -1521,6 +1597,8 @@ sub setVlansOnTrunk($$$$) {
     # And save it back...
     my $rv = snmpitSetFatal($self->{SESS},
         ["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,"OCTETSTR"]);
+    $self->unlock();
+
     if ($rv) {
 	return 1;
     } else {
@@ -1594,8 +1672,7 @@ sub clearAllVlansOnTrunk($$) {
 #        return value currently ignored.
 
 sub resetVlanIfOnTrunk($$$) {
-    my $self = shift;
-    my ($modport, $value, $vlan_number) = @_;
+    my ($self, $modport, $vlan_number) = @_;
 
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
@@ -1619,6 +1696,7 @@ sub resetVlanIfOnTrunk($$$) {
     #
     # Get the exisisting bitfield for allowed VLANs on the trunk
     #
+    $self->lock();
     my $bitfield = snmpitGetFatal($self->{SESS},
 	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
     my $unpacked = unpack("B*",$bitfield);
@@ -1663,20 +1741,21 @@ sub resetVlanIfOnTrunk($$$) {
     # And save it back...
     $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
     	    "OCTETSTR"]);
+    $self->unlock();
     return 0;
 }
 
 #
 # Enable trunking on a port
 #
-# usage: enablePortTrunking(self, modport, nativevlan)
+# usage: enablePortTrunking2(self, modport, nativevlan, equaltrunking)
 #        modport: module.port of the trunk to operate on
 #        nativevlan: VLAN number of the native VLAN for this trunk
 #        Returns 1 on success, 0 otherwise
 #
-sub enablePortTrunking($$$) {
-    my $self = shift;
-    my ($port,$native_vlan) = @_;
+sub enablePortTrunking2($$$$) {
+    my ($self,$port,$native_vlan,$equaltrunking) = @_;
+    my $trunking_vlan = ($equaltrunking ? 1 : $native_vlan);
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
 
@@ -1703,7 +1782,7 @@ sub enablePortTrunking($$$) {
     #
     # Set the native VLAN for this trunk
     #
-    my $nativeVlan = ["vlanTrunkPortNativeVlan",$ifIndex,$native_vlan,"INTEGER"];
+    my $nativeVlan = ["vlanTrunkPortNativeVlan",$ifIndex,$trunking_vlan,"INTEGER"];
     $rv = snmpitSetWarn($self->{SESS},$nativeVlan);
     if (!$rv) {
 	warn "ERROR: Unable to set native VLAN on trunk\n";
@@ -1713,12 +1792,14 @@ sub enablePortTrunking($$$) {
     #
     # Finally, enable trunking!
     #
-    my $trunkEnable = ["vlanTrunkPortDynamicState",$ifIndex,"on","INTEGER"];
+    my $trunkEnable = ["vlanTrunkPortDynamicState",$ifIndex,"onNoNegotiate","INTEGER"];
     $rv = snmpitSetWarn($self->{SESS},$trunkEnable);
     if (!$rv) {
 	warn "ERROR: Unable to enable trunking\n";
 	return 0;
     }
+
+    if ($equaltrunking) { return 1; }
 
     #
     # Allow the native VLAN to cross the trunk
@@ -1982,6 +2063,24 @@ sub debug($$;$) {
     if ($self->{DEBUG} >= $debuglevel) {
 	print STDERR $string;
     }
+}
+
+my $lock_held = 0;
+
+sub lock($) {
+    my $self = shift;
+    my $token = "snmpit_" . $self->{NAME};
+    if ($lock_held == 0) {
+	my $old_umask = umask(0);
+	die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+	umask($old_umask);
+    }
+    $lock_held = 1
+}
+
+sub unlock($) {
+	if ($lock_held == 1) { TBScriptUnlock();}
+	$lock_held = 0;
 }
 
 # End with true

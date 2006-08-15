@@ -16,6 +16,7 @@ use Exporter;
 @EXPORT = qw( macport portnum Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
+		getExperimentTrunks setVlanTag
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks
@@ -163,6 +164,44 @@ sub getVlanPorts (@) {
 
     # Convert from the DB format to the one used by the snmpit modules
     return convertPortsFromIfaces(@ports);
+}
+
+#
+# Returns an an array of trunked ports (in node:card form) used by an experiment
+#
+sub getExperimentTrunks($$) {
+    my ($pid, $eid) = @_;
+    my @ports;
+
+    my $query = "select distinct r.node_id,v.iface from reserved as r" .
+		  "left join vinterfaces as v on v.node_id=r.node_id" .
+		  "where r.pid='$pid' and r.eid='$eid' and v.type='vlan' and" .
+		  "v.iface is not NULL";
+
+#    $query = "select node_id , iface from trunk_test";
+
+    my $result = DBQueryFatal($query);
+    while (my ($node, $iface) = $result->fetchrow()) {
+	$node = $node . ":" . $iface;
+	push @ports, $node;
+    }
+    return convertPortsFromIfaces(@ports);
+}
+
+#
+# Update database to store vlan tag.
+#
+sub setVlanTag ($$) {
+    my ($vlan_id, $vlan_number) = @_;
+    # Silently exit if they passed us no VLANs
+    if (!$vlan_id || !defined($vlan_number)) {
+	return ();
+    }
+
+    my $result = DBQueryFatal("UPDATE vlans SET tag=$vlan_number " .
+				"WHERE id=$vlan_id");
+
+    return 0;
 }
 
 #

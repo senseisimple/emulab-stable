@@ -253,6 +253,8 @@ sub setPortVlan($$@) {
     # Split up the ports among the devices involved
     #
     my %map = mapPortsToDevices(@ports);
+    my %trunks;
+    my @trunks;
 
     if ($self->{PRUNE_VLANS}) {
         #
@@ -278,8 +280,8 @@ sub setPortVlan($$@) {
         # Find out every switch which might have to transit this VLAN through
         # its trunks
         #
-        my %trunks = getTrunks();
-        my @trunks = getTrunksFromSwitches(\%trunks, keys %switches);
+        %trunks = getTrunks();
+        @trunks = getTrunksFromSwitches(\%trunks, keys %switches);
         foreach my $trunk (@trunks) {
             my ($src,$dst) = @$trunk;
             $switches{$src} = $switches{$dst} = 1;
@@ -327,6 +329,7 @@ sub setPortVlan($$@) {
         }
     }
 
+    my %BumpedVlans = ();
     #
     # Perform the operation on each switch
     #
@@ -343,10 +346,48 @@ sub setPortVlan($$@) {
 	# Simply make the appropriate call on the device
 	#
 	$errors += $device->setPortVlan($vlan_number,@{$map{$devicename}});
+
+	#
+	# When making firewalls, may have to flush FDB entries from trunks
+	#
+	if (defined($device->{DISPLACED_VLANS})) {
+	    foreach my $vlan (@{$device->{DISPLACED_VLANS}}) {
+		$BumpedVlans{$vlan} = 1;
+	    }
+	    $device->{DISPLACED_VLANS} = undef;
+	}
     }
 
     if ($vlan_id ne 'default') {
-	$errors += (!$self->setVlanOnTrunks($vlan_number,1,@ports));
+	# if PRUNE were not in effect, then %trunks and @trunks
+	# aren't valid.  If VTP weren't enforced however,
+	# merely calling setVlanOnTrunks() with just the specified
+	# ports would miss transit-only switches.
+	# maybe the phrase at the top should be if (PRUNE || !VTP ..)
+	# expecially if running VTP automatically creates the interswitch
+	# trunks.
+	# I'll let Rob R. decide what to do about that -- sklower.
+	$errors += (!$self->setVlanOnTrunks2($vlan_number,1,\%trunks,@trunks));
+    }
+
+    #
+    # When making firewalls, may have to flush FDB entries from trunks
+    #
+    foreach my $vlan (keys %BumpedVlans) {
+	foreach my $devicename ($self->switchesWithPortsInVlan($vlan)) {
+	    my $dev = $self->{DEVICES}{$devicename};
+	    foreach my $neighbor (keys %{$trunks{$devicename}}) {
+		my $trunkIndex = $dev->getChannelIfIndex(
+				    @{$trunks{$devicename}{$neighbor}});
+		if (!defined($trunkIndex)) {
+		    warn "unable to find channel information on $devicename ".
+			 "for $devicename-$neighbor EtherChannel\n";
+		    $errors += 1;
+		} else {
+		    $dev->resetVlanIfOnTrunk($trunkIndex,$vlan);
+		}
+	    }
+	}
     }
 
     return $errors;
@@ -679,33 +720,19 @@ sub getStats($) {
 #
 # Turns on trunking on a given port, allowing only the given VLANs on it
 #
-# usage: enableTrunking(self, port, vlan identifier list)
+# usage: enableTrunking2(self, port, equaltrunking, vlan identifier list)
+#
+# formerly was enableTrunking() without the predicate to decline to put
+# the port in dual mode.
 #
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub enableTrunking($$@) {
+sub enableTrunking2($$$@) {
     my $self = shift;
     my $port = shift;
+    my $equaltrunking = shift;
     my @vlan_ids = @_;
-
-    #
-    # On a Cisco, the first VLAN given becomes the native VLAN for the trunk
-    #
-    my $native_vlan_id = shift @vlan_ids;
-    if (!$native_vlan_id) {
-	print STDERR "ERROR: No native VLAN passed to enableTrunking()!\n";
-	return 0;
-    }
-
-    #
-    # Grab the VLAN number for the native VLAN
-    #
-    my $vlan_number = $self->{LEADER}->findVlan($native_vlan_id);
-    if (!$vlan_number) {
-	print STDERR "ERROR: Native VLAN $native_vlan_id does not exist!\n";
-	return 0;
-    }
 
     #
     # Split up the ports among the devices involved
@@ -717,37 +744,60 @@ sub enableTrunking($$@) {
 	warn "ERROR: Unable to find device entry for $devicename\n";
 	return 0;
     }
+    #
+    # If !equaltrunking, the first VLAN given becomes the PVID for the trunk
+    #
+    my ($native_vlan_id, $vlan_number);
+    if ($equaltrunking) {
+	$native_vlan_id = "default";
+	$vlan_number = 1;
+    } else {
+	$native_vlan_id = shift @vlan_ids;
+	if (!$native_vlan_id) {
+	    warn "ERROR: No VLAN passed to enableTrunking()!\n";
+	    return 0;
+	}
+	#
+	# Grab the VLAN number for the native VLAN
+	#
+	$vlan_number = $device->findVlan($native_vlan_id);
+	if (!$vlan_number) {
+	    warn "Native VLAN $native_vlan_id was not on $devicename";
+	    # This is painful
+	    my $error = $self->setPortVlan($native_vlan_id,$port);
+	    if ($error) {
+		    warn ", and couldn't add it\n"; return 0;
+	    } else { warn "\n"; } 
+	}
+    }
 
     #
     # Simply make the appropriate call on the device
     #
     print "Enable trunking: Port is $port, native VLAN is $native_vlan_id\n"
 	if ($self->{DEBUG});
-    my $rv = $device->enablePortTrunking($port, $vlan_number);
+    my $rv = $device->enablePortTrunking2($port, $vlan_number, $equaltrunking);
 
     #
     # If other VLANs were given, add them to the port too
     #
     if (@vlan_ids) {
-	my %vlan_numbers = $self->{LEADER}->findVlans(@vlan_ids);
 	my @vlan_numbers;
 	foreach my $vlan_id (@vlan_ids) {
 	    #
-	    # First, make sure that the VLAN really does exist
+	    # setPortVlan makes sure that the VLAN really does exist
+	    # and will set up intervening trunks as well as adding the
+	    # trunked port to that VLAN
 	    #
-	    my $vlan_number = $vlan_numbers{$vlan_id};
-	    if (!$vlan_number) {
-		warn "ERROR: VLAN $vlan_id not found on switch!";
+	    my $error = $self->setPortVlan($vlan_id,$port);
+	    if ($error) {
+		warn "ERROR: could not add VLAN $vlan_id to trunk $port\n";
 		next;
 	    }
 	    push @vlan_numbers, $vlan_number;
 	}
 	print "  add VLANs " . join(",",@vlan_numbers) . " to trunk\n"
 	    if ($self->{DEBUG});
-	if (!$device->setVlansOnTrunk($port,1,@vlan_numbers)) {
-	    warn "ERROR: could not add VLANs " .
-		join(",",@vlan_numbers) . " to trunk";
-	}
     }
 
     return $rv;
@@ -833,6 +883,18 @@ sub setVlanOnTrunks($$$;@) {
     # switches
     #
     my @trunks = getTrunksFromSwitches(\%trunks,@switches);
+    return $self->setVlanOnTrunks2($vlan_number,$value,\%trunks,@trunks);
+}
+#
+# Enables or disables (depending on $value) a VLAN on all the supplied
+# trunks. Returns 1 on sucess, 0 on failure.
+#
+sub setVlanOnTrunks2($$$$@) {
+    my $self = shift;
+    my $vlan_number = shift;
+    my $value = shift;
+    my $trunkref = shift;
+    my @trunks = @_;
 
     #
     # Now, we go through the list of trunks that need to be modifed, and
@@ -859,7 +921,7 @@ sub setVlanOnTrunks($$$;@) {
 	    # Trunks might be EtherChannels, find the ifIndex
 	    #
             my $trunkIndex = $self->{DEVICES}{$src}->
-                             getChannelIfIndex(@{ $trunks{$src}{$dst} });
+                             getChannelIfIndex(@{ $$trunkref{$src}{$dst} });
             if (!defined($trunkIndex)) {
                 warn "ERROR - unable to find channel information on $src ".
 		     "for $src-$dst EtherChannel\n";
@@ -880,7 +942,7 @@ sub setVlanOnTrunks($$$;@) {
 	    # Trunks might be EtherChannels, find the ifIndex
 	    #
             my $trunkIndex = $self->{DEVICES}{$dst}->
-                             getChannelIfIndex(@{ $trunks{$dst}{$src} });
+                             getChannelIfIndex(@{ $$trunkref{$dst}{$src} });
             if (!defined($trunkIndex)) {
                 warn "ERROR - unable to find channel information on $dst ".
 		     "for $src-$dst EtherChannel\n";
@@ -913,11 +975,8 @@ sub switchesWithPortsInVlan($$) {
     my @switches = ();
     foreach my $devicename (keys %{$self->{DEVICES}}) {
         my $device = $self->{DEVICES}{$devicename};
-        foreach my $line ($device->listVlans()) {
-            my ($vlan_id, $vlan, $memberRef) = @$line;
-            if (($vlan == $vlan_number) && (@$memberRef > 0)) {
-                push @switches, $devicename;
-            }
+	if ($device->vlanHasPorts($vlan_mumber)) {
+	    push @switches, $devicename;
         }
     }
     return @switches;

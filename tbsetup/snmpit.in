@@ -101,6 +101,8 @@ VLAN Control:
   -N <name>         Print out the VLAN number for the named VLAN
   -c                Delete ALL VLANs, and recreate from the database. ** USE
                         WITH EXTREME CAUTION **
+  -F                Create all vlans in the given stack on the leader for
+		    use in leader->{ALLVLANSONLEADER} (Internal use only)
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -112,6 +114,7 @@ Port Control:
   -u <half|full> <ports> Set duplex of <ports> to half or full
   -T <port> <names>      Enable trunking on the given <port>, and allow VLANs
                              with the given <names> across it
+  -E <port> <names>      Like -T, but "Equal" mode; PVID is also tagged
   -U <port>              Turn off trunking for the given <port>
   -b <ports>             Print out port status for a set of ports
   -B <statstring>        Pass in a stat string from -b to restore status
@@ -128,8 +131,8 @@ END
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n',
-    'N=s@','o=s@','p=s','q','r','s', 'S=s@', 't','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s');
+    'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
+    'y=s','x=s','z=s','F');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -152,6 +155,7 @@ my $pid;
 my $eid;
 my @ports;
 my @optvlanids = ();
+my $equaltrunking = 0;
 
 #
 # Some operations have mandatory agruments - for others, make sure that
@@ -176,12 +180,13 @@ if ($opt{t} || $opt{r}) {
     # Options that take a list of ports
     #
     @ports = @ARGV;
-} elsif ($opt{T}) {
+} elsif ($opt{T} || $opt{E}) {
     #
     # Options that take both a port and a list of VLANs - we require at least
     # one VLAN to be given
     #
-    if (!@ARGV) {
+    if ($opt{E}) { $opt{T} = $opt{E}; $equaltrunking = 1;}
+    elsif (!@ARGV) {
 	tberror "At least one VLAN required";
 	exit &usage;
     }
@@ -219,9 +224,10 @@ if ($opt{r}) { push @commands, ["reset"]; }
 if ($opt{c}) { push @commands, ["recreate"]; }
 if ($opt{U}) { push @commands, ["trunkdisable"]; }
 if ($opt{b}) { push @commands, ["portstatus"]; }
+if ($opt{F}) { push @commands, ["synchleader"]; }
 
 #
-# Commands that can appear once, and take an agurment
+# Commands that can appear once, and take an argument
 #
 if ($opt{d}) { push @commands, ["portcontrol","disable"]; }
 if ($opt{e}) { push @commands, ["portcontrol","enable"]; }
@@ -457,7 +463,7 @@ foreach my $command (@commands) {
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/ || /make/ || /remove/ || /vlannumber/) && do {
+	(/listvlans/ || /getstats/ || /make/ || /remove/ || /vlannumber/ || /synchleader/) && do {
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
@@ -581,12 +587,6 @@ foreach my $command (@commands) {
 		    @{$stacks{$stack_id}});
 		last;
 	    };
-	    /nortel/ && do {
-		require snmpit_nortel;
-		$stack = new snmpit_nortel($stack_id,$debug,
-		    @{$stacks{$stack_id}});
-		last;
-	    };
 	    /generic/ && do {
 		require snmpit_stack;
 		$stack = new snmpit_stack($stack_id,$debug,
@@ -648,6 +648,10 @@ foreach my $command (@commands) {
 	    $exitval += doListVlans(\@stacks);
 	    last;
 	}; # /listvlans/ && do 
+	/synchleader/ && do {
+	    $exitval += doSynchLeader(\@stacks);
+	    last;
+	}; # /listvlans/ && do 
 	/listports/ && do {
 	    $exitval += doListPorts(\@stacks);
 	    last;
@@ -689,7 +693,7 @@ foreach my $command (@commands) {
 	    last;
 	}; # /trunkenable/ && do
 	/trunkdisable/ && do {
-	    $exitval += doTrunkDisable(\@stacks,@ports);
+	    $exitval += doTrunkDisable(\@stacks,$ports[0]);
 	    last;
 	}; # /trunkdisable/ && do
 	/portstatus/ && do {
@@ -854,6 +858,35 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
     }
 
     return 0;
+}
+
+#
+# This routine does a number of illegal things.  It is used
+# to make sure the leader of a stack contains all vlans on all switches
+# in the stack and is only useful for moving a stack back and forth
+# between types "cisco" and "generic" (where $stack->{ALLVLANSONLEADER} must be
+# set to 1.
+#
+sub doSynchLeader ($) {
+
+    my $stacks = shift;
+    my $errors = 0;
+    if (!TBAdmin()) {
+	die "Only admins are allowed to synchronize stacks\n";
+    }
+
+    foreach my $stack (@$stacks) {
+	my $leader = $stack->{LEADER};
+	my %vlans = $stack->findVlans();
+	while (my ($id,$num) = each %vlans) {
+	    if (($num >= $leader->{MIN_VLAN}) &&
+		($num <= $leader->{MAX_VLAN}) &&
+		!($leader->vlanNumberExists($num))) {
+			$errors += $leader->createVlan($id, $num);
+	    }
+	}
+    }
+    return $errors;
 }
 
 #
@@ -1110,6 +1143,8 @@ sub doVlansFromTables($@) {
     my @vlans = @_;
 
     my $errors = 0;
+    my $vlan_number;
+    my $oEopt = $equaltrunking;
 
     if (@$stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n" .
@@ -1124,6 +1159,13 @@ sub doVlansFromTables($@) {
 	return RemoteDoVlansFromTables(@vlans);
     }
 
+    my @trunkedPorts = getExperimentTrunks($eid,$pid);
+    $equaltrunking = 1;
+    foreach my $port (@trunkedPorts) {
+	$errors += doTrunkEnable($stacks,$port);
+    }
+    $equaltrunking = $oEopt;
+
     foreach my $vlan (@vlans) {
 	my @ports = getVlanPorts($vlan);
 	if ($stack->vlanExists($vlan)) {
@@ -1131,13 +1173,14 @@ sub doVlansFromTables($@) {
 		if (!$quiet);
 	    $errors += $stack->setPortVlan($vlan,@ports);
 	} else {
-	    if (!$stack->createVlan($vlan,\@ports)) {
+	    $vlan_number = $stack->createVlan($vlan,\@ports);
+	    if (!$vlan_number) {
 		tberror "Failed to create VLAN with id $vlan";
 		#
 		# Don't try to put ports in a VLAN if it couldn't be created
 		#
 		$errors++;
-	    }
+	    } else { setVlanTag($vlan, $vlan_number); }
 	}
 
 	#
@@ -1188,6 +1231,10 @@ sub doReset($@) {
     }
 
     my $errors = 0;
+    my @trunkedPorts = getExperimentTrunks($eid,$pid);
+    foreach my $port (@trunkedPorts) {
+	$errors += doTrunkDisable($stacks,$port);
+    }
     #
     # Just remove the VLAN from evey stack on which it exists. We keep a
     # list and do them all at once for efficiency.
@@ -1196,6 +1243,9 @@ sub doReset($@) {
 	my @existant_vlans = $stack->existantVlans(@vlans);
 	if (!$stack->removeVlan(@existant_vlans)) {
 	    $errors++;
+	}
+	foreach my $vlan (@existant_vlans) {
+	    setVlanTag($vlan, 0);
 	}
     }
     return $errors;
@@ -1453,7 +1503,7 @@ sub doTrunkEnable($$@) {
     my $stack = $$stacks[0];
     print "Enabling trunking on $port ...\n"
 	if (!$quiet);
-    return !($stack->enableTrunking($port,@vlans));
+    return !($stack->enableTrunking2($port,$equaltrunking,@vlans));
 }
 
 #
@@ -1476,12 +1526,10 @@ sub doTrunkDisable($$) {
     #
     my $stack = $$stacks[0];
     my $errors = 0;
-    foreach my $port (@ports) {
-	print "Disabling trunking on port $port ...\n"
-	    if (!$quiet);
-	if (!$stack->disableTrunking($port)) {
-	    $errors++;
-	}
+    print "Disabling trunking on port $port ...\n"
+	if (!$quiet);
+    if (!$stack->disableTrunking($port)) {
+	$errors++;
     }
     return $errors;
 }

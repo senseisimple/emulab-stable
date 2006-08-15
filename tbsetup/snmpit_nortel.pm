@@ -27,6 +27,9 @@ use English;
 use SNMP;
 use snmpit_lib;
 
+use libtestbed;
+
+
 #
 # These are the commands that can be passed to the portControl function
 # below
@@ -708,13 +711,16 @@ sub setPortVlan($$@) {
 	printf STDERR "$id: Could not get current list for VLAN $vlan_number\n";
 	return 1;
     }
+    $self->lock();
     my @newlist;
     my @oldlist = $self->portSetToList($portSet);
     push @oldlist, @portlist;
     my $SetVal = $self->listToPortSet(@oldlist);
     $self->debug("$id: members of VLAN $vlan_number [ @oldlist ]\n");
 
-    if ($self->snmpSetCheckPortSet($obj, $vlan_number, $SetVal)) {
+    $errors = $self->snmpSetCheckPortSet($obj, $vlan_number, $SetVal);
+    $self->unlock();
+    if ($errors) {
 	return 1;
     }
     #
@@ -729,11 +735,11 @@ sub setPortVlan($$@) {
 
     if ($self->{SKIPIGMP}) { return $errors; }
 
+    $self->lock();
     my $igmp = "rcVlanIgmpVer1SnoopMRouterPorts";
     my $IgnoredVal = $self->{SESS}->get("$igmp.$vlan_number");
-    if ($self->snmpSetCheckPortSet($igmp, $vlan_number, $SetVal)) {
-	return 1;
-    }
+    $errors += $self->snmpSetCheckPortSet($igmp, $vlan_number, $SetVal);
+    $self->unlock();
 
     return $errors;
 }
@@ -771,10 +777,12 @@ sub delPortVlan($$@) {
     $self->debug("ports: " . join(",",@ports) . "\n");
     $self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
 
+    $self->lock();
     my $portSet = $self->{SESS}->get("$obj.$vlan_number");
 
     if (!$portSet) {
 	printf STDERR "Could not get current list for VLAN $vlan_number\n";
+	$self->unlock();
 	return 1;
     }
     my @oldlist = $self->portSetToList($portSet);
@@ -786,12 +794,14 @@ sub delPortVlan($$@) {
 
     my $SetVal = $self->listToPortSet(@oldlist);
 
-    return $self->snmpSetCheckPortSet($obj, $vlan_number, $SetVal);
+    my $result = $self->snmpSetCheckPortSet($obj, $vlan_number, $SetVal);
+    $self->unlock();
+    return $result;
 }
 
 
 #
-# Remove all ports from the given VLANS. Each VLAN is given as a VLAN
+# Disables all ports in the given VLANS. Each VLAN is given as a VLAN
 # 802.1Q tag value.
 #
 # usage: removePortsFromVlan(self,@vlan)
@@ -1306,16 +1316,18 @@ sub clearAllVlansOnTrunk($$) {
 #
 # Enable trunking on a port
 #
-# usage: enablePortTrunking(self, modport, nativevlan)
+# usage: enablePortTrunking2(self, modport, nativevlan, equaltrunking)
 #        modport: module.port of the trunk to operate on
 #        nativevlan: VLAN number of the native VLAN for this trunk
+#	 equaltrunk: don't do dual mode; tag PVID also.
 #        Returns 1 on success, 0 otherwise
 #
-sub enablePortTrunking($$$) {
-    my $self = shift;
-    my ($port,$native_vlan) = @_;
+sub enablePortTrunking2($$$$) {
+    my ($self,$port,$native_vlan,$equaltrunking) = @_;
 
-    if (!defined($native_vlan) || ($native_vlan <= 1)) {
+    if ($equaltrunking) {
+	if (!$native_vlan) { $native_vlan = 1; }
+    } elsif (!defined($native_vlan) || ($native_vlan <= 1)) {
 	warn "Error: innappropriate or missing PVID for trunk\n";
 	return 0;
     }
@@ -1337,14 +1349,17 @@ sub enablePortTrunking($$$) {
 	return 0;
     } 
     #
-    # Set port type to "untagPvidOnly"
+    # Set port type apropriately.
     #
-    $portType = ["rcVlanPortType",$portIndex,5,"INTEGER"];
+    my $portTypeOid = 5; # "untagPvidOnly"
+    if ($equaltrunking) { $portTypeOid = 2; } # "tagAll"
+    $portType = ["rcVlanPortType",$portIndex,$portTypeOid,"INTEGER"];
     $rv = $self->{SESS}->set($portType);
     if (!defined($rv)) {
-	warn "enablePortTrunking: Unable to set port type to untagPvidOnly\n";
+	warn "enablePortTrunking: Unable to set port type\n";
 	return 0;
     }
+    # Next call waits for switch to stabilize before proceeding.
     $rv = $self->{SESS}->get("rcVlanPortType.$portIndex");
     return 1;
 }
@@ -1491,6 +1506,24 @@ sub debug($$;$) {
     if ($self->{DEBUG} >= $debuglevel) {
 	print STDERR $string;
     }
+}
+
+my $lock_held = 0;
+
+sub lock($) {
+    my $self = shift;
+    my $token = "snmpit_" . $self->{NAME};
+    if ($lock_held == 0) {
+	my $old_umask = umask(0);
+	die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+	umask($old_umask);
+    }
+    $lock_held = 1;
+}
+
+sub unlock($) {
+	if ($lock_held == 1) { TBScriptUnlock();}
+	$lock_held = 0;
 }
 
 # End with true
