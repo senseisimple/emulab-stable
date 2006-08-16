@@ -87,6 +87,11 @@ use libtblog;
 use libtblog qw(dblog *SERR);
 use NodeType;
 
+use constant false => 0;
+use constant true  => 1;
+
+sub parse_error($);
+
 #
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
@@ -248,6 +253,7 @@ else {
     while (<ERR>) {
 	print SERR $_;
 	if (/^\s*\*\*\*\s*(.+)/) {
+	    parse_error($err);
 	    dblog(TBLOG_ERR, {}, $err) if $err; # flush any previous errors
 	    $_ = $1;
 	    if (/^\S+:\s*$/) { # error on next line
@@ -256,12 +262,14 @@ else {
 		s/^\s+//;
 	    } 
 	    s/\s+$//;
+	    parse_error($_);
 	    dblog(TBLOG_ERR, {}, $_) if $_;
 	    $err = '';
 	} else {
 	    $err .= $_;
 	}
     }
+    parse_error($err);
     dblog(TBLOG_ERR, {}, $err) if $err;
 
     tblog_exit();
@@ -272,7 +280,9 @@ close ERR;
 if ($?) {
     my $exit_status = $? >> 8;
     
-    tbdie({type=>'extra', cause=>'user'}, "Parsing failed (error code $exit_status)!");
+    tbdie({cause => 'user', type => 'extra', severity => SEV_ERROR,
+	   error => ['ns_parse_failed']},
+	  "Parsing failed (error code $exit_status)!");
 }
 exit(0)
     if ($impotent);
@@ -285,7 +295,9 @@ system("$TB/libexec/xmlconvert -p -x $outfile $pid $eid");
 if ($?) {
     my $exit_status = $? >> 8;
     
-    tbdie("XML converter exited with error code $exit_status!\n");
+    tbdie({type => 'primary', severity => SEV_ERROR,
+	   error => ['xml_converter_failed']},
+	  "XML converter exited with error code $exit_status!\n");
 }
 
 #
@@ -637,4 +649,52 @@ sub GenDefsFile($)
 
     print TCL "}\n";
     close(TCL);
+}
+
+sub parse_error($) {
+    my ($mesg) = @_;
+
+    return if parse_invalid_os_error($mesg);
+    return if parse_invalid_variable_error($mesg);
+
+    return;
+}
+
+sub parse_invalid_os_error($) {
+    my ($mesg) = @_;
+    my ($type, $osname);
+
+    if ($mesg =~ /^\[tb-set-(\w+)-os\] Invalid osid (\S+)\.$/) {
+	($type, $osname) = ($1, $2);
+    } else {
+	return false;
+    }
+
+    tbreport(SEV_ADDITIONAL, {script => 'parse.tcl'}, 'invalid_os',
+	     $type, $osname, undef);
+
+    return true;
+}
+
+sub parse_invalid_variable_error($) {
+    my ($mesg) = @_;
+    my ($type, $var);
+
+    if ($mesg =~ /^\[tb-set-hardware\] Invalid hardware type (\S+)\.$/) {
+	$var  = $1;
+	$type = 'hardware_type';
+    } elsif ($mesg =~ /^\[run\] Invalid lan\/link name (\S+)\./) {
+	$var  = $1;
+	$type = 'lan_link_name';
+    } elsif ($mesg =~ /^\[run\] Invalid node name (\S+)\./) {
+	$var  = $1;
+	$type = 'node_name';
+    } else {
+	return false;
+    }
+
+    tbreport(SEV_ADDITIONAL, {script => 'parse.tcl'}, 'invalid_variable',
+	     $type, $var);
+
+    return true;
 }

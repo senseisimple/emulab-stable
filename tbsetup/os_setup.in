@@ -116,10 +116,12 @@ $| = 1; #Turn off line buffering on output
 # Used to die with a -1 return code, to indicate to caller (tbswap)
 # that the failure is not likely to be fixed with another attempt.
 #
-sub die_noretry($)
+sub die_noretry($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my ($mesg) = shift;
-    tberror $mesg;
+    tberror($parms, $mesg);
     exit(-1);
 }
 
@@ -332,7 +334,9 @@ while (my %row = $db_result->fetchhash()) {
     #
     foreach my $rpm (split(":", $row{'rpms'})) {
 	if (! -f $rpm) {
-	    die_noretry("RPM $rpm for node $node does not exist!");
+	    die_noretry({type => 'primary', severity => SEV_ERROR,
+			 error => ['file_not_found', 'rpm', $rpm, $node]},
+			"RPM $rpm for node $node does not exist!");
 	}
     }
 
@@ -343,7 +347,9 @@ while (my %row = $db_result->fetchhash()) {
 	my ($dir, $tar) = split(" ", $tarspec);
 
 	if (! -f $tar) {
-	    die_noretry("Tarfile $tar for node $node does not exist!");
+	    die_noretry({type => 'primary', severity => SEV_ERROR,
+			 error => ['file_not_found', 'tar', $tar, $node]},
+			"Tarfile $tar for node $node does not exist!");
 	}
     }
 
@@ -588,7 +594,9 @@ if ($firewalled) {
     if (!$canceled) {
 	TBGetCancelFlag($pid, $eid, \$canceled);
 	if ($canceled) {
-	    tbnotice "Swap canceled; will terminate os_setup early!";
+	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
+		      error => ['cancel_flag']},
+		     "Swap canceled; will terminate os_setup early!");
 	    goto tballdone;
 	}
     }
@@ -627,7 +635,9 @@ if ($plabinelab) {
     if (!$canceled) {
 	TBGetCancelFlag($pid, $eid, \$canceled);
 	if ($canceled) {
-	    tbnotice "Swap canceled; will terminate os_setup early!";
+	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
+		      error => ['cancel_flag']},
+		     "Swap canceled; will terminate os_setup early!");
 	    goto tballdone;
 	}
     }
@@ -864,7 +874,9 @@ while ( @nodelist ) {
 	TBGetCancelFlag($pid, $eid, \$canceled);
 
 	if ($canceled) {
-	    tbnotice "Swap canceled; will terminate os_setup early!";
+	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
+		      error => ['cancel_flag']},
+		     "Swap canceled; will terminate os_setup early!");
 	}
     }
 
@@ -1152,7 +1164,9 @@ elsif (@vnodelist) {
 	    TBGetCancelFlag($pid, $eid, \$canceled);
 	
 	    if ($canceled) {
-		tbnotice "Swap canceled; not retrying failed virtual nodes!";
+		tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
+			  error => ['cancel_flag']},
+			 "Swap canceled; not retrying failed virtual nodes!");
 	    }
 	    else {
 		# Mark each node so that vnode_setup will retry.
@@ -1278,9 +1292,28 @@ my $summary = '';
 # First gather stats
 #
 foreach (keys %failed_nodes) {
+    my $node = $_;
     my $osid = $osids{$_};
     my $type = $node_types{$_};
     my ($what,$fatal)  = @{$failed_nodes{$_}};
+
+    my ($error_type, $severity);
+
+    if ($what eq 'boot') {
+	$error_type = 'node_boot_failed';
+    } elsif ($what eq 'reload') {
+	$error_type = 'node_load_failed';
+    }
+
+    if ($fatal eq 'fatal') {
+	$severity = SEV_ERROR;
+    } elsif ($fatal eq 'nonfatal') {
+	$severity = SEV_WARNING;
+    }
+
+    if (defined($error_type) && defined($severity)) {
+	tbreport($severity, $error_type, $node, $type, $osid);
+    }
 
     $tally{$what}{$osid} = {} unless defined $tally{$what}{$osid};
     my $t = $tally{$what}{$osid};
@@ -1464,7 +1497,9 @@ sub SetupReload($$$)
 	}
     }
     else {
-	die_noretry("No image can be found for $osid on $node!");
+	die_noretry({type => 'primary', severity => SEV_ERROR,
+		     error => ['file_not_found', 'image', $osid, $node]},
+		    "No image can be found for $osid on $node!");
     }
 }
 

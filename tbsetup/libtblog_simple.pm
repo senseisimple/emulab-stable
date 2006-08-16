@@ -26,7 +26,9 @@ use Exporter;
 	      tbdie
 	      tblog_session
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
-	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
+	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG
+	      SEV_DEBUG SEV_NOTICE SEV_WARNING SEV_SECONDARY
+	      SEV_ERROR SEV_ADDITIONAL SEV_IMMEDIATE);
 
 # After package decl.
 # DO NOT USE "use English" in this module
@@ -90,8 +92,13 @@ while (my ($n,$v) = each %PRIORITY_MAP_TO_STR) {
 # tbreport related constants
 #
 
-# FILLMEIN: Be sure that any exported constants don't conflict with
-#   tblog ones
+use constant SEV_DEBUG      =>   0;
+use constant SEV_NOTICE     => 100;
+use constant SEV_WARNING    => 300;
+use constant SEV_SECONDARY  => 400;
+use constant SEV_ERROR      => 500; # Threshold
+use constant SEV_ADDITIONAL => 600;
+use constant SEV_IMMEDIATE  => 900;
 
 #
 # Utility functions

@@ -214,7 +214,9 @@ use Exporter;
 	      tblog_set_cleanup tblog_get_cleanup
 	      copy_hash
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
-	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
+	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG
+	      SEV_DEBUG SEV_NOTICE SEV_WARNING SEV_SECONDARY
+	      SEV_ERROR SEV_ADDITIONAL SEV_IMMEDIATE);
 @EXPORT_OK = qw (dblog *SOUT *SERR);
 
 # After package decl.
@@ -766,9 +768,94 @@ sub dblog_real ( $$@ ) {
   *dblog = \&dblog_real;
 }
 
-#
-# FILLMEIN
-#
+use constant CONTEXT_MAP => {
+    'assign_type_precheck' =>
+	['report_context', 'vc0',      'i0',  'i1', 'i2', 'vc1'],
+	#                  vtype, requested, slots,  max, round
+    'assign_mapping_precheck' =>
+	['report_context', 'vc0', 'vc1', 'vc2',      'i0',  'i1'],
+	#                  vnode, class,  type, requested, count
+    'assign_fixed_node' =>
+	['report_context', 'vc0', 'vc1', 'vc2'],
+	#                  class, vnode, pnode
+    'over_disk_quota' =>
+	['report_context',   'vc0'],
+	#                  control
+    'update_aborted' =>
+	['report_context',  'vc0'],
+	#                  result
+    'set_experiment_state_failed' =>
+	['report_context', 'vc0'],
+	#                  state
+    'archive_op_failed' =>
+	['report_context',     'vc0', 'vc1', 'vc2'],
+	#                  operation,  type,   dir
+    'modify_firewall_not_allowed' =>
+	['report_context',     'vc0', 'vc1'],
+	#                  operation, state
+    'os_node_reset_failed' =>
+	['report_context', 'vc0'],
+	#                   type
+    'assign_wrapper_failed' =>
+	['report_context',   'i0'],
+	#                  status
+    'invalidate_bootblock_failed' =>
+	['report_context', 'vc0'],
+	#                   node
+    'run_command_failed' =>
+	['report_context',   'vc0', 'vc1'],
+	#                  command,  node
+    'node_lacks_linkdelay_support' =>
+	['report_context', 'vc0', 'vc1',  'vc2'],
+	#                   node,   lan, osname
+    'invalid_os' =>
+	['report_context', 'vc0',  'vc1', 'vc2'],
+	#                   type, osname, pname
+    'copy_ns_file_failed' =>
+	['report_context', 'vc0', 'vc1'],
+	#                    src,  dest
+    'bad_data' =>
+	['report_context', 'vc0', 'vc1'],
+	#                  field,  data
+    'bogus_ns_file' =>
+	['report_context', 'vc0'],
+	#                   path
+    'disallowed_directory' =>
+	['report_context', 'vc0'],
+	#                   path
+    'node_boot_failed' =>
+	['report_context', 'vc0', 'vc1', 'vc2'],
+	#                   node,  type,  osid
+    'node_load_failed' =>
+	['report_context', 'vc0', 'vc1', 'vc2'],
+	#                   node,  type,  osid
+    'file_not_found' =>
+	['report_context', 'vc0', 'vc1', 'vc2'],
+	#                   type,  path,  node
+    'invalid_variable' =>
+	['report_context', 'vc0', 'vc1'],
+	#                   type,   var
+    'create_vlan_failed' =>
+	['report_context', 'vc0'],
+	#                   vlan
+    'get_port_status_failed' =>
+	['report_context', 'vc0'],
+	#                   port
+    'device_not_in_stack' =>
+	['report_context',  'vc0'],
+	#                  device
+    'invalid_switch_stack' =>
+	['report_context', 'vc0'],
+	#                  stack
+
+    'assign_violation' => [
+	'report_assign_violation', 
+	'unassigned', 'pnode_load', 'no_connect', 'link_users',
+	'bandwidth', 'desires', 'vclass', 'delay',
+	'trivial_mix', 'subnodes', 'max_types', 'endpoints',
+    ],
+};
+
 sub tbreport( $@ ) {
     my ($severity) = shift;
     my $parms = {};
@@ -787,9 +874,27 @@ sub tbreport( $@ ) {
 	$seq = new_seq_num() unless defined $seq;
 	
 	my $session = $ENV{TBLOG_SESSION};
+	my $attempt = $ENV{TBLOG_ATTEMPT};
 
-	# FILLMEIN: Put your code here
-	print STDERR "IN TBREPORT\n";
+	croak("error_type must be _0-9A-Za-z") unless $error_type =~ /^\w+$/;
+
+	my $sql = sprintf("insert into report_error (seq, stamp, session, attempt, severity, script, error_type) values(%d, UNIX_TIMESTAMP(now()), %d, %d, %d, %d, %s)",
+		          $seq, $session, $attempt, $severity, $script_num, DBQuoteSpecial($error_type));
+
+	DBQueryFatal($sql);
+
+	if (@context > 0) {
+	    croak("$error_type has no associated entry in CONTEXT_MAP")
+		unless defined(CONTEXT_MAP->{$error_type}); 
+
+	    my ($table, @columns) = @{CONTEXT_MAP->{$error_type}};
+
+	    my $sql = sprintf("insert into %s (seq, " . join(', ', @columns) .
+			      ") values(%d" . ", %s" x @columns . ")",
+			      $table, $seq, map(DBQuoteSpecial($_), @context));
+
+	    DBQueryFatal($sql);
+	}
     };
     # Print a warning on failure but don't log the results to the database
     # as that is likely to fail also

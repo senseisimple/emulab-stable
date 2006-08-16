@@ -31,7 +31,7 @@ use Exporter;
 use English;
 use libdb;
 use libtestbed;
-use libtblog ('tbdie', 'tbwarn');
+use libtblog qw(tbdie tbwarn tbreport SEV_ERROR);
 use strict;
 use SNMP;
 
@@ -893,6 +893,7 @@ sub snmpitGetFatal($$;$) {
     $result = snmpitDoIt($SNMPIT_GET,$sess,$var,$retries);
 
     if (! defined $result) {
+	tbreport(SEV_ERROR, 'snmp_get_fatal');
 	snmpitFatal("SNMP GET failed");
     }
     return $result;
@@ -942,6 +943,7 @@ sub snmpitSetFatal($$;$) {
     $result = snmpitDoIt($SNMPIT_SET,$sess,$var,$retries);
 
     if (! defined $result) {
+	tbreport(SEV_ERROR, 'snmp_set_fatal');
 	snmpitFatal("SNMP SET failed");
     }
     return $result;

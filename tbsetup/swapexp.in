@@ -123,7 +123,7 @@ my $isadmin  = 0;
 my $modifyError; # needed when emailing error
 
 # Protos
-sub fatal($);
+sub fatal($;$);
 sub CheckFWinfo($);
 sub GatherFWinfo();
 		
@@ -333,7 +333,8 @@ if ($waitmode) {
 my $overquota = system("$checkquota $dbuid");
 
 if ($overquota) {
-    tberror({cause => 'user'},
+    tberror({cause => 'user', severity => SEV_WARNING,
+	     error => ['over_disk_quota', $CONTROL]},
 	    "You are over your disk quota on $CONTROL; please cleanup!");
 }
 
@@ -426,11 +427,15 @@ if ($batch) {
 	      "Currently $estate, but should be QUEUED.")
 	    if ($estate ne EXPTSTATE_QUEUED);
 	
-	tbdie("Batch experiment $pid/$eid has been canceled! Aborting.")
+	tbdie({cause => 'canceled', severity => SEV_IMMEDIATE,
+	       error => ['cancel_flag']},
+	      "Batch experiment $pid/$eid has been canceled! Aborting.")
 	    if ($canceled);
 
 	# Do not allow it to swap in. What about swapout? 
-	tbdie("Batch experiment cannot swap in when over quota! Aborting.")
+	tbdie({type => 'primary', severity => SEV_ERROR,
+	       error => ['over_disk_quota', $CONTROL]},
+	      "Batch experiment cannot swap in when over quota! Aborting.")
 	    if ($overquota);
     }
     elsif ($inout eq "out") {
@@ -461,10 +466,12 @@ else {
 			   "QUEUE. Currently $estate.")
 		if ($estate ne EXPTSTATE_SWAPPED);
 
-	    ExitWithStatus(1,
-			   "Batch experiment $pid/$eid cannot swap in when ".
-			   "over quota!\n")
-		if ($overquota);
+	    if ($overquota) {
+		tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);
+		ExitWithStatus(1,
+			       "Batch experiment $pid/$eid cannot swap in when ".
+			       "over quota!\n")
+	    }
 	    
 	    $experiment->SetState(EXPTSTATE_QUEUED);
 	}
@@ -511,10 +518,12 @@ else {
 			"Cannot modify an active ElabInElab experiment (yet).")
 		if ($elabinelab && $estate ne EXPTSTATE_SWAPPED && !$isadmin);
 
-	    ExitWithStatus(1,
-			   "Cannot modify batch experiment $pid/$eid when ".
-			   "over quota!\n")
-		if ($overquota);
+	    if ($overquota) {
+		tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);
+		ExitWithStatus(1,
+			       "Cannot modify batch experiment $pid/$eid when ".
+			       "over quota!\n")
+	    }
 	    
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
@@ -559,10 +568,12 @@ else {
 		      ExitWithStatus(1,
 				     "Experiment $pid/$eid is not swapped out!");
 		  }
-		  ExitWithStatus(1,
-				 "Experiment $pid/$eid cannot swap in when ".
-				 "over quota!\n")
-		      if ($overquota);
+		  if ($overquota) {
+		      tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);
+		      ExitWithStatus(1,
+				     "Experiment $pid/$eid cannot swap in when ".
+				     "over quota!\n")
+		  }
 		  
 		  last SWITCH;
 	      };
@@ -626,10 +637,12 @@ else {
 		      if ($elabinelab &&
 			  $estate ne EXPTSTATE_SWAPPED && !$isadmin);
 
-		  ExitWithStatus(1,
-				 "Experiment $pid/$eid cannot be modified ".
-				 "when over quota!\n")
-		      if ($overquota);
+		  if ($overquota) {
+		      tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);
+		      ExitWithStatus(1,
+				     "Experiment $pid/$eid cannot be modified ".
+				     "when over quota!\n")
+		  }
 		  
 		  last SWITCH;
 	      };
@@ -678,7 +691,9 @@ $termswapstate = $estate;
 
 # Lock the record, set the nextstate, and unlock the table.
 $experiment->Lock($nextswapstate) == 0
-    or tbdie("Failed to set experiment state to $nextswapstate");
+    or tbdie({type => 'secondary', severity => SEV_SECONDARY,
+	      error => ['set_experiment_state_failed', $nextswapstate]},
+	     "Failed to set experiment state to $nextswapstate");
 
 #
 # At this point, we need to force a cleanup no matter how we exit.
@@ -860,25 +875,33 @@ if ($inout eq "out") {
 
     if ($experiment->Swap("out", $optarg) != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswap out failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['tbswap_out_failed']},
+	      "tbswap out failed!");
     }
 
     #
     # Add the files that have been detected by tracing to the archive.
     #
     if (libArchive::TBExperimentArchiveAddTracedFiles($pid, $eid) < 0) {
-	fatal("Failed to add traced files to the experiment archive!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['archive_op_failed', 'add_traced_files', undef, undef]},
+	      "Failed to add traced files to the experiment archive!");
     }
 
     #
     # Add the special per-experiment archive directory.
     #
     if (libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) < 0) {
-	fatal("Failed to add user specified files to the experiment archive!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['archive_op_failed', 'add_user_files', undef, undef]},
+	      "Failed to add user specified files to the experiment archive!");
     }
 
     $experiment->SetState(EXPTSTATE_SWAPPED) == 0
-	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
+	or fatal({type => 'secondary', severity => SEV_SECONDARY,
+		  error => ['set_experiment_state_failed', EXPTSTATE_SWAPPED()]},
+	         "Failed to set experiment state to " . EXPTSTATE_SWAPPED());
     
     $experiment->ClearPanicBit() == 0
 	or fatal("Failed to clear the panic bit!");
@@ -893,11 +916,15 @@ elsif ($inout eq "in") {
 
     if ($experiment->Swap("in") != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswap in failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['tbswap_in_failed']},
+	      "tbswap in failed!");
     }
     
     $experiment->SetState(EXPTSTATE_ACTIVE) == 0
-	or fatal("Failed to set experiment state to " . EXPTSTATE_ACTIVE());
+	or fatal({type => 'secondary', severity => SEV_SECONDARY,
+		  error => ['set_experiment_state_failed', EXPTSTATE_ACTIVE()]},
+	         "Failed to set experiment state to " . EXPTSTATE_ACTIVE());
     
     $experiment->Report($repfile, "-b");
 }
@@ -948,7 +975,9 @@ elsif ($inout eq "modify") {
 		if ($rendering);
 
 	    $modifyError = "Update aborted; old virtual state restored.";
-	    fatal($modifyError);
+	    fatal({type => 'secondary', severity => SEV_SECONDARY,
+		   error => ['update_aborted', 'virtual_state_restored']},
+		  $modifyError);
 	    # Never returns;
 	}
 	#
@@ -1023,9 +1052,11 @@ elsif ($inout eq "modify") {
 		$modifySwapped = 1;
                 # Old accounting info.
 		$experiment->SetSwapTime();
+		tbreport(SEV_SECONDARY, 'update_aborted', 'swapped_out');
 		$modifyError = "Update aborted; experiment swapped out.";
 	    }
 	    else {
+		tbreport(SEV_SECONDARY, 'update_aborted', 'state_restored');
 		$modifyError = "Update aborted; old state restored.";
 
 		# Reset the swapper since the experiment is still running.
@@ -1097,28 +1128,40 @@ $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
 
 if (! -e "$archivedir") {
     mkdir("$archivedir", 0775)
-	or fatal("Failed to mkdir $archivedir");
+	or fatal({type => 'primary', severity => SEV_ERROR,
+		  error => ['archive_op_failed', 'mkdir', undef, $archivedir]},
+	         "Failed to mkdir $archivedir");
 }
 if (! -e "$archivedir/tbdata") {
     mkdir("$archivedir/tbdata", 0775)
-	or fatal("Failed to mkdir $archivedir/tbdata");
+	or fatal({type => 'primary', severity => SEV_ERROR,
+		  error => ['archive_op_failed', 'mkdir', undef, "$archivedir/tbdata"]},
+	         "Failed to mkdir $archivedir/tbdata");
 }
 if (! -e "$archivedir/nsdata") {
     mkdir("$archivedir/nsdata", 0775)
-	or fatal("Failed to mkdir $archivedir/nsdata");
+	or fatal({type => 'primary', severity => SEV_ERROR,
+		  error => ['archive_op_failed', 'mkdir', undef, "$archivedir/nsdata"]},
+	         "Failed to mkdir $archivedir/nsdata");
 }
 
 system("cp -fp $workdir/$eid.ns $archivedir/nsdata/nsfile.ns") == 0
-    or fatal("Failed to copy nsfile to $archivedir/tbdata");
+    or fatal({type => 'primary', severity => SEV_ERROR,
+	      error => ['archive_op_failed', 'copy', "$workdir/$eid.ns", "$archivedir/nsdata/nsfile.ns"]},
+	     "Failed to copy nsfile to $archivedir/tbdata");
 
 if (defined($logname)) {
     system("cp -fp $logname $archivedir/tbdata/log.$tag") == 0
-    or fatal("Failed to copy logfile to $archivedir/tbdata");
+    or fatal({type => 'primary', severity => SEV_ERROR,
+	      error => ['archive_op_failed', 'copy', $logname, "$archivedir/tbdata/log.$tag"]},
+	     "Failed to copy logfile to $archivedir/tbdata");
 }
 
 if (-e $repfile) {
     system("cp -fp $workdir/$repfile $archivedir/tbdata/tbreport.$tag") == 0
-	or fatal("Failed to copy nsfile to $archivedir/tbdata");
+	or fatal({type => 'primary', severity => SEV_ERROR,
+		  error => ['archive_op_failed', 'copy', "$workdir/$repfile", "$archivedir/tbdata/tbreport.$tag"]},
+	         "Failed to copy nsfile to $archivedir/tbdata");
 }
 
 # And tell the archive library about the above files.
@@ -1132,7 +1175,9 @@ if ($inout eq "modify") {
     print "Doing a commit on the previous experiment archive ...\n";
     libArchive::TBExperimentArchiveSwapModCommit($pid, $eid,
 						 $estate eq EXPTSTATE_SWAPPED)
-	== 0 or	fatal("Failed to commit experiment archive!");
+	== 0 or	fatal({type => 'secondary', severity => SEV_SECONDARY,
+		       error => ['archive_op_failed', 'commit', undef, undef]},
+		      "Failed to commit experiment archive!");
 }
 
 #
@@ -1140,14 +1185,18 @@ if ($inout eq "modify") {
 #
 print "Doing a savepoint on the experiment archive ...\n";
 if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, $tag) < 0) {
-    fatal("Failed to do a savepoint on the experiment archive!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['archive_op_failed', 'savepoint', undef, undef]},
+	  "Failed to do a savepoint on the experiment archive!");
 }
 
 # Commit the archive after swapout
 if ($inout eq "out") {
     print "Doing a commit on the experiment archive ...\n";
     libArchive::TBCommitExperimentArchive($pid, $eid, $tag) == 0 or
-	fatal("Failed to commit experiment archive!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['archive_op_failed', 'commit', undef, undef]},
+	      "Failed to commit experiment archive!");
 }
 
 #
@@ -1450,6 +1499,7 @@ sub CheckFWinfo($)
     # swapped or active state.
     if ($wasfirewalled && !$nowfirewalled) {
 	if (! $isadmin) {
+	    tbreport(SEV_ERROR, 'modify_firewall_not_allowed', 'turn_off', undef);
 	    $msg = "Not allowed to turn off firewalling!";
 	    goto noway;
 	}
@@ -1482,6 +1532,7 @@ sub CheckFWinfo($)
     # active state. We will allow this later.
     if (!$wasfirewalled && $nowfirewalled) {
 	if ($curstate eq EXPTSTATE_ACTIVE()) {
+	    tbreport(SEV_ERROR, 'modify_firewall_not_allowed', 'turn_on', 'active');
 	    $msg = "Not allowed to turn on firewalling while active!";
 	    goto noway;
 	}
@@ -1521,6 +1572,7 @@ sub CheckFWinfo($)
 	    goto noway;
 	}
 	if ($fwstyle_mapping{$new_fwstyle} < $fwstyle_mapping{$fwstyle}) {
+	    tbreport(SEV_ERROR, 'modify_firewall_not_allowed', 'reduce_level', undef);
 	    $msg = "Not allowed to reduce the firewall level!";
 	    goto noway;
 	}
@@ -1538,11 +1590,13 @@ sub CheckFWinfo($)
 # exit in the library. This is problematic, cause we could be exiting
 # cause the mysql server has gone whacky again. 
 #
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my($mesg) = $_[0];
 
-    tberror($mesg);
+    tberror($parms, $mesg);
     tbinfo("Cleaning up and exiting with status $errorstat ...");
 
     #

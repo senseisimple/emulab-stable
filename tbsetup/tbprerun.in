@@ -118,12 +118,14 @@ sub cleanup {
 #
 # Fatal error.
 #
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my ($mesg) = @_;
     
     cleanup();
-    tbdie($mesg);
+    tbdie($parms, $mesg);
 }
 
 # Need this below.
@@ -141,7 +143,9 @@ TBExptRemoveVirtualState($pid, $eid);
 print "Running parser ... " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("parser started");
 if (system("parse-ns $zeeopt $pid $gid $eid $nsfile")) {
-    fatal("Parsing failed!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['ns_parse_failed']},
+	  "Parsing failed!");
 }
 TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
@@ -200,7 +204,9 @@ if ($elabinelab) {
     print "Re-Running parser ... " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("parser started");
     if (system("parse-ns $pid $gid $eid $nsfile")) {
-	fatal("Parsing failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['ns_parse_failed']},
+	      "Parsing failed!");
     }
     TBDebugTimeStamp("parser finished");
     print "Parser done! " . TBTimeStamp() . "\n";
@@ -265,7 +271,9 @@ if (!$zeemode) {
     print "Setting up static routes (if requested) ... \n";
 
     if (system("staticroutes $pid $eid")) {
-	fatal("Static route calculation failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['static_routes_failed']},
+	      "Static route calculation failed!");
     }
 }
 
@@ -301,7 +309,9 @@ if (!$elabinelab) {
 		     "probably out of date.\n");
 	}
 	else {
-	    fatal("verify-ns failed!");
+	    fatal({type => 'secondary', severity => SEV_SECONDARY,
+		   error => ['ns_verify_failed']},
+		  "verify-ns failed!");
 	}
     }
 }
@@ -314,7 +324,9 @@ if (!$zeemode) {
     TBDebugTimeStamp("assign prerun started");
     print "Doing a pre-assign ...\n";
     if (system("$wrapper -t $pid $eid")) {
-	fatal("assign prerun failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['assign_wrapper_failed', undef]},
+	      "assign prerun failed!");
     }
 }
 

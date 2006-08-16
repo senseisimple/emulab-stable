@@ -56,7 +56,7 @@ sub usage()
 sub ParseArgs();
 sub CheckCopyArgs();
 sub CopyInArchive();
-sub fatal($);
+sub fatal($;$);
 
 my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:";	# Enough options?
 my $batchmode= 1;
@@ -182,7 +182,8 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 # our time. Make sure user sees the error by exiting with 1.
 #
 if (system("$checkquota $dbuid") != 0) {
-    tberror({cause => 'user'},
+    tberror({cause => 'user', type => 'primary', severity => SEV_ERROR,
+	     error => ['over_disk_quota', $CONTROL]},
 	    "You are over your disk quota on $CONTROL; please cleanup!");
     exit(1);
 }
@@ -243,7 +244,9 @@ elsif (!defined($tempnsfile)) {
 }
 elsif (! -f $tempnsfile || ! -r $tempnsfile || -z $tempnsfile) {
     # Exit so that user sees the error, not us.
-    tberror("$tempnsfile does not exist or is not a readable file!");
+    tberror({type => 'primary', severity => SEV_ERROR,
+	     error => ['bogus_ns_file', $tempnsfile]},
+	    "$tempnsfile does not exist or is not a readable file!");
     exit(1);
 }
 
@@ -304,7 +307,9 @@ $args{'noidleswap_reason'} = $noidleswap_reason;
 
 # Now create the experiment; we get back a perl class instance.
 if (! ($experiment = Experiment->Create($pid, $eid, \%args))) {
-    tbdie("Could not create a new experiment record!");
+    tbdie({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['create_experiment_record_failed']},
+	  "Could not create a new experiment record!");
 }
 
 #
@@ -329,7 +334,9 @@ if (!$template_mode || $instance_idx) {
 	    # Obey exit status protocol for web page; User should see this.
 	    $errorstat = 1;
 	}
-	fatal("Failed to created experiment directory");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['create_experiment_directory_failed']},
+	      "Failed to created experiment directory");
     }
 }
 else {
@@ -363,20 +370,26 @@ chdir("$workdir") or
 # when doing an experiment branch (fork).
 #
 if ($template_mode && defined($archive_eid)) {
-    fatal("Could not create experiment archive!")
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['archive_op_failed', 'create', undef, undef]},
+	  "Could not create experiment archive!")
 	if (libArchive::TBForkExperimentArchive($pid, $eid,
 						$pid, $archive_eid, undef)
 	    < 0);
 }
 elsif ($copybranch) {
     # Currently, support branching from existing experiment only.
-    fatal("Could not create experiment archive!")
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['archive_op_failed', 'create', undef, undef]},
+	  "Could not create experiment archive!")
 	if (libArchive::TBForkExperimentArchive($pid, $eid,
 						$copypid,
 						$copyeid, $copytag) < 0);
 }
 elsif (libArchive::TBCreateExperimentArchive($pid, $eid) < 0) {
-    fatal("Could not create experiment archive!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['archive_op_failed', 'create', undef, undef]},
+	  "Could not create experiment archive!");
 }
 
 #
@@ -429,7 +442,9 @@ if (!defined($tempnsfile)) {
 # Now we can get the NS file!
 #
 if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
-    fatal("Could not copy $tempnsfile to $workdir/$nsfile");
+    fatal({type => 'primary', severity => SEV_ERROR,
+	   error => ['copy_ns_file_failed', $tempnsfile, $nsfile]},
+	  "Could not copy $tempnsfile to $workdir/$nsfile");
 }
 chmod(0664, "$nsfile");
 
@@ -440,7 +455,9 @@ chmod(0664, "$nsfile");
 if (system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
     # Obey exit status protocol for web page.
     $errorstat = 1;
-    fatal("NS Parse failed!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['ns_parse_failed']},
+	  "NS Parse failed!");
 }
 
 #
@@ -572,7 +589,9 @@ $experiment->SetState(EXPTSTATE_PRERUN) == 0
 
 if ($experiment->PreRun($nsfile, ($zeeopt ? "-z" : ""))) {
     $errorstat = $? >> 8;
-    fatal("tbprerun failed!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['tbprerun_failed']},
+	  "tbprerun failed!");
 }
 
 $experiment->SetState(EXPTSTATE_SWAPPED) == 0
@@ -587,7 +606,9 @@ if (! ($frontend || $batchmode)) {
 
     if ($experiment->Swap("in") != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswap in failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['tbswap_in_failed']},
+	      "tbswap in failed!");
     }
     
     $experiment->SetState(EXPTSTATE_ACTIVE) == 0
@@ -620,7 +641,9 @@ if (! ($frontend || $batchmode)) {
 
 # We append this report in the email message below.
 if ($experiment->Report($repfile, "-b") != 0) {
-    fatal("tbreport failed!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['tbreport_failed']},
+	  "tbreport failed!");
 }
 
 # Latest log is always called the same thing.
@@ -673,7 +696,9 @@ libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
 #
 print "Doing a savepoint on the experiment archive ...\n";
 if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
-    fatal("Failed to do a savepoint on the experiment archive!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['archive_op_failed', 'savepoint', undef, undef]},
+	  "Failed to do a savepoint on the experiment archive!");
 }
 
 #
@@ -683,7 +708,9 @@ if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
 if ($copybranch) {
     print "Doing a commit on the experiment archive ...\n";
     libArchive::TBCommitExperimentArchive($pid, $eid, "branch_merge") == 0 or
-	fatal("Failed to commit experiment archive!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['archive_op_failed', 'commit', undef, undef]},
+	      "Failed to commit experiment archive!");
 }
 
 #
@@ -916,7 +943,9 @@ sub ParseArgs()
 	    $tempnsfile = $1;
 	}
 	else {
-	    tbdie("Bad data returned by realpath: $translated");
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'realpath', $translated]},
+		  "Bad data returned by realpath: $translated");
 	}
 
 	#
@@ -931,7 +960,9 @@ sub ParseArgs()
 	    ! ($tempnsfile =~ /^\/proj/) &&
 	    ! ($tempnsfile =~ /^\/groups/) &&
 	    ! ($tempnsfile =~ /^\/users/)) {
-	    tberror("$tempnsfile does not resolve to an allowed directory!");
+	    tberror({type => 'primary', severity => SEV_ERROR,
+		     error => ['disallowed_directory', $tempnsfile]},
+		    "$tempnsfile does not resolve to an allowed directory!");
 	    # Note positive status; so error goes to user not tbops.
 	    exit(1);
 	}
@@ -968,7 +999,9 @@ sub ParseArgs()
 
 	if (! (($copyarg =~ /^([-\w]+),([-\w]+)(?::[-\w]*)?$/) ||
 	       ($copyarg =~ /^(\d+)(?::[-\w]*)?$/))) {
-	    tbdie("Bad data in argument: $copyarg");
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'argument', $copyarg]},
+		  "Bad data in argument: $copyarg");
 	}
 	# This option only makes sense with -c option.
 	if (defined($options{"b"})) {
@@ -986,7 +1019,9 @@ sub ParseArgs()
 	    $pid = $1;
 	}
 	else {
-	    tbdie("Bad data in argument: $pid.");
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'argument', $pid]},
+		  "Bad data in argument: $pid.");
 	}
     }
     if (defined($options{"e"})) {
@@ -996,11 +1031,15 @@ sub ParseArgs()
 	    $eid = $1;
 	}
 	else {
-	    tbdie("Bad data in argument: $eid.");
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'argument', $eid]},
+		  "Bad data in argument: $eid.");
 	}
 	if (! TBcheck_dbslot($eid, "experiments", "eid",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    tbdie("Improper experiment name (id)!");
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'eid', $eid]},
+		  "Improper experiment name (id)!");
 	}
     }
     if (defined($options{"g"})) {
@@ -1010,7 +1049,9 @@ sub ParseArgs()
 	    $gid = $1;
 	}
 	else {
-	    tbdie("Bad data in argument: $gid.");
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'argument', $gid]},
+		  "Bad data in argument: $gid.");
 	}
     }
     if (defined($options{"E"})) {
@@ -1072,7 +1113,9 @@ sub ParseArgs()
 		$archive_eid = $1;
 	    }
 	    else {
-		tbdie("Bad data in argument: $archive_eid.");
+		tbdie({type => 'primary', severity => SEV_ERROR,
+		       error => ['bad_data', 'argument', $archive_eid]},
+		      "Bad data in argument: $archive_eid.");
 	    }
 	}
 	
@@ -1083,7 +1126,9 @@ sub ParseArgs()
 		$instance_idx = $1;
 	    }
 	    else {
-		tbdie("Bad data in argument: $instance_idx.");
+		tbdie({type => 'primary', severity => SEV_ERROR,
+		       error => ['bad_data', 'argument', $instance_idx]},
+		      "Bad data in argument: $instance_idx.");
 	    }
 	}
     }
@@ -1233,11 +1278,13 @@ sub CopyInArchive()
 # exit in the library. This is problematic, cause we could be exiting
 # cause the mysql server has gone whacky again. 
 #
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my($mesg) = $_[0];
 
-    tberror $mesg;
+    tberror($parms, $mesg);
     tbinfo "Cleaning up and exiting with status $errorstat ...";
 
     #

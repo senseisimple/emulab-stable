@@ -15,6 +15,11 @@ BEGIN {$FAKE_SCRIPTNAME = $ARGV[0];}
 use lib "@prefix@/lib";
 use libtblog qw(:DEFAULT dblog *SOUT *SERR);
 
+use constant false => 0;
+use constant true  => 1;
+
+sub parse_error($);
+
 tblog_set_default_cause('temp');
 
 use strict;
@@ -82,6 +87,7 @@ if ($exitcode) {
 	    if ($mesg =~ s/^warning:\s+//i) {
 		dblog(TBLOG_WARNING, {sublevel=>$sublevel}, $mesg);
 	    } else {
+		parse_error($mesg);
 		dblog(TBLOG_ERR, {sublevel=>$sublevel}, $mesg);
 	    }
 	}
@@ -106,10 +112,134 @@ if ($exitcode) {
 
 exit $exitcode;
 
+sub parse_error($) {
+    my ($mesg) = @_;
 
+    return if parse_type_precheck_error($mesg);
+    return if parse_mapping_precheck_error($mesg);
+    return if parse_violation_error($mesg);
+    return if parse_fixed_node_error($mesg);
 
+    return;
+}
 
+sub parse_type_precheck_error($) {
+    my ($mesg) = @_;
+    my ($vtype, $requested, $slots, $max, $round);
 
+    if ($mesg =~ /^No (\w+) physical nodes of type (\S+) found \((\d+) requested\)$/) {
+	($round, $vtype, $requested) = ($1, $2, $3);
+	$slots = 0;
+    } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but only (\d+) (\w+) nodes of type \w+ found$/) {
+	($requested, $vtype, $slots, $round) = ($1, $2, $3, $4);
+    } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but you are only allowed to use (\d+)$/) {
+	($requested, $vtype, $max) = ($1, $2, $3);
+    } else {
+	return false;
+    }
 
+    tbreport(SEV_WARNING, 'assign_type_precheck',
+             $vtype, $requested, $slots, $max, $round);
 
+    return true;
+}
 
+sub parse_mapping_precheck_error($) {
+    my ($mesg) = @_;
+
+    if ($mesg =~ /^No possible mapping for (\S+)\n/) {
+	my $vnode = $1;
+	my (undef, @lines) = split("\n", $mesg);
+
+	foreach my $line (@lines) {
+	    my ($class, $type, $requested, $count);
+
+	    if ($line =~ /^No links of type (\S+) found! \((\d+) requested\)$/) {
+		($type, $requested) = ($1, $2);
+		$class = 'link';
+		$count = 0;
+	    } elsif ($line =~ /^Too many links of type (\S+)! \((\d+) requested, (\d+) found\)$/) {
+		($type, $requested, $count) = ($1, $2, $3);
+		$class = 'link';
+	    } elsif ($line =~ /^Too much bandwidth on emulated links!$/) {
+		$class = 'bandwidth';
+		$count = 1; # Necessary?
+	    } elsif ($line =~ /^No physical nodes have feature (\S+)!$/) {
+		$type  = $1;
+		$class = 'feature';
+		$count = 0; # Necessary?
+	    } else {
+		# Unknown?
+		next;
+	    }
+
+	    tbreport(SEV_WARNING, 'assign_mapping_precheck',
+		     $vnode, $class, $type, $requested, $count);
+	}
+
+	return true;
+    }
+
+    return false;
+}
+
+sub parse_violation_error($) {
+    my ($mesg) = @_;
+
+    if ($mesg =~ /^Type precheck passed\.\n/) {
+	my ($unassigned, $pnode_load, $no_connect, $link_users, $bandwidth,
+	    $desires, $vclass, $delay, $trivial_mix, $subnodes, $max_types,
+	    $endpoints);
+
+	my (undef, @lines) = split("\n", $mesg);
+
+	foreach my $line (@lines) {
+	    if    ($line =~ /^  unassigned: +(\d+)$/)  { $unassigned  = $1 }
+	    elsif ($line =~ /^  pnode_load: +(\d+)$/)  { $pnode_load  = $1 }
+	    elsif ($line =~ /^  no_connect: +(\d+)$/)  { $no_connect  = $1 }
+	    elsif ($line =~ /^  link_users: +(\d+)$/)  { $link_users  = $1 }
+	    elsif ($line =~ /^  bandwidth: +(\d+)$/)   { $bandwidth   = $1 }
+	    elsif ($line =~ /^  desires: +(\d+)$/)     { $desires     = $1 }
+	    elsif ($line =~ /^  vclass: +(\d+)$/)      { $vclass      = $1 }
+	    elsif ($line =~ /^  delay: +(\d+)$/)       { $delay       = $1 }
+	    elsif ($line =~ /^  trivial mix: +(\d+)$/) { $trivial_mix = $1 }
+	    elsif ($line =~ /^  subnodes: +(\d+)$/)    { $subnodes    = $1 }
+	    elsif ($line =~ /^  max_types: +(\d+)$/)   { $max_types   = $1 }
+	    elsif ($line =~ /^  endpoints: +(\d+)$/)   { $endpoints   = $1 }
+	}
+
+	tbreport(SEV_WARNING, 'assign_violation',
+		 $unassigned, $pnode_load, $no_connect, $link_users, $bandwidth,
+		 $desires, $vclass, $delay, $trivial_mix, $subnodes, $max_types,
+		 $endpoints);
+
+	return true;
+    }
+
+    return false;
+}
+
+sub parse_fixed_node_error($) {
+    my ($mesg) = @_;
+    my ($class, $vnode, $pnode);
+
+    if ($mesg =~ /^Fixed node: (\S+) does not exist\.$/) {
+	$vnode = $1;
+	$class = 'exist';
+    } elsif ($mesg =~ /^Fixed node: (\S+) not available\.$/) {
+	$pnode = $1;
+	$class = 'available';
+    } elsif ($mesg =~ /^Unable to find a type for fixed, vtyped, node (\S+)$/) {
+	$vnode = $1;
+	$class = 'type';
+    } elsif ($mesg =~ /^Fixed node: Could not map (\S+) to (\S+)$/) {
+	($vnode, $pnode) = ($1, $2);
+	$class = 'map';
+    } else {
+	return false;
+    }
+
+    tbreport(SEV_WARNING, 'assign_fixed_node', $class, $vnode, $pnode);
+
+    return true;
+}

@@ -825,7 +825,8 @@ while (1) {
 	$precheck = 1;
 	my $retval = RunAssign();
 	if ($retval != 0) {
-	    fatal({type=>'extra', cause=>'user'}, 
+	    fatal({type=>'extra', cause=>'user', severity=>SEV_ERROR,
+	           error=>['infeasible_resource_assignment']}, 
 		  "This experiment cannot be instantiated on this ".
                   "testbed. You have most likely asked for hardware ".
                   "this testbed does not have, such as nodes of a type ".
@@ -843,14 +844,18 @@ while (1) {
 
 
     if ($currentrun >= $maxrun && $retval != 2) {
-	fatal("Reached run limit. Giving up.");
+	fatal({type => 'primary', severity => SEV_ERROR,
+	       error => ['reached_assign_run_limit']},
+	      "Reached run limit. Giving up.");
     }
 
     if ($retval < 0) {
 	#
 	# Failure in assign.
 	#
-	fatal("Unretriable error. Giving up.");
+	fatal({type => 'primary', severity => SEV_ERROR,
+	       error => ['unretriable_assign_error']},
+	      "Unretriable error. Giving up.");
     }
     
     print "Waiting 5 seconds and trying again...\n";
@@ -956,7 +961,9 @@ sub RunAssign ()
 		    kill('TERM', -$pgrp);
 		    waitpid($childpid, 0);
 
-		    fatal("Cancel flag set; aborting assign run!");
+		    fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
+			   error => ['cancel_flag']},
+			  "Cancel flag set; aborting assign run!");
 		    return -1;
 		}
 		# Loop again to reap child above before exit.
@@ -976,7 +983,9 @@ sub RunAssign ()
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
     if ($canceled) {
-	fatal("Cancel flag set; aborting assign run!");
+	fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
+	       error => ['cancel_flag']},
+	      "Cancel flag set; aborting assign run!");
 	return -1;
     }
 
@@ -1458,7 +1467,9 @@ foreach my $pnode (keys(%virtnodes)) {
 
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    fatal("Cancel flag set; aborting assign run!")
+    fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
+	   error => ['cancel_flag']},
+	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
 
     #
@@ -1644,7 +1655,9 @@ foreach my $pnode (keys(%virtnodes)) {
 
 # Check cancel flag before continuing. 
 TBGetCancelFlag($pid, $eid, \$canceled);
-fatal("Cancel flag set; aborting assign run!")
+fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
+       error => ['cancel_flag']},
+      "Cancel flag set; aborting assign run!")
     if ($canceled);
 
 # Set port range (see below for how we deal with update).
@@ -3870,7 +3883,8 @@ sub LoadVirtNodes()
 
 	    if (! ($osid = TBOSID($pid, $osname)) &&
 		! ($osid = TBOSID(TB_OPSPID, $osname))) {
-		fatal({cause => 'user'}, 
+		fatal({cause => 'user', type => 'primary', severity => SEV_ERROR,
+		       error => ['invalid_os', undef, $osname, $pid]},
 		      "Invalid OS $osname in project $pid!");
 	    }
 	    # Stash this in the virt_nodes data structure.
@@ -4239,13 +4253,17 @@ sub LoadExperiment()
     if (!defined($jail_osid) && defined($jail_osname)) {
 	if (! ($jail_osid = TBOSID($pid, $jail_osname)) &&
 	    ! ($jail_osid = TBOSID(TB_OPSPID, $jail_osname))) {
-	    fatal({cause=>'user'}, "Invalid OS $jail_osname in project $pid!");
+	    fatal({cause => 'user', type => 'primary', severity => SEV_ERROR,
+		   error => ['invalid_os', 'jail', $jail_osname, $pid]},
+		  "Invalid OS $jail_osname in project $pid!");
 	}
     }
     if (!defined($delay_osid) && defined($delay_osname)) {
 	if (! ($delay_osid = TBOSID($pid, $delay_osname)) &&
 	    ! ($delay_osid = TBOSID(TB_OPSPID, $delay_osname))) {
-	    fatal({cause=>'user'}, "Invalid OS $delay_osname in project $pid!");
+	    fatal({cause => 'user', type => 'primary', severity => SEV_ERROR,
+		   error => ['invalid_os', 'delay', $delay_osname, $pid]},
+		  "Invalid OS $delay_osname in project $pid!");
 	}
     }
     # Keep a desire string we can use to make sure that the node type picked
@@ -4750,19 +4768,21 @@ sub CreateTopFile()
 			    "(endnode traffic shaping)\n");
 		    $toperrors++;
 		}
-		else {
-		    #
-		    # All the OS's have to support linkdelays.
-		    #
-		    foreach my $node ($node0, $node1) {
-			my $osid = virtnodeosid($node);
+		#
+		# All the OS's have to support linkdelays.
+		#
+		foreach my $node ($node0, $node1) {
+		    my $osid = virtnodeosid($node);
 
-			if (! $osdoeslinkdelays{$osid}) {
-			    tberror("$node in link $lan is running an OSID ".
-				    "($osid) that does not support linkdelays ".
-				    "(endnode traffic shaping)\n");
-			    $toperrors++;
-			}
+		    if (!defined($osid)) {
+			tbreport(SEV_ERROR, 'node_lacks_linkdelay_support', $node, $lan, $osid);
+		    } elsif (! $osdoeslinkdelays{$osid}) {
+			tberror({type => 'primary', severity => SEV_ERROR,
+				 error => ['node_lacks_linkdelay_support', $node, $lan, $osid]},
+				"$node in link $lan is running an OSID ".
+				"($osid) that does not support linkdelays ".
+				"(endnode traffic shaping)\n");
+			$toperrors++;
 		    }
 		}
 	    }

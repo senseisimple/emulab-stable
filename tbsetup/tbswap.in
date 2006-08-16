@@ -251,7 +251,9 @@ elsif ($swapop eq "update") {
     #
     print STDERR "Checking with Admission Control ...\n";
     if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
-	tberror "Admission control failure!\n";
+	tberror({type => 'secondary', severity => SEV_SECONDARY,
+		 error => ['admission_control_failure']},
+		"Admission control failure!\n");
 	print "Failingly finished swap-$swapop for $pid/$eid. " .
 	    TBTimeStamp() . "\n";
 	TBDebugTimeStamp("tbswap $swapop finished (failed)");
@@ -349,7 +351,9 @@ elsif ($swapop eq "in") {
     #
     print STDERR "Checking with Admission Control ...\n";
     if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
-	tberror "Admission control failure!\n";
+	tberror({type => 'secondary', severity => SEV_SECONDARY,
+		 error => ['admission_control_failure']},
+		"Admission control failure!\n");
 	print "Failingly finished swap-$swapop for $pid/$eid. " .
 	    TBTimeStamp() . "\n";
 	TBDebugTimeStamp("tbswap $swapop finished (failed)");
@@ -388,7 +392,8 @@ tblog_set_attempt(0);
 
 TBGetCancelFlag($pid, $eid, \$canceled);
 if ($canceled) {
-    tberror ({type=>'summary', cause=>'canceled'},
+    tberror ({type=>'summary', cause=>'canceled', 
+	      severity=>SEV_IMMEDIATE, error=>['cancel_flag']},
 	     "Experiment swap-$swapop canceled by user.");
 }
 
@@ -452,7 +457,9 @@ sub doSwapout($) {
 		($update_Eventsys_restart && $type == UPDATE) ) {
 		print "Stopping the event system\n";
 		if (system("eventsys_control stop $pid $eid")) {
-		    tberror "Failed to stop the event system.";
+		    tberror({type => 'secondary', severity => SEV_SECONDARY,
+			     error => ['eventsys_stop_failed']},
+			    "Failed to stop the event system.");
 		    $swapout_errors = 1;
 		}
 
@@ -462,7 +469,9 @@ sub doSwapout($) {
 		if (-x $piper) {
 		    print "Stopping the location piper\n";
 		    if (system("$piper -k $pid $eid")) {
-			tberror "Failed to stop location piper.";
+			tberror({type => 'secondary', severity => SEV_SECONDARY,
+				 error => ['piper_stop_failed']},
+				"Failed to stop location piper.");
 			$swapout_errors = 1;
 		    }
 		}
@@ -477,7 +486,9 @@ sub doSwapout($) {
 	if ($elabinelab && $type >= CLEANUP) {
 	    print "Tearing down elabinelab. This could take a while.\n";
 	    if (system("elabinelab -k $pid $eid")) {
-		tberror "Failed to teardown elabinelab!";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['elabinelab_tear_down_failed']},
+			"Failed to teardown elabinelab!");
 		$swapout_errors = 1;
 	    }
 	}
@@ -492,7 +503,9 @@ sub doSwapout($) {
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
 	    if (system("snmpit -r $pid $eid")) {
-		tberror "Failed to reset VLANs";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['vlan_reset_failed']},
+			"Failed to reset VLANs");
 		$swapout_errors = 1;
 	    } else {
 		$cleanvlans = 0;
@@ -510,7 +523,9 @@ sub doSwapout($) {
 	if (! $TESTMODE && $plabinelab) {
 	    print "Tearing down plabinelab.\n";
 	    if (system("plabinelab -k $pid $eid")) {
-		tberror "Failed to teardown plabinelab!";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['plabinelab_tear_down_failed']},
+			"Failed to teardown plabinelab!");
 		$swapout_errors = 1;
 	    }
 	}
@@ -524,7 +539,9 @@ sub doSwapout($) {
 	    print "Tearing down virtual nodes.\n";
 	    TBDebugTimeStamp("vnode_setup -k started");
 	    if (system("vnode_setup -d -k $pid $eid")) {
-		tberror "Failed to tear down vnodes.";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['vnode_tear_down_failed']},
+			"Failed to tear down vnodes.");
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("vnode_setup finished");
@@ -571,7 +588,9 @@ sub doSwapout($) {
 	print STDERR "Freeing nodes.\n";
 	TBDebugTimeStamp("nfree started");
 	if (system("nfree $pid $eid")) {
-	    tberror "Could not free nodes.";
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['nfree_failed']},
+		    "Could not free nodes.");
 	    $swapout_errors = 1;
 	}
 	TBDebugTimeStamp("nfree finished");
@@ -617,7 +636,9 @@ sub doSwapout($) {
 	    print "Tearing down failed virtual nodes.\n";
 	    TBDebugTimeStamp("vnode_setup -k started");
 	    if (system("vnode_setup -d -k $pid $eid @failedvnodes")) {
-		tberror "Failed to tear down vnodes.";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['vnode_tear_down_failed']},
+			"Failed to tear down vnodes.");
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("vnode_setup -k finished");
@@ -648,7 +669,9 @@ sub doSwapout($) {
 	    #
 	    if (system("nfree -x $pid $eid " .
 		       join(" ", (@failedpnodes, @failedvnodes)))) {
-		tberror "Could not free nodes.";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['nfree_failed']},
+			"Could not free nodes.");
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("nfree finished");
@@ -702,7 +725,9 @@ sub doSwapout($) {
 	    print "Resetting mountpoints.\n";
 	    TBDebugTimeStamp("exports started");
 	    if (system("exports_setup")) {
-		tberror "Failed to reset mountpoints.";
+		tberror({severity => SEV_WARNING,
+			 error => ['mountpoint_reset_failed']},
+			"Failed to reset mountpoints.");
 	    }
 	    TBDebugTimeStamp("exports finished");
 	}
@@ -811,10 +836,12 @@ sub doSwapin($) {
 	    # Wrapper sets this bit when recovery is possible.
 	    if ($exitcode & 64) {
 		# We can recover. 
+		tbreport(SEV_SECONDARY, 'assign_wrapper_failed', $exitcode);
 		return 7;
 	    }
 	    else {
 		# No recovery, no retry.
+		tbreport(SEV_SECONDARY, 'assign_wrapper_failed', $exitcode);
 		return 1;
 	    }
 	}
@@ -825,8 +852,10 @@ sub doSwapin($) {
 
     # Check cancel flag before continuing. No retry, 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    return 1
-	if ($canceled);
+    if ($canceled) {
+	tbreport(SEV_IMMEDIATE, 'cancel_flag');
+	return 1
+    }
 
     #
     # Look for any nodes in RES_TEARDOWN. These need to be released,
@@ -928,7 +957,9 @@ sub doSwapin($) {
 	#
 	# No recovery for now - what would we do?
 	#
-	tberror "Failed to set up tarballs.";
+	tberror({type => 'secondary', severity => SEV_SECONDARY,
+		 error => ['tarfiles_setup_failed']},
+		"Failed to set up tarballs.");
 	return 1;
     }
     TBDebugTimeStamp("tarfiles_setup finished");
@@ -962,7 +993,9 @@ sub doSwapin($) {
 		print "Creating Planetlab slice.\n";
 		TBDebugTimeStamp("plabslice create started");
 		if (system("plabslice create $pid $eid")) {
-		    tberror "Failed to create Plab dslice";
+		    tberror({type => 'secondary', severity => SEV_SECONDARY,
+			     error => ['plabslice_create_failed']},
+			    "Failed to create Plab dslice");
 		    return 3;
 		}
 		TBDebugTimeStamp("plabslice alloc finished");
@@ -972,8 +1005,10 @@ sub doSwapin($) {
 
     # Check cancel flag before continuing. No retry, 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    return 1
-	if ($canceled);
+    if ($canceled) {
+	tbreport(SEV_IMMEDIATE, 'cancel_flag');
+	return 1
+    }
 
     #
     # These things need to get started before the nodes come up, so we'll
@@ -984,7 +1019,9 @@ sub doSwapin($) {
     print "Setting up mountpoints.\n";
     TBDebugTimeStamp("mountpoints started");
     if (system("exports_setup")) {
-	tberror "Failed to setup mountpoints.";
+	tberror({type => 'secondary', severity => SEV_SECONDARY,
+		 error => ['mountpoints_setup_failed']},
+		"Failed to setup mountpoints.");
 	return 1;
     }
     TBDebugTimeStamp("mountpoints finished");
@@ -1003,7 +1040,9 @@ sub doSwapin($) {
 	print "Cleaning NFS traces.\n";
 	TBDebugTimeStamp("nfstrace gc started");
 	if (system("nfstrace gc $pid $eid")) {
-	    tberror "Failed to setup nfstrace.";
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['nfstrace_setup_failed']},
+		    "Failed to setup nfstrace.");
 	    return 1;
 	}
 	TBDebugTimeStamp("nfstrace gc finished");
@@ -1011,8 +1050,10 @@ sub doSwapin($) {
 
     # Check cancel flag before continuing. No retry, 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    return 1
-	if ($canceled);
+    if ($canceled) {
+	tbreport(SEV_IMMEDIATE, 'cancel_flag');
+	return 1
+    }
 
     #
     # Setup any control-net firewall.
@@ -1035,7 +1076,9 @@ sub doSwapin($) {
 	print "Setting up plabinelab.\n";
 	TBDebugTimeStamp("plabinelab setup started");
 	if (system("plabinelab $optarg $pid $eid")) {
-	    tberror "Failed to setup plabinelab!";
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['plabinelab_setup_failed']},
+		    "Failed to setup plabinelab!");
 	    return 1;
 	}
 	TBDebugTimeStamp("plabinelab setup finished");
@@ -1120,7 +1163,9 @@ sub doSwapin($) {
     print "Setting up VLANs.\n";
     TBDebugTimeStamp("snmpit started");
     if (system("snmpit -t $pid $eid")) {
-	tberror {type=>'summary'}, "Failed to set up VLANs.";
+	tberror({type => 'summary', severity => SEV_SECONDARY,
+		 error => ['vlan_setup_failed']},
+		"Failed to set up VLANs.");
 	return 1;
     }
     TBDebugTimeStamp("snmpit finished");
@@ -1173,8 +1218,10 @@ sub doSwapin($) {
 	    # rules.  But right now, I may screw up too!
 	    #
 	    if ($firewalled) {
-		tberror "Not retrying, ".
-		    "possibly an error in firewall setup or configuration.";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['os_node_reset_failed', 'firewall']},
+			"Not retrying, ".
+			"possibly an error in firewall setup or configuration.");
 		return 1;
 	    }
 
@@ -1185,8 +1232,10 @@ sub doSwapin($) {
 	    # a doSwapin() again.
 	    #
             if (($CHILD_ERROR >> 8) == 1) {
+		tbreport(SEV_SECONDARY, 'os_node_reset_failed', 'retry');
 		return 3;
 	    } else {
+		tbreport(SEV_SECONDARY, 'os_node_reset_failed', 'error');
 		print STDERR "Not retrying due to error type.\n";
 		return 1;
 	    }
@@ -1222,7 +1271,9 @@ sub doSwapin($) {
 	    print "Starting the event system.\n";
 	    TBDebugTimeStamp("eventsys_control started");
 	    if (system("eventsys_control start $pid $eid")) {
-		tberror "Failed to start the event system.";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['eventsys_start_failed']},
+			"Failed to start the event system.");
 		return 1;
 	    }
 	    TBDebugTimeStamp("eventsys_control finished");
@@ -1273,7 +1324,9 @@ sub doSwapin($) {
 	print "Setting up elabinelab. This could take a while!\n";
 	TBDebugTimeStamp("elabinelab setup started");
 	if (system("elabinelab $optarg $pid $eid")) {
-	    tberror "Failed to setup elabinelab!";
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['elabinelab_setup_failed']},
+		    "Failed to setup elabinelab!");
 	    return 1;
 	}
 	TBDebugTimeStamp("ElabInElab setup finished");
@@ -1287,7 +1340,9 @@ sub doSwapin($) {
 	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
 	    TBDebugTimeStamp("Starting event time");
 	    if (system("tevc -e $pid/$eid now __ns_sequence start")) {
-		tberror "Failed to start event time.";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['event_time_start_failed']},
+			"Failed to start event time.");
 		return 1;
 	    }
 	}
@@ -1413,7 +1468,9 @@ sub doFW($$$$) {
 	TBDebugTimeStamp("snmpit firewall setup: VLAN");
 	print "doFW: '$fwsetupstr1'\n";
 	if (system($fwsetupstr1)) {
-	    tberror "Failed to setup Firewall control net VLAN.";
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['fwcnvlan_setup_failed']},
+		    "Failed to setup Firewall control net VLAN.");
 	    return 1;
 	}
 	#
@@ -1590,6 +1647,7 @@ sub undoFWNodes($$;@) {
 	TBDebugTimeStamp("Powering down nodes");
 	system("power off @nodes");
 	if ($?) {
+	    tbreport(SEV_SECONDARY, 'power_off_failed');
 	    $fwerr = "Failed to power off all nodes!";
 	    @fwstate = ("Firewall is still in place",
 			"Some nodes may NOT be powered off",
@@ -1664,6 +1722,9 @@ sub undoFWNodes($$;@) {
 	$myargs{'poweron'} = 1;
 	$myargs{'retry'} = 1;
 	if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
+	    foreach my $failed (@failed) {
+		tbreport(SEV_ERROR, 'invalidate_bootblock_failed', $failed);
+	    }
 	    $fwerr = "Failed to invalidate bootblocks on @failed!";
 	    @fwstate = ("Firewall is NOT in place",
 			"All nodes set to admin mode");
@@ -1877,9 +1938,15 @@ sub doSwapoutAction($$%)
 	    print STDERR "No nodes require state saving.\n";
 	} elsif (TBAdminMfsRunCmd(\%myargs, \@failed, @pnodes)) {
 	    if ($soaction{'isfatal'}) {
+		foreach my $failed (@failed) {
+		    tbreport(SEV_ERROR, 'run_command_failed', $soaction{'command'}, $failed);
+		}
 		tberror
 		    "Failed to run '" . $soaction{'command'} . "' on @failed!";
 		return 1;
+	    }
+	    foreach my $failed (@failed) {
+		tbreport(SEV_WARNING, 'run_command_failed', $soaction{'command'}, $failed);
 	    }
 	    tbwarn
 		"Failed to run '" . $soaction{'command'} . "' on @failed!";

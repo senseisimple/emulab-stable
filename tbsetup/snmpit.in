@@ -202,7 +202,9 @@ if ($opt{t} || $opt{r}) {
     # Everything else
     #
     if (@ARGV) {
-	tberror "Too many arguments!";
+	tberror({type => 'primary', severity => SEV_ERROR,
+		 error => ['too_many_arguments']},
+		"Too many arguments!");
 	exit &usage;
     }
 }
@@ -286,6 +288,7 @@ if ($opt{p}) {
     } elsif ($opt{p} =~ /^10/) {
 	push @commands, ["portcontrol","10mbit"];
     } else {
+	tbreport(SEV_ERROR, 'bad_data', 'port_speed', $opt{p});
 	die "Bad port speed: $opt{p}. Valid values are 10, 100, and 1000\n";
     }
 }
@@ -303,6 +306,7 @@ if ($opt{u}) {
 }
 
 if (!@commands) {
+    tbreport(SEV_ERROR, 'no_operation');
     die "No operation given\n";
 }
 
@@ -327,7 +331,9 @@ if ($opt{S}) {
 	if (@switches) {
 	    push @supplied_stacks, $stack;
 	} else {
-	    tbdie "No such switch stack: $stack";
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['invalid_switch_stack', $stack]},
+		  "No such switch stack: $stack");
 	}
     }
 }
@@ -421,11 +427,13 @@ if (@ports) {
 		    "argument has been given\n";
 	    }
 	} else {
+	    tbreport(SEV_ERROR, 'bad_data', 'port', $port);
 	    die "Bad format for port $port\n"
 	}
     }
 
     if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
+	tbreport(SEV_ERROR, 'insufficient_permissions');
 	die "You do not have permission to modify some or all of the nodes\n" .
 		"that will be affected by the operation you requested\n";
     }
@@ -627,8 +635,10 @@ foreach my $command (@commands) {
 		}
 	    }
 	    if (!$matched) {
-		tbdie "One or more ports are on $device, but no " .
-		    "stack containing it was specified!";
+		tbdie({type => 'primary', severity => SEV_ERROR,
+		       error => ['device_not_in_stack', $device]},
+		      "One or more ports are on $device, but no " .
+		      "stack containing it was specified!");
 	    }
 	}
     }
@@ -1006,7 +1016,9 @@ sub doPortStatus($@) {
     #
     foreach my $port (keys %ports) {
         if (!$ports{$port}) {
-            tberror "Unable to get status information for $port!";
+	    tberror({type => 'primary', severity => SEV_ERROR,
+		     error => ['get_port_status_failed', $port]},
+		    "Unable to get status information for $port!");
             $errors++;
         } else {
             print "port=$port;$ports{$port}\n";
