@@ -165,15 +165,21 @@ if {$do_bsd} {
     set elab_rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
 }
 
+if {$do_bsd} {
+    set elabshell "/bin/sh -T"
+} else {
+    set elabshell "/bin/sh"
+}
+
 if {$use_magent} {
     set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh"
 } else {
     set stubcommand "/bin/sh /local/pelab/stub/auto-stub.sh"
 }
 if {$use_dbmonitor} {
-    set moncommand "/bin/sh /local/pelab/dbmonitor/auto-dbmonitor.sh"
+    set moncommand "$elabshell /local/pelab/dbmonitor/auto-dbmonitor.sh"
 } else {
-    set moncommand "/bin/sh /local/pelab/monitor/auto-monitor.sh"
+    set moncommand "$elabshell /local/pelab/monitor/auto-monitor.sh"
 }
 
 set elan_string ""
@@ -263,7 +269,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     incr tfix
 
     if {$trace_end_nodes} {
-	set tcpdump($tdix) [$elab($i) program-agent -command "/bin/sh /local/pelab/run-tcpdump.sh elab $i $tcpdump_args"]
+	set tcpdump($tdix) [$elab($i) program-agent -command "$elabshell /local/pelab/run-tcpdump.sh elab $i $tcpdump_args"]
 	lappend tdlist $tcpdump($tdix)
 	incr tdix
     }

@@ -1,4 +1,8 @@
 #!/bin/sh
+#
+# XXX under BSD this script has to be run with -T or else a signal will
+# not break the script out of the wait.
+#
 
 ARGS=$*
 if [ -z "$PID" -o -z "$EID" ]; then
@@ -29,7 +33,7 @@ echo $SH ${DBMONITOR_DIR}/run-dbmonitor.sh $ARGS
 $SH ${DBMONITOR_DIR}/run-dbmonitor.sh $ARGS &
 DBMONPID=$!
 # Kill the monitor if we get killed - TODO: harsher kill?
-trap "$AS_ROOT kill $DBMONPID" EXIT
+trap "$AS_ROOT kill $DBMONPID" TERM
 
 #
 # Give it time to come up
@@ -50,4 +54,5 @@ echo "Running!";
 #
 # Wait for our monitor to finish
 #
-wait
+wait $DBMONPID
+exit 0

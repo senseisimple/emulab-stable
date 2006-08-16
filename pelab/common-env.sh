@@ -36,7 +36,7 @@ NICKFILE="$EMUBOOT/nickname"
 RCPLAB="$EMUBOOT/rc.plab"
 HOSTSFILE="/etc/hosts"
 IFCONFIG="/sbin/ifconfig"
-PERL="${BIN_PATH}/perl"
+PERL="/usr/bin/perl"
 PYTHON="${BIN_PATH}/python"
 SH=/bin/sh
 SUDO="${BIN_PATH}/sudo"
@@ -220,6 +220,16 @@ log_output_background()
     echo $!
 }
 
+sync_watchdog()
+{
+    TIMO=$1
+    SYNCDPID=$2
+
+    sleep $TIMO
+    echo '*** HUPing syncd'
+    $AS_ROOT kill -HUP $SYNCDPID
+}
+
 #
 # If $SYNC command doesn't return within the indicated timeout period,
 # HUP the syncserver to force everyone out of a barrier.
@@ -241,7 +251,7 @@ sync_timeout()
 
     # and a watchdog
     if [ -n "$SYNCDPID" ]; then
-        (sleep $TIMO; echo '*** HUPing syncd'; $AS_ROOT kill -HUP $SYNCDPID) & DOGPID=$!
+        sync_watchdog $TIMO $SYNCDPID & DOGPID=$!
     fi
 
     # wait for the command to finish or be terminated
@@ -250,7 +260,7 @@ sync_timeout()
 
     # nuke the watchdog
     if [ -n "$SYNCDPID" ]; then
-        kill $DOGPID >/dev/null 2>&1
+        kill -9 $DOGPID >/dev/null 2>&1
     fi
 
     # and return the result
