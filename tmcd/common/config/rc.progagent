@@ -144,6 +144,29 @@ sub doboot()
 	unlink $CONFIG;
 
 	#
+	# We want to run program-agent even if there are currently no
+	# registered agents.  But to do that, we need a UID which we
+	# get from the TMCC creator command.  Note that if we do not
+	# get a UID, we just exit normally without starting the agent.
+	# This is backward compatible and enables us to boot up unallocated
+	# nodes (though I am not sure they would ever reach this script).
+	#
+	if (@agents == 0) {
+	    my @tmccresults;
+	    if (tmcc(TMCCCMD_CREATOR, undef, \@tmccresults) < 0) {
+		fatal("Could not get UID for progagent from server!");
+	    }
+	    if ($tmccresults[0] =~ / SWAPPER=([-\w]*)/) {
+		push(@agents, "UID=$1\n");
+	    } elsif ($tmccresults[0] =~ /^CREATOR=([-\w]*)/) {
+		push(@agents, "UID=$1\n");
+	    } else {
+		warning("Cannot determine UID for program agent, not running");
+		exit(0);
+	    }
+	}
+
+	#
 	# Write the data to the file. The rc script will interpret it.
 	# Note that one of the lines (the first) indicates what user to
 	# run the agent as. 
