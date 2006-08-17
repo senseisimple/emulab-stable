@@ -171,7 +171,7 @@ struct PacketInfo
   enum {size = sizeof(int)*(2         +1           +21    + 1) +
              sizeof(short)*(0         +0           +0     + 2) +
               sizeof(char)*(0         +0           +7     + 1) +
-  sizeof(IpHeader) + sizeof(struct tcphdr)};
+  sizeof(struct ip) + sizeof(struct tcphdr)};
 
   Time packetTime;
   int packetLength;

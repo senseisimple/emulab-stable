@@ -36,6 +36,6 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body);
 // It is presumed that value contains pointers to the various
 // substructures that need to be filled.
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
-                  IpHeader & ip, struct tcphdr & tcp);
+                  struct ip & ip, struct tcphdr & tcp);
 
 #endif

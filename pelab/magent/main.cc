@@ -412,7 +412,7 @@ void replayLoop(void)
   char packetBuffer[(PacketInfo::size > sizeof(SensorCommand))
                    ? PacketInfo::size : sizeof(SensorCommand)];
   struct tcp_info kernel;
-  IpHeader ip;
+  struct ip ip;
   struct tcphdr tcp;
   PacketInfo packet;
   map<Order, SensorList> streams;

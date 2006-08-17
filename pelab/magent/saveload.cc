@@ -115,8 +115,8 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, kernel->tcpi_advmss);
   pos = saveInt(pos, kernel->tcpi_reordering);
 
-  memcpy(pos, value.ip, sizeof(IpHeader));
-  pos += sizeof(IpHeader);
+  memcpy(pos, value.ip, sizeof(struct ip));
+  pos += sizeof(struct ip);
 
   memcpy(pos, value.tcp, sizeof(struct tcphdr));
   pos += sizeof(struct tcphdr);
@@ -278,7 +278,7 @@ auto_ptr<Command> loadCommand(Header * head, char * body)
 }
 
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
-                  IpHeader & ip, struct tcphdr & tcp)
+                  struct ip & ip, struct tcphdr & tcp)
 {
   char * pos = buffer;
   value->kernel = &kernel;
@@ -330,8 +330,8 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadInt(pos, & kernel.tcpi_advmss);
   pos = loadInt(pos, & kernel.tcpi_reordering);
 
-  memcpy(&ip, pos, sizeof(IpHeader));
-  pos += sizeof(IpHeader);
+  memcpy(&ip, pos, sizeof(struct ip));
+  pos += sizeof(struct ip);
 
   memcpy(&tcp, pos, sizeof(struct tcphdr));
   pos += sizeof(struct tcphdr);
