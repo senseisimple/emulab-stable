@@ -165,25 +165,6 @@ struct WriteResult
   Time nextWrite;
 };
 
-struct IpHeader
-{
-  unsigned char ip_vhl;         /* header length, version */
-#define IP_V(ip)        (((ip)->ip_vhl & 0xf0) >> 4)
-#define IP_HL(ip)       ((ip)->ip_vhl & 0x0f)
-  unsigned char ip_tos;         /* type of service */
-  unsigned short ip_len;         /* total length */
-  unsigned short ip_id;          /* identification */
-  unsigned short ip_off;         /* fragment offset field */
-#define IP_DF 0x4000                    /* dont fragment flag */
-#define IP_MF 0x2000                    /* more fragments flag */
-#define IP_OFFMASK 0x1fff               /* mask for fragmenting bits */
-  unsigned char ip_ttl;         /* time to live */
-  unsigned char ip_p;           /* protocol */
-  unsigned short ip_sum;         /* checksum */
-  struct in_addr ip_src;
-  struct in_addr ip_dst;  /* source and dest address */
-};
-
 struct PacketInfo
 {
   //                        packetTime+packetLength+kernel+elab
@@ -195,7 +176,7 @@ struct PacketInfo
   Time packetTime;
   int packetLength;
   struct tcp_info const * kernel;
-  IpHeader const * ip;
+  struct ip const * ip;
   struct tcphdr const * tcp;
   Order elab;
   bool bufferFull;

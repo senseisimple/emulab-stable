@@ -17,7 +17,7 @@ namespace
   int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
                    unsigned char const * packet);
   void handleTcp(struct pcap_pkthdr const * pcapInfo,
-                 IpHeader const * ipPacket,
+                 struct ip const * ipPacket,
                  struct tcphdr const * tcpPacket);
   void handleKernel(Connection * conn, struct tcp_info * kernel);
 }
@@ -407,13 +407,13 @@ namespace
       logWrite(ERROR, "Unknown link layer type: %d", packetType);
       return;
     }
-    IpHeader const * ipPacket;
+    struct ip const * ipPacket;
     struct tcphdr const * tcpPacket;
     size_t bytesRemaining = pcapInfo->caplen - sizeof(struct ether_header);
 
-    ipPacket = reinterpret_cast<IpHeader const *>
+    ipPacket = reinterpret_cast<struct ip const *>
       (packet + sizeof(struct ether_header));
-    if (bytesRemaining < sizeof(IpHeader))
+    if (bytesRemaining < sizeof(struct ip))
     {
       logWrite(ERROR, "A captured packet was too short to contain an "
                "IP header");
@@ -421,8 +421,8 @@ namespace
     }
     // ipHeaderLength and version are in a one byte field so
     // endian-ness doesn't matter.
-    int ipHeaderLength = IP_HL(ipPacket);
-    int version = IP_V(ipPacket);
+    int ipHeaderLength = ipPacket->ip_hl;
+    int version = ipPacket->ip_v;
     if (version != 4)
     {
       logWrite(ERROR, "A non IPv4 packet was captured");
@@ -472,7 +472,7 @@ namespace
   }
 
   void handleTcp(struct pcap_pkthdr const * pcapInfo,
-                 IpHeader const * ipPacket,
+                 struct ip const * ipPacket,
                  struct tcphdr const * tcpPacket)
   {
     logWrite(PCAP, "Captured a TCP packet");
