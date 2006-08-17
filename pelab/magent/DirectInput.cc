@@ -93,6 +93,13 @@ void DirectInput::nextCommand(fd_set * readable)
     {
 //      logWrite(COMMAND_INPUT, "Finished reading a command: CHECKSUM=%d",
 //               checksum());
+      if (global::replayArg == REPLAY_SAVE
+          && (commandHeader.type == NEW_CONNECTION_COMMAND
+              || commandHeader.type == DELETE_CONNECTION_COMMAND
+              || commandHeader.type == SENSOR_COMMAND))
+      {
+        replayWriteCommand(headerBuffer, bodyBuffer, commandHeader.size);
+      }
       currentCommand = loadCommand(&commandHeader, bodyBuffer);
       index = 0;
       state = HEADER;

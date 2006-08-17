@@ -51,6 +51,12 @@ int createServer(int port, std::string const & debugString);
 int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
                  std::string const & debugString);
 
+class PacketInfo;
+
+void replayWriteCommand(char * head, char * body, unsigned short bodySize);
+void replayWritePacket(int command, PacketInfo * packet);
+
+
 // Enum of header types -- to-monitor (Events, etc.)
 enum
 {
@@ -67,7 +73,10 @@ enum
   SENSOR_COMMAND = 3,
   CONNECT_COMMAND = 4,
   TRAFFIC_WRITE_COMMAND = 5,
-  DELETE_CONNECTION_COMMAND = 6
+  DELETE_CONNECTION_COMMAND = 6,
+  // These are pseudo-commands for replay.
+  PACKET_INFO_SEND_COMMAND = 7,
+  PACKET_INFO_ACK_COMMAND = 8
 };
 
 // This is used for the type field in a SensorCommand
@@ -177,6 +186,12 @@ struct IpHeader
 
 struct PacketInfo
 {
+  //                        packetTime+packetLength+kernel+elab
+  enum {size = sizeof(int)*(2         +1           +21    + 1) +
+             sizeof(short)*(0         +0           +0     + 2) +
+              sizeof(char)*(0         +0           +7     + 1) +
+  sizeof(IpHeader) + sizeof(struct tcphdr)};
+
   Time packetTime;
   int packetLength;
   struct tcp_info const * kernel;
@@ -192,6 +207,13 @@ enum
   CONNECTION_MODEL_KERNEL = 1
 };
 
+enum
+{
+  NO_REPLAY = 0,
+  REPLAY_LOAD = 1,
+  REPLAY_SAVE = 2
+};
+
 class ConnectionModel;
 class Connection;
 class CommandInput;
@@ -203,6 +225,8 @@ namespace global
   extern unsigned short peerServerPort;
   extern unsigned short monitorServerPort;
   extern bool doDaemonize;
+  extern int replayArg;
+  extern int replayfd;
 
   extern int peerAccept;
   extern std::auto_ptr<ConnectionModel> connectionModelExemplar;

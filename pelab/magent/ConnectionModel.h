@@ -16,6 +16,13 @@ public:
   // an error. Errno is not preserved.
   virtual int writeMessage(int size, WriteResult & result)=0;
   virtual bool isConnected(void)=0;
+
+  // These are static members which are used. They are called from
+  // switch statements in main.cc
+  // static void init(void);
+  // static void addNewPeer(fd_set * readable);
+  // static void readFromPeers(fd_set * readable);
+  // static void packetCapture(fd_set * readable);
 };
 
 class ConnectionModelNull : public ConnectionModel

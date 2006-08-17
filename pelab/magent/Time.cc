@@ -27,6 +27,11 @@ struct timeval * Time::getTimeval(void)
   return &data;
 }
 
+struct timeval const * Time::getTimeval(void) const
+{
+  return &data;
+}
+
 Time Time::operator+(int const & right) const
 {
   Time result;

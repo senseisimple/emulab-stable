@@ -137,25 +137,28 @@ void Connection::captureSend(PacketInfo * packet)
 {
   logWrite(SENSOR, "Captured a send packet");
   Sensor * head = measurements.getHead();
+  packet->elab = elab;
+  packet->bufferFull = bufferFull;
   if (head != NULL && isConnected)
   {
-    packet->elab = elab;
-    packet->bufferFull = bufferFull;
     head->captureSend(packet);
   }
+  replayWritePacket(PACKET_INFO_SEND_COMMAND, packet);
 }
 
 void Connection::captureAck(PacketInfo * packet)
 {
   logWrite(SENSOR, "Captured an ack packet");
   Sensor * head = measurements.getHead();
+  packet->elab = elab;
+  packet->bufferFull = bufferFull;
   if (head != NULL && isConnected)
   {
-    packet->elab = elab;
-    packet->bufferFull = bufferFull;
     head->captureAck(packet);
   }
+  replayWritePacket(PACKET_INFO_ACK_COMMAND, packet);
 }
+
 ConnectionModel const * Connection::getConnectionModel(void)
 {
   return peer.get();

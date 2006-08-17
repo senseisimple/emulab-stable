@@ -25,6 +25,8 @@ namespace global
   unsigned short peerServerPort = 0;
   unsigned short monitorServerPort = 0;
   bool doDaemonize = false;
+  int replayArg = NO_REPLAY;
+  int replayfd = -1;
 
   int peerAccept = -1;
   string interface;
@@ -46,6 +48,7 @@ void usageMessage(char *progname);
 void processArgs(int argc, char * argv[]);
 void init(void);
 void mainLoop(void);
+void replayLoop(void);
 void writeToConnections(multimap<Time, Connection *> & schedule);
 void addNewPeer(fd_set * readable);
 void readFromPeers(fd_set * readable);
@@ -53,6 +56,7 @@ void packetCapture(fd_set * readable);
 
 int main(int argc, char * argv[])
 {
+  umask(0);
   processArgs(argc, argv);
   init();
   if (global::doDaemonize)
@@ -64,17 +68,27 @@ int main(int argc, char * argv[])
       logWrite(ERROR, "Daemonization failed: %s", strerror(errno));
     }
   }
-  mainLoop();
+  if (global::replayArg == REPLAY_LOAD)
+  {
+    replayLoop();
+  }
+  else
+  {
+    mainLoop();
+  }
   return 0;
 }
 
-void usageMessage(char *progname) {
+void usageMessage(char *progname)
+{
   cerr << "Usage: " << progname << " [options]" << endl;
   cerr << "  --connectionmodel=<null|kerneltcp> " << endl;
   cerr << "  --peerserverport=<int> " << endl;
   cerr << "  --monitorserverport=<int> " << endl;
   cerr << "  --interface=<iface> " << endl;
   cerr << "  --daemonize " << endl;
+  cerr << "  --replay-save=<filename> " << endl;
+  cerr << "  --replay-loae=<filename> " << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
@@ -86,6 +100,8 @@ void processArgs(int argc, char * argv[])
   global::monitorServerPort = 4200;
   global::interface = "vnet";
   global::doDaemonize = false;
+  global::replayArg = NO_REPLAY;
+  global::replayfd = -1;
 
   static struct option longOptions[] = {
     // If you modify this, make sure to modify the shortOptions string below
@@ -95,22 +111,26 @@ void processArgs(int argc, char * argv[])
     {"monitorserverport", required_argument, NULL, 'm'},
     {"interface",         required_argument, NULL, 'i'},
     {"daemonize",         no_argument      , NULL, 'd'},
+    {"replay-save",       required_argument, NULL, 's'},
+    {"replay-load",       required_argument, NULL, 'l'},
     // Required so that getopt_long can find the end of the list
     {NULL, 0, NULL, 0}
   };
 
-  string shortOptions = "c:p:m:i:d";
+  string shortOptions = "c:p:m:i:ds:l:";
 
   // Not used
   int longIndex;
 
   // Loop until all options have been handled
-  while (true) {
+  while (true)
+  {
     int ch =
       getopt_long(argc, argv, shortOptions.c_str(), longOptions, &longIndex);
 
     // Detect end of options
-    if (ch == -1) {
+    if (ch == -1)
+    {
       break;
     }
 
@@ -118,47 +138,100 @@ void processArgs(int argc, char * argv[])
 
     // Make a copy of optarg that's more c++-y.
     string optArg;
-    if (optarg != NULL) {
+    if (optarg != NULL)
+    {
         optArg = optarg;
     }
 
-    switch ((char) ch) {
-      case 'c':
-        if (optArg == "null") {
-          global::connectionModelArg = CONNECTION_MODEL_NULL;
-        } else if (optArg == "kerneltcp") {
-          global::connectionModelArg = CONNECTION_MODEL_KERNEL;
-        } else {
-          usageMessage(argv[0]);
-          exit(1);
-        }
-        break;
-      case 'p':
-        if (sscanf(optarg,"%i",&argIntVal)) {
-          usageMessage(argv[0]);
-          exit(1);
-        } else {
-          global::peerServerPort = argIntVal;
-        }
-        break;
-      case 'm':
-        if (sscanf(optarg,"%i",&argIntVal)) {
-          usageMessage(argv[0]);
-          exit(1);
-        } else {
-          global::monitorServerPort = argIntVal;
-        }
-        break;
-      case 'i':
-        global::interface = optArg;
-        break;
-      case 'd':
-        global::doDaemonize = true;
-        break;
-      case '?':
-      default:
+    switch ((char) ch)
+    {
+    case 'c':
+      if (optArg == "null") {
+        global::connectionModelArg = CONNECTION_MODEL_NULL;
+      }
+      else if (optArg == "kerneltcp")
+      {
+        global::connectionModelArg = CONNECTION_MODEL_KERNEL;
+      }
+      else
+      {
         usageMessage(argv[0]);
         exit(1);
+      }
+      break;
+    case 'p':
+      if (sscanf(optarg,"%i",&argIntVal))
+      {
+        usageMessage(argv[0]);
+        exit(1);
+      }
+      else
+      {
+        global::peerServerPort = argIntVal;
+      }
+      break;
+    case 'm':
+      if (sscanf(optarg,"%i",&argIntVal))
+      {
+        usageMessage(argv[0]);
+        exit(1);
+      }
+      else
+      {
+        global::monitorServerPort = argIntVal;
+      }
+      break;
+    case 'i':
+      global::interface = optArg;
+      break;
+    case 'd':
+      global::doDaemonize = true;
+      break;
+    case 's':
+      if (global::replayArg == NO_REPLAY)
+      {
+        global::replayfd = open(optarg, O_WRONLY | O_CREAT | O_TRUNC,
+                                S_IRWXU | S_IRWXG | S_IRWXO);
+        if (global::replayfd != -1)
+        {
+          global::replayArg = REPLAY_SAVE;
+        }
+        else
+        {
+          logWrite(ERROR, "Error opening replay-save file: %s: %s", optarg,
+                   strerror(errno));
+        }
+      }
+      else
+      {
+        logWrite(ERROR, "replay-save option was invoked when replay "
+                 "was already set");
+      }
+      break;
+    case 'l':
+      if (global::replayArg == NO_REPLAY)
+      {
+        global::replayfd = open(optarg, O_RDONLY);
+        if (global::replayfd != -1)
+        {
+          global::replayArg = REPLAY_LOAD;
+        }
+        else
+        {
+          logWrite(ERROR, "Error opening replay-load file: %s: %s", optarg,
+                   strerror(errno));
+        }
+      }
+      else
+      {
+        logWrite(ERROR, "replay-load option was invoked when replay "
+                 "was already set");
+      }
+      break;
+    case '?':
+    default:
+      usageMessage(argv[0]);
+      exit(1);
     }
   }
 }
@@ -260,6 +333,142 @@ void mainLoop(void)
     cerr << "c";
     packetCapture(&readable);
     cerr << ")";
+  }
+}
+
+// Returns true on success
+bool replayWrite(char * source, int size)
+{
+  bool result = true;
+  int error = write(global::replayfd, source, size);
+  if (error <= 0)
+  {
+    if (error == 0)
+    {
+      logWrite(EXCEPTION, "replayfd was closed unexpectedly");
+    }
+    else if (error == -1)
+    {
+      logWrite(EXCEPTION, "Error writing replay output: %s", strerror(errno));
+    }
+    result = false;
+  }
+  return result;
+}
+
+void replayWriteCommand(char * head, char * body, unsigned short bodySize)
+{
+  bool success = true;
+  success = replayWrite(head, Header::headerSize);
+  if (success)
+  {
+    replayWrite(body, bodySize);
+  }
+}
+
+void replayWritePacket(int command, PacketInfo * packet)
+{
+  Header head;
+  head.type = command;
+  head.size = PacketInfo::size;
+  head.key = packet->elab;
+  char headBuffer[Header::headerSize];
+  saveHeader(headBuffer, head);
+
+  bool success = replayWrite(headBuffer, Header::headerSize);
+  if (success)
+  {
+    char packetBuffer[PacketInfo::size];
+    savePacket(packetBuffer, *packet);
+    replayWrite(packetBuffer, PacketInfo::size);
+  }
+}
+
+// Returns true on success
+bool replayRead(char * dest, int size)
+{
+  bool result = true;
+  int error = read(global::replayfd, dest, size);
+  if (error <= 0)
+  {
+    if (error == 0)
+    {
+      logWrite(EXCEPTION, "End of replay input");
+    }
+    else if (error == -1)
+    {
+      logWrite(EXCEPTION, "Error reading replay input: %s", strerror(errno));
+    }
+    result = false;
+  }
+  return result;
+}
+
+void replayLoop(void)
+{
+  bool done = false;
+  char headerBuffer[Header::headerSize];
+  Header head;
+  char packetBuffer[(PacketInfo::size > sizeof(SensorCommand))
+                   ? PacketInfo::size : sizeof(SensorCommand)];
+  struct tcp_info kernel;
+  IpHeader ip;
+  struct tcphdr tcp;
+  PacketInfo packet;
+  map<Order, SensorList> streams;
+
+  done = ! replayRead(headerBuffer, Header::headerSize);
+  while (!done)
+  {
+    loadHeader(headerBuffer, &head);
+    switch(head.type)
+    {
+    case NEW_CONNECTION_COMMAND:
+      streams.insert(make_pair(head.key, SensorList()));
+      break;
+    case DELETE_CONNECTION_COMMAND:
+      streams.erase(head.key);
+      break;
+    case SENSOR_COMMAND:
+      done = ! replayRead(packetBuffer, sizeof(int));
+      if (!done)
+      {
+        unsigned int sensorType = 0;
+        loadInt(packetBuffer, & sensorType);
+        SensorCommand sensor;
+        sensor.type = sensorType;
+        streams[head.key].addSensor(sensor);
+      }
+      break;
+    case PACKET_INFO_SEND_COMMAND:
+    case PACKET_INFO_ACK_COMMAND:
+      done = ! replayRead(packetBuffer, PacketInfo::size);
+      if (!done)
+      {
+        loadPacket(packetBuffer, &packet, kernel, ip, tcp);
+        Sensor * sensorHead = streams[head.key].getHead();
+        if (sensorHead != NULL)
+        {
+          if (head.type == PACKET_INFO_SEND_COMMAND)
+          {
+            sensorHead->captureSend(&packet);
+          }
+          else
+          {
+            sensorHead->captureAck(&packet);
+          }
+        }
+      }
+      break;
+    default:
+      logWrite(ERROR, "Invalid command type in replay input: %d", head.type);
+      done = true;
+      break;
+    }
+    if (!done)
+    {
+      done = ! replayRead(headerBuffer, Header::headerSize);
+    }
   }
 }
 

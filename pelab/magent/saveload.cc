@@ -72,6 +72,66 @@ char * saveHeader(char * buffer, Header const & value)
   }
 }
 
+char * savePacket(char * buffer, PacketInfo const & value)
+{
+  char * pos = buffer;
+  struct tcp_info const * kernel = value.kernel;
+
+  pos = saveInt(pos, value.packetTime.getTimeval()->tv_sec);
+  pos = saveInt(pos, value.packetTime.getTimeval()->tv_usec);
+  pos = saveInt(pos, value.packetLength);
+  pos = saveChar(pos, kernel->tcpi_state);
+  pos = saveChar(pos, kernel->tcpi_ca_state);
+  pos = saveChar(pos, kernel->tcpi_retransmits);
+  pos = saveChar(pos, kernel->tcpi_probes);
+  pos = saveChar(pos, kernel->tcpi_backoff);
+  pos = saveChar(pos, kernel->tcpi_options);
+  unsigned char  windowScale = (kernel->tcpi_snd_wscale & 0xf)
+    | ((kernel->tcpi_rcv_wscale & 0xf) << 4);
+  pos = saveChar(pos, windowScale);
+
+  pos = saveInt(pos, kernel->tcpi_rto);
+  pos = saveInt(pos, kernel->tcpi_ato);
+  pos = saveInt(pos, kernel->tcpi_snd_mss);
+  pos = saveInt(pos, kernel->tcpi_rcv_mss);
+
+  pos = saveInt(pos, kernel->tcpi_unacked);
+  pos = saveInt(pos, kernel->tcpi_sacked);
+  pos = saveInt(pos, kernel->tcpi_lost);
+  pos = saveInt(pos, kernel->tcpi_retrans);
+  pos = saveInt(pos, kernel->tcpi_fackets);
+
+  pos = saveInt(pos, kernel->tcpi_last_data_sent);
+  pos = saveInt(pos, kernel->tcpi_last_ack_sent);
+  pos = saveInt(pos, kernel->tcpi_last_data_recv);
+  pos = saveInt(pos, kernel->tcpi_last_ack_recv);
+
+  pos = saveInt(pos, kernel->tcpi_pmtu);
+  pos = saveInt(pos, kernel->tcpi_rcv_ssthresh);
+  pos = saveInt(pos, kernel->tcpi_rtt);
+  pos = saveInt(pos, kernel->tcpi_rttvar);
+  pos = saveInt(pos, kernel->tcpi_snd_ssthresh);
+  pos = saveInt(pos, kernel->tcpi_snd_cwnd);
+  pos = saveInt(pos, kernel->tcpi_advmss);
+  pos = saveInt(pos, kernel->tcpi_reordering);
+
+  memcpy(pos, value.ip, sizeof(IpHeader));
+  pos += sizeof(IpHeader);
+
+  memcpy(pos, value.tcp, sizeof(struct tcphdr));
+  pos += sizeof(struct tcphdr);
+
+  pos = saveChar(pos, value.elab.transport);
+  pos = saveInt(pos, value.elab.ip);
+  pos = saveShort(pos, value.elab.localPort);
+  pos = saveShort(pos, value.elab.remotePort);
+
+  unsigned char bufferFull = value.bufferFull;
+  pos = saveChar(pos, bufferFull);
+
+  return pos;
+}
+
 char * loadChar(char * buffer, unsigned char * value)
 {
   if (buffer == NULL)
@@ -216,3 +276,75 @@ auto_ptr<Command> loadCommand(Header * head, char * body)
   result->key = head->key;
   return result;
 }
+
+char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
+                  IpHeader & ip, struct tcphdr & tcp)
+{
+  char * pos = buffer;
+  value->kernel = &kernel;
+  value->ip = &ip;
+  value->tcp = &tcp;
+
+  unsigned int timeSeconds = 0;
+  pos = loadInt(pos, & timeSeconds);
+  value->packetTime.getTimeval()->tv_sec = timeSeconds;
+  unsigned int timeMicroseconds = 0;
+  pos = loadInt(pos, & timeMicroseconds);
+  value->packetTime.getTimeval()->tv_usec = timeMicroseconds;
+  unsigned int packetLength = 0;
+  pos = loadInt(pos, & packetLength);
+  value->packetLength = static_cast<int>(packetLength);
+  pos = loadChar(pos, & kernel.tcpi_state);
+  pos = loadChar(pos, & kernel.tcpi_ca_state);
+  pos = loadChar(pos, & kernel.tcpi_retransmits);
+  pos = loadChar(pos, & kernel.tcpi_probes);
+  pos = loadChar(pos, & kernel.tcpi_backoff);
+  pos = loadChar(pos, & kernel.tcpi_options);
+  unsigned char  windowScale = 0;
+  pos = loadChar(pos, &windowScale);
+  kernel.tcpi_snd_wscale = windowScale & 0xf;
+  kernel.tcpi_rcv_wscale = (windowScale >> 4) & 0xf;
+
+  pos = loadInt(pos, & kernel.tcpi_rto);
+  pos = loadInt(pos, & kernel.tcpi_ato);
+  pos = loadInt(pos, & kernel.tcpi_snd_mss);
+  pos = loadInt(pos, & kernel.tcpi_rcv_mss);
+
+  pos = loadInt(pos, & kernel.tcpi_unacked);
+  pos = loadInt(pos, & kernel.tcpi_sacked);
+  pos = loadInt(pos, & kernel.tcpi_lost);
+  pos = loadInt(pos, & kernel.tcpi_retrans);
+  pos = loadInt(pos, & kernel.tcpi_fackets);
+
+  pos = loadInt(pos, & kernel.tcpi_last_data_sent);
+  pos = loadInt(pos, & kernel.tcpi_last_ack_sent);
+  pos = loadInt(pos, & kernel.tcpi_last_data_recv);
+  pos = loadInt(pos, & kernel.tcpi_last_ack_recv);
+
+  pos = loadInt(pos, & kernel.tcpi_pmtu);
+  pos = loadInt(pos, & kernel.tcpi_rcv_ssthresh);
+  pos = loadInt(pos, & kernel.tcpi_rtt);
+  pos = loadInt(pos, & kernel.tcpi_rttvar);
+  pos = loadInt(pos, & kernel.tcpi_snd_ssthresh);
+  pos = loadInt(pos, & kernel.tcpi_snd_cwnd);
+  pos = loadInt(pos, & kernel.tcpi_advmss);
+  pos = loadInt(pos, & kernel.tcpi_reordering);
+
+  memcpy(&ip, pos, sizeof(IpHeader));
+  pos += sizeof(IpHeader);
+
+  memcpy(&tcp, pos, sizeof(struct tcphdr));
+  pos += sizeof(struct tcphdr);
+
+  pos = loadChar(pos, & value->elab.transport);
+  pos = loadInt(pos, & value->elab.ip);
+  pos = loadShort(pos, & value->elab.localPort);
+  pos = loadShort(pos, & value->elab.remotePort);
+
+  unsigned char bufferFull = 0;
+  pos = loadChar(pos, &bufferFull);
+  value->bufferFull = (bufferFull == 1);
+
+  return pos;
+}
+
