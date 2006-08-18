@@ -72,14 +72,40 @@ char * saveHeader(char * buffer, Header const & value)
   }
 }
 
+char * saveOptions(char * buffer, std::list<Option> const & options)
+{
+  char * pos = buffer;
+
+  pos = saveInt(pos, options.size());
+  list<Option>::const_iterator current = options.begin();
+  list<Option>::const_iterator limit = options.end();
+  for (; current != limit; ++current)
+  {
+    pos = saveChar(pos, current->type);
+    pos = saveChar(pos, current->length);
+    if (current->length > 0)
+    {
+      memcpy(pos, current->buffer, current->length);
+      pos += current->length;
+    }
+  }
+
+  return pos;
+}
+
 char * savePacket(char * buffer, PacketInfo const & value)
 {
   char * pos = buffer;
   struct tcp_info const * kernel = value.kernel;
 
+  // Save packet time
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_sec);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_usec);
+
+  // Save packet length
   pos = saveInt(pos, value.packetLength);
+
+  // Save tcp_info
   pos = saveChar(pos, kernel->tcpi_state);
   pos = saveChar(pos, kernel->tcpi_ca_state);
   pos = saveChar(pos, kernel->tcpi_retransmits);
@@ -115,17 +141,27 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, kernel->tcpi_advmss);
   pos = saveInt(pos, kernel->tcpi_reordering);
 
+  // Save IP header
   memcpy(pos, value.ip, sizeof(struct ip));
   pos += sizeof(struct ip);
 
+  // Save IP options
+  pos = saveOptions(pos, * value.ipOptions);
+
+  // Save TCP header
   memcpy(pos, value.tcp, sizeof(struct tcphdr));
   pos += sizeof(struct tcphdr);
 
+  // Save TCP options
+  pos = saveOptions(pos, * value.tcpOptions);
+
+  // Save elab stuff
   pos = saveChar(pos, value.elab.transport);
   pos = saveInt(pos, value.elab.ip);
   pos = saveShort(pos, value.elab.localPort);
   pos = saveShort(pos, value.elab.remotePort);
 
+  // Save bufferFull measurement
   unsigned char bufferFull = value.bufferFull;
   pos = saveChar(pos, bufferFull);
 
@@ -218,6 +254,36 @@ char * loadHeader(char * buffer, Header * value)
   }
 }
 
+// Assumption: The input buffer will not be destroyed or changed
+// before the list of optins is destroyed.
+char * loadOptions(char * buffer, std::list<Option> * options)
+{
+  char * pos = buffer;
+
+  Option current;
+  size_t i = 0;
+  size_t limit = 0;
+
+  pos = loadInt(pos, &limit);
+  for (i = 0; i < limit; ++i)
+  {
+    pos = loadChar(pos, & current.type);
+    pos = loadChar(pos, & current.length);
+    if (current.length > 0)
+    {
+      current.buffer = reinterpret_cast<unsigned char *>(pos);
+      pos += current.length;
+    }
+    else
+    {
+      current.buffer = NULL;
+    }
+    options->push_back(current);
+  }
+
+  return pos;
+}
+
 auto_ptr<Command> loadCommand(Header * head, char * body)
 {
   auto_ptr<Command> result;
@@ -278,22 +344,30 @@ auto_ptr<Command> loadCommand(Header * head, char * body)
 }
 
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
-                  struct ip & ip, struct tcphdr & tcp)
+                  struct ip & ip, struct tcphdr & tcp,
+                  list<Option> & ipOptions, list<Option> & tcpOptions)
 {
   char * pos = buffer;
   value->kernel = &kernel;
   value->ip = &ip;
+  value->ipOptions = &ipOptions;
   value->tcp = &tcp;
+  value->tcpOptions = &tcpOptions;
 
+  // Load packet time
   unsigned int timeSeconds = 0;
   pos = loadInt(pos, & timeSeconds);
   value->packetTime.getTimeval()->tv_sec = timeSeconds;
   unsigned int timeMicroseconds = 0;
   pos = loadInt(pos, & timeMicroseconds);
   value->packetTime.getTimeval()->tv_usec = timeMicroseconds;
+
+  // Load packet length
   unsigned int packetLength = 0;
   pos = loadInt(pos, & packetLength);
   value->packetLength = static_cast<int>(packetLength);
+
+  // Load tcp_info
   pos = loadChar(pos, & kernel.tcpi_state);
   pos = loadChar(pos, & kernel.tcpi_ca_state);
   pos = loadChar(pos, & kernel.tcpi_retransmits);
@@ -330,17 +404,27 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadInt(pos, & kernel.tcpi_advmss);
   pos = loadInt(pos, & kernel.tcpi_reordering);
 
+  // Load IP header
   memcpy(&ip, pos, sizeof(struct ip));
   pos += sizeof(struct ip);
 
+  // Load IP options
+  pos = loadOptions(pos, &ipOptions);
+
+  // Load TCP header
   memcpy(&tcp, pos, sizeof(struct tcphdr));
   pos += sizeof(struct tcphdr);
 
+  // Load TCP options
+  pos = loadOptions(pos, &tcpOptions);
+
+  // Load elab
   pos = loadChar(pos, & value->elab.transport);
   pos = loadInt(pos, & value->elab.ip);
   pos = loadShort(pos, & value->elab.localPort);
   pos = loadShort(pos, & value->elab.remotePort);
 
+  // Load bufferFull
   unsigned char bufferFull = 0;
   pos = loadChar(pos, &bufferFull);
   value->bufferFull = (bufferFull == 1);

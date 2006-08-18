@@ -370,7 +370,7 @@ void replayWritePacket(int command, PacketInfo * packet)
 {
   Header head;
   head.type = command;
-  head.size = PacketInfo::size;
+  head.size = packet->census();
   head.key = packet->elab;
   char headBuffer[Header::headerSize];
   saveHeader(headBuffer, head);
@@ -378,9 +378,10 @@ void replayWritePacket(int command, PacketInfo * packet)
   bool success = replayWrite(headBuffer, Header::headerSize);
   if (success)
   {
-    char packetBuffer[PacketInfo::size];
-    savePacket(packetBuffer, *packet);
-    replayWrite(packetBuffer, PacketInfo::size);
+    vector<char> packetBuffer;
+    packetBuffer.resize(head.size);
+    savePacket(& packetBuffer[0], *packet);
+    replayWrite(& packetBuffer[0], head.size);
   }
 }
 
@@ -409,11 +410,12 @@ void replayLoop(void)
   bool done = false;
   char headerBuffer[Header::headerSize];
   Header head;
-  char packetBuffer[(PacketInfo::size > sizeof(SensorCommand))
-                   ? PacketInfo::size : sizeof(SensorCommand)];
+  vector<char> packetBuffer;
   struct tcp_info kernel;
   struct ip ip;
+  list<Option> ipOptions;
   struct tcphdr tcp;
+  list<Option> tcpOptions;
   PacketInfo packet;
   map<Order, SensorList> streams;
 
@@ -421,6 +423,7 @@ void replayLoop(void)
   while (!done)
   {
     loadHeader(headerBuffer, &head);
+    packetBuffer.resize(head.size);
     switch(head.type)
     {
     case NEW_CONNECTION_COMMAND:
@@ -430,11 +433,11 @@ void replayLoop(void)
       streams.erase(head.key);
       break;
     case SENSOR_COMMAND:
-      done = ! replayRead(packetBuffer, sizeof(int));
+      done = ! replayRead(& packetBuffer[0], sizeof(int));
       if (!done)
       {
         unsigned int sensorType = 0;
-        loadInt(packetBuffer, & sensorType);
+        loadInt(& packetBuffer[0], & sensorType);
         SensorCommand sensor;
         sensor.type = sensorType;
         streams[head.key].addSensor(sensor);
@@ -442,10 +445,11 @@ void replayLoop(void)
       break;
     case PACKET_INFO_SEND_COMMAND:
     case PACKET_INFO_ACK_COMMAND:
-      done = ! replayRead(packetBuffer, PacketInfo::size);
+      done = ! replayRead(& packetBuffer[0], head.size);
       if (!done)
       {
-        loadPacket(packetBuffer, &packet, kernel, ip, tcp);
+        loadPacket(& packetBuffer[0], &packet, kernel, ip, tcp, ipOptions,
+                   tcpOptions);
         Sensor * sensorHead = streams[head.key].getHead();
         if (sensorHead != NULL)
         {

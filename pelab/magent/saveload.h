@@ -26,16 +26,20 @@ char * saveChar(char * buffer, unsigned char value);
 char * saveShort(char * buffer, unsigned short value);
 char * saveInt(char * buffer, unsigned int value);
 char * saveHeader(char * buffer, Header const & value);
+char * saveOptions(char * buffer, std::list<Option> const & options);
 char * savePacket(char * buffer, PacketInfo const & value);
 
 char * loadChar(char * buffer, unsigned char * value);
 char * loadShort(char * buffer, unsigned short * value);
 char * loadInt(char * buffer, unsigned int * value);
 char * loadHeader(char * buffer, Header * value);
+char * loadOptions(char * buffer, std::list<Option> * options);
 std::auto_ptr<Command> loadCommand(Header * head, char * body);
 // It is presumed that value contains pointers to the various
 // substructures that need to be filled.
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
-                  struct ip & ip, struct tcphdr & tcp);
+                  struct ip & ip, struct tcphdr & tcp,
+                  std::list<Option> & ipOptions,
+                  std::list<Option> & tcpOptions);
 
 #endif

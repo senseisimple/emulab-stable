@@ -18,8 +18,12 @@ namespace
                    unsigned char const * packet);
   void handleTcp(struct pcap_pkthdr const * pcapInfo,
                  struct ip const * ipPacket,
-                 struct tcphdr const * tcpPacket);
-  void handleKernel(Connection * conn, struct tcp_info * kernel);
+                 struct tcphdr const * tcpPacket,
+                 unsigned char const * tcpPacketStart,
+                 list<Option> & ipOptions);
+  bool handleKernel(Connection * conn, struct tcp_info * kernel);
+  void parseOptions(unsigned char const * buffer, int size,
+                    list<Option> * options);
 }
 
 pcap_t * KernelTcp::pcapDescriptor = NULL;
@@ -438,11 +442,18 @@ namespace
       logWrite(ERROR, "A non TCP packet was captured");
       return;
     }
+
+    list<Option> ipOptions;
+    unsigned char const * optionsBegin = packet + sizeof(struct ether_header)
+      + sizeof(struct ip);
+    int optionsSize = ipHeaderLength*4 - sizeof(struct ip);
+    parseOptions(optionsBegin, optionsSize, &ipOptions);
+
     // ipHeaderLength is multiplied by 4 because it is a
     // length in 4-byte words.
-    tcpPacket = reinterpret_cast<struct tcphdr const *>
-      (packet + sizeof(struct ether_header)
-       + ipHeaderLength*4);
+    unsigned char const * tcpPacketStart = packet + sizeof(struct ether_header)
+      + ipHeaderLength*4;
+    tcpPacket = reinterpret_cast<struct tcphdr const *>(tcpPacketStart);
     bytesRemaining -= ipHeaderLength*4;
     if (bytesRemaining < sizeof(struct tcphdr))
     {
@@ -450,7 +461,7 @@ namespace
                "a TCP header");
       return;
     }
-    handleTcp(pcapInfo, ipPacket, tcpPacket);
+    handleTcp(pcapInfo, ipPacket, tcpPacket, tcpPacketStart, ipOptions);
   }
 
   int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
@@ -473,7 +484,9 @@ namespace
 
   void handleTcp(struct pcap_pkthdr const * pcapInfo,
                  struct ip const * ipPacket,
-                 struct tcphdr const * tcpPacket)
+                 struct tcphdr const * tcpPacket,
+                 unsigned char const * tcpPacketStart,
+                 list<Option> & ipOptions)
   {
     logWrite(PCAP, "Captured a TCP packet");
     struct tcp_info kernelInfo;
@@ -486,12 +499,21 @@ namespace
     {
       isAck = false;
     }
+
+    list<Option> tcpOptions;
+    unsigned char const * tcpOptionsBegin = tcpPacketStart
+      + sizeof(struct tcphdr);
+    int tcpOptionsSize = tcpPacket->doff*4 - sizeof(struct tcphdr);
+    parseOptions(tcpOptionsBegin, tcpOptionsSize, &tcpOptions);
+
     PacketInfo packet;
     packet.packetTime = Time(pcapInfo->ts);
     packet.packetLength = pcapInfo->len;
     packet.kernel = &kernelInfo;
     packet.ip = ipPacket;
+    packet.ipOptions = &ipOptions;
     packet.tcp = tcpPacket;
+    packet.tcpOptions = &tcpOptions;
 
     Order key;
     // Assume that this is an outgoing packet.
@@ -502,15 +524,12 @@ namespace
 
     map<Order, Connection *>::iterator pos;
     pos = global::planetMap.find(key);
-    if (pos != global::planetMap.end())
+    // If it is an outgoing packet, and it is sending original data
+    // (not an ack), and we can successfully fill in the kernel data
+    if (pos != global::planetMap.end() && !isAck
+      && handleKernel(pos->second, &kernelInfo))
     {
-      // This is an outgoing packet.
-      if (!isAck)
-      {
-        // We only care about sent packets, not acked packets.
-        handleKernel(pos->second, &kernelInfo);
-        pos->second->captureSend(&packet);
-      }
+      pos->second->captureSend(&packet);
     }
     else
     {
@@ -521,21 +540,19 @@ namespace
       key.remotePort = ntohs(tcpPacket->source);
 
       pos = global::planetMap.find(key);
-      if (pos != global::planetMap.end())
+      // If this is an incoming packet, and it is an ack packet, and
+      // we can successfully fill in the kernel data
+      if (pos != global::planetMap.end() && isAck
+          && handleKernel(pos->second, &kernelInfo))
       {
-        // This is an incoming packet.
-        if (isAck)
-        {
-          // We only care about ack packets, not sent packets.
-          handleKernel(pos->second, &kernelInfo);
-          pos->second->captureAck(&packet);
-        }
+        pos->second->captureAck(&packet);
       }
     }
   }
 
-  void handleKernel(Connection * conn, struct tcp_info * kernel)
+  bool handleKernel(Connection * conn, struct tcp_info * kernel)
   {
+    bool result = true;
     // This is a filthy filthy hack. Basically, I need the fd in order
     // to introspect the kernel for it. But I don't want that part of
     // the main interface because we don't even know that a random
@@ -552,6 +569,7 @@ namespace
       {
         logWrite(ERROR, "Failed to get the kernel TCP info: %s",
                  strerror(errno));
+        result = false;
       }
     }
     else
@@ -560,6 +578,55 @@ namespace
                "ConnectionModel on the actual connection wasn't of type "
                "KernelTcp. This inconsistency will lead to "
                "undefined/uninitialized behaviour");
+      result = false;
+    }
+  return result;
+  }
+
+  void parseOptions(unsigned char const * buffer, int size,
+                    list<Option> * options)
+  {
+    unsigned char const * pos;
+    unsigned char const * limit = buffer + size;
+    Option current;
+    bool done = false;
+    while (pos < limit && !done)
+    {
+      current.type = *pos;
+      ++pos;
+      if (current.type == 0)
+      {
+        // This is the ending marker. We're done here.
+        current.length = 0;
+        current.buffer = NULL;
+        options->push_back(current);
+        done = true;
+      }
+      else if (current.type == 1)
+      {
+        // This is the padding no-op marker. There is no length field.
+        current.length = 0;
+        current.buffer = NULL;
+        options->push_back(current);
+      }
+      else
+      {
+        // This is some other code. There is a length field and length-2
+        // other bytes.
+        current.length = *pos - 2;
+        ++pos;
+
+        if (current.length > 0)
+        {
+          current.buffer = pos;
+          pos += current.length;
+        }
+        else
+        {
+          current.buffer = NULL;
+        }
+        options->push_back(current);
+      }
     }
   }
 }

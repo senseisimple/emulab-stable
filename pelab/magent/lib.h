@@ -170,7 +170,7 @@ struct Option
   Option() : type(0), length(0), buffer(NULL) {}
   unsigned char type;
   unsigned char length;
-  char * buffer;
+  unsigned char const * buffer;
 };
 
 struct PacketInfo
