@@ -49,6 +49,7 @@ struct( initvalres => {
 my %shapeinfo;
 
 my $showonly = 0;
+my $starttime = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10000;	# Kbits/sec
@@ -59,16 +60,27 @@ my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
 
+my $now     = time();
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("n", \%options)) {
+if (! getopts("S:n", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
     $showonly = 1;
+}
+if (defined($options{"S"})) {
+    my $high = time();
+    my $low = $high - (23 * 60 * 60); # XXX
+
+    $starttime = $options{"S"};
+    if ($starttime && ($starttime < $low || $starttime > $high)) {
+	die("Bogus timestamp $starttime, should be in [$low - $high]\n");
+    }
 }
 if (@ARGV != 2) {
     print STDERR "usage: init-elabnodes pid eid\n";
@@ -160,6 +172,15 @@ foreach my $mapping (@nodelist) {
 	$ip_mapping{$pnode} = inet_ntoa($ips[0]);
     }
 }
+
+my $msg = "Intializing conditions from time ";
+if ($starttime) {
+    $msg .= "$starttime (now - " . ($now - $starttime) . " seconds)\n";
+} else {
+    $msg .= $now . " (now)\n";
+    $starttime = $now;
+}
+print($msg);
 
 #
 # Get planetlab info for each planetlab node...
@@ -275,7 +296,8 @@ sub get_plabinfo($)
 	my $query_result =
 	    DBQueryFatal("select latency,loss,bw from pair_data ".
 			 "where srcsite_idx='$src_site' and ".
-			 "      dstsite_idx='$dst_site' ".
+			 "      dstsite_idx='$dst_site' and ".
+			 "      unixstamp <= $starttime ".
 			 "order by unixstamp desc limit 5");
 
 	if (!$query_result->numrows) {
@@ -334,9 +356,9 @@ sub get_pathInitCond($$$;$)
 {
     my ($srcnode, $dstnode, $pasthours, $expAlpha) = @_;
     if( !defined $expAlpha) { $expAlpha = 0.6; }  #default alpha value
-    my $endtime = time();
-    #my $starttime = $endtime - (60*60*24);
-    my $starttime = $endtime - (60*60*$pasthours);
+    my $lasttime = $starttime;
+    #my $firsttime = $lasttime - (60*60*24);
+    my $firsttime = $lasttime - (60*60*$pasthours);
     my $srcsite_idx    = $site_mapping{$srcnode};
     my $dstsite_idx    = $site_mapping{$dstnode};
 
@@ -358,8 +380,8 @@ sub get_pathInitCond($$$;$)
 		      "srcsite_idx = $srcsite_idx and ".
 		      "dstsite_idx = $dstsite_idx and ".
 		      "(latency IS NOT NULL or bw IS NOT NULL) and ".
-		      "unixstamp > $starttime and ".
-		      "unixstamp < $endtime ".
+		      "unixstamp > $firsttime and ".
+		      "unixstamp <= $lasttime ".
 		      "order by unixstamp asc ".
 		      ";" );
     while( my $hr = $sth->fetchrow_hashref() ){
@@ -385,8 +407,8 @@ sub get_pathInitCond($$$;$)
 		      "srcsite_idx = $dstsite_idx and ".
 		      "dstsite_idx = $srcsite_idx and ".
 		      "(latency IS NOT NULL) and ".
-		      "unixstamp > $starttime and ".
-		      "unixstamp < $endtime ".
+		      "unixstamp > $firsttime and ".
+		      "unixstamp <= $lasttime ".
 		      "order by unixstamp asc ".
 		      ";" );
 	while( my $hr = $sth->fetchrow_hashref() ){
