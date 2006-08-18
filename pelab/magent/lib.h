@@ -165,19 +165,49 @@ struct WriteResult
   Time nextWrite;
 };
 
+struct Option
+{
+  Option() : type(0), length(0), buffer(NULL) {}
+  unsigned char type;
+  unsigned char length;
+  char * buffer;
+};
+
 struct PacketInfo
 {
-  //                        packetTime+packetLength+kernel+elab
-  enum {size = sizeof(int)*(2         +1           +21    + 1) +
-             sizeof(short)*(0         +0           +0     + 2) +
-              sizeof(char)*(0         +0           +7     + 1) +
-  sizeof(struct ip) + sizeof(struct tcphdr)};
+  size_t census(void)
+  {
+    //                           packetTime+packetLength+kernel+elab
+    size_t result = sizeof(int)*(2         +1           +21    + 1) +
+                  sizeof(short)*(0         +0           +0     + 2) +
+                   sizeof(char)*(0         +0           +7     + 1) +
+      sizeof(struct ip) + sizeof(struct tcphdr);
+    // Size for ipOptions and tcpOptions.
+    result += sizeof(unsigned int)*2;
+
+    std::list<Option>::iterator pos = ipOptions->begin();
+    std::list<Option>::iterator limit = ipOptions->end();
+    for (; pos != limit; ++pos)
+    {
+      result += 2 + pos->length;
+    }
+
+    pos = tcpOptions->begin();
+    limit = tcpOptions->end();
+    for (; pos != limit; ++pos)
+    {
+      result += 2 + pos->length;
+    }
+    return result;
+  }
 
   Time packetTime;
   int packetLength;
   struct tcp_info const * kernel;
   struct ip const * ip;
+  std::list<Option> * ipOptions;
   struct tcphdr const * tcp;
+  std::list<Option> * tcpOptions;
   Order elab;
   bool bufferFull;
 };
