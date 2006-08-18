@@ -181,28 +181,37 @@ while (1) {
     my $now = time();
     my $sleeptime = $MAXSLEEPTIME;
     my $reappool;
+    my $lastwindowsize = -1;
 
-    # Check/update the pools and fire off new checks as window room permits.
+    # Update pool membership.
     foreach my $pool (@allpools) {
-        print "Checking pool: $pool->{'NAME'}\n";
         updatenodepool($pool);
-        # Build 'em up (to the max window size # of jobs)
-        while ($windowsize < $MAXWINSIZE &&
-               $pool->getnextchecktime() <= $now) {
-            $pool->checknextnode();
-            $windowsize++;
+    }
+
+    # Check pools and fire off new checks as window room permits.  If no
+    # new node tests were added since the last run through the pools, then
+    # bail out.
+    while ($windowsize < $MAXWINSIZE && $windowsize != $lastwindowsize) {
+        $lastwindowsize = $windowsize;
+        foreach my $pool (@allpools) {
+            # if pool still has nodes to test, get them going.
+            if ($pool->getnextchecktime() <= $now) {
+                $pool->checknextnode();
+                $windowsize++;
+            }
         }
-        # Now adjust the sleep time according to the next node service time.
-        # The next service time is defined as the soonest time in the future
-        # that a node in any of the pools needs attention (either to be 
-        # checked, or to be processed as a result of an already running check).
-        # This value is tracked/updated by the pools outside of the main loop.
-        if ($windowsize < $MAXWINSIZE) {
-            my $nextservicetime = $pool->getnextservicetime();
-            my $servicediff = $nextservicetime - $now;
-            $servicediff = $servicediff > $MINSLEEP ? $servicediff : $MINSLEEP;
-            $sleeptime = MIN($servicediff, $sleeptime);
-        }
+    }
+
+    # Now adjust the sleep time according to the next node service 
+    # time.  The next service time is defined as the soonest time in 
+    # the future that a node in any of the pools needs attention 
+    # (either to be checked, or to be processed as a result of an 
+    # already running check).
+    foreach my $pool (@allpools) {
+        my $nextservicetime = $pool->getnextservicetime();
+        my $servicediff = $nextservicetime - $now;
+        $servicediff = $servicediff > $MINSLEEP ? $servicediff : $MINSLEEP;
+        $sleeptime = MIN($servicediff, $sleeptime);
     }
 
     # Go to sleep waiting for the next node to process.
