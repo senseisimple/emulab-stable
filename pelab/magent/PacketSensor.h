@@ -22,6 +22,7 @@ protected:
 private:
   struct SentPacket
   {
+    SentPacket();
     bool inSequenceBlock(unsigned int sequence);
 
     unsigned int seqStart;

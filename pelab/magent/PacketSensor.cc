@@ -5,7 +5,7 @@
 
 using namespace std;
 
-PacketSensor::PacketSensor()
+PacketSensor::PacketSensor() : globalSequence()
 {
   ackedSize = 0;
   ackedSendTime = Time();
@@ -173,4 +173,8 @@ bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
     logWrite(SENSOR, "No!");
   }
   return result;
+}
+
+PacketSensor::SentPacket::SentPacket()
+    : seqStart(0), seqEnd(0), totalLength(), timestamp() {
 }
