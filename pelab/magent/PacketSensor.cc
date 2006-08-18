@@ -70,7 +70,7 @@ void PacketSensor::localSend(PacketInfo * packet)
     record.seqStart = startSequence;
 
     /*
-     * Caclulate the packet payload size - we have to make sure to take into
+     * Calculate the packet payload size - we have to make sure to take into
      * account IP and TCP option headers
      */
     unsigned int sequenceLength =
@@ -84,8 +84,8 @@ void PacketSensor::localSend(PacketInfo * packet)
     record.totalLength = packet->packetLength;
     record.timestamp = packet->packetTime;
     logWrite(SENSOR,
-             "PacketSensor::localSend() new record: ss=%i,sl=%i,se=%i,tl=%i",
-             record.seqStart,sequenceLength,record.seqEnd,
+             "PacketSensor::localSend() new record: ss=%u,sl=%u,se=%u,tl=%u",
+             record.seqStart, sequenceLength, record.seqEnd,
              record.totalLength);
     globalSequence.seqEnd = record.seqEnd;
     if (unacked.empty())
