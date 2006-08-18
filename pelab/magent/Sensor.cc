@@ -63,7 +63,13 @@ void NullSensor::localSend(PacketInfo *)
   logWrite(SENSOR, "Send received");
 }
 
-void NullSensor::localAck(PacketInfo *)
+void NullSensor::localAck(PacketInfo * packet)
 {
   logWrite(SENSOR, "Ack received");
+  list<Option>::iterator pos = packet->tcpOptions->begin();
+  list<Option>::iterator limit = packet->tcpOptions->end();
+  for (; pos != limit; ++pos)
+  {
+    logWrite(SENSOR, "TCP Option: %d", pos->type);
+  }
 }

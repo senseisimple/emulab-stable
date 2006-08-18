@@ -586,7 +586,8 @@ namespace
   void parseOptions(unsigned char const * buffer, int size,
                     list<Option> * options)
   {
-    unsigned char const * pos;
+//    logWrite(PCAP, "Parsing options");
+    unsigned char const * pos = buffer;
     unsigned char const * limit = buffer + size;
     Option current;
     bool done = false;
@@ -628,5 +629,6 @@ namespace
         options->push_back(current);
       }
     }
+//    logWrite(PCAP, "Finished parsing options");
   }
 }

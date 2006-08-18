@@ -32,7 +32,7 @@ public:
   virtual ~NullSensor();
 protected:
   virtual void localSend(PacketInfo *);
-  virtual void localAck(PacketInfo *);
+  virtual void localAck(PacketInfo * packet);
 };
 
 #endif
