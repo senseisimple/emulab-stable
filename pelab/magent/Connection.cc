@@ -135,7 +135,6 @@ void Connection::addSensor(SensorCommand const & newSensor)
 
 void Connection::captureSend(PacketInfo * packet)
 {
-  logWrite(SENSOR, "Captured a send packet");
   Sensor * head = measurements.getHead();
   packet->elab = elab;
   packet->bufferFull = bufferFull;
@@ -148,7 +147,6 @@ void Connection::captureSend(PacketInfo * packet)
 
 void Connection::captureAck(PacketInfo * packet)
 {
-  logWrite(SENSOR, "Captured an ack packet");
   Sensor * head = measurements.getHead();
   packet->elab = elab;
   packet->bufferFull = bufferFull;

@@ -258,6 +258,7 @@ char * loadHeader(char * buffer, Header * value)
 // before the list of optins is destroyed.
 char * loadOptions(char * buffer, std::list<Option> * options)
 {
+  options->clear();
   char * pos = buffer;
 
   Option current;
