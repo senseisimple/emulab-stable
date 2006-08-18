@@ -85,7 +85,8 @@ void PacketSensor::localSend(PacketInfo * packet)
     record.timestamp = packet->packetTime;
     logWrite(SENSOR,
              "PacketSensor::localSend() new record: ss=%i,sl=%i,se=%i,tl=%i",
-             record.seqStart);
+             record.seqStart,sequenceLength,record.seqEnd,
+             record.totalLength);
     globalSequence.seqEnd = record.seqEnd;
     if (unacked.empty())
     {
