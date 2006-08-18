@@ -7,6 +7,7 @@
 use English;
 use Getopt::Std;
 use POSIX qw(strftime);
+use POSIX ":sys_wait_h";
 
 #
 # Monitor the condition of plab nodes by continually trying to setup/teardown
@@ -51,21 +52,18 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+# Load pool libraries
+use plabmon_badpool;
+use plabmon_goodpool;
+
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
 
 # Variables from libdb.
-my $PLABMOND_PID    = PLABMOND_PID();
-my $PLABMOND_EID    = PLABMOND_EID();
+my $PLABDOWN_PID    = PLABDOWN_PID();
+my $PLABDOWN_EID    = PLABDOWN_EID();
 my $PLABHOLDING_PID = PLABHOLDING_PID();
 my $PLABHOLDING_EID = PLABHOLDING_EID();
-my $NODEDEAD_PID    = NODEDEAD_PID();
-my $NODEDEAD_EID    = NODEDEAD_EID();
-
-sub TimeStamp()
-{
-    return POSIX::strftime("%m/%d/%y %H:%M:%S", localtime());
-}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -83,22 +81,21 @@ if (defined($options{"d"})) {
 }
 
 #
-# Functions
+# Function prototypes
 #
-sub nodepostalloc($);
-sub nodeprecheck($);
+sub updatenodepool($);
 sub fatal($);
-sub search($@);
 
 #
-# Local vars
+# Global vars
 #
-my $logfile = "$TB/log/plabmonitord";
-my @oldnodes = ();
-my $LOOPSLEEP = 1800;  # 1/2 hour between successive loops.
-my $PAUSETIME = 120;   # 2 minute pause after running vnode_setup
-my $SETUPWAIT = 600;   # how long to wait for vnode to setup.
-my $BATCHNUM = 100;     # degree of parallelization
+my $logfile      = "$TB/log/plabmonitord";
+my $MINSLEEP     = 2;    # Sleep for no less than 2 seconds.
+my $MAXWINSIZE   = 40;   # Degree of parallelization.
+my $MAXSLEEPTIME = 600;  # Don't ever sleep for longer than this - we need
+                         #  to wake up once in a while!
+my $CHILLTIME    = 5;    # How long to wait after processing expirations.
+my $NEVER        = 0;    # "Never" in seconds since the Epoch.
 
 #
 # daemonize
@@ -109,199 +106,193 @@ if (!$debug) {
     }
 }
 
+# pid -> pool mapping; passed in as param to pool setup funtion.
+my %chpid2pool = ();
+
 print "Plab Monitor Daemon starting... pid $$, at ".`date`;
 
 #
-# We want list of all vnodes in our special experiment, whose pnodes are
-# in hwdown. These are the nodes we test, hoping to move them out of
-# hwdown.
+# Create the node pools.
 #
+my $badpool  = plabmon_badpool->new("bad", 
+                                    $PLABDOWN_PID, 
+                                    $PLABDOWN_EID, 
+                                    \%chpid2pool);
+my $goodpool = plabmon_goodpool->new("good", 
+                                     $PLABHOLDING_PID, 
+                                     $PLABHOLDING_EID, 
+                                     \%chpid2pool);
+@allpools = ($badpool, $goodpool);
+
+
+#
+# helper
+#
+sub MIN($$) {
+    my ($a, $b) = @_;
+
+    my $res =  $a < $b ? $a : $b;
+
+    return $res;
+}
+
+#
+# Handle termination/hangup signals
+#
+sub termsig($) {
+    my $signame = shift;
+    print "*** $0: Received $signame - exiting.\n";
+
+    foreach my $pid (keys %chpid2pool) {
+        kill("TERM", $pid);
+    }
+
+    while (wait() > 0) {};
+
+    exit -1;
+}
+
+$SIG{TERM} = \&termsig;
+$SIG{HUP}  = \&termsig;
+$SIG{INT}  = \&termsig;
+
+#
+# Collect child procs into array.
+#
+my @reapedchildren = ();
+$SIG{CHLD} = sub {
+    my $chpid;
+    my $chstat;
+    do {
+        $chpid = waitpid(-1, WNOHANG);
+        $chstat = $?;
+        if ($chpid > 0) {
+            push @reapedchildren, [$chpid, $chstat];
+        }
+    } while $chpid > 0;
+};
+
+#
+# Main loop: grind around looking for nodes to check in the various
+# pools.  Sleep until next node is ready to be processed.
+#
+my $windowsize = 0;
 while (1) {
+    my $now = time();
+    my $sleeptime = $MAXSLEEPTIME;
+    my $reappool;
 
-    my $start = time();
-
-    print "--------------------------------------------------------------". 
-          "----------------\n";
-    print "Starting plabmonitord loop at ". TimeStamp() ."\n";
-
-    # Get entries for plab physnodes in hwdown.
-    my $query_result =
-	DBQueryWarn("select r1.node_id,n1.phys_nodeid from reserved as r1 ".
-		    "left join nodes as n1 on n1.node_id=r1.node_id ".
-		    "left join reserved as r2 on r2.node_id=n1.phys_nodeid ".
-		    "where r1.pid='$PLABMOND_PID' and ".
-		    "      r1.eid='$PLABMOND_EID' and ".
-		    "      r2.pid='$NODEDEAD_PID' and ".
-		    "      r2.eid='$NODEDEAD_EID' ".
-		    "order by rand()");
-
-    if (!$query_result) {
-	print "Failed to get node list from DB! Waiting a while ...\n";
-	goto loop;
-    }
-
-    #
-    # Build up current node list.  We prefer to try nodes that haven't
-    # failed in previous iterations (the newly dead).
-    #
-    my @nodes = ();
-    while (my ($vnode,$pnode) = $query_result->fetchrow_array()) {
-        if (search($vnode, @oldnodes)) {
-            # We've seen this node before, put it on the end.
-            push (@nodes, [$vnode, $pnode]);
+    # Check/update the pools and fire off new checks as window room permits.
+    foreach my $pool (@allpools) {
+        print "Checking pool: $pool->{'NAME'}\n";
+        updatenodepool($pool);
+        # Build 'em up (to the max window size # of jobs)
+        while ($windowsize < $MAXWINSIZE &&
+               $pool->getnextchecktime() <= $now) {
+            $pool->checknextnode();
+            $windowsize++;
         }
-        else {
-            # We haven't seen this one, put it on the front.
-            unshift(@nodes, [$vnode, $pnode]);
+        # Now adjust the sleep time according to the next node service time.
+        # The next service time is defined as the soonest time in the future
+        # that a node in any of the pools needs attention (either to be 
+        # checked, or to be processed as a result of an already running check).
+        # This value is tracked/updated by the pools outside of the main loop.
+        if ($windowsize < $MAXWINSIZE) {
+            my $nextservicetime = $pool->getnextservicetime();
+            my $servicediff = $nextservicetime - $now;
+            $servicediff = $servicediff > $MINSLEEP ? $servicediff : $MINSLEEP;
+            $sleeptime = MIN($servicediff, $sleeptime);
         }
     }
 
-    # We're done with last run's failed node list.  Clear it since it
-    # will be built again this run.
-    @oldnodes = ();
+    # Go to sleep waiting for the next node to process.
+    print "Monitor going to sleep for $sleeptime seconds.\n";
+    sleep($sleeptime);
 
-    # Run through the nodes in parallelized batches
-    while (my @batch = splice(@nodes,0,$BATCHNUM)) {
-        # Do some initial checks on the nodes and remove those that
-        # fail these from testing this time around.
-        my @batch2 = grep(nodeprecheck($_), @batch);
-        my @vnodes = map {$_->[0]} @batch2;
-        my @pnodes = map {$_->[1]} @batch2;
-
-        sleep 5;
-    
-        print "##############################################################################\n";
-        print "### Checking vnodes: @vnodes on pnodes: @pnodes at ".
-            TimeStamp() . "\n";
-    
-        #
-        # Try to setup this batch of vnodes.
-        #
-        system("vnode_setup -f -d -w $SETUPWAIT -n $BATCHNUM ".
-               "$PLABMOND_PID $PLABMOND_EID @vnodes");
-
-        print "sleeping for a bit.\n"
-            if ($debug);
-        sleep($PAUSETIME); # wait a bit to let final stragglers check in.
-
-        # Check the nodes to find out which are up, and which failed
-        # in the vnode_setup we just ran.
-        print "Checking vnode_setup run status\n";
-        my @failed = ();
-        my @succeeded = ();
-        foreach $vnode (@batch2) {
-            if (nodepostalloc($vnode)) {
-                push(@succeeded, $vnode);
-            } else {
-                push(@failed, $vnode);
+    # Handle any children that have exited.
+    while(my $childinfo = shift @reapedchildren) {
+        my $chpid  = $childinfo->[0];
+        my $chstat = $childinfo->[1];
+        if ($chpid > 0) {
+            next if !defined($chpid2pool{$chpid});
+            $reappool = $chpid2pool{$chpid};
+            delete $chpid2pool{$chpid};
+            if ($reappool->processchild($chpid, $chstat)) {
+                $windowsize--;
             }
         }
-        
-        # If any fail, try to tear them down.
-        if (@failed) {
-            my @fvnodes = map {$_->[0]} @failed;
-            
-            print "### vnode_setup failed for the following vnodes: @fvnodes\n";
-            print "### Proceding to tear them down.\n";
-            system("vnode_setup -f -d -k -n $BATCHNUM $PLABMOND_PID $PLABMOND_EID @fvnodes");
-        }
-
-        # If any succedded, let tbops know about it.
-        if (@succeeded) {
-            my @spnodes = map {$_->[1]} @succeeded;
-
-            SENDMAIL($TBAUTOMAIL, @succeeded ." plab nodes revived.",
-                     "The following nodes have been brought back from the afterworld:\n\n".
-                     join("\n", @spnodes) ."\n",
-                     $TBOPS);
-        }
-
-        # Keep track of failed nodes for next daemon loop iteration.
-        push(@oldnodes, @failed);
     }
 
-  loop:
-    # Wait a while between setup attempts to let PLAB deallocation percolate.
-    print "Sleeping for $LOOPSLEEP seconds.\n";
-    sleep($LOOPSLEEP);
+    #$now = time(); # Must reset $now after sleep.
+
+    # Look for expired processes.  Calling checkexpiration on a pool
+    # has the side effect of checking for ISUP (or ISUP expiration) for
+    # any nodes pending thusly in the pool.
+    foreach my $pool (@allpools) {
+        $pool->checkexpiration();
+    }
+
+    # We may have just fired off a bunch of kills, so chill for a bit to
+    # let things quiesce.
+    sleep($CHILLTIME);
 }
 
 #
-# Check vnode status, moving nodes back into production if they booted up,
-# and leaving them in hwdown if they didn't.
+# Go through the PID/EID associated with the pool and grab any new nodes
+# that have appeared.
 #
-sub nodepostalloc($) {
-    my ($vnode, $pnode) = @{$_[0]};
-    my $revive = 0;
-    my $retval = 0;
-    my $state = TBDB_NODESTATE_UNKNOWN();
-
-    # Did the node send ISUP (boot up completely)?
-    if (TBGetNodeEventState($vnode, \$state) && 
-        $state eq TBDB_NODESTATE_ISUP()) 
-    {
-        $revive = 1;
-    }
-
-    print "State for $vnode is $state\n" if $debug;
-
-    #
-    # It came up! Move the pnode out of hwdown and back into
-    # normal holding experiment.
-    #
-    if ($revive &&
-        DBQueryWarn("update reserved set ".
-                    "  pid='$PLABHOLDING_PID',eid='$PLABHOLDING_EID' ".
-                    "where node_id='$pnode'")) {
-        print "$pnode brought back from the afterworld at ".
-            TimeStamp() . "\n";
-        
-        TBSetNodeLogEntry($pnode, "root", TB_DEFAULT_NODELOGTYPE(),
-                          "'Moved to $PLABHOLDING_EID; ".
-                          "plab node $vnode setup okay by monitor.'");
-        $retval = 1;
-
-    # We couldn't get it up..
-    } else {
-        print "Leaving $pnode in hwdown!\n";
-        $retval = 0;
-    }
-
-    return $retval;
-}
-
-
+# XXX: Also, remove nodes that have disappeared (wrong to do here).
 #
-# Preliminary checks:
-# * make sure pnode is still in hwdown
-#
-sub nodeprecheck($) {
-    my ($vnode, $pnode) = @{$_[0]};
-    my $retval = 1;
+sub updatenodepool($) {
+    my $pool = shift;
+    my $poolpid = $pool->{'PID'};
+    my $pooleid = $pool->{'EID'};
+    my $poolpnodes = $pool->{'PNODES'};
 
-    # * Try full vnode_setup on node - mgmt sliver.
-    #   - If (multiple?) fail, try to delete node/sliver from mgmt slice.
-    #     (can we push out this action?)
-    #
-    
-    #
-    # Make sure the node is still in $NODEDEAD_*
-    #
-    my $query_result = DBQueryWarn("select node_id from reserved where ".
-                                   "node_id = '$pnode' and ".
-                                   "pid = '$NODEDEAD_PID' and ".
-                                   "eid = '$NODEDEAD_EID'");
-    if (!$query_result) {
-        print "Node $pnode entry DB check failed!  Skipping it ...\n";
-        $retval = 0;
-    }
-        
-    elsif (!$query_result->num_rows()) {
-        print "Node was removed out from under us! Continuing on ...\n";
-        $retval = 0;
+    my $now = time();
+
+    print "Updating node membership in pool: $pool->{'NAME'}\n";
+
+    # XXX: need to change everything to deal with vnodes rather than pnodes.
+    my $qres = 
+        DBQueryFatal("select r.node_id from reserved as r ".
+                     "left join nodes as n on n.node_id=r.node_id ".
+                     "left join node_types as nt on n.type = nt.type ".
+                     "where r.pid='$poolpid' and ".
+                     "      r.eid='$pooleid' and ".
+                     "      nt.isplabphysnode = 1");
+
+    if ($qres and $qres->num_rows()) {
+        # Find any new nodes that need to be added and add them.
+        while (my @row = $qres->fetchrow_array()) {
+            my $pnodename = $row[0];
+            if (!exists $poolpnodes->{$pnodename} ) {
+                print "Adding $pnodename to pool: $pool->{'NAME'}\n";
+                $poolpnodes->{$pnodename} = {'name'           => $pnodename,
+                                             'entertime'      => $now,
+                                             'lastcheckstart' => $NEVER,
+                                             'nextchecktime'  => $now,
+                                             'lastfailtime'   => $NEVER,
+                                             'consecfails'    => 0,
+                                             'consecsuccess'  => 0,
+                                             'setupfails'     => 0};
+            }
+            # Mark this node as still in the pool as of this check.
+            $poolpnodes->{$pnodename}->{'updtime'} = $now;
+        }
     }
 
-    return $retval;
+    # Prune out nodes that no longer appear in the pool query.
+    # XXX: A node entry should never disappear, and should be
+    #      moved explicitly from one pool to another.
+    foreach my $pnodename (keys %{$poolpnodes}) {
+        if ($poolpnodes->{$pnodename}->{'updtime'} != $now) {
+            print "Removing $pnodename from pool: $pool->{'NAME'}\n";
+            delete $poolpnodes->{$pnodename};
+        }
+    }
+
+    return;
 }
 
 #
@@ -313,19 +304,4 @@ sub fatal($)
 
     SENDMAIL($TBOPS, "Plab Monitor Died", $msg, $TBOPS);
     die($msg);
-}
-
-#
-# Helper function - see if item is first element in any member of 
-# an array of tuples.
-#
-sub search($@)
-{
-    $target = shift;
-    foreach $elt (@_) {
-        if ($target eq $elt->[0]) {
-            return 1;
-        }
-    }
-    return 0;
 }

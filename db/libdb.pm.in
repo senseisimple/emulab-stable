@@ -30,6 +30,7 @@ use vars qw(@ISA @EXPORT);
 
 	 PROJROOT GROUPROOT USERROOT TBOPSPID EXPTLOGNAME
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
+         PLABTESTING_PID PLABTESTING_EID PLABDOWN_PID PLABDOWN_EID
 
 	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust MapNumericUID
 
@@ -402,8 +403,12 @@ sub NODEDEAD_PID()		{ $TBOPSPID; }
 sub NODEDEAD_EID()		{ "hwdown"; }
 sub PLABMOND_PID()		{ $TBOPSPID; }
 sub PLABMOND_EID()		{ "plab-monitor"; }
+sub PLABTESTING_PID()		{ $TBOPSPID; }
+sub PLABTESTING_EID()		{ "plab-testing"; }
 sub PLABHOLDING_PID()		{ $TBOPSPID; }
-sub PLABHOLDING_EID()		{ "plabnodes"; }
+sub PLABHOLDING_EID()		{ "plabup"; }
+sub PLABDOWN_PID()		{ $TBOPSPID; }
+sub PLABDOWN_EID()		{ "plabdown"; }
 sub OLDRESERVED_PID()		{ $TBOPSPID; }
 sub OLDRESERVED_EID()		{ "oldreserved"; }
 sub NFREELOCKED_PID()		{ $TBOPSPID; }

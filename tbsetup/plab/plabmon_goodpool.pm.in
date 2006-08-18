@@ -1,0 +1,487 @@
+# -*- perl -*-
+#
+# EMULAB-LGPL
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# plabmonitor node pool module for checking up on "good" plab
+# nodes.
+#
+
+package plabmon_goodpool;
+
+use strict;
+use English;
+
+use POSIX qw(WIFSIGNALED WEXITSTATUS);
+
+$| = 1; # Turn off line buffering on output
+
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Node;
+
+my $BADINST = 99;
+
+my $VNODESETUPTIMEOUT = 600; # XXX: need to get from sitevar, or
+                             #      pass in via new().
+my $ISUPWAITTIME      = 600;      # XXX: likewise...
+my $TEARDOWNTIMEOUT   = 120;   # XXX: ...
+
+my $SETUPMODE        = "SETUPMODE";
+my $TEARDOWNGOODMODE = "TEARDOWNGOODMODE";
+my $TEARDOWNBADMODE  = "TEARDOWNBADMODE";
+
+my $SETUPFAIL    = "SETUPFAIL";
+my $SETUPSUCCESS = "SETUPSUCCESS";
+
+my $BIGINT = 9999999999;
+
+my $CLIENT_BIN = "@CLIENT_BINDIR@";
+my $SSH = "@prefix@/bin/sshtb -n";
+my $PLABNODE = "@prefix@/sbin/plabnode";
+my $VNODE_SETUP = "@prefix@/sbin/vnode_setup";
+my $NFREE = "@prefix@/bin/nfree";
+# XXX - testing
+#my $PLABNODE = "/home/kwebb/bin/randsleep.pl";
+
+my $PLABDOWN_PID    = PLABDOWN_PID();
+my $PLABDOWN_EID    = PLABDOWN_EID();
+my $PLABTESTING_PID = PLABTESTING_PID();
+my $PLABTESTING_EID = PLABTESTING_EID();
+
+sub MIN($$) {
+    my ($a, $b) = @_;
+
+    my $res =  $a < $b ? $a : $b;
+
+    return $res;
+}
+
+sub TimeStamp()
+{
+    return POSIX::strftime("%m/%d/%y %H:%M:%S", localtime());
+}
+
+sub new($$$$$) {
+
+    # The next two lines are some voodoo taken from perltoot(1)
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+
+    my ($poolname, $poolpid, $pooleid, $chpid2pool) = @_;
+
+    #
+    # Create the actual object
+    #
+    my $self = {};
+
+    $self->{'NAME'} = $poolname;
+    $self->{'PID'}  = $poolpid;
+    $self->{'EID'}  = $pooleid;
+    $self->{'CHPID2POOL'} = $chpid2pool;
+    $self->{'PNODES'}  = {};
+    $self->{'PENDING'} = {};
+
+    # Clean up anything left behind by a terminated monitor
+    # XXX: this is kind of hacky, but it works.
+    my @vnodes = ExpNodes($PLABTESTING_PID, $PLABTESTING_EID);
+    if (@vnodes) {
+        system("$VNODE_SETUP -f -k -n 100 $PLABTESTING_PID $PLABTESTING_EID");
+        Node::DeleteVnodes(@vnodes);
+    }
+
+    bless($self,$class);
+    return $self;
+}
+
+#
+# Things to do to check a node in the good pool:
+# 1) Ping the node (maybe with ssh) (?) - not done right now
+# 2) Try to instantiate a sliver via plabnode
+# 3) Try to run vnodesetup on the instantiated node.
+# 4) Wait for ISUP (or failure/timeout).
+#
+sub checknextnode($) {
+    my $self = shift;
+
+    my $now = time();
+    my $pnode = $self->getnextchecknode();
+
+    # Nothinig to check!
+    if (!$pnode) {
+        return;
+    }
+
+    # Grab a new sliver to test with
+    my @vnodes = ();
+    my %options = ( 'pid'    => $PLABTESTING_PID,
+                    'eid'    => $PLABTESTING_EID,
+                    'count'  => 1,
+                    'vtype'  => 'pcplab',
+                    'nodeid' => $pnode->{'name'});
+    if (Node::CreateVnodes(\@vnodes, \%options)) {
+        print "Failed to allocate vnode for $pnode->{'name'}!\n";
+        return;
+    }
+
+    my $vnode = $vnodes[0];
+
+    if (!defined($vnode)) {
+        print "Could not create vnode associated with $pnode!\n";
+        return;
+    }
+
+    print "Pool: $self->{'NAME'}: Testing node $pnode->{'name'} at ".
+        TimeStamp() . "\n";
+
+    my $chpid = fork();
+
+    if ($chpid) {
+        # Update node attributes
+        $pnode->{'lastcheckstart'} = $now;
+        $pnode->{'vnode'} = $vnode;
+        $pnode->{'mode'} = $SETUPMODE;
+        $pnode->{'pid'} = $chpid;
+        $pnode->{'timeout'} = $now + $VNODESETUPTIMEOUT;
+        $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
+        $self->{'CHPID2POOL'}->{$chpid} = $self;
+
+        return
+    }
+
+    # Worker process.
+    else {
+        $SIG{CHLD} = 'DEFAULT';
+        TBdbfork();	# So we get the event system fork too ...
+        # Make sure vnode is in the proper state before trying to
+        # bring it up.
+        TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN());
+
+        # XXX: should probably look to see if we have an RCAP for this
+        #      vnode and try to clean it up first if so.
+
+        if (TBForkCmd("$PLABNODE -f alloc $PLABTESTING_PID ".
+                      "$PLABTESTING_EID $vnode",1)) {
+            print "*** Vserver instantiation failed: $vnode\n";
+            # XXX: Should check DB state instead.
+            exit($BADINST);
+        }
+
+        exec "$SSH -host $vnode $CLIENT_BIN/vnodesetup -p $vnode" or
+            die "Yike! Can't exec command!\n";
+    }
+
+    # NOTREACHED
+}
+
+sub getnextchecknode($) {
+    my $self = shift;
+
+    my $retnode = "";
+    my $nextcheck = $BIGINT;
+
+    foreach my $pnode (values %{$self->{'PNODES'}}) {
+        my $nchecktime = $pnode->{'nextchecktime'};
+        if (!exists($self->{'PENDING'}->{$pnode->{'name'}}) and
+            $nchecktime < $nextcheck) {
+            $nextcheck = $nchecktime;
+            $retnode = $pnode;
+        }
+    }
+
+    return $retnode;
+}
+    
+
+#
+# XXX: comment.
+#
+sub getnextchecktime($) {
+    my $self = shift;
+    
+    my $nextnode = $self->getnextchecknode();
+
+    if ($nextnode) {
+        return $nextnode->{'nextchecktime'}
+    }
+
+    return $BIGINT; # XXX
+}
+
+sub getnexttimeout($) {
+    my $self = shift;
+
+    my $timeout = $BIGINT; # XXX
+
+    foreach my $pnode (values %{$self->{'PNODES'}}) {
+        my $ntmo = $pnode->{'timeout'};
+        if ($ntmo && exists($self->{'PENDING'}->{$pnode->{'name'}})) {
+            $timeout = MIN($ntmo, $timeout);
+        }
+    }
+
+    return $timeout;
+}
+
+sub getnextservicetime($) {
+    my $self = shift;
+
+    return MIN($self->getnexttimeout(), $self->getnextchecktime());
+}
+
+
+#
+# XXX: Comment me
+#
+sub processchild($$$) {
+    my $self   = shift;
+    my $chpid  = shift;
+    my $exstat = shift;
+
+    my $pnode;
+    my $now = time();
+    my $bad = 0;
+
+    foreach my $findpnode (values %{$self->{'PENDING'}}) {
+        if (defined($findpnode->{'pid'}) and $findpnode->{'pid'} == $chpid) {
+            $pnode = $findpnode;
+            last;
+        }
+    }
+
+    if (!defined($pnode)) {
+        print "Pool: $self->{'NAME'}: $chpid not found in pending list!\n";
+        return 0;
+    }
+
+    # Clear pid entry - child has gone away.
+    delete $pnode->{'pid'};
+
+    # Check the nodes to find out which are up, and which failed
+    # in the vnode_setup we just ran.
+    print "Pool: $self->{'NAME'}: Checking status of ".
+          "$pnode->{'name'} @ ". `date`;
+
+    # Handle vnode teardown
+    if ($pnode->{'mode'} eq $TEARDOWNGOODMODE or
+        $pnode->{'mode'} eq $TEARDOWNBADMODE) {
+
+        if (!$exstat) {
+            print "Teardown of $pnode->{'vnode'} complete\n";
+        } else {
+            print "Teardown of $pnode->{'vnode'} failed: $exstat\n";
+        }
+
+        delete $self->{'PENDING'}->{$pnode->{'name'}};
+        # Delete the vnode created to test this node - we're done with it.
+        my @vnodes = ($pnode->{'vnode'},);
+        Node::DeleteVnodes(@vnodes);
+        $pnode->{'vnode'} = "";
+
+        if ($pnode->{'mode'} eq $TEARDOWNGOODMODE) {
+            $self->nodesetupcomplete($pnode);
+        }
+        elsif ($pnode->{'mode'} eq $TEARDOWNBADMODE) {
+            $self->movetodownpool($pnode);
+        }
+        return 1;
+    }
+
+    SWRN1: for ($exstat) {
+        WIFSIGNALED($_) && do {
+            if ($now > $pnode->{'timeout'}) {
+                print "Timeout waiting for $pnode->{'vnode'} to instantiate.\n";
+            }
+            else {
+                print "Setup of $pnode->{'vnode'} killed for unknown reason.\n";
+            }
+            $bad = 1;
+            last SWRN1;
+        };
+
+        WEXITSTATUS($_) == $BADINST && do {
+            print "Instantiation of $pnode->{'vnode'} failed.\n";
+            $bad = 1;
+            last SWRN1;
+        };
+
+        WEXITSTATUS($_) > 0 && do {
+            print "Vnodesetup failed on $pnode->{'vnode'}.\n";
+            $bad = 1;
+            last SWRN1;
+        };
+
+        # default
+        print "Node setup succeeded on $pnode->{'vnode'}.\n".
+              "   Waiting for node to hit ISUP.\n";
+        $bad = 0;
+    }
+
+    # Log success/failure in any case.
+    # XXX: do this!
+                
+    if ($bad) {
+        # If setup failed, schedule a vnode teardown.
+        $self->teardownnode($pnode, $SETUPFAIL);
+        return 0;
+    }
+
+    # Setup a timeout to wait for ISUP.
+    $pnode->{'timeout'} = $now + $ISUPWAITTIME;
+    return 1;
+}
+
+#
+# XXX: Comment me
+#
+sub checkexpiration($) {
+    my $self = shift;
+    my $now = time();
+
+    foreach my $pnode (values %{ $self->{'PENDING'} }) {
+
+        # ISUP or TBFAILED?  Check for these before timeout.
+        my $state = TBDB_NODESTATE_UNKNOWN();
+        if (TBGetNodeEventState($pnode->{'vnode'}, \$state)) {
+            if ($state eq TBDB_NODESTATE_ISUP()) {
+                # Yes!  Node is up.
+                print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
+                    " succeeded\n";
+                $self->teardownnode($pnode, $SETUPSUCCESS);
+                next;
+            }
+            elsif ($state eq TBDB_NODESTATE_TBFAILED()) {
+                $self->teardownnode($pnode, $SETUPFAIL);
+                next;
+            }
+        } else {
+            print "Error getting event state for $pnode->{'vnode'}\n";
+        }
+
+        # Have we timed out waiting for this node?
+        if ($pnode->{'timeout'} <= $now) {
+            $pnode->{'timeout'} = 0;
+            print "Pool: $self->{'NAME'}: $pnode->{'vnode'} timeout.\n";
+            # Node has an associated PID
+            if (defined($pnode->{'pid'})) {
+                kill("TERM", $pnode->{'pid'});
+                # Cleanup/processing handled in processchild()
+            }
+            # ... else we were waiting for an ISUP
+            else {
+                $self->teardownnode($pnode, $SETUPFAIL);
+            }
+        }
+    }
+
+    return;
+}
+
+
+sub teardownnode($$;$) {
+    my ($self, $pnode, $reason) = @_;
+
+    my $now = time();
+
+    my $chpid = fork();
+
+    if ($chpid) {
+        # Update node attributes, return pid of worker proc.
+        $pnode->{'pid'} = $chpid;
+        $pnode->{'timeout'} = $now + $TEARDOWNTIMEOUT;
+        $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
+        $self->{'CHPID2POOL'}->{$chpid} = $self;
+
+        if ($reason eq $SETUPFAIL) {
+            $pnode->{'mode'} = $TEARDOWNBADMODE;
+        }
+        elsif ($reason eq $SETUPSUCCESS) {
+            $pnode->{'mode'} = $TEARDOWNGOODMODE;
+        }
+
+        return;
+    }
+
+    # Worker process.
+    else {
+        $SIG{CHLD} = 'DEFAULT';
+        TBdbfork();	# So we get the event system fork too ...
+        my $vnode = $pnode->{'vnode'};
+
+        # Free the vserver, if possible.
+        TBForkCmd("$SSH -host $vnode $CLIENT_BIN/vnodesetup -p -k $vnode",1);
+
+        # Make sure vnode is in the proper state (regardless of the success
+        # or failure of the previous command.
+        TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN());
+
+        # Try to ssh in and kill the vserver.
+        TBForkCmd("$PLABNODE -f free $PLABTESTING_PID $PLABTESTING_EID $vnode",1);
+        
+        exit(0);
+    }
+
+    # NOTREACHED
+}
+
+
+# XXX: may be bogus, but it'll do for now.
+my $MININTERVAL = 300;
+my $MAXINTERVAL = 3600;
+sub calcnextcheck($$;$) {
+    my ($self, $pnode, $reason) = @_;
+
+    my $now = time();
+
+    my $numsuccess  = $pnode->{'consecsuccess'};
+    my $nextcheck = int($now + $MININTERVAL + 0.5 * $numsuccess * $MININTERVAL);
+    $pnode->{'nextchecktime'} = MIN($now+$MAXINTERVAL, $nextcheck) + int(rand(60));
+}
+
+#
+# Check vnode status, moving nodes back into production if they booted up,
+# and leaving them in hwdown if they didn't.
+#
+sub nodesetupcomplete($$) {
+    my $self  = shift;
+    my $pnode = shift;
+
+    $pnode->{'timeout'} = 0;
+    $pnode->{'consecfails'} = 0;
+    $pnode->{'consecsuccess'}++;
+
+    #
+    # It came up!  Calculate the next check time and move on...
+    #
+    $self->calcnextcheck($pnode);
+
+    return;
+}
+
+sub movetodownpool($$) {
+    my $self  = shift;
+    my $pnode = shift;
+
+    $pnode->{'consecsuccess'} = 0;
+    $pnode->{'consecfails'} = 1;
+
+    #
+    # It failed to come up. Move the pnode to hwdown...
+    #
+    DBQueryWarn("update reserved set ".
+                "  pid='$PLABDOWN_PID',eid='$PLABDOWN_EID' ".
+                "   where node_id=\"$pnode->{'name'}\"");
+    print "$pnode->{'name'} failed testing; sent to hwdown at ".
+        TimeStamp() . "\n";
+    
+    TBSetNodeLogEntry($pnode->{'name'}, "root", TB_DEFAULT_NODELOGTYPE(),
+                      "'Moved to $PLABDOWN_EID; ".
+                      "plab node $pnode->{'vnode'} setup failed by monitor.'");
+}
+
+# Make perl happy...
+1;

@@ -18,7 +18,8 @@ SBIN_STUFF	= plabslice plabnode plabrenewd plabmetrics plabstats \
 		  plabmonitord plablinkdata plabdist plabhttpd plabdiscover \
 		  plabrenewonce
 
-LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py
+LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py \
+		  plabmon_badpool.pm plabmon_goodpool.pm
 
 LIBEXEC_STUFF	= webplabstats
 

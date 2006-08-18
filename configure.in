@@ -764,8 +764,11 @@ outfiles="$outfiles Makeconf GNUmakefile \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
         tbsetup/plab/mod_PLCNM.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
+        tbsetup/plab/plabrenewonce \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
-	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
+	tbsetup/plab/plabmonitord \
+        tbsetup/plab/plabmon_badpool.pm tbsetup/plab/plabmon_goodpool.pm \
+        tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
 	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
