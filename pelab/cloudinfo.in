@@ -1,0 +1,281 @@
+#!/usr/bin/perl
+
+#
+# Hack to extract info from delay nodes about delay pipes.
+# Only used with pelab "clouds" right now (hence the name).
+#
+
+my $verbose = 1;
+my $ispelab = 1;
+my $zeroem = 0;
+
+use constant IN_SHOW  => 1;
+use constant IN_SHOWP => 2;
+use constant IN_MAP   => 3;
+
+my $NLIST = "@prefix@/bin/node_list";
+
+my $ipfwpat = q(^\d+\s+(\d+)\s+(\d+) pipe (\d+) ip from any to (any|[0-9\.]+) (\S+) (\S+) (\S+));
+my $pipepat1 = 
+q(^(\d+):\s+(unlimited|[\d\.]+ [KM]bit/s)\s+([\d\.]+) ms\s+(\d+ sl\.(?:plr [\d\.]+)?));
+my $mappat =
+q(^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d+));
+
+sub usage()
+{
+    print STDERR "usage: cloudinfo [-z] pid eid\n";
+    exit(1);
+}
+
+my %options = ();
+if (!getopts("z", \%options)) {
+    usage();
+}
+if (defined($options{"z"})) {
+    $zeroem = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my ($pid,$eid) = @ARGV;
+
+my @nodelist = split('\s+', `$NLIST -v -e $pid,$eid`);
+chomp(@nodelist);
+my $nnodes = grep(/^tbs?delay/, @nodelist);
+if ($nnodes == 0) {
+    print STDERR "No delay nodes in $pid/$eid?!\n";
+    exit(1);
+}
+
+for my $node (@nodelist) {
+    next
+	if ($node !~ /^tbs?delay/);
+
+    my $host = "$node.$eid.$pid.emulab.net";
+    my $cmd = "ssh -o stricthostkeychecking=no $host ".
+	"'(echo === cat mapping; cat /var/emulab/boot/delay_mapping; ".
+	"  echo === ipfw show; sudo ipfw show; ".
+	"  echo === ipfw pipe show; sudo ipfw pipe show)'";
+    if (!open(IN, "$cmd |")) {
+	warn("could not execute '$cmd'");
+	next;
+    }
+    my $IN = *IN;
+    parseit($IN);
+    close(IN);
+    printit($node);
+    %pipeinfo = ();
+}
+exit(0);
+
+sub printit($)
+{
+    my ($node) = @_;
+
+    print "\n$node:\n";
+    my @pipes =
+	sort {
+	    $pipeinfo{$a}->{"node"} cmp $pipeinfo{$b}->{"node"} ||
+	    $pipeinfo{$a}->{"dir"} cmp $pipeinfo{$b}->{"dir"} ||
+	    $pipeinfo{$a}->{"ip"} cmp $pipeinfo{$b}->{"ip"} ||
+	    $pipeinfo{$a}->{"inout"} cmp $pipeinfo{$b}->{"inout"}
+	} keys %pipeinfo;
+    
+    my @anypipes = ();
+    my @badpipes = ();
+    my ($lastdir, $lastnode);
+    foreach $pipe (@pipes) {
+	if ($pipeinfo{$pipe}->{"ignore"}) {
+	    if ($pipeinfo{$pipe}->{"pkts"}) {
+		push(@badpipes, $pipe);
+	    }
+	    next;
+	}
+	if ($pipeinfo{$pipe}->{"ip"} eq "any") {
+	    push(@anypipes, $pipe);
+	    next;
+	}
+	if (defined($lastdir) && $lastdir ne $pipeinfo{$pipe}->{"dir"} ||
+	    defined($lastnode) && $lastnode ne $pipeinfo{$pipe}->{"node"}) {
+	    print "\n";
+	}
+	printapipe($pipe);
+	$lastnode = $pipeinfo{$pipe}->{"node"};
+	$lastdir = $pipeinfo{$pipe}->{"dir"};
+    }
+    print "\n";
+    foreach $pipe (@anypipes) {
+	printapipe($pipe);
+    }
+    if ($verbose && @badpipes) {
+	print "*** Ignored pipes with traffic:\n";
+	foreach $pipe (@badpipes) {
+	    printapipe($pipe);
+	}
+    }
+}
+
+sub printapipe($)
+{
+    my ($pipe) = @_;
+
+    printf "%8s %1s ", $pipeinfo{$pipe}->{"node"}, $pipeinfo{$pipe}->{"dir"};
+    if ($ispelab) {
+	my $node = $pipeinfo{$pipe}->{"ip"};
+	if ($node =~ /^10\.0\.0\.(\d+)$/) {
+	    $node = "elab-$1";
+	}
+	printf "%8s: ", $node;
+    } else {
+	printf "%16s: ", $pipeinfo{$pipe}->{"ip"};
+    }
+    my $bw = $pipeinfo{$pipe}->{"bw"};
+    if ($bw eq "unlimited") {
+	print " unlimited";
+    } else {
+	printf "%10d", $bw;
+    }
+    printf ", %4dms", $pipeinfo{$pipe}->{"delay"};
+    printf ", %4.1f%%", $pipeinfo{$pipe}->{"plr"};
+    printf ", %10d", $pipeinfo{$pipe}->{"pkts"};
+    printf ", %10d", $pipeinfo{$pipe}->{"bytes"};
+    print "\n";
+}
+
+sub parseit($)
+{
+    my ($INP) = @_;
+
+    my %outif2node;
+    my %inif2node;
+
+    while (<$INP>) {
+	if (/^=== ipfw show$/) {
+	    $state = IN_SHOW;
+	} elsif (/^=== ipfw pipe show$/) {
+	    $state = IN_SHOWP;
+	} elsif (/^=== cat mapping$/) {
+	    $state = IN_MAP;
+	} elsif ($state == IN_SHOW) {
+	    if (/$ipfwpat/) {
+		my $rule = $_;
+		chomp($rule);
+		my $pkts = $1;
+		my $bytes = $2;
+		my $pipe = int($3);
+		my $ip = $4;
+		my $inout = $5;
+		my $sndrcv = $6;
+		my $iface = $7;
+		my ($dir,$node);
+		if (exists($outif2node{$iface})) {
+		    $dir = ">";
+		    $node = $outif2node{$iface};
+		} elsif (exists($inif2node{$iface})) {
+		    $dir = "<";
+		    $node = $inif2node{$iface};
+		} else {
+		    print "*** unknown interface $iface\n";
+		}
+
+		$pipeinfo{$pipe} = {
+		    "pkts" => $pkts,
+		    "bytes" => $bytes,
+		    "ip" => $ip,
+		    "inout" => $inout,
+		    "sndrcv" => $sndrcv,
+		    "iface" => $iface,
+		    "dir" => $dir,
+		    "node" => $node,
+		    "ignore" => 0
+		};
+
+		#
+		# For pelab we assume/enforce certain things
+		#
+		# - nodes are "elab-<#>"
+		# - ips are "10.0.0.<#>"
+		# - we should only see "<" traffic on rules targeting
+		#   a node we are delaying
+		# - there may be traffic on in/out "any" rules, but only
+		#   from before the per-flow pipes were setup.
+		# - there should be no output traffic to ourselves
+		#
+		if ($ispelab) {
+		    my ($ipix,$nodeix);
+
+		    if ($node =~ /^elab-(\d+)$/) {
+			$nodeix = $1;
+		    } else {
+			print "*** ignoring non-pelab rule: $rule\n";
+			$pipeinfo{$pipe}->{"ignore"} = 1;
+			next;
+		    }
+		    if ($ip eq "any") {
+			$pipeinfo{$pipe}->{"ignore"} = 1;
+			next;
+		    }
+		    if ($ip =~ /^10\.0\.0\.(\d+)$/) {
+			$ipix = $1;
+			if ($dir eq "<" && $nodeix != $ipix ||
+			    $dir eq ">" && $nodeix == $ipix) {
+			    $pipeinfo{$pipe}->{"ignore"} = 1;
+			    next;
+			}
+		    } else {
+			print "*** ignoring non-pelab rule: $rule\n";
+			$pipeinfo{$pipe}->{"ignore"} = 1;
+			next;
+		    }
+		}
+
+	    }
+	} elsif ($state == IN_SHOWP) {
+	    if (/$pipepat1/) {
+		my $pipe = int($1);
+		my $bw = $2;
+		my $delay = $3;
+		my $plr = $4;
+
+		if ($bw =~ /(\d+.\d+) Mbit\/s/) {
+		    $bw = $1 * 1000 * 1000;
+		} elsif ($bw =~ /(\d+.\d+) Kbit\/s/) {
+		    $bw = $1 * 1000;
+		}
+		if ($plr =~ /plr (\d+\.\d+)/) {
+		    $plr = $1 * 100.0;
+		} else {
+		    $plr = 0;
+		}
+
+		if (!exists($pipeinfo{$pipe})) {
+		    print "*** unreferenced pipe $pipe\n";
+		} else {
+		    $pipeinfo{$pipe}->{"bw"} = $bw;
+		    $pipeinfo{$pipe}->{"delay"} = $delay;
+		    $pipeinfo{$pipe}->{"plr"} = $plr;
+		}
+	    }
+	} elsif ($state == IN_MAP) {
+	    if (/$mappat/) {
+		my $node = $3;
+		if ($node ne $4) {
+		    my $onode = $4;
+		    $outif2node{$6} = $onode;
+		    $inif2node{$5} = $onode;
+		}
+		$outif2node{$5} = $node;
+		$inif2node{$6} = $node;
+	    }
+	} else {
+	    ;
+	}
+    }
+    close($INP);
+
+    foreach $pipe (keys %pipeinfo) {
+	if (!exists($pipeinfo{$pipe}->{"bw"})) {
+	    print "*** no info for pipe $pipe\n";
+	}
+    }
+}

@@ -9,9 +9,12 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= pelab
 
+BIN_STUFF	= cloudinfo
+
 include $(OBJDIR)/Makeconf
 
-all:
+all: $(BIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+control-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF))
