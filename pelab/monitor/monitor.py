@@ -77,7 +77,7 @@ def main_loop():
       if pos[0] == sys.stdin.fileno() and (pos[1] & select.POLLIN) != 0 and not done:
           # A line of data from tcpdump is available.
           try:
-            sys.stdout.write('get_next_packet()\n')
+#            sys.stdout.write('get_next_packet()\n')
             get_next_packet(conn)
           except EOFError:
             sys.stdout.write('Done: Got EOF on stdin\n')
@@ -90,7 +90,7 @@ def main_loop():
         sys.stdout.write('fd: ' + str(pos[0]) + ' conn-fd: ' + str(conn.fileno()) + '\n')
       # Update the stub
     if total_size != last_total:
-      sys.stdout.write('Total Size: ' + str(total_size) + '\n')
+#      sys.stdout.write('Total Size: ' + str(total_size) + '\n')
       last_total = total_size
 #    sys.stdout.write('Loop end\n')
 
@@ -183,6 +183,8 @@ def get_next_packet(conn):
                        localport, remoteport, '')
           send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
                        localport, remoteport, save_int(MIN_DELAY_SENSOR))
+          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
+                       localport, remoteport, save_int(NULL_SENSOR))
         elif event == 'Closed':
           send_command(conn, DELETE_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
                       localport, remoteport, '')
@@ -282,7 +284,7 @@ def send_command(conn, command_id, protocol, ipaddr, localport, remoteport,
             + save_short(localport)
             + save_short(remoteport)
             + command)
-  sys.stdout.write('Sending command: CHECKSUM=' + str(checksum(output)) + '\n')
+#  sys.stdout.write('Sending command: CHECKSUM=' + str(checksum(output)) + '\n')
   conn.sendall(output)
 
 def send_destinations(conn, packet_list):
