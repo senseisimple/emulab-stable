@@ -535,6 +535,19 @@ sub GetImageInfo($;$)
 	}
     }
 
+    my $sb = stat($imagepath);
+
+    #
+    # A zero-length image cannot be right and will result in much confusion
+    # if allowed to pass: the image load will succeed, but the disk will be
+    # unchanged, making it appear that os_load loaded the default image.
+    #
+    if ($sb->size == 0) {
+	tberror "$imagepath is empty!";
+	$imageinfo{$imageid} = 'BADIMAGE';
+	return 0;
+    }
+
     #
     # Compute a maxwait time based on the image size plus a constant
     # factor for the reboot cycle.  This is used later in
@@ -542,7 +555,6 @@ sub GetImageInfo($;$)
     # image DB state, so we store it in the imageinfo array too.
     #
     if (!defined($rowref->{'maxloadwait'})) {
-	my $sb = stat($imagepath);
 	my $chunks = $sb->size >> 20; # size may be > 2^31, shift is unsigned
 
 	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 65) + (5 * 60));
