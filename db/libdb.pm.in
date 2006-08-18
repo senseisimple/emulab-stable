@@ -406,9 +406,9 @@ sub PLABMOND_EID()		{ "plab-monitor"; }
 sub PLABTESTING_PID()		{ $TBOPSPID; }
 sub PLABTESTING_EID()		{ "plab-testing"; }
 sub PLABHOLDING_PID()		{ $TBOPSPID; }
-sub PLABHOLDING_EID()		{ "plabup"; }
+sub PLABHOLDING_EID()		{ "plabnodes"; }
 sub PLABDOWN_PID()		{ $TBOPSPID; }
-sub PLABDOWN_EID()		{ "plabdown"; }
+sub PLABDOWN_EID()		{ "hwdown"; }
 sub OLDRESERVED_PID()		{ $TBOPSPID; }
 sub OLDRESERVED_EID()		{ "oldreserved"; }
 sub NFREELOCKED_PID()		{ $TBOPSPID; }
