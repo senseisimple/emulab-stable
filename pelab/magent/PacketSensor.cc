@@ -110,9 +110,17 @@ void PacketSensor::localAck(PacketInfo * packet)
   bool found = false;
   ackedSize = 0;
 
+  /*
+   * When we get an ACK, the sequence number is really the next one the peer
+   * excects to see: thus, the last sequence number it's ACKing is one less
+   * than this.
+   * XXX: Handle wraparound
+   */
+  uint32_t ack_for = ntohl(packet->tcp->ack_seq) - 1;
+
   while (pos != limit && !found)
   {
-    found = pos->inSequenceBlock(ntohl(packet->tcp->ack_seq));
+    found = pos->inSequenceBlock(ack_for);
     /*
      * XXX: Assumes that SACK is not in use - assumes that this ACK is for all
      * sequence numbers up to the one it's ACKing
