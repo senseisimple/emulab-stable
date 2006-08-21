@@ -247,51 +247,53 @@ void KernelTcp::init(void)
   // Set up the connectionModelExemplar
   global::connectionModelExemplar.reset(new KernelTcp());
 
-  // Set up packet capture
-  char errbuf[PCAP_ERRBUF_SIZE];
-  struct bpf_program fp;      /* hold compiled program     */
-  bpf_u_int32 maskp;          /* subnet mask               */
-  bpf_u_int32 netp;           /* ip                        */
-  ostringstream filter;
+  if (!global::replayArg == NO_REPLAY) {
+    // Set up packet capture
+    char errbuf[PCAP_ERRBUF_SIZE];
+    struct bpf_program fp;      /* hold compiled program     */
+    bpf_u_int32 maskp;          /* subnet mask               */
+    bpf_u_int32 netp;           /* ip                        */
+    ostringstream filter;
 
-  /* ask pcap for the network address and mask of the device */
-  pcap_lookupnet(global::interface.c_str(), &netp, &maskp, errbuf);
-  filter << "port " << global::peerServerPort << " and tcp";
+    /* ask pcap for the network address and mask of the device */
+    pcap_lookupnet(global::interface.c_str(), &netp, &maskp, errbuf);
+    filter << "port " << global::peerServerPort << " and tcp";
 
-  /* open device for reading.
-   * NOTE: We use non-promiscuous */
-  pcapDescriptor = pcap_open_live(global::interface.c_str(), BUFSIZ, 0,
-                                  SNIFF_WAIT, errbuf);
-  if(pcapDescriptor == NULL)
-  {
-    logWrite(ERROR, "pcap_open_live() failed: %s", errbuf);
-  }
-  // Lets try and compile the program, optimized
-  else if(pcap_compile(pcapDescriptor, &fp,
-                       const_cast<char *>(filter.str().c_str()),
-                       1, maskp) == -1)
-  {
-    logWrite(ERROR, "pcap_compile() failed: %s", pcap_geterr(pcapDescriptor));
-    pcap_close(pcapDescriptor);
-  }
-  // set the compiled program as the filter
-  else if(pcap_setfilter(pcapDescriptor,&fp) == -1)
-  {
-    logWrite(ERROR, "pcap_filter() failed: %s", pcap_geterr(pcapDescriptor));
-    pcap_close(pcapDescriptor);
-  }
-  else
-  {
-    pcapfd = pcap_get_selectable_fd(pcapDescriptor);
-    if (pcapfd == -1)
+    /* open device for reading.
+     * NOTE: We use non-promiscuous */
+    pcapDescriptor = pcap_open_live(global::interface.c_str(), BUFSIZ, 0,
+                                    SNIFF_WAIT, errbuf);
+    if(pcapDescriptor == NULL)
     {
-      logWrite(ERROR, "Failed to get a selectable file descriptor "
-               "for pcap: %s", pcap_geterr(pcapDescriptor));
+      logWrite(ERROR, "pcap_open_live() failed: %s", errbuf);
+    }
+    // Lets try and compile the program, optimized
+    else if(pcap_compile(pcapDescriptor, &fp,
+                         const_cast<char *>(filter.str().c_str()),
+                         1, maskp) == -1)
+    {
+      logWrite(ERROR, "pcap_compile() failed: %s", pcap_geterr(pcapDescriptor));
+      pcap_close(pcapDescriptor);
+    }
+    // set the compiled program as the filter
+    else if(pcap_setfilter(pcapDescriptor,&fp) == -1)
+    {
+      logWrite(ERROR, "pcap_filter() failed: %s", pcap_geterr(pcapDescriptor));
       pcap_close(pcapDescriptor);
     }
     else
     {
-      setDescriptor(pcapfd);
+      pcapfd = pcap_get_selectable_fd(pcapDescriptor);
+      if (pcapfd == -1)
+      {
+        logWrite(ERROR, "Failed to get a selectable file descriptor "
+                 "for pcap: %s", pcap_geterr(pcapDescriptor));
+        pcap_close(pcapDescriptor);
+      }
+      else
+      {
+        setDescriptor(pcapfd);
+      }
     }
   }
 }
