@@ -95,7 +95,10 @@ if ($exitcode) {
 
     # log all relevent output as one entry unless an obvious_error was
     # already found
-    dblog(TBLOG_ERR, {}, $err) unless ($obvious_error);
+    if (!$obvious_error) {
+	parse_error($err);
+	dblog(TBLOG_ERR, {}, $err);
+    }
 
     # create a log entry that assign failed
 
@@ -130,7 +133,7 @@ sub parse_type_precheck_error($) {
     if ($mesg =~ /^No (\w+) physical nodes of type (\S+) found \((\d+) requested\)$/) {
 	($round, $vtype, $requested) = ($1, $2, $3);
 	$slots = 0;
-    } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but only (\d+) (\w+) nodes of type \w+ found$/) {
+    } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but only (\d+) (\w+) nodes of type \S+ found$/) {
 	($requested, $vtype, $slots, $round) = ($1, $2, $3, $4);
     } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but you are only allowed to use (\d+)$/) {
 	($requested, $vtype, $max) = ($1, $2, $3);

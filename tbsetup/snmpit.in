@@ -1188,7 +1188,9 @@ sub doVlansFromTables($@) {
 	} else {
 	    $vlan_number = $stack->createVlan($vlan,\@ports);
 	    if (!$vlan_number) {
-		tberror "Failed to create VLAN with id $vlan";
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['create_vlan_failed', $vlan]},
+			"Failed to create VLAN with id $vlan");
 		#
 		# Don't try to put ports in a VLAN if it couldn't be created
 		#

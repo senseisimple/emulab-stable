@@ -33,7 +33,7 @@ sub usage()
     exit(-1);
 }
 
-sub fatal($);
+sub fatal($;$);
 
 my $optlist  = "bwqx";
 my $waitmode = 0;
@@ -79,6 +79,7 @@ my $TBLOGS = "@TBLOGSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 use libArchive;
 use Experiment;
 
@@ -455,7 +456,9 @@ if ($estate eq EXPTSTATE_ACTIVE) {
 		    TBDB_STATS_FLAGS_START);
 
     if ($experiment->Swap("out") != 0) {
-	fatal("tbswap out failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['tbswap_out_failed']},
+	      "tbswap out failed!");
     }
     $experiment->SetState(EXPTSTATE_TERMINATING) == 0
 	or fatal("Failed to set experiment state to " .
@@ -543,11 +546,13 @@ SENDMAIL("$user_name <$user_email>",
 
 exit 0;
 
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my($mesg) = $_[0];
     
-    print STDOUT $mesg;
+    tberror($parms, $mesg);
 
     $experiment->Unlock();
 
