@@ -88,7 +88,7 @@ void usageMessage(char *progname)
   cerr << "  --interface=<iface> " << endl;
   cerr << "  --daemonize " << endl;
   cerr << "  --replay-save=<filename> " << endl;
-  cerr << "  --replay-loae=<filename> " << endl;
+  cerr << "  --replay-load=<filename> " << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
