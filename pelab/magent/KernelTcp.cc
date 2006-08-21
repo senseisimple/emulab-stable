@@ -247,7 +247,7 @@ void KernelTcp::init(void)
   // Set up the connectionModelExemplar
   global::connectionModelExemplar.reset(new KernelTcp());
 
-  if (!global::replayArg == NO_REPLAY) {
+  if (global::replayArg != REPLAY_LOAD) {
     // Set up packet capture
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;      /* hold compiled program     */
