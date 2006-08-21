@@ -492,15 +492,6 @@ namespace
   {
     logWrite(PCAP, "Captured a TCP packet");
     struct tcp_info kernelInfo;
-    bool isAck;
-    if (tcpPacket->ack & 0x0001)
-    {
-      isAck = true;
-    }
-    else
-    {
-      isAck = false;
-    }
 
     list<Option> tcpOptions;
     unsigned char const * tcpOptionsBegin = tcpPacketStart
@@ -517,37 +508,101 @@ namespace
     packet.tcp = tcpPacket;
     packet.tcpOptions = &tcpOptions;
 
+    /*
+     * Classify this packet as outgoing or incoming, by trying to look it up
+     * with the the local and remote ports in the same order as they appear in
+     * the packet, and reversed.
+     * NOTE: We put the destination IP address in the planetMap, so we
+     * reverse the sense of ip_dst and ip_src
+     */
     Order key;
-    // Assume that this is an outgoing packet.
     key.transport = TCP_CONNECTION;
     key.ip = ntohl(ipPacket->ip_dst.s_addr);
     key.localPort = ntohs(tcpPacket->source);
     key.remotePort = ntohs(tcpPacket->dest);
 
+    bool outgoing;
+
+    logWrite(PCAP,"Looking up key (outgoing): i=%s,lp=%i,rp=%i",
+        inet_ntoa(ipPacket->ip_dst),key.localPort,key.remotePort);
     map<Order, Connection *>::iterator pos;
     pos = global::planetMap.find(key);
-    // If it is an outgoing packet, and it is sending original data
-    // (not an ack), and we can successfully fill in the kernel data
-    if (pos != global::planetMap.end() && !isAck
-      && handleKernel(pos->second, &kernelInfo))
-    {
-      pos->second->captureSend(&packet);
-    }
-    else
-    {
-      // Assume that this is an incoming packet.
-      key.transport = TCP_CONNECTION;
+
+    if (pos != global::planetMap.end()) {
+      outgoing = true;
+    } else {
       key.ip = ntohl(ipPacket->ip_src.s_addr);
       key.localPort = ntohs(tcpPacket->dest);
       key.remotePort = ntohs(tcpPacket->source);
-
+      logWrite(PCAP,"Looking up key (incoming): i=%s,lp=%i,rp=%i",
+          inet_ntoa(ipPacket->ip_src),key.localPort,key.remotePort);
       pos = global::planetMap.find(key);
-      // If this is an incoming packet, and it is an ack packet, and
-      // we can successfully fill in the kernel data
-      if (pos != global::planetMap.end() && isAck
-          && handleKernel(pos->second, &kernelInfo))
-      {
+      if (pos != global::planetMap.end()) {
+        outgoing = false;
+      } else {
+        logWrite(ERROR,"Unable to look find packet in planetMap");
+        return;
+      }
+    }
+
+    /*
+     * Next, determine if this packet is an ACK (note that it can also be a
+     * data packet, even if it's an ACK. This is called piggybacking)
+     */
+    bool isAck = (tcpPacket->ack & 0x0001);
+
+    /*
+     * Finally, figure out if this packet contains any data
+     */
+    bool hasData;
+    uint32_t totalHeaderLength = ipPacket->ip_hl * 4 + tcpPacket->doff * 4;
+    uint32_t totalIPLen = ntohs(ipPacket->ip_len);
+    if (totalHeaderLength == totalIPLen) {
+      hasData = false;
+    } else {
+      if (totalHeaderLength < totalIPLen) {
+        hasData = true;
+      } else {
+        logWrite(ERROR,"Internal error in packet data size computation: hl=%i, il=%i",
+            totalHeaderLength, totalIPLen);
+      }
+    }
+
+    /*
+     * Now that we've classified this packet, do something about it
+     */
+    logWrite(PCAP,"Packet classified: outgoing=%i, isAck=%i, hasData=%i",
+        outgoing, isAck, hasData);
+    if (!handleKernel(pos->second, &kernelInfo)) {
+      logWrite(ERROR,"handleKernel() failed");
+      return;
+    }
+
+    if (outgoing) {
+      /*
+       * Outgoing packets
+       */
+      if (isAck) {
+        /*
+         * XXX - This is not yet implemented (I think)
+         */
+        //logWrite(ERROR,"Unhandled: outgoing ACK");
+      }
+      if (hasData) {
+        pos->second->captureSend(&packet);
+      }
+    } else {
+      /*
+       * Incoming packets
+       */
+      if (isAck) {
         pos->second->captureAck(&packet);
+      }
+      if (hasData) {
+        /*
+         * XXX - This is not yet implemented (I think)
+         */
+        //logWrite(ERROR,"Unhandled: incoming data");
       }
     }
   }
