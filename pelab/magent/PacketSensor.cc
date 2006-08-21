@@ -33,7 +33,7 @@ Time const & PacketSensor::getAckedSendTime(void) const
 void PacketSensor::localSend(PacketInfo * packet)
 {
   logWrite(SENSOR,
-           "PacketSensor::localSend() for sequence number %i",
+           "PacketSensor::localSend() for sequence number %u",
             ntohl(packet->tcp->seq));
   unsigned int startSequence = ntohl(packet->tcp->seq);
   if (globalSequence.inSequenceBlock(startSequence))
@@ -94,7 +94,7 @@ void PacketSensor::localSend(PacketInfo * packet)
       globalSequence.seqEnd = record.seqEnd;
     }
     logWrite(SENSOR,
-             "PacketSensor::localSend(): global start = %i, global end = %i",
+             "PacketSensor::localSend(): global start = %u, global end = %u",
              globalSequence.seqStart, globalSequence.seqEnd);
     unacked.push_back(record);
   }
