@@ -80,7 +80,9 @@ void PacketSensor::localSend(PacketInfo * packet)
          - (packet->ip->ip_hl*4)
         // Total length of all TCP headers (including options)
          - (packet->tcp->doff*4);
-    record.seqEnd = record.seqStart + sequenceLength;
+    // We want to get the sequence number of the last data byte, not the
+    // sequence number of the first byte of the next segment
+    record.seqEnd = record.seqStart + sequenceLength - 1;
     record.totalLength = packet->packetLength;
     record.timestamp = packet->packetTime;
     logWrite(SENSOR,
@@ -114,9 +116,24 @@ void PacketSensor::localAck(PacketInfo * packet)
    * When we get an ACK, the sequence number is really the next one the peer
    * excects to see: thus, the last sequence number it's ACKing is one less
    * than this.
-   * XXX: Handle wraparound
+   * Note: This should handle wraparound properly
    */
   uint32_t ack_for = ntohl(packet->tcp->ack_seq) - 1;
+  logWrite(SENSOR, "PacketSensor::localAck() for sequence number %u",
+          ack_for);
+
+  /*
+   * Make sure this packet doesn't have a SACK option, in which case our
+   * calculation is wrong.
+   */
+  list<Option>::iterator opt;
+  for (opt = packet->tcpOptions->begin();
+       opt != packet->tcpOptions->end();
+       ++opt) {
+    if (opt->type == TCPOPT_SACK) {
+      logWrite(ERROR,"Packet has a SACK option!");
+    }
+  }
 
   while (pos != limit && !found)
   {
@@ -130,10 +147,7 @@ void PacketSensor::localAck(PacketInfo * packet)
     {
       ackedSendTime = pos->timestamp;
     }
-    else
-    {
-      ++pos;
-    }
+    ++pos;
   }
   if (!found)
   {
@@ -153,6 +167,10 @@ void PacketSensor::localAck(PacketInfo * packet)
   {
     globalSequence.seqStart = unacked.front().seqStart;
   }
+
+  logWrite(SENSOR, "PacketSensor::localAck() decided on size %u",
+          ackedSize);
+
 }
 
 bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
@@ -163,14 +181,14 @@ bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
   bool result = false;
   if (seqStart < seqEnd)
   {
-    result = sequence >= seqStart && sequence < seqEnd;
+    result = sequence >= seqStart && sequence <= seqEnd;
   }
   else if (seqStart > seqEnd)
   {
     /*
      * This handles the sequence number wrapping around
      */
-    result = sequence >= seqStart || sequence < seqEnd;
+    result = sequence >= seqStart || sequence <= seqEnd;
   }
   if (result)
   {
