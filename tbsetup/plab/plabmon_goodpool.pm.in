@@ -29,7 +29,7 @@ my $BADINST = 99;
 my $VNODESETUPTIMEOUT = 600; # XXX: need to get from sitevar, or
                              #      pass in via new().
 my $ISUPWAITTIME      = 600;      # XXX: likewise...
-my $TEARDOWNTIMEOUT   = 120;   # XXX: ...
+my $TEARDOWNTIMEOUT   = 300;   # XXX: ...
 
 my $SETUPMODE        = "SETUPMODE";
 my $TEARDOWNGOODMODE = "TEARDOWNGOODMODE";
@@ -150,12 +150,14 @@ sub checknextnode($) {
         $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
         $self->{'CHPID2POOL'}->{$chpid} = $self;
 
+        print "Pool $self->{'NAME'}: fired off setup worker $chpid for ".
+              "$pnode->{'name'}\n";
+
         return
     }
 
     # Worker process.
     else {
-        $SIG{CHLD} = 'DEFAULT';
         TBdbfork();	# So we get the event system fork too ...
         # Make sure vnode is in the proper state before trying to
         # bring it up.
@@ -255,7 +257,7 @@ sub processchild($$$) {
 
     if (!defined($pnode)) {
         print "Pool: $self->{'NAME'}: $chpid not found in pending list!\n";
-        return 0;
+        return 1;
     }
 
     # Clear pid entry - child has gone away.
@@ -264,7 +266,7 @@ sub processchild($$$) {
     # Check the nodes to find out which are up, and which failed
     # in the vnode_setup we just ran.
     print "Pool: $self->{'NAME'}: Checking status of ".
-          "$pnode->{'name'} @ ". `date`;
+          "$pnode->{'name'} (pid: $chpid) @ ". `date`;
 
     # Handle vnode teardown
     if ($pnode->{'mode'} eq $TEARDOWNGOODMODE or
@@ -327,12 +329,11 @@ sub processchild($$$) {
     if ($bad) {
         # If setup failed, schedule a vnode teardown.
         $self->teardownnode($pnode, $SETUPFAIL);
-        return 0;
+    } else {
+        # Setup a timeout to wait for ISUP.
+        $pnode->{'timeout'} = $now + $ISUPWAITTIME;
     }
-
-    # Setup a timeout to wait for ISUP.
-    $pnode->{'timeout'} = $now + $ISUPWAITTIME;
-    return 1;
+    return 0;
 }
 
 #
@@ -403,12 +404,14 @@ sub teardownnode($$;$) {
             $pnode->{'mode'} = $TEARDOWNGOODMODE;
         }
 
+        print "Pool $self->{'NAME'}: fired off teardown worker $chpid for ".
+              "$pnode->{'name'}\n";
+
         return;
     }
 
     # Worker process.
     else {
-        $SIG{CHLD} = 'DEFAULT';
         TBdbfork();	# So we get the event system fork too ...
         my $vnode = $pnode->{'vnode'};
 

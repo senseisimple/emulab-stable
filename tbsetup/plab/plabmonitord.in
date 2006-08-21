@@ -89,7 +89,8 @@ sub fatal($);
 #
 # Global vars
 #
-my $logfile      = "$TB/log/plabmonitord";
+my $LOGFILE      = "$TB/log/plabmonitord";
+my $PIDFILE      = "/var/run/plabmonitord.pid";
 my $MINSLEEP     = 2;    # Sleep for no less than 2 seconds.
 my $MAXWINSIZE   = 40;   # Degree of parallelization.
 my $MAXSLEEPTIME = 600;  # Don't ever sleep for longer than this - we need
@@ -97,14 +98,24 @@ my $MAXSLEEPTIME = 600;  # Don't ever sleep for longer than this - we need
 my $CHILLTIME    = 5;    # How long to wait after processing expirations.
 my $NEVER        = 0;    # "Never" in seconds since the Epoch.
 
+my $MAXLA        = 20;   # Don't let the system load get out of hand.
+my $UPTIME       = "/usr/bin/uptime";
+
 #
 # daemonize
 #
 if (!$debug) {
-    if (TBBackGround($logfile)) {
+    if (TBBackGround($LOGFILE)) {
         exit(0);
     }
 }
+
+#
+# Write our pid into the pid file so we can be killed later. 
+#
+system("echo '$PID' > $PIDFILE") == 0 or
+    die("*** $0:\n".
+	"    Could not create $PIDFILE!");
 
 # pid -> pool mapping; passed in as param to pool setup funtion.
 my %chpid2pool = ();
@@ -126,7 +137,7 @@ my $goodpool = plabmon_goodpool->new("good",
 
 
 #
-# helper
+# helpers
 #
 sub MIN($$) {
     my ($a, $b) = @_;
@@ -136,6 +147,11 @@ sub MIN($$) {
     return $res;
 }
 
+sub getLA() {
+    my ($LAstr) = `$UPTIME` =~ /load averages:\s+([\d\.]+),/;
+    return int($LAstr);
+}    
+
 #
 # Handle termination/hangup signals
 #
@@ -143,11 +159,13 @@ sub termsig($) {
     my $signame = shift;
     print "*** $0: Received $signame - exiting.\n";
 
-    foreach my $pid (keys %chpid2pool) {
-        kill("TERM", $pid);
-    }
+    # Whack the whole process group (except top level parent!)
+    local $SIG{TERM} = 'IGNORE';
+    kill("TERM", -$$);
 
     while (wait() > 0) {};
+
+    unlink($PIDFILE);
 
     exit -1;
 }
@@ -155,22 +173,6 @@ sub termsig($) {
 $SIG{TERM} = \&termsig;
 $SIG{HUP}  = \&termsig;
 $SIG{INT}  = \&termsig;
-
-#
-# Collect child procs into array.
-#
-my @reapedchildren = ();
-$SIG{CHLD} = sub {
-    my $chpid;
-    my $chstat;
-    do {
-        $chpid = waitpid(-1, WNOHANG);
-        $chstat = $?;
-        if ($chpid > 0) {
-            push @reapedchildren, [$chpid, $chstat];
-        }
-    } while $chpid > 0;
-};
 
 #
 # Main loop: grind around looking for nodes to check in the various
@@ -191,8 +193,11 @@ while (1) {
     # Check pools and fire off new checks as window room permits.  If no
     # new node tests were added since the last run through the pools, then
     # bail out.
-    while ($windowsize < $MAXWINSIZE && $windowsize != $lastwindowsize) {
+    my $curLA = getLA();
+    while ($windowsize < $MAXWINSIZE && $windowsize != $lastwindowsize
+           && $curLA < $MAXLA) {
         $lastwindowsize = $windowsize;
+        $curLA = getLA();
         foreach my $pool (@allpools) {
             # if pool still has nodes to test, get them going.
             if ($pool->getnextchecktime() <= $now) {
@@ -215,20 +220,19 @@ while (1) {
     }
 
     # Go to sleep waiting for the next node to process.
-    print "Monitor going to sleep for $sleeptime seconds.\n";
+    print "Monitor going to sleep for $sleeptime seconds ".
+          "(winsize: $windowsize, LA: $curLA).\n";
+
     sleep($sleeptime);
 
     # Handle any children that have exited.
-    while(my $childinfo = shift @reapedchildren) {
-        my $chpid  = $childinfo->[0];
-        my $chstat = $childinfo->[1];
-        if ($chpid > 0) {
-            next if !defined($chpid2pool{$chpid});
-            $reappool = $chpid2pool{$chpid};
-            delete $chpid2pool{$chpid};
-            if ($reappool->processchild($chpid, $chstat)) {
-                $windowsize--;
-            }
+    while((my $chpid = waitpid(-1, WNOHANG)) > 0) {
+        my $chstat = $?;
+        next if !defined($chpid2pool{$chpid});
+        $reappool = $chpid2pool{$chpid};
+        delete $chpid2pool{$chpid};
+        if ($reappool->processchild($chpid, $chstat)) {
+            $windowsize--;
         }
     }
 
@@ -269,7 +273,8 @@ sub updatenodepool($) {
                      "left join node_types as nt on n.type = nt.type ".
                      "where r.pid='$poolpid' and ".
                      "      r.eid='$pooleid' and ".
-                     "      nt.isplabphysnode = 1");
+                     "      nt.isplabphysnode = 1 ".
+                     "order by rand()");
 
     if ($qres and $qres->num_rows()) {
         # Find any new nodes that need to be added and add them.
@@ -280,7 +285,7 @@ sub updatenodepool($) {
                 $poolpnodes->{$pnodename} = {'name'           => $pnodename,
                                              'entertime'      => $now,
                                              'lastcheckstart' => $NEVER,
-                                             'nextchecktime'  => $now,
+                                             'nextchecktime'  => $now + int(rand(120)),
                                              'lastfailtime'   => $NEVER,
                                              'consecfails'    => 0,
                                              'consecsuccess'  => 0,
