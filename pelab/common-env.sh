@@ -16,6 +16,17 @@ COMMON_ENV_LOADED="yes"
 UNAME=`uname -s`
 
 #
+# Yow.  The BSD shell requires setting trapsasync (-T) to allow us to
+# receive signals when in a wait.
+#
+if [ "$UNAME" = "FreeBSD" ]; then
+    set -o trapsasync
+    SH="/bin/sh -T"
+else
+    SH=/bin/sh
+fi
+
+#
 # Different binary directories for FreeBSD/Linux
 #
 if [ "$UNAME" = "Linux" ]; then
@@ -38,7 +49,6 @@ HOSTSFILE="/etc/hosts"
 IFCONFIG="/sbin/ifconfig"
 PERL="/usr/bin/perl"
 PYTHON="${BIN_PATH}/python"
-SH=/bin/sh
 SUDO="${BIN_PATH}/sudo"
 MKDIR="/bin/mkdir"
 CHMOD="/bin/chmod"

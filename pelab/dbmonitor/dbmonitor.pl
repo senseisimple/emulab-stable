@@ -50,7 +50,7 @@ sub usage()
     exit(1);
 }
 
-my $optlist  = "ndi:ps1S:";
+my $optlist  = "ndi:ps1S:U";
 my $showonly = 0;
 my $debug = 0;
 my $interval = (1 * 60);
@@ -58,9 +58,10 @@ my $verbose = 1;
 my $onceonly = 0;
 my $starttime = 0;
 my $timeskew = 0;
+my $bidir = 1;
 
 # Default values.  Note: delay and PLR are round trip values.
-my $DEF_BW =  10;	# Kbits/sec
+my $DEF_BW =  50;	# Kbits/sec
 my $DEF_DEL = 1000;	# ms
 my $DEF_PLR = 0.0;	# prob.
 
@@ -95,6 +96,9 @@ if (defined($options{"s"})) {
 }
 if (defined($options{"1"})) {
     $onceonly = 1;
+}
+if (defined($options{"U"})) {
+    $bidir = 0;
 }
 if (defined($options{"S"})) {
     my $high = time();
@@ -323,6 +327,20 @@ sub get_plabinfo($@)
 	}
 
 	#
+	#
+	#
+	my $siteclause;
+	if ($bidir) {
+	    $siteclause =
+		"((srcsite_idx='$src_site' and dstsite_idx='$dst_site') or ".
+		" (dstsite_idx='$src_site' and srcsite_idx='$dst_site')) ";
+			     
+	} else {
+	    $siteclause = 
+		"(srcsite_idx='$src_site' and dstsite_idx='$dst_site') ";
+	}
+
+	#
 	# BW and latency records are separate and there are, in general,
 	# a lot more latency measurements than BW measurements.  So we
 	# make two queries grabbing the latest of each.
@@ -333,9 +351,8 @@ sub get_plabinfo($@)
 	my $query_result =
 	    DBQueryFatal("select latency,unixstamp from pair_data ".
 			 " where ".
-			 "  srcsite_idx='$src_site' and ".
-			 "  dstsite_idx='$dst_site' and ".
-			 "   latency is not null ".
+			 $siteclause .
+			 " and latency is not null ".
 			 $dateclause .
 			 " order by unixstamp desc limit 1");
 	if (!$query_result->numrows) {
@@ -349,9 +366,8 @@ sub get_plabinfo($@)
 	$query_result =
 	    DBQueryFatal("select bw,unixstamp from pair_data ".
 			 " where ".
-			 "  srcsite_idx='$src_site' and ".
-			 "  dstsite_idx='$dst_site' and ".
-			 "   bw is not null ".
+			 $siteclause .
+			 " and bw is not null ".
 			 $dateclause .
 			 " order by unixstamp desc limit 1");
 	if (!$query_result->numrows) {

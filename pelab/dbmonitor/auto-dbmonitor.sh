@@ -1,8 +1,4 @@
 #!/bin/sh
-#
-# XXX under BSD this script has to be run with -T or else a signal will
-# not break the script out of the wait.
-#
 
 ARGS=$*
 if [ -z "$PID" -o -z "$EID" ]; then
