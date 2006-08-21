@@ -493,7 +493,7 @@ while (my %row = $db_result->fetchhash()) {
 	if $dbg;
 }
 
-@all_nodes = (keys %nodes, keys %vnodes, keys %plabvnodes);
+@all_nodes = (keys %nodes, keys %vnodes);
 
 #
 # Perform some prechecks on the images.  This will also have the
