@@ -9,11 +9,16 @@ use libwanetmon;
 # A node from each site to take part in the measurements
 my @expnodes;
 
-my %deadnodes;
+#my %deadnodes;
 
 sub usage 
 {
-    warn "Usage: $0 <input_file> [-p port] [-e pid/eid] [-l latency period] [-b bandwidth period] [-a] [-o outputport]\n";
+    warn "Usage: $0 [-p port] [-e pid/eid]".
+	"[-l latency period] [-b bandwidth period] [-a]".
+	"[-o outputport] [-L]   <input_file>\n".
+	"where -a = measure all pairs\n".
+	"      -L = do not init Latency\n".
+	"      -B = do not init bandwidth\n";
     return 1;
 }
 
@@ -40,11 +45,14 @@ $settings{"expt"} = "__none";
 #*****************************************
 
 my %opt = ();
-getopts("s:p:o:h:e:l:b:a", \%opt);
+getopts("s:p:o:h:e:l:b:aBL", \%opt);
 
 if ($opt{h}) { exit &usage; }
 if ($opt{e}) { $settings{"expt"} = $opt{e}; }
 if ($opt{a}) { $settings{"allpairs"} = 1; }
+if ($opt{L}) { $settings{"noLatency"} = 1; }
+if ($opt{B}) { $settings{"noBW"} = 1; }
+
 
 # XXX: We should transfer the defaults into the %settings hash, then
 #      override here.  However, the rest of the code references DEF_PER
@@ -81,9 +89,14 @@ my $socket;
 setcmdport($port);
 setexpid($settings{expt});
 
+#
+# Prototypes
+#
+sub outputErrors();
 
+#
 #MAIN
-#TODO: Control Loop
+#
 my $cmd = "";
 while( $cmd ne "q" )
 {
@@ -114,83 +127,92 @@ sub start
     if( $settings{allpairs} == 1 ){
 	#start fully-connected tests amongst nodes
 
-	foreach my $node (@expnodes){
-	    #build string of destination nodes
-	    #init bandwidth
-	    my $bw_destnodes;
-	    foreach my $dest (@expnodes){
-		#add destination nodes to this source node, but not "self"
-		if( $dest ne $node ){
-		    $bw_destnodes = $bw_destnodes." ".$dest;
+	if( !defined $settings{noBW} ){
+	    foreach my $node (@expnodes){
+		#build string of destination nodes
+		#init bandwidth
+		my $bw_destnodes;
+		foreach my $dest (@expnodes){
+		    #add destination nodes to this source node, but not "self"
+		    if( $dest ne $node ){
+			$bw_destnodes = $bw_destnodes." ".$dest;
+		    }
 		}
+		initnode($node, $bw_destnodes, $DEF_PER{"bw"}, "bw");
+		#TODO! Distribute initialization times evenly
 	    }
-	    initnode($node, $bw_destnodes, $DEF_PER{"bw"}, "bw");
-	    #TODO! Distribute initialization times evenly
 	}
 
 
+	
 	#INIT LATENCY
+#	if( !defined $settings{noLatency} ){
 
-	#make connections "balanced" to prevent one node from running tests to
-	# all the others
-	my @destmat;
-	#initialize matrix: 0=>no link, 1=>link, 2=>reverse or self link
-	#index values are index of @expnodes
-	my ($i,$j) = (0,0);
-	for $i (0..$#expnodes){
-	    push @destmat, [];
-	    for $j (0..$#expnodes){
-		if( $i == $j ){
-		    $destmat[$i][$j] = 2;
-		}else{
-		    $destmat[$i][$j] = 0;
+	    #make connections "balanced" to prevent one node from running tests to
+	    # all the others
+	    my @destmat;
+	    #initialize matrix: 0=>no link, 1=>link, 2=>reverse or self link
+	    #index values are index of @expnodes
+	    my ($i,$j) = (0,0);
+	    for $i (0..$#expnodes){
+		push @destmat, [];
+		for $j (0..$#expnodes){
+		    if( $i == $j ){
+			$destmat[$i][$j] = 2;
+		    }else{
+			$destmat[$i][$j] = 0;
+		    }
 		}
 	    }
-	}
 
-	#mark connections in matrix
-	my $remaining_connections = @expnodes * (@expnodes-1);
-    #    print "numexpnodes = ".scalar(@expnodes)."\n";
-	($i, $j) = (0, 0);    
-	while( $remaining_connections > 0 ){
-	    #walk array of destination nodes looking for the first "no link"
-	    #starting at the previous node
-	    while( $destmat[$i][$j] != 0 ){
-		$j = ($j+1) % @expnodes;
+	    #mark connections in matrix
+	    my $remaining_connections = @expnodes * (@expnodes-1);
+	    #    print "numexpnodes = ".scalar(@expnodes)."\n";
+	    ($i, $j) = (0, 0);    
+	    while( $remaining_connections > 0 ){
+		#walk array of destination nodes looking for the first "no link"
+		#starting at the previous node
+		while( $destmat[$i][$j] != 0 ){
+		    $j = ($j+1) % @expnodes;
+		}
+		$destmat[$i][$j] = 1;
+		$destmat[$j][$i] = 2;
+		$remaining_connections -= 2;
+		#	print "i,j, remaining = $i,$j,$remaining_connections\n";
+		$i = ($i+1) % @expnodes;
 	    }
-	    $destmat[$i][$j] = 1;
-	    $destmat[$j][$i] = 2;
-	    $remaining_connections -= 2;
-    #	print "i,j, remaining = $i,$j,$remaining_connections\n";
-	    $i = ($i+1) % @expnodes;
-	}
 
 =pod
-	#print connection matrix
-	print "\n";
-	for $i (0..$#expnodes){
-	    for $j (0..$#expnodes){
-		print " $destmat[$i][$j] ";
+	    #print connection matrix
+            print "\n";
+	    for $i (0..$#expnodes){
+		for $j (0..$#expnodes){
+		    print " $destmat[$i][$j] ";
+		}
+		print "\n";
 	    }
-	    print "\n";
-	}
 =cut
 
-	#send latency data
-	for $i (0..$#expnodes){
-	    #build string of destination nodes
-	    my $lat_destnodes;
-	    for $j (0..$#expnodes){
-		#add destination nodes to this source node, but not "self"
-		if( $destmat[$i][$j] == 1 ){
-		    $lat_destnodes = $lat_destnodes." ".$expnodes[$j];
+            #send latency data
+            for $i (0..$#expnodes){
+		#build string of destination nodes
+		my $lat_destnodes;
+		for $j (0..$#expnodes){
+		    #add destination nodes to this source node, but not "self"
+		    if( $destmat[$i][$j] == 1 ){
+			if (defined $lat_destnodes){
+			    $lat_destnodes = $lat_destnodes." ".$expnodes[$j];
+			}else{
+			    $lat_destnodes = $expnodes[$j];
+			}
+		    }
 		}
+		#send list
+		#	print "$lat_destnodes\n";
+		initnode($expnodes[$i], $lat_destnodes, 
+			 $DEF_PER{"latency"}, "latency");
 	    }
-	    #send list
-    #	print "$lat_destnodes\n";
-	    initnode($expnodes[$i], $lat_destnodes, 
-		     $DEF_PER{"latency"}, "latency");
-	}
+#	}
     }
     
     elsif( $settings{allpairs} == 0 ){
