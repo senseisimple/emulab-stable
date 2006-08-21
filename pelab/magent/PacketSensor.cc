@@ -147,7 +147,10 @@ void PacketSensor::localAck(PacketInfo * packet)
     {
       ackedSendTime = pos->timestamp;
     }
-    ++pos;
+    if (pos != limit)
+    {
+      ++pos;
+    }
   }
   if (!found)
   {
