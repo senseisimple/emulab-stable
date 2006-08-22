@@ -28,7 +28,7 @@ while (<>) {
     }
     my $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY ".
       "DEST=$dstip BANDWIDTH=$bw DELAY=$del PLR=$plr";
-    print STDERR "$cmd\n";
+    #print STDERR "$cmd\n";
     system("$cmd");
     if ($? != 0) {
 	print STDERR "*** Failed to set paramters for $src -> $dst\n";
