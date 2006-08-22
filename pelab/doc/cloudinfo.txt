@@ -63,7 +63,7 @@ The file parsepipe.pl is now checked in as "cloudinfo".
 Date: Tue, 22 Aug 2006 15:25:50 -0600 (MDT)
 From: Kevin Atkinson <kevina@cs.utah.edu>
 To: pelab@flux.utah.edu
-Subject: Setting And Restoring Seeting For Elab Cloud
+Subject: Setting And Restoring Settings For Elab Cloud
 
 It is now possible to save and restore the elab "cloud" settings.
 I hacked Mike's cloudinfo script to dump the settings in a form that is easy
