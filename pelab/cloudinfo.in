@@ -5,9 +5,12 @@
 # Only used with pelab "clouds" right now (hence the name).
 #
 
+use Getopt::Std;
+
 my $verbose = 1;
 my $ispelab = 1;
 my $zeroem = 0;
+my $dumpfile = 0;
 
 use constant IN_SHOW  => 1;
 use constant IN_SHOWP => 2;
@@ -23,16 +26,19 @@ q(^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d+));
 
 sub usage()
 {
-    print STDERR "usage: cloudinfo [-z] pid eid\n";
+    print STDERR "usage: cloudinfo [-z] [-d] pid eid\n";
     exit(1);
 }
 
 my %options = ();
-if (!getopts("z", \%options)) {
+if (!getopts("zd", \%options)) {
     usage();
 }
 if (defined($options{"z"})) {
     $zeroem = 1;
+}
+if (defined($options{"d"})) {
+    $dumpfile = 1;
 }
 if (@ARGV != 2) {
     usage();
@@ -45,6 +51,10 @@ my $nnodes = grep(/^tbs?delay/, @nodelist);
 if ($nnodes == 0) {
     print STDERR "No delay nodes in $pid/$eid?!\n";
     exit(1);
+}
+
+if ($dumpfile) {
+    print "$pid $eid\n";
 }
 
 for my $node (@nodelist) {
@@ -72,7 +82,7 @@ sub printit($)
 {
     my ($node) = @_;
 
-    print "\n$node:\n";
+    print "\n$node:\n" unless $dumpfile;
     my @pipes =
 	sort {
 	    $pipeinfo{$a}->{"node"} cmp $pipeinfo{$b}->{"node"} ||
@@ -97,18 +107,18 @@ sub printit($)
 	}
 	if (defined($lastdir) && $lastdir ne $pipeinfo{$pipe}->{"dir"} ||
 	    defined($lastnode) && $lastnode ne $pipeinfo{$pipe}->{"node"}) {
-	    print "\n";
+	    print "\n" unless $dumpfile;
 	}
 	printapipe($pipe);
 	$lastnode = $pipeinfo{$pipe}->{"node"};
 	$lastdir = $pipeinfo{$pipe}->{"dir"};
     }
-    print "\n";
+    print "\n" unless $dumpfile;
     foreach $pipe (@anypipes) {
 	printapipe($pipe);
     }
-    if ($verbose && @badpipes) {
-	print "*** Ignored pipes with traffic:\n";
+    if ($verbose && @badpipes && !$dumpfile) {
+	print STDERR "*** Ignored pipes with traffic:\n";
 	foreach $pipe (@badpipes) {
 	    printapipe($pipe);
 	}
@@ -119,27 +129,44 @@ sub printapipe($)
 {
     my ($pipe) = @_;
 
-    printf "%8s %1s ", $pipeinfo{$pipe}->{"node"}, $pipeinfo{$pipe}->{"dir"};
+    my $node;
     if ($ispelab) {
-	my $node = $pipeinfo{$pipe}->{"ip"};
+	$node = $pipeinfo{$pipe}->{"ip"};
 	if ($node =~ /^10\.0\.0\.(\d+)$/) {
 	    $node = "elab-$1";
 	}
-	printf "%8s: ", $node;
+	$node = sprintf "%8s", $node unless $dumpfile;
     } else {
-	printf "%16s: ", $pipeinfo{$pipe}->{"ip"};
+        $node = $pipeinfo{$pipe}->{"ip"};
+	$node = sprintf "%16s", $node unless $dumpfile;
     }
     my $bw = $pipeinfo{$pipe}->{"bw"};
-    if ($bw eq "unlimited") {
-	print " unlimited";
-    } else {
-	printf "%10d", $bw;
+
+    if (!$dumpfile) {
+
+	printf "%8s %1s ", $pipeinfo{$pipe}->{"node"}, $pipeinfo{$pipe}->{"dir"};
+	print "$node: ";
+	if ($bw eq "unlimited") {
+	    print " unlimited";
+	} else {
+	    printf "%10d", $bw;
+	}
+	printf ", %4dms", $pipeinfo{$pipe}->{"delay"};
+	printf ", %4.1f%%", $pipeinfo{$pipe}->{"plr"};
+	printf ", %10d", $pipeinfo{$pipe}->{"pkts"};
+	printf ", %10d", $pipeinfo{$pipe}->{"bytes"};
+	print "\n";
+
+    } elsif ($node ne $pipeinfo{$pipe}{node}) {
+
+	if ($pipeinfo{$pipe}->{"dir"} eq ">") {
+	    print "$pipeinfo{$pipe}{node} $node ";
+	} else {
+	    print "$node $pipeinfo{$pipe}{node} ";
+	}
+	$bw /= 1000;
+	print "$bw $pipeinfo{$pipe}{delay} $pipeinfo{$pipe}{plr}\n";
     }
-    printf ", %4dms", $pipeinfo{$pipe}->{"delay"};
-    printf ", %4.1f%%", $pipeinfo{$pipe}->{"plr"};
-    printf ", %10d", $pipeinfo{$pipe}->{"pkts"};
-    printf ", %10d", $pipeinfo{$pipe}->{"bytes"};
-    print "\n";
 }
 
 sub parseit($)
@@ -175,7 +202,7 @@ sub parseit($)
 		    $dir = "<";
 		    $node = $inif2node{$iface};
 		} else {
-		    print "*** unknown interface $iface\n";
+		    print STDERR "*** unknown interface $iface\n";
 		}
 
 		$pipeinfo{$pipe} = {
@@ -207,7 +234,7 @@ sub parseit($)
 		    if ($node =~ /^elab-(\d+)$/) {
 			$nodeix = $1;
 		    } else {
-			print "*** ignoring non-pelab rule: $rule\n";
+			print STDERR "*** ignoring non-pelab rule: $rule\n";
 			$pipeinfo{$pipe}->{"ignore"} = 1;
 			next;
 		    }
@@ -223,7 +250,7 @@ sub parseit($)
 			    next;
 			}
 		    } else {
-			print "*** ignoring non-pelab rule: $rule\n";
+			print STDERR "*** ignoring non-pelab rule: $rule\n";
 			$pipeinfo{$pipe}->{"ignore"} = 1;
 			next;
 		    }
@@ -249,7 +276,7 @@ sub parseit($)
 		}
 
 		if (!exists($pipeinfo{$pipe})) {
-		    print "*** unreferenced pipe $pipe\n";
+		    print STDERR "*** unreferenced pipe $pipe\n";
 		} else {
 		    $pipeinfo{$pipe}->{"bw"} = $bw;
 		    $pipeinfo{$pipe}->{"delay"} = $delay;
@@ -275,7 +302,7 @@ sub parseit($)
 
     foreach $pipe (keys %pipeinfo) {
 	if (!exists($pipeinfo{$pipe}->{"bw"})) {
-	    print "*** no info for pipe $pipe\n";
+	    print STDERR "*** no info for pipe $pipe\n";
 	}
     }
 }

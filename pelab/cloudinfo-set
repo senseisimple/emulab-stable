@@ -2,7 +2,7 @@
 
 #
 # cloudinfo-set: Set the cloud info based on an input file of the form:
-#  
+#
 #   <pid> <eid>
 #   <src> <dst> <bw> <delay> <loss>
 #
@@ -17,13 +17,23 @@ chop;
 my ($pid,$eid) = /^(\S+)\s+(\S+)$/ or die
   "First line must be of the form \"<pid> <eid>\"\n";
 
+my $failures = 0;
+
 while (<>) {
     my ($src, $dst, $bw, $del, $plr) = split /\s+/;
-    my $dstix = $dst =~ (/^elab-\d+$/) or die "Host names must be of the form elab-NUM\n";
-    my $dstip = "10.0.0.$dstix";
+    my $dstip = $dst;
+    if ($dstip !~ /^\d+\.\d+\.\d+\.\d+$/) {
+	$dst =~ (/^elab-(\d+)$/) or die "Host names must be of the form elab-NUM\n";
+	$dstip = "10.0.0.$1";
+    }
     my $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY ".
       "DEST=$dstip BANDWIDTH=$bw DELAY=$del PLR=$plr";
     print STDERR "$cmd\n";
     system("$cmd");
+    if ($? != 0) {
+	print STDERR "*** Failed to set paramters for $src -> $dst\n";
+	$failures++;
+    }
 }
 
+exit $failures;
