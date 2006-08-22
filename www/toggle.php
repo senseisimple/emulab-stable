@@ -83,9 +83,7 @@ if ($type == "adminon") {
 }
 elseif ($type == "webfreeze") {
     # must be admin
-    # Do not check if they are admin mode (ISADMIN), check if they
-    # have the power to change to admin mode!
-    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ) {
+    if (! $isadmin) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
     if (!TBCurrentUser($target_uid)) {
