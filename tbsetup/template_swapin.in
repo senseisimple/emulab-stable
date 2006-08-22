@@ -327,6 +327,7 @@ if ($OPSDBSUPPORT) {
     if (system("$dbcontrol addexpdb $pid $eid")) {
 	fatal(-1, "$dbcontrol addexpdb failed!");
     }
+    $experiment->Refresh();
 }
 
 #
@@ -495,7 +496,7 @@ DBQueryFatal("replace into virt_user_environment set ".
 	     "   name='ARCHIVE', value='$instance_path/archive',".
 	     "   idx=2, pid='$pid', eid='$eid'");
 
-if ($experiment->dpdb() && $experiment->dpdbname() ne '') {
+if ($experiment->dpdb() && $experiment->dpdbname() ne "") {
     my $dpdbname = $experiment->dpdbname();
 
     DBQueryFatal("insert into virt_user_environment set ".
