@@ -269,7 +269,6 @@ void mainLoop(void)
   // Select on file descriptors
   while (true)
   {
-    cerr << "(";
 //    struct timeval debugTimeout;
 //    debugTimeout.tv_sec = 0;
 //    debugTimeout.tv_usec = 100000;
@@ -290,11 +289,9 @@ void mainLoop(void)
       timeUntilWrite = Time();
       waitPeriod = NULL;
     }
-    cerr << "s";
     int error = select(global::maxReader + 1, &readable, NULL, NULL,
 //                       &debugTimeout);
                        waitPeriod);
-    cerr << "e";
     if (error == -1)
     {
       switch (errno)
@@ -315,7 +312,6 @@ void mainLoop(void)
       }
     }
 
-    cerr << "c";
     global::input->nextCommand(&readable);
     Command * current = global::input->getCommand();
     if (current != NULL)
@@ -324,15 +320,10 @@ void mainLoop(void)
 //      global::input->nextCommand(&readable);
 //      current = global::input->getCommand();
     }
-    cerr << "w";
     writeToConnections(schedule);
-    cerr << "a";
     addNewPeer(&readable);
-    cerr << "r";
     readFromPeers(&readable);
-    cerr << "c";
     packetCapture(&readable);
-    cerr << ")";
   }
 }
 
