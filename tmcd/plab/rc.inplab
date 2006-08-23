@@ -34,7 +34,8 @@ if ($EUID != 0) {
 my $RCDIR	 = "$BINDIR/rc";
 my $PLABCONFIG   = "$BOOTDIR/rc.plab";
 my $SVCFILE      = "$BOOTDIR/svcslice";
-my $IPADDRFILE    = "$BOOTDIR/myip";
+my $IPADDRFILE   = "$BOOTDIR/myip";
+my $PWDFILE      = "/etc/passwd";
 my $TMPLPWDFILE  = "/etc/passwd.tmpl";
 
 #
@@ -216,21 +217,38 @@ sub doplabconfig()
     # XXX: need to actually use the slice name, but we don't really have
     #      it stored anywhere yet.
     print "Fixing up the passwd file.\n";
-    my $sliceuserent = `grep "^utah_" /etc/passwd`;
-    chomp $sliceuserent;
-    defined($sliceuserent) and $sliceuserent or 
-        fatal("Can't find slice user entry!");
-    my @pwdfields = split /:/, $sliceuserent;
-    $pwdfields[1] = "*";
-    $sliceuserent = join(":", @pwdfields);
-    open(TMPLPWD, ">>$TMPLPWDFILE") or 
-        fatal("Can't open passwd template file");
-    print TMPLPWD "$sliceuserent\n";
-    close(TMPLPWD);
-    !system("cp -f /etc/passwd /etc/passwd.orig") and
-        !system("cp -f $TMPLPWDFILE /etc/passwd") or
-            fatal("Couldn't fix up passwd file!");
+    my $sliceuserent = "";
+    open(PWD, "< $PWDFILE") or
+        fatal("Can't open password file for reading!");
+    while (my $pwln = <PWD>) {
+        chomp($pwln);
+        if ($pwln =~ /^utah_/) {
+            my @pwdfields = split /:/, $pwln;
+            $pwdfields[1] = "*";
+            $sliceuserent = join(":", @pwdfields);
+            last;
+        }
+    }
+    close(PWD);
+    if (!$sliceuserent) {
+        fatal("Couldn't find slice user entry in passwd file!");
+    }
+    !system("cp -f $TMPLPWDFILE $PWDFILE.new") or
+        fatal("Can't copy template file!");
+    open(PWNEW, ">> $PWDFILE.new") or
+        fatal("Can't open new password file for append!");
+    print PWNEW $sliceuserent . "\n";
+    close(PWNEW);
+    if (! -e "$PWDFILE.orig") {
+        !system("cp -f $PWDFILE $PWDFILE.orig") or
+            fatal("Can't backup passwd file!");
+    }
+    !system("mv -f $PWDFILE.new $PWDFILE") or
+        fatal("Could not move new password file into place!");
 
+    #
+    # Grab plab specific config data and process it.
+    #
     if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
 	fatal("Could not get plabconfig from server!");
     }
@@ -327,4 +345,3 @@ sub doplabconfig()
     chmod(0755, $PLABCONFIG);
     return 0;
 }
-
