@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1636,7 +1636,7 @@ sub clearAllVlansOnTrunk($$) {
     }
 
     #
-    # Get the exisisting bitfield for allowed VLANs on the trunk
+    # Get the existing bitfield for allowed VLANs on the trunk
     #
     my $bitfield = snmpitGetFatal($self->{SESS},
 	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
@@ -1689,7 +1689,7 @@ sub resetVlanIfOnTrunk($$$) {
     #
     my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
     if (!($channel =~ /^\d+$/) || ($channel == 0)) {
-	print "WARNING: setVlansOnTrunk got zero channel for $self->{NAME}.$modport\n";
+	print "WARNING: resetVlanIfOnTrunk got bad channel ($channel) for $self->{NAME}.$modport\n";
 	return 0;
     }
     if (($channel =~ /^\d+$/) && ($channel != 0)) {
@@ -1697,7 +1697,7 @@ sub resetVlanIfOnTrunk($$$) {
     }
 
     #
-    # Get the exisisting bitfield for allowed VLANs on the trunk
+    # Get the existing bitfield for allowed VLANs on the trunk
     #
     $self->lock();
     my $bitfield = snmpitGetFatal($self->{SESS},
