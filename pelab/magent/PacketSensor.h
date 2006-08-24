@@ -8,10 +8,12 @@
 #include "Sensor.h"
 #include "Time.h"
 
+class StateSensor;
+
 class PacketSensor : public Sensor
 {
 public:
-  PacketSensor();
+  PacketSensor(StateSensor * newState);
   // Get the size of the acknowledgement in bytes.
   int getAckedSize(void) const;
   // Get the time of the last packet sent which was acked.
@@ -36,6 +38,8 @@ private:
   Time ackedSendTime;
   std::list<SentPacket> unacked;
   SentPacket globalSequence;
+
+  StateSensor * state;
 };
 
 #endif

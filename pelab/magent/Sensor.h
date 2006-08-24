@@ -17,8 +17,7 @@ public:
   virtual ~Sensor();
   Sensor * getTail(void);
   void addNode(std::auto_ptr<Sensor> node);
-  void captureSend(PacketInfo * packet);
-  void captureAck(PacketInfo * packet);
+  void capturePacket(PacketInfo * packet);
 private:
   std::auto_ptr<Sensor> next;
 protected:

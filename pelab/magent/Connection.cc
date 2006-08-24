@@ -133,28 +133,16 @@ void Connection::addSensor(SensorCommand const & newSensor)
   measurements.addSensor(newSensor);
 }
 
-void Connection::captureSend(PacketInfo * packet)
+void Connection::capturePacket(PacketInfo * packet)
 {
   Sensor * head = measurements.getHead();
   packet->elab = elab;
   packet->bufferFull = bufferFull;
   if (head != NULL && isConnected)
   {
-    head->captureSend(packet);
+    head->capturePacket(packet);
   }
-  replayWritePacket(PACKET_INFO_SEND_COMMAND, packet);
-}
-
-void Connection::captureAck(PacketInfo * packet)
-{
-  Sensor * head = measurements.getHead();
-  packet->elab = elab;
-  packet->bufferFull = bufferFull;
-  if (head != NULL && isConnected)
-  {
-    head->captureAck(packet);
-  }
-  replayWritePacket(PACKET_INFO_ACK_COMMAND, packet);
+  replayWritePacket(packet);
 }
 
 ConnectionModel const * Connection::getConnectionModel(void)

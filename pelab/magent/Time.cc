@@ -22,6 +22,12 @@ long long Time::toMilliseconds(void) const
   return result;
 }
 
+double Time::toDouble(void) const
+{
+  double result = data.tv_sec + data.tv_usec / 1000000.0;
+  return result;
+}
+
 struct timeval * Time::getTimeval(void)
 {
   return &data;
@@ -54,7 +60,7 @@ Time Time::operator-(Time const & right) const
 {
   Time result;
   result.data.tv_sec = data.tv_sec - right.data.tv_sec;
-  long usec = data.tv_sec - right.data.tv_usec;
+  long usec = data.tv_usec - right.data.tv_usec;
   if (usec < 0)
   {
     --(result.data.tv_sec);

@@ -6,6 +6,7 @@
 #include "Sensor.h"
 #include "Command.h"
 
+#include "StateSensor.h"
 #include "PacketSensor.h"
 #include "DelaySensor.h"
 #include "MinDelaySensor.h"
@@ -53,6 +54,9 @@ void SensorList::addSensor(SensorCommand const & newSensor)
   case NULL_SENSOR:
     pushNullSensor();
     break;
+  case STATE_SENSOR:
+    pushStateSensor();
+    break;
   case PACKET_SENSOR:
     pushPacketSensor();
     break;
@@ -87,6 +91,7 @@ void SensorList::reset(void)
   tail = NULL;
   // Dependency = NULL here
   depNullSensor = NULL;
+  depStateSensor = NULL;
   depPacketSensor = NULL;
   depDelaySensor = NULL;
   depThroughputSensor = NULL;
@@ -97,6 +102,7 @@ void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
   if (tail != NULL)
   {
     tail->addNode(newSensor);
+    tail = tail->getTail();
   }
   else
   {
@@ -114,6 +120,7 @@ void SensorList::pushNullSensor(void)
   // Example dependency check
   if (depNullSensor == NULL)
   {
+    logWrite(SENSOR, "Adding NullSensor");
     NullSensor * newSensor = new NullSensor();
     std::auto_ptr<Sensor> current(newSensor);
     pushSensor(current);
@@ -123,14 +130,33 @@ void SensorList::pushNullSensor(void)
   }
 }
 
+void SensorList::pushStateSensor(void)
+{
+  // Dependency list
+
+  // Dependency check
+  if (depStateSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding StateSensor");
+    StateSensor * newSensor = new StateSensor();
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Dependency set
+    depStateSensor = newSensor;
+  }
+}
+
 void SensorList::pushPacketSensor(void)
 {
   // Dependency list
+  pushStateSensor();
 
   // Example dependency check
   if (depPacketSensor == NULL)
   {
-    PacketSensor * newSensor = new PacketSensor();
+    logWrite(SENSOR, "Adding PacketSensor");
+    PacketSensor * newSensor = new PacketSensor(depStateSensor);
     std::auto_ptr<Sensor> current(newSensor);
     pushSensor(current);
 
@@ -142,12 +168,14 @@ void SensorList::pushPacketSensor(void)
 void SensorList::pushDelaySensor(void)
 {
   // Dependency list
+  pushStateSensor();
   pushPacketSensor();
 
   // Example dependency check
   if (depDelaySensor == NULL)
   {
-    DelaySensor * newSensor = new DelaySensor(depPacketSensor);
+    logWrite(SENSOR, "Adding DelaySensor");
+    DelaySensor * newSensor = new DelaySensor(depPacketSensor, depStateSensor);
     std::auto_ptr<Sensor> current(newSensor);
     pushSensor(current);
 
@@ -161,6 +189,7 @@ void SensorList::pushMinDelaySensor(void)
   // Dependency list
   pushDelaySensor();
 
+  logWrite(SENSOR, "Adding MinDelaySensor");
   std::auto_ptr<Sensor> current(new MinDelaySensor(depDelaySensor));
   pushSensor(current);
 }
@@ -170,6 +199,7 @@ void SensorList::pushMaxDelaySensor(void)
   // Dependency list
   pushDelaySensor();
 
+  logWrite(SENSOR, "Adding MaxDelaySensor");
   std::auto_ptr<Sensor> current(new MaxDelaySensor(depDelaySensor));
   pushSensor(current);
 }
@@ -177,12 +207,15 @@ void SensorList::pushMaxDelaySensor(void)
 void SensorList::pushThroughputSensor(void)
 {
   // Dependency list
+  pushStateSensor();
   pushPacketSensor();
 
   // Example dependency check
   if (depThroughputSensor == NULL)
   {
-    ThroughputSensor * newSensor = new ThroughputSensor(depPacketSensor);
+    logWrite(SENSOR, "Adding ThroughputSensor");
+    ThroughputSensor * newSensor = new ThroughputSensor(depPacketSensor,
+                                                        depStateSensor);
     std::auto_ptr<Sensor> current(newSensor);
     pushSensor(current);
 

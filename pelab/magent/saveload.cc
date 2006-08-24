@@ -165,6 +165,9 @@ char * savePacket(char * buffer, PacketInfo const & value)
   unsigned char bufferFull = value.bufferFull;
   pos = saveChar(pos, bufferFull);
 
+ // Save packetType
+  pos = saveChar(pos, value.packetType);
+
   return pos;
 }
 
@@ -429,6 +432,9 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   unsigned char bufferFull = 0;
   pos = loadChar(pos, &bufferFull);
   value->bufferFull = (bufferFull == 1);
+
+  // Load packet type
+  pos = loadChar(pos, & value->packetType);
 
   return pos;
 }

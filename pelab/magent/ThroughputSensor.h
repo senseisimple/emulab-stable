@@ -8,11 +8,12 @@
 #include "Sensor.h"
 
 class PacketSensor;
+class StateSensor;
 
 class ThroughputSensor : public Sensor
 {
 public:
-  ThroughputSensor(PacketSensor * newPacketHistory);
+  ThroughputSensor(PacketSensor * newPacketHistory, StateSensor * newState);
   int getThroughputInKbps(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
@@ -21,6 +22,7 @@ private:
   int throughputInKbps;
   Time lastAckTime;
   PacketSensor * packetHistory;
+  StateSensor * state;
 };
 
 #endif

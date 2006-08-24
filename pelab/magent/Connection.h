@@ -37,10 +37,8 @@ public:
                        std::multimap<Time, Connection *> & schedule);
   // Adds a particular kind of sensor when requested by the monitor.
   void addSensor(SensorCommand const & newSensor);
-  // Notifies the sensors of a data packet which was sent.
-  void captureSend(PacketInfo * packet);
-  // Notifies the sensors of an acknowledged packet which was received.
-  void captureAck(PacketInfo * packet);
+  // Notifies the sensors of a captured packet.
+  void capturePacket(PacketInfo * packet);
   // Allows the connection model to be viewed.
   ConnectionModel const * getConnectionModel(void);
   // Notifies the traffic model that a timer has expired on the

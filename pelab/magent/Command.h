@@ -80,6 +80,7 @@ protected:
 public:
   unsigned int delta;
   unsigned int size;
+  Time localTime;
 };
 
 class DeleteConnectionCommand : public Command

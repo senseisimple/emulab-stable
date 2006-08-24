@@ -33,24 +33,29 @@ Sensor * Sensor::getTail(void)
 
 void Sensor::addNode(auto_ptr<Sensor> node)
 {
-  next = node;
-}
-
-void Sensor::captureSend(PacketInfo * packet)
-{
-  localSend(packet);
-  if (next.get() != NULL)
+  if (next.get() == NULL)
   {
-    next->captureSend(packet);
+    next = node;
+  }
+  else
+  {
+    logWrite(ERROR, "Sensor::addNode(): A list tail was asked to add a node.");
   }
 }
 
-void Sensor::captureAck(PacketInfo * packet)
+void Sensor::capturePacket(PacketInfo * packet)
 {
-  localAck(packet);
+  if (packet->packetType == PACKET_INFO_SEND_COMMAND)
+  {
+    localSend(packet);
+  }
+  else
+  {
+    localAck(packet);
+  }
   if (next.get() != NULL)
   {
-    next->captureAck(packet);
+    next->capturePacket(packet);
   }
 }
 

@@ -1,7 +1,7 @@
 all: magent
 
-magent: CircularTraffic.o Command.o Connection.o Decayer.o DelaySensor.o DirectInput.o KernelTcp.o MaxDelaySensor.o MinDelaySensor.o PacketSensor.o Sensor.o SensorList.o ThroughputSensor.o Time.o TrivialCommandOutput.o log.o main.o saveload.o
-	g++ -I. -g -Wall CircularTraffic.o Command.o Connection.o Decayer.o DelaySensor.o DirectInput.o KernelTcp.o MaxDelaySensor.o MinDelaySensor.o PacketSensor.o Sensor.o SensorList.o ThroughputSensor.o Time.o TrivialCommandOutput.o log.o main.o saveload.o -lm -lpcap -o magent
+magent: CircularTraffic.o Command.o Connection.o Decayer.o DelaySensor.o DirectInput.o KernelTcp.o MaxDelaySensor.o MinDelaySensor.o PacketSensor.o Sensor.o SensorList.o StateSensor.o ThroughputSensor.o Time.o TrivialCommandOutput.o log.o main.o saveload.o
+	g++ -I. -g -Wall CircularTraffic.o Command.o Connection.o Decayer.o DelaySensor.o DirectInput.o KernelTcp.o MaxDelaySensor.o MinDelaySensor.o PacketSensor.o Sensor.o SensorList.o StateSensor.o ThroughputSensor.o Time.o TrivialCommandOutput.o log.o main.o saveload.o -lm -lpcap -o magent
 
 CircularTraffic.o: CircularTraffic.cc lib.h log.h TrafficModel.h CircularTraffic.h Command.h ConnectionModel.h
 	g++ -I. -g -Wall -c CircularTraffic.cc
@@ -15,7 +15,7 @@ Connection.o: Connection.cc lib.h log.h Connection.h Time.h ConnectionModel.h Tr
 Decayer.o: Decayer.cc lib.h Decayer.h
 	g++ -I. -g -Wall -c Decayer.cc
 
-DelaySensor.o: DelaySensor.cc lib.h Sensor.h DelaySensor.h PacketSensor.h Time.h
+DelaySensor.o: DelaySensor.cc lib.h Sensor.h DelaySensor.h PacketSensor.h Time.h StateSensor.h
 	g++ -I. -g -Wall -c DelaySensor.cc
 
 DirectInput.o: DirectInput.cc lib.h log.h CommandInput.h saveload.h DirectInput.h
@@ -30,16 +30,19 @@ MaxDelaySensor.o: MaxDelaySensor.cc lib.h Sensor.h Decayer.h MaxDelaySensor.h De
 MinDelaySensor.o: MinDelaySensor.cc lib.h Sensor.h Decayer.h MinDelaySensor.h DelaySensor.h log.h saveload.h CommandOutput.h
 	g++ -I. -g -Wall -c MinDelaySensor.cc
 
-PacketSensor.o: PacketSensor.cc lib.h Sensor.h PacketSensor.h
+PacketSensor.o: PacketSensor.cc lib.h Sensor.h PacketSensor.h StateSensor.h
 	g++ -I. -g -Wall -c PacketSensor.cc
 
 Sensor.o: Sensor.cc lib.h Sensor.h
 	g++ -I. -g -Wall -c Sensor.cc
 
-SensorList.o: SensorList.cc lib.h log.h SensorList.h Sensor.h Command.h PacketSensor.h DelaySensor.h MinDelaySensor.h MaxDelaySensor.h ThroughputSensor.h
+SensorList.o: SensorList.cc lib.h log.h SensorList.h Sensor.h Command.h PacketSensor.h DelaySensor.h MinDelaySensor.h MaxDelaySensor.h ThroughputSensor.h StateSensor.h
 	g++ -I. -g -Wall -c SensorList.cc
 
-ThroughputSensor.o: ThroughputSensor.cc lib.h Sensor.h ThroughputSensor.h PacketSensor.h
+StateSensor.o: StateSensor.cc lib.h Sensor.h StateSensor.h
+	g++ -I. -g -Wall -c StateSensor.cc
+
+ThroughputSensor.o: ThroughputSensor.cc lib.h Sensor.h ThroughputSensor.h PacketSensor.h StateSensor.h
 	g++ -I. -g -Wall -c ThroughputSensor.cc
 
 Time.o: Time.cc lib.h Time.h

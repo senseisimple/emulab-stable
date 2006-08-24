@@ -588,22 +588,28 @@ namespace
          */
         //logWrite(ERROR,"Unhandled: outgoing ACK");
       }
-      if (hasData) {
-        pos->second->captureSend(&packet);
-      }
+// JD: This should be called even when there is no data. Otherwise,
+// there is confusion at connection startup and when there are other
+// zero length segments which should be sent.
+//      if (hasData) {
+        packet.packetType = PACKET_INFO_SEND_COMMAND;
+        pos->second->capturePacket(&packet);
+//      }
     } else {
       /*
        * Incoming packets
        */
       if (isAck) {
-        pos->second->captureAck(&packet);
+        packet.packetType = PACKET_INFO_ACK_COMMAND;
+        pos->second->capturePacket(&packet);
       }
-      if (hasData) {
+// See above
+//      if (hasData) {
         /*
          * XXX - This is not yet implemented (I think)
          */
         //logWrite(ERROR,"Unhandled: incoming data");
-      }
+//      }
     }
   }
 

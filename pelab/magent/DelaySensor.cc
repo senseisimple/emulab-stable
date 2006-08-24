@@ -3,11 +3,14 @@
 #include "lib.h"
 #include "DelaySensor.h"
 #include "PacketSensor.h"
+#include "StateSensor.h"
 #include "Time.h"
 
 using namespace std;
 
-DelaySensor::DelaySensor(PacketSensor * newPacketHistory)
+DelaySensor::DelaySensor(PacketSensor * newPacketHistory,
+                         StateSensor * newState)
+  : state(newState)
 {
   lastDelay = 0;
   packetHistory = newPacketHistory;
@@ -24,6 +27,14 @@ void DelaySensor::localSend(PacketInfo *)
 
 void DelaySensor::localAck(PacketInfo * packet)
 {
-  Time diff = packet->packetTime - packetHistory->getAckedSendTime();
-  lastDelay = diff.toMilliseconds();
+  if (state->getState() == StateSensor::ESTABLISHED)
+  {
+    Time diff = packet->packetTime - packetHistory->getAckedSendTime();
+    lastDelay = diff.toMilliseconds();
+    logWrite(SENSOR, "DELAY realDiff: %f seconds, calcDiff: %f",
+             packet->packetTime.toDouble()
+             - packetHistory->getAckedSendTime().toDouble(),
+             diff.toDouble());
+    logWrite(SENSOR, "DELAY: %d", lastDelay);
+  }
 }

@@ -8,7 +8,7 @@
 class CircularTraffic : public TrafficModel
 {
 public:
-  enum { DEFAULT_SIZE = 20 };
+  enum { EXPIRATION_TIME = 500 }; // in milliseconds
 public:
   CircularTraffic();
   virtual ~CircularTraffic();
@@ -19,10 +19,14 @@ public:
                            Time const & previousTime,
                            WriteResult & result);
 private:
-  int begin;
-  int usedCount;
-  int current;
-  std::vector<TrafficWriteCommand> writes;
+  // Quick function to treat the writes list as though it were
+  // circular
+  std::list<TrafficWriteCommand>::iterator advance(
+    std::list<TrafficWriteCommand>::iterator old);
+private:
+  std::list<TrafficWriteCommand>::iterator current;
+  std::list<TrafficWriteCommand> writes;
+  unsigned int nextWriteSize;
 };
 
 #endif

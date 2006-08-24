@@ -357,10 +357,10 @@ void replayWriteCommand(char * head, char * body, unsigned short bodySize)
   }
 }
 
-void replayWritePacket(int command, PacketInfo * packet)
+void replayWritePacket(PacketInfo * packet)
 {
   Header head;
-  head.type = command;
+  head.type = packet->packetType;
   head.size = packet->census();
   head.key = packet->elab;
   char headBuffer[Header::headerSize];
@@ -444,14 +444,7 @@ void replayLoop(void)
         Sensor * sensorHead = streams[head.key].getHead();
         if (sensorHead != NULL)
         {
-          if (head.type == PACKET_INFO_SEND_COMMAND)
-          {
-            sensorHead->captureSend(&packet);
-          }
-          else
-          {
-            sensorHead->captureAck(&packet);
-          }
+          sensorHead->capturePacket(&packet);
         }
       }
       break;

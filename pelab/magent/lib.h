@@ -41,6 +41,7 @@ extern char * optarg;
 #include <vector>
 #include <string>
 #include <sstream>
+#include <algorithm>
 
 #include "Time.h"
 
@@ -54,7 +55,7 @@ int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
 class PacketInfo;
 
 void replayWriteCommand(char * head, char * body, unsigned short bodySize);
-void replayWritePacket(int command, PacketInfo * packet);
+void replayWritePacket(PacketInfo * packet);
 
 
 // Enum of header types -- to-monitor (Events, etc.)
@@ -75,19 +76,20 @@ enum
   TRAFFIC_WRITE_COMMAND = 5,
   DELETE_CONNECTION_COMMAND = 6,
   // These are pseudo-commands for replay.
-  PACKET_INFO_SEND_COMMAND = 7,
-  PACKET_INFO_ACK_COMMAND = 8
+  PACKET_INFO_SEND_COMMAND = 255,
+  PACKET_INFO_ACK_COMMAND = 254
 };
 
 // This is used for the type field in a SensorCommand
 enum SensorType
 {
   NULL_SENSOR = 0,
-  PACKET_SENSOR = 1,
-  DELAY_SENSOR = 2,
-  MIN_DELAY_SENSOR = 3,
-  MAX_DELAY_SENSOR = 4,
-  THROUGHPUT_SENSOR = 5
+  STATE_SENSOR = 1,
+  PACKET_SENSOR = 2,
+  DELAY_SENSOR = 3,
+  MIN_DELAY_SENSOR = 4,
+  MAX_DELAY_SENSOR = 5,
+  THROUGHPUT_SENSOR = 6
 };
 
 // This is used for the type field in the ConnectionModelCommand.
@@ -181,7 +183,9 @@ struct PacketInfo
     size_t result = sizeof(int)*(2         +1           +21    + 1) +
                   sizeof(short)*(0         +0           +0     + 2) +
                    sizeof(char)*(0         +0           +7     + 1) +
-      sizeof(struct ip) + sizeof(struct tcphdr);
+      sizeof(struct ip) + sizeof(struct tcphdr)
+      + sizeof(unsigned char) /* bufferFull */
+      + sizeof(unsigned char) /* packetType */;
     // Size for ipOptions and tcpOptions.
     result += sizeof(unsigned int)*2;
 
@@ -203,6 +207,11 @@ struct PacketInfo
 
   Time packetTime;
   int packetLength;
+  /* ---IMPORTANT NOTE--- The tcp_info structure is built at the time of
+   * packet processing, not at the time that a packet is
+   * captured. Most of the time it doesn't matter if the data here
+   * is a little stale. But things like tcp state that can change
+   * fundamentally on a packet by packet basis cannot be used!  */
   struct tcp_info const * kernel;
   struct ip const * ip;
   std::list<Option> * ipOptions;
@@ -210,6 +219,7 @@ struct PacketInfo
   std::list<Option> * tcpOptions;
   Order elab;
   bool bufferFull;
+  unsigned char packetType;
 };
 
 enum
