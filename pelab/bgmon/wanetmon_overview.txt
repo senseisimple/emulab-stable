@@ -77,14 +77,25 @@ tests are sent to ops, but not cached until an ack for an existing file is
 received. Every so many iterations (set by $subtimer) of the main poll loop, all
 cached results are sent to ops again.
 
-The scheduling algorithm does not guarantee completion of measurements with hard time bounds as a real-time system does. However, there are mechanisms in place to attempt best effort service. 
-There can be only one outstanding measurement to a single destination at a time. In other words, another test to the same destination cannot start until the previous one finishes.
-Each poll loop, the current system time is compared with timeOfNextRun for each schedulable test. If current time is greater, the test is started. However, if the maximum number of tests of that type is already being run, the pending test is put on a wait queue. The events in the wait queue are run every X times through the main poll loop.
+The scheduling algorithm does not guarantee completion of measurements
+with hard time bounds as a real-time system does. However, there are
+mechanisms in place to attempt best effort service.  There can be only
+one outstanding measurement to a single destination at a time. In
+other words, another test to the same destination cannot start until
+the previous one finishes.  Each poll loop, the current system time is
+compared with timeOfNextRun for each schedulable test. If current time
+is greater, the test is started. However, if the maximum number of
+tests of that type is already being run, the pending test is put on a
+wait queue. The events in the wait queue are run every X times through
+the main poll loop.
 
 
 (Overview - automanage.pl)
 
-Automanage is one of many potential "manager" applications. A manager application is one which gives commands to one or more bgmon apps. Automanage attemps to choose a single node from each site to run measurements to/from, and do this without an operator's assistance.
+Automanage is one of many potential "manager" applications. A manager
+application is one which gives commands to one or more bgmon
+apps. Automanage attemps to choose a single node from each site to run
+measurements to/from, and do this without an operator's assistance.
 
 Data Structures:
   %allnodes: filled with the latest status of each node from an XML-RPC call.
@@ -95,9 +106,28 @@ site.
 %intersitenodes. Sets a constraint on which nodes and sites are used.
   %deadnodes: records what nodes seem to be non-responsive.
 
-Automanage periodically gets the status of planetlab nodes through the XML-RPC interface. For each unique site, a "bestnode" is chosen based on up/down status and load. The complexity of this application comes when sites and nodes change. All nodes at a site can go down, the bestnode at a site can change, or a new site can become available. Automanage handles each of these cases.
+Automanage periodically gets the status of planetlab nodes through the
+XML-RPC interface. For each unique site, a "bestnode" is chosen based
+on up/down status and load. The complexity of this application comes
+when sites and nodes change. All nodes at a site can go down, the
+bestnode at a site can change, or a new site can become
+available. Automanage handles each of these cases.
 
-The user API of automanage is entirely on the command line (for now?). The key parameters are the latency measurement period (in seconds), the bandwidth measurement duty-cycle (a fraction), and a node-constraint file. The duty-cycle refers to the amount of time that any one node is performing a bandwidth test. If a value of 0.1 was given, 10% of the time a particular node will be running iperf. This measurement frequency is specified in this manner to allow for automatic adjustments based on the number of sites included in the measuement set. The measurement set is constrained first by the nodes listed in the constraint file, then by the sites which have available nodes. An example bandwidth period calculation is as follows. Given: 150 sites, 0.1 duty-cycle, and 10 second iperf duration; each test frequency from a given node shall be (150 - 1) * 10 sec * (1/0.1) = 14900 seconds = 4 hours. Bandwidth tests should not be run at 100% duty cycle to avoid flooding the link.
+The user API of automanage is entirely on the command line (for
+now?). The key parameters are the latency measurement period (in
+seconds), the bandwidth measurement duty-cycle (a fraction), and a
+node-constraint file. The duty-cycle refers to the amount of time that
+any one node is performing a bandwidth test. If a value of 0.1 was
+given, 10% of the time a particular node will be running iperf. This
+measurement frequency is specified in this manner to allow for
+automatic adjustments based on the number of sites included in the
+measuement set. The measurement set is constrained first by the nodes
+listed in the constraint file, then by the sites which have available
+nodes. An example bandwidth period calculation is as follows. Given:
+150 sites, 0.1 duty-cycle, and 10 second iperf duration; each test
+frequency from a given node shall be (150 - 1) * 10 sec * (1/0.1) =
+14900 seconds = 4 hours. Bandwidth tests should not be run at 100%
+duty cycle to avoid flooding the link.
 
 
 
