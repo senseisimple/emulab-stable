@@ -250,6 +250,7 @@ namespace global
   extern bool doDaemonize;
   extern int replayArg;
   extern int replayfd;
+  extern std::list<int> replaySensors;
 
   extern int peerAccept;
   extern std::auto_ptr<ConnectionModel> connectionModelExemplar;

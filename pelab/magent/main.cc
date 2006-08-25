@@ -27,6 +27,7 @@ namespace global
   bool doDaemonize = false;
   int replayArg = NO_REPLAY;
   int replayfd = -1;
+  list<int> replaySensors;
 
   int peerAccept = -1;
   string interface;
@@ -89,6 +90,7 @@ void usageMessage(char *progname)
   cerr << "  --daemonize " << endl;
   cerr << "  --replay-save=<filename> " << endl;
   cerr << "  --replay-load=<filename> " << endl;
+  cerr << "  --replay-sensor=<null|state|packet|delay|min-delay|max-delay|throughput|ewma-throughput>" << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
@@ -113,6 +115,7 @@ void processArgs(int argc, char * argv[])
     {"daemonize",         no_argument      , NULL, 'd'},
     {"replay-save",       required_argument, NULL, 's'},
     {"replay-load",       required_argument, NULL, 'l'},
+    {"replay-sensor",     required_argument, NULL, 'n'},
     // Required so that getopt_long can find the end of the list
     {NULL, 0, NULL, 0}
   };
@@ -230,6 +233,45 @@ void processArgs(int argc, char * argv[])
         fprintf(stderr, "replay-load option was invoked when replay "
                  "was already set\n");
           exit(1);
+      }
+      break;
+    case 'n':
+      if (optArg == "null")
+      {
+        global::replaySensors.push_back(NULL_SENSOR);
+      }
+      else if (optArg == "state")
+      {
+        global::replaySensors.push_back(STATE_SENSOR);
+      }
+      else if (optArg == "packet")
+      {
+        global::replaySensors.push_back(PACKET_SENSOR);
+      }
+      else if (optArg == "delay")
+      {
+        global::replaySensors.push_back(DELAY_SENSOR);
+      }
+      else if (optArg == "min-delay")
+      {
+        global::replaySensors.push_back(MIN_DELAY_SENSOR);
+      }
+      else if (optArg == "max-delay")
+      {
+        global::replaySensors.push_back(MAX_DELAY_SENSOR);
+      }
+      else if (optArg == "throughput")
+      {
+        global::replaySensors.push_back(THROUGHPUT_SENSOR);
+      }
+      else if (optArg == "ewma-throughput")
+      {
+        global::replaySensors.push_back(EWMA_THROUGHPUT_SENSOR);
+      }
+      else
+      {
+        usageMessage(argv[0]);
+        exit(1);
       }
       break;
     case '?':
@@ -430,7 +472,18 @@ void replayLoop(void)
     switch(head.type)
     {
     case NEW_CONNECTION_COMMAND:
-      streams.insert(make_pair(head.key, SensorList()));
+    {
+      map<Order, SensorList>::iterator current =
+        streams.insert(make_pair(head.key, SensorList())).first;
+      list<int>::iterator pos = global::replaySensors.begin();
+      list<int>::iterator limit = global::replaySensors.end();
+      SensorCommand tempSensor;
+      for (; pos != limit; ++pos)
+      {
+        tempSensor.type = *pos;
+        current->second.addSensor(tempSensor);
+      }
+    }
       break;
     case DELETE_CONNECTION_COMMAND:
       streams.erase(head.key);
@@ -439,11 +492,14 @@ void replayLoop(void)
       done = ! replayRead(& packetBuffer[0], sizeof(int));
       if (!done)
       {
-        unsigned int sensorType = 0;
-        loadInt(& packetBuffer[0], & sensorType);
-        SensorCommand sensor;
-        sensor.type = sensorType;
-        streams[head.key].addSensor(sensor);
+        if (global::replaySensors.empty())
+        {
+          unsigned int sensorType = 0;
+          loadInt(& packetBuffer[0], & sensorType);
+          SensorCommand sensor;
+          sensor.type = sensorType;
+          streams[head.key].addSensor(sensor);
+        }
       }
       break;
     case PACKET_INFO_SEND_COMMAND:
