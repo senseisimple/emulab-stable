@@ -130,6 +130,11 @@ if {$do_bsd} {
     set use_dbmonitor 1
 }
 
+#
+# If non-zero, limits the number of slots in the queues for the fake PlanetLab
+#
+set limit_fake_queue_slots 0
+
 # End of user-settable options
 ##########
 
@@ -311,6 +316,12 @@ if {$fake_plab} {
     set plabc [$ns make-cloud "$plan_string" $cloud_bw $cloud_delay]
     tb-set-ip-lan $plab(1) $plabc 10.1.0.1
     $plabc trace
+    if {$limit_fake_queue_slots} {
+        for {set i 1} {$i <= $num_pcs} {incr i} {
+            set fakequeues($i) [[$ns lanlink $plabc $plab($i)] queue]
+            $fakequeues($i) set limit_ $limit_fake_queue_slots
+        }
+    }
 }
 
 #
