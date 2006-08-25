@@ -198,14 +198,16 @@ void processArgs(int argc, char * argv[])
         }
         else
         {
-          logWrite(ERROR, "Error opening replay-save file: %s: %s", optarg,
+          fprintf(stderr,"Error opening replay-save file: %s: %s\n", optarg,
                    strerror(errno));
+          exit(1);
         }
       }
       else
       {
-        logWrite(ERROR, "replay-save option was invoked when replay "
-                 "was already set");
+        fprintf(stderr, "replay-save option was invoked when replay "
+                 "was already set\n");
+          exit(1);
       }
       break;
     case 'l':
@@ -218,14 +220,16 @@ void processArgs(int argc, char * argv[])
         }
         else
         {
-          logWrite(ERROR, "Error opening replay-load file: %s: %s", optarg,
+          fprintf(stderr, "Error opening replay-load file: %s: %s\n", optarg,
                    strerror(errno));
+          exit(1);
         }
       }
       else
       {
-        logWrite(ERROR, "replay-load option was invoked when replay "
-                 "was already set");
+        fprintf(stderr, "replay-load option was invoked when replay "
+                 "was already set\n");
+          exit(1);
       }
       break;
     case '?':
