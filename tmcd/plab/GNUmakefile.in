@@ -14,7 +14,7 @@ COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
                     libtmcc.pm libsetup.pm libtestbed.pm startcmddone)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
-                    rc.inplab plabrusage pa-wrapper runelvin)
+                    rc.inplab plabrusage runelvin)
 OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
 		    install-tarfile install-rpm)
 EVSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/event/lib/, \

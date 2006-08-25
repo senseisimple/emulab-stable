@@ -30,7 +30,6 @@ my $WRAPLOG = "$LOGDIR/progwrap.debug";
 my $PIDFILE = "/var/run/progagent.pid";
 my $CONFIG  = "$BOOTDIR/progagents";
 my $PAGENT  = "$BINDIR/program-agent";
-my $PAWRAPPER = "$BINDIR/pa-wrapper";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -184,26 +183,48 @@ sub doboot()
 
 	print "Starting Program Agent ...\n";
 
+	#
+	# PlanetLab nodes don't have a fixed elvind port, so we need to
+	# look that up and pass it in.  Also for plab, we always restart
+	# a dead program-agent, regardless of the cause.
+	#
 	if (PLAB()) {
-	    system("$PAWRAPPER $PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
-		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
-	    # pa-wrapper already does what the loop above does.
-	    exit($? >> 8);
+	    my $elvind_port;
+
+	    if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
+		# this failure does happen...
+		warning("Could not get plabconfig from server, ".
+			"waiting awhile and trying again...");
+		sleep(5);
+		next;
+	    }
+	    if ($tmccresults[0] =~ /ELVIND_PORT=(\d+)/) {
+		$elvind_port = $1;
+	    }
+	    else {
+		# this failure should not happen
+		fatal("invalid format for plabconfig info");
+	    }
+	    system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
+		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG ".
+		   "-r -p $elvind_port");
 	}
 	else {
 	    system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
 		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
-	}
-	exit(0)
-	    if (! $?);
+	    exit(0)
+		if (! $?);
 
-	# Like the magic exit code? This means the agent was told by boss
-	# to exit so that we can regen the config file and then restart.
-	# There is most certainly a better way to do this.
-	if ($? >> 8 != 45) {
-	    fatal("program agent exited with non-zero status: $?");
+	    # Like the magic exit code? This means the agent was told by boss
+	    # to exit so that we can regen the config file and then restart.
+	    # There is most certainly a better way to do this.
+	    if ($? >> 8 != 45) {
+		fatal("program agent exited with non-zero status: $?");
+	    }
 	}
 	
+	print "Program Agent died ($?), restarting...\n";
+
 	#
 	# We want to restart, go around the loop again. Turn the cache off.
 	#
