@@ -2021,6 +2021,19 @@ CREATE TABLE port_counters (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `port_registration`
+--
+
+CREATE TABLE port_registration (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  service varchar(64) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
+  port int(11) unsigned NOT NULL default '0',
+  PRIMARY KEY  (pid,eid,service)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `portmap`
 --
 
