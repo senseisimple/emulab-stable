@@ -56,6 +56,7 @@ private:
   StateSensor * depStateSensor;
   PacketSensor * depPacketSensor;
   DelaySensor * depDelaySensor;
+  MinDelaySensor * depMinDelaySensor;
   ThroughputSensor * depThroughputSensor;
 };
 

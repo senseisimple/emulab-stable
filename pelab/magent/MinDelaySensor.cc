@@ -8,7 +8,7 @@
 using namespace std;
 
 MinDelaySensor::MinDelaySensor(DelaySensor * newDelay)
-  : minimum(1000000, -0.01)
+  : minimum(1000000, -0.01), minDelay(1000000)
 {
   delay = newDelay;
 }
@@ -22,8 +22,9 @@ void MinDelaySensor::localAck(PacketInfo * packet)
   int current = delay->getLastDelay();
   if (current < minimum && current != 0)
   {
+    minDelay = current;
     ostringstream buffer;
-    buffer << "delay=" << current/2;
+    buffer << "delay=" << minDelay/2;
     minimum.reset(current);
     global::output->eventMessage(buffer.str(), packet->elab,
                                  CommandOutput::FORWARD_PATH);

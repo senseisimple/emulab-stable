@@ -99,6 +99,7 @@ void SensorList::reset(void)
   depPacketSensor = NULL;
   depDelaySensor = NULL;
   depThroughputSensor = NULL;
+  depMinDelaySensor = NULL;
 }
 
 void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
@@ -194,20 +195,29 @@ void SensorList::pushMinDelaySensor(void)
   // Dependency list
   pushDelaySensor();
 
-  logWrite(SENSOR, "Adding MinDelaySensor");
-  std::auto_ptr<Sensor> current(new MinDelaySensor(depDelaySensor));
-  pushSensor(current);
+  if (depMinDelaySensor == NULL) {
+      logWrite(SENSOR, "Adding MinDelaySensor");
+      MinDelaySensor * newSensor = new MinDelaySensor(depDelaySensor);
+      std::auto_ptr<Sensor> current(newSensor);
+      pushSensor(current);
+
+      // Dependency set
+      depMinDelaySensor = newSensor;
+  }
+  
 }
 
 void SensorList::pushMaxDelaySensor(void)
 {
   // Dependency list
+  pushMinDelaySensor();
   pushDelaySensor();
   pushStateSensor();
 
   logWrite(SENSOR, "Adding MaxDelaySensor");
   std::auto_ptr<Sensor> current(new MaxDelaySensor(depDelaySensor,
-                                                   depStateSensor));
+                                                   depStateSensor,
+                                                   depMinDelaySensor));
   pushSensor(current);
 }
 
