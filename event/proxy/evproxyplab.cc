@@ -383,7 +383,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      }
 	      
 	      tuple->expt = expt;
-	      tuple->scheduler = 2;
 		  
 	      /* malloc data -- to be freed in subscribe_callback */
 	      char *data = (char *) xmalloc(sizeof(expt));
@@ -397,7 +396,13 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		error("could not subscribe to events on remote server.\n");
 	      }
 
-	      tuple->scheduler = 0;
+#if 0
+              /* This stuff is borked right now - part of the pre-staging
+               * enhancement, but the code was failing to properly track
+               * (and hence unsubscribe) from both the standard experiment
+               * path, and the pre-stage path.
+               */
+	      tuple->scheduler = 2;
 		  
 	      retval = event_async_subscribe(bosshandle, 
 					  expt_callback, tuple, NULL,
@@ -406,6 +411,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      if (! retval) {
 		error("could not subscribe to events on remote server.\n");
 	      } 
+#endif
 
               info("Subscribing to experiment: %s\n", expt);
 
@@ -493,6 +499,8 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 	}
 
 	if (strcmp(objecttype,TBDB_OBJECTTYPE_EVPROXY) != 0) {
+
+#if 0
 	  /*
            * Filter <plabsched,1> events, and for rest resend the notification 
 	   * to the local elvind server.
@@ -501,10 +509,10 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 						 TBDB_PLABSCHED, &plabsched);
 	  
 	  if ((!ret) || (plabsched != 1)) {
+#endif
 	    
 	    if (! event_notify(localhandle, notification))
 	      error("Failed to deliver notification!\n");
-	  }
 	}
 }
 
