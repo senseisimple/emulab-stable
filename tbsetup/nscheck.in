@@ -29,7 +29,7 @@ my  $optlist = "";
 #
 # Function phototype(s)
 #
-sub fatal($);
+sub fatal($;$);
 
 #
 # Configure variables
@@ -38,6 +38,12 @@ my $TB       = "@prefix@";
 my $parser   = "$TB/libexec/parse-ns";
 my $status   = 0;
 my $dirname;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtblog;
 
 #
 # Turn off line buffering on output
@@ -137,20 +143,23 @@ chdir($dirname) or
 #
 
 if (system("$parser -n -a $nsfile") != 0) {
-    print "NS Parse failed!\n";
+    tberror({type => 'secondary', severity => SEV_SECONDARY,
+	     error => ['ns_parse_failed']},
+	    "NS Parse failed!");
     $status = 1;
 }
 
 system("/bin/rm", "-rf", "$dirname");
 exit $status;
 
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my($mesg) = $_[0];
 
     system("/bin/rm", "-rf", "$dirname")
 	if (defined($dirname));
 
-    die("*** $0:\n".
-	"    $mesg\n");
+    tbdie($parms, $mesg);
 }

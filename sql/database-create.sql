@@ -371,6 +371,8 @@ CREATE TABLE errors (
   script smallint(3) NOT NULL default '0',
   cause varchar(16) NOT NULL default '',
   confidence float NOT NULL default '0',
+  need_more_info ?? NOT NULL default '0',
+  
   mesg text NOT NULL,
   PRIMARY KEY  (session)
 ) TYPE=MyISAM;
@@ -2177,6 +2179,7 @@ CREATE TABLE `report_error` (
   `seq` int(10) unsigned NOT NULL,
   `stamp` int(10) unsigned NOT NULL,
   `session` int(10) unsigned NOT NULL,
+  `invocation` int(10) unsigned NOT NULL,
   `attempt` tinyint(1) NOT NULL,
   `severity` smallint(3) NOT NULL,
   `script` smallint(3) NOT NULL,

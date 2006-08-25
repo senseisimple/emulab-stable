@@ -873,13 +873,14 @@ sub tbreport( $@ ) {
 
 	$seq = new_seq_num() unless defined $seq;
 	
-	my $session = $ENV{TBLOG_SESSION};
-	my $attempt = $ENV{TBLOG_ATTEMPT};
+	my $session    = $ENV{TBLOG_SESSION};
+	my $invocation = $ENV{TBLOG_INVOCATION};
+	my $attempt    = $ENV{TBLOG_ATTEMPT};
 
 	croak("error_type must be _0-9A-Za-z") unless $error_type =~ /^\w+$/;
 
-	my $sql = sprintf("insert into report_error (seq, stamp, session, attempt, severity, script, error_type) values(%d, UNIX_TIMESTAMP(now()), %d, %d, %d, %d, %s)",
-		          $seq, $session, $attempt, $severity, $script_num, DBQuoteSpecial($error_type));
+	my $sql = sprintf("insert into report_error (seq, stamp, session, invocation, attempt, severity, script, error_type) values(%d, UNIX_TIMESTAMP(now()), %d, %d, %d, %d, %d, %s)",
+		          $seq, $session, $invocation, $attempt, $severity, $script_num, DBQuoteSpecial($error_type));
 
 	DBQueryFatal($sql);
 

@@ -3649,7 +3649,6 @@ last_net_act,last_cpu_act,last_ext_act);
 
          unlock tables;
 
-
 4.83: Add a per-experiment port registration table. See tmcd.c
 
 	CREATE TABLE port_registration (
@@ -3661,3 +3660,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (pid,eid,service)
 	) TYPE=MyISAM;
 
+4.84: Add "invocation" column to report_error
+
+      alter table report_error
+          add column invocation integer unsigned not null after session;
