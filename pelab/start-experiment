@@ -103,8 +103,12 @@ if (defined($options{"i"})) {
 if (defined($options{"N"})) {
     if ($options{"N"} eq "s") {
 	$stub_cmd = "/bin/sh /local/pelab/magent/auto-magent.sh";
+	$stub_cmdargs = ""
+	    if ($stub_cmdargs eq $UNKNOWN);
     } elsif ($options{"N"} eq "m") {
 	$mon_cmd = "/bin/sh /local/pelab/dbmonitor/auto-dbmonitor.sh";
+	$mon_cmdargs = ""
+	    if ($mon_cmdargs eq $UNKNOWN);
     } else {
 	die "Unknown -N type '", $options{"N"}, "'\n";
     }
@@ -112,8 +116,12 @@ if (defined($options{"N"})) {
 if (defined($options{"O"})) {
     if ($options{"O"} eq "s") {
 	$stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
+	$stub_cmdargs = ""
+	    if ($stub_cmdargs eq $UNKNOWN);
     } elsif ($options{"O"} eq "m") {
 	$mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
+	$mon_cmdargs = ""
+	    if ($mon_cmdargs eq $UNKNOWN);
     } else {
 	die "Unknown -O type '", $options{"O"}, "'\n";
     }
@@ -249,7 +257,7 @@ if ($realplab) {
 }
 
 $startarg = "";
-print "##### Starting monitors\n";
+print "##### Starting monitors";
 if ($mon_cmdargs ne $UNKNOWN) {
     print " with: '$mon_cmd $mon_cmdargs'";
     $startarg = "'COMMAND=$mon_cmd $mon_cmdargs'";
