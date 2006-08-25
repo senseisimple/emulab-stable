@@ -70,6 +70,10 @@ static void logPrefix(int flags)
   {
     fprintf(logFile, "PCAP ");
   }
+  if (flags & COMMAND_OUTPUT)
+  {
+    fprintf(logFile, "COMMAND_OUTPUT ");
+  }
   if (logTimestamp)
   {
     struct timeval now;

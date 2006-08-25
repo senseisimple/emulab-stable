@@ -5,16 +5,6 @@
 
 using namespace std;
 
-bool Sensor::isLinkSaturated(PacketInfo * packet)
-{
-  return packet->bufferFull &&
-    // and *not* in slow start
-    !(packet->kernel->tcpi_snd_cwnd < packet->kernel->tcpi_snd_ssthresh
-      || (static_cast<unsigned int>(htons(packet->tcp->window))
-          << packet->kernel->tcpi_rcv_wscale)
-      <= (packet->kernel->tcpi_unacked * 1448));
-}
-
 Sensor::~Sensor()
 {
 }

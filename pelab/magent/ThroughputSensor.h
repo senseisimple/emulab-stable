@@ -20,6 +20,7 @@ protected:
   virtual void localAck(PacketInfo * packet);
 private:
   int throughputInKbps;
+  int maxThroughput;
   Time lastAckTime;
   PacketSensor * packetHistory;
   StateSensor * state;

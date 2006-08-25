@@ -260,8 +260,16 @@ void init(void)
       "Terminating program.", global::connectionModelArg);
   }
 
-  global::input.reset(new DirectInput());
-  global::output.reset(new TrivialCommandOutput());
+  if (global::replayArg == REPLAY_LOAD)
+  {
+    global::input.reset(new NullCommandInput());
+    global::output.reset(new NullCommandOutput());
+  }
+  else
+  {
+    global::input.reset(new DirectInput());
+    global::output.reset(new TrivialCommandOutput());
+  }
 }
 
 void mainLoop(void)
@@ -601,6 +609,17 @@ int createServer(int port, string const & debugString)
   if (error == -1)
   {
     logWrite(ERROR, "setsockopt(SO_REUSEADDR): %s: %s", debugString.c_str(),
+             strerror(errno));
+    close(fd);
+    return -1;
+  }
+
+  int forcedSize = 262144;
+  error = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &forcedSize,
+                     sizeof(forcedSize));
+  if (error == -1)
+  {
+    logWrite(ERROR, "Failed to set receive buffer size: %s",
              strerror(errno));
     close(fd);
     return -1;

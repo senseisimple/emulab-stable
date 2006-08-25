@@ -4,13 +4,15 @@
 #include "MaxDelaySensor.h"
 #include "DelaySensor.h"
 #include "CommandOutput.h"
+#include "StateSensor.h"
 
 using namespace std;
 
-MaxDelaySensor::MaxDelaySensor(DelaySensor * newDelay)
+MaxDelaySensor::MaxDelaySensor(DelaySensor * newDelay, StateSensor * newState)
   : maximum(0, 0.01)
+  , delay(newDelay)
+  , state(newState)
 {
-  delay = newDelay;
 }
 
 void MaxDelaySensor::localSend(PacketInfo *)
@@ -20,7 +22,8 @@ void MaxDelaySensor::localSend(PacketInfo *)
 void MaxDelaySensor::localAck(PacketInfo * packet)
 {
   int current = delay->getLastDelay();
-  if (current > maximum && current != 0)
+  logWrite(SENSOR, "current=%d,saturated=%d", current, state->isSaturated());
+  if (current > maximum && current != 0 && state->isSaturated())
   {
     ostringstream buffer;
     buffer << "MAXINQ=" << current;

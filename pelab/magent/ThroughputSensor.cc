@@ -10,10 +10,10 @@ using namespace std;
 ThroughputSensor::ThroughputSensor(PacketSensor * newPacketHistory,
                                    StateSensor * newState)
   : throughputInKbps(0)
+  , maxThroughput(0)
   , packetHistory(newPacketHistory)
   , state(newState)
 {
-  throughputInKbps = 0;
 }
 
 int ThroughputSensor::getThroughputInKbps(void) const
@@ -35,8 +35,23 @@ void ThroughputSensor::localAck(PacketInfo * packet)
       // period is in seconds.
       double period = (currentAckTime - lastAckTime).toMilliseconds() / 1000.0;
       double kilobits = packetHistory->getAckedSize() * (8.0/1000.0);
-      throughputInKbps = static_cast<int>(kilobits/period);
+      int latest = static_cast<int>(kilobits/period);
+      if (state->isSaturated() || latest > maxThroughput)
+      {
+        throughputInKbps = latest;
+        maxThroughput = latest;
+        logWrite(SENSOR, "THROUGHPUT: %d kbps", throughputInKbps);
+      }
+    }
+    else
+    {
+      throughputInKbps = 0;
     }
     lastAckTime = currentAckTime;
+  }
+  else
+  {
+    throughputInKbps = 0;
+    lastAckTime = Time();
   }
 }

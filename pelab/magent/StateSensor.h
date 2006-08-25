@@ -22,12 +22,16 @@ public:
 public:
   StateSensor();
   virtual ~StateSensor();
-  int getState(void);
+  int getState(void) const;
+  bool isSaturated(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
+  void calculateSaturated(PacketInfo * packet);
+private:
   int state;
+  bool saturated;
 };
 
 #endif

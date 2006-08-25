@@ -42,6 +42,7 @@ extern char * optarg;
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 
 #include "Time.h"
 
@@ -89,7 +90,8 @@ enum SensorType
   DELAY_SENSOR = 3,
   MIN_DELAY_SENSOR = 4,
   MAX_DELAY_SENSOR = 5,
-  THROUGHPUT_SENSOR = 6
+  THROUGHPUT_SENSOR = 6,
+  EWMA_THROUGHPUT_SENSOR = 7
 };
 
 // This is used for the type field in the ConnectionModelCommand.
@@ -143,7 +145,7 @@ struct Order
   {
     return !(*this == right);
   }
-  std::string toString(void)
+  std::string toString(void) const
   {
     std::ostringstream buffer;
     if (transport == TCP_CONNECTION)

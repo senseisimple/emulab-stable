@@ -31,10 +31,6 @@ void DelaySensor::localAck(PacketInfo * packet)
   {
     Time diff = packet->packetTime - packetHistory->getAckedSendTime();
     lastDelay = diff.toMilliseconds();
-    logWrite(SENSOR, "DELAY realDiff: %f seconds, calcDiff: %f",
-             packet->packetTime.toDouble()
-             - packetHistory->getAckedSendTime().toDouble(),
-             diff.toDouble());
-    logWrite(SENSOR, "DELAY: %d", lastDelay);
+    logWrite(SENSOR, "DELAY: %d ms", lastDelay);
   }
 }

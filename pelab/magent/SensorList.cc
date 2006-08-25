@@ -12,6 +12,7 @@
 #include "MinDelaySensor.h"
 #include "MaxDelaySensor.h"
 #include "ThroughputSensor.h"
+#include "EwmaThroughputSensor.h"
 
 using namespace std;
 
@@ -71,6 +72,9 @@ void SensorList::addSensor(SensorCommand const & newSensor)
     break;
   case THROUGHPUT_SENSOR:
     pushThroughputSensor();
+    break;
+  case EWMA_THROUGHPUT_SENSOR:
+    pushEwmaThroughputSensor();
     break;
   default:
     logWrite(ERROR,
@@ -133,6 +137,7 @@ void SensorList::pushNullSensor(void)
 void SensorList::pushStateSensor(void)
 {
   // Dependency list
+  pushNullSensor();
 
   // Dependency check
   if (depStateSensor == NULL)
@@ -198,9 +203,11 @@ void SensorList::pushMaxDelaySensor(void)
 {
   // Dependency list
   pushDelaySensor();
+  pushStateSensor();
 
   logWrite(SENSOR, "Adding MaxDelaySensor");
-  std::auto_ptr<Sensor> current(new MaxDelaySensor(depDelaySensor));
+  std::auto_ptr<Sensor> current(new MaxDelaySensor(depDelaySensor,
+                                                   depStateSensor));
   pushSensor(current);
 }
 
@@ -222,4 +229,14 @@ void SensorList::pushThroughputSensor(void)
     // Example dependency set
     depThroughputSensor = newSensor;
   }
+}
+
+void SensorList::pushEwmaThroughputSensor(void)
+{
+  // Dependency list
+  pushThroughputSensor();
+
+  logWrite(SENSOR, "Adding EwmaThroughputSensor");
+  std::auto_ptr<Sensor> current(new EwmaThroughputSensor(depThroughputSensor));
+  pushSensor(current);
 }

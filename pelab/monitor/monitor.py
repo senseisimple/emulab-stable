@@ -32,6 +32,7 @@ DELAY_SENSOR = 3
 MIN_DELAY_SENSOR = 4
 MAX_DELAY_SENSOR = 5
 THROUGHPUT_SENSOR = 6
+EWMA_THROUGHPUT_SENSOR = 7
 
 CONNECTION_SEND_BUFFER_SIZE = 0
 CONNECTION_RECEIVE_BUFFER_SIZE = 1
@@ -185,7 +186,11 @@ def get_next_packet(conn):
           send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
                        localport, remoteport, save_int(MIN_DELAY_SENSOR))
           send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, save_int(NULL_SENSOR))
+#                       localport, remoteport, save_int(NULL_SENSOR))
+#          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
+                       localport, remoteport, save_int(MAX_DELAY_SENSOR))
+          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
+                       localport, remoteport, save_int(EWMA_THROUGHPUT_SENSOR))
         elif event == 'Closed':
           send_command(conn, DELETE_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
                       localport, remoteport, '')

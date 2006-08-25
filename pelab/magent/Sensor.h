@@ -12,8 +12,6 @@
 class Sensor
 {
 public:
-  bool isLinkSaturated(PacketInfo * packet);
-public:
   virtual ~Sensor();
   Sensor * getTail(void);
   void addNode(std::auto_ptr<Sensor> node);

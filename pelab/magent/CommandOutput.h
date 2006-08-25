@@ -32,13 +32,16 @@ public:
     if (message.size() <= 0xffff && message.size() > 0)
     {
       Header prefix;
+      std::string pathString;
       if (dir == FORWARD_PATH)
       {
         prefix.type = EVENT_FORWARD_PATH;
+        pathString = "FORWARD";
       }
       else
       {
         prefix.type = EVENT_BACKWARD_PATH;
+        pathString = "BACKWARD";
       }
       prefix.size = message.size();
       prefix.key = key;
@@ -50,6 +53,8 @@ public:
         writeMessage(headerBuffer, Header::headerSize);
         writeMessage(message.c_str(), message.size());
         endMessage();
+        logWrite(COMMAND_OUTPUT, "(%s,%s): %s",
+                 key.toString().c_str(), pathString.c_str(), message.c_str());
       }
     }
     else
