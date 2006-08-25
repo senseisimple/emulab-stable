@@ -91,8 +91,11 @@ void DirectInput::nextCommand(fd_set * readable)
     }
     if (error == commandHeader.size - index)
     {
-      logWrite(COMMAND_INPUT, "Finished reading a command of type: %d",
-               commandHeader.type);
+      if (commandHeader.type != TRAFFIC_WRITE_COMMAND)
+      {
+        logWrite(COMMAND_INPUT, "Finished reading a command of type: %d",
+                 commandHeader.type);
+      }
 //      logWrite(COMMAND_INPUT, "Finished reading a command: CHECKSUM=%d",
 //               checksum());
       if (global::replayArg == REPLAY_SAVE
