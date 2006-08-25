@@ -1083,11 +1083,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	}
 
 	/*
-	 * Do private key check. widearea nodes must report a private key
-	 * It comes over ssl of course. At present we skip this check for
-	 * ron nodes. 
+	 * Do private key check. (Non-plab) widearea nodes must report a
+	 * private key. It comes over ssl of course. At present we skip
+	 * this check for ron nodes. 
 	 */
-	if (!reqp->islocal) {
+	if (!reqp->islocal && !(reqp->isplabdslice || reqp->isplabsvc)) {
 		if (!havekey) {
 			error("%s: No privkey sent!\n", reqp->nodeid);
 			/*
