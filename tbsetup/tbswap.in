@@ -55,6 +55,7 @@ use libadminctrl;
 use libadminmfs;
 use libtblog;
 use libArchive;
+use Experiment;
 
 #require exitonwarn; # exitonwarn isn't really a module, so just require it
 
@@ -179,6 +180,12 @@ TBDebugTimeStampsOn();
 my ($dbuid, $uname, $umail);
 if (UNIX2DBUID($UID, \$dbuid)) {
     UserDBInfo($dbuid, \$uname, \$umail);
+}
+
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object!")
 }
 
 #
@@ -758,7 +765,9 @@ sub doSwapout($) {
     #
     if ( $type >= CLEANUP ) {
 	print STDERR "Resetting DB.\n";
-	TBExptRemovePhysicalState( $pid, $eid );
+	$experiment->RemovePhysicalState();
+	# Special. 
+	$experiment->ClearPortRegistration();
     }
 
     tblog_set_cleanup(0);
@@ -1116,6 +1125,9 @@ sub doSwapin($) {
 				     TBDB_ALLOCSTATE_RES_RECONFIG()));
 	    }
 	}
+	# Do this only when nodes are to be rebooted.
+	$experiment->ClearPortRegistration()
+	    if ($type == UPDATE);
     }
 
     #

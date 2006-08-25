@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,16 +23,17 @@
 #include <paths.h>
 #include "decls.h"
 #include "log.h"
+#include "tmcc.h"
 
 int		debug   = 0;
 int		verbose = 0;
-static int	portnum = SERVER_PORTNUM;
+static int	portnum = 0;
 static void     print_barriers(void);
 static void     clear_barriers(void);
 static int      readall(int socket, void *buffer, size_t len);
 static int      writeall(int socket, void *buffer, size_t len);
 static int      handle_request(int, struct sockaddr_in *, barrier_req_t *,int);
-static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
+static int	makesockets(int *portnum, int *udpsockp, int *tcpsockp);
 static int	maxtcpsocket(fd_set *fs, unsigned int current_max);
 static void     remove_tcpclient(int sock);
 static void     release_client(int sock, struct in_addr ip, int istcp,
@@ -191,10 +192,18 @@ main(int argc, char **argv)
 	/*
 	 * Create TCP/UDP server.
 	 */
-	if (makesockets(portnum, &udpsock, &tcpsock) < 0) {
+	if (makesockets(&portnum, &udpsock, &tcpsock) < 0) {
 		error("Could not make sockets!");
 		exit(1);
 	}
+	/*
+	 * Register with tmcc
+	 */
+	if (PortRegister(SERVER_SERVNAME, portnum) < 0) {
+		error("Could not register service with tmcd!");
+		exit(1);
+	}
+	
 	/* Now become a daemon */
 	if (!debug)
 		daemon(0, 1);
@@ -487,7 +496,7 @@ writeall(int socket, void *buffer, size_t len)
  * Create sockets on specified port.
  */
 static int
-makesockets(int portnum, int *udpsockp, int *tcpsockp)
+makesockets(int *portnum, int *udpsockp, int *tcpsockp)
 {
 	struct sockaddr_in	name;
 	int			length, i, udpsock, tcpsock;
@@ -510,7 +519,7 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
-	name.sin_port = htons((u_short) portnum);
+	name.sin_port = *portnum;
 	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
 		pfatal("binding stream socket");
 	}
@@ -522,7 +531,9 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
 	if (listen(tcpsock, 128) < 0) {
 		pfatal("listen");
 	}
-	info("listening on TCP port %d\n", ntohs(name.sin_port));
+	*portnum = ntohs(name.sin_port);
+
+	info("listening on TCP port %d\n", *portnum);
 	
 	/*
 	 * Setup UDP socket
@@ -552,7 +563,7 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
-	name.sin_port = htons((u_short) portnum);
+	name.sin_port = htons((u_short) *portnum);
 	if (bind(udpsock, (struct sockaddr *) &name, sizeof(name))) {
 		pfatal("binding dgram socket");
 	}

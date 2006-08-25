@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -31,7 +31,7 @@ use Exporter;
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
 	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY TMCCCMD_USERENV
 	     TMCCCMD_TIPTUNNELS TMCCCMD_TRACEINFO TMCCCMD_ELVINDPORT
-             TMCCCMD_PLABEVENTKEYS
+             TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
 	     TMCCCMD_MOTELOG
 	     );
 
@@ -175,6 +175,7 @@ my %commandset =
       "elvindport"      => {TAG => "elvindport"},
       "plabeventkeys"   => {TAG => "plabeventkeys"},
       "motelog"         => {TAG => "motelog"},
+      "portregister"    => {TAG => "portregister"},
     );
 
 #
@@ -232,6 +233,7 @@ sub TMCCCMD_TRACEINFO   (){ $commandset{"traceinfo"}->{TAG}; }
 sub TMCCCMD_ELVINDPORT  (){ $commandset{"elvindport"}->{TAG}; }
 sub TMCCCMD_PLABEVENTKEYS(){ $commandset{"plabeventkeys"}->{TAG}; }
 sub TMCCCMD_MOTELOG()   { $commandset{"motelog"}->{TAG}; }
+sub TMCCCMD_PORTREGISTER() { $commandset{"portregister"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

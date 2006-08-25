@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,7 +24,7 @@ control-install: client
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS		= log.o tbdefs.o popenf.o systemf.o be_user.o
+OBJS		= log.o tbdefs.o popenf.o systemf.o be_user.o tmcc.o
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 
 libtb.a:	$(OBJS) tbdb.o
@@ -41,6 +41,7 @@ tbdefs.o:	tbdefs.h
 popenf.o:	popenf.h
 systemf.o:	systemf.h
 be_user.o:	be_user.h
+tmcc.o:		popenf.h tmcc.h
 
 install: all
 

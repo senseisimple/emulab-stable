@@ -1,9 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
+#define SERVER_SERVNAME		"emulab_syncd"
 #define SERVER_PORTNUM		16534
 #define SOCKBUFSIZE		(1024 * 128)
 

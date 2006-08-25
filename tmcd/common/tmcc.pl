@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -32,7 +32,7 @@ sub usage()
     print STDERR " -D   	Force command to use a direct, UDP request\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcDi:f:";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcDif:";
 my $debug       = 0;
 my $CMD;
 my $ARGS;

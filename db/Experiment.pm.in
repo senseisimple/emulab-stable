@@ -1112,6 +1112,44 @@ sub ClearBackupState($)
     TBExptClearBackupState($pid, $eid);
     return 0;
 }
+sub RemovePhysicalState($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (TBExptRemovePhysicalState($pid, $eid));
+
+    return 0;
+}
+
+#
+# The port registration table is special, and needs to be cleared only
+# at certain times. See tbswap.
+#
+sub ClearPortRegistration($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (! DBQueryWarn("delete from port_registration ".
+			  "where pid='$pid' and eid='$eid'"));
+
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

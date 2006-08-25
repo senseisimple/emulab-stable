@@ -255,6 +255,7 @@ COMMAND_PROTOTYPE(doelvindport);
 COMMAND_PROTOTYPE(doplabeventkeys);
 COMMAND_PROTOTYPE(dointfcmap);
 COMMAND_PROTOTYPE(domotelog);
+COMMAND_PROTOTYPE(doportregister);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -270,10 +271,11 @@ COMMAND_PROTOTYPE(domotelog);
 /*
  * Flags encode a few other random properties of commands
  */
-#define F_REMUDP	0x1	/* remote nodes can request using UDP */
-#define F_MINLOG	0x2	/* record minimal logging info normally */
-#define F_MAXLOG	0x4	/* record maximal logging info normally */
-#define F_ALLOCATED	0x8	/* node must be allocated to make call */
+#define F_REMUDP	0x01	/* remote nodes can request using UDP */
+#define F_MINLOG	0x02	/* record minimal logging info normally */
+#define F_MAXLOG	0x04	/* record maximal logging info normally */
+#define F_ALLOCATED	0x08	/* node must be allocated to make call */
+#define F_REMNOSSL	0x10	/* remote nodes can request without SSL */
 
 struct command {
 	char	*cmdname;
@@ -345,7 +347,8 @@ struct command {
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
 	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
 	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
-	{ "motelog",     FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
+	{ "motelog",      FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
+	{ "portregister", FULLCONFIG_NONE, F_REMNOSSL, doportregister},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1040,14 +1043,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 				goto skipit;
 		}
 	}
-	else if (!reqp->islocal) {
-		if (!istcp)
-			goto execute;
-		
-		error("%s: Remote node connected without SSL!\n",reqp->nodeid);
-		if (!insecure)
-			goto skipit;
-	}
 	else if (reqp->iscontrol) {
 		if (!istcp)
 			goto execute;
@@ -1126,6 +1121,16 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (!istcp && !reqp->islocal &&
 	    (command_array[i].flags & F_REMUDP) == 0) {
 		error("%s: %s: Invalid UDP request from remote node\n",
+		      reqp->nodeid, command_array[i].cmdname);
+		goto skipit;
+	}
+
+	/*
+	 * Ditto for remote node connection without SSL.
+	 */
+	if (!reqp->islocal && 
+	    (command_array[i].flags & F_REMNOSSL) == 0) {
+		error("%s: %s: Invalid NO-SSL request from remote node\n",
 		      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
 	}
@@ -6793,4 +6798,96 @@ COMMAND_PROTOTYPE(domotelog)
 
     mysql_free_result(res);
     return 0;
+}
+
+/*
+ * Return motelog info for this node.
+ */
+COMMAND_PROTOTYPE(doportregister)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE], service[128];
+	int		rc, port;
+
+	/*
+	 * Dig out the service and the port number.
+	 * Need to be careful about not overflowing the buffer.
+	 */
+	sprintf(buf, "%%%ds %%d", sizeof(service));
+	rc = sscanf(rdata, buf, service, &port);
+
+	if (rc == 0) {
+		error("doportregister: No service specified!\n");
+		return 1;
+	}
+	if (rc != 1 && rc != 2) {
+		error("doportregister: Wrong number of arguments!\n");
+		return 1;
+	}
+
+	/* No special characters means it will fit */
+	mysql_escape_string(buf, service, strlen(service));
+	if (strlen(buf) >= sizeof(service)) {
+		error("doportregister: Illegal chars in service!\n");
+		return 1;
+	}
+	strcpy(service, buf);
+
+	/*
+	 * Single argument, lookup up service.
+	 */
+	if (rc == 1) {
+		res = mydb_query("select port,node_id "
+				 "   from port_registration "
+				 "where pid='%s' and eid='%s' and "
+				 "      service='%s'",
+				 2, reqp->pid, reqp->eid, service);
+		
+		if (!res) {
+			error("doportregister: %s: "
+			      "DB Error getting registration for %s\n",
+			      reqp->nodeid, service);
+			return 1;
+		}
+		if ((int)mysql_num_rows(res) == 0) {
+			mysql_free_result(res);
+			return 0;
+		}
+		row = mysql_fetch_row(res);
+		OUTPUT(buf, sizeof(buf), "PORT=%s NODEID=%s.%s\n",
+		       row[0], row[1], OURDOMAIN);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		if (verbose)
+			info("PORTREG: %s: %s", reqp->nodeid, buf);
+		return 0;
+	}
+	
+	/*
+	 * If port is zero, clear it from the DB
+	 */
+	if (port == 0) {
+		mydb_update("delete from port_registration  "
+			    "where pid='%s' and eid='%s' and "
+			    "      service='%s'",
+			    reqp->pid, reqp->eid, service);
+	}
+	else {
+		/*
+		 * Register port for the service.
+		 */
+		if (mydb_update("replace into port_registration set "
+				"     pid='%s', eid='%s', "
+				"     service='%s', node_id='%s', port='%d'",
+				reqp->pid, reqp->eid, service,
+				reqp->nodeid, port)) {
+			error("doportregister: %s: DB Error setting %s=%d!\n",
+			      reqp->nodeid, service, port);
+			return 1;
+		}
+	}
+	if (verbose)
+		info("PORTREG: %s: %s=%d\n", reqp->nodeid, service, port);
+	
+	return 0;
 }
