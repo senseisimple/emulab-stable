@@ -1033,6 +1033,12 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 
 #ifdef  WITHSSL
 	/*
+	 * We verify UDP requests below based on the particular request
+	 */
+	if (!istcp)
+		goto execute;
+
+	/*
 	 * If the connection is not SSL, then it must be a local node.
 	 */
 	if (isssl) {
@@ -1044,9 +1050,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 	}
 	else if (reqp->iscontrol) {
-		if (!istcp)
-			goto execute;
-
 		error("%s: Control node connection without SSL!\n",
 		      reqp->nodeid);
 		if (!insecure)
@@ -1128,7 +1131,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Ditto for remote node connection without SSL.
 	 */
-	if (!reqp->islocal && 
+	if (istcp && !isssl && !reqp->islocal && 
 	    (command_array[i].flags & F_REMNOSSL) == 0) {
 		error("%s: %s: Invalid NO-SSL request from remote node\n",
 		      reqp->nodeid, command_array[i].cmdname);
