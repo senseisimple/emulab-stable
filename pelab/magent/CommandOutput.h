@@ -53,6 +53,9 @@ public:
         writeMessage(headerBuffer, Header::headerSize);
         writeMessage(message.c_str(), message.size());
         endMessage();
+      }
+      if (result == SENDING_MESSAGE || global::replayArg == REPLAY_LOAD)
+      {
         logWrite(COMMAND_OUTPUT, "(%s,%s): %s",
                  key.toString().c_str(), pathString.c_str(), message.c_str());
       }
