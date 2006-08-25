@@ -371,8 +371,6 @@ CREATE TABLE errors (
   script smallint(3) NOT NULL default '0',
   cause varchar(16) NOT NULL default '',
   confidence float NOT NULL default '0',
-  need_more_info ?? NOT NULL default '0',
-  
   mesg text NOT NULL,
   PRIMARY KEY  (session)
 ) TYPE=MyISAM;
