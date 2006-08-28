@@ -75,6 +75,7 @@ copyfiles: $(ALLSCRIPTS) $(ALLCONFS) $(ALLCERTS) $(PKGSRCTREE) mkdirtree
 	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
 			plabroot/usr/local/etc/emulab
 	cp -pR $(PKGSRCTREE)/ plabroot
+	chmod 4555 plabroot/usr/local/etc/emulab/program-agent
 	echo "@BOSSNODE@" > plabroot/usr/local/etc/emulab/bossnode
 	cp /dev/null plabroot/usr/local/etc/emulab/isrem
 
