@@ -239,8 +239,8 @@ Simulator instproc event-group {args} {
     return [new EventGroup]
 }
 
-Simulator instproc make-cloud {nodes args} {
-    return [$self make-lan $nodes 100Mbps 0ms]
+Simulator instproc make-cloud {nodes bw delay args} {
+    return [$self make-lan $nodes $bw $delay]
 }
 
 Node instproc program-agent {args} {
