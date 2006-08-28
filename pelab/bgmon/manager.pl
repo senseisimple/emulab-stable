@@ -1,5 +1,26 @@
 #!/usr/bin/perl -W
 
+=pod
+
+A Utility to be run on ops to send control commands to
+a set of nodes. This is most useful to manually adjust measurement
+frequency of specific nodes of interest.
+
+Parameters/options (more details):
+- port: remote port num to use for commands (TCP).
+- latency/bandwidth periods: period in seconds between measurements.
+- outputport: local port number when sending commands (TCP).
+- (-a): when initializing the set of nodes given in <input_file>,
+        schedule measurements in a fully connected fashion. Default
+        is to init nodes in a pairwise fashion, in order listed in
+        <input_file>.
+
+After script starts, it awaits a user command at a console prompt.
+The commands fully implemented are "start" and "stop", which send 
+proper INIT or STOPALL commands, respectively, to the node set.
+
+=cut
+
 use Getopt::Std;
 use strict;
 use IO::Socket::INET;
@@ -8,8 +29,6 @@ use libwanetmon;
 
 # A node from each site to take part in the measurements
 my @expnodes;
-
-#my %deadnodes;
 
 sub usage 
 {
@@ -62,8 +81,6 @@ if (defined($opt{b})) { $DEF_PER{"bw"} = $opt{b}; }
 
 if (@ARGV > 1) { exit &usage; }
 
-#my $filename_defaults = "destlist";
-#my $filename_defaults = "expnodes.txt";
 my $filename_defaults = $ARGV[0];
 
 my $sel = IO::Select->new();
