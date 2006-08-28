@@ -519,10 +519,23 @@ makesockets(int *portnum, int *udpsockp, int *tcpsockp)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
-	name.sin_port = *portnum;
+
+	/* Start with default portnumber, and then retry if taken. */
+	if (*portnum == 0) {
+		name.sin_port = htons((u_short) SERVER_PORTNUM);
+		if (! bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
+			/* Got the default port */
+			goto bound;
+		}
+		if (errno != EADDRINUSE)
+			pfatal("binding stream socket");
+		/* Retry below with portnum=0 */
+	}
+	name.sin_port = htons((u_short) *portnum);
 	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
 		pfatal("binding stream socket");
 	}
+ bound:
 	/* Find assigned port value and print it out. */
 	length = sizeof(name);
 	if (getsockname(tcpsock, (struct sockaddr *) &name, &length)) {
