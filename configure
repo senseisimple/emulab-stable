@@ -2331,7 +2331,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
         tbsetup/plab/plabrenewonce \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
-	tbsetup/plab/plabmonitord \
+	tbsetup/plab/plabmonitord tbsetup/plab/libplabmon.pm \
         tbsetup/plab/plabmon_badpool.pm tbsetup/plab/plabmon_goodpool.pm \
         tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \

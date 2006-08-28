@@ -21,6 +21,7 @@ $| = 1; # Turn off line buffering on output
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libplabmon;
 
 my $BADINST = 99;
 my $VNODESETUPTIMEOUT = 600; # XXX: need to get from sitevar, or
@@ -43,19 +44,6 @@ my $PLABMOND_PID    = PLABMOND_PID();
 my $PLABMOND_EID    = PLABMOND_EID();
 my $PLABHOLDING_PID = PLABHOLDING_PID();
 my $PLABHOLDING_EID = PLABHOLDING_EID();
-
-sub MIN($$) {
-    my ($a, $b) = @_;
-
-    my $res =  $a < $b ? $a : $b;
-
-    return $res;
-}
-
-sub TimeStamp()
-{
-    return POSIX::strftime("%m/%d/%y %H:%M:%S", localtime());
-}
 
 sub new($$$$$) {
 
@@ -121,9 +109,6 @@ sub checknextnode($) {
         $pnode->{'timeout'} = $now + $VNODESETUPTIMEOUT;
         $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
         $self->{'CHPID2POOL'}->{$chpid} = $self;
-
-        print "Pool $self->{'NAME'}: fired off worker $chpid for ".
-              "$pnode->{'name'}\n";
 
         return
     }
@@ -248,6 +233,7 @@ sub processchild($$$) {
         } else {
             print "Teardown of $pnode->{'vnode'} failed: $exstat\n";
         }
+
         return 1;
     }
 
@@ -289,12 +275,13 @@ sub processchild($$$) {
         $self->teardownnode($pnode);
         $self->calcnextcheck($pnode);
         $pnode->{'consecfails'}++;
-        return 0;
-    } 
+    } else {
+        # Instantiation was successful.
+        # Setup a timeout to wait for ISUP.
+        $pnode->{'timeout'} = $now + $ISUPWAITTIME;
+    }
 
-    # Setup a timeout to wait for ISUP.
-    $pnode->{'timeout'} = $now + $ISUPWAITTIME;
-    return 1;
+    return 0;
 }
 
 #
@@ -303,22 +290,28 @@ sub processchild($$$) {
 sub checkexpiration($) {
     my $self = shift;
     my $now = time();
+    my $numfinished = 0;
 
     foreach my $pnode (values %{ $self->{'PENDING'} }) {
 
         # ISUP or TBFAILED?  Check for these before timeout.
         my $state = TBDB_NODESTATE_UNKNOWN();
         if (TBGetNodeEventState($pnode->{'vnode'}, \$state)) {
-            if ($state eq TBDB_NODESTATE_ISUP()) {
-                # Yes!  Node is up.
-                $self->nodesetupcomplete($pnode);
-                next;
-            }
-            elsif ($state eq TBDB_NODESTATE_TBFAILED()) {
-                $self->teardownnode($pnode);
-                $self->calcnextcheck($pnode);
-                $pnode->{'consecfails'}++;
-                next;
+            if ($pnode->{'mode'} eq $SETUPMODE) {
+                if ($state eq TBDB_NODESTATE_ISUP()) {
+                    # Yes!  Node is up.
+                    print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
+                        " succeeded\n";
+                    $self->nodesetupcomplete($pnode);
+                    $numfinished++;
+                    next;
+                }
+                elsif ($state eq TBDB_NODESTATE_TBFAILED()) {
+                    $self->teardownnode($pnode);
+                    $self->calcnextcheck($pnode);
+                    $pnode->{'consecfails'}++;
+                    next;
+                }
             }
         } else {
             print "Error getting event state for $pnode->{'vnode'}\n";
@@ -342,7 +335,7 @@ sub checkexpiration($) {
         }
     }
 
-    return;
+    return $numfinished;
 }
 
 
@@ -360,9 +353,6 @@ sub teardownnode($$;$) {
         $pnode->{'timeout'} = $now + $TEARDOWNTIMEOUT;
         $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
         $self->{'CHPID2POOL'}->{$chpid} = $self;
-
-        print "Pool $self->{'NAME'}: fired off teardown worker $chpid for ".
-              "$pnode->{'name'}\n";
 
         return;
     }
@@ -390,22 +380,21 @@ sub teardownnode($$;$) {
 
 # XXX: may be bogus, but it'll do for now.
 my $MININTERVAL = 300;
-my $MAXINTERVAL = 3600;
+my $MAXINTERVAL = 12 * 3600;
 sub calcnextcheck($$;$) {
     my ($self, $pnode, $reason) = @_;
 
     my $now = time();
 
-    my $numfails  = $pnode->{'consecfails'};
-    my $nextcheck = int($now + $MININTERVAL + 0.5 * $numfails * $MININTERVAL);
-    $pnode->{'nextchecktime'} = MIN($now+$MAXINTERVAL, $nextcheck) + int(rand(60));
+    my $numfails  = $pnode->{'consecfails'} ? $pnode->{'consecfails'} : 1;
+    my $nextint = int($numfails * $numfails * $MININTERVAL);
+    $pnode->{'nextchecktime'} = 
+        $now + MIN($MAXINTERVAL, $nextint) + int(rand(120));
 }
 
 #
 # Check vnode status, moving nodes back into production if they booted up,
 # and leaving them in hwdown if they didn't.
-#
-# XXX: fix this damn thing.
 #
 sub nodesetupcomplete($$) {
     my $self  = shift;
@@ -435,11 +424,11 @@ sub nodesetupcomplete($$) {
     return;
 }
 
+
+#
 # Get vnode entries (and their corresponding pnodes) 
 # for the service slice vservers.
 # 
-# XXX: move to plabmon library module.
-#
 sub getsvcvnode($$) {
     my $self  = shift;
     my $pnode = shift;
@@ -460,6 +449,7 @@ sub getsvcvnode($$) {
 
     return $row[0];
 }
+
 
 # Make perl happy...
 1;

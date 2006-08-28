@@ -22,6 +22,7 @@ $| = 1; # Turn off line buffering on output
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libplabmon;
 use Node;
 
 my $BADINST = 99;
@@ -52,19 +53,6 @@ my $PLABDOWN_PID    = PLABDOWN_PID();
 my $PLABDOWN_EID    = PLABDOWN_EID();
 my $PLABTESTING_PID = PLABTESTING_PID();
 my $PLABTESTING_EID = PLABTESTING_EID();
-
-sub MIN($$) {
-    my ($a, $b) = @_;
-
-    my $res =  $a < $b ? $a : $b;
-
-    return $res;
-}
-
-sub TimeStamp()
-{
-    return POSIX::strftime("%m/%d/%y %H:%M:%S", localtime());
-}
 
 sub new($$$$$) {
 
@@ -111,7 +99,7 @@ sub checknextnode($) {
     my $now = time();
     my $pnode = $self->getnextchecknode();
 
-    # Nothinig to check!
+    # Nothing to check!
     if (!$pnode) {
         return;
     }
@@ -150,10 +138,7 @@ sub checknextnode($) {
         $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
         $self->{'CHPID2POOL'}->{$chpid} = $self;
 
-        print "Pool $self->{'NAME'}: fired off setup worker $chpid for ".
-              "$pnode->{'name'}\n";
-
-        return
+        return;
     }
 
     # Worker process.
@@ -290,6 +275,7 @@ sub processchild($$$) {
         elsif ($pnode->{'mode'} eq $TEARDOWNBADMODE) {
             $self->movetodownpool($pnode);
         }
+
         return 1;
     }
 
@@ -342,22 +328,25 @@ sub processchild($$$) {
 sub checkexpiration($) {
     my $self = shift;
     my $now = time();
+    my $numfinished = 0;
 
-    foreach my $pnode (values %{ $self->{'PENDING'} }) {
+    foreach my $pnode (values %{ $self->{'PENDING'} }) {        
 
         # ISUP or TBFAILED?  Check for these before timeout.
         my $state = TBDB_NODESTATE_UNKNOWN();
         if (TBGetNodeEventState($pnode->{'vnode'}, \$state)) {
-            if ($state eq TBDB_NODESTATE_ISUP()) {
-                # Yes!  Node is up.
-                print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
-                    " succeeded\n";
-                $self->teardownnode($pnode, $SETUPSUCCESS);
-                next;
-            }
-            elsif ($state eq TBDB_NODESTATE_TBFAILED()) {
-                $self->teardownnode($pnode, $SETUPFAIL);
-                next;
+            if ($pnode->{'mode'} eq $SETUPMODE) {
+                if ($state eq TBDB_NODESTATE_ISUP()) {
+                    # Yes!  Node is up.
+                    print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
+                        " succeeded\n";
+                    $self->teardownnode($pnode, $SETUPSUCCESS);
+                    next;
+                }
+                elsif ($state eq TBDB_NODESTATE_TBFAILED()) {
+                    $self->teardownnode($pnode, $SETUPFAIL);
+                    next;
+                }
             }
         } else {
             print "Error getting event state for $pnode->{'vnode'}\n";
@@ -379,7 +368,7 @@ sub checkexpiration($) {
         }
     }
 
-    return;
+    return $numfinished;
 }
 
 
@@ -404,9 +393,6 @@ sub teardownnode($$;$) {
             $pnode->{'mode'} = $TEARDOWNGOODMODE;
         }
 
-        print "Pool $self->{'NAME'}: fired off teardown worker $chpid for ".
-              "$pnode->{'name'}\n";
-
         return;
     }
 
@@ -415,17 +401,16 @@ sub teardownnode($$;$) {
         TBdbfork();	# So we get the event system fork too ...
         my $vnode = $pnode->{'vnode'};
 
-        # Free the vserver, if possible.
+        # Try to ssh in and kill processes running in the vserver.
         TBForkCmd("$SSH -host $vnode $CLIENT_BIN/vnodesetup -p -k $vnode",1);
 
         # Make sure vnode is in the proper state (regardless of the success
         # or failure of the previous command.
         TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN());
 
-        # Try to ssh in and kill the vserver.
-        TBForkCmd("$PLABNODE -f free $PLABTESTING_PID $PLABTESTING_EID $vnode",1);
-        
-        exit(0);
+        # Free the vserver, if possible.
+        exec "$PLABNODE -f free $PLABTESTING_PID $PLABTESTING_EID $vnode" or
+            die "Doh!  Can't exec command!\n";
     }
 
     # NOTREACHED
@@ -440,9 +425,10 @@ sub calcnextcheck($$;$) {
 
     my $now = time();
 
-    my $numsuccess  = $pnode->{'consecsuccess'};
-    my $nextcheck = int($now + $MININTERVAL + 0.5 * $numsuccess * $MININTERVAL);
-    $pnode->{'nextchecktime'} = MIN($now+$MAXINTERVAL, $nextcheck) + int(rand(60));
+    my $numsuccess = $pnode->{'consecsuccess'} ? $pnode->{'consecsuccess'} : 1;
+    my $nextint    = int(2 * $numsuccess * $MININTERVAL);
+    $pnode->{'nextchecktime'} = 
+        $now + MIN($MAXINTERVAL, $nextint) + int(rand(120));
 }
 
 #

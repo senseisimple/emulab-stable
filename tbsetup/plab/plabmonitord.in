@@ -51,6 +51,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libplabmon;
 
 # Load pool libraries
 use plabmon_badpool;
@@ -99,7 +100,6 @@ my $CHILLTIME    = 5;    # How long to wait after processing expirations.
 my $NEVER        = 0;    # "Never" in seconds since the Epoch.
 
 my $MAXLA        = 20;   # Don't let the system load get out of hand.
-my $UPTIME       = "/usr/bin/uptime";
 
 #
 # daemonize
@@ -122,6 +122,10 @@ my %chpid2pool = ();
 
 print "Plab Monitor Daemon starting... pid $$, at ".`date`;
 
+# XXX: testing
+#OpenDebugLog("chlog", "$TB/log/chlog.dbg") or die "Can't open debug log!";
+#DebugLog("chlog", "Plabmonitord start: Child debug log opened");
+
 #
 # Create the node pools.
 #
@@ -134,23 +138,6 @@ my $goodpool = plabmon_goodpool->new("good",
                                      $PLABHOLDING_EID, 
                                      \%chpid2pool);
 @allpools = ($badpool, $goodpool);
-
-
-#
-# helpers
-#
-sub MIN($$) {
-    my ($a, $b) = @_;
-
-    my $res =  $a < $b ? $a : $b;
-
-    return $res;
-}
-
-sub getLA() {
-    my ($LAstr) = `$UPTIME` =~ /load averages:\s+([\d\.]+),/;
-    return int($LAstr);
-}    
 
 #
 # Handle termination/hangup signals
@@ -225,6 +212,8 @@ while (1) {
 
     sleep($sleeptime);
 
+    #$now = time(); # Must reset $now after sleep.
+
     # Handle any children that have exited.
     while((my $chpid = waitpid(-1, WNOHANG)) > 0) {
         my $chstat = $?;
@@ -236,13 +225,14 @@ while (1) {
         }
     }
 
-    #$now = time(); # Must reset $now after sleep.
-
     # Look for expired processes.  Calling checkexpiration on a pool
     # has the side effect of checking for ISUP (or ISUP expiration) for
-    # any nodes pending thusly in the pool.
+    # any nodes pending thusly in the pool.  The return value is the
+    # number of nodes that the pool has finished processing (if any).
+    # Decrement the windowsize appropriately.
     foreach my $pool (@allpools) {
-        $pool->checkexpiration();
+        my $numfinished = $pool->checkexpiration();
+        $windowsize -= $numfinished;
     }
 
     # We may have just fired off a bunch of kills, so chill for a bit to
