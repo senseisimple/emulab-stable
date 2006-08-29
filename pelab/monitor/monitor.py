@@ -268,11 +268,8 @@ def set_delay(milliseconds, dest):
 def set_loss(probability, dest):
   return set_link(this_ip, dest, 'plr=' + str(probability))
 
-def set_max_delay(delay, dest):
-  hertz = 10000.0
-  milliseconds = 1000.0
-  return set_link(this_ip, dest, 'MAXINQ=' + str(int(
-    (hertz/milliseconds)*delay )))
+def set_max_delay(milliseconds, dest):
+  return set_link(this_ip, dest, 'MAXINQ=' + str(milliseconds))
 
 def set_link(source, dest, ending):
   command = ('/usr/testbed/bin/tevc -e ' + this_experiment + ' now '
