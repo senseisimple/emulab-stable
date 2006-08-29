@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -29,6 +29,10 @@ else
     echo "Vnodeid must be stored in /var/emulab/boot/plabname"
     exit 1;
 fi
+
+# Pass this along for tmcc clients.
+TMCCVNODEID=$VNODEID
+export TMCCVNODEID
 
 # See how we were called.
 case "$1" in

@@ -19,19 +19,29 @@
 int
 tmcc(char *fmt, char *ret, int retlen, ...)
 {
-	char		buf[2*BUFSIZ], *bp = ret;
+	char		buf[2*BUFSIZ], *bp = ret, *ep;
 	va_list		ap;
 	FILE		*fp;
 	int		retval = 0;
 	int		count  = 0;
 
+	/* See if this is inside a vnode */
+	if ((ep = getenv("TMCCVNODEID")) == NULL)
+		ep = "";
+
 	/* Need to tack on the path to tmcc */
-	if (strlen(TMCC) + strlen(fmt) + 1 > sizeof(buf)) {
+	if (strlen(TMCC) + strlen(fmt) + strlen(ep) + 10 > sizeof(buf)) {
 		errno = ENOMEM;
 		return -1;
 	}
+	
 	strcpy(buf, TMCC);
 	strcat(buf, " ");
+	if (strlen(ep)) {
+		strcat(buf, "-n ");
+		strcat(buf, ep);
+		strcat(buf, " ");
+	}
 	strcat(buf, fmt);
 
 	va_start(ap, retlen);
