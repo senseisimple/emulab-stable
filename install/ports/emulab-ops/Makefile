@@ -82,11 +82,13 @@ RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/CGI/Session.pm:${PORTSDIR}/www/p5-CGI-Session \
-        ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/GD/Graph.pm:${PORTSDIR}/groups/p5-GD-Graph \
+	${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd \
         ${LOCALBASE}/share/adodb/adodb.inc.php:${PORTSDIR}/databases/adodb \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/HTML/Parser.pm:${PORTSDIR}/www/p5-HTML-Parser \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
         curl:${PORTSDIR}/ftp/curl \
+        snort:${PORTSDIR}/security/snort \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 .else
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
