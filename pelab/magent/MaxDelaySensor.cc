@@ -39,7 +39,7 @@ void MaxDelaySensor::localAck(PacketInfo * packet)
   if (queueingDelay < 0) {
     logWrite(ERROR,"Queueing delay is less than zero!");
   }
-  if (queueingDelay > maximum && current != 0) && state->isSaturated())
+  if ((queueingDelay > maximum) && (current != 0) && state->isSaturated())
   {
     ostringstream buffer;
     buffer << "MAXINQ=" << queueingDelay;
