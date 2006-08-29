@@ -23,7 +23,14 @@ void MaxDelaySensor::localSend(PacketInfo *)
 
 void MaxDelaySensor::localAck(PacketInfo * packet)
 {
-  int current = delay->getLastDelay();
+
+  /*
+   * Only try to make this calculation on established connections
+   */
+  if (state->getState() != StateSensor::ESTABLISHED) {
+    return;
+  }
+
   /*
    * We assume that the minimum delay is transmission delay plus the
    * propagation delay. Thus, any additional time is from queueing.
@@ -32,6 +39,7 @@ void MaxDelaySensor::localAck(PacketInfo * packet)
    * dummynet queue, so we have to include the 'forward' part of the min delay
    * in our calculation.
    */
+  int current = delay->getLastDelay();
   int minimumDelay = mindelay->getMinDelay();
   int queueingDelay = current - (minimumDelay/2);
   logWrite(SENSOR, "current=%d,min=%d,queueing=%d,saturated=%d", current,
