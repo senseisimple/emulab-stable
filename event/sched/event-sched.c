@@ -97,7 +97,7 @@ static timeline_agent_t ns_timeline;
 
 static void sigpass(int sig)
 {
-	info("event-sched: received signal %d, exiting\n", sig);
+	info("event-sched[%d]: received signal %d, exiting\n", getpid(), sig);
 	
 	if (emcd_pid != -1)
 		kill(emcd_pid, sig);
@@ -111,7 +111,7 @@ static void sigpass(int sig)
 
 static void sigpanic(int sig)
 {
-	info("event-sched: sigpanic %d\n", sig);
+	info("event-sched[%d]: sigpanic %d\n", getpid(), sig);
 
 	abort();
 }
