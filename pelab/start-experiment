@@ -9,6 +9,7 @@ my $PYTHON = "/usr/local/bin/python";
 my $PERL = "/usr/bin/perl";
 my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
 my $NODELIST = "/usr/testbed/bin/node_list";
+my $EXPINFO = "/usr/testbed/bin/expinfo";
 
 my $realplab = 0;
 my $initelab = 0;
@@ -52,6 +53,17 @@ if (@ARGV != 2) {
     usage();
 }
 my ($pid, $eid) = @ARGV;
+
+#
+# Make sure the experiment is swapped in!
+#
+my @expinfo = `$EXPINFO $pid $eid`;
+if (grep /No such experiment/, @expinfo) {
+    die "*** ERROR: Experiment does not exist!\n";
+} elsif (! grep(/State: active/,@expinfo)) {
+    die "*** ERROR: Experiment is not swapped in!\n";
+}
+
 $stub_cmdargs = get_cmdargs("plab", $stub_cmd);
 $mon_cmdargs = get_cmdargs("elab", $mon_cmd);
 if (defined($options{"S"})) {
@@ -125,6 +137,19 @@ if (defined($options{"O"})) {
     } else {
 	die "Unknown -O type '", $options{"O"}, "'\n";
     }
+}
+
+#
+# Let's help some boor bozos (Rob) get the right command line args
+#
+print "##### Stashing node list for experiment\n";
+my @vnodes = split /\s+/,`$NODELIST -v -e $pid,$eid`;
+my $hasfakeplab = grep /plab-\d+/, @vnodes;
+my $hasrealplab = grep /planet-\d+/, @vnodes;
+if (!$hasfakeplab && $hasrealplab && !$realplab) {
+    die "*** ERROR: Forgot to specify -p!\n";
+} elsif ($hasfakeplab && !$hasrealplab && $realplab) {
+    die "*** ERROR: Should not use -p!\n";
 }
 
 #
@@ -241,10 +266,10 @@ if (system "$TEVC -e $pid/$eid now tdhosts start") {
 #
 my $startarg = "";
 print "##### Starting stubs";
-if ($stub_cmdargs ne $UNKNOWN) {
-    print " with: '$stub_cmd $stub_cmdargs'";
-    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
-}
+#if ($stub_cmdargs ne $UNKNOWN) {
+#    print " with: '$stub_cmd $stub_cmdargs'";
+#    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
+#}
 print "\n";
 if ($realplab) {
     if (system "$TEVC -e $pid/$eid now planetstubs start $startarg") {
