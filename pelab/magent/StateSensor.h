@@ -13,10 +13,6 @@ public:
     INITIAL,
     AFTER_SYN,
     AFTER_SYN_ACK,
-    // This doesn't correspond to any real TCP state. This is so that
-    // later sensors on the same ack won't see it as part of an
-    // established connection.
-    BEFORE_ESTABLISHED,
     ESTABLISHED
   };
 public:

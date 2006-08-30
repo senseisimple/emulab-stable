@@ -38,11 +38,6 @@ void StateSensor::localSend(PacketInfo * packet)
   }
   else if (! packet->tcp->syn && state == AFTER_SYN_ACK)
   {
-    state = BEFORE_ESTABLISHED;
-    logWrite(SENSOR, "State change to BEFORE_ESTABLISHED");
-  }
-  else if (state == BEFORE_ESTABLISHED)
-  {
     state = ESTABLISHED;
     logWrite(SENSOR, "State change to ESTABLISHED");
   }
@@ -59,11 +54,6 @@ void StateSensor::localAck(PacketInfo * packet)
   else if (packet->tcp->syn && packet->tcp->ack)
   {
     logWrite(ERROR, "Received a SYNACK packet out of order");
-  }
-  else if (state == BEFORE_ESTABLISHED)
-  {
-    state = ESTABLISHED;
-    logWrite(SENSOR, "State change to ESTABLISHED");
   }
   calculateSaturated(packet);
 }
