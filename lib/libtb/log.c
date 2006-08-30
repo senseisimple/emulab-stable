@@ -41,7 +41,7 @@ loginit(int slog, char *name)
 	if (name) {
 		int	fd;
 
-		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0640)) != -1) {
+		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0644)) != -1) {
 			(void)dup2(fd, STDOUT_FILENO);
 			(void)dup2(fd, STDERR_FILENO);
 			if (fd > 2)
