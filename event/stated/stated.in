@@ -809,6 +809,10 @@ sub stateTransition($$) {
 		checkGenISUP($node);
 		next;
 	    };
+	    /^CHECKPORTREG$/ && do {
+		CheckPortRegistration($node);
+		next;
+	    };
 	    /^$TBRESET$/ && do {
 		# We successfully booted, so clear some flags
 		$nodes{$node}{noretry}   = 0;
@@ -1250,6 +1254,40 @@ sub setTimeout( $$$$ ) {
 	}
     }
     if (0) { print "Done:\n"; qshow(); }
+}
+
+sub CheckPortRegistration($) {
+    my ($node) = @_;
+    my ($pid, $eid, $vname);
+    
+    debug("$node: Checking Port Registration for $node\n");
+
+    return
+	if (! NodeidToExp($node, \$pid, \$eid, \$vname));
+
+    #
+    # The point is to see if a node has come up without filling port
+    # registrations that would affect backwards compatability with older
+    # images. 
+    #
+    my $query_result =
+	DBQueryWarn("select sync_server from experiments ".
+		    "where pid='$pid' and eid='$eid' and ".
+		    "      sync_server='$vname'");
+
+    if ($query_result && $query_result->num_rows) {
+	$query_result =
+	    DBQueryWarn("select port from port_registration ".
+			"where pid='$pid' and eid='$eid' and ".
+			"      node_id='$node' and service='emulab_syncd'");
+	
+	if ($query_result && !$query_result->num_rows) {
+	    DBQueryWarn("insert into port_registration set ".
+			"     pid='$pid', eid='$eid', ".
+			"     service='emulab_syncd', ".
+			"     node_id='$node', port='16534'");
+	}
+    }
 }
 
 # Remove a timeout.
