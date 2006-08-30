@@ -8,16 +8,17 @@ use Getopt::Std;
 use strict;
 
 sub usage {
-    warn "Usage: $0 [-p port] [-e pid/eid] <monitoraddr> <link dest> ".
+    warn "Usage: $0 [-p port] [-e pid/eid] [-d testduration] <monitoraddr> <link dest> ".
 	"<testtype> <testper(seconds)> <COMMAND>\n";
     return 1;
 }
 
 my %opt = ();
-getopts("e:s:p:h",\%opt);
+getopts("e:d:p:h",\%opt);
 
-my ($expt, $port);
+my ($expt, $port, $testduration);
 if ($opt{e}) { $expt = $opt{e}; } else { $expt = "__none"; }
+if ($opt{d}) { $testduration = $opt{d}; }
 if ($opt{p}) { $port = $opt{p}; } else{ $port = 5052; }
 if ($opt{h}) { exit &usage; }
 if (@ARGV != 5) { exit &usage; }
@@ -31,7 +32,8 @@ my %cmd = ( expid     => $expt,
 	    cmdtype   => $cmd,
 	    dstnode  => $destnode,
 	    testtype  => $testtype,
-	    testper   => $testper
+	    testper   => $testper,
+	    duration  => $testduration
 	    );
 
 my $socket;

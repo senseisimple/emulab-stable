@@ -1,14 +1,17 @@
 #!/usr/bin/perl
 
-#TODO!! Result index numbers for ACKs?... window size 2x > buffer size???
+#TODO!!
+# - finish implementation of rate change duration.
+
 
 =pod
 
-Send a UDP message to this node, containing a Storable::freeze hash
+Send a UDP message to this node, containing a 
+libwanetmon::serialize_hash() hash
 with the following key/value pairs:
 
-cmdtype => EDIT or INIT or SINGLE or STOPALL
-and the following for each of the above cmdtypes:
+cmdtype => one of the following types, and associated key/values
+           (examples given)
 EDIT:
 dstnode  => plab2
 testtype => latency or bw
@@ -19,14 +22,22 @@ destnodes => "plab1 plab2"
 SINGLE:
 dstnode => plabxxx
 testtype => latency or bw
+STOPALL:
+STATUS: *TODO*
 
 where,
 EDIT: Modify a specific link test to specific destination node.
 INIT: Initialize the link tests with default destination nodes and frequency.
+    Measurements to nodes not in init set but already scheduled 
+    will not be erased or changed.
+
 SINGLE: Perform a single link test to a specifc destination node.
+STOPALL: Erase all scheduled measurements.
+STATUS: get status of bgmon as a string description. In the reply,
+        the message contains "ACK\n" followed by the status string terminated
+        by  "\n"
 
-
-TODO: ACK documentation?
+*TODO* ACK documentation?
 
 
 OPERATION NUANCES:
@@ -43,6 +54,9 @@ OPERATION NUANCES:
     - regardless of the return value, parsing the results continues as normal,
       with the parsing function dealing with setting the error codes in the
       result.
+- If a node/sliver is rebooted, our startup script should run and re-start
+  bgmon. However, the current state of running tests is lost (on purpose!).
+  The management application can query the status using the STATUS command
 =cut
 
 use Getopt::Std;
@@ -80,21 +94,22 @@ my $rcvBufferSize = 2048;  #max size for an incoming UDP message
 my %outsockets = ();       #sockets keyed by dest node
 #MARK_RELIABLE
 # each result waiting to be acked has an id number and corresponding file
-my $resultDBlimit = 100;
+my $resultDBlimit = 12000;  #approx 24 hours of data at "normal" test rates
 my $magic         = "0xDeAdBeAf";
 
 my %testevents = ();
 
 #queue for each test type containing tests that need to
-# be run, but couldn't, due to MAX_SIMU_TESTS.
-# keys are test types, values are lists
-# This separate Q, which has higher priority than the normal %testevents
-# should solve "starvation" issues if an "early" test blocks for too long
-# such as during a network timeout with iperf
+# be run.
 my %waitq = ( latency => [],
 	      bw      => [] );
 
 my %runningtestPIDs = ();  # maps from PID's -> array of destnode, bw
+
+my $status;  #keeps track of status of this bgmon. Possible values are:
+             # anyscheduled_no, anyscheduled_yes
+$status = "anyscheduled_no";
+
 
 #*****************************************
 
@@ -146,7 +161,7 @@ my $sel = IO::Select->new();
 $sel->add($socket_cmd);
 $sel->add($socket_ack);
 
-my $subtimer_reset = 50;  # subtimer reaches 0 this many times thru poll loop
+my $subtimer_reset = 10;  # subtimer reaches 0 this many times thru poll loop
 my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 
 
@@ -161,17 +176,21 @@ sub handleincomingmsgs()
     foreach my $handle (@ready){
 
 	my %sockIn;
+	my $cmdHandle;
 	if( $handle eq $socket_ack ){
 	    $handle->recv( $inmsg, $rcvBufferSize );
 	    %sockIn = %{ deserialize_hash($inmsg) };
 	}elsif( $handle eq $socket_cmd ){
-	    my $cmdHandle = $handle->accept();
+	    $cmdHandle = $handle->accept();
 	    $inmsg = <$cmdHandle>;
 	    chomp $inmsg;
 	    %sockIn = %{ deserialize_hash($inmsg) };
-	    if( !isMsgValid(\%sockIn) ){  return 0; }
+	    if( !isMsgValid(\%sockIn) ){  
+		close $cmdHandle;
+		return 0; 
+	    }
 	    print $cmdHandle "ACK\n";
-	    close $cmdHandle;
+	    
 	}
 #	print "received msg: $inmsg\n";
 
@@ -198,74 +217,206 @@ sub handleincomingmsgs()
 	elsif( $cmdtype eq "EDIT" ){
 	    my $linkdest = $sockIn{dstnode};
 	    my $testtype = $sockIn{testtype};
-	    my $testper = $sockIn{testper};
+	    my $newtestper = $sockIn{testper};
+	    my $duration =$sockIn{duration};
+	    my $managerID=$sockIn{managerID};
+
 	    my $testev = \%{ $testevents{$linkdest}{$testtype} };
 
-#	    $testev->{"limitTime"} = time_all()+10;
-	    # TODO: Implement a limit on time of change
-	    #  need to save "baseline" testing period
-	    $testev->{"limitTime"} = $sockIn{limitTime};
-	    $testev->{"testper"} = $testper;
-	    $testev->{"flag_scheduled"} = 0;
-	    $testev->{"timeOfNextRun"} = time_all();
-	    
-	    print time()." EDIT:\n";
-	    print( "linkdest=$linkdest\n".
-		   "testype =$testtype\n".
-		   "testper=$testper\n" );
+
+	    if( editTest($testev, $newtestper, $duration, $managerID) ){
+		print time()." EDIT:\n";
+		print( "linkdest=$linkdest\n".
+		       "testype =$testtype\n".
+		       "testper=$newtestper\n" );
+		print "duration=".$sockIn{duration}."\n" 
+		    if( defined $sockIn{duration} );
+	    }
+=pod
+	    # only change test if conditions met...
+	    if( checkTestChangeAllowed( $testev, $managerID ) ){
+		# TODO: TEST THIS!!!
+		#
+		# Smartly handle two overlapping requests, such that
+                #  the highest rate is used for the duration specified
+                #  in the command
+		# TODO: Add fancier queuing here!
+
+                # Specifications:
+		#  - an EDIT with testper=0
+		#    will stop the corresponding 'temp' or 'forever' test
+		#    selected by the value of 'duration'.
+		#  - ** Only a "background" rate (forever) and one
+		#       temporary rate increase are supported.
+		#  - ANY new 'forever' rate will overwrite the previous one
+		#  - A 'forever' faster than existing 'temp' overwrites 'temp'
+		#    and does not recover it if a future 'forever' has a rate
+		#    less than the 'temp' (it removes all trace)
+		# state descriptions: (Current state) -> (action)
+		# saved valid|Currently running | New|   change|replace
+		# 'forever'  | 0=forever        |Edit|  period?|saved
+		# exists     | 1=temp)          |Type| ->      |'forever'?
+		#  0          0                   0         1     0
+		#  0          1                   0         0     1
+		#  1          1                   0         0     1
+		#  0          0                   1         1     1
+		#  0          1                   1         1     0
+		#  1          1                   1         1     0
+
+		#TODO!!!
+		# EDIT above... action after rcving 'forever' while running
+                #  a 'temp' depends on period comparisons between
+		#  old 'forever' new 'forever' and 'temp'
+
+		#make sure existing testper is valid
+		if( !defined $testev->{testper} ){
+		    $testev->{testper} = 0;
+		}
+		#make sure limitTime is valid
+		if( !defined $testev->{limitTime} ){
+		    $testev->{limitTime} = 0;
+		}
+
+		if( defined $sockIn{duration} && $sockIn{duration} > 0 ){
+		    # New edit is a 'temp' type
+		    if( $newtestper < $testev->{testper} || 
+			$testev->{testper} == 0 )
+		    {
+			# state (xx1->1?) new per checked for faster freq.
+			if( $testev->{limitTime} == 0 && $newtestper > 0){
+			    # state (x01->11)
+			    #Save existing 'forever' test and use new testper
+			    $testev->{prevPeriod} = $testev->{testper};
+			    $testev->{testper} = $newtestper;
+			    $testev->{limitTime} = 
+				time_all()+$sockIn{duration};
+			}elsif( $testev->{limitTime} != 0 ){
+			    # state (x11->10)
+			    if( $newtestper == 0 ){
+				# temp edit is 0 per, so re-start saved
+				#'forever' test
+				$testev->{testper} = $testev->{prevPeriod};
+				$testev->{limitTime} = 0;
+			    }else{
+				#update period and duration with new command
+				$testev->{testper} = $newtestper;
+				$testev->{limitTime} = 
+				    time_all()+$sockIn{duration};
+			    }
+			}
+		    }
+		}else{
+		    #state (xx0->??)
+		    # New edit is a 'forever' type
+		    if( $testev->{limitTime} == 0 ){
+			# state (x00->10)
+			#  currently running a forever
+			$testev->{testper} = $newtestper;
+		    }else{
+			# state (x10->01)
+			#  currently running a temp
+			# cases of periods
+			#  1) new forever is not 0 and < existing temp.
+			#  2) new forever is 0
+			#  3) new forever is > existing temp
+			if( $newtestper != 0 &&
+			    $newtestper < $testev->{testper} )
+			{
+			    #case 1
+			    $testev->{testper} = $newtestper;
+			    $testev->{limitTime} = 0;
+			    $testev->{prevPeriod} = 0;
+			}elsif( $newtestper == 0 ){
+			    #case 2
+			    $testev->{prevPeriod} = 0;
+			}elsif( $newtestper > $testev->{testper} ){
+			    #case 3
+			    $testev->{prevPeriod} = $newtestper;
+			}
+		    }
+		}
+
+		$testev->{flag_scheduled} = 0;
+		$testev->{timeOfNextRun} = time_all();
+		$testev->{managerID} = $managerID;
+
+
+		print time()." EDIT:\n";
+		print( "linkdest=$linkdest\n".
+		       "testype =$testtype\n".
+		       "testper=$newtestper\n" );
+		print "duration=".$sockIn{duration}."\n" 
+		    if( defined $sockIn{duration} );
+	    }
+=cut
+
 	}
 	elsif( $cmdtype eq "INIT" ){
 	    print time()." INIT: ";
 	    my $testtype = $sockIn{testtype};
 	    my @destnodes 
 		= split(" ",$sockIn{destnodes});
-	    my $testper = $sockIn{testper};
+#	    my $testper = $sockIn{testper};
+	    my $newtestper = $sockIn{testper};
+	    my $duration =$sockIn{duration};
+	    my $managerID=$sockIn{managerID};
+	    
 	    #distribute start times from offset 0 to testper/2
 	    my $offsetinc = 0;
 	    if( (scalar @destnodes) != 0 ){
-		$offsetinc = $testper/(scalar @destnodes)/2.0;
+		$offsetinc = $newtestper/(scalar @destnodes)/2.0;
 	    }
 	    my $offset = 0;
             foreach my $linkdest (@destnodes){
 		my $testev = \%{ $testevents{$linkdest}{$testtype} };
-		#be smart about adding tests
-		# don't want to change already running tests
-		# only change those tests which have been updated
-		if( defined($testev->{"testper"}) &&
-		    $testper == $testev->{"testper"} )
-		{
-		    # do nothing... keep test as it is
-		}else{
-		    # update test
-		    $testev->{"testper"} =$testper;
-		    $testev->{"flag_scheduled"} =0;
-		    # TODO? be smart about when the first test should run?
-		    $testev->{"timeOfNextRun"} = time_all() + $offset;
-		    $offset += $offsetinc;
-		}
+		editTest($testev, $newtestper, $duration, $managerID, $offset);
+		$offset += $offsetinc;
 	    }
-	    print " $testtype  $testper\n";
+	    print " $testtype  $newtestper\n";
 	}
 	elsif( $cmdtype eq "SINGLE" ){
 	    my $linkdest = $sockIn{dstnode};
 	    my $testtype = $sockIn{testtype};
 	    my $testev = \%{ $testevents{$linkdest}{$testtype} };
-	    $testev->{"testper"} = 0;
-	    $testev->{"timeOfNextRun"} = time_all()-1;
-	    $testev->{"flag_scheduled"} = 1;
-	    $testev->{"pid"} = 0;
-
+	    my $managerID=$sockIn{managerID} if( defined $sockIn{managerID} );
+	    if(checkTestChangeAllowed( $testev, $managerID, 0)){
+		$testev->{managerID} = $managerID;
+		$testev->{"testper"} = 0;
+		$testev->{"timeOfNextRun"} = time_all()-1;
+		$testev->{"flag_scheduled"} = 1;
+		$testev->{"pid"} = 0;
+	    }
 	    print( time()." SINGLE\n".
 		   "linkdest=$linkdest\n".
 		   "testype =$testtype\n");
 	}
 	elsif( $cmdtype eq "STOPALL" ){
 	    print time()." STOPALL\n";
-	    %testevents = ();
-	    %waitq = ();
+	    my $managerID=$sockIn{managerID} if( defined $sockIn{managerID} );
+
+	    #delete those entries of this managerID
+	    for my $destaddr ( keys %testevents ) {
+		for my $testtype ( keys %{ $testevents{$destaddr} } ){
+		    my $testev = \%{ $testevents{$destaddr}{$testtype} };
+		    if(checkTestChangeAllowed( $testev, $managerID, 0)){
+#			%testevents = ();
+			%waitq = ();  #clearing the whole Q shouldn't
+                                      # cause problems, and is the easiest soln
+			delete $testevents{$destaddr}{$testtype};
+		    }
+		}
+	    }
 	}
 	elsif( $cmdtype eq "DIE" ){
 	    die "Received termination command. Exiting.\n";
+	}
+	elsif( $cmdtype eq "GETSTATUS" ){
+	    if( defined $cmdHandle ){
+		print $cmdHandle "$status\n";
+	    }
+	}
+	if( defined $cmdHandle ){
+	    close $cmdHandle;
 	}
     }
 }
@@ -282,6 +433,13 @@ while (1) {
     sendOldResults();
 
     handleincomingmsgs();
+
+    #set status of this bgmon
+    if( keys %testevents != 0){
+	$status = "anyscheduled_yes";
+    }else{
+	$status = "anyscheduled_no";
+    }
 
     #re-try wait Q every $subtimer_reset times through poll loop
     #try to run tests on queue
@@ -302,82 +460,46 @@ while (1) {
 	}
     }
 
-    #iterate through all outstanding running tests
-    #mark flags of finished tests
-    foreach my $pid (keys %runningtestPIDs){
-	use POSIX ":sys_wait_h";
 
-	#get nodeid and testtype
+    # Reap all dead children.
+    #mark flags of finished tests
+#    my @deadpids;
+    use POSIX ":sys_wait_h";
+    while( (my $pid = waitpid(-1,&WNOHANG)) > 0 ){
+#	push @deadpids, $pid;
+	my $destaddr = $runningtestPIDs{$pid}[0];
+	my $testtype = $runningtestPIDs{$pid}[1];
+	my $testev = \%{ $testevents{$destaddr}{$testtype} };
+	# handle the case where a test (iperf) times out
+	if( defined $testev->{"timedout"} ){
+	    $testev->{"flag_scheduled"} = 0;
+	    delete $testev->{"timedout"};
+	}else{
+	    $testev->{"flag_finished"} = 1;
+	}
+	$testev->{"pid"} = 0;
+	delete $runningtestPIDs{$pid};	
+    } 
+
+    foreach my $pid (keys %runningtestPIDs){
 	my $destaddr = $runningtestPIDs{$pid}[0];
 	my $testtype = $runningtestPIDs{$pid}[1];
 	my $testev = \%{ $testevents{$destaddr}{$testtype} };
 
-	my $kid = waitpid( $pid, &WNOHANG );
-	if( $kid == $pid )
-	{
-	    # process is dead
-
-	    $testev->{"flag_finished"} = 1;
-	    $testev->{"pid"} = 0;
-
-=pod        #NOT USED ANYMORE
-	    if( $testtype eq "bw" && $? != 0 ){
-		# IPERF SPECIFIC... exited with error
-		#process exited abnormally
-		#reset pid
-		$testev->{"pid"} = 0;
-		#schedule next test at a % of a normal period from now
-		my $nextrun = time_all() + 
-		    $testev->{"testper"} *
-			$TEST_FAIL_RETRY{$testtype};
-		$testev->{"timeOfNextRun"} = $nextrun;
-		#delete tmp filename
-		my $filename = createtmpfilename($destaddr, $testtype);
-		unlink($filename) or warn "can't delete temp file";
-		
-		# TODO - send errors to find down paths
-		my %results = 
-		    ("sourceaddr" => $thismonaddr,
-		     "destaddr" => $destaddr,
-		     "testtype" => $testtype,
-		     "result" => $ERRID{unknown},
-		     "tstamp" => $testev->{"tstamp"},
-		     "magic"  => "$magic",
-		     );
-		
-		#save result to local DB
-		my $index = saveTestToLocalDB(\%results);
-		#send result to remote DB
-		sendResults(\%results, $index);
-		
-		print time_all().
-		    " $testev->{testtype} proc $pid exited abnormally\n";
-	    }
-	    else{
-		#process finished, so mark it's "finished" flag
-		$testev->{"flag_finished"} = 1;
-		$testev->{"pid"} = 0;
-#			print "test $destaddr / $testtype finished\n";
-	    }
-=cut
-
-	    delete $runningtestPIDs{$pid};
-	}
-
-	#If this process is bandwidth, kill it if it has
-	#      been running too long (iperf has a looong timeout)
-	elsif( $testtype eq "bw" &&
-	       time_all() >
-	       $testev->{"tstamp"} + 
-	       $iperftimeout )
+	if( $testtype eq "bw" &&
+	    time_all() >
+	    $testev->{"tstamp"} + 
+	    $iperftimeout )    
 	{
 	    kill 'TERM', $pid;
 	    delete $runningtestPIDs{$pid};
 	    print time_all()." bw timeout: killed $destaddr, ".
 		"pid=$pid\n";
-
+=pod
 	    $testev->{"pid"} = 0;
 	    $testev->{"flag_scheduled"} = 0;
+	    $testev->{"timedout"} = 1;
+=cut
 	    #delete tmp filename
 	    my $filename = createtmpfilename($destaddr, $testtype);
 	    unlink($filename) or warn "can't delete temp file";
@@ -443,8 +565,25 @@ while (1) {
 	    }
 
 	    #schedule new tests
-	    if( $testev->{"flag_scheduled"} == 0 && $testev->{"testper"} > 0 )
+	    if( $testev->{"flag_scheduled"} == 0 && 
+#		defined $testev->{"testper"} &&
+		$testev->{"testper"} > 0 )
 	    {
+		
+		if( $testev->{limitTime} > 0 &&
+		    time_all() >= $testev->{limitTime} )
+		{
+		    print "resetting period from ".$testev->{testper};
+		    # Rate increase expired. Reset rate to old val.
+		    if( defined $testev->{prevPeriod} ){
+			$testev->{testper} = $testev->{prevPeriod};
+		    }else{
+			$testev->{testper} = 0;
+		    }
+		    print " to ".$testev->{testper}."\n";
+		    $testev->{limitTime} = 0;
+		}
+
 		if( time_all() < 
 		    $testev->{"timeOfNextRun"} + $testev->{"testper"} )
 		{
@@ -885,3 +1024,144 @@ sub isMsgValid(\%)
     return 1;
 }
 
+
+sub checkTestChangeAllowed(\%$)
+{
+    my ($href, $managerID ) = @_;
+    my %testev = %{$href};
+    if( !defined %testev ||
+	!defined $testev{managerID} ||
+	$managerID eq $testev{managerID} )
+    {
+#	print "checkTestChangeAllowed passed!\n";
+	if( defined %testev &&
+	    !defined $testev{managerID} )
+	{
+	    $testev{managerID} = $managerID;
+	}
+	return 1;
+    }else{
+	print "checkTestChangeAllowed failed!\n";
+	print "  new managerID=$managerID\n".
+	    "  old managerID=$testev{managerID}\n";
+	return 0;
+    }
+}
+
+
+sub editTest(\$$$,$)
+{
+    my ($testev, $newtestper, $duration, $managerID, $offset) = @_;
+    $offset = 0 if( !defined $offset );
+
+    # only change test if conditions met...
+    if( checkTestChangeAllowed( %{$testev}, $managerID ) ){
+	#
+	# Smartly handle two overlapping requests, such that
+	#  the highest rate is used for the duration specified
+	#  in the command
+	# TODO: Add fancier queuing here!
+
+	# Specifications:
+	#  - an EDIT with testper=0
+	#    will stop the corresponding 'temp' or 'forever' test
+	#    selected by the value of 'duration'.
+	#  - ** Only a "background" rate (forever) and one
+	#       temporary rate increase are supported.
+	#  - ANY new 'forever' rate will overwrite the previous one
+	#  - A 'forever' faster than existing 'temp' overwrites 'temp'
+	#    and does not recover it if a future 'forever' has a rate
+	#    less than the 'temp' (it removes all trace)
+	# state descriptions: (Current state) -> (action)
+	# saved valid|Currently running | New|   change|replace
+	# 'forever'  | 0=forever        |Edit|  period?|saved
+	# exists     | 1=temp)          |Type| ->      |'forever'?
+	#  0          0                   0         1     0
+	#  0          1                   0         0     1
+	#  1          1                   0         0     1
+	#  0          0                   1         1     1
+	#  0          1                   1         1     0
+	#  1          1                   1         1     0
+
+	#TODO!!!
+	# EDIT above states... action after rcving 'forever' while running
+	#  a 'temp' depends on period comparisons between
+	#  old 'forever' new 'forever' and 'temp'
+
+	#make sure existing testper is valid
+	if( !defined $testev->{testper} ){
+	    $testev->{testper} = 0;
+	}
+	#make sure limitTime is valid
+	if( !defined $testev->{limitTime} ){
+	    $testev->{limitTime} = 0;
+	}
+
+	if( defined $duration && $duration > 0 ){
+	    # New edit is a 'temp' type
+	    if( $newtestper < $testev->{testper} || 
+		$testev->{testper} == 0 )
+	    {
+		# state (xx1->1?) new per checked for faster freq.
+		if( $testev->{limitTime} == 0 && $newtestper > 0){
+		    # state (x01->11)
+		    #Save existing 'forever' test and use new testper
+		    $testev->{prevPeriod} = $testev->{testper};
+		    $testev->{testper} = $newtestper;
+		    $testev->{limitTime} = 
+			time_all()+$duration;
+		}elsif( $testev->{limitTime} != 0 ){
+		    # state (x11->10)
+		    if( $newtestper == 0 ){
+			# temp edit is 0 per, so re-start saved
+			#'forever' test
+			$testev->{testper} = $testev->{prevPeriod};
+			$testev->{limitTime} = 0;
+		    }else{
+			#update period and duration with new command
+			$testev->{testper} = $newtestper;
+			$testev->{limitTime} = 
+			    time_all()+$duration;
+		    }
+		}
+	    }
+	}else{
+	    #state (xx0->??)
+	    # New edit is a 'forever' type
+	    if( $testev->{limitTime} == 0 ){
+		# state (x00->10)
+		#  currently running a forever
+		$testev->{testper} = $newtestper;
+	    }else{
+		# state (x10->01)
+		#  currently running a temp
+		# cases of periods
+		#  1) new forever is not 0 and < existing temp.
+		#  2) new forever is 0
+		#  3) new forever is > existing temp
+		if( $newtestper != 0 &&
+		    $newtestper < $testev->{testper} )
+		{
+		    #case 1
+		    $testev->{testper} = $newtestper;
+		    $testev->{limitTime} = 0;
+		    $testev->{prevPeriod} = 0;
+		}elsif( $newtestper == 0 ){
+		    #case 2
+		    $testev->{prevPeriod} = 0;
+		}elsif( $newtestper > $testev->{testper} ){
+		    #case 3
+		    $testev->{prevPeriod} = $newtestper;
+		}
+	    }
+	}
+
+	$testev->{flag_scheduled} = 0;
+	$testev->{timeOfNextRun} = time_all()+$offset;
+	$testev->{managerID} = $managerID;
+	return 1;
+    }
+    else{
+	return 0;
+    }
+}

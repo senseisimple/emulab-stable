@@ -33,8 +33,9 @@ my @expnodes;
 sub usage 
 {
     warn "Usage: $0 [-p port] [-e pid/eid]".
-	"[-l latency period] [-b bandwidth period] [-a]".
-	"[-o outputport] [-L]   <input_file>\n".
+	" [-l latency period] [-b bandwidth period] [-a]".
+        " [-d testduration]".
+	" [-o outputport] [-L]   <input_file>\n".
 	"where -a = measure all pairs\n".
 	"      -L = do not init Latency\n".
 	"      -B = do not init bandwidth\n";
@@ -64,10 +65,11 @@ $settings{"expt"} = "__none";
 #*****************************************
 
 my %opt = ();
-getopts("s:p:o:h:e:l:b:aBL", \%opt);
+getopts("s:p:o:h:e:d:l:b:aBL", \%opt);
 
 if ($opt{h}) { exit &usage; }
 if ($opt{e}) { $settings{"expt"} = $opt{e}; }
+if ($opt{d}) { $settings{"testduration"} = $opt{d}; }
 if ($opt{a}) { $settings{"allpairs"} = 1; }
 if ($opt{L}) { $settings{"noLatency"} = 1; }
 if ($opt{B}) { $settings{"noBW"} = 1; }
@@ -276,7 +278,8 @@ sub initnode($$$$)
 		cmdtype   => "INIT",
 		destnodes => $destnodes,
 		testtype  => $testtype,
-		testper   => $testper
+		testper   => $testper,
+		duration  => $settings{testduration}
 		);
 
     sendcmd($node,\%cmd);
