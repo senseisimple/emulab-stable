@@ -578,38 +578,22 @@ namespace
       return;
     }
 
+    // We want to distinguish between packets that are outgoing and
+    // packets that are incoming. All other separation can be done
+    // inside the sensors themselves. We call these 'Send' and 'Ack'
+    // packets because my thinking was originally muddied about this.
     if (outgoing) {
       /*
        * Outgoing packets
        */
-      if (isAck) {
-        /*
-         * XXX - This is not yet implemented (I think)
-         */
-        //logWrite(ERROR,"Unhandled: outgoing ACK");
-      }
-// JD: This should be called even when there is no data. Otherwise,
-// there is confusion at connection startup and when there are other
-// zero length segments which should be sent.
-//      if (hasData) {
-        packet.packetType = PACKET_INFO_SEND_COMMAND;
-        pos->second->capturePacket(&packet);
-//      }
+      packet.packetType = PACKET_INFO_SEND_COMMAND;
+      pos->second->capturePacket(&packet);
     } else {
       /*
        * Incoming packets
        */
-      if (isAck) {
-        packet.packetType = PACKET_INFO_ACK_COMMAND;
-        pos->second->capturePacket(&packet);
-      }
-// See above
-//      if (hasData) {
-        /*
-         * XXX - This is not yet implemented (I think)
-         */
-        //logWrite(ERROR,"Unhandled: incoming data");
-//      }
+      packet.packetType = PACKET_INFO_ACK_COMMAND;
+      pos->second->capturePacket(&packet);
     }
   }
 
