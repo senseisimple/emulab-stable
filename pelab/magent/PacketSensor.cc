@@ -94,10 +94,24 @@ void PacketSensor::localSend(PacketInfo * packet)
                "PacketSensor::localSend() new record: ss=%u,sl=%u,se=%u,tl=%u",
                record.seqStart, sequenceLength, record.seqEnd,
                record.totalLength);
-      globalSequence.seqEnd = record.seqEnd;
       if (unacked.empty())
       {
         globalSequence.seqStart = record.seqStart;
+        globalSequence.seqEnd = record.seqEnd;
+      }
+      else
+      {
+        /*
+         * Sanity check - the new packet we're adding should start where the
+         * last one left off
+         */
+        if (record.seqStart != (globalSequence.seqEnd + 1))
+        {
+          logWrite(EXCEPTION,"PacketSensor::localSend() may have missed a "
+                   "packet - last seq seen: %d, new seq: %d (lost %d)",
+                   globalSequence.seqEnd,record.seqStart,
+                   record.seqStart - globalSequence.seqEnd);
+        }
         globalSequence.seqEnd = record.seqEnd;
       }
       logWrite(SENSOR,
