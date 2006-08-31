@@ -54,6 +54,7 @@ void writeToConnections(multimap<Time, Connection *> & schedule);
 void addNewPeer(fd_set * readable);
 void readFromPeers(fd_set * readable);
 void packetCapture(fd_set * readable);
+void exitHandler(int signal);
 
 int main(int argc, char * argv[])
 {
@@ -288,6 +289,17 @@ void init(void)
   global::maxReader = -1;
 
   logInit(stderr, LOG_EVERYTHING, true);
+
+  /*
+   * Install a signal handler so that we can catch control-C's, etc.
+   */;
+  struct sigaction action;
+  action.sa_handler = exitHandler;
+  sigemptyset(&action.sa_mask);
+  action.sa_flags = 0;
+  sigaction(SIGTERM,&action,NULL);
+  sigaction(SIGINT,&action,NULL);
+
   srandom(getpid());
   switch (global::connectionModelArg)
   {
@@ -773,4 +785,9 @@ int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
 
   setDescriptor(resultfd);
   return resultfd;
+}
+
+void exitHandler(int signal) {
+    logWrite(EXCEPTION,"Killed with signal %i, cleaning up",signal);
+    exit(0);
 }
