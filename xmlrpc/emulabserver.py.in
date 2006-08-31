@@ -4496,6 +4496,97 @@ class template:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Commit (modify) a template.
+    #
+    def template_commit(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid",))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w\/]*$", argdict["guid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        argstr  = "-q"
+
+        for opt, val in argdict.items():
+            if opt == "exp":
+                argstr += " -e "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        argstr += " "
+        argstr += str(argdict["guid"])
+        
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_commit " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Export a template.
+    #
+    def export(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "instance"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w\/]*$", argdict["guid"]) and
+                re.match("^[-\w]*$", argdict["instance"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        argstr  = "-q"
+
+        for opt, val in argdict.items():
+            if opt == "instance":
+                argstr += " -i "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        argstr += " "
+        argstr += str(argdict["guid"])
+        
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_export " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
     pass
 
 #

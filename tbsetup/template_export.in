@@ -287,6 +287,9 @@ if ($spew) {
     system("$TAR zcf - -C $checkout .");
     cleanup();
 }
+else {
+    print "$checkout\n";
+}
 exit(0);
 
 #

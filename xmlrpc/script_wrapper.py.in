@@ -127,6 +127,10 @@ API = {
                             "help" : "Wait for experiment to reach a state" },
     "tipacl"            : { "func" : "tipacl",
                             "help" : "Get console acl" },
+    "template_commit"   : { "func" : "template_commit",
+                            "help" : "Commit changes to template (modify)" },
+    "template_export"   : { "func" : "template_export",
+                            "help" : "Export template record" },
 };
 
 #
@@ -1748,6 +1752,146 @@ class tipacl:
         wrapperoptions();
         return
     pass
+
+#
+# template_commit
+#
+class template_commit:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid   = None
+        params = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"] = val
+                pass
+            pass
+        
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+            pass
+        
+        if guid == None:
+            self.usage();
+            return -1
+        params["guid"] = guid
+        
+        rval,response = do_method("template", "template_commit", params);
+        return rval;
+    
+    def usage(self):
+	print "template_commit [<guid/vers>]";
+	print "where:";
+	print "     -w        - Wait for template to finish commit";
+        print "     -e        - Commit from specific template instance (eid)";
+        print "    guid/vers  - Commit template";
+        print ""
+        print "By default, commit runs in the background, sending you email ";
+        print "when the operation has completed. Use the -w option to wait";
+        print "in the foreground, returning exit status. Email is still sent.";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+class template_export:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "i:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid   = None
+        params = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-i":
+                params["instance"] = val
+                pass
+            pass
+        
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+            pass
+        
+        if guid == None:
+            self.usage();
+            return -1
+        params["guid"] = guid
+        
+        rval,response = do_method("template", "export", params);
+        return rval;
+    
+    def usage(self):
+	print "template_export -i instance_id [<guid/vers>]";
+	print "where:";
+        print "     -i        - Export specific template instance (idx)";
+        print "    guid/vers  - Commit template";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# Infer template guid from path
+#
+def infer_guid(path):
+    guid = None
+    vers = None
+    dirs = path.split(os.path.sep)
+    if ((len(dirs) < 6) or
+        (not (("proj" in dirs) and ("templates" in dirs))) or
+        (len(dirs) < (dirs.index("templates") + 2))):
+        return None
+    else:
+        guid = dirs[dirs.index("templates") + 1]
+        vers = dirs[dirs.index("templates") + 2]
+        pass
+    return guid + "/" + vers
 
 #
 # Process program arguments. There are two ways we could be invoked.

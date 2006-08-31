@@ -31,7 +31,8 @@ USERLIBS	= sshxmlrpc.py emulabclient.py libxmlrpc.pm
 SYMLINKS        = node_admin node_reboot os_load create_image node_list \
 		  delay_config link_config savelogs portstats eventsys_control \
 		  readycount nscheck startexp batchexp startexp swapexp endexp \
-		  modexp expinfo node_avail tbuisp expwait
+		  modexp expinfo node_avail tbuisp expwait template_commit \
+		  template_export
 
 #
 # Force dependencies on the scripts so that they will be rerun through

@@ -149,15 +149,6 @@ if (system("$checkquota $dbuid") != 0) {
 ParseArgs();
 
 #
-# In wait mode, block SIGINT until we spin off the background process.
-#
-if ($waitmode) {
-    $SIG{QUIT} = 'IGNORE';
-    $SIG{TERM} = 'IGNORE';
-    $SIG{INT}  = 'IGNORE';
-}
-
-#
 # Make sure UID is allowed to create experiments in this project.
 #
 if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
@@ -187,11 +178,17 @@ else {
 	if (! defined($description));
 }
 
-# Use the logonly option to audit so that we get a record mailed.
-LogStart(0);
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
 
 #
-# Create a template record. 
+# Create a template record now, so we know what it is.
 #
 my %args = ();
 
@@ -216,6 +213,78 @@ if (! ($template = Template->Create(\%args))) {
 #
 $justexit = 0;
 
+# Grab stuff we need out of the template.
+$guid = $template->guid();
+$vers = $template->vers();
+$eid  = $template->eid();
+
+#
+# Use the logonly option to audit so that we get a record mailed.
+#
+if (my $childpid = AuditStart(1, undef, 1)) {
+    #
+    # Parent exits normally, unless in waitmode. We have to set
+    # justexit to make sure the END block below does not run.
+    #
+    $justexit = 1;
+    
+    if (!$waitmode) {
+	print("Template $pid/$tid is being created.\n".
+ 	      "You will be notified via email it is ready to use\n")
+	    if (! $quiet);
+	exit(0);
+    }
+    print("Waiting for template $pid/$tid to be created\n")
+	if (! $quiet);
+
+    # Give child a chance to run.
+    select(undef, undef, undef, 0.25);
+	
+    #
+    # Reset signal handlers. User can now kill this process, without
+    # stopping the child.
+    #
+    $SIG{TERM} = 'DEFAULT';
+    $SIG{QUIT} = 'DEFAULT';
+    $SIG{INT}  = 'DEFAULT';
+
+    #
+    # Wait until child exits or until user gets bored and types ^C.
+    #
+    waitpid($childpid, 0);
+    my $exit_code = $? >> 8;
+
+    print("Done. Exited with status: $?\n")
+	if (! $quiet);
+
+    if ($exit_code == 0) {
+        # Web interface depends on this line. Bad; need another way to send
+        # back the newly generated guid/version.
+	print "Template $guid/$vers has been created\n";
+    }
+    else {
+	my $d = tblog_lookup_error();
+	print tblog_format_error($d);
+    }
+    
+    exit $exit_code;
+}
+
+#
+# We need to catch TERM so we can kill the children and do a cleanup.
+#
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}! Killing template setup ...");
+}
+$SIG{TERM} = \&handler;
+$SIG{QUIT} = 'DEFAULT';
+
 #
 # The template gets its own directory structure. 
 #
@@ -235,11 +304,6 @@ $template->NewMetadata("description", $description,
 #
 $template->NewMetadata("TID", $tid, $dbuid, "tid") == 0
     or fatal(-1, "Failed to insert metadata record for description");
-
-# Grab stuff we need out of the template.
-$guid = $template->guid();
-$vers = $template->vers();
-$eid  = $template->eid();
 
 # Now invoke batchexp to preload the experiment. Note special -x option.
 system("$batchexp ". 
@@ -353,10 +417,6 @@ if ($modify) {
 	or fatal(-1, "Could not update parent template record!");
 }
 
-# Web interface depends on this line. Bad; need another way to send
-# back the newly generated guid/version.
-LogEnd();
-print "Template $guid/$vers has been created\n";
 exit(0);
 
 #

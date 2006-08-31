@@ -28,7 +28,7 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_export [-q] [-s] [-e eid] <guid/vers>\n".
+	  "Usage: template_export [-q] [-e eid] <guid/vers>\n".
 	  "switches and arguments:\n".
 	  "-q          - be less chatty\n".
 	  "-e <eid>    - Experiment instance to commit from\n".
@@ -128,13 +128,40 @@ if (! $template->AccessCheck($dbuid, TB_EXPT_MODIFY)) {
 #
 $SIG{TERM} = \&sighandler;
 
-if ($eid) {
+if (defined($eid)) {
     CommitFromInstance();
 }
 else {
     CommitFromTemplate();
 } 
 exit(0);
+
+#
+# Commit a template. This is basically a template modify operation.
+#
+sub CommitFromTemplate()
+{
+    my $pid     = $template->pid();
+    my $tid     = $template->tid();
+    my $gid     = $template->gid();
+    my $userdir = $template->path();
+    my $nsfile  = "$userdir/archive/nsdata/nsfile.ns";
+    my $optarg  = ($quiet ? "-q" : "");
+    
+    #
+    # The NS file is taken from the template.
+    #
+    fatal(1, "There is no NS file in $userdir/archive/nsdata!")
+	if (! -e $nsfile);
+
+    #
+    # Do a template modify of the current template.
+    #
+    system("$modify -m $guid/$version -w $optarg -g $gid $pid $tid $nsfile");
+    if ($?) {
+	fatal($? >> 8, "Failed to modify template!");
+    }
+}
 
 #
 # Commit from an instance.
@@ -240,10 +267,6 @@ sub ParseArgs()
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 	    tbdie("Improper experiment name (id)!");
 	}
-    }
-    else {
-	tberror("Must provide an experiment ID (-e option)!");
-	exit(1);
     }
 
     if (defined($options{"q"})) {
