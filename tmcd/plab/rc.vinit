@@ -30,10 +30,6 @@ else
     exit 1;
 fi
 
-# Pass this along for tmcc clients.
-TMCCVNODEID=$VNODEID
-export TMCCVNODEID
-
 # See how we were called.
 case "$1" in
     start)

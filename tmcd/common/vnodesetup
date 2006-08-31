@@ -161,6 +161,9 @@ libsetup_setvnodeid($vnodeid);
 # Tell tmcc library too, although thats already been done with previous call.
 configtmcc("subnode", $vnodeid);
 
+# Pass this along for tmcc clients.
+$ENV{'TMCCVNODEID'} = $vnodeid;
+
 #
 # Hacky. All this path stuff is hacky.
 # 
