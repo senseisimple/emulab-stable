@@ -3667,3 +3667,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.85: Fix to previous revision; Skip to next entry.
 
+4.86: Fix up column definitions for latitude and longitude in 
+      widearea_nodeinfo table.
+
+      alter table widearea_nodeinfo
+          change latitude latitude float default NULL,
+          change longitude longitude float default NULL;
+

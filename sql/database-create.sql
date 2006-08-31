@@ -3135,8 +3135,8 @@ CREATE TABLE widearea_nodeinfo (
   external_node_id tinytext,
   hostname varchar(255) default NULL,
   site varchar(255) default NULL,
-  latitude float(6,5) default NULL,
-  longitude float(6,5) default NULL,
+  latitude float default NULL,
+  longitude float default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
