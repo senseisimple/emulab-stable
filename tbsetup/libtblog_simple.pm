@@ -23,8 +23,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
-	      tbdie
-	      tblog_session
+	      tbdie tblog_new_child_process tblog_session 
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
 	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG
 	      SEV_DEBUG SEV_NOTICE SEV_WARNING SEV_SECONDARY
@@ -128,6 +127,17 @@ sub tblog_session() {
     return $ENV{TBLOG_SESSION};
 }
 
+
+#
+# Dummy tblog_init_process, does nothing in this module
+# Once the real "libtblog.pm" is used than this will be replaced
+# with the real function 
+#
+sub tblog_init_process_dummy( @ ) {
+    return 1;
+}
+*tblog_init_process = \&tblog_init_process_dummy;
+
 #
 # Dummy dblog, does nothing in this module
 # Once the real "libtblog.pm" is used than this will be replaced
@@ -137,6 +147,14 @@ sub dblog_dummy( $$@ ) {
   return 1;
 }
 *dblog = \&dblog_dummy;
+
+
+#
+# Enter a new child process, which should be called after a fork
+#
+sub tblog_new_child_process() { 
+    tblog_init_process(undef);
+}
 
 #
 # tblog(priority, mesg, ...)

@@ -208,7 +208,8 @@ use Exporter;
 	      tbdie tbreport tblog_set_info tblog_set_default_cause
 	      tblog_sub_process tblog_find_error tblog_email_error
 	      tblog_start_capture tblog_stop_capture
-	      tblog_new_process tblog_init_process tblog_exit
+	      tblog_new_process tblog_new_child_process
+	      tblog_init_process tblog_exit
 	      tblog_session tblog_lookup_error tblog_format_error
 	      tblog_set_attempt tblog_inc_attempt tblog_get_attempt
 	      tblog_set_cleanup tblog_get_cleanup
@@ -419,19 +420,34 @@ sub tblog_new_process(@) {
 #
 # NOTE: Everything is currently stored in the %ENV hash.
 #
-sub tblog_init_process(@) {
+sub tblog_init_process_real(@) {
     my ($script, @argv) = @_;
     local $DBQUERY_MAXTRIES = 3;
 
-    # Get script name
+    if (defined $script) {
 
-    $ENV{TBLOG_SCRIPTNAME} = $script;
-    $ENV{TBLOG_BASE_SCRIPTNAME} = $script unless defined $ENV{TBLOG_BASE_SCRIPTNAME};
+	# Get script name
+	
+	$ENV{TBLOG_SCRIPTNAME} = $script;
+	$ENV{TBLOG_BASE_SCRIPTNAME} = $script unless defined $ENV{TBLOG_BASE_SCRIPTNAME};
+	
+	# Get script number
+	
+	$ENV{TBLOG_SCRIPTNUM} = script_name_to_num($ENV{TBLOG_SCRIPTNAME});
 
-    # Get script number
+	# Reset the child field
 
-    $ENV{TBLOG_SCRIPTNUM} = script_name_to_num($ENV{TBLOG_SCRIPTNAME});
+	delete $ENV{TBLOG_CHILD};
 
+    } else {
+
+	# We are a child process after a fork
+
+	$ENV{TBLOG_CHILD} = 1;
+
+	@argv = ('...');
+    }
+	
     # ...
 
     if (defined $ENV{'TBLOG_SESSION'}) {
@@ -463,6 +479,10 @@ sub tblog_init_process(@) {
 	DBQueryFatal("update log set session=$id,invocation=$id where seq=$id");
     }
 
+}
+{
+  local $^W = 0;
+  *tblog_init_process = \&tblog_init_process_real;
 }
 
 
@@ -614,11 +634,16 @@ sub tblog_exit() {
 # informative_scriptname()
 #
 sub informative_scriptname() {
+    my $name;
     if ($ENV{TBLOG_BASE_SCRIPTNAME} eq $REAL_SCRIPTNAME) {
-	return $ENV{TBLOG_SCRIPTNAME};
+	$name = $ENV{TBLOG_SCRIPTNAME};
     } else {
-	return "$ENV{TBLOG_SCRIPTNAME} (but really $REAL_SCRIPTNAME)";
+	$name = "$ENV{TBLOG_SCRIPTNAME} (but really $REAL_SCRIPTNAME)";
     }
+    if ($ENV{TBLOG_CHILD}) {
+	$name = "child of $name";
+    }
+    return $name;
 }
 
 

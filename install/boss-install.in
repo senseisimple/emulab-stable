@@ -103,6 +103,7 @@ my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
 my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
+my $MYSQL_PM_PATCH  = "$TOP_SRCDIR/patches/Mysql.pm.patch";
 my $PHP4_PATCH      = "$TOP_SRCDIR/patches/php4-Makefile.patch";
 my $INIT_PRIVKEY    = "$TOP_SRCDIR/install/identity";
 
@@ -459,6 +460,27 @@ Phase "patches", "Applying patches", sub {
 	    PhaseSkip("$patchfile already applied");
 	}
 	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+    };
+    Phase "Mysql.pm.patch", "Patching Mysql.pm", sub {
+	my $patchfile = $MYSQL_PM_PATCH;
+	my $patchfile = `realpath $patchfile`;
+	chomp $patchfile;
+
+	my $dir;
+	foreach $prefix (@INC) {
+	    if (-e "$prefix/Mysql.pm") {
+		$dir = $prefix;
+		last;
+	    }
+	}
+	if (!defined($dir)) {
+	    PhaseFail("Unable to find Mysql.pm");
+	}
+
+	if (!ExecQuiet("$PATCH -d $dir -C -f -l -R -i $patchfile")) {
+	    PhaseSkip("$patchfile already applied");
+	}
+	ExecQuietFatal("$PATCH -d $dir -f -l -i $patchfile");
     };
 };
 

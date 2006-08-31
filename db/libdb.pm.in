@@ -10,6 +10,8 @@
 # A library of useful DB stuff. Mostly things that get done a lot.
 # Saves typing.
 #
+# NOTE: Overrides perl's builtin fork()
+#
 # XXX: The notion of "uid" is a tad confused. A unix uid is a number,
 #      while in the DB a user uid is a string (equiv to unix login).
 #      Needs to be cleaned up.
@@ -240,6 +242,7 @@ use POSIX qw(strftime);
 require Node;
 require NodeType;
 require Mysql;
+use subs qw(fork);
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT
 	    @EXPORT_OK @virtualTables @physicalTables);
@@ -377,6 +380,30 @@ sub NewTBDBHandle() {
     TBDBConnect($dbnum);
     return $dbnum;
 }
+
+#
+# Special version of fork to
+#    1) Set InactiveDestroy in the child process so that it won't send a
+#       disconnect when the handle is destroyed as this will also
+#       close the database handle for the parent
+#    2) Call tblog_new_child_process in the child process to properly
+#       inform tblog of the new process.  NOTE: This will be a NoOp
+#       if the libtblog module is not loaded.
+#
+sub fork() {
+    my $pid = CORE::fork();
+    return $pid unless defined $pid;
+    if ($pid == 0) {
+	# We are the child
+	for (my $i = 0; $i < @DB; $i++) {
+	    $DB[$i]->setInactiveDestroy(1) if defined $DB[$i];
+	}
+	tblog_new_child_process();
+    }
+    return $pid;
+}
+*CORE::GLOBAL::fork = \&fork;
+
 
 #
 # Record last DB error string.
