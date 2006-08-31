@@ -1172,7 +1172,7 @@ sub doVlansFromTables($@) {
 	return RemoteDoVlansFromTables(@vlans);
     }
 
-    my @trunkedPorts = getExperimentTrunks($eid,$pid);
+    my @trunkedPorts = getExperimentTrunks($pid,$eid);
     $equaltrunking = 1;
     foreach my $port (@trunkedPorts) {
 	$errors += doTrunkEnable($stacks,$port);
