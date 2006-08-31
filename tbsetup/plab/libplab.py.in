@@ -148,6 +148,16 @@ signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 #
 
 #
+# Multiple attribute change exception
+#
+class MultiChangeError(Exception):
+    def __init__(self, nodeid, chattrs={}):
+        self.nodeid = nodeid
+        self.chattrs = chattrs
+        pass
+    pass
+
+#
 # Class responsible for parsing planetlab sites file
 #
 class siteParser:
@@ -190,7 +200,7 @@ class siteParser:
             if attrs.has_key('LATITUDE'):
                 self.__latitude = attrs['LATITUDE']
             else:
-                self.__latiturde = 0
+                self.__latitude = 0
             if attrs.has_key('LONGITUDE'):
                 self.__longitude = attrs['LONGITUDE']
             else:
@@ -388,10 +398,22 @@ class Plab:
 
         # Process node updates.
         updstr = ""
+        chgerrstr = ""
         if len(toupdate):
             print "There are %d plab node updates." % len(toupdate)
             for updent,updmapent in toupdate:
-                self.__updateNodeMapping(updmapent)
+                try:
+                    self.__updateNodeMapping(updmapent)
+                    pass
+                except MultiChangeError, e:
+                    print "%s not updated: Too many attribute changes." % \
+                          e.nodeid
+                    chgerrstr += "%s:\n" % e.nodeid
+                    for attr,val in e.chattrs.items():
+                        chgerrstr += "\t%s:\t%s => %s\n" % (attr,val[0],val[1])
+                        pass
+                    chgerrstr += "\n"
+                    continue
                 self.__addNode(updent, updmapent)
                 # Add a line for the add/update message.
                 nodestr = updmapent[0] + "\n"
@@ -400,6 +422,14 @@ class Plab:
                     pass
                 updstr += nodestr + "\n"
                 pass
+            pass
+
+        if chgerrstr:
+            SENDMAIL(TBOPS,
+                     "Two or more changes detected for some plab nodes",
+                     "Two or more distinguishing attributes have changed "
+                     "on the following planetlab nodes:\n\n%s\n" % chgerrstr,
+                     TBOPS)
             pass
 
         if len(toadd) or len(toupdate):
@@ -802,18 +832,7 @@ class Plab:
                                           'LONGITUDE' : 'longitude',}}
 
         nodeid, chattrs = updent
-        
-        if len(chattrs) > 2:
-            errmsg = "More than 2 plab node attrs have changed!\n\n%s\n\n" \
-                     "%s has been moved to hwdown." % (chattrs, nodeid)
-            MarkPhysNodeDown(nodeid)
-            TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, errmsg)
-            SENDMAIL(TBOPS,
-                     "More than 2 plab node attrs have changed on %s" % nodeid,
-                     errmsg,
-                     TBOPS)
-            raise RuntimeError, errmsg # XXX: maybe don't raise an exception.
-        
+                
         # seperate out attrs by table
         chattrs_by_table = {}
         for attr in chattrs:
@@ -821,12 +840,28 @@ class Plab:
             if table not in chattrs_by_table:
                 chattrs_by_table[table] = []
             chattrs_by_table[table].append(attr)
+            pass
+
+        # If more than 2 attributes have changed in the plab_mapping table,
+        # then move the node to hwdown and report the issue.
+        if chattrs_by_table.has_key('plab_mapping') and \
+               len(chattrs_by_table['plab_mapping']) > 2:
+            pmattrs = {}
+            for attr in chattrs_by_table['plab_mapping']:
+                pmattrs[attr] = chattrs[attr]
+                pass
+            errmsg = "More than 2 plab node attrs have changed!\n\n%s\n\n" \
+                     "%s has been moved to hwdown." % (pmattrs, nodeid)
+            MarkPhysNodeDown(nodeid)
+            TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, errmsg)
+            raise MultiChangeError(nodeid, pmattrs)
 
         # update each table
         for table in chattrs_by_table:
             updstr = ",".join(map(lambda x: "%s='%s'" %
-                (attrmap[table][x[0]],x[1][1]), chattrs.items()))
-            DBQueryFatal("update %s set %s where node_id='%s'" % (table, updstr, nodeid))
+                (attrmap[table][x],chattrs[x][1]), chattrs_by_table[table]))
+            DBQueryFatal("update %s set %s where node_id='%s'" %
+                         (table, updstr, nodeid))
         updmsg = "Plab node %s attributes updated:\n\n%s" % (nodeid, chattrs)
         TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, updmsg)
         # updateNodeEtries() already sends mail.
