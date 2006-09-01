@@ -51,6 +51,7 @@ my %shapeinfo;
 my $showonly = 0;
 my $starttime = 0;
 my $outfile;
+my $doelabaddrs = 1;
 
 # Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10000;	# Kbits/sec
@@ -230,8 +231,14 @@ sub write_info($)
 	    my ($dst,$bw,$del,$plr) = @{$rec};
 
 	    # XXX src is an "elab-N" string, dst is a "10.0.0.N" address
-	    $src =~ s/$eprefix/$pprefix/;
-	    $dst =~ s/10\.0\.0\./$pprefix/;
+	    if ($doelabaddrs) {
+		$src =~ s/$eprefix/10.0.0./;
+	    } else {
+		$src =~ s/$eprefix/$pprefix/;
+		$src = $ip_mapping{$node_mapping{$src}};
+		$dst =~ s/10\.0\.0\./$pprefix/;
+		$dst = $ip_mapping{$node_mapping{$dst}};
+	    }
 
 	    #
 	    # Jon says:
@@ -244,9 +251,7 @@ sub write_info($)
 	    #   include a PLR place holder after bandwidth in the form
 	    #   of a probability N.NNNN
 	    #
-	    printf $OUT "%s %s %d %d %6.4f\n",
-	           $ip_mapping{$node_mapping{$src}},
-	           $ip_mapping{$node_mapping{$dst}},
+	    printf $OUT "%s %s %d %d %6.4f\n", $src, $dst,
 	           $del + 0.5, $bw + 0.5, $plr;
 	}
     }
