@@ -218,7 +218,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
         tb-set-node-tarfiles $planet($i) $tarfiles
         tb-set-node-rpms $planet($i) $plab_rpms
-        set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
+        set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
 
@@ -242,7 +242,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
         tb-set-node-tarfiles $plab($i) $tarfiles
         tb-set-node-rpms $plab($i) $plab_rpms
-        set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
+        set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
 
@@ -269,7 +269,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     if {$elab_rpms != ""} {
         tb-set-node-rpms $elab($i) $elab_rpms
     }
-    set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
+    set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
     lappend tflist $tfupdate($tfix)
     incr tfix
 
