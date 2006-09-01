@@ -182,47 +182,74 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
   }
   if (state == CONNECTED)
   {
-    // Create a different random write each time.
-    vector<char> buffer;
-    buffer.resize(size);
-    size_t i = 0;
-    for (i = 0; i < buffer.size(); ++i)
+    /*
+     * Create a different random write each time.
+     * We do this in terms of full words rather than chars because this is a
+     * performance-critical piece of code.
+     * XXX: What I really want here is a compile-time assert, not a runtime
+     * assert...
+     */
+    assert(MAX_WRITESIZE % 4 == 0);
+    uint32_t buffer[MAX_WRITESIZE / 4];
+    int bufferwords = min(MAX_WRITESIZE / 4, size / 4);
+    for (int i = 0; i < bufferwords; ++i)
     {
-      buffer[i] = static_cast<char>(random() & 0xff);
+      buffer[i] = random();
     }
-    // Actually write the darn thing.
-    int error = send(peersock, & buffer[0], buffer.size(), 0);
-    if (error == 0)
-    {
-      close(peersock);
-      peersock = -1;
-      state = DISCONNECTED;
-      result.bufferFull = false;
-      result.isConnected = false;
-      return 0;
-    }
-    else if (error == -1)
-    {
-      if (errno == EWOULDBLOCK)
+
+    /*
+     * We only have MAX_WRITESIZE bytes of random data - therefore, we may have
+     * to do more than one write if they asked for a bigger write than
+     * MAX_WRITESIZE
+     */
+    int bytesToWrite;
+    int bytesWritten = 0;
+    for (bytesToWrite = size; bytesToWrite > 0; bytesToWrite -= MAX_WRITESIZE) {
+      // Actually write the darn thing.
+      int error = send(peersock, &buffer[0], size, 0);
+      logWrite(CONNECTION_MODEL,"Tried to write %d bytes, actually wrote %d",
+              size, error);
+
+      if (error == 0)
       {
-        result.bufferFull = true;
+        close(peersock);
+        peersock = -1;
+        state = DISCONNECTED;
+        result.bufferFull = false;
+        result.isConnected = false;
+        return 0;
+      }
+      else if (error == -1)
+      {
+        if (errno == EWOULDBLOCK)
+        {
+          logWrite(CONNECTION_MODEL,"Buffer is full");
+          result.bufferFull = true;
+          // No point in trying more writes
+          return error;
+        }
+        else
+        {
+          logWrite(EXCEPTION, "Failed write to peer: %s", strerror(errno));
+        }
+        return -1;
       }
       else
       {
-        logWrite(EXCEPTION, "Failed write to peer: %s", strerror(errno));
+        // Write succeeded, all bytes got written
+        bytesWritten += bytesToWrite;
       }
-      return -1;
     }
-    else
-    {
-      return error;
-    }
-  }
-  result.bufferFull = false;
-  result.isConnected = false;
-  return -1;
-}
 
+    // Return the total number of bytes written
+    return bytesWritten;
+
+  } else {
+    result.bufferFull = false;
+    result.isConnected = false;
+    return -1;
+  }
+}
 bool KernelTcp::isConnected(void)
 {
   return state == CONNECTED;

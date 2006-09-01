@@ -24,6 +24,7 @@ extern "C"
 #include <netdb.h>
 #include <math.h>
 #include <pcap.h>
+#include <assert.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
 #include <netinet/ether.h>
