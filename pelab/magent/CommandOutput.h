@@ -29,19 +29,39 @@ public:
   void eventMessage(std::string const & message, Order const & key,
                     PathDirection dir=FORWARD_PATH)
   {
+    if (dir == FORWARD_PATH)
+    {
+      genericMessage(EVENT_FORWARD_PATH, message, key);
+    }
+    else
+    {
+      genericMessage(EVENT_BACKWARD_PATH, message, key);
+    }
+  }
+
+  void genericMessage(int type, std::string const & message, Order const & key)
+  {
     if (message.size() <= 0xffff && message.size() > 0)
     {
       Header prefix;
       std::string pathString;
-      if (dir == FORWARD_PATH)
+      prefix.type = type;
+      switch (prefix.type)
       {
-        prefix.type = EVENT_FORWARD_PATH;
-        pathString = "FORWARD";
-      }
-      else
-      {
-        prefix.type = EVENT_BACKWARD_PATH;
-        pathString = "BACKWARD";
+      case EVENT_FORWARD_PATH:
+        pathString = "EVENT_FORWARD";
+        break;
+      case EVENT_BACKWARD_PATH:
+        pathString = "EVENT_BACKWARD";
+        break;
+      case TENTATIVE_THROUGHPUT:
+        pathString = "TENTATIVE_THROUGHPUT";
+        break;
+      case AUTHORITATIVE_BANDWIDTH:
+        pathString = "AUTHORITATIVE_BANDWIDTH";
+        break;
+      default:
+        pathString = "Unknown Output Command Type";
       }
       prefix.size = message.size();
       prefix.key = key;

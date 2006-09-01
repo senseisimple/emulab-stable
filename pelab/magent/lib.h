@@ -63,8 +63,21 @@ void replayWritePacket(PacketInfo * packet);
 // Enum of header types -- to-monitor (Events, etc.)
 enum
 {
+  // In these two cases, the body of the message is a string to be
+  // sent as an opaque event.
   EVENT_FORWARD_PATH = 0,
-  EVENT_BACKWARD_PATH = 1
+  EVENT_BACKWARD_PATH = 1,
+
+  // In these two cases, the body of the message is a string
+  // consisting only of the number of estimated throughput or
+  // bandwidth in kbps.
+
+  // This is the bandwidth number to send if it exceeds the current
+  // bandwidth on the monitor side.
+  TENTATIVE_THROUGHPUT = 2,
+  // This is a bandwidth number to use even if it is smaller than the
+  // bandwidth on the monitor side
+  AUTHORITATIVE_BANDWIDTH = 3
 };
 
 // Enum of header types -- from-monitor (Commands)

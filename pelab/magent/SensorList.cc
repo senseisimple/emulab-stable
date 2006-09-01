@@ -204,7 +204,7 @@ void SensorList::pushMinDelaySensor(void)
       // Dependency set
       depMinDelaySensor = newSensor;
   }
-  
+
 }
 
 void SensorList::pushMaxDelaySensor(void)
@@ -244,9 +244,11 @@ void SensorList::pushThroughputSensor(void)
 void SensorList::pushEwmaThroughputSensor(void)
 {
   // Dependency list
+  pushStateSensor();
   pushThroughputSensor();
 
   logWrite(SENSOR, "Adding EwmaThroughputSensor");
-  std::auto_ptr<Sensor> current(new EwmaThroughputSensor(depThroughputSensor));
+  std::auto_ptr<Sensor> current(new EwmaThroughputSensor(depThroughputSensor,
+                                                         depStateSensor));
   pushSensor(current);
 }

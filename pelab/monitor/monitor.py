@@ -13,10 +13,13 @@ import time
 import socket
 import select
 import re
+from optparse import OptionParser
 
 EVENT_FORWARD_PATH = 0
 EVENT_BACKWARD_PATH = 1
-
+TENTATIVE_THROUGHPUT = 2
+AUTHORITATIVE_BANDWIDTH = 3
+  
 NEW_CONNECTION_COMMAND = 0
 TRAFFIC_MODEL_COMMAND = 1
 CONNECTION_MODEL_COMMAND = 2
@@ -46,10 +49,16 @@ emulated_to_real = {}
 real_to_emulated = {}
 emulated_to_interface = {}
 ip_mapping_filename = ''
+initial_filename = ''
 this_experiment = ''
 this_ip = ''
 stub_ip = ''
+stub_port = 0
 netmon_output_version = 2
+
+# A throughput measurement is only passed on as an event if it is
+# larger than the last bandwidth from that connection
+connection_bandwidth = {}
 
 total_size = 0
 last_total = -1
@@ -61,9 +70,9 @@ def main_loop():
   read_args()
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-  sys.stdout.write("stub_ip is %s\n" % stub_ip)
+  sys.stdout.write("stub_ip is " + stub_ip + ":" + str(stub_port) + "\n")
   sys.stdout.flush()
-  conn.connect((stub_ip, 4200))
+  conn.connect((stub_ip, stub_port))
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
   poll.register(conn, select.POLLIN)
@@ -97,16 +106,60 @@ def main_loop():
 #    sys.stdout.write('Loop end\n')
 
 def read_args():
-  global ip_mapping_filename, this_experiment, this_ip, stub_ip
-  if len(sys.argv) >= 4:
-    ip_mapping_filename = sys.argv[1]
-    this_experiment = sys.argv[2]
-    this_ip = sys.argv[3]
-    populate_ip_tables()
-    if len(sys.argv) == 5:
-      stub_ip = sys.argv[4]
-    else:
-      stub_ip = emulated_to_real[this_ip]
+  global ip_mapping_filename, this_experiment, this_ip, stub_ip, stub_port
+  global initial_filename
+
+  usage = "usage: %prog [options]"
+  parser = OptionParser(usage=usage)
+  parser.add_option("--mapping", action="store", type="string",
+                    dest="ip_mapping_filename", metavar="MAPPING_FILE",
+                    help="File mapping IP addresses on Emulab to those on PlanetLab (required)")
+  parser.add_option("--experiment", action="store", type="string",
+                    dest="this_experiment", metavar="EXPERIMENT_NAME",
+                    help="Experiment name of the form pid/eid (required)")
+  parser.add_option("--ip", action="store", type="string",
+                    dest="this_ip", metavar="X.X.X.X",
+                    help="The IP address the monitor will use (required)")
+  parser.add_option("--stub-ip", action="store", type="string",
+                    dest="stub_ip", metavar="X.X.X.X",
+                    help="The IP address of the stub (if not specified, defaults to the one in the ip mapping)")
+  parser.add_option("--stub-port", action="store", type="int",
+                    dest="stub_port", default=4200,
+                    help="The port used to connect to the stub (defaults to 4200)")
+  parser.add_option("--initial", action="store", type="string",
+                    dest="initial_filename", metavar="INITIAL_CONDITIONS_FILE",
+                    help="File giving initial conditions for connections (defaults to no shaping)")
+
+  (options, args) = parser.parse_args()
+  ip_mapping_filename = options.ip_mapping_filename
+  this_experiment = options.this_experiment
+  this_ip = options.this_ip
+  stub_ip = options.stub_ip
+  stub_port = options.stub_port
+  initial_filename = options.initial_filename
+
+  if len(args) != 0:
+    parser.print_help()
+    parser.error("Invalid argument(s): " + str(args))
+  if ip_mapping_filename == None:
+    parser.print_help()
+    parser.error("Missing --mapping=MAPPING_FILE option")
+  if this_experiment == None:
+    parser.print_help()
+    parser.error("Missing --experiment=EXPERIMENT_NAME option")
+  if this_ip == None:
+    parser.print_help()
+    parser.error("Missing --ip=X.X.X.X option")
+
+  populate_ip_tables()
+  if stub_ip == None:
+    sys.stdout.write('stub_ip was None before\n')
+    stub_ip = emulated_to_real[this_ip]
+  sys.stdout.write('stub_ip: ' + stub_ip + '\n')
+  sys.stdout.write('this_ip: ' + this_ip + '\n')
+  sys.stdout.write('emulated_to_real: ' + str(emulated_to_real) + '\n')
+  if initial_filename != None:
+    read_initial_conditions()
 
 def populate_ip_tables():
   input = open(ip_mapping_filename, 'r')
@@ -117,6 +170,25 @@ def populate_ip_tables():
       emulated_to_real[fields[0]] = fields[1]
       real_to_emulated[fields[1]] = fields[0]
       emulated_to_interface[fields[0]] = fields[2]
+    line = input.readline()
+
+# Format of an initial conditions file is:
+#
+# List of lines, where each line is of the format:
+# <source-ip> <dest-ip> <delay> <bandwidth>
+#
+# Where source and dest ip addresses are in x.x.x.x format, and delay and
+# bandwidth are integral values in milliseconds and kilobits per second
+# respectively.
+def read_initial_conditions():
+  input = open(initial_filename, 'r')
+  line = input.readline()
+  while line != '':
+    fields = line.strip().split(' ', 3)
+    if len(fields) == 4 and fields[0] == this_ip:
+      set_link(fields[0], fields[1], 'delay=' + str(int(fields[2])/2))
+      set_link(fields[0], fields[1], 'bandwidth=' + fields[3])
+      connection_bandwidth[fields[1]] = int(fields[3])
     line = input.readline()
 
 def get_next_packet(conn):
@@ -219,6 +291,7 @@ def get_next_packet(conn):
       sys.stdout.write('skipped line in the wrong format: ' + line)
     
 def receive_characteristic(conn):
+  global connection_bandwidth
   buf = conn.recv(12)
   if len(buf) != 12:
     sys.stdout.write('Event header is the wrong size. Length: '
@@ -234,10 +307,24 @@ def receive_characteristic(conn):
   if len(buf) != size:
     sys.stdout.write('Event body is the wrong size.\n')
     return False
-  if (eventType == EVENT_FORWARD_PATH):
+  if eventType == EVENT_FORWARD_PATH:
     set_link(this_ip, dest, buf)
-  elif (eventType == EVENT_BACKWARD_PATH):
+  elif eventType == EVENT_BACKWARD_PATH:
     set_link(dest, this_ip, buf)
+  elif eventType == TENTATIVE_THROUGHPUT:
+    # There is a throughput number, but we don't know whether the link
+    # is saturated or not. If the link is not saturated, then we just
+    # need to make sure that emulated bandwidth >= real
+    # bandwidth. This means that we output a throughput number only if
+    # it is greater than our previous measurements because we don't
+    # know that bandwidth has decreased.
+    if int(buf) > connection_bandwidth[dest]:
+      connection_bandwidth[dest] = int(buf)
+      set_link(dest, this_ip, 'bandwidth=' + buf)
+  elif eventType == AUTHORITATIVE_BANDWIDTH:
+    # We know that the bandwidth has definitely changed. Reset everything.
+    connection_bandwidth[dest] = int(buf)
+    set_link(dest, this_ip, 'bandwidth=' + buf)
   else:
     sys.stdout.write('Other: ' + str(eventType) + ', ' + str(value) + '\n');
   return True

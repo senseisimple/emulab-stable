@@ -4,13 +4,17 @@
 #include "EwmaThroughputSensor.h"
 #include "ThroughputSensor.h"
 #include "CommandOutput.h"
+#include "StateSensor.h"
 
 using namespace std;
 
 EwmaThroughputSensor::EwmaThroughputSensor(
-  ThroughputSensor * newThroughputSource)
-  : throughput(0.0)
+  ThroughputSensor * newThroughputSource,
+  StateSensor * newState)
+  : maxThroughput(0)
+  , bandwidth(0.0)
   , throughputSource(newThroughputSource)
+  , state(newState)
 {
 }
 
@@ -21,21 +25,39 @@ void EwmaThroughputSensor::localSend(PacketInfo * packet)
 void EwmaThroughputSensor::localAck(PacketInfo * packet)
 {
   int latest = throughputSource->getThroughputInKbps();
-  if (latest != 0)
+  if (state->isSaturated())
   {
-    if (throughput == 0.0)
+    // The link is saturated, so we know that the throughput
+    // measurement is the real bandwidth.
+    if (bandwidth == 0.0)
     {
-      throughput = latest;
+      bandwidth = latest;
     }
     else
     {
       static const double alpha = 0.1;
-      throughput = throughput*(1.0-alpha) + latest*alpha;
+      bandwidth = bandwidth*(1.0-alpha) + latest*alpha;
     }
+    // We have got an actual bandwidth measurement, so reset
+    // maxThroughput accordingly.
+    maxThroughput = static_cast<int>(bandwidth);
     ostringstream buffer;
-    buffer << setiosflags(ios::fixed | ios::showpoint) << setprecision(0);
-    buffer << "bandwidth=" << throughput;
-    global::output->eventMessage(buffer.str(), packet->elab,
-                                 CommandOutput::FORWARD_PATH);
+    buffer << static_cast<int>(bandwidth);
+    global::output->genericMessage(AUTHORITATIVE_BANDWIDTH, buffer.str(),
+                            packet->elab);
+  }
+  else
+  {
+    // The link isn't saturated, so we don't know whether this
+    // throughput measurement represents real bandwidth or not.
+    if (latest > maxThroughput)
+    {
+      maxThroughput = latest;
+      // Send out a tentative number
+      ostringstream buffer;
+      buffer << maxThroughput;
+      global::output->genericMessage(TENTATIVE_THROUGHPUT, buffer.str(),
+                              packet->elab);
+    }
   }
 }
