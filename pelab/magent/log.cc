@@ -28,51 +28,46 @@ void logCleanup(void)
 }
 
 // Print the timestamp and type of logging to the logFile.
-static void logPrefix(int flags)
+static void logPrefix(int which)
 {
-  if (flags & ERROR)
+  switch(which)
   {
+  case ERROR:
     fprintf(logFile, "ERROR ");
-  }
-  if (flags & EXCEPTION)
-  {
+    break;
+  case EXCEPTION:
     fprintf(logFile, "EXCEPTION ");
-  }
-  if (flags & PEER_CYCLE)
-  {
+    break;
+  case PEER_CYCLE:
     fprintf(logFile, "PEER_CYCLE ");
-  }
-  if (flags & SENSOR)
-  {
+    break;
+  case SENSOR:
     fprintf(logFile, "SENSOR ");
-  }
-  if (flags & CONNECTION_MODEL)
-  {
+    break;
+  case CONNECTION_MODEL:
     fprintf(logFile, "CONNECTION_MODEL ");
-  }
-  if (flags & ROBUST)
-  {
+    break;
+  case ROBUST:
     fprintf(logFile, "ROBUST ");
-  }
-  if (flags & MAIN_LOOP)
-  {
+    break;
+  case MAIN_LOOP:
     fprintf(logFile, "MAIN_LOOP ");
-  }
-  if (flags & COMMAND_INPUT)
-  {
+    break;
+  case COMMAND_INPUT:
     fprintf(logFile, "COMMAND_INPUT ");
-  }
-  if (flags & CONNECTION)
-  {
+    break;
+  case CONNECTION:
     fprintf(logFile, "CONNECTION ");
-  }
-  if (flags & PCAP)
-  {
+    break;
+  case PCAP:
     fprintf(logFile, "PCAP ");
-  }
-  if (flags & COMMAND_OUTPUT)
-  {
+    break;
+  case COMMAND_OUTPUT:
     fprintf(logFile, "COMMAND_OUTPUT ");
+    break;
+  default:
+    fprintf(logFile, "LOG_ERROR ");
+    break;
   }
   if (logTimestamp)
   {
