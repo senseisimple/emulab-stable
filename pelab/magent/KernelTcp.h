@@ -30,8 +30,7 @@ private:
   int receiveBufferSize;
   int maxSegmentSize;
   int useNagles;
-  // MAX_WRITESIZE is in chars, and must be a multiple of 4
-  static const int MAX_WRITESIZE = 2048;
+  static const int MAX_WRITESIZE;
 public:
   static pcap_t * pcapDescriptor;
   static int pcapfd;

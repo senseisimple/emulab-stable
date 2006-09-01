@@ -172,6 +172,9 @@ void KernelTcp::addParam(ConnectionModelCommand const & param)
   }
 }
 
+// MAX_WRITESIZE is in chars, and must be a multiple of 4
+const int KernelTcp::MAX_WRITESIZE = 8192;
+
 int KernelTcp::writeMessage(int size, WriteResult & result)
 {
   if (state == DISCONNECTED)
@@ -205,10 +208,11 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
     int bytesToWrite;
     int bytesWritten = 0;
     for (bytesToWrite = size; bytesToWrite > 0; bytesToWrite -= MAX_WRITESIZE) {
+      int writeSize = min(MAX_WRITESIZE,bytesToWrite);
       // Actually write the darn thing.
-      int error = send(peersock, &buffer[0], size, 0);
+      int error = send(peersock, &buffer[0], writeSize, 0);
       logWrite(CONNECTION_MODEL,"Tried to write %d bytes, actually wrote %d",
-              size, error);
+              writeSize, error);
 
       if (error == 0)
       {
@@ -226,7 +230,7 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
           logWrite(CONNECTION_MODEL,"Buffer is full");
           result.bufferFull = true;
           // No point in trying more writes
-          return error;
+          return bytesWritten + error;
         }
         else
         {
