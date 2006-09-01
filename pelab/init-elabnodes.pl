@@ -128,7 +128,8 @@ libxmlrpc::Config({"server"  => $RPCSERVER,
 #
 my @nodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
 chomp(@nodelist);
-print "NODELIST:\n@nodelist\n";
+print "NODELIST:\n@nodelist\n"
+    if (!$outfile);
 my $nnodes = grep(/^${pprefix}/, @nodelist);
 if ($nnodes == 0) {
     print STDERR "No planetlab nodes in $pid/$eid?!\n";
@@ -162,7 +163,8 @@ foreach my $mapping (@nodelist) {
 	}
 	my ($site_index) = $query_result->fetchrow_array();
 	
-	print "Mapping $vnode to $pnode\n";
+	print "Mapping $vnode to $pnode\n"
+	    if (!$outfile);
 
 	$node_mapping{$vnode} = $pnode;
 	$site_mapping{$pnode} = $site_index;
@@ -392,7 +394,8 @@ sub get_plabinfo($)
 =cut
 
 	print "elab-$srcix -> elab-$dstix: ".
-	    "real=$dst, bw=$bw, del=$del, plr=$plr\n";
+	    "real=$dst, bw=$bw, del=$del, plr=$plr\n"
+		if (!$outfile);
 
 	# XXX need to lookup "elab-$dstix"
 	$dst = "10.0.0.$dstix";
