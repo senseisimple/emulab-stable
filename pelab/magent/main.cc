@@ -435,10 +435,11 @@ void replayWritePacket(PacketInfo * packet)
   bool success = replayWrite(headBuffer, Header::headerSize);
   if (success)
   {
-    vector<char> packetBuffer;
-    packetBuffer.resize(head.size);
+    char *packetBuffer;
+    packetBuffer = static_cast<char*>(malloc(head.size));
     savePacket(& packetBuffer[0], *packet);
     replayWrite(& packetBuffer[0], head.size);
+    free(packetBuffer);
   }
 }
 
