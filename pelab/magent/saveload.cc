@@ -106,6 +106,7 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, value.packetLength);
 
   // Save tcp_info
+/* Inefficient, but safe.
   pos = saveChar(pos, kernel->tcpi_state);
   pos = saveChar(pos, kernel->tcpi_ca_state);
   pos = saveChar(pos, kernel->tcpi_retransmits);
@@ -140,6 +141,10 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, kernel->tcpi_snd_cwnd);
   pos = saveInt(pos, kernel->tcpi_advmss);
   pos = saveInt(pos, kernel->tcpi_reordering);
+*/
+
+  memcpy(pos, kernel, sizeof(struct tcp_info));
+  pos += sizeof(struct tcp_info);
 
   // Save IP header
   memcpy(pos, value.ip, sizeof(struct ip));
@@ -372,6 +377,7 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   value->packetLength = static_cast<int>(packetLength);
 
   // Load tcp_info
+/* Inefficient, but safe
   pos = loadChar(pos, & kernel.tcpi_state);
   pos = loadChar(pos, & kernel.tcpi_ca_state);
   pos = loadChar(pos, & kernel.tcpi_retransmits);
@@ -407,6 +413,10 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadInt(pos, & kernel.tcpi_snd_cwnd);
   pos = loadInt(pos, & kernel.tcpi_advmss);
   pos = loadInt(pos, & kernel.tcpi_reordering);
+*/
+
+  memcpy(&kernel, pos, sizeof(struct tcp_info));
+  pos += sizeof(struct tcp_info);
 
   // Load IP header
   memcpy(&ip, pos, sizeof(struct ip));
