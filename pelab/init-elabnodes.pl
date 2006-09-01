@@ -252,9 +252,12 @@ sub write_info($)
 	    # Mike adds:
 	    #   include a PLR place holder after bandwidth in the form
 	    #   of a probability N.NNNN
+	    # Kevin has done something similar but with order:
+	    #    <source-ip> <dest-ip> <bandwidth> <delay> <loss>
+	    # so that is now the order.
 	    #
 	    printf $OUT "%s %s %d %d %6.4f\n", $src, $dst,
-	           $del + 0.5, $bw + 0.5, $plr;
+	           $bw + 0.5, $del + 0.5, $plr;
 	}
     }
 }
