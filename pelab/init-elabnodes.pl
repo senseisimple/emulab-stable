@@ -18,7 +18,7 @@
 my $TEVC = "/usr/testbed/bin/tevc";
 my $NLIST = "/usr/testbed/bin/node_list";
 my $pprefix = "planet-";
-#my $pprefix = "plab-";
+my $eprefix = "elab-";
 
 # XXX Need to configure this stuff!
 use lib '/usr/testbed/lib';
@@ -50,6 +50,7 @@ my %shapeinfo;
 
 my $showonly = 0;
 my $starttime = 0;
+my $outfile;
 
 # Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10000;	# Kbits/sec
@@ -67,11 +68,14 @@ my $now     = time();
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("S:n", \%options)) {
+if (! getopts("S:no:", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
     $showonly = 1;
+}
+if (defined($options{"o"})) {
+    $outfile = $options{"o"};
 }
 if (defined($options{"S"})) {
     my $high = time();
@@ -130,10 +134,16 @@ if ($nnodes == 0) {
     exit(1);
 }
 
-# Preload the site indicies rather then doing fancy joins.
+# map a "plabXXX" pname to a DB site index
 my %site_mapping = ();
+
+# map an Emulab "planet-N" vname to a pname
 my %node_mapping = ();
+
+# map an Emulab vname to its vname index (e.g., "planet-3" -> "3")
 my %ix_mapping   = ();
+
+# map a "plabXXX" pname to its IP address
 my %ip_mapping   = ();
 
 foreach my $mapping (@nodelist) {
@@ -180,7 +190,8 @@ if ($starttime) {
     $msg .= $now . " (now)\n";
     $starttime = $now;
 }
-print($msg);
+print($msg)
+    if (!defined($outfile));
 
 #
 # Get planetlab info for each planetlab node...
@@ -190,12 +201,56 @@ foreach my $vnode (keys(%node_mapping)) {
 }
 
 #
-# ...and send events to set the characteristics
+# ...and send events to set the characteristics or output the info to a file.
 #
-send_events()
-    if (!$showonly);
+if (!$showonly) {
+    if (defined($outfile)) {
+	write_info($outfile);
+    } else {
+	send_events();
+    }
+}
 
 exit(0);
+
+sub write_info($)
+{
+    my $file = shift;
+    my $OUT;
+
+    if ($outfile ne "-") {
+	open(INFO, ">$file") or die("Cannot open $file");
+	$OUT = *INFO;
+    } else {
+	$OUT = *STDOUT;
+    }
+
+    foreach my $src (keys %shapeinfo) {
+	foreach my $rec (@{$shapeinfo{$src}}) {
+	    my ($dst,$bw,$del,$plr) = @{$rec};
+
+	    # XXX src is an "elab-N" string, dst is a "10.0.0.N" address
+	    $src =~ s/$eprefix/$pprefix/;
+	    $dst =~ s/10\.0\.0\./$pprefix/;
+
+	    #
+	    # Jon says:
+	    #   List of lines, where each line is of the format:
+	    #    <source-ip> <dest-ip> <delay> <bandwidth>
+	    #   Where source and dest ip addresses are in x.x.x.x format,
+	    #   and delay and bandwidth are integral values in milliseconds
+	    #   and kilobits per second respectively.
+	    # Mike adds:
+	    #   include a PLR place holder after bandwidth in the form
+	    #   of a probability N.NNNN
+	    #
+	    printf $OUT "%s %s %d %d %6.4f\n",
+	           $ip_mapping{$node_mapping{$src}},
+	           $ip_mapping{$node_mapping{$dst}},
+	           $del + 0.5, $bw + 0.5, $plr;
+	}
+    }
+}
 
 sub send_events()
 {
@@ -213,7 +268,6 @@ sub send_events()
 	}
     }
 }
-
 
 #
 # Grab data from DB.
