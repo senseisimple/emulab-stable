@@ -5,6 +5,12 @@ ARGS=$*
 . `dirname $0`/../common-env.sh
 
 #
+# cd to the log directory so that any files that get written - cores, gprof
+# files, etc. get put in a place where loghole will see them
+#
+cd $LOGDIR
+
+#
 # Start up our own measurement agent
 #
 echo $SH ${MAGENT_DIR}/run-magent.sh #$ARGS
