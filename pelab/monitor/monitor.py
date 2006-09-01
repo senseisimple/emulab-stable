@@ -175,7 +175,7 @@ def populate_ip_tables():
 # Format of an initial conditions file is:
 #
 # List of lines, where each line is of the format:
-# <source-ip> <dest-ip> <delay> <bandwidth> <loss>
+# <source-ip> <dest-ip> <bandwidth> <delay> <loss>
 #
 # Where source and dest ip addresses are in x.x.x.x format, and delay and
 # bandwidth are integral values in milliseconds and kilobits per second
@@ -187,9 +187,9 @@ def read_initial_conditions():
     # Don't worry about loss for now. Just discard the value.
     fields = line.strip().split(' ', 4)
     if len(fields) == 5 and fields[0] == this_ip:
-      set_link(fields[0], fields[1], 'delay=' + str(int(fields[2])/2))
-      set_link(fields[0], fields[1], 'bandwidth=' + fields[3])
-      connection_bandwidth[fields[1]] = int(fields[3])
+      set_link(fields[0], fields[1], 'delay=' + str(int(fields[3])/2))
+      set_link(fields[0], fields[1], 'bandwidth=' + fields[2])
+      connection_bandwidth[fields[1]] = int(fields[2])
     line = input.readline()
 
 def get_next_packet(conn):
