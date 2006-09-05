@@ -16,6 +16,8 @@ public:
   PacketSensor(StateSensor * newState);
   // Get the size of the acknowledgement in bytes.
   int getAckedSize(void) const;
+  // Find out if the packet in question is a retransmission
+  bool getIsRetransmit(void) const;
   // Get the time of the last packet sent which was acked.
   Time const & getAckedSendTime(void) const;
 protected:
@@ -38,6 +40,7 @@ private:
   Time ackedSendTime;
   std::list<SentPacket> unacked;
   SentPacket globalSequence;
+  bool isRetransmit;
 
   StateSensor * state;
 };

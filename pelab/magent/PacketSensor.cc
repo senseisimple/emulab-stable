@@ -12,6 +12,7 @@ PacketSensor::PacketSensor(StateSensor * newState)
 {
   ackedSize = 0;
   ackedSendTime = Time();
+  isRetransmit = false;
 }
 
 int PacketSensor::getAckedSize(void) const
@@ -21,6 +22,11 @@ int PacketSensor::getAckedSize(void) const
     logWrite(ERROR, "PacketSensor::getAckedSize() called before localAck()");
   }
   return ackedSize;
+}
+
+bool PacketSensor::getIsRetransmit(void) const
+{
+  return isRetransmit;
 }
 
 Time const & PacketSensor::getAckedSendTime(void) const
@@ -35,20 +41,23 @@ Time const & PacketSensor::getAckedSendTime(void) const
 
 void PacketSensor::localSend(PacketInfo * packet)
 {
+  // Assume this packet is not a retransmit unless proven otherwise
+  isRetransmit = false;
   if (state->getState() == StateSensor::ESTABLISHED)
   {
-    logWrite(SENSOR,
+    logWrite(SENSOR_DETAIL,
              "PacketSensor::localSend() for sequence number %u",
              ntohl(packet->tcp->seq));
     unsigned int startSequence = ntohl(packet->tcp->seq);
     if (globalSequence.inSequenceBlock(startSequence))
     {
-      logWrite(SENSOR,
-               "PacketSensor::localSend() within globalSequence");
       /*
        * This packet should be in our list of sent packets - ie. it's a
        * retransmit.
        */
+      logWrite(SENSOR_DETAIL,
+               "PacketSensor::localSend() found a retransmit");
+      isRetransmit = true;
       list<SentPacket>::iterator pos = unacked.begin();
       list<SentPacket>::iterator limit = unacked.end();
       bool done = false;
@@ -90,7 +99,7 @@ void PacketSensor::localSend(PacketInfo * packet)
       record.seqEnd = record.seqStart + sequenceLength - 1;
       record.totalLength = packet->packetLength;
       record.timestamp = packet->packetTime;
-      logWrite(SENSOR,
+      logWrite(SENSOR_COMPLETE,
                "PacketSensor::localSend() new record: ss=%u,sl=%u,se=%u,tl=%u",
                record.seqStart, sequenceLength, record.seqEnd,
                record.totalLength);
@@ -114,7 +123,7 @@ void PacketSensor::localSend(PacketInfo * packet)
         }
         globalSequence.seqEnd = record.seqEnd;
       }
-      logWrite(SENSOR,
+      logWrite(SENSOR_COMPLETE,
                "PacketSensor::localSend(): global start = %u, global end = %u",
                globalSequence.seqStart, globalSequence.seqEnd);
       unacked.push_back(record);
@@ -127,13 +136,11 @@ void PacketSensor::localSend(PacketInfo * packet)
 
 void PacketSensor::localAck(PacketInfo * packet)
 {
+  // Right now, we don't know whether or not this ACK is for a retransmitted
+  // packet (we could tell, but there doesn't seem to be a need yet)
+  isRetransmit = false;
   if (state->getState() == StateSensor::ESTABLISHED)
   {
-    list<SentPacket>::iterator pos = unacked.begin();
-    list<SentPacket>::iterator limit = unacked.end();
-    bool found = false;
-    ackedSize = 0;
-
     /*
      * When we get an ACK, the sequence number is really the next one the peer
      * excects to see: thus, the last sequence number it's ACKing is one less
@@ -141,8 +148,34 @@ void PacketSensor::localAck(PacketInfo * packet)
      * Note: This should handle wraparound properly
      */
     uint32_t ack_for = ntohl(packet->tcp->ack_seq) - 1;
-    logWrite(SENSOR, "PacketSensor::localAck() for sequence number %u",
+
+    logWrite(SENSOR_DETAIL, "PacketSensor::localAck() for sequence number %u",
              ack_for);
+
+    /*
+     * Check to see if the ack is for a seq number smaller than the global
+     * sequence - this could mean two things: (1) it's a duplicate ack (in
+     * which case it means packet loss or packet re-ordering) (2) we got two
+     * (or more) acks out of order
+     * No action taken yet other than logging
+     * XXX: Needs support for wraparound!
+     */
+    if (ack_for < globalSequence.seqStart)
+    {
+      if (ack_for == (globalSequence.seqStart - 1)) {
+        logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected a "
+                                "duplicate ack");
+        return;
+      } else {
+        logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected an "
+                                "old ack");
+      }
+    }
+
+    list<SentPacket>::iterator pos = unacked.begin();
+    list<SentPacket>::iterator limit = unacked.end();
+    bool found = false;
+    ackedSize = 0;
 
     /*
      * Make sure this packet doesn't have a SACK option, in which case our
@@ -193,14 +226,14 @@ void PacketSensor::localAck(PacketInfo * packet)
       globalSequence.seqStart = unacked.front().seqStart;
     }
 
-    logWrite(SENSOR, "PacketSensor::localAck() decided on size %u",
+    logWrite(SENSOR_DETAIL, "PacketSensor::localAck() decided on size %u",
              ackedSize);
   }
 }
 
 bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
 {
-  logWrite(SENSOR,
+  logWrite(SENSOR_COMPLETE,
            "PacketSensor::inSequenceBlock(): Is %u between %u and %u?",
            sequence, seqStart, seqEnd);
   bool result = false;
@@ -217,11 +250,11 @@ bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
   }
   if (result)
   {
-    logWrite(SENSOR, "Yes!");
+    logWrite(SENSOR_COMPLETE, "Yes!");
   }
   else
   {
-    logWrite(SENSOR, "No!");
+    logWrite(SENSOR_COMPLETE, "No!");
   }
   return result;
 }
