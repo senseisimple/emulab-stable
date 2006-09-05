@@ -573,6 +573,27 @@ sub WebKeyPath($)
 }
 
 #
+# Add an environment variable.
+#
+sub AddEnvVariable($$$)
+{
+    my ($self, $var, $val) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (! DBQueryWarn("insert into virt_user_environment set ".
+			  "   name='$var', value='$val', ".
+			  "   pid='$pid', eid='$eid'"));
+    return 0;
+}
+
+#
 # Experiment locking and state changes.
 #
 sub Unlock($;$)
