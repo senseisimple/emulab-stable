@@ -1239,6 +1239,7 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     global DPDBNAME, COLLAB_PW
     
     retval = 0
+    delete_dir = False
 
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
 
@@ -1248,9 +1249,8 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     extra_logholes = []
 
     try:
-        opts, node_list = getopt.getopt(args, "nl:r:Ps", [
-            "no-standard", "local=", "remote=",
-            ])
+        opts, node_list = getopt.getopt(args, "nl:r:Psd", [
+            "no-standard", "local=", "remote=", "delete" ])
         for opt, val in opts:
             if opt in ("-n", "--no-standard"):
                 standard_logholes = False
@@ -1270,6 +1270,9 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                 pass
             elif opt in ("-s", "--snapshot"):
                 snapshot_traces = True
+                pass
+            elif opt in ("-d", "--delete"):
+                delete_dir = True
                 pass
             pass
         pass
@@ -1630,6 +1633,13 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
             pass
         pass
     
+    # Schedule clean
+    if delete_dir:
+        os.chdir(logdir)
+        open(CLEANFILE, 'w')
+        os.chmod(CLEANFILE, 0664)
+        pass
+
     return retval
 
 ##
