@@ -107,8 +107,8 @@ void PacketSensor::localSend(PacketInfo * packet)
          */
         if (record.seqStart != (globalSequence.seqEnd + 1))
         {
-          logWrite(EXCEPTION,"PacketSensor::localSend() may have missed a "
-                   "packet - last seq seen: %d, new seq: %d (lost %d)",
+          fprintf(stderr,"PacketSensor::localSend() may have missed a "
+                   "packet - last seq seen: %u, new seq: %u (lost %d)",
                    globalSequence.seqEnd,record.seqStart,
                    record.seqStart - globalSequence.seqEnd);
         }
