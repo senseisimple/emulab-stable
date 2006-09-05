@@ -89,6 +89,8 @@ Simulator instproc init {args} {
 
     $self instvar parameter_list;
     array set parameter_list {}
+    $self instvar parameter_descriptions;
+    array set parameter_descriptions {}
 
     var_import ::GLOBALS::last_class
     set last_class $self
@@ -356,6 +358,7 @@ Simulator instproc run {} {
     $self instvar tiptunnel_list
     $self instvar topography_list
     $self instvar parameter_list
+    $self instvar parameter_descriptions
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -679,8 +682,17 @@ Simulator instproc run {} {
 
     foreach name [array names parameter_list] {
 	set default_value $parameter_list($name)
+	set description $parameter_descriptions($name)
 
-	$self spitxml_data "virt_parameters" [list "name" "value"] [list $name $default_value ]	
+	set p_fields [list "name" "value"]
+	set p_values [list $name $default_value]
+
+	if {$description != {}} {
+	    lappend p_fields "description"
+	    lappend p_values $description
+	}
+
+	$self spitxml_data "virt_parameters" $p_fields $p_values
     }
 	
     foreach sourcefile $sourcefile_list {
@@ -1108,14 +1120,31 @@ Simulator instproc add_topography {tg} {
     return 0
 }
 
-Simulator instproc define-template-parameter {name value} {
+Simulator instproc define-template-parameter {name args} {
     $self instvar parameter_list
+    $self instvar parameter_descriptions
     var_import ::TBCOMPAT::parameter_list_defaults
+
+    if {$args == {}} {
+	perror "\[define-template-parameter] not enough arguments!"
+	return
+    }
+    if {[llength $args] > 2} {
+	perror "\[define-template-parameter] too many arguments!"
+	return
+    }
+    set value [lindex $args 0]
+    set description {}
+    
+    if {[llength $args] == 2} {
+	set description [lindex $args 1]
+    }
 
     if {[info exists parameter_list_defaults($name)]} {
 	set value $parameter_list_defaults($name)
     }
     set parameter_list($name) $value
+    set parameter_descriptions($name) $description
     
     # And install the name/value in the outer environment.
     uplevel 1 real_set \{$name\} \{$value\}

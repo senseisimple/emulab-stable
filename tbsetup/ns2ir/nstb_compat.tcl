@@ -259,8 +259,9 @@ Node instproc unknown {m args} {
 Simulator instproc connect {src dst} {
 }
 
-Simulator instproc define-template-parameter {name value} {
+Simulator instproc define-template-parameter {name args} {
     # install the name/value in the outer environment.
+    set value [lindex $args 0]    
     uplevel 1 set \{$name\} \{$value\}
 }
 

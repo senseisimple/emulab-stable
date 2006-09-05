@@ -367,6 +367,12 @@ if ($expstate) {
     }
 
     if ($instance && $expstate == $TB_EXPTSTATE_ACTIVE) {
+	if ($instance->runidx()) {
+	    WRITESUBMENUBUTTON("Stop Current Experiment Run",
+			       "template_exprun.php?action=stop&guid=$guid".
+			       "&version=$vers&eid=$exp_eid");
+	}
+
 	WRITESUBMENUBUTTON("Start New Experiment Run",
 			   "template_exprun.php?action=start&guid=$guid".
 			   "&version=$vers&eid=$exp_eid");

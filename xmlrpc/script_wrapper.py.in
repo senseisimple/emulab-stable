@@ -131,6 +131,14 @@ API = {
                             "help" : "Commit changes to template (modify)" },
     "template_export"   : { "func" : "template_export",
                             "help" : "Export template record" },
+    "template_swapin"   : { "func" : "template_swapin",
+                            "help" : "Instantiate a template" },
+    "template_swapout"  : { "func" : "template_swapout",
+                            "help" : "Terminate template instance" },
+    "template_startrun" : { "func" : "template_startrun",
+                            "help" : "Start new experiment run" },
+    "template_stoprun"  : { "func" : "template_stoprun",
+                            "help" : "Stop current experiment run" },
 };
 
 #
@@ -1788,6 +1796,9 @@ class template_commit:
         # Try to infer the template guid/vers from the current path.
         if len(req_args) == 0:
             guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
             pass
         elif len(req_args) == 1:
             guid = req_args[0]
@@ -1804,9 +1815,9 @@ class template_commit:
     def usage(self):
 	print "template_commit [<guid/vers>]";
 	print "where:";
-	print "     -w        - Wait for template to finish commit";
-        print "     -e        - Commit from specific template instance (eid)";
-        print "    guid/vers  - Commit template";
+	print "     -w     - Wait for template to finish commit";
+        print "     -e     - Commit from specific template instance (eid)";
+        print "    guid    - Template GUID";
         print ""
         print "By default, commit runs in the background, sending you email ";
         print "when the operation has completed. Use the -w option to wait";
@@ -1849,14 +1860,17 @@ class template_export:
         # Try to infer the template guid/vers from the current path.
         if len(req_args) == 0:
             guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
             pass
         elif len(req_args) == 1:
             guid = req_args[0]
             pass
-        
-        if guid == None:
+        else:
             self.usage();
             return -1
+        
         params["guid"] = guid
         
         rval,response = do_method("template", "export", params);
@@ -1865,8 +1879,344 @@ class template_export:
     def usage(self):
 	print "template_export -i instance_id [<guid/vers>]";
 	print "where:";
-        print "     -i        - Export specific template instance (idx)";
-        print "    guid/vers  - Commit template";
+        print "     -i   - Export specific template instance (idx)";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_swapin
+#
+class template_swapin:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv,
+                                           "bwqS:L:a:l:E:p:e:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-b":
+                params["batch"] = "yes";
+                pass
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-e":
+                params["exp"] = val;
+                pass
+            elif opt == "-p":
+                xmlfilename = val;
+                pass
+            elif opt == "-S":
+                params["swappable"]     = "no";
+                params["noswap_reason"] = val;
+                pass
+            elif opt == "-L":
+                params["idleswap"]          = 0;
+                params["noidleswap_reason"] = val;
+                pass
+            elif opt == "-l":
+                params["idleswap"] = val;
+                pass
+            elif opt == "-a":
+                params["max_duration"] = val;
+                pass
+            elif opt == "-f":
+                params["noswapin"] = "yes"
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+            pass
+        else:
+            self.usage();
+            return -1
+        
+        params["guid"] = guid
+
+        if xmlfilename:
+            try:
+                params["xmlfilestr"] = open(xmlfilename).read();
+                pass
+            except:
+                print "Could not open file: " + req_args[0];
+                return -1;
+            pass
+        
+        rval,response = do_method("template", "swapin", params);
+        return rval;
+
+    def usage(self):
+        print "template_swapin [-q] [-b] [-E description] [-p xmlfilename] ";
+        print "         [-S reason] [-L reason] [-a <time>] [-l <time>]";
+        print "         -e <eid> <guid>";
+	print "where:";
+        print "   -b   - queue for the batch system";
+        print "   -w   - wait for non-batchmode experiment to instantiate";
+        print "   -q   - be less chatty";
+        print "   -S   - Instance cannot be swapped; must provide reason";
+        print "   -L   - Instance cannot be IDLE swapped; must provide reason";
+        print "   -a   - Auto swapout NN minutes after instance is swapped in";
+        print "   -l   - Auto swapout NN minutes after instance goes idle";
+        print "   -E   - A pithy sentence describing your experiment";
+        print "   -p   - XML file of parameter bindings";
+        print "   -e   - The instance name (unique, alphanumeric, no blanks)";
+        print "   guid - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_swapout
+#
+class template_swapout:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid   = None
+        params = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+        else:
+            self.usage();
+            return -1
+            
+        params["guid"] = guid
+
+        rval,response = do_method("template", "swapout", params);
+        return rval;
+
+    def usage(self):
+	print "template_swapout -e id [<guid/vers>]";
+	print "where:";
+        print "     -e   - Instance ID (aka eid)";
+	print "     -w   - Wait for instance to finish terminating";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_startrun
+#
+class template_startrun:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:c",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-c":
+                params["clear"] = "yes"
+                pass
+            elif opt == "-r":
+                params["runid"] = val
+                pass
+            elif opt == "-p":
+                xmlfilename = val;
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+            pass
+        else:
+            self.usage();
+            return -1
+            
+        params["guid"] = guid
+
+        if xmlfilename:
+            try:
+                params["xmlfilestr"] = open(xmlfilename).read();
+                pass
+            except:
+                print "Could not open file: " + req_args[0];
+                return -1;
+            pass
+        
+        rval,response = do_method("template", "startrun", params);
+        return rval;
+
+    def usage(self):
+	print "template_startrun [-r <id>] [-E <descr>] -e id [<guid/vers>]";
+	print "where:";
+        print "     -E   - A pithy sentence describing your run";
+        print "     -p   - XML file of parameter bindings";
+        print "     -r   - A token (id) for the run";
+        print "     -e   - Instance ID (aka eid)";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_stoprun
+#
+class template_stoprun:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+            pass
+        else:
+            self.usage();
+            return -1
+            
+        params["guid"] = guid
+
+        rval,response = do_method("template", "stoprun", params);
+        return rval;
+
+    def usage(self):
+	print "template_stoprun [-w] -e id [<guid/vers>]";
+	print "where:";
+        print "     -e   - Instance ID (aka eid)";
+        print "    guid  - Template GUID";
         print ""
         print "Environment:"
         print "  cwd   The template GUID will be inferred from the current"

@@ -1037,6 +1037,10 @@ startrun_callback(event_handle_t handle,
 		return;
 	}
 
+	/*
+	 * XXX Both of these need to send completion events
+	 */
+
 	if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0) {
 		info("startrun_callback: Got a stop event.\n");
 		
@@ -1049,6 +1053,11 @@ startrun_callback(event_handle_t handle,
 				stop_program(pinfo, NULL);
 			}
 		}
+		return;
+	}
+
+	if (strcmp(event, TBDB_EVENTTYPE_RELOAD) == 0) {
+		info("startrun_callback: Got a reload event.\n");
 		/*
 		 * Wrapper will restart us.
 		 */

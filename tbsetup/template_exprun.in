@@ -33,6 +33,7 @@ sub usage()
 	  "switches and arguments:\n".
 	  "-a <action> - start or stop\n".
 	  "-w          - wait for run to start\n".
+	  "-s          - save DB contents at end of run; default is clean\n".
 	  "-q          - be less chatty\n".
 	  "-E <str>    - A pithy sentence describing the run\n".
 	  "-r <runid>  - A token ... we will make on up for you\n".
@@ -41,11 +42,12 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwp:E:a:r:e:d";
+my $optlist	 = "qwp:E:a:r:e:dsc";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
 my $debug        = 0;
+my $clean        = 0;
 my $paramfile;
 my %parameters   = ();
 my $action;
@@ -151,6 +153,10 @@ if (system("$checkquota $dbuid") != 0) {
 
 # Now parse arguments.
 ParseArgs();
+
+if ($action eq "start" && !defined($runid)) {
+    tbdie("Must provide a run ID (-r argument) when starting a new run!");
+}
 
 #
 # In wait mode, block SIGINT until we spin off the background process.
@@ -313,7 +319,8 @@ if (defined($instance->runidx())) {
 
     # Ug. I need to figure out how to hook into the event sequence
     # mechanism so I can use a completion event.
-    sleep(2);
+    print "Asking program agents to stop ... this will take a moment.\n";
+    sleep(5);
     
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
@@ -331,15 +338,35 @@ if (defined($instance->runidx())) {
     #
     # Commit the archive. 
     #
-    system("$archcontrol -t $runid commit $pid $eid");
+    my $this_run   = $instance->CurrentRun();
+    my $this_runid = $this_run->{"runid"};
+    
+    system("$archcontrol -t ${action}run_${this_runid} commit $pid $eid");
 
     # This has to be done after the archive commit, so we can find the tag.
     $instance->FinalizeCurrentRun() == 0
 	or fatal(-1, "Could not finalize experiment run for $instance!");
+
+    print "Experiment run '$this_runid' has been stopped.\n";    
 }
 
 goto done
     if ($action eq "stop");
+
+#
+# Clean/Clear if requested before generating the new run, in case there
+# is a problem.
+#
+if ($clean) {
+    # This runs loghole.
+    print "Asking loghole to clean the logs ... this will take a moment.\n";
+    $instance->LogClean() == 0
+	or fatal(-1, "Loghole failed");
+
+    print "Cleaning the instance database ... this will take a moment.\n";
+    $instance->CleanDB() == 0
+	or fatal(-1, "Dump Database failed");
+}
 
 #
 # Generate a new run.
@@ -380,6 +407,8 @@ if ($paramfile) {
 		     "   pid='$pid', eid='$eid'");	
     }
     SignalProgAgents("RELOAD");
+    # XXX Need to use a completion event!
+    sleep(5);
 }
 
 #
@@ -389,6 +418,7 @@ print "Asking the event system to replay events ...\n";
 system("$eventcontrol replay $pid $eid") == 0
     or fatal(-1, "Could not restart the event system!");
 
+print "Experiment run '$runid' has been started.\n";
 done:
 
 # Stop the web interface from spewing.
@@ -456,15 +486,16 @@ sub ParseArgs()
 	    tbdie("Improper experiment name (id)!");
 	}
     }
-    else {
-	tbdie("Must provide a run ID (-r argument)!");
-    }
     
     if (defined($options{"a"})) {
 	$action = $options{"a"};
 
 	if ($action ne "start" and $action ne "stop") {
 	    tbdie("Improper -a argument: $action.");
+	}
+	# Need the equiv of a taint check.
+	if ($action =~ /^([\w]+)$/) {
+	    $action = $1;
 	}
     }
     else {
@@ -479,6 +510,9 @@ sub ParseArgs()
     }
     if (defined($options{"d"})) {
 	$debug = 1;
+    }
+    if (defined($options{"c"})) {
+	$clean = 1;
     }
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"},

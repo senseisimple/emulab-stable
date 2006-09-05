@@ -113,6 +113,7 @@ use libtblog;
 use Template;
 use Experiment;
 use event;
+use libaudit;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -266,6 +267,85 @@ my $pid    = $template->pid();
 my $copyid = $template->pid() . "," . $template->eid();
 
 #
+# Go to the background now so we have a proper log of what happened.
+#
+#
+$SIG{TERM} = \&sighandler;
+
+#
+# Use the logonly option to audit so that we get a record mailed.
+#
+if (! ($foreground || $batchmode)) {
+    if ($instance->CreateLogFile("swapin", \$logname) < 0) {
+	fatal(-1, "Could not create logfile!");
+    }
+
+    if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
+				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE)) {
+	#
+	# Parent exits normally, unless in waitmode. We have to set
+	# justexit to make sure the END block below does not run.
+	#
+	$justexit = 1;
+
+	if (!$waitmode) {
+	    #
+	    # Before we can actually exit, we need to wait. Totally ick;
+	    # the logfile stuff needs work.
+	    #
+	    while (1) {
+		my ($tmp1, $tmp2);
+
+		last
+		    if (TBExptGetLogFile($pid, $eid, \$tmp1, \$tmp2));
+
+		sleep(2);
+	    }
+	    if ($batchmode) {
+		print("Experiment $pid/$eid has entered the batch system.\n".
+		      "You will be notified when it is fully instantiated.\n")
+		    if (! $quiet);
+	    }
+	    else {
+		print("Experiment $pid/$eid is now being instantiated.\n".
+		      "You will be notified via email when this is done.\n")
+		    if (! $quiet);
+	    }
+	    exit(0);
+	}
+	print("Waiting for experiment $eid to fully instantiate.\n")
+	    if (! $quiet);
+	    
+	if (-t STDIN && !$quiet) {
+	    print("You may type ^C at anytime; you will be notified via ".
+		  "email.\n".
+		  "You will not actually interrupt the instantiation.\n");
+	}
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n")
+	    if (! $quiet);
+	exit($? >> 8);
+    }
+    TBdbfork();
+}
+
+#
 # Build up arguments to batchexp. I do not want to bother with shell
 # escapes, hence the list argument to system instead of a long string.
 # Be sure to leave it this way, or perl will invoke a shell and that
@@ -304,6 +384,14 @@ fatal($? >> 8, "Could not pre-instantiate the experiment")
 
 # Need to kill the experiment if we fail after this point.
 $exptcreated = 1;
+
+#
+# Now we can do this ...
+#
+if (defined($logname) && ! ($foreground || $batchmode)) {
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
+}
 
 # Grab the experiment record for below.
 my $experiment = Experiment->Lookup($pid, $eid);
@@ -360,82 +448,6 @@ my $userdir = $experiment->UserDir();
 if ($paramfile) {
     system("/bin/cp", $paramfile, $userdir . "/archive/parameters.xml") == 0
 	or tbdie("Could not copy out $paramfile");
-}
-
-#
-# Catch this so we can clean up.
-#
-$SIG{TERM} = \&sighandler;
-
-#
-# If not in batch mode, go into the background. Parent exits.
-#
-if (! $foreground) {
-    $logname = TBExptCreateLogFile($pid, $eid, "instantiate");
-
-    if (! $batchmode) {
-	TBExptSetLogFile($pid, $eid, $logname);
-	TBExptOpenLogFile($pid, $eid);
-    }
-
-    if (my $childpid = TBBackGround($logname)) {
-	#
-	# Parent exits normally, unless in waitmode. We have to set
-	# justexit to make sure the END block below does not run.
-	#
-	$justexit = 1;
-
-	if (!$waitmode) {
-	    if ($batchmode) {
-		print("Experiment $pid/$eid has entered the batch system.\n".
-		      "You will be notified when it is fully instantiated.\n")
-		    if (! $quiet);
-	    }
-	    else {
-		print("Experiment $pid/$eid is now being instantiated.\n".
-		      "You will be notified via email when this is done.\n")
-		    if (! $quiet);
-	    }
-	    exit(0);
-	}
-	print("Waiting for experiment $eid to fully instantiate.\n")
-	    if (! $quiet);
-	    
-	if (-t STDIN && !$quiet) {
-	    print("You may type ^C at anytime; you will be notified via email.".
-		  "\n".
-		  "You will not actually interrupt the experiment itself.\n");
-	}
-	
-	# Give child a chance to run.
-	select(undef, undef, undef, 0.25);
-	
-	#
-	# Reset signal handlers. User can now kill this process, without
-	# stopping the child.
-	#
-	$SIG{TERM} = 'DEFAULT';
-	$SIG{INT}  = 'DEFAULT';
-	$SIG{QUIT} = 'DEFAULT';
-
-	#
-	# Wait until child exits or until user gets bored and types ^C.
-	#
-	waitpid($childpid, 0);
-	
-	print("Done. Exited with status: $?\n")
-	    if (! $quiet);
-	exit($? >> 8);
-    }
-    TBdbfork();
-}
-
-#
-# When in waitmode, must put ourselves in another process group so that
-# an interrupt to the parent will not have any effect on the backend.
-#
-if ($waitmode) {
-    POSIX::setsid();
 }
 
 #
@@ -610,6 +622,7 @@ $instance->Start() == 0
 TBExptCloseLogFile($pid, $eid)
     if (defined($logname) && !$batchmode);
 
+# Email is sent from libaudit at exit ...
 exit(0);
 
 #

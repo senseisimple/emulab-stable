@@ -75,6 +75,7 @@ sub SetDBs(@);
 sub DumpDB(@);
 sub LoadDB(@);
 sub GraphDB(@);
+sub CleanDB(@);
 sub fatal($);
 
 #
@@ -133,6 +134,9 @@ elsif ($action eq "loaddb") {
 }
 elsif ($action eq "graphdb") {
     exit(GraphDB(@ARGV));
+}
+elsif ($action eq "cleandb") {
+    exit(CleanDB(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -472,6 +476,42 @@ sub DumpDB(@)
 	fatal($! ? "Error closing $MYSQLDUMP pipe: $!"
 	         : "Exit status $? from $MYSQLDUMP");
 
+    return 0;
+}
+
+#
+# Clean a DB.
+#
+sub CleanDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+
+    # This is called as root, so just switch to the proper DB.
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to $dbname database!");
+    }
+
+    my $query_result =
+	DBQueryFatal("show tables");
+
+    while (my ($table) = $query_result->fetchrow_array()) {
+	DBQueryFatal("delete from `$table`");
+    }
     return 0;
 }
 

@@ -59,6 +59,7 @@ sub AddTempDB(@);
 sub LoadTempDB(@);
 sub DelTempDB(@);
 sub DumpExpDB(@);
+sub CleanExpDB(@);
 sub GraphDB(@);
 sub DoOpsStuff($;$);
 sub Initialize();
@@ -161,6 +162,9 @@ elsif ($action eq "loadtempdb") {
 }
 elsif ($action eq "dumpexpdb") {
     exit(DumpExpDB(@ARGV));
+}
+elsif ($action eq "cleanexpdb") {
+    exit(CleanExpDB(@ARGV));
 }
 elsif ($action eq "graphdb") {
     exit(GraphDB(@ARGV));
@@ -488,7 +492,8 @@ sub AddExpDB(@)
     # XXX See if there are any traced links. 
     #
     $query_result =
-	DBQueryFatal("select vname from virt_lans where trace_db!=0");
+	DBQueryFatal("select vname from virt_lans ".
+		     "where pid='$pid' and eid='$eid' and trace_db!=0");
     my $traceflag = ($query_result->numrows ? "-s" : "");
 
     print "Adding DB '$dbname' to mysql database on $CONTROL.\n";
@@ -547,8 +552,6 @@ sub DelExpDB(@)
     else {
 	die("Bad data in eid: $eid");
     }
-    my $gid = ExpGroup($pid, $eid);
-    my $exptidx;
 
     #
     # Always do a DB removal if the experiment has a dbname set.
@@ -564,9 +567,6 @@ sub DelExpDB(@)
     return -1
 	if (!defined($dbname));
 
-    return -1
-	if (!TBExptIDX($pid, $eid, \$exptidx));
-    
     print "Removing DB '$dbname' from mysql database on $CONTROL.\n";
     my $retval = DoOpsStuff("deldb $dbname");
     if ($retval) {
@@ -607,8 +607,6 @@ sub DumpExpDB(@)
     else {
 	die("Bad data in filename: $filename");
     }
-    my $gid = ExpGroup($pid, $eid);
-    my $exptidx;
 
     #
     # Check to see if the experiment actually wants its own DB.
@@ -624,11 +622,53 @@ sub DumpExpDB(@)
     return -1
 	if (!defined($dbname));
 
-    return -1
-	if (!TBExptIDX($pid, $eid, \$exptidx));
-    
     print "Dumping mysql DB '$dbname' to $filename on $CONTROL.\n";
     my $retval = DoOpsStuff("dumpdb $dbname $filename");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+sub CleanExpDB(@)
+{
+    my ($pid, $eid) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Bad data in pid: $pid");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die("Bad data in eid: $eid");
+    }
+
+    #
+    # Check to see if the experiment actually wants its own DB.
+    #
+    my $query_result =
+	DBQueryFatal("select dpdbname from experiments ".
+		     "where pid='$pid' and eid='$eid' and dpdb!=0");
+    return 0
+	if (!$query_result->numrows);
+    
+    my ($dbname) = $query_result->fetchrow_array();
+
+    return -1
+	if (!defined($dbname));
+
+    print "Cleaning mysql DB '$dbname' on $CONTROL.\n";
+    my $retval = DoOpsStuff("cleandb $dbname");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }

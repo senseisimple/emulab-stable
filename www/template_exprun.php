@@ -26,14 +26,100 @@ unset($parameter_xmlfile);
 $deletexmlfile = 0;
 
 #
+# Run the script backend
+#
+function DOIT($instance, $action, $command_options)
+{
+    global $guid, $version, $pid, $gid, $eid, $uid;
+    global $deletexmlfile, $parameter_xmlfile;
+    $message = "";
+
+    $command_options = "-e $eid " . $command_options;
+    
+    if ($action == "start") {
+	PAGEHEADER("Start new Experiment Run");
+	$message = "Starting new experiment run";
+	$command_options = "-a start " . $command_options;
+    }
+    else {
+	PAGEHEADER("Stop current Experiment Run");
+	$message = "Stopping current experiment run";
+	$command_options = "-a stop " . $command_options;
+    }	
+
+    #
+    # Grab the unix GID for running scripts.
+    #
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    #
+    # Avoid SIGPROF in child.
+    #
+    set_time_limit(0);
+
+    echo "<font size=+2>Template <b>" .
+            MakeLink("template",
+		     "guid=$guid&version=$version", "$guid/$version") .
+            "</b>, Instance <b>" .
+            MakeLink("project", "pid=$pid", $pid) . "/" .
+            MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
+    echo "</b></font>\n";
+    echo "<br><br>\n";
+
+    echo "<script type='text/javascript' language='javascript' ".
+	 "        src='template_sup.js'>\n";
+    echo "</script>\n";
+
+    STARTBUSY($message);
+
+    #
+    # Run the backend script.
+    #
+    $retval = SUEXEC($uid, "$pid,$unix_gid",
+		     "webtemplate_exprun $command_options $guid/$version",
+		     SUEXEC_ACTION_IGNORE);
+
+    CLEARBUSY();
+
+    if ($deletexmlfile) {
+	unlink($parameter_xmlfile);
+    }
+
+    #
+    # Fatal Error. Report to the user, even though there is not much he can
+    # do with the error. Also reports to tbops.
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    }
+
+    # User error. Tell user and exit.
+    if ($retval) {
+	SUEXECERROR(SUEXEC_ACTION_USERERROR);
+	return;
+    }
+
+    STARTLOG($pid, $eid);
+}
+
+#
 # Spit the form out using the array of data.
 #
 function SPITFORM($instance, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
-    global $guid, $version, $eid;
+    global $guid, $version, $pid, $eid;
 
-    PAGEHEADER("Start an Experiment Run");
+    PAGEHEADER("Start new Experiment Run");
+
+    echo "<font size=+2>Template <b>" .
+            MakeLink("template",
+		     "guid=$guid&version=$version", "$guid/$version") .
+            "</b>, Instance <b>" .
+            MakeLink("project", "pid=$pid", $pid) . "/" .
+            MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
+    echo "</b></font>\n";
+    echo "<br><br>\n";
 
     echo "<center>\n";
     $template = $instance->template();
@@ -84,6 +170,23 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
               </td>
           </tr>\n";
 
+    #
+    # Clean logs before starting run?
+    #
+    echo "<tr>
+	      <td class='pad4'>Clean Logs:</td>
+              <td class='pad4' class=left>
+  	          <input type=checkbox name='formfields[clean]' value='Yep'";
+
+    if (isset($formfields[clean]) &&
+	strcmp($formfields[clean], "Yep") == 0) {
+	echo " checked='1'";
+    }
+    echo ">";
+    echo "&nbsp (run '<tt>loghole clean</tt>' before starting run)
+	    </td>
+	  </tr>\n";
+
     echo "<tr>
               <td colspan=2>
                Use this text area for an (optional) description:
@@ -103,9 +206,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 	# Table of inputs.
 	#
 	echo "<tr>
-		  <td class='pad4'>Formal Parameters:<br>
-                             <font color=red>(Currently Ignored!)</font>
-                    </td>
+		  <td class='pad4'>Formal Parameters:</td>
 		  <td>
  		    <table cellpadding=0 cellspacing=0 border=0>\n";
 	
@@ -203,12 +304,15 @@ if (!$instance) {
 	    "a valid experiment template instance!", 1);
 }
 
-#
-# On first load, display virgin form and exit.
-#
-if (!isset($exprun)) {
+if (isset($action) && $action == "stop") {
+    # Run the backend script.
+    DOIT($instance, $action, "");
+    PAGEFOOTER();
+    return;
+}
+elseif (!isset($exprun)) {
     #
-    # 
+    # On first load, display virgin form and exit.
     #
     $defaults['runid'] = $instance->NextRunID();
 
@@ -240,7 +344,7 @@ elseif (! isset($formfields)) {
 $errors = array();
 
 # Set up command options
-$command_options = " -a start -e $eid ";
+$command_options = " ";
 
 #
 # RunID:
@@ -256,6 +360,13 @@ elseif (TBValidExperiment($pid, $formfields[runid])) {
 }
 else {
     $command_options .= " -r " . escapeshellarg($formfields[runid]);
+}
+
+#
+# Clean?
+#
+if (isset($formfields[clean]) && $formfields[clean] == "Yep") {
+    $command_options .= " -c";
 }
 
 #
@@ -333,62 +444,8 @@ if (count($errors)) {
     exit(1);
 }
 
-#
-# Grab the unix GID for running scripts.
-#
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-#
-# Avoid SIGPROF in child.
-#
-set_time_limit(0);
-
-# Okay, we can spit back a header now that there is no worry of redirect.
-PAGEHEADER("Start Experiment Run");
-
-echo "<font size=+2>Template <b>" .
-        MakeLink("template",
-		 "guid=$guid&version=$version", "$guid/$version") .
-        "</b>, Instance <b>" .
-        MakeLink("project", "pid=$pid", $pid) . "/" .
-        MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
-echo "</b></font>\n";
-echo "<br><br>\n";
-
-echo "<script type='text/javascript' language='javascript' ".
-     "        src='template_sup.js'>\n";
-echo "</script>\n";
-
-STARTBUSY("Starting experiment run!");
-
-#
 # Run the backend script.
-#
-$retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_exprun $command_options $guid/$version",
-		 SUEXEC_ACTION_IGNORE);
-
-CLEARBUSY();
-
-if ($deletexmlfile) {
-    unlink($parameter_xmlfile);
-}
-
-#
-# Fatal Error. Report to the user, even though there is not much he can
-# do with the error. Also reports to tbops.
-# 
-if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
-}
-
-# User error. Tell user and exit.
-if ($retval) {
-    SUEXECERROR(SUEXEC_ACTION_USERERROR);
-    return;
-}
-
-STARTLOG($pid, $eid);
+DOIT($instance, $action, $command_options);
 
 #
 # Standard Testbed Footer

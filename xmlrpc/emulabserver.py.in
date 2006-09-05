@@ -180,7 +180,7 @@ def CheckProjPermission(uid, pid):
                               output="Illegal characters in project ID!")
 
     res = DBQueryFatal("SELECT trust FROM group_membership "
-                       "WHERE uid=%s and pid=%s and gid=%s",
+                       "WHERE uid=%s and pid=%s and gid=%s and trust!='none'",
                        (uid, pid, pid))
 
     if len(res) == 0:
@@ -4583,6 +4583,265 @@ class template:
         
         (exitval, output) = runcommand(TBDIR +
                                        "/bin/template_export " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Instantiate a template.
+    #
+    def swapin(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        if (argerror):
+            return argerror
+        
+        xmlfilename = None
+        argstr      = "-q"
+        
+        for opt, val in argdict.items():
+            if opt == "batch":
+                if not xbool(val):
+                    argstr += " -b"
+                    pass
+                pass
+            elif opt == "description":
+                argstr += " -E "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "swappable":
+                if not xbool(val):
+                    if not argdict.has_key("noswap_reason"):
+                        return EmulabResponse(RESPONSE_BADARGS,
+                                       output="Must supply noswap reason!");
+                    argstr += " -S "
+                    argstr += escapeshellarg(argdict["noswap_reason"])
+                    pass
+                pass
+            elif opt == "noswap_reason":
+                pass
+            elif opt == "idleswap":
+                if val == 0:
+                    if not argdict.has_key("noidleswap_reason"):
+                        return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Must supply noidleswap reason!");
+                    argstr += " -L "
+                    argstr += escapeshellarg(argdict["noidleswap_reason"])
+                    pass
+                else:
+                    argstr += " -l "
+                    argstr += escapeshellarg(str(val))
+                    pass
+                pass
+            elif opt == "noidleswap_reason":
+                pass
+            elif opt == "autoswap" or opt == "max_duration":
+                argstr += " -a "
+                argstr += escapeshellarg(str(val))
+                pass
+            elif opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "xmlfilepath":
+                # Backend script will verify this local path. 
+                xmlfilename = escapeshellarg(val)
+                pass
+            elif opt == "xmlfilestr":
+                xmlfilestr = val
+            
+                if len(xmlfilestr) > (1024 * 512):
+                    return EmulabResponse(RESPONSE_TOOBIG,
+                                         output="XML File way too big!");
+        
+                (xmlfp, xmlfilename) = writensfile(xmlfilestr)
+                if not xmlfilename:
+                    return EmulabResponse(RESPONSE_SERVERERROR,
+                                         output="Server Error")
+                pass
+            pass
+
+        if xmlfilename:
+            argstr += " -p " + xmlfilename
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_swapin " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Start a new run
+    #
+    def startrun(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp", "runid"))
+        if (argerror):
+            return argerror
+        
+        xmlfilename = None
+        argstr      = "-q"
+        
+        for opt, val in argdict.items():
+            if opt == "description":
+                argstr += " -E "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "clear":
+                argstr += " -c "
+                pass
+            elif opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "xmlfilepath":
+                # Backend script will verify this local path. 
+                xmlfilename = escapeshellarg(val)
+                pass
+            elif opt == "xmlfilestr":
+                xmlfilestr = val
+            
+                if len(xmlfilestr) > (1024 * 512):
+                    return EmulabResponse(RESPONSE_TOOBIG,
+                                         output="XML File way too big!");
+        
+                (xmlfp, xmlfilename) = writensfile(xmlfilestr)
+                if not xmlfilename:
+                    return EmulabResponse(RESPONSE_SERVERERROR,
+                                         output="Server Error")
+                pass
+            pass
+
+        if xmlfilename:
+            argstr += " -p " + xmlfilename
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " -r " + escapeshellarg(argdict["runid"])
+        argstr += " -a start"
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_exprun " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Stop current run.
+    #
+    def stoprun(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        if (argerror):
+            return argerror
+        
+        xmlfilename = None
+        argstr      = "-q"
+        
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            pass
+        
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " -a stop"
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_exprun " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Terminate an instance
+    #
+    def swapout(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        if (argerror):
+            return argerror
+
+        argstr = "-q"
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_swapout " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         

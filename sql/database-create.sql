@@ -2895,6 +2895,7 @@ CREATE TABLE virt_parameters (
   eid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext,
+  description text,
   PRIMARY KEY  (pid,eid,name)
 ) TYPE=MyISAM;
 

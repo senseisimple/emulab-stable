@@ -221,7 +221,7 @@ $eid  = $template->eid();
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
-if (my $childpid = AuditStart(1, undef, 1)) {
+if (my $childpid = AuditStart(LIBAUDIT_DAEMON, undef, LIBAUDIT_LOGONLY)) {
     #
     # Parent exits normally, unless in waitmode. We have to set
     # justexit to make sure the END block below does not run.
@@ -377,14 +377,14 @@ libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
 # info forever (after the underlying experiment is terminated).
 #
 my $query_result =
-    DBQueryWarn("select name,value from virt_parameters ".
+    DBQueryWarn("select name,value,description from virt_parameters ".
               "where pid='$pid' and eid='$eid'");
 
 fatal(-1, "Could not get virt_parameters for $pid/$eid")
     if (! $query_result);
 
-while (my ($name, $value) = $query_result->fetchrow_array()) {
-    $template->NewFormalParameter($name, $value) == 0
+while (my ($name, $value, $description) = $query_result->fetchrow_array()) {
+    $template->NewFormalParameter($name, $value, $description, $dbuid) == 0
 	or fatal(-1, "Could not set formal parameter for $pid/$eid")
 }
 
