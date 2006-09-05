@@ -1,0 +1,215 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+all: src_forms spider forms_coverage input_coverage probes
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+
+OBJDIR		= ../..
+SUBDIR		= www/sec-check
+SRCWWW		= $(TESTBED_SRCDIR)/www
+
+OURDOMAIN       = @OURDOMAIN@
+EinE_proj	= testbed
+EinE_exp	= vulnElab
+EinE_boss	= myboss
+
+#================================================================
+# Grep the sources for <form and make up a list of php form files.
+src_forms: src_list src_count src_msg
+
+# All of the forms lines.
+SRC_FORMS	= $(SRCSC)/src_forms.list
+# Just the files list.
+SRC_FILES	= $(SRCSC)/src_files.list
+src_list: $(SRC_FILES)
+# Ignore any Emacs backup files with tilde's in the filenames.
+$(SRC_FORMS) $(SRC_FILES):
+	(cd $(SRCWWW); \
+	  find . -maxdepth 1 -name '*.php*' -print0 | \
+	    xargs -0 grep -n '<form' | fgrep -v /save/ | \
+	    sed '/^[^:]*~/d' | sort) > $(SRC_FORMS)
+	sed -e 's|^[^:]*/||' -e 's|:.*||' $(SRC_FORMS) > $(SRC_FILES)
+
+SRC_COUNT	= $(SRCSC)/src_files.count
+src_count: $(SRC_COUNT)
+$(SRC_COUNT): $(SRC_FILES)
+	sed 's|^\./\([^:]*\):.*|\1|' $(SRC_FILES) | \
+	    sort -u | wc -l > $(SRC_COUNT)
+src_msg: src_count
+	@echo "** `wc -l < $(SRC_FORMS)` separate forms" \
+	     "are on `cat $(SRC_COUNT)` code pages.  **"
+
+#================================================================
+# Spider a copy of the EinE site with wget and extract its forms list.
+spider: clear_wget_dir login admin do_spider site_list site_count site_msg
+
+WGETDIR		= admin.wget
+
+# Login info for the inner Emulab.
+uid		= $(USER)
+### It's better to log in a browser and change your password in Edit Profile
+### in the inner Elab to this string, than to put your real password here.
+pswd		= EinE_tmp
+
+dom		= $(EinE_proj).$(OURDOMAIN)
+svr		= $(EinE_boss).$(EinE_exp).$(dom)
+root		= http://$(svr)
+sroot		= https://$(svr)
+
+
+# These are used only in the $(WGETDIR).
+COOKIES		= cookies.txt
+sv_cookies	= --save-cookies $(COOKIES)
+ld_cookies	= --load-cookies $(COOKIES)
+wget_args	= --keep-session-cookies --no-check-certificate
+
+# Reject these links, which don't have any input fields,
+# and don't ask for confirmation before taking action.
+top_links	= logout.php3,toggle.php
+showexp_links	= showlogfile.php3
+shownode_links	= nodetipacl.php3,showconlog.php3,nodessh.php3
+rej_links	= .txt,$(top_links),$(showexp_links),$(shownode_links)
+
+# Clear out the wget directory.
+clear_wget_dir: $(WGETDIR)
+$(WGETDIR):
+	- rm -rf $(WGETDIR).prev
+	- mv -f $(WGETDIR) $(WGETDIR).prev
+	mkdir $(WGETDIR)
+
+# Log in and create a current cookies.txt file.
+login: $(WGETDIR) $(WGETDIR)/login.php3
+$(WGETDIR)/login.php3:
+	cd $(WGETDIR); \
+	wget -S -dv $(wget_args) $(sv_cookies) -o login.log -O login.html \
+	     --post-data "uid=$(uid)&password=$(pswd)&login=Login" \
+	     $(sroot)/login.php3
+
+# Log in above, then use this to toggle the admin bit on.
+admin: login admin.html
+admin.html:
+	cd $(WGETDIR); \
+	wget -S -dv $(wget_args) $(ld_cookies) -o admin.log -O admin.html \
+	     "$(sroot)/toggle.php?target_uid=$uid&type=adminon&value=1"
+
+# Finally ready to grab the whole site.
+do_spider: $(WGETDIR)/wget.log
+$(WGETDIR)/wget.log:
+	@echo "** Be patient, it's 25 megabytes, at maybe a meg a minute. **"
+	cd $(WGETDIR); \
+	wget -r -S $(wget_args) $(ld_cookies) -o wget.log \
+	     -k -D $(dom) -R $(rej_links) -X /downloads,/gallery $(sroot)
+	du -s $(WGETDIR)
+
+# Extract a list of the active forms in the site.
+SITE_FORMS	= $(SRCSC)/site_forms.list
+SITE_FILES	= $(SRCSC)/site_files.list
+site_list: $(SITE_FILES)
+# Ignore flyspray and Twiki for now.
+# Ignore the search box form on every page, we'll treat it separately.
+# Remove "get" arg lists following a question-mark from wget filenames.
+$(SITE_FORMS) $(SITE_FILES): $(WGETDIR)/wget.log
+	(cd $(WGETDIR); \
+	  find . \( -name distributions -prune \) \
+		-o \( -name flyspray -prune \) \
+		-o \( -name twiki -prune \) \
+		-o -type f -print0 | xargs -0 grep -n '<form ' | \
+	    fgrep -v /search.php3 ) | sort -u > $(SITE_FORMS)
+	sed -e 's|^[^:]*/||' -e 's|[:?].*||' $(SITE_FORMS) | \
+	    uniq > $(SITE_FILES)
+
+SITE_COUNT	= $(SRCSC)/site_forms.count
+site_count: $(SITE_COUNT)
+$(SITE_COUNT): $(SITE_FILES)
+	sed 's|^\./\([^:]*\):.*|\1|' $(SITE_FILES) | \
+	    sort -u | wc -l > $(SITE_COUNT)
+site_msg: site_count
+	@echo "** `wc -l < $(SITE_FORMS)` forms instances" \
+	     "are in `cat $(SITE_COUNT)` web pages.  **"
+
+#================================================================
+# Compare the two lists to find uncovered (unlinked) forms.
+forms_coverage: files_missing forms_msg
+
+FILES_MISSING = $(SRCSC)/files_missing.list
+files_missing: $(FILES_MISSING)
+$(FILES_MISSING): src_count site_count
+	diff $(SRC_FILES) $(SITE_FILES) | grep '^[<>]' > $(FILES_MISSING)
+forms_msg: src_msg site_msg
+	@echo "** `wc -l < $(FILES_MISSING)` forms files are not covered.  **"
+
+# Look at files_missing.list and see README-howto.txt for the
+# procedure to activate coverage of more forms.
+
+#================================================================
+# Grep spidered forms for <input definitions and devise acceptable values.
+input_coverage: input_list input_msg gen_normal run_normal
+
+SITE_INPUTS     = $(SRCSC)/site_inputs.list
+INPUT_NAMES	= $(SRCSC)/input_names.list
+INPUT_VALUES	= $(SRCSC)/input_values.list
+input_list: $(INPUT_NAMES)
+# Extract input fields from the files from wget.
+# Canonicalize and reorder: <input type=.* name=.* value=.* .*>
+$(SITE_INPUTS): 
+	@(cd $(WGETDIR); \
+	  gawk -f ../$(SRCSC)/form-input.awk \
+	    $(shell sed -e "s/:.*//" -e "s/.*/'&'/" $(SITE_FORMS) ) \
+	 ) > $(SITE_INPUTS)
+# Get unique field names.  We only care about type="text" for now.
+$(INPUT_NAMES): $(SITE_INPUTS)
+	awk '/type="text"/{print $$3}' $(SITE_INPUTS) | \
+	    sort -u > $(INPUT_NAMES)
+
+input_msg: input_list
+	@echo "** `wc -l < $(INPUT_NAMES)` unique input field names.  **"
+
+# Copy input_names.list to input_values.list .
+# Edit value= clauses onto the lines.
+
+# Convert the list to WebInject XML test cases submitting input field values.
+NORMAL_URLS     = $(SRCSC)/site_normal.urls
+NORMAL_CASES	= $(SRCSC)/normal_cases.xml
+gen_normal: $(NORMAL_CASES)
+$(NORMAL_URLS): $(SITE_INPUTS) $(SITE_VALUES)
+        gawk -f $(SRCSC)/forms-to-urls -v VALUES=$(SITE_VALUES) \
+            $(SITE_INPUTS) > $(NORMAL_URLS)
+$(NORMAL_CASES): $(NORMAL_URLS)
+	gawk -f $(SRCSC)/urls-to-webinject $(NORMAL_URLS) > $(NORMAL_CASES)
+
+# Test using WebInject until "normal" input tests work properly in all forms.
+NORMAL_OUTPUT	= $(SRCSC)/normal_output.xml
+run_normal: $(NORMAL_OUTPUT)
+$(NORMAL_OUTPUT): $(NORMAL_CASES)
+	(cd $(SRCSC)/webinject;
+	    webinject.pl ../$(NORMAL_CASES);
+	    mv results.xml ../$(NORMAL_OUTPUT)
+
+#================================================================
+# Probe the checking code of all input fields for SQL injection holes.
+probes: gen_probes run_probes
+
+# Generate WebInject cases with SQL injection probes in individual fields.
+# Probe strings include form and field names that caused the hole.
+PROBE_URLS     = $(SRCSC)/site_probe.urls
+PROBE_CASES	= $(SRCSC)/probe_cases.xml
+gen_probes: $(PROBE_CASES)
+$(PROBE_URLS): $(SITE_INPUTS) $(SITE_VALUES)
+        gawk -f $(SRCSC)/forms-to-urls -v PROBE=1 -v VALUES=$(SITE_VALUES) \
+            $(SITE_INPUTS) > $(PROBE_URLS)
+$(PROBE_CASES): $(PROBE_URLS)
+	gawk -f $(SRCSC)/urls-to-webinject $(PROBE_URLS) > $(PROBE_CASES)
+
+# Run the probes through webinject.
+# Successfully caught cases should produce "invalid input" warnings.
+# Potential penetrations will log SQL errors with the form/field name.
+PROBE_OUTPUT	= $(SRCSC)/probe_output.xml
+run_probes: $(PROBE_OUTPUT)
+$(PROBE_OUTPUT): $(PROBE_CASES)
+	(cd $(SRCSC)/webinject;
+	   webinject.pl ../$(PROBE_CASES);
+	   mv results.xml ../$(PROBE_OUTPUT)
