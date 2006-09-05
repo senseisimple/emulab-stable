@@ -20,6 +20,14 @@ void logInit(FILE * destFile, int flags, int useTimestamp)
   {
     logFile = destFile;
     logFlags = flags;
+    if ((logFlags & SENSOR_COMPLETE) != 0)
+    {
+      logFlags = logFlags | SENSOR_DETAIL | SENSOR;
+    }
+    else if ((logFlags & SENSOR_DETAIL) != 0)
+    {
+      logFlags = logFlags | SENSOR;
+    }
     logTimestamp = useTimestamp;
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -46,6 +54,8 @@ static void logPrefix(int which)
   case PEER_CYCLE:
     messageClass = "PEER_CYCLE ";
     break;
+  case SENSOR_COMPLETE:
+  case SENSOR_DETAIL:
   case SENSOR:
     messageClass = "SENSOR ";
     break;
@@ -78,9 +88,8 @@ static void logPrefix(int which)
   {
     struct timeval now;
     gettimeofday(&now, NULL);
-    now.tv_sec -= startSeconds;
-    fprintf(logFile, "\n%s %u:%u: ", messageClass,
-            now.tv_sec - startSeconds, (now.tv_usec)/1000);
+    fprintf(logFile, "\n%s %f: ", messageClass,
+            (double)(now.tv_sec) + ((now.tv_usec)/1000)/1000.0);
   }
   else
   {
