@@ -470,17 +470,18 @@ while (1) {
 	my $destaddr = $runningtestPIDs{$pid}[0];
 	my $testtype = $runningtestPIDs{$pid}[1];
 	my $testev = \%{ $testevents{$destaddr}{$testtype} };
-	# handle the case where a test (iperf) times out
+	# handle the case where a test (iperf) times out and bgmon kills it
 	if( defined $testev->{"timedout"} ){
 	    $testev->{"flag_scheduled"} = 0;
 	    delete $testev->{"timedout"};
-	}else{
+	}elsif( defined $testev ){
 	    $testev->{"flag_finished"} = 1;
 	}
 	$testev->{"pid"} = 0;
 	delete $runningtestPIDs{$pid};	
     } 
 
+    # Check for running tests which are taking too long.
     foreach my $pid (keys %runningtestPIDs){
 	my $destaddr = $runningtestPIDs{$pid}[0];
 	my $testtype = $runningtestPIDs{$pid}[1];
@@ -491,15 +492,17 @@ while (1) {
 	    $testev->{"tstamp"} + 
 	    $iperftimeout )    
 	{
+	    # bw test is running too long, so kill it
+
 	    kill 'TERM', $pid;
-	    delete $runningtestPIDs{$pid};
+#	    delete $runningtestPIDs{$pid};
 	    print time_all()." bw timeout: killed $destaddr, ".
 		"pid=$pid\n";
-=pod
-	    $testev->{"pid"} = 0;
-	    $testev->{"flag_scheduled"} = 0;
+
+#	    $testev->{"pid"} = 0;
+#	    $testev->{"flag_scheduled"} = 0;
 	    $testev->{"timedout"} = 1;
-=cut
+
 	    #delete tmp filename
 	    my $filename = createtmpfilename($destaddr, $testtype);
 	    unlink($filename) or warn "can't delete temp file";
@@ -537,7 +540,7 @@ while (1) {
 		    $raw = $raw.$line;
 		}
 		close FILE;
-		unlink($filename) or die "can't delete temp file";
+		unlink($filename) or warn "can't delete temp file";
 		#parse raw data
 		my $parsedData = parsedata($testtype,$raw);
 		$testev->{"results_parsed"} = $parsedData;
