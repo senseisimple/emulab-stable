@@ -1026,6 +1026,7 @@ startrun_callback(event_handle_t handle,
 {
 	struct proginfo *pinfo;
 	char		event[TBDB_FLEN_EVEVENTTYPE];
+	char		objname[TBDB_FLEN_EVOBJTYPE];
 
 	assert(handle != NULL);
 	assert(notification != NULL);
@@ -1036,6 +1037,14 @@ startrun_callback(event_handle_t handle,
 		error("Could not get event from notification!\n");
 		return;
 	}
+	if (! event_notification_get_objname(handle, notification,
+					     objname, sizeof(objname))) {
+		error("Could not get objname from notification!\n");
+		return;
+	}
+	/* XXX Ignore events that are not to ALL. */
+	if (strcmp(objname, ADDRESSTUPLE_ALL))
+		return;
 
 	/*
 	 * XXX Both of these need to send completion events
