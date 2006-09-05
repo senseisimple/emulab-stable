@@ -12,7 +12,9 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV
-	 LogStart LogEnd );
+	 LogStart LogEnd
+	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY LIBAUDIT_NODELETE
+       );
 
 # After package decl.
 use English;
@@ -47,6 +49,9 @@ my $logfile;
 # Logonly, not to audit list.
 my $logonly     = 0;
 
+# Save log when logging only.
+my $savelog     = 0;
+
 # Untainted scriptname for email below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
     $SCRIPTNAME = basename($1);
@@ -62,6 +67,14 @@ if (my ($name,undef,undef,undef,undef,undef,$gcos) = getpwuid($UID)) {
 }
 
 #
+# Options to AuditStart.
+#
+sub LIBAUDIT_NODAEMON	{ 0; }
+sub LIBAUDIT_DAEMON	{ 0x01; }
+sub LIBAUDIT_LOGONLY	{ 0x02; }
+sub LIBAUDIT_NODELETE	{ 0x04; }
+
+#
 # Start an audit (or log) of a script. First arg is a flag indicating if
 # the script should fork/detach. The second (optional) arg is a file name
 # into which the log should be written. The return value is non-zero in the
@@ -69,7 +82,7 @@ if (my ($name,undef,undef,undef,undef,undef,$gcos) = getpwuid($UID)) {
 # 
 sub AuditStart($;$$)
 {
-    my($daemon, $logname, $logging) = @_;
+    my($daemon, $logname, $options) = @_;
 
     #
     # If we are already auditing, then do not audit a child script. This
@@ -81,8 +94,14 @@ sub AuditStart($;$$)
     }
 
     # Logging instead of "auditing" ...
-    if (defined($logging)) {
-	$logonly = $logging;
+    if (defined($options)) {
+	if ($options & LIBAUDIT_LOGONLY()) {
+	    $logonly = 1;
+
+	    if ($options & LIBAUDIT_NODELETE()) {
+		$savelog = 1;
+	    }
+	}
     }
 
     #
@@ -116,20 +135,6 @@ sub AuditStart($;$$)
 	    select(undef, undef, undef, 0.2);
 	    return $mypid;
 	}
-
-	#
-	# Create a new session to ensure we are clear of any process group
-	#
-        setsid() or
-	    die("setsid failed: $!");
-    
-	#
-	# We have to disconnect from the caller by redirecting both STDIN
-	# and STDOUT away from the pipe. Otherwise the caller (the web
-	# server) will continue to wait even though the parent has exited.
-	#
-	open(STDIN, "< /dev/null") or
-	    die("opening /dev/null for STDIN: $!");
     }
     $auditing = 1;
 
@@ -144,7 +149,7 @@ sub AuditStart($;$$)
     }
 
     # Save old stderr and stdout.
-    if ($PERL_VERSION >= 5.008) {
+    if (!$daemon && $PERL_VERSION >= 5.008) {
 	eval("open(OLDOUT, \">&\", \*STDOUT); ".
 	     "\$libaudit::SAVE_STDOUT = *OLDOUT; ".
 	     "open(OLDERR, \">&\", \*STDERR); ".
@@ -162,6 +167,22 @@ sub AuditStart($;$$)
     STDOUT->autoflush(1);
     STDERR->autoflush(1);
 
+    if ($daemon) {
+	#
+	# We have to disconnect from the caller by redirecting both
+	# STDIN and STDOUT away from the pipe. Otherwise the caller
+	# will continue to wait even though the parent has exited.
+	#
+	open(STDIN, "< /dev/null") or
+	    die("opening /dev/null for STDIN: $!");
+
+	#
+	# Create a new session to ensure we are clear of any process group
+	#
+        POSIX::setsid() or
+	    die("setsid failed: $!");
+    }
+
     return 0;
 }
 
@@ -170,7 +191,7 @@ sub LogStart($;$)
 {
     my($daemon, $logname) = @_;
 
-    return AuditStart($daemon, $logname, 1);
+    return AuditStart($daemon, $logname, LIBAUDIT_LOGONLY());
 }
 
 sub LogEnd()
@@ -185,7 +206,8 @@ sub AuditEnd()
 {
     SendAuditMail(0);
     delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
-    unlink($logfile);
+    unlink($logfile)
+	if (! ($logonly && $savelog));
     return 0;
 }
 
@@ -246,7 +268,7 @@ sub SendAuditMail($)
 	# Avoid duplicate messages.
 	$auditing = 0;
 
-	if ($PERL_VERSION >= 5.008) {
+	if (!$daemon && $PERL_VERSION >= 5.008) {
 	    eval("open(STDOUT, \">&\", \$libaudit::SAVE_STDOUT); ".
 		 "open(STDERR, \">&\", \$libaudit::SAVE_STDERR);");
 	}
@@ -299,7 +321,7 @@ sub SendAuditMail($)
 	# Leave logfile if sendmail fails. 
 	if (SENDMAIL($TO, $subject, $body, $FROM, $HDRS, @FILES)) {
 	    unlink($logfile)
-		if (defined($logfile));
+		if (defined($logfile) && (! ($logonly && $savelog)));
 	}
     }
 }
