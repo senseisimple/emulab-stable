@@ -2058,6 +2058,12 @@ foreach my $lan (keys(%virt_lans)) {
 		 "   idx from event_objecttypes where ".
 		 "   event_objecttypes.type='LINKTRACE'");
 
+    DBQueryFatal("insert into event_groups ".
+		 " (pid, eid, idx, group_name, agent_name) ".
+		 " values ('$pid', '$eid', NULL, 'all_lans', '$lan')");
+
+    # An event group to hit all the links and lans in an experiment
+
     foreach my $member (virtlanmembers($lan)) {
 	my ($vnode) = split(":", $member);
 	

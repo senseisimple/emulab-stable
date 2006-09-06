@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -52,10 +52,12 @@ my $MAPFILE = TMDELMAP();
 my $KEYFILE = TMEVENTKEY();
 my $logfile;
 my $pidfile;
+my $vnodearg = "";
 
 if (defined($vnodeid)) {
     $logfile = CONFDIR() . "/delayagent.debug";
     $pidfile = CONFDIR() . "/delayagent.pid";
+    $vnodearg = "-j $vnodeid";
 }
 else {
     $logfile = "$LOGDIR/delayagent.debug";
@@ -92,6 +94,6 @@ my ($pid, $eid, $vname) = check_nickname();
 #
 my $elvind = "localhost";
 
-system("delay-agent -s $elvind -E $pid/$eid ".
+system("delay-agent -s $elvind -E $pid/$eid $vnodearg ".
        "-f $MAPFILE -l $logfile -i $pidfile -k $KEYFILE &");
 exit($? >> 0);

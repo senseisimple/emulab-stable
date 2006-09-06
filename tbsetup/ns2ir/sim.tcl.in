@@ -1681,6 +1681,12 @@ Simulator instproc make_event {outer event} {
 		    }
 		    set args "STARTAT=1 STOPAT=$(-stopat)"
 		}
+		"reset-lans" {
+		    set otype LINK
+		    set vname "all_lans"
+		    set vnode "*"
+		    set etype RESET
+		}
 		unknown {
 		    punsup "$obj $cmd $evargs"
 		    return
