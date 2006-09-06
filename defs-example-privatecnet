@@ -1,6 +1,18 @@
 #
 # This is an example definitions file for configure.
 #
+# This version has a non-routable control network; i.e., nodes must be
+# accessed via the multi-homed, publically routable "users" node.
+# The control network looks like:
+#
+# Complete:            192.168.0/22
+# "public" segment:      192.168.3/24
+# "private" segment:     192.168.2/24
+# "node control segment: 192.168.0/23 (aka: 192.168.0/24, 192.168.1/24)
+#
+# This configuration requires a router/firewall between the segments
+# (addreses 192.168.{0,2,3}.1).
+#
 # Use the --with-TBDEFS=filename to specify your own file.
 # If you add a variable, be sure to go and update configure.in.
 #
@@ -118,8 +130,8 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 # For boss this is an address on the private segment of the control net.
 # For users this is an address on the public segment of the control net.
 #
-BOSSNODE_IP=155.98.32.70
-USERNODE_IP=155.98.33.74
+BOSSNODE_IP=192.168.2.70
+USERNODE_IP=192.168.3.74
 FSNODE_IP=$USERNODE_IP
 
 #
@@ -128,8 +140,8 @@ FSNODE_IP=$USERNODE_IP
 # unroutable network), then define the the external addresses here (and
 # the internal addresses above).
 #
-EXTERNAL_BOSSNODE_IP=$BOSSNODE_IP
-EXTERNAL_USERNODE_IP=$USERNODE_IP
+EXTERNAL_BOSSNODE_IP=155.98.32.70
+EXTERNAL_USERNODE_IP=155.98.33.74
 EXTERNAL_FSNODE_IP=$EXTERNAL_USERNODE_IP
 
 #
@@ -141,35 +153,35 @@ EXTERNAL_FSNODE_IP=$EXTERNAL_USERNODE_IP
 # The overall control network range - this subnet should cover the
 # CONTROL, PRIVATE, and PUBLIC networks below.
 #
-TESTBED_NETWORK=155.98.32.0
-TESTBED_NETMASK=255.255.240.0
+TESTBED_NETWORK=192.168.0.0
+TESTBED_NETMASK=255.255.252.0
 
 #
 # As above, if you have internal and external networks, define the
 # external network here, and the internal network above.
 # 
-EXTERNAL_TESTBED_NETWORK=$TESTBED_NETWORK
-EXTERNAL_TESTBED_NETMASK=$TESTBED_NETMASK
+EXTERNAL_TESTBED_NETWORK=155.98.32.0
+EXTERNAL_TESTBED_NETMASK=255.255.240.0
 
 #
 # The node control network segment.
 #
-CONTROL_ROUTER_IP=155.98.36.1
-CONTROL_NETWORK=155.98.36.0
-CONTROL_NETMASK=255.255.252.0
+CONTROL_ROUTER_IP=192.168.0.1
+CONTROL_NETWORK=192.168.0.0
+CONTROL_NETMASK=255.255.254.0
 
 #
 # The private network segment.
 #
-PRIVATE_NETWORK=155.98.32.0
-PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETWORK=192.168.2.0
+PRIVATE_ROUTER=192.168.2.1
 PRIVATE_NETMASK=255.255.255.0
 
 #
 # The public network segment.
 #
-PUBLIC_NETWORK=155.98.33.0
-PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETWORK=192.168.3.0
+PUBLIC_ROUTER=192.168.3.1
 PUBLIC_NETMASK=255.255.255.0
 
 #
@@ -177,7 +189,7 @@ PUBLIC_NETMASK=255.255.255.0
 # to use for new nodes being added to the testbed.
 # You need at least one.
 #
-DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
+DHCPD_DYNRANGE="192.168.1.240 192.168.1.250"
 
 #
 # If you have forwarders for your named, specify them here for named.conf
