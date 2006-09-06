@@ -24,6 +24,7 @@ private:
   Decayer minimum;
   DelaySensor * delay;
   int minDelay;
+  int lastreported;
 };
 
 #endif
