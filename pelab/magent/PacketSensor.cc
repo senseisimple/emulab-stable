@@ -41,6 +41,21 @@ Time const & PacketSensor::getAckedSendTime(void) const
 
 void PacketSensor::localSend(PacketInfo * packet)
 {
+  /*
+   * Check for window scaling, which is not supported yet by this code. This
+   * option is only legal on SACK packets. If we decide to support window
+   * scaling in the future, it might be better to move it to some other sensor
+   */
+  if (packet->tcp->syn) {
+    list<Option>::iterator opt;
+    for (opt = packet->tcpOptions->begin();
+         opt != packet->tcpOptions->end();
+         ++opt) {
+      if (opt->type == TCPOPT_WINDOW) {
+        logWrite(ERROR,"TCP window scaling in use - not supported!");
+      }
+    }
+  }
   // Assume this packet is not a retransmit unless proven otherwise
   isRetransmit = false;
   if (state->getState() == StateSensor::ESTABLISHED)
