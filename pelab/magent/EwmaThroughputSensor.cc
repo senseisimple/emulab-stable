@@ -9,8 +9,8 @@
 using namespace std;
 
 EwmaThroughputSensor::EwmaThroughputSensor(
-  ThroughputSensor * newThroughputSource,
-  StateSensor * newState)
+  ThroughputSensor const * newThroughputSource,
+  StateSensor const * newState)
   : maxThroughput(0)
   , bandwidth(0.0)
   , throughputSource(newThroughputSource)

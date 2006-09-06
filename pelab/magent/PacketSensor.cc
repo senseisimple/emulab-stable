@@ -6,7 +6,7 @@
 
 using namespace std;
 
-PacketSensor::PacketSensor(StateSensor * newState)
+PacketSensor::PacketSensor(StateSensor const * newState)
   : globalSequence()
   , state(newState)
 {

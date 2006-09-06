@@ -10,6 +10,11 @@
 // check to each associated push function to see if that pointer is
 // non-NULL.
 
+// ASSUMPTION: Functions called through the dependency declarations
+// are queries only. They do not change the sensor
+// involved. Therefore, declare them const and any reference to them
+// const and any query-functions in them const.
+
 #ifndef SENSOR_LIST_H_STUB_2
 #define SENSOR_LIST_H_STUB_2
 
@@ -51,13 +56,13 @@ private:
   void pushEwmaThroughputSensor(void);
 private:
   // Example dependency
-  NullSensor * depNullSensor;
+  NullSensor const * depNullSensor;
   // Dependency pointers.
-  StateSensor * depStateSensor;
-  PacketSensor * depPacketSensor;
-  DelaySensor * depDelaySensor;
-  MinDelaySensor * depMinDelaySensor;
-  ThroughputSensor * depThroughputSensor;
+  StateSensor const * depStateSensor;
+  PacketSensor const * depPacketSensor;
+  DelaySensor const * depDelaySensor;
+  MinDelaySensor const * depMinDelaySensor;
+  ThroughputSensor const * depThroughputSensor;
 };
 
 #endif

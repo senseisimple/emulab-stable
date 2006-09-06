@@ -8,8 +8,8 @@
 
 using namespace std;
 
-DelaySensor::DelaySensor(PacketSensor * newPacketHistory,
-                         StateSensor * newState)
+DelaySensor::DelaySensor(PacketSensor const * newPacketHistory,
+                         StateSensor const * newState)
   : state(newState)
 {
   lastDelay = 0;

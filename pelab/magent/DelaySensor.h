@@ -11,15 +11,16 @@ class StateSensor;
 class DelaySensor : public Sensor
 {
 public:
-  DelaySensor(PacketSensor * newPacketHistory, StateSensor * newState);
+  DelaySensor(PacketSensor const * newPacketHistory,
+              StateSensor const * newState);
   int getLastDelay(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
   int lastDelay;
-  PacketSensor * packetHistory;
-  StateSensor * state;
+  PacketSensor const * packetHistory;
+  StateSensor const * state;
 };
 
 #endif

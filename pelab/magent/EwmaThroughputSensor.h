@@ -11,8 +11,8 @@ class StateSensor;
 class EwmaThroughputSensor : public Sensor
 {
 public:
-  EwmaThroughputSensor(ThroughputSensor * newThroughputSource,
-                       StateSensor * newState);
+  EwmaThroughputSensor(ThroughputSensor const * newThroughputSource,
+                       StateSensor const * newState);
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
@@ -21,8 +21,8 @@ private:
   int maxThroughput;
   // And EWMA of the last several solid bandwidth measurements
   double bandwidth;
-  ThroughputSensor * throughputSource;
-  StateSensor * state;
+  ThroughputSensor const * throughputSource;
+  StateSensor const * state;
 };
 
 #endif

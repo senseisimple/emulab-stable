@@ -8,8 +8,10 @@
 
 using namespace std;
 
-MaxDelaySensor::MaxDelaySensor(DelaySensor * newDelay, StateSensor * newState,
-        MinDelaySensor *newminDelay, PacketSensor *newpacketSensor)
+MaxDelaySensor::MaxDelaySensor(DelaySensor const * newDelay,
+                               StateSensor const * newState,
+                               MinDelaySensor const * newminDelay,
+                               PacketSensor const * newpacketSensor)
   : maximum(0, 0.01)
   , delay(newDelay)
   , state(newState)

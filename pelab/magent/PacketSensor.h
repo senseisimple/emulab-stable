@@ -13,7 +13,7 @@ class StateSensor;
 class PacketSensor : public Sensor
 {
 public:
-  PacketSensor(StateSensor * newState);
+  PacketSensor(StateSensor const * newState);
   // Get the size of the acknowledgement in bytes.
   int getAckedSize(void) const;
   // Find out if the packet in question is a retransmission
@@ -42,7 +42,7 @@ private:
   SentPacket globalSequence;
   bool isRetransmit;
 
-  StateSensor * state;
+  StateSensor const * state;
 };
 
 #endif

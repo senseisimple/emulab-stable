@@ -16,17 +16,18 @@ class PacketSensor;
 class MaxDelaySensor : public Sensor
 {
 public:
-  MaxDelaySensor(DelaySensor * newDelay, StateSensor * newState,
-                 MinDelaySensor * newminDelay, PacketSensor * newpacketSensor);
+  MaxDelaySensor(DelaySensor const * newDelay, StateSensor const * newState,
+                 MinDelaySensor const * newminDelay,
+                 PacketSensor const * newpacketSensor);
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
   Decayer maximum;
-  DelaySensor * delay;
-  StateSensor * state;
-  MinDelaySensor * mindelay;
-  PacketSensor * packetsensor;
+  DelaySensor const * delay;
+  StateSensor const * state;
+  MinDelaySensor const * mindelay;
+  PacketSensor const * packetsensor;
 
   // The last delay we reported to the monitor
   int lastreported;

@@ -7,8 +7,8 @@
 
 using namespace std;
 
-ThroughputSensor::ThroughputSensor(PacketSensor * newPacketHistory,
-                                   StateSensor * newState)
+ThroughputSensor::ThroughputSensor(PacketSensor const * newPacketHistory,
+                                   StateSensor const * newState)
   : throughputInKbps(0)
   , maxThroughput(0)
   , packetHistory(newPacketHistory)

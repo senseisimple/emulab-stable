@@ -14,15 +14,15 @@ class DelaySensor;
 class MinDelaySensor : public Sensor
 {
 public:
-  MinDelaySensor(DelaySensor * newDelay);
+  MinDelaySensor(DelaySensor const * newDelay);
   // Note: This is the minimum RTT, not one-way delay
-  int getMinDelay() { return minDelay; }
+  int getMinDelay(void) const { return minDelay; }
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
   Decayer minimum;
-  DelaySensor * delay;
+  DelaySensor const * delay;
   int minDelay;
   int lastreported;
 };

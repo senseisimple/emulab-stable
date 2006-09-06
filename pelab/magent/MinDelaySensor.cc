@@ -7,7 +7,7 @@
 
 using namespace std;
 
-MinDelaySensor::MinDelaySensor(DelaySensor * newDelay)
+MinDelaySensor::MinDelaySensor(DelaySensor const * newDelay)
   : minimum(1000000, -0.01), minDelay(1000000), lastreported(-1)
 {
   delay = newDelay;

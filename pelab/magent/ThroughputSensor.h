@@ -13,7 +13,8 @@ class StateSensor;
 class ThroughputSensor : public Sensor
 {
 public:
-  ThroughputSensor(PacketSensor * newPacketHistory, StateSensor * newState);
+  ThroughputSensor(PacketSensor const * newPacketHistory,
+                   StateSensor const * newState);
   int getThroughputInKbps(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
@@ -22,8 +23,8 @@ private:
   int throughputInKbps;
   int maxThroughput;
   Time lastAckTime;
-  PacketSensor * packetHistory;
-  StateSensor * state;
+  PacketSensor const * packetHistory;
+  StateSensor const * state;
 };
 
 #endif
