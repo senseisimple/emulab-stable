@@ -213,11 +213,13 @@ void SensorList::pushMaxDelaySensor(void)
   pushMinDelaySensor();
   pushDelaySensor();
   pushStateSensor();
+  pushPacketSensor();
 
   logWrite(SENSOR, "Adding MaxDelaySensor");
   std::auto_ptr<Sensor> current(new MaxDelaySensor(depDelaySensor,
                                                    depStateSensor,
-                                                   depMinDelaySensor));
+                                                   depMinDelaySensor,
+                                                   depPacketSensor));
   pushSensor(current);
 }
 
