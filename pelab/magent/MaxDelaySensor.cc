@@ -9,16 +9,35 @@
 using namespace std;
 
 MaxDelaySensor::MaxDelaySensor(DelaySensor * newDelay, StateSensor * newState,
-        MinDelaySensor *newminDelay)
+        MinDelaySensor *newminDelay, PacketSensor *newpacketSensor)
   : maximum(0, 0.01)
   , delay(newDelay)
   , state(newState)
   , mindelay(newminDelay)
+  , packetsensor(newpacketSensor)
+  , lastreported(-1)
 {
 }
 
-void MaxDelaySensor::localSend(PacketInfo *)
+void MaxDelaySensor::localSend(PacketInfo * packet)
 {
+  /*
+   * If we detect packet loss, report the maximum delay we've recently seen on
+   * the forward path
+   */
+  if (packetsensor->getIsRetransmit()) {
+    if (lastreported != maximum.get()) {
+      logWrite(SENSOR,"MaxDelaySensor::localSend() reporting new max %d",
+               maximum.get());
+      ostringstream buffer;
+      buffer << "MAXINQ=" << maximum.get();
+      global::output->eventMessage(buffer.str(), packet->elab);
+      lastreported = maximum.get();
+    } else {
+      logWrite(SENSOR_DETAIL,"MaxDelaySensor::localSend() suppressing max %d",
+               maximum.get());
+    }
+  }
 }
 
 void MaxDelaySensor::localAck(PacketInfo * packet)
@@ -46,13 +65,16 @@ void MaxDelaySensor::localAck(PacketInfo * packet)
            minimumDelay, queueingDelay, state->isSaturated());
   if (queueingDelay < 0) {
     logWrite(ERROR,"Queueing delay is less than zero!");
+    return;
   }
-  if ((queueingDelay > maximum) && (current != 0) && state->isSaturated())
+  /*
+   * Keep track of the maximum delay on the forward path that we've seen
+   * recently. If we discover any packet loss, we'll report the delay seen for
+   * by this packet
+   */
+  if ((queueingDelay > maximum) && (current != 0))
   {
-    ostringstream buffer;
-    buffer << "MAXINQ=" << queueingDelay;
     maximum.reset(queueingDelay);
-    global::output->eventMessage(buffer.str(), packet->elab);
   }
   else
   {
