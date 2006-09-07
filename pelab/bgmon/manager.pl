@@ -150,7 +150,7 @@ sub start
 	    foreach my $node (@expnodes){
 		#build string of destination nodes
 		#init bandwidth
-		my $bw_destnodes;
+		my $bw_destnodes = "";
 		foreach my $dest (@expnodes){
 		    #add destination nodes to this source node, but not "self"
 		    if( $dest ne $node ){
