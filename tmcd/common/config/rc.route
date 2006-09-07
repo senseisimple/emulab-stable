@@ -62,7 +62,6 @@ sub doboot();
 sub doshutdown();
 sub doreconfig();
 sub docleanup();
-sub ddijkstra($);
 
 # Parse command line.
 if (! getopts($optlist, \%options)) {
