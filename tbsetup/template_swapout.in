@@ -186,7 +186,7 @@ $SIG{TERM} = \&sighandler;
 if (! $batchmode) {
     # Cleanup
     $experiment->CleanLogFiles() == 0
-	or fatal("Could not clean up logfiles!");
+	or fatal(-1, "Could not clean up logfiles!");
     
     $logname = TBExptCreateLogFile($pid, $eid, "swapout");
     TBExptSetLogFile($pid, $eid, $logname);
