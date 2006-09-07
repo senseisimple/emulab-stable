@@ -1246,7 +1246,7 @@ sub doReset($@) {
     }
 
     my $errors = 0;
-    my @trunkedPorts = getExperimentTrunks($eid,$pid);
+    my @trunkedPorts = getExperimentTrunks($pid,$eid);
     foreach my $port (@trunkedPorts) {
 	$errors += doTrunkDisable($stacks,$port);
     }
