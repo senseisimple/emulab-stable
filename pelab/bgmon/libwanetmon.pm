@@ -22,6 +22,7 @@ require Exporter;
 	       stopnode
 	       edittest
 	       killnode
+	       getstatus
 	       );
 
 
@@ -111,10 +112,14 @@ sub sendcmd($$)
     my $node = $_[0];
     my $hashref = $_[1];
     my %cmd = %$hashref;
+    if( !defined $cmd{managerID} ){
+	$cmd{managerID} = "default";
+    }
 
     my $sercmd = serialize_hash( \%cmd );
     my $f_success = 0;
     my $max_tries = 3;
+    my $retval;
     do{
 	$socket = IO::Socket::INET->new( PeerPort => $port,
 					 Proto    => 'tcp',
@@ -126,8 +131,8 @@ sub sendcmd($$)
 	    $sel->add($socket);
 	    my ($ready) = $sel->can_read(2);  #timeout (seconds) (?)
 	    if( defined($ready) && $ready eq $socket ){
-		my $ack = <$ready>;
-#		chomp $ack;
+		my $ack;
+		($ack, $retval) = <$ready>;
 		if( defined $ack && ( (chomp($ack),$ack) eq "ACK") ){
 		    $f_success = 1;
 #		        print "Got ACK from $node for command\n";
@@ -136,6 +141,8 @@ sub sendcmd($$)
 		}else{
 		    $max_tries--;
 		}
+		chomp $retval 
+		    if( defined $retval );
 	    }else{
 		$max_tries--;
 	    }
@@ -154,7 +161,7 @@ sub sendcmd($$)
     }elsif( $f_success == 1 ){
 	#success!
 	delete $deadnodes{$node};
-	return 1;
+	return (1,$retval);
     }
 
 }
@@ -194,11 +201,21 @@ sub edittest($$$;$)
 		testper  => $testper,
 		limitTime=> $limitTime);
 
-    return sendcmd($srcnode,\%cmd);
+    return ${[sendcmd($srcnode,\%cmd)]}[0];
 }
 
 
-
+sub getstatus($){
+    my ($node) = @_;
+    my %cmd = ( expid    => $expid,
+		cmdtype  => "GETSTATUS" );
+    my @cmdresult = sendcmd($node,\%cmd);
+    if( defined $cmdresult[1] ){
+	return $cmdresult[1];
+    }else{
+	return "error";
+    }
+}
 
 
 1;
