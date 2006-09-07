@@ -3162,9 +3162,11 @@ sub TBExptCreateLogFile($$$)
     my($pid, $eid, $prefix) = @_;
     my $logdir;
     my $logname;
+    my $linkname;
 
-    $logdir  = TBExptWorkDir($pid, $eid);
-    $logname = `mktemp $logdir/${prefix}.XXXXXX`;
+    $logdir   = TBExptWorkDir($pid, $eid);
+    $linkname = "$logdir/${prefix}.log";
+    $logname  = `mktemp $logdir/${prefix}.XXXXXX`;
 
     if ($logname =~ /^([-\@\w\.\/]+)$/) {
 	$logname = $1;
@@ -3177,6 +3179,16 @@ sub TBExptCreateLogFile($$$)
     chmod(0664, $logname) or
 	die("*** $0:\n".
 	    "    Could not chmod $logname to 0644: $!\n");
+
+    # Link it to $prefix.log so that the most recent is well know.
+    if (-e $linkname) {
+	die("*** $0:\n".
+	    "    CreateLogFile: $linkname already exists!\n");
+    }
+    if (! link($logname, $linkname)) {
+	die("*** $0:\n".
+	    "    CreateLogFile: Cannot link $logname,$linkname: $!\n");
+    }
 
     return $logname;
 }
@@ -4850,7 +4862,7 @@ sub MapNodeOSID($$)
 }
 
 #
-# Save off the log files for an experiment.
+# Save off the log files for an experiment to long term storage.
 #
 sub TBSaveExpLogFiles($$)
 {

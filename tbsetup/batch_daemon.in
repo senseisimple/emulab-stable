@@ -54,6 +54,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use Template;
+use Experiment;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -344,8 +345,15 @@ sub dosomething($$)
     
     # Locals
     my $creator = $exphash->{'expt_head_uid'};
-
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (! defined($experiment)) {
+	print "Could not find experiment object! Skipping ...\n";
+	return -1;
+    }
     print "Doing a '$dowhat' to batch experiment $pid/$eid\n";
+
+    # Clean before starting.
+    $experiment->CleanLogFiles();
 
     #
     # Create a temporary name for a log file. We do this in the parent so

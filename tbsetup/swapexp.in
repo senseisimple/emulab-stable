@@ -756,6 +756,10 @@ if ($inout eq "modify" && defined($modnsfile)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch && ! $template_mode) {
+    # Cleanup
+    $experiment->CleanLogFiles() == 0
+	or fatal("Could not clean up logfiles!");
+
     if ($experiment->CreateLogFile("swapexp", \$logname) != 0) {
 	fatal("Could not create logfile!");
     }

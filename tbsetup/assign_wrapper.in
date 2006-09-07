@@ -998,7 +998,9 @@ sub RunAssign ()
     # Saving up assign.log coz each swapin/modify is
     # different and it is nice to have every mapping
     # for debugging and archiving purposes
-    system("/bin/cp assign.log assign-$pid-$eid-$$.log");
+    # We do not call it .log though, since we do not want it copied
+    # out to the user directory every swapin. See Experiment.pm
+    system("/bin/cp assign.log $pid-$eid-$$.assign");
     if (!open(ASSIGNFP, "assign.log")) {
 	print("Could not open assign logfile!\n");
 	return -1;

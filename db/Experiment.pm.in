@@ -914,8 +914,40 @@ sub SaveLogFiles($)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $workdir = $self->WorkDir();
+    my $logdir  = TBExptLogDir($pid, $eid);
 
-    TBSaveExpLogFiles($pid, $eid);
+    # What the hell is this file! Very annoying.
+    if (-e "$workdir/.rnd") {
+	system("/bin/rm -f $workdir/.rnd");
+    }
+    system("/bin/cp -Rpf $workdir/ $logdir");
+    return 0;
+}
+
+#
+# Remove old logfiles from the wordir.
+#
+sub CleanLogFiles($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $workdir = $self->WorkDir();
+    my $files   = "";
+    
+    foreach my $ext ("log", "ptop", "top", "assign") {
+	$files = "$files $workdir/*.${ext}";
+    }
+    foreach my $prefix ("swap", "start", "cancel") {
+	$files = "$files $workdir/${prefix}*.*";
+    }
+    system("/bin/rm -f $files") == 0
+	or return -1;
+
     return 0;
 }
 
@@ -935,7 +967,7 @@ sub CopyLogFiles($)
     my $workdir = $self->WorkDir();
     my $userdir = $self->UserDir();
 
-    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+    system("/bin/cp -Rfp $workdir/*.log $userdir/tbdata");
     return 0;
 }
 

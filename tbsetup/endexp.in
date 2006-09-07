@@ -391,6 +391,10 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (!$batch && !$template_mode) {
+    # Cleanup
+    $experiment->CleanLogFiles() == 0
+	or fatal("Could not clean up logfiles!");
+    
     if ($experiment->CreateLogFile("endexp", \$logname) != 0) {
 	fatal("Could not create logfile!");
     }

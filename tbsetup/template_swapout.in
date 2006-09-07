@@ -82,6 +82,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Template;
+use Experiment;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -162,6 +163,12 @@ if (!defined($instance)) {
     fatal(-1, "Could not get instance record for experiment $exptidx!");
 }
 
+# Grab the experiment record for below.
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal(-1, "Experiment $pid/$eid object could not be found!");
+}
+
 #
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
@@ -177,6 +184,10 @@ $SIG{TERM} = \&sighandler;
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batchmode) {
+    # Cleanup
+    $experiment->CleanLogFiles() == 0
+	or fatal("Could not clean up logfiles!");
+    
     $logname = TBExptCreateLogFile($pid, $eid, "swapout");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
