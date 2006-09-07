@@ -89,9 +89,6 @@ use constant INSIGNIFICANT_BW_ERROR_HI  => 0.015; # percent.
 use constant INSIGNIFICANT_BW_ERROR_LO  => 0.03;  # percent.
 use constant INSIGNIFICANT_BW_ERROR_LO_Windows  => 0.10;  # Lower expectations.
 
-# latency must be corrected for xmit delay under this speed.
-use constant LAT_LOW_BW => 10000000;
-
 # slow send rate (for bw from LIMIT_BW_MIN to LIMIT_BW_LO)
 use constant SLOW_SEND => 100;
 use constant FAST_SEND => 250;
@@ -982,6 +979,168 @@ sub force_arp {
     &barrier();
 }
 
+#
+# Compute the packet header size used by the bandwidth shaper for its
+# calculations.  We need this for various estimations.  Our argument is
+# the link on which the packet is being sent.
+#
+# Header size depends on how the shaping is done:
+#
+# * Delay nodes running dummynet count IP/UDP/ethernet headers
+#   (but *not* the 4 byte CRC)
+#
+# * End-node shaping ("linkdelays") on FreeBSD (dummynet again,
+#   but at layer3) count only IP/UDP headers.  Linux end-node shaping
+#   appears to be the same.
+#
+# * Veth encapsulation adds another 16 bytes to the overhead in the
+#   non-linkdelay case.
+#
+sub header_size {
+    my $edge = shift;
+
+    # IP (20) + UDP (8)
+    my $hsize = 20 + 8;
+
+    if ($edge->dstyle ne "linkdelay") {
+	# + eth (14)
+	$hsize += 14;
+	if ($edge->mpxstyle eq "veth") {
+	    # + veth (16)
+	    $hsize += 16;
+	}
+    }
+    return $hsize;
+}
+
+#
+# Compute the expected RTT value for a link.
+#
+# Facts from analysis in /users/davidand/public/calibrate.
+# Came from 40 independent swapins (enough for normality assumption)
+# (note that data actually is normal at any particular latency point, 
+# according to described.lst)
+#
+# Best fit regression for the error as a function of total latency,
+# according to sas.
+# See regression1.lst and regression1.sas
+# -0.00523(actual)     0.00003096 fbsd
+# -0.00530(actual)     0.00003478 linux
+# roughly identical, so use:
+# -0.005(actual)
+#
+# Inherent delay in the system (with a delay node) is
+# see described.lst and described.sas
+# 0.337737  fbsd
+# 0.362282  linux (median was 0.328000)
+# round to:
+# 0.333 ms
+#
+# Note, this has been measured and is in one of the emulab papers (Shashi)
+#
+# Also, described.lst provides good support for the notion that
+# the distribution of latencies is normal. For Fbsd all of the 
+# distributions were normal, and most were for Linux. So, use this
+# assumption in order to send fewer test packets.
+#
+sub link_rtt {
+    my ($edge,$other_edge,$psize) = @_;
+
+    # the null hypothesis value, u.
+    my $u = $edge->delay + $other_edge->delay;
+			    
+    # the calibration as a function of $u
+    $u += 0.333 - 0.005 * $u / 2;
+
+    #
+    # Correct latency to account for transport delay.
+    #
+    # Strictly speaking, we need to account for this once the ethernet
+    # bandwidth goes below 10Mb/sec which is the point at which the
+    # media transport delay becomes significant to us (~1.2ms each way).
+    # While calculating transport delay based on bandwidth seems easy
+    # enough, it isn't really.  Two aspects of the current emulation
+    # techniques make it more complicated.
+    #
+    # First, we always use 100Mb links to/from the delay nodes (or between
+    # linkdelayed nodes).  Thus, in the absense of an explicit delay value,
+    # as long as the transfer rate is less than the capped BW and the
+    # individual packet size is sufficiently small (see next paragraph),
+    # those packets will go across the wire with 100Mb ethernet latency
+    # (about 120us) regardless of the BW setting.  This case has been
+    # accounted for in our (empirically determined) base latency calculation
+    # described above.
+    #
+    # Second, we also see quantization effects, from both Linux and BSD
+    # emulations, once the bandwidth drops below a certain point.  For
+    # example, in our ping-based latency test, a single ping packet counts
+    # as 84 bytes or 672 bits (when using end-node shaping).  As long as the
+    # ping rate does not exceed one packet per tick (1ms for end-node shaping)
+    # and the allowed bit rate is greater than 672 bits/tick, then a packet
+    # will never be delayed due to bandwidth shaping.  Otherwise, the
+    # bandwidth shaper will delay each packet for one or more ticks til it
+    # accumulates enough bandwidth credit to send the packet.  In our latency
+    # test, the packet rate is never a problem (5 pings/sec), but the bandwidth
+    # may be.  With a 1ms tick, once the bandwidth drops below 672 bits * 1000
+    # ticks/sec == 672Kb/sec, packets will start to experience at least 1ms
+    # of delay in each direction.
+    #
+    # So, given the IP payload size of a packet as a parameter, we calculate
+    # the point at which transport time becomes significant and calculate
+    # the added latency.
+    #
+    # ASSUMPTIONS:
+    # * packet rate is no faster than 1 packet per tick
+    # * < 1ms one-way latency is "insignificant"
+    #
+    my $bits_per_packet;
+    my $bwthresh;
+
+    $bits_per_packet = (&header_size($edge) + $psize) * 8;
+    if ($edge->dstyle eq "linkdelay") {
+	$bwthresh = $bits_per_packet * 1000;
+    } else {
+	$bwthresh = 10000000;
+    }
+    if ($edge->bw < $bwthresh) {
+	$u += (1000 * $bits_per_packet / $edge->bw);
+    }
+
+    $bits_per_packet = (&header_size($other_edge) + $psize) * 8;
+    if ($other_edge->dstyle eq "linkdelay") {
+	$bwthresh = $bits_per_packet * 1000;
+    } else {
+	$bwthresh = 10000000;
+    }
+    if ($other_edge->bw < $bwthresh) {
+	$u += (1000 * $bits_per_packet / $other_edge->bw);
+    }
+
+    #
+    # XXX with dummynet, packets which are not queued for bandwidth shaping,
+    # but go directly to the delay queue (either because there is no BW
+    # specified or because there is not a backlog) may be delayed from [0-1]
+    # tick short of the specified delay value depending on when during the
+    # current tick the packet is queued.  So on average, it will be 1/2 tick
+    # short for these packets on links with non-zero delay values.  With
+    # endnode shaping where the tick value is 1ms, that will be on average
+    # 1ms short for a round trip, enough that we will compensate for it here.
+    #
+    if ($edge->delay > 0 && $edge->dstyle eq "linkdelay" &&
+	$hostmap{$edge->src}->os eq "FreeBSD") {
+	$u -= 0.5;
+    }
+    if ($other_edge->delay > 0 && $other_edge->dstyle eq "linkdelay" &&
+	$hostmap{$other_edge->src}->os eq "FreeBSD") {
+	$u -= 0.5;
+    }
+    if ($u < 0.0) {
+	$u = 0.0;
+    }
+
+    return $u;
+}
+
 # For directly connected hosts, checks latency using Ping.
 sub latency_test {
     my %waitlist;
@@ -1018,10 +1177,13 @@ sub latency_test {
 				       1, undef, $ptimo);
 			
 			if ($reportonly) {
+			    my $u = &link_rtt($edge, $other_edge, 56);
+
 			    &info("    Latency result on $hostname for " .
 				  &print_edge($edge) . 
 				  ": count/avg/stddev = ".
-				  "$result_cnt/$sample_avg/$sample_dev\n");
+				  "$result_cnt/$sample_avg/$sample_dev ".
+				  "(expected $u)\n");
 			    exit(EXIT_OK);
 			}
 
@@ -1032,74 +1194,7 @@ sub latency_test {
 			    &error(NAME_LATENCY, $edge, $errmsg);
 			    exit(EXIT_NOT_OK);
 			} else {
-
-# facts from analysis in /users/davidand/public/calibrate.
-# came from 40 independent swapins (enough for normality assumption)
-# (note that data actually is normal at any particular latency point, 
-# according to described.lst)
-
-# best fit regression for the error as a function of total latency, according to sas.
-# see regression1.lst and regression1.sas
-#-0.00523(actual)     0.00003096 fbsd
-#-0.00530(actual)     0.00003478 linux
-# roughly identical, so use:
-#-0.005(actual)
-
-# inherent delay in the system (with a delay node) is
-# see described.lst and described.sas
-# 0.337737  fbsd
-# 0.362282  linux (median was 0.328000)
-# round to:
-# 0.333 ms
-
-# note, this has been measured and is in one of the emulab papers (Shashi)
-
-# Also, described.lst provides good support for the notion that
-# the distribution of latencies is normal. For Fbsd all of the 
-# distributions were normal, and most were for Linux. So, use this
-# assumption in order to send fewer test packets.
-			   
-
-			    # the null hypothesis value, u.
-			    my $u = $edge->delay + $other_edge->delay;
-			    
-			    # the calibration as a function of $u
-			    $u += 0.333 - 0.005 * $u / 2;
-
-#
-# With dummynet, packets which are not queued for bandwidth shaping, but
-# go directly to the delay queue (either because there is no BW specified
-# or because there is not a backlog) may be delayed from [0-1] tick short
-# of the specified delay value depending on when during the current tick
-# the packet is queued.  So on average, it will be 1/2 tick short for these
-# packets on links with non-zero delay values.  With endnode shaping where
-# the tick value is 1ms, that will be on average 1ms short for a round trip,
-# enough that we will compensate for it here.
-#
-			    if ($edge->delay > 0 &&
-				$edge->dstyle eq "linkdelay" &&
-				$hostmap{$edge->src}->os eq "FreeBSD") {
-				$u -= 0.5;
-			    }
-			    if ($other_edge->delay > 0 &&
-				$other_edge->dstyle eq "linkdelay" &&
-				$hostmap{$other_edge->src}->os eq "FreeBSD") {
-				$u -= 0.5;
-			    }
-			    if ($u < 0.0) {
-				$u = 0.0;
-			    }
-
-			    # factor in transport delay at slow network speeds.
-			    # transport delay:
-			    #     64B (icmp) + 20B (ip) + 14B (ethernet)
-			    # to units of ms.
-			    if($edge->bw < LAT_LOW_BW) {
-				$u += 1000 * (98 * 8) / $edge->bw;
-			    }
-			    if($other_edge->bw < LAT_LOW_BW) {
-				$u += 1000 * (98 * 8) / $other_edge->bw;
-			    }
+			    my $u = &link_rtt($edge, $other_edge, 56);
 			    
 			    my $x_bar = $sample_avg;
 			    my $numerator = $x_bar - $u;
@@ -1305,12 +1400,23 @@ sub bw_test {
 		    #
 		    my $acktime = 50;
 		    my $clockres = ($edge->dstyle eq "linkdelay") ? 1 : 10;
-		    my $minacktime = $edge->delay + $redge->delay;
+		    my $minacktime = &link_rtt($edge, $redge);
+
+		    #
+		    # Ugh.  Since we are over-driving the link, our transmit
+		    # queue is likely to be non-empty, delaying the FIN and
+		    # thus further delaying the ACK.  So based on the edge BW
+		    # and the default emulation queue size of 50, we estimate
+		    # how long til we hit the wire and add that to the RTT.
+		    #
+		    my $psize = (&header_size($edge) + IPERF_PKTSIZE) * 8;
+		    $minacktime += (($psize * 50/2) / $edge->bw) * 1000;
+		    $minacktime = int($minacktime);
+
+		    # must not be less than RTT or clock resolution
 		    if ($minacktime < $clockres) {
 			$minacktime = $clockres;
 		    }
-
-		    # must not be less than RTT or clock resolution
 		    if ($acktime < $minacktime) {
 			$acktime = $minacktime;
 		    }
@@ -1414,26 +1520,9 @@ sub bw_test {
 		#
 		# XXX Iperf uses *only* UDP payload length when calculating
 		# the bandwidth. We want to add the rest of the overhead
-		# before making the comparison below.  Overhead depends on
-		# how the shaping is done.  Delay nodes running dummynet
-		# count IP/UDP/ethernet headers (but *not* the 4 byte CRC):
+		# before making the comparison below.
 		#
-		# <IPERF_PKTSIZE>B + 20B (ip) + 8B (udp) + 14B (ethernet).
-		#
-		# End-node shaping ("linkdelays") on FreeBSD (dummynet
-		# again, but at layer3) count only IP/UDP headers.
-		# Linux appears to be the same.
-		#
-		# veth encapsulation add another 16 bytes to the
-		# overhead in the non-linkdelay case.
-		#
-		my $poh = 20 + 8;
-		if ($edge->dstyle ne "linkdelay") {
-		    $poh += 14;
-		    if ($edge->mpxstyle eq "veth") {
-			$poh += 16;
-		    }
-		}
+		my $poh = &header_size($edge);
 		my $bw = ((IPERF_PKTSIZE + $poh) * 8 * $numpkts) / $duration;
 		
 		#
