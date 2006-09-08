@@ -649,6 +649,23 @@ if ($plabinelab) {
 }
 
 #
+# Start up plab vnode setup now since it doesn't depend on
+# physical node readiness.
+#
+my $plab_setup_pid = -1;
+if (grep($_, values(%plabvnodes))) {
+    my $plabnumbatch = TBGetSiteVar("plab/setup/vnode_batch_size");
+    my $plabwait     = TBGetSiteVar("plab/setup/vnode_wait_time");
+    TBDebugTimeStamp("Starting PlanetLab vnode setup.");
+    if (!($plab_setup_pid = fork())) { 
+        exec("$vnode_setup -p -n $plabnumbatch -w $plabwait $pid $eid") 
+            or die_noretry("Exec failed.");
+    } elsif ($plab_setup_pid == -1) {
+        die_noretry("Fork failed.");
+    }
+}
+
+#
 # We need to issue the reboots and the reloads in parallel.
 #
 TBDebugTimeStamp("rebooting/reloading nodes started");
@@ -1032,23 +1049,28 @@ elsif ($failed && @vnodelist) {
 	"failures!";
 }
 elsif (@vnodelist) {
-    my $vnode_setup_args = ""; # add any generic args here.
     my @retry_list = ();
 
     TBDebugTimeStamp("Setting up virtual nodes");
     print "Setting up virtual testbed nodes ...\n";
 
-    # If there are any plab vnodes, we have to adjust batching and timeouts
-    # accordingly.
-    if (grep($_, values(%plabvnodes))) {
-        my $plabnumbatch = TBGetSiteVar("plab/setup/vnode_batch_size");
-        my $plabwait     = TBGetSiteVar("plab/setup/vnode_wait_time");        
-        $vnode_setup_args .= " -n $plabnumbatch -w $plabwait ";
+    # Wait for plab vnode setup to finish if it's running.
+    if ($plab_setup_pid > 0) {
+        my $kid = waitpid($plab_setup_pid,0);
+        if ($kid == $plab_setup_pid) {
+            if ($?) {
+                die_noretry("Failed to setup plab vnodes.");
+            }
+        } else {
+            die_noretry("Error waiting for plab vnode to finish.");
+        }
     }
 
   retry:
     TBDebugTimeStamp("Setting up virtual nodes");
-    system("$vnode_setup $vnode_setup_args $pid $eid");
+    # Only fire off local (jailed) nodes here.  Plab vnode setup has
+    # already been started at this point.
+    system("$vnode_setup -j $pid $eid");
     if ($?) {
 	die_noretry("Vnode setup failed!");
     }

@@ -18,10 +18,10 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: vnode_setup [-f] [-k] [-n <numbatch>] [-w <wait_time>] <pid> <eid> [node ...]\n";
+    print STDOUT "Usage: vnode_setup [-f] [-k] [-j] [-p] [-n <numbatch>] [-w <wait_time>] <pid> <eid> [node ...]\n";
     exit(-1);
 }
-my  $optlist = "fdkn:w:";
+my  $optlist = "fdkjpn:w:";
 
 #
 # We don't want to run this script unless its the real version.
@@ -46,6 +46,8 @@ my $debug       = 0;
 my $force       = 0;
 my $failed      = 0;
 my $killmode    = 0;
+my $jailonly    = 0;
+my $plabonly    = 0;
 my $numbatch    = 10;
 my $childwait   = 120;
 my $dbuid;
@@ -84,6 +86,12 @@ if (defined($options{"d"})) {
 if (defined($options{"k"})) {
     $killmode = 1;
 }
+if (defined($options{"j"})) {
+    $jailonly = 1;
+}
+if (defined($options{"p"})) {
+    $plabonly = 1;
+}
 if (defined($options{"n"})) {
     if ($options{"n"} =~ /^(\d+)$/) {
         $numbatch = $1;
@@ -118,6 +126,10 @@ if ($eid =~ /^([-\@\w]+)$/) {
 }
 else {
     die("*** Bad data in eid: $eid\n");
+}
+
+if ($plabonly && $jailonly) {
+    die("*** '-j' and '-p' are mutually exclusive.");
 }
 
 #
@@ -177,6 +189,10 @@ foreach my $node (@nodes) {
 
     if (! TBIsNodeVirtual($node, \$jailed, \$plab)) {
 	next;
+    }
+    if (($plabonly || $jailonly) and 
+        !($plabonly && $plab or $jailonly && $jailed)) {
+        next;
     }
     if (! TBPhysNodeID($node, \$pnode)) {
 	die("*** $0:\n".
