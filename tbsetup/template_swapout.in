@@ -68,6 +68,8 @@ my $justexit    = 1;
 
 # Programs we need
 my $endexp      = "$TB/bin/endexp";
+my $swapexp     = "$TB/bin/swapexp";
+my $endrun      = "$TB/bin/template_exprun";
 
 # Protos
 sub ParseArgs();
@@ -169,6 +171,14 @@ if (!defined($experiment)) {
     fatal(-1, "Experiment $pid/$eid object could not be found!");
 }
 
+# Check for cancel.
+if (! $batchmode) {
+    if ($experiment->state() eq EXPTSTATE_ACTIVATING) {
+	system("$swapexp -s out $pid $eid");
+	exit($? >> 8);
+    }
+}
+
 #
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
@@ -245,18 +255,15 @@ if ($waitmode) {
     POSIX::setsid();
 }
 
+#
+# Stop the current run.
+#
+system("$endrun -a stop -f -e $eid $guid/$version") == 0
+    or fatal(-1, "Could not stop the current run!");
+
 # This sets the stop time.
 $instance->Stop() == 0
     or fatal(-1, "Could not stop experiment instance!");
-
-# This runs loghole.
-print "Asking loghole to sync the logfiles ... this will take a minute.\n";
-$instance->LogHole() == 0
-    or fatal(-1, "Loghole failed");
-
-print "Dumping the instance database ... this will take a minute.\n";
-$instance->DumpDB() == 0
-    or fatal(-1, "Dump Database failed");
 
 #
 # Now do the swapout.
