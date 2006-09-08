@@ -18,17 +18,32 @@ ThroughputSensor::ThroughputSensor(PacketSensor const * newPacketHistory,
 
 int ThroughputSensor::getThroughputInKbps(void) const
 {
-  return throughputInKbps;
+  if (ackValid)
+  {
+    return throughputInKbps;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "ThroughputSensor::getThroughputInKbps() "
+             "called with invalid data");
+    return 0;
+  }
 }
 
 void ThroughputSensor::localSend(PacketInfo *)
 {
+  ackValid = false;
+  sendValid = true;
 }
 
 void ThroughputSensor::localAck(PacketInfo * packet)
 {
-  if (state->getState() == StateSensor::ESTABLISHED)
+  sendValid = false;
+  if (state->isAckValid() && packetHistory->isAckValid() &&
+      state->getState() == StateSensor::ESTABLISHED)
   {
+    ackValid = true;
     Time currentAckTime = packet->packetTime;
     if (lastAckTime != Time() && currentAckTime != lastAckTime)
     {
@@ -46,6 +61,7 @@ void ThroughputSensor::localAck(PacketInfo * packet)
     else
     {
       throughputInKbps = 0;
+      ackValid = false;
     }
     lastAckTime = currentAckTime;
   }
@@ -53,5 +69,6 @@ void ThroughputSensor::localAck(PacketInfo * packet)
   {
     throughputInKbps = 0;
     lastAckTime = Time();
+    ackValid = false;
   }
 }

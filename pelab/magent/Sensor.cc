@@ -5,6 +5,12 @@
 
 using namespace std;
 
+Sensor::Sensor()
+  : sendValid(false)
+  , ackValid(false)
+{
+}
+
 Sensor::~Sensor()
 {
 }
@@ -49,17 +55,32 @@ void Sensor::capturePacket(PacketInfo * packet)
   }
 }
 
+bool Sensor::isSendValid(void) const
+{
+  return sendValid;
+}
+
+bool Sensor::isAckValid(void) const
+{
+  return ackValid;
+}
+
+
 NullSensor::~NullSensor()
 {
 }
 
 void NullSensor::localSend(PacketInfo *)
 {
+  ackValid = false;
+  sendValid = true;
   logWrite(SENSOR, "Send received");
 }
 
 void NullSensor::localAck(PacketInfo * packet)
 {
+  sendValid = false;
+  ackValid = true;
   logWrite(SENSOR, "Ack received");
   list<Option>::iterator pos = packet->tcpOptions->begin();
   list<Option>::iterator limit = packet->tcpOptions->end();

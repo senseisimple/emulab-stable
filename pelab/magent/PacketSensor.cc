@@ -17,26 +17,45 @@ PacketSensor::PacketSensor(StateSensor const * newState)
 
 int PacketSensor::getAckedSize(void) const
 {
-  if (ackedSendTime == Time())
+  if (ackValid)
   {
-    logWrite(ERROR, "PacketSensor::getAckedSize() called before localAck()");
+    return ackedSize;
   }
-  return ackedSize;
+  else
+  {
+    logWrite(ERROR,
+             "PacketSensor::getAckedSize() called with invalid ack data");
+    return 0;
+  }
 }
 
 bool PacketSensor::getIsRetransmit(void) const
 {
-  return isRetransmit;
+  if (sendValid)
+  {
+    return isRetransmit;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "PacketSensor::getIsRetransmit() called with invalid send data");
+    return false;
+  }
 }
 
 Time const & PacketSensor::getAckedSendTime(void) const
 {
-  if (ackedSendTime == Time())
+  if (ackValid)
   {
-    logWrite(ERROR, "PacketSensor::getAckedSendTime() called before"
-             " localAck()");
+    return ackedSendTime;
   }
-  return ackedSendTime;
+  else
+  {
+    logWrite(ERROR,
+             "PacketSensor::getAckedSendTime() called with invalid ack data");
+    static Time invalidTime = Time();
+    return invalidTime;
+  }
 }
 
 void PacketSensor::localSend(PacketInfo * packet)
@@ -57,9 +76,12 @@ void PacketSensor::localSend(PacketInfo * packet)
     }
   }
   // Assume this packet is not a retransmit unless proven otherwise
+  ackValid = false;
   isRetransmit = false;
-  if (state->getState() == StateSensor::ESTABLISHED)
+  if (state->isSendValid() && state->getState() == StateSensor::ESTABLISHED)
   {
+    // Set it to true, and then set it to false if we encounter an error.
+    sendValid = true;
     logWrite(SENSOR_DETAIL,
              "PacketSensor::localSend() for sequence number %u",
              ntohl(packet->tcp->seq));
@@ -86,7 +108,9 @@ void PacketSensor::localSend(PacketInfo * packet)
       }
 
       if (!done) {
-        logWrite(ERROR, "localSend() unable to find packet record to update.");
+        logWrite(ERROR,
+                 "localSend() unable to find packet record to update.");
+        sendValid = false;
       }
     }
     else
@@ -99,8 +123,8 @@ void PacketSensor::localSend(PacketInfo * packet)
       record.seqStart = startSequence;
 
       /*
-       * Calculate the packet payload size - we have to make sure to take into
-       * account IP and TCP option headers
+       * Calculate the packet payload size - we have to make sure to
+       * take into account IP and TCP option headers
        */
       unsigned int sequenceLength =
         // Total length of the IP part of the packet
@@ -132,9 +156,9 @@ void PacketSensor::localSend(PacketInfo * packet)
         if (record.seqStart != (globalSequence.seqEnd + 1))
         {
           fprintf(stderr,"PacketSensor::localSend() may have missed a "
-                   "packet - last seq seen: %u, new seq: %u (lost %d)",
-                   globalSequence.seqEnd,record.seqStart,
-                   record.seqStart - globalSequence.seqEnd);
+                  "packet - last seq seen: %u, new seq: %u (lost %d)",
+                  globalSequence.seqEnd,record.seqStart,
+                  record.seqStart - globalSequence.seqEnd);
         }
         globalSequence.seqEnd = record.seqEnd;
       }
@@ -147,15 +171,22 @@ void PacketSensor::localSend(PacketInfo * packet)
     ackedSize = 0;
     ackedSendTime = Time();
   }
+  else
+  {
+    sendValid = false;
+  }
 }
 
 void PacketSensor::localAck(PacketInfo * packet)
 {
+  sendValid = false;
   // Right now, we don't know whether or not this ACK is for a retransmitted
   // packet (we could tell, but there doesn't seem to be a need yet)
   isRetransmit = false;
-  if (state->getState() == StateSensor::ESTABLISHED)
+  if (state->isAckValid() && state->getState() == StateSensor::ESTABLISHED)
   {
+    // Set it to true, and then set it to false if we encounter an error.
+    ackValid = true;
     /*
      * When we get an ACK, the sequence number is really the next one the peer
      * excects to see: thus, the last sequence number it's ACKing is one less
@@ -202,6 +233,7 @@ void PacketSensor::localAck(PacketInfo * packet)
          ++opt) {
       if (opt->type == TCPOPT_SACK) {
         logWrite(ERROR,"Packet has a SACK option!");
+        ackValid = false;
       }
     }
 
@@ -228,6 +260,7 @@ void PacketSensor::localAck(PacketInfo * packet)
                "of unacked packets.");
       ackedSize = 0;
       ackedSendTime = Time();
+      ackValid = false;
       return;
     }
     unacked.erase(unacked.begin(), pos);
@@ -243,6 +276,10 @@ void PacketSensor::localAck(PacketInfo * packet)
 
     logWrite(SENSOR_DETAIL, "PacketSensor::localAck() decided on size %u",
              ackedSize);
+  }
+  else
+  {
+    ackValid = false;
   }
 }
 

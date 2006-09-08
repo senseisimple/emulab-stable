@@ -17,16 +17,37 @@ StateSensor::~StateSensor()
 
 int StateSensor::getState(void) const
 {
-  return state;
+  if (sendValid || ackValid)
+  {
+    return state;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "StateSensor::getState() called with invalid data");
+    return INITIAL;
+
+  }
 }
 
 bool StateSensor::isSaturated(void) const
 {
-  return saturated;
+  if (sendValid || ackValid)
+  {
+    return saturated;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "StateSensor::isSaturated() called with invalid data");
+    return false;
+  }
 }
 
 void StateSensor::localSend(PacketInfo * packet)
 {
+  ackValid = false;
+  sendValid = true;
   if (packet->tcp->syn && state == INITIAL)
   {
     state = AFTER_SYN;
@@ -35,6 +56,7 @@ void StateSensor::localSend(PacketInfo * packet)
   else if (packet->tcp->syn)
   {
     logWrite(ERROR, "Sent a SYN packet out of order");
+    sendValid = false;
   }
   else if (! packet->tcp->syn && state == AFTER_SYN_ACK)
   {
@@ -46,6 +68,8 @@ void StateSensor::localSend(PacketInfo * packet)
 
 void StateSensor::localAck(PacketInfo * packet)
 {
+  sendValid = false;
+  ackValid = true;
   if (packet->tcp->syn && packet->tcp->ack && state == AFTER_SYN)
   {
     state = AFTER_SYN_ACK;
@@ -54,6 +78,7 @@ void StateSensor::localAck(PacketInfo * packet)
   else if (packet->tcp->syn && packet->tcp->ack)
   {
     logWrite(ERROR, "Received a SYNACK packet out of order");
+    ackValid = false;
   }
   calculateSaturated(packet);
 }

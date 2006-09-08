@@ -12,15 +12,23 @@
 class Sensor
 {
 public:
+  Sensor();
   virtual ~Sensor();
   Sensor * getTail(void);
   void addNode(std::auto_ptr<Sensor> node);
   void capturePacket(PacketInfo * packet);
+  bool isSendValid(void) const;
+  bool isAckValid(void) const;
 private:
   std::auto_ptr<Sensor> next;
 protected:
   virtual void localSend(PacketInfo * packet)=0;
   virtual void localAck(PacketInfo * packet)=0;
+protected:
+  // This is used for functions which only yield data on a send.
+  bool sendValid;
+  // This is used for functions which only yield data on an ack.
+  bool ackValid;
 };
 
 class NullSensor : public Sensor

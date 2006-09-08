@@ -16,7 +16,7 @@ class MinDelaySensor : public Sensor
 public:
   MinDelaySensor(DelaySensor const * newDelay);
   // Note: This is the minimum RTT, not one-way delay
-  int getMinDelay(void) const { return minDelay; }
+  int getMinDelay(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);

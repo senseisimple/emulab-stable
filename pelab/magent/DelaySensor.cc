@@ -18,19 +18,37 @@ DelaySensor::DelaySensor(PacketSensor const * newPacketHistory,
 
 int DelaySensor::getLastDelay(void) const
 {
-  return lastDelay;
+  if (ackValid)
+  {
+    return lastDelay;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "DelaySensor::getLastDelay() called with invalid ack data");
+    return 0;
+  }
 }
 
 void DelaySensor::localSend(PacketInfo *)
 {
+  ackValid = false;
+  sendValid = true;
 }
 
 void DelaySensor::localAck(PacketInfo * packet)
 {
-  if (state->getState() == StateSensor::ESTABLISHED)
+  sendValid = false;
+  if (state->isAckValid() && packetHistory->isAckValid()
+      && state->getState() == StateSensor::ESTABLISHED)
   {
     Time diff = packet->packetTime - packetHistory->getAckedSendTime();
     lastDelay = diff.toMilliseconds();
     logWrite(SENSOR, "DELAY: %d ms", lastDelay);
+    ackValid = true;
+  }
+  else
+  {
+    ackValid = false;
   }
 }

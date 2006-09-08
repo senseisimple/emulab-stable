@@ -23,11 +23,12 @@ MaxDelaySensor::MaxDelaySensor(DelaySensor const * newDelay,
 
 void MaxDelaySensor::localSend(PacketInfo * packet)
 {
+  ackValid = false;
   /*
    * If we detect packet loss, report the maximum delay we've recently seen on
    * the forward path
    */
-  if (packetsensor->getIsRetransmit()) {
+  if (packetsensor->isSendValid() && packetsensor->getIsRetransmit()) {
     if (lastreported != maximum.get()) {
       logWrite(SENSOR,"MaxDelaySensor::localSend() reporting new max %d",
                maximum.get());
@@ -39,16 +40,25 @@ void MaxDelaySensor::localSend(PacketInfo * packet)
       logWrite(SENSOR_DETAIL,"MaxDelaySensor::localSend() suppressing max %d",
                maximum.get());
     }
+    sendValid = true;
+  }
+  else
+  {
+    sendValid = false;
   }
 }
 
 void MaxDelaySensor::localAck(PacketInfo * packet)
 {
+  sendValid = false;
 
   /*
    * Only try to make this calculation on established connections
    */
-  if (state->getState() != StateSensor::ESTABLISHED) {
+  if (! state->isAckValid() || ! delay->isAckValid()
+      || ! mindelay->isAckValid()
+      ||  state->getState() != StateSensor::ESTABLISHED) {
+    ackValid = false;
     return;
   }
 
@@ -67,6 +77,7 @@ void MaxDelaySensor::localAck(PacketInfo * packet)
            minimumDelay, queueingDelay, state->isSaturated());
   if (queueingDelay < 0) {
     logWrite(ERROR,"Queueing delay is less than zero!");
+    ackValid = false;
     return;
   }
   /*
@@ -82,4 +93,5 @@ void MaxDelaySensor::localAck(PacketInfo * packet)
   {
     maximum.decay();
   }
+  ackValid = true;
 }

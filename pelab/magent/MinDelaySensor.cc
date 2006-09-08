@@ -13,28 +13,53 @@ MinDelaySensor::MinDelaySensor(DelaySensor const * newDelay)
   delay = newDelay;
 }
 
+int MinDelaySensor::getMinDelay(void) const
+{
+  if (ackValid)
+  {
+    return minDelay;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "MinDelaySensor::getMinDelay() called with invalid ack data");
+    return 0;
+  }
+}
+
 void MinDelaySensor::localSend(PacketInfo *)
 {
+  ackValid = false;
+  sendValid = true;
 }
 
 void MinDelaySensor::localAck(PacketInfo * packet)
 {
-  int current = delay->getLastDelay();
-  int oneway = current / 2;
-  if (current < minimum && current != 0 && oneway != lastreported)
+  sendValid = false;
+  if (delay->isAckValid())
   {
-    minDelay = current;
-    ostringstream buffer;
-    buffer << "delay=" << oneway;
-    minimum.reset(current);
-    global::output->eventMessage(buffer.str(), packet->elab,
-                                 CommandOutput::FORWARD_PATH);
-    global::output->eventMessage(buffer.str(), packet->elab,
-                                 CommandOutput::BACKWARD_PATH);
-    lastreported = oneway;
+    int current = delay->getLastDelay();
+    int oneway = current / 2;
+    if (current < minimum && current != 0 && oneway != lastreported)
+    {
+      minDelay = current;
+      ostringstream buffer;
+      buffer << "delay=" << oneway;
+      minimum.reset(current);
+      global::output->eventMessage(buffer.str(), packet->elab,
+                                   CommandOutput::FORWARD_PATH);
+      global::output->eventMessage(buffer.str(), packet->elab,
+                                   CommandOutput::BACKWARD_PATH);
+      lastreported = oneway;
+    }
+    else
+    {
+      minimum.decay();
+    }
+    ackValid = false;
   }
   else
   {
-    minimum.decay();
+    ackValid = false;
   }
 }
