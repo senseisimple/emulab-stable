@@ -23,7 +23,7 @@ sub usage()
 	"Usage: eventsys_control [-f] <start|stop|replay> <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "df";
+my  $optlist = "dfa";
 
 #
 # Configure variables
@@ -76,6 +76,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $proxy	= "$TB/sbin/eventsys.proxy";
 my $debug	= 1;
 my $force       = 0;
+my $agent       = 0;
 my $expstate;
 my $exptidx;
 my $dbuid;
@@ -96,6 +97,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"a"})) {
+    $agent = 1;
 }
 my $action = $ARGV[0];
 my $pid    = $ARGV[1];
@@ -168,6 +172,18 @@ if ($action eq "replay" || $action eq "stop") {
 		 "pid='$pid' and eid='$eid' and objecttype=3 and eventtype=1");
 }
 
+#
+# Do we need a program agent on ops?
+#
+if ($action ne "stop" && ! $agent) {
+    my $query_result =
+	DBQueryFatal("select vname from virt_agents as v ".
+		     "left join event_objecttypes as o on o.idx=v.objecttype ".
+		     "where v.pid='$pid' and v.eid='$eid' and ".
+		     "      o.type='PROGRAM' and v.vnode='ops'");
+    $agent = $query_result->numrows;
+}
+
 # Need the unix_gid info to pass to boss.
 my $gid = ExpGroup($pid, $eid);
 my ($unix_gid, $unix_gidname);
@@ -189,6 +205,8 @@ if (! TBExptIDX($pid, $eid, \$exptidx)) {
 my $cmd = $proxy;
 $cmd .= " -d"
     if ($debug);
+$cmd .= " -a"
+    if ($agent);
 $cmd .= " -t " . TBExptUserDir($pid, $eid) . "/archive/events"
     if (Template::Instance->LookupByExptidx($exptidx));
 $cmd .= " -l " . TBExptUserDir($pid, $eid) . "/logs/event-sched.log";

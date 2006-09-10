@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,10 +49,12 @@ program-agent-debug: program-agent.o version.o
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:
+install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/program-agent.8 \
 		$(INSTALL_DIR)/opsdir/man/man8/program-agent.8
+
+control-install:	$(INSTALL_SBINDIR)/program-agent
 
 client: $(PROGRAMS)
 client-install: client
@@ -63,3 +65,8 @@ client-install: client
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

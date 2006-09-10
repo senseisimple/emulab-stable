@@ -42,11 +42,12 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwp:E:a:r:e:dsc";
+my $optlist	 = "qwp:E:a:r:e:dscf";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
 my $debug        = 0;
+my $foreground   = 0;
 my $clean        = 0;
 my $paramfile;
 my %parameters   = ();
@@ -238,7 +239,9 @@ if (defined($paramfile)) {
 	    $donebad++;
 	}
 	# DB records inserted below, once experiment is pre-loaded.
-	$parameters{$name} = $value;
+	# Watch for unwanted parameters.
+	$parameters{$name} = $value
+	    if (exists($parameters{$name}));
     }
     # User sees this error.
     exit(1)
@@ -253,7 +256,7 @@ $SIG{TERM} = \&sighandler;
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (! $debug) {
+if (! ($debug || $foreground)) {
     $logname = TBExptCreateLogFile($pid, $eid, "newrun");
 
     TBExptSetLogFile($pid, $eid, $logname);
@@ -402,14 +405,17 @@ if ($paramfile) {
 	else {
 	    $value = "''";
 	}
-	DBQueryFatal("replace into virt_user_environment set ".
-		     "   name='$name', value=$value, ".
-		     "   pid='$pid', eid='$eid'");	
+	DBQueryFatal("update virt_user_environment set value=$value ".
+		     "where pid='$pid' and eid='$eid' and name='$name'");
     }
     SignalProgAgents("RELOAD");
     # XXX Need to use a completion event!
     sleep(5);
 }
+
+print "Writing environment strings ...\n";
+$instance->WriteEnvVariables() == 0
+    or fatal(-1, "Could not write environment strings for program agents");
 
 #
 # Restart the event stream from the beginning.
@@ -510,6 +516,9 @@ sub ParseArgs()
     }
     if (defined($options{"d"})) {
 	$debug = 1;
+    }
+    if (defined($options{"f"})) {
+	$foreground = 1;
     }
     if (defined($options{"c"})) {
 	$clean = 1;

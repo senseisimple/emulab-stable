@@ -51,6 +51,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use Experiment;
 
 #
 # Turn off line buffering on output
@@ -90,6 +91,12 @@ if (! ($state = ExpState($pid, $eid))) {
 
 if (! ($gid = ExpGroup($pid,$eid))) {
     tbdie("Unable to get group for $pid/$eid");
+}
+
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object!")
 }
 
 #
@@ -466,6 +473,14 @@ if (! $TESTMODE) {
 		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
     }
 }
+
+print "Writing environment strings ...\n";
+$experiment->WriteEnvVariables() == 0
+    or fatal("Could not write environment strings for program agents");
+
+print "Writing program agent info ...\n";
+$experiment->WriteProgramAgents() == 0
+    or fatal("Could not write program agent info");
 
 TBDebugTimeStamp("tbprerun finished");
 print "Pre run finished. " . TBTimeStamp() . "\n";

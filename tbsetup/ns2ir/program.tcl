@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -61,12 +61,16 @@ Program instproc updatedb {DB} {
 	perror "\[updatedb] $self has disallowed newline in command: $command"
 	return
     }
-
     set progvnode $node
+
+    #
     # if the attached node is a simulated one, we attach the
     # program to the physical node on which the simulation runs
-    if { [$node set simulated] == 1 } {
-	set progvnode [$node set nsenode]
+    #
+    if {$progvnode != "ops"} {
+	if { [$node set simulated] == 1 } {
+	    set progvnode [$node set nsenode]
+	}
     }
 
     # Update the DB

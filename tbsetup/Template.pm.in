@@ -2674,6 +2674,22 @@ sub CreateLogFile($$$)
     return 0;
 }
 
+sub WriteEnvVariables($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $experiment = $self->Experiment();
+
+    return -1
+	if (! defined($experiment));
+
+    return $experiment->WriteEnvVariables();
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 
 1;

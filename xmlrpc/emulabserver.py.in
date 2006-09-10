@@ -2831,7 +2831,22 @@ class experiment:
                       (argdict["proj"], argdict["exp"]))
 
         for agent in res:
-            if agent[2] == None:
+            if agent[1] == "ops":
+                nodeid = "ops"
+
+                ipres = DBQuery("select IP from interfaces "
+                                "where node_id=%s and role='ctrl'",
+                                (nodeid))
+
+                if not ipres or len(ipres) == 0:
+                    continue
+
+                ipaddr = ipres[0][0]
+                if not ipaddr:
+                    ipaddr = ""
+                    pass
+                pass
+            elif agent[2] == None:
                 nodeid = ""
                 ipaddr = ""
                 pass

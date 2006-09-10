@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,6 +49,7 @@ control-install:
 	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
 	@$(MAKE) -C linktest control-install
+	@$(MAKE) -C program-agent control-install
 
 post-install: 
 	@$(MAKE) -C linktest post-install

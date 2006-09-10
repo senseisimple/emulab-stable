@@ -224,7 +224,9 @@ if (defined($paramfile)) {
 	    $donebad++;
 	}
 	# DB records inserted below, once experiment is pre-loaded.
-	$parameters{$name} = $value;
+	# Watch for unwanted parameters.
+	$parameters{$name} = $value
+	    if (exists($parameters{$name}));
     }
     # User sees this error.
     exit(1)
@@ -536,6 +538,10 @@ if ($experiment->dpdb() && $experiment->dpdbname() ne "") {
 		     "   pid='$pid', eid='$eid'");
     }
 }
+
+print "Writing environment strings ...\n";
+$instance->WriteEnvVariables() == 0
+    or fatal(-1, "Could not write environment strings for program agents");
 
 #
 # Now do the swapin (or it gets queued if a batch experiment).

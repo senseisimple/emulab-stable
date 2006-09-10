@@ -170,6 +170,15 @@ Node instproc updatedb {DB} {
     var_import ::GLOBALS::default_ip_routing_type
     var_import ::GLOBALS::enforce_user_restrictions
     var_import ::TBCOMPAT::hwtype_class
+
+    #
+    # Rserved name; conflicts with kludgy manner in which a program
+    # agent can used on ops.
+    #
+    if {"$self" == "ops"} {
+	perror "You may not use the name for 'ops' for a node!"
+	return
+    }
     
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.

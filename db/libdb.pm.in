@@ -3182,8 +3182,7 @@ sub TBExptCreateLogFile($$$)
 
     # Link it to $prefix.log so that the most recent is well know.
     if (-e $linkname) {
-	die("*** $0:\n".
-	    "    CreateLogFile: $linkname already exists!\n");
+	unlink($linkname);
     }
     if (! link($logname, $linkname)) {
 	die("*** $0:\n".

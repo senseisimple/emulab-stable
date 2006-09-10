@@ -24,8 +24,9 @@ sub usage()
 	"-l logfile -t record_file start|stop|replay\n";
     exit(-1);
 }
-my $optlist = "u:e:k:dl:g:t:";
+my $optlist = "u:e:k:dl:g:t:a";
 my $debug   = 0;
+my $runagent= 0;
 my $user;
 my $pid;
 my $eid;
@@ -40,9 +41,12 @@ my $action;
 #
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
 my $sched    = "$TB/sbin/event-sched";
+my $agent    = "$TB/sbin/program-agent";
 my $PIDDIR   = "/var/run/emulab/evsched";
 my $PIDFILE;
+my $EXPDIR;
 
 #
 # Turn off line buffering on output
@@ -70,6 +74,9 @@ if ($UID != 0) {
 use lib "@prefix@/lib";
 use libtestbed;
 
+# Protos
+sub StartProgram($@);
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -92,6 +99,9 @@ if (! defined($options{"u"}) ||
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"a"})) {
+    $runagent = 1;
+}
 if (defined($options{"t"})) {
     $recordfile = $options{"t"};
 }
@@ -110,6 +120,7 @@ else {
     usage();
 }
 $PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
+$EXPDIR  = "/proj/$pid/exp/$eid";
 
 #
 # Deal with stop and replay.
@@ -131,9 +142,11 @@ if ($action eq "stop" || $action eq "replay") {
 	}
 	unlink($PIDFILE);
 
-	if (! kill('TERM', $epid)) {
-	    die("*** $0:\n".
-		"Failed to stop event system for $pid/$eid! - $! $epid\n");
+	if (kill(0, $epid) || ! $!{ESRCH}) {
+	    if (! kill('TERM', $epid)) {
+		die("*** $0:\n".
+		    "Failed to stop event system for $pid/$eid! - $! $epid\n");
+	    }
 	}
     }
     
@@ -192,7 +205,7 @@ if (my $childpid = TBBackGround($logfile)) {
     # Delay a moment, and they look for an exit status. This is intended
     # to catch startup problems.
     #
-    sleep(1);
+    sleep(2);
     my $foo = waitpid($childpid, &WNOHANG);
     if ($foo) {
 	my $status = $?;
@@ -208,7 +221,7 @@ if (my $childpid = TBBackGround($logfile)) {
 }
 
 #
-# Write out a pid file just prior to doing the exec. The user is not granted
+# Write out a pid file prior to flipping; the user is not granted
 # access to this pid file.
 #
 if (system("echo '$PID' > $PIDFILE")) {
@@ -216,17 +229,111 @@ if (system("echo '$PID' > $PIDFILE")) {
 	"    Could not create $PIDFILE!");
 }
 
-# Flip to user and never go back!
-$GID            = $unix_ggid;
-$EGID           = "$unix_ggid $unix_ggid $unix_pgid";
-$EUID = $UID    = $unix_uid;
-$ENV{'USER'}    = $user;
-$ENV{'LOGNAME'} = $user;
+#
+# We will have two subprocesses.
+#
+my $schedpid;
+my $agentpid;
 
-# And run it.
-exec("$sched " . ($debug ? "-d" : "") .
-     ($recordfile ? " -t $recordfile" : "") .
-     " -s localhost -k $keyfile $pid $eid");
-die("*** $0:\n".
-    "    Could not exec $sched!");
+#
+# Catch TERM to kill off the scheduler and the agent. The death is picked
+# up in the loop below.
+#
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    
+    print "Caught a TERM; killing the scheduler and agent\n";
+    
+    kill('TERM', $schedpid)
+	if (defined($schedpid));
+    kill('TERM', $agentpid)
+	if (defined($agentpid));
+    sleep(1);
+}
+$SIG{TERM} = \&handler;
+
+#
+# Set the command lines for the programs
+#
+my @sched_command_options = ();
+
+push(@sched_command_options, "-d")
+    if ($debug);
+push(@sched_command_options, ("-t", $recordfile))
+    if ($recordfile);
+push(@sched_command_options, ("-s", "localhost", "-k", $keyfile, $pid, $eid));
+
+my @agent_command_options = ("-u", $user, "-d", "-e", "$pid/$eid",
+			     "-k", $keyfile,
+			     "-c", "$EXPDIR/tbdata/program_agents",
+			     "-f", "$EXPDIR/tbdata/environment",
+			     "-o", "$EXPDIR/logs/ops");
+
+#
+# We want to catch these programs if they exit abnormally.
+#
+$schedpid = StartProgram($sched, @sched_command_options);
+$agentpid = StartProgram($agent, @agent_command_options)
+    if ($runagent);
+
+while (1) {
+    my $waitpid = wait();
+    my $exitstatus = $?;
+    my $which;
+
+    # No more children.
+    last
+	if ($waitpid < 0);
+
+    if ($waitpid == $schedpid) {
+	$schedpid = undef;
+	$which    = "Event Scheduler";
+    }
+    else {
+	$agentpid = undef;
+	$which    = "Program Agent";
+    }
+
+    #
+    # Send mail about abnormal exit.
+    # 
+    if ($?) {
+	SENDMAIL($user,
+		 "$which for $pid/$eid died on $CONTROL",
+		 "$which exited with status: $?",
+		 "$user",
+		 "CC: $TBOPS");
+    }
+
+    last
+	if (! (defined($schedpid) || defined($agentpid)));
+}
+exit(0);
+
+sub StartProgram($@)
+{
+    my ($command, @arguments) = @_;
+
+    my $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+    select(undef, undef, undef, 0.2);
+
+    # Flip to user and never go back
+    $GID            = $unix_ggid;
+    $EGID           = "$unix_ggid $unix_ggid $unix_pgid";
+    $EUID = $UID    = $unix_uid;
+    $ENV{'USER'}    = $user;
+    $ENV{'LOGNAME'} = $user;
+
+    print "$command @arguments\n";
+
+    exec $command, @arguments;
+    
+    die("*** $0:\n".
+	"    Could not exec $command!\n");
+}
 

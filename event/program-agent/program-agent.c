@@ -54,7 +54,7 @@
  * since a "chatty" program can fill it up, which might cause odd behavior to
  * happen.
  */
-#define LOGDIR		"/local/logs"
+static char		*LOGDIR = "/local/logs";
 
 /**
  * Maximum number of agents to be managed by this daemon.
@@ -82,6 +82,11 @@ static event_handle_t	handle;
 static char		debug;
 
 /**
+ * Flag indicating the program agent is running on ops.
+ */
+static int		isops;
+
+/**
  * The actual number of agents being managed by this daemon.
  */
 static int		numagents;
@@ -102,6 +107,11 @@ static int		childpipe[2];
  * The config file path.
  */
 static char		*configfile;
+
+/**
+ * The environment file, which can be in a different place then configfile.
+ */
+static char		*envfile;
 
 /**
  * The project and experiment ID that this daemon is running in.
@@ -326,6 +336,29 @@ dump_proginfos(void)
 #endif
 
 /**
+ * Handler for SIGTERM that kills everything off and exits nicely.
+ *
+ * @param sig The actual signal number received.
+ */
+static void
+sigterm(int sig)
+{
+	struct proginfo *pinfo;
+
+	/*
+	 * Stop all running programs so that their log files
+	 * are complete.
+	 */
+	for (pinfo = proginfos; pinfo != NULL; pinfo = pinfo->next) {
+		if (pinfo->pid != 0) {
+			stop_program(pinfo, NULL);
+		}
+	}
+
+	exit(0);
+}
+
+/**
  * Print the usage statement to standard error.
  *
  * @param progname The name of the program as given on the command line.
@@ -387,7 +420,7 @@ main(int argc, char **argv)
 	progname = argv[0];
 	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:")) != -1) {
+	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:f:o:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(progname);
@@ -414,8 +447,15 @@ main(int argc, char **argv)
 		case 'c':
 			configfile = optarg;
 			break;
+		case 'f':
+			envfile = optarg;
+			break;
 		case 'u':
 			user = optarg;
+			break;
+		case 'o':
+			LOGDIR = optarg;
+			isops  = 1;
 			break;
 		case 'i':
 			pidfile = optarg;
@@ -462,6 +502,8 @@ main(int argc, char **argv)
 			"error: pid/eid and config file flags are required\n");
 		usage(progname);
 	}
+	if (!envfile)
+	        envfile = configfile;
 	
 	if (parse_configfile(configfile) != 0)
 		exit(1);
@@ -510,7 +552,8 @@ main(int argc, char **argv)
 		else
 			loginit(1, "program-agent");
 	}
-
+	signal(SIGTERM, sigterm);
+	
 	/*
 	 * Must be a valid user of course.
 	 */
@@ -541,10 +584,13 @@ main(int argc, char **argv)
 	}
 	info("agentlist: %s\n", agentlist);
 	info("user: %s\n", user);
-	
-	if ((stat(LOGDIR, &st) < 0) &&
-	    (system("mkdir -p -m 0775 " LOGDIR) != 0)) {
-		fatal("Could not make log directory: %s", LOGDIR);
+
+	if (stat(LOGDIR, &st) < 0) {
+		sprintf(buf, "mkdir -p -m 0775 %s", LOGDIR);
+	    
+		if (system(buf) != 0) {
+			fatal("Could not make directory: %s", LOGDIR);
+		}
 	}
 
 	if (st.st_uid != pw->pw_uid) {
@@ -626,7 +672,7 @@ main(int argc, char **argv)
 	/* XXX Need to eval the ENV parts of the config file after we've
 	 * setup the environment.
 	 */
-	if (parse_configfile_env(configfile) != 0)
+	if (parse_configfile_env(envfile) != 0)
 		exit(1);
 	
 	/*
@@ -1067,6 +1113,16 @@ startrun_callback(event_handle_t handle,
 
 	if (strcmp(event, TBDB_EVENTTYPE_RELOAD) == 0) {
 		info("startrun_callback: Got a reload event.\n");
+
+		/*
+		 * Ops is special since the file is local and there is no
+		 * tmcd or wrapper.
+		 */
+		if (isops) {
+			parse_configfile_env(envfile);
+			return;
+		}
+		
 		/*
 		 * Wrapper will restart us.
 		 */
@@ -1651,30 +1707,32 @@ parse_configfile_env(char *filename)
 	
 	while (fgets(buf, sizeof(buf), fp)) {
 		int cc = strlen(buf);
+		char *bp;
+		FILE *file;
+		
 		if (buf[cc-1] == '\n')
 			buf[cc-1] = (char) NULL;
 
-		if (!strncmp(buf, "ENV ", 4)) {
-			FILE *file;
-			
-			/* XXX Kind of a stupid way to eval any variables. */
-			if ((file = popenf("echo %s", "r", &buf[4])) != NULL) {
-				if (fgets(buf, sizeof(buf), file) != NULL) {
-					char *idx;
-
-					if ((idx = strchr(buf, '\n')) != NULL)
-						*idx = '\0';
-					if ((idx = strchr(buf, '=')) != NULL) {
-						*idx = '\0';
-						setenv(strdup(buf),
-						       idx + 1,
-						       1);
-					}
-				}
-				pclose(file);
-				file = NULL;
-			}
+		if (isops)
+			bp = buf;
+		else if (!strncmp(buf, "ENV ", 4))
+			bp = &buf[4];
+		else
 			continue;
+		
+		/* XXX Kind of a stupid way to eval any variables. */
+		if ((file = popenf("echo %s", "r", bp)) != NULL) {
+			if (fgets(buf, sizeof(buf), file) != NULL) {
+				char *idx;
+
+				if ((idx = strchr(buf, '\n')) != NULL)
+					*idx = '\0';
+				if ((idx = strchr(buf, '=')) != NULL) {
+					*idx = '\0';
+					setenv(strdup(buf), idx + 1, 1);
+				}
+			}
+			pclose(file);
 		}
 	}
 	
