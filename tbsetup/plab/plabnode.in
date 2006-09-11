@@ -6,26 +6,32 @@
 # All rights reserved.
 #
 
+# system imports
 import sys, os
-sys.path.append("@prefix@/lib")
 import getopt
-from libtestbed import *
-import libplab
 import time
+import traceback
 import __builtin__
 
+# Emulab imports
+sys.path.append("@prefix@/lib")
+from libtestbed import *
+import libplab
 
-TRIES = 3
-SLEEPINT = 5
 
 def usage(me):
-    print "Usage: %s [ -vdf ] { alloc | free } pid eid nodeid" % me
+    print "Usage: %s [ -vdf ] { alloc | renew | free } pid eid nodeid" % me
     sys.exit(1)
+
+def processException(command, nodeid, e):
+    print "plabnode: %s, %s, fail, %s" % (nodeid, command, str(e))
+    if parser.values.debug:
+        traceback.print_exc()
+        pass
+    pass
 
 def main(args):
     me = args[0]
-    alloctries = TRIES
-    setuptries = TRIES
     Force = False
 
     #
@@ -54,48 +60,46 @@ def main(args):
     slice = plab.loadSlice(pid, eid)
 
     if command == "alloc":
-        node = slice.createNode(nodeid, force=parser.values.force)
-        
-        while 1:
-            try:
-                node.emulabify()
-                # Note that vnode_setup boots the node
-            except:
-                print "Node setup failed on %s" % nodeid
-            else:
-                break
-
-            setuptries = setuptries - 1
-            if setuptries > 0:
-                print "Sleeping for %s seconds and then retrying " \
-                      "setup on %s" % (SLEEPINT, nodeid)
-                time.sleep(SLEEPINT)
-            else:
-                print "Giving up after %s setup attempts on %s" % \
-                      (TRIES, nodeid)
-                node.free()
-                raise
+        try:
+            node = slice.createNode(nodeid, force=parser.values.force)
+            node.emulabify()
+            # Note that vnode_setup boots the node
+            pass
+        except Exception, e:
+            print "Node setup failed on %s" % nodeid
+            processException(command, nodeid, e)
+            try: node.free()
+            except: pass
+            sys.exit(1)
+            pass
+        pass
 
     elif command == "renew":
         try:
             node = slice.loadNode(nodeid)
+            node.renew()
+            pass
         except:
-            print "renew: Node %s isn't allocated" % nodeid
+            processException(command, nodeid, e)
             sys.exit(1)
-        node.renew()
+            pass
 
     elif command == "free":
         try:
             node = slice.loadNode(nodeid)
-        except:
-            print "free: Node %s doesn't appear to be allocated to %s/%s" % \
-                  (nodeid, pid, eid)
+            node.free()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
             sys.exit(1)
-
-        node.free()
+            pass
+        pass
 
     else:
         usage(me)
+        pass
+
+    pass
 
 if __name__ == "__main__":
     main(sys.argv)

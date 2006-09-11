@@ -16,6 +16,8 @@ import calendar
 import cPickle
 
 from libtestbed import *
+from aspects import wrap_around
+from timer_advisories import timeAdvice
 
 #
 # output control vars
@@ -61,7 +63,6 @@ MIN_REV    = 10
 # subsequent request.
 #
 class __PLCagent:
-    
     class __PLCMutexMethod:
         def __init__(self, funcname, obj):
             self.__lockfile = open(PLC_LOCKFILE, "w")
@@ -95,10 +96,12 @@ class __PLCagent:
 
 
 class NMagent:
-    def __init__(self, IP, nmport = DEF_NM_PORT):
+    def __init__(self, IP, nodeid, nmport = DEF_NM_PORT):
         self.__server = xmlrpclib.ServerProxy("http://" + IP + ":" +
                                               nmport + "/")
         self.__vers = [0,0,0]
+        self.IP = IP
+        self.nodeid = nodeid
         pass
 
     def create_sliver(self, ticket):
@@ -120,8 +123,10 @@ class NMagent:
         return self.__vers
 
     pass
-    
-        
+#wrap_around(NMagent.create_sliver, timeAdvice)
+#wrap_around(NMagent.delete_sliver, timeAdvice)
+
+
 #
 # The real PLC agent.  Wraps up standard arguments to the
 # PLC XMLRPC interface.
@@ -392,9 +397,7 @@ class mod_PLCNM:
     def createNode(self, node):
 
         ticketdata = cPickle.loads(node.slice.slicemeta)
-        agent  = NMagent(node.IP)
-
-        TIMESTAMP("createnode started on %s" % (node.nodeid))
+        agent  = NMagent(node.IP, node.nodeid)
                   
         #res = tryXmlrpcCmd(agent.SliceNodesAdd, node.IP,
         #                   OKstrs = ["already assigned"])
@@ -417,9 +420,7 @@ class mod_PLCNM:
         pass
 
         try:
-            TIMESTAMP("create_sliver() starting on %s." % node.nodeid)
             res = tryXmlrpcCmd(agent.create_sliver, ticketdata)
-            TIMESTAMP("create_sliver() complete on %s." % node.nodeid)
             if debug:
                 print res
                 pass
@@ -442,7 +443,7 @@ class mod_PLCNM:
 
     def freeNode(self, node):
         rcap = cPickle.loads(node.nodemeta)
-        agent = NMagent(node.IP)
+        agent = NMagent(node.IP, node.nodeid)
         res = None
 
         try:
@@ -458,7 +459,6 @@ class mod_PLCNM:
                   (node.nodeid, node.slice.slicename)
             raise
         
-        TIMESTAMP("freenode %s finished." % node.nodeid)
         return res
 
     def renewNode(self, node, length = 0):

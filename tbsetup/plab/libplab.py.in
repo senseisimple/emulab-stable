@@ -52,6 +52,13 @@ agents = {'PLC'    : mod_PLC,
           'PLCNM'  : mod_PLCNM}
 
 #
+# Initialize the AOP stuff
+#
+from aspects import wrap_around
+from timer_advisories import initTimeAdvice, timeAdvice
+initTimeAdvice("plabtiming")
+
+#
 # output control vars
 #
 verbose = 0
@@ -157,6 +164,7 @@ class MultiChangeError(Exception):
         pass
     pass
 
+
 #
 # Class responsible for parsing planetlab sites file
 #
@@ -235,7 +243,7 @@ class siteParser:
             pass
         return
 
-        
+
 class Plab:
     def __init__(self, agent=None):
         if not agent:
@@ -1017,12 +1025,12 @@ class Plab:
         return
     
     pass # end class Plab
-
+# AOP wrappers for class Plab
+wrap_around(Plab.createSlice, timeAdvice)
 
 #
 # Slice abstraction
 #
-
 class Slice:
 
     def __init__(self, plab, pid, eid, slicename = None):
@@ -1304,12 +1312,15 @@ class Slice:
                             " where r.pid=%s and r.eid=%s "
                             " and n1.type=%s and i.role=%s",
                             (self.pid, self.eid, "pcplab", "ctrl"))
+    pass  # end of class Slice
+# AOP wrappers for class Slice
+wrap_around(Slice._create, timeAdvice)
+wrap_around(Slice.destroy, timeAdvice)
 
 
 #
 # Node abstraction
 #
-
 class Node:
     def __init__(self, slice, nodeid, pollNode = False):
         self.slice = slice
@@ -1624,3 +1635,8 @@ class Node:
         if debug:
             print "IP is %s for node %s" % (IP, self.nodeid)
         return IP
+    pass  # end of class Node
+# AOP wrappers for class Node
+wrap_around(Node._create, timeAdvice)
+wrap_around(Node.free, timeAdvice)
+wrap_around(Node.emulabify, timeAdvice)
