@@ -78,7 +78,8 @@ void StateSensor::localAck(PacketInfo * packet)
   else if (packet->tcp->syn && packet->tcp->ack)
   {
     logWrite(ERROR, "Received a SYNACK packet out of order");
-    ackValid = false;
+    //ackValid = false;
+    state = ESTABLISHED;
   }
   calculateSaturated(packet);
 }
