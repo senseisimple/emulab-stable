@@ -228,6 +228,9 @@ sub choosenodes
 		"$intersitenodes{$site} to $bestnode\n";
 	    # ** This section handles when a "bestnode" at a site changes
 
+	    #TODO: This logic should be fixed so the new tests are
+	    #  started before old ones are stopped. This may help
+	    #  prevent "holes" in the data collection to a site.
 	    #  Stop sigs to other nodes using old "bestnode" value
 	    if( defined $intersitenodes{$site} ){
 		foreach my $srcsite (keys %intersitenodes){
@@ -243,11 +246,13 @@ sub choosenodes
     }
 }
 
-
 sub initNewSiteNode($)
 {
     my ($site) = @_;
 #    $intersitenodes{$site} = $bestnode;
+
+    # stop any tests remaining on this node.
+    stopnode($intersitenodes{$site});
 
     # start tests to and from this new site
     foreach my $srcsite (keys %intersitenodes){
