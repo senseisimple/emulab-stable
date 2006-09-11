@@ -15,6 +15,7 @@ public:
   Time operator+(int const & right) const;
   Time operator-(Time const & right) const;
   bool operator<(Time const & right) const;
+  bool operator>(Time const & right) const;
   bool operator==(Time const & right) const;
   bool operator!=(Time const & right) const;
 private:

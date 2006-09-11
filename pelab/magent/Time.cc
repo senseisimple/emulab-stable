@@ -76,6 +76,12 @@ bool Time::operator<(Time const & right) const
     < make_pair(right.data.tv_sec, right.data.tv_usec);
 }
 
+bool Time::operator>(Time const & right) const
+{
+  return make_pair(data.tv_sec, data.tv_usec)
+    > make_pair(right.data.tv_sec, right.data.tv_usec);
+}
+
 bool Time::operator==(Time const & right) const
 {
   return make_pair(data.tv_sec, data.tv_usec)
