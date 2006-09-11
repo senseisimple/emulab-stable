@@ -397,6 +397,9 @@ void mainLoop(void)
 bool replayWrite(char * source, int size)
 {
   bool result = true;
+  if (size == 0) {
+      return true;
+  }
   int error = write(global::replayfd, source, size);
   if (error <= 0)
   {
