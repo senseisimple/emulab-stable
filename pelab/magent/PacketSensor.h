@@ -7,6 +7,7 @@
 
 #include "Sensor.h"
 #include "Time.h"
+#include "lib.h"
 
 class StateSensor;
 
@@ -35,6 +36,15 @@ private:
     unsigned int totalLength;
     Time timestamp;
   };
+  struct SACKOption
+  {
+    unsigned char kind;
+    unsigned char length;
+    uint32_t regions[];
+  } __attribute__((__packed__));
+
+  typedef std::pair<uint32_t, uint32_t> rangepair;
+  typedef std::list<rangepair> rangelist;
 private:
   int ackedSize;
   Time ackedSendTime;

@@ -76,7 +76,7 @@ void PacketSensor::localSend(PacketInfo * packet)
     }
   }
   // Assume this packet is not a retransmit unless proven otherwise
-  ackValid = false;
+  ackValid = true;
   isRetransmit = false;
   if (state->isSendValid() && state->getState() == StateSensor::ESTABLISHED)
   {
@@ -187,95 +187,188 @@ void PacketSensor::localAck(PacketInfo * packet)
   {
     // Set it to true, and then set it to false if we encounter an error.
     ackValid = true;
+
+    /*
+     * Thanks to SACKs, we might have to worry about more than one range of
+     * ACKed packets.
+     */
+    rangelist ranges;
+
     /*
      * When we get an ACK, the sequence number is really the next one the peer
      * excects to see: thus, the last sequence number it's ACKing is one less
      * than this.
-     * Note: This should handle wraparound properly
      */
     uint32_t ack_for = ntohl(packet->tcp->ack_seq) - 1;
-
     logWrite(SENSOR_DETAIL, "PacketSensor::localAck() for sequence number %u",
              ack_for);
-
     /*
-     * Check to see if the ack is for a seq number smaller than the global
-     * sequence - this could mean two things: (1) it's a duplicate ack (in
-     * which case it means packet loss or packet re-ordering) (2) we got two
-     * (or more) acks out of order
-     * No action taken yet other than logging
-     * XXX: Needs support for wraparound!
+     * We assume that the ACK field of the packet is acking from the smallest
+     * sequence number we know of up to it value
+     * XXX: When the ACK is for a sequence number smaller than any we know of,
+     * we could assume it is not acking any new packets - but, this requires
+     * some more thought about wraparaound, so we'll live with spurious errors
+     * for now.
      */
-    if (ack_for < globalSequence.seqStart)
-    {
-      if (ack_for == (globalSequence.seqStart - 1)) {
-        logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected a "
-                                "duplicate ack");
-        return;
-      } else {
-        logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected an "
-                                "old ack");
-      }
-    }
-
-    list<SentPacket>::iterator pos = unacked.begin();
-    list<SentPacket>::iterator limit = unacked.end();
-    bool found = false;
-    ackedSize = 0;
+    ranges.push_back(rangepair(globalSequence.seqStart,ack_for));
 
     /*
-     * Make sure this packet doesn't have a SACK option, in which case our
-     * calculation is wrong.
+     * Now look for SACKs
      */
     list<Option>::iterator opt;
+    bool hasSack = false;
     for (opt = packet->tcpOptions->begin();
          opt != packet->tcpOptions->end();
          ++opt) {
       if (opt->type == TCPOPT_SACK) {
-        logWrite(ERROR,"Packet has a SACK option!");
-        ackValid = false;
+        struct SACKOption *optheader = (struct SACKOption*)(opt->buffer);
+        /*
+         * Figure out how many regions there are in this option header. There
+         * are two octets for the 'kind' and length fields of the header, then
+         * two 4-octet sequence numbers for each region
+         */
+        int num_sacks = (optheader->length - 2) / 8;
+        if ((optheader->length - 2) % 8 == 0) {
+          logWrite(SENSOR,"Bad SACK header length: %i", (optheader->length));
+          return;
+        }
+        for (int i = 0; i < num_sacks; i++) {
+          uint32_t start = ntohl(optheader->regions[i*2]);
+          /*
+           * Like a reguar ACK, the 'end' is the first sequence number *after*
+           * the range
+           */
+          uint32_t end = ntohl(optheader->regions[i*2 + 1]) - 1;
+          ranges.push_back(rangepair(start, end));
+          logWrite(SENSOR_COMPLETE,"PacketSensor::localAck() found SACK "
+                                   "range %u to %u", start, end);
+        }
+
+        hasSack = true;
       }
     }
 
-    while (pos != limit && !found)
-    {
-      found = pos->inSequenceBlock(ack_for);
+    /*
+     * Now, take evry range we know about and handle it
+     * XXX: Needs some though wrt wraparound
+     */
+    ackedSize = 0;
+    ackedSendTime = Time();
+    rangelist::iterator range;
+    for (range = ranges.begin(); range != ranges.end(); range++) {
+      uint32_t range_start = range->first;
+      uint32_t range_end = range->second;
+
+      logWrite(SENSOR_DETAIL, "PacketSensor::localAck() handling range "
+                              "%u to %u", range_start, range_end);
+
       /*
-       * XXX: Assumes that SACK is not in use - assumes that this ACK
-       * is for all sequence numbers up to the one it's ACKing
+       * Check to see if the ack is for a seq number smaller than the global
+       * sequence - this could mean two things: (1) it's a duplicate ack (in
+       * which case it means packet loss or packet re-ordering) (2) we got two
+       * (or more) acks out of order
+       * No action taken yet other than logging
+       * XXX: Needs support for wraparound!
        */
-      ackedSize += pos->totalLength;
-      if (found)
+      if (range_end < globalSequence.seqStart)
       {
-        ackedSendTime = pos->timestamp;
+        if (range_end == (globalSequence.seqStart - 1)) {
+          logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected a "
+                                  "duplicate ack");
+          continue;
+        }
+        else
+        {
+            logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected an "
+                                    "old ack");
+            continue;
+        }
       }
-      if (pos != limit)
+
+      /*
+       * Now, we find the packets which contain the start and the end of the
+       * region being acked. For now, if one of these packets is missing, we
+       * just indicate that our value is invalid. In the future, we could try
+       * something fancier, like guess the length of the missing packets (from
+       * the sequence number).
+       * XXX: Again, needs support for wraparound!
+       */
+      list<SentPacket>::iterator firstPacket = unacked.begin();
+      while (firstPacket != unacked.end() &&
+             !firstPacket->inSequenceBlock(range_start)) {
+        firstPacket++;
+      }
+
+      if (firstPacket == unacked.end()) {
+        logWrite(ERROR, "Range starts in unknown packet");
+        ackValid = false;
+        break;
+      }
+
+      list<SentPacket>::iterator lastPacket = unacked.begin();
+      while (lastPacket != unacked.end() && 
+             !lastPacket->inSequenceBlock(range_end)) {
+        lastPacket++;
+      }
+
+      if (lastPacket == unacked.end()) {
+        logWrite(ERROR, "Range ends in unknown packet");
+        ackValid = false;
+        break;
+      }
+
+      /*
+       * Now, iterate between the two packets, looking at timestamps and adding
+       * up sizes
+       */
+      list<SentPacket>::iterator pos = firstPacket;
+      while (1)
       {
-        ++pos;
+        ackedSize += pos->totalLength;
+        /*
+         * We want the time for the most recently acked packet, not the one
+         * that has the highest sequence number
+         */
+        if (pos->timestamp > ackedSendTime) {
+          ackedSendTime = pos->timestamp;
+        }
+        /*
+         * XXX - should we be looking for packets in the range that we didn't
+         * know about?
+         */
+        if (pos == lastPacket) {
+          break;
+        } else {
+          ++pos;
+        }
       }
-    }
-    if (!found)
-    {
-      logWrite(ERROR, "Could not find the ack sequence number in list "
-               "of unacked packets.");
-      ackedSize = 0;
-      ackedSendTime = Time();
-      ackValid = false;
-      return;
-    }
-    unacked.erase(unacked.begin(), pos);
-    if (unacked.empty())
-    {
-      globalSequence.seqStart = 0;
-      globalSequence.seqEnd = 0;
-    }
-    else
-    {
-      globalSequence.seqStart = unacked.front().seqStart;
+
+      /*
+       * Now, remove these packets from our list.
+       * XXX: This makes the assumption that all acks are on packet boundaries
+       * - this seems be be true in practice, but might not be true in theory
+       * XXX: In the future, we may want to marked SACKed packets, not totally
+       * remove them
+       */
+      unacked.erase(firstPacket, lastPacket);
+      // erase() does not erase the final member of the range, so we have
+      // to do that ourselves
+      unacked.erase(lastPacket);
+
+      if (unacked.empty())
+      {
+        globalSequence.seqStart = 0;
+        globalSequence.seqEnd = 0;
+      }
+      else
+      {
+        globalSequence.seqStart = unacked.front().seqStart;
+        globalSequence.seqEnd = unacked.back().seqEnd;
+      }
     }
 
-    logWrite(SENSOR_DETAIL, "PacketSensor::localAck() decided on size %u",
-             ackedSize);
+    logWrite(SENSOR_DETAIL,"PacketSensor::localAck() decided on size %i",
+        ackedSize);
   }
   else
   {
