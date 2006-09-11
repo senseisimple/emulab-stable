@@ -35,7 +35,7 @@ my $lastinsert = 0;	# Timestamp.
 
 my %lasttimestamp;  #prevents adding duplicate entries in DB
 my %duplicatecnt;   #counters keeping track of duplicate entries.
-my $duplicateKillThresh = 5; #kill node if this many duplicates occur per index
+my $duplicateKillThresh = 50; #kill node if this many duplicates occur per index
 
 #
 # Turn off line buffering on output
