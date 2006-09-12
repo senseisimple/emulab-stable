@@ -23,7 +23,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  spewconlog opsdb_control
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
                   websetdest spewsource weblinkmon_ctl webcvsweb \
-		  webspewconlog xlogin webviewvc
+		  webspewconlog xlogin webviewvc spewevents
 CTRLSBIN_SCRIPTS= opsdb_control.proxy
 
 #
