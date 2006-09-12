@@ -45,9 +45,12 @@ void Sensor::capturePacket(PacketInfo * packet)
   {
     localSend(packet);
   }
-  else
+  else if (packet->packetType == PACKET_INFO_ACK_COMMAND)
   {
     localAck(packet);
+  } else {
+    logWrite(ERROR,"Sensor::capturePacket() got unexpected packet type %d",
+             packet->packetType);
   }
   if (next.get() != NULL)
   {
