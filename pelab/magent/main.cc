@@ -452,9 +452,8 @@ void replayWritePacket(PacketInfo * packet)
     packetBuffer = static_cast<char*>(malloc(head.size));
     //logWrite(REPLAY,"Making a packet buffer of size %d",head.size);
     char* endptr = savePacket(& packetBuffer[0], *packet);
-    // savePacket returns the pointer to the last byte written, so we have to
-    // subtract 1 to find out how many bytes were written
-    int writtensize = (endptr - packetBuffer - 1);
+    // find out how many bytes were written
+    int writtensize = (endptr - packetBuffer);
     if (writtensize != head.size) {
         logWrite(ERROR,"replayWritePacket(): Made packet save buffer of size "
                        "%d, but wrote %d", head.size, writtensize);

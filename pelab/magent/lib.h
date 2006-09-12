@@ -195,15 +195,13 @@ struct PacketInfo
 {
   size_t census(void)
   {
-    //                           packetTime+packetLength
-    size_t result = sizeof(int)*(2         +1           ) +
-                  sizeof(short)*(0         +0           ) +
-                   sizeof(char)*(0         +0           ) +
+    // packetTime + packetLength
+    size_t result = sizeof(int)*(2+1) +
       sizeof(struct tcp_info) +
       sizeof(struct ip) + sizeof(struct tcphdr)
       + sizeof(unsigned char) /* bufferFull */
       + sizeof(unsigned char) /* packetType */
-      + sizeof(struct Order); /* elab */
+      + sizeof(unsigned char) + sizeof(int) + 2*sizeof(short); /* elab */
     // Size for ipOptions and tcpOptions.
     result += sizeof(unsigned int)*2;
 

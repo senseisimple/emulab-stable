@@ -101,12 +101,11 @@ char * savePacket(char * buffer, PacketInfo const & value)
 
   // Save packet time
   //logWrite(REPLAY, "Saving timestamps at byte %i",
-  //        pos - buffer);
+  //       pos - buffer);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_sec);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_usec);
 
   // Save packet length
-  // Bytes 8 - 11
   //logWrite(REPLAY, "Saving length at byte %i",
   //        pos - buffer);
   pos = saveInt(pos, value.packetLength);
@@ -151,12 +150,11 @@ char * savePacket(char * buffer, PacketInfo const & value)
 
   //logWrite(REPLAY, "Saving tcp_info at byte %i",
   //        pos - buffer);
-  pos = saveInt(pos, value.packetLength);
   memcpy(pos, kernel, sizeof(struct tcp_info));
   pos += sizeof(struct tcp_info);
 
   // Save IP header
-  //logWrite(REPLAY, "Saving IP hader at byte %i",
+  //logWrite(REPLAY, "Saving IP header at byte %i",
   //        pos - buffer);
   memcpy(pos, value.ip, sizeof(struct ip));
   pos += sizeof(struct ip);
