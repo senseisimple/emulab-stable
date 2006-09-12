@@ -51,6 +51,7 @@ enum LOG_TYPE
   COMMAND_OUTPUT   = 0x0400,
   SENSOR_DETAIL    = 0x0800,
   SENSOR_COMPLETE  = 0x1000,
+  REPLAY           = 0x2000,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x0000,
   LOG_EVERYTHING   = 0x1fff
