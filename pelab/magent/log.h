@@ -60,7 +60,7 @@ enum LOG_TYPE
   REPLAY           = 0x2000,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x0000,
-  LOG_EVERYTHING   = 0x2fff
+  LOG_EVERYTHING   = 0x3fff
 };
 
 #endif
