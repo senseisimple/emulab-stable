@@ -300,6 +300,16 @@ void init(void)
   sigaction(SIGTERM,&action,NULL);
   sigaction(SIGINT,&action,NULL);
 
+  /*
+   * Make sure we leave a core dump if we crash
+   */
+  struct rlimit limit;
+  limit.rlim_cur = RLIM_INFINITY;
+  limit.rlim_max = RLIM_INFINITY;
+  if (setrlimit(RLIMIT_CORE,&limit)) {
+      logWrite(ERROR,"Unable to set core dump size!");
+  }
+
   srandom(getpid());
   switch (global::connectionModelArg)
   {
@@ -440,7 +450,15 @@ void replayWritePacket(PacketInfo * packet)
   {
     char *packetBuffer;
     packetBuffer = static_cast<char*>(malloc(head.size));
-    savePacket(& packetBuffer[0], *packet);
+    //logWrite(REPLAY,"Making a packet buffer of size %d",head.size);
+    char* endptr = savePacket(& packetBuffer[0], *packet);
+    // savePacket returns the pointer to the last byte written, so we have to
+    // subtract 1 to find out how many bytes were written
+    int writtensize = (endptr - packetBuffer - 1);
+    if (writtensize != head.size) {
+        logWrite(ERROR,"replayWritePacket(): Made packet save buffer of size "
+                       "%d, but wrote %d", head.size, writtensize);
+    }
     replayWrite(& packetBuffer[0], head.size);
     free(packetBuffer);
   }
@@ -520,6 +538,7 @@ void replayLoop(void)
       break;
     case PACKET_INFO_SEND_COMMAND:
     case PACKET_INFO_ACK_COMMAND:
+      logWrite(EXCEPTION,"Got a packet: %d",head.type);
       done = ! replayRead(& packetBuffer[0], head.size);
       if (!done)
       {
