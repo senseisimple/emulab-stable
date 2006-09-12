@@ -80,6 +80,9 @@ static void logPrefix(int which)
   case COMMAND_OUTPUT:
     messageClass = "COMMAND_OUTPUT ";
     break;
+  case REPLAY:
+    messageClass = "REPLAY ";
+    break;
   default:
     messageClass = "LOG_ERROR ";
     break;

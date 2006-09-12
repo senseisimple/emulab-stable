@@ -3,6 +3,12 @@
 #ifndef _LOG_H
 #define _LOG_H
 
+// HOWTO: Add a new logging option
+// (1) Add a constant to the logging enum below. Set the next available bit.
+// (2) Set that bit in the LOG_EVERYTHING constant.
+// (3) Add the text to print in the prefix for that option in the switch
+//     statement in log.cc
+
 // The logging framework. Use logInit() during initialization to set
 // up logging. Then use log() to generate messages. logCleanup()
 // should be called during program shutdown.
@@ -54,7 +60,7 @@ enum LOG_TYPE
   REPLAY           = 0x2000,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x0000,
-  LOG_EVERYTHING   = 0x1fff
+  LOG_EVERYTHING   = 0x2fff
 };
 
 #endif
