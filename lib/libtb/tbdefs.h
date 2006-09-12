@@ -78,6 +78,7 @@
 #define TBDB_EVENTTYPE_MESSAGE	"MESSAGE"
 #define TBDB_EVENTTYPE_RUN	"RUN"
 #define TBDB_EVENTTYPE_CREATE	"CREATE"
+#define TBDB_EVENTTYPE_STOPRUN	"STOPRUN"
 
 /*
  * Global event passthru sentinal - does _NOT_ go in either event array

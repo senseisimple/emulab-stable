@@ -4692,7 +4692,7 @@ class template:
             pass
 
         if xmlfilename:
-            argstr += " -p " + xmlfilename
+            argstr += " -x " + xmlfilename
             pass
 
         argstr += " -e " + escapeshellarg(argdict["exp"])
@@ -4723,10 +4723,11 @@ class template:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        argerror = CheckRequiredArgs(argdict, ("guid", "exp", "runid"))
+        argerror = CheckRequiredArgs(argdict, ("exp", ))
         if (argerror):
             return argerror
-        
+
+        pid         = None
         xmlfilename = None
         argstr      = "-q"
         
@@ -4737,6 +4738,13 @@ class template:
                 pass
             elif opt == "clear":
                 argstr += " -c "
+                pass
+            elif opt == "runid":
+                argstr += " -r "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "pid":
+                pid = escapeshellarg(val)
                 pass
             elif opt == "wait":
                 if xbool(val):
@@ -4761,14 +4769,23 @@ class template:
                 pass
             pass
 
+        if pid == None and not argdict.has_key("guid"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Must supply pid or guid")
+
         if xmlfilename:
-            argstr += " -p " + xmlfilename
+            argstr += " -x " + xmlfilename
             pass
 
         argstr += " -e " + escapeshellarg(argdict["exp"])
-        argstr += " -r " + escapeshellarg(argdict["runid"])
         argstr += " -a start"
-        argstr += " " + escapeshellarg(argdict["guid"])
+
+        if pid == None:
+            argstr += " " + escapeshellarg(argdict["guid"])
+            pass
+        else:
+            argstr += " -p " + pid
+            pass
 
         (exitval, output) = runcommand(TBDIR +
                                        "/bin/template_exprun " + argstr)
@@ -4795,12 +4812,12 @@ class template:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        argerror = CheckRequiredArgs(argdict, ("exp",))
         if (argerror):
             return argerror
         
-        xmlfilename = None
-        argstr      = "-q"
+        pid    = None
+        argstr = "-q"
         
         for opt, val in argdict.items():
             if opt == "wait":
@@ -4808,12 +4825,30 @@ class template:
                     argstr += " -w "
                     pass
                 pass
+            if opt == "quiet":
+                if xbool(val):
+                    argstr += " -q "
+                    pass
+                pass
+            elif opt == "pid":
+                pid = escapeshellarg(val)
+                pass
             pass
         
+        if pid == None and not argdict.has_key("guid"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Must supply pid or guid")
+
         argstr += " -e " + escapeshellarg(argdict["exp"])
         argstr += " -a stop"
-        argstr += " " + escapeshellarg(argdict["guid"])
-
+        
+        if pid == None:
+            argstr += " " + escapeshellarg(argdict["guid"])
+            pass
+        else:
+            argstr += " -p " + pid
+            pass
+        
         (exitval, output) = runcommand(TBDIR +
                                        "/bin/template_exprun " + argstr)
         if exitval:

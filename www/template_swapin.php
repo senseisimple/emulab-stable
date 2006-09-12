@@ -542,7 +542,7 @@ if (count($parameter_masterlist)) {
 	fclose($fp);
 	chmod($parameter_xmlfile, 0666);
     }
-    $command_options .= " -p $parameter_xmlfile";
+    $command_options .= " -x $parameter_xmlfile";
 }
 
 #

@@ -29,7 +29,7 @@ sub usage()
 {
     print(STDERR
 	  "Usage: template_exprun [-q] [-w] [-r <runid>] ".
-	  "-a <action> -e <eid> <guid/vers>\n".
+	  "-a <action> -e <eid> [-p <pid> | <guid/vers>]\n".
 	  "switches and arguments:\n".
 	  "-a <action> - start or stop\n".
 	  "-w          - wait for run to start\n".
@@ -37,12 +37,13 @@ sub usage()
 	  "-q          - be less chatty\n".
 	  "-E <str>    - A pithy sentence describing the run\n".
 	  "-r <runid>  - A token ... we will make on up for you\n".
-	  "-p <file>   - XML file of parameter bindings\n".
+	  "-x <file>   - XML file of parameter bindings\n".
 	  "-e <eid>    - The instance name\n".
+          "-p <pid>    - Use the pid/eid to find the template GUID\n".
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwp:E:a:r:e:dscf";
+my $optlist	 = "qwx:p:E:a:r:e:dscf";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -54,6 +55,7 @@ my %parameters   = ();
 my $action;
 my $description;
 my $runid;
+my $pid;
 my $eid;
 my $guid;
 my $version;
@@ -77,7 +79,6 @@ my $user_name;
 my $user_email;
 my $logname;
 my $dbuid;
-my $pid;
 my $exptidx;
 my $template;
 my $instance;
@@ -94,7 +95,8 @@ my $eventcontrol= "$TB/bin/eventsys_control";
 sub ParseArgs();
 sub fatal($$);
 sub sighandler($);
-sub SignalProgAgents($);	       
+sub SignalProgAgents($);
+sub SendCompletionEvent();
 
 #
 # Testbed Support libraries
@@ -105,6 +107,7 @@ use libtestbed;
 use libtblog;
 use libArchive;
 use Template;
+use Experiment;
 use event;
 
 # Be careful not to exit on transient error
@@ -155,10 +158,6 @@ if (system("$checkquota $dbuid") != 0) {
 # Now parse arguments.
 ParseArgs();
 
-if ($action eq "start" && !defined($runid)) {
-    tbdie("Must provide a run ID (-r argument) when starting a new run!");
-}
-
 #
 # In wait mode, block SIGINT until we spin off the background process.
 #
@@ -169,13 +168,49 @@ if ($waitmode) {
 }
 
 #
-# Grab template and do access check.
+# This script allows pid/eid to be used to find the template.
 #
-$template = Template->Lookup($guid, $version);
+if (defined($guid)) {
+    $template = Template->Lookup($guid, $version);
 
-if (!defined($template)) {
-    tbdie("Experiment template $guid/$version does not exist!");
+    if (!defined($template)) {
+	tbdie("Experiment template $guid/$version does not exist!");
+    }
+    $pid = $template->pid();    
 }
+
+#
+# Find the experiment ...
+#
+my $experiment = Experiment->Lookup($pid, $eid);
+    
+if (! defined($experiment)) {
+    tbdie("Experiment $pid/$eid does not exist!");
+}
+
+#
+# And then the template instance from that ...
+#
+$instance = Template::Instance->LookupByExptidx($experiment->idx());
+
+if (!defined($instance)) {
+    tbdie("Experiment instance $eid in project $pid does not exist!");
+}
+
+# In case we got here by the pid instead of guid.
+if (!defined($template)) {
+    $template = $instance->template();
+
+    if (!defined($template)) {
+	tbdie("Cannot find template for $instance!");
+    }
+    $guid    = $template->guid();
+    $version = $template->vers();
+}
+   
+#
+# Check project permission.
+#
 if (! TBProjAccessCheck($dbuid,
 			$template->pid(), $template->gid(),
 			TB_PROJECT_CREATEEXPT)) {
@@ -183,24 +218,19 @@ if (! TBProjAccessCheck($dbuid,
 	    "$guid/$version");
     exit(1);
 }
-$pid = $template->pid();
 
-#
-# Grab Instance.
-#
-if (! TBExptIDX($pid, $eid, \$exptidx)) {
-    tbdie("Could not get experiment index for $pid,$eid!");
-}
-
-$instance = Template::Instance->LookupByExptidx($exptidx);
-
-if (!defined($instance)) {
-    tbdie("Experiment instance $eid in $guid/$version does not exist!");
-}
-   
-if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
+if ($experiment->state() ne EXPTSTATE_ACTIVE()) {
     tberror("Template instance experiment $pid/$eid in not active!");
     exit(1);
+}
+
+if ($action eq "start" && !defined($runid)) {
+    if ($instance->NewRunID(\$runid) < 0) {
+	tbdie("Could not determine a new runid; please use the -r option!");
+    }
+    else {
+	print "Using new run ID '$runid' ...\n";
+    }
 }
 
 #
@@ -353,8 +383,12 @@ if (defined($instance->runidx())) {
     print "Experiment run '$this_runid' has been stopped.\n";    
 }
 
-goto done
-    if ($action eq "stop");
+if ($action eq "stop") {
+    # Send completion event only on "stop"; otherwise it gets lost.
+    SendCompletionEvent();
+    goto done;
+}
+
 
 #
 # Clean/Clear if requested before generating the new run, in case there
@@ -443,20 +477,40 @@ sub ParseArgs()
 	usage();
     }
 
-    if (@ARGV != 1) {
-	usage();
-    }
     #
-    # Pick up guid/version first and untaint.
+    # Allow pid to be used instead of GUID.
     #
-    my $tmp = shift(@ARGV);
+    if (@ARGV == 1) {
+	#
+	# Pick up guid/version first and untaint.
+	#
+	my $tmp = shift(@ARGV);
 
-    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
-	$guid = $1;
-	$version = $2;
+	if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	    $guid = $1;
+	    $version = $2;
+	}
+	else {
+	    tbdie("Bad data in argument: $tmp");
+	}
+    }
+    elsif (defined($options{"p"})) {
+	$pid = $options{"p"};
+
+	if ($pid =~ /^([-\w]+)$/) {
+	    $pid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $pid.");
+	}
+	if (! TBcheck_dbslot($pid, "projects", "pid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper project name (pid)!");
+	}
     }
     else {
-	tbdie("Bad data in argument: $tmp");
+	tberror("Must provide GUID or -p option!");
+	exit(1);
     }
     
     if (defined($options{"e"})) {
@@ -532,8 +586,8 @@ sub ParseArgs()
 	$description = $options{"E"};
     }
 
-    if (defined($options{"p"})) {
-	my $inputfile = $options{"p"};
+    if (defined($options{"x"})) {
+	my $inputfile = $options{"x"};
 
 	# Note different taint check (allow /).
 	if ($inputfile =~ /^([-\w\.\/]+)$/) {
@@ -662,6 +716,29 @@ sub SignalProgAgents($)
 	    }
     }
     
+    if (!event_notify($handle, $notification)) {
+	fatal(-1, "could not send environment event notification!");
+    }
+}
+
+sub SendCompletionEvent()
+{
+    fatal(-1, "Could not connect to event system!")
+	if (!$handle);
+    
+    my $tuple = address_tuple_alloc();
+    fatal(-1, "Could not allocate an address tuple\n")
+	if (!$tuple);
+   
+    %$tuple = (objtype   => "SIMULATOR",
+	       objname   => "ns",
+	       eventtype => "COMPLETE",
+	       expt      => "$pid/$eid");
+
+    my $notification = event_notification_alloc($handle, $tuple);
+    fatal(-1, "Could not allocate a notification\n")
+	if (!$notification);
+
     if (!event_notify($handle, $notification)) {
 	fatal(-1, "could not send environment event notification!");
     }

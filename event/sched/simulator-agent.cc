@@ -401,6 +401,21 @@ static int do_snapshot(simulator_agent_t sa, char *args)
 	return retval;
 }
 
+static int do_stoprun(simulator_agent_t sa, char *args)
+{
+	int retval = 0;
+
+	assert(sa != NULL);
+	assert(args != NULL);
+	
+	if (systemf("template_stoprun -p %s -e %s", pid, eid) != 0) {
+		error("failed to stop current run\n");
+		retval = -1;
+	}
+
+	return retval;
+}
+
 static int strreltime(char *buf, size_t buflen, time_t secs)
 {
     int hours, mins, retval = 0;
@@ -525,6 +540,9 @@ static void *simulator_agent_looper(void *arg)
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_SNAPSHOT) == 0){
 				do_snapshot(sa, argsbuf);
+			}
+			else if (strcmp(evtype, TBDB_EVENTTYPE_STOPRUN) == 0){
+				do_stoprun(sa, argsbuf);
 			}
 			else {
 				error("cannot handle SIMULATOR event %s.",

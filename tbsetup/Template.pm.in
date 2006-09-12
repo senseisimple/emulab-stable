@@ -2274,6 +2274,55 @@ sub NewRunBinding($$$)
 }
 
 #
+# Make up a new run name based on the previous run name.
+#
+sub NewRunID($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+    my $lastname;
+    my $newname;
+
+    my $query_result =
+	DBQueryWarn("select MAX(idx) from experiment_runs ".
+		    "where exptidx='$exptidx'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    my ($maxidx) = $query_result->fetchrow_array();
+
+    if (defined($self->runidx())) {
+	my $this_run = $self->CurrentRun();
+
+	$lastname = $this_run->{"runid"};
+    }
+    else {
+	my $last_run = $self->LastRun();
+
+	$lastname = $last_run->{"runid"};
+    }
+
+    #
+    # Look for the typical "-RX" extension and increment X. Otherwise append
+    # a -RX where X is the max run number plus one.
+    #
+    if ($lastname =~ /^([\w]*)\-R(\d*)$/) {
+	$newname = $1 . "-R" . ($maxidx + 1);
+    }
+    else {
+	$newname = $lastname . "-R" . ($maxidx + 1);
+    }
+    $$prval = $newname;
+    return 0;
+}
+
+#
 # Use tevc to tell loghole to sync. We have to send a bunch of extra args
 # to get loghole to do what we want.
 #

@@ -1901,7 +1901,7 @@ class template_swapin:
     def apply(self):
         try:
             opts, req_args = getopt.getopt(self.argv,
-                                           "bwqS:L:a:l:E:p:e:",
+                                           "bwqS:L:a:l:E:e:x:",
                                            [ "help" ]);
             pass
         except getopt.error, e:
@@ -1926,7 +1926,7 @@ class template_swapin:
             elif opt == "-e":
                 params["exp"] = val;
                 pass
-            elif opt == "-p":
+            elif opt == "-x":
                 xmlfilename = val;
                 pass
             elif opt == "-S":
@@ -1992,7 +1992,7 @@ class template_swapin:
         print "   -a   - Auto swapout NN minutes after instance is swapped in";
         print "   -l   - Auto swapout NN minutes after instance goes idle";
         print "   -E   - A pithy sentence describing your experiment";
-        print "   -p   - XML file of parameter bindings";
+        print "   -x   - XML file of parameter bindings";
         print "   -e   - The instance name (unique, alphanumeric, no blanks)";
         print "   guid - Template GUID";
         print ""
@@ -2079,7 +2079,7 @@ class template_startrun:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:c",
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:",
                                            [ "help" ]);
             pass
         except getopt.error, e:
@@ -2087,6 +2087,7 @@ class template_startrun:
             self.usage();
             return -1;
 
+        pid         = None
         guid        = None
         xmlfilename = None
         params      = {}
@@ -2108,6 +2109,9 @@ class template_startrun:
                 params["runid"] = val
                 pass
             elif opt == "-p":
+                pid = val
+                pass
+            elif opt == "-x":
                 xmlfilename = val;
                 pass
             elif opt == "-e":
@@ -2116,21 +2120,26 @@ class template_startrun:
             pass
 
         # Try to infer the template guid/vers from the current path.
-        if len(req_args) == 0:
-            guid = infer_guid(os.getcwd())
-            if guid == None:
+        if pid == None:
+            if len(req_args) == 0:
+                guid = infer_guid(os.getcwd())
+                if guid == None:
+                    self.usage();
+                    return -1
+                pass
+            elif len(req_args) == 1:
+                guid = req_args[0]
+                pass
+            else:
                 self.usage();
                 return -1
-            pass
-        elif len(req_args) == 1:
-            guid = req_args[0]
+            
+            params["guid"] = guid
             pass
         else:
-            self.usage();
-            return -1
-            
-        params["guid"] = guid
-
+            params["pid"] = pid
+            pass
+        
         if xmlfilename:
             try:
                 params["xmlfilestr"] = open(xmlfilename).read();
@@ -2144,10 +2153,10 @@ class template_startrun:
         return rval;
 
     def usage(self):
-	print "template_startrun [-r <id>] [-E <descr>] -e id [<guid/vers>]";
+	print "template_startrun [-r <id>] [-E <descr>] -e id [-p <pid> | <guid/vers>]";
 	print "where:";
         print "     -E   - A pithy sentence describing your run";
-        print "     -p   - XML file of parameter bindings";
+        print "     -x   - XML file of parameter bindings";
         print "     -r   - A token (id) for the run";
         print "     -e   - Instance ID (aka eid)";
         print "    guid  - Template GUID";
@@ -2170,15 +2179,15 @@ class template_stoprun:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "we:qp:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
             self.usage();
             return -1;
 
+        pid         = None
         guid        = None
-        xmlfilename = None
         params      = {}
         
         for opt, val in opts:
@@ -2188,32 +2197,42 @@ class template_stoprun:
             elif opt == "-w":
                 params["wait"] = "yes"
                 pass
+            elif opt == "-q":
+                params["quiet"] = "yes"
+                pass
+            elif opt == "-p":
+                pid = val
+                pass
             elif opt == "-e":
                 params["exp"]  = val;
                 pass
             pass
 
         # Try to infer the template guid/vers from the current path.
-        if len(req_args) == 0:
-            guid = infer_guid(os.getcwd())
-            if guid == None:
+        if pid == None:
+            if len(req_args) == 0:
+                guid = infer_guid(os.getcwd())
+                if guid == None:
+                    self.usage();
+                    return -1
+                pass
+            elif len(req_args) == 1:
+                guid = req_args[0]
+                pass
+            else:
                 self.usage();
                 return -1
-            pass
-        elif len(req_args) == 1:
-            guid = req_args[0]
+            params["guid"] = guid
             pass
         else:
-            self.usage();
-            return -1
-            
-        params["guid"] = guid
+            params["pid"] = pid
+            pass
 
         rval,response = do_method("template", "stoprun", params);
         return rval;
 
     def usage(self):
-	print "template_stoprun [-w] -e id [<guid/vers>]";
+	print "template_stoprun [-w] -e id [-p <pid> | <guid/vers>]";
 	print "where:";
         print "     -e   - Instance ID (aka eid)";
         print "    guid  - Template GUID";
@@ -2242,6 +2261,23 @@ def infer_guid(path):
         vers = dirs[dirs.index("templates") + 2]
         pass
     return guid + "/" + vers
+
+#
+# Infer pid and eid
+#
+def infer_pideid(path):
+    pid = None
+    eid = None
+    dirs = path.split(os.path.sep)
+    if ((len(dirs) < 6) or
+        (not (("proj" in dirs) and ("exp" in dirs))) or
+        (len(dirs) < (dirs.index("exp") + 1))):
+        return None
+    else:
+        pid = dirs[dirs.index("proj") + 1]
+        eid = dirs[dirs.index("proj") + 3]
+        pass
+    return pid, eid
 
 #
 # Process program arguments. There are two ways we could be invoked.

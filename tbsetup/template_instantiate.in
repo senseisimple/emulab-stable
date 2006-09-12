@@ -36,7 +36,7 @@ sub usage()
 	  "-w       - wait for template to be instantiated\n".
 	  "-q       - be less chatty\n".
 	  "-E <str> - A pithy sentence describing the instance\n".
-	  "-p <file>- XML file of parameter bindings\n".
+	  "-x <file>- XML file of parameter bindings\n".
 	  "-S <str> - Instance cannot be swapped; must provide reason\n".
 	  "-L <str> - Instance cannot be IDLE swapped; must provide reason\n".
 	  "-n       - Do not send idle email (internal option only)\n".
@@ -47,7 +47,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:p:bE:t:";
+my $optlist	 = "qwe:S:L:na:l:se:x:bE:t:";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -711,8 +711,8 @@ sub ParseArgs()
 	}
     }
 
-    if (defined($options{"p"})) {
-	my $inputfile = $options{"p"};
+    if (defined($options{"x"})) {
+	my $inputfile = $options{"x"};
 
 	# Note different taint check (allow /).
 	if ($inputfile =~ /^([-\w\.\/]+)$/) {

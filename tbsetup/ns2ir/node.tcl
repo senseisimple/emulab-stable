@@ -172,7 +172,7 @@ Node instproc updatedb {DB} {
     var_import ::TBCOMPAT::hwtype_class
 
     #
-    # Rserved name; conflicts with kludgy manner in which a program
+    # Reserved name; conflicts with kludgy manner in which a program
     # agent can used on ops.
     #
     if {"$self" == "ops"} {

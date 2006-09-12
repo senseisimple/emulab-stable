@@ -1621,6 +1621,10 @@ Simulator instproc make_event {outer event} {
 		    set otype SIMULATOR
 		    set etype SWAPOUT
 		}
+		"stoprun" {
+		    set otype SIMULATOR
+		    set etype STOPRUN
+		}
 		"trace-for" {
 		    set vname "slothd"
 		    set otype SLOTHD
