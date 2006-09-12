@@ -95,14 +95,20 @@ char * saveOptions(char * buffer, std::list<Option> const & options)
 
 char * savePacket(char * buffer, PacketInfo const & value)
 {
+  //logWrite(REPLAY, "Saving a packet");
   char * pos = buffer;
   struct tcp_info const * kernel = value.kernel;
 
   // Save packet time
+  //logWrite(REPLAY, "Saving timestamps at byte %i",
+  //        pos - buffer);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_sec);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_usec);
 
   // Save packet length
+  // Bytes 8 - 11
+  //logWrite(REPLAY, "Saving length at byte %i",
+  //        pos - buffer);
   pos = saveInt(pos, value.packetLength);
 
   // Save tcp_info
@@ -143,34 +149,57 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, kernel->tcpi_reordering);
 */
 
+  //logWrite(REPLAY, "Saving tcp_info at byte %i",
+  //        pos - buffer);
+  pos = saveInt(pos, value.packetLength);
   memcpy(pos, kernel, sizeof(struct tcp_info));
   pos += sizeof(struct tcp_info);
 
   // Save IP header
+  //logWrite(REPLAY, "Saving IP hader at byte %i",
+  //        pos - buffer);
   memcpy(pos, value.ip, sizeof(struct ip));
   pos += sizeof(struct ip);
 
   // Save IP options
+  //logWrite(REPLAY, "Saving IP options at byte %i",
+  //        pos - buffer);
   pos = saveOptions(pos, * value.ipOptions);
 
   // Save TCP header
+  //logWrite(REPLAY, "Saving TCP header at byte %i",
+  //        pos - buffer);
   memcpy(pos, value.tcp, sizeof(struct tcphdr));
   pos += sizeof(struct tcphdr);
 
   // Save TCP options
+  //logWrite(REPLAY, "Saving TCP options at byte %i",
+  //        pos - buffer);
   pos = saveOptions(pos, * value.tcpOptions);
 
   // Save elab stuff
+  //logWrite(REPLAY, "Saving elab.transport at byte %i",
+  //        pos - buffer);
   pos = saveChar(pos, value.elab.transport);
+  //logWrite(REPLAY, "Saving elab.ip at byte %i",
+  //        pos - buffer);
   pos = saveInt(pos, value.elab.ip);
+  //logWrite(REPLAY, "Saving elab.localport at byte %i",
+  //        pos - buffer);
   pos = saveShort(pos, value.elab.localPort);
+  //logWrite(REPLAY, "Saving elab.remoteport at byte %i",
+  //        pos - buffer);
   pos = saveShort(pos, value.elab.remotePort);
 
   // Save bufferFull measurement
   unsigned char bufferFull = value.bufferFull;
+  //logWrite(REPLAY, "Saving buferfull at byte %i",
+  //        pos - buffer);
   pos = saveChar(pos, bufferFull);
 
- // Save packetType
+  // Save packetType
+  //logWrite(REPLAY, "Saving type at byte %i",
+  //        pos - buffer);
   pos = saveChar(pos, value.packetType);
 
   return pos;
@@ -364,6 +393,8 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   value->tcpOptions = &tcpOptions;
 
   // Load packet time
+  //logWrite(REPLAY, "Loading timestamps at byte %i",
+  //        pos - buffer);
   unsigned int timeSeconds = 0;
   pos = loadInt(pos, & timeSeconds);
   value->packetTime.getTimeval()->tv_sec = timeSeconds;
@@ -372,6 +403,8 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   value->packetTime.getTimeval()->tv_usec = timeMicroseconds;
 
   // Load packet length
+  //logWrite(REPLAY, "Loading length at byte %i",
+  //        pos - buffer);
   unsigned int packetLength = 0;
   pos = loadInt(pos, & packetLength);
   value->packetLength = static_cast<int>(packetLength);
@@ -415,36 +448,74 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadInt(pos, & kernel.tcpi_reordering);
 */
 
+  //logWrite(REPLAY, "Loading tcp_info at byte %i",
+  //        pos - buffer);
   memcpy(&kernel, pos, sizeof(struct tcp_info));
   pos += sizeof(struct tcp_info);
 
   // Load IP header
+  //logWrite(REPLAY, "Loading IP header at byte %i",
+  //        pos - buffer);
   memcpy(&ip, pos, sizeof(struct ip));
   pos += sizeof(struct ip);
 
+  //logWrite(REPLAY,"IP v=%i l=%i src=%s", ip.ip_v, ip.ip_hl,
+  //        inet_ntoa(ip.ip_src));
+
   // Load IP options
+  //logWrite(REPLAY, "Loading IP options at byte %i",
+  //        pos - buffer);
   pos = loadOptions(pos, &ipOptions);
 
   // Load TCP header
+  //logWrite(REPLAY, "Loading TCP header at byte %i",
+  //        pos - buffer);
   memcpy(&tcp, pos, sizeof(struct tcphdr));
   pos += sizeof(struct tcphdr);
 
+  //logWrite(REPLAY,"TCP sport=%i dport=%i",htons(tcp.source),
+  //        htons(tcp.dest));
+
   // Load TCP options
+  //logWrite(REPLAY, "Loading TCP options at byte %i",
+  //        pos - buffer);
   pos = loadOptions(pos, &tcpOptions);
 
   // Load elab
+  //logWrite(REPLAY, "Loading elab.transport at byte %i",
+  //        pos - buffer);
   pos = loadChar(pos, & value->elab.transport);
+  //logWrite(REPLAY, "Loading elab.ip at byte %i",
+  //        pos - buffer);
   pos = loadInt(pos, & value->elab.ip);
+  //logWrite(REPLAY, "Loading elab.localport at byte %i",
+  //        pos - buffer);
   pos = loadShort(pos, & value->elab.localPort);
+  //logWrite(REPLAY, "Loading elab.remoteport at byte %i",
+  //        pos - buffer);
   pos = loadShort(pos, & value->elab.remotePort);
+  //logWrite(REPLAY,"ELAB trans=%i IP=%i.%i.%i.%.i lp=%i rp=%i",
+  //        value->elab.transport,
+  //        ((value->elab.ip) >> 24) & 0xff,
+  //        ((value->elab.ip) >> 16) & 0xff,
+  //        ((value->elab.ip) >> 8) & 0xff,
+  //        (value->elab.ip) & 0xff,
+  //        (value->elab.localPort),
+  //        (value->elab.remotePort));
 
   // Load bufferFull
   unsigned char bufferFull = 0;
+  //logWrite(REPLAY, "Loading bufferfull at byte %i",
+  //        pos - buffer);
   pos = loadChar(pos, &bufferFull);
+  //logWrite(REPLAY,"BFULL=%i",bufferFull);
   value->bufferFull = (bufferFull == 1);
 
   // Load packet type
+  //logWrite(REPLAY, "Loading type at byte %i",
+  //        pos - buffer);
   pos = loadChar(pos, & value->packetType);
+  //logWrite(REPLAY,"TYPE=%d",value->packetType);
 
   return pos;
 }
