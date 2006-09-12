@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw (MIN TimeStamp getLA OpenDebugLog DebugLog);
+@EXPORT = qw (MIN TimeStamp getLA OpenLog Log STATUSLOG STATUSLOGPATH);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
@@ -29,6 +29,9 @@ my $UPTIME       = "/usr/bin/uptime";
 
 # package vars
 my %logs = ();
+
+sub STATUSLOG { "StatusLog"; }
+sub STATUSLOGPATH { "$TB/log/plabnodestatus.log"; }
 
 sub MIN($$) {
     my ($a, $b) = @_;
@@ -50,7 +53,7 @@ sub getLA() {
 #
 # Open a log file for writing
 #
-sub OpenDebugLog($$) {
+sub OpenLog($$) {
     my $loghandlename = shift;
     my $logfile = shift;
     my $loghandle = new IO::File;
@@ -70,7 +73,7 @@ sub OpenDebugLog($$) {
 #
 # Print out a timestamped log entry to a particular file.
 #
-sub DebugLog($$) {
+sub Log($$) {
     my $loghandlename = shift;
     my $logmsg = shift;
 

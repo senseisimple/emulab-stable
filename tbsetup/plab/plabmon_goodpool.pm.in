@@ -12,7 +12,7 @@
 
 package plabmon_goodpool;
 
-use strict;
+#use strict;
 use English;
 
 use POSIX qw(WIFSIGNALED WEXITSTATUS);
@@ -245,6 +245,9 @@ sub processchild($$$) {
         return 1;
     }
 
+    # Setup log entry prefix
+    my $logmsg = "$self->{'NAME'}, $pnode->{'name'}, ";
+
     # Clear pid entry - child has gone away.
     delete $pnode->{'pid'};
 
@@ -259,8 +262,10 @@ sub processchild($$$) {
 
         if (!$exstat) {
             print "Teardown of $pnode->{'vnode'} complete\n";
+            Log(STATUSLOG, $logmsg . "teardown, success, teardown succeeded.");
         } else {
             print "Teardown of $pnode->{'vnode'} failed: $exstat\n";
+            Log(STATUSLOG, $logmsg . "teardown, fail, teardown failed.");
         }
 
         delete $self->{'PENDING'}->{$pnode->{'name'}};
@@ -279,13 +284,16 @@ sub processchild($$$) {
         return 1;
     }
 
+    # Test exit status for setup mode(s)
     SWRN1: for ($exstat) {
         WIFSIGNALED($_) && do {
             if ($now > $pnode->{'timeout'}) {
                 print "Timeout waiting for $pnode->{'vnode'} to instantiate.\n";
+                $logmsg .= "setup, fail, timeout waiting for node.";
             }
             else {
                 print "Setup of $pnode->{'vnode'} killed for unknown reason.\n";
+                $logmsg .= "setup, fail, killed - unknown reason.";
             }
             $bad = 1;
             last SWRN1;
@@ -293,12 +301,14 @@ sub processchild($$$) {
 
         WEXITSTATUS($_) == $BADINST && do {
             print "Instantiation of $pnode->{'vnode'} failed.\n";
+            $logmsg .= "setup, fail, vserver instantiation failed.";
             $bad = 1;
             last SWRN1;
         };
 
         WEXITSTATUS($_) > 0 && do {
             print "Vnodesetup failed on $pnode->{'vnode'}.\n";
+            $logmsg .= "setup, fail, vnodesetup failed (excode: $exstat).";
             $bad = 1;
             last SWRN1;
         };
@@ -309,12 +319,10 @@ sub processchild($$$) {
         $bad = 0;
     }
 
-    # Log success/failure in any case.
-    # XXX: do this!
-                
     if ($bad) {
         # If setup failed, schedule a vnode teardown.
         $self->teardownnode($pnode, $SETUPFAIL);
+        Log(STATUSLOG, $logmsg);
     } else {
         # Setup a timeout to wait for ISUP.
         $pnode->{'timeout'} = $now + $ISUPWAITTIME;
@@ -340,6 +348,8 @@ sub checkexpiration($) {
                     # Yes!  Node is up.
                     print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
                         " succeeded\n";
+                    Log(STATUSLOG, "$self->{'NAME'}, $pnode->{'name'}, ".
+                        "setup, success, node came up successfully.");
                     $self->teardownnode($pnode, $SETUPSUCCESS);
                     next;
                 }
