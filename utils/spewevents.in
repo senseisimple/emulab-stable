@@ -166,8 +166,8 @@ sub callbackFunc($$$) {
 	$arguments =~ s/\s+$//;	
 
 	$string .= "  $arguments";
-	$string .= "\n";
     }
+    $string .= "\n";
 
     my $rval = syswrite(STDOUT, $string);
 
