@@ -397,6 +397,9 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
     WRITESUBMENUBUTTON("Link Tracing/Monitoring",
 		       "linkmon_list.php3?pid=$exp_pid&eid=$exp_eid");
     
+    WRITESUBMENUBUTTON("Event Viewer",
+		       "showevents.php?pid=$exp_pid&eid=$exp_eid");
+    
     #
     # Admin and project/experiment leaders get this option.
     #

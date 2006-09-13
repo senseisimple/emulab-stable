@@ -125,10 +125,18 @@ if ($fromweb) {
 #
 # Loop.
 #
+my $lastevent_time = time();
+
 while (1) {
     # Quit when the experiment is no longer active.
     last
 	if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE());
+
+    # Quit if no events for a long time.
+    if (time() - $lastevent_time > 300) {
+	syswrite(STDOUT, "No events for a long time; stopping ...\n");
+	last;
+    }
     
     event_poll_blocking($handle, 2000);
 }
@@ -147,16 +155,26 @@ sub callbackFunc($$$) {
     my $eventtype = event_notification_get_eventtype($handle, $notification);
     my $arguments = event_notification_get_arguments($handle, $notification);
 
-    my $string =
-	"$time $group $host $objtype $objname $eventtype";
-    $string .= " ARGS:$arguments"
-	if (defined($arguments));
-    $string .= "\n";
+    my $string = 
+	sprintf("%-12s %-10s %-15s %-12s %-15s %-15s",
+		"$time", "$group", "$host", "$objtype",
+		"$objname", "$eventtype");
+
+    if (defined($arguments)) {
+	# Trim extra whitespace.
+	$arguments =~ s/^\s+//;
+	$arguments =~ s/\s+$//;	
+
+	$string .= "  $arguments";
+	$string .= "\n";
+    }
 
     my $rval = syswrite(STDOUT, $string);
 
-    # If the web page stops ...
+    # If the web page stops this is only way to catch it and exit.
+    # Hence, the use of syswrite so we can get status back.
     exit(0)
 	if (!defined($rval));
 
+    $lastevent_time = time();
 }
