@@ -221,24 +221,25 @@ void PacketSensor::localAck(PacketInfo * packet)
          opt != packet->tcpOptions->end();
          ++opt) {
       if (opt->type == TCPOPT_SACK) {
-        struct SACKOption *optheader = (struct SACKOption*)(opt->buffer);
         /*
          * Figure out how many regions there are in this option header. There
-         * are two octets for the 'kind' and length fields of the header, then
-         * two 4-octet sequence numbers for each region
+         * are are two 4-octet sequence numbers for each region
          */
-        int num_sacks = (optheader->length - 2) / 8;
-        if ((optheader->length - 2) % 8 == 0) {
-          logWrite(SENSOR,"Bad SACK header length: %i", (optheader->length));
+        int num_sacks = opt->length / 8;
+        logWrite(SENSOR,"SACK: length = %d num_sacks = %d", opt->length,
+                 num_sacks);
+        if (opt->length % 8 != 0) {
+          logWrite(SENSOR,"Bad SACK header length: %i", (opt->length));
           return;
         }
+        const uint32_t *regions = reinterpret_cast<const uint32_t*>(opt->buffer);
         for (int i = 0; i < num_sacks; i++) {
-          uint32_t start = ntohl(optheader->regions[i*2]);
+          uint32_t start = ntohl(regions[i*2]);
           /*
            * Like a reguar ACK, the 'end' is the first sequence number *after*
            * the range
            */
-          uint32_t end = ntohl(optheader->regions[i*2 + 1]) - 1;
+          uint32_t end = ntohl(regions[i*2 + 1]) - 1;
           ranges.push_back(rangepair(start, end));
           logWrite(SENSOR_COMPLETE,"PacketSensor::localAck() found SACK "
                                    "range %u to %u", start, end);
