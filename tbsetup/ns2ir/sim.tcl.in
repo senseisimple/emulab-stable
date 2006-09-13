@@ -1297,6 +1297,8 @@ Simulator instproc make_event {outer event} {
 	    set vname $obj
 	    
 	    switch -- $cmd {
+		"create"    {set etype CREATE}
+		"clear"     {set etype CLEAR}
 		"up"	    {set etype UP}
 		"down"	    {set etype DOWN}
 		"bandwidth" {
@@ -1704,7 +1706,7 @@ Simulator instproc make_event {outer event} {
     }
 
     if { $otype == "" } {
-	perror "\[make_event] otype was empty; event was $event"
+	perror "\[make_event] otype was empty; event $event, class $cl"
     }
 
     return [list $vnode $vname $otype $etype $args $atstring]
