@@ -373,7 +373,7 @@ static int do_reset(simulator_agent_t sa, char *args)
 	assert(sa != NULL);
 	assert(args != NULL);
 
-	if (systemf("loghole --port=%d --quiet clean",
+	if (systemf("loghole --port=%d --force --quiet clean",
 		    DEFAULT_RPC_PORT) != 0) {
 		error("failed to clean log holes\n");
 	}
