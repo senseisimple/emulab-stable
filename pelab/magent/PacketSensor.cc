@@ -240,9 +240,24 @@ void PacketSensor::localAck(PacketInfo * packet)
            * the range
            */
           uint32_t end = ntohl(regions[i*2 + 1]) - 1;
-          ranges.push_back(rangepair(start, end));
-          logWrite(SENSOR_COMPLETE,"PacketSensor::localAck() found SACK "
-                                   "range %u to %u", start, end);
+
+          logWrite(SENSOR_DETAIL,"PacketSensor::localAck() found SACK "
+                                 "range %u to %u", start, end);
+
+          /*
+           * This check is for something I have, believe it or not, actually
+           * seen - the SACK is for a range also being ACKed by the packet's
+           * ACK field. It looks like the Linux stack can do this after a
+           * retransmitted packet (possibly to tell the sender it has recieved
+           * two copies?)
+           * Anyway, I *think* we don't want to double count these bytes.
+           */
+          if (end <= ack_for) {
+            logWrite(SENSOR_DETAIL,"PacketSensor::localAck() suppressed "
+                                   "redundant SACK");
+          } else {
+            ranges.push_back(rangepair(start, end));
+          }
         }
 
         hasSack = true;
