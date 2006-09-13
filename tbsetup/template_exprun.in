@@ -735,6 +735,9 @@ sub SignalProgAgents($)
 
 sub SendCompletionEvent()
 {
+    return
+	if (!defined($ctoken));
+    
     my $arguments = " CTOKEN=$ctoken ERROR=0 ";
 
     #
