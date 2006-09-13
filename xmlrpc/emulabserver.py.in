@@ -4825,7 +4825,11 @@ class template:
                     argstr += " -w "
                     pass
                 pass
-            if opt == "quiet":
+            elif opt == "token":
+                argstr += " -t "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "quiet":
                 if xbool(val):
                     argstr += " -q "
                     pass

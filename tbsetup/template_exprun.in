@@ -43,7 +43,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwx:p:E:a:r:e:dscf";
+my $optlist	 = "qwx:p:E:a:r:e:dscft:";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -61,6 +61,7 @@ my $guid;
 my $version;
 my $inputfile;
 my $handle;
+my $ctoken;
 
 #
 # Configure variables
@@ -90,6 +91,7 @@ my $justexit    = 1;
 my $checkquota  = "$TB/sbin/checkquota";
 my $archcontrol = "$TB/bin/archive_control";
 my $eventcontrol= "$TB/bin/eventsys_control";
+my $tevc        = "$TB/bin/tevc";
 
 # Protos
 sub ParseArgs();
@@ -577,6 +579,16 @@ sub ParseArgs()
     if (defined($options{"c"})) {
 	$clean = 1;
     }
+    if (defined($options{"t"})) {
+	$ctoken = $options{"t"};
+
+	if ($ctoken =~ /^([-\w]+)$/) {
+	    $ctoken = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $ctoken.");
+	}
+    }
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"},
 			     "experiment_templates", "description",
@@ -723,25 +735,14 @@ sub SignalProgAgents($)
 
 sub SendCompletionEvent()
 {
-    fatal(-1, "Could not connect to event system!")
-	if (!$handle);
-    
-    my $tuple = address_tuple_alloc();
-    fatal(-1, "Could not allocate an address tuple\n")
-	if (!$tuple);
-   
-    %$tuple = (objtype   => "SIMULATOR",
-	       objname   => "ns",
-	       eventtype => "COMPLETE",
-	       expt      => "$pid/$eid");
+    my $arguments = " CTOKEN=$ctoken ERROR=0 ";
 
-    my $notification = event_notification_alloc($handle, $tuple);
-    fatal(-1, "Could not allocate a notification\n")
-	if (!$notification);
-
-    if (!event_notify($handle, $notification)) {
-	fatal(-1, "could not send environment event notification!");
-    }
+    #
+    # Easier to use tevc, and besides the perl swig wrappers are broken
+    # in some way cause event_notificaton_set_arguments does not work.
+    #
+    system("$tevc -e $pid/$eid now ns COMPLETE $arguments") == 0
+	or fatal(-1, "Could not send completion event notification!");
 }
 
 END {

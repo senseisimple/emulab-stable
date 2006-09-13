@@ -695,6 +695,7 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 	char			eventtype[TBDB_FLEN_EVEVENTTYPE];
 	struct agent	       *agentp;
 	timeline_agent_t	ta = NULL;
+	int			token;
 	
 	if (! event_notification_get_timeline(handle, notification,
 						   timeline,
@@ -808,11 +809,20 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 		event_notification_set_host(handle,
 					    event.notification,
 					    agentp->ipaddr);
-		event_notification_put_int32(handle,
-					     event.notification,
-					     "TOKEN",
-					     next_token);
-		next_token += 1;
+
+		/*
+		 * Do not override token.
+		 */
+		if (! event_notification_get_int32(handle,
+						   event.notification,
+						   "TOKEN",
+						   (int32_t *)&token)) {
+			event_notification_put_int32(handle,
+						     event.notification,
+						     "TOKEN",
+						     next_token);
+			next_token += 1;
+		}
 
 		if (recordevents) {
 			char	argsbuf[BUFSIZ] = "";

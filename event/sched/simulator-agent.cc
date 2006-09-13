@@ -401,14 +401,18 @@ static int do_snapshot(simulator_agent_t sa, char *args)
 	return retval;
 }
 
-static int do_stoprun(simulator_agent_t sa, char *args)
+static int do_stoprun(simulator_agent_t sa, int token, char *args)
 {
 	int retval = 0;
 
 	assert(sa != NULL);
 	assert(args != NULL);
-	
-	if (systemf("template_stoprun -p %s -e %s", pid, eid) != 0) {
+
+	/*
+	 * Not allowed to use waitmode; will deadlock the event system!
+	 */
+	if (systemf("template_stoprun -t %d -p %s -e %s",
+		    token, pid, eid) != 0) {
 		error("failed to stop current run\n");
 		retval = -1;
 	}
@@ -542,7 +546,7 @@ static void *simulator_agent_looper(void *arg)
 				do_snapshot(sa, argsbuf);
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_STOPRUN) == 0){
-				do_stoprun(sa, argsbuf);
+				do_stoprun(sa, token, argsbuf);
 			}
 			else {
 				error("cannot handle SIMULATOR event %s.",

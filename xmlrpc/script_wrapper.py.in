@@ -2179,7 +2179,7 @@ class template_stoprun:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:qp:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "we:qp:t:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -2203,8 +2203,11 @@ class template_stoprun:
             elif opt == "-p":
                 pid = val
                 pass
+            elif opt == "-t":
+                params["token"] = val;
+                pass
             elif opt == "-e":
-                params["exp"]  = val;
+                params["exp"] = val;
                 pass
             pass
 

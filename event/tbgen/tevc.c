@@ -35,6 +35,8 @@
 static int debug;
 
 static int exit_value = 0;
+static int completion_token;
+static int wait_for_complete;
 
 static event_handle_t handle;
 
@@ -77,7 +79,6 @@ main(int argc, char **argv)
 	char *server = NULL;
 	char *port = NULL;
 	int control = 0;
-	int wait_for_complete = 0;
 	int timeout = 0;
 	char *myeid = NULL;
 	char *keyfile = NULL;
@@ -365,11 +366,22 @@ main(int argc, char **argv)
 			when.tv_usec = 0;
 		}
 
-		if (debug) {
+		if (wait_for_complete) {
 			struct timeval now;
 			
+			/*
+			 * If waiting for a complete event, lets stick our
+			 * own token in so we can wait for the proper
+			 * completion event.
+			 */			
 			gettimeofday(&now, NULL);
-			
+
+			completion_token = now.tv_sec;
+
+			event_notification_put_int32(handle,
+						     notification,
+						     "TOKEN",
+						     completion_token);
 		}
 		
 		if (event_schedule(handle, notification, &when) == 0) {
@@ -400,9 +412,21 @@ void comp_callback(event_handle_t handle,
 		   void *data)
 {
 	char *value, argsbuf[BUFSIZ] = "";
+	int ctoken;
 
 	event_notification_get_arguments(handle, notification,
 					 argsbuf, sizeof(argsbuf));
+
+	if (event_arg_get(argsbuf, "CTOKEN", &value) > 0) {
+		if (sscanf(value, "%d", &ctoken) != 1) {
+			error("bad ctoken value for complete: %s\n", argsbuf);
+		}
+		if (ctoken != completion_token)
+			return;
+	}
+	else {
+		return;
+	}
 	
 	if (event_arg_get(argsbuf, "ERROR", &value) > 0) {
 		if (sscanf(value, "%d", &exit_value) != 1) {
