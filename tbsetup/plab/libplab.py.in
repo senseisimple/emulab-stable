@@ -613,7 +613,8 @@ class Plab:
 
         for gw in MAGIC_INET_GATEWAYS:
             if trace.find(gw) != -1:
-                break
+                nodeent['LINKTYPE'] = "pcplabinet"
+                return
         else:
             print "WARNING: Unknown gateway for host %s" % nodeent['IP']
 
