@@ -552,6 +552,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 {
 	static char *run_completes[] = {
 		TBDB_EVENTTYPE_RUN,
+		TBDB_EVENTTYPE_HALT,
 		NULL
 	};
 
@@ -563,6 +564,11 @@ int sends_complete(struct agent *agent, const char *evtype)
 	static char *simulator_completes[] = {
 		TBDB_EVENTTYPE_REPORT,
 		TBDB_EVENTTYPE_MODIFY,
+		TBDB_EVENTTYPE_SNAPSHOT,
+		NULL
+	};
+
+	static char *linktrace_completes[] = {
 		TBDB_EVENTTYPE_SNAPSHOT,
 		NULL
 	};
@@ -597,7 +603,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
 		{ TBDB_OBJECTTYPE_CONSOLE, NULL },
 		{ TBDB_OBJECTTYPE_TOPOGRAPHY, NULL },
-		{ TBDB_OBJECTTYPE_LINKTRACE, NULL },
+		{ TBDB_OBJECTTYPE_LINKTRACE, linktrace_completes },
 		{ TBDB_OBJECTTYPE_EVPROXY, NULL },
 		{ TBDB_OBJECTTYPE_BGMON, NULL },
 		{ NULL, NULL }

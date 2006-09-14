@@ -2062,7 +2062,7 @@ foreach my $lan (keys(%virt_lans)) {
 
     DBQueryFatal("insert into event_groups ".
 		 " (pid, eid, idx, group_name, agent_name) ".
-		 " values ('$pid', '$eid', NULL, 'all_lans', '$lan')");
+		 " values ('$pid', '$eid', NULL, '__all_lans', '$lan')");
 
     # An event group to hit all the links and lans in an experiment
 
@@ -2081,6 +2081,16 @@ foreach my $lan (keys(%virt_lans)) {
 		     "   '*', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINKTRACE'");
+
+	DBQueryFatal("insert into event_groups ".
+		     " (pid, eid, idx, group_name, agent_name) ".
+		     " values ('$pid', '$eid', NULL, ".
+		     "         '__all_tracemon', '${lan}-${vnode}-tracemon')");
+
+	DBQueryFatal("insert into event_groups ".
+		     " (pid, eid, idx, group_name, agent_name) ".
+		     " values ('$pid', '$eid', NULL, ".
+		     "         '${lan}_tracemon','${lan}-${vnode}-tracemon')");
     }
 }
 

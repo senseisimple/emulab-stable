@@ -246,6 +246,7 @@ volatile int killme = 0;
 volatile int stop   = 0;
 volatile int reload = 0;
 char *reload_tag = NULL;
+unsigned int reload_token = ~0;
 
 #ifdef EVENTSYS
 /*
@@ -258,6 +259,9 @@ struct timeval start_time;
  * 1 if we're adjusting timestamps by start_time, 0 otherwise
  */
 int adjust_time = 0;
+
+/* For the subscription. */
+char *pideid;
 #endif
 
 /*
@@ -386,9 +390,10 @@ int main (int argc, char **argv) {
 	int tcpdump_mode;
 	int interface_it;
 #ifdef EVENTSYS
-	char *exp;
-	char *objname;
 	address_tuple_t tuple;
+	char *keyfile = NULL;
+	char *objname = NULL;
+	event_handle_t ehandle;
 #endif
 #ifdef EMULAB
 	FILE *control_interface;
@@ -408,18 +413,13 @@ int main (int argc, char **argv) {
 	event_server = NULL;
 #endif
 
-#ifdef EVENTSYS
-	exp = 0;
-	objname = 0;
-#endif
-
 	tcpdump_mode = 0;
 	global_bpf_filter = NULL;
 
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:Icl:L:dP:a")) != -1)
+	while ((ch = getopt(argc,argv, "f:i:e:hpnNzs:otb:Icl:L:dP:ak:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -459,7 +459,7 @@ int main (int argc, char **argv) {
 			break;
 #ifdef EVENTSYS
 		case 'e':
-			exp = optarg;
+			pideid = optarg;
 			break;
 		case 'a':
 			adjust_time = 1;
@@ -469,6 +469,9 @@ int main (int argc, char **argv) {
 			break;
 		case 's':
 			event_server = optarg;
+			break;
+		case 'k':
+			keyfile = optarg;
 			break;
 #endif
 		case 'h':
@@ -804,12 +807,11 @@ int main (int argc, char **argv) {
 	 * Wait for time to start
 	 */
 #ifdef EVENTSYS
-	if (exp) {
-	    event_handle_t ehandle;
+	if (pideid) {
 	    char server_string[1024];
 
 	    pthread_mutex_lock(&lib_lock);
-	    printf("Waiting for time start in experiment %s\n",exp);
+	    printf("Waiting for time start in experiment %s\n", pideid);
 	    tuple = address_tuple_alloc();
 	    if (tuple == NULL) {
 		fatal("could not allocate an address tuple");
@@ -817,7 +819,7 @@ int main (int argc, char **argv) {
 	    tuple->host      = ADDRESSTUPLE_ANY;
 	    tuple->site      = ADDRESSTUPLE_ANY;
 	    tuple->group     = ADDRESSTUPLE_ANY;
-	    tuple->expt      = exp ? exp : ADDRESSTUPLE_ANY;
+	    tuple->expt      = pideid ? pideid : ADDRESSTUPLE_ANY;
 	    tuple->objtype   = TBDB_OBJECTTYPE_TIME;
 	    tuple->objname   = ADDRESSTUPLE_ANY;
 	    tuple->eventtype = TBDB_EVENTTYPE_START;
@@ -829,7 +831,7 @@ int main (int argc, char **argv) {
 		server_string[0] = '\0';
 	    }
 
-	    ehandle = event_register(server_string,0);
+	    ehandle = event_register_withkeyfile(server_string, 0, keyfile);
 	    if (ehandle == NULL) {
 		fatal("could not register with event system");
 	    }
@@ -1692,14 +1694,25 @@ static void
 callback(event_handle_t handle,
 	         event_notification_t notification, void *data) {
 
-	char objtype[256], eventtype[256];
-	int len = 256;
-
+	char	objname[TBDB_FLEN_EVOBJNAME];
+	char	eventtype[TBDB_FLEN_EVEVENTTYPE];
+	char	objtype[TBDB_FLEN_EVOBJTYPE];
+	
 	printf("Received an event (%d)\n", getpid());
 	fflush(stdout);
-	event_notification_get_objtype(handle, notification, objtype, len);
-	event_notification_get_eventtype(handle, notification, eventtype, len);
-
+	
+	event_notification_get_objtype(handle, notification,
+				       objtype, sizeof(objtype));
+	
+	event_notification_get_eventtype(handle, notification,
+					 eventtype, sizeof(eventtype));
+	
+	event_notification_get_objname(handle, notification,
+				       objname, sizeof(objname));
+	
+	event_notification_get_int32(handle, notification,
+				     "TOKEN", (int32_t *)&reload_token);
+	
 	if (!strcmp(objtype,TBDB_OBJECTTYPE_TIME) &&
 		!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
 	    /* OK, time has started */
@@ -1739,8 +1752,32 @@ callback(event_handle_t handle,
 				reload_tag = NULL;
 			}
 			if (capture_mode) {
+				int rc;
+				
+				pthread_mutex_lock(&lock);
 				stop   = 1;
 				reload = interfaces;
+
+				while (reload)
+					pthread_cond_wait(&cond, &lock);
+				pthread_mutex_unlock(&lock);
+
+				fprintf(stderr, "sending complete %d (%d)\n",
+					reload_token, getpid());
+				fflush(stderr);
+
+				rc = event_do(handle,
+					 EA_Experiment, pideid,
+					 EA_Type, TBDB_OBJECTTYPE_LINKTRACE,
+					 EA_Name, objname,
+					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+					 EA_ArgInteger, "ERROR", 0,
+					 EA_ArgInteger, "CTOKEN", reload_token,
+					 EA_TAG_DONE);
+
+				fprintf(stderr, "returned %d\n", rc);
+				fflush(stderr);
+				
 			}
 		}
 		return;

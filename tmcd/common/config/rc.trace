@@ -210,7 +210,8 @@ sub doboot()
 	# For the event system, listen for events to the entire link/lan,
 	# and for this node on the link/lan.
 	#
-	$eventargs .= " -L ${linkname}-${vnode}-tracemon,${linkname}-tracemon";
+	$eventargs .= " -L ${linkname}-${vnode}-tracemon";
+	$eventargs .= " -k " . TMEVENTKEY();
 
 	#
 	# User can specify a snaplen. Otherwise, If the trace type is
