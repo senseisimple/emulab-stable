@@ -151,7 +151,7 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
     $expstate ne EXPTSTATE_ACTIVATING &&
     $expstate ne EXPTSTATE_MODIFY_RESWAP &&
     $expstate ne EXPTSTATE_SWAPPING) {
-    tbdie("Experiment $pid/$eid must active (or swapping)!");
+    tbdie("Experiment $pid/$eid must be active (or swapping)!");
 }
 
 #
