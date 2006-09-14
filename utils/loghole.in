@@ -68,6 +68,7 @@ DELAYLOG2XPLOT = os.path.join(prefix, "bin", "delaylog2xplot")
 
 MERGECAP = "/usr/X11R6/bin/mergecap"
 TCPTRACE = "/usr/local/bin/tcptrace"
+TEVC     = os.path.join(prefix, "bin", "tevc")
 
 PID = None
 EID = None
@@ -1094,37 +1095,14 @@ def making_progress(jobs, logsize, logdir):
 # @param traces Sequence of dictionaries describing the active link tracers.
 #
 def trace_pre(traces):
-    at = address_tuple()
-    at.eventtype = "SNAPSHOT"
-    at.expt = "%s/%s" % (PID, EID)
-    at.scheduler = 1
-
-    tv = timeval()
-    tv.tv_sec = int(time.time())
+    if len(traces) == 0:
+        return;
     
-    notified = {}
-    ec = EventClient(server="event-server",
-                     keyfile=os.path.join("/proj", PID, "exp", EID,
-                                          "tbdata", "eventkey"))
-
-    for trace in traces:
-        if trace["trace_type"] == "monitor":
-            continue
-        
-        lvn = trace["linkvname"]
-        if lvn not in notified:
-            at.objname = "%s-tracemon" % (lvn,)
-            en = ec.create_notification(at)
-            ec.schedule(en, tv)
-            notified[lvn] = 1
-            pass
-        
+    rc = os.system(TEVC + " -w -t 30 -e %s/%s now __all_tracemon snapshot" %
+                   (PID, EID))
+    if rc != 0:
+        print "Could not SNAPSHOT the trace agents!";
         pass
-
-    if len(notified) > 0:
-        time.sleep(1)
-        pass
-    
     return
 
 ##
