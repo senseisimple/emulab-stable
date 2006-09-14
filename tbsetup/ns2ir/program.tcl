@@ -16,10 +16,19 @@ Class Program -superclass NSObject
 
 namespace eval GLOBALS {
     set new_classes(Program) {}
+    variable all_programs {}
 }
 
 Program instproc init {s} {
     global ::GLOBALS::last_class
+    global ::GLOBALS::all_programs
+
+    if {$all_programs == {}} {
+	# Create a default event group to hold all program agents.
+	set foo [uplevel \#0 "set __all_programs [new EventGroup $s]"]
+	set all_programs $foo
+    }
+    $all_programs add $self
 
     $self set sim $s
     $self set node {}
@@ -35,9 +44,11 @@ Program instproc init {s} {
 }
 
 Program instproc rename {old new} {
+    global ::GLOBALS::all_programs
     $self instvar sim
 
     $sim rename_program $old $new
+    $all_programs rename-agent $old $new
 }
 
 # updatedb DB

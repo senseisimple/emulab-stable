@@ -350,13 +350,11 @@ if ($waitmode) {
 # Might not be a current run, which is okay.
 #
 if (defined($instance->runidx())) {
-    SignalProgAgents("STOP");
-
     # Ug. I need to figure out how to hook into the event sequence
     # mechanism so I can use a completion event.
     print "Asking program agents to stop ... this will take a moment.\n";
-    sleep(5);
-    
+    SignalProgAgents("STOP");
+
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
 	or fatal(-1, "Could not stop experiment run for $instance!");
@@ -444,14 +442,13 @@ if ($paramfile) {
 	DBQueryFatal("update virt_user_environment set value=$value ".
 		     "where pid='$pid' and eid='$eid' and name='$name'");
     }
+    print "Writing environment strings ...\n";
+    $instance->WriteEnvVariables() == 0
+	or fatal(-1, "Could not write environment strings for program agents");
+    
+    print "Asking program agents to reload ... this will take a moment.\n";
     SignalProgAgents("RELOAD");
-    # XXX Need to use a completion event!
-    sleep(5);
 }
-
-print "Writing environment strings ...\n";
-$instance->WriteEnvVariables() == 0
-    or fatal(-1, "Could not write environment strings for program agents");
 
 #
 # Restart the event stream from the beginning.
@@ -679,58 +676,22 @@ sub sighandler($) {
 }
 
 #
-# Send the new environement strings to the program agents as an event.
-# This bypasses the scheduler and goes directly. Not sure if this is the
-# best approach, but I like it better then restarting the agents and having
-# them contact tmcd.
+# Use tevc to send an event and wait for completion.
 #
 sub SignalProgAgents($)
 {
     my ($action) = @_;
-    
-    if (!defined($handle)) {
-	my $URL     = "elvin://" . TB_EVENTSERVER();
-	my $keyfile = TBDB_EVENTKEY($pid, $eid);
-	
-	$handle = event_register_withkeyfile($URL, 0, $keyfile);
-	
-	fatal(-1, "Could not connect to event system!")
-	    if (!$handle);
+    my $agent;
+
+    if ($action eq "STOP") {
+	$agent = "__all_programs";
     }
-    
-    my $tuple = address_tuple_alloc();
-    fatal(-1, "Could not allocate an address tuple\n")
-	if (!$tuple);
-   
-    %$tuple = (host      => $event::ADDRESSTUPLE_ALL,
-	       objtype   => "PROGRAM",
-	       objname   => $event::ADDRESSTUPLE_ALL,
-	       eventtype => $action,
-	       expt      => "$pid/$eid");
-
-    my $notification = event_notification_alloc($handle, $tuple);
-    fatal(-1, "Could not allocate a notification\n")
-	if (!$notification);
-
-    if ($action eq "RELOAD") {
-	# Add in the new environ strings.
-	my $binding_string = "";
-    
-	foreach my $name (keys(%parameters)) {
-	    my $value = $parameters{$name};
-
-	    $binding_string .= "$name=$value\n";
-	}
-
-	if (! event_notification_put_string($handle, $notification,
-					    "environment", $binding_string)) {
-	    fatal(-1, "Could not add environment strings to notification\n")
-	    }
+    else {
+	$agent = "__all_program-agents";
     }
-    
-    if (!event_notify($handle, $notification)) {
-	fatal(-1, "could not send environment event notification!");
-    }
+
+    system("$tevc -w -t 60 -e $pid/$eid now $agent $action") == 0
+	or fatal(-1, "Could not send event notification!");
 }
 
 sub SendCompletionEvent()

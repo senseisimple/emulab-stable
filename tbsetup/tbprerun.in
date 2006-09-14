@@ -478,6 +478,10 @@ print "Writing environment strings ...\n";
 $experiment->WriteEnvVariables() == 0
     or fatal("Could not write environment strings for program agents");
 
+print "Setting up additional program agent support ...\n";
+$experiment->SetupProgramAgents() == 0
+    or fatal("Could not setup program agent support");
+
 print "Writing program agent info ...\n";
 $experiment->WriteProgramAgents() == 0
     or fatal("Could not write program agent info");

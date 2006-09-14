@@ -98,6 +98,11 @@ static int		numagents;
 static char		*user;
 
 /**
+ * Our vnode name, for subscribing to events for the program agent itself.
+ */
+static char		*vnode;
+
+/**
  * Pipe used by the SIGCHLD handler to notify the main event loop that one or
  * more chld processes are ready to be reaped.
  */
@@ -119,6 +124,11 @@ static char		*envfile;
 static char		*pideid;
 
 /**
+ * The name of the token file, which holds a completion token.
+ */
+static char		*tokenfile;
+
+/**
  * Elvin error object.
  */
 static elvin_error_t elvin_error;
@@ -129,10 +139,12 @@ static elvin_error_t elvin_error;
 enum {
 	PIB_TIMEOUT_FIRED,	/*< Indicates that the process was terminated
 				  via a timeout and not a regular signal. */
+	PIB_HALT_COMPLETION,
 };
 
 enum {
-	PIF_TIMEOUT_FIRED = (1L << PIB_TIMEOUT_FIRED),
+	PIF_TIMEOUT_FIRED   = (1L << PIB_TIMEOUT_FIRED),
+	PIF_HALT_COMPLETION = (1L << PIB_HALT_COMPLETION),
 };
 
 /**
@@ -156,6 +168,7 @@ struct proginfo {
 	int		pid;
 	struct timeval  started;
 	unsigned long	token;
+	unsigned long	halt_token;
 	unsigned long	flags;
 	struct proginfo *next;
 };
@@ -192,13 +205,13 @@ static void	start_callback(event_handle_t handle,
 
 /**
  * Handler for the RELOAD event, which tells the program agent to reload
- * its environment, and includes the new environment strings.
+ * its environment.
  *
  * @param handle The connection to the event system.
  * @param notification The start event.
  * @param data NULL
  */
-static void	startrun_callback(event_handle_t handle,
+static void	reload_callback(event_handle_t handle,
 				  event_notification_t notification,
 				  void *data);
 
@@ -420,7 +433,7 @@ main(int argc, char **argv)
 	progname = argv[0];
 	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:f:o:")) != -1) {
+	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:f:o:v:t:")) != -1){
 		switch (c) {
 		case 'h':
 			usage(progname);
@@ -455,7 +468,6 @@ main(int argc, char **argv)
 			break;
 		case 'o':
 			LOGDIR = optarg;
-			isops  = 1;
 			break;
 		case 'i':
 			pidfile = optarg;
@@ -489,6 +501,14 @@ main(int argc, char **argv)
 			break;
 		case 'k':
 			keyfile = optarg;
+			break;
+		case 't':
+			tokenfile = optarg;
+			break;
+		case 'v':
+			vnode = optarg;
+			if (strcmp(vnode, "ops") == 0)
+				isops = 1;
 			break;
 		default:
 			usage(progname);
@@ -771,6 +791,7 @@ main(int argc, char **argv)
 		TBDB_EVENTTYPE_RUN ","
 		TBDB_EVENTTYPE_START ","
 		TBDB_EVENTTYPE_STOP ","
+		TBDB_EVENTTYPE_HALT ","
 		TBDB_EVENTTYPE_KILL;
 
 	/*
@@ -791,15 +812,41 @@ main(int argc, char **argv)
 		fatal("could not subscribe to event");
 	}
 
+	snprintf(buf, sizeof(buf), "__%s_program-agent", vnode);
+			 
 	tuple->objtype   = TBDB_OBJECTTYPE_PROGRAM;
-	tuple->objname   = ADDRESSTUPLE_ALL;
-	tuple->eventtype = TBDB_EVENTTYPE_RELOAD "," TBDB_EVENTTYPE_STOP;
+	tuple->objname   = buf;
+	tuple->eventtype = TBDB_EVENTTYPE_RELOAD;
+
+	if (tokenfile && access(tokenfile, R_OK) == 0) {
+		FILE	*fp;
+		unsigned long	token = ~0;
+		
+		if ((fp = fopen(tokenfile, "r")) != NULL) {
+			if (fscanf(fp, "%lu", &token) == 1) {
+				event_do(handle,
+					 EA_Experiment, pideid,
+					 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+					 EA_Name, buf,
+					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+					 EA_ArgInteger, "ERROR", 0,
+					 EA_ArgInteger, "CTOKEN", token,
+					 EA_TAG_DONE);
+			}
+			else {
+				error("tokenfile could not be parsed!\n");
+			}
+		}
+		else {
+			errorc("Could not open token file for reading!");
+		}
+	}
 
 	/*
-	 * Subscribe to the RELOAD/STOP start event we specified above.
+	 * Subscribe to the RELOAD start event we specified above.
 	 */
-	if (! event_subscribe(handle, startrun_callback, tuple, NULL)) {
-		fatal("could not subscribe to event");
+	if (! event_subscribe(handle, reload_callback, tuple, NULL)) {
+		fatal("could not subscribe to reload event");
 	}
 
 	/*
@@ -931,6 +978,27 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		}
 	}
 	else if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0) {
+		stop_program(pinfo, args);
+	}
+	else if (strcmp(event, TBDB_EVENTTYPE_HALT) == 0) {
+		/*
+		 * HALT is special; it sends an event to the caller when
+		 * the program actually exits.
+		 */
+		if (! pinfo->pid) {
+			event_do(handle,
+				 EA_Experiment, pideid,
+				 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+				 EA_Name, pinfo->name,
+				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+				 EA_ArgInteger, "ERROR", 0,
+				 EA_ArgInteger, "CTOKEN", token,
+				 EA_TAG_DONE);
+			return;
+		}
+		pinfo->halt_token = token;
+		pinfo->flags |= PIF_HALT_COMPLETION;
+		
 		stop_program(pinfo, args);
 	}
 	else if (strcmp(event, TBDB_EVENTTYPE_KILL) == 0) {
@@ -1066,13 +1134,13 @@ start_callback(event_handle_t handle,
 }
 
 static void
-startrun_callback(event_handle_t handle,
+reload_callback(event_handle_t handle,
 		  event_notification_t notification,
 		  void *data)
 {
-	struct proginfo *pinfo;
 	char		event[TBDB_FLEN_EVEVENTTYPE];
 	char		objname[TBDB_FLEN_EVOBJTYPE];
+	unsigned long	token = ~0;
 
 	assert(handle != NULL);
 	assert(notification != NULL);
@@ -1088,28 +1156,8 @@ startrun_callback(event_handle_t handle,
 		error("Could not get objname from notification!\n");
 		return;
 	}
-	/* XXX Ignore events that are not to ALL. */
-	if (strcmp(objname, ADDRESSTUPLE_ALL))
-		return;
-
-	/*
-	 * XXX Both of these need to send completion events
-	 */
-
-	if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0) {
-		info("startrun_callback: Got a stop event.\n");
-		
-		/*
-		 * Stop all running programs so that their log files
-		 * are complete.
-		 */
-		for (pinfo = proginfos; pinfo != NULL; pinfo = pinfo->next) {
-			if (pinfo->pid != 0) {
-				stop_program(pinfo, NULL);
-			}
-		}
-		return;
-	}
+	event_notification_get_int32(handle, notification,
+				     "TOKEN", (int32_t *)&token);
 
 	if (strcmp(event, TBDB_EVENTTYPE_RELOAD) == 0) {
 		info("startrun_callback: Got a reload event.\n");
@@ -1120,12 +1168,34 @@ startrun_callback(event_handle_t handle,
 		 */
 		if (isops) {
 			parse_configfile_env(envfile);
+
+			event_do(handle,
+				 EA_Experiment, pideid,
+				 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+				 EA_Name, objname,
+				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+				 EA_ArgInteger, "ERROR", 0,
+				 EA_ArgInteger, "CTOKEN", token,
+				 EA_TAG_DONE);
+
 			return;
 		}
 		
 		/*
-		 * Wrapper will restart us.
+		 * Wrapper will restart us but first write the token to a
+		 * file so that we can send a completion upon restart.
 		 */
+		if (tokenfile) {
+			FILE	*fp;
+			
+			if ((fp = fopen(tokenfile, "w")) == NULL) {
+				errorc("Could not open token file");
+				exit(-1);
+			}
+			fprintf(fp, "%lu\n", token);
+			fflush(fp);
+			fclose(fp);
+		}
 		exit(45);
 	}
 }
@@ -1915,11 +1985,25 @@ child_callback(elvin_io_handler_t handler,
 			
 			pi->token = ~0;
 			pi->flags &= ~(PIF_TIMEOUT_FIRED);
+			
+			if (pi->flags & PIF_HALT_COMPLETION) {
+				event_do(handle,
+					 EA_Experiment, pideid,
+					 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+					 EA_Name, pi->name,
+					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+					 EA_ArgInteger, "ERROR", exit_code,
+					 EA_ArgInteger, "CTOKEN",
+					    pi->halt_token,
+					 EA_TAG_DONE);
+				pi->flags &= ~(PIF_HALT_COMPLETION);
+			}
 			if (pi->timeout_handle != NULL) {
 				elvin_sync_remove_timeout(pi->timeout_handle,
 							  eerror);
 				pi->timeout_handle = NULL;
 			}
+
 		}
 	}
 	

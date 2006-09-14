@@ -27,6 +27,8 @@ Class EventGroup -superclass NSObject
 Class Firewall -superclass NSObject
 
 Simulator instproc init {args} {
+    var_import ::GLOBALS::program_group
+    
     # A counter for internal ids
     $self set id_counter 0
 
@@ -1689,8 +1691,7 @@ Simulator instproc make_event {outer event} {
 		}
 		"reset-lans" {
 		    set otype LINK
-		    set vname "all_lans"
-		    set vnode "*"
+		    set vname "__all_lans"
 		    set etype RESET
 		}
 		unknown {

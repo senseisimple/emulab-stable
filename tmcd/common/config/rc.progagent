@@ -30,6 +30,7 @@ my $WRAPLOG = "$LOGDIR/progwrap.debug";
 my $PIDFILE = "/var/run/progagent.pid";
 my $CONFIG  = "$BOOTDIR/progagents";
 my $PAGENT  = "$BINDIR/program-agent";
+my $TOKEN   = "/var/tmp/progagent-token";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -133,6 +134,8 @@ sub doboot()
     # Fully disconnect from bootup. 
     setsid();
 
+    $TOKEN .= ".$$";
+
     while (1) {
 	if (tmcc(TMCCCMD_PROGRAMS, undef, \@agents) < 0) {
 	    fatal("Could not get progagent config from server!");
@@ -207,10 +210,11 @@ sub doboot()
 	    }
 	    system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
 		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG ".
-		   "-r -p $elvind_port");
+		   "-v $vname -r -p $elvind_port -t $TOKEN");
 	}
 	else {
 	    system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
+		   "-v $vname -t $TOKEN ".
 		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
 	    exit(0)
 		if (! $?);

@@ -267,6 +267,7 @@ push(@sched_command_options, ("-s", "localhost", "-k", $keyfile, $pid, $eid));
 
 my @agent_command_options = ("-u", $user, "-d", "-e", "$pid/$eid",
 			     "-k", $keyfile,
+			     "-v", "ops",
 			     "-c", "$EXPDIR/tbdata/program_agents",
 			     "-f", "$EXPDIR/tbdata/environment",
 			     "-o", "$EXPDIR/logs/ops");

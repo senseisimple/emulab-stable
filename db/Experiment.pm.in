@@ -1243,6 +1243,50 @@ sub ClearPortRegistration($)
 }
 
 #
+# Setup up phony program agent event agents and groups. This is so we
+# can talk to the program agent itself, not to the programs the agent
+# is responsible for. 
+#
+sub SetupProgramAgents($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select distinct vnode from virt_programs ".
+		    "where pid='$pid' and eid='$eid'");
+    
+    return -1
+	if (!defined($query_result));
+    return 0
+	if (! $query_result->numrows);
+
+    while (my ($vnode) = $query_result->fetchrow_array()) {
+	DBQueryWarn("replace into virt_agents ".
+		     " (pid, eid, vname, vnode, objecttype) ".
+		     " select '$pid', '$eid', '__${vnode}_program-agent', ".
+		     "   '$vnode', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='PROGRAM'")
+	    or return -1;
+
+	DBQueryWarn("replace into event_groups ".
+		    " (pid, eid, idx, group_name, agent_name) ".
+		    " values ('$pid', '$eid', NULL, ".
+		    "         '__all_program-agents', ".
+		    "         '__${vnode}_program-agent')")
+	    or return -1;
+    }
+    return 0;
+}
+
+#
 # Write the virt program data for the program agent that will run on ops.
 # Ops does not speak to tmcd for experiments, so need to get this info
 # over another way. 

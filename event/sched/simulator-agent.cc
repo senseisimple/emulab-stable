@@ -504,6 +504,9 @@ static void *simulator_agent_looper(void *arg)
 						     (int32_t *)&token);
 			argsbuf[sizeof(argsbuf) - 1] = '\0';
 
+			/* Strictly for the event viewer */
+			event_notify(handle, se.notification);
+
 			if (strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT) == 0) {
 				EmulabResponse er;
 				
