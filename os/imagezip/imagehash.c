@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -78,6 +78,7 @@ static int hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
 			 struct hashinfo **hinfop);
 static char *spewhash(unsigned char *h, int hlen);
 
+static char *signame(char *name);
 static int imagecmp(char *ifile, char *dev);
 static int datacmp(uint32_t off, uint32_t size, unsigned char *idata);
 
@@ -109,6 +110,8 @@ main(int argc, char **argv)
 				fprintf(stderr, "Invalid hash block size\n");
 				usage();
 			}
+			if (maxreadbufmem < hashblksize)
+				maxreadbufmem = hashblksize;
 			break;
 		case 'F':
 			fileid = strdup(optarg);
@@ -174,8 +177,17 @@ main(int argc, char **argv)
 	 * Ensure we can open both files before we do the expensive stuff.
 	 */
 	if (strcmp(argv[0], "-") != 0 && access(argv[0], R_OK) != 0) {
-		perror("image file");
-		exit(1);
+		/*
+		 * If comparing against a sig file, don't require that
+		 * the image exist, only the sig.
+		 */
+		if (!create && access(signame(argv[0]), R_OK) == 0) {
+			fprintf(stderr, "WARNING: image does not exist "
+				"but signature does, using signature...\n");
+		} else {
+			perror("image file");
+			exit(1);
+		}
 	}
 	if (!create && access(argv[1], R_OK) != 0) {
 		perror("device file");
@@ -500,11 +512,13 @@ createhash(char *name, struct hashinfo **hinfop)
 	return 0;
 }
 
+static volatile uint32_t badhashes, checkedhashes;
+
 static int
 checkhash(char *name, struct hashinfo *hinfo)
 {
 	uint32_t i, inbad, badstart, badsize, reportbad;
-	uint32_t badhashes, badchunks, lastbadchunk;
+	uint32_t badchunks, lastbadchunk;
 	uint64_t badhashdata;
 	struct hashregion *reg;
 	int chunkno;
@@ -609,6 +623,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 					name, badstart, badstart + badsize - 1);
 			reportbad = inbad = 0;
 		}
+		checkedhashes++;
 	}
 	/*
 	 * Finished on a sour note, report the final bad stretch.
@@ -1400,7 +1415,13 @@ diskreader(void *arg)
 	struct readbuf *rbuf;
 	uint32_t i;
 
+	if (detail)
+		fprintf(stderr, "Reader thread running\n");
+
 	for (i = 0, reg = hinfo->regions; i < hinfo->nregions; i++, reg++) {
+		/* XXX maxreadbufmem has to at least hold one hash region */
+		if (maxreadbufmem < sectobytes(reg->region.size))
+			maxreadbufmem = sectobytes(reg->region.size);
 		rbuf = alloc_readbuf(reg->region.start, reg->region.size, 1);
 		readblock(rbuf);
 		pthread_mutex_lock(&readqueue_mutex);
@@ -1446,6 +1467,15 @@ fsleep(unsigned int usecs)
 static void
 dump_stats(int sig)
 {
-	printf("%s: %lu chunks, %lu regions, %lu hashregions, %llu data bytes\n",
-	       imagename, nchunks, nregions, nhregions, ndatabytes);
+#ifndef NOTHREADS
+	if (sig && !nothreads && pthread_self() == reader_pid)
+		return;
+#endif
+
+	printf("%s: %lu chunks, ", imagename, nchunks);
+	if (create)
+		printf("%lu regions, ", nregions);
+	else
+		printf("%u of %u hashes bad, ", badhashes, checkedhashes);
+	printf("%lu hashregions, %llu data bytes\n", nhregions, ndatabytes);
 }
