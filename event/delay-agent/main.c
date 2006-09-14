@@ -301,19 +301,21 @@ int main(int argc, char **argv)
         return 1;
       }
 
-  strcat(lanobjects, ",");
-  strcat(lanobjects, ADDRESSTUPLE_ALL);
-  event_t->objname   = lanobjects;
-  event_t->objtype   = TBDB_OBJECTTYPE_LINK;
-  event_t->eventtype = TBDB_EVENTTYPE_RESET;
-  event_t->host      = ADDRESSTUPLE_ANY;
-  event_t->expt      = myexp;
-
-  if (event_subscribe(handle, reset_callback, event_t, NULL) == NULL) {
-      error("could not subscribe to %d event\n",event_t->eventtype);
+  if (strlen(lanobjects)) {
+    strcat(lanobjects, ",");
+    strcat(lanobjects, ADDRESSTUPLE_ALL);
+    event_t->objname   = lanobjects;
+    event_t->objtype   = TBDB_OBJECTTYPE_LINK;
+    event_t->eventtype = TBDB_EVENTTYPE_RESET;
+    event_t->host      = ADDRESSTUPLE_ANY;
+    event_t->expt      = myexp;
+    
+    if (event_subscribe(handle, reset_callback, event_t, NULL) == NULL) {
+      error("could not subscribe to %d event\n", event_t->eventtype);
       return 1;
+    }
   }
-
+  
   info("subscribed...\n");
   /* free the memory for the address tuple*/
   address_tuple_free(event_t);
@@ -426,19 +428,14 @@ void
 reset_callback(event_handle_t handle,
 		event_notification_t notification, void *data)
 {
-	char	buf1[BUFSIZ], buf2[BUFSIZ];
+	char	buf[BUFSIZ];
 	char    *prog = "delaysetup";
 
 	info("Got a RESET event!\n");
 
-	if (myvnode) {
-		sprintf(buf1, "%s -u -j %s", prog, myvnode);
-		sprintf(buf2, "%s -i -j %s", prog, myvnode);
-	}
-	else {
-		sprintf(buf1, "%s -u", prog);
-		sprintf(buf2, "%s -i", prog);
-	}
-	system(buf1);
-	system(buf2);
+	if (myvnode)
+		sprintf(buf, "%s -r -j %s", prog, myvnode);
+	else
+		sprintf(buf, "%s -r", prog);
+	system(buf);
 }
