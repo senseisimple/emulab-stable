@@ -13,6 +13,7 @@
 #include "MaxDelaySensor.h"
 #include "ThroughputSensor.h"
 #include "EwmaThroughputSensor.h"
+#include "LeastSquaresThroughput.h"
 
 using namespace std;
 
@@ -75,6 +76,9 @@ void SensorList::addSensor(SensorCommand const & newSensor)
     break;
   case EWMA_THROUGHPUT_SENSOR:
     pushEwmaThroughputSensor();
+    break;
+  case LEAST_SQUARES_THROUGHPUT:
+    pushLeastSquaresThroughput();
     break;
   default:
     logWrite(ERROR,
@@ -252,5 +256,17 @@ void SensorList::pushEwmaThroughputSensor(void)
   logWrite(SENSOR, "Adding EwmaThroughputSensor");
   std::auto_ptr<Sensor> current(new EwmaThroughputSensor(depThroughputSensor,
                                                          depStateSensor));
+  pushSensor(current);
+}
+
+void SensorList::pushLeastSquaresThroughput(void)
+{
+  // Dependency list
+  pushThroughputSensor();
+  pushDelaySensor();
+
+  logWrite(SENSOR, "Adding LeastSquaresThroughput");
+  std::auto_ptr<Sensor> current(new LeastSquaresThroughput(depThroughputSensor,
+                                                           depDelaySensor));
   pushSensor(current);
 }

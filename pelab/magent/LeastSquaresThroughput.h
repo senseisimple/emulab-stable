@@ -18,8 +18,8 @@ public:
                          DelaySensor const * newDelay);
   virtual ~LeastSquaresThroughput();
 protected:
-  virtual void localSend(PacketInfo * packet)=0;
-  virtual void localAck(PacketInfo * packet)=0;
+  virtual void localSend(PacketInfo * packet);
+  virtual void localAck(PacketInfo * packet);
 private:
   ThroughputSensor const * throughput;
   DelaySensor const * delay;

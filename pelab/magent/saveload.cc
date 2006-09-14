@@ -5,11 +5,66 @@
 #include "saveload.h"
 #include "Command.h"
 
-using namespace std;
+// Uncomment this to turn on the verbose input for log replay format.
+// #define LOG_REPLAY_FORMAT
 
+namespace
+{
+  #ifdef LOG_REPLAY_FORMAT
+  const int DASHES_MAX = 200;
+  char dashes[DASHES_MAX];
+  int dashesLevel = 0;
+  #endif
+
+  int count = 0;
+  int logFlag = LOG_NOTHING;
+
+  class FileLevel
+  {
+  public:
+    FileLevel()
+    {
+      #ifdef LOG_REPLAY_FORMAT
+      if (dashesLevel == 0)
+      {
+        count = 0;
+      }
+      dashes[dashesLevel] = '-';
+      ++dashesLevel;
+      dashes[dashesLevel] = '\0';
+      #endif
+    }
+    ~FileLevel()
+    {
+      #ifdef LOG_REPLAY_FORMAT
+      dashes[dashesLevel] = '\0';
+      --dashesLevel;
+      #endif
+    }
+  };
+}
+
+#ifdef LOG_REPLAY_FORMAT
+#define logReplay(str,afterCount) ((afterCount == 0) \
+                                    ? (logWrite(logFlag, "%s> %s @ %d", \
+                                                dashes, str, count)) \
+                                    : (logWrite(logFlag, "%s> %s @ [%d, %d)", \
+                                                dashes, str, count, \
+                                                afterCount)))
+#else
+#define logReplay(str, afterCount)
+#endif
+
+int getLastSaveloadSize(void)
+{
+  return count;
+}
 
 char * saveChar(char * buffer, unsigned char value)
 {
+  FileLevel up;
+  logReplay("Char", count + sizeof(value));
+  count += sizeof(value);
   if (buffer != NULL)
   {
     memcpy(buffer, &value, sizeof(value));
@@ -17,13 +72,16 @@ char * saveChar(char * buffer, unsigned char value)
   }
   else
   {
-    logWrite(ERROR, "saveChar() called with a NULL buffer");
+//    logWrite(ERROR, "saveChar() called with a NULL buffer");
     return buffer;
   }
 }
 
 char * saveShort(char * buffer, unsigned short value)
 {
+  FileLevel up;
+  logReplay("Short", count + sizeof(value));
+  count += sizeof(value);
   if (buffer != NULL)
   {
     unsigned short ordered = htons(value);
@@ -32,13 +90,16 @@ char * saveShort(char * buffer, unsigned short value)
   }
   else
   {
-    logWrite(ERROR, "saveShort() called with a NULL buffer");
+//    logWrite(ERROR, "saveShort() called with a NULL buffer");
     return buffer;
   }
 }
 
 char * saveInt(char * buffer, unsigned int value)
 {
+  FileLevel up;
+  logReplay("Int", count + sizeof(value));
+  count += sizeof(value);
   if (buffer != NULL)
   {
     unsigned int ordered = htonl(value);
@@ -47,46 +108,59 @@ char * saveInt(char * buffer, unsigned int value)
   }
   else
   {
-    logWrite(ERROR, "saveInt() called with a NULL buffer");
+//    logWrite(ERROR, "saveInt() called with a NULL buffer");
+    return buffer;
+  }
+}
+
+char * saveBuffer(char * buffer, void const * input, unsigned int size)
+{
+  FileLevel up;
+  logReplay("Buffer", count + size);
+  count += size;
+  if (buffer != NULL)
+  {
+    memcpy(buffer, input, size);
+    return buffer + size;
+  }
+  else
+  {
     return buffer;
   }
 }
 
 char * saveHeader(char * buffer, Header const & value)
 {
-  if (buffer != NULL)
-  {
-    char * pos = buffer;
-    pos = saveChar(pos, value.type);
-    pos = saveShort(pos, value.size);
-    pos = saveChar(pos, value.key.transport);
-    pos = saveInt(pos, value.key.ip);
-    pos = saveShort(pos, value.key.localPort);
-    pos = saveShort(pos, value.key.remotePort);
-    return pos;
-  }
-  else
-  {
-    logWrite(ERROR, "saveHeader() called with a NULL buffer");
-    return buffer;
-  }
+  FileLevel up;
+  logReplay("Header", 0);
+  char * pos = buffer;
+  pos = saveChar(pos, value.type);
+  pos = saveShort(pos, value.size);
+  pos = saveChar(pos, value.key.transport);
+  pos = saveInt(pos, value.key.ip);
+  pos = saveShort(pos, value.key.localPort);
+  pos = saveShort(pos, value.key.remotePort);
+  return pos;
 }
 
 char * saveOptions(char * buffer, std::list<Option> const & options)
 {
+  FileLevel up;
+  logReplay("Options", 0);
   char * pos = buffer;
 
   pos = saveInt(pos, options.size());
-  list<Option>::const_iterator current = options.begin();
-  list<Option>::const_iterator limit = options.end();
+  std::list<Option>::const_iterator current = options.begin();
+  std::list<Option>::const_iterator limit = options.end();
   for (; current != limit; ++current)
   {
+    FileLevel up;
+    logReplay("Option", 0);
     pos = saveChar(pos, current->type);
     pos = saveChar(pos, current->length);
     if (current->length > 0)
     {
-      memcpy(pos, current->buffer, current->length);
-      pos += current->length;
+      pos = saveBuffer(pos, current->buffer, current->length);
     }
   }
 
@@ -95,19 +169,23 @@ char * saveOptions(char * buffer, std::list<Option> const & options)
 
 char * savePacket(char * buffer, PacketInfo const & value)
 {
-  //logWrite(REPLAY, "Saving a packet");
+  FileLevel up;
+  count = 0;
+  if (buffer != NULL)
+  {
+    logFlag = REPLAY;
+  }
+  logReplay("savePacket", 0);
   char * pos = buffer;
   struct tcp_info const * kernel = value.kernel;
 
   // Save packet time
-  //logWrite(REPLAY, "Saving timestamps at byte %i",
-  //       pos - buffer);
+  logReplay("packetTime", 0);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_sec);
   pos = saveInt(pos, value.packetTime.getTimeval()->tv_usec);
 
   // Save packet length
-  //logWrite(REPLAY, "Saving length at byte %i",
-  //        pos - buffer);
+  logReplay("packetLength", 0);
   pos = saveInt(pos, value.packetLength);
 
   // Save tcp_info
@@ -148,63 +226,56 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, kernel->tcpi_reordering);
 */
 
-  //logWrite(REPLAY, "Saving tcp_info at byte %i",
-  //        pos - buffer);
-  memcpy(pos, kernel, sizeof(struct tcp_info));
-  pos += sizeof(struct tcp_info);
+  logReplay("tcp_info", 0);
+  pos = saveBuffer(pos, kernel, sizeof(struct tcp_info));
+//  memcpy(pos, kernel, sizeof(struct tcp_info));
+//  pos += sizeof(struct tcp_info);
 
   // Save IP header
-  //logWrite(REPLAY, "Saving IP header at byte %i",
-  //        pos - buffer);
-  memcpy(pos, value.ip, sizeof(struct ip));
-  pos += sizeof(struct ip);
+  logReplay("IP header", 0);
+  pos = saveBuffer(pos, value.ip, sizeof(struct ip));
+//  memcpy(pos, value.ip, sizeof(struct ip));
+//  pos += sizeof(struct ip);
 
   // Save IP options
-  //logWrite(REPLAY, "Saving IP options at byte %i",
-  //        pos - buffer);
+  logReplay("IP options", 0);
   pos = saveOptions(pos, * value.ipOptions);
 
   // Save TCP header
-  //logWrite(REPLAY, "Saving TCP header at byte %i",
-  //        pos - buffer);
-  memcpy(pos, value.tcp, sizeof(struct tcphdr));
-  pos += sizeof(struct tcphdr);
+  logReplay("TCP header", 0);
+  pos = saveBuffer(pos, value.tcp, sizeof(struct tcphdr));
+//  memcpy(pos, value.tcp, sizeof(struct tcphdr));
+//  pos += sizeof(struct tcphdr);
 
   // Save TCP options
-  //logWrite(REPLAY, "Saving TCP options at byte %i",
-  //        pos - buffer);
+  logReplay("TCP options", 0);
   pos = saveOptions(pos, * value.tcpOptions);
 
   // Save elab stuff
-  //logWrite(REPLAY, "Saving elab.transport at byte %i",
-  //        pos - buffer);
+  logReplay("elab key", 0);
   pos = saveChar(pos, value.elab.transport);
-  //logWrite(REPLAY, "Saving elab.ip at byte %i",
-  //        pos - buffer);
   pos = saveInt(pos, value.elab.ip);
-  //logWrite(REPLAY, "Saving elab.localport at byte %i",
-  //        pos - buffer);
   pos = saveShort(pos, value.elab.localPort);
-  //logWrite(REPLAY, "Saving elab.remoteport at byte %i",
-  //        pos - buffer);
   pos = saveShort(pos, value.elab.remotePort);
 
   // Save bufferFull measurement
+  logReplay("bufferFull", 0);
   unsigned char bufferFull = value.bufferFull;
-  //logWrite(REPLAY, "Saving buferfull at byte %i",
-  //        pos - buffer);
   pos = saveChar(pos, bufferFull);
 
   // Save packetType
-  //logWrite(REPLAY, "Saving type at byte %i",
-  //        pos - buffer);
+  logReplay("packetType", 0);
   pos = saveChar(pos, value.packetType);
 
+  logFlag = LOG_NOTHING;
   return pos;
 }
 
 char * loadChar(char * buffer, unsigned char * value)
 {
+  FileLevel up;
+  logReplay("Char", count + sizeof(*value));
+  count += sizeof(*value);
   if (buffer == NULL)
   {
     logWrite(ERROR, "loadChar() called with a NULL buffer");
@@ -224,6 +295,9 @@ char * loadChar(char * buffer, unsigned char * value)
 
 char * loadShort(char * buffer, unsigned short * value)
 {
+  FileLevel up;
+  logReplay("Short", count + sizeof(*value));
+  count += sizeof(*value);
   if (buffer == NULL)
   {
     logWrite(ERROR, "loadShort() called with a NULL buffer");
@@ -245,6 +319,9 @@ char * loadShort(char * buffer, unsigned short * value)
 
 char * loadInt(char * buffer, unsigned int * value)
 {
+  FileLevel up;
+  logReplay("Int", count + sizeof(*value));
+  count += sizeof(*value);
   if (buffer == NULL)
   {
     logWrite(ERROR, "loadInt() called with a NULL buffer");
@@ -264,8 +341,32 @@ char * loadInt(char * buffer, unsigned int * value)
   }
 }
 
+char * loadBuffer(char * buffer, void * output, unsigned int size)
+{
+  FileLevel up;
+  logReplay("Buffer", count + size);
+  count += size;
+  if (buffer == NULL)
+  {
+    logWrite(ERROR, "loadBuffer() called with a NULL buffer");
+    return buffer;
+  }
+  else if (output == NULL)
+  {
+    logWrite(ERROR, "loadBuffer() called with a NULL output");
+    return buffer;
+  }
+  else
+  {
+    memcpy(output, buffer, size);
+    return buffer + size;
+  }
+}
+
 char * loadHeader(char * buffer, Header * value)
 {
+  FileLevel up;
+  logReplay("Header", 0);
   if (buffer == NULL)
   {
     logWrite(ERROR, "loadHeader() called with a NULL buffer");
@@ -293,6 +394,8 @@ char * loadHeader(char * buffer, Header * value)
 // before the list of optins is destroyed.
 char * loadOptions(char * buffer, std::list<Option> * options)
 {
+  FileLevel up;
+  logReplay("Options", 0);
   options->clear();
   char * pos = buffer;
 
@@ -303,12 +406,15 @@ char * loadOptions(char * buffer, std::list<Option> * options)
   pos = loadInt(pos, &limit);
   for (i = 0; i < limit; ++i)
   {
+    FileLevel up;
+    logReplay("Option", 0);
     pos = loadChar(pos, & current.type);
     pos = loadChar(pos, & current.length);
     if (current.length > 0)
     {
       current.buffer = reinterpret_cast<unsigned char *>(pos);
       pos += current.length;
+      count += current.length;
     }
     else
     {
@@ -320,9 +426,10 @@ char * loadOptions(char * buffer, std::list<Option> * options)
   return pos;
 }
 
-auto_ptr<Command> loadCommand(Header * head, char * body)
+std::auto_ptr<Command> loadCommand(Header * head, char * body)
 {
-  auto_ptr<Command> result;
+  FileLevel up;
+  std::auto_ptr<Command> result;
   switch (head->type)
   {
   case NEW_CONNECTION_COMMAND:
@@ -381,8 +488,16 @@ auto_ptr<Command> loadCommand(Header * head, char * body)
 
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
                   struct ip & ip, struct tcphdr & tcp,
-                  list<Option> & ipOptions, list<Option> & tcpOptions)
+                  std::list<Option> & ipOptions,
+                  std::list<Option> & tcpOptions)
 {
+  count = 0;
+  FileLevel up;
+  if (buffer != NULL)
+  {
+    logFlag = REPLAY;
+  }
+  logReplay("loadPacket", 0);
   char * pos = buffer;
   value->kernel = &kernel;
   value->ip = &ip;
@@ -391,8 +506,7 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   value->tcpOptions = &tcpOptions;
 
   // Load packet time
-  //logWrite(REPLAY, "Loading timestamps at byte %i",
-  //        pos - buffer);
+  logReplay("packetTime", 0);
   unsigned int timeSeconds = 0;
   pos = loadInt(pos, & timeSeconds);
   value->packetTime.getTimeval()->tv_sec = timeSeconds;
@@ -401,8 +515,7 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   value->packetTime.getTimeval()->tv_usec = timeMicroseconds;
 
   // Load packet length
-  //logWrite(REPLAY, "Loading length at byte %i",
-  //        pos - buffer);
+  logReplay("packetLength", 0);
   unsigned int packetLength = 0;
   pos = loadInt(pos, & packetLength);
   value->packetLength = static_cast<int>(packetLength);
@@ -446,51 +559,42 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadInt(pos, & kernel.tcpi_reordering);
 */
 
-  //logWrite(REPLAY, "Loading tcp_info at byte %i",
-  //        pos - buffer);
-  memcpy(&kernel, pos, sizeof(struct tcp_info));
-  pos += sizeof(struct tcp_info);
+  logReplay("tcp_info", 0);
+  pos = loadBuffer(pos, &kernel, sizeof(struct tcp_info));
+//  memcpy(&kernel, pos, sizeof(struct tcp_info));
+//  pos += sizeof(struct tcp_info);
 
   // Load IP header
-  //logWrite(REPLAY, "Loading IP header at byte %i",
-  //        pos - buffer);
-  memcpy(&ip, pos, sizeof(struct ip));
-  pos += sizeof(struct ip);
+  logReplay("IP header", 0);
+  pos = loadBuffer(pos, &ip, sizeof(struct ip));
+//  memcpy(&ip, pos, sizeof(struct ip));
+//  pos += sizeof(struct ip);
 
   //logWrite(REPLAY,"IP v=%i l=%i src=%s", ip.ip_v, ip.ip_hl,
   //        inet_ntoa(ip.ip_src));
 
   // Load IP options
-  //logWrite(REPLAY, "Loading IP options at byte %i",
-  //        pos - buffer);
+  logReplay("IP options", 0);
   pos = loadOptions(pos, &ipOptions);
 
   // Load TCP header
-  //logWrite(REPLAY, "Loading TCP header at byte %i",
-  //        pos - buffer);
-  memcpy(&tcp, pos, sizeof(struct tcphdr));
-  pos += sizeof(struct tcphdr);
+  logReplay("TCP header", 0);
+  pos = loadBuffer(pos, &tcp, sizeof(struct tcphdr));
+//  memcpy(&tcp, pos, sizeof(struct tcphdr));
+//  pos += sizeof(struct tcphdr);
 
   //logWrite(REPLAY,"TCP sport=%i dport=%i",htons(tcp.source),
   //        htons(tcp.dest));
 
   // Load TCP options
-  //logWrite(REPLAY, "Loading TCP options at byte %i",
-  //        pos - buffer);
+  logReplay("TCP options", 0);
   pos = loadOptions(pos, &tcpOptions);
 
   // Load elab
-  //logWrite(REPLAY, "Loading elab.transport at byte %i",
-  //        pos - buffer);
+  logReplay("elab key", 0);
   pos = loadChar(pos, & value->elab.transport);
-  //logWrite(REPLAY, "Loading elab.ip at byte %i",
-  //        pos - buffer);
   pos = loadInt(pos, & value->elab.ip);
-  //logWrite(REPLAY, "Loading elab.localport at byte %i",
-  //        pos - buffer);
   pos = loadShort(pos, & value->elab.localPort);
-  //logWrite(REPLAY, "Loading elab.remoteport at byte %i",
-  //        pos - buffer);
   pos = loadShort(pos, & value->elab.remotePort);
   //logWrite(REPLAY,"ELAB trans=%i IP=%i.%i.%i.%.i lp=%i rp=%i",
   //        value->elab.transport,
@@ -502,19 +606,18 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   //        (value->elab.remotePort));
 
   // Load bufferFull
+  logReplay("bufferFull", 0);
   unsigned char bufferFull = 0;
-  //logWrite(REPLAY, "Loading bufferfull at byte %i",
-  //        pos - buffer);
   pos = loadChar(pos, &bufferFull);
   //logWrite(REPLAY,"BFULL=%i",bufferFull);
   value->bufferFull = (bufferFull == 1);
 
   // Load packet type
-  //logWrite(REPLAY, "Loading type at byte %i",
-  //        pos - buffer);
+  logReplay("packetType", 0);
   pos = loadChar(pos, & value->packetType);
   //logWrite(REPLAY,"TYPE=%d",value->packetType);
 
+  logFlag = LOG_NOTHING;
   return pos;
 }
 

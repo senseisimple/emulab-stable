@@ -105,7 +105,8 @@ enum SensorType
   MIN_DELAY_SENSOR = 4,
   MAX_DELAY_SENSOR = 5,
   THROUGHPUT_SENSOR = 6,
-  EWMA_THROUGHPUT_SENSOR = 7
+  EWMA_THROUGHPUT_SENSOR = 7,
+  LEAST_SQUARES_THROUGHPUT = 8
 };
 
 // This is used for the type field in the ConnectionModelCommand.
@@ -193,33 +194,7 @@ struct Option
 
 struct PacketInfo
 {
-  size_t census(void)
-  {
-    // packetTime + packetLength
-    size_t result = sizeof(int)*(2+1) +
-      sizeof(struct tcp_info) +
-      sizeof(struct ip) + sizeof(struct tcphdr)
-      + sizeof(unsigned char) /* bufferFull */
-      + sizeof(unsigned char) /* packetType */
-      + sizeof(unsigned char) + sizeof(int) + 2*sizeof(short); /* elab */
-    // Size for ipOptions and tcpOptions.
-    result += sizeof(unsigned int)*2;
-
-    std::list<Option>::iterator pos = ipOptions->begin();
-    std::list<Option>::iterator limit = ipOptions->end();
-    for (; pos != limit; ++pos)
-    {
-      result += 2 + pos->length;
-    }
-
-    pos = tcpOptions->begin();
-    limit = tcpOptions->end();
-    for (; pos != limit; ++pos)
-    {
-      result += 2 + pos->length;
-    }
-    return result;
-  }
+  size_t census(void) const;
 
   Time packetTime;
   int packetLength;

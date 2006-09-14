@@ -813,3 +813,37 @@ void exitHandler(int signal) {
     logWrite(EXCEPTION,"Killed with signal %i, cleaning up",signal);
     exit(0);
 }
+
+size_t PacketInfo::census(void) const
+{
+  /* TODO: Remove this old code. It is too easy to get wrong.
+  // packetTime + packetLength
+  size_t result = sizeof(int)*(2+1) +
+    sizeof(struct tcp_info) +
+    sizeof(struct ip) + sizeof(struct tcphdr)
+    + sizeof(unsigned char) // bufferFull
+    + sizeof(unsigned char) // packetType
+    + sizeof(unsigned char) + sizeof(int) + 2*sizeof(short); // elab
+  // Size for ipOptions and tcpOptions.
+  result += sizeof(unsigned int)*2;
+
+  std::list<Option>::iterator pos = ipOptions->begin();
+  std::list<Option>::iterator limit = ipOptions->end();
+  for (; pos != limit; ++pos)
+  {
+    result += 2 + pos->length;
+  }
+
+  pos = tcpOptions->begin();
+  limit = tcpOptions->end();
+  for (; pos != limit; ++pos)
+  {
+    result += 2 + pos->length;
+  }
+  return result;
+  */
+
+  savePacket(NULL, *this);
+  return static_cast<size_t>(getLastSaveloadSize());
+}
+

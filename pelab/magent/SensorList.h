@@ -29,6 +29,7 @@ class MinDelaySensor;
 class MaxDelaySensor;
 class ThroughputSensor;
 class EwmaThroughputSensor;
+class LeastSquaresThroughput;
 
 class SensorList
 {
@@ -54,6 +55,7 @@ private:
   void pushMaxDelaySensor(void);
   void pushThroughputSensor(void);
   void pushEwmaThroughputSensor(void);
+  void pushLeastSquaresThroughput(void);
 private:
   // Example dependency
   NullSensor const * depNullSensor;
