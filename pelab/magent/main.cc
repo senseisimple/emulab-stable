@@ -91,7 +91,7 @@ void usageMessage(char *progname)
   cerr << "  --daemonize " << endl;
   cerr << "  --replay-save=<filename> " << endl;
   cerr << "  --replay-load=<filename> " << endl;
-  cerr << "  --replay-sensor=<null|state|packet|delay|min-delay|max-delay|throughput|ewma-throughput>" << endl;
+  cerr << "  --replay-sensor=<null|state|packet|delay|min-delay|max-delay|throughput|ewma-throughput|leastsquares-throughput>" << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
@@ -268,6 +268,10 @@ void processArgs(int argc, char * argv[])
       else if (optArg == "ewma-throughput")
       {
         global::replaySensors.push_back(EWMA_THROUGHPUT_SENSOR);
+      }
+      else if (optArg == "leastsquares-throughput")
+      {
+        global::replaySensors.push_back(LEAST_SQUARES_THROUGHPUT);
       }
       else
       {
