@@ -573,6 +573,11 @@ int sends_complete(struct agent *agent, const char *evtype)
 		NULL
 	};
 
+	static char *link_completes[] = {
+		TBDB_EVENTTYPE_RESET,
+		NULL
+	};
+
 	static char *node_completes[] = {
 		TBDB_EVENTTYPE_REBOOT,
 		TBDB_EVENTTYPE_RELOAD,
@@ -589,7 +594,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		char *objtype;
 		char **evtypes;
 	} objtype2complete[] = {
-		{ TBDB_OBJECTTYPE_LINK, NULL },
+		{ TBDB_OBJECTTYPE_LINK, link_completes },
 		{ TBDB_OBJECTTYPE_TRAFGEN, NULL },
 		{ TBDB_OBJECTTYPE_TIME, NULL },
 		{ TBDB_OBJECTTYPE_PROGRAM, run_completes },

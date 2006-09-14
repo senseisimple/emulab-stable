@@ -428,8 +428,11 @@ void
 reset_callback(event_handle_t handle,
 		event_notification_t notification, void *data)
 {
-	char	buf[BUFSIZ];
-	char    *prog = "delaysetup";
+	char		buf[BUFSIZ];
+	char		objname[TBDB_FLEN_EVOBJNAME];
+	char		*prog = "delaysetup";
+	unsigned long	token = ~0;
+	int		errcode = 0;
 
 	info("Got a RESET event!\n");
 
@@ -437,5 +440,20 @@ reset_callback(event_handle_t handle,
 		sprintf(buf, "%s -r -j %s", prog, myvnode);
 	else
 		sprintf(buf, "%s -r", prog);
-	system(buf);
+	errcode = system(buf);
+
+	event_notification_get_int32(handle, notification,
+				     "TOKEN", (int32_t *)&token);
+	event_notification_get_objname(handle, notification,
+				       objname, sizeof(objname));
+
+	/* ... notify the scheduler of the completion. */
+	event_do(handle,
+		 EA_Experiment, myexp,
+		 EA_Type, TBDB_OBJECTTYPE_LINK,
+		 EA_Name, objname,
+		 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+		 EA_ArgInteger, "ERROR", errcode,
+		 EA_ArgInteger, "CTOKEN", token,
+		 EA_TAG_DONE);
 }
