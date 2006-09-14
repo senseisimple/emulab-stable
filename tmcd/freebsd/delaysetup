@@ -16,12 +16,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: delaysetup [-i | -u] [-j <vnodeid>]\n";
+    print "Usage: delaysetup [-i | -u | -r] [-j <vnodeid>]\n";
     exit(1);
 }
-my $optlist	= "iuj:";
+my $optlist	= "iurj:";
 my $install	= 0;
 my $uninstall	= 0;
+my $reinstall   = 0;
 my $vnodeid;
 
 # Drag in path stuff so we can find emulab stuff.
@@ -61,6 +62,9 @@ if (defined($options{"i"})) {
 if (defined($options{"u"})) {
     $uninstall = 1;
 }
+if (defined($options{"r"})) {
+    $reinstall = 1;
+}
 if (defined($options{"j"})) {
     $vnodeid = $options{"j"};
     libsetup_setvnodeid($vnodeid);
@@ -84,13 +88,30 @@ else {
 
 #
 # Delay node configuration goop.
+# First figure out our kernels.
 #
-my $KERNEL100	= "/kernel.100HZ";
-my $KERNEL1000  = "/kernel.1000HZ";
-my $KERNEL10000 = "/kernel.10000HZ";
-my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
-my $KERNELJAIL  = "/kernel.jail";	# Specific to jails (with linkdelays).
-my $KERNELLDELAY= "/kernel.linkdelay";	# Link delay kernel.
+my $KERNELDELAY;	# for delay nodes
+my $KERNELJAIL;		# for linkdelays + jails
+my $KERNELLDELAY;	# for linkdelays
+
+if ($FBSD_VERSION <= 4) {
+    if (-e "/kernel") {
+	# newer 4.x setup
+	$KERNELDELAY = "/kernel.delay";
+	$KERNELJAIL  = "/kernel.jail";
+	$KERNELLDELAY= "/kernel.linkdelay";
+    } else {
+	# old 4.x setup
+	$KERNELDELAY = "/kernel.10000HZ";
+	$KERNELJAIL  = "/kernel.1000HZ";
+	$KERNELLDELAY= "/kernel.1000HZ";
+    }
+} else {
+    # 5.x and beyond
+    $KERNELDELAY = "/boot/kernel.delay/kernel";
+    $KERNELJAIL  = "/boot/kernel.linkdelay/kernel";
+    $KERNELLDELAY= "/boot/kernel.linkdelay/kernel";
+}
 
 # This should never happen!
 if (REMOTE() || MFS()) {
@@ -101,13 +122,14 @@ if (REMOTE() || MFS()) {
 print "Checking Testbed delay configuration ... \n";
 
 # Uninstall just looks for the files, runs them, and exits.
-if ($uninstall) {
+if ($reinstall || $uninstall) {
     system(TMDELAY . " disable")
 	if (-e TMDELAY);
 
     system(TMLINKDELAY . " disable")
 	if (-e TMLINKDELAY);
-    exit(0);
+    exit(0)
+	if ($uninstall);
 }
 
 #
@@ -192,12 +214,11 @@ sub DelaySetup
 	print DEL "ipfw -f flush\n";
 
  	#
- 	# If we are in a new-style image that uses a polling-based kernel
- 	# turn on polling.
+	# Turn on polling if possible
  	#
- 	if (-e $KERNELDELAY) {
- 	    print DEL "sysctl -w kern.polling.enable=1\n";
- 	}
+	print DEL "if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	print DEL "    sysctl -w kern.polling.enable=1\n";
+	print DEL "fi\n";
 
 	foreach $delay (@delays) {
 	    my $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
@@ -351,8 +372,20 @@ sub DelaySetup
 		$redparams2 .= "$weight2/$minthresh2/$maxthresh2/$max_p";
 	    }
 
-	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
-	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
+	    #
+	    # To allow addition of more specific, per-interface rules
+	    # (e.g., for pelab) we put the general rules toward the
+	    # end of the table.  We don't know what the max general rule
+	    # fed to us out of the DB will be, but lets assume that starting
+	    # at 60000 provides us with enough room for those.
+	    #
+	    $p1 += 60000
+		if ($p1 + 60000 < 65535);
+	    $p2 += 60000
+		if ($p2 + 60000 < 65535);
+
+	    print DEL "ipfw add $p1 pipe $p1 ip from any to any in recv $iface1\n";
+	    print DEL "ipfw add $p2 pipe $p2 ip from any to any in recv $iface2\n";
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
 	    print DEL "bw ${bandw1}Kbit/s plr $plr1 $queue1 $redparams1\n";
 	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
@@ -391,7 +424,7 @@ sub DelaySetup
  	if (-e $KERNELDELAY) {
  	    $kernel = $KERNELDELAY;
  	} else {
- 	    $kernel = $KERNEL1000;
+ 	    $kernel = $KERNELLDELAY;
  	}
 	$checkreplace = 1;
     }
@@ -638,6 +671,22 @@ sub checkkernel($)
     print STDOUT "Making sure node is running $kernel ... \n";
 
     if (-e $kernel) {
+	#
+	# In FreeBSD 5 and above, the command line is used to ensure we
+	# boot the correct kernel.  So just complain if it is not right.
+	# constituent modules.  We need to figure our what the correct thing
+	# to do is.
+	#
+	if ($FBSD_VERSION >= 5) {
+	    my $curkernel = `sysctl -n kern.bootfile`;
+	    chomp($curkernel);
+	    if ($curkernel ne $kernel) {
+		print "FreeBSD 5 running wrong kernel '$curkernel', ".
+		      "should be '$kernel'\n";
+	    }
+	    return;
+	}
+
 	if (system("cmp -s /kernel $kernel") != 0) {
 	    if (system("cp -f /kernel /kernel.save")) {
 		print "Could not backup /kernel! Aborting kernel change\n";
