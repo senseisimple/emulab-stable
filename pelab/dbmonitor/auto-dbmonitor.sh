@@ -29,7 +29,8 @@ echo $SH ${DBMONITOR_DIR}/run-dbmonitor.sh $ARGS
 $SH ${DBMONITOR_DIR}/run-dbmonitor.sh $ARGS &
 DBMONPID=$!
 # Kill the monitor if we get killed - TODO: harsher kill?
-trap "$AS_ROOT kill $DBMONPID" TERM
+# Note that we assume that a kill of us is "normal" and just exit 0.
+trap "$AS_ROOT kill $DBMONPID; exit 0" TERM
 
 #
 # Give it time to come up
@@ -51,4 +52,4 @@ echo "Running!";
 # Wait for our monitor to finish
 #
 wait $DBMONPID
-exit 0
+exit $?

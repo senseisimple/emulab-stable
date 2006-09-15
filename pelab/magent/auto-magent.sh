@@ -18,7 +18,8 @@ $SH ${MAGENT_DIR}/run-magent.sh & #$ARGS
 # Kill the agent if we get killed - TODO: harsher kill?
 # Because the magent backgrounds itself, it's harder to figure out
 # what its pid is, just just do a killall
-trap "$AS_ROOT killall $MAGENT" EXIT
+# Note that we assume that a kill of us is "normal" and just exit 0.
+trap "$AS_ROOT killall $MAGENT; exit 0" EXIT
 
 #
 # Give it time to come up
@@ -49,3 +50,4 @@ echo "Running!";
 # Wait for our agent to finish
 #
 wait
+exit $?

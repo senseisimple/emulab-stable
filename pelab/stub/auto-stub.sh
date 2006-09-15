@@ -11,7 +11,8 @@ echo $SH ${STUB_DIR}/run-stub.sh $ARGS
 $SH ${STUB_DIR}/run-stub.sh $ARGS &
 STUBPID=$!
 # Kill the stub if we get killed - TODO: harsher kill?
-trap "$AS_ROOT kill $STUBPID; $AS_ROOT killall stubd" EXIT
+# Note that we assume that a kill of us is "normal" and just exit 0.
+trap "$AS_ROOT kill $STUBPID; $AS_ROOT killall stubd; exit 0" EXIT
 
 #
 # Give it time to come up
@@ -42,3 +43,4 @@ echo "Running!";
 # Wait for our stub to finish
 #
 wait
+exit $?

@@ -99,12 +99,14 @@ export TMPDIR="/var/tmp/";
 export LOGDIR="/local/logs/"
 
 #
-# Temproary files we use
+# Temproary files we use.
+# We put them in /local/logs so they become part of the fossil record.
 #
-export IPMAP="/var/tmp/ip-mapping.txt"
+export IPMAP="/local/logs/ip-mapping.txt"
+export INITCOND="/local/logs/initial-conditions.txt"
 
 #
-# Important scrips/libraries
+# Important scripts/libraries
 #
 export NETMOND="netmond"
 export STUBD="stubd"
@@ -112,6 +114,7 @@ export MAGENT="magent"
 export MONITOR="monitor.py"
 export DBMONITOR="dbmonitor.pl"
 export GENIPMAP="gen-ip-mapping.pl"
+export GENINITCOND="init-elabnodes.pl"
 export NETMON_LIB="libnetmon.so"
 
 #
@@ -125,6 +128,16 @@ else
     export RUNNING_ON="elab"
     export ON_PLAB=""
     export ON_ELAB="yes"
+fi
+
+#
+# Are we the "master" (sync server) node?
+#
+
+if `$SYNC -m`; then
+    export ON_MASTER="yes"
+else
+    export ON_MASTER=""
 fi
 
 #
@@ -199,19 +212,14 @@ fi
 barrier_wait()
 {
     BARRIER=$1
-    #
-    # Are we the master?
-    #
-    $SYNC -m
-    MASTER=$?
-    if [ "$MASTER" = "1" ]; then
-        # I know, this looks backwards. But it's right
-        $SYNC -n $BARRIER 
-	_rval=$?
-    else
+
+    if [ $ON_MASTER ]; then
         WAITERS=`expr $PEERS - 1`
         echo "Waiting up to $SYNCTIMO seconds for $WAITERS clients"
         sync_timeout $SYNCTIMO $SYNC -n $BARRIER -i $WAITERS
+	_rval=$?
+    else
+        $SYNC -n $BARRIER 
 	_rval=$?
     fi
 

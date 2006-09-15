@@ -10,6 +10,7 @@ my $PERL = "/usr/bin/perl";
 my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
 my $NODELIST = "/usr/testbed/bin/node_list";
 my $EXPINFO = "/usr/testbed/bin/expinfo";
+my $INITCOND = "init-elabnodes.pl";
 
 my $realplab = 0;
 my $initelab = 0;
@@ -37,6 +38,13 @@ sub usage()
     exit(1);
 }
 my $optlist = "CS:s:M:m:piN:O:";
+
+my $pelabdir;
+if ($0 =~ /(.*)\/[^\/]+$/) {
+    $pelabdir = $1;
+} else {
+    $pelabdir = ".";
+}
 
 #
 # Parse command arguments.
@@ -139,6 +147,9 @@ if (defined($options{"O"})) {
     }
 }
 
+my $use_magent = ($stub_cmd =~ /magent/) ? 1 : 0;
+my $use_simplemodel = ($mon_cmd =~ /dbmonitor/) ? 1 : 0;
+
 #
 # Let's help some boor bozos (Rob) get the right command line args
 #
@@ -230,10 +241,21 @@ if (system "$EVENTSYS -e $pid,$eid replay") {
 print "##### Waiting for event system to start\n";
 sleep(10);
 
-if ($initelab) {
+#
+# Fetch and store the initial conditions for plab nodes if desired.
+# We both stash them in a file and set them directly.  The former is
+# read by the monitor at start up to inform the stubs.  The latter is
+# for backward compat with the old monitor/stubs that did not do it for
+# themselves.
+#
+if ($realplab && $initelab && !$use_simplemodel) {
+    print "##### Stashing initial path conditions for plab nodes\n";
+    if (system "$pelabdir/$INITCOND -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid") {
+	warn "Could not acquire initial path conditions\n";
+    }
     print "##### Initializing Emulab link characteristics\n";
-    if (system "$PERL init-elabnodes.pl $pid $eid") {
-	die "Error initializing Emulab links\n";
+    if (system "$pelabdir/$INITCOND $pid $eid") {
+	warn "Error initializing Emulab links with initial path conditions\n";
     }
 }
 
@@ -266,10 +288,10 @@ if (system "$TEVC -e $pid/$eid now tdhosts start") {
 #
 my $startarg = "";
 print "##### Starting stubs";
-#if ($stub_cmdargs ne $UNKNOWN) {
-#    print " with: '$stub_cmd $stub_cmdargs'";
-#    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
-#}
+if ($stub_cmdargs ne $UNKNOWN) {
+    print " with: '$stub_cmd $stub_cmdargs'";
+    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
+}
 print "\n";
 if ($realplab) {
     if (system "$TEVC -e $pid/$eid now planetstubs start $startarg") {
