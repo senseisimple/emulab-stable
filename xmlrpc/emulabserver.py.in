@@ -3298,17 +3298,20 @@ class node:
             "  (b.pid=%s and b.eid=%s), "
             "  (a.eventstate='ISUP' or "
             "   a.eventstate='PXEWAIT' or "
-            "   a.eventstate='POWEROFF'),wn.site,nfcpu.weight "
+            "   a.eventstate='POWEROFF'),wn.site,nfcpu.weight, "
+            "   GROUP_CONCAT(DISTINCT aux.type),wn.hostname "
             "FROM nodes AS a "
             "left join reserved as b on a.node_id=b.node_id "
             "left join node_types as nt on a.type=nt.type "
+            "left join node_auxtypes as aux on aux.node_id=a.node_id "
             "left join nodetypeXpid_permissions as p on a.type=p.type "
             "left join widearea_nodeinfo as wn on wn.node_id=a.phys_nodeid "
             "left join node_features as nfcpu on (nfcpu.node_id=a.phys_nodeid "
             "  and nfcpu.feature='+load') "
             "WHERE a.role='testnode' "
             "  "+ class_test +" and "
-            "      (p.pid is null" + pid_clause + ") " + type_test,
+            "      (p.pid is null" + pid_clause + ") " + type_test +
+            "group by a.node_id",
             (TBOPSPID, 'plabnodes'))
         
         if len(res) == 0:
@@ -3326,6 +3329,12 @@ class node:
                 if row[4]:
                     result[row[0]]["site"] = row[4]
                     result[row[0]]["cpu"] = row[5]
+                    pass
+                if row[6] and row[6] != "":
+                    result[row[0]]["auxtypes"] = row[6]
+                    pass
+                if row[7] and row[7] != "":
+                    result[row[0]]["hostname"] = row[7]
                     pass
                 pass
             pass
