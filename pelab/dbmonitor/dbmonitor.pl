@@ -409,12 +409,34 @@ sub get_plabinfo($@)
 	#
 	if ($del < 0 || $bw < 0) {
 	    if (($del < 0 && $bw < 0) ||
-		($del < 0 && $del_stamp >= $bw_stamp) ||
 		($bw < 0 && $bw_stamp >= $del_stamp)) {
 		print STDERR "marking as down: bw=$bw($bw_stamp), del=$del($del_stamp)\n"
 		    if ($debug);
 		$plr = 1;
 	    }
+
+	    #
+	    # XXX some nodes don't allow pings, but are actually up.
+	    # So if we get a delay value of -1 but a legitimate BW value,
+	    # we make a more detailed query to determine if the node has
+	    # "always" (in the last N hours of data in the DB) returned -1.
+	    #
+	    elsif ($del < 0 && $del_stamp >= $bw_stamp) {
+		my $query_result =
+		    DBQueryFatal("select count(*) from pair_data ".
+				 " where ".
+				 $siteclause .
+				 " and latency is not null and latency >= 0 ".
+				 $dateclause);
+		my ($count) = $query_result->fetchrow_array();
+		if ($count > 0) {
+		    print STDERR "marking as down: ".
+			"bw=$bw($bw_stamp), del=$del($del_stamp)\n"
+			if ($debug);
+		    $plr = 1;
+		}
+	    }
+
 	    $del = $DEF_DEL
 		if ($del < 0);
 	    $bw = $DEF_BW
