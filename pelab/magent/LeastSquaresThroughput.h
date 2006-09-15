@@ -33,6 +33,11 @@ private:
   int oldest;
   // The total number of samples ever encountered.
   int totalSamples;
+
+  // The last number reported to the monitor in kbps.
+  // Only send bandwidth if it is different than this number.
+  // Only send throughput if it is > this number.
+  int lastReport;
 };
 
 #endif

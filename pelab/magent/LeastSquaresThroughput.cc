@@ -16,6 +16,7 @@ LeastSquaresThroughput::LeastSquaresThroughput(
   , delay(newDelay)
   , oldest(0)
   , totalSamples(0)
+  , lastReport(0)
 {
 }
 
@@ -81,17 +82,29 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
         // being filled up, which means that the link was saturated
         // over the last SAMPLE_COUNT samples. So use the average to
         // yield a result.
-        ostringstream buffer;
-        buffer << static_cast<int>(throughputAverage);
-        global::output->genericMessage(AUTHORITATIVE_BANDWIDTH, buffer.str(),
-                                       packet->elab);
-
-        ackValid = true;
+        if (static_cast<int>(throughputAverage) != lastReport)
+        {
+          lastReport = static_cast<int>(throughputAverage);
+          ostringstream buffer;
+          buffer << static_cast<int>(throughputAverage);
+          global::output->genericMessage(AUTHORITATIVE_BANDWIDTH, buffer.str(),
+                                         packet->elab);
+        }
       }
       else
       {
-        ackValid = false;
+        // The buffers are not being filled up. So we just have a
+        // tentative throughput measurement.
+        if (static_cast<int>(throughputAverage) > lastReport)
+        {
+          lastReport = static_cast<int>(throughputAverage);
+          ostringstream buffer;
+          buffer << static_cast<int>(throughputAverage);
+          global::output->genericMessage(TENTATIVE_THROUGHPUT, buffer.str(),
+                                         packet->elab);
+        }
       }
+      ackValid = true;
     }
     else
     {
