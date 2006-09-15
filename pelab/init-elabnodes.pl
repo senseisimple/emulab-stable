@@ -23,10 +23,10 @@ my $eprefix = "elab-";
 # XXX Need to configure this stuff!
 use lib '/usr/testbed/lib';
 use libtbdb;
+#use libxmlrpc;
 use Socket;
 use Getopt::Std;
 use Class::Struct;
-use libxmlrpc;
 use strict;
 
 my ($initvalLat, $initvalBw);
@@ -52,6 +52,7 @@ my $showonly = 0;
 my $starttime = 0;
 my $outfile;
 my $doelabaddrs = 1;
+my $remote = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10000;	# Kbits/sec
@@ -59,6 +60,7 @@ my $DEF_DEL = 0;	# ms
 my $DEF_PLR = 0.0;	# prob.
 
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
+my $DBHOST  = "localhost";
 my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
 
@@ -69,7 +71,7 @@ my $now     = time();
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("S:no:", \%options)) {
+if (! getopts("S:no:r", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
@@ -77,6 +79,11 @@ if (defined($options{"n"})) {
 }
 if (defined($options{"o"})) {
     $outfile = $options{"o"};
+}
+if (defined($options{"r"})) {
+    $remote = $options{"r"};
+    $PWDFILE = "/local/pelab/pelabdb.pwd";
+    $DBHOST = "users.emulab.net";
 }
 if (defined($options{"S"})) {
     my $high = time();
@@ -101,32 +108,37 @@ if ($DBPWD =~ /^([\w]*)\s([\w]*)$/) {
 else{
     fatal("Bad chars in password!");
 }
-TBDBConnect($DBNAME, $DBUSER, $DBPWD) == 0
+TBDBConnect($DBNAME, $DBUSER, $DBPWD, $DBHOST) == 0
     or die("Could not connect to pelab database!\n");
 
-# RPC STUFF ##############################################
-my $TB         = "/usr/testbed";
-my $ELABINELAB = 0;
-my $RPCSERVER  = "boss.emulab.net";  #?
-my $RPCPORT    = "3069";
-#my $RPCCERT    = "/etc/outer_emulab.pem"; #?
-my $RPCCERT = "~/.ssl/emulab.pem";
-my $MODULE = "node";
-my $METHOD = "getlist";
-
-libxmlrpc::Config({"server"  => $RPCSERVER,
-		    "verbose" => 0,
-		    "portnum" => $RPCPORT});
-# END RPC STUFF ##########################################
-
-
+#if (!$remote) {
+#    # RPC STUFF ##############################################
+#    my $TB         = "/usr/testbed";
+#    my $ELABINELAB = 0;
+#    my $RPCSERVER  = "boss.emulab.net";  #?
+#    my $RPCPORT    = "3069";
+#    #my $RPCCERT    = "/etc/outer_emulab.pem"; #?
+#    my $RPCCERT = "~/.ssl/emulab.pem";
+#    my $MODULE = "node";
+#    my $METHOD = "getlist";
+#
+#    libxmlrpc::Config({"server"  => $RPCSERVER,
+#		       "verbose" => 0,
+#		       "portnum" => $RPCPORT});
+#    # END RPC STUFF ##########################################
+#}
 
 #
 # XXX figure out how many pairs there are, and for each, who the
 # corresponding planetlab node is.  Can probably get all this easier
 # via XMLRPC...
 #
-my @nodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
+my @nodelist;
+if ($remote) {
+    @nodelist = split('\s+', `cat /proj/$pid/exp/$eid/tmp/node_list`);
+} else {
+    @nodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
+}
 chomp(@nodelist);
 print "NODELIST:\n@nodelist\n"
     if (!$outfile);
