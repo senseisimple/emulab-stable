@@ -14,6 +14,8 @@ import socket
 import select
 import re
 from optparse import OptionParser
+sys.path.append("/usr/testbed/lib")
+from tbevent import EventClient, address_tuple, ADDRESSTUPLE_ALL
 
 EVENT_FORWARD_PATH = 0
 EVENT_BACKWARD_PATH = 1
@@ -46,6 +48,13 @@ CONNECTION_USE_NAGLES = 3
 TCP_CONNECTION = 0
 UDP_CONNECTION = 1
 
+# Client connection to event server.  Make this global since we don't
+# want to be continually connecting and disconnecting (and creating/destroying
+# the eventsys object).  The object is actually instantiated at the top of
+# the main_loop function.
+TBEVENT_SERVER = "event-server.emulab.net"
+evclient = None
+
 emulated_to_real = {}
 real_to_emulated = {}
 emulated_to_interface = {}
@@ -66,7 +75,7 @@ last_total = -1
 prev_time = 0.0
 
 def main_loop():
-  global total_size, last_total
+  global total_size, last_total, evclient
   # Initialize
   read_args()
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -77,6 +86,10 @@ def main_loop():
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
   poll.register(conn, select.POLLIN)
+  # XXX: The name of the event server is hardwired here, and due to the
+  #      lack of autoconf, isn't even an autoconf var.  Could add a command
+  #      line option to set it if needed.
+  evclient = EventClient(server=TBEVENT_SERVER)
   done = False
 
   while not done:
@@ -361,11 +374,30 @@ def set_max_delay(milliseconds, dest):
   return set_link(this_ip, dest, 'MAXINQ=' + str(milliseconds))
 
 def set_link(source, dest, ending):
-  command = ('/usr/testbed/bin/tevc -e ' + this_experiment + ' now '
-             + emulated_to_interface[source] + ' modify dest=' + dest + ' '
-             + ending)
-  sys.stdout.write('event: ' + command + '\n')
-  return os.system(command)
+  # Create event system address tuple to identify the notification.
+  # The event type is currently always "MODIFY", and the event is not
+  # sent through the scheduler; it is sent as an immediate notification.
+  global evclient
+  evtuple = address_tuple()
+  evtuple.host  = ADDRESSTUPLE_ALL
+  evtuple.site  = ADDRESSTUPLE_ALL
+  evtuple.group = ADDRESSTUPLE_ALL
+  evtuple.eventtype = 'MODIFY'
+  evtuple.expt = this_experiment
+  evtuple.objname   = emulated_to_interface[source]
+  evnotification = evclient.create_notification(evtuple)
+  evargs = ['DEST=' + dest, ]
+  # Uppercase all arguments.
+  for part in ending.split():
+    arg, val = part.split('=',1)
+    evargs.append(arg.upper() + '=' + val)
+    pass
+  evargstr = ' '.join(evargs)
+  evnotification.setArguments(evargstr)
+  sys.stdout.write('event: ' + evargstr + '\n')
+  # Must invert the return value of the notification send function as the
+  # original code here returned the exit code of tevc (hence 0 means success).
+  return not evclient.notify(evnotification)
 
 def send_command(conn, command_id, protocol, ipaddr, localport, remoteport,
                  command):
