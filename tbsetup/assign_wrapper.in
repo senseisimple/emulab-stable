@@ -2054,9 +2054,16 @@ foreach my $lan (keys(%virt_lans)) {
 		 "   idx from event_objecttypes where ".
 		 "   event_objecttypes.type='LINK'");
 
-    DBQueryFatal("insert into event_groups ".
-		 " (pid, eid, idx, group_name, agent_name) ".
-		 " values ('$pid', '$eid', NULL, '__all_lans', '$lan')");
+    #
+    # XXX there is no link (delay) agent running on plab nodes
+    # (i.e., protocol==ipv4) currently, so we cannot be sending them
+    # events that they will not acknowledge.
+    #
+    if (virtlanprotocol($lan) ne "ipv4") {
+	DBQueryFatal("insert into event_groups ".
+		     " (pid, eid, idx, group_name, agent_name) ".
+		     " values ('$pid', '$eid', NULL, '__all_lans', '$lan')");
+    }
 
     # An event group to hit all the links and lans in an experiment
 
