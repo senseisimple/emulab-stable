@@ -683,7 +683,7 @@ sub SignalProgAgents($)
     my ($action) = @_;
     my $agent;
 
-    if ($action eq "STOP") {
+    if ($action eq "HALT") {
 	$agent = "__all_programs";
     }
     else {
