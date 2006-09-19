@@ -1752,12 +1752,14 @@ callback(event_handle_t handle,
 				free(reload_tag);
 				reload_tag = NULL;
 			}
+#if 0 /* XXX nice idea, but there is too much .0 magic in loghole */
 			if (reload_tag == NULL) {
 				reload_tag = malloc(12);
 				if (reload_tag)
 					snprintf(reload_tag, 12,
 						 "%010lu", time(0));
 			}
+#endif
 			if (capture_mode) {
 				int rc;
 				
