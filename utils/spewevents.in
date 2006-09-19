@@ -133,7 +133,7 @@ while (1) {
 	if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE());
 
     # Quit if no events for a long time.
-    if (time() - $lastevent_time > 300) {
+    if (time() - $lastevent_time > 900) {
 	syswrite(STDOUT, "No events for a long time; stopping ...\n");
 	last;
     }
