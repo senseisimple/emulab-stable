@@ -234,14 +234,23 @@ sub doboot()
 	    $optargs .= " -P " . (4442 + $idx);
 	}
 
-	if (! JAILED() && ! PLAB() ) {
+	my @directions = ("recv", "xmit");
+
+	if ( PLAB() ) {
+	    #
+	    # No point running pcapper for both directions as we cannot
+	    # differentiate the direction anyway.
+	    #
+	    @directions = ("both");
+	}
+	elsif (! JAILED() ) {
 	    #
 	    # Need the ethernet address for the vnode so we can create an ether
 	    # rule for tcpdump. We want to make sure that we get the correct
 	    # packets. We want to capture just the packets from the source node
 	    # for the link, both before the pipe and after the pipe.  In this
 	    # way, we prevent too much duplication of packets, but we also get
-	    # to see how the dummynet pipes have affected te packets, since an
+	    # to see how the dummynet pipes have affected the packets, since a
 	    # packet will end up in the output twice; once before the pipe and
 	    # again after the pipe. At the same time, we can also support
 	    # asymmetric rules (remember, a duplex link has two queues).
@@ -277,7 +286,7 @@ sub doboot()
 	my @cmd  = split('\s+', "$PCAPPER -I $optargs $eventargs -t");
 	my @args = ();
 
-	foreach my $dir ("recv", "xmit") {
+	foreach my $dir (@directions) {
 	    my $file = "/local/logs/trace_${vnode}-${linkname}.${dir}";
 	    my $iface;
 	    my $mac;
