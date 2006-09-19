@@ -235,7 +235,7 @@ characteristics:
 <p>
 When you receive email containing the experiment setup information (as
 described in <a href="tutorial.php3#Beginning">Beginning an
-Experiment</a>), you will notice an additonal section that gives a
+Experiment</a>), you will notice an additional section that gives a
 summary of the events that will be delivered during your experiment:
 <code><pre>
 Event Summary:
@@ -285,7 +285,7 @@ of the nodes are actually rebooted and ready, time does not start
 ticking until all of the nodes have reported to the event system that
 they are ready. At present, events are restricted to system level
 agents (Emulab traffic generators and delay nodes), but in the future
-we expect to provide an API that will allow experimentors to write
+we expect to provide an API that will allow experimenters to write
 their own event agents.
 </p>
 
@@ -348,13 +348,13 @@ Some points worth mentioning:
      can result in unpredictable behavior if you are not careful.
 
 <li> Currently, the event list is replayed each time the experiment is
-     swapped in. This is almost certainly not the behaviour people
+     swapped in. This is almost certainly not the behavior people
      expect; we plan to change that very soon.
 
 <li> <tt>tevc</tt> does not provide any feedback; if you specify an
      object (say, cbr78 or link45) that is not a valid object in your
      experiment, the event is silently thrown away. Further, if you
-     specify an operation or parameter that is not approprate (say,
+     specify an operation or parameter that is not appropriate (say,
      "link0 start" instead of "link0 up"), the event is silently
      dropped. We expect to add error feedback in the future.
 </ul>
@@ -597,16 +597,16 @@ captured, you may supply any valid tcpdump (pcap) style expression:
 
 You may also set the <b>snaplen</b> for a link or lan, which sets the
 number of bytes that will be captured by each of the trace agents (as
-mentioned above, the default is 64 bytes, which is adquate for
-determing the type of most packets):
+mentioned above, the default is 64 bytes, which is adequate for
+determining the type of most packets):
 	<code><pre>
 	$link0 trace_snaplen 128</code></pre>
 <br>
 
 Tracing parameters may also be specified on a <b>per-node basis</b>,
 for each node in a link or lan. For example, consider the duplex link
-<tt>link0</tt> above bewteen <tt>nodeA</tt> and <tt>nodeB</tt>. If you
-want to set a different snaplen and trace expresssion for packets
+<tt>link0</tt> above between <tt>nodeA</tt> and <tt>nodeB</tt>. If you
+want to set a different snaplen and trace expression for packets
 <em>leaving</em> <tt>nodeA</tt>, then:
 	<code><pre>
 	[[$ns link $nodeA $nodeB] queue] set trace_type header
@@ -697,13 +697,15 @@ node and <em>received</em> by the delay node. The <tt>.xmit</tt> files
 hold those packets that were <em>transmitted</em> by the delay node
 and received by the other side of the link. So, for packets sent from
 <tt>nodeA</tt> to <tt>nodeB</tt>, the packet would arrive at the delay
-node and be stored in </tt>trace_nodeA-link0.recv</tt>. Once the packet
+node and be recorded in </tt>trace_nodeA-link0.recv</tt>. Once the packet
 traverses the delay node (subject to Dummynet traffic shaping) and it is
-about to be transmitted, it is stored in </tt>trace_nodeA-link0.recv</tt>. 
+about to be transmitted, it is recorded in </tt>trace_nodeA-link0.xmit</tt>. 
 By comparing these two files, you can see how the Dummynet traffic
 shaping has affected your packets, in each direction. Note that even
 if you have not specified traffic shaping, you still get the same set
-of files (easier that way!).
+of files.  In this case, the <tt>.recv</tt> and <tt>.xmit</tt> files
+will be nearly identical, reflecting only the negligible propagation delay
+through the software bridge.
 <br>
 
 When you issue a "snapshot" command, the above files are closed, and
@@ -738,11 +740,17 @@ end nodes of a link (or a lan) with the following NS command:
 	<code><pre>
 	$link0 trace_endnode 1</code></pre>
 
+(Note that if a delay node does exist, it will be used for traffic capture
+even if endnode tracing is specified.)
 When tracing/monitoring is done on an endnode, the output files are
 again stored in <tt>/local/logs</tt>, and are named by the link and
 node name. The difference is that there is just a <em>single</em>
 output file, for those packets <em>leaving</em> the node. Packets are
 captured after traffic shaping has been applied. 
+
+Endnode tracing can also be used on PlanetLab nodes setup through
+Emulab's Planetlab portal.  In this case, all packets sent or received
+are recorded in the <tt>.xmit</tt> file.
 
 <blockquote>
 <ul>
