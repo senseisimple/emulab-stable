@@ -34,9 +34,10 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwaie:b";
+my $optlist	 = "qwaie:bf";
 my %options      = ();
 my $quiet        = 0;
+my $force        = 0;
 my $waitmode     = 0;
 my $batchmode    = 0;	# Called from the batch daemon.
 my $eid;
@@ -258,7 +259,9 @@ if ($waitmode) {
 #
 # Stop the current run.
 #
-system("$endrun -a stop -f -e $eid $guid/$version") == 0
+my $opt = ($force ? "-i" : "");
+
+system("$endrun $opt -a stop -f -e $eid $guid/$version") == 0
     or fatal(-1, "Could not stop the current run!");
 
 # This sets the stop time.
@@ -339,6 +342,9 @@ sub ParseArgs()
     }
     if (defined($options{"b"})) {
 	$batchmode = 1;
+    }
+    if (defined($options{"f"})) {
+	$force = 1;
     }
 }
 

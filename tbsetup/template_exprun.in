@@ -43,12 +43,13 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwx:p:E:a:r:e:dscft:";
+my $optlist	 = "qwx:p:E:a:r:e:dscft:i";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
 my $debug        = 0;
 my $foreground   = 0;
+my $ignoreerrors = 0;
 my $clean        = 0;
 my $paramfile;
 my %parameters   = ();
@@ -362,10 +363,12 @@ if (defined($instance->runidx())) {
     # This runs loghole.
     print "Asking loghole to sync the logfiles ... this will take a minute.\n";
     $instance->LogHole() == 0
+	or $ignoreerrors
 	or fatal(-1, "Loghole failed");
 
     print "Dumping the instance database ... this will take a minute.\n";
     $instance->DumpDB() == 0
+	or $ignoreerrors
 	or fatal(-1, "Dump Database failed");
 
     #
@@ -576,6 +579,9 @@ sub ParseArgs()
     if (defined($options{"c"})) {
 	$clean = 1;
     }
+    if (defined($options{"i"})) {
+	$ignoreerrors = 1;
+    }
     if (defined($options{"t"})) {
 	$ctoken = $options{"t"};
 
@@ -691,6 +697,7 @@ sub SignalProgAgents($)
     }
 
     system("$tevc -w -t 60 -e $pid/$eid now $agent $action") == 0
+	or $ignoreerrors
 	or fatal(-1, "Could not send event notification!");
 }
 
