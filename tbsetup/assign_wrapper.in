@@ -2075,6 +2075,11 @@ foreach my $lan (keys(%virt_lans)) {
 		 "where pid='$pid' and eid='$eid' and ".
 		 "      group_name='${lan}-tracemon'");
 
+    # Must clean these cause of how this code used to work; temporary.
+    DBQueryFatal("delete from virt_agents ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 "      vname='${lan}-tracemon'");
+
     foreach my $member (virtlanmembers($lan)) {
 	my ($vnode) = split(":", $member);
 
