@@ -234,16 +234,7 @@ sub doboot()
 	    $optargs .= " -P " . (4442 + $idx);
 	}
 
-	my @directions = ("recv", "xmit");
-
-	if ( PLAB() ) {
-	    #
-	    # No point running pcapper for both directions as we cannot
-	    # differentiate the direction anyway.
-	    #
-	    @directions = ("both");
-	}
-	elsif (! JAILED() ) {
+	if (! JAILED() && ! PLAB() ) {
 	    #
 	    # Need the ethernet address for the vnode so we can create an ether
 	    # rule for tcpdump. We want to make sure that we get the correct
@@ -285,8 +276,9 @@ sub doboot()
 	# See perl manpage topic on exec ...
 	my @cmd  = split('\s+', "$PCAPPER -I $optargs $eventargs -t");
 	my @args = ();
+	my $norecv = 0;
 
-	foreach my $dir (@directions) {
+	foreach my $dir ("recv", "xmit") {
 	    my $file = "/local/logs/trace_${vnode}-${linkname}.${dir}";
 	    my $iface;
 	    my $mac;
@@ -309,10 +301,24 @@ sub doboot()
             # But, if it's a PlanetLab node, we assume it has only one
             # interface.
 	    #
-	    next
-		if ((!defined($mac) || $mac eq "") && ! PLAB());
+	    if ((!defined($mac) || $mac eq "") && ! PLAB()) {
+		if ($dir eq "recv") {
+		    $norecv = 1;
+		}
+		next;
+	    }
 
             if (PLAB()) {
+		#
+		# XXX We create only a .xmit file even though it contains
+		# both recv and xmit packets.  It would be nice to call it
+		# something more logical (.both), but those sufficies are
+		# part of loghole's genetic makeup and are not to be tampered
+		# with.
+		#
+		next
+		    if ($dir eq "recv");
+
                 # XXX - Hardcoding this works for now...
                 $iface = "eth0";
             } else {
@@ -328,7 +334,7 @@ sub doboot()
 	    push(@args, $iface);
 	    push(@args, "$expr");
 
-	    if ($dir eq "recv") {
+	    if ($dir eq "recv" || $norecv) {
 		print GK "mapif ${iface}=${vnode}-${linkname}\n";
 	    }
 	}
