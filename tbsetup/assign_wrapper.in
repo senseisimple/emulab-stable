@@ -2047,6 +2047,11 @@ PatchVirts();
 # (or lan node delay). The agents will subscribe to these additional
 # names when they start up.
 #
+# Must clean these to avoid duplicates.
+DBQueryFatal("delete from event_groups ".
+	     "where pid='$pid' and eid='$eid' and ".
+	     "      (group_name='__all_lans' or group_name='__all_tracemon')");
+
 foreach my $lan (keys(%virt_lans)) {
     DBQueryFatal("replace into virt_agents ".
 		 " (pid, eid, vname, vnode, objecttype) ".
@@ -2065,11 +2070,14 @@ foreach my $lan (keys(%virt_lans)) {
 		     " values ('$pid', '$eid', NULL, '__all_lans', '$lan')");
     }
 
-    # An event group to hit all the links and lans in an experiment
+    # Must clean these to avoid duplicates created by the loop below.
+    DBQueryFatal("delete from event_groups ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 "      group_name='${lan}-tracemon'");
 
     foreach my $member (virtlanmembers($lan)) {
 	my ($vnode) = split(":", $member);
-	
+
 	DBQueryFatal("replace into virt_agents ".
 		     " (pid, eid, vname, vnode, objecttype) ".
 		     " select '$pid', '$eid', '${lan}-${vnode}', '*', ".
