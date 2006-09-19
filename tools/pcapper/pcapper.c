@@ -520,7 +520,8 @@ int main (int argc, char **argv) {
 	/*
 	 * Find out which interface is the control net
 	 */
-	if ((control_interface = popen(CONTROL_IFACE,"r")) >= 0) {
+	if (access(CONTROL_IFACE, X_OK) == 0 &&
+	    (control_interface = popen(CONTROL_IFACE,"r")) >= 0) {
 		if (!fgets(control,1024,control_interface)) {
 			fprintf(stderr,"Unable to determine control "
 					"interface\n");
@@ -532,7 +533,7 @@ int main (int argc, char **argv) {
 		/*
 		 * Chomp off the newline
 		 */
-		if (control[strlen(control) -1] == '\n') {
+		if (control[0] && control[strlen(control) -1] == '\n') {
 			control[strlen(control) -1] = '\0';
 		}
 		
@@ -626,14 +627,14 @@ int main (int argc, char **argv) {
 		printf("Interface %s is ... ",name);
 
 #ifdef EMULAB
-		if (control && !strcmp(control,name)) {
+		if (control[0] && !strcmp(control,name)) {
 			/* Skip control net */
 			printf("control\n");
 		} else
 #endif
 		if (flag_ifr.ifr_flags & IFF_LOOPBACK) {
 			/* Skip loopback */
-			printf("loopback\n");
+			printf("skipped (loopback)\n");
 		} else if (flag_ifr.ifr_flags & IFF_UP) {
 			struct readpackets_args *args;
 			struct sockaddr_in *sin;
@@ -649,7 +650,7 @@ int main (int argc, char **argv) {
 			if (getaddr(name,&ifaddr)) {
 				/* Has carrier, but no IP */
 				if (!include_ipless_interfaces) {
-					printf("down (with carrier)\n");
+					printf("skipped (no IP address)\n");
 					continue;
 				}
 			}
@@ -669,7 +670,7 @@ int main (int argc, char **argv) {
 			}
 
 			/*
-			 * If we're in 'tcmdump mode' we may have to do this
+			 * If we're in 'tcpdump mode' we may have to do this
 			 * more than once
 			 */
 			interface_it = 0;
@@ -692,8 +693,6 @@ int main (int argc, char **argv) {
 					if (!matched) {
 						continue;
 					}
-					fprintf(stderr, "F:%s\n", bpf_filter);
-					fflush(stderr);
 					
 					/*
 					 * Copy it into the global interfaces list
@@ -703,10 +702,10 @@ int main (int argc, char **argv) {
 					strcat(interface_names[interfaces],bpf_filter);
 					strcat(interface_names[interfaces],"'");
 					strcat(interface_names[interfaces],"\n");
-					fprintf(stderr, "F:%s\n", bpf_filter);
-					fflush(stderr);
-					
+
 					printf("watched ");
+					if (bpf_filter[0])
+						printf("(%s) ", bpf_filter);
 
 				} else { 
 					/*
@@ -724,7 +723,7 @@ int main (int argc, char **argv) {
 							}
 						}
 						if (j == argc) {
-							printf("skipped\n");
+							printf("skipped (not specified)\n");
 							continue;
 						}
 					}
@@ -734,26 +733,28 @@ int main (int argc, char **argv) {
 					strcpy(interface_names[interfaces],hostname);
 					strcat(interface_names[interfaces],"\n");
 
-					printf("up\n");
+					printf("watched\n");
 				}
 
 				if (interfaces >= MAX_INTERFACES) {
-					printf("up, ignored (too many interfaces)\n");
+					printf("skipped (too many interfaces)\n");
 					continue;
 				}
-
 
 				/*
 				 * Start up a new thread to read packets from 
 				 * this interface.
 				 */
 				pthread_mutex_lock(&lib_lock);
+
+				fprintf(stderr, "Starting thread for %s(%d): %s",
+					name, interfaces, interface_names[interfaces]);
+				fflush(stderr);
+
 				args = (struct readpackets_args*)
 					malloc(sizeof(struct  readpackets_args));
 				args->devname = (char*)malloc(strlen(name) + 1);
 				args->bpf_filter = bpf_filter;
-				fprintf(stderr, "F:%s\n", bpf_filter);
-				fflush(stderr);
 				
 				strcpy(args->devname,name);
 				args->index = interfaces;
@@ -769,17 +770,18 @@ int main (int argc, char **argv) {
 
 			if (tcpdump_mode) {
 				if (matched_filters == 0) {
-					printf("skipped");
+					printf("skipped (not specified)");
 				}
 				printf("\n");
 			}
 
 		} else {
 			/* Skip interfaces that don't have carrier */
-			printf("down\n");
+			printf("skipped (down)\n");
 		}
 	}
 	close(sock);
+	fflush(stdout);
 
 	if (interfaces <= 0) {
 		fprintf(stderr,"No interfaces to monitor!\n");
@@ -1365,8 +1367,6 @@ void *readpackets_capturemode(void *args)
 		exit(1);
 	}
 	bpf_filter = sargs->bpf_filter;
-	fprintf(stderr, "F:%s\n", bpf_filter);
-	fflush(stderr);
 
 	/*
 	 * Put an empty filter on the device, or we get nothing (but only
@@ -1433,10 +1433,11 @@ void *readpackets_capturemode(void *args)
 		}
 		rename(filenames[sargs->index], buf);
 
+		pthread_mutex_lock(&lock);
+
 		fprintf(stderr, "reload=%d (%d)\n", reload, getpid());
 		fflush(stderr);
 
-		pthread_mutex_lock(&lock);
 		reload--;
 		if (reload == 0) {
 			pthread_mutex_unlock(&lock);
@@ -1750,6 +1751,12 @@ callback(event_handle_t handle,
 			if ((rc == 0) || (rc > 256)) {
 				free(reload_tag);
 				reload_tag = NULL;
+			}
+			if (reload_tag == NULL) {
+				reload_tag = malloc(12);
+				if (reload_tag)
+					snprintf(reload_tag, 12,
+						 "%010lu", time(0));
 			}
 			if (capture_mode) {
 				int rc;
