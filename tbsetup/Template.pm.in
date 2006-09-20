@@ -26,6 +26,7 @@ use overload ('""' => 'Stringify');
 
 # Configure variables
 my $TB		= "@prefix@";
+my $CONTROL	= "@USERNODE@";
 my $MD5         = "/sbin/md5";
 my $MKDIR       = "/bin/mkdir";
 my $RMDIR       = "/bin/rmdir";
@@ -2044,8 +2045,7 @@ sub NewRun($$;$)
 
     my $query_result =
 	DBQueryWarn("insert into experiment_runs set ".
-		    "   exptidx='$exptidx', runid='$runid', $dclause ".
-		    "   start_time=now()");
+		    "   $dclause exptidx='$exptidx', runid='$runid' ");
 
     return -1
 	if (! $query_result);
@@ -2094,6 +2094,31 @@ sub DeleteCurrentRun($)
 	or return -1;
     
     return Refresh($self);
+}
+
+#
+# Start the (first) experiment run.
+#
+sub StartFirstRun($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx     = $self->idx();
+    my $runidx  = $self->runidx();
+    my $exptidx = $self->exptidx();
+
+    return -1
+	if (!defined($runidx));
+
+    DBQueryWarn("update experiment_runs set start_time=now() ".
+		"where exptidx='$exptidx' and idx='$runidx'")
+	or return -1;
+
+    return $self->Start();
 }
 
 #
@@ -2266,10 +2291,41 @@ sub NewRunBinding($$$)
 		"  name='$name', value=$value")
 	or return -1;
 
-    DBQueryFatal("replace into virt_user_environment set ".
-		 "   name='$name', value=$value, ".
-		 "   pid='$pid', eid='$eid'");
+    DBQueryWarn("replace into virt_user_environment set ".
+		"   name='$name', value=$value, ".
+		"   pid='$pid', eid='$eid'")
+	or return -1;
     
+    return 0;
+}
+
+#
+# Get list of bindings for the current run.
+#
+sub RunBindingList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %results = ();
+    my $exptidx = $self->exptidx();
+    my $runidx  = $self->runidx();
+
+    my $query_result =
+	DBQueryWarn("select name,value ".
+		    "   from experiment_run_bindings ".
+		    "where exptidx='$exptidx' and runidx='$runidx'");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($name,$value) = $query_result->fetchrow_array()) {
+	$results{$name} = $value;
+    }
+    %$prval = %results;
     return 0;
 }
 
@@ -2738,6 +2794,98 @@ sub WriteEnvVariables($)
 
     return $experiment->WriteEnvVariables();
 }
+
+#
+# Setup the environment variables for a template swapin.
+#
+sub InitializeEnvVariables($;$)
+{
+    my ($self, $parameters) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $experiment    = $self->Experiment();
+    my $instance_path = $self->path();
+    my $pid           = $self->pid();
+    my $eid           = $self->eid();
+    my $dbuid         = $self->uid();
+
+    return -1
+	if (! defined($experiment));
+
+    #
+    # Ick, Ick, Ick. I want these to be at the beginning of the enviroment
+    # strings so they are set in case the user has used any OPT variables
+    # in the NS file (and they refer to $DATASTORE or $ARCHIVE).
+    #
+    my $query_result =
+	DBQueryWarn("select MAX(idx) from virt_user_environment ".
+		    "where pid='$pid' and eid='$eid'");
+    return -1
+	if (!$query_result);
+
+    my ($maxenv) = $query_result->fetchrow_array();
+
+    if ($maxenv) {
+	for (my $idx = $maxenv; $idx > 0; $idx--) {
+	    my $newidx = $idx + 2;
+    
+	    DBQueryFatal("update virt_user_environment set idx=$newidx ".
+			 "where idx='$idx' and pid='$pid' and eid='$eid'");
+	}
+    }
+    $experiment->AddEnvVariable("DATASTORE",
+				"$instance_path/template_datastore", 1)
+	== 0 or return -1;
+				    
+    $experiment->AddEnvVariable("ARCHIVE",
+				"$instance_path/archive", 2)
+	== 0 or return -1;
+
+    if ($experiment->dpdb() && $experiment->dpdbname() ne "") {
+	my $dpdbname = $experiment->dpdbname();
+
+	$experiment->AddEnvVariable("DP_DBNAME", $dpdbname) == 0
+	    or return -1;
+	
+	$experiment->AddEnvVariable("DP_HOST", $CONTROL) == 0
+	    or return -1;
+
+	#
+	# XXX This needs to change to a per-experiment user/password.
+	#
+	$experiment->AddEnvVariable("DP_USER", $dbuid) == 0
+	    or return -1;
+
+	$query_result =
+	    DBQueryFatal("select mailman_password from users ".
+			 "where uid='$dbuid'");
+	my ($mailman_password) = $query_result->fetchrow_array();
+    
+	if (defined($mailman_password)) {
+	    $experiment->AddEnvVariable("DP_PASSWORD", $mailman_password) == 0
+		or return -1;
+	}
+    }
+
+    #
+    # Before we actually swapin, copy the parameters to the environment
+    # table so that they are available to the program agent when it starts up
+    # on the nodes.
+    #
+    if (defined($parameters)) {
+	foreach my $name (keys(%{ $parameters })) {
+	    my $value = $parameters->{$name};
+
+	    $experiment->AddEnvVariable($name, $value) == 0
+		or return -1;
+	}
+    }
+    return 0;
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 

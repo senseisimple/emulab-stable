@@ -2079,7 +2079,7 @@ class template_startrun:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:",
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:m",
                                            [ "help" ]);
             pass
         except getopt.error, e:
@@ -2101,6 +2101,9 @@ class template_startrun:
                 pass
             elif opt == "-w":
                 params["wait"] = "yes"
+                pass
+            elif opt == "-m":
+                params["modify"] = "yes"
                 pass
             elif opt == "-c":
                 params["clear"] = "yes"

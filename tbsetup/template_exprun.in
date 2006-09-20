@@ -43,7 +43,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwx:p:E:a:r:e:dscft:i";
+my $optlist	 = "qwx:p:E:a:r:e:dscft:im";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -51,6 +51,7 @@ my $debug        = 0;
 my $foreground   = 0;
 my $ignoreerrors = 0;
 my $clean        = 0;
+my $doswapmod    = 0;
 my $paramfile;
 my %parameters   = ();
 my $action;
@@ -89,6 +90,7 @@ my $cleaning    = 0;
 my $justexit    = 1;
 
 # Programs we need
+my $swapexp     = "$TB/bin/swapexp";
 my $checkquota  = "$TB/sbin/checkquota";
 my $archcontrol = "$TB/bin/archive_control";
 my $eventcontrol= "$TB/bin/eventsys_control";
@@ -423,42 +425,48 @@ $justexit = 0;
 #
 # And the bindings for the run ...
 #
-if ($paramfile) {
-    foreach my $name (keys(%parameters)) {
-	my $value = $parameters{$name};
+foreach my $name (keys(%parameters)) {
+    my $value = $parameters{$name};
 
-	$instance->NewRunBinding($name, $value) == 0
-	    or fatal(-1, "Could not create new experiment run binding ".
-		     "for $instance!");
-
-        #
-        # Hmm. Before we actually swapin, copy the parameters to the
-        # environment table so that they are available to the program
-        # agent when it starts up on the nodes (say, on reboot).
-	#
-	if (defined($value)) {
-	    $value = DBQuoteSpecial($value);
-	}
-	else {
-	    $value = "''";
-	}
-	DBQueryFatal("update virt_user_environment set value=$value ".
-		     "where pid='$pid' and eid='$eid' and name='$name'");
-    }
-    print "Writing environment strings ...\n";
-    $instance->WriteEnvVariables() == 0
-	or fatal(-1, "Could not write environment strings for program agents");
-    
-    print "Asking program agents to reload ... this will take a moment.\n";
-    SignalProgAgents("RELOAD");
+    $instance->NewRunBinding($name, $value) == 0
+	or fatal(-1, "Could not create new experiment run binding ".
+		 "for $instance!");
 }
 
-#
-# Restart the event stream from the beginning.
-#
-print "Asking the event system to replay events ...\n";
-system("$eventcontrol replay $pid $eid") == 0
-    or fatal(-1, "Could not restart the event system!");
+# We munge the environment variables.
+$instance->InitializeEnvVariables(\%parameters) == 0
+    or fatal(-1, "Could not add new environment variables to instance");
+    
+print "Writing environment strings ...\n";
+$instance->WriteEnvVariables() == 0
+    or fatal(-1, "Could not write environment strings for program agents");
+    
+print "Asking program agents to reload ... this will take a moment.\n";
+SignalProgAgents("RELOAD");
+
+
+if ($doswapmod) {
+    #
+    # Now do the swapmod, using the original NS file for now.
+    #
+    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
+    my $nsfile     = "$archivedir/nsdata/nsfile.ns";
+    my @arguments  = ($swapexp, "-q", "-x", "-s", "modify",
+		      $pid, $eid, $nsfile);
+
+    print "Starting a swap modify ...\n";
+    system(@arguments);
+    fatal($? >> 8, "Swap modify failed!")
+	if ($?);
+}
+else {
+    #
+    # Restart the event stream from the beginning.
+    #
+    print "Asking the event system to replay events ...\n";
+    system("$eventcontrol replay $pid $eid") == 0
+	or fatal(-1, "Could not restart the event system!");
+}
 
 print "Experiment run '$runid' has been started.\n";
 done:
@@ -581,6 +589,9 @@ sub ParseArgs()
     }
     if (defined($options{"i"})) {
 	$ignoreerrors = 1;
+    }
+    if (defined($options{"m"})) {
+	$doswapmod = 1;
     }
     if (defined($options{"t"})) {
 	$ctoken = $options{"t"};

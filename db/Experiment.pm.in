@@ -580,9 +580,9 @@ sub WebKeyPath($)
 #
 # Add an environment variable.
 #
-sub AddEnvVariable($$$)
+sub AddEnvVariable($$$;$)
 {
-    my ($self, $var, $val) = @_;
+    my ($self, $name, $value, $index) = @_;
 
     # Must be a real reference. 
     return -1
@@ -591,10 +591,19 @@ sub AddEnvVariable($$$)
     my $pid = $self->pid();
     my $eid = $self->eid();
 
-    return -1
-	if (! DBQueryWarn("insert into virt_user_environment set ".
-			  "   name='$var', value='$val', ".
-			  "   pid='$pid', eid='$eid'"));
+    if (defined($value)) {
+	$value = DBQuoteSpecial($value);
+    }
+    else {
+	$value = "''";
+    }
+
+    DBQueryWarn("replace into virt_user_environment set ".
+		"   name='$name', value=$value, ".
+		(defined($index) ? "idx=$index, " : "") .
+		"   pid='$pid', eid='$eid'")
+	or return -1;
+    
     return 0;
 }
 

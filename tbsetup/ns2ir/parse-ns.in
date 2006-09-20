@@ -50,6 +50,7 @@ my $pid;
 my $gid;
 my $eid;
 my $nsfile;
+my $experiment;
 
 #
 # Turn off line buffering on output
@@ -86,6 +87,8 @@ use libtestbed;
 use libtblog;
 use libtblog qw(dblog *SERR);
 use NodeType;
+use Template;
+use Experiment;
 
 use constant false => 0;
 use constant true  => 1;
@@ -151,6 +154,12 @@ if (defined($pid)) {
     }
     else {
 	die("Bad data in argument: $gid.");
+    }
+
+    # Slowly convert to new libraries ...
+    $experiment = Experiment->Lookup($pid, $eid);
+    if (! defined($experiment)) {
+	tbdie("Cannot find the experiment object for $pid/$eid");
     }
 }
 
@@ -626,26 +635,40 @@ sub GenDefsFile($)
     #
     # For Templates.
     #
-    if (defined($pid)) {
-	$query_result =
-	    DBQueryFatal("select instance_idx from experiments ".
-			 "where pid='$pid' and eid='$eid'");
-	my ($instance_idx) = $query_result->fetchrow_array();
-	if ($instance_idx) {
-	    print TCL "# Template goo\n";
+    print TCL "# Template goo\n";
+    # Does not matter what it is, as long as it is set.
+    print TCL "set ::DATASTORE \"/proj\"\n";
+    
+    if (defined($experiment)) {
+	my $instance =
+	    Template::Instance->LookupByID($experiment->instance_idx());
 	
-	    $query_result =
-		DBQueryFatal("select * from experiment_template_instance_bindings ".
-			     "where instance_idx='$instance_idx'");
+	if (defined($instance)) {
+	    my $datastore = $instance->path() . "/template_datastore";
+	    my %parameters;
 
-	    while (my %row = $query_result->fetchhash()) {
-		my $name  = $row{'name'};
-		my $value = $row{'value'};
+	    print TCL "set ::DATASTORE \"$datastore\"\n";
+
+	    $instance->BindingList(\%parameters) == 0
+		or tbdie("Could not get binding list for $instance");
+		
+	    foreach my $name (keys(%parameters)) {
+		my $value = $parameters{$name};
+
+		print TCL "set parameter_list_defaults($name) \"$value\"\n";
+	    }
+	    
+	    $instance->RunBindingList(\%parameters) == 0
+		or tbdie("Could not get run binding list for $instance");
+		
+	    foreach my $name (keys(%parameters)) {
+		my $value = $parameters{$name};
 
 		print TCL "set parameter_list_defaults($name) \"$value\"\n";
 	    }
 	}
     }
+    print TCL "\n\n";
 
     print TCL "}\n";
     close(TCL);
