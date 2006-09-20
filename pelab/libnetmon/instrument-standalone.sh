@@ -12,6 +12,11 @@ export -n LIBNETMON_SOCKPATH
 export -n LIBNETMON_CONTROL_SOCKPATH
 
 #
+# Make sure we can get coredumps
+#
+ulimit -c unlimited
+
+#
 # Get a new version of the output
 #
 export LIBNETMON_OUTPUTVERSION=2
