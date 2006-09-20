@@ -151,7 +151,7 @@ my $use_magent = ($stub_cmd =~ /magent/) ? 1 : 0;
 my $use_simplemodel = ($mon_cmd =~ /dbmonitor/) ? 1 : 0;
 
 #
-# Let's help some boor bozos (Rob) get the right command line args
+# Let's help some poor bozos (Rob) get the right command line args
 #
 print "##### Stashing node list for experiment\n";
 my @vnodes = split /\s+/,`$NODELIST -v -e $pid,$eid`;
@@ -288,6 +288,9 @@ if (system "$TEVC -e $pid/$eid now tdhosts start") {
 #
 my $startarg = "";
 print "##### Starting stubs";
+if ($initelab && $use_magent) {
+    $stub_cmdargs += " /proj/$pid/exp/$eid/tmp/initial-conditions.txt ";
+}
 if ($stub_cmdargs ne $UNKNOWN) {
     print " with: '$stub_cmd $stub_cmdargs'";
     $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
