@@ -1920,7 +1920,7 @@ def validate_visitor(arg, dirname, names):
                 
                 status = {}
                 for line in open(os.path.join(dirname, name)):
-                    (key, value) = line.split("=")
+                    (key, value) = line.split("=",2)
                     status[key] = value
                     pass
                 
