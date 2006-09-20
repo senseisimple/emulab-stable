@@ -76,6 +76,15 @@ prev_time = 0.0
 
 def main_loop():
   global total_size, last_total, evclient
+
+  # XXX: The name of the event server is hardwired here, and due to the
+  #      lack of autoconf, isn't even an autoconf var.  Could add a command
+  #      line option to set it if needed.
+  # XXX: This HAS to be done before read_args, becuase read_args can fire
+  #      off set_link().
+  #      
+  evclient = EventClient(server=TBEVENT_SERVER)
+
   # Initialize
   read_args()
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -86,10 +95,6 @@ def main_loop():
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
   poll.register(conn, select.POLLIN)
-  # XXX: The name of the event server is hardwired here, and due to the
-  #      lack of autoconf, isn't even an autoconf var.  Could add a command
-  #      line option to set it if needed.
-  evclient = EventClient(server=TBEVENT_SERVER)
   done = False
 
   while not done:
@@ -276,8 +281,10 @@ def get_next_packet(conn):
 #                       localport, remoteport, save_int(NULL_SENSOR))
 #          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
                        localport, remoteport, save_int(MAX_DELAY_SENSOR))
+#          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
+#                       localport, remoteport, save_int(EWMA_THROUGHPUT_SENSOR))
           send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, save_int(EWMA_THROUGHPUT_SENSOR))
+                       localport, remoteport, save_int(LEAST_SQUARES_THROUGHPUT))
         elif event == 'Closed':
           send_command(conn, DELETE_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
                       localport, remoteport, '')
