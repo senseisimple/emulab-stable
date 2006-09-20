@@ -333,9 +333,21 @@ def receive_characteristic(conn):
     # bandwidth. This means that we output a throughput number only if
     # it is greater than our previous measurements because we don't
     # know that bandwidth has decreased.
-    if int(buf) > connection_bandwidth[dest]:
-      connection_bandwidth[dest] = int(buf)
-      set_link(dest, this_ip, 'bandwidth=' + buf)
+    # If we don't know what the bandwidth is for this host, ignore tentative
+    # measurments until we find out (due to an authoritative message)
+    # XXX: It appears that this code only does one of these checks - it's not
+    # checking wheter the link is saturated or not. This may be correct - since
+    # the stub is basically doing that already when decideding if the measurment
+    # is authoritative or not. So, either the code or the comment needs fixing.
+    if connection_bandwidth.has_key(dest):
+      if int(buf) > connection_bandwidth[dest]:
+          connection_bandwidth[dest] = int(buf)
+          set_link(dest, this_ip, 'bandwidth=' + buf)
+      else:
+        sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - %i vs %i\n'
+                         % (dest,int(buf), connection_bandwidth[dest]))
+    else:
+      sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - no data\n' % (dest))
   elif eventType == AUTHORITATIVE_BANDWIDTH:
     # We know that the bandwidth has definitely changed. Reset everything.
     connection_bandwidth[dest] = int(buf)
