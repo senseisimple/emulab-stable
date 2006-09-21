@@ -39,6 +39,12 @@ void DelaySensor::localSend(PacketInfo *)
 void DelaySensor::localAck(PacketInfo * packet)
 {
   sendValid = false;
+  /*
+   * XXX: According to RFC 2988, TCP MUST use Karn's algorithm for RTT
+   * calculation, which means that it cannot use retransmitted packets to
+   * caculate RTT (since it is ambiguous which of the two packets is being
+   * ACKed) unless using TCP timestamps
+   */
   if (state->isAckValid() && packetHistory->isAckValid()
       && state->getState() == StateSensor::ESTABLISHED)
   {
