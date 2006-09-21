@@ -3681,3 +3681,7 @@ last_net_act,last_cpu_act,last_ext_act);
       
       alter table virt_parameters add description text;
 
+4.88: Add bwlimit field to widearea_nodinfo table to track the bandwidth
+      caps for plab nodes.
+
+      alter table widearea_nodeinfo add bwlimit varchar(32) default NULL;
