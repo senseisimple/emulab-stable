@@ -219,13 +219,19 @@ class siteParser:
             if not attrs.has_key('MAC'):
                 attrs['MAC'] = "None"
                 pass
-            self.__hosts.append({'HNAME'     : attrs['NAME'],
-                                 'IP'        : attrs['IP'],
-                                 'PLABID'    : attrs['NODE_ID'],
-                                 'MAC'       : attrs['MAC'],
-                                 'SITE'      : self.__sitename,
-                                 'LATITUDE'  : self.__latitude,
-                                 'LONGITUDE' : self.__longitude})
+            if not attrs.has_key('BWLIMIT'):
+                attrs['BWLIMIT'] = "-1"
+                pass
+            self.__hosts.append({
+                'HNAME'     : attrs['NAME'],
+                'IP'        : attrs['IP'],
+                'PLABID'    : attrs['NODE_ID'],
+                'MAC'       : attrs['MAC'],
+                'BWLIMIT'   : attrs['BWLIMIT'],
+                'SITE'      : self.__sitename,
+                'LATITUDE'  : self.__latitude,
+                'LONGITUDE' : self.__longitude
+                })
             pass
         
         else:
@@ -409,24 +415,24 @@ class Plab:
         chgerrstr = ""
         if len(toupdate):
             print "There are %d plab node updates." % len(toupdate)
-            for updent,updmapent in toupdate:
+            for (nodeent,(nodeid,diffattrs)) in toupdate:
                 try:
-                    self.__updateNodeMapping(updmapent)
+                    self.__updateNodeMapping(nodeid, diffattrs)
                     pass
                 except MultiChangeError, e:
                     print "%s not updated: Too many attribute changes." % \
                           e.nodeid
                     chgerrstr += "%s:\n" % e.nodeid
-                    for attr,val in e.chattrs.items():
-                        chgerrstr += "\t%s:\t%s => %s\n" % (attr,val[0],val[1])
+                    for (attr,(old,new)) in e.chattrs.items():
+                        chgerrstr += "\t%s:\t%s => %s\n" % (attr,old,new)
                         pass
                     chgerrstr += "\n"
                     continue
-                self.__addNode(updent, updmapent)
+                self.__updateNode(nodeid, nodeent)
                 # Add a line for the add/update message.
-                nodestr = updmapent[0] + "\n"
-                for attr,val in updmapent[1].items():
-                    nodestr += "\t%s:\t%s => %s\n" % (attr,val[0],val[1])
+                nodestr = nodeid + "\n"
+                for (attr,(old,new)) in diffattrs.items():
+                    nodestr += "\t%s:\t%s => %s\n" % (attr,old,new)
                     pass
                 updstr += nodestr + "\n"
                 pass
@@ -514,21 +520,23 @@ class Plab:
         """
         res = DBQueryFatal("select plab_mapping.node_id,plab_id,"
                            "plab_mapping.hostname,IP,mac,site,latitude,"
-                           "longitude"
+                           "longitude,bwlimit"
                            " from plab_mapping"
                            " left join widearea_nodeinfo on"
                            "    plab_mapping.node_id = "
                            "    widearea_nodeinfo.node_id")
         
         ret = {}
-        for nodeid, plabid, hostname, ip, mac, site, latitude, longitude in res:
+        for (nodeid, plabid, hostname, ip, mac, site,
+             latitude, longitude, bwlimit) in res:
             ret[nodeid] = {'PLABID'    : plabid,
                            'HNAME'     : hostname,
                            'IP'        : ip,
                            'MAC'       : mac,
                            'SITE'      : site,
                            'LATITUDE'  : latitude,
-                           'LONGITUDE' : longitude}
+                           'LONGITUDE' : longitude,
+                           'BWLIMIT'   : bwlimit}
             pass
         # Check for duplicate node attributes: report any that are found.
         dups = self.__findDuplicateAttrs(ret.values())
@@ -546,12 +554,11 @@ class Plab:
         """
         Find duplicate node attributes in the node list passed in.
         """
-        uniqattrs = ['PLABID', 'HNAME', 'IP', 'MAC']
         attrs = {}
         dups = {}
         
         for ent in nodelist:
-            for attr in uniqattrs:
+            for attr in ATTR_CRIT_KEYS:
                 entry = "%s:%s" % (attr, ent[attr])
                 if attrs.has_key(entry) and \
                    ent[attr] not in ATTR_NIL_VALUES:
@@ -622,60 +629,28 @@ class Plab:
         nodeent['LINKTYPE'] = "*Unknown*"
         return
 
-    def __addNode(self, nodeent, updent = ()):
+    def __addNode(self, nodeent):
         """
-        getFree helper function.  Adds a new Plab pnode and associated
-        vnodes to the DB.  linktype should be one of (inet2, inet, intl,
-        dsl).
+        updateNodeEntries() helper function.  Adds a new Plab pnode and
+        associated vnode to the DB.  The argument is a dictionary containing
+        the new node's attributes.
         """
-        # block out common termination signals while adding a node
-        osigs = disable_sigs(TERMSIGS)
+        # Generate/grab variables to be used when creating the node.
         defosid, controliface = self.__getNodetypeInfo()
         hostonly = nodeent['HNAME'].replace(".", "-")
-        # These will be setup properly below.
-        nidnum = 0
-        priority = 0
-        nodeid = ""
-        vnodeprefix = ""
+        nidnum, priority = self.__nextFreeNodeid()
+        nodeid = "%s%d" % (NODEPREFIX, nidnum)
+        vnodeprefix = "%svm%d" % (NODEPREFIX, nidnum)
+        print "Creating pnode %s as %s, priority %d." % \
+              (nodeent['IP'], nodeid, priority)
 
-        # Setup nodeid according to whether or not we were passed in an
-        # update entry.
-        if updent:
-            nodeid = updent[0]
-            print "Updating node %s" % nodeid
-            pass
-        else:
-            nidnum, priority = self.__nextFreeNodeid()
-            nodeid = "%s%d" % (NODEPREFIX, nidnum)
-            vnodeprefix = "%svm%d" % (NODEPREFIX, nidnum)
-            print "Creating pnode %s as %s, priority %d." % \
-                  (nodeent['IP'], nodeid, priority)
-            pass
+        # Do the stuff common to both node addition and update first
+        # Note that if this fails, we want the exception generated to
+        # percolate up to the caller immediately, so don't catch it.
+        self.__updateNode(nodeid, nodeent)
 
-        haslatlong = (('LATITUDE' in nodeent and 'LONGITUDE' in nodeent) and
-            (nodeent['LATITUDE'] != 0 or nodeent['LONGITUDE'] != 0))
+        # Now perform stuff specific to node addition
         try:
-            DBQueryFatal("replace into widearea_nodeinfo"
-                         " (node_id, contact_uid, hostname, site, latitude, "
-                         "  longitude)"
-                         " values (%s, %s, %s, %s, %s, %s)",
-                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE'],
-                          # Poor man's ternary operator
-                          haslatlong and nodeent['LATITUDE'] or "NULL",
-                          haslatlong and nodeent['LONGITUDE'] or "NULL"))
-
-            DBQueryFatal("replace into interfaces"
-                         " (node_id, card, port, IP, interface_type,"
-                         " iface, role)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (nodeid, 0, 1, nodeent['IP'], 'plab_fake',
-                          controliface, 'ctrl'))
-
-            # Don't do anything else if we are only updating the node
-            if updent:
-                enable_sigs(osigs)
-                return
-
             DBQueryFatal("replace into nodes"
                          " (node_id, type, phys_nodeid, role, priority,"
                          "  op_mode, def_boot_osid,"
@@ -761,9 +736,6 @@ class Plab:
                          (nodeent['SITE'], siteidx, nodeid, nodeidx))
 
             # Create a single reserved plab vnode for the managment sliver.
-            # XXX I left it as "20" cause of all the existing ones.
-            # XXXX I set it to 1 due to the above comment (correct?)
-            #      since we are re-creating anyway.            
             n = 1
             vprio = (priority * 100) + n
             sshdport = 38000 + n
@@ -809,68 +781,86 @@ class Plab:
                      nodeid, "Some operation failed while trying to add a"
                      " newly discovered plab node to the DB:\n %s"
                      "\n Please clean up!\n" % tbmsg, TBOPS)
-            enable_sigs(osigs)
             raise
-
-        # last but not least, unblock signals
-        enable_sigs(osigs)
         return
 
 
-    def __updateNodeMapping(self, updent):
+    def __updateNode(self, nodeid, nodeent):
         """
-        Updates changed node attributes in the mapping table.
+        updateNodeEntries() helper function.  Updates attributes for plab
+        nodes passed in via the nodeent argument.
+        """
+        # Get the name of the control interface for plab nodes.
+        defosid, controliface = self.__getNodetypeInfo()
+
+        haslatlong = (('LATITUDE' in nodeent and 'LONGITUDE' in nodeent) and
+            (nodeent['LATITUDE'] != 0 or nodeent['LONGITUDE'] != 0))
+        try:
+            DBQueryFatal("replace into widearea_nodeinfo"
+                         " (node_id, contact_uid, hostname, site, latitude, "
+                         "  longitude, bwlimit)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE'],
+                          # Poor man's ternary operator
+                          haslatlong and nodeent['LATITUDE'] or "NULL",
+                          haslatlong and nodeent['LONGITUDE'] or "NULL",
+                          nodeent['BWLIMIT']))
+
+            DBQueryFatal("replace into interfaces"
+                         " (node_id, card, port, IP, interface_type,"
+                         " iface, role)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (nodeid, 0, 1, nodeent['IP'], 'plab_fake',
+                          controliface, 'ctrl'))
+            pass
+        except:
+            print "Error updating PLAB node in DB: someone needs to clean up!"
+            tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
+            SENDMAIL(TBOPS, "Error updating plab node in DB: %s\n" % nodeid,
+                     "Some operation failed while trying to update"
+                     " plab node %s in the DB:\n\n%s"
+                     "\nPlease clean up!\n" % (nodeid, tbmsg), TBOPS)
+            raise
+        return
+
+
+    def __updateNodeMapping(self, nodeid, chattrs):
+        """
+        Updates changed node attributes in the plab mapping table.
         """
         uid = os.getuid()
         dbuid = uid == 0 and "root" or UNIX2DBUID(uid)
-        # mapping from attrs to which table they belong in
-        tablemap = {'PLABID'    : 'plab_mapping',
-                    'HNAME'     : 'plab_mapping',
-                    'IP'        : 'plab_mapping',
-                    'MAC'       : 'plab_mapping',
-                    'SITE'      : 'widearea_nodeinfo',
-                    'LATITUDE'  : 'widearea_nodeinfo',
-                    'LONGITUDE' : 'widearea_nodeinfo',}
+
         # mapping from attrs to column names
-        attrmap = {'plab_mapping' : {'PLABID' : 'plab_id',
-                                     'HNAME'  : 'hostname',
-                                     'IP'     : 'IP',
-                                     'MAC'    : 'mac'},
-                   'widearea_nodeinfo' : {'SITE'      : 'site',
-                                          'LATITUDE'  : 'latitude',
-                                          'LONGITUDE' : 'longitude',}}
+        attrmap = {'PLABID' : 'plab_id',
+                   'HNAME'  : 'hostname',
+                   'IP'     : 'IP',
+                   'MAC'    : 'mac'}
 
-        nodeid, chattrs = updent
-                
-        # seperate out attrs by table
-        chattrs_by_table = {}
-        for attr in chattrs:
-            table = tablemap[attr]
-            if table not in chattrs_by_table:
-                chattrs_by_table[table] = []
-            chattrs_by_table[table].append(attr)
-            pass
-
-        # If more than 2 attributes have changed in the plab_mapping table,
-        # then move the node to hwdown and report the issue.
-        if chattrs_by_table.has_key('plab_mapping') and \
-               len(chattrs_by_table['plab_mapping']) > 2:
-            pmattrs = {}
-            for attr in chattrs_by_table['plab_mapping']:
-                pmattrs[attr] = chattrs[attr]
+        # Get the intersection of mapping (critical) keys with those that
+        # have changed.
+        changedcritkeys = set(ATTR_CRIT_KEYS) & set(chattrs.keys())
+        # nothing to do if none of the mapping attributes have changed.
+        if not changedcritkeys:
+            return
+        # If the node has more than two critical attrs that have changed,
+        # then move it to hwdown and raise an exception.
+        if len(changedcritkeys) > 2:
+            crattrs = {}
+            for chkey in changedcritkeys:
+                crattrs[chkey] = chattrs[chkey]
                 pass
             errmsg = "More than 2 plab node attrs have changed!\n\n%s\n\n" \
-                     "%s has been moved to hwdown." % (pmattrs, nodeid)
+                     "%s has been moved to hwdown." % (crattrs, nodeid)
             MarkPhysNodeDown(nodeid)
             TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, errmsg)
-            raise MultiChangeError(nodeid, pmattrs)
+            raise MultiChangeError(nodeid, crattrs)
 
-        # update each table
-        for table in chattrs_by_table:
-            updstr = ",".join(map(lambda x: "%s='%s'" %
-                (attrmap[table][x],chattrs[x][1]), chattrs_by_table[table]))
-            DBQueryFatal("update %s set %s where node_id='%s'" %
-                         (table, updstr, nodeid))
+        # Update mapping table entry.
+        updstr = ",".join(map(lambda x: "%s='%s'" %
+                              (attrmap[x],chattrs[x][1]), changedcritkeys))
+        DBQueryFatal("update plab_mapping set %s where node_id='%s'" %
+                     (updstr, nodeid))
         updmsg = "Plab node %s attributes updated:\n\n%s" % (nodeid, chattrs)
         TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, updmsg)
         # updateNodeEtries() already sends mail.
