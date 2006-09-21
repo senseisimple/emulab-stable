@@ -635,7 +635,7 @@ if ($widearea) {
     #
     $result =
 	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site,".
-                     "i.card,i.port,i.iface ".
+                     "i.card,i.port,i.iface,wn.bwlimit ".
 		     "from nodes as n ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
@@ -647,7 +647,8 @@ if ($widearea) {
 		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
 		     "        nt.isvirtnode=0)");
     
-    while (($physnode,$ptype,$status,$mpid,$meid,$site,$card,$port,$iface)
+    while (($physnode,$ptype,$status,$mpid,$meid,$site,$card,$port,$iface,
+            $bwlimit)
 	   = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
@@ -705,6 +706,16 @@ if ($widearea) {
 	if ($node_type_osids{$ptype}) {
 	    push @features, map "OS-$_:0", @{$node_type_osids{$ptype}};
 	}
+
+        #
+        # Put in a feature indicating whether or not this node has a bandwidth
+        # cap
+        #
+        if (!defined($bwlimit) || $bwlimit eq "-1") {
+	    push @features, "nobwlimit:0";
+        } else {
+	    push @features, "bwlimit:0";
+        }
 
 	my $text = "node $physnode " .
 	           join(" ",@types) . " - " . join(" ",@features) .
