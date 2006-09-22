@@ -28,6 +28,7 @@ class DelaySensor;
 class MinDelaySensor;
 class MaxDelaySensor;
 class ThroughputSensor;
+class TSThroughputSensor;
 class EwmaThroughputSensor;
 class LeastSquaresThroughput;
 
@@ -54,6 +55,7 @@ private:
   void pushMinDelaySensor(void);
   void pushMaxDelaySensor(void);
   void pushThroughputSensor(void);
+  void pushTSThroughputSensor(void);
   void pushEwmaThroughputSensor(void);
   void pushLeastSquaresThroughput(void);
 private:
@@ -65,6 +67,7 @@ private:
   DelaySensor const * depDelaySensor;
   MinDelaySensor const * depMinDelaySensor;
   ThroughputSensor const * depThroughputSensor;
+  TSThroughputSensor const * depTSThroughputSensor;
 };
 
 #endif

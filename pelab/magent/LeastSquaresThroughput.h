@@ -8,20 +8,20 @@
 
 #include "Sensor.h"
 
-class ThroughputSensor;
+class TSThroughputSensor;
 class DelaySensor;
 
 class LeastSquaresThroughput : public Sensor
 {
 public:
-  LeastSquaresThroughput(ThroughputSensor const * newThroughput,
+  LeastSquaresThroughput(TSThroughputSensor const * newThroughput,
                          DelaySensor const * newDelay);
   virtual ~LeastSquaresThroughput();
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
-  ThroughputSensor const * throughput;
+  TSThroughputSensor const * throughput;
   DelaySensor const * delay;
 
   // The number of samples kept at any given time.

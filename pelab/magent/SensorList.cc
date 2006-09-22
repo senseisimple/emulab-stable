@@ -12,6 +12,7 @@
 #include "MinDelaySensor.h"
 #include "MaxDelaySensor.h"
 #include "ThroughputSensor.h"
+#include "TSThroughputSensor.h"
 #include "EwmaThroughputSensor.h"
 #include "LeastSquaresThroughput.h"
 
@@ -74,6 +75,9 @@ void SensorList::addSensor(SensorCommand const & newSensor)
   case THROUGHPUT_SENSOR:
     pushThroughputSensor();
     break;
+  case TSTHROUGHPUT_SENSOR:
+    pushTSThroughputSensor();
+    break;
   case EWMA_THROUGHPUT_SENSOR:
     pushEwmaThroughputSensor();
     break;
@@ -103,6 +107,7 @@ void SensorList::reset(void)
   depPacketSensor = NULL;
   depDelaySensor = NULL;
   depThroughputSensor = NULL;
+  depTSThroughputSensor = NULL;
   depMinDelaySensor = NULL;
 }
 
@@ -247,6 +252,26 @@ void SensorList::pushThroughputSensor(void)
   }
 }
 
+void SensorList::pushTSThroughputSensor(void)
+{
+  // Dependency list
+  pushStateSensor();
+  pushPacketSensor();
+
+  // Example dependency check
+  if (depTSThroughputSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding TSThroughputSensor");
+    TSThroughputSensor * newSensor = new TSThroughputSensor(depPacketSensor,
+                                                            depStateSensor);
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depTSThroughputSensor = newSensor;
+  }
+}
+
 void SensorList::pushEwmaThroughputSensor(void)
 {
   // Dependency list
@@ -262,11 +287,11 @@ void SensorList::pushEwmaThroughputSensor(void)
 void SensorList::pushLeastSquaresThroughput(void)
 {
   // Dependency list
-  pushThroughputSensor();
+  pushTSThroughputSensor();
   pushDelaySensor();
 
   logWrite(SENSOR, "Adding LeastSquaresThroughput");
-  std::auto_ptr<Sensor> current(new LeastSquaresThroughput(depThroughputSensor,
+  std::auto_ptr<Sensor> current(new LeastSquaresThroughput(depTSThroughputSensor,
                                                            depDelaySensor));
   pushSensor(current);
 }

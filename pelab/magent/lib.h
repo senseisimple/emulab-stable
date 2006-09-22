@@ -106,7 +106,8 @@ enum SensorType
   MAX_DELAY_SENSOR = 5,
   THROUGHPUT_SENSOR = 6,
   EWMA_THROUGHPUT_SENSOR = 7,
-  LEAST_SQUARES_THROUGHPUT = 8
+  LEAST_SQUARES_THROUGHPUT = 8,
+  TSTHROUGHPUT_SENSOR = 9
 };
 
 // This is used for the type field in the ConnectionModelCommand.

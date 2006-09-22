@@ -2,14 +2,14 @@
 
 #include "lib.h"
 #include "LeastSquaresThroughput.h"
-#include "ThroughputSensor.h"
+#include "TSThroughputSensor.h"
 #include "DelaySensor.h"
 #include "CommandOutput.h"
 
 using namespace std;
 
 LeastSquaresThroughput::LeastSquaresThroughput(
-  ThroughputSensor const * newThroughput,
+  TSThroughputSensor const * newThroughput,
   DelaySensor const * newDelay)
 
   : throughput(newThroughput)
@@ -74,7 +74,8 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
       // sample numbers which monotonically increase.
       double slope = num/denom;
 
-      logWrite(SENSOR, "LeastSquares: SLOPE: %f", slope);
+      logWrite(SENSOR, "LeastSquares: SLOPE: %f TPA: %i LR:%i", slope,
+               static_cast<int>(throughputAverage),lastReport);
 
       if (slope > 0)
       {
