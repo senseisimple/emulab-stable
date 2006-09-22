@@ -61,6 +61,8 @@ emulated_to_interface = {}
 ip_mapping_filename = ''
 initial_filename = ''
 this_experiment = ''
+pid = ''
+eid = ''
 this_ip = ''
 stub_ip = ''
 stub_port = 0
@@ -75,15 +77,7 @@ last_total = -1
 prev_time = 0.0
 
 def main_loop():
-  global total_size, last_total, evclient
-
-  # XXX: The name of the event server is hardwired here, and due to the
-  #      lack of autoconf, isn't even an autoconf var.  Could add a command
-  #      line option to set it if needed.
-  # XXX: This HAS to be done before read_args, becuase read_args can fire
-  #      off set_link().
-  #      
-  evclient = EventClient(server=TBEVENT_SERVER)
+  global total_size, last_total
 
   # Initialize
   read_args()
@@ -126,6 +120,7 @@ def main_loop():
 
 def read_args():
   global ip_mapping_filename, this_experiment, this_ip, stub_ip, stub_port
+  global pid, eid, evclient
   global initial_filename
 
   usage = "usage: %prog [options]"
@@ -169,6 +164,17 @@ def read_args():
   if this_ip == None:
     parser.print_help()
     parser.error("Missing --ip=X.X.X.X option")
+
+  (pid,eid) = this_experiment.split('/')
+
+  # XXX: The name of the event server is hardwired here, and due to the
+  #      lack of autoconf, isn't even an autoconf var.  Could add a command
+  #      line option to set it if needed.
+  # XXX: This HAS to be done before here, becuase read_args can fire
+  #      off set_link().
+  #      
+  evclient = EventClient(server=TBEVENT_SERVER,
+                         keyfile="/proj/%s/exp/%s/tbdata/eventkey" % (pid,eid))
 
   populate_ip_tables()
   if stub_ip == None:
@@ -402,6 +408,7 @@ def set_link(source, dest, ending):
   evtuple.site  = ADDRESSTUPLE_ALL
   evtuple.group = ADDRESSTUPLE_ALL
   evtuple.eventtype = 'MODIFY'
+  evtuple.objtype = 'LINK'
   evtuple.expt = this_experiment
   evtuple.objname   = emulated_to_interface[source]
   evnotification = evclient.create_notification(evtuple)
