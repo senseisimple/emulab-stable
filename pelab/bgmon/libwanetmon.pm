@@ -7,23 +7,30 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 use IO::Socket::INET;
 use IO::Select;
+#use lib '/usr/testbed/lib';
+#use event;
 require Exporter;
 
 @ISA    = "Exporter";
-@EXPORT = qw ( 
+our @EXPORT = qw ( 
 	       %deadnodes
 	       %ERRID
 	       deserialize_hash
 	       serialize_hash
 	       sendcmd
+	       sendcmd_evsys
 	       time_all
 	       setcmdport
 	       setexpid
 	       stopnode
+	       stopnode_evsys
 	       edittest
+	       edittest_evsys
 	       killnode
 	       getstatus
 	       );
+our @EXPORT_OK = qw(
+		    );
 
 
 # These errors define specifics of when a measurement value cannot be
@@ -49,11 +56,13 @@ my $expid;
 sub setcmdport($)
 {
     $port = $_[0];
+#    print "libwanetmon: port=$port\n";
 }
 
 sub setexpid($)
 {
     $expid = $_[0];
+#    print "libwanetmon: expid=$expid\n";
 }
 
 
@@ -117,6 +126,7 @@ sub sendcmd($$)
     }
 
     my $sercmd = serialize_hash( \%cmd );
+#    print "sercmd=$sercmd\n";
     my $f_success = 0;
     my $max_tries = 3;
     my $retval;
@@ -167,13 +177,73 @@ sub sendcmd($$)
 }
 
 
-sub stopnode($)
+
+
+#
+# input params:
+# - name of command (EDIT, INIT, etc..)
+# - hash of extra strings to add to event notification
+# - handle to eventsystem "handle"
+sub sendcmd_evsys($$$)
 {
-    my ($node) = @_;
+    my ($cmdname, $hashref,$handle) = @_;
+    my %cmd = %$hashref;
+
+    #
+    # This is the evsys command to send
+    #
+    my $tuple = event::address_tuple_alloc();
+    if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+    %$tuple = ( objtype   => "BGMON",
+		objname   => "manager",
+		eventtype => $cmdname,
+		expt      => "__none",
+		);
+
+    my $notification = event::event_notification_alloc($handle,$tuple);
+    if (!$notification) { die "Could not allocate notification\n"; }
+
+    # set extra params
+    foreach my $name (keys %cmd){
+	if( 0 == event::event_notification_put_string( $handle,
+						$notification,
+						"$name",
+						$cmd{$name} ) )
+	{ warn "Could not add attribute to notification\n"; }
+    }
+
+    #send notification
+    if (!event::event_notify($handle, $notification)) {
+	die("could not send test event notification");
+    }
+
+    event::event_notification_free($handle, $notification);
+
+}
+
+
+sub stopnode($$)
+{
+    my ($node,$managerID) = @_;
     my %cmd = ( expid    => $expid,
+		managerID => $managerID,
 		cmdtype  => "STOPALL" );
     sendcmd($node,\%cmd);
 }
+
+
+#
+#
+sub stopnode_evsys($$$)
+{
+    my ($node, $managerID, $handle) = @_;
+    my %cmd = ( srcnode      => $node,
+		managerID    => $managerID,
+		cmdtype  => "STOPALL" );
+    sendcmd_evsys("STOPALL",\%cmd,$handle);
+}
+
 
 sub killnode($)
 {
@@ -184,12 +254,10 @@ sub killnode($)
 }
 
 
-sub edittest($$$;$)
+sub edittest($$$$$$)
 {
-    my ($srcnode, $destnode, $testper, $testtype, $limitTime) = @_;
-    if( !defined $limitTime ){
-	$limitTime = 0;
-    }
+    my ($srcnode, $destnode, $testper, $testtype, $duration, $managerID) = @_;
+
     if ($srcnode eq $destnode ){
 	return -1;
     }
@@ -199,9 +267,30 @@ sub edittest($$$;$)
 		dstnode  => $destnode,
 		testtype => $testtype,
 		testper  => $testper,
-		limitTime=> $limitTime);
+		duration => $duration );
 
     return ${[sendcmd($srcnode,\%cmd)]}[0];
+}
+
+sub edittest_evsys($$$$$$$)
+{
+    my ($srcnode, $destnode, $testper, $testtype, 
+	$duration, $managerID, $handle) = @_;
+
+    if ($srcnode eq $destnode ){
+	return -1;
+    }
+
+    my %cmd = ( managerID    => $managerID,
+		srcnode  => $srcnode,
+		dstnode  => $destnode,
+		testtype => $testtype,
+		testper  => $testper,
+		duration => $duration );
+
+    sendcmd_evsys("EDIT",\%cmd,$handle);
+
+    #return ${[sendcmd($srcnode,\%cmd)]}[0];
 }
 
 
@@ -216,6 +305,8 @@ sub getstatus($){
 	return "error";
     }
 }
+
+
 
 
 1;

@@ -17,6 +17,7 @@ my %test_per = (  # defaults
 	       "latency" => 300,
 	       "bw"      => 0,
 	       );
+$thisManagerID = "automanagerclient";
 my %intersitenodes = (); #final list for fully-connected test
 my @constrnodes;    #test constrained to these nodes
 my %sitenodes;      #hash listing all sites => nodes
@@ -259,11 +260,15 @@ sub initNewSiteNode($)
 	edittest( $intersitenodes{$srcsite},
 		  $intersitenodes{$site},
 		  $test_per{bw},
-		  "bw" );
+		  "bw",
+		  0,
+		  $thisManagerID);
 	edittest( $intersitenodes{$site},
 		  $intersitenodes{$srcsite},
 		  $test_per{bw},
-		  "bw" );
+		  "bw"
+		  0,
+		  $thisManagerID );
 	my $r = rand;
 	if( $r <= .5 ){
 	    edittest( $intersitenodes{$srcsite},

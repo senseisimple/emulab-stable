@@ -84,9 +84,12 @@ my %cacheLastSentAt;    #{indx} -> tstamp of last sent cache result
 my $cacheIndxWaitPer = 5; #wait x sec between cache send attempts of same indx
 my $iperfduration = 5;  #length of each iperf test in seconds
 my $iperftimeout = 30;   #kill an iperf process lasting longer than this.
+my $outDet_maxPastSuc = 12; #consider a path for outage detection if a valid
+                            #result appeared within this many hours in the past
+
+=pod
 # percentage of testing period to wait after a test process abnormally exits
 # note: 0.1 = 10%
-=pod
 my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.5);
 =cut  
@@ -170,7 +173,7 @@ sub handleincomingmsgs()
     my $inmsg;
     my $cmdHandle;
 
-    #check for pending received events
+
     my @ready = $sel->can_read($pollPer);  #wait max of 0.1 sec. Don't want to
                                       #have 0 here, or CPU usage goes high
     foreach my $handle (@ready){
@@ -223,133 +226,42 @@ sub handleincomingmsgs()
 
 	    my $testev = \%{ $testevents{$linkdest}{$testtype} };
 
+	    print time()." EDIT:\n";
+	    print( "linkdest=$linkdest\n".
+		   "testype =$testtype\n".
+		   "testper=$newtestper\n" );
+	    print "duration=".$sockIn{duration}."\n" 
+		if( defined $sockIn{duration} );
 
-	    if( editTest($testev, $newtestper, $duration, $managerID) ){
-		print time()." EDIT:\n";
-		print( "linkdest=$linkdest\n".
-		       "testype =$testtype\n".
-		       "testper=$newtestper\n" );
-		print "duration=".$sockIn{duration}."\n" 
-		    if( defined $sockIn{duration} );
+
+	    #
+	    # only edit test if this test is not in an outage state,
+	    # thus testing periods defined outside of user control
+	    #
+	    if( !defined $testev->{outagestate} ){
+		$testev->{outagestate} = "normal";
+#		print "initial EDIT, so setting outagestate to normal\n";
 	    }
-=pod
-	    # only change test if conditions met...
-	    if( checkTestChangeAllowed( $testev, $managerID ) ){
-		# TODO: TEST THIS!!!
-		#
-		# Smartly handle two overlapping requests, such that
-                #  the highest rate is used for the duration specified
-                #  in the command
-		# TODO: Add fancier queuing here!
+	    if( $testev->{outagestate} eq "normal" )
+	    {
+		editTest($testev, $newtestper, $duration, $managerID);
+	    }else{
+		print time()." PATH CURRENTLY IN OUTAGE DETECTION MODE\n";
 
-                # Specifications:
-		#  - an EDIT with testper=0
-		#    will stop the corresponding 'temp' or 'forever' test
-		#    selected by the value of 'duration'.
-		#  - ** Only a "background" rate (forever) and one
-		#       temporary rate increase are supported.
-		#  - ANY new 'forever' rate will overwrite the previous one
-		#  - A 'forever' faster than existing 'temp' overwrites 'temp'
-		#    and does not recover it if a future 'forever' has a rate
-		#    less than the 'temp' (it removes all trace)
-		# state descriptions: (Current state) -> (action)
-		# saved valid|Currently running | New|   change|replace
-		# 'forever'  | 0=forever        |Edit|  period?|saved
-		# exists     | 1=temp)          |Type| ->      |'forever'?
-		#  0          0                   0         1     0
-		#  0          1                   0         0     1
-		#  1          1                   0         0     1
-		#  0          0                   1         1     1
-		#  0          1                   1         1     0
-		#  1          1                   1         1     0
-
-		#TODO!!!
-		# EDIT above... action after rcving 'forever' while running
-                #  a 'temp' depends on period comparisons between
-		#  old 'forever' new 'forever' and 'temp'
-
-		#make sure existing testper is valid
-		if( !defined $testev->{testper} ){
-		    $testev->{testper} = 0;
-		}
-		#make sure limitTime is valid
-		if( !defined $testev->{limitTime} ){
-		    $testev->{limitTime} = 0;
-		}
-
-		if( defined $sockIn{duration} && $sockIn{duration} > 0 ){
-		    # New edit is a 'temp' type
-		    if( $newtestper < $testev->{testper} || 
-			$testev->{testper} == 0 )
-		    {
-			# state (xx1->1?) new per checked for faster freq.
-			if( $testev->{limitTime} == 0 && $newtestper > 0){
-			    # state (x01->11)
-			    #Save existing 'forever' test and use new testper
-			    $testev->{prevPeriod} = $testev->{testper};
-			    $testev->{testper} = $newtestper;
-			    $testev->{limitTime} = 
-				time_all()+$sockIn{duration};
-			}elsif( $testev->{limitTime} != 0 ){
-			    # state (x11->10)
-			    if( $newtestper == 0 ){
-				# temp edit is 0 per, so re-start saved
-				#'forever' test
-				$testev->{testper} = $testev->{prevPeriod};
-				$testev->{limitTime} = 0;
-			    }else{
-				#update period and duration with new command
-				$testev->{testper} = $newtestper;
-				$testev->{limitTime} = 
-				    time_all()+$sockIn{duration};
-			    }
-			}
-		    }
+		#save this newest command in "pending"
+		if( defined $duration && $duration > 0){
+		    $testev->{pendingtempper} = $newtestper;
+		    $testev->{pendingtempduration} = $duration;
+		    $testev->{pendingtemprcvtime} = time();
 		}else{
-		    #state (xx0->??)
-		    # New edit is a 'forever' type
-		    if( $testev->{limitTime} == 0 ){
-			# state (x00->10)
-			#  currently running a forever
-			$testev->{testper} = $newtestper;
-		    }else{
-			# state (x10->01)
-			#  currently running a temp
-			# cases of periods
-			#  1) new forever is not 0 and < existing temp.
-			#  2) new forever is 0
-			#  3) new forever is > existing temp
-			if( $newtestper != 0 &&
-			    $newtestper < $testev->{testper} )
-			{
-			    #case 1
-			    $testev->{testper} = $newtestper;
-			    $testev->{limitTime} = 0;
-			    $testev->{prevPeriod} = 0;
-			}elsif( $newtestper == 0 ){
-			    #case 2
-			    $testev->{prevPeriod} = 0;
-			}elsif( $newtestper > $testev->{testper} ){
-			    #case 3
-			    $testev->{prevPeriod} = $newtestper;
-			}
-		    }
+		    $testev->{pendingdurationper} = $newtestper;
 		}
-
-		$testev->{flag_scheduled} = 0;
-		$testev->{timeOfNextRun} = time_all();
-		$testev->{managerID} = $managerID;
-
-
-		print time()." EDIT:\n";
-		print( "linkdest=$linkdest\n".
-		       "testype =$testtype\n".
-		       "testper=$newtestper\n" );
-		print "duration=".$sockIn{duration}."\n" 
-		    if( defined $sockIn{duration} );
 	    }
-=cut
-
+	    print( "linkdest=$linkdest\n".
+		   "testype =$testtype\n".
+		   "testper=$newtestper\n" );
+	    print "duration=".$sockIn{duration}."\n" 
+		if( defined $sockIn{duration} );
 	}
 	elsif( $cmdtype eq "INIT" ){
 	    print time()." INIT: ";
@@ -369,8 +281,28 @@ sub handleincomingmsgs()
 	    my $offset = 0;
             foreach my $linkdest (@destnodes){
 		my $testev = \%{ $testevents{$linkdest}{$testtype} };
-		editTest($testev, $newtestper, $duration, $managerID, $offset);
-		$offset += $offsetinc;
+
+		#
+		# only edit test if this test is not in an outage state,
+		# thus testing periods defined outside of user control
+		#
+		if( !defined $testev->{outagestate} ){
+		    $testev->{outagestate} = "normal";
+		}if( $testev->{outagestate} eq "normal" ){
+		    editTest($testev, $newtestper, $duration, 
+			     $managerID, $offset);
+		    $offset += $offsetinc;
+		}else{
+		    print time()." PATH CURRENTLY IN OUTAGE DETECTION MODE\n";
+		    #save this newest command in "pending"
+		    if( defined $duration && $duration > 0){
+			$testev->{pendingtempper} = $newtestper;
+			$testev->{pendingtempduration} = $duration;
+			$testev->{pendingtemprcvtime} = time();
+		    }else{
+			$testev->{pendingdurationper} = $newtestper;
+		    }
+		}
 	    }
 	    print " $testtype  $newtestper\n";
 	}
@@ -565,6 +497,12 @@ while (1) {
 		#reset flags
 		$testev->{"flag_finished"} = 0;
 		$testev->{"flag_scheduled"} = 0;
+
+		#TODO: Outage detection here...
+		#look at latency to determine outage
+		if( $testtype eq "latency" ){
+		    updateOutageState( $testev );
+		}
 	    }
 
 	    #schedule new tests
@@ -996,15 +934,18 @@ sub createDBfilename()
 
 #############################################################################
 
+#
+# return a warning (bw, for now) if a test has not been run for a while
+# after when it is scheduled to be
 sub detectHang($)
 {
     my ($nodeid) = @_;
-    my $TIMEOUT_NUM_PER = 5;
+    my $TIMEOUT_NUM_PER = 10;
 
-    if( 
-	$testevents{$nodeid}{bw}{flag_scheduled} == 1 &&
+    if( $testevents{$nodeid}{bw}{flag_scheduled} == 1 &&
 	time_all() > $testevents{$nodeid}{bw}{timeOfNextRun} +
-	$testevents{$nodeid}{bw}{testper} * $TIMEOUT_NUM_PER )
+	$testevents{$nodeid}{bw}{testper} * $TIMEOUT_NUM_PER
+	&& $testevents{$nodeid}{bw}{testper} >0 )
     {
 	return "bw";
     }
@@ -1030,6 +971,8 @@ sub isMsgValid(\%)
 
 sub checkTestChangeAllowed(\%$)
 {
+    return 1;  # always allowed.. for now
+=pod
     my ($href, $managerID ) = @_;
     my %testev = %{$href};
     if( !defined %testev ||
@@ -1049,6 +992,7 @@ sub checkTestChangeAllowed(\%$)
 	    "  old managerID=$testev{managerID}\n";
 	return 0;
     }
+=cut
 }
 
 
@@ -1166,5 +1110,56 @@ sub editTest(\$$$,$)
     }
     else{
 	return 0;
+    }
+}
+
+
+#
+#
+#
+=pod
+state transitions
+
+CurrentState   Input                 NextState
+----------------------------------------------
+normal         gotErr&PrevSucc       highFreq
+               else                  normal
+highFreq       <60sec&ERR            highFreq
+               >60sec&ERR            medFreq
+               SUCCESS               outageEnd
+medFreq        <10min&ERR            medFreq
+               >10min&ERR            lowFreq
+               SUCCESS               outageEnd
+lowFreq        ERR                   lowFreq
+               SUCCESS               outageEnd
+outageEnd      <120sec&SUCCESS       outageEnd
+               >120sec&SUCCESS       normal
+               ERR                   highFreq
+=cut
+
+sub updateOutageState(\$)
+{
+    my ($testev) = @_;
+    my $curstate = $testev->{outagestate};
+    if( $parseData > 0 ){
+	#valid result, so note the time that this was seen
+	$testev->{lastValidLatTime} = time();
+    }
+
+
+    # SWITCH ON outagestate
+    if( $curstate eq "normal" ){
+
+    }elsif(){
+
+    }
+
+
+    if( defined $testev->{lastValidLatTime} && 
+	    time() < $testev->{lastValidLatTime}
+	    + $outDet_maxPastSuc )
+    {
+	#path down and was up recently, so start latency outage
+	
     }
 }

@@ -14,6 +14,8 @@ Parameters/options (more details):
         schedule measurements in a fully connected fashion. Default
         is to init nodes in a pairwise fashion, in order listed in
         <input_file>.
+- (-e): project and experiment ids of the experiment running bgmons on
+        plab. For now, this is tbres/pelabbgmon.
 
 After script starts, it awaits a user command at a console prompt.
 The commands fully implemented are "start" and "stop", which send 
