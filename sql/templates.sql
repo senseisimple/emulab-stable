@@ -362,6 +362,9 @@ CREATE TABLE experiment_runs (
   runid varchar(32) NOT NULL default '',
   -- A short description; not sure I really want this. 
   description tinytext,
+  -- The archive tags for the start and end of the run.
+  starting_archive_tag varchar(64) default NULL,
+  ending_archive_tag varchar(64) default NULL,
   -- The tag for the commit at the end of the run.
   archive_tag varchar(64) default NULL,
   -- Timestamps

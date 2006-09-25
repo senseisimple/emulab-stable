@@ -486,6 +486,8 @@ CREATE TABLE experiment_runs (
   idx int(10) unsigned NOT NULL auto_increment,
   runid varchar(32) NOT NULL default '',
   description tinytext,
+  starting_archive_tag varchar(64) default NULL,
+  ending_archive_tag varchar(64) default NULL,
   archive_tag varchar(64) default NULL,
   start_time datetime default NULL,
   stop_time datetime default NULL,

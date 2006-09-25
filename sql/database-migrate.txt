@@ -3685,3 +3685,14 @@ last_net_act,last_cpu_act,last_ext_act);
       caps for plab nodes.
 
       alter table widearea_nodeinfo add bwlimit varchar(32) default NULL;
+
+4.89: Add starting and ending archive tags to experiment run, to
+      replace the single end of run archive tag.
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      alter table experiment_runs add \
+        starting_archive_tag varchar(64) default NULL after description;
+      alter table experiment_runs add \
+        ending_archive_tag varchar(64) default NULL after starting_archive_tag;
+
