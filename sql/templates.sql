@@ -370,6 +370,9 @@ CREATE TABLE experiment_runs (
   -- Timestamps
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  -- If the run specified swapmod, record that with this flag.
+  -- The NS file is stored in the archive.
+  swapmod tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (exptidx, idx)
 ) TYPE=MyISAM;
 

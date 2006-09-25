@@ -491,6 +491,7 @@ CREATE TABLE experiment_runs (
   archive_tag varchar(64) default NULL,
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  swapmod tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (exptidx,idx)
 ) TYPE=MyISAM;
 
