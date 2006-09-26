@@ -3019,7 +3019,7 @@ sub Delete($)
 
     my $runidx  = $self->idx();
     my $exptidx = $self->exptidx();
-    my $instance_id = $self->instance()->idx();
+    my $instance_idx = $self->instance()->idx();
 
     DBQueryWarn("delete from experiment_run_bindings ".
 		"where exptidx='$exptidx' and runidx='$runidx'")
