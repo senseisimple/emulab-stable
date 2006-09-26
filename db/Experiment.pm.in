@@ -1352,5 +1352,36 @@ sub WriteProgramAgents($)
     return 0;
 }
 
+#
+# Return node status list for all nodes in the experiment. Status is defined
+# as either up or down, which for now is going to be returned as 0,1.
+#
+sub NodeStatusList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %results = ();
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select n.node_id,n.status from reserved as r ".
+		    "left join node_status as n on n.node_id=r.node_id ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return -1
+	if (!defined($query_result));
+    
+    while (my ($node_id,$status) = $query_result->fetchrow_array()) {
+	$results{$node_id} = (($status eq "up") ? 1 : 0);
+    }
+    %$prval = %results;
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
