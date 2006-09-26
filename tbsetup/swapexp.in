@@ -286,6 +286,17 @@ my $workdir = $experiment->WorkDir();
 my $userdir = $experiment->UserDir();
 
 #
+# See if this is a template instance; error if the -x option not provided,
+# since that means user is trying to self-terminate; not in the program.
+#
+if (my $instance = Template::Instance->LookupByExptidx($experiment->idx()))
+    if (! $template_mode) {
+	die("*** $0:\n".
+	    "    $pid/$eid is a template instance; use another command\n");
+    }
+}
+
+#
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
