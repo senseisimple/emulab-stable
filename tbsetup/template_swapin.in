@@ -47,7 +47,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:x:bE:t:";
+my $optlist	 = "qwe:S:L:na:l:se:x:bE:t:r:f";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -90,6 +90,11 @@ my @ExptStates  = ();
 my $cleaning    = 0;
 my $exptcreated = 0;
 my $justexit    = 1;
+# For replay
+my $replay_exptidx;	# Instance to replay.
+my $replay_runidx;	# Optional run within instance to replay.
+my $replay_instance;	# Replay a complete instance, from first run.
+my $replay_run;	        # Replay starting with a particular run in instance.
 
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
@@ -190,6 +195,37 @@ if (! TBProjAccessCheck($dbuid,
 }
 
 #
+# Grab instance and/or run if this is a replay.
+#
+if (defined($replay_exptidx)) {
+    $replay_instance =
+      Template::Instance->LookupByExptidx($replay_exptidx);
+
+    if (!defined($replay_instance)) {
+	tbdie("Replay Instance $replay_exptidx does not exist!");
+    }
+
+    if (!defined($replay_runidx)) {
+	#
+	# Default to first run.
+	#
+	# XXX Need to convert these other routines to return Run objects
+	my $row = $replay_instance->FirstRun();
+	if (defined($row)) {
+	    tbdie("Could not find first run for $replay_instance!");
+	}
+	$replay_runidx = $row->{'idx'};
+    }
+
+    $replay_run =
+      Template::Instance::Run->LookupByID($replay_exptidx, $replay_runidx);
+
+    if (!defined($replay_run)) {
+	tbdie("Replay Run $replay_runidx does not exist!");
+    }
+}
+
+#
 # If we have a parameter file, we need to copyin the values and store
 # them in the DB for this experiment. Note that these override existing
 # values, so we start with those first.
@@ -235,7 +271,7 @@ if (defined($paramfile)) {
 }
 
 #
-# Generate a new template instance record, and get back its index.
+# Generate a new template instance record.
 # We will finish updating it later.
 #
 $instance = $template->NewInstance($eid, $dbuid);
@@ -250,7 +286,8 @@ if (!defined($instance)) {
 $justexit = 0;
 
 #
-# Now insert the binding records so that the parser can get them.
+# Now insert the binding records for the instance so that the parser
+# can get them.
 #
 if ($paramfile) {
     foreach my $name (keys(%parameters)) {
@@ -260,14 +297,42 @@ if ($paramfile) {
 	    or fatal(-1, "Error inserting binding into DB!");
     }
 }
+elsif (defined($replay_instance)) {
+    #
+    # Bindings come from the replay instance (well, run).
+    #
+    my %replay_bindings = ();
+
+    $replay_run->BindingList(\%replay_bindings) == 0
+	or fatal(-1, "Error getting bindings from $replay_run!");
+
+    foreach my $name (keys(%replay_bindings)) {
+	my $value = $replay_bindings{$name};
+
+	# Insert into new instance now, for the parser to pick up.
+	$instance->NewBinding($name, $value) == 0
+	    or fatal(-1, "Error inserting binding into DB!");
+
+	# These are used below for inserting the run bindings.
+	$parameters{$name} = $value
+	    if (exists($parameters{$name}));
+    }
+}
 
 #
-# For now, I am not worrying about reparsing the experiment. Just make
-# a copy of the existing preload associated with the template. This will
-# certainly change later.
+# We make a copy of either the underlying template experiment, or of the
+# replay argument.
 #
 my $pid    = $template->pid();
 my $copyid = $template->pid() . "," . $template->eid();
+
+#
+# Ah, but if this is a replay, then the copyid is really a tag in a
+# previous experiment. 
+#
+if (defined($replay_instance)) {
+    $copyid = $replay_instance->exptidx() . ":" . $replay_run->start_tag();
+}
 
 #
 # Go to the background now so we have a proper log of what happened.
@@ -422,9 +487,9 @@ if ($OPSDBSUPPORT) {
 }
 
 #
-# Need the current archive tag so we know how to find the datastore that
-# corresponds to this instance, at some later date.
-#
+# Need the current archive tag so that we can mark the new instance
+# with the the corresponding state of the archive.
+# 
 libArchive::TBExperimentArchiveTag($template->pid(),
 				   $template->eid(), \$template_tag) == 0
     or fatal(-1, "Could not get current tag for $template");
@@ -454,13 +519,22 @@ if ($paramfile) {
 }
 
 #
-# Copy the datastore into the experiment directory. This really needs
-# to be a checkout, and it really needs to go someplace other then the
-# exp directory. Anyway, once that is done, add an environment
-# variable the user can reference for finding files in the datastore.
+# Grab a checkout of the datastore and place it into the exp directory.
+# This is essentially a copy.
 #
 my $instance_path = $userdir;
-$instance->CopyDataStore($template_tag,
+my $datastore_tag = $template_tag;
+
+#
+# But if this is a replay, then use the tag corresponding to the run being
+# replayed, so that we get the datastore that was in place when the run was,
+# well, originally run.
+#
+if (defined($replay_instance)) {
+    $datastore_tag = $replay_run->start_tag();
+}
+
+$instance->CopyDataStore($datastore_tag,
 			 "$instance_path/template_datastore") == 0
     or fatal(-1, "Could not copy datastore ($template_tag) to instance");
 
@@ -616,6 +690,9 @@ sub ParseArgs()
     if (defined($options{"w"})) {
 	$waitmode = 1;
     }
+    if (defined($options{"f"})) {
+	$foreground = 1;
+    }
     if (defined($options{"b"})) {
 	$batchmode = 1;
     }
@@ -695,6 +772,21 @@ sub ParseArgs()
 	    tbdie("Improper template description!");
 	}
 	$description = $options{"E"};
+    }
+
+    if (defined($options{"r"})) {
+	my $replay_option = $options{"r"};
+
+	if ($replay_option =~ /^([\d]+)$/) {
+	    $replay_exptidx = $1;
+	}
+	elsif ($replay_option =~ /^([\d]+):([\d]+)$/) {
+	    $replay_exptidx = $1;
+	    $replay_runidx  = $2;
+	}
+	else {
+	    tbdie("Bad data in argument: $replay_option");
+	}
     }
 }
 
