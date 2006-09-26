@@ -48,7 +48,7 @@ void
 sigalrm(int sig)
 {
 	event_stop_main(handle);
-	exit_value = -1;
+	exit_value = ETIMEDOUT;
 }
 
 void
