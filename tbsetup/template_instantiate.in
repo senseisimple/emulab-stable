@@ -82,6 +82,7 @@ my $EVhandle;
 my $exptidx;
 my $template;
 my $instance;
+my $run;
 my $logname;
 my $template_tag;
 my @ExptStates  = ();
@@ -539,8 +540,10 @@ if ($batchmode) {
 #
 # All instances currently start with a default run.
 #
-$instance->NewRun($eid, $description) == 0
-    or fatal(-1, "Could not insert experiment new run record!");
+$run = $instance->NewRun($eid, $description);
+if (!defined($run)) {
+    fatal(-1, "Could not create new experiment run for $instance!");
+}
 
 #
 # And the bindings for the default run ...
@@ -552,7 +555,7 @@ foreach my $name (keys(%parameters)) {
 	or fatal(-1, "Error inserting run binding into DB!");
 }
 
-$instance->StartFirstRun() == 0
+$instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0
     or fatal(-1, "Could not update start time in instance record!");
 
 # Stop the web interface from spewing.
