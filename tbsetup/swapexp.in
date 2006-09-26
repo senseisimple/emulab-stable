@@ -80,6 +80,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libArchive;
+use Template;
 use Experiment;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
