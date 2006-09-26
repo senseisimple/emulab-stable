@@ -390,3 +390,21 @@ CREATE TABLE experiment_run_bindings (
   PRIMARY KEY  (exptidx, runidx, name)
 ) TYPE=MyISAM;
 
+#
+# This table holds the names of nodes that failed to respond during a start
+# or stop run. This is mostly informational at this point.
+#
+CREATE TABLE experiment_template_instance_deadnodes (
+  -- Backlink to the instance above.
+  instance_idx int(10) unsigned NOT NULL default '0',
+  -- The experiment index (into the current experiments table).
+  exptidx int(10) unsigned NOT NULL default '0',
+  -- The run index 
+  runidx int(10) unsigned NOT NULL default '0',
+  -- The node that failed.
+  node_id varchar(32) NOT NULL default '',
+  -- The vname of the node since that is typically more useful.
+  vname varchar(32) NOT NULL default '',
+  PRIMARY KEY  (instance_idx, runidx, node_id)
+) TYPE=MyISAM;
+

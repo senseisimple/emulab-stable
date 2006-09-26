@@ -3703,3 +3703,14 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table experiment_runs add swapmod tinyint(1) NOT NULL default '0';
 
+4.91: Add a table to store the ids of nodes that fail during an
+      instance (well, run). 
+
+	CREATE TABLE experiment_template_instance_deadnodes (
+	  instance_idx int(10) unsigned NOT NULL default '0',
+	  exptidx int(10) unsigned NOT NULL default '0',
+	  runidx int(10) unsigned NOT NULL default '0',
+	  node_id varchar(32) NOT NULL default '',
+	  vname varchar(32) NOT NULL default '',
+	  PRIMARY KEY  (instance_idx, runidx, node_id)
+	) TYPE=MyISAM;

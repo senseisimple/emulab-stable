@@ -605,6 +605,19 @@ CREATE TABLE experiment_template_instance_bindings (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `experiment_template_instance_deadnodes`
+--
+
+CREATE TABLE experiment_template_instance_deadnodes (
+  instance_idx int(10) unsigned NOT NULL default '0',
+  exptidx int(10) unsigned NOT NULL default '0',
+  runidx int(10) unsigned NOT NULL default '0',
+  node_id varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  PRIMARY KEY  (instance_idx, runidx, node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `experiment_template_instances`
 --
 
