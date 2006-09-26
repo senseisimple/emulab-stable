@@ -4848,6 +4848,11 @@ class template:
                     argstr += " -q "
                     pass
                 pass
+            elif opt == "ignoreerrors":
+                if xbool(val):
+                    argstr += " -i "
+                    pass
+                pass
             elif opt == "pid":
                 pid = escapeshellarg(val)
                 pass

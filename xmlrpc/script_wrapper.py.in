@@ -2182,7 +2182,7 @@ class template_stoprun:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:qp:t:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "we:qp:t:i", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -2208,6 +2208,9 @@ class template_stoprun:
                 pass
             elif opt == "-t":
                 params["token"] = val;
+                pass
+            elif opt == "-i":
+                params["ignoreerrors"] = "yes";
                 pass
             elif opt == "-e":
                 params["exp"] = val;
@@ -2241,6 +2244,8 @@ class template_stoprun:
 	print "template_stoprun [-w] -e id [-p <pid> | <guid/vers>]";
 	print "where:";
         print "     -e   - Instance ID (aka eid)";
+        print "     -i   - Ignore errors and force Run to stop";
+	print "     -w   - Wait for Run to finish stopping";
         print "    guid  - Template GUID";
         print ""
         print "Environment:"
