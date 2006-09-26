@@ -2110,7 +2110,7 @@ sub DeleteCurrentRun($)
 	or return -1;
     
     DBQueryWarn("delete from experiment_template_instance_deadnodes ".
-		"where instance_idx='$idx' and idx='$runidx'")
+		"where instance_idx='$idx' and runidx='$runidx'")
 	or return -1;
     
     DBQueryWarn("update experiment_template_instances set runidx=NULL ".
@@ -3030,7 +3030,7 @@ sub Delete($)
 	or return -1;
 
     DBQueryWarn("delete from experiment_template_instance_deadnodes ".
-		"where instance_idx='$instance_idx' and idx='$runidx'")
+		"where instance_idx='$instance_idx' and runidx='$runidx'")
 	or return -1;
     
     return 0;
