@@ -9,7 +9,7 @@ use strict;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
-use Errno qw(EDQUOT);
+use Errno qw(EDQUOT ETIMEDOUT);
 use XML::Simple;
 use Data::Dumper;
 
@@ -54,6 +54,7 @@ my $clean        = 0;
 my $doswapmod    = 0;
 my $paramfile;
 my %parameters   = ();
+my %deadnodes    = ();
 my $action;
 my $description;
 my $runid;
@@ -84,6 +85,7 @@ my $logname;
 my $dbuid;
 my $exptidx;
 my $template;
+my $run;
 my $instance;
 # For the END block below.
 my $cleaning    = 0;
@@ -102,6 +104,7 @@ sub fatal($$);
 sub sighandler($);
 sub SignalProgAgents($);
 sub SendCompletionEvent();
+sub CheckForDeadNodes();
 
 #
 # Testbed Support libraries
@@ -353,10 +356,16 @@ if ($waitmode) {
 # Might not be a current run, which is okay.
 #
 if (defined($instance->runidx())) {
-    # Ug. I need to figure out how to hook into the event sequence
-    # mechanism so I can use a completion event.
+    $run = Template::Instance::Run->LookupByID($instance->exptidx(),
+					       $instance->runidx());
+    if (!defined($run)) {
+	tbdie("Cannot get current run object for $instance!");
+    }
+	
     print "Asking program agents to stop ... this will take a moment.\n";
-    SignalProgAgents("HALT");
+    SignalProgAgents("HALT") == 0
+	or $ignoreerrors
+	or CheckForDeadNodes();
 
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
@@ -366,7 +375,7 @@ if (defined($instance->runidx())) {
     print "Asking loghole to sync the logfiles ... this will take a minute.\n";
     $instance->LogHole() == 0
 	or $ignoreerrors
-	or fatal(-1, "Loghole failed");
+        or CheckForDeadNodes();
 
     print "Dumping the instance database ... this will take a minute.\n";
     $instance->DumpDB() == 0
@@ -394,7 +403,6 @@ if ($action eq "stop") {
     goto done;
 }
 
-
 #
 # Clean/Clear if requested before generating the new run, in case there
 # is a problem.
@@ -413,14 +421,20 @@ if ($clean) {
 #
 # Generate a new run.
 #
-$instance->NewRun($runid, $description) == 0
-    or fatal(-1, "Could not create new experiment run for $instance!");
+$run = $instance->NewRun($runid, $description);
+if (!defined($run)) {
+    fatal(-1, "Could not create new experiment run for $instance!");
+}
 
 #
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
 #
 $justexit = 0;
+
+# Mark the start time of the run.
+$instance->StartRun(($doswapmod ? Template::STARTRUN_FLAGS_SWAPMOD() : 0)) == 0
+    or fatal(-1, "Could not mark start of new run for $instance!");
 
 #
 # And the bindings for the run ...
@@ -442,12 +456,14 @@ $instance->WriteEnvVariables() == 0
     or fatal(-1, "Could not write environment strings for program agents");
     
 print "Asking program agents to reload ... this will take a moment.\n";
-SignalProgAgents("RELOAD");
-
+SignalProgAgents("RELOAD") == 0
+    or $ignoreerrors
+    or CheckForDeadNodes();
 
 if ($doswapmod) {
     #
-    # Now do the swapmod, using the original NS file for now.
+    # Now do the swapmod, using the original NS file for now. The environ
+    # variables will be passed to the NS reparse by parse-ns wrapper script.
     #
     my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
     my $nsfile     = "$archivedir/nsdata/nsfile.ns";
@@ -470,6 +486,23 @@ else {
 
 print "Experiment run '$runid' has been started.\n";
 done:
+
+if (keys(%deadnodes)) {
+    my $subject;
+    my $message = "";
+
+    foreach my $node_id (keys(%deadnodes)) {
+	$message .= "$node_id appears to be unresponsive\n";
+    }
+
+    if ($action eq "stop") {
+	$subject = "Node failures during Stop Run";
+    }
+    else {
+	$subject = "Node failures during Start New Run";
+    }
+    SENDMAIL($dbuid, $subject, $message, $TBOPS, "CC: $TBOPS");
+}
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)
@@ -661,8 +694,9 @@ sub ParseArgs()
 #
 sub cleanup()
 {
+    # only for start new run; stop run failures do not do this!
     $instance->DeleteCurrentRun()
-	if (defined($instance));
+	if (defined($instance) && defined($run));
 }
 
 sub fatal($$)
@@ -707,9 +741,17 @@ sub SignalProgAgents($)
 	$agent = "__all_program-agents";
     }
 
-    system("$tevc -w -t 60 -e $pid/$eid now $agent $action") == 0
-	or $ignoreerrors
-	or fatal(-1, "Could not send event notification!");
+    system("$tevc -w -t 30 -e $pid/$eid now $agent $action");
+    if ($?) {
+	#
+	# Timeout is important; other errors are real errors.
+	#
+	return ETIMEDOUT
+	    if ($? >> 8 == ETIMEDOUT);
+
+	fatal(-1, "Could not send event notification!");
+    }
+    return 0;
 }
 
 sub SendCompletionEvent()
@@ -725,6 +767,36 @@ sub SendCompletionEvent()
     #
     system("$tevc -e $pid/$eid now ns COMPLETE $arguments") == 0
 	or fatal(-1, "Could not send completion event notification!");
+}
+
+#
+# Look to see if any nodes have died. This is currently our best way to
+# determine likely non-responders to the events and loghole operations,
+# since right now there is no information from the event scheduler about
+# it.  Will probably need to add that, but lets try this for now. The main
+# problem is plab nodes.
+#
+sub CheckForDeadNodes()
+{
+    my %nodestatuslist;
+    
+    $experiment->NodeStatusList(\%nodestatuslist) == 0
+	or fatal(-1, "Could not get node status list");
+
+    foreach my $node_id (keys(%nodestatuslist)) {
+	next
+	    if ($nodestatuslist{$node_id});
+
+	#
+	# Node is dead. Need to record this as part of the template record.
+	# This hash is for later, to send a summary report to the user.
+	#
+	$deadnodes{$node_id} = $node_id;
+	$run->MarkNodeDead($node_id) == 0
+	    or fatal(-1, "Could not mark node as dead in $run");
+
+	tbwarn("$node_id appears to be dead during start/stop run");
+    }
 }
 
 END {

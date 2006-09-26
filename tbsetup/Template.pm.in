@@ -40,6 +40,10 @@ my $RSYNC	= "/usr/local/bin/rsync";
 my %templates   = ();
 my $debug	= 1;
 
+# Flags for functions below.
+sub STARTRUN_FLAGS_FIRSTRUN()	{ 0x1 ;}
+sub STARTRUN_FLAGS_SWAPMOD()	{ 0x2 ;}
+
 #
 # Grab a new GUID for a template. We do not have to use it of course.
 #
@@ -1632,6 +1636,10 @@ use English;
 use libArchive;
 use overload ('""' => 'Stringify');
 
+# Flags for functions below.
+sub STARTRUN_FLAGS_FIRSTRUN()	{ return Template::STARTRUN_FLAGS_FIRSTRUN(); }
+sub STARTRUN_FLAGS_SWAPMOD()	{ return Template::STARTRUN_FLAGS_SWAPMOD(); }
+
 #
 # Lookup a template experiment and create a class instance to return.
 #
@@ -1701,6 +1709,11 @@ sub Create($$)
 
     my $query = "insert into experiment_template_instances set ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    # Give it an initial start time; updated later.
+    $query .= ", "
+	if (defined($argref) && scalar(keys%{$argref}));
+    $query .= "start_time=now() ";
 
     my $query_result = DBQueryWarn($query);
     return undef
@@ -2032,35 +2045,42 @@ sub NewRun($$;$)
     my ($self, $runid, $description) = @_;
 
     # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $run = Template::Instance::Run->Create($self, $runid, $description);
+    return undef
+	if (! defined($run));
+
+    # Grab the run idx and store that back into the instance since it
+    # is now the current run.
+    my $runidx = $run->idx();
+    my $idx    = $self->idx();
+
+    if (! DBQueryWarn("update experiment_template_instances set ".
+		      "  runidx='$runidx' ".
+		      "where idx='$idx'")) {
+	$run->Delete();
+	return undef;
+    }
+    Refresh($self);
+    return $run;
+}
+
+#
+# Lookup a run by its runid.
+#
+sub LookupRun($$)
+{
+    my ($self, $runid) = @_;
+
+    # Must be a real reference. 
     return -1
 	if (! ref($self));
 
     my $exptidx = $self->exptidx();
-    my $dclause = "";
 
-    if (defined($description) && $description ne "") {
-	$description = DBQuoteSpecial($description);
-	$dclause     = "description=$description , ";
-    }
-
-    my $query_result =
-	DBQueryWarn("insert into experiment_runs set ".
-		    "   $dclause exptidx='$exptidx', runid='$runid' ");
-
-    return -1
-	if (! $query_result);
-
-    # Grab the insert record and store that back into the instance since it
-    # is now the current run.
-    my $runidx = $query_result->insertid;
-    my $idx    = $self->idx();
-
-    DBQueryWarn("update experiment_template_instances set ".
-		"  runidx='$runidx' ".
-		"where idx='$idx'")
-	or return -1;
-    
-    return Refresh($self);
+    return Template::Instance::Run->LookupByRunID($exptidx, $runid);
 }
 
 #
@@ -2089,36 +2109,52 @@ sub DeleteCurrentRun($)
 		"where exptidx='$exptidx' and idx='$runidx'")
 	or return -1;
     
+    DBQueryWarn("delete from experiment_template_instance_deadnodes ".
+		"where instance_idx='$idx' and idx='$runidx'")
+	or return -1;
+    
     DBQueryWarn("update experiment_template_instances set runidx=NULL ".
 		"where idx='$idx'")
 	or return -1;
-    
+
     return Refresh($self);
 }
 
 #
 # Start the (first) experiment run.
 #
-sub StartFirstRun($)
+sub StartRun($;$)
 {
-    my ($self) = @_;
+    my ($self, $flags) = @_;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
 
+    $flags = 0
+	if (!defined($flags));
+
     my $idx     = $self->idx();
     my $runidx  = $self->runidx();
     my $exptidx = $self->exptidx();
+    my $clause  = (($flags & STARTRUN_FLAGS_SWAPMOD()) ? ", swapmod=1 " : "");
+    my $archive_tag;
 
+    #
+    # Grab the current archive tag.
+    #
     return -1
-	if (!defined($runidx));
-
-    DBQueryWarn("update experiment_runs set start_time=now() ".
+	if (ArchiveTag($self, \$archive_tag) < 0);
+    
+    DBQueryWarn("update experiment_runs set start_time=now(), ".
+		"       starting_archive_tag='$archive_tag' $clause ".
 		"where exptidx='$exptidx' and idx='$runidx'")
 	or return -1;
 
-    return $self->Start();
+    return $self->Start()
+	if ($flags & STARTRUN_FLAGS_FIRSTRUN());
+    
+    return 0;
 }
 
 #
@@ -2171,7 +2207,8 @@ sub FinalizeCurrentRun($)
     return -1
 	if (ArchiveTag($self, \$archive_tag) < 0);
     
-    DBQueryWarn("update experiment_runs set archive_tag='$archive_tag' ".
+    DBQueryWarn("update experiment_runs set ".
+		"  ending_archive_tag='$archive_tag' ".
 		"where exptidx='$exptidx' and idx='$runidx'")
 	or return -1;
 
@@ -2220,7 +2257,7 @@ sub LastRun($)
     my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     my $exptidx = $self->exptidx();
@@ -2228,6 +2265,25 @@ sub LastRun($)
     my $query_result =
 	DBQueryWarn("select * from experiment_runs ".
 		    "where exptidx='$exptidx' order by idx desc limit 1");
+
+    return undef
+	if (!$query_result);
+
+    return $query_result->fetchrow_hashref();
+}
+sub FirstRun($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+
+    my $query_result =
+	DBQueryWarn("select * from experiment_runs ".
+		    "where exptidx='$exptidx' order by idx asc limit 1");
 
     return undef
 	if (!$query_result);
@@ -2313,6 +2369,14 @@ sub RunBindingList($$)
     my %results = ();
     my $exptidx = $self->exptidx();
     my $runidx  = $self->runidx();
+
+    if (! defined($runidx)) {
+	#
+	# This happens when called during initial swapin.
+	#
+	%$prval = %results;
+	return 0;
+    }
 
     my $query_result =
 	DBQueryWarn("select name,value ".
@@ -2886,7 +2950,251 @@ sub InitializeEnvVariables($;$)
     return 0;
 }
 
+############################################################################
+
+package Template::Instance::Run;
+use libdb;
+use libtestbed;
+use libtblog;
+use English;
+use libArchive;
+use overload ('""' => 'Stringify');
+
+# Flags for functions below.
+sub STARTRUN_FLAGS_FIRSTRUN()	{ return Template::STARTRUN_FLAGS_FIRSTRUN(); }
+sub STARTRUN_FLAGS_SWAPMOD()	{ return Template::STARTRUN_FLAGS_SWAPMOD(); }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self)  = @_;
+    my $guid    = $self->instance()->template()->guid();
+    my $vers    = $self->instance()->template()->vers();
+    my $exptidx = $self->exptidx();
+    my $runid   = $self->runid();
+
+    return "[Run:$runid exptidx:$exptidx Template:$guid/$vers]";
+}
+
+#
+# Create a new run object.
+#
+sub Create($$$;$)
+{
+    my ($class, $instance, $runid, $description) = @_;
+
+    return undef
+	if (ref($class));
+
+    my $exptidx = $instance->exptidx();
+    my $dclause = "";
+
+    if (defined($description) && $description ne "") {
+	$description = DBQuoteSpecial($description);
+	$dclause     = "description=$description , ";
+    }
+
+    my $query_result =
+	DBQueryWarn("insert into experiment_runs set ".
+		    "   $dclause exptidx='$exptidx', runid='$runid' ");
+
+    return undef
+	if (! $query_result);
+
+    # Grab the insert record.
+    my $runidx = $query_result->insertid;
+
+    return Template::Instance::Run->LookupByID($exptidx, $runidx);
+}
+
+sub Delete($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $runidx  = $self->idx();
+    my $exptidx = $self->exptidx();
+    my $instance_id = $self->instance()->idx();
+
+    DBQueryWarn("delete from experiment_run_bindings ".
+		"where exptidx='$exptidx' and runidx='$runidx'")
+	or return -1;
+
+    DBQueryWarn("delete from experiment_runs ".
+		"where exptidx='$exptidx' and idx='$runidx'")
+	or return -1;
+
+    DBQueryWarn("delete from experiment_template_instance_deadnodes ".
+		"where instance_idx='$instance_idx' and idx='$runidx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Lookup a run by its experiment idx and run idx within the experiment.
+#
+sub LookupByID($$$)
+{
+    my ($class, $exptidx, $idx) = @_;
+
+    my $query_result =
+	DBQueryWarn("select * ".
+		    "  from experiment_runs ".
+		    "where exptidx='$exptidx' and idx='$idx'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self            = {};
+    $self->{'DB'}       = $query_result->fetchrow_hashref();
+
+    # Backlink to the instance
+    my $instance        = Template::Instance->LookupByExptidx($exptidx);
+    return undef
+	if (!defined($instance));
+    $self->{'INSTANCE'} = $instance;
+
+    bless($self, $class);
+    return $self;
+}
+
+#
+# Lookup a run by its experiment idx and run ID.
+#
+sub LookupByRunID($$$)
+{
+    my ($class, $exptidx, $runid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select * ".
+		    "  from experiment_runs ".
+		    "where exptidx='$exptidx' and runid='$runid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self            = {};
+    $self->{'DB'}       = $query_result->fetchrow_hashref();
+
+    # Backlink to the instance
+    my $instance        = Template::Instance->LookupByExptidx($exptidx);
+    return undef
+	if (!defined($instance));
+    $self->{'INSTANCE'} = $instance;
+
+    bless($self, $class);
+    return $self;
+}
+
+# accessors
+sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DB'}->{$_[1]}); }
+sub idx($)     { return field($_[0], 'idx'); }
+sub exptidx($) { return field($_[0], 'exptidx'); }
+sub runid($)   { return field($_[0], 'runid'); }
+sub start_time { return field($_[0], 'start_time'); }
+sub stop_time  { return field($_[0], 'stop_time'); }
+sub start_tag  { return field($_[0], 'starting_archive_tag'); }
+sub stop_tag   { return field($_[0], 'ending_archive_tag'); }
+sub instance($){ return ((!ref($_[0])) ? -1 : $_[0]->{'INSTANCE'}); }
+sub template($){ return ((!ref($_[0])) ? -1 : instance($_[0])->template()); }
+
+#
+# Refresh by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+    my $idx     = $self->idx();
+    
+    my $query_result =
+	DBQueryWarn("select * ".
+		    "  from experiment_runs ".
+		    "where exptidx='$exptidx' and idx='$idx'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+	
+    $self->{'DB'} = $query_result->fetchrow_hashref();
+    return 0;
+}
+
+#
+# Get list of bindings for the run.
+#
+sub BindingList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %results = ();
+    my $runidx  = $self->idx();
+    my $exptidx = $self->exptidx();
+
+    my $query_result =
+	DBQueryWarn("select name,value ".
+		    "   from experiment_run_bindings ".
+		    "where runidx='$runidx' and exptidx='$exptidx'");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($name,$value) = $query_result->fetchrow_array()) {
+	$results{$name} = $value;
+    }
+    %$prval = %results;
+    return 0;
+}
+
+#
+# Mark a node as dead for this run; this is recorded in the DB.
+#
+sub MarkNodeDead($$)
+{
+    my ($self, $node_id) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $runidx       = $self->idx();
+    my $instance_idx = $self->instance()->idx();
+    my $exptidx      = $self->exptidx();
+
+    # Need the vname;
+    my $query_result =
+	DBQueryWarn("select vname from reserved ".
+		    "where node_id='$node_id'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    my ($vname) = $query_result->fetchrow_array();
+
+    return -1
+	if (!defined($vname));
+
+    DBQueryWarn("insert into experiment_template_instance_deadnodes set ".
+		"  instance_idx='$instance_idx', exptidx='$exptidx', ".
+		"  runidx='$runidx', node_id='$node_id', vname='$vname'")
+	or return -1;
+
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 
 1;
+
