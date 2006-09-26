@@ -1791,13 +1791,15 @@ class experiment:
                 "(unix_timestamp(now()) - unix_timestamp( "
                 "greatest(na.last_tty_act,na.last_net_act,na.last_cpu_act,"
                 "na.last_ext_act))),ni.load_1min,ni.load_5min,ni.load_15min,"
-                "n.phys_nodeid,r.erole "
+                "n.phys_nodeid,r.erole,GROUP_CONCAT(DISTINCT nx.type) as atype"
                 "  from reserved as r "
                 "left join nodes as n on r.node_id=n.node_id "
                 "left join node_status as ns on ns.node_id=n.node_id "
                 "left join node_activity as na on na.node_id=n.node_id "
                 "left join node_idlestats as ni on ni.node_id=n.node_id "
+		"left join node_auxtypes as nx on nx.node_id=n.phys_nodeid "
                 "where r.pid=%s and r.eid=%s "
+		"group by r.node_id "
                 "order by r.vname",
                 (argdict["proj"], argdict["exp"]))
             osmappings = {}
@@ -1807,6 +1809,9 @@ class experiment:
                 tmp["name"] = res[0]
                 tmp["node"] = res[1]
                 tmp["type"] = res[2]
+		if tmp["type"] == "pcplab":
+		    tmp["auxtype"] = res[12]
+		    pass
                 tmp["pnode"] = res[10]
                 if not osmappings.has_key(res[3]):
                     osres = DBQuery(
