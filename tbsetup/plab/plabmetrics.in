@@ -27,6 +27,8 @@ sub usage()
 }
 
 sub InsertMetrics($%);
+sub ProcessCoMonData($);
+sub DownLoadURL($$);
 
 my $optlist = "dn";
 my $debug   = 0;
@@ -70,8 +72,19 @@ my $LOADMETRIC;
 my $MAXLOAD;
 my $MINDISK;
 
-my $metricsage;
-my %metrics;
+my $INF = 99999;
+my %REQCOLUMNS = ('name'      => 1,
+                  '1minload'  => 1, 
+                  '5minload'  => 1, 
+                  'diskused'  => 1, 
+                  'disksize'  => 1,
+                  'lastcotop' => 1,
+                   );
+
+my $COMONDATAFILE = TBMakeLogname("comon-data");
+my $COMONURL = "http://summer.cs.princeton.edu/status/tabulator.cgi".
+    "?table=table_nodeview&format=formatspaces&select='resptime%20%3E%200'";
+my %host2nodeid = ();
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 5;
@@ -148,28 +161,119 @@ print "\n=== plabmetrics ".
     if $debug;
 
 #
+# Grab node telemetry from CoMon
+#
+if (DownLoadURL($COMONURL, $COMONDATAFILE)) {
+    fatal("Failed to download CoMon data!");
+}
+
+#
 # Grab the node list from the DB in one query, which we use later to
-# map from the IP we get from the XML output, to our node_id. 
+# map from the hostname we get from the CoMon output, to our node_id. 
 #
 my $query_result =
-    DBQueryFatal("select n.node_id as plabnode, nr.*, ".
-		 "       unix_timestamp()-unix_timestamp(nr.status_timestamp) ".
-		 "       as metricsage ".
+    DBQueryFatal("select n.node_id, wa.hostname".
 		 " from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
-		 "left join node_rusage as nr on nr.node_id=n.node_id ".
+                 "left join widearea_nodeinfo as wa on n.node_id = wa.node_id ".
 		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
     		 "and nt.class='pcplabphys'");
 
 #
-# Loop through and insert metrics.
-# 
-while (my %row = $query_result->fetchhash()) {
-    my $nodeid = $row{'plabnode'};
-
-    InsertMetrics($nodeid, %row);
+# Create hostname map.
+#
+while (my ($node_id, $hostname) = $query_result->fetchrow_array()) {
+    $host2nodeid{$hostname} = $node_id;
 }
+
+#
+# Run through the CoMon data file and insert metrics.
+#
+ProcessCoMonData($COMONDATAFILE);
+unlink($COMONDATAFILE);
 exit(0);
+
+#
+# data helper funcs
+#
+sub isnull($) {
+    my $arg = shift;
+
+    if (!defined($arg) or $arg eq 'null' or $arg eq 'NULL') {
+        return 1;
+    }
+    return 0;
+}
+
+sub null2inf($) {
+    my $arg = shift;
+
+    if (isnull($arg)) {
+        $arg = $INF;
+    }
+
+    return $arg;
+}
+
+#
+# Run through each line of the comon data, extracting plab node metrics
+# and inserting these into the DB.
+#
+sub ProcessCoMonData($) {
+    my $comonfile = shift;
+    my %colpos = ();
+
+    open(COMON, "<$comonfile") or
+        fatal("Can't open comon data file!");
+
+    # Grab the column header line and find the position of all the columns
+    # we care about.
+    my $columnln = <COMON>;
+    chomp $columnln;
+    my @columns = split(/\s+/, $columnln);
+    my $colnum = 0;
+    foreach $column (@columns) {
+        if (exists($REQCOLUMNS{$column})) {
+            $colpos{$column} = $colnum;
+        }
+        $colnum++;
+    }
+
+    # Make sure all columns are present and accounted for
+    if (scalar(keys %colpos) != scalar(keys %REQCOLUMNS)) {
+        fatal("Some columns were missing in CoMon data!");
+    }
+
+    while (my $row = <COMON>) {
+        chomp $row;
+        my @coldata = split(/\s+/, $row);
+        next if (!@coldata or scalar(@coldata) != scalar(@columns));
+        my $hostname = $coldata[$colpos{'name'}];
+        my $node_id = "";
+        if (exists($host2nodeid{$hostname})) {
+            $node_id = $host2nodeid{$hostname};
+        } else {
+            print STDERR "*** WARNING: $hostname not known in ".
+                "Emulab database!\n";
+            next;
+        }
+        my %metrics = ();
+        $metrics{'metricsage'} = null2inf($coldata[$colpos{'lastcotop'}]);
+        $metrics{'load_1min'}  = null2inf($coldata[$colpos{'1minload'}]);
+        $metrics{'load_5min'}  = null2inf($coldata[$colpos{'5minload'}]);
+        # XXX: bah, no load15 data in CoMon output.
+        $metrics{'load_15min'} = null2inf($coldata[$colpos{'5minload'}]);
+        my $disksize = $coldata[$colpos{'disksize'}];
+        my $diskused = $coldata[$colpos{'diskused'}];
+        if (isnull($disksize) or isnull($diskused) or $disksize < 1) {
+            $metrics{'disk_used'} = 100;
+        } else {
+            $metrics{'disk_used'} = $diskused / $disksize * 100;
+        }
+        InsertMetrics($node_id, %metrics);
+    }
+}
+
 
 #
 # Insert the metrics we care about. Called for each node.
@@ -260,6 +364,43 @@ sub InsertMetrics($%)
     }
 }
 
+
+#
+# Download URL into a file.
+#
+sub DownLoadURL($$)
+{
+    my ($url, $tempfile) = @_;
+
+    print STDERR "Downloading $url to $tempfile ...\n"
+	if (1);
+    
+    #
+    # Must prevent hangs ...
+    #
+    my $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 120;
+	waitpid($syspid, 0);
+	alarm 0;
+	my $exitcode = $?;
+
+	warn("*** Timed out downloading link data from web site!\n")
+	    if ($exitcode == 15);
+	    
+	warn("*** Could not download link data from web site!\n")
+	    if ($exitcode);
+
+	return($exitcode >> 8);
+    }
+    else {
+	exec("/usr/local/bin/wget","-q","-O","$tempfile","$url");
+	exit(1);
+    }
+}
+
 sub fatal {
     my $msg = $_[0];
     my $quiet = (defined($_[1]) ? $_[1] : 0);
@@ -269,6 +410,8 @@ sub fatal {
     }
     print "$msg\n"
 	if $debug;
+
+    unlink($COMONDATAFILE);
 
     die($msg);
 }
