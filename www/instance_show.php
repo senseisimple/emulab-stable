@@ -100,10 +100,12 @@ echo "</script>\n";
 #
 # Throw up graph stuff.
 #
+if (0) {
 echo "<center>\n";
 echo "<br>";
 $instance->ShowGraphArea("pps");
 echo "</center>\n";
+} 
 
 #
 # Standard Testbed Footer
