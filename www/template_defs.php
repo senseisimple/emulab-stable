@@ -1087,7 +1087,8 @@ class TemplateInstance
 	    $start     = $rrow['start_time'];
 	    $stop      = $rrow['stop_time'];
 	    $exptidx   = $rrow['exptidx'];
-	    $tag       = $rrow['archive_tag'];
+	    $start_tag = $rrow['starting_archive_tag'];
+	    $end_tag   = $rrow['ending_archive_tag'];
 	    $description = $rrow['description'];
 	    $onmouseover = "";
 
@@ -1105,10 +1106,10 @@ class TemplateInstance
 		$description = "&nbsp ";
 	    }
 
-	    if (isset($tag) && $tag != "") {
+	    if (isset($end_tag) && $end_tag != "") {
 		$archive_link =
 		    "<a href=archive_view.php3".
-		    "/$exptidx/history/$tag/?exptidx=$exptidx>".
+		    "/$exptidx/history/$end_tag/?exptidx=$exptidx>".
 		    "<img border=0 alt='i' src='greenball.gif'></a>";
 	    }
 	    else {
