@@ -20,6 +20,7 @@ use libtestbed;
 use libtblog;
 use English;
 use Data::Dumper;
+use File::Basename;
 use overload ('""' => 'Stringify');
 
 # Configure variables
@@ -971,9 +972,9 @@ sub SaveLogFiles($)
 
     # What the hell is this file! Very annoying.
     if (-e "$workdir/.rnd") {
-	system("/bin/rm -f $workdir/.rnd");
+	mysystem("/bin/rm -f $workdir/.rnd");
     }
-    system("/bin/cp -Rpf $workdir/ $logdir");
+    mysystem("/bin/cp -Rpf $workdir/ $logdir");
     return 0;
 }
 
@@ -989,15 +990,21 @@ sub CleanLogFiles($)
 	if (! ref($self));
 
     my $workdir = $self->WorkDir();
-    my $files   = "";
     
-    foreach my $ext ("log", "ptop", "top", "assign") {
-	$files = "$files $workdir/*.${ext}";
+    opendir(DIR, $workdir) or
+	return -1;
+    my @files   = readdir(DIR);
+    my @delete  = ();
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	push(@delete, "${workdir}/$1")
+	    if ($file =~ /^(.*\.(log|ptop|top|assign))$/);
+
+	push(@delete, "${workdir}/$1")
+	    if ($file =~ /^((swap|start|cancel|newrun).*\..*)$/);
     }
-    foreach my $prefix ("swap", "start", "cancel", "newrun") {
-	$files = "$files $workdir/${prefix}*.*";
-    }
-    system("/bin/rm -f $files") == 0
+    mysystem("/bin/rm -f @delete") == 0
 	or return -1;
 
     return 0;
@@ -1019,7 +1026,41 @@ sub CopyLogFiles($)
     my $workdir = $self->WorkDir();
     my $userdir = $self->UserDir();
 
-    system("/bin/cp -Rfp $workdir/*.{log,ns,report,png} $userdir/tbdata");
+    opendir(DIR, $workdir) or
+	return -1;
+    my @files  = readdir(DIR);
+    closedir(DIR);
+    my @copy   = ();
+
+    foreach my $file (@files) {
+	push(@copy, "${workdir}/$1")
+	    if ($file =~ /^(.*\.(log|report|ns|png))$/);
+    }
+
+    mysystem("/bin/cp -fp @copy $userdir/tbdata");
+    return 0;
+}
+
+#
+# Backup the user directory for debugging. 
+#
+sub BackupUserData($)
+{
+    my ($self) = @_;
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $userdir = $self->UserDir();
+    my $path    = dirname($userdir);
+    my $dir     = basename($userdir);
+    my $backup  = "${path}/.${dir}-failed";
+
+    if (-e $backup) {
+	mysystem("/bin/rm -rf $backup");
+    }
+    mysystem("/bin/mv $userdir $backup");
     return 0;
 }
 
