@@ -3186,7 +3186,7 @@ sub MarkNodeDead($$)
     return -1
 	if (!defined($vname));
 
-    DBQueryWarn("insert into experiment_template_instance_deadnodes set ".
+    DBQueryWarn("replace into experiment_template_instance_deadnodes set ".
 		"  instance_idx='$instance_idx', exptidx='$exptidx', ".
 		"  runidx='$runidx', node_id='$node_id', vname='$vname'")
 	or return -1;
