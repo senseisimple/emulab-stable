@@ -3695,6 +3695,10 @@ last_net_act,last_cpu_act,last_ext_act);
         starting_archive_tag varchar(64) default NULL after description;
       alter table experiment_runs add \
         ending_archive_tag varchar(64) default NULL after starting_archive_tag;
+      update experiment_runs set ending_archive_tag=archive_tag \
+           where archive_tag is not null and archive_tag!='';
+      update experiment_runs set starting_archive_tag=archive_tag \
+           where archive_tag is not null and archive_tag!='';
 
 4.90: Add a swapmod flag to the experiment run to indicate that a swapmod
       was resquested by the user.
