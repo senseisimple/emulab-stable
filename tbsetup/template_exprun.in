@@ -499,7 +499,7 @@ if (keys(%deadnodes)) {
 	$subject = "Node failures during Stop Run";
     }
     else {
-	$subject = "Node failures during Start New Run";
+	$subject = "Node failures during Start New Run ($runid)";
     }
     SENDMAIL($dbuid, $subject, $message, $TBOPS, "CC: $TBOPS");
 }
@@ -799,11 +799,15 @@ sub CheckForDeadNodes()
 	# Node is dead. Need to record this as part of the template record.
 	# This hash is for later, to send a summary report to the user.
 	#
-	$deadnodes{$node_id} = $node_id;
 	$run->MarkNodeDead($node_id) == 0
 	    or fatal(-1, "Could not mark node as dead in $run");
 
 	tbwarn("$node_id appears to be dead during start/stop run");
+
+	#
+	# This is for email message at the end.
+	#
+	$deadnodes{$node_id} = $node_id;
     }
 }
 
