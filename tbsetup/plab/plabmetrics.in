@@ -347,7 +347,7 @@ sub InsertMetrics($%)
     if ((100.0 - $metrics{disk_used}) >= $MINDISK) {
 	$disk = 0;
     } else {
-	$disk = 1;
+	$disk = 0.9;
     }
 
     if ($debug || $impotent) {
