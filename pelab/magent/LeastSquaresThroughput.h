@@ -27,7 +27,14 @@ private:
   // The number of samples kept at any given time.
   static const int SAMPLE_COUNT = 5;
   // Circular buffers of the last SAMPLE_COUNT samples.
-  int throughputSamples[SAMPLE_COUNT];
+  //   The number of bytes in each sample. Used for average throughput
+  //   calculation.
+  int byteSamples[SAMPLE_COUNT];
+  //   The delta time of each sample. This is the difference between
+  //   the time of the ack at that sample and the time of the ack at
+  //   the previous sample (in milliseconds).
+  uint32_t timeSamples[SAMPLE_COUNT];
+//  int throughputSamples[SAMPLE_COUNT];
   int delaySamples[SAMPLE_COUNT];
   // The index of the oldest stored sample.
   int oldest;

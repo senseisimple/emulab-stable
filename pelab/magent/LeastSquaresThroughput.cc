@@ -35,14 +35,20 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
   sendValid = false;
   if (throughput->isAckValid() && delay->isAckValid())
   {
-    throughputSamples[oldest] = throughput->getThroughputInKbps();
+//    throughputSamples[oldest] = throughput->getThroughputInKbps();
+    byteSamples[oldest] = throughput->getLastByteCount();
+    timeSamples[oldest] = throughput->getLastPeriod();
     delaySamples[oldest] = delay->getLastDelay();
     oldest = (oldest + 1) % SAMPLE_COUNT;
     ++totalSamples;
     if (totalSamples >= SAMPLE_COUNT)
     {
       int i = 0;
-      double throughputAverage = 0;
+//      double throughputAverage = 0;
+      int byteTotal = 0;
+      uint32_t timeTotal = 0;
+      int x_i = 0;
+      int y_i = 0;
       double numA = 0.0;
       double numB = 0.0;
       double numC = 0.0;
@@ -54,30 +60,41 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
       for (; i < SAMPLE_COUNT; ++i)
       {
         int index = (oldest + i) % SAMPLE_COUNT;
-        throughputAverage += throughputSamples[index];
+//        throughputAverage += throughputSamples[index];
+        byteTotal += byteSamples[SAMPLE_COUNT];
+        timeTotal += timeSamples[SAMPLE_COUNT];
 
         logWrite(SENSOR_DETAIL, "LeastSquares: Delay sample #%d: %d", i,
                  delaySamples[index]);
-        numA += i * delaySamples[index];
-        numB += i;
-        numC += delaySamples[index];
-        denomA += i * i;
-        denomB += i;
-        denomC += i;
+        x_i += timeSamples[SAMPLE_COUNT];
+        y_i = delaySamples[index];
+        numA += x_i * y_i;
+        numB += x_i;
+        numC += y_i;
+        denomA += x_i * x_i;
+        denomB += x_i;
+        denomC += x_i;
       }
-      throughputAverage /= SAMPLE_COUNT;
+      // Calculate throughput.
+//      throughputAverage /= SAMPLE_COUNT;
+      double throughputAverage = throughput->getThroughputInKbps(timeTotal,
+                                                                 byteTotal);
 
       double num = (numA * numD) - (numB * numC);
       double denom = (denomA * denomD) - (denomB * denomC);
 
       // Theoretically denom cannot be 0 because our x values are
       // sample numbers which monotonically increase.
-      double slope = num/denom;
+      double slope = 0.0;
+      if (fabs(denom) > 0.00001)
+      {
+        slope = num/denom;
+      }
 
       logWrite(SENSOR, "LeastSquares: SLOPE: %f TPA: %i LR:%i", slope,
                static_cast<int>(throughputAverage),lastReport);
 
-      if (slope > 0)
+      if (slope > 0.0)
       {
         // The closest linear approximation indicates that buffers are
         // being filled up, which means that the link was saturated

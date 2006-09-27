@@ -17,16 +17,53 @@ int TSThroughputSensor::getThroughputInKbps(void) const
 {
   if (ackValid)
   {
-    return throughputInKbps;
+    return getThroughputInKbps(getLastPeriod(), getLastByteCount());
   }
   else
   {
     logWrite(ERROR,
-             "ThroughputSensor::getThroughputInKbps() "
+             "TSThroughputSensor::getThroughputInKbps() "
              "called with invalid data");
     return 0;
   }
 }
+
+int TSThroughputSensor::getThroughputInKbps(uint32_t period,
+                                            int byteCount) const
+{
+  double kilobits = byteCount * (8.0/1000.0);
+  return static_cast<int>(kilobits/(period / 1000.0));
+}
+
+uint32_t TSThroughputSensor::getLastPeriod(void) const
+{
+  if (ackValid)
+  {
+    return lastPeriod;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "TSThroughputSensor::getLastPeriod() called with invalid data");
+    return 0;
+  }
+}
+
+int TSThroughputSensor::getLastByteCount(void) const
+{
+  if (ackValid)
+  {
+    return lastByteCount;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "TSThroughputSensor::getLastByteCount() "
+             "called with invalid data");
+    return 0;
+  }
+}
+
 
 void TSThroughputSensor::localSend(PacketInfo *)
 {
@@ -58,7 +95,7 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
         currentAckTS = htonl(stamps[0]);
       }
     }
-    
+
     /*
      * It would be nice if we could fall back to regular timing instead of
      * bailing, maybe that's a feature for someday...
@@ -67,7 +104,8 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
       logWrite(ERROR,"TSThroughputSensor::localAck() got a packet without a "
                      "timestamp");
       ackValid = false;
-      throughputInKbps = 0;
+      lastPeriod = 1;
+      lastByteCount = 0;
       lastAckTS = 0;
       return;
     }
@@ -76,7 +114,8 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
       logWrite(ERROR,"TSThroughputSensor::localAck() got timestamps in reverse "
                      "order: o=%u,n=%u",lastAckTS,currentAckTS);
       ackValid = false;
-      throughputInKbps = 0;
+      lastPeriod = 1;
+      lastByteCount = 0;
       lastAckTS = 0;
       return;
     }
@@ -88,24 +127,23 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
        * period is in arbitrary units decided on by the other end - we assume
        * they are in milliseconds XXX: Verify this
        */
-      int period = currentAckTS - lastAckTS;
-      double kilobits = packetHistory->getAckedSize() * (8.0/1000.0);
-      int latest = static_cast<int>(kilobits/(period / 1000.0));
-      throughputInKbps = latest;
-      maxThroughput = latest;
+      lastPeriod = currentAckTS - lastAckTS;
+      lastByteCount = packetHistory->getAckedSize();
       logWrite(SENSOR, "TSTHROUGHPUT: %d kbps (period=%i,kbits=%f)",
-          latest,period,kilobits);
+          getThroughputInKbps(), lastPeriod, lastByteCount*(8.0/1000.0));
     }
     else
     {
-      throughputInKbps = 0;
+      lastPeriod = 1;
+      lastByteCount = 0;
       ackValid = false;
     }
     lastAckTS = currentAckTS;
   }
   else
   {
-    throughputInKbps = 0;
+    lastPeriod = 1;
+    lastByteCount = 0;
     lastAckTS = 0;
     ackValid = false;
   }

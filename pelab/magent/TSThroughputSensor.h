@@ -18,18 +18,22 @@
 class PacketSensor;
 class StateSensor;
 
-class TSThroughputSensor : public Sensor 
+class TSThroughputSensor : public Sensor
 {
 public:
   TSThroughputSensor(PacketSensor const * newPacketHistory,
                    StateSensor const * newState);
   int getThroughputInKbps(void) const;
+  int getThroughputInKbps(uint32_t period, int byteCount) const;
+  uint32_t getLastPeriod(void) const;
+  int getLastByteCount(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
-  int throughputInKbps;
-  int maxThroughput;
+//  int throughputInKbps;
+  uint32_t lastPeriod;
+  int lastByteCount;
   uint32_t lastAckTS;
   PacketSensor const * packetHistory;
   StateSensor const * state;
