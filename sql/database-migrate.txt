@@ -3505,7 +3505,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
       To populate:
 
-         ./init_nodeattrs.pl
+         ./init_nodeattrs.pl | mysql tbdb
 
       Now it is safe to do this:
 
