@@ -508,6 +508,10 @@ if (keys(%deadnodes)) {
 TBExptCloseLogFile($pid, $eid)
     if (defined($logname));
 
+# log file gets copied out to the user directory.
+$experiment->CopyLogFiles()
+    if (defined($logname));
+
 exit(0);
 
 #
@@ -697,6 +701,10 @@ sub cleanup()
     # only for start new run; stop run failures do not do this!
     $instance->DeleteCurrentRun()
 	if (defined($instance) && defined($run));
+
+    # log file gets copied out to the user directory.
+    $experiment->CopyLogFiles()
+	if (defined($experiment) && defined($logname));
 }
 
 sub fatal($$)
