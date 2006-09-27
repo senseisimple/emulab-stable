@@ -846,6 +846,9 @@ sub cleanup()
     if ($exptcreated) {
 	exit(-1)
 	    if (!TBExptIDX($pid, $eid, \$exptidx));
+
+	# Before killing it, save off the user directory for debugging.
+	$experiment->BackupUserData();
 		
 	system("$endexp -x -q -w $pid $eid");
 	exit(-1)
