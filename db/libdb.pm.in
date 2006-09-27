@@ -242,7 +242,6 @@ use POSIX qw(strftime);
 require Node;
 require NodeType;
 require Mysql;
-use subs qw(fork);
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT
 	    @EXPORT_OK @virtualTables @physicalTables);
@@ -274,12 +273,53 @@ else {
     $SCRIPTNAME = "Tainted";
 }
 
+{
+    #
+    # Create a special class for keeping track of the process the
+    # database handle was created.  This is needed so that the child
+    # process after a fork() 1) set's InactiveDestroy to avoid sending
+    # a disconnect message since it will also close the parent's
+    # database handle 2) reconnects since two separate processes
+    # shouldn't share the same handle.  (1) is handled via overridding
+    # the database handle DESTROY method, (2) is handled in the
+    # DBQueryN function.
+    #
+    package TestbedDBHandle;
+    use vars '@ISA';
+    @ISA = ('Mysql');
+    @TestbedDBHandle::Statement::ISA = ('Mysql::Statement');
+    my %DB_PID; # hash based on db handle
+    sub obj_hash( $ ) {
+	# Return a hex string of the location of the object in memory.
+	# This is slightly better than just converting it to a scalar
+	# as two objects as the scalar also included the class name
+	# the object is "blessed" into which might change over time
+	sprintf("0x%x", $_[0]); 
+    }
+    sub MakeA ( $ ) {
+	my ($obj) = @_;
+	bless ($obj);
+	$DB_PID{obj_hash($obj)} = $$;
+    }
+    sub db_pid () {
+	my ($self) = @_;
+	return $DB_PID{obj_hash($self)};
+    }
+    sub DESTROY {
+	my ($self) = @_;
+	if ($self->db_pid() != $$) {
+	    $self->setInactiveDestroy(1);
+	}
+	delete $DB_PID{obj_hash($self)};
+	$self->SUPER::DESTROY() if $self->can("SUPER::DESTROY");
+    }
+}
+
 #
 # Set up for querying the database. Note that fork causes a reconnect
 # to the DB in the child.
 #
 my @DB;
-my $DB_PID;
 $DBQUERY_MAXTRIES  = 1;
 $DBQUERY_RECONNECT = 1;
 $DBCONN_MAXTRIES   = 5;
@@ -304,6 +344,7 @@ sub TBDBConnect($)
 
     while ($maxtries) {
 	$DB[$dbnum] = Mysql->connect("localhost", $DBNAME, $dbuser, "none");
+        TestbedDBHandle::MakeA($DB[$dbnum]);
 	if (defined($DB[$dbnum])) {
 	    last;
 	}
@@ -322,7 +363,6 @@ sub TBDBConnect($)
     }
     $DB[$dbnum]->{'dbh'}->{'PrintError'} = 0;
     $Mysql::QUIET = 1;
-    $DB_PID = $PID;
     return 0;
 }
 TBDBConnect(0);
@@ -380,30 +420,6 @@ sub NewTBDBHandle() {
     TBDBConnect($dbnum);
     return $dbnum;
 }
-
-#
-# Special version of fork to
-#    1) Set InactiveDestroy in the child process so that it won't send a
-#       disconnect when the handle is destroyed as this will also
-#       close the database handle for the parent
-#    2) Call tblog_new_child_process in the child process to properly
-#       inform tblog of the new process.  NOTE: This will be a NoOp
-#       if the libtblog module is not loaded.
-#
-sub fork() {
-    my $pid = CORE::fork();
-    return $pid unless defined $pid;
-    if ($pid == 0) {
-	# We are the child
-	for (my $i = 0; $i < @DB; $i++) {
-	    $DB[$i]->setInactiveDestroy(1) if defined $DB[$i];
-	}
-	tblog_new_child_process();
-    }
-    return $pid;
-}
-*CORE::GLOBAL::fork = \&fork;
-
 
 #
 # Record last DB error string.
@@ -4600,7 +4616,7 @@ sub DBQueryN($$)
     }
 
     # Reconnect to mysqld in child of fork.
-    if (defined($DB_PID) && $DB_PID != $PID) {
+    if ($DB[$dbnum]->db_pid() != $PID) {
 	if (TBDBReconnect(1) != 0) {
 	    $DBErrorString =
 		"  Query: $query\n".

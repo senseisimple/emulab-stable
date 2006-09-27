@@ -244,6 +244,7 @@ my $REAL_SCRIPTNAME = $SCRIPTNAME;
 undef $SCRIPTNAME; # signal to use $ENV{TBLOG_SCRIPTNAME}
 
 my $DB;
+my $TBLOG_PID;
 
 #
 # Internal Utility Functions
@@ -409,6 +410,15 @@ sub tblog_new_process(@) {
 }
 
 #
+# tblog_new_child_process
+#
+# Enter a new child process, which is called after fork.
+#
+sub tblog_new_child_process() {
+    tblog_init_process(undef);
+}
+
+#
 # tblog_init_process CMD, ARGV
 #
 # Init a new process
@@ -420,9 +430,12 @@ sub tblog_new_process(@) {
 #
 # NOTE: Everything is currently stored in the %ENV hash.
 #
-sub tblog_init_process_real(@) {
+sub tblog_init_process(@) {
     my ($script, @argv) = @_;
     local $DBQUERY_MAXTRIES = 3;
+
+    # Set TBLOG_PID so that we can detect when we are a child. 
+    $TBLOG_PID = $$;
 
     if (defined $script) {
 
@@ -479,10 +492,6 @@ sub tblog_init_process_real(@) {
 	DBQueryFatal("update log set session=$id,invocation=$id where seq=$id");
     }
 
-}
-{
-  local $^W = 0;
-  *tblog_init_process = \&tblog_init_process_real;
 }
 
 
@@ -721,10 +730,11 @@ sub new_seq_num (;$) {
 #   message in $@.  Otherwise will return the seq number.
 #   Valid parms: sublevel, cause, type
 #
-my $in_dblog = 0; # Used to avoid an infinite recursion when
-                  # DBQueryFatal fails as a log entry is made to
-                  # record the failure, which will than likely cause
-                  # another failure and so on
+use vars '$in_dblog';
+$in_dblog = 0; # Used to avoid an infinite recursion when
+               # DBQueryFatal fails as a log entry is made to
+               # record the failure, which will than likely cause
+               # another failure and so on
 sub dblog_real ( $$@ ) {
     my ($priority, $parms, @mesg) = @_;
     my $mesg = join('',@mesg);
@@ -734,6 +744,16 @@ sub dblog_real ( $$@ ) {
     $in_dblog = 1;
     eval {
 	check_env();
+
+        if ($TBLOG_PID != $$) {
+            # Do it here to avoid any possiblty of infinite recursion 
+            # since we are about to set $in_dblog to 0. ...
+            $TBLOG_PID = $$;
+            # $in_dblog is reset locally since tblog_new_child_process 
+            # will call dblog in order to log entering the child process
+            local $in_dblog = 0;
+            tblog_new_child_process();
+        }
 
 	my $cause;
 	$cause = normalize_cause($parms->{cause}) 
