@@ -61,12 +61,17 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
       {
         int index = (oldest + i) % SAMPLE_COUNT;
 //        throughputAverage += throughputSamples[index];
-        byteTotal += byteSamples[SAMPLE_COUNT];
-        timeTotal += timeSamples[SAMPLE_COUNT];
+        byteTotal += byteSamples[index];
+        timeTotal += timeSamples[index];
 
-        logWrite(SENSOR_DETAIL, "LeastSquares: Delay sample #%d: %d", i,
+        logWrite(SENSOR_DETAIL, "LeastSquares: ***Delay sample #%d: %d", i,
                  delaySamples[index]);
-        x_i += timeSamples[SAMPLE_COUNT];
+        logWrite(SENSOR_DETAIL, "LeastSquares: Period sample: %d",
+                 timeSamples[index]);
+        logWrite(SENSOR_DETAIL, "LeastSquares: Kilobit sample: %f",
+                 byteSamples[index]*(8.0/1000.0));
+
+        x_i += timeSamples[index];
         y_i = delaySamples[index];
         numA += x_i * y_i;
         numB += x_i;
@@ -77,6 +82,8 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
       }
       // Calculate throughput.
 //      throughputAverage /= SAMPLE_COUNT;
+      logWrite(SENSOR, "LeastSquares: timeTotal: %d, kilobitTotal: %f",
+               timeTotal, byteTotal*(8.0/1000.0));
       double throughputAverage = throughput->getThroughputInKbps(timeTotal,
                                                                  byteTotal);
 
