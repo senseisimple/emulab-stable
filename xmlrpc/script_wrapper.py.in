@@ -1771,7 +1771,7 @@ class template_commit:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "we:p:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1780,6 +1780,8 @@ class template_commit:
 
         guid   = None
         params = {}
+        eid    = None
+        pid    = None
         
         for opt, val in opts:
             if opt in ("-h", "--help"):
@@ -1790,34 +1792,50 @@ class template_commit:
                 pass
             elif opt == "-e":
                 params["exp"] = val
+                eid = val
+                pass
+            elif opt == "-p":
+                params["proj"] = val
+                pid = val;
                 pass
             pass
         
         # Try to infer the template guid/vers from the current path.
-        if len(req_args) == 0:
+        if (len(req_args) == 0 and pid == None and eid == None):
             guid = infer_guid(os.getcwd())
-            if guid == None:
-                self.usage();
-                return -1
+            if guid != None:
+                params["guid"] = guid
+                pass
+            else:
+                (pid, eid) = infer_pideid(os.getcwd())
+                
+                if (pid != None and eid != None):
+                    params["proj"] = pid
+                    params["exp"] = eid
+                    pass
+                else:
+                    self.usage();
+                    return -1
+                pass
             pass
         elif len(req_args) == 1:
             guid = req_args[0]
             pass
-        
-        if guid == None:
+        else:
             self.usage();
             return -1
-        params["guid"] = guid
         
         rval,response = do_method("template", "template_commit", params);
         return rval;
     
     def usage(self):
-	print "template_commit [<guid/vers>]";
+	print "template_commit [-e eid] [<guid/vers>]"
+        print "template_commit -p pid -e eid"
 	print "where:";
 	print "     -w     - Wait for template to finish commit";
-        print "     -e     - Commit from specific template instance (eid)";
-        print "    guid    - Template GUID";
+        print "     -e     - Commit from specific template instance (eid)"
+        print "     -p     - Project for -e option (pid)"
+        print "    guid    - Template GUID"
         print ""
         print "By default, commit runs in the background, sending you email ";
         print "when the operation has completed. Use the -w option to wait";
@@ -2283,12 +2301,12 @@ def infer_pideid(path):
     if ((len(dirs) < 6) or
         (not (("proj" in dirs) and ("exp" in dirs))) or
         (len(dirs) < (dirs.index("exp") + 1))):
-        return None
+        return (None, None)
     else:
         pid = dirs[dirs.index("proj") + 1]
         eid = dirs[dirs.index("proj") + 3]
         pass
-    return pid, eid
+    return (pid, eid)
 
 #
 # Process program arguments. There are two ways we could be invoked.

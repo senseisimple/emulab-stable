@@ -4544,14 +4544,6 @@ class template:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        argerror = CheckRequiredArgs(argdict, ("guid",))
-        if (argerror):
-            return argerror
-
-        if not (re.match("^[-\w\/]*$", argdict["guid"])):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                  output="Improperly formed arguments")
-
         argstr  = "-q"
 
         for opt, val in argdict.items():
@@ -4559,10 +4551,20 @@ class template:
                 argstr += " -e "
                 argstr += escapeshellarg(val)
                 pass
+            elif opt == "proj":
+                argstr += " -p "
+                argstr += escapeshellarg(val)
+                pass
             pass
 
-        argstr += " "
-        argstr += str(argdict["guid"])
+        if argdict.has_key("guid"):
+            if not (re.match("^[-\w\/]*$", argdict["guid"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed arguments")
+
+            argstr += " "
+            argstr += str(argdict["guid"])
+            pass
         
         (exitval, output) = runcommand(TBDIR +
                                        "/bin/template_commit " + argstr)

@@ -28,18 +28,21 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_export [-q] [-e eid] <guid/vers>\n".
+	  "Usage: template_commit [-q] [-e eid] <guid/vers>\n".
+	  "       template_commit [-q] -p pid -e eid\n".
 	  "switches and arguments:\n".
 	  "-q          - be less chatty\n".
 	  "-e <eid>    - Experiment instance to commit from\n".
+	  "-p <pid>    - Project for -e option\n".
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qe:d";
+my $optlist	 = "qe:dp:";
 my %options      = ();
 my $quiet        = 0;
 my $debug        = 0;
 my $eid;
+my $pid;
 my $guid;
 my $version;
 
@@ -113,11 +116,30 @@ ParseArgs();
 #
 # Grab template info and do access check.
 #
-$template = Template->Lookup($guid, $version);
+if (defined($pid)) {
+    # Eid is also defined.
+    my $experiment = Experiment->Lookup($pid, $eid);
+    
+    if (!defined($experiment)) {
+	fatal(-1, "Could not get experiment record for experiment $pid/$eid!");
+    }
 
-if (!defined($template)) {
-    tbdie("Experiment template $guid/$version does not exist!");
+    $template = Template->LookupByExptidx($experiment->idx());
+
+    if (!defined($template)) {
+	tbdie("Cannot find template for $pid/$eid!");
+    }
+    $guid    = $template->guid();
+    $version = $template->vers();
 }
+else {
+    $template = Template->Lookup($guid, $version);
+
+    if (!defined($template)) {
+	tbdie("Experiment template $guid/$version does not exist!");
+    }
+}
+
 if (! $template->AccessCheck($dbuid, TB_EXPT_MODIFY)) {
     tberror("You do not have permission to commit template $guid/$version");
     exit(1);
@@ -237,21 +259,42 @@ sub ParseArgs()
 	usage();
     }
 
-    if (@ARGV != 1) {
-	usage();
-    }
-    
     #
-    # Pick up guid/version first and untaint.
+    # Allow pid to be used instead of GUID.
     #
-    my $tmp = shift(@ARGV);
+    if (@ARGV == 1) {
+	#
+	# Pick up guid/version first and untaint.
+	#
+	my $tmp = shift(@ARGV);
 
-    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
-	$guid = $1;
-	$version = $2;
+	if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	    $guid = $1;
+	    $version = $2;
+	}
+	else {
+	    tbdie("Bad data in argument: $tmp");
+	}
+    }
+    elsif (defined($options{"p"})) {
+	usage()
+	    if (!defined($options{"e"}));
+	
+	$pid = $options{"p"};
+
+	if ($pid =~ /^([-\w]+)$/) {
+	    $pid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $pid.");
+	}
+	if (! TBcheck_dbslot($pid, "projects", "pid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper project name (pid)!");
+	}
     }
     else {
-	tbdie("Bad data in argument: $tmp");
+	usage();
     }
 
     if (defined($options{"e"})) {
