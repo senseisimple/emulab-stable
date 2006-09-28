@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 #TODO!!
 # - finish implementation of rate change duration.
@@ -19,7 +19,7 @@ testper  => 30
 INIT:
   ** todo **
 destnodes => "plab1 plab2"
-SINGLE:
+SINGLE: ** DEPRECIATED **
 dstnode => plabxxx
 testtype => latency or bw
 STOPALL:
@@ -31,7 +31,7 @@ INIT: Initialize the link tests with default destination nodes and frequency.
     Measurements to nodes not in init set but already scheduled 
     will not be erased or changed.
 
-SINGLE: Perform a single link test to a specifc destination node.
+SINGLE ** DEPRECIATED **: Perform a single link test to a specifc destination node.
 STOPALL: Erase all scheduled measurements.
 STATUS: get status of bgmon as a string description. In the reply,
         the message contains "ACK\n" followed by the status string terminated
@@ -65,7 +65,7 @@ use DB_File;
 use IO::Socket::INET;
 use IO::Select;
 use libwanetmon;
-
+use Cmdqueue;
 
 $| = 1;
 
@@ -101,19 +101,34 @@ my $resultDBlimit = 12000;  #approx 24 hours of data at "normal" test rates
 my $magic         = "0xDeAdBeAf";
 
 my %testevents = ();
-
 #queue for each test type containing tests that need to
 # be run.
 my %waitq = ( latency => [],
 	      bw      => [] );
-
 my %runningtestPIDs = ();  # maps from PID's -> array of destnode, bw
-
 my $status;  #keeps track of status of this bgmon. Possible values are:
              # anyscheduled_no, anyscheduled_yes
 $status = "anyscheduled_no";
 
-
+#*****************************************
+# PROTOTYPES
+sub sendOldResults;
+sub spawnTest($$);
+sub getRunningTestsCnt($);
+sub parsedata($$);
+sub printTimeEvents;
+sub saveTestToLocalDB($);
+sub delLocalDBEntry($);
+sub sendResults($$);
+sub createtmpfilename($$);
+sub createDBfilename();
+sub detectHang($);
+sub isMsgValid(\%);
+sub checkTestChangeAllowed(\%$);
+sub updateTestEvent($);
+		    sub addCmd($$);
+sub updateOutageState(\$);
+sub initTestEv($$);
 #*****************************************
 
 my %opt = ();
@@ -129,7 +144,7 @@ if ($opt{c}) { $cmdport = $opt{c}; } else { $cmdport = 5052; }
 if ($opt{a}) { $ackport = $opt{a}; } else { $ackport = 5050; }
 if ($opt{p}) { $sendport = $opt{p}; } else { $sendport = 5051; }
 if ($opt{e}) { $expid = $opt{e}; } else { $expid = "none"; }
-if ($opt{d}) { $workingdir = $opt{d}; `cd $workingdir`; }
+if ($opt{d}) { $workingdir = $opt{d}; chdir $workingdir; }
 if ($opt{i}) { $iperfport = $opt{i}; } else { $iperfport = 5002; }
 
 my $thismonaddr;
@@ -188,7 +203,7 @@ sub handleincomingmsgs()
 	    $inmsg = <$cmdHandle>;
 	    chomp $inmsg;
 	    %sockIn = %{ deserialize_hash($inmsg) };
-	    if( !isMsgValid(\%sockIn) ){  
+	    if( !isMsgValid(%sockIn) ){
 		close $cmdHandle;
 		return 0; 
 	    }
@@ -197,7 +212,7 @@ sub handleincomingmsgs()
 	}
 #	print "received msg: $inmsg\n";
 
-	if( !isMsgValid(\%sockIn) ){ return 0; }
+	if( !isMsgValid(%sockIn) ){ return 0; }
 
 	my $cmdtype = $sockIn{cmdtype};	
 	if( $cmdtype eq "ACK" ){
@@ -223,7 +238,7 @@ sub handleincomingmsgs()
 	    my $newtestper = $sockIn{testper};
 	    my $duration =$sockIn{duration};
 	    my $managerID=$sockIn{managerID};
-
+	    initTestEv($linkdest,$testtype);
 	    my $testev = \%{ $testevents{$linkdest}{$testtype} };
 
 	    print time()." EDIT:\n";
@@ -233,35 +248,10 @@ sub handleincomingmsgs()
 	    print "duration=".$sockIn{duration}."\n" 
 		if( defined $sockIn{duration} );
 
-
-	    #
-	    # only edit test if this test is not in an outage state,
-	    # thus testing periods defined outside of user control
-	    #
-	    if( !defined $testev->{outagestate} ){
-		$testev->{outagestate} = "normal";
-#		print "initial EDIT, so setting outagestate to normal\n";
-	    }
-	    if( $testev->{outagestate} eq "normal" )
-	    {
-		editTest($testev, $newtestper, $duration, $managerID);
-	    }else{
-		print time()." PATH CURRENTLY IN OUTAGE DETECTION MODE\n";
-
-		#save this newest command in "pending"
-		if( defined $duration && $duration > 0){
-		    $testev->{pendingtempper} = $newtestper;
-		    $testev->{pendingtempduration} = $duration;
-		    $testev->{pendingtemprcvtime} = time();
-		}else{
-		    $testev->{pendingdurationper} = $newtestper;
-		}
-	    }
-	    print( "linkdest=$linkdest\n".
-		   "testype =$testtype\n".
-		   "testper=$newtestper\n" );
-	    print "duration=".$sockIn{duration}."\n" 
-		if( defined $sockIn{duration} );
+	    #add new cmd to queue
+#	    my $cmd = Cmd->new($managerID, $newtestper, $duration);
+#	    $testev->{cmdq}->add( $cmd );
+	    addCmd( $testev, Cmd->new($managerID, $newtestper, $duration) );
 	}
 	elsif( $cmdtype eq "INIT" ){
 	    print time()." INIT: ";
@@ -274,53 +264,21 @@ sub handleincomingmsgs()
 	    my $managerID=$sockIn{managerID};
 	    
 	    #distribute start times from offset 0 to testper/2
+#TODO: HANDLE OFFSET SOMEWHERE!!
 	    my $offsetinc = 0;
 	    if( (scalar @destnodes) != 0 ){
 		$offsetinc = $newtestper/(scalar @destnodes)/2.0;
 	    }
 	    my $offset = 0;
             foreach my $linkdest (@destnodes){
+		initTestEv($linkdest,$testtype);
 		my $testev = \%{ $testevents{$linkdest}{$testtype} };
-
-		#
-		# only edit test if this test is not in an outage state,
-		# thus testing periods defined outside of user control
-		#
-		if( !defined $testev->{outagestate} ){
-		    $testev->{outagestate} = "normal";
-		}if( $testev->{outagestate} eq "normal" ){
-		    editTest($testev, $newtestper, $duration, 
-			     $managerID, $offset);
-		    $offset += $offsetinc;
-		}else{
-		    print time()." PATH CURRENTLY IN OUTAGE DETECTION MODE\n";
-		    #save this newest command in "pending"
-		    if( defined $duration && $duration > 0){
-			$testev->{pendingtempper} = $newtestper;
-			$testev->{pendingtempduration} = $duration;
-			$testev->{pendingtemprcvtime} = time();
-		    }else{
-			$testev->{pendingdurationper} = $newtestper;
-		    }
-		}
+		#add new cmd to queue
+		addCmd( $testev, 
+			Cmd->new($managerID, $newtestper, $duration) );
+		$offset += $offsetinc;
 	    }
 	    print " $testtype  $newtestper\n";
-	}
-	elsif( $cmdtype eq "SINGLE" ){
-	    my $linkdest = $sockIn{dstnode};
-	    my $testtype = $sockIn{testtype};
-	    my $testev = \%{ $testevents{$linkdest}{$testtype} };
-	    my $managerID=$sockIn{managerID} if( defined $sockIn{managerID} );
-	    if(checkTestChangeAllowed( $testev, $managerID, 0)){
-		$testev->{managerID} = $managerID;
-		$testev->{"testper"} = 0;
-		$testev->{"timeOfNextRun"} = time_all()-1;
-		$testev->{"flag_scheduled"} = 1;
-		$testev->{"pid"} = 0;
-	    }
-	    print( time()." SINGLE\n".
-		   "linkdest=$linkdest\n".
-		   "testype =$testtype\n");
 	}
 	elsif( $cmdtype eq "STOPALL" ){
 	    print time()." STOPALL\n";
@@ -330,11 +288,10 @@ sub handleincomingmsgs()
 	    for my $destaddr ( keys %testevents ) {
 		for my $testtype ( keys %{ $testevents{$destaddr} } ){
 		    my $testev = \%{ $testevents{$destaddr}{$testtype} };
-		    if(checkTestChangeAllowed( $testev, $managerID, 0)){
-#			%testevents = ();
-			%waitq = ();  #clearing the whole Q shouldn't
-                                      # cause problems, and is the easiest soln
-			delete $testevents{$destaddr}{$testtype};
+		    #update scheduled tests in case something changed
+		    if( defined $testev->{cmdq} ){
+			$testev->{cmdq}->rmCmds( $managerID );
+			updateTestEvent( $testev );
 		    }
 		}
 	    }
@@ -398,14 +355,14 @@ while (1) {
 #    my @deadpids;
     use POSIX ":sys_wait_h";
     while( (my $pid = waitpid(-1,&WNOHANG)) > 0 ){
-#	push @deadpids, $pid;
 	my $destaddr = $runningtestPIDs{$pid}[0];
 	my $testtype = $runningtestPIDs{$pid}[1];
 	my $testev = \%{ $testevents{$destaddr}{$testtype} };
 	# handle the case where a test (iperf) times out and bgmon kills it
-	if( defined $testev->{"timedout"} ){
+	#TODO: MADE A CHANGE HERE (9/25/06)... IN CASE IT BREAKS, LOOK HERE
+	if( $testev->{"timedout"} == 1 ){
 	    $testev->{"flag_scheduled"} = 0;
-	    delete $testev->{"timedout"};
+	    $testev->{"timedout"} = 0;
 	}elsif( defined $testev ){
 	    $testev->{"flag_finished"} = 1;
 	}
@@ -427,12 +384,9 @@ while (1) {
 	    # bw test is running too long, so kill it
 
 	    kill 'TERM', $pid;
-#	    delete $runningtestPIDs{$pid};
 	    print time_all()." bw timeout: killed $destaddr, ".
 		"pid=$pid\n";
 
-#	    $testev->{"pid"} = 0;
-#	    $testev->{"flag_scheduled"} = 0;
 	    $testev->{"timedout"} = 1;
 
 	    #delete tmp filename
@@ -512,17 +466,15 @@ while (1) {
 	    {
 		
 		if( $testev->{limitTime} > 0 &&
-		    time_all() >= $testev->{limitTime} )
+		    time() >= $testev->{limitTime} )
 		{
-		    print "resetting period from ".$testev->{testper};
-		    # Rate increase expired. Reset rate to old val.
-		    if( defined $testev->{prevPeriod} ){
-			$testev->{testper} = $testev->{prevPeriod};
-		    }else{
-			$testev->{testper} = 0;
-		    }
+		    my $oldper = $testev->{testper};
+		    # Rate increase expired. Get new value from Q
+		    $testev->{cmdq}->cleanQueue();  #rid expired values
+		    $testev->{testper} = 0;  #reset existing period
+		    updateTestEvent($testev);
+		    print "resetting period from $oldper";
 		    print " to ".$testev->{testper}."\n";
-		    $testev->{limitTime} = 0;
 		}
 
 		if( time_all() < 
@@ -538,12 +490,6 @@ while (1) {
 
 		$testev->{"flag_scheduled"} = 1;
 	    }
-
-#	    print "nextrun="
-#		.$testevents{$destaddr}{$testtype}{"timeOfNextRun"}."\n";
-#	    print "scheduled?=".$testevents{$destaddr}{$testtype}{"flag_scheduled"}.
-		"\n";
-#	    print "pid=".$testevents{$destaddr}{$testtype}{"pid"}."\n";
 
 	    #check for new tests ready to run
 	    if( $testev->{"timeOfNextRun"} <= time_all() &&
@@ -623,7 +569,7 @@ sub sendOldResults()
 	next if( time() - $results{ts_finished} < 10 );
 	print "sending old result:  $index\n";
 	sendResults(\%results, $index);
-	# TODO: set last tstamp here in cacheLastSentAt
+
 	$cacheLastSentAt{$index} = time();
     }
 
@@ -658,7 +604,7 @@ sub spawnTest($$)
     #Add to queue if it doesn't exist already
     #  this seach is inefficient... use a hash? sparse array? sorted list?
     my $flag_duplicate = 0;
-    if( $linkdest ne undef ){
+    if( defined $linkdest ){
 	foreach my $element ( @{$waitq{$testtype}} ){
 	    if( $element eq $linkdest ){
 		$flag_duplicate = 1;
@@ -733,7 +679,8 @@ sub getRunningTestsCnt($)
 
     #count currently running tests
     for my $destaddr ( keys %testevents ) {
-	if( $testevents{$destaddr}{$type}{"pid"} > 0 ){
+	if( defined $testevents{$destaddr}{$type} &&
+	    $testevents{$destaddr}{$type}{"pid"} > 0 ){
 	    #we have a running process, so inc it's counter
 	    $testcount++;
 	}
@@ -942,7 +889,8 @@ sub detectHang($)
     my ($nodeid) = @_;
     my $TIMEOUT_NUM_PER = 10;
 
-    if( $testevents{$nodeid}{bw}{flag_scheduled} == 1 &&
+    if( defined $testevents{$nodeid}{bw} &&
+	$testevents{$nodeid}{bw}{flag_scheduled} == 1 &&
 	time_all() > $testevents{$nodeid}{bw}{timeOfNextRun} +
 	$testevents{$nodeid}{bw}{testper} * $TIMEOUT_NUM_PER
 	&& $testevents{$nodeid}{bw}{testper} >0 )
@@ -995,7 +943,7 @@ sub checkTestChangeAllowed(\%$)
 =cut
 }
 
-
+=pod
 sub editTest(\$$$,$)
 {
     my ($testev, $newtestper, $duration, $managerID, $offset) = @_;
@@ -1056,7 +1004,7 @@ sub editTest(\$$$,$)
 		    $testev->{prevPeriod} = $testev->{testper};
 		    $testev->{testper} = $newtestper;
 		    $testev->{limitTime} = 
-			time_all()+$duration;
+			time()+$duration;
 		}elsif( $testev->{limitTime} != 0 ){
 		    # state (x11->10)
 		    if( $newtestper == 0 ){
@@ -1068,7 +1016,7 @@ sub editTest(\$$$,$)
 			#update period and duration with new command
 			$testev->{testper} = $newtestper;
 			$testev->{limitTime} = 
-			    time_all()+$duration;
+			    time()+$duration;
 		    }
 		}
 	    }
@@ -1113,6 +1061,7 @@ sub editTest(\$$$,$)
     }
 }
 
+=cut
 
 #
 #
@@ -1139,9 +1088,10 @@ outageEnd      <120sec&SUCCESS       outageEnd
 
 sub updateOutageState(\$)
 {
+=pod
     my ($testev) = @_;
     my $curstate = $testev->{outagestate};
-    if( $parseData > 0 ){
+    if( $testev->{results_parsed} > 0 ){
 	#valid result, so note the time that this was seen
 	$testev->{lastValidLatTime} = time();
     }
@@ -1155,11 +1105,96 @@ sub updateOutageState(\$)
     }
 
 
-    if( defined $testev->{lastValidLatTime} && 
-	    time() < $testev->{lastValidLatTime}
-	    + $outDet_maxPastSuc )
+    if( defined($testev->{lastValidLatTime}) && 
+	time() < $testev->{lastValidLatTime}
+	+ $outDet_maxPastSuc )
     {
 	#path down and was up recently, so start latency outage
 	
     }
+=cut
+}
+
+#
+# update testevents with latest from queue.
+#   input: ref to testev
+#
+# Called from places which change the cmdqueue:
+#   receive an EDIT/INIT/STOPALL, test expired, outage detected/measured
+#
+sub updateTestEvent($)
+{
+    my ($testev) = @_;
+    my $curPer = $testev->{testper};
+    my $head = $testev->{cmdq}->head();
+
+    if( !defined $head ){
+	#if no tests in queue, stop testev.
+	$testev->{flag_scheduled} = 0;
+	$testev->{testper} = 0;
+    }
+    #compare currently running test info with head of queue
+    elsif( $curPer == 0 ||
+	   $head->period() < $curPer )
+    {
+	#replace running info with that from head:
+	#  testper, limitTime, flag_scheduled, timeOfNextRun, managerID
+	$testev->{testper} = $head->period();
+	if( $head->duration() == 0 ){
+	    $testev->{limitTime} = 0;
+	}else{
+	    $testev->{limitTime} = time_all() +
+		$head->timeleft();
+	}
+	$testev->{flag_scheduled} = 0;
+	$testev->{managerID} = $head->managerid();
+    }
+#    print $testev->{cmdq}->getQueueInfo();
+}
+
+#
+# add a command to the queue of a testev
+#
+sub addCmd($$)
+{
+    my ($testev, $cmd) = @_;
+    $testev->{cmdq}->add($cmd);
+    #update scheduled tests in case something changed
+    updateTestEvent( $testev );
+}
+
+sub initTestEv($$)
+{
+    my ($dest,$type) = @_;
+
+    if( !defined $testevents{$dest}{$type} ){
+	$testevents{$dest}{$type} = {
+				     cmdq => Cmdqueue->new(),
+				     flag_scheduled => 0,
+				     flag_finished  => 0,
+				     testper        => 0,
+				     timeOfNextRun  => 0,
+				     limitTime      => 0,
+				     pid            => 0,
+				     timedout       => 0
+				     };
+    }
+=pod
+    if( !defined
+	$testev->{cmdq} ){
+	$testev->{cmdq} = Cmdqueue->new();
+    }if(!defined
+	$testev->{flag_scheduled} ){
+	$testev->{flag_scheduled} = 0;
+    }if(!defined
+	$testev->{flag_finished} ){
+	$testev->{flag_finished} = 0;
+    }if(!defined
+	$testev->{testper} ){
+	$testev->{testper} = 0;
+    }if(!defined
+	$testev->{limitTime} ){
+	$testev->{limitTime} = 0;
+    }
+=cut
 }

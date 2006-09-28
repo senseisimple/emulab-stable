@@ -184,10 +184,16 @@ sub sendcmd($$)
 # - name of command (EDIT, INIT, etc..)
 # - hash of extra strings to add to event notification
 # - handle to eventsystem "handle"
-sub sendcmd_evsys($$$)
+sub sendcmd_evsys($$$;$)
 {
-    my ($cmdname, $hashref,$handle) = @_;
+    my ($cmdname, $hashref,$handle,$manType) = @_;
     my %cmd = %$hashref;
+
+    if( !defined $manType ){
+	$manType = "managerclient";
+    }
+
+    print "manType = $manType\n";
 
     #
     # This is the evsys command to send
@@ -195,8 +201,8 @@ sub sendcmd_evsys($$$)
     my $tuple = event::address_tuple_alloc();
     if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
-    %$tuple = ( objtype   => "BGMON",
-		objname   => "manager",
+    %$tuple = ( objtype   => "WANETMON",
+		objname   => $manType,
 		eventtype => $cmdname,
 		expt      => "__none",
 		);
@@ -219,7 +225,6 @@ sub sendcmd_evsys($$$)
     }
 
     event::event_notification_free($handle, $notification);
-
 }
 
 
@@ -241,7 +246,14 @@ sub stopnode_evsys($$$)
     my %cmd = ( srcnode      => $node,
 		managerID    => $managerID,
 		cmdtype  => "STOPALL" );
-    sendcmd_evsys("STOPALL",\%cmd,$handle);
+    my $manType;
+    if( $managerID eq "automanagerclient" ){
+	$manType = $managerID;
+    }else{
+	$manType = "managerclient";
+    }
+
+    sendcmd_evsys("STOPALL",\%cmd,$handle,$manType);
 }
 
 
@@ -266,8 +278,8 @@ sub edittest($$$$$$)
 		cmdtype  => "EDIT",
 		dstnode  => $destnode,
 		testtype => $testtype,
-		testper  => $testper,
-		duration => $duration );
+		testper  => "$testper",
+		duration => "$duration" );
 
     return ${[sendcmd($srcnode,\%cmd)]}[0];
 }
@@ -285,10 +297,17 @@ sub edittest_evsys($$$$$$$)
 		srcnode  => $srcnode,
 		dstnode  => $destnode,
 		testtype => $testtype,
-		testper  => $testper,
-		duration => $duration );
+		testper  => "$testper",
+		 duration => "$duration" );
 
-    sendcmd_evsys("EDIT",\%cmd,$handle);
+    my $manType;
+    if( $managerID eq "automanagerclient" ){
+	$manType = $managerID;
+    }else{
+	$manType = "managerclient";
+    }
+
+    sendcmd_evsys("EDIT",\%cmd,$handle,$manType);
 
     #return ${[sendcmd($srcnode,\%cmd)]}[0];
 }
