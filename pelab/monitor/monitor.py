@@ -348,10 +348,12 @@ def receive_characteristic(conn):
     # know that bandwidth has decreased.
     # If we don't know what the bandwidth is for this host, ignore tentative
     # measurments until we find out (due to an authoritative message)
-    # XXX: It appears that this code only does one of these checks - it's not
-    # checking wheter the link is saturated or not. This may be correct - since
-    # the stub is basically doing that already when decideding if the measurment
-    # is authoritative or not. So, either the code or the comment needs fixing.
+
+    # There is no way to know whether the link is saturated or not. If
+    # it was saturated and we knew it, then the event type would be
+    # AUTHORITATIVE_BANDWIDTH. Therefore, we assume that it is
+    # authoritative if it is greater than the previous measurement,
+    # and that it is just a throughput number if it is less.
     if connection_bandwidth.has_key(dest):
       if int(buf) > connection_bandwidth[dest]:
           connection_bandwidth[dest] = int(buf)
