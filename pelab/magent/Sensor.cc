@@ -73,18 +73,20 @@ NullSensor::~NullSensor()
 {
 }
 
-void NullSensor::localSend(PacketInfo *)
+void NullSensor::localSend(PacketInfo * packet)
 {
   ackValid = false;
   sendValid = true;
-  logWrite(SENSOR, "Send received");
+  logWrite(SENSOR, "----------------------------------------");
+  logWrite(SENSOR, "Send received: Time: %f", packet->packetTime.toDouble());
 }
 
 void NullSensor::localAck(PacketInfo * packet)
 {
   sendValid = false;
   ackValid = true;
-  logWrite(SENSOR, "Ack received");
+  logWrite(SENSOR, "----------------------------------------");
+  logWrite(SENSOR, "Ack received: Time: %f", packet->packetTime.toDouble());
   list<Option>::iterator pos = packet->tcpOptions->begin();
   list<Option>::iterator limit = packet->tcpOptions->end();
   for (; pos != limit; ++pos)
