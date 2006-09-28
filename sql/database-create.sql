@@ -854,6 +854,7 @@ CREATE TABLE experiments (
   instance_idx int(10) unsigned NOT NULL default '0',
   dpdb tinyint(1) NOT NULL default '0',
   dpdbname varchar(64) default NULL,
+  dpdbpassword varchar(64) default NULL,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode),

@@ -3718,3 +3718,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	  vname varchar(32) NOT NULL default '',
 	  PRIMARY KEY  (instance_idx, runidx, node_id)
 	) TYPE=MyISAM;
+
+4.92: Add a per-experiment DP password so that users do not need to
+      use their own.
+
+      alter table experiments add dpdbpassword varchar(64) default NULL;
+
