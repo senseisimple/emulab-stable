@@ -12,7 +12,7 @@ $SH ${STUB_DIR}/run-stub.sh $ARGS &
 STUBPID=$!
 # Kill the stub if we get killed - TODO: harsher kill?
 # Note that we assume that a kill of us is "normal" and just exit 0.
-trap "$AS_ROOT kill $STUBPID; $AS_ROOT killall stubd; exit 0" EXIT
+trap "{ $AS_ROOT kill $STUBPID; $AS_ROOT killall stubd; true; }" TERM
 
 #
 # Give it time to come up
@@ -40,7 +40,12 @@ fi
 echo "Running!";
 
 #
-# Wait for our stub to finish
+# Wait for our monitor to finish
+# XXX ignores exit status of child
 #
 wait
-exit $?
+status=$?
+if [ $status -eq 15 ]; then
+    status=0
+fi
+exit $status

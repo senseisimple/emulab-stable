@@ -23,7 +23,6 @@ my $eprefix = "elab-";
 # XXX Need to configure this stuff!
 use lib '/usr/testbed/lib';
 use libtbdb;
-#use libxmlrpc;
 use Socket;
 use Getopt::Std;
 use Class::Struct;
@@ -55,7 +54,7 @@ my $doelabaddrs = 1;
 my $remote = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
-my $DEF_BW = 10000;	# Kbits/sec
+my $DEF_BW = 10001;	# Kbits/sec
 my $DEF_DEL = 0;	# ms
 my $DEF_PLR = 0.0;	# prob.
 
@@ -63,6 +62,21 @@ my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 my $DBHOST  = "localhost";
 my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
+
+# map a "plabXXX" pname to a DB site index
+my %site_mapping = ();
+
+# map a "plabXXX" pname to its IP address
+my %ip_mapping   = ();
+
+# map an Emulab "planet-N" vname to a pname
+my %node_mapping = ();
+
+# map an Emulab vname to its vname index (e.g., "planet-3" -> "3")
+my %ix_mapping   = ();
+
+# map an Emulab vname to its inet connectivity (e.g. "planet-3" -> "inet2")
+my %inet_mapping = ();
 
 my $now     = time();
 
@@ -111,54 +125,53 @@ else{
 TBDBConnect($DBNAME, $DBUSER, $DBPWD, $DBHOST) == 0
     or die("Could not connect to pelab database!\n");
 
-#if (!$remote) {
-#    # RPC STUFF ##############################################
-#    my $TB         = "/usr/testbed";
-#    my $ELABINELAB = 0;
-#    my $RPCSERVER  = "boss.emulab.net";  #?
-#    my $RPCPORT    = "3069";
-#    #my $RPCCERT    = "/etc/outer_emulab.pem"; #?
-#    my $RPCCERT = "~/.ssl/emulab.pem";
-#    my $MODULE = "node";
-#    my $METHOD = "getlist";
 #
-#    libxmlrpc::Config({"server"  => $RPCSERVER,
-#		       "verbose" => 0,
-#		       "portnum" => $RPCPORT});
-#    # END RPC STUFF ##########################################
-#}
-
-#
-# XXX figure out how many pairs there are, and for each, who the
-# corresponding planetlab node is.  Can probably get all this easier
-# via XMLRPC...
+# Figure out how many pairs there are, and for each, who the
+# corresponding planetlab node is.
 #
 my @nodelist;
 if ($remote) {
     @nodelist = split('\s+', `cat /proj/$pid/exp/$eid/tmp/node_list`);
+    chomp(@nodelist);
 } else {
-    @nodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
+    require libxmlrpc;
+
+    # not needed unless we change the default config
+    #libxmlrpc::Config();
+
+    my $rval = libxmlrpc::CallMethod("experiment", "info",
+				     { "proj" => "$pid",
+				       "exp"  => "$eid",
+				       "aspect" => "mapping"});
+    if (defined($rval)) {
+	#
+	# Generate vname=pnode pairs.
+	# Also record inet/inet2/intl status of plab nodes
+	#
+	foreach my $node (keys %$rval) {
+	    my $str = "$node=" . $rval->{$node}{"pnode"};
+	    push(@nodelist, $str);
+	    if ($node =~ /^$pprefix/) {
+		my $auxtype = $rval->{$node}{"auxtype"};
+		if ($auxtype =~ /inet2/) {
+		    $auxtype = "inet2";
+		} else {
+		    $auxtype = "inet";
+		}
+		$inet_mapping{$node} = $auxtype;
+	    }
+	}
+    }
 }
-chomp(@nodelist);
+
 print "NODELIST:\n@nodelist\n"
     if (!$outfile);
+
 my $nnodes = grep(/^${pprefix}/, @nodelist);
 if ($nnodes == 0) {
     print STDERR "No planetlab nodes in $pid/$eid?!\n";
     exit(1);
 }
-
-# map a "plabXXX" pname to a DB site index
-my %site_mapping = ();
-
-# map an Emulab "planet-N" vname to a pname
-my %node_mapping = ();
-
-# map an Emulab vname to its vname index (e.g., "planet-3" -> "3")
-my %ix_mapping   = ();
-
-# map a "plabXXX" pname to its IP address
-my %ip_mapping   = ();
 
 foreach my $mapping (@nodelist) {
     if ($mapping =~ /^(${pprefix}[\d]+)=([\w]*)$/) {
@@ -274,14 +287,87 @@ sub write_info($)
     }
 }
 
+sub plab_type($)
+{
+    my ($node) = (@_);
+    my $ix;
+    my $t;
+
+    if ($node =~ /^$pprefix(\d+)/) {
+	$ix = $1;
+    } elsif ($node =~ /^$eprefix(\d+)/) {
+	$ix = $1;
+    } elsif ($node =~ /10\.0\.0\.(\d+)/) {
+	$ix = $1;
+    }
+
+    $t = $inet_mapping{"$pprefix$ix"};
+    if (!defined($t)) {
+	warn("*** Could not determine type of $node ($pprefix$ix)");
+	$t = "inet";
+    }
+    return $t;
+}
+
+#
+# How we shape the links depends on whether the nodes involved are Internet 2
+# (I2) or commodity internet (I1) as follows:
+#
+# 1. Delay (and eventually PLR) are per-node pair as always
+#
+# 2. If source is an I1 node, outgoing bandwidth to all nodes is shared
+#    and equal to the max BW measured to any one of the nodes.
+#
+# 3. If source is an I2 node, per-node pair pipes are used for all I2
+#    destinations.  For I1 destinations, the computation is as in #2,
+#    the max per-path value for any of them.
+#
 sub send_events()
 {
+    my %dstmap;
+
     foreach my $src (keys %shapeinfo) {
+	my $stype = plab_type($src);
+	my $gotinet = 0;
+	my $maxbw = 0;
+
+	#
+	# Loop over all destinations forming I2 pipes and keeping track
+	# of the max BW to all I1 nodes.
+	#
+	my @cmds;
 	foreach my $rec (@{$shapeinfo{$src}}) {
 	    my ($dst,$bw,$del,$plr) = @{$rec};
-	    my $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY ".
-		"DEST=$dst BANDWIDTH=$bw DELAY=$del PLR=$plr";
-	    print "elabc-$src: DEST=$dst BANDWIDTH=$bw DELAY=$del PLR=$plr...";
+
+	    if (!defined($dstmap{$dst})) {
+		$dstmap{$dst} = plab_type($dst);
+	    }
+	    my $dtype = $dstmap{$dst};
+
+	    my $cmd = "DEST=$dst DELAY=$del PLR=$plr";
+	    if ($stype eq "inet" || $dtype eq "inet") {
+		$gotinet = 1;
+		if ($bw != $DEF_BW && $bw > $maxbw) {
+		    $maxbw = $bw;
+		}
+	    } else {
+		$cmd .= " BANDWIDTH=$bw";
+	    }
+	    push(@cmds, $cmd);
+	}
+
+	#
+	# Setup the shared BW pipe
+	#
+	if ($gotinet) {
+	    $maxbw = $DEF_BW if ($maxbw == 0);
+	    my $cmd = "BANDWIDTH=$maxbw";
+	    push(@cmds, $cmd);
+	}
+
+	foreach my $cmd (@cmds) {
+	    print "elabc-$src ($stype): $cmd...";
+	    $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY " . $cmd;
 	    if (system("$cmd") != 0) {
 		print "[FAILED]\n";
 	    } else {
@@ -411,6 +497,20 @@ sub get_plabinfo($)
 	print "elab-$srcix -> elab-$dstix: ".
 	    "real=$dst, bw=$bw, del=$del, plr=$plr\n"
 		if (!$outfile);
+
+	#
+	# Convert as necessary:
+	# * recorded delay is round-trip, so divide by 2 for one-way
+	# * BW is based on TCP payload, so compensate for dummynet's
+	#   use of ethernet.  Assuming full-sized ethernet packets
+	#   each with 54 bytes of overhead (14 + 20 + 20) that dummynet
+	#   will count, that is 1514 bytes for every 1460 that iperf
+	#   counts.  So we adjust by a factor of 1.036.
+	#
+	$del = int($del/2 + 0.5);
+	if ($bw != $DEF_BW) {
+	    $bw = int($bw * 1.036 + 0.5);
+	}
 
 	# XXX need to lookup "elab-$dstix"
 	$dst = "10.0.0.$dstix";

@@ -19,7 +19,7 @@ $SH ${MAGENT_DIR}/run-magent.sh & #$ARGS
 # Because the magent backgrounds itself, it's harder to figure out
 # what its pid is, just just do a killall
 # Note that we assume that a kill of us is "normal" and just exit 0.
-trap "$AS_ROOT killall $MAGENT; exit 0" EXIT
+trap "$AS_ROOT killall $MAGENT; exit 0" TERM
 
 #
 # Give it time to come up
@@ -47,7 +47,8 @@ fi
 echo "Running!";
 
 #
-# Wait for our agent to finish
+# Wait for our monitor to finish
+# XXX ignores exit status of child
 #
 wait
-exit $?
+exit 0

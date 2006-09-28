@@ -50,6 +50,7 @@ echo "Running!";
 
 #
 # Wait for our monitor to finish
+# XXX ignores exit status of child
 #
-wait $DBMONPID
-exit $?
+wait
+exit 0

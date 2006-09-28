@@ -21,7 +21,7 @@ $SH ${MONITOR_DIR}/run-monitor-libnetmon.sh $ARGS &
 MONPID=$!
 # Kill the monitor if we get killed - TODO: harsher kill?
 # Note that we assume that a kill of us is "normal" and just exit 0.
-trap "$AS_ROOT kill $MONPID; $AS_ROOT killall netmond; exit 0" EXIT
+trap "{ $AS_ROOT kill $MONPID; $AS_ROOT killall netmond; true; }" TERM
 
 #
 # Give it time to come up
@@ -43,4 +43,8 @@ echo "Running!";
 # Wait for our monitor to finish
 #
 wait
-exit $?
+status=$?
+if [ $status -eq 15 ]; then
+    status=0
+fi
+exit $status

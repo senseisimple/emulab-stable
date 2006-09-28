@@ -18,7 +18,11 @@ use constant IN_MAP   => 3;
 
 my $NLIST = "@prefix@/bin/node_list";
 
+# XXX hack
+$NLIST = "/usr/testbed/bin/node_list" if ($NLIST[0] == '@');
+
 my $ipfwpat = q(^\d+\s+(\d+)\s+(\d+) pipe (\d+) ip from any to (any|[0-9\.]+) (\S+) (\S+) (\S+));
+my $ipfwpat2 = q(^\d+\s+(\d+)\s+(\d+) pipe (\d+) ip from ([0-9\.]+) to any (\S+) (\S+) (\S+));
 my $pipepat1 = 
 q(^(\d+):\s+(unlimited|[\d\.]+ [KM]bit/s)\s+([\d\.]+) ms\s+(\d+ sl\.(?:plr [\d\.]+)?));
 my $mappat =
@@ -101,10 +105,12 @@ sub printit($)
 	    }
 	    next;
 	}
+	if (0) {
 	if ($pipeinfo{$pipe}->{"ip"} eq "any") {
 	    push(@anypipes, $pipe);
 	    next;
 	}
+        }
 	if (defined($lastdir) && $lastdir ne $pipeinfo{$pipe}->{"dir"} ||
 	    defined($lastnode) && $lastnode ne $pipeinfo{$pipe}->{"node"}) {
 	    print "\n" unless $dumpfile;
@@ -184,7 +190,7 @@ sub parseit($)
 	} elsif (/^=== cat mapping$/) {
 	    $state = IN_MAP;
 	} elsif ($state == IN_SHOW) {
-	    if (/$ipfwpat/) {
+	    if (/$ipfwpat/ || /$ipfwpat2/) {
 		my $rule = $_;
 		chomp($rule);
 		my $pkts = $1;
@@ -239,16 +245,20 @@ sub parseit($)
 			next;
 		    }
 		    if ($ip eq "any") {
-			$pipeinfo{$pipe}->{"ignore"} = 1;
+			if ($dir eq "<") {
+			    $pipeinfo{$pipe}->{"ignore"} = 1;
+			}
 			next;
 		    }
 		    if ($ip =~ /^10\.0\.0\.(\d+)$/) {
 			$ipix = $1;
+			if (0) {
 			if ($dir eq "<" && $nodeix != $ipix ||
 			    $dir eq ">" && $nodeix == $ipix) {
 			    $pipeinfo{$pipe}->{"ignore"} = 1;
 			    next;
 			}
+		    }
 		    } else {
 			print STDERR "*** ignoring non-pelab rule: $rule\n";
 			$pipeinfo{$pipe}->{"ignore"} = 1;
