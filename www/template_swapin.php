@@ -78,6 +78,19 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     echo "<table align=center border=1>\n";
 
     #
+    # Pass along replay info, but no need to display it.
+    #
+    if (isset($formfields["replay_instance_idx"])) {
+	echo "<input type=hidden name=\"formfields[replay_instance_idx]\"
+                     value='" . $formfields["replay_instance_idx"] . "'>\n";
+
+	if (isset($formfields["replay_run_idx"])) {
+	    echo "<input type=hidden name=\"formfields[replay_run_idx]\"
+                         value='" . $formfields["replay_run_idx"] . "'>\n";
+	}
+    }
+
+    #
     # EID:
     #
     echo "<tr>
@@ -336,10 +349,41 @@ if (!isset($swapin)) {
     $defaults[exp_idleswap_timeout]  = TBGetSiteVar("idle/threshold");
     $defaults[exp_autoswap]          = TBGetSiteVar("general/autoswap_mode");
     $defaults[exp_autoswap_timeout]  = TBGetSiteVar("general/autoswap_threshold");
+
     #
-    # Look for formal parameters that the user can specify.
+    # Optional replay instance/run.
     #
-    $template->FormalParameters($parameters);
+    unset($replay_instance);
+
+    if (isset($replay_instance_idx)) {
+	if (!TBvalid_integer($replay_instance_idx)) {
+	    PAGEARGERROR("Invalid characters in replay instance IDX!");
+	}
+    
+	$replay_instance =
+	    TemplateInstance::LookupByExptidx($replay_instance_idx);
+	if (!$replay_instance) {
+	    USERERROR("No such instance $replay_instance_idx in template!", 1);
+	}
+	$defaults["replay_instance_idx"] = $replay_instance_idx;
+
+	if (isset($replay_run_idx)) {
+	    if (!TBvalid_integer($replay_run_idx)) {
+		PAGEARGERROR("Invalid characters in replay run IDX!");
+	    }
+	    $replay_instance->RunBindings($parameters);
+	    $defaults["replay_run_idx"] = $replay_run_idx;
+	}
+	else {
+	    $replay_instance->Bindings($parameters);	
+	}
+    }
+    else {
+        #
+        # Look for formal parameters that the user can specify.
+        #
+	$template->FormalParameters($parameters);
+    }
     
     #
     # Allow formfields that are already set to override defaults
@@ -575,6 +619,28 @@ if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
     }
     else {
 	$command_options .= " -t " . $formfields[exp_linktest];
+    }
+}
+
+#
+# Replay info.
+#
+if (isset($formfields["replay_instance_idx"]) &&
+    $formfields["replay_instance_idx"] != "") {
+    if (!preg_match("/^[\d]+$/", $formfields["replay_instance_idx"])) {
+	$errors["Replay Instance"] = "Invalid replay instance";
+    }
+    else {
+	$command_options .= " -r " . $formfields["replay_instance_idx"];
+    }
+    if (isset($formfields["replay_run_idx"]) &&
+	$formfields["replay_run_idx"] != "") {
+	if (!preg_match("/^[\d]+$/", $formfields["replay_run_idx"])) {
+	    $errors["Replay Run"] = "Invalid replay run";
+	}
+	else {
+	    $command_options .= ":" . $formfields["replay_run_idx"];
+	}
     }
 }
 

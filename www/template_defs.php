@@ -541,7 +541,7 @@ class Template
                <th align=center>Show</th>
                <th align=center>Archive</th>
                <th align=center>Export</th>
-               <th align=center>Analyze</th>
+               <th align=center>Replay</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -599,8 +599,9 @@ class Template
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 
 	    echo " <td align=center>".
- 		    MakeLink("analyze",
-			     "guid=$guid&version=$vers&exptidx=$exptidx",
+ 		    MakeLink("swapin",
+			     "guid=$guid&version=$vers".
+			     "&replay_instance_idx=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 	    echo " </td>
                  </tr>\n";
@@ -1294,6 +1295,29 @@ class TemplateInstance
 	}
 	return 0;
     }
+
+    #
+    # Return an array of the bindings for a run of template instance.
+    #
+    function RunBindings($runidx, &$bindings) {
+	$bindings = array();
+
+	$instance_idx = $this->idx();
+	$exptidx      = $this->exptidx();
+
+	$query_result =
+	    DBQueryFatal("select * from experiment_run_bindings ".
+			 "where exptidx='$exptidx' and runidx='$runidx'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $name	= $row['name'];
+	    $value	= $row['value'];
+
+	    $bindings[$name] = $value;
+	}
+	return 0;
+    }
+    
     #
     # Show graph stuff, either for entire instance or for a run. Very hacky.
     #
@@ -1644,6 +1668,9 @@ function MakeLink($which, $args, $text)
     }
     elseif ($which == "analyze") {
 	$page = "template_analyze.php";
+    }
+    elseif ($which == "swapin") {
+	$page = "template_swapin.php";
     }
     return "<a href=${page}?${args}>$text</a>";
 }

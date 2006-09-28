@@ -1013,9 +1013,9 @@ sub CleanLogFiles($)
 #
 # Copy log files to user visible space. Maybe not such a good idea anymore?
 #
-sub CopyLogFiles($)
+sub CopyLogFiles($;@)
 {
-    my ($self) = @_;
+    my ($self, @files) = @_;
 
     # Must be a real reference. 
     return -1
@@ -1026,9 +1026,15 @@ sub CopyLogFiles($)
     my $workdir = $self->WorkDir();
     my $userdir = $self->UserDir();
 
+    # Specific files, then return.
+    if (@files) {
+	mysystem("/bin/cp -fp @files $userdir/tbdata");
+	return 0;
+    }
+
     opendir(DIR, $workdir) or
 	return -1;
-    my @files  = readdir(DIR);
+    @files  = readdir(DIR);
     closedir(DIR);
     my @copy   = ();
 

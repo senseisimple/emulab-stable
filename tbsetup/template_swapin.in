@@ -211,7 +211,7 @@ if (defined($replay_exptidx)) {
 	#
 	# XXX Need to convert these other routines to return Run objects
 	my $row = $replay_instance->FirstRun();
-	if (defined($row)) {
+	if (!defined($row)) {
 	    tbdie("Could not find first run for $replay_instance!");
 	}
 	$replay_runidx = $row->{'idx'};
@@ -299,7 +299,9 @@ if ($paramfile) {
 }
 elsif (defined($replay_instance)) {
     #
-    # Bindings come from the replay instance (well, run).
+    # Bindings come from the replay instance (well, run), although the
+    # use can still have provided a parameter file (above) to override
+    # the values from the record. 
     #
     my %replay_bindings = ();
 
@@ -534,11 +536,12 @@ if (defined($replay_instance)) {
     $datastore_tag = $replay_run->start_tag();
 }
 
+print "Checking out a copy of the template datastore ($datastore_tag)\n";
 $instance->CopyDataStore($datastore_tag,
 			 "$instance_path/template_datastore") == 0
-    or fatal(-1, "Could not copy datastore ($template_tag) to instance");
+    or fatal(-1, "Could not copy datastore to instance");
 
-# Ditto for dynamic events.
+# Ditto for dynamic events. 
 $instance->CopyTemplateEvents() == 0
     or fatal(-1, "Could not copy template events to instance");
 
@@ -599,7 +602,7 @@ if ($batchmode) {
 	    }
 	    elsif ($state eq EXPTSTATE_SWAPPED()) {
 		# Dumped out of the batch system for some reason.
-		print "Experiment ha been removed from the batch queue.\n";
+		print "Experiment has been removed from the batch queue.\n";
 
 		#
 		# We are done; remove record of this attempt and exit.
