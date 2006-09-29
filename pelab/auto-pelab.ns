@@ -138,7 +138,7 @@ if {$do_bsd} {
 #
 # If non-zero, uses the new stub (magent) instead of the old one
 #
-set use_magent 0
+set use_magent 1
 
 #
 # If non-zero, uses the DB-based "monitor" to control the cloud shaping
@@ -152,6 +152,12 @@ if {$do_bsd} {
 # If non-zero, limits the number of slots in the queues for the fake PlanetLab
 #
 set limit_fake_queue_slots 0
+
+#
+# Use this to set a unique port so that you don't collide with others on the
+# same node. Only supported when use_magent is 1
+#
+set stub_port 3149
 
 #
 # Enforce no_plab requirements
@@ -177,6 +183,9 @@ if {$do_bsd} {
 
 tb-set-delay-os $delay_os
 
+set stub_peer_port $stub_port
+set stub_command_port [expr $stub_port + 1]
+
 #
 # Tarballs and RPMs we install on all nodes
 #
@@ -195,14 +204,14 @@ if {$do_bsd} {
 }
 
 if {$use_magent} {
-    set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh"
+    set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh --peerserverport=$stub_peer_port --monitorserverport=$stub_command_port"
 } else {
     set stubcommand "/bin/sh /local/pelab/stub/auto-stub.sh"
 }
 if {$use_dbmonitor} {
     set moncommand "$elabshell /local/pelab/dbmonitor/auto-dbmonitor.sh"
 } else {
-    set moncommand "$elabshell /local/pelab/monitor/auto-monitor.sh"
+    set moncommand "$elabshell /local/pelab/monitor/auto-monitor.sh --stub-port=$stub_command_port"
 }
 
 #
@@ -327,7 +336,7 @@ if {$real_plab} {
     set realinternet [$ns make-lan "$inet_string" 100Mbps 0ms]
     tb-set-lan-protocol $realinternet ipv4
     if {$trace} {
-	$realinternet trace
+	$realinternet trace header "tcp and port $stub_peer_port"
 	if {$trace_end_nodes} {
 	    $realinternet trace_endnode 1
 	}
