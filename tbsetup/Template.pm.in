@@ -2909,7 +2909,8 @@ sub InitializeEnvVariables($;$)
 	== 0 or return -1;
 
     if ($experiment->dpdb() && $experiment->dpdbname() ne "") {
-	my $dpdbname = $experiment->dpdbname();
+	my $dpdbname     = $experiment->dpdbname();
+	my $dpdbpassword = $experiment->dpdbpassword();
 
 	$experiment->AddEnvVariable("DP_DBNAME", $dpdbname) == 0
 	    or return -1;
@@ -2917,21 +2918,11 @@ sub InitializeEnvVariables($;$)
 	$experiment->AddEnvVariable("DP_HOST", $CONTROL) == 0
 	    or return -1;
 
-	#
-	# XXX This needs to change to a per-experiment user/password.
-	#
-	$experiment->AddEnvVariable("DP_USER", $dbuid) == 0
+	$experiment->AddEnvVariable("DP_USER", $dpdbname) == 0
 	    or return -1;
 
-	$query_result =
-	    DBQueryFatal("select mailman_password from users ".
-			 "where uid='$dbuid'");
-	my ($mailman_password) = $query_result->fetchrow_array();
-    
-	if (defined($mailman_password)) {
-	    $experiment->AddEnvVariable("DP_PASSWORD", $mailman_password) == 0
-		or return -1;
-	}
+	$experiment->AddEnvVariable("DP_PASSWORD", $dpdbpassword) == 0
+	    or return -1;
     }
 
     #

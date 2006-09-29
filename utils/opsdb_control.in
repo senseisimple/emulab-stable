@@ -474,16 +474,23 @@ sub AddExpDB(@)
     # Check to see if the experiment actually wants its own DB.
     #
     my $query_result =
-	DBQueryFatal("select dpdbname from experiments ".
+	DBQueryFatal("select dpdbname,dpdbpassword from experiments ".
 		     "where pid='$pid' and eid='$eid' and dpdb!=0");
     return 0
 	if (!$query_result->numrows);
     
-    my ($dpdbname) = $query_result->fetchrow_array();
+    my ($dpdbname,$dpdbpassword) = $query_result->fetchrow_array();
 
     if (defined($dpdbname)) {
 	# Allow override.
 	$dbname = $dpdbname;
+    }
+    if (!defined($dpdbpassword)) {
+	$dpdbpassword = TBGenSecretKey();
+	$dpdbpassword = substr($dpdbpassword, 0, 10);
+
+	DBQueryFatal("update experiments set dpdbpassword='$dpdbpassword' ".
+		     "where pid='$pid' and eid='$eid'");
     }
     return -1
 	if (!TBExptIDX($pid, $eid, \$exptidx));
@@ -509,6 +516,20 @@ sub AddExpDB(@)
     }
     DBQueryFatal("update experiment_stats set dpdbname='$dbname' ".
 		 "where exptidx='$exptidx'");
+
+    #
+    # Add a user that is named by this DB, with the password from above.
+    # Basically, a per-experiment DB user for the DB.
+    #
+    print "Adding user '$dbname' to mysql database on $CONTROL.\n";
+    $retval = DoOpsStuff("adduser $dbname", $dpdbpassword);
+    if ($retval && $retval != EEXIST()) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    $retval = DoOpsStuff("setdbs", "$dbname $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
 
     #
     # Now we need to update the access list for everyone in the group.
@@ -567,8 +588,17 @@ sub DelExpDB(@)
     return -1
 	if (!defined($dbname));
 
+    #
+    # Delete the per-experiment DB user for the DB.
+    #
+    print "Deleting user '$dbname' from mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("deluser $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+
     print "Removing DB '$dbname' from mysql database on $CONTROL.\n";
-    my $retval = DoOpsStuff("deldb $dbname");
+    $retval = DoOpsStuff("deldb $dbname");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }

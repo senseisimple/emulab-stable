@@ -764,6 +764,9 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $lockdown    = $exprow["lockdown"];
     $exptidx     = $exprow["idx"];
     $archive_idx = $exprow["archive_idx"];
+    $dpdb        = $exprow["dpdb"];
+    $dpdbname    = $exprow["dpdbname"];
+    $dpdbpassword= $exprow["dpdbpassword"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -1066,6 +1069,17 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 	    echo "<tr>
                       <td>Sync Server: </td>
                       <td class=\"left\">$syncserver</td>
+                  </tr>\n";
+	}
+	if ($dpdb && $dpdbname && $dpdbpassword) {
+	    echo "<tr>
+                      <td>DataBase Name: </td>
+                      <td class=\"left\">$dpdbname</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>DataBase Password: </td>
+                      <td class=\"left\">$dpdbpassword</td>
                   </tr>\n";
 	}
         echo "<tr>
