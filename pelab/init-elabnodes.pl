@@ -144,6 +144,8 @@ if ($remote) {
 				       "exp"  => "$eid",
 				       "aspect" => "mapping"});
     if (defined($rval)) {
+	my $gotplab = 0;
+
 	#
 	# Generate vname=pnode pairs.
 	# Also record inet/inet2/intl status of plab nodes
@@ -159,6 +161,53 @@ if ($remote) {
 		    $auxtype = "inet";
 		}
 		$inet_mapping{$node} = $auxtype;
+		$gotplab++;
+	    }
+	}
+
+	#
+	# No planetlab machines in the experiment.  We might be doing
+	# emulation only, so look for a list of plab nodes in the
+	# user environment.
+	#
+	if ($gotplab == 0) {
+	    my %plist;
+
+	    my $rval = libxmlrpc::CallMethod("experiment", "metadata",
+					     { "proj" => "$pid",
+					       "exp"  => "$eid" });
+	    if (defined($rval)) {
+		my $aref = $rval->{"user_environment"};
+		foreach my $env (@$aref) {
+		    if ($env->{"name"} =~ /pelab-elab-(\d+)-mapping/) {
+			my $node = "planet-$1";
+			$plist{$node} = $env->{"value"};
+			my $str = "$node=" . $plist{$node};
+			push(@nodelist, $str);
+		    }
+		}
+
+		# sslxmlrpc_client.py -m node getlist class=pcplabphys
+		my $rval = libxmlrpc::CallMethod("node", "getlist",
+						 { "proj" => "$pid",
+						   "class"  => "pcplabphys" });
+		if (defined($rval)) {
+		    while (my ($node,$pnode) = each(%plist)) {
+			my $auxtype;
+			if (defined($rval->{$pnode})) {
+			    $auxtype = $rval->{$pnode}{"auxtypes"};
+			    if ($auxtype =~ /inet2/) {
+				$auxtype = "inet2";
+			    } else {
+				$auxtype = "inet";
+			    }
+			} else {
+			    $auxtype = "inet";
+			}
+			$inet_mapping{$node} = $auxtype;
+			$gotplab++;
+		    }
+		}
 	    }
 	}
     }
