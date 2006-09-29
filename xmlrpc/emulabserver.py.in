@@ -3333,6 +3333,8 @@ class node:
                     }
                 if row[4]:
                     result[row[0]]["site"] = row[4]
+                    pass
+                if row[5] and row[5] != "":
                     result[row[0]]["cpu"] = row[5]
                     pass
                 if row[6] and row[6] != "":
