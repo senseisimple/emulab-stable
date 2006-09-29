@@ -483,10 +483,13 @@ sub get_plabinfo($)
 	}
 	if(!defined($plr)){
 	    $plr = $DEF_PLR;
+	    # do not complain right now since we do not collect this
+	    if (0) {
 	    warn("*** Could not get lossrate ".
 		 "$srcvnode ($src_site) --> $dstvnode ($dst_site)\n".
 		 "    defaulting to ".
 		 "${DEF_PLR}plr\n" );
+	    }
 	}
 	if($initvalBw->numSamples == $initvalBw->numErrValSamples){	 
 	    $bw = $DEF_BW;
@@ -543,9 +546,9 @@ sub get_plabinfo($)
 	}
 =cut
 
-	print "elab-$srcix -> elab-$dstix: ".
-	    "real=$dst, bw=$bw, del=$del, plr=$plr\n"
-		if (!$outfile);
+	printf("elab-%d -> elab-%d: real=%s, bw=%d, del=%d, plr=%4.2f\n",
+	       $srcix, $dstix, $dst, int($bw + 0.5), int($del + 0.5), $plr)
+	    if (!$outfile);
 
 	#
 	# Convert as necessary:
