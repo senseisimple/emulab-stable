@@ -13,8 +13,8 @@ cd $LOGDIR
 #
 # Start up our own measurement agent
 #
-echo $SH ${MAGENT_DIR}/run-magent.sh #$ARGS
-$SH ${MAGENT_DIR}/run-magent.sh --daemonize #$ARGS 
+echo $SH ${MAGENT_DIR}/run-magent.sh $ARGS
+$SH ${MAGENT_DIR}/run-magent.sh --daemonize $ARGS 
 # Kill the agent if we get killed - TODO: harsher kill?
 # Because the magent backgrounds itself, it's harder to figure out
 # what its pid is, just just do a killall
