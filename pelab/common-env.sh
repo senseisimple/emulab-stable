@@ -52,6 +52,7 @@ PYTHON="${BIN_PATH}/python"
 SUDO="${BIN_PATH}/sudo"
 MKDIR="/bin/mkdir"
 CHMOD="/bin/chmod"
+SU="/bin/su"
 
 SYNC="/usr/local/etc/emulab/emulab-sync"
 SYNCTIMO=120
@@ -131,6 +132,16 @@ else
 fi
 
 #
+# Find out if we're in a vserver - can we see the init process?
+#
+ps --pid 1 > /dev/null
+if [ $? == 1 ]; then
+    export IN_VSERVER="yes"
+else
+    export IN_VSERVER=""
+fi
+
+#
 # Are we the "master" (sync server) node?
 #
 
@@ -196,7 +207,14 @@ if [ "$HOST_ROLE" = "monitor" ]; then
 elif [ "$HOST_ROLE" = "stub" ]; then
     if [ "$ON_ELAB" = "yes" ]; then
         export PLAB_IP=`lookup_ip_host $HOSTNAME $EPLAB_LAN`
-        export PLAB_IFACE=`ifacename $PLAB_IP`
+        #
+        # We could still be in a vserver
+        #
+        if [ "$IN_VSERVER" = "yes" ]; then
+            export PLAB_IFACE="vnet"
+        else
+            export PLAB_IFACE=`ifacename $PLAB_IP`
+        fi
     else
         # On real planetlab
         export PLAB_IFACE="vnet"
@@ -284,5 +302,9 @@ sync_timeout()
     # and return the result
     return $RVAL
 }
+
+#
+# Become the 'vuser'
+#
 
 fi # End of header guard
