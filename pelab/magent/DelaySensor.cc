@@ -50,8 +50,15 @@ void DelaySensor::localAck(PacketInfo * packet)
   {
     Time diff = packet->packetTime - packetHistory->getAckedSendTime();
     lastDelay = diff.toMilliseconds();
-    logWrite(SENSOR, "DELAY: %d ms", lastDelay);
-    ackValid = true;
+    // Failsafe - if this happens, we need to fix the cause, but in the
+    // meantime, let's just make sure that it doesn't make it to the monitor
+    if (lastDelay < 0) {
+      logWrite(ERROR, "DelaySensor::localAck() Bogus delay %d", lastDelay);
+      ackValid = false;
+    } else {
+      logWrite(SENSOR, "DELAY: %d ms", lastDelay);
+      ackValid = true;
+    }
   }
   else
   {

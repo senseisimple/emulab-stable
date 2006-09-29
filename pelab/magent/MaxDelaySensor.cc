@@ -29,6 +29,12 @@ void MaxDelaySensor::localSend(PacketInfo * packet)
    * the forward path
    */
   if (packetsensor->isSendValid() && packetsensor->getIsRetransmit()) {
+    if (maximum.get() <= 0) {
+      logWrite(ERROR,"maxDelaySensor::localSend() got bogus max %i",
+                      maximum.get());
+      sendValid = false;
+      return;
+    }
     if (lastreported != maximum.get()) {
       logWrite(SENSOR,"MaxDelaySensor::localSend() reporting new max %d",
                maximum.get());
