@@ -3,6 +3,8 @@
 # Script to run the monitor, collecting data from libnetmon
 #
 
+ARGS=$*
+
 #
 # Let common-env know what role we're playing
 #
@@ -54,6 +56,6 @@ fi
 
 
 #echo "Starting up monitor for $PROJECT/$EXPERIMENT $PELAB_IP $SIP";
-echo "Starting up monitor with options --mapping=$IPMAP --experiment=$PROJECT/$EXPERIMENT --ip=$PELAB_IP $INITARG";
-exec $NETMON_DIR/$NETMOND -v 2 -f 262144 | tee $LOGDIR/libnetmon.out | $PYTHON $MONITOR_DIR/$MONITOR --mapping=$IPMAP --experiment=$PROJECT/$EXPERIMENT --ip=$PELAB_IP $INITARG
+echo "Starting up monitor with options --mapping=$IPMAP --experiment=$PROJECT/$EXPERIMENT --ip=$PELAB_IP $INITARG $ARGS";
+exec $NETMON_DIR/$NETMOND -v 2 -f 262144 | tee $LOGDIR/libnetmon.out | $PYTHON $MONITOR_DIR/$MONITOR --mapping=$IPMAP --experiment=$PROJECT/$EXPERIMENT --ip=$PELAB_IP $INITARG $ARGS
 #exec $NETMON_DIR/$NETMOND -v 2 | $PYTHON $MONITOR_DIR/$MONITOR ip-mapping.txt $PROJECT/$EXPERIMENT $PELAB_IP $SIP
