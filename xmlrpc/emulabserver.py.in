@@ -3298,6 +3298,16 @@ class node:
                           + ")")
             pass
 
+        node_clause = ""
+        if argdict.has_key("nodes"):
+            if not re.match("^[-\w]+(,[-\w]+)*$", str(argdict["nodes"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Bad chars in node list!")
+
+            nodestr = "','".join(str(argdict["nodes"]).split(","))
+            node_clause = " and a.node_id in ('" + nodestr + "') "
+            pass
+
         res = DBQueryFatal(
             "SELECT a.node_id,a.type,b.node_id is null or "
             "  (b.pid=%s and b.eid=%s), "
@@ -3315,7 +3325,8 @@ class node:
             "  and nfcpu.feature='+load') "
             "WHERE a.role='testnode' "
             "  "+ class_test +" and "
-            "      (p.pid is null" + pid_clause + ") " + type_test +
+            "  (p.pid is null" + pid_clause + ") "
+            "  "+ type_test +" "+ node_clause +
             "group by a.node_id",
             (TBOPSPID, 'plabnodes'))
         
