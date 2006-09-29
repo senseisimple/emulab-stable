@@ -474,6 +474,10 @@ if (! $TESTMODE) {
     }
 }
 
+# Setup env variables.
+$experiment->InitializeEnvVariables() == 0
+    or fatal("Could not initialize environment strings variables");
+
 print "Writing environment strings ...\n";
 $experiment->WriteEnvVariables() == 0
     or fatal("Could not write environment strings for program agents");

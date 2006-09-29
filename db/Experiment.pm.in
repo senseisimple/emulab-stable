@@ -26,6 +26,7 @@ use overload ('""' => 'Stringify');
 # Configure variables
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
+my $CONTROL	= "@USERNODE@";
 my $EVENTSYS    = @EVENTSYS@;
 my $TEVC	= "$TB/bin/tevc";
 my $DBCONTROL   = "$TB/sbin/opsdb_control";
@@ -600,11 +601,33 @@ sub AddEnvVariable($$$;$)
 	$value = "''";
     }
 
-    DBQueryWarn("replace into virt_user_environment set ".
-		"   name='$name', value=$value, ".
-		(defined($index) ? "idx=$index, " : "") .
-		"   pid='$pid', eid='$eid'")
-	or return -1;
+    #
+    # Look to see if the variable exists, since a replace will actually
+    # create a new row cause there is an auto_increment in the table that
+    # is used to maintain order of the variables as specified in the NS file.
+    #
+    my $query_result =
+	DBQueryWarn("select idx from virt_user_environment ".
+		    "where name='$name' and pid='$pid' and eid='$eid'");
+
+    return -1
+	if (!$query_result);
+
+    if ($query_result->numrows) {
+	my $idx = (defined($index) ? $index :
+		   ($query_result->fetchrow_array())[0]);
+	    
+	DBQueryWarn("replace into virt_user_environment set ".
+		    "   name='$name', value=$value, idx=$idx, ".
+		    "   pid='$pid', eid='$eid'")
+	    or return -1;
+    }
+    else {
+	DBQueryWarn("insert into virt_user_environment set ".
+		    "   name='$name', value=$value, idx=NULL, ".
+		    "   pid='$pid', eid='$eid'")
+	    or return -1;
+    }
     
     return 0;
 }
@@ -1428,6 +1451,40 @@ sub NodeStatusList($$)
 	$results{$node_id} = (($status eq "up") ? 1 : 0);
     }
     %$prval = %results;
+    return 0;
+}
+
+#
+# Setup the environment variables for a swapin.
+#
+sub InitializeEnvVariables($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $self->Refresh() == 0
+	or return -1;
+
+    if ($self->dpdb() && $self->dpdbname() && $self->dpdbname() ne "") {
+	my $dpdbname     = $self->dpdbname();
+	my $dpdbpassword = $self->dpdbpassword();
+
+	$self->AddEnvVariable("DP_DBNAME", $dpdbname) == 0
+	    or return -1;
+	
+	$self->AddEnvVariable("DP_HOST", $CONTROL) == 0
+	    or return -1;
+
+	$self->AddEnvVariable("DP_USER", $dpdbname) == 0
+	    or return -1;
+
+	$self->AddEnvVariable("DP_PASSWORD", $dpdbpassword) == 0
+	    or return -1;
+    }
+    
     return 0;
 }
 

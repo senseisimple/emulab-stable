@@ -2908,23 +2908,7 @@ sub InitializeEnvVariables($;$)
 				"$instance_path/archive", 2)
 	== 0 or return -1;
 
-    if ($experiment->dpdb() && $experiment->dpdbname() ne "") {
-	my $dpdbname     = $experiment->dpdbname();
-	my $dpdbpassword = $experiment->dpdbpassword();
-
-	$experiment->AddEnvVariable("DP_DBNAME", $dpdbname) == 0
-	    or return -1;
-	
-	$experiment->AddEnvVariable("DP_HOST", $CONTROL) == 0
-	    or return -1;
-
-	$experiment->AddEnvVariable("DP_USER", $dpdbname) == 0
-	    or return -1;
-
-	$experiment->AddEnvVariable("DP_PASSWORD", $dpdbpassword) == 0
-	    or return -1;
-    }
-
+    # Now safe to do the rest.
     #
     # Before we actually swapin, copy the parameters to the environment
     # table so that they are available to the program agent when it starts up
