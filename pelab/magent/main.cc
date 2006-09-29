@@ -164,7 +164,7 @@ void processArgs(int argc, char * argv[])
       }
       break;
     case 'p':
-      if (sscanf(optarg,"%i",&argIntVal))
+      if (sscanf(optarg,"%i",&argIntVal) != 1)
       {
         usageMessage(argv[0]);
         exit(1);
@@ -175,7 +175,7 @@ void processArgs(int argc, char * argv[])
       }
       break;
     case 'm':
-      if (sscanf(optarg,"%i",&argIntVal))
+      if (sscanf(optarg,"%i",&argIntVal) != 1)
       {
         usageMessage(argv[0]);
         exit(1);
@@ -541,7 +541,6 @@ void replayLoop(void)
       break;
     case PACKET_INFO_SEND_COMMAND:
     case PACKET_INFO_ACK_COMMAND:
-      logWrite(EXCEPTION,"Got a packet: %d",head.type);
       done = ! replayRead(& packetBuffer[0], head.size);
       if (!done)
       {
