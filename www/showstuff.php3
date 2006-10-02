@@ -1078,6 +1078,11 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                   </tr>\n";
 
 	    echo "<tr>
+                      <td>DataBase User: </td>
+                      <td class=\"left\">E${exptidx}</td>
+                  </tr>\n";
+
+	    echo "<tr>
                       <td>DataBase Password: </td>
                       <td class=\"left\">$dpdbpassword</td>
                   </tr>\n";

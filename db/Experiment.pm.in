@@ -1471,6 +1471,7 @@ sub InitializeEnvVariables($)
     if ($self->dpdb() && $self->dpdbname() && $self->dpdbname() ne "") {
 	my $dpdbname     = $self->dpdbname();
 	my $dpdbpassword = $self->dpdbpassword();
+	my $dpdbuser     = "E" . $self->idx();
 
 	$self->AddEnvVariable("DP_DBNAME", $dpdbname) == 0
 	    or return -1;
@@ -1478,7 +1479,7 @@ sub InitializeEnvVariables($)
 	$self->AddEnvVariable("DP_HOST", $CONTROL) == 0
 	    or return -1;
 
-	$self->AddEnvVariable("DP_USER", $dpdbname) == 0
+	$self->AddEnvVariable("DP_USER", $dpdbuser) == 0
 	    or return -1;
 
 	$self->AddEnvVariable("DP_PASSWORD", $dpdbpassword) == 0

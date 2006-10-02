@@ -521,12 +521,14 @@ sub AddExpDB(@)
     # Add a user that is named by this DB, with the password from above.
     # Basically, a per-experiment DB user for the DB.
     #
-    print "Adding user '$dbname' to mysql database on $CONTROL.\n";
-    $retval = DoOpsStuff("adduser $dbname", $dpdbpassword);
+    my $dbuser = "E${exptidx}";
+    
+    print "Adding user '$dbuser' to mysql database on $CONTROL.\n";
+    $retval = DoOpsStuff("adduser $dbuser", $dpdbpassword);
     if ($retval && $retval != EEXIST()) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
-    $retval = DoOpsStuff("setdbs", "$dbname $dbname");
+    $retval = DoOpsStuff("setdbs", "$dbuser $dbname");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
@@ -578,12 +580,12 @@ sub DelExpDB(@)
     # Always do a DB removal if the experiment has a dbname set.
     #
     my $query_result =
-	DBQueryFatal("select dpdbname from experiments ".
+	DBQueryFatal("select dpdbname,idx from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     return 0
 	if (!$query_result->numrows);
     
-    my ($dbname) = $query_result->fetchrow_array();
+    my ($dbname,$exptidx) = $query_result->fetchrow_array();
 
     return -1
 	if (!defined($dbname));
@@ -591,8 +593,10 @@ sub DelExpDB(@)
     #
     # Delete the per-experiment DB user for the DB.
     #
-    print "Deleting user '$dbname' from mysql database on $CONTROL.\n";
-    my $retval = DoOpsStuff("deluser $dbname");
+    my $dbuser = "E${exptidx}";
+    
+    print "Deleting user '$dbuser' from mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("deluser $dbuser");
     if ($retval) {
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
