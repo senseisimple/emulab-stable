@@ -467,7 +467,7 @@ if ($doswapmod) {
     #
     my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
     my $nsfile     = "$archivedir/nsdata/nsfile.ns";
-    my @arguments  = ($swapexp, "-q", "-x", "-s", "modify",
+    my @arguments  = ($swapexp, "-q", "-e", "-x", "-s", "modify",
 		      $pid, $eid, $nsfile);
 
     print "Starting a swap modify ...\n";
