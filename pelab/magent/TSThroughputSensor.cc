@@ -9,7 +9,8 @@ using namespace std;
 
 TSThroughputSensor::TSThroughputSensor(PacketSensor const * newPacketHistory,
                                    StateSensor const * newState)
-  : lastAckTS(0), packetHistory(newPacketHistory), state(newState)
+  : lastAckTS(0), packetHistory(newPacketHistory), state(newState),
+    deferredBytes(0)
 {
 }
 
@@ -109,15 +110,38 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
 
     if (lastAckTS != 0)
     {
-      ackValid = true;
-      /*
-       * period is in arbitrary units decided on by the other end - we assume
-       * they are in milliseconds XXX: Verify this
-       */
-      lastPeriod = currentAckTS - lastAckTS;
-      lastByteCount = packetHistory->getAckedSize();
-      logWrite(SENSOR, "TSTHROUGHPUT: %d kbps (period=%i,kbits=%f)",
-          getThroughputInKbps(), lastPeriod, lastByteCount*(8.0/1000.0));
+      uint32_t period = currentAckTS - lastAckTS;
+      if (period == 0) {
+        /*
+         * If the period is 0, then the two packets arrived in the same
+         * millisecond. If this is the case, we'll just take the bytes acked
+         * here and count them as being acked by the next packet, and we'll
+         * keep doing this until we get a non-zero period. It would probably be
+         * better to count the throughput for these bytes with the previous
+         * packet, but that would be a problem since we'd have to delay
+         * reporting for every packet until we saw a subsequent non-zero
+         * period.
+         */
+        ackValid = false;
+        deferredBytes += packetHistory->getAckedSize();
+        logWrite(SENSOR, "TSThroughputSensor::localAck() deferring %i bytes "
+                         "due to zero period (%i total)",
+                         packetHistory->getAckedSize(), deferredBytes);
+      } else {
+        ackValid = true;
+        /*
+         * period is in arbitrary units decided on by the other end - we assume
+         * they are in milliseconds
+         * XXX: This is a very fragile assumption - it works with Linux on x86,
+         * but is not likely to work under other circumstances
+         */
+        lastPeriod = period;
+        lastByteCount = packetHistory->getAckedSize() + deferredBytes;
+        logWrite(SENSOR, "TSTHROUGHPUT: %d kbps (period=%i,kbits=%f,deferred=%f)",
+            getThroughputInKbps(), lastPeriod, lastByteCount*(8.0/1000.0),
+            deferredBytes*(8.0/1000));
+        deferredBytes = 0;
+      }
     }
     else
     {

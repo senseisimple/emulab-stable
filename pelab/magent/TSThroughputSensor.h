@@ -37,6 +37,7 @@ private:
   uint32_t lastAckTS;
   PacketSensor const * packetHistory;
   StateSensor const * state;
+  int deferredBytes;
 };
 
 uint32_t findTcpTimestamp(PacketInfo * packet);
