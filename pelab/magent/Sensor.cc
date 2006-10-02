@@ -69,6 +69,10 @@ bool Sensor::isAckValid(void) const
 }
 
 
+NullSensor::NullSensor() : lastPacketTime()
+{
+}
+
 NullSensor::~NullSensor()
 {
 }
@@ -79,6 +83,11 @@ void NullSensor::localSend(PacketInfo * packet)
   sendValid = true;
   logWrite(SENSOR, "----------------------------------------");
   logWrite(SENSOR, "Send received: Time: %f", packet->packetTime.toDouble());
+  if (packet->packetTime < lastPacketTime) {
+    logWrite(EXCEPTION,"Reordered packets! Old %f New %f",lastPacketTime.toDouble(),
+            packet->packetTime.toDouble());
+  }
+  lastPacketTime = packet->packetTime;
 }
 
 void NullSensor::localAck(PacketInfo * packet)
@@ -93,4 +102,9 @@ void NullSensor::localAck(PacketInfo * packet)
   {
     logWrite(SENSOR, "TCP Option: %d", pos->type);
   }
+  if (packet->packetTime < lastPacketTime) {
+    logWrite(EXCEPTION,"Reordered packets! Old %f New %f",lastPacketTime.toDouble(),
+            packet->packetTime.toDouble());
+  }
+  lastPacketTime = packet->packetTime;
 }

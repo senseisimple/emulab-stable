@@ -34,10 +34,16 @@ protected:
 class NullSensor : public Sensor
 {
 public:
+  NullSensor();
   virtual ~NullSensor();
 protected:
   virtual void localSend(PacketInfo *);
   virtual void localAck(PacketInfo * packet);
+  
+  // This is used to detect packets that we see in a different order than
+  // the appeared on the wire
+  Time lastPacketTime;
+
 };
 
 #endif
