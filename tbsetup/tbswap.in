@@ -1300,16 +1300,6 @@ sub doSwapin($) {
 		     "where pid='$pid' and eid='$eid'");
     my ($linktest_level,$linktest_pid) = $query_result->fetchrow_array();
 
-    # Temporary. Only studly users get to control linktest level.
-    # Mere users always get at least level three.
-    $query_result =
-	DBQueryFatal("select stud from users where uid='$dbuid'");
-    my ($studly) = $query_result->fetchrow_array();
-
-    if (! $studly && $MAINSITE) {
-	$linktest_level = ($linktest_level <= 3 ? 3 : $linktest_level);
-    }
- 
     if ($linktest_level && ($type == REAL || $type == UPDATE)) {
 	if ($linktest_pid) {
 	    tbwarn "Linktest is already running! $linktest_pid";
