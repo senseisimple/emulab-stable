@@ -18,7 +18,7 @@ protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
-  int lastDelay;
+  long long lastDelay;
 
 //  Time lastLocalTimestamp;
 //  uint32_t lastRemoteTimestamp;
