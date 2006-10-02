@@ -79,8 +79,8 @@ void MaxDelaySensor::localAck(PacketInfo * packet)
   int current = delay->getLastDelay();
   int minimumDelay = mindelay->getMinDelay();
   int queueingDelay = current - (minimumDelay/2);
-  logWrite(SENSOR, "current=%d,min=%d,queueing=%d,saturated=%d", current,
-           minimumDelay, queueingDelay, state->isSaturated());
+  logWrite(SENSOR, "MaxDelaySensor::LocalAck() current=%d,min=%d,queueing=%d",
+                   current, minimumDelay, queueingDelay);
   if (queueingDelay < 0) {
     logWrite(ERROR,"Queueing delay is less than zero!");
     ackValid = false;
