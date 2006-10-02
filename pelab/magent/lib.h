@@ -77,7 +77,11 @@ enum
   TENTATIVE_THROUGHPUT = 2,
   // This is a bandwidth number to use even if it is smaller than the
   // bandwidth on the monitor side
-  AUTHORITATIVE_BANDWIDTH = 3
+  AUTHORITATIVE_BANDWIDTH = 3,
+
+  // This is used to let the monitor know which connections we are
+  // keeping track of for synchronization purposes.
+  SYNC_REPLY = 4
 };
 
 // Enum of header types -- from-monitor (Commands)
@@ -90,6 +94,12 @@ enum
   CONNECT_COMMAND = 4,
   TRAFFIC_WRITE_COMMAND = 5,
   DELETE_CONNECTION_COMMAND = 6,
+  // A new monitor uses this to ensure a blank slate.
+  DELETE_ALL_CONNECTIONS_COMMAND = 7,
+  // A monitor is sending a heartbeat request to ensure that our
+  // connection lists are synced up and the command connection is
+  // still active.
+  SYNC_REQUEST_COMMAND = 8,
   // These are pseudo-commands for replay.
   PACKET_INFO_SEND_COMMAND = 255,
   PACKET_INFO_ACK_COMMAND = 254

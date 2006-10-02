@@ -81,20 +81,7 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
      * Find the time the other end of this connection says it sent this
      * ACK
      */
-    uint32_t currentAckTS = 0;
-    list<Option>::iterator opt;
-    for (opt = packet->tcpOptions->begin();
-         opt != packet->tcpOptions->end();
-         ++opt) {
-      if (opt->type == TCPOPT_TIMESTAMP) {
-        const uint32_t *stamps = reinterpret_cast<const uint32_t*>(opt->buffer);
-        /*
-         * stamps[0] is TSval (the sending node's timestamp)
-         * stamps[1] is TSecr (the timestamp the sending node is echoing)
-         */
-        currentAckTS = htonl(stamps[0]);
-      }
-    }
+    uint32_t currentAckTS = findTcpTimestamp(packet);
 
     /*
      * It would be nice if we could fall back to regular timing instead of
@@ -147,4 +134,26 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
     lastAckTS = 0;
     ackValid = false;
   }
+}
+
+uint32_t findTcpTimestamp(PacketInfo * packet)
+{
+  uint32_t result = 0;
+  bool done = false;
+  list<Option>::iterator opt = packet->tcpOptions->begin();
+  list<Option>::iterator limit = packet->tcpOptions->end();
+  for (; opt != limit && !done; ++opt)
+  {
+    if (opt->type == TCPOPT_TIMESTAMP)
+    {
+      const uint32_t *stamps = reinterpret_cast<const uint32_t*>(opt->buffer);
+      /*
+       * stamps[0] is TSval (the sending node's timestamp)
+       * stamps[1] is TSecr (the timestamp the sending node is echoing)
+       */
+      result = ntohl(stamps[0]);
+      done = true;
+    }
+  }
+  return result;
 }

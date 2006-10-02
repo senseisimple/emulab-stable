@@ -5,6 +5,7 @@
 #include "PacketSensor.h"
 #include "StateSensor.h"
 #include "Time.h"
+#include "TSThroughputSensor.h"
 
 using namespace std;
 

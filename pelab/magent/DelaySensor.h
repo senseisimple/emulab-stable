@@ -19,6 +19,13 @@ protected:
   virtual void localAck(PacketInfo * packet);
 private:
   int lastDelay;
+
+//  Time lastLocalTimestamp;
+//  uint32_t lastRemoteTimestamp;
+//  int localDeltaTotal;
+//  int remoteDeltaTotal;
+//  int lastSentDelay;
+
   PacketSensor const * packetHistory;
   StateSensor const * state;
 };

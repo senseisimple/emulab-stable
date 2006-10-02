@@ -39,4 +39,6 @@ private:
   StateSensor const * state;
 };
 
+uint32_t findTcpTimestamp(PacketInfo * packet);
+
 #endif
