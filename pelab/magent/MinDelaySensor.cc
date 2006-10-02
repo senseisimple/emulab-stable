@@ -56,7 +56,7 @@ void MinDelaySensor::localAck(PacketInfo * packet)
     {
       minimum.decay();
     }
-    ackValid = false;
+    ackValid = true;
   }
   else
   {
