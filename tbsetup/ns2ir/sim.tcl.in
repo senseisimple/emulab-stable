@@ -1301,6 +1301,7 @@ Simulator instproc make_event {outer event} {
 	    switch -- $cmd {
 		"create"    {set etype CREATE}
 		"clear"     {set etype CLEAR}
+		"reset"     {set etype RESET}
 		"up"	    {set etype UP}
 		"down"	    {set etype DOWN}
 		"bandwidth" {
