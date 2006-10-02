@@ -35,6 +35,8 @@ private:
     // This is the total length including all headers.
     unsigned int totalLength;
     Time timestamp;
+    // Has this packet been retransmitted?
+    bool retransmitted;
   };
 
   typedef std::pair<uint32_t, uint32_t> rangepair;

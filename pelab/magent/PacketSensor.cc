@@ -31,14 +31,15 @@ int PacketSensor::getAckedSize(void) const
 
 bool PacketSensor::getIsRetransmit(void) const
 {
-  if (sendValid)
+  if (sendValid || ackValid)
   {
     return isRetransmit;
   }
   else
   {
     logWrite(ERROR,
-             "PacketSensor::getIsRetransmit() called with invalid send data");
+             "PacketSensor::getIsRetransmit() called with invalid send or ack "
+             "data");
     return false;
   }
 }
@@ -103,6 +104,7 @@ void PacketSensor::localSend(PacketInfo * packet)
         if (pos->inSequenceBlock(startSequence))
         {
           pos->timestamp = packet->packetTime;
+          pos->retransmitted = true;
           done = true;
         }
       }
@@ -155,10 +157,13 @@ void PacketSensor::localSend(PacketInfo * packet)
          */
         if (record.seqStart != (globalSequence.seqEnd + 1))
         {
-          fprintf(stderr,"PacketSensor::localSend() may have missed a "
+          logWrite(ERROR,"PacketSensor::localSend() may have missed a "
                   "packet - last seq seen: %u, new seq: %u (lost %d)",
                   globalSequence.seqEnd,record.seqStart,
                   record.seqStart - globalSequence.seqEnd);
+        } else {
+          logWrite(SENSOR_COMPLETE,"PacketSensor::localSend() looks good: %u %u",
+                  record.seqStart, globalSequence.seqEnd);
         }
         globalSequence.seqEnd = record.seqEnd;
       }
@@ -170,6 +175,7 @@ void PacketSensor::localSend(PacketInfo * packet)
 
     ackedSize = 0;
     ackedSendTime = Time();
+    sendValid = false;
   }
   else
   {
@@ -181,7 +187,7 @@ void PacketSensor::localAck(PacketInfo * packet)
 {
   sendValid = false;
   // Right now, we don't know whether or not this ACK is for a retransmitted
-  // packet (we could tell, but there doesn't seem to be a need yet)
+  // packet - we will find out later
   isRetransmit = false;
   if (state->isAckValid() && state->getState() == StateSensor::ESTABLISHED)
   {
@@ -340,6 +346,14 @@ void PacketSensor::localAck(PacketInfo * packet)
       list<SentPacket>::iterator pos = firstPacket;
       while (1)
       {
+        /*
+         * If any packets were retransmitted, then we consider the whole ACK to
+         * be for a retransmitted packet. We might be able to make this more
+         * fine grained.
+         */
+        if (pos->retransmitted) {
+          isRetransmit = true;
+        }
         ackedSize += pos->totalLength;
         /*
          * We want the time for the most recently acked packet, not the one
@@ -385,6 +399,10 @@ void PacketSensor::localAck(PacketInfo * packet)
 
     logWrite(SENSOR_DETAIL,"PacketSensor::localAck() decided on size %i",
         ackedSize);
+    if (ackedSize == 0) {
+      logWrite(EXCEPTION,"PacketSensor::localAck() declaring ACK invalid");
+      ackValid = false;
+    }
   }
   else
   {
@@ -421,5 +439,5 @@ bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
 }
 
 PacketSensor::SentPacket::SentPacket()
-    : seqStart(0), seqEnd(0), totalLength(), timestamp() {
+    : seqStart(0), seqEnd(0), totalLength(), timestamp(), retransmitted(false) {
 }
