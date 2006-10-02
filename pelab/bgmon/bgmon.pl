@@ -1130,26 +1130,29 @@ sub updateTestEvent($)
 
     if( !defined $head ){
 	#if no tests in queue, stop testev.
+	print "NO HEAD for ".$testev->{testper}."\n";
 	$testev->{flag_scheduled} = 0;
 	$testev->{testper} = 0;
     }
     #compare currently running test info with head of queue
-    elsif( $curPer == 0 ||
+    elsif( !defined $curPer ||
+	   $curPer == 0 ||
 	   $head->period() < $curPer )
     {
 	#replace running info with that from head:
 	#  testper, limitTime, flag_scheduled, timeOfNextRun, managerID
+	print "replacing period $curPer with ".$head->period()."\n";
 	$testev->{testper} = $head->period();
 	if( $head->duration() == 0 ){
 	    $testev->{limitTime} = 0;
 	}else{
-	    $testev->{limitTime} = time_all() +
-		$head->timeleft();
+	    $testev->{limitTime} = time_all() + $head->timeleft();
 	}
 	$testev->{flag_scheduled} = 0;
+	$testev->{timeOfNextRun} = 0;
 	$testev->{managerID} = $head->managerid();
+	print $testev->{cmdq}->getQueueInfo();
     }
-#    print $testev->{cmdq}->getQueueInfo();
 }
 
 #
