@@ -908,13 +908,17 @@ def do_show(args):
 # @param *args The list of directories to sync.
 # @retval The exit status of the rsync command-line.
 #
-def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
-          delay = 0, as_root = False):
+def rsync(host, base, dlpath = None, paths = ["/"], port = None,
+          output = False, delay = 0, as_root = False, relative = True):
     global RSYNC, HOME, DEBUG
     
     retval = 0
     for path in paths:
-        fullpath = os.path.join("", base, path[1:], "")
+        if relative == True:
+            fullpath = os.path.join("", base, path[1:], "")
+        else:
+            fullpath = base
+            pass
         try:
             os.makedirs(fullpath)
             pass
@@ -923,8 +927,10 @@ def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
         cmd = [RSYNC,
                "-rtgoDlz",
                "-v", # XXX
-               "--copy-unsafe-links",
-               "--include-from=" + dlpath]
+               "--copy-unsafe-links"]
+        if dlpath != None:
+            cmd.append("--include-from=" + dlpath)
+            pass
         if VERBOSITY > VERBOSITY_HUMAN:
             cmd.append("-v")
             pass
@@ -1220,6 +1226,8 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     delete_dir = False
 
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    # Special dir for local program agent (or other stuff).
+    opsdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "ops")
 
     standard_logholes = True
     snapshot_traces = False
@@ -1377,6 +1385,22 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                     pass
                 pass
 
+            #
+            # Do the local ops directory first.
+            #
+            if os.path.exists(opsdir):
+                if mode == "sync":
+                    pid = rsync("localhost", logdir,
+                                paths = [opsdir], output = True,
+                                relative = False)
+                    pass
+                elif mode == "clean":
+                    pid = rmstar("localhost", None, 0, False, opsdir + "/*")
+                    pass
+                else:
+                    assert 0
+                pass
+
             known_nodes = sets.Set(node_list) & (phosts | vhosts)
             unknown_nodes = known_nodes ^ sets.Set(node_list)
 
@@ -1433,7 +1457,7 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                         pass
                     if mode == "sync":
                         pid = rsync(phost, os.path.join(logdir, vhost),
-                                    dlhandle.name,
+                                    dlpath = dlhandle.name,
                                     port = ssh_data[phost].get("port", None),
                                     output = True,
                                     delay = delay,

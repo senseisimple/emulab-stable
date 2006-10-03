@@ -270,7 +270,8 @@ my @agent_command_options = ("-u", $user, "-d", "-e", "$pid/$eid",
 			     "-v", "ops",
 			     "-c", "$EXPDIR/tbdata/program_agents",
 			     "-f", "$EXPDIR/tbdata/environment",
-			     "-o", "$EXPDIR/logs/ops");
+			     "-l", "$EXPDIR/logs/progagent.debug",
+			     "-o", "$EXPDIR/ops");
 
 #
 # We want to catch these programs if they exit abnormally.
