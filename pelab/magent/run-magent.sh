@@ -21,6 +21,7 @@ export LIBNETMON_OUTPUTFILE="/local/logs/libnetmon.out"
 #
 # Just run the stub!
 #
+uptime
 echo "Running PID $$"
 echo "Starting magent on $PLAB_IFACE ($PLAB_IP) Extra arguments: $*"
 exec $AS_ROOT $NETMON_DIR/instrument-standalone.sh $MAGENT_DIR/$MAGENT --interface=$PLAB_IFACE --replay-save=/local/logs/stub.replay $*
