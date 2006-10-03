@@ -22,11 +22,6 @@ $SH ${MAGENT_DIR}/run-magent.sh --daemonize $ARGS
 trap "$AS_ROOT killall $MAGENT; exit 0" TERM
 
 #
-# Give it time to come up
-#
-sleep 1
-
-#
 # Wait for all of the agents to start
 #
 echo "Waiting for measurement agents to become ready";
@@ -47,8 +42,10 @@ fi
 echo "Running!";
 
 #
-# Wait for our monitor to finish
-# XXX ignores exit status of child
+# We just sleep forever here as the stub has detached itself and
+# we cannot exit without screwing up the program agent.  The program
+# agent will kill us (and the magent by virtue of the trap) when it
+# is good and ready.
 #
-wait
+while true; do sleep 1000; done
 exit 0
