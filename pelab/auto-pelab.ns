@@ -410,4 +410,220 @@ if {$fake_plab} {
     tb-set-ip-link $prouter $internet 192.168.254.2
 }
 
+set pid ${GLOBALS::pid}
+set eid ${GLOBALS::eid}
+
+set opsagent [new Program $ns]
+$opsagent set node "ops"
+$opsagent set command "/bin/true"
+
+#
+# The set of traced links
+# XXX still cannot use an event-group of link tracing events in a sequence
+#
+#set tracegroup [$ns event-group $tracelist]
+
+#
+# Build up the event sequences to start and stop an actual run.
+#
+if {$real_plab} {
+  set start [$ns event-sequence]
+    $start append "$ns log \"Starting REAL plab experiment\""
+
+    # stop stubs and monitors
+    $start append "$ns log \"##### Stopping stubs and monitors...\""
+    $start append "$planetstubs stop"
+    $start append "$monitorgroup stop"
+
+    # stop servers
+    $start append "$ns log \"##### Stopping servers...\""
+    $start append "$allservers stop"
+
+    # stop link logging
+    $start append "$ns log \"##### Roll link trace logs...\""
+    foreach link $tracelist {
+        $start append "$link trace snapshot"
+        $start append "$link trace stop"
+    }
+
+    # clean out log files
+    # XXX original script passed --root, cleanlogs does not--may be a problem.
+    $start append "$ns log \"##### Cleaning logs...\""
+    $start append "$ns cleanlogs"
+
+    # reset shaping characteristics for all nodes
+    $start append "$ns log \"##### Resetting links...\""
+    $start append "$elabc clear"
+    $start append "$elabc reset"
+
+    # distinguish between real/fake runs
+    # XXX I'm thinkin...we can do better than this!
+    $start append "$opsagent run -command \"cp /dev/null /proj/$pid/exp/$eid/tmp/real_plab\""
+
+    # save off node list
+    $start append "$ns log \"##### Creating node list...\""
+    $start append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
+
+    # initialize path characteristics
+    $start append "$ns log \"##### Initialize emulation node path characteristics...\""
+    $start append "$elabc create"
+    $start append "$opsagent run -command \"/usr/testbed/bin/init-elabnodes.pl  -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid\""
+
+    # restart link tracing
+    # XXX cleanlogs has unlinked the current trace log, so we have to
+    # snapshot to bring it back into existence
+    $start append "$ns log \"##### Starting link tracing...\""
+    foreach link $tracelist {
+        $start append "$link trace snapshot"
+        $start append "$link trace start"
+    }
+
+    # restart servers
+    $start append "$ns log \"##### Starting server...\""
+    $start append "$allservers start"
+
+    # restart stubs and monitors
+    $start append "$ns log \"##### Starting stubs and monitors...\""
+    $start append "$planetstubs start"
+    $start append "$monitorgroup start"
+
+    # gather up the data and inform the user
+    $start append "$ns log \"##### Experiment run started!\""
+    # XXX cannot do a report here as that will cause the logs to be
+    #     deleted before the next loghole sync
+    if {0} {
+    $start append "$ns report"
+    }
+
+  set stop [$ns event-sequence]
+    $stop append "$ns log \"Stopping REAL plab experiment\""
+
+    # stop stubs and monitors
+    $stop append "$ns log \"##### Stopping stubs and monitors...\""
+    $stop append "$planetstubs stop"
+    $stop append "$monitorgroup stop"
+
+    # stop servers
+    $stop append "$ns log \"##### Stopping servers...\""
+    $stop append "$allservers stop"
+
+    # stop link logging and save logs
+    $stop append "$ns log \"##### Stop link tracing...\""
+    foreach link $tracelist {
+        $stop append "$link trace snapshot"
+        $stop append "$link trace stop"
+    }
+
+    # grab logfiles XXX report will do this for us
+    if {0} {
+    $stop append "$ns log \"##### Grabbing logs...\""
+    $stop append "$opsagent run -command \"loghole -e $pid/$eid sync\""
+    $stop append "$opsagent run -command \"loghole -e $pid/$eid archive\""
+    }
+
+    # reset shaping characteristics for all nodes
+    $stop append "$ns log \"##### Resetting links...\""
+    $stop append "$elabc clear"
+    $stop append "$elabc reset"
+
+    # gather up the data and inform the user
+    $stop append "$ns log \"##### Experiment run stopped!\""
+    $stop append "$ns report"
+}
+
+#
+# Build up the event sequences to start and stop an actual run on FAKE
+# plab nodes.  The only difference here (besides the names) is that these
+# sequences use plabstubs rather than planetstubs.
+#
+if {$fake_plab} {
+  set start_fake [$ns event-sequence]
+    $start_fake append "$ns log \"Starting FAKE plab experiment\""
+
+    # stop stubs and monitors
+    $start_fake append "$ns log \"##### Stopping stubs and monitors...\""
+    $start_fake append "$plabstubs stop"
+    $start_fake append "$monitorgroup stop"
+
+    # stop servers
+    $start_fake append "$ns log \"##### Stopping servers...\""
+    $start_fake append "$allservers stop"
+
+    # stop link logging
+    $start_fake append "$ns log \"##### Roll link trace logs...\""
+    foreach link $tracelist {
+        $start_fake append "$link trace snapshot"
+        $start_fake append "$link trace stop"
+    }
+
+    # clean out log files
+    # XXX original script passed --root, cleanlogs does not--may be a problem.
+    $start_fake append "$ns log \"##### Cleaning logs...\""
+    $start_fake append "$ns cleanlogs"
+
+    # reset shaping characteristics for all nodes
+    $start_fake append "$ns log \"##### Resetting links...\""
+    $start_fake append "$elabc clear"
+    $start_fake append "$elabc reset"
+
+    # distinguish between real/fake runs
+    # XXX I'm thinkin...we can do better than this!
+    $start_fake append "$opsagent run -command \"rm -f /proj/$pid/exp/$eid/tmp/real_plab\""
+
+    # save off node list
+    $start_fake append "$ns log \"##### Creating node list...\""
+    $start_fake append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
+
+    # restart link tracing
+    # XXX cleanlogs has unlinked the current trace log, so we have to
+    # snapshot to bring it back into existence
+    $start_fake append "$ns log \"##### Starting link tracing...\""
+    foreach link $tracelist {
+        $start_fake append "$link trace snapshot"
+        $start_fake append "$link trace start"
+    }
+
+    # restart servers
+    $start_fake append "$ns log \"##### Starting server...\""
+    $start_fake append "$allservers start"
+
+    # restart stubs and monitors
+    $start_fake append "$ns log \"##### Starting stubs and monitors...\""
+    $start_fake append "$plabstubs start"
+    $start_fake append "$monitorgroup start"
+
+    # gather up the data and inform the user
+    $start_fake append "$ns log \"##### Experiment run started!\""
+    # XXX cannot do a report here as that will cause the logs to be
+    #     deleted before the next loghole sync
+
+  set stop_fake [$ns event-sequence]
+    $stop_fake append "$ns log \"Stopping FAKE plab experiment\""
+
+    # stop stubs and monitors
+    $stop_fake append "$ns log \"##### Stopping stubs and monitors...\""
+    $stop_fake append "$plabstubs stop"
+    $stop_fake append "$monitorgroup stop"
+
+    # stop servers
+    $stop_fake append "$ns log \"##### Stopping servers...\""
+    $stop_fake append "$allservers stop"
+
+    # stop link logging and save logs
+    $stop_fake append "$ns log \"##### Stop link tracing...\""
+    foreach link $tracelist {
+        $stop_fake append "$link trace snapshot"
+        $stop_fake append "$link trace stop"
+    }
+
+    # reset shaping characteristics for all nodes
+    $stop_fake append "$ns log \"##### Resetting links...\""
+    $stop_fake append "$elabc clear"
+    $stop_fake append "$elabc reset"
+
+    # gather up the data and inform the user
+    $stop_fake append "$ns log \"##### Experiment run stopped!\""
+    $stop_fake append "$ns report"
+}
+
 $ns run

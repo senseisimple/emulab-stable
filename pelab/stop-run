@@ -1,0 +1,46 @@
+#!/bin/sh
+
+waitfor="-w"
+agent=""
+
+usage()
+{
+    echo "Usage: stop-run [-nfp] pid eid"
+    echo "       -n do not wait for completion"
+    echo "       -f run on fake plab nodes"
+    echo "       -p run on real plab nodes (default)"
+    exit 1
+}
+
+args=`getopt fnp $*`
+if [ $? -ne 0 ]; then
+    usage
+fi
+set -- $args
+for i; do
+    case "$i"
+    in
+        -n)
+	    waitfor=
+	    shift;;
+	-f)
+	    agent="_fake"
+	    shift;;
+	-p)
+	    agent=""
+	    shift;;
+	--)
+	    shift
+	    break;;
+    esac
+done
+
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+P=$1
+E=$2
+
+exec tevc $waitfor -e $P/$E now stop$agent run
+exit $?

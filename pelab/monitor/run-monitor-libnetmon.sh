@@ -30,6 +30,11 @@ if [ $# != 0 ]; then
 
 fi
 
+# XXX can we possibly get any more lame than this?
+if [ -e /proj/$PROJECT/exp/$EXPERIMENT/tmp/real_plab ]; then
+    REAL_PLAB=1
+fi
+
 if ! [ -x "$NETMON_DIR/$NETMOND" ]; then
     gmake -C $NETMON_DIR $NETMOND
 fi
