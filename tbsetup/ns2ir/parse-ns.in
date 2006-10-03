@@ -644,7 +644,7 @@ sub GenDefsFile($)
 	    Template::Instance->LookupByID($experiment->instance_idx());
 	
 	if (defined($instance)) {
-	    my $datastore = $instance->path() . "/template_datastore";
+	    my $datastore = $instance->path() . "/datastore";
 	    my %parameters;
 
 	    print TCL "set ::DATASTORE \"$datastore\"\n";

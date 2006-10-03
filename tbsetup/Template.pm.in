@@ -2901,7 +2901,7 @@ sub InitializeEnvVariables($;$)
 	}
     }
     $experiment->AddEnvVariable("DATASTORE",
-				"$instance_path/template_datastore", 1)
+				"$instance_path/datastore", 1)
 	== 0 or return -1;
 				    
     $experiment->AddEnvVariable("ARCHIVE",

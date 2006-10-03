@@ -192,7 +192,7 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    if (!defined($instance)) {
 		tbdie("Invalid RPM URL for non-template experiment: $rpm");
 	    }
-	    my $localfile = $instance->template()->path() . "/datastore/" . $1;
+	    my $localfile = $instance->path() . "/datastore/" . $1;
 
 	    tbdie("$rpm cannot be found; $localfile does not exist")
 		if (! -e $localfile);
@@ -245,7 +245,7 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 		tbdie("Invalid tarball URL for non-template experiment: ".
 		      "$tarfile");
 	    }
-	    my $localfile = $instance->template()->path() . "/datastore/" . $1;
+	    my $localfile = $instance->path() . "/datastore/" . $1;
 
 	    tbdie("$tarfile cannot be found; $localfile does not exist")
 		if (! -e $localfile);
