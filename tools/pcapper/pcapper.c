@@ -186,12 +186,15 @@ void *readpackets(void *args);
 void *feedclient(void *args);
 void *runeventsys(void *args);
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
-	const u_char *packet);
+		const u_char *packet);
 int getaddr(char *dev, struct in_addr *addr);
 #ifdef EVENTSYS
-static void
-callback(event_handle_t handle,
-	event_notification_t notification, void *data);
+#ifdef __linux__
+static void onusr1(int);
+static void pthread_WAKEUPDAMIT(void);
+#endif
+static void callback(event_handle_t handle,
+		     event_notification_t notification, void *data);
 #endif
 
 /*
@@ -363,6 +366,11 @@ void usage(char *progname) {
 static void cleanup(int sig)
 {
 	killme = 1;
+#ifdef EVENTSYS
+#ifdef __linux__
+	pthread_WAKEUPDAMIT();
+#endif
+#endif
 }
 
 /*
@@ -660,14 +668,16 @@ int main (int argc, char **argv) {
 			 * Grab the 'hostname' for the interface, but fallback
 			 * to IP if we can't get it.
 			 */
-			host = gethostbyaddr((char*)&ifaddr,
-					     sizeof(ifaddr),AF_INET);
-
-			if (host) {
-				strcpy(hostname,host->h_name);
-			} else {
-				strcpy(hostname,inet_ntoa(ifaddr));
-			}
+			if (ifr->ifr_addr.sa_family == AF_INET) {
+				host = gethostbyaddr((char*)&ifaddr,
+						     sizeof(ifaddr),AF_INET);
+				if (host) {
+					strcpy(hostname,host->h_name);
+				} else {
+					strcpy(hostname,inet_ntoa(ifaddr));
+				}
+			} else
+				strcpy(hostname, "<NO IP>");
 
 			/*
 			 * If we're in 'tcpdump mode' we may have to do this
@@ -952,6 +962,16 @@ int main (int argc, char **argv) {
 		action.sa_handler = cleanup;
 		sigaction(SIGTERM, &action, NULL);
 		sigaction(SIGINT, &action, NULL);
+#ifdef EVENTSYS
+#ifdef __linux__
+		/*
+		 * XXX serious hack.  Need to catch SIGUSR1 in all threads
+		 * so they can be signal()ed out of libpcap.
+		 */
+		action.sa_handler = onusr1;
+		sigaction(SIGUSR1, &action, NULL);
+#endif
+#endif
 	}
 
 	/*
@@ -1326,6 +1346,7 @@ void *readpackets(void *args) {
 			exit(1);
 		}
 	}
+
 	pcap_close(dev);
 	if (killme)
 		return 0;
@@ -1340,7 +1361,7 @@ void *readpackets_capturemode(void *args)
 	struct readpackets_args *sargs = (struct readpackets_args*) args;
 	char ebuf[1024];
 	pcap_t *dev;
-	int size;
+	int size, npkt;
 	bpf_u_int32 mask, net;
 	struct bpf_program filter;
 	char *bpf_filter;
@@ -1355,6 +1376,12 @@ void *readpackets_capturemode(void *args)
 	/* Lock the pcap stuff */
 	pthread_mutex_lock(&lib_lock);
 
+	if (debug) {
+		fprintf(stderr, "%d/%ld: handling '%s'\n",
+			getpid(), pthread_self(), sargs->devname);
+		fflush(stderr);
+	}
+
 	/*
 	 * NOTE: We set the timeout to a full second - if we set it lower, we
 	 * don't get to see packets until a certain number have been buffered
@@ -1366,6 +1393,13 @@ void *readpackets_capturemode(void *args)
 			sargs->devname, ebuf);
 		exit(1);
 	}
+
+	/*
+	 * Record our pcap device into the global array, so that it can be
+	 * found by other processes.
+	 */
+	pcap_devs[sargs->index] = dev;
+
 	bpf_filter = sargs->bpf_filter;
 
 	/*
@@ -1404,18 +1438,29 @@ void *readpackets_capturemode(void *args)
 	}
 	sargs->pdumper = pdumper;
 
+	npkt = 0;
 	while (!killme && !reload) {
-		if (debug) {
-			fprintf(stderr, "packet(%d)\n", getpid());
+		if (debug > 1) {
+			fprintf(stderr, "%ld: %d pkts\n", pthread_self(), npkt);
 			fflush(stderr);
 		}
-		if (pcap_dispatch(dev, -1, dump_packet, (u_char *)sargs)
-		    < 0) {
+		npkt = pcap_dispatch(dev, -1, dump_packet, (u_char *)sargs);
+		/* -2 is returned as a result of pcap_breakloop */
+		if (npkt < 0 && npkt != -2) {
 			pcap_perror(dev,"pcap_dispatch failed: ");
 			fflush(stderr);
 			exit(1);
 		}
 	}
+
+	if (debug) {
+		pthread_mutex_lock(&lock);
+		fprintf(stderr,
+			"%ld: dispatch done, reload=%d, killme=%d\n",
+			pthread_self(), reload, killme);
+		pthread_mutex_unlock(&lock);
+	}
+
 	pcap_dump_close(pdumper);
 	if (reload) {
 		/*
@@ -1435,7 +1480,7 @@ void *readpackets_capturemode(void *args)
 
 		pthread_mutex_lock(&lock);
 
-		fprintf(stderr, "reload=%d (%d)\n", reload, getpid());
+		fprintf(stderr, "  %ld: reload=%d\n", pthread_self(), reload);
 		fflush(stderr);
 
 		reload--;
@@ -1449,7 +1494,7 @@ void *readpackets_capturemode(void *args)
 				pthread_cond_wait(&cond, &lock);
 			pthread_mutex_unlock(&lock);
 		}
-		fprintf(stderr, "reload=%d (%d)\n", reload, getpid());
+		fprintf(stderr, "  %ld: reload done\n", pthread_self());
 		fflush(stderr);
 		goto again;
 	}
@@ -1465,8 +1510,8 @@ void dump_packet(u_char *args, const struct pcap_pkthdr *header,
 {
 	struct readpackets_args *sargs = (struct readpackets_args*) args;
 	
-	if (debug) {
-		fprintf(stderr, "got packet\n");
+	if (debug > 1) {
+		fprintf(stderr, "%ld: got packet\n", pthread_self());
 		fflush(stderr);
 	}
 	if (!stop)
@@ -1686,6 +1731,43 @@ int getaddr(char *dev, struct in_addr *addr) {
 }
 
 #ifdef EVENTSYS
+
+/*
+ * What a hoot.  The Linux (at least Fedora) version of pcapper
+ * will not timeout in the dispatch routine.  It apparently will stay
+ * in recvfrom() til it gets a packet.  So we blast all the pthreads
+ * out of recvfrom with a signal after setting the flag to force them
+ * to return from dispatch (pcap_breakloop).
+ */
+#ifdef __linux__
+static void
+onusr1(int sig)
+{
+	if (debug > 1)
+		fprintf(stderr, "%ld: got USR1\n", pthread_self());
+}
+
+static void
+pthread_WAKEUPDAMIT(void)
+{
+	int rc;
+
+	for (rc = 0; rc < MAX_INTERFACES; rc++) {
+		pthread_t pt;
+		pcap_t *pc;
+
+		pt = getpacket_threads[rc];
+		pc = pcap_devs[rc];
+		if (pt == 0 || pc == NULL)
+			continue;
+		pcap_breakloop(pc);
+		pthread_kill(pt, SIGUSR1);
+		if (debug > 1)
+			fprintf(stderr, "smackin %ld\n", pt);
+	}
+}
+#endif
+
 /*
  * Callback used for the event system. Resets the experiment start time,
  * and signals the main thread, which may be waiting on the condition
@@ -1699,7 +1781,7 @@ callback(event_handle_t handle,
 	char	eventtype[TBDB_FLEN_EVEVENTTYPE];
 	char	objtype[TBDB_FLEN_EVOBJTYPE];
 	
-	printf("Received an event (%d)\n", getpid());
+	printf("%d/%ld: received an event\n", getpid(), pthread_self());
 	fflush(stdout);
 	
 	event_notification_get_objtype(handle, notification,
@@ -1714,6 +1796,9 @@ callback(event_handle_t handle,
 	event_notification_get_int32(handle, notification,
 				     "TOKEN", (int32_t *)&reload_token);
 	
+	printf("  EVENT: %s %s\n", objtype, eventtype);
+	fflush(stdout);
+
 	if (!strcmp(objtype,TBDB_OBJECTTYPE_TIME) &&
 		!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
 	    /* OK, time has started */
@@ -1767,12 +1852,20 @@ callback(event_handle_t handle,
 				stop   = 1;
 				reload = interfaces;
 
+				fprintf(stderr,
+					"%ld: reload, waiting for %d threads\n",
+					pthread_self(), reload);
+				fflush(stderr);
+
+#ifdef __linux__
+				pthread_WAKEUPDAMIT();
+#endif
 				while (reload)
 					pthread_cond_wait(&cond, &lock);
 				pthread_mutex_unlock(&lock);
 
-				fprintf(stderr, "sending complete %d (%d)\n",
-					reload_token, getpid());
+				fprintf(stderr, "%ld: sending complete %d\n",
+					pthread_self(), reload_token);
 				fflush(stderr);
 
 				rc = event_do(handle,
@@ -1784,7 +1877,8 @@ callback(event_handle_t handle,
 					 EA_ArgInteger, "CTOKEN", reload_token,
 					 EA_TAG_DONE);
 
-				fprintf(stderr, "returned %d\n", rc);
+				fprintf(stderr, "%ld: returned %d\n",
+					pthread_self(), rc);
 				fflush(stderr);
 				
 			}
