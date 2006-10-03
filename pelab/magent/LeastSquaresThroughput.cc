@@ -64,11 +64,11 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
         byteTotal += byteSamples[index];
         timeTotal += timeSamples[index];
 
-        logWrite(SENSOR_DETAIL, "LeastSquares: ***Delay sample #%d: %d", i,
+        logWrite(SENSOR_COMPLETE, "LeastSquares: ***Delay sample #%d: %d", i,
                  delaySamples[index]);
-        logWrite(SENSOR_DETAIL, "LeastSquares: Period sample: %d",
+        logWrite(SENSOR_COMPLETE, "LeastSquares: Period sample: %d",
                  timeSamples[index]);
-        logWrite(SENSOR_DETAIL, "LeastSquares: Kilobit sample: %f",
+        logWrite(SENSOR_COMPLETE, "LeastSquares: Kilobit sample: %f",
                  byteSamples[index]*(8.0/1000.0));
 
         x_i += timeSamples[index];

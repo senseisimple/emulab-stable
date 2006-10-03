@@ -296,7 +296,7 @@ void init(void)
   FD_ZERO(&global::readers);
   global::maxReader = -1;
 
-  logInit(stderr, LOG_EVERYTHING, true);
+  logInit(stderr, LOG_EVERYTHING & ~SENSOR_COMPLETE, true);
 
   /*
    * Install a signal handler so that we can catch control-C's, etc.
