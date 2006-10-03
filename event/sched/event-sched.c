@@ -567,6 +567,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		TBDB_EVENTTYPE_REPORT,
 		TBDB_EVENTTYPE_MODIFY,
 		TBDB_EVENTTYPE_SNAPSHOT,
+		TBDB_EVENTTYPE_LOG,
 		NULL
 	};
 

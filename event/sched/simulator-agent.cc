@@ -557,6 +557,7 @@ static void *simulator_agent_looper(void *arg)
 			}
 			if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_REPORT) == 0 ||
+			    strcmp(evtype, TBDB_EVENTTYPE_LOG) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_SNAPSHOT) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_MODIFY) == 0) {
 				event_do(handle,
