@@ -6853,16 +6853,15 @@ COMMAND_PROTOTYPE(doportregister)
 			      reqp->nodeid, service);
 			return 1;
 		}
-		if ((int)mysql_num_rows(res) == 0) {
-			mysql_free_result(res);
-			return 0;
+		if ((int)mysql_num_rows(res) > 0) {
+			row = mysql_fetch_row(res);
+			OUTPUT(buf, sizeof(buf), "PORT=%s NODEID=%s.%s\n",
+			       row[0], row[1], OURDOMAIN);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			if (verbose)
+				info("PORTREG: %s: %s", reqp->nodeid, buf);
 		}
-		row = mysql_fetch_row(res);
-		OUTPUT(buf, sizeof(buf), "PORT=%s NODEID=%s.%s\n",
-		       row[0], row[1], OURDOMAIN);
-		client_writeback(sock, buf, strlen(buf), tcp);
-		if (verbose)
-			info("PORTREG: %s: %s", reqp->nodeid, buf);
+		mysql_free_result(res);
 		return 0;
 	}
 	
