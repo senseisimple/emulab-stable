@@ -33,7 +33,18 @@ int TSThroughputSensor::getThroughputInKbps(uint32_t period,
                                             int byteCount) const
 {
   double kilobits = byteCount * (8.0/1000.0);
-  return static_cast<int>(kilobits/(period / 1000.0));
+  int result = 0;
+  if (period != 0)
+  {
+    result = static_cast<int>(kilobits/(period / 1000.0));
+  }
+  else
+  {
+    logWrite(ERROR,
+             "TSThroughputSensor::getThroughputInKbps(period, byteCount) "
+             "called with a '0' period.");
+  }
+  return result;
 }
 
 uint32_t TSThroughputSensor::getLastPeriod(void) const

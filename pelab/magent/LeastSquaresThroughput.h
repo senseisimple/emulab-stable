@@ -25,7 +25,7 @@ private:
   DelaySensor const * delay;
 
   // The number of samples kept at any given time.
-  static const int SAMPLE_COUNT = 5;
+  static const int SAMPLE_COUNT = 50;
   // Circular buffers of the last SAMPLE_COUNT samples.
   //   The number of bytes in each sample. Used for average throughput
   //   calculation.

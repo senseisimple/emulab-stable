@@ -58,6 +58,7 @@ private:
   void pushTSThroughputSensor(void);
   void pushEwmaThroughputSensor(void);
   void pushLeastSquaresThroughput(void);
+  void pushAverageThroughputSensor(void);
 private:
   // Example dependency
   NullSensor const * depNullSensor;

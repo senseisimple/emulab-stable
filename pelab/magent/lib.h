@@ -117,7 +117,8 @@ enum SensorType
   THROUGHPUT_SENSOR = 6,
   EWMA_THROUGHPUT_SENSOR = 7,
   LEAST_SQUARES_THROUGHPUT = 8,
-  TSTHROUGHPUT_SENSOR = 9
+  TSTHROUGHPUT_SENSOR = 9,
+  AVERAGE_THROUGHPUT_SENSOR = 10
 };
 
 // This is used for the type field in the ConnectionModelCommand.

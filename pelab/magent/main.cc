@@ -273,6 +273,10 @@ void processArgs(int argc, char * argv[])
       {
         global::replaySensors.push_back(LEAST_SQUARES_THROUGHPUT);
       }
+      else if (optArg == "average-throughput")
+      {
+        global::replaySensors.push_back(AVERAGE_THROUGHPUT_SENSOR);
+      }
       else
       {
         usageMessage(argv[0]);
