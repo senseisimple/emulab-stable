@@ -474,6 +474,18 @@ if ($doswapmod) {
     system(@arguments);
     fatal($? >> 8, "Swap modify failed!")
 	if ($?);
+
+    #
+    # XXX FIX! Do this again, cause the swapmod messed up the env variables.
+    #
+    $instance->Refresh();
+
+     # We munge the environment variables.
+    $instance->InitializeEnvVariables(\%parameters) == 0
+	or fatal(-1, "Could not add new environment variables to instance");
+    
+    $instance->WriteEnvVariables() == 0
+	or fatal(-1, "Could not write environment strings for program agents");
 }
 else {
     #
