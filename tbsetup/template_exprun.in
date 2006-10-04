@@ -388,7 +388,7 @@ if (defined($instance->runidx())) {
     my $this_run   = $instance->CurrentRun();
     my $this_runid = $this_run->{"runid"};
     
-    system("$archcontrol -t ${action}run_${this_runid} commit $pid $eid");
+    system("$archcontrol -d -t ${action}run_${this_runid} commit $pid $eid");
 
     # This has to be done after the archive commit, so we can find the tag.
     $instance->FinalizeCurrentRun() == 0
