@@ -52,6 +52,7 @@ my $starttime = 0;
 my $outfile;
 my $doelabaddrs = 1;
 my $remote = 0;
+my $cloudonly = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10001;	# Kbits/sec
@@ -85,7 +86,7 @@ my $now     = time();
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("S:no:r", \%options)) {
+if (! getopts("S:no:rC", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
@@ -98,6 +99,9 @@ if (defined($options{"r"})) {
     $remote = $options{"r"};
     $PWDFILE = "/local/pelab/pelabdb.pwd";
     $DBHOST = "users.emulab.net";
+}
+if (defined($options{"C"})) {
+    $cloudonly = 1;
 }
 if (defined($options{"S"})) {
     my $high = time();
@@ -283,8 +287,10 @@ foreach my $vnode (keys(%node_mapping)) {
 if (!$showonly) {
     if (defined($outfile)) {
 	write_info($outfile);
+    } elsif ($cloudonly) {
+	send_cloud_events();
     } else {
-	send_events();
+	send_hybrid_events();
     }
 }
 
@@ -359,6 +365,26 @@ sub plab_type($)
 }
 
 #
+# Set up pipes in the "old school" style of one pipe per src-dst pair.
+#
+sub send_cloud_events()
+{
+    foreach my $src (keys %shapeinfo) {
+  	foreach my $rec (@{$shapeinfo{$src}}) {
+  	    my ($dst,$bw,$del,$plr) = @{$rec};
+ 	    my $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY ".
+ 		"DEST=$dst BANDWIDTH=$bw DELAY=$del PLR=$plr";
+ 	    print "elabc-$src: DEST=$dst BANDWIDTH=$bw DELAY=$del PLR=$plr...";
+  	    if (system("$cmd") != 0) {
+  		print "[FAILED]\n";
+  	    } else {
+		print "[OK]\n";
+	    }
+	}
+    }
+}
+
+#
 # How we shape the links depends on whether the nodes involved are Internet 2
 # (I2) or commodity internet (I1) as follows:
 #
@@ -371,7 +397,7 @@ sub plab_type($)
 #    destinations.  For I1 destinations, the computation is as in #2,
 #    the max per-path value for any of them.
 #
-sub send_events()
+sub send_hybrid_events()
 {
     my %dstmap;
 
