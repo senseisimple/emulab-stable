@@ -15,7 +15,6 @@
 #include "TSThroughputSensor.h"
 #include "EwmaThroughputSensor.h"
 #include "LeastSquaresThroughput.h"
-#include "AverageThroughputSensor.h"
 
 using namespace std;
 
@@ -304,8 +303,11 @@ void SensorList::pushAverageThroughputSensor(void)
 {
   // Dependency list
   pushTSThroughputSensor();
+  pushDelaySensor();
 
   logWrite(SENSOR, "Adding AverageThroughputSensor");
-  std::auto_ptr<Sensor> current(new AverageThroughputSensor(depTSThroughputSensor));
+  std::auto_ptr<Sensor> current(
+    new LeastSquaresThroughput(depTSThroughputSensor, depDelaySensor,
+                               LeastSquaresThroughput::DEFAULT_MAX_PERIOD));
   pushSensor(current);
 }

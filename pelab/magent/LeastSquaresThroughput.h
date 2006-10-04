@@ -14,32 +14,40 @@ class DelaySensor;
 class LeastSquaresThroughput : public Sensor
 {
 public:
+  // The default max period to use.
+  static const int DEFAULT_MAX_PERIOD = 500;
+public:
   LeastSquaresThroughput(TSThroughputSensor const * newThroughput,
-                         DelaySensor const * newDelay);
+                         DelaySensor const * newDelay,
+                         int newMaxPeriod = 0);
   virtual ~LeastSquaresThroughput();
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
 private:
+  struct Ack
+  {
+    Ack() : size(0), period(0), rtt(0) {}
+    int size; // in bytes
+    uint32_t period; // in milliseconds
+    int rtt; // in milliseconds
+  };
+private:
   TSThroughputSensor const * throughput;
   DelaySensor const * delay;
 
   // The number of samples kept at any given time.
-  static const int SAMPLE_COUNT = 50;
-  // Circular buffers of the last SAMPLE_COUNT samples.
-  //   The number of bytes in each sample. Used for average throughput
-  //   calculation.
-  int byteSamples[SAMPLE_COUNT];
-  //   The delta time of each sample. This is the difference between
-  //   the time of the ack at that sample and the time of the ack at
-  //   the previous sample (in milliseconds).
-  uint32_t timeSamples[SAMPLE_COUNT];
-//  int throughputSamples[SAMPLE_COUNT];
-  int delaySamples[SAMPLE_COUNT];
-  // The index of the oldest stored sample.
-  int oldest;
+  static const int MAX_SAMPLE_COUNT = 100;
+  // Circular buffer of the last MAX_SAMPLE_COUNT samples.
+  Ack samples[MAX_SAMPLE_COUNT];
+
+  // The index of the latest stored sample.
+  int latest;
   // The total number of samples ever encountered.
   int totalSamples;
+  // The maximum amount of time to look backwards in milliseconds. If
+  // this number is <= 0 then all available samples are used.
+  int maxPeriod;
 
   // The last number reported to the monitor in kbps.
   // Only send bandwidth if it is different than this number.
