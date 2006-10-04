@@ -40,6 +40,8 @@ private:
   static const int MAX_SAMPLE_COUNT = 100;
   // Circular buffer of the last MAX_SAMPLE_COUNT samples.
   Ack samples[MAX_SAMPLE_COUNT];
+  // The maximum number of samples used for least squares analysis.
+  static const int MAX_LEAST_SQUARES_SAMPLES = 5;
 
   // The index of the latest stored sample.
   int latest;

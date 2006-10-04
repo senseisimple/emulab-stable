@@ -10,6 +10,7 @@ using namespace std;
 
 const int LeastSquaresThroughput::MAX_SAMPLE_COUNT;
 const int LeastSquaresThroughput::DEFAULT_MAX_PERIOD;
+const int LeastSquaresThroughput::MAX_LEAST_SQUARES_SAMPLES;
 
 LeastSquaresThroughput::LeastSquaresThroughput(
   TSThroughputSensor const * newThroughput,
@@ -61,11 +62,11 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
     double numA = 0.0;
     double numB = 0.0;
     double numC = 0.0;
-    double numD = limit;
+    double numD = min(MAX_LEAST_SQUARES_SAMPLES, limit);
     double denomA = 0.0;
     double denomB = 0.0;
     double denomC = 0.0;
-    double denomD = limit;
+    double denomD = min(MAX_LEAST_SQUARES_SAMPLES, limit);
     for (; i < limit && (timeTotal <= static_cast<uint32_t>(maxPeriod)
                          || maxPeriod <= 0); ++i)
     {
@@ -76,21 +77,24 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
       byteTotal += samples[index].size;
       timeTotal += samples[index].period;
 
-      logWrite(SENSOR_COMPLETE, "LeastSquares: ***Delay sample #%d: %d", i,
-               samples[index].rtt);
-      logWrite(SENSOR_COMPLETE, "LeastSquares: Period sample: %d",
-               samples[index].period);
-      logWrite(SENSOR_COMPLETE, "LeastSquares: Kilobit sample: %f",
-               samples[index].size*(8.0/1000.0));
+      if (i < MAX_LEAST_SQUARES_SAMPLES)
+      {
+        logWrite(SENSOR_COMPLETE, "LeastSquares: ***Delay sample #%d: %d", i,
+                 samples[index].rtt);
+        logWrite(SENSOR_COMPLETE, "LeastSquares: Period sample: %d",
+                 samples[index].period);
+        logWrite(SENSOR_COMPLETE, "LeastSquares: Kilobit sample: %f",
+                 samples[index].size*(8.0/1000.0));
 
-      x_i += samples[index].period;
-      y_i = samples[index].rtt;
-      numA += x_i * y_i;
-      numB += x_i;
-      numC += y_i;
-      denomA += x_i * x_i;
-      denomB += x_i;
-      denomC += x_i;
+        x_i += samples[index].period;
+        y_i = samples[index].rtt;
+        numA += x_i * y_i;
+        numB += x_i;
+        numC += y_i;
+        denomA += x_i * x_i;
+        denomB += x_i;
+        denomC += x_i;
+      }
     }
     // Calculate throughput.
     logWrite(SENSOR, "LeastSquares: timeTotal: %d, kilobitTotal: %f",
