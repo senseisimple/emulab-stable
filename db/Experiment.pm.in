@@ -1440,7 +1440,7 @@ sub NodeStatusList($$)
     my $eid = $self->eid();
 
     my $query_result =
-	DBQueryWarn("select n.node_id,n.status from reserved as r ".
+	DBQueryWarn("select r.node_id,n.status from reserved as r ".
 		    "left join node_status as n on n.node_id=r.node_id ".
 		    "where pid='$pid' and eid='$eid'");
 
@@ -1448,6 +1448,10 @@ sub NodeStatusList($$)
 	if (!defined($query_result));
     
     while (my ($node_id,$status) = $query_result->fetchrow_array()) {
+	# Skip nodes with no status info reported. 
+	next
+	    if (!defined($status) || $status eq "");
+	
 	$results{$node_id} = (($status eq "up") ? 1 : 0);
     }
     %$prval = %results;
