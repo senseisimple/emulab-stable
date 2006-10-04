@@ -538,8 +538,8 @@ sub TestGlobalPolicy($$$$$)
 	    if (!$query_result);
 
 	if (! $query_result->numrows) {
-	    Declare("You must be a member of these projects to swapin any ".
-		    "experiments: $auxdata");
+	    Declare("You are not a member of a project with permission to ".
+		    "swapin experiments.");
 	    return 0;
 	}
     }
