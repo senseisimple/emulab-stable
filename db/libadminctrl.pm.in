@@ -240,7 +240,7 @@ sub Declare($)
 {
     my ($msg) = @_;
     
-    tberror("Admission Control: $msg\n");
+    tberror({cause => 'user'}, "Admission Control: $msg\n");
 }
 
 # Debug stuff
