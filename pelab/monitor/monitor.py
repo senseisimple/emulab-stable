@@ -292,7 +292,7 @@ def get_next_packet(conn):
 #          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
 #                       localport, remoteport, save_int(EWMA_THROUGHPUT_SENSOR))
           send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, save_int(LEAST_SQUARES_THROUGHPUT))
+                       localport, remoteport, save_int(AVERAGE_THROUGHPUT_SENSOR))
         elif event == 'Closed':
           send_command(conn, DELETE_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
                       localport, remoteport, '')
