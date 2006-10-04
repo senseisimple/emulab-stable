@@ -216,9 +216,14 @@ if (system "$LOGHOLE -e $pid/$eid clean -f -r") {
 # Reset the links so that we remove any delay changes we might have previously
 # made
 #
-print "##### Resetting all links in the experiment\n";
-if (system "$PYTHON resetlinks.py $pid $eid") {
-    die "Error resetting links\n";
+print "##### Resetting all links in the experiment..";
+print "clear..";
+if (system "$TEVC -e $pid/$eid now elabc clear") {
+    die "Error running tevc elabc clear\n";
+}
+print "reset\n";
+if (system "$TEVC -w -e $pid/$eid now elabc reset") {
+    die "Error running tevc elabc reset\n";
 }
 
 #
