@@ -191,9 +191,13 @@ if ($remote) {
 		    }
 		}
 
+		# build a node string to use in the node.getlist call
+		my $nodestr = join(',', values(%plist));
+
 		# sslxmlrpc_client.py -m node getlist class=pcplabphys
 		my $rval = libxmlrpc::CallMethod("node", "getlist",
 						 { "proj" => "$pid",
+						   "nodes" => "$nodestr",
 						   "class"  => "pcplabphys" });
 		if (defined($rval)) {
 		    while (my ($node,$pnode) = each(%plist)) {
