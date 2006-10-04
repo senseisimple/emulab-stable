@@ -12,7 +12,8 @@ DirectInput::DirectInput()
   , monitorSocket(-1)
   , index(0)
 {
-  logWrite(COMMAND_INPUT, "Creating the command accept socket");
+  logWrite(COMMAND_INPUT, "Creating the command accept socket on port %d",
+           global::monitorServerPort);
   monitorAccept = createServer(global::monitorServerPort,
                                "Command accept socket (No incoming command "
                                "connections will be accepted.");
