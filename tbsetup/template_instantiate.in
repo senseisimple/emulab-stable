@@ -102,6 +102,7 @@ my $batchexp    = "$TB/bin/batchexp";
 my $swapexp     = "$TB/bin/swapexp";
 my $endexp      = "$TB/bin/endexp";
 my $dbcontrol   = "$TB/sbin/opsdb_control";
+my $archcontrol = "$TB/bin/archive_control";
 
 # Protos
 sub ParseArgs();
@@ -612,6 +613,15 @@ if ($batchmode) {
 	}
     }
   done:
+}
+
+#
+# Lets commit the experiment archive now that it is active. The experiment is
+# already running, but thats not a big deal.
+#
+system("$archcontrol -t instantiate commit $pid $eid");
+if ($?) {
+    fatal(-1, "Could not commit archive!");
 }
 
 #

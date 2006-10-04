@@ -692,20 +692,23 @@ libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
     or fatal("Failed to add user archive files to the archive!");
 
 #
-# Do a SavePoint on the experiment files.
+# Do a SavePoint on the experiment files. In template mode, let the wrapper
+# deal with this. Avoids duplication of work.
 #
-print "Doing a savepoint on the experiment archive ...\n";
-if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
-    fatal({type => 'secondary', severity => SEV_SECONDARY,
-	   error => ['archive_op_failed', 'savepoint', undef, undef]},
-	  "Failed to do a savepoint on the experiment archive!");
+if (! $template_mode) {
+    print "Doing a savepoint on the experiment archive ...\n";
+    if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['archive_op_failed', 'savepoint', undef, undef]},
+	      "Failed to do a savepoint on the experiment archive!");
+    }
 }
 
 #
 # If this is a branch, then do a commit. Otherwise, the archive looks
 # wrong cause its a branch from the original and shows all those files.
 #
-if ($copybranch) {
+if ($copybranch && !$template_mode) {
     print "Doing a commit on the experiment archive ...\n";
     libArchive::TBCommitExperimentArchive($pid, $eid, "branch_merge") == 0 or
 	fatal({type => 'secondary', severity => SEV_SECONDARY,

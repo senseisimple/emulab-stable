@@ -1197,17 +1197,21 @@ if ($inout eq "modify") {
 }
 
 #
-# Do a SavePoint on the experiment files.
+# Do a SavePoint on the experiment files. For both of these archive
+# operations, skip if in template mode; we have too many tags building
+# up from too many operations. Leave it to the wrapper script.
 #
-print "Doing a savepoint on the experiment archive ...\n";
-if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, $tag) < 0) {
-    fatal({type => 'secondary', severity => SEV_SECONDARY,
-	   error => ['archive_op_failed', 'savepoint', undef, undef]},
-	  "Failed to do a savepoint on the experiment archive!");
+if (! $template_mode) {
+    print "Doing a savepoint on the experiment archive ...\n";
+    if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, $tag) < 0) {
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['archive_op_failed', 'savepoint', undef, undef]},
+	      "Failed to do a savepoint on the experiment archive!");
+    }
 }
 
 # Commit the archive after swapout
-if ($inout eq "out") {
+if ($inout eq "out" && !$template_mode) {
     print "Doing a commit on the experiment archive ...\n";
     libArchive::TBCommitExperimentArchive($pid, $eid, $tag) == 0 or
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
