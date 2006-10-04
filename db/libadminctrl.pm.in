@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -192,6 +192,7 @@ use lib '@prefix@/lib';
 use English;
 use libdb;
 use libtestbed;
+use libtblog;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -239,7 +240,7 @@ sub Declare($)
 {
     my ($msg) = @_;
     
-    print STDERR "*** Admission Control: $msg\n";
+    tberror("Admission Control: $msg\n");
 }
 
 # Debug stuff
