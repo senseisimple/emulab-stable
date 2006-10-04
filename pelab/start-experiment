@@ -255,7 +255,7 @@ if ($realplab && $initelab && !$use_simplemodel) {
 	warn "Could not acquire initial path conditions\n";
     }
     print "##### Initializing Emulab link characteristics\n";
-    if (system "$pelabdir/$INITCOND $pid $eid") {
+    if (system "$pelabdir/$INITCOND -C $pid $eid") {
 	warn "Error initializing Emulab links with initial path conditions\n";
     }
 }
