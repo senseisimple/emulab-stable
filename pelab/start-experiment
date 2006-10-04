@@ -259,10 +259,10 @@ if ($realplab && $initelab && !$use_simplemodel) {
     if (system "$pelabdir/$INITCOND -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid") {
 	warn "Could not acquire initial path conditions\n";
     }
-    print "##### Initializing Emulab link characteristics\n";
-    if (system "$pelabdir/$INITCOND -C $pid $eid") {
-	warn "Error initializing Emulab links with initial path conditions\n";
-    }
+#    print "##### Initializing Emulab link characteristics\n";
+#    if (system "$pelabdir/$INITCOND -C $pid $eid") {
+#	warn "Error initializing Emulab links with initial path conditions\n";
+#    }
 }
 
 print "##### Restarting servers\n";
@@ -301,7 +301,7 @@ print "##### Starting stubs";
 #    print " with: '$stub_cmd $stub_cmdargs'";
 #    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
 #}
-#print "\n";
+print "\n";
 if ($realplab) {
     if (system "$TEVC -e $pid/$eid now planetstubs start") {
 	die "Error running tevc\n";
@@ -313,17 +313,17 @@ if ($realplab) {
 }
 
 #$startarg = "";
-print "##### Starting monitors\n";
+print "##### Starting monitors";
 #if ($mon_cmdargs ne $UNKNOWN) {
 #    print " with: '$mon_cmd $mon_cmdargs'";
 #    $startarg = "'COMMAND=$mon_cmd $mon_cmdargs'";
 #}
-#print "\n";
+print "\n";
 if (system "$TEVC -e $pid/$eid now monitorgroup start") {
     die "Error running tevc\n";
 }
 
-#print "##### Starting tcpdumps";
+#print "##### Starting tcpdumps\n";
 #if (system "$TEVC -e $pid/$eid now plabtcpdump start") {
 #    die "Error running tevc\n";
 #}
