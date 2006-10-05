@@ -140,7 +140,7 @@ void PacketSensor::localSend(PacketInfo * packet)
       record.seqEnd = record.seqStart + sequenceLength - 1;
       record.totalLength = packet->packetLength;
       record.timestamp = packet->packetTime;
-      logWrite(SENSOR_COMPLETE,
+      logWrite(SENSOR_DETAIL,
                "PacketSensor::localSend() new record: ss=%u,sl=%u,se=%u,tl=%u",
                record.seqStart, sequenceLength, record.seqEnd,
                record.totalLength);
