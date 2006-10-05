@@ -157,10 +157,39 @@ void PacketSensor::localSend(PacketInfo * packet)
          */
         if (record.seqStart != (globalSequence.seqEnd + 1))
         {
-          logWrite(ERROR,"PacketSensor::localSend() may have missed a "
+          LOG_TYPE type;
+          if (record.seqStart - globalSequence.seqEnd > 15000) {
+            type = ERROR;
+          } else {
+            type = EXCEPTION;
+          }
+          logWrite(type,"PacketSensor::localSend() may have missed a "
                   "packet - last seq seen: %u, new seq: %u (lost %d)",
                   globalSequence.seqEnd,record.seqStart,
                   record.seqStart - globalSequence.seqEnd);
+          /*
+           * Put a dummy packet into the record. We multiply the data size by a
+           * constant factor that takes into account the header size for typical
+           * packets.
+           */
+          SentPacket fake;
+          fake.seqStart = globalSequence.seqEnd + 1;
+          fake.seqEnd = record.seqStart - 1;
+          fake.totalLength = static_cast<int>((fake.seqEnd - fake.seqStart)
+              * SUPERMAGIC_PACKET_MULTIPLIER);
+          fake.fake = true;
+          fake.timestamp = Time();
+          unacked.push_back(fake);
+
+          /*
+           * Calculate the packet payload size - we have to make sure to
+           * take into account IP and TCP option headers
+           */
+          logWrite(SENSOR_COMPLETE,
+                   "PacketSensor::localSend() fake record: ss=%u,sl=%u,se=%u,tl=%u",
+                   fake.seqStart, (fake.seqEnd - fake.seqStart), fake.seqEnd,
+                   fake.totalLength);
+
         } else {
           logWrite(SENSOR_COMPLETE,"PacketSensor::localSend() looks good: %u %u",
                   record.seqStart, globalSequence.seqEnd);
@@ -208,6 +237,8 @@ void PacketSensor::localAck(PacketInfo * packet)
     uint32_t ack_for = ntohl(packet->tcp->ack_seq) - 1;
     logWrite(SENSOR_DETAIL, "PacketSensor::localAck() for sequence number %u",
              ack_for);
+    logWrite(SENSOR_COMPLETE, "PacketSensor::localAck() globalSequnce is %u "
+            "to %u", globalSequence.seqStart, globalSequence.seqEnd);
     /*
      * We assume that the ACK field of the packet is acking from the smallest
      * sequence number we know of up to it value
@@ -216,7 +247,25 @@ void PacketSensor::localAck(PacketInfo * packet)
      * some more thought about wraparaound, so we'll live with spurious errors
      * for now.
      */
-    ranges.push_back(rangepair(globalSequence.seqStart,ack_for));
+    if ((globalSequence.seqStart == 0) && (globalSequence.seqEnd == 0)) {
+      /*
+       * In this case, we know of no outstanding packets
+       */
+      logWrite(EXCEPTION, "PacketSensor::localAck(): Got an ACK, but I don't "
+                          "know of any outstanding packets");
+    } else if (ack_for == (globalSequence.seqStart - 1)) {
+      logWrite(SENSOR, "PacketSensor::localAck() detected a "
+                       "duplicate ack for %u",ack_for);
+    } else if (ack_for < globalSequence.seqStart) {
+      logWrite(EXCEPTION, "PacketSensor::localAck(): Got an ACK below the "
+                          "globalRange (%u < %u)",ack_for,
+                          globalSequence.seqStart);
+    } else {
+        /*
+         * Okay, this looks like a legit ACK!
+         */
+        ranges.push_back(Range(globalSequence.seqStart,ack_for,false));
+    }
 
     /*
      * Now look for SACKs
@@ -262,7 +311,7 @@ void PacketSensor::localAck(PacketInfo * packet)
             logWrite(SENSOR_DETAIL,"PacketSensor::localAck() suppressed "
                                    "redundant SACK");
           } else {
-            ranges.push_back(rangepair(start, end));
+            ranges.push_back(Range(start, end, true));
           }
         }
 
@@ -278,8 +327,8 @@ void PacketSensor::localAck(PacketInfo * packet)
     ackedSendTime = Time();
     rangelist::iterator range;
     for (range = ranges.begin(); range != ranges.end(); range++) {
-      uint32_t range_start = range->first;
-      uint32_t range_end = range->second;
+      uint32_t range_start = range->start;
+      uint32_t range_end = range->end;
 
       logWrite(SENSOR_DETAIL, "PacketSensor::localAck() handling range "
                               "%u to %u", range_start, range_end);
@@ -294,17 +343,9 @@ void PacketSensor::localAck(PacketInfo * packet)
        */
       if (range_end < globalSequence.seqStart)
       {
-        if (range_end == (globalSequence.seqStart - 1)) {
-          logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected a "
-                                  "duplicate ack");
+          logWrite(EXCEPTION, "PacketSensor::localAck() detected an "
+                              "old ack");
           continue;
-        }
-        else
-        {
-            logWrite(SENSOR_DETAIL, "PacketSensor::localAck() detected an "
-                                    "old ack");
-            continue;
-        }
       }
 
       /*
@@ -327,6 +368,21 @@ void PacketSensor::localAck(PacketInfo * packet)
         break;
       }
 
+      bool split = false;
+      if (firstPacket->seqStart != range_start) {
+        /*
+         * We have to split up this SentPacket so that we can ACK only part of
+         * it
+         */
+        logWrite(SENSOR_DETAIL, "PacketSensor::localAck(): Range does not "
+            "start on packet boundary: %u (%u to %u, tl %u)",
+            range_start, firstPacket->seqStart, firstPacket->seqEnd,
+            firstPacket->totalLength);
+        SentPacket::splitPacket(firstPacket, range_start, &unacked);
+        //firstPacket = iterators.second;
+        split = true;
+      }
+
       list<SentPacket>::iterator lastPacket = unacked.begin();
       while (lastPacket != unacked.end() && 
              !lastPacket->inSequenceBlock(range_end)) {
@@ -337,6 +393,51 @@ void PacketSensor::localAck(PacketInfo * packet)
         logWrite(ERROR, "Range ends in unknown packet");
         ackValid = false;
         break;
+      }
+
+      if (lastPacket->seqEnd != range_end) {
+        /*
+         * We have to split up this SentPacket so that we can ACK only part of
+         * it
+         */
+        logWrite(SENSOR_DETAIL, "PacketSensor::localAck(): Range does not "
+            "end on packet boundary: %u (%u to %u, tl %u)",
+            range_end, lastPacket->seqStart, lastPacket->seqEnd,
+            firstPacket->totalLength);
+        SentPacket::splitPacket(lastPacket, range_end +1, &unacked);
+        split = true;
+        //lastPacket = iterators.first;
+      }
+
+      if (split) {
+        /*
+         * Wow, the STL list is *lame*. Insertion invalidates the
+         * iterators (WHY?), so we have to find the packets again
+         */
+        firstPacket = unacked.begin();
+        while (firstPacket != unacked.end() &&
+               !firstPacket->inSequenceBlock(range_start)) {
+          firstPacket++;
+        }
+        if (firstPacket == unacked.end() ||
+            firstPacket->seqStart != range_start) {
+          logWrite(ERROR,"PacketSensor::localack(): Internal error - starting "
+              "packet not found");
+          ackValid = false;
+          continue;
+        }
+        lastPacket = unacked.begin();
+        while (lastPacket != unacked.end() && 
+               !lastPacket->inSequenceBlock(range_end)) {
+          lastPacket++;
+        }
+        if (lastPacket == unacked.end() ||
+            lastPacket->seqEnd != range_end) {
+          logWrite(ERROR,"PacketSensor::localack(): Internal error - ending "
+              "packet not found");
+          ackValid = false;
+          continue;
+        }
       }
 
       /*
@@ -354,18 +455,30 @@ void PacketSensor::localAck(PacketInfo * packet)
         if (pos->retransmitted) {
           isRetransmit = true;
         }
-        ackedSize += pos->totalLength;
+
+        /*
+         * Don't count up bytes that have already been SACKed
+         */
+        if (!pos->sacked) {
+            ackedSize += pos->totalLength;
+        }
+
+        /*
+         * If this range is a SACK, mark the packet as being SACKed so that we
+         * won't count it again.
+         */
+        if (range->from_sack) {
+            pos->sacked = true;
+        }
+
         /*
          * We want the time for the most recently acked packet, not the one
-         * that has the highest sequence number
+         * that has the highest sequence number. Ignore 'fake' packets.
          */
-        if (pos->timestamp > ackedSendTime) {
+        if (!pos->fake && (pos->timestamp > ackedSendTime)) {
           ackedSendTime = pos->timestamp;
         }
-        /*
-         * XXX - should we be looking for packets in the range that we didn't
-         * know about?
-         */
+
         if (pos == lastPacket) {
           break;
         } else {
@@ -374,16 +487,15 @@ void PacketSensor::localAck(PacketInfo * packet)
       }
 
       /*
-       * Now, remove these packets from our list.
-       * XXX: This makes the assumption that all acks are on packet boundaries
-       * - this seems be be true in practice, but might not be true in theory
-       * XXX: In the future, we may want to marked SACKed packets, not totally
-       * remove them
+       * Now, remove these packets from our list, but not if this was a SACK,
+       * since we are likely to see future ACKs or SACKs for the same packet
        */
-      unacked.erase(firstPacket, lastPacket);
-      // erase() does not erase the final member of the range, so we have
-      // to do that ourselves
-      unacked.erase(lastPacket);
+      if (!range->from_sack) {
+        unacked.erase(firstPacket, lastPacket);
+        // erase() does not erase the final member of the range, so we have
+        // to do that ourselves
+        unacked.erase(lastPacket);
+      }
 
       if (unacked.empty())
       {
@@ -439,5 +551,47 @@ bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
 }
 
 PacketSensor::SentPacket::SentPacket()
-    : seqStart(0), seqEnd(0), totalLength(), timestamp(), retransmitted(false) {
+    : seqStart(0), seqEnd(0), totalLength(), timestamp(), retransmitted(false),
+      sacked(0), fake(false) {
+}
+
+void PacketSensor::SentPacket::splitPacket(PacketSensor::SentPacketIterator it,
+      unsigned int split_seqnum, std::list<SentPacket> *unacked) {
+
+  // Save these away so that we can use them in the message below
+  unsigned int old_start = it->seqStart;
+  unsigned int old_end = it->seqEnd;
+  unsigned int old_length = it->seqEnd - it->seqStart;
+  unsigned int old_tl = it->totalLength;
+
+  SentPacket newpacket = *it;
+  newpacket.seqEnd = split_seqnum - 1;
+  it->seqStart = split_seqnum;
+  /*
+   * Figure out what percent of the totalLength each part accounted for so that
+   * we can split it fairly.
+   */
+  double firstpct =
+                  (static_cast<double>(newpacket.seqEnd) -
+                   static_cast<double>(newpacket.seqStart)) /
+                  static_cast<double>(old_length);
+  double secondpct =
+                   (static_cast<double>(it->seqEnd) -
+                    static_cast<double>(it->seqStart)) /
+                   static_cast<double>(old_length);
+  newpacket.totalLength = static_cast<int>(firstpct * old_tl);
+  it->totalLength = static_cast<int>(secondpct * old_tl);
+  // The new packet goes before the old packet
+  PacketSensor::SentPacketIterator newit;
+  newit = unacked->insert(it,newpacket);
+  logWrite(SENSOR_DETAIL, "PacketSensor::splitPacket(): Split %u to %u "
+      "(tl %i) into %u to %u (tl %i) and %u to %u (tl %i)",
+      old_start, old_end, old_tl, newit->seqStart, newit->seqEnd,
+      newit->totalLength, it->seqStart, it->seqEnd, it->totalLength);
+}
+
+PacketSensor::Range::Range(unsigned int _start, unsigned int _end, bool _sack) {
+    start = _start;
+    end = _end;
+    from_sack = _sack;
 }
