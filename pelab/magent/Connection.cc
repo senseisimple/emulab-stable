@@ -98,7 +98,7 @@ void Connection::connect(void)
     {
       logWrite(CONNECTION, "Inserting a connection with key %s",
                planet.toString().c_str());
-      global::planetMap.insert(make_pair(planet, this));
+      global::planetMap[planet] = this;
     }
   }
   else
@@ -164,15 +164,15 @@ Time Connection::writeToConnection(Time const & previousTime)
   if (!isConnected && result.isConnected)
   {
     planet = result.planet;
-    global::planetMap.insert(make_pair(planet, this));
+    global::planetMap[planet] = this;
   }
   else if (isConnected && result.isConnected
            && planet != result.planet)
   {
     logWrite(CONNECTION, "OldKey: %s", planet.toString().c_str());
-    global::planetMap.erase(planet);
+    global::planetMap[planet] = NULL;
     planet = result.planet;
-    global::planetMap.insert(make_pair(planet, this));
+    global::planetMap[planet] = this;
     logWrite(CONNECTION, "NewKey: %s", planet.toString().c_str());
   }
   isConnected = result.isConnected;
@@ -186,7 +186,7 @@ void Connection::cleanup(std::multimap<Time, Connection *> & schedule)
   logWrite(CONNECTION, "Connection cleanup");
   if (isConnected)
   {
-    global::planetMap.erase(planet);
+    global::planetMap[planet] = NULL;
   }
   if (nextWrite != Time())
   {

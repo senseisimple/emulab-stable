@@ -576,6 +576,12 @@ namespace
       }
     }
 
+    if (pos->second == NULL)
+    {
+      logWrite(EXCEPTION, "Packet captured after the end of a connection.");
+      return;
+    }
+
     /*
      * Next, determine if this packet is an ACK (note that it can also be a
      * data packet, even if it's an ACK. This is called piggybacking)
