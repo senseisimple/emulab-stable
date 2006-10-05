@@ -571,7 +571,7 @@ namespace
       if (pos != global::planetMap.end()) {
         outgoing = false;
       } else {
-        logWrite(ERROR,"Unable to look find packet in planetMap");
+        logWrite(ERROR,"Unable to find packet in planetMap");
         return;
       }
     }

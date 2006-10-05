@@ -12,7 +12,8 @@ using namespace std;
 
 void NewConnectionCommand::run(std::multimap<Time, Connection *> &)
 {
-  logWrite(COMMAND_INPUT, "Running NEW_CONNECTION_COMMAND");
+  logWrite(COMMAND_INPUT, "Running NEW_CONNECTION_COMMAND: %s",
+           key.toString().c_str());
   std::map<Order, Connection>::iterator pos
     = global::connections.find(key);
   if (pos == global::connections.end())
@@ -32,7 +33,8 @@ void NewConnectionCommand::runConnect(Connection *,
 void TrafficModelCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
-  logWrite(COMMAND_INPUT, "Running TRAFFIC_MODEL_COMMAND");
+  logWrite(COMMAND_INPUT, "Running TRAFFIC_MODEL_COMMAND: %s",
+           key.toString().c_str());
   std::auto_ptr<TrafficModel> model(new CircularTraffic());
   conn->setTraffic(model);
 }
@@ -42,7 +44,8 @@ void TrafficModelCommand::runConnect(Connection * conn,
 void ConnectionModelCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
-  logWrite(COMMAND_INPUT, "Running CONNECTION_MODEL_COMMAND");
+  logWrite(COMMAND_INPUT, "Running CONNECTION_MODEL_COMMAND: %s",
+           key.toString().c_str());
   conn->addConnectionModelParam(*this);
 }
 
@@ -51,7 +54,8 @@ void ConnectionModelCommand::runConnect(Connection * conn,
 void SensorCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
-  logWrite(COMMAND_INPUT, "Running SENSOR_COMMAND");
+  logWrite(COMMAND_INPUT, "Running SENSOR_COMMAND: %s",
+           key.toString().c_str());
   conn->addSensor(*this);
 }
 
@@ -60,7 +64,8 @@ void SensorCommand::runConnect(Connection * conn,
 void ConnectCommand::runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &)
 {
-  logWrite(COMMAND_INPUT, "Running CONNECT_COMMAND");
+  logWrite(COMMAND_INPUT, "Running CONNECT_COMMAND: %s",
+           key.toString().c_str());
   conn->connect();
 }
 
@@ -77,7 +82,8 @@ void TrafficWriteCommand::runConnect(Connection * conn,
 
 void DeleteConnectionCommand::run(std::multimap<Time, Connection *> & schedule)
 {
-  logWrite(COMMAND_INPUT, "Running DELETE_CONNECTION_COMMAND");
+  logWrite(COMMAND_INPUT, "Running DELETE_CONNECTION_COMMAND: %s",
+           key.toString().c_str());
   std::map<Order, Connection>::iterator pos
     = global::connections.find(key);
   if (pos != global::connections.end())
