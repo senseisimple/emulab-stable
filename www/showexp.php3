@@ -377,6 +377,17 @@ if ($expstate) {
 			   "template_exprun.php?action=start&guid=$guid".
 			   "&version=$vers&eid=$exp_eid");
 
+	if ($instance->pause_time()) {
+	    WRITESUBMENUBUTTON("Continue Experiment RunTime",
+		       "template_exprun.php?action=continue&guid=$guid".
+		       "&version=$vers&eid=$exp_eid");
+	}
+	else {
+	    WRITESUBMENUBUTTON("Pause Experiment Runtime",
+		       "template_exprun.php?action=pause&guid=$guid".
+		       "&version=$vers&eid=$exp_eid");
+	}
+
 	WRITESUBMENUBUTTON("Create New Template",
 			   "template_commit.php?&guid=$guid".
 			   "&version=$vers&exptidx=$expindex");

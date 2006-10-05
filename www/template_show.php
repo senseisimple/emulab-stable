@@ -291,6 +291,11 @@ WRITESUBMENUBUTTON("Add Metadata",
 		   "template_metadata.php?action=add&".
 		   "guid=$guid&version=$version");
 
+if ($template->EventCount() > 0) {
+    WRITESUBMENUBUTTON("Edit Template Events",
+		       "template_editevents.php?guid=$guid&version=$version");
+}
+
 # We show the user the datastore for the template; the rest of it is not important.
 WRITESUBMENUBUTTON("Template Archive",
 		   "archive_view.php3/$exptidx/trunk?exptidx=$exptidx");

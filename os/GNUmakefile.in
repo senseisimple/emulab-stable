@@ -26,12 +26,15 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
 	@$(MAKE) -C frisbee.redux install
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_record \
+		$(INSTALL_DIR)/opsdir/bin/template_record
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 \
 		$(INSTALL_DIR)/opsdir/man/man1/install-tarfile.1
 
 control-install: 
 	@$(MAKE) -C imagezip install
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_record $(LBINDIR)/template_record
 
 client:
 ifeq ($(SYSTEM),FreeBSD)
@@ -47,6 +50,7 @@ client-install: client
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_record $(LBINDIR)/template_record
 ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-swapimage $(LBINDIR)/

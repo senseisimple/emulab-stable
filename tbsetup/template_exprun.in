@@ -31,7 +31,7 @@ sub usage()
 	  "Usage: template_exprun [-q] [-w] [-r <runid>] ".
 	  "-a <action> -e <eid> [-p <pid> | <guid/vers>]\n".
 	  "switches and arguments:\n".
-	  "-a <action> - start or stop\n".
+	  "-a <action> - pause, continue, start or stop\n".
 	  "-w          - wait for run to start\n".
 	  "-s          - save DB contents at end of run; default is clean\n".
 	  "-q          - be less chatty\n".
@@ -232,7 +232,16 @@ if ($experiment->state() ne EXPTSTATE_ACTIVE()) {
     exit(1);
 }
 
-if ($action eq "start" && !defined($runid)) {
+#
+# Pause and Continue are easy
+#
+if ($action eq "pause") {
+    exit($instance->PauseTime());
+}
+elsif ($action eq "continue") {
+    exit($instance->ContinueTime());
+}
+elsif ($action eq "start" && !defined($runid)) {
     if ($instance->NewRunID(\$runid) < 0) {
 	tbdie("Could not determine a new runid; please use the -r option!");
     }
@@ -462,7 +471,13 @@ if ($doswapmod) {
     fatal($? >> 8, "Swap modify failed!")
 	if ($?);
 
-    $instance->Refresh();    
+    $instance->Refresh();
+
+    # This has to be redone since the batchexp will have written
+    # incomplete data.
+    print "Writing program agent info ...\n";
+    $instance->WriteProgramAgents() == 0
+	or fatal(-1, "Could not write program agent info");
 }
 
 #
@@ -601,7 +616,8 @@ sub ParseArgs()
     if (defined($options{"a"})) {
 	$action = $options{"a"};
 
-	if ($action ne "start" and $action ne "stop") {
+	if ($action ne "start" && $action ne "stop" &&
+	    $action ne "pause" && $action ne "continue") {
 	    tbdie("Improper -a argument: $action.");
 	}
 	# Need the equiv of a taint check.

@@ -103,6 +103,76 @@ function DOIT($instance, $action, $command_options)
 }
 
 #
+# Run the script backend
+#
+function DOTIME($instance, $action)
+{
+    global $guid, $version, $pid, $gid, $eid, $uid;
+    $message = "";
+
+    if ($action == "pause") {
+	PAGEHEADER("Pause Experiment Time");
+	$message = "Pausing experiment runtime";
+    }
+    else {
+	PAGEHEADER("Continue Experiment Time");
+	$message = "Continuing experiment runtime";
+    }	
+
+    $command_options = "-e $eid -a $action ";
+    
+    #
+    # Grab the unix GID for running scripts.
+    #
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    #
+    # Avoid SIGPROF in child.
+    #
+    set_time_limit(0);
+
+    echo "<font size=+2>Template <b>" .
+            MakeLink("template",
+		     "guid=$guid&version=$version", "$guid/$version") .
+            "</b>, Instance <b>" .
+            MakeLink("project", "pid=$pid", $pid) . "/" .
+            MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
+    echo "</b></font>\n";
+    echo "<br><br>\n";
+
+    echo "<script type='text/javascript' language='javascript' ".
+	 "        src='template_sup.js'>\n";
+    echo "</script>\n";
+
+    STARTBUSY($message);
+
+    #
+    # Run the backend script.
+    #
+    $retval = SUEXEC($uid, "$pid,$unix_gid",
+		     "webtemplate_exprun $command_options $guid/$version",
+		     SUEXEC_ACTION_IGNORE);
+
+    CLEARBUSY();
+
+    #
+    # Fatal Error. Report to the user, even though there is not much he can
+    # do with the error. Also reports to tbops.
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    }
+
+    # User error. Tell user and exit.
+    if ($retval) {
+	SUEXECERROR(SUEXEC_ACTION_USERERROR);
+	return;
+    }
+
+    PAGEREPLACE("showexp.php3?pid=$pid&eid=$eid");
+}
+
+#
 # Spit the form out using the array of data.
 #
 function SPITFORM($instance, $formfields, $parameters, $errors)
@@ -324,6 +394,12 @@ if (!$instance) {
 if (isset($action) && $action == "stop") {
     # Run the backend script.
     DOIT($instance, $action, "");
+    PAGEFOOTER();
+    return;
+}
+elseif (isset($action) && ($action == "pause" || $action == "continue")) {
+    # Run the backend script.
+    DOTIME($instance, $action, "");
     PAGEFOOTER();
     return;
 }

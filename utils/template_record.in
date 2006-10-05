@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Do some analysis.
+#
+sub usage()
+{
+    print STDOUT "Usage: template_record -e <pid/eid> <script> [args ...]\n";
+    exit(-1);
+}
+my $optlist = "-e:";
+
+
+# Configure variables.
+my $TB          = "@prefix@";
+
+# Locals.
+my $pid;
+my $eid;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"e"})) {
+    ($pid,$eid) = split(/\//, $options{"e"});
+}
+else {
+    #
+    # See if we can infer the pid/eid from the path.
+    #
+    if (`pwd` =~ /^(?:\/[-\w]+)*\/proj\/([-\w]+)\/exp\/([-\w]+)/) {
+	$pid = $1;
+	$eid = $2;
+	print "Using $pid/$eid\n";
+    }
+    else {
+	usage();
+    }
+}
+if (@ARGV < 1) {
+    usage();
+}
+my $scriptname = shift(@ARGV);
+
+#
+# Grab the user environment variables.
+#
+open(USRENV, "/proj/$pid/exp/$eid/tbdata/environment")
+    or die("Could not open user environment file!\n");
+
+while (<USRENV>) {
+    if ($_ =~ /^(.*)=(.*)$/) {
+	$ENV{$1} = $2;
+    }
+}
+
+#
+# Run the analysis.
+# If it completes okay then schedule an event for the current time.
+#
+my $now = time();
+my $childpid = fork();
+if (! $childpid) {
+    #
+    # Child runs command
+    #
+    exec $scriptname, @ARGV;
+    die("Could not exec $scriptname\n");
+}
+
+#
+# Wait until child exits or until user gets bored and types ^C.
+#
+waitpid($childpid, 0);
+if ($?) {
+    exit(-1);
+}
+
+#
+# Okay, ssh over to ops to run the xmlrpc client. SHould be installed locally.
+#
+system("$TB/bin/sslxmlrpc_client.py -m template addprogevent ".
+       "  proj=$pid exp=$eid vnode='ops' when=$now ".
+       "  cmd='$scriptname @ARGV'");
+    
+exit 0;

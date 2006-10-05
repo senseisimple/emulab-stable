@@ -1713,7 +1713,7 @@ sub Create($$)
     # Give it an initial start time; updated later.
     $query .= ", "
 	if (defined($argref) && scalar(keys%{$argref}));
-    $query .= "start_time=now() ";
+    $query .= "start_time=now(),continue_time=now() ";
 
     my $query_result = DBQueryWarn($query);
     return undef
@@ -1725,17 +1725,21 @@ sub Create($$)
     return Template::Instance->LookupByID($idx);
 }
 # accessors
-sub idx($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'idx'}); }
-sub exptidx($) { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'exptidx'}); }
-sub guid($)    { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'parent_guid'});}
-sub vers($)    { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'parent_vers'});}
-sub pid($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'pid'}); }
-sub eid($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'eid'}); }
-sub uid($)     { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'uid'}); }
-sub runidx($)  { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'runidx'}); }
-sub start_time { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'start_time'}); }
-sub stop_time  { return ((!ref($_[0])) ? -1 : $_[0]->{'DB'}->{'stop_time'}); }
-sub template($){ return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'DB'}->{$_[1]}); }
+sub idx($)           { return field($_[0], 'idx'); }
+sub exptidx($)       { return field($_[0], 'exptidx'); }
+sub guid($)          { return field($_[0], 'parent_guid');}
+sub vers($)          { return field($_[0], 'parent_vers');}
+sub pid($)           { return field($_[0], 'pid'); }
+sub eid($)           { return field($_[0], 'eid'); }
+sub uid($)           { return field($_[0], 'uid'); }
+sub runidx($)        { return field($_[0], 'runidx'); }
+sub start_time($)    { return field($_[0], 'start_time'); }
+sub stop_time($)     { return field($_[0], 'stop_time'); }
+sub pause_time($)    { return field($_[0], 'pause_time'); }
+sub continue_time($) { return field($_[0], 'continue_time'); }
+sub runtime($)       { return field($_[0], 'runtime'); }
+sub template($)      { return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
 
 # The path is the path of the experiment.
 sub path($)    { return TBExptUserDir($_[0]->pid(), $_[0]->eid()); }
@@ -1792,7 +1796,7 @@ sub Update($$;$)
     my $idx   = $self->idx();
     my $query = "update experiment_template_instances set ";
 
-    $query .= "start_time=now() "
+    $query .= "start_time=now(),continue_time=now(),runtime=0 "
 	if ($start_time);
 
     if (defined($argref) && scalar(keys%{$argref})) {
@@ -2118,6 +2122,100 @@ sub DeleteCurrentRun($)
 	or return -1;
 
     return Refresh($self);
+}
+
+#
+# Pause and Continue time, keeping track of running time. 
+#
+sub PauseTime($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    if ($self->pause_time()) {
+	tbwarn("$self is already paused!\n");
+	return -1;
+    }
+    if (!defined($self->continue_time())) {
+	tbwarn("PauseTime: $self is in an inconsistent state!\n");
+	return -1;
+    }
+
+    my $idx    = $self->idx();
+
+    DBQueryWarn("update experiment_template_instances set ".
+		"   runtime=runtime + ".
+		"    (UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(continue_time)), ".
+		"   continue_time=NULL, ".		
+		"   pause_time=now() ".
+		"where idx='$idx'")
+	or return -1;
+
+    return Refresh($self);
+}
+sub ContinueTime($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    if (! defined($self->pause_time())) {
+	tbwarn("$self is not paused!\n");
+	return -1;
+    }
+    if (defined($self->continue_time())) {
+	tbwarn("PauseTime: $self is in an inconsistent state!\n");
+	return -1;
+    }
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("update experiment_template_instances set ".
+		"   continue_time=now(), ".
+		"   pause_time=NULL ".
+		"where idx='$idx'")
+	or return -1;
+
+    return Refresh($self);
+}
+sub AdjustTimeStamp($$$)
+{
+    my ($self, $timestamp, $peventtime) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx    = $self->idx();
+
+    if ($self->pause_time()) {
+	# If paused, the event runs at the difference between now() and the
+	# timestamp provided.
+	$$peventtime = $self->runtime() + (time() - $timestamp);
+    }
+    else {
+	# Running. Need to calculate current runtime.
+	
+	my $query_result =
+	    DBQueryWarn("select runtime + ".
+			"         (UNIX_TIMESTAMP(now()) - ".
+			"          UNIX_TIMESTAMP(continue_time)) ".
+			"  from experiment_template_instances ".
+			"where idx='$idx'");
+
+	return -1
+	    if (!$query_result || !$query_result->numrows);
+
+	my ($t) = $query_result->fetchrow_array();
+
+	$$peventtime = $t + (time() - $timestamp);
+    }
+    return 0;
 }
 
 #
@@ -2659,12 +2757,24 @@ sub AddEvent($$$$)
     my $eid  = $self->eid();
     my $cmd  = DBQuoteSpecial("COMMAND=$commandline");
 
+    #
+    # Need to adjust the timestamp to account for stopped time. This also
+    # converts from absolute to relative event time.
+    #
+    my $firetime;
+    
+    $self->AdjustTimeStamp($timestamp, \$firetime) == 0
+	or return -1;
+
     # We assume program agent events right now. Change later.
     my $query_result =
-	DBQueryWarn("select idx from event_objecttypes where type='PROGRAM'");
+	DBQueryWarn("select idx from event_objecttypes ".
+		    "where type='PROGRAM' or type='SEQUENCE' order by type");
     return -1
-	if (!$query_result || ! $query_result->numrows);
-    my ($event_objecttype) = $query_result->fetchrow_array();
+	if (!$query_result || $query_result->numrows != 2);
+
+    my ($program_objecttype)  = $query_result->fetchrow_array();
+    my ($sequence_objecttype) = $query_result->fetchrow_array();
 
     # And its a start event of course.
     $query_result =
@@ -2674,18 +2784,37 @@ sub AddEvent($$$$)
     my ($event_eventtype) = $query_result->fetchrow_array();
 
     #
-    # Need to convert the timestamp from absolute unixtime to relative time.
+    # We need an event sequence to properly order sequential events. 
     #
-    my $runidx  = $self->runidx();
-    my $exptidx = $self->exptidx();
+    my $sequence_name = "${vnode}_record";
 
     $query_result =
-	DBQueryWarn("select UNIX_TIMESTAMP(start_time) from experiment_runs ".
-		    "where exptidx='$exptidx' and idx='$runidx'");
+	DBQueryWarn("select * from virt_agents ".
+		    "where pid='$pid' and eid='$eid' and ".
+		    "      vname='$sequence_name'");
     return -1
-	if (!$query_result || ! $query_result->numrows);
-    my ($starttime) = $query_result->fetchrow_array();
-    my $firetime    = $timestamp - $starttime;
+	if (!$query_result);
+
+    if (! $query_result->numrows) {
+	DBQueryWarn("replace into virt_agents set ".
+		    "  pid='$pid', eid='$eid', ".
+		    "  vnode='*', vname='$sequence_name', ".
+		    "  objecttype='$sequence_objecttype'")
+	    or return -1;
+	
+	if (! DBQueryWarn("insert into eventlist set ".
+			  "  pid='$pid', eid='$eid', time='0', ".
+			  "  vnode='$vnode', vname='$sequence_name', ".
+			  "  objecttype='$sequence_objecttype', ".
+			  "  eventtype='$event_eventtype', ".
+			  "  atstring='', arguments=''")) {
+	    
+	    DBQueryWarn("delete from virt_agents ".
+			"where pid='$pid' and eid='$eid' and ".
+			"      vname='$sequence_name'");
+	    return -1;
+	}
+    }
 
     # Make up a vname.
     my $vname = "dprog" . $firetime;
@@ -2697,9 +2826,10 @@ sub AddEvent($$$$)
 	DBQueryWarn("insert into eventlist set ".
 		    "  pid='$pid', eid='$eid', time='$firetime', ".
 		    "  vnode='$vnode', vname='$vname', ".
-		    "  objecttype='$event_objecttype', ".
+		    "  objecttype='$program_objecttype', ".
 		    "  eventtype='$event_eventtype', ".
-		    "  atstring='', arguments=$cmd");
+		    "  atstring='', arguments=$cmd, ".
+		    "  parent='$sequence_name'");
     return -1
 	if (!$query_result || ! $query_result->numrows);
 
@@ -2710,7 +2840,7 @@ sub AddEvent($$$$)
     if (!DBQueryWarn("insert into virt_agents set ".
 		     "  pid='$pid', eid='$eid', ".
 		     "  vnode='$vnode', vname='$vname', ".
-		     "  objecttype='$event_objecttype'")) {
+		     "  objecttype='$program_objecttype'")) {
 	DBQueryWarn("delete from eventlist ".
 		    "where pid='$pid' and eid='$eid' and idx='$eventidx'");
 	return -1;
@@ -2736,7 +2866,7 @@ sub AddEvent($$$$)
 		     "  parent_guid='$guid', parent_vers='$vers', ".
 		     "  time='$firetime', ".
 		     "  vnode='$vnode', vname='$vname', ".
-		     "  objecttype='$event_objecttype', ".
+		     "  objecttype='$program_objecttype', ".
 		     "  eventtype='$event_eventtype', ".
 		     "  arguments=$cmd")) {
 	DBQueryWarn("delete from eventlist ".
@@ -2769,7 +2899,22 @@ sub CopyTemplateEvents($)
     my $pid  = $self->pid();
     my $eid  = $self->eid();
 
+    # Need to insert a sequence to wrap these.
     my $query_result =
+	DBQueryWarn("select idx from event_objecttypes where type='SEQUENCE'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    my ($sequence_objecttype) = $query_result->fetchrow_array();
+
+    # And its a start event of course.
+    $query_result =
+	DBQueryWarn("select idx from event_eventtypes where type='START'");
+    return -1
+	if (!$query_result || ! $query_result->numrows);
+    my ($start_eventtype) = $query_result->fetchrow_array();
+
+    # Now process the template events.
+    $query_result =
 	DBQueryWarn("select * from experiment_template_events ".
 		    "where parent_guid='$guid' and parent_vers='$vers'");
     
@@ -2783,6 +2928,30 @@ sub CopyTemplateEvents($)
 	my $event_objecttype = $rowref->{"objecttype"};
 	my $event_eventtype  = $rowref->{"eventtype"};
 	my $cmd              = DBQuoteSpecial($rowref->{"arguments"});
+	my $sequence_name    = "${vnode}_record";
+
+	my $agent_result =
+	    DBQueryWarn("select * from virt_agents ".
+			"where pid='$pid' and eid='$eid' and ".
+			"      vname='$sequence_name'");
+	return -1
+	    if (!$agent_result);
+	
+	if (! $agent_result->numrows) {
+	    DBQueryWarn("replace into virt_agents set ".
+			"  pid='$pid', eid='$eid', ".
+			"  vnode='*', vname='$sequence_name', ".
+			"  objecttype='$sequence_objecttype'")
+		or return -1;
+
+	    DBQueryWarn("insert into eventlist set ".
+			"  pid='$pid', eid='$eid', time='0', ".
+			"  vnode='$vnode', vname='$sequence_name', ".
+			"  objecttype='$sequence_objecttype', ".
+			"  eventtype='$start_eventtype', ".
+			"  atstring='', arguments=''")
+		or return -1;
+	}
 
 	#
 	# Any failure and and the instance will be killed by the
@@ -2793,7 +2962,8 @@ sub CopyTemplateEvents($)
 		    "  vnode='$vnode', vname='$vname', ".
 		    "  objecttype='$event_objecttype', ".
 		    "  eventtype='$event_eventtype', ".
-		    "  atstring='', arguments=$cmd")
+		    "  atstring='', arguments=$cmd, ".
+		    "  parent='$sequence_name'")
 	    or return -1;
 
 	# Need a virt_agent entry.
@@ -2857,6 +3027,22 @@ sub WriteEnvVariables($)
 	if (! defined($experiment));
 
     return $experiment->WriteEnvVariables();
+}
+
+sub WriteProgramAgents($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $experiment = $self->Experiment();
+
+    return -1
+	if (! defined($experiment));
+
+    return $experiment->WriteProgramAgents();
 }
 
 #

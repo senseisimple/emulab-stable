@@ -864,6 +864,69 @@ class Template
 	$foo = $row[0] + 1;
 	return "${tid}-V${foo}"; 
     }
+
+    #
+    # Return array of template events, ordered by time.
+    #
+    function EventList(&$eventlist) {
+	$eventlist = array();
+	$guid = $this->guid();
+	$vers = $this->vers();
+	
+	$query_result =
+	    DBQueryFatal("select * from experiment_template_events ".
+			 "where parent_guid='$guid' and ".
+			 "      parent_vers='$vers' ".
+			 "order by time");
+
+	$i = 0;
+	while ($row = mysql_fetch_array($query_result)) {
+	    $eventlist[$i++] = $row;
+	}
+	return 0;
+    }
+    function EventCount() {
+	$guid = $this->guid();
+	$vers = $this->vers();
+	
+	$query_result =
+	    DBQueryFatal("select count(*) from experiment_template_events ".
+			 "where parent_guid='$guid' and ".
+			 "      parent_vers='$vers' ");
+
+	$row   = mysql_fetch_array($query_result);
+	$count = $row[0];
+	return $count;
+    }
+    function DeleteEvent($vname) {
+	$guid = $this->guid();
+	$vers = $this->vers();
+	
+	DBQueryFatal("delete from experiment_template_events ".
+		     "where parent_guid='$guid' and ".
+		     "      parent_vers='$vers' and ".
+		     "      vname='$vname'");
+
+	return 0;
+    }
+    function ModifyEvent($vname, $changes) {
+	$guid = $this->guid();
+	$vers = $this->vers();
+	$sets = array();
+	
+	while (list ($key, $value) = each ($changes)) {
+	    $value  = addslashes($value);
+	    $sets[] = "$key='$value'";
+	}
+	
+	DBQueryFatal("update experiment_template_events set ".
+		     implode(",", $sets) . " ".
+		     "where parent_guid='$guid' and ".
+		     "      parent_vers='$vers' and ".
+		     "      vname='$vname'");
+
+	return 0;
+    }
 }
 
 #
@@ -943,6 +1006,10 @@ class TemplateInstance
     function stop_time() {
 	return (is_null($this->instance) ? -1 :
 		$this->instance['stop_time']);
+    }
+    function pause_time() {
+	return (is_null($this->instance) ? -1 :
+		$this->instance['pause_time']);
     }
     function template() {
 	return (is_null($this->instance) ? -1 : $this->template);

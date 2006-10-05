@@ -15,7 +15,8 @@ include $(OBJDIR)/Makeconf
 SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
-                  setdest loghole webcopy linkmon_ctl snmp-if-deref.sh
+                  setdest loghole webcopy linkmon_ctl snmp-if-deref.sh \
+		  template_record
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
@@ -40,6 +41,8 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
 	$(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_SCRIPTS)) \
 	subdir-install
+	$(INSTALL_PROGRAM) template_record \
+		$(INSTALL_DIR)/opsdir/bin/template_record
 	$(INSTALL_PROGRAM) loghole $(INSTALL_DIR)/opsdir/bin/loghole
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
 	$(INSTALL) -m 0644 $(SRCDIR)/loghole.1 \

@@ -554,6 +554,11 @@ print "Writing environment strings ...\n";
 $instance->WriteEnvVariables() == 0
     or fatal(-1, "Could not write environment strings for program agents");
 
+# This has to be redone since the batchexp will have written incomplete data.
+print "Writing program agent info ...\n";
+$instance->WriteProgramAgents() == 0
+    or fatal(-1, "Could not write program agent info");
+
 #
 # Now do the swapin (or it gets queued if a batch experiment).
 #
