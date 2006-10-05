@@ -159,7 +159,7 @@ while(1)
 
     outputErrors();
 
-    sleep( 60 );
+    sleep( 60*30 );
     $f_firsttime = 0;
 }
 
