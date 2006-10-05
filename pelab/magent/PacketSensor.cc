@@ -170,7 +170,12 @@ void PacketSensor::localSend(PacketInfo * packet)
           /*
            * Put a dummy packet into the record. We multiply the data size by a
            * constant factor that takes into account the header size for typical
-           * packets.
+           * packets. We put the current packet's timestamp on the fake packet.
+           * This is pretty safe - the worst it can do is slightly
+           * underestimate RTT - but, since the current packet is definitely
+           * newer, our RTT estimates will almost always use its timestamp. The
+           * only case that we'll underestimate is when some ACK only ACKs fake
+           * packets, which is hopefully rare, and the error should be small
            */
           SentPacket fake;
           fake.seqStart = globalSequence.seqEnd + 1;
@@ -178,7 +183,7 @@ void PacketSensor::localSend(PacketInfo * packet)
           fake.totalLength = static_cast<int>((fake.seqEnd - fake.seqStart)
               * SUPERMAGIC_PACKET_MULTIPLIER);
           fake.fake = true;
-          fake.timestamp = Time();
+          fake.timestamp = packet->packetTime;
           unacked.push_back(fake);
 
           /*
@@ -281,10 +286,10 @@ void PacketSensor::localAck(PacketInfo * packet)
          * are are two 4-octet sequence numbers for each region
          */
         int num_sacks = opt->length / 8;
-        logWrite(SENSOR,"SACK: length = %d num_sacks = %d", opt->length,
+        logWrite(SENSOR_DETAIL,"SACK: length = %d num_sacks = %d", opt->length,
                  num_sacks);
         if (opt->length % 8 != 0) {
-          logWrite(SENSOR,"Bad SACK header length: %i", (opt->length));
+          logWrite(ERROR,"Bad SACK header length: %i", (opt->length));
           return;
         }
         const uint32_t *regions = reinterpret_cast<const uint32_t*>(opt->buffer);
@@ -379,7 +384,6 @@ void PacketSensor::localAck(PacketInfo * packet)
             range_start, firstPacket->seqStart, firstPacket->seqEnd,
             firstPacket->totalLength);
         SentPacket::splitPacket(firstPacket, range_start, &unacked);
-        //firstPacket = iterators.second;
         split = true;
       }
 
@@ -406,7 +410,6 @@ void PacketSensor::localAck(PacketInfo * packet)
             firstPacket->totalLength);
         SentPacket::splitPacket(lastPacket, range_end +1, &unacked);
         split = true;
-        //lastPacket = iterators.first;
       }
 
       if (split) {
@@ -473,9 +476,9 @@ void PacketSensor::localAck(PacketInfo * packet)
 
         /*
          * We want the time for the most recently acked packet, not the one
-         * that has the highest sequence number. Ignore 'fake' packets.
+         * that has the highest sequence number.
          */
-        if (!pos->fake && (pos->timestamp > ackedSendTime)) {
+        if (pos->timestamp > ackedSendTime) {
           ackedSendTime = pos->timestamp;
         }
 
