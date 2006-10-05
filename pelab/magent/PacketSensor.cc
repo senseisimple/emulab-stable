@@ -76,6 +76,28 @@ void PacketSensor::localSend(PacketInfo * packet)
       }
     }
   }
+
+  /*
+   * Calculate the packet payload size - we have to make sure to
+   * take into account IP and TCP option headers
+   */
+  unsigned int sequenceLength =
+    // Total length of the IP part of the packet
+    (ntohs(packet->ip->ip_len))
+    // Total length of all IP headers (including options)
+    - (packet->ip->ip_hl*4)
+    // Total length of all TCP headers (including options)
+    - (packet->tcp->doff*4);
+  /*
+   * Bail out now if there is no data in this packet
+   */
+  if (sequenceLength == 0) {
+    ackValid = false;
+    sendValid = false;
+    logWrite(SENSOR_DETAIL,"PacketSensor::localSend() skipping a non-data packet");
+    return;
+  }
+
   // Assume this packet is not a retransmit unless proven otherwise
   ackValid = true;
   isRetransmit = false;
@@ -124,17 +146,6 @@ void PacketSensor::localSend(PacketInfo * packet)
       SentPacket record;
       record.seqStart = startSequence;
 
-      /*
-       * Calculate the packet payload size - we have to make sure to
-       * take into account IP and TCP option headers
-       */
-      unsigned int sequenceLength =
-        // Total length of the IP part of the packet
-        (ntohs(packet->ip->ip_len))
-        // Total length of all IP headers (including options)
-        - (packet->ip->ip_hl*4)
-        // Total length of all TCP headers (including options)
-        - (packet->tcp->doff*4);
       // We want to get the sequence number of the last data byte, not the
       // sequence number of the first byte of the next segment
       record.seqEnd = record.seqStart + sequenceLength - 1;
