@@ -633,7 +633,7 @@ CREATE TABLE experiment_template_instances (
   stop_time datetime default NULL,
   pause_time datetime default NULL,
   continue_time datetime default NULL,
-  runtime int(10) unsigned default 0,
+  runtime int(10) unsigned default '0',
   runidx int(10) unsigned default NULL,
   template_tag varchar(64) default NULL,
   export_time datetime default NULL,

@@ -3738,3 +3738,5 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiment_template_instances add \
          runtime int(10) unsigned default 0 after continue_time;
 
+4.94: Minor fix to last revision; skip to next entry please.
+
