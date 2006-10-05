@@ -315,7 +315,7 @@ void init(void)
   limit.rlim_cur = RLIM_INFINITY;
   limit.rlim_max = RLIM_INFINITY;
   if (setrlimit(RLIMIT_CORE,&limit)) {
-      logWrite(ERROR,"Unable to set core dump size!");
+      logWrite(EXCEPTION,"Unable to set core dump size!");
   }
 
   srandom(getpid());
