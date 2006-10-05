@@ -447,7 +447,28 @@ foreach my $name (keys(%parameters)) {
 		 "for $instance!");
 }
 
-# We munge the environment variables.
+if ($doswapmod) {
+    #
+    # Now do the swapmod, using the original NS file for now. The environ
+    # variables will be passed to the NS reparse by parse-ns wrapper script.
+    #
+    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
+    my $nsfile     = "$archivedir/nsdata/nsfile.ns";
+    my @arguments  = ($swapexp, "-q", "-x", "-s", "modify",
+		      $pid, $eid, $nsfile);
+
+    print "Starting a swap modify ...\n";
+    system(@arguments);
+    fatal($? >> 8, "Swap modify failed!")
+	if ($?);
+
+    $instance->Refresh();    
+}
+
+#
+# We munge the environment variables *AFTER* the potential swapmod since
+# it will have scrogged the user env.
+#
 $instance->InitializeEnvVariables(\%parameters) == 0
     or fatal(-1, "Could not add new environment variables to instance");
     
@@ -460,41 +481,12 @@ SignalProgAgents("RELOAD") == 0
     or $ignoreerrors
     or CheckForDeadNodes();
 
-if ($doswapmod) {
-    #
-    # Now do the swapmod, using the original NS file for now. The environ
-    # variables will be passed to the NS reparse by parse-ns wrapper script.
-    #
-    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
-    my $nsfile     = "$archivedir/nsdata/nsfile.ns";
-    my @arguments  = ($swapexp, "-q", "-e", "-x", "-s", "modify",
-		      $pid, $eid, $nsfile);
-
-    print "Starting a swap modify ...\n";
-    system(@arguments);
-    fatal($? >> 8, "Swap modify failed!")
-	if ($?);
-
-    #
-    # XXX FIX! Do this again, cause the swapmod messed up the env variables.
-    #
-    $instance->Refresh();
-
-     # We munge the environment variables.
-    $instance->InitializeEnvVariables(\%parameters) == 0
-	or fatal(-1, "Could not add new environment variables to instance");
-    
-    $instance->WriteEnvVariables() == 0
-	or fatal(-1, "Could not write environment strings for program agents");
-}
-else {
-    #
-    # Restart the event stream from the beginning.
-    #
-    print "Asking the event system to replay events ...\n";
-    system("$eventcontrol replay $pid $eid") == 0
-	or fatal(-1, "Could not restart the event system!");
-}
+#
+# Restart the event stream from the beginning.
+#
+print "Asking the event system to replay events ...\n";
+system("$eventcontrol replay $pid $eid") == 0
+    or fatal(-1, "Could not restart the event system!");
 
 print "Experiment run '$runid' has been started.\n";
 done:
