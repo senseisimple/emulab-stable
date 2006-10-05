@@ -1,9 +1,5 @@
 #!/usr/bin/perl -w
 
-#TODO!!
-# - finish implementation of rate change duration.
-
-
 =pod
 
 Send a UDP message to this node, containing a 
@@ -70,7 +66,7 @@ use Cmdqueue;
 $| = 1;
 
 sub usage {
-	warn "Usage: $0 [-s server] [-c cmdport] [-a ackport] [-p sendport] [-e pid/eid] -d <working_dir> [hostname]\n";
+	warn "Usage: $0 [-s server] [-c cmdport] [-a ackport] [-p sendport] [-e pid/eid] <-d working_dir> [hostname]\n";
 	return 1;
 }
 
@@ -84,8 +80,18 @@ my %cacheLastSentAt;    #{indx} -> tstamp of last sent cache result
 my $cacheIndxWaitPer = 5; #wait x sec between cache send attempts of same indx
 my $iperfduration = 5;  #length of each iperf test in seconds
 my $iperftimeout = 30;   #kill an iperf process lasting longer than this.
+my $fpingTimeoutDef = 10000; #milliseconds for fping to timeout
+my $outManID = "outageMan"; #name to use for ManagerID when an outage is detctd
 my $outDet_maxPastSuc = 12; #consider a path for outage detection if a valid
                             #result appeared within this many hours in the past
+my %outTestFreq = ( high  => 1,
+		    med   => 10,
+		    low   => 600,
+		    outageEnd=> 10 );
+my %outTestDur =  ( high  => 60,
+		    med   => 60,
+		    low   => 0,
+		    outageEnd=> 120 );
 
 =pod
 # percentage of testing period to wait after a test process abnormally exits
@@ -124,15 +130,14 @@ sub createtmpfilename($$);
 sub createDBfilename();
 sub detectHang($);
 sub isMsgValid(\%);
-sub checkTestChangeAllowed(\%$);
 sub updateTestEvent($);
-		    sub addCmd($$);
-sub updateOutageState(\$);
+sub addCmd($$);
+sub updateOutageState($);
 sub initTestEv($$);
 #*****************************************
 
 my %opt = ();
-getopts("s:a:p:e:d:i:h",\%opt);
+getopts("s:c:a:p:e:d:i:h",\%opt);
 
 #if ($opt{h}) { exit &usage; }
 #if (@ARGV > 1) { exit &usage; }
@@ -153,13 +158,21 @@ if( defined  $ARGV[0] ){
 }else{
     $_ = `cat /var/emulab/boot/nodeid`;
     /plabvm(\d+)-/;
-    $thismonaddr = "plab$1";
+    if( defined $1 ){
+	$thismonaddr = "plab$1" ;
+    }else{
+	$thismonaddr = `hostname`;
+	chomp $thismonaddr;
+    }
 }
 print "thismonaddr = $thismonaddr\n";
+print "command-port = $cmdport\n";
+print "result send port = $sendport\n";
+print "ackport = $ackport\n";
 
 # Create a TCP socket to receive commands on
 my $socket_cmd = IO::Socket::INET->new( LocalPort => $cmdport,
-					LocalHost => $thismonaddr,
+#TODO: added this as comment, in case it breaks: LocalHost => $thismonaddr,
 					Proto    => 'tcp',
 					Blocking => 0,
 					Listen   => 1,
@@ -189,10 +202,8 @@ sub handleincomingmsgs()
     my $cmdHandle;
 
 
-    my @ready = $sel->can_read($pollPer);  #wait max of 0.1 sec. Don't want to
-                                      #have 0 here, or CPU usage goes high
+    my @ready = $sel->can_read($pollPer);
     foreach my $handle (@ready){
-
 	my %sockIn;
 	my $cmdHandle;
 	if( $handle eq $socket_ack ){
@@ -626,7 +637,8 @@ sub spawnTest($$)
 	return 0;
     }
     $linkdest = pop @{$waitq{$testtype}};
-    print time_all()." running $linkdest / $testtype\n";
+    my $fpingTimeout = $testevents{$linkdest}{$testtype}{fpingTimeout};
+    print time()." running $linkdest / $testtype\n";
 
   FORK:{
       if( my $pid = fork ){
@@ -650,8 +662,7 @@ sub spawnTest($$)
 #	      print "##########latTest\n";
 	      #one ping, using fping (2 total attempts, 10 sec timeout between)
 	      exec "sudo $workingdir".
-		  "fping -t10000 -s -r1 $linkdest >& $filename"
-#	      exec "ping -c 1 -w 60 $linkdest >$filename"
+		  "fping -t$fpingTimeout -s -r1 $linkdest >& $filename"
 		  or die "can't exec: $!\n";
 	  }elsif( $testtype eq "bw" ){
 	      #command line for "BANDWIDTH TEST"
@@ -858,9 +869,7 @@ sub sendResults($$){
 		   result   => $results->{result},
 		   tstamp   => $results->{tstamp},
 		   index    => $index );
-
     my $result_serial = serialize_hash( \%result );
-
     $socket_snd->send($result_serial);
 }
 
@@ -916,155 +925,10 @@ sub isMsgValid(\%)
     return 1;
 }
 
-
-sub checkTestChangeAllowed(\%$)
-{
-    return 1;  # always allowed.. for now
-=pod
-    my ($href, $managerID ) = @_;
-    my %testev = %{$href};
-    if( !defined %testev ||
-	!defined $testev{managerID} ||
-	$managerID eq $testev{managerID} )
-    {
-#	print "checkTestChangeAllowed passed!\n";
-	if( defined %testev &&
-	    !defined $testev{managerID} )
-	{
-	    $testev{managerID} = $managerID;
-	}
-	return 1;
-    }else{
-	print "checkTestChangeAllowed failed!\n";
-	print "  new managerID=$managerID\n".
-	    "  old managerID=$testev{managerID}\n";
-	return 0;
-    }
-=cut
-}
-
-=pod
-sub editTest(\$$$,$)
-{
-    my ($testev, $newtestper, $duration, $managerID, $offset) = @_;
-    $offset = 0 if( !defined $offset );
-
-    # only change test if conditions met...
-    if( checkTestChangeAllowed( %{$testev}, $managerID ) ){
-	#
-	# Smartly handle two overlapping requests, such that
-	#  the highest rate is used for the duration specified
-	#  in the command
-	# TODO: Add fancier queuing here!
-
-	# Specifications:
-	#  - an EDIT with testper=0
-	#    will stop the corresponding 'temp' or 'forever' test
-	#    selected by the value of 'duration'.
-	#  - ** Only a "background" rate (forever) and one
-	#       temporary rate increase are supported.
-	#  - ANY new 'forever' rate will overwrite the previous one
-	#  - A 'forever' faster than existing 'temp' overwrites 'temp'
-	#    and does not recover it if a future 'forever' has a rate
-	#    less than the 'temp' (it removes all trace)
-	# state descriptions: (Current state) -> (action)
-	# saved valid|Currently running | New|   change|replace
-	# 'forever'  | 0=forever        |Edit|  period?|saved
-	# exists     | 1=temp)          |Type| ->      |'forever'?
-	#  0          0                   0         1     0
-	#  0          1                   0         0     1
-	#  1          1                   0         0     1
-	#  0          0                   1         1     1
-	#  0          1                   1         1     0
-	#  1          1                   1         1     0
-
-	#TODO!!!
-	# EDIT above states... action after rcving 'forever' while running
-	#  a 'temp' depends on period comparisons between
-	#  old 'forever' new 'forever' and 'temp'
-
-	#make sure existing testper is valid
-	if( !defined $testev->{testper} ){
-	    $testev->{testper} = 0;
-	}
-	#make sure limitTime is valid
-	if( !defined $testev->{limitTime} ){
-	    $testev->{limitTime} = 0;
-	}
-
-	if( defined $duration && $duration > 0 ){
-	    # New edit is a 'temp' type
-	    if( $newtestper < $testev->{testper} || 
-		$testev->{testper} == 0 )
-	    {
-		# state (xx1->1?) new per checked for faster freq.
-		if( $testev->{limitTime} == 0 && $newtestper > 0){
-		    # state (x01->11)
-		    #Save existing 'forever' test and use new testper
-		    $testev->{prevPeriod} = $testev->{testper};
-		    $testev->{testper} = $newtestper;
-		    $testev->{limitTime} = 
-			time()+$duration;
-		}elsif( $testev->{limitTime} != 0 ){
-		    # state (x11->10)
-		    if( $newtestper == 0 ){
-			# temp edit is 0 per, so re-start saved
-			#'forever' test
-			$testev->{testper} = $testev->{prevPeriod};
-			$testev->{limitTime} = 0;
-		    }else{
-			#update period and duration with new command
-			$testev->{testper} = $newtestper;
-			$testev->{limitTime} = 
-			    time()+$duration;
-		    }
-		}
-	    }
-	}else{
-	    #state (xx0->??)
-	    # New edit is a 'forever' type
-	    if( $testev->{limitTime} == 0 ){
-		# state (x00->10)
-		#  currently running a forever
-		$testev->{testper} = $newtestper;
-	    }else{
-		# state (x10->01)
-		#  currently running a temp
-		# cases of periods
-		#  1) new forever is not 0 and < existing temp.
-		#  2) new forever is 0
-		#  3) new forever is > existing temp
-		if( $newtestper != 0 &&
-		    $newtestper < $testev->{testper} )
-		{
-		    #case 1
-		    $testev->{testper} = $newtestper;
-		    $testev->{limitTime} = 0;
-		    $testev->{prevPeriod} = 0;
-		}elsif( $newtestper == 0 ){
-		    #case 2
-		    $testev->{prevPeriod} = 0;
-		}elsif( $newtestper > $testev->{testper} ){
-		    #case 3
-		    $testev->{prevPeriod} = $newtestper;
-		}
-	    }
-	}
-
-	$testev->{flag_scheduled} = 0;
-	$testev->{timeOfNextRun} = time_all()+$offset;
-	$testev->{managerID} = $managerID;
-	return 1;
-    }
-    else{
-	return 0;
-    }
-}
-
-=cut
-
 #
-#
+#  Adjust latency measurement frequency if a path is detected to have
+#   gone down. Also adjusts the timeout frequency of fping to allow for
+#   a more frequent probing.
 #
 =pod
 state transitions
@@ -1086,9 +950,8 @@ outageEnd      <120sec&SUCCESS       outageEnd
                ERR                   highFreq
 =cut
 
-sub updateOutageState(\$)
+sub updateOutageState($)
 {
-=pod
     my ($testev) = @_;
     my $curstate = $testev->{outagestate};
     if( $testev->{results_parsed} > 0 ){
@@ -1097,22 +960,102 @@ sub updateOutageState(\$)
     }
 
 
-    # SWITCH ON outagestate
+    # SWITCH ON "outagestate"
     if( $curstate eq "normal" ){
-
-    }elsif(){
-
+	if( isWorkingPathDown($testev) > 0 ){
+	    # STATE TRANSITION -> highFreq
+	    addCmd( $testev, Cmd->new($outManID,
+				      $outTestFreq{high},
+				      0) );  #forever, since internally managed
+	    $curstate = "highFreq";
+	    $testev->{outStateTime} = time();
+	    $testev->{fpingTimeout} = $outTestFreq{high}*1000/2;
+	}
+    }elsif( $curstate eq "highFreq" ){
+	if( isWorkingPathDown($testev) > 0 &&
+	    time() - $testev->{outStateTime} > $outTestDur{high} )
+	{
+	    # STATE TRANSITION -> medFreq
+	    addCmd( $testev, Cmd->new($outManID,
+				      $outTestFreq{med},
+				      0) );  #forever, since internally managed
+	    $curstate = "medFreq";
+	    $testev->{outStateTime} = time();
+	    $testev->{fpingTimeout} = $outTestFreq{med}*1000/2;
+	}elsif( isWorkingPathDown($testev) < 0 ){
+	    # STATE TRANSITION -> outageEnd
+	    $curstate = outSetState_outageEnd($testev);
+	}
+    }elsif( $curstate eq "medFreq" ){
+	if( isWorkingPathDown($testev) > 0 &&
+	    time() - $testev->{outStateTime} > $outTestDur{med} )
+	{
+	    # STATE TRANSITION -> lowFreq
+	    addCmd( $testev, Cmd->new($outManID,
+				      $outTestFreq{low},
+				      0) );  #forever, since internally managed
+	    $curstate = "lowFreq";
+	    $testev->{outStateTime} = time();
+	    $testev->{fpingTimeout} = $fpingTimeoutDef;
+	}elsif( isWorkingPathDown($testev) < 0 ){
+	    # STATE TRANSITION -> outageEnd
+	    $curstate = outSetState_outageEnd($testev);
+	}
+    }elsif( $curstate eq "lowFreq" ){
+	if( isWorkingPathDown($testev) < 0 ){
+	    # STATE TRANSITION -> outageEnd
+	    $curstate = outSetState_outageEnd($testev);
+	}
+    }elsif( $curstate eq "outageEnd" ){
+	if( isWorkingPathDown($testev) < 0 &&
+	    time() - $testev->{outStateTime} > $outTestDur{outageEnd} )
+	{
+	    # STATE TRANSITION -> normal
+	    # Delete outageManID entry in cmdqueue
+	    #  set period to 0
+	    addCmd( $testev, Cmd->new($outManID,0,0) );
+	    $curstate = "normal";
+	    $testev->{outStateTime} = 0;
+	    $testev->{fpingTimeout} = $fpingTimeoutDef;
+	}elsif( isWorkingPathDown($testev) > 0 ){
+	    # STATE TRANSITION -> highFreq
+	    $curstate = "highFreq";
+	    $testev->{outStateTime} = time();
+	    $testev->{fpingTimeout} = $outTestFreq{high}*1000/2;
+	}
     }
 
+    # save new state
+    if( $curstate ne $testev->{outagestate} ){
+	print "NEW STATE: $curstate to \n";
+    }
+    $testev->{outagestate} = $curstate;
+}
 
-    if( defined($testev->{lastValidLatTime}) && 
-	time() < $testev->{lastValidLatTime}
-	+ $outDet_maxPastSuc )
+sub outSetState_outageEnd($)
+{
+    my ($testev) = @_;
+    addCmd( $testev, Cmd->new($outManID,
+			      $outTestFreq{outageEnd},
+			      0) );  #forever, since internally managed
+#    $testev->{outagestate} = "outageEnd";
+    $testev->{outStateTime} = time();
+    $testev->{fpingTimeout} = $outTestFreq{outageEnd}*1000/2;
+    return "outageEnd";
+}
+
+sub isWorkingPathDown($)
+{
+    my ($testev) = @_;
+    my $secSinceUp = time() - $testev->{lastValidLatTime};
+    if( $testev->{results_parsed} < 0 && 
+	$secSinceUp < $outDet_maxPastSuc*60*60 )
     {
-	#path down and was up recently, so start latency outage
-	
+	#path is down and was up recently
+	return $secSinceUp;  #return seconds since last being up
+    }else{
+	return -1;
     }
-=cut
 }
 
 #
@@ -1137,7 +1080,8 @@ sub updateTestEvent($)
     #compare currently running test info with head of queue
     elsif( !defined $curPer ||
 	   $curPer == 0 ||
-	   $head->period() < $curPer )
+#	   $head->period() < $curPer )
+	   $head->period() != $curPer )
     {
 	#replace running info with that from head:
 	#  testper, limitTime, flag_scheduled, timeOfNextRun, managerID
@@ -1179,25 +1123,10 @@ sub initTestEv($$)
 				     timeOfNextRun  => 0,
 				     limitTime      => 0,
 				     pid            => 0,
-				     timedout       => 0
+				     timedout       => 0,
+				     outagestate    => "normal",
+				     lastValidLatTime => 0,
+				     fpingTimeout   => $fpingTimeoutDef
 				     };
     }
-=pod
-    if( !defined
-	$testev->{cmdq} ){
-	$testev->{cmdq} = Cmdqueue->new();
-    }if(!defined
-	$testev->{flag_scheduled} ){
-	$testev->{flag_scheduled} = 0;
-    }if(!defined
-	$testev->{flag_finished} ){
-	$testev->{flag_finished} = 0;
-    }if(!defined
-	$testev->{testper} ){
-	$testev->{testper} = 0;
-    }if(!defined
-	$testev->{limitTime} ){
-	$testev->{limitTime} = 0;
-    }
-=cut
 }
