@@ -16,7 +16,7 @@ use IO::Select;
 $| = 1;
 
 sub usage {
-    print "Usage: $0 [-s server] [-p port] [-c commandport] [-e pid/eid] [-d] [-i]\n";
+    print "Usage: $0 [-s server] [-p port] [-c commandport] [-d] [-i]\n";
     return 1;
 }
 
@@ -26,7 +26,7 @@ my $evexpt   = "__none";
 my $bgmonexpt = "tbres/pelabbgmon";
 my ($server,$port,$cmdport);
 my %opt = ();
-if (!getopts("s:p:c:e:dih", \%opt)) {
+if (!getopts("s:p:c:dih", \%opt)) {
     exit &usage;
 }
 
@@ -35,7 +35,7 @@ if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{c}) { $cmdport = $opt{c};} else { $cmdport = 5052; }
 if ($opt{h}) { exit &usage; }
-if ($opt{e}) { $evexpt = $opt{e}; }
+#if ($opt{e}) { $evexpt = $opt{e}; }
 if ($opt{d}) { $debug = 1; }
 if ($opt{i}) { $impotent = 1; } 
 
@@ -113,7 +113,7 @@ while (1) {
 #	    print "accepting connection\n";
 	    $cmdHandle = $handle->accept();
 	    my $inmsg = <$cmdHandle>;
-#	    print "gotmsg: $inmsg\n";
+	    print "gotmsg from amc: $inmsg\n";
 	    chomp $inmsg;
 	    %sockIn = %{ deserialize_hash($inmsg) };
 	    my $srcnode = $sockIn{srcnode};
@@ -173,8 +173,14 @@ sub callbackFunc($$$) {
 	    my $managerID = event_notification_get_string($handle,
 							  $notification,
 							  "managerID");
+	    my $newexpid = event_notification_get_string($handle,
+							  $notification,
+							  "expid");
+	    if( !defined $newexpid || $newexpid eq "" ){
+		$newexpid = $bgmonexpt;
+	    }
 
-	    my %cmd = ( expid     => $bgmonexpt,
+	    my %cmd = ( expid     => $newexpid,
 			cmdtype   => $eventtype,
 			dstnode   => $dstnode,
 			testtype  => $testtype,
@@ -184,7 +190,7 @@ sub callbackFunc($$$) {
 			);
 
 
-	    print "got EDIT: $srcnode, $dstnode\n";
+	    print "got EDIT: $srcnode, $dstnode: $newexpid\n";
 
 
 #	    my $socket;
@@ -192,7 +198,7 @@ sub callbackFunc($$$) {
 
 	    # only automanager can send "forever" edits (duration=0)
 	    if( $duration > 0 || $managerID eq "automanagerclient" ){
-		print "sending cmd from $srcnode\n";
+		print "sending cmd to $srcnode on behalf of $managerID\n";
 		sendcmd( $srcnode, \%cmd );
 	    }
 
@@ -217,8 +223,14 @@ sub callbackFunc($$$) {
 	    my $managerID = event_notification_get_string($handle,
 							  $notification,
 							  "managerID");
+	    my $newexpid = event_notification_get_string($handle,
+							 $notification,
+							 "expid");
+	    if( !defined $newexpid || $newexpid eq "" ){
+		$newexpid = $bgmonexpt;
+	    }
 
-	    my %cmd = ( expid     => $bgmonexpt,
+	    my %cmd = ( expid     => $newexpid,
 			cmdtype   => $eventtype,
 			destnodes  => $destnodes,
 			testtype  => $testtype,
@@ -228,7 +240,7 @@ sub callbackFunc($$$) {
 			);
 
 	    print "got $eventtype:$srcnode,$destnodes,$testtype,".
-		"$testper,$duration,$managerID,$bgmonexpt\n";
+		"$testper,$duration,$managerID,$newexpid\n";
 
 	    # only automanager can send "forever" edits (duration=0)
 	    if( $duration > 0 ){ #|| $managerID eq "automanagerclient" ){
