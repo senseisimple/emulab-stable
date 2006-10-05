@@ -11,8 +11,6 @@ public:
   enum
   {
     INITIAL,
-    AFTER_SYN,
-    AFTER_SYN_ACK,
     ESTABLISHED
   };
 public:

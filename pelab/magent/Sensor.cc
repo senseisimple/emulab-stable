@@ -82,6 +82,7 @@ void NullSensor::localSend(PacketInfo * packet)
   ackValid = false;
   sendValid = true;
   logWrite(SENSOR, "----------------------------------------");
+  logWrite(SENSOR, "Stream ID: %s", packet->elab.toString().c_str());
   logWrite(SENSOR, "Send received: Time: %f", packet->packetTime.toDouble());
   if (packet->packetTime < lastPacketTime) {
     logWrite(EXCEPTION,"Reordered packets! Old %f New %f",lastPacketTime.toDouble(),
@@ -95,6 +96,7 @@ void NullSensor::localAck(PacketInfo * packet)
   sendValid = false;
   ackValid = true;
   logWrite(SENSOR, "----------------------------------------");
+  logWrite(SENSOR, "Stream ID: %s", packet->elab.toString().c_str());
   logWrite(SENSOR, "Ack received: Time: %f", packet->packetTime.toDouble());
   list<Option>::iterator pos = packet->tcpOptions->begin();
   list<Option>::iterator limit = packet->tcpOptions->end();
