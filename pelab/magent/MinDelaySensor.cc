@@ -40,7 +40,7 @@ void MinDelaySensor::localAck(PacketInfo * packet)
   {
     int current = delay->getLastDelay();
     int oneway = current / 2;
-    if (current < minimum && current != 0 && oneway != lastreported)
+    if (current < minimum && oneway != lastreported)
     {
       minDelay = current;
       ostringstream buffer;
@@ -56,6 +56,8 @@ void MinDelaySensor::localAck(PacketInfo * packet)
     {
       minimum.decay();
     }
+    logWrite(SENSOR_DETAIL,"MinDelaySensor::localAck() sez: cur=%i one=%i min=%i last=%i",
+            current, oneway, minimum.get(), lastreported);
     ackValid = true;
   }
   else
