@@ -234,6 +234,13 @@ void PacketSensor::localAck(PacketInfo * packet)
   // Right now, we don't know whether or not this ACK is for a retransmitted
   // packet - we will find out later
   isRetransmit = false;
+  
+  // Ignore SYN
+  if (packet->tcp->syn) {
+      logWrite(SENSOR_DETAIL, "PacketSensor::localAck() Skipping SYN");
+      ackValid = false;
+      return;
+  }
 
   // Ignore FIN
   if (packet->tcp->fin) {
