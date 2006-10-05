@@ -309,6 +309,9 @@ CREATE TABLE experiment_template_instances (
   -- A little bit of duplication ...
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  pause_time datetime default NULL,
+  continue_time datetime default NULL,
+  runtime int(10) unsigned default 0,
   -- The current experiment that is running (see below). One at a time!
   runidx int(10) unsigned default NULL,
   -- The tag for the template at the time of instantiation.

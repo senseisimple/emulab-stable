@@ -3724,3 +3724,17 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table experiments add dpdbpassword varchar(64) default NULL;
 
+4.93: Add pause_time field to template instance to track when user
+      stops time. Since this is strictly for the purposes of setting
+      the timestamps on "record" events, its very simple. In other
+      words, this ain't gonna support time travel!
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      alter table experiment_template_instances add \
+         pause_time datetime default NULL after stop_time;
+      alter table experiment_template_instances add \
+         continue_time datetime default NULL after stop_time;
+      alter table experiment_template_instances add \
+         runtime int(10) unsigned default 0 after continue_time;
+
