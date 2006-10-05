@@ -234,6 +234,14 @@ void PacketSensor::localAck(PacketInfo * packet)
   // Right now, we don't know whether or not this ACK is for a retransmitted
   // packet - we will find out later
   isRetransmit = false;
+
+  // Ignore FIN
+  if (packet->tcp->fin) {
+      logWrite(SENSOR_DETAIL, "PacketSensor::localAck() Skipping FIN");
+      ackValid = false;
+      return;
+  }
+  
   if (state->isAckValid() && state->getState() == StateSensor::ESTABLISHED)
   {
     // Set it to true, and then set it to false if we encounter an error.
