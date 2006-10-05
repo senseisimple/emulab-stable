@@ -18,6 +18,7 @@ sub usage
     warn "Usage: $0 [-p port] [-i managerID]".
 	" [-l latency period] [-b bandwidth period] [-a]".
         " [-d testduration]".
+	" [-e bgmonExpt]".
 	" [-o outputport] [-L]   <input_file>\n".
 	"where -a = measure all pairs\n".
 	"      -L = do not init Latency\n".
@@ -31,6 +32,7 @@ sub usage
 my %settings;  #misc options
 $settings{"allpairs"} = 0;  #if 0, interprets input nodes as pairs
 $settings{"expt"} = "__none";
+$settings{"bgmonexpt"} = "tbres/pelabbgmon";
 $settings{per_latency} = 600;
 $settings{per_bw} = 0;
 
@@ -44,7 +46,7 @@ else { $settings{managerID} = "default"; }
 if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{h}) { exit &usage; }
-if ($opt{e}) { $settings{"expt"} = $opt{e}; }
+if ($opt{e}) { $settings{"bgmonexpt"} = $opt{e}; }
 if ($opt{d}) { $settings{"testduration"} = $opt{d}; }
 if ($opt{a}) { $settings{"allpairs"} = 1; }
 if ($opt{L}) { $settings{"noLatency"} = 1; }
@@ -52,8 +54,10 @@ if ($opt{B}) { $settings{"noBW"} = 1; }
 if (defined($opt{l})) { $settings{per_latency} = $opt{l}; }
 if (defined($opt{b})) { $settings{per_bw} = $opt{b}; }
 
-if (@ARGV > 1) { exit &usage; }
+if (@ARGV != 1) { exit &usage; }
 my $filename_default = $ARGV[0];
+
+print "bgmonexpt=".$settings{"bgmonexpt"}."\n";
 
 my $URL = "elvin://$server";
 if ($port) { $URL .= ":$port"; }
@@ -69,8 +73,10 @@ open FILE, "< $filename_default"
     or die "can't open file $filename_default";
 while( <FILE> ){
     chomp;
-    if( $_ =~ m/plab/ ){ 
+#    if( $_ =~ m/plab/ ){ 
+    if( $_ ne "" ){
 	push @expnodes, $_;
+	print "$_\n";
     }
 }
 close FILE;
@@ -248,7 +254,8 @@ sub initnode($$$$)
 		dstnodes => $destnodes,
 		testtype  => $testtype,
 		testper   => "$testper",
-		duration  => "$settings{testduration}"
+		duration  => "$settings{testduration}",
+		expid     => "$settings{bgmonexpt}"
 		);
 
 #    sendcmd($node,\%cmd);
@@ -258,11 +265,6 @@ sub initnode($$$$)
     print "destnodes = $destnodes\n";
     print "testper = $testper\n";
     print "testtype = $testtype\n";
+    print "expid = ".$cmd{expid}."\n";
 }
-
-
-
-
-
-
 
