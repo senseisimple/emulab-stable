@@ -65,6 +65,10 @@ if ($opt{i}) { $impotent = 1; }
 
 if (@ARGV !=0) { exit &usage; }
 
+print "pid/eid = $expid\n";
+print "receiveport = $port\n";
+print "sendport = $sendport\n";
+
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 ##TODO: CHANGE TO "pelab" and "pelab"
 my $DBNAME = "pelab";
@@ -93,9 +97,6 @@ $sel->add($socket_rcv);
 # MAIN LOOP
 #
 
-setcmdport(5052);   #TODO: Parameterize this port number
-setexpid($expid);
-
 while (1) {
 
     #check for pending received events
@@ -120,6 +121,8 @@ sub handleincomingmsgs()
     my @ready = $sel->can_read(1000);
     foreach my $handle (@ready){
 	$socket_rcv->recv( $inmsg, 2048 );
+	chomp $inmsg;
+	print "debug: got a udp message: $inmsg\n" if( $debug > 2 );
 	my %inhash = %{ deserialize_hash( $inmsg )};
 #	foreach my $key (keys %inhash){
 #	    print "key=$key\n";
@@ -132,6 +135,7 @@ sub handleincomingmsgs()
 
 	# if incoming result is not of this expid, return
 	if( $exp_in ne $expid ){
+	    print "ignored msg from expid=$exp_in\n" if( $debug > 2 );
 	    return;
 	}
 
@@ -312,35 +316,3 @@ sub SendBatchedInserts()
 
 
 #############################################################################
-
-#
-# Custom sub to turn a hash into a string. Hashes must not contain
-# the substring of $separator anywhere!!!
-#
-sub serialize_hash($)
-{
-    my ($hashref) = @_;
-    my %hash = %$hashref;
-    my $separator = "::";
-    my $out = "";
-
-    for my $key (keys %hash){
-	$out .= $separator if( $out ne "" );
-	$out .= $key.$separator.$hash{$key};
-    }
-    return $out;
-}
-
-sub deserialize_hash($)
-{
-    my ($string) = @_;
-    my $separator = "::";
-    my %hashout;
-    
-    my @tokens = split( /$separator/, $string );
-
-    for( my $i=0; $i<@tokens; $i+=2 ){
-	$hashout{$tokens[$i]} = $tokens[$i+1];
-    }
-    return \%hashout;
-}
