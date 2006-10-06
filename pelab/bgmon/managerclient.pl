@@ -19,7 +19,7 @@ sub usage
 	" [-l latency period] [-b bandwidth period] [-a]".
         " [-d testduration]".
 	" [-e bgmonExpt]".
-	" [-o outputport] [-L]".
+	" [-p eventSys port] [-L]".
 	" [-f input_file]".
 	" [-c initial_command]".
 	" <list of nodes>\n".
