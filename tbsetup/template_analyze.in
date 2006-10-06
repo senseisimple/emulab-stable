@@ -74,8 +74,8 @@ sub cleanup();
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-use libaudit;
 use libtblog;
+use libaudit;
 use Template;
 
 # In libdb
@@ -182,7 +182,7 @@ foreach my $name (keys(%runlist)) {
     my $idx    = $rowref->{"idx"};
     my $dir    = "$checkout/run${idx}";
     my $subdir = "archive/dbdata";
-    my $tag    = $rowref->{"archive_tag"};
+    my $tag    = $rowref->{"ending_archive_tag"};
     my $dbdump = "$dir/dbdump.gz";
 
     # This could happen if template is still instantiated (last run).

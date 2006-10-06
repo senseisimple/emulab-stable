@@ -254,7 +254,7 @@ if (keys(%runlist)) {
 	my $rowref = $runlist{$name};
 	my $runidx = $rowref->{"idx"};
 	my $dir    = "$checkout/run${runidx}";
-	my $tag    = $rowref->{"archive_tag"};
+	my $tag    = $rowref->{"ending_archive_tag"};
 
 	# This could happen if template still instantiated (last run).
 	next
