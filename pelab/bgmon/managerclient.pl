@@ -19,7 +19,9 @@ sub usage
 	" [-l latency period] [-b bandwidth period] [-a]".
         " [-d testduration]".
 	" [-e bgmonExpt]".
-	" [-o outputport] [-L]   <input_file>\n".
+	" [-o outputport] [-L]".
+	" [-f input_file]".
+	" <list of nodes>\n".
 	"where -a = measure all pairs\n".
 	"      -L = do not init Latency\n".
 	"      -B = do not init bandwidth\n";
@@ -39,7 +41,8 @@ $settings{per_bw} = 0;
 #*****************************************
 
 my %opt = ();
-getopts("i:s:p:o:h:e:d:l:b:aBL", \%opt);
+my $filename_default;
+getopts("i:s:p:o:h:e:d:l:b:f:aBL", \%opt);
 my ($server,$port);
 if ($opt{i}) { $settings{managerID} = $opt{i}; } 
 else { $settings{managerID} = "default"; }
@@ -51,11 +54,16 @@ if ($opt{d}) { $settings{"testduration"} = $opt{d}; }
 if ($opt{a}) { $settings{"allpairs"} = 1; }
 if ($opt{L}) { $settings{"noLatency"} = 1; }
 if ($opt{B}) { $settings{"noBW"} = 1; }
-if (defined($opt{l})) { $settings{per_latency} = $opt{l}; }
-if (defined($opt{b})) { $settings{per_bw} = $opt{b}; }
+if ($opt{l}) { $settings{per_latency} = $opt{l}; }
+if ($opt{b}) { $settings{per_bw} = $opt{b}; }
+if ($opt{f}) { $filename_default = $opt{f}; } else{ $filename_default = ""; }
 
-if (@ARGV != 1) { exit &usage; }
-my $filename_default = $ARGV[0];
+#if (@ARGV != 1) { exit &usage; }
+if( @ARGV > 0 ){
+    foreach my $node (@ARGV){
+	push @expnodes, $node;
+    }
+}
 
 print "bgmonexpt=".$settings{"bgmonexpt"}."\n";
 
@@ -68,18 +76,19 @@ if (!$handle) { die "Unable to register with event system\n"; }
 
 
 
-#read the experiment nodes
-open FILE, "< $filename_default" 
-    or die "can't open file $filename_default";
-while( <FILE> ){
-    chomp;
-#    if( $_ =~ m/plab/ ){ 
-    if( $_ ne "" ){
-	push @expnodes, $_;
-	print "$_\n";
+#read the experiment nodes from a file
+if( $filename_default ne "" ){
+    open FILE, "< $filename_default" 
+	or die "can't open file $filename_default";
+    while( <FILE> ){
+	chomp;
+	if( $_ ne "" ){
+            push @expnodes, $_;
+            print "$_\n";
+        }
     }
+    close FILE;
 }
-close FILE;
 
 
 
