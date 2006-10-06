@@ -21,8 +21,10 @@ sub usage
 	" [-e bgmonExpt]".
 	" [-o outputport] [-L]".
 	" [-f input_file]".
+	" [-c initial_command]".
 	" <list of nodes>\n".
 	"where -a = measure all pairs\n".
+	"      initial_command = \"start\" or \"stop\"\n".
 	"      -L = do not init Latency\n".
 	"      -B = do not init bandwidth\n";
     return 1;
@@ -41,8 +43,8 @@ $settings{per_bw} = 0;
 #*****************************************
 
 my %opt = ();
-my $filename_default;
-getopts("i:s:p:o:h:e:d:l:b:f:aBL", \%opt);
+my ($filename_default, $initCmd);
+getopts("i:s:p:o:e:d:l:b:f:c:aBLh", \%opt);
 my ($server,$port);
 if ($opt{i}) { $settings{managerID} = $opt{i}; } 
 else { $settings{managerID} = "default"; }
@@ -57,6 +59,7 @@ if ($opt{B}) { $settings{"noBW"} = 1; }
 if ($opt{l}) { $settings{per_latency} = $opt{l}; }
 if ($opt{b}) { $settings{per_bw} = $opt{b}; }
 if ($opt{f}) { $filename_default = $opt{f}; } else{ $filename_default = ""; }
+if ($opt{c}) { $initCmd = $opt{c}; } else{ $initCmd = ""; }
 
 #if (@ARGV != 1) { exit &usage; }
 if( @ARGV > 0 ){
@@ -91,6 +94,8 @@ if( $filename_default ne "" ){
 }
 
 
+sub doCmd($);
+
 
 #
 # TODO: ?   How to get list of deadnodes back?
@@ -99,15 +104,35 @@ if( $filename_default ne "" ){
 #
 #MAIN
 #
+
+# handle given command on command-line
+if( $initCmd ne "" ){
+    doCmd($initCmd);
+    exit 0;   #exit
+}
+
+# handle interactive commands
 my $cmd = "";
 while( $cmd ne "q" )
 {
 
 #  TODO: handle Deadnodes
 #    %deadnodes = ();
-    
+    print "> ";
     $cmd = <STDIN>;
     chomp $cmd;
+    doCmd($cmd);
+    
+    #  TODO: re-do outputErrors!!
+    #outputErrors();
+}
+
+
+
+
+sub doCmd($)
+{
+    my ($cmd) = @_;
 
   SWITCH: {
       if( $cmd eq "start" ){ start(); last SWITCH; }
@@ -119,10 +144,9 @@ while( $cmd ne "q" )
       if( $cmd eq "auto"){ setAutoNodes(); last SWITCH; }
       my $nothing = 1;
   }
-    #  TODO: re-do outputErrors!!
-    #outputErrors();
-
 }
+
+
 
 
 #START
