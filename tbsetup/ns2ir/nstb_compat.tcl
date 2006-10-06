@@ -83,6 +83,7 @@ proc tb-set-link-est-bandwidth {srclink args} {}
 proc tb-set-lan-est-bandwidth {lan bw} {}
 proc tb-set-node-lan-est-bandwidth {node lan bw} {}
 proc tb-set-node-plab-role {node role} {}
+proc tb-set-dpdb {onoff} {}
 
 proc tb-set-security-level {level} {
 
