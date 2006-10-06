@@ -206,8 +206,10 @@ sub AuditEnd()
 {
     SendAuditMail(0);
     delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
-    unlink($logfile)
-	if (! ($logonly && $savelog));
+    if (defined($logfile)) {
+	unlink($logfile)
+	    if (! ($logonly && $savelog));
+    }
     return 0;
 }
 
