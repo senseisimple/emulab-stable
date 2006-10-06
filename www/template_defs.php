@@ -542,6 +542,7 @@ class Template
                <th align=center>Archive</th>
                <th align=center>Export</th>
                <th align=center>Replay</th>
+               <th align=center>Load DBs</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -602,6 +603,11 @@ class Template
  		    MakeLink("swapin",
 			     "guid=$guid&version=$vers".
 			     "&replay_instance_idx=$exptidx",
+			     "<img border=0 alt='Show' src='greenball.gif'>");
+
+	    echo " <td align=center>".
+ 		    MakeLink("analyze",
+			     "guid=$guid&version=$vers&exptidx=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 	    echo " </td>
                  </tr>\n";
