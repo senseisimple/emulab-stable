@@ -140,12 +140,12 @@ sub handleincomingmsgs()
 	}
 
 	print "\n" if( $debug > 1 );
-	print("linksrc=$linksrc\n".
+	print("linksrc =$linksrc\n".
 	      "linkdest=$linkdest\n".
-	      "testtype =$testtype\n".
-	      "result=$result\n".
-	      "index=$index\n".
-	      "tstamp=$tstamp\n") if( $debug > 1 );
+	      "testtype=$testtype\n".
+	      "result  =$result\n".
+	      "index   =$index\n".
+	      "tstamp  =$tstamp\n") if( $debug > 1 );
 
 	if( defined $linksrc ){
 	    my $socket_snd = 
@@ -252,6 +252,21 @@ sub saveTestToDB()
 	$dstnode = $nodeids{$results{linkdest}};
     }
 
+    my $testtype = $results{'testtype'};
+    my $result   = $results{'result'};
+    my $tstamp   = $results{'tstamp'};
+    my $latency  = ($testtype eq "latency" ? "$result" : "NULL");
+    my $loss     = ($testtype eq "loss"    ? "$result" : "NULL");
+    my $bw       = ($testtype eq "bw"      ? "$result" : "NULL");
+
+    # TODO: hacky... log "outage" markers of 100% loss
+    if( $testtype eq "outage" && $result eq "down"){
+	$loss = "1";
+	print "     LOSS = 100%\n\n" if( $debug > 2 );
+    }
+
+
+    # Check for valid DB id's.. RETURN from sub if invalid
     if( $srcsite eq "" || $srcnode eq "" || $dstsite eq "" || $dstnode eq "" ){
 	warn "No results matching node id's $results{linksrc} and/or ".
 	    "$results{linkdest}. Results:\n";
@@ -261,12 +276,8 @@ sub saveTestToDB()
 	warn "dstnode=$dstnode\n";
 	return;
     }
-    my $testtype = $results{'testtype'};
-    my $result   = $results{'result'};
-    my $tstamp   = $results{'tstamp'};
-    my $latency  = ($testtype eq "latency" ? "$result" : "NULL");
-    my $loss     = ($testtype eq "loss"    ? "$result" : "NULL");
-    my $bw       = ($testtype eq "bw"      ? "$result" : "NULL");
+   
+    
 
     if ($bw eq "") {
 	my $src = $results{'linksrc'};
