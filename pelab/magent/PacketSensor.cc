@@ -181,7 +181,17 @@ void PacketSensor::localSend(PacketInfo * packet)
           /*
            * Put a dummy packet into the record. We multiply the data size by a
            * constant factor that takes into account the header size for typical
-           * packets. We put the current packet's timestamp on the fake packet.
+           * packets.
+           */
+
+          /* The following is false. This is more common than
+           * expected, and can lead to RTT estimates that are much
+           * lower than reality. Therefore, set the time to Time() and
+           * then avoid such packets when determining the latest time
+           * (and if there are only such packets being acked, then set
+           * ackValid to false. */
+
+          /* We put the current packet's timestamp on the fake packet.
            * This is pretty safe - the worst it can do is slightly
            * underestimate RTT - but, since the current packet is definitely
            * newer, our RTT estimates will almost always use its timestamp. The
@@ -194,7 +204,7 @@ void PacketSensor::localSend(PacketInfo * packet)
           fake.totalLength = static_cast<int>((fake.seqEnd - fake.seqStart)
               * SUPERMAGIC_PACKET_MULTIPLIER);
           fake.fake = true;
-          fake.timestamp = packet->packetTime;
+          fake.timestamp = Time(); //packet->packetTime;
           unacked.push_back(fake);
 
           /*
@@ -234,7 +244,7 @@ void PacketSensor::localAck(PacketInfo * packet)
   // Right now, we don't know whether or not this ACK is for a retransmitted
   // packet - we will find out later
   isRetransmit = false;
-  
+
   // Ignore SYN
   if (packet->tcp->syn) {
       logWrite(SENSOR_DETAIL, "PacketSensor::localAck() Skipping SYN");
@@ -248,7 +258,7 @@ void PacketSensor::localAck(PacketInfo * packet)
       ackValid = false;
       return;
   }
-  
+
   if (state->isAckValid() && state->getState() == StateSensor::ESTABLISHED)
   {
     // Set it to true, and then set it to false if we encounter an error.
@@ -414,7 +424,7 @@ void PacketSensor::localAck(PacketInfo * packet)
       }
 
       list<SentPacket>::iterator lastPacket = unacked.begin();
-      while (lastPacket != unacked.end() && 
+      while (lastPacket != unacked.end() &&
              !lastPacket->inSequenceBlock(range_end)) {
         lastPacket++;
       }
@@ -433,7 +443,7 @@ void PacketSensor::localAck(PacketInfo * packet)
         logWrite(SENSOR_DETAIL, "PacketSensor::localAck(): Range does not "
             "end on packet boundary: %u (%u to %u, tl %u)",
             range_end, lastPacket->seqStart, lastPacket->seqEnd,
-            firstPacket->totalLength);
+            lastPacket->totalLength);
         SentPacket::splitPacket(lastPacket, range_end +1, &unacked);
         split = true;
       }
@@ -456,7 +466,7 @@ void PacketSensor::localAck(PacketInfo * packet)
           continue;
         }
         lastPacket = unacked.begin();
-        while (lastPacket != unacked.end() && 
+        while (lastPacket != unacked.end() &&
                !lastPacket->inSequenceBlock(range_end)) {
           lastPacket++;
         }
@@ -536,6 +546,13 @@ void PacketSensor::localAck(PacketInfo * packet)
         globalSequence.seqStart = unacked.front().seqStart;
         globalSequence.seqEnd = unacked.back().seqEnd;
       }
+    }
+
+    if (ackedSendTime == Time())
+    {
+      logWrite(EXCEPTION, "PacketSensor::localAck() received an ack for only "
+               "artificial packets: declaring ACK invalid");
+      ackValid = false;
     }
 
     logWrite(SENSOR_DETAIL,"PacketSensor::localAck() decided on size %i",
