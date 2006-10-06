@@ -74,7 +74,8 @@ sub usage {
 #*****************************************
 my $pollPer = 0.1;  #number of seconds to sleep between poll loops
 my %MAX_SIMU_TESTS = (latency => "10",
-		      bw      => "1");
+		      bw      => "1",
+		      outage  => "10");
 my $cacheSendRate = 5;  #number of cached results per second
 my %cacheLastSentAt;    #{indx} -> tstamp of last sent cache result
 my $cacheIndxWaitPer = 5; #wait x sec between cache send attempts of same indx
@@ -240,6 +241,10 @@ sub handleincomingmsgs()
 		};
 	    my %results = %{ deserialize_hash($db{$index}) };
 	    print time()." Ack for index $index. Deleting cache entry\n";
+	    print "rcved ACK, but UDP/tstamp not defined\n" 
+		if( !defined $tstamp );
+	    print "rcved ACK, but dbfile/tstamp not defined\n" 
+		if( !defined $results{tstamp} );
 	    delLocalDBEntry($index)
 		if( $tstamp eq $results{tstamp} );
 	}
@@ -408,7 +413,7 @@ while (1) {
 		 "destaddr" => $destaddr,
 		 "testtype" => $testtype,
 		 "result" => $ERRID{timeout},
-		 "tstamp" => $testev->{"tstamp"},
+		 "tstamp" => $testev->{tstamp},
 		 "magic"  => "$magic",
 		 );
 	    #save result to local DB
@@ -447,7 +452,7 @@ while (1) {
 		     "destaddr" => $destaddr,
 		     "testtype" => $testtype,
 		     "result" => $parsedData,
-		     "tstamp" => $testev->{"tstamp"},
+		     "tstamp" => $testev->{tstamp},
 		     "magic"  => "$magic",
 		     "ts_finished" => time()
 		     );
@@ -463,10 +468,11 @@ while (1) {
 		$testev->{"flag_finished"} = 0;
 		$testev->{"flag_scheduled"} = 0;
 
-		#TODO: Outage detection here...
-		#look at latency to determine outage
+		# Check for outage
 		if( $testtype eq "latency" ){
-		    updateOutageState( $testev );
+		    updateOutageState( $destaddr );
+		}elsif( $testtype eq "outage" ){
+		    updateOutageState_lossCheck( $destaddr );
 		}
 	    }
 
@@ -650,8 +656,6 @@ sub spawnTest($$)
 	  
       }elsif( defined $pid ){
 	  #child
-	  #exec 'ls','-l' or die "can't exec: $!\n";
-	  
 	  my $filename = createtmpfilename($linkdest,$testtype);
 
 	  #############################
@@ -670,6 +674,10 @@ sub spawnTest($$)
 	      exec "$workingdir".
 		  "iperf -c $linkdest -t $iperfduration -p $iperfport >$filename"
 		      or die "can't exec: $!";
+	  }elsif( $testtype eq "outage" ){
+	      exec "$workingdir".
+		  "fping -c16 -p250 $linkdest >& $filename"
+		      or die "can't exec: $!\n";
 	  }else{
 	      warn "bad testtype: $testtype";
 	  }
@@ -781,6 +789,21 @@ sub parsedata($$)
 	    $parsed = $ERRID{unknown};
 	}
 #	print "parsed=$parsed\n";
+    }elsif( $type eq "outage" ){
+	print "parsing Outage data\n";
+	if( /loss = \d+\/\d+\/([\d.]+)%/ ){
+	    $parsed = $1;
+	}else{
+	    $parsed = "";
+	}
+	if( defined($parsed) && 
+	    $parsed < 100 )
+	{
+	    $parsed = "lossy";
+	}elsif( $parsed == 100 ){
+	    $parsed = "down";
+	}
+	print "parsed data = $parsed\n";
     }
 	   
     return $parsed;
@@ -935,8 +958,12 @@ state transitions
 
 CurrentState   Input                 NextState
 ----------------------------------------------
-normal         gotErr&PrevSucc       highFreq
+normal         gotErr&PrevSucc       lossCheck
                else                  normal
+lossCheck      pingSucc
+               |  lossCheck=lossy    normal
+               lossCheck=down        highFreq
+               else                  lossCheck
 highFreq       <60sec&ERR            highFreq
                >60sec&ERR            medFreq
                SUCCESS               outageEnd
@@ -950,26 +977,75 @@ outageEnd      <120sec&SUCCESS       outageEnd
                ERR                   highFreq
 =cut
 
+#
+#   CALLED FROM A OUTAGETEST RESULT
+sub updateOutageState_lossCheck($)
+{
+    my ($destaddr) = @_;
+    my $latref = \%{ $testevents{$destaddr}{latency} };
+    my $outref = \%{ $testevents{$destaddr}{outage} };
+    my $curstate = $latref->{outagestate};
+    if( $curstate eq "lossCheck" ){
+	if( $outref->{results_parsed} eq "lossy" ){
+	    # STATE TRANSITION -> normal
+	    # ** but start outageEnd monitoring for a time
+	    # Delete outageManID entry in cmdqueue
+	    #  set period to 0
+	    addCmd( $latref, Cmd->new($outManID,
+				      $outTestFreq{outageEnd},
+				      $outTestDur{outageEnd}) );
+	    $latref->{outagestate} = "normal";
+	    $latref->{outStateTime} = 0;
+	    $latref->{fpingTimeout} = $fpingTimeoutDef;
+	    print "NEW STATE: normal\n";
+	}elsif( $outref->{results_parsed} eq "down" ){
+	    # STATE TRANSITION -> highFreq
+	    addCmd( $latref, Cmd->new($outManID,
+				      $outTestFreq{high},
+				      0) );  #forever, since internally managed
+	    $latref->{outagestate} = "highFreq";
+	    $latref->{outStateTime} = time();
+	    $latref->{fpingTimeout} = $outTestFreq{high}*1000/2;
+	    print "NEW STATE: highFreq\n";
+	}
+    }
+}
+
+#
+#   MUST BE CALLED WITH A $TESTEV POINTING TO A LATENCY TESTTYPE HASH
 sub updateOutageState($)
 {
-    my ($testev) = @_;
+    my ($destaddr) = @_;
+    my $testev = \%{ $testevents{$destaddr}{latency} };
     my $curstate = $testev->{outagestate};
+    my $nextstate = $curstate;
     if( $testev->{results_parsed} > 0 ){
 	#valid result, so note the time that this was seen
 	$testev->{lastValidLatTime} = time();
     }
 
-
     # SWITCH ON "outagestate"
     if( $curstate eq "normal" ){
 	if( isWorkingPathDown($testev) > 0 ){
-	    # STATE TRANSITION -> highFreq
-	    addCmd( $testev, Cmd->new($outManID,
-				      $outTestFreq{high},
-				      0) );  #forever, since internally managed
-	    $curstate = "highFreq";
-	    $testev->{outStateTime} = time();
-	    $testev->{fpingTimeout} = $outTestFreq{high}*1000/2;
+	    # STATE TRANSITION -> lossCheck
+	    $nextstate = "lossCheck";
+	    # run outage check
+	    $testevents{$destaddr}{outage}{testper} = 0;
+	    $testevents{$destaddr}{outage}{timeOfNextRun} = time_all()-1;
+	    $testevents{$destaddr}{outage}{flag_scheduled} = 1;
+	    $testevents{$destaddr}{outage}{pid} = 0;
+	    $testevents{$destaddr}{outage}{flag_finished} =0;
+	    $testevents{$destaddr}{outage}{timedout} = 0;
+	}
+    }elsif( $curstate eq "lossCheck" ){
+	if( isWorkingPathDown($testev) < 0 ){
+	    # STATE TRANSITION -> normal
+	    # Delete outageManID entry in cmdqueue
+	    #  set period to 0
+	    addCmd( $testev, Cmd->new($outManID,0,0) );
+	    $nextstate = "normal";
+	    $testev->{outStateTime} = 0;
+	    $testev->{fpingTimeout} = $fpingTimeoutDef;
 	}
     }elsif( $curstate eq "highFreq" ){
 	if( isWorkingPathDown($testev) > 0 &&
@@ -979,12 +1055,12 @@ sub updateOutageState($)
 	    addCmd( $testev, Cmd->new($outManID,
 				      $outTestFreq{med},
 				      0) );  #forever, since internally managed
-	    $curstate = "medFreq";
+	    $nextstate = "medFreq";
 	    $testev->{outStateTime} = time();
 	    $testev->{fpingTimeout} = $outTestFreq{med}*1000/2;
 	}elsif( isWorkingPathDown($testev) < 0 ){
 	    # STATE TRANSITION -> outageEnd
-	    $curstate = outSetState_outageEnd($testev);
+	    $nextstate = outSetState_outageEnd($testev);
 	}
     }elsif( $curstate eq "medFreq" ){
 	if( isWorkingPathDown($testev) > 0 &&
@@ -994,17 +1070,17 @@ sub updateOutageState($)
 	    addCmd( $testev, Cmd->new($outManID,
 				      $outTestFreq{low},
 				      0) );  #forever, since internally managed
-	    $curstate = "lowFreq";
+	    $nextstate = "lowFreq";
 	    $testev->{outStateTime} = time();
 	    $testev->{fpingTimeout} = $fpingTimeoutDef;
 	}elsif( isWorkingPathDown($testev) < 0 ){
 	    # STATE TRANSITION -> outageEnd
-	    $curstate = outSetState_outageEnd($testev);
+	    $nextstate = outSetState_outageEnd($testev);
 	}
     }elsif( $curstate eq "lowFreq" ){
 	if( isWorkingPathDown($testev) < 0 ){
 	    # STATE TRANSITION -> outageEnd
-	    $curstate = outSetState_outageEnd($testev);
+	    $nextstate = outSetState_outageEnd($testev);
 	}
     }elsif( $curstate eq "outageEnd" ){
 	if( isWorkingPathDown($testev) < 0 &&
@@ -1014,22 +1090,22 @@ sub updateOutageState($)
 	    # Delete outageManID entry in cmdqueue
 	    #  set period to 0
 	    addCmd( $testev, Cmd->new($outManID,0,0) );
-	    $curstate = "normal";
+	    $nextstate = "normal";
 	    $testev->{outStateTime} = 0;
 	    $testev->{fpingTimeout} = $fpingTimeoutDef;
 	}elsif( isWorkingPathDown($testev) > 0 ){
 	    # STATE TRANSITION -> highFreq
-	    $curstate = "highFreq";
+	    $nextstate = "highFreq";
 	    $testev->{outStateTime} = time();
 	    $testev->{fpingTimeout} = $outTestFreq{high}*1000/2;
 	}
     }
 
     # save new state
-    if( $curstate ne $testev->{outagestate} ){
-	print "NEW STATE: $curstate to \n";
+    if( $curstate ne $nextstate ){
+	print "NEW STATE: $nextstate\n";
     }
-    $testev->{outagestate} = $curstate;
+    $testev->{outagestate} = $nextstate;
 }
 
 sub outSetState_outageEnd($)
