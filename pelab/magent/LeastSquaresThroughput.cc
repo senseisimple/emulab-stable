@@ -136,7 +136,10 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
       // line is reflected. So decreasing slope on the reflected-line
       // means that there would have been increasing slope on the
       // original line and therefore increasing delays.
-      if (slope < 0.0)
+
+      // Make sure that the slope isn't being confused by banding at
+      // the millisecond level.
+      if (slope < -0.1)
       {
         // The closest linear approximation indicates that buffers are
         // being filled up, which means that the link was saturated
