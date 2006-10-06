@@ -359,16 +359,16 @@ def receive_characteristic(conn):
     if connection_bandwidth.has_key(dest):
       if int(buf) > connection_bandwidth[dest]:
           connection_bandwidth[dest] = int(buf)
-          set_link(dest, this_ip, 'bandwidth=' + buf)
+          set_link(this_ip, dest, 'bandwidth=' + buf)
       else:
         sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - %i vs %i\n'
                          % (dest,int(buf), connection_bandwidth[dest]))
     else:
       sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - no data\n' % (dest))
-  elif eventType == AUTHORITATIVE_BANDWIDTH:
+  elif eventType == AUTHORITATIVE_BANDWIDTH and int(buf) > 0:
     # We know that the bandwidth has definitely changed. Reset everything.
     connection_bandwidth[dest] = int(buf)
-    set_link(dest, this_ip, 'bandwidth=' + buf)
+    set_link(this_ip, dest, 'bandwidth=' + buf)
   else:
     sys.stdout.write('Other: ' + str(eventType) + ', ' + str(value) + '\n');
   return True
