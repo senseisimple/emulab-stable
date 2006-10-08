@@ -103,8 +103,9 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
     // Calculate throughput.
     logWrite(SENSOR, "LeastSquares: timeTotal: %d, kilobitTotal: %f",
              timeTotal, byteTotal*(8.0/1000.0));
-    double throughputAverage = throughput->getThroughputInKbps(timeTotal,
-                                                               byteTotal);
+    double throughputAverage
+      = TSThroughputSensor::getThroughputInKbps(timeTotal,
+                                                byteTotal);
 
     double num = (numA * numD) - (numB * numC);
     double denom = (denomA * denomD) - (denomB * denomC);

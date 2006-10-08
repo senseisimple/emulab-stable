@@ -14,6 +14,26 @@ class StateSensor;
 class PacketSensor : public Sensor
 {
 public:
+  // An INVALID_REGION indicates that either a period of idleness in
+  // the connection has occurred (all packets have been acked at some
+  // point, and the next ack has not yet been reached). Or a packet
+  // loss has occurred and no ack has yet acked only valid packets.
+
+  // A BEGIN_VALID_REGION indicates the first packet of a region. This
+  // can be used as the starting barrier for difference calculations
+  // in timestamps, for instance. This is set on the first valid ack
+  // packet. On the next packet, the state is changed to VALID_REGION
+
+  // A VALID_REGION indicates that this packet represents a packet in
+  // the stream when no funny business with packet loss or connection
+  // idleness has been detected.
+  enum RegionState
+  {
+    INVALID_REGION,
+    BEGIN_VALID_REGION,
+    VALID_REGION
+  };
+public:
   PacketSensor(StateSensor const * newState);
   // Get the size of the acknowledgement in bytes.
   int getAckedSize(void) const;
@@ -21,6 +41,7 @@ public:
   bool getIsRetransmit(void) const;
   // Get the time of the last packet sent which was acked.
   Time const & getAckedSendTime(void) const;
+  RegionState getRegionState(void) const;
 protected:
   virtual void localSend(PacketInfo * packet);
   virtual void localAck(PacketInfo * packet);
@@ -55,7 +76,7 @@ private:
   /*
    * We use this to keep track of the ranges being ACKed and SACKed
    */
-  struct Range 
+  struct Range
   {
     Range(unsigned int, unsigned int, bool);
     unsigned int start;
@@ -68,6 +89,8 @@ private:
   Time ackedSendTime;
   SentPacket globalSequence;
   bool isRetransmit;
+  RegionState currentRegionState;
+  Time lastAckTime;
 
   StateSensor const * state;
 

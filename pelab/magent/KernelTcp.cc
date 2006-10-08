@@ -5,6 +5,8 @@
 #include "KernelTcp.h"
 #include "Command.h"
 
+#include "TSThroughputSensor.h"
+
 using namespace std;
 
 namespace
@@ -36,6 +38,8 @@ KernelTcp::KernelTcp()
   , receiveBufferSize(0)
   , maxSegmentSize(0)
   , useNagles(1)
+  , debugPrevTime(getCurrentTime())
+  , debugByteCount(0)
 {
 }
 
@@ -229,6 +233,21 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
         {
           logWrite(CONNECTION_MODEL,"Buffer is full");
           result.bufferFull = true;
+
+          Time currentTime = getCurrentTime();
+          uint32_t timeTotal = (currentTime - debugPrevTime).toMilliseconds();
+          if (debugByteCount > 0 && timeTotal > 0)
+          {
+            logWrite(CONNECTION_MODEL,
+                     "Load estimate: %d kbps, %d kilobits, %d millis",
+                     TSThroughputSensor::getThroughputInKbps(timeTotal,
+                                                             debugByteCount),
+                     debugByteCount, timeTotal);
+            debugPrevTime = currentTime;
+            debugByteCount = 0;
+          }
+
+          // XXX This doesn't make sense. We know that error is -1.
           // No point in trying more writes
           return bytesWritten + error;
         }
@@ -240,7 +259,9 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
       }
       else
       {
+        debugByteCount += error;
         // Write succeeded, all bytes got written
+        // XXX Shouldn't this be error?
         bytesWritten += bytesToWrite;
       }
     }

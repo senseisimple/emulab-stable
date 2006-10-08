@@ -31,6 +31,9 @@ private:
   int maxSegmentSize;
   int useNagles;
   static const int MAX_WRITESIZE;
+private:
+  Time debugPrevTime;
+  int debugByteCount;
 public:
   static pcap_t * pcapDescriptor;
   static int pcapfd;

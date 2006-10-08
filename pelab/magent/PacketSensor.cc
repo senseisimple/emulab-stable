@@ -13,6 +13,8 @@ PacketSensor::PacketSensor(StateSensor const * newState)
   ackedSize = 0;
   ackedSendTime = Time();
   isRetransmit = false;
+  currentRegionState = INVALID_REGION;
+  lastAckTime = Time();
 }
 
 int PacketSensor::getAckedSize(void) const
@@ -59,8 +61,28 @@ Time const & PacketSensor::getAckedSendTime(void) const
   }
 }
 
+PacketSensor::RegionState PacketSensor::getRegionState(void) const
+{
+  if (ackValid || sendValid)
+  {
+    return currentRegionState;
+  }
+  else
+  {
+    logWrite(ERROR,
+             "PacketSensor::getRegionState() called "
+             "with invalid ack or send data");
+    return INVALID_REGION;
+  }
+}
+
 void PacketSensor::localSend(PacketInfo * packet)
 {
+  ackValid = false;
+  if (currentRegionState == BEGIN_VALID_REGION)
+  {
+    currentRegionState = VALID_REGION;
+  }
   /*
    * Check for window scaling, which is not supported yet by this code. This
    * option is only legal on SACK packets. If we decide to support window
@@ -99,7 +121,6 @@ void PacketSensor::localSend(PacketInfo * packet)
   }
 
   // Assume this packet is not a retransmit unless proven otherwise
-  ackValid = true;
   isRetransmit = false;
   if (state->isSendValid() && state->getState() == StateSensor::ESTABLISHED)
   {
@@ -159,6 +180,13 @@ void PacketSensor::localSend(PacketInfo * packet)
       {
         globalSequence.seqStart = record.seqStart;
         globalSequence.seqEnd = record.seqEnd;
+        if (packet->packetTime > lastAckTime)
+        {
+          // Only invalidate if this packet happened after the last
+          // ack packet. This is necessary because of the re-ordering
+          // problem.
+          currentRegionState = INVALID_REGION;
+        }
       }
       else
       {
@@ -241,6 +269,11 @@ void PacketSensor::localSend(PacketInfo * packet)
 void PacketSensor::localAck(PacketInfo * packet)
 {
   sendValid = false;
+  lastAckTime = packet->packetTime;
+  if (currentRegionState == BEGIN_VALID_REGION)
+  {
+    currentRegionState = VALID_REGION;
+  }
   // Right now, we don't know whether or not this ACK is for a retransmitted
   // packet - we will find out later
   isRetransmit = false;
@@ -366,6 +399,7 @@ void PacketSensor::localAck(PacketInfo * packet)
      */
     ackedSize = 0;
     ackedSendTime = Time();
+    bool isRegionValid = true;
     rangelist::iterator range;
     for (range = ranges.begin(); range != ranges.end(); range++) {
       uint32_t range_start = range->start;
@@ -405,6 +439,7 @@ void PacketSensor::localAck(PacketInfo * packet)
 
       if (firstPacket == unacked.end()) {
         logWrite(ERROR, "Range starts in unknown packet");
+        isRegionValid = false;
         ackValid = false;
         break;
       }
@@ -518,6 +553,16 @@ void PacketSensor::localAck(PacketInfo * packet)
           ackedSendTime = pos->timestamp;
         }
 
+        /*
+         * If any of the packets are fake, that means that there have
+         * been some packets dropped by libpcap. This means, that we
+         * know that it is invalid.
+         */
+        if (pos->fake)
+        {
+          isRegionValid = false;
+        }
+
         if (pos == lastPacket) {
           break;
         } else {
@@ -540,12 +585,31 @@ void PacketSensor::localAck(PacketInfo * packet)
       {
         globalSequence.seqStart = 0;
         globalSequence.seqEnd = 0;
+        // We don't want to start in INVALID_REGION yet. Since some
+        // packets are re-ordered, we may have gotten all available
+        // acks, but not the sends which were actually earlier.
       }
       else
       {
         globalSequence.seqStart = unacked.front().seqStart;
         globalSequence.seqEnd = unacked.back().seqEnd;
       }
+    }
+
+    if (isRegionValid)
+    {
+      if (currentRegionState == INVALID_REGION)
+      {
+        currentRegionState = BEGIN_VALID_REGION;
+      }
+      else
+      {
+        currentRegionState = VALID_REGION;
+      }
+    }
+    else
+    {
+      currentRegionState = INVALID_REGION;
     }
 
     if (ackedSendTime == Time())

@@ -48,7 +48,10 @@ void DelaySensor::localAck(PacketInfo * packet)
    */
   if (state->isAckValid() && packetHistory->isAckValid()
       && !packetHistory->getIsRetransmit()
-      && state->getState() == StateSensor::ESTABLISHED)
+      && state->getState() == StateSensor::ESTABLISHED
+      && (packetHistory->getRegionState() == PacketSensor::VALID_REGION
+          || packetHistory->getRegionState()
+                  == PacketSensor::BEGIN_VALID_REGION))
   {
     Time diff = packet->packetTime - packetHistory->getAckedSendTime();
     lastDelay = diff.toMilliseconds();

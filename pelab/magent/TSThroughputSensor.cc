@@ -30,7 +30,7 @@ int TSThroughputSensor::getThroughputInKbps(void) const
 }
 
 int TSThroughputSensor::getThroughputInKbps(uint32_t period,
-                                            int byteCount) const
+                                            int byteCount)
 {
   double kilobits = byteCount * (8.0/1000.0);
   int result = 0;
@@ -87,8 +87,15 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
 {
   sendValid = false;
   if (state->isAckValid() && packetHistory->isAckValid() &&
-      state->getState() == StateSensor::ESTABLISHED)
+      state->getState() == StateSensor::ESTABLISHED
+      && (packetHistory->getRegionState() == PacketSensor::VALID_REGION
+          || packetHistory->getRegionState()
+                  == PacketSensor::BEGIN_VALID_REGION))
   {
+    if (packetHistory->getRegionState() == PacketSensor::BEGIN_VALID_REGION)
+    {
+      lastAckTS = 0;
+    }
     /*
      * Find the time the other end of this connection says it sent this
      * ACK
@@ -101,7 +108,7 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
      */
     if (currentAckTS == 0) {
       logWrite(ERROR,"TSThroughputSensor::localAck() got a packet without a "
-                     "timestamp");
+               "timestamp");
       ackValid = false;
       lastPeriod = 1;
       lastByteCount = 0;
@@ -111,7 +118,7 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
 
     if (lastAckTS != 0 && currentAckTS < lastAckTS) {
       logWrite(ERROR,"TSThroughputSensor::localAck() got timestamps in reverse "
-                     "order: o=%u,n=%u",lastAckTS,currentAckTS);
+               "order: o=%u,n=%u",lastAckTS,currentAckTS);
       ackValid = false;
       lastPeriod = 1;
       lastByteCount = 0;
@@ -136,8 +143,8 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
         ackValid = false;
         deferredBytes += packetHistory->getAckedSize();
         logWrite(SENSOR, "TSThroughputSensor::localAck() deferring %i bytes "
-                         "due to zero period (%i total)",
-                         packetHistory->getAckedSize(), deferredBytes);
+                 "due to zero period (%i total)",
+                 packetHistory->getAckedSize(), deferredBytes);
       } else {
         ackValid = true;
         /*
@@ -149,8 +156,8 @@ void TSThroughputSensor::localAck(PacketInfo * packet)
         lastPeriod = period;
         lastByteCount = packetHistory->getAckedSize() + deferredBytes;
         logWrite(SENSOR, "TSTHROUGHPUT: %d kbps (period=%i,kbits=%f,deferred=%f)",
-            getThroughputInKbps(), lastPeriod, lastByteCount*(8.0/1000.0),
-            deferredBytes*(8.0/1000));
+                 getThroughputInKbps(), lastPeriod, lastByteCount*(8.0/1000.0),
+                 deferredBytes*(8.0/1000));
         deferredBytes = 0;
       }
     }

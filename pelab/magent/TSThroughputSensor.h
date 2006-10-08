@@ -24,7 +24,7 @@ public:
   TSThroughputSensor(PacketSensor const * newPacketHistory,
                    StateSensor const * newState);
   int getThroughputInKbps(void) const;
-  int getThroughputInKbps(uint32_t period, int byteCount) const;
+  static int getThroughputInKbps(uint32_t period, int byteCount);
   uint32_t getLastPeriod(void) const;
   int getLastByteCount(void) const;
 protected:
