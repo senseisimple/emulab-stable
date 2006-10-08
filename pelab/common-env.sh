@@ -237,8 +237,19 @@ barrier_wait()
         sync_timeout $SYNCTIMO $SYNC -n $BARRIER -i $WAITERS
 	_rval=$?
     else
-        $SYNC -n $BARRIER 
-	_rval=$?
+	#
+	# XXX on planetlab, lookup of the syncserver name can
+	# fail transiently.  Try a couple more times, waiting in between.
+	#
+	for i in 1 2 3; do
+	    $SYNC -n $BARRIER 
+	    _rval=$?
+	    if [ $_rval -ne 68 ]; then
+	        break
+	    fi
+	    echo "sync on $BARRIER failed, trying again..."
+	    sleep 10
+	done
     fi
 
     return $_rval
