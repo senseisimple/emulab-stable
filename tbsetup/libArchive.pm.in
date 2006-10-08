@@ -88,9 +88,11 @@ sub mysystem($)
 
     print STDERR "Running '$command'\n"
 	if ($debug);
-    system($command);
+    my $retval = system($command);
     $ENV{'TMPDIR'} = $tmpdir
 	if (defined($tmpdir));
+
+    return $retval;
 }
 
 # Another little helper for scripts that include this library.
