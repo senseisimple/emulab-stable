@@ -66,7 +66,6 @@ my $TAGTYPE_INTERNAL  = "internal";
 #
 umask(0002);
 
-
 # On or off
 sub doarchiving($)
 {
@@ -83,9 +82,15 @@ sub mysystem($)
 {
     my ($command) = @_;
 
+    # Need a big TMPDIR for svn stuff.
+    my $tmpdir = $ENV{'TMPDIR'};
+    $ENV{'TMPDIR'} = "/usr/testbed/tmp";
+
     print STDERR "Running '$command'\n"
 	if ($debug);
     system($command);
+    $ENV{'TMPDIR'} = $tmpdir
+	if (defined($tmpdir));
 }
 
 # Another little helper for scripts that include this library.
