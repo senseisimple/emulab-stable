@@ -793,7 +793,7 @@ REPLACE INTO table_regex VALUES ('virt_parameters','pid','text','redirect','proj
 REPLACE INTO table_regex VALUES ('virt_parameters','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_parameters','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_parameters','value','text','redirect','default:tinytext',0,256,NULL);
-REPLACE INTO table_regex VALUES ('virt_parameters','description','text','redirect','default:text',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_parameters','description','text','redirect','experiment_templates:description',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_instance_bindings','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_instance_bindings','value','text','redirect','default:tinytext',0,256,NULL);
 REPLACE INTO table_regex VALUES ('experiment_runs','runid','text','redirect','experiments:eid',0,0,NULL);
