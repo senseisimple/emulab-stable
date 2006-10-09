@@ -84,7 +84,7 @@ def main_loop():
   # Initialize
   read_args()
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+#  conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
   sys.stdout.write("stub_ip is " + stub_ip + ":" + str(stub_port) + "\n")
   sys.stdout.flush()
   conn.connect((stub_ip, stub_port))
