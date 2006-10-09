@@ -395,6 +395,7 @@ if {$USE_DBMONITOR} {
     set dbmonitor [new Program $ns]
     $dbmonitor set node "ops"
     $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl -i $DBMONITOR_INTERVAL $pid $eid"
+    $dbmonitor set expected-exit-code $ecode
     set monitorlist $dbmonitor
 }
 
