@@ -1743,6 +1743,7 @@ sub template($)      { return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
 
 # The path is the path of the experiment.
 sub path($)    { return TBExptUserDir($_[0]->pid(), $_[0]->eid()); }
+sub workdir($) { return TBExptWorkDir($_[0]->pid(), $_[0]->eid()); }
 
 #
 # Stringify for output.

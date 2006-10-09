@@ -77,6 +77,7 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
+my $PARAMS      = "parameters.xml";
 
 # Locals
 my $user_name;
@@ -293,6 +294,10 @@ if (defined($paramfile)) {
     # User sees this error.
     exit(1)
 	if ($donebad);
+    
+    # Save away for later since returning to web interface deletes it.
+    system("/bin/cp", $paramfile, $instance->workdir() . "/$PARAMS") == 0
+	or fatal(-1, "Could not save $paramfile to workdir");
 }
 
 #
@@ -490,6 +495,20 @@ if ($doswapmod) {
     print "Writing program agent info ...\n";
     $instance->WriteProgramAgents() == 0
 	or fatal(-1, "Could not write program agent info");
+}
+
+#
+# Now we stash the parameter file for the next version of the archive.
+#
+if (defined($paramfile)) {
+    my $source = $instance->workdir() . "/$PARAMS";
+    my $target = $instance->path() . "/archive/$PARAMS";
+
+    unlink($target)
+	if (-e $target);
+    
+    system("/bin/cp", $source, $target) == 0
+	or fatal(-1, "Could not copy $source to $target");
 }
 
 #
