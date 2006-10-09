@@ -52,10 +52,12 @@ sub usage()
     exit(1);
 }
 
-my $optlist  = "ndi:prs1S:U";
+my $optlist  = "b:ndi:l:prs1S:U";
 my $showonly = 0;
 my $debug = 0;
 my $interval = (1 * 60);
+my $latinterval = $interval;
+my $bwinterval = (10 * 60);
 my $verbose = 1;
 my $onceonly = 0;
 my $starttime = 0;
@@ -75,6 +77,23 @@ my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
 
 #
+# Check the environment for default interval settings
+#
+if (exists($ENV{DBMONITOR_INTERVAL}) &&
+    $ENV{DBMONITOR_INTERVAL} > 0) {
+    $interval = int($ENV{DBMONITOR_INTERVAL});
+}
+if (exists($ENV{DBMONITOR_LATINTERVAL}) &&
+    $ENV{DBMONITOR_LATINTERVAL} > 0) {
+    $latinterval = int($ENV{DBMONITOR_LATINTERVAL});
+}
+if (exists($ENV{DBMONITOR_BWINTERVAL}) &&
+    $ENV{DBMONITOR_BWINTERVAL} > 0) {
+    $bwinterval = int($ENV{DBMONITOR_BWINTERVAL});
+}
+
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
@@ -90,6 +109,12 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"i"})) {
     $interval = int($options{"i"});
+}
+if (defined($options{"b"})) {
+    $bwinterval = int($options{"b"});
+}
+if (defined($options{"l"})) {
+    $latinterval = int($options{"l"});
 }
 # XXX compat: ignore -p option
 if (defined($options{"p"})) {
@@ -123,6 +148,21 @@ if (@ARGV != 2) {
     usage();
 }
 my ($pid,$eid) = @ARGV;
+
+if ($interval < 1 || $latinterval < 1 || $bwinterval < 1) {
+    print STDERR "Bad interval value $interval/$latinterval/$bwinterval\n";
+    exit(1);
+}
+
+#
+# Run interval is the smaller of the desired latency and BW intervals.
+#
+if ($latinterval < $interval) {
+    $interval = $latinterval;
+}
+if ($bwinterval < $interval) {
+    $interval = $bwinterval;
+}
 
 # Get DB password and connect.
 my $DBPWD   = `cat $PWDFILE`;
@@ -273,7 +313,6 @@ logmsg($msg);
 # multiple of the update interval, no less than 1 minute.
 #
 if ($tweakbgmon) {
-    $bgmon_interval = $interval;
     $bgmon_update = int(60 / $interval + 0.5);
     $bgmon_update = 1 if ($bgmon_update == 0);
 }
@@ -288,21 +327,12 @@ while (1) {
     my $elapsed = time() - $startat;
     if ($tweakbgmon && ($intervals % $bgmon_update) == 0) {
 	# XXX +60 to ensure overlap
-	my $duration = $interval * $bgmon_update + 60;
-
-	#
-	# For bandwidth we don't go lower than <# of nodes> * 30 seconds;
-	# e.g., 10 minutes for 20 nodes.
-	#
-	my $bwinterval = scalar(@bgmon_nodes) * 30;
-	if ($bwinterval < $interval) {
-	    $bwinterval = $interval;
-	}
+	my $duration = $latinterval * $bgmon_update + 60;
 
 	logmsg("==== Set DB update lat_freq/bw_freq/duration to ".
 	       "$interval/$bwinterval/$duration at +$elapsed\n");
 
-	bgmon_update($interval, $bwinterval, $duration);
+	bgmon_update($latinterval, $bwinterval, $duration);
     }
     logmsg("==== DB check at +$elapsed\n");
     if (get_plabinfo($me, @them) && !$showonly) {
