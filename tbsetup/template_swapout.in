@@ -175,7 +175,7 @@ if (!defined($experiment)) {
 # Check for cancel.
 if (! $batchmode) {
     if ($experiment->state() eq EXPTSTATE_ACTIVATING) {
-	system("$swapexp -s out $pid $eid");
+	system("$swapexp -x -s out $pid $eid");
 	exit($? >> 8);
     }
 }
