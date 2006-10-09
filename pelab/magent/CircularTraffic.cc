@@ -31,16 +31,22 @@ Time CircularTraffic::addWrite(TrafficWriteCommand const & newWrite,
                                Time const & deadline)
 {
   Time now = getCurrentTime();
-  writes.push_back(newWrite);
-  writes.back().localTime = now;
-  // XXX: end() is not necessarily a constant value. Though this
-  // should work, if there is erratic behaviour, here is a good place
-  // to check.
-  if (current == writes.end())
+  if (! writes.empty() && newWrite.delta == 0)
   {
-    current = writes.begin();
+    writes.back().size += newWrite.size;
   }
-
+  else
+  {
+    writes.push_back(newWrite);
+    writes.back().localTime = now;
+    // XXX: end() is not necessarily a constant value. Though this
+    // should work, if there is erratic behaviour, here is a good place
+    // to check.
+    if (current == writes.end())
+    {
+      current = writes.begin();
+    }
+  }
   if (deadline == Time())
   {
     // If there is no current deadline, return the next one.

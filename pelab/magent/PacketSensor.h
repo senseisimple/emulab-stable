@@ -29,9 +29,9 @@ public:
   // idleness has been detected.
   enum RegionState
   {
-    INVALID_REGION,
-    BEGIN_VALID_REGION,
-    VALID_REGION
+    INVALID_REGION = 0,
+    BEGIN_VALID_REGION = 1,
+    VALID_REGION = 2
   };
 public:
   PacketSensor(StateSensor const * newState);

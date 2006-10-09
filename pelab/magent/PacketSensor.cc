@@ -630,6 +630,7 @@ void PacketSensor::localAck(PacketInfo * packet)
   {
     ackValid = false;
   }
+  logWrite(SENSOR, "REGION: %d", currentRegionState);
 }
 
 bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
