@@ -347,7 +347,9 @@ if ($expstate) {
 			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVATING) {
-		WRITESUBMENUBUTTON("Cancel Experiment Swapin",
+		WRITESUBMENUBUTTON(($instance ?
+				   "Cancel Template Instantiation" :
+  				   "Cancel Experiment Swapin"),
 				   "swapexp.php3?inout=out".
 				   "&pid=$exp_pid&eid=$exp_eid");
 	    }
