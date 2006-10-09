@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -22,6 +22,16 @@ $clause      = 0;
 $having      = "";
 $active      = 0;
 $idle        = 0;
+
+function MakeMouseOver($string)
+{
+    $string = ereg_replace("\n", "<br>", $string);
+    $string = ereg_replace("\r", "", $string);
+    $string = htmlentities($string);
+    $string = preg_replace("/\'/", "\&\#039;", $string);
+
+    return "onmouseover=\"return escape('$string')\"";
+}
 
 #
 # Hack for NSDI deadline. Generalize later.
@@ -303,6 +313,7 @@ Include idle-ignore experiments</a></center></p><br />\n";
     # 
     $total_usage  = array();
     $perexp_usage = array();
+    $perexp_types = array();
 
     #
     # Geta all the classes of nodes each experiment is using, and create
@@ -324,6 +335,26 @@ Include idle-ignore experiments</a></center></p><br />\n";
 	$count = $row[3];
 	
 	$perexp_usage["$pid:$eid"][$class] = $count;
+    }
+
+    #
+    # Geta all the types of nodes each experiment is using, and create
+    # a two-D array with their counts.
+    # 
+    $usage_query =
+	DBQueryFatal("select r.pid,r.eid,n.type, ".
+		     "  count(n.type) as ncount ".
+		     "from reserved as r ".
+		     "left join nodes as n on r.node_id=n.node_id ".
+		     "group by r.pid,r.eid,n.type");
+
+    while ($row = mysql_fetch_array($usage_query)) {
+	$pid   = $row[0];
+	$eid   = $row[1];
+	$type  = $row[2];
+	$count = $row[3];
+	
+	$perexp_types["$pid:$eid"][$type] = $count;
     }
 
     #
@@ -578,7 +609,6 @@ if ($thumb && !$idle) {
 		    $pcs = $count;
 		}
 
-
 		# Summary counts for just the experiments in the projects
 		# the user is a member of.
 		if (!isset($total_usage[$class]))
@@ -586,6 +616,24 @@ if ($thumb && !$idle) {
 			
 		$total_usage[$class] += $count;
 	    }
+	}
+
+	$onmouseover = "";
+	reset($perexp_types);
+	if (isset($perexp_types["$pid:$eid"])) {
+	    $mouseover  = "<table align=center ";
+	    $mouseover .= " cellpadding=2 cellspacing=2 border=2> ";
+	    $mouseover .= "<tr><th>Node Type</th><th>Count</th></tr> ";
+
+	    while (list ($type, $count) = each($perexp_types["$pid:$eid"])) {
+		$mouseover .= "<tr><td class=pad4>$type</td>";
+		$mouseover .= "    <td class=pad4>$count</td></tr> ";
+
+	    }
+	    $mouseover .= "</table>";
+	    $onmouseover  = "onmouseover=\"this.T_WIDTH=175; ";
+	    $onmouseover .= "this.T_FONTSIZE='16px'; this.T_OFFSETX=0; ";
+	    $onmouseover .= "return escape('$mouseover')\"";
 	}
 
 	# in idle or active, skip experiments with no nodes.
@@ -600,13 +648,13 @@ if ($thumb && !$idle) {
 	if ($isidle && !$ignore) { $nodes = $nodes.$idlemark; }
 	# If multiple classes, then hightlight the number and show pcs/nodes.
 	if ($special) {
+	    echo "<td nowrap $onmouseover><font color=red>$nodes</font>";
 	    if ($pcs)
-		echo "<td nowrap><font color=red>$nodes</font> ($pcs)</td>\n";
-	    else
-		echo "<td nowrap><font color=red>$nodes</font></td>\n";
+		echo " ($pcs)";
+	    echo "</td>\n";	    
 	}
 	else
-            echo "<td>$nodes</td>\n";
+            echo "<td $onmouseover>$nodes</td>\n";
 
 	if ($idletime == -1) {
 	    $idlestr = "&nbsp;";
