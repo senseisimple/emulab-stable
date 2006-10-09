@@ -47,10 +47,10 @@ if (system "$TEVC -e $pid/$eid now monitorgroup stop") {
 # Stop link tracing
 #
 print "##### Stopping link tracing\n";
-if (system "$TEVC -e $pid/$eid now planetc-tracemon snapshot") {
+if (system "$TEVC -e $pid/$eid now planet-tracemon snapshot") {
     die "Error running tevc\n";
 }
-if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
+if (system "$TEVC -e $pid/$eid now planet-tracemon stop") {
     die "Error running tevc\n";
 }
 if (system "$TEVC -e $pid/$eid now plabc-tracemon snapshot") {
