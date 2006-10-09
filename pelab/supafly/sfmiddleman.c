@@ -306,6 +306,8 @@ int main(int argc,char **argv) {
 		 * we read what we can when we can...
 		 */
 
+		//printf("going for another read\n");
+
 		retval = read(send_client_fd,
 			      &buf[current_send_rc],
 			      block_size - current_send_rc);
@@ -327,6 +329,23 @@ int main(int argc,char **argv) {
 		    }
 		    else if (errno == EAGAIN) {
 			// ignore, doh
+			//ewarn("while reading");
+		    }
+		    else {
+			//ewarn("unexpected while reading");
+		    }
+		}
+		else if (retval == 0) {
+		    /* dead sender */
+		    close(send_client_fd);
+		    FD_CLR(send_client_fd,&static_rfds);
+		    send_client_fd = -1;
+		    
+		    current_send_rc = 0;
+
+		    if (debug > 1) {
+			fprintf(stderr,
+				"DEBUG: (send client!) disconnect!\n");
 		    }
 		}
 		else {

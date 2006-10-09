@@ -137,6 +137,10 @@ int main(int argc,char **argv) {
 		    ewarn("weird");
 		}
 	    }
+	    else if (retval == 0) {
+		/* middleman dumped out */
+		efatal("middleman appears to have disappeared");
+	    }
 	    else {
 		bytesRead += retval;
 	    }
