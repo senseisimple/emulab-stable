@@ -104,7 +104,7 @@ $ns define-template-parameter PLABNODES {} \
  NOTE: You can get a list of node IDs and sites at:\
      https://www.emulab.net/nodecontrol_list.php3?showtype=widearea }
 # Example node list
-#set PLABNODES {plab179 pab614 plab588 plab305 plab259}
+#set PLABNODES {plab518 plab541 plab628 plab736 plab360}
 
 #
 # Where to grab your tarball of pelab software from. To make this tarball:
@@ -210,6 +210,14 @@ $ns define-template-parameter USE_DBMONITOR $val \
  (rather than the application monitor) to control the cloud shaping. }
 
 #
+# If dbmonitor is set, this is the interval in seconds at which to poll the DB
+# and potentially update the shaping characteristics
+#
+$ns define-template-parameter DBMONITOR_INTERVAL 10 \
+{If USE_DBMONITOR is non-zero, the interval in seconds at which to poll\
+ the DB to check for path characteristic changes. }
+
+#
 # If non-zero, limits the number of slots in the queues for the fake PlanetLab
 #
 $ns define-template-parameter LIMIT_FAKE_QUEUE_SLOTS 0 \
@@ -237,6 +245,9 @@ if {$NO_PLAB} {
 
 # End of user-settable options
 ##########
+
+set pid ${GLOBALS::pid}
+set eid ${GLOBALS::eid}
 
 set delay_os FBSD54-DNODE
 
@@ -275,7 +286,9 @@ if {$USE_MAGENT} {
 } else {
     set stubcommand "/bin/sh /local/pelab/stub/auto-stub.sh"
 }
-if {$USE_DBMONITOR} {
+
+# we don't run dbmonitor on the nodes anymore
+if {0 && $USE_DBMONITOR} {
     set moncommand "$elabshell /local/pelab/dbmonitor/auto-dbmonitor.sh"
 } else {
     set moncommand "$elabshell /local/pelab/monitor/auto-monitor.sh --stub-port=$stub_command_port"
@@ -373,6 +386,16 @@ for {set i 1} {$i <= $NUM_PCS} {incr i} {
     if {[llength $PLABNODES] > 0} {
         set opt(pelab-elab-$i-mapping) [lindex $PLABNODES [expr $i - 1]]
     }
+}
+
+#
+# Run the DB monitor on ops
+#
+if {$USE_DBMONITOR} {
+    set dbmonitor [new Program $ns]
+    $dbmonitor set node "ops"
+    $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl -i $DBMONITOR_INTERVAL $pid $eid"
+    set monitorlist $dbmonitor
 }
 
 #
@@ -477,9 +500,7 @@ if {$FAKE_PLAB} {
     tb-set-ip-link $prouter $internet 192.168.254.2
 }
 
-set pid ${GLOBALS::pid}
-set eid ${GLOBALS::eid}
-
+# for one-off ops commands
 set opsagent [new Program $ns]
 $opsagent set node "ops"
 $opsagent set command "/bin/true"
@@ -493,13 +514,15 @@ $opsagent set command "/bin/true"
 #
 # Build up the event sequences to start and stop an actual run.
 #
-if {$REAL_PLAB} {
+if {$NO_PLAB || $REAL_PLAB} {
   set start [$ns event-sequence]
     $start append "$ns log \"Starting REAL plab experiment\""
 
     # stop stubs and monitors
     $start append "$ns log \"##### Stopping stubs and monitors...\""
-    $start append "$planetstubs stop"
+    if {$REAL_PLAB} {
+	$start append "$planetstubs stop"
+    }
     $start append "$monitorgroup stop"
 
     # stop servers
@@ -523,18 +546,22 @@ if {$REAL_PLAB} {
     $start append "$elabc clear"
     $start append "$elabc reset"
 
-    # distinguish between real/fake runs
-    # XXX I'm thinkin...we can do better than this!
-    $start append "$opsagent run -command \"cp /dev/null /proj/$pid/exp/$eid/tmp/REAL_PLAB\""
+    if {$REAL_PLAB} {
+	# distinguish between real/fake runs
+	# XXX I'm thinkin...we can do better than this!
+	$start append "$opsagent run -command \"cp /dev/null /proj/$pid/exp/$eid/tmp/real_plab\""
 
-    # save off node list
-    $start append "$ns log \"##### Creating node list...\""
-    $start append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
+	# save off node list
+	$start append "$ns log \"##### Creating node list...\""
+	$start append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
 
-    # initialize path characteristics
-    $start append "$ns log \"##### Initialize emulation node path characteristics...\""
-    $start append "$elabc create"
-    $start append "$opsagent run -command \"/usr/testbed/bin/init-elabnodes.pl  -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid\""
+	# initialize path characteristics
+	$start append "$ns log \"##### Initialize emulation node path characteristics...\""
+	$start append "$elabc create"
+	$start append "$opsagent run -command \"/usr/testbed/bin/init-elabnodes.pl  -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid\""
+    } else {
+	$start append "$elabc create"
+    }
 
     # restart link tracing
     # XXX cleanlogs has unlinked the current trace log, so we have to
@@ -551,7 +578,9 @@ if {$REAL_PLAB} {
 
     # restart stubs and monitors
     $start append "$ns log \"##### Starting stubs and monitors...\""
-    $start append "$planetstubs start"
+    if {$REAL_PLAB} {
+	$start append "$planetstubs start"
+    }
     $start append "$monitorgroup start"
 
     # gather up the data and inform the user
@@ -564,7 +593,9 @@ if {$REAL_PLAB} {
 
     # stop stubs and monitors
     $stop append "$ns log \"##### Stopping stubs and monitors...\""
-    $stop append "$planetstubs stop"
+    if {$REAL_PLAB} {
+	$stop append "$planetstubs stop"
+    }
     $stop append "$monitorgroup stop"
 
     # stop servers
@@ -625,7 +656,7 @@ if {$FAKE_PLAB} {
 
     # distinguish between real/fake runs
     # XXX I'm thinkin...we can do better than this!
-    $start_fake append "$opsagent run -command \"rm -f /proj/$pid/exp/$eid/tmp/REAL_PLAB\""
+    $start_fake append "$opsagent run -command \"rm -f /proj/$pid/exp/$eid/tmp/real_plab\""
 
     # save off node list
     $start_fake append "$ns log \"##### Creating node list...\""
@@ -696,7 +727,7 @@ if {$FAKE_PLAB} {
 # However, we do that on a start run, so it is not strictly necessary to
 # do it on stop.
 #
-if {$REAL_PLAB} {
+if {$NO_PLAB || $REAL_PLAB} {
     $ns at 0 "start run"
 } elseif {$FAKE_PLAB} {
     $ns at 0 "start_fake run"
