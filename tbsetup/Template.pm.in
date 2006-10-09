@@ -2692,9 +2692,9 @@ sub ArchiveTag($$)
 #
 # Copy the datastore from the template down to the instance. Temporary ...
 #
-sub CopyDataStore($$$)
+sub CopyDataStore($$$;$)
 {
-    my ($self, $archive_tag, $to_path) = @_;
+    my ($self, $archive_tag, $to_path, $replay_instance) = @_;
 
     # Must be a real reference. 
     return -1
@@ -2702,14 +2702,18 @@ sub CopyDataStore($$$)
 
     # From the template itself. 
     my $exptidx;
-    
-    TBExptIDX($self->template()->pid(), $self->template()->eid(), \$exptidx)
+    my $instance = (defined($replay_instance) ? $replay_instance : $self);
+
+    TBExptIDX($instance->template()->pid(),
+	      $instance->template()->eid(), \$exptidx)
 	or return -1;
 
     if (! -e $to_path) {
 	Template::mysystem("mkdir -p $to_path") == 0
 	    or return -1;
     }
+
+    libArchive::setdebug(2);
 
     libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
 						     $to_path,
