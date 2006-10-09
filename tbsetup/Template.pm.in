@@ -2567,7 +2567,7 @@ sub LogHole($)
     #
     # Do the loghole thing.
     #
-    Template::mysystem("$TEVC -w -t 300 -e $pid/$eid now ns SNAPSHOT ".
+    Template::mysystem("$TEVC -w -t 600 -e $pid/$eid now ns SNAPSHOT ".
 		       "    LOGHOLE_ARGS='-s'") == 0
        or return -1;
 
