@@ -380,6 +380,18 @@ if (defined($instance->runidx())) {
     $instance->StopCurrentRun() == 0
 	or fatal(-1, "Could not stop experiment run for $instance!");
 
+    if ($action eq "abort") {
+	# XXX What about the tag?
+	$instance->FinalizeCurrentRun() == 0
+	    or fatal(-1, "Could not finalize experiment run for $instance!");
+
+	print "Experiment run has been aborted!\n";    
+	
+	# Send completion event only on "stop/abort"; otherwise it gets lost.
+	SendCompletionEvent();
+	goto done;
+    }
+
     # This runs loghole.
     print "Asking loghole to sync the logfiles ... this will take a minute.\n";
     $instance->LogHole() == 0
@@ -617,7 +629,8 @@ sub ParseArgs()
 	$action = $options{"a"};
 
 	if ($action ne "start" && $action ne "stop" &&
-	    $action ne "pause" && $action ne "continue") {
+	    $action ne "pause" && $action ne "continue" &&
+	    $action ne "abort") {
 	    tbdie("Improper -a argument: $action.");
 	}
 	# Need the equiv of a taint check.

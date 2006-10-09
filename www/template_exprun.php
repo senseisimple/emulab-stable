@@ -41,6 +41,11 @@ function DOIT($instance, $action, $command_options)
 	$message = "Starting new experiment run";
 	$command_options = "-a start " . $command_options;
     }
+    elseif ($action == "abort") {
+	PAGEHEADER("Abort Experiment Run");
+	$message = "Aborting experiment run";
+	$command_options = "-a abort " . $command_options;
+    }
     else {
 	PAGEHEADER("Stop current Experiment Run");
 	$message = "Stopping current experiment run";
@@ -391,7 +396,7 @@ if (!$instance) {
 	    "a valid experiment template instance!", 1);
 }
 
-if (isset($action) && $action == "stop") {
+if (isset($action) && ($action == "stop" || $action == "abort")) {
     # Run the backend script.
     DOIT($instance, $action, "");
     PAGEFOOTER();

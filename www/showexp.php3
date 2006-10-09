@@ -371,6 +371,9 @@ if ($expstate) {
 	    WRITESUBMENUBUTTON("Stop Current Experiment Run",
 			       "template_exprun.php?action=stop&guid=$guid".
 			       "&version=$vers&eid=$exp_eid");
+	    WRITESUBMENUBUTTON("Abort Current Experiment Run",
+			       "template_exprun.php?action=abort&guid=$guid".
+			       "&version=$vers&eid=$exp_eid");
 	}
 
 	WRITESUBMENUBUTTON("Start New Experiment Run",

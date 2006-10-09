@@ -1243,6 +1243,8 @@ class TemplateInstance
 	$row   = mysql_fetch_array($query_result);
 	$start = $row['start_time'];
 	$stop  = $row['stop_time'];
+	$start_tag   = $row['starting_archive_tag'];
+	$end_tag     = $row['ending_archive_tag'];
 	$description = $row['description'];
 
 	if (!isset($stop))
@@ -1270,6 +1272,8 @@ class TemplateInstance
 	ShowItem("ID",          $runidx);
 	ShowItem("Started",     $start);
 	ShowItem("Stopped",     $stop);
+	ShowItem("Start Tag",   $start_tag);
+	ShowItem("End Tag",     $end_tag);
 
 	if (isset($description) && $description != "") {
 	    echo "<tr>
