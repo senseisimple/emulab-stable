@@ -213,9 +213,17 @@ $ns define-template-parameter USE_DBMONITOR $val \
 # If dbmonitor is set, this is the interval in seconds at which to poll the DB
 # and potentially update the shaping characteristics
 #
-$ns define-template-parameter DBMONITOR_INTERVAL 10 \
-{If USE_DBMONITOR is non-zero, the interval in seconds at which to poll\
- the DB to check for path characteristic changes. }
+$ns define-template-parameter DBMONITOR_LATINTERVAL 10 \
+{If USE_DBMONITOR is non-zero, the interval in seconds at which DB latency\
+ data is updated by bgmon for use by the DB monitor.  The DB monitor queries\
+ the database using the smaller of this and the DBMONITOR_BWINTERVAL values.\
+ Uses the default value if set to zero here. }
+
+$ns define-template-parameter DBMONITOR_BWINTERVAL 0 \
+{If USE_DBMONITOR is non-zero, the interval in seconds at which DB bandwidth\
+ data is updated by bgmon for use by the DB monitor.  The DB monitor queries\
+ the database using the smaller of this and the DBMONITOR_LATINTERVAL values.\
+ Uses the default value if set to zero here. }
 
 #
 # If non-zero, limits the number of slots in the queues for the fake PlanetLab
@@ -390,11 +398,12 @@ for {set i 1} {$i <= $NUM_PCS} {incr i} {
 
 #
 # Run the DB monitor on ops
+# Intervals are passed via the environment.
 #
 if {$USE_DBMONITOR} {
     set dbmonitor [new Program $ns]
     $dbmonitor set node "ops"
-    $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl -i $DBMONITOR_INTERVAL $pid $eid"
+    $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl $pid $eid"
     $dbmonitor set expected-exit-code $ecode
     set monitorlist $dbmonitor
 }
