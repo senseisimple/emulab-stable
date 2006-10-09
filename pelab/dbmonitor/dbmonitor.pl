@@ -288,16 +288,19 @@ while (1) {
     my $elapsed = time() - $startat;
     if ($tweakbgmon && ($intervals % $bgmon_update) == 0) {
 	# XXX +60 to ensure overlap
-	# XXX XXX wait on the +60 until I am sure that bgmon DTR thing.
-	my $duration = $interval * $bgmon_update;
-	logmsg("==== Set DB update frequency/duration to ".
-	       "$interval/$duration at +$elapsed\n");
+	my $duration = $interval * $bgmon_update + 60;
 
-	# XXX flaming hack
-	my $bwinterval = 0;
-#	if (@bgmon_nodes <= 20) {
-#	    $bwinterval = 600;
-#	}
+	#
+	# For bandwidth we don't go lower than <# of nodes> * 30 seconds;
+	# e.g., 10 minutes for 20 nodes.
+	#
+	my $bwinterval = scalar(@bgmon_nodes) * 30;
+	if ($bwinterval < $interval) {
+	    $bwinterval = $interval;
+	}
+
+	logmsg("==== Set DB update lat_freq/bw_freq/duration to ".
+	       "$interval/$bwinterval/$duration at +$elapsed\n");
 
 	bgmon_update($interval, $bwinterval, $duration);
     }

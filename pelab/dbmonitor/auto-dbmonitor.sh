@@ -25,8 +25,8 @@ cp -p /proj/$PID/exp/$EID/tmp/node_list /var/tmp/node-mapping
 #
 # Start up our own monitor
 #
-echo $SH ${DBMONITOR_DIR}/run-dbmonitor.sh $ARGS
-$SH ${DBMONITOR_DIR}/run-dbmonitor.sh $ARGS &
+echo $SH ${DBMONITOR_DIR}/run-dbmonitor.sh -r $ARGS
+$SH ${DBMONITOR_DIR}/run-dbmonitor.sh -r $ARGS &
 DBMONPID=$!
 # Kill the monitor if we get killed - TODO: harsher kill?
 # Note that we assume that a kill of us is "normal" and just exit 0.
