@@ -140,7 +140,7 @@ void LeastSquaresThroughput::localAck(PacketInfo * packet)
 
       // Make sure that the slope isn't being confused by banding at
       // the millisecond level.
-      if (slope < -0.1)
+      if (slope < -0.1 && packet->bufferFull)
       {
         // The closest linear approximation indicates that buffers are
         // being filled up, which means that the link was saturated
