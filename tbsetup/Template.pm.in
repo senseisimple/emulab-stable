@@ -2702,11 +2702,17 @@ sub CopyDataStore($$$;$)
 
     # From the template itself. 
     my $exptidx;
-    my $instance = (defined($replay_instance) ? $replay_instance : $self);
 
-    TBExptIDX($instance->template()->pid(),
-	      $instance->template()->eid(), \$exptidx)
-	or return -1;
+    if (defined($replay_instance)) {
+	TBExptIDX($replay_instance->pid(),
+		  $replay_instance->eid(), \$exptidx)
+	    or return -1;
+    }
+    else {
+	TBExptIDX($self->template()->pid(),
+		  $self->template()->eid(), \$exptidx)
+	    or return -1;
+    }
 
     if (! -e $to_path) {
 	Template::mysystem("mkdir -p $to_path") == 0
