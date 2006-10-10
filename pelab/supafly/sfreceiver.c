@@ -83,6 +83,7 @@ int main(int argc,char **argv) {
     int bytesRead;
     int blocksRead = 0;
     struct timeval t1;
+    int block_count = 0;
     
     parse_args(argc,argv);
 
@@ -156,8 +157,14 @@ int main(int argc,char **argv) {
 	    }
 	}
 
+	++block_count;
+
 	gettimeofday(&t1,NULL);
 
+	fprintf(stdout,"TIME %d %.4f\n",
+		block_count,
+		t1.tv_sec + t1.tv_usec / 1000000);
+	
 	fprintf(stdout,
 		"INFO: read %d bytes (a block) at %.6f\n",
 		block_size,
