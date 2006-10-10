@@ -107,6 +107,7 @@ int main(int argc,char **argv) {
     fd_set rfds;
     fd_set static_rfds;
     int current_send_rc;
+    int block_count = 0;
 
     /* grab some quick args */
     parse_args(argc,argv);
@@ -356,6 +357,8 @@ int main(int argc,char **argv) {
 		if (current_send_rc == block_size) {
 		    current_send_rc = 0;
 
+		    ++block_count;
+
 		    /* end of block, do the encryption op and note times... */
 		    if (debug > 1) {
 			fprintf(stderr,
@@ -392,8 +395,9 @@ int main(int argc,char **argv) {
 			t3.tv_usec += 1000000;
 		    }
 		    fprintf(stdout,
-			    "BLOCKTIME(%s): %d at %.6f\n",
+			    "BLOCKTIME(%s): %d %d at %.6f\n",
 			    (only_encrypt)?"e":"de",
+			    block_count,
 			    t3.tv_sec * 1000 + t3.tv_usec,
 			    t2.tv_sec + t2.tv_usec / 1000000.0f);
 		    fflush(stdout);
