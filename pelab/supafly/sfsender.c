@@ -199,7 +199,7 @@ int main(int argc,char **argv) {
 
 	    fprintf(stdout,"TIME %d %.4f\n",
 		    block_count - remaining_block_count,
-		    tv.tv_sec + tv.tv_usec / 1000000);
+		    tv.tv_sec + tv.tv_usec / 1000000.0f);
 
 	    --remaining_block_count;
 
