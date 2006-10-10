@@ -301,19 +301,17 @@ int main(int argc, char **argv)
         return 1;
       }
 
-  if (strlen(lanobjects)) {
-    strcat(lanobjects, ",");
-    strcat(lanobjects, ADDRESSTUPLE_ALL);
-    event_t->objname   = lanobjects;
-    event_t->objtype   = TBDB_OBJECTTYPE_LINK;
-    event_t->eventtype = TBDB_EVENTTYPE_RESET;
-    event_t->host      = ADDRESSTUPLE_ANY;
-    event_t->expt      = myexp;
+  strcat(lanobjects, ",");
+  strcat(lanobjects, ADDRESSTUPLE_ALL);
+  event_t->objname   = lanobjects;
+  event_t->objtype   = TBDB_OBJECTTYPE_LINK;
+  event_t->eventtype = TBDB_EVENTTYPE_RESET;
+  event_t->host      = ADDRESSTUPLE_ANY;
+  event_t->expt      = myexp;
     
-    if (event_subscribe(handle, reset_callback, event_t, NULL) == NULL) {
-      error("could not subscribe to %d event\n", event_t->eventtype);
-      return 1;
-    }
+  if (event_subscribe(handle, reset_callback, event_t, NULL) == NULL) {
+    error("could not subscribe to %d event\n", event_t->eventtype);
+    return 1;
   }
   
   info("subscribed...\n");
