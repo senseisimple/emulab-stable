@@ -157,13 +157,13 @@ int main(int argc,char **argv) {
 	    }
 	}
 
-	++block_count;
 
 	gettimeofday(&t1,NULL);
 
 	fprintf(stdout,"TIME %d %.4f\n",
 		block_count,
-		t1.tv_sec + t1.tv_usec / 1000000);
+		t1.tv_sec + t1.tv_usec / 1000000.0f);
+	++block_count;
 	
 	fprintf(stdout,
 		"INFO: read %d bytes (a block) at %.6f\n",
