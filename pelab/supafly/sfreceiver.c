@@ -24,7 +24,7 @@ char *deadbeef = "deadbeef";
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -scCmMud  (option defaults in parens)\n",
+	    "USAGE: %s -cudR  (option defaults in parens)\n",
 	    bin
 	    );
 }
@@ -33,10 +33,20 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:m:M:ud")) != -1) {
+    while ((c = getopt(argc,argv,"s:m:R:h:ud")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
+	    if (ep == optarg) {
+		usage(argv[0]);
+		exit(-1);
+	    }
+	    break;
+	case 'h':
+	    middleman_host = optarg;
+	    break;
+	case 'R':
+	    middleman_port = (short)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
 		exit(-1);

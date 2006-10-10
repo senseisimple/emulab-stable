@@ -14,7 +14,7 @@ int block_size = 4096;
 int block_count = 1024;
 int only_encrypt = 0;
 int debug = 0;
-char *srv_host = "localhost";
+char *srv_host = INADDR_ANY;
 short srv_send_port = MIDDLEMAN_SEND_CLIENT_PORT;
 short srv_recv_port = MIDDLEMAN_RECV_CLIENT_PORT;
 
@@ -34,7 +34,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:oud")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:S:R:h:oud")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);

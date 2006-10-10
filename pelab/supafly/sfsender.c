@@ -41,7 +41,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:ud")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:ud")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -73,6 +73,16 @@ void parse_args(int argc,char **argv) {
 	    break;
 	case 'P':
 	    msg_pause_us = strtol(optarg,&ep,10);
+	    if (ep == optarg) {
+		usage(argv[0]);
+		exit(-1);
+	    }
+	    break;
+	case 'h':
+	    middleman_host = optarg;
+	    break;
+	case 'S':
+	    middleman_port = (short)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
 		exit(-1);
