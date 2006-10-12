@@ -381,10 +381,15 @@ while (1) {
 		    # Should check DB state instead.
 		    exit(99);
 		}
+                # Make sure the system knows we now have state on the node!
+                TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 	    }
 
 	    # Cleanup is used only on plab nodes.
-	    if ($mode ne "cleanup") {
+            # Don't try to teardown plab vnodes; it's just asking for
+            # trouble as the shutdown may hang or take too long.  It's
+            # best to simply try and free the vserver below.
+	    if (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))) {
 		my $args = (($mode eq "teardown") ? "-k " :
 			    ($mode eq "reboot" ? "-r " : " "));
 		$args   .= ($jailed   ? "-j " : " ");
@@ -397,6 +402,7 @@ while (1) {
 
             # Free the plab node lease if necessary.
             if ($plab && ($mode eq "teardown" || $mode eq "cleanup")) {
+                TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN);
                 exec("$TB/sbin/plabnode free $pid $eid $vnode");
                 die("*** $0:\n".
                     "    exec failed!\n");
