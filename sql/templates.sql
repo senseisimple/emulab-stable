@@ -318,6 +318,8 @@ CREATE TABLE experiment_template_instances (
   template_tag varchar(64) default NULL,
   -- Date of last export.
   export_time datetime default NULL,
+  -- A lock to prevent mayhem.
+  locked datetime default NULL,
   PRIMARY KEY  (idx),
   KEY  (exptidx),
   KEY  (parent_guid,parent_vers),

@@ -3740,3 +3740,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.94: Minor fix to last revision; skip to next entry please.
 
+4.95: Add a locked field to the instances table.
+
+      alter table experiment_template_instances add \
+           locked datetime default NULL;
+
