@@ -100,13 +100,9 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 }
 
 # Template Instance Experiments get special treatment in this page.
-$instance = NULL;
-if ($EXPOSETEMPLATES) {
-     $instance = TemplateInstance::LookupByExptidx($exptidx);
-
-     if (! is_null($instance) && $inout != "out") {
-	 PAGEARGERROR("Invalid action for template instance");
-     }
+$instance = TemplateInstance::LookupByExptidx($exptidx);
+if ($instance && $inout != "out") {
+    PAGEARGERROR("Invalid action for template instance");
 }
 
 # Convert inout to informative text.

@@ -224,11 +224,51 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 	echo "</table><br>\n";
     }
 
+    #
+    # Get the default params for the template, instance and the previous run.
+    # These go out for the user to select via a button, which will provide an
+    # initial setting for the parameters.
+    #
+    $template->FormalParameters($formal_parameters);
+    $instance->Bindings($instance_parameters);
+    $instance->RunBindings($instance->LastRunIdx(), $lastrun_parameters);
+
+    #
+    # Spit out some inline script. Its not as if there will be hundreds
+    # of parameters, right?
+    #
+    echo "<script type='text/javascript' language='javascript' ".
+	 "        src='template_sup.js'>\n";
+    echo "</script>\n";
+    echo "<script language=JavaScript>\n";
+    echo "var formal_names  = new Array();\n";
+    echo "var template_values = new Array();\n";
+    echo "var instance_values = new Array();\n";
+    echo "var lastrun_values  = new Array();\n";
+    $i = 0;
+    while (list ($name, $value) = each ($formal_parameters)) {
+	echo "formal_names[$i] = '$name';\n";
+	echo "template_values[$i] = '$value';\n";
+	$i++;
+    }
+    $i = 0;
+    while (list ($name, $value) = each ($instance_parameters)) {
+	echo "instance_values[$i] = '$value';\n";
+	$i++;
+    }
+    $i = 0;
+    while (list ($name, $value) = each ($lastrun_parameters)) {
+	echo "lastrun_values[$i] = '$value';\n";
+	$i++;
+    }
+    echo "</script>\n";
+    
+
     echo "<form action=template_exprun.php".
 	    "?action=start&guid=$guid&version=$version&eid=$eid ".
 	 "      method=post>\n";
     echo "<table align=center border=1>\n";
-
+    
     #
     # RunID:
     #
@@ -301,6 +341,22 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 		  <td class='pad4'>Formal Parameters:</td>
 		  <td>
  		    <table cellpadding=0 cellspacing=0 border=0>\n";
+
+	echo "<tr><td>Choose Values:</td><td>";
+	echo "<table cellpadding=0 cellspacing=0 border=0>\n";
+	echo "<tr><td>\n";
+	echo " <button name=formals type=button value=Formals ";
+	echo "  onclick=\"SetRunParams(formal_names, template_values);\">";
+	echo "Template</button>\n";
+	echo "</td><td>\n";
+	echo " <button name=instance type=button value=Instance ";
+	echo "  onclick=\"SetRunParams(formal_names, instance_values);\">";
+	echo "Instance</button>\n";
+	echo "</td><td>\n";
+	echo " <button name=lastrun type=button value='Previous Run' ";
+	echo "  onclick=\"SetRunParams(formal_names, lastrun_values);\">";
+	echo "Previous Run</button>\n";
+	echo "</tr></table>\n";
 	
 	while (list ($name, $value) = each ($parameters)) {
 	    if (!isset($value))
@@ -310,8 +366,9 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
                     <td class='pad4'>$name</td>
                     <td class='pad4' class=left>
                         <input type=text
+                               id='parameter_$name'
                                name=\"parameters[$name]\"
-                               value=\"" . $value . "\"
+                               value=\"\"
 	                       size=60
                                maxlength=1024>
                     </td>

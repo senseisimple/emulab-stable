@@ -188,11 +188,11 @@ else {
     # Note that we just want the last run since that will include the
     # accumulated data.
     #
-    my $rowref = $instance->LastRun();
+    my $lastrun = $instance->LastRun();
     fatal(-1, "Could not get last run for instance $instance!")
-	if (! defined($rowref));
+	if (! defined($lastrun));
 
-    my $idx = $rowref->{'idx'};
+    my $idx = $lastrun->idx();
     $dbname = "${guid},${version}," . $instance->idx() . ",$idx";
     
     my $query_result =

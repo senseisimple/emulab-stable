@@ -43,7 +43,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwx:p:E:a:r:e:dscft:im";
+my $optlist	 = "qwx:p:E:a:r:e:dscft:imy:";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -52,6 +52,7 @@ my $foreground   = 0;
 my $ignoreerrors = 0;
 my $clean        = 0;
 my $doswapmod    = 0;
+my $paramwhich;
 my $paramfile;
 my %parameters   = ();
 my %deadnodes    = ();
@@ -256,11 +257,41 @@ elsif ($action eq "start" && !defined($runid)) {
 # them in the DB for this experiment. Note that these override existing
 # values, so we start with those first.
 #
-# XXX Do we keep these values in the DB forever? Or just keep the XML file
-# around and archived? 
+# Start with the requested set of params, and then let the XML file override
+# them as needed.
 #
-$instance->BindingList(\%parameters) == 0
-    or tbdie("Could not get binding list for $instance");
+if (defined($paramwhich)) {
+    if ($paramwhich eq "template") {
+	$template->FormalParameterList(\%parameters) == 0
+	    or tbdie("Could not get formal parameters for $template");
+    }
+    elsif ($paramwhich eq "instance") {
+	$instance->BindingList(\%parameters) == 0
+	    or tbdie("Could not get binding list for $instance");
+    }
+    elsif ($paramwhich eq "lastrun") {
+	my $lastrun;
+
+	if (defined($instance->runidx())) {
+	    $lastrun =
+		Template::Instance::Run->LookupByID($instance->exptidx(),
+						    $instance->runidx());
+	}
+	else {
+	    $lastrun = $instance->LastRun();
+	}
+	defined($lastrun) 
+	    or tbdie("Could not get run for $instance");
+
+	$lastrun->BindingList(\%parameters) == 0
+	    or tbdie("Could not get binding list for $run");
+    }
+}
+else {
+    # Default to the instance bindings. 
+    $instance->BindingList(\%parameters) == 0
+	or tbdie("Could not get binding list for $instance");
+}
 
 if (defined($paramfile)) {
     my $donebad = 0;
@@ -699,6 +730,18 @@ sub ParseArgs()
 	    tbdie("Improper template description!");
 	}
 	$description = $options{"E"};
+    }
+    if (defined($options{"y"})) {
+	$paramwhich = $options{"y"};
+
+	if ($paramwhich ne "template" && $paramwhich ne "instance" &&
+	    $paramwhich ne "lastrun") {
+	    tbdie("Improper -y argument: $paramwhich");
+	}
+	# Need the equiv of a taint check.
+	if ($paramwhich =~ /^([\w]+)$/) {
+	    $paramwhich = $1;
+	}
     }
 
     if (defined($options{"x"})) {

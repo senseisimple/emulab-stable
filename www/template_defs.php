@@ -1394,6 +1394,25 @@ class TemplateInstance
 	}
 	return 0;
     }
+
+    #
+    # Return in the index of the most recent run.
+    #
+    function LastRunIdx() {
+	$exptidx      = $this->exptidx();
+
+	$query_result =
+	    DBQueryFatal("select idx from experiment_runs ".
+			 "where exptidx='$exptidx' ".
+			 "order by idx desc limit 1");
+
+	if (!mysql_num_rows($query_result)) {
+	    return 0;
+	}
+
+	$row = mysql_fetch_array($query_result);
+	return $row[0];
+    }
     
     #
     # Show graph stuff, either for entire instance or for a run. Very hacky.

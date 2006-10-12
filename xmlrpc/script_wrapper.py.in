@@ -2097,7 +2097,7 @@ class template_startrun:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:m",
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:my:",
                                            [ "help" ]);
             pass
         except getopt.error, e:
@@ -2128,6 +2128,9 @@ class template_startrun:
                 pass
             elif opt == "-r":
                 params["runid"] = val
+                pass
+            elif opt == "-y":
+                params["params"] = val
                 pass
             elif opt == "-p":
                 pid = val
@@ -2178,6 +2181,7 @@ class template_startrun:
 	print "where:";
         print "     -E   - A pithy sentence describing your run";
         print "     -x   - XML file of parameter bindings";
+        print "     -y   - Default params, one of template,instance,lastrun";
         print "     -r   - A token (id) for the run";
         print "     -e   - Instance ID (aka eid)";
         print "    guid  - Template GUID";

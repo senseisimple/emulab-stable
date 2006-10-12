@@ -35,3 +35,20 @@ function SetActiveTemplate(img_name, div_name, area_name)
     template_div.style['width']  = width + "px";
     template_div.style['visibility'] = "visible";
 }
+
+/*
+ * For initializing template run params
+ */
+function SetRunParams(names, values)
+{
+    for (i = 0; i < names.length; i++) {
+	var name  = names[i];
+	var value = values[i];
+	var field = document.getElementById("parameter_" + name);
+
+	if (field) {
+	    field.value = value;
+	}
+    }
+}
+

@@ -4785,6 +4785,10 @@ class template:
                     argstr += " -m "
                     pass
                 pass
+            elif opt == "params":
+                argstr += " -y "
+                argstr += escapeshellarg(val)
+                pass
             elif opt == "xmlfilepath":
                 # Backend script will verify this local path. 
                 xmlfilename = escapeshellarg(val)

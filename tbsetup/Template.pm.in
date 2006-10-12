@@ -2362,14 +2362,17 @@ sub LastRun($)
     my $exptidx = $self->exptidx();
 
     my $query_result =
-	DBQueryWarn("select * from experiment_runs ".
+	DBQueryWarn("select idx from experiment_runs ".
 		    "where exptidx='$exptidx' order by idx desc limit 1");
 
     return undef
 	if (!$query_result);
 
-    return $query_result->fetchrow_hashref();
+    my $runidx = ($query_result->fetchrow_array())[0];
+
+    return Template::Instance::Run->LookupByID($exptidx, $runidx);
 }
+
 sub FirstRun($)
 {
     my ($self) = @_;
@@ -2524,7 +2527,7 @@ sub NewRunID($$)
     else {
 	my $last_run = $self->LastRun();
 
-	$lastname = $last_run->{"runid"};
+	$lastname = $last_run->runid();
     }
 
     #
