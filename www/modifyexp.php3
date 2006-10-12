@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -218,7 +218,7 @@ if ($speclocal) {
     # is a security worry, but good to enforce it anyway.
     #
     if (!preg_match("/^([-\@\w\.\/]+)$/", $exp_localnsfile)) {
-	USERERROR("NS File", "Pathname includes illegal characters", 1);
+	USERERROR("NS File: Pathname includes illegal characters", 1);
     }
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
         ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
