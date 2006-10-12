@@ -82,13 +82,18 @@ sub mysystem($)
 {
     my ($command) = @_;
 
+    TBDebugTimeStampsOn();    
+
     # Need a big TMPDIR for svn stuff.
     my $tmpdir = $ENV{'TMPDIR'};
     $ENV{'TMPDIR'} = "/usr/testbed/tmp";
 
     print STDERR "Running '$command'\n"
 	if ($debug);
+
+    TBDebugTimeStamp($command);
     my $retval = system($command);
+    TBDebugTimeStamp("Done");
     $ENV{'TMPDIR'} = $tmpdir
 	if (defined($tmpdir));
 
