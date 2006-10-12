@@ -320,6 +320,7 @@ CREATE TABLE experiment_template_instances (
   export_time datetime default NULL,
   -- A lock to prevent mayhem.
   locked datetime default NULL,
+  locker_pid int(11) default '0',
   PRIMARY KEY  (idx),
   KEY  (exptidx),
   KEY  (parent_guid,parent_vers),

@@ -638,6 +638,7 @@ CREATE TABLE experiment_template_instances (
   template_tag varchar(64) default NULL,
   export_time datetime default NULL,
   locked datetime default NULL,
+  locker_pid int(11) default '0',
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
   KEY parent_guid (parent_guid,parent_vers),

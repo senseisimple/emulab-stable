@@ -3745,3 +3745,7 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiment_template_instances add \
            locked datetime default NULL;
 
+4.96: Oops, forgot part of last revision!
+
+      alter table experiment_template_instances add \
+             locker_pid int(11) default '0',
