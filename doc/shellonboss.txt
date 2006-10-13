@@ -60,8 +60,11 @@ never compromised. Okay, lets get serious.
 
 * In order to install the testbed software, you need to be in group wheel,
   which lets you use "sudo". No password to gain root is required.
-  BE CAREFUL!
+  BE CAREFUL! Think about where you are before you do something like:
 
+	sudo rm -rf *
+
+------
 
 Okay, enough about security. Lets talk about building and installing
 testbed software. I'll describe how I operate; others in the group almost
