@@ -1739,6 +1739,8 @@ sub stop_time($)     { return field($_[0], 'stop_time'); }
 sub pause_time($)    { return field($_[0], 'pause_time'); }
 sub continue_time($) { return field($_[0], 'continue_time'); }
 sub runtime($)       { return field($_[0], 'runtime'); }
+sub locked($)        { return field($_[0], 'locked'); }
+sub locker_pid($)    { return field($_[0], 'locker_pid'); }
 sub template($)      { return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
 
 # The path is the path of the experiment.
@@ -1814,6 +1816,94 @@ sub Update($$;$)
 
     return Refresh($self);
 }
+
+#
+# Locking to prevent concurrent access
+#
+sub TryLock($$)
+{
+    my ($self, $ptoken) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("lock tables experiment_template_instances write")
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select locked,locker_pid ".
+		    "    from experiment_template_instances ".
+		    "where idx='$idx'");
+
+    if (! $query_result) {
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+    my ($locked,$locker_pid) = $query_result->fetchrow_array();
+
+    if (defined($locked)) {
+	return 0
+	    if (defined($locker_pid) && $locker_pid == $PID);
+	
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+
+    DBQueryWarn("update experiment_template_instances set ".
+		"  locked=now(), locker_pid='$PID' ".
+		"where idx='$idx'")
+	or return -1;
+
+    DBQueryWarn("unlock tables");
+    $self->Refresh();
+    $$ptoken = $PID;
+    return 0;
+}
+sub UnLock($$)
+{
+    my ($self, $token) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("lock tables experiment_template_instances write")
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select locked,locker_pid ".
+		    "    from experiment_template_instances ".
+		    "where idx='$idx'");
+
+    if (! $query_result) {
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+    my ($locked,$locker_pid) = $query_result->fetchrow_array();
+
+    return 0
+	if (!defined($locked));
+
+    if ($locker_pid != $token) {
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+
+    DBQueryWarn("update experiment_template_instances set ".
+		"  locked=NULL, locker_pid=0 ".
+		"where idx='$idx'")
+	or return -1;
+    
+    DBQueryWarn("unlock tables");
+    $self->Refresh();
+    return 0;
+}
+
 # Set the start time ...
 sub Start($)
 {
@@ -2410,14 +2500,7 @@ sub CurrentRun($)
     return undef
 	if (!defined($runidx));
 
-    my $query_result =
-	DBQueryWarn("select * from experiment_runs ".
-		    "where exptidx='$exptidx' and idx='$runidx'");
-
-    return undef
-	if (!$query_result);
-
-    return $query_result->fetchrow_hashref();
+    return Template::Instance::Run->LookupByID($exptidx, $runidx);
 }
 
 #
@@ -2522,7 +2605,7 @@ sub NewRunID($$)
     if (defined($self->runidx())) {
 	my $this_run = $self->CurrentRun();
 
-	$lastname = $this_run->{"runid"};
+	$lastname = $this_run->runid();
     }
     else {
 	my $last_run = $self->LastRun();

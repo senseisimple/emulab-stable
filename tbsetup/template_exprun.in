@@ -87,11 +87,12 @@ my $logname;
 my $dbuid;
 my $exptidx;
 my $template;
-my $run;
+my $newrun;
 my $instance;
+my $locktoken;
 # For the END block below.
 my $cleaning    = 0;
-my $justexit    = 1;
+my $justexit    = 0;
 
 # Programs we need
 my $swapexp     = "$TB/bin/swapexp";
@@ -106,7 +107,7 @@ sub fatal($$);
 sub sighandler($);
 sub SignalProgAgents($);
 sub SendCompletionEvent();
-sub CheckForDeadNodes();
+sub CheckForDeadNodes($);
 
 #
 # Testbed Support libraries
@@ -235,6 +236,22 @@ if ($experiment->state() ne EXPTSTATE_ACTIVE()) {
 }
 
 #
+# Lets use a lock to prevent confusion; it appears to happen more then I
+# thought it would.
+#
+if ($instance->TryLock(\$locktoken) != 0) {
+    if ($instance->locked()) {
+	tberror("$instance is locked!\n".
+		"Another operation started at ". $instance->locked() . "\n");
+	exit(1);
+    }
+    else {
+	tberror("Could not lock the instance!");
+	exit(-1);
+    }
+}
+
+#
 # Pause and Continue are easy
 #
 if ($action eq "pause") {
@@ -284,7 +301,7 @@ if (defined($paramwhich)) {
 	    or tbdie("Could not get run for $instance");
 
 	$lastrun->BindingList(\%parameters) == 0
-	    or tbdie("Could not get binding list for $run");
+	    or tbdie("Could not get binding list for $lastrun");
     }
 }
 else {
@@ -353,17 +370,19 @@ if (! ($debug || $foreground)) {
 	$justexit = 1;
 
 	if (!$waitmode) {
-	    print("A new run is being started for $pid/$eid.\n")
+	    print((($action eq "start") ?
+		   "A new run is being started for $pid/$eid.\n" :
+		   "Stopping current run in $pid/$eid.\n"))
 		if (! $quiet);
 	    exit(0);
 	}
-	print("Waiting for new run to start.\n")
+	print("Waiting for run to $action ...\n")
 	    if (! $quiet);
 	    
 	if (-t STDIN && !$quiet) {
 	    print("You may type ^C at anytime.".
 		  "\n".
-		  "You will not actually interrupt the experiment itself.\n");
+		  "You will not interrupt the operation.\n");
 	}
 	
 	# Give child a chance to run.
@@ -389,6 +408,8 @@ if (! ($debug || $foreground)) {
     TBdbfork();
 }
 
+sleep(60);
+
 #
 # When in waitmode, must put ourselves in another process group so that
 # an interrupt to the parent will not have any effect on the backend.
@@ -401,16 +422,16 @@ if ($waitmode) {
 # Might not be a current run, which is okay.
 #
 if (defined($instance->runidx())) {
-    $run = Template::Instance::Run->LookupByID($instance->exptidx(),
-					       $instance->runidx());
-    if (!defined($run)) {
+    my $thisrun = $instance->CurrentRun();
+
+    if (!defined($thisrun)) {
 	tbdie("Cannot get current run object for $instance!");
     }
 	
     print "Asking program agents to stop ... this will take a moment.\n";
     SignalProgAgents("HALT") == 0
 	or $ignoreerrors
-	or CheckForDeadNodes();
+	or CheckForDeadNodes($thisrun);
 
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
@@ -432,7 +453,7 @@ if (defined($instance->runidx())) {
     print "Asking loghole to sync the logfiles ... this will take a minute.\n";
     $instance->LogHole() == 0
 	or $ignoreerrors
-        or CheckForDeadNodes();
+        or CheckForDeadNodes($thisrun);
 
     print "Dumping the instance database ... this will take a minute.\n";
     $instance->DumpDB() == 0
@@ -442,8 +463,7 @@ if (defined($instance->runidx())) {
     #
     # Commit the archive. 
     #
-    my $this_run   = $instance->CurrentRun();
-    my $this_runid = $this_run->{"runid"};
+    my $this_runid = $thisrun->runid();
     
     system("$archcontrol -d -t ${action}run_${this_runid} commit $pid $eid");
 
@@ -478,16 +498,10 @@ if ($clean) {
 #
 # Generate a new run.
 #
-$run = $instance->NewRun($runid, $description);
-if (!defined($run)) {
+$newrun = $instance->NewRun($runid, $description);
+if (!defined($newrun)) {
     fatal(-1, "Could not create new experiment run for $instance!");
 }
-
-#
-# At this point, we need to force a cleanup no matter how we exit.
-# See the END block below.
-#
-$justexit = 0;
 
 # Mark the start time of the run.
 $instance->StartRun(($doswapmod ? Template::STARTRUN_FLAGS_SWAPMOD() : 0)) == 0
@@ -556,7 +570,7 @@ $instance->WriteEnvVariables() == 0
 print "Asking program agents to reload ... this will take a moment.\n";
 SignalProgAgents("RELOAD") == 0
     or $ignoreerrors
-    or CheckForDeadNodes();
+    or CheckForDeadNodes($newrun);
 
 #
 # Restart the event stream from the beginning.
@@ -795,7 +809,10 @@ sub cleanup()
 {
     # only for start new run; stop run failures do not do this!
     $instance->DeleteCurrentRun()
-	if (defined($instance) && defined($run));
+	if (defined($instance) && defined($newrun));
+
+    $instance->UnLock($locktoken)
+	if (defined($instance) && defined($locktoken));
 
     # log file gets copied out to the user directory.
     $experiment->CopyLogFiles()
@@ -879,8 +896,10 @@ sub SendCompletionEvent()
 # it.  Will probably need to add that, but lets try this for now. The main
 # problem is plab nodes.
 #
-sub CheckForDeadNodes()
+sub CheckForDeadNodes($)
 {
+    my ($thisrun) = @_;
+    
     my %nodestatuslist;
     
     $experiment->NodeStatusList(\%nodestatuslist) == 0
@@ -894,8 +913,8 @@ sub CheckForDeadNodes()
 	# Node is dead. Need to record this as part of the template record.
 	# This hash is for later, to send a summary report to the user.
 	#
-	$run->MarkNodeDead($node_id) == 0
-	    or fatal(-1, "Could not mark node as dead in $run");
+	$thisrun->MarkNodeDead($node_id) == 0
+	    or fatal(-1, "Could not mark node as dead in $thisrun");
 
 	tbwarn("$node_id appears to be dead during start/stop run");
 
@@ -908,7 +927,16 @@ sub CheckForDeadNodes()
 
 END {
     # Normal exit, nothing to do.
-    if (!$? || $justexit) {
+    return
+	if ($justexit);
+    
+    if (!$?) {
+        #
+        # Unlock ... safe cause the unlock routine will only let the original
+        # process do the unlock, and only if its locked.
+	#
+	$instance->UnLock($locktoken)
+	    if (defined($instance) && defined($locktoken));
 	return;
     }
     my $saved_exitcode = $?;
