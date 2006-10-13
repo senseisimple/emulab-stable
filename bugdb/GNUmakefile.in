@@ -15,7 +15,7 @@ SBIN_SCRIPTS		= addbugdbproj addbugdbuser setbugdbgroups \
 			  bugdbsetup
 LIBEXEC_SCRIPTS		= bugdbxlogin
 
-CTRL_SBIN_SCRIPTS	= bugdbproxy
+CTRL_SBIN_SCRIPTS	= bugdbproxy bugdbgateway
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -40,6 +40,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/setbugdbgroups
 	chown root $(INSTALL_LIBEXECDIR)/bugdbxlogin
 	chmod u+s $(INSTALL_LIBEXECDIR)/bugdbxlogin
+	chown nobody $(INSTALL_DIR)/opsdir/sbin/bugdbgateway
+	chmod u+s $(INSTALL_DIR)/opsdir/sbin/bugdbgateway
 
 #
 # Control node installation (okay, plastic)

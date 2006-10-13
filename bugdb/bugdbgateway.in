@@ -1,0 +1,308 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Errno;
+use Mail::Internet;
+use Mail::Address;
+
+#
+# Gateway email into BUG DB.
+#
+sub usage()
+{
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $OURDOMAIN= "@OURDOMAIN@";
+my $FLYEMAIL = "flyspray\@" . $OURDOMAIN;
+my $FLYCONF  = "/usr/local/etc/flyspray.conf.php";
+
+# From sysexits.h
+my $EX_DATAERR	= 65;
+my $EX_NOUSER	= 67;
+my $EX_SOFTWARE	= 70;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname;
+my $dbuser;
+my $dbpass;
+
+# Protos
+sub fatal($$);
+sub CheckFlysprayUser($$);
+sub CheckFlysprayTaskID($);
+sub AddFlysprayComment($$$);
+sub FlysprayNotify($$$);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+#
+# The DB user/passwd are stored in the flyspray config file, which is
+# hopefully not group readable. Open and parse that file, then open a
+# connection to the DB.
+#
+$FLYCONF = "$TB/etc/flyspray.conf.php"
+    if (! -e $FLYCONF);
+
+open(FLY, $FLYCONF) or
+    die("*** $0:\n".
+	"    Could not open $FLYCONF for reading!\n");
+
+while (<FLY>) {
+    if ($_ =~ /^([-\w]*)\s*=\s*"([-\w]*)"$/) {
+	if ($1 eq "dbname") {
+	    $dbname = $2;
+	}
+	elsif ($1 eq "dbuser") {
+	    $dbuser = $2;
+	}
+	elsif ($1 eq "dbpass") {
+	    $dbpass = $2;
+	}
+    }
+}
+close(FLY);
+
+# Make sure we have everything we need.
+if (!defined($dbname) ||
+    !defined($dbuser) ||
+    !defined($dbpass)) {
+    fatal(-1, "Could not find db parameters in $FLYCONF!");
+}
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal(-1, "Could not connect to flyspray database!");
+}
+
+#
+# Use this library to parse the message from STDIN.
+#
+my $message = new Mail::Internet \*STDIN;
+fatal($EX_DATAERR, "Cannot parse message")
+    if (! $message);
+my $body    = $message->body();
+my $header  = $message->head();
+my $headers = $header->header_hashref();
+
+fatal($EX_DATAERR, "Headers missing")
+    if (!defined($headers->{"From"}) ||
+	!defined($headers->{"Subject"}));
+
+# Convert this to a string.
+my $comment = "";
+foreach my $line (@{ $body }) {
+    $comment .= $line;
+}
+
+#
+# Figure out the user and the flyspray ID number. If we cannot get that
+# then its an error.
+#
+my $user;
+my $userid;
+my $fsid;
+my @objects = Mail::Address->parse($headers->{"From"}[0]);
+
+fatal($EX_DATAERR, "Cannot parse From: ". $headers->{"From"}[0])
+    if (! @objects);
+
+if ($objects[0]->user() =~ /^([-\w]*)$/) {
+    $user = $1;
+}
+else {
+    fatal($EX_DATAERR, "Cannot parse User: " . $objects[0]->user());
+}
+
+if ($headers->{"Subject"}[0] =~ /Emulab FS\#(\d*)/) {
+    $fsid = $1;
+}
+else {
+    fatal($EX_DATAERR, "Cannot parse Subject: " . $headers->{"Subject"}[0]);
+}
+
+#
+# Now we check things.
+#
+fatal($EX_NOUSER, "No such user: $user")
+    if (CheckFlysprayUser($user, \$userid) != 0);
+
+fatal(-1, "No such task: $fsid")
+    if (CheckFlysprayTaskID($fsid) != 0);
+
+fatal($EX_SOFTWARE, "Could not add comment to task $fsid")
+    if (AddFlysprayComment($fsid, $userid, $comment) != 0);
+
+# No errors reported since comment as been added.
+FlysprayNotify($fsid, $userid, $comment);
+
+exit(0);
+
+#
+# Utility function to get the flyspray user_id for an Emulab user.
+#
+sub CheckFlysprayUser($$)
+{
+    my ($user, $puser_id) = @_;
+
+    my $query_result =
+	DBQueryFatal("select user_id from flyspray_users ".
+		     "where user_name='$user'");
+
+    return -1
+	if (!$query_result->numrows);
+
+    my ($id) = $query_result->fetchrow_array();
+    $$puser_id = $id;
+    return 0;
+}
+
+#
+# Lookup a task ID to make sure its a valid task.
+#
+sub CheckFlysprayTaskID($)
+{
+    my ($id) = @_;
+
+    my $query_result =
+	DBQueryFatal("select task_id from flyspray_tasks ".
+		     "where task_id='$id'");
+
+    return -1
+	if (!$query_result->numrows);
+
+    return 0;
+}
+
+#
+# Add comment ...
+#
+sub AddFlysprayComment($$$)
+{
+    my ($fsid, $userid, $comment) = @_;
+
+    my $now  = time();
+    $comment = DBQuoteSpecial($comment);
+    
+    DBQueryFatal("insert into flyspray_comments ".
+		 "  (comment_id, task_id, date_added, user_id, comment_text) ".
+		 "  values (NULL, '$fsid', '$now', $userid, $comment)");
+
+    return 0;
+}
+
+#
+# And send out the notification.
+#
+sub FlysprayNotify($$$)
+{
+    my ($fsid, $userid, $comment) = @_;
+    my $assigned_to;
+    my @email_addresses = ();
+
+    my $query_result =
+	DBQueryWarn("select project_title from flyspray_tasks as t ".
+		    "left join flyspray_projects as p on ".
+		    "  p.project_id=t.attached_to_project ".
+		    "where t.task_id='$fsid'");
+    
+    # no error since comment already added.
+    return
+ 	if (!$query_result || !$query_result->numrows);
+
+    my ($project) = $query_result->fetchrow_array();
+
+    #
+    # Email of person assigned to task.
+    #
+    $query_result =
+	DBQueryWarn("select email_address from flyspray_tasks as t ".
+		    "left join flyspray_users as u on ".
+		    "   t.assigned_to=u.user_id ".
+		    "where task_id='$fsid' and email_address is not null");
+
+    # no error since comment already added.
+    return
+ 	if (!$query_result);
+
+    if ($query_result->numrows) {
+	($assigned_to) = $query_result->fetchrow_array();
+
+	push(@email_addresses, $assigned_to);
+    }
+
+    #
+    # Get list of notifications.
+    #
+    $query_result =
+	DBQueryWarn("select * from flyspray_notifications as n ".
+		    "left join flyspray_users as u on n.user_id=u.user_id ".
+		    "where n.task_id='$fsid' and u.notify_type=1");
+
+    # no error since comment already added.
+    return
+ 	if (!$query_result || !$query_result->numrows);
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $email = $row->{"email_address"};
+
+	# Avoid duplicate of assigned_to person. 
+	next
+	    if (defined($assigned_to) && $assigned_to eq $email);
+
+	push(@email_addresses, $email);
+    }
+    SENDMAIL(join(",", @email_addresses),
+	     "$project FS#${fsid} comment added",
+	     $comment, $FLYEMAIL,
+	     "Reply-To: $FLYEMAIL");
+}
+
+sub fatal($$)
+{
+    my ($code, $mesg) = @_;
+
+    print STDERR
+	"*** $0:\n".
+	"    $mesg\n";
+    exit($code);
+}
