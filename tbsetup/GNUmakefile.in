@@ -37,8 +37,10 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  elabinelab snmpit.proxy panic repos_daemon node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy
 
-CTRLBIN_STUFF   = console_setup.proxy sfskey_update.proxy \
+CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
+
+CTRLBIN_STUFF	= fetchtar.proxy
 
 FSBIN_STUFF	= exports_setup.proxy smbpasswd_setup.proxy
 
@@ -149,7 +151,8 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
 	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.pm) \
-	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLBIN_STUFF)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/bin/, $(CTRLBIN_STUFF)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_STUFF))\
 	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(FSBIN_STUFF))
 
 post-install: 
@@ -214,8 +217,8 @@ endif
 #
 # Control node installation (okay, plastic)
 #
-control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRLBIN_STUFF)) \
-			$(addprefix $(INSTALL_BINDIR)/, fetchtar.proxy) \
+control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRLSBIN_STUFF)) \
+			$(addprefix $(INSTALL_BINDIR)/, $(CTRLBIN_STUFF)) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
 	@$(MAKE) -C nsverify control-install
@@ -264,6 +267,11 @@ subdir-distclean:
 $(INSTALL_DIR)/opsdir/lib/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/bin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL) $< $@
 
 $(INSTALL_DIR)/opsdir/sbin/%: %
