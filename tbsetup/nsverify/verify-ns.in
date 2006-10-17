@@ -167,6 +167,8 @@ while (!$done) {
 	}
     }
     elsif ($nsline ne $dbline) {
+	chomp $nsline;
+	chomp $dbline;
 	tbdie("Topology verification failed ('$nsline'!='$dbline')!");
     }
 }
