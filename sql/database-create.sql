@@ -629,6 +629,7 @@ CREATE TABLE experiment_template_instances (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   uid varchar(8) NOT NULL default '',
+  description tinytext,
   start_time datetime default NULL,
   stop_time datetime default NULL,
   pause_time datetime default NULL,

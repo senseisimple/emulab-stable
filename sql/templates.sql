@@ -306,6 +306,8 @@ CREATE TABLE experiment_template_instances (
   eid varchar(32) NOT NULL default '',
   -- Creator of the instance.
   uid varchar(8) NOT NULL default '',
+  -- A short description; not sure I really want this. 
+  description tinytext,
   -- A little bit of duplication ...
   start_time datetime default NULL,
   stop_time datetime default NULL,
