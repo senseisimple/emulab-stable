@@ -556,35 +556,50 @@ if (count($parameter_masterlist)) {
     }
     else {
 	#
-	# Generate a temporary file and write in the XML goo.
+	# Lets confirm that the user did not forget to set at least one value. 
 	#
-	list($usec, $sec) = explode(' ', microtime());
-	srand((float) $sec + ((float) $usec * 100000));
-	$foo = rand();
-
-	$parameter_xmlfile = "/tmp/$uid-$foo.xml";
-    	$deletexmlfile = 1;
-
-	if (! ($fp = fopen($parameter_xmlfile, "w"))) {
-	    TBERROR("Could not create temporary file $parameter_xmlfile", 1);
-	}
-	
-	fwrite($fp, "<template_parameters>\n");
-
+	$gotone = 0;
 	while (list ($name, $default_value) = each ($parameter_masterlist)) {
-	    if (isset($parameters[$name])) {
-		$value = $parameters[$name];
+	    if (isset($parameters[$name]) && $parameters[$name] != "") {
+		$gotone = 1;
 	    }
-	    else {
-		$value = $default_value;
-	    }
-	    
-	    fwrite($fp, " <parameter name=\"$name\">");
-	    fwrite($fp, "<value>$value</value></parameter>\n");
 	}
-	fwrite($fp, "</template_parameters>\n");
-	fclose($fp);
-	chmod($parameter_xmlfile, 0666);
+	if (! $gotone) {
+	    $errors["Parameters"] = "You did not set any values";
+	}
+	else {
+  	    #
+	    # Generate a temporary file and write in the XML goo.
+	    #
+	    list($usec, $sec) = explode(' ', microtime());
+	    srand((float) $sec + ((float) $usec * 100000));
+	    $foo = rand();
+
+	    $parameter_xmlfile = "/tmp/$uid-$foo.xml";
+	    $deletexmlfile = 1;
+
+	    if (! ($fp = fopen($parameter_xmlfile, "w"))) {
+		TBERROR("Could not create temp file $parameter_xmlfile", 1);
+	    }
+	
+	    fwrite($fp, "<template_parameters>\n");
+
+	    reset($parameter_masterlist);
+	    while (list ($name,$default_value) = each($parameter_masterlist)) {
+		if (isset($parameters[$name])) {
+		    $value = $parameters[$name];
+		}
+		else {
+		    $value = $default_value;
+		}
+	    
+		fwrite($fp, " <parameter name=\"$name\">");
+		fwrite($fp, "<value>$value</value></parameter>\n");
+	    }
+	    fwrite($fp, "</template_parameters>\n");
+	    fclose($fp);
+	    chmod($parameter_xmlfile, 0666);
+	}
     }
     $command_options .= " -x $parameter_xmlfile";
 }
