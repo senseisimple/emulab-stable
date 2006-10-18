@@ -14,7 +14,7 @@ use XML::Simple;
 use Data::Dumper;
 
 #
-# Create a new experiment template. 
+# Swapin a previously instantiated template.
 #
 # Exit codes are important; they tell the web page what has happened so
 # it can say something useful to the user. Fatal errors are mostly done
@@ -28,37 +28,22 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_swapin [-q] [-w] [-s]\n".
-	  "         [-S reason] [-L reason] [-a <time>] [-l <time>] ".
-	  "-e <eid> <guid/vers>\n".
+	  "Usage: template_swapin [-q] [-w] -e <eid> <guid/vers>\n".
 	  "switches and arguments:\n".
-	  "-b       - batchmode; insert into batch queue\n".
 	  "-w       - wait for template to be instantiated\n".
 	  "-q       - be less chatty\n".
-	  "-E <str> - A pithy sentence describing the instance\n".
-	  "-x <file>- XML file of parameter bindings\n".
-	  "-S <str> - Instance cannot be swapped; must provide reason\n".
-	  "-L <str> - Instance cannot be IDLE swapped; must provide reason\n".
-	  "-n       - Do not send idle email (internal option only)\n".
-	  "-a <nnn> - Auto swapout nnn minutes after instance is swapped in\n".
-	  "-l <nnn> - Auto swapout nnn minutes after instance goes idle\n".
-	  "-s       - Save disk state on swapout\n".
 	  "-e <eid> - The instance name (unique, alphanumeric, no blanks)\n".
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:x:bE:t:r:f";
+my $optlist	 = "qwe:f";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
-my $batchmode    = 0;
 my $foreground   = 0;
-my $description;
-my $paramfile;
 my $guid;
 my $version;
 my $eid;
-my %parameters   = ();
 
 #
 # Configure variables
@@ -79,9 +64,11 @@ my $user_name;
 my $user_email;
 my $dbuid;
 my $EVhandle;
-my $exptidx;
 my $template;
 my $instance;
+my $experiment;
+my %parameters;
+my $pid;
 my $run;
 my $logname;
 my $template_tag;
@@ -90,11 +77,6 @@ my @ExptStates  = ();
 my $cleaning    = 0;
 my $exptcreated = 0;
 my $justexit    = 1;
-# For replay
-my $replay_exptidx;	# Instance to replay.
-my $replay_runidx;	# Optional run within instance to replay.
-my $replay_instance;	# Replay a complete instance, from first run.
-my $replay_run;	        # Replay starting with a particular run in instance.
 
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
@@ -195,148 +177,28 @@ if (! TBProjAccessCheck($dbuid,
 	    "$guid/$version");
     exit(1);
 }
+$pid = $template->pid();
 
 #
-# Grab instance and/or run if this is a replay.
+# Grab instance; better exist since this is a swapin of an instance!
 #
-if (defined($replay_exptidx)) {
-    $replay_instance =
-      Template::Instance->LookupByExptidx($replay_exptidx);
-
-    if (!defined($replay_instance)) {
-	tbdie("Replay Instance $replay_exptidx does not exist!");
-    }
-
-    if (!defined($replay_runidx)) {
-	#
-	# Default to first run.
-	#
-	# XXX Need to convert these other routines to return Run objects
-	my $row = $replay_instance->FirstRun();
-	if (!defined($row)) {
-	    tbdie("Could not find first run for $replay_instance!");
-	}
-	$replay_runidx = $row->{'idx'};
-    }
-
-    $replay_run =
-      Template::Instance::Run->LookupByID($replay_exptidx, $replay_runidx);
-
-    if (!defined($replay_run)) {
-	tbdie("Replay Run $replay_runidx does not exist!");
-    }
+# We need to find the experiment so we can find the instance.
+# This is wrong, but necessary cause of how templates are layered over
+# the existing experiment structure.
+#
+$experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    tbdie("Experiment $pid/$eid does not exist!");
 }
 
-#
-# If we have a parameter file, we need to copyin the values and store
-# them in the DB for this experiment. Note that these override existing
-# values, so we start with those first.
-#
-# XXX Do we keep these values in the DB forever? Or just keep the XML file
-# around and archived? 
-#
-$template->FormalParameterList(\%parameters) == 0
-    or tbdie("Could not get formal parameter list for $template");
-
-if (defined($paramfile)) {
-    my $donebad = 0;
-    
-    my $parse  = XMLin($paramfile,
-		       VarAttr => 'name',
-		       ContentKey => '-content',
-		       SuppressEmpty => undef);
-
-    foreach my $name (keys(%{ $parse->{'parameter'} })) {
-	my $value = $parse->{'parameter'}->{"$name"}->{'value'};
-
-	if (! TBcheck_dbslot($name,
-			     "experiment_template_instance_bindings", "name",
-			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    tberror("Illegal characters in parameter name: $name");
-	    $donebad++;
-	}
-	if (defined($value) &&
-	    ! TBcheck_dbslot($value,
-			     "experiment_template_instance_bindings", "value",
-			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    tberror("Illegal characters in parameter value: $value");
-	    $donebad++;
-	}
-	# DB records inserted below, once experiment is pre-loaded.
-	# Watch for unwanted parameters.
-	$parameters{$name} = $value
-	    if (exists($parameters{$name}));
-    }
-    # User sees this error.
-    exit(1)
-	if ($donebad);
-}
-
-#
-# Generate a new template instance record.
-# We will finish updating it later.
-#
-$instance = $template->NewInstance($eid, $dbuid);
+$instance = Template::Instance->LookupByExptidx($experiment->idx());
 if (!defined($instance)) {
-    fatal(-1, "Could not insert new experiment instance record!");
+    tbdie("Could not get instance record for experiment $pid/$eid!");
 }
 
-#
-# At this point, we need to force a cleanup no matter how we exit.
-# See the END block below.
-#
-$justexit = 0;
-
-#
-# Now insert the binding records for the instance so that the parser
-# can get them.
-#
-if ($paramfile) {
-    foreach my $name (keys(%parameters)) {
-	my $value = $parameters{$name};
-
-	$instance->NewBinding($name, $value) == 0
-	    or fatal(-1, "Error inserting binding into DB!");
-    }
-}
-elsif (defined($replay_instance)) {
-    #
-    # Bindings come from the replay instance (well, run), although the
-    # use can still have provided a parameter file (above) to override
-    # the values from the record. 
-    #
-    my %replay_bindings = ();
-
-    $replay_run->BindingList(\%replay_bindings) == 0
-	or fatal(-1, "Error getting bindings from $replay_run!");
-
-    foreach my $name (keys(%replay_bindings)) {
-	my $value = $replay_bindings{$name};
-
-	# Insert into new instance now, for the parser to pick up.
-	$instance->NewBinding($name, $value) == 0
-	    or fatal(-1, "Error inserting binding into DB!");
-
-	# These are used below for inserting the run bindings.
-	$parameters{$name} = $value
-	    if (exists($parameters{$name}));
-    }
-}
-
-#
-# We make a copy of either the underlying template experiment, or of the
-# replay argument.
-#
-my $pid    = $template->pid();
-my $copyid = $template->pid() . "," . $template->eid();
-
-#
-# Ah, but if this is a replay, then the copyid is really a tag in a
-# previous experiment. 
-#
-if (defined($replay_instance)) {
-    $copyid = $replay_instance->exptidx() . ":" . $replay_run->start_tag();
-}
+# Need these for default run below.
+$instance->BindingList(\%parameters) == 0
+    or fatal(-1, "Error getting bindings from $instance!");
 
 #
 # Go to the background now so we have a proper log of what happened.
@@ -347,10 +209,14 @@ $SIG{TERM} = \&sighandler;
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
-if (! ($foreground || $batchmode)) {
-    if ($instance->CreateLogFile("swapin", \$logname) < 0) {
-	fatal(-1, "Could not create logfile!");
-    }
+if (! ($foreground || $experiment->batchmode())) {
+    # Cleanup
+    $experiment->CleanLogFiles() == 0
+	or fatal(-1, "Could not clean up logfiles!");
+    
+    $logname = TBExptCreateLogFile($pid, $eid, "swapin");
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
 
     if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
 				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE)) {
@@ -373,7 +239,7 @@ if (! ($foreground || $batchmode)) {
 
 		sleep(2);
 	    }
-	    if ($batchmode) {
+	    if ($experiment->batchmode()) {
 		print("Experiment $pid/$eid has entered the batch system.\n".
 		      "You will be notified when it is fully instantiated.\n")
 		    if (! $quiet);
@@ -417,163 +283,30 @@ if (! ($foreground || $batchmode)) {
     TBdbfork();
 }
 
-#
-# Build up arguments to batchexp. I do not want to bother with shell
-# escapes, hence the list argument to system instead of a long string.
-# Be sure to leave it this way, or perl will invoke a shell and that
-# would be a really bad thing.
-#
-# Note special -x option.
-#
-my @arguments =
-    ($batchexp, "-x", $template->eid(), "-y", $instance->idx(), "-q", "-f",
-     "-p", $pid, "-e", $eid, "-g", $template->gid(),
-     "-E", "'Experiment Template Instantiation $guid/$version' ",
-     "-c" , $copyid);
-
-# All the other goo.
-push(@arguments, "-i")
-    if (!$batchmode);
-push(@arguments, "-s")
-    if (defined($options{"s"}));
-push(@arguments, "-n")
-    if (defined($options{"n"}));
-push(@arguments, ("-S", $options{"S"}))
-    if (defined($options{"S"}));
-push(@arguments, ("-L", $options{"L"}))
-    if (defined($options{"L"}));
-push(@arguments, ("-l", $options{"l"}))
-    if (defined($options{"l"}));
-push(@arguments, ("-a", $options{"a"}))
-    if (defined($options{"a"}));
-push(@arguments, ("-t", $options{"t"}))
-    if (defined($options{"t"}));
-
-# Now invoke batchexp.
-system(@arguments);
-fatal($? >> 8, "Could not pre-instantiate the experiment")
-    if ($?);
-
-# Need to kill the experiment if we fail after this point.
-$exptcreated = 1;
-
-#
-# Now we can do this ...
-#
-if (defined($logname) && ! ($foreground || $batchmode)) {
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
-}
-
-# Grab the experiment record for below.
-my $experiment = Experiment->Lookup($pid, $eid);
-if (!defined($experiment)) {
-    fatal(-1, "Experiment $pid/$eid could not be found after creation!");
-}
-$exptidx = $experiment->idx();
-
-#
-# Templates always get a DB; override the NS file setting of dpdb, and
-# then call out to have it created.
-#
-if ($OPSDBSUPPORT) {
-    my %args = ();
-    
-    $args{'dpdb'} = 1;
-
-    $experiment->Update(\%args) == 0
-	or fatal(-1, "Could not update experiment record!");
-    
-    if (system("$dbcontrol addexpdb $pid $eid")) {
-	fatal(-1, "$dbcontrol addexpdb failed!");
-    }
-    $experiment->Refresh();
-}
-
-#
-# Need the current archive tag so that we can mark the new instance
-# with the the corresponding state of the archive.
-# 
-libArchive::TBExperimentArchiveTag($template->pid(),
-				   $template->eid(), \$template_tag) == 0
-    or fatal(-1, "Could not get current tag for $template");
-
-#
-# Update the Instance
-#
-my %args = ();
-$args{'exptidx'}      = $exptidx;
-$args{'template_tag'} = $template_tag;
-
-$instance->Update(0, \%args) == 0
-    or fatal(-1, "Could not update experiment instance record!");
-
-# Event connect now that experiment is created.
-SetupEventHandler();
-
-my $workdir = $experiment->WorkDir();
-my $userdir = $experiment->UserDir();
-
-#
-# Now we stash the parameter file.
-#
-if ($paramfile) {
-    system("/bin/cp", $paramfile, $userdir . "/archive/parameters.xml") == 0
-	or tbdie("Could not copy out $paramfile");
-}
-
-#
-# Grab a checkout of the datastore and place it into the exp directory.
-# This is essentially a copy.
-#
-my $instance_path = $userdir;
-my $datastore_tag = $template_tag;
-
-#
-# But if this is a replay, then use the tag corresponding to the run being
-# replayed, so that we get the datastore that was in place when the run was,
-# well, originally run.
-#
-if (defined($replay_instance)) {
-    $datastore_tag = $replay_run->start_tag();
-}
-
-print "Checking out a copy of the template datastore ($datastore_tag)\n";
-$instance->CopyDataStore($datastore_tag,
-			 "$instance_path/datastore", $replay_instance) == 0
-    or fatal(-1, "Could not copy datastore to instance");
-
-# Ditto for dynamic events. 
-$instance->CopyTemplateEvents() == 0
-    or fatal(-1, "Could not copy template events to instance");
-
-# We munge the environment variables.
-$instance->InitializeEnvVariables(\%parameters) == 0
-    or fatal(-1, "Could not add new environment variables to instance");
-    
-print "Writing environment strings ...\n";
-$instance->WriteEnvVariables() == 0
-    or fatal(-1, "Could not write environment strings for program agents");
-
-# This has to be redone since the batchexp will have written incomplete data.
-print "Writing program agent info ...\n";
-$instance->WriteProgramAgents() == 0
-    or fatal(-1, "Could not write program agent info");
+# Event connect before starting swapin so we catch all the states.
+SetupEventHandler()
+    if ($experiment->batchmode());
 
 #
 # Now do the swapin (or it gets queued if a batch experiment).
 #
-@arguments = ($swapexp, "-q", "-x", "-s", "in", $pid, $eid);
+my @arguments = ($swapexp, "-q", "-x", "-s", "in", $pid, $eid);
 
 system(@arguments);
 fatal($? >> 8, "Could not instantiate the experiment")
     if ($?);
 
 #
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
+#
 # We will spew forth info to the user each time the batch daemon tries to
 # swap it in. 
 #
-if ($batchmode) {
+if ($experiment->batchmode()) {
     #
     # Spin waiting for the state to change in swapexp. We are waiting for
     # it to swapin or go back to swapped.
@@ -625,7 +358,7 @@ if ($batchmode) {
 # Lets commit the experiment archive now that it is active. The experiment is
 # already running, but thats not a big deal.
 #
-system("$archcontrol -t instantiate commit $pid $eid");
+system("$archcontrol -t swapin commit $pid $eid");
 if ($?) {
     fatal(-1, "Could not commit archive!");
 }
@@ -633,7 +366,7 @@ if ($?) {
 #
 # All instances currently start with a default run.
 #
-$run = $instance->NewRun($eid, $description);
+$run = $instance->NewRun($eid, $instance->description());
 if (!defined($run)) {
     fatal(-1, "Could not create new experiment run for $instance!");
 }
@@ -653,7 +386,10 @@ $instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)
-    if (defined($logname) && !$batchmode);
+    if (defined($logname));
+
+# Make sure the most recent version gets copied out.
+$experiment->CopyLogFiles();
 
 # Email is sent from libaudit at exit ...
 exit(0);
@@ -708,104 +444,6 @@ sub ParseArgs()
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
-    }
-    if (defined($options{"f"})) {
-	$foreground = 1;
-    }
-    if (defined($options{"b"})) {
-	$batchmode = 1;
-    }
-    if (defined($options{"S"})) {
-	if ($options{"S"} =~ /^(.*)$/) {
-	    $options{"S"} = $1;
-	}
-    }
-    if (defined($options{"L"})) {
-	if ($options{"L"} =~ /^(.*)$/) {
-	    $options{"L"} = $1;
-	}
-    }
-    if (defined($options{"l"})) {
-	if ($options{"l"} =~ /^(.*)$/) {
-	    $options{"l"} = $1;
-	}
-    }
-    if (defined($options{"a"})) {
-	if ($options{"a"} =~ /^(.*)$/) {
-	    $options{"a"} = $1;
-	}
-    }
-    if (defined($options{"t"})) {
-	if ($options{"t"} =~ /^(.*)$/) {
-	    $options{"t"} = $1;
-	}
-    }
-
-    if (defined($options{"x"})) {
-	my $inputfile = $options{"x"};
-
-	# Note different taint check (allow /).
-	if ($inputfile =~ /^([-\w\.\/]+)$/) {
-	    $inputfile = $1;
-	}
-	else {
-	    tbdie("Bad data in parameter file: $inputfile");
-	}
-
-	#
-	# Called from ops interactively. Make sure NS file in /proj or /users.
-	#
-	# Use realpath to resolve any symlinks.
-	#
-	my $translated = `realpath $inputfile`;
-	if ($translated =~ /^([-\w\.\/]+)$/) {
-	    $inputfile = $1;
-	}
-	else {
-	    tbdie("Bad data returned by realpath: $translated");
-	}
-
-	#
-	# The file must reside in /proj, /groups, or /users. Since this script
-	# runs as the caller, regular file permission checks ensure its a file
-	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
-	# since this script is invoked directly from web interface.
-	#
-	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.xml/) &&
-	    ! ($inputfile =~ /^\/tmp\/\d+\.xml/) &&
-	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
-	    ! ($inputfile =~ /^\/proj/) &&
-	    ! ($inputfile =~ /^\/groups/) &&
-	    ! ($inputfile =~ /^\/users/)) {
-	    tberror("$inputfile does not resolve to an allowed directory!");
-	    # Note positive status; so error goes to user not tbops.
-	    exit(1);
-	}
-	$paramfile = $inputfile;
-    }
-
-    if (defined($options{"E"})) {
-	if (! TBcheck_dbslot($options{"E"},
-			     "experiment_templates", "description",
-			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    tbdie("Improper template description!");
-	}
-	$description = $options{"E"};
-    }
-
-    if (defined($options{"r"})) {
-	my $replay_option = $options{"r"};
-
-	if ($replay_option =~ /^([\d]+)$/) {
-	    $replay_exptidx = $1;
-	}
-	elsif ($replay_option =~ /^([\d]+):([\d]+)$/) {
-	    $replay_exptidx = $1;
-	    $replay_runidx  = $2;
-	}
-	else {
-	    tbdie("Bad data in argument: $replay_option");
-	}
     }
 }
 
@@ -862,23 +500,16 @@ sub EventHandler($$$) {
 #
 sub cleanup()
 {
-    if ($exptcreated) {
-	exit(-1)
-	    if (!TBExptIDX($pid, $eid, \$exptidx));
+    # For debugging.
+    $experiment->BackupUserData()
+	if (defined($experiment));
 
-	# Before killing it, save off the user directory for debugging.
-	$experiment->BackupUserData();
-		
-	system("$endexp -x -q -w $pid $eid");
-	exit(-1)
-	    if ($?);
-    }
-    $instance->Delete()
-	if (defined($instance));
+    $instance->DeleteCurrentRun()
+	if (defined($run));
 
     # Stop the web interface from spewing.
     TBExptCloseLogFile($pid, $eid)
-	if (defined($logname) && !$batchmode);
+	if (defined($logname));
 }
 
 sub fatal($$)

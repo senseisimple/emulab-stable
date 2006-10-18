@@ -1246,7 +1246,7 @@ sub MetadataList($$)
 #
 sub NewInstance($$$)
 {
-    my ($self, $eid, $creator) = @_;
+    my ($self, $eid, $creator, $description) = @_;
 
     # Must be a real reference. 
     return undef
@@ -1259,6 +1259,8 @@ sub NewInstance($$$)
     $args{'pid'}         = $self->pid();
     $args{'eid'}         = $eid;
     $args{'uid'}         = $creator;
+    $args{'description'} = $description
+	if (defined($description));
 
     return Template::Instance->Create(\%args);
 }
@@ -1703,9 +1705,16 @@ sub LookupByExptidx($$)
 sub Create($$)
 {
     my ($class, $argref) = @_;
+    my $description;
 
     return undef
 	if (ref($class));
+
+    # must treat specially.
+    if (exists($argref->{'description'})) {
+	$description = DBQuoteSpecial($argref->{'description'});
+	delete($argref->{'description'});
+    }
 
     my $query = "insert into experiment_template_instances set ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
@@ -1714,6 +1723,8 @@ sub Create($$)
     $query .= ", "
 	if (defined($argref) && scalar(keys%{$argref}));
     $query .= "start_time=now(),continue_time=now() ";
+    $query .= ",description=$description"
+	if (defined($description));
 
     my $query_result = DBQueryWarn($query);
     return undef
@@ -1741,6 +1752,7 @@ sub continue_time($) { return field($_[0], 'continue_time'); }
 sub runtime($)       { return field($_[0], 'runtime'); }
 sub locked($)        { return field($_[0], 'locked'); }
 sub locker_pid($)    { return field($_[0], 'locker_pid'); }
+sub description($)   { return field($_[0], 'description'); }
 sub template($)      { return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
 
 # The path is the path of the experiment.

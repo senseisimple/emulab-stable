@@ -33,6 +33,7 @@ sub usage()
 	  "-e <eid> <guid/vers>\n".
 	  "switches and arguments:\n".
 	  "-b       - batchmode; insert into batch queue\n".
+	  "-p       - preload only; do not swapin\n".
 	  "-w       - wait for template to be instantiated\n".
 	  "-q       - be less chatty\n".
 	  "-E <str> - A pithy sentence describing the instance\n".
@@ -47,12 +48,13 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwe:S:L:na:l:se:x:bE:t:r:f";
+my $optlist	 = "qwe:S:L:na:l:se:x:bE:t:r:fp";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
 my $batchmode    = 0;
 my $foreground   = 0;
+my $preload      = 0;
 my $description;
 my $paramfile;
 my $guid;
@@ -82,7 +84,6 @@ my $EVhandle;
 my $exptidx;
 my $template;
 my $instance;
-my $run;
 my $logname;
 my $template_tag;
 my @ExptStates  = ();
@@ -99,7 +100,7 @@ my $replay_run;	        # Replay starting with a particular run in instance.
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
 my $batchexp    = "$TB/bin/batchexp";
-my $swapexp     = "$TB/bin/swapexp";
+my $swapin      = "$TB/bin/template_swapin";
 my $endexp      = "$TB/bin/endexp";
 my $dbcontrol   = "$TB/sbin/opsdb_control";
 my $archcontrol = "$TB/bin/archive_control";
@@ -276,7 +277,7 @@ if (defined($paramfile)) {
 # Generate a new template instance record.
 # We will finish updating it later.
 #
-$instance = $template->NewInstance($eid, $dbuid);
+$instance = $template->NewInstance($eid, $dbuid, $description);
 if (!defined($instance)) {
     fatal(-1, "Could not insert new experiment instance record!");
 }
@@ -508,9 +509,6 @@ $args{'template_tag'} = $template_tag;
 $instance->Update(0, \%args) == 0
     or fatal(-1, "Could not update experiment instance record!");
 
-# Event connect now that experiment is created.
-SetupEventHandler();
-
 my $workdir = $experiment->WorkDir();
 my $userdir = $experiment->UserDir();
 
@@ -560,96 +558,25 @@ print "Writing program agent info ...\n";
 $instance->WriteProgramAgents() == 0
     or fatal(-1, "Could not write program agent info");
 
-#
-# Now do the swapin (or it gets queued if a batch experiment).
-#
-@arguments = ($swapexp, "-q", "-x", "-s", "in", $pid, $eid);
-
-system(@arguments);
-fatal($? >> 8, "Could not instantiate the experiment")
-    if ($?);
-
-#
-# We will spew forth info to the user each time the batch daemon tries to
-# swap it in. 
-#
-if ($batchmode) {
+if (! $preload) {
     #
-    # Spin waiting for the state to change in swapexp. We are waiting for
-    # it to swapin or go back to swapped.
+    # Now do the swapin (or it gets queued if a batch experiment).
     #
-    my $queued = 0;
-    
-    while (1) {
-	@ExptStates = ();
-	event_poll_blocking($EVhandle, 500);
-
-	next
-	    if (! @ExptStates);
-
-	foreach my $state (@ExptStates) {
-	    print "$state\n";
-	    
-	    if ($state eq EXPTSTATE_ACTIVATING()) {
-		print "Experiment is starting a swapin attempt ...\n";
-	    }
-	    elsif ($state eq EXPTSTATE_ACTIVE()) {
-		print "Experiment swapped in!\n";
-		goto done;
-	    }
-	    elsif ($state eq EXPTSTATE_QUEUED()) {
-		# Failed to swapin; still queued in the batch system.
-		if (! $queued) {
-		    print "Experiment has entered the batch system\n";
-		    $queued = 1;
-		}
-		else {
-		    print "Experiment swapin attempt failed.\n";
-		}
-	    }
-	    elsif ($state eq EXPTSTATE_SWAPPED()) {
-		# Dumped out of the batch system for some reason.
-		print "Experiment has been removed from the batch queue.\n";
-
-		#
-		# We are done; remove record of this attempt and exit.
-		#
-		fatal(1, "Experiment has been removed from the batch queue");
-	    }
-	}
+    system("$swapin -w -f -e $eid $guid/$version");
+    if ($?) {
+	fatal(-1, "Could not swapin instance $instance!");
     }
-  done:
 }
-
-#
-# Lets commit the experiment archive now that it is active. The experiment is
-# already running, but thats not a big deal.
-#
-system("$archcontrol -t instantiate commit $pid $eid");
-if ($?) {
-    fatal(-1, "Could not commit archive!");
+else {
+    #
+    # Lets commit the experiment archive now. The experiment might already
+    # be running, but thats not a big deal.
+    #
+    system("$archcontrol -t instantiate commit $pid $eid");
+    if ($?) {
+	fatal(-1, "Could not commit archive!");
+    }
 }
-
-#
-# All instances currently start with a default run.
-#
-$run = $instance->NewRun($eid, $description);
-if (!defined($run)) {
-    fatal(-1, "Could not create new experiment run for $instance!");
-}
-
-#
-# And the bindings for the default run ...
-#
-foreach my $name (keys(%parameters)) {
-    my $value = $parameters{$name};
-
-    $instance->NewRunBinding($name, $value) == 0
-	or fatal(-1, "Error inserting run binding into DB!");
-}
-
-$instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0
-    or fatal(-1, "Could not update start time in instance record!");
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)
@@ -711,6 +638,9 @@ sub ParseArgs()
     }
     if (defined($options{"f"})) {
 	$foreground = 1;
+    }
+    if (defined($options{"p"})) {
+	$preload = 1;
     }
     if (defined($options{"b"})) {
 	$batchmode = 1;
@@ -786,7 +716,7 @@ sub ParseArgs()
 
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"},
-			     "experiment_templates", "description",
+			     "experiment_template_instances", "description",
 			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 	    tbdie("Improper template description!");
 	}
@@ -807,54 +737,6 @@ sub ParseArgs()
 	    tbdie("Bad data in argument: $replay_option");
 	}
     }
-}
-
-#
-# Subscribe to experiment state change events.
-#
-sub SetupEventHandler()
-{
-    my $port = @BOSSEVENTPORT@;
-    my $URL  = "elvin://localhost:$port";
-    
-    # Connect to the event system, and subscribe the the events we want
-    $EVhandle = event_register($URL, 0);
-    
-    if (!$EVhandle) {
-	tbdie("Unable to register with event system\n");
-    }
-
-    my $tuple = address_tuple_alloc();
-    if (!$tuple) {
-	tbdie("Could not allocate an address tuple\n");
-    }
-
-    %$tuple = ( objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-		objname   => "$pid/$eid",
-		expt      => "$pid/$eid",
-		host      => $BOSSNODE,
-	      );
-    
-    if (!event_subscribe($EVhandle, \&EventHandler, $tuple)) {
-	tbdie("Could not subscribe to events\n");
-    }
-}
-
-#
-# Callback for above.
-#
-sub EventHandler($$$) {
-    my ($handle,$notification,undef) = @_;
-    
-    my $objname   = event_notification_get_objname($handle,$notification);
-    my $eventtype = event_notification_get_eventtype($handle,$notification);
-
-    print "$objname, $eventtype\n";
-
-    return
-	if ($objname ne "$pid/$eid");
-
-    push(@ExptStates, $eventtype);
 }
 
 #

@@ -336,7 +336,9 @@ if ($expstate) {
 	}
 	else {
 	    if ($expstate == $TB_EXPTSTATE_SWAPPED) {
-		WRITESUBMENUBUTTON("Swap Experiment In",
+		WRITESUBMENUBUTTON(($instance ?
+				    "Swap Instance In" :
+				    "Swap Experiment In"),
 			 "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||

@@ -270,6 +270,22 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	  </tr>\n";
 
     #
+    # Preload?
+    #
+    echo "<tr>
+	      <td class='pad4' colspan=2>
+		  <input type=checkbox name='formfields[preload]'
+                         value='Yep'";
+
+    if (isset($formfields[preload]) &&
+	strcmp($formfields[preload], "Yep") == 0) {
+	echo " checked='1'";
+    }
+    echo ">\n";
+    echo "Do Not Swap In</td>
+	 </tr>\n";
+
+    #
     # Run linktest, and level. 
     #
     if (STUDLY() || $EXPOSELINKTEST) {
@@ -341,6 +357,7 @@ if (! $template->AccessCheck($uid, $TB_EXPT_UPDATE)) {
 #
 if (!isset($swapin)) {
     $defaults[eid]		     = $template->tid();
+    $defaults[preload]               = "no";    
     $defaults[exp_swappable]         = "1";
     $defaults[exp_noswap_reason]     = "";
     $defaults[exp_idleswap]          = "1";
@@ -625,6 +642,13 @@ if (isset($formfields[batched]) && $formfields[batched] == "Yep") {
 }
 
 #
+# Preload?
+#
+if (isset($formfields[preload]) && $formfields[preload] == "Yep") {
+    $command_options .= " -p";
+}
+
+#
 # LinkTest
 #
 if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
@@ -697,7 +721,8 @@ STARTBUSY("Starting template instantiation!");
 # Run the backend script.
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_swapin $command_options -e $eid $guid/$version",
+		 "webtemplate_instantiate ".
+		    "$command_options -e $eid $guid/$version",
 		 SUEXEC_ACTION_IGNORE);
 
 CLEARBUSY();

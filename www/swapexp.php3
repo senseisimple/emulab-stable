@@ -101,7 +101,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 
 # Template Instance Experiments get special treatment in this page.
 $instance = TemplateInstance::LookupByExptidx($exptidx);
-if ($instance && $inout != "out") {
+if ($instance && ($inout != "out" && $inout != "in")) {
     PAGEARGERROR("Invalid action for template instance");
 }
 
@@ -169,7 +169,7 @@ if (!$confirmed) {
 	echo "<font color=red><br>forcibly</br></font> ";
     }
     if ($instance) {
-	echo "terminate template instance";
+	echo "$action template instance";
     }
     else {
 	echo "$action experiment";
@@ -236,7 +236,8 @@ if ($instance) {
     $guid = $instance->guid();
     $version = $instance->vers();
 
-    STARTBUSY("Terminating template instance!");
+    STARTBUSY(($inout == "out" ? "Terminating" : "Starting") . 
+	      " template instance!");    
 }
 
 #
@@ -256,7 +257,7 @@ $retval = SUEXEC($uid, "$exp_pid,$unix_gid",
 		  ($force ?
 		   "webidleswap $args $exp_pid $exp_eid" :
 		   ($instance ?
-		    "webtemplate_swapout -e $exp_eid $guid/$version" :
+		    "webtemplate_swap$inout -e $exp_eid $guid/$version" :
 		    "webswapexp -s $inout $exp_pid $exp_eid")),
 		 SUEXEC_ACTION_IGNORE);
 
