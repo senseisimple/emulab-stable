@@ -185,7 +185,8 @@ if ($UID && !TBAdmin($UID)) {
 #
 if (system("$checkquota $dbuid") != 0) {
     die("*** $0:\n".
-	"    You are over your disk quota on $CONTROL; please cleanup!\n");
+	"    You are over your disk quota on $CONTROL; ".
+	"please login there and cleanup!\n");
 }
 
 #

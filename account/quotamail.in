@@ -39,10 +39,15 @@ You can check your usage with the 'quota' command on @USERNODE@:
 
 (Note: This will not work from nodes in an experiment.)
 
-The directory trees where you most likely have files are:
+The directory trees (on @USERNODE@) where you most likely have files are:
+
 Project directory:    @FSDIR_PROJ@
 Group directory:      @FSDIR_GROUPS@
 User/Home directory:  @FSDIR_USERS@   
+
+PLEASE NOTE: just login to @USERNODE@ directly to do the cleanup!
+You will not be able to swapin an experiment to access these directories
+while over quota.
 
 Thanks,
 @THISHOMEBASE@ Testbed Operations

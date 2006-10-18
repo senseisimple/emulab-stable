@@ -184,7 +184,8 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 if (system("$checkquota $dbuid") != 0) {
     tberror({cause => 'user', type => 'primary', severity => SEV_ERROR,
 	     error => ['over_disk_quota', $CONTROL]},
-	    "You are over your disk quota on $CONTROL; please cleanup!");
+	    "You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
     exit(1);
 }
 

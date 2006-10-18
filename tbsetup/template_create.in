@@ -141,7 +141,8 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 # our time. Make sure user sees the error by exiting with 1.
 #
 if (system("$checkquota $dbuid") != 0) {
-    tberror("You are over your disk quota on $CONTROL; please cleanup!");
+    tberror("You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
     exit(1);
 }
 

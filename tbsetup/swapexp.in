@@ -347,7 +347,8 @@ my $overquota = system("$checkquota $dbuid");
 if ($overquota) {
     tberror({cause => 'user', severity => SEV_WARNING,
 	     error => ['over_disk_quota', $CONTROL]},
-	    "You are over your disk quota on $CONTROL; please cleanup!");
+	    "You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
 }
 
 #
