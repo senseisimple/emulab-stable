@@ -205,7 +205,7 @@ sub ArchiveCreate(;$$$)
 	goto bad;
     }
     # Initialize the repo.
-    mysystem("$SVNADMIN create $repodir") == 0
+    mysystem("$SVNADMIN create --fs-type fsfs $repodir") == 0
 	or goto bad;
     
     # Create an stub directory tree and import it as "root"
