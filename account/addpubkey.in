@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,7 +42,6 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
-my $HOMEDIR	= "/users";
 my $KEYGEN	= "/usr/bin/ssh-keygen";
 my $USERUID;
 
@@ -70,6 +69,8 @@ sub ParseKey($);
 sub InitUser();
 sub GenerateKeyFile();
 sub fatal($);
+
+my $HOMEDIR = USERROOT();
 
 #
 # Turn off line buffering on output

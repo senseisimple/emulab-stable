@@ -20,6 +20,8 @@ PACKAGE_VERSION = 0.1
 XMLRPC_SERVER = "@BOSSNODE@"
 XMLRPC_PORT   = 3069
 
+PROJROOT = "@PROJROOT_DIR@"
+
 try:
     pw = pwd.getpwuid(os.getuid())
 except KeyError:
@@ -72,7 +74,7 @@ except getopt.error, e:
 
 pid, eid = req_args
 
-expdir = os.path.join("/proj", pid, "exp", eid)
+expdir = os.path.join(PROJROOT, pid, "exp", eid)
 
 sys.path.append(os.path.join(prefix, "lib"))
 from sshxmlrpc import *

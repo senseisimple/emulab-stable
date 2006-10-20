@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -32,8 +32,6 @@ my $CVSDCONFOLD	= "/usr/local/etc/cvsd/cvsd.conf.backup";
 my $HEADFILE    = "$TB/lib/cvsd.conf.head";
 my $STARTPROG   = "/usr/local/etc/rc.d/cvsd.sh";
 my $REPODIR     = "cvsrepos";
-my $PROJREPODIR = "/proj/$REPODIR";
-my $JAILREPODIR = "/var/cvsjail/$REPODIR";
 my $MOUNT	= "/sbin/mount -o ro";
 my $UNMOUNT     = "/sbin/umount";
 my %pubrepos    = ();
@@ -61,6 +59,9 @@ sub fatal($);
 # 
 use lib "@prefix@/lib";
 use libtestbed;
+
+my $PROJREPODIR = PROJDIR() . "/$REPODIR";
+my $JAILREPODIR = "/var/cvsjail/$REPODIR";
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

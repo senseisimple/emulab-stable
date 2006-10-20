@@ -52,8 +52,6 @@ my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
 my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 
-my $PROJROOT = "/proj";
-my $GRPROOT  = "/groups";
 my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
 my $DELMMLIST= "$TB/sbin/delmmlist";
@@ -78,6 +76,9 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+
+my $PROJROOT    = PROJROOT();
+my $GRPROOT     = GROUPROOT();
 
 #
 # Check args.

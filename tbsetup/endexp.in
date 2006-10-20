@@ -88,7 +88,6 @@ use Experiment;
 $libdb::DBQUERY_MAXTRIES = 0;
 
 my $tbdir       = "$TB/bin/";
-my $projroot    = "/proj";
 my $tbdata      = "tbdata";
 my $archcontrol = "$TB/bin/archive_control";
 my $nextstate;

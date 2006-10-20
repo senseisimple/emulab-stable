@@ -94,7 +94,7 @@ if (!$confirmed) {
     echo "<blockquote><blockquote>
           <ol>
             <li> By default, your instance will be exported to
-                 <tt>/proj/$pid/export/$guid/$version/$exptidx</tt>,
+                 <tt>$TBPROJ_DIR/$pid/export/$guid/$version/$exptidx</tt>,
                  available to
                  other experiments in your project. If you want to export
                  to a local file, click the <em>local disk</em> option

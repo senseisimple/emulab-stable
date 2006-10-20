@@ -79,7 +79,6 @@ if ($EUID != 0) {
 $libdb::DBQUERY_MAXTRIES = 30;
 
 # Locals
-my $PROJROOT	= PROJROOT();
 my $SAVEUID     = $UID;
 my $workdir;
 my %noderoles	= ();
@@ -294,8 +293,9 @@ $UID = 0;
 #
 my $mkelab = "$TB/etc/rc.mkelab";
 
-if (-e "/proj/$pid/exp/$eid/rc.mkelab") {
-    $mkelab = "/proj/$pid/exp/$eid/rc.mkelab";
+my $expdir = PROJROOT() . "/$pid/exp/$eid";
+if (-e "$expdir/rc.mkelab") {
+    $mkelab = "$expdir/rc.mkelab";
 }
 print "Copying $mkelab to ${bossnode}/${opsnode}";
 print "/${fsnode}"
@@ -914,7 +914,7 @@ sub DumpDBGoo()
     $UID = 0;
     system("tar cf - -C $statedir . | ".
 	   "   gzip | $SSH -F /dev/null -host $CONTROL ".
-	   "   '(cat > /$PROJROOT/$pid/exp/$eid/dbstate.tar.gz)'");
+	   "   '(cat > $expdir/dbstate.tar.gz)'");
     if ($?) {
 	die("*** $0:\n".
 	    "    Could not create dbstate.tar.gz\n");

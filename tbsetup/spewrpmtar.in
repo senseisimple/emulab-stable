@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -207,13 +207,14 @@ sub VerifyFile()
     }
 
     #
-    # The file must reside in /proj/$pid/$eid or /groups/$pid/$eid.
-    # allow anything from /users!
+    # The file must reside in /proj/$pid/$eid, /groups/$pid/$gid
+    # or /scratch/$pid.  Don't allow anything from /users!
     #
-    if (! ($translated =~ /^\/proj\/$pid\//) &&
-	! ($translated =~ /^\/groups\/$pid\/$eid\//)) {
+    if (! TBValidUserDir($translated, 0, undef, $pid, $gid)) {
 	if ($debug) {
-	    print STDERR "$translated is not in /proj or /groups!\n";
+	    print STDERR "$translated is not in ",
+			 join(' or ', TBValidUserDirList(undef, $pid, $gid)),
+			 ".\n";
 	}
 	return 1;
     }

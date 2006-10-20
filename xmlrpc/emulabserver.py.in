@@ -43,10 +43,11 @@ from emulabclient import *
 VERSION = 0.1
 
 # Well known directories
-PROJROOT = "/proj"
-GROUPROOT = "/groups"
-SHAREROOT = "/share"
-USERSROOT = "/users"
+PROJROOT = "@PROJROOT_DIR@"
+GROUPROOT = "@GROUPSROOT_DIR@"
+SCRATCHROOT = "@SCRATCHROOT_DIR@"
+SHAREROOT = "@SHAREROOT_DIR@"
+USERSROOT = "@USERSROOT_DIR@"
 
 # List of directories exported to nodes via NFS.
 NFS_EXPORTS = [
@@ -54,6 +55,7 @@ NFS_EXPORTS = [
     GROUPROOT,
     SHAREROOT,
     USERSROOT,
+    SCRATCHROOT,
     ]
 
 #
@@ -794,6 +796,7 @@ class fs:
         for proj in projs:
             if proj[0] == proj[1]:
                 res.append(PROJROOT + "/" + proj[0])
+		res.append(SCRATCHROOT + "/" + proj[0])
                 pass
             else:
                 res.append(GROUPROOT + "/" + proj[0] + "/" + proj[1])
@@ -5092,7 +5095,7 @@ def nfspath(value):
 
     found = False
     for export in NFS_EXPORTS:
-        if retval.startswith(export):
+        if export != "" and retval.startswith(export):
             found = True
             break
         pass

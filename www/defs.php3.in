@@ -63,11 +63,19 @@ if ($WWWHOST != "www.emulab.net") {
     $TBMAINSITE = 0;
 }
 
-$TBPROJ_DIR     = "/proj";
-$TBUSER_DIR	= "/users";
-$TBGROUP_DIR	= "/groups";
+$TBPROJ_DIR     = "@PROJROOT_DIR@";
+$TBUSER_DIR	= "@USERSROOT_DIR@";
+$TBGROUP_DIR	= "@GROUPSROOT_DIR@";
+$TBSCRATCH_DIR	= "@SCRATCHROOT_DIR@";
 $TBCVSREPO_DIR  = "$TBPROJ_DIR/cvsrepos";
 $TBNSSUBDIR     = "nsdir";
+
+$TBVALIDDIRS	  = "$TBPROJ_DIR, $TBUSER_DIR, $TBGROUP_DIR";
+$TBVALIDDIRS_HTML = "<code>$TBPROJ_DIR</code>, <code>$TBUSER_DIR</code>, <code>$TBGROUP_DIR</code>";
+if ($TBSCRATCH_DIR) {
+    $TBVALIDDIRS .= ", $TBSCRATCH_DIR";
+    $TBVALIDDIRS_HTML .= ", <code>$TBSCRATCH_DIR</code>";
+}
 
 $TBAUTHCOOKIE   = "HashCookie" . $TBCOOKIESUFFIX;
 $TBNAMECOOKIE   = "MyUidCookie" . $TBCOOKIESUFFIX;
@@ -394,6 +402,29 @@ function CHECKPASSWORD($uid, $password, $name, $email, &$error)
 
 function LASTNODELOGIN($node)
 {
+}
+
+function VALIDUSERPATH($path, $uid="", $pid="", $gid="", $eid="")
+{
+    global $TBPROJ_DIR, $TBUSER_DIR, $TBGROUP_DIR, $TBSCRATCH_DIR;
+
+    #
+    # No ids specified, just make sure it starts with an appropriate prefix.
+    #
+    if (!$uid && !$pid && !$gid && !$eid) {
+	if (ereg("^$TBPROJ_DIR/.*", $path) ||
+	    ereg("^$TBUSER_DIR/.*", $path) ||
+	    ereg("^$TBGROUP_DIR/.*", $path)) {
+	    return 1;
+	}
+	if ($TBSCRATCH_DIR && ereg("^$TBSCRATCH_DIR/.*", $path)) {
+	    return 1;
+	}
+	return 0;
+    }
+
+    # XXX for now, see tbsetup/libtestbed.pm for what should happen
+    return 0;
 }
 
 #

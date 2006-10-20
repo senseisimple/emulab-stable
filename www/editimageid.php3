@@ -351,10 +351,10 @@ else {
     $gid    = $defaults["gid"];
 	
     if (!$shared && strcmp($gid, $pid)) {
-	$pdef = "/groups/" . $pid . "/" . $gid . "/";
+	$pdef = "$TBGROUP_DIR/" . $pid . "/" . $gid . "/";
     }
     else {
-	$pdef = "/proj/" . $pid . "/";
+	$pdef = "$TBPROJ_DIR/" . $pid . "/";
     }
 
     if (strpos($formfields[path], $pdef) === false) {

@@ -49,7 +49,6 @@ my $eid;
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $PROJROOT	= "/proj";
 my $EVENTSYS	= @EVENTSYS@;
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";

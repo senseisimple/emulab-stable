@@ -9,6 +9,13 @@ use Getopt::Std;
 use English;
 use POSIX;
 
+#
+# XXX config stuff that does not belong on the client-side
+#
+my $TB            = "@prefix@";
+my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
+my $EVENTSERVER   = "@EVENTSERVER";
+my $PROJROOT      = "@PROJROOT_DIR@";
 
 #
 # Wrapper for running the linktest daemon. This script is currently
@@ -41,9 +48,8 @@ my $startAt = 1; # default start level
 my $stopAt = 4 ; # default stop level
 
 # Local goo
-my $TB          = "@prefix@";
-my $TMCC	= "@CLIENT_BINDIR@/tmcc";
-my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
+my $TMCC	= "$CLIENT_BINDIR/tmcc";
+my $LTEVENT     = "$CLIENT_BINDIR/ltevent";
 my $LOGHOLE     = "$TB/bin/loghole";
 my $LTEVENTOPS  = "$TB/libexec/ltevent";
 my $STOPEVENT   = "STOP"; # XXX Left in here for backwards compat.
@@ -206,18 +212,18 @@ else {
 # Default to the standard event server.
 #
 if (!defined($server)) {
-    $server = "@EVENTSERVER@";
+    $server = "$EVENTSERVER";
 }
 
 #
 # These days, must use a keyfile!
 #
 if (!defined($keyfile)) {
-    $keyfile = "/proj/$pid/exp/$eid/tbdata/eventkey";
+    $keyfile = "$PROJROOT/$pid/exp/$eid/tbdata/eventkey";
 }
 
-my $linktest_path; # path to linktest data.
-$linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
+# path to linktest data.
+my $linktest_path = "$PROJROOT/$pid/exp/$eid/tbdata/linktest";
 
 # send the startup event.
 my $args = starter();
@@ -467,7 +473,7 @@ sub kill_linktest_run {
 }
 
 sub run_loghole {
-    my $ltlogs = "/proj/$pid/exp/$eid/tbdata/ltlogs";
+    my $ltlogs = "$PROJROOT/$pid/exp/$eid/tbdata/ltlogs";
 
     print "Downloading logs...\n";
 

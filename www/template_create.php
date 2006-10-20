@@ -25,6 +25,7 @@ function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $projlist;
+    global $TBVALIDDIRS_HTML;
 
     PAGEHEADER("Create an Experiment Template");
 
@@ -177,8 +178,7 @@ function SPITFORM($formfields, $errors)
                     <td>&nbsp;&nbsp;<b>or</b></td><td></td>
                     </tr><tr>
                       <td class='pad4'>On Server<br>
-                              <font size='-1'>(<code>/proj</code>,
-                        <code>/groups</code>, <code>/users</code>)</font></td>
+                              <font size='-1'>($TBVALIDDIRS_HTML)</font></td>
                       <td class='pad4'>
 	                <input type=text
                                name=\"formfields[localnsfile]\"
@@ -352,11 +352,9 @@ elseif (isset($formfields[localnsfile]) && $formfields[localnsfile] != "") {
     if (!preg_match("/^([-\@\w\.\/]+)$/", $formfields[localnsfile])) {
 	$errors["Server NS File"] = "Pathname includes illegal characters";
     }
-    elseif (! ereg("^$TBPROJ_DIR/.*",  $formfields[localnsfile]) &&
-	    ! ereg("^$TBUSER_DIR/.*",  $formfields[localnsfile]) &&
-	    ! ereg("^$TBGROUP_DIR/.*", $formfields[localnsfile])) {
-	$errors["Server NS File"] = "Must reside in either ".
-	    "$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/";
+    elseif (! VALIDUSERPATH($formfields[localnsfile])) {
+	$errors["Server NS File"] =
+		"Must reside in one of: $TBVALIDDIRS";
     }
     $nsfilelocale = "local";
 }

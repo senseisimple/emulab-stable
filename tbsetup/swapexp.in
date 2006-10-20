@@ -255,19 +255,18 @@ if ($inout eq "modify" && @ARGV > 2) {
     }
 
     #
-    # The file must reside in /proj, /groups, or /users. Since this script
-    # runs as the caller, regular file permission checks ensure its a file
-    # the user is allowed to use. /tmp/$guid-$nsref.nsfile also allowed
-    # since this script is invoked directly from web interface, which generates
-    # a name that should not be guessable, so as long as it looks to be in
-    # proper format, we accept it. 
+    # The file must reside in an acceptible location. Since this script
+    # runs as the caller, regular file permission checks ensure it is a
+    # file the user is allowed to use.   So we don't have to be too tight
+    # with the RE matching /tmp and /var/tmp files.  Note that
+    # /tmp/$guid-$nsref.nsfile is also allowed since this script is
+    # invoked directly from web interface which generates a name that
+    # should not be guessable.
     #
     if (! ($tempnsfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
 	! ($tempnsfile =~ /^\/var\/tmp\/php\w+/) &&
-	! ($tempnsfile =~ /^\/proj/) &&
-	! ($tempnsfile =~ /^\/groups/) &&
-	! ($tempnsfile =~ /^\/users/)) {
-	tbdie("$tempnsfile does not resolve to an appropriate directory!");
+	! TBValidUserDir($tempnsfile, 0)) {
+	tbdie("$tempnsfile does not resolve to an allowed directory!");
     }
 
     if (! -f $tempnsfile || -z $tempnsfile || ! -r $tempnsfile) {

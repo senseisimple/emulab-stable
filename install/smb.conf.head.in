@@ -177,7 +177,7 @@ log level = 2
 
 [share]
                 comment         = Shared files
-                path            = /share
+                path            = @SHAREROOT_DIR@
 		browsable	= yes
                 writable        = no
 #                create mask     = 0770

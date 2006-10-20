@@ -14,7 +14,7 @@ variable links
 # optional items
 variable rtproto "none"
 variable simname
-variable DATASTORE "/proj"
+variable DATASTORE "@PROJROOT_DIR@"
 
 rename puts real_puts
 proc puts {args} {

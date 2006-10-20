@@ -30,6 +30,7 @@ FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 FSDIR_SHARE=/share
+FSDIR_SCRATCH=
 FS_WITH_QUOTAS="/q /users"
 WWWHOST=www.emulab.net
 TBMAINSITE=1

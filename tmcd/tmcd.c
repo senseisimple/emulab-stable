@@ -47,11 +47,15 @@
 #ifdef  FSDIR_SHARE
 #define FSSHAREDIR	FSNODE ":" FSDIR_SHARE
 #endif
-#define PROJDIR		"/proj"
-#define GROUPDIR	"/groups"
-#define USERDIR		"/users"
+#ifdef  FSDIR_SCRATCH
+#define FSSCRATCHDIR	FSNODE ":" FSDIR_SCRATCH
+#endif
+#define PROJDIR		PROJROOT_DIR
+#define GROUPDIR	GROUPSROOT_DIR
+#define USERDIR		USERSROOT_DIR
+#define SCRATCHDIR	SCRATCHROOT_DIR
+#define SHAREDIR	SHAREROOT_DIR
 #define NETBEDDIR	"/netbed"
-#define SHAREDIR	"/share"
 #define PLISALIVELOGDIR "/usr/testbed/log/plabisalive"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
@@ -2978,6 +2982,16 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 		
+#ifdef FSSCRATCHDIR
+		/*
+		 * Return scratch mount if its defined.
+		 */
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
+		       FSSCRATCHDIR, reqp->pid, SCRATCHDIR, reqp->pid);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+#endif
 #ifdef FSSHAREDIR
 		/*
 		 * Return share mount if its defined.
@@ -3030,6 +3044,18 @@ COMMAND_PROTOTYPE(domounts)
 				client_writeback(sock, buf, strlen(buf), tcp);
 				info("MOUNTS: %s", buf);
 			}
+#ifdef FSSCRATCHDIR
+			/*
+			 * Pointer to per-project scratch directory.
+			 */
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
+			       fshostid, FSDIR_SCRATCH, reqp->pid,
+			       SCRATCHDIR, reqp->pid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			if (verbose)
+				info("MOUNTS: %s", buf);
+#endif
 #ifdef FSSHAREDIR
 			/*
 			 * Pointer to /share.
@@ -3058,16 +3084,19 @@ COMMAND_PROTOTYPE(domounts)
 			 *
 			 * Pointer to /proj.
 			 */
-			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s/%s\n",
-				fshostid, FSDIR_PROJ, NETBEDDIR, PROJDIR);
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s LOCAL=%s/%s\n",
+			       fshostid, FSDIR_PROJ, NETBEDDIR, PROJDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("MOUNTS: %s", buf);
+			if (verbose)
+				info("MOUNTS: %s", buf);
 
 			/*
 			 * Pointer to /groups
 			 */
-			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s%s\n",
-				fshostid, FSDIR_GROUPS, NETBEDDIR, GROUPDIR);
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s LOCAL=%s%s\n",
+			       fshostid, FSDIR_GROUPS, NETBEDDIR, GROUPDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
 				info("MOUNTS: %s", buf);
@@ -3075,17 +3104,30 @@ COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /users
 			 */
-			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s%s\n",
-				fshostid, FSDIR_USERS, NETBEDDIR, USERDIR);
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s LOCAL=%s%s\n",
+			       fshostid, FSDIR_USERS, NETBEDDIR, USERDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
 				info("MOUNTS: %s", buf);
+#ifdef FSSCRATCHDIR
+			/*
+			 * Pointer to per-project scratch directory.
+			 */
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s LOCAL=%s/%s\n",
+			       fshostid, FSDIR_SCRATCH, NETBEDDIR, SCRATCHDIR);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			if (verbose)
+				info("MOUNTS: %s", buf);
+#endif
 #ifdef FSSHAREDIR
 			/*
 			 * Pointer to /share.
 			 */
-			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s%s\n",
-				fshostid, FSDIR_SHARE, NETBEDDIR, SHAREDIR);
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s LOCAL=%s%s\n",
+			       fshostid, FSDIR_SHARE, NETBEDDIR, SHAREDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
 				info("MOUNTS: %s", buf);
@@ -3251,7 +3293,7 @@ COMMAND_PROTOTYPE(dosfshostid)
 	 * Create symlink names
 	 */
 	OUTPUT(sfspath, sizeof(sfspath), "/sfs/%s", nodehostid);
-	OUTPUT(dspath, sizeof(dspath), "/proj/%s/%s.%s.%s", DOTSFS,
+	OUTPUT(dspath, sizeof(dspath), "%s/%s/%s.%s.%s", PROJDIR, DOTSFS,
 	       reqp->nickname, reqp->eid, reqp->pid);
 
 	/*

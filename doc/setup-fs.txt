@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2005 University of Utah and the Flux Group.
+# Copyright (c) 2002-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -63,6 +63,12 @@ space to hold them:
 			which aids per-project accountability.
 /groups/      - Needs enough space for files shared by the sub-groups of
 			projects. These are primarily used by classes, if any.
+/scratch/     - Optional, large filesystem of "scratch" space.  The intent
+			is that this filesystem provides per-project space
+			that is not "guaranteed" (for the Utah Emulab that
+			means we do not back it up to tape).  If used,
+			you would either set no quotas, or higher quotas
+			than for /proj.
 /share/       - Exported read-only to all nodes, we use it for providing to
 			experimenters the source for the FreeBSD and Linux
 			versions we run as well as common packages and RPMs.
@@ -74,6 +80,11 @@ main reason you'd want to keep them in separate filesystems (i.e., so people
 can have different /users/ and /proj/ quotas.) If you do not think you will
 ever use quotas, then you could make /users and /proj part of the same
 filesystem.
+
+As mentioned /scratch is optional.  If you are not providing "guarantees"
+such as filesaved or RAIDed disk space and you are not using quotas, you
+might as well just put all your space in /proj and not define FSDIR_SCRATCH
+in the defs file.
 
 Note also since /share is exported read-only, FreeBSD requires that it be on
 a separate filesystem from anything that is exported read-write.  So while
@@ -87,7 +98,8 @@ symlinks to the appropriate places. ie., if you make one big filesystem called
 	ln -s /z/proj /proj
 	... etc.
 
-In other words, we assume the existence of /users, /proj, /group and /share.
+In other words, we assume the existence of /users, /proj, /group and /share
+(but not /scratch).
 
 Do *not* create any user accounts, Emulab does not require that its users
 have login accounts on the fileserver.  For the purposes of this setup, just

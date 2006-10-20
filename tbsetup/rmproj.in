@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -24,7 +24,6 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
 
-my $PROJROOT = "/proj";
 my $RMGROUP  = "$TB/sbin/rmgroup";
 my $MODGROUPS= "$TB/sbin/modgroups";
 
@@ -46,6 +45,9 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+
+my $PROJROOT     = PROJROOT();
+my $SCRATCHROOT  = SCRATCHROOT();
 
 #
 # We don't want to run this script unless its the real version.
@@ -138,6 +140,30 @@ if (-e "$PROJROOT/$pid") {
     }
 }
     
+#
+# and the scratch directory if it exists
+#
+if ($SCRATCHROOT && -e "$SCRATCHROOT/$pid") {
+    my $oldname = "$SCRATCHROOT/$pid";
+    my $newname = "$SCRATCHROOT/$savename";
+
+    if (rename($oldname, $newname)) {
+	#
+	# Chown the owner/group to root and set the permissions so no
+	# one is allowed to look inside.
+	#
+	if (! chmod(0700, $newname)) {
+	    fatal("Could not chmod directory $newname to 0700: $!");
+	}
+	if (! chown(0, 0, $newname)) {
+	    fatal("Could not chown directory $newname to 0/0: $!");
+	}
+    }
+    else {
+	fatal("Could not rename proj directory to $newname: $!");
+    }
+}
+
 #
 # Ditto for the experiment working directory.
 #

@@ -65,7 +65,6 @@ my $endexp   = "$TB/bin/endexp";
 my $savelogs = "$TB/bin/savelogs";
 my $avail    = "$TB/sbin/avail";
 my $batchlog = "$TB/log/batchlog";
-my $projroot = "/proj";
 my $debug    = 0;
 
 # New template stuff.

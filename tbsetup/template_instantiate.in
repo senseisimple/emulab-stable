@@ -66,7 +66,6 @@ my %parameters   = ();
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $PROJROOT	= "/proj";
 my $EVENTSYS	= @EVENTSYS@;
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
@@ -696,17 +695,17 @@ sub ParseArgs()
 	}
 
 	#
-	# The file must reside in /proj, /groups, or /users. Since this script
-	# runs as the caller, regular file permission checks ensure its a file
-	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
-	# since this script is invoked directly from web interface.
+	# The file must reside in an acceptible location. Since this script
+	# runs as the caller, regular file permission checks ensure it is a
+	# file the user is allowed to use.  So we don't have to be too tight
+	# with the RE matching /tmp and /var/tmp files.  These .xml files
+	# are allowed since this script is invoked directly from web interface
+	# which generates a name that should not be guessable.
 	#
 	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.xml/) &&
 	    ! ($inputfile =~ /^\/tmp\/\d+\.xml/) &&
 	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
-	    ! ($inputfile =~ /^\/proj/) &&
-	    ! ($inputfile =~ /^\/groups/) &&
-	    ! ($inputfile =~ /^\/users/)) {
+	    ! TBValidUserDir($inputfile, 0)) {
 	    tberror("$inputfile does not resolve to an allowed directory!");
 	    # Note positive status; so error goes to user not tbops.
 	    exit(1);

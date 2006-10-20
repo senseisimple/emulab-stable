@@ -210,6 +210,7 @@ function SPITFORM($formfields, $errors)
     global $view, $view_style, $projlist, $linktest_levels;
     global $EXPOSELINKTEST, $EXPOSEARCHIVE;
     global $EXPOSESTATESAVE;
+    global $TBVALIDDIRS_HTML;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -518,8 +519,8 @@ function SPITFORM($formfields, $errors)
                     <td>&nbsp;&nbsp;<b>or</b></td><td></td>
                     </tr><tr>
                       <td class='pad4'>On Server<br>
-                              <font size='-1'>(<code>/proj</code>,
-                        <code>/groups</code>, <code>/users</code>)</font></td>
+                              <font size='-1'>(" . $TBVALIDDIRS_HTML .
+	    		      ")</font></td>
                       <td class='pad4'>
 	                <input type=text
                                name=\"formfields[exp_localnsfile]\"

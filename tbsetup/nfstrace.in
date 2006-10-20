@@ -22,6 +22,7 @@ my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
 my $FSDIR_PROJ = "@FSDIR_PROJ@";
 my $FSDIR_USERS = "@FSDIR_USERS@";
 my $FSDIR_SHARE = "@FSDIR_SHARE@";
+my $FSDIR_SCRATCH = "@FSDIR_SCRATCH@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
@@ -113,6 +114,12 @@ use libdb;
 use libtestbed;
 use libArchive;
 
+my $PROJROOT    = PROJROOT();
+my $GROUPROOT   = GROUPROOT();
+my $USERROOT    = USERROOT();
+my $SHAREROOT   = SHAREROOT();
+my $SCRATCHROOT = SCRATCHROOT();
+
 $UID = 0;
 
 if ($cmd eq "add") {
@@ -156,10 +163,13 @@ if ($cmd eq "get" || $cmd eq "transfer") {
 	}
 	($exptidx, $rsrcidx) = $query_result->fetchrow_array();
     }
-    $cmdline .= " -m $FSDIR_GROUPS:/groups";
-    $cmdline .= " -m $FSDIR_PROJ:/proj";
-    $cmdline .= " -m $FSDIR_USERS:/users";
-    $cmdline .= " -m $FSDIR_SHARE:/share";
+    $cmdline .= " -m $FSDIR_GROUPS:$GROUPROOT";
+    $cmdline .= " -m $FSDIR_PROJ:$PROJROOT";
+    $cmdline .= " -m $FSDIR_USERS:$USERROOT";
+    $cmdline .= " -m $FSDIR_SHARE:SHAREROOT";
+    if ($FSDIR_SCRATCH) {
+	$cmdline .= " -m $FSDIR_SCRATCH:$SCRATCHROOT";
+    }
     $cmdline .= " $pid $eid";
 }
 elsif ($cmd eq "gc") {
@@ -200,10 +210,13 @@ sub InsertFile($)
     my ($fn) = @_;
     my $retval = -1;
     
-    $fn =~ s|^$FSDIR_GROUPS|/groups|;
-    $fn =~ s|^$FSDIR_PROJ|/proj|;
-    $fn =~ s|^$FSDIR_USERS|/users|;
-    $fn =~ s|^$FSDIR_SHARE|/share|;
+    $fn =~ s|^$FSDIR_GROUPS|$GROUPROOT|;
+    $fn =~ s|^$FSDIR_PROJ|$PROJROOT|;
+    $fn =~ s|^$FSDIR_USERS|$USERROOT|;
+    $fn =~ s|^$FSDIR_SHARE|$SHAREROOT|;
+    if ($FSDIR_SCRATCH) {
+	$fn =~ s|^$FSDIR_SCRATCH|$SCRATCHROOT|;
+    }
     
     $fn = DBQuoteSpecial($fn);
 

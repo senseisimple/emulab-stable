@@ -52,6 +52,8 @@ use libtestbed;
 use libaudit;
 use libArchive;
 
+my $SHAREROOT = SHAREROOT();
+
 #
 # Verify user and get his DB uid.
 #
@@ -365,7 +367,7 @@ elsif ($action eq "list" ||
     while (my ($fn) = $query_result->fetchrow_array()) {
 	#print "Accessed: $fn\n";
 	
-	if ($fn =~ /^\/share/ ||
+	if ($fn =~ /^$SHAREROOT/ ||
 	    $fn =~ /\/tbdata\// ||
 	    $fn =~ /^<u:/) {
 	    next;

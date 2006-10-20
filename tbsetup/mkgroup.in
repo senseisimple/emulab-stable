@@ -14,8 +14,7 @@ use Getopt::Std;
 # entries and the group directory. Runs in the foreground all the time;
 # Its quick enough that the user can wait for it.
 #
-# XXX - /proj wired in
-#       control node wired in.
+# XXX - control node wired in.
 #
 sub usage()
 {
@@ -38,8 +37,6 @@ my $ELABINELAB  = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $OPSDBSUPPORT= @OPSDBSUPPORT@;
-my $PROJROOT    = "/proj";
-my $GRPROOT     = "/groups";
 my $SSH         = "$TB/bin/sshtb";
 my $ADDMMLIST   = "$TB/sbin/addmmlist";
 my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
@@ -81,6 +78,9 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+
+my $PROJROOT    = PROJROOT();
+my $GRPROOT     = GROUPROOT();
 
 #
 # We don't want to run this script unless its the real version.

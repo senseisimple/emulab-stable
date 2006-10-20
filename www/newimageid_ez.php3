@@ -147,7 +147,7 @@ function SPITFORM($formfields, $errors)
 	echo     "var global = 0;";
 
     echo         "if (pid == '') {
-                      theform['formfields[path]'].value = '/proj';
+                      theform['formfields[path]'].value = '$TBPROJ_DIR';
                   }
                   else if (theform['formfields[imagename]'].value == '') {
 		      theform['formfields[imagename]'].defaultValue = '';
@@ -158,11 +158,11 @@ function SPITFORM($formfields, $errors)
                       }
 		      else if (gid == '' || gid == pid || shared) {
     	                  theform['formfields[path]'].value =
-                                  '/proj/' + pid + '/images/';
+                                  '$TBPROJ_DIR/' + pid + '/images/';
                       }
                       else {
     	                  theform['formfields[path]'].value =
-                                  '/groups/' + pid + '/' + gid + '/images/';
+                                  '$TBGROUP_DIR/' + pid + '/' + gid + '/images/';
                       }
                   }
                   else if (theform['formfields[imagename]'].value != '') {
@@ -175,11 +175,11 @@ function SPITFORM($formfields, $errors)
                       }
 		      else if (gid == '' || gid == pid || shared) {
     	                  theform['formfields[path]'].value =
-                                  '/proj/' + pid + '/images/' + filename;
+                                  '$TBPROJ_DIR/' + pid + '/images/' + filename;
                       }
                       else {
     	                  theform['formfields[path]'].value =
-                                  '/groups/' + pid + '/' + gid + '/images/' +
+                                  '$TBGROUP_DIR/' + pid + '/' + gid + '/images/' +
                                   filename;
                       }
                   }
@@ -365,7 +365,7 @@ function SPITFORM($formfields, $errors)
     #
     echo "<tr>
               <td>Filename (full path) of Image:<br>
-                  (must reside in /proj)</td>
+                  (must reside in $TBPROJ_DIR)</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[path]\"
@@ -698,7 +698,7 @@ function spithidden($formfields, $field) {
 #
 if (! $submit) {
     $defaults = array();
-    $defaults[path]     = "/proj/";
+    $defaults[path]     = "$TBPROJ_DIR/";
     $defaults[shared]   = "Nope";
 
     if ($nodetype == "mote") {
@@ -713,7 +713,7 @@ if (! $submit) {
     } else {
 	# Defaulys for PC-type nodes
 	$defaults[loadpart] = "X";
-	$defaults[path]     = "/proj/";
+	$defaults[path]     = "$TBPROJ_DIR/";
 	$defaults[op_mode]  = TBDB_DEFAULT_OSID_OPMODE;
 	$defaults[os_feature_ping] = "checked";
 	$defaults[os_feature_ssh]  = "checked";
@@ -747,9 +747,9 @@ if (! $submit) {
 	    $defaults[gid] = $group;
 	    
 	    if (!strcmp($project, $group))
-		$defaults[path]     = "/proj/$project/images/";
+		$defaults[path]     = "$TBPROJ_DIR/$project/images/";
 	    else
-		$defaults[path]     = "/groups/$project/$group/images/";
+		$defaults[path]     = "$TBGROUP_DIR/$project/$group/images/";
 	}
 	reset($projlist);
     }
@@ -912,10 +912,10 @@ elseif (! $isadmin) {
 	isset($formfields[gid]) &&
 	strcmp($formfields[gid], "") &&
 	strcmp($formfields[gid], $formfields[pid])) {
-	$pdef = "/groups/" . $formfields[pid] . "/" . $formfields[gid] . "/";
+	$pdef = "$TBGROUP_DIR/" . $formfields[pid] . "/" . $formfields[gid] . "/";
     }
     else {
-	$pdef = "/proj/" . $formfields[pid] . "/images/";
+	$pdef = "$TBPROJ_DIR/" . $formfields[pid] . "/images/";
     }
 
     if (strpos($formfields[path], $pdef) === false) {

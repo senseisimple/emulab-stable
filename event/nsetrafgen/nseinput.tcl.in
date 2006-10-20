@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,6 +11,7 @@ global CLIENTBINDIR
 set CLIENTVARDIR @CLIENT_VARDIR@
 set CLIENTBINDIR @CLIENT_BINDIR@
 set EVENTSERVER  @EVENTSERVER@
+set PROJDIR	 @PROJROOT_DIR@
 
 # consults tmcc hostnames database to translate hostname to IP
 # returns ip address of name
@@ -439,11 +440,11 @@ set pideidlist [split [exec hostname] "."]
 set vnode [lindex $pideidlist 0]
 set eid [lindex $pideidlist 1]
 set pid [lindex $pideidlist 2]
-set logpath "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
+set logpath "$PROJDIR/$pid/exp/$eid/logs/nse-$vnode.log"
 set simobjname [$ns set tbname]
 set nseswap_cmdline "$CLIENTBINDIR/tevc -s $EVENTSERVER -e $pid/$eid now $simobjname NSESWAP SIMHOST=$vnode"
 
-set pktrate_logpath "/proj/$pid/exp/$eid/logs/nse-vnodepktrate-$vnode.log"
+set pktrate_logpath "$PROJDIR/$pid/exp/$eid/logs/nse-vnodepktrate-$vnode.log"
 
 # Configuring the Scheduler to monitor the event system
 set evsink [new TbEventSink]

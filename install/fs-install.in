@@ -31,6 +31,16 @@ my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
+my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
+
+#
+# Fixed paths for clients
+#
+my $PROJROOT    = "@PROJROOT_DIR@";
+my $GROUPROOT   = "@GROUPSROOT_DIR@";
+my $USERROOT    = "@USERSROOT_DIR@";
+my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
+my $SHAREROOT	= "@SHAREROOT_DIR@";
 
 # For /share export below.
 my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
@@ -156,8 +166,15 @@ my $VARRUN        = "/var/run";
 my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
     "/var/log/mountd.log");
 
-my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
-    ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
+my @TESTBED_DIRS       = ([$PREFIX, "0775"], [$USERROOT, "0755"],
+    [$PROJROOT, "0755"], [$GROUPROOT, "0755"], [$SHAREROOT, "0775"]);
+my @MOUNTPOINTS        = ($USERROOT, $PROJROOT, $GROUPROOT, $SHAREROOT);
+
+if ($SCRATCHDIR) {
+    push(@TESTBED_DIRS, [$SCRATCHROOT, "0755"]);
+    push(@MOUNTPOINTS, $SCRATCHROOT);
+}
+
 
 #
 # A few files we have to deal with
@@ -320,13 +337,14 @@ Phase "exports", "Setting up exports", sub {
 	# filesystems.  Note: we cannot do /share on the same exports line
 	# as the other filesystems because of the RO mount below (trust me).
 	#
-	my @dirs = ('/users','/groups','/proj');
-	@dirs = map {`realpath $_`} @dirs;
-	chomp @dirs;
 	my %filesystems;
-	foreach my $dir (@dirs) {
-	    my ($dev,@junk) = stat $dir;
-	    push @{$filesystems{$dev}}, $dir;
+	foreach my $dir (@MOUNTPOINTS) {
+	    if ($dir ne $SHAREROOT) {
+		my $dir = `realpath $dir`;
+		chomp($dir);
+		my $dev = (stat($dir))[0];
+		push @{$filesystems{$dev}}, $dir;
+	    }
 	}
 
 	#
@@ -344,7 +362,7 @@ Phase "exports", "Setting up exports", sub {
 	# but to the control network read-only.
 	#
 	my ($a,$b,$c,$d) = ($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
-	my $realdir = `realpath /share`;
+	my $realdir = `realpath $SHAREROOT`;
 	chomp($realdir);
 	push(@exports_lines,
 	    "$realdir\t$BOSSNODE $USERNODE -maproot=root");

@@ -637,7 +637,7 @@ sub GenDefsFile($)
     #
     print TCL "# Template goo\n";
     # Does not matter what it is, as long as it is set.
-    print TCL "set ::DATASTORE \"/proj\"\n";
+    print TCL "set ::DATASTORE \"" . PROJROOT() . "\"\n";
     
     if (defined($experiment)) {
 	my $instance =

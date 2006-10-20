@@ -30,7 +30,7 @@ use vars qw(@ISA @EXPORT);
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT PROJMEMBERTRUST_LOCALROOT
 
-	 PROJROOT GROUPROOT USERROOT TBOPSPID EXPTLOGNAME
+	 TBOPSPID EXPTLOGNAME
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
          PLABTESTING_PID PLABTESTING_EID PLABDOWN_PID PLABDOWN_EID
 
@@ -255,10 +255,8 @@ my $BOSSNODE    = "@BOSSNODE@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPSPID	= "emulab-ops";
 my $SCRIPTNAME  = "Unknown";
-my $PROJROOT    = "/proj";
-my $GROUPROOT   = "/groups";
-my $USERROOT    = "/users";
 my $EXPTLOGNAME = "activity.log";
+my $PROJROOT    = "@PROJROOT_DIR@";
 
 if ($EVENTSYS) {
     require event;
@@ -456,9 +454,6 @@ sub OLDRESERVED_PID()		{ $TBOPSPID; }
 sub OLDRESERVED_EID()		{ "oldreserved"; }
 sub NFREELOCKED_PID()		{ $TBOPSPID; }
 sub NFREELOCKED_EID()		{ "nfree-locked"; }
-sub PROJROOT()			{ $PROJROOT; }
-sub GROUPROOT()			{ $GROUPROOT; }
-sub USERROOT()			{ $USERROOT; }
 sub TBOPSPID()			{ $TBOPSPID; }
 sub EXPTLOGNAME()		{ $EXPTLOGNAME; }
 
@@ -3295,6 +3290,7 @@ sub TBExptDestroy($$)
     }
     # Yuck.
     if ($pid ne $gid) {
+	# XXX note that this is not the same as TBExptUserDir
 	my $eidlink = "$PROJROOT/$pid/exp/$eid";
 	unlink($eidlink)
 	    if (-l $eidlink);

@@ -16,7 +16,9 @@ use Exporter;
 	 TBDebugTimeStampsOn TBForkCmd TB_BOSSEVENTPORT TB_EVENTSERVER
 	 TBScriptLock TBScriptUnlock TBTimeStampWithDate
 	 TBSCRIPTLOCK_OKAY TBSCRIPTLOCK_TIMEDOUT
-	 TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED);
+	 TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED
+	 PROJROOT GROUPROOT USERROOT SCRATCHROOT SHAREROOT
+	 TBValidUserDir TBValidUserDirList);
 
 # After package decl.
 use English;
@@ -34,6 +36,31 @@ my $BOSSNODE = "@BOSSNODE@";
 my $TIMESTAMPS = "@TIMESTAMPS@";
 my $TBOPSEMAIL = "@TBOPSEMAIL@";
 my $SCRIPTNAME = "Unknown";
+
+#
+# Real mount points (on the fileserver) for exported directories.
+# At the moment, we have no reason to export these via functions.
+#
+my $FSDIR_USER = "@FSDIR_USERS@";
+my $FSDIR_PROJ = "@FSDIR_PROJ@";
+my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
+my $FSDIR_SHARE = "@FSDIR_SHARE@";
+my $FSDIR_SCRATCH = "@FSDIR_SCRATCH@";
+
+#
+# Standard mountpoints for exported directories.
+# The scratch directory is optional, hence the FSDIR_SCRATCH check.
+#
+my $PROJROOT    = "@PROJROOT_DIR@";
+my $GROUPROOT   = "@GROUPSROOT_DIR@";
+my $USERROOT    = "@USERSROOT_DIR@";
+my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
+my $SHAREROOT	= "@SHAREROOT_DIR@";
+sub PROJROOT()	  { $PROJROOT; }
+sub GROUPROOT()	  { $GROUPROOT; }
+sub USERROOT()	  { $USERROOT; }
+sub SHAREROOT()   { $SHAREROOT; }
+sub SCRATCHROOT() { $FSDIR_SCRATCH ? $SCRATCHROOT : ""; }
 
 # Hostname of our boss node
 sub TB_BOSSNODE()	{ $BOSSNODE; }
@@ -333,6 +360,157 @@ sub TBForkCmd($;$) {
 
     # NOTREACHED
     return(0);
+}
+
+#
+# Determine if a user-specified path falls within the standard
+# user-accessible directories.
+#
+# If $userealpath is non-zero this will use the real filesystem path on the
+# fileserver (e.g., /q/proj) rather than the conventional mount point (/proj).
+# Obviously, this option should only be used when run on the fileserver.
+#
+sub TBValidUserDir($$;$$$)
+{
+    my ($path, $userealpath, $uid, $pid, $gid, $eid) = @_;
+    my ($uroot, $proot, $groot, $sroot);
+
+    #
+    # Decide whether to test against the "real" (server-side) path
+    # or the user-visible mount point.
+    #
+    if ($userealpath) {
+	$uroot = $FSDIR_USER;
+	$proot = $FSDIR_PROJ;
+	$groot = $FSDIR_GROUPS;
+	if ($FSDIR_SCRATCH) {
+	    $sroot = $FSDIR_SCRATCH;
+	}
+    } else {
+	$uroot = $USERROOT;
+	$proot = $PROJROOT;
+	$groot = $GROUPROOT;
+	if ($FSDIR_SCRATCH) {
+	    $sroot = $SCRATCHROOT;
+	}
+    }
+
+    #
+    # No ids specified, just make sure it starts with an appropriate prefix.
+    #
+    if (!$uid && !$pid && !$gid && !$eid) {
+	if ($path =~ /^$proot\// ||
+	    $path =~ /^$uroot\// ||
+	    $path =~ /^$groot\//) {
+	    return 1;
+	}
+	if (defined($sroot) && $path =~ /^$sroot\//) {
+	    return 1;
+	}
+
+	return 0;
+    }
+    #
+    # Otherwise check for specific directories based on:
+    #
+    #	$uid		/users/$uid
+    #
+    #	$pid		/proj/$pid,
+    #			/scratch/$pid (if present)
+    #
+    #	$pid+$gid	/proj/$pid,
+    #			/groups/$pid/$gid,
+    #			/scratch/$pid (if present)
+    #
+    #	$pid+$eid	/proj/$pid/exp/$eid
+    #
+    #	$pid+$gid+$eid	/groups/$pid/$gid/exp/$eid
+    #
+    if ($uid) {
+	if ($path =~ /^$uroot\/$uid\//) {
+	    return 1;
+	}
+    }
+    if ($pid) {
+	if ($eid) {
+	    if ($gid) {
+		if ($path =~ /^$groot\/$pid\/$gid\/exp\/$eid\//) {
+		    return 1;
+		}
+	    } else {
+		if ($path =~ /^$proot\/$pid\/exp\/$eid\//) {
+		    return 1;
+		}
+	    }
+	} else {
+	    if ($path =~ /^$proot\/$pid\//) {
+		return 1;
+	    }
+	    if ($gid) {
+		if ($path =~ /^$groot\/$pid\/$gid\//) {
+		    return 1;
+		}
+	    }
+
+	    #
+	    # XXX /scratch is currently just per-project
+	    #
+	    if (defined($sroot)) {
+		if ($path =~ /^$sroot\/$pid\//) {
+		    return 1;
+		}
+	    }
+	}
+    }
+
+    return 0;
+}
+
+#
+# Return a list of valid directories based on the specified
+# $uid, $pid, $gid, $eid.  Used for error messages.
+#
+sub TBValidUserDirList(;$$$$)
+{
+    my ($uid, $pid, $gid, $eid) = @_;
+    my @dirs;
+
+    if (!$uid && !$pid && !$gid && !$eid) {
+	@dirs = ($USERROOT, $PROJROOT, $GROUPROOT);
+	if ($FSDIR_SCRATCH) {
+	    push(@dirs, $SCRATCHROOT);
+	}
+	return join(", ", @dirs);
+    }
+
+    if ($uid) {
+	push(@dirs, "$USERROOT/$uid");
+    }
+
+    if ($pid) {
+	if ($eid) {
+	    if ($gid) {
+		push(@dirs, "$GROUPROOT/$pid/$gid/exp/$eid");
+	    } else {
+		push(@dirs, "$PROJROOT/$pid/exp/$eid");
+	    }
+	} else {
+	    push(@dirs, "$PROJROOT/$pid");
+	    # don't confuse for $pid==$gid (/groups/$pid/$gid is /proj/$pid)
+	    if ($gid && $gid ne $pid) {
+		push(@dirs, "$GROUPROOT/$pid/$gid");
+	    }
+
+	    #
+	    # XXX /scratch is currently just per-project
+	    #
+	    if ($FSDIR_SCRATCH) {
+		push(@dirs, "$SCRATCHROOT/$pid");
+	    }
+	}
+    }
+
+    return @dirs;
 }
 
 #

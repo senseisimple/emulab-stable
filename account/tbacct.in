@@ -50,7 +50,6 @@ my $PROTOUSER   = 'elabman';
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
 my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
 
-my $HOMEDIR	= "/users";
 my $USERPATH	= "$TB/bin";
 my $ADDKEY	= "$TB/sbin/addpubkey";
 my $USERADD	= "/usr/sbin/pw useradd";
@@ -136,6 +135,8 @@ sub ThawUser();
 sub CheckDotFiles();
 sub GenerateSFSKey();
 sub fatal($);
+
+my $HOMEDIR	= USERROOT();
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

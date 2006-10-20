@@ -40,6 +40,16 @@ my $BOSSNODE   = '@BOSSNODE@';
 my $BOSSNODE_IP= '@BOSSNODE_IP@';
 my $USERNODE_IP= '@USERNODE_IP@';
 my $FSNODE_IP=   '@FSNODE_IP@';
+my $SCRATCHDIR = '@FSDIR_SCRATCH@';
+
+#
+# Fixed paths for clients
+#
+my $PROJROOT    = "@PROJROOT_DIR@";
+my $GROUPROOT   = "@GROUPSROOT_DIR@";
+my $USERROOT    = "@USERSROOT_DIR@";
+my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
+my $SHAREROOT	= "@SHAREROOT_DIR@";
 
 #
 # Some programs we use
@@ -154,8 +164,11 @@ my $CISCO_MIB_FTP = "ftp://ftp.cisco.com/pub/mibs/v2";
 #
 my @TESTBED_DIRS = ($PREFIX);
 
-my @MOUNTPOINTS = ("$PREFIX/usersvar", "$PREFIX/opsdir",
-		   "/users", "/proj", "/groups", "/share");
+my @MOUNTPOINTS = ("$USERSVAR_DIR", "$OPSDIR_DIR",
+		   "$USERROOT", "$PROJROOT", "$GROUPROOT", "$SHAREROOT");
+if ($SCRATCHDIR) {
+    push(@MOUNTPOINTS, "$SCRATCHROOT");
+}
 
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
@@ -810,15 +823,20 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	AppendToFileFatal($FSTAB,
-		"$FSNODE:/users\t\t/users\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/proj\t\t/proj\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/groups\t\t/groups\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/share\t\t/share\tnfs\trw,nodev,nosuid\t0\t0",
-		"$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,".
-			  "-b,nodev,nosuid\t0\t0",
-		"$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,".
-			  "-b,nodev,nosuid\t0\t0");
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,nodev,nosuid\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,nodev,nosuid\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,nodev,nosuid\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	if ($SCRATCHDIR) {
+	    push(@lines,
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	}
+	push(@lines,
+	     "$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,".
+	     "-b,nodev,nosuid\t0\t0",
+	     "$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,".
+	     "-b,nodev,nosuid\t0\t0");
+	AppendToFileFatal($FSTAB, @lines);
     };
     Phase "mounts", "Mounting NFS filesystems", sub {
 	foreach my $dir (@MOUNTPOINTS) {
@@ -1160,14 +1178,14 @@ if ($BUGDBSUPPORT) {
 
 Phase "firstuser", "Setting up initial user (elabman)", sub {
     PhaseSkip("elabman already created")
-	if (-d "/users/elabman");
+	if (-d "$USERROOT/elabman");
     ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
 		   (defined($password) ? " -p $password" : ""));
 };
 
 Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
     PhaseSkip("elabckup already created")
-	if (-d "/users/elabckup");
+	if (-d "$USERROOT/elabckup");
     ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
 		   (defined($password) ? " -p $password" : "").
 		   " -u elabckup -n 'Emulab Checkup User' ".
@@ -1181,7 +1199,7 @@ Phase "experiments", "Setting up system experiments", sub {
 	
 	Phase "$pid/$eid", "$pid/$eid", sub {
 	    PhaseSkip("Experiment Created")
-		if (-d "/proj/$pid/exp/$eid");
+		if (-d "$PROJROOT/$pid/exp/$eid");
 	    ExecQuietFatal("$SUDO -u elabman $WAP $BATCHEXP ".
 			   "  -q -i -w -f -n -S 'System Experiment' ".
 			   "  -L 'System Experiment' ".

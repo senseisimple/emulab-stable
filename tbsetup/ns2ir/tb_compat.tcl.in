@@ -32,15 +32,23 @@ namespace eval TBCOMPAT {
 
     # Substitutions for "/proj",
     variable FSDIR_PROJ "@FSDIR_PROJ@"
+    variable PROJROOT	"@PROJROOT_DIR@"
 
     # ... "/groups",
     variable FSDIR_GROUPS "@FSDIR_GROUPS@"
+    variable GROUPROOT	  "@GROUPSROOT_DIR@"
 
-    # ... "/users", and
+    # ... "/users",
     variable FSDIR_USERS "@FSDIR_USERS@"
+    variable USERROOT	 "@USERSROOT_DIR@"
 
-    # ... "/share".
+    # ... "/share", and
     variable FSDIR_SHARE "@FSDIR_SHARE@"
+    variable SHAREROOT	 "@SHAREROOT_DIR@"
+
+    # ... "/scratch".
+    variable FSDIR_SCRATCH "@FSDIR_SCRATCH@"
+    variable SCRATCHROOT   "@SCRATCHROOT_DIR@"
 
     # This is a general procedure that takes a node, an object (lan or link)
     # it is connected to, and an IP address, and sets the IP address
@@ -419,6 +427,7 @@ proc tb-set-node-tarfiles {node args} {
 	set dir [lindex $args 0]
 	set tarfile [lindex $args 1]
 	
+	#
 	# Check the install directory to make sure it is not an NFS mount.
 	# This check can also act as an alert to the user that the arguments
 	# are wrong.  For example, the following line will pass the above
@@ -426,11 +435,15 @@ proc tb-set-node-tarfiles {node args} {
 	#
 	#   tb-set-node-tarfiles $node /proj/foo/bar.tgz /proj/foo/baz.tgz
 	#
-	# XXX /proj is hardcoded since the subst is /q/proj.
-	if {[string match "/proj/*" $dir] ||
-	    [string match "${::TBCOMPAT::FSDIR_GROUPS}/*" $dir] ||
-	    [string match "${::TBCOMPAT::FSDIR_USERS}/*" $dir] ||
-	    [string match "${::TBCOMPAT::FSDIR_SHARE}/*" $dir]} {
+	# XXX This is a hack check because they can specify '/' and have
+	# "proj/foo/..." in the tarball and still clobber themselves.
+	#
+	if {[string match "${::TBCOMPAT::PROJROOT}/*" $dir] ||
+	    [string match "${::TBCOMPAT::GROUPROOT}/*" $dir] ||
+	    [string match "${::TBCOMPAT::USERROOT}/*" $dir] ||
+	    [string match "${::TBCOMPAT::SHAREROOT}/*" $dir] ||
+	    (${::TBCOMPAT::SCRATCHROOT} != "" &&
+	     [string match "${::TBCOMPAT::SCRATCHROOT}/*" $dir])} {
 	    perror "\[tb-set-node-tarfiles] '$dir' refers to an NFS directory instead of the node's local disk."
 	    return
 	} elseif {![string match "/*" $dir]} {
@@ -450,9 +463,11 @@ proc tb-set-node-tarfiles {node args} {
 		perror "\[tb-set-node-tarfiles] '$tarfile' is not an http, https, or ftp URL."
 		return
 	    }
-	} elseif {![string match "/proj/*" $tarfile] &&
-	          ![string match "/groups/*" $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in '/proj' or '/groups'"
+	} elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $tarfile] &&
+	          ![string match "${::TBCOMPAT::GROUPROOT}/*" $tarfile] &&
+	          (${::TBCOMPAT::SCRATCHROOT} == "" ||
+	           ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $tarfile])} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in an allowed directory"
 	    return
 	} elseif {![file exists $tarfile]} {
 	    perror "\[tb-set-node-tarfiles] '$tarfile' does not exist."

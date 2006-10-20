@@ -23,7 +23,7 @@ my $PREFIX = '@prefix@';
 
 my @MAILING_LISTS = ("@TBOPSEMAIL@","@TBLOGSEMAIL@","@TBWWWEMAIL@",
     "@TBAPPROVALEMAIL@","@TBAUDITEMAIL@","@TBSTATEDEMAIL@",
-    "@TBTESTSUITEEMAIL@", "@TBERRORSEMAIL@");
+    "@TBTESTSUITEEMAIL@", "@TBERRORSEMAIL@", "@TBAUTOMAILEMAIL@");
 
 
 my $OURDOMAIN   = '@OURDOMAIN@';
@@ -45,6 +45,16 @@ my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
 my $LIBDIR      = "$PREFIX/lib";
+my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
+
+#
+# Fixed paths for clients
+#
+my $PROJROOT    = "@PROJROOT_DIR@";
+my $GROUPROOT   = "@GROUPSROOT_DIR@";
+my $USERROOT    = "@USERSROOT_DIR@";
+my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
+my $SHAREROOT	= "@SHAREROOT_DIR@";
 
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
@@ -199,10 +209,16 @@ my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
 my @LOCAL_MAILING_LISTS = grep(/$OURDOMAIN$/,@MAILING_LISTS);
 my @MAILING_LIST_NAMES  = map { /^([\w-]+)\@/ } @LOCAL_MAILING_LISTS;
 
-my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
-    ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
+my @TESTBED_DIRS       = ([$PREFIX, "0775"], [$USERROOT, "0755"],
+			  [$PROJROOT, "0755"], [$GROUPROOT, "0755"],
+			  [$SHAREROOT, "0775"]);
 
-my @MOUNTPOINTS        = ("/users", "/proj", "/groups", "/share");
+my @MOUNTPOINTS        = ($USERROOT, $PROJROOT, $GROUPROOT, $SHAREROOT);
+
+if ($SCRATCHDIR) {
+    push(@TESTBED_DIRS, [$SCRATCHROOT, "0755"]);
+    push(@MOUNTPOINTS, $SCRATCHROOT);
+}
 
 #
 # A few files we have to deal with
@@ -558,9 +574,9 @@ Phase "exports", "Setting up exports", sub {
 	# filesystems.  Note: we cannot do /share on the same exports line
 	# as the other filesystems because of the RO mount below (trust me).
 	#
-	my @dirs = ('/var','/usr/testbed');
+	my @dirs = ('/var', $PREFIX);
 	if ($ISFS) {
-	    @dirs = ('/users','/groups','/proj',@dirs);
+	    @dirs = (grep(!/^$SHAREROOT$/, @MOUNTPOINTS), @dirs);
 	}
 	@dirs = map {`realpath $_`} @dirs;
 	chomp @dirs;
@@ -587,7 +603,7 @@ Phase "exports", "Setting up exports", sub {
 	    #
 	    my ($a,$b,$c,$d) =
 		($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
-	    my $realdir = `realpath /share`;
+	    my $realdir = `realpath $SHAREROOT`;
 	    chomp($realdir);
 	    push(@exports_lines,
 		 "$realdir\t$BOSSNODE -maproot=root");
@@ -601,15 +617,15 @@ Phase "exports", "Setting up exports", sub {
 	#
 	if ($CVSSUPPORT) {
 	    my $pdir;
-	    my $dfout = `df /proj | fgrep '/dev'`;
+	    my $dfout = `df $PROJROOT | fgrep '/dev'`;
 	    if ($?) {
-		PhaseFail("'df /proj' failed!");
+		PhaseFail("'df $PROJROOT' failed!");
 	    }
 	    if ($dfout =~ /\s+([\/\w]*)$/) {
 		$pdir = $1;
 	    }
 	    else {
-		PhaseFail("Could not determine where /proj is mounted!");
+		PhaseFail("Could not determine where $PROJROOT is mounted!");
 	    }
 	    push(@exports_lines, "$pdir\tlocalhost -alldirs");
 	}
@@ -645,11 +661,16 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	AppendToFileFatal($FSTAB,
-		"$FSNODE:/users\t\t/users\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/proj\t\t/proj\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/groups\t\t/groups\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/share\t\t/share\tnfs\trw,nodev,nosuid\t0\t0");
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,nodev,nosuid\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,nodev,nosuid\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,nodev,nosuid\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	if ($SCRATCHDIR) {
+	    push(@lines,
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	}
+
+	AppendToFileFatal($FSTAB, @lines);
     };
     Phase "mounts", "Mounting NFS filesystems", sub {
 	foreach my $dir (@MOUNTPOINTS) {
@@ -1076,7 +1097,7 @@ if ($CVSSUPPORT) {
     my $CVSDHEAD  = "$LIBDIR/cvsd.conf.head";
     my $CVSDJAIL  = "/var/cvsjail";
     my $BUILDROOT = "/usr/local/sbin/cvsd-buildroot";
-    my $REPOSDIR  = "/proj/cvsrepos";
+    my $REPOSDIR  = "$PROJROOT/cvsrepos";
     
     Phase "cvsd", "Installing cvsd", sub {
 	PhaseSkip("cvsd not supported on ops")

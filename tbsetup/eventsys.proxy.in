@@ -12,7 +12,8 @@ use Errno;
 use POSIX ":sys_wait_h";
     
 #
-# A wrapper for controlling the event scheduler from boss. 
+# A wrapper for controlling from boss the event scheduler running on ops.
+# This wrapper runs on ops.
 #
 # The first argument option is the user to run this script as, since we
 # get invoked by a root ssh from boss. 
@@ -120,7 +121,7 @@ else {
     usage();
 }
 $PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
-$EXPDIR  = "/proj/$pid/exp/$eid";
+$EXPDIR  = PROJROOT() . "/$pid/exp/$eid";
 
 #
 # Deal with stop and replay.
@@ -193,7 +194,7 @@ if (! -d $LOGDIR) {
 }
 
 #
-# Create a chile whose output is directed into the logfile. Parents waits
+# Create a child whose output is directed into the logfile. Parent waits
 # a moment and then exits.
 #
 if (-e $logfile) {

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -43,6 +43,7 @@ my $dirname;
 # Testbed Support libraries
 #
 use lib "@prefix@/lib";
+use libtestbed;
 use libtblog;
 
 #
@@ -94,18 +95,16 @@ else {
 }
 
 #
-# The file must reside in /proj, /groups, or /users. Since this script
-# runs as the caller, regular file permission checks ensure its a file
-# the user is allowed to use. /tmp/$guid-$nsref.nsfile also allowed
-# since this script is invoked directly from web interface, which generates
-# a name that should not be guessable, so as long as it looks to be in
-# proper format, we accept it. 
+# The file must reside in an acceptible location. Since this script
+# runs as the caller, regular file permission checks ensure it is a
+# file the user is allowed to use.  So we don't have to be too tight
+# with the RE matching /tmp and /var/tmp files.  Note that
+# /tmp/$pid-$eid.nsfile.XXXXX is also allowed since this script is
+# invoked directly from web interface.
 #
 if (! ($tempfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
     ! ($tempfile =~ /^\/var\/tmp\/php\w+/) &&
-    ! ($tempfile =~ /^\/proj/) &&
-    ! ($tempfile =~ /^\/groups/) &&
-    ! ($tempfile =~ /^\/users/)) {
+    ! TBValidUserDir($tempfile, 0)) {
     fatal("$tempfile does not resolve to an appropriate directory!\n");
 }
 

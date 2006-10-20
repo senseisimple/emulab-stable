@@ -16,6 +16,16 @@
 # installation script/directions should take care of this now.
 #
 
+PROJSTR="Project directory:    @FSDIR_PROJ@"
+GROUPSSTR="Group directory:      @FSDIR_GROUPS@"
+USERSSTR="User/Home directory:  @FSDIR_USERS@"
+if [ -n "@FSDIR_SCRATCH@" ]; then
+    SCRATCHSTR="Project scratch directory: @FSDIR_SCRATCH@"
+else
+    SCRATCHSTR=""
+fi
+
+
 for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /\+/ {print $1}'`
 do
 (
@@ -41,9 +51,10 @@ You can check your usage with the 'quota' command on @USERNODE@:
 
 The directory trees (on @USERNODE@) where you most likely have files are:
 
-Project directory:    @FSDIR_PROJ@
-Group directory:      @FSDIR_GROUPS@
-User/Home directory:  @FSDIR_USERS@   
+$PROJSTR
+$GROUPSSTR
+$USERSSTR
+$SCRATCHSTR
 
 PLEASE NOTE: just login to @USERNODE@ directly to do the cleanup!
 You will not be able to swapin an experiment to access these directories

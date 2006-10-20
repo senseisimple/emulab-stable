@@ -94,19 +94,27 @@ TBACTIVEARCHIVE=testbed-active-users-archive@example.emulab.net
 #
 # Real paths (no symlinks) to the directories that get exported from ops
 #
-FSDIR_GROUPS=/groups
+# FSDIR_SCRATCH is optional.  The intent is that it provides per-project
+# space that is not "guaranteed" (for the Utah Emulab that means we do
+# not back it up to tape).  If defined, you would either set no quotas,
+# or higher quotas than for FSDIR_PROJ, on this filesystem.  If you are
+# not providing guarantees and are not doing quotas, you might as well
+# just put all your space in /proj and leave FSDIR_SCRATCH= blank.
+#
+FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 FSDIR_SHARE=/share
+FSDIR_SCRATCH=
 
 #
 # Filesystems on which quotas should be enforced.
 # Note that if multiple of the FSDIR_* vars above are on the same filesystem
-# (e.g., /q/proj and /q/users) then you should only specify the base of the
+# (e.g., /q/proj and /q/groups) then you should only specify the base of the
 # common filesystem on which they all reside here (e.g., /q).
 # Set to the empty string to turn off quota checking.
 #
-FS_WITH_QUOTAS="/q /groups /users"
+FS_WITH_QUOTAS="/q /users"
 
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.

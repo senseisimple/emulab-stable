@@ -40,10 +40,6 @@ my $ADDBUGDBPROJ= "$TB/sbin/addbugdbproj";
 my $ADDMMLIST   = "$TB/sbin/addmmlist";
 my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
 	  
-my $PROJROOT = "/proj";
-my $GRPROOT  = "/groups";
-my $TFTPROOT = "/tftpboot";
-my $CVSREPOS = "$PROJROOT/cvsrepos";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
 		"groups", "tiplogs", "images/sigs", "templates");
 my $projhead;
@@ -66,6 +62,16 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+
+my $PROJROOT     = PROJROOT();
+my $GRPROOT      = GROUPROOT();
+my $SCRATCHROOT  = SCRATCHROOT();
+
+#
+# XXX semi-hardwired, oddball paths
+#
+my $TFTPDIR  = "/tftpboot/$PROJROOT";
+my $CVSREPOS = "$PROJROOT/cvsrepos";
 
 #
 # We don't want to run this script unless its the real version.
@@ -190,6 +196,19 @@ if (! -e "$PROJROOT/$pid") {
 	fatal("Could not chown $PROJROOT/$pid to $uid/$gid: $!");
     }
 }
+if ($SCRATCHROOT && ! -e "$SCRATCHROOT/$pid") {
+    if (! mkdir("$SCRATCHROOT/$pid", 0770)) {
+	fatal("Could not make directory $SCRATCHROOT/$pid: $!");
+    }
+
+    if (! chmod(0770, "$SCRATCHROOT/$pid")) {
+	fatal("Could not chmod directory $SCRATCHROOT/$pid: $!");
+    }
+
+    if (! chown($uid, $gid, "$SCRATCHROOT/$pid")) {
+	fatal("Could not chown $SCRATCHROOT/$pid to $uid/$gid: $!");
+    }
+}
 
 #
 # Make project subdirs.
@@ -211,15 +230,15 @@ foreach my $dir (@DIRLIST) {
 #
 # Create a tftp directory for oskit kernels.
 #
-if (! -e "$TFTPROOT/proj/$pid") {
-    if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
-	fatal("Could not make directory $TFTPROOT/proj/$pid: $!");
+if (! -e "$TFTPDIR/$pid") {
+    if (! mkdir("$TFTPDIR/$pid", 0770)) {
+	fatal("Could not make directory $TFTPDIR/$pid: $!");
     }
-    if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
-	fatal("Could not chmod directory $TFTPROOT/proj/$pid: $!");
+    if (! chmod(0777, "$TFTPDIR/$pid")) {
+	fatal("Could not chmod directory $TFTPDIR/$pid: $!");
     }
-    if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
-	fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+    if (! chown($uid, $gid, "$TFTPDIR/$pid")) {
+	fatal("Could not chown $TFTPDIR/$pid to $uid/$gid: $!");
     }
 }
 

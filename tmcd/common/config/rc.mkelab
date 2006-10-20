@@ -106,6 +106,9 @@ my $WINSUPPORT = 0;
 # This also gets turned on/off below
 my $NOSETUP    = 0;
 
+# Whether we configure a /scratch FS, turned on/off below
+my $SCRATCHFS  = 0;
+
 # This will not change ...
 my $PHP4_PKG = "php4-extensions-1.0";
 
@@ -215,6 +218,7 @@ sub doboot()
     $emulabconfig{"MFSCONSOLE"} = "sio";
     $emulabconfig{"WINSUPPORT"} = 0;
     $emulabconfig{"NOSETUP"}    = 0;
+    $emulabconfig{"SCRATCHFS"}  = 0;
 
     #
     # Turn the tmcc results into a hash first. Then call the boss or ops
@@ -246,6 +250,10 @@ sub doboot()
     # Ditto nosetup.
     if ($emulabconfig{"NOSETUP"}) {
 	$NOSETUP = 1;
+    }
+    # and scratch filesystem usage
+    if ($emulabconfig{"SCRATCHFS"}) {
+	$SCRATCHFS = 1;
     }
 
     # XXX Temporary
@@ -441,13 +449,14 @@ sub SetupFsNode()
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
-    # /proj, /users, and /groups. Also allows /share to be created/
+    # /proj, /users, /groups and /scratch. Also allows /share to be created/
     #
     mysystem("umount -A -t nfs");
     # In case umount fails!
     mysystem("cd /; mv -f users users.old");
     mysystem("cd /; mv -f proj proj.old");
-    # Groups might not exists
+    mysystem("cd /; mv -f share share.old");
+    # This might not exist
     mysystem("cd /; mv -f groups groups.old")
 	if (-d "/groups");
     mysystem("mkdir ${TBDIR}/users ${TBDIR}/proj ${TBDIR}/groups");
@@ -455,9 +464,17 @@ sub SetupFsNode()
     mysystem("ln -s ${TBDIR}/proj /proj");
     mysystem("ln -s ${TBDIR}/groups /groups");
 
+    if ($SCRATCHFS) {
+	mysystem("cd /; mv -f scratch scratch.old")
+	    if (-d "/scratch");
+	mysystem("mkdir ${TBDIR}/scratch");
+	mysystem("ln -s ${TBDIR}/scratch /scratch");
+    }
+
     #
     # Setup a stub /share using slice 2 of the image.
     #
+    mysystem("mkdir /share");
     mysystem("$BINDIR/mkextrafs.pl -f -s 2 /share");
 
     #
@@ -760,14 +777,14 @@ sub SetupOpsNode($)
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
-    # /proj, /users, and /groups. Also allows /share to be created/
+    # /proj, /users, /groups and /scratch. Also allows /share to be created/
     #
     mysystem("umount -A -t nfs");
     # In case umount fails!
     mysystem("cd /; mv -f users users.old");
     mysystem("cd /; mv -f proj proj.old");
     mysystem("cd /; mv -f share share.old");
-    # Groups might not exists
+    # This might not exist
     mysystem("cd /; mv -f groups groups.old")
 	if (-d "/groups");
     if ($isfs) {
@@ -783,6 +800,17 @@ sub SetupOpsNode($)
 	mysystem("$BINDIR/mkextrafs.pl -f -s 2 /share");
     } else {
 	mysystem("mkdir /users /proj /groups /share");
+    }
+
+    if ($SCRATCHFS) {
+	mysystem("cd /; mv -f scratch scratch.old")
+	    if (-d "/scratch");
+	if ($isfs) {
+	    mysystem("mkdir ${TBDIR}/scratch");
+	    mysystem("ln -s ${TBDIR}/scratch /scratch");
+	} else {
+	    mysystem("mkdir /scratch");
+	}
     }
 
     #
@@ -1575,6 +1603,14 @@ sub CreateDefsFile($)
 		};
 		/^TBCOOKIESUFFIX$/ && do {
 		    print OUTDEFS "TBCOOKIESUFFIX=\"$eid\"\n";
+		    last SWITCH;
+		};
+		/^FSDIR_SCRATCH$/ && do {
+		    if ($SCRATCHFS) {
+			print OUTDEFS "FSDIR_SCRATCH=/q/scratch\n";
+		    } else {
+			print OUTDEFS "FSDIR_SCRATCH=\n";
+		    }
 		    last SWITCH;
 		};
 		

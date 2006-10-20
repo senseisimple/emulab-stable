@@ -20,6 +20,7 @@ my $optlist = "-e:";
 
 # Configure variables.
 my $TB          = "@prefix@";
+my $PROJROOT	= "@PROJROOT_DIR@";
 
 # Locals.
 my $pid;
@@ -45,7 +46,7 @@ else {
     #
     # See if we can infer the pid/eid from the path.
     #
-    if (`pwd` =~ /^(?:\/[-\w]+)*\/proj\/([-\w]+)\/exp\/([-\w]+)/) {
+    if (`pwd` =~ /^(?:\/[-\w]+)*\/$PROJROOT\/([-\w]+)\/exp\/([-\w]+)/) {
 	$pid = $1;
 	$eid = $2;
 	print "Using $pid/$eid\n";
@@ -62,7 +63,7 @@ my $scriptname = shift(@ARGV);
 #
 # Grab the user environment variables.
 #
-open(USRENV, "/proj/$pid/exp/$eid/tbdata/environment")
+open(USRENV, "/$PROJROOT/$pid/exp/$eid/tbdata/environment")
     or die("Could not open user environment file!\n");
 
 while (<USRENV>) {

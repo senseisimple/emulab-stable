@@ -244,7 +244,7 @@ my $isglobal = $imageid_row{'global'};
 # Redirect pathname for global images.
 #
 if ($isglobal && ($filename =~ /^\/usr\/testbed/)) {
-    $filename = "/proj/$pid/images/" . basename($filename);
+    $filename = PROJDIR() . "/$pid/images/" . basename($filename);
     print "*** WARNING: Writing global descriptor to $filename instead!\n";
 }
 
@@ -274,13 +274,11 @@ else {
 }
 
 #
-# The file must reside in /proj, /groups, or /users. Since this script
+# The file must reside in an allowed directory. Since this script
 # runs as the caller, regular file permission checks ensure its a file
 # the user is allowed to use. 
 #
-if (! ($filename =~ /^\/proj/) &&
-    ! ($filename =~ /^\/groups/) &&
-    ! ($filename =~ /^\/users/)) {
+if (! TBValidUserDir($filename, 0)) {
     die("*** $0:\n".
 	"    $filename does not resolve to an allowed directory!\n");
 }

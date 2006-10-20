@@ -51,10 +51,15 @@ my $inittag     = 'root';
 my $defaultview = 'head';
 my $debug       = 0;
 my $svnopt      = ($debug ? "" : "-q");
-my %ROOTS       = ("proj"   => "proj",
-		   "users"  => "users",
-		   "share"  => "share",
-		   "groups" => "groups");
+my $SHAREROOT   = SHAREROOT();
+my $SCRATCHROOT = SCRATCHROOT();
+my %ROOTS       = (PROJROOT()  => "proj",
+		   USERROOT()  => "users",
+		   $SHAREROOT  => "share",
+		   GROUPROOT() => "groups");
+if ($SCRATCHROOT) {
+    $ROOTS{$SCRATCHROOT} = "scratch";
+}
 
 my $TAGTYPE_USER      = "user";
 my $TAGTYPE_COMMIT    = "commit";
@@ -303,7 +308,7 @@ sub ValidatePath($)
     # the rootdir so we can copy it in.
     #
     if ($realpath =~ /^[\/]+(\w+)\/(.+)$/) {
-	$rootdir  = $1;
+	$rootdir  = "/$1";
 	$pathname = $2;
     }
     else {
@@ -366,7 +371,7 @@ sub ArchiveAdd($$;$$$)
 	# Last part of path must be a directory.
 	#
 	if (! -d $pathname) {
-	    print STDERR "ArchiveAdd: Must be a direcotory: $pathname\n";
+	    print STDERR "ArchiveAdd: Must be a directory: $pathname\n";
 	    return -1;
 	}
 	my ($filename,$directory,undef) = fileparse($pathname);
@@ -1466,7 +1471,7 @@ sub TBExperimentArchiveAddTracedFiles($$)
 		     "LEFT JOIN accessed_files as af on af.idx=fr.fileidx ".
 		     "WHERE fr.rsrcidx=$rsrcidx and fr.type!='l'");
     while (my ($fn) = $query_result->fetchrow_array()) {
-	if ($fn =~ /^\/share/ ||
+	if ($fn =~ /^$SHAREROOT/ ||
 	    $fn =~ /^<u:/) {
 	    next;
 	}

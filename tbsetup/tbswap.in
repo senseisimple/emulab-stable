@@ -1902,7 +1902,7 @@ sub doSwapoutAction($$%)
 	    $state{'_interval'} = $stateinterval;
 	    $state{'_timeout'} = $statetimeout;
 	    $state{'_iterations'} = 0;
-	    my $swapdir = "/proj/$pid/exp/$eid/swapinfo";
+	    my $swapdir = PROJROOT() . "/$pid/exp/$eid/swapinfo";
 	    my @enodes = ();
 	    foreach my $node (@pnodes) {
 		my $vname = $nodes{$node};

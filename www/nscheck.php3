@@ -73,17 +73,15 @@ if ($speclocal) {
     # for the file before going to ground, so the user will get immediate
     # feedback if the filename is bogus.
     #
-    # Do not allow anything outside of /users or /proj. I do not think there
-    # is a security worry, but good to enforce it anyway.
+    # Do not allow anything outside of the usual directories. I do not think
+    # there is a security worry, but good to enforce it anyway.
     #
     if (!preg_match("/^([-\@\w\.\/]+)$/", $exp_localnsfile)) {
 	USERERROR("NS File: Pathname includes illegal characters", 1);
     }
-    if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
-        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
-        ! ereg("^$TBGROUP_DIR/.*" ,$exp_localnsfile)) {
-	USERERROR("NS File: You must specify a server resident file in either ".
-                  "$TBUSER_DIR/ or $TBPROJ_DIR/", 1);
+    if (!VALIDUSERPATH($exp_localnsfile)) {
+	USERERROR("NS File: You must specify a server resident file in " .
+		  "one of: ${TBVALIDDIRS}.", 1);
     }
     
     $nsfile = $exp_localnsfile;

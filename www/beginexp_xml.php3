@@ -171,11 +171,9 @@ elseif (isset($formfields[exp_localnsfile]) &&
     if (!preg_match("/^([-\@\w\.\/]+)$/", $formfields[exp_localnsfile])) {
 	$errors["Server NS File"] = "Pathname includes illegal characters";
     }
-    elseif (! ereg("^$TBPROJ_DIR/.*",  $formfields[exp_localnsfile]) &&
-	    ! ereg("^$TBUSER_DIR/.*",  $formfields[exp_localnsfile]) &&
-	    ! ereg("^$TBGROUP_DIR/.*", $formfields[exp_localnsfile])) {
-	$errors["Server NS File"] = "Must reside in either ".
-	    "$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/";
+    elseif (! VALIDUSERPATH($formfields[exp_localnsfile])) {
+	$errors["Server NS File"] =
+		"Must reside in one of: $TBVALIDDIRS";
     }
     $nsfilelocale = "local";
 }

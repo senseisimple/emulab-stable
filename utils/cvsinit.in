@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -18,7 +18,6 @@ my $TB       = "@prefix@";
 my $CVSBIN   = "/usr/bin/cvs";
 my $CHOWN    = "/usr/sbin/chown";
 my $CVSSUPPORT  = @CVSSUPPORT@;
-my $PROJROOT = "/proj";
 
 #
 # Untaint the path
@@ -55,6 +54,7 @@ if (! $CVSSUPPORT) {
 my $query_result =
     DBQueryFatal("select pid,head_uid from projects");
 
+my $PROJROOT = PROJROOT();
 while (my ($pid,$projhead) = $query_result->fetchrow_array()) {
     next
 	if (! -d "$PROJROOT/$pid");

@@ -85,7 +85,6 @@ my $copydir;		# Directory extracted from archive, to delete.
 # Configure variables
 #
 my $TB       = "@prefix@";
-my $PROJROOT = "/proj";
 my $EVENTSYS = @EVENTSYS@;
 my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
@@ -938,7 +937,8 @@ sub ParseArgs()
 	}
 
 	#
-	# Called from ops interactively. Make sure NS file in /proj or /users.
+	# Called from ops interactively. Make sure NS file resides in an
+	# appropriate location.
 	#
 	# Use realpath to resolve any symlinks.
 	#
@@ -953,17 +953,18 @@ sub ParseArgs()
 	}
 
 	#
-	# The file must reside in /proj, /groups, or /users. Since this script
-	# runs as the caller, regular file permission checks ensure its a file
-	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
-	# since this script is invoked directly from web interface.
+	# The file must reside in an acceptible location. Since this script
+	# runs as the caller, regular file permission checks ensure it is a
+	# file the user is allowed to use.  So we don't have to be too tight
+	# with the RE matching /tmp and /var/tmp files.  Note that
+	# /tmp/$guid-$nsref.nsfile is also allowed since this script is
+	# invoked directly from web interface which generates a name that
+	# should not be guessable.
 	#
 	if (! ($tempnsfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
 	    ! ($tempnsfile =~ /^\/tmp\/\d+\.ns/) &&
 	    ! ($tempnsfile =~ /^\/var\/tmp\/php\w+/) &&
-	    ! ($tempnsfile =~ /^\/proj/) &&
-	    ! ($tempnsfile =~ /^\/groups/) &&
-	    ! ($tempnsfile =~ /^\/users/)) {
+	    ! TBValidUserDir($tempnsfile, 0)) {
 	    tberror({type => 'primary', severity => SEV_ERROR,
 		     error => ['disallowed_directory', $tempnsfile]},
 		    "$tempnsfile does not resolve to an allowed directory!");

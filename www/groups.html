@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -126,8 +126,10 @@ group will get accounts on the nodes; other members of the same
 project, not in the group, will not get accounts.
 </li>
 <li>
-Emulab uses NFS mounted filesystems for <tt>/users</tt>, <tt>/proj</tt>, 
-and <tt>/groups</tt> on the experimental nodes. Because of the nature of
+Emulab uses NFS mounted filesystems for
+<tt>/users</tt>, <tt>/proj</tt>, <tt>/groups</tt>,
+and (optionally) <tt>/scratch</tt>
+on the experimental nodes. Because of the nature of
 NFS, giving root privileges to a user will allow them to read/write
 any files on any filesystems that are mounted, since root access
 allows them to <em>su</em> as any other user. Thus, any files in the

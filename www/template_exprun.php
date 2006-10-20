@@ -184,6 +184,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
     global $guid, $version, $pid, $eid;
+    global $TBVALIDDIRS_HTML;
 
     PAGEHEADER("Start new Experiment Run");
 
@@ -378,8 +379,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
                </td><td></td></tr>\n";
 	echo "<tr>
                   <td class='pad4'>On Server<br>
-                           <font size='-1'>(<code>/proj</code>,
-                      <code>/groups</code>, <code>/users</code>)</font></td>
+                           <font size='-1'>($TBVALIDDIRS_HTML)</font></td>
                   <td class='pad4'>
 	              <input type=text
                              name=\"formfields[parameter_xmlfile]\"
@@ -557,11 +557,9 @@ if (count($parameter_masterlist)) {
 	    $errors["Parameter XML File"] =
 		"Pathname includes illegal characters";
 	}
-	elseif (! ereg("^$TBPROJ_DIR/.*",  $parameter_xmlfile) &&
-		! ereg("^$TBUSER_DIR/.*",  $parameter_xmlfile) &&
-		! ereg("^$TBGROUP_DIR/.*", $parameter_xmlfile)) {
-	    $errors["Parameter XML File"] = "Must reside in either ".
-		"$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/";
+	elseif (! VALIDUSERPATH($parameter_xmlfile)) {
+	    $errors["Parameter XML File"] =
+		"Must reside in one of: $TBVALIDDIRS";
 	}
     	$deletexmlfile = 0;
     }

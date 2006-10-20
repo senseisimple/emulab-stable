@@ -32,6 +32,7 @@ my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ELABINELAB  = @ELABINELAB@;
+my $PROJROOT    = "@PROJROOT_DIR@";
 
 # Max number of retries (per node) before its deemed fatal. This allows
 # for the occasional pxeboot failure.
@@ -966,7 +967,7 @@ sub osload_setupswapinfo($$;@)
 	}
 
 	# XXX backward compat
-	my $infodir = "/proj/$rpid/exp/$reid/swapinfo";
+	my $infodir = "/$PROJROOT/$rpid/exp/$reid/swapinfo";
 	if (! -d "$infodir" && !mkdir($infodir, 0770)) {
 	    print "*** swapinfo: no swap info directory $infodir!\n";
 	    next
@@ -989,7 +990,7 @@ sub osload_setupswapinfo($$;@)
 	if ($imagepid eq TBOPSPID()) {
 	    $sigdir = "$TB/images/sigs";
 	} else {
-	    $sigdir = "/proj/$imagepid/images/sigs";
+	    $sigdir = "/$PROJROOT/$imagepid/images/sigs";
 	}
 	$signame = "$imageid.ndz.sig";
 	$signame =~ s/^$imagepid-//;
@@ -1051,7 +1052,7 @@ sub osload_setupswapinfo($$;@)
     # in an experiment (else we don't know whether a sig is used or not).
     #
     if ($allnodes) {
-	my $infodir = "/proj/$pid/exp/$eid/swapinfo";
+	my $infodir = "/$PROJROOT/$pid/exp/$eid/swapinfo";
 	my @allsigs = `ls $infodir/*.sig`;
 	chomp(@allsigs);
 	for my $sig (@allsigs) {

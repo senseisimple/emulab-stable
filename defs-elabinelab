@@ -28,6 +28,7 @@ FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/q/users
 FSDIR_SHARE=/share
+FSDIR_SCRATCH=changeme
 WWWHOST=changeme
 TBMAINSITE=0
 THISHOMEBASE=changeme

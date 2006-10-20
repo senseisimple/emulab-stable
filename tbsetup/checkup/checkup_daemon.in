@@ -50,7 +50,7 @@ $libdb::DBQUERY_MAXTRIES = 30;
 my $NODEDEAD_PID= NODEDEAD_PID;
 my $NODEDEAD_EID= NODEDEAD_EID;
 my $TBOPSPID= TBOPSPID;
-my $HOME= "/users/elabckup";
+my $HOME= USERROOT() . "/elabckup";
 
 sub fatal($);
 sub notify($);
@@ -204,7 +204,8 @@ MAINLOOP: while(1) {
 	    }
 	    elsif ($state eq "running") {
 		# Check the experiment's state.
-		my $report = "/proj/$TBOPSPID/exp/$eid/logs/report.mail";
+		my $report = PROJROOT() .
+		    "/$TBOPSPID/exp/$eid/logs/report.mail";
 
 		if (-e $report) {
 		    # Failed...
