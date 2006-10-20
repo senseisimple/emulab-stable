@@ -100,6 +100,11 @@ VERBOSITY = VERBOSITY_HUMAN
 
 SERVER = None
 
+# For compressfile stuff
+COMPRESSFILE_THRESHOLD  = 512 * 1024
+COMPRESSFILE_EXTENSIONS = [ ".zip", ".gz", ".bz2" ]
+COMPRESSFILE_PROGRAM    = "/usr/bin/gzip"
+
 OSIDS = {}
 
 JOB_TRIES = 3
@@ -925,7 +930,8 @@ def rsync(host, base, dlpath = None, paths = ["/"], port = None,
         except OSError:
             pass
         cmd = [RSYNC,
-               "-rtgoDlz",
+               "-rtgoDl",
+               "-z", # rsync compression, ssh compression turned off below
                "-v", # XXX
                "--copy-unsafe-links"]
         if dlpath != None:
@@ -935,6 +941,7 @@ def rsync(host, base, dlpath = None, paths = ["/"], port = None,
             cmd.append("-v")
             pass
         ssh_args = ("ssh -o BatchMode=yes -o StrictHostKeyChecking=no "
+                    + "-o Compression=no "
                     + "-o UserKnownHostsFile="
                     + os.path.join(HOME, ".ssh", "emulab_known_hosts"))
         if IDENTITY:
@@ -1034,6 +1041,36 @@ def print_status(msg):
     sys.stdout.flush()
     
     return
+
+#
+# Compress a file. Return False if file is skipped for whatever reason.
+#
+def compressfile(root, file, threshold):
+    pathname = os.path.join(root, file)
+    if not os.path.exists(pathname):
+        return False
+    statinfo = os.stat(pathname)
+    mode     = statinfo[stat.ST_MODE]
+    size     = statinfo[stat.ST_SIZE]
+    # Only regular files
+    if not stat.S_ISREG(mode):
+        return False
+    # Only files greater then threshold
+    if not size >= threshold:
+        return False
+    first, last = os.path.splitext(pathname)
+    # Try to avoid compressing things that are already compressed.
+    if last in COMPRESSFILE_EXTENSIONS:
+        return False
+    # Lets be careful of foo and foo.gz, which is from a previous run.
+    if os.path.exists(pathname + ".gz"):
+        os.unlink(pathname + ".gz")
+        pass
+    print_status("Compressing " + pathname + " --> " + pathname + ".gz\n")
+    exitval = os.system(COMPRESSFILE_PROGRAM + " %s " % (pathname,))
+    if exitval != 0:
+        return False
+    return True
 
 def print_job_status(mode, hosts, jobs, hoststatus, hoststart):
     if not sys.stdout.isatty() or VERBOSITY < VERBOSITY_HUMAN:
@@ -1232,11 +1269,12 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     standard_logholes = True
     snapshot_traces = False
     post_process = True
+    compress = False
     extra_logholes = []
 
     try:
-        opts, node_list = getopt.getopt(args, "nl:r:Psd", [
-            "no-standard", "local=", "remote=", "delete" ])
+        opts, node_list = getopt.getopt(args, "nl:r:Psdc", [
+            "no-standard", "local=", "remote=", "delete", "compress"])
         for opt, val in opts:
             if opt in ("-n", "--no-standard"):
                 standard_logholes = False
@@ -1259,6 +1297,9 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                 pass
             elif opt in ("-d", "--delete"):
                 delete_dir = True
+                pass
+            elif opt in ("-c", "--compress"):
+                compress = True
                 pass
             pass
         pass
@@ -1633,6 +1674,11 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                 pass
             
             pass
+        pass
+
+    # Do compression
+    if compress:
+        do_compress("", as_root = as_root)
         pass
     
     # Schedule clean
@@ -2076,6 +2122,73 @@ def do_clean(args):
     if do_nodes:
         do_sync(args, mode="clean", must_be_active=0, as_root = as_root)
         pass
+
+    return retval
+
+##
+# Performs the "compress" action, which compresses logs in the experiment
+# log directory.
+#
+# @param args Action-specific command line arguments.
+#
+def do_compress(args, as_root=False):
+    retval     = 0
+    force      = 0
+    as_root    = False
+    compressed = []
+
+    # Parse action-specific options and arguments.
+    try:
+        opts, args = getopt.getopt(args, "fr", [
+            "force", "root", ])
+        for opt, val in opts:
+            if opt in ("-f", "--force"):
+                force = 1
+                pass
+            elif opt in ("-r", "--root"):
+                as_root = True
+            pass
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        clean_usage()
+        return 2
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    os.chdir(logdir)
+    for entry in os.listdir(logdir):
+        path = os.path.join(logdir, entry)
+        if os.path.isdir(path):
+            for root, dirs, files in os.walk(path, topdown=False):
+                for file in files:
+                    if compressfile(root, file, COMPRESSFILE_THRESHOLD):
+                        filename = os.path.join(root, file)
+                        relname  = filename[len(logdir) + 1:]
+                        compressed.append(relname)
+                        pass
+                    pass
+                pass
+            pass
+        else:
+            if compressfile(logdir, entry, COMPRESSFILE_THRESHOLD):
+                compressed.append(entry)
+                pass
+            pass
+        pass
+
+    # Write out list of files compressed in this run.
+    compressname = ".compressed"
+    if os.path.exists(compressname):
+        os.unlink(compressname)
+        pass
+    fp = open(compressname, 'w')
+    for file in compressed:
+        fp.write(file)
+        fp.write("\n")
+        pass
+    fp.close();
 
     return retval
 
