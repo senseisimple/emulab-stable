@@ -1053,6 +1053,10 @@ sub header_size {
 sub link_rtt {
     my ($edge,$other_edge,$psize) = @_;
 
+    # XXX assume a ping packet
+    $psize = 56
+	if (!defined($psize));
+
     # the null hypothesis value, u.
     my $u = $edge->delay + $other_edge->delay;
 			    
@@ -1184,7 +1188,7 @@ sub latency_test {
 				       1, undef, $ptimo);
 			
 			if ($reportonly) {
-			    my $u = &link_rtt($edge, $other_edge, 56);
+			    my $u = &link_rtt($edge, $other_edge);
 
 			    &info("    Latency result on $hostname for " .
 				  &print_edge($edge) . 
@@ -1201,7 +1205,7 @@ sub latency_test {
 			    &error(NAME_LATENCY, $edge, $errmsg);
 			    exit(EXIT_NOT_OK);
 			} else {
-			    my $u = &link_rtt($edge, $other_edge, 56);
+			    my $u = &link_rtt($edge, $other_edge);
 			    
 			    my $x_bar = $sample_avg;
 			    my $numerator = $x_bar - $u;
