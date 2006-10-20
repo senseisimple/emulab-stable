@@ -419,6 +419,8 @@ sub SetupFsNode()
     mysystem("rm -rf /usr/testbed/bin");
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
+    unlink("/etc/rc.d/netif-emulab")
+	if (-e "/etc/rc.d/netif-emulab");
 
     # XXX fer now: if not set, derive from the OPS info
     if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
@@ -737,6 +739,8 @@ sub SetupOpsNode($)
     mysystem("rm -rf /usr/testbed/bin");
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
+    unlink("/etc/rc.d/netif-emulab")
+	if (-e "/etc/rc.d/netif-emulab");
 
     goto skippkg
 	if ($NOSETUP);
@@ -1102,6 +1106,8 @@ sub SetupBossNode()
     mysystem("rm -rf /usr/testbed/bin");
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
+    unlink("/etc/rc.d/netif-emulab")
+	if (-e "/etc/rc.d/netif-emulab");
 
     #
     # Create a bigger /var/db/mysql (before installing mysql!)
