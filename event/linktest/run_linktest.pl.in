@@ -14,7 +14,7 @@ use POSIX;
 #
 my $TB            = "@prefix@";
 my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
-my $EVENTSERVER   = "@EVENTSERVER";
+my $EVENTSERVER   = "@EVENTSERVER@";
 my $PROJROOT      = "@PROJROOT_DIR@";
 
 #
