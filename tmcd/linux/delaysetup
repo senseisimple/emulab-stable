@@ -156,6 +156,8 @@ sub LinkDelaySetup()
         print DEL "modprobe imq numdevs=10\n";
         print DEL "sysctl -w net.core.rmem_max=8388608\n";
         print DEL "sysctl -w net.core.wmem_max=8388608\n";
+        print DEL "sysctl -w net.core.rmem_default=87380\n";
+        print DEL "sysctl -w net.core.wmem_default=87380\n";
         print DEL "sysctl -w net.core.netdev_max_backlog=2048\n";
 
 	foreach $delay (@delays) {
@@ -237,15 +239,14 @@ sub LinkDelaySetup()
 	    #
             # Just changed things to work similarly in Linux
             #
-	    my $queue = "";
+	    my $qlen = 0;
+	    my $rqlen = 5 * 1500;
 	    if ($qinbytes) {
 		if ($limit <= 0 || $limit > (1024 * 1024)) {
 		    print "Q limit $limit for pipe $pipeno is bogus.\n";
 		}
 		else {
-                    # In Linux, we have to convert to packets
-		    $queue = int($limit/1500);
-                    $queue = $queue > 0 ? $queue : 1;
+		    $qlen = $limit;
 		}
 	    }
 	    elsif ($limit != 0) {
@@ -253,12 +254,13 @@ sub LinkDelaySetup()
 		    print "Q limit $limit for pipe $pipeno is bogus.\n";
 		}
 		else {
-		    $queue = $limit;
+		    # convert to bytes
+		    $qlen = $limit*1500;
 		}
 	    }
 
             # RED/GRED stuff
-# Just skip this for a minute	    
+# Just skip this until someone complains...
 #  	    my $redparams = "";
 #  	    if ($red) {
 #  		if ($gentle) {
@@ -271,11 +273,6 @@ sub LinkDelaySetup()
 #  		$redparams .= "$weight/$minthresh/$maxthresh/$max_p";
 #  	    }
 
-            # XXX: temporarily select between delay, plr, and [g]red
-            # until they become classful queues.
-            
-            print DEL "ifconfig $iface txqueuelen $queue\n";
-
             print DEL "$TC qdisc add dev $iface handle $pipeno root ";
             print DEL "plr $plr\n";
 
@@ -287,7 +284,7 @@ sub LinkDelaySetup()
             print DEL "ceil ${bandw}\n";
 
             print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
-            print DEL "parent ". ($pipeno+10) .":1 delay usecs $delay\n";
+            print DEL "parent ". ($pipeno+10) .":1 delay usecs $delay qlen $qlen\n";
 
             $iface =~ /\D+(\d+)/;
             my $imqnum = $1;
@@ -306,7 +303,7 @@ sub LinkDelaySetup()
                 
                 print DEL "$TC qdisc add dev imq${imqnum} handle ";
                 print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
-                print DEL "delay usecs $rdelay reset_time 1\n";
+                print DEL "delay usecs $rdelay qlen $rqlen reset_time 1\n";
 
                 print DEL "$IPTABLES -t mangle -A PREROUTING -i $iface ";
                 print DEL "-j IMQ --todev $imqnum\n";
