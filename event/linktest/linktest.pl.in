@@ -18,9 +18,6 @@ my $LINKTEST_VERSION = "1.2";
 #
 # XXX config stuff that does not belong on the client-side
 #
-my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
-my $CLIENT_VARDIR = "@CLIENT_VARDIR@";
-my $EVENTSERVER   = "@EVENTSERVER@";
 my $PROJROOT      = "@PROJROOT_DIR@";
 
 #
@@ -57,18 +54,21 @@ sub usage()
 ##############################################################################
 
 # path to applications and files
-use constant PATH_NICKNAME => "$CLIENT_VARDIR/boot/nickname";
-use constant PATH_KEYFILE => "$CLIENT_VARDIR/boot/eventkey";
-use constant PATH_RUDE => "$CLIENT_BINDIR/emulab-rude";
-use constant PATH_CRUDE => "$CLIENT_BINDIR/emulab-crude";
-use constant PATH_IPERF => "$CLIENT_BINDIR/emulab-iperf";
-use constant PATH_RCTOPO => "$CLIENT_BINDIR/rc/rc.topomap";
-use constant PATH_EMULAB_SYNC => "$CLIENT_BINDIR/emulab-sync";
-use constant PATH_LTEVENT => "$CLIENT_BINDIR/ltevent";
-use constant PATH_TEVC => "$CLIENT_BINDIR/tevc";
-use constant RUN_PATH => "$CLIENT_BINDIR"; # where the linktest-ns runs.
-use constant EVENTSERVER => "$EVENTSERVER";
-use constant PATH_SCHEDFILE => "$CLIENT_VARDIR/logs/linktest.sched";
+use constant PATH_NICKNAME => "@CLIENT_VARDIR@/boot/nickname";
+use constant PATH_KEYFILE => "@CLIENT_VARDIR@/boot/eventkey";
+use constant PATH_RUDE => "@CLIENT_BINDIR@/emulab-rude";
+use constant PATH_CRUDE => "@CLIENT_BINDIR@/emulab-crude";
+use constant PATH_IPERF => "@CLIENT_BINDIR@/emulab-iperf";
+use constant PATH_RCTOPO => "@CLIENT_BINDIR@/rc/rc.topomap";
+use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
+use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
+use constant PATH_TEVC => "@CLIENT_BINDIR@/tevc";
+use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
+use constant EVENTSERVER => "@EVENTSERVER@";
+use constant PATH_SCHEDFILE => "@CLIENT_VARDIR@/logs/linktest.sched";
+use constant PATH_SYNCSERVER => "@CLIENT_VARDIR@/boot/syncserver";
+use constant PATH_TOPOFILE => "@CLIENT_VARDIR@/boot/ltmap";
+use constant PATH_PTOPOFILE => "@CLIENT_VARDIR@/boot/ltpmap";
 
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
@@ -321,8 +321,8 @@ $gid = $proj_id;
 #
 $expt_path = "$PROJROOT/$proj_id/exp/$exp_id/tbdata";
 $linktest_path = "$expt_path/linktest";
-$topology_file = "$CLIENT_VARDIR/boot/ltmap";
-$ptopology_file = "$CLIENT_VARDIR/boot/ltpmap";
+$topology_file = PATH_TOPOFILE;
+$ptopology_file = PATH_PTOPOFILE;
 
 #
 # Determine what OS we are.  Used for handling the occasional difference
@@ -347,7 +347,7 @@ sleep(int(rand(5)));
 # is not participating, we choose the first node on the host list.
 #
 $synserv = "";
-my $ssname = "$CLIENT_VARDIR/boot/syncserver";
+my $ssname = PATH_SYNCSERVER;
 if ($ssname) {
     @results = &read_file($ssname);
     ($synserv) = split/\./, $results[0];
