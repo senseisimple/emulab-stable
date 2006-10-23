@@ -16,7 +16,7 @@ if {${::GLOBALS::explicit_firewall}} {
     $fw set-type ipfw2-vlan
         
     if {${::GLOBALS::security_level} == 1} {
-	$fw set-style open
+	$fw set-style basic
     } elseif {${::GLOBALS::security_level} == 2} {
 	$fw set-style basic	
     } elseif {${::GLOBALS::security_level} == 3} {
