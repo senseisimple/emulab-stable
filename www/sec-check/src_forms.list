@@ -1,0 +1,105 @@
+./approveproject_form.php3:109:      <form action='approveproject.php3?pid=$pid' method='post'>\n";
+./approveuser_form.php3:152:echo "<form action='approveuser.php3' method='post'>\n";
+./approvewauser_form.php3:109:echo "<form action='approvewauser.php3' method='post'>\n";
+./archive_missing.php3:132:    echo "<form action='archive_missing.php3?exptidx=$exptidx'
+./archive_tag.php3:83:          <form action=archive_tag.php3?exptidx=$exptidx method=post>\n";
+./archive_view.php3:84:    echo "<form action='${TBBASE}/archive_tag.php3' $style method=get>\n";
+./archive_view.php3:90:echo "<form action='${TBBASE}/archive_tags.php3' $style method=get>";
+./archive_view.php3:96:    echo "<form action='${TBBASE}/archive_missing.php3' $style method=get>";
+./beginexp_form.php3:312:    echo "<form name=form1 enctype=multipart/form-data
+./boot.php3:91:    echo "<form action=boot.php3 target=_blank method=post>";
+./cdromnewkey.php:58:          <form action=cdromnewkey.php method=post>\n";
+./cdromqueue.php3:63:	echo "<form action=cdromqueue.php3 method=post>";
+./cdromrequest.php3:49:          <form action=cdromrequest.php3 method=post>\n";
+./chpasswd.php3:98:          <form action=${TBBASE}/chpasswd.php3?${args} method=post>\n";
+./delaycontrol.php3:211:print "<form action='delaycontrol.php3' method=post>\n" .
+./deletegroup.php3:79:    echo "<form action='deletegroup.php3?pid=$pid&gid=$gid' method=post>";
+./deleteimageid.php3:98:    echo "<form action='deleteimageid.php3' method=post>";
+./deletenodelog.php3:71:    echo "<form action='deletenodelog.php3' method=post>";
+./deleteosid.php3:147:    echo "<form action=\"deleteosid.php3\" method=\"post\">";
+./deleteproject.php3:65:    echo "<form action=\"deleteproject.php3\" method=\"post\">";
+./deleteproject.php3:82:    echo "<form action=\"deleteproject.php3\" method=\"post\">";
+./deletepubkey.php3:94:    echo "<form action='deletepubkey.php3?target_uid=$target_uid&key=$key'
+./deletesfskey.php3:95:    echo "<form action='deletesfskey.php3?target_uid=$target_uid&key=$key'
+./deleteuser.php3:196:    echo "<form action=deleteuser.php3 method=post>";
+./deleteuser.php3:223:    echo "<form action=deleteuser.php3 method=post>";
+./delmmlist.php3:74:    echo "<form action='delmmlist.php3?listname=$listname' method=post>";
+./editexp.php3:89:          <form action=editexp.php3?pid=$pid&eid=$eid method=post>\n";
+./editgroup_form.php3:105:          <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
+./editimageid.php3:87:          <form action='editimageid.php3?imageid=$url'
+./editnodetype.php3:137:          <form action=editnodetype.php3?$formargs method=post " .
+./editsitevars.php3:106:    echo "<form action='editsitevars.php3' method='get'>";
+./editsitevars.php3:42:	echo "<form action='editsitevars.php3' method='post'>";
+./editsitevars.php3:84:    echo "<form action='editsitevars.php3' method='get'>";
+./editsitevars.php3:97:    echo "<form action='editsitevars.php3' method='get'>";
+./endexp.php3:95:    echo "<form action='endexp.php3?pid=$exp_pid&eid=$exp_eid' method=post>";
+./expaccess_form.php3:73:      <form action='expaccess.php3?pid=$pid&eid=$eid' method=post>\n";
+./feedback.php3:122:    echo "<form action=feedback.php3 method=get>";
+./floormap.php3:395:echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
+./freenode.php3:75:    echo "<form action='freenode.php3?node_id=$node_id' method=post>";
+./freezeuser.php3:117:    echo "<form action=freezeuser.php3 method=post>";
+./freezeuser.php3:136:    echo "<form action=freezeuser.php3 method=post>";
+./gensslcert.php3:123:          <form enctype=multipart/form-data
+./joinproject.php3:143:          <form name=myform enctype=multipart/form-data
+./kb-manage.php3:85:          <form action='kb-manage.php3' method=post>\n";
+./kb-search.php3:27:          <form action=kb-search.php3 method=get>\n";
+./linktest.php3:359:echo "<form action=linktest.php3 method=post name=myform id=myform>";
+./loadimage.php3:100:    echo "<center><form action='loadimage.php3' method='post'>\n".
+./loadimage.php3:70:    echo "<form action='loadimage.php3' method='post'>\n".
+./login.php3:106:          <form action='${TBBASE}/login.php3${pagearg}' method=post>
+./menu.php3:205:	   <form method=get action=$TBDOCBASE/search.php3>
+./menu.php3:331:        <form method='get' action='$newsBase/search.php3'>
+./modifyexp.php3:118:    echo "<form name='form1' action='modifyexp.php3?pid=$pid&eid=$eid&go=1' method='post' onsubmit=\"return false;\" enctype=multipart/form-data>";
+./modnodeattributes_form.php3:84:echo "<form action=\"modnodeattributes.php3?refer=$refer\"
+./moduserinfo.php3:83:          <form action=moduserinfo.php3 method=post>\n";
+./newgroup_form.php3:47:echo "<form action=newgroup.php3 method=post>
+./newimageid.php3:160:          <form action='newimageid.php3' method=post name=idform>\n";
+./newimageid_ez.php3:1106:    echo "<form enctype=\"multipart/form-data\" action='newimageid_ez.php3'
+./newimageid_ez.php3:196:          <form action='newimageid_ez.php3' enctype=\"multipart/form-data\"
+./newmmlist.php3:105:          <form action='newmmlist.php3' method=post name=myform>\n";
+./newnode_edit.php3:81:<form action="newnode_edit.php3" method="get">
+./newnodelog_form.php3:50:     <form action='newnodelog.php3' method=post>\n";
+./newnodes_list.php3:327:<form action="newnodes_list.php3" method="get" name="nodeform">
+./newosid_form.php3:51:<form action="newosid.php3" method="post" name=idform>
+./newproject.php3:149:          <form enctype=multipart/form-data name=myform
+./news.php3:154:	echo "<form action='news.php3' ".
+./news.php3:202:	echo "<form action='news.php3' method='post'>\n";
+./news.php3:269:	echo "<form action='news.php3' method='post'>";
+./news.php3:62:	echo "<form action='news.php3' method='post'>\n";
+./nodecontrol_form.php3:97:echo "<form action=\"nodecontrol.php3?refer=$refer\"
+./nodemon.php3:16:    echo "<form action=\"nodemon.php3\" method=POST>\n";
+./nodemon_all.php3:16:    echo "<form action=\"nodemon_all.php3\" method=POST>\n";
+./nscheck_form.php3:32:echo "<form enctype=\"multipart/form-data\"
+./nsgen.php3:124:    echo "<form name='form1' action='nsgen.php3' method='get'>\n";
+./panicbutton.php3:79:    echo "<form action='panicbutton.php3?pid=$exp_pid&eid=$exp_eid'".
+./password.php3:80:          <form action=${TBBASE}/password.php3 method=post>
+./plab_ez.php3:113:    echo "<form name='form1' action='plab_ez.php3' method='get'>\n";
+./powertime.php3:56:    $body_str .= "<form action='powertime.php3' method=get><br><table>";
+./prereserve_node.php3:78:          <form action='prereserve_node.php3?node_id=$node_id' method=post>\n";
+./remapexp.php3:79:    echo "<form action=remapexp.php3 method=post>";
+./replayexp.php3:80:    echo "<form action='replayexp.php3?pid=$exp_pid&eid=$exp_eid'
+./request_idleinfo.php3:97:    echo "<form action='request_idleinfo.php3?pid=$pid&eid=$eid' method=post>";
+./request_swapexp.php3:107:    echo "<form action='request_swapexp.php3?pid=$pid&eid=$eid' method=post>";
+./robotmap.php3:254:echo "<form method=post action='robotmap.php3" .
+./search.php3:21:          <form action=search.php3 method=get>\n";
+./setnodeloc.php3:131:          <form action=setnodeloc.php3 method=get>
+./showpubkeys.php3:159:          <form enctype=multipart/form-data
+./showsfskeys.php3:157:          <form enctype=multipart/form-data
+./showstuff.php3:1781:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
+./showsumstats.php3:104:echo "<form action=showsumstats.php3 method=get>
+./showuser_list.php3:55:echo "<form action=showuser_list.php3 method=post>
+./survey.php3:189:echo "<form action='survey.php3' method='post'>";
+./swapexp.php3:186:    echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
+./template_analyze.php:82:    echo "<form action='template_analyze.php?guid=$guid&version=$version".
+./template_commit.php:88:    echo "<form action='template_commit.php?guid=$guid&version=$version".
+./template_create.php:53:    echo "<form enctype=multipart/form-data
+./template_export.php:82:    echo "<form action='template_export.php?guid=$guid&version=$version".
+./template_exprun.php:152:    echo "<form action=template_exprun.php".
+./template_metadata.php:65:    echo "<form action=template_metadata.php?action=$action method=post>\n";
+./template_modify.php:54:    echo "<form action='template_modify.php?guid=$guid&version=$version'
+./template_swapin.php:76:    echo "<form action=template_swapin.php?guid=$guid&version=$version ".
+./updateaccounts.php3:105:    echo "<form action='updateaccounts.php3?pid=$pid&eid=$eid' method=post>";
+./verifyusr_form.php3:30:      <form action=\"verifyusr.php3\" method=\"post\">\n";
+./widearea_nodeinfo.php3:222:    echo "<form action='widearea_nodeinfo.php3' method='get'>
+./widearea_register.php:99:          <form enctype=multipart/form-data
+./wideareakeys.php3:79: 	echo "<form action=wideareakeys.php3 method=post>";

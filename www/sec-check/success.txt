@@ -1,0 +1,16 @@
+has been successfully queued.
+is being created.
+has been approved.
+Creating project group
+This will take a few moments
+As a pending user of the Testbed
+you will receive a key via email.
+Membership status for user
+was <b>granted</b> membership
+Starting experiment configuration
+You will be notified via email
+Attempting to reboot
+Snapshot Node Disk into Existing Image Descriptor
+Knowledge Base Entry:
+Your new SSL certificate has been created
+Log for node

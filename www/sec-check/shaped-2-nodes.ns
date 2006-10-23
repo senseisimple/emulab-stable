@@ -1,0 +1,12 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set node1 [$ns node]
+set node2 [$ns node]
+set link0 [$ns duplex-link $node1 $node2 100Mb 50ms DropTail]
+$link0 trace
+
+$ns rtproto Static
+$ns run
+

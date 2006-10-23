@@ -47,15 +47,25 @@ sec-check/README-howto.txt - Documentation outline.
  - Forms coverage
    . Grep the sources for <form and make up a list of php form files.
        gmake src_forms
+         Creates: src_forms.list, src_files.list
      - 105 separate forms are on 95 php code pages (plus 7 "extras" on Boss.)
+       gmake src_msg
 
    . Spider a copy of the EinE site with wget and extract its forms list.
+     Have to edit the EinE experiment details into the makefile.
+     It's better to change your password in the EinE than put it in the makefile.
+     See GNUmakefile.in for details.  
+       gmake login
        gmake spider
        gmake site_forms
+         Creates: admin.wget subdir, site_forms.list, site_files.list
      - 40 "base" forms are visible once logged in as user, 47 with admin on.
+       gmake site_msg
 
    . Compare the two lists to find uncovered (unlinked) forms.
        gmake forms_coverage
+         Creates: files_missing.list
+       gmake forms_msg
 
    . Create a script to activate the EinE site to turn on all forms.
      - Look in the sources to find where the missing links should be.
@@ -64,7 +74,7 @@ sec-check/README-howto.txt - Documentation outline.
        . Projects/users awaiting approval, 
        . Experiments swapped in with active nodes, and so on.
      - Capture a list of URL's along with Get or Post inputs for automation.
-     - Convert the list into an wget script and/or WebInject test cases.
+     - Add steps to the activate: list in the GNUmakefile.in .
 
    . Re-spider and compare until everything is covered (no more missing forms.)
        gmake spider
@@ -73,11 +83,23 @@ sec-check/README-howto.txt - Documentation outline.
  - Input fields coverage
    . Grep spidered forms for <input definitions and devise acceptable values.
        gmake input_coverage
+         Creates: site_inputs.list, input_names.list
+	 You make: input_values.list
+      At first, Copy input_names.list to input_values.list,
+      then edit default values onto the lines for auto-form-fill-in.
+      After the first time, you can merge new ones into input_values.list .
+
      - 1631 <input lines in admin-base, 511 unique, with 156 unique field names.
+         gmake input_msg
      - But only 78 of the unique field names are text fields.
 
-   . Convert the list to WebInject XML test cases submitting input field values.
-   . Test using WebInject until "normal" input tests work properly in all forms.
+ - "normal" test cases
+   . Convert the list to test cases submitting input field values.
+       gmake gen_normal
+         Creates: site_normal.urls, normal_cases.xml
+   . Test until "normal" input tests work properly in all forms.
+       gmake run_normal
+         Creates: normal_output.xml
 
  - Probe the checking code of all input fields for SQL injection holes
    . Generate WebInject cases with SQL injection probes in individual fields.
