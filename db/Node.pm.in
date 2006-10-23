@@ -272,23 +272,17 @@ sub CreateVnodes($$)
     #
     # Need the vtype node_type info. 
     #
-    my $query_result =
-	DBQueryWarn("select * from node_types where type='$vtype'");
-    return -1
-	if (! $query_result);
-
-    if (! $query_result->numrows) {
+    my $nodetype = NodeType->Lookup($vtype);
+    if (! defined($nodetype)) {
 	print STDERR "*** CreateVnodes: No such node type '$vtype'\n";
 	return -1;
     }
-    my $vtype_rowref = $query_result->fetchrow_hashref();
-
-    if (!$vtype_rowref->{"isdynamic"}) {
+    if (!$nodetype->isdynamic()) {
 	print STDERR "*** CreateVnodes: Not a dynamic node type: '$vtype'\n";
 	return -1;
     }
-    my $isremote = $vtype_rowref->{"isremotenode"};
-    my $isjailed = $vtype_rowref->{"isjailed"};
+    my $isremote = $nodetype->isremotenode();
+    my $isjailed = $nodetype->isjailed();
 
     #
     # Make up a priority (just used for sorting). We need the name prefix
@@ -309,9 +303,9 @@ sub CreateVnodes($$)
     # Need the opmode, which comes from the OSID, which is in the node_types
     # table. 
     #
-    my $osid = $vtype_rowref->{"osid"};
+    my $osid = $nodetype->default_osid();
     
-    $query_result =
+    my $query_result =
 	DBQueryWarn("select op_mode from os_info where osid='$osid'");
     return -1
 	if (! $query_result);
