@@ -1,14 +1,14 @@
-diff -ur --new-file iproute2/Config iproute2-linkdelays/Config
---- iproute2/Config	2000-04-16 11:42:46.000000000 -0600
-+++ iproute2-linkdelays/Config	2006-10-19 20:31:17.000000000 -0600
+diff -ru --new-file iproute2/Config iproute2-linkdelays/Config
+--- iproute2/Config	Sun Apr 16 11:42:46 2000
++++ iproute2-linkdelays/Config	Tue Jun 17 14:23:53 2003
 @@ -1,2 +1,4 @@
  TC_CONFIG_DIFFSERV=n
 +TC_CONFIG_DELAY=y
 +TC_CONFIG_PLR=y
  TC_CONFIG_ATM=n
-diff -ur --new-file iproute2/examples/delay.eth0 iproute2-linkdelays/examples/delay.eth0
---- iproute2/examples/delay.eth0	1969-12-31 17:00:00.000000000 -0700
-+++ iproute2-linkdelays/examples/delay.eth0	2006-10-19 20:31:17.000000000 -0600
+diff -ru --new-file iproute2/examples/delay.eth0 iproute2-linkdelays/examples/delay.eth0
+--- iproute2/examples/delay.eth0	Wed Dec 31 17:00:00 1969
++++ iproute2-linkdelays/examples/delay.eth0	Tue May 13 16:46:57 2003
 @@ -0,0 +1,17 @@
 +#! /bin/sh
 +
@@ -27,9 +27,9 @@ diff -ur --new-file iproute2/examples/delay.eth0 iproute2-linkdelays/examples/de
 +
 +${TC} qdisc add dev ${DEVICE} root delay ${USECS}
 +
-diff -ur --new-file iproute2/tc/Makefile iproute2-linkdelays/tc/Makefile
---- iproute2/tc/Makefile	2002-01-09 20:08:18.000000000 -0700
-+++ iproute2-linkdelays/tc/Makefile	2006-10-19 20:31:17.000000000 -0600
+diff -ru --new-file iproute2/tc/Makefile iproute2-linkdelays/tc/Makefile
+--- iproute2/tc/Makefile	Wed Jan  9 20:08:18 2002
++++ iproute2-linkdelays/tc/Makefile	Tue Jun 17 14:23:17 2003
 @@ -13,6 +13,12 @@
  TCMODULES += f_u32.o
  TCMODULES += f_route.o
@@ -51,10 +51,10 @@ diff -ur --new-file iproute2/tc/Makefile iproute2-linkdelays/tc/Makefile
  #TCMODULES += q_hpfq.o
  #TCMODULES += q_hfsc.o
  
-diff -ur --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
---- iproute2/tc/q_delay.c	1969-12-31 17:00:00.000000000 -0700
-+++ iproute2-linkdelays/tc/q_delay.c	2006-10-19 23:26:00.000000000 -0600
-@@ -0,0 +1,145 @@
+diff -ru --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
+--- iproute2/tc/q_delay.c	Wed Dec 31 17:00:00 1969
++++ iproute2-linkdelays/tc/q_delay.c	Thu Jul 10 18:19:51 2003
+@@ -0,0 +1,133 @@
 +/*
 + * q_delay.c		Delay.
 + *
@@ -82,7 +82,7 @@ diff -ur --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
 +
 +static void explain(void)
 +{
-+	fprintf(stderr, "Usage: ... delay <microseconds> [qlen <queue_length_in_bytes>] [reset_time (0|1)]\n");
++	fprintf(stderr, "Usage: ... delay <microseconds> [reset_time (0|1)]\n");
 +}
 +
 +static void explain1(char *arg)
@@ -102,15 +102,13 @@ diff -ur --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
 +
 +	memset(&opt, 0, sizeof(opt));
 +
-+	if ( argc > 6 ) { 
-+          fprintf(stderr, "Too many arguments (seen: %d, expected: 2, 4, or 6)\n",
++	if ( argc > 4 ) { 
++          fprintf(stderr, "Too many arguments (seen: %d, expected: 2 or 4)\n",
 +                  argc);
-+	  explain();
 +          return -1;
 +	} else if ( argc < 2 ) { 
-+          fprintf(stderr, "Too few arguments (seen: %d, expected: 2, 4, or 6)\n",
++          fprintf(stderr, "Too few arguments (seen: %d, expected: 2 or 4)\n",
 +                  argc);
-+	  explain();
 +          return -1;
 +	} else {
 +
@@ -132,15 +130,6 @@ diff -ur --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
 +                return -1;
 +              }
 +              fprintf( stdout, "reset_time: %u\n", opt.reset_time );
-+            }
-+            else if (!strcmp(*argv, "qlen")) {
-+              NEXT_ARG();
-+              opt.qlen_in_bytes = strtoul(*argv,&end,0);
-+              if (*end) {
-+                explain1("qlen");
-+                return -1;
-+              }
-+              fprintf( stdout, "qlen: %u\n", opt.qlen_in_bytes );
 +            }
 +            argc--;
 +            argv++;
@@ -165,9 +154,8 @@ diff -ur --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
 +		return -1;
 +	
 +	qopt = RTA_DATA(opt);
-+	fprintf( f, "delay { %u } qlen ( %u ) reset_time { %u }", 
++	fprintf( f, "delay { %u } reset_time { %u }", 
 +                 qopt->delay_usec,
-+		 qopt->qlen_in_bytes,
 +                 qopt->reset_time
 +		);
 +
@@ -200,9 +188,9 @@ diff -ur --new-file iproute2/tc/q_delay.c iproute2-linkdelays/tc/q_delay.c
 +        delay_print_opt,
 +};
 +
-diff -ur --new-file iproute2/tc/q_htb.c iproute2-linkdelays/tc/q_htb.c
---- iproute2/tc/q_htb.c	1969-12-31 17:00:00.000000000 -0700
-+++ iproute2-linkdelays/tc/q_htb.c	2006-10-19 20:31:17.000000000 -0600
+diff -ru --new-file iproute2/tc/q_htb.c iproute2-linkdelays/tc/q_htb.c
+--- iproute2/tc/q_htb.c	Wed Dec 31 17:00:00 1969
++++ iproute2-linkdelays/tc/q_htb.c	Fri Jun 13 11:05:52 2003
 @@ -0,0 +1,306 @@
 +/*
 + * q_htb.c		HTB.
@@ -510,9 +498,9 @@ diff -ur --new-file iproute2/tc/q_htb.c iproute2-linkdelays/tc/q_htb.c
 +	htb_parse_class_opt,
 +	htb_print_opt,
 +};
-diff -ur --new-file iproute2/tc/q_plr.c iproute2-linkdelays/tc/q_plr.c
---- iproute2/tc/q_plr.c	1969-12-31 17:00:00.000000000 -0700
-+++ iproute2-linkdelays/tc/q_plr.c	2006-10-19 20:31:17.000000000 -0600
+diff -ru --new-file iproute2/tc/q_plr.c iproute2-linkdelays/tc/q_plr.c
+--- iproute2/tc/q_plr.c	Wed Dec 31 17:00:00 1969
++++ iproute2-linkdelays/tc/q_plr.c	Wed Jul  9 18:18:08 2003
 @@ -0,0 +1,117 @@
 +/*
 + * q_plr.c      packet loss qdisc
@@ -631,9 +619,9 @@ diff -ur --new-file iproute2/tc/q_plr.c iproute2-linkdelays/tc/q_plr.c
 +        plr_print_opt,
 +};
 +
-diff -ur --new-file iproute2/tc/tc_qdisc.c iproute2-linkdelays/tc/tc_qdisc.c
---- iproute2/tc/tc_qdisc.c	2002-01-15 04:15:23.000000000 -0700
-+++ iproute2-linkdelays/tc/tc_qdisc.c	2006-10-19 20:31:17.000000000 -0600
+diff -ru --new-file iproute2/tc/tc_qdisc.c iproute2-linkdelays/tc/tc_qdisc.c
+--- iproute2/tc/tc_qdisc.c	Tue Jan 15 04:15:23 2002
++++ iproute2-linkdelays/tc/tc_qdisc.c	Tue Jun 17 14:49:01 2003
 @@ -36,7 +36,7 @@
  	fprintf(stderr, "\n");
  	fprintf(stderr, "       tc qdisc show [ dev STRING ] [ingress]\n");
