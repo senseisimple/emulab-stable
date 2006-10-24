@@ -123,7 +123,9 @@ sub SENDMAIL($$$;$$@)
 	print MAIL "$Headers\n";
     }
     print MAIL "X-NetBed: $SCRIPTNAME\n";
-    print MAIL "To: $To\n";
+    if (defined($To)) {
+	print MAIL "To: $To\n";
+    }
     print MAIL "Subject: $tag: $Subject\n";
     print MAIL "\n";
     print MAIL "$Message\n";
