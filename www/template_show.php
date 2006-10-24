@@ -279,7 +279,7 @@ if (isset($action) && $action == "deletetemplate" &&
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
     PAGEHEADER("Delete Template: $guid/$version");
-    STARTBUSY("Deleting template $guid/$version recurively");
+    STARTBUSY("Deleting template $guid/$version recursively");
 
     # Pass recursive option all the time.
     $retval = SUEXEC($uid, "$pid,$unix_gid",
