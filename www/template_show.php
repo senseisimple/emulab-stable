@@ -76,7 +76,7 @@ CheckArguments($guid, $version);
 function Show($which, $zoom, $detail)
 {
     global $pid, $eid, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
-    global $template;
+    global $template, $isadmin;
     $html = "";
 
     if ($which == "vis") {
@@ -155,6 +155,16 @@ function Show($which, $zoom, $detail)
 	$html .= " onclick=\"GraphChange('zoomout');\">Zoom Out</button>\n";
 	$html .= "<button name=zoomin type=button value=in";
 	$html .= " onclick=\"GraphChange('zoomin');\">Zoom In</button>\n";
+
+	# A delete button with a confirm box right there.
+	if ($isadmin) {
+	    $html .= "<br><br>\n";
+	    $html .= "<button name=deletetemplate type=button value=Delete";
+	    $html .= " onclick=\"DeleteTemplate();\">";
+	    $html .= "<font color=red>Delete</font></button>&nbsp";	
+	    $html .= "<input id=confirm_delete type=checkbox value=Yep> ";
+	    $html .= "Confirm";
+	}
     }
     elseif ($which == "nsfile") {
 	$nsdata = "";
@@ -261,6 +271,49 @@ if (isset($action) && ($action == "activate" || $action == "inactivate")) {
     GraphChange($action, 0, 1);
 }
 
+# Delete is just plain special!
+if (isset($action) && $action == "deletetemplate" &&
+    isset($confirmed) && $confirmed == "yep") {
+
+    # Need this for scripts.
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    PAGEHEADER("Delete Template: $guid/$version");
+    STARTBUSY("Deleting template $guid/$version recurively");
+
+    # Pass recursive option all the time.
+    $retval = SUEXEC($uid, "$pid,$unix_gid",
+		     "webtemplate_delete -r $guid/$version",
+		     SUEXEC_ACTION_IGNORE);
+
+    CLEARBUSY();
+    
+    #
+    # Fatal Error. Report to the user, even though there is not much he can
+    # do with the error. Also reports to tbops.
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    }
+
+    # User error. Tell user and exit.
+    if ($retval) {
+	SUEXECERROR(SUEXEC_ACTION_USERERROR);
+	PAGEFOOTER();
+	return;
+    }
+    #
+    # Okay, lets zap back to the root, unless this was the root.
+    #
+    if ($template->IsRoot()) {
+	PAGEREPLACE("showuser.php3?target_uid=$uid");
+    }
+    else {
+	PAGEREPLACE("template_show.php?guid=$guid&version=1");
+    }
+    return;
+}
+
 #
 # Standard Testbed Header after argument checking.
 #
@@ -356,6 +409,20 @@ echo "<script type='text/javascript' language='javascript'>
         }
         function VisChange(zoom, detail) {
             x_Show('vis', zoom, detail, Show_cb);
+            return false;
+        }
+        function DeleteTemplate() {
+            confirm_flag = 0;
+            confirm_box  = getObjbyName('confirm_delete');
+
+	    if (confirm_box) {
+                confirm_flag = ((confirm_box.checked == true) ? 1 : 0);
+            }
+            if (confirm_flag == 0) {
+                return false;
+            }
+	    window.location.replace('template_show.php?guid=$guid" .
+                  "&version=$version&action=deletetemplate&confirmed=yep');
             return false;
         }
         function GraphChange(action) {

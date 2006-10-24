@@ -76,6 +76,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Template;
+use libaudit;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -186,6 +187,9 @@ foreach my $template (@templates) {
 exit(1)
     if ($active);
 
+# Use the logonly option to audit so that we get a record mailed.
+LogStart(0);
+
 #
 # Okay, do the deletions.
 #
@@ -212,6 +216,8 @@ foreach my $template (@templates) {
     }
 
     # And finally the template record.
+    print "Deleting template $template ...\n";
+    
     $template->Delete() == 0
 	or tbdie("Could not delete template $template");
 }

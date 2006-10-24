@@ -59,7 +59,8 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  webtemplate_swapin webtemplate_swapout webtemplate_exprun \
 		  webtemplate_graph webtemplate_metadata webtemplate_export \
 		  webtemplate_control webtemplate_commit webtemplate_analyze \
-		  webtemplate_linkgraph webtemplate_instantiate
+		  webtemplate_linkgraph webtemplate_instantiate \
+		  webtemplate_delete
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
