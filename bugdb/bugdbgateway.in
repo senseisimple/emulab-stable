@@ -63,7 +63,7 @@ sub fatal($$);
 sub CheckFlysprayUser($$);
 sub CheckFlysprayTaskID($);
 sub AddFlysprayComment($$$);
-sub FlysprayNotify($$$);
+sub FlysprayNotify($$$$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -174,7 +174,7 @@ fatal($EX_SOFTWARE, "Could not add comment to task $fsid")
     if (AddFlysprayComment($fsid, $userid, $comment) != 0);
 
 # No errors reported since comment as been added.
-FlysprayNotify($fsid, $userid, $comment);
+FlysprayNotify($fsid, $user, $userid, $comment);
 
 exit(0);
 
@@ -234,9 +234,9 @@ sub AddFlysprayComment($$$)
 #
 # And send out the notification.
 #
-sub FlysprayNotify($$$)
+sub FlysprayNotify($$$$)
 {
-    my ($fsid, $userid, $comment) = @_;
+    my ($fsid, $user, $userid, $comment) = @_;
     my $assigned_to;
     my @email_addresses = ();
 
@@ -294,7 +294,8 @@ sub FlysprayNotify($$$)
     }
     SENDMAIL(undef,
 	     "$project FS#${fsid} comment added",
-	     $comment, $FLYEMAIL,
+	     "*** $project FS#${fsid} comment added by $user\n\n$comment",
+	     $FLYEMAIL,
 	     "Bcc: " . join(",", @email_addresses));
 }
 
