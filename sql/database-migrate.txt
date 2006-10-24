@@ -3758,3 +3758,5 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiment_template_instances add \
              description tinytext after uid;
 
+4.98: Drop the columns from the node_types table, that were supposed
+      to be done in revision 4.74 above. Skip to next revision ...
