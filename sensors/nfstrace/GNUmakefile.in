@@ -133,6 +133,7 @@ install: all
 	$(INSTALL) -m 0755 nfsdump $(DESTDIR)$(INSTALL_SBIN)
 	$(INSTALL) -m 0755 $(SRCDIR)/nfsdump2db $(DESTDIR)$(INSTALL_SBIN)
 	$(INSTALL) -m 0755 $(SRCDIR)/nfstrace.proxy $(DESTDIR)$(INSTALL_SBIN)
+	-mkdir -p $(DESTDIR)$(INSTALL_ETC)/rc.d
 	$(INSTALL) -m 0755 nfstrace.init $(DESTDIR)$(INSTALL_ETC)/rc.d/nfstrace
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/nfstrace.proxy.8 \
