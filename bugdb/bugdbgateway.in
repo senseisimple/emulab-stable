@@ -292,10 +292,10 @@ sub FlysprayNotify($$$)
 
 	push(@email_addresses, $email);
     }
-    SENDMAIL(join(",", @email_addresses),
+    SENDMAIL(undef,
 	     "$project FS#${fsid} comment added",
 	     $comment, $FLYEMAIL,
-	     "Reply-To: $FLYEMAIL");
+	     "Bcc: " . join(",", @email_addresses));
 }
 
 sub fatal($$)
