@@ -68,6 +68,20 @@
 #define MAX_CLIENTS 8
 
 /*
+ * What a hoot.  The Linux (at least Fedora) version of pcapper
+ * will not timeout in the dispatch routine.  It apparently will stay
+ * in recvfrom() til it gets a packet.  So we blast all the pthreads
+ * out of recvfrom with a signal after setting the flag to force them
+ * to return from dispatch (pcap_breakloop).
+ *
+ * XXX we can only do this if pcap_breakloop exists, which apparently
+ * it doesn't on older Linux releases.
+ */
+#if defined(EVENTSYS) && defined(HAVE_PCAP_BREAKLOOP)
+#define MUST_WAKEUP_PCAP
+#endif
+
+/*
  * Program run to determine the control interface.
  */
 #define CONTROL_IFACE CLIENT_BINDIR "/control_interface"
@@ -189,7 +203,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 		const u_char *packet);
 int getaddr(char *dev, struct in_addr *addr);
 #ifdef EVENTSYS
-#ifdef __linux__
+#ifdef MUST_WAKEUP_PCAP
 static void onusr1(int);
 static void pthread_WAKEUPDAMIT(void);
 #endif
@@ -366,10 +380,8 @@ void usage(char *progname) {
 static void cleanup(int sig)
 {
 	killme = 1;
-#ifdef EVENTSYS
-#ifdef __linux__
+#ifdef MUST_WAKEUP_PCAP
 	pthread_WAKEUPDAMIT();
-#endif
 #endif
 }
 
@@ -962,15 +974,13 @@ int main (int argc, char **argv) {
 		action.sa_handler = cleanup;
 		sigaction(SIGTERM, &action, NULL);
 		sigaction(SIGINT, &action, NULL);
-#ifdef EVENTSYS
-#ifdef __linux__
+#ifdef MUST_WAKEUP_PCAP
 		/*
 		 * XXX serious hack.  Need to catch SIGUSR1 in all threads
 		 * so they can be signal()ed out of libpcap.
 		 */
 		action.sa_handler = onusr1;
 		sigaction(SIGUSR1, &action, NULL);
-#endif
 #endif
 	}
 
@@ -1739,7 +1749,7 @@ int getaddr(char *dev, struct in_addr *addr) {
  * out of recvfrom with a signal after setting the flag to force them
  * to return from dispatch (pcap_breakloop).
  */
-#ifdef __linux__
+#ifdef MUST_WAKEUP_PCAP
 static void
 onusr1(int sig)
 {
@@ -1857,7 +1867,7 @@ callback(event_handle_t handle,
 					pthread_self(), reload);
 				fflush(stderr);
 
-#ifdef __linux__
+#ifdef MUST_WAKEUP_PCAP
 				pthread_WAKEUPDAMIT();
 #endif
 				while (reload)

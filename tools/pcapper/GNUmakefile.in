@@ -9,6 +9,7 @@ TESTBED_SRCDIR  = @top_srcdir@
 OBJDIR          = ../..
 SUBDIR          = tools/pcapper
 SYSTEM	       := $(shell uname -s)
+RHLVERSION     := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\).*/Linux\1/' | sed -e 's/Fedora Core release \([0-9]\).*/FC\1/')
 
 include $(OBJDIR)/Makeconf
 
@@ -38,6 +39,10 @@ LDFLAGS = -static
 CFLAGS_FBSD    = $(CFLAGS) $(TBCFLAGS)
 CFLAGS_FBSD_NE = $(CFLAGS)
 CFLAGS_LINUX   = $(CFLAGS) -I/usr/include/pcap $(TBCFLAGS)
+ifneq (,$(findstring FC, $(RHLVERSION)))
+# XXX should be configed
+CFLAGS_LINUX  += -DHAVE_PCAP_BREAKLOOP
+endif
 
 LIBS_FBSD      = $(PTHREADLIBS) $(TBLIBS) $(PCAPLIBS)
 LIBS_FBSD_NE   = $(PTHREADLIBS) $(PCAPLIBS)
