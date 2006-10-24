@@ -50,7 +50,8 @@ function CheckArguments($guid, $version) {
     #
     # Check to make sure this is a valid template.
     #
-    if (($template = new Template($guid, $version)) == NULL) {
+    $template = Template::Lookup($guid, $version);    
+    if (!$template) {
 	USERERROR("The experiment template $guid/$version is not a ".
 		  "valid experiment template!", 1);
     }
