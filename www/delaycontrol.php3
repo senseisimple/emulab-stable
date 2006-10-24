@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -491,6 +491,12 @@ echo "<br>
       <a href=linktest.php3?pid=$pid&eid=$eid>Linktest</a> to make sure the
       links are configured properly,<br>
       but <b><em>only</em></b> if you clicked the 'Save' box above!\n";
+
+echo "<br><br> 
+      <b>We strongly recommend that you always use
+      <a href=linktest.php3?pid=$pid&eid=$eid>Linktest</a> or some
+      other testing mechanism to ensure that your links and lans are
+      behaving as you expect them to.</b>\n";
 } 
 
 PAGEFOOTER();

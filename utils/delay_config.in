@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,7 +40,7 @@ sub usage()
     # Web interface cares about this return value!
     exit(2);
 }
-my  $optlist = "dms:";
+my  $optlist = "dms:c";
 
 #
 # Configure variables
@@ -50,6 +50,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TEVC        = "$TB/bin/tevc";
 my $GENTOPO     = "$TB/libexec/gentopofile";
 my $debug	= 0;
+my $compatmode  = 0;
 
 #
 # Testbed Support libraries
@@ -82,6 +83,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"c"})) {
+    $compatmode = 1;
 }
 
 # Functions
@@ -239,7 +243,7 @@ foreach my $key (keys(%config)) {
 }
 
 #
-# These map the names I'm using in the config hash (which correspond
+# These map the names I am using in the config hash (which correspond
 # to the DB slot names) into the event parameter names to send over to the
 # delay agent.
 #
@@ -309,7 +313,25 @@ $inject_string .= " modify ";
 foreach my $key (keys(%config)) {
     my $val = $config{$key};
     my $str = $agentmap{$key};
-    
+
+    #
+    # When changing an entire lan, we have to adjust delay/loss since
+    # there is a delay *to* the lan and a delay *from* the lan.
+    # We do not do this for links since there is just a single delay.
+    # When changing a single node in a lan, we fall back to the way things
+    # operate in the parser, which is that the user intended to change both
+    # directions to exactly this value. 
+    #
+    if (!$islink && !defined($srcvnode) && !$compatmode) {
+        if ($key eq "delay") {
+	    # This follows what is done in the parser.
+	    $val = $val / 2.0;
+	}
+        else {
+	    # This follows what is done in the parser.
+	    $val = 1-sqrt(1-$val);
+	}
+    }
     $inject_string .= "${str}=$val ";
 }
 if ($debug) {
@@ -319,6 +341,13 @@ if ($debug) {
 system($inject_string) &&
     die("*** $0:\n".
 	"    Failed to inject delay update event!\n");
+
+print "*** WARNING:\n";
+print "    You should *always* test your links and lans to make sure they\n";
+print "    are behaving as you expect. You can do this by hand with ping,\n";
+print "    or you can use Emulab's LinkTest feature.\n";
+print "    Type 'linktest' into the Emulab search box to find out how to ".
+    "use it.\n";
     
 exit(0);
 
@@ -395,6 +424,25 @@ sub ChangeDelayConfig() {
 		$query_clause .= "q0_${1}=$val,q1_${1}=$val";
 	    }
 	    else {
+		#
+		# When changing an entire lan, we have to adjust delay/loss
+		# since there is a delay *to* the lan and a delay *from*
+		# the lan.  We do not do this for links since there is just
+		# a single delay.  When changing a single node in a lan, we
+		# fall back to the way things operate in the parser, which
+		# is that the user intended to change both directions to
+		# exactly this value.
+		#
+		if (!$islink && !defined($srcvnode) && !$compatmode) {
+		    if ($key eq "delay") {
+			# This follows what is done in the parser.
+			$val = $val / 2.0;
+		    }
+		    else {
+			# This follows what is done in the parser.
+			$val = 1-sqrt(1-$val);
+		    }
+		}
 		$query_clause .= "${key}0=$val,${key}1=$val";
 	    }
 	}
@@ -460,6 +508,16 @@ sub ChangeLinkDelayConfig() {
     foreach my $key (keys(%config)) {
 	my $val = $config{$key};
 
+	if (!$islink && !defined($srcvnode) && !$compatmode) {
+	    if ($key eq "delay") {
+		# This follows what is done in the parser.
+		$val = $val / 2.0;
+	    }
+	    else {
+		# This follows what is done in the parser.
+		$val = 1-sqrt(1-$val);
+	    }
+	}
 	push(@query_clauses, "${key}=$val");
 	
 	#
@@ -498,68 +556,15 @@ sub ChangeVirtLans() {
     my @query_clauses;
     my $query_string;
     my @query_clauses2;
-    
+
     #
-    # When changing an entire link or lan symmetrically its easy; they can
-    # be done the same. When changing one node in a lan (symmetrically),
-    # the numbers are slightly different for delay/lossrate, but otherwise
-    # its the same operation, except for operating on a single node.
+    # The first case is for changing a node in a duplex link asymmetrically.
     #
-    if (!defined($srcvnode) || !$islink) {
-	foreach my $key (keys(%config)) {
-	    my $val = $config{$key};
-
-	    if ($key eq "delay") {
-		my $delay = $val;
-
-		# This follows what is done in the parser.
-		$delay = $delay / 2.0
-		    if ($islink);
-
-		push(@query_clauses, "delay=$delay");
-		push(@query_clauses, "rdelay=$delay");
-	    }
-	    elsif ($key eq "lossrate") {
-		my $lossrate = $val;
-
-		# This follows what is done in the parser.
-		$lossrate = 1-sqrt(1-$lossrate)
-		    if ($islink);
-
-		push(@query_clauses, "lossrate=$lossrate");
-		push(@query_clauses, "rlossrate=$lossrate");
-	    }
-	    elsif ($key eq "bandwidth") {
-		push(@query_clauses, "bandwidth=$val");
-		push(@query_clauses, "rbandwidth=$val");
-	    }
-	    else {
-		push(@query_clauses, "$key=$val");
-	    }
-	}
-
-	$query_string = "update virt_lans set ".
-	    join(",", @query_clauses) .
-	    " where pid='$pid' and eid='$eid' and vname='$link'";
-
+    if ($islink && defined($srcvnode)) {
 	#
-	# A lan node change since it cannot be a link if srcvnode defined.
-	# 
-	if (defined($srcvnode)) {
-	    $query_string .= " and member like '${srcvnode}:%'";
-	}
-
-	if ($debug) {
-	    print "$query_string\n";
-	}
-	DBQueryFatal($query_string);
-    }
-    else {
-	#
-	# Here we change a duplex link asymmetrically. In a duplex link
-	# the delay/bw/plr params are split between the two virt_lan
-	# members using the "r" params to hold the "from switch" half of
-	# the value. This makes it rather confusing. 
+	# In a duplex link the delay/bw/plr params are split between the
+	# two virt_lan members using the "r" params to hold the "from
+	# switch" half of the value. This makes it rather confusing.
 	# 
 	foreach my $key (keys(%config)) {
 	    my $val = $config{$key};
@@ -606,6 +611,63 @@ sub ChangeVirtLans() {
 	    }
 	    DBQueryFatal($query_string);
 	}
+    }
+    else {
+	#
+	# When changing an entire link or lan symmetrically its easy; they can
+	# be done the same. When changing one node in a lan (symmetrically),
+	# the numbers are slightly different for delay/lossrate, but otherwise
+	# its the same operation, except for operating on a single node.
+	#
+	foreach my $key (keys(%config)) {
+	    my $val = $config{$key};
+
+	    if ($key eq "delay") {
+		my $delay = $val;
+
+		# This follows what is done in the parser;
+		# See tb-set-node-lan-delay
+		$delay = $delay / 2.0
+		    if (!defined($srcvnode));
+
+		push(@query_clauses, "delay=$delay");
+		push(@query_clauses, "rdelay=$delay");
+	    }
+	    elsif ($key eq "lossrate") {
+		my $lossrate = $val;
+
+		# This follows what is done in the parser.
+		# See tb-set-node-lan-lossrate
+		$lossrate = 1-sqrt(1-$lossrate)
+		    if (!defined($srcvnode));
+
+		push(@query_clauses, "lossrate=$lossrate");
+		push(@query_clauses, "rlossrate=$lossrate");
+	    }
+	    elsif ($key eq "bandwidth") {
+		push(@query_clauses, "bandwidth=$val");
+		push(@query_clauses, "rbandwidth=$val");
+	    }
+	    else {
+		push(@query_clauses, "$key=$val");
+	    }
+	}
+
+	$query_string = "update virt_lans set ".
+	    join(",", @query_clauses) .
+	    " where pid='$pid' and eid='$eid' and vname='$link'";
+
+	#
+	# A lan node change since it cannot be a link if srcvnode defined.
+	# 
+	if (defined($srcvnode)) {
+	    $query_string .= " and member like '${srcvnode}:%'";
+	}
+
+	if ($debug) {
+	    print "$query_string\n";
+	}
+	DBQueryFatal($query_string);
     }
     #
     # Now we need to regen the linktest map file ...
