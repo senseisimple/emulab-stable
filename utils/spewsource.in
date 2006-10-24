@@ -27,7 +27,7 @@ my $output;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CVS		= "/usr/bin/cvs";
-my $TAR		= "/usr/bin/tar";
+my $TAR		= "/usr/bin/gtar";
 my $GZIP	= "/usr/bin/gzip";
 my $CVSREPO     = "/usr/testbed/CVS";
 
