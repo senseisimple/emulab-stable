@@ -1426,6 +1426,7 @@ sub CreateDefsFile($)
     while (<INDEFS>) {
 	my $key;
 	my $val;
+	my $line = $_;		# In case the switch doesn't match.
 	
 	if ($_ =~ /^([-\w]*)="(.+)"$/ ||
 	    $_ =~ /^([-\w]*)=(.+)$/) {
@@ -1620,7 +1621,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		
-		print OUTDEFS $_;
+		print OUTDEFS $line;
 	    }
 	}
 	else {
