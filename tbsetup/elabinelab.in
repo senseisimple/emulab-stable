@@ -81,6 +81,7 @@ $libdb::DBQUERY_MAXTRIES = 30;
 # Locals
 my $SAVEUID     = $UID;
 my $workdir;
+my $expdir;
 my %noderoles	= ();
 my $opsnode;
 my $bossnode;
@@ -140,6 +141,7 @@ else {
     die("Tainted argument $eid!\n");
 }
 $workdir = TBExptWorkDir($pid, $eid);
+$expdir = PROJROOT() . "/$pid/exp/$eid";
 
 #
 # Verify user and get his DB uid.
@@ -292,8 +294,6 @@ $UID = 0;
 # version from the web server.
 #
 my $mkelab = "$TB/etc/rc.mkelab";
-
-my $expdir = PROJROOT() . "/$pid/exp/$eid";
 if (-e "$expdir/rc.mkelab") {
     $mkelab = "$expdir/rc.mkelab";
 }
