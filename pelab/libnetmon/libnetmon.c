@@ -128,7 +128,7 @@ void lnm_init() {
 
         filepath = getenv("LIBNETMON_OUTPUTFILE");
         if (sockpath) {
-            int sockfd;
+            int sockfd, contimo;
             struct sockaddr_un servaddr;
 
             DEBUG(printf("Opening socket at path %s\n",sockpath));
@@ -141,9 +141,23 @@ void lnm_init() {
             servaddr.sun_family = AF_LOCAL;
             strcpy(servaddr.sun_path,sockpath);
 
-            if (real_connect(sockfd, (struct sockaddr*) &servaddr,
-                             sizeof(servaddr))) {
-                croak0("Unable to connect to netmond socket\n");
+	    char *contimo_s = getenv("LIBNETMON_CONNECTTIMO");
+            if (contimo_s && sscanf(contimo_s,"%i", &contimo) == 1)
+		    printf("libnetmon: Setting connection timeout to %i seconds\n",
+			   contimo);
+	    else
+		    contimo = 1;
+
+	    while (1) {
+		    if (real_connect(sockfd, (struct sockaddr*) &servaddr,
+				     sizeof(servaddr)) == 0) {
+			    break;
+		    }
+		    if (contimo && --contimo == 0) {
+			    croak0("Unable to connect to netmond socket\n");
+		    }
+		    printf("libnetmon: Failed to connect, trying again...\n");
+		    sleep(1);
             }
 
             outstream = fdopen(sockfd,"w");

@@ -7,6 +7,12 @@ SOCK="${TMPDIR}/netmon.sock";
 CSOCK="${SOCK}.control";
 
 #
+# Number of times (1 second apart) to try connecting to netmond.
+# (0 means try forever, unset means just one try).
+#
+TIMO=5
+
+#
 # Try once to build the library
 #
 if ! [ -e $NETMON_DIR/$LIB_SO ]; then
@@ -29,3 +35,7 @@ export LD_LIBRARY_PATH=$NETMON_DIR
 export LD_PRELOAD=$LIB_SO
 export LIBNETMON_SOCKPATH=$SOCK
 export LIBNETMON_CONTROL_SOCKPATH=$CSOCK
+
+# Allow this to be overridden from the environment
+LIBNETMON_CONNECTTIMO=${LIBNETMON_CONNECTTIMO:=$TIMO}
+export LIBNETMON_CONNECTTIMO
