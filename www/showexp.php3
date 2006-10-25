@@ -78,12 +78,13 @@ function Show($which, $arg1, $arg2)
 	ob_end_clean();
     }
     elseif ($which == "details") {
+	$showevents = $arg1;
 	$output = array();
 	$retval = 0;
 	$html   = "";
 
         # Show event summary and firewall info.
-        $flags = "-b -e -f";
+        $flags = ($showevents ? "-e -a" : "-b -e -f");
 
 	$result = exec("$TBSUEXEC_PATH $uid $TBADMINGROUP ".
 		       "webreport $flags $pid $eid",
@@ -97,9 +98,15 @@ function Show($which, $arg1, $arg2)
 	}
 	$html .= "</div></pre>\n";
 
+	$html .= "<button name=showevents type=button value=1";
+	$html .= " onclick=\"ShowEvents();\">";
+	$html .= "Show Events</button>\n";
+	
+	$html .= "&nbsp &nbsp &nbsp &nbsp &nbsp &nbsp ";
+
 	$html .= "<button name=savedetails type=button value=1";
 	$html .= " onclick=\"SaveDetails();\">";
-	$html .= "Save</button>\n";
+	$html .= "Save to File</button>\n";
     }
     elseif ($which == "graphs") {
 	$graphtype = $arg1;
@@ -586,6 +593,10 @@ echo "<script type='text/javascript' language='javascript'>
         }
         function GraphChange(which) {
             x_Show('graphs', which, 0, Show_cb);
+            return false;
+        }
+        function ShowEvents() {
+            x_Show('details', 1, 0, Show_cb);
             return false;
         }
         function SaveDetails() {

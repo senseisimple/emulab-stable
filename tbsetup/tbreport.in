@@ -63,7 +63,7 @@ my $hasplab    = 0;
 my %ipmap;
 my %membermap;
 
-getopts('hnmdlevbrf',\%opt);
+getopts('hnmdlevbrfa',\%opt);
 
 if ($opt{h}) {
     exit &usage;
@@ -98,6 +98,9 @@ if ($opt{l}) {
 }
 if ($opt{e}) {
     $showevents = 1;
+    if ($opt{a}) {
+	$verbose = 1;
+    }
 }
 if ($opt{r}) {
     $showroutes = 1;
