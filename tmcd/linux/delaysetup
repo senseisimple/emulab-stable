@@ -115,6 +115,7 @@ sub LinkDelaySetup()
 
     # Lets clean out old instructions.
     unlink TMLINKDELAY;
+    unlink TMDELMAP;
 
     #
     # We need to know if any jailed nodes. That changes which kernel
@@ -169,7 +170,7 @@ sub LinkDelaySetup()
 	    $pat .= q(LINTERM=(\d+) QINBYTES=(\d+) BYTES=(\d+) );
 	    $pat .= q(MEANPSIZE=(\d+) WAIT=(\d+) SETBIT=(\d+) );
 	    $pat .= q(DROPTAIL=(\d+) GENTLE=(\d+));
-	    
+
 	    $delay =~ /$pat/;
 
 	    my $iface     = $1;
@@ -187,7 +188,7 @@ sub LinkDelaySetup()
 	    my $rbandw    = $13;
 	    my $rplr      = $14;
 	    my $red       = $15;
-	    
+
 	    #
 	    # Only a few of these NS RED params make sense for dummynet,
 	    # but they all come through; someday they might be used.

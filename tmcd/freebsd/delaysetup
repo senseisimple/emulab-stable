@@ -504,7 +504,7 @@ sub LinkDelaySetup
 	    #
 	    # tmcd returns the interfaces as MAC addrs.
 	    #
-	    my $iface     = findiface($1);
+	    my $iface     = $1;
 	    my $type      = $2;
 	    my $linkname  = $3;
 	    my $vnode     = $4;
@@ -536,6 +536,14 @@ sub LinkDelaySetup
 	    my $setbit    = $25;
 	    my $droptail  = $26;
 	    my $gentle    = $27;
+
+	    #
+	    # tmcd returns the interfaces as MAC addrs, so convert to
+	    # an interface name.  Note that we also use the given IP
+	    # address which is the unique characteristic for some forms
+	    # of virtual interface.
+	    # 
+	    $iface        = findiface($iface,$inet);
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
@@ -583,17 +591,26 @@ sub LinkDelaySetup
 		$redparams .= "$weight/$minthresh/$maxthresh/$max_p";
 	    }
 
-	    $upcmds .= "ifconfig $iface media 100baseTX mediaopt full-duplex";
-	    $upcmds .= "\n";
+	    #
+	    # XXX don't try to set the speed/duplex of virtual devices
+	    # XXX we should not be hardwiring the speed/duplex here anyway
+	    #
+	    if ($iface !~ /^(vlan|veth)/) {
+		$upcmds .= "ifconfig $iface media 100baseTX ".
+		           "mediaopt full-duplex\n    ";
+	    }
 
 	    $upcmds .= "ipfw add $pipeno pipe $pipeno ip from any to ".
-		       "any out xmit $iface nexthop $inet:$mask\n";
+		       "any out xmit $iface nexthop $inet:$mask\n    ";
 
 	    $upcmds .= "ipfw pipe $pipeno config delay ${delay}ms " .
-	               "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
+	               "bw ${bandw}Kbit/s plr $plr $queue $redparams\n    ";
 
-	    $downcmds .= "ipfw pipe delete $pipeno\n";
-	    $downcmds .= "ipfw delete $pipeno\n";
+	    # not needed due to flush commands output below
+	    if (defined($vnodeid)) {
+		$downcmds .= "ipfw pipe delete $pipeno\n    ";
+		$downcmds .= "ipfw delete $pipeno\n    ";
+	    }
 
 	    if ($type eq "duplex") {
 		#
@@ -602,13 +619,16 @@ sub LinkDelaySetup
 		# 1 queue slot is not enough. Make it 4 instead.
 		#
 		$upcmds .= "ipfw add $rpipeno pipe $rpipeno ip from any ".
-		           "to any in recv $iface\n";
+		           "to any in recv $iface\n    ";
 
 		$upcmds .= "ipfw pipe $rpipeno config delay ${rdelay}ms ".
-		           "bw ${rbandw}Kbit/s plr $rplr queue 5\n";
+		           "bw ${rbandw}Kbit/s plr $rplr queue 5\n    ";
 
-		$downcmds .= "ipfw pipe delete $rpipeno\n";
-		$downcmds .= "ipfw delete $rpipeno\n";
+		# not needed due to flush commands output below
+		if (defined($vnodeid)) {
+		    $downcmds .= "ipfw pipe delete $rpipeno\n    ";
+		    $downcmds .= "ipfw delete $rpipeno\n    ";
+		}
 	    }
 
 	    if ($type eq "duplex") {
@@ -631,14 +651,14 @@ sub LinkDelaySetup
 	print DEL "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
 	print DEL "case \"\$action\" in\n";
 	print DEL "  enable)\n";
-	print DEL "     $upcmds\n";
+	print DEL "    $upcmds\n";
 	# Turn off Flow-based IP (fast) forwarding since it causes packets
 	# to bypass traffic shaping and ipfw. Stupid!
-	print DEL "     sysctl -w net.inet.ip.fastforwarding=0\n";
-	print DEL "     ;;\n";
+	print DEL "    sysctl -w net.inet.ip.fastforwarding=0\n";
+	print DEL "    ;;\n";
 	print DEL "  disable)\n";
-	print DEL "     $downcmds\n";
-	print DEL "     ;;\n";
+	print DEL "    $downcmds\n";
+	print DEL "    ;;\n";
 	print DEL "esac\n";
 	close(DEL);
 	chmod(0755, TMLINKDELAY);
