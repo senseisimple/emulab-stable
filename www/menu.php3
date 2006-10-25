@@ -596,6 +596,11 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("My Chat Buddies", $TBBASE,
 			       "mychat.php3?target_uid=$login_uid");
 	}
+	if ($BUGDBSUPPORT) {
+	    WRITESIDEBARBUTTON("<b>Report Emulab Bug</b>", $TBBASE,
+		       "gotobugdb.php3?do=newtask&project_title=Emulab");
+	}
+	
 	echo "</ul>\n";
     }
 
