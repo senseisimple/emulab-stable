@@ -50,6 +50,9 @@ echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 echo "<br>\n";
+echo "<br>\n";
+echo "<b>Watch events as they are dispatched from the event scheduler.</b>";
+echo "<br>\n";
 
 echo "<div><iframe id='outputframe' ".
       "width=100% height=600 scrolling=auto border=4></iframe></div>\n";
