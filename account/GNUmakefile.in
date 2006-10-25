@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,6 +14,11 @@ include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys
 LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = tbacct addpubkey mkusercert
+SETUID_LIBX_SCRIPTS  =
 
 #
 # Force dependencies on the scripts so that they will be rerun through

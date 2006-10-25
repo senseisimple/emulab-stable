@@ -19,6 +19,11 @@ CTRL_SBIN_SCRIPTS	= wikiproxy
 CTRL_LIB_FILES		= usertemplate webhometemplate
 TWIKIFILES		= UserPermNotes.txt GroupPermNotes.txt LocalSite.cfg
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = addwikiuser delwikiuser addwikiproj setwikigroups 
+SETUID_LIBX_SCRIPTS  = wikixlogin
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.

@@ -71,6 +71,15 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
+			tbrsync
+SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeelauncher frisbeeimage \
+			rmuser idleswap named_setup exports_setup \
+			sfskey_update setgroups newnode_reboot vnode_setup \
+			elabinelab nfstrace
+SETUID_LIBX_SCRIPTS  = rmproj console_setup spewlogfile
+
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 ifeq ($(FBSDVERSION),FreeBSD4)

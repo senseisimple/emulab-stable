@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,11 @@ SUBDIR		= mote
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= tbuisp tbsgmotepower newmote set-mote-id
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = tbuisp tbsgmotepower
+SETUID_LIBX_SCRIPTS  =
 
 #
 # Force dependencies on the scripts so that they will be rerun through

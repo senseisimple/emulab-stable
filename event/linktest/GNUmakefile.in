@@ -20,6 +20,12 @@ SCRIPT_CONTROL  = linktest_control
 SCRIPT_TBCOMPAT = tb_compat.tcl
 SCRIPT_NSTB_COMPAT = nstb_compat.tcl
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = $(SCRIPT_CONTROL)
+SETUID_LIBX_SCRIPTS  = 
+
+
 SYSTEM	       := $(patsubst CYGWIN%,CYGWIN,$(shell uname -s))
 
 include $(OBJDIR)/Makeconf
@@ -82,9 +88,9 @@ $(DAEMON_OBJS): ../lib/libevent.a ../lib/event.h
 $(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
 
 # We install just enough to fire off the test from boss and wait. 
-install: weblinktest $(SCRIPT_CONTROL) $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT)
+install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \
+		$(INSTALL_SBINDIR)/$(SCRIPT_CONTROL) 
 	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
-	$(INSTALL_PROGRAM) $(SCRIPT_CONTROL) $(INSTALL_SBINDIR)
 	$(INSTALL_DATA) $(SRCDIR)/linktest.html $(INSTALL_WWWDIR)/doc
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin

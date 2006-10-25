@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,6 +23,11 @@ LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py \
 		  aspects.py timer_advisories.py
 
 LIBEXEC_STUFF	= webplabstats
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = plabslice plabnode plabrenewd
+SETUID_LIBX_SCRIPTS  =
 
 #
 # Force dependencies on the scripts so that they will be rerun through

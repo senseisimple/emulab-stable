@@ -27,6 +27,11 @@ LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
 		  webspewconlog xlogin webviewvc spewevents
 CTRLSBIN_SCRIPTS= opsdb_control.proxy
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = grabwebcams checkquota spewconlog opsdb_control
+SETUID_LIBX_SCRIPTS  = xlogin
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.

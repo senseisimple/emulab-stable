@@ -155,7 +155,7 @@ while (my ($pid,$gid) = $query_result->fetchrow_array()) {
 # And populate all the lists!
 #
 foreach my $pid (@projects) {
-    system("$GENELISTS $optarg -p $pid") == 0
+    system("$GENELISTS $optarg -f -p $pid") == 0
 	or fatal("Could not populate lists for project $pid!");
 }
 

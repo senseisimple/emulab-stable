@@ -26,6 +26,11 @@ LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
 USERSBINS	= genelists.proxy dumperrorlog.proxy
 USERLIBS	= libtbdb.pm
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = genelists dhcpd_makeconf elabinelab_bossinit
+SETUID_LIBX_SCRIPTS  = 
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.

@@ -35,6 +35,22 @@ $(INSTALL_ETCDIR)/%: %
 	-mkdir -p $(INSTALL_ETCDIR)
 	$(INSTALL_DATA) $< $@
 
+$(addprefix $(INSTALL_SBINDIR)/, $(SETUID_SBIN_SCRIPTS)): $(INSTALL_SBINDIR)/%: %
+	echo "Installing (setuid) $<"
+	-mkdir -p $(INSTALL_SBINDIR)
+	$(SUDO) $(INSTALL) -o root -m 4755 $< $@
+
+$(addprefix $(INSTALL_BINDIR)/, $(SETUID_BIN_SCRIPTS)): $(INSTALL_BINDIR)/%: %
+	echo "Installing (setuid) $<"
+	-mkdir -p $(INSTALL_BINDIR)
+	$(SUDO) $(INSTALL) -o root -m 4755 $< $@
+
+$(addprefix $(INSTALL_LIBEXECDIR)/, $(SETUID_LIBX_SCRIPTS)): $(INSTALL_LIBEXECDIR)/%: %
+	echo "Installing (setuid) $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)
+	$(SUDO) $(INSTALL) -o root -m 4755 $< $@
+
+
 CFLAGS += $(LOCALCFLAGS)
 
 clean:

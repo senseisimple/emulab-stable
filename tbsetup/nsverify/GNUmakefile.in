@@ -23,6 +23,11 @@ LIB_STUFF = tb_compat.tcl
 LIBEXEC_STUFF = nstbparse
 BOSSLIBEXEC = verify-ns
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  = verify-ns
+
 all: $(LIB_STUFF) $(LIBEXEC_STUFF) $(BOSSLIBEXEC)
 
 include $(TESTBED_SRCDIR)/GNUmakerules

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,6 +10,11 @@ OBJDIR          = ../..
 SUBDIR          = tools/whol
 
 include $(OBJDIR)/Makeconf
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = whol
+SETUID_LIBX_SCRIPTS  =
 
 all: whol
 

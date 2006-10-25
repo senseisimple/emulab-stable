@@ -17,6 +17,11 @@ LIBEXEC_SCRIPTS		= bugdbxlogin
 
 CTRL_SBIN_SCRIPTS	= bugdbproxy bugdbgateway
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = addbugdbproj addbugdbuser setbugdbgroups 
+SETUID_LIBX_SCRIPTS  = bugdbxlogin
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
