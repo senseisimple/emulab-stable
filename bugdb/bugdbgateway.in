@@ -154,6 +154,7 @@ else {
 }
 
 if ($headers->{"Subject"}[0] =~ / FS\#(\d*) comment /s ||
+    $headers->{"Subject"}[0] =~ / FS\#(\d*) changed$/s ||
     $headers->{"Subject"}[0] =~ / FS\#(\d*) .* opened$/s) {
     $fsid = $1;
 }
