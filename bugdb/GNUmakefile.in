@@ -56,7 +56,7 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRL_SBIN_SCRIPTS))
 clean:
 	rm -f *.o core
 
-$(INSTALL_DIR)/opsdir/sbin/%: %
-	@echo "Installing $<"
+$(INSTALL_DIR)/opsdir/sbin/bugdbgateway: bugdbgateway
+	echo "Installing (setuid) $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
-	$(INSTALL) $< $@
+	$(SUDO) $(INSTALL) -o nobody -m 4755 $< $@
