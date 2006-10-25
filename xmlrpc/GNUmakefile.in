@@ -29,7 +29,7 @@ EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 CLIENTBINS      = sshxmlrpc_client.py script_wrapper.py sslxmlrpc_client.py
 USERLIBS	= sshxmlrpc.py emulabclient.py libxmlrpc.pm
 SYMLINKS        = node_admin node_reboot os_load create_image node_list \
-		  delay_config link_config savelogs portstats eventsys_control \
+		  delay_config wilink_config savelogs portstats eventsys_control \
 		  readycount nscheck startexp batchexp startexp swapexp endexp \
 		  modexp expinfo node_avail tbuisp expwait template_commit \
 		  template_export template_swapin template_swapout \

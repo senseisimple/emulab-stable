@@ -94,9 +94,9 @@ API = {
     "delay_config"      : { "func" : "delay_config",
                             "help" : "Change the link shaping characteristics " +
                                      "for a link or lan" },
-    "link_config"       : { "func" : "link_config",
-                            "help" : "Change interface parameters " +
-                                     "for a wireless link" },
+    "wilink_config"     : { "func" : "wilink_config",
+                            "help" : "Change INTERFACE parameters " +
+                                     "for a WIRELESS link" },
     "savelogs"          : { "func" : "savelogs",
                             "help" : "Save console tip logs to experiment " +
                                      "directory" },
@@ -732,9 +732,9 @@ class delay_config:
         return
 
 #
-# link_config
+# wilink_config
 #
-class link_config:
+class wilink_config:
     def __init__(self, argv=None):
         self.argv = argv;
         return
@@ -807,8 +807,8 @@ class link_config:
         return rval;
 
     def usage(self):
-	print "link_config [options] -e pid,eid link PARAM=value ...";
-	print "link_config [options] pid eid link PARAM=value ...";
+	print "wilink_config [options] -e pid,eid link PARAM=value ...";
+	print "wilink_config [options] pid eid link PARAM=value ...";
 	print "where:";
 	print "     -m   - Modify virtual experiment as well as current state";
 	print "     -s   - Select the source of the link to change";
@@ -817,6 +817,12 @@ class link_config:
         print "";
         print "Special Param";
         print " ENABLE=yes/no   - Bring the link up or down (or ENABLE=up/down)";
+        print ""
+        print "*********************** WARNING *******************************"
+        print "   wilink_config is used to configure WIRELESS INTERFACES!"
+        print "   Use delay_config to change the traffic shaping parameters"
+        print "   on normal links and lans."
+        print "***************************************************************"
         wrapperoptions();
         return
 
