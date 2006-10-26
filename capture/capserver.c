@@ -142,7 +142,12 @@ main(int argc, char **argv)
 		if ((clientsock = accept(tcpsock,
 					 (struct sockaddr *)&client,
 					 &length)) < 0) {
-			syslog(LOG_ERR, "accept failed: %m");
+			if (errno == ECONNABORTED) {
+				syslog(LOG_ERR, "accept failed: %m; "
+				       "continuing");
+				continue;
+			}
+			syslog(LOG_ERR, "accept failed: %m; exiting");
 			exit(1);
 		}
 		port = ntohs(client.sin_port);
