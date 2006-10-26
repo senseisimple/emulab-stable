@@ -366,14 +366,19 @@ CREATE TABLE emulab_indicies (
 
 CREATE TABLE errors (
   session int(10) unsigned NOT NULL default '0',
+  rank tinyint(1) NOT NULL default '0',
   stamp int(10) unsigned NOT NULL default '0',
   exptidx int(11) NOT NULL default '0',
   script smallint(3) NOT NULL default '0',
   cause varchar(16) NOT NULL default '',
   confidence float NOT NULL default '0',
+  inferred tinyint(1) default NULL,
+  need_more_info tinyint(1) default NULL,
   mesg text NOT NULL,
-  PRIMARY KEY  (session)
+  tblog_revision varchar(8) NOT NULL,
+  PRIMARY KEY  (session,rank)
 ) TYPE=MyISAM;
+
 
 --
 -- Table structure for table `event_eventtypes`

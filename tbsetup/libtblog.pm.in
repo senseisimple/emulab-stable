@@ -246,6 +246,8 @@ undef $SCRIPTNAME; # signal to use $ENV{TBLOG_SCRIPTNAME}
 my $DB;
 my $TBLOG_PID;
 
+my $REVISION_STR = '$Revision: 2.22 $';
+
 #
 # Internal Utility Functions
 #
@@ -983,7 +985,17 @@ The relevant errors are also flagged using "relevant" flag:
 
 =cut
 
-sub tblog_find_error () {
+sub tblog_find_error ( ;$$ );
+
+sub tblog_find_error ( ;$$ ) {
+
+    my ($rank, $filter) = @_;
+    $rank = 0   unless defined $rank;
+    if (defined $filter && $filter) {
+	$filter = "AND ($filter)";
+    } else {
+	$filter = '';
+    }
 
     my $saved_exitcode = $?;
 
@@ -993,6 +1005,7 @@ sub tblog_find_error () {
     my $cause = '';
     my $cause_desc;
     my $confidence = 0.0;
+    my @related_errors;
 
     local $DBQUERY_MAXTRIES = 3;
 
@@ -1001,18 +1014,22 @@ sub tblog_find_error () {
 	check_env();
 	$session = $ENV{TBLOG_SESSION};
 
+	my ($tblog_revision) = $REVISION_STR =~ /Revision: ([^ \$]+)/ 
+	    or die "bad REVISON string";
+
 	#
 	# Build the Tree
 	#
 	# Tree data structure:
 	# invocation = {invocation => INT, parent => INT, 
 	#		[{seq => int ...} || {seq => int, child => invox}]}
+	#    
 	
 	my $root = {invocation => 0, log => []};
 	my %lookup = (0 => $root);
 	my @log;
 	
-	my $query_result = DBQueryFatal "select seq,parent,invocation,sublevel,priority,mesg,cause,script_name,type,inferred from log natural join scripts where session = $session and priority <= $NOTICE and attempt <= 1 and not cleanup order by seq";
+	my $query_result = DBQueryFatal "select seq,parent,invocation,sublevel,priority,mesg,cause,script_name,type,inferred from log natural join scripts where session = $session and priority <= $NOTICE and attempt <= 1 and not cleanup $filter order by seq";
 	
 	for (my $i = 0; $i < $query_result->num_rows; $i++) {
 	    
@@ -1114,6 +1131,7 @@ sub tblog_find_error () {
 		} elsif ($_->{priority} <= $ERR) {
 		    
 		    push @posib_errs, $_;
+		    push @related_errors, $_;
 
 		    if ($_->{type} eq 'summary') {
 			last;
@@ -1159,6 +1177,18 @@ sub tblog_find_error () {
 	$cause = 'unknown' unless $cause;
 
 	#
+	# Determine need_more_info from error type
+	#
+	my $need_more_info = -1;
+	foreach (@relevant) {
+	    if ($_->{type} eq 'summary' || $_->{type} eq 'primary') {
+		$need_more_info = 0;
+	    } elsif ($_->{type} eq 'secondary') {
+		$need_more_info = 1 if $need_more_info == -1;
+	    }
+	}
+
+	#
 	# From script determine confidence 
 	#
 	$confidence = 0.5;
@@ -1175,6 +1205,7 @@ sub tblog_find_error () {
 	} elsif ($cause ne 'unknown') {
 	    $confidence = 0.6;
 	}
+
 
 	# 
 	# Finally print/store the relevant errors
@@ -1195,36 +1226,40 @@ sub tblog_find_error () {
 		# if multiline don't reformat
 		$error .= "$_->{mesg}\n";
 	    }
+
+	    $error .= "...\n" if $need_more_info == 1;
+
 	    $prev = $_;
 	}
-	$error = "No clue as to what went wrong!\n" unless length $error > 0;
+	if (length $error == 0) {
+	    if ($rank == 0) {
+		$error = "No clue as to what went wrong!\n";
+	    } else {
+		$error = "";
+	    }
+	}
 	chop $error;
 
 	$cause_desc = DBQuerySingleFatal
 	    "select cause_desc from causes where cause = '$cause'";
-	
-	print SERR "**** Experimental information, please ignore ****\n";
-	print SERR "Session ID = $session\n";
-	print SERR "Likely Cause of the Problem:\n";
-	print SERR indent($error, '  ');
-	print SERR "Cause: $cause\n";
-	print SERR "Confidence: $confidence\n";
-	print SERR "Script: $script\n";
-	print SERR "**** End experimental information ****\n";
-	
+
 	my $script_num = DBQuerySingleFatal
 	  sprintf("select script from scripts where script_name=%s",
 		  DBQuoteSpecial $script);
 	
 	DBQueryFatal
 	  sprintf("insert into errors ".
-		  "(stamp, exptidx, session, cause, confidence, script, mesg) ".
+		  "(stamp, exptidx, session, rank, cause, confidence, inferred, need_more_info, script, mesg, tblog_revision) ".
 		  "values ".
-		  "(UNIX_TIMESTAMP(now()), %d, %d, %s, %f, %d, %s)",
+		  "(UNIX_TIMESTAMP(now()), %d, %d, %d, %s, %f, %d, %s, %d, %s, %s)",
 		  $ENV{TBLOG_EXPTIDX},
-		  $session, DBQuoteSpecial($cause), $confidence, $script_num,
-		  DBQuoteSpecial($error));
-
+		  $session, $rank, DBQuoteSpecial($cause), 
+		  $confidence, $inferred, 
+		  ($need_more_info == -1 ? 'NULL' : $need_more_info),
+		  $script_num,
+		  DBQuoteSpecial($error),
+		  DBQuoteSpecial($tblog_revision));
+	
 	DBQueryFatal
 	  sprintf("update log set relevant=1 where seq in (%s)",
 		  join(',', map {$_->{seq}} @relevant))         if @relevant;
@@ -1244,7 +1279,37 @@ sub tblog_find_error () {
 
 	eval {tblog $WARNING, add_prefix("tblog_find_error failed", $err)};
     }
-    
+
+    if ($rank == 0) {
+	my $other_error;
+	if ($cause eq 'canceled') {
+	    my @to_skip = map {$_->{seq}} @related_errors;
+	    my $to_skip = 'seq NOT IN ('.join(',',@to_skip).')';
+	    $other_error = tblog_find_error(1, "cause <> 'canceled' AND $to_skip");
+	}
+
+	print SERR "**** Experimental information, please ignore ****\n";
+	print SERR "Session ID = $session\n";
+	print SERR "Likely Cause of the Problem:\n";
+	print SERR indent($error, '  ');
+	print SERR "Cause: $cause\n";
+	print SERR "Confidence: $confidence\n";
+	print SERR "Script: $script\n";
+	if ($cause eq 'canceled') {
+	    print SERR "\n";
+	    if (length($other_error->{mesg}) == 0) {
+		print SERR "No other error found.\n";
+	    } else {
+		print SERR "Possible Error Before Cancellation:\n";
+		print SERR indent($other_error->{mesg}, '  ');
+		print SERR "Cause: $other_error->{cause}\n";
+		print SERR "Confidence: $other_error->{confidence}\n";
+		print SERR "Script: $other_error->{script}\n";
+	    }
+	}
+	print SERR "**** End experimental information ****\n";
+    }
+
     $? = $saved_exitcode;
     return {session=>$session, exptidx=>$ENV{TBLOG_EXPTIDX},
 	    mesg=>$error, cause=>$cause, cause_desc=>$cause_desc,
@@ -1271,7 +1336,7 @@ sub tblog_lookup_error ( ;$ ) {
 	("select session, exptidx, mesg, e.cause, cause_desc, confidence, script_name as script".
 	 "  from errors as e, scripts as s, causes as c".
 	 "  where e.script = s.script and e.cause = c.cause ".
-	 "    and session = $session");
+	 "    and session = $session and rank = 0");
 
     $? = $saved_exitcode;
 

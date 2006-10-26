@@ -62,7 +62,7 @@ if (!$isadmin) {
 
 $query_result =
     DBQueryFatal("SELECT e.cause,e.confidence,e.mesg,cause_desc FROM experiment_stats as s,errors as e, causes as c ".
-	         "WHERE s.exptidx = $exptidx and e.cause = c.cause and s.last_error = e.session");
+	         "WHERE s.exptidx = $exptidx and e.cause = c.cause and s.last_error = e.session and rank = 0");
 
 if (mysql_num_rows($query_result) != 0) {
   $row = mysql_fetch_array($query_result);

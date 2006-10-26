@@ -85,10 +85,10 @@ if ($exitcode) {
 	    }
 	    my $sublevel = length($space) > 0 ? 1 : 0;
 	    if ($mesg =~ s/^warning:\s+//i) {
-		dblog(TBLOG_WARNING, {sublevel=>$sublevel}, $mesg);
+		dblog(TBLOG_WARNING, {sublevel=>$sublevel, type=>'primary'}, $mesg);
 	    } else {
 		parse_error($mesg);
-		dblog(TBLOG_ERR, {sublevel=>$sublevel}, $mesg);
+		dblog(TBLOG_ERR, {sublevel=>$sublevel, type=>'primary'}, $mesg);
 	    }
 	}
     }
@@ -97,7 +97,7 @@ if ($exitcode) {
     # already found
     if (!$obvious_error) {
 	parse_error($err);
-	dblog(TBLOG_ERR, {}, $err);
+	dblog(TBLOG_ERR, {type=>'primary'}, $err);
     }
 
     # create a log entry that assign failed

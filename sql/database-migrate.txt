@@ -3760,3 +3760,14 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.98: Drop the columns from the node_types table, that were supposed
       to be done in revision 4.74 above. Skip to next revision ...
+
+4.99: Add columns to errors table for better information on errors
+
+      alter table errors
+          add column rank tinyint(1) not null default 0 after session,
+	  drop primary key,
+	  add primary key (session, rank),
+	  add column inferred tinyint(1) null after confidence,
+	  add column need_more_info tinyint(1) null after inferred,
+	  add column tblog_revision varchar(8) not null after mesg;
+
