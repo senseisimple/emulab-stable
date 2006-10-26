@@ -956,6 +956,7 @@ function PAGEFOOTER($view = NULL) {
     }
     echo "        <td class=contact>Questions? Contact $TBMAILADDR</td>";
     echo "       </tr>\n";
+    echo "      </table>\n";
     echo "      <!-- end copyright -->\n";
     echo "</div>";
     echo "</div>";
