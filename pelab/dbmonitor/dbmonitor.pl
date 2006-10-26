@@ -46,13 +46,16 @@ sub usage()
 " -n   don't actually set characteristics, just print values from DB\n".
 " -r   is running 'remote' on nodes, handle only the node in question\n".
 " -s   silent mode, don't print any non-errors\n".
+" -B   do not mess with bgmon settings\n".
 "\n".
 " -i interval   periodic interval at which to query DB (seconds)\n".
+" -b interval   set bgmon bandwidth testing interval\n".
+" -l interval   set bgmon latency testing interval\n".
 " -S starttime  start time for values pulled from DB (seconds since epoch)\n";
     exit(1);
 }
 
-my $optlist  = "b:ndi:l:prs1S:U";
+my $optlist  = "Bb:ndi:l:prs1S:U";
 my $showonly = 0;
 my $debug = 0;
 my $interval = (1 * 60);
@@ -144,6 +147,10 @@ if (defined($options{"S"})) {
     }
     $timeskew = $high - $starttime;
 }
+if (defined($options{"B"})) {
+    $tweakbgmon = 0;
+}
+
 if (@ARGV != 2) {
     usage();
 }
@@ -230,7 +237,7 @@ foreach my $mapping (@nodelist) {
 	$vnode_to_pnode{$vnode} = $pnode;
 	$vnode_to_dbix{$vnode} = $site_index;
 
-	if ($vnode =~ /^$pprefix-(\d+)/) {
+	if ($vnode =~ /^$pprefix-(\d+)$/) {
 	    $ix_mapping{$vnode} = $1;
 	} else {
 	    die("Could not map $vnode to its index!\n");
@@ -261,7 +268,7 @@ undef @nodelist;
 my $me;
 if ($remote) {
     my ($elabname) = split('\.', `hostname`);
-    if ($elabname =~ /^$eprefix-(\d)+$/) {
+    if ($elabname =~ /^$eprefix-(\d+)$/) {
 	$me = "$pprefix-$1";
 	if (!exists($vnode_to_pnode{$me})) {
 	    die("Bogus host name $elabname");
@@ -281,7 +288,7 @@ if ($remote) {
 
 my @them = ();
 foreach my $vnode (keys(%vnode_to_pnode)) {
-    if ($vnode =~ /^$pprefix-(\d)+$/) {
+    if ($vnode =~ /^$pprefix-(\d+)$/) {
 	my $ix = $1;
 	if (defined($me) && $vnode eq $me) {
 	    next;
@@ -318,6 +325,12 @@ if ($tweakbgmon) {
 }
 
 #
+# Play nice and crank back bgmon if we get killed
+#
+$SIG{TERM} = \&bgmon_stop;
+$SIG{INT} = \&bgmon_stop;
+
+#
 # Periodically get DB info for all possible targets and
 # send it to the appropriate delay agents.
 #
@@ -344,7 +357,7 @@ while (1) {
     $intervals++;
 }
 
-exit(0);
+bgmon_stop();
 
 #
 # Get the list of nodes in an experiment via XML RPC.
@@ -491,16 +504,20 @@ sub fetchone($$$$$)
     my $dateclause = "";
     if (defined($mynow)) {
 	$dateclause = "and unixstamp <= $mynow ";
+    } else {
+	$mynow = time();
     }
 
     #
     # BW and latency records are separate and there are, in general,
     # a lot more latency measurements than BW measurements.  So we
     # make two queries grabbing the latest of each.
-    # Note that there are no loss measurements right now.
+    #
+    # We also now grab loss data as a loss of 1.0 indicates that bgmon
+    # has determined that a link is down.
     #
     my ($del,$plr,$bw);
-    my ($del_stamp,$plr_stamp,$bw_stamp);
+    my ($del_stamp,$plr_stamp,$bw_stamp) = (0,0,0);
     my $query_result =
 	DBQueryFatal("select latency,unixstamp from pair_data ".
 		     " where ".
@@ -508,12 +525,7 @@ sub fetchone($$$$$)
 		     " and latency is not null ".
 		     $dateclause .
 		     " order by unixstamp desc limit 1");
-    if (!$query_result->numrows) {
-	warn("*** Could not get latency data for ".
-	     "$me ($src_site) --> $dstvnode ($dst_site)\n".
-	     "    defaulting to ${DEF_DEL}ms\n");
-	($del, $del_stamp) = ($DEF_DEL, time());
-    } else {
+    if ($query_result->numrows) {
 	($del, $del_stamp) = $query_result->fetchrow_array();
     }
     $query_result =
@@ -523,58 +535,84 @@ sub fetchone($$$$$)
 		     " and bw is not null ".
 		     $dateclause .
 		     " order by unixstamp desc limit 1");
-    if (!$query_result->numrows) {
-	warn("*** Could not get bandwidth data for ".
-	     "$me ($src_site) --> $dstvnode ($dst_site)\n".
-	     "    defaulting to ${DEF_BW}Kbps\n");
-	($bw, $bw_stamp) = ($DEF_BW, time());
-    } else {
+    if ($query_result->numrows) {
 	($bw, $bw_stamp) = $query_result->fetchrow_array();
+    }
+    $query_result =
+	DBQueryFatal("select loss,unixstamp from pair_data ".
+		     " where ".
+		     $siteclause .
+		     " and loss is not null ".
+		     $dateclause .
+		     " order by unixstamp desc limit 1");
+    if ($query_result->numrows) {
+	($plr, $plr_stamp) = $query_result->fetchrow_array();
     }
     
     if ($showonly || $debug) {
 	print "DB state for $me ($src_site) -> $dstvnode ($dst_site):\n";
-	print "  (del=$del\@$del_stamp, bw=$bw\@$bw_stamp)\n";
+	print "  (del=",
+	      $del_stamp ? "$del\@$del_stamp" : "NONE",
+	      ", bw=",
+              $bw_stamp ? "$bw\@$bw_stamp" : "NONE",
+              ", plr=",
+              $plr_stamp ? "$plr\@$plr_stamp" : "NONE",
+	      ")\n";
     }
 
     #
-    # XXX This needs to be modified!
+    # Check for down links.
+    # A link is definitely down if the DB says so (plr==1) and there have
+    # been no other valid latency/bw readings since.
     #
-    if (!defined($del)) {
-	$del = $DEF_DEL;
-	$del_stamp = time();
-    }
-    if (!defined($plr)) {
-	$plr = $DEF_PLR;
-	$plr_stamp = time();
-    }
-    # undef or zero--zero BW is not very useful
-    if ($bw == 0) {
-	$bw = $DEF_BW;
-	$bw_stamp = time();
+    if ($plr_stamp && $plr == 1) {
+	if ($del_stamp < $plr_stamp && $bw_stamp < $plr_stamp) {
+	    print STDERR "DB reports link as down\n"
+    		if ($debug);
+	} else {
+	    $plr = DEF_PLR;
+	    $plr_stamp = $mynow;
+	}
     }
 
     #
-    # Check for down links, reflected by either delay or bandwidth
+    # A down link may also be reflected by either delay or bandwidth
     # being set to < 0.  If only one is set negative, look at the most
     # recent of delay/bw to determine whether to mark the link as
     # down.
     #
-    if ($del < 0 || $bw < 0) {
-	if (($del < 0 && $bw < 0) ||
-	    ($bw < 0 && $bw_stamp >= $del_stamp)) {
-	    print STDERR "marking as down: bw=$bw($bw_stamp), del=$del($del_stamp)\n"
-		if ($debug);
+    elsif (($del_stamp && $del < 0) || ($bw_stamp && $bw < 0)) {
+	#
+	# Both are negative
+	#
+	if ($del_stamp && $del < 0 && $bw_stamp && $bw < 0) {
+	    print STDERR "marking as down, no valid bw/del measurements: ".
+		         "bw=$bw($bw_stamp), del=$del($del_stamp)\n"
+			     if ($debug);
 	    $plr = 1;
+	    $plr_stamp = $mynow;
 	}
 
+	#
+	# Erroneous BW measurement that is more recent than delay measurement
+	#
+	elsif ($bw_stamp && $bw < 0 && $bw_stamp >= $del_stamp) {
+	    print STDERR "marking as down, most recent bw measurement bad: ".
+		         "bw=$bw($bw_stamp), del=$del($del_stamp)\n"
+			     if ($debug);
+	    $plr = 1;
+	    $plr_stamp = $mynow;
+	}
+
+	#
+	# Erroneous delay measurement that is more recent than BW.
 	#
 	# XXX some nodes don't allow pings, but are actually up.
 	# So if we get a delay value of -1 but a legitimate BW value,
 	# we make a more detailed query to determine if the node has
 	# "always" (in the last N hours of data in the DB) returned -1.
 	#
-	elsif ($del < 0 && $del_stamp >= $bw_stamp) {
+	elsif ($del_stamp && $del < 0 && $del_stamp >= $bw_stamp) {
 	    my $query_result =
 		DBQueryFatal("select count(*) from pair_data ".
 			     " where ".
@@ -583,18 +621,45 @@ sub fetchone($$$$$)
 			     $dateclause);
 	    my ($count) = $query_result->fetchrow_array();
 	    if ($count > 0) {
-		print STDERR "marking as down: ".
+		print STDERR "marking as down, most recent del measurement bad: ".
 		    "bw=$bw($bw_stamp), del=$del($del_stamp)\n"
 			if ($debug);
 		$plr = 1;
+		$plr_stamp = $mynow;
 	    }
 	}
-
-	$del = $DEF_DEL
-	    if ($del < 0);
-	$bw = $DEF_BW
-	    if ($bw < 0);
     }
+	
+    #
+    # Now that we have taken care of loss conditions, set default values
+    # for those for which we did not get readings.
+    #
+    if ($del_stamp == 0) {
+	print STDERR "NOTE: no current latency data for ".
+		     "$me ($src_site) --> $dstvnode ($dst_site)\n".
+		     "    defaulting to {$DEF_DEL}ms\n";
+	$del = $DEF_DEL;
+	$del_stamp = $mynow;
+    }
+    if ($plr_stamp == 0) {
+	# XXX this condition is common
+	if (0) {
+	    print STDERR "NOTE: no current loss data for ".
+			 "$me ($src_site) --> $dstvnode ($dst_site)\n".
+			 "    defaulting to ${DEF_PLR}\n";
+	}
+	$plr = $DEF_PLR;
+	$plr_stamp = $mynow;
+    }
+    # undef or zero--zero BW is not very useful
+    if ($bw_stamp == 0 || $bw == 0) {
+	print STDERR "NOTE: no current bandwidth data for ".
+		     "$me ($src_site) --> $dstvnode ($dst_site)\n".
+		     "    defaulting to ${DEF_BW}Kbps\n";
+	$bw = $DEF_BW;
+	$bw_stamp = $mynow;
+    }
+
     return ($del, $plr, $bw);
 }
 
@@ -740,10 +805,24 @@ sub bgmon_update($$$)
 
     my $cmd = "$MANAGERCLIENT -i $pid/$eid -c start -a " .
 	"$livstr $bivstr -d $dur " . join(' ', @bgmon_nodes);
-print "doing $cmd\n";
+    print STDERR "bgmon_update: $cmd\n"
+	if ($debug);
     if (system("$cmd") != 0) {
 	warn("*** '$cmd' failed\n");
     }
+}
+
+sub bgmon_stop()
+{
+    if ($tweakbgmon) {
+	my $cmd = "$MANAGERCLIENT -i $pid/$eid -c stop";
+	print STDERR "\nbgmon_stop: $cmd\n"
+	    if ($debug);
+	if (system("$cmd") != 0) {
+	    warn("*** '$cmd' failed\n");
+	}
+    }
+    exit(0);
 }
 
 sub logmsg($)
