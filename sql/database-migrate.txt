@@ -3393,10 +3393,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.64: Fix archive tags to be proper size.
 
-      **** Skip this if you just did 4.41 above.
-
       alter table experiment_resources change archive_tag \
           archive_tag varchar(64) default NULL;
+
+      **** Skip this statement if you just did 4.41 above.
 
       alter table experiment_runs change archive_tag \
           archive_tag varchar(64) default NULL;
