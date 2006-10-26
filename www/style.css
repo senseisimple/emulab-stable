@@ -338,8 +338,15 @@ ul.submenu li.newgroup {
   display: inline;
 }
 .contact {
+  background-color:#FFF;
   font-size: x-small;
   text-align: right;
+  margin-bottom: 0px;
+}
+.reportbug {
+  background-color:#FFF;
+  font-size: x-small;
+  text-align: left;
   margin-bottom: 0px;
 }
 /*   END Content */

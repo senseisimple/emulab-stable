@@ -904,6 +904,7 @@ function ENDPAGE() {
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
     global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring, $currently_busy;
+    global $login_uid;
 
     if ($currently_busy) {
 	CLEARBUSY();
@@ -941,12 +942,21 @@ function PAGEFOOTER($view = NULL) {
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
     }
-    echo "
-                <p class='contact'>
-                    Problems?
-	            Contact $TBMAILADDR.
-                </p>
-                <!-- end copyright -->\n";
+    echo "      <br>\n";
+    echo "      <table class=stealth width=100% ".
+	               "border='0' cellspacing='0' cellpadding='0'>";
+    echo "       <tr>\n";
+    
+    if ($login_uid) {
+	echo "    <td class=reportbug>";
+	echo "      <a href='$TBBASE/gotobugdb.php3".
+	                    "?do=newtask&project_title=Emulab'>";
+	echo "        Report Bug, Request Feature</a>";
+	echo "    </td>";
+    }
+    echo "        <td class=contact>Questions? Contact $TBMAILADDR</td>";
+    echo "       </tr>\n";
+    echo "      <!-- end copyright -->\n";
     echo "</div>";
     echo "</div>";
 
