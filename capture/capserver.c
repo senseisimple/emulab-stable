@@ -16,6 +16,7 @@
 #include <syslog.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <mysql/mysql.h>
 #include <sys/time.h>
 #include <grp.h>
