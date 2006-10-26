@@ -1172,6 +1172,31 @@ sub doVlansFromTables($@) {
 	return RemoteDoVlansFromTables(@vlans);
     }
 
+    #
+    # Sanity check: make sure that this experiment does not use more VLANs than
+    # we can put on the stack. Note that we don't try to check how many are
+    # available (ie. total - used), because getting the 'used' value is not
+    # trivial.
+    #
+    my $leader = getStackLeader($stack->{STACKID});
+    if (!defined $leader) {
+        tberror "Unable to get stack leader for $stack->{STACKID}";
+        return 1;
+    }
+    my $switch_options = getDeviceOptions($leader);
+    if (!defined $switch_options) {
+        tberror "Unable to get stack leader for $stack->{STACKID}";
+        return 1;
+    }
+    my $vlan_count = $switch_options->{'max_vlan'} -
+                     $switch_options->{'min_vlan'};
+    my $expt_vlan_count = scalar(@vlans);
+    if ($expt_vlan_count > $vlan_count) {
+        tberror "Too many VLANs in experiment: $expt_vlan_count requested, " .
+                "$vlan_count available";
+        return 1;
+    }
+
     my @trunkedPorts = getExperimentTrunks($pid,$eid);
     $equaltrunking = 1;
     foreach my $port (@trunkedPorts) {
