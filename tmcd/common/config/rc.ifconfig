@@ -115,9 +115,7 @@ sub doboot()
     # Get the iface list from libsetup, which handles parsing the stuff
     # we get back from tmcd.
     #
-    if (getifconfig(\@ifacelist) != 0) {
-	fatal("Could not get ifconfig from libsetup!");
-    }
+    mygetifconfig(\@ifacelist);
     return 0
 	if (! @ifacelist);
 
@@ -300,4 +298,57 @@ sub docleanup()
 {
     unlink $TMIFC;
     unlink $TMIFMAP;
+}
+
+#
+# Total ICK!
+#
+# We may have to retry the getifconfig call if the experiment involves
+# "vlan" devices.  Since the VLAN tag (number) comes from the switch,
+# and switch setup happens in parallel with us, it is possible that some
+# VLANs may not yet be assigned.  So we keep calling getifconfig until
+# we have tags for all such interfaces.
+#
+sub mygetifconfig($)
+{
+    my ($listref) = @_;
+
+    #
+    # How long it takes can be proportional to the number of VLANs that
+    # have to be setup--could be seconds, could be minutes.  Arbitrarily
+    # pick 10 minutes.  In the long run, it probably doesn't matter because
+    # the higher level node setup timeout is likely to trigger at around
+    # 8-10 minutes, rebooting us anyway.
+    #
+    my $maxtries = 40;
+    my $sleeptime = 15;
+
+    my @ifacelist = ();
+    if (getifconfig(\@ifacelist) != 0) {
+	fatal("Could not get ifconfig from libsetup!");
+    }
+
+    for (my $tries = 0; $tries < $maxtries; $tries++) {
+	my $bad = 0;
+	foreach my $ifconfig (@ifacelist) {
+	    if ($ifconfig->{ISVIRT} &&
+		$ifconfig->{ITYPE} eq "vlan" && $ifconfig->{VTAG} == 0) {
+		$bad++;
+	    }
+	}
+	if (!$bad) {
+	    @$listref = @ifacelist;
+	    return;
+	}
+
+	warning("$bad vlan devices do not yet have tags, trying again...");
+	sleep($sleeptime);
+
+	@ifacelist = ();
+	if (getifconfig(\@ifacelist, 1) != 0) {
+	    fatal("Could not re-get ifconfig from libsetup!");
+	}
+    }
+
+    fatal("Could not get all VLAN tags after $maxtries tries");
 }
