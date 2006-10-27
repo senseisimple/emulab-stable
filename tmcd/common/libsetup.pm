@@ -483,14 +483,19 @@ sub dorole()
 # case for the IXP configuration stuff). This is inconsistent with many
 # other config scripts, but at some point that will change. 
 #
-sub getifconfig($)
+sub getifconfig($;$)
 {
-    my ($rptr)       = @_;	# Return list to caller (reference).
+    my ($rptr,$nocache) = @_;	# Return list to caller (reference).
     my @tmccresults  = ();
     my @ifacelist    = ();	# To be returned to caller.
     my %ifacehash    = ();
 
-    if (tmcc(TMCCCMD_IFC, undef, \@tmccresults) < 0) {
+    my %tmccopts = ();
+    if ($nocache) {
+	$tmccopts{"nocache"} = 1;
+    }
+
+    if (tmcc(TMCCCMD_IFC, undef, \@tmccresults, %tmccopts) < 0) {
 	warn("*** WARNING: Could not get interface config from server!\n");
 	@$rptr = ();
 	return -1;
@@ -567,6 +572,7 @@ sub getifconfig($)
 	    $ifconfig->{"DUPLEX"}   = $duplex;
 	    $ifconfig->{"ALIASES"}  = "";	# gone as of version 27
 	    $ifconfig->{"IFACE"}    = $iface;
+	    $ifconfig->{"VIFACE"}   = $iface;
 	    $ifconfig->{"RTABID"}   = $rtabid;
 	    $ifconfig->{"LAN"}      = $lan;
 	    $ifconfig->{"SETTINGS"} = {};
@@ -600,10 +606,11 @@ sub getifconfig($)
 	    } else {
 
 		#
-		# A veth might not have any underlying physical interface if the
-		# link or lan is completely contained on the node. tmcd tells us
-		# that by setting the pmac to "none". Note that this obviously is
-		# relevant on the physnode, not when called from inside a vnode.
+		# A veth might not have any underlying physical interface
+		# if the link or lan is completely contained on the node.
+		# tmcd tells us that by setting the pmac to "none". Note
+		# that this obviously is relevant on the physnode, not when
+		# called from inside a vnode.
 		#
 		if ($pmac ne "none") {
 		    if (! ($iface = findiface($pmac))) {
@@ -626,6 +633,10 @@ sub getifconfig($)
 	    $ifconfig->{"ENCAP"}    = $encap;
 	    $ifconfig->{"LAN"}      = $lan;
 	    $ifconfig->{"VTAG"}     = $vtag;
+
+	    # determine the OS-specific virtual device name
+	    $ifconfig->{"VIFACE"}   = os_viface_name($ifconfig);
+
 	    push(@ifacelist, $ifconfig);
 	}
 	else {

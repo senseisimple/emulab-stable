@@ -318,9 +318,11 @@ sub gatedsetup ()
     print IFS "\tarea 0.0.0.2 {\n\t\tauthtype none;\n";
 
     foreach my $ifconfig (@ifacelist) {
-	my $xif = $ifconfig->{"IFACE"};
-	
-	print IFS "\t\tinterface $xif { priority 1; };\n";
+	# only do this for IP configured interfaces
+	if ($ifconfig->{"IPADDR"} ne "") {
+	    my $xif = $ifconfig->{"VIFACE"};
+	    print IFS "\t\tinterface $xif { priority 1; };\n";
+	}
     }
 
     print IFS "\t};\n};\n";

@@ -17,7 +17,7 @@ use Exporter;
 	 $LOOPBACKMOUNT 
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_ifconfig_veth
+	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts
@@ -287,6 +287,40 @@ sub os_ifconfig_veth($$$$$;$$$$$)
     $downlines = "$IFCONFIGBIN ${itype}${id} destroy";
 
     return ($uplines, $downlines);
+}
+
+#
+# Compute the name of a virtual interface device based on the
+# information in ifconfig hash (as returned by getifconfig).
+#
+sub os_viface_name($)
+{
+    my ($ifconfig) = @_;
+    my $piface = $ifconfig->{"IFACE"};
+
+    #
+    # Physical interfaces use their own name
+    #
+    if (!$ifconfig->{"ISVIRT"}) {
+	return $piface;
+    }
+
+    #
+    # Otherwise we have a virtual interface: alias, veth, vlan.
+    #
+    # alias: There is no alias device, just use the phys device
+    # veth:  veth<ID>
+    # vlan:  vlan<ID>
+    #
+    my $itype = $ifconfig->{"ITYPE"};
+    if ($itype eq "alias") {
+	return $piface;
+    } elsif ($itype =~ /^(vlan|veth)$/) {
+	return $itype . $ifconfig->{"ID"};
+    }
+
+    warn("FreeBSD does not support virtual interface type '$itype'\n");
+    return undef;
 }
 
 #

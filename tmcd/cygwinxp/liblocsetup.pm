@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,7 @@ use Exporter;
 	 os_account_cleanup os_accounts_start os_accounts_end os_accounts_sync
 	 os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_groupgid os_useradd os_userdel os_usermod os_mkdir
-	 os_ifconfig_veth
+	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_samba_mount 
@@ -363,6 +363,25 @@ sub os_ifconfig_line($$$$$$$;$$%)
 sub os_ifconfig_veth($$$$$;$$$$$)
 {
     return "";
+}
+
+#
+# Compute the name of a virtual interface device based on the
+# information in ifconfig hash (as returned by getifconfig).
+#
+sub os_viface_name($)
+{
+    my ($ifconfig) = @_;
+    my $piface = $ifconfig->{"IFACE"};
+
+    #
+    # Physical interfaces use their own name
+    #
+    if (!$ifconfig->{"ISVIRT"}) {
+	return $piface;
+    }
+    warn("CygWin does not support virtual interface type '$itype'\n");
+    return undef;
 }
 
 #
