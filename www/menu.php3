@@ -951,7 +951,7 @@ function PAGEFOOTER($view = NULL) {
 	echo "    <td class=reportbug>";
 	echo "      <a href='$TBBASE/gotobugdb.php3".
 	                    "?do=newtask&project_title=Emulab'>";
-	echo "        Report Bug, Request Feature</a>";
+	echo "        Report Bug, Gripe, Request Feature</a>";
 	echo "    </td>";
     }
     echo "        <td class=contact>Questions? Contact $TBMAILADDR</td>";
