@@ -2443,22 +2443,31 @@ COMMAND_PROTOTYPE(dohosts)
 	 * nodes and all of the IPs on those nodes. This is the basis
 	 * for the canonical host table. Join it with the reserved
 	 * table to get the node_id at the same time (saves a step).
+	 *
+	 * XXX NSE hack: Using the v2pmap table instead of reserved because
+	 * of multiple simulated to one physical node mapping. Currently,
+	 * reserved table contains a vname which is generated in the case of
+	 * nse
+	 *
+	 * XXX PELAB hack: If virt_lans.protocol is 'ipv4' then this is a
+	 * "LAN" of real internet nodes and we should return the control
+	 * network IP address.  The intent is to give plab nodes some
+	 * convenient aliases for refering to each other.
 	 */
-	/*
-	  XXX NSE hack: Using the v2pmap table instead of reserved because
-	  of multiple simulated to one physical node mapping. Currently,
-	  reserved table contains a vname which is generated in the case of
-	  nse
-	 */
-	res = mydb_query("select v.vname,v.vnode,v.ip,v.vport,v2p.node_id "
+	res = mydb_query("select v.vname,v.vnode,v.ip,v.vport,v2p.node_id,"
+			 "v.protocol,i.IP "
 			 "    from virt_lans as v "
 			 "left join v2pmap as v2p on "
 			 "     v.vnode=v2p.vname and v.pid=v2p.pid and "
 			 "     v.eid=v2p.eid "
+			 "left join nodes as n on "
+			 "     v2p.node_id=n.node_id "
+			 "left join interfaces as i on "
+			 "     n.phys_nodeid=i.node_id and i.role='ctrl' "
 			 "where v.pid='%s' and v.eid='%s' and "
 			 "      v2p.node_id is not null "
-			 "      order by v.vnode",
-			 5, reqp->pid, reqp->eid);
+			 "      order by v.vnode,v.vname",
+			 7, reqp->pid, reqp->eid);
 
 	if (!res) {
 		error("HOSTNAMES: %s: DB Error getting virt_lans!\n",
@@ -2509,7 +2518,16 @@ COMMAND_PROTOTYPE(dohosts)
 		strcpy(host->nodeid, row[4]);
 		host->virtiface = atoi(row[3]);
 		host->shared = shareditem;
-		inet_aton(row[2], &host->ipaddr);
+
+		/*
+		 * As mentioned above, links with protocol 'ipv4'
+		 * use the control net addresses of connected nodes.
+		 */
+		if (row[5] && strcmp("ipv4", row[5]) == 0 && row[6])
+			inet_aton(row[6], &host->ipaddr);
+		else
+			inet_aton(row[2], &host->ipaddr);
+
 		host->next = hosts;
 		hosts = host;
 	}
