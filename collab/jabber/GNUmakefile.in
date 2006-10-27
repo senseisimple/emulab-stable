@@ -19,6 +19,12 @@ CTRL_LIBEXEC_SCRIPTS	=
 CTRL_LIB_FILES		= 
 CTRL_SBIN_SCRIPTS	= jabberproxy
 
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = addjabberuser deljabberuser addjabberchat \
+			modjabberbuddies deljabberchat setchatmembers
+SETUID_LIBX_SCRIPTS  = 
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
