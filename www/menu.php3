@@ -596,11 +596,6 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("My Chat Buddies", $TBBASE,
 			       "mychat.php3?target_uid=$login_uid");
 	}
-	if ($BUGDBSUPPORT) {
-	    WRITESIDEBARBUTTON("<b>Report Emulab Bug</b>", $TBBASE,
-		       "gotobugdb.php3?do=newtask&project_title=Emulab");
-	}
-	
 	echo "</ul>\n";
     }
 
@@ -765,6 +760,12 @@ function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 	    #
 	    echo "       <a class='builtwith' href='http://www.emulab.net'>
                          <img src='$BASEPATH/builtwith.png'></a>";
+	}
+	else {
+	    echo "<span class=gripe><a href='$TBBASE/gotobugdb.php3".
+	                    "?do=newtask&project_title=Emulab'>";
+	    echo "Report Bug, Gripe, Request Feature</a>";
+	    echo "</span>\n";
 	}
 	echo "<!-- sidebar ends -->
               </div>";
