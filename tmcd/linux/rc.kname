@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -22,7 +22,7 @@ if (-e "$BOOTDIR/runlilo") {
     if (!unlink("$BOOTDIR/runlilo")) {
 	print "WARNING: could not unlink $BOOTDIR/runlilo\n";
     }
-    if (system("/sbin/lilo >$LOGDIR/lilo.out 2>&1")) {
+    if (system("/sbin/lilo -P ignore >$LOGDIR/lilo.out 2>&1")) {
 	print "WARNING: error $? while running LILO, ".
 	      "see $LOGDIR/lilo.out\n";
     }
