@@ -29,7 +29,8 @@ my $output;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CVS		= "/usr/bin/cvs";
-my $TAR		= "/usr/bin/gtar";
+##my $TAR	= "/usr/bin/gtar --ignore-failed-read";
+my $TAR		= "/usr/bin/tar";
 my $GZIP	= "/usr/bin/gzip";
 my $CVSREPO     = "/usr/testbed/CVS";
 
@@ -117,7 +118,7 @@ system("$CVS -f -R -Qd $CVSREPO export -r $tag " .
 # Tar and gzip. Send to stdout (for web interface) unless an output file
 # is specified.
 #
-system("$TAR --ignore-failed-read -cf - -C $tempdir . | gzip -c -1 ".
+system("$TAR -c -f - -C $tempdir . | gzip -c -1 ".
        (defined($output) ? "> $output" : "")) == 0
     or fatal("Failed to tar/gzip testbed source code (tag $tag)!");
 
