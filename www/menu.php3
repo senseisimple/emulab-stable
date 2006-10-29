@@ -750,7 +750,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 {
-    global $TBMAINSITE;
+    global $TBMAINSITE, $login_uid;
 
     if (!$nocontent) {
 	if (!$TBMAINSITE) {
@@ -761,7 +761,7 @@ function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 	    echo "       <a class='builtwith' href='http://www.emulab.net'>
                          <img src='$BASEPATH/builtwith.png'></a>";
 	}
-	else {
+	elseif ($login_uid) {
 	    echo "<span class=gripe><a href='$TBBASE/gotobugdb.php3".
 	                    "?do=newtask&project_title=Emulab'>";
 	    echo "Report Bug, Gripe, Request Feature</a>";
