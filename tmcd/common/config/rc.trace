@@ -328,6 +328,20 @@ sub doboot()
                         "interface!\n";
                     next;
                 }
+
+		# XXX - if we're on a wifi node, we get goofed up here
+		# because we get the wifiX VAP device.  The pcapper
+		# needs to listen on the real athX device.  So, we just 
+		# fix that little thing here.  This should probably
+		# be moved up into findiface, but it wouldn't be clean
+		# there either.  Correspondingly, we don't put it in
+		# findif.c because other parts of wifi setup
+		# depend on seeing the wifiX name!  Sigh.
+
+		if ($iface =~ /wifi(\d+)/) {
+		    $iface = "ath$1";
+		}
+
             }
 	    push(@cmd, "-f");
 	    push(@cmd, $file);
