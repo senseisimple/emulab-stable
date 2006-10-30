@@ -841,7 +841,8 @@ class Template
 	    DBQueryFatal("select name,value ".
 			 "   from experiment_template_parameters ".
 			 "where parent_guid='$guid' and ".
-			 "      parent_vers='$vers'");
+			 "      parent_vers='$vers' ".
+			 "order by name");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	= $row['name'];
@@ -1362,7 +1363,8 @@ class TemplateInstance
 	    DBQueryFatal("select * ".
 			 "   from experiment_template_instance_bindings ".
 			 "where parent_guid='$guid' and parent_vers='$vers' ".
-			 "      and instance_idx='$instance_idx'");
+			 "      and instance_idx='$instance_idx' ".
+			 "order by name");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	= $row['name'];
@@ -1384,7 +1386,8 @@ class TemplateInstance
 
 	$query_result =
 	    DBQueryFatal("select * from experiment_run_bindings ".
-			 "where exptidx='$exptidx' and runidx='$runidx'");
+			 "where exptidx='$exptidx' and runidx='$runidx' ".
+			 "order by name");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	= $row['name'];
