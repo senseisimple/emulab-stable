@@ -340,10 +340,10 @@ while (1) {
     my $elapsed = time() - $startat;
     if ($tweakbgmon && ($intervals % $bgmon_update) == 0) {
 	# XXX +60 to ensure overlap
-	my $duration = $latinterval * $bgmon_update + 60;
+	my $duration = $interval * $bgmon_update + 60;
 
 	logmsg("==== Set DB update lat_freq/bw_freq/duration to ".
-	       "$interval/$bwinterval/$duration at +$elapsed\n");
+	       "$latinterval/$bwinterval/$duration at +$elapsed\n");
 
 	bgmon_update($latinterval, $bwinterval, $duration);
     }
@@ -570,7 +570,7 @@ sub fetchone($$$$$)
 	    print STDERR "DB reports link as down\n"
     		if ($debug);
 	} else {
-	    $plr = DEF_PLR;
+	    $plr = $DEF_PLR;
 	    $plr_stamp = $mynow;
 	}
     }
@@ -634,10 +634,10 @@ sub fetchone($$$$$)
     # Now that we have taken care of loss conditions, set default values
     # for those for which we did not get readings.
     #
-    if ($del_stamp == 0) {
+    if ($del_stamp == 0 || $del < 0) {
 	print STDERR "NOTE: no current latency data for ".
 		     "$me ($src_site) --> $dstvnode ($dst_site)\n".
-		     "    defaulting to {$DEF_DEL}ms\n";
+		     "    defaulting to ${DEF_DEL}ms\n";
 	$del = $DEF_DEL;
 	$del_stamp = $mynow;
     }
@@ -652,7 +652,7 @@ sub fetchone($$$$$)
 	$plr_stamp = $mynow;
     }
     # undef or zero--zero BW is not very useful
-    if ($bw_stamp == 0 || $bw == 0) {
+    if ($bw_stamp == 0 || $bw <= 0) {
 	print STDERR "NOTE: no current bandwidth data for ".
 		     "$me ($src_site) --> $dstvnode ($dst_site)\n".
 		     "    defaulting to ${DEF_BW}Kbps\n";

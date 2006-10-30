@@ -96,7 +96,7 @@ if (defined($options{"o"})) {
     $outfile = $options{"o"};
 }
 if (defined($options{"r"})) {
-    $remote = $options{"r"};
+    $remote = 1;
     $PWDFILE = "/local/pelab/pelabdb.pwd";
     $DBHOST = "users.emulab.net";
 }

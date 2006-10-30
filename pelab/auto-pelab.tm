@@ -186,10 +186,14 @@ if {$DO_BSD} {
     set cstr "/usr/bin/iperf -t 60 -c "
 }
 $ns define-template-parameter SERVERPROG $sstr \
-{Server program to run automatically on all elab nodes. }
+{Server program to run automatically on all elab nodes.\
+ Set to the NULL string to disable. }
 $ns define-template-parameter CLIENTPROG $cstr \
-{Client to run automatically on Plab nodes.\
+{Client to run automatically on elab nodes.\
  NOTE: not supported currently. }
+
+$ns define-template-parameter ALLNODESPROG "/bin/true" \
+{Application to run automatically on all nodes.}
 
 #
 # If non-zero, uses the new stub (magent) instead of the old one
@@ -242,6 +246,9 @@ $ns define-template-parameter STUB_PORT 3149 \
  Change to avoid collisions with others on the same node.\
  NOTE: only used when USE_MAGENT is non-zero. }
 
+# XXX for internal use only
+set NO_STUB 0
+
 #
 # Enforce NO_PLAB requirements
 #
@@ -249,6 +256,14 @@ if {$NO_PLAB} {
     set FAKE_PLAB 0
     set REAL_PLAB 0
     set USE_DBMONITOR 1
+}
+
+#
+# Enforce USE_DBMONITOR requirements
+#
+if {$USE_DBMONITOR} {
+    set USE_MAGENT 0
+    set NO_STUB 1
 }
 
 # End of user-settable options
@@ -320,11 +335,13 @@ set planetservers {}
 set serverlist {}
 set clientlist {}
 set tflist {}
+set anlist {}
 
 #
 # Create all of the nodes
 #
 set tfix 1
+set anix 1
 for {set i 1} {$i <= $NUM_PCS} {incr i} {
 
     if {$REAL_PLAB} {
@@ -337,9 +354,13 @@ for {set i 1} {$i <= $NUM_PCS} {incr i} {
 
         tb-set-node-tarfiles $planet($i) $tarfiles
         tb-set-node-rpms $planet($i) $plab_rpms
+
         set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
+	set allnodes($anix) [$planet($i) program-agent -command $ALLNODESPROG]
+	lappend anlist $allnodes($anix)
+	incr anix
 
         if {[llength $PLABSITES] > 0} {
             set why_doesnt_tcl_have_concat "*&"
@@ -364,6 +385,9 @@ for {set i 1} {$i <= $NUM_PCS} {incr i} {
         set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
+	set allnodes($anix) [$plab($i) program-agent -command $ALLNODESPROG]
+	lappend anlist $allnodes($anix)
+	incr anix
     }
 
     set elab($i) [$ns node]
@@ -385,6 +409,9 @@ for {set i 1} {$i <= $NUM_PCS} {incr i} {
     set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
     lappend tflist $tfupdate($tfix)
     incr tfix
+    set allnodes($anix) [$elab($i) program-agent -command $ALLNODESPROG]
+    lappend anlist $allnodes($anix)
+    incr anix
 
     #
     # If the user has given a PLABNODES list, we set up $opt variables so that
@@ -426,6 +453,7 @@ set allservers [$ns event-group $serverlist]
 set allclients [$ns event-group $clientlist]
 
 set tfhosts [$ns event-group $tflist]
+set anhosts [$ns event-group $anlist]
 
 set tracelist {}
 
@@ -530,14 +558,16 @@ if {$NO_PLAB || $REAL_PLAB} {
 
     # stop stubs and monitors
     $start append "$ns log \"##### Stopping stubs and monitors...\""
-    if {$REAL_PLAB} {
+    if {!$NO_STUB && $REAL_PLAB} {
 	$start append "$planetstubs stop"
     }
     $start append "$monitorgroup stop"
 
     # stop servers
-    $start append "$ns log \"##### Stopping servers...\""
-    $start append "$allservers stop"
+    if {$SERVERPROG != ""} {
+	$start append "$ns log \"##### Stopping servers...\""
+	$start append "$allservers stop"
+    }
 
     # stop link logging
     $start append "$ns log \"##### Roll link trace logs...\""
@@ -583,12 +613,14 @@ if {$NO_PLAB || $REAL_PLAB} {
     }
 
     # restart servers
-    $start append "$ns log \"##### Starting server...\""
-    $start append "$allservers start"
+    if {$SERVERPROG != ""} {
+	$start append "$ns log \"##### Starting server...\""
+	$start append "$allservers start"
+    }
 
     # restart stubs and monitors
     $start append "$ns log \"##### Starting stubs and monitors...\""
-    if {$REAL_PLAB} {
+    if {!$NO_STUB && $REAL_PLAB} {
 	$start append "$planetstubs start"
     }
     $start append "$monitorgroup start"
@@ -603,14 +635,16 @@ if {$NO_PLAB || $REAL_PLAB} {
 
     # stop stubs and monitors
     $stop append "$ns log \"##### Stopping stubs and monitors...\""
-    if {$REAL_PLAB} {
+    if {!$NO_STUB && $REAL_PLAB} {
 	$stop append "$planetstubs stop"
     }
     $stop append "$monitorgroup stop"
 
     # stop servers
-    $stop append "$ns log \"##### Stopping servers...\""
-    $stop append "$allservers stop"
+    if {$SERVERPROG != ""} {
+	$stop append "$ns log \"##### Stopping servers...\""
+	$stop append "$allservers stop"
+    }
 
     # stop link logging and save logs
     $stop append "$ns log \"##### Stop link tracing...\""
@@ -640,12 +674,16 @@ if {$FAKE_PLAB} {
 
     # stop stubs and monitors
     $start_fake append "$ns log \"##### Stopping stubs and monitors...\""
-    $start_fake append "$plabstubs stop"
+    if {!$NO_STUB} {
+        $start_fake append "$plabstubs stop"
+    }
     $start_fake append "$monitorgroup stop"
 
     # stop servers
-    $start_fake append "$ns log \"##### Stopping servers...\""
-    $start_fake append "$allservers stop"
+    if {$SERVERPROG != ""} {
+	$start_fake append "$ns log \"##### Stopping servers...\""
+	$start_fake append "$allservers stop"
+    }
 
     # stop link logging
     $start_fake append "$ns log \"##### Roll link trace logs...\""
@@ -682,12 +720,16 @@ if {$FAKE_PLAB} {
     }
 
     # restart servers
-    $start_fake append "$ns log \"##### Starting server...\""
-    $start_fake append "$allservers start"
+    if {$SERVERPROG != ""} {
+	$start_fake append "$ns log \"##### Starting server...\""
+	$start_fake append "$allservers start"
+    }
 
     # restart stubs and monitors
     $start_fake append "$ns log \"##### Starting stubs and monitors...\""
-    $start_fake append "$plabstubs start"
+    if {!$NO_STUB} {
+	$start_fake append "$plabstubs start"
+    }
     $start_fake append "$monitorgroup start"
 
     # gather up the data and inform the user
@@ -700,12 +742,16 @@ if {$FAKE_PLAB} {
 
     # stop stubs and monitors
     $stop_fake append "$ns log \"##### Stopping stubs and monitors...\""
-    $stop_fake append "$plabstubs stop"
+    if {!$NO_STUB} {
+	$stop_fake append "$plabstubs stop"
+    }
     $stop_fake append "$monitorgroup stop"
 
     # stop servers
-    $stop_fake append "$ns log \"##### Stopping servers...\""
-    $stop_fake append "$allservers stop"
+    if {$SERVERPROG != ""} {
+	$stop_fake append "$ns log \"##### Stopping servers...\""
+	$stop_fake append "$allservers stop"
+    }
 
     # stop link logging and save logs
     $stop_fake append "$ns log \"##### Stop link tracing...\""
