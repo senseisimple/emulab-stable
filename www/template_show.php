@@ -458,22 +458,37 @@ $bodyclosestring = "<script type='text/javascript'>SET_DHTML();</script>\n";
 echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
-          <a href=\"#A\" style=\"background-color:white\" ".
+          <a href=\"template_show.php?guid=$guid&version=$version&show=vis\"
+               style=\"background-color:white\" ".
                "id=\"li_vis\" onclick=\"Show('vis');\">".
                "Visualization</a></li>\n";
 echo "<li>
-          <a href=\"#B\" id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
+          <a href=\"template_show.php?guid=$guid&version=$version&show=nsfile\"
+              id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
               "NS File</a></li>\n";
 echo "<li>
-          <a href=\"#C\" id=\"li_graph\" onclick=\"Show('graph');\">".
+          <a href=\"template_show.php?guid=$guid&version=$version&show=graph\"
+              id=\"li_graph\" onclick=\"Show('graph');\">".
               "Graph</a></li>\n";
 echo "</ul>\n";
 
 #
-# Start out with Visualization ...
+# Start out with  ...
 #
 echo "<div align=center width=\"100%\" id=\"showexp_visarea\">\n";
-echo Show("vis", 0, 0);
+if (!isset($show) || $show == "vis") {
+    echo Show("vis", 0, 0);
+}
+elseif ($show == "nsfile") {
+    echo Show("nsfile", 0, 0);
+}
+elseif ($show == "graph") {
+    echo Show("graph", 0, 0);
+}
+else {
+    echo Show("vis", 0, 0);
+
+}
 echo "</div>\n";
 echo "</div>\n";
 
