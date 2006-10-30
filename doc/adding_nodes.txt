@@ -20,23 +20,57 @@ A. Information about the node
 B. If the node is of a new type
 -------------------------------
 
-1. You'll need specs on the nodes for the node type table. You'll
-   need a name for the type, processor class (ie PIII), speed (MHz),
-   RAM size (in MB), Hard disk size (in GB), max # of physical cards
-   it holds (including the motherboard as a card if it has blt-in
-   ethernet), and the maximum number of ports it has on a card (ie 1,
-   2 for dual card, 4 for quad card). You'll also need to give it a
-   default OS id (the default OS to boot), which port is the control
-   net (ie 4), how long you should make people wait before power cycling
-   again, the default image id, delay capacity, control iface (ie
-   eth4), the type of the primary disk ('ad'==IDE,'da'==SCSI') and the
-   OS id to boot when it is acting as a delay node.
+1. You'll need specs on the nodes for the node_types and node_type_attributes
+   tables. For node_types, you'll just need a name for the type:
+
+   insert into `node_types` (class,type) values ("pc", "pc2800d");
+
+   For node_type_attributes you will create a row for each of several
+   attributes.  For this, you will need a name for the processor class
+   (e.g. Core Duo), speed (MHz), RAM size (in MB), boot hard disk type and unit
+   ('ad' and '0' for IDE, 'da' and '0' for SCSI, 'ad' and '4' for SATA),
+   boot disk size (in GB), max # of physical cards it holds (including the
+   motherboard as a card if it has built-in ethernet), and the approximate
+   amount of time it takes the machine to "power cycle" (in seconds).
+
+   You'll also need to give it a default OS id (the default OS to boot)
+   and image ID (disk image the default OS comes from), which port is the
+   control net (e.g. 4) and what its Linux name is (e.g. "eth4"), how many
+   links this node can delay (usually: num_experimental_links / 2), and
+   how many virtual nodes ("jails") the machine can support.
+
    Example:
 
-   insert into node_types
-   (class,type,proc,speed,RAM,HD,max_interfaces,osid,control_net,imageid,imageable,delay_capacity,virtnode_capacity,control_iface,disktype,bootdisk_unit,delay_osid,jail_osid)
-   values
-   ("pc","pc2000","P4",2000,512,20.0,5,"RHL-STD",0,"emulab-ops-FBSD47+RHL73-STD",1,2,10,"eth0","ad",0,"FBSD-STD","FBSD-STD");
+   insert into `node_type_attributes` values
+     ('pc2800d','processor','Pentium D','string'),
+     ('pc2800d','frequency','2800','integer'),
+     ('pc2800d','memory','2048','integer'),
+     ('pc2800d','disktype','ad','string'),
+     ('pc2800d','bootdisk_unit','4','integer'),
+     ('pc2800d','disksize','160.00','float'),
+     ('pc2800d','max_interfaces','4','integer'),
+     ('pc2800d','power_delay','60','integer'),
+     ('pc2800d','default_imageid','emulab-ops-FBSD54+FC4-STD','string'),
+     ('pc2800d','default_osid','emulab-ops-FBSD54','string'),
+     ('pc2800d','control_network','0','integer'),
+     ('pc2800d','control_interface','eth0','string'),
+     ('pc2800d','delay_capacity','2','integer'),
+     ('pc2800d','virtnode_capacity','50','integer');
+
+   There are also assorted other attributes you need not change, just
+   use these:
+
+   insert into `node_type_attributes` values
+     ('pc2800d','delay_osid','FBSD-STD','string'),
+     ('pc2800d','jail_osid','FBSD-STD','string'),
+     ('pc2800d','adminmfs_osid','FREEBSD-MFS','string'),
+     ('pc2800d','diskloadmfs_osid','FRISBEE-MFS','string'),
+     ('pc2800d','pxe_boot_path','/tftpboot/pxeboot.emu','string'),
+     ('pc2800d','imageable','1','boolean'),
+     ('pc2800d','rebootable','1','boolean'),
+     ('pc2800d','simnode_capacity','0','integer'),
+     ('pc2800d','trivlink_maxspeed','0','integer');
+
 
 2. There are several scripts that limit searches to certain classes.
    If the new type you have added does not have class "pc", you may need
