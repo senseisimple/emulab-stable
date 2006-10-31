@@ -59,7 +59,64 @@ function GraphChange(which) {
     return false;
 }
 
+function GetMaxHeight(id) {
+    var Iframe    = document.getElementById(id);
+    var winheight = 0;
+    var yoff      = 0;
+
+    // This tells us the total height of the browser window.
+    if (window.innerHeight) // all except Explorer
+	winheight = window.innerHeight;
+    else if (document.documentElement &&
+	     document.documentElement.clientHeight)
+	// Explorer 6 Strict Mode
+	winheight = document.documentElement.clientHeight;
+    else if (document.body)
+	// other Explorers
+	winheight = document.body.clientHeight;
+
+    // Now get the Y offset of the outputframe.
+    yoff = Iframe.offsetTop;
+
+    if (winheight != 0) {
+	// Now calculate how much room is left and make the iframe
+	// big enough to use most of the rest of the window.
+	if (yoff != 0)
+	    winheight = winheight - (yoff + 175);
+	else
+	    winheight = winheight * 0.7;
+    }
+    return winheight;
+}
+
 function SetupOutputArea(id) {
+    var Iframe    = document.getElementById(id);
+    var IframeDoc = IframeDocument(id);
+    var winheight = GetMaxHeight(id);
+
+    IframeDoc.open();
+    IframeDoc.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
+    IframeDoc.close();
+
+    Iframe.style.border = "2px solid";
+    Iframe.height       = winheight;
+    Iframe.width        = "100%";
+    Iframe.scrolling    = "auto";
+    Iframe.frameBorder  = "1";
+}
+
+function HideFrame(id) {
+    var Iframe    = document.getElementById(id);
+    var IframeDoc = IframeDocument(id);
+
+    Iframe.style.border = "0px none";
+    Iframe.frameBorder  = 0;
+    Iframe.height       = 0;
+    Iframe.width        = 0;
+    Iframe.scrolling    = "no";
+}
+
+function ShowDownLoader(id) {
     var Iframe    = document.getElementById(id);
     var IframeDoc = IframeDocument(id);
 
@@ -80,19 +137,20 @@ function SetupOutputArea(id) {
     // Now get the Y offset of the outputframe.
     yoff = Iframe.offsetTop;
 
-    IframeDoc.open();
-    IframeDoc.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
-    IframeDoc.close();
-
-    if (winheight != 0)
+    if (winheight != 0) {
 	// Now calculate how much room is left and make the iframe
 	// big enough to use most of the rest of the window.
 	if (yoff != 0)
 	    winheight = winheight - (yoff + 175);
 	else
 	    winheight = winheight * 0.7;
-    
-    Iframe.height = winheight;
+    }
+
+    Iframe.style.border = "2px solid";
+    Iframe.height       = winheight;
+    Iframe.width        = "100%";
+    Iframe.scrolling    = "auto";
+    Iframe.frameBorder  = "1";
 }
 
 /* @return The innerHeight of the window. */

@@ -408,8 +408,6 @@ if (! ($debug || $foreground)) {
     TBdbfork();
 }
 
-sleep(60);
-
 #
 # When in waitmode, must put ourselves in another process group so that
 # an interrupt to the parent will not have any effect on the backend.

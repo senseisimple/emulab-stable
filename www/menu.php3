@@ -1114,7 +1114,6 @@ function STARTBUSY($msg) {
     echo "<center>\n";
     echo "<b>$msg</b> ...<br>\n";
     echo "This will take a few moments; please be <em>patient</em>.<br>\n";
-    echo "<br>\n";
     echo "<img id='busy' src='busy.gif'>".
 	   "<span id='loading'> Working ...</span>";
     echo "<br><br>\n";

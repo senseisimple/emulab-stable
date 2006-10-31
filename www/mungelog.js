@@ -19,7 +19,7 @@ var lastLine = ""; // The last line of the download text.
 var getPNodeProgress = 0;
 
 var nextState = LOG_STATE_LOADING; // The state of the log download.
-var docTriesLeft = 2; // Tries before giving up on getting the document.
+var docTriesLeft = 5; // Tries before giving up on getting the document.
 
 var lastError = -2;
 var maxLineLength = 110;
@@ -44,10 +44,15 @@ function GetPNodes_cb(data) {
 }
 
 /* Clear the various 'loading' indicators. */
-function ml_loadFinished() {
+function ml_loadFinished(done) {
     clearInterval(upInterval);
 
-    ClearLoadingIndicators("<center><b>Done!</b></center>");
+    if (done) {
+        ClearLoadingIndicators("<center><b>Done!</b></center>");
+    }
+    else {
+        ClearLoadingIndicators(" ");
+    }
 
     nextState = LOG_STATE_LOADED;
 }
@@ -166,6 +171,11 @@ function ml_handleReadyState(state) {
     var oa     = idoc.getElementById('outputarea');
     var dl     = document.getElementById('downloader');
 
+    if (docTriesLeft < 0) {
+        /* Already decided we were broken; just ignore */
+        return;
+    }
+
     if ((rt = ml_getBodyText(dl)) == null) {
 	/* 
 	 * Browsers that do not support DOMs for text/plain files or are a
@@ -175,25 +185,26 @@ function ml_handleReadyState(state) {
 	 */
 	docTriesLeft -= 1;
 	if (docTriesLeft < 0) {
-	    /* Give up, turn off the spinner and */
-	    ml_loadFinished();
-	    
-	    /* ... try to make the iframe visible. */
-	    dl.border = 1;
-	    dl.width = "90%";
-	    
-	    dl.height = 500;
-	    
-	    dl.style.width = "90%";
-	    dl.style.height = 500;
-	    dl.style.border = 1;
-	}
+	    /* Give up, turn off the spinner */
+	    ml_loadFinished(0);
 
+            /* Hide the outputarea */
+            HideFrame("outputframe");
+
+            /* Make the downloader frame visible. */
+	    var winheight = GetMaxHeight('downloader');
+
+	    dl.style.border = "2px solid";
+	    dl.height       = winheight;
+	    dl.width        = "100%";
+	    dl.scrolling    = "auto";
+	    dl.frameBorder  = "1";
+	}
 	return;
     }
 
     if (state == LOG_STATE_LOADED) {
-	ml_loadFinished();
+	ml_loadFinished(1);
     }
     
     if (state == LOG_STATE_LOADING || state == LOG_STATE_LOADED) {

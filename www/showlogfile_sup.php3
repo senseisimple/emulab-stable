@@ -93,43 +93,6 @@ function STARTLOG($pid, $eid)
     global $BASEPATH;
 
     STARTWATCHER($pid, $eid);
-    
-    echo "<script type='text/javascript' language='javascript'>\n";
-    echo "function SetupOutputArea() {
-              var Iframe = document.getElementById('outputframe');
-	      var IframeDoc = IframeDocument('outputframe');
-              var winheight = 0;
-              var yoff = 0;
-
-	      // This tells us the total height of the browser window.
-              if (window.innerHeight) // all except Explorer
-                  winheight = window.innerHeight;
-              else if (document.documentElement &&
-                       document.documentElement.clientHeight)
-                  // Explorer 6 Strict Mode
-	          winheight = document.documentElement.clientHeight;
-              else if (document.body)
-                  // other Explorers
-                 winheight = document.body.clientHeight;
-
-              // Now get the Y offset of the outputframe.
-              yoff = Iframe.offsetTop;
-
-	      IframeDoc.open();
-	      IframeDoc.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
- 	      IframeDoc.close();
-
-              if (winheight != 0)
-                  // Now calculate how much room is left and make the iframe
-                  // big enough to use most of the rest of the window.
-                  if (yoff != 0)
-                      winheight = winheight - (yoff + 175);
-                  else
-                      winheight = winheight * 0.7;
-
-	          Iframe.height = winheight;
-          }
-          </script>\n";
 
     echo "<center>\n";
     echo "<img id='busy' src='busy.gif'>
@@ -147,16 +110,16 @@ function STARTLOG($pid, $eid)
           </script>\n";
     echo "<script type='text/javascript' language='javascript'>\n";
 
-    echo "SetupOutputArea();\n"; 
+    echo "SetupOutputArea('outputframe');\n"; 
 
     echo "exp_pid = \"$pid\";\n";
     echo "exp_eid = \"$eid\";\n";
-    echo "</script>
+    echo "</script><div>
          <iframe id='downloader' name='downloader' width=0 height=0
                  src='spewlogfile.php3?pid=$pid&eid=$eid'
                  onload='ml_handleReadyState(LOG_STATE_LOADED);'
-                 border=0 style='width:0px; height:0px; border: 0px'>
-         </iframe>\n";
+                 border=0 frameborder=0>
+         </iframe></div>\n";
 }
 
 # See if this request is to one of the above functions. Does not return

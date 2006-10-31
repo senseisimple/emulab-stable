@@ -444,6 +444,9 @@ sub ParseArgs()
     if (defined($options{"w"})) {
 	$waitmode = 1;
     }
+    if (defined($options{"f"})) {
+	$foreground = 1;
+    }
 }
 
 #
