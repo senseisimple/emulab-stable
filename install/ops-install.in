@@ -1105,7 +1105,8 @@ if ($CVSSUPPORT) {
 
 	Phase "files", "Installing cvsd files", sub {
 	    DoneIfExists($CVSDHEAD);
-	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/collab/cvs control-install");
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/collab/cvstools ".
+			   "  control-install");
 	};
 
 	Phase "cvsd.conf", "Installing cvsd.conf", sub {
