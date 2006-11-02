@@ -60,7 +60,7 @@ sub fatal($);
 use lib "@prefix@/lib";
 use libtestbed;
 
-my $PROJREPODIR = PROJDIR() . "/$REPODIR";
+my $PROJREPODIR = PROJROOT() . "/$REPODIR";
 my $JAILREPODIR = "/var/cvsjail/$REPODIR";
 
 #
