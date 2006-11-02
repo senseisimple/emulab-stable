@@ -60,3 +60,8 @@ $(INSTALL_DIR)/opsdir/sbin/bugdbgateway: bugdbgateway
 	echo "Installing (setuid) $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(SUDO) $(INSTALL) -o nobody -m 4755 $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/bugdbproxy: bugdbproxy
+	echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL_PROGRAM) $< $@
