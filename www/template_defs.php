@@ -1574,16 +1574,23 @@ class TemplateMetadata
     var $metadata;
 
     #
-    # Instances are found by their experiment index. 
+    # 
     #
     function TemplateMetadata($guid, $vers) {
 	$guid = addslashes($guid);
 	$vers = addslashes($vers);
-	
+
+	#
+	# Ug. I think the metadata_type field is going to have to move
+	# into the experiment_template_metadata_items table.
+        #
 	$query_result =
-	    DBQueryFatal("select * from experiment_template_metadata_items ".
-			 "where guid='$guid' and ".
-			 "      vers='$vers'");
+	    DBQueryFatal("select i.*,m.metadata_type ".
+			 "    from experiment_template_metadata_items as i ".
+			 "left join experiment_template_metadata as m on ".
+			 "      m.metadata_guid=i.guid and ".
+			 "      m.metadata_vers=i.vers ".
+			 "where i.guid='$guid' and i.vers='$vers'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    $this->template = NULL;
