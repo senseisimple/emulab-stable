@@ -3172,6 +3172,10 @@ sub InitializeEnvVariables($;$)
     return -1
 	if (! defined($experiment));
 
+    # Reinit ...
+    $experiment->InitializeEnvVariables()
+	== 0 or return -1;
+
     #
     # Ick, Ick, Ick. I want these to be at the beginning of the enviroment
     # strings so they are set in case the user has used any OPT variables
