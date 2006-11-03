@@ -854,6 +854,34 @@ class Template
     }
 
     #
+    # Return an array of the formal parameters for a template.
+    #
+    function FormalParameterMouseOvers(&$mouseovers) {
+	$mouseovers = array();
+	$guid = $this->guid();
+	$vers = $this->vers();
+	
+	$query_result =
+	    DBQueryFatal("select p.name,m.value as description ".
+			 "   from experiment_template_parameters as p ".
+			 "left join experiment_template_metadata_items as m ".
+			 "  on m.guid=p.metadata_guid and ".
+			 "     m.vers=p.metadata_vers ".
+			 "where p.parent_guid='$guid' and ".
+			 "      p.parent_vers='$vers'");
+    
+	while ($row = mysql_fetch_array($query_result)) {
+	    $name	 = $row['name'];
+	    $description = $row['description'];
+
+	    if (isset($description) && $description != "") {
+		$mouseovers[$name] = MakeMouseOver($description);
+	    }
+	}
+	return 0;
+    }
+
+    #
     # Find next candidate for a template (modify) TID
     #
     function NextTID() {

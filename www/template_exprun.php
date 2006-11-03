@@ -231,6 +231,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
     # initial setting for the parameters.
     #
     $template->FormalParameters($formal_parameters);
+    $template->FormalParameterMouseOvers($mouseovers);
     $instance->Bindings($instance_parameters);
     $instance->RunBindings($instance->LastRunIdx(), $lastrun_parameters);
 
@@ -362,9 +363,10 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 	while (list ($name, $value) = each ($parameters)) {
 	    if (!isset($value))
 		$value = "&nbsp";
+	    $mouseover = (isset($mouseovers[$name]) ? $mouseovers[$name] : "");
 
 	    echo "<tr>
-                    <td class='pad4'>$name</td>
+                    <td class='pad4' $mouseover>$name</td>
                     <td class='pad4' class=left>
                         <input type=text
                                id='parameter_$name'

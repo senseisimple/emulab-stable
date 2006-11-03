@@ -196,6 +196,12 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     }
     
     if (count($parameters)) {
+	#
+	# Lets get an array of mouseovers to use in the form.
+	#
+	unset($mouseovers);
+	$template->FormalParameterMouseOvers($mouseovers);
+	
         #
 	# Table of inputs.
 	#
@@ -207,9 +213,10 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	while (list ($name, $value) = each ($parameters)) {
 	    if (!isset($value))
 		$value = "&nbsp";
+	    $mouseover = (isset($mouseovers[$name]) ? $mouseovers[$name] : "");
 
 	    echo "<tr>
-                    <td class='pad4'>$name</td>
+                    <td class='pad4' $mouseover>$name</td>
                     <td class='pad4' class=left>
                         <input type=text
                                name=\"parameters[$name]\"
