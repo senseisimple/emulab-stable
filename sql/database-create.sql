@@ -284,7 +284,7 @@ CREATE TABLE delays (
 
 CREATE TABLE deleted_users (
   uid varchar(8) NOT NULL default '',
-  uid_idx smallint(5) unsigned NOT NULL default '0',
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   usr_created datetime default NULL,
   usr_deleted datetime default NULL,
   usr_name tinytext,
@@ -996,12 +996,16 @@ CREATE TABLE group_membership (
   uid varchar(8) NOT NULL default '',
   gid varchar(16) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
+  pid_idx mediumint(8) unsigned NOT NULL default '0',
+  gid_idx mediumint(8) unsigned NOT NULL default '0',
   trust enum('none','user','local_root','group_root','project_root') default NULL,
   date_applied date default NULL,
   date_approved datetime default NULL,
-  PRIMARY KEY  (uid,gid,pid),
+  PRIMARY KEY  (uid_idx,gid_idx),
   KEY pid (pid),
-  KEY gid (gid)
+  KEY gid (gid),
+  UNIQUE KEY uid (uid,pid,gid)
 ) TYPE=MyISAM;
 
 --
@@ -1024,6 +1028,7 @@ CREATE TABLE group_policies (
 CREATE TABLE group_stats (
   pid varchar(12) NOT NULL default '',
   gid varchar(12) NOT NULL default '',
+  gid_idx mediumint(8) unsigned NOT NULL default '0',
   exptstart_count int(11) unsigned default '0',
   exptstart_last datetime default NULL,
   exptpreload_count int(11) unsigned default '0',
@@ -1040,7 +1045,8 @@ CREATE TABLE group_stats (
   allexpt_vnode_duration int(11) unsigned default '0',
   allexpt_pnodes int(11) unsigned default '0',
   allexpt_pnode_duration int(11) unsigned default '0',
-  PRIMARY KEY  (pid,gid)
+  PRIMARY KEY  (gid_idx),
+  UNIQUE KEY pidgid (pid,gid)
 ) TYPE=MyISAM;
 
 --
@@ -1050,6 +1056,8 @@ CREATE TABLE group_stats (
 CREATE TABLE groups (
   pid varchar(12) NOT NULL default '',
   gid varchar(12) NOT NULL default '',
+  pid_idx mediumint(8) unsigned NOT NULL default '0',
+  gid_idx mediumint(8) unsigned NOT NULL default '0',
   leader varchar(8) NOT NULL default '',
   created datetime default NULL,
   description tinytext,
@@ -1059,10 +1067,12 @@ CREATE TABLE groups (
   expt_last date default NULL,
   wikiname tinytext,
   mailman_password tinytext,
-  PRIMARY KEY  (pid,gid),
+  PRIMARY KEY  (gid_idx),
   KEY unix_gid (unix_gid),
   KEY gid (gid),
-  KEY pid (pid)
+  KEY pid (pid),
+  KEY pididx (pid_idx,gid_idx),
+  UNIQUE KEY pidgid (pid,gid)
 ) TYPE=MyISAM;
 
 --
@@ -2079,6 +2089,7 @@ CREATE TABLE proj_memb (
 
 CREATE TABLE project_stats (
   pid varchar(12) NOT NULL default '',
+  pid_idx mediumint(8) unsigned NOT NULL default '0',
   exptstart_count int(11) unsigned default '0',
   exptstart_last datetime default NULL,
   exptpreload_count int(11) unsigned default '0',
@@ -2095,7 +2106,8 @@ CREATE TABLE project_stats (
   allexpt_vnode_duration int(11) unsigned default '0',
   allexpt_pnodes int(11) unsigned default '0',
   allexpt_pnode_duration int(11) unsigned default '0',
-  PRIMARY KEY  (pid)
+  PRIMARY KEY  (pid_idx),
+  UNIQUE KEY pid (pid)
 ) TYPE=MyISAM;
 
 --
@@ -2104,6 +2116,7 @@ CREATE TABLE project_stats (
 
 CREATE TABLE projects (
   pid varchar(12) NOT NULL default '',
+  pid_idx mediumint(8) unsigned NOT NULL default '0',
   created datetime default NULL,
   expires date default NULL,
   name tinytext,
@@ -2130,11 +2143,12 @@ CREATE TABLE projects (
   default_user_interface enum('emulab','plab') NOT NULL default 'emulab',
   linked_to_us tinyint(4) NOT NULL default '0',
   cvsrepo_public tinyint(1) NOT NULL default '0',
-  PRIMARY KEY  (pid),
+  PRIMARY KEY  (pid_idx),
   KEY unix_gid (unix_gid),
   KEY approved (approved),
   KEY approved_2 (approved),
-  KEY pcremote_ok (pcremote_ok)
+  KEY pcremote_ok (pcremote_ok),
+  UNIQUE KEY pid (pid)
 ) TYPE=MyISAM;
 
 --
@@ -2547,7 +2561,7 @@ CREATE TABLE user_sslcerts (
 
 CREATE TABLE user_stats (
   uid varchar(8) NOT NULL default '',
-  uid_idx smallint(5) unsigned NOT NULL default '0',
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   weblogin_count int(11) unsigned default '0',
   weblogin_last datetime default NULL,
   exptstart_count int(11) unsigned default '0',
@@ -2575,6 +2589,7 @@ CREATE TABLE user_stats (
 
 CREATE TABLE users (
   uid varchar(8) NOT NULL default '',
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   usr_created datetime default NULL,
   usr_expires datetime default NULL,
   usr_modified datetime default NULL,
@@ -2619,9 +2634,10 @@ CREATE TABLE users (
   wikiname tinytext,
   wikionly tinyint(1) default '0',
   mailman_password tinytext,
-  PRIMARY KEY  (uid),
+  PRIMARY KEY  (uid_idx),
   KEY unix_uid (unix_uid),
-  KEY status (status)
+  KEY status (status),
+  UNIQUE KEY uid (uid)
 ) TYPE=MyISAM;
 
 --

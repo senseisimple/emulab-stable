@@ -821,57 +821,32 @@ if (! $returning) {
 	ADDPUBKEY($joining_uid, "webaddpubkey $addpubkeyargs");
     }
 
-    # Initial mailman_password.
-    $mailman_password = substr(GENHASH(), 0, 10);
+    $args = array();
+    $args["usr_expires"]   = $usr_expires;
+    $args["usr_name"]	   = $usr_name;
+    $args["usr_email"]     = $usr_email;
+    $args["usr_addr"]      = $usr_addr;
+    $args["usr_addr2"]     = $usr_addr2;
+    $args["usr_city"]      = $usr_city;
+    $args["usr_state"]     = $usr_state;
+    $args["usr_zip"]       = $usr_zip;
+    $args["usr_country"]   = $usr_country;
+    $args["usr_URL"]       = $usr_URL;
+    $args["usr_phone"]     = $usr_phone;
+    $args["usr_shell"]     = 'tcsh';
+    $args["usr_title"]     = $usr_title;
+    $args["usr_affil"]     = $usr_affil;
+    $args["usr_pswd"]      = $encoding;
+    $args["wikiname"]      = $wikiname;
 
-    # Unique Unix UID.
-    $unix_uid = TBGetUniqueIndex('next_uid');
-
-    DBQueryFatal("INSERT INTO users ".
-	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	" usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
-	" usr_URL,usr_phone,usr_shell,usr_title,usr_affil,usr_pswd,unix_uid,".
-	" status,pswd_expires,usr_modified,wikionly,wikiname,".
-	" mailman_password) ".
-	"VALUES ('$joining_uid', now(), '$usr_expires', '$usr_name', ".
-        "'$usr_email', ".
-	"'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
-	"'$usr_country', ".
-	"'$usr_URL', '$usr_phone', 'tcsh', '$usr_title', '$usr_affil', ".
-        "'$encoding', $unix_uid, 'newuser', ".
-	"date_add(now(), interval 1 year), now(), $forwikionly, '$wikiname', ".
-	"'$mailman_password')");
-
-    DBQueryFatal("INSERT INTO user_stats (uid, uid_idx) ".
-		 "VALUES ('$joining_uid', $unix_uid)");
-
-    $key = TBGenVerificationKey($joining_uid);
-
-    TBMAIL("$usr_name '$joining_uid' <$usr_email>",
-      "Your New User Key",
-      "\n".
-      "Dear $usr_name ($joining_uid):\n\n".
-      "This is your account verification key: $key\n\n".
-      "Please use this link to verify your user account:\n".
-      "\n".
-      "    ${TBBASE}/login.php3?vuid=$joining_uid&key=$key\n".
-      "\n".
-      ($forwikionly ?
-       "Once you have verified your account, you will be able to access\n".
-       "the Wiki. You MUST verify your account first!"
-       :       
-       "Once you have verified your account, the project leader will be\n".
-       "able to approve you. You MUST verify your account before the project".
-       "\n".
-       "leader can approve you. After project approval, you will be\n".
-       "marked as an active user, and will be granted full access to your\n".
-       "user account.") .
-      "\n\n".
-      "Thanks,\n".
-      "Testbed Operations\n",
-      "From: $TBMAIL_APPROVAL\n".
-      "Bcc: $TBMAIL_AUDIT\n".
-      "Errors-To: $TBMAIL_WWW");
+    if (! ($user = User::NewUser($joining_uid, 0, $forwikionly, $args))) {
+	TBERROR("Could not create new user '$joining_uid'!", 1);
+    }
+}
+else {
+    if (! ($user = User::LookupByUid($joining_uid))) {
+	TBERROR("Could not lookup user '$joining_uid'!", 1);
+    }
 }
 
 #
@@ -883,40 +858,40 @@ if ($forwikionly) {
 }
 
 #
+# Need the project and group objects for the rest of this.
+#
+if (! ($project = Project::LookupByPid($pid))) {
+    TBERROR("Could not lookup object for $pid!", 1);
+}
+if (! ($group = Group::LookupByPidGid($pid, $gid))) {
+    TBERROR("Could not lookup object for $pid/$gid!", 1);
+}
+
+#
+# If joining a subgroup, also add to project group.
+#
+if ($pid != $gid && ! $project->IsMember($user)) {
+    if ($project->AddNewMember($user) < 0) {
+	TBERROR("Could not add user $joining_uid to project group $pid", 1);
+    }
+}
+
+#
 # Add to the group, but with trust=none. The project/group leader will have
 # to upgrade the trust level, making the new user real.
 #
-$query_result =
-    DBQueryFatal("insert into group_membership ".
-		 "(uid,gid,pid,trust,date_applied) ".
-		 "values ('$joining_uid','$gid','$pid','none', now())");
-
-#
-# This could be a new user or an old user trying to join a specific group
-# in a project. If the user is new to the project too, then must insert
-# a group_membership in the default group for the project. 
-#
-if (! TBGroupMember($joining_uid, $pid, $pid, $approved)) {
-    DBQueryFatal("insert into group_membership ".
-		 "(uid,gid,pid,trust,date_applied) ".
-		 "values ('$joining_uid','$pid','$pid','none', now())");
+if ($group->AddNewMember($user) < 0) {
+    TBERROR("Could not add user $joining_uid to group $pid/$gid", 1);
 }
 
 #
 # Generate an email message to the proj/group leaders.
 #
-$query_result =
-    DBQueryFatal("select usr_name,usr_email,leader from users as u ".
-		 "left join groups as g on u.uid=g.leader ".
-		 "where g.pid='$pid' and g.gid='$gid'");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("DB Error getting email address for group leader $leader!", 1);
-}
-$leader_name = $row[0];
-$leader_email = $row[1];
-$leader_uid = $row[2];
-
-$allleaders = TBLeaderMailList($pid,$gid);
+$leader       = $project->Leader();
+$leader_name  = $leader->name();
+$leader_email = $leader->email();
+$leader_uid   = $leader->uid();
+$allleaders   = TBLeaderMailList($pid,$gid);
 
 #
 # The mail message to the leader. We send this for returning users

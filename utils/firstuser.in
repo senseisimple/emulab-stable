@@ -24,6 +24,7 @@ my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
 my $mkgroup = '@prefix@/sbin/mkgroup';
 my $mkacct  = '@prefix@/sbin/tbacct';
+my $modgrps = '@prefix@/sbin/modgroups';
 
 my $protouser       = 'elabman';
 my $protouser_name  = 'Emulab Manager';
@@ -175,47 +176,57 @@ DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
 	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
 	"usr_modified=now(), admin=1, webonly=$webonly, status='active', ".
 	"usr_shell='$protouser_shell', usr_email='$protouser_email', ".
-	"mailman_password='$mailman_password'");
+	"mailman_password='$mailman_password',uid_idx=$uid");
+DBQueryFatal("insert into user_stats set uid='$protouser',uid_idx=$uid");
 
 if (!defined($opts{u})) {
     
     print "Creating project in database...\n";
     DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
 		 "name='$protoproj_desc', head_uid='$protouser', ".
-		 "unix_gid=$gid,approved=1");
+		 "unix_gid=$gid,approved=1,pid_idx=$gid");
+    DBQueryFatal("insert into project_stats set ".
+		 "pid='$protoproj',pid_idx=$gid");
 
     print "Creating group in database...\n";
     DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', ".
 		 "leader='$protouser', created=now(), ".
 		 "description='Default Group', " .
-		 "unix_gid=$ggid, unix_name='$protoproj'");
-}
+		 "unix_gid=$ggid, gid_idx=$ggid, unix_name='$protoproj'");
+    DBQueryFatal("insert into group_stats set ".
+		 "pid='$protoproj',gid='$protoproj',gid_idx=$gid");
 
-print "Putting user in group...\n";
-DBQueryFatal("insert into group_membership set uid='$protouser', " .
-	"pid='$protoproj', gid='$protoproj',  trust='$trust'," .
-	"date_applied=now(), date_approved=now()");
+    DBQueryFatal("replace into emulab_indicies set name='next_gid',idx=10000");
+}
 
 # Flip UID to the new user so that the mk* scripts are happy - they can't
 # be run as root for accountability reasons
 $EUID = $UID = $uid;
 $EGID = $GID = $gid;
 
-if (!defined($opts{u})) {
+if (defined($opts{u})) {
+    #
+    # Creating specific user; it is implied that the user will go into
+    # the proto project, which must already exist of course.
+    #
+    print "Running mkacct...\n";
+    if (system "$wap $mkacct -b add $protouser") {
+	die "Unable to create account for initial user $protouser\n";
+    }
+
+    print "Running modgroups...\n";
+    if (system "$wap $modgrps -a $protoproj:$protoproj:$trust $protouser") {
+	die "Unable to add initial user $protouser to project $protoproj\n";
+    }
+}
+else {
+    #
+    # Creating the initial project. This handles everything.
+    #
     print "Running mkproj...\n";
     if (system "$wap $mkproj $protoproj") {
 	die "Unable to create initial project $protoproj\n";
     }
-
-    print "Running mkgrp...\n";
-    if (system "$wap $mkgroup $protoproj $protoproj") {
-	die "Unable to create group for initial project $protoproj\n";
-    }
-}
-
-print "Running mkacct...\n";
-if (system "$wap $mkacct -b add $protouser") {
-    die "Unable to create account for initial user $protouser\n";
 }
 
 if (defined($opts{u})) {

@@ -17,7 +17,6 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use libtblog;
 use English;
 use Data::Dumper;
 use File::Basename;
@@ -27,3 +26,202 @@ use overload ('""' => 'Stringify');
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $CONTROL	= "@USERNODE@";
+
+# Cache of instances to avoid regenerating them.
+my %users      = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $uid_idx) = @_;
+
+    # Look in cache first
+    return $users{"$uid_idx"}
+        if (exists($users{"$uid_idx"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from users where uid_idx=$uid_idx");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'USER'}  = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $users{"$uid_idx"} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub uid_idx($)		{ return field($_[0], "uid_idx"); }
+sub uid($)		{ return field($_[0], "uid"); }
+sub created($)		{ return field($_[0], "usr_created"); }
+sub expires($)		{ return field($_[0], "usr_expires"); }
+sub modified($)		{ return field($_[0], "usr_modified"); }
+sub name($)		{ return field($_[0], "usr_name"); }
+sub title($)		{ return field($_[0], "usr_title"); }
+sub affil($)		{ return field($_[0], "usr_affil"); }
+sub email($)		{ return field($_[0], "usr_email"); }
+sub URL($)		{ return field($_[0], "usr_URL"); }
+sub addr($)		{ return field($_[0], "usr_addr"); }
+sub addr2($)		{ return field($_[0], "usr_addr2"); }
+sub city($)		{ return field($_[0], "usr_city"); }
+sub state($)		{ return field($_[0], "usr_state"); }
+sub zip($)		{ return field($_[0], "usr_zip"); }
+sub country($)		{ return field($_[0], "usr_country"); }
+sub phone($)		{ return field($_[0], "usr_phone"); }
+sub shell($)		{ return field($_[0], "usr_shell"); }
+sub pswd($)		{ return field($_[0], "usr_pswd"); }
+sub w_pswd($)		{ return field($_[0], "usr_w_pswd"); }
+sub unix_uid($)		{ return field($_[0], "unix_uid"); }
+sub status($)		{ return field($_[0], "status"); }
+sub admin($)		{ return field($_[0], "admin"); }
+sub foreign_admin($)	{ return field($_[0], "foreign_admin"); }
+sub dbedit($)		{ return field($_[0], "dbedit"); }
+sub stud($)		{ return field($_[0], "stud"); }
+sub webonly($)		{ return field($_[0], "webonly"); }
+sub pswd_expires($)	{ return field($_[0], "pswd_expires"); }
+sub cvsweb($)		{ return field($_[0], "cvsweb"); }
+sub emulab_pubkey($)	{ return field($_[0], "emulab_pubkey"); }
+sub home_pubkey($)	{ return field($_[0], "home_pubkey"); }
+sub adminoff($)		{ return field($_[0], "adminoff"); }
+sub verify_key($)	{ return field($_[0], "verify_key"); }
+sub widearearoot($)	{ return field($_[0], "widearearoot"); }
+sub wideareajailroot($) { return field($_[0], "wideareajailroot"); }
+sub notes($)		{ return field($_[0], "notes"); }
+sub weblogin_frozen($)  { return field($_[0], "weblogin_frozen"); }
+sub weblogin_failcount($){return field($_[0], "weblogin_failcount");}
+sub weblogin_failstamp($){return field($_[0], "weblogin_failstamp");}
+sub plab_user($)	{ return field($_[0], "plab_user"); }
+sub user_interface($)	{ return field($_[0], "user_interface"); }
+sub chpasswd_key($)	{ return field($_[0], "chpasswd_key"); }
+sub chpasswd_expires($) { return field($_[0], "chpasswd_expires"); }
+sub wikiname($)		{ return field($_[0], "wikiname"); }
+sub wikionly($)		{ return field($_[0], "wikionly"); }
+sub mailman_password($) { return field($_[0], "mailman_password"); }
+
+#
+# Lookup user given a plain uid. For backwards compat.
+#
+sub LookupByUid($$)
+{
+    my ($class, $uid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select uid_idx from users where uid='$uid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given the unix uid ($UID typically).
+#
+sub LookupByUnixId($$)
+{
+    my ($class, $unix_uid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid,uid_idx from users ".
+		     "where unix_uid='$unix_uid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid, $uid_idx) = $query_result->fetchrow_array();
+
+    # Sanity check against password file before returning.
+    my ($pwname) = getpwuid($unix_uid) or
+	die("*** $unix_uid is not in the password file!");
+
+    if ($uid ne $pwname) {
+	warn("*** WARNING: LookupByUnixId: $pwname does not match $uid\n");
+	return undef
+    }
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+    
+    my $query_result =
+	DBQueryWarn("select * from users where uid_idx=$uid_idx");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'USER'} = $query_result->fetchrow_hashref();
+
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uid     = $self->uid();
+    my $uid_idx = $self->uid_idx();
+
+    return "[User: $uid, IDX: $uid_idx]";
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query = "update users set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where uid_idx='$uid_idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

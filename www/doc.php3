@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -65,8 +65,6 @@ echo "<li><b><a href=\"$TBBASE/kb-search.php3\">\n
 <li><b><a href="tutorial/docwrapper.php3?docname=nscommands.html">
               Emulab-specific NS Extensions Reference Manual</a></b>
 <li><b><a href = "xmlrpcapi.php3">Emulab's XML-RPC interface reference</a></b>
-<li><b><a href="doc/docwrapper.php3?docname=tmcd.html">
-              Testbed Master Control Daemon (TMCD) Reference Manual</a></b>
 <li><b><a href = "docwrapper.php3?docname=swapping.html">
           Node Usage Policies and "Swapping" Experiments</a></b>
 <li><b><a href = "doc/docwrapper.php3?docname=netbuilddoc.html">

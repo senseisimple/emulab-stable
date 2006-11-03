@@ -30,6 +30,8 @@ $BUGDBCOOKIENAME= "FlysprayCookie";
 $MAILMANURL     = "http://${USERNODE}/mailman";
 $OPSCVSURL      = "http://${USERNODE}/cvsweb/cvsweb.cgi";
 $OPSJETIURL     = "http://${USERNODE}/jabber/jeti.php";
+$MIN_UNIX_UID   = @MIN_UNIX_UID@;
+$MIN_UNIX_GID   = @MIN_UNIX_GID@;
 $EXPOSELINKTEST = 1;
 $EXPOSESTATESAVE= 0;
 $EXPOSEARCHIVE  = 0;
@@ -112,6 +114,9 @@ $RSS_HEADER_NEWS = "<link rel=\"alternate\" type=\"application/rss+xml\" " .
 # Database constants and the like.
 #
 include("dbdefs.php3");
+include("user_defs.php");
+include("group_defs.php");
+include("project_defs.php");
 
 #
 # Control how error messages are returned to the user. If the session is

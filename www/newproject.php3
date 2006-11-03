@@ -1051,82 +1051,55 @@ if (! $returning) {
     if (isset($addpubkeyargs)) {
 	ADDPUBKEY($proj_head_uid, "webaddpubkey $addpubkeyargs");
     }
-    # Initial mailman_password.
-    $mailman_password = substr(GENHASH(), 0, 10);
 
-    # Unique Unix UID.
-    $unix_uid = TBGetUniqueIndex('next_uid');
+    $args = array();
+    $args["usr_expires"]   = $proj_expires;
+    $args["usr_name"]	   = $usr_name;
+    $args["usr_email"]     = $usr_email;
+    $args["usr_addr"]      = $usr_addr;
+    $args["usr_addr2"]     = $usr_addr2;
+    $args["usr_city"]      = $usr_city;
+    $args["usr_state"]     = $usr_state;
+    $args["usr_zip"]       = $usr_zip;
+    $args["usr_country"]   = $usr_country;
+    $args["usr_URL"]       = $usr_URL;
+    $args["usr_phone"]     = $usr_phone;
+    $args["usr_shell"]     = 'tcsh';
+    $args["usr_title"]     = $usr_title;
+    $args["usr_affil"]     = $usr_affil;
+    $args["usr_pswd"]      = $encoding;
+    $args["wikiname"]      = $wikiname;
 
-    DBQueryFatal("INSERT INTO users ".
-	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
-	 " usr_URL,usr_title,usr_affil,usr_phone,usr_shell,usr_pswd,unix_uid,".
-	 " status,pswd_expires,usr_modified,wikiname,mailman_password) ".
-	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
-         "'$usr_email', ".
-	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
-	 "'$usr_country', ".
-	 "'$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', 'tcsh', '$encoding', $unix_uid, 'newuser', ".
-	 "date_add(now(), interval 1 year), now(), '$wikiname', ".
-	 "'$mailman_password')");
-
-    DBQueryFatal("INSERT INTO user_stats (uid, uid_idx) ".
-		 "VALUES ('$proj_head_uid', $unix_uid)");
-
-    if (! $FirstInitState) {
-	$key = TBGenVerificationKey($proj_head_uid);
-
-	TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
-	   "Your New User Key",
-	   "\n".
-	   "Dear $usr_name:\n\n".
-	   "This is your account verification key: $key\n\n".
-	   "Please use this link to verify your user account:\n".
-	   "\n".
-	   "    ${TBBASE}/login.php3?vuid=$proj_head_uid&key=$key\n".
-	   "\n".
-	   "You will then be verified as a user. When you have been both\n".
-	   "verified and approved by Testbed Operations, you will be marked\n".
-	   "as an active user and granted full access to your account.\n".
-	   "\n".
-	   "Thanks,\n".
-	   "Testbed Operations\n",
-	   "From: $TBMAIL_APPROVAL\n".
-	   "Bcc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
+    if (! ($leader = User::NewUser($proj_head_uid, 1, 0, $args))) {
+	TBERROR("Could not create new user '$proj_head_uid'!", 1);
+    }
+}
+else {
+    if (! ($leader = User::LookupByUid($proj_head_uid))) {
+	TBERROR("Could not lookup project leader '$proj_head_uid'!", 1);
     }
 }
 
 #
 # Now for the new Project
-# * Create a new project in the database.
-# * Create a new default group for the project.
-# * Create a new group_membership entry in the database, default trust=none.
-# * Generate a mail message to testbed ops.
 #
-DBQueryFatal("INSERT INTO projects ".
-	     "(pid, created, expires, name, URL, head_uid, ".
-	     " num_members, num_pcs, why, funders, unix_gid, ".
-	     " num_pcplab, num_ron, public, public_whynot, linked_to_us)".
-	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
-	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
-	     "        '$proj_pcs', '$proj_why', ".
-	     "        '$proj_funders', NULL, $plabpcs, $ronpcs, ".
-	     "         $public, '$proj_whynotpublic', $linked)");
+$args = array();
+$args["expires"]       = $proj_expires;
+$args["name"]	       = $proj_name;
+$args["URL"]           = $proj_URL;
+$args["num_members"]   = $proj_members;
+$args["num_pcs"]       = $proj_pcs;
+$args["why"]           = $proj_why;
+$args["funders"]       = $proj_funders;
+$args["num_pcplab"]    = $plabpcs;
+$args["num_ron"]       = $ronpcs;
+$args["public"]        = $public;
+$args["public_whynot"] = $proj_whynotpublic;
+$args["linked_to_us"]  = $linked;
 
-DBQueryFatal("INSERT INTO project_stats (pid) VALUES ('$pid')");
-
-DBQueryFatal("INSERT INTO groups ".
-	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
-	     "VALUES ('$pid', '$pid', '$proj_head_uid', now(), ".
-	     "        'Default Group', NULL, '$pid')");
-
-DBQueryFatal("INSERT INTO group_stats (pid, gid) VALUES ('$pid', '$pid')");
-
-DBQueryFatal("insert into group_membership ".
-	     "(uid, gid, pid, trust, date_applied) ".
-	     "values ('$proj_head_uid','$pid','$pid','none', now())");
+if (! ($project = Project::NewProject($pid, $leader, $args))) {
+	TBERROR("Could not create new project '$pid'!", 1);
+}
 
 #
 # If a new user, do not send the full blown message until verified.
@@ -1205,16 +1178,9 @@ if ($FirstInitState) {
     
     DBQueryFatal("insert into unixgroup_membership set ".
 		 "uid='$proj_head_uid', gid='$TBADMINGROUP'");
+
+    Group::Initialize($proj_head_uid, $pid);
     
-    DBQueryFatal("insert into group_membership ".
-		 "(uid, gid, pid, trust, date_applied) ".
-		 "values ('$proj_head_uid','$TBOPSPID','$TBOPSPID', ".
-		 "'" . TBDB_TRUSTSTRING_GROUPROOT . "', now())");
-
-    DBQueryFatal("update group_membership set ".
-		 "  trust='" . TBDB_TRUSTSTRING_PROJROOT . "' ".
-		 "where uid='$proj_head_uid' and pid='$pid'");
-
     #
     # Move to next phase. 
     # 

@@ -3771,3 +3771,60 @@ last_net_act,last_cpu_act,last_ext_act);
 	  add column need_more_info tinyint(1) null after inferred,
 	  add column tblog_revision varchar(8) not null after mesg;
 
+4.100: Add uid_idx column to users table, to become the new unique id
+       for all users.
+       Add pid_idx column to projects table, to become the new unique id
+       for all projects.
+       Add gid_idx column to groups table, to become the new unique id
+       for all groups.
+
+       Order matters ...
+
+       alter table users add 
+           uid_idx mediumint(8) unsigned NOT NULL default '0' after uid;
+       alter table users drop primary key;
+       alter table users add UNIQUE KEY uid (uid);
+       
+       alter table user_stats change uid_idx 
+           uid_idx mediumint(8) unsigned NOT NULL default '0';
+
+       alter table deleted_users change uid_idx 
+           uid_idx mediumint(8) unsigned NOT NULL default '0';
+
+       alter table projects add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after pid;
+       alter table projects drop primary key;
+       alter table projects add UNIQUE KEY pid (pid);
+
+       alter table project_stats add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after pid;
+       alter table project_stats drop primary key;
+       alter table project_stats add UNIQUE KEY pid (pid);
+	   
+       alter table groups add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after gid;
+       alter table groups add 
+           gid_idx mediumint(8) unsigned NOT NULL default '0' after pid_idx;
+       alter table groups drop primary key;
+       alter table groups add KEY pididx (pid_idx,gid_idx);
+       alter table groups add UNIQUE KEY pidgid (pid,gid);
+
+       alter table group_stats add 
+           gid_idx mediumint(8) unsigned NOT NULL default '0' after gid;
+       alter table group_stats drop primary key;
+       alter table group_stats add UNIQUE KEY pidgid (pid,gid);
+
+       alter table group_membership add 
+           uid_idx mediumint(8) unsigned NOT NULL default '0' after pid;
+       alter table group_membership add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after uid_idx;
+       alter table group_membership add 
+           gid_idx mediumint(8) unsigned NOT NULL default '0' after pid_idx;
+       alter table group_membership drop primary key;
+       alter table group_membership add UNIQUE KEY uid (uid,pid,gid);
+       
+       # Now run this script to populate the indexes and create new KEYS.
+
+         ./init_newids.pl
+
+4.101:

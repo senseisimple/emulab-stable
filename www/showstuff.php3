@@ -31,6 +31,7 @@ function SHOWPROJECT($pid, $thisuid) {
           </center>
           <table align=center cellpadding=2 border=1>\n";
     
+    $proj_idx    	= $row["pid_idx"];
     $proj_created	= $row[created];
     #$proj_expires	= $row[expires];
     $proj_name		= $row[name];
@@ -90,7 +91,7 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "<tr>
               <td>Name: </td>
               <td class=\"left\">
-                <a href='showproject.php3?pid=$pid'>$pid</a></td>
+                <a href='showproject.php3?pid=$pid'>$pid ($proj_idx)</a></td>
           </tr>\n";
     
     echo "<tr>
@@ -263,6 +264,7 @@ function SHOWGROUP($pid, $gid, $thisuid) {
           </center>
           <table align=center border=1>\n";
 
+    $gid_idx    = $row["gid_idx"];
     $leader	= $row[leader];
     $created	= $row[created];
     $description= $row[description];
@@ -286,7 +288,8 @@ function SHOWGROUP($pid, $gid, $thisuid) {
     echo "<tr>
               <td>GID: </td>
               <td class=\"left\">
-                <a href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
+                <a href='showgroup.php3?pid=$pid&gid=$gid'>$gid ($gid_idx)".
+	         "</a></td>
           </tr>\n";
     
     echo "<tr>
@@ -478,6 +481,7 @@ function SHOWUSER($uid) {
 
     $row	= mysql_fetch_array($userinfo_result);
     #$usr_expires = $row[usr_expires];
+    $uid_idx     = $row["uid_idx"];
     $usr_email   = $row[usr_email];
     $usr_URL     = $row[usr_URL];
     $usr_addr    = $row[usr_addr];
@@ -538,7 +542,7 @@ function SHOWUSER($uid) {
     
     echo "<tr>
               <td>Username:</td>
-              <td>$uid</td>
+              <td>$uid ($uid_idx)</td>
           </tr>\n";
     
     echo "<tr>
@@ -3019,35 +3023,6 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
     if (! $embedded) {
         echo "</table>\n";
     }
-}
-
-#
-# Stats
-#
-function SHOWUSERSTATS($uid) {
-
-    $query_result =
-	DBQueryFatal("select s.* from users as u ".
-		     "left join user_stats as s on s.uid_idx=u.unix_uid ".
-		     "where u.uid='$uid'");
-
-    if (! mysql_num_rows($query_result)) {
-	return;
-    }
-    $row = mysql_fetch_assoc($query_result);
-
-    #
-    # Not pretty printed yet.
-    #
-    echo "<table align=center border=1>\n";
-    
-    foreach($row as $key => $value) {
-	echo "<tr>
-                  <td>$key:</td>
-                  <td>$value</td>
-              </tr>\n";
-    }
-    echo "</table>\n";
 }
 
 function SHOWPROJSTATS($pid) {

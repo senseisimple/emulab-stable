@@ -313,7 +313,7 @@ DBQueryFatal("replace into deleted_users ".
 	     "  usr_title, usr_affil, usr_email, usr_URL, ".
 	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
 	     "  usr_country, usr_phone, webonly, wikionly, notes) ".
-	     " select '$user', now(), unix_uid, usr_created, usr_name, ".
+	     " select '$user', now(), uid_idx, usr_created, usr_name, ".
 	     "  usr_title, usr_affil, usr_email, usr_URL, ".
 	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
 	     "  usr_country, usr_phone, webonly, wikionly, notes ".

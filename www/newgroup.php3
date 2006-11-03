@@ -115,23 +115,25 @@ if ($count == $maxtries) {
     TBERROR("Could not form a unique Unix group name!", 1);
 }
 
+# Need the user object for creating the group.
+if (! ($leader = User::LookupByUid($group_leader))) {
+    TBERROR("Could not lookup user '$group_leader'!", 1);
+}
+# and the project.
+if (! ($project = Project::LookupByPid($group_pid))) {
+    TBERROR("Could not lookup project '$group_pid'!", 1);
+}
+
 #
-# Create the new group and set up the initial membership for the leader
-# (and the project leader if not the same).
-# 
-DBQueryFatal("INSERT INTO groups ".
-	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
-	     "VALUES ('$group_pid', '$group_id', '$group_leader', now(), ".
-	     "        '$group_description', NULL, '$unix_gname')");
-
-DBQueryFatal("INSERT INTO group_stats ".
-	     "(pid, gid) ".
-	     "VALUES ('$group_pid', '$group_id')");
-
+# Create the new group and set up the initial membership for the leader.
 #
 # Note, if the project leader wants to be in the subgroup, he/she has to
 # add themself via the edit page. 
 #
+if (! ($newgroup = Group::NewGroup($project, $group_id, $leader,
+				   $group_description, $unix_gname))) {
+    TBERROR("Could not create new group $group_pid/$group_id!", 1);
+}
 
 #
 # Grab the unix GID for running scripts.

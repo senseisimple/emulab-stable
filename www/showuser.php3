@@ -255,7 +255,13 @@ if ($isadmin) {
           <h3>User Stats</h3>
          </center>\n";
 
-    SHOWUSERSTATS($target_uid);
+    #
+    # XXX: need to redo this entire script ...
+    #
+    if (! ($user = User::LookupByUid($target_uid))) {
+	TBERROR("Could not lookup user '$target_uid'!", 1);
+    }
+    echo $user->ShowStats();
 }
 
 #

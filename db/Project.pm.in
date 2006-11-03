@@ -17,7 +17,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use libtblog;
+use Group;
 use English;
 use Data::Dumper;
 use File::Basename;
@@ -27,3 +27,197 @@ use overload ('""' => 'Stringify');
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $CONTROL	= "@USERNODE@";
+
+# Cache of instances to avoid regenerating them.
+my %projects   = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $pid_idx) = @_;
+
+    # Look in cache first
+    return $projects{"$pid_idx"}
+        if (exists($projects{"$pid_idx"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from projects where pid_idx=$pid_idx");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self           = {};
+    $self->{'PROJECT'} = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $projects{"$pid_idx"} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'PROJECT'}->{$_[1]}); }
+sub pid($)	        { return field($_[0], "pid"); }
+sub gid($)	        { return field($_[0], "gid"); }
+sub pid_idx($)          { return field($_[0], "pid_idx"); }
+sub gid_idx($)          { return field($_[0], "gid_idx"); }
+sub leader($)           { return field($_[0], "leader"); }
+sub created($)          { return field($_[0], "created"); }
+sub description($)      { return field($_[0], "description"); }
+sub unix_gid($)         { return field($_[0], "unix_gid"); }
+sub unix_name($)        { return field($_[0], "unix_name"); }
+sub expt_count($)       { return field($_[0], "expt_count"); }
+sub expt_last($)        { return field($_[0], "expt_last"); }
+sub wikiname($)         { return field($_[0], "wikiname"); }
+sub mailman_password($) { return field($_[0], "mailman_password"); }
+
+#
+# Lookup given pid For backwards compat.
+#
+sub LookupByPid($$)
+{
+    my ($class, $pid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select pid_idx from projects where pid='$pid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($pid_idx) = $query_result->fetchrow_array();
+
+    return Project->Lookup($pid_idx);
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $pid_idx = $self->pid_idx();
+    
+    my $query_result =
+	DBQueryWarn("select * from projects where pid_idx=$pid_idx");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'PROJECT'} = $query_result->fetchrow_hashref();
+
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid     = $self->pid();
+    my $pid_idx = $self->pid_idx();
+
+    return "[Project: $pid, IDX: $pid_idx]";
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid_idx = $self->pid_idx();
+
+    my $query = "update projects set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where pid_idx='$pid_idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Delete a user from the project (and all subgroups of course). No checks
+# are made; that should be done higher up. Optionally return list of groups
+# from which the user was deleted.
+#
+sub DeleteUser($$;$)
+{
+    my ($self, $user, $plist) = @_;
+    my @grouplist = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    my $uid_idx = $user->uid_idx();
+    my $pid_idx = $self->pid_idx();
+    my $gid_idx = $pid_idx;
+
+    # Need a list of all groups for the user in this project.
+    # Should probably use a "class" method in the Groups module.
+    my $query_result =
+	DBQueryWarn("select gid_idx from group_membership ".
+		    "where pid_idx=$pid_idx and uid_idx=$uid_idx");
+    return -1
+	if (! $query_result);
+    return 0
+	if (! $query_result->numrows);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	# Do main group last.
+	next
+	    if ($idx == $gid_idx);
+
+	my $group = Group->Lookup($idx);
+	return -1
+	    if (!defined($group));
+
+	return -1
+	    if ($group->DeleteMemberShip($user) < 0);
+
+	push(@grouplist, $group);
+    }
+
+    my $group = Group->Lookup($gid_idx);
+    return -1
+	if (!defined($group));
+
+    return -1
+	if ($group->DeleteMemberShip($user) < 0);
+
+    if (defined($plist)) {
+	@$plist = (@grouplist, $group);
+    }
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

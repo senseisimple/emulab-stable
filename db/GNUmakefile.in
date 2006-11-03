@@ -20,7 +20,7 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
 		  dumperrorlog
 LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
-		  NodeType.pm Interface.pm
+		  NodeType.pm Interface.pm User.pm Group.pm Project.pm
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy dumperrorlog.proxy

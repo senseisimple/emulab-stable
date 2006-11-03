@@ -239,6 +239,9 @@ use libtblog_simple;
 use English;
 use File::Basename;
 use POSIX qw(strftime);
+require User;
+require Project;
+require Group;
 require Node;
 require NodeType;
 require Mysql;
@@ -5001,6 +5004,12 @@ sub GatherSwapStats($$$$$;$)
     $lastswapuid = $uid
 	if (!defined($lastswapuid) || $lastswapuid eq "");
 
+    # Need these for user_stats below. Eventually do major rewrite!
+    my $thisuser     = User->LookupByUid($uid);
+    my $lastuser     = User->LookupByUid($lastswapuid);
+    my $this_uid_idx = $thisuser->uid_idx();
+    my $last_uid_idx = $thisuser->uid_idx();
+
     #
     # A non-zero ecode indicates error. If op is a preload/swapin/start/modify
     # then we do not want to gather anymore stats beyond the error code
@@ -5198,10 +5207,10 @@ sub GatherSwapStats($$$$$;$)
 		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
 		    "    allexpt_pnode_duration=".
 		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
-		    "where uid=".
+		    "where uid_idx=".
 		    ((($mode eq TBDB_STATS_SWAPOUT) ||
 		      ($mode eq TBDB_STATS_SWAPMODIFY)) ?
-		     "'$lastswapuid'" : "'$uid'"));
+		     "'$last_uid_idx'" : "'$this_uid_idx'"));
 
 	#
 	# Project/group aggregate is a little more convenient to work with
@@ -5297,7 +5306,7 @@ sub GatherSwapStats($$$$$;$)
 
     # We do these here since even failed operations implies activity
     DBQueryWarn("update user_stats set last_activity=now() ".
-		"where uid='$uid'");
+		"where uid_idx='$this_uid_idx'");
     DBQueryWarn("update project_stats set last_activity=now() ".
 		"where pid='$pid'");
     DBQueryWarn("update group_stats set last_activity=now() ".
