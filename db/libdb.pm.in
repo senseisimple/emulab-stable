@@ -5651,8 +5651,17 @@ END {
     #   (in cleanup) Can't call method "FETCH" on an undefined value at 
     #   /usr/local/lib/perl5/site_perl/5.8.8/mach/Mysql.pm line 91 during 
     #   global destruction.
-    # Which is probably due to some object being destroyed too some somewhere
-    # in the DBI/DBD modules.
+    # where line 91 is:
+    #  	my $oldvalue = $self->{'dbh'}->{'InactiveDestroy'};
+    # which is in setInactiveDestroy() which get called in libdb.pm in:
+    #   if ($self->db_pid() != $$) {
+    #       $self->setInactiveDestroy(1);
+    #   }
+    # which is in TestbedDBHandle::DESTROY (still in libdb.pm even
+    # though it is a diffrent package)
+    #
+    # This error is probably due to some object being destroyed too
+    # soon somewhere in the DBI/DBD modules.
     TBDBDisconnect();
 }
 
