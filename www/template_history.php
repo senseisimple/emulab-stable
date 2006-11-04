@@ -58,12 +58,8 @@ if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
 	      "$guid/$version!", 1);
 }
 
-echo "<font size=+2>Experiment Template <b>" .
-        MakeLink("template",
-		 "guid=$guid&version=$version", "$guid/$version") . 
-      "</b></font>\n";
+echo $template->PageHeader();
 echo "<br><br>\n";
-
 $template->ShowHistory($expand);
 
 #

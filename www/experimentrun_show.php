@@ -94,14 +94,8 @@ sajax_handle_client_request();
 # Standard Testbed Header after argument checking.
 #
 PAGEHEADER("Experiment Run");
-
-echo "<font size=+2>Experiment Run<b> " .
-         MakeLink("instance",
-		  "guid=$guid&version=$version&exptidx=$exptidx",
-		  "$guid/$version/$exptidx") . 
-      "</b></font>\n";
+echo $instance->RunPageHeader($runidx);
 echo "<br><br>\n";
-
 $instance->ShowRun($runidx);
 
 echo "<script type='text/javascript' language='javascript'>\n";

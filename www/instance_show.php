@@ -85,12 +85,8 @@ sajax_handle_client_request();
 #
 PAGEHEADER("Template Instance");
 
-echo "<font size=+2>Template Instance <b>" .
-         MakeLink("template",
-		  "guid=$guid&version=$version", "$guid/$version") . 
-      "</b></font>\n";
+echo $instance->PageHeader();
 echo "<br><br>\n";
-
 $instance->Show(1);
 
 echo "<script type='text/javascript' language='javascript'>\n";

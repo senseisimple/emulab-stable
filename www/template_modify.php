@@ -18,7 +18,7 @@ $isadmin = ISADMIN($uid);
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($formfields, $errors)
+function SPITFORM($template, $formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $guid, $version;
@@ -45,10 +45,7 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
 
-    echo "<font size=+2>Experiment Template <b>" .
-            MakeLink("template",
-		     "guid=$guid&version=$version", "$guid/$version") . 
-	   "</b></font>\n";
+    echo $template->PageHeader();
     echo "<br><br>\n";
 
     echo "<form action='template_modify.php?guid=$guid&version=$version'
@@ -151,7 +148,7 @@ if (! isset($modify)) {
     $defaults["tid"] = $template->NextTID();
     $defaults["nsdata"] = $input_list[0];
     $defaults["description"] = $template->description();
-    SPITFORM($defaults, 0);
+    SPITFORM($template, $defaults, 0);
     PAGEFOOTER();
     exit();
 }
@@ -215,7 +212,7 @@ if (!isset($formfields[nsdata]) || $formfields[nsdata] == "") {
 }
 
 if (count($errors)) {
-    SPITFORM($formfields, $errors);
+    SPITFORM($template, $formfields, $errors);
     PAGEFOOTER();
     exit(1);
 }

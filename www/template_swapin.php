@@ -707,13 +707,11 @@ set_time_limit(0);
 # Okay, we can spit back a header now that there is no worry of redirect.
 PAGEHEADER("Instantiate Experiment Template");
 
-echo "<font size=+2>Template <b>" .
-        MakeLink("template",
-		 "guid=$guid&version=$version", "$guid/$version") .
-        "</b>, Instance <b>" .
-        MakeLink("project", "pid=$pid", $pid) . "/" .
-        MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
-echo "</b></font>\n";
+echo $template->PageHeader();
+echo "<font size=+2>, Instance <b>" .
+      MakeLink("project", "pid=$pid", $pid) . "/" .
+      MakeLink("experiment", "pid=$pid&eid=$eid", $eid) . 
+     "</b></font>";
 echo "<br><br>\n";
 
 echo "<script type='text/javascript' language='javascript' ".

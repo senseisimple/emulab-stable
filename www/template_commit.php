@@ -76,6 +76,7 @@ $eid = $instance->eid();
 #
 if (!$confirmed) {
     PAGEHEADER("Create Template from Instance");
+    echo $instance->ExpPageHeader();
     
     echo "<center><br><font size=+1>
           Create new Template from instance $eid 
@@ -112,13 +113,7 @@ set_time_limit(0);
 
 PAGEHEADER("Create Template from Instance");
 
-echo "<font size=+2>Template <b>" .
-        MakeLink("template",
-		 "guid=$guid&version=$version", "$guid/$version") .
-        "</b>, Instance <b>" .
-        MakeLink("project", "pid=$pid", $pid) . "/" .
-        MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
-echo "</b></font>\n";
+echo $instance->ExpPageHeader();
 echo "<br><br>\n";
 
 echo "<script type='text/javascript' language='javascript' ".

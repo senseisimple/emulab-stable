@@ -289,6 +289,20 @@ class Template
     }
 
     #
+    # Page header; spit back some html for the typical page header.
+    #
+    function PageHeader() {
+	$guid = $this->guid();
+	$vers = $this->vers();
+	$html = "<font size=+2>Template <b>" .
+	    MakeLink("template",
+		     "guid=$guid&version=$vers", "$guid/$vers") . 
+	    "</b></font>";
+
+	return $html;
+    }
+
+    #
     # Display template parameters and default values in a table
     #
     function ShowParameters() {
@@ -1112,6 +1126,63 @@ class TemplateInstance
 	    $this->ShowRunList(1);
 	}
     }
+
+    #
+    # Page header; spit back some html for the typical page header.
+    #
+    function PageHeader() {
+	$template = $this->template();	
+	$exptidx  = $this->exptidx();
+	$html     = $template->PageHeader();
+	$guid     = $this->guid();
+	$vers     = $this->vers();
+	$eid      = $this->eid();
+
+	$html .= "<font size=+2>, Instance <b>" .
+	    MakeLink("instance",
+		     "guid=$guid&version=$vers&exptidx=$exptidx", $eid) .
+	    "</b></font>";
+	return $html;
+    }
+
+    #
+    # A variant that points to the active experiment.
+    #
+    function ExpPageHeader() {
+	$template = $this->template();	
+	$html     = $template->PageHeader();
+	$guid     = $this->guid();
+	$vers     = $this->vers();
+	$pid      = $this->pid();
+	$eid      = $this->eid();
+
+	$html .= "<font size=+2>, Instance <b>" .
+	    MakeLink("project", "pid=$pid", $pid) . "/" .
+	    MakeLink("experiment", "pid=$pid&eid=$eid", $eid) . 
+	    "</b></font>";
+
+	return $html;
+    }
+    
+    #
+    # Ditto for a run, although run should its own class.
+    #
+    function RunPageHeader($runidx) {
+	$template = $this->template();	
+	$exptidx  = $this->exptidx();
+	$html     = $this->PageHeader();
+	$guid     = $this->guid();
+	$vers     = $this->vers();
+	$eid      = $this->eid();
+	$runid    = $this->GetRunID($runidx);
+
+	$html .= "<font size=+2>, Run <b>" .
+	    MakeLink("run",
+		     "guid=$guid&version=$vers&exptidx=$exptidx".
+		     "&runidx=$runidx", $runid) .
+	    "</b></font>";
+	return $html;
+    }
     
     #
     # Display instance bindings in a table
@@ -1377,6 +1448,23 @@ class TemplateInstance
 	return "${eid}-R${foo}"; 
     }
 
+    #
+    # Get runid from a runidx; run needs to be its own class!
+    #
+    function GetRunID($runidx) {
+	$exptidx = $this->exptidx();
+
+	$query_result =
+	    DBQueryFatal("select r.runid from experiment_runs as r ".
+			 "where r.exptidx='$exptidx' and r.idx='$runidx'");
+
+	if (!mysql_num_rows($query_result))
+	    return "";
+
+	$row = mysql_fetch_array($query_result);
+	return $row[0];
+    }
+    
     #
     # Return an array of the bindings for a template instance.
     #

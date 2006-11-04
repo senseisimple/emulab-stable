@@ -27,11 +27,8 @@ function SPITFORM($template, $formfields, $errors)
 
     $guid = $template->guid();
     $version = $template->vers();
-    
-    echo "<font size=+2>Template <b>";
-    echo MakeLink("template", "guid=$guid&version=$version", "$guid/$version");
-    echo "</b>";
-    echo "</b></font>\n";
+
+    echo $template->PageHeader();
     echo "<br>\n";
     
     echo "<center>\n";
