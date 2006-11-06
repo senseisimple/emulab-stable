@@ -48,7 +48,7 @@ The tb* log functions (except for tbinfo) will automatically prefix
 the message with "***" and other appropriate formatting so don't
 include any.  However, multiline messages are okay.
 
-Normal perl "die" can and should still be used when reporting an
+Normal perl C<die> can and should still be used when reporting an
 internal error such as calling a function incorrectly.  The message
 will still be logged but it will be flagged as an internal error.
 
@@ -82,6 +82,24 @@ tblog_set_default_cause will only set the default cause for errors.
 
 When using the normal perl C<die> or C<warn> the cause is always set
 to "internal", since they may come from perl itself.
+
+=head2 Primary vs Secondary Error
+
+A primary error is an error which directly identifies the cause of the
+problem such as "not enough nodes free".  A secondary error is the
+result of a primary error such as "assign failed".  Tblog uses this
+information to help determine when it found the root cause.  By
+default an error is neither primary or secondary.  To flag an error
+as either set the "type" parameter to "primary" or "secondary"
+respectfully.  For example:
+
+  tberror({type => 'primary'}, "message");
+  rberror({type => 'secondary'}, "message");
+
+Note, multiple parameters can be specified, so that the "type"
+parameter can be combined with the "cause" parameter.  For example:
+
+  tberror({cause => 'temp', type => 'primary'}, "message");
 
 =head2 Finding the Cause of the Error
 
@@ -231,6 +249,8 @@ use Carp;
 
 use strict;
 
+#use Data::Dumper;
+
 #
 # Testbed Support libraries
 #
@@ -246,7 +266,7 @@ undef $SCRIPTNAME; # signal to use $ENV{TBLOG_SCRIPTNAME}
 my $DB;
 my $TBLOG_PID;
 
-my $REVISION_STR = '$Revision: 2.22 $';
+my $REVISION_STR = '$Revision: 2.23 $';
 
 #
 # Internal Utility Functions
@@ -734,9 +754,9 @@ sub new_seq_num (;$) {
 #
 use vars '$in_dblog';
 $in_dblog = 0; # Used to avoid an infinite recursion when
-               # DBQueryFatal fails as a log entry is made to
-               # record the failure, which will than likely cause
-               # another failure and so on
+	       # DBQueryFatal fails as a log entry is made to
+	       # record the failure, which will than likely cause
+	       # another failure and so on
 sub dblog_real ( $$@ ) {
     my ($priority, $parms, @mesg) = @_;
     my $mesg = join('',@mesg);
@@ -747,15 +767,15 @@ sub dblog_real ( $$@ ) {
     eval {
 	check_env();
 
-        if ($TBLOG_PID != $$) {
-            # Do it here to avoid any possiblty of infinite recursion 
-            # since we are about to set $in_dblog to 0. ...
-            $TBLOG_PID = $$;
-            # $in_dblog is reset locally since tblog_new_child_process 
-            # will call dblog in order to log entering the child process
-            local $in_dblog = 0;
-            tblog_new_child_process();
-        }
+	if ($TBLOG_PID != $$) {
+	    # Do it here to avoid any possiblty of infinite recursion 
+	    # since we are about to set $in_dblog to 0. ...
+	    $TBLOG_PID = $$;
+	    # $in_dblog is reset locally since tblog_new_child_process 
+	    # will call dblog in order to log entering the child process
+	    local $in_dblog = 0;
+	    tblog_new_child_process();
+	}
 
 	my $cause;
 	$cause = normalize_cause($parms->{cause}) 
@@ -773,7 +793,7 @@ sub dblog_real ( $$@ ) {
 	} else {
 	    $DBQUERY_MAXTRIES = 1;
 	    $failure_action = sub {
-	        DBFatal("Could not log entry to DB", 1);
+		DBFatal("Could not log entry to DB", 1);
 	    };
 	}
 	
@@ -927,7 +947,7 @@ sub tbreport( $@ ) {
 	croak("error_type must be _0-9A-Za-z") unless $error_type =~ /^\w+$/;
 
 	my $sql = sprintf("insert into report_error (seq, stamp, session, invocation, attempt, severity, script, error_type) values(%d, UNIX_TIMESTAMP(now()), %d, %d, %d, %d, %d, %s)",
-		          $seq, $session, $invocation, $attempt, $severity, $script_num, DBQuoteSpecial($error_type));
+			  $seq, $session, $invocation, $attempt, $severity, $script_num, DBQuoteSpecial($error_type));
 
 	DBQueryFatal($sql);
 
@@ -985,9 +1005,54 @@ The relevant errors are also flagged using "relevant" flag:
 
 =cut
 
-sub tblog_find_error ( ;$$ );
+sub tblog_determine_single_error ( ;$$ );
+sub tblog_store_error ($);
+sub tblog_dump_error ($);
 
-sub tblog_find_error ( ;$$ ) {
+sub tblog_find_error(;$)
+{
+    my ($options) = (@_);
+    $options = {} unless defined $options;
+
+    my $saved_exitcode = $?;
+    my $res;
+
+    eval {
+       $res = tblog_determine_single_error();
+
+       my @to_skip;
+       my $r = $res;
+       while ($r->{cause} eq 'canceled') {
+	   push @to_skip, @{$r->{related}};
+	   my $to_skip = 'seq NOT IN ('.join(',',@to_skip).')';
+	   $r = tblog_determine_single_error(1, $to_skip);
+       }
+       $res->{other_error} = $r unless $r eq $res;
+       my $other_error = $res->{other_error};
+
+       tblog_store_error($res);
+
+       tblog_dump_error($res) unless $options->{quiet};
+    };
+
+    if ($@) {
+       $res->{err} = $@;
+       eval {SENDMAIL(TB_OPSEMAIL, "tblog_find_error failed",
+		      "Experiment: $ENV{TBLOG_EXPTIDX}\n".
+		      "User: $ENV{TBLOG_UID}\n".
+		      "Session: $ENV{TBLOG_SESSION}\n".
+		      "Script: $ENV{TBLOG_SCRIPTNAME}\n".
+		      "\n".
+		      "$res->{err}\n")};
+
+       eval {tblog $WARNING, add_prefix("tblog_find_error failed", $res->{err})};
+    }
+
+    $? = $saved_exitcode;
+    return $res;
+}
+
+sub tblog_determine_single_error ( ;$$ ) {
 
     my ($rank, $filter) = @_;
     $rank = 0   unless defined $rank;
@@ -996,324 +1061,318 @@ sub tblog_find_error ( ;$$ ) {
     } else {
 	$filter = '';
     }
-
-    my $saved_exitcode = $?;
-
+    
     my $session = 0;
     my $error = '';
     my $script = '';
     my $cause = '';
     my $cause_desc;
     my $confidence = 0.0;
-    my @related_errors;
 
     local $DBQUERY_MAXTRIES = 3;
 
-    eval {
+    check_env();
+    $session = $ENV{TBLOG_SESSION};
 
-	check_env();
-	$session = $ENV{TBLOG_SESSION};
+    my ($tblog_revision) = $REVISION_STR =~ /Revision: ([^ \$]+)/ 
+	or die "bad REVISON string";
 
-	my ($tblog_revision) = $REVISION_STR =~ /Revision: ([^ \$]+)/ 
-	    or die "bad REVISON string";
-
-	#
-	# Build the Tree
-	#
-	# Tree data structure:
-	# invocation = {invocation => INT, parent => INT, 
-	#		[{seq => int ...} || {seq => int, child => invox}]}
-	#    
+    #
+    # Build the Tree
+    #
+    # Tree data structure:
+    # invocation = {invocation => INT, parent => INT, 
+    #           [{seq => int ...} || {seq => int, child => invox}]}
+    #    
+    
+    my $root = {invocation => 0, log => []};
+    my %lookup = (0 => $root);
+    my @log;
+    
+    my $query_result = DBQueryFatal "select seq,parent,invocation,sublevel,priority,mesg,cause,script_name,type,inferred from log natural join scripts where session = $session and priority <= $NOTICE and attempt <= 1 and not cleanup $filter order by seq";
+    
+    for (my $i = 0; $i < $query_result->num_rows; $i++) {
 	
-	my $root = {invocation => 0, log => []};
-	my %lookup = (0 => $root);
-	my @log;
+	my ($seq, $parent, $invocation, $sublevel, $priority, $mesg, $cause, $script, $type, $inferred) 
+	    = $query_result->fetchrow;
 	
-	my $query_result = DBQueryFatal "select seq,parent,invocation,sublevel,priority,mesg,cause,script_name,type,inferred from log natural join scripts where session = $session and priority <= $NOTICE and attempt <= 1 and not cleanup $filter order by seq";
-	
-	for (my $i = 0; $i < $query_result->num_rows; $i++) {
+	if (not exists $lookup{$invocation}) {
 	    
-	    my ($seq, $parent, $invocation, $sublevel, $priority, $mesg, $cause, $script, $type, $inferred) 
-		= $query_result->fetchrow;
-	    
-	    if (not exists $lookup{$invocation}) {
-		
-		my $p = $lookup{$parent};
-		die "Parent Doesn't Exists!" unless defined $p;
-		$lookup{$invocation} = {invocation => $invocation, 
-					parent => $parent, 
-					script=>$script, 
-					log => []};
-		push @{$p->{log}}, {seq => $invocation, 
-				    child => $lookup{$invocation}};
-		
-	    }
-	    
-	    push @{$lookup{$invocation}{log}}, {seq => $seq, 
-						invocation=>$invocation, 
-						sublevel=> $sublevel,
-						priority => $priority,
-						type => $type,
-						cause => $cause,
-						inferred => $inferred,
-						mesg => $mesg};
+	    my $p = $lookup{$parent};
+	    die "Parent Doesn't Exists!" unless defined $p;
+	    $lookup{$invocation} = {invocation => $invocation, 
+				    parent => $parent, 
+				    script=>$script, 
+				    log => []};
+	    push @{$p->{log}}, {seq => $invocation, 
+				child => $lookup{$invocation}};
 	    
 	}
+	
+	push @{$lookup{$invocation}{log}}, {seq => $seq, 
+					    invocation=>$invocation, 
+					    sublevel=> $sublevel,
+					    priority => $priority,
+					    type => $type,
+					    cause => $cause,
+					    inferred => $inferred,
+					    mesg => $mesg};
+	
+    }
 
-	my $handle_sublevels;
-	$handle_sublevels = sub {
+    my $handle_sublevels;
+    $handle_sublevels = sub {
 
-	    my ($tree) = @_;
+	my ($tree) = @_;
 
-	    my $log = $tree->{log};
-	    return unless defined $log;
+	my $log = $tree->{log};
+	return unless defined $log;
 
-	    # normalize sublevels
-	    my $min_sublevel = 200;
-	    foreach (@$log) {
-		$min_sublevel = $_->{sublevel} 
-		    if exists $_->{sublevel} && $_->{sublevel} < $min_sublevel;
-	    }
+	# normalize sublevels
+	my $min_sublevel = 200;
+	foreach (@$log) {
+	    $min_sublevel = $_->{sublevel} 
+	    if exists $_->{sublevel} && $_->{sublevel} < $min_sublevel;
+	}
 
-	    for (my $i = 0; $i < @$log; $i++) {
+	for (my $i = 0; $i < @$log; $i++) {
 
-		local $_ = $log->[$i];
+	    local $_ = $log->[$i];
 
-		if (exists $_->{sublevel} && $_->{sublevel} > $min_sublevel) {
+	    if (exists $_->{sublevel} && $_->{sublevel} > $min_sublevel) {
 
-		    my @sublog = ($_);
-		    my $j = $i + 1;
-		    while ($j < @$log && 
-			   exists $log->[$j]->{sublevel} &&
-			   $log->[$j]->{sublevel} > $min_sublevel) {
-			push @sublog, $log->[$j];
-			$j++;
-		    }
-		    my $repl = {
-			child => {log => [@sublog]}
-		    };
-		    splice(@$log, $i, $j - $i, $repl);
-		    $handle_sublevels->($repl->{child})
+		my @sublog = ($_);
+		my $j = $i + 1;
+		while ($j < @$log && 
+		       exists $log->[$j]->{sublevel} &&
+		       $log->[$j]->{sublevel} > $min_sublevel) {
+		    push @sublog, $log->[$j];
+		    $j++;
+		}
+		my $repl = {
+		    child => {log => [@sublog]}
+		};
+		splice(@$log, $i, $j - $i, $repl);
+		$handle_sublevels->($repl->{child})
 
 		} elsif (exists $_->{child}) {
 
 		    $handle_sublevels->($_->{child});
 
 		}
-	    }
+	}
 
-	};
+    };
 
-	$handle_sublevels->($root);
+    $handle_sublevels->($root);
 
 
-	#
-	# Now find the relevant errors.
-	#
-	
-	my $find_relevant;
-	$find_relevant = sub {
+    #
+    # Now find the relevant errors.
+    #
+    
+    my @related_errors;
+    my $find_relevant;
+    $find_relevant = sub {
 
-	    my ($tree) = @_;
+	my ($tree) = @_;
 
-	    my @posib_errs;
-	    my @extra_info;
+	my @posib_errs;
+	my @extra_info;
 
-	    foreach (reverse @{$tree->{log}}) {
+	foreach (reverse @{$tree->{log}}) {
 
-		if (exists $_->{child}) {
-		    
-		    my @errs = $find_relevant->($_->{child});
-		    if (@errs) {
-			return (reverse(@extra_info),@errs);
-		    } 
-		    
-		} elsif ($_->{priority} <= $ERR) {
-		    
-		    push @posib_errs, $_;
-		    push @related_errors, $_;
+	    if (exists $_->{child}) {
+		
+		my @errs = $find_relevant->($_->{child});
+		if (@errs) {
+		    return (reverse(@extra_info),@errs);
+		} 
+		
+	    } elsif ($_->{priority} <= $ERR) {
+		
+		push @posib_errs, $_;
+		push @related_errors, $_;
 
-		    if ($_->{type} eq 'summary') {
-			last;
-		    } elsif ($_->{type} eq 'extra') {
-			push @extra_info, $_;
-		    }
-		    
+		if ($_->{type} eq 'summary') {
+		    last;
+		} elsif ($_->{type} eq 'extra') {
+		    push @extra_info, $_;
 		}
 		
 	    }
-
-	    return reverse @posib_errs;
-	};
-
-	my @relevant = $find_relevant->($root);
-	
-	#
-	# Get the most relevent script
-	#
-	$script = '';
-	if (@relevant) {
-	    $script = $lookup{$relevant[0]->{invocation}}->{script};
+	    
 	}
 
-	#
-	# Figure out the cause;
-	#
-	my $type = '';
-	my $inferred = -1;
-
-	# Assumes that 'extra' info will come first
-	
-	foreach (@relevant) {
-	    if (!$cause && $_->{cause}) {
-		$cause = $_->{cause};
-		$type = $_->{type};
-	    } elsif ($_->{cause} && $_->{type} ne 'extra' &&
-		     $_->{type} eq $type && $_->{cause} ne $cause) {
-		$cause = 'unknown';
-	    }
-	    $inferred = $_->{inferred} if $inferred < $_->{inferred};
-	}
-	$cause = 'unknown' unless $cause;
-
-	#
-	# Determine need_more_info from error type
-	#
-	my $need_more_info = -1;
-	foreach (@relevant) {
-	    if ($_->{type} eq 'summary' || $_->{type} eq 'primary') {
-		$need_more_info = 0;
-	    } elsif ($_->{type} eq 'secondary') {
-		$need_more_info = 1 if $need_more_info == -1;
-	    }
-	}
-
-	#
-	# From script determine confidence 
-	#
-	$confidence = 0.5;
-	if ($script =~ /^assign/ && ($cause eq 'temp' || $cause eq 'user')) {
-	    $confidence = 0.9;
-	} elsif ($script =~ /^parse/ && $cause eq 'user') {
-	    $confidence = 0.9;
-	} elsif ($script =~ /^os_setup/ && $type eq 'summary') {
-	    $confidence = 0.9;
-	} elsif ($inferred == 0) {
-	    $confidence = 0.7;
-	} elsif ($inferred == 1) {
-	    $confidence = 0.6;
-	} elsif ($cause ne 'unknown') {
-	    $confidence = 0.6;
-	}
-
-
-	# 
-	# Finally print/store the relevant errors
-	#
-	
-	local $Text::Wrap::columns = 72;
-	
-	my $prev;
-	foreach (@relevant) {
-	    # avoid printing the exact same error twice
-	    next if (defined $prev && $prev->{mesg} eq $_->{mesg});
-
-	    $error .= "\n" if defined $prev;
-
-	    if ($_->{mesg} !~ /\n/) {
-		$error .= expand(wrap('','', "$_->{mesg}\n"));
-	    } else {
-		# if multiline don't reformat
-		$error .= "$_->{mesg}\n";
-	    }
-
-	    $error .= "...\n" if $need_more_info == 1;
-
-	    $prev = $_;
-	}
-	if (length $error == 0) {
-	    if ($rank == 0) {
-		$error = "No clue as to what went wrong!\n";
-	    } else {
-		$error = "";
-	    }
-	}
-	chop $error;
-
-	$cause_desc = DBQuerySingleFatal
-	    "select cause_desc from causes where cause = '$cause'";
-
-	my $script_num = DBQuerySingleFatal
-	  sprintf("select script from scripts where script_name=%s",
-		  DBQuoteSpecial $script);
-	
-	DBQueryFatal
-	  sprintf("insert into errors ".
-		  "(stamp, exptidx, session, rank, cause, confidence, inferred, need_more_info, script, mesg, tblog_revision) ".
-		  "values ".
-		  "(UNIX_TIMESTAMP(now()), %d, %d, %d, %s, %f, %d, %s, %d, %s, %s)",
-		  $ENV{TBLOG_EXPTIDX},
-		  $session, $rank, DBQuoteSpecial($cause), 
-		  $confidence, $inferred, 
-		  ($need_more_info == -1 ? 'NULL' : $need_more_info),
-		  $script_num,
-		  DBQuoteSpecial($error),
-		  DBQuoteSpecial($tblog_revision));
-	
-	DBQueryFatal
-	  sprintf("update log set relevant=1 where seq in (%s)",
-		  join(',', map {$_->{seq}} @relevant))         if @relevant;
+	return reverse @posib_errs;
     };
 
-    my $err;
-
-    if ($@) {
-	$err = $@;
-	eval {SENDMAIL(TB_OPSEMAIL, "tblog_find_error failed",
-		       "Experiment: $ENV{TBLOG_EXPTIDX}\n".
-		       "User: $ENV{TBLOG_UID}\n".
-		       "Session: $ENV{TBLOG_SESSION}\n".
-		       "Script: $ENV{TBLOG_SCRIPTNAME}\n".
-		       "\n".
-		       "$err\n")};
-
-	eval {tblog $WARNING, add_prefix("tblog_find_error failed", $err)};
+    my @relevant = $find_relevant->($root);
+    #
+    # Get the most relevent script
+    #
+    $script = '';
+    if (@relevant) {
+	$script = $lookup{$relevant[0]->{invocation}}->{script};
     }
 
-    if ($rank == 0) {
-	my $other_error;
-	if ($cause eq 'canceled') {
-	    my @to_skip = map {$_->{seq}} @related_errors;
-	    my $to_skip = 'seq NOT IN ('.join(',',@to_skip).')';
-	    $other_error = tblog_find_error(1, "cause <> 'canceled' AND $to_skip");
-	}
+    #
+    # Figure out the cause;
+    #
+    my $type = '';
+    my $inferred = -1;
 
-	print SERR "**** Experimental information, please ignore ****\n";
-	print SERR "Session ID = $session\n";
-	print SERR "Likely Cause of the Problem:\n";
-	print SERR indent($error, '  ');
-	print SERR "Cause: $cause\n";
-	print SERR "Confidence: $confidence\n";
-	print SERR "Script: $script\n";
-	if ($cause eq 'canceled') {
-	    print SERR "\n";
-	    if (length($other_error->{mesg}) == 0) {
-		print SERR "No other error found.\n";
-	    } else {
-		print SERR "Possible Error Before Cancellation:\n";
-		print SERR indent($other_error->{mesg}, '  ');
-		print SERR "Cause: $other_error->{cause}\n";
-		print SERR "Confidence: $other_error->{confidence}\n";
-		print SERR "Script: $other_error->{script}\n";
-	    }
+    # Assumes that 'extra' info will come first
+    
+    foreach (@relevant) {
+	if (!$cause && $_->{cause}) {
+	    $cause = $_->{cause};
+	    $type = $_->{type};
+	} elsif ($_->{cause} && $_->{type} ne 'extra' &&
+		 $_->{type} eq $type && $_->{cause} ne $cause) {
+	    $cause = 'unknown';
 	}
-	print SERR "**** End experimental information ****\n";
+	$inferred = $_->{inferred} if $inferred < $_->{inferred};
+    }
+    $cause = 'unknown' unless $cause;
+
+    #
+    # Determine need_more_info from error type
+    #
+    my $need_more_info = -1;
+    foreach (@relevant) {
+	if ($_->{type} eq 'summary' || $_->{type} eq 'primary') {
+	    $need_more_info = 0;
+	} elsif ($_->{type} eq 'secondary') {
+	    $need_more_info = 1 if $need_more_info == -1;
+	}
     }
 
-    $? = $saved_exitcode;
-    return {session=>$session, exptidx=>$ENV{TBLOG_EXPTIDX},
+    #
+    # From script determine confidence 
+    #
+    $confidence = 0.5;
+    if ($script =~ /^assign/ && ($cause eq 'temp' || $cause eq 'user')) {
+	$confidence = 0.9;
+    } elsif ($script =~ /^parse/ && $cause eq 'user') {
+	$confidence = 0.9;
+    } elsif ($script =~ /^os_setup/ && $type eq 'summary') {
+	$confidence = 0.9;
+    } elsif ($inferred == 0) {
+	$confidence = 0.7;
+    } elsif ($inferred == 1) {
+	$confidence = 0.6;
+    } elsif ($cause ne 'unknown') {
+	$confidence = 0.6;
+    }
+
+
+    # 
+    # Finally print/store the relevant errors
+    #
+    
+    local $Text::Wrap::columns = 72;
+    
+    my $prev;
+    foreach (@relevant) {
+	# avoid printing the exact same error twice
+	next if (defined $prev && $prev->{mesg} eq $_->{mesg});
+
+	$error .= "\n" if defined $prev;
+
+	if ($_->{mesg} !~ /\n/) {
+	    $error .= expand(wrap('','', "$_->{mesg}\n"));
+	} else {
+	    # if multiline don't reformat
+	    $error .= "$_->{mesg}\n";
+	}
+
+	$error .= "...\n" if $need_more_info == 1;
+
+	$prev = $_;
+    }
+    if (length $error == 0) {
+	if ($rank == 0) {
+	    $error = "No clue as to what went wrong!\n";
+	} else {
+	    $error = "";
+	}
+    }
+    chop $error;
+
+    $cause_desc = DBQuerySingleFatal
+	"select cause_desc from causes where cause = '$cause'";
+
+    my $script_num =
+      ($script ne ''
+       ? (DBQuerySingleFatal
+	  sprintf ("select script from scripts where script_name=%s",
+		   DBQuoteSpecial $script))
+       : 0);
+    
+    return {source=>'find_error', session=>$session, rank=>$rank,
+	    exptidx=>$ENV{TBLOG_EXPTIDX},
 	    mesg=>$error, cause=>$cause, cause_desc=>$cause_desc,
-	    confidence=>$confidence, script=>$script, err=>$err};
+	    confidence=>$confidence, inferred=>$inferred, 
+	    need_more_info=>$need_more_info,
+	    script=>$script, script_num=>$script_num,
+	    relevant=>[map {$_->{seq}} @relevant],
+	    related=>[map {$_->{seq}} @related_errors],
+	    tblog_revision => $tblog_revision};
+}
+
+sub tblog_store_error ($)
+{
+    my ($d) = @_;
+
+    croak "Data must be from tblog_find_error not tblog_lookup_error.\n" 
+	unless $d->{source} eq 'find_error';
+
+    DBQueryFatal
+       sprintf("delete from errors where session = %d", $d->{session});
+
+    DBQueryFatal
+	sprintf("insert into errors ".
+		"(stamp, exptidx, session, rank, cause, confidence, inferred, need_more_info, script, mesg, tblog_revision) ".
+		"values ".
+		"(UNIX_TIMESTAMP(now()), %d, %d, %d, %s, %f, %d, %s, %d, %s, %s)",
+		$d->{exptidx},
+		$d->{session}, $d->{rank}, DBQuoteSpecial($d->{cause}),
+		$d->{confidence}, $d->{inferred}, 
+		($d->{need_more_info} == -1 ? 'NULL' : $d->{need_more_info}),
+		$d->{script_num},
+		DBQuoteSpecial($d->{mesg}),
+		DBQuoteSpecial($d->{tblog_revision}));
+    
+    DBQueryFatal
+	sprintf("update log set relevant=1 where seq in (%s)",
+		join(',', @{$d->{relevant}}))         if @{$d->{relevant}};
+}
+
+sub tblog_dump_error ($)
+{
+    my ($d) = @_;
+    print SERR "**** Experimental information, please ignore ****\n";
+    print SERR "Session ID = $d->{session}\n";
+    print SERR "Likely Cause of the Problem:\n";
+    print SERR indent($d->{mesg}, '  ');
+    print SERR "Cause: $d->{cause}\n";
+    print SERR "Confidence: $d->{confidence}\n";
+    print SERR "Script: $d->{script}\n";
+    if ($d->{cause} eq 'canceled') {
+       my $other_error = $d->{other_error};
+       print SERR "\n";
+       if (length($other_error->{mesg}) == 0) {
+	   print SERR "No other error found.\n";
+       } else {
+	   print SERR "Possible Error Before Cancellation:\n";
+	   print SERR indent($other_error->{mesg}, '  ');
+	   print SERR "Cause: $other_error->{cause}\n";
+	   print SERR "Confidence: $other_error->{confidence}\n";
+	   print SERR "Script: $other_error->{script}\n";
+       }
+    }
+    print SERR "**** End experimental information ****\n";
 }
 
 =item tblog_lookup_error [SESSION]
@@ -1358,8 +1417,11 @@ WHAT is something like "Swap In Failure", "Swap Out Failure", etc.
 =cut
 
 sub tblog_email_error ( $$$$$$$$@ ) {
-    
-    my ($d, $to, $what, $pideid, $from, $headers, $testbed_ops, $prefix, @files) = @_;
+
+    my ($d, $to, $what, $pideid, $from, $headers, $tbops_headers, $prefix, @files) = @_;
+
+    carp "TBOBS_HEADERS must be a complete header!  Expect SENDMAIL to fail."  
+	unless $tbops_headers =~ /:/;
 
     my $threshold = 0.55;
 
@@ -1368,7 +1430,7 @@ sub tblog_email_error ( $$$$$$$$@ ) {
 		|| $d->{cause} eq 'canceled'))
     {
 	$headers .= "\n" if defined $headers && length($headers) > 0;
-	$headers .= "$testbed_ops";
+	$headers .= "$tbops_headers";
 	$headers .= "\nX-NetBed-Cc: testbed-ops";
     } else {
 	$from = "Testbed Ops <@TBOPSEMAIL@>";
@@ -1377,10 +1439,11 @@ sub tblog_email_error ( $$$$$$$$@ ) {
 	$headers .= "\nX-NetBed-Cc: testbed-errors";
     }
 
-    my $subject = "$what: $pideid";
+    my $which = $pideid ? ": $pideid" : "";
+    my $subject = "$what$which";
 
     if ($d->{confidence} > $threshold && $d->{cause} ne 'unknown') {
-	$subject = "$what: $d->{cause_desc}: $pideid";
+	$subject = "$what: $d->{cause_desc}$which";
     }
     
     my $body;
@@ -1403,19 +1466,8 @@ sub tblog_email_error ( $$$$$$$$@ ) {
     } else {
 
 	$body = 
-	  ("Please look at the log below to see what happened. If the error\n".
-	   "resulted from a lack of free nodes, you can use this web page to\n".
-	   "get a summary of free nodes:\n\n".
-	   "  @TBBASE@/nodecontrol_list.php3\n".
-	   "\n".
-	   "Please do not try again until you see enough nodes free. Or, you\n".
-	   "can use the batch system to swap your experiment in when enough\n".
-	   "nodes are free:\n\n".
-	   "  @TBDOCBASE@/tutorial/docwrapper.php3?docname=tutorial.html".
-	   "#BatchMode\n");
-	
+	    ("Please look at the log below to see what happened.");
     }
-
 
     SENDMAIL($to, $subject, $body, $from, $headers, @files);
 }
@@ -1461,9 +1513,13 @@ sub TIEHANDLE {
 
 sub PRINT {
     my $this = shift;
-    print {$$this} @_;
+    if ($$this->opened()) {
+	print {$$this} @_;
+    } else {
+	carp "print() on unopened filehandle" unless $$this->opened;
+    }
     local $_ = join '', @_; # NOTE: This doesn't take into account "$,"
-                            # or output_field_separator
+			    # or output_field_separator
     s/\n$//;
     if (/warning:/i) {
       dblog $WARNING, {inferred=>2}, $_;
@@ -1493,7 +1549,9 @@ sub OPEN {
     # Since package is a compile time directive, the only way to do
     # this is to do an eval on a string.
     eval("package $caller_package;".
-	 '@_ == 1 ? open($$this, $_[0]) : open($$this, $_[0], $_[1])');
+	 '@_ == 1 ? open($$this, $_[0]) : 
+          @_ == 2 ? open($$this, $_[0], $_[1]) :
+          open($$this, shift, shift, @_)');
 }
 
 sub CLOSE {

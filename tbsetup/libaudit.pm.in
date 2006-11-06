@@ -12,8 +12,9 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV
+	 AddAuditInfo
 	 LogStart LogEnd
-	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY LIBAUDIT_NODELETE
+	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY LIBAUDIT_NODELETE LIBAUDIT_FANCY
        );
 
 # After package decl.
@@ -21,6 +22,7 @@ use English;
 use POSIX qw(isatty setsid);
 use File::Basename;
 use IO::Handle;
+use Carp;
 
 #
 # Testbed Support libraries
@@ -52,6 +54,13 @@ my $logonly     = 0;
 # Save log when logging only.
 my $savelog     = 0;
 
+# If set than send "fancy" email and also call tblog_find_error
+# on errors
+my $fancy       = 0;
+
+# Extra info used when AUDIT_FANCY is set
+my %AUDIT_INFO;
+
 # Untainted scriptname for email below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
     $SCRIPTNAME = basename($1);
@@ -73,6 +82,8 @@ sub LIBAUDIT_NODAEMON	{ 0; }
 sub LIBAUDIT_DAEMON	{ 0x01; }
 sub LIBAUDIT_LOGONLY	{ 0x02; }
 sub LIBAUDIT_NODELETE	{ 0x04; }
+sub LIBAUDIT_FANCY      { 0x08; } # Only use if libdb and libtblog are
+                                  # already in use
 
 #
 # Start an audit (or log) of a script. First arg is a flag indicating if
@@ -101,6 +112,12 @@ sub AuditStart($;$$)
 	    if ($options & LIBAUDIT_NODELETE()) {
 		$savelog = 1;
 	    }
+	}
+	if ($options & LIBAUDIT_FANCY()) {
+	    if (!$INC{"libdb.pm"} || !$INC{"libtblog.pm"}) {
+		croak "libdb and libtblog must be loaded when using LIBAUDIT_FANCY";
+	    }
+	    $fancy = 1;
 	}
     }
 
@@ -134,6 +151,9 @@ sub AuditStart($;$$)
 	if ($mypid) {
 	    select(undef, undef, undef, 0.2);
 	    return $mypid;
+	}
+	if (defined(&libtblog::tblog_new_child_process)) {
+	    libtblog::tblog_new_child_process();
 	}
     }
     $auditing = 1;
@@ -262,6 +282,7 @@ sub AuditFork()
 # what happened is sent to the logs list so that we can go back and see the
 # details if needed.
 # 
+sub SendFancyMail($);
 sub SendAuditMail($)
 {
     my($exitstatus) = @_;
@@ -269,6 +290,12 @@ sub SendAuditMail($)
     if ($auditing) {
 	# Avoid duplicate messages.
 	$auditing = 0;
+
+	# Needs to called here before STDOUT and STDERR is
+	# redirectected below
+	if ($exitstatus && $fancy) {
+	    &libtblog::tblog_find_error(); 
+	}
 
 	if (!$daemon && $PERL_VERSION >= 5.008) {
 	    eval("open(STDOUT, \">&\", \$libaudit::SAVE_STDOUT); ".
@@ -293,6 +320,11 @@ sub SendAuditMail($)
 
 	# Success and no log ...
 	if ($exitstatus == 0 && !(defined($logfile) && -s $logfile)) {
+	    return;
+	}
+
+	if ($fancy) {
+	    SendFancyMail($exitstatus);
 	    return;
 	}
 
@@ -325,6 +357,129 @@ sub SendAuditMail($)
 	    unlink($logfile)
 		if (defined($logfile) && (! ($logonly && $savelog)));
 	}
+    }
+}
+
+sub SendFancyMail($)
+{
+    import libdb;
+    import libtblog;
+
+    my ($exitstatus) = @_;
+    
+    my ($TO, $FROM);
+    my ($name, $email);
+    if (UserDBInfo($USERNAME, \$name, \$email)) {
+	$TO = "$name <$email>";
+    } else {
+	$TO = "$GCOS <${USERNAME}\@${OURDOMAIN}>";
+    }
+    $FROM = $TO;
+
+    my @FILES;
+    
+    if (defined($logfile) && -s $logfile) {
+	@FILES = ($logfile);
+    }
+
+    # Avoid sending a person the same email twice
+    my $extra_cc;
+    if (defined ($AUDIT_INFO{cc})) {
+	my @cc;
+	my @prev_emails = ($email);
+	OUTER: foreach (@{$AUDIT_INFO{cc}}) {
+	    ($email) = /([^<> \t@]+@[^<> \t@]+)/;
+	    foreach my $e (@prev_emails) {
+		next OUTER if $email eq $e;
+		push @prev_email, $e;
+	    }
+	    push @cc, $_;
+	}
+	if (@cc) {
+	    $extra_cc = "Cc: ";
+	    $extra_cc .= join(', ', @cc);
+	}
+    }
+
+    my $sendmail_res;
+    if ($exitstatus) {
+	my $d = tblog_lookup_error();
+	my $prefix;
+	$prefix .= "$SCRIPTNAME @SAVEARGV\n";
+	$prefix .= "Exited with status: $exitstatus";
+	my $what = "Failed: $SCRIPTNAME";
+	$what = $AUDIT_INFO{failure_frag} if defined $AUDIT_INFO{failure_frag};
+	$which = $AUDIT_INFO{which};
+	$sendmail_res 
+	    = tblog_email_error($d, $TO, $what,	$which, 
+				$FROM, $extra_cc, "Cc: $TBOPS",
+				$prefix, @FILES); 
+
+    } else {
+
+	my $subject  = "$SCRIPTNAME succeeded";
+	$subject = $AUDIT_INFO{success_frag} if defined $AUDIT_INFO{success_frag};
+	$subject .= ": $AUDIT_INFO{which}" if defined $AUDIT_INFO{which};
+	my $body     = "$SCRIPTNAME @SAVEARGV\n";
+
+	my $HDRS;
+	$HDRS .= "$extra_cc\n" if defined $extra_cc;
+	$HDRS .= "Reply-To: $TBOPS\n";
+	$HDRS .= "Bcc: $TBLOGS";
+	
+	$sendmail_res 
+	    = SENDMAIL($TO, $subject, $body, $FROM, $HDRS, @FILES);
+    }
+    
+    if ($sendmail_res) {
+	unlink($logfile)
+	    if (defined($logfile) && (! $savelog));
+    }
+}
+
+
+# Info on possibe values for AUDIT_INFO
+# [KEY => string|list]
+my %AUDIT_METAINFO = 
+    ( which => 'string',        # ex "PROJ/EXP"
+      success_frag => 'string', # ex "T. Swapped In"
+      failure_frag => 'string', # ie "Bla Failure"
+      cc => 'list');            # Cc audit mail to these people
+
+#
+# AddAuditInfo($key, $value)
+#   add additional information for libaudit to use in SendAuditMail
+#   when AUDIT_FANCY is set
+#
+# TODO: Eventually child scripts should be able to use AddAuditInfo, not 
+#   just the script in which AuditStart(...) was called.  This will probably
+#   involve storing the values in the database somehow.
+#
+sub AddAuditInfo ($$) {
+    my ($key, $value) = @_;
+
+    if (!$auditing) {
+
+	carp "AddAuditInfo($key, ...) ignored since the script isn't being audited.";
+	return 0;
+
+    }
+
+    if ($AUDIT_METAINFO{$key} eq 'string') {
+	
+	$AUDIT_INFO{$key} = $value;
+	return 1;
+
+    } elsif ($AUDIT_METAINFO{$key} eq 'list') {
+
+	push @{$AUDIT_INFO{$key}}, $value;
+	return 1;
+
+    } else {
+
+	carp "Unknown key, \"$key\" in AddAuditInfo";
+	return 0;
+
     }
 }
 

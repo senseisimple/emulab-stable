@@ -353,7 +353,7 @@ if (! ($foreground || $batchmode)) {
     }
 
     if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
-				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE)) {
+				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
 	#
 	# Parent exits normally, unless in waitmode. We have to set
 	# justexit to make sure the END block below does not run.
@@ -415,6 +415,13 @@ if (! ($foreground || $batchmode)) {
 	exit($? >> 8);
     }
     TBdbfork();
+
+    # Add audit info.  Right now this will only work when called in
+    # the child of the script being audited.  Eventually these can be
+    # set anywhere.
+    AddAuditInfo("which", "$pid/$eid");
+    AddAuditInfo("failure_frag", "T. Instantiation Failure");
+    AddAuditInfo("success_frag", "New T. Instance Created");
 }
 
 #

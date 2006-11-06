@@ -1421,32 +1421,34 @@ sub cleanup()
     #
     $experiment->SetCancelFlag(EXPTCANCEL_CLEAR);
 
-    #
-    # Figure out the error if possible
-    #
-    my $error_data = tblog_find_error();
-
-    #
-    # Send a message to the testbed list. Append the logfile.
-    #
-    
-    #
-    # also try to send mail to robocops if it was a robot/mote exp
-    #
-    my $rcops = '';
-    if ($robotexp) {
-	$rcops = "\nCc:  $TBROBOCOPS";
+    if (!$ENV{'TBAUDITON'}) {
+	#
+	# Figure out the error if possible
+	#
+	my $error_data = tblog_find_error();
+	
+	#
+	# Send a message to the testbed list. Append the logfile.
+	#
+	
+	#
+	# also try to send mail to robocops if it was a robot/mote exp
+	#
+	my $rcops = '';
+	if ($robotexp) {
+	    $rcops = "\nCc:  $TBROBOCOPS";
+	}
+	
+	tblog_email_error($error_data,
+			  "$user_name <$user_email>",
+			  "Swap ${inout} Failure", "$pid/$eid",
+			  ($idleswap ? $TBOPS : "$user_name <$user_email>"),
+			  "Cc:  $expt_head_name <$expt_head_email> $rcops",
+			  "Cc:  $TBOPS $rcops",
+			  $modifyError,
+			  (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
     }
-
-    tblog_email_error($error_data,
-		      "$user_name <$user_email>",
-		      "Swap ${inout} Failure", "$pid/$eid",
-		      ($idleswap ? $TBOPS : "$user_name <$user_email>"),
-		      "Cc:  $expt_head_name <$expt_head_email> $rcops",
-		      "Cc:  $TBOPS $rcops",
-		      $modifyError,
-		      (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
-
+	
     if ($modifyHosed) {
 	#
 	# Copy off the workdir to the user directory, Then back up both of
