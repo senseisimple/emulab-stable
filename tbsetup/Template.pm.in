@@ -22,6 +22,7 @@ use libtestbed;
 use libtblog;
 use Experiment;
 use English;
+use HTML::Entities;
 use overload ('""' => 'Stringify');
 
 # Configure variables
@@ -682,7 +683,8 @@ sub NewMetadata($$$$;$)
     }
 
     my $safename  = DBQuoteSpecial($name);
-    my $safevalue = DBQuoteSpecial($value);
+    # HTML entity encode; yep, plain text only.
+    my $safevalue = DBQuoteSpecial(encode_entities($value));
 
     my $query_result =
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
@@ -786,7 +788,7 @@ sub ModifyMetadata($$$$)
 	if ($already_exists <= 0);
 
     $name  = DBQuoteSpecial($name);
-    $value = DBQuoteSpecial($value);
+    $value = DBQuoteSpecial(encode_entities($value));
 
     DBQueryWarn("lock tables experiment_template_metadata_items write")
 	or return -1;
