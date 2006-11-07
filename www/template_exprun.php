@@ -595,6 +595,7 @@ if (count($parameter_masterlist)) {
 	
 	    fwrite($fp, "<template_parameters>\n");
 
+	    reset($parameter_masterlist);
 	    while (list($name,$default_value) = each ($parameter_masterlist)) {
 		if (isset($parameters[$name])) {
 		    $value = $parameters[$name];
