@@ -32,21 +32,6 @@ adhere to the syntax and operational model of
      <a href="http://www.postel.org/tg">TG Tool Set</a> to generate
      traffic.
 
-<li> <b>Traffic Generation using
-     <a href="http://www.isi.edu/nsnam/ns/doc/node487.html">
-     NS Emulation (NSE)</b></a>: Emulab supports TCP traffic generation
-     using NS's Agent/TCP/FullTcp which is a BSD Reno derivative and
-     its subclasses namely Newreno, Tahoe and Sack. Currently two
-     application classes are supported: Application/FTP and 
-     Application/Telnet. The former drives the FullTcp agent to send
-     bulk-data according to connection dynamics. The latter uses the
-     NS's <a href="http://citeseer.nj.nec.com/danzig91tcplib.html"> 
-     tcplib</a> telnet distribution for telnet-like data. For
-     configuration parameters and commands allowed on the objects,
-     refer to NS documentation
-     <a href="http://www.isi.edu/nsnam/ns/doc/node351.html">
-     here.</a>
-
 <li> <b>Event System</b>: Emulab supports limited use of the NS <em>at</em>
      syntax, allowing you to define a static set of events in your NS
      file, to be delivered to agents running on your nodes. There is
@@ -176,37 +161,6 @@ on nodeB:
 </p>
 
 <p>
-Here is a good example for NSE FullTcp traffic generation. The
-following code snippet attaches an FTP agent that drives a Reno
-FullTcp on NodeA:
-	<code><pre>
-	set tcpfull0 [new Agent/TCP/FullTcp]
-	$ns attach-agent $nodeA $tcpfull0
-
-	set ftp0 [new Application/FTP]
-	$ftp0 attach-agent $tcpfull0</code></pre>
-      
-</p>
-
-<p>
-You must then define the sink FullTcp endpoint and call the method
-"listen" making this agent wait for an incoming connection:
-	<code><pre>
-	set tcpfull1 [new Agent/TCP/FullTcp/Sack]
-	$tcpfull1 listen
-	$ns attach-agent $nodeB $tcpfull1</code></pre>
-
-</p>
-
-<p>
-Like all other source-sink traffic generators, you need to connect
-them:
-        <code><pre>
-	$ns connect $tcpfull0 $tcpfull1</code></pre>
-
-</p>
-
-<p>
 Lastly, a set of events to control your applications and link
 characteristics: 
 	<code><pre>
@@ -218,11 +172,6 @@ characteristics:
 	$ns at 110.0 "$link0 up"
 	$ns at 115.0 "$cbr0  stop"
 
-	$ns at 120.0 "$ftp0 start"
-	$ns at 140.0 "$tcpfull0 set segsize_ 256; $tcpfull0 set	segsperack_ 2"
-	$ns at 145.0 "$tcpfull1 set nodelay_ true"
-	$ns at 150.0 "$ftp0 stop"
-	
 	$ns at 120.0 "$cbr1  start"
 	$ns at 130.0 "$cbr1  set packetSize_ 512"
 	$ns at 130.0 "$cbr1  set interval_ 0.01"
@@ -265,15 +214,10 @@ Time         Node         Agent      Type       Event      Arguments
 120.000      nodeA        cbr1       TRAFGEN    START      PACKETSIZE=500
                                                            RATE=100000
                                                            INTERVAL=0.005
-120.000      nodeA        ftp0       TRAFGEN    MODIFY     $ftp0 start
 130.000      nodeA        cbr1       TRAFGEN    MODIFY     PACKETSIZE=512
 130.000      nodeA        cbr1       TRAFGEN    MODIFY     INTERVAL=0.01
 140.000      tbsdelay0    link0      LINK       DOWN       
-140.000      nodeA        tcpfull0   TRAFGEN    MODIFY     $tcpfull0 set segsize_ 256
-140.000      nodeA        tcpfull0   TRAFGEN    MODIFY     $tcpfull0 set segsperack_ 2
-145.000      nodeB        tcpfull1   TRAFGEN    MODIFY     $tcpfull1 set nodelay_ true
 150.000      tbsdelay0    link0      LINK       UP         
-150.000      nodeA        ftp0       TRAFGEN    MODIFY     $ftp0 stop
 160.000      nodeA        cbr1       TRAFGEN    STOP		</code></pre>
 
 <p>
@@ -424,8 +368,6 @@ example:
       $cbr0 stop
       </pre>
 
-<li> FullTcp, FTP and Telnet: Refer to the NS documentation <a
-     href="http://www.isi.edu/nsnam/ns/doc/ns_doc.pdf">here</a>.
 </ul>
 
 <p>
