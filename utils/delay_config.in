@@ -327,7 +327,7 @@ foreach my $key (keys(%config)) {
 	    # This follows what is done in the parser.
 	    $val = $val / 2.0;
 	}
-        else {
+        elsif ($key eq "lossrate") {
 	    # This follows what is done in the parser.
 	    $val = 1-sqrt(1-$val);
 	}
@@ -438,7 +438,7 @@ sub ChangeDelayConfig() {
 			# This follows what is done in the parser.
 			$val = $val / 2.0;
 		    }
-		    else {
+		    elsif ($key eq "lossrate") {
 			# This follows what is done in the parser.
 			$val = 1-sqrt(1-$val);
 		    }
@@ -513,7 +513,7 @@ sub ChangeLinkDelayConfig() {
 		# This follows what is done in the parser.
 		$val = $val / 2.0;
 	    }
-	    else {
+	    elsif ($key eq "lossrate") {
 		# This follows what is done in the parser.
 		$val = 1-sqrt(1-$val);
 	    }
