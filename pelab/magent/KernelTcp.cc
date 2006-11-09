@@ -291,11 +291,13 @@ enum { SNIFF_WAIT = 10 };
 void KernelTcp::init(void)
 {
   // Set up the peerAccept socket
-  global::peerAccept = createServer(global::peerServerPort,
-                                    "Peer accept socket (No incoming peer "
-                                    "connections will be accepted)");
-  logWrite(PEER_CYCLE, "Created peer server on port %d",
-           global::peerServerPort);
+  if (global::peerServerPort != 0) {
+    global::peerAccept = createServer(global::peerServerPort,
+				      "Peer accept socket (No incoming peer "
+				      "connections will be accepted)");
+    logWrite(PEER_CYCLE, "Created peer server on port %d",
+	     global::peerServerPort);
+  }
 
   // Set up the connectionModelExemplar
   global::connectionModelExemplar.reset(new KernelTcp());

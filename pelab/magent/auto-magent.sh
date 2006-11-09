@@ -10,16 +10,26 @@ ARGS=$*
 #
 cd $LOGDIR
 
+TARGETS=$MAGENT
+
 #
 # Start up our own measurement agent
 #
+if [ $MAGENT_NORECV -ne 0 ]; then
+    port=`echo $ARGS | sed -e 's/.*--peerserverport=\([0-9][0-9]*\).*/\1/'`
+    ARGS=`echo $ARGS | sed -e "s/--peerserverport=$port/--peerserverport=0/"`
+    echo "${IPERFD_DIR}/$IPERFD -p $port"
+    ${IPERFD_DIR}/$IPERFD -p $port &
+    TARGETS="$TARGETS $IPERFD"
+fi
+
 echo $SH ${MAGENT_DIR}/run-magent.sh $ARGS
 $SH ${MAGENT_DIR}/run-magent.sh --daemonize $ARGS 
 # Kill the agent if we get killed - TODO: harsher kill?
 # Because the magent backgrounds itself, it's harder to figure out
 # what its pid is, just just do a killall
 # Note that we assume that a kill of us is "normal" and just exit 0.
-trap "$AS_ROOT killall $MAGENT; exit 0" TERM
+trap "$AS_ROOT killall $TARGETS; exit 0" TERM
 
 #
 # Wait for all of the agents to start
