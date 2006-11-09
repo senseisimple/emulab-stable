@@ -117,6 +117,7 @@ include("dbdefs.php3");
 include("user_defs.php");
 include("group_defs.php");
 include("project_defs.php");
+include("experiment_defs.php");
 
 #
 # Control how error messages are returned to the user. If the session is

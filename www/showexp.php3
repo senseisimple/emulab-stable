@@ -368,6 +368,10 @@ if ($expstate) {
 	    WRITESUBMENUBUTTON("Terminate Experiment",
 			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
+	elseif ($instance && $expstate == $TB_EXPTSTATE_SWAPPED) {
+	    WRITESUBMENUBUTTON("Terminate Instance",
+			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
+	}
 
         # Batch experiments can be modifed only when paused.
 	if (!$instance && ($expstate == $TB_EXPTSTATE_SWAPPED ||

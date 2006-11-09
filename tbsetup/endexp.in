@@ -454,6 +454,9 @@ if (!$batch && !$template_mode) {
     }
     TBdbfork();
 }
+# Give the web page a chance to start looking at the log file before
+# the entire experiment is gone.
+sleep(1);
 
 #
 # When in waitmode, must put ourselves in another process group so that

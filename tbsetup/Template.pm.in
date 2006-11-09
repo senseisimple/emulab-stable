@@ -1721,12 +1721,11 @@ sub Create($$)
     my $query = "insert into experiment_template_instances set ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
 
-    # Give it an initial start time; updated later.
-    $query .= ", "
-	if (defined($argref) && scalar(keys%{$argref}));
-    $query .= "start_time=now(),continue_time=now() ";
-    $query .= ",description=$description"
-	if (defined($description));
+    if (defined($description)) {
+	$query .= ", "
+	    if (defined($argref) && scalar(keys%{$argref}));
+	$query .= "description=$description";
+    }
 
     my $query_result = DBQueryWarn($query);
     return undef
@@ -2019,7 +2018,7 @@ sub Experiment($)
 #
 # Delete a template instance record.
 #
-sub Delete($$$)
+sub Delete($)
 {
     my ($self) = @_;
 

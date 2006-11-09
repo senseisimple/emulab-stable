@@ -63,6 +63,7 @@ my $logname;
 my $exptidx;
 my $template;
 my $instance;
+my $neveractive = 0;
 # For the END block below.
 my $cleaning    = 0;
 my $justexit    = 1;
@@ -178,6 +179,7 @@ if (! $batchmode) {
 	system("$swapexp -x -s out $pid $eid");
 	exit($? >> 8);
     }
+    # Check for a pre-loaded instance (never active).
 }
 
 #
@@ -247,6 +249,9 @@ if (! $batchmode) {
     }
     TBdbfork();
 }
+# Give the web page a chance to start looking at the log file before
+# the entire experiment is gone.
+sleep(1);
 
 #
 # When in waitmode, must put ourselves in another process group so that
@@ -257,19 +262,21 @@ if ($waitmode) {
 }
 
 #
-# Stop the current run.
+# Stop the current run, but only if the instance was actually instantiated.
 #
-my $opt = ($force ? "-i" : "");
+if (defined($instance->start_time())) {
+    my $opt = ($force ? "-i" : "");
 
-system("$endrun $opt -a stop -f -e $eid $guid/$version") == 0
-    or fatal(-1, "Could not stop the current run!");
+    system("$endrun $opt -a stop -f -e $eid $guid/$version") == 0
+	or fatal(-1, "Could not stop the current run!");
 
-# This sets the stop time.
-$instance->Stop() == 0
-    or fatal(-1, "Could not stop experiment instance!");
+    # This sets the stop time.
+    $instance->Stop() == 0
+	or fatal(-1, "Could not stop experiment instance!");
+}
 
 #
-# Now do the swapout.
+# Now do the swapout (or just the termination).
 #
 # Note special -x option.
 #
@@ -283,9 +290,17 @@ system(@arguments);
 fatal($? >> 8, "Could not terminate template instance")
     if ($?);
 
-# Reminder; instance records are not deleted!
-$instance->Finalize() == 0
-    or fatal(-1, "Could not finalize experiment instance!");
+if (defined($instance->start_time())) {
+    # Reminder; instance records are not deleted.
+    $instance->Finalize() == 0
+	or fatal(-1, "Could not finalize experiment instance!");
+}
+else {
+    # Okay, we *do* delete if the instance was never instantiated.
+    print("Deleting instance since it was never swapped in!\n");
+    $instance->Delete() == 0
+	or fatal(-1, "Could not delete instance!");
+}
 
 exit(0);
 
