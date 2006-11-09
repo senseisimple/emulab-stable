@@ -96,6 +96,7 @@ export MAGENT_DIR="${BASE}/magent/";
 export NETMON_DIR="${BASE}/libnetmon/";
 export MONITOR_DIR="${BASE}/monitor/";
 export DBMONITOR_DIR="${BASE}/dbmonitor/";
+export IPERFD_DIR="${BASE}/iperfd/";
 export TMPDIR="/var/tmp/";
 export LOGDIR="/local/logs/"
 
@@ -114,6 +115,7 @@ export STUBD="stubd"
 export MAGENT="magent"
 export MONITOR="monitor.py"
 export DBMONITOR="dbmonitor.pl"
+export IPERFD="iperfd"
 export GENIPMAP="gen-ip-mapping.pl"
 export GENINITCOND="init-elabnodes.pl"
 export NETMON_LIB="libnetmon.so"
