@@ -31,12 +31,17 @@ Running an experiment with the auto-pelab scripts:
    that you'd like to test:
      Go to your testbed source tree
      Run 'cvs up'!!!
-     Run 'gmake' in pelab/stub and pelab/libnetmon (on a DevBox machine)
+     Run 'gmake' in pelab/stub, pelab/magent, pelab/libnetmon and pelab/iperfd
+       (on a DevBox machine)
      From the root of your source tree, run:
          tar czvf /proj/tbres/my-pelab.tar.gz pelab
      Of course, don't name it 'my-plab.tar.gz'! You can put this file in
        a subdirectory if you want, but it must be somewhere in
          /proj/tbres/
+     Or you can use the pelab/make-tarball script to create the tarball:
+	 cd pelab; ./make-tarball /proj/tbres/my-pelab.tar.gz
+     It is a little more selective about what goes in the tarball.
+
      Put the path to your tarball in the pelab_tar variable in auto-pelab.ns 
 
 2) Read the user-settable options at the top of auto-pelab.ns and change them
