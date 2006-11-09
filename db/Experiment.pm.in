@@ -1022,6 +1022,10 @@ sub CleanLogFiles($)
     closedir(DIR);
 
     foreach my $file (@files) {
+	# Just in case ...
+	next
+	    if ($file =~ /^.*\.ns$/);
+	
 	push(@delete, "${workdir}/$1")
 	    if ($file =~ /^(.*\.(log|ptop|top|assign))$/);
 
