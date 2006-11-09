@@ -126,17 +126,26 @@ set hwtype "pc"
 # be started by the 'start-experiment' script
 #
 if {$do_bsd} {
-    set serverprog "/usr/local/etc/emulab/emulab-iperf -s "
+    set sstr "/usr/local/etc/emulab/emulab-iperf -s "
     # NOTE: No client support for now, you'll have to run the client yourself
-    set clientprog "/usr/local/etc/emulab/emulab-iperf -t 60 -c "
+    set cstr "/usr/local/etc/emulab/emulab-iperf -t 60 -c "
 } else {
-    set serverprog "/usr/bin/iperf -s "
+    set sstr "/usr/bin/iperf -s "
     # NOTE: No client support for now, you'll have to run the client yourself
-    set clientprog "/usr/bin/iperf -t 60 -c "
+    set cstr "/usr/bin/iperf -t 60 -c "
 }
+set serverprog $sstr
+set clientprog $cstr
+
+#
+# Application to run automatically on all nodes (planet, plab or elab)
+#
+set allnodesprog "/bin/true"
 
 #
 # If non-zero, uses the new stub (magent) instead of the old one
+# If set to 1, uses the new stub as a receiver
+# If set to 2, uses a separate iperfd to receive traffic
 #
 set use_magent 1
 
@@ -149,10 +158,17 @@ if {$do_bsd} {
 }
 
 #
-# If dbmonitor is set, this is the interval in seconds at which to poll the DB
-# and potentially update the shaping characteristics
+# If dbmonitor is set, these are the intervals at which the latency and BW
+# data are sampled by bgmon on the plab nodes (zero means use the default).
+# The smaller (shorter interval) of the two, is used as the interval at which
+# dbmonitor polls the DB to get data recorded by bgmon.
 #
-set dbmonitor_interval 10
+set dbmonitor_latinterval 10
+set dbmonitor_bwinterval 0
+
+# Get these into the environment for dbmonitor to read
+set opt(DBMONITOR_LATINTERVAL) $dbmonitor_latinterval
+set opt(DBMONITOR_BWINTERVAL) $dbmonitor_bwinterval
 
 #
 # If non-zero, limits the number of slots in the queues for the fake PlanetLab
@@ -161,9 +177,12 @@ set limit_fake_queue_slots 0
 
 #
 # Use this to set a unique port so that you don't collide with others on the
-# same node. Only supported when use_magent is 1
+# same node. Only supported when use_magent is set
 #
 set stub_port 3149
+
+# XXX for internal use only
+set no_stub 0
 
 #
 # Enforce no_plab requirements
@@ -172,6 +191,14 @@ if {$no_plab} {
     set fake_plab 0
     set real_plab 0
     set use_dbmonitor 1
+}
+
+#
+# Enforce USE_DBMONITOR requirements
+#
+if {$use_dbmonitor} {
+    set use_magent 0
+    set no_stub 1
 }
 
 # End of user-settable options
@@ -214,6 +241,10 @@ if {$do_bsd} {
 
 if {$use_magent} {
     set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh --peerserverport=$stub_peer_port --monitorserverport=$stub_command_port"
+    # XXX woeful, and hopefully temporary, hack
+    if {$use_magent == 2} {
+	set opt(MAGENT_NORECV) 1
+    }
 } else {
     set stubcommand "/bin/sh /local/pelab/stub/auto-stub.sh"
 }
@@ -243,11 +274,13 @@ set planetservers {}
 set serverlist {}
 set clientlist {}
 set tflist {}
+set anlist {}
 
 #
 # Create all of the nodes
 #
 set tfix 1
+set anix 1
 for {set i 1} {$i <= $num_pcs} {incr i} {
 
     if {$real_plab} {
@@ -260,9 +293,13 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
         tb-set-node-tarfiles $planet($i) $tarfiles
         tb-set-node-rpms $planet($i) $plab_rpms
+
         set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
+	set allnodes($anix) [$planet($i) program-agent -command $allnodesprog]
+	lappend anlist $allnodes($anix)
+	incr anix
 
         if {[llength $plabsites] > 0} {
             set why_doesnt_tcl_have_concat "*&"
@@ -287,6 +324,9 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
         set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
 	lappend tflist $tfupdate($tfix)
 	incr tfix
+	set allnodes($anix) [$plab($i) program-agent -command $allnodesprog]
+	lappend anlist $allnodes($anix)
+	incr anix
     }
 
     set elab($i) [$ns node]
@@ -308,6 +348,9 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
     lappend tflist $tfupdate($tfix)
     incr tfix
+    set allnodes($anix) [$elab($i) program-agent -command $allnodesprog]
+    lappend anlist $allnodes($anix)
+    incr anix
 
     #
     # If the user has given a plabnodes list, we set up $opt variables so that
@@ -321,11 +364,12 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
 #
 # Run the DB monitor on ops
+# Intervals are passed via the environment.
 #
 if {$use_dbmonitor} {
     set dbmonitor [new Program $ns]
     $dbmonitor set node "ops"
-    $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl -i $dbmonitor_interval $pid $eid"
+    $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl $pid $eid"
     $dbmonitor set expected-exit-code $ecode
     set monitorlist $dbmonitor
 }
@@ -348,6 +392,7 @@ set allservers [$ns event-group $serverlist]
 set allclients [$ns event-group $clientlist]
 
 set tfhosts [$ns event-group $tflist]
+set anhosts [$ns event-group $anlist]
 
 set tracelist {}
 
@@ -452,14 +497,16 @@ if {$no_plab || $real_plab} {
 
     # stop stubs and monitors
     $start append "$ns log \"##### Stopping stubs and monitors...\""
-    if {$real_plab} {
+    if {!$no_stub && $real_plab} {
 	$start append "$planetstubs stop"
     }
     $start append "$monitorgroup stop"
 
     # stop servers
-    $start append "$ns log \"##### Stopping servers...\""
-    $start append "$allservers stop"
+    if {$serverprog != ""} {
+	$start append "$ns log \"##### Stopping servers...\""
+	$start append "$allservers stop"
+    }
 
     # stop link logging
     $start append "$ns log \"##### Roll link trace logs...\""
@@ -505,12 +552,14 @@ if {$no_plab || $real_plab} {
     }
 
     # restart servers
-    $start append "$ns log \"##### Starting server...\""
-    $start append "$allservers start"
+    if {$serverprog != ""} {
+	$start append "$ns log \"##### Starting server...\""
+	$start append "$allservers start"
+    }
 
     # restart stubs and monitors
     $start append "$ns log \"##### Starting stubs and monitors...\""
-    if {$real_plab} {
+    if {!$no_stub && $real_plab} {
 	$start append "$planetstubs start"
     }
     $start append "$monitorgroup start"
@@ -525,14 +574,16 @@ if {$no_plab || $real_plab} {
 
     # stop stubs and monitors
     $stop append "$ns log \"##### Stopping stubs and monitors...\""
-    if {$real_plab} {
+    if {!$no_stub && $real_plab} {
 	$stop append "$planetstubs stop"
     }
     $stop append "$monitorgroup stop"
 
     # stop servers
-    $stop append "$ns log \"##### Stopping servers...\""
-    $stop append "$allservers stop"
+    if {$serverprog != ""} {
+	$stop append "$ns log \"##### Stopping servers...\""
+	$stop append "$allservers stop"
+    }
 
     # stop link logging and save logs
     $stop append "$ns log \"##### Stop link tracing...\""
@@ -562,12 +613,16 @@ if {$fake_plab} {
 
     # stop stubs and monitors
     $start_fake append "$ns log \"##### Stopping stubs and monitors...\""
-    $start_fake append "$plabstubs stop"
+    if {!$no_stub} {
+	$start_fake append "$plabstubs stop"
+    }
     $start_fake append "$monitorgroup stop"
 
     # stop servers
-    $start_fake append "$ns log \"##### Stopping servers...\""
-    $start_fake append "$allservers stop"
+    if {$serverprog != ""} {
+	$start_fake append "$ns log \"##### Stopping servers...\""
+	$start_fake append "$allservers stop"
+    }
 
     # stop link logging
     $start_fake append "$ns log \"##### Roll link trace logs...\""
@@ -604,12 +659,16 @@ if {$fake_plab} {
     }
 
     # restart servers
-    $start_fake append "$ns log \"##### Starting server...\""
-    $start_fake append "$allservers start"
+    if {$serverprog != ""} {
+	$start_fake append "$ns log \"##### Starting server...\""
+	$start_fake append "$allservers start"
+    }
 
     # restart stubs and monitors
     $start_fake append "$ns log \"##### Starting stubs and monitors...\""
-    $start_fake append "$plabstubs start"
+    if {!$no_stub} {
+	$start_fake append "$plabstubs start"
+    }
     $start_fake append "$monitorgroup start"
 
     # gather up the data and inform the user
@@ -622,12 +681,16 @@ if {$fake_plab} {
 
     # stop stubs and monitors
     $stop_fake append "$ns log \"##### Stopping stubs and monitors...\""
-    $stop_fake append "$plabstubs stop"
+    if {!$no_stub} {
+	$stop_fake append "$plabstubs stop"
+    }
     $stop_fake append "$monitorgroup stop"
 
     # stop servers
-    $stop_fake append "$ns log \"##### Stopping servers...\""
-    $stop_fake append "$allservers stop"
+    if {$serverprog != ""} {
+	$stop_fake append "$ns log \"##### Stopping servers...\""
+	$stop_fake append "$allservers stop"
+    }
 
     # stop link logging and save logs
     $stop_fake append "$ns log \"##### Stop link tracing...\""
