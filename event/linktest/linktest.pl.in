@@ -648,7 +648,8 @@ sub write_rude_cfg {
     #	$millis		time to run
     #
     push @contents, "START NOW\n";
-    push @contents, "0000 $stream_id ON 3001 " 
+    # Let bind() choose the src port; any constant port may be already in use.
+    push @contents, "0000 $stream_id ON 0 " 
 	. $edge->dst . "-" . $edge->name
 	    . ":10001 CONSTANT $sample_size 20\n";
     if ($edge->delay) {

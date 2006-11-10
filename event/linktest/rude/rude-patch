@@ -550,6 +550,24 @@ diff -c -r1.1.1.1 -r1.2
 *** rude/parse.c	27 Jun 2006 17:50:14 -0000	1.1.1.1
 --- rude/parse.c	27 Jun 2006 18:28:48 -0000	1.2
 ***************
+*** 309,315 ****
+    new->tos = -1;  /* By default, don't set the TOS */
+  
+    /* Do sanity check to the given parameters */
+!   if((time < 0) || (sport < 1024) || ((typenum=check_type(type)) < 0) || 
+       (check_dst(dst,&new->dst) != 0)){
+      free(new);
+      RUDEBUG1("flow_on() - illegal argument values\n");
+--- 309,316 ----
+    new->tos = -1;  /* By default, don't set the TOS */
+  
+    /* Do sanity check to the given parameters */
+!   if((time < 0) || (sport > 0 && sport < 1024) || 
+!      ((typenum=check_type(type)) < 0) || 
+       (check_dst(dst,&new->dst) != 0)){
+      free(new);
+      RUDEBUG1("flow_on() - illegal argument values\n");
+***************
 *** 688,694 ****
 --- 688,696 ----
         /* NEW in 0.50: Enable flow "stop" - ZERO transmission rate... */
