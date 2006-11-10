@@ -371,7 +371,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
                         <input type=text
                                id='parameter_$name'
                                name=\"parameters[$name]\"
-                               value=\"\"
+                               value=\"" . $value . "\"
 	                       size=60
                                maxlength=1024>
                     </td>
@@ -474,9 +474,9 @@ elseif (!isset($exprun)) {
     $defaults['runid'] = $instance->NextRunID();
 
     #
-    # Get the current bindings for the template instance.
+    # Get the current bindings of the current run.
     #
-    $instance->Bindings($bindings);
+    $instance->RunBindings($instance->LastRunIdx(), $bindings);
     
     #
     # Allow formfields that are already set to override defaults
