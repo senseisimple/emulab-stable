@@ -472,31 +472,48 @@ sub vlanUnlock($) {
     # Send the command to apply what's in the edit buffer
     #
     my $ApplyRetVal = snmpitSetWarn($self->{SESS},[$EditOp,1,"apply","INTEGER"]);
-    $self->debug("Apply set: '$ApplyRetVal'\n");
-
-    #
-    # Loop waiting for the switch to tell us that it's finished applying the
-    # edits
-    #
-    $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
-    $self->debug("Apply gave $ApplyRetVal\n");
-    while ($ApplyRetVal eq "inProgress") { 
-        # Rate-limit our polling
-        select(undef,undef,undef,.1);
-	$ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
-	$self->debug("Apply gave $ApplyRetVal\n");
-        print ".";
+    if (!defined($ApplyRetVal)) {
+        $self->debug("Apply set: '$ApplyRetVal'\n");
+    } else {
+        $self->debug("Apply returned undef\n");
     }
 
-    #
-    # Tell the caller what happened
-    #
-    if ($ApplyRetVal ne "succeeded") {
+    if (!defined($ApplyRetVal) || $ApplyRetVal != 1) {
         print " FAILED\n";
-	warn("**** ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
-    } else { 
-        print " Succeeded\n";
-	$self->debug("Apply Succeeded.\n");
+	warn("**** ERROR: Failure attempting to apply VLAN changes ($ApplyRetVal)\n");
+    } else {
+
+        #
+        # No point in trying to do this part if the switch rejected our request
+        # to apply the edit buffer changes.
+        #
+        # Loop waiting for the switch to tell us that it's finished applying the
+        # edits
+        #
+        $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
+        if (!defined($ApplyRetVal)) {
+            $self->debug("Apply set: '$ApplyRetVal'\n");
+        } else {
+            $self->debug("Apply returned undef\n");
+        }
+        while ($ApplyRetVal eq "inProgress") { 
+            # Rate-limit our polling
+            select(undef,undef,undef,.1);
+            $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
+            $self->debug("Apply gave $ApplyRetVal\n");
+            print ".";
+        }
+
+        #
+        # Tell the caller what happened
+        #
+        if ($ApplyRetVal ne "succeeded") {
+            print " FAILED\n";
+            warn("**** ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
+        } else { 
+            print " Succeeded\n";
+            $self->debug("Apply Succeeded.\n");
+        }
     }
 
     #
