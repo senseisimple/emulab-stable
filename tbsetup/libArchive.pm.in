@@ -30,7 +30,8 @@ my $TB		= "@prefix@";
 my $MAINSITE    = @TBMAINSITE@;
 my $ARCHSUPPORT = @ARCHIVESUPPORT@;
 my $USEARCHIVE  = ($MAINSITE || $ARCHSUPPORT);
-my %ALLOWEDPID  = ("testbed" => 1, "compadres" => 1, "tbres" => 1);
+my %ALLOWEDPID  = ("testbed" => 1, "compadres" => 1, "tbres" => 1,
+		   "fightfire" => 1);
 # XXX
 my $ARCHIVEDIR  = "/usr/testbed/exparchive";
 my $TESTMODE    = @TESTMODE@;
