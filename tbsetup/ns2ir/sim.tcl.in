@@ -1662,10 +1662,15 @@ Simulator instproc make_event {outer event} {
 		    set etype REPORT
 		    ::GLOBALS::named-args $evargs {
 			-digester {}
+			-archive {}
 		    }
 		    if {$(-digester) != {}} {
 			set args "DIGESTER={$(-digester)}"
 		    }
+		    if {$(-archive) != {}} {
+			set args "ARCHIVE={$(-archive)} ${args}"
+		    }
+		    
 		}
 		"snapshot" {
 		    set otype SIMULATOR

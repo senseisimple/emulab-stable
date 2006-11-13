@@ -215,6 +215,8 @@ int send_report(simulator_agent_t sa, char *args)
 	char loghole_name[BUFSIZ];
 	int rc, retval;
 	FILE *file;
+	bool archive = true;
+	char * tmp;
 
 	assert(sa != NULL);
 	assert(args != NULL);
@@ -331,29 +333,44 @@ int send_report(simulator_agent_t sa, char *args)
 		fclose(file);
 		file = NULL;
 	}
+	
+	if ((rc = event_arg_get(args, "ARCHIVE", &tmp)) > 0) {
+		if (rc == 4 && strncmp(tmp, "true", 4) == 0) {
+			archive = true;
+		} else if (rc == 5 && strncmp(tmp, "false", 5) == 0) {
+			archive = false;
+		} else {
+			error("ARCHIVE must be \"true\" or \"false\"\n");
+		}
+	} 
 
-	if ((file = popenf("loghole --port=%d --quiet archive --delete", "r",
-			   DEFAULT_RPC_PORT)) == NULL) {
-		strcpy(loghole_name, eid);
-		error("failed to archive log holes\n");
+	if (archive) {
+		if ((file = popenf("loghole --port=%d --quiet archive --delete", 
+				   "r", DEFAULT_RPC_PORT)) == NULL) {
+			strcpy(loghole_name, eid);
+			error("failed to archive log holes\n");
+		}
+		else {
+			int len;
+			
+			fgets(loghole_name, sizeof(loghole_name), file);
+			pclose(file);
+			file = NULL;
+			
+			len = strlen(loghole_name);
+			if (loghole_name[len - 1] == '\n')
+				loghole_name[len - 1] = '\0';
+		}
 	}
 	else {
-		int len;
-		
-		fgets(loghole_name, sizeof(loghole_name), file);
-		pclose(file);
-		file = NULL;
-
-		len = strlen(loghole_name);
-		if (loghole_name[len - 1] == '\n')
-			loghole_name[len - 1] = '\0';
+		loghole_name[0] = '\0';
 	}
 
 	if (systemf("mail -s \"%s: %s/%s experiment report\" %s "
 		    "< logs/report.mail",
 		    OURDOMAIN,
 		    pid,
-		    loghole_name,
+		    loghole_name[0] ? loghole_name : eid,
 		    getenv("USER")) != 0) {
 		errorc("could not execute send report\n");
 		retval = -1;
