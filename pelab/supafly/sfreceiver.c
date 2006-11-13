@@ -13,7 +13,7 @@ int optind,opterr,optopt;
 int block_size = 4096;
 /** -m <middleman hostname> */
 char *middleman_host = "localhost";
-/** -M <middleman hostport> */
+/** -R <middleman hostport> */
 short middleman_port = MIDDLEMAN_RECV_CLIENT_PORT;
 int debug = 0;
 
@@ -24,8 +24,13 @@ char *deadbeef = "deadbeef";
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -cudR  (option defaults in parens)\n",
-	    bin
+	    "USAGE: %s -cudR  (option defaults in parens)\n"
+	    "  -s <block_size>  rx block size (%d)\n"
+	    "  -m <hostname>    Middleman host to connect to (%s)\n"
+	    "  -R <port>        Middle port to connect to (%d)\n"
+	    "  -d[d..d]         Enable various levels of debug output\n"
+	    "  -u               Print this msg\n",
+	    bin,block_size,middleman_host,middleman_port
 	    );
 }
 
@@ -134,7 +139,9 @@ int main(int argc,char **argv) {
     while (1) {
 	bytesRead = 0;
 	while (bytesRead < block_size) {
-	    retval = read(recv_sock,buf,block_size);
+	    retval = read(recv_sock,
+			  &buf[(block_size - bytesRead)],
+			  (block_size - bytesRead));
 
 	    if (retval < 0) {
 		if (errno == ECONNRESET) {

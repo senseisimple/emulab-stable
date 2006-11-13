@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <fcntl.h>
 
 #include "defs.h"
 #include "crypto.h"
@@ -27,13 +28,28 @@ int debug = 0;
 
 char *deadbeef = "deadbeef";
 
+int ack_count = 0;
+
+int unack_threshold = -1;
+
 /** 
  * functions
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -scCpPmMud  (option defaults in parens)\n",
-	    bin
+	    "USAGE: %s -scCpPmMudba  (option defaults in parens)\n"
+	    "  -s <block_size>  tx block size (%d)\n"
+	    "  -c <block_count> tx block size (%d)\n"
+	    "  -C <msg_count>   number of times to send block_count msgs (%d)\n"
+	    "  -p <time>        Microseconds to pause between block sends (%d)\n"
+	    "  -P <time>        Microseconds to pause between msg sends (%d)\n"
+	    "  -m <hostname>    Middleman host to connect to (%s)\n"
+	    "  -M <port>        Middle port to connect to (%d)\n"
+	    "  -a <threshold>   Stop sending if gte threshold unack'd blocks remain (if less than 0, never wait) (%d)\n"
+	    "  -d[d..d]         Enable various levels of debug output\n"
+	    "  -u               Print this msg\n",
+	    bin,block_size,block_count,msg_count,block_pause_us,msg_pause_us,
+	    middleman_host,middleman_port,unack_threshold
 	    );
 }
 
@@ -41,7 +57,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:ud")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:uda:b")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -94,6 +110,13 @@ void parse_args(int argc,char **argv) {
 	case 'd':
 	    ++debug;
 	    break;
+	case 'a':
+	    unack_threshold = (int)strtol(optarg,&ep,10);
+	    if (ep == optarg) {
+		usage(argv[0]);
+		exit(-1);
+	    }
+	    break;
 	default:
 	    break;
 	}
@@ -120,11 +143,13 @@ int main(int argc,char **argv) {
     int retval;
     int bytesWritten;
     struct timeval tv;
+    int ack_count;
     
     parse_args(argc,argv);
 
     remaining_block_count = block_count;
     remaining_msg_count = msg_count;
+    ack_count = 0;
 
     /* initialize ourself... */
     srand(time(NULL));
@@ -165,6 +190,9 @@ int main(int argc,char **argv) {
 		sizeof(struct sockaddr_in)) < 0) {
 	efatal("could not connect to middleman");
     }
+
+    /* set nonblocking so we can read acks at low priority */
+    fcntl(send_sock,F_SETFL,O_NONBLOCK);
     
     /* heh, we don't do encryption!  that way, if the middleman
      * does a decrypt/encrypt with the same keys/iv, they should forward
@@ -186,6 +214,9 @@ int main(int argc,char **argv) {
 		    if (errno == EPIPE) {
 			efatal("while writing to middleman");
 		    }
+		    else if (errno == EAGAIN) {
+			;
+		    }
 		    else {
 			ewarn("while writing to middleman");
 		    }
@@ -205,9 +236,10 @@ int main(int argc,char **argv) {
 
 	    if (remaining_block_count % 8 == 0) {
 		fprintf(stdout,
-			"INFO: %d blocks remaining in msg %d\n",
+			"INFO: %d blocks remaining in msg %d; %d acks\n",
 			remaining_block_count,
-			msg_count - remaining_msg_count);
+			msg_count - remaining_msg_count,
+			ack_count);
 	    }
 
 	    /* interblock sleep time */
@@ -217,9 +249,32 @@ int main(int argc,char **argv) {
 		}
 	    }
 
+	    /* check for acks... */
+	    /* just read one right away to stay ahead of the game... */
+	    while (read(send_sock,&buf[0],sizeof(char)) == sizeof(char)) {
+		++ack_count;
+	    }
+
+	    if (unack_threshold > -1) {
+		while (((block_count - remaining_block_count) - ack_count) > unack_threshold) {
+		    warn("hit the unack threshold!");
+		    
+		    /* sleep until we get ack'd */
+		    if (usleep(100*1000) < 0) {
+			ewarn("sleep at ack edge failed");
+		    }
+		    
+		    if (read(send_sock,&buf[0],sizeof(char)) == sizeof(char)) {
+			++ack_count;
+		    }
+		}
+	    }
+	    
 	}
 
+	remaining_block_count = block_size;
 	--remaining_msg_count;
+	ack_count = 0;
 
 	fprintf(stdout,
 		"INFO: only %d msgs remaining\n",

@@ -20,13 +20,24 @@ short srv_recv_port = MIDDLEMAN_RECV_CLIENT_PORT;
 
 char *deadbeef = "deadbeef";
 
+int pushback = 0;
+
 /**
  * defs
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -scohSRud  (option defaults in parens)\n",
-	    bin
+	    "USAGE: %s -scohSRudb  (option defaults in parens)\n"
+	    "  -s <block_size>  tx block size (%d)\n"
+	    "  -c <block_count> tx block size (%d)\n"
+	    "  -h <hostname>    Listen on this host/addr (INADDR_ANY)\n"
+	    "  -S <port>        Listen on this port for one sender at a time (%d)\n"
+	    "  -R <port>        Listen on this port for receivers (%d)\n"
+	    "  -o               Only encrypt (instead of dec/enc)\n"
+	    "  -b               Ack all received blocks from sender AFTER crypto\n"
+	    "  -d[d..d]         Enable various levels of debug output\n"
+	    "  -u               Print this msg\n",
+	    bin,block_size,block_count,srv_send_port,srv_recv_port
 	    );
 }
 
@@ -34,7 +45,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:S:R:h:oud")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:S:R:h:oudb")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -75,6 +86,9 @@ void parse_args(int argc,char **argv) {
 	    exit(0);
 	case 'd':
 	    ++debug;
+	    break;
+	case 'b':
+	    pushback = 1;
 	    break;
 	default:
 	    break;
@@ -233,6 +247,7 @@ int main(int argc,char **argv) {
 
 		/* zero the counter */
 		current_send_rc = 0;
+		block_count = 0;
 	    }
 	    else if (FD_ISSET(srv_recv_sock,&rfds)) {
 		struct sockaddr_in client_sin;
@@ -321,6 +336,7 @@ int main(int argc,char **argv) {
 			send_client_fd = -1;
 
 			current_send_rc = 0;
+			block_count = 0;
 
 			if (debug > 1) {
 			    fprintf(stderr,
@@ -343,6 +359,7 @@ int main(int argc,char **argv) {
 		    send_client_fd = -1;
 		    
 		    current_send_rc = 0;
+		    block_count = 0;
 
 		    if (debug > 1) {
 			fprintf(stderr,
@@ -358,6 +375,8 @@ int main(int argc,char **argv) {
 		    current_send_rc = 0;
 
 		    ++block_count;
+
+		    /* wait to send ack until after crypto */
 
 		    /* end of block, do the encryption op and note times... */
 		    if (debug > 1) {
@@ -401,6 +420,15 @@ int main(int argc,char **argv) {
 			    t3.tv_sec * 1000 + t3.tv_usec,
 			    t2.tv_sec + t2.tv_usec / 1000000.0f);
 		    fflush(stdout);
+
+		    /**
+		     * send the ack after crypto ops...
+		     */
+		    if (pushback) {
+			if ((retval = write(send_client_fd,&buf[0],sizeof(char))) < 0) {
+			    ewarn("failed to send ack");
+			}
+		    }
 		    
 		    if (debug > 1) {
 			fprintf(stderr,
