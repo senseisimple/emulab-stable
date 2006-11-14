@@ -26,3 +26,4 @@ tbsetup/plab/libdslice
 tool/svn/svn_load_dirs.pl
 copyrights 
 hyperviewer/hypviewer 
+www/sec-check
