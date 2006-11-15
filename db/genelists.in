@@ -27,6 +27,7 @@ sub usage() {
 sub ActiveUsers();
 sub RecentUsers();
 sub RecentProjects();
+sub RecentProjectLeaders();
 sub Users();
 sub WideAreaPeople();
 sub ProjectLeaders();
@@ -239,6 +240,9 @@ RecentUsers()
 RecentProjects()
     if ($all || $activity || $update);
 
+RecentProjectLeaders()
+    if ($all || $activity || $update);
+
 Users()
     if ($all || defined($user));
 
@@ -359,6 +363,36 @@ sub RecentProjects()
     $userlist .= "$TBACTIVE";
 
     genelist($query_result, $userlist, "emulab-recently-active-projects", 0);
+}
+
+#
+# Recently active projects (leaders).
+#
+sub RecentProjectLeaders()
+{
+    my $userlist;
+    my $query_result;
+
+    my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
+
+    if (! ($query_result =
+	   DBQuery("select distinct u.usr_email from project_stats as s ".
+		   "left join group_membership as g on ".
+		   "  g.pid=s.pid and g.gid=g.pid ".
+		   "left join users as u on u.uid=g.uid ".
+                   "left join projects as p on u.uid=p.head_uid ".
+		   "where u.status='active' and ".
+		   "      ((UNIX_TIMESTAMP(now()) - ".
+		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
+                   " and p.pid is not null " .
+		   "order by u.usr_email"))) {
+	DBFatal("Getting Recently Active Project Leaders!");
+    }
+    $userlist  = "$TBOPS\n";
+    $userlist .= "$TBACTIVE";
+
+    genelist($query_result, $userlist,
+             "emulab-recently-active-project-leaders", 0);
 }
 
 #
