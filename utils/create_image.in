@@ -27,7 +27,7 @@ my $maxwait      = (40 * 60);
 my $idlewait     = ( 8 * 60);
 my $reportwait   = ( 2 * 60);
 my $checkwait    = 15;
-my $maximagesize = (4 * 1024**3); # 4GB
+my $maximagesize = (6 * 1024**3); # 6GB
 
 #
 # Create a disk image.
