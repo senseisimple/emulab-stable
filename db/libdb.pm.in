@@ -299,6 +299,7 @@ else {
     }
     sub MakeA ( $ ) {
 	my ($obj) = @_;
+	return unless defined $obj;
 	bless ($obj);
 	$DB_PID{obj_hash($obj)} = $$;
     }
