@@ -1,12 +1,12 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
 
-echo "${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
+echo "`date`: ${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
 
 if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
 then
@@ -65,7 +65,7 @@ fi
 #
 $BINDIR/sethostname.dhclient >$LOGDIR/dhclient.log 2>&1
 
-echo "${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
+echo "`date`: ${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
 
 #
 # The killing of dhclient and shutdown of other interfaces is handled
