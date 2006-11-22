@@ -21,7 +21,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches cvsinit checkquota \
-		  spewconlog opsdb_control
+		  spewconlog opsdb_control daemon_wrapper
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
                   websetdest spewsource weblinkmon_ctl webcvsweb \
 		  webspewconlog xlogin webviewvc spewevents
