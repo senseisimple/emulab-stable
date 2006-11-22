@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -239,7 +239,8 @@ int
 PacketReceive(Packet_t *p)
 {
 	struct sockaddr_in from;
-	int		   mlen, alen;
+	int		   mlen;
+	unsigned int	   alen;
 
 	alen = sizeof(from);
 	bzero(&from, alen);
