@@ -96,8 +96,14 @@ case "$1" in
 		# else is setup first; i.e., run this last!
 		#
 		if [ -x @prefix@/sbin/batch_daemon  ]; then
-			echo -n " batchd"
-			@prefix@/sbin/batch_daemon
+			echo -n " batchd wrapper "
+			if [ -x @prefix@/sbin/daemon_wrapper ]; then
+				@prefix@/sbin/daemon_wrapper \
+				  -i 30 -l @prefix@/log/batchlog \
+				  @prefix@/sbin/batch_daemon -d
+			else
+				@prefix@/sbin/batch_daemon
+			fi
 		fi
 		;;
 	stop)

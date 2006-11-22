@@ -4,9 +4,10 @@
 #
 case "$1" in
 	start)
-		if [ -x @prefix@/sbin/dhcpd_wrapper ]; then
-			echo -n " dhcpd_wrapper"
-			@prefix@/sbin/dhcpd_wrapper
+		if [ -x @prefix@/sbin/daemon_wrapper ]; then
+			echo -n " dhcpd wrapper"
+			@prefix@/sbin/daemon_wrapper \
+			  /usr/local/sbin/dhcpd -f
 		fi
 		;;
 	stop)
