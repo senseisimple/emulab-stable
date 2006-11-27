@@ -38,6 +38,7 @@ else {
     #
     $returning = 0;
 }
+unset($addpubkeyargs);
 
 $ACCOUNTWARNING =
     "Before continuing, please make sure your username " .
@@ -57,7 +58,7 @@ function SPITFORM($formfields, $returning, $errors)
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDOCBASE, $WWWHOST;
     global $usr_keyfile, $FirstInitState;
     global $ACCOUNTWARNING, $EMAILWARNING;
-    global $WIKISUPPORT, $WIKIHOME;
+    global $WIKISUPPORT, $WIKIHOME, $USERSELECTUIDS;
     
     PAGEHEADER("Start a New Testbed Project");
 
@@ -164,28 +165,30 @@ function SPITFORM($formfields, $returning, $errors)
               </tr>\n";
 
         #
-        # UserName:
+        # UID:
         #
-        echo "<tr>
-                  <td colspan=2>*<a
-                         href='docwrapper.php3?docname=security.html'
-                         target=_blank>Username</a>
-                            (alphanumeric, lowercase):</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[proj_head_uid]\"
-                             value=\"" . $formfields[proj_head_uid] . "\"
-	                     size=$TBDB_UIDLEN
-                             onchange=\"alert('$ACCOUNTWARNING')\"
-	                     maxlength=$TBDB_UIDLEN>
-                  </td>
-              </tr>\n";
+	if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	    echo "<tr>
+                      <td colspan=2>*<a
+                             href='docwrapper.php3?docname=security.html'
+                             target=_blank>Username</a>
+                                (alphanumeric, lowercase):</td>
+                      <td class=left>
+                          <input type=text
+                                 name=\"formfields[proj_head_uid]\"
+                                 value=\"" . $formfields[proj_head_uid] . "\"
+	                         size=$TBDB_UIDLEN
+                                 onchange=\"alert('$ACCOUNTWARNING')\"
+	                         maxlength=$TBDB_UIDLEN>
+                      </td>
+                  </tr>\n";
+	}
 
 	#
 	# Full Name
 	#
         echo "<tr>
-                  <td colspan=2>*Full Name:</td>
+                  <td colspan=2>*Full Name (first and last):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_name]\"
@@ -351,6 +354,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
+                             value=\"$formfields[password1]\"
                              size=8></td>
               </tr>\n";
 
@@ -359,6 +363,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
+                             value=\"$formfields[password2]\"
                              size=8></td>
              </tr>\n";
     }
@@ -637,16 +642,18 @@ $errors = array();
 # These fields are required!
 #
 if (! $returning) {
-    if (!isset($formfields[proj_head_uid]) ||
-	strcmp($formfields[proj_head_uid], "") == 0) {
-	$errors["Username"] = "Missing Field";
-    }
-    elseif (!TBvalid_uid($formfields[proj_head_uid])) {
-	$errors["UserName"] = TBFieldErrorString();
-    }
-    elseif (TBCurrentUser($formfields[proj_head_uid]) ||
-	    posix_getpwnam($formfields[proj_head_uid])) {
-	$errors["UserName"] = "Already in use. Pick another";
+    if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	if (!isset($formfields[proj_head_uid]) ||
+	    strcmp($formfields[proj_head_uid], "") == 0) {
+	    $errors["Username"] = "Missing Field";
+	}
+	elseif (!TBvalid_uid($formfields[proj_head_uid])) {
+	    $errors["UserName"] = TBFieldErrorString();
+	}
+	elseif (TBCurrentUser($formfields[proj_head_uid]) ||
+		posix_getpwnam($formfields[proj_head_uid])) {
+	    $errors["UserName"] = "Already in use. Pick another";
+	}
     }
     if (!isset($formfields[usr_title]) ||
 	strcmp($formfields[usr_title], "") == 0) {
@@ -698,11 +705,8 @@ if (! $returning) {
         #
         # Treat this error separate. Not allowed.
         #
-	PAGEHEADER("Start a New Testbed Project");
-	USERERROR("The email address '$formfields[usr_email]' is already in ".
-		  "use by another user.<br>Perhaps you have ".
-		  "<a href='password.php3?email=$formfields[usr_email]'>".
-		  "forgotten your username.</a>", 1);
+	$errors["Email Address"] =
+	    "Already in use. <b>Did you forget to login?</b>";
     }
     if (isset($formfields[usr_URL]) &&
 	strcmp($formfields[usr_URL], "") &&
@@ -768,7 +772,9 @@ if (! $returning) {
     elseif (strcmp($formfields[password1], $formfields[password2])) {
 	$errors["Confirm Password"] = "Does not match Password";
     }
-    elseif (! CHECKPASSWORD($formfields[proj_head_uid],
+    elseif (! CHECKPASSWORD((($USERSELECTUIDS ||
+			     $FirstInitState == "createproject") ?
+			     $formfields[proj_head_uid] : "ignored"),
 			    $formfields[password1],
 			    $formfields[usr_name],
 			    $formfields[usr_email], $checkerror)) {
@@ -856,6 +862,82 @@ if (isset($formfields[proj_linked]) &&
     $errors["Link to Us"] = "Bad Value";
 }
 
+# Present these errors before we call out to do pubkey stuff; saves work.
+if (count($errors)) {
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+# Okay, do pubkey checks.
+if (!$returning) {
+    #
+    # Pub Key.
+    #
+    if (isset($formfields[usr_key]) &&
+	strcmp($formfields[usr_key], "")) {
+        #
+        # This is passed off to the shell, so taint check it.
+        # 
+	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
+	    $errors["PubKey"] = "Invalid characters";
+	}
+	else {
+            #
+            # Replace any embedded newlines first.
+            #
+	    $formfields[usr_key] =
+		ereg_replace("[\n]", "", $formfields[usr_key]);
+	    $usr_key = $formfields[usr_key];
+
+            #
+            # Verify key format.
+            #
+	    if (ADDPUBKEY(null, "webaddpubkey -n -k '$usr_key' ")) {
+		$errors["Pubkey Format"] =
+		    "Could not be parsed. Is it a public key?";
+	    }
+	    else {
+		$addpubkeyargs = "-k '$usr_key' ";
+	    }
+	}
+    }
+
+    #
+    # If usr provided a file for the key, it overrides the paste in text.
+    #
+    if (isset($_FILES['usr_keyfile']) &&
+	$_FILES['usr_keyfile']['name'] != "" &&
+	$_FILES['usr_keyfile']['name'] != "none") {
+
+	$localfile = $_FILES['usr_keyfile']['tmp_name'];
+
+	if (! stat($localfile)) {
+	    $errors["PubKey File"] = "No such file";
+	}
+        # Taint check shell arguments always! 
+	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+	    $errors["PubKey File"] = "Invalid characters";
+	}
+	else {
+	    chmod($localfile, 0644);
+
+            #
+            # Verify key format.
+            #
+	    if (ADDPUBKEY(null, "webaddpubkey -n $localfile ")) {
+		$errors["Pubkey Format"] =
+		    "Could not be parsed. Is it a public key?";
+	    }
+	    else {
+		$addpubkeyargs = "$localfile";
+	    }
+	    
+	}
+    }
+}
+
+# Done with sanity checks!
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
     PAGEFOOTER();
@@ -866,7 +948,9 @@ if (count($errors)) {
 # Certain of these values must be escaped or otherwise sanitized.
 #
 if (!$returning) {
-    $proj_head_uid     = $formfields[proj_head_uid];
+    $proj_head_uid     = (($USERSELECTUIDS ||
+			   $FirstInitState == "createproject") ?
+			  null : $formfields[proj_head_uid]);
     $usr_title         = addslashes($formfields[usr_title]);
     $usr_name          = addslashes($formfields[usr_name]);
     $usr_affil         = addslashes($formfields[usr_affil]);
@@ -898,87 +982,57 @@ if (!$returning) {
 	$usr_addr2 = addslashes($formfields[usr_addr2]);
     }
 
-    #
-    # Pub Key.
-    #
-    if (isset($formfields[usr_key]) &&
-	strcmp($formfields[usr_key], "")) {
-        #
-        # This is passed off to the shell, so taint check it.
-        # 
-	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	    $errors["PubKey"] = "Invalid characters";
-	}
-	else {
-            #
-            # Replace any embedded newlines first.
-            #
-	    $formfields[usr_key] =
-		ereg_replace("[\n]", "", $formfields[usr_key]);
-	    $usr_key = $formfields[usr_key];
-	    $addpubkeyargs = "-k $proj_head_uid '$usr_key' ";
-	}
+    $args = array();
+    $args["usr_expires"]   = $proj_expires;
+    $args["usr_name"]	   = $usr_name;
+    $args["usr_email"]     = $usr_email;
+    $args["usr_addr"]      = $usr_addr;
+    $args["usr_addr2"]     = $usr_addr2;
+    $args["usr_city"]      = $usr_city;
+    $args["usr_state"]     = $usr_state;
+    $args["usr_zip"]       = $usr_zip;
+    $args["usr_country"]   = $usr_country;
+    $args["usr_URL"]       = $usr_URL;
+    $args["usr_phone"]     = $usr_phone;
+    $args["usr_shell"]     = 'tcsh';
+    $args["usr_title"]     = $usr_title;
+    $args["usr_affil"]     = $usr_affil;
+    $args["usr_pswd"]      = crypt("$password1");
+    $args["wikiname"]      = $wikiname;
+
+    if (! ($leader = User::NewUser($proj_head_uid, 1, 0, $args))) {
+	TBERROR("Could not create new user '$usr_email'!", 1);
     }
+    # If null; used below
+    $proj_head_uid = $leader->uid();
 
-    #
-    # If usr provided a file for the key, it overrides the paste in text.
-    #
-    if (isset($_FILES['usr_keyfile']) &&
-	$_FILES['usr_keyfile']['name'] != "" &&
-	$_FILES['usr_keyfile']['name'] != "none") {
-
-	$localfile = $_FILES['usr_keyfile']['tmp_name'];
-
-	if (! stat($localfile)) {
-	    $errors["PubKey File"] = "No such file";
-	}
-        # Taint check shell arguments always! 
-	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
-	    $errors["PubKey File"] = "Invalid characters";
-	}
-	else {
-	    $addpubkeyargs = "$proj_head_uid $usr_keyfile";
-	    chmod($usr_keyfile, 0644);	
-	}
-    }
-    #
-    # Verify key format.
-    #
-    if (isset($addpubkeyargs) &&
-	ADDPUBKEY($proj_head_uid, "webaddpubkey -n $addpubkeyargs")) {
-	$errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
-    }
-
-    if (count($errors)) {
-	SPITFORM($formfields, $returning, $errors);
-	PAGEFOOTER();
-	return;
+    if (isset($addpubkeyargs)) {
+	ADDPUBKEY($proj_head_uid,
+		  "webaddpubkey -u $proj_head_uid $addpubkeyargs");
     }
 }
 else {
-    #
-    # Grab info from the DB for the email message below. Kinda silly.
-    #
-    $query_result =
-	DBQueryFatal("select * from users where uid='$proj_head_uid'");
-    
-    $row = mysql_fetch_array($query_result);
-    
-    $usr_title	   = $row[usr_title];
-    $usr_name	   = $row[usr_name];
-    $usr_affil	   = $row[usr_affil];
-    $usr_email	   = $row[usr_email];
-    $usr_addr	   = $row[usr_addr];
-    $usr_addr2     = $row[usr_addr2];
-    $usr_city	   = $row[usr_city];
-    $usr_state	   = $row[usr_state];
-    $usr_zip	   = $row[usr_zip];
-    $usr_country   = $row[usr_country];
-    $usr_phone	   = $row[usr_phone];
-    $usr_URL       = $row[usr_URL];
-    $wikiname      = $row[wikiname];
+    if (! ($leader = User::LookupByUid($proj_head_uid))) {
+	TBERROR("Could not lookup project leader '$proj_head_uid'!", 1);
+    }
+
+    $usr_title	   = $leader->title();
+    $usr_name	   = $leader->name();
+    $usr_affil	   = $leader->affil();
+    $usr_email	   = $leader->email();
+    $usr_addr	   = $leader->addr();
+    $usr_addr2     = $leader->addr2();
+    $usr_city	   = $leader->city();
+    $usr_state	   = $leader->state();
+    $usr_zip	   = $leader->zip();
+    $usr_country   = $leader->country();
+    $usr_phone	   = $leader->phone();
+    $usr_URL       = $leader->URL();
+    $wikiname      = $leader->wikiname();
     $usr_returning = "Yes";
 }
+
+# And the project details.
 $pid               = $formfields[pid];
 $proj_name	   = addslashes($formfields[proj_name]);
 $proj_URL          = addslashes($formfields[proj_URL]);
@@ -1026,59 +1080,6 @@ else {
     $ronpcs = 0;
 }
 
-#
-# Check that we can guarantee uniqueness of the unix group name.
-# 
-$query_result =
-    DBQueryFatal("select gid from groups where unix_name='$pid'");
-
-if (mysql_num_rows($query_result)) {
-    TBERROR("Could not form a unique Unix group name for $pid!", 1);
-}
-
-#
-# For a new user:
-# * Create a new account in the database.
-# * Generate a mail message to the user with the verification key.
-# 
-if (! $returning) {
-    $encoding    = crypt("$password1");
-
-    #
-    # Must be done before user record is inserted!
-    # XXX Since, user does not exist, must run as nobody. Script checks. 
-    # 
-    if (isset($addpubkeyargs)) {
-	ADDPUBKEY($proj_head_uid, "webaddpubkey $addpubkeyargs");
-    }
-
-    $args = array();
-    $args["usr_expires"]   = $proj_expires;
-    $args["usr_name"]	   = $usr_name;
-    $args["usr_email"]     = $usr_email;
-    $args["usr_addr"]      = $usr_addr;
-    $args["usr_addr2"]     = $usr_addr2;
-    $args["usr_city"]      = $usr_city;
-    $args["usr_state"]     = $usr_state;
-    $args["usr_zip"]       = $usr_zip;
-    $args["usr_country"]   = $usr_country;
-    $args["usr_URL"]       = $usr_URL;
-    $args["usr_phone"]     = $usr_phone;
-    $args["usr_shell"]     = 'tcsh';
-    $args["usr_title"]     = $usr_title;
-    $args["usr_affil"]     = $usr_affil;
-    $args["usr_pswd"]      = $encoding;
-    $args["wikiname"]      = $wikiname;
-
-    if (! ($leader = User::NewUser($proj_head_uid, 1, 0, $args))) {
-	TBERROR("Could not create new user '$proj_head_uid'!", 1);
-    }
-}
-else {
-    if (! ($leader = User::LookupByUid($proj_head_uid))) {
-	TBERROR("Could not lookup project leader '$proj_head_uid'!", 1);
-    }
-}
 
 #
 # Now for the new Project
@@ -1105,10 +1106,8 @@ if (! ($project = Project::NewProject($pid, $leader, $args))) {
 # If a new user, do not send the full blown message until verified.
 #
 if ($returning || $FirstInitState) {
-    #
-    # Grab the unix GID that was assigned.
-    #
-    TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
+    $unix_gid  = $project->unix_gid();
+    $unix_name = $project->unix_name();
 
     #
     # The mail message to the approval list.
@@ -1157,6 +1156,7 @@ else {
 	   "'$usr_name' wants to start project '$pid'.\n".
 	   "\n".
 	   "Name:            $usr_name ($proj_head_uid)\n".
+	   "Email:           $usr_email\n".
 	   "Returning User?: No\n".
 	   "\n".
 	   "No action is necessary until the user has verified the account.\n",

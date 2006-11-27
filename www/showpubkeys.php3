@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -270,7 +270,7 @@ if (isset($formfields[usr_key]) &&
         #
 	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
 	$usr_key = $formfields[usr_key];
-	$addpubkeyargs = "-k $target_uid '$usr_key' ";
+	$addpubkeyargs = "-k '$usr_key' ";
     }
 }
 
@@ -291,7 +291,7 @@ if (isset($_FILES['usr_keyfile']) &&
 	$errors["PubKey File"] = "Invalid characters";
     }
     else {
-	$addpubkeyargs = "$target_uid $localfile";
+	$addpubkeyargs = "$localfile";
 	chmod($localfile, 0644);	
     }
 }
@@ -325,7 +325,7 @@ if (count($errors)) {
 # Okay, first run the script in verify mode to see if the key is
 # parsable. If it is, then do it for real.
 #
-if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
+if (ADDPUBKEY($uid, "webaddpubkey -n -u $target_uid $addpubkeyargs")) {
     $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -334,7 +334,7 @@ if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
 #
 # Insert key, update authkeys files and nodes if appropriate.
 #
-ADDPUBKEY($uid, "webaddpubkey $addpubkeyargs");
+ADDPUBKEY($uid, "webaddpubkey -u $target_uid $addpubkeyargs");
 
 #
 # Redirect back, avoiding a POST in the history.

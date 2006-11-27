@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,7 +31,7 @@ if ($simple) {
 
 # Must use https!
 if (!isset($SSL_PROTOCOL)) {
-    PAGEHEADER("Forgot Your Username or Password?", $view);
+    PAGEHEADER("Forgot Your Password?", $view);
     USERERROR("Must use https:// to access this page!", 1);
 }
 
@@ -40,7 +40,7 @@ if (!isset($SSL_PROTOCOL)) {
 # 
 if (($known_uid = GETUID()) != FALSE) {
     if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
-	PAGEHEADER("Forgot Your Username or Password?", $view);
+	PAGEHEADER("Forgot Your Password?", $view);
 
 	echo "<h3>
               You are logged in. You must already know your password!
@@ -58,7 +58,7 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
 {
     global	$TBBASE;
     
-    PAGEHEADER("Forgot Your Username or Password?", $view);
+    PAGEHEADER("Forgot Your Password?", $view);
 
     if ($failed) {
 	echo "<center>
@@ -94,8 +94,6 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
              <td align=center colspan=2>
                  <b><input type=submit value=\"Reset Password\"
                            name=reset></b>
-                 <b><input type=submit value=\"Mail my Username\"
-                           name=tellme></b>
              </td>
           </tr>\n";
     
@@ -169,34 +167,6 @@ if (preg_replace("/[^0-9]/", "", $phone) !=
 TBUserInfo($uid, $uid_name, $uid_email);
 
 #
-# If just telling the user his account uid, send it and be done.
-#
-if (isset($tellme)) {
-    PAGEHEADER("Forgot Your Username?", $view);
-    
-    TBMAIL("$uid_name <$uid_email>",
-	   "Login ID requested by '$uid'",
-	   "\n".
-	   "Your Emulab login ID is '$uid'. Please use this ID when logging\n".
-	   "in at ${TBBASE}.\n".
-	   "\n".
-	   "The request originated from IP: " . $_SERVER['REMOTE_ADDR'] . "\n".
-	   "\n".
-	   "Thanks,\n".
-	   "Testbed Operations\n",
-	   "From: $TBMAIL_OPS\n".
-	   "Bcc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
-
-    echo "<br>
-          An email message has been sent to your account. In it you will find
-          your login ID.\n";
-
-    PAGEFOOTER();
-    exit(0);
-}
-
-#
 # Yep. Generate a random key and send the user an email message with a URL
 # that will allow them to change their password. 
 #
@@ -209,7 +179,7 @@ setcookie($TBAUTHCOOKIE, $keyA, 0, "/",
 	  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
 # It is okay to spit this now that we have sent the cookie.
-PAGEHEADER("Forgot Your Username or Password?", $view);
+PAGEHEADER("Forgot Your Password?", $view);
 
 DBQueryFatal("update users set ".
 	     "       chpasswd_key='$key', ".

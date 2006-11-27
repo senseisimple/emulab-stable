@@ -18,9 +18,10 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
 		  idletimes idlemail setsitevar audit changeuid changepid \
 		  elabinelab_bossinit update_permissions mysqld_watchdog \
 		  dumperrorlog
-LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
+LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert \
+		  webchangeuid
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
-		  NodeType.pm Interface.pm User.pm Group.pm Project.pm
+		  NodeType.pm Interface.pm User.pm Group.pm Project.pm 
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy dumperrorlog.proxy

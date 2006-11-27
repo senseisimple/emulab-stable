@@ -24,6 +24,7 @@ class Project
 	    return;
 	}
 	$this->project = mysql_fetch_array($query_result);
+	$this->group   = null;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -102,7 +103,6 @@ class Project
     function num_ron()       { return $this->field("num_ron"); }
     function why()           { return $this->field("why"); }
     function control_node()  { return $this->field("control_node"); }
-    function unix_gid()      { return $this->field("unix_gid"); }
     function approved()      { return $this->field("approved"); }
     function inactive()      { return $this->field("inactive"); }
     function date_inactive() { return $this->field("date_inactive"); }
@@ -116,6 +116,16 @@ class Project
     function linked_to_us()  { return $this->field("linked_to_us"); }
     function cvsrepo_public(){ return $this->field("cvsrepo_public"); }
 
+    function unix_gid() {
+	$group = $this->LoadGroup();
+	
+	return $group->unix_gid();
+    }
+    function unix_name() {
+	$group = $this->LoadGroup();
+
+	return $group->unix_name();
+    }
 
     #
     # Class function to create new project and return object.
@@ -190,17 +200,14 @@ class Project
 	    TBERROR("Project::LoadGroup: Could not load group $gid_idx!", 1);
 	}
 	$this->group = $group;
-	return 0;
+	return $group;
     }
 
     #
     # Add *new* member to project group; starts out with trust=none.
     #
     function AddNewMember($user) {
-	if (! $this->group) {
-	    $this->LoadGroup();
-	}
-	$group = $this->group;
+	$group = $this->LoadGroup();
 
 	return $group->AddNewMember($user);
     }
@@ -209,10 +216,7 @@ class Project
     # Check if user is a member of this project (well, group)
     #
     function IsMember($user) {
-	if (! $this->group) {
-	    $this->LoadGroup();
-	}
-	$group = $this->group;
+	$group = $this->LoadGroup();
 
 	return $group->IsMember($user);
     }

@@ -37,6 +37,7 @@ else {
 if (!isset($forwikionly)) {
     $forwikionly = 0;
 }
+unset($addpubkeyargs);
 
 $ACCOUNTWARNING =
     "Before continuing, please make sure your username " .
@@ -55,7 +56,7 @@ function SPITFORM($formfields, $returning, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN;
     global $ACCOUNTWARNING, $EMAILWARNING;
-    global $WIKISUPPORT, $forwikionly, $WIKIHOME;
+    global $WIKISUPPORT, $forwikionly, $WIKIHOME, $USERSELECTUIDS;
 
     if ($forwikionly)
 	PAGEHEADER("Wiki Registration");
@@ -146,29 +147,31 @@ function SPITFORM($formfields, $returning, $errors)
 	        "method=post>\n";
 
     if (! $returning) {
-        #
-        # UserName:
-        #
-        echo "<tr>
-                  <td colspan=2>*<a
-                         href='docwrapper.php3?docname=security.html'
-                         target=_blank>Username</a>
-                            (alphanumeric, lowercase):</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[joining_uid]\"
-                             value=\"" . $formfields[joining_uid] . "\"
-	                     size=$TBDB_UIDLEN
-                             onchange=\"alert('$ACCOUNTWARNING')\"
-	                     maxlength=$TBDB_UIDLEN>
-                  </td>
-              </tr>\n";
+	if ($USERSELECTUIDS) {
+            #
+            # UID.
+            #
+	    echo "<tr>
+                      <td colspan=2>*<a
+                             href='docwrapper.php3?docname=security.html'
+                             target=_blank>Username</a>
+                                (alphanumeric, lowercase):</td>
+                      <td class=left>
+                          <input type=text
+                                 name=\"formfields[joining_uid]\"
+                                 value=\"" . $formfields[joining_uid] . "\"
+	                         size=$TBDB_UIDLEN
+                                 onchange=\"alert('$ACCOUNTWARNING')\"
+	                         maxlength=$TBDB_UIDLEN>
+                      </td>
+                  </tr>\n";
+	}
 
 	#
 	# Full Name
 	#
         echo "<tr>
-                  <td colspan=2>*Full Name:</td>
+                  <td colspan=2>*Full Name (first and last):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_name]\"
@@ -341,6 +344,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
+                             value=\"$formfields[password1]\"
                              size=8></td>
               </tr>\n";
 
@@ -349,6 +353,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
+                             value=\"$formfields[password2]\"
                              size=8></td>
              </tr>\n";
     }
@@ -501,16 +506,18 @@ $errors = array();
 # These fields are required!
 #
 if (! $returning) {
-    if (!isset($formfields[joining_uid]) ||
-	strcmp($formfields[joining_uid], "") == 0) {
-	$errors["Username"] = "Missing Field";
-    }
-    elseif (!TBvalid_uid($formfields[joining_uid])) {
-	$errors["UserName"] = TBFieldErrorString();
-    }
-    elseif (TBCurrentUser($formfields[joining_uid]) ||
-	    posix_getpwnam($formfields[joining_uid])) {
-	$errors["UserName"] = "Already in use. Pick another";
+    if ($USERSELECTUIDS) {
+	if (!isset($formfields[joining_uid]) ||
+	    strcmp($formfields[joining_uid], "") == 0) {
+	    $errors["Username"] = "Missing Field";
+	}
+	elseif (!TBvalid_uid($formfields[joining_uid])) {
+	    $errors["UserName"] = TBFieldErrorString();
+	}
+	elseif (TBCurrentUser($formfields[joining_uid]) ||
+		posix_getpwnam($formfields[joining_uid])) {
+	    $errors["UserName"] = "Already in use. Pick another";
+	}
     }
     if (!isset($formfields[usr_name]) ||
 	strcmp($formfields[usr_name], "") == 0) {
@@ -561,14 +568,8 @@ if (! $returning) {
 	$errors["Email Address"] = TBFieldErrorString();
     }
     elseif (TBCurrentEmail($formfields[usr_email])) {
-        #
-        # Treat this error separate. Not allowed.
-        #
-	PAGEHEADER("Apply for Project Membership");
-	USERERROR("The email address '$formfields[usr_email]' is already in ".
-		  "use by another user.<br>Perhaps you have ".
-		  "<a href='password.php3?email=$formfields[usr_email]'>".
-		  "forgotten your username.</a>", 1);
+	$errors["Email Address"] =
+	    "Already in use. <b>Did you forget to login?</b>";
     }
     if (! $forwikionly) {
 	if (isset($formfields[usr_URL]) &&
@@ -636,18 +637,133 @@ if (! $returning) {
     elseif (strcmp($formfields[password1], $formfields[password2])) {
 	$errors["Confirm Password"] = "Does not match Password";
     }
-    elseif (! CHECKPASSWORD($formfields[joining_uid],
+    elseif (! CHECKPASSWORD(($USERSELECTUIDS ?
+			     $formfields[joining_uid] : "ignored"),
 			    $formfields[password1],
 			    $formfields[usr_name],
 			    $formfields[usr_email], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
 }
-if (!$forwikionly && (!isset($formfields[pid]) ||
-		      strcmp($formfields[pid], "") == 0)) {
-    $errors["Project Name"] = "Missing Field";
+if (!$forwikionly) {
+    if (!isset($formfields[pid]) || $formfields[pid] == "") {
+	$errors["Project Name"] = "Missing Field";
+    }
+    else {
+        # Confirm pid/gid early to avoid spamming the page.
+	$pid = $formfields[pid];
+
+	if (isset($formfields[gid]) && $formfields[gid] != "") {
+	    $gid = $formfields[gid];
+	}
+	else {
+	    $gid = $pid;
+	}
+
+	if (!TBvalid_pid($pid) || !TBValidProject($pid)) {
+	    $errors["Project Name"] = "Invalid Project Name";
+	}
+	elseif (!TBvalid_gid($gid) || !TBValidGroup($pid, $gid)) {
+	    $errors["Group Name"] = "Invalid Group Name";
+	}
+    }
 }
 
+# Present these errors before we call out to do pubkey stuff; saves work.
+if (count($errors)) {
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+# Okay, do pubkey checks.
+if (!$returning && !$forwikionly) {
+    #
+    # Pub key provided in form (paste in).
+    #
+    if (isset($formfields[usr_key]) &&
+	strcmp($formfields[usr_key], "")) {
+        #
+        # This is passed off to the shell, so taint check it.
+        # 
+	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
+	    $errors["PubKey"] = "Invalid characters";
+	}
+	else {
+            #
+            # Replace any embedded newlines first.
+            #
+	    $formfields[usr_key] =
+		ereg_replace("[\n]", "", $formfields[usr_key]);
+	    $usr_key = $formfields[usr_key];
+
+            #
+            # Verify key format.
+            #
+	    if (ADDPUBKEY(null, "webaddpubkey -n -k '$usr_key' ")) {
+		$errors["Pubkey Format"] =
+		    "Could not be parsed. Is it a public key?";
+	    }
+	    else {
+		$addpubkeyargs = "-k '$usr_key' ";
+	    }
+	}
+    }
+
+    #
+    # If usr provided a file for the key, it overrides the paste in text.
+    #
+    if (isset($_FILES['usr_keyfile']) &&
+	$_FILES['usr_keyfile']['name'] != "" &&
+	$_FILES['usr_keyfile']['name'] != "none") {
+
+	$localfile = $_FILES['usr_keyfile']['tmp_name'];
+
+	if (! stat($localfile)) {
+	    $errors["PubKey File"] = "No such file";
+	}
+        # Taint check shell arguments always! 
+	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+	    $errors["PubKey File"] = "Invalid characters";
+	}
+	else {
+	    chmod($localfile, 0644);
+
+            #
+            # Verify key format.
+            #
+	    if (ADDPUBKEY(null, "webaddpubkey -n $localfile ")) {
+		$errors["Pubkey Format"] =
+		    "Could not be parsed. Is it a public key?";
+	    }
+	    else {
+		$addpubkeyargs = "$localfile";
+	    }
+	}
+    }
+}
+
+#
+# Need the user, project and group objects for the rest of this.
+#
+if (!$forwikionly) {
+    if (! ($project = Project::LookupByPid($pid))) {
+	TBERROR("Could not lookup object for $pid!", 1);
+    }
+    if (! ($group = Group::LookupByPidGid($pid, $gid))) {
+	TBERROR("Could not lookup object for $pid/$gid!", 1);
+    }
+    if ($returning) {
+	if (! ($user = User::LookupByUid($joining_uid))) {
+	    TBERROR("Could not lookup user '$joining_uid'!", 1);
+	}
+	if ($group->IsMember($user)) {
+	    $errors["Membership"] = "You are already a member";
+	}
+    }
+}
+
+# Done with sanity checks!
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
     PAGEFOOTER();
@@ -655,10 +771,13 @@ if (count($errors)) {
 }
 
 #
-# Certain of these values must be escaped or otherwise sanitized.
+# Create a new user.
 #
-if (!$returning) {
-    $joining_uid       = $formfields[joining_uid];
+if (! $returning) {
+    #
+    # Certain of these values must be escaped or otherwise sanitized.
+    #
+    $joining_uid       = ($USERSELECTUIDS ? null : $formfields[joining_uid]);
     $usr_name          = addslashes($formfields[usr_name]);
     $usr_email         = $formfields[usr_email];
     $password1         = $formfields[password1];
@@ -702,127 +821,8 @@ if (!$returning) {
 	$usr_addr2 = addslashes($formfields[usr_addr2]);
     }
 
-    #
-    # Pub Key.
-    #
-    if (isset($formfields[usr_key]) &&
-	strcmp($formfields[usr_key], "")) {
-        #
-        # This is passed off to the shell, so taint check it.
-        # 
-	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	    $errors["PubKey"] = "Invalid characters";
-	}
-	else {
-            #
-            # Replace any embedded newlines first.
-            #
-	    $formfields[usr_key] =
-		ereg_replace("[\n]", "", $formfields[usr_key]);
-	    $usr_key = $formfields[usr_key];
-	    $addpubkeyargs = "-k $joining_uid '$usr_key' ";
-	}
-    }
-
-    #
-    # If usr provided a file for the key, it overrides the paste in text.
-    #
-    if (isset($_FILES['usr_keyfile']) &&
-	$_FILES['usr_keyfile']['name'] != "" &&
-	$_FILES['usr_keyfile']['name'] != "none") {
-
-	$localfile = $_FILES['usr_keyfile']['tmp_name'];
-
-	if (! stat($localfile)) {
-	    $errors["PubKey File"] = "No such file";
-	}
-        # Taint check shell arguments always! 
-	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
-	    $errors["PubKey File"] = "Invalid characters";
-	}
-	else {
-	    $addpubkeyargs = "$joining_uid $usr_keyfile";
-	    chmod($usr_keyfile, 0644);	
-	}
-    }
-}
-else {
-    #
-    # Grab info from the DB for the email message below. Kinda silly.
-    #
-    $query_result =
-	DBQueryFatal("select * from users where uid='$joining_uid'");
-    
-    $row = mysql_fetch_array($query_result);
-    
-    $usr_title	= $row[usr_title];
-    $usr_name	= $row[usr_name];
-    $usr_affil	= $row[usr_affil];
-    $usr_email	= $row[usr_email];
-    $usr_addr	= $row[usr_addr];
-    $usr_addr2	= $row[usr_addr2];
-    $usr_city	= $row[usr_city];
-    $usr_state	= $row[usr_state];
-    $usr_zip	= $row[usr_zip];
-    $usr_country= $row[usr_country];
-    $usr_phone	= $row[usr_phone];
-    $usr_URL    = $row[usr_URL];
-}
-$usr_expires  = date("Y:m:d", time() + (86400 * 120));
-$pid          = $formfields[pid];
-
-if (isset($formfields[gid]) && $formfields[gid] != "") {
-    $gid = $formfields[gid];
-}
-else {
-    $gid = $pid;
-}
-
-if (!$forwikionly) {
-    if (!TBvalid_pid($pid) || !TBValidProject($pid)) {
-	$errors["Project Name"] = "Invalid Project Name";
-    }
-    elseif (!TBvalid_gid($gid) || !TBValidGroup($pid, $gid)) {
-	$errors["Group Name"] = "Invalid Group Name";
-    }
-    elseif (TBGroupMember($joining_uid, $pid, $gid, $approved)) {
-	$errors["Membership"] = "You are already a member";
-    }
-}
-
-#
-# Verify key format.
-#
-if (isset($addpubkeyargs) &&
-    ADDPUBKEY($joining_uid, "webaddpubkey -n $addpubkeyargs")) {
-    $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
-}
-
-if (count($errors)) {
-    SPITFORM($formfields, $returning, $errors);
-    PAGEFOOTER();
-    return;
-}
-
-#
-# For a new user:
-# * Create a new account in the database.
-# * Add user email to the list of email address.
-# * Generate a mail message to the user with the verification key.
-#
-if (! $returning) {
-    $encoding = crypt("$password1");
-
-    #
-    # Must be done before user record is inserted!
-    # XXX Since user does not exist, must run as nobody. Script checks. 
-    # 
-    if (isset($addpubkeyargs)) {
-	ADDPUBKEY($joining_uid, "webaddpubkey $addpubkeyargs");
-    }
-
     $args = array();
-    $args["usr_expires"]   = $usr_expires;
+    $args["usr_expires"]   = date("Y:m:d", time() + (86400 * 120));
     $args["usr_name"]	   = $usr_name;
     $args["usr_email"]     = $usr_email;
     $args["usr_addr"]      = $usr_addr;
@@ -836,16 +836,16 @@ if (! $returning) {
     $args["usr_shell"]     = 'tcsh';
     $args["usr_title"]     = $usr_title;
     $args["usr_affil"]     = $usr_affil;
-    $args["usr_pswd"]      = $encoding;
+    $args["usr_pswd"]      = crypt("$password1");
     $args["wikiname"]      = $wikiname;
 
     if (! ($user = User::NewUser($joining_uid, 0, $forwikionly, $args))) {
-	TBERROR("Could not create new user '$joining_uid'!", 1);
+	TBERROR("Could not create new user '$usr_email'!", 1);
     }
-}
-else {
-    if (! ($user = User::LookupByUid($joining_uid))) {
-	TBERROR("Could not lookup user '$joining_uid'!", 1);
+    $joining_uid = $user->uid();
+
+    if (!$forwikionly && isset($addpubkeyargs)) {
+	ADDPUBKEY($joining_uid, "webaddpubkey -u $joining_uid $addpubkeyargs");
     }
 }
 
@@ -855,16 +855,6 @@ else {
 if ($forwikionly) {
     header("Location: wikiregister.php3?finished=1");
     exit();
-}
-
-#
-# Need the project and group objects for the rest of this.
-#
-if (! ($project = Project::LookupByPid($pid))) {
-    TBERROR("Could not lookup object for $pid!", 1);
-}
-if (! ($group = Group::LookupByPidGid($pid, $gid))) {
-    TBERROR("Could not lookup object for $pid/$gid!", 1);
 }
 
 #
@@ -887,46 +877,8 @@ if ($group->AddNewMember($user) < 0) {
 #
 # Generate an email message to the proj/group leaders.
 #
-$leader       = $project->Leader();
-$leader_name  = $leader->name();
-$leader_email = $leader->email();
-$leader_uid   = $leader->uid();
-$allleaders   = TBLeaderMailList($pid,$gid);
-
-#
-# The mail message to the leader. We send this for returning users
-# who are are also verified, since they could not use this page
-# if they were not verified.
-#
 if ($returning) {
-    TBMAIL("$leader_name '$leader_uid' <$leader_email>",
-	   "$joining_uid $pid Project Join Request",
-	   "$usr_name is trying to join your group $gid in project $pid.\n".
-	   "\n".
-	   "Contact Info:\n".
-	   "Name:            $usr_name\n".
-	   "Emulab ID:       $joining_uid\n".
-	   "Email:           $usr_email\n".
-	   "User URL:        $usr_URL\n".
-	   "Job Title:       $usr_title\n".
-	   "Affiliation:     $usr_affil\n".
-	   "Address 1:       $usr_addr\n".
-	   "Address 2:       $usr_addr2\n".
-	   "City:            $usr_city\n".
-	   "State:           $usr_state\n".
-	   "ZIP/Postal Code: $usr_zip\n".
-	   "Country:         $usr_country\n".
-	   "Phone:           $usr_phone\n".
-	   "\n".
-	   "Please return to $TBWWW,\n".
-	   "log in, and select the 'New User Approval' page to enter your\n".
-	   "decision regarding $usr_name's membership in your project.\n\n".
-	   "Thanks,\n".
-	   "Testbed Operations\n",
-	   "From: $TBMAIL_APPROVAL\n".
-	   "Cc: $allleaders\n".
-	   "Bcc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
+    $group->NewMemberNotify($user);
 }
 
 #

@@ -16,17 +16,18 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: addpubkeys [-n] [-k] <user> [<keyfile> | <key>]\n";
-    print "       addpubkeys [-i [-f] | -w] <user>\n";
+    print "Usage: addpubkeys [-k | -f] [-n | -u <user>] [<keyfile> | <key>]\n";
+    print "       addpubkeys [-i [-r] | -w] <user>\n";
     print "Options:\n";
     print " -k      Indicates that key was passed in on the command line\n";
+    print " -f      Indicates that key was passed in as a filename\n";
     print " -n      Verify key format only; do not enter into into DB\n";
     print " -w      Generate new authkeys (protocol 1 and 2) file for user\n";
     print " -i      Initialize mode; generate initial key for user\n";
-    print " -f      Force a generate of initial key for user\n";
+    print " -r      Force a regenerate of initial key for user\n";
     exit(-1);
 }
-my $optlist   = "kniwf";
+my $optlist   = "kniwfu:r";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
@@ -110,42 +111,52 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"k"})) {
     $iskey = 1;
 }
+if (defined($options{"f"})) {
+    $iskey = 0;
+}
 if (defined($options{"n"})) {
     $verify = 1;
 }
 if (defined($options{"i"})) {
     $initmode = 1;
 }
-if (defined($options{"f"})) {
+if (defined($options{"r"})) {
     $force = 1;
 }
 if (defined($options{"w"})) {
     $genmode = 1;
 }
+if (defined($options{"u"})) {
+    $user = $options{"u"};
+}
 if ($verify && $genmode) {
     usage();
 }
 if ($initmode || $genmode) {
-    if (@ARGV != 1) {
-	usage();
-    }
-}
-elsif (@ARGV == 2) {
-    $keyfile = $ARGV[1];
+    usage()
+	if (@ARGV != 1);
+
+    $user = $ARGV[0];
 }
 else {
-    usage();
-}    
-$user = $ARGV[0];
+    usage()
+	if (@ARGV != 1);
+    usage()
+	if (!$verify && !defined($user));
+    
+    $keyfile = $ARGV[0];
+}
 
 #
 # Untaint the arguments.
 #
-if ($user =~ /^([-\w_]+)$/i) {
-    $user = $1;
-}
-else {
-    fatal("Tainted username: $user");
+if (defined($user)) {
+    if ($user =~ /^([-\w_]+)$/i) {
+	$user = $1;
+    }
+    else {
+	fatal("Tainted username: $user");
+    }
 }
 
 #

@@ -36,6 +36,7 @@ $EXPOSELINKTEST = 1;
 $EXPOSESTATESAVE= 0;
 $EXPOSEARCHIVE  = 0;
 $EXPOSETEMPLATES= 0;
+$USERSELECTUIDS = 0;
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
@@ -81,6 +82,7 @@ if ($TBSCRATCH_DIR) {
 
 $TBAUTHCOOKIE   = "HashCookie" . $TBCOOKIESUFFIX;
 $TBNAMECOOKIE   = "MyUidCookie" . $TBCOOKIESUFFIX;
+$TBEMAILCOOKIE  = "MyEmailCookie" . $TBCOOKIESUFFIX;
 $TBLOGINCOOKIE  = "LoginCookie" . $TBCOOKIESUFFIX;
 
 $HTTPTAG        = "http://";
@@ -161,6 +163,8 @@ function TBERROR ($message, $death, $xmp = 0) {
     global $session_interactive, $session_errorhandler;
     $script = urldecode($_SERVER['REQUEST_URI']);
 
+    CLEARBUSY();
+
     TBMAIL($TBMAIL_OPS,
          "WEB ERROR REPORT",
          "\n".
@@ -189,6 +193,8 @@ function TBERROR ($message, $death, $xmp = 0) {
 function USERERROR($message, $death) {
     global $TBMAILADDR;
     global $session_interactive, $session_errorhandler;
+
+    CLEARBUSY();
 
     if (! $session_interactive) {
 	if ($session_errorhandler)
@@ -339,7 +345,7 @@ function ADDPUBKEY($uid, $cmdandargs) {
     # nobody. We will get audit email in case we need to track what has
     # happened. 
     #
-    if (! HASREALACCOUNT($uid)) {
+    if (!$uid || !HASREALACCOUNT($uid)) {
 	$uid = "nobody";
     }
     return SUEXEC($uid, "nobody", $cmdandargs, 0);

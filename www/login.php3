@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -74,6 +74,8 @@ if (($known_uid = GETUID()) != FALSE) {
 
 #
 # Spit out the form.
+#
+# The uid can be an email address, and in fact defaults to that now. 
 # 
 function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
 {
@@ -105,10 +107,11 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
     echo "<table align=center border=1>
           <form action='${TBBASE}/login.php3${pagearg}' method=post>
           <tr>
-              <td>Username:</td>
+              <td>Email Address:<br>
+                   <font size=-2>(or UserName)</font></td>
               <td><input type=text
                          value=\"$uid\"
-                         name=uid size=20></td>
+                         name=uid size=30></td>
           </tr>
           <tr>
               <td>Password:</td>
@@ -131,7 +134,7 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
           </table>\n";
 
     echo "<center><h2>
-          <a href='password.php3'>Forgot your username or password?</a>
+          <a href='password.php3'>Forgot your password?</a>
           </h2></center>\n";
 }
 
@@ -139,9 +142,17 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
 # If not clicked, then put up a form.
 #
 if (! isset($login)) {
-    # Allow page arg to override what we think is the UID to log in as. 
-    SPITFORM((isset($vuid) ? $vuid : $known_uid),
-	     $key, $referrer, 0, $adminmode, $simple, $view);
+    # Allow page arg to override what we think is the UID to log in as.
+    # Use email address now, for the login uid. Still allow real uid though.
+    if (isset($vuid)) {
+	# For login during verification step, from email message.
+	$login_id = $vuid;
+    }
+    else {
+	$login_id = REMEMBERED_ID();
+    }
+    
+    SPITFORM($login_id, $key, $referrer, 0, $adminmode, $simple, $view);
     PAGEFOOTER($view);
     return;
 }

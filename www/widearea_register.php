@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -775,7 +775,7 @@ if (!$returning) {
 	    $formfields[usr_key] =
 		ereg_replace("[\n]", "", $formfields[usr_key]);
 	    $usr_key = $formfields[usr_key];
-	    $addpubkeyargs = "-k $usr_uid '$usr_key' ";
+	    $addpubkeyargs = "-k '$usr_key' ";
 	}
     }
 
@@ -790,7 +790,7 @@ if (!$returning) {
 	    $errors["PubKey File"] = "No such file";
 	}
 	else {
-	    $addpubkeyargs = "$usr_uid $usr_keyfile";
+	    $addpubkeyargs = "$usr_keyfile";
 	    chmod($usr_keyfile, 0644);	
 	}
     }
@@ -798,7 +798,7 @@ if (!$returning) {
     # Verify key format.
     #
     if (isset($addpubkeyargs) &&
-	ADDPUBKEY($usr_uid, "webaddpubkey -n $addpubkeyargs")) {
+	ADDPUBKEY($usr_uid, "webaddpubkey -n -u $usr_uid $addpubkeyargs")) {
 	$errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
     }
 }
@@ -856,7 +856,7 @@ if (! $returning) {
     # XXX Since, user does not exist, must run as nobody. Script checks. 
     # 
     if (isset($addpubkeyargs)) {
-	ADDPUBKEY($usr_uid, "webaddpubkey $addpubkeyargs");
+	ADDPUBKEY($usr_uid, "webaddpubkey -u $usr_uid $addpubkeyargs");
     }
 
     # Unique Unix UID.

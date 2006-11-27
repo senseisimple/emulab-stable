@@ -221,6 +221,8 @@ if (!$wikionly && ($isadmin || !strcmp($uid, $target_uid))) {
 }
 
 if ($isadmin) {
+    SUBMENUSECTION("Admin Options");
+    
     if (!strcmp(TBUserStatus($target_uid), TBDB_USERSTATUS_FROZEN)) {
 	WRITESUBMENUBUTTON("Thaw User",
 		   "freezeuser.php3?target_uid=$target_uid&action=thaw");
@@ -234,6 +236,11 @@ if ($isadmin) {
 
     WRITESUBMENUBUTTON("SU as User",
 		       "suuser.php?target_uid=$target_uid");
+
+    if ($userstatus == TBDB_USERSTATUS_UNAPPROVED) {
+	WRITESUBMENUBUTTON("Change UID",
+			   "changeuid.php?target_uid=$target_uid");
+    }
 
     if (! strcmp($userstatus, TBDB_USERSTATUS_NEWUSER) ||
 	! strcmp($userstatus, TBDB_USERSTATUS_UNVERIFIED)) {

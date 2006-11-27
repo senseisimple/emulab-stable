@@ -74,6 +74,19 @@ function GENHASH() {
 }
 
 #
+# Return the value of what we told the browser to remember for the login.
+# Currently, this is an email address, stored in a long term cookie.
+#
+function REMEMBERED_ID() {
+    global $TBEMAILCOOKIE;
+
+    if (isset($_COOKIE[$TBEMAILCOOKIE])) {
+	return $_COOKIE[$TBEMAILCOOKIE];
+    }
+    return null;
+}
+
+#
 # Return the value of the currently logged in uid, or null if not
 # logged in. Basically, check the browser to see if its sending a UID
 # and HASH back, and then check the DB to see if the user is really
@@ -692,7 +705,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     $user_result =
 	DBQueryFatal("select uid,usr_pswd,admin,weblogin_frozen,".
 		     "       weblogin_failcount,weblogin_failstamp, ".
-		     "       usr_email,usr_name,unix_uid ".
+		     "       usr_email,usr_name,unix_uid,usr_email ".
 		     "from users where ".
 		     (TBvalid_email($token) ?
 		      "usr_email='$token'" :
@@ -712,6 +725,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	$usr_email   = $row['usr_email'];
 	$usr_name    = $row['usr_name'];
 	$uid_idx     = $row['unix_uid'];
+	$usr_email   = $row['usr_email'];
 
 	# Check for frozen accounts. We do not update the IP record when
 	# an account is frozen.
@@ -768,7 +782,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
         #
         # Insert a record in the login table for this uid.
 	#
-	if (DOLOGIN_MAGIC($uid, $adminon) < 0) {
+	if (DOLOGIN_MAGIC($uid, $usr_email, $adminon) < 0) {
 	    return -1;
 	}
 
@@ -832,10 +846,10 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     return -1;
 }
 
-function DOLOGIN_MAGIC($uid, $adminon = 0)
+function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
 {
     global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
-    global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
+    global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES, $TBEMAILCOOKIE;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
@@ -882,15 +896,20 @@ function DOLOGIN_MAGIC($uid, $adminon = 0)
     setcookie($TBLOGINCOOKIE, $crc, 0, "/", $TBAUTHDOMAIN, 0);
 
     #
-    # We give this a really long timeout. We want to remember who the
-    # the user was each time they load a page, and more importantly,
-    # each time they come back to the main page so we can fill in their
-    # user name. NOTE: This cookie is integral to authorization, since
-    # we do not pass around the UID anymore, but look for it in the
-    # cookie.
-    # 
-    $timeout = $now + (60 * 60 * 24 * 32);
-    setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
+    # We want to remember who the user was each time they load a page
+    # NOTE: This cookie is integral to authorization, since we do not pass
+    # around the UID anymore, but look for it in the cookie.
+    #
+    setcookie($TBNAMECOOKIE, $uid, 0, "/", $TBAUTHDOMAIN, 0);
+
+    #
+    # This is a long term cookie so we can remember who the user was, and
+    # and stick that in the login box.
+    #
+    if ($email) {
+	$timeout = $now + (60 * 60 * 24 * 365);
+	setcookie($TBEMAILCOOKIE, $email, $timeout, "/", $TBAUTHDOMAIN, 0);
+    }
 
     #
     # Clear the existing Wiki cookie so that there is not an old one

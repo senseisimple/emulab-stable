@@ -7,6 +7,7 @@
 class Group
 {
     var	$group;
+    var $project;
 
     #
     # Constructor by lookup on unique index.
@@ -22,7 +23,8 @@ class Group
 	    $this->group = NULL;
 	    return;
 	}
-	$this->group = mysql_fetch_array($query_result);
+	$this->group   = mysql_fetch_array($query_result);
+	$this->project = null;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -82,6 +84,19 @@ class Group
 	return 0;
     }
 
+    #
+    # Load the project for a group lazily.
+    #
+    function LoadProject() {
+	$pid_idx = $this->pid_idx();
+
+	if (! ($project = Project::Lookup($pid_idx))) {
+	    TBERROR("Group::LoadProject: Could not load project $pid_idx!", 1);
+	}
+	$this->project = $project;
+	return 0;
+    }
+
     # accessors
     function field($name) {
 	return (is_null($this->group) ? -1 : $this->group[$name]);
@@ -107,6 +122,17 @@ class Group
     function NewGroup($project, $gid, $leader, $description, $unix_name) {
 	global $TBBASE, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
 	global $MIN_UNIX_GID;
+
+        #
+        # Check that we can guarantee uniqueness of the unix group name.
+        # 
+	$query_result =
+	    DBQueryFatal("select gid from groups ".
+			 "where unix_name='$unix_name'");
+
+	if (mysql_num_rows($query_result)) {
+	    TBERROR("Could not form a unique Unix group name: $unix_name!", 1);
+	}
 
 	# Every group gets a new unique index.
 	$gid_idx = TBGetUniqueIndex('next_gid');
@@ -225,6 +251,69 @@ class Group
 			 "        'none', now())")) {
 	    return -1;
 	}
+	return 0;
+    }
+
+    #
+    # Notify leaders of new (and verified) group member.
+    #
+    function NewMemberNotify($user) {
+	global $TBWWW, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
+	
+	if (! $this->project) {
+	    $this->LoadProject();
+	}
+	$project	= $this->project;
+	$pid            = $project->pid();
+	$gid            = $project->gid();
+	$leader		= $project->Leader();
+	$leader_name	= $leader->name();
+	$leader_email	= $leader->email();
+	$leader_uid	= $leader->uid();
+	$allleaders	= TBLeaderMailList($pid, $gid);
+	$joining_uid    = $user->uid();
+	$usr_title	= $user->title();
+	$usr_name	= $user->name();
+	$usr_affil	= $user->affil();
+	$usr_email	= $user->email();
+	$usr_addr	= $user->addr();
+	$usr_addr2	= $user->addr2();
+	$usr_city	= $user->city();
+	$usr_state	= $user->state();
+	$usr_zip	= $user->zip();
+	$usr_country	= $user->country();
+	$usr_phone	= $user->phone();
+	$usr_URL	= $user->URL();
+	
+	TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+	   "$joining_uid $pid Project Join Request",
+	   "$usr_name is trying to join your group $gid in project $pid.\n".
+	   "\n".
+	   "Contact Info:\n".
+	   "Name:            $usr_name\n".
+	   "Emulab ID:       $joining_uid\n".
+	   "Email:           $usr_email\n".
+	   "User URL:        $usr_URL\n".
+	   "Job Title:       $usr_title\n".
+	   "Affiliation:     $usr_affil\n".
+	   "Address 1:       $usr_addr\n".
+	   "Address 2:       $usr_addr2\n".
+	   "City:            $usr_city\n".
+	   "State:           $usr_state\n".
+	   "ZIP/Postal Code: $usr_zip\n".
+	   "Country:         $usr_country\n".
+	   "Phone:           $usr_phone\n".
+	   "\n".
+	   "Please return to $TBWWW,\n".
+	   "log in, and select the 'New User Approval' page to enter your\n".
+	   "decision regarding $usr_name's membership in your project.\n\n".
+	   "Thanks,\n".
+	   "Testbed Operations\n",
+	   "From: $TBMAIL_APPROVAL\n".
+	   "Cc: $allleaders\n".
+	   "Bcc: $TBMAIL_AUDIT\n".
+	   "Errors-To: $TBMAIL_WWW");
+
 	return 0;
     }
 

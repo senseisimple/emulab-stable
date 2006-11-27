@@ -1,7 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -32,9 +32,6 @@ use libaudit;
 use libdb;
 use libtestbed;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
-
 #
 # Turn off line buffering on output
 #
@@ -45,14 +42,6 @@ $| = 1;
 # 
 $ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-#
-# We don't want to run this script unless its the real version.
-#
-#if ($EUID != 0) {
-#    die("*** $0:\n".
-#	"    Must be setuid! Maybe its a development version?\n");
-#}
 
 #
 # This script is setuid, so please do not run it as root. Hard to track
@@ -187,3 +176,6 @@ DBQueryFatal("delete from login where uid='$olduid'");
 #
 print "Updating users table ...\n";
 DBQueryFatal("update users set uid='$newuid' where uid='$olduid'");
+
+exit(0);
+

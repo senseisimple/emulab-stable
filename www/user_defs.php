@@ -136,6 +136,77 @@ class User
     function NewUser($uid, $isleader, $wikionly, $args) {
 	global $TBBASE, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
 	global $MIN_UNIX_UID;
+
+	#
+	# If no uid, we need to generate a unique one for the user.
+	#
+	if (! $uid) {
+	    #
+	    # Take the first 5 letters of the email to form a root. That gives
+	    # us 3 digits to make it unique, since unix uids are limited to 8
+	    # chars, sheesh!
+	    #
+	    $email = $args["usr_email"];
+
+	    if (! preg_match('/^([-\w\+\.]+)\@([-\w\.]+)$/', $email, $matches))
+		return null;
+
+	    $token = $matches[1];
+
+            # Squeeze out any dots or dashes.
+	    $token = preg_replace('/\./', '', $token);
+	    $token = preg_replace('/\-/', '', $token);
+
+            # Trim off any trailing numbers or +foo tokens.
+	    if (! preg_match('/^([a-zA-Z]+)/', $token, $matches)) {
+		return null;
+	    }
+	    
+	    $token = $matches[1];
+
+	    # First 5 chars, at most.
+	    $token = substr($token, 0, 5);
+
+	    # Grab all root matches from the DB.
+	    $query_result =
+		DBQueryFatal("select uid from users ".
+			     "where uid like '${token}%'");
+
+	    if (!$query_result)
+		return null;
+
+	    # Easy; no matches at all!
+	    if (!mysql_num_rows($query_result)) {
+		$uid = "$token" . "001";
+	    }
+	    else {
+		$max = 0;
+		
+		#
+		# Find unused slot. Must be a better way to do this!
+		#
+		while ($row = mysql_fetch_array($query_result)) {
+		    $foo = $row[0];
+
+                    # Split name from number
+		    if (! preg_match('/^([a-zA-Z]+)(\d*)$/', $foo, $matches)) {
+			return null;
+		    }
+		    $name   = $matches[1];
+		    $number = $matches[2];
+
+		    # Must be exact root
+		    if ($name != $token)
+			continue;
+
+		    # Backwards compatability; might not have appended number.
+		    if (isset($number) && intval($number) > $max)
+			$max = intval($number);
+		}
+		$max++;
+		$uid = $token . sprintf("%03d", $max);
+	    }
+	}
 	
 	#
 	# The array of inserts is assumed to be safe already. Generate
