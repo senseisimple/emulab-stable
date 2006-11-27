@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+#
+# This gets invoked from the Web interface. Simply a wrapper ...
+#
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+#
+# Run the real thing, and never return.
+# 
+exec "$TB/sbin/changeuid", @ARGV;
+
+die("webchangeuid: Could not exec changeuid: $!");

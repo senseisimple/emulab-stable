@@ -716,7 +716,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
-	db/update_permissions \
+	db/update_permissions db/webchangeuid \
 	db/grabron db/webnfree db/stategraph db/readycount \
 	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
 	db/webnewwanode db/libdb.py db/elabinelab_bossinit \
