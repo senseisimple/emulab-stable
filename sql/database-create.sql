@@ -854,6 +854,7 @@ CREATE TABLE experiments (
   elabinelab_eid varchar(32) default NULL,
   elabinelab_cvstag varchar(64) default NULL,
   elabinelab_nosetup tinyint(1) NOT NULL default '0',
+  elabinelab_singlenet tinyint(1) NOT NULL default '0',
   security_level tinyint(1) NOT NULL default '0',
   lockdown tinyint(1) NOT NULL default '0',
   paniced tinyint(1) NOT NULL default '0',

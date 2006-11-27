@@ -3827,4 +3827,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
          ./init_newids.pl
 
-4.101:
+4.101: Add a dual/single elabinelab control network flag to
+       experiments table.
+
+	alter table experiments add elabinelab_singlenet tinyint(1) \
+            NOT NULL default '0' after elabinelab_nosetup;
