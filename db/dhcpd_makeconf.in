@@ -50,6 +50,7 @@ my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
 my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
 my %servernodes	    = ();
+my %singlectlnet    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
 my $OUT		    = *STDOUT; 
@@ -133,8 +134,24 @@ if (! $query_result) {
 }
 while (my %row = $query_result->fetchhash()) {
     if (defined($row{"pid"}) && defined($row{"eid"})) {
-	my $tag = $row{"pid"} . ":" . $row{"eid"};
+	my $pid = $row{"pid"};
+	my $eid = $row{"eid"};
+	my $tag = "${pid}:${eid}";
+	
 	$servernodes{$tag} = $row{"IP"};
+
+	#
+	# Need to know if this is a single or dual control network model.
+	#
+	my $exp_result =
+	    DBQueryFatal("select elabinelab_singlenet from experiments ".
+			 "where pid='$pid' and eid='$eid'");
+	if ($exp_result->num_rows) {
+	    $singlectlnet{$tag} = ($exp_result->fetchrow_array())[0];
+	}
+	else {
+	    $singlectlnet{$tag} = 0;
+	}
     }
 }
 
@@ -171,6 +188,7 @@ while (<IF>) {
 		    my $next_server = "";
 		    my $hostname = "";
 		    my $dns = "";
+		    my $booting = "";
 		    my $filename = "";
 
 		    if ($vnames && defined($row{"vname"})) {
@@ -203,10 +221,17 @@ while (<IF>) {
 			    $next_server = "${spaces}\tnext-server " .
 				$servernodes{$tag} . ";\n";
 			} else {
-			    $next_server = "${spaces}\tnext-server " .
-				$servernodes{$tag} . ";\n";
-			    $dns = "${spaces}\toption domain-name-servers ".
-				"1.1.1.1;\n";
+			    if ($singlectlnet{$tag}) {
+				$hostname = "${spaces}\toption host-name ".
+				    "\"$node_id\";\n";
+				$booting  = "${spaces}\tignore booting;\n";
+			    }
+			    else {
+				$next_server = "${spaces}\tnext-server " .
+				    $servernodes{$tag} . ";\n";
+				$dns = "${spaces}\toption ".
+				    "domain-name-servers 1.1.1.1;\n";
+			    }
 			}
 		    }
 		    else {
@@ -255,6 +280,7 @@ while (<IF>) {
 		    print $OUT $filename;
 		    print $OUT $next_server;
 		    print $OUT $dns;
+		    print $OUT $booting;
 		    print $OUT "${spaces}\thardware ethernet $mac;\n";
 		    print $OUT $hostname;
 		    print $OUT "${spaces}\tfixed-address $ip;\n";
