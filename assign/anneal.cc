@@ -222,18 +222,25 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   init_score();
 
   /* Set up fixed nodes */
+  /* Count of nodes which could not be fixed - we wait until we've tried to fix
+   * all nodes before bailing, so that the user gets to see all of the
+   * messages.
+   */
+  int fix_failed = 0;
   for (name_name_map::iterator fixed_it=fixed_nodes.begin();
        fixed_it!=fixed_nodes.end();++fixed_it) {
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
-      cout << "*** Fixed node: " << (*fixed_it).first <<
+      cout << "*** Fixed virtual node: " << (*fixed_it).first <<
 	" does not exist." << endl;
-      exit(EXIT_UNRETRYABLE);
+      fix_failed++;
+      continue;
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
     if (pname2vertex.find((*fixed_it).second) == pname2vertex.end()) {
-      cout << "*** Fixed node: " << (*fixed_it).second <<
+      cout << "*** Fixed physical node: " << (*fixed_it).second <<
 	" not available." << endl;
-      exit(EXIT_UNRETRYABLE);
+      fix_failed++;
+      continue;
     }
     pvertex pv = pname2vertex[(*fixed_it).second];
     tb_vnode *vn = get(vvertex_pmap,vv);
@@ -258,6 +265,8 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
         }
       }
       if (vn->type.empty()) {
+        // This is an internal error, so it's okay to handle it in a different
+        // way from the others
         cout << "*** Unable to find a type for fixed, vtyped, node " << vn->name
           << endl;
         exit(EXIT_FATAL);
@@ -269,7 +278,8 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     if (add_node(vv,pv,false,true,false) == 1) {
       cout << "*** Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
-      exit(EXIT_UNRETRYABLE);
+      fix_failed++;
+      continue;
     }
     vn->fixed = true;
     /*
@@ -279,6 +289,11 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     }
     */
     num_fixed++;
+  }
+
+  if (fix_failed){
+    cout << "*** Some fixed nodes failed to map" << endl;
+    exit(EXIT_UNRETRYABLE);
   }
 
   // Subtract the number of fixed nodes from nnodes, since they don't really
