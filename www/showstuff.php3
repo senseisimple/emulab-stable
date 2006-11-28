@@ -869,14 +869,20 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 	$instance = TemplateInstance::LookupByExptidx($exptidx);
 
 	if (! is_null($instance)) {
-	    $guid = $instance->guid();
-	    $vers = $instance->vers();
+	    $guid   = $instance->guid();
+	    $vers   = $instance->vers();
+	    $runidx = $instance->runidx();
+	    $runid  = $instance->GetRunID($runidx);
 	
 	    echo "<tr>
                     <td>Template: </td>
                     <td class=\"left\">
                        <a href='template_show.php?guid=$guid&version=$vers'>
-                          $guid/$vers</a></td>
+                          $guid/$vers</a>
+                           (Current Run:
+                              <a href='experimentrun_show.php?guid=$guid".
+		              "&version=$vers&exptidx=$exptidx&runidx=$runidx'>".
+		             "$runid)</a></td>
                   </tr>\n";
 	}
 
