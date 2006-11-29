@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -67,7 +67,7 @@ install-real:	resolv.conf \
 		$(NAMEDB_DIR)/localhost.rev \
 		$(NAMEDB_DIR)/$(OURDOMAIN).db.head \
 		$(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head \
-		$(addprefix $(NAMEDB_DIR)/reverse/, $(REVFILES))
+		$(addprefix $(NAMEDB_DIR)/reverse/, $(wildcard *.db.head))
 	$(INSTALL_DATA) resolv.conf $(ETCDIR)/resolv.conf
 
 clean: 

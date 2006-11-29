@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -85,6 +85,11 @@ my ($ia, $ib, $ic, $id) =
 my ($ea, $eb, $ec, $ed) =
     ($EXTERNAL_TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
 
+my ($ima, $imb, $imc, $imd) =
+    ($TESTBED_NETMASK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+my ($ema, $emb, $emc, $emd) =
+    ($EXTERNAL_TESTBED_NETMASK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+
 $infile = shift @ARGV || exit &usage;
 
 open(IF,"<$infile") or
@@ -117,6 +122,28 @@ while (<IF>) {
 			print $1 . $1 . "$forwarder;\n";
 		    }
 		    print $1 . "};\n";
+		}
+	    }
+	    elsif ($2 eq "internal_network_reverse_zones") {
+		for (my $i = $ic; $i <= $ic + (255 - $imc); $i++) {
+		    my $dotted           = "${ia}.${ib}.${i}";
+		    my $dotted_reverse   = "${i}.${ib}.${ia}";
+
+		    print $1 . "zone \"${dotted_reverse}.in-addr.arpa\" in {\n";
+		    print $1 . "\ttype master;\n";
+		    print $1 . "\tfile \"reverse/${dotted}.db\";\n";
+		    print $1 . "};\n";		    
+		}
+	    }
+	    elsif ($2 eq "external_network_reverse_zones") {
+		for (my $i = $ec; $i <= $ec + (255 - $emc); $i++) {
+		    my $dotted           = "${ea}.${eb}.${i}";
+		    my $dotted_reverse   = "${i}.${eb}.${ea}";
+
+		    print $1 . "zone \"${dotted_reverse}.in-addr.arpa\" in {\n";
+		    print $1 . "\ttype master;\n";
+		    print $1 . "\tfile \"reverse/${dotted}.db\";\n";
+		    print $1 . "};\n";		    
 		}
 	    }
 	    else {
