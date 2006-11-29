@@ -265,6 +265,7 @@ namespace eval GLOBALS {
     variable elabinelab_topo ""
     variable elabinelab_eid {}
     variable elabinelab_cvstag {}
+    variable elabinelab_singlenet 0
 
     # Does user want a per-experiment DB?
     variable dpdb 0

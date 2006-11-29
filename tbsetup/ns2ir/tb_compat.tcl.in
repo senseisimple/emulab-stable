@@ -1575,6 +1575,11 @@ proc tb-set-elabinelab-cvstag {cvstag} {
 
     set elabinelab_cvstag $cvstag
 }
+proc tb-elabinelab-singlenet {} {
+    var_import ::GLOBALS::elabinelab_singlenet
+
+    set elabinelab_singlenet 1
+}
 
 #
 # Set the inner elab role for a node.

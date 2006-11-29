@@ -77,6 +77,7 @@ proc tb-elab-in-elab {onoff} {}
 proc tb-elab-in-elab-topology {topo} {}
 proc tb-set-inner-elab-eid {eid} {}
 proc tb-set-elabinelab-cvstag {cvstag} {}
+proc tb-elabinelab-singlenet {} {}
 proc tb-set-node-inner-elab-role {node role} {}
 proc tb-set-node-id {vnode myid} {}
 proc tb-set-link-est-bandwidth {srclink args} {}

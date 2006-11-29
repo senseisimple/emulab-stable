@@ -93,6 +93,11 @@ my $hostname = `hostname`;
 chomp($hostname);
 my ($bossname, $outer_bossip) = tmccbossinfo();
 
+# This is the router IP to the outside world. Needed in lots of places.
+my $outer_routerip;
+# And the netmask on the outer control network.
+my $outer_netmask;
+
 # Outer FS node name. See below.
 my $fsname;
 
@@ -108,6 +113,9 @@ my $NOSETUP    = 0;
 
 # Whether we configure a /scratch FS, turned on/off below
 my $SCRATCHFS  = 0;
+
+# Single or dual control network.
+my $SINGLE_CONTROLNET = 0;
 
 # This will not change ...
 my $PHP4_PKG = "php4-extensions-1.0";
@@ -166,6 +174,7 @@ sub SetupBossNode();
 sub CreateDefsFile($);
 sub SetupSendMail($$);
 sub GetEmulabSource($);
+sub MungeMfsRoot($);
 
 #
 # Boot Action.
@@ -219,6 +228,23 @@ sub doboot()
     $emulabconfig{"WINSUPPORT"} = 0;
     $emulabconfig{"NOSETUP"}    = 0;
     $emulabconfig{"SCRATCHFS"}  = 0;
+    $emulabconfig{"SINGLE_CONTROLNET"} = 1;
+
+    #
+    # Need outer control router IP in lots of places.
+    #
+    if (! -e "$BOOTDIR/routerip") {
+	fatal("$BOOTDIR/routerip does not exist!");
+    }
+    $outer_routerip = `cat $BOOTDIR/routerip`;
+    chomp($outer_routerip);
+
+    # And the outer netmask
+    if (! -e "$BOOTDIR/mynetmask") {
+	fatal("$BOOTDIR/mynetmask does not exist!");
+    }
+    $outer_netmask = `cat $BOOTDIR/mynetmask`;
+    chomp($outer_netmask);
 
     #
     # Turn the tmcc results into a hash first. Then call the boss or ops
@@ -254,6 +280,10 @@ sub doboot()
     # and scratch filesystem usage
     if ($emulabconfig{"SCRATCHFS"}) {
 	$SCRATCHFS = 1;
+    }
+    # and single vs dual control network
+    if ($emulabconfig{"SINGLE_CONTROLNET"}) {
+	$SINGLE_CONTROLNET = 0;
     }
 
     # XXX Temporary
@@ -366,12 +396,6 @@ sub SetupFsNode()
     my $outer_ip = `cat $BOOTDIR/myip`;
     chomp($outer_ip);
     
-    if (! -e "$BOOTDIR/mynetmask") {
-	SetupFatal("$BOOTDIR/mynetmask does not exist!");
-    }
-    my $outer_netmask = `cat $BOOTDIR/mynetmask`;
-    chomp($outer_netmask);
-
     if (! -e "$BOOTDIR/controlif") {
 	SetupFatal("$BOOTDIR/controlif does not exist!");
     }
@@ -379,26 +403,22 @@ sub SetupFsNode()
     chomp($outer_controlif);
 
     #
-    # Need outer control router IP below too.
-    #
-    if (! -e "$BOOTDIR/routerip") {
-	SetupFatal("$BOOTDIR/routerip does not exist!");
-    }
-    my $outer_routerip = `cat $BOOTDIR/routerip`;
-    chomp($outer_routerip);
-
-    #
     # We also need the hardwired config for the inner control network.
     # Major kludge; should get it from tmcd data.
     #
     my @ifacelist;
-    
-    if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
-	SetupFatal("Could not get ifconfig from libsetup!");
+    my $inner_controlif;
+    my $inner_ip;
+    my $inner_netmask;
+
+    if (! $SINGLE_CONTROLNET) {
+	if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
+	    SetupFatal("Could not get ifconfig from libsetup!");
+	}
+	$inner_controlif = $ifacelist[0]->{IFACE};
+	$inner_ip        = $ifacelist[0]->{IPADDR};
+	$inner_netmask   = $ifacelist[0]->{IPMASK};
     }
-    my $inner_controlif = $ifacelist[0]->{IFACE};
-    my $inner_ip        = $ifacelist[0]->{IPADDR};
-    my $inner_netmask   = $ifacelist[0]->{IPMASK};
 
     #
     # Run the prepare script to clear out the current accounts and such.
@@ -516,19 +536,25 @@ sub SetupFsNode()
     print RC "nfs_client_enable=\"YES\"\n";
     print RC "mountd_flags=\"-r -p 900\"\n";
 
-    print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
+    print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
 	"\"inet $outer_ip netmask $outer_netmask\"\n";
-    print RC "ifconfig_${inner_controlif}=".
-	"\"inet $inner_ip netmask $inner_netmask ".
-	"media 100baseTX mediaopt full-duplex\"\n";
+
+    if (! $SINGLE_CONTROLNET) {
+	print RC "network_interfaces=\"\$network_interfaces $inner_controlif\"\n";
+	print RC "ifconfig_${inner_controlif}=".
+	    "\"inet $inner_ip netmask $inner_netmask ".
+	    "media 100baseTX mediaopt full-duplex\"\n";
+    }
+    print RC "network_interfaces=\"\$network_interfaces lo0\"\n";
     print RC "static_routes=\"outerboss vnodes\"\n";
     print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
     print RC "route_vnodes=\"-net ". $emulabconfig{"JAILIPBASE"} .
 	" -netmask " . $emulabconfig{"JAILIPMASK"} .
-	    " -iface $inner_controlif\"\n";
+	" -iface " . ($SINGLE_CONTROLNET ?
+		      $outer_controlif : $inner_controlif) . "\"\n";
     # Leave default route pointing to control network until setup complete.
-    if ($NOSETUP) {
+    if ($NOSETUP || $SINGLE_CONTROLNET) {
 	print RC "defaultrouter=\"$outer_routerip\"\n";
     }
     else {
@@ -686,12 +712,6 @@ sub SetupOpsNode($)
     my $outer_ip = `cat $BOOTDIR/myip`;
     chomp($outer_ip);
     
-    if (! -e "$BOOTDIR/mynetmask") {
-	SetupFatal("$BOOTDIR/mynetmask does not exist!");
-    }
-    my $outer_netmask = `cat $BOOTDIR/mynetmask`;
-    chomp($outer_netmask);
-
     if (! -e "$BOOTDIR/controlif") {
 	SetupFatal("$BOOTDIR/controlif does not exist!");
     }
@@ -699,26 +719,22 @@ sub SetupOpsNode($)
     chomp($outer_controlif);
 
     #
-    # Need outer control router IP below too.
-    #
-    if (! -e "$BOOTDIR/routerip") {
-	SetupFatal("$BOOTDIR/routerip does not exist!");
-    }
-    my $outer_routerip = `cat $BOOTDIR/routerip`;
-    chomp($outer_routerip);
-
-    #
     # We also need the hardwired config for the inner control network.
     # Major kludge; should get it from tmcd data.
     #
     my @ifacelist;
-    
-    if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
-	SetupFatal("Could not get ifconfig from libsetup!");
+    my $inner_controlif;
+    my $inner_ip;
+    my $inner_netmask;
+
+    if (! $SINGLE_CONTROLNET) {
+	if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
+	    SetupFatal("Could not get ifconfig from libsetup!");
+	}
+	$inner_controlif = $ifacelist[0]->{IFACE};
+	$inner_ip        = $ifacelist[0]->{IPADDR};
+	$inner_netmask   = $ifacelist[0]->{IPMASK};
     }
-    my $inner_controlif = $ifacelist[0]->{IFACE};
-    my $inner_ip        = $ifacelist[0]->{IPADDR};
-    my $inner_netmask   = $ifacelist[0]->{IPMASK};
 
     #
     # Run the prepare script to clear out the current accounts and such.
@@ -866,19 +882,25 @@ sub SetupOpsNode($)
 
     print RC "syslogd_flags=\"-a $control_network\"\n";
 
-    print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
+    print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
 	"\"inet $outer_ip netmask $outer_netmask\"\n";
-    print RC "ifconfig_${inner_controlif}=".
-	"\"inet $inner_ip netmask $inner_netmask ".
-	"media 100baseTX mediaopt full-duplex\"\n";
+    
+    if (! $SINGLE_CONTROLNET) {
+	print RC "network_interfaces=\"\$network_interfaces $inner_controlif\"\n";
+	print RC "ifconfig_${inner_controlif}=".
+	    "\"inet $inner_ip netmask $inner_netmask ".
+	    "media 100baseTX mediaopt full-duplex\"\n";
+    }
+    print RC "network_interfaces=\"\$network_interfaces lo0\"\n";
     print RC "static_routes=\"outerboss vnodes\"\n";
     print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
     print RC "route_vnodes=\"-net ". $emulabconfig{"JAILIPBASE"} .
 	" -netmask " . $emulabconfig{"JAILIPMASK"} .
-	    " -iface $inner_controlif\"\n";
+	" -iface " . ($SINGLE_CONTROLNET ?
+		      $outer_controlif : $inner_controlif) . "\"\n";
     # Leave default route pointing to control network until setup complete.
-    if ($NOSETUP) {
+    if ($NOSETUP || $SINGLE_CONTROLNET) {
 	print RC "defaultrouter=\"$outer_routerip\"\n";
     }
     else {
@@ -1050,21 +1072,6 @@ sub SetupBossNode()
     my $outer_ip = `cat $BOOTDIR/myip`;
     chomp($outer_ip);
     
-    if (! -e "$BOOTDIR/mynetmask") {
-	SetupFatal("$BOOTDIR/mynetmask does not exist!");
-    }
-    my $outer_netmask = `cat $BOOTDIR/mynetmask`;
-    chomp($outer_netmask);
-
-    #
-    # Need outer control router IP below too.
-    #
-    if (! -e "$BOOTDIR/routerip") {
-	SetupFatal("$BOOTDIR/routerip does not exist!");
-    }
-    my $outer_routerip = `cat $BOOTDIR/routerip`;
-    chomp($outer_routerip);
-
     #
     # And we need the name of the control interface for natd below.
     #
@@ -1079,13 +1086,18 @@ sub SetupBossNode()
     # Major kludge; should get it from tmcd data.
     #
     my @ifacelist;
-    
-    if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
-	SetupFatal("Could not get ifconfig from libsetup!");
+    my $inner_controlif;
+    my $inner_ip;
+    my $inner_netmask;
+
+    if (! $SINGLE_CONTROLNET) {
+	if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
+	    SetupFatal("Could not get ifconfig from libsetup!");
+	}
+	$inner_controlif = $ifacelist[0]->{IFACE};
+	$inner_ip        = $ifacelist[0]->{IPADDR};
+	$inner_netmask   = $ifacelist[0]->{IPMASK};
     }
-    my $inner_controlif = $ifacelist[0]->{IFACE};
-    my $inner_ip        = $ifacelist[0]->{IPADDR};
-    my $inner_netmask   = $ifacelist[0]->{IPMASK};
 
     #
     # Run the prepare script to clear out the current accounts and such.
@@ -1185,17 +1197,23 @@ sub SetupBossNode()
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
 
-    print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
+    print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
 	"\"inet $outer_ip netmask $outer_netmask\"\n";
-    print RC "ifconfig_${inner_controlif}=".
-	"\"inet $inner_ip netmask $inner_netmask ".
-	"media 100baseTX mediaopt full-duplex\"\n";
+
+    if (! $SINGLE_CONTROLNET) {
+	print RC "network_interfaces=\"\$network_interfaces $inner_controlif\"\n";
+	print RC "ifconfig_${inner_controlif}=".
+	    "\"inet $inner_ip netmask $inner_netmask ".
+	    "media 100baseTX mediaopt full-duplex\"\n";
+    }
+    print RC "network_interfaces=\"\$network_interfaces lo0\"\n";
     print RC "static_routes=\"outerboss vnodes\"\n";
     print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
     print RC "route_vnodes=\"-net ". $emulabconfig{"JAILIPBASE"} .
 	" -netmask " . $emulabconfig{"JAILIPMASK"} .
-	    " -iface $inner_controlif\"\n";
+	" -iface " . ($SINGLE_CONTROLNET ?
+		      $outer_controlif : $inner_controlif) . "\"\n";
 
     #
     # Use natd so that internal control network can talk to outside world.
@@ -1228,6 +1246,18 @@ sub SetupBossNode()
     # Create a defs file. Note that this will move to boss at some point.
     #
     CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+
+    if ($SINGLE_CONTROLNET) {
+	#
+	# Hack dhcpd.conf.template to ignore the rest of emulab.
+	# This precludes dynamic node addition 
+	# Might think about allowing back if the experiment is firewalled.
+	#
+	mysystem("cd ${TBDIR}/testbed/src/testbed/dhcpd ; ".
+		 " sed -E -i .orig -e " .
+		 "   's;range .DHCPD_DYNRANGE.;ignore unknown-clients;' ".
+		 "  dhcpd.conf.template.in");
+    }
 
     goto skipsetup
 	if ($NOSETUP);
@@ -1335,6 +1365,16 @@ sub SetupBossNode()
     mysystem("cp -p ${TBDIR}/testbed/stuff/emulab.pem $RPCCERT");
 
     #
+    # Copy the inner ssl cert and root's public ssh keys to the mfs's
+    # so that imported they will talk to the inner boss properly.
+    # At Berkeley the frisbee mfs copies these to disk images,
+    # needing changes to slicefix , which always needs to be run now.
+    #
+    MungeMfsRoot("frisbee");
+    MungeMfsRoot("freebsd");
+    MungeMfsRoot("freebsd.newnode");
+
+    #
     # Set up a bunch of DB stuff.  This part will eventually be optional,
     # resulting in a naked setup that will need to be configured the rest of
     # the way by hand. 
@@ -1407,8 +1447,17 @@ sub CreateDefsFile($)
     my $bossnode_ip     = $emulabconfig{"BOSSIP"};
     my $opsnode_ip      = $emulabconfig{"OPSIP"};
     my $fsnode_ip       = $emulabconfig{"FSIP"};
+    my $control_netmask = "255.255.255.0";
+
+    #
+    # The control network netmask differs if using a single control network. 
+    #
+    if ($SINGLE_CONTROLNET) {
+	$control_netmask = $outer_netmask;
+    }
+    
     my $control_network = inet_ntoa(inet_aton($opsnode_ip) &
-				    inet_aton("255.255.255.0"));
+				    inet_aton($control_netmask));
     # Put dynrange at the top.
     my $dynrange_low    = inet_ntoa(inet_aton($control_network) |
 				    inet_aton("0.0.0.230"));
@@ -1489,7 +1538,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^TESTBED_NETMASK$/ && do {
-		    print OUTDEFS "TESTBED_NETMASK=255.255.255.0\n";
+		    print OUTDEFS "TESTBED_NETMASK=$control_netmask\n";
 		    last SWITCH;
 		};
 		/^BOSSNODE_IP$/ && do {
@@ -1505,7 +1554,16 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^CONTROL_ROUTER_IP$/ && do {
-		    print OUTDEFS "CONTROL_ROUTER_IP=$bossnode_ip\n";
+		    my $control_router_ip;
+		    
+		    if ($SINGLE_CONTROLNET) {
+			$control_router_ip = $outer_routerip;
+		    }
+		    else {
+			$control_router_ip = $bossnode_ip;
+		    }
+		    print OUTDEFS "CONTROL_ROUTER_IP=$control_router_ip\n";
+		    
 		    last SWITCH;
 		};
 		/^CONTROL_NETWORK$/ && do {
@@ -1513,7 +1571,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^CONTROL_NETMASK$/ && do {
-		    print OUTDEFS "CONTROL_NETMASK=255.255.255.0\n";
+		    print OUTDEFS "CONTROL_NETMASK=$control_netmask\n";
 		    last SWITCH;
 		};
 		/^PRIVATE_NETWORK$/ && do {
@@ -1521,7 +1579,16 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^PRIVATE_ROUTER$/ && do {
-		    print OUTDEFS "PRIVATE_ROUTER=$bossnode_ip\n";
+		    my $private_router;
+		    
+		    if ($SINGLE_CONTROLNET) {
+			$private_router = $outer_routerip;
+		    }
+		    else {
+			$private_router = $bossnode_ip;
+		    }
+		    
+		    print OUTDEFS "PRIVATE_ROUTER=$private_router\n";
 		    last SWITCH;
 		};
 		/^PRIVATE_NETMASK$/ && do {
@@ -1533,11 +1600,19 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^PUBLIC_ROUTER$/ && do {
-		    print OUTDEFS "PUBLIC_ROUTER=$bossnode_ip\n";
+		    my $public_router;
+		    
+		    if ($SINGLE_CONTROLNET) {
+			$public_router = $outer_routerip;
+		    }
+		    else {
+			$public_router = $bossnode_ip;
+		    }
+		    print OUTDEFS "PUBLIC_ROUTER=$public_router\n";
 		    last SWITCH;
 		};
 		/^PUBLIC_NETMASK$/ && do {
-		    print OUTDEFS "PUBLIC_NETMASK=255.255.255.0\n";
+		    print OUTDEFS "PUBLIC_NETMASK=$control_netmask\n";
 		    last SWITCH;
 		};
 		/^NAMED_FORWARDERS$/ && do {
@@ -1632,6 +1707,26 @@ sub CreateDefsFile($)
     close(OUTDEFS);
     mysystem("cat /tmp/defs-elabinelab");
     mysystem("mv -f /tmp/defs-elabinelab $defsfile");
+}
+
+sub MungeMfsRoot($)
+{
+    my $tftpdir = shift;
+    my ($mount, $release);
+    
+    if ($FBSD_VERSION >= 5) {
+	$mount = "mdconfig -a -t vnode -f mfsroot -u 2; mount /dev/md2 /mnt;";
+	$release = "mdconfig -d -u 2;";
+    }
+    else {
+	$mount = "vnconfig -c vn1 mfsroot; mount /dev/vn1 /mnt;";
+	$release = "vnconfig -u vn1;";
+    }
+    mysystem("cd /tftpboot/$tftpdir/boot; " . $mount . "cd /usr/testbed/etc;" .
+	     "cat /root/.ssh/*.pub >> /mnt/root/.ssh/authorized_keys2; " .
+	     "cp -p emulab.pem client.pem /mnt/etc/emulab ; umount /mnt ; " .
+	     $release . " cd /tftpboot/$tftpdir/boot; " .
+	     "gzip < mfsroot > mfsroot.gz ");
 }
 
 #

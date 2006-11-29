@@ -745,6 +745,7 @@ REPLACE INTO table_regex VALUES ('firewall_rules','rule','text','regex','^\\w[-\
 REPLACE INTO table_regex VALUES ('virt_nodes','inner_elab_role','text','regex','^(boss|boss\\+router|router|ops|ops\\+fs|fs|node)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','plab_role','text','regex','^(plc|node|none)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','elabinelab_singlenet','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',0,45,NULL);
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);

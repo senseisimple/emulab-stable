@@ -158,6 +158,7 @@ typedef struct {
 	int		isplabdslice;
 	int		isplabsvc;
 	int		elab_in_elab;
+        int		singlenet;	  /* Modifier for elab_in_elab */
 	int		update_accounts;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
@@ -4055,7 +4056,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,vt.isplabdslice, "
 				 " ps.admin, "
-				 " e.elab_in_elab "
+				 " e.elab_in_elab,e.elabinelab_singlenet "
 				 "from nodes as nv "
 				 "left join nodes as np on "
 				 " np.node_id=nv.phys_nodeid "
@@ -4075,7 +4076,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " nk.node_id=nv.node_id "
 				 "where nv.node_id='%s' and "
 				 " (i.IP='%s' and i.role='ctrl') ",
-				 24, reqp->vnodeid, inet_ntoa(ipaddr));
+				 25, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -4085,7 +4086,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,0, "
-				 " 0,e.elab_in_elab "
+				 " 0,e.elab_in_elab,e.elabinelab_singlenet "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -4097,7 +4098,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=n.node_id "
 				 "where i.IP='%s' and i.role='ctrl'", /*XXX*/
-				 24, inet_ntoa(ipaddr));
+				 25, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -4128,6 +4129,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	reqp->isplabdslice = (! strcasecmp(row[21], "0") ? 0 : 1);
 	reqp->isplabsvc    = (row[22] && strcasecmp(row[22], "0")) ? 1 : 0;
 	reqp->elab_in_elab = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
+	reqp->singlenet    = (row[24] && strcasecmp(row[24], "0")) ? 1 : 0;
 
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
@@ -5834,14 +5836,28 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	 * that all the nodes are on a single lan. If we get fancier about
 	 * that, we will have to figure out how to label the specific lans
 	 * se we know which is which.
+	 *
+	 * Note the single vs dual control network differences!
 	 */
-	res = mydb_query("select r.node_id,r.inner_elab_role,vl.ip,r.vname "
-			 "  from reserved as r "
-			 "left join virt_lans as vl on vl.vnode=r.vname and "
-			 "  vl.pid=r.pid and vl.eid=r.eid "
-			 "where r.pid='%s' and r.eid='%s' and "
-			 "      r.inner_elab_role is not null",
-			 4, reqp->pid, reqp->eid);
+	if (reqp->singlenet) {
+		res = mydb_query("select r.node_id,r.inner_elab_role,"
+				 "   i.IP,r.vname from reserved as r "
+				 "left join interfaces as i on "
+				 "     i.node_id=r.node_id and i.role='ctrl' "
+				 "where r.pid='%s' and r.eid='%s' and "
+				 "      r.inner_elab_role is not null",
+				 4, reqp->pid, reqp->eid);
+	}
+	else {
+		res = mydb_query("select r.node_id,r.inner_elab_role,"
+				 "   vl.ip,r.vname from reserved as r "
+				 "left join virt_lans as vl on "
+				 "     vl.vnode=r.vname and "
+				 "     vl.pid=r.pid and vl.eid=r.eid "
+				 "where r.pid='%s' and r.eid='%s' and "
+				 "      r.inner_elab_role is not null",
+				 4, reqp->pid, reqp->eid);
+	}
 
 	if (!res) {
 		error("EMULABCONFIG: %s: DB Error getting elab_in_elab\n",
@@ -5959,6 +5975,13 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	    }
 	}
 	mysql_free_result(res);
+
+	/*
+	 * Tell the inner elab if its a single control network setup.
+	 */
+	bufp += OUTPUT(bufp, ebufp - bufp, "SINGLE_CONTROLNET=%d\n",
+		       reqp->singlenet);
+
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }

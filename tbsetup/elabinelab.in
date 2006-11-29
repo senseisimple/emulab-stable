@@ -181,9 +181,10 @@ my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
 # XXX NOSETUP option needs more work ...
 #
 $query_result =
-    DBQueryFatal("select elabinelab_nosetup from experiments ".
+    DBQueryFatal("select elabinelab_nosetup,elabinelab_singlenet ".
+		 "   from experiments ".
 		 "where pid='$pid' and eid='$eid'");
-my ($nosetup) = $query_result->fetchrow_array();
+my ($nosetup,$singlenet) = $query_result->fetchrow_array();
 
 #
 # Presetup; turn off firewall.
@@ -779,19 +780,21 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_interfaces\n");
 
-    # First, mark the real control network as "other" to avoid it being
-    # thought of as the control network!.
-    DBQueryWarn("update temp_interfaces ".
-		"set role='" . TBDB_IFACEROLE_OUTER_CONTROL() . "' " .
-		"where role='" . TBDB_IFACEROLE_CONTROL() . "'")
-	or die("*** $0:\n".
-	       "    Could not delete control ifaces from temp_interfaces\n");
+    if (! $singlenet) {
+	# First, mark the real control network as "other" to avoid it being
+	# thought of as the control network!.
+	DBQueryWarn("update temp_interfaces ".
+		    "set role='" . TBDB_IFACEROLE_OUTER_CONTROL() . "' " .
+		    "where role='" . TBDB_IFACEROLE_CONTROL() . "'")
+	    or die("*** $0:\n".
+		   "    Could not delete control ifaces from temp_interfaces\n");
 
-    DBQueryWarn("update temp_interfaces set ".
-		" role='" . TBDB_IFACEROLE_CONTROL() . "' " .
-		"where IP!='' and role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
-	or die("*** $0:\n".
-	       "    Could not update roles in temp_interfaces\n");
+	DBQueryWarn("update temp_interfaces set ".
+		    " role='" . TBDB_IFACEROLE_CONTROL() . "' " .
+		    "where IP!='' and role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
+	    or die("*** $0:\n".
+		   "    Could not update roles in temp_interfaces\n");
+    }
 
     # And rename the fs/ops nodes as above.
     if (defined($fsnode)) {
@@ -822,8 +825,8 @@ sub DumpDBGoo()
 		"select t.* from reserved as r ".
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
-		"left join wires as t on t.node_id1=r.node_id and ".
-		"     t.type='Node' ".
+		"left join wires as t on t.node_id1=r.node_id ".
+		($singlenet == 0 ? " and t.type='Node' " : " ") .
 		"where r.pid='$pid' and r.eid='$eid' and ".
 		"      v.inner_elab_role in ('node','ops','fs','ops+fs') ")
 	or die("*** $0:\n".
@@ -841,16 +844,18 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not ops node_id in temp_wires\n");
 
-    # But we need to take out the wires that are being used as the
-    # inner control network, or at least mark them as Control.
-    $query_result =
-	DBQueryWarn("select node_id,card,port from temp_interfaces ".
-		    "where role='" . TBDB_IFACEROLE_CONTROL() . "' ");
+    if (! $singlenet) {
+	# But we need to take out the wires that are being used as the
+	# inner control network, or at least mark them as Control.
+	$query_result =
+	    DBQueryWarn("select node_id,card,port from temp_interfaces ".
+			"where role='" . TBDB_IFACEROLE_CONTROL() . "' ");
 
-    while (my ($node_id,$card,$port) = $query_result->fetchrow_array()) {
-	DBQueryWarn("update temp_wires set type='Control' ".
-		    "where node_id1='$node_id' and card1=$card and ".
-		    "      port1=$port");
+	while (my ($node_id,$card,$port) = $query_result->fetchrow_array()) {
+	    DBQueryWarn("update temp_wires set type='Control' ".
+			"where node_id1='$node_id' and card1=$card and ".
+			"      port1=$port");
+	}
     }
     # Okay, now add the "trunk" wires in without any alteration.
     DBQueryWarn("insert into temp_wires ".

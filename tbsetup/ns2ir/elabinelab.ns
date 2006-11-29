@@ -100,13 +100,16 @@ for {set i 1} {$i <= $maxpcs} {incr i} {
 	    tb-set-hardware [set $name] pcslow
 	}
 }
-set publiclan [$ns make-lan $lanstr 100Mb 0ms]
 
-tb-set-ip-lan $myboss $publiclan 10.200.1.252
-tb-set-ip-lan $myops  $publiclan 10.200.1.253
-for {set i 1} {$i <= $maxpcs} {incr i} {
+if { ${::GLOBALS::elabinelab_singlenet} == 0 } {
+    set publiclan [$ns make-lan $lanstr 100Mb 0ms]
+
+    tb-set-ip-lan $myboss $publiclan 10.200.1.252
+    tb-set-ip-lan $myops  $publiclan 10.200.1.253
+    for {set i 1} {$i <= $maxpcs} {incr i} {
 	set name "mypc${i}"
 	tb-set-ip-lan [set $name] $publiclan 10.200.1.$i
+    }
 }
 
 if {[info exists ::TBCOMPAT::elabinelab_nodeos("boss")]} {

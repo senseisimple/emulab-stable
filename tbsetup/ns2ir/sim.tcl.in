@@ -397,6 +397,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::elabinelab_topo
     var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::elabinelab_cvstag
+    var_import ::GLOBALS::elabinelab_singlenet
     var_import ::GLOBALS::security_level
     var_import ::GLOBALS::explicit_firewall
     var_import ::GLOBALS::sourcefile_list
@@ -627,6 +628,8 @@ Simulator instproc run {} {
     if {$elab_in_elab} {
 	lappend fields "elab_in_elab"
 	lappend values 1
+	lappend fields "elabinelab_singlenet"
+	lappend values $elabinelab_singlenet
 
 	if { $elabinelab_eid != {} } {
 	    lappend fields "elabinelab_eid"
