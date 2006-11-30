@@ -104,8 +104,8 @@ sub SENDMAIL($$$;$$@)
     #
     # Untaint the path locally. Note that using a "local" fails on older perl!
     # 
-    my %SAVE_ENV = %ENV;
-    $ENV{PATH} = "/bin:/usr/bin";
+    my $SAVE_PATH = $ENV{'PATH'};
+    $ENV{'PATH'} = "/bin:/usr/bin";
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
     if (! open(MAIL, "|/usr/sbin/sendmail -t")) {
@@ -149,11 +149,11 @@ sub SENDMAIL($$$;$$@)
 	print STDERR "SENDMAIL: Could not finish sendmail: $!\n";
 	goto bad;
     }
-    %ENV = %SAVE_ENV;
+    $ENV{'PATH'} = $SAVE_PATH;
     return 1;
 
   bad:
-    %ENV = %SAVE_ENV;
+    $ENV{'PATH'} = $SAVE_PATH;
     return 0;
 }
 
