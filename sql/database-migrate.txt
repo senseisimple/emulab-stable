@@ -3832,3 +3832,26 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table experiments add elabinelab_singlenet tinyint(1) \
             NOT NULL default '0' after elabinelab_nosetup;
+
+4.102: Fixes to report tables for mysql 3.23; must provide defaults
+       when declared NOT NULL.
+
+	alter table report_assign_violation change `seq`
+                  `seq` int(10) unsigned NOT NULL default '0';
+
+	alter table report_context change `seq`
+                  `seq` int(10) unsigned NOT NULL default '0';
+
+	alter table errors change tblog_revision
+                  tblog_revision varchar(8) NOT NULL default '';
+
+	alter table report_error
+            change `seq` `seq` int(10) unsigned NOT NULL default '0',
+            change `stamp` `stamp` int(10) unsigned NOT NULL default '0',
+            change `session` `session` int(10) unsigned NOT NULL default '0',
+            change `invocation` `invocation` int(10) unsigned NOT NULL default '0',
+            change `attempt` `attempt` tinyint(1) NOT NULL default '0',
+            change `severity` `severity` smallint(3) NOT NULL default '0',
+            change `script` `script` smallint(3) NOT NULL default '0',
+            change `error_type` `error_type` varchar(255) NOT NULL default '';
+

@@ -375,7 +375,7 @@ CREATE TABLE errors (
   inferred tinyint(1) default NULL,
   need_more_info tinyint(1) default NULL,
   mesg text NOT NULL,
-  tblog_revision varchar(8) NOT NULL,
+  tblog_revision varchar(8) NOT NULL default '',
   PRIMARY KEY  (session,rank)
 ) TYPE=MyISAM;
 
@@ -2157,7 +2157,7 @@ CREATE TABLE projects (
 --
 
 CREATE TABLE `report_assign_violation` (
-  `seq` int(10) unsigned NOT NULL,
+  `seq` int(10) unsigned NOT NULL default '0',
   `unassigned` int(11) default NULL,
   `pnode_load` int(11) default NULL,
   `no_connect` int(11) default NULL,
@@ -2178,7 +2178,7 @@ CREATE TABLE `report_assign_violation` (
 --
 
 CREATE TABLE `report_context` (
-  `seq` int(10) unsigned NOT NULL,
+  `seq` int(10) unsigned NOT NULL default '0',
   `i0` int(11) default NULL,
   `i1` int(11) default NULL,
   `i2` int(11) default NULL,
@@ -2193,14 +2193,14 @@ CREATE TABLE `report_context` (
 --
 
 CREATE TABLE `report_error` (
-  `seq` int(10) unsigned NOT NULL,
-  `stamp` int(10) unsigned NOT NULL,
-  `session` int(10) unsigned NOT NULL,
-  `invocation` int(10) unsigned NOT NULL,
-  `attempt` tinyint(1) NOT NULL,
-  `severity` smallint(3) NOT NULL,
-  `script` smallint(3) NOT NULL,
-  `error_type` varchar(255) NOT NULL,
+  `seq` int(10) unsigned NOT NULL default '0',
+  `stamp` int(10) unsigned NOT NULL default '0',
+  `session` int(10) unsigned NOT NULL default '0',
+  `invocation` int(10) unsigned NOT NULL default '0',
+  `attempt` tinyint(1) NOT NULL default '0',
+  `severity` smallint(3) NOT NULL default '0',
+  `script` smallint(3) NOT NULL default '0',
+  `error_type` varchar(255) NOT NULL default '',
   PRIMARY KEY  (`seq`),
   KEY `session` (`session`)
 ) TYPE=MyISAM;
