@@ -266,7 +266,7 @@ undef $SCRIPTNAME; # signal to use $ENV{TBLOG_SCRIPTNAME}
 my $DB;
 my $TBLOG_PID;
 
-my $REVISION_STR = '$Revision: 2.23 $';
+my $REVISION_STR = '$Revision: 2.24 $';
 
 #
 # Internal Utility Functions
@@ -1513,10 +1513,11 @@ sub TIEHANDLE {
 
 sub PRINT {
     my $this = shift;
-    if ($$this->opened()) {
+    if (IO::Handle::opened($$this)) { # $$this->opened doesn't work 
+                                      # with perl 5.005
 	print {$$this} @_;
     } else {
-	carp "print() on unopened filehandle" unless $$this->opened;
+	carp "print() on unopened filehandle";
     }
     local $_ = join '', @_; # NOTE: This doesn't take into account "$,"
 			    # or output_field_separator
