@@ -1,19 +1,12 @@
 #!/usr/bin/perl -w
-
+#
 # This file was modified from an Netbed/Emulab module.
 # Modfications Copyright (c) 2004, Regents, University of California.
 #
-
-#
-# This file is part of the Netbed/Emulab network testbed software.
-# In brief, you can't redistribute it or use it for commercial purposes,
-# and you must give appropriate credit and return improvements to Utah.
-# See the file LICENSE at the root of the source tree for details.
-# 
+# EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 #
 # snmpit module for Nortel level 2 switches
 #

@@ -1,4 +1,8 @@
-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 AC_PREREQ(2.13)
 
 AC_INIT(Makeconf.in)
