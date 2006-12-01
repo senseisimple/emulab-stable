@@ -1,6 +1,10 @@
 #! /usr/bin/gawk -f
 #
-# forms-to-urls - Generate wget statements for a set of URL's.
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# urls-to-wget - Generate wget statements for a set of URL's.
 #
 # Assumes you are already logged in to Emulab, with a valid cookies.txt file.
 #

@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 # Makefile for the hyperviewer application directory.  See ROADMAP for details.
 # gmake -f GNUMakefile
 
@@ -6,7 +12,7 @@ HVROOT = hypviewer
 HVINC  = ${HVROOT}/include
 HVSRC  = ${HVROOT}/src
 
-# The follosing matches Munzner's Makefile scheme.
+# The following matches Munzner's Makefile scheme.
 CPU = free
 ##CPU = linux
 WINSYS = wxpy
