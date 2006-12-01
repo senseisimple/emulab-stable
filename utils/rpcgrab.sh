@@ -1,4 +1,15 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Hack script to extract the latest temp/power/current values from the RPC
+# power controller logs.  Used to generate data for the cricket grapher.
+# Uses the ancient Utah "reverse cat" tac program.
+#
 
 tac=/usr/site/bin/tac
 
