@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #Usage: tcpdump | python monitor.py <mapping-file> <experiment-name>
 #                                   <my-address> [stub-address]
 # mapping-file is a file which maps emulated addresses to real addresses.

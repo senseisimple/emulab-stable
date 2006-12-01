@@ -1,4 +1,3 @@
-
 /*
  * EMULAB-COPYRIGHT
  * Copyright (c) 2000-2006 University of Utah and the Flux Group.

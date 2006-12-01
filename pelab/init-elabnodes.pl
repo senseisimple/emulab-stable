@@ -1,5 +1,11 @@
 #!/usr/bin/perl
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Based on pairwise characteristics of planet-* nodes (real planetlab nodes)
 # in a pelab experiment, set the delay characteristics for the corresponding
 # elab-* nodes.

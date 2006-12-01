@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 if [ $# -lt 2 ]; then
     echo "usage: run-tcpdump type index [ tcpdump-args ... ]"

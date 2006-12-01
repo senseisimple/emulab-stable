@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 #
 # cloudinfo-set: Set the cloud info based on an input file of the form:
