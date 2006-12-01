@@ -1,3 +1,87 @@
+/*
+ * This file has a bit of a checkered past.
+ *
+ * Parts were inspired by the FreeBSD ganglia module:
+ *	ganglia-3.0.1/srclib/libmetrics/freebsd/metrics.c
+ * Parts were lifted from FreeBSD vmstat:
+ *	src/usr.bin/vmstat/vmstat.c
+ * Parts were lifted from FreeBSD top:
+ *	src/usr.bin/top/machine.c
+ */
+
+/*
+ * Ganglia notice:
+ *
+ *  First stab at support for metrics in FreeBSD
+ *  by Preston Smith <psmith@physics.purdue.edu>
+ *  Wed Feb 27 14:55:33 EST 2002
+ *  Improved by Brooks Davis <brooks@one-eyed-alien.net>,
+ *  Fixed libkvm code.
+ *  Tue Jul 15 16:42:22 EST 2003
+ *
+ * $Id: auxfuncs.c,v 1.3 2006-12-01 19:06:04 mike Exp $
+ */
+
+/*
+ * vmstat notice:
+ *
+ * Copyright (c) 1980, 1986, 1991, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
+ * top notice:
+ *
+ * top - a top users display for Unix
+ *
+ * SYNOPSIS:  For FreeBSD-2.x and later
+ *
+ * DESCRIPTION:
+ * Originally written for BSD4.4 system by Christos Zoulas.
+ * Ported to FreeBSD 2.x by Steven Wallace && Wolfram Schneider
+ * Order support hacked in from top-3.5beta6/machine/m_aix41.c
+ *   by Monte Mitzelfelt (for latest top see http://www.groupsys.com/topinfo/)
+ *
+ * This is the machine-dependent module for FreeBSD 2.2
+ * Works for:
+ *	FreeBSD 2.2.x, 3.x, 4.x, and probably FreeBSD 2.1.x
+ *
+ * LIBS: -lkvm
+ *
+ * AUTHOR:  Christos Zoulas <christos@ee.cornell.edu>
+ *          Steven Wallace  <swallace@freebsd.org>
+ *          Wolfram Schneider <wosch@FreeBSD.org>
+ *
+ * $FreeBSD: src/usr.bin/top/machine.c,v 1.29.2.2 2001/07/31 20:27:05 tmm Exp $
+ */
 
 #include <sys/param.h>
 #include <sys/wait.h>
@@ -215,6 +299,10 @@ getswapouts(void)
 	return tmp;
 }
 
+/*
+ * Slurped from vmstat:
+ * $FreeBSD: src/usr.bin/vmstat/vmstat.c,v 1.38.2.5 2003/09/20 19:10:01 bms Exp $
+ */
 char **
 getdrivedata(argv)
 	char **argv;
