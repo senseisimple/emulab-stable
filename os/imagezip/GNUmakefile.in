@@ -156,8 +156,8 @@ imagezip: imagezip.o disksize.o version.o $(ZIPLIBS)
 imagezip.o:	imagezip.c
 	$(CC) -c $(ZIPCFLAGS) -o imagezip.o $<
 
-imageunzip: imageunzip.o crc.o version.o 
-	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
+imageunzip: imageunzip.o disksize.o crc.o version.o 
+	$(CC) $(CFLAGS) imageunzip.o disksize.o crc.o version.o $(UNZIPLIBS) -o imageunzip
 
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<

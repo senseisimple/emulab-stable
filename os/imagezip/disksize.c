@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -29,6 +29,7 @@ getdisksize(int fd)
 {
 	unsigned long disksize = 0;
 	unsigned int ssize = 512;
+	off_t whuzat;
 
 #ifdef linux
 	if (disksize == 0) {
@@ -63,6 +64,8 @@ getdisksize(int fd)
 #endif
 #endif
 
+	whuzat = lseek(fd, (off_t)0, SEEK_CUR);
+
 	/*
 	 * OS wouldn't tell us anything directly, try a seek to the
 	 * end of the device.
@@ -82,6 +85,12 @@ getdisksize(int fd)
 		fprintf(stderr, "WARNING: "
 			"could not seek to final sector (%lu) of disk\n",
 			disksize - 1);
+
+	if (whuzat >= 0) {
+		if (lseek(fd, whuzat, SEEK_SET) < 0)
+			fprintf(stderr, "WARNING: "
+				"could not seek to previous offset on disk\n");
+	}
 
 	return disksize;
 }

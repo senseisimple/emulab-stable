@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -95,11 +95,13 @@ static int	 inflate_subblock(const char *);
 void		 writezeros(off_t offset, off_t zcount);
 void		 writedata(off_t offset, size_t count, void *buf);
 
+static void	zero_remainder(void);
 static void	getrelocinfo(const blockhdr_t *hdr);
 static void	applyrelocs(off_t offset, size_t cc, void *buf);
 
 static int	 seekable;
 static off_t	 nextwriteoffset;
+static off_t	 maxwrittenoffset;
 
 static int	 imagetoobigwarned;
 
@@ -255,8 +257,8 @@ void dodots(int dottype, off_t cc)
 		if ((count = newgb - lastgb) <= 0)
 			return;
 		lastgb = newgb;
-		chr = (dottype == DODOTS_DATA) ? '*' :
-			(dottype == DODOTS_ZERO) ? 'o' : 's';
+		chr = (dottype == DODOTS_DATA) ? '.' :
+			(dottype == DODOTS_ZERO) ? 'z' : 's';
 		break;
 	}
 
@@ -687,6 +689,21 @@ main(int argc, char *argv[])
 			perror("Setting seek pointer to slice");
 			exit(1);
 		}
+
+		/*
+		 * XXX zeroing and slice mode don't mix.
+		 *
+		 * To do so properly, we would have to zero all space before
+		 * and after the slice in question.  But zeroing before would
+		 * clobber the MBR and boot info, probably not what was
+		 * intended.  So we just don't do it til we figure out what
+		 * the "right" behavior is.
+		 */
+		if (slice) {
+			fprintf(stderr,
+				"WARNING: requested zeroing in slice mode, "
+				"will NOT zero outside of slice!\n");
+		}
 	}
 
 	threadinit();
@@ -765,6 +782,9 @@ main(int argc, char *argv[])
 	}
  done:
 	close(infd);
+
+	/* When zeroing, may need to zero the rest of the disk */
+	zero_remainder();
 
 	/* This causes the output queue to drain */
 	threadquit();
@@ -874,6 +894,9 @@ ImageUnzipChunk(char *chunkdata)
 void
 ImageUnzipFlush(void)
 {
+	/* When zeroing, may need to zero the rest of the disk */
+	zero_remainder();
+
 	threadwait();
 }
 
@@ -1323,7 +1346,7 @@ inflate_subblock(const char *chunkbufp)
 void
 writezeros(off_t offset, off_t zcount)
 {
-	size_t	zcc;
+	size_t	zcc, wcc;
 	off_t ozcount;
 
 	assert((offset & (SECSIZE-1)) == 0);
@@ -1361,17 +1384,30 @@ writezeros(off_t offset, off_t zcount)
 			compute_crc((u_char *)zeros, zcc, &crc);
 		else
 #endif
-		if ((zcc = write(outfd, zeros, zcc)) != zcc) {
-			if (zcc < 0) {
+		if ((wcc = write(outfd, zeros, zcc)) != zcc) {
+			if (wcc < 0) {
 				perror("Writing Zeros");
+			} else if ((wcc & (SECSIZE-1)) != 0) {
+				fprintf(stderr, "Writing Zeros: "
+					"partial sector write (%d bytes)\n",
+					wcc);
+				wcc = -1;
+			} else if (wcc == 0) {
+				fprintf(stderr, "Writing Zeros: "
+					"unexpected EOF\n");
+				wcc = -1;
 			}
-			exit(1);
+			if (wcc < 0)
+				exit(1);
+			zcc = wcc;
 		}
 		zcount     -= zcc;
 		totalrdata += zcc;
 		nextwriteoffset += zcc;
 		dodots(DODOTS_ZERO, ozcount-zcount);
 	}
+	if (nextwriteoffset > maxwrittenoffset)
+		maxwrittenoffset = nextwriteoffset;
 }
 
 void
@@ -1405,8 +1441,55 @@ writedata(off_t offset, size_t size, void *buf)
 		exit(1);
 	}
 	nextwriteoffset = offset + cc;
+	if (nextwriteoffset > maxwrittenoffset)
+		maxwrittenoffset = nextwriteoffset;
 	totalrdata += cc;
 	dodots(DODOTS_DATA, cc);
+}
+
+/*
+ * If the target disk is larger than the disk on which the image was made,
+ * there will be some remaining space on the disk that needs to be zeroed.
+ */
+static void
+zero_remainder()
+{
+	extern unsigned long getdisksize(int fd);
+	off_t disksize;
+
+	if (!dofill)
+		return;
+
+	/* XXX zeroing and slice mode don't mix; see earlier comment. */
+	if (slice)
+		return;
+
+	if (outputmaxsec == 0)
+		outputmaxsec = getdisksize(outfd);
+	disksize = sectobytes(outputmaxsec);
+	if (debug)
+		fprintf(stderr, "\ndisksize = %lld\n", disksize);
+
+	/* XXX must wait for writer thread to finish to get maxwrittenoffset value */
+	threadwait();
+
+	if (disksize > maxwrittenoffset) {
+		off_t remaining = disksize - maxwrittenoffset;
+		writebuf_t *wbuf;
+
+		if (debug)
+			fprintf(stderr, "zeroing %lld bytes at offset %lld "
+				"(%u sectors at %u)\n",
+				remaining, maxwrittenoffset,
+				bytestosec(remaining), bytestosec(maxwrittenoffset));
+		wbuf = alloc_writebuf(maxwrittenoffset, remaining, 0, 1);
+		dowrite_request(wbuf);
+	} else {
+		if (debug)
+			fprintf(stderr, "not zeroing: disksize = %lld, "
+				"maxwritten =  %lld\n",
+				disksize, maxwrittenoffset);
+	}
 }
 
 #include "sliceinfo.h"

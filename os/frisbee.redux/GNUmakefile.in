@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -48,7 +48,7 @@ endif
 
 CLIENTFLAGS	= $(CFLAGS)
 CLIENTLIBS	= -lz $(PTHREADLIBS)
-CLIENTOBJS	= client.o frisbee.o $(SHAREDOBJS)
+CLIENTOBJS	= client.o frisbee.o disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
@@ -91,6 +91,9 @@ event.o:	$(SRCDIR)/event.c decls.h log.h event.h
 	$(CC) $(EVENTFLAGS) -c $(SRCDIR)/event.c
 
 $(FRISBEEDIR)/imageunzip.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/queue.h
+
+disksize.o:	$(FRISBEEDIR)/disksize.c
+	$(CC) -c $(CFLAGS) -I$(FRISBEEDIR) -o disksize.o $<
 
 frisbee.o:	$(FRISBEEDIR)/imageunzip.c
 	$(CC) -c $(CFLAGS) -DFRISBEE -I$(FRISBEEDIR) -o frisbee.o $<
