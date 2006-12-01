@@ -1,4 +1,10 @@
 (*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
+(*
  * tree-assign.ml
  * Assign IP addresses to a tree
  *)

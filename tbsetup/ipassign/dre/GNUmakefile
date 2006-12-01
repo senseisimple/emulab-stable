@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 all: test-heap graph2dot test-dijk test-dijk.opt test-dre test-dre.opt \
 	dre-histogram dre-histogram.opt name-ga name-ga.opt ordering-to-tree \
 	ordering-to-tree.opt graph-to-tree graph-to-tree.opt tree-assign tree-assign.opt \

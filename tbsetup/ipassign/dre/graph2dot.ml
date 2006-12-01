@@ -1,4 +1,10 @@
 (*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
+(*
  * graph2dot.ml - Convert Jon Duerig's graph files into input files for dot
  * File format is a bunch of lines constisting of four ints where:
  * First is edge weight (unused)
