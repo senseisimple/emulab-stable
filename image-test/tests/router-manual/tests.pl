@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 test_traceroute 'node1', 'nodeA', qw(node3-lan nodeA-link);
 test_traceroute 'nodeA', 'node1', qw(node3-link node1-lan);
