@@ -47,7 +47,7 @@ $types_result =
 function SPITFORM($formfields, $errors)
 {
     global $uid, $projlist, $isadmin, $types_result;
-    global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
+    global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN, $TBPROJ_DIR;
     
     if ($errors) {
 	echo "<table class=nogrid

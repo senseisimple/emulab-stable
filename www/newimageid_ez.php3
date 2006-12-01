@@ -88,7 +88,7 @@ function SPITFORM($formfields, $errors)
     global $uid, $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
       $osid_featurelist, $nodetype, $filename_extension, $help_message;
     global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
-    global $TBDB_OSID_VERSLEN, $TBBASE;
+    global $TBDB_OSID_VERSLEN, $TBBASE, $TBPROJ_DIR;
 
     global $view;
     #
