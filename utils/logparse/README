@@ -1,0 +1,10 @@
+These are some scripts used to parse testbed-ops and other testbed related mail
+lists in order to extract experiment and node history.
+
+These were used to extract information about experiments that happened before we
+started keeping such info in the database.  As such, they are probably only of
+interest to Utah and not to new Emulab sites.  parsemail.pl in particular has a
+lot of builtin Utah Emulab history.
+
+See the regen script for how all these scripts tie together.
+ 
