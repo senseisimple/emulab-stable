@@ -66,16 +66,16 @@ use Cmdqueue;
 $| = 1;
 
 sub usage {
-	warn "Usage: $0 [-s server] [-c cmdport] [-a ackport] [-p sendport] [-e pid/eid] <-d working_dir> [hostname]\n";
-	return 1;
+        warn "Usage: $0 [-s server] [-c cmdport] [-a ackport] [-p sendport] [-e pid/eid] <-d working_dir> [hostname]\n";
+        return 1;
 }
 
 
 #*****************************************
 my $pollPer = 0.1;  #number of seconds to sleep between poll loops
 my %MAX_SIMU_TESTS = (latency => "10",
-		      bw      => "1",
-		      outage  => "10");
+                      bw      => "1",
+                      outage  => "10");
 my $cacheSendRate = 5;  #number of cached results per second
 my %cacheLastSentAt;    #{indx} -> tstamp of last sent cache result
 my $cacheIndxWaitPer = 5; #wait x sec between cache send attempts of same indx
@@ -86,19 +86,19 @@ my $outManID = "outageMan"; #name to use for ManagerID when an outage is detctd
 my $outDet_maxPastSuc = 12; #consider a path for outage detection if a valid
                             #result appeared within this many hours in the past
 my %outTestFreq = ( high  => 1,
-		    med   => 10,
-		    low   => 600,
-		    outageEnd=> 10 );
+                    med   => 10,
+                    low   => 600,
+                    outageEnd=> 10 );
 my %outTestDur =  ( high  => 60,
-		    med   => 60,
-		    low   => 0,
-		    outageEnd=> 120 );
+                    med   => 60,
+                    low   => 0,
+                    outageEnd=> 120 );
 
 =pod
 # percentage of testing period to wait after a test process abnormally exits
 # note: 0.1 = 10%
 my %TEST_FAIL_RETRY= (latency => 0.3,
-		      bw      => 0.5);
+                      bw      => 0.5);
 =cut  
 my $rcvBufferSize = 2048;  #max size for an incoming UDP message
 my %outsockets = ();       #sockets keyed by dest node
@@ -111,7 +111,7 @@ my %testevents = ();
 #queue for each test type containing tests that need to
 # be run.
 my %waitq = ( latency => [],
-	      bw      => [] );
+              bw      => [] );
 my %runningtestPIDs = ();  # maps from PID's -> array of destnode, bw
 my $status;  #keeps track of status of this bgmon. Possible values are:
              # anyscheduled_no, anyscheduled_yes
@@ -160,10 +160,10 @@ if( defined  $ARGV[0] ){
     $_ = `cat /var/emulab/boot/nodeid`;
     /plabvm(\d+)-/;
     if( defined $1 ){
-	$thismonaddr = "plab$1" ;
+        $thismonaddr = "plab$1" ;
     }else{
-	$thismonaddr = `hostname`;
-	chomp $thismonaddr;
+        $thismonaddr = `hostname`;
+        chomp $thismonaddr;
     }
 }
 print "thismonaddr = $thismonaddr\n";
@@ -174,19 +174,19 @@ print "ackport = $ackport\n";
 # Create a TCP socket to receive commands on
 my $socket_cmd = IO::Socket::INET->new( LocalPort => $cmdport,
 #TODO: added this as comment, in case it breaks: LocalHost => $thismonaddr,
-					Proto    => 'tcp',
-					Blocking => 0,
-					Listen   => 1,
-					ReuseAddr=> 1 )
+                                        Proto    => 'tcp',
+                                        Blocking => 0,
+                                        Listen   => 1,
+                                        ReuseAddr=> 1 )
     or die "Couldn't create socket on $cmdport\n";
 # Create a UDP socket to receive acks on
 my $socket_ack = IO::Socket::INET->new( LocalPort => $ackport,
-					Proto    => 'udp' )
+                                        Proto    => 'udp' )
     or die "Couldn't create socket on $ackport\n";
 
 my $socket_snd = IO::Socket::INET->new( PeerPort => $sendport,
-					Proto    => 'udp',
-					PeerAddr => $server );
+                                        Proto    => 'udp',
+                                        PeerAddr => $server );
 
 #create Select object.
 my $sel = IO::Select->new();
@@ -205,124 +205,124 @@ sub handleincomingmsgs()
 
     my @ready = $sel->can_read($pollPer);
     foreach my $handle (@ready){
-	my %sockIn;
-	my $cmdHandle;
-	if( $handle eq $socket_ack ){
-	    $handle->recv( $inmsg, $rcvBufferSize );
-	    %sockIn = %{ deserialize_hash($inmsg) };
-	}elsif( $handle eq $socket_cmd ){
-	    $cmdHandle = $handle->accept();
-	    $inmsg = <$cmdHandle>;
-	    chomp $inmsg;
-	    %sockIn = %{ deserialize_hash($inmsg) };
-	    if( !isMsgValid(%sockIn) ){
-		close $cmdHandle;
-		return 0; 
-	    }
-	    print $cmdHandle "ACK\n";
-	    
-	}
-#	print "received msg: $inmsg\n";
+        my %sockIn;
+        my $cmdHandle;
+        if( $handle eq $socket_ack ){
+            $handle->recv( $inmsg, $rcvBufferSize );
+            %sockIn = %{ deserialize_hash($inmsg) };
+        }elsif( $handle eq $socket_cmd ){
+            $cmdHandle = $handle->accept();
+            $inmsg = <$cmdHandle>;
+            chomp $inmsg;
+            %sockIn = %{ deserialize_hash($inmsg) };
+            if( !isMsgValid(%sockIn) ){
+                close $cmdHandle;
+                return 0; 
+            }
+            print $cmdHandle "ACK\n";
+            
+        }
+#       print "received msg: $inmsg\n";
 
-	if( !isMsgValid(%sockIn) ){ return 0; }
+        if( !isMsgValid(%sockIn) ){ return 0; }
 
-	my $cmdtype = $sockIn{cmdtype};	
-	if( $cmdtype eq "ACK" ){
-	    my $index = $sockIn{index};
-	    my $tstamp =$sockIn{tstamp};
+        my $cmdtype = $sockIn{cmdtype}; 
+        if( $cmdtype eq "ACK" ){
+            my $index = $sockIn{index};
+            my $tstamp =$sockIn{tstamp};
 
-	    # delete cache entry if ACK tstamp  matches the actual stored data
-	    my %db;
-	    my $filename = createDBfilename();
-	    tie( %db, "DB_File", $filename) or 
-		eval {
-		    warn time()." cannot open db file";
-		    return -1;
-		};
-	    my %results = %{ deserialize_hash($db{$index}) };
-	    print time()." Ack for index $index. Deleting cache entry\n";
-	    print "rcved ACK, but UDP/tstamp not defined\n" 
-		if( !defined $tstamp );
-	    print "rcved ACK, but dbfile/tstamp not defined\n" 
-		if( !defined $results{tstamp} );
-	    delLocalDBEntry($index)
-		if( $tstamp eq $results{tstamp} );
-	}
-	elsif( $cmdtype eq "EDIT" ){
-	    my $linkdest = $sockIn{dstnode};
-	    my $testtype = $sockIn{testtype};
-	    my $newtestper = $sockIn{testper};
-	    my $duration =$sockIn{duration};
-	    my $managerID=$sockIn{managerID};
-	    initTestEv($linkdest,$testtype);
-	    my $testev = \%{ $testevents{$linkdest}{$testtype} };
+            # delete cache entry if ACK tstamp  matches the actual stored data
+            my %db;
+            my $filename = createDBfilename();
+            tie( %db, "DB_File", $filename) or 
+                eval {
+                    warn time()." cannot open db file";
+                    return -1;
+                };
+            my %results = %{ deserialize_hash($db{$index}) };
+            print time()." Ack for index $index. Deleting cache entry\n";
+            print "rcved ACK, but UDP/tstamp not defined\n" 
+                if( !defined $tstamp );
+            print "rcved ACK, but dbfile/tstamp not defined\n" 
+                if( !defined $results{tstamp} );
+            delLocalDBEntry($index)
+                if( $tstamp eq $results{tstamp} );
+        }
+        elsif( $cmdtype eq "EDIT" ){
+            my $linkdest = $sockIn{dstnode};
+            my $testtype = $sockIn{testtype};
+            my $newtestper = $sockIn{testper};
+            my $duration =$sockIn{duration};
+            my $managerID=$sockIn{managerID};
+            initTestEv($linkdest,$testtype);
+            my $testev = \%{ $testevents{$linkdest}{$testtype} };
 
-	    print time()." EDIT:\n";
-	    print( "linkdest=$linkdest\n".
-		   "testype =$testtype\n".
-		   "testper=$newtestper\n" );
-	    print "duration=".$sockIn{duration}."\n" 
-		if( defined $sockIn{duration} );
+            print time()." EDIT:\n";
+            print( "linkdest=$linkdest\n".
+                   "testype =$testtype\n".
+                   "testper=$newtestper\n" );
+            print "duration=".$sockIn{duration}."\n" 
+                if( defined $sockIn{duration} );
 
-	    #add new cmd to queue
-#	    my $cmd = Cmd->new($managerID, $newtestper, $duration);
-#	    $testev->{cmdq}->add( $cmd );
-	    addCmd( $testev, Cmd->new($managerID, $newtestper, $duration) );
-	}
-	elsif( $cmdtype eq "INIT" ){
-	    print time()." INIT: ";
-	    my $testtype = $sockIn{testtype};
-	    my @destnodes 
-		= split(" ",$sockIn{destnodes});
-#	    my $testper = $sockIn{testper};
-	    my $newtestper = $sockIn{testper};
-	    my $duration =$sockIn{duration};
-	    my $managerID=$sockIn{managerID};
-	    
-	    #distribute start times from offset 0 to testper/2
+            #add new cmd to queue
+#           my $cmd = Cmd->new($managerID, $newtestper, $duration);
+#           $testev->{cmdq}->add( $cmd );
+            addCmd( $testev, Cmd->new($managerID, $newtestper, $duration) );
+        }
+        elsif( $cmdtype eq "INIT" ){
+            print time()." INIT: ";
+            my $testtype = $sockIn{testtype};
+            my @destnodes 
+                = split(" ",$sockIn{destnodes});
+#           my $testper = $sockIn{testper};
+            my $newtestper = $sockIn{testper};
+            my $duration =$sockIn{duration};
+            my $managerID=$sockIn{managerID};
+            
+            #distribute start times from offset 0 to testper/2
 #TODO: HANDLE OFFSET SOMEWHERE!!
-	    my $offsetinc = 0;
-	    if( (scalar @destnodes) != 0 ){
-		$offsetinc = $newtestper/(scalar @destnodes)/2.0;
-	    }
-	    my $offset = 0;
+            my $offsetinc = 0;
+            if( (scalar @destnodes) != 0 ){
+                $offsetinc = $newtestper/(scalar @destnodes)/2.0;
+            }
+            my $offset = 0;
             foreach my $linkdest (@destnodes){
-		initTestEv($linkdest,$testtype);
-		my $testev = \%{ $testevents{$linkdest}{$testtype} };
-		#add new cmd to queue
-		addCmd( $testev, 
-			Cmd->new($managerID, $newtestper, $duration) );
-		$offset += $offsetinc;
-	    }
-	    print " $testtype  $newtestper\n";
-	}
-	elsif( $cmdtype eq "STOPALL" ){
-	    print time()." STOPALL\n";
-	    my $managerID=$sockIn{managerID} if( defined $sockIn{managerID} );
+                initTestEv($linkdest,$testtype);
+                my $testev = \%{ $testevents{$linkdest}{$testtype} };
+                #add new cmd to queue
+                addCmd( $testev, 
+                        Cmd->new($managerID, $newtestper, $duration) );
+                $offset += $offsetinc;
+            }
+            print " $testtype  $newtestper\n";
+        }
+        elsif( $cmdtype eq "STOPALL" ){
+            print time()." STOPALL\n";
+            my $managerID=$sockIn{managerID} if( defined $sockIn{managerID} );
 
-	    #delete those entries of this managerID
-	    for my $destaddr ( keys %testevents ) {
-		for my $testtype ( keys %{ $testevents{$destaddr} } ){
-		    my $testev = \%{ $testevents{$destaddr}{$testtype} };
-		    #update scheduled tests in case something changed
-		    if( defined $testev->{cmdq} ){
-			$testev->{cmdq}->rmCmds( $managerID );
-			updateTestEvent( $testev );
-		    }
-		}
-	    }
-	}
-	elsif( $cmdtype eq "DIE" ){
-	    die "Received termination command. Exiting.\n";
-	}
-	elsif( $cmdtype eq "GETSTATUS" ){
-	    if( defined $cmdHandle ){
-		print $cmdHandle "$status\n";
-	    }
-	}
-	if( defined $cmdHandle ){
-	    close $cmdHandle;
-	}
+            #delete those entries of this managerID
+            for my $destaddr ( keys %testevents ) {
+                for my $testtype ( keys %{ $testevents{$destaddr} } ){
+                    my $testev = \%{ $testevents{$destaddr}{$testtype} };
+                    #update scheduled tests in case something changed
+                    if( defined $testev->{cmdq} ){
+                        $testev->{cmdq}->rmCmds( $managerID );
+                        updateTestEvent( $testev );
+                    }
+                }
+            }
+        }
+        elsif( $cmdtype eq "DIE" ){
+            die "Received termination command. Exiting.\n";
+        }
+        elsif( $cmdtype eq "GETSTATUS" ){
+            if( defined $cmdHandle ){
+                print $cmdHandle "$status\n";
+            }
+        }
+        if( defined $cmdHandle ){
+            close $cmdHandle;
+        }
     }
 }
 
@@ -341,28 +341,28 @@ while (1) {
 
     #set status of this bgmon
     if( keys %testevents != 0){
-	$status = "anyscheduled_yes";
+        $status = "anyscheduled_yes";
     }else{
-	$status = "anyscheduled_no";
+        $status = "anyscheduled_no";
     }
 
     #re-try wait Q every $subtimer_reset times through poll loop
     #try to run tests on queue
-    if( $subtimer == 0 ){	
+    if( $subtimer == 0 ){       
 
-	foreach my $testtype (keys %waitq){
+        foreach my $testtype (keys %waitq){
 
-	    if( scalar(@{$waitq{$testtype}}) != 0 ){
-		print time_all()." $testtype QUEUE: ";
-		foreach my $node (@{$waitq{$testtype}}){
-		    print "$node ";
-		}
-		print "\n";
-	    }
-	    #
-	    # Run next scheduled test
-	    spawnTest( undef, $testtype );
-	}
+            if( scalar(@{$waitq{$testtype}}) != 0 ){
+                print time_all()." $testtype QUEUE: ";
+                foreach my $node (@{$waitq{$testtype}}){
+                    print "$node ";
+                }
+                print "\n";
+            }
+            #
+            # Run next scheduled test
+            spawnTest( undef, $testtype );
+        }
     }
 
 
@@ -371,165 +371,165 @@ while (1) {
 #    my @deadpids;
     use POSIX ":sys_wait_h";
     while( (my $pid = waitpid(-1,&WNOHANG)) > 0 ){
-	my $destaddr = $runningtestPIDs{$pid}[0];
-	my $testtype = $runningtestPIDs{$pid}[1];
-	my $testev = \%{ $testevents{$destaddr}{$testtype} };
-	# handle the case where a test (iperf) times out and bgmon kills it
-	#TODO: MADE A CHANGE HERE (9/25/06)... IN CASE IT BREAKS, LOOK HERE
-	if( $testev->{"timedout"} == 1 ){
-	    $testev->{"flag_scheduled"} = 0;
-	    $testev->{"timedout"} = 0;
-	}elsif( defined $testev ){
-	    $testev->{"flag_finished"} = 1;
-	}
-	$testev->{"pid"} = 0;
-	delete $runningtestPIDs{$pid};	
+        my $destaddr = $runningtestPIDs{$pid}[0];
+        my $testtype = $runningtestPIDs{$pid}[1];
+        my $testev = \%{ $testevents{$destaddr}{$testtype} };
+        # handle the case where a test (iperf) times out and bgmon kills it
+        #TODO: MADE A CHANGE HERE (9/25/06)... IN CASE IT BREAKS, LOOK HERE
+        if( $testev->{"timedout"} == 1 ){
+            $testev->{"flag_scheduled"} = 0;
+            $testev->{"timedout"} = 0;
+        }elsif( defined $testev ){
+            $testev->{"flag_finished"} = 1;
+        }
+        $testev->{"pid"} = 0;
+        delete $runningtestPIDs{$pid};  
     } 
 
     # Check for running tests which are taking too long.
     foreach my $pid (keys %runningtestPIDs){
-	my $destaddr = $runningtestPIDs{$pid}[0];
-	my $testtype = $runningtestPIDs{$pid}[1];
-	my $testev = \%{ $testevents{$destaddr}{$testtype} };
+        my $destaddr = $runningtestPIDs{$pid}[0];
+        my $testtype = $runningtestPIDs{$pid}[1];
+        my $testev = \%{ $testevents{$destaddr}{$testtype} };
 
-	if( $testtype eq "bw" &&
-	    time_all() >
-	    $testev->{"tstamp"} + 
-	    $iperftimeout )    
-	{
-	    # bw test is running too long, so kill it
+        if( $testtype eq "bw" &&
+            time_all() >
+            $testev->{"tstamp"} + 
+            $iperftimeout )    
+        {
+            # bw test is running too long, so kill it
 
-	    kill 'TERM', $pid;
-	    print time_all()." bw timeout: killed $destaddr, ".
-		"pid=$pid\n";
+            kill 'TERM', $pid;
+            print time_all()." bw timeout: killed $destaddr, ".
+                "pid=$pid\n";
 
-	    $testev->{"timedout"} = 1;
+            $testev->{"timedout"} = 1;
 
-	    #delete tmp filename
-	    my $filename = createtmpfilename($destaddr, $testtype);
-	    unlink($filename) or warn "can't delete temp file";
-	    my %results = 
-		("sourceaddr" => $thismonaddr,
-		 "destaddr" => $destaddr,
-		 "testtype" => $testtype,
-		 "result" => $ERRID{timeout},
-		 "tstamp" => $testev->{tstamp},
-		 "magic"  => "$magic",
-		 );
-	    #save result to local DB
-	    my $index = saveTestToLocalDB(\%results);
-	    #send result to remote DB
-	    sendResults(\%results, $index);
-	}
+            #delete tmp filename
+            my $filename = createtmpfilename($destaddr, $testtype);
+            unlink($filename) or warn "can't delete temp file";
+            my %results = 
+                ("sourceaddr" => $thismonaddr,
+                 "destaddr" => $destaddr,
+                 "testtype" => $testtype,
+                 "result" => $ERRID{timeout},
+                 "tstamp" => $testev->{tstamp},
+                 "magic"  => "$magic",
+                 );
+            #save result to local DB
+            my $index = saveTestToLocalDB(\%results);
+            #send result to remote DB
+            sendResults(\%results, $index);
+        }
 
     }
 
     #iterate through all event structures
     for my $destaddr ( keys %testevents ) {
-	for my $testtype ( keys %{ $testevents{$destaddr} } ){
+        for my $testtype ( keys %{ $testevents{$destaddr} } ){
 
-	    my $testev = \%{ $testevents{$destaddr}{$testtype} };
+            my $testev = \%{ $testevents{$destaddr}{$testtype} };
 
-	    #check for finished events
-	    if( $testev->{"flag_finished"} == 1 ){
-		#read raw results from temp file
-		my $filename = createtmpfilename($destaddr, $testtype);
-		open FILE, "< $filename"
-		    or warn "can't open file $filename";
-	        my @raw_lines = <FILE>;
-		my $raw;
-		foreach my $line (@raw_lines){
-		    $raw = $raw.$line;
-		}
-		close FILE;
-		unlink($filename) or warn "can't delete temp file";
-		#parse raw data
-		my $parsedData = parsedata($testtype,$raw);
-		$testev->{"results_parsed"} = $parsedData;
+            #check for finished events
+            if( $testev->{"flag_finished"} == 1 ){
+                #read raw results from temp file
+                my $filename = createtmpfilename($destaddr, $testtype);
+                open FILE, "< $filename"
+                    or warn "can't open file $filename";
+                my @raw_lines = <FILE>;
+                my $raw;
+                foreach my $line (@raw_lines){
+                    $raw = $raw.$line;
+                }
+                close FILE;
+                unlink($filename) or warn "can't delete temp file";
+                #parse raw data
+                my $parsedData = parsedata($testtype,$raw);
+                $testev->{"results_parsed"} = $parsedData;
 
-		my %results = 
-		    ("sourceaddr" => $thismonaddr,
-		     "destaddr" => $destaddr,
-		     "testtype" => $testtype,
-		     "result" => $parsedData,
-		     "tstamp" => $testev->{tstamp},
-		     "magic"  => "$magic",
-		     "ts_finished" => time()
-		     );
+                my %results = 
+                    ("sourceaddr" => $thismonaddr,
+                     "destaddr" => $destaddr,
+                     "testtype" => $testtype,
+                     "result" => $parsedData,
+                     "tstamp" => $testev->{tstamp},
+                     "magic"  => "$magic",
+                     "ts_finished" => time()
+                     );
 
-		#MARK_RELIABLE
-		#save result to local DB
-		my $index = saveTestToLocalDB(\%results);
+                #MARK_RELIABLE
+                #save result to local DB
+                my $index = saveTestToLocalDB(\%results);
 
-		#send result to remote DB
-		sendResults(\%results, $index);
+                #send result to remote DB
+                sendResults(\%results, $index);
 
-		#reset flags
-		$testev->{"flag_finished"} = 0;
-		$testev->{"flag_scheduled"} = 0;
+                #reset flags
+                $testev->{"flag_finished"} = 0;
+                $testev->{"flag_scheduled"} = 0;
 
-		# Check for outage
-		if( $testtype eq "latency" ){
-		    updateOutageState( $destaddr );
-		}elsif( $testtype eq "outage" ){
-		    updateOutageState_lossCheck( $destaddr );
-		}
-	    }
+                # Check for outage
+                if( $testtype eq "latency" ){
+                    updateOutageState( $destaddr );
+                }elsif( $testtype eq "outage" ){
+                    updateOutageState_lossCheck( $destaddr );
+                }
+            }
 
-	    #schedule new tests
-	    if( $testev->{"flag_scheduled"} == 0 && 
-#		defined $testev->{"testper"} &&
-		$testev->{"testper"} > 0 )
-	    {
-		
-		if( $testev->{limitTime} > 0 &&
-		    time() >= $testev->{limitTime} )
-		{
-		    my $oldper = $testev->{testper};
-		    # Rate increase expired. Get new value from Q
-		    $testev->{cmdq}->cleanQueue();  #rid expired values
-		    $testev->{testper} = 0;  #reset existing period
-		    updateTestEvent($testev);
-		    print "resetting period from $oldper";
-		    print " to ".$testev->{testper}."\n";
-		}
+            #schedule new tests
+            if( $testev->{"flag_scheduled"} == 0 && 
+#               defined $testev->{"testper"} &&
+                $testev->{"testper"} > 0 )
+            {
+                
+                if( $testev->{limitTime} > 0 &&
+                    time() >= $testev->{limitTime} )
+                {
+                    my $oldper = $testev->{testper};
+                    # Rate increase expired. Get new value from Q
+                    $testev->{cmdq}->cleanQueue();  #rid expired values
+                    $testev->{testper} = 0;  #reset existing period
+                    updateTestEvent($testev);
+                    print "resetting period from $oldper";
+                    print " to ".$testev->{testper}."\n";
+                }
 
-		if( time_all() < 
-		    $testev->{"timeOfNextRun"} + $testev->{"testper"} )
-		{
-		    #if time of next run is in the future, set it to that
-		    $testev->{"timeOfNextRun"} += $testev->{"testper"};
-		}else{
-		    #if time of next run is in the past, set to current time
-		    $testev->{"timeOfNextRun"} 
-		      = time_all();
-		}
+                if( time_all() < 
+                    $testev->{"timeOfNextRun"} + $testev->{"testper"} )
+                {
+                    #if time of next run is in the future, set it to that
+                    $testev->{"timeOfNextRun"} += $testev->{"testper"};
+                }else{
+                    #if time of next run is in the past, set to current time
+                    $testev->{"timeOfNextRun"} 
+                      = time_all();
+                }
 
-		$testev->{"flag_scheduled"} = 1;
-	    }
+                $testev->{"flag_scheduled"} = 1;
+            }
 
-	    #check for new tests ready to run
-	    if( $testev->{"timeOfNextRun"} <= time_all() &&
-		$testev->{"flag_scheduled"} == 1 && 
-		$testev->{"pid"} == 0 )
-	    {
-		#run test
-		spawnTest( $destaddr, $testtype );
-	    }
+            #check for new tests ready to run
+            if( $testev->{"timeOfNextRun"} <= time_all() &&
+                $testev->{"flag_scheduled"} == 1 && 
+                $testev->{"pid"} == 0 )
+            {
+                #run test
+                spawnTest( $destaddr, $testtype );
+            }
 
-	}#end loop
+        }#end loop
 
-	# may not be needed, but may help detect errors
-	my $hangres = detectHang($destaddr);
-	if( $hangres eq "bw" ){
-	    print "HANG: $hangres,  $destaddr\n";
-	    # reset time of next run
-	    $testevents{$destaddr}{bw}{"timeOfNextRun"} = time_all();
-	}
+        # may not be needed, but may help detect errors
+        my $hangres = detectHang($destaddr);
+        if( $hangres eq "bw" ){
+            print "HANG: $hangres,  $destaddr\n";
+            # reset time of next run
+            $testevents{$destaddr}{bw}{"timeOfNextRun"} = time_all();
+        }
     }
 
     if( $subtimer == 0 ){
-	$subtimer = $subtimer_reset;
+        $subtimer = $subtimer_reset;
     }
 }
 
@@ -545,49 +545,49 @@ sub sendOldResults()
     # acked because the network is slow or down.
     #
     my $count    = 0;
-    	# Wake up and send only this number at once.
+        # Wake up and send only this number at once.
     my $maxcount = int( $pollPer*$cacheSendRate );
 
     my %db;
     my $filename = createDBfilename();
     tie( %db, "DB_File", $filename) or 
-	eval {
-	    warn time()." cannot open db file";
-	    return -1;
-	};
+        eval {
+            warn time()." cannot open db file";
+            return -1;
+        };
 
     my @ids = keys %db;
    
     $iterSinceLastRun++;
     while( ($count < $maxcount && $count < scalar(@ids)) 
-	|| ($iterSinceLastRun > (1/($pollPer*$cacheSendRate))) )
+        || ($iterSinceLastRun > (1/($pollPer*$cacheSendRate))) )
     {
-	if( scalar(@ids) == 0 ){
-	    last;
-	}
-	my $index = $ids[int( rand scalar(@ids) )];
-	my %results = %{ deserialize_hash($db{$index}) };
-	next if( (defined $cacheLastSentAt{$index})  &&
-		 time() - $cacheLastSentAt{$index} < 
-		 $cacheIndxWaitPer );
+        if( scalar(@ids) == 0 ){
+            last;
+        }
+        my $index = $ids[int( rand scalar(@ids) )];
+        my %results = %{ deserialize_hash($db{$index}) };
+        next if( (defined $cacheLastSentAt{$index})  &&
+                 time() - $cacheLastSentAt{$index} < 
+                 $cacheIndxWaitPer );
 
-	if (!exists($results{"magic"}) || $results{"magic"} ne $magic) {
-	    # Hmm, something went wrong!
-	    print "Old results for index $index are scrogged; deleting!\n";
-	    delLocalDBEntry($index);
-	    @ids = keys %db;
-#	    next;
-	}
+        if (!exists($results{"magic"}) || $results{"magic"} ne $magic) {
+            # Hmm, something went wrong!
+            print "Old results for index $index are scrogged; deleting!\n";
+            delLocalDBEntry($index);
+            @ids = keys %db;
+#           next;
+        }
 
-	$count++;
-	$iterSinceLastRun = 0;
+        $count++;
+        $iterSinceLastRun = 0;
 
-	#don't send recently completed tests
-	next if( time() - $results{ts_finished} < 10 );
-	print "sending old result:  $index\n";
-	sendResults(\%results, $index);
+        #don't send recently completed tests
+        next if( time() - $results{ts_finished} < 10 );
+        print "sending old result:  $index\n";
+        sendResults(\%results, $index);
 
-	$cacheLastSentAt{$index} = time();
+        $cacheLastSentAt{$index} = time();
     }
 
 
@@ -622,25 +622,25 @@ sub spawnTest($$)
     #  this seach is inefficient... use a hash? sparse array? sorted list?
     my $flag_duplicate = 0;
     if( defined $linkdest ){
-	foreach my $element ( @{$waitq{$testtype}} ){
-	    if( $element eq $linkdest ){
-		$flag_duplicate = 1;
-	    }
-	}
-	if( $flag_duplicate == 0 ){
-	    unshift @{$waitq{$testtype}}, $linkdest;
-#	    print time_all()." added $linkdest to Q $testtype\n";
-	}
+        foreach my $element ( @{$waitq{$testtype}} ){
+            if( $element eq $linkdest ){
+                $flag_duplicate = 1;
+            }
+        }
+        if( $flag_duplicate == 0 ){
+            unshift @{$waitq{$testtype}}, $linkdest;
+#           print time_all()." added $linkdest to Q $testtype\n";
+        }
     }
 
     #exit and don't fork if the max number of tests is already being run
     if( getRunningTestsCnt($testtype) >= $MAX_SIMU_TESTS{$testtype} ){
-	return -1;
+        return -1;
     }
 
     #set the destination to be head of Q.
     if( scalar @{$waitq{$testtype}} == 0 ){
-	return 0;
+        return 0;
     }
     $linkdest = pop @{$waitq{$testtype}};
     my $fpingTimeout = $testevents{$linkdest}{$testtype}{fpingTimeout};
@@ -648,44 +648,44 @@ sub spawnTest($$)
 
   FORK:{
       if( my $pid = fork ){
-	  #parent
-	  #save child pid in test event
-	  $testevents{$linkdest}{$testtype}{"pid"} = $pid;
-	  $testevents{$linkdest}{$testtype}{"tstamp"} = time_all();
-	  $runningtestPIDs{$pid} = [$linkdest, $testtype];
-	  
+          #parent
+          #save child pid in test event
+          $testevents{$linkdest}{$testtype}{"pid"} = $pid;
+          $testevents{$linkdest}{$testtype}{"tstamp"} = time_all();
+          $runningtestPIDs{$pid} = [$linkdest, $testtype];
+          
       }elsif( defined $pid ){
-	  #child
-	  my $filename = createtmpfilename($linkdest,$testtype);
+          #child
+          my $filename = createtmpfilename($linkdest,$testtype);
 
-	  #############################
-	  ###ADD MORE TEST TYPES HERE###
-	  #############################
-	  if( $testtype eq "latency" ){
-	      #command line for "LATENCY TEST"
-#	      print "##########latTest\n";
-	      #one ping, using fping (2 total attempts, 10 sec timeout between)
-	      exec "sudo $workingdir".
-		  "fping -t$fpingTimeout -s -r1 $linkdest >& $filename"
-		  or die "can't exec: $!\n";
-	  }elsif( $testtype eq "bw" ){
-	      #command line for "BANDWIDTH TEST"
-#	      print "###########bwtest\n";
-	      exec "$workingdir".
-		  "iperf -c $linkdest -t $iperfduration -p $iperfport >$filename"
-		      or die "can't exec: $!";
-	  }elsif( $testtype eq "outage" ){
-	      exec "$workingdir".
-		  "fping -c16 -p250 $linkdest >& $filename"
-		      or die "can't exec: $!\n";
-	  }else{
-	      warn "bad testtype: $testtype";
-	  }
+          #############################
+          ###ADD MORE TEST TYPES HERE###
+          #############################
+          if( $testtype eq "latency" ){
+              #command line for "LATENCY TEST"
+#             print "##########latTest\n";
+              #one ping, using fping (2 total attempts, 10 sec timeout between)
+              exec "sudo $workingdir".
+                  "fping -t$fpingTimeout -s -r1 $linkdest >& $filename"
+                  or die "can't exec: $!\n";
+          }elsif( $testtype eq "bw" ){
+              #command line for "BANDWIDTH TEST"
+#             print "###########bwtest\n";
+              exec "$workingdir".
+                  "iperf -c $linkdest -t $iperfduration -p $iperfport >$filename"
+                      or die "can't exec: $!";
+          }elsif( $testtype eq "outage" ){
+              exec "$workingdir".
+                  "fping -c16 -p250 $linkdest >& $filename"
+                      or die "can't exec: $!\n";
+          }else{
+              warn "bad testtype: $testtype";
+          }
 
       }elsif( $! == EAGAIN ){
-	  #recoverable fork error, redo;
-	  sleep 1;
-	  redo FORK;
+          #recoverable fork error, redo;
+          sleep 1;
+          redo FORK;
       }else{ die "can't fork: $!\n";}
   }
     return 0;
@@ -698,11 +698,11 @@ sub getRunningTestsCnt($)
 
     #count currently running tests
     for my $destaddr ( keys %testevents ) {
-	if( defined $testevents{$destaddr}{$type} &&
-	    $testevents{$destaddr}{$type}{"pid"} > 0 ){
-	    #we have a running process, so inc it's counter
-	    $testcount++;
-	}
+        if( defined $testevents{$destaddr}{$type} &&
+            $testevents{$destaddr}{$type}{"pid"} > 0 ){
+            #we have a running process, so inc it's counter
+            $testcount++;
+        }
     }
 #    print "testcount = $testcount\n";
     return $testcount;
@@ -722,90 +722,90 @@ sub parsedata($$)
     #############################
     #latency test
     if( $type eq "latency" ){
-	# for fping results parsing, using -s option.
-	# Note, these must be in this order!
+        # for fping results parsing, using -s option.
+        # Note, these must be in this order!
 
 
-	# TODO: get these regex's to work as OR logic...
+        # TODO: get these regex's to work as OR logic...
 =pod
-	if(
-	    /ICMP Network Unreachable/ ||
-	    /ICMP Host Unreachable from/ ||
-	    /ICMP Protocol Unreachable/ ||
-	    /ICMP Port Unreachable/ ||
-	    /ICMP Unreachable/
+        if(
+            /ICMP Network Unreachable/ ||
+            /ICMP Host Unreachable from/ ||
+            /ICMP Protocol Unreachable/ ||
+            /ICMP Port Unreachable/ ||
+            /ICMP Unreachable/
 =cut
-	if( /^ICMP / )
-	{
-	    $parsed = $ERRID{ICMPunreachable};
-	}elsif( /address not found/ ){
-	    $parsed = $ERRID{unknownhost};
-	}elsif( /2 timeouts/ ){
-	    $parsed = $ERRID{timeout};
-	}elsif( /[\s]+([\S]*) ms \(avg round trip time\)/ ){
-	    $parsed = "$1" if( $1 ne "0.00" );
-	}else{
-	    $parsed = $ERRID{unknown};
-	}
+        if( /^ICMP / )
+        {
+            $parsed = $ERRID{ICMPunreachable};
+        }elsif( /address not found/ ){
+            $parsed = $ERRID{unknownhost};
+        }elsif( /2 timeouts/ ){
+            $parsed = $ERRID{timeout};
+        }elsif( /[\s]+([\S]*) ms \(avg round trip time\)/ ){
+            $parsed = "$1" if( $1 ne "0.00" );
+        }else{
+            $parsed = $ERRID{unknown};
+        }
 =pod
         #this section of parsing is for linux ping hosts.
-	if(     /100\% packet loss/ ){
-	    $parsed = $ERRID{timeout};
-	}elsif( /Time to live exceeded/ ){ # ?
-	    $parsed = $ERRID{ttlexceed};
-	}elsif( /unknown host/ ){
-	    $parsed = $ERRID{unknownhost};
-	}elsif( /time=(.*)\s?ms/ ){
-	    $parsed = "$1";
-	}else{
-	    $parsed = $ERRID{unknown};
-	}
+        if(     /100\% packet loss/ ){
+            $parsed = $ERRID{timeout};
+        }elsif( /Time to live exceeded/ ){ # ?
+            $parsed = $ERRID{ttlexceed};
+        }elsif( /unknown host/ ){
+            $parsed = $ERRID{unknownhost};
+        }elsif( /time=(.*)\s?ms/ ){
+            $parsed = "$1";
+        }else{
+            $parsed = $ERRID{unknown};
+        }
         # This section of parsing is a bit wrong.. for freebsd hosts??
-	if( /0 packets received/ ){
-	    $parsed = $ERRID{timeout};
-	}elsif( /Time to live exceeded/ ){
-	    $parsed = $ERRID{ttlexceed};
-	}elsif( /time=(.*)\s?ms/ ){
-	    $parsed = "$1";
-	}else{
-	    $parsed = $ERRID{unknown};
-	}
+        if( /0 packets received/ ){
+            $parsed = $ERRID{timeout};
+        }elsif( /Time to live exceeded/ ){
+            $parsed = $ERRID{ttlexceed};
+        }elsif( /time=(.*)\s?ms/ ){
+            $parsed = "$1";
+        }else{
+            $parsed = $ERRID{unknown};
+        }
 =cut
     }elsif( $type eq "bw" ){
-	if(    /connect failed: Connection timed out/ ){
-	    # this one shouldn't happen, if the timeout check done by
+        if(    /connect failed: Connection timed out/ ){
+            # this one shouldn't happen, if the timeout check done by
             # bgmon is set low enough.
-	    $parsed = $ERRID{timeout};
-	}elsif( /write1 failed:/ ){
-	    $parsed = $ERRID{iperfHostUnreachable};
-	}elsif( /error: Name or service not known/ ){
-	    $parsed = $ERRID{unknownhost};
-	}elsif( /\s+(\S*)\s+([MK])bits\/sec/ ){
-	    $parsed = $1;
-	    if( $2 eq "M" ){
-		$parsed *= 1000;
-	    }
-	}else{
-	    $parsed = $ERRID{unknown};
-	}
-#	print "parsed=$parsed\n";
+            $parsed = $ERRID{timeout};
+        }elsif( /write1 failed:/ ){
+            $parsed = $ERRID{iperfHostUnreachable};
+        }elsif( /error: Name or service not known/ ){
+            $parsed = $ERRID{unknownhost};
+        }elsif( /\s+(\S*)\s+([MK])bits\/sec/ ){
+            $parsed = $1;
+            if( $2 eq "M" ){
+                $parsed *= 1000;
+            }
+        }else{
+            $parsed = $ERRID{unknown};
+        }
+#       print "parsed=$parsed\n";
     }elsif( $type eq "outage" ){
-	print "parsing Outage data\n";
-	if( /loss = \d+\/\d+\/([\d.]+)%/ ){
-	    $parsed = $1;
-	}else{
-	    $parsed = "";
-	}
-	if( defined($parsed) && 
-	    $parsed < 100 )
-	{
-	    $parsed = "lossy";
-	}elsif( $parsed == 100 ){
-	    $parsed = "down";
-	}
-	print "parsed data = $parsed\n";
+        print "parsing Outage data\n";
+        if( /loss = \d+\/\d+\/([\d.]+)%/ ){
+            $parsed = $1;
+        }else{
+            $parsed = "";
+        }
+        if( defined($parsed) && 
+            $parsed < 100 )
+        {
+            $parsed = "lossy";
+        }elsif( $parsed == 100 ){
+            $parsed = "down";
+        }
+        print "parsed data = $parsed\n";
     }
-	   
+           
     return $parsed;
 }
 
@@ -813,19 +813,19 @@ sub parsedata($$)
 #############################################################################
 sub printTimeEvents {
     for my $destaddr ( keys %testevents ) {
-	for my $testtype ( keys %{ $testevents{$destaddr} } ){
-	    print 
-		"finished? ".
-		$testevents{$destaddr}{$testtype}{"flag_finished"}."\n".
-		"scheduled?= ".
-		$testevents{$destaddr}{$testtype}{"flag_scheduled"}."\n".
-		"testper?= ".
+        for my $testtype ( keys %{ $testevents{$destaddr} } ){
+            print 
+                "finished? ".
+                $testevents{$destaddr}{$testtype}{"flag_finished"}."\n".
+                "scheduled?= ".
+                $testevents{$destaddr}{$testtype}{"flag_scheduled"}."\n".
+                "testper?= ".
                 $testevents{$destaddr}{$testtype}{"testper"}."\n".
-		"timeOfNextRun= ".
-	        $testevents{$destaddr}{$testtype}{"timeOfNextRun"}."\n" .
-		"results_parsed= ".
-      	        $testevents{$destaddr}{$testtype}{"results_parsed"}."\n";
-	}
+                "timeOfNextRun= ".
+                $testevents{$destaddr}{$testtype}{"timeOfNextRun"}."\n" .
+                "results_parsed= ".
+                $testevents{$destaddr}{$testtype}{"results_parsed"}."\n";
+        }
     }
 }
 
@@ -840,21 +840,21 @@ sub saveTestToLocalDB($)
     my %db;
     my $filename = createDBfilename();
     tie( %db, "DB_File", $filename ) or 
-	eval {
-	    warn time()." cannot create db file";
-	    return -1;
-	};
+        eval {
+            warn time()." cannot create db file";
+            return -1;
+        };
 
     #
     # Find an unused index. Leave zero unused to indicate we ran out.
     #
     my $index;
     for ($index = 1; $index < $resultDBlimit; $index++) {
-	last
-	    if( !defined($db{$index}) );
+        last
+            if( !defined($db{$index}) );
     }
     return 0
-	if ($index == $resultDBlimit);
+        if ($index == $resultDBlimit);
 
     
     $db{$index} = serialize_hash($results);
@@ -869,13 +869,13 @@ sub delLocalDBEntry($)
     my %db;
     my $filename = createDBfilename();
     tie( %db, "DB_File", $filename) or 
-	eval {
-	    warn time()." cannot open db file";
-	    return -1;
-	};    
+        eval {
+            warn time()." cannot open db file";
+            return -1;
+        };    
 
     if( defined $db{$index} ){
-	delete $db{$index};
+        delete $db{$index};
     }
 
     untie %db;
@@ -886,12 +886,12 @@ sub sendResults($$){
     my ($results, $index) = @_;
 
     my %result = ( expid    => $expid,
-		   linksrc  => $results->{sourceaddr},
-		   linkdest => $results->{destaddr},
-		   testtype => $results->{testtype},
-		   result   => $results->{result},
-		   tstamp   => $results->{tstamp},
-		   index    => $index );
+                   linksrc  => $results->{sourceaddr},
+                   linkdest => $results->{destaddr},
+                   testtype => $results->{testtype},
+                   result   => $results->{result},
+                   tstamp   => $results->{tstamp},
+                   index    => $index );
     my $result_serial = serialize_hash( \%result );
     $socket_snd->send($result_serial);
 }
@@ -922,12 +922,12 @@ sub detectHang($)
     my $TIMEOUT_NUM_PER = 10;
 
     if( defined $testevents{$nodeid}{bw} &&
-	$testevents{$nodeid}{bw}{flag_scheduled} == 1 &&
-	time_all() > $testevents{$nodeid}{bw}{timeOfNextRun} +
-	$testevents{$nodeid}{bw}{testper} * $TIMEOUT_NUM_PER
-	&& $testevents{$nodeid}{bw}{testper} >0 )
+        $testevents{$nodeid}{bw}{flag_scheduled} == 1 &&
+        time_all() > $testevents{$nodeid}{bw}{timeOfNextRun} +
+        $testevents{$nodeid}{bw}{testper} * $TIMEOUT_NUM_PER
+        && $testevents{$nodeid}{bw}{testper} >0 )
     {
-	return "bw";
+        return "bw";
     }
     
     return "nohang";
@@ -939,11 +939,11 @@ sub isMsgValid(\%)
     my ($hashref) = @_;
     my %msgHash = %$hashref;
     if( !defined($msgHash{cmdtype}) ){
-	warn "bad message format\n";
-	return 0;  #bad message
+        warn "bad message format\n";
+        return 0;  #bad message
     }
     if( $msgHash{expid} ne $expid ){
-	return 0;  #not addressed to this experiment
+        return 0;  #not addressed to this experiment
     }
     return 1;
 }
@@ -986,28 +986,28 @@ sub updateOutageState_lossCheck($)
     my $outref = \%{ $testevents{$destaddr}{outage} };
     my $curstate = $latref->{outagestate};
     if( $curstate eq "lossCheck" ){
-	if( $outref->{results_parsed} eq "lossy" ){
-	    # STATE TRANSITION -> normal
-	    # ** but start outageEnd monitoring for a time
-	    # Delete outageManID entry in cmdqueue
-	    #  set period to 0
-	    addCmd( $latref, Cmd->new($outManID,
-				      $outTestFreq{outageEnd},
-				      $outTestDur{outageEnd}) );
-	    $latref->{outagestate} = "normal";
-	    $latref->{outStateTime} = 0;
-	    $latref->{fpingTimeout} = $fpingTimeoutDef;
-	    print "NEW STATE: normal\n";
-	}elsif( $outref->{results_parsed} eq "down" ){
-	    # STATE TRANSITION -> highFreq
-	    addCmd( $latref, Cmd->new($outManID,
-				      $outTestFreq{high},
-				      0) );  #forever, since internally managed
-	    $latref->{outagestate} = "highFreq";
-	    $latref->{outStateTime} = time();
-	    $latref->{fpingTimeout} = $outTestFreq{high}*1000/2;
-	    print "NEW STATE: highFreq\n";
-	}
+        if( $outref->{results_parsed} eq "lossy" ){
+            # STATE TRANSITION -> normal
+            # ** but start outageEnd monitoring for a time
+            # Delete outageManID entry in cmdqueue
+            #  set period to 0
+            addCmd( $latref, Cmd->new($outManID,
+                                      $outTestFreq{outageEnd},
+                                      $outTestDur{outageEnd}) );
+            $latref->{outagestate} = "normal";
+            $latref->{outStateTime} = 0;
+            $latref->{fpingTimeout} = $fpingTimeoutDef;
+            print "NEW STATE: normal\n";
+        }elsif( $outref->{results_parsed} eq "down" ){
+            # STATE TRANSITION -> highFreq
+            addCmd( $latref, Cmd->new($outManID,
+                                      $outTestFreq{high},
+                                      0) );  #forever, since internally managed
+            $latref->{outagestate} = "highFreq";
+            $latref->{outStateTime} = time();
+            $latref->{fpingTimeout} = $outTestFreq{high}*1000/2;
+            print "NEW STATE: highFreq\n";
+        }
     }
 }
 
@@ -1020,90 +1020,90 @@ sub updateOutageState($)
     my $curstate = $testev->{outagestate};
     my $nextstate = $curstate;
     if( $testev->{results_parsed} > 0 ){
-	#valid result, so note the time that this was seen
-	$testev->{lastValidLatTime} = time();
+        #valid result, so note the time that this was seen
+        $testev->{lastValidLatTime} = time();
     }
 
     # SWITCH ON "outagestate"
     if( $curstate eq "normal" ){
-	if( isWorkingPathDown($testev) > 0 ){
-	    # STATE TRANSITION -> lossCheck
-	    $nextstate = "lossCheck";
-	    # run outage check
-	    $testevents{$destaddr}{outage}{testper} = 0;
-	    $testevents{$destaddr}{outage}{timeOfNextRun} = time_all()-1;
-	    $testevents{$destaddr}{outage}{flag_scheduled} = 1;
-	    $testevents{$destaddr}{outage}{pid} = 0;
-	    $testevents{$destaddr}{outage}{flag_finished} =0;
-	    $testevents{$destaddr}{outage}{timedout} = 0;
-	}
+        if( isWorkingPathDown($testev) > 0 ){
+            # STATE TRANSITION -> lossCheck
+            $nextstate = "lossCheck";
+            # run outage check
+            $testevents{$destaddr}{outage}{testper} = 0;
+            $testevents{$destaddr}{outage}{timeOfNextRun} = time_all()-1;
+            $testevents{$destaddr}{outage}{flag_scheduled} = 1;
+            $testevents{$destaddr}{outage}{pid} = 0;
+            $testevents{$destaddr}{outage}{flag_finished} =0;
+            $testevents{$destaddr}{outage}{timedout} = 0;
+        }
     }elsif( $curstate eq "lossCheck" ){
-	if( isWorkingPathDown($testev) < 0 ){
-	    # STATE TRANSITION -> normal
-	    # Delete outageManID entry in cmdqueue
-	    #  set period to 0
-	    addCmd( $testev, Cmd->new($outManID,0,0) );
-	    $nextstate = "normal";
-	    $testev->{outStateTime} = 0;
-	    $testev->{fpingTimeout} = $fpingTimeoutDef;
-	}
+        if( isWorkingPathDown($testev) < 0 ){
+            # STATE TRANSITION -> normal
+            # Delete outageManID entry in cmdqueue
+            #  set period to 0
+            addCmd( $testev, Cmd->new($outManID,0,0) );
+            $nextstate = "normal";
+            $testev->{outStateTime} = 0;
+            $testev->{fpingTimeout} = $fpingTimeoutDef;
+        }
     }elsif( $curstate eq "highFreq" ){
-	if( isWorkingPathDown($testev) > 0 &&
-	    time() - $testev->{outStateTime} > $outTestDur{high} )
-	{
-	    # STATE TRANSITION -> medFreq
-	    addCmd( $testev, Cmd->new($outManID,
-				      $outTestFreq{med},
-				      0) );  #forever, since internally managed
-	    $nextstate = "medFreq";
-	    $testev->{outStateTime} = time();
-	    $testev->{fpingTimeout} = $outTestFreq{med}*1000/2;
-	}elsif( isWorkingPathDown($testev) < 0 ){
-	    # STATE TRANSITION -> outageEnd
-	    $nextstate = outSetState_outageEnd($testev);
-	}
+        if( isWorkingPathDown($testev) > 0 &&
+            time() - $testev->{outStateTime} > $outTestDur{high} )
+        {
+            # STATE TRANSITION -> medFreq
+            addCmd( $testev, Cmd->new($outManID,
+                                      $outTestFreq{med},
+                                      0) );  #forever, since internally managed
+            $nextstate = "medFreq";
+            $testev->{outStateTime} = time();
+            $testev->{fpingTimeout} = $outTestFreq{med}*1000/2;
+        }elsif( isWorkingPathDown($testev) < 0 ){
+            # STATE TRANSITION -> outageEnd
+            $nextstate = outSetState_outageEnd($testev);
+        }
     }elsif( $curstate eq "medFreq" ){
-	if( isWorkingPathDown($testev) > 0 &&
-	    time() - $testev->{outStateTime} > $outTestDur{med} )
-	{
-	    # STATE TRANSITION -> lowFreq
-	    addCmd( $testev, Cmd->new($outManID,
-				      $outTestFreq{low},
-				      0) );  #forever, since internally managed
-	    $nextstate = "lowFreq";
-	    $testev->{outStateTime} = time();
-	    $testev->{fpingTimeout} = $fpingTimeoutDef;
-	}elsif( isWorkingPathDown($testev) < 0 ){
-	    # STATE TRANSITION -> outageEnd
-	    $nextstate = outSetState_outageEnd($testev);
-	}
+        if( isWorkingPathDown($testev) > 0 &&
+            time() - $testev->{outStateTime} > $outTestDur{med} )
+        {
+            # STATE TRANSITION -> lowFreq
+            addCmd( $testev, Cmd->new($outManID,
+                                      $outTestFreq{low},
+                                      0) );  #forever, since internally managed
+            $nextstate = "lowFreq";
+            $testev->{outStateTime} = time();
+            $testev->{fpingTimeout} = $fpingTimeoutDef;
+        }elsif( isWorkingPathDown($testev) < 0 ){
+            # STATE TRANSITION -> outageEnd
+            $nextstate = outSetState_outageEnd($testev);
+        }
     }elsif( $curstate eq "lowFreq" ){
-	if( isWorkingPathDown($testev) < 0 ){
-	    # STATE TRANSITION -> outageEnd
-	    $nextstate = outSetState_outageEnd($testev);
-	}
+        if( isWorkingPathDown($testev) < 0 ){
+            # STATE TRANSITION -> outageEnd
+            $nextstate = outSetState_outageEnd($testev);
+        }
     }elsif( $curstate eq "outageEnd" ){
-	if( isWorkingPathDown($testev) < 0 &&
-	    time() - $testev->{outStateTime} > $outTestDur{outageEnd} )
-	{
-	    # STATE TRANSITION -> normal
-	    # Delete outageManID entry in cmdqueue
-	    #  set period to 0
-	    addCmd( $testev, Cmd->new($outManID,0,0) );
-	    $nextstate = "normal";
-	    $testev->{outStateTime} = 0;
-	    $testev->{fpingTimeout} = $fpingTimeoutDef;
-	}elsif( isWorkingPathDown($testev) > 0 ){
-	    # STATE TRANSITION -> highFreq
-	    $nextstate = "highFreq";
-	    $testev->{outStateTime} = time();
-	    $testev->{fpingTimeout} = $outTestFreq{high}*1000/2;
-	}
+        if( isWorkingPathDown($testev) < 0 &&
+            time() - $testev->{outStateTime} > $outTestDur{outageEnd} )
+        {
+            # STATE TRANSITION -> normal
+            # Delete outageManID entry in cmdqueue
+            #  set period to 0
+            addCmd( $testev, Cmd->new($outManID,0,0) );
+            $nextstate = "normal";
+            $testev->{outStateTime} = 0;
+            $testev->{fpingTimeout} = $fpingTimeoutDef;
+        }elsif( isWorkingPathDown($testev) > 0 ){
+            # STATE TRANSITION -> highFreq
+            $nextstate = "highFreq";
+            $testev->{outStateTime} = time();
+            $testev->{fpingTimeout} = $outTestFreq{high}*1000/2;
+        }
     }
 
     # save new state
     if( $curstate ne $nextstate ){
-	print "NEW STATE: $nextstate\n";
+        print "NEW STATE: $nextstate\n";
     }
     $testev->{outagestate} = $nextstate;
 }
@@ -1112,8 +1112,8 @@ sub outSetState_outageEnd($)
 {
     my ($testev) = @_;
     addCmd( $testev, Cmd->new($outManID,
-			      $outTestFreq{outageEnd},
-			      0) );  #forever, since internally managed
+                              $outTestFreq{outageEnd},
+                              0) );  #forever, since internally managed
 #    $testev->{outagestate} = "outageEnd";
     $testev->{outStateTime} = time();
     $testev->{fpingTimeout} = $outTestFreq{outageEnd}*1000/2;
@@ -1125,12 +1125,12 @@ sub isWorkingPathDown($)
     my ($testev) = @_;
     my $secSinceUp = time() - $testev->{lastValidLatTime};
     if( $testev->{results_parsed} < 0 && 
-	$secSinceUp < $outDet_maxPastSuc*60*60 )
+        $secSinceUp < $outDet_maxPastSuc*60*60 )
     {
-	#path is down and was up recently
-	return $secSinceUp;  #return seconds since last being up
+        #path is down and was up recently
+        return $secSinceUp;  #return seconds since last being up
     }else{
-	return -1;
+        return -1;
     }
 }
 
@@ -1148,30 +1148,30 @@ sub updateTestEvent($)
     my $head = $testev->{cmdq}->head();
 
     if( !defined $head ){
-	#if no tests in queue, stop testev.
-	print "NO HEAD for ".$testev->{testper}."\n";
-	$testev->{flag_scheduled} = 0;
-	$testev->{testper} = 0;
+        #if no tests in queue, stop testev.
+        print "NO HEAD for ".$testev->{testper}."\n";
+        $testev->{flag_scheduled} = 0;
+        $testev->{testper} = 0;
     }
     #compare currently running test info with head of queue
     elsif( !defined $curPer ||
-	   $curPer == 0 ||
-#	   $head->period() < $curPer )
-	   $head->period() != $curPer )
+           $curPer == 0 ||
+#          $head->period() < $curPer )
+           $head->period() != $curPer )
     {
-	#replace running info with that from head:
-	#  testper, limitTime, flag_scheduled, timeOfNextRun, managerID
-	print "replacing period $curPer with ".$head->period()."\n";
-	$testev->{testper} = $head->period();
-	if( $head->duration() == 0 ){
-	    $testev->{limitTime} = 0;
-	}else{
-	    $testev->{limitTime} = time_all() + $head->timeleft();
-	}
-	$testev->{flag_scheduled} = 0;
-	$testev->{timeOfNextRun} = 0;
-	$testev->{managerID} = $head->managerid();
-	print $testev->{cmdq}->getQueueInfo();
+        #replace running info with that from head:
+        #  testper, limitTime, flag_scheduled, timeOfNextRun, managerID
+        print "replacing period $curPer with ".$head->period()."\n";
+        $testev->{testper} = $head->period();
+        if( $head->duration() == 0 ){
+            $testev->{limitTime} = 0;
+        }else{
+            $testev->{limitTime} = time_all() + $head->timeleft();
+        }
+        $testev->{flag_scheduled} = 0;
+        $testev->{timeOfNextRun} = 0;
+        $testev->{managerID} = $head->managerid();
+        print $testev->{cmdq}->getQueueInfo();
     }
 }
 
@@ -1191,18 +1191,18 @@ sub initTestEv($$)
     my ($dest,$type) = @_;
 
     if( !defined $testevents{$dest}{$type} ){
-	$testevents{$dest}{$type} = {
-				     cmdq => Cmdqueue->new(),
-				     flag_scheduled => 0,
-				     flag_finished  => 0,
-				     testper        => 0,
-				     timeOfNextRun  => 0,
-				     limitTime      => 0,
-				     pid            => 0,
-				     timedout       => 0,
-				     outagestate    => "normal",
-				     lastValidLatTime => 0,
-				     fpingTimeout   => $fpingTimeoutDef
-				     };
+        $testevents{$dest}{$type} = {
+                                     cmdq => Cmdqueue->new(),
+                                     flag_scheduled => 0,
+                                     flag_finished  => 0,
+                                     testper        => 0,
+                                     timeOfNextRun  => 0,
+                                     limitTime      => 0,
+                                     pid            => 0,
+                                     timedout       => 0,
+                                     outagestate    => "normal",
+                                     lastValidLatTime => 0,
+                                     fpingTimeout   => $fpingTimeoutDef
+                                     };
     }
 }
