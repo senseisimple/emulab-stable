@@ -44,6 +44,9 @@ load onto nodes.
 + testsend.pl - Run on ops. Sends a command to a single node. Command
 line parameters not used can be set to anything for placeholders.
 
++ libwanetmon.pm - Common subroutines and variables used in many
+scripts in this system.
+
 
 (Overview - bgmon.pl) 
 
@@ -78,11 +81,16 @@ run. The applications are ping and a modified iperf. (iperf is
 modified to exit with an error code) When a test is ready to be run,
 bgmon forks one of these test apps with its output redirected to a
 temporary file. When the test app exits, bgmon parses this file for a
-result. There is room for improvement for the implementation of
-handling a finished process: a child process of bgmon is probably not
-correctly reaped when it exits. Currently, a waitpid is called with
-the pid of each running test. A test app is finished, and the entry in
-%testevents is marked as such, when a 0 is returned.
+result, and sends it to ops.
+
+There are a variety of possible errors that the measurement apps can
+have. These are detected by parsing the measurement output. If the
+test was determined to have an error, the corresponding numeric error
+value is looked up in the hash ERRID, in libwanetmon.pm . This error
+value is stored in the test result field of the data structure sent to
+ops. Ops adds this to the database like any other "valid" test
+result. Later analysis of the data can look for these error values when
+evaluating a path.
 
 Program flow for bgmon revolves around a poll loop. Each iteration, it
 blocks on a select call for a number of seconds (0.1, currently) to
@@ -96,9 +104,8 @@ A test result is cached in a file before being sent to ops. It is
 deleted when ops returns an ack message with the corresponding
 index. There is a limit for how many ack-pending files can exist. When
 the limit is reached, newly-completed tests are sent to ops, but not
-cached until an ack for an existing file is received. Every so many
-iterations (set by $subtimer) of the main poll loop, all cached
-results are sent to ops again.
+cached until an ack for an existing file is received. Cached results
+are resent to ops at a rate determined with the cacheSendRate variable.
 
 The scheduling algorithm does not guarantee completion of measurements
 with hard time bounds as a real-time system does. However, there are

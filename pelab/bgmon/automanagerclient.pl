@@ -1,4 +1,9 @@
 #!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 use strict;
 use lib '/usr/testbed/lib';
@@ -600,7 +605,6 @@ sub sendcmd_amc($)
     if(defined $socket){
 	print $socket "$sercmd\n";
 	my $res = <$socket>;
-#	print "got status: $res";
 	print "$res";
 	chomp $res;
 	if( $res eq "OK" ){
@@ -623,6 +627,7 @@ sub edittest_amc( $$$$$$ ){
     print "edittest_amc : @_ \n";
 
     my %cmd = ( expid    => $bgmonexpt,
+		managerID=> $thisManagerID,
 		cmdtype  => "EDIT",
 		dstnode  => $destnode,
 		srcnode  => $srcnode,

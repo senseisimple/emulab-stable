@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 use Getopt::Std;
 
@@ -36,8 +41,8 @@ if( @ARGV < 1 ){
 
 my $path = $ARGV[0];
 
-#system "sudo perl -mevent -I. -I/usr/testbed/lib -d $ARGV[0]bgmon.pl &";
-system "perl $path/bgmon.pl -e $expt -i $iperfport -d $path/ &";
+#system "sudo perl $path/bgmon.pl -e $expt -i $iperfport -d $path/ >/tmp/bgmon.log&";
+system "sudo perl -I$path $path/bgmon.pl -e $expt -i $iperfport -d $path/&";
 system "sudo rm $path/iperfd.out $path/iperfd.err";
 system "sudo $path/iperfd -s -p $iperfport >& $path/iperfd.err > $path/iperfd.out &";
 

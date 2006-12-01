@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 use lib '/usr/testbed/lib';
 use libtbdb;
@@ -113,8 +118,8 @@ while (1) {
 #	    print "accepting connection\n";
 	    $cmdHandle = $handle->accept();
 	    my $inmsg = <$cmdHandle>;
-	    print "gotmsg from amc: $inmsg\n";
 	    chomp $inmsg;
+	    print "gotmsg from amc: $inmsg\n";
 	    %sockIn = %{ deserialize_hash($inmsg) };
 	    my $srcnode = $sockIn{srcnode};
 	    my @res = sendcmd( $srcnode, \%sockIn ); #send hash on out
@@ -192,12 +197,8 @@ sub callbackFunc($$$) {
 
 	    print "got EDIT: $srcnode, $dstnode: $newexpid\n";
 
-
-#	    my $socket;
-#	    my $sel = IO::Select->new();
-
 	    # only automanager can send "forever" edits (duration=0)
-	    if( $duration > 0 || $managerID eq "automanagerclient" ){
+	    if( isCmdValid(\%cmd) ){
 		print "sending cmd to $srcnode on behalf of $managerID\n";
 		sendcmd( $srcnode, \%cmd );
 	    }
@@ -243,7 +244,11 @@ sub callbackFunc($$$) {
 		"$testper,$duration,$managerID,$newexpid\n";
 
 	    # only automanager can send "forever" edits (duration=0)
-	    if( $duration > 0 ){ #|| $managerID eq "automanagerclient" ){
+#	    if( $duration > 0 ){ #|| $managerID eq "automanagerclient" ){
+#		print "sending cmd from $srcnode\n";
+#		sendcmd( $srcnode, \%cmd );
+#	    }
+	    if( isCmdValid(\%cmd) ){
 		print "sending cmd from $srcnode\n";
 		sendcmd( $srcnode, \%cmd );
 	    }
@@ -261,6 +266,49 @@ sub callbackFunc($$$) {
 	    stopnode($srcnode, $managerID);
 	}
 
+}
+
+
+sub isCmdValid($)
+{
+    my ($cmdref) = @_;
+    my $valid = 1;
+
+    #list of invalid conditions
+    if( $cmdref->{managerID} ne "automanagerclient" ){
+	#managerclient is not the AMC
+	if( $cmdref->{duration} eq "0" ){
+	    #only AMC can send "forever" commands
+	    $valid = 0;
+	}elsif( $cmdref->{testtype} eq "bw" )
+	{
+	    my @destnodes;
+	    if( $cmdref->{cmdtype} eq "INIT" ){
+		@destnodes = split(" ",$cmdref->{destnodes});
+	    }elsif( $cmdref->{cmdtype} eq "EDIT" ){
+		push @destnodes, $cmdref->{dstnode};
+	    }
+	    my $numDest = scalar(@destnodes);
+	    #bandwidth must conform to limit
+	    #SET TO MAX RATE, but it becomes VALID
+
+	    #for now, just limit duration if bw period is low
+	    if( $cmdref->{testper} < 600 && 
+		$cmdref->{duration} > 120 )
+	    {
+		$cmdref->{duration} = "120";
+		$cmdref->{testper} = "600";
+	    }
+	    #limit duration, if testper is given with a duty-cycle
+	    # higher than 20% for the given size set of destinations
+	    elsif( $cmdref->{duration} > 120 &&
+		    $cmdref->{testper} < ($numDest-1) * 5 * 1/.20 )
+	    {
+		$cmdref->{duration} = "120";
+	    }
+	}
+    }
+    return $valid;
 }
 
 

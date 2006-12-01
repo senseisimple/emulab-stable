@@ -1,4 +1,10 @@
 #!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 
 package libwanetmon;
 
@@ -217,6 +223,7 @@ sub sendcmd_evsys($$$;$)
 						"$name",
 						$cmd{$name} ) )
 	{ warn "Could not add attribute to notification\n"; }
+#	print "adding $name => ".$cmd{$name}."\n";
     }
 
     #send notification

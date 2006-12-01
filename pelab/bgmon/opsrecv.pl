@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 ########################
 # TODO:
@@ -89,6 +94,10 @@ TBDBConnect($DBNAME,$DBUSER,$DBPWD);
 
 my $socket_rcv = IO::Socket::INET->new( LocalPort => $port,
 					Proto     => 'udp' );
+#my $socket_snd = IO::Socket::INET->new( PeerPort => $sendport,
+#					Proto    => 'udp',
+#					PeerAddr => "$linksrc");
+
 
 my $sel = IO::Select->new();
 $sel->add($socket_rcv);
@@ -148,10 +157,17 @@ sub handleincomingmsgs()
 	      "tstamp  =$tstamp\n") if( $debug > 1 );
 
 	if( defined $linksrc ){
-	    my $socket_snd = 
-	      IO::Socket::INET->new( PeerPort => $sendport,
-				     Proto    => 'udp',
-				     PeerAddr => "$linksrc");
+	    my $socket_snd;
+	    eval{
+		$socket_snd = 
+		  IO::Socket::INET->new( PeerPort => $sendport,
+					 Proto    => 'udp',
+					 PeerAddr => "$linksrc");
+	    };
+	    if( $@ ){
+		#socket creation was fatal
+		warn "Socket creation failed: $@\n";
+	    }
 	    my %ack = ( expid   => $expid,
 			cmdtype => "ACK",
 			index   => $index,
