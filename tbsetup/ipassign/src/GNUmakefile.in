@@ -21,7 +21,7 @@ LIBEXEC_STUFF	= ipassign
 
 BIN_STUFF	= difference add-x inet2graph brite2graph top2graph
 
-IPASSIGN_OBJECTS = Assigner.o ConservativeAssigner.o Framework.o \
+IPASSIGN_OBJECTS = ConservativeAssigner.o Framework.o \
                    HierarchicalAssigner.o bitmath.o \
                    coprocess.o ipassign.o
 
