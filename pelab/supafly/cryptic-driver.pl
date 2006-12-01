@@ -1,5 +1,11 @@
 #!/usr/bin/perl
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 sub numerically($$);
 sub smin(\@);
 sub smax(\@);

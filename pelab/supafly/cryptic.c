@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 /**
  * This is a simple little program that measure time required to encrypt 
  * n m-KB blocks with triple des.

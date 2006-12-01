@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
