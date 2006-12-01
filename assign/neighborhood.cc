@@ -1,3 +1,14 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
+ * A set of functions useful for exploring the neighborhood of a particular
+ * solution.
+ */
+
 #include "neighborhood.h"
 
 // From asssign.cc

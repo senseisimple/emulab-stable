@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005-2006 University of Utah and the Flux Group.
+   All rights reserved.
+-->
 <element name="top" xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" ns="http://emulab.net/resources/vtop/1.0" xmlns="http://relaxng.org/ns/structure/1.0">
   <attribute name="pid">
     <a:documentation>Project ID</a:documentation>

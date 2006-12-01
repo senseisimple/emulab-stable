@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005-2006 University of Utah and the Flux Group.
+   All rights reserved.
+-->
 <top pid="testbed" eid="xmltop" xmlns="http://emulab.net/resources/vtop/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemalocation="http://emulab.net/resources/vtop/1.0 file:/home/ricci/testbed/assign/top.xsd">
     <node name="nodeA"><ass/>
         <node_type>

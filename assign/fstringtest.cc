@@ -1,3 +1,11 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ *
+ * Test program for the fstring library.
+ */
+
 #include "fstring.h"
 #include <iostream>
 using namespace std;

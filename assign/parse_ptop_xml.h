@@ -1,3 +1,13 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
+ * Parsing for the (experimental) ptop XML format
+ */
+
 #ifndef __PARSE_PTOP_XML_H
 #define __PARSE_PTOP_XML_h
 

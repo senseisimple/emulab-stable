@@ -1,7 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
  * All rights reserved.
+ */
+
+/*
+ * Parsing for the (experimental) ptop XML format
  */
 
 #include "port.h"

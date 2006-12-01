@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005-2006 University of Utah and the Flux Group.
+   All rights reserved.
+-->
 <!DOCTYPE ptop SYSTEM "ptop.dtd">
 <ptop testbed="emulab">
     <node name="pc1">
