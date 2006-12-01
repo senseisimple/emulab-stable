@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * XXX all this should come out of a standard include file, this is just
  * here to get everything to compile.
  */
