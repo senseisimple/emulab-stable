@@ -28,6 +28,7 @@ sub usage()
 }
 my $optlist  = "dgkfur";
 my $debug    = 1;
+my $verbose  = 0;
 my $killmode = 0;
 my $fwboot   = 0;
 my $dbgooonly= 0;
@@ -142,6 +143,11 @@ else {
 }
 $workdir = TBExptWorkDir($pid, $eid);
 $expdir = PROJROOT() . "/$pid/exp/$eid";
+
+# Build Logfile names
+my $opslogfile  = "$workdir/opsnode.log";
+my $fslogfile   = "$workdir/fsnode.log";
+my $bosslogfile = "$workdir/bossnode.log";
 
 #
 # Verify user and get his DB uid.
@@ -310,7 +316,7 @@ system("scp $mkelab ${fsnode}:/tmp")
 if (defined($fsnode)) {
     TBDebugTimeStamp("Setting up fsnode");
     print "Setting up fsnode on $fsnode\n";
-    system("$SSH -host $fsnode /tmp/rc.mkelab -s -d > /tmp/fsnode.$$ 2>&1");
+    system("$SSH -host $fsnode /tmp/rc.mkelab -s -d > $fslogfile 2>&1");
     if ($?) {
 	$UID = $SAVEUID;
 	SENDMAIL("$user_name <$user_email>",
@@ -318,8 +324,7 @@ if (defined($fsnode)) {
 		 "Error building the fs node ($fsnode)",
 		 $TBOPS,
 		 "Cc: $TBOPS",
-		 ("/tmp/fsnode.$$"));
-	system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+		 ($fslogfile));
 	print STDERR "*** $0:\n".
 	    "    Error building the fsnode ($fsnode)!\n";
 	exit(($debug ? 0 : -1));
@@ -327,7 +332,7 @@ if (defined($fsnode)) {
 }
 TBDebugTimeStamp("Setting up opsnode");
 print "Setting up opsnode on $opsnode\n";
-system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > /tmp/opsnode.$$ 2>&1");
+system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > $opslogfile 2>&1");
 if ($?) {
     $UID = $SAVEUID;
     SENDMAIL("$user_name <$user_email>",
@@ -335,15 +340,14 @@ if ($?) {
 	     "Error building the ops node ($opsnode)",
 	     $TBOPS,
 	     "Cc: $TBOPS",
-	     ("/tmp/opsnode.$$"));
-    system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+	     ($opslogfile));
     print STDERR "*** $0:\n".
 	         "    Error building the opsnode ($opsnode)!\n";
     exit(($debug ? 0 : -1));
 }
 TBDebugTimeStamp("Setting up bossnode");
 print "Setting up bossnode on $bossnode\n";
-system("$SSH -host $bossnode /tmp/rc.mkelab -s -d > /tmp/bossnode.$$ 2>&1");
+system("$SSH -host $bossnode /tmp/rc.mkelab -s -d > $bosslogfile 2>&1");
 if ($?) {
     $UID = $SAVEUID;
     SENDMAIL("$user_name <$user_email>",
@@ -351,30 +355,31 @@ if ($?) {
 	     "Error building the boss node ($bossnode)",
 	     $TBOPS,
 	     "Cc: $TBOPS",
-	     ("/tmp/bossnode.$$"));
-    system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+	     ($bosslogfile));
     print STDERR "*** $0:\n".
 	         "    Error building the bossnode ($bossnode)!\n";
     exit(($debug ? 0 : -1));
 }
 
-# Send these log files off now so that we can look at them.
-if (defined($fsnode)) {
-    SENDMAIL("$user_name <$user_email>",
-	     "ElabInElab Setup Log: $pid/$eid",
-	     "Logs for building fs/ops/boss ($fsnode/$opsnode/$bossnode)",
-	     $TBOPS,
-	     "Cc: $TBOPS",
-	     ("/tmp/fsnode.$$", "/tmp/opsnode.$$", "/tmp/bossnode.$$"));
-} else {
-    SENDMAIL("$user_name <$user_email>",
-	     "ElabInElab Setup Log: $pid/$eid",
-	     "Logs for building ops/boss ($opsnode/$bossnode)",
-	     $TBOPS,
-	     "Cc: $TBOPS",
-	     ("/tmp/opsnode.$$", "/tmp/bossnode.$$"));
+if ($verbose) {
+    # Send these log files off now so that we can look at them.
+    if (defined($fsnode)) {
+	SENDMAIL("$user_name <$user_email>",
+		 "ElabInElab Setup Log: $pid/$eid",
+		 "Logs for building fs/ops/boss ($fsnode/$opsnode/$bossnode)",
+		 $TBOPS,
+		 "Cc: $TBOPS",
+		 ($fslogfile, $opslogfile, $bosslogfile));
+    }
+    else {
+	SENDMAIL("$user_name <$user_email>",
+		 "ElabInElab Setup Log: $pid/$eid",
+		 "Logs for building ops/boss ($opsnode/$bossnode)",
+		 $TBOPS,
+		 "Cc: $TBOPS",
+		 ($opslogfile, $bosslogfile));
+    }
 }
-system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
 $UID  = $SAVEUID;
 
 # Run as real user for the next few scripts, which are setuid.
