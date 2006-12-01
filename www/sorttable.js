@@ -1,3 +1,7 @@
+/*
+ * From http://kryogenix.org/code/browser/sorttable/
+ */
+
 addEvent(window, "load", sortables_init);
 
 var SORT_COLUMN_INDEX;

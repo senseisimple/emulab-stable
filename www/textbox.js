@@ -1,4 +1,8 @@
-
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 function focus_text(textInput, defval) {
     if (textInput.value == defval) {
 	textInput.value = "";

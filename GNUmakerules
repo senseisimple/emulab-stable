@@ -1,6 +1,7 @@
 #
-# Insert Copyright Here.
-#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
 
 # Get rid of a bunch of nasty built-in implicit rules,
 # to avoid bogus circular dependencies and make things go faster.

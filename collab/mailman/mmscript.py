@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 from Mailman import mm_cfg
 from Mailman import MailList
 from Mailman import Utils

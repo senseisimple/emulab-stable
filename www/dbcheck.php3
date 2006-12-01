@@ -1,5 +1,9 @@
 <?php
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Stuff to support checking field data before we insert it into the DB.
 #
 define("TBDB_CHECKDBSLOT_NOFLAGS",	0x0);

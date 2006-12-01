@@ -1,4 +1,8 @@
-
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 var LOG_STATE_LOADING = 1;
 var LOG_STATE_LOADED = 2;
 
