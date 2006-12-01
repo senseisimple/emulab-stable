@@ -1,5 +1,11 @@
 #! /bin/sh
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 # chkconfig: 2345 30 90
 # description: Vision master control client software.
 
