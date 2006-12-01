@@ -11,8 +11,10 @@ fbsdvers=`uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/'`
 # Version 5.X uses a different name for the wrapper. Silly.
 /usr/local/bin/mysql -V | egrep -q -s 'Distrib 5.'
 if [ $? -eq 0 ]; then
+        isvers5=1
 	safeprog=/usr/local/bin/mysqld_safe
 else
+        isvers5=0
 	safeprog=/usr/local/bin/safe_mysqld
 fi
 
@@ -21,7 +23,7 @@ options="--pid-file=/var/db/mysql/mysqld.pid --skip-grant-tables --skip-networki
 case "$1" in
 	start|faststart)
 		if [ -x $safeprog ]; then
-			if [ "$fbsdvers" = "FreeBSD6" ]; then
+			if [ "$fbsdvers" = "FreeBSD6" -o $isvers5 -eq 1 ]; then
 			        #
 				# mysqld does not properly detach, and so it
 				# gets a SIGHUP, which causes it to reload
