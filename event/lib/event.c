@@ -1102,7 +1102,7 @@ static void subscription_callback(elvin_handle_t server,
 				  void *rock,
 				  elvin_error_t status);
 
-#define EXPRESSION_LENGTH 1024
+#define EXPRESSION_LENGTH 8192
 
 /*
  * Subscribe to events of type TYPE.  Event notifications that match
@@ -1129,8 +1129,8 @@ addclause(char *tag, char *clause, char *exp, int size, int *index)
 {
 	int	count = 0;
 	char	*bp;
-	char    clausecopy[BUFSIZ], *strp = clausecopy;
-	char	buf[BUFSIZ];
+	char    clausecopy[EXPRESSION_LENGTH], *strp = clausecopy;
+	char	buf[EXPRESSION_LENGTH];
 	int     needglob = 1;
 
 	/* Must copy clause since we use strsep! */
