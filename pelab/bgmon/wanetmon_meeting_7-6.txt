@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 Pelab - Wanetmon
 Meeting July 6, 2006
 Discussed issues and other potential problems.
