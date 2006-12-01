@@ -54,6 +54,11 @@
  * project, please see <http://www.apache.org/>.
  *
  */
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 /*
  * suexec.c -- "Wrapper" support program for suEXEC behaviour for Apache
