@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 import javax.swing.*;
 import javax.swing.event.*;

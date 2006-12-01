@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * Dataset.java
  *
  * Created on July 7, 2006, 2:53 PM

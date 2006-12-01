@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * NodePosition.java
  *
  * Created on February 1, 2006, 9:41 PM

@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * GenericLinkStats.java
  *
  * Created on July 4, 2006, 11:08 AM

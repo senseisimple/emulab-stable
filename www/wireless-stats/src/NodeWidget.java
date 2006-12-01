@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * NodeWidget.java
  *
  * Created on July 11, 2005, 8:19 AM

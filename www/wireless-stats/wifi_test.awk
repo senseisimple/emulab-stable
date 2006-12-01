@@ -1,4 +1,11 @@
 #/bin/nawk
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 # wifi_test.awk
 # Generate test data file from the positions, ramp connectivity by distance & power.
 

@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * NodeLinkModel.java
  *
  * Created on July 19, 2005, 8:58 PM
