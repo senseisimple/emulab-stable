@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // StateSensor.h
 
 #ifndef STATE_SENSOR_H_STUB_2

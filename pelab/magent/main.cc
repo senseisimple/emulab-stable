@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // main.cc
 
 #include "lib.h"
@@ -43,6 +49,8 @@ namespace global
 
   std::auto_ptr<CommandInput> input;
   std::auto_ptr<CommandOutput> output;
+
+  int logFlags =  LOG_EVERYTHING /*& ~SENSOR_COMPLETE*/;
 }
 
 void usageMessage(char *progname);
@@ -92,6 +100,7 @@ void usageMessage(char *progname)
   cerr << "  --replay-save=<filename> " << endl;
   cerr << "  --replay-load=<filename> " << endl;
   cerr << "  --replay-sensor=<null|state|packet|delay|min-delay|max-delay|throughput|ewma-throughput|leastsquares-throughput>" << endl;
+  cerr << "  --less-logging" << endl;
   logWrite(ERROR, "Bad command line argument", global::connectionModelArg);
 }
 
@@ -117,11 +126,12 @@ void processArgs(int argc, char * argv[])
     {"replay-save",       required_argument, NULL, 's'},
     {"replay-load",       required_argument, NULL, 'l'},
     {"replay-sensor",     required_argument, NULL, 'n'},
+    {"less-logging",      no_argument      , NULL, 'L'},
     // Required so that getopt_long can find the end of the list
     {NULL, 0, NULL, 0}
   };
 
-  string shortOptions = "c:p:m:i:ds:l:";
+  string shortOptions = "c:p:m:i:ds:l:L";
 
   // Not used
   int longIndex;
@@ -283,6 +293,9 @@ void processArgs(int argc, char * argv[])
         exit(1);
       }
       break;
+    case 'L':
+      logFlags = ERROR & EXCEPTION;
+      break;
     case '?':
     default:
       usageMessage(argv[0]);
@@ -296,7 +309,7 @@ void init(void)
   FD_ZERO(&global::readers);
   global::maxReader = -1;
 
-  logInit(stderr, LOG_EVERYTHING /*& ~SENSOR_COMPLETE*/, true);
+  logInit(stderr, logFlags, true);
 
   /*
    * Install a signal handler so that we can catch control-C's, etc.

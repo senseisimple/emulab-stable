@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // PacketSensor.cc
 
 #include "lib.h"
@@ -167,6 +173,40 @@ void PacketSensor::localSend(PacketInfo * packet)
       SentPacket record;
       record.seqStart = startSequence;
 
+<<<<<<< PacketSensor.cc
+      /*
+       * Calculate the packet payload size - we have to make sure to
+       * take into account IP and TCP option headers
+       */
+      unsigned int sequenceLength =
+        // Total length of the IP part of the packet
+        (ntohs(packet->ip->ip_len))
+        // Total length of all IP headers (including options)
+        - (packet->ip->ip_hl*4)
+        // Total length of all TCP headers (including options)
+<<<<<<< PacketSensor.cc
+         - (packet->tcp->doff*4);
+    record.seqEnd = record.seqStart + sequenceLength;
+    record.totalLength = packet->packetLength;
+    record.timestamp = packet->packetTime;
+    logWrite(SENSOR,
+<<<<<<< PacketSensor.cc
+             "PacketSensor::localSend() new record: ss=%i,sl=%i,se=%i,tl=%i",
+             record.seqStart,record.sequenceLength,record.seqEnd,
+             record.totalLength);
+=======
+             "PacketSensor::localSend() new record: ss=%u,sl=%u,se=%u,tl=%u",
+             record.seqStart, sequenceLength, record.seqEnd,
+             record.totalLength);
+>>>>>>> 1.5
+    globalSequence.seqEnd = record.seqEnd;
+    if (unacked.empty())
+    {
+      globalSequence.seqStart = record.seqStart;
+=======
+        - (packet->tcp->doff*4);
+=======
+>>>>>>> 1.27
       // We want to get the sequence number of the last data byte, not the
       // sequence number of the first byte of the next segment
       record.seqEnd = record.seqStart + sequenceLength - 1;
@@ -176,6 +216,11 @@ void PacketSensor::localSend(PacketInfo * packet)
                "PacketSensor::localSend() new record: ss=%u,sl=%u,se=%u,tl=%u",
                record.seqStart, sequenceLength, record.seqEnd,
                record.totalLength);
+<<<<<<< PacketSensor.cc
+>>>>>>> 1.11
+      globalSequence.seqEnd = record.seqEnd;
+=======
+>>>>>>> 1.16
       if (unacked.empty())
       {
         globalSequence.seqStart = record.seqStart;

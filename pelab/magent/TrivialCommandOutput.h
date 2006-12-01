@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // TrivialCommandOutput.h
 
 #ifndef TRIVIAL_COMMAND_OUTPUT_H_STUB_2

@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // TrafficModel.h
 
 #ifndef TRAFFIC_MODEL_H_STUB_2

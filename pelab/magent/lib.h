@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // lib.h
 
 #ifndef LIB_H_PELAB_2
@@ -268,5 +274,7 @@ namespace global
 
   extern std::auto_ptr<CommandInput> input;
   extern std::auto_ptr<CommandOutput> output;
+
+  extern int logFlags;
 }
 #endif
