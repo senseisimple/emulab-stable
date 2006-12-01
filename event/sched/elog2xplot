@@ -1,4 +1,9 @@
 #! /usr/bin/awk -f
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 BEGIN {
 	printf("timeval unsigned\n");

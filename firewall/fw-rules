@@ -1,4 +1,10 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Firewall rule template.
 #
 # The bulk of the line is the body of an IPFW rule, a '#' denoted "comment"

@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #	cd from <builddir>/event/trafgen to testbed/event/trafgen
 
 if [ -x /usr/bin/fetch ]; then
