@@ -950,7 +950,7 @@ if (count($errors)) {
 if (!$returning) {
     $proj_head_uid     = (($USERSELECTUIDS ||
 			   $FirstInitState == "createproject") ?
-			  null : $formfields[proj_head_uid]);
+			  $formfields[proj_head_uid] : null);
     $usr_title         = addslashes($formfields[usr_title]);
     $usr_name          = addslashes($formfields[usr_name]);
     $usr_affil         = addslashes($formfields[usr_affil]);

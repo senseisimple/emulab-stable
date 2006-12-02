@@ -777,7 +777,7 @@ if (! $returning) {
     #
     # Certain of these values must be escaped or otherwise sanitized.
     #
-    $joining_uid       = ($USERSELECTUIDS ? null : $formfields[joining_uid]);
+    $joining_uid       = ($USERSELECTUIDS ? $formfields[joining_uid] : null);
     $usr_name          = addslashes($formfields[usr_name]);
     $usr_email         = $formfields[usr_email];
     $password1         = $formfields[password1];
