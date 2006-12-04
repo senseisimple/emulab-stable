@@ -911,7 +911,17 @@ sub TBGrpTrust($$$)
 	$gid = $pid;
     }
 
+    #
+    # User must be active to be trusted.
+    #
     my $query_result =
+	DBQueryFatal("select status from users ".
+		     "where uid='$uid' and status='" . USERSTATUS_ACTIVE() . "'");
+    if ($query_result->numrows == 0) {
+	return PROJMEMBERTRUST_NONE;
+    }
+
+    $query_result =
 	DBQueryFatal("select trust from group_membership ".
 		     "where uid='$uid' and pid='$pid' and gid='$gid'");
 
