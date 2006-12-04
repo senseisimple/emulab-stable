@@ -478,6 +478,16 @@ else {
 			   "QUEUE. Currently $estate.")
 		if ($estate ne EXPTSTATE_SWAPPED);
 
+	    #
+	    # For the moment, only the creator of the batch can queue it. This
+	    # avoids all kinds of problems inside the batch daemon, with it
+	    # not knowing who to swap the experiment in as. This is a temporary
+	    # solution, at least until I have time to decide what is correct.
+	    #
+	    ExitWithStatus(1,
+			   "Only the creator of a batch experiment can queue it!")
+		if ($experiment->creator() ne $dbuid);
+
 	    if ($overquota) {
 		tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);
 		ExitWithStatus(1,
