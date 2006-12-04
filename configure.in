@@ -842,6 +842,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	www/xmlrpcpipe.php3 \
 	www/swish.conf www/websearch \
 	www/garcia-telemetry/GNUmakefile www/tutorial/GNUmakefile \
+	www/sec-check/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
 	vis/floormap vis/webfloormap \
