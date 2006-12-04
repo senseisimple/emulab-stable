@@ -228,7 +228,7 @@ sub doboot()
     $emulabconfig{"WINSUPPORT"} = 0;
     $emulabconfig{"NOSETUP"}    = 0;
     $emulabconfig{"SCRATCHFS"}  = 0;
-    $emulabconfig{"SINGLE_CONTROLNET"} = 1;
+    $emulabconfig{"SINGLE_CONTROLNET"} = 0;
 
     #
     # Need outer control router IP in lots of places.
@@ -283,7 +283,7 @@ sub doboot()
     }
     # and single vs dual control network
     if ($emulabconfig{"SINGLE_CONTROLNET"}) {
-	$SINGLE_CONTROLNET = 0;
+	$SINGLE_CONTROLNET = 1;
     }
 
     # XXX Temporary
