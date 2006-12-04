@@ -831,7 +831,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
-	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
+	utils/link_config utils/import_commitlog \
 	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
 	utils/grabwebcams utils/loghole utils/webcopy \
 	utils/setdest utils/websetdest utils/grabswitchconfig \
