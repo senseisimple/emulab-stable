@@ -1,4 +1,13 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2001-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ *
+ * BSD code derived from:
+ * $FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.21 2004/03/15 07:25:30 ru Exp $
+ */
+
+/*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

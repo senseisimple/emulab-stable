@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * This is a sample client to run on a testbed node to capture TBEXAMPLE
  * events for the node. Modify as needed of course.
  */

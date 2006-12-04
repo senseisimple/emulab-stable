@@ -1,5 +1,11 @@
 #!/usr/bin/perl
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # This is a sample event generator to send TBEXAMPLE events to all nodes
 # in an experiment. Perl equivalent of tbsend.c
 #

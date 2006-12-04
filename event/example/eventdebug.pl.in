@@ -1,5 +1,11 @@
 #!/usr/bin/perl
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Debug the event system by subscribing to and printing all events - event
 # system analog of tcpdump. An trivial modification of tbrecv.pl
 #

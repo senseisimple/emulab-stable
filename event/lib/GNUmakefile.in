@@ -149,6 +149,9 @@ client-libinstall:
 clean:
 	/bin/rm -f *.o libevent.a libevent_r.a *.so *.py
 
+distclean:
+	/bin/rm -f event.pm event_wrap.c event_wrap_py.c tbevent.py
+
 $(INSTALL_DIR)/opsdir/lib/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/lib

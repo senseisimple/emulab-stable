@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2000, 2001, 2003, 2004 University of Utah and the Flux Group.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * boot/bootwhat.h from the OSKit.

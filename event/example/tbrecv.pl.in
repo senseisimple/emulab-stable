@@ -1,5 +1,11 @@
 #!/usr/bin/perl
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # This is a sample client to run on a testbed node to capture TBEXAMPLE
 # events for the node. Perl equivalent of tbrecv.c
 #

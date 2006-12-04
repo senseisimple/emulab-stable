@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * This is a sample event generator to send TBEXAMPLE events to all nodes
  * in an experiment. Modify as needed of course.
  */

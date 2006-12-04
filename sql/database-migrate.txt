@@ -1,4 +1,8 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Anytime you change database-create.sql, but sure to put any special
 # (sql) instructions that need to be executed to bring an existing DB
 # into compliance.
