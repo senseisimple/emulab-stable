@@ -1,4 +1,9 @@
 #!/usr/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 LINKNAME=planetc
 HOSTNAME=`cat /var/emulab/boot/nickname | sed 's/\..*//'`

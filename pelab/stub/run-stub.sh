@@ -1,5 +1,11 @@
 #!/bin/sh
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Script to run the stub
 #
 

@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 all: stubd stub-monitor dumb-client dumb-server
 
 stubd: stubd.o stub-pcap.o lookup.o log.o
