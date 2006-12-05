@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 /* Compile on cygwin with gcc -mwindows -mno-cygwin -o ssh-mime ssh-mime.c */
 /* Set the env PUTTY_CMD to the path of where you have put putty */
 #include <stdio.h>

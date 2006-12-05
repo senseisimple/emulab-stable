@@ -1,4 +1,8 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # For installation.
 #
 SRCDIR		= @srcdir@

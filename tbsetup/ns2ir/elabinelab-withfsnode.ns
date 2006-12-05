@@ -1,4 +1,10 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # This file is intended to be included into another NS file. It is not
 # a stand alone file.
 # 

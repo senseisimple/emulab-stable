@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 TMPSUDOERS=/tmp/sudoers
 ME=`whoami`
