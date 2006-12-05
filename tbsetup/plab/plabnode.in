@@ -79,7 +79,7 @@ def main(args):
             node = slice.loadNode(nodeid)
             node.renew()
             pass
-        except:
+        except Exception, e:
             processException(command, nodeid, e)
             sys.exit(1)
             pass
