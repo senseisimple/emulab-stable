@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 SNMPGET="/usr/local/bin/snmpget -m CISCO-STACK-MIB:CISCO-PAGP-MIB -Ovq"
 community="public"
