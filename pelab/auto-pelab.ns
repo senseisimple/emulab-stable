@@ -196,7 +196,10 @@ set no_stub 0
 if {$no_plab} {
     set fake_plab 0
     set real_plab 0
-    set use_dbmonitor 1
+# XXX don't force use of dbmonitor; may want to just use init_elabnodes.
+#    set use_dbmonitor 1
+    set use_magent 0
+    set no_stub 1
 }
 
 #
