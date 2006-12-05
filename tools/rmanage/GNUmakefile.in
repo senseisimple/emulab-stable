@@ -1,0 +1,35 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = tools/rmanage
+
+include $(OBJDIR)/Makeconf
+
+all: rmanage
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS = -Wall 
+LDFLAGS = -lssl
+
+rmanage: GNUmakefile rmanage.o
+	$(CC) $(CFLAGS) $(LDFLAGS) rmanage.o -o rmanage
+		cp rmanage rmanage.debug
+		strip rmanage
+
+rmanage.o: rmanage.c rmcp.c
+	$(CC) -c -o rmanage.o $(CFLAGS) $<
+
+rmcp.o: rmcp.c rmcp.h
+	$(CC) -c -o rmcp.o $(CFLAGS) $<
+
+install boss-install: $(INSTALL_SBINDIR)/rmanage
+
+clean:
+	rm -f *.o core rmanage rmanage.debug
