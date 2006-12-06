@@ -871,19 +871,29 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 	if (! is_null($instance)) {
 	    $guid   = $instance->guid();
 	    $vers   = $instance->vers();
-	    $runidx = $instance->runidx();
-	    $runid  = $instance->GetRunID($runidx);
 	
 	    echo "<tr>
                     <td>Template: </td>
                     <td class=\"left\">
                        <a href='template_show.php?guid=$guid&version=$vers'>
-                          $guid/$vers</a>
-                           (Current Run:
-                              <a href='experimentrun_show.php?guid=$guid".
+                          $guid/$vers</a>";
+
+	    if ($instance->runidx()) {
+	        $runidx = $instance->runidx();
+	        $runid  = $instance->GetRunID($runidx);
+		echo " (Current Run:
+                       <a href='experimentrun_show.php?guid=$guid".
 		              "&version=$vers&exptidx=$exptidx&runidx=$runidx'>".
-		             "$runid)</a></td>
-                  </tr>\n";
+		             "$runid</a>)</td>";
+	    } else {
+	        $runidx = $instance->LastRunIdx();
+	        $runid  = $instance->GetRunID($runidx);
+		echo " (Last Run:
+                       <a href='experimentrun_show.php?guid=$guid".
+		              "&version=$vers&exptidx=$exptidx&runidx=$runidx'>".
+		             "$runid</a>)</td>";
+           }
+           echo "</tr>\n";
 	}
 
 	echo "<tr>

@@ -1224,6 +1224,47 @@ class TemplateInstance
     }
 
     #
+    # Display last run bindings in a table
+    #
+    function ShowLastRunBindings() {
+	$exptidx      = $this->exptidx();
+	$runidx       = $this->LastRunIdx();
+
+	$query_result =
+	    DBQueryWarn("select * from experiment_run_bindings ".
+			 "where exptidx='$exptidx' and runidx='$runidx' ".
+			 "order by name");
+
+	if (!mysql_num_rows($query_result))
+	    return 0;
+
+	echo "<center>
+               <h3>Last Run Bindings</h3>
+             </center> 
+             <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+
+ 	echo "<tr>
+                <th>Name</th>
+                <th>Value</th>
+              </tr>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $name	= $row['name'];
+	    $value	= $row['value'];
+	    if (!isset($value)) {
+		$value = "&nbsp";
+	    }
+
+	    echo "<tr>
+                   <td>$name</td>
+                   <td>$value</td>
+                  </tr>\n";
+  	}
+	echo "</table>\n";
+	return 1;
+    }
+
+    #
     # Show the run list for an instance.
     #
     function ShowRunList($withheader) {

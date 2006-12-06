@@ -697,7 +697,7 @@ if ($instance &&
     ($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_PANICED ||
      $expstate == $TB_EXPTSTATE_ACTIVATING)) {
-    $instance->ShowBindings();
+    $instance->ShowLastRunBindings();
 }
 
 #
