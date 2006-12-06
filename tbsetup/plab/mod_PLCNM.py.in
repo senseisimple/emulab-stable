@@ -14,6 +14,7 @@ import fcntl
 import time
 import calendar
 import cPickle
+import os
 
 from libtestbed import *
 from aspects import wrap_around
@@ -29,8 +30,10 @@ debug = 0
 # PLC constants
 #
 DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
-DEF_PLC_USER = "lepreau@cs.utah.edu"
-DEF_PLC_PASS = "phurds"            # XXX: hardcoded, cleartext passwds bad.
+# these are now sucked in from a file
+DEF_PLC_USER = ""
+DEF_PLC_PASS = ""
+DEF_PLC_PASS_FILE = "@prefix@/etc/plab/plc.pw"
 
 DEF_NM_PORT = "814"
 
@@ -137,8 +140,16 @@ class NMagent:
 class PLCagent:
     def __init__(self, slicename,
                  uri = DEF_PLC_URI,
-                 username = DEF_PLC_USER,
-                 password = DEF_PLC_PASS):
+                 username = "",
+                 password = ""):
+
+        if username == "":
+            username = mod_PLCNM.username
+            pass
+        if password == "":
+            password = mod_PLCNM.password
+            pass
+        
         if not slicename:
             raise RuntimeError, "Must provide a slicename!"
         self.__slice = {}
@@ -221,11 +232,26 @@ class PLCagent:
 
 
 class mod_PLCNM:
+    username = ""
+    password = ""
+    
     def __init__(self):
         self.modname = "mod_PLCNM"
         self.__PLCagent = None
         self.__sliceexpdict = {}
         self.__sliceexptime = 0
+
+        # try to grab the master account info from the file:
+        try:
+            file = open(DEF_PLC_PASS_FILE,'r')
+            lines = file.readlines()
+            mod_PLCNM.username = lines[0].strip('\n')
+            mod_PLCNM.password = lines[1].strip('\n')
+            pass
+        except:
+            print "Failed to retrive master passwd from %s" % DEF_PLC_PASS_FILE
+            raise
+        
         return
 
     def createSlice(self, slice):
