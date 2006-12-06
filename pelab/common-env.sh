@@ -169,9 +169,12 @@ else
 fi
 
 #
-# How big is this experiment? Counts the number of planetlab nodes
+# How big is this experiment? Counts the number of planetlab nodes. IF there
+# are real planetlab nodes in this experiment, count them instead of the number
+# of fake planetlab nodes - this allows us to remove planetlab nodes that fail
+# from the experiment, and *maybe* everything else will just work.
 #
-export PEER_PAIRS=`$GREP -E -c 'elab-.*-elabc ' /etc/hosts`
+export PEER_PAIRS=`$GREP -q planet /etc/hosts && $GREP -E -c 'planet-.*-realinternet ' /etc/hosts || $GREP -E -c 'plab-.*-plabc ' /etc/hosts`
 export PEERS=`expr $PEER_PAIRS \* 2`
 
 #
