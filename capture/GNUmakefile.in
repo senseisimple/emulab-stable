@@ -26,7 +26,7 @@ DBFLAGS	+= -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
 #
-CFLAGS += -g -O2 -DLOG_DROPS -I${OBJDIR} -DLOG_TESTBED=$(LOG_TESTBED)
+CFLAGS += -Wall -g -O2 -DLOG_DROPS -I${OBJDIR} -DLOG_TESTBED=$(LOG_TESTBED)
 
 ifeq ($(SYSTEM),Linux)
 ifeq ($(host_cpu),arm)

@@ -22,6 +22,8 @@
 	
 #include <sys/param.h>
 
+#include <unistd.h>
+#include <string.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <strings.h>
@@ -49,6 +51,9 @@
 #include <arpa/inet.h>
 #include <setjmp.h>
 #include <netdb.h>
+#ifndef __linux__
+#include <rpc/rpc.h>
+#endif
 #ifdef WITHSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -70,6 +75,16 @@ void usage(void);
 void warning(char *format, ...);
 void die(char *format, ...);
 void dolog(int level, char *format, ...);
+
+int val2speed(int val);
+void rawmode(char *devname, int speed);
+void writepid(void);
+void createkey(void);
+int handshake(void);
+#ifdef USESOCKETS
+int clientconnect(void);
+#endif
+int handleupload(void);
 
 #ifdef __linux__
 #define _POSIX_VDISABLE '\0'
@@ -294,7 +309,7 @@ int
 main(int argc, char **argv)
 {
 	char strbuf[MAXPATHLEN], *newstr();
-	int flags, op, i;
+	int op, i;
 	struct sigaction sa;
 	extern int optind;
 	extern char *optarg;
@@ -302,7 +317,10 @@ main(int argc, char **argv)
 	struct sockaddr_in name;
 #endif
 
-	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
+	if ((Progname = rindex(argv[0], '/')))
+		Progname++;
+	else
+		Progname = *argv;
 
 	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:P")) != EOF)
 		switch (op) {
@@ -379,17 +397,17 @@ main(int argc, char **argv)
 
 	Machine = argv[0];
 
-	(void) sprintf(strbuf, PIDNAME, LOGPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), PIDNAME, LOGPATH, argv[0]);
 	Pidname = newstr(strbuf);
-	(void) sprintf(strbuf, LOGNAME, LOGPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), LOGNAME, LOGPATH, argv[0]);
 	Logname = newstr(strbuf);
-	(void) sprintf(strbuf, RUNNAME, LOGPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), RUNNAME, LOGPATH, argv[0]);
 	Runname = newstr(strbuf);
-	(void) sprintf(strbuf, TTYNAME, TIPPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), TTYNAME, TIPPATH, argv[0]);
 	Ttyname = newstr(strbuf);
-	(void) sprintf(strbuf, PTYNAME, TIPPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), PTYNAME, TIPPATH, argv[0]);
 	Ptyname = newstr(strbuf);
-	(void) sprintf(strbuf, DEVNAME, DEVPATH, argv[1]);
+	(void) snprintf(strbuf, sizeof(strbuf), DEVNAME, DEVPATH, argv[1]);
 	Devname = newstr(strbuf);
 
 	openlog(Progname, LOG_PID, LOG_TESTBED);
@@ -457,7 +475,7 @@ main(int argc, char **argv)
 		Bossaddr.sin_port   = htons(serverport);
 	}
 
-	(void) sprintf(strbuf, ACLNAME, ACLPATH, Machine);
+	(void) snprintf(strbuf, sizeof(strbuf), ACLNAME, ACLPATH, Machine);
 	Aclname = newstr(strbuf);
 	
 	/*
@@ -521,7 +539,7 @@ main(int argc, char **argv)
 			die("socket(): %s", geterr(errno));
 		if (connect(ptyfd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 			die("connect(): %s", geterr(errno));
-		sprintf(key.key, "RELAY %d", portnum);
+		snprintf(key.key, sizeof(key.key), "RELAY %d", portnum);
 		key.keylen = strlen(key.key);
 		if (write(ptyfd, &key, sizeof(key)) != sizeof(key))
 			die("write(): %s", geterr(errno));
@@ -580,7 +598,8 @@ int	pid;
 void
 capture(void)
 {
-	flags = FNDELAY;
+	int flags = FNDELAY;
+
 	(void) fcntl(ptyfd, F_SETFL, &flags);
 
 	if (pid = fork())
@@ -759,7 +778,7 @@ capture(void)
 		if (i == 0) {
 #ifdef	USESOCKETS
 			if (needshake) {
-				handshake();
+				(void) handshake();
 				continue;
 			}
 #endif
@@ -767,10 +786,10 @@ capture(void)
 		}
 #ifdef	USESOCKETS
 		if (FD_ISSET(sockfd, &fds)) {
-			clientconnect();
+			(void) clientconnect();
 		}
 		if ((upfd >=0) && FD_ISSET(upfd, &fds)) {
-			handleupload();
+			(void) handleupload();
 		}
 #endif	/* USESOCKETS */
 		if ((devfd >= 0) && FD_ISSET(devfd, &fds)) {
@@ -1208,6 +1227,7 @@ newstr(char *str)
 /*
  * Open up PID file and write our pid into it.
  */
+void
 writepid(void)
 {
 	int fd;
@@ -1222,7 +1242,7 @@ writepid(void)
 	if (chmod(Pidname, 0644) < 0)
 		die("%s: chmod: %s", Pidname, geterr(errno));
 	
-	(void) sprintf(buf, "%d\n", getpid());
+	(void) snprintf(buf, sizeof(buf), "%d\n", getpid());
 	
 	if (write(fd, buf, strlen(buf)) < 0)
 		die("%s: write: %s", Pidname, geterr(errno));
@@ -1323,11 +1343,13 @@ powermonmode(void)
 	usleep(100000);
 	
 	tcflush(devfd, TCOFLUSH);
+	return 0;
 }
 
 /*
  * Put the console line into raw mode.
  */
+void
 rawmode(char *devname, int speed)
 {
 	struct termios t;
@@ -1759,7 +1781,7 @@ handleupload(void)
  * Generate our secret key and write out the file that local tip uses
  * to do a secure connect.
  */
-int
+void
 createkey(void)
 {
 	int			cc, i, fd;
@@ -1767,7 +1789,7 @@ createkey(void)
 	FILE		       *fp;
 
 	if (relay_snd)
-		return 1;
+		return;
 
 	/*
 	 * Generate the key. Should probably generate a random
@@ -1846,8 +1868,7 @@ createkey(void)
 	/*
 	 * Send the info over.
 	 */
-	handshake();
-	return 1;
+	(void) handshake();
 }
 
 /*
