@@ -585,7 +585,7 @@ else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
-		    event/sched/GNUmakefile event/test/GNUmakefile \
+		    event/sched/GNUmakefile \
                     event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \

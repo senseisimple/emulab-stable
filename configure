@@ -1973,7 +1973,7 @@ else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
-		    event/sched/GNUmakefile event/test/GNUmakefile \
+		    event/sched/GNUmakefile \
                     event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
@@ -2444,7 +2444,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
-	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
+	utils/link_config utils/import_commitlog \
 	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
 	utils/grabwebcams utils/loghole utils/webcopy \
 	utils/setdest utils/websetdest utils/grabswitchconfig \
@@ -2455,6 +2455,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	www/xmlrpcpipe.php3 \
 	www/swish.conf www/websearch \
 	www/garcia-telemetry/GNUmakefile www/tutorial/GNUmakefile \
+	www/sec-check/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
 	vis/floormap vis/webfloormap \
