@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -317,6 +317,15 @@ sub doplabconfig()
 	# XXX This shouldn't be hardcoded
 	print RC "setconfigopt /etc/resolv.conf domain emulab.net\n";
 	print RC "setconfigopt /etc/resolv.conf search emulab.net\n\n";
+
+	# XXX make sure we can resolve our own name
+	print RC "if ! ping -c 1 `hostname` >/dev/null 2>&1; then\n".
+	         "    myip=`cat /var/emulab/boot/myip`\n".
+	         "    myhn=`hostname`\n".
+	         "    if [ -n \"\$myip\" -a -n \"\$myhn\" ]; then\n".
+	         "        setconfigopt /etc/hosts \$myip \$myhn\n".
+	         "    fi\n".
+		 "fi\n";
 
 	# No SSH X11 Forwarding
 	print RC "setconfigopt /etc/ssh/sshd_config X11Forwarding no\n";
