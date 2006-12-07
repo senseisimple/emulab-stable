@@ -93,6 +93,7 @@ int sched_event_prepare(event_handle_t handle, sched_event_t *se);
 int sched_event_enqueue_copy(event_handle_t handle,
 			     sched_event_t *se,
 			     struct timeval *new_time);
+void make_timestamp(char * buf, const struct timeval * t_timeval);
 
 /* queue.c */
 void sched_event_init(void);

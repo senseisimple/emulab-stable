@@ -283,6 +283,7 @@ int event_do(event_handle_t handle, ea_tag_t tag, ...);
 /* util.c */
 void *xmalloc(int size);
 void *xrealloc(void *p, int size);
+void make_timestamp(char * buf, const struct timeval * t_timeval);
 
 #ifdef __cplusplus
 }

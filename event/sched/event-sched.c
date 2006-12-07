@@ -798,15 +798,19 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 		}
 		
 		if (debug) {
+		        char time_buf_1[24], time_buf_2[24];
 			struct timeval now;
 		    
 			gettimeofday(&now, NULL);
+
+			make_timestamp(time_buf_1, &event.time);
+			make_timestamp(time_buf_2, &now);
 			
 			info("Sched: "
-			     "note:%p at:%ld:%d now:%ld:%d agent:%s %s\n",
+			     "note:%p at:%s now:%s agent:%s %s\n",
 			     event.notification,
-			     event.time.tv_sec, event.time.tv_usec,
-			     now.tv_sec, now.tv_usec, agentp->name,
+			     time_buf_1, time_buf_2,
+			     agentp->name,
 			     eventtype);
 		}
 		
@@ -897,7 +901,8 @@ dequeue(event_handle_t handle)
 {
 	sched_event_t next_event;
 	struct timeval now;
-	
+	char time_buf_1[24], time_buf_2[24];
+
 	while (1) {
 		if (sched_event_dequeue(&next_event, 1) < 0)
 			break;
@@ -907,11 +912,11 @@ dequeue(event_handle_t handle)
 			gettimeofday(&now, NULL);
 
 		if (debug) {
-			info("Fire:  note:%p at:%ld:%d now:%ld:%d agent:%s\n",
+			make_timestamp(time_buf_1, &next_event.time);
+			make_timestamp(time_buf_2, &now);
+			info("Fire:  note:%p at:%s now:%s agent:%s\n",
 			     next_event.notification,
-			     next_event.time.tv_sec, next_event.time.tv_usec,
-			     now.tv_sec,
-			     now.tv_usec,
+			     time_buf_1, time_buf_2,
 			     next_event.agent.s ?
 			     (next_event.length == 1 ?
 			      next_event.agent.s->name :

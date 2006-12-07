@@ -17,6 +17,7 @@
 #include "popenf.h"
 #include "systemf.h"
 #include "rpc.h"
+#include "log.h"
 #include "simulator-agent.h"
 
 using namespace emulab;
@@ -232,6 +233,16 @@ int send_report(simulator_agent_t sa, char *args)
 	assert(lnEmptyList(&sa->sa_error_records));
 	if (pthread_mutex_unlock(&sa->sa_local_agent.la_mutex) != 0)
 		assert(0);
+	
+	if (debug) {
+		char time_buf[24];
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		make_timestamp(time_buf, &now);
+		info("Sending Report at %s with args \"%s\"\n",
+		     time_buf, args);
+	}
+	     
 
 	/*
 	 * Get the logs off the nodes so we can generate summaries from the
