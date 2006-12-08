@@ -104,7 +104,7 @@ sub Phase($$$) {
     #
     SWITCH: for ($@) {
 	(/^skip$/) && do {
-	    print "[ Skipped   ]\n";
+	    print "[ Skipped ($libinstall::reason) ]\n";
 	    $$parentSkipped++;
 	    $libinstall::phaseResults{$name} = $_;
 	    last SWITCH;
@@ -224,7 +224,7 @@ sub DoneIfExists($) {
     my ($filename) = @_;
     if (!$filename) { PhaseFail("Bad filename passed to DoneIfExists"); }
     if (-e $filename) {
-	PhaseSkip("File $filename already exists");
+	PhaseSkip("File already exists");
     }
 }
 
@@ -235,7 +235,7 @@ sub DoneIfDoesntExist($) {
     my ($filename) = @_;
     if (!$filename) { PhaseFail("Bad filename passed to DoneIfExists"); }
     if (!-e $filename) {
-	PhaseSkip("File $filename does not exist");
+	PhaseSkip("File does not exist");
     }
 }
 
@@ -249,7 +249,7 @@ sub DoneIfEdited($) {
     open(FH,$filename) or return;
     if (grep /$MAGIC_STRING/, <FH>) {
         close(FH);
-	PhaseSkip("File $filename has already been edited\n");
+	PhaseSkip("File has already been edited");
     }
     close(FH);
 }
@@ -291,7 +291,7 @@ sub DoneIfMounted($)
 		if ($opt eq "nfs") {
 		    if ($dir eq $2) {
 			close(MOUNT);
-			PhaseSkip("NFS dir $dir already mounted");
+			PhaseSkip("NFS dir already mounted");
 		    }
 		}
 	    }

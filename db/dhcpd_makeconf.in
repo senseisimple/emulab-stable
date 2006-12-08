@@ -158,7 +158,11 @@ while (my %row = $query_result->fetchhash()) {
 open(IF,"<$template") or
     fatal("Unable to open $template for reading");
 while (<IF>) {
-	if (/^(\s*)\%\%nodetype=(\w+)/) {
+	if (/^(\s*)range\s*;/) {
+		# Comment out a null DHCPD_DYNRANGE line.
+		my $spaces = $1;
+		print $OUT "${spaces}#range ... ...;\n";
+	} elsif (/^(\s*)\%\%nodetype=(\w+)/) {
 		my $spaces = $1;
 		my $nodetype = $2;
 

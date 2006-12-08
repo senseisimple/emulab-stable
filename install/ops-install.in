@@ -79,7 +79,9 @@ use Getopt::Std;
 # Handle command-line options
 #
 sub usage {
-    print "Usage: ops-install [-b] [-p packagedir] [-P portname]\n";
+    print "Usage: ops-install [-b] [-p packagedir] [-s] " .
+	"[-P ops-portname] [-F fs-portname]\n";
+    print "  Required: -p (for binary packages) or -s (for source makes.)\n";
     exit(1);
 }
 
@@ -102,9 +104,10 @@ my $PHP4_PORT = "php4-extensions-1.0";
 
 my $packagedir = "";
 my $batchmode  = 0;
+my $domakes  = 0;
 my $password;
 my %opts;
-if (! getopts("P:p:bw:F:", \%opts)) {
+if (! getopts("P:p:bsw:F:", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -112,6 +115,9 @@ if (defined($opts{p})) {
 }
 if (defined($opts{b})) {
     $batchmode = 1;
+}
+if (defined($opts{s})) {
+    $domakes = 1;
 }
 if (defined($opts{P})) {
     $OPS_PORT = $opts{P};
@@ -121,6 +127,15 @@ if (defined($opts{F})) {
 }
 if (defined($opts{w})) {
     $password = $opts{w};
+}
+# Don't just charge into making ports from source by default.
+if ($packagedir eq "" and $domakes eq 0) {
+    print "At least one of -p and -s must be given.\n";
+    usage();
+}
+if ($packagedir ne "" and $domakes eq 1) {
+    print "Only one of -p and -s can be given.\n";
+    usage();
 }
 if (@ARGV) {
     usage();
@@ -381,7 +396,7 @@ Phase "ports", "Installing ports", sub {
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
-    PhaseSkip("Package directory provided; not installing from source")
+    PhaseSkip("Package directory provided; not installing from sources")
 	if ($packagedir);
     
     Phase "pcopy", "Copying ports into place", sub {
@@ -474,7 +489,7 @@ Phase "patches", "Applying patches", sub {
 	    $patchfile = "${patchfile}-0.13";
 	}
 	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-	    PhaseSkip("$patchfile already applied");
+	    PhaseSkip("Patch already applied");
 	}
 	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
     };
@@ -483,7 +498,7 @@ Phase "patches", "Applying patches", sub {
 	    my $patchfile = $MAILMAN_PATCH;
 	
 	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-		PhaseSkip("$patchfile already applied");
+		PhaseSkip("Patch already applied");
 	    }
 	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
 	};

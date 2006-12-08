@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2001-2005 University of Utah and the Flux Group.
+# Copyright (c) 2001-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -144,9 +144,9 @@ and make sure the home directories for them are removed as well!
 
 Again, almost the same as on ops. Download the same tarball, and follow
 the same pkg_add procedure, except this time, you're going to install
-the emulab-boss-1.8 package instead of emulab-ops:
+the emulab-boss package instead of emulab-ops:
 
-	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 pkg_add emulab-boss-1.8
+	env PKG_PATH=/usr/tmp/FreeBSD-6.1-20060921 pkg_add emulab-boss-2.0
 
 Also grab a copy of our approved ports tree and install it, the same as
 described in setup-ops.txt.
@@ -184,12 +184,15 @@ boss-install in the object tree, instead of ops-install. Just run this
 script as root (note the same package directory argument as above).
 
 	cd install
-	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 perl boss-install
+	perl boss-install -p /usr/tmp/packages
 
 Like the ops-install script, boss-install sets up passwordless sudo for
 anyone in the wheel group.
 
 ##### Step 7 - Installing from source.
+
+This step is now done as part of boss-install.  You can check it or fix up
+problems by doing the makes yourself, as follows:
 
 In your object directory, do a 'gmake && gmake boss-install'. Then, as root, do
 a 'gmake post-install'. The post-install target needs to run as root, so that
@@ -311,8 +314,9 @@ Utah for some.
 
 locate database - It can be useful to update the 'locate' database to help you
 find files as you're learning the system. This normally happens nightly, but
-you can force it to happen now by running 'locate.updatedb' as root. This will
-take several minutes. You can then find foo.conf by running 'locate foo.conf'.
+you can force it to happen now by running '/usr/libexec/locate.updatedb' as
+root. This will take several minutes. You can then find foo.conf by running
+'locate foo.conf'.
 
 ##### Step 11 - Reboot boss
 

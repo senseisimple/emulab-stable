@@ -6,7 +6,7 @@
 
 #####
 ##### Setting up the Utah Network Testbed software
-##### Most recently tested on FreeBSD 4.11.
+##### Most recently tested on FreeBSD 6.1 .
 #####
 
 ##### Step 1 - OS installation and setup
@@ -97,37 +97,36 @@ collection that are known to work with our software, and to save you hours
 of compile time, we provide pre-built binary packages of the ports required
 by Emulab. 
 
-(Do not let the names of the following tar files bother you, e.g.
-"FreeBSD-4.10" or the apparent 20041102 date stamp.  These are indeed
-the correct files to use with FreeBSD 4.11 and with the current (May 2005)
-Emulab distribution.)
-
 Download the packages tarball from:
 
-	http://www.emulab.net/downloads/FreeBSD-4.10-20041102.tar.gz
+	http://www.emulab.net/downloads/FreeBSD-6.1-20060921.tar.gz
 
 (You can use the FreeBSD 'fetch' command to download the file.)
 
-Now, untar this someplace (you need about 70MB of space, so don't use /tmp).
+Now, untar this someplace (you need about 140MB of space, so don't use /tmp).
 Let's say you untarred it into /usr/tmp. You would then run:
 
-	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 pkg_add emulab-ops-1.4
+	env PKG_PATH=/usr/tmp/FreeBSD-6.1-20060921 pkg_add emulab-ops-2.0
 
 Of course, if you untarred it somewhere else, put in the correct path.
 
-Now you need to download a ports tree that corresponds to the above
-packages.  We have run into many, many problems with versions of the
+We provide all of the binary packages necessary to build ops/fs/boss in our
+packages tarball, making setup of an Emulab-in-Emulab very quick.  You may
+want to install more packages built from ports tree makefiles with downloaded
+sources, but if not there is no need to install a /usr/ports tree.
+
+We have run into many, many problems with clashes between versions of the
 FreeBSD ports.  So, rather than using the /usr/ports tree that comes on the
 FreeBSD installation media, we use one that we've tested against. You can
 grab our 'approved' copy of the ports tree from:
 
-	http://www.emulab.net/downloads/ports-20041102.tar.gz
+	http://www.emulab.net/downloads/ports-20060921.tar.gz
 	
+The tarball is about 40 meg; it unpacks to 175 meg.
+
 Untar it, move it into place as /usr/ports (rename the old directory to
 ports.old, or just remove it), and install whatever ports you want to make
-ops feel like 'home' (like emacs, jove, or whatever). NOTE: You must
-download and copy the ports tree into place, even if you do not intend to
-install any packages yourself.
+ops feel like 'home' (like emacs, jove, or whatever)
 
 ##### Step 3 - Unpacking and running configure
 
@@ -159,7 +158,7 @@ an 'install' subdirectory, with a script called 'ops-install'. Just run this
 script as root (note the same package directory argument as above).
 
 	cd install
-	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 perl ops-install
+	perl ops-install -p /usr/tmp/packages
 
 It will take care of installing any additional ports, and doing various
 other configuration of FreeBSD required to make it into an ops node. The
