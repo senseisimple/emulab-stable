@@ -167,13 +167,13 @@ sub CommitFromTemplate()
     my $tid     = $template->tid();
     my $gid     = $template->gid();
     my $userdir = $template->path();
-    my $nsfile  = "$userdir/archive/nsdata/nsfile.ns";
+    my $nsfile  = "$userdir/tbdata/nsfile.ns";
     my $optarg  = ($quiet ? "-q" : "");
     
     #
     # The NS file is taken from the template.
     #
-    fatal(1, "There is no NS file in $userdir/archive/nsdata!")
+    fatal(1, "There is no NS file in $userdir/tbdata!")
 	if (! -e $nsfile);
 
     #
@@ -204,12 +204,12 @@ sub CommitFromInstance()
     }
 
     my $userdir = $instance->path();
-    my $nsfile  = "$userdir/archive/nsdata/nsfile.ns";
+    my $nsfile  = "$userdir/tbdata/nsfile.ns";
 
     #
     # The NS file is taken from the instance. 
     #
-    fatal(1, "There is no NS file in $userdir/archive/nsdata!")
+    fatal(1, "There is no NS file in $userdir/tbdata!")
 	if (! -e $nsfile);
 
     #

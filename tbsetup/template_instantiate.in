@@ -353,7 +353,7 @@ if (! ($foreground || $batchmode)) {
     }
 
     if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
-				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
+			  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
 	#
 	# Parent exits normally, unless in waitmode. We have to set
 	# justexit to make sure the END block below does not run.
@@ -522,7 +522,7 @@ my $userdir = $experiment->UserDir();
 # Now we stash the parameter file.
 #
 if ($paramfile) {
-    system("/bin/cp", $paramfile, $userdir . "/archive/parameters.xml") == 0
+    system("/bin/cp", $paramfile, $userdir . "/parameters.xml") == 0
 	or tbdie("Could not copy out $paramfile");
 }
 

@@ -367,12 +367,13 @@ if ($modify) {
     # and tell the archive library about the above files.
     libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
 	or fatal(-1, "Failed to add datastore files to the archive!");
-
-    # and then do a savepoint prior to the commit below.
-    print "Doing another savepoint\n";
-    libArchive::TBExperimentArchiveSavePoint($pid, $eid, "CopyDataStore") >= 0
-	or fatal(-1, "Failed to do a savepoint on the experiment archive!");
 }
+# Do a savepoint prior to the commit below. As noted above, this is
+# not done in batchexp.
+print "Doing a savepoint\n";
+libArchive::TBExperimentArchiveSavePoint($pid, $eid, "CopyDataStore") >= 0
+    or fatal(-1, "Failed to do a savepoint on the experiment archive!");
+
 print "Doing final commit\n";
 libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
     >= 0 or fatal(-1, "Failed to commit experiment archive!");

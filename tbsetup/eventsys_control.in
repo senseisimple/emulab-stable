@@ -207,7 +207,7 @@ $cmd .= " -d"
     if ($debug);
 $cmd .= " -a"
     if ($agent);
-$cmd .= " -t " . TBExptUserDir($pid, $eid) . "/archive/events"
+$cmd .= " -t " . TBExptUserDir($pid, $eid) . "/logs/events"
     if (Template::Instance->LookupByExptidx($exptidx));
 $cmd .= " -l " . TBExptUserDir($pid, $eid) . "/logs/event-sched.log";
 $cmd .= " -k " . TBDB_EVENTKEY($pid, $eid);

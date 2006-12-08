@@ -182,7 +182,7 @@ foreach my $name (keys(%runlist)) {
     my $rowref = $runlist{$name};
     my $idx    = $rowref->{"idx"};
     my $dir    = "$checkout/run${idx}";
-    my $subdir = "archive/dbdata";
+    my $subdir = "dbdata";
     my $tag    = $rowref->{"ending_archive_tag"};
     my $dbdump = "$dir/dbdump.gz";
 

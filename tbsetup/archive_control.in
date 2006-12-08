@@ -250,9 +250,6 @@ elsif ($action eq "addtoarchive") {
     my $userdir = TBExptUserDir($pid, $eid);
     my $errors  = 0;
 	
-    # This is special by convention;
-    my $subdir = "$userdir/archive";
-
     usage()
 	if (! @ARGV);
 

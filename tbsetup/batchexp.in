@@ -218,7 +218,7 @@ if (!defined($tempnsfile) && !defined($copyarg) && !TBAdmin($dbuid)) {
     tbdie("Only admins can create experiments with no NS file");
 }
 my $nsfile  = "$eid.ns";
-my $repfile = "$eid.report";
+my $repfile = "report";
 
 # Defaults for the DB and for the email message. 
 $noswap_reason = "None Given"
@@ -448,6 +448,22 @@ if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
 }
 chmod(0664, "$nsfile");
 
+# Future; do not name the ns as above, but use generic name.
+if (system("/bin/cp", "$tempnsfile", "nsfile.ns")) {
+    fatal({type => 'primary', severity => SEV_ERROR,
+	   error => ['copy_ns_file_failed', $tempnsfile, "nsfile.ns"]},
+	  "Could not copy $tempnsfile to $workdir/$nsfile");
+}
+
+# We created this file below so kill it.
+if ($copyarg) {
+    # This is tainted for reasons I do not understand.
+    if ($tempnsfile =~ /^([-\w\.\/]+)$/) {
+	$tempnsfile = $1;
+    }
+    unlink($tempnsfile);
+}
+
 #
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
@@ -662,32 +678,7 @@ $experiment->SaveLogFiles();
 #
 $experiment->CopyLogFiles();
 
-#
-# Copy out some files to the archive directory so that they get saved later.
-#
-my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
-
-if (! -e "$archivedir/tbdata") {
-    mkdir("$archivedir/tbdata", 0775)
-	or fatal("Failed to mkdir $archivedir/tbdata");
-}
-if (! -e "$archivedir/nsdata") {
-    mkdir("$archivedir/nsdata", 0775)
-	or fatal("Failed to mkdir $archivedir/nsdata");
-}
-
-system("cp -fp $workdir/$nsfile $archivedir/nsdata/nsfile.ns") == 0
-    or fatal("Failed to copy nsfile to $archivedir/tbdata");
-
-if (defined($logname)) {
-    system("cp -fp $logname $archivedir/tbdata/log.batchexp") == 0
-    or fatal("Failed to copy logfile to $archivedir/tbdata");
-}
-
-system("cp -fp $workdir/$repfile $archivedir/tbdata/tbreport.batchexp") == 0
-    or fatal("Failed to copy nsfile to $archivedir/tbdata");
-
-# And tell the archive library about the above files.
+# Tell the archive library to add all files to the archive. 
 libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
     or fatal("Failed to add user archive files to the archive!");
 
@@ -1220,56 +1211,36 @@ sub CopyInArchive()
     return 0
 	if (!defined($copyarg));
 
-    my $dstdir = "$userdir/archive/nsdata";
-    $tempnsfile = "$dstdir/nsfile.ns";
+    $tempnsfile = "/tmp/$$.ns";
 
     if ($copyfrom eq "exp") {
 	#
-	# Copy in from a current experiment. This is probably a bad thing
-	# to do, but hey. 
+	# Grab a copy from the DB since we save all current NS files there.
 	#
-	my $srcdir = $copy_experiment->UserDir() . "/archive/nsdata";
+	my $query_result =
+	    DBQueryFatal("select nsfile from nsfiles ".
+			 "where pid='$copypid' and eid='$copyeid'");
+	tbdie("No such experiment in DB for $copypid/$copyeid\n")
+	    if (!$query_result->numrows);
+	my ($nsfile) = $query_result->fetchrow_array();
+	tbdie("No nsfile in DB for $copypid/$copyeid\n")
+	    if (!defined($nsfile) || $nsfile eq "");
 
-	if (-e $srcdir) {
-	    print "Copying experiment archive from ${srcdir}\n";
-	    system("$RSYNC -rtgoDlz --delete ${srcdir}/ $dstdir");
-	    if ($?) {
-		fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
-	    }
-	}
-	else {
-	    #
-	    # This is a really old experiment with no archive yet.
-	    # Get the old experiment nsfile from the db.
-	    #
-	    my $query_result =
-		DBQueryFatal("select nsfile from nsfiles ".
-			     "where pid='$copypid' and eid='$copyeid'");
-	    tbdie("No such experiment in DB for $copypid/$copyeid\n")
-		if (!$query_result->numrows);
-	    my ($nsfile) = $query_result->fetchrow_array();
-	    tbdie("No nsfile in DB for $copypid/$copyeid\n")
-		if (!defined($nsfile) || $nsfile eq "");
-
-	    if (! -e "$dstdir") {
-		mkdir("$dstdir", 0775)
-		    or fatal("Failed to mkdir $dstdir for copy");
-	    }
-
-	    open(NS, "> $tempnsfile")
-		or tbdie("Could not write ns code to $tempnsfile!\n");
-	    $nsfile =~ s/\r//g;
-	    print NS $nsfile;
-	    print NS "\n";
-	    close(NS);
-	    chmod(0664, "$tempnsfile");
-        }
+	open(NS, "> $tempnsfile")
+	    or tbdie("Could not write ns code to $tempnsfile!\n");
+	$nsfile =~ s/\r//g;
+	print NS $nsfile;
+	print NS "\n";
+	close(NS);
+	chmod(0664, "$tempnsfile");
     }
     else {
 	#
 	# Ask for a checkout of the archive. 
 	#
-	my $subdir = "/archive/nsdata";
+	my $dstdir = "$userdir/nsdata";
+	my $subdir = "/exp/tbdata";
+	my $oldns  = "$dstdir/${copyeid}.ns";
 
 	print "Checking out experiment archive to $dstdir\n";
         libArchive::TBCheckoutExperimentArchivebyExptIDX($copyidx,
@@ -1277,6 +1248,31 @@ sub CopyInArchive()
  							 $copytag,
 							 $subdir)
 	    == 0 or fatal("CopyInArchive: Checking out archive");
+
+	#
+	# An old template will have the nsfile in a different place.
+	#
+	if (! -e $oldns) {
+	    $subdir = "/archive/nsdata";
+	    $oldns  = "$dstdir/archive/nsdata/nsfile.ns";
+
+	    print "Checking out experiment archive to $dstdir\n";
+	    libArchive::TBCheckoutExperimentArchivebyExptIDX($copyidx,
+							     $dstdir,
+							     $copytag,
+							     $subdir)
+		== 0 or fatal("CopyInArchive: Checking out archive");
+	}
+	
+	fatal("Missing NS file: $oldns")
+	    if (! -e $oldns);
+
+	#
+	# Now copy the old NS file out and delete the rest of it.
+	#
+	system("/bin/cp", "$oldns", "$tempnsfile") == 0
+	    or fatal("Failed to copy $oldns to $tempnsfile");
+	system("/bin/rm -rf $dstdir");
     }
 }
 
@@ -1321,4 +1317,5 @@ END {
     $cleaning = 1;
     cleanup();
     $? = $saved_exitcode;
+
 }

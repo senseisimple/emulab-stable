@@ -366,7 +366,7 @@ sub ArchiveAdd($$;$$$)
 	#
 	# What does this do? 
 	# Basically, we copy the last part (directory) to / of the checkin.
-	# eg: cp /proj/pid/exp/eid/archive/... /archive of the checkins.
+	# eg: cp /proj/pid/exp/eid... /exp of the checkins.
 	# This avoids pid/eid tokens in the archive.
 	#
 	# Last part of path must be a directory.
@@ -375,11 +375,9 @@ sub ArchiveAdd($$;$$$)
 	    print STDERR "ArchiveAdd: Must be a directory: $pathname\n";
 	    return -1;
 	}
-	my ($filename,$directory,undef) = fileparse($pathname);
-
-	$rootdir    = $filename;
-	$sourcedir  = $directory;
-	$sourcefile = $filename . "/";
+	$rootdir    = "exp";
+	$sourcedir  = $pathname;
+	$sourcefile = "./";
     }
     elsif ($pathname =~ /^[\/]+(\w+)\/([-\w\/\.\+\@,~]+)$/) {
 	$rootdir    = $1;
@@ -1500,7 +1498,7 @@ sub TBUserFileArchiveDirectory($$)
 }
 
 #
-# Add files the user explicitly wants archived
+# Add all files from the experiment directory to the archive.
 #
 sub TBExperimentArchiveAddUserFiles($$)
 {
@@ -1517,25 +1515,13 @@ sub TBExperimentArchiveAddUserFiles($$)
 	if ($rval < 0);
 
     my $userdir  = TBExptUserDir($pid, $eid);
-    my $userarch = "$userdir/archive";
 
-    if (-e $userarch) {
-	$rval = ArchiveAdd($archive_idx, $userarch, $view, 1, 1);
-
-	return $rval
-	    if ($rval != 0);
-    }
-
-    # Another special directory ... specifically for templates.
-    my $userstore = "$userdir/datastore";
-
-    if (-e $userstore) {
-	$rval = ArchiveAdd($archive_idx, $userstore, $view, 1, 1);
+    if (-e $userdir) {
+	$rval = ArchiveAdd($archive_idx, "$userdir/.", $view, 1, 1);
 
 	return $rval
 	    if ($rval != 0);
     }
-    
     return 0;
 }
 

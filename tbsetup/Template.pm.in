@@ -2655,8 +2655,7 @@ sub LogHole($)
     my $pid        = $self->pid();
     my $eid        = $self->eid();
     my $userdir    = TBExptUserDir($pid, $eid);
-    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
-    my $logdir     = "$archivedir/logs";
+    my $logdir     = "$userdir/logs";
 
     if (! -e $logdir) {
 	mkdir($logdir, 0775)
@@ -2669,13 +2668,6 @@ sub LogHole($)
     Template::mysystem("$TEVC -w -t 600 -e $pid/$eid now ns SNAPSHOT ".
 		       "    LOGHOLE_ARGS='-c -s'") == 0
        or return -1;
-
-    #
-    # Copy the experiment logs directory into the archive. 
-    # 
-    Template::mysystem("cd $userdir; ".
-		       "   $RSYNC -rtgoDlz --delete logs $archivedir") == 0
-	or return -1;
 
     return 0;
 }
@@ -2716,11 +2708,11 @@ sub DumpDB($)
 
     my $pid     = $self->pid();
     my $eid     = $self->eid();
-
-    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
+    my $userdir = TBExptUserDir($pid, $eid);
+    my $dumpdir = "$userdir/dbdata";
+    
     # The file is a gzipped.
-    my $dumpdir    = "$archivedir/dbdata";
-    my $dumpfile   = "$dumpdir/dbdump.gz";
+    my $dumpfile= "$dumpdir/dbdump.gz";
 
     if (! -e $dumpdir) {
 	mkdir($dumpdir, 0775)

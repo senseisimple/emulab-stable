@@ -357,7 +357,7 @@ $SIG{TERM} = \&sighandler;
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! ($debug || $foreground)) {
-    $logname = TBExptCreateLogFile($pid, $eid, "newrun");
+    $logname = TBExptCreateLogFile($pid, $eid, "run");
 
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
@@ -463,7 +463,7 @@ if (defined($instance->runidx())) {
     #
     my $this_runid = $thisrun->runid();
     
-    system("$archcontrol -d -t ${action}run_${this_runid} commit $pid $eid");
+    system("$archcontrol -d -t stoprun_${this_runid} commit $pid $eid");
 
     # This has to be done after the archive commit, so we can find the tag.
     $instance->FinalizeCurrentRun() == 0
@@ -521,8 +521,8 @@ if ($doswapmod) {
     # Now do the swapmod, using the original NS file for now. The environ
     # variables will be passed to the NS reparse by parse-ns wrapper script.
     #
-    my $archivedir = libArchive::TBUserFileArchiveDirectory($pid, $eid);
-    my $nsfile     = "$archivedir/nsdata/nsfile.ns";
+    my $userdir    = $instance->path();
+    my $nsfile     = "$userdir/tbdata/nsfile.ns";
     my @arguments  = ($swapexp, "-q", "-x", "-s", "modify",
 		      $pid, $eid, $nsfile);
 
@@ -545,7 +545,7 @@ if ($doswapmod) {
 #
 if (defined($paramfile)) {
     my $source = $instance->workdir() . "/$PARAMS";
-    my $target = $instance->path() . "/archive/$PARAMS";
+    my $target = $instance->path() . "/$PARAMS";
 
     unlink($target)
 	if (-e $target);
@@ -597,12 +597,15 @@ if (keys(%deadnodes)) {
     SENDMAIL($dbuid, $subject, $message, $TBOPS, "CC: $TBOPS");
 }
 
-# Stop the web interface from spewing.
-TBExptCloseLogFile($pid, $eid)
-    if (defined($logname));
-
 # log file gets copied out to the user directory.
 $experiment->CopyLogFiles()
+    if (defined($logname));
+
+# We lose the log info for this commit.
+system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
+
+# Stop the web interface from spewing.
+TBExptCloseLogFile($pid, $eid)
     if (defined($logname));
 
 exit(0);
