@@ -27,6 +27,7 @@ my %test_per = (  # defaults
 $thisManagerID = "automanagerclient";
 #$expid = "__none"; #expt field in event system notification.
 my $bgmonexpt = "tbres/pelabbgmon";
+my ($pid, $eid) = ("tbres","pelabbgmon");
 my %intersitenodes = (); #final list for fully-connected test
 my @constrnodes;    #test constrained to these nodes
 my %sitenodes;      #hash listing all sites => nodes
@@ -134,6 +135,14 @@ else{
 	foreach my $node (@{$sitenodes{$site}}){
 	    stopnode($node);
 	}
+    }
+    #only use nodes that are in the tbres/pelabbgmon expt.
+    my $NLIST = "/usr/testbed/bin/node_list";
+    my @constrnodes = split('\s+', `$NLIST -e $pid,$eid -h`);
+    chomp(@constrnodes);
+    print "NODES IN $bgmonexpt\n";
+    foreach my $node (@constrnodes){
+        print "$node\n";
     }
 }
 
