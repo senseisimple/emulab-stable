@@ -1117,7 +1117,7 @@ elsif ($inout eq "modify") {
 	    fatal("Could not mv $modnsfile to $nsfile");
 	}
 	unlink("nsfile.ns");
-	if (system("/bin/cp -p", "$nsfile", "nsfile.ns")) {
+	if (system("/bin/cp", "$nsfile", "nsfile.ns")) {
 	    fatal("Could not cp $nsfile to nsfile.ns");
 	}
     }
