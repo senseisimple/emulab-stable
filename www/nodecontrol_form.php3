@@ -100,7 +100,7 @@ echo "<form action=\"nodecontrol.php3?refer=$refer\"
 echo "<tr>
           <td>Node ID:</td>
           <td class=\"left\"> 
-              <input readonly type=readonly name=node_id value=\"$node_id\">
+              <input readonly type=text name=node_id value=\"$node_id\">
               </td>
       </tr>\n";
 
@@ -108,7 +108,7 @@ if ($vname) {
     echo "<tr>
               <td>Virtual Name:</td>
               <td class=left> 
-                  <input readonly type=readonly name=vname value='$vname'>
+                  <input readonly type=text name=vname value='$vname'>
                   </td>
           </tr>\n";
 }
@@ -116,7 +116,7 @@ if ($vname) {
 echo "<tr>
           <td>Node Type:</td>
           <td class=\"left\"> 
-              <input readonly type=readonly name=node_type value=\"$type\">
+              <input readonly type=text name=node_type value=\"$type\">
               </td>
       </tr>\n";
 
