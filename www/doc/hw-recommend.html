@@ -67,7 +67,7 @@ recommendations, and outlines the consequences of each choice.
 		For our first round of machines ("pc600"), we bought standard
 		motherboards and 4U cases, and assembled the machines ourselves.
 		For our second round of PCs ("pc850"), we opted for the (now
-		discontinued)<a
+		discontinued) <a
 		href="http://www.intel.com">Intel</a> ISP1100 server platform,
 		which includes a 1U case, custom motherboard with 2 onboard
 		NICs and serial console redirection, and a power supply.
@@ -233,12 +233,13 @@ recommendations, and outlines the consequences of each choice.
 <hr>
 
 <a NAME="SERVERS"></a><h2>Servers</h2>
-	Two is preferable, though 1 could be made to work. The NFS server
+	Two is preferable, though 1 could be made to work if you are willing
+	to invest some time and effort. The NFS server
 	needs enough space for /users and /proj , as well as a few extra gigs
 	for build trees, logs, and images.  If you have more than 128 nodes,
 	and plan to use Cyclades or RocketPort serial ports, you need one
 	"tip server" machine per 128 serial lines (other serial muxes may
-	have similar limitations.  Tip servers do not need to be very
+	have similar limitations.)  Tip servers do not need to be very
 	powerful. A 1000Mb network connection is suggested for disk image
 	distribution machine (usually boss.) though you can get by with 100Mb.
 	Database machine should have reasonably fast CPU and plenty of RAM.
