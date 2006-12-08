@@ -80,6 +80,7 @@ ld_cookies	= --load-cookies $(COOKIES)
 ld_cookies_subdir = --load-cookies ../$(COOKIES)
 cookie_args	= --keep-session-cookies --no-check-certificate
 wget_args	= -S -k $(cookie_args) $(ld_cookies)
+wget_args_subdir= -S -k $(cookie_args) $(ld_cookies_subdir)
 
 # Log in and create a current cookies.txt file.
 # Args are uid and password.
@@ -120,23 +121,32 @@ fmt_html_args = $(subst $(empty) ,&,$(subst \ ,%20,$(subst \",%22,$(strip $(1)))
 # Post a form via wget and check the returned page.
 # Args are [root],php_infile,[html_outfile],html_args .
 # root defaults to $(sroot) .  html_outfile defaults to php_infile.html .
+outdir = activate.wget
 define wget_post
-	if [ ! -d activate ]; then echo yes; fi
-	root_dir=$(strip $(1)) \
-	php_infile=$(strip $(2)) \
-	html_outfile=$(strip $(3)); \
-	wget $(wget_args) \
-	    -O $${html_outfile:=activate/$(2).html} \
-	    -o activate/$${html_outfile}.log \
-	    --post-data "$(call fmt_html_args, $(4))" \
-	    $${root_dir:-$(sroot)}/$${php_infile} && \
-	if $(success_cmd) $${html_outfile}; then \
-	    echo "* SUCCESS"; \
-	elif $(failure_cmd) $${html_outfile}; then \
-	    (echo "*** FAILURE"; exit 1); \
-	else echo "*** UNKNOWN RESULT"; \
-	fi
+	@ if [ ! -d $(outdir) ]; then mkdir $(outdir); fi
+	@ root_dir=$(strip $(1)) \
+	  php_infile=$(strip $(2)) \
+	  html_outfile=$(strip $(3)); \
+	  post_args="$(call fmt_html_args, $(4))"; \
+	  echo "==== $(outdir) $${root_dir} $${php_infile} $${html_outfile}.html ===="; \
+	  echo "cd $(outdir); wget $(wget_args_subdir) \
+	    -O $${html_outfile:=$(2).html} \
+	    -o $${html_outfile}.log \
+	    --post-data '$${post_args}' \
+	    $${root_dir:-$(sroot)}/$${php_infile}" \
+	    > $(outdir)/$${html_outfile}.cmd; \
+	  sh $(outdir)/$${html_outfile}.cmd; \
+	  if $(success_cmd) $(outdir)/$${html_outfile}; then \
+	      echo "* SUCCESS"; \
+	  elif $(failure_cmd) $(outdir)/$${html_outfile}; then \
+	      (echo "*** FAILURE"; exit 1); \
+	  else echo "*** UNKNOWN RESULT"; \
+	  fi
 endef
+
+# Check results.
+success_cmd = fgrep -f $(SRCDIR)/success.txt
+failure_cmd = fgrep -f $(SRCDIR)/failure.txt
 
 # Send an SQL command to myboss.
 # Commas need to be entered with a variable $(comma).
@@ -145,7 +155,7 @@ boss_sql = echo "$(strip $(1));" | ssh $(boss) mysql tbdb
 
 #================================================================
 # Activate the newly swapped-in EinE site to turn on as many forms as we can.
-activate_tasks = newproj1 newproj2 approve_proj new_group \
+activate_tasks = new_proj1 new_proj2 approve_proj new_group \
 	  new_user1 new_user2 confirm_user1 approve_user1 \
 	  new_exp1 new_exp2 mod_exp2
 .PHONY:   $(activate_tasks)
@@ -225,7 +235,7 @@ new_user2: logout
             formfields[joining_uid]=$(usr2)\
             formfields[usr_name]=$(subst $(empty) ,\ ,$(name2))\
             formfields[wikiname]=$(subst $(empty) ,,$(name2))\
-            formfields[usr_email]=never.confirm\
+            formfields[usr_email]=never.confirm@nowhere.net\
 	    $(user_common))
 # Pretend the user sent in his e-mail confirmation.
 confirm_user1:
@@ -236,9 +246,10 @@ query_user1:
 	    select uid$(comma) usr_name$(comma) status \
 	      from users where uid='$(usr1)')
 
-# Approve a new user.  (Takes a couple of minutes to run.)  (%24 is $ .)
+# Approve a new user.  (Takes a couple of minutes to run.)  (%24 is "$" .)
 # Gotta log back in after being logged out above.
 approve_user1: ###admin
+	$(login_sys)
 	$(admin_cmd)
 	$(call wget_post,,approveuser.php3,appusr1.html,\
 	    $(usr1)%24%24approval-$(proj1)%2F$(proj1)=approve\
@@ -306,8 +317,12 @@ rej_links	= \
 	.txt,$(top_links),$(showexp_links),$(shownode_links),$(linkmon_links)
 
 # Clear out the wget directories.
-.PHONY:          public.wget admin.wget
-clear_wget_dirs: public.wget admin.wget
+.PHONY:          activate.wget public.wget admin.wget
+clear_wget_dirs: activate.wget public.wget admin.wget
+activate.wget:
+	- rm -rf activate.wget.prev
+	- mv -f activate.wget activate.wget.prev
+	mkdir activate.wget
 public.wget:
 	- rm -rf public.wget.prev
 	- mv -f public.wget public.wget.prev

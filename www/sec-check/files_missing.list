@@ -7,6 +7,7 @@
 < cdromqueue.php3
 < cdromrequest.php3
 < chpasswd.php3
+< delaycontrol.php3
 < deletenodelog.php3
 < deleteproject.php3
 < deletesfskey.php3
@@ -15,6 +16,7 @@
 < editsitevars.php3
 < expaccess_form.php3
 < floormap.php3
+< linktest.php3
 < menu.php3
 < modnodeattributes_form.php3
 < newimageid.php3
@@ -25,6 +27,7 @@
 < panicbutton.php3
 < prereserve_node.php3
 < remapexp.php3
+< replayexp.php3
 < request_idleinfo.php3
 < request_swapexp.php3
 < robotmap.php3

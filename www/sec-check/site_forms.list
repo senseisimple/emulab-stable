@@ -15,7 +15,8 @@
 ./myboss.vulnelab.testbed.emulab.net/archive_view.php3?exptidx=8:79:<font size=+1>This is the (Subversion) archive for experiment 8.<br><br></font><form action='https://myboss.vulnelab.testbed.emulab.net/archive_tag.php3' style="float:left; width:33%;" method=get>
 ./myboss.vulnelab.testbed.emulab.net/archive_view.php3?exptidx=8:80:<b><input type=submit name=tag value='Tag Archive'></b><input type=hidden name=exptidx value='8'></form><form action='https://myboss.vulnelab.testbed.emulab.net/archive_tags.php3' style="float:left; width:33%;" method=get><b><input type=submit name=tag value='Show Tags'></b><input type=hidden name=exptidx value='8'></form><form action='https://myboss.vulnelab.testbed.emulab.net/archive_missing.php3' style="float:left; width:33%;" method=get><b><input type=submit name=missing value='Show Missing Files'></b><input type=hidden name=exptidx value='8'></form><iframe width=100% height=800 scrolling=yes src='cvsweb/cvsweb.php3?exptidx=8' border=2></iframe>
 ./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3:116:            </ul></p><br><form name=form1 enctype=multipart/form-data
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=8:T20061003-120217-208_preswapmod:98:<form name=form1 enctype=multipart/form-data
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=7:T20061121-120618-396_preswapmod:98:<form name=form1 enctype=multipart/form-data
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=8:T20061122-041524-229_swapout:98:<form name=form1 enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,hwdown:98:<form name=form1 enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,nfree-leases:98:<form name=form1 enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,oldreserved:98:<form name=form1 enctype=multipart/form-data
@@ -30,11 +31,9 @@
 ./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=cisco5:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=cisco5>
 ./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=cisco8:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=cisco8>
 ./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=ops:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=ops>
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc25:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=pc25>
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc37:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=pc37>
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc4:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=pc4>
-./myboss.vulnelab.testbed.emulab.net/boot.php3?pid=testbed&eid=testexp1:95:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=pid value=testbed>
-./myboss.vulnelab.testbed.emulab.net/delaycontrol.php3?pid=testbed&eid=testexp1:90:<form action='https://myboss.vulnelab.testbed.emulab.net/delaycontrol.php3' method=post>
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc109:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=pc109>
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc150:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=pc150>
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc157:94:<form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method=post><input type=hidden name=node_id value=pc157>
 ./myboss.vulnelab.testbed.emulab.net/deletegroup.php3?pid=testproj&gid=testgroup:82:<form action='deletegroup.php3?pid=testproj&amp;gid=testgroup' method=post><b><input type=submit name=confirmed value=Confirm></b>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=emulab-ops-FBSD-RON:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='emulab-ops-FBSD-RON'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-EEIDE-FC2-0915:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-EEIDE-FC2-0915'>
@@ -68,6 +67,7 @@
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD49-CLEAN:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD49-CLEAN'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD49-STABLE-BOSS:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD49-STABLE-BOSS'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD49-UPDATE:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD49-UPDATE'>
+./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD54-MROUTING:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD54-MROUTING'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD54-NEWPORTS:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD54-NEWPORTS'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD54-PORTSRC:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD54-PORTSRC'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-FBSD60-NEWPORTS:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-FBSD60-NEWPORTS'>
@@ -90,6 +90,7 @@
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-EMSTAR:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-EMSTAR'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-LBS:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-LBS'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-LBSTOO:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-LBSTOO'>
+./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-LINKDELAY:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-LINKDELAY'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-LT:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-LT'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-NEWWIFI:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-NEWWIFI'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-RHL90-STOLEN:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-RHL90-STOLEN'>
@@ -117,6 +118,7 @@
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-SP1-pc3000-new:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-SP1-pc3000-new'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-SP2-new:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-SP2-new'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-SP2-pc3000-new:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-SP2-pc3000-new'>
+./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-TMP:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-TMP'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-UPD-pc3000-new:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-UPD-pc3000-new'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-UPDATE-new:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-UPDATE-new'>
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testbed-WINXP-UPDATE-sysprep:82:<form action='https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3' method=post><input type=hidden name=imageid value='testbed-WINXP-UPDATE-sysprep'>
@@ -153,6 +155,7 @@
 ./myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?target_uid=testuser&key=1:82:<form action='deletepubkey.php3?target_uid=testuser&amp;key=1'
 ./myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?target_uid=testuser&key=2:82:<form action='deletepubkey.php3?target_uid=testuser&amp;key=2'
 ./myboss.vulnelab.testbed.emulab.net/deleteuser.php3?target_uid=testuser&target_pid=testproj:81:<form action="https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3" method=post><input type=hidden name=target_uid value="testuser">
+./myboss.vulnelab.testbed.emulab.net/deleteuser.php3?target_uid=testusr2&target_pid=testproj:81:<form action="https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3" method=post><input type=hidden name=target_uid value="testusr2">
 ./myboss.vulnelab.testbed.emulab.net/editexp.php3?pid=emulab-ops&eid=hwdown:82:          <form action="editexp.php3?pid=emulab-ops&amp;eid=hwdown" method=post>
 ./myboss.vulnelab.testbed.emulab.net/editexp.php3?pid=emulab-ops&eid=nfree-leases:82:          <form action="editexp.php3?pid=emulab-ops&amp;eid=nfree-leases" method=post>
 ./myboss.vulnelab.testbed.emulab.net/editexp.php3?pid=emulab-ops&eid=oldreserved:82:          <form action="editexp.php3?pid=emulab-ops&amp;eid=oldreserved" method=post>
@@ -195,6 +198,7 @@
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD49-CLEAN:80:          <form action='editimageid.php3?imageid=testbed-FBSD49-CLEAN'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD49-STABLE-BOSS:80:          <form action='editimageid.php3?imageid=testbed-FBSD49-STABLE-BOSS'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD49-UPDATE:80:          <form action='editimageid.php3?imageid=testbed-FBSD49-UPDATE'
+./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD54-MROUTING:80:          <form action='editimageid.php3?imageid=testbed-FBSD54-MROUTING'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD54-NEWPORTS:80:          <form action='editimageid.php3?imageid=testbed-FBSD54-NEWPORTS'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD54-PORTSRC:80:          <form action='editimageid.php3?imageid=testbed-FBSD54-PORTSRC'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-FBSD60-NEWPORTS:80:          <form action='editimageid.php3?imageid=testbed-FBSD60-NEWPORTS'
@@ -217,6 +221,7 @@
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-EMSTAR:80:          <form action='editimageid.php3?imageid=testbed-RHL90-EMSTAR'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-LBS:80:          <form action='editimageid.php3?imageid=testbed-RHL90-LBS'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-LBSTOO:80:          <form action='editimageid.php3?imageid=testbed-RHL90-LBSTOO'
+./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-LINKDELAY:80:          <form action='editimageid.php3?imageid=testbed-RHL90-LINKDELAY'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-LT:80:          <form action='editimageid.php3?imageid=testbed-RHL90-LT'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-NEWWIFI:80:          <form action='editimageid.php3?imageid=testbed-RHL90-NEWWIFI'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-RHL90-STOLEN:80:          <form action='editimageid.php3?imageid=testbed-RHL90-STOLEN'
@@ -244,6 +249,7 @@
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-SP1-pc3000-new:80:          <form action='editimageid.php3?imageid=testbed-WINXP-SP1-pc3000-new'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-SP2-new:80:          <form action='editimageid.php3?imageid=testbed-WINXP-SP2-new'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-SP2-pc3000-new:80:          <form action='editimageid.php3?imageid=testbed-WINXP-SP2-pc3000-new'
+./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-TMP:80:          <form action='editimageid.php3?imageid=testbed-WINXP-TMP'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-UPD-pc3000-new:80:          <form action='editimageid.php3?imageid=testbed-WINXP-UPD-pc3000-new'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-UPDATE-new:80:          <form action='editimageid.php3?imageid=testbed-WINXP-UPDATE-new'
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=testbed-WINXP-UPDATE-sysprep:80:          <form action='editimageid.php3?imageid=testbed-WINXP-UPDATE-sysprep'
@@ -263,9 +269,9 @@
 ./myboss.vulnelab.testbed.emulab.net/endexp.php3?pid=emulab-ops&eid=opsnodes:97:<form action='endexp.php3?pid=emulab-ops&amp;eid=opsnodes' method=post><input type=hidden name=exp_pideid value="">
 ./myboss.vulnelab.testbed.emulab.net/endexp.php3?pid=emulab-ops&eid=reloading:92:<form action='endexp.php3?pid=emulab-ops&amp;eid=reloading' method=post><input type=hidden name=exp_pideid value="">
 ./myboss.vulnelab.testbed.emulab.net/endexp.php3?pid=emulab-ops&eid=reloadpending:92:<form action='endexp.php3?pid=emulab-ops&amp;eid=reloadpending' method=post><input type=hidden name=exp_pideid value="">
-./myboss.vulnelab.testbed.emulab.net/endexp.php3?pid=testbed&eid=testexp1:97:<form action='endexp.php3?pid=testbed&amp;eid=testexp1' method=post><input type=hidden name=exp_pideid value="">
+./myboss.vulnelab.testbed.emulab.net/endexp.php3?pid=testbed&eid=testexp1:92:<form action='endexp.php3?pid=testbed&amp;eid=testexp1' method=post><input type=hidden name=exp_pideid value="">
 ./myboss.vulnelab.testbed.emulab.net/endexp.php3?pid=testbed&eid=testexp2:100:<form action='endexp.php3?pid=testbed&amp;eid=testexp2' method=post><input type=hidden name=exp_pideid value="">
-./myboss.vulnelab.testbed.emulab.net/feedback.php3?pid=testbed&eid=testexp1&mode=clear:94:<form action="https://myboss.vulnelab.testbed.emulab.net/feedback.php3" method=get><input type=hidden name=pid value=testbed>
+./myboss.vulnelab.testbed.emulab.net/feedback.php3?pid=testbed&eid=testexp1&mode=clear:89:<form action="https://myboss.vulnelab.testbed.emulab.net/feedback.php3" method=get><input type=hidden name=pid value=testbed>
 ./myboss.vulnelab.testbed.emulab.net/feedback.php3?pid=testbed&eid=testexp2&mode=clear:97:<form action="https://myboss.vulnelab.testbed.emulab.net/feedback.php3" method=get><input type=hidden name=pid value=testbed>
 ./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=ops:224:<form action='freenode.php3?node_id=ops' method=post><b><input type=submit name=confirmed value=Confirm></b>
 ./myboss.vulnelab.testbed.emulab.net/freezeuser.php3?target_uid=fish&action=freeze:89:<form action="https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3" method=post><input type=hidden name=target_uid value="fish">
@@ -275,7 +281,6 @@
 ./myboss.vulnelab.testbed.emulab.net/kb-manage.php3:96:          <form action='kb-manage.php3' method=post>
 ./myboss.vulnelab.testbed.emulab.net/kb-search.php3:61:          <form action="kb-search.php3" method=get>
 ./myboss.vulnelab.testbed.emulab.net/kb-search.php3:77:          <form action="kb-search.php3" method=get>
-./myboss.vulnelab.testbed.emulab.net/linktest.php3?pid=testbed&eid=testexp1:320:<form action="https://myboss.vulnelab.testbed.emulab.net/linktest.php3" method=post name=myform id=myform><input type=hidden name=pid value=testbed>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=emulab-ops-FBSD-RON:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-EEIDE-FC2-0915:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-EEIDE-RHL90-0827:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
@@ -308,6 +313,7 @@
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD49-CLEAN:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD49-STABLE-BOSS:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD49-UPDATE:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
+./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD54-MROUTING:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD54-NEWPORTS:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD54-PORTSRC:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-FBSD60-NEWPORTS:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
@@ -330,6 +336,7 @@
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-EMSTAR:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-LBS:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-LBSTOO:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
+./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-LINKDELAY:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-LT:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-NEWWIFI:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-RHL90-STOLEN:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
@@ -357,6 +364,7 @@
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-SP1-pc3000-new:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-SP2-new:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-SP2-pc3000-new:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
+./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-TMP:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-UPD-pc3000-new:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-UPDATE-new:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=testbed-WINXP-UPDATE-sysprep:78:<center><br /><form action='https://myboss.vulnelab.testbed.emulab.net/loadimage.php3' method='post'>
@@ -376,6 +384,7 @@
 ./myboss.vulnelab.testbed.emulab.net/modifyexp.php3?pid=testbed&eid=testexp2:101:<tr><th colspan=2><font size='+1'><a href='clientui.php3?pid=testbed&amp;eid=testexp2'>GUI Editor</a> - Edit the topology using a Java applet.</font></th></tr><form name='form1' action='https://myboss.vulnelab.testbed.emulab.net/modifyexp.php3?pid=testbed&amp;eid=testexp2&amp;go=1' method='post' onsubmit="return false;" enctype=multipart/form-data><tr><th>Upload new NS file: </th><td><input type=hidden name=MAX_FILE_SIZE value=512000><input type=file name=exp_nsfile size=30 onchange="this.form.syntax.disabled=(this.value=='')" /></td></tr>
 ./myboss.vulnelab.testbed.emulab.net/moduserinfo.php3?target_uid=fish:95:          <form action="https://myboss.vulnelab.testbed.emulab.net/moduserinfo.php3" method=post>
 ./myboss.vulnelab.testbed.emulab.net/moduserinfo.php3?target_uid=testuser:86:          <form action="https://myboss.vulnelab.testbed.emulab.net/moduserinfo.php3" method=post>
+./myboss.vulnelab.testbed.emulab.net/moduserinfo.php3?target_uid=testusr2:86:          <form action="https://myboss.vulnelab.testbed.emulab.net/moduserinfo.php3" method=post>
 ./myboss.vulnelab.testbed.emulab.net/newgroup_form.php3?pid=testproj:78:<form action="https://myboss.vulnelab.testbed.emulab.net/newgroup.php3" method=post>
 ./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
 ./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=cisco1:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
@@ -384,9 +393,9 @@
 ./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=cisco5:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
 ./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=cisco8:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
 ./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=ops:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc25:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc37:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc4:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc109:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc150:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc157:136:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
 ./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?nodetype=mote:137:          <form action='newimageid_ez.php3' enctype="multipart/form-data"
 ./myboss.vulnelab.testbed.emulab.net/newmmlist.php3:119:          <form action='newmmlist.php3' method=post name=myform>
 ./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=cisco1:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
@@ -395,9 +404,9 @@
 ./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=cisco5:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
 ./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=cisco8:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
 ./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=ops:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc25:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc37:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc4:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc109:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc150:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc157:84:     <form action='https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3' method=post>
 ./myboss.vulnelab.testbed.emulab.net/newnodes_list.php3:90:<form action="newnodes_list.php3" method="get" name="nodeform">
 ./myboss.vulnelab.testbed.emulab.net/newosid_form.php3:90:<form action="https://myboss.vulnelab.testbed.emulab.net/newosid.php3" method="post" name=idform>
 ./myboss.vulnelab.testbed.emulab.net/newproject.php3:108:          <form enctype=multipart/form-data name=myform
@@ -408,9 +417,9 @@
 ./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=cisco5:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
 ./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=cisco8:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
 ./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=ops:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc25:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc37:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc4:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc109:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc150:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc157:80:<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer="
 ./myboss.vulnelab.testbed.emulab.net/nscheck_form.php3:88:<form enctype="multipart/form-data"
 ./myboss.vulnelab.testbed.emulab.net/nsgen.php3?template=plabdevbox:98:<form name='form1' action='https://myboss.vulnelab.testbed.emulab.net/nsgen.php3' method='get'>
 ./myboss.vulnelab.testbed.emulab.net/nsgen.php3?template=plinabox:97:<form name='form1' action='https://myboss.vulnelab.testbed.emulab.net/nsgen.php3' method='get'>
@@ -422,14 +431,15 @@
 ./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=cisco5:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
 ./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=cisco8:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
 ./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=ops:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc25:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc37:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc4:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
-./myboss.vulnelab.testbed.emulab.net/replayexp.php3?&pid=testbed&eid=testexp1:94:<form action='https://myboss.vulnelab.testbed.emulab.net/replayexp.php3?pid=testbed&amp;eid=testexp1'
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc109:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc150:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc157:78:<center>Update last power time for:<br><form action='https://myboss.vulnelab.testbed.emulab.net/powertime.php3' method=get><br><table><tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr><tr>
 ./myboss.vulnelab.testbed.emulab.net/showpubkeys.php3?target_uid=fish:212:          <form enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/showpubkeys.php3?target_uid=testuser:128:          <form enctype=multipart/form-data
+./myboss.vulnelab.testbed.emulab.net/showpubkeys.php3?target_uid=testusr2:95:          <form enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/showsfskeys.php3?target_uid=fish:100:          <form enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/showsfskeys.php3?target_uid=testuser:91:          <form enctype=multipart/form-data
+./myboss.vulnelab.testbed.emulab.net/showsfskeys.php3?target_uid=testusr2:91:          <form enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/showsumstats.php3:91:            Month</a>, </b><form action="showsumstats.php3" method=get>
 ./myboss.vulnelab.testbed.emulab.net/showsumstats.php3?showby=projects&sortby=edays&range=day:91:            Month</a>, </b><form action="showsumstats.php3" method=get>
 ./myboss.vulnelab.testbed.emulab.net/showsumstats.php3?showby=projects&sortby=edays&range=month:91:            Week</a>, Month, </b><form action="showsumstats.php3" method=get>
@@ -489,12 +499,7 @@
 ./myboss.vulnelab.testbed.emulab.net/showsumstats.php3?showby=users&sortby=uid:91:            Month</a>, </b><form action="showsumstats.php3" method=get>
 ./myboss.vulnelab.testbed.emulab.net/showsumstats.php3?showby=users:91:            Month</a>, </b><form action="showsumstats.php3" method=get>
 ./myboss.vulnelab.testbed.emulab.net/showuser_list.php3:94:<form action="showuser_list.php3" method=post>
+./myboss.vulnelab.testbed.emulab.net/swapexp.php3?inout=in&pid=testbed&eid=testexp1:89:<form action='swapexp.php3?inout=in&amp;pid=testbed&amp;eid=testexp1'
 ./myboss.vulnelab.testbed.emulab.net/swapexp.php3?inout=in&pid=testbed&eid=testexp2:97:<form action='swapexp.php3?inout=in&amp;pid=testbed&amp;eid=testexp2'
-./myboss.vulnelab.testbed.emulab.net/swapexp.php3?inout=out&pid=testbed&eid=testexp1:94:<form action='swapexp.php3?inout=out&amp;pid=testbed&amp;eid=testexp1'
-./myboss.vulnelab.testbed.emulab.net/swapexp.php3?inout=restart&pid=testbed&eid=testexp1:94:<form action='swapexp.php3?inout=restart&amp;pid=testbed&amp;eid=testexp1'
 ./myboss.vulnelab.testbed.emulab.net/template_create.php:87:<form enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=emulab-ops&eid=opsnodes&nodeid=ops:100:<form action='https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=emulab-ops&amp;eid=opsnodes' method=post><b><input type=submit name=confirmed value=Confirm></b>
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc25:100:<form action='updateaccounts.php3?pid=testbed&amp;eid=testexp1' method=post><b><input type=submit name=confirmed value=Confirm></b>
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc37:100:<form action='updateaccounts.php3?pid=testbed&amp;eid=testexp1' method=post><b><input type=submit name=confirmed value=Confirm></b>
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc4:100:<form action='updateaccounts.php3?pid=testbed&amp;eid=testexp1' method=post><b><input type=submit name=confirmed value=Confirm></b>
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1:100:<form action='updateaccounts.php3?pid=testbed&amp;eid=testexp1' method=post><b><input type=submit name=confirmed value=Confirm></b>

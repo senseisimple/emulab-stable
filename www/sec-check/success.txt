@@ -14,3 +14,6 @@ Snapshot Node Disk into Existing Image Descriptor
 Knowledge Base Entry:
 Your new SSL certificate has been created
 Log for node
+Commit/Tag Archive
+has been deleted
+let's be sure
