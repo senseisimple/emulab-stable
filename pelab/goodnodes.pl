@@ -113,8 +113,12 @@ if( defined($pid) && defined($eid) ){
 #            print "$allnodes[$i]\n";
         }
     }
+#    chomp @allnodes;
 }
 
+#print "allnodes[".scalar(@allnodes-1]=$allnodes
+
+#print "%%%%%%\n@allnodes\n%%%%%%%%%%";
 
 #
 # build set of nodes to test for fully-connectedness.
@@ -139,18 +143,19 @@ do{
     if( !isFullyConn($lowestRating) ){
         #modify set
         # delete worst node
-        print "deleting $chosenBySite{$lowestRatedSite} ".
-            "with rating=$lowestRating\n";
+#        print "deleting $chosenBySite{$lowestRatedSite} ".
+#            "with rating=$lowestRating\n";
         delete $chosenBySite{$lowestRatedSite};
         # add new node
         while( scalar(keys %chosenBySite) < $numnodes )
         {
-            if( $allnodesIndex < scalar(@allnodes) ){
+            if( $allnodesIndex < scalar(@allnodes)-1 ){
                 $allnodesIndex++;
+                #addNew will add to chosenBySite if good N.
+                addNew($allnodesIndex); 
             }else{
                 die "COULD NOT MAKE FULLY CONNECTED SET!\n";
             }
-            addNew($allnodesIndex); #addNew will add to chosenBySite if good N.
         }
     }
 }while( !isFullyConn($lowestRating) ); #test if fully-connected
@@ -158,8 +163,9 @@ do{
 print "FULLY CONNECTED (n=$numnodes)!\n";
 print "allnodeindex=$allnodesIndex of ".scalar(@allnodes)."\n";
 
+#printChosenNodes();
 
-#TODO: print out Fullyconnected set.
+print "FINAL SET:\n";
 foreach my $siteidx (keys %chosenBySite){
     print "$chosenBySite{$siteidx}\n";
 }
@@ -187,32 +193,36 @@ sub isFullyConn($){
 # Returns the siteid of the lowest rated (connectedness) node, and its rating
 #
 sub fullyConnTest{
+
+    %connRating = ();
  
-    foreach my $srcsiteid (keys %chosenBySite){
-        my $srcnode = $chosenBySite{$srcsiteid};
-        foreach my $dstsiteid (keys %chosenBySite){
-            next if( $srcsiteid == $dstsiteid );
-            my $dstnode = $chosenBySite{$dstsiteid};
+    my @nodes = values %chosenBySite;
+
+    for( my $i=0; $i<scalar(@nodes)-1; $i++ ){
+        my $srcnode = $nodes[$i];
+
+        for( my $j=$i+1; $j<scalar(@nodes); $j++ ){
+            my $dstnode = $nodes[$j];
 
             if( !defined($connMatrix{$srcnode}{$dstnode}) ){ 
                 my ($latConn, $bwConnF, $bwConnB) 
                     = checkConn($srcnode, $dstnode);
 #                print "$srckey => $dstkey, lat=$latConn, ".
 #                    "bwF=$bwConnF, bwB=$bwConnB\n";
-                print "$srcnode => $dstnode, ($latConn,$bwConnF,$bwConnB)\n";
+#                print "$srcnode => $dstnode, ($latConn,$bwConnF,$bwConnB)\n";
 
                 $connMatrix{$srcnode}{$dstnode} = $latConn + $bwConnF;
                 $connMatrix{$dstnode}{$srcnode} = $latConn + $bwConnB;
-
-                #
-                #a node's rating is defined as the number of successful
-                # bw tests it is the dst for, plus the number of latency
-                # tests it is involved in.
-                #
-                $connRating{$dstnode} += $latConn + $bwConnF;
-                $connRating{$srcnode} += $latConn + $bwConnB;
             }
-        }
+
+            #a node's rating is defined as the number of successful
+            # bw tests it is the dst for, plus the number of latency
+            # tests it is involved in.
+            #
+            $connRating{$dstnode} += $connMatrix{$srcnode}{$dstnode};
+            $connRating{$srcnode} += $connMatrix{$dstnode}{$srcnode};
+            
+        }        
     }
 
 
@@ -233,7 +243,7 @@ sub fullyConnTest{
         if( $connRating{$node} < $lowestRating ){
             $lowestRating = $connRating{$node};
             $lowestRatedSite = $site;
-            print "new lowest rating $lowestRating from $node\n";
+#            print "new lowest rating $lowestRating from $node\n";
         }
     }
 
@@ -256,7 +266,9 @@ sub addNew($){
     my ($index) = @_;
     my $nodeid = $allnodes[$index];
     my $f_valid = 1;
-    
+
+#    print "adding index $index=$nodeid of ".scalar(@allnodes)-1."\n";;
+
     #get node and site IDxs
     my ($siteidx,$nodeidx) = getNodeIDs($nodeid);
 
@@ -402,3 +414,22 @@ sub checkConn($$){
     return ($latConn, $bwConnF, $bwConnB);
 }
 
+
+
+sub printChosenNodes{
+
+    my @nodes = values %chosenBySite;
+
+    for( my $i=0; $i<scalar(@nodes)-1; $i++ ){
+        my $src = $nodes[$i];
+        for( my $j=$i+1; $j<scalar(@nodes); $j++ ){
+            my $dst = $nodes[$j];
+            print "$src=>$dst :: $connMatrix{$src}{$dst} ".
+                "and $connMatrix{$dst}{$src}\n";
+        }
+    }
+
+    foreach my $node (@nodes){
+        print "$node: $connRating{$node}\n";
+    }
+}
