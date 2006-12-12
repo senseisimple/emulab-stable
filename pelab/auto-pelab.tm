@@ -112,6 +112,17 @@ $ns define-template-parameter PLABNODES {} \
 # Example node list
 #set PLABNODES {plab518 plab541 plab628 plab736 plab360}
 
+
+# Empty List
+$ns define-template-parameter SKIPLIST {} \
+{Node numbers to ignore.  For example "2 7"}
+# Example list
+#set SKIPLIST {2 7}
+
+for {set i 0} {$i < [llength $SKIPLIST]} {incr i} {
+    set skip([lindex $SKIPLIST $i]) 1
+}
+
 #
 # Where to grab your tarball of pelab software from. To make this tarball:
 #   Go to your testbed source tree
@@ -350,7 +361,7 @@ set tfix 1
 set anix 1
 for {set i 1} {$i <= $NUM_PCS} {incr i} {
 
-    if {$REAL_PLAB} {
+    if {$REAL_PLAB && ![info exists skip($i)]} {
         set planet($i) [$ns node]
         tb-set-hardware $planet($i) pcplab
         append inet_string "$planet(${i}) "
@@ -424,7 +435,7 @@ for {set i 1} {$i <= $NUM_PCS} {incr i} {
     # even if they are not actually using PlanetLab nodes, the simple model can
     # still see the mapping between elab and plab nodes
     #
-    if {[llength $PLABNODES] > 0} {
+    if {[llength $PLABNODES] > 0 && ![info exists skip($i)]} {
         set opt(pelab-elab-$i-mapping) [lindex $PLABNODES [expr $i - 1]]
     }
 }
@@ -559,114 +570,114 @@ $opsagent set command "/bin/true"
 # Build up the event sequences to start and stop an actual run.
 #
 if {$NO_PLAB || $REAL_PLAB} {
-  set start [$ns event-sequence]
-    $start append "$ns log \"Starting REAL plab experiment\""
+  set start_real [$ns event-sequence]
+    $start_real append "$ns log \"Starting REAL plab experiment\""
 
     # stop stubs and monitors
-    $start append "$ns log \"##### Stopping stubs and monitors...\""
+    $start_real append "$ns log \"##### Stopping stubs and monitors...\""
     if {!$NO_STUB && $REAL_PLAB} {
-	$start append "$planetstubs stop"
+	$start_real append "$planetstubs stop"
     }
-    $start append "$monitorgroup stop"
+    $start_real append "$monitorgroup stop"
 
     # stop servers
     if {$SERVERPROG != ""} {
-	$start append "$ns log \"##### Stopping servers...\""
-	$start append "$allservers stop"
+	$start_real append "$ns log \"##### Stopping servers...\""
+	$start_real append "$allservers stop"
     }
 
     # stop link logging
-    $start append "$ns log \"##### Roll link trace logs...\""
+    $start_real append "$ns log \"##### Roll link trace logs...\""
     foreach link $tracelist {
-        $start append "$link trace snapshot"
-        $start append "$link trace stop"
+        $start_real append "$link trace snapshot"
+        $start_real append "$link trace stop"
     }
 
     # clean out log files
     # XXX original script passed --root, cleanlogs does not--may be a problem.
-    $start append "$ns log \"##### Cleaning logs...\""
-    $start append "$ns cleanlogs"
+    $start_real append "$ns log \"##### Cleaning logs...\""
+    $start_real append "$ns cleanlogs"
 
     # reset shaping characteristics for all nodes
-    $start append "$ns log \"##### Resetting links...\""
-    $start append "$elabc clear"
-    $start append "$elabc reset"
+    $start_real append "$ns log \"##### Resetting links...\""
+    $start_real append "$elabc clear"
+    $start_real append "$elabc reset"
 
     if {$REAL_PLAB} {
 	# distinguish between real/fake runs
 	# XXX I'm thinkin...we can do better than this!
-	$start append "$opsagent run -command \"cp /dev/null /proj/$pid/exp/$eid/tmp/real_plab\""
+	$start_real append "$opsagent run -command \"cp /dev/null /proj/$pid/exp/$eid/tmp/real_plab\""
 
 	# save off node list
-	$start append "$ns log \"##### Creating node list...\""
-	$start append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
+	$start_real append "$ns log \"##### Creating node list...\""
+	$start_real append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
 
 	# initialize path characteristics
-	$start append "$ns log \"##### Initialize emulation node path characteristics...\""
-	$start append "$elabc create"
-	$start append "$opsagent run -command \"/usr/testbed/bin/init-elabnodes.pl  -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid\""
+	$start_real append "$ns log \"##### Initialize emulation node path characteristics...\""
+	$start_real append "$elabc create"
+	$start_real append "$opsagent run -command \"/usr/testbed/bin/init-elabnodes.pl  -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid\""
     } else {
-	$start append "$elabc create"
+	$start_real append "$elabc create"
     }
 
     # restart link tracing
     # XXX cleanlogs has unlinked the current trace log, so we have to
     # snapshot to bring it back into existence
-    $start append "$ns log \"##### Starting link tracing...\""
+    $start_real append "$ns log \"##### Starting link tracing...\""
     foreach link $tracelist {
-        $start append "$link trace snapshot"
-        $start append "$link trace start"
+        $start_real append "$link trace snapshot"
+        $start_real append "$link trace start"
     }
 
     # restart servers
     if {$SERVERPROG != ""} {
-	$start append "$ns log \"##### Starting server...\""
-	$start append "$allservers start"
+	$start_real append "$ns log \"##### Starting server...\""
+	$start_real append "$allservers start"
     }
 
     # restart stubs and monitors
-    $start append "$ns log \"##### Starting stubs and monitors...\""
+    $start_real append "$ns log \"##### Starting stubs and monitors...\""
     if {!$NO_STUB && $REAL_PLAB} {
-	$start append "$planetstubs start"
+	$start_real append "$planetstubs start"
     }
-    $start append "$monitorgroup start"
+    $start_real append "$monitorgroup start"
 
     # gather up the data and inform the user
-    $start append "$ns log \"##### Experiment run started!\""
+    $start_real append "$ns log \"##### Experiment run started!\""
     # XXX cannot do a report here as that will cause the logs to be
     #     deleted before the next loghole sync
 
-  set stop [$ns event-sequence]
-    $stop append "$ns log \"Stopping REAL plab experiment\""
+  set stop_real [$ns event-sequence]
+    stop_real append "$ns log \"Stopping REAL plab experiment\""
 
     # stop stubs and monitors
-    $stop append "$ns log \"##### Stopping stubs and monitors...\""
+    stop_real append "$ns log \"##### Stopping stubs and monitors...\""
     if {!$NO_STUB && $REAL_PLAB} {
-	$stop append "$planetstubs stop"
+	stop_real append "$planetstubs stop"
     }
-    $stop append "$monitorgroup stop"
+    stop_real append "$monitorgroup stop"
 
     # stop servers
     if {$SERVERPROG != ""} {
-	$stop append "$ns log \"##### Stopping servers...\""
-	$stop append "$allservers stop"
+	stop_real append "$ns log \"##### Stopping servers...\""
+	stop_real append "$allservers stop"
     }
 
     # stop link logging and save logs
-    $stop append "$ns log \"##### Stop link tracing...\""
+    stop_real append "$ns log \"##### Stop link tracing...\""
     foreach link $tracelist {
-        $stop append "$link trace snapshot"
-        $stop append "$link trace stop"
+        stop_real append "$link trace snapshot"
+        stop_real append "$link trace stop"
     }
 
     # reset shaping characteristics for all nodes
-    $stop append "$ns log \"##### Resetting links...\""
-    $stop append "$elabc clear"
-    $stop append "$elabc reset"
+    stop_real append "$ns log \"##### Resetting links...\""
+    stop_real append "$elabc clear"
+    stop_real append "$elabc reset"
 
     # gather up the data and inform the user
-    $stop append "$ns log \"##### Experiment run stopped!\""
-    $stop append "$ns report"
+    stop_real append "$ns log \"##### Experiment run stopped!\""
+    stop_real append "$ns report"
 }
 
 #
@@ -790,7 +801,7 @@ if {$FAKE_PLAB} {
 # do it on stop.
 #
 if {$NO_PLAB || $REAL_PLAB} {
-    $ns at 0 "start run"
+    $ns at 0 "start_real run"
 } elseif {$FAKE_PLAB} {
     $ns at 0 "start_fake run"
 }
