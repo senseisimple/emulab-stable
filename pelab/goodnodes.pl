@@ -9,7 +9,8 @@
 # - Find a set of fully connected nodes from the list of nodes at
 #     boss:/proj/tbres/plab-reliable-list
 # - Size of desired set given as a parameter
-# - + Nodes must have both latency and bw data in the past XXX hours (XXX<24)
+# - + The sites containing the nodes must have both latency and bw 
+#     data in the past XXX hours (XXX<24)
 #   + The set will not contain more than one node from a site
 # - Run this on ops.
 
@@ -41,13 +42,13 @@ if (! getopts("e:", \%opt)) { exit &usage; }
 if ($opt{e}) { ($pid,$eid) = split('/', $opt{e}); }
 if (@ARGV !=1) { exit &usage; }
 my $numnodes = $ARGV[0];
-my @allnodes = ();    #nodes to consider, in order of desirablility (?)
+my @allnodes = ();      #nodes to consider, in order of desirablility (?)
 my %chosenBySite = ();  #indexed by siteidx, maps to plabxxx
 my %nodeIds = ();       #indexed by plabxxx => (siteid, nodeid)
 my $earliesttime = time() - $pastHourWindow*60*60;
 my %expnodes = ();  #nodes making up eid/pid
-my %connMatrix = (); # {srcplabxxx}{dstplabxxx} => 1/0 mapping 
-my %connRating = (); # plabxxx => rating value
+my %connMatrix = (); # {srcsite}{dstsite} => 1/0 mapping 
+my %connRating = (); # site => rating value
 my $allnodesIndex = 0;
 
 #
@@ -127,7 +128,7 @@ for( $allnodesIndex=0; $allnodesIndex < scalar(@allnodes); $allnodesIndex++ ){
     if( !addNew($allnodesIndex) ){
     }
     if( scalar( keys %chosenBySite ) == $numnodes ){
-        print "got $numnodes nodes\n";
+#        print "got $numnodes nodes\n";
         last;
     }
 }
@@ -140,6 +141,7 @@ for( $allnodesIndex=0; $allnodesIndex < scalar(@allnodes); $allnodesIndex++ ){
 my ($lowestRatedSite, $lowestRating) = ();
 do{    
     ($lowestRatedSite, $lowestRating) = fullyConnTest();
+#    print "lowestRatedSite=$lowestRatedSite, lowestRating=$lowestRating\n";
     if( !isFullyConn($lowestRating) ){
         #modify set
         # delete worst node
@@ -196,32 +198,29 @@ sub fullyConnTest{
 
     %connRating = ();
  
-    my @nodes = values %chosenBySite;
+    my @sites = keys %chosenBySite;
+#    print "nodes=@nodes\n";
 
-    for( my $i=0; $i<scalar(@nodes)-1; $i++ ){
-        my $srcnode = $nodes[$i];
+    for( my $i=0; $i<scalar(@sites)-1; $i++ ){
+        my $srcsite = $sites[$i];
 
-        for( my $j=$i+1; $j<scalar(@nodes); $j++ ){
-            my $dstnode = $nodes[$j];
+        for( my $j=$i+1; $j<scalar(@sites); $j++ ){
+            my $dstsite = $sites[$j];
 
-            if( !defined($connMatrix{$srcnode}{$dstnode}) ){ 
-                my ($latConn, $bwConnF, $bwConnB) 
-                    = checkConn($srcnode, $dstnode);
-#                print "$srckey => $dstkey, lat=$latConn, ".
-#                    "bwF=$bwConnF, bwB=$bwConnB\n";
-#                print "$srcnode => $dstnode, ($latConn,$bwConnF,$bwConnB)\n";
+            if( !defined($connMatrix{$srcsite}{$dstsite}) ){ 
+                my ($latConn,$bwConnF,$bwConnB)=checkConn($srcsite,$dstsite);
+#                print "$srcsite => $dstsite, ($latConn,$bwConnF,$bwConnB)\n";
 
-                $connMatrix{$srcnode}{$dstnode} = $latConn + $bwConnF;
-                $connMatrix{$dstnode}{$srcnode} = $latConn + $bwConnB;
+                $connMatrix{$srcsite}{$dstsite} = $latConn + $bwConnF;
+                $connMatrix{$dstsite}{$srcsite} = $latConn + $bwConnB;
             }
 
             #a node's rating is defined as the number of successful
             # bw tests it is the dst for, plus the number of latency
             # tests it is involved in.
             #
-            $connRating{$dstnode} += $connMatrix{$srcnode}{$dstnode};
-            $connRating{$srcnode} += $connMatrix{$dstnode}{$srcnode};
-            
+            $connRating{$dstsite} += $connMatrix{$srcsite}{$dstsite};
+            $connRating{$srcsite} += $connMatrix{$dstsite}{$srcsite};
         }        
     }
 
@@ -232,16 +231,14 @@ sub fullyConnTest{
     # find lowest rating
     #
     foreach my $site (keys %chosenBySite){
-#        print "looking at site $site\n";
-        my $node = $chosenBySite{$site};
         if( !defined $lowestRating ){
-            $lowestRating = $connRating{$node};
+            $lowestRating = $connRating{$site};
             $lowestRatedSite = $site;
             next;
         }
         
-        if( $connRating{$node} < $lowestRating ){
-            $lowestRating = $connRating{$node};
+        if( $connRating{$site} < $lowestRating ){
+            $lowestRating = $connRating{$site};
             $lowestRatedSite = $site;
 #            print "new lowest rating $lowestRating from $node\n";
         }
@@ -253,14 +250,13 @@ sub fullyConnTest{
 
 
 
-
 #
-# add node at given index to potential result set of "%chosenBySite"
+# add the site of given node at given index to result set of "%chosenBySite"
 # if data exists for that node
 #  returns 1 if successful, 0 if fail.
 #  fail: 
 #    - no results
-#    - already a node under its siteix
+#    - already a node under its siteix in %chosenBySite
 #
 sub addNew($){
     my ($index) = @_;
@@ -272,15 +268,13 @@ sub addNew($){
     #get node and site IDxs
     my ($siteidx,$nodeidx) = getNodeIDs($nodeid);
 
-    #check if this node satisfies the constraints
+    #** check if this node satisfies the constraints **
 
-    # TODO: conditonally, check for valid results
     #check for existing data
     my $query_result =
         DBQueryFatal("select latency from pair_data ".
                      "where latency is not NULL and ".
                      "dstsite_idx=$siteidx and ".
-                     "dstnode_idx=$nodeidx and ".
                      "unixstamp > $earliesttime ".
                      "limit 1");
 
@@ -288,7 +282,7 @@ sub addNew($){
 #        warn("No latency results from $nodeid\n");
         return 0;
     }
-    my @latencies = $query_result->fetchrow_array();
+    my @result = $query_result->fetchrow_array();
     
     if( $f_valid == 1 ){
         #add node to set if one doesn't already exist from its site
@@ -348,9 +342,8 @@ sub getNodeIDs($){
 # - bwConnB is 0, 1 / for bw from dst to src
 #
 sub checkConn($$){
-    my ($srcnode, $dstnode)    = @_;
-    my ($srcsite, $srcnodeidx) = @{$nodeIds{$srcnode}};
-    my ($dstsite,$dstnodeidx)  = @{$nodeIds{$dstnode}};
+#    my ($srcnode, $dstnode)    = @_;
+    my ($srcsite, $dstsite) = @_;
     my ($latConn, $bwConnF, $bwConnB) = (0,0,0);
     my $latTestStr= "> 0";
 #    my $latTestStr= "is not null";
@@ -360,13 +353,9 @@ sub checkConn($$){
                      "where (latency $latTestStr  and ".
                      "unixstamp > $earliesttime) and ".                     
                      "((srcsite_idx=$srcsite and ".
-                     "srcnode_idx=$srcnodeidx and ".
-                     "dstsite_idx=$dstsite and ".
-                     "dstnode_idx=$dstnodeidx) or ".
+                     "dstsite_idx=$dstsite) or ".
                      "(srcsite_idx=$dstsite and ".
-                     "srcnode_idx=$dstnodeidx and ".
-                     "dstsite_idx=$srcsite and ".
-                     "dstnode_idx=$srcnodeidx)) ".
+                     "dstsite_idx=$srcsite)) ".
                      "limit 1";
 
     my $query_result =
@@ -382,9 +371,7 @@ sub checkConn($$){
             "where bw $bwTestStr and ".
             "unixstamp > $earliesttime and ".                     
             "srcsite_idx=$srcsite and ".
-            "srcnode_idx=$srcnodeidx and ".
             "dstsite_idx=$dstsite and ".
-            "dstnode_idx=$dstnodeidx ".                     
             "limit 1";
 #    print $qstr."\n\n";
     $query_result =
@@ -400,9 +387,7 @@ sub checkConn($$){
                      "where bw $bwTestStr and ".
                      "unixstamp > $earliesttime and ".                     
                      "srcsite_idx=$dstsite and ".
-                     "srcnode_idx=$dstnodeidx and ".
                      "dstsite_idx=$srcsite and ".
-                     "dstnode_idx=$srcnodeidx ".                     
                      "limit 1"
                      );
     if (! $query_result->numrows) {
