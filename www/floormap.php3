@@ -470,6 +470,9 @@ else {
 }
 echo "  Show nodes on other floors as hollow dots.\n";
 echo "  <br>\n";
+if (isset($feature)) {
+    echo "  <a href='floormap.php3'>Show all wireless nodes</a><br>\n";
+}
 echo "  <input name=map type=image style=\"border: 2px solid\" ";
 echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">\n";
 echo "  <br>\n";
