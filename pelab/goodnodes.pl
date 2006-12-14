@@ -33,13 +33,15 @@ my $pprefix = "node-";
 #
 $| = 1;
 sub usage {
-        print "Usage: $0 [-e pid/eid] <numNodes>\n";
+        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] <numNodes>\n";
         return 1;
 }
 my ($pid, $eid);
+my $blacklistfilename;
 my %opt = ();
-if (! getopts("e:", \%opt)) { exit &usage; }
+getopts("e:f:", \%opt);
 if ($opt{e}) { ($pid,$eid) = split('/', $opt{e}); }
+if ($opt{f}) { $blacklistfilename = $opt{f}; }
 if (@ARGV !=1) { exit &usage; }
 my $numnodes = $ARGV[0];
 my @allnodes = ();      #nodes to consider, in order of desirablility (?)
@@ -47,6 +49,7 @@ my %chosenBySite = ();  #indexed by siteidx, maps to plabxxx
 my %nodeIds = ();       #indexed by plabxxx => (siteid, nodeid)
 my $earliesttime = time() - $pastHourWindow*60*60;
 my %expnodes = ();  #nodes making up eid/pid
+my %blacknodes = ();#nodes not allowed to be chosen (deleted from allnodes)
 my %connMatrix = (); # {srcsite}{dstsite} => 1/0 mapping 
 my %connRating = (); # site => rating value
 my $allnodesIndex = 0;
@@ -63,8 +66,22 @@ foreach my $nodeinfo (@allnodesinfo){
     push @allnodes, $fields[0];
     #print "$fields[0]\n";
 }
+close FILE;
 
-
+#
+# get list of blacklisted nodes
+#
+if( defined $blacklistfilename ){
+    open FILE, "< $blacklistfilename"
+        or die "Can't open file";
+    my @blacklist = <FILE>;
+    chomp @blacklist;
+    foreach my $node (@blacklist){
+        $blacknodes{$node} = 1;
+        print "blacknode: $node\n";
+    }
+    close FILE;
+}
 
 #
 # Get DB password and connect.
@@ -106,7 +123,9 @@ if( defined($pid) && defined($eid) ){
     }
     #delete nodes from allnodes not found in given experiment
     for( my $i=0; $i < scalar(@allnodes); $i++ ){
-        if( !defined $expnodes{$allnodes[$i]} ){
+        if( !defined $expnodes{$allnodes[$i]} ||
+            defined $blacknodes{$allnodes[$i]})
+        {
 #            print "removing $allnodes[$i] from set\n";
             splice( @allnodes, $i, 1 );
             $i--;
