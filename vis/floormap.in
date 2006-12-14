@@ -21,6 +21,7 @@ sub usage {
     print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
     print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
+    print STDERR "[-F <feature>]\n";
     print STDERR "\nor\n";
     print STDERR "Usage: floormap [-k] [-o <prefix>] ";
     exit(-1);
@@ -35,7 +36,7 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTakgzvnxy";
+my $optlist  = "df:o:s:c:S:C:O:e:F:tTakgzvnxy";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
@@ -52,6 +53,8 @@ my $show_nodes     = 1;
 my $building;
 my $floor;
 my $image;
+
+my $feature_filter;
 
 # These result from clicking on zoom/pan controls outside.
 my $scale      = 1;	# From clicking on one of the scale buttons.
@@ -299,6 +302,9 @@ if (defined($options{"x"})) {
     $show_exclusion = 1;
 }
 
+if (defined($options{"F"})) {
+    $feature_filter = $options{"F"};
+}
 if (defined($options{"e"})) {
     if ($options{"e"} =~ /([-\w]*),([-\w]*)/) {
 	$pid = $1;
@@ -497,7 +503,9 @@ sub dofloor($$)
 		"  from location_info as loc ".
 		"left join reserved as r on r.node_id=loc.node_id ".
 		"left join nodes as n on n.node_id=loc.node_id ".
+		(defined($feature_filter)?"left join node_features as f on f.node_id=loc.node_id ":"") .
 		"where loc.building='$building' " .
+                (defined($feature_filter)?" and f.feature='$feature_filter' ":"") . 
 		(defined($pid) ? " and r.pid='$pid' and r.eid='$eid'" : "");
     my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
 

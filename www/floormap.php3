@@ -9,7 +9,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Wireless PC Map");
+PAGEHEADER("Wireless PC Map" . ((isset($feature) && $feature != "")?" ($feature)":" (802.11)"));
 
 #
 # Only logged in people at the moment; might open up at some point.
@@ -37,6 +37,16 @@ if (isset($building) && $building != "") {
 else {
     $building = "MEB";
     unset($floor);
+}
+
+if (isset($feature) && $feature != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[-\w]+$/", $feature)) {
+        PAGEARGERROR("Invalid feature argument.");
+    }
+}
+else {
+    unset($feature);
 }
 
 #
@@ -216,7 +226,9 @@ $query_result =
 		 "left join interface_settings as s on ".
 		 "     s.node_id=loc.node_id and s.capkey='channel' ".
 		 "left join reserved as r on r.node_id=loc.node_id ".
+		 (isset($feature)?" left join node_features as f on f.node_id=loc.node_id ":"") . 
 		 "where loc.building='$building' ".
+		 (isset($feature)?" and f.feature='$feature' ":"") . 
 		 (isset($floor) ? "and loc.floor='$floor'" : ""));
 
 while ($row = mysql_fetch_array($query_result)) {
@@ -308,6 +320,7 @@ $perl_args = "-o $prefix " .
 
 	     (isset($pid) ? "-e $pid,$eid " : "") .
 	     (isset($floor) ? "-f $floor " : "") .
+             (isset($feature) ? "-F $feature " : "") . 
 	     (isset($building) ? "$building" : "");  # Building arg must be last!
 
 if (0) {    ### Put the Perl script args into the page when debugging.
@@ -331,7 +344,9 @@ if (! readfile("${prefix}.map")) {
 
 echo "<font size=+1>For more info on using wireless nodes, see the
      <a href='tutorial/docwrapper.php3?docname=wireless.html'>
-     wireless tutorial.</a></font>\n";
+     wireless tutorial</a> and the 
+     <a href='tutorial/docwrapper.php3?docname=gnuradio.html'>GNU software 
+     defined radio tutorial</a>.</font>\n";
 
 echo "<center>\n";
 
@@ -462,6 +477,9 @@ zoom_btns($curr_scale);
 
 # Hidden items are all returned as page arguments when any input control is clicked.
 echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
+if (isset($feature)) {
+    echo "  <input type=\"hidden\" name=\"feature\" value=\"$feature\">\n";
+}
 
 # The last_* items come from a .state file with the map, from the Perl script.
 if (! readfile("${prefix}.state")) {
