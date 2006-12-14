@@ -27,6 +27,7 @@ my $dobw = 0;
 my $doloss = 0;
 my $bidir = 0;
 my $number = 0;
+my $usenames = 0;
 
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 my $DBNAME  = "pelab";
@@ -40,7 +41,7 @@ my $eid;
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("Bbdle:S:n:", \%options)) {
+if (! getopts("BNbdle:S:n:", \%options)) {
     usage();
 }
 if (defined($options{"e"})) {
@@ -48,6 +49,9 @@ if (defined($options{"e"})) {
 }
 if (defined($options{"B"})) {
     $bidir = 1;
+}
+if (defined($options{"N"})) {
+    $usenames = 1;
 }
 if (defined($options{"d"})) {
     $dolatency = 1;
@@ -71,9 +75,10 @@ if (defined($options{"S"})) {
     }
 }
 if (!defined($pid) && @ARGV != 2) {
-    print STDERR "usage: showsamples.pl [-Bbdl] <srcix>|all <dstix>|all\n";
+    print STDERR "usage: showsamples.pl [-BNbdl] <srcix>|all <dstix>|all\n";
     print STDERR "   show database records for given site indices\n";
     print STDERR "       -B        show both srcix -> dstix and dstix -> srcix\n";
+    print STDERR "       -N        two args are names rather than indicies\n";
     print STDERR "       -b        show bandwidth\n";
     print STDERR "       -d        show delay (the default)\n";
     print STDERR "       -l        show loss\n";
@@ -129,7 +134,30 @@ if (defined($pid)) {
 	}
     }
     exit(0);
-}
+} elsif ($usenames) {
+    my $sname = $srcix;
+    my $dname = $dstix;
+
+    my $query_result =
+        DBQueryFatal("select site_idx from site_mapping ".
+		     "where node_id='$sname'");
+    if ($query_result->numrows) {
+	$srcix = $query_result->fetchrow_array();
+	print "$sname is site $srcix\n";
+    } else {
+	die("could not find index for $sname\n");
+    }
+
+    $query_result =
+        DBQueryFatal("select site_idx from site_mapping ".
+		     "where node_id='$dname'");
+    if ($query_result->numrows) {
+	$dstix = $query_result->fetchrow_array();
+	print "$dname is site $dstix\n";
+    } else {
+	die("could not find index for $dname\n");
+    }
+} 
 
 if (!$dolatency && !$dobw && !$doloss) {
     $dolatency = 1;
