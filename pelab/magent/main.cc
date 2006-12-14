@@ -294,7 +294,7 @@ void processArgs(int argc, char * argv[])
       }
       break;
     case 'L':
-      logFlags = ERROR & EXCEPTION;
+      global::logFlags = ERROR & EXCEPTION;
       break;
     case '?':
     default:
@@ -309,7 +309,7 @@ void init(void)
   FD_ZERO(&global::readers);
   global::maxReader = -1;
 
-  logInit(stderr, logFlags, true);
+  logInit(stderr, global::logFlags, true);
 
   /*
    * Install a signal handler so that we can catch control-C's, etc.
@@ -379,16 +379,26 @@ void mainLoop(void)
     {
       timeUntilWrite = nextWrite->first - now;
       waitPeriod = timeUntilWrite.getTimeval();
+      logWrite(MAIN_LOOP, "Before select, waitTime=%f",
+               timeUntilWrite.toDouble());
     }
-    else
+    else if (nextWrite == schedule.end())
     {
       // otherwise we want to wait forever.
       timeUntilWrite = Time();
       waitPeriod = NULL;
+      logWrite(MAIN_LOOP, "Before select, waitTime=forever");
+    }
+    else
+    {
+      timeUntilWrite = Time();
+      waitPeriod = timeUntilWrite.getTimeval();
+      logWrite(MAIN_LOOP, "Before select, waitTime=zero");
     }
     int error = select(global::maxReader + 1, &readable, NULL, NULL,
 //                       &debugTimeout);
                        waitPeriod);
+    logWrite(MAIN_LOOP, "After select");
     if (error == -1)
     {
       switch (errno)

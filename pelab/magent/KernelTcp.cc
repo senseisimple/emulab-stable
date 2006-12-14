@@ -221,9 +221,10 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
     for (bytesToWrite = size; bytesToWrite > 0; bytesToWrite -= MAX_WRITESIZE) {
       int writeSize = min(MAX_WRITESIZE,bytesToWrite);
       // Actually write the darn thing.
+      logWrite(CONNECTION_MODEL, "About to write %d bytes", writeSize);
       int error = send(peersock, &buffer[0], writeSize, 0);
-      logWrite(CONNECTION_MODEL,"Tried to write %d bytes, actually wrote %d",
-              writeSize, error);
+      logWrite(CONNECTION_MODEL,
+               "Tried to write %d bytes, actually wrote %d", writeSize, error);
 
       if (error == 0)
       {
@@ -299,10 +300,10 @@ void KernelTcp::init(void)
   // Set up the peerAccept socket
   if (global::peerServerPort != 0) {
     global::peerAccept = createServer(global::peerServerPort,
-				      "Peer accept socket (No incoming peer "
-				      "connections will be accepted)");
+                                      "Peer accept socket (No incoming peer "
+                                      "connections will be accepted)");
     logWrite(PEER_CYCLE, "Created peer server on port %d",
-	     global::peerServerPort);
+             global::peerServerPort);
   }
 
   // Set up the connectionModelExemplar
