@@ -226,6 +226,22 @@ JAILIPBASE=$VIRTNODE_NETWORK
 JAILIPMASK=$VIRTNODE_NETMASK
 
 #
+# Only supported on the Mother Ship (emulab.net) right now.
+#
+WIKISUPPORT=0
+BUGDBSUPPORT=0
+MAILMANSUPPORT=0
+CVSSUPPORT=0
+CHATSUPPORT=0
+NFSTRACESUPPORT=0
+ARCHIVESUPPORT=0
+OPSDBSUPPORT=0
+SFSSUPPORT=0
+PELABSUPPORT=0
+PLABSUPPORT=0
+PLAB_ROOTBALL="plabroot-18.tar.bz2"
+
+#
 # You shouldn't have to change anything below this point
 #
 
@@ -233,7 +249,6 @@ TBADMINGROUP=tbadmin
 TBDBNAME=tbdb
 IPBASE=10
 DELAYCAPACITY=2
-SFSSUPPORT=0
 DISABLE_NSE=1
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
@@ -241,4 +256,3 @@ FRISEBEEMCASTPORT=3564
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!
 #WWW=www.example.emulab.net/emulab-www
-

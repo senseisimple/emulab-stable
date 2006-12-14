@@ -11,6 +11,7 @@ OBJDIR		= ..
 SUBDIR		= rc.d
 
 WINSUPPORT      = @WINSUPPORT@
+PELABSUPPORT    = @PELABSUPPORT@
 SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
@@ -29,6 +30,9 @@ endif
 else
 RC_SCRIPTS  += 1.named.sh
 endif
+endif
+ifeq ($(WINSUPPORT),1)
+OPS_SCRIPTS += pelab.sh
 endif
 
 #

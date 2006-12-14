@@ -25,7 +25,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
                   websetdest spewsource weblinkmon_ctl webcvsweb \
 		  webspewconlog xlogin webviewvc spewevents
-CTRLSBIN_SCRIPTS= opsdb_control.proxy
+CTRLSBIN_SCRIPTS= opsdb_control.proxy daemon_wrapper
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

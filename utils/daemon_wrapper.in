@@ -10,10 +10,10 @@ use POSIX qw(setsid);
 
 sub usage()
 {
-    print "Usage: daemon_wrapper [-i interval] [-p pidfile] [-l logfile] command args ...\n";
+    print STDERR "Usage: daemon_wrapper [-i interval] [-p pidfile] [-l logfile] [-n name] command args ...\n";
     exit(1);
 }
-my $optlist  = "di:p:l:";
+my $optlist  = "di:p:l:n:";
 my $debug    = 0;
 my $mininterval = 1;
 my $maxinterval = (24 * 60 * 60);
@@ -53,12 +53,25 @@ if (defined($options{"p"})) {
 if (defined($options{"l"})) {
     $logfile = $options{"l"};
 }
+if (defined($options{"n"})) {
+    if ($options{"n"} =~ /^([-\w]+)$/) {
+	$daemon = $1;
+    } else {
+	print STDERR "Bogus characters in name string\n";
+	exit(1);
+    }
+    
+}
 if (@ARGV < 1) {
     usage();
 }
 $cmd = shift;
-if ($cmd =~ /.*\/([^\/]+)/) {
-    $daemon = $1;
+if (!defined($daemon)) {
+    if ($cmd =~ /.*\/([-\w]+)$/) {
+	$daemon = $1;
+    } else {
+	$daemon = "pid$$";
+    }
 }
 $cmdargs = join(' ', @ARGV);
 

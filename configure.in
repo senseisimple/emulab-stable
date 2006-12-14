@@ -620,7 +620,9 @@ AC_SUBST(EVENTSYS)
 if test $PELABSUPPORT -eq 0; then
 	pelabfiles="";
 else
-	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile ";
+	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile \
+		    pelab/bgmon/GNUmakefile ";
+	optional_subdirs="$optional_subdirs pelab";
 fi
 
 #

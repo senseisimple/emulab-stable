@@ -35,12 +35,9 @@ FS_WITH_QUOTAS="/q /users"
 WWWHOST=www.emulab.net
 TBMAINSITE=1
 THISHOMEBASE=Emulab.Net
-PLABSUPPORT=1
-PLAB_ROOTBALL="plabroot-18.tar.bz2"
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 WINSUPPORT=1
-PELABSUPPORT=1
 
 #
 # This next group will not work outside of Utah (yet).
@@ -54,6 +51,10 @@ CHATSUPPORT=1
 NFSTRACESUPPORT=1
 ARCHIVESUPPORT=1
 OPSDBSUPPORT=1
+PELABSUPPORT=1
+PLABSUPPORT=1
+PLAB_ROOTBALL="plabroot-18.tar.bz2"
+
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.

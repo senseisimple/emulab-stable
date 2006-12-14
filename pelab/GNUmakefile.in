@@ -17,4 +17,17 @@ all: $(BIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-control-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF))
+install: subdir-install $(addprefix $(INSTALL_DIR)/opsdir/bin/, $(BIN_STUFF))
+
+boss-install: install
+
+subdir-install:
+	@$(MAKE) -C db boss-install
+	@$(MAKE) -C bgmon boss-install
+
+clean:
+
+$(INSTALL_DIR)/opsdir/bin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL) $< $@
