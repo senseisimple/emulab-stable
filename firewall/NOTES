@@ -354,7 +354,7 @@ resided.  If the firewall actually tried to send traffic to one of the
 proxy-arped hosts, it would wind up creating another routing table entry
 with the real gateway.  The result was two entries, one associated with
 each interface (inside and outside).  While things did seem to work, it
-was clear that I was header for a fall.
+was clear that I was headed for a fall.
 
 So, try number two takes advantage of our support for multiple routing
 tables that we use for virtual nodes.  Now, the inner vlan0 interface is
@@ -425,7 +425,7 @@ page for more.  Another is that active connections get cut off when the
 firewall reboots, we can live with this.  Related though, is that the
 firewall needs to send keep-alives for TCP connections for which it has
 dynamic rules so that the firewall rule will stay in place if the connection
-is still alive.  But, do to the way in which we configure the inside
+is still alive.  But, due to the way in which we configure the inside
 interface, we cannot send IP traffic, e.g., a keepalive, to the inside from
 the firewall.  Fortunately, sending to the outside is sufficient to keep the
 connection alive.
