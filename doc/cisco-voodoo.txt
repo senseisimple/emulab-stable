@@ -199,10 +199,10 @@ ID  Name                            Members of VLAN
    To stop cloning:
       Console> (enable) set span disable <monitor>
 
-   NOTE: as of 10/10/05 we have bge0 on oboss attached to the control net
-   so that it can be used for cloning.  Its cisco2 port is 2/13, use that
-   for <monitor>.  Also note that you will have to have the interface
-   configured in order to run tcpdump on it.  I just do:
+   NOTE: as of 12/14/06 we have bge0 on oboss attached to the control net
+   switch (cisco2) so that it can be used for spanning.  Its cisco2 port
+   is 9/13, use that for <monitor>.  Also note that you will have to have
+   the interface configured in order to run tcpdump on it.  I just do:
       ifconfig bge0
    no IP info is necessary.  Then:
       ifconfig bge0 down
