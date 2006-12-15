@@ -478,7 +478,8 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 #endif
 
   /*
-   * Calculate the number of iterations to stay at this temperature step
+   * When melting, this is the number of different solutions we will try during
+   * this temperature step
    */
   melt_trans = neighborsize;
   
