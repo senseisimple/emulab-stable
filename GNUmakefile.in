@@ -11,6 +11,7 @@ SUBDIR		=
 TESTBED_SRCDIR  = @top_srcdir@
 DISTCLEAN_FILES = @DISTCLEAN_FILES@ 
 EVENTSYS	= @EVENTSYS@
+PELABSUPPORT	= @PELABSUPPORT@
 
 SYSTEM	       := $(shell uname -s)
 
@@ -93,6 +94,9 @@ endif
 	@$(MAKE) -C xmlrpc control-install
 	@$(MAKE) -C tmcd control-install
 	@$(MAKE) -C account control-install
+ifeq ($(PELABSUPPORT),1)
+	@$(MAKE) -C pelab control-install
+endif
 
 fs-install:
 	@$(MAKE) -C tbsetup fs-install
