@@ -7,6 +7,9 @@
 use English;
 use Getopt::Std;
 
+# XXX should not be hardwired
+my $ELABDOMAIN = "emulab.net";
+
 #
 # This script is the plab vserver equiv of ../common/rc.bootsetup. It runs
 # inside the vserver and does a limited set of bootstrapping tasks.
@@ -314,16 +317,20 @@ sub doplabconfig()
 	      "}\n\n");
 
 	# Make it look like it's in Emulab domain
-	# XXX This shouldn't be hardcoded
-	print RC "setconfigopt /etc/resolv.conf domain emulab.net\n";
-	print RC "setconfigopt /etc/resolv.conf search emulab.net\n\n";
+	print RC "setconfigopt /etc/resolv.conf domain $ELABDOMAIN\n";
+	print RC "setconfigopt /etc/resolv.conf search $ELABDOMAIN\n\n";
 
 	# XXX make sure we can resolve our own name
 	print RC "if ! ping -c 1 `hostname` >/dev/null 2>&1; then\n".
 	         "    myip=`cat /var/emulab/boot/myip`\n".
 	         "    myhn=`hostname`\n".
 	         "    if [ -n \"\$myip\" -a -n \"\$myhn\" ]; then\n".
-	         "        setconfigopt /etc/hosts \$myip \$myhn\n".
+		 "        myal=\"\"\n".
+	         "        mynn=`cat /var/emulab/boot/nickname`\n".
+	         "        if [ -n \"\$mynn\" ]; then\n".
+		 "            myal=\"\$mynn.$ELABDOMAIN\"\n".
+	         "        fi\n".
+	         "        setconfigopt /etc/hosts \$myip \"\$myhn \$myal\"\n".
 	         "    fi\n".
 		 "fi\n";
 

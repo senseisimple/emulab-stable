@@ -129,6 +129,12 @@ static char		*pideid;
 static char		*tokenfile;
 
 /**
+ * Non-zero if this is a plab node
+ * XXX hack to allow adjustment of NODE environment variable
+ */
+static int		isplab;
+
+/**
  * Elvin error object.
  */
 static elvin_error_t elvin_error;
@@ -433,7 +439,7 @@ main(int argc, char **argv)
 	progname = argv[0];
 	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:f:o:v:t:")) != -1){
+	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:f:o:v:t:P")) != -1){
 		switch (c) {
 		case 'h':
 			usage(progname);
@@ -509,6 +515,9 @@ main(int argc, char **argv)
 			vnode = optarg;
 			if (strcmp(vnode, "ops") == 0)
 				isops = 1;
+			break;
+		case 'P':
+			isplab = 1;
 			break;
 		default:
 			usage(progname);
@@ -659,34 +668,82 @@ main(int argc, char **argv)
 	setenv("HOME", pw->pw_dir, 1);
 	setenv("PID", pid, 1);
 	setenv("EID", eid, 1);
+
+	/*
+	 * Find the host's control net name/IP.  This will always be the
+	 * fully qualified name.  Note that if we cannot resolve the FQN
+	 * (which often happens on planetlab nodes) we dig the IP out of
+	 * the Emulab DB info.
+	 */
 	gethostname(buf, sizeof(buf));
-	if ((idx = strchr(buf, '.')) != NULL) {
-	    *idx = '\0';
-	}
-	setenv("NODE", buf, 1);
 	if ((he = gethostbyname(buf)) == NULL) {
 		/* XXX should not be hardwired */
 		char *ipfile = "/var/emulab/boot/myip";
 
-		warning("warning: cannot resolve hostname '%s' to obtain IP address,"
-			" reading IP from %s instead\n", buf, ipfile);
+		warning("WARNING: cannot resolve hostname '%s'"
+			" to obtain IP address, reading IP from %s instead\n",
+			buf, ipfile);
 		fp = fopen(ipfile, "r");
 		if (fp == NULL)
-		    warning("warning: cannot get IP address for hostname '%s',"
-			    " assuming no network links available\n", buf);
+			warning("WARNING: cannot get IP address for hostname '%s',"
+				" assuming no network links available\n", buf);
 		else {
-		    fgets(buf, sizeof(buf), fp);
-		    (void) fclose(fp);
-		    if ((idx = strchr(buf, '\n')) != NULL)
-			*idx = '\0';
-		    setenv("NODEIP", buf, 1);	    
+			char ipbuf[BUFSIZ];
+
+			fgets(ipbuf, sizeof(ipbuf), fp);
+			(void) fclose(fp);
+			if ((idx = strchr(ipbuf, '\n')) != NULL)
+				*idx = '\0';
+			setenv("NODECNETIP", ipbuf, 1);
 		}
 	}
 	else {
 	    struct in_addr ia;
 
 	    memcpy(&ia, he->h_addr, he->h_length);
-	    setenv("NODEIP", inet_ntoa(ia), 1);	    
+	    setenv("NODECNETIP", inet_ntoa(ia), 1);	    
+	}
+
+	/*
+	 * XXX for planetlab, hostname is the official hostname as opposed
+	 * to the per-experiment Emulab alias.  To be consistent, we want
+	 * NODECNET (and hence NODE) to reflect the Emulab name.
+	 */
+	if (isplab) {
+		/* XXX should not be hardwired */
+		char *alfile = "/var/emulab/boot/nickname";
+
+		fp = fopen(alfile, "r");
+		if (fp != NULL) {
+			fgets(buf, sizeof(buf), fp);
+			(void) fclose(fp);
+			if ((idx = strchr(buf, '\n')) != NULL) {
+				*idx++ = '.';
+				strncat(buf, OURDOMAIN,
+					sizeof(buf) - (idx - buf) - 1);
+			}
+			setenv("NODECNET", buf, 1);
+		}
+	} else
+		setenv("NODECNET", buf, 1);
+
+	/*
+	 * Now find "the default" experimental network interface by stripping
+	 * the domain qualifier and looking that up.  If the short name fails
+	 * to resolve, we assume there are no experimental interfaces.
+	 *
+	 * XXX for backwards compat, we always set NODE even if it does not
+	 * resolve.  It might still be useful as a tag.
+	 */
+	if ((idx = strchr(buf, '.')) != NULL) {
+	    *idx = '\0';
+	}
+	setenv("NODE", buf, 1);
+	if ((he = gethostbyname(buf)) != NULL) {
+		struct in_addr ia;
+
+		memcpy(&ia, he->h_addr, he->h_length);
+		setenv("NODEIP", inet_ntoa(ia), 1);	    
 	}
 
 	/* XXX Need to eval the ENV parts of the config file after we've

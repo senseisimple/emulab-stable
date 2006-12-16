@@ -399,17 +399,33 @@ directory containing Emulab specific binaries.</td>
 </tr>
 
 <tr>
+<td>NODECNET</td>
+<td>The fully-qualified name of the node this program agent is running on.
+This name resolves to the IP address of the control network interface
+of the node.</td>
+</tr>
+
+<tr>
+<td>NODECNETIP</td>
+<td>The IP address of the control network interface.
+This address should <i>not</i> be advertised to, or used by, applications
+within an experiment as it will cause all traffic to flow over the control
+network rather than the experimental network.
+
+<tr>
 <td>NODE</td>
-<td>The name of the node this program agent is running on.  Note that this is
-the short name and <i>not</i> the fully qualified host name that would refer to
-the control interface.</td>
+<td>The unqualified name of the node this program agent is running on.
+For nodes with experimental interfaces,
+this name resolves to the IP address of an experimental interface on the node.
+For nodes with more than one experimental interface, there is no guarantee
+which one it will resolve to.
+For nodes with no experimental interfaces, the name will not resolve.</td>
 </tr>
 
 <tr>
 <td>NODEIP</td>
-<td>The IP address of the experiment network interface that the node name maps
-to.  For nodes with no experimental interfaces, this variable will not be
-set.</td>
+<td>The IP address of the experiment network interface that NODE resolves to.
+For nodes with no experimental interfaces, this variable will not be set.</td>
 </tr>
 
 <tr>

@@ -208,7 +208,7 @@ sub doboot()
 		# this failure should not happen
 		fatal("invalid format for plabconfig info");
 	    }
-	    system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
+	    system("$PAGENT -P -e $pid/$eid -s localhost -l $LOGFILE ".
 		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG ".
 		   "-v $vname -r -p $elvind_port -t $TOKEN");
 	}
