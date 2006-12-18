@@ -295,6 +295,29 @@ foreach my $node (@nodes) {
 		    # this would move up into os_setup.
 		    $mode = "reboot";
 		}
+		elsif ($plab && $allocstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+		    # This is a special case.  If we reuse one of the plab 
+		    # nodes, but use a different vname in the topo, there will
+		    # be an entry in the database and a slice will be reserved
+		    # because it's never torn down.  However, we need to 
+		    # skip plabnode alloc and go straight to vnodesetup.
+		    #
+		    # BUT, we only can do this if the sliver entry is already
+		    # in the database!
+		    # Also note that this could eventually cause problems
+		    # if there is a mistaken sliver entry in the DB.
+
+		    $res = DBQueryFatal(
+			"select slicename,node_id from plab_slice_nodes" . 
+			" where pid='$pid' and eid='$eid' " . 
+                        "   and node_id='$node'");
+		    if ($res->numrows == 1) {
+			# node exists; change mode to resetup
+			$mode = "resetup";
+			print "Doing a resetup on '$node'\n";
+		    }
+		    
+		}
 	    }
 	}
     }
@@ -395,7 +418,7 @@ while (1) {
 		$args   .= ($jailed   ? "-j " : " ");
 		$args   .= ($plab     ? "-p " : " ");
 		$args   .= "$vnode ";
-                
+		
 		$exval = TBForkCmd("$ssh -host $vnode ".
                                  "$CLIENT_BIN/vnodesetup $args",1);
             }
