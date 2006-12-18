@@ -1,0 +1,236 @@
+#!/usr/local/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
+# This is a simple little script that renews "meta" slices listed either in a 
+# file  or on the command line.  The Emulab metaslices were all created through
+# the PlanetLab webpage, so are "plc-instantiated," and thus cannot be renewed
+# through the xmlrpc interface.  Therefore, this script logs into the web 
+# interface and renews the requested slices.
+#
+
+use LWP::UserAgent;
+use HTTP::Request::Common qw(POST);
+use HTTP::Headers;
+use HTTP::Cookies;
+use Date::Parse;
+use English;
+
+use lib "@prefix@/lib";
+use libtestbed;
+
+$PLAB_CREDS_FILE = "@prefix@/etc/plab/plc.pw";
+$PLAB_METASLICE_FILE = "@prefix@/etc/plab/metaslices";
+
+$WEEK = (60*60*24*7);
+$SLICE_EXP_WINDOW = $WEEK * 1;
+
+my @slices;
+my $sfile = $PLAB_METASLICE_FILE;
+
+# grab args
+while ($#ARGV > 1) {
+    $arg = shift;
+    if ($arg eq "-f" || $arg eq "--file") {
+	$sfile = shift;
+	if (!defined($sfile)) {
+	    print "ERROR: -f,--file require a file with slices to renew\n";
+	    exit(1);
+	}
+    }
+    else {
+	push @slices, $arg;
+    }
+}
+
+# open the file and grab slices
+open(SFILE,"$sfile") 
+    or die "could not open slice file '$sfile'!";
+while (my $line = <SFILE>) {
+    chomp($line);
+
+    if (!($line =~ /^\#/ || $line eq '')) {
+	push @slices, $line;
+    }
+}
+close(SFILE);
+
+# read in our plc credentials
+open(PFILE,"$PLAB_CREDS_FILE")
+    or die "could not open plc uid/passwd file '$PLAB_CREDS_FILE'!";
+my @creds = <PFILE>;
+close(PFILE);
+if (scalar(@creds) < 2) {
+    print "ERROR: malformed credentials file '$PLAB_CREDS_FILE'!\n";
+    exit(1);
+}
+chomp($creds[0]);
+chomp($creds[1]);
+
+my $uid = $creds[0];
+my $passwd = $creds[1];
+
+#print "DEBUG: uid=$uid,passwd=$passwd\n";
+
+
+$PLC_LOGIN = 'https://www.planet-lab.org/db/login/login.php';
+$PLC_SLICE_DETAIL = 'https://www.planet-lab.org/db/slices/detail.php?slice_name=';
+$PLC_RENEW = 'https://www.planet-lab.org/db/slices/renew_slice.php?slice_name=';
+$PLC_LOGOUT = 'https://www.planet-lab.org/db/login/logout.php';
+
+print "Checking slices";
+foreach my $slice (@slices) {
+    print " $slice";
+}
+print ".\n";
+
+my $ua = LWP::UserAgent->new();
+# make a cookie jar to store the PHPSESSID cookie
+$ua->cookie_jar({});
+
+my ($req,$res);
+my $phpsessid;
+
+# log into planetlab website
+#$req = HTTP::Request->new(POST => $PLC_LOGIN);
+#$req->content_type('application/x-www-form-urlencoded');
+#$req->content('email=$uid&password=$passwd');
+$req = POST $PLC_LOGIN, [ email => $uid, password => $passwd ];
+
+$res = $ua->request($req);
+#print $res->as_string();
+
+#@slices = ('utah_allnodes');
+
+# now figure out, for each slice, what is the current exp date
+# if the slice is due to expire in less than a week, renew it
+#   by selecting one of the options in the drop-down box
+
+my %ok;
+my %errors;
+my %sliceexp;
+
+my $now = time();
+foreach my $slice (@slices) {
+    # dig out the exp date
+    # we have to look at the detail page, not the renew page, to get the date,
+    # because the renew page will just tell us we can't renew if the slice has
+    # has been recently renewed.
+    $req = HTTP::Request->new(GET => "$PLC_SLICE_DETAIL" . "$slice");
+    $res = $ua->request($req);
+
+    #print $res->as_string();
+
+    my $page = $res->content();
+    my @plines = split('\n',$page);
+    my $i;
+    my $expdate_str = '';
+
+    my $surl = '';
+    my $sdesc = '';
+
+    foreach my $line (@plines) {
+	if ($line =~ /Slice expiration:[\<\/\w\>]+\s+(\d+\-\w+\-\d+ \d+:\d+:\d+ \w+)/) {
+	    $expdate_str = $1;
+	    $sliceexp{$slice} = $1;
+	    #print "$slice expires at '$expdate_str'\n";
+	    last;
+	}
+    }
+    
+    if ($expdate_str ne '') {
+	my $exptime = str2time($expdate_str);
+	#print "slice '$slice' expires in " . ($exptime - $now) . "s\n";
+
+	if ($exptime < $now) {
+	    $errors{$slice} = "Slice '$slice' already expired!";
+	    print "WARNING: slice '$slice' already expired!\n";
+	}
+	elsif (($exptime - $now) > $SLICE_EXP_WINDOW) {
+	    $ok{$slice} = "Slice does not expire for " . (($exptime - $now)/(60*60*24)) . " days\n";
+	}
+	else {
+	    # need a renew:
+	    # first GET the renew page so we can parse out the description
+	    # and url fields in the form (they're easiest to grab here)
+	    $req = HTTP::Request->new(GET => "$PLC_RENEW" . "$slice");
+	    $res = $ua->request($req);
+
+	    $page = $res->content();
+	    @plines = split('\n',$page);
+	    foreach my $line (@plines) {
+		if ($line =~ /\<input.*name=\"url\" value=\"(.*)\" \/\>/) {
+		    # found the url
+		    $surl = $1;
+		}
+		elsif ($line =~ /\<textarea name=\"description\".*\>(.*)\<\/textarea/) {
+		    # found the description
+		    $sdesc = $1;
+		}
+	    }
+
+	    if ($surl eq '' || $sdesc eq '') {
+		print "WARNING: could not get url and description for slice '$slice'; cannot renew!\n";
+		$errors{$slice} = "could not get url and description for slice '$slice'";
+	    }
+	    else {
+		# always push it out for a month -- the longest item in the 
+		# page (at least it was when I looked in 12/2006)
+		# the page should accept renews up to 8 weeks though...
+		$req = POST $PLC_RENEW . "$slice", [ submitted => "Renew", 
+					  url => $surl,
+					  description => $sdesc,
+					  length => 4 ];
+		$res = $ua->request($req);
+
+		print $res->as_string();
+
+		$ok{$slice} = "Renewed";
+	    }
+	}
+    }
+    else {
+	print "WARNING: could not determine slice expiration time for '$slice'\n";
+	$errors{$slice} = "couldn't get expiration time for slice '$slice'";
+    }
+
+}
+
+
+# logout
+$req = HTTP::Request->new(GET => $PLC_LOGOUT);
+$res = $ua->request($req);
+
+# spam time!
+# XXX: this goes to my (dmj) account right now until I am sure that things
+# are working good...
+my $TBOPS = "johnsond\@flux.utah.edu";
+
+my $mailcontent = "Meta Slice Renew Report:\n\n";
+foreach my $slice (@slices) {
+    $mailcontent .= 
+	"Slice '$slice':\n" . 
+        "  Expiration time: ".$sliceexp{$slice}."\n";
+    if (defined($errors{$slice})) {
+	$mailcontent .= "  ERROR: " . $errors{$slice} . "\n";
+    }
+    elsif (defined($ok{$slice})) {
+	$mailcontent .= "  Success: " . $ok{$slice} . "\n";
+    }
+    else {
+	$mailcontent .= "  Nothing identifiable happened!\n";
+    }
+    $mailcontent .= "\n";
+}
+
+print "Sending report.\n";
+
+SENDMAIL("Testbed Operators <$TBOPS>",
+	 "plabmsrenew did something",
+	 "$mailcontent",
+	 "plabmsrenew <$TBOPS>");
+
+exit(0);
