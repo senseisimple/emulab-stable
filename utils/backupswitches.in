@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,6 +41,7 @@ my $datestr = "$year-$mon-$mday";
 #
 # Back up each switch in turn
 #
+unlink $TMPFILE;
 foreach my $switch (@ARGV) {
     system "$GRAB $switch $TMPFILE"
         and die "Unable to grab config for $switch\n";
