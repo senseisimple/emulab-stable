@@ -21,7 +21,7 @@ fi
 
 echo "##### cleaning up a little"
 rm -f magent/*.o stub/*.o
-strip magent/magent stub/stubd
+strip magent/magent stub/stubd libnetmon/netmonup
 
 echo "##### creating tarball $path from .."
 tar czf $path -C .. $files

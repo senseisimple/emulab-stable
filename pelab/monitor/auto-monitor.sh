@@ -10,6 +10,11 @@ ARGS=$*
 . `dirname $0`/../common-env.sh
 
 #
+# How long to wait for netmond.
+#
+NETMOND_TIMO=60
+
+#
 # Wait for all of the stubs to start
 #
 echo "Waiting for stubs to become ready";
@@ -29,9 +34,19 @@ MONPID=$!
 trap "{ $AS_ROOT kill $MONPID; $AS_ROOT killall netmond; true; }" TERM
 
 #
-# Give it time to come up
+# Make sure it is ready to receive requests.
+# We do this with a simple program that just opens a socket.
+# When run under libnetmon, it will fail if netmond is not yet running.
 #
-sleep 1
+if [ -x ${NETMON_DIR}/netmonup ]; then
+    LIBNETMON_CONNECTTIMO=$NETMOND_TIMO \
+	${MONITOR_DIR}/instrument.sh ${NETMON_DIR}/netmonup
+    if [ $? -ne 0 ]; then
+        echo "**** WARNING: netmond failed to start after $NETMOND_TIMO seconds"
+    fi
+else
+    sleep 2
+fi
 
 #
 # Wait for all the monitors to come up

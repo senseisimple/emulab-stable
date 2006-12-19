@@ -15,10 +15,10 @@ else
     LD_FLAGS=
 endif
 
-all: libnetmon.so netmond
+all: libnetmon.so netmond netmonup
 
 %.so: %.c %.h
 	$(CC) $(CFLAGS) $(LD_FLAGS) -shared -o $@ $<
 
 clean:
-	-rm *.so netmond
+	-rm *.so netmond netmonup
