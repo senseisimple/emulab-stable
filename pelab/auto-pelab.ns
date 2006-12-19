@@ -84,6 +84,15 @@ set plabnodes {}
 # Example node list
 #set plabnodes {plab518 plab541 plab628 plab736 plab360}
 
+# Empty List
+set skiplist {}
+# Example list
+#set skiplist {2 7}
+
+for {set i 0} {$i < [llength $skiplist]} {incr i} {
+    set skip([lindex $skiplist $i]) 1
+}
+
 #
 # Where to grab your tarball of pelab software from. To make this tarball:
 #   Go to your testbed source tree
@@ -292,7 +301,7 @@ set tfix 1
 set anix 1
 for {set i 1} {$i <= $num_pcs} {incr i} {
 
-    if {$real_plab} {
+    if {$real_plab && ![info exists skip($i)]} {
         set planet($i) [$ns node]
         tb-set-hardware $planet($i) pcplab
         append inet_string "$planet(${i}) "
@@ -366,7 +375,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     # even if they are not actually using PlanetLab nodes, the simple model can
     # still see the mapping between elab and plab nodes
     #
-    if {[llength $plabnodes] > 0} {
+    if {[llength $plabnodes] > 0 && ![info exists skip($i)]} {
         set opt(pelab-elab-$i-mapping) [lindex $plabnodes [expr $i - 1]]
     }
 }
