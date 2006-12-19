@@ -112,7 +112,6 @@ $ns define-template-parameter PLABNODES {} \
 # Example node list
 #set PLABNODES {plab518 plab541 plab628 plab736 plab360}
 
-
 # Empty List
 $ns define-template-parameter SKIPLIST {} \
 {Node numbers to ignore.  For example "2 7"}
@@ -220,6 +219,14 @@ $ns define-template-parameter USE_MAGENT 1 \
  instead of the old one on plab nodes. }
 
 #
+# If non-zero, start an iperfd process to receive traffic that would
+# otherwise go to the stub.
+#
+$ns define-template-parameter MAGENT_NORECV 0 \
+{If non-zero, turn off receiving traffic in the stub\
+ (an iperfd process is started to do it instead). }
+
+#
 # If non-zero, uses the DB-based "monitor" to control the cloud shaping
 #
 set val 0
@@ -231,8 +238,10 @@ $ns define-template-parameter USE_DBMONITOR $val \
  (rather than the application monitor) to control the cloud shaping. }
 
 #
-# If dbmonitor is set, this is the interval in seconds at which to poll the DB
-# and potentially update the shaping characteristics
+# If dbmonitor is set, these are the intervals at which the latency and BW
+# data are sampled by bgmon on the plab nodes.  The smaller (shorter interval)
+# of the two, is used as the interval at which dbmonitor polls the DB to get
+# data recorded by bgmon.
 #
 $ns define-template-parameter DBMONITOR_LATINTERVAL 10 \
 {If USE_DBMONITOR is non-zero, the interval in seconds at which DB latency\
@@ -272,7 +281,9 @@ set NO_STUB 0
 if {$NO_PLAB} {
     set FAKE_PLAB 0
     set REAL_PLAB 0
-    set USE_DBMONITOR 1
+# XXX don't force use of dbmonitor; may want to just use init_elabnodes.
+#    set USE_DBMONITOR 1
+    set NO_STUB 1
 }
 
 #
@@ -692,7 +703,7 @@ if {$FAKE_PLAB} {
     # stop stubs and monitors
     $start_fake append "$ns log \"##### Stopping stubs and monitors...\""
     if {!$NO_STUB} {
-        $start_fake append "$plabstubs stop"
+	$start_fake append "$plabstubs stop"
     }
     $start_fake append "$monitorgroup stop"
 
