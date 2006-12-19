@@ -15,6 +15,11 @@
 #define CONTROLSOCK SOCKPATH ".control"
 
 /*
+ * For convience
+ */
+typedef enum {true = 1, false = 0} bool;
+
+/*
  * Control messages
  */
 #define CONTROL_MESSAGE_SIZE 256
@@ -27,6 +32,7 @@ typedef enum {
     CM_MAXSOCKSIZE = 0,
     CM_OUTPUTVER,
     CM_REPORTS,
+    CM_MONITORDUP,
 
     CM_SOCKSIZE = 64,
     CM_QUERY
@@ -74,6 +80,14 @@ typedef struct {
     unsigned int type;
     unsigned char reports[CONTROL_MESSAGE_PAYLOAD_SIZE];
 } reports_m;
+
+/*
+ * Boolean: are we supposed to monitor UDP sockets?
+ */
+typedef struct {
+    unsigned int type;
+    unsigned char enable;
+} monitorudp_m;
 
 /*
  * Socket size change report

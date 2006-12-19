@@ -63,6 +63,12 @@ void lnm_init() {
         allocFDspace();
 
         /*
+         * By default, monitor TCP sockets only
+         */
+        monitor_tcp = true;
+        monitor_udp = false;
+
+        /*
          * Figure out which version of the output format we're supposed to use
          */
         char *outversion_s;
@@ -75,6 +81,32 @@ void lnm_init() {
             output_version = 1;
         }
         DEBUG(printf("Using output version %i\n",output_version));
+
+        /*
+         * Find out if we're supposed to monitor UDP sockets. Set to a non-zero
+         * int to monitor
+         */
+        char *monitor_udp_s;
+        monitor_udp_s = getenv("LIBNETMON_MONITORUDP");
+        if (monitor_udp_s) {
+            int flag;
+            if (!sscanf(outversion_s,"%i",&flag) == 1) {
+                croak1("Bad value for LIBNETMON_MONITORUDP: %s\n",
+                        monitor_udp_s);
+            }
+            if (flag) {
+                monitor_udp = true;
+            } else {
+                monitor_udp = false;
+            }
+        }
+
+        /*
+         * Get our PID
+         * TODO: We need to handle fork() and its variants - our children could
+         * get different PIDs
+         */
+        pid = getpid();
 
 #define FIND_REAL_FUN(FUN) \
           real_##FUN = (FUN##_proto_t*)dlsym(RTLD_NEXT,#FUN); \
@@ -418,14 +450,15 @@ void startFD(int fd) {
     }
     */
     /*
-     * Check to make sure it's a TCP socket
+     * Check to make sure it's a type of socket we're supposed to be monitoring
      */
     typesize = sizeof(unsigned int);
     if (getsockopt(fd,SOL_SOCKET,SO_TYPE,&socktype,&typesize) != 0) {
         croak1("Unable to get socket type: %s\n",strerror(errno));
     }
-    if (socktype != SOCK_STREAM) {
-        DEBUG(printf("Ignoring a non-TCP socket\n"));
+    if (!((monitor_tcp && socktype == SOCK_STREAM) ||
+          (monitor_udp && socktype == SOCK_DGRAM))) {
+        DEBUG(printf("Ignoring a type socket we're not monitoring\n"));
         return;
     }
 
@@ -464,8 +497,30 @@ void startFD(int fd) {
 		forced_bufsize, rcvsize);
     }
 
+    /*
+     * For version 3 and up, port numbers are not used for socket identifiers,
+     * so we can report a New event now. For earlier output versions, this gets
+     * reported in informConnect()
+     */
+    if (output_version >= 3) {
+        fprintf(outstream,"New: ");
+        fprintID(outstream,fd);
+        fprintf(outstream," ");
+        fprintTime(outstream);
+        fprintf(outstream," ");
+        if (socktype == SOCK_STREAM) {
+            fprintf(outstream,"TCP");
+        } else if (socktype == SOCK_DGRAM) {
+            fprintf(outstream,"UDP");
+        } else {
+            fprintf(outstream,"UNKNOWN");
+        }
+        fprintf(outstream,"\n");
+    }
+
     monitorFDs[fd].monitoring = true;
     monitorFDs[fd].connected = false;
+    monitorFDs[fd].socktype = socktype;
 
     DEBUG(printf("Watching FD %i\n",fd));
 
@@ -513,13 +568,19 @@ void stopWatchingAll() {
  */
 void fprintID(FILE *f, int fd) {
 
-    /*
-     * Note, we've switched from local_port to FD for the first field - this is
-     * so that we can report on a connection before connect() finishes
-     */
-    fprintf(f,"%i:%s:%i", fd,
-            monitorFDs[fd].remote_hostname,
-            monitorFDs[fd].remote_port);
+    if (output_version <= 2) {
+        /*
+         * Note, we've switched from local_port to FD for the first field - this is
+         * so that we can report on a connection before connect() finishes
+         */
+        fprintf(f,"%i:%s:%i", fd,
+                monitorFDs[fd].remote_hostname,
+                monitorFDs[fd].remote_port);
+    } else if (output_version == 3) {
+        fprintf(f,"%i:%i",pid,fd);
+    } else {
+        croak0("Improper output version");
+    }
 
 }
 
@@ -546,6 +607,7 @@ void process_control_packet(generic_m *m) {
     max_socket_m *maxmsg;
     out_ver_m *vermsg;
     reports_m *reportmsg;
+    monitorudp_m *monitorudpmsg;
 
     DEBUG(printf("Processing control packet\n"));
         
@@ -598,8 +660,24 @@ void process_control_packet(generic_m *m) {
             lnm_parse_reportopt(reportmsg->reports);
 
             break;
+        case CM_MONITORDUP:
+            /*
+             * The server is telling us whether it wants us to monitor UDP
+             * sockets
+             */
+            monitorudpmsg = (monitorudp_m*)m;
+
+            if (monitorudpmsg->enable) {
+                DEBUG(printf("Enabling UDP monitoring\n"));
+                monitor_udp = true;
+            } else {
+                DEBUG(printf("Disabling UDP monitoring\n"));
+                monitor_udp = false;
+            }
+
+            break;
         default:
-            croak1("Got an unexepected control message type: %i\n",
+            croak1("Got an unexpected control message type: %i\n",
 		   (void *)m->type);
     }
 }
@@ -756,6 +834,7 @@ void log_packet(int fd, size_t len) {
                     monitorFDs[fd].remote_port, len);
             break;
         case 2:
+        case 3:
             fprintf(outstream,"%lu.%06lu > ", time.tv_sec, time.tv_usec);
             fprintID(outstream,fd);
             fprintf(outstream," (%i)\n", len);
@@ -770,7 +849,7 @@ void log_packet(int fd, size_t len) {
  * Inform the user that the nodelay flag has been changed
  */
 void informNodelay(int fd) {
-    if (output_version >= 2) {
+    if (monitorFDs[fd].socktype == SOCK_STREAM && output_version >= 2) {
 	fprintf(outstream,"TCP_NODELAY: ");
 	fprintID(outstream,fd);
 	fprintf(outstream," %i\n",monitorFDs[fd].tcp_nodelay);
@@ -778,7 +857,7 @@ void informNodelay(int fd) {
 }
 
 void informMaxseg(int fd) {
-    if (output_version >= 2) {
+    if (monitorFDs[fd].socktype == SOCK_STREAM && output_version >= 2) {
 	fprintf(outstream,"TCP_MAXSEG: ");
 	fprintID(outstream,fd);
 	fprintf(outstream," %i\n",monitorFDs[fd].tcp_maxseg);
@@ -806,13 +885,37 @@ void informBufsize(int fd, int which) {
 void informConnect(int fd) {
     if (output_version >= 2) {
 	/*
-	 * Let the monitor know about it
+         * Let the monitor know about it - note: if it's a UDP socket, we've
+         * already reported on it in startFD. Note that, for version 3, we
+         * report the existence of the socket earler, in startFD
 	 */
-	fprintf(outstream,"New: ");
-	fprintID(outstream,fd);
-	fprintf(outstream," ");
-        fprintTime(outstream);
-	fprintf(outstream,"\n");
+        if ((output_version < 3) && monitorFDs[fd].socktype == SOCK_STREAM) {
+            fprintf(outstream,"New: ");
+            fprintID(outstream,fd);
+            fprintf(outstream," ");
+            fprintTime(outstream);
+            fprintf(outstream,"\n");
+        }
+
+        /*
+         * New versions of the output no longer include port numbers in the
+         * identifier. So, report those now
+         */
+        if (output_version >= 3){
+            fprintf(outstream,"RemoteIP: ");
+            fprintID(outstream,fd);
+            fprintf(outstream," ");
+            fprintTime(outstream);
+            fprintf(outstream," %s",monitorFDs[fd].remote_hostname);
+            fprintf(outstream,"\n");
+
+            fprintf(outstream,"RemotePort: ");
+            fprintID(outstream,fd);
+            fprintf(outstream," ");
+            fprintTime(outstream);
+            fprintf(outstream," %i",monitorFDs[fd].remote_port);
+            fprintf(outstream,"\n");
+        }
 
 	/*
 	 * Some things we report on for every connection
@@ -874,7 +977,6 @@ int socket(int domain, int type, int protocol) {
  * connecting to some host.
  *
  * TODO: Allow for some filters:
- *      Only TCP connections
  *      Only certain hosts? (eg. not loopback)
  */
 int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
@@ -930,7 +1032,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          */
 
         /*
-         * Get the local port number so that we can monitor about it
+         * Get the local port number so that we can monitor it
          */
         struct sockaddr_in localaddr;
         int namelen = sizeof(localaddr);

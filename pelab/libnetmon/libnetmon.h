@@ -43,7 +43,6 @@
 /*
  * Just a few things for convience
  */
-typedef enum {true = 1, false = 0} bool;
 const unsigned int FD_ALLOC_SIZE = 8;
 
 /*
@@ -106,6 +105,8 @@ typedef struct {
     int local_port;
 
     bool connected; /* Is this FD currently connected or not? */
+
+    int socktype; /* Socket type - normally SOCK_STREAM or SOCK_DGRAM */
 
     /*
      * Socket options we keep track of
@@ -181,6 +182,18 @@ static void control_query();
  * Which version of the output format are we using?
  */
 static unsigned int output_version;
+
+/*
+ * Our PID
+ */
+static pid_t pid;
+
+/*
+ * These describe the types of sockets we're monitoring - basically, are we
+ * monitoring TCP, UDP, or both?
+ */
+static bool monitor_tcp;
+static bool monitor_udp;
 
 /*
  * These describe which things we need to report on. report_all is sort of a

@@ -57,6 +57,11 @@ unsigned int forced_socksize = 0;
 char *reports = NULL;
 
 /*
+ * Enable UDP mointoring
+ */
+bool monitor_udp = false;
+
+/*
  * Give a client a report on what settings it should use.
  *
  * Returns non-zero if it gets an error - probably means the client should
@@ -67,6 +72,7 @@ unsigned int write_status(int fd) {
     max_socket_m *sockrep;
     out_ver_m *verrep;
     reports_m *reprep;
+    monitorudp_m *udprep;
 
     /*
      * Report on the maximum socket size
@@ -120,6 +126,22 @@ unsigned int write_status(int fd) {
         }
     }
 
+    /*
+     * Report on whether or not we want to monitor UDP sockets. Older versions
+     * of libnetmon won't know what to do with this, so only report if it's
+     * turned on
+     */
+    if (monitor_udp) {
+        udprep = (monitorudp_m *)&(message);
+        udprep->type = CM_MONITORDUP;
+        udprep->enable = true;
+
+        if (write(fd,&message,CONTROL_MESSAGE_SIZE) != CONTROL_MESSAGE_SIZE) {
+            /* Client probably disconnected */
+            return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -129,6 +151,7 @@ void usage() {
     fprintf(stderr,"    -l size         Maximum socket buffer size\n");
     fprintf(stderr,"    -f size         Force a socket buffer size\n");
     fprintf(stderr,"    -r reports      Enable listed reports\n");
+    fprintf(stderr,"    -u              Monitor UDP sockets\n");
     exit(-1);
 }
 
@@ -147,7 +170,7 @@ int main(int argc, char **argv) {
     /*
      * Process command-line args
      */
-    while ((ch = getopt(argc, argv, "f:l:v:r:")) != -1) {
+    while ((ch = getopt(argc, argv, "f:l:v:r:u")) != -1) {
         switch(ch) {
             case 'f':
                 if (sscanf(optarg,"%i",&forced_socksize) != 1) {
@@ -167,6 +190,9 @@ int main(int argc, char **argv) {
             case 'r':
                 reports = (char*)malloc(strlen(optarg) + 1);
                 strcpy(reports,optarg);
+                break;
+            case 'u':
+                monitor_udp = true;
                 break;
             default:
                 usage();

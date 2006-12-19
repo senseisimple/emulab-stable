@@ -9,16 +9,15 @@ Line format 3 for libnetmon:
 
 Possible commands and their values:
 
-New (no value)
-Protocol (value is 'TCP' or 'UDP')
-DestIP (value is a dotted quadruplet describing destination IP address)
+New (value is 'TCP' or 'UDP')
+RemoteIP (value is a dotted quadruplet describing destination IP address)
 RemotePort (value is a number representing the remote port of the connection)
 LocalPort (value is a number representing the local port of the connection)
 TCP_NODELAY (int)
 TCP_MAXSEG (int)
 SO_RCVBUF (int)
 SO_SNDBUF (int)
-Connected (no value)
+Connected (no value) (RemoteIP and RemotePort MUST be sent before this command)
 Write (value is the size of the write or sendto)
 Closed (no value)
 
