@@ -19,5 +19,21 @@ SO_RCVBUF (int)
 SO_SNDBUF (int)
 Connected (no value) (RemoteIP and RemotePort MUST be sent before this command)
 Write (value is the size of the write or sendto)
+SendTo (value is <localPort>:<remoteIP>:<remotePort>:<size>
 Closed (no value)
 
+On a TCP connection, there should be the following sequence:
+
+New
+(TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|RemoteIP|RemotePort)*
+Connected
+LocalPort
+Write*
+Closed
+
+On a UDP connection, there should be the following sequence:
+
+New
+(SO_RCVBUF|SO_SNDBUF)*
+SendTo*
+Closed
