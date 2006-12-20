@@ -40,7 +40,7 @@ class Project
 	    # Try lookup by plain uid.
 	    $foo = Project::LookupByPid($pid_idx);
 	    
-	    if (! $foo->IsValid())
+	    if (!$foo || !$foo->IsValid())
 		return null;
 
 	    # Return here, in case I add a cache and forget to do this.
