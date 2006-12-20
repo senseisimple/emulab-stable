@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,11 +17,14 @@ if (!isset($xml)) {
 #
 # Get current user, if any. We return info to logged in admin users,
 # or to someone who has the right key.
-# 
-$uid = GETLOGIN();
-if ($uid) {
-    LOGGEDINORDIE($uid);
-    if (!ISADMIN($uid)) {
+#
+$this_user = CheckLogin($check_status);
+
+if ($this_user) {
+    CheckLoginOrDie();
+    $isadmin = ISADMIN();
+
+    if (!$isadmin)) {
 	USERERROR("You do not have permission to view this page!", 1);
     }
 }

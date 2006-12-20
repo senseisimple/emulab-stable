@@ -13,9 +13,10 @@ sajax_export("GetExpState", "Show");
 #
 # Only known and logged in users can look at experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
 $tag = "Experiment";
 
 #

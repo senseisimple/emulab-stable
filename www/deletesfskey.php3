@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,16 +14,16 @@ include("showstuff.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # Page arguments.
-$target_uid = $_GET['target_uid'];
-$key        = $_GET['key'];
+$user = $_GET['user'];
+$key  = $_GET['key'];
 
 # Pedantic argument checking.
-if (!isset($target_uid) || $target_uid == "" || !TBvalid_uid($target_uid) ||
+if (!isset($user) || $user == "" || !User::ValidWebID($user) ||
     !isset($key) || $key == "" || !preg_match("/^[-\w\.\@\#]+$/", $key)) {
     PAGEARGERROR();
 }
@@ -31,20 +31,19 @@ if (!isset($target_uid) || $target_uid == "" || !TBvalid_uid($target_uid) ||
 #
 # Check to make sure thats this is a valid UID.
 #
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("The user $target_uid is not a valid user", 1);
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("The user $user is not a valid user", 1);
 }
+$target_dbuid = $target_user->uid();
+$target_uid   = $target_user->uid();
 
 #
 # Verify that this uid is a member of one of the projects that the
 # target_uid is in. Must have proper permission in that group too. 
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-
-    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
-	USERERROR("You do not have permission to change ${user}'s keys!", 1);
-    }
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_MODIFYINFO)) {
+    USERERROR("You do not have permission!", 1);
 }
 
 #
@@ -52,7 +51,7 @@ if (!$isadmin &&
 #
 $query_result =
     DBQueryFatal("select * from user_sfskeys ".
-		 "where uid='$target_uid' and comment='$key'");
+		 "where uid='$target_dbuid' and comment='$key'");
 
 if (! mysql_num_rows($query_result)) {
     USERERROR("SFS Key '$key' for user '$target_uid' does not exist!", 1);
@@ -76,9 +75,10 @@ if ($canceled) {
           SFS Public Key deletion canceled!
           </h2></center>\n";
 
+    $url = CreateURL("deletesfskey", $target_user);
+
     echo "<br>
-          Back to <a href='showsfskeys.php3?target_uid=$target_uid'>
-                 sfs public keys</a> for user '$uid'.\n";
+          Back to <a href='$url'>sfs public keys</a> for user '$uid'.\n";
     
     PAGEFOOTER();
     return;
@@ -91,9 +91,10 @@ if (!$confirmed) {
           Are you <b>REALLY</b>
           sure you want to delete this SFS Public Key for user '$target_uid'?
           </h3>\n";
+
+    $url = CreateURL("deletesfskey", $target_user, "key", $key);
     
-    echo "<form action='deletesfskey.php3?target_uid=$target_uid&key=$key'
-                method=post>";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -112,8 +113,11 @@ if (!$confirmed) {
 #
 # Audit
 #
-TBUserInfo($uid, $uid_name, $uid_email);
-TBUserInfo($target_uid, $targuid_name, $targuid_email);
+$uid_name  = $this_user->name();
+$uid_email = $this_user->email();
+
+$targuid_name  = $target_user->name();
+$targuid_email = $target_user->email();
 
 TBMAIL("$targuid_name <$targuid_email>",
      "SFS Public Key for '$target_uid' Deleted",
@@ -129,7 +133,7 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Errors-To: $TBMAIL_WWW");
 
 DBQueryFatal("delete from user_sfskeys ".
-	     "where uid='$target_uid' and comment='$key'");
+	     "where uid='$target_dbuid' and comment='$key'");
 
 #
 # update sfs_users files and nodes if appropriate.
@@ -141,6 +145,6 @@ else {
     SUEXEC("nobody", "nobody", "webaddsfskey -w $target_uid", 0);
 }
 
-header("Location: showsfskeys.php3?target_uid=$target_uid");
+PAGEREPLACE(CreateURL("showsfskeys", $target_user));
 
 ?>

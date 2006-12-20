@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,10 +12,10 @@ if (!$MAILMANSUPPORT) {
 }
 
 # No Pageheader since we spit out a redirection below.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # We will either show a specific list.
@@ -56,7 +56,8 @@ if (isset($pid) && $pid != "") {
     # admin can request access to the list admin interface, and we need
     # a different cookie for that.
     #
-    TBUserInfo($uid, $user_name, $user_email);
+    $user_name  = $this_user->name();
+    $user_email = $this_user->email();
     $user_email = rawurlencode($user_email);
     
     $cookietype = "user";
@@ -118,7 +119,8 @@ elseif (isset($listname) && $listname != "") {
     if (! TBvalid_mailman_listname($listname)) {
 	PAGEARGERROR("Invalid characters in $listname!");
     }
-    TBUserInfo($uid, $user_name, $user_email);
+    $user_name  = $this_user->name();
+    $user_email = $this_user->email();
     $user_email = rawurlencode($user_email);
 	
     $optargs = "";

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,8 +14,9 @@ PAGEHEADER("Node Control Form");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
@@ -41,7 +42,6 @@ $row = mysql_fetch_array($query_result);
 # Admin users can control any node, but normal users can only control
 # nodes in their own experiments.
 #
-$isadmin = ISADMIN($uid);
 if (! $isadmin) {
     if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
         USERERROR("You do not have permission to modify node $node_id!", 1);

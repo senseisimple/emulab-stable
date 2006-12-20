@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,18 +14,11 @@ if (!$CHATSUPPORT) {
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-$query_result =
-    DBQueryFatal("select mailman_password from users where uid='$uid'");
-
-if (!mysql_num_rows($query_result)) {
-    USERERROR("No such user $uid!", 1);
-}
-$row = mysql_fetch_array($query_result);
-$password = $row['mailman_password'];
+$password = $this_user->mailman_password();
 
 PAGEHEADER("My Instant Messaging");
 

@@ -16,9 +16,9 @@ PAGEHEADER("Edit Image Descriptor");
 #
 # Only known and logged in users!
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Must get the imageid as a page argument.

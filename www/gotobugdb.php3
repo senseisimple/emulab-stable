@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,9 +12,10 @@ if (!$BUGDBSUPPORT) {
 }
 
 # No Pageheader since we spit out a redirection below.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY); # XXX BUGDBONLY ?
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
+		     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY); # XXX BUGDBONLY ?
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # The project to zap to on the other side

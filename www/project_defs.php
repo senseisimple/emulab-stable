@@ -36,9 +36,17 @@ class Project
     function Lookup($pid_idx) {
 	$foo = new Project($pid_idx);
 
-	if ($foo->IsValid())
+	if (! $foo->IsValid()) {
+	    # Try lookup by plain uid.
+	    $foo = Project::LookupByPid($pid_idx);
+	    
+	    if (! $foo->IsValid())
+		return null;
+
+	    # Return here, in case I add a cache and forget to do this.
 	    return $foo;
-	return null;
+	}
+	return $foo;
     }
 
     # Backwards compatable lookup by pid. Will eventually flush this.
@@ -128,6 +136,14 @@ class Project
     }
 
     #
+    # At some point we will stop passing pid and start using pid_idx.
+    # Use this function to avoid having to change a bunch of code twice.
+    #
+    function URLParam() {
+	return $this->pid();
+    }
+
+    #
     # Class function to create new project and return object.
     #
     function NewProject($pid, $leader, $args) {
@@ -190,6 +206,16 @@ class Project
     }
 
     #
+    # Access Check, which for now uses the global function to avoid duplication
+    # until all code is changed.
+    #
+    function AccessCheck($user, $access_type) {
+	return TBProjAccessCheck($user->uid(),
+				 $this->pid(), $this->pid(),
+				 $access_type);
+    }
+
+    #
     # Load the default group for a project lazily.
     #
     function LoadGroup() {
@@ -204,6 +230,18 @@ class Project
     }
 
     #
+    # Return user object for leader.
+    #
+    function GetLeader() {
+	$head_uid = $this->head_uid();
+
+	if (! ($leader = User::Lookup($head_uid))) {
+	    TBERROR("Could not find user object for $head_uid", 1);
+	}
+	return $leader;
+    }
+
+    #
     # Add *new* member to project group; starts out with trust=none.
     #
     function AddNewMember($user) {
@@ -215,22 +253,104 @@ class Project
     #
     # Check if user is a member of this project (well, group)
     #
-    function IsMember($user) {
+    function IsMember($user, &$approved) {
 	$group = $this->LoadGroup();
 
-	return $group->IsMember($user);
+	return $group->IsMember($user, $approved);
     }
 
     #
-    # Return user object for the leader.
+    # Member list for a group.
     #
-    function Leader() {
-	$head_uid = $this->head_uid();
+    function MemberList() {
+	$pid_idx = $this->pid_idx();
+	$result  = array();
 
-	if (! ($leader = User::LookupByUid($head_uid))) {
-	    TBERROR("Project::Leader: Could not lookup leader $head_uid!", 1);
+	$query_result =
+	    DBQueryFatal("select uid_idx from group_membership ".
+			 "where pid_idx='$pid_idx' and gid_idx=pid_idx");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $uid_idx = $row["uid_idx"];
+
+	    if (! ($user =& User::Lookup($uid_idx))) {
+		TBERROR("Project::MemberList: ".
+			"Could not load user $uid_idx!", 1);
+	    }
+	    $result[] =& $user;
 	}
-	return $leader;
+	return $result;
+    }
+
+    #
+    # List of subgroups for a project member (not including default group).
+    #
+    function GroupList($user) {
+	$pid_idx = $this->pid_idx();
+	$uid_idx = $user->uid_idx();
+	$result  = array();
+
+	$query_result =
+	    DBQueryFatal("select gid_idx from group_membership ".
+			 "where pid_idx='$pid_idx' and pid_idx!=gid_idx and ".
+			 "      uid_idx='$uid_idx'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $gid_idx = $row["gid_idx"];
+
+	    if (! ($group = Group::Lookup($gid_idx))) {
+		TBERROR("Project::GroupList: ".
+			"Could not load group $gid_idx!", 1);
+	    }
+	    $result[] = $group;
+	}
+	return $result;
+    }
+
+    #
+    # Change the leader for a project. Done *only* before project is
+    # approved.
+    #
+    function ChangeLeader($leader) {
+	$group = $this->LoadGroup();
+	$idx   = $this->pid_idx();
+	$uid   = $leader->uid();
+
+	DBQueryFatal("update projects set head_uid='$uid' ".
+		     "where pid_idx='$idx'");
+
+	$this->project["head_uid"] = $uid;
+	return $group->ChangeLeader($leader);
     }
     
+    #
+    # Change various fields.
+    #
+    function SetApproved($approved) {
+	$idx   = $this->pid_idx();
+
+	if ($approved)
+	    $approved = 1;
+	else
+	    $approved = 0;
+	
+	DBQueryFatal("update projects set approved='$approved' ".
+		     "where pid_idx='$idx'");
+
+	$this->project["approved"] = $approved;
+	return 0;
+    }
+    function SetRemoteOK($ok) {
+	$idx    = $this->pid_idx();
+	$safeok = addslashes($ok);
+
+	DBQueryFatal("update projects set pcremote_ok='$safeok' ".
+		     "where pid_idx='$idx'");
+
+	$this->project["pcremote_ok"] = $ok;
+	return 0;
+	
+
+    }
+
 }

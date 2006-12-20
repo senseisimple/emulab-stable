@@ -37,12 +37,25 @@ class Experiment
 	return !is_null($this->experiment);
     }
 
-    # Lookup by exptidx.
+    # Lookup by exptidx, but allow for lookup by pid,eid with variable args.
     function Lookup($exptidx) {
+	$args = func_get_args();
+
 	$foo = new Experiment($exptidx);
 
 	if ($foo->IsValid())
 	    return $foo;
+
+        # Try lookup with pid,eid.
+	if (count($args) == 2) {
+	    $pid = array_shift($args);
+	    $eid = array_shift($args);
+
+	    $foo = Experiment::LookupByPidEid($pid, $eid);
+
+	    if ($foo->IsValid())
+		return $foo;
+	}
 	return null;
     }
 
@@ -102,6 +115,16 @@ class Experiment
 	return $this->group;
     }
 
+    #
+    # Get the creator for a project.
+    #
+    function GetCreator() {
+	return User::Lookup($this->creator());
+    }
+    function GetSwapper() {
+	return User::Lookup($this->swapper());
+    }
+
     # accessors
     function field($name) {
 	return (is_null($this->experiment) ? -1 : $this->experiment[$name]);
@@ -139,9 +162,10 @@ class Experiment
     # Access Check. This is not code I want to duplicate, so hand off to
     # global routine until all code converted.
     #
-    function AccessCheck ($uid, $access_type) {
+    function AccessCheck ($user, $access_type) {
 	$pid = $this->pid();
 	$eid = $this->eid();
+	$uid = $user->uid();
 	
 	return TBExptAccessCheck($uid, $pid, $eid, $access_type);
     }

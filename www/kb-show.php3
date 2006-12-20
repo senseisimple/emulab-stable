@@ -36,12 +36,11 @@ else {
 #
 # Admin users get a menu.
 #
-if (!$printable) {
-    $uid     = GETLOGIN();
+if (($this_user = CheckLogin($ignore))) {
+    $isadmin = ISADMIN();
+}
+else {
     $isadmin = 0;
-    if (CHECKLOGIN($uid) & CHECKLOGIN_LOGGEDIN) {
-	$isadmin = ISADMIN();
-    }
 }
 
 #

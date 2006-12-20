@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,15 +9,15 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
 # 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
+if (!isset($user) ||
+    strcmp($user, "") == 0) {
     USERERROR("You must provide a User ID.", 1);
 }
 
@@ -27,13 +27,19 @@ if (!$isadmin) {
     USERERROR("You do not have permission to view this page!", 1);
 }
 
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("$target_uid is not a valid user ID!", 1);
+#
+# Confirm target is a real user.
+#
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("The user $target_uid is not a valid user", 1);
 }
+$target_uid = $target_user->uid();
 
 # Get email info and Key,
-TBUserInfo($target_uid, $usr_name, $usr_email);
-$key = TBGetVerificationKey($target_uid);
+$usr_name  = $target_user->name();
+$usr_email = $target_user->email();
+$key       = $target_user->verify_key();
+
 if (!$key || !strcmp($key, "")) {
     USERERROR("$target_uid does not have a valid verification key!", 1);
 }
@@ -46,7 +52,7 @@ TBMAIL("$usr_name '$target_uid' <$usr_email>",
        "This is your account verification key: $key\n\n".
        "Please use this link to verify your user account:\n".
        "\n".
-       "    ${TBBASE}/login.php3?vuid=$target_uid&key=$key\n".
+       "    ${TBBASE}/login.php3?vuid=$user&key=$key\n".
        "\n".
        "You will then be verified as a user.\n".
        "\n".

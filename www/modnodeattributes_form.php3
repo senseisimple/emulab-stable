@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,8 +14,9 @@ PAGEHEADER("Modify Node Attributes Form");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
@@ -38,7 +39,6 @@ $noderow = mysql_fetch_array($query_result);
 #
 # Only admin users can modify node attributes.
 #
-$isadmin = ISADMIN($uid);
 if (! $isadmin) {
   USERERROR("You do not have permission to modify node $node_id!", 1);
 }

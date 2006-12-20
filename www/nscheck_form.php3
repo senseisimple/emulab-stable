@@ -14,8 +14,9 @@ PAGEHEADER("Syntax Check your NS file");
 #
 # Only known and logged in users can begin experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 ?>
 <table align="center" border="1"> 

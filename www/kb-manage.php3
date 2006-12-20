@@ -19,12 +19,11 @@ define("TBDB_KB_BODYLEN",	10000);
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-# Summary data for admins only.
-if (!ISADMIN()) {
+if (!$isadmin) {
     USERERROR("You are not allowed to view this page!", 1);
 }
 

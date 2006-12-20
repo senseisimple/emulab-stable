@@ -13,8 +13,9 @@ include("defs.php3");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 $idleswaptimeout = TBGetSiteVar("idle/threshold");
 
 #
@@ -33,15 +34,14 @@ if (!isset($eid) ||
 #
 # Check to make sure this is a valid PID/EID tuple.
 #
-if (! TBValidExperiment($pid, $eid)) {
-    USERERROR("The experiment $eid is not a valid experiment ".
-	      "in project $pid.", 1);
+if (! ($experiment = Experiment::Lookup($pid, $eid))) {
+    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
 }
 
 #
 # Verify Permission.
 #
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
+if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to modify experiment $pid/$eid!", 1);
 }
 
@@ -632,9 +632,15 @@ if ($doemail &&
     ! (ISADMINISTRATOR() &&
        (!strcmp($uid, $creator) || !strcmp($uid, $swapper)))) {
 
-    TBUserInfo($uid,     $user_name, $user_email);
-    TBUserInfo($creator, $cname, $cemail);
-    TBUserInfo($swapper, $sname, $semail);
+    $target_creator = $experiment->GetCreator();
+    $target_swapper = $experiment->GetSwapper();
+
+    $user_name  = $this_user->name();
+    $user_email = $this_user->email();
+    $cname      = $target_creator->name();
+    $cemail     = $target_creator->email();
+    $sname      = $target_swapper->name();
+    $semail     = $target_swapper->email();
 
     $olds = ($defaults[swappable] ? "Yes" : "No");
     $oldsr= $defaults[noswap_reason];

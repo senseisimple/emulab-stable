@@ -38,17 +38,15 @@ if (!isset($SSL_PROTOCOL)) {
 #
 # Must not be logged in.
 # 
-if (($known_uid = GETUID()) != FALSE) {
-    if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
-	PAGEHEADER("Forgot Your Password?", $view);
+if (CheckLogin($check_status)) {
+    PAGEHEADER("Forgot Your Password?", $view);
 
-	echo "<h3>
+    echo "<h3>
               You are logged in. You must already know your password!
-              </h3>\n";
-
-	PAGEFOOTER($view);
-	die("");
-    }
+          </h3>\n";
+    
+    PAGEFOOTER($view);
+    die("");
 }
 
 #
@@ -143,17 +141,14 @@ if (!isset($phone) || $phone == "" || !TBvalid_phone($phone) ||
     return;
 }
 
-$query_result =
-    DBQueryFatal("select uid,usr_phone from users ".
-		 "where LCASE(usr_email)=LCASE('$email')");
-
-if (! mysql_num_rows($query_result)) {
+if (! ($user = User::LookupByEmail($email))) {
     SPITFORM($email, $phone, 2, $simple, $view);
     return;
 }
-$row = mysql_fetch_row($query_result);
-$uid = $row[0];
-$usr_phone = $row[1];
+$uid       = $user->uid();
+$usr_phone = $user->phone();
+$uid_name  = $user->name();
+$uid_email = $user->email();
 
 #
 # Compare phone by striping out anything but the numbers.
@@ -163,8 +158,6 @@ if (preg_replace("/[^0-9]/", "", $phone) !=
     SPITFORM($email, $phone, 3, $simple, $view);
     return;
 }
-
-TBUserInfo($uid, $uid_name, $uid_email);
 
 #
 # Yep. Generate a random key and send the user an email message with a URL
@@ -181,10 +174,7 @@ setcookie($TBAUTHCOOKIE, $keyA, 0, "/",
 # It is okay to spit this now that we have sent the cookie.
 PAGEHEADER("Forgot Your Password?", $view);
 
-DBQueryFatal("update users set ".
-	     "       chpasswd_key='$key', ".
-	     "       chpasswd_expires=UNIX_TIMESTAMP(now())+(60*30) ".
-	     "where uid='$uid'");
+$user->SetChangePassword($key, "UNIX_TIMESTAMP(now())+(60*30)");
 
 TBMAIL("$uid_name <$uid_email>",
        "Password Reset requested by '$uid'",

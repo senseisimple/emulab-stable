@@ -1,14 +1,17 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
 # Some Knowledge Base entries are visible only to admins.
-$uid = GETLOGIN();
-$admin_access = ISADMIN($uid) || ISFOREIGN_ADMIN($uid);
+$admin_access = $isadmin || ISFOREIGN_ADMIN();
 
 # Page arguments.
 $printable = $_GET['printable'];

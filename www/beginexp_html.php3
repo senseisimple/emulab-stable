@@ -25,10 +25,10 @@ function EXPERROR()
 #
 # Only known and logged in users can begin experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-# This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
 #
@@ -48,7 +48,7 @@ $idleswaptimeout = TBGetSiteVar("idle/threshold");
 #
 # See what projects the uid can create experiments in. Must be at least one.
 #
-$projlist = TBProjList($uid, $TB_PROJECT_CREATEEXPT);
+$projlist = $this_user->ProjectAccessList($TB_PROJECT_CREATEEXPT);
 
 if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".

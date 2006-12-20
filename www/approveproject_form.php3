@@ -15,13 +15,13 @@ PAGEHEADER("New Project Approval");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Of course verify that this uid has admin privs!
 #
-$isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to approve projects!", 1);
 }
@@ -37,8 +37,8 @@ if (!isset($pid) ||
 #
 # Check to make sure thats this is a valid PID.
 #
-if (! TBValidProject($pid)) {
-    USERERROR("The project $pid is not a valid project.", 1);
+if (! ($this_project = Project::Lookup($pid))) {
+    USERERROR("Unknown project $pid", 1);
 }
 
 echo "<center><h3>You have the following choices:</h3></center>
@@ -79,19 +79,19 @@ echo "<center><h3>You have the following choices:</h3></center>
 #
 SHOWPROJECT($pid, $uid);
 
-TBProjLeader($pid, $projleader);
+$projleader = $this_project->GetLeader();
 
 echo "<center>
       <h3>Project Leader Information</h3>
       </center>
       <table align=center border=0>\n";
 
-SHOWUSER($projleader);
+SHOWUSER($projleader->uid());
 
 #
 # Check to make sure that the head user is 'unapproved' or 'active'
 #
-$headstatus = TBUserStatus($projleader);
+$headstatus = $projleader->status();
 if (!strcmp($headstatus,TBDB_USERSTATUS_UNAPPROVED) ||
 	!strcmp($headstatus,TBDB_USERSTATUS_ACTIVE)) {
     $approvable = 1;
@@ -136,7 +136,7 @@ echo "<tr>
        </tr>\n";
 
 #
-# Allow the approver to change the project's head UID - gotta find everyone in
+# Allow the approver to change the projects head UID - gotta find everyone in
 # the default group, first
 #
 echo "<tr>
@@ -144,12 +144,14 @@ echo "<tr>
 	      Head UID:
               <select name=head_uid>
                       <option value=''>(Unchanged)</option>";
-$query_result =
-    DBQueryFatal("select uid from group_membership where pid='$pid' and " .
-	    "gid='$pid'");
-while ($row = mysql_fetch_array($query_result)) {
-    $thisuid = $row[uid];
-    echo "                      <option value='$thisuid'>$thisuid</option>\n";
+
+$allmembers = $this_project->MemberList();
+
+foreach ($allmembers as $other_user) {
+    $this_uid   = $other_user->uid();
+    $this_webid = $other_user->webid();
+    
+    echo "                   <option value='$this_webid'>$this_uid</option>\n";
 }
 echo "        </select>
           </td>

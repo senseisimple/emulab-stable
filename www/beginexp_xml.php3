@@ -55,11 +55,12 @@ function XMLSTATUS($status, $message)
 # need to investigate how to make this cleaner, perhaps with a global variable
 # that changes how TBERROR and USERERROR operate. Needs more thought.
 #
-$uid    = GETLOGIN();
-$status = CHECKLOGIN($uid);
-if (($status & CHECKLOGIN_LOGGEDIN) != CHECKLOGIN_LOGGEDIN) {
+$this_user = CheckLogin($status);
+if (!$this_user ||
+    (($status & CHECKLOGIN_LOGGEDIN) != CHECKLOGIN_LOGGEDIN)) {
     EXPERROR("autherror", "Not logged in");
 }
+$uid = $this_user->uid();
 
 # Need this below;
 $idleswaptimeout = TBGetSiteVar("idle/threshold");
@@ -190,7 +191,7 @@ else {
     # I am going to allow shell experiments to be created (No NS file),
     # but only by admin types.
     #
-    if (! ISADMIN($uid)) {
+    if (! ISADMIN()) {
 	$errors["NS File"] = "You must provide an NS file";
     }
 }
@@ -206,7 +207,7 @@ if (!isset($formfields[exp_swappable]) ||
     if (!isset($formfields[exp_noswap_reason]) ||
         !strcmp($formfields[exp_noswap_reason], "")) {
 
-        if (! ISADMIN($uid)) {
+        if (! ISADMIN()) {
 	    $errors["Not Swappable"] = "No justification provided";
         }
 	else {
@@ -228,7 +229,7 @@ if (!isset($formfields[exp_idleswap]) ||
 
     if (!isset($formfields[exp_noidleswap_reason]) ||
 	!strcmp($formfields[exp_noidleswap_reason], "")) {
-	if (! ISADMIN($uid)) {
+	if (! ISADMIN()) {
 	    $errors["Not Idle-Swappable"] = "No justification provided";
 	}
 	else {
@@ -421,11 +422,6 @@ if (isset($formfields[exp_savedisk]) &&
 if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
     $linktestarg   = "-t " . $formfields[exp_linktest];
 }
-
-#
-# We need the email address for messages below.
-#
-TBUserInfo($uid, $user_name, $user_email);
 
 #
 # Grab the unix GID for running scripts.

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,20 +14,18 @@ include("defs.php3");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
 
-# Get the windows password from the database, or use a random default.
-$query_result =
-    DBQueryFatal("select usr_pswd, usr_w_pswd from users where uid='$uid'");
-$row = mysql_fetch_array($query_result);
-if (strcmp($row[usr_w_pswd],""))
-    $pswd = $row[usr_w_pswd];
+if ($this_user->w_pswd() != "") {
+    $pswd = $this_user->w_pswd();
+}
 else {
     # The initial random default for the Windows Password is based on the Unix
     # encrypted password, in particular the random salt if it's an MD5 crypt,
-    # consisting of the 8 characters after an initial "$1$" and followed by a "$". 
-    $unixpwd = explode('$', $row[usr_pswd]);
+    # consisting of the 8 characters after an initial "$1$" and followed by a
+    # "$". 
+    $unixpwd = explode('$', $this_user->pswd());
     if (strlen($unixpwd[0]) > 0)
 	# When there's no $ at the beginning, it's not an MD5 hash.
 	$pswd = substr($unixpwd[0],0,8);

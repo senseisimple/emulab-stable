@@ -18,9 +18,9 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # List of valid toggles
 $toggles = array("adminon", "webfreeze", "cvsweb", "lockdown",
@@ -35,8 +35,8 @@ $values  = array("adminon"        => array(0,1),
 
 # list of valid extra variables for the each toggle, and mandatory flag.
 $optargs = array("adminon"        => array(),
-		 "webfreeze"      => array("target_uid" => 1),
-		 "cvsweb"         => array("target_uid" => 1),
+		 "webfreeze"      => array("user" => 1),
+		 "cvsweb"         => array("user" => 1),
 		 "lockdown"       => array("pid" => 1, "eid" => 1),
 		 "cvsrepo_public" => array("pid" => 1));
 
@@ -79,29 +79,27 @@ if ($type == "adminon") {
     if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
-    SETADMINMODE($uid, $value);
+    SETADMINMODE($value);
 }
 elseif ($type == "webfreeze") {
     # must be admin
     if (! $isadmin) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
-    if (!TBCurrentUser($target_uid)) {
-	PAGEARGERROR("Target user '$target_uid' is not a valid user!");
+    if (! ($target_user = User::Lookup($user))) {
+	PAGEARGERROR("Target user '$user' is not a valid user!");
     }
-    DBQueryFatal("update users set weblogin_frozen='$value' ".
-		 "where uid='$target_uid'");
+    $target_user->SetWebFreeze($value);
 }
 elseif ($type == "cvsweb") {
     # must be admin
     if (! $isadmin) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
-    if (!TBCurrentUser($target_uid)) {
-	PAGEARGERROR("Target user '$target_uid' is not a valid user!");
+    if (! ($target_user = User::Lookup($user))) {
+	PAGEARGERROR("Target user '$user' is not a valid user!");
     }
-    DBQueryFatal("update users set cvsweb='$value' ".
-		 "where uid='$target_uid'");
+    $target_user->SetCVSWeb($value);
 }
 elseif ($type == "lockdown") {
     # must be admin
@@ -140,12 +138,12 @@ else {
 #
 if (isset($HTTP_REFERER) && $HTTP_REFERER != "" &&
     strpos($HTTP_REFERER,$_SERVER[SCRIPT_NAME])===false) {
-    # Make sure the referer isn't me!
+    # Make sure the referer is not me!
     header("Location: $HTTP_REFERER");
 }
 else {
-    if (isset($target_uid)) {
-	header("Location: $TBBASE/showuser.php3?target_uid=$target_uid");
+    if (isset($user)) {
+	header("Location: " . CreateURL("showuser", $target_user));
     } elseif (isset($pid) && isset($eid)) {
 	header("Location: $TBBASE/showexp.php3?pid=$pid&eid=$eid");
     } else {

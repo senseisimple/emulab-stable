@@ -1,13 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 # No Pageheader since we spit out a redirection below.
-$uid = GETLOGIN();
 
 #
 # We must get the redirection target.
@@ -37,7 +36,9 @@ if ($redirect_host != "www.datapository.net" &&
 # Okay, now see if the user is logged in. If not, the user will be
 # be brought back here after logging in.
 #
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Generate a cookie. 

@@ -15,14 +15,14 @@ PAGEHEADER("OS Descriptor List");
 #
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Admin users can see all OSIDs, while normal users can only see
 # ones in their projects or ones that are globally available.
 #
-$isadmin = ISADMIN($uid);
 
 if (! isset($sortby))
     $sortby = "normal";
@@ -42,7 +42,7 @@ else
 #
 $extraclause = "";
 if (isset($creator) && $creator != "") {
-    if (! TBvalid_uid($creator)) {
+    if (! User::ValidWebID($creator)) {
 	PAGEARGERROR("Invalid characters in creator");
     }
     if ($isadmin) 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,9 +14,11 @@ PAGEHEADER("Widearea Accounts Approval Form");
 #
 # Only admin types can use this page.
 #
-$auth_usr = GETLOGIN();
-LOGGEDINORDIE($auth_usr);
-if (! ISADMIN($auth_usr)) {
+$this_user = CheckLoginOrDie();
+$auth_usr  = $this_user->uid();
+$isadmin   = ISADMIN();
+
+if (! $isadmin) {
     USERERROR("Only testbed administrators people can access this page!", 1);
 }
 
@@ -109,9 +111,9 @@ echo "<tr>
 echo "<form action='approvewauser.php3' method='post'>\n";
 
 while ($usersrow = mysql_fetch_array($query_result)) {
-    $newuid        = $usersrow[uid];
-    $node_id       = $usersrow[node_id];
-    $date_applied  = $usersrow[date_applied];
+    $newuid        = $usersrow["uid"];
+    $node_id       = $usersrow["node_id"];
+    $date_applied  = $usersrow["date_applied"];
 
     #
     # Cause this field was added late and might be null.
@@ -120,21 +122,21 @@ while ($usersrow = mysql_fetch_array($query_result)) {
 	$date_applied = "--";
     }
 
-    $userinfo_result =
-	DBQueryFatal("SELECT * from users where uid='$newuid'");
+    if (! ($user = User::Lookup($newuid))) {
+	TBERROR("Could not lookup user $uid_idx", 1);
+    }
 
-    $row	= mysql_fetch_array($userinfo_result);
-    $name	= $row[usr_name];
-    $email	= $row[usr_email];
-    $title	= $row[usr_title];
-    $affil	= $row[usr_affil];
-    $addr	= $row[usr_addr];
-    $addr2	= $row[usr_addr2];
-    $city	= $row[usr_city];
-    $state	= $row[usr_state];
-    $zip	= $row[usr_zip];
-    $country	= $row[usr_country];
-    $phone	= $row[usr_phone];
+    $name	= $user->name();
+    $email	= $user->email();
+    $title	= $user->title();
+    $affil	= $user->affil();
+    $addr	= $user->addr();
+    $addr2	= $user->addr2();
+    $city	= $user->city();
+    $state	= $user->state();
+    $zip	= $user->zip();
+    $country	= $user->country();
+    $phone	= $user->phone();
 
     echo "<tr>
               <td colspan=10> </td>

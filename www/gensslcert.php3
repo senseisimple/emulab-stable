@@ -9,9 +9,9 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # The conclusion.
@@ -19,10 +19,15 @@ $isadmin = ISADMIN($uid);
 if (isset($_GET['finished'])) {
     PAGEHEADER("Generate SSL Certificate");
 
-    $target_uid = $_GET['target_uid'];
+    $user = $_GET['user'];
+
+    if (! ($target_user = User::Lookup($user))) {
+	USERERROR("The user $user is not a valid user", 1);
+    }
+    $url = CreateURL("getsslcert", $target_user);
     
     echo "Your new SSL certificate has been created. You can
-          <a href=getsslcert.php3?target_uid=$target_uid>download</a> your 
+          <a href='$url'>download</a> your 
           certificate and private key in PEM format, and then save
           it to a file in your .ssl directory.\n";
 	    
@@ -36,55 +41,54 @@ if (isset($_GET['finished'])) {
 #
 if (! isset($_POST['submit'])) {
     # First page load. Default to current user.
-    if (! isset($_GET['target_uid']))
-	$target_uid = $uid;
+    if (! isset($_GET['user']))
+	$user = $uid;
     else
-	$target_uid = $_GET['target_uid'];
+	$user = $_GET['user'];
 }
 else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
+    # Form submitted. Make sure we have a formfields array and a user.
     if (!isset($_POST['formfields']) ||
 	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['target_uid'])) {
+	!isset($_POST['formfields']['user'])) {
 	PAGEARGERROR("Invalid form arguments.");
     }
     $formfields = $_POST['formfields'];
-    $target_uid = $formfields['target_uid'];
+    $user = $formfields['user'];
 }
 
 # Pedantic check of uid before continuing.
-if ($target_uid == "" || !TBvalid_uid($target_uid)) {
-    PAGEARGERROR("Invalid uid: '$target_uid'");
+if ($user == "" || !User::ValidWebID($user)) {
+    PAGEARGERROR("Invalid uid: '$user'");
 }
 
 #
 # Check to make sure thats this is a valid UID.
 #
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("The user $target_uid is not a valid user", 1);
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("The user $user is not a valid user", 1);
 }
+$target_uid = $target_user->uid();
 
 #
 # Only admin people can create SSL certs for another user.
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-    USERERROR("You do not have permission to create SSL certs for $user!", 1);
+if (!$isadmin && !$target_user->SameUser($this_user)) {
+    USERERROR("You do not have permission to create SSL certs ".
+	      "for $target_uid!", 1);
 }
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $target_uid, $BOSSNODE;
+    global $isadmin, $target_user, $BOSSNODE;
+
+    $target_uid    = $target_user->uid();
+    $target_webid  = $target_user->webid();
 
     #
     # Standard Testbed Header, now that we know what we want to say.
     #
-    if (strcmp($uid, $target_uid)) {
-	PAGEHEADER("Generate SSL Certificate for user: $target_uid");
-    }
-    else {
-	PAGEHEADER("Generate SSL Certificate");
-    }
+    PAGEHEADER("Generate SSL Certificate for user: $target_uid");
 
     echo "<blockquote>
           By downloading an encrypted SSL certificate, you are able to use
@@ -122,8 +126,8 @@ function SPITFORM($formfields, $errors)
     echo "<table align=center border=1> 
           <form enctype=multipart/form-data
                 action=gensslcert.php3 method=post>\n";
-    echo "<input type=hidden name=\"formfields[target_uid]\" ".
-	         "value=$target_uid>\n";
+    echo "<input type=hidden name=\"formfields[user]\" ".
+	         "value=$target_webid>\n";
 
     echo "<tr>
               <td>PassPhrase[<b>1</b>]:</td>
@@ -195,7 +199,8 @@ $errors = array();
 #
 # Need this for checkpass.
 #
-TBUserInfo($target_uid, $user_name, $user_email);
+$user_name  = $target_user->name();
+$user_email = $target_user->email();
 
 #TBERROR("$target_uid, $user_name, $user_email, " .
 #	$formfields[passphrase1], 0); 
@@ -252,5 +257,6 @@ SUEXEC($target_uid, "nobody",
 #
 # Redirect back, avoiding a POST in the history.
 # 
-header("Location: gensslcert.php3?finished=1&target_uid=$target_uid");
+header("Location: ". CreateURL("getsslcert", $target_user, "finished", 1));
+
 ?>

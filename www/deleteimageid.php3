@@ -14,8 +14,9 @@ PAGEHEADER("Delete an Image Descriptor");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Must provide the ImageID.

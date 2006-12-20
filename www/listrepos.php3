@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,27 +18,36 @@ if (!$CVSSUPPORT) {
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
 # 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
+if (!isset($user) ||
+    strcmp($user, "") == 0) {
     PAGEARGERROR("You must provide a User ID!");
 }
 else {
-    if (! TBvalid_uid($target_uid)) {
-	PAGEARGERROR("Invalid characters in $target_uid!");
+    if (! User::ValidWebID($user)) {
+	PAGEARGERROR("Invalid characters in $user!");
     }
 }
 
 #
+# Check to make sure thats this is a valid UID.
+#
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("The user $user is not a valid user", 1);
+}
+$userstatus = $target_user->status();
+$target_uid = $target_user->uid();
+
+#
 # Standard Testbed Header, now that we know what we want to say.
 #
-if (strcmp($uid, $target_uid)) {
+if (strcmp($uid, $user)) {
     PAGEHEADER("CVS Repositories for: $target_uid");
 }
 else {
@@ -46,29 +55,17 @@ else {
 }
 
 #
-# Check to make sure thats this is a valid UID. Getting the status works,
-# and we need that later. 
-#
-if (! ($userstatus = TBUserStatus($target_uid))) {
-    USERERROR("The user $target_uid is not a valid user", 1);
-}
-
-#
 # Verify Permission.
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-
-    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
-	USERERROR("You do not have permission to view this user's ".
-		  "information!", 1);
-    }
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+    USERERROR("You do not have permission to view ${uid}'s information!", 1);
 }
 
 #
 # See what projects the uid is a member of, and print some repo pointers
 #
-$projlist = TBProjList($target_uid, $TB_PROJECT_READINFO);
+$projlist = $target_user->ProjectAccessList($TB_PROJECT_READINFO);
 
 if (! count($projlist)) {
     USERERROR("$target_uid is not a member of any Projects!", 1);
@@ -101,7 +98,7 @@ while (list($pid) = each($projlist)) {
 }
 echo "</table>\n";
 
-if (TBCvswebAllowed($uid)) {
+if ($target_user->cvsweb()) {
     echo "<br><center>
           You also have CVSweb access to the
           <a href=cvsweb/cvswebwrap.php3>Emulab Source Repository</a>.

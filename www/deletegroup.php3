@@ -14,8 +14,9 @@ PAGEHEADER("Delete a Group");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # First off, sanity check page args.

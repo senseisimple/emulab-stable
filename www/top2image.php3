@@ -12,10 +12,11 @@ include("defs.php3");
 #
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page arguments.

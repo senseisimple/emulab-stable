@@ -184,6 +184,9 @@ function TBvalid_uid($token) {
     return TBcheck_dbslot($token, "users", "uid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_uididx($token) {
+    return TBvalid_integer($token);
+}
 #
 # Used to allow _ (underscore), but no more.
 # 

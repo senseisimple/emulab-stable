@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -15,9 +15,9 @@ PAGEHEADER("Experiment Admission Control Policies");
 #
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Only admin people can see this page.
@@ -127,11 +127,16 @@ if (mysql_num_rows($query_result)) {
         $count   = $row["count"];
         $auxdata = $row["auxdata"];
 
+	if (! ($user = User::Lookup($puid))) {
+	    TBERROR("Could not lookup object for user $puid", 1);
+	}
+	$showuser_url = CreateURL("showuser", $user);
+	
 	if (!$auxdata)
 	    $auxdata = "&nbsp";
     
         echo "<tr>
-                  <td><A href='showuser.php3?target_uid=$puid'>$puid</a></td>
+                  <td><A href='$showuser_url'>$puid</a></td>
                   <td>$policy</td>
                   <td>$count</td>
                   <td>$auxdata</td>\n";

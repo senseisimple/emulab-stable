@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -14,14 +14,13 @@ function SPITERROR($code, $msg)
 }
 
 #
-# Only known and logged in users can watch LEDs
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-
-$status = CHECKLOGIN($uid);
-if (($status & CHECKLOGIN_LOGGEDIN) != CHECKLOGIN_LOGGEDIN) {
+if (! ($this_user = CheckLogin($check_status)) ||
+    ($check_status & CHECKLOGIN_LOGGEDIN) != CHECKLOGIN_LOGGEDIN) {
     SPITERROR(401, "Not logged in");
 }
+$uid = $this_user->uid();
 
 #
 # Optional pid,eid. Without a building/floor, show all the nodes for the

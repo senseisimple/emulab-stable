@@ -14,13 +14,13 @@ PAGEHEADER("New Project Approved");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
 
 #
 # Of course verify that this uid has admin privs!
 #
-$isadmin = ISADMIN($uid);
+$isadmin = ISADMIN();
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to approve projects!", 1);
 }
@@ -37,22 +37,27 @@ echo "<center><h1>
 #
 # Grab the head_uid for this project. This verifies it is a valid project.
 #
-$query_result = 
-    DBQueryFatal("SELECT head_uid from projects where pid='$pid'");
-if (($row = mysql_fetch_row($query_result)) == 0) {
+if (! ($this_project = Project::Lookup($pid))) {
     TBERROR("Unknown project $pid", 1);
 }
-$headuid = $row[0];
+if (! ($leader = $this_project->GetLeader())) {
+    TBERROR("Error getting leader for $pid", 1);
+}
+$headuid = $this_project->head_uid();
 
 #
 # If the user wanted to change the head uid, do that now (we change both
 # the head_uid and the leader of the default project)
 #
-if (isset($head_uid) && strcmp($head_uid,"")) {
+if (isset($head_uid) && $head_uid != "") {
+    if (! ($newleader = User::Lookup($head_uid))) {
+	TBERROR("Unknown user $head_uid", 1);
+    }
+    if ($this_project->ChangeLeader($newleader) < 0) {
+	TBERROR("Error changing leader to $head_uid", 1);
+    }
+    $leader  = $newleader;
     $headuid = $head_uid;
-    DBQueryFatal("UPDATE projects set head_uid='$headuid' where pid='$pid'");
-    DBQueryFatal("UPDATE groups set leader='$headuid' where pid='$pid' and " .
-	    "gid='$pid'");
 }
 
 if (!isset($user_interface) ||
@@ -70,26 +75,16 @@ if (!isset($user_interface) ||
 # and we will change it to "unapproved" or "active", respectively.
 # If the status is "active", we leave it alone. 
 #
-$query_result = 
-    DBQueryFatal("SELECT status,usr_email,usr_name from users ".
-		 "where uid='$headuid'");
-if (mysql_num_rows($query_result) == 0) {
-    TBERROR("Unknown user $headuid", 1);
-}
-$row = mysql_fetch_row($query_result);
-$curstatus     = $row[0];
-$headuid_email = $row[1];
-$headname      = $row[2];
+$curstatus     = $leader->status();
+$headuid_email = $leader->email();
+$headname      = $leader->name();
 #echo "Status = $curstatus, Email = $headuid_email<br>\n";
 
 #
 # Then we check that the headuid is really listed in the group_membership
 # table (default group), just to be sure. 
 #
-$query_result =
-    DBQueryFatal("SELECT trust from group_membership where ".
-		 "uid='$headuid' and pid='$pid' and gid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
+if (! $this_project->IsMember($leader, $ignore)) {
     USERERROR("User $headuid is not the leader of project $pid.", 1);
 }
 
@@ -194,17 +189,14 @@ elseif (strcmp($approval, "approve") == 0) {
 	    TBERROR("Invalid $headuid status $curstatus in ".
                     "approveproject.php3", 1);
         }
-	DBQueryFatal("UPDATE users set status='$newstatus', ".
-		     "       user_interface='$user_interface' ".
-		     "WHERE uid='$headuid'");
+	$leader->SetUserInterface($user_interface);
+	$leader->SetStatus($newstatus);
     }
 
     #
     # Set the project "approved" field to true. 
     #
-    DBQueryFatal("update projects set approved='1', ".
-		 "       default_user_interface='$user_interface' ".
-		 "where pid='$pid'");
+    $this_project->SetApproved(1);
 
     #
     # XXX
@@ -223,8 +215,7 @@ elseif (strcmp($approval, "approve") == 0) {
     }
     if (count($pcremote_ok)) {
 	    $foo = implode(",", $pcremote_ok);
-	    DBQueryFatal("UPDATE projects set pcremote_ok='$foo' ".
-			 "WHERE pid='$pid'");
+	    $this_project->SetRemoteOK($foo);
     }
 
     #

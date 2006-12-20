@@ -14,14 +14,14 @@ PAGEHEADER("Freeze User Account");
 #
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify arguments.
 # 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
+if (!isset($user) || $user == "") {
     USERERROR("You must provide a User ID.", 1);
 }
 if (isset($action)) {
@@ -41,19 +41,19 @@ else {
     $tag      = "frozen";
     $dbaction = TBDB_USERSTATUS_FROZEN;
 }
-$isadmin = ISADMIN($uid);
 
 #
 # Confirm target is a real user.
 #
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("No such user '$target_uid'", 1);
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("No such user '$user'", 1);
 }
+$target_uid = $target_user->uid();
 
 #
 # Confirm a valid op.
 #
-$userstatus = TBUserStatus($target_uid);
+$userstatus = $target_user->status();
 if (!strcmp($action, "thaw") &&
      strcmp($userstatus, TBDB_USERSTATUS_FROZEN)) {
     USERERROR("You cannot thaw someone who is not frozen!", 1);
@@ -71,7 +71,8 @@ if (!strcmp($action, "freeze")) {
 # Requesting? Fire off email and we are done. 
 # 
 if (isset($request) && $request) {
-    TBUserInfo($uid, $uid_name, $uid_email);
+    $uid_name  = $this_user->name();
+    $uid_email = $this_user->email();
 
     TBMAIL($TBMAIL_OPS,
 	   "$action User Request: '$target_uid'",
@@ -115,7 +116,7 @@ if (!$confirmed) {
     echo "Are you <b>REALLY</b> sure you want to $action user '$target_uid'\n";
     
     echo "<form action=freezeuser.php3 method=post>";
-    echo "<input type=hidden name=target_uid value=\"$target_uid\">\n";
+    echo "<input type=hidden name=user value=\"$user\">\n";
     echo "<input type=hidden name=action value=\"$action\">\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
@@ -134,7 +135,7 @@ if (!$confirmed_twice) {
               '$target_uid'\n";
     
     echo "<form action=freezeuser.php3 method=post>";
-    echo "<input type=hidden name=target_uid value=\"$target_uid\">\n";
+    echo "<input type=hidden name=user value=\"$user\">\n";
     echo "<input type=hidden name=confirmed value=Confirm>\n";
     echo "<input type=hidden name=action value=\"$action\">\n";
     echo "<b><input type=submit name=confirmed_twice value=Confirm></b>\n";
@@ -146,8 +147,8 @@ if (!$confirmed_twice) {
     return;
 }
 
-DBQueryFatal("update users set status='$dbaction' ".
-	     "where uid='$target_uid'");
+# Change the DB first; backend requires it.
+$target_user->SetStatus($dbaction);
 
 STARTBUSY("User '$target_uid' is being ${tag}!");
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,13 +14,13 @@ PAGEHEADER("New Project Approval List");
 #
 # Only known and logged in users can do this. uid came in with the URI.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
 
 #
 # Of course verify that this uid has admin privs!
 #
-$isadmin = ISADMIN($uid);
+$isadmin = ISADMIN();
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to approve projects!", 1);
 }
@@ -32,7 +32,7 @@ if (! $isadmin) {
 # implies denying the project leader account, when there is just a single
 # project pending for that project leader. 
 #
-$query_result = DBQueryFatal("SELECT *, ".
+$query_result = DBQueryFatal("SELECT pid_idx, ".
 			     " DATE_FORMAT(created, '%m/%d/%y') as day_created ".
 			     " from projects ".
 			     "where approved='0' order by created desc");
@@ -64,36 +64,42 @@ echo "<tr>
       </tr>\n";
 
 while ($projectrow = mysql_fetch_array($query_result)) {
-    $pid      = $projectrow[pid];
-    $headuid  = $projectrow[head_uid];
-    $Purl     = $projectrow[URL];
-    $Pname    = $projectrow[name];
-    $Pcreated = $projectrow[day_created];
+    $pid_idx  = $projectrow["pid_idx"];
+    $Pcreated = $projectrow["day_created"];
 
-    $userinfo_result =
-	DBQueryFatal("SELECT * from users where uid='$headuid'");
+    if (! ($project = Project::Lookup($pid_idx))) {
+	TBERROR("Could not lookup project $pid_idx", 1);
+    }
+    if (! ($leader = $project->GetLeader())) {
+	TBERROR("Could not get leader for project $pid_idx", 1);
+    }
+    $pid        = $project->pid();
+    $Purl       = $project->URL();
+    $Pname      = $project->name();
+    $headuid    = $leader->uid();
+    $name	= $leader->name();
+    $email	= $leader->email();
+    $title	= $leader->title();
+    $affil	= $leader->affil();
+    $phone	= $leader->phone();
+    $status     = $leader->status();
 
-    $row	= mysql_fetch_array($userinfo_result);
-    $name	= $row[usr_name];
-    $email	= $row[usr_email];
-    $title	= $row[usr_title];
-    $affil	= $row[usr_affil];
-    $phone	= $row[usr_phone];
-    $status     = $row[status];
+    $apprproj_url = CreateURL("approveproject_form", $project);
+    $showproj_url = CreateURL("showproject", $project);
+    $showuser_url = CreateURL("showuser", $leader);
 
     echo "<tr>
               <td height=15 colspan=6></td>
           </tr>
           <tr>
               <td align=center valign=center rowspan=2>
-                  <A href='approveproject_form.php3?pid=$pid'>
+                  <A href='$apprproj_url'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td rowspan=2>
-                  <A href='showproject.php3?pid=$pid'>$pid</A>
+                  <A href='$showproj_url'>$pid</A>
                   <br>$Pcreated</td>
               <td rowspan=2>
-                  <A href='showuser.php3?target_uid=$headuid'>
-                     $headuid</A></td>
+                  <A href='$showuser_url'>$headuid</A></td>
               <td>$name";
     if ($status == TBDB_USERSTATUS_NEWUSER) {
 	echo " (<font color=red>unverified</font>)";

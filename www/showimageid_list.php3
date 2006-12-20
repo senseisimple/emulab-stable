@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -15,14 +15,14 @@ PAGEHEADER("Image List");
 #
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Admin users can see all ImageIDs, while normal users can only see
 # ones in their projects or ones that are globally available.
 #
-$isadmin = ISADMIN($uid);
 
 if (! isset($sortby))
     $sortby = "normal";
@@ -42,7 +42,7 @@ $extraclause = "";
 # Allow for creator restriction
 #
 if (isset($creator) && $creator != "") {
-    if (! TBvalid_uid($creator)) {
+    if (! User::ValidWebID($creator)) {
 	PAGEARGERROR("Invalid characters in creator");
     }
     if ($isadmin) 

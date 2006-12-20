@@ -12,8 +12,8 @@ include("defs.php3");
 
 #
 # Get current user.
-# 
-$uid = GETLOGIN();
+#
+$this_user = CheckLogin($check_status);
 
 #
 # See if we are in an initial Emulab setup.
@@ -25,11 +25,11 @@ $FirstInitState = (TBGetFirstInitState() == "createproject");
 # If the login is not valid. We require that the user be logged in
 # to start a second project.
 #
-if ($uid && !$FirstInitState) {
+if ($this_user && !$FirstInitState) {
     # Allow unapproved users to create multiple projects ...
     # Must be verified though.
-    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
-    $proj_head_uid = $uid;
+    CheckLoginOrDie(CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
+    $proj_head_uid = $this_user->uid();
     $returning = 1;
 }
 else {
@@ -625,7 +625,7 @@ if (! isset($_POST['submit'])) {
     return;
 }
 else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
+    # Form submitted. Make sure we have a formfields array.
     if (!isset($_POST['formfields']) ||
 	!is_array($_POST['formfields'])) {
 	PAGEARGERROR("Invalid form arguments.");
@@ -650,7 +650,7 @@ if (! $returning) {
 	elseif (!TBvalid_uid($formfields[proj_head_uid])) {
 	    $errors["UserName"] = TBFieldErrorString();
 	}
-	elseif (TBCurrentUser($formfields[proj_head_uid]) ||
+	elseif (User::Lookup($formfields[proj_head_uid]) ||
 		posix_getpwnam($formfields[proj_head_uid])) {
 	    $errors["UserName"] = "Already in use. Pick another";
 	}
@@ -683,7 +683,7 @@ if (! $returning) {
 	elseif (! TBvalid_wikiname($formfields[wikiname])) {
 	    $errors["WikiName"] = TBFieldErrorString();
 	}
-	elseif (TBCurrentWikiName($formfields[wikiname])) {
+	elseif (User::LookupByWikiName($formfields[wikiname])) {
 	    $errors["WikiName"] = "Already in use. Pick another";
 	}
     }
@@ -701,7 +701,7 @@ if (! $returning) {
     elseif (! TBvalid_email($formfields[usr_email])) {
 	$errors["Email Address"] = TBFieldErrorString();
     }
-    elseif (TBCurrentEmail($formfields[usr_email])) {
+    elseif (User::LookupByEmail($formfields[usr_email])) {
         #
         # Treat this error separate. Not allowed.
         #
@@ -1000,7 +1000,8 @@ if (!$returning) {
     $args["usr_pswd"]      = crypt("$password1");
     $args["wikiname"]      = $wikiname;
 
-    if (! ($leader = User::NewUser($proj_head_uid, 1, 0, $args))) {
+    if (! ($leader = User::NewUser($proj_head_uid,
+				   TBDB_NEWACCOUNT_PROJLEADER, $args))) {
 	TBERROR("Could not create new user '$usr_email'!", 1);
     }
     # If null; used below
@@ -1012,10 +1013,7 @@ if (!$returning) {
     }
 }
 else {
-    if (! ($leader = User::LookupByUid($proj_head_uid))) {
-	TBERROR("Could not lookup project leader '$proj_head_uid'!", 1);
-    }
-
+    $leader = $this_user;
     $usr_title	   = $leader->title();
     $usr_name	   = $leader->name();
     $usr_affil	   = $leader->affil();

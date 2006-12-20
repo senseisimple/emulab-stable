@@ -15,14 +15,14 @@ PAGEHEADER("Create a new OS Descriptor");
 #
 # Only known and logged in users
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # See what projects the uid can do this in.
 #
-$projlist = TBProjList($uid, $TB_PROJECT_MAKEOSID);
+$projlist = $this_user->ProjectAccessList($TB_PROJECT_MAKEOSID);
 
 if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".

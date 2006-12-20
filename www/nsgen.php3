@@ -21,8 +21,9 @@ if (!isset($template)) {
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Check to see if the template file actually exists
@@ -69,7 +70,7 @@ if ($submit == "Begin Experiment" || $submit == "Show NS File") {
     if ($submit == "Begin Experiment") {
         BEGINEXP($nsref);
     } else {
-        $filename =  $TMPDIR . GETUID() . "-$nsref.nsfile";
+        $filename =  $TMPDIR . $uid . "-$nsref.nsfile";
         header("Content-type: text/plain");
         readfile($filename);
         unlink($filename);
@@ -227,7 +228,7 @@ function startElement($parser,$name,$attrs)
         $templateauthor = "";
         if (isset($attrs['AUTHOR'])) {
             if (isset($attrs['AUTHORUID'])) {
-                $templateauthor = "<a href='showuser.php3?target_uid=$attrs[AUTHORUID]'>";
+                $templateauthor = "<a href='showuser.php3?user=$attrs[AUTHORUID]'>";
                 $templateauthor .= $attrs['AUTHOR'] . "</a>";
             } else {
                 $templateauthor = isset($attrs['AUTHOR']);
@@ -247,7 +248,7 @@ function startElement($parser,$name,$attrs)
 function MAKENS($template,$templatefields,$templatevalues) {
     global $NSGEN;
     global $TMPDIR;
-    global $templatefile;
+    global $templatefile, $uid;
     
     #
     # Pick out some defaults for the exp. creation page
@@ -259,7 +260,7 @@ function MAKENS($template,$templatefields,$templatevalues) {
     list($usec, $sec) = explode(' ', microtime());
     srand((float) $sec + ((float) $usec * 100000));
     $nsref = rand();
-    $outfile = $TMPDIR . GETUID() . "-$nsref.nsfile";
+    $outfile = $TMPDIR . $uid . "-$nsref.nsfile";
 
     #
     # Pick out the parameters for command-line arguments

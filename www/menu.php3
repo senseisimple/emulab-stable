@@ -5,8 +5,8 @@
 # All rights reserved.
 #
 
+$login_user       = null;
 $login_status     = CHECKLOGIN_NOTLOGGEDIN;
-$login_uid        = 0;
 $drewheader       = 0;
 $noheaders	  = 0;
 $autorefresh      = 0;
@@ -130,7 +130,7 @@ function WRITESIDEBARNOTICE($text) {
 #
 function WRITEPLABTOPBAR() {
     echo "<table class=\"topbar\" width=\"100%\" cellpadding=\"2\" cellspacing=\"0\" align=\"center\">\n";
-    global $login_status, $login_uid;
+    global $login_status, $login_user;
     global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
 
@@ -141,37 +141,14 @@ function WRITEPLABTOPBAR() {
         $TBBASE, "plabmetrics.php3");
 
     WRITETOPBARBUTTON("My Testbed",
-	$TBBASE,
-	"showuser.php3?target_uid=$login_uid");
-
+		      $TBBASE, CreateURL("showuser", $login_user));
 
     WRITETOPBARBUTTON("Advanced Experiment",
         $TBBASE, "beginexp_html.php3");
 
-    if ($login_status & CHECKLOGIN_TRUSTED) {
-	# Only project/group leaders can do these options
-	# Show a "new" icon if there are people waiting for approval
-	$query_result =
-	DBQueryFatal("select g.* from group_membership as authed ".
-		     "left join group_membership as g on ".
-		     " g.pid=authed.pid and g.gid=authed.gid ".
-		     "left join users as u on u.uid=g.uid ".
-		     "where u.status!='".
-		     TBDB_USERSTATUS_UNVERIFIED . "' and ".
-		     " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
-		     "' and g.uid!='$login_uid' and ".
-		     "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
-		     "  and authed.uid='$login_uid' and ".
-		     "  (authed.trust='group_root' or ".
-		     "   authed.trust='project_root') ".
-		     "ORDER BY g.uid,g.pid,g.gid");
-	if (mysql_num_rows($query_result) > 0) {
-	     WRITETOPBARBUTTON_NEW("Approve Users",
-				   $TBBASE, "approveuser_form.php3");
-	} else {
-	    WRITETOPBARBUTTON("Approve Users",
+    if ($login_status & CHECKLOGIN_TRUSTED && $login_user->ApprovalList(0)) {
+	WRITESIDEBARBUTTON_NEW("Approve Users",
 			       $TBBASE, "approveuser_form.php3");
-	}
     }
 
     WRITETOPBARBUTTON("Log Out", $TBBASE, "logout.php3?next_page=" .
@@ -188,11 +165,11 @@ function WRITEPLABTOPBAR() {
 # across the bottom of the page rather than the top
 #
 function WRITEPLABBOTTOMBAR() {
-    global $login_status, $login_uid;
+    global $login_status, $login_user;
     global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
 
-    if ($login_uid) {
+    if ($login_user) {
 	$newsBase = $TBBASE; 
     } else {
 	$newsBase = $TBDOCBASE;
@@ -220,7 +197,7 @@ function WRITEPLABBOTTOMBAR() {
 # sees depends on the login status and the DB status.
 #
 function WRITESIDEBAR() {
-    global $login_status, $login_uid, $pid, $gid;
+    global $login_status, $login_user, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
     global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT;
     global $CHECKLOGIN_WIKINAME;
@@ -251,7 +228,7 @@ function WRITESIDEBAR() {
     #
     # This is so an admin can use the editing features of news.
     #
-    if ($login_uid) { # && ISADMIN($login_uid)) { 
+    if ($login_user) {
 	$newsBase = $TBBASE; 
     } else {
 	$newsBase = $TBDOCBASE;
@@ -406,7 +383,7 @@ function WRITESIDEBAR() {
 	echo "<a id='webdisabled' href='$TBDOCBASE/nologins.php3'>".
 	    "Web Interface Temporarily Unavailable</a>";
 
-        if (!$login_uid || !ISADMIN($login_uid)) {	
+        if (!$login_user || !ISADMIN()) {	
 	    WRITESIDEBARNOTICE("Please Try Again Later");
         }
     }
@@ -440,8 +417,8 @@ function WRITESIDEBAR() {
 	    elseif ($login_status & (CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY)) {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
-				   "showuser.php3?target_uid=$login_uid");
-
+				   CreateURL("showuser", $login_user));
+					     
 		if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
 		    $wikiname = $CHECKLOGIN_WIKINAME;
 		
@@ -451,12 +428,13 @@ function WRITESIDEBAR() {
 		}
 
 		WRITESIDEBARBUTTON("Update User Information",
-				   $TBBASE, "moduserinfo.php3");
+				   $TBBASE,
+				   CreateURL("moduserinfo", $login_user));
 	    }
 	    else {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
-				   "showuser.php3?target_uid=$login_uid");
+				   CreateURL("showuser", $login_user));
 
 		#
                 # Since a user can be a member of more than one project,
@@ -488,32 +466,11 @@ function WRITESIDEBAR() {
 	        	"ImageIDs</a> or <a " .
 	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a></li>";
 
-		if ($login_status & CHECKLOGIN_TRUSTED) {
-		  WRITESIDEBARDIVIDER();
-                  # Only project/group leaders can do these options
-                  # Show a "new" icon if there are people waiting for approval
-		  $query_result =
-		    DBQueryFatal("select g.* from group_membership as authed ".
-				 "left join group_membership as g on ".
-				 " g.pid=authed.pid and g.gid=authed.gid ".
-				 "left join users as u on u.uid=g.uid ".
-				 "where u.status!='".
-				 TBDB_USERSTATUS_UNVERIFIED . "' and ".
-				 " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
-				 "' and g.uid!='$login_uid' and ".
-				 "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
-				 "  and authed.uid='$login_uid' and ".
-				 "  (authed.trust='group_root' or ".
-				 "   authed.trust='project_root') ".
-				 "ORDER BY g.uid,g.pid,g.gid");
-		  if (mysql_num_rows($query_result) > 0) {
+		if ($login_status & CHECKLOGIN_TRUSTED &&
+		    $login_user->ApprovalList(0)) {
+		    WRITESIDEBARDIVIDER();
 		    WRITESIDEBARBUTTON_NEW("New User Approval",
 					   $TBBASE, "approveuser_form.php3");
-		  } else {
-
-		      WRITESIDEBARBUTTON("New User Approval",
-				       $TBBASE, "approveuser_form.php3");
-		  }
 		}
 	    }
 	}
@@ -521,11 +478,14 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("New User Verification",
 			       $TBBASE, "verifyusr_form.php3");
 	    WRITESIDEBARBUTTON("Update User Information",
-			       $TBBASE, "moduserinfo.php3");
+			       $TBBASE,
+			       CreateURL("moduserinfo", $login_user));
 	}
 	elseif ($login_status & (CHECKLOGIN_UNAPPROVED)) {
 	    WRITESIDEBARBUTTON("Update User Information",
-			       $TBBASE, "moduserinfo.php3");
+			       $TBBASE,
+			       CreateURL("moduserinfo", $login_user));
+			       
 	}
 	#
 	# Standard options for logged in users!
@@ -542,8 +502,8 @@ function WRITESIDEBAR() {
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
         # Logout option. No longer take up space with an image.
 	WRITESIDEBARBUTTON("<b>Logout</b>",
-			   $TBBASE, "logout.php3?target_uid=$login_uid");
-	
+			   $TBBASE,
+			   CreateURL("logout", $login_user));
 	echo "</ul>\n";
     }
 
@@ -562,20 +522,14 @@ function WRITESIDEBAR() {
 	}
 	if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
 	    if (!isset($pid) || $pid == "") {
-		$query_result =
-		    DBQueryFatal("select pid from group_membership where ".
-				 "uid='$login_uid' and pid=gid and ".
-				 "trust!='none' ".
-				 "order by date_approved asc limit 1");
-		if (mysql_num_rows($query_result)) {
-		    $row = mysql_fetch_array($query_result);
-		    $firstpid = $row[pid];
+		if (($project = $login_user->FirstApprovedProject())) {
+		    $firstpid = $project->pid();
 		}
 	    }
 	}
 	if ($MAILMANSUPPORT) {
-	    $mmurl  = "showmmlists.php3?target_uid=$login_uid";
-	    WRITESIDEBARBUTTON("My Mailing Lists", $TBBASE, $mmurl);
+	     WRITESIDEBARBUTTON("My Mailing Lists", $TBBASE,
+				CreateURL("showmmlists", $login_user));
 	}
 	if ($BUGDBSUPPORT) {
 	    $bugdburl = "gotobugdb.php3";
@@ -590,17 +544,17 @@ function WRITESIDEBAR() {
 	}
 	if ($CVSSUPPORT) {
 	    WRITESIDEBARBUTTON("My CVS Repositories", $TBBASE,
-			       "listrepos.php3?target_uid=$login_uid");
+			       CreateURL("listrepos", $login_user));
 	}
 	if ($CHATSUPPORT) {
 	    WRITESIDEBARBUTTON("My Chat Buddies", $TBBASE,
-			       "mychat.php3?target_uid=$login_uid");
+			       CreateURL("mychat", $login_user));
 	}
 	echo "</ul>\n";
     }
 
     # Optional ADMIN menu.
-    if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN($login_uid)) {
+    if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN()) {
 	echo "<h3 class='menuheader'>Administration</h3>
               <ul class='menu'>";
 	
@@ -750,7 +704,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 {
-    global $TBMAINSITE, $login_uid;
+    global $TBMAINSITE, $login_user;
 
     if (!$nocontent) {
 	if (!$TBMAINSITE) {
@@ -761,7 +715,7 @@ function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 	    echo "       <a class='builtwith' href='http://www.emulab.net'>
                          <img src='$BASEPATH/builtwith.png'></a>";
 	}
-	elseif ($login_uid) {
+	elseif ($login_user) {
 	    echo "<span class=gripe><a href='$TBBASE/gotobugdb.php3".
 	                    "?do=newtask&project_title=Emulab'>";
 	    echo "Report Bug, Gripe, Request Feature</a>";
@@ -780,7 +734,8 @@ function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 # Spit out a vanilla page header.
 #
 function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
-    global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
+    global $login_status, $login_user;
+    global $TBBASE, $TBDOCBASE, $THISHOMEBASE;
     global $BASEPATH, $SSL_PROTOCOL, $drewheader, $autorefresh;
     global $TBMAINSITE;
 
@@ -791,15 +746,10 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 
     #
     # Figure out who is logged in, if anyone.
-    # 
-    if (($known_uid = GETUID()) != FALSE) {
-        #
-        # Check to make sure the UID is logged in (not timed out).
-        #
-        $login_status = CHECKLOGIN($known_uid);
-	if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-	    $login_uid = $known_uid;
-	}
+    #
+    if (($login_user = CheckLogin($status)) != null) {
+	$login_status = $status;
+	$login_uid    = $login_user->uid();
     }
 
     #
@@ -814,10 +764,10 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     # We want to allow admin types to continue using the web interface,
     # and logout anyone else that is currently logged in!
     #
-    if (NOLOGINS() && $login_uid && !ISADMIN($login_uid)) {
-	DOLOGOUT($login_uid);
+    if (NOLOGINS() && $login_user && !ISADMIN()) {
+	DOLOGOUT($login_user);
 	$login_status = CHECKLOGIN_NOTLOGGEDIN;
-	$login_uid    = 0;
+	$login_user   = null;
     }
     
     header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
@@ -856,7 +806,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     echo "<div id='logintime'>";
     echo "<span id='loggedin'>";
     $now = date("D M d g:ia T");
-    if ($login_uid) {
+    if ($login_user) {
 	echo "<span class='uid'>$login_uid</span> Logged in.";
     }
     echo "</span>";
@@ -874,13 +824,21 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     echo "<div id='versioninfo'>$versioninfo</div>";
 
     echo "<h2 class='contenttitle'>\n";
-    if ($login_uid && ISADMINISTRATOR()) {
-	if (ISADMIN($login_uid)) {
-	    echo "<a href=\"$TBBASE/toggle.php?target_uid=$login_uid&type=adminon&value=0\"><img src='/redball.gif'
+    if ($login_user && ISADMINISTRATOR()) {
+	if (ISADMIN()) {
+	    $url = CreateURL("toggle", $login_user,
+			     "type", "adminon", "value", 0);
+
+	    echo "<a href=\"$TBBASE/$url\">
+                      <img src='/redball.gif'
                           border='0' alt='Admin On'></a>\n";
 	}
 	else {
-	    echo "<a href=\"$TBBASE/toggle.php?target_uid=$login_uid&type=adminon&value=1\"><img src='/greenball.gif'
+	    $url = CreateURL("toggle", $login_user,
+			     "type", "adminon", "value", 1);
+
+	    echo "<a href=\"$TBBASE/$url\">
+                       <img src='/greenball.gif'
                           border='0' alt='Admin Off'></a>\n";
 	}
     }
@@ -905,7 +863,7 @@ function ENDPAGE() {
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
     global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring, $currently_busy;
-    global $login_uid;
+    global $login_user;
 
     if ($currently_busy) {
 	CLEARBUSY();
@@ -948,7 +906,7 @@ function PAGEFOOTER($view = NULL) {
 	               "border='0' cellspacing='0' cellpadding='0'>";
     echo "       <tr>\n";
     
-    if ($login_uid) {
+    if ($login_user) {
 	echo "    <td class=reportbug>";
 	echo "      <a href='$TBBASE/gotobugdb.php3".
 	                    "?do=newtask&project_title=Emulab'>";

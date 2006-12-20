@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,10 +12,10 @@ include("defs.php3");
 PAGEHEADER("New Users Approved");
 
 #
-# Only known and logged in users can be verified.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
 
 $projectchecks = array();
 
@@ -92,8 +92,18 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #
     # Verify an actual user that is being approved.
     #
-    if (! TBCurrentUser($user)) {
+    if (! ($target_user = User::Lookup($user))) {
 	TBERROR("Trying to approve unknown user $user.", 1);
+    }
+
+    # Ditto the project.
+    if (! ($target_project = Project::Lookup($project))) {
+	TBERROR("Trying to approve user into unknown project $project.", 1);
+    }
+
+    # Ditto the group.
+    if (! ($target_group = Group::LookupByPidGid($project, $group))) {
+	TBERROR("Trying to approve user into unknown group $group", 1);
     }
     
     #
@@ -101,25 +111,23 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     # to approver users in the project/group. Also, only project leaders
     # can add someone to the default group as group_root.
     #
-    if (! TBProjAccessCheck($uid, $project, $group, $TB_PROJECT_ADDUSER)) {
+    if (! $target_group->AccessCheck($this_user, $TB_PROJECT_ADDUSER)) {
 	USERERROR("You are not allowed to approve users in ".
 		  "$project/$group!", 1);
     }
 
-    if (strcmp($newtrust, "group_root") == 0 &&
-	strcmp($group, $project) == 0) {
-	if (! TBProjAccessCheck($uid, $project, $group, 
-                                $TB_PROJECT_BESTOWGROUPROOT)) {
-	    USERERROR("You do not have permission to add new users with group ".
-		      "root trust to the default group!", 1);
-	}
+    if ($newtrust == "group_root" && $project == $group &&
+	!$target_project->AccessCheck($this_user,
+				      $TB_PROJECT_BESTOWGROUPROOT)) {
+	USERERROR("You do not have permission to add new users with group ".
+		  "root trust to the default group!", 1);
     }
     
     #
     # Check if already approved in the project/group. If already an
     # approved member, something went wrong.
     #
-    TBGroupMember($user, $project, $group, $isapproved);
+    $target_group->IsMember($target_user, $isapproved);
     if ($isapproved) {
 	USERERROR("$user is already an approved member of ".
 		  "$project/$group!", 1);
@@ -146,12 +154,12 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     if (strcmp($project, $group) == 0 &&
 	(strcmp($approval, "deny") == 0 ||
 	 strcmp($approval, "nuke") == 0)) {
-	$query_result =
-	    DBQueryFatal("select gid from group_membership ".
-			 "where uid='$user' and pid='$project' and pid!=gid");
-	
-	while ($row = mysql_fetch_array($query_result)) {
-	    $gid = $row[gid];
+
+	# List of subgroup membership in this project.
+	$grouplist = $target_project->GroupList($target_user);
+
+	foreach ($grouplist as $subgroup) {
+	    $gid = $subgroup->gid();
 
             #
             # Create and indirect through post var for subgroup approval value.
@@ -183,7 +191,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     if (strcmp($project, $group) == 0)
 	continue;
 
-    TBGroupMember($user, $project, $project, $isapproved);
+    $target_project->IsMember($target_user, $isapproved);
     if ($isapproved)
 	continue;
 
@@ -236,6 +244,14 @@ while (list ($user, $value) = each ($projectchecks)) {
 
 	#echo "$user $pid $gid $trust $foo $bar<br>\n";
 
+	if (! ($target_group = Group::LookupByPidGid($pid, $gid))) {
+	    TBERROR("Could not find group object for $project/$group", 1);
+	}
+
+	if (! ($target_user = User::Lookup($user))) {
+	    TBERROR("Could not find user object for $user", 1);
+	}
+	
 	#
 	# This looks for different trust levels in different subgroups
 	# of the same project. We are only checking the form arguments
@@ -258,8 +274,7 @@ while (list ($user, $value) = each ($projectchecks)) {
 	}
 	$pidlist[$pid] = $pid;
 
-	# Check vs. the database
-	TBCheckGroupTrustConsistency($user, $pid, $gid, $trust, 1);
+	$target_group->CheckTrustConsistency($target_user, $trust, 1);
     }
     
     reset($value);
@@ -298,27 +313,32 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     # and we will change it to "unapproved" or "active", respectively.
     # If the status is "active", we leave it alone. 
     #
-    $query_result =
-        DBQueryFatal("SELECT status,usr_email,usr_name from users where ".
-		     "uid='$user'");
-    if (mysql_num_rows($query_result) == 0) {
-	TBERROR("Unknown user $user", 1);
+    if (! ($target_user = User::Lookup($user))) {
+	TBERROR("Trying to approve unknown user $user.", 1);
     }
-    $row = mysql_fetch_row($query_result);
-    $curstatus  = $row[0];
-    $user_email = $row[1];
-    $user_name  = $row[2];
+    $curstatus  = $target_user->status();
+    $user_email = $target_user->email();
+    $user_name  = $target_user->name();
     #echo "Status = $curstatus, Email = $user_email<br>\n";
+
+    # Ditto the project and group
+    if (! ($target_project = Project::Lookup($project))) {
+	TBERROR("Trying to approve user into unknown project $project.", 1);
+    }
+    if (! ($target_group = Group::LookupByPidGid($project, $group))) {
+	TBERROR("Trying to approve user into unknown group $group", 1);
+    }
 
     #
     # Email info for current user.
-    # 
-    TBUserInfo($uid, $uid_name, $uid_email);
+    #
+    $uid_name  = $this_user->name();
+    $uid_email = $this_user->email();
 
     #
     # Email info for the proj/group leaders too.
     #
-    $leaders = TBLeaderMailList($project,$group);
+    $leaders = $target_group->LeaderMailList();
     
     #
     # Well, looks like everything is okay. Change the project membership
@@ -335,10 +355,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
         # Must delete the group_membership record since we require that the 
         # user reapply once denied. Send the luser email to let him know.
         #
-        $query_result =
-	    DBQueryFatal("delete from group_membership ".
-			 "where uid='$user' and pid='$project' and ".
-			 "      gid='$group'");
+	$target_group->DeleteMember($target_user);
 
         TBMAIL("$user_name '$user' <$user_email>",
              "Membership Denied in '$project/$group'",
@@ -365,21 +382,17 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
         # Must delete the group_membership record since we require that the 
         # user reapply once denied. Send the luser email to let him know.
         #
-        $query_result =
-	    DBQueryFatal("delete from group_membership ".
-			 "where uid='$user' and pid='$project' and ".
-			 "      gid='$group'");
+	$target_group->DeleteMember($target_user);
 
 	#
 	# See if user is in any other projects (even unapproved).
 	#
-        $query_result =
-	    DBQueryFatal("select * from group_membership where uid='$user'");
+	$project_list = $target_user->ProjectMembershipList();
 
 	#
 	# If yes, then we cannot safely delete the user account.
 	#
-	if (mysql_num_rows($query_result)) {
+	if (count($project_list)) {
 	    echo "<p>
                   User $user was <b>denied</b> membership in $project/$group.
                   <br>
@@ -436,11 +449,9 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	    }
 	    if (!($user_interface = TBGetDefaultProjectUserInterface($project)))
 		$user_interface = TBDB_USER_INTERFACE_EMULAB;
-	    
-	    DBQueryFatal("UPDATE users set ".
-			 "       status='$newstatus', ".
-			 "       user_interface='$user_interface' ".
-			 "WHERE uid='$user'");
+
+	    $target_user->SetUserInterface($user_interface);
+	    $target_user->SetStatus($newstatus);
 
             #
             # Create user account on control node.

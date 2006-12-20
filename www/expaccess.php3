@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,8 +14,9 @@ PAGEHEADER("Manage Shared Access to your Experiment");
 #
 # Only known and logged in users can do this. 
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # We must get a valid PID/EID.
@@ -49,7 +50,7 @@ if (!$row[0]) {
 # the experiment creator or the project leader has permission to mess
 # with this. 
 #
-if (! ($isadmin = ISADMIN($uid))) {
+if (! $isadmin) {
     #
     # One of them better be you!
     #

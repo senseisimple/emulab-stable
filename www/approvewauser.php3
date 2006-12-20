@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,9 +14,11 @@ PAGEHEADER("Widearea Accounts Approval Form");
 #
 # Only known and logged in users can be verified.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-if (! ISADMIN($uid)) {
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+if (! $isadmin) {
     USERERROR("Only testbed administrators people can access this page!", 1);
 }
 ignore_user_abort(1);
@@ -77,7 +79,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #
     # Verify an actual user that is being approved.
     #
-    if (! TBCurrentUser($user)) {
+    if (! ($target_user = User::Lookup($user))) {
 	TBERROR("Trying to approve unknown user $user.", 1);
     }
     
@@ -138,22 +140,19 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     # and we will change it to "unapproved" or "active", respectively.
     # If the status is "active", we leave it alone. 
     #
-    $query_result =
-        DBQueryFatal("SELECT status,usr_email,usr_name from users where ".
-		     "uid='$user'");
-    if (mysql_num_rows($query_result) == 0) {
-	TBERROR("Unknown user $user", 1);
+    if (! ($target_user = User::Lookup($user))) {
+	TBERROR("Trying to approve unknown user $user.", 1);
     }
-    $row = mysql_fetch_row($query_result);
-    $curstatus  = $row[0];
-    $user_email = $row[1];
-    $user_name  = $row[2];
+    $curstatus  = $target_user->status();
+    $user_email = $target_user->email();
+    $user_name  = $target_user->name();
     #echo "Status = $curstatus, Email = $user_email<br>\n";
 
     #
     # Email info for current user.
-    # 
-    TBUserInfo($uid, $uid_name, $uid_email);
+    #
+    $uid_name  = $this_user->name();
+    $uid_email = $this_user->email();
 
     #
     # Well, looks like everything is okay. Change the project membership
@@ -206,13 +205,12 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	#
 	# See if user is in any other projects (even unapproved).
 	#
-        $query_result =
-	    DBQueryFatal("select * from group_membership where uid='$user'");
+	$project_list = $target_user->ProjectMembershipList();
 
 	#
 	# If yes, then we cannot safely delete the user account.
 	#
-	if (mysql_num_rows($query_result)) {
+	if (count($project_list)) {
 	    echo "<p>
                   User $user was <b>denied</b> an account on $node_id.
                   <br>
@@ -238,8 +236,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
                   \n";
 	    continue;
 	}
-	
-	$query_result = DBQueryFatal("delete FROM users where uid='$user'");
+	$target_user->Delete();
 	
 	echo "<p>
                 User $user was <b>denied</b> an account on $node_id.
@@ -275,10 +272,10 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	    else {
 	        TBERROR("Invalid $user status $curstatus!", 1);
 	    }
-	    $query_result =
-		DBQueryFatal("UPDATE users set status='$newstatus' ".
-			     "WHERE uid='$user'");
+	    $target_user->SetStatus($newstatus);
 	}
+
+	$url = CreateURL("showpubkeys", $target_user);
 
         TBMAIL("$user_name '$user' <$user_email>",
 	       "Widearea account granted on '$node_id' ",
@@ -287,7 +284,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	       "account on $node_id with $newtrust permissions.\n".
 	       "\n".
 	       "In order to log into this node, you must upload an ssh key\n".
-	       "via: ${TBBASE}/showpubkeys.php3?target_uid=$user\n".
+	       "via: ${TBBASE}/$url\n".
 	       "\n\n".
 	       "Thanks,\n".
 	       "Testbed Operations\n",

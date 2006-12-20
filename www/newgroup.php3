@@ -43,8 +43,9 @@ if (!isset($group_leader) ||
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Check ID for sillyness.
@@ -116,11 +117,11 @@ if ($count == $maxtries) {
 }
 
 # Need the user object for creating the group.
-if (! ($leader = User::LookupByUid($group_leader))) {
+if (! ($leader = User::Lookup($group_leader))) {
     TBERROR("Could not lookup user '$group_leader'!", 1);
 }
 # and the project.
-if (! ($project = Project::LookupByPid($group_pid))) {
+if (! ($project = Project::Lookup($group_pid))) {
     TBERROR("Could not lookup project '$group_pid'!", 1);
 }
 
@@ -158,8 +159,10 @@ STOPBUSY();
 #
 # Send an email message with a join link.
 #
-TBUserInfo($group_leader, $group_leader_name, $group_leader_email);
-TBUserInfo($uid, $user_name, $user_email);
+$group_leader_name  = $leader->name();
+$group_leader_email = $leader->email();
+$user_name          = $this_user->name();
+$user_email         = $this_user->email();
 
 TBMAIL("$group_leader_name '$group_leader' <$group_leader_email>",
        "New Group '$group_pid/$group_id' Created",

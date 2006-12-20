@@ -10,8 +10,9 @@ include("showstuff.php3");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
@@ -56,7 +57,7 @@ $exptidx  = $experiment->idx();
 #
 # Verify permissions.
 #
-if (! $experiment->AccessCheck($uid, $TB_EXPT_DESTROY)) {
+if (! $experiment->AccessCheck($this_user, $TB_EXPT_DESTROY)) {
     USERERROR("You do not have permission to end experiment $pid/$eid!", 1);
 }
 

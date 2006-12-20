@@ -21,12 +21,11 @@ PAGEHEADER("Show Group Information");
 #
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.

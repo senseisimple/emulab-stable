@@ -10,19 +10,12 @@ include("showstuff.php3");
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
 # 
-
+# We want to allow logged in users with expired passwords to change them.
 #
-# Only known and logged in users can modify info.
-#
-# Note different test though, since we want to allow logged in
-# users with expired passwords to change them.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid,
-	      CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
-$isadmin = ISADMIN($uid);
-
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # Shell options we support. Maybe stick in DB someday.
 $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
@@ -39,8 +32,12 @@ $wikionly = 0;
 function SPITFORM($formfields, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN, $isadmin;
-    global $target_uid, $wikionly;
+    global $target_user, $wikionly;
     global $shelllist, $defaultshell;
+
+    $username = $target_user->uid();
+    $uid_idx  = $target_user->uid_idx();
+    $webid    = $target_user->webid();
     
     #
     # Standard Testbed Header. Written late cause of password
@@ -87,13 +84,11 @@ function SPITFORM($formfields, $errors)
         #
         echo "<tr>
                   <td colspan=2>Username:</td>
-                  <td class=left>
-                      $formfields[target_uid]
+                  <td class=left>$username ($uid_idx)
                       <input type=hidden
-                             name=\"formfields[target_uid]\"
-                             value=\"" . $formfields[target_uid] . "\"
-                             size=$TBDB_UIDLEN
-   	                     maxlength=$TBDB_UIDLEN>
+                             name=\"formfields[user]\"
+                             value=\"" . $webid . "\"
+                             size=$TBDB_UIDLEN>
               </td>
              </tr>\n";
 
@@ -341,10 +336,10 @@ function SPITFORM($formfields, $errors)
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (!$wikionly) {
+	$pubkey_url = CreateURL("showpubkeys", $target_user);
+	
 	echo "<li> You can also
-                 <a href='showpubkeys.php3?target_uid=$target_uid'>
-                 edit your ssh public keys</a> and your
-                 <a href='showsfskeys.php3?target_uid=$target_uid'>
+                 <a href='$pubkey_url'>edit your ssh public keys</a>.
 		 sfs public keys</a>.
             <li> The City, State, ZIP/Postal Code, and Country fields 
                  were added later, so
@@ -369,82 +364,81 @@ function SPITFORM($formfields, $errors)
 #
 if (! isset($_POST['submit'])) {
     # First page load. Default to current user.
-    if (! isset($_GET['target_uid']))
-	$target_uid = $uid;
+    if (! isset($_GET['user']))
+	$user = $uid;
     else
-	$target_uid = $_GET['target_uid'];
+	$user = $_GET['user'];
 }
 else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
+    # Form submitted. Make sure we have a formfields array and a user.
     if (!isset($_POST['formfields']) ||
 	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['target_uid'])) {
+	!isset($_POST['formfields']['user'])) {
 	PAGEARGERROR("Invalid form arguments!");
     }
     $formfields = $_POST['formfields'];
-    $target_uid = $formfields['target_uid'];
+    $user       = $formfields['user'];
 }
 
 # Pedantic check of uid before continuing.
-if ($target_uid == "" || !TBvalid_uid($target_uid)) {
-    PAGEARGERROR("Invalid uid: '$target_uid'");
+if ($user == "" || !User::ValidWebID($user)) {
+    PAGEARGERROR("Invalid uid: '$user'");
 }
+
+#
+# Confirm target is a real user.
+#
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("No such user '$user'", 1);
+}
+$target_uid = $target_user->uid();
 
 #
 # Admin types can change anyone. 
 #
-if (! $isadmin &&
-    $uid != $target_uid &&
-    ! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_MODIFYINFO)) {
     USERERROR("You do not have permission to modify information for ".
 	      "user: $target_uid!", 1);
 }
 
 #
-# Suck the current info out of the database.
-#
-$query_result =
-    DBQueryFatal("select * from users where uid='$target_uid'");
-
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("No such user: $target_uid", 1);
-}
-
-$defaults = array();
-    
-#
 # Construct a defaults array based on current DB info. Used for the initial
 # form, and to determine if any changes were made. This is to avoid churning
 # the passwd file for no reason, given that most people use this page
 # simply to change their password. 
-# 
-$row = mysql_fetch_array($query_result);
-$defaults[target_uid]  = $target_uid;
-$defaults[usr_email]   = $row[usr_email];
-$defaults[usr_URL]     = $row[usr_URL];
-$defaults[usr_addr]    = $row[usr_addr];
-$defaults[usr_addr2]   = $row[usr_addr2];
-$defaults[usr_city]    = $row[usr_city];
-$defaults[usr_state]   = $row[usr_state];
-$defaults[usr_zip]     = $row[usr_zip];
-$defaults[usr_country] = $row[usr_country];
-$defaults[usr_name]    = $row[usr_name];
-$defaults[usr_phone]   = $row[usr_phone];
-$defaults[usr_title]   = $row[usr_title];
-$defaults[usr_affil]   = $row[usr_affil];
-$defaults[usr_shell]   = $row[usr_shell];
-$defaults[notes]       = $row[notes];
-$defaults[user_interface] = $row[user_interface];
-$wikionly              = $row[wikionly];
+#
+$defaults	       = array();
+$defaults[user]        = $target_user->webid();
+$defaults[usr_email]   = $target_user->email();
+$defaults[usr_URL]     = $target_user->URL();
+$defaults[usr_addr]    = $target_user->addr();
+$defaults[usr_addr2]   = $target_user->addr2();
+$defaults[usr_city]    = $target_user->city();
+$defaults[usr_state]   = $target_user->state();
+$defaults[usr_zip]     = $target_user->zip();
+$defaults[usr_country] = $target_user->country();
+$defaults[usr_name]    = $target_user->name();
+$defaults[usr_phone]   = $target_user->phone();
+$defaults[usr_title]   = $target_user->title();
+$defaults[usr_affil]   = $target_user->affil();
+$defaults[usr_shell]   = $target_user->shell();
+$defaults[notes]       = $target_user->notes();
+$defaults[user_interface] = $target_user->user_interface();
+$wikionly              = $target_user->wikionly();
 
-# Show and keep the Windows password if user-set, otherwise fill in the random one.
-if (strcmp($row[usr_w_pswd],""))
-    $defaults[w_password1] = $defaults[w_password2] = $row[usr_w_pswd];
+# Show and keep the Windows password if user-set, otherwise fill in the
+# random one. 
+if ($target_user->w_pswd() != "") {
+    $defaults[w_password1] = $defaults[w_password2] = $target_user->w_pswd();
+}
 else {
+    #
     # The initial random default for the Windows Password is based on the Unix
     # encrypted password, in particular the random salt if it's an MD5 crypt,
-    # consisting of the 8 characters after an initial "$1$" and followed by a "$". 
-    $unixpwd = explode('$', $row[usr_pswd]);
+    # consisting of the 8 chars after an initial "$1$" and followed by "$".
+    #
+    $unixpwd = explode('$', $target_user->pswd());
     if (strlen($unixpwd[0]) > 0)
 	# When there's no $ at the beginning, its not an MD5 hash.
 	$randpwd = substr($unixpwd[0],0,8);
@@ -519,7 +513,8 @@ if (!isset($formfields[usr_email]) ||
 elseif (! TBvalid_email($formfields[usr_email])) {
     $errors["Email Address"] = TBFieldErrorString();
 }
-elseif (! TBUniqueEmail($target_uid, $formfields[usr_email])) {
+elseif (($temp_user = User::LookupByEmail($formfields[usr_email])) &&
+	!$target_user->SameUser($temp_user)) {
     $errors["Email Address"] = "Already in use by another user!";
 }
 if (!$isadmin && !$wikionly) {
@@ -587,7 +582,7 @@ if (isset($formfields[password1]) &&
     elseif (strcmp($formfields[password1], $formfields[password2])) {
 	$errors["Retype Password"] = "Two Passwords Do Not Match";
     }
-    elseif (! CHECKPASSWORD($formfields[target_uid],
+    elseif (! CHECKPASSWORD($target_uid,
 			    $formfields[password1],
 			    $formfields[usr_name],
 			    $formfields[usr_email], $checkerror)) {
@@ -604,7 +599,7 @@ if (isset($formfields[w_password1]) &&
     elseif (strcmp($formfields[w_password1], $formfields[w_password2])) {
 	$errors["Retype Windows Password"] = "Two Windows Passwords Do Not Match";
     }
-    elseif (! CHECKPASSWORD($formfields[target_uid],
+    elseif (! CHECKPASSWORD($target_uid,
 			    $formfields[w_password1],
 			    $formfields[usr_name],
 			    $formfields[usr_email], $checkerror)) {
@@ -618,78 +613,46 @@ if (count($errors)) {
 }
 
 PAGEHEADER("Modify User Information");
-
-$usr_name     = addslashes($formfields[usr_name]);
-$usr_email    = $formfields[usr_email];
-$password1    = $formfields[password1];
-$password2    = $formfields[password2];
-$usr_title    = addslashes($formfields[usr_title]);
-$usr_affil    = addslashes($formfields[usr_affil]);
-$usr_addr     = addslashes($formfields[usr_addr]);
-$usr_city     = addslashes($formfields[usr_city]);
-$usr_state    = addslashes($formfields[usr_state]);
-$usr_zip      = addslashes($formfields[usr_zip]);
-$usr_country  = addslashes($formfields[usr_country]);
-$usr_phone    = $formfields[usr_phone];
-$usr_shell    = $formfields[usr_shell];
-$w_password1  = $formfields[w_password1];
-$w_password2  = $formfields[w_password2];
-
-if (! isset($formfields[usr_URL]) ||
-    strcmp($formfields[usr_URL], "") == 0 ||
-    strcmp($formfields[usr_URL], $HTTPTAG) == 0) {
-    $usr_URL = "";
-}
-else {
-    $usr_URL = addslashes($formfields[usr_URL]);
-}
-
-if (! isset($formfields[usr_addr2])) {
-    $usr_addr2 = "";
-}
-else {
-    $usr_addr2 = addslashes($formfields[usr_addr2]);
-}
+STARTBUSY("Making user profile changes");
 
 #
 # Only admin types can change the email address. If its different, the
 # user circumvented the form, and so its okay to blast it.
 #
-TBUserInfo($target_uid, $dbusr_name, $dbusr_email);
-
-if (strcmp($usr_email, $dbusr_email)) {
+if ($target_user->email() != $formfields["usr_email"]) {
     if (!$isadmin) {
 	USERERROR("You are not allowed to change your email address. <br> ".
 		  "Please contact Testbed Operations.", 1);
     }
-    DBQueryFatal("update users set usr_email='$usr_email' ".
-		 "where uid='$target_uid'");
-}
+    $target_user->SetEmail($formfields["usr_email"]);
 
-STARTBUSY("Making user profile changes");
+    TBMAIL($TBMAIL_AUDIT,
+	   "Email Address for '$target_uid' Modified",
+	   "\n".
+	   "Email Address for '$target_uid' changed by '$uid'.\n".
+	   "\n".
+	   "Name:              " . $target_user->name()  . "\n".
+	   "IDX:               " . $target_user->uid_idx()  . "\n".
+	   "Email:             " . $target_user->email() . "\n",
+	   "From: $TBMAIL_OPS\n".
+	   "Errors-To: $TBMAIL_WWW");
+}
 
 #
 # Now see if the user is requesting to change the password. We checked
 # them above when the form was submitted.
 #
-if ((isset($password1) && strcmp($password1, "")) &&
-    (isset($password2) && strcmp($password2, ""))) {
+if ((isset($formfields["password1"]) && $formfields["password1"] != "") &&
+    (isset($formfields["password2"]) && $formfields["password2"] != "")) {
 
-    $query_result =
-	DBQueryFatal("select usr_pswd from users WHERE uid='$target_uid'");
-    if (! mysql_num_rows($query_result)) {
-	TBERROR("Error getting usr_pswd for $target_uid", 1);
-    }
-    $row = mysql_fetch_array($query_result);
-    $old_encoding = $row[usr_pswd];
-    $new_encoding = crypt("$password1", $old_encoding);
+    $old_encoding = $target_user->pswd();
+    $new_encoding = crypt($formfields["password1"], $old_encoding);
 
     #
     # Compare. Must change it!
     # 
     if (! strcmp($old_encoding, $new_encoding)) {
 	$errors["New Password"] = "New password is the same as old password";
-
 	SPITFORM($formfields, $errors);
 	PAGEFOOTER();
 	return;
@@ -699,23 +662,20 @@ if ((isset($password1) && strcmp($password1, "")) &&
     # Do it again. This ensures we use the current algorithm, not whatever
     # it was encoded with last time.
     #
-    $new_encoding = crypt("$password1");
+    $new_encoding = crypt($formfields["password1"]);
 
     #
     # Insert into database. When changing password for someone else,
     # always set the expiration to right now so that the target user
     # is "forced" to change it. 
     #
-    if ($uid != $target_uid)
+    if (! $target_user->SameUser($this_user))
 	$expires = "now()";
     else
 	$expires = "date_add(now(), interval 1 year)";
-    
-    $insert_result =
-	DBQueryFatal("UPDATE users SET usr_pswd='$new_encoding', ".
-		     "pswd_expires=$expires ".
-		     "WHERE uid='$target_uid'");
 
+    $target_user->SetPassword($new_encoding, $expires);
+    
     if ($wikionly) {
 	if ($CHECKLOGIN_STATUS & CHECKLOGIN_ACTIVE) {
 	    SUEXEC("nobody", "nobody", "webtbacct passwd $target_uid",
@@ -733,15 +693,11 @@ if ((isset($password1) && strcmp($password1, "")) &&
 # them above when the form was submitted.
 #
 if (!$wikionly &&
-    ((isset($w_password1) && strcmp($w_password1, "")) &&
-     (isset($w_password2) && strcmp($w_password2, "")))) {
+    ((isset($formfields["w_password1"]) && $formfields["w_password1"] != "") &&
+     (isset($formfields["w_password2"]) && $formfields["w_password2"] != ""))){
 
-    #
-    # Insert into database.
-    $insert_result =
-	DBQueryFatal("UPDATE users SET usr_w_pswd='$w_password1' ".
-		     "WHERE uid='$target_uid'");
-
+    $target_user->SetWindowsPassword($formfields["w_password1"]);
+    
     if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
 	SUEXEC($uid, "nobody", "webtbacct wpasswd $target_uid", 1);
     }
@@ -751,12 +707,8 @@ if (!$wikionly &&
 # Only admins can change the notes field. We do not bother to generate
 # any email or external updates for this.
 #
-if ($isadmin &&
-    strcmp($defaults[notes], $formfields[notes])) {
-    $notes = addslashes($formfields[notes]);
-
-    DBQueryFatal("UPDATE users SET notes='$notes' ".
-		 "WHERE uid='$target_uid'");
+if ($isadmin && $target_user->notes() != $formfields["notes"]) {
+    $target_user->SetNotes($formfields["notes"]);
 }
 
 #
@@ -769,60 +721,53 @@ if (isset($formfields[user_interface]) &&
 else {
     $user_interface = TBDB_USER_INTERFACE_EMULAB;
 }
-if ($defaults[user_interface] != $user_interface) {
-    DBQueryFatal("update users set ".
-		 "user_interface='$user_interface' ".
-		 "where uid=\"$target_uid\"");
+if ($target_user->user_interface() != $user_interface) {
+    $target_user->SetUserInterface($user_interface);
 }
 
 #
-# Now change the rest of the information, but only if the user actually
-# changed the info. We use the original info in the defaults array and
-# the value in the formfields array to compare, cause of addslashes stuff. 
-#
-if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
-    strcmp($defaults[usr_URL],   $formfields[usr_URL]) ||
-    strcmp($defaults[usr_addr],  $formfields[usr_addr]) ||
-    strcmp($defaults[usr_addr2], $formfields[usr_addr2]) ||
-    strcmp($defaults[usr_city],  $formfields[usr_city]) ||
-    strcmp($defaults[usr_state], $formfields[usr_state]) ||
-    strcmp($defaults[usr_zip],   $formfields[usr_zip]) ||
-    strcmp($defaults[usr_country],   $formfields[usr_country]) ||
-    strcmp($defaults[usr_phone], $formfields[usr_phone]) ||
-    strcmp($defaults[usr_title], $formfields[usr_title]) ||
-    strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
-    strcmp($defaults[usr_shell], $formfields[usr_shell]) ||
-    # Check this too, since we want to call out if the email addr changed.
-    strcmp($defaults[usr_email], $formfields[usr_email])) {
+# Now change the rest of the information.
+$usr_name     = $formfields[usr_name];
+$usr_email    = $formfields[usr_email];
+$usr_title    = $formfields[usr_title];
+$usr_affil    = $formfields[usr_affil];
+$usr_addr     = $formfields[usr_addr];
+$usr_city     = $formfields[usr_city];
+$usr_state    = $formfields[usr_state];
+$usr_zip      = $formfields[usr_zip];
+$usr_country  = $formfields[usr_country];
+$usr_phone    = $formfields[usr_phone];
+$usr_shell    = $formfields[usr_shell];
 
-    DBQueryFatal("UPDATE users SET ".
-		 "usr_name=\"$usr_name\",       ".
-		 "usr_URL=\"$usr_URL\",         ".
-		 "usr_addr=\"$usr_addr\",       ".
-		 "usr_addr2=\"$usr_addr2\",     ".
-		 "usr_city=\"$usr_city\",       ".
-		 "usr_state=\"$usr_state\",     ".
-		 "usr_zip=\"$usr_zip\",         ".
-		 "usr_country=\"$usr_country\", ".
-		 "usr_phone=\"$usr_phone\",     ".
-		 "usr_title=\"$usr_title\",     ".
-		 "usr_affil=\"$usr_affil\",     ".
-		 "usr_shell=\"$usr_shell\",     ".
-		 "usr_modified=now()            ".
-		 "WHERE uid=\"$target_uid\"");
+if (! isset($formfields[usr_URL]) ||
+    strcmp($formfields[usr_URL], "") == 0 ||
+    strcmp($formfields[usr_URL], $HTTPTAG) == 0) {
+    $usr_URL = "";
+}
+else {
+    $usr_URL = $formfields[usr_URL];
+}
 
-    # Only to user. We care about password and email changes only.
-    $BCC = "";
-    if (strcmp($usr_email, $dbusr_email)) {
-	$BCC = "\nBcc: $TBMAIL_AUDIT";
-    }
-    
+if (! isset($formfields[usr_addr2])) {
+    $usr_addr2 = "";
+}
+else {
+    $usr_addr2 = $formfields[usr_addr2];
+}
+
+$modified = $target_user->ChangeProfile($usr_name,  $usr_title,
+					$usr_affil, $usr_addr,
+					$usr_addr2, $usr_city,
+					$usr_state, $usr_zip, $usr_country,
+					$usr_phone, $usr_shell, $usr_URL);
+if ($modified) {
     TBMAIL("$usr_name <$usr_email>",
 	   "User Information for '$target_uid' Modified",
 	   "\n".
 	   "User information for '$target_uid' changed by '$uid'.\n".
 	   "\n".
 	   "Name:              $usr_name\n".
+	   "IDX:               " . $target_user->uid_idx()  . "\n".
 	   "Email:             $usr_email\n".
 	   "URL:               $usr_URL\n".
 	   "Affiliation:       $usr_affil\n".
@@ -836,8 +781,8 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 	   "Job Title:         $usr_title\n".
 	   "Shell:             $usr_shell\n",
 	   "WikiOnly:	       $wikionly\n",
-	   "From: $TBMAIL_OPS".
-	   $BCC .
+	   "From: $TBMAIL_OPS\n".
+	   "Bcc: $TBMAIL_AUDIT\n" .
 	   "Errors-To: $TBMAIL_WWW");
 
     #
@@ -854,7 +799,7 @@ STOPBUSY();
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 # 
-PAGEREPLACE("showuser.php3?target_uid=$target_uid#PROFILE");
+PAGEREPLACE(CreateURL("showuser", $target_user) . "#PROFILE");
 
 #
 # Standard Testbed Footer

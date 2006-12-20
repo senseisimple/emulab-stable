@@ -10,9 +10,9 @@ include("showstuff.php3");
 #
 # Only admin users ...
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (!$isadmin) {
     USERERROR("You do not have permission to login names!", 1);
@@ -24,40 +24,43 @@ if (!$isadmin) {
 #
 if (! isset($_POST['submit'])) {
     # First page load. Default to current user.
-    if (! isset($_GET['target_uid']))
-	$target_uid = $uid;
+    if (! isset($_GET['user']))
+	$user = $uid;
     else
-	$target_uid = $_GET['target_uid'];
+	$user = $_GET['user'];
 }
 else {
-    # Form submitted. Make sure we have a target_uid and a new_uid.
-    if (! isset($_POST['target_uid']) || $_POST['target_uid'] == "" ||
+    # Form submitted. Make sure we have a target user and a new_uid.
+    if (! isset($_POST['user']) || $_POST['user'] == "" ||
 	! isset($_POST['new_uid']) || $_POST['new_uid'] == "") {
 	PAGEARGERROR("Invalid form arguments.");
     }
-    $target_uid = $_POST['target_uid'];
-    $new_uid    = $_POST['new_uid'];
+    $user    = $_POST['user'];
+    $new_uid = $_POST['new_uid'];
 }
 
 # Pedantic check of uid before continuing.
-if ($target_uid == "" || !TBvalid_uid($target_uid)) {
-    PAGEARGERROR("Invalid uid: '$target_uid'");
+if ($user == "" || !User::ValidWebID($user)) {
+    PAGEARGERROR("Invalid uid: 'user'");
 }
 
 # Find user. Must be unapproved (verified user). Any other state is too hard.
-if (! ($user = User::LookupByUid($target_uid))) {
-    USERERROR("The user $target_uid is not a valid user", 1);
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("The user $user is not a valid user", 1);
 }
-if ($user->status() != TBDB_USERSTATUS_UNAPPROVED) {
+$target_uid = $target_user->uid();
+
+if ($target_user->status() != TBDB_USERSTATUS_UNAPPROVED) {
     USERERROR("The user $target_uid must be ".
 	      "unapproved (but verified) to change!", 1);
 }
 
-function SPITFORM($user, $new_uid, $error)
+function SPITFORM($target_user, $new_uid, $error)
 {
     global $TBDB_UIDLEN;
     
-    $target_uid = $user->uid();
+    $target_uid   = $target_user->uid();
+    $target_webid = $target_user->webid();
     
     #
     # Standard Testbed Header.
@@ -93,7 +96,7 @@ function SPITFORM($user, $new_uid, $error)
                            name=submit></b>
              </td>
           </tr>
-	  <input type=hidden name=target_uid value=$target_uid>
+	  <input type=hidden name=user value=$target_webid>
           </form>
           </table>\n";
 
@@ -110,7 +113,7 @@ function SPITFORM($user, $new_uid, $error)
 # If not clicked, then put up a form.
 #
 if (! isset($_POST['submit'])) {
-    SPITFORM($user, "", null);
+    SPITFORM($target_user, "", null);
     return;
 }
 
@@ -120,12 +123,12 @@ $error = null;
 if (!TBvalid_uid($new_uid)) {
     $error = "UID: " . TBFieldErrorString();
 }
-elseif (User::LookupByUid($new_uid) || posix_getpwnam($new_uid)) {
+elseif (User::Lookup($new_uid) || posix_getpwnam($new_uid)) {
     $error = "UID: Already in use. Pick another";
 }
 
 if ($error) {
-    SPITFORM($user, $new_uid, $error);
+    SPITFORM($target_user, $new_uid, $error);
     return;
 }
 
@@ -146,7 +149,7 @@ SUEXEC($uid, $TBADMINGROUP,
 
 # Stop the busy indicator and zap to user page.
 STOPBUSY();
-PAGEREPLACE("showuser.php3?target_uid=$new_uid");
+PAGEREPLACE(CreateURL("showuser", $target_user));
 
 #
 # Standard Testbed Footer

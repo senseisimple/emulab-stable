@@ -9,9 +9,9 @@ include("defs.php3");
 #
 # Only admin people!
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (! $isadmin) {
     USERERROR("You do not have permission to pre-reserve nodes!", 1);

@@ -14,13 +14,9 @@ include("osiddefs.php3");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
-# Admin users only
-#
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (! $isadmin) {
     USERERROR("You do not have permission to edit node types!", 1);

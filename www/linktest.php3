@@ -35,8 +35,9 @@ if (sajax_client_request()) {
 }
 
 # Now check login status.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Need this argument checking in a function so it can called from the

@@ -12,19 +12,19 @@ include("defs.php3");
 
 #
 # Get current user.
-# 
-$uid = GETLOGIN();
+#
+$this_user = CheckLogin($check_status);
 
 #
 # If a uid came in, then we check to see if the login is valid.
 # We require that the user be logged in to start a second project.
 #
-if ($uid) {
+if ($this_user) {
     # Allow unapproved users to join multiple groups ...
     # Must be verified though.
-    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED|
-		  CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
-    $joining_uid = $uid;
+    CheckLoginOrDie(CHECKLOGIN_UNAPPROVED|
+		    CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+    $joining_uid = $this_user->uid();
     $returning = 1;
 }
 else {
@@ -489,7 +489,7 @@ if (! isset($_POST['submit'])) {
     return;
 }
 else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
+    # Form submitted. Make sure we have a formfields array.
     if (!isset($_POST['formfields']) ||
 	!is_array($_POST['formfields'])) {
 	PAGEARGERROR("Invalid form arguments.");
@@ -514,7 +514,7 @@ if (! $returning) {
 	elseif (!TBvalid_uid($formfields[joining_uid])) {
 	    $errors["UserName"] = TBFieldErrorString();
 	}
-	elseif (TBCurrentUser($formfields[joining_uid]) ||
+	elseif (User::Lookup($formfields[joining_uid]) ||
 		posix_getpwnam($formfields[joining_uid])) {
 	    $errors["UserName"] = "Already in use. Pick another";
 	}
@@ -540,7 +540,7 @@ if (! $returning) {
 	elseif (! TBvalid_wikiname($formfields[wikiname])) {
 	    $errors["WikiName"] = TBFieldErrorString();
 	}
-	elseif (TBCurrentWikiName($formfields[wikiname])) {
+	elseif (User::LookupByWikiName($formfields[wikiname])) {
 	    $errors["WikiName"] = "Already in use. Pick another";
 	}
     }
@@ -567,7 +567,7 @@ if (! $returning) {
     elseif (! TBvalid_email($formfields[usr_email])) {
 	$errors["Email Address"] = TBFieldErrorString();
     }
-    elseif (TBCurrentEmail($formfields[usr_email])) {
+    elseif (User::LookupByEmail($formfields[usr_email])) {
 	$errors["Email Address"] =
 	    "Already in use. <b>Did you forget to login?</b>";
     }
@@ -747,17 +747,15 @@ if (!$returning && !$forwikionly) {
 # Need the user, project and group objects for the rest of this.
 #
 if (!$forwikionly) {
-    if (! ($project = Project::LookupByPid($pid))) {
+    if (! ($project = Project::Lookup($pid))) {
 	TBERROR("Could not lookup object for $pid!", 1);
     }
     if (! ($group = Group::LookupByPidGid($pid, $gid))) {
 	TBERROR("Could not lookup object for $pid/$gid!", 1);
     }
     if ($returning) {
-	if (! ($user = User::LookupByUid($joining_uid))) {
-	    TBERROR("Could not lookup user '$joining_uid'!", 1);
-	}
-	if ($group->IsMember($user)) {
+	$user = $this_user;
+	if ($group->IsMember($user, $ignore)) {
 	    $errors["Membership"] = "You are already a member";
 	}
     }
@@ -839,7 +837,8 @@ if (! $returning) {
     $args["usr_pswd"]      = crypt("$password1");
     $args["wikiname"]      = $wikiname;
 
-    if (! ($user = User::NewUser($joining_uid, 0, $forwikionly, $args))) {
+    if (! ($user = User::NewUser($joining_uid,
+				 TBDB_NEWACCOUNT_WIKIONLY, $args))) {
 	TBERROR("Could not create new user '$usr_email'!", 1);
     }
     $joining_uid = $user->uid();
@@ -860,7 +859,7 @@ if ($forwikionly) {
 #
 # If joining a subgroup, also add to project group.
 #
-if ($pid != $gid && ! $project->IsMember($user)) {
+if ($pid != $gid && ! $project->IsMember($user, $ignore)) {
     if ($project->AddNewMember($user) < 0) {
 	TBERROR("Could not add user $joining_uid to project group $pid", 1);
     }

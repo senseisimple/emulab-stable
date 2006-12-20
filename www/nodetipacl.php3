@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,8 +14,9 @@ include("xmlrpc.php3");
 #
 # Only known and logged in users can get acls..
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
@@ -30,7 +31,7 @@ if (!isset($node_id) ||
 # nodes in their own experiments.
 #
 # XXX is MODIFYINFO the correct one to check? (probably)
-$isadmin = ISADMIN($uid);
+#
 if (! $isadmin) {
     if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) {
         USERERROR("You do not have permission to tip to node $node_id!", 1);

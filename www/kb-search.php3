@@ -8,8 +8,8 @@ if (!isset($embedded)) {
     require("defs.php3");
 
     # Some Knowledge Base entries are visible only to admins.
-    $uid = GETLOGIN();
-    $admin_access = ISADMIN($uid) || ISFOREIGN_ADMIN($uid);
+    $this_user = CheckLogin($check_status);
+    $admin_access = ISADMIN() || ISFOREIGN_ADMIN();
 }
 
 #

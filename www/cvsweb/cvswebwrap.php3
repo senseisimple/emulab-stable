@@ -15,11 +15,11 @@ require("defs.php3");
 # We look for anon access, and if so, redirect to ops web server.
 # WARNING: See the LOGGEDINORDIE() calls below.
 #
-$uid = GETLOGIN();
+$this_user = CheckLogin($check_status);
 
 # Redirect now, to avoid phishing.
-if ($uid) {
-    LOGGEDINORDIE($uid);
+if ($this_user) {
+    CheckLoginOrDie();
 }
 else {
     $url = $OPSCVSURL . "?cvsroot=$pid";

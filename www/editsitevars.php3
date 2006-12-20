@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,13 +14,10 @@ PAGEHEADER("Edit Site Variables");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-#
-# Of course verify that this uid has admin privs!
-#
-$isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to edit site variables!", 1);
 }

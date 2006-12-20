@@ -11,23 +11,34 @@ include_once("template_defs.php");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
 # 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
+if (!isset($user) ||
+    strcmp($user, "") == 0) {
     USERERROR("You must provide a User ID.", 1);
 }
 
 #
+# Check to make sure thats this is a valid UID.
+#
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("Could not lookup user '$user'!", 1);
+}
+$userstatus = $target_user->status();
+$wikionly   = $target_user->wikionly();
+$target_idx = $target_user->uid_idx();
+$target_uid = $target_user->uid();
+
+#
 # Standard Testbed Header, now that we know what we want to say.
 #
-if (strcmp($uid, $target_uid)) {
+if (! $this_user->SameUser($target_user)) {
     PAGEHEADER("Information for User: $target_uid");
 }
 else {
@@ -35,25 +46,12 @@ else {
 }
 
 #
-# Check to make sure thats this is a valid UID. Getting the status works,
-# and we need that later. 
-#
-if (! ($userstatus = TBUserStatus($target_uid))) {
-    USERERROR("The user $target_uid is not a valid user", 1);
-}
-$wikionly = TBWikiOnlyUser($target_uid);
-
-#
 # Verify that this uid is a member of one of the projects that the
 # target_uid is in. Must have proper permission in that group too. 
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-
-    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
-	USERERROR("You do not have permission to view this user's ".
-		  "information!", 1);
-    }
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+    USERERROR("You do not have permission to view this user's information!", 1);
 }
 
 #
@@ -69,12 +67,12 @@ if ($message != "") {
 #
 # Tell the user how many PCs he is using.
 #
-$yourpcs = TBUserPCs($target_uid);
+$yourpcs = $target_user->PCsInUse();
 
 if ($yourpcs) {
     echo "<center><font color=Red size=+2>\n";
     
-    if (strcmp($uid, $target_uid))
+    if (! $this_user->SameUser($target_user))
 	echo "$target_uid is using $yourpcs PCs!\n";
     else
 	echo "You are using $yourpcs PCs!\n";
@@ -108,9 +106,10 @@ $query_result =
 		 "left join experiments as e on g.pid=e.pid and g.gid=e.gid ".
 		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
 		 "left join group_membership as g2 on g2.pid=g.pid and ".
-		 "     g2.gid=g.gid and g2.uid='$uid' ".
-		 "where g.uid='$target_uid' and ".
-		 ($isadmin ? "" : "g2.uid is not null and ") .
+		 "     g2.gid=g.gid and ".
+		 "     g2.uid_idx='" . $this_user->uid_idx() . "' ".
+		 "where g.uid_idx='$target_idx' and ".
+		 ($isadmin ? "" : "g2.uid_idx is not null and ") .
 		 "g.trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
 		 "group by g.pid, g.gid ".
 		 "order by g.pid,gr.created");
@@ -200,61 +199,66 @@ SUBMENUSTART("User Options");
 # Permission check not needed; if the user can view this page, they can
 # generally access these subpages, but if not, the subpage will still whine.
 # 
-WRITESUBMENUBUTTON("Edit Profile",  "moduserinfo.php3?target_uid=$target_uid");
+WRITESUBMENUBUTTON("Edit Profile",
+		   CreateURL("moduserinfo", $target_user));
 
-if (!$wikionly && ($isadmin || !strcmp($uid, $target_uid))) {
+if (!$wikionly && ($isadmin || $target_user->SameUser($this_user))) {
     WRITESUBMENUBUTTON("Edit SSH Keys",
-		       "showpubkeys.php3?target_uid=$target_uid");
+		       CreateURL("showpubkeys", $target_user));
+    
     WRITESUBMENUBUTTON("Edit SFS Keys",
-		       "showsfskeys.php3?target_uid=$target_uid");
+		       CreateURL("showsfskeys", $target_user));
 
     WRITESUBMENUBUTTON("Generate SSL Cert",
-		       "gensslcert.php3?target_uid=$target_uid");
+		       CreateURL("gensslcert", $target_user));
 
     WRITESUBMENUBUTTON("Show History",
-		       "showstats.php3?showby=user&which=$target_uid");
+		       CreateURL("showstats", $target_user, "showby", "user"));
 
     if ($MAILMANSUPPORT && mysql_num_rows($mm_result)) {
 	WRITESUBMENUBUTTON("Show Mailman Lists",
-			   "showmmlists.php3?target_uid=$target_uid");
+			   CreateURL("showmmlists", $target_user));
     }
 }
 
 if ($isadmin) {
     SUBMENUSECTION("Admin Options");
     
-    if (!strcmp(TBUserStatus($target_uid), TBDB_USERSTATUS_FROZEN)) {
+    if (!strcmp($userstatus, TBDB_USERSTATUS_FROZEN)) {
 	WRITESUBMENUBUTTON("Thaw User",
-		   "freezeuser.php3?target_uid=$target_uid&action=thaw");
+			   CreateURL("freezeuser", $target_user,
+				     "action", "thaw"));
     }
     else {
 	WRITESUBMENUBUTTON("Freeze User",
-		   "freezeuser.php3?target_uid=$target_uid&action=freeze");
+			   CreateURL("freezeuser", $target_user,
+				     "action", "freeze"));
     }
     WRITESUBMENUBUTTON("Delete User",
-		       "deleteuser.php3?target_uid=$target_uid");
+		       CreateURL("deleteuser", $target_user));
 
     WRITESUBMENUBUTTON("SU as User",
-		       "suuser.php?target_uid=$target_uid");
+		       CreateURL("suuser", $target_user));
 
     if ($userstatus == TBDB_USERSTATUS_UNAPPROVED) {
 	WRITESUBMENUBUTTON("Change UID",
-			   "changeuid.php?target_uid=$target_uid");
+			   CreateURL("changeuid", $this_user));
     }
 
     if (! strcmp($userstatus, TBDB_USERSTATUS_NEWUSER) ||
 	! strcmp($userstatus, TBDB_USERSTATUS_UNVERIFIED)) {
 	WRITESUBMENUBUTTON("Resend Verification Key",
-			   "resendkey.php3?target_uid=$target_uid");
+			   CreateURL("resendkey", $this_user));
     }
     else {
 	WRITESUBMENUBUTTON("Send Test Email Message",
-			   "sendtestmsg.php3?target_uid=$target_uid");
+			   CreateURL("sendtestmsg", $this_user));
     }
 }
 SUBMENUEND();
 
-SHOWUSER($target_uid);
+$target_user->Show();
+
 SUBPAGEEND();
 
 if ($isadmin) {
@@ -262,13 +266,7 @@ if ($isadmin) {
           <h3>User Stats</h3>
          </center>\n";
 
-    #
-    # XXX: need to redo this entire script ...
-    #
-    if (! ($user = User::LookupByUid($target_uid))) {
-	TBERROR("Could not lookup user '$target_uid'!", 1);
-    }
-    echo $user->ShowStats();
+    echo $target_user->ShowStats();
 }
 
 #

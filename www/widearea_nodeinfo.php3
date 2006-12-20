@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -10,8 +10,9 @@ include("showstuff.php3");
 #
 # Only known and logged in users can see this information
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if ($node_id) {
     PAGEHEADER("Wide Area Link Characteristics For $node_id");

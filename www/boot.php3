@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,8 +14,9 @@ include("showstuff.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Check to make sure a valid nodeid, *or* a valid experiment.
@@ -105,11 +106,6 @@ if (!$confirmed) {
     return;
 }
 
-#
-# For the audit message.
-#
-TBUserInfo($uid, $uid_name, $uid_email);
-
 if ($nodemode) {
     $message = "$node_id was rebooted via the web interface by $uid\n";
     $subject = "Node Reboot: $node_id";
@@ -149,11 +145,6 @@ else {
 if (! $fp) {
     USERERROR("Reboot failed!", 1);
 }
-
-#TBMAIL($TBMAIL_AUDIT,
-#       $subject, $message,
-#       "From: $uid_name <$uid_email>\n".
-#       "Errors-To: $TBMAIL_WWW");
 
 header("Content-Type: text/plain");
 header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");

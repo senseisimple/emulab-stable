@@ -12,12 +12,12 @@ include("defs.php3");
 PAGEHEADER("Experiment Information Listing");
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-$isadmin     = ISADMIN($uid);
 $clause      = 0;
 $having      = "";
 $active      = 0;
@@ -375,6 +375,11 @@ if ($thumb && !$idle) {
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["dshort"];
         $rsrcidx = $row["rsrcidx"];
+
+	if (! ($head_user = User::Lookup($huid))) {
+	    TBERROR("Could not lookup object for user $huid", 1);
+	}
+	$showuser_url = CreateURL("showuser", $head_user);
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
 
@@ -437,7 +442,7 @@ if ($thumb && !$idle) {
 	    }	
 
 	    echo "<font size=-2><b>Created by:</b> ".
-		 "<a href='showuser.php3?target_uid=$huid'>$huid</a>".
+		 "<a href='$showuser_url'>$huid</a>".
 		 "</font><br />\n";
 
 	    $special = 0;
@@ -526,6 +531,11 @@ if ($thumb && !$idle) {
 	$idletime = ($idlesec > 300 ? round($idlesec/3600,1) : 0);
 	# reset pcs
 	$pcs=0;
+
+	if (! ($head_user = User::Lookup($huid))) {
+	    TBERROR("Could not lookup object for user $huid", 1);
+	}
+	$showuser_url = CreateURL("showuser", $head_user);
 	
 	if ($swapreqs && !$isidle) {
 	    $swapreqs = "";
@@ -677,7 +687,7 @@ if ($thumb && !$idle) {
 	    echo "<td>$name</td>\n";
 	}
 	
-        echo "<td><A href='showuser.php3?target_uid=$huid'>$huid</A></td>\n";
+        echo "<td><A href='$showuser_url'>$huid</A></td>\n";
 	echo "</tr>\n";
     }
     echo "</table>\n";

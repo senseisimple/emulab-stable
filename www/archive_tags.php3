@@ -15,9 +15,9 @@ PAGEHEADER("Experiment Tags");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # Show just the last N records unless request is different.
 if (!isset($records) || !strcmp($records, "")) {

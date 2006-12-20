@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -13,7 +13,7 @@ if (isset($_REQUEST['simple'])) {
 }
 
 # Form arguments.
-$reset_uid = $_REQUEST['reset_uid'];
+$user      = $_REQUEST['user'];
 $keyB      = $_REQUEST['key'];
 # We also need the other half of the key from the browser.
 $keyA      = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
@@ -28,7 +28,7 @@ if ((isset($keyB) && $keyB != "") && (!isset($keyA) || $keyA == "")) {
 	      "Knowledge Base Entry</a> to see what the likely cause is.", 1);
 }
 
-if (!isset($reset_uid) || $reset_uid == "" || !TBvalid_uid($reset_uid) ||
+if (!isset($user) || $user == "" || !User::ValidWebID($user) ||
     !isset($keyA) || $keyA == "" || !preg_match("/^[\w]+$/", $keyA) ||
     !isset($keyB) || $keyB == "" || !preg_match("/^[\w]+$/", $keyB)) {
     PAGEARGERROR();
@@ -55,25 +55,25 @@ if ($simple) {
 #
 # Must not be logged in.
 # 
-if (($known_uid = GETUID()) != FALSE) {
-    if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
-	PAGEHEADER("Reset Your Password", $view);
+if (GETLOGIN() != FALSE) {
+    PAGEHEADER("Reset Your Password", $view);
 
-	echo "<h3>
+    echo "<h3>
               You are logged in. You must already know your password!
-              </h3>\n";
+          </h3>\n";
 
-	PAGEFOOTER($view);
-	die("");
-    }
+    PAGEFOOTER($view);
+    die("");
 }
 
 #
 # Spit out the form.
 # 
-function SPITFORM($uid, $key, $failed, $simple, $view)
+function SPITFORM($target_user, $key, $failed, $simple, $view)
 {
     global	$TBBASE;
+
+    $uid = $target_user->uid();
     
     PAGEHEADER("Reset Your Password", $view);
 
@@ -92,10 +92,11 @@ function SPITFORM($uid, $key, $failed, $simple, $view)
               </center>\n";
     }
 
-    $args = "reset_uid=$uid&key=$key&simple=$simple";
+    $chpass_url = CreateURL("chpasswd", $target_user,
+			    "key", $key, "simple", $simple);
 	
     echo "<table align=center border=1>
-          <form action=${TBBASE}/chpasswd.php3?${args} method=post>\n";
+          <form action='${TBBASE}/$chpass_url' method=post>\n";
 
     echo "<tr>
               <td>Password:</td>
@@ -128,26 +129,22 @@ function SPITFORM($uid, $key, $failed, $simple, $view)
 # Check to make sure that the key is valid and that the timeout has not
 # expired.
 #
-$query_result =
-    DBQueryFatal("select chpasswd_key,chpasswd_expires,usr_email,usr_name ".
-		 "   from users ".
-		 "where uid='$reset_uid'");
-# Silent error about invalid users.
-if (!mysql_num_rows($query_result)) {
-    PAGEARGERROR();    
+if (! ($target_user = User::Lookup($user))) {
+    # Silent error about invalid users.
+    PAGEARGERROR();
 }
-$row       = mysql_fetch_row($query_result);
-$usr_email = $row[2];
-$usr_name  = $row[3];
+$usr_email  = $target_user->email();
+$usr_name   = $target_user->name();
+$target_uid = $target_user->uid();
 
 # Silent error when there is no key/timeout set for the user.
-if (!isset($row[0]) || !$row[1]) {
-    PAGEARGERROR();    
+if (!$target_user->chpasswd_key() || !$target_user->chpasswd_expires()) {
+    PAGEARGERROR();
 }
-if ($row[0] != $key) {
+if ($target_user->chpasswd_key() != $key) {
     USERERROR("You do not have permission to change your password!", 1);
 }
-if (time() > $row[1]) {
+if (time() > $target_user->chpasswd_expires()) {
     USERERROR("Your key has expired. Please request a
                <a href='password.php3'>new key</a>.", 1);
 }
@@ -156,7 +153,8 @@ if (time() > $row[1]) {
 # If not clicked, then put up a form.
 #
 if (! isset($reset)) {
-    SPITFORM($reset_uid, $keyB, 0, $simple, $view);
+    SPITFORM($target_user, $keyB, 0, $simple, $view);
+    PAGEFOOTER();
     return;
 }
 
@@ -168,15 +166,21 @@ $password2 = $_POST['password2'];
 
 if (!isset($password1) || $password1 == "" ||
     !isset($password2) || $password2 == "") {
-    SPITFORM($reset_uid, $keyB, "You must supply a password", $simple, $view);
+    SPITFORM($target_user, $keyB,
+	     "You must supply a password", $simple, $view);
+    PAGEFOOTER();
     return;
 }
 if ($password1 != $password2) {
-    SPITFORM($reset_uid, $keyB, "Two passwords do not match", $simple, $view);
+    SPITFORM($target_user, $keyB,
+	     "Two passwords do not match", $simple, $view);
+    PAGEFOOTER();
     return;
 }
-if (! CHECKPASSWORD($reset_uid, $password1, $usr_name, $usr_email, $checkerror)){
-    SPITFORM($reset_uid, $keyB, $checkerror, $simple, $view);
+if (! CHECKPASSWORD($target_uid,
+		    $password1, $usr_name, $usr_email, $checkerror)){
+    SPITFORM($target_user, $keyB, $checkerror, $simple, $view);
+    PAGEFOOTER();
     return;
 }
 
@@ -189,19 +193,21 @@ PAGEHEADER("Reset Your Password", $view);
 $encoding = crypt("$password1");
 $expires  = "date_add(now(), interval 1 year)";
 
-DBQueryFatal("update users set ".
-	     "       chpasswd_key=NULL,chpasswd_expires=0, ".
-	     "       usr_pswd='$encoding',pswd_expires=$expires ".
-	     "where uid='$reset_uid'");
+$target_user->SetPassword($encoding, $expires);
 
-if (HASREALACCOUNT($reset_uid)) {
-    SUEXEC($reset_uid, "nobody", "webtbacct passwd $reset_uid", 1);
+if (HASREALACCOUNT($target_uid)) {
+    STARTBUSY("Resetting your password");
+
+    SUEXEC($target_uid, "nobody", "webtbacct passwd $target_uid",
+	   SUEXEC_ACTION_DIE);
+    
+    CLEARBUSY();
 }
 
 TBMAIL("$usr_name <$usr_email>",
-       "Password Reset for '$reset_uid'",
+       "Password Reset for '$target_uid'",
        "\n".
-       "The password for '$reset_uid' has been reset via the web interface.\n".
+       "The password for '$target_uid' has been reset via the web interface.\n".
        "If this message is unexpected, please contact Testbed Operations\n".
        "($TBMAILADDR_OPS) immediately!\n".
        "\n".

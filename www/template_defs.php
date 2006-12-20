@@ -220,6 +220,11 @@ class Template
 	$description = $this->description();
 	$path        = $this->path();
 
+	if (! ($user = User::Lookup($uid))) {
+	    TBERROR("Could not lookup object for user $uid", 1);
+	}
+	$showuser_url = CreateURL("showuser", $user);
+	
         #
         # We need the metadata guid/version for the TID and description since
         # they are mungable metadata.
@@ -259,7 +264,7 @@ class Template
 	
 	ShowItem("Project", MakeLink("project", "pid=$pid", $pid));
 	ShowItem("Group",   $gid);
-	ShowItem("Creator", MakeLink("user", "target_uid=$uid", $uid));
+	ShowItem("Creator", MakeAnchor($showuser_url, $uid));
 	ShowItem("Created", $created);
 
 	echo "<tr><td align=center colspan=2>Datastore Directory</td></tr>\n";
@@ -1090,6 +1095,11 @@ class TemplateInstance
 	$template= $this->template();
 	$pcount  = $template->ParameterCount();
 
+	if (! ($user = User::Lookup($uid))) {
+	    TBERROR("Could not lookup object for user $uid", 1);
+	}
+	$showuser_url = CreateURL("showuser", $user);
+	
 	if ($detailed && $pcount) {
 	    echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
 		 " cellpadding=0 cellspacing=0 align=center>\n";
@@ -1107,7 +1117,7 @@ class TemplateInstance
 			  "guid=$guid&version=$vers", "$guid/$vers"));
 	ShowItem("ID",          $exptidx);
 	ShowItem("Project",     MakeLink("project", "pid=$pid", $pid));
-	ShowItem("Creator",     MakeLink("user", "target_uid=$uid", $uid));
+	ShowItem("Creator",     MakeAnchor($url, $uid));
 	ShowItem("Started",     $start);
 	ShowItem("Stopped",     (isset($stop) ? $stop : "&nbsp"));
 	ShowItem("Current Run", (isset($runidx) ? $runidx : "&nbsp"));
@@ -1936,6 +1946,14 @@ function MakeLink($which, $args, $text)
 	$page = "template_swapin.php";
     }
     return "<a href=${page}?${args}>$text</a>";
+}
+
+#
+# New version of above function, will replace it eventually.
+#
+function MakeAnchor($url, $text)
+{
+    return "<a href='${url}'>$text</a>";
 }
 
 #

@@ -20,27 +20,33 @@ PAGEHEADER("Node Control Center");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
 # 
-if (isset($target_uid)) {
-    if ($target_uid == "") {
-	$target_uid = $uid;
+if (isset($user)) {
+    if ($user == "") {
+	$user = $uid;
     }
-    elseif (! TBvalid_uid($target_uid)) {
-	PAGEARGERROR("Invalid characters in '$target_uid'");
+    elseif (! User::ValidWebID($user)) {
+	PAGEARGERROR("Invalid characters in '$user'");
     }
-    elseif (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
-	USERERROR("You do not have permission to view this user's ".
-		  "information!", 1);
+    elseif (! ($target_user = User::Lookup($user))) {
+	USERERROR("The user $user is not a valid user", 1);
     }
+    elseif (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+	USERERROR("You do not have permission to do this!", 1);
+    }
+    $target_uid  = $target_user->uid();
+    $target_idx  = $target_user->uid_idx();
 }
 else {
-    $target_uid = $uid;
+    $target_uid  = $uid;
+    $target_idx  = $this_user->uid_idx();
+    $target_user = $this_user;
 }
 
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
@@ -177,7 +183,7 @@ if (! strcmp($showtype, "summary")) {
 		DBQueryFatal("select distinct type from group_membership as g ".
 			     "left join nodetypeXpid_permissions as p ".
 			     "     on g.pid=p.pid ".
-			     "where uid='$target_uid' $pidclause");
+			     "where uid_idx='$target_idx' $pidclause");
 	}
 	
 	while ($row = mysql_fetch_array($query_result)) {
@@ -236,7 +242,7 @@ if (! strcmp($showtype, "summary")) {
 	}
     }
 
-    $projlist = TBProjList($target_uid, $TB_PROJECT_CREATEEXPT);
+    $projlist = $target_user->ProjectAccessList($TB_PROJECT_CREATEEXPT);
     if (count($projlist) > 1) {
 	echo "<b>By Project Permission: ";
 	while (list($project) = each($projlist)) {

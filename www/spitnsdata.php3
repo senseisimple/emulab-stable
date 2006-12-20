@@ -8,10 +8,11 @@ include("defs.php3");
 include_once("template_defs.php");
 
 #
-# Only known and logged in users can begin experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # This comes from the begin_experiment page, when cloning an experiment

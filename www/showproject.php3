@@ -22,12 +22,11 @@ PAGEHEADER("Show Project Information");
 #
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
@@ -118,10 +117,15 @@ while ($row = mysql_fetch_array($query_result)) {
     $desc     = stripslashes($row[description]);
     $leader   = $row[leader];
 
+    if (! ($leader_user = User::Lookup($leader))) {
+	TBERROR("Could not lookup object for user $leader", 1);
+    }
+    $showuser_url = CreateURL("showuser", $leader_user);
+
     echo "<tr>
               <td><A href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
               <td>$desc</td>
-              <td><A href='showuser.php3?target_uid=$leader'>$leader</A></td>
+              <td><A href='$showuser_url'>$leader</A></td>
           </tr>\n";
 }
 echo "</table>\n";

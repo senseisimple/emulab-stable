@@ -23,8 +23,9 @@ PAGEHEADER("Syntax Check an NS File", $view);
 #
 # Only known and logged in users can begin experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Not allowed to specify both a local and an upload!

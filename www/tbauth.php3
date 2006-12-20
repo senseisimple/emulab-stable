@@ -12,11 +12,13 @@
 #
 $CHECKLOGIN_STATUS		= -1;
 $CHECKLOGIN_UID			= 0;
+$CHECKLOGIN_IDX			= null;
 $CHECKLOGIN_NOLOGINS		= -1;
 $CHECKLOGIN_WIKINAME            = "";
 $CHECKLOGIN_IDLETIME            = 0;
 $CHECKLOGIN_HASHKEY             = null;
 $CHECKLOGIN_HASHHASH            = null;
+$CHECKLOGIN_USER                = null;
 
 #
 # New Mapping. 
@@ -88,18 +90,13 @@ function REMEMBERED_ID() {
 
 #
 # Return the value of the currently logged in uid, or null if not
-# logged in. Basically, check the browser to see if its sending a UID
-# and HASH back, and then check the DB to see if the user is really
-# logged in.
+# logged in. This interface is deprecated and being replaced.
 # 
 function GETLOGIN() {
-    if (($uid = GETUID()) == FALSE)
-	    return FALSE;
-
-    $check = CHECKLOGIN($uid);
-
-    if ($check & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID))
-	    return $uid;
+    global $CHECKLOGIN_USER;
+    
+    if (CheckLogin($status))
+	return $CHECKLOGIN_USER->uid();
 
     return FALSE;
 }
@@ -111,44 +108,59 @@ function GETLOGIN() {
 # 
 function GETUID() {
     global $TBNAMECOOKIE;
-    global $nocookieuid;
 
-    $curname = FALSE;
-
-    # XXX - nocookieuid is sent by netbuild applet in URL.
     if (isset($_GET['nocookieuid'])) {
-	$curname = $_GET['nocookieuid'];
+	$uid = $_GET['nocookieuid'];
+	
+	#
+	# XXX - nocookieuid is sent by netbuild applet in URL. A few other java
+        # apps as well, and we retain this for backwards compatability.
+	#
+        # Pedantic check
+	if (! preg_match("/^[-\w]+$/", $uid)) {
+	    return FALSE;
+	}
+	$safe_uid = addslashes($uid);
+
+	#
+	# Map this to an index (from a uid).
+	#
+	$query_result =
+	    DBQueryFatal("select uid_idx from users where uid='$safe_uid'");
+    
+	if (! mysql_num_rows($query_result))
+	    return FALSE;
+	
+	$row = mysql_fetch_array($query_result);
+	return $row[0];
     }
     elseif (isset($_COOKIE[$TBNAMECOOKIE])) {
-	$curname = $_COOKIE[$TBNAMECOOKIE];
-    }
-    else
-	return FALSE;
+	$idx = $_COOKIE[$TBNAMECOOKIE];
 
-    # Verify valid string (no special chars like single/double quotes!).
-    # We do not use the standard check function here, since we want to
-    # avoid a DB access on each page until its required. Thats okay since
-    # since we just need to ensure that we feed to the DB query is safe.
-    if (! preg_match("/^[-\w]+$/", $curname)) {
-	return FALSE;
+        # Pedantic check
+	if (! preg_match("/^[-\w]+$/", $idx)) {
+	    return FALSE;
+	}
+
+	return $idx;
     }
-    return $curname;
+    return FALSE;
 }
 
 #
-# Verify a login by sucking a UIDs current hash value out of the database.
+# Verify a login by sucking UIDs current hash value out of the database.
 # If the login has expired, or of the hashkey in the database does not
 # match what came back in the cookie, then the UID is no longer logged in.
 #
 # Returns a combination of the CHECKLOGIN values above.
 #
-function CHECKLOGIN($uid) {
+function LoginStatus() {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $CHECKLOGIN_NODETYPES;
     global $CHECKLOGIN_WIKINAME, $TBOPSPID;
     global $EXPOSEARCHIVE, $EXPOSETEMPLATES;
     global $CHECKLOGIN_HASHKEY, $CHECKLOGIN_HASHHASH;
-    global $nocookieauth;
+    global $nocookieauth, $CHECKLOGIN_IDX, $CHECKLOGIN_USER;
     
     #
     # If we already figured this out, do not duplicate work!
@@ -156,7 +168,13 @@ function CHECKLOGIN($uid) {
     if ($CHECKLOGIN_STATUS != CHECKLOGIN_NOSTATUS) {
 	return $CHECKLOGIN_STATUS;
     }
-    $CHECKLOGIN_UID = $uid;
+
+    # No UID in the browser? Obviously not logged in!
+    if (($uid_idx = GETUID()) == FALSE) {
+	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	return $CHECKLOGIN_STATUS;
+    }
+    $CHECKLOGIN_IDX = $uid_idx;
 
     # for java applet, we can send the key in the $auth variable,
     # rather than passing it is a cookie.
@@ -192,7 +210,7 @@ function CHECKLOGIN($uid) {
     if (isset($hashhash)) {
 	$CHECKLOGIN_HASHHASH = $safe_hashhash = addslashes($hashhash);
     }
-    $safe_uid = addslashes($uid);
+    $safe_idx = addslashes($uid_idx);
     
     #
     # Note that we get multiple rows back because of the group_membership
@@ -202,12 +220,12 @@ function CHECKLOGIN($uid) {
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,l.adminon,webonly, " .
 		     "       user_interface,n.type,u.stud,u.wikiname, ".
-		     "       u.wikionly,g.pid,u.foreign_admin " .
+		     "       u.wikionly,g.pid,u.foreign_admin,u.uid_idx " .
 		     " from users as u ".
-		     "left join login as l on l.uid=u.uid ".
-		     "left join group_membership as g on g.uid=u.uid ".
+		     "left join login as l on l.uid_idx=u.uid_idx ".
+		     "left join group_membership as g on g.uid_idx=u.uid_idx ".
 		     "left join nodetypeXpid_permissions as n on g.pid=n.pid ".
-		     "where u.uid='$safe_uid' and ".
+		     "where u.uid_idx='$safe_idx' and ".
 		     (isset($curhash) ?
 		      "l.hashkey='$safe_curhash'" :
 		      "l.hashhash='$safe_hashhash'"));
@@ -254,6 +272,7 @@ function CHECKLOGIN($uid) {
 
 	# Set foreign_admin=1 for admins of another Emulab.
 	$foreign_admin   = $row[15];
+	$uid_idx         = $row[16];
 
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
@@ -270,17 +289,18 @@ function CHECKLOGIN($uid) {
     # Check for frozen account. Might do something interesting later.
     #
     if (! strcmp($status, TBDB_USERSTATUS_FROZEN)) {
-	DBQueryFatal("DELETE FROM login WHERE uid='$safe_uid'");
+	DBQueryFatal("DELETE FROM login WHERE uid_idx='$uid_idx'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 	return $CHECKLOGIN_STATUS;
     }
 
     #
-    # Check for expired login. It does not matter if the cookie matches,
-    # kill the entry anyway so the user is officially logged out.
+    # Check for expired login. Remove this entry from the logins table to
+    # keep it from getting cluttered.
     #
     if (time() > $timeout) {
-	DBQueryFatal("DELETE FROM login WHERE uid='$safe_uid'");
+	DBQueryFatal("delete from login where ".
+		     "uid_idx='$uid_idx' and hashkey='$hashkey'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_TIMEDOUT;
 	return $CHECKLOGIN_STATUS;
     }
@@ -341,6 +361,13 @@ function CHECKLOGIN($uid) {
 	}
     }
 
+    # Cache this now; someone will eventually want it.
+    $CHECKLOGIN_USER = User::Lookup($uid_idx);
+    if (! $CHECKLOGIN_USER) {
+	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	return $CHECKLOGIN_STATUS;
+    }
+
     #
     # Now add in the modifiers.
     #
@@ -399,29 +426,15 @@ function CHECKLOGIN($uid) {
 # conditions. 
 #
 function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
-    global $TBBASE, $BASEPATH, $HTTP_COOKIE_VARS, $TBNAMECOOKIE;
+    global $TBBASE, $BASEPATH;
     global $TBAUTHTIMEOUT, $CHECKLOGIN_HASHKEY;
 
-    # If our login is not valid, then the uid is already set to "",
-    # so refresh it to the cookie value. Then we can pass the right
-    # uid to checklogin, so we can give the right error message.
-    if ($uid == "") {
-	$uid = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
-
-	if ($uid == "") {
-		$uid = FALSE;
-	}
-	else {
-            # Verify valid string (no special chars like single/double quotes!)
-	    if (! preg_match("/^[-\w]+$/", $uid)) {
-		TBERROR("LOGGEDINORDIE: Illegal characters in $uid", 1);
-	    }
-	}
-    }
-
     #
-    # Allow the caller to specify a different URL to direct the user
-    # to
+    # We now ignore the $uid argument and let LoginStatus figure it out.
+    #
+    
+    #
+    # Allow the caller to specify a different URL to direct the user to
     #
     if (!$login_url) {
 	$login_url = "$TBBASE/login.php3?refer=1";
@@ -430,10 +443,7 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     $link = "\n<a href=\"$login_url\">Please ".
 	"log in again.</a>\n";
 
-    if ($uid == FALSE)
-        USERERROR("You do not appear to be logged in! $link", 1);
-    
-    $status = CHECKLOGIN($uid);
+    $status = LoginStatus();
 
     switch ($status & CHECKLOGIN_STATUSMASK) {
     case CHECKLOGIN_NOTLOGGEDIN:
@@ -458,7 +468,8 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
 	    $timeout = time() + $TBAUTHTIMEOUT;
 
 	    DBQueryFatal("UPDATE login set timeout='$timeout' ".
-			 "where uid='$uid' and hashkey='$CHECKLOGIN_HASHKEY'");
+			 "where uid_idx='$CHECKLOGIN_IDX' and ".
+			 "      hashkey='$CHECKLOGIN_HASHKEY'");
 	}
 	break;
     default:
@@ -479,20 +490,53 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
         USERERROR("You have not verified your account yet!", 1);
     if ($status & CHECKLOGIN_UNAPPROVED)
         USERERROR("Your account has not been approved yet!", 1);
-    if (($status & CHECKLOGIN_WEBONLY) && ! ISADMIN($uid))
+    if (($status & CHECKLOGIN_WEBONLY) && ! ISADMIN())
         USERERROR("Your account does not permit you to access this page!", 1);
-    if (($status & CHECKLOGIN_WIKIONLY) && ! ISADMIN($uid))
+    if (($status & CHECKLOGIN_WIKIONLY) && ! ISADMIN())
         USERERROR("Your account does not permit you to access this page!", 1);
 
     #
     # Lastly, check for nologins here. This heads off a bunch of other
     # problems and checks we would need.
     #
-    if (NOLOGINS() && !ISADMIN($uid))
+    if (NOLOGINS() && !ISADMIN())
         USERERROR("Sorry. The Web Interface is ".
 		  "<a href=nologins.php3>Temporarily Unavailable!</a>", 1);
 
-    return $uid;
+    # No one should ever look at the return value of this function.
+    return null;
+}
+
+#
+# This is the new interface to the above function. 
+#
+function CheckLoginOrDie($modifier = 0, $login_url = NULL)
+{
+    global $CHECKLOGIN_USER;
+    
+    LOGGEDINORDIE(GETUID(), $modifier, $login_url);
+
+    #
+    # If this returns, login is valid. Return the user object to caller.
+    #
+    return $CHECKLOGIN_USER;
+}
+
+#
+# This interface allows the return of the actual status. I know, its a
+# global variable, but this interface is cleaner. 
+#
+function CheckLogin(&$status)
+{
+    global $CHECKLOGIN_USER;
+
+    $status = LoginStatus();
+
+    # If login looks valid, return the user. 
+    if ($status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID))
+	    return $CHECKLOGIN_USER;
+
+    return null;
 }
 
 #
@@ -501,7 +545,7 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
 # in user that has to be admin. So ignore the uid and make sure
 # there is a login status.
 #
-function ISADMIN($uid = 1) {
+function ISADMIN() {
     global $CHECKLOGIN_STATUS;
     
     if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
@@ -532,8 +576,7 @@ function STUDLY() {
     global $CHECKLOGIN_STATUS;
     
     if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
-	$uid=GETUID();
-	TBERROR("STUDLY: $uid is not logged in!", 1);
+	TBERROR("STUDLY: user is not logged in!", 1);
     }
 
     return (($CHECKLOGIN_STATUS &
@@ -545,8 +588,7 @@ function OPSGUY() {
     global $CHECKLOGIN_STATUS;
     
     if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
-	$uid=GETUID();
-	TBERROR("OPSGUY: $uid is not logged in!", 1);
+	TBERROR("OPSGUY: user is not logged in!", 1);
     }
 
     return (($CHECKLOGIN_STATUS &
@@ -558,8 +600,7 @@ function WIKIONLY() {
     global $CHECKLOGIN_STATUS;
     
     if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
-	$uid=GETUID();
-	TBERROR("WIKIONLY: $uid is not logged in!", 1);
+	TBERROR("WIKIONLY: user is not logged in!", 1);
     }
 
     return (($CHECKLOGIN_STATUS &
@@ -582,25 +623,23 @@ function ISADMINISTRATOR() {
 #
 # Toggle current login admin bit. Must be an administrator of course!
 #
-function SETADMINMODE($uid, $onoff) {
-    global $HTTP_COOKIE_VARS, $TBAUTHCOOKIE;
+function SETADMINMODE($onoff) {
+    global $CHECKLOGIN_HASHKEY, $CHECKLOGIN_IDX;
     
     # This makes sure the user is actually logged in secure (https).
     if (! ISADMINISTRATOR())
 	return;
 
-    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
-
-    if (!isset($curhash) ||
-	!preg_match("/^[\w]+$/", $curhash)) {
+    # Be pedantic.
+    if (! ($CHECKLOGIN_HASHKEY && $CHECKLOGIN_IDX))
 	return;
-    }
+
     $onoff   = addslashes($onoff);
-    $curhash = addslashes($curhash);
-    $uid     = addslashes($uid);
+    $curhash = addslashes($CHECKLOGIN_HASHKEY);
+    $uid_idx = $CHECKLOGIN_IDX;
     
     DBQueryFatal("update login set adminon='$onoff' ".
-		 "where uid='$uid' and hashkey='$curhash'");
+		 "where uid_idx='$uid_idx' and hashkey='$curhash'");
 }
 
 # Is this user a planetlab user? Returns 1 if they are, 0 if not.
@@ -615,16 +654,14 @@ function ISPLABUSER() {
 	if (!$uid) {
 	    return 0;
 	}
-	$query_result =
-	    DBQueryFatal("SELECT user_interface FROM users WHERE uid='$uid'");
-	if (!mysql_num_rows($query_result)) {
+	# Lookup sanitizes argument.
+	if (! ($user = User::Lookup($uid)))
 	    return 0;
-	}
 
-	$row = mysql_fetch_row($query_result);
-	if ($row[0]) {
-	    return ($row[0] == TBDB_USER_INTERFACE_PLAB);
-	} else {
+	if ($user->user_interface()) {
+	    return ($user->user_interface() == TBDB_USER_INTERFACE_PLAB);
+	}
+	else {
 	    return 0;
 	}
     } else {
@@ -649,10 +686,10 @@ function ISPLABUSER() {
 #
 function NODETYPE_ALLOWED($type) {
     global $CHECKLOGIN_NODETYPES;
-    $uid = GETUID();
-    if (!$uid) {
+
+    if (! GETUID())
 	return 0;
-    }
+
     if ($CHECKLOGIN_NODETYPES[$type]) {
 	return 1;
     } else {
@@ -702,38 +739,33 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	}
     }
 
-    $user_result =
-	DBQueryFatal("select uid,usr_pswd,admin,weblogin_frozen,".
-		     "       weblogin_failcount,weblogin_failstamp, ".
-		     "       usr_email,usr_name,unix_uid,usr_email ".
-		     "from users where ".
-		     (TBvalid_email($token) ?
-		      "usr_email='$token'" :
-		      "uid='$token'"));
-
+    if (TBvalid_email($token)) {
+	$user = User::LookupByEmail($token);
+    }
+    else {
+	$user = User::Lookup($token);
+    }
+	    
     #
     # Check password in the database against provided. 
     #
     do {
-      if ($row = mysql_fetch_array($user_result)) {
-	$uid         = $row['uid'];
-        $db_encoding = $row['usr_pswd'];
-	$isadmin     = $row['admin'];
-	$frozen      = $row['weblogin_frozen'];
-	$failcount   = $row['weblogin_failcount'];
-	$failstamp   = $row['weblogin_failstamp'];
-	$usr_email   = $row['usr_email'];
-	$usr_name    = $row['usr_name'];
-	$uid_idx     = $row['unix_uid'];
-	$usr_email   = $row['usr_email'];
+      if ($user) {
+	$uid         = $user->uid();
+        $db_encoding = $user->pswd();
+	$isadmin     = $user->admin();
+	$frozen      = $user->weblogin_frozen();
+	$failcount   = $user->weblogin_failcount();
+	$failstamp   = $user->weblogin_failstamp();
+	$usr_email   = $user->email();
+	$usr_name    = $user->name();
+	$uid_idx     = $user->unix_uid();
+	$usr_email   = $user->email();
 
 	# Check for frozen accounts. We do not update the IP record when
 	# an account is frozen.
 	if ($frozen) {
-	    DBQueryFatal("update users set ".
-			 "       weblogin_failcount=weblogin_failcount+1, ".
-			 "       weblogin_failstamp='$now' ".
-			 "where uid='$uid'");
+	    $user->UpdateWebLoginFail();
 	    return -1;
 	}
 	
@@ -744,8 +776,8 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	    #
 	    $failcount++;
 	    if ($failcount > DOLOGIN_MAXUSERATTEMPTS) {
-		$frozen = 1;
-	    
+		$user->SetWebFreeze(1);
+		
 		TBMAIL("$usr_name '$uid' <$usr_email>",
 		   "Web Login Freeze: '$uid'",
 		   "Your login has been frozen because there were too many\n".
@@ -756,11 +788,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 		   "Bcc: $TBMAIL_AUDIT\n".
 		   "Errors-To: $TBMAIL_WWW");
 	    }
-
-	    DBQueryFatal("update users set weblogin_frozen='$frozen', ".
-			 "       weblogin_failcount='$failcount', ".
-			 "       weblogin_failstamp='$now' ".
-			 "where uid='$uid'");
+	    $user->UpdateWebLoginFail();
             break;
         }
 	#
@@ -782,7 +810,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
         #
         # Insert a record in the login table for this uid.
 	#
-	if (DOLOGIN_MAGIC($uid, $usr_email, $adminon) < 0) {
+	if (DOLOGIN_MAGIC($uid, $uid_idx, $usr_email, $adminon) < 0) {
 	    return -1;
 	}
 
@@ -807,7 +835,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     if (!isset($IP)) {
 	return -1;
     }
-	
+
     $ipfrozen = 0;
     if (isset($iprow)) {
 	$ipfailcount = $iprow['failcount'];
@@ -846,7 +874,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     return -1;
 }
 
-function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
+function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 {
     global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES, $TBEMAILCOOKIE;
@@ -856,6 +884,9 @@ function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
     
     # Caller makes these checks too.
     if (!TBvalid_uid($uid)) {
+	return -1;
+    }
+    if (!TBvalid_uididx($uid_idx)) {
 	return -1;
     }
     $now = time();
@@ -869,8 +900,9 @@ function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
     $hashkey = GENHASH();
     $crc     = bin2hex(mhash(MHASH_CRC32, $hashkey));
 
-    DBQueryFatal("replace into login (uid,hashkey,hashhash,timeout,adminon) ".
-		 "values ('$uid', '$hashkey', '$crc', '$timeout', $adminon)");
+    DBQueryFatal("replace into login ".
+		 "  (uid,uid_idx,hashkey,hashhash,timeout,adminon) values ".
+		 "  ('$uid', $uid_idx, '$hashkey', '$crc', '$timeout', $adminon)");
 
     #
     # Issue the cookie requests so that subsequent pages come back
@@ -900,7 +932,7 @@ function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
     # NOTE: This cookie is integral to authorization, since we do not pass
     # around the UID anymore, but look for it in the cookie.
     #
-    setcookie($TBNAMECOOKIE, $uid, 0, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBNAMECOOKIE, $uid_idx, 0, "/", $TBAUTHDOMAIN, 0);
 
     #
     # This is a long term cookie so we can remember who the user was, and
@@ -934,7 +966,7 @@ function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
 	
     DBQueryFatal("update users set ".
 		 "       weblogin_failcount=0,weblogin_failstamp=0 ".
-		 "where uid='$uid'");
+		 "where uid_idx='$uid_idx'");
 
     return 0;
 }
@@ -943,24 +975,19 @@ function DOLOGIN_MAGIC($uid, $email = null, $adminon = 0)
 # Verify a password
 # 
 function VERIFYPASSWD($uid, $password) {
-    if (! isset($password) ||
-	strcmp($password, "") == 0) {
+    if (! isset($password) || $password == "") {
 	return -1;
     }
 
-    $query_result =
-	DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$uid'");
+    if (! ($user = User::Lookup($uid)))
+	return -1;
 
     #
     # Check password in the database against provided. 
     #
-    if ($row = mysql_fetch_row($query_result)) {
-        $db_encoding = $row[0];
-        $encoding = crypt("$password", $db_encoding);
+    $encoding = crypt("$password", $user->pswd());
 	
-        if (strcmp($encoding, $db_encoding)) {
-            return -1;
-	}
+    if ($encoding == $user->pswd()) {
 	return 0;
     }
     return -1;
@@ -969,15 +996,25 @@ function VERIFYPASSWD($uid, $password) {
 #
 # Log out a UID.
 #
-function DOLOGOUT($uid) {
-    global $CHECKLOGIN_STATUS, $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
+function DOLOGOUT($user) {
+    global $CHECKLOGIN_STATUS, $CHECKLOGIN_USER;
+    global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
     global $WIKISUPPORT, $WIKICOOKIENAME, $HTTP_COOKIE_VARS;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
 
-    # Pedantic check.
-    if (!TBvalid_uid($uid)) {
+    if (! $CHECKLOGIN_USER)
 	return 1;
+
+    $uid_idx = $user->uid_idx();
+
+    #
+    # An admin logging out another user. Nothing else to do.
+    #
+    if (! $user->SameUser($CHECKLOGIN_USER)) {
+	DBQueryFatal("delete from login where uid_idx='$uid_idx'");
+	return 0;
     }
+
     $CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 
     $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
@@ -1001,7 +1038,7 @@ function DOLOGOUT($uid) {
     $safe_hashhash = addslashes($hashhash);
 
     DBQueryFatal("delete from login ".
-		 " where uid='$uid' and ".
+		 " where uid_idx='$uid_idx' and ".
 		 (isset($curhash) ?
 		  "hashkey='$safe_curhash'" :
 		  "hashhash='$safe_hashhash'"));
@@ -1039,7 +1076,7 @@ function LASTWEBLOGIN($uid) {
 
     $query_result =
         DBQueryFatal("select weblogin_last from users as u ".
-		     "left join user_stats as s on s.uid_idx=u.unix_uid ".
+		     "left join user_stats as s on s.uid_idx=u.uid_idx ".
 		     "where u.uid='$uid'");
     
     if (mysql_num_rows($query_result)) {
@@ -1050,17 +1087,12 @@ function LASTWEBLOGIN($uid) {
 }
 
 function HASREALACCOUNT($uid) {
-    $query_result =
-	DBQueryFatal("select status,webonly,wikionly from users ".
-		     "where uid='$uid'");
-
-    if (!mysql_num_rows($query_result)) {
+    if (! ($user = User::Lookup($uid)))
 	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $status   = $row[0];
-    $webonly  = $row[1];
-    $wikionly = $row[2];
+
+    $status   = $user->status();
+    $webonly  = $user->webonly();
+    $wikionly = $user->wikionly();
 
     if ($webonly || $wikionly ||
 	(strcmp($status, TBDB_USERSTATUS_ACTIVE) &&

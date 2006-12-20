@@ -14,8 +14,9 @@ PAGEHEADER("Project Information List");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Admin users can see all projects, while normal users can only see
@@ -23,7 +24,6 @@ LOGGEDINORDIE($uid);
 #
 # XXX Should we form the list from project members instead of leaders?
 #
-$isadmin = ISADMIN($uid);
 
 if (!isset($splitview) || !$isadmin)
     $splitview = 0;
@@ -253,6 +253,11 @@ function GENPLIST ($query_result)
 	$ncount     = $ncounts[$pid];
 	$pcount     = $pcounts[$pid];
 
+	if (! ($head_user = User::Lookup($headuid))) {
+	    TBERROR("Could not lookup object for user $headuid", 1);
+	}
+	$showuser_url = CreateURL("showuser", $head_user);
+	
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                   <td>\n";
@@ -263,8 +268,7 @@ function GENPLIST ($query_result)
 	    echo "    <img alt='N' src='redball.gif'>\n";
 	}
 	echo "             $Pname</td>
-                  <td><A href='showuser.php3?target_uid=$headuid'>
-                         $headuid</A></td>\n";
+                  <td><A href='$showuser_url'>$headuid</A></td>\n";
 
 	echo "<td>$idle</td>\n";
 	echo "<td>$expt_count</td>\n";

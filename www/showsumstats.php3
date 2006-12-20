@@ -15,11 +15,12 @@ PAGEHEADER("Testbed Summary Stats");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # Summary data for admins only.
-if (!ISADMIN() && !STUDLY()) {
+if (!$isadmin && !STUDLY()) {
     USERERROR("You are not allowed to view this page!", 1);
 }
 
@@ -126,7 +127,7 @@ function showsummary ($showby, $sortby) {
 	    $which = "uid";
 	    $table = "user_stats";
 	    $title = "User Summary Stats (Epoch)";
-	    $link  = "showuser.php3?target_uid=";
+	    $link  = "showuser.php3?user=";
 	    break;
         default:
 	    USERERROR("Invalid showby argument: $showby!", 1);
@@ -166,9 +167,9 @@ function showsummary ($showby, $sortby) {
 			 "allexpt_duration / (24 * 3600) as expt_days, ".
 			 "exptswapin_count+exptstart_count as expt_swapins, ".
 			 "exptpreload_count+exptstart_count as expt_new, ".
-			 "u.usr_name ".
+			 "u.usr_name, s.uid_idx ".
 			 "from user_stats as s ".
-			 "left join users as u on u.unix_uid=s.uid_idx ".
+			 "left join users as u on u.uid_idx=s.uid_idx ".
 			 "$wclause ".
 			 "order by $order");
     }
@@ -178,7 +179,8 @@ function showsummary ($showby, $sortby) {
 			 "allexpt_pnode_duration / (24 * 3600) as pnode_days,".
 			 "allexpt_duration / (24 * 3600) as expt_days, ".
 			 "exptswapin_count+exptstart_count as expt_swapins, ".
-			 "exptpreload_count+exptstart_count as expt_new ".
+			 "exptpreload_count+exptstart_count as expt_new, ".
+			 "${which}_idx ".
 			 "from $table  ".
 			 "$wclause ".
 			 "order by $order");
@@ -260,6 +262,7 @@ function showsummary ($showby, $sortby) {
     mysql_data_seek($query_result, 0);    
     while ($row = mysql_fetch_assoc($query_result)) {
 	$heading = $row[$which];
+	$idx     = $row["${which}_idx"];
 	$pnodes  = $row["allexpt_pnodes"];
 	$phours  = $row["pnode_days"];
 	$ehours  = $row["expt_days"];
@@ -664,7 +667,7 @@ function showrange ($showby, $sortby, $range) {
 	    $which = "uid";
 	    $table = $uid_summary;
 	    $title = "User Summary Stats ($range)";
-	    $link  = "showuser.php3?target_uid=";
+	    $link  = "showuser.php3?user=";
 	    break;
         default:
 	    USERERROR("Invalid showby argument: $showby!", 1);

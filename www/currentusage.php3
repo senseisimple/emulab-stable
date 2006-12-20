@@ -12,8 +12,8 @@ require("Sajax.php");
 
 #
 # Get current user.
-# 
-$uid = GETLOGIN();
+#
+$this_user = CheckLogin($check_status);
 
 #
 # For anonymous users, show experiment stats.
@@ -184,9 +184,9 @@ function SHOWFREENODES()
 # This is for the Sajax request.
 #
 function FreeNodeHtml() {
-    global $uid;
+    global $this_user;
 
-    if ($uid) {
+    if ($this_user) {
 	return SHOWFREENODES();
     }
     else {
@@ -208,7 +208,7 @@ function handle_error($message, $death)
 #
 # If user is anonymous, show experiment stats, otherwise useful info.
 # 
-if ($uid) {
+if ($this_user) {
     sajax_init();
     sajax_export("FreeNodeHtml");
 

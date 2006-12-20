@@ -14,10 +14,9 @@ PAGEHEADER("Confirm Verification");
 #
 # Only known and logged in users can be verified. 
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid,
-	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$this_user = CheckLoginOrDie(CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
 
 #
 # Must provide the key!
@@ -30,18 +29,11 @@ if (!isset($key) || strcmp($key, "") == 0) {
 #
 # Grab the status and do the modification.
 #
-$query_result =
-    DBQueryFatal("select status,wikionly from users ".
-		 "where uid='$uid'");
-
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Database Error retrieving status for $uid!", 1);
-}
-$status   = $row[0];
-$wikionly = $row[1];
+$status   = $this_user->status();
+$wikionly = $this_user->wikionly();
 
 #
-# No multiple verifications!
+# No multiple verifications.
 # 
 if (! strcmp($status, TBDB_USERSTATUS_ACTIVE) ||
     ! strcmp($status, TBDB_USERSTATUS_UNAPPROVED)) {
@@ -51,17 +43,32 @@ if (! strcmp($status, TBDB_USERSTATUS_ACTIVE) ||
 
 #
 # The user is logged in, so all we need to do is confirm the key.
-# Make sure it matches.
 #
-$keymatch = TBGetVerificationKey($uid);
-
-if (strcmp($key, $keymatch)) {
+if ($key != $this_user->verify_key()) {
     USERERROR("The given key \"$key\" is incorrect. ".
 	      "Please enter the correct key.", 1);
 }
 
-function INFORMLEADERS($uid) {
+function INFORMLEADERS($this_user) {
     global $TBWWW, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
+
+    #
+    # Grab user info.
+    #
+    $usr_email   = $this_user->email();
+    $usr_URL     = $this_user->URL();
+    $usr_addr    = $this_user->addr();
+    $usr_addr2	 = $this_user->addr2();
+    $usr_city	 = $this_user->city();
+    $usr_state	 = $this_user->state();
+    $usr_zip	 = $this_user->zip();
+    $usr_country = $this_user->country();
+    $usr_name    = $this_user->name();
+    $usr_phone   = $this_user->phone();
+    $usr_title   = $this_user->title();
+    $usr_affil   = $this_user->affil();
+    $uid_idx     = $this_user->uid_idx();
+    $uid         = $this_user->uid();
 
     #
     # Get the list of all project/groups this users has tried to join
@@ -69,59 +76,38 @@ function INFORMLEADERS($uid) {
     # himself.
     #
     $group_result =
-	DBQueryFatal("select * from group_membership ".
-		     "where uid='$uid' and trust='none'");
-
-    #
-    # Grab user info.
-    #
-    $userinfo_result =
-	DBQueryFatal("select * from users where uid='$uid'");
-
-    $row	 = mysql_fetch_array($userinfo_result);
-    $usr_email   = $row[usr_email];
-    $usr_URL     = $row[usr_URL];
-    $usr_addr    = stripslashes($row[usr_addr]);
-    $usr_addr2	 = stripslashes($row[usr_addr2]);
-    $usr_city	 = stripslashes($row[usr_city]);
-    $usr_state	 = stripslashes($row[usr_state]);
-    $usr_zip	 = stripslashes($row[usr_zip]);
-    $usr_country = stripslashes($row[usr_country]);
-    $usr_name    = stripslashes($row[usr_name]);
-    $usr_phone   = $row[usr_phone];
-    $usr_title   = stripslashes($row[usr_title]);
-    $usr_affil   = stripslashes($row[usr_affil]);
-
+	DBQueryFatal("select gid_idx from group_membership ".
+		     "where uid_idx='$uid_idx' and trust='none'");
+				     
      while ($row = mysql_fetch_array($group_result)) {
-	 $pid = $row[pid];
-	 $gid = $row[gid];
+	 $gid_idx = $row["gid_idx"];
 
-	 TBProjLeader($pid, $projleader_uid);
-	 TBGroupLeader($pid, $gid, $grpleader_uid);
+	 if (! ($group = Group::Lookup($gid_idx))) {
+	     TBERROR("Could not find group record for $gid_idx", 1);
+	 }
+	 $project     = $group->Project();
+	 $projleader  = $project->GetLeader();
+	 $groupleader = $group->GetLeader();
+	 $pid         = $project->pid();
+	 $gid         = $group->gid();
 
-	 if (!strcmp($projleader_uid, $uid)) {
+	 if ($this_user->SameUser($projleader)) {
 	     #
 	     # Project leader verifying himself. 
 	     # 
-	     TBUserInfo($projleader_uid, $leader_name, $leader_email);
-	     TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
-
-	     $projinfo_result =
-		 DBQueryFatal("select * from projects where pid='$pid'");
-
-	     $row		= mysql_fetch_array($projinfo_result);
-	     $proj_name		= stripslashes($row[name]);
-	     $proj_URL          = $row[URL];
-	     $proj_funders      = stripslashes($row[funders]);
-	     $proj_public       = ($row[public] ? "Yes" : "No");
-	     $proj_linked       = ($row[linked_to_us] ? "Yes" : "No");
-	     $proj_whynotpublic = stripslashes($row[public_whynot]);
-	     $proj_members      = $row[num_members];
-	     $proj_pcs          = $row[num_pcs];
-	     $proj_plabpcs      = $row[num_pcplab];
-	     $proj_ronpcs       = $row[num_ron];
-	     $proj_why		= stripslashes($row[why]);
-	     $proj_expires      = $row[expires];
+	     $proj_name		= $project->name();
+	     $proj_URL          = $project->URL();
+	     $proj_funders      = $project->funders();
+	     $proj_public       = ($project->public() ? "Yes" : "No");
+	     $proj_linked       = ($project->linked_to_us() ? "Yes" : "No");
+	     $proj_whynotpublic = $project->public_whynot();
+	     $proj_members      = $project->num_members();
+	     $proj_pcs          = $project->num_pcs();
+	     $proj_plabpcs      = $project->num_pcplab();
+	     $proj_ronpcs       = $project->num_ron();
+	     $proj_why		= $project->why();
+	     $unix_gid          = $group->unix_gid();
+	     $unix_name         = $group->unix_name();
 	     
 	     TBMAIL($TBMAIL_APPROVAL,
 		"New Project '$pid' ($uid)",
@@ -132,7 +118,6 @@ function INFORMLEADERS($uid) {
 		"Email:           $usr_email\n".
 		"User URL:        $usr_URL\n".
 		"Project:         $proj_name\n".
-		"Expires:         $proj_expires\n".
 		"Project URL:     $proj_URL\n".
 		"Public URL:      $proj_public\n".
 		"Why Not Public:  $proj_whynotpublic\n".
@@ -162,10 +147,12 @@ function INFORMLEADERS($uid) {
 		"Errors-To: $TBMAIL_WWW");
 	 }
 	 else {
-	     TBUserInfo($grpleader_uid, $leader_name, $leader_email);
-	     $allleaders = TBLeaderMailList($pid,$gid);
+	     $leader_name  = $groupleader->name();
+	     $leader_email = $groupleader->email();
+	     $leader_uid   = $groupleader->uid();
+	     $allleaders   = TBLeaderMailList($pid,$gid);
 	     
-	     TBMAIL("$leader_name '$grpleader_uid' <$leader_email>",
+	     TBMAIL("$leader_name '$leader_uid' <$leader_email>",
 		"$uid $pid Project Join Request",
 		"$usr_name is trying to join your group $gid in project $pid.".
 		"\n".
@@ -200,8 +187,8 @@ function INFORMLEADERS($uid) {
 }
 
 if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
-    DBQueryFatal("update users set status='active' where uid='$uid'");
-
+    $this_user->SetStatus(TBDB_USERSTATUS_ACTIVE());
+    
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
 	   "\n".
@@ -219,9 +206,10 @@ if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
 	 "that are now available to you will appear.\n";
 }
 elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
-    $newstatus = ($wikionly ? "active" : "unapproved");
+    $newstatus = ($wikionly ?
+		  TBDB_USERSTATUS_ACTIVE() : TBDB_USERSTATUS_UNAPPROVED());
     
-    DBQueryFatal("update users set status='$newstatus' where uid='$uid'");
+    $this_user->SetStatus(TBDB_USERSTATUS_UNAPPROVED());
 
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
@@ -243,20 +231,15 @@ elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
 
 	#
 	# The backend sets the actual WikiName
-	# 
-	$query_result =
-	    DBQueryFatal("select wikiname from users where uid='$uid'");
-
-	if (($row = mysql_fetch_row($query_result)) == 0) {
-	    TBERROR("Database Error retrieving status for $uid!", 1);
-	}
-	$wikiname = $row[0];
+	#
+	$this_user->Refresh();
+	$wikiname = $this_user->wikiname();
 
 	echo "You have been verified. You may now access the Wiki at<br>".
 	    "<a href='$WIKIURL/$wikiname'>$WIKIURL/$wikiname</a>\n";
     }
     else {
-	INFORMLEADERS($uid);
+	INFORMLEADERS($this_user);
 
 	echo "<p>".
 	     "You have now been verified. However, your application ".

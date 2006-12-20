@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -23,8 +23,9 @@ if (isset($advanced) || $advanced || (isset($submit)
 #
 # Only known and logged in users can get this page
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid,0,"$TBBASE/login_plab.php3?refer=1");
+$this_user = CheckLoginOrDie(0, "$TBBASE/login_plab.php3?refer=1");
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # The reason for this apparently redundant pair of arrays is so that we can
@@ -489,7 +490,8 @@ function CHECKTARS($formfields) {
 # Make an NS file with the supplied data
 #
 function MAKENS($formfields) {
-    global $NSGEN, $PLAB_TEMPLATE;
+    global $NSGEN, $PLAB_TEMPLATE, $uid;
+    
     #
     # Pick out some defaults for the exp. creation page
     #
@@ -536,7 +538,7 @@ function MAKENS($formfields) {
     srand((float) $sec + ((float) $usec * 100000));
     $nsref = rand();
     $url .= "&nsref=$nsref";
-    $outfile = "/tmp/" . GETUID() . "-$nsref.nsfile";
+    $outfile = "/tmp/" . $uid . "-$nsref.nsfile";
     $nsgen_args = "";
     if ($formfields['count']) {
 	$nsgen_args .= "-v Count='$formfields[count]' ";

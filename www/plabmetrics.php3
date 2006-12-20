@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -15,8 +15,9 @@ PAGEHEADER("PlanetLab Metrics");
 #
 # Only known and logged in users can get plab data.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # This is very simple; just invoke the script and spit the results back

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -10,9 +10,9 @@ include("showstuff.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page/form arguments. Note that the target uid comes initially as a
@@ -20,59 +20,56 @@ $isadmin = ISADMIN($uid);
 #
 if (! isset($_POST['submit'])) {
     # First page load. Default to current user.
-    if (! isset($_GET['target_uid']))
-	$target_uid = $uid;
+    if (! isset($_GET['user']))
+	$user = $uid;
     else
-	$target_uid = $_GET['target_uid'];
+	$user = $_GET['user'];
 }
 else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
+    # Form submitted. Make sure we have a formfields array and a user.
     if (!isset($_POST['formfields']) ||
 	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['target_uid'])) {
+	!isset($_POST['formfields']['user'])) {
 	PAGEARGERROR("Invalid form arguments.");
     }
     $formfields = $_POST['formfields'];
-    $target_uid = $formfields['target_uid'];
+    $user       = $formfields['user'];
 }
 
 # Pedantic check of uid before continuing.
-if ($target_uid == "" || !TBvalid_uid($target_uid)) {
-    PAGEARGERROR("Invalid uid: '$target_uid'");
+if ($user == "" || !User::ValidWebID($user)) {
+    PAGEARGERROR("Invalid uid: '$user'");
 }
 
 #
 # Check to make sure thats this is a valid UID.
 #
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("The user $target_uid is not a valid user", 1);
+if (! ($target_user = User::Lookup($user))) {
+    USERERROR("The user $user is not a valid user", 1);
 }
+$target_uid = $target_user->uid();
 
 #
 # Verify that this uid is a member of one of the projects that the
 # target_uid is in. Must have proper permission in that group too. 
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-
-    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
-	USERERROR("You do not have permission to view ${user}'s keys!", 1);
-    }
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+    USERERROR("You do not have permission to view ${uid}'s keys!", 1);
 }
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $target_uid, $BOSSNODE;
+    global $isadmin, $target_user, $BOSSNODE;
+
+    $target_uid = $target_user->uid();
+    $uid_idx    = $target_user->uid_idx();
+    $webid      = $target_user->webid();
 
     #
     # Standard Testbed Header, now that we know what we want to say.
     #
-    if (strcmp($uid, $target_uid)) {
-	PAGEHEADER("SFS Public Keys for user: $target_uid");
-    }
-    else {
-	PAGEHEADER("My SFS Public Keys");
-    }
+    PAGEHEADER("SFS Public Keys for user: $target_uid");
 
     #
     # Get the list and show it.
@@ -104,10 +101,12 @@ function SPITFORM($formfields, $errors)
 	    }
 	    $chunky  = chunk_split("$pubkey $comment $fnote", 75, "<br>\n");
 
+	    $delurl  = CreateURL("deletesfskey", $target_user, "key", $foo);
+
 	    echo "<tr>
                      <td align=center>
-                       <A href=deletesfskey.php3?target_uid=$target_uid" .
-	                  "&key=$foo><img alt=X src=redball.gif></A>
+                       <A href='$delurl'>
+                            <img alt='Delete Key' src=redball.gif></A>
                      </td>
                      <td>$chunky</td>
                   </tr>\n";
@@ -156,8 +155,8 @@ function SPITFORM($formfields, $errors)
     echo "<table align=center border=1> 
           <form enctype=multipart/form-data
                 action=showsfskeys.php3 method=post>\n";
-    echo "<input type=hidden name=\"formfields[target_uid]\" ".
-	         "value=$target_uid>\n";
+    echo "<input type=hidden name=\"formfields[user]\" ".
+	         "value=$webid>\n";
 
     #
     # SFS public key
@@ -303,8 +302,12 @@ DBQueryFatal("replace into user_sfskeys ".
 #
 # Audit
 #
-TBUserInfo($uid, $uid_name, $uid_email);
-TBUserInfo($target_uid, $targuid_name, $targuid_email);
+$uid_name  = $this_user->name();
+$uid_email = $this_user->email();
+
+$targuid_name  = $target_user->name();
+$targuid_email = $target_user->email();
+
 $chunky = chunk_split("$usr_key $comment", 75, "\n");
 
 TBMAIL("$targuid_name <$targuid_email>",
@@ -330,5 +333,6 @@ else {
     SUEXEC("nobody", "nobody", "webaddsfskey -w $target_uid", 0);
 }
 
-header("Location: showsfskeys.php3?target_uid=$target_uid");
+header("Location: ". CreateURL("showsfskeys", $target_user));
+
 ?>

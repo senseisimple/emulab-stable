@@ -13,9 +13,9 @@ sajax_export("Show", "GraphChange");
 #
 # Only known and logged in users ...
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # Need these below, set in CheckArguments.
 $pid = "";
@@ -307,7 +307,7 @@ if (isset($action) && $action == "deletetemplate" &&
     # Okay, lets zap back to the root, unless this was the root.
     #
     if ($template->IsRoot()) {
-	PAGEREPLACE("showuser.php3?target_uid=$uid");
+	PAGEREPLACE(CreateURL("showuser", $this_user));
     }
     else {
 	PAGEREPLACE("template_show.php?guid=$guid&version=1");

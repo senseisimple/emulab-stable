@@ -47,15 +47,17 @@ if ($simple) {
 
 
 #
-# Must not be logged in already!
-# 
-if (($known_uid = GETUID()) != FALSE) {
-    if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
+# Must not be logged in already.
+#
+if (($this_user = CheckLogin($status))) {
+    $this_webid = $this_user->webid();
+    
+    if ($status & CHECKLOGIN_LOGGEDIN) {
 	#
 	# If doing a verification for the logged in user, zap to that page.
 	# If doing a verification for another user, then must login in again.
 	#
-	if (isset($key) && (!isset($vuid) || $vuid == $known_uid)) {
+	if (isset($key) && (!isset($vuid) || $vuid == $this_webid)) {
 	    header("Location: $TBBASE/verifyusr.php3?key=$key");
 	    return;
 	}

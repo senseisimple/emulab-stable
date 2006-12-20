@@ -20,9 +20,10 @@ PAGEHEADER("New Testbed Nodes");
 #
 # Only admins can see this page
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
 if (! $isadmin) {
     USERERROR("You do not have admin privileges!", 1);
 }

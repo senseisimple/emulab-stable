@@ -7,8 +7,9 @@
 chdir("..");
 include("defs.php3");
 
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 PAGEHEADER("Wireless/WSN Testbed Connectivity Statistics");
 

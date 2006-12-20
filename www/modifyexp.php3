@@ -11,11 +11,11 @@ $parser   = "$TB/libexec/ns2ir/parse-ns";
 $TMPDIR   = "/tmp/";
 
 #
-# Only known and logged in users can modify experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (isset($formfields['exp_localnsfile'])) {
     $exp_localnsfile = $formfields['exp_localnsfile'];

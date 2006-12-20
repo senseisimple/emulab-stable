@@ -9,10 +9,11 @@ include("showstuff.php3");
 include_once("template_defs.php");
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
@@ -52,7 +53,7 @@ PAGEHEADER("Swap Control");
 # Only admins can issue a force swapout
 # 
 if (isset($force) && $force == 1) {
-	if (! ISADMIN($uid)) {
+	if (! $isadmin) {
 		USERERROR("Only testbed administrators can forcibly swap ".
 			  "an experiment out!", 1);
 	}

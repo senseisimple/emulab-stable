@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -19,9 +19,10 @@ PAGEHEADER("New Testbed Node");
 #
 # Only admins can see this page
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
 if (! $isadmin) {
     USERERROR("You do not have admin privileges!", 1);
 }

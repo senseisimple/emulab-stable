@@ -9,10 +9,11 @@ include("defs.php3");
 $currentusage  = 0;
 
 #
-# Only known and logged in users can look at experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 PAGEBEGINNING("Experiment State Change", 0, 1);
 

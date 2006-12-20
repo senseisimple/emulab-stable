@@ -14,9 +14,9 @@ include_once("template_defs.php");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
@@ -465,7 +465,7 @@ if (!isset($formfields[exp_swappable]) ||
     if (!isset($formfields[exp_noswap_reason]) ||
         !strcmp($formfields[exp_noswap_reason], "")) {
 
-        if (! ISADMIN($uid)) {
+        if (! $isadmin) {
 	    $errors["Not Swappable"] = "No justification provided";
         }
 	else {
@@ -495,7 +495,7 @@ if (!isset($formfields[exp_idleswap]) ||
 
     if (!isset($formfields[exp_noidleswap_reason]) ||
 	!strcmp($formfields[exp_noidleswap_reason], "")) {
-	if (! ISADMIN($uid)) {
+	if (! $isadmin) {
 	    $errors["Not Idle-Swappable"] = "No justification provided";
 	}
 	else {

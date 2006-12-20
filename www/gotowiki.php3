@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,9 +12,9 @@ if (!$WIKISUPPORT) {
 }
 
 # No Pageheader since we spit out a redirection below.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
 
 #
 # The page to zap to on the other side

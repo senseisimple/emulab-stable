@@ -15,14 +15,9 @@ PAGEHEADER("User List");
 #
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
-# Admin users can see all users, while normal users can only see
-# users in their projects.
-#
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # For "recent" stuff below.
 $dorecent = 0;
@@ -191,11 +186,14 @@ echo "</tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
     $thisuid  = $row[uid];
+    $webid    = $row[uid_idx];
     $name     = $row[usr_name];
     $status   = $row[status];
     $unix_uid = $row[unix_uid];
     $webidle  = $row[webidle];
     $usersidle= $row[usersidle];
+
+    $showuser_url = CreateURL("showuser", URLARG_UID, $webid);
 
     echo "<tr>\n";
 
@@ -206,7 +204,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "<td align=center><img alt=\"N\" src=\"redball.gif\"></td>\n";
     }
 
-    echo "<td><A href='showuser.php3?target_uid=$thisuid'>$thisuid</A></td>
+    echo "<td><A href='$showuser_url'>$thisuid</A></td>
               <td>$name</td>\n";
 
     # List of projects.

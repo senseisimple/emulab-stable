@@ -120,6 +120,7 @@ $RSS_HEADER_NEWS = "<link rel=\"alternate\" type=\"application/rss+xml\" " .
 # Database constants and the like.
 #
 include("dbdefs.php3");
+include("url_defs.php");
 include("user_defs.php");
 include("group_defs.php");
 include("project_defs.php");

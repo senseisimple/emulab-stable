@@ -12,16 +12,16 @@ include("defs.php3");
 
 #
 # Get current user.
-# 
-$uid = GETLOGIN();
+#
+$this_user = CheckLoginOrDie();
 
 #
 # If a uid came in, then we check to see if the login is valid.
 # If the login is not valid. We require that the user be logged in.
 #
-if ($uid) {
-    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED);
-    $usr_uid = $uid;
+if ($this_user) {
+    CheckLoginOrDie(CHECKLOGIN_UNAPPROVED);
+    $usr_uid = $this_user->uid();
     $returning = 1;
 }
 else {
@@ -31,6 +31,7 @@ else {
     $returning = 0;
 }
 $haveinfo = 0;
+unset($addpubkeyargs);
 
 #
 # Default connection type strings,
@@ -523,7 +524,7 @@ if (! $returning) {
 	    $errors["UserName"] =
 		"Too long! Must be less than or equal to $TBDB_UIDLEN";
 	}
-	elseif (TBCurrentUser($formfields[usr_uid])) {
+	elseif (User::Lookup($formfields[usr_uid])) {
 	    $errors["UserName"] =
 		"Already in use. Select another";
 	}
@@ -544,16 +545,12 @@ if (! $returning) {
 	strcmp($formfields[usr_email], "") == 0) {
 	$errors["Email Address"] = "Missing Field";
     }
-    else {
-	$usr_email    = $formfields[usr_email];
-	$email_domain = strstr($usr_email, "@");
-    
-	if (! $email_domain ||
-	    strcmp($usr_email, $email_domain) == 0 ||
-	    strlen($email_domain) <= 1 ||
-	    ! strstr($email_domain, ".")) {
-	    $errors["Email Address"] = "Looks invalid!";
-	}
+    elseif (! TBvalid_email($formfields[usr_email])) {
+	$errors["Email Address"] = TBFieldErrorString();
+    }
+    elseif (User::LookupByEmail($formfields[usr_email])) {
+	$errors["Email Address"] =
+	    "Already in use. <b>Did you forget to login?</b>";
     }
     if (isset($formfields[usr_URL]) &&
 	strcmp($formfields[usr_URL], "") &&
@@ -696,6 +693,108 @@ if (count($errors)) {
     return;
 }
 
+# Okay, do pubkey checks.
+if (!$returning) {
+    #
+    # Pub key provided in form (paste in).
+    #
+    if (isset($formfields[usr_key]) &&
+	strcmp($formfields[usr_key], "")) {
+        #
+        # This is passed off to the shell, so taint check it.
+        # 
+	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
+	    $errors["PubKey"] = "Invalid characters";
+	}
+	else {
+            #
+            # Replace any embedded newlines first.
+            #
+	    $formfields[usr_key] =
+		ereg_replace("[\n]", "", $formfields[usr_key]);
+	    $usr_key = $formfields[usr_key];
+
+            #
+            # Verify key format.
+            #
+	    if (ADDPUBKEY(null, "webaddpubkey -n -k '$usr_key' ")) {
+		$errors["Pubkey Format"] =
+		    "Could not be parsed. Is it a public key?";
+	    }
+	    else {
+		$addpubkeyargs = "-k '$usr_key' ";
+	    }
+	}
+    }
+
+    #
+    # If usr provided a file for the key, it overrides the paste in text.
+    #
+    if (isset($_FILES['usr_keyfile']) &&
+	$_FILES['usr_keyfile']['name'] != "" &&
+	$_FILES['usr_keyfile']['name'] != "none") {
+
+	$localfile = $_FILES['usr_keyfile']['tmp_name'];
+
+	if (! stat($localfile)) {
+	    $errors["PubKey File"] = "No such file";
+	}
+        # Taint check shell arguments always! 
+	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+	    $errors["PubKey File"] = "Invalid characters";
+	}
+	else {
+	    chmod($localfile, 0644);
+
+            #
+            # Verify key format.
+            #
+	    if (ADDPUBKEY(null, "webaddpubkey -n $localfile ")) {
+		$errors["Pubkey Format"] =
+		    "Could not be parsed. Is it a public key?";
+	    }
+	    else {
+		$addpubkeyargs = "$localfile";
+	    }
+	}
+    }
+}
+
+if (count($errors)) {
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Verify that the key is valid. This will weed out bozos who like to
+# fill in random forms. 
+#
+$query_result =
+    DBQueryFatal("select * from widearea_privkeys as w ".
+		 "where w.lockkey='$cdkey' and w.IP='$IP'");
+
+if (!mysql_num_rows($query_result)) {
+    $errors["CD Key"] = "Invalid CD Key for $node_id";
+}
+
+#
+# Check for an existing entry in widearea_accounts.
+#
+$query_result =
+    DBQueryFatal("select * from widearea_accounts ".
+		 "where uid='$usr_uid' and node_id='$node_id'");
+
+if (mysql_num_rows($query_result)) {
+    $errors["IP Address"] = "You have already requested an account on $IP";
+}
+
+if (count($errors)) {
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
+}
+
 #
 # Certain of these values must be escaped or otherwise sanitized.
 #
@@ -711,18 +810,6 @@ if (! $haveinfo) {
     $node_state    = addslashes($formfields[node_state]);
     $node_zip      = $formfields[node_zip];
     $node_country  = addslashes($formfields[node_country]);
-}
-
-#
-# Verify that the key is valid. This will weed out bozos who like to
-# fill in random forms. 
-#
-$query_result =
-    DBQueryFatal("select * from widearea_privkeys as w ".
-		 "where w.lockkey='$cdkey' and w.IP='$IP'");
-
-if (!mysql_num_rows($query_result)) {
-    $errors["CD Key"] = "Invalid CD Key for $node_id";
 }
 
 if (!$returning) {
@@ -747,7 +834,7 @@ if (!$returning) {
 	$usr_URL = "";
     }
     else {
-	$usr_URL = $formfields[usr_URL];
+	$usr_URL = addslashes($formfields[usr_URL]);
     }
     
     if (! isset($formfields[usr_addr2])) {
@@ -757,148 +844,49 @@ if (!$returning) {
 	$usr_addr2 = addslashes($formfields[usr_addr2]);
     }
 
-    #
-    # Pub Key.
-    #
-    if (isset($formfields[usr_key]) &&
-	strcmp($formfields[usr_key], "")) {
-        #
-        # This is passed off to the shell, so taint check it.
-        # 
-	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	    $errors["PubKey"] = "Invalid characters";
-	}
-	else {
-            #
-            # Replace any embedded newlines first.
-            #
-	    $formfields[usr_key] =
-		ereg_replace("[\n]", "", $formfields[usr_key]);
-	    $usr_key = $formfields[usr_key];
-	    $addpubkeyargs = "-k '$usr_key' ";
-	}
-    }
+    $args = array();
+    $args["usr_name"]	   = $usr_name;
+    $args["usr_email"]     = $usr_email;
+    $args["usr_addr"]      = $usr_addr;
+    $args["usr_addr2"]     = $usr_addr2;
+    $args["usr_city"]      = $usr_city;
+    $args["usr_state"]     = $usr_state;
+    $args["usr_zip"]       = $usr_zip;
+    $args["usr_country"]   = $usr_country;
+    $args["usr_URL"]       = $usr_URL;
+    $args["usr_phone"]     = $usr_phone;
+    $args["usr_shell"]     = 'tcsh';
+    $args["usr_title"]     = $usr_title;
+    $args["usr_affil"]     = $usr_affil;
+    $args["usr_pswd"]      = crypt("$password1");
 
-    #
-    # If usr provided a file for the key, it overrides the paste in text.
-    #
-    if (isset($usr_keyfile) &&
-	strcmp($usr_keyfile, "") &&
-	strcmp($usr_keyfile, "none")) {
-
-	if (! stat($usr_keyfile)) {
-	    $errors["PubKey File"] = "No such file";
-	}
-	else {
-	    $addpubkeyargs = "$usr_keyfile";
-	    chmod($usr_keyfile, 0644);	
-	}
+    if (! ($user = User::NewUser($usr_uid, TBDB_NEWACCOUNT_WEBONLY, $args))) {
+	TBERROR("Could not create new user '$usr_email'!", 1);
     }
-    #
-    # Verify key format.
-    #
-    if (isset($addpubkeyargs) &&
-	ADDPUBKEY($usr_uid, "webaddpubkey -n -u $usr_uid $addpubkeyargs")) {
-	$errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
+    $usr_uid = $user->uid();
+
+    if (isset($addpubkeyargs)) {
+	ADDPUBKEY($usr_uid, "webaddpubkey -u $usr_uid $addpubkeyargs");
     }
 }
 else {
     #
     # Grab info from the DB for the email message below. Kinda silly.
     #
-    $query_result =
-	DBQueryFatal("select * from users where uid='$usr_uid'");
-    
-    $row = mysql_fetch_array($query_result);
-    
-    $usr_title	   = $row[usr_title];
-    $usr_name	   = $row[usr_name];
-    $usr_affil	   = $row[usr_affil];
-    $usr_email	   = $row[usr_email];
-    $usr_addr	   = $row[usr_addr];
-    $usr_addr2     = $row[usr_addr2];
-    $usr_city	   = $row[usr_city];
-    $usr_state	   = $row[usr_state];
-    $usr_zip	   = $row[usr_zip];
-    $usr_country   = $row[usr_country];
-    $usr_phone	   = $row[usr_phone];
-    $usr_URL       = $row[usr_URL];
+    $user = $this_user;
+    $usr_title	   = $user->title();
+    $usr_name	   = $user->name();
+    $usr_affil	   = $user->affil();
+    $usr_email	   = $user->email();
+    $usr_addr	   = $user->addr();
+    $usr_addr2     = $user->addr2();
+    $usr_city	   = $user->city();
+    $usr_state	   = $user->state();
+    $usr_zip	   = $user->zip();
+    $usr_country   = $user->country();
+    $usr_phone	   = $user->phone();
+    $usr_URL       = $user->URL();
     $usr_returning = "Yes";
-}
-
-#
-# Check for an existing entry in widearea_accounts.
-#
-$query_result =
-    DBQueryFatal("select * from widearea_accounts ".
-		 "where uid='$usr_uid' and node_id='$node_id'");
-
-if (mysql_num_rows($query_result)) {
-    $errors["IP Address"] = "You have already requested an account on $IP";
-}
-
-if (count($errors)) {
-    SPITFORM($formfields, $returning, $errors);
-    PAGEFOOTER();
-    return;
-}
-
-#
-# For a new user:
-# * Create a new account in the database.
-# * Generate a mail message to the user with the verification key.
-# 
-if (! $returning) {
-    $encoding = crypt("$password1");
-
-    #
-    # Must be done before user record is inserted!
-    # XXX Since, user does not exist, must run as nobody. Script checks. 
-    # 
-    if (isset($addpubkeyargs)) {
-	ADDPUBKEY($usr_uid, "webaddpubkey -u $usr_uid $addpubkeyargs");
-    }
-
-    # Unique Unix UID.
-    $unix_uid = TBGetUniqueIndex('next_uid');
-
-    DBQueryFatal("INSERT INTO users ".
-	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
-	 " usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,".
-	 " status,pswd_expires,usr_modified,webonly) ".
-	 "VALUES ('$usr_uid', now(), '$usr_expires', '$usr_name', ".
-         "'$usr_email', ".
-	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
-	 "'$usr_country', ".
-	 "'$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', '$encoding', $unix_uid, 'newuser', ".
-	 "date_add(now(), interval 1 year), now(), 1)");
-    
-    DBQueryFatal("INSERT INTO user_stats (uid, uid_idx) ".
-		 "VALUES ('$usr_uid', $unix_uid)");
-
-    $key = TBGenVerificationKey($usr_uid);
-
-    TBMAIL("$usr_name '$usr_uid' <$usr_email>",
-      "Your New User Key",
-      "\n".
-      "Dear $usr_name:\n\n".
-      "This is your account verification key: $key\n\n".
-      "Please use this link to verify your user account:\n".
-      "\n".
-      "    ${TBBASE}/login.php3?vuid=$usr_uid&key=$key\n".
-      "\n".
-      "Once you have verified your account, Testbed Operations will be\n".
-      "able to approve you. You MUST verify your account first! After you\n".
-      "have been approved by Testbed Operations, an acount will be created\n".
-      "for you on $node_id.\n".
-      "\n".
-      "Thanks,\n".
-      "Testbed Operations\n",
-      "From: $TBMAIL_APPROVAL\n".
-      "Bcc: $TBMAIL_AUDIT\n".
-      "Errors-To: $TBMAIL_WWW");
 }
 
 #

@@ -14,9 +14,9 @@ include_once("template_defs.php");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Spit the form out using the array of data.
@@ -225,7 +225,7 @@ function SPITFORM($formfields, $errors)
 #
 # See what projects the uid can create experiments in. Must be at least one.
 #
-$projlist = TBProjList($uid, $TB_PROJECT_CREATEEXPT);
+$projlist = $this_user->ProjectAccessList($TB_PROJECT_CREATEEXPT);
 
 if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".

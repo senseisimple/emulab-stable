@@ -18,9 +18,9 @@ PAGEHEADER("Snapshot Node Disk into Existing Image Descriptor");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (! isset($imageid)) {
     USERERROR("Must pass image name to page as 'imageid'.", 1 );

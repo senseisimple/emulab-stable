@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -21,11 +21,11 @@ function MyError($msg)
 
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
@@ -87,7 +87,7 @@ if (!$admins_can_view || (!$anyone_can_view && !$isadmin)) {
 #
 # Now check permission.
 #
-if (!$isadmin && !TBWebCamAllowed($uid)) {
+if (!$isadmin && !$this_user->WebCamAllowed()) {
     MyError("Not enough permission to view the robot cameras!");
 }
 

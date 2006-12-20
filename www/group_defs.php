@@ -4,6 +4,11 @@
 # Copyright (c) 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
+#
+# A cache of groups to avoid lookups. Indexed by gid_idx;
+#
+$group_cache = array();
+
 class Group
 {
     var	$group;
@@ -23,8 +28,8 @@ class Group
 	    $this->group = NULL;
 	    return;
 	}
-	$this->group   = mysql_fetch_array($query_result);
-	$this->project = null;
+	$this->group   =& mysql_fetch_array($query_result);
+	$this->project =  null;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -34,11 +39,20 @@ class Group
 
     # Lookup by gid_idx.
     function Lookup($gid_idx) {
+	global $group_cache;
+
+        # Look in cache first
+	if (array_key_exists("$gid_idx", $group_cache))
+	    return $group_cache["$gid_idx"];
+	
 	$foo = new Group($gid_idx);
 
-	if ($foo->IsValid())
-	    return $foo;
-	return null;
+	if (! $foo->IsValid())
+	    return null;
+
+	# Insert into cache.
+	$group_cache["$gid_idx"] = $foo;
+	return $foo;
     }
 
     # Backwards compatable lookup by pid,gid. Will eventually flush this.
@@ -56,12 +70,7 @@ class Group
 	$row = mysql_fetch_array($query_result);
 	$idx = $row['gid_idx'];
 
-	$foo = new Group($idx); 
-
-	if ($foo->IsValid())
-	    return $foo;
-	
-	return null;
+	return Group::Lookup($idx);	
     }
     
     #
@@ -80,7 +89,7 @@ class Group
 	    $this->group = NULL;
 	    return -1;
 	}
-	$this->group = mysql_fetch_array($query_result);
+	$this->group =& mysql_fetch_array($query_result);
 	return 0;
     }
 
@@ -95,6 +104,61 @@ class Group
 	}
 	$this->project = $project;
 	return 0;
+    }
+    function Project() {
+	if (! $this->project) {
+	    $this->LoadProject();
+	}
+	return $this->project;
+    }
+    
+    #
+    # Return user object for leader.
+    #
+    function GetLeader() {
+	$head_uid = $this->leader();
+
+	if (! ($leader = User::Lookup($head_uid))) {
+	    TBERROR("Could not find user object for $head_uid", 1);
+	}
+	return $leader;
+    }
+
+    #
+    # Access Check, which for now uses the global function to avoid duplication
+    # until all code is changed.
+    #
+    function AccessCheck($user, $access_type) {
+	return TBProjAccessCheck($user->uid(), $this->pid(), $this->gid(),
+				 $access_type);
+    }
+
+    #
+    # Return a users trust within the group.
+    #
+    function UserTrust($user) {
+	global $TBDB_TRUST_NONE;
+	
+	$uid_idx = $user->uid_idx();
+	$pid_idx = $this->pid_idx();
+	$gid_idx = $this->gid_idx();
+
+	$query_result =
+	    DBQueryFatal("select trust from group_membership ".
+			 "where uid_idx='$uid_idx' and ".
+			 "      pid_idx='$pid_idx' and gid_idx='$gid_idx'");
+
+        #
+        # No membership is the same as no trust. True? Maybe an error instead?
+        # 
+	if (mysql_num_rows($query_result) == 0) {
+	    return $TBDB_TRUST_NONE;
+	}
+	$row = mysql_fetch_array($query_result);
+	$trust_string = $row[trust];
+
+	# Convert string to number.      
+	return TBTrustConvert($trust_string);
     }
 
     # accessors
@@ -210,7 +274,7 @@ class Group
 	    TBERROR("Group::Initialize: Could not find $TBOPSPID!", 1);
 	}
 
-	$user = User::LookupByUid($uid);
+	$user = User::Lookup($uid);
 
 	if (! $user) {
 	    TBERROR("Group::Initialize: Could not find user $uid!", 1);
@@ -255,6 +319,24 @@ class Group
     }
 
     #
+    # And a delete function.
+    #
+    function DeleteMember($user) {
+	$uid     = $user->uid();
+	$uid_idx = $user->uid_idx();
+	$pid     = $this->pid();
+	$pid_idx = $this->pid_idx();
+	$gid     = $this->gid();
+	$gid_idx = $this->gid_idx();
+
+	DBQueryFatal("delete from group_membership ".
+		     "where uid_idx='$uid_idx' and pid_idx='$pid_idx' and ".
+		     "      gid_idx='$gid_idx'");
+	
+	return 0;
+    }
+
+    #
     # Notify leaders of new (and verified) group member.
     #
     function NewMemberNotify($user) {
@@ -270,7 +352,7 @@ class Group
 	$leader_name	= $leader->name();
 	$leader_email	= $leader->email();
 	$leader_uid	= $leader->uid();
-	$allleaders	= TBLeaderMailList($pid, $gid);
+	$allleaders	= $this->LeaderMailList();
 	$joining_uid    = $user->uid();
 	$usr_title	= $user->title();
 	$usr_name	= $user->name();
@@ -320,7 +402,9 @@ class Group
     #
     # Check if user is a member of this group.
     #
-    function IsMember($user) {
+    function IsMember($user, &$approved) {
+	global $TBDB_TRUST_USER;
+	
 	$uid     = $user->uid();
 	$uid_idx = $user->uid_idx();
 	$gid     = $this->gid();
@@ -330,6 +414,196 @@ class Group
 	    DBQueryFatal("select trust from group_membership ".
 			 "where uid_idx='$uid_idx' and gid_idx='$gid_idx'");
 
-	return mysql_num_rows($query_result);
+	if (mysql_num_rows($query_result) == 0) {
+	    $approved = 0;
+	    return 0;
+	}
+
+	$row      = mysql_fetch_row($query_result);
+	$trust    = $row[0];
+	$approved = TBMinTrust($trust, $TBDB_TRUST_USER);
+
+	return 1;
+    }
+
+    #
+    # Change the leader for a group.
+    #
+    function ChangeLeader($leader) {
+	$idx   = $this->gid_idx();
+	$uid   = $leader->uid();
+
+	DBQueryFatal("update groups set leader='$uid' ".
+		     "where gid_idx='$idx'");
+
+	$this->group["leader"] = $uid;
+	return 0;
+    }
+
+    #
+    # Trust consistency.
+    #
+    function CheckTrustConsistency($user, $newtrust, $fail) {
+	global $TBDB_TRUST_USER;
+	
+	$uid = $user->uid();
+	$pid = $this->pid();
+	$gid = $this->gid();
+	$uid_idx = $user->uid_idx();
+	$pid_idx = $this->pid_idx();
+	$gid_idx = $this->gid_idx();
+	$trust_none = TBDB_TRUSTSTRING_NONE;
+	
+        # 
+        # set $newtrustisroot to 1 if attempting to set a rootful trust,
+        # 0 otherwise.
+        #
+	$newtrustisroot = TBTrustConvert($newtrust) > $TBDB_TRUST_USER ? 1 : 0;
+
+        #
+        # If changing subgroup trust level, then compare levels.
+        # A user may not have root privs in the project and user privs
+        # in the subgroup; it makes no sense to do that and can violate trust.
+        #
+	if ($pid_idx != $gid_idx) {
+            #
+            # Setting non-default "sub"group.
+	    # Verify that if user has root in project,
+	    # we are setting a rootful trust for him in 
+	    # the subgroup as well.
+	    #
+	    $projtrustisroot =
+		TBProjTrust($uid, $pid) > $TBDB_TRUST_USER ? 1 : 0;
+
+	    if ($projtrustisroot > $newtrustisroot) {
+		if (!$fail)
+		    return 0;
+		
+		TBERROR("User $uid may not have a root trust level in ".
+			"the default group of $pid, ".
+			"yet be non-root in subgroup $gid!", 1);
+	    }
+	}
+	else {
+            #
+	    # Setting default group.
+	    # Do not verify anything (yet.)
+	    #
+	    $projtrustisroot = $newtrustisroot;
+	}
+
+        #
+        # Get all the subgroups not equal to the subgroup being changed.
+        # 
+	$query_result =
+	    DBQueryFatal("select trust,gid from group_membership ".
+			 "where uid_idx='$uid_idx' and ".
+			 "      pid_idx='$pid_idx' and ".
+			 "      gid_idx!=pid_idx and ".
+			 "      gid_idx!='$gid_idx' and ".
+			 "      trust!='$trust_none'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $grptrust = $row[0];
+	    $ogid     = $row[1];
+	
+  	    # 
+	    # Get what the users trust level is in the 
+	    # current subgroup we are looking at.
+	    #
+	    $grptrustisroot = 
+		TBTrustConvert($grptrust) > $TBDB_TRUST_USER ? 1 : 0;
+
+ 	    #
+	    # If users trust level is higher in the default group than in the
+	    # subgroup we are looking at, this is wrong.
+ 	    #
+	    if ($projtrustisroot > $grptrustisroot) {
+	        if (!$fail)
+		    return 0;
+
+		TBERROR("User $uid may not have a root trust level in ".
+			"the default group of $pid, ".
+			"yet be non-root in subgroup $ogid!", 1);
+	    }
+
+	    if ($pid_idx != $gid_idx) {
+                #
+	        # Iff we are modifying a subgroup, 
+	        # Make sure that the trust we are setting is as
+	        # rootful as the trust we already have set in
+	        # every other subgroup.
+	        # 
+		if ($newtrustisroot != $grptrustisroot) { 
+		    if (!$fail)
+			return 0;
+		    
+		    TBERROR("User $uid may not mix root and ".
+			    "non-root trust levels in ".
+			    "different subgroups of $pid!", 1);
+		}
+	    }
+	}
+	return 1;
+    }
+
+    #
+    # Hmm, this is really a grooup_membership query. Needs different treatment.
+    #
+    function MemberShipInfo($user, &$trust, &$date_applied, &$date_approved) {
+	$uid_idx = $user->uid_idx();
+	$gid_idx = $this->gid_idx();
+
+	$query_result =
+	    DBQueryFatal("select trust,date_applied,date_approved ".
+			 "  from group_membership ".
+			 "where uid_idx='$uid_idx' and gid_idx='$gid_idx'");
+
+	if (! mysql_num_rows($query_result)) {
+	    TBERROR("Group::MemberShipInfo: ".
+		    "Lookup failed for $uid_idx/$gid_idx", 1);
+	}
+	$row      = mysql_fetch_row($query_result);
+	$trust    = $row[0];
+	$date_applied  = $row[1];
+	$date_approved = $row[2];
+	
+	return 0;
+    }
+
+    #
+    # Return mail addresses for project_root and group_root people.
+    #
+    function LeaderMailList() {
+	$gid_idx = $this->gid_idx();
+	$pid_idx = $this->pid_idx();
+
+	# Constants.
+	$trust_group  = TBDB_TRUSTSTRING_GROUPROOT;
+	$trust_project= TBDB_TRUSTSTRING_PROJROOT;
+
+	$query_result =
+	    DBQueryFatal("select distinct usr_name,u.uid,usr_email ".
+			 "   from users as u ".
+			 "left join group_membership as gm on ".
+			 "     gm.uid_idx=u.uid_idx ".
+			 "where (trust='$trust_project' and ".
+			 "       pid_idx='$pid_idx') or ".
+			 "      (trust='$trust_group' and ".
+			 "       pid_idx='$pid_idx' and gid_idx='$gid_idx') ".
+			 "order by trust DESC, usr_name");
+  
+	if (mysql_num_rows($query_result) == 0) {
+	    return "";
+	}
+	
+	$mailstr="";
+	while ($row = mysql_fetch_array($query_result)) {
+	    if ($mailstr != "")
+		$mailstr .= ", ";
+	    
+	    $mailstr .= '"' . $row[usr_name] . " (". $row[uid] . ")\" <" .
+		$row[usr_email] . ">";
+	}
     }
 }
