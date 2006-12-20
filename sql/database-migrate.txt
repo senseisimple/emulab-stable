@@ -3859,3 +3859,21 @@ last_net_act,last_cpu_act,last_ext_act);
             change `script` `script` smallint(3) NOT NULL default '0',
             change `error_type` `error_type` varchar(255) NOT NULL default '';
 
+4.103: Change the login table to use the uid_idx field, but also map
+       from the uid_idx to the uid for compatability with unchanged
+       code.
+
+        drop table login;
+	
+	CREATE TABLE login (
+	  uid_idx mediumint(8) unsigned NOT NULL default '0',
+	  uid varchar(10) NOT NULL default '',
+	  hashkey varchar(64) NOT NULL default '',
+	  hashhash varchar(64) NOT NULL default '',
+	  timeout varchar(10) NOT NULL default '',
+	  adminon tinyint(1) NOT NULL default '0',
+	  PRIMARY KEY  (uid_idx,hashkey),
+	  UNIQUE KEY hashhash (uid_idx,hashhash)
+	  UNIQUE KEY uidkey (uid,hashkey)
+	) TYPE=MyISAM;
+       

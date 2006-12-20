@@ -1332,13 +1332,15 @@ CREATE TABLE log (
 --
 
 CREATE TABLE login (
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   uid varchar(10) NOT NULL default '',
   hashkey varchar(64) NOT NULL default '',
   hashhash varchar(64) NOT NULL default '',
   timeout varchar(10) NOT NULL default '',
   adminon tinyint(1) NOT NULL default '0',
-  PRIMARY KEY  (uid,hashkey),
-  UNIQUE KEY hashhash (uid,hashhash)
+  PRIMARY KEY  (uid_idx,hashkey),
+  UNIQUE KEY hashhash (uid_idx,hashhash)
+  UNIQUE KEY uidkey (uid,hashkey)
 ) TYPE=MyISAM;
 
 --
