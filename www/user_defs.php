@@ -59,7 +59,7 @@ class User
 	    # Try lookup by plain uid.
 	    $foo =& User::LookupByUid($uid_idx);
 	    
-	    if (! $foo->IsValid())
+	    if (!$foo || !$foo->IsValid())
 		return null;
 	    
 	    # Already in the cache from LookupByUid() so just return it.
