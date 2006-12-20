@@ -44,6 +44,7 @@ $url_mapping["freezeuser"]		= "freezeuser.php3";
 $url_mapping["changeuid"]		= "changeuid.php";
 $url_mapping["resendkey"]		= "resendkey.php3";
 $url_mapping["sendtestmsg"]		= "sendtestmsg.php3";
+$url_mapping["chpasswd"]		= "chpasswd.php3";
 	     
 #
 # The caller will pass in a page id, and a list of things. If the thing

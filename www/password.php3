@@ -184,7 +184,7 @@ TBMAIL("$uid_name <$uid_email>",
        "password. If the link expires, you can request a new one from the\n".
        "web interface.\n".
        "\n".
-       "    ${TBBASE}/chpasswd.php3?reset_uid=$uid&key=$keyB&simple=$simple\n".
+       "    ${TBBASE}/chpasswd.php3?user=$uid&key=$keyB&simple=$simple\n".
        "\n".
        "The request originated from IP: " . $_SERVER['REMOTE_ADDR'] . "\n".
        "\n".
