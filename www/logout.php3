@@ -37,7 +37,7 @@ if (isset($user)) {
     }
     $target_uid = $target_user->uid();
     
-    if (! $isadmin) {
+    if (!$isadmin && !$target_user->SameUser($this_user)) {
 	PAGEHEADER("Logout");
 	echo "<center>
                   <h3>You do not have permission to logout '$target_uid'</h3>
