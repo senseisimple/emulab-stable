@@ -87,7 +87,7 @@ elseif (! strcmp($showtype, "widearea")) {
     $showtag = "widearea";
 }
 elseif (! strcmp($showtype, "homeless")) {
-    $clause  = "left join group_membership as m on u.uid=m.uid ";
+    $clause  = "left join group_membership as m on u.uid_idx=m.uid_idx ";
     $clause .= "left join widearea_accounts as w on u.uid=w.uid ";
     $where   = "where (m.uid is null and w.node_id is NULL) ";
     $showtag = "homeless";

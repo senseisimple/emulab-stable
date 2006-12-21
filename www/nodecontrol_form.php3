@@ -76,13 +76,15 @@ if ($isadmin) {
 		     "order by o.osid");
 }
 else {
+    $uid_idx = $this_user->uid_idx();
+    
     $osid_result =
 	DBQueryFatal("select distinct o.osname, o.pid, o.osid as oosid," .
 		     "p.osid as posid from os_info as o ".
 		     "left join group_membership as m on m.pid=o.pid ".
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where p.node_id='$node_id' or ".
-		     "  ((m.uid='$uid' or o.shared=1) and ".
+		     "  ((m.uid_idx='$uid_idx' or o.shared=1) and ".
 		     "   (o.path!='' and o.path is not NULL)) ".
 		     "order by o.pid,o.osid");
 }

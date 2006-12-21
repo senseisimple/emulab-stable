@@ -31,37 +31,26 @@ if (!TBvalid_eid($eid)) {
 }
  
 #
-# Check to make sure this is a valid PID/EID tuple.
+# Check to make sure this is a valid PID/EID.
 #
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE ".
-		 "eid='$eid' and pid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The experiment $eid is not a valid experiment ".
-            "in project $pid.", 1);
-} else {
-  $row     = mysql_fetch_array($query_result);
-  $exptidx = $row[idx];
+if (! ($experiment = Experiment::Lookup($pid, $eid))) {
+    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
 }
-
-$expstate = TBExptState($pid, $eid);
+$exptidx = $experiment->idx();
 
 #
-# Verify that this uid is a member of the project for the experiment
-# being displayed.
+# Must have permission to view experiment details.
 #
-if (!$isadmin) {
-    $query_result =
-	DBQueryFatal("SELECT pid FROM group_membership ".
-		     "WHERE uid='$uid' and pid='$pid'");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("You are not a member of Project $pid!", 1);
-    }
+if (!$isadmin &&
+    !$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment last error!", 1);
 }
 
 $query_result =
-    DBQueryFatal("SELECT e.cause,e.confidence,e.mesg,cause_desc FROM experiment_stats as s,errors as e, causes as c ".
-	         "WHERE s.exptidx = $exptidx and e.cause = c.cause and s.last_error = e.session and rank = 0");
+    DBQueryFatal("select e.cause,e.confidence,e.mesg,cause_desc ".
+		 "   from experiment_stats as s,errors as e, causes as c ".
+	         "where s.exptidx = $exptidx and e.cause = c.cause and ".
+		 "      s.last_error = e.session and rank = 0");
 
 if (mysql_num_rows($query_result) != 0) {
   $row = mysql_fetch_array($query_result);

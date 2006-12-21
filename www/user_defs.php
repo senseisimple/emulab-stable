@@ -13,6 +13,7 @@ $user_cache = array();
 class User
 {
     var	$user;
+    var $tempdata;		# For temporary data values ...
 
     #
     # For pedantic checks early in pages.
@@ -208,6 +209,14 @@ class User
     function wikiname()		{ return $this->field("wikiname"); }
     function wikionly()		{ return $this->field("wikionly"); }
     function mailman_password() { return $this->field("mailman_password"); }
+
+    # Temporary data storage ... useful.
+    function SetTempData(&$value) {
+	$this->tempdata =& $value;
+    }
+    function &GetTempData() {
+	return $this->tempdata;
+    }
 
     #
     # Class function to create new user and return object.

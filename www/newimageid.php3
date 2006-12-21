@@ -83,11 +83,13 @@ function SPITFORM($formfields, $errors)
 			 "order by osid");
     }
     else {
+	$uid_idx = $this_user->uid_idx();
+	
 	$osid_result =
 	    DBQueryFatal("select distinct o.* from os_info as o ".
 			 "left join group_membership as m ".
 			 " on m.pid=o.pid ".
-			 "where m.uid='$uid' and ".
+			 "where m.uid_idx='$uid_idx' and ".
 			 "      (path='' or path is NULL) and ".
 			 "      version!='' and version is not NULL ".
 			 "order by o.pid,o.osid");

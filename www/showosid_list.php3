@@ -61,10 +61,12 @@ if ($isadmin) {
 		     "order by $order");
 }
 else {
+    $uid_idx = $this_user->uid_idx();
+    
     $query_result =
 	DBQueryFatal("select distinct o.* from os_info as o ".
 		     "left join group_membership as g on g.pid=o.pid ".
-		     "where (g.uid='$uid' or o.shared=1) ".
+		     "where (g.uid_idx='$uid_idx' or o.shared=1) ".
 		     "$extraclause ".
 		     "order by $order");
 }

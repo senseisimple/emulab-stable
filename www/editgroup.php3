@@ -8,9 +8,9 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
-# No testbed header since we spit out a redirect.
+# Standard Testbed Header
 #
-ignore_user_abort(1);
+PAGEHEADER("Edit Group Membership");
 
 #
 # Only known and logged in users.
@@ -46,7 +46,7 @@ if (! ($group = Group::LookupByPidGid($pid, $gid))) {
 #
 # Verify permission. 
 #
-if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
+if (! $group->AccessCheck($this_user, $TB_PROJECT_EDITGROUP)) {
     USERERROR("You do not have permission to edit group $gid in ".
 	      "project $pid!", 1);
 }
@@ -55,7 +55,7 @@ if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
 # See if user is allowed to add non-members to group.
 # 
 $grabusers = 0;
-if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
+if ($group->AccessCheck($this_user, $TB_PROJECT_GROUPGRABUSERS)) {
     $grabusers = 1;
 }
 
@@ -63,7 +63,7 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
 # See if user is allowed to bestow group_root upon members of group.
 # 
 $bestowgrouproot = 0;
-if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_BESTOWGROUPROOT)) {
+if ($group->AccessCheck($this_user, $TB_PROJECT_BESTOWGROUPROOT)) {
     $bestowgrouproot = 1;
 }
 
@@ -72,11 +72,7 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_BESTOWGROUPROOT)) {
 # removed! Do not include members that have not been approved to main
 # group either! This will force them to go through the approval page first.
 #
-$curmembers_result =
-    DBQueryFatal("select distinct m.uid, m.trust from group_membership as m ".
-		 "left join groups as g on g.pid=m.pid and g.gid=m.gid ".
-		 "where m.pid='$pid' and m.gid='$gid' and ".
-		 "      m.uid!=g.leader and m.trust!='none'");
+$curmembers = $group->MemberList();
 
 #
 # Grab the user list from the project. These are the people who can be
@@ -84,13 +80,7 @@ $curmembers_result =
 # include members that have not been approved to main group either! This
 # will force them to go through the approval page first.
 # 
-$nonmembers_result =
-    DBQueryFatal("select m.uid from group_membership as m ".
-		 "left join group_membership as a on ".
-		 "     a.uid=m.uid and a.pid=m.pid and a.gid='$gid' ".
-		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL ".
-		 "      and m.trust!='none'");
-
+$nonmembers = $group->NonMemberList();
 
 #
 # First pass does checks. Second pass does the real thing. 
@@ -102,11 +92,11 @@ $nonmembers_result =
 # from the group membership. Otherwise, look to see if the trust level
 # has been changed.
 # 
-if (mysql_num_rows($curmembers_result)) {
-    while ($row = mysql_fetch_array($curmembers_result)) {
-	$user     = $row[0];
-	$oldtrust = $row[1];
-	$foo      = "change_$user";
+if (count($curmembers)) {
+    foreach ($curmembers as $target_user) {
+	$target_uid = $target_user->uid();
+	$oldtrust   = $target_user->GetTempData();
+	$foo        = "change_$target_uid";    
 
 	#
 	# Is member to be deleted?
@@ -116,25 +106,21 @@ if (mysql_num_rows($curmembers_result)) {
 	    continue;
 	}
 
-	if (! ($target_user = User::Lookup($user))) {
-	    TBERROR("Could not find user object for $user", 1);
-	}
-
         #
         # There should be a corresponding trust variable in the POST vars.
         # Note that we construct the variable name and indirect to it.
         #
-        $foo      = "$user\$\$trust";
+        $foo      = "$target_uid\$\$trust";
 	$newtrust = $$foo;
 	
 	if (!$newtrust || strcmp($newtrust, "") == 0) {
-	    TBERROR("Error finding trust for $user in editgroup.php3", 1);
+	    TBERROR("Error finding trust for $target_uid in editgroup", 1);
 	}
 
-	if (strcmp($newtrust, "user") &&
-	    strcmp($newtrust, "local_root") &&
-	    strcmp($newtrust, "group_root")) {
-	    TBERROR("Invalid trust $newtrust for $user in editgroup.php3.", 1);
+	if (strcmp($newtrust, TBDB_TRUSTSTRING_USER) &&
+	    strcmp($newtrust, TBDB_TRUSTSTRING_LOCALROOT) &&
+	    strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT)) {
+	    TBERROR("Invalid trust $newtrust for $target_uid in editgroup", 1);
 	}
 
 	#
@@ -143,7 +129,7 @@ if (mysql_num_rows($curmembers_result)) {
 	# permitted.
 	#
 	if (strcmp($newtrust, $oldtrust) &&
-	    !strcmp($newtrust, "group_root") && 
+	    !strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT) && 
 	    !$bestowgrouproot) {
 	    USERERROR("You do not have permission to bestow group root".
 		      "trust to users in $pid/$gid!", 1 );
@@ -151,6 +137,7 @@ if (mysql_num_rows($curmembers_result)) {
 
 	$group->CheckTrustConsistency($target_user, $newtrust, 1);
     }
+    reset($curmembers);
 }
 
 #
@@ -160,44 +147,38 @@ if (mysql_num_rows($curmembers_result)) {
 # Only do this if user has permission to grab users. 
 #
 
-if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
-    while ($row = mysql_fetch_array($nonmembers_result)) {
-	$user = $row[0];
-	$foo  = "add_$user";
+if ($grabusers && !$defaultgroup && count($nonmembers)) {
+    foreach ($nonmembers as $target_user) {
+	$target_uid = $target_user->uid();
+	$foo        = "add_$target_uid";    
 	
 	if (isset($$foo)) {
 	    #
 	    # There should be a corresponding trust variable in the POST vars.
 	    # Note that we construct the variable name and indirect to it.
 	    #
-	    $bar      = "$user\$\$trust";
+	    $bar      = "$target_uid\$\$trust";
 	    $newtrust = $$bar;
 	    
 	    if (!$newtrust || strcmp($newtrust, "") == 0) {
-		TBERROR("Error finding trust for $user in editgroup.php3",
-			1);
+		TBERROR("Error finding trust for $target_uid", 1);
 	    }
 	    
-	    if (strcmp($newtrust, "user") &&
-		strcmp($newtrust, "local_root") &&
-		strcmp($newtrust, "group_root")) {
-		TBERROR("Invalid trust $newtrust for $user in editgroup.php3.",
-			1);
+	    if (strcmp($newtrust, TBDB_TRUSTSTRING_USER) &&
+		strcmp($newtrust, TBDB_TRUSTSTRING_LOCALROOT) &&
+		strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT)) {
+		TBERROR("Invalid trust $newtrust for $target_uid", 1);
 	    }
 
-	    if (!strcmp($newtrust, "group_root")
+	    if (!strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT)
 		&& !$bestowgrouproot) {
 		USERERROR("You do not have permission to bestow group root".
 			  "trust to users in $pid/$gid!", 1 );
 	    }
-
-	    if (! ($target_user = User::Lookup($user))) {
-		TBERROR("Could not find user object for $user", 1);
-	    }
-
 	    $group->CheckTrustConsistency($target_user, $newtrust, 1);
 	}
     }
+    reset($nonmembers);
 }
 
 #
@@ -205,7 +186,9 @@ if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
 #
 # Grab the unix GID for running scripts.
 #
-TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
+$unix_gid = $group->unix_gid();
+
+STARTBUSY("Applying group membership changes");
 
 #
 # Go through the list of current members. For each one, check to see if
@@ -213,28 +196,28 @@ TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 # from the group membership. Otherwise, look to see if the trust level
 # has been changed.
 #
-if (mysql_num_rows($curmembers_result)) {
-    mysql_data_seek($curmembers_result, 0);
-    
-    while ($row = mysql_fetch_array($curmembers_result)) {
-	$user = $row[0];
-	$oldtrust = $row[1];
-	$foo  = "change_$user";
+if (count($curmembers)) {
+    foreach ($curmembers as $target_user) {
+	$target_uid = $target_user->uid();
+	$oldtrust   = $target_user->GetTempData();
+	$foo        = "change_$target_uid";    
 
 	if (!$defaultgroup && !isset($$foo)) {
-	    SUEXEC($uid, $unix_gid, "webmodgroups -r $pid:$gid $user", 1);
+	    SUEXEC($uid, $unix_gid, "webmodgroups -r $pid:$gid $target_uid",
+		   SUEXEC_ACTION_DIE);
 	    continue;
 	}
         #
         # There should be a corresponding trust variable in the POST vars.
         # Note that we construct the variable name and indirect to it.
         #
-        $foo      = "$user\$\$trust";
+        $foo      = "$target_uid\$\$trust";
 	$newtrust = $$foo;
 	
 	if (strcmp($oldtrust,$newtrust)) {
 	    SUEXEC($uid, $unix_gid,
-		   "webmodgroups -m $pid:$gid:$newtrust $user", 1);
+		   "webmodgroups -m $pid:$gid:$newtrust $target_uid",
+		   SUEXEC_ACTION_DIE);
 	}
     }
 }
@@ -245,32 +228,36 @@ if (mysql_num_rows($curmembers_result)) {
 # to the group membership, with the trust level specified.
 # 
 
-if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
-    mysql_data_seek($nonmembers_result, 0);
-    
-    while ($row = mysql_fetch_array($nonmembers_result)) {
-	$user = $row[0];
-	$foo  = "add_$user";
+if ($grabusers && !$defaultgroup && count($nonmembers)) {
+    foreach ($nonmembers as $target_user) {
+	$target_uid = $target_user->uid();
+	$foo        = "add_$target_uid";    
 	
 	if (isset($$foo)) {
 	    #
 	    # There should be a corresponding trust variable in the POST vars.
 	    # Note that we construct the variable name and indirect to it.
 	    #
-	    $bar      = "$user\$\$trust";
+	    $bar      = "$target_uid\$\$trust";
 	    $newtrust = $$bar;
 
 	    SUEXEC($uid, $unix_gid,
-		   "webmodgroups -a $pid:$gid:$newtrust $user", 1);
+		   "webmodgroups -a $pid:$gid:$newtrust $target_uid",
+		   SUEXEC_ACTION_DIE);
 	}
     }
 }
+
+STOPBUSY();
 
 #
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 # 
-header("Location: showgroup.php3?pid=$pid&gid=$gid");
+PAGEREPLACE("showgroup.php3?pid=$pid&gid=$gid");
 
-# No Testbed footer.
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

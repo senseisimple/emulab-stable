@@ -293,6 +293,8 @@ function GENPLIST ($query_result)
 # Get the project list for non admins.
 #
 if (! $isadmin) {
+    $uid_idx = $this_user->uid_idx();
+    
     $query_result =
 	DBQueryFatal("SELECT p.*, ".
 		     "IF(p.expt_last, ".
@@ -301,7 +303,7 @@ if (! $isadmin) {
 		     "FROM projects as p ".
 		     "left join group_membership as g on ".
 		     " p.pid=g.pid and g.pid=g.gid ".
-		     "where g.uid='$uid' and g.trust!='none' ".
+		     "where g.uid_idx='$uid_idx' and g.trust!='none' ".
 		     "group by p.pid order by $order");
 				   
     if (mysql_num_rows($query_result) == 0) {

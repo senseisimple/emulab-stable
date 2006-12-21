@@ -431,6 +431,77 @@ class Group
     }
 
     #
+    # Return list of approved members in this group. 
+    #
+    function MemberList($exclude_leader = 1) {
+	$gid_idx    = $this->gid_idx();
+	$pid_idx    = $this->pid_idx();
+	$trust_none = TBDB_TRUSTSTRING_NONE;
+	$leader     = $this->GetLeader();
+	$result     = array();
+
+	$query_result =
+	    DBQueryFatal("select m.uid_idx,m.trust ".
+			 "   from group_membership as m ".
+			 "left join groups as g on ".
+			 "     g.pid=m.pid and g.gid=m.gid ".
+			 "where m.pid_idx='$pid_idx' and ".
+			 "      m.gid_idx='$gid_idx' and ".
+			 "      m.trust!='$trust_none'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $uid_idx = $row["uid_idx"];
+	    $trust   = $row["trust"];
+
+	    if ($exclude_leader && $leader->uid_idx() == $uid_idx)
+		continue;
+
+	    if (! ($user =& User::Lookup($uid_idx))) {
+		TBERROR("Group::MemberList: ".
+			"Could not load user $uid_idx!", 1);
+	    }
+	    # So caller can get this.
+	    $user->SetTempData($trust);
+	    
+	    $result[] =& $user;
+	}
+	return $result;
+    }
+
+    #
+    # Grab the user list from the project. These are the people who can be
+    # added. Do not include people in the above list, obviously! Do not
+    # include members that have not been approved to main group either! This
+    # will force them to go through the approval page first.
+    #
+    function NonMemberList() {
+	$gid_idx    = $this->gid_idx();
+	$pid_idx    = $this->pid_idx();
+	$trust_none = TBDB_TRUSTSTRING_NONE;
+	$result     = array();
+	
+	$query_result =
+	    DBQueryFatal("select m.uid_idx from group_membership as m ".
+			 "left join group_membership as a on ".
+			 "     a.uid_idx=m.uid_idx and ".
+			 "     a.pid_idx=m.pid_idx and a.gid_idx='$gid_idx' ".
+			 "where m.pid_idx='$pid_idx' and ".
+			 "      m.gid_idx=m.pid_idx and a.uid_idx is NULL ".
+			 "      and m.trust!='$trust_none'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $uid_idx = $row["uid_idx"];
+
+	    if (! ($user =& User::Lookup($uid_idx))) {
+		TBERROR("Group::NonMemberList: ".
+			"Could not load user $uid_idx!", 1);
+	    }
+	    $result[] =& $user;
+	}
+	return $result;
+    }
+
+    #
     # Change the leader for a group.
     #
     function ChangeLeader($leader) {

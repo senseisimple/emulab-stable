@@ -46,7 +46,7 @@ if (! ($group = Group::LookupByPidGid($pid, $gid))) {
 #
 # Verify permission.
 #
-if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
+if (! $group->AccessCheck($this_user, $TB_PROJECT_EDITGROUP)) {
     USERERROR("You do not have permission to edit group $gid in ".
 	      "project $pid!", 1);
 }
@@ -55,7 +55,7 @@ if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
 # See if user is allowed to add non-members to group.
 # 
 $grabusers = 0;
-if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
+if ($group->AccessCheck($this_user, $TB_PROJECT_GROUPGRABUSERS)) {
     $grabusers = 1;
 }
 
@@ -63,7 +63,7 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
 # See if user is allowed to bestow group_root upon members of group.
 # 
 $bestowgrouproot = 0;
-if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_BESTOWGROUPROOT)) {
+if ($group->AccessCheck($this_user, $TB_PROJECT_BESTOWGROUPROOT)) {
     $bestowgrouproot = 1;
 }
 
@@ -74,24 +74,15 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_BESTOWGROUPROOT)) {
 # to main group either! This will force them to go through the approval
 # page first.
 #
-$curmembers_result =
-    DBQueryFatal("select m.uid,m.trust from group_membership as m ".
-		 "left join groups as g on g.pid=m.pid and g.gid=m.gid ".
-		 "where m.pid='$pid' and m.gid='$gid' and ".
-		 "      m.uid!=g.leader and m.trust!='none'");
+$curmembers = $group->MemberList();
 
 #
 # Grab the user list from the project. These are the people who can be
 # added. Do not include people in the above list, obviously! Do not
 # include members that have not been approved to main group either! This
 # will force them to go through the approval page first.
-# 
-$nonmembers_result =
-    DBQueryFatal("select m.uid from group_membership as m ".
-		 "left join group_membership as a on ".
-		 "     a.uid=m.uid and a.pid=m.pid and a.gid='$gid' ".
-		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL ".
-		 "      and m.trust!='none'");
+#
+$nonmembers = $group->NonMemberList();
 
 #
 # We do not allow the actual group info to be edited. Just the membership.
@@ -104,14 +95,14 @@ echo "<br><center>
        <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
       </center>\n";
 
-if (mysql_num_rows($curmembers_result) ||
-    ($grabusers && mysql_num_rows($nonmembers_result))) {
+if (count($curmembers) ||
+    ($grabusers && count($nonmembers))) {
     echo "<br>
           <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
           <table align=center border=1>\n";
 }
 
-if (mysql_num_rows($curmembers_result)) {
+if (count($curmembers)) {
     if ($defaultgroup) {
 	echo "<tr><td align=center colspan=2 nowrap=1>
               <br>
@@ -131,33 +122,30 @@ if (mysql_num_rows($curmembers_result)) {
               </td></tr>\n";
     }
 
-    while ($row = mysql_fetch_array($curmembers_result)) {
-	$user  = $row[0];
-	$trust = $row[1];
-
-	if (! ($target_user = User::Lookup($user))) {
-	    TBERROR("Could not look up user object for $user", 1);
-	}
-	$showurl = CreateURL("showuser", $target_user);
+    foreach ($curmembers as $target_user) {
+	$target_uid = $target_user->uid();
+	$trust      = $target_user->GetTempData();
+	$showurl    = CreateURL("showuser", $target_user);
 
 	if ($defaultgroup) {
 	    echo "<tr>
                      <td>
-                       <input type=hidden name='change_$user' value=permit>
-                          <A href='$showurl'>$user &nbsp</A>
+                       <input type=hidden name='change_$target_uid'
+                               value=permit>
+                          <A href='$showurl'>$target_uid &nbsp</A>
                      </td>\n";
 	}
 	else {
 	    echo "<tr>
                      <td>   
                        <input checked type=checkbox value=permit
-                              name='change_$user'>
-                          <A href='$showurl'>$user &nbsp</A>
+                              name='change_$target_uid'>
+                          <A href='$showurl'>$target_uid &nbsp</A>
                      </td>\n";
 	}
 
 	echo "   <td align=center>
-                    <select name='$user\$\$trust'>\n";
+                    <select name='$target_uid\$\$trust'>\n";
 
 	#
 	# We want to have the current trust value selected in the menu.
@@ -188,9 +176,10 @@ if (mysql_num_rows($curmembers_result)) {
                    </td>\n";
     }
     echo "</tr>\n";
+    reset($curmembers);
 }
 
-if ($grabusers && mysql_num_rows($nonmembers_result)) {
+if ($grabusers && count($nonmembers)) {
     echo "<tr><td align=center colspan=2 nowrap=1>
           <br>
           <font size=+1><b>Add Group Members</b></font>[<b>1</b>].
@@ -198,24 +187,20 @@ if ($grabusers && mysql_num_rows($nonmembers_result)) {
              Select the ones you would like to add.<br>
              Be sure to select the appropriate trust level.
           </td></tr>\n";
-    
-    while ($row = mysql_fetch_array($nonmembers_result)) {
-	$user  = $row[0];
-	$trust = $row[1];
-	
-	if (! ($target_user = User::Lookup($user))) {
-	    TBERROR("Could not look up user object for $user", 1);
-	}
-	$showurl = CreateURL("showuser", $target_user);
+
+    foreach ($nonmembers as $target_user) {
+	$target_uid = $target_user->uid();
+	$trust      = $target_user->GetTempData();
+	$showurl    = CreateURL("showuser", $target_user);
 
 	echo "<tr>
                  <td>
-                   <input type=checkbox value=permit name='add_$user'>
-                      <A href='$showurl'>$user &nbsp</A>
+                   <input type=checkbox value=permit name='add_$target_uid'>
+                      <A href='$showurl'>$target_uid &nbsp</A>
                  </td>\n";
 
 	echo "   <td align=center>
-                   <select name='$user\$\$trust'>\n";
+                   <select name='$target_uid\$\$trust'>\n";
 
 	if ($group->CheckTrustConsistency($target_user,
 					  TBDB_TRUSTSTRING_USER, 0)) {
@@ -239,10 +224,11 @@ if ($grabusers && mysql_num_rows($nonmembers_result)) {
 	    </td>\n";
     }
     echo "</tr>\n";
+    reset($nonmembers);
 }
 
-if (mysql_num_rows($curmembers_result) ||
-    ($grabusers && mysql_num_rows($nonmembers_result))) {
+if (count($curmembers) ||
+    ($grabusers && count($nonmembers))) {
     echo "<tr>
              <td align=center colspan=2>
                  <b><input type=submit value=Submit></b>

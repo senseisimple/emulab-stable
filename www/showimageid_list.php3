@@ -67,11 +67,13 @@ else {
     # permission to use/modify the image/descriptor of course, but that is
     # checked in the pages that do that stuff. In other words, ignore the
     # shared flag in the descriptors.
-    # 
+    #
+    $uid_idx = $this_user->uid_idx();
+    
     $query_result =
 	DBQueryFatal("select distinct i.* from images as i ".
 		     "left join group_membership as g on g.pid=i.pid ".
-		     "where (g.uid='$uid' or i.global) ".
+		     "where (g.uid_idx='$uid_idx' or i.global) ".
 		     "$extraclause ".
 		     "order by $order");
 }

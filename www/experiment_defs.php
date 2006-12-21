@@ -53,7 +53,7 @@ class Experiment
 
 	    $foo = Experiment::LookupByPidEid($pid, $eid);
 
-	    if ($foo->IsValid())
+	    if ($foo && $foo->IsValid())
 		return $foo;
 	}
 	return null;
