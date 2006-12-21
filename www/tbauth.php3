@@ -759,7 +759,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	$failstamp   = $user->weblogin_failstamp();
 	$usr_email   = $user->email();
 	$usr_name    = $user->name();
-	$uid_idx     = $user->unix_uid();
+	$uid_idx     = $user->uid_idx();
 	$usr_email   = $user->email();
 
 	# Check for frozen accounts. We do not update the IP record when
