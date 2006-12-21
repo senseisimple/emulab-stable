@@ -112,7 +112,7 @@ class User
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
-			"where wikiname='$safe_wikiname')");
+			"where wikiname='$safe_wikiname'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
