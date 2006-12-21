@@ -838,7 +838,8 @@ if (! $returning) {
     $args["wikiname"]      = $wikiname;
 
     if (! ($user = User::NewUser($joining_uid,
-				 TBDB_NEWACCOUNT_WIKIONLY, $args))) {
+				 ($forwikionly ? TBDB_NEWACCOUNT_WIKIONLY : 0),
+				 $args))) {
 	TBERROR("Could not create new user '$usr_email'!", 1);
     }
     $joining_uid = $user->uid();
