@@ -187,7 +187,7 @@ function INFORMLEADERS($this_user) {
 }
 
 if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
-    $this_user->SetStatus(TBDB_USERSTATUS_ACTIVE());
+    $this_user->SetStatus(TBDB_USERSTATUS_ACTIVE);
     
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
@@ -207,9 +207,9 @@ if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
 }
 elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
     $newstatus = ($wikionly ?
-		  TBDB_USERSTATUS_ACTIVE() : TBDB_USERSTATUS_UNAPPROVED());
+		  TBDB_USERSTATUS_ACTIVE : TBDB_USERSTATUS_UNAPPROVED);
     
-    $this_user->SetStatus(TBDB_USERSTATUS_UNAPPROVED());
+    $this_user->SetStatus($newstatus);
 
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
