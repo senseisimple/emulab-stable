@@ -502,7 +502,7 @@ class node_list:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "pvhme:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "pPvhHme:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -521,11 +521,17 @@ class node_list:
             elif opt == "-p":
                 which = "phys";
                 pass
+            elif opt == "-P":
+                which = "phystype";
+                pass
             elif opt == "-v":
                 which = "virt";
                 pass
             elif opt == "-h":
                 which = "pphys";
+                pass
+            elif opt == "-H":
+                which = "pphysauxtype";
                 pass
             elif opt == "-m":
                 which = "mapping";
@@ -555,8 +561,14 @@ class node_list:
             elif which == "phys":
                 print val["node"], " ",
                 pass
+            elif which == "phystype":
+                print ("%s=%s") % (val["node"],val["type"]), " ",
+                pass
             elif which == "pphys":
                 print val["pnode"], " ",
+                pass
+            elif which == "pphysauxtype":
+                print "%s=%s"  % (val["pnode"],val["auxtype"]), " ",
                 pass
             elif which == "mapping":
                 print "%s=%s" % (node, val["pnode"]),
@@ -570,8 +582,10 @@ class node_list:
 	print "node_list [options] -e pid,eid";
 	print "where:";
 	print "     -p   - Print physical (Emulab database) names (default)";
+	print "     -P   - Like -p, but include node type";
 	print "     -v   - Print virtual (experiment assigned) names";
 	print "     -h   - Print physical name of host for virtual nodes";
+	print "     -H   - Like -h, but include node auxtypes";
  	print "     -e   - Project and Experiment ID to list";
         wrapperoptions();
         return
