@@ -27,21 +27,23 @@ my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 my $DBNAME  = "pelab";
 my $DBUSER  = "pelab";
 my $NLIST = "/usr/testbed/bin/node_list";
-my $pprefix = "node-";
+my $pprefix = "plab";
 #
 # Turn off line buffering on output
 #
 $| = 1;
 sub usage {
-        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] <numNodes>\n";
+        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type] <numNodes>\n";
         return 1;
 }
 my ($pid, $eid);
 my $blacklistfilename;
+my $type = "";
 my %opt = ();
-getopts("e:f:", \%opt);
+getopts("e:f:t:", \%opt);
 if ($opt{e}) { ($pid,$eid) = split('/', $opt{e}); }
 if ($opt{f}) { $blacklistfilename = $opt{f}; }
+if ($opt{t}) { $type = $opt{t}; }
 if (@ARGV !=1) { exit &usage; }
 my $numnodes = $ARGV[0];
 my @allnodes = ();      #nodes to consider, in order of desirablility (?)
@@ -111,12 +113,17 @@ sub isFullyConn($);
 if( defined($pid) && defined($eid) ){
 #    print "reading $pid/$eid nodes\n";
     #add exp nodes to a hash
-    my @expnodelist = split('\s+', `$NLIST -m -e $pid,$eid`);
+    my @expnodelist = split('\s+', `$NLIST -H -e $pid,$eid`);
     chomp(@expnodelist);
-    foreach my $mapping (@expnodelist) {
-        if ($mapping =~ /^(${pprefix}[\d]+)=([\w]*)$/) {
-            my $vnode = $1;
-            my $pnode = $2;
+    foreach my $node (@expnodelist) {
+        if ($node =~ /^(${pprefix}\d+)=([\w,]*)$/) {
+            my $pnode = $1;
+            my $types = $2;
+            my @types = split(/,/,$types);
+            if ($type && ! grep(/^$type$/,@types)) {
+                #print "Skipping $pnode ($type,$types)\n";
+                next;
+            }
 #            print "$vnode ($pnode)\n";
             $expnodes{$pnode} = 1;  #set this node
         }
