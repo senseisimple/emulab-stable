@@ -15,6 +15,10 @@
 
 # Stash the desired URL's, indexed by their output order.
 {
+    # Change proj, group, user, exp ids to leave activation objs alone.
+    $0 = gensub("(test(proj|group|use?r|exp))[12]?", "\\13", "g", $0);
+    $0 = gensub("(pid\\]?=)testbed", "\\1testproj3", "g", $0);
+
     # Remove suffix after php filename first, then path prefix.
     fn = gensub(".*/", "", 1, gensub("(php3*).*", "\\1", 1, $0));
     if ( o = order[fn] ) urls[o] = $0;

@@ -1,0 +1,9 @@
+post:https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?confirmed=Confirm&eid=testexp3&inout=out&pid=testproj3
+post:https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?confirmed=Confirm&target_uid=testuser3&target_pid=testproj3
+post:https://myboss.vulnelab.testbed.emulab.net/deletegroup.php3?confirmed=Confirm&gid=testgroup3&pid=testproj3
+post:https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?confirmed=Confirm&imageid=testbed-testimg
+post:https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?confirmed=Confirm&osid=emulab-ops-RHL90-STD
+post:https://myboss.vulnelab.testbed.emulab.net/endexp.php3?confirmed=Confirm&exp_pideid=&eid=testexp3&pid=testproj3
+post:https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?confirmed=Confirm&key=1&target_uid=fish
+post:https://myboss.vulnelab.testbed.emulab.net/freenode.php3?confirmed=Confirm&node_id=ops
+post:https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?confirmed=Confirm&target_uid=testuser3&action=freeze

@@ -10,6 +10,7 @@ was <b>granted</b> membership
 Starting experiment configuration
 You will be notified via email
 Attempting to reboot
+Successful
 Snapshot Node Disk into Existing Image Descriptor
 Knowledge Base Entry:
 Your new SSL certificate has been created
@@ -17,3 +18,11 @@ Log for node
 Commit/Tag Archive
 has been deleted
 let's be sure
+Are you REALLY REALLY sure
+Your NS file looks good
+This template is for creating
+To finish creating your slice
+public keys for user
+Knowledge Base search results
+Click to visit archive
+Done!

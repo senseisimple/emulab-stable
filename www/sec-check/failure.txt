@@ -1,6 +1,6 @@
 Invalid form arguments
 Invalid page arguments
-Invalid node name
+Invalid node
 No tags
 Could not continue
 You are not authorized
@@ -21,8 +21,16 @@ You cannot modify
 You are already a member
 You must provide
 No tags for experiment
-The following images are using this OS Descriptor
+The following images are using
 There must be a unique mapping
 Page Error
 cannot freeze someone
 not active
+At least one node must be selected
+No Matches
+Please try again
+You are still logged in
+Please log out first
+You do not appear to be logged in
+Please log in again
+You cannot modify an experiment in transition

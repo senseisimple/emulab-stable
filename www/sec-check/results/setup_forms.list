@@ -1,10 +1,14 @@
+login.php3
 newproject.php3
-joinproject.php3
 approveproject_form.php3
-newgroup_form.php3
+joinproject.php3
 approveuser.php3
 beginexp_html.php3
+modifyexp.php3
+editexp.php3
+newgroup_form.php3
 newgroup.php3
+editgroup.php3
 newimageid_ez.php3
 newmmlist.php3
 newosid.php3

@@ -93,7 +93,7 @@ sec-check/README-howto.txt - Documentation outline.
          gmake input_msg
      - But only 78 of the unique field names are text fields.
 
- - "normal" test cases
+ - "normal operation" test cases
    . Convert the list to test cases submitting input field values.
        gmake gen_normal
          Creates: site_normal.urls, normal_cases.xml
@@ -102,10 +102,10 @@ sec-check/README-howto.txt - Documentation outline.
          Creates: normal_output.xml
 
  - Probe the checking code of all input fields for SQL injection holes
-   . Generate WebInject cases with SQL injection probes in individual fields.
+   . Generate test cases with SQL injection probes in individual fields.
      Probe strings include form and field names that caused the hole.
    . Successfully caught cases should produce "invalid input" warnings.
-   . Potential penetrations will log SQL errors with the form/field name.
+   . Potential penetrations will log DBQuery errors with the form/field names.
 
  - Plug all of the holes by adding or fixing input validation logic.
    . Re-run probes to check.

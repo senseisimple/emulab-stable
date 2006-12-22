@@ -1,28 +1,23 @@
-https://myboss.vulnelab.testbed.emulab.net/kb-search.php3?submit=Submit Query&query=
-post:https://myboss.vulnelab.testbed.emulab.net/login.php3?password=EinE_tmp&uid=testuser
-https://myboss.vulnelab.testbed.emulab.net/archive_tag.php3?exptidx=1
-https://myboss.vulnelab.testbed.emulab.net/archive_tags.php3?exptidx=1
-https://myboss.vulnelab.testbed.emulab.net/archive_missing.php3?exptidx=1
-post:https://myboss.vulnelab.testbed.emulab.net/boot.php3?confirmed=Confirm&node_id=pc4
-post:https://myboss.vulnelab.testbed.emulab.net/editexp.php3?formfields[mem_usage]=0&formfields[batchmode]=1&formfields[idleswap_timeout]=4&submit=Submit&formfields[autoswap]=1&formfields[autoswap_timeout]=10&formfields[noidleswap_reason]=Testing.&eid=hwdown&formfields[cpu_usage]=3&formfields[idleswap]=0&formfields[linktest_level]=0&formfields[description]=Descriptive text.&pid=emulab-ops
-post:https://myboss.vulnelab.testbed.emulab.net/editgroup.php3?testuser$$trust=local_root&add_testuser=permit&gid=testgroup&pid=testproj
-post:https://myboss.vulnelab.testbed.emulab.net/editimageid.php3?formfields[path]=/proj/testbed/images/FBSD-RON.ndz&formfields[mtype_pc850]=Yep&submit=Submit&imageid=emulab-ops-FBSD-RON&formfields[description]=Descriptive text.
-https://myboss.vulnelab.testbed.emulab.net/feedback.php3?mode=clear&confirmed=Confirm&clear_last=1&eid=testexp1&clear_bootstrap=1&pid=testproj
+https://myboss.vulnelab.testbed.emulab.net/kb-search.php3?query_type=and&submit=Submit Query&query_which=both&query=what
+https://myboss.vulnelab.testbed.emulab.net/archive_tag.php3?exptidx=7
+https://myboss.vulnelab.testbed.emulab.net/archive_tags.php3?exptidx=7
+https://myboss.vulnelab.testbed.emulab.net/archive_missing.php3?exptidx=7
+post:https://myboss.vulnelab.testbed.emulab.net/boot.php3?confirmed=Confirm&node_id=pc32
+post:https://myboss.vulnelab.testbed.emulab.net/editimageid.php3?formfields[path]=/proj/testbed/images/testimg.ndz&formfields[mtype_pc850]=Yep&submit=Submit&imageid=emulab-ops-FBSD-RON&formfields[description]=Descriptive text.
+https://myboss.vulnelab.testbed.emulab.net/feedback.php3?mode=clear&confirmed=Confirm&clear_last=1&eid=testexp1&clear_bootstrap=1&pid=testbed
 post:https://myboss.vulnelab.testbed.emulab.net/gensslcert.php3?formfields[passphrase1]=EinE_tmp&submit=Create SSL Cert&formfields[passphrase2]=EinE_tmp&formfields[target_uid]=testuser
 post:https://myboss.vulnelab.testbed.emulab.net/kb-manage.php3?formfields[xref_tag]=test_tag&formfields[title]=Test title.&submit=Submit&formfields[section]=none&formfields[body]=Test body.&formfields[faq_entry]=0&formfields[new_section]=test_section
-post:https://myboss.vulnelab.testbed.emulab.net/loadimage.php3?node=pc4&submit=Go!&imageid=emulab-ops-RHL90-STD
-post:https://myboss.vulnelab.testbed.emulab.net/modifyexp.php3?nsdata=&MAX_FILE_SIZE=1024&go=1&formfields[exp_localnsfile]=/users/fish/shaped-2-nodes.ns&eid=testexp1&pid=testbed
+post:https://myboss.vulnelab.testbed.emulab.net/loadimage.php3?node=pc32&submit=Go!&imageid=testbed-testimg
 post:https://myboss.vulnelab.testbed.emulab.net/moduserinfo.php3?formfields[usr_country]=USA&formfields[user_interface]=plab&formfields[usr_city]=Salt Lake Silly&formfields[usr_affil]=Emulab Scripts&formfields[usr_state]=UT&formfields[usr_URL]=http://www.emulab.net&formfields[usr_name]=Test User&submit=Submit&formfields[usr_addr]=Silly&formfields[target_uid]=testuser&formfields[notes]=&formfields[password1]=EinE_tmp&formfields[usr_email]=fish@flux.utah.edu&formfields[password2]=EinE_tmp&formfields[usr_phone]=801-123-4567&formfields[w_password1]=;lkjasdf&formfields[usr_zip]=12345&formfields[w_password2]=&formfields[usr_shell]=sh&formfields[usr_addr2]=Address&formfields[usr_title]=Tester
-post:https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?log_type=misc&log_entry=Test log entry.&node_id=pc4
+post:https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?log_type=misc&log_entry=Test log entry.&node_id=pc32
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber=
-post:https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?rpms=&def_boot_osid=CONSUME&startupcmd=&node_type=cisco6509&tarballs=&refer=&def_boot_cmd_line=&node_id=pc4
+post:https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?rpms=&def_boot_osid=CONSUME&startupcmd=&node_type=cisco6509&tarballs=&refer=&def_boot_cmd_line=&node_id=pc32
 post:https://myboss.vulnelab.testbed.emulab.net/nscheck.php3?MAX_FILE_SIZE=1024&formfields[exp_localnsfile]=/users/fish/shaped-2-nodes.ns
 https://myboss.vulnelab.testbed.emulab.net/nsgen.php3?template=plabdevbox&templatevalues[ImageName]=PLAB-DEVBOX&templatevalues[NodeName]=devbox&templatevalues[HWType]=pc
 https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[count]=10&formfields[when]=52&submit=Create it&formfields[type]=pcplab&formfields[canfail]=Yep&formfields[units]=168&formfields[resusage]=3
-https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc4&poweron=Yep&confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc32&poweron=Yep&confirmed=Confirm
 post:https://myboss.vulnelab.testbed.emulab.net/showpubkeys.php3?MAX_FILE_SIZE=1024&formfields[target_uid]=testuser&formfields[usr_key]=
 post:https://myboss.vulnelab.testbed.emulab.net/showsfskeys.php3?formfields[target_uid]=testuser&formfields[usr_key]=
 https://myboss.vulnelab.testbed.emulab.net/showsumstats.php3?sortby=pdays&range=mm/dd/yy-mm/dd/yy&showby=users
 post:https://myboss.vulnelab.testbed.emulab.net/showuser_list.php3?sortby=uid&searchfor=&showtype=loggedin
-post:https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?confirmed=Confirm&eid=testexp1&inout=in&pid=testbed
-post:https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?confirmed=Confirm&eid=opsnodes&nodeid=pc4&pid=emulab-ops
+post:https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?confirmed=Confirm&eid=testexp1&nodeid=pc32&pid=testbed

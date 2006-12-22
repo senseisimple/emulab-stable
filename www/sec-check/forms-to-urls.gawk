@@ -86,10 +86,12 @@ form && /^<input/ {		# <input type="..." name="..." value=... ...>
     else if ( $0 ~ " value='" )
 	value = gensub(".* value='([^']*)'.*", "\\1", 1);
     else value = "";
-    ##printf "type %s, name %s, value %s\n", type, name, value;
+    checked = $0 ~ "\\<checked\\>";
+    ##printf "type %s, name %s, value %s, checked %s\n", type, name, value, checked;
 
     val_arg = (type=="text" || type=="textarea" || type=="password" || 
-	       type=="hidden" || type=="checkbox" || type=="select");
+	       type=="hidden" || type=="checkbox" || type=="select" ||
+	       type=="radio" && checked);
     # Follow just the positive submit controls, not cancel, etc.
     sub_arg = (type=="submit" && 
 	       (value ~ "Submit" || value ~ "Create" || 

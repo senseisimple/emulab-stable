@@ -16,6 +16,8 @@ all: $(all_tasks)
 msgs: $(msgs_tasks)
 
 SRCDIR		= @srcdir@
+RESDIR		= $(SRCDIR)/results
+
 TESTBED_SRCDIR	= @top_srcdir@
 
 OBJDIR		= ../..
@@ -32,9 +34,9 @@ OURDOMAIN       = @OURDOMAIN@
 src_forms: src_list src_msg
 
 # All of the forms lines.
-SRC_FORMS	= $(SRCDIR)/src_forms.list
+SRC_FORMS	= $(RESDIR)/src_forms.list
 # Just the files list.
-SRC_FILES	= $(SRCDIR)/src_files.list
+SRC_FILES	= $(RESDIR)/src_files.list
 src_list: $(SRC_FORMS) $(SRC_FILES)
 $(SRC_FORMS):
 	# Ignore any Emacs backup files with tilde's in the filenames.
@@ -89,7 +91,7 @@ login_user = wget -S -dv $(cookie_args) $(sv_cookies) \
 	--post-data "uid=$(1)&password=$(2)&login=Login" \
 	$(sroot)/login.php3
 login_sys := $(call login_user,$(uid),$(pswd))
-login:
+login: logout
 	$(login_sys)
 
 # Log in above, then use this to toggle the admin bit on.
@@ -266,10 +268,10 @@ exp_common =  $(call fmt_html_args,\
 	    formfields[exp_localnsfile]=/users/$(USER)/shaped-2-nodes.ns\
 	    formfields[exp_swappable]=1\
 	    formfields[exp_noswap_reason]=\
-	    formfields[exp_idleswap]=1\
+	    formfields[exp_idleswap]=0\
 	    formfields[exp_idleswap_timeout]=4\
-	    formfields[exp_noidleswap_reason]=\
-	    formfields[exp_autoswap]=1\
+	    formfields[exp_noidleswap_reason]=Because\
+	    formfields[exp_autoswap]=0\
 	    formfields[exp_autoswap_timeout]=16\
 	    formfields[exp_linktest]=3)
 exp1 = testexp1
@@ -287,6 +289,8 @@ new_exp2:
 	    -p $(EinE_proj) -e $(exp2) shaped-2-nodes.ns'
 
 # Modify an experiment (first time creates an archive.)
+### XXX This fails at first: "You cannot modify an experiment in transition."
+### XXX Try again.  Gotta figure out how to wait until it's done with the swapin.
 mod_exp2:
 	$(call wget_post,,modifyexp.php3,modexp2.html,\
 	    pid=$(EinE_proj) eid=$(exp2) go=1\
@@ -355,8 +359,8 @@ admin.wget/admin.log:
 	du -s admin.wget
 
 # Extract a list of the active forms in the site.
-SITE_FORMS	= $(SRCDIR)/site_forms.list
-SITE_FILES	= $(SRCDIR)/site_files.list
+SITE_FORMS	= $(RESDIR)/site_forms.list
+SITE_FILES	= $(RESDIR)/site_files.list
 site_list: $(SITE_FORMS) $(SITE_FILES)
 
 # Ignore flyspray and Twiki for now.
@@ -370,16 +374,16 @@ FORMS_CMD = find . \( -name distributions -prune \) \
 # Kill suffix after filename first: .../archive_view.php3/9/trunk?exptidx=9
 FILES_CMD = sed -e 's|\(php3*\).*|\1|' -e 's|^[^:]*/||' 
 
-PUBLIC_FORMS	= $(SRCDIR)/public_forms.list
-PUBLIC_FILES	= $(SRCDIR)/public_files.list
+PUBLIC_FORMS	= $(RESDIR)/public_forms.list
+PUBLIC_FILES	= $(RESDIR)/public_files.list
 public_list: $(PUBLIC_FORMS) $(PUBLIC_FILES)
 $(PUBLIC_FORMS): public.wget/public.log
 	(cd public.wget; $(FORMS_CMD) > $(PUBLIC_FORMS)
 $(PUBLIC_FILES): $(PUBLIC_FORMS)
 	$(FILES_CMD) $(PUBLIC_FORMS) | uniq > $(PUBLIC_FILES)
 
-ADMIN_FORMS	= $(SRCDIR)/admin_forms.list
-ADMIN_FILES	= $(SRCDIR)/admin_files.list
+ADMIN_FORMS	= $(RESDIR)/admin_forms.list
+ADMIN_FILES	= $(RESDIR)/admin_files.list
 admin_list: $(ADMIN_FORMS) $(ADMIN_FILES)
 $(ADMIN_FORMS): admin.wget/admin.log
 	(cd admin.wget; $(FORMS_CMD) > $(ADMIN_FORMS)
@@ -406,7 +410,7 @@ site_msg: site_list public_list admin_list
 .PHONY:         files_missing forms_msg
 forms_coverage: files_missing forms_msg
 
-FILES_MISSING = $(SRCDIR)/files_missing.list
+FILES_MISSING = $(RESDIR)/files_missing.list
 files_missing: $(FILES_MISSING)
 $(FILES_MISSING): $(SRC_FILES) $(SITE_FILES)
 	diff $(SRC_FILES) $(SITE_FILES) | grep '^[<>]' > $(FILES_MISSING)
@@ -423,11 +427,11 @@ forms_msg: files_missing src_msg site_msg
 .PHONY:         input_list input_msg
 input_coverage: input_list input_msg
 
-SITE_INPUTS     = $(SRCDIR)/site_inputs.list
-INPUT_NAMES	= $(SRCDIR)/input_names.list
+SITE_INPUTS     = $(RESDIR)/site_inputs.list
+INPUT_NAMES	= $(RESDIR)/input_names.list
 input_list: $(SITE_INPUTS) $(INPUT_NAMES)
-PUBLIC_INPUTS   = $(SRCDIR)/public_inputs.list
-ADMIN_INPUTS    = $(SRCDIR)/admin_inputs.list
+PUBLIC_INPUTS   = $(RESDIR)/public_inputs.list
+ADMIN_INPUTS    = $(RESDIR)/admin_inputs.list
 $(SITE_INPUTS): $(PUBLIC_INPUTS) $(ADMIN_INPUTS)
 	cat $(PUBLIC_INPUTS) $(ADMIN_INPUTS) > $(SITE_INPUTS)
 
@@ -435,8 +439,8 @@ $(SITE_INPUTS): $(PUBLIC_INPUTS) $(ADMIN_INPUTS)
 # Output sections terminated by a blank line contain: filename, <form, <input* .
 # Canonicalize and reorder: <input type="..." name="..." value=... ...>
 # INPUTS_CMD is parameterized by dir:={public,admin}
-DIR_FORMS 	= $(SRCDIR)/$(dir)_forms.list
-DIR_INPUTS	= $(SRCDIR)/$(dir)_inputs.list
+DIR_FORMS 	= $(RESDIR)/$(dir)_forms.list
+DIR_INPUTS	= $(RESDIR)/$(dir)_inputs.list
 # This awk command gets a long list of forms file names on the command line.
 INPUTS_CMD = @echo "form-inputs from $(dir)_forms.list files to $(dir)_inputs.list"; \
 	(cd $(dir).wget && gawk -f ../$(SRCDIR)/form-input.gawk \
@@ -451,9 +455,9 @@ ADMIN_INPUTS_CMD := $(INPUTS_CMD)
 $(ADMIN_INPUTS): $(ADMIN_FORMS) $(SRCDIR)/form-input.gawk
 	$(ADMIN_INPUTS_CMD)
 
-# Get unique input field names: text, textarea, hidden, checkbox, and select.
+# Get unique input field names: text(area), hidden, checkbox, select, radio/checked.
 $(INPUT_NAMES): $(SITE_INPUTS)
-	awk '/type="text/ || /type="hidden"/ || /type="checkbox"/ || /type="select"/ \
+	gawk '/type="(text|hidden|checkbox|select)/ || /\<checked\>/ \
 	    {print $$3}' $(SITE_INPUTS) | sort -u > $(INPUT_NAMES)
 
 input_msg: input_list
@@ -461,7 +465,7 @@ input_msg: input_list
 	      "`wc -l < $(INPUT_NAMES)` unique.  **" | tr -s " "
 
 # Copy input_names.list to input_values.list at first, 
-# then Edit default values onto the lines for auto-form-fill-in.
+# then edit default values onto the lines for auto-form-fill-in.
 INPUT_VALUES	= $(SRCDIR)/input_values.list
 
 #================================================================
@@ -477,28 +481,28 @@ run_tasks = run_setup run_normal run_teardown
 gen_all: $(gen_tasks)
 run_all: $(run_tasks)
 
-NORMAL_URLS	= $(SRCDIR)/site_normal.urls
-NORMAL_WGET	= $(SRCDIR)/normal_cases.wget
-NORMAL_CASES	= $(SRCDIR)/normal_cases.xml
+NORMAL_URLS	= $(RESDIR)/site_normal.urls
+NORMAL_WGET	= $(RESDIR)/normal_cases.wget
+NORMAL_CASES	= $(RESDIR)/normal_cases.xml
 gen_normal: $(NORMAL_URLS) $(NORMAL_WGET) ###$(NORMAL_CASES)
 
 # Separate out the setup and teardown URL's.
 sep_cmd		= gawk -f $(SRCDIR)/sep-urls.gawk
-SETUP_URLS	= $(SRCDIR)/site_setup.urls
-SETUP_FORMS	= $(SRCDIR)/setup_forms.list
-SETUP_WGET	= $(SRCDIR)/setup_cases.wget
-SETUP_CASES	= $(SRCDIR)/setup_cases.xml
+SETUP_URLS	= $(RESDIR)/site_setup.urls
+SETUP_FORMS	= $(RESDIR)/setup_forms.list
+SETUP_WGET	= $(RESDIR)/setup_cases.wget
+SETUP_CASES	= $(RESDIR)/setup_cases.xml
 gen_setup: $(SETUP_URLS) $(SETUP_WGET) ###$(SETUP_CASES)
 
-TEARDOWN_URLS	= $(SRCDIR)/site_teardown.urls
-TEARDOWN_FORMS	= $(SRCDIR)/teardown_forms.list
-TEARDOWN_WGET	= $(SRCDIR)/teardown_cases.wget
-TEARDOWN_CASES	= $(SRCDIR)/teardown_cases.xml
+TEARDOWN_URLS	= $(RESDIR)/site_teardown.urls
+TEARDOWN_FORMS	= $(RESDIR)/teardown_forms.list
+TEARDOWN_WGET	= $(RESDIR)/teardown_cases.wget
+TEARDOWN_CASES	= $(RESDIR)/teardown_cases.xml
 gen_teardown: $(TEARDOWN_URLS) $(TEARDOWN_WGET) ###$(TEARDOWN_CASES)
 
 $(NORMAL_URLS) $(SETUP_URLS) $(TEARDOWN_URLS): \
   $(SITE_INPUTS) $(INPUT_NAMES) $(INPUT_VALUES) $(SRCDIR)/forms-to-urls.gawk \
-  $(SRCDIR)/sep-urls.gawk $(SRCDIR)/setup_forms.list $(SRCDIR)/teardown_forms.list
+  $(SRCDIR)/sep-urls.gawk $(SETUP_FORMS) $(TEARDOWN_FORMS)
 	gawk -f $(SRCDIR)/forms-to-urls.gawk -v VALUES=$(INPUT_VALUES) \
             $(SITE_INPUTS) > tmp_urls
 	fgrep -v -f $(SETUP_FORMS) tmp_urls | \
@@ -537,10 +541,10 @@ analyze:
 	@$(call analyze_hdr,failure)
 	-$(call analyze_cmd,failure.txt)
 	@$(call analyze_hdr,UNKNOWN)
-	@sed -n 's/:.*//' $(analyze_output) > recognized_output.files
+	@sed -n 's/:.*//p' $(analyze_output) > recognized_output.files
 	ls *.html | fgrep -v -f recognized_output.files $(tee)
 
-NORMAL_OUTPUT	= $(SRCDIR)/normal_output.xml
+NORMAL_OUTPUT	= $(RESDIR)/normal_output.xml
 run_webinject: $(NORMAL_OUTPUT)
 $(NORMAL_OUTPUT): $(NORMAL_CASES)
 	(cd $(SRCDIR)/webinject;
@@ -554,8 +558,8 @@ probe:  gen_probes run_probes
 
 # Generate WebInject cases with SQL injection probes in individual fields.
 # Probe strings include form and field names that caused the hole.
-PROBE_URLS	= $(SRCDIR)/site_probe.urls
-PROBE_CASES	= $(SRCDIR)/probe_cases.xml
+PROBE_URLS	= $(RESDIR)/site_probe.urls
+PROBE_CASES	= $(RESDIR)/probe_cases.xml
 gen_probes: $(PROBE_CASES)
 $(PROBE_URLS): $(SITE_INPUTS) $(INPUT_VALUES)
         gawk -f $(SRCDIR)/forms-to-urls -v PROBE=1 -v VALUES=$(INPUT_VALUES) \
@@ -566,7 +570,7 @@ $(PROBE_CASES): $(PROBE_URLS)
 # Run the probes through webinject.
 # Successfully caught cases should produce "invalid input" warnings.
 # Potential penetrations will log SQL errors with the form/field name.
-PROBE_OUTPUT	= $(SRCDIR)/probe_output.xml
+PROBE_OUTPUT	= $(RESDIR)/probe_output.xml
 run_probes: $(PROBE_OUTPUT)
 $(PROBE_OUTPUT): $(PROBE_CASES)
 	(cd $(SRCDIR)/webinject;
