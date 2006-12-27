@@ -242,17 +242,17 @@ if ($isadmin) {
 
     if ($userstatus == TBDB_USERSTATUS_UNAPPROVED) {
 	WRITESUBMENUBUTTON("Change UID",
-			   CreateURL("changeuid", $this_user));
+			   CreateURL("changeuid", $target_user));
     }
 
     if (! strcmp($userstatus, TBDB_USERSTATUS_NEWUSER) ||
 	! strcmp($userstatus, TBDB_USERSTATUS_UNVERIFIED)) {
 	WRITESUBMENUBUTTON("Resend Verification Key",
-			   CreateURL("resendkey", $this_user));
+			   CreateURL("resendkey", $target_user));
     }
     else {
 	WRITESUBMENUBUTTON("Send Test Email Message",
-			   CreateURL("sendtestmsg", $this_user));
+			   CreateURL("sendtestmsg", $target_user));
     }
 }
 SUBMENUEND();
