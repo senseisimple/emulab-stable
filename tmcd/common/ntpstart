@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -55,6 +55,14 @@ my @tmccresults;
 # Since this is a wrapper, we have to try to start ntp no matter what.
 #
 sub ntpstart () {
+    #
+    # XXX FreeBSD 7 prepends "-c <configfile>" to the arguments
+    # which in our case means before the command name!
+    #
+    if ($ARGV[0] eq "-c") {
+	shift @ARGV;
+	shift @ARGV;
+    }
     if ($debug) {
 	print "@ARGV\n";
 	return 0;
@@ -225,4 +233,3 @@ sub fatal($)
 	         "    $msg\n";
     exit(ntpstart());
 }
-

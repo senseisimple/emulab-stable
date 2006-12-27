@@ -1,0 +1,94 @@
+#
+# Emulab version of netif to DHCP on all interfaces simultaneously.
+# Runs before the standard netif, and effectively neuters that script.
+# Note the dependencies below.  Every script that declares that it must run
+# BEFORE netif is listed as a REQUIRE here so that we are properly ordered
+# w.r.t. those scripts.
+#
+
+# PROVIDE: netif-emulab
+# REQUIRE: atm1 ipfilter mountcritlocal pccard serial sppp sysctl
+# REQUIRE: adjkerntz hostname ipfs ipnat kldxref random
+# BEFORE: netif
+# KEYWORD: nojail
+
+. /etc/rc.subr
+. /etc/network.subr
+
+name="netif-emulab"
+start_cmd="cnet_start"
+stop_cmd="cnet_stop"
+_cmdifn=
+
+# this is a separate function so we can redirect all the output below
+cnet_dhcp()
+{
+	#
+	# Argh! FreeBSD >= 6 has rewritten dhclient and it no longer takes
+	# the -i option.  So we remove that option here.
+	#
+	dhclient_flags=`echo $dhclient_flags | sed -e 's/-i [0-9][0-9]*//'`
+
+	#
+	# Argh V2! FreeBSD >= 6 dhclient also allows only a single interface
+	# to be specified.  I tried to make this work by launching multiple,
+	# simultaneous dhclients, but that caused EEPROM read failures on
+	# em devices.  So we will use the "pure" port version if it is
+	# installed.
+	#
+	if [ -x /usr/local/sbin/dhclient ]; then
+	    echo "Using dhclient port..."
+	    dhclient_program="/usr/local/sbin/dhclient"
+	    ${dhclient_program} ${dhclient_flags} $*
+	else
+	    echo "Using default dhclient..."
+	    for _if in $*; do
+		${dhclient_program} ${dhclient_flags} -b $_if
+	    done
+	    wait
+	fi
+}
+
+cnet_start()
+{
+	rm -f @CLIENT_VARDIR@/boot/controlif
+
+	#
+	# Find all the relevant networks IFs.
+	# Don't do loopback, funky tunnel devices
+	# (e.g., IP-over-string-and-cans).
+	#
+	# At Utah Emulab we also exclude wireless interfaces as our
+	# wireless machines are in a production ether and might get
+	# an answer!
+	#
+	_ifs=""
+	network_interfaces=`ifconfig -l | sed -e 's/lo0//'`
+	for _if in $network_interfaces; do
+	case $_if in
+	lo*|gif*|faith*|tun*|plip*)
+		;;
+	ath*)
+		;;
+	*)
+		_ifs="$_ifs $_if"
+		;;
+	esac
+	done
+
+	echo "Emulab looking for control net among: $_ifs ..."
+	cnet_dhcp $_ifs >@CLIENT_VARDIR@/logs/netif-emulab.log 2>&1
+	if [ -e @CLIENT_VARDIR@/boot/controlif ]; then
+		echo "Emulab control net is `cat @CLIENT_VARDIR@/boot/controlif`"
+	else
+		echo "*** No Emulab control net found!"
+	fi
+}
+
+cnet_stop()
+{
+	rm -f @CLIENT_VARDIR@/boot/controlif
+}
+
+load_rc_config $name
+run_rc_command $*

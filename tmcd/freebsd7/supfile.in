@@ -1,0 +1,4 @@
+#
+# Bump as needed.
+#
+FBSD70-STD base=@CLIENT_VARDIR@ prefix=/ preserve release=20061221
