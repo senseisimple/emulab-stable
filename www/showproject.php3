@@ -69,6 +69,8 @@ if ($isadmin) {
     WRITESUBMENUDIVIDER();
     WRITESUBMENUBUTTON("Delete this project",
 		       "deleteproject.php3?pid=$pid");
+    WRITESUBMENUBUTTON("Resend Approval Message",
+		       "resendapproval.php?pid=$pid");
 }
 
 SUBMENUEND();
