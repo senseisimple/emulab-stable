@@ -2814,9 +2814,13 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
     $site		= $row[site];
 
     if (! ($user = User::Lookup($contact_uid))) {
-	TBERROR("Error getting object for user $contact_uid", 1);
+	# This is not an error since the field is set to "nobody" when
+	# there is no contact info. Why is that?
+	$showuser_url = CreateURL("showuser", URLARG_UID, $contact_uid);
     }
-    $showuser_url = CreateURL("showuser", $user);
+    else {
+	$showuser_url = CreateURL("showuser", $user);
+    }
 
     if (! $embedded) {
 	echo "<table border=2 cellpadding=0 cellspacing=2
