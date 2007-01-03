@@ -468,7 +468,7 @@ int main(int argc, char *argv[])
 		{
 			n = recvfrom(sd, msg, MAX_MSG, readFlags,
 			(struct sockaddr *) &echoServAddr, &echoLen);
-			if(n == EWOULDBLOCK)
+			if(n == -1 && errno == EWOULDBLOCK)
 			{
 				printf("Going to block in recvmsg\n");
 				exit(1);
