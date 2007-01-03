@@ -1,0 +1,5 @@
+EXECUTABLE=UdpServer
+
+
+${EXECUTABLE}: UdpServer.cc
+	g++ -o $@ UdpServer.cc -lpcap
