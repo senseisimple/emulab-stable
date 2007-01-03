@@ -91,7 +91,7 @@ void PacketSensor::localSend(PacketInfo * packet)
   }
   /*
    * Check for window scaling, which is not supported yet by this code. This
-   * option is only legal on SACK packets. If we decide to support window
+   * option is only legal on SYN packets. If we decide to support window
    * scaling in the future, it might be better to move it to some other sensor
    */
   if (packet->tcp->syn) {
