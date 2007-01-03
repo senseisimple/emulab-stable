@@ -211,7 +211,7 @@ if (getpwuid($UID) eq "nobody") {
     $this_user = $target_user;
 }
 else {
-    $this_user = User->Lookup($UID);
+    $this_user = User->LookupByUnixId($UID);
 
     if (! defined($this_user)) {
 	fatal("You ($UID) do not exist!");
