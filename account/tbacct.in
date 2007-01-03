@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -24,7 +24,7 @@ use Getopt::Std;
 sub usage()
 {
     print("Usage: tbacct [-f] [-b] ".
-	  "<add|del|mod|passwd|wpasswd|freeze|thaw> <user>\n");
+	  "<add|del|mod|passwd|wpasswd|email|freeze|thaw> <user> [args]\n");
     exit(-1);
 }
 my $optlist = "fb";
@@ -37,6 +37,7 @@ my $batch   = 0;
 my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
@@ -121,6 +122,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
 #
 # Function prototypes
@@ -132,6 +134,7 @@ sub UpdateWindowsPassword();
 sub UpdateUser(;$);
 sub FreezeUser();
 sub ThawUser();
+sub UpdateEmail();
 sub CheckDotFiles();
 sub GenerateSFSKey();
 sub fatal($);
@@ -152,11 +155,11 @@ if (defined($options{"f"})) {
 if (defined($options{"b"})) {
     $batch = 1;
 }
-if (@ARGV != 2) {
+if (@ARGV < 2) {
     usage();
 }
-my $cmd  = $ARGV[0];
-my $user = $ARGV[1];
+my $cmd  = shift(@ARGV);
+my $user = shift(@ARGV);
 
 #
 # Untaint the arguments.
@@ -167,7 +170,7 @@ if ($user =~ /^([-\w]+)$/i) {
 else {
     die("Tainted argument: $user\n");
 }
-if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw)$/) {
+if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw|email)$/) {
     $cmd = $1;
 }
 else {
@@ -177,6 +180,18 @@ else {
 # Only admins can use force mode.
 if ($force && ! TBAdmin($UID)) {
     fatal("Only admins can use force mode!");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+
+# Map invoking user to object.
+my $this_user = User->Lookup($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
 #
@@ -192,27 +207,16 @@ if (AuditStart(0)) {
 #
 # Get the user info (the user being operated on).
 #
-$query_result =
-    DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin, ".
-		 " u.usr_w_pswd,u.wikionly ".
-		 "from users as u ".
-		 "where u.uid='$user'");
-
-if ($query_result->numrows == 0) {
-    fatal("$user is not in the DB. This is bad.\n");
-}
-@row            = $query_result->fetchrow_array();
-my $pswd        = $row[0];
-my $user_number = $row[1];
-my $fullname    = $row[2];
-my $user_email  = $row[3];
-my $status      = $row[4];
-my $webonly     = $row[5];
-my $usr_shell   = $row[6];
-my $usr_admin   = $row[7];
-my $wpswd       = $row[8];
-my $wikionly    = $row[9];
+my $pswd        = $target_user->pswd();
+my $user_number = $target_user->unix_uid();
+my $fullname    = $target_user->name();
+my $user_email  = $target_user->email();
+my $status      = $target_user->status();
+my $webonly     = $target_user->webonly();
+my $usr_shell   = $target_user->shell();
+my $usr_admin   = $target_user->admin();
+my $wpswd       = $target_user->w_pswd();
+my $wikionly    = $target_user->wikionly();
 
 #
 # Get the users earliest project membership to use as the default group
@@ -257,6 +261,10 @@ SWITCH: for ($cmd) {
     };
     /^wpasswd$/ && do {
 	UpdateWindowsPassword();
+	last SWITCH;
+    };
+    /^email$/ && do {
+	UpdateEmail();
 	last SWITCH;
     };
     /^mod$/ && do {
@@ -635,6 +643,84 @@ sub UpdateUser(;$)
     system("$GENELISTS -m -u $user");
     $EUID = 0;
 
+    return 0;
+}
+
+#
+# Change email address for user.
+#
+sub UpdateEmail()
+{
+    my $forward = "$HOMEDIR/$user/.forward";
+    
+    #
+    # Only admin people can do this.
+    #
+    if (! TBAdmin($UID)) {
+	fatal("You do not have permission to update email for user $user.");
+    }
+
+    #
+    # New email comes in on the command line. 
+    #
+    usage()
+	if (! @ARGV);
+
+    my $new_email = shift(@ARGV);
+
+    # Lets not do this if no changes.
+    return 0
+	if ($new_email eq $user_email);
+
+    # Must be valid.
+    if (! TBcheck_dbslot($new_email, "users", "usr_email",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	fatal("Invalid characters in email address!");
+    }
+
+    my %args = ();
+    $args{"usr_email"} = $new_email;
+
+    if ($target_user->Update(\%args)) {
+	fatal("Could not update email address for $target_user");
+    }
+
+    # Send auditing email before next step in case of failure.
+    SENDMAIL("$fullname <$user_email>",
+	     "Email Address for '$user' Modified",
+	     "\n".
+	     "Email Address for '$user' changed by " . $this_user->uid() ."\n".
+	     "\n".
+	     "Name:              " . $target_user->name()  . "\n".
+	     "IDX:               " . $target_user->uid_idx()  . "\n".
+	     "Old Email:         " . $user_email . "\n".
+	     "New Email:         " . $new_email . "\n".
+	     "\n".
+	     "If this is unexpected, please contact Testbed Operations\n".
+	     "($TBOPS) immediately!\n".
+	     "\n",
+	     "$TBOPS",
+	     "CC: $new_email\n".
+	     "Bcc: $TBAUDIT");
+
+    # Change global in this script. 
+    $user_email = $target_user->email();
+
+    $EUID = $UID;
+
+    # Update mailman elists.
+    system("$MMMODIFYUSER $user")
+	if ($MAILMANSUPPORT);
+    
+    # Update system elists.
+    system("$GENELISTS -m -u $user");
+
+    $EUID = 0;
+
+    # Remove the users current .forward file to force regen.
+    unlink($forward)
+	if (-e $forward);
+    
     return 0;
 }
 

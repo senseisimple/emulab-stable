@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -624,18 +624,12 @@ if ($target_user->email() != $formfields["usr_email"]) {
 	USERERROR("You are not allowed to change your email address. <br> ".
 		  "Please contact Testbed Operations.", 1);
     }
-    $target_user->SetEmail($formfields["usr_email"]);
-
-    TBMAIL($TBMAIL_AUDIT,
-	   "Email Address for '$target_uid' Modified",
-	   "\n".
-	   "Email Address for '$target_uid' changed by '$uid'.\n".
-	   "\n".
-	   "Name:              " . $target_user->name()  . "\n".
-	   "IDX:               " . $target_user->uid_idx()  . "\n".
-	   "Email:             " . $target_user->email() . "\n",
-	   "From: $TBMAIL_OPS\n".
-	   "Errors-To: $TBMAIL_WWW");
+    
+    # Invoke the backend to deal with this.
+    SUEXEC($uid, "nobody",
+	   "webtbacct email $target_uid " .
+	       escapeshellarg($formfields["usr_email"]),
+	   SUEXEC_ACTION_DIE);
 }
 
 #
