@@ -123,6 +123,7 @@ use libaudit;
 use libdb;
 use libtestbed;
 use User;
+use Project;
 
 #
 # Function prototypes
@@ -140,6 +141,16 @@ sub GenerateSFSKey();
 sub fatal($);
 
 my $HOMEDIR	= USERROOT();
+
+#
+# Rewrite audit version of ARGV to prevent password in mail logs.
+#
+if ($ARGV[0] eq "passwd" && scalar(@ARGV) == 3) {
+    my @NEWARGV = @ARGV;
+
+    $NEWARGV[scalar(@NEWARGV) - 1] = "**********";
+    AuditSetARGV(@NEWARGV);
+}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -188,10 +199,23 @@ if (! defined($target_user)) {
     fatal("$user does not exist!");
 }
 
-# Map invoking user to object.
-my $this_user = User->Lookup($UID);
-if (! defined($this_user)) {
-    fatal("You ($UID) do not exist!");
+#
+# Map invoking user to object. 
+# If invoked as "nobody" its for a user with no actual account, and so
+# just set the current user to that user. If we make any callouts it will
+# fail (verbosely of course).
+#
+my $this_user;
+
+if (getpwuid($UID) eq "nobody") {
+    $this_user = $target_user;
+}
+else {
+    $this_user = User->Lookup($UID);
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
 }
 
 #
@@ -207,6 +231,7 @@ if (AuditStart(0)) {
 #
 # Get the user info (the user being operated on).
 #
+my $dbid        = $target_user->dbid();
 my $pswd        = $target_user->pswd();
 my $user_number = $target_user->unix_uid();
 my $fullname    = $target_user->name();
@@ -223,19 +248,17 @@ my $wikionly    = $target_user->wikionly();
 # for the case that the account is being (re)created. We convert that to
 # the unix info.
 #
+my $firstproject;
 my $default_groupname;
 my $default_groupgid;
 
-$query_result =
-    DBQueryFatal("select m.pid from group_membership as m ".
-		 "where m.uid='$user' and m.pid=m.gid and m.trust!='none' ".
-		 "order by date_approved asc limit 1");
+if ($target_user->FirstApprovedProject(\$firstproject) < 0) {
+    fatal("Could not determine first approved project for $target_user");
+}
 
-if (my ($defpid) = $query_result->fetchrow_array) {
-    if (! TBGroupUnixInfo($defpid, $defpid,
-			  \$default_groupgid, \$default_groupname)) {
-	fatal("No info for default project $defpid!");
-    }
+if (defined($firstproject)) {
+    $default_groupname = $firstproject->unix_name();
+    $default_groupgid  = $firstproject->unix_gid();
 }
 else {
     print "No group membership for $user; using the guest group!\n";
@@ -359,6 +382,16 @@ sub AddUser()
 		fatal("Could not add user $user ($user_number) to $CONTROL.");
 	    }
 	}
+
+	# shell escape.
+	$pswd =~ s/\$/\\\$/g;
+	$pswd =~ s/\*/\\\*/g;
+
+	print "Initializing user $user password on $CONTROL.\n";
+	    
+	if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+	    fatal("Could not initialize password for user $user on $CONTROL!");
+	}
     }
     $UID = $SAVEUID;
 
@@ -415,8 +448,7 @@ sub AddUser()
     if ($CONTROL ne $BOSSNODE) {
 	GenerateSFSKey();
     }
-
-    return UpdatePassword();
+    return 0;
 }
 
 #
@@ -493,43 +525,110 @@ sub DelUser()
 #
 sub UpdatePassword()
 {
-    # shell escape.
-    $pswd     =~ s/\$/\\\$/g;
-    $pswd     =~ s/\*/\\\*/g;
+    #
+    # New password (encrypted) comes in on the command line. 
+    #
+    usage()
+	if (! @ARGV);
 
-    #
-    # Check status. Ignore if user is not active.
-    #
-    if ($status ne USERSTATUS_ACTIVE) {
-	print("$user is not active! Not updating the password!\n");
+    my $new_pswd  = shift(@ARGV);
+
+    # Lets not do this if no changes.
+    if ($new_pswd eq $target_user->pswd()) {
+	print "Password has not changed ...\n";
 	return 0;
     }
 
+    # Lets prevent any odd characters.
+    if ($new_pswd =~ /[\'\\\"\&]+/) {
+	fatal("Invalid characters in new password encryption string!");
+    }
+
+    #
+    # Insert into database. When changing password for someone else,
+    # always set the expiration to right now so that the target user
+    # is "forced" to change it. 
+    #
+    my $expires;
+    
+    if (! $target_user->SameUser($this_user)) {
+	$expires = "now()";
+    }
+    else {
+	$expires = "date_add(now(), interval 1 year)";
+    }
+
+    if ($target_user->SetPassword($new_pswd, $expires)) {
+	fatal("Could not update password encryption string for $target_user");
+    }
+
+    # Send auditing email before next step in case of failure.
+    SENDMAIL("$fullname <$user_email>",
+	     "Password for '$user' has been changed",
+	     "\n".
+	     "Emulab password for '$user' has been changed by " .
+	            $this_user->uid() ."\n".
+	     "\n".
+	     "Name:              " . $target_user->name()  . "\n".
+	     "IDX:               " . $target_user->uid_idx()  . "\n".
+	     "\n".
+	     "If this is unexpected, please contact Testbed Operations\n".
+	     "($TBOPS) immediately!\n".
+	     "\n",
+	     "$TBOPS",
+	     "Bcc: $TBAUDIT");
+
+    # Go no further if a webonly user.
+    return 0
+	if ($webonly);
+
+    #
+    # Go no further if user is not active or frozen.
+    #
+    return 0
+	if (! ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN));
+
+    #
+    # Change on ops only if there is a real account there.
+    #
     if (! $wikionly) {
+	#
+	# Grab from the DB to avoid taint checking sillyness.
+	#
+	my $safe_pswd = $target_user->pswd();
+	# shell escape.
+	$safe_pswd    =~ s/\$/\\\$/g;
+	$safe_pswd    =~ s/\*/\\\*/g;
+	
 	$UID = 0;
 	if ($CONTROL ne $BOSSNODE) {
 	    print "Updating user $user password on $CONTROL.\n";
 	    
-	    if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+	    if (system("$SSH -host $CONTROL $CHPASS -p '$safe_pswd' $user")) {
 		fatal("Could not change password for user $user on $CONTROL!");
 	    }
 	}
 	$UID = $SAVEUID;
     }
+
+    #
+    # Ick. If invoked as "nobody" then the user was either frozen or
+    # inactive. Lets skip the rest of this for now. Needs more thought
+    # and cleanup in the web interface to this, since we cannot call
+    # out to these scripts as "nobody" (yet).
+    #
+    return 0
+	if (getpwuid($UID) eq "nobody");
     
     $EUID = $UID;
-    # And to the wiki if enabled.
+    # And the wiki if enabled.
     system("$ADDWIKIUSER -u $user")
-	if ($WIKISUPPORT && $user ne $PROTOUSER);
+	if ($WIKISUPPORT && $user ne $PROTOUSER && !$webonly);
 
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER -m $user")
-	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
+	if ($BUGDBSUPPORT && $user ne $PROTOUSER && ! ($wikionly || $webonly));
 
-    # And to the OPS db if enabled.
-    system("$OPSDBCONTROL adduser $user")
-	if ($OPSDBSUPPORT && $user ne $PROTOUSER);
-  
     $EUID = 0;
     
     return 0;

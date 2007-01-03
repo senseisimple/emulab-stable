@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package User;
@@ -21,6 +21,7 @@ use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
+use Project;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -46,15 +47,29 @@ sub mysystem($)
 #
 sub Lookup($$)
 {
-    my ($class, $uid_idx) = @_;
+    my ($class, $token) = @_;
+    my $query_result;
 
     # Look in cache first
-    return $users{"$uid_idx"}
-        if (exists($users{"$uid_idx"}));
-    
-    my $query_result =
-	DBQueryWarn("select * from users where uid_idx=$uid_idx");
+    return $users{"$token"}
+        if (exists($users{"$token"}));
 
+    #
+    # For backwards compatability, look to see if the token is numeric
+    # or alphanumeric. If numeric, assumes its an idx, otherwise a name.
+    #
+    if ($token =~ /^\d*$/) {
+	$query_result =
+	    DBQueryWarn("select * from users where uid_idx='$token'");
+    }
+    elsif ($token =~ /^\w*$/) {
+	$query_result =
+	    DBQueryWarn("select * from users where uid='$token'");
+    }
+    else {
+	return undef;
+    }
+    
     return undef
 	if (!$query_result || !$query_result->numrows);
 
@@ -64,13 +79,14 @@ sub Lookup($$)
     bless($self, $class);
     
     # Add to cache. 
-    $users{"$uid_idx"} = $self;
+    $users{$self->{'USER'}->{'uid_idx'}} = $self;
     
     return $self;
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
 sub uid_idx($)		{ return field($_[0], "uid_idx"); }
+sub dbid($)		{ return field($_[0], "uid_idx"); }
 sub uid($)		{ return field($_[0], "uid"); }
 sub created($)		{ return field($_[0], "usr_created"); }
 sub expires($)		{ return field($_[0], "usr_expires"); }
@@ -124,15 +140,7 @@ sub LookupByUid($$)
 {
     my ($class, $uid) = @_;
 
-    my $query_result =
-	DBQueryWarn("select uid_idx from users where uid='$uid'");
-
-    return undef
-	if (! $query_result || !$query_result->numrows);
-
-    my ($uid_idx) = $query_result->fetchrow_array();
-
-    return User->Lookup($uid_idx);
+    return User->Lookup($uid);
 }
 
 #
@@ -219,6 +227,79 @@ sub Update($$)
 
     return -1
 	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Equality test for two users. Not strictly necessary in perl, but good form.
+#
+sub SameUser($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->uid_idx() == $other->uid_idx();
+}
+
+#
+# First approved project.
+#
+sub FirstApprovedProject($$)
+{
+    my ($self, $pptr) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select pid_idx from group_membership ".
+		    "where uid_idx='$uid_idx' and pid_idx=gid_idx and ".
+		    "      trust!='none' ".
+		    "order by date_approved asc limit 1");
+
+    if (! $query_result || !$query_result->numrows) {
+	$pptr = undef;
+	return 0;
+    }
+
+    my ($pid_idx) = $query_result->fetchrow_array();
+    my $project   = Project->Lookup($pid_idx);
+    
+    if (! defined($project)) {
+	warn("*** User::FirstApprovedProject: ".
+	     "Could not load project $pid_idx!");
+	return -1;
+    }
+    $$pptr = $project;
+    return 0;
+}
+
+#
+# Set password for user.
+#
+sub SetPassword($$$)
+{
+    my ($self, $encoding, $expires) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    # Clear the chpasswd stuff anytime passwd is set.
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  usr_pswd='$encoding', pswd_expires=$expires, ".
+			  "  chpasswd_key=NULL,chpasswd_expires=0 ".
+			  "where uid_idx='$uid_idx'"));
 
     return Refresh($self);
 }

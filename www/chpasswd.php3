@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -191,33 +191,25 @@ setcookie($TBAUTHCOOKIE, "", time() - 1000000, "/", $TBAUTHDOMAIN, 0);
 PAGEHEADER("Reset Your Password", $view);
 
 $encoding = crypt("$password1");
-$expires  = "date_add(now(), interval 1 year)";
+$safe_encoding = escapeshellarg($encoding);
 
-$target_user->SetPassword($encoding, $expires);
+STARTBUSY("Resetting your password");
 
-if (HASREALACCOUNT($target_uid)) {
-    STARTBUSY("Resetting your password");
-
-    SUEXEC($target_uid, "nobody", "webtbacct passwd $target_uid",
+#
+# Invoke backend to deal with this.
+#
+if (!HASREALACCOUNT($target_uid)) {
+    SUEXEC("nobody", "nobody",
+	   "webtbacct passwd $target_uid $safe_encoding",
 	   SUEXEC_ACTION_DIE);
-    
-    CLEARBUSY();
+}
+else {
+    SUEXEC($target_uid, "nobody",
+	   "webtbacct passwd $target_uid $safe_encoding",
+	   SUEXEC_ACTION_DIE);
 }
 
-TBMAIL("$usr_name <$usr_email>",
-       "Password Reset for '$target_uid'",
-       "\n".
-       "The password for '$target_uid' has been reset via the web interface.\n".
-       "If this message is unexpected, please contact Testbed Operations\n".
-       "($TBMAILADDR_OPS) immediately!\n".
-       "\n".
-       "The change originated from IP: " . $_SERVER['REMOTE_ADDR'] . "\n".
-       "\n".
-       "Thanks,\n".
-       "Testbed Operations\n",
-       "From: $TBMAIL_OPS\n".
-       "Bcc: $TBMAIL_AUDIT\n".
-       "Errors-To: $TBMAIL_WWW");
+CLEARBUSY();
 
 echo "<br>
       Your password has been changed.\n";

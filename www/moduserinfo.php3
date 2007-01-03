@@ -245,6 +245,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
+                             value=\"" . $formfields[password1] . "\"
                              size=8></td>
               </tr>\n";
 
@@ -253,6 +254,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
+                             value=\"" . $formfields[password2] . "\"
                              size=8></td>
              </tr>\n";
 
@@ -656,28 +658,20 @@ if ((isset($formfields["password1"]) && $formfields["password1"] != "") &&
     # Do it again. This ensures we use the current algorithm, not whatever
     # it was encoded with last time.
     #
-    $new_encoding = crypt($formfields["password1"]);
+    $new_encoding  = crypt($formfields["password1"]);
+    $safe_encoding = escapeshellarg($new_encoding);
 
     #
-    # Insert into database. When changing password for someone else,
-    # always set the expiration to right now so that the target user
-    # is "forced" to change it. 
+    # Invoke backend to deal with this.
     #
-    if (! $target_user->SameUser($this_user))
-	$expires = "now()";
-    else
-	$expires = "date_add(now(), interval 1 year)";
-
-    $target_user->SetPassword($new_encoding, $expires);
-    
-    if ($wikionly) {
-	if ($CHECKLOGIN_STATUS & CHECKLOGIN_ACTIVE) {
-	    SUEXEC("nobody", "nobody", "webtbacct passwd $target_uid",
-		   SUEXEC_ACTION_DIE);
-	}
+    if (!HASREALACCOUNT($uid)) {
+	SUEXEC("nobody", "nobody",
+	       "webtbacct passwd $target_uid $safe_encoding",
+	       SUEXEC_ACTION_DIE);
     }
-    elseif (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
-	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid",
+    else {
+	SUEXEC($uid, "nobody",
+	       "webtbacct passwd $target_uid $safe_encoding",
 	       SUEXEC_ACTION_DIE);
     }
 }
