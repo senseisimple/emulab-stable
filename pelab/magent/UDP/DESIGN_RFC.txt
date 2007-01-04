@@ -1,0 +1,174 @@
+		Application Centric Internet Modelling - UDP
+		--------------------------------------------
+
+Node Setup:
+-----------
+
+Application is run on the Emulab nodes, and it is LD_PRELOADed with
+libnetmon.
+
+libnetmon on each Emulab node talks to application monitor using 
+a Unix domain socket and sends information about the sendto() 
+(and datagram connect() ) calls (intervals between sendto calls, as well as size
+of data sent by each call ) made by the application on that node.
+
+The application monitor sends this information to the corresponding management
+agent running on a planetlab node.
+
+
+How does it Work ? 
+------------------
+
+Eg: Let 'nodeA' and 'nodeB' be the hosts running the management agent on planetlab.
+Let us assume that the UDP data transfer is one directional, from nodeA -> nodeB.
+
+As of now, the management agent is programmed to send UDP traffic just as it was
+sent by the application running in Emulab - No effort is made to control the rate
+at which UDP packets are sent and no congestion control is used. For practical
+reasons, to play nice with TCP and other traffic in the network between planet lab
+nodes, some form of congestion control would probably be introduced in the
+management agent in the future.
+
+The management agent on nodeA sends UDP packets to nodeB. We intend to
+replicate the sendto() calls being done by the application in Emulab, observe
+the throughput and RTT achieved by these packets and feed those parameters
+back to the monitor. The application in Emulab is not affected by the exact contents 
+of the data being sent between the planetlab nodes.
+
+
+So, we use a simple application level protocol between the management agents.
+This protocol is implemented using the application level data of the UDP packets.
+
+Protocol in the data packets:
+-----------------------------
+nodeA sends UDP packets to nodeB, embedding monotonically increasing sequence numbers
+in the packets. 
+
+Whenever nodeA sends a packet to nodeB, it captures the timestamp when the packet is
+about to be put on the network. On receiving an acknowledgement from nodeB, again a 
+timestamp is taken at the time of arrival of the acknowledgement. Half of the difference
+between these two timestamps for a packet gives an approximate value of the RTT
+for that packet - Or the one way delay.
+
+Acknowledgements ( & redundancy ):
+---------------------------------
+nodeB echoes the packets back, indicating that the particular
+sequence number packet was correctly received.
+
+In each ACK packet, nodeB includes the sequence number of the packet
+being acknowledged, as well as the sequence numbers of the last 3 packets
+it has received. Including these extra sequence numbers in each ACK makes
+the throughput calculations resilient to the loss of a small number of
+( 3 consecutive ACK packets can be dropped without any effect on the
+throughput calculation ) ACK packets on the reverse path.
+
+
+Minimum Delay:
+-------------
+
+The minimum of these one way delays is taken as having no queuing delay and hence
+is considered as the sum of ( propagation + transmission + processing ) delays
+in the forward path. Whenever the minimum delay value changes, an event message is
+sent to the application monitor with the new value - and the dummy net pipe
+corresponding to the connection between nodeA and nodeB is updated with that delay value
+for the delay queue.
+
+
+Dummy net Queue Size:
+---------------------
+
+We also keep track of the maximum one way delay. The difference between the maximum one
+way delay and the minimum from above, gives the value of approximate maximum queuing delay
+on the forward path. Whenever there is a new maximum queuing delay value, an event is sent to the
+application monitor and the value is used to set the maximum queue size for the dummy net pipe.
+
+Throughput (available bandwidth):
+---------------------------------
+
+For each acknowledged packet ( assuming no dropped packets ):
+
+Throughput = ( data size of the packet + header overhead ) / ( total one way delay for the packet )
+
+If every packet sent from nodeA is acknowledged by nodeB and there is no packet loss on
+either the forward or the reverse path, the above equation gives the throughput for
+each packet sent. Taking into account packet drops on the forward path and some packet
+drops on the reverse path, the throughput is calculated as below.
+
+Whenever packets are sent by nodeA, information about the sequence number, timestamp and
+the size of data in the packet is stored in a list at nodeA. When an acknowledgement
+is received, all the packets being acknowledged ( including any of redundant sequence
+numbers in the acknowledgement ) are removed from that list and used for throughput
+calculation. The sum of these packet sizes gives the amount of data that was transferred
+in this round trip time.
+
+After the redundant acknowledgements are considered, any packets remaining in the list with
+sequence numbers less than the latest acknowledged sequence number: were either lost in
+the forward path, or their ACK packets were lost on the reverse path. We cannot distinguish
+between forward/reverse path loss and consider them as forward path loss in both cases.
+
+These lost packets are also removed from the list at nodeA. The start_time of the round trip
+for throughput calculation is taken as the earliest send time of all the lost packets and
+all the acknowledged packets. The end_time of the round trip is the time at which the
+current acknowledgement was received.
+
+The throughput is then = ( sum of data size of ACKed packets ) / ( 0.5 * (end_time - start_time ) )
+
+
+Note: 
+-----
+
+There is another way in which throughput can be calculated. The receiver(nodeB) can timestamp
+packets when they are received and send these timestamps in the ACK packets.
+
+Throughput = (size of data being ACKed) / ( last_receiver_time_stamp - current_receiver_time_stamp )
+
+Here, throughput is being calculated depending on when each packet was seen by the receiver. The
+assumption is that there is a single bottleneck link in the network: and the packets seen
+by the receiver will be spaced ( in time ) depending on the queueing & transmission delays
+encountered by the packets at the bottleneck.
+
+However, the spacing between the packets at the receiver need not be the same as that 
+at the bottleneck.This spacing can become compressed(similar to TCP ACK compression) later on in 
+the network ( at a fast link for example ),and it is possible for the packets to arrive 
+immedietly after one another at the receiver.
+
+The delays seen between the receiver in this case will be different than the spacing between
+the packets after the bottleneck link and we will end up overestimating the throughput value.
+
+The reason for this is that we fail to take queuing delay into account for closely spaced
+packets arriving at the receiver. Since the clocks are not synchronized between the sender and
+receiver, it is not possible to accurately calculate the one way delay at the receiver.
+
+Hence, throughput values are being calculated at the sender based on the one way delay for
+each packet. However, this means that the throughput value will be effected by the RTT
+calculation. We assume that the forward and reverse paths are symmetric, in terms of the path
+capacity and delay introduced - although this might not be true in some cases.
+
+
+Problems that might crop up:
+----------------------------
+
+1) We are using libpcap in the management agent on planet lab nodes. Due to
+long delays in scheduling of the application ( & the limited BPF buffer size), 
+this might result in some UDP packets being dropped by libpcap.
+
+The alternative is to use SO_TIMESTAMP option provided for datagram sockets.
+These timestamps are also as accurate as libpcap timestamps and are provided
+for each received UDP packet by the socket layer. If this option is used,
+then we can do away with libpcap.
+
+However, SO_TIMESTAMP option implies that we are dependent on the UDP receive
+socket buffer not getting full, while we are on planet lab ready queue.
+If this buffer is full and packets are dropped by the kernel, then the application
+simply does not know about the dropped packets.
+
+Since libpcap allows us to capture only part of each packet ( we plan to capture only
+the first 128 bytes ), its buffer can hold a larger number of packets than UDP
+receive buffer can ( assuming MTU sized UDP packets ), and hence should be less
+affected by the packet drop problem.
+
+This is just a hypothesis and needs to be tested on planetlab.
+
+
+
+
