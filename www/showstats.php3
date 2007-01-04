@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,7 +31,7 @@ if (! isset($showby)) {
 	$showby = "user";
 }
 if (! isset($which))
-    $which = 0;
+    $which = null;
 # Show just the last N records unless request is different.
 if (!isset($records) || !strcmp($records, "")) {
     $records = 100;
@@ -92,19 +92,19 @@ echo "<br>\n";
 
 # Determine what to do.
 if ($showby == "user") {
-    if ($which && $which != $uid) {
-	if (! ($target_user = User::Lookup($which))) {
-	    USERERROR("The user $which is not a valid user", 1);
-	}
-	elseif (! $target_user->AccessCheck($this_user,
-					    $TB_USERINFO_READINFO)) {
-	    USERERROR("You do not have permission to view ${which}'s stats!",
-		      1);
-	}
+    if (!isset($user) || $user == "") {
+	$target_user = $this_user;
     }
-    else
-	$which = $uid;
-    $wclause = "where t.uid='$which'";
+    elseif (! TBvalid_uididx($user)) {
+	PAGEARGERROR("Invalid characters in user ID");
+    }
+    elseif (! ($target_user = User::Lookup($user))) {
+	USERERROR("User '$user' is not a valid user", 1);
+    }
+    elseif (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+	USERERROR("You do not have permission to view ${user}'s stats!", 1);
+    }
+    $wclause = "where t.uid='" . $target_user->uid() . "'";
 }
 elseif ($showby == "project") {
     if (! $which) {
