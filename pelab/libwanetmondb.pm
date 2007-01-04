@@ -5,6 +5,13 @@
 # All rights reserved.
 #
 
+#
+# TODO:
+#  - Don't connect to DB every query. Leave connection open util
+#    another DB needs to be connected to (DG 1/3/07), unless the 
+#    "connect" subroutine already does this...
+#
+
 package libwanetmondb;
 
 use strict;
@@ -83,11 +90,12 @@ sub getRows($)
 
 
     if( $useOps ){
+#        print "USING OPS\n";
         TBDBConnect($OPSDBNAME, $DBUSER, $dbpwd) == 0
             or die("Could not connect to ops/pelab database!\n");
         my $query_result = DBQueryFatal($query);
         if (! $query_result->numrows) {
-            warn("No results from OpsDB with query:\n$query\n");
+#            warn("No results from OpsDB with query:\n$query\n");
             return @rows;
         }
         while( my $hrow = $query_result->fetchrow_hashref() ){
@@ -98,7 +106,7 @@ sub getRows($)
             or die("Could not connect to nfs/pelab database!\n");
         my $query_result = DBQueryFatal($query);
         if (! $query_result->numrows) {
-            warn("No results from DataPository DB with query:\n$query\n");
+#            warn("No results from DataPository DB with query:\n$query\n");
             return @rows;
         }
         while( my $hrow = $query_result->fetchrow_hashref() ){
@@ -113,3 +121,5 @@ sub getRows($)
 
 
 1;  # DON'T REMOVE THIS
+
+
