@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Project;
@@ -47,25 +47,43 @@ sub mysystem($)
 #
 sub Lookup($$)
 {
-    my ($class, $pid_idx) = @_;
+    my ($class, $token) = @_;
+    my $query_result;
 
     # Look in cache first
-    return $projects{"$pid_idx"}
-        if (exists($projects{"$pid_idx"}));
-    
-    my $query_result =
-	DBQueryWarn("select * from projects where pid_idx=$pid_idx");
+    return $projects{"$token"}
+        if (exists($projects{"$token"}));
 
+    #
+    # For backwards compatability, look to see if the token is numeric
+    # or alphanumeric. If numeric, assumes its an idx, otherwise a name.
+    #
+    if ($token =~ /^\d*$/) {
+	$query_result =
+	    DBQueryWarn("select * from projects where pid_idx='$token'");
+    }
+    elsif ($token =~ /^\w*$/) {
+	$query_result =
+	    DBQueryWarn("select * from projects where pid='$token'");
+    }
+    else {
+	return undef;
+    }
+    
     return undef
 	if (!$query_result || !$query_result->numrows);
 
     my $self           = {};
     $self->{'PROJECT'} = $query_result->fetchrow_hashref();
+    $self->{'GROUP'}   = Group->Lookup($self->{'PROJECT'}->{'pid_idx'});
+
+    return undef
+	if (!defined($self->{'GROUP'}));
 
     bless($self, $class);
     
     # Add to cache. 
-    $projects{"$pid_idx"} = $self;
+    $projects{$self->{'PROJECT'}->{'pid_idx'}} = $self;
     
     return $self;
 }
@@ -74,16 +92,19 @@ sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'PROJECT'}->{$_[1]}); }
 sub pid($)	        { return field($_[0], "pid"); }
 sub gid($)	        { return field($_[0], "gid"); }
 sub pid_idx($)          { return field($_[0], "pid_idx"); }
-sub gid_idx($)          { return field($_[0], "gid_idx"); }
-sub leader($)           { return field($_[0], "leader"); }
+sub gid_idx($)          { return field($_[0], "pid_idx"); }
+sub head_uid($)         { return field($_[0], "head_uid"); }
+sub head_idx($)         { return field($_[0], "head_idx"); }
 sub created($)          { return field($_[0], "created"); }
 sub description($)      { return field($_[0], "description"); }
-sub unix_gid($)         { return field($_[0], "unix_gid"); }
-sub unix_name($)        { return field($_[0], "unix_name"); }
 sub expt_count($)       { return field($_[0], "expt_count"); }
 sub expt_last($)        { return field($_[0], "expt_last"); }
 sub wikiname($)         { return field($_[0], "wikiname"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
+
+# These come from the group not the project.
+sub unix_gid($)         { return $_[0]->{'GROUP'}->unix_gid(); }
+sub unix_name($)        { return $_[0]->{'GROUP'}->unix_name(); }
 
 #
 # Lookup given pid For backwards compat.
