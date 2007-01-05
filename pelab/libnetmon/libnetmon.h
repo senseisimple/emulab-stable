@@ -90,9 +90,10 @@ static bool connectedFD_p(int);
 
 /*
  * Log that a packet has been sent to the kernel on a given FD with a given
- * size
+ * size. If the final argument is non-NULL, then we are logging a packet from
+ * sendto(), and should report the IP address and port numbers involved
  */
-static void log_packet(int, size_t);
+static void log_packet(int, size_t, const struct sockaddr*);
 
 /*
  * The information we keep about each FD we're monitoring
@@ -222,6 +223,8 @@ typedef ssize_t read_proto_t(int, void *, size_t);
 typedef ssize_t recv_proto_t(int, void *, size_t, int);
 typedef ssize_t recvmsg_proto_t(int,struct msghdr *, int);
 typedef ssize_t accept_proto_t(int,struct sockaddr *, socklen_t *);
+typedef ssize_t	sendto_proto_t(int, const void *, size_t, int,
+                               const struct sockaddr *, socklen_t);
 
 /*
  * Locations of the real library functions
@@ -236,6 +239,7 @@ static read_proto_t       *real_read;
 static recv_proto_t       *real_recv;
 static recvmsg_proto_t    *real_recvmsg;
 static accept_proto_t     *real_accept;
+static sendto_proto_t     *real_sendto;
 
 /*
  * Note: Functions that we're wrapping are in the .c file

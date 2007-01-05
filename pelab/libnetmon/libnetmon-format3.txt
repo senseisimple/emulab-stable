@@ -18,7 +18,7 @@ TCP_MAXSEG (int)
 SO_RCVBUF (int)
 SO_SNDBUF (int)
 Connected (no value) (RemoteIP and RemotePort MUST be sent before this command)
-Write (value is the size of the write or sendto)
+Send (value is the size of the write or sendto)
 SendTo (value is <localPort>:<remoteIP>:<remotePort>:<size>
 Closed (no value)
 
@@ -28,12 +28,13 @@ New
 (TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|RemoteIP|RemotePort)*
 Connected
 LocalPort
-Write*
+Send*
 Closed
 
 On a UDP connection, there should be the following sequence:
 
 New
+Connected?
 (SO_RCVBUF|SO_SNDBUF)*
 SendTo*
 Closed

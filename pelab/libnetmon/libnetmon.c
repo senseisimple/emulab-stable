@@ -108,13 +108,6 @@ void lnm_init() {
          */
         pid = getpid();
 
-#define FIND_REAL_FUN(FUN) \
-          real_##FUN = (FUN##_proto_t*)dlsym(RTLD_NEXT,#FUN); \
-          if (!real_##FUN) { \
-              croak1("Unable to get the address of " #FUN "(): %s\n", \
-                    dlerror()); \
-          }
-
         /*
          * Default to reporting on everything - the individual reporting
          * options will get turned on later if report_all is true
@@ -130,6 +123,13 @@ void lnm_init() {
         /*
          * Find the real versions of the library functions we're going to wrap
          */
+#define FIND_REAL_FUN(FUN) \
+          real_##FUN = (FUN##_proto_t*)dlsym(RTLD_NEXT,#FUN); \
+          if (!real_##FUN) { \
+              croak1("Unable to get the address of " #FUN "(): %s\n", \
+                    dlerror()); \
+          }
+
         FIND_REAL_FUN(socket);
         FIND_REAL_FUN(close);
         FIND_REAL_FUN(connect);
@@ -140,6 +140,7 @@ void lnm_init() {
         FIND_REAL_FUN(recv);
         FIND_REAL_FUN(recvmsg);
         FIND_REAL_FUN(accept);
+        FIND_REAL_FUN(sendto);
 
         /*
          * Connect to netmond if we've been asked to
@@ -423,7 +424,6 @@ void nameFD(int fd, const struct sockaddr *localname,
     if (report_connect) {
         informConnect(fd);
     }
-
 }
 
 /*
@@ -811,7 +811,7 @@ bool connectedFD_p(int whichFD) {
 /*
  * Let the user know that a packet has been sent.
  */
-void log_packet(int fd, size_t len) {
+void log_packet(int fd, size_t len, const struct sockaddr *srvaddr) {
     if (!report_io) {
         return;
     }
@@ -834,10 +834,53 @@ void log_packet(int fd, size_t len) {
                     monitorFDs[fd].remote_port, len);
             break;
         case 2:
-        case 3:
             fprintf(outstream,"%lu.%06lu > ", time.tv_sec, time.tv_usec);
             fprintID(outstream,fd);
             fprintf(outstream," (%i)\n", len);
+            break;
+        case 3:
+            /*
+             * We handle send() and sendto() differently - specificially, we
+             * assume sendto() calls are UDP, and thus we need to log the dest
+             * IP, plus local and remote ports. (Note: It is legal to call
+             * sendto() on a TCP socket, but you must give a null srvaddr,
+             * which will result in us handling as a send())
+             */
+            if (monitorFDs[fd].socktype == SOCK_STREAM) {
+                // send()
+                fprintf(outstream,"Send: ");
+                fprintID(outstream,fd);
+                fprintf(outstream," %lu.%06lu %i\n", time.tv_sec, time.tv_usec,
+                        len);
+            } else {
+                int local_port = monitorFDs[fd].local_port;
+                char *remote_ip;
+                int remote_port;
+                if (srvaddr != NULL) {
+                    const struct sockaddr_in *inaddr =
+                        (const struct sockaddr_in*)srvaddr ;
+                    /*
+                     * XXX - We should cache this so we don;t have to
+                     * re-compute it so many times.
+                     * XXX - This is probably not thread-safe
+                     */
+                    remote_ip = inet_ntoa(inaddr->sin_addr);
+                    remote_port = ntohs(inaddr->sin_port);
+                } else {
+                    if (! connectedFD_p(fd)) {
+                        croak0("Attempted to call sendto() on an unconnected "
+                               "socket without a srvaddr");
+                    }
+                    remote_ip = monitorFDs[fd].remote_hostname;
+                    remote_port = monitorFDs[fd].remote_port;
+                }
+                fprintf(outstream,"SendTo: ");
+                fprintID(outstream,fd);
+                fprintf(outstream," %lu.%06lu %i:%s:%i:%i\n",
+                        time.tv_sec, time.tv_usec,
+                        local_port, remote_ip, remote_port,
+                        len);
+            }
             break;
         default:
             croak1("Bad output version: %i\n", (void *)output_version);
@@ -852,6 +895,10 @@ void informNodelay(int fd) {
     if (monitorFDs[fd].socktype == SOCK_STREAM && output_version >= 2) {
 	fprintf(outstream,"TCP_NODELAY: ");
 	fprintID(outstream,fd);
+        if (output_version >= 3) {
+            fprintf(outstream," ");
+            fprintTime(outstream);
+        }
 	fprintf(outstream," %i\n",monitorFDs[fd].tcp_nodelay);
     }
 }
@@ -860,6 +907,10 @@ void informMaxseg(int fd) {
     if (monitorFDs[fd].socktype == SOCK_STREAM && output_version >= 2) {
 	fprintf(outstream,"TCP_MAXSEG: ");
 	fprintID(outstream,fd);
+        if (output_version >= 3) {
+            fprintf(outstream," ");
+            fprintTime(outstream);
+        }
 	fprintf(outstream," %i\n",monitorFDs[fd].tcp_maxseg);
     }
 }
@@ -877,6 +928,10 @@ void informBufsize(int fd, int which) {
 	fprintf(outstream,"%s: ", (which == SO_SNDBUF) ?
 		"SO_SNDBUF" : "SO_RCVBUF");
 	fprintID(outstream,fd);
+        if (output_version >= 3) {
+            fprintf(outstream," ");
+            fprintTime(outstream);
+        }
 	fprintf(outstream," %i\n", bufsize);
 
     }
@@ -899,9 +954,11 @@ void informConnect(int fd) {
 
         /*
          * New versions of the output no longer include port numbers in the
-         * identifier. So, report those now
+         * identifier. So, report those now. Note that we only do this for TCP
+         * sockets - UDP sockets will get this information reported with each
+         * sendto()
          */
-        if (output_version >= 3){
+        if (output_version >= 3 && monitorFDs[fd].socktype == SOCK_STREAM){
             fprintf(outstream,"RemoteIP: ");
             fprintID(outstream,fd);
             fprintf(outstream," ");
@@ -1040,10 +1097,15 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
             croak1("Unable to get local socket name: %s\n", strerror(errno));
         }
         int local_port = ntohs(localaddr.sin_port);
+        monitorFDs[sockfd].local_port = local_port;
 
-        if (report_connect) {
+        if (report_connect && monitorFDs[sockfd].socktype == SOCK_STREAM) {
             fprintf(outstream,"LocalPort: ");
             fprintID(outstream,sockfd);
+            if (output_version >= 3) {
+                fprintf(outstream," ");
+                fprintTime(outstream);
+            }
             fprintf(outstream," %i\n",local_port);
         }
     } else {
@@ -1083,8 +1145,13 @@ int accept(int s, struct sockaddr * addr,
         if (report_connect) {
             fprintf(outstream,"LocalPort: ");
             fprintID(outstream,rv);
+            if (output_version >= 3) {
+                fprintf(outstream," ");
+                fprintTime(outstream);
+            }
             fprintf(outstream," %i\n",ntohs(((struct sockaddr_in*)addr)->sin_port));
         }
+        monitorFDs[s].local_port = ntohs(((struct sockaddr_in*)addr)->sin_port);
     }
 
     return rv;
@@ -1116,7 +1183,6 @@ int close(int d) {
  *
  * TODO: Need to write wrappers for other functions that can be used to send
  * data on a socket:
- * sendto
  * sendmsg
  * writev
  * others?
@@ -1134,12 +1200,11 @@ ssize_t send(int s, const void *msg, size_t len, int flags) {
      */
     /*
      * TODO: There are a LOT of error cases, flags, etc, that we should handle.
-     * For 
      */
     rv = real_send(s,msg,len,flags);
 
     if ((rv > 0) && monitorFD_p(s)) {
-        log_packet(s,rv);
+        log_packet(s,rv,NULL);
     }
 
     return rv;
@@ -1160,12 +1225,60 @@ ssize_t write(int fd, const void *buf, size_t count) {
     rv = real_write(fd,buf,count);
 
     if ((rv > 0) && monitorFD_p(fd)) {
-        log_packet(fd,rv);
+        log_packet(fd,rv,NULL);
     }
 
     return rv;
 
 }
+
+/*
+ * Wrap the sendto() function to capture writes to UDP sockets
+ */
+ssize_t sendto(int fd, const void *buf, size_t count, int flags,
+               const struct sockaddr *serv_addr, socklen_t addrlen) {
+    ssize_t rv;
+
+    lnm_init();
+    lnm_control();
+
+    rv = real_sendto(fd, buf, count, flags, serv_addr, addrlen);
+
+    if ((rv > 0) && monitorFD_p(fd)) {
+        /*
+         * If this socket is UDP and not connected, we need to make sure that we
+         * have the local port number, so that we can include it in the sendto()
+         * reports
+         */
+        if (monitorFDs[fd].socktype == SOCK_DGRAM && !connectedFD_p(fd) &&
+            monitorFDs[fd].local_port == 0) {
+            // TODO: This overlaps a bit with nameFD - there is probably some
+            // refactoring that should be done.
+            struct sockaddr_in *localaddr;
+            union {
+                struct sockaddr sa;
+                char data[128];
+            } sockname;
+            socklen_t namelen;
+            namelen = sizeof(sockname.data);
+            int gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
+            if (gsn_rv != 0) {
+                croak1("Unable to get local socket name: %s\n", strerror(errno));
+            }
+            localaddr = (struct sockaddr_in *) &(sockname.sa);
+            monitorFDs[fd].local_port = ntohs(localaddr->sin_port);
+        }
+
+        /*
+         * Report on the actual packet
+         */
+        log_packet(fd,rv,serv_addr);
+    }
+
+    return rv;
+
+}
+
 
 int setsockopt (int s, int level, int optname, const void *optval,
                  socklen_t optlen) {
