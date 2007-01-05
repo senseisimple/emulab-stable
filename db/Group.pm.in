@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Group;
@@ -53,7 +53,7 @@ sub Lookup($$)
         if (exists($groups{"$gid_idx"}));
     
     my $query_result =
-	DBQueryWarn("select * from groups where gid_idx=$gid_idx");
+	DBQueryWarn("select * from groups where gid_idx='$gid_idx'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
@@ -163,6 +163,23 @@ sub Update($$)
 	if (! DBQueryWarn($query));
 
     return Refresh($self);
+}
+
+#
+# Change the leader for a group.
+#
+sub ChangeLeader($$)
+{
+    my ($self, $leader) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($leader)));
+
+    my %args = ();
+    $args{'leader'}     = $leader->uid();
+    $args{'leader_idx'} = $leader->uid_idx();
+    return $self->Update(\%args);
 }
 
 #

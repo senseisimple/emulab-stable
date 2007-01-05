@@ -172,6 +172,14 @@ sub LookupByUnixId($$)
 }
 
 #
+# Wrap above function so I do not forget to use it for the current user.
+#
+sub ThisUser($)
+{
+    return User->LookupByUnixId($UID);
+}
+
+#
 # Refresh a class instance by reloading from the DB.
 #
 sub Refresh($)
@@ -265,7 +273,7 @@ sub FirstApprovedProject($$)
 		    "order by date_approved asc limit 1");
 
     if (! $query_result || !$query_result->numrows) {
-	$pptr = undef;
+	$$pptr = undef;
 	return 0;
     }
 
@@ -279,6 +287,22 @@ sub FirstApprovedProject($$)
     }
     $$pptr = $project;
     return 0;
+}
+
+#
+# Change the status of a user in the DB.
+#
+sub SetStatus($$)
+{
+    my ($self, $status) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %args = ("status" => $status);
+
+    return $self->Update(\%args);
 }
 
 #

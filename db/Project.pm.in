@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use User;
 use Group;
 use English;
 use Data::Dumper;
@@ -99,6 +100,7 @@ sub created($)          { return field($_[0], "created"); }
 sub description($)      { return field($_[0], "description"); }
 sub expt_count($)       { return field($_[0], "expt_count"); }
 sub expt_last($)        { return field($_[0], "expt_last"); }
+sub approved($)         { return field($_[0], "approved"); }
 sub wikiname($)         { return field($_[0], "wikiname"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
 
@@ -144,7 +146,7 @@ sub Refresh($)
 
     $self->{'PROJECT'} = $query_result->fetchrow_hashref();
 
-    return 0;
+    return $self->{'GROUP'}->Refresh();
 }
 
 #
@@ -182,6 +184,57 @@ sub Update($$)
 	if (! DBQueryWarn($query));
 
     return Refresh($self);
+}
+
+#
+# Return user object for leader.
+#
+sub GetLeader($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return User->Lookup($self->head_idx());
+}
+
+#
+# Change the leader for a project. Done *only* before project is approved.
+#
+sub ChangeLeader($$)
+{
+    my ($self, $leader) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($leader)));
+
+    # Default group fits.
+    $self->{'GROUP'}->ChangeLeader($leader) == 0
+	or return -1;
+
+    # Then the project
+    my %args = ();
+    $args{'head_uid'} = $leader->uid();
+    $args{'head_idx'} = $leader->uid_idx();
+    return $self->Update(\%args);
+}
+
+#
+# Set the approval bit,
+#
+sub SetApproved($$)
+{
+    my ($self, $approved) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self)));
+
+    my %args = ("approved" => ($approved ? 1 : 0));
+    return $self->Update(\%args);
 }
 
 #
