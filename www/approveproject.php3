@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -49,7 +49,7 @@ $headuid = $this_project->head_uid();
 # If the user wanted to change the head uid, do that now (we change both
 # the head_uid and the leader of the default project)
 #
-if (isset($head_uid) && $head_uid != "") {
+if ($approval == "approve" && isset($head_uid) && $head_uid != "") {
     if (! ($newleader = User::Lookup($head_uid))) {
 	TBERROR("Unknown user $head_uid", 1);
     }
@@ -78,6 +78,7 @@ if (!isset($user_interface) ||
 $curstatus     = $leader->status();
 $headuid_email = $leader->email();
 $headname      = $leader->name();
+#$headidx       = $leader->uid_idx();
 #echo "Status = $curstatus, Email = $headuid_email<br>\n";
 
 #
@@ -175,28 +176,15 @@ elseif ((strcmp($approval, "deny") == 0) ||
           </h3>\n";
 }
 elseif (strcmp($approval, "approve") == 0) {
-
-    #
-    # Change the status if necessary. This only happens for new users
-    # being approved in their first project. After this, the status is
-    # going to be "active", and we just leave it that way.
-    #
-    if (strcmp($curstatus, "active")) {
-        if (strcmp($curstatus, "unapproved") == 0) {
-	    $newstatus = "active";
-        }
-        else {
-	    TBERROR("Invalid $headuid status $curstatus in ".
-                    "approveproject.php3", 1);
-        }
-	$leader->SetUserInterface($user_interface);
-	$leader->SetStatus($newstatus);
+    $optargs = "";
+    
+    # Sanity check the leader status.
+    if ($curstatus != TBDB_USERSTATUS_ACTIVE &&
+	$curstatus != TBDB_USERSTATUS_UNAPPROVED) {
+	TBERROR("Invalid $headuid status $curstatus", 1);
     }
-
-    #
-    # Set the project "approved" field to true. 
-    #
-    $this_project->SetApproved(1);
+    # Why is this here?
+    $leader->SetUserInterface($user_interface);
 
     #
     # XXX
@@ -218,41 +206,43 @@ elseif (strcmp($approval, "approve") == 0) {
 	    $this_project->SetRemoteOK($foo);
     }
 
+    unset($tmpfname);
+    if (isset($message)) {
+	$tmpfname = tempnam("/tmp", "approveproj");
+	$fp = fopen($tmpfname, "w");
+	fwrite($fp, $message);
+	fclose($fp);
+	
+	$optargs = " -f " . escapeshellarg($tmpfname);
+    }
+
     #
     # Invoke the script. This does it all. If it fails, we will find out
     # about it.
     #
-    echo "<br>
-          Project '$pid' is being created!<br><br>
-          This will take a minute or two. <b>Please</b> do not click the Stop
-          button during this time. If you do not receive notification within
-          a reasonable amount of time, please contact $TBMAILADDR.\n";
-    flush();
+    STARTBUSY("Project '$pid' is being created");
+    
+    $retval = SUEXEC($uid, $TBADMINGROUP, "webmkproj $optargs $pid",
+		     SUEXEC_ACTION_IGNORE);
 
-    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", SUEXEC_ACTION_DIE);
+    CLEARBUSY();
 
-    TBMAIL("$headname '$headuid' <$headuid_email>",
-         "Project '$pid' Approval",
-         "\n".
-	 "This message is to notify you that your project '$pid'\n".
-	 "has been approved.  We recommend that you save this link so that\n".
-	 "you can send it to people you wish to have join your project.\n".
-	 "Otherwise, tell them to go to ${TBBASE} and join it.\n".
-	 "\n".
-	 "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
-         "\n".
-	 "$message\n".
-         "\n".
-         "Thanks,\n".
-         "Testbed Operations\n",
-         "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_APPROVAL\n".
-         "Errors-To: $TBMAIL_WWW");
+    if (isset($tmpfname)) {
+	unlink($tmpfname);
+    }
+    if ($retval) {
+	# Lets tack the message onto the output so we have a record.
+	if (isset($message)) {
+	    $suexec_output .= "\n\n*** Saved approval message text:\n\n";
+	    $suexec_output .= $message;
+	}
+	SUEXECERROR(SUEXEC_ACTION_DIE);
+	return;
+    }
 
     if (!$FirstInitState) {
-	echo "<p><b>
-                 Project $pid (User: $headuid) has been approved.
-                </b>\n";
+	sleep(1);
+	PAGEREPLACE(CreateURL("showproject", $this_project));
     }
     else {
 	echo "<br><br><font size=+1>\n";
