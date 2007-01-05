@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -136,7 +136,7 @@ if (! ($group = $experiment->Group())) {
 # Lots of email addresses!
 $allleaders    = $group->LeaderMailList();
 $swapper_name  = $swapper_user->name();
-$swapper_email = $swapper_user->mail();
+$swapper_email = $swapper_user->email();
 $creator_name  = $creator_user->name();
 $creator_email = $creator_user->email();
 if ($swapper != $creator) {
