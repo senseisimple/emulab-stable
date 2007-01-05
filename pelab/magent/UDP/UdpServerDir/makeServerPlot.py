@@ -25,7 +25,7 @@ for line in inFile:
 	else:
 		currentTime = int(match.group(2))
 		timeDiff = currentTime - initTime
-		bandWidth = int(match.group(4))*8000000 / ( ( currentTime - lastTime )*1024)
+		bandWidth = int(match.group(4))*1000000 / ( ( currentTime - lastTime ))
 		lastTime = currentTime
 
 	outFile.write(str(timeDiff) + "  " + str(bandWidth) + "\n" )

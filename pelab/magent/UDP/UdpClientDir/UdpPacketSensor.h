@@ -9,7 +9,7 @@
 using namespace std;
 
 class UdpPacketInfo;
-//class equalSeqNum;
+class equalSeqNum;
 class UdpSensor;
 
 class UdpPacketSensor:public UdpSensor{

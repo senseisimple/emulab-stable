@@ -24,6 +24,7 @@ struct UdpState{
 	unsigned long long lostPacketDelay;
 
 	long minDelayBytes;
+	bool sendError, ackError;
 };
 
 class equalSeqNum:public binary_function<const UdpPacketInfo * , unsigned int, bool> {

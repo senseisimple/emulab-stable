@@ -24,6 +24,7 @@
 
 #define LOCAL_SERVER_PORT 1500
 #define MAX_MSG 1524
+#define SNAPLEN 128
 
 pcap_t *pcapDescriptor = NULL;
 
@@ -46,6 +47,7 @@ int sd, rc, n, flags;
 socklen_t cliLen;
 struct sockaddr_in cliAddr, servAddr;
 unsigned long long lastAckTime = 0;
+std::ofstream outFile;
 
 unsigned long long getPcapTimeMicro(const struct timeval *tp)
 {
@@ -204,6 +206,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		// will be a combination of code below and that in UdpClient.
 	{
 	    unsigned int packetSeqNum = *(unsigned int *)(dataPtr + 1) ;
+	    int overhead = ipPacket->ip_hl*4 + 8 + 14 + 2;
         //printf("Data being received = %c, %u\n", *(unsigned char *)(dataPtr), *(unsigned int *)(dataPtr + 1));
 
 	    // If this sequence number is greater than the last sequence number
@@ -217,6 +220,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		memcpy(&appAck[2], &packetSeqNum, sizeof(unsigned int));
 
 		milliSec = getPcapTimeMicro(&pcap_info->ts);
+		outFile << "TIME="<<milliSec<<",SIZE="<<udpLen - 8 + overhead<<std::endl;
 		if(lastAckTime == 0)
 			lastAckTime = milliSec;
 		else
@@ -392,7 +396,7 @@ void init_pcap(char *interface)
 
 
         pcap_lookupnet(interface, &netp, &maskp, errBuf);
-        pcapDescriptor = pcap_open_live(interface, BUFSIZ, 0, 0, errBuf);
+        pcapDescriptor = pcap_open_live(interface, SNAPLEN, 0, 0, errBuf);
         localAddress.s_addr = netp;
         printf("IP addr = %s\n", inet_ntoa(localAddress));
 
@@ -450,8 +454,6 @@ int main(int argc, char *argv[])
 	flags = fcntl(sd, F_GETFL, 0);
 
 	cliLen = sizeof(cliAddr);
-
-	std::ofstream outFile;
 
 	outFile.open("Throughput.log", std::ios::out);
 

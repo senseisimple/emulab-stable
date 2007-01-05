@@ -22,7 +22,7 @@
 
 #define REMOTE_SERVER_PORT 1500
 #define MAX_MSG 1600
-#define SNAPLEN 96
+#define SNAPLEN 128
 
 #include "UdpThroughputSensor.h"
 #include "UdpMinDelaySensor.h"
@@ -325,6 +325,18 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	// Change the socket descriptor to non-blocking.
+	flags = fcntl(sd, F_GETFL, 0);
+	flags = flags | O_NONBLOCK;
+	int readFlags = flags;
+
+	// Set the socket descriptor to be non-blocking.
+	if( fcntl(sd, F_SETFL, flags) < 0)
+	{
+		printf("Error setting non blocking socket flags with fcntl.\n");
+		exit(1);
+	}
+
 	/* bind any port */
 	cliAddr.sin_family = AF_INET;
 	cliAddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -367,17 +379,6 @@ int main(int argc, char *argv[])
 	FD_ZERO(&readFdSet);
 	FD_ZERO(&writeFdSet);
 
-	// Change the socket descriptor to non-blocking.
-	flags = fcntl(sd, F_GETFL, 0);
-	flags = flags | O_NONBLOCK;
-	int readFlags = flags;
-
-	// Set the socket descriptor to be non-blocking.
-	if( fcntl(sd, F_SETFL, flags) < 0)
-	{
-		printf("Error setting non blocking socket flags with fcntl.\n");
-		exit(1);
-	}
 
 	// Read the command line arguments.
 	// Number of packets, Size of the packets to be sent, and their sending rate.
@@ -402,11 +403,11 @@ int main(int argc, char *argv[])
 		{
 			// UDP sends do not block - we don't need to 
 			// check if the socket is ready for writing.
-	//		FD_SET(sd, &writeFdSet);
+			FD_SET(sd, &writeFdSet);
 
-	//		select(1024,NULL,&writeFdSet, NULL,&selectTimeout);
+			select(sd + 1,NULL,&writeFdSet, NULL,&selectTimeout);
 
-	//		if(FD_ISSET(sd, &writeFdSet) != 0)
+			if(FD_ISSET(sd, &writeFdSet) != 0)
 			{
 
 				// This is used to regulate the rate
@@ -435,8 +436,7 @@ int main(int argc, char *argv[])
 
 					if(rc < 0)
 					{
-					    printf("Blocked in send = %d\n",errno);
-					    exit(1);
+					    printf("WARNING:Blocked in send = %d\n",errno);
 					}
 					else
 					{
@@ -451,7 +451,7 @@ int main(int argc, char *argv[])
 		// for reading.
 		FD_SET(sd, &readFdSet);
 
-		select(1024, &readFdSet, NULL, NULL,&selectTimeout);
+		select(sd + 1, &readFdSet, NULL, NULL,&selectTimeout);
 
 		if(FD_ISSET(sd, &readFdSet) != 0)
 		{

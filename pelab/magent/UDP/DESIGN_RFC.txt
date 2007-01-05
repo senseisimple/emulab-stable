@@ -62,6 +62,20 @@ the throughput calculations resilient to the loss of a small number of
 ( 3 consecutive ACK packets can be dropped without any effect on the
 throughput calculation ) ACK packets on the reverse path.
 
+The ACK packets also contain the timestamps at the receiver when the original
+packets were received. The timestamp for the packet being ACKed is an
+absolute value ( in micro seconds ), and the values for redundant ACKs are
+relative to this absolute value.
+
+As of now, the acknowledgement packets are of the same size as the received
+data packets. If they are a fixed minimum size, then it could affect the RTT
+calculations. If the packets sent from nodeA -> nodeB are say 1500 bytes long
+and the ACK packets are about 50 bytes, then the transmission delay on the forward
+path is going to be more than the transmission delay on the reverse path.
+
+When one way delay is calculated as half of RTT, this causes the one way delay
+estimate to be lower the actual value for the forward path ( if the ACKs are a fixed minimum size).
+
 
 Minimum Delay:
 -------------
@@ -82,43 +96,14 @@ way delay and the minimum from above, gives the value of approximate maximum que
 on the forward path. Whenever there is a new maximum queuing delay value, an event is sent to the
 application monitor and the value is used to set the maximum queue size for the dummy net pipe.
 
-Throughput (available bandwidth):
----------------------------------
+Note: UDP packets sent by from nodeA may not always be the maximum sized packets, as is most
+often the case with TCP. So, the minimum and maximum delay values need to be calculated ( ideally for
+every packet size), keeping the maximum sized UDP packet in mind. The one way delay values are
+thus scaled to represent maximum sized packets. ( we divide the one way delay by number of bytes in
+the packet + overhead, and then multiply it by 1500 ).
 
-For each acknowledged packet ( assuming no dropped packets ):
-
-Throughput = ( data size of the packet + header overhead ) / ( total one way delay for the packet )
-
-If every packet sent from nodeA is acknowledged by nodeB and there is no packet loss on
-either the forward or the reverse path, the above equation gives the throughput for
-each packet sent. Taking into account packet drops on the forward path and some packet
-drops on the reverse path, the throughput is calculated as below.
-
-Whenever packets are sent by nodeA, information about the sequence number, timestamp and
-the size of data in the packet is stored in a list at nodeA. When an acknowledgement
-is received, all the packets being acknowledged ( including any of redundant sequence
-numbers in the acknowledgement ) are removed from that list and used for throughput
-calculation. The sum of these packet sizes gives the amount of data that was transferred
-in this round trip time.
-
-After the redundant acknowledgements are considered, any packets remaining in the list with
-sequence numbers less than the latest acknowledged sequence number: were either lost in
-the forward path, or their ACK packets were lost on the reverse path. We cannot distinguish
-between forward/reverse path loss and consider them as forward path loss in both cases.
-
-These lost packets are also removed from the list at nodeA. The start_time of the round trip
-for throughput calculation is taken as the earliest send time of all the lost packets and
-all the acknowledged packets. The end_time of the round trip is the time at which the
-current acknowledgement was received.
-
-The throughput is then = ( sum of data size of ACKed packets ) / ( 0.5 * (end_time - start_time ) )
-
-
-Note: 
------
-
-There is another way in which throughput can be calculated. The receiver(nodeB) can timestamp
-packets when they are received and send these timestamps in the ACK packets.
+Throughput: 
+-----------
 
 Throughput = (size of data being ACKed) / ( last_receiver_time_stamp - current_receiver_time_stamp )
 
@@ -126,6 +111,9 @@ Here, throughput is being calculated depending on when each packet was seen by t
 assumption is that there is a single bottleneck link in the network: and the packets seen
 by the receiver will be spaced ( in time ) depending on the queueing & transmission delays
 encountered by the packets at the bottleneck.
+
+We assume that the forward and reverse paths are symmetric, in terms of the path
+capacity and delay introduced - although this might not be true in some cases.
 
 However, the spacing between the packets at the receiver need not be the same as that 
 at the bottleneck.This spacing can become compressed(similar to TCP ACK compression) later on in 
@@ -139,10 +127,8 @@ The reason for this is that we fail to take queuing delay into account for close
 packets arriving at the receiver. Since the clocks are not synchronized between the sender and
 receiver, it is not possible to accurately calculate the one way delay at the receiver.
 
-Hence, throughput values are being calculated at the sender based on the one way delay for
-each packet. However, this means that the throughput value will be effected by the RTT
-calculation. We assume that the forward and reverse paths are symmetric, in terms of the path
-capacity and delay introduced - although this might not be true in some cases.
+This compression of packets can affect the throughput calculated - currently we do not of
+any way to avoid this potential problem. ( it does seem to occur infrequently, only on a few paths ).
 
 
 Problems that might crop up:
@@ -168,6 +154,15 @@ receive buffer can ( assuming MTU sized UDP packets ), and hence should be less
 affected by the packet drop problem.
 
 This is just a hypothesis and needs to be tested on planetlab.
+
+
+2) Reordering of packets on the forward path & reordering of ACKs on the reverse path
+
+We currently ignore the reordering of packets/ACKs on forward/reverse paths.
+
+If this happens persistently and is perceived as a characteristic of some links,
+then it might need to be addressed.
+
 
 
 
