@@ -2814,7 +2814,7 @@ sub CopyDataStore($$$;$)
     libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
 						     $to_path,
 						     $archive_tag,
-						     "datastore")
+						     "exp/datastore")
 	== 0 or return -1;
     
     return 0;
