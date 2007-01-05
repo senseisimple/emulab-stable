@@ -6,7 +6,7 @@
 
 #####
 ##### Setting up the Utah Network Testbed software.
-##### Tested on FreeBSD 4.11
+##### Most recently tested on FreeBSD 6.1 .
 #####
 
 ##### Important notes
