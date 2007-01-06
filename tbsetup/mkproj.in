@@ -26,7 +26,7 @@ sub usage()
 my $optlist    = "qsh:m:f:";
 my $quiet      = 0;
 my $silent     = 0;
-my $leader_uid;
+my $newleader_uid;
 my $message;
 my $mfilename;
 my $pid;
@@ -40,7 +40,9 @@ sub fatal($);
 my $TB            = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
 my $TBAPPROVAL	  = "@TBAPPROVALEMAIL@";
+my $TBAUDIT	  = "@TBAUDITEMAIL@";
 my $TBBASE        = "@TBBASE@";
+my $TBWWW         = "@TBWWW@";
 my $MKGROUP       = "$TB/sbin/mkgroup";
 my $MODGROUPS     = "$TB/sbin/modgroups";
 my $MKACCT        = "$TB/sbin/tbacct add";
@@ -93,7 +95,7 @@ my $CVSREPOS = "$PROJROOT/cvsrepos";
 
 # Locals
 my $leader;
-my $projhead;
+my $oldleader;
 
 #
 # We do not want to run this script unless its the real version.
@@ -134,7 +136,7 @@ if (defined($options{"f"})) {
 	if (! -e $mfilename);
 }
 if (defined($options{"h"})) {
-    $leader_uid = $options{"h"};
+    $newleader_uid = $options{"h"};
 }
 usage()
     if (! @ARGV);
@@ -201,10 +203,10 @@ if (defined($mfilename)) {
 # leader. Note that this is allowed *only* for projects that have not
 # been approved yet. 
 #
-if (defined($leader_uid)) {
-    $leader = User->Lookup($leader_uid);
+if (defined($newleader_uid)) {
+    $leader = User->Lookup($newleader_uid);
     if (!defined($leader)) {
-	fatal("Could not map user $leader_uid to its object!");
+	fatal("Could not map user $newleader_uid to its object!");
     }
     # See if already did this; is so skip the following checks.
     my $curleader = $target_project->GetLeader();
@@ -215,11 +217,14 @@ if (defined($leader_uid)) {
 	fatal("Not allowed to change the leader of an approved project!")
 	    if ($target_project->approved());
 
+	# Save for email below.
+	$oldleader = $curleader;
+
 	# Update the project structure with the new leader. We are going
 	# to set the approved bit below, so this is the last chance to do
 	# this until we have code in place to change it later.
 	$target_project->ChangeLeader($leader) == 0 or
-	    fatal("Could not change project leader for $pid to $leader_uid!");
+	    fatal("Could not change leader for $pid to $newleader_uid!");
     }
 }
 else {
@@ -481,6 +486,28 @@ if (!$silent) {
      "Testbed Operations\n",
      "$TBAPPROVAL",
      "Bcc: $TBAPPROVAL");
+
+    #
+    # If the leader was switched, then generate a second message to the
+    # new leader telling him to approve the original leader to the project.
+    #
+    if (defined($oldleader)) {
+	my $oldleader_uid  = $oldleader->uid();
+	my $oldleader_name = $oldleader->name();
+	
+	SENDMAIL("$leader_name <$leader_email>",
+		 "$oldleader_uid $pid Project Join Request",
+		 "$oldleader_name wants to join project $pid.\n".
+		 "\n".
+		 "Please return to $TBWWW,\n".
+		 "log in, select the 'New User Approval' page, and enter\n".
+		 "your decision regarding ${oldleader_name}'s membership.\n".
+		 "\n".
+		 "Thanks,\n".
+		 "Testbed Operations\n",
+		 "$TBAPPROVAL",
+		 "Bcc: $TBAUDIT");
+    }
 }
 
 print "Project Creation Completed!\n";
