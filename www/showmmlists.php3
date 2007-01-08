@@ -145,7 +145,7 @@ if (mysql_num_rows($query_result)) {
     echo "<table border=2 cellpadding=0 cellspacing=2
            align='center'>\n";
 
-    $showmmlists_url = CreateUrl("showmmlists", $target_user)
+    $showmmlists_url = CreateUrl("showmmlists", $target_user);
 
     echo "<tr>
               <th><a href='${showmmlists_url}&sortby=listname'>List Name</th>
