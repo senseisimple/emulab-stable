@@ -718,7 +718,7 @@ class User
 			 "left join group_membership as authed on ".
 			 "     g.pid_idx=authed.pid_idx and ".
 			 "     g.gid_idx=authed.gid_idx and ".
-			 "     g.uid_idx='$uid_idx' ".
+			 "     g.uid_idx='$this_idx' ".
 			 "where authed.uid_idx='$auth_idx' and ".
 			 "      (authed.trust='group_root' or ".
 			 "       authed.trust='project_root')");
