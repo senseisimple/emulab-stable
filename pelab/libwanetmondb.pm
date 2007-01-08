@@ -72,9 +72,8 @@ sub getRows($)
     if( !defined $t0 || !defined $t1 ){
         #use Ops
         $useOps = 1;
-#        $t0 = time() - ($OpsDataDuration-1)*60*60;
-#        $t1 = time();
     }
+#    print "t0=$t0\nt1=$t1\n$query\n";
 
     #Determine whether to go to DPos or Ops databases
     if( defined $t0 &&
@@ -91,7 +90,7 @@ sub getRows($)
 
     if( $useOps ){
 #        print "USING OPS\n";
-        TBDBConnect($OPSDBNAME, $DBUSER, $dbpwd) == 0
+        TBDBConnect($OPSDBNAME, $DBUSER, $dbpwd,"") == 0
             or die("Could not connect to ops/pelab database!\n");
         my $query_result = DBQueryFatal($query);
         if (! $query_result->numrows) {
@@ -102,6 +101,7 @@ sub getRows($)
             push @rows, $hrow;
         }
     }else{
+#        print "USING DP: $query\n";
         TBDBConnect($DPDBNAME, $DBUSER, $dbpwd,$DPDBHOST) == 0
             or die("Could not connect to nfs/pelab database!\n");
         my $query_result = DBQueryFatal($query);
@@ -112,6 +112,7 @@ sub getRows($)
         while( my $hrow = $query_result->fetchrow_hashref() ){
             push @rows, $hrow;
         }
+#        print "finished DP\n";
     }
 
     return @rows;
