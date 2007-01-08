@@ -14,42 +14,52 @@
 #   + The set will not contain more than one node from a site
 # - Run this on ops.
 
+
+#
+# TODO:
+# - add options for time window
+#
+
+
 #use diagnostics;
 use strict;
+use English;
 use Getopt::Std;
 use lib '/usr/testbed/lib';
 use libtbdb;
+use libwanetmondb;
 
-
-my $pastHourWindow = 6;
 my $allnodeFile = "/proj/tbres/plab-reliable-list";
-my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
-my $DBNAME  = "pelab";
-my $DBUSER  = "pelab";
 my $NLIST = "/usr/testbed/bin/node_list";
 my $pprefix = "plab";
-#
+my $windowHrsDef = 6;
+
 # Turn off line buffering on output
-#
 $| = 1;
+
 sub usage {
-        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type] <numNodes>\n";
+        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type]".
+            "[-0 starttime] [-1 endtime] <numNodes>\n";
         return 1;
 }
 my ($pid, $eid);
 my $blacklistfilename;
 my $type = "";
+my ($t0, $t1);
 my %opt = ();
-getopts("e:f:t:", \%opt);
+getopts("0:1:e:f:t:", \%opt);
 if ($opt{e}) { ($pid,$eid) = split('/', $opt{e}); }
 if ($opt{f}) { $blacklistfilename = $opt{f}; }
 if ($opt{t}) { $type = $opt{t}; }
+if ($opt{0}) { $t0 = $opt{0}; } else { $t0 = time()-$windowHrsDef*60*60; }
+if ($opt{1}) { $t1 = $opt{1}; }
+elsif($opt{0}) { $t1 = $t0+$windowHrsDef*60*60; }
+else { $t1 = time(); }
 if (@ARGV !=1) { exit &usage; }
 my $numnodes = $ARGV[0];
 my @allnodes = ();      #nodes to consider, in order of desirablility (?)
 my %chosenBySite = ();  #indexed by siteidx, maps to plabxxx
 my %nodeIds = ();       #indexed by plabxxx => (siteid, nodeid)
-my $earliesttime = time() - $pastHourWindow*60*60;
 my %expnodes = ();  #nodes making up eid/pid
 my %blacknodes = ();#nodes not allowed to be chosen (deleted from allnodes)
 my %connMatrix = (); # {srcsite}{dstsite} => 1/0 mapping 
@@ -84,20 +94,6 @@ if( defined $blacklistfilename ){
     }
     close FILE;
 }
-
-#
-# Get DB password and connect.
-#
-my $DBPWD   = `cat $PWDFILE`;
-if ($DBPWD =~ /^([\w]*)\s([\w]*)$/) {
-    $DBPWD = $1;
-}
-else{
-    fatal("Bad chars in password!");
-}
-TBDBConnect($DBNAME, $DBUSER, $DBPWD) == 0
-    or die("Could not connect to pelab database!\n");
-
 
 #
 # prototypes
@@ -296,20 +292,18 @@ sub addNew($){
 
     #** check if this node satisfies the constraints **
 
-    #check for existing data
-    my $query_result =
-        DBQueryFatal("select latency from pair_data ".
+    my $qstr = "select latency from pair_data ".
                      "where latency is not NULL and ".
                      "dstsite_idx=$siteidx and ".
-                     "unixstamp > $earliesttime ".
-                     "limit 1");
-
-    if (! $query_result->numrows) {
+                     "unixstamp > $t0 and ".
+                     "unixstamp < $t1 ".
+                     "limit 1";
+    my @results = getRows($qstr);
+    if( !scalar(@results) ){
 #        warn("No latency results from $nodeid\n");
         return 0;
     }
-    my @result = $query_result->fetchrow_array();
-    
+
     if( $f_valid == 1 ){
         #add node to set if one doesn't already exist from its site
         if( !defined $chosenBySite{$siteidx} ){
@@ -336,25 +330,17 @@ sub getNodeIDs($){
         return @{$nodeIds{$nodeid}};
     }
 
-    # Grab the site index.
-    my $query_result =
-        DBQueryFatal("select site_idx from site_mapping ".
-                     "where node_id='$nodeid'");
+    # Grab the site and node index.
+    my $qstr = "select * from site_mapping ".
+               "where node_id='$nodeid'";
+    my @results = getRows($qstr);
 
-    if (! $query_result->numrows) {
-        die("Could not map $nodeid to its site index!\n");
+    if( !scalar(@results) ){
+        die("Could not map $nodeid to its site or node index!\n");
     }
-    my ($site_idx) = $query_result->fetchrow_array();
 
-    # Grab the node index.
-    $query_result =
-        DBQueryFatal("select node_idx from site_mapping ".
-                     "where node_id='$nodeid'");
-
-    if (! $query_result->numrows) {
-        die("Could not map $nodeid to its node index!\n");
-    }
-    my ($node_idx) = $query_result->fetchrow_array();
+    my $site_idx = $results[0]->{site_idx};
+    my $node_idx = $results[0]->{node_idx};
 
     $nodeIds{$nodeid} = [$site_idx,$node_idx];
 #    print "added to nodeIds: $nodeid => @{$nodeIds{$nodeid}}\n";
@@ -377,51 +363,45 @@ sub checkConn($$){
     
     my $qstr = "select * from pair_data ".
                      "where (latency $latTestStr  and ".
-                     "unixstamp > $earliesttime) and ".                     
+                     "unixstamp > $t0 and ".
+                     "unixstamp < $t1) and ".
                      "((srcsite_idx=$srcsite and ".
                      "dstsite_idx=$dstsite) or ".
                      "(srcsite_idx=$dstsite and ".
                      "dstsite_idx=$srcsite)) ".
                      "limit 1";
-
-    my $query_result =
-        DBQueryFatal($qstr );
-#    print $qstr."\n\n";
-    if (! $query_result->numrows) {
-#        warn("No latency results from $nodeid\n");
+    my @results = getRows($qstr);
+    if( !scalar(@results) ){
     }else{
         $latConn = 1;
     }
     
     $qstr = "select * from pair_data ".
             "where bw $bwTestStr and ".
-            "unixstamp > $earliesttime and ".                     
+            "unixstamp > $t0 and ".
+            "unixstamp < $t1 and ".
             "srcsite_idx=$srcsite and ".
-            "dstsite_idx=$dstsite and ".
+            "dstsite_idx=$dstsite ".
             "limit 1";
-#    print $qstr."\n\n";
-    $query_result =
-        DBQueryFatal($qstr);
-    if (! $query_result->numrows )
-    {
+    @results = getRows($qstr);
+    if( !scalar(@results) ){
     }else{
         $bwConnF = 1;
     }
 
-    $query_result =
-        DBQueryFatal("select * from pair_data ".
-                     "where bw $bwTestStr and ".
-                     "unixstamp > $earliesttime and ".                     
-                     "srcsite_idx=$dstsite and ".
-                     "dstsite_idx=$srcsite and ".
-                     "limit 1"
-                     );
-    if (! $query_result->numrows) {
+    $qstr = "select * from pair_data ".
+            "where bw $bwTestStr and ".
+            "unixstamp > $t0 and ".
+            "unixstamp < $t1 and ".
+            "srcsite_idx=$dstsite and ".
+            "dstsite_idx=$srcsite ".
+            "limit 1";
+    @results = getRows($qstr);
+    if( !scalar(@results) ){
     }else{
         $bwConnB = 1;
     }
-
-    
+#    print "($latConn, $bwConnF, $bwConnB)\n";
     return ($latConn, $bwConnF, $bwConnB);
 }
 
@@ -444,3 +424,4 @@ sub printChosenNodes{
         print "$node: $connRating{$node}\n";
     }
 }
+
