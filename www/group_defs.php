@@ -680,5 +680,6 @@ class Group
 	    $mailstr .= '"' . $row[usr_name] . " (". $row[uid] . ")\" <" .
 		$row[usr_email] . ">";
 	}
+	return $mailstr;
     }
 }
