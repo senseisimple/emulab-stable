@@ -89,6 +89,50 @@ static bool monitorFD_p(int);
 static bool connectedFD_p(int);
 
 /*
+ * Logging messages
+ */
+
+/*
+ * The types of log messages which are currently defined, and the associated
+ * ASCII strings
+ */
+typedef enum { LOG_NEW = 0,
+               LOG_REMOTEIP, 
+               LOG_REMOTEPORT,
+               LOG_LOCALPORT,
+               LOG_TCP_NODELAY,
+               LOG_TCP_MAXSEG,
+               LOG_SO_RCVBUF,
+               LOG_SO_SNDBUF,
+               LOG_CONNECTED,
+               LOG_SEND,
+               LOG_SENDTO,
+               LOG_CLOSED
+} logmsg_t;
+static char *log_type_names[] = {
+    "New",
+    "RemoteIP",
+    "RemotePort",
+    "LocalPort",
+    "TCP_NODELAY",
+    "TCP_MAXSEG",
+    "SO_RCVBUF",
+    "SO_SNDBUF",
+    "Connected",
+    "Send",
+    "SendTo",
+    "Closed"
+};
+
+/*
+ * Print out a log message. First argument is the type of the log mesage, the
+ * second is the file descriptor number, and the remaining arguments are
+ * processed like arguments to printf() (ie. a format string, then zero or more
+ * arguments to be interpolated into the format string)
+ */
+static void printlog(logmsg_t,int, ... );
+
+/*
  * Log that a packet has been sent to the kernel on a given FD with a given
  * size. If the final argument is non-NULL, then we are logging a packet from
  * sendto(), and should report the IP address and port numbers involved

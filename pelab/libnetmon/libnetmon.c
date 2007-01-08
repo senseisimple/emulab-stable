@@ -107,10 +107,9 @@ void lnm_init() {
          */
 #define FIND_REAL_FUN(FUN) \
           real_##FUN = (FUN##_proto_t*)dlsym(RTLD_NEXT,#FUN); \
-          if (!real_##FUN) { \
+          if (!real_##FUN) \
               croak("Unable to get the address of " #FUN "(): %s\n", \
                     dlerror()); \
-          }
 
         FIND_REAL_FUN(socket);
         FIND_REAL_FUN(close);
@@ -126,7 +125,7 @@ void lnm_init() {
 
         /*
          * Connect to netmond if we've been asked to
-         */
+         */ 
 
         /*
          * If this is set at all, use the standard data and control sockets for
@@ -351,7 +350,8 @@ void lnm_control_wait() {
 }
 
 /*
- * Get the unique identifier for a connection
+ * 'Name' a file descriptor by getting a unique identifier for it - port
+ * numbers, IP addresses, etc.
  */
 void nameFD(int fd, const struct sockaddr *localname,
         const struct sockaddr *remotename) {
@@ -381,7 +381,6 @@ void nameFD(int fd, const struct sockaddr *localname,
      * later
      */
     monitorFDs[fd].remote_port = ntohs(remoteaddr->sin_port);
-    /* XXX Error checking */
     monitorFDs[fd].remote_hostname = inet_ntoa(remoteaddr->sin_addr);
 
     /*
@@ -402,10 +401,6 @@ void nameFD(int fd, const struct sockaddr *localname,
 
     monitorFDs[fd].local_port = ntohs(localaddr->sin_port);
 
-    monitorFDs[fd].connected = true;
-    if (report_connect) {
-        informConnect(fd);
-    }
 }
 
 /*
@@ -485,19 +480,7 @@ void startFD(int fd) {
      * reported in informConnect()
      */
     if (output_version >= 3) {
-        fprintf(outstream,"New: ");
-        fprintID(outstream,fd);
-        fprintf(outstream," ");
-        fprintTime(outstream);
-        fprintf(outstream," ");
-        if (socktype == SOCK_STREAM) {
-            fprintf(outstream,"TCP");
-        } else if (socktype == SOCK_DGRAM) {
-            fprintf(outstream,"UDP");
-        } else {
-            fprintf(outstream,"UNKNOWN");
-        }
-        fprintf(outstream,"\n");
+        printlog(LOG_NEW,fd,(socktype == SOCK_STREAM)?"TCP":"UDP");
     }
 
     monitorFDs[fd].monitoring = true;
@@ -521,13 +504,11 @@ void stopFD(int fd) {
     /*
      * Let the monitor know we're done with it
      */
-    if (output_version >= 2 && report_connect) {
-        fprintf(outstream,"Closed: ");
-        fprintID(outstream,fd);
-        fprintf(outstream,"\n");
-    }
+    printlog(LOG_CLOSED,fd);
 
     monitorFDs[fd].monitoring = false;
+
+    // XXX: Possible memory leak?
     if (monitorFDs[fd].remote_hostname != NULL) {
         monitorFDs[fd].remote_hostname = NULL;
     }
@@ -543,6 +524,158 @@ void stopWatchingAll() {
             stopFD(i);
         }
     }
+}
+
+void printlog(logmsg_t type, int fd, ...) {
+    /*
+     * A set of variables that turns on and off specific parts of the output
+     * string
+     */
+    bool print_name = true;
+    bool print_id = true;
+    bool print_timestamp = true;
+    bool print_value = true;
+
+    /*
+     * If this is set to false, we bypass logging completely.
+     */
+    bool print = true;
+
+    DEBUG(printf("printlog(%i,%i,...) called\n");)
+
+    /*
+     * Decide what to print based on the type of the log message and the output
+     * version
+     */
+    switch (type) {
+        case LOG_NEW:
+            // Old versions didn't print a timestamp or socket type
+            if (output_version < 3) { print_timestamp = print_value = false; }
+            break;
+        case LOG_REMOTEIP:
+            // This message only showed up in version 3
+            if (output_version < 3) { print = false; }
+            break;
+        case LOG_REMOTEPORT:
+            // This message only showed up in version 3
+            if (output_version < 3) { print = false; }
+            break;
+        case LOG_LOCALPORT:
+            // This message only showed up in version 1
+            if (output_version < 1) { print = false; }
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // Only report if we're also reporting connection info
+            if (!report_connect) { print = false; }
+            break;
+        case LOG_TCP_NODELAY:
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_sockopt) { print = false; }
+            break;
+        case LOG_TCP_MAXSEG:
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_sockopt) { print = false; }
+            break;
+        case LOG_SO_RCVBUF:
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_sockopt) { print = false; }
+            break;
+        case LOG_SO_SNDBUF:
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_sockopt) { print = false; }
+            break;
+        case LOG_CONNECTED:
+            // No Value
+            print_value = false;
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_connect) { print = false; }
+            break;
+        case LOG_SEND:
+            // This should be handled by calling log_packet()
+            croak("LOG_SEND passed to printlog()");
+            break;
+        case LOG_SENDTO:
+            // This should be handled by calling log_packet()
+            croak("LOG_SENDTO passed to printlog()");
+            break;
+        case LOG_CLOSED:
+            // No Value
+            print_value = false;
+            // Old version didn't include a timestamp
+            if (output_version < 3) { print_timestamp = false; }
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_connect) { print = false; }
+            break;
+        default:
+            croak("Invalid type (%) passed to printlog()\n",type);
+    }
+
+    /*
+     * If we've decided not to print anything at all, bail now
+     */
+    if (!print) {
+        return;
+    }
+
+    /*
+     * Print out the name of the command
+     */
+    if (print_name) {
+        char *logname = log_type_names[type];
+        fprintf(outstream,"%s: ",logname);
+    }
+
+    /*
+     * Print out the ID of the socket the action is for
+     */
+    if (print_id) {
+        fprintID(outstream,fd);
+        fprintf(outstream," ");
+    }
+
+    /*
+     * Print out a timestamp
+     */
+    if (print_timestamp) {
+        fprintTime(outstream);
+        fprintf(outstream," ");
+    }
+
+    va_list ap;
+    va_start(ap,fd);
+    if (print_value) {
+        /*
+         * First variadic argument is the format string, which must be passed
+         * specially to vfprintf;
+         */
+        char *fmt = va_arg(ap,char*);
+        vfprintf(outstream,fmt,ap);
+    }
+    va_end(ap);
+
+    fprintf(outstream,"\n");
 }
 
 /*
@@ -791,7 +924,9 @@ bool connectedFD_p(int whichFD) {
 }
 
 /*
- * Let the user know that a packet has been sent.
+ * Let the user know that a packet has been sent. This function is, for now,
+ * seperate from printlog() because it prints out very different messages for
+ * early versions of the output format
  */
 void log_packet(int fd, size_t len, const struct sockaddr *srvaddr) {
     if (!report_io) {
@@ -874,106 +1009,57 @@ void log_packet(int fd, size_t len, const struct sockaddr *srvaddr) {
  * Inform the user that the nodelay flag has been changed
  */
 void informNodelay(int fd) {
-    if (monitorFDs[fd].socktype == SOCK_STREAM && output_version >= 2) {
-	fprintf(outstream,"TCP_NODELAY: ");
-	fprintID(outstream,fd);
-        if (output_version >= 3) {
-            fprintf(outstream," ");
-            fprintTime(outstream);
-        }
-	fprintf(outstream," %i\n",monitorFDs[fd].tcp_nodelay);
+    if (monitorFDs[fd].socktype == SOCK_STREAM) {
+        printlog(LOG_TCP_NODELAY, fd, "%i",monitorFDs[fd].tcp_nodelay);
     }
 }
 
 void informMaxseg(int fd) {
-    if (monitorFDs[fd].socktype == SOCK_STREAM && output_version >= 2) {
-	fprintf(outstream,"TCP_MAXSEG: ");
-	fprintID(outstream,fd);
-        if (output_version >= 3) {
-            fprintf(outstream," ");
-            fprintTime(outstream);
-        }
-	fprintf(outstream," %i\n",monitorFDs[fd].tcp_maxseg);
+    if (monitorFDs[fd].socktype == SOCK_STREAM) {
+        printlog(LOG_TCP_MAXSEG, fd, "%i",monitorFDs[fd].tcp_maxseg);
     }
 }
 
 void informBufsize(int fd, int which) {
-    int bufsize;
-    if (output_version >= 2) {
-	/* TODO: Handle bad which parameter */
-	if (which == SO_SNDBUF) {
-	    bufsize = monitorFDs[fd].sndbuf;
-	} else {
-	    bufsize = monitorFDs[fd].rcvbuf;
-	}
+    /* TODO: Handle bad which parameter */
+    printlog((which == SO_SNDBUF) ? LOG_SO_SNDBUF : LOG_SO_RCVBUF,
+             fd, "%i",
+             (which == SO_SNDBUF) ? monitorFDs[fd].sndbuf :
+                                    monitorFDs[fd].rcvbuf);
 
-	fprintf(outstream,"%s: ", (which == SO_SNDBUF) ?
-		"SO_SNDBUF" : "SO_RCVBUF");
-	fprintID(outstream,fd);
-        if (output_version >= 3) {
-            fprintf(outstream," ");
-            fprintTime(outstream);
-        }
-	fprintf(outstream," %i\n", bufsize);
-
-    }
 }
 
 void informConnect(int fd) {
-    if (output_version >= 2) {
-	/*
-         * Let the monitor know about it - note: if it's a UDP socket, we've
-         * already reported on it in startFD. Note that, for version 3, we
-         * report the existence of the socket earler, in startFD
-	 */
-        if ((output_version < 3) && monitorFDs[fd].socktype == SOCK_STREAM) {
-            fprintf(outstream,"New: ");
-            fprintID(outstream,fd);
-            fprintf(outstream," ");
-            fprintTime(outstream);
-            fprintf(outstream,"\n");
-        }
-
-        /*
-         * New versions of the output no longer include port numbers in the
-         * identifier. So, report those now. Note that we only do this for TCP
-         * sockets - UDP sockets will get this information reported with each
-         * sendto()
-         */
-        if (output_version >= 3 && monitorFDs[fd].socktype == SOCK_STREAM){
-            fprintf(outstream,"RemoteIP: ");
-            fprintID(outstream,fd);
-            fprintf(outstream," ");
-            fprintTime(outstream);
-            fprintf(outstream," %s",monitorFDs[fd].remote_hostname);
-            fprintf(outstream,"\n");
-
-            fprintf(outstream,"RemotePort: ");
-            fprintID(outstream,fd);
-            fprintf(outstream," ");
-            fprintTime(outstream);
-            fprintf(outstream," %i",monitorFDs[fd].remote_port);
-            fprintf(outstream,"\n");
-        }
-
-	/*
-	 * Some things we report on for every connection
-	 */
-        if (report_sockopt) {
-            informNodelay(fd);
-            informMaxseg(fd);
-            informBufsize(fd, SO_RCVBUF);
-            informBufsize(fd, SO_SNDBUF);
-        }
-
-        if (report_connect) {
-            fprintf(outstream,"Connected: ");
-            fprintID(outstream,fd);
-            fprintf(outstream," ");
-            fprintTime(outstream);
-            fprintf(outstream,"\n");
-        }
+    /*
+     * Let the monitor know about it - note: if it's a UDP socket, we've
+     * already reported on it in startFD. Note that, for version 3, we
+     * report the existence of the socket earler, in startFD
+     */
+    if ((output_version < 3) && monitorFDs[fd].socktype == SOCK_STREAM) {
+        printlog(LOG_NEW, fd,
+                 (monitorFDs[fd].socktype == SOCK_STREAM)?"TCP":"UDP");
     }
+
+    /*
+     * New versions of the output no longer include port numbers in the
+     * identifier. So, report those now. Note that we only do this for TCP
+     * sockets - UDP sockets will get this information reported with each
+     * sendto()
+     */
+    if (monitorFDs[fd].socktype == SOCK_STREAM){
+        printlog(LOG_REMOTEIP,fd,"%s",monitorFDs[fd].remote_hostname);
+        printlog(LOG_REMOTEPORT,fd,"%i",monitorFDs[fd].remote_port);
+    }
+
+    /*
+     * Some things we report on for every connection
+     */
+    informNodelay(fd);
+    informMaxseg(fd);
+    informBufsize(fd, SO_RCVBUF);
+    informBufsize(fd, SO_SNDBUF);
+
+    printlog(LOG_CONNECTED,fd);
 }
 
 int getNewSockbuf(int fd, int which) {
@@ -998,7 +1084,6 @@ int getNewSockbuf(int fd, int which) {
 /*
  * Library function wrappers
  */
-
 int socket(int domain, int type, int protocol) {
     int returnedFD;
     lnm_init();
@@ -1041,6 +1126,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
      */
     if (monitorFD_p(sockfd)) {
         nameFD(sockfd,NULL,serv_addr);
+        informConnect(sockfd);
     }
 
     rv = real_connect(sockfd, serv_addr, addrlen);
@@ -1069,6 +1155,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          * if they don't, and just write to it, we won't find out. So, for
          * now, just assume that the connect() will succeed.
          */
+        monitorFDs[sockfd].connected = true;
 
         /*
          * Get the local port number so that we can monitor it
@@ -1081,14 +1168,11 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
         int local_port = ntohs(localaddr.sin_port);
         monitorFDs[sockfd].local_port = local_port;
 
-        if (report_connect && monitorFDs[sockfd].socktype == SOCK_STREAM) {
-            fprintf(outstream,"LocalPort: ");
-            fprintID(outstream,sockfd);
-            if (output_version >= 3) {
-                fprintf(outstream," ");
-                fprintTime(outstream);
-            }
-            fprintf(outstream," %i\n",local_port);
+        /*
+         * Report on the local port number
+         */
+        if (monitorFDs[sockfd].socktype == SOCK_STREAM) {
+            printlog(LOG_LOCALPORT,sockfd,"%i",local_port);
         }
     } else {
         /*
@@ -1124,16 +1208,12 @@ int accept(int s, struct sockaddr * addr,
          */
         startFD(rv);
         nameFD(rv,addr,NULL);
-        if (report_connect) {
-            fprintf(outstream,"LocalPort: ");
-            fprintID(outstream,rv);
-            if (output_version >= 3) {
-                fprintf(outstream," ");
-                fprintTime(outstream);
-            }
-            fprintf(outstream," %i\n",ntohs(((struct sockaddr_in*)addr)->sin_port));
-        }
+        informConnect(rv);
+        // XXX Accessors
+        monitorFDs[s].connected = 1;
         monitorFDs[s].local_port = ntohs(((struct sockaddr_in*)addr)->sin_port);
+        printlog(LOG_CONNECTED,rv);
+        printlog(LOG_LOCALPORT,rv,"%i",monitorFDs[s].local_port);
     }
 
     return rv;
@@ -1261,7 +1341,6 @@ ssize_t sendto(int fd, const void *buf, size_t count, int flags,
 
 }
 
-
 int setsockopt (int s, int level, int optname, const void *optval,
                  socklen_t optlen) {
     int rv;
@@ -1317,7 +1396,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 	     * not be exactly what the user asked for
 	     */
 	    getNewSockbuf(s,optname);
-	    if (connectedFD_p(s) && report_sockopt) {
+	    if (connectedFD_p(s)) {
 		informBufsize(s,optname);
 	    }
 	}
@@ -1329,7 +1408,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 	    if (optname == TCP_NODELAY) {
 		monitorFDs[s].tcp_nodelay = *((int *)optval);
 
-		if (connectedFD_p(s) && report_sockopt) {
+		if (connectedFD_p(s)) {
 		     /* If connected, inform user of this call */
 		    informNodelay(s);
 		}
@@ -1337,7 +1416,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 	    if (optname == TCP_MAXSEG) {
 		monitorFDs[s].tcp_maxseg = *((int *)optval);
 
-		if (connectedFD_p(s) && report_sockopt) {
+		if (connectedFD_p(s)) {
 		    /* If connected, inform user of this call */
 		    informMaxseg(s);
 		}
