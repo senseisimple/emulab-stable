@@ -244,7 +244,7 @@ if (! TableChanged("node_history", "uid_idx")) {
 		 "  uid_idx mediumint(8) unsigned NOT NULL default '0' ".
 		 "after uid");
 }
-#UpdateTable("node_history", "uid_idx", "uid");
+UpdateTable("node_history", "uid_idx", "uid");
 
 # nodelog
 if (! TableChanged("nodelog", "reporting_idx")) {
@@ -260,7 +260,7 @@ if (! TableChanged("testbed_stats", "uid_idx")) {
 		 "  uid_idx mediumint(8) unsigned NOT NULL default '0' ".
 		 "after uid");
 }
-#UpdateTable("testbed_stats", "uid_idx", "uid");
+UpdateTable("testbed_stats", "uid_idx", "uid");
 
 # widearea_accounts
 if (! TableChanged("widearea_accounts", "uid_idx")) {
