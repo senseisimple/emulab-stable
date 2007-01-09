@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -59,8 +59,8 @@ config.status:
 rude-$(VERSION):
 	$(SRCDIR)/rude-fetch.sh $(SRCDIR)
 
-clean: Makefile
-	$(MAKE) -f Makefile clean
+clean:
+	@if [ -r Makefile ]; then $(MAKE) -f Makefile clean; fi
 
 Makefile: config.status
 
