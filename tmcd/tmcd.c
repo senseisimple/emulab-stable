@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -3470,7 +3470,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
-	char		*disktype;
+	char		*disktype, *useacpi;
 	int		disknum, zfill;
 
 	/*
@@ -3529,12 +3529,14 @@ COMMAND_PROTOTYPE(doloadinfo)
 	 */
 	disktype = DISKTYPE;
 	disknum = DISKNUM;
+	useacpi = "unknown";
 
 	res = mydb_query("select attrkey,attrvalue from nodes as n "
 			 "left join node_type_attributes as a on "
 			 "     n.type=a.type "
 			 "where (a.attrkey='bootdisk_unit' or "
-			 "       a.attrkey='disktype') and "
+			 "       a.attrkey='disktype' or "
+			 "       a.attrkey='use_acpi') and "
 			 "      n.node_id='%s'", 2, reqp->nodeid);
 	
 	if (!res) {
@@ -3556,12 +3558,15 @@ COMMAND_PROTOTYPE(doloadinfo)
 				else if (strcmp(row[0], "disktype") == 0) {
 					disktype = row[1];
 				}
+				else if (strcmp(row[0], "use_acpi") == 0) {
+					useacpi = row[1];
+				}
 			}
 			nrows--;
 		}
 	}
-	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d ZFILL=%d\n",
-	       disktype, disknum, zfill);
+	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d ZFILL=%d ACPI=%s\n",
+	       disktype, disknum, zfill, useacpi);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
