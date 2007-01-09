@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -90,3 +90,13 @@ sysetc-install:	dir-install netif-emulab
 
 script-install:	dir-install
 #	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+
+#
+# NOTES:
+#  * We still use rc.conf.d/dhclient right now (til we switch to 6.x rc.d files)
+#
+frisbee-mfs-install:
+	(cd ../freebsd5; $(MAKE) all frisbee-mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,6 +25,13 @@ endif
 endif
 
 include $(OBJDIR)/Makeconf
+
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
 
 all:	frisbee frisbeed
 
@@ -54,8 +61,8 @@ SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
-CFLAGS		= -O2 -g -Wall -fno-builtin-log -static $(PTHREADCFLAGS) -DSTATS
-LDFLAGS		= -static
+CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS
+LDFLAGS		= $(LDSTATIC)
 
 #
 # Define this if your implementation of cond_vars works well

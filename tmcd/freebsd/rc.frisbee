@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -85,6 +85,8 @@ DISK=`echo $LOADINFO | awk -F= '{ printf $5 }' | awk -F' ' '{ print $1 }'`
 DISK=${DISK:-'ad0'}
 ZFILL=`echo $LOADINFO | awk -F= '{ printf $6 }' | awk -F' ' '{ print $1 }'`
 ZFILL=${ZFILL:-'0'}
+ACPI=`echo $LOADINFO | awk -F= '{ printf $7 }' | awk -F' ' '{ print $1 }'`
+ACPI=${ACPI:-'unknown'}
 
 if [ "$PARTITION" != "0" ]; then
 	SLICE="-s $PARTITION"
@@ -218,6 +220,7 @@ if [ x"$ADDRESS" != x ]; then
 		echo "Resizing final disk partition"
 		$BINDIR/growdisk -vW /dev/$DISK
 		echo "Adjusting slice-related files"
+		export SLICEFIX_ACPI=$ACPI
 		$BINDIR/slicefix $PARTITION $DISK
 		echo "Image load complete at `date`"
 

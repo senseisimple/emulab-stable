@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -215,7 +215,17 @@ frisbee-mfs: mfsoscheck
 	@$(MAKE) -C os frisbee-mfs
 	@$(MAKE) -C tmcd frisbee-mfs
 
+frisbee-mfs-nostatic: mfsoscheck
+	@NOSTATIC=1 $(MAKE) -C cdrom/groklilo client
+	@NOSTATIC=1 $(MAKE) -C os frisbee-mfs
+	@NOSTATIC=1 $(MAKE) -C tmcd frisbee-mfs
+
 frisbee-mfs-install: destdircheck frisbee-mfs
+	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
+	@$(MAKE) -C os frisbee-mfs-install
+	@$(MAKE) -C tmcd frisbee-mfs-install
+
+frisbee-mfs-nostatic-install: destdircheck frisbee-mfs-nostatic
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C tmcd frisbee-mfs-install

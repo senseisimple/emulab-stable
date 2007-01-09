@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -12,6 +12,13 @@ SUBDIR		= tmcd
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
+
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
 
 all:	server fullclient client
 fullclient: tmcc
@@ -80,7 +87,7 @@ tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ)
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
 tmcc: tmcc.c decls.h $(SSLOBJ)
-	$(CC) $(CFLAGS) $(SSLFLAGS) -static -g -o tmcc $< $(SSLOBJ) \
+	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc $< $(SSLOBJ) \
 		$(LFLAGS) $(TMLIBS)
 
 tmcc-shared: tmcc.c decls.h $(SSLOBJ)
@@ -88,10 +95,10 @@ tmcc-shared: tmcc.c decls.h $(SSLOBJ)
 		$(LFLAGS) $(TMLIBS)
 
 tmcc-nossl-debug: tmcc.c decls.h
-	$(CC) $(CFLAGS) -static -g -o $@ $< $(LFLAGS) $(TMSLIBS)
+	$(CC) $(CFLAGS) $(LDSTATIC) -g -o $@ $< $(LFLAGS) $(TMSLIBS)
 
 findif-debug: findif.o
-	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) -static
+	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) $(LDSTATIC)
 
 dostype-debug: dostype.o
 	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
@@ -139,7 +146,7 @@ ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
 
 clean:	subdir-clean
-	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype version.c
+	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype *-debug version.c
 
 subdir-clean:
 	@$(MAKE) -C $(MDSUBDIR) clean
