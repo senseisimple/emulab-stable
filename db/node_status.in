@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -187,7 +187,7 @@ while (my ($node) = $query_result->fetchrow_array) {
 	if ($verbose);
     if (!$debug) {
 	MarkPhysNodeDown($node);
-	TBSetNodeLogEntry($node, $UID, TB_DEFAULT_NODELOGTYPE(),
+	TBSetNodeLogEntry($node, "root", TB_DEFAULT_NODELOGTYPE(),
 		"'Moved to hwdown by node_status; ".
 		"did not report in for more than $timeout seconds.'");
     }
