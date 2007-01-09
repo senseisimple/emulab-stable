@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -82,6 +82,7 @@ use libtblog;
 use libArchive;
 use Template;
 use Experiment;
+use User;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -110,7 +111,6 @@ my $template_node = 0;
 
 my $inout;
 my $logname;
-my $dbuid;
 my $user_name;
 my $user_email;
 my @allnodes;
@@ -119,7 +119,6 @@ my $action;
 my $tag;
 my $nextswapstate;
 my $termswapstate;
-my $isadmin  = 0;
 
 my $modifyError; # needed when emailing error
 
@@ -297,19 +296,17 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
 }
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database.");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
-$isadmin = TBAdmin($UID);
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $isadmin    = TBAdmin();
 
 #
 # Set error reporting info
@@ -321,7 +318,7 @@ tblog_set_info($pid,$eid,$UID);
 # Note that any script down the line has to do an admin check also. 
 #
 if ($UID && !$isadmin &&
-    ! $experiment->AccessCheck($dbuid, TB_EXPT_DESTROY)) {
+    ! $experiment->AccessCheck($user_uid, TB_EXPT_DESTROY)) {
     tbdie("You do not have permission to swap or modify this experiment!");
 }
 
@@ -341,7 +338,7 @@ if ($waitmode) {
 #
 # Check for overquota; we deal with it below, cause of the batch system.
 #
-my $overquota = system("$checkquota $dbuid");
+my $overquota = system("$checkquota $user_uid");
 
 if ($overquota) {
     tberror({cause => 'user', severity => SEV_WARNING,
@@ -386,7 +383,6 @@ my $cancelflag      = $experiment->canceled();
 my $expt_locked     = $experiment->locked();
 my $elabinelab      = $experiment->elabinelab();
 my $lockdown        = $experiment->lockdown();
-my $last_swap_uid   = $experiment->swapper();
 my $swappablebit    = $experiment->swappable();
 my $idleswapbit     = $experiment->idleswap();
 my $autoswapbit     = $experiment->autoswap();
@@ -398,6 +394,12 @@ my $noidleswap      = $experiment->noidleswap_reason();
 my $idleswaptime    = $experiment->idleswap_timeout() / 60.0;
 my $autoswaptime    = $experiment->autoswap_timeout() / 60.0;
 my $rendering       = $experiment->prerender_pid();
+
+# Need the previous swapper for rollback below.
+my $last_swapper = User->Lookup($experiment->swapper_idx());
+if (! defined($last_swapper)) {
+    tbdie("Error looking up object for last swapper!");
+}
 
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
@@ -486,7 +488,7 @@ else {
 	    #
 	    ExitWithStatus(1,
 			   "Only the creator of a batch experiment can queue it!")
-		if ($experiment->creator() ne $dbuid);
+		if ($experiment->creator() ne $user_uid);
 
 	    if ($overquota) {
 		tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);
@@ -874,15 +876,15 @@ $SIG{QUIT} = 'DEFAULT';
 # Gather stats; start clock ticking
 #
 if ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, 0,
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPIN, 0,
 		    TBDB_STATS_FLAGS_START);
 }
 elsif ($inout eq "out") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0,
 		    TBDB_STATS_FLAGS_START);
 }
 elsif ($inout eq "modify") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0,
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPMODIFY, 0,
 		    TBDB_STATS_FLAGS_START);
 }
 
@@ -933,12 +935,12 @@ if ($inout eq "out") {
 	or fatal("Failed to clear the panic bit!");
 }
 elsif ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $dbuid,
+    GatherSwapStats($pid, $eid, $user_uid,
 		    TBDB_STATS_SWAPIN, 0, TBDB_STATS_FLAGS_PRESWAPIN);
 
     # Set the swapper now so that nodes use the proper uid. If the swapin
     # fails, we leave the swapper as is, since its harmless and informative.
-    $experiment->SetSwapper($dbuid);
+    $experiment->SetSwapper($this_user);
 
     if ($experiment->Swap("in") != 0) {
 	$errorstat = $? >> 8;
@@ -963,7 +965,7 @@ elsif ($inout eq "modify") {
 	fatal("Failed to do a preswapmod on the experiment archive!");
     }
 
-    GatherSwapStats($pid, $eid, $dbuid,
+    GatherSwapStats($pid, $eid, $user_uid,
 		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
 
     # Gather up some firewall state for later comparison.
@@ -1032,7 +1034,7 @@ elsif ($inout eq "modify") {
 	# Set the swapper now so that nodes use the proper uid. If the
 	# swapin fails, we need to reset the swapper back so that he
 	# is charged appropriately.
-	$experiment->SetSwapper($dbuid);
+	$experiment->SetSwapper($this_user);
 
 	my $optarg = "";
 	#
@@ -1086,7 +1088,7 @@ elsif ($inout eq "modify") {
 		$modifyError = "Update aborted; old state restored.";
 
 		# Reset the swapper since the experiment is still running.
-		$experiment->SetSwapper($last_swap_uid);
+		$experiment->SetSwapper($last_swapper);
 	    }
 	}
     }
@@ -1194,18 +1196,18 @@ if ($inout eq "out" && !$template_mode) {
 # Gather stats. 
 #
 if ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, 0);
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPIN, 0);
 }
 elsif ($inout eq "out") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0,
 		    ($idleswap ? TBDB_STATS_FLAGS_IDLESWAP() : 0));
 }
 elsif ($inout eq "modify") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0);
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPMODIFY, 0);
 }
 
 # Accounting info. For swapout, must be after its done with.
-$experiment->SetSwapInfo($dbuid);
+$experiment->SetSwapInfo($this_user);
 
 #
 # In batch mode, just exit without sending email or unlocking. The
@@ -1289,7 +1291,7 @@ sub cleanup()
     # Gather stats. 
     #
     if ($inout eq "in") {
-	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, $errorstat);
+	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPIN, $errorstat);
 
 	#
 	# Must clean up the experiment if it managed to swap in.
@@ -1303,7 +1305,7 @@ sub cleanup()
 	}
     }
     elsif ($inout eq "out") {
-	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $errorstat);
+	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, $errorstat);
     }
     elsif ($inout eq "modify") {
 	#
@@ -1312,10 +1314,10 @@ sub cleanup()
 	# that fails, but results in the experiment being restored the
 	# way it was. 
 	#
-	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, $errorstat);
+	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPMODIFY, $errorstat);
 	
 	if ($modifySwapped) {
-	    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
+	    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0);
 	}
     }
 
@@ -1346,7 +1348,7 @@ sub cleanup()
 		$stat = $? >> 8;
 	    }
 	    $experiment->SetState(EXPTSTATE_SWAPPED);
-	    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $stat);
+	    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, $stat);
 	}
 
 	$stat = 0;
@@ -1358,7 +1360,7 @@ sub cleanup()
 	#
 	# Okay, we are going to destroy the experiment below.
 	# 
-	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
+	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_TERMINATE, 0);
 	
 	# Must override since we are so badly hosed. 
 	$termswapstate = EXPTSTATE_TERMINATED;

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,6 +18,7 @@ PAGEHEADER("Create a new OS Descriptor");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 #
@@ -256,12 +257,13 @@ if (TBValidOSID($osid)) {
 $query_result =
     DBQueryFatal("INSERT INTO os_info ".
 		 "(osname, osid, description,OS,version,path,magic,op_mode, ".
-		 " osfeatures, pid, shared, creator, mustclean, created, ".
-		 " reboot_waittime) ".
+		 " osfeatures, pid, shared, creator, creator_idx, mustclean, ".
+		 " created, reboot_waittime) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
 		 "        '$os_version', $os_path, '$os_magic', '$op_mode', ".
 		 "        '$os_features', '$pid', $os_shared, ".
-	         "        '$uid', $os_mustclean, now(), $reboot_waittime)");
+	         "        '$uid', '$dbid', $os_mustclean, now(), ".
+		 "        $reboot_waittime)");
 
 DBQueryFatal("unlock tables");
 

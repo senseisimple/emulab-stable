@@ -165,6 +165,7 @@ class User
     function uid_idx()		{ return $this->field("uid_idx"); }
     function uid()		{ return $this->field("uid"); }
     function webid()		{ return $this->field("uid_idx"); }
+    function dbid()		{ return $this->field("uid_idx"); }
     function created()		{ return $this->field("usr_created"); }
     function expires()		{ return $this->field("usr_expires"); }
     function modified()		{ return $this->field("usr_modified"); }
@@ -747,25 +748,6 @@ class User
 	$this->user["status"] = $status;
 	return 0;
     }
-    function SetEmail($email) {
-	$idx = $this->uid_idx();
-
-	DBQueryFatal("update users set usr_email='$email' ".
-		     "where uid_idx='$idx'");
-	$this->user["usr_email"] = $email;
-	return 0;
-    }
-    function SetPassword($encoding, $expires) {
-	$idx = $this->uid_idx();
-
-	# Clear the chpasswd stuff anytime passwd is set.
-	DBQueryFatal("update users set ".
-		     "  usr_pswd='$encoding', pswd_expires=$expires, ".
-		     "  chpasswd_key=NULL,chpasswd_expires=0 ".
-		     "where uid_idx='$idx'");
-	$this->user["usr_pswd"] = $encoding;
-	return 0;
-    }
     function SetChangePassword($key, $expires) {
 	$idx = $this->uid_idx();
 
@@ -949,14 +931,19 @@ class User
     #
     # Return project membership list for a user.
     #
-    function ProjectMembershipList() {
-	$uid_idx = $this->uid_idx();
-	$result  = array();
+    function ProjectMembershipList($desired_trust = null) {
+	$uid_idx   = $this->uid_idx();
+	$result    = array();
+	$condition = "";
+
+	if ($desired_trust && $desired_trust != "") {
+	    $condition = "and trust='$desired_trust'";
+	}
 
 	$query_result =
 	    DBQueryFatal("select pid_idx from group_membership ".
 			 "where pid_idx=gid_idx and ".
-			 "      uid_idx='$uid_idx'");
+			 "      uid_idx='$uid_idx' $condition");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $pid_idx = $row["pid_idx"];
@@ -1068,5 +1055,44 @@ class User
 			 "where g.uid_idx='$uid_idx' and class='robot'");
 	
 	return mysql_num_rows($query_result);
+    }
+
+    #
+    # Generic function to look up some table values given a set of desired
+    # fields and some conditions. Pretty simple, not widely usful, but it
+    # helps to avoid spreding more uid based queries around then we need to.
+    #
+    function &TableLookUp($table, $fields, $conditions = "") {
+	$uid_idx = $this->uid_idx();
+
+	if ($conditions && $conditions != "") {
+	    $conditions = "and ($conditions)";
+	}
+	else {
+	    $conditions = "";
+	}
+
+	$query_result =
+	    DBQueryWarn("select distinct $fields from $table ".
+			"where uid_idx='$uid_idx' $conditions");
+
+	return $query_result;
+    }
+    # Ditto for delete
+    function TableDelete($table, $conditions = "") {
+	$uid_idx = $this->uid_idx();
+
+	if ($conditions && $conditions != "") {
+	    $conditions = "and ($conditions)";
+	}
+	else {
+	    $conditions = "";
+	}
+
+	if (!DBQueryWarn("delete from $table ".
+			 "where uid_idx='$uid_idx' $conditions"))
+	    return -1;
+
+	return 0;
     }
 }

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -21,6 +21,7 @@ define("TBDB_KB_BODYLEN",	10000);
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 if (!$isadmin) {
@@ -421,6 +422,7 @@ if (isset($idx)) {
     else {
 	DBQueryFatal("update knowledge_base_entries set ".
 		     "  modifier_uid='$uid', ".
+		     "  modifier_idx='$dbid', ".
 		     "  date_modified=now(), ".
 		     "  section='$section', ".
 		     "  title='$title', ".
@@ -434,6 +436,7 @@ else {
     DBQueryFatal("insert into knowledge_base_entries set ".
 		 "  idx=NULL, ".
 		 "  creator_uid='$uid', ".
+		 "  creator_idx='$dbid', ".
 		 "  date_created=now(), ".
 		 "  section='$section', ".
 		 "  title='$title', ".

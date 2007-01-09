@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -83,17 +83,16 @@ if (isset($target_pid)) {
 # if being completely removed.
 #
 if (isset($target_pid)) {
-    TBProjLeader($target_pid, $leader_uid);
-    if (! strcmp($target_uid, $leader_uid)) {
+    $leader = $target_project->GetLeader();
+
+    if ($leader->SameUser($target_user)) {
 	USERERROR("$target_uid is the leader of project $target_pid!", 1);
     }
 }
 else {
-    $query_result =
-	DBQueryFatal("select pid from projects ".
-		     "where head_uid='$target_dbuid'");
+    $projlist = $target_user->ProjectMembershipList(TBDB_TRUSTSTRING_PROJROOT);
 
-    if (mysql_num_rows($query_result)) {
+    if (count($projlist)) {
 	USERERROR("$target_uid is still heading up projects!", 1);
     }
 }

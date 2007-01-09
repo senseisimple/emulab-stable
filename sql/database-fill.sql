@@ -579,6 +579,19 @@ REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][\\w]+$'
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_name','text','regex','^[-\\w\\. ]+$',4,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\\.]+)\\@([-\\w\\.]+)$',3,64,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_shell','text','regex','^(csh|sh|bash|tcsh)$',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('users','usr_title','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_affil','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_addr','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_addr2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_state','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_city','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_zip','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_country','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_URL','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_pswd','text','redirect','default:tinytext',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','vname','text','redirect','eventlist:vname',0,0,NULL);

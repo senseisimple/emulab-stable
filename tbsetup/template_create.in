@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -98,6 +98,7 @@ use libtblog;
 use libArchive;
 use Template;
 use libaudit;
+use User;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 120;
@@ -122,24 +123,22 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 #
 # Before doing anything else, check for overquota ... lets not waste
 # our time. Make sure user sees the error by exiting with 1.
 #
-if (system("$checkquota $dbuid") != 0) {
+if (system("$checkquota $user_uid") != 0) {
     tberror("You are over your disk quota on $CONTROL; ".
 	    "please login there and cleanup!");
     exit(1);
@@ -151,7 +150,7 @@ ParseArgs();
 #
 # Make sure UID is allowed to create experiments in this project.
 #
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+if (! TBProjAccessCheck($user_uid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
     tbdie("You do not have permission to create experiments in $pid/$gid");
 }
 
@@ -165,7 +164,7 @@ if ($modify) {
 	tbdie("Experiment template $parent_guid/$parent_vers does not exist!");
     }
 
-    if (!$parent_template->AccessCheck($dbuid, TB_EXPT_READINFO)) {
+    if (!$parent_template->AccessCheck($user_uid, TB_EXPT_READINFO)) {
 	tbdie("You do not have permission to modify experiment template ".
 	      "$parent_guid/$parent_vers");
     }
@@ -174,7 +173,7 @@ if ($modify) {
 	if (!defined($description));
 }
 else {
-    $description = "Created by $dbuid"
+    $description = "Created by $user_uid"
 	if (! defined($description));
 }
 
@@ -199,7 +198,8 @@ if ($modify) {
 $args{'pid'}         = $pid;
 $args{'gid'}         = $gid;
 $args{'tid'}         = $tid;
-$args{'uid'}         = $dbuid;
+$args{'uid'}         = $user_uid;
+$args{'uid_idx'}     = $user_dbid;
 $args{'description'} = DBQuoteSpecial($description);
 $args{'description'} =~ s/^\'(.*)\'$/$1/;
 
@@ -303,13 +303,13 @@ if (my $rval = $template->CreateDirectory()) {
 # The description is versioned metadata the user can modify.
 #
 $template->NewMetadata("description", $description,
-		       $dbuid, "template_description") == 0
+		       $this_user, "template_description") == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 #
 # The TID is versioned metadata the user can modify.
 #
-$template->NewMetadata("TID", $tid, $dbuid, "tid") == 0
+$template->NewMetadata("TID", $tid, $this_user, "tid") == 0
     or fatal(-1, "Failed to insert metadata record for description");
 
 # Now invoke batchexp to preload the experiment. Note special -x option.
@@ -361,7 +361,7 @@ if ($modify) {
     libArchive::TBCommitExperimentArchive($pid, $eid, "template_modify")
 	>= 0 or fatal(-1, "Failed to commit experiment archive!");
     
-    $template->CopyDataStore($parent_template, $dbuid) == 0
+    $template->CopyDataStore($parent_template, $user_uid) == 0
 	or fatal(-1, "Failed to copy data store");
 
     # and tell the archive library about the above files.
@@ -392,7 +392,7 @@ fatal(-1, "Could not get virt_parameters for $pid/$eid")
     if (! $query_result);
 
 while (my ($name, $value, $description) = $query_result->fetchrow_array()) {
-    $template->NewFormalParameter($name, $value, $description, $dbuid) == 0
+    $template->NewFormalParameter($name, $value, $description, $this_user) == 0
 	or fatal(-1, "Could not set formal parameter for $pid/$eid")
 }
 
@@ -401,7 +401,7 @@ while (my ($name, $value, $description) = $query_result->fetchrow_array()) {
 # XXX This has to be done after the previous step (virt_parameters)
 #
 if ($modify) {
-    $template->CopyMetadata($parent_template, $dbuid) == 0
+    $template->CopyMetadata($parent_template, $this_user) == 0
 	or fatal(-1, "Failed to copy metadata records");
 }
    

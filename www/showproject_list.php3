@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -243,7 +243,7 @@ function GENPLIST ($query_result)
 
     while (list($pid, $foo) = each($showby)) {
 	$projectrow = $projectrows[$pid];
-	$headuid    = $projectrow[head_uid];
+	$headidx    = $projectrow[head_idx];
 	$Pname      = stripslashes($projectrow[name]);
 	$approved   = $projectrow[approved];
 	$expt_count = $projectrow[expt_count];
@@ -253,10 +253,11 @@ function GENPLIST ($query_result)
 	$ncount     = $ncounts[$pid];
 	$pcount     = $pcounts[$pid];
 
-	if (! ($head_user = User::Lookup($headuid))) {
-	    TBERROR("Could not lookup object for user $headuid", 1);
+	if (! ($head_user = User::Lookup($headidx))) {
+	    TBERROR("Could not lookup object for user $headidx", 1);
 	}
 	$showuser_url = CreateURL("showuser", $head_user);
+	$headuid      = $head_user->uid();
 	
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>

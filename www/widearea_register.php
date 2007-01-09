@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -863,7 +863,8 @@ if (!$returning) {
     if (! ($user = User::NewUser($usr_uid, TBDB_NEWACCOUNT_WEBONLY, $args))) {
 	TBERROR("Could not create new user '$usr_email'!", 1);
     }
-    $usr_uid = $user->uid();
+    $usr_uid  = $user->uid();
+    $usr_dbid = $user->dbid();
 
     if (isset($addpubkeyargs)) {
 	ADDPUBKEY($usr_uid, "webaddpubkey -u $usr_uid $addpubkeyargs");
@@ -886,6 +887,7 @@ else {
     $usr_country   = $user->country();
     $usr_phone	   = $user->phone();
     $usr_URL       = $user->URL();
+    $usr_dbid      = $user->dbid();
     $usr_returning = "Yes";
 }
 
@@ -893,17 +895,17 @@ else {
 # Enter a new widearea_accounts record. To be approved later.
 #
 DBQueryFatal("insert into widearea_accounts ".
-	     "(uid, node_id, trust, date_applied) ".
-	     "values ('$usr_uid','$node_id','none',now())");
+	     "(uid, uid_idx, node_id, trust, date_applied) ".
+	     "values ('$usr_uid','$usr_dbid','$node_id','none',now())");
 
 #
 # Enter a new widearea info record for the node.
 #
 if (! $haveinfo) {
     DBQueryFatal("insert into widearea_nodeinfo ".
-		 "(node_id, machine_type, contact_uid, connect_type, ".
-		 " city, state, country, zip) ".
-		 "values ('$node_id', '$node_type', '$usr_uid', ".
+		 "(node_id, machine_type, contact_uid, contact_idx, ".
+		 " connect_type, city, state, country, zip) ".
+		 "values ('$node_id', '$node_type', '$usr_uid', '$usr_dbid', ".
 		 "        '$node_conn', '$node_city', '$node_state',  ".
 		 "        '$node_country', '$node_zip')");
 }

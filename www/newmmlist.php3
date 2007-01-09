@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -15,6 +15,7 @@ include("defs.php3");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 #
@@ -326,8 +327,9 @@ if (mysql_num_rows($query_result)) {
     return;
 }
 
-DBQueryFatal("insert into mailman_listnames (listname, owner_uid, created) ".
-	     "values ('$listname', '$uid', now())");
+DBQueryFatal("insert into mailman_listnames ".
+	     " (listname, owner_uid, owner_idx, created) ".
+	     "values ('$listname', '$uid', '$dbid', now())");
 DBQueryFatal("unlock tables");
 
 #

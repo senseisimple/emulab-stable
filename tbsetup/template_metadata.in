@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -50,7 +50,6 @@ my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 
 # Locals
-my $dbuid;
 my $template;
 my $instance;
 # For the END block below.
@@ -87,9 +86,12 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
 
 # Now parse arguments.
 ParseArgs();
@@ -102,7 +104,7 @@ $template = Template->Lookup($template_guid, $template_vers);
 if (!defined($template)) {
     tbdie("Experiment template $template_guid/$template_vers does not exist!");
 }
-if (! TBProjAccessCheck($dbuid,
+if (! TBProjAccessCheck($user_uid,
 			$template->pid(), $template->gid(),
 			TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to add metadata to template ".
@@ -128,7 +130,7 @@ if ($action eq "delete") {
     tbdie("Metadata name '$metadata_name' does not exist!")
 	if (!$already_exists);
     
-    $template->DeleteMetadata($metadata_name, $dbuid) == 0
+    $template->DeleteMetadata($metadata_name) == 0
 	or tbdie("Could not delete metadata item '$metadata_name'");
 }
 elsif ($action eq "add") {
@@ -136,14 +138,14 @@ elsif ($action eq "add") {
 	if ($already_exists);
     
     $template->NewMetadata($metadata_name, $metadata_value,
-			   $dbuid, $metadata_type) == 0
+			   $this_user, $metadata_type) == 0
 	or tbdie("Could not add new metadata item '$metadata_name'");
 }
 else {
     tbdie("Metadata name '$metadata_name' does not exist!")
 	if (!$already_exists);
     
-    $template->ModifyMetadata($metadata_name, $metadata_value, $dbuid) == 0
+    $template->ModifyMetadata($metadata_name, $metadata_value, $this_user) == 0
 	or tbdie("Could not modify metadata item '$metadata_name'");
 }
 exit(0);

@@ -73,8 +73,8 @@ function SPITFORM($formfields, $errors)
     #
     # Get the list and show it.
     #
-    $query_result =
-	DBQueryFatal("select * from user_pubkeys where uid='$target_uid'");
+    $query_result =&
+	$target_user->TableLookUp("user_pubkeys", "*");
 
     if (mysql_num_rows($query_result)) {
 	echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
@@ -89,10 +89,10 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
-	    $comment = $row[comment];
-	    $pubkey  = $row[pubkey];
-	    $date    = $row[stamp];
-	    $idx     = $row[idx];
+	    $comment = $row['comment'];
+	    $pubkey  = $row['pubkey'];
+	    $date    = $row['stamp'];
+	    $idx     = $row['idx'];
 	    $fnote   = "";
 
 	    if (strstr($comment, $BOSSNODE)) {

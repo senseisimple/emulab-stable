@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -51,6 +51,7 @@ PAGEHEADER("Create a new Image Descriptor ($title)");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 #
@@ -1180,22 +1181,22 @@ if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
 DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$bootpart" . "_osid, ".
-	     " default_osid, path, pid, global, creator, created, ".
-	     " gid, shared) ".
+	     " default_osid, path, pid, global, creator, creator_idx, ".
+	     " created, gid, shared) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
 	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $global, ".
-             "   '$uid', now(), '$gid', $shared)");
+             "   '$uid', '$dbid', now(), '$gid', $shared)");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
-	     " osfeatures, pid, creator, shared, created, op_mode, ".
-	     " max_concurrent, reboot_waittime) ".
+	     " osfeatures, pid, creator, creator_idx, shared, created, ".
+	     " op_mode, max_concurrent, reboot_waittime) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', $global, now(), '$op_mode', $max_concurrent, ".
-             "   $reboot_waittime)");
+             "   '$uid', '$dbid', $global, now(), '$op_mode', ".
+             "   $max_concurrent, $reboot_waittime)");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".

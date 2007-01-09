@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Experiment;
@@ -130,6 +130,8 @@ sub dpdb($)		{ return field($_[0], 'dpdb');}
 sub dpdbname($)         { return field($_[0], 'dpdbname');}
 sub dpdbpassword($)     { return field($_[0], 'dpdbpassword');}
 sub instance_idx($)     { return field($_[0], 'instance_idx'); }
+sub creator_idx($)      { return field($_[0], 'creator_idx');}
+sub swapper_idx($)      { return field($_[0], 'swapper_idx');}
 
 #
 # Lookup an experiment given an experiment index.
@@ -335,20 +337,21 @@ sub Create($$$$)
 	tberror("Error inserting experiment resources record for $pid/$eid!");
 	return undef;
     }
-    my $rsrcidx   = $query_result->insertid;
-    my $creator   = $argref->{'expt_head_uid'};
-    my $gid       = $argref->{'gid'};
-    my $batchmode = $argref->{'batchmode'};
+    my $rsrcidx     = $query_result->insertid;
+    my $creator_uid = $argref->{'expt_head_uid'};
+    my $creator_idx = $argref->{'creator_idx'};
+    my $gid         = $argref->{'gid'};
+    my $batchmode   = $argref->{'batchmode'};
 
     #
     # Now create an experiment_stats record to match.
     #
     if (! DBQueryWarn("insert into experiment_stats ".
-		      "(eid, pid, creator, gid, created, ".
+		      "(eid, pid, creator, creator_idx, gid, created, ".
 		      " batch, exptidx, rsrcidx) ".
-		      "values('$eid', '$pid', '$creator', '$gid', ".
-		      "FROM_UNIXTIME('$now'), ".
-		      "$batchmode, $exptidx, $rsrcidx)")) {
+		      "values('$eid', '$pid', '$creator_uid', '$creator_idx',".
+		      "       '$gid', FROM_UNIXTIME('$now'), ".
+		      "        $batchmode, $exptidx, $rsrcidx)")) {
 	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
 	DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
 	DBQueryWarn("unlock tables");
@@ -1103,7 +1106,7 @@ sub BackupUserData($)
 #
 sub SetSwapInfo($$)
 {
-    my ($self, $dbuid) = @_;
+    my ($self, $user) = @_;
 
     # Must be a real reference. 
     return -1
@@ -1113,25 +1116,30 @@ sub SetSwapInfo($$)
     my $eid = $self->eid();
     
     TBSetExpSwapTime($pid, $eid);
-    TBExptSetSwapUID($pid, $eid, $dbuid);
+    $self->SetSwapper($user);
     return $self->Refresh();
 }
 
 #
-# Just the swap uid,
+# Just the swap uid.
 #
 sub SetSwapper($$)
 {
-    my ($self, $dbuid) = @_;
+    my ($self, $user) = @_;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
-    
-    TBExptSetSwapUID($pid, $eid, $dbuid);
+    my $pid  = $self->pid();
+    my $eid  = $self->eid();
+    my $uid  = $user->uid();
+    my $dbid = $user->dbid();
+
+    DBQueryWarn("update experiments set ".
+		"   expt_swap_uid='$uid', swapper_idx='$dbid' ".
+		"where pid='$pid' and eid='$eid'");
+
     return $self->Refresh();
 }
 

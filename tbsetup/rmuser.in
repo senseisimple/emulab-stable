@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -70,6 +70,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
 my $HOMEDIR	= USERROOT();
 
@@ -110,16 +111,25 @@ $user = $ARGV[0];
 #
 # Untaint the argument.
 #
-if ($user =~ /^([a-z0-9_]+)$/i) {
+if ($user =~ /^(\w+)$/i) {
     $user = $1;
 }
 else {
     die("Tainted argument $user!\n");
 }
 
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You are not a valid emulab user!\n");
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+my $target_dbid  = $target_user->dbid();
+my $target_uid   = $target_user->uid();
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
 #
@@ -127,11 +137,11 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 # leaders to delete accounts in their projects, but for now lets not.
 # There are issues of people in multiple projects.
 #
-if (!TBAdmin($UID)) {
+if (!TBAdmin()) {
     if (! defined($pid) ||
 	! TBProjAccessCheck($UID, $pid, $pid, TB_PROJECT_DELUSER)) {
 	die("*** $0:\n".
-	    "    You do not have enough permission to remove user $user!\n");
+	    "    You do not have permission to remove user $target_user!\n");
     }
 }
 
@@ -145,12 +155,12 @@ my $control_node = $CONTROL;
 #
 $query_result =
     DBQueryFatal("select * from experiments ".
-		 "where expt_head_uid='$user' ".
+		 "where expt_head_uid='$target_uid' ".
 		 (defined($pid) ? "and pid='$pid'" : ""));
 
 if ($query_result->numrows) {
     die("*** $0:\n".
-	"    $user is still heading up experiments! Please terminate them.\n");
+	"    $target_uid is still heading up experiments! Please terminate them.\n");
 }
 
 #
@@ -158,25 +168,23 @@ if ($query_result->numrows) {
 # if being completely removed.
 #
 if ($pidmode) {
-    if (ProjLeader($pid) eq $user) {
+    if (ProjLeader($pid) eq $target_uid) {
 	die("*** $0:\n".
-	    "    $user is the leader of project $pid!\n");
+	    "    $target_user is the leader of project $pid!\n");
     }
 }
 else {
     $query_result =
-	DBQueryFatal("select pid from projects where head_uid='$user'");
+	DBQueryFatal("select pid from projects where head_uid='$target_uid'");
 
     if ($query_result->numrows) {
 	die("*** $0:\n".
-	    "    $user is still heading up projects! Please fix that.\n");
+	    "    $target_user is still heading up projects!\n");
     }
 }
 
 # Get current status.
-$query_result =
-    DBQueryFatal("select status from users where uid='$user'");
-my ($status) = $query_result->fetchrow_array();
+$status = $target_user->status();
 
 #
 # If nuke mode is also specified, then the account is being nuked from
@@ -187,16 +195,16 @@ if ($nuke) {
     if ($status ne USERSTATUS_NEWUSER &&
 	$status ne USERSTATUS_UNAPPROVED) {
 	die("*** $0:\n".
-	    "    $user is not an unapproved user in project $pid!\n");
+	    "    $target_uid is not an unapproved user in project $pid!\n");
     }
 
     $query_result =
 	DBQueryFatal("select pid from group_membership ".
-		     "where uid='$user' and pid!='$pid'");
+		     "where uid_idx='$target_dbid' and pid!='$pid'");
 
     if ($query_result->numrows) {
 	die("*** $0:\n".
-	    "    $user is a member of other projects!\n");
+	    "    $target_uid is a member of other projects!\n");
     }
 }
 
@@ -224,7 +232,7 @@ if ($pidmode) {
     # Drop root for calling modgroups.
     #
     $EUID = $UID;
-    system("$MODGROUPS -r $pid:$pid $user");
+    system("$MODGROUPS -r $pid:$pid $target_uid");
 
     exit($? >> 8)
 	if (!$nuke);
@@ -232,41 +240,47 @@ if ($pidmode) {
     $EUID = 0;
 }
 else {
-    DBQueryFatal("update users set status='" . TBDB_USERSTATUS_FROZEN . "'" .
-		 "where uid='$user'");
+    my $args = ();
+
+    $args{'status'} = TBDB_USERSTATUS_FROZEN;
+
+    $target_user->Update(\%args) == 0
+	or fatal("Could not update status for $target_uid!");
 
     #
     # Now schedule account updates; Once the user is frozen, all accounts
     # will be terminated.
     #
-    TBNodeUpdateAccountsByUID($user);
+    TBNodeUpdateAccountsByUID($target_uid);
 }
 
 #
 # Not in pidmode. Kill the user's entire group membership.
 # Must be done *after* the account update!
 # 
-DBQueryFatal("delete from group_membership where uid='$user'");
+DBQueryFatal("delete from group_membership where uid_idx='$target_dbid'");
 
 #
 # Then the pubkey tables.
 # 
-DBQueryFatal("delete from user_pubkeys where uid='$user'");
-DBQueryFatal("delete from user_sfskeys where uid='$user'");
+DBQueryFatal("delete from user_pubkeys  where uid_idx='$target_dbid'");
+DBQueryFatal("delete from user_sfskeys  where uid_idx='$target_dbid'");
+DBQueryFatal("delete from user_sslcerts where uid_idx='$target_dbid'");
 
 #
 # Must do widearea_accounts too!
 #
-DBQueryFatal("delete from widearea_accounts where uid='$user'");
+DBQueryFatal("delete from widearea_accounts where uid_idx='$target_dbid'");
 
 #
 # Then some other pidly tables.
 # 
-DBQueryFatal("delete from login where uid='$user'");
-DBQueryFatal("delete from nodeuidlastlogin where uid='$user'");
-DBQueryFatal("delete from uidnodelastlogin where uid='$user'");
-DBQueryFatal("delete from unixgroup_membership where uid='$user'");
-DBQueryFatal("delete from userslastlogin where uid='$user'");
+DBQueryFatal("delete from login where uid='$target_uid'");
+DBQueryFatal("delete from nodeuidlastlogin where uid='$target_uid'");
+DBQueryFatal("delete from uidnodelastlogin where uid='$target_uid'");
+DBQueryFatal("delete from unixgroup_membership where uid='$target_uid'");
+DBQueryFatal("delete from userslastlogin where uid='$target_uid'");
+DBQueryFatal("delete from user_policies  where uid='$target_uid'");
 
 #
 # Remove user from both local and control node. No need to do this in
@@ -275,8 +289,8 @@ DBQueryFatal("delete from userslastlogin where uid='$user'");
 if (! $nuke) {
     $EUID = $UID;
 
-    system("$DELACCT $user") == 0 or
-	fatal("$DELACCT $user failed!");
+    system("$DELACCT $target_uid") == 0 or
+	fatal("$DELACCT $target_uid failed!");
 
     $EUID = 0;
 }
@@ -284,10 +298,10 @@ if (! $nuke) {
 #
 # Rename the users home dir if its there.
 #
-if (-d "$HOMEDIR/$user") {
-    my $newname = "$HOMEDIR/$user-" . TBDateTimeFSSafe();
+if (-d "$HOMEDIR/$target_uid") {
+    my $newname = "$HOMEDIR/$target_uid-" . TBDateTimeFSSafe();
 
-    if (rename("$HOMEDIR/$user", $newname)) {
+    if (rename("$HOMEDIR/$target_uid", $newname)) {
 	print "Renamed homedir to $newname. Remember to delete it!\n";
 	
 	#
@@ -306,27 +320,21 @@ if (-d "$HOMEDIR/$user") {
     }
 }
 
-# Note that we no longer delete from the user_stats table. We maintain
-# deleted user records.
-DBQueryFatal("replace into deleted_users ".
-	     " (uid, usr_deleted, uid_idx, usr_created, usr_name, ".
-	     "  usr_title, usr_affil, usr_email, usr_URL, ".
-	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
-	     "  usr_country, usr_phone, webonly, wikionly, notes) ".
-	     " select '$user', now(), uid_idx, usr_created, usr_name, ".
-	     "  usr_title, usr_affil, usr_email, usr_URL, ".
-	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
-	     "  usr_country, usr_phone, webonly, wikionly, notes ".
-	     " from users where uid='$user'")
-    if ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN);
-
 #
-# Then the users table. This is the very last step, since if there were
-# any failures above, we can still rerun the script without it barfing.
-# 
-DBQueryFatal("delete from users where uid='$user'");
-
-print "User removal Complete!\n";
+# In nuke mode, we really do kill the account, since its from a denied
+# project join request and there is no reason to keep the account around
+# to pollute the table.
+#
+# Otherwise, the user is "archived" by setting his status accordingly.
+#
+if ($nuke) {
+    DBQueryFatal("delete from users where uid_idx='$target_dbid'");
+    print "User '$target_uid' has been removed!\n";
+}
+else {
+    $target_user->SetStatus($User::NEWUSER_FLAGS_ARCHIVED);
+    print "User '$target_uid' has been archived!\n";
+}
 exit(0);
 
 sub fatal($) {

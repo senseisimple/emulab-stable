@@ -34,7 +34,6 @@ if (!isset($user) || $user == "" || !User::ValidWebID($user) ||
 if (! ($target_user = User::Lookup($user))) {
     USERERROR("The user $user is not a valid user", 1);
 }
-$target_dbuid = $target_user->uid();
 $target_uid   = $target_user->uid();
 
 #
@@ -49,17 +48,17 @@ if (!$isadmin &&
 #
 # Get the actual key.
 #
-$query_result =
-    DBQueryFatal("select * from user_sfskeys ".
-		 "where uid='$target_dbuid' and comment='$key'");
+$query_result =& $target_user->TableLookUp("user_sfskeys",
+					   "pubkey,comment",
+					   "comment='$key'");
 
 if (! mysql_num_rows($query_result)) {
     USERERROR("SFS Key '$key' for user '$target_uid' does not exist!", 1);
 }
 
 $row    = mysql_fetch_array($query_result);
-$pubkey = $row[pubkey];
-$comment= $row[comment];
+$pubkey = $row['pubkey'];
+$comment= $row['comment'];
 $chunky = chunk_split("$pubkey $comment", 70, "<br>\n");
 
 #
@@ -132,8 +131,7 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Bcc: $TBMAIL_AUDIT\n".
      "Errors-To: $TBMAIL_WWW");
 
-DBQueryFatal("delete from user_sfskeys ".
-	     "where uid='$target_dbuid' and comment='$key'");
+$target_user->TableDelete("user_sfskeys", "comment='$key'");
 
 #
 # update sfs_users files and nodes if appropriate.
@@ -147,4 +145,8 @@ else {
 
 PAGEREPLACE(CreateURL("showsfskeys", $target_user));
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

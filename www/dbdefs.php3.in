@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Database Constants
@@ -936,49 +936,6 @@ function TBValidNodeType($type)
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
-    return 1;
-}
-
-#
-# Return Project Leader.
-#
-# usage TBProjLeader($pid, &$projleader)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBProjLeader($pid, &$projleader)
-{
-    $query_result =
-	DBQueryFatal("select head_uid from projects where pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $projleader  = $row[head_uid];
-    
-    return 1;
-}
-
-#
-# Return Group Leader.
-#
-# usage TBGroupLeader($pid, $gid, &$groupleader)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBGroupLeader($pid, $gid, &$groupleader)
-{
-    $query_result =
-	DBQueryFatal("select leader from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $groupleader  = $row[leader];
-    
     return 1;
 }
 

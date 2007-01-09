@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -45,14 +45,13 @@ my $errors = 0;
 my $message;
 my @nodes;
 my $type = "misc";
-my $dbuid;
 
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    Go Away! You do not exist in the Emulab Database.\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("You ($UID) do not exist!\n");
 }
 
 #
@@ -101,7 +100,7 @@ foreach my $node ( @nodes ) {
 # And then insert the log entry.
 #
 foreach my $node ( @nodes ) {
-    if (! TBSetNodeLogEntry($node, $dbuid, $type, $message)) {
+    if (! TBSetNodeLogEntry($node, $this_user->uid(), $type, $message)) {
 	print STDERR "Failed to insert entry for node $node\n";
 	$errors++;
     }

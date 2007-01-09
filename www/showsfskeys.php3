@@ -47,7 +47,8 @@ if ($user == "" || !User::ValidWebID($user)) {
 if (! ($target_user = User::Lookup($user))) {
     USERERROR("The user $user is not a valid user", 1);
 }
-$target_uid = $target_user->uid();
+$target_uid  = $target_user->uid();
+$target_dbid = $target_user->dbid();
 
 #
 # Verify that this uid is a member of one of the projects that the
@@ -74,8 +75,8 @@ function SPITFORM($formfields, $errors)
     #
     # Get the list and show it.
     #
-    $query_result =
-	DBQueryFatal("select * from user_sfskeys where uid='$target_uid'");
+    $query_result =&
+	$target_user->TableLookUp("user_sfskeys", "*");
 
     if (mysql_num_rows($query_result)) {
 	echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
@@ -90,9 +91,9 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
-	    $comment = $row[comment];
-	    $pubkey  = $row[pubkey];
-	    $date    = $row[stamp];
+	    $comment = $row['comment'];
+	    $pubkey  = $row['pubkey'];
+	    $date    = $row['stamp'];
 	    $fnote   = "";
 	    $foo     = rawurlencode($comment);
 
@@ -297,7 +298,8 @@ if (count($errors)) {
 }
 
 DBQueryFatal("replace into user_sfskeys ".
-	     "values ('$target_uid', '$comment', '$usr_key', now())");
+	     "values ('$target_uid', '$target_dbid', ".
+	     "        '$comment', '$usr_key', now())");
 
 #
 # Audit

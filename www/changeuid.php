@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -49,6 +49,7 @@ if (! ($target_user = User::Lookup($user))) {
     USERERROR("The user $user is not a valid user", 1);
 }
 $target_uid = $target_user->uid();
+$target_idx = $target_user->uid_idx();
 
 if ($target_user->status() != TBDB_USERSTATUS_UNAPPROVED) {
     USERERROR("The user $target_uid must be ".
@@ -145,7 +146,7 @@ STARTBUSY("Changing UID");
 # Run the backend script.
 #
 SUEXEC($uid, $TBADMINGROUP,
-       "webchangeuid $target_uid $new_uid", SUEXEC_ACTION_USERERROR);
+       "webchangeuid $target_idx $new_uid", SUEXEC_ACTION_USERERROR);
 
 # Stop the busy indicator and zap to user page.
 STOPBUSY();

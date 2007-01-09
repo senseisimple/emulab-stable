@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -16,6 +16,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
 #
 # Create user SSL certificates.
@@ -48,7 +49,6 @@ my $CACONFIG    = "$SSLDIR/ca.cnf";
 my $EMULAB_CERT = "$TB/etc/emulab.pem";
 my $EMULAB_KEY  = "$TB/etc/emulab.key";
 my $OPENSSL     = "/usr/bin/openssl";
-my $lockfile    = "/var/tmp/testbed_mkusercert_lockfile";
 my $WORKDIR     = "$TB/ssl";
 my $SAVEUID	= $UID;
 
@@ -137,6 +137,18 @@ else {
     die("Tainted argument: $user\n");
 }
 
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
 #
 # This script is always audited. Mail is sent automatically upon exit.
 #
@@ -154,103 +166,38 @@ if (AuditStart(0)) {
 chdir("$WORKDIR") or
     fatal("Could not chdir to $WORKDIR: $!");
 
-open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-$count = 0;
-if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-    #
-    # If we don't get it the first time, we wait for:
-    # 1) The lock to become free, in which case we do our thing
-    # 2) The time on the lock to change, in which case we wait for that process
-    #    to finish
-    #
-    my $oldlocktime = (stat(LOCK))[9];
-    my $gotlock = 0;
-    while (1) {
-	print "Another exports update in progress, waiting for it to finish\n";
-	if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-	    # OK, got the lock, we can do what we're supposed to
-	    $gotlock = 1;
-	    last;
-	}
-	$locktime = (stat(LOCK))[9];
-	if ($locktime != $oldlocktime) {
-	    $oldlocktime = $locktime;
-	    last;
-	}
-	if ($count++ > 60)  {
-	    fatal("Could not get the lock after a long time!\n");
-	}
-	sleep(1);
-    }
-
-    $count = 0;
-    #
-    # If we didn't get the lock, wait for the processes that did to finish
-    #
-    if (!$gotlock) {
-	while (1) {
-	    if ((stat(LOCK))[9] != $oldlocktime) {
-		exit(0);
-	    }
-	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		close(LOCK);
-		exit(0);
-	    }
-	    if ($count++ > 20)  {
-		fatal("Process with the lock did not finish after ".
-		      "a long time!\n");
-	    }
-	    sleep(1); 
-	}
-    }
-}
-
-#
-# Perl-style touch(1)
-#
-my $now = time;
-utime $now, $now, $lockfile;
+TBScriptLock("mkusercert") == 0 or
+    fatal("Could not get the lock!");
 
 #
 # Get the user info (the user being operated on).
 #
-my $query_result =
-    DBQueryFatal("select u.usr_name,u.usr_email,u.admin,u.unix_uid ".
-		 "from users as u ".
-		 "where u.uid='$user'");
-
-if ($query_result->numrows == 0) {
-    fatal("$user is not in the DB. This is bad.\n");
-}
-my @row         = $query_result->fetchrow_array();
-my $fullname    = $row[0];
-my $user_email  = $row[1];
-my $usr_admin   = $row[2];
-my $user_number = $row[3];
+my $fullname    = $target_user->name();
+my $user_email  = $target_user->email();
+my $usr_admin   = $target_user->admin();
+my $user_number = $target_user->uid_idx();
+my $user_uid    = $target_user->uid();
+my $user_dbid   = $target_user->dbid();
 
 #
 # Get the users earliest project membership to use as the default group
 # for the case that the account is being (re)created. We convert that to
 # the unix info.
 #
-my $default_groupname;
+my $default_project;
 my $default_groupgid;
 
-$query_result =
-    DBQueryFatal("select m.pid from group_membership as m ".
-		 "where m.uid='$user' and m.pid=m.gid and m.trust!='none' ".
-		 "order by date_approved asc limit 1");
+if ($target_user->FirstApprovedProject(\$default_project) < 0) {
+    fatal("Could not locate default project for $target_user");
+}
 
-if (my ($defpid) = $query_result->fetchrow_array) {
-    if (! TBGroupUnixInfo($defpid, $defpid,
-			  \$default_groupgid, \$default_groupname)) {
-	fatal("No info for default project $defpid!");
-    }
+if (defined($default_project)) {
+    $default_groupgid = $default_project->unix_gid();
 }
 else {
-    print "No group membership for $user; using the guest group!\n";
+    print "No group membership for $target_user; using the guest group!\n";
 
-    ($default_groupname,undef,$default_groupgid,undef) = getgrnam("guest");
+    (undef,undef,$default_groupgid,undef) = getgrnam("guest");
 }
 
 #
@@ -264,8 +211,8 @@ open(TEMP, ">>usercert.cnf")
     or fatal("Could not open $TEMPLATE for append: $!");
 
 print TEMP "OU\t\t= sslxmlrpc\n";
-print TEMP "CN\t\t= $user\n";
-print TEMP "emailAddress\t= $user" . "\@" . "$OURDOMAIN\n";
+print TEMP "CN\t\t= $user_uid\n";
+print TEMP "emailAddress\t= $user_uid" . "\@" . "$OURDOMAIN\n";
 close(TEMP)
     or fatal("Could not close usercert.cnf: $!");
 
@@ -310,14 +257,15 @@ $UID = $SAVEUID;
 # unencrypted). Might change that at some point. 
 #
 DBQueryFatal("delete from user_sslcerts ".
-	     "where uid='$user' and ".
+	     "where uid_idx='$user_dbid' and ".
 	     "       encrypted=" . (defined($password) ? 1 : 0));
 
 #
 # Create a new entry in the table.
 #
-DBQueryFatal("insert into user_sslcerts (uid, idx, created, encrypted) ".
-	     " values ('$user', $curidx, now(), ".
+DBQueryFatal("insert into user_sslcerts ".
+	     "(uid, uid_idx, idx, created, encrypted) values ".
+	     "('$user_uid', '$user_dbid', $curidx, now(), ".
 	               (defined($password) ? 1 : 0) . ")");
 
 #
@@ -353,7 +301,7 @@ close(PKEY);
 $pkeystring = DBQuoteSpecial($pkeystring);
 $certstring = DBQuoteSpecial($certstring);
 DBQueryFatal("update user_sslcerts set cert=$certstring,privkey=$pkeystring ".
-	     "where uid='$user' and idx=$curidx");
+	     "where uid_idx='$user_dbid' and idx=$curidx");
 
 #
 # Combine the key and the certificate into one file which is installed
@@ -366,7 +314,7 @@ system("cat usercert_key.pem usercert_cert.pem > usercert.pem") == 0
 #
 # Copy the certificate to the users .ssl directory.
 #
-my $ssldir = "$USERDIR/$user/.ssl";
+my $ssldir = "$USERDIR/$user_uid/.ssl";
 if (! -d $ssldir) {
     mkdir($ssldir, 0700) or
 	fatal("Could not mkdir $ssldir: $!");
@@ -390,12 +338,13 @@ system("cp -f usercert.pem $target") == 0
 chown($user_number, $default_groupgid, "$target")
     or fatal("Could not chown $target: $!");
 
-close(LOCK);
+TBScriptUnlock();
 exit(0);
 
 sub fatal($) {
     my($mesg) = $_[0];
 
+    TBScriptUnlock();
     die("*** $0:\n".
 	"    $mesg\n");
 }

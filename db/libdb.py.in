@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -205,10 +205,11 @@ def TBExptIDX(pid,eid):
 def TBSetNodeLogEntry(node, dbuid, type, message):
     if not TBValidNodeName(node) or not TBValidNodeLogType(type):
 	return 0
+    idx = TBMapUIDtoIDX(dbuid)
     return DBQueryWarn("insert into nodelog "
 		       "values "
-                       "(%s, NULL, %s, %s, %s, now())",
-                       (node, type, dbuid, message))
+                       "(%s, NULL, %s, %s, %s, %s, now())",
+                       (node, type, dbuid, idx, message))
 
 #
 # Validate a node name.
@@ -273,12 +274,14 @@ def TBSetNodeHistory(nodeid, op, uid, pid, eid):
         pass
     except ValueError:
         pass
+
+    idx = TBMapUIDtoIDX(uid)
     
     return DBQueryWarn("insert into node_history set "
 		       "  history_id=0, node_id=%s, op=%s, "
-		       "  uid=%s, stamp=UNIX_TIMESTAMP(now()), "
+		       "  uid=%s, uid_idx=%s stamp=UNIX_TIMESTAMP(now()), "
 		       "  exptidx=%s",
-                       (nodeid,op,uid,exptidx))
+                       (nodeid,op,uid,idx,exptidx))
 
 
 def TBSiteVarExists(name):
@@ -310,3 +313,15 @@ def TBGetSiteVar(name):
     
     raise RuntimeException, \
           "*** attempted to fetch unknown site variable name!"
+
+def TBMapUIDtoIDX(uid):
+    uid = DBQuoteSpecial(uid)
+    
+    qres = DBQueryFatal("select uid_idx from users "
+                        "where uid=%s", (uid,))
+
+    if len(qres) == 0:
+        return 0
+
+    return qres[0]
+

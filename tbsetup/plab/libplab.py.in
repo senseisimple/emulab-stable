@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -797,10 +797,11 @@ class Plab:
             (nodeent['LATITUDE'] != 0 or nodeent['LONGITUDE'] != 0))
         try:
             DBQueryFatal("replace into widearea_nodeinfo"
-                         " (node_id, contact_uid, hostname, site, latitude, "
-                         "  longitude, bwlimit)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE'],
+                         " (node_id, contact_uid, contact_idx, hostname, site,"
+                         "  latitude, longitude, bwlimit)"
+                         " values (%s, %s, %s, %s, %s, %s, %s, %s)",
+                         (nodeid, 'nobody', '0', nodeent['HNAME'],
+                          nodeent['SITE'],
                           # Poor man's ternary operator
                           haslatlong and nodeent['LATITUDE'] or "NULL",
                           haslatlong and nodeent['LONGITUDE'] or "NULL",

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,6 +18,7 @@ PAGEHEADER("Create a new Image Descriptor (long form)");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 #
@@ -834,14 +835,14 @@ $query_result =
     DBQueryFatal("INSERT INTO images ".
 		 "(imagename, imageid, description, loadpart, loadlength, ".
 		 " part1_osid, part2_osid, part3_osid, part4_osid, ".
-		 " default_osid, path, pid, gid, shared, global, creator, ".
-		 " created) ".
+		 " default_osid, path, pid, gid, shared, global, ".
+		 " creator, creator_idx, created) ".
 		 "VALUES ".
 		 "  ('$imagename', '$imageid', '$description', $loadpart, ".
 		 "   $loadlength, ".
 		 "   $part1_osid, $part2_osid, $part3_osid, $part4_osid, ".
 		 "   '$default_osid', '$path', '$pid', '$gid', $shared, ".
-	         "   $global, '$uid', now())");
+	         "   $global, '$uid', '$dbid', now())");
 
 if (!$isadmin || $makedefault) {
     for ($i = 0; $i < count($mtypes_array); $i++) {

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -102,15 +102,13 @@ use libtblog;
 use libArchive;
 use Experiment;
 use Template;
+use User;
 
 my $parser      = "$TB/libexec/parse-ns";
 my $checkquota  = "$TB/sbin/checkquota";
 my $tbbindir    = "$TB/bin/";
 my $RSYNC	= "/usr/local/bin/rsync";
 my $errorstat=-1;
-my $user_name;
-my $user_email;
-my $dbuid;
 my $exptidx;
 my $logname;
 
@@ -163,24 +161,22 @@ my $experiment;
 my $copy_experiment;
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 #
 # Before doing anything else, check for overquota ... lets not waste
 # our time. Make sure user sees the error by exiting with 1.
 #
-if (system("$checkquota $dbuid") != 0) {
+if (system("$checkquota $user_uid") != 0) {
     tberror({cause => 'user', type => 'primary', severity => SEV_ERROR,
 	     error => ['over_disk_quota', $CONTROL]},
 	    "You are over your disk quota on $CONTROL; ".
@@ -206,7 +202,7 @@ if (!defined($gid)) {
     $gid = $pid;
 }
 if (!defined($description)) {
-    $description = "Created by $dbuid";
+    $description = "Created by $user_uid";
 }
 if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
     tbdie("Must provide a reason with -S option (not swappable reason)!");
@@ -214,7 +210,7 @@ if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
 if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")){
     tbdie("Must provide a reason with -L option (no idleswap reason)!");
 }
-if (!defined($tempnsfile) && !defined($copyarg) && !TBAdmin($dbuid)) {
+if (!defined($tempnsfile) && !defined($copyarg) && !TBAdmin()) {
     tbdie("Only admins can create experiments with no NS file");
 }
 my $nsfile  = "$eid.ns";
@@ -229,7 +225,7 @@ $noidleswap_reason = "None Given"
 #
 # Make sure UID is allowed to create experiments in this project.
 #
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+if (! TBProjAccessCheck($user_uid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
     die("You do not have permission to create experiments in $pid/$gid");
 }
 
@@ -283,8 +279,10 @@ if ($waitmode) {
 my %args = ();
 
 $args{'gid'}	  	   = $gid;
-$args{'expt_head_uid'}	   = $dbuid;
-$args{'expt_swap_uid'}	   = $dbuid;
+$args{'expt_head_uid'}	   = $user_uid;
+$args{'expt_swap_uid'}	   = $user_uid;
+$args{'creator_idx'}	   = $user_dbid;
+$args{'swapper_idx'}	   = $user_dbid;
 $args{'state'}		   = $exptstate;
 $args{'priority'}	   = $priority;
 $args{'swappable'}	   = $swappable;
@@ -480,11 +478,11 @@ if (system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
 # Gather statistics; start the clock ticking.
 #
 if ($frontend || $batchmode) {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0,
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_PRELOAD, 0,
 		    TBDB_STATS_FLAGS_START);
 }
 else {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0,
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_START, 0,
 		    TBDB_STATS_FLAGS_START);
 }
 
@@ -711,16 +709,16 @@ if ($copybranch && !$template_mode) {
 # Gather statistics.
 #
 if ($frontend || $batchmode) {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0);
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_PRELOAD, 0);
 }
 else {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0);
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_START, 0);
 }
 
 #
 # Set accounting stuff, but on success only, and *after* gathering swap stats!
 #
-$experiment->SetSwapInfo($dbuid);
+$experiment->SetSwapInfo($this_user);
 
 #
 # Close up the log file so the webpage stops.
@@ -834,10 +832,10 @@ sub cleanup()
     # Gather statistics.
     #
     if ($frontend) {
-	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, $errorstat);
+	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_PRELOAD, $errorstat);
     }
     else {
-	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, $errorstat);
+	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_START, $errorstat);
     }
     $experiment->Refresh();
 
@@ -868,7 +866,7 @@ sub cleanup()
     #
     # Okay, we *are* going to terminate the experiment.
     # 
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
+    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_TERMINATE, 0);
 
     # Clear the logfile so the webpage stops.
     $experiment->CloseLogFile();

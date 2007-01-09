@@ -33,7 +33,7 @@ if (! ($target_user = User::Lookup($user))) {
     USERERROR("The user $user is not a valid user", 1);
 }
 $target_uid   = $target_user->uid();
-$target_dbuid = $target_user->uid();
+$target_idx   = $target_user->uid_idx();
 
 #
 # Only admin people can create SSL certs for another user.
@@ -43,9 +43,8 @@ if (!$isadmin && !$target_user->SameUser($this_user)) {
 	      "for $user!", 1);
 }
 
-$query_result =
-    DBQueryFatal("select cert,privkey from user_sslcerts ".
-		 "where uid='$target_dbuid' and encrypted=1");
+$query_result =& $target_user->TableLookUp("user_sslcerts",
+					   "cert,privkey", "encrypted=1");
 
 if (!mysql_num_rows($query_result)) {
     PAGEHEADER("Download SSL Certificate for $target_uid");

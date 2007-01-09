@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 class Project
@@ -104,6 +104,7 @@ class Project
     function funders()       { return $this->field("funders"); }
     function addr()          { return $this->field("addr"); }
     function head_uid()      { return $this->field("head_uid"); }
+    function head_idx()      { return $this->field("head_idx"); }
     function num_members()   { return $this->field("num_members"); }
     function num_pcs()       { return $this->field("num_pcs"); }
     function num_sharks()    { return $this->field("num_sharks"); }
@@ -172,6 +173,7 @@ class Project
 	$insert_data[] = "pid='$pid'";
 	$insert_data[] = "pid_idx='$pid_idx'";
 	$insert_data[] = "head_uid='" . $leader->uid() . "'";
+	$insert_data[] = "head_idx='" . $leader->uid_idx() . "'";
 	$insert_data[] = "created=now()";
 
 	# Insert into DB. Should probably lock the table ...
@@ -233,10 +235,10 @@ class Project
     # Return user object for leader.
     #
     function GetLeader() {
-	$head_uid = $this->head_uid();
+	$head_idx = $this->head_idx();
 
-	if (! ($leader = User::Lookup($head_uid))) {
-	    TBERROR("Could not find user object for $head_uid", 1);
+	if (! ($leader = User::Lookup($head_idx))) {
+	    TBERROR("Could not find user object for $head_idx", 1);
 	}
 	return $leader;
     }
@@ -312,14 +314,17 @@ class Project
     # approved.
     #
     function ChangeLeader($leader) {
-	$group = $this->LoadGroup();
-	$idx   = $this->pid_idx();
-	$uid   = $leader->uid();
+	$group   = $this->LoadGroup();
+	$idx     = $this->pid_idx();
+	$uid     = $leader->uid();
+	$uid_idx = $leader->uid_idx();
 
-	DBQueryFatal("update projects set head_uid='$uid' ".
+	DBQueryFatal("update projects set ".
+		     "  head_uid='$uid',head_idx='$uid_idx' ".
 		     "where pid_idx='$idx'");
 
 	$this->project["head_uid"] = $uid;
+	$this->project["head_idx"] = $uid_idx;
 	return $group->ChangeLeader($leader);
     }
     

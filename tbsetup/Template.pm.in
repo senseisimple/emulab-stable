@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX Need to deal with locking at some point ...
@@ -660,6 +660,8 @@ sub NewMetadata($$$$;$)
 
     my $template_guid = $self->guid();
     my $template_vers = $self->vers();
+    my $creator_uid   = $creator->uid();
+    my $creator_dbid  = $creator->uid_idx();
 
     return -1
 	if (NewGUID(\$guid) < 0);
@@ -688,7 +690,8 @@ sub NewMetadata($$$$;$)
 
     my $query_result =
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
-		    "   guid='$guid', vers='$version', uid='$creator', ".
+		    "   guid='$guid', vers='$version', ".
+		    "   uid='$creator_uid', uid_idx='$creator_dbid', ".
 		    "   template_guid='$template_guid', ".
 		    "   name=$safename, value=$safevalue, created=now()");
     return -1
@@ -778,6 +781,8 @@ sub ModifyMetadata($$$$)
 
     my $template_guid = $self->guid();
     my $template_vers = $self->vers();
+    my $creator_uid   = $creator->uid();
+    my $creator_dbid  = $creator->uid_idx();
     my $parent_guid;
     my $parent_vers;
     my $metadata_type;
@@ -809,7 +814,8 @@ sub ModifyMetadata($$$$)
     #
     if (!DBQueryWarn("insert into experiment_template_metadata_items set ".
 		     "     guid='$parent_guid',vers='$metadata_vers', ".
-		     "     template_guid='$template_guid', uid='$creator', ".
+		     "     template_guid='$template_guid', ".
+		     "     uid='$creator_uid', uid_idx='$creator_dbid', ".
 		     "     parent_guid='$parent_guid',".
 		     "     parent_vers='$parent_vers'," .
 		     "     name=$name, value=$value, created=now()")) {
@@ -867,7 +873,7 @@ sub ModifyMetadata($$$$)
 #
 sub NewFormalParameter($$$$$)
 {
-    my ($self, $name, $value, $description, $dbuid) = @_;
+    my ($self, $name, $value, $description, $user) = @_;
 
     # Must be a real reference. 
     return -1
@@ -894,7 +900,7 @@ sub NewFormalParameter($$$$$)
 
     if (defined($description) && $description ne "") {
 	$self->NewMetadata($name,
-			   $description, $dbuid, "parameter_description")
+			   $description, $user, "parameter_description")
 	    == 0 or return -1;
     }
 
@@ -1080,6 +1086,8 @@ sub CopyMetadata($$$)
     my $from_guid = $parent->guid();
     my $from_vers = $parent->vers();
     my $to_vers   = $self->vers();
+    my $copier_uid  = $copier->uid();
+    my $copier_dbid = $copier->uid_idx();
 
     #
     # Copy the toplevel items.
@@ -1172,7 +1180,8 @@ sub CopyMetadata($$$)
 	    or return -1;
 
 	DBQueryWarn("insert into experiment_template_metadata_items set ".
-		    "   guid='$guid', vers='$version', uid='$copier', ".
+		    "   guid='$guid', vers='$version', ".
+		    "   uid='$copier_uid', uid_idx='$copier_dbid', ".
 		    "   template_guid='$from_guid', ".
 		    (! defined($parent_guid) ? "" :
 		     "  parent_guid='$parent_guid',".
@@ -1260,7 +1269,8 @@ sub NewInstance($$$)
     $args{'parent_vers'} = $self->vers();
     $args{'pid'}         = $self->pid();
     $args{'eid'}         = $eid;
-    $args{'uid'}         = $creator;
+    $args{'uid'}         = $creator->uid();
+    $args{'uid_idx'}     = $creator->uid_idx();
     $args{'description'} = $description
 	if (defined($description));
 

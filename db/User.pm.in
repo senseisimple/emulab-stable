@@ -22,11 +22,41 @@ use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
 use Project;
+use vars qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
+	    $NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
+	    $USERSTATUS_ACTIVE $USERSTATUS_FROZEN
+	    $USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
+	    $USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED
+	    @EXPORT_OK);
 
 # Configure variables
-my $TB		= "@prefix@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $CONTROL	= "@USERNODE@";
+my $TB		   = "@prefix@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $CONTROL	   = "@USERNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $MIN_UNIX_UID   = @MIN_UNIX_UID@;
+my $MIN_UNIX_GID   = @MIN_UNIX_GID@;
+
+# Create() flags.
+$NEWUSER_FLAGS_PROJLEADER	= 0x01;
+$NEWUSER_FLAGS_WIKIONLY		= 0x02;
+$NEWUSER_FLAGS_WEBONLY		= 0x04;
+$NEWUSER_FLAGS_ARCHIVED		= 0x08;
+
+# Status values.
+$USERSTATUS_ACTIVE		= "active";
+$USERSTATUS_FROZEN		= "frozen";
+$USERSTATUS_UNAPPROVED		= "unapproved";
+$USERSTATUS_UNVERIFIED		= "unverified";
+$USERSTATUS_NEWUSER	        = "newuser";
+$USERSTATUS_ARCHIVED	        = "archived";
+
+# Why, why, why?
+@EXPORT_OK = qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
+		$NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
+		$USERSTATUS_ACTIVE $USERSTATUS_FROZEN
+		$USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
+		$USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED);
 
 # Cache of instances to avoid regenerating them.
 my %users      = ();
@@ -168,6 +198,237 @@ sub LookupByUnixId($$)
 	return undef
     }
 
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given a wikiname. This is just to make sure the wikiname
+# the user picked is unique.
+#
+sub LookupByWikiName($$)
+{
+    my ($class, $wikiname) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where wikiname='$wikiname'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given a wikiname. This is just to make sure the wikiname
+# the user picked is unique.
+#
+sub LookupByEmail($$)
+{
+    my ($class, $email) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where LCASE(usr_email)=LCASE('$email')");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Class function to create new user and return object.
+#
+sub Create($$$$)
+{
+    my ($class, $uid, $flags, $argref) = @_;
+
+    my $isleader = ($flags & $NEWUSER_FLAGS_PROJLEADER ? 1 : 0);
+    my $wikionly = ($flags & $NEWUSER_FLAGS_WIKIONLY   ? 1 : 0);
+    my $webonly  = ($flags & $NEWUSER_FLAGS_WEBONLY    ? 1 : 0);
+    my $archived = ($flags & $NEWUSER_FLAGS_ARCHIVED   ? 1 : 0);
+
+    #
+    # If no uid, we need to generate a unique one for the user.
+    #
+    if (! $uid) {
+	#
+	# Take the first 5 letters of the email to form a root. That gives
+	# us 3 digits to make it unique, since unix uids are limited to 8
+	# chars, sheesh!
+	#
+	my $email = $argref->{'usr_email'};
+	my $token;
+
+	if ($email =~ /^([-\w\+\.]+)\@([-\w\.]+)$/) {
+	    $token = $1;
+	}
+	else {
+	    return undef;
+	}
+	# Squeeze out any dots or dashes.
+	$token =~ s/\.//g;
+	$token =~ s/\-//g;
+
+	# Trim off any trailing numbers or +foo tokens.
+	if ($token =~ /^([a-zA-Z]+)/) {
+	    $token = $1;
+	}
+	else {
+	    return undef;
+	}
+
+	# First 5 chars, at most.
+	$token = substr($token, 0, 5);
+
+	# Grab all root matches from the DB.
+	my $query_result =
+	    DBQueryWarn("select uid from users where uid like '${token}%'");
+
+	return undef
+	    if (!$query_result);
+
+	# Easy; no matches at all!
+	if (!$query_result->numrows) {
+	    $uid = "$token" . "001";
+	}
+	else {
+	    my $max = 0;
+		
+	    #
+	    # Find unused slot. Must be a better way to do this!
+	    #
+	    while (my ($foo) = $query_result->fetchrow_array()) {
+		my $name;
+		my $number;
+		
+		# Split name from number
+		if ($foo =~ /^([a-zA-Z]+)(\d*)$/) {
+		    $name   = $1;
+		    $number = $2;
+		}
+		else {
+		    return undef;
+		}
+		# Must be exact root
+		next
+		    if ($name != $token);
+
+		# Backwards compatability; might not have appended number.
+		if (isset($number) && intval($number) > $max) {
+		    $max = intval($number);
+		}
+	    }
+	    $max++;
+	    $uid = $token . sprintf("%03d", $max);
+	}
+    }
+	
+    #
+    # The array of inserts is assumed to be safe already. Generate
+    # a list of actual insert clauses to be joined below.
+    #
+    my @insert_data = (!defined($argref) ? () :
+		       map("$_=" . DBQuoteSpecial($argref->{$_}),
+			   keys(%{$argref})));
+
+    # Every user gets a new unique index.
+    my $uid_idx = TBGetUniqueIndex('next_uid');
+
+    #
+    # Get me an unused unix id. 
+    #
+    my $unix_uid;
+
+    #
+    # Start here, and keep going if the one picked from the DB just
+    # happens to be in use (in the passwd file). Actually happens!
+    #
+    my $min_uid = $MIN_UNIX_UID;
+    
+    while (! defined($unix_uid)) {
+	#
+	# Nice query, eh? Basically, find unused numbers by looking at
+	# existing numbers plus one, and check to see if that number
+	# is taken.
+	#
+	my $query_result =
+	    DBQueryWarn("select u.unix_uid + 1 as start from users as u ".
+			"left outer join users as r on ".
+			"  u.unix_uid + 1 = r.unix_uid ".
+			"where u.unix_uid>$min_uid and ".
+			"      u.unix_uid<60000 and ".
+			"      r.unix_uid is null limit 1");
+	return undef
+	    if (! $query_result);
+
+	if (! $query_result->numrows) {
+	    print "*** WARNING: Could not find an unused unix_uid!\n";
+	    return undef;
+	}
+
+	my ($unused) = $query_result->fetchrow_array();
+
+	if (getpwuid($unused)) {
+	    # Keep going.
+	    $min_uid++;
+	}
+	else {
+	    # Break out of loop.
+	    $unix_uid = $unused;
+	}
+    }
+
+    # Initial mailman_password.
+    my $mailman_password = substr(TBGenSecretKey(), 0, 10);
+
+    # And a verification key.
+    my $verify_key = TBGenSecretKey();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "wikionly='1'")
+	if ($wikionly);
+    push(@insert_data, "webonly='1'")
+	if ($webonly);
+
+    push(@insert_data, "usr_created=now()");
+    push(@insert_data, "usr_modified=now()");
+    push(@insert_data, "unix_uid=$unix_uid");
+    push(@insert_data, "mailman_password='$mailman_password'");
+    push(@insert_data, "verify_key='$verify_key'");
+    push(@insert_data, "uid_idx='$uid_idx'");
+    push(@insert_data, "uid='$uid'");
+
+    if ($archived) {
+	#
+	# Creating an archived user; this only happens when restoring a
+        # deleted user (which is to say, not often).
+	#
+	push(@insert_data, "status='$USERSTATUS_ARCHIVED'");
+	push(@insert_data, "usr_name='$uid'");
+	push(@insert_data, "pswd_expires=now()");
+	push(@insert_data, "usr_pswd='*'");
+	push(@insert_data, "usr_email='bouncer\@${OURDOMAIN}'");
+    }
+    else {
+	push(@insert_data, "status='$USERSTATUS_NEWUSER'");
+	push(@insert_data, "pswd_expires=date_add(now(), interval 1 year)");
+    }
+
+    # Insert into DB.
+    DBQueryWarn("insert into users set " . join(",", @insert_data))
+	or return undef;
+
+    if (! DBQueryWarn("insert into user_stats (uid, uid_idx) ".
+		      "VALUES ('$uid', $uid_idx)")) {
+	DBQueryFatal("delete from users where uid_idx='$uid_idx'");
+	return undef;
+    }
     return User->Lookup($uid_idx);
 }
 

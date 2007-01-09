@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV
+    qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV AuditGetARGV
 	 AddAuditInfo
 	 LogStart LogEnd
 	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY LIBAUDIT_NODELETE LIBAUDIT_FANCY
@@ -240,6 +240,10 @@ sub AuditEnd()
 sub AuditSetARGV(@)
 {
     @SAVEARGV = @_;
+}
+sub AuditGetARGV()
+{
+    return @SAVEARGV;
 }
 
 #

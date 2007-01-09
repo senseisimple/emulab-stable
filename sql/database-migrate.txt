@@ -3877,3 +3877,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	  UNIQUE KEY uidkey (uid,hashkey)
 	) TYPE=MyISAM;
        
+
+4.104: More uid changes. First, add new status to users table:
+
+       alter table users change status 
+          status enum('newuser','unapproved','unverified','active',
+                      'frozen','archived','other') NOT NULL default 'newuser';
+
+       All of the other sql differences are made in the following script:
+
+         ./step2_newids.pl

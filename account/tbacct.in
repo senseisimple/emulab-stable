@@ -145,7 +145,7 @@ my $HOMEDIR	= USERROOT();
 #
 # Rewrite audit version of ARGV to prevent password in mail logs.
 #
-if ($ARGV[0] eq "passwd" && scalar(@ARGV) == 3) {
+if (scalar(@ARGV) == 3 && $ARGV[0] eq "passwd") {
     my @NEWARGV = @ARGV;
 
     $NEWARGV[scalar(@NEWARGV) - 1] = "**********";

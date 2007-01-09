@@ -32,6 +32,7 @@ CREATE TABLE experiment_templates (
   -- Template ID (something unique that the user specifies)
   tid varchar(32) NOT NULL default '',
   -- Creator of the template
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   uid varchar(8) NOT NULL default '',
   -- Eric says these are really metadata. Probably true.
   description mediumtext,
@@ -198,6 +199,7 @@ CREATE TABLE experiment_template_metadata_items (
   -- permission checks and for deletion.
   template_guid varchar(16) NOT NULL default '',
   -- Creator of this record
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   uid varchar(8) NOT NULL default '',
   -- Key/Value pairs.
   name varchar(64) NOT NULL default '',
@@ -305,6 +307,7 @@ CREATE TABLE experiment_template_instances (
   -- The actual eid (for the experiments table)
   eid varchar(32) NOT NULL default '',
   -- Creator of the instance.
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   uid varchar(8) NOT NULL default '',
   -- A short description; not sure I really want this. 
   description tinytext,

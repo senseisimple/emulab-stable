@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -116,10 +116,10 @@ class Group
     # Return user object for leader.
     #
     function GetLeader() {
-	$head_uid = $this->leader();
+	$leader_idx = $this->leader_idx();
 
-	if (! ($leader = User::Lookup($head_uid))) {
-	    TBERROR("Could not find user object for $head_uid", 1);
+	if (! ($leader = User::Lookup($leader_idx))) {
+	    TBERROR("Could not find user object for $leader_idx", 1);
 	}
 	return $leader;
     }
@@ -170,6 +170,7 @@ class Group
     function pid_idx()          { return $this->field("pid_idx"); }
     function gid_idx()          { return $this->field("gid_idx"); }
     function leader()           { return $this->field("leader"); }
+    function leader_idx()       { return $this->field("leader_idx"); }
     function created()          { return $this->field("created"); }
     function description()      { return $this->field("description"); }
     function unix_gid()         { return $this->field("unix_gid"); }
@@ -236,6 +237,7 @@ class Group
 	if (!DBQueryWarn("insert into groups set ".
 			 " pid='$pid', gid='$gid', ".
 			 " leader='" . $leader->uid() . "'," .
+			 " leader_idx='" . $leader->uid_idx() . "'," .
 			 " created=now(), ".
 			 " description='$description', ".
 			 " unix_name='$unix_name', ".
@@ -352,7 +354,7 @@ class Group
 	$project	= $this->project;
 	$pid            = $project->pid();
 	$gid            = $project->gid();
-	$leader		= $project->Leader();
+	$leader		= $project->GetLeader();
 	$leader_name	= $leader->name();
 	$leader_email	= $leader->email();
 	$leader_uid	= $leader->uid();
@@ -505,13 +507,15 @@ class Group
     # Change the leader for a group.
     #
     function ChangeLeader($leader) {
-	$idx   = $this->gid_idx();
-	$uid   = $leader->uid();
+	$idx     = $this->gid_idx();
+	$uid     = $leader->uid();
+	$uid_idx = $leader->uid_idx();
 
-	DBQueryFatal("update groups set leader='$uid' ".
+	DBQueryFatal("update groups set leader='$uid',leader_idx='$uid_idx' ".
 		     "where gid_idx='$idx'");
 
 	$this->group["leader"] = $uid;
+	$this->group["leader_idx"] = $uid_idx;
 	return 0;
     }
 

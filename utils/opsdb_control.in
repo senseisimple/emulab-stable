@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -71,9 +71,7 @@ sub fatal($);
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-# Locals
-my $dbuid;
+use User;
 
 #
 # We don't want to run this script unless its the real version.
@@ -103,10 +101,12 @@ if (! $OPSDBSUPPORT) {
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database!\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -746,7 +746,8 @@ sub AddTempDB(@)
     # Add DB record for it.
     #
     if (! DBQueryWarn("insert into datapository_databases set ".
-		      "  pid='$pid', gid='$gid', uid='$dbuid', ".
+		      "  pid='$pid', gid='$gid', ".
+		      "  uid='$user_uid', uid_idx='$user_dbid', ".
 		      "  dbname='$dbname', created=now()")) {
 	fatal("Failed to add temporary dbname to database");
     }

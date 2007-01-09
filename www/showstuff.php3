@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -38,7 +38,7 @@ function SHOWPROJECT($pid, $ignore) {
     $proj_URL		= $row[URL];
     $proj_public        = $row[public];
     $proj_funders	= $row[funders];
-    $proj_head_uid	= $row[head_uid];
+    $proj_head_idx	= $row[head_idx];
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
     # These are now booleans, not actual counts.
@@ -53,10 +53,11 @@ function SHOWPROJECT($pid, $ignore) {
     $wikiname           = $row[wikiname];
     $cvsrepo_public     = $row[cvsrepo_public];
 
-    if (! ($head_user = User::Lookup($proj_head_uid))) {
-	TBERROR("Could not lookup object for user $proj_head_uid", 1);
+    if (! ($head_user = User::Lookup($proj_head_idx))) {
+	TBERROR("Could not lookup object for user $proj_head_idx", 1);
     }
-    $showuser_url = CreateURL("showuser", $head_user);
+    $showuser_url  = CreateURL("showuser", $head_user);
+    $proj_head_uid = $head_user->uid();
 
     if ($proj_public) {
 	$proj_public = "Yes";
@@ -258,24 +259,24 @@ function SHOWGROUP($pid, $gid, $ignore) {
     global $OURDOMAIN;
     global $MAILMANSUPPORT;
     global $TBDB_TRUST_GROUPROOT;
-    
-    $query_result =
-	DBQueryFatal("SELECT * FROM groups WHERE pid='$pid' and gid='$gid'");
-    $row = mysql_fetch_array($query_result);
 
+    if (! ($this_group = Group::LookupByPidGid($pid, $gid))) {
+	TBERROR("Could not lookup object for group $pid/$gid", 1);
+    }
+    
     echo "<center>
           <h3>Group Profile</h3>
           </center>
           <table align=center border=1>\n";
 
-    $gid_idx    = $row["gid_idx"];
-    $leader	= $row[leader];
-    $created	= $row[created];
-    $description= $row[description];
-    $expt_count = $row[expt_count];
-    $expt_last  = $row[expt_last];
-    $unix_gid   = $row[unix_gid];
-    $unix_name  = $row[unix_name];
+    $gid_idx    = $this_group->gid_idx();
+    $created	= $this_group->created();
+    $leader	= $this_group->leader();
+    $description= $this_group->description();
+    $expt_count = $this_group->expt_count();
+    $expt_last  = $this_group->expt_last();
+    $unix_gid   = $this_group->unix_gid();
+    $unix_name  = $this_group->unix_name();
 
     if (strcmp($pid,$gid))
 	$mail = "$pid-$gid" . "-users@" . $OURDOMAIN;
@@ -286,7 +287,7 @@ function SHOWGROUP($pid, $gid, $ignore) {
 	$expt_last = "&nbsp;";
     }
 
-    if (! ($leader_user = User::Lookup($leader))) {
+    if (! ($leader_user = $this_group->GetLeader())) {
 	TBERROR("Could not lookup object for user $leader", 1);
     }
     $showuser_url = CreateURL("showuser", $leader_user);

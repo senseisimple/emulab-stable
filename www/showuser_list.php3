@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -32,6 +32,7 @@ echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
                <a href='showuser_list.php3?showtype=homeless'>homeless</a>,
                <a href='showuser_list.php3?showtype=active'>active</a>,
                <a href='showuser_list.php3?showtype=inactive'>inactive</a>,
+               <a href='showuser_list.php3?showtype=archived'>archived</a>,
                <a href='showuser_list.php3?showtype=all'>all</a>.</b>\n";
 
 if (!isset($showtype)) {
@@ -101,6 +102,11 @@ elseif (! strcmp($showtype, "active")) {
     $clause  = "";
     $where   = "where u.status='active' ";
     $showtag = "active";
+}
+elseif (! strcmp($showtype, "archived")) {
+    $clause  = "";
+    $where   = "where u.status='archived' ";
+    $showtag = "archived";
 }
 else {
     $clause  = "";

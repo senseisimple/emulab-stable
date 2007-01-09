@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -48,12 +48,16 @@ my $USERUID;
 
 # Locals
 my $user;
+my $this_user;
+my $target_user;
 my $keyfile;
 my $keyline;
 my $key;
 my $comment;
 my $user_name;
 my $user_email;
+my $user_dbid;
+my $user_uid;
 
 #
 # Testbed Support libraries
@@ -151,12 +155,22 @@ else {
 # Untaint the arguments.
 #
 if (defined($user)) {
-    if ($user =~ /^([-\w_]+)$/i) {
+    if ($user =~ /^([-\w]+)$/i) {
 	$user = $1;
     }
     else {
 	fatal("Tainted username: $user");
     }
+    # Map user to object.
+    $target_user = User->Lookup($user);
+    if (! defined($target_user)) {
+	fatal("$user does not exist!")
+    }
+
+    $user_name  = $target_user->name();
+    $user_email = $target_user->email();
+    $user_dbid  = $target_user->dbid();
+    $user_uid   = $target_user->uid();
 }
 
 #
@@ -170,6 +184,13 @@ if (getpwuid($UID) eq "nobody") {
 }
 else {
     $USERUID = getpwnam($user);
+
+    # Map invoking user to object.
+    $this_user = User->LookupByUnixId($UID);
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
 }
 
 #
@@ -214,28 +235,19 @@ else {
 #
 if (!$verify) {
     # If its the user himself, then we can generate a new authkeys file. 
-    if (!$nobody && getpwuid($UID) ne "$user" && !TBAdmin($UID)) {
-	fatal("You are not allowed to set pubkeys for $user.\n");
+    if (!$nobody && !TBAdmin() && !$target_user->SameUser($this_user)) {
+	fatal("You are not allowed to set pubkeys for $target_user\n");
     }
-    if (-d "$HOMEDIR/$user/.ssh") {    
+    if (-d "$HOMEDIR/$user_uid/.ssh") {
 	$genmode = 1;
     }
-
+    
     #
     # This script is audited when not in verify mode. Since all keys are first
     # checked with verify mode, this should not cause any extra email from bad
     # keys.
     #
     AuditStart(0);
-
-    if (! UserDBInfo($user, \$user_name, \$user_email)) {
-	if ($nobody) {
-	    $noemail = 1;
-	}
-	else {
-	    fatal("No DB info for $user!");
-	}
-    }
 }
 
 # Drop root privs, switching to user.
@@ -323,12 +335,13 @@ sub ParseKey($) {
     $key = "$key $comment";
 
     DBQueryFatal("replace into user_pubkeys ".
-		 "values ('$user', 0, '$key', now(), '$comment')");
+		 "values ('$user_uid', '$user_dbid', ".
+		 "        0, '$key', now(), '$comment')");
 
     #
     # Mark user record as modified so nodes are updated.
     #
-    TBNodeUpdateAccountsByUID($user);
+    TBNodeUpdateAccountsByUID($user_uid);
 
     my $chunked = "";
 
@@ -348,8 +361,8 @@ sub ParseKey($) {
 
     if (! $noemail) {
 	SENDMAIL("$user_name <$user_email>",
-		 "SSH Public Key for '$user' Added",
-		 "SSH Public Key for '$user' added:\n".
+		 "SSH Public Key for '$user_uid' Added",
+		 "SSH Public Key for '$user_uid' added:\n".
 		 "\n".
 		 "$chunked\n",
 		 "$TBOPS");
@@ -364,7 +377,7 @@ sub ParseKey($) {
 #
 sub InitUser()
 {
-    my $sshdir  = "$HOMEDIR/$user/.ssh";
+    my $sshdir  = "$HOMEDIR/$user_uid/.ssh";
 
     #
     # Set up the ssh key, but only if not done so already.
@@ -384,7 +397,7 @@ sub InitUser()
 
 	    if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([-\w\@\.]*)/) {
 		DBQueryFatal("delete from user_pubkeys ".
-			     "where uid='$user' and pubkey='$1 $2'");
+			     "where uid_idx='$user_dbid' and pubkey='$1 $2'");
 	    }
 	    unlink("$sshdir/identity");
 	}
@@ -404,7 +417,8 @@ sub InitUser()
 
 	if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([-\w\@\.]*)/) {
 	    DBQueryFatal("replace into user_pubkeys ".
-			 "values ('$user', 0, '$1 $2', now(), '$2')");
+			 "values ('$user_uid', '$user_dbid', ".
+			 "        0, '$1 $2', now(), '$2')");
 	}
 	else {
 	    fatal("Bad protocol 1 public key: $ident\n");
@@ -425,7 +439,7 @@ sub InitUser()
 	    if ($ident =~
 		/^(ssh-rsa [-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
 		DBQueryFatal("delete from user_pubkeys ".
-			     "where uid='$user' and pubkey='$1 $2'");
+			     "where uid_idx='$user_dbid' and pubkey='$1 $2'");
 	    }
 	    unlink("$sshdir/id_rsa");
 	}
@@ -446,13 +460,8 @@ sub InitUser()
 	if ($ident =~
 	    /^(ssh-rsa [-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
 	    DBQueryFatal("replace into user_pubkeys ".
-			 "values ('$user', 0, '$1 $2', now(), '$2')");
-
-	    #
-	    # Backwards compat. Remove later.
-	    #
-	    DBQueryFatal("update users set emulab_pubkey='$1 $2' ".
-			 "where uid='$user'");
+			 "values ('$user_uid', '$user_dbid', ".
+			 "        0, '$1 $2', now(), '$2')");
 	}
 	else {
 	    fatal("Bad protocol 2 public key: $ident\n");
@@ -468,7 +477,7 @@ sub InitUser()
 sub GenerateKeyFile()
 {
     my @pkeys   = ();
-    my $sshdir  = "$HOMEDIR/$user/.ssh";
+    my $sshdir  = "$HOMEDIR/$user_uid/.ssh";
     my $keyfile = "$sshdir/authorized_keys";
 	
     if (! -e $sshdir) {
@@ -478,7 +487,8 @@ sub GenerateKeyFile()
 	}
     }
     my $query_result =
-	DBQueryFatal("select pubkey from user_pubkeys where uid='$user'");
+	DBQueryFatal("select pubkey from user_pubkeys ".
+		     "where uid_idx='$user_dbid'");
 
     while (my ($key) = $query_result->fetchrow_array()) {
 	push(@pkeys, $key);

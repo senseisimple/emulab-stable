@@ -34,8 +34,8 @@ if (!isset($user) || $user == "" || !User::ValidWebID($user) ||
 if (! ($target_user = User::Lookup($user))) {
     USERERROR("The user $user is not a valid user", 1);
 }
-$target_dbuid = $target_user->uid();
-$target_uid   = $target_user->uid();
+$target_dbid = $target_user->dbid();
+$target_uid  = $target_user->uid();
 
 #
 # Verify that this uid is a member of one of the projects that the
@@ -49,16 +49,14 @@ if (!$isadmin &&
 #
 # Get the actual key.
 #
-$query_result =
-    DBQueryFatal("select * from user_pubkeys ".
-		 "where uid='$target_dbuid' and idx='$key'");
+$query_result =& $target_user->TableLookUp("user_pubkeys", "*", "idx='$key'");
 
 if (! mysql_num_rows($query_result)) {
     USERERROR("Public Key for user '$target_uid' does not exist!", 1);
 }
 
 $row    = mysql_fetch_array($query_result);
-$pubkey = $row[pubkey];
+$pubkey = $row['pubkey'];
 $chunky = chunk_split($pubkey, 70, "<br>\n");
 
 #
@@ -132,7 +130,7 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Errors-To: $TBMAIL_WWW");
 
 DBQueryFatal("delete from user_pubkeys ".
-	     "where uid='$target_dbuid' and idx='$key'");
+	     "where uid_idx='$target_dbid' and idx='$key'");
 
 #
 # update authkeys files and nodes, but only if user has a real account.
