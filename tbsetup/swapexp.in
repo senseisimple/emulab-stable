@@ -111,8 +111,6 @@ my $template_node = 0;
 
 my $inout;
 my $logname;
-my $user_name;
-my $user_email;
 my @allnodes;
 my @row;
 my $action;
