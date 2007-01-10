@@ -37,7 +37,7 @@ while you are in that directory).
 * Installed 'teachswitch' (from testbed/tools/teachswitch/) into
   /etc/testbed
 
-Put these in /usr/local/etc/rc.d instead.  Make sure newclient is executable.
+Put these in /usr/local/etc/emulab instead.  Make sure newclient is executable.
 teachswitch will have to be compiled.  It is best you do this on the same
 OS that it will be running on to avoid shared library problems (or statically
 link it).
