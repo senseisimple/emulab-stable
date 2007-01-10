@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require_once("Sajax.php");
@@ -16,7 +16,7 @@ if (sajax_client_request()) {
 }
 
 function CHECKPAGEARGS($pid, $eid) {
-    global $uid, $TB_EXPT_READINFO;
+    global $this_user, $TB_EXPT_READINFO;
     
     #
     # Verify page arguments.
@@ -37,15 +37,24 @@ function CHECKPAGEARGS($pid, $eid) {
     }
 
     #
+    # If $this_user is not set, someone got confused. 
+    #
+    if (!isset($this_user)) {
+	TBERROR("Current user is not defined in CHECKPAGEARGS()", 1);
+    }
+
+    #
     # Check to make sure this is a valid PID/EID tuple.
     #
-    if (! TBValidExperiment($pid, $eid)) {
+    $experiment = Experiment::LookupByPidEid($pid, $eid);
+    if (! $experiment) {
 	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
     }
+    
     #
     # Verify permission.
     #
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+    if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view the log for $pid/$eid!", 1);
     }
 }

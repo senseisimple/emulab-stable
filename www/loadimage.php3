@@ -1,11 +1,18 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
@@ -14,13 +21,6 @@ include("showlogfile_sup.php3");
 # Standard Testbed Header
 #
 PAGEHEADER("Snapshot Node Disk into Existing Image Descriptor");
-
-#
-# Only known and logged in users.
-#
-$this_user = CheckLoginOrDie();
-$uid       = $this_user->uid();
-$isadmin   = ISADMIN();
 
 if (! isset($imageid)) {
     USERERROR("Must pass image name to page as 'imageid'.", 1 );
