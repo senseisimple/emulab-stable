@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -150,7 +150,7 @@ function INFORMLEADERS($this_user) {
 	     $leader_name  = $groupleader->name();
 	     $leader_email = $groupleader->email();
 	     $leader_uid   = $groupleader->uid();
-	     $allleaders   = TBLeaderMailList($pid,$gid);
+	     $allleaders   = $group->LeaderMailList();
 	     
 	     TBMAIL("$leader_name '$leader_uid' <$leader_email>",
 		"$uid $pid Project Join Request",
