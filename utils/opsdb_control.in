@@ -202,7 +202,7 @@ sub AddUser(@)
     # Map target user to object.
     my $target_user = User->Lookup($target_uid);
     fatal("No such user in DB: $target_uid!")
-	if (!defined($user));
+	if (!defined($target_uid));
 
     my $password = $target_user->mailman_password();
     fatal("No password defined for $target_uid!")
@@ -243,7 +243,7 @@ sub DelUser(@)
     # Map target user to object.
     my $target_user = User->Lookup($target_uid);
     fatal("No such user in DB: $target_uid!")
-	if (!defined($user));
+	if (!defined($target_uid));
 
     print "Removing user '$target_uid' from mysql database on $CONTROL.\n";
     my $retval = DoOpsStuff("deluser $target_uid");
