@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -21,6 +21,9 @@ FSUBDIR	       = 5
 endif
 ifeq ($(FBSDVERSION),FreeBSD6)
 FSUBDIR	       = 6
+endif
+ifeq ($(FBSDVERSION),FreeBSD7)
+FSUBDIR	       = 7
 endif
 SUBDIRS	       = $(FSUBDIR)
 

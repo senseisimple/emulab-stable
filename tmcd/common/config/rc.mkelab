@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -223,7 +223,7 @@ sub doboot()
     $emulabconfig{"JAILIPBASE"} = "172.16.0.0";
     $emulabconfig{"JAILIPMASK"} = "255.240.0.0";
     $emulabconfig{"MFSTARBALL"} = "tftpboot-elabinelab.tar.gz";
-    $emulabconfig{"MFSVERSION"} = "53";
+    $emulabconfig{"MFSVERSION"} = "62";
     $emulabconfig{"MFSCONSOLE"} = "sio";
     $emulabconfig{"WINSUPPORT"} = 0;
     $emulabconfig{"NOSETUP"}    = 0;
@@ -303,7 +303,7 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
     }
-    elsif ($FBSD_VERSION == 6.1) {
+    elsif ($FBSD_VERSION == 6.1 || $FBSD_VERSION == 6.2) {
 	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/6.1/packages";
 	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/6.1/packages";
 	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/6.1/packages";
@@ -1338,10 +1338,10 @@ sub SetupBossNode()
     # XXX frisbee-53 appears in the os_info table for some images still
     # XXX note: must copy, symlink won't work
     mysystem("cd /tftpboot; cp -rp frisbee frisbee-53")
-	if ($fv eq "53");
+	if ($fv ne "47");
 
     #
-    # Have recently added a 5.3 based newnode MFS
+    # Have recently added a 6.2 based newnode MFS
     #
     if (! -e "/tftpboot/freebsd.newnode") {
 	$fv = $emulabconfig{"MFSVERSION"};
