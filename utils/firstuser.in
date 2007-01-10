@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -14,6 +14,7 @@ use Getopt::Std;
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use User;
 
 my $tbadmin    = '@TBADMINGROUP@';
 my $ELABINELAB = @ELABINELAB@;
@@ -72,9 +73,9 @@ if (defined($opts{e})) {
     $protouser_email = $opts{e};
 }
 
-my $result = DBQueryFatal("select * from users where uid='$protouser'");
-if ($result->num_rows()) {
-    die "This script has already been run, there is no need to run it again\n";
+my $user = User->Lookup('$protouser');
+if (defined($user)) {
+    die("This script has already been run, no need to run it again!\n");
 }
 
 if ($UID != 0) {

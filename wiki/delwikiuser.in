@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -48,6 +48,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 # Protos
 sub fatal($);
@@ -178,14 +179,11 @@ utime $now, $now, $lockfile;
 # Look in the DB to see if there is already a wikiname defined. If
 # we use that. Otherwise have to form one from the user name. Ick.
 #
-my $query_result =
-    DBQueryFatal("select wikiname ".
-		 "from users where uid='$user'");
-
-if (!$query_result->numrows) {
-    fatal("No such user $user in the DB!");
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
 }
-my ($wikiname) = $query_result->fetchrow_array();
+my $wikiname = $target_user->wikiname();
 
 if (!defined($wikiname)) {
     print "There is no wikiname defined in the DB. ".

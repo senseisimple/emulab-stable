@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -47,6 +47,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 # Protos
 sub fatal($);
@@ -102,6 +103,13 @@ else {
     die("Bad data in user: $user.");
 }
 
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+my $uid_idx = $target_user->uid_idx();
+
 #
 # This script always does the right thing, so no permission checks.
 # In fact, all it does is call over to ops to run a script over there.
@@ -111,7 +119,7 @@ else {
 my $query_result =
     DBQueryFatal("select p.pid,g.wikiname,p.trust from group_membership as p ".
 		 "left join groups as g on g.pid=p.pid and g.gid=p.gid ".
-		 "where uid='$user' and p.pid=g.gid and trust!='none'");
+		 "where uid_idx='$uid_idx' and p.pid=g.gid and trust!='none'");
 
 while (my ($pid,$wikiname,$trust) = $query_result->fetchrow_array()) {
     if (!defined($wikiname)) {
@@ -129,17 +137,15 @@ while (my ($pid,$wikiname,$trust) = $query_result->fetchrow_array()) {
     }
 }
 
-# Admin users ... TBAdmin() test does not work for this test ...
-$query_result =
-    DBQueryFatal("select wikiname,admin from users where uid='$user'");
-my ($wikiname,$isadmin) = $query_result->fetchrow_array();
-if ($isadmin) {
-    push(@glist, "TWikiAdmin");
-}
+my $wikiname = $target_user->wikiname();
 if (!defined($wikiname)) {
     print "There is no wikiname defined in the DB. ".
 	"Must not have a wiki account!\n";
     exit(0);
+}
+
+if ($target_user->admin()) {
+    push(@glist, "TWikiAdmin");
 }
 exit(0)
     if (! @glist);

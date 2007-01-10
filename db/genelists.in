@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Fcntl ':flock';
@@ -73,6 +73,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
 
 #
 # We don't want to run this script unless its the real version.
@@ -300,7 +301,7 @@ sub ActiveUsers()
 	   DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
 		   "left join group_membership as p ".
 		   "     on e.pid=p.pid and p.pid=p.gid ".
-		   "left join users as u on u.uid=p.uid ".
+		   "left join users as u on u.uid_idx=p.uid_idx ".
 		   "where u.status='active' and ".
 		   "      e.state='active' ".
 		   "order by u.usr_email"))) {
@@ -325,7 +326,7 @@ sub RecentUsers()
 
     if (! ($query_result =
 	   DBQuery("select distinct u.usr_email from user_stats as s ".
-		   "left join users as u on u.uid=s.uid ".
+		   "left join users as u on u.uid_idx=s.uid_idx ".
 		   "where ((UNIX_TIMESTAMP(now()) - ".
 		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
 		   "order by u.usr_email"))) {
@@ -352,7 +353,7 @@ sub RecentProjects()
 	   DBQuery("select distinct u.usr_email from project_stats as s ".
 		   "left join group_membership as g on ".
 		   "  g.pid=s.pid and g.gid=g.pid ".
-		   "left join users as u on u.uid=g.uid ".
+		   "left join users as u on u.uid_idx=g.uid_idx ".
 		   "where u.status='active' and ".
 		   "      ((UNIX_TIMESTAMP(now()) - ".
 		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
@@ -379,7 +380,7 @@ sub RecentProjectLeaders()
 	   DBQuery("select distinct u.usr_email from project_stats as s ".
 		   "left join group_membership as g on ".
 		   "  g.pid=s.pid and g.gid=g.pid ".
-		   "left join users as u on u.uid=g.uid ".
+		   "left join users as u on u.uid_idx=g.uid_idx ".
                    "left join projects as p on u.uid=p.head_uid ".
 		   "where u.status='active' and ".
 		   "      ((UNIX_TIMESTAMP(now()) - ".
@@ -424,7 +425,7 @@ sub WideAreaPeople()
     my $query_result =
 	DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
 		     "left join group_membership as m on m.pid=p.pid ".
-		     "left join users as u on u.uid=m.uid ".
+		     "left join users as u on u.uid_idx=m.uid_idx ".
 		     "where p.approved!=0 and p.pcremote_ok is not null ".
 		     "      and m.trust!='none' and u.status='active' ".
 		     "order by usr_email");
@@ -442,7 +443,7 @@ sub ProjectLeaders()
 		     ($MAILMANSUPPORT ?
 		      ", u.uid ,u.usr_name, u.mailman_password " : "") .
 		     "  from projects as p ".
-		     "left join users as u on u.uid=p.head_uid ".
+		     "left join users as u on u.uid_idx=p.head_idx ".
 		     "where p.approved!=0 ".
 		     "order by usr_email");
 

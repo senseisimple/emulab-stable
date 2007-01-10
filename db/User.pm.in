@@ -78,6 +78,7 @@ sub mysystem($)
 sub Lookup($$)
 {
     my ($class, $token) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
     my $query_result;
 
     # Look in cache first
@@ -88,13 +89,18 @@ sub Lookup($$)
     # For backwards compatability, look to see if the token is numeric
     # or alphanumeric. If numeric, assumes its an idx, otherwise a name.
     #
-    if ($token =~ /^\d*$/) {
+    if ($token =~ /^\d+$/) {
 	$query_result =
 	    DBQueryWarn("select * from users where uid_idx='$token'");
     }
-    elsif ($token =~ /^\w*$/) {
+    elsif ($token =~ /^\w+$/) {
+	# When looking up by uid, only look for non-archived users;
+	# Must use an idx if you really want an archived user. This
+	# will prevent problems with code that has not yet been
+	# changed to use the idx field.
 	$query_result =
-	    DBQueryWarn("select * from users where uid='$token'");
+	    DBQueryWarn("select * from users ".
+			"where uid='$token' and status!='$status_archived'");
     }
     else {
 	return undef;
@@ -208,10 +214,12 @@ sub LookupByUnixId($$)
 sub LookupByWikiName($$)
 {
     my ($class, $wikiname) = @_;
-
+    my $status_archived = $USERSTATUS_ARCHIVED;
+    
     my $query_result =
 	DBQueryFatal("select uid_idx from users ".
-		     "where wikiname='$wikiname'");
+		     "where wikiname='$wikiname' and ".
+		     "      status!='$status_archived'");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
@@ -228,10 +236,12 @@ sub LookupByWikiName($$)
 sub LookupByEmail($$)
 {
     my ($class, $email) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
 
     my $query_result =
 	DBQueryFatal("select uid_idx from users ".
-		     "where LCASE(usr_email)=LCASE('$email')");
+		     "where LCASE(usr_email)=LCASE('$email') and ".
+		     "      status!='$status_archived'");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
@@ -438,6 +448,18 @@ sub Create($$$$)
 sub ThisUser($)
 {
     return User->LookupByUnixId($UID);
+}
+
+#
+# The "implied" user is the user the web interface says we are running as.
+#
+sub ImpliedUser($)
+{
+    return undef
+	if (! exists($ENV{'HTTP_INVOKING_USER'}));
+    
+    # The lookup routine checks it argument, so no need to taint check.
+    return User->Lookup($ENV{'HTTP_INVOKING_USER'});
 }
 
 #

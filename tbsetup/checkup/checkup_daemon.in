@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,9 +40,8 @@ my $TBOPS    = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+use User;
+use Project;
 
 #
 # These come from the library.
@@ -53,7 +52,6 @@ my $TBOPSPID= TBOPSPID;
 my $HOME= USERROOT() . "/elabckup";
 
 sub fatal($);
-sub notify($);
 sub daemonize();
 sub misconfig($$);
 sub IsNodeFree($);
@@ -98,25 +96,22 @@ if (! $debug) {
 
 print "Checkup daemon starting... pid $$, at ".`date`;
 
-# Switch to the elabckup user.
-my $query_result = 
-    DBQueryFatal("select unix_uid from users where uid='elabckup'");
+# Need the unix uid for the backup user.
+my $user = User->Lookup('elabckup');
+fatal("Could not get object for backup user")
+    if (!defined($user));
+my $ev_uid   = $user->unix_uid();
 
-if (! $query_result || $query_result->numrows == 0) {
-    fatal("Cannot get elabckup uid\n");
-}
-
-my ($ev_uid) = $query_result->fetchrow_array;
-
-my ($unix_gid, $unix_gidname);
-if (! TBGroupUnixInfo($TBOPSPID, $TBOPSPID, \$unix_gid, \$unix_gidname)) {
-    die("*** $0:\n".
-	"    Could not get unix group info for $TBOPSPID!\n");
-}
+# and need the unix gid for the group.
+my $project = Project->Lookup($TBOPSPID);
+fatal("Could not get object for $TBOPSPID project")
+    if (!defined($project));
+my $unix_gid = $project->unix_gid();
 
 print "Experiment head: $ev_uid\n"
     if ($debug);
 
+# Switch to the elabckup user.
 $GID = $unix_gid;
 $EGID = "$unix_gid";
 $EUID = $UID = $ev_uid;
@@ -453,4 +448,11 @@ sub daemonize()
     open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
 
     return 0;
+}
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
 }

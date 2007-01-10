@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -145,7 +145,7 @@ else {
 #
 my $query_result =
     DBQueryFatal("select sfs.pubkey from users as u ".
-		 "left join user_sfskeys as sfs on sfs.uid=u.uid ".
+		 "left join user_sfskeys as sfs on sfs.uid_idx=u.uid_idx ".
 		 "where u.status='active' and u.webonly=0");
 
 while (my ($pubkey) = $query_result->fetchrow_array()) {

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -80,7 +80,7 @@ $query_result =
 		 " from experiment_resources as r ".
 		 "left join experiment_stats as s on r.exptidx=s.exptidx ".
 		 "left join testbed_stats as t on t.rsrcidx=r.idx ".
-		 "left join users as u on u.uid=t.uid ".
+		 "left join users as u on u.uid_idx=t.uid_idx ".
 		 "where r.plabnodes!=0 and t.exitcode=0 and ".
 		 "     (t.action='start' or t.action='swapin' or ".
 		 "      t.action='swapout') $wclause ".

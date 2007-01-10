@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -49,6 +49,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 # Protos
 sub fatal($);
@@ -105,6 +106,12 @@ if ($user =~ /^([-\w]+)$/) {
 }
 else {
     die("Bad data in user: $user.");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
 }
 
 #
@@ -182,15 +189,10 @@ utime $now, $now, $lockfile;
 # Look in the DB to see if there is already a wikiname defined. If
 # we use that. Otherwise have to form one from the user name. Ick.
 #
-my $query_result =
-    DBQueryFatal("select wikiname,usr_name,usr_email,usr_pswd ".
-		 "from users where uid='$user'");
-
-if (!$query_result->numrows) {
-    fatal("No such user $user in the DB!");
-}
-my ($wikiname,$usr_name,$usr_email,$usr_pswd) =
-    $query_result->fetchrow_array();
+my $wikiname  = $target_user->wikiname();
+my $usr_name  = $target_user->name();
+my $usr_email = $target_user->email();
+my $usr_pswd  = $target_user->pswd();
 
 if (!defined($wikiname)) {
     # In update mode, do nothing if no wikiname.
@@ -221,19 +223,17 @@ if (!defined($wikiname)) {
     }
 
     #
-    # Make sure that no other user has the same wikiname but a different
-    # email address. 
+    # Make sure that no other user has the same wikiname.
     #
-    $query_result =
-	DBQueryFatal("select uid,usr_name from users ".
-		     "where wikiname='$wikiname' and usr_email!='$usr_email'");
+    fatal("The wikiname for $user ($wikiname) is already in use!")
+	if (User->LookupByWikiName($wikiname));
 
-    if ($query_result->numrows) {
-	fatal("The wikiname for $user ($wikiname) is already in use!");
-    }
     print "Selecting wikiname '$wikiname' for user $user\n";
 
-    DBQueryFatal("update users set wikiname='$wikiname' where uid='$user'");
+    my %update_args = ("wikiname" => $wikiname);
+
+    fatal("Could not update wikiname for $target_user")
+	if ($target_user->Update(\%update_args) != 0);
 }
 
 #

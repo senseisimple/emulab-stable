@@ -318,7 +318,7 @@ def TBMapUIDtoIDX(uid):
     uid = DBQuoteSpecial(uid)
     
     qres = DBQueryFatal("select uid_idx from users "
-                        "where uid=%s", (uid,))
+                        "where uid=%s and status!='archived'", (uid,))
 
     if len(qres) == 0:
         return 0

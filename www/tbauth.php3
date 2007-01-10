@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -108,6 +108,7 @@ function GETLOGIN() {
 # 
 function GETUID() {
     global $TBNAMECOOKIE;
+    $status_archived = TBDB_USERSTATUS_ARCHIVED;
 
     if (isset($_GET['nocookieuid'])) {
 	$uid = $_GET['nocookieuid'];
@@ -126,7 +127,9 @@ function GETUID() {
 	# Map this to an index (from a uid).
 	#
 	$query_result =
-	    DBQueryFatal("select uid_idx from users where uid='$safe_uid'");
+	    DBQueryFatal("select uid_idx from users ".
+			 "where uid='$safe_uid' and ".
+			 "      status!='$status_archived'");
     
 	if (! mysql_num_rows($query_result))
 	    return FALSE;
@@ -412,6 +415,15 @@ function LoginStatus() {
     if ($admin && $adminon) {
     	putenv("HTTP_WITH_TB_ADMIN_PRIVS=1");
     }
+    #
+    # This environment variable is likely to become the new method for
+    # specifying the credentials of the invoking user. Still thinking
+    # about this, but the short story is that the web interface should
+    # not invoke so much stuff as the user, but rather as a neutral user
+    # with implied credentials. 
+    #
+    putenv("HTTP_INVOKING_USER=" . $CHECKLOGIN_USER->webid());
+    
     # XXX Temporary.
     if ($stud) {
 	$EXPOSEARCHIVE = 1;

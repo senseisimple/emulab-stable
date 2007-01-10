@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -697,10 +697,10 @@ sub DumpDBGoo()
 
 	DBQueryWarn("create temporary table temp_$table ".
 		    "select t.* from group_membership as gm ".
-		    "left join users as u on u.uid=gm.uid ".
-		    "left join $table as t on t.uid=u.uid ".
+		    "left join users as u on u.uid_idx=gm.uid_idx ".
+		    "left join $table as t on t.uid_idx=u.uid_idx ".
 		    "where gm.pid='$pid' and gm.gid=gm.pid ".
-		    " and t.uid is not NULL and ".
+		    " and t.uid_idx is not NULL and ".
 		    " u.status='" . USERSTATUS_ACTIVE() . "'")
 	    or die("*** $0:\n".
 		   "    Could not create table temp_$table\n");
@@ -721,7 +721,7 @@ sub DumpDBGoo()
 
     # The group_membership is also special.
     DBQueryWarn("select gm.* from group_membership as gm ".
-		"left join users as u on u.uid=gm.uid ".
+		"left join users as u on u.uid_idx=gm.uid_idx ".
 		"where (gm.pid='$pid' or ".
 		"       gm.pid='" . TBOPSPID() . "') and ".
 		" u.status='" . USERSTATUS_ACTIVE() . "' ".

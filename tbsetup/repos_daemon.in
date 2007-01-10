@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,6 +49,8 @@ my $FLOOR = 4;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
+use Project;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -128,21 +130,17 @@ if (! $debug) {
 
 print "Repositioning Daemon starting... pid $$, at ".`date`;
 
-# XXX Need to get an emulab-ops user to run the event system as.
-$query_result = 
-    DBQueryFatal("select unix_uid from users where uid='elabman'");
+# Need the unix uid for the emulab-ops user.
+my $user = User->Lookup('elabman');
+fatal("Could not get object for emulab-ops user")
+    if (!defined($user));
+my $ev_uid   = $user->unix_uid();
 
-if (! $query_result || $query_result->numrows == 0) {
-    fatal("Cannot get elabman uid\n");
-}
-
-my ($ev_uid) = $query_result->fetchrow;
-
-my ($unix_gid, $unix_gidname);
-if (! TBGroupUnixInfo($REPOSPID, $REPOSPID, \$unix_gid, \$unix_gidname)) {
-    die("*** $0:\n".
-	"    Could not get unix group info for $REPOSPID!\n");
-}
+# and need the unix gid for the group.
+my $project = Project->Lookup($REPOSEID);
+fatal("Could not get object for $REPOSEID project")
+    if (!defined($project));
+my $unix_gid = $project->unix_gid();
 
 print "Experiment head: $ev_uid\n"
     if ($debug);

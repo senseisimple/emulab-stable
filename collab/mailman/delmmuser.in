@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -54,6 +54,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 #
 # We don't want to run this script unless its the real version.
@@ -78,14 +79,6 @@ if ($UID == 0) {
 if (! $MAILMANSUPPORT) {
     print "MailMan support is not enabled. Exit ...\n";
     exit(0);
-}
-
-#
-# Get user DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
 }
 
 #
@@ -114,18 +107,12 @@ else {
     die("Bad data in uid: $target_uid");
 }
 
-my $query_result =
-    DBQueryFatal("select usr_email, mailman_password, usr_name ".
-		 "from users where uid='$target_uid'");
+my $target_user = User->Lookup($target_uid);
+if (! defined($target_user)) {
+    fatal("$target_uid does not exist!");
+}
+my $email = $target_user->email();
 
-fatal("No such user in DB: $target_uid!")
-    if (!$query_result->numrows);
-
-my ($email, $password, $fullname) = $query_result->fetchrow_array();
-
-#
-# Note that since we are sending cleartext passwords over, pipe the info
-# into its STDIN so that the passwords are not visible in a ps listing.
 #
 # For ssh.
 #

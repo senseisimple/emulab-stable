@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -233,7 +233,7 @@ while (@row = $nodes_result->fetchrow_array) {
 	# XXX needs to be fixed for shared experiments?
 	$users_result =
 	    DBQueryFatal("select distinct g.uid from group_membership as g ".
-			 "left join users as u on u.uid=g.uid ".
+			 "left join users as u on u.uid_idx=g.uid_idx ".
 			 "where g.pid='$pid' and g.gid='$gid' and ".
 			 "      (g.trust!='none' and ".
 			 "       u.webonly=0 and ".

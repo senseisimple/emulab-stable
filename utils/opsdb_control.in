@@ -199,14 +199,12 @@ sub AddUser(@)
 	die("Bad data in uid: $target_uid");
     }
 
-    my $query_result =
-	DBQueryFatal("select mailman_password ".
-		     "from users where uid='$target_uid'");
-
+    # Map target user to object.
+    my $target_user = User->Lookup($target_uid);
     fatal("No such user in DB: $target_uid!")
-	if (!$query_result->numrows);
+	if (!defined($user));
 
-    my ($password) = $query_result->fetchrow_array();
+    my $password = $target_user->mailman_password();
     fatal("No password defined for $target_uid!")
 	if (!defined($password) || $password eq "");
 
@@ -242,12 +240,10 @@ sub DelUser(@)
 	die("Bad data in uid: $target_uid");
     }
 
-    my $query_result =
-	DBQueryFatal("select mailman_password ".
-		     "from users where uid='$target_uid'");
-
+    # Map target user to object.
+    my $target_user = User->Lookup($target_uid);
     fatal("No such user in DB: $target_uid!")
-	if (!$query_result->numrows);
+	if (!defined($user));
 
     print "Removing user '$target_uid' from mysql database on $CONTROL.\n";
     my $retval = DoOpsStuff("deluser $target_uid");
@@ -539,7 +535,7 @@ sub AddExpDB(@)
     my $users_result =
 	DBQueryFatal("select distinct g.uid ".
 		     "  from group_membership as g ".
-		     "left join users as u on u.uid=g.uid ".
+		     "left join users as u on u.uid_idx=g.uid_idx ".
 		     "where (u.status='active' or u.status='frozen') and ".
 		     "      g.trust!='none' and ".
   		     "      g.pid='$pid' and g.gid='$gid'");
@@ -766,7 +762,7 @@ sub AddTempDB(@)
     my $users_result =
 	DBQueryFatal("select distinct g.uid ".
 		     "  from group_membership as g ".
-		     "left join users as u on u.uid=g.uid ".
+		     "left join users as u on u.uid_idx=g.uid_idx ".
 		     "where (u.status='active' or u.status='frozen') and ".
 		     "      g.trust!='none' and ".
   		     "      g.pid='$pid' and g.gid='$gid'");
@@ -963,7 +959,7 @@ sub Initialize()
     my $users_result =
 	DBQueryFatal("select distinct g.uid ".
 		     "  from group_membership as g ".
-		     "left join users as u on u.uid=g.uid ".
+		     "left join users as u on u.uid_idx=g.uid_idx ".
 		     "where u.status='active' or u.status='frozen' ".
 #  		     "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
 #		     "       g.pid='tbres' or g.pid='utahstud')" .

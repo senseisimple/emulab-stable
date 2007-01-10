@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -74,9 +74,12 @@ class User
     # Backwards compatable lookup by uid. Will eventually flush this.
     function &LookupByUid($uid) {
 	$safe_uid = addslashes($uid);
+	$status_archived = TBDB_USERSTATUS_ARCHIVED;
 
 	$query_result =
-	    DBQueryWarn("select uid_idx from users where uid='$safe_uid'");
+	    DBQueryWarn("select uid_idx from users ".
+			"where uid='$safe_uid' and ".
+			"      status!='$status_archived'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -91,10 +94,12 @@ class User
     # locally unique.
     function &LookupByEmail($email) {
 	$safe_email = addslashes($email);
+	$status_archived = TBDB_USERSTATUS_ARCHIVED;
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
-			"where LCASE(usr_email)=LCASE('$safe_email')");
+			"where LCASE(usr_email)=LCASE('$safe_email') and ".
+			"      status!='$status_archived'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -109,10 +114,12 @@ class User
     # locally unique.
     function &LookupByWikiName($wikiname) {
 	$safe_wikiname = addslashes($wikiname);
+	$status_archived = TBDB_USERSTATUS_ARCHIVED;
 
 	$query_result =
 	    DBQueryWarn("select uid_idx from users ".
-			"where wikiname='$safe_wikiname'");
+			"where wikiname='$safe_wikiname' and ".
+			"      status!='$status_archived'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;

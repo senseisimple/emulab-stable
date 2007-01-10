@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -99,7 +99,7 @@ mysystem("$TB/sbin/mkproj $pid");
 #
 my $users_result =
     DBQueryFatal("select distinct u.uid,u.admin from group_membership as m ".
-		 "left join users as u on u.uid=m.uid ".
+		 "left join users as u on u.uid_idx=m.uid_idx ".
 		 "where u.status='" . USERSTATUS_ACTIVE() . "'");
 while (my ($uid,$admin) = $users_result->fetchrow_array()) {
     next

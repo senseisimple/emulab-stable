@@ -53,6 +53,7 @@ define("TBDB_USERSTATUS_NEWUSER",	"newuser");
 define("TBDB_USERSTATUS_UNAPPROVED",	"unapproved");
 define("TBDB_USERSTATUS_UNVERIFIED",	"unverified");
 define("TBDB_USERSTATUS_FROZEN",	"frozen");
+define("TBDB_USERSTATUS_ARCHIVED",	"archived");
 
 #
 # Type of new account.

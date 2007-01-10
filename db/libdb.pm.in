@@ -499,6 +499,7 @@ sub USERSTATUS_FROZEN()		{ "frozen"; }
 sub USERSTATUS_UNAPPROVED()	{ "unapproved"; }
 sub USERSTATUS_UNVERIFIED()	{ "unverified"; }
 sub USERSTATUS_NEWUSER()	{ "newuser"; }
+sub USERSTATUS_ARCHIVED()	{ "archived"; }
 
 #
 # We want valid project membership to be non-zero for easy membership
@@ -912,18 +913,25 @@ sub TBGrpTrust($$$)
     }
 
     #
+    # Must map to an existing user to be trusted, obviously
+    #
+    my $target_user = User->Lookup($uid);
+    return PROJMEMBERTRUST_NONE
+	if (! defined($target_user));
+    my $uid_idx = $target_user->uid_idx();
+
+    #
     # User must be active to be trusted.
     #
-    my $query_result =
-	DBQueryFatal("select status from users ".
-		     "where uid='$uid' and status='" . USERSTATUS_ACTIVE() . "'");
-    if ($query_result->numrows == 0) {
-	return PROJMEMBERTRUST_NONE;
-    }
+    return PROJMEMBERTRUST_NONE
+	if ($target_user->status() ne USERSTATUS_ACTIVE());
 
+    #
+    # Must be a member of the group.
+    #
     $query_result =
 	DBQueryFatal("select trust from group_membership ".
-		     "where uid='$uid' and pid='$pid' and gid='$gid'");
+		     "where uid_idx='$uid_idx' and pid='$pid' and gid='$gid'");
 
     #
     # No membership is the same as no trust. True? Maybe an error instead?
@@ -954,20 +962,15 @@ sub TBProjTrust($$)
 }
 
 #
-# Test admin status. Optional argument is the UID or Name to test. If not
-# provided, then test the current UID.
+# Test admin status. Ignore argument; we only care if the current user
+# has admin privs turned on.
 #
-# XXX Argument is *either* a numeric UID, or a string name.
-#
-# usage: TBAdmin([int or char* uid]);
+# usage: TBAdmin();
 #        returns 1 if an admin type.
 #        returns 0 if a mere user.
 #
 sub TBAdmin(;$)
 {
-    my($uid) = @_;
-    my($name);
-
     #
     # No one is considered an admin unless they have the magic environment
     # variable set (so that you have to be a bit more explict about wanting
@@ -979,54 +982,27 @@ sub TBAdmin(;$)
 	return 0;
     }
 
-    if (!defined($uid)) {
-	$uid = $UID;
-    }
+    # Map current user to object and confirm admin status from db.
+    my $this_user = User->ThisUser();
+    return 0
+	if (! defined($this_user));
 
-    #
-    # Test if numeric. Map to name if it is.
-    #
-    if ($uid =~ /^[0-9]+$/) {
-	($name) = getpwuid($uid)
-	    or die "$uid not in passwd file\n";
-    }
-    else {
-	$name = $uid;
-    }
-
-    my $query_result =
-	DBQueryFatal("select admin from users where uid='$name'");
-
-    my @row = $query_result->fetchrow_array();
-    if ($row[0] == 1) {
-	return 1;
-    }
-    return 0;
+    return $this_user->admin();
 }
 
 #
 # Test whether current user is a member of the emulab-ops project.
+# We ignore the argument; always test the current user. 
 # 
 sub TBOpsGuy(;$)
 {
-    my($uid) = @_;
-    my($name);
+    # Map current user to object and confirm admin status from db.
+    my $this_user = User->ThisUser();
+    return 0
+	if (! defined($this_user));
 
-    if (!defined($uid)) {
-	$uid = $UID;
-    }
-
-    #
-    # Test if numeric. Map to name if it is.
-    #
-    if ($uid =~ /^[0-9]+$/) {
-	($name) = getpwuid($uid)
-	    or die "$uid not in passwd file\n";
-    }
-    else {
-	$name = $uid;
-    }
-    return TBMinTrust(TBProjTrust($name, $TBOPSPID), PROJMEMBERTRUST_USER());
+    return TBMinTrust(TBProjTrust($this_user->uid_idx(), $TBOPSPID),
+		      PROJMEMBERTRUST_USER());
 }
 
 #
@@ -1495,7 +1471,7 @@ sub TBLeaderMailList($;$) {
     # have the strings in variables...
     my $query_result =
     DBQueryFatal("select distinct usr_name,u.uid,usr_email from users as u ".
-                 "left join group_membership as gm on gm.uid=u.uid ".
+                 "left join group_membership as gm on gm.uid_idx=u.uid_idx ".
                  "where (trust='project_root' and pid='$pid') or ".
 		 "(trust='group_root' and pid='$pid' and gid='$gid') ".
                  "order by trust DESC, usr_name");
@@ -2477,20 +2453,16 @@ sub TBImageLoadMaxOkay($$;@)
 #        returns 1 if the UID is okay.
 #        returns 0 if the UID is bogus.
 #
-sub UserDBInfo ($$$) {
-    my($dbuid, $username, $useremail) = @_;
+sub UserDBInfo($$$)
+{
+    my ($dbuid, $username, $useremail) = @_;
 
-    my $query_result =
-	DBQueryWarn("select usr_name,usr_email from users ".
-		    "where uid='$dbuid'");
-
-    if (!$query_result || $query_result->num_rows < 1) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    $$username  = $row[0];
-    $$useremail = $row[1];
+    my $target_user = User->Lookup($dbuid);
+    return 0
+	if (! defined($target_user));
+    
+    $$username  = $target_user->name();
+    $$useremail = $target_user->email();
     return 1;
 }
 
@@ -2544,10 +2516,7 @@ sub TBUnixGroupList ($) {
 }
 
 #
-# Map UID to DB UID (login). Does a DB check to make sure user is known to
-# the DB (user obviously has a regular account), and that account will
-# always match what the DB says. Redundant, I know. But consider it a
-# sanity (or consistency) check.
+# Map UID to DB UID (login). This function will eventually be tossed.
 #
 # usage: UNIX2DBUID(int uid, \$login)
 #        returns 1 if the UID is okay.
@@ -2556,23 +2525,11 @@ sub TBUnixGroupList ($) {
 sub UNIX2DBUID ($$) {
     my($unix_uid, $userlogin) = @_;
 
-    my $query_result =
-	DBQueryFatal("select uid from users where unix_uid='$unix_uid'");
+    my $target_user = User->LookupByUnixId($unix_uid);
+    return 0
+	if (! defined($target_user));
 
-    if ($query_result->num_rows < 1) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-
-    my ($pwname) = getpwuid($unix_uid) or
-	die("*** $unix_uid is not in the password file!");
-
-    if ($row[0] ne $pwname) {
-	warn("*** WARNING: $pwname does not match $row[0]\n");
-	return 0;
-    }
-
-    $$userlogin = $row[0];
+    $$userlogin = $target_user->uid();
     return 1;
 }
 
@@ -4160,9 +4117,10 @@ sub TBNodeUpdateAccountsByUID($)
     my $query_result =
 	DBQueryFatal("select p.pid,pcremote_ok from users as u ".
 		     "left join group_membership as g on ".
-		     "  u.uid=g.uid and g.pid=g.gid ".
+		     "  u.uid_idx=g.uid_idx and g.pid=g.gid ".
 		     "left join projects as p on p.pid=g.pid ".
-		     "where u.uid='$uid' and p.pid is not null");
+		     "where u.uid='$uid' and u.status='active' and ".
+		     "      p.pid is not null");
 
     while (my %row = $query_result->fetchhash()) {
 	my $pid      = $row{'pid'};

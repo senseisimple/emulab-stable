@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -10,7 +10,7 @@ header("Content-type: text/xml");
 
 $query_result=
     DBQueryFatal("SELECT subject, author, body, msgid, ".
-    		 "date, usr_name, usr_email " .
+    		 "date, usr_name " .
 		 "FROM webnews ".
                  "LEFT JOIN users on webnews.author = users.uid " .
                  "WHERE archived=0 " .
