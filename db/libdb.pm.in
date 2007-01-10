@@ -929,7 +929,7 @@ sub TBGrpTrust($$$)
     #
     # Must be a member of the group.
     #
-    $query_result =
+    my $query_result =
 	DBQueryFatal("select trust from group_membership ".
 		     "where uid_idx='$uid_idx' and pid='$pid' and gid='$gid'");
 
