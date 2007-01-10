@@ -161,7 +161,8 @@ sub new($$$;$) {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt";
     } elsif ($self->{OSTYPE} eq "IOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt",
-                    "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt";
+                    "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt",
+                    "$mibpath/CISCO-CONFIG-COPY-MIB.txt";
     } else {
 	warn "ERROR: Unsupported switch OS $self->{OSTYPE}\n";
 	return undef;
@@ -2006,16 +2007,6 @@ sub writeConfigTFTP($$$) {
     #
 
     #
-    # The MIB this function currently uses is only supported on CatOS. IOS
-    # actually has a better one (CISCO-CONFIG-COPY-MIB), so we'll be able to
-    # support it in the future
-    #
-    if ($self->{OSTYPE} ne "CatOS") {
-	warn "writeConfigTFTP only supported on CatOS\n";
-	return 0;
-    }
-
-    #
     # Start off by resolving the server's name into an IP address
     #
     my $ip = inet_aton($server);
@@ -2027,42 +2018,128 @@ sub writeConfigTFTP($$$) {
     my $ipstr = join(".",unpack('C4',$ip));
 
     #
-    # Set up a few values on the switch to tell it where to stick the config
-    # file
+    # CatOS switches use the CISCO-STACK-MIB for this, IOS switches use
+    # CISCO-CONFIG-COPY-MIB (which is much more powerful)
     #
-    my $setHost = ["tftpHost",0,$ipstr,"STRING"];
-    my $setFilename = ["tftpFile",0,$filename,"STRING"];
+    if ($self->{OSTYPE} eq "CatOS") {
+        #
+        # Set up a few values on the switch to tell it where to stick the config
+        # file
+        #
+        my $setHost = ["tftpHost",0,$ipstr,"STRING"];
+        my $setFilename = ["tftpFile",0,$filename,"STRING"];
 
-    snmpitSetFatal($self->{SESS},$setHost);
-    snmpitSetFatal($self->{SESS},$setFilename);
+        snmpitSetFatal($self->{SESS},$setHost);
+        snmpitSetFatal($self->{SESS},$setFilename);
 
-    #
-    # Okay, go!
-    #
-    my $tftpGo = ["tftpAction","0","uploadConfig","INTEGER"];
-    snmpitSetFatal($self->{SESS},$tftpGo);
+        #
+        # Okay, go!
+        #
+        my $tftpGo = ["tftpAction","0","uploadConfig","INTEGER"];
+        snmpitSetFatal($self->{SESS},$tftpGo);
 
-    #
-    # Poll to see if it suceeded - wait for a while, but not forever!
-    #
-    my $tftpResult = ["tftpResult",0];
-    my $iters = 0;
-    my $rv;
-    while (($rv = snmpitGetFatal($self->{SESS},$tftpResult))
-	eq "inProgress" && ($iters < 30)) {
-	$iters++;
-	sleep(1);
-    }
-    if ($iters == 30) {
-	warn "TFTP write took longer than 30 seconds!";
-	return 0;
+        #
+        # Poll to see if it suceeded - wait for a while, but not forever!
+        #
+        my $tftpResult = ["tftpResult",0];
+        my $iters = 0;
+        my $rv;
+        while (($rv = snmpitGetFatal($self->{SESS},$tftpResult))
+            eq "inProgress" && ($iters < 30)) {
+            $iters++;
+            sleep(1);
+        }
+        if ($iters == 30) {
+            warn "TFTP write took longer than 30 seconds!";
+            return 0;
+        } else {
+            if ($rv ne "success") {
+                warn "TFTP write failed with error $rv\n";
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+
     } else {
-	if ($rv ne "success") {
-	    warn "TFTP write failed with error $rv\n";
-	    return 0;
-	} else {
-	    return 1;
-	}
+        #
+        # We generate a random number that we'll use to identify this session.
+        #
+        my $sessid = int(rand(65536));
+
+        #
+        # Create an entry in the ccCopyTable. createAndWait means we'll be
+        # sending more data in subsequent packets
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyEntryRowStatus",$sessid,
+            'createAndWait','INTEGER']);
+
+        #
+        # We'll be uploading to a TFTP server
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyDestFileType",$sessid,
+            'networkFile','INTEGER']);
+        snmpitSetFatal($self->{SESS},["ccCopyServerAddress",$sessid,
+            $ipstr,'STRING']);
+        snmpitSetFatal($self->{SESS},["ccCopyFileName",$sessid,
+            $filename,'STRING']);
+        snmpitSetFatal($self->{SESS},["ccCopyProtocol",$sessid,
+            'tftp','INTEGER']);
+        
+        #
+        # We want the running-config file (ie. the current configuration)
+        #
+        snmpitSetFatal($self->{SESS},["ccCopySourceFileType",$sessid,
+            'runningConfig','INTEGER']);
+
+        #
+        # Engage!
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyEntryRowStatus",$sessid,
+            'active','INTEGER']);
+
+        #
+        # Wait for it to finish
+        #
+        my $ccCopyResult = ["ccCopyState",$sessid];
+        my $iters = 0;
+        my $rv;
+        while ($rv = snmpitGetFatal($self->{SESS},$ccCopyResult)) {
+            # We finished, one way or the other...
+            if ($rv eq "successful" || $rv eq "failed") {
+                last;
+            }
+            # Give up, it's taken too long
+            if ($iters++ == 30) {
+                last;
+            }
+
+            sleep(1);
+        }
+
+        #
+        # If it failed, find out why
+        #
+        my $cause = snmpitGetWarn($self->{SESS},["ccCopyFailCause",$sessid]);
+
+        #
+        # Remove our ccCopyTable entry
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyEntryRowStatus",$sessid,
+            'destroy','INTEGER']);
+
+        if ($iters == 30) {
+            warn "TFTP write took longer than 30 seconds!";
+            return 0;
+        } else {
+            if ($rv ne "successful") {
+                warn "TFTP write failed with error $rv ($cause)\n";
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+
     }
 }
 
