@@ -332,7 +332,7 @@ if ($nuke) {
     print "User '$target_uid' has been removed!\n";
 }
 else {
-    $target_user->SetStatus($User::NEWUSER_FLAGS_ARCHIVED);
+    $target_user->SetStatus($User::USERSTATUS_ARCHIVED);
     print "User '$target_uid' has been archived!\n";
 }
 exit(0);
