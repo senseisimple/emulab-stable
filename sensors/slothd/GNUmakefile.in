@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,6 +17,13 @@ SDPROGS		= sdcollectd$(EXE) slothd$(EXE)
 SYSTEM          := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
+
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
 
 CC?=gcc
 ## For debug compilation
@@ -47,7 +54,7 @@ all: $(SDPROGS) client
 include ${TESTBED_SRCDIR}/GNUmakerules
 
 slothd-debug: slothd.o slothd.h version.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDSTATIC) -o $@ slothd.o version.o $(LIBS)
 
 # This is started up at user login on Windows to monitor desktop events for slothd.
 idlemon-debug: idlemon.o version.o
@@ -87,4 +94,4 @@ endif
 control-install:
 
 clean:
-	rm -f *.o $(SDPROGS) $(WINPROGS) *~ core *.core version.c
+	rm -f *.o $(SDPROGS) $(WINPROGS) slothd-debug *~ core *.core version.c

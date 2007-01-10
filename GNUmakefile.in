@@ -205,7 +205,17 @@ mfs: mfsoscheck
 	@$(MAKE) -C sensors mfs
 	@$(MAKE) -C tmcd mfs
 
+mfs-nostatic: mfsoscheck
+	@NOSTATIC=1 $(MAKE) -C os mfs
+	@NOSTATIC=1 $(MAKE) -C sensors mfs
+	@NOSTATIC=1 $(MAKE) -C tmcd mfs
+
 mfs-install: destdircheck mfs client-mkdirs
+	@$(MAKE) -C os mfs-install
+	@$(MAKE) -C sensors mfs-install
+	@$(MAKE) -C tmcd mfs-install
+
+mfs-nostatic-install: destdircheck mfs-nostatic client-mkdirs
 	@$(MAKE) -C os mfs-install
 	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install

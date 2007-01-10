@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -60,6 +60,13 @@ WITH_HASH	= 1
 
 include $(OBJDIR)/Makeconf
 
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
+
 SUBDIRCFLAGS	= -Wall -O2 -g # -ansi -pedantic
 ifeq ($(SYSTEM),Linux)
 SUBDIRCFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -D_THREAD_SAFE -pthread
@@ -79,7 +86,7 @@ endif
 # Necessary sometimes.
 #PTHREADCFLAGS	+= -DCONDVARS_WORK
 
-CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) -static
+CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) $(LDSTATIC)
 LIBS 		= -lz
 ZIPCFLAGS	= $(CFLAGS) -Wall
 ZIPLIBS		= 

@@ -100,3 +100,9 @@ frisbee-mfs-install:
 	rm -f $(SYSETCDIR)/testbed/dhclient
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*
 	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+mfs-install:
+	(cd ../freebsd5; $(MAKE) all mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
