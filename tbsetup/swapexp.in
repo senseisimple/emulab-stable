@@ -393,12 +393,6 @@ my $idleswaptime    = $experiment->idleswap_timeout() / 60.0;
 my $autoswaptime    = $experiment->autoswap_timeout() / 60.0;
 my $rendering       = $experiment->prerender_pid();
 
-# Need the previous swapper for rollback below.
-my $last_swapper = User->Lookup($experiment->swapper_idx());
-if (! defined($last_swapper)) {
-    tbdie("Error looking up object for last swapper!");
-}
-
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
     $idleswap_time = min($idleswaptime * 60, $idleswap_time);
@@ -724,6 +718,12 @@ $experiment->Lock($nextswapstate) == 0
 $justexit = 0;
 
 $experiment->UnLockTables();
+
+# Need the previous swapper for rollback below. Safe now that tables unlocked.
+my $last_swapper = User->Lookup($experiment->swapper_idx());
+if (! defined($last_swapper)) {
+    tbdie("Error looking up object for last swapper!");
+}
 
 #
 # XXX - At this point a failure is going to leave things in an
