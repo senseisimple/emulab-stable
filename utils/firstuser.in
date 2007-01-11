@@ -129,9 +129,6 @@ while (getpwuid($uid)) { $uid++; }
 my $gid = $MINGID;
 while (getgrgid($gid)) { $gid++; }
 
-my $ggid = $gid + 1;
-while (getgrgid($ggid)) { $ggid++; }
-
 # We put the proto-user in the tbadmin group, because the emulab-ops
 # group does not exist yet
 my $agid = (getgrnam($tbadmin))[2];
@@ -193,7 +190,8 @@ if (!defined($opts{u})) {
     DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', ".
 		 "leader='$protouser', created=now(), ".
 		 "description='Default Group', " .
-		 "unix_gid=$ggid, gid_idx=$ggid, unix_name='$protoproj'");
+		 "unix_gid=$gid, gid_idx=$gid, pid_idx=$gid, ".
+		 "unix_name='$protoproj'");
     DBQueryFatal("insert into group_stats set ".
 		 "pid='$protoproj',gid='$protoproj',gid_idx=$gid");
 
