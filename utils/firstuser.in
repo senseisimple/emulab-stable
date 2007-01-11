@@ -36,6 +36,8 @@ my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
 my $webonly         = 1;
+my $uid_idx	    = 1; # Initial IDX for protouser.
+my $pid_idx         = 1; # Initial IDX for protoproj.
 my $trust           = "project_root";
 my $password;
 my $encpass;
@@ -149,6 +151,19 @@ if (!$batchmode) {
     }
 }
 
+#
+# what a mess. For elabinelab, we need to find out what the idx for the
+# emulab-ops project was on the outer boss since we have tables with that
+# idx already in it.
+#
+if ($ELABINELAB) {
+    $result = DBQueryFatal("select distinct pid_idx from group_membership ".
+			   "where pid='$protoproj' and pid=gid");
+    if ($result->numrows) {
+	($pid_idx) = $result->fetchrow_array();
+    }
+}
+
 print "Creating user on boss...\n";
 if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G \"$Ggid\" -h - " .
     "-m -d $HOMEDIR/$protouser -s /bin/nologin -c \"$protouser_name\"\n") {
@@ -182,18 +197,18 @@ if (!defined($opts{u})) {
     print "Creating project in database...\n";
     DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
 		 "name='$protoproj_desc', head_uid='$protouser', ".
-		 "head_idx=$uid, unix_gid=$gid,approved=1,pid_idx=$gid");
+		 "head_idx=$uid, unix_gid=$gid,approved=1,pid_idx=$pid_idx");
     DBQueryFatal("insert into project_stats set ".
-		 "pid='$protoproj',pid_idx=$gid");
+		 "pid='$protoproj',pid_idx=$pid_idx");
 
     print "Creating group in database...\n";
     DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', ".
 		 "leader='$protouser', created=now(), ".
 		 "description='Default Group', " .
-		 "unix_gid=$gid, gid_idx=$gid, pid_idx=$gid, ".
+		 "unix_gid=$gid, gid_idx=$pid_idx, pid_idx=$pid_idx, ".
 		 "unix_name='$protoproj'");
     DBQueryFatal("insert into group_stats set ".
-		 "pid='$protoproj',gid='$protoproj',gid_idx=$gid");
+		 "pid='$protoproj',gid='$protoproj',gid_idx=$pid_idx");
 
     DBQueryFatal("replace into emulab_indicies set name='next_gid',idx=10000");
 }
