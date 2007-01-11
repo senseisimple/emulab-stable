@@ -117,7 +117,7 @@ if (!defined($encpass)) {
 # Get uid for the user and a gid for the project
 
 # For non-initial users, get the next available index.
-$result = DBQueryFatal("select idx from emulab_indicies ".
+my $result = DBQueryFatal("select idx from emulab_indicies ".
 		       "where name='next_uid'");
 if ($result->numrows() > 0) {
     ($MINUID) = $result->fetchrow_array();
