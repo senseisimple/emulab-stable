@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -66,6 +66,27 @@ foreach my $dbfile (@DBFILES) {
     if (-e $dbfile) {
 	unlink($dbfile) or
 	    die("Could not unlink $dbfile");
+    }
+}
+
+#
+# Attempt to unmount all NFS filesystem if not already unmounted.
+# This allows us to clean up /users and /proj.  We only do the cleanup if
+# if unmount succeeds and even then, we do it in a safe way.
+#
+if (-e "/share/freebsd") {
+    print "Unmounting NFS filesystems ...\n";
+    # XXX "unmount -t nfs" does not seem to work
+    if (!system("umount -h fs")) {
+	#
+	# Note that this command will not remove anything if the NFS unmounts
+	# failed (and we didn't catch it) because the directories in question
+	# will not be empty.
+	#
+	system("rmdir /users/* /proj/* /groups/* /scratch/*");
+    } else {
+	print "Could not determine if NFS filesystems are unmounted, ".
+	      "NOT cleaning up /proj and /users\n";
     }
 }
 
