@@ -169,7 +169,7 @@ if (-e $mapfile_internal_head) {
 #
 opendir(DIR,$reversedir) or fatal("Unable to open directory $reversedir\n");
 while (my $dirent = readdir(DIR)) {
-    if ($dirent !~ /((\d+\.\d+\.\d+)\.db)\.head/) {
+    if ($dirent !~ /((\d+\.\d+\.\d+).*\.db)\.head/) {
 	next;
     }
     my $subnet = $2;
