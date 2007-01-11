@@ -3,12 +3,13 @@
 
 class UdpPacketInfo{
         public:
-	explicit UdpPacketInfo::UdpPacketInfo(unsigned int, unsigned int, unsigned long long, bool);
-        unsigned int seqNum;
-        unsigned int packetSize;
+	UdpPacketInfo::UdpPacketInfo();
+	UdpPacketInfo::UdpPacketInfo(unsigned short int, unsigned short int, unsigned long long);
+        unsigned short int seqNum;
+        unsigned short int packetSize;
         unsigned long long timeStamp;
-	bool isFastPacket;
-	unsigned long long lastTimeDiff;
+
+	bool isFake;
 };
 
 #endif

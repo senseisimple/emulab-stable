@@ -17,14 +17,15 @@ class UdpPacketSensor:public UdpSensor{
 	public:
 
 	explicit UdpPacketSensor(UdpState &udpStateVal);
+	~UdpPacketSensor();
 	void localSend(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
 	void localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
 
 	private:
 
-	list<UdpPacketInfo *> sentPacketList;
+	list<UdpPacketInfo> sentPacketList;
 	UdpState & udpStateInfo;
-	unsigned long long lastPacketTime;
+	long lastSeenSeqNum;
 };
 
 

@@ -1,102 +1,123 @@
 #include "UdpPacketSensor.h"
 
 UdpPacketSensor::UdpPacketSensor(UdpState &udpStateVal)
-	:udpStateInfo(udpStateVal)
+	:udpStateInfo(udpStateVal),
+	lastSeenSeqNum(-1)
 {
-	lastPacketTime = 0;
 
+}
+
+UdpPacketSensor::~UdpPacketSensor()
+{
+	// Empty the list used to store the packets.
+	sentPacketList.clear();
 
 }
 
 void UdpPacketSensor::localSend(char *packetData, int Len, int overheadLen, unsigned long long timeStamp)
 {
-	int minSize = 2*sizeof(unsigned int);
+	int minSize = 2*globalConsts::USHORT_INT_SIZE;
 
 	if(Len < minSize)
 	{
 		cout << "Error: UDP packet data sent to PacketSensor::localSend was less than the "
 			" required minimum "<< minSize << " bytes\n";
-		udpStateInfo.sendError = true;
 		return;
 	}
-	udpStateInfo.sendError = false;
 
-	unsigned int seqNum = *(unsigned int *)(packetData);
-	unsigned int packetSize = *(unsigned int *)(packetData + sizeof(unsigned int));
-	bool isFastPacket = false;
-	unsigned long long sendTimeDelta = 0;
+	unsigned short int seqNum = *(unsigned short int *)(packetData);
+	unsigned short int packetSize = *(unsigned short int *)(packetData + globalConsts::USHORT_INT_SIZE) + overheadLen;
+	UdpPacketInfo tmpPacketInfo;
 
-	if(lastPacketTime == 0)
-		lastPacketTime = timeStamp;
-	else
+	if(lastSeenSeqNum != -1)
 	{
+		// We missed some packets because of loss in libpcap buffer.
+		// Add fake packets to the sent list, their sizes and time stamps
+		// are unknown - but they can be gathered from the ACK packets.
+		if(seqNum > (lastSeenSeqNum + 1))
+		{
+			for(int i = 1;i < seqNum - lastSeenSeqNum ; i++)
+			{
+				tmpPacketInfo.seqNum = lastSeenSeqNum + i;
+				tmpPacketInfo.isFake = true;
 
-		sendTimeDelta = timeStamp - lastPacketTime;
-		lastPacketTime = timeStamp;
-
+				sentPacketList.push_back(tmpPacketInfo);
+			}
+		}
 	}
-	if(! sentPacketList.empty())
-		sentPacketList.back()->lastTimeDiff = sendTimeDelta;
 
-	sentPacketList.push_back(new UdpPacketInfo(seqNum, packetSize, timeStamp, isFastPacket));
+	lastSeenSeqNum = seqNum;
+
+	tmpPacketInfo.seqNum = seqNum;
+	tmpPacketInfo.packetSize = packetSize;
+	tmpPacketInfo.timeStamp = timeStamp;
+	tmpPacketInfo.isFake = false;
+
+	sentPacketList.push_back(tmpPacketInfo);
 }
 
 void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsigned long long timeStamp)
 {
-	int minSize = 1 + sizeof(unsigned int) + sizeof(unsigned long long);
-
-	if(Len < minSize)
+	if(Len < globalConsts::minAckPacketSize)
 	{
 		cout << "Error: UDP packet data sent to PacketSensor::localAck was less than the "
-			" minimum "<< minSize << " bytes\n";
-		udpStateInfo.ackError = true;
+			" minimum "<< globalConsts::minAckPacketSize << " bytes\n";
 		return;
 	}
 
-	unsigned int seqNum = *(unsigned int *)(packetData + 1);
+	unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
 
 	// Find the entry for the packet this ACK is acknowledging, and
 	// remove it from the sent(&unacked) packet list.
-	list<UdpPacketInfo * >::iterator listIterator;
+	list<UdpPacketInfo >::iterator listIterator;
 
 	listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(equalSeqNum(), seqNum)); 
 
 	if(listIterator == sentPacketList.end())
 	{
-		cout << "ERROR: Unacked packet list is incorrect Or incorrect"
-			"acknowledgement received for seqNum = "<<seqNum<<" in PacketSensor::localAck\n";
+		cout << "WARNING: Unknown seq number "<<seqNum<<" is being ACKed. "
+			"We might have received "
+			" a reordered ACK, which has already been ACKed using redundant ACKs .\n";
 		udpStateInfo.ackError = true;
-		return;
 	}
-	udpStateInfo.ackError = false;
+	else
+		udpStateInfo.ackError = false;
 
-	int i;
+	// We received an ACK correctly(without reordering), but we dont have any record of ever
+	// sending the original packet(Actually, we have a fake packet inserted into our send list)
+       //	-- this indicates libpcap loss.
+	if( (*listIterator).isFake == true)
+		udpStateInfo.isAckFake = true;
+	else
+		udpStateInfo.isAckFake = false;
+
 
 	// Remove the old state information.
-	for(i = 0;i < udpStateInfo.recentSentPackets.size(); i++)
-		delete udpStateInfo.recentSentPackets[i];
-
 	udpStateInfo.recentSentPackets.clear();
 	udpStateInfo.packetLoss = 0;
-	udpStateInfo.fastPacketLoss = 0;
-	udpStateInfo.lostPacketDelay = 0;
-	udpStateInfo.lastSentTime = (ULONG_LONG_MAX);
 
-	int redunAckSize = sizeof(unsigned int) + sizeof(unsigned long);
-	int numRedunAcks = static_cast<int>(packetData[0]);
+	int i;
+	unsigned char numRedunAcksChar = 0; 
+	int numRedunAcks = 0; 
+
+	// Read how many redundant ACKs are being sent in this packet.
+	memcpy(&numRedunAcksChar, &packetData[0], globalConsts::UCHAR_SIZE);
+
+	numRedunAcks = static_cast<int>(numRedunAcksChar);
 
 	// Store an iterator to the current seqNum being acknowledge, and delete it at the end.
-	list<UdpPacketInfo * >::iterator curPacketIterator = listIterator;
+	list<UdpPacketInfo >::iterator curPacketIterator = listIterator;
 
 	// Look at the redundant ACKs first.
+	UdpPacketInfo tmpPacketInfo;
 
 	if(numRedunAcks > 0)
 	{
-		unsigned int redunSeqNum;
+		unsigned short int redunSeqNum;
 
 		for(i = 0; i < numRedunAcks; i++)
 		{
-			redunSeqNum = *(unsigned int *)(packetData + minSize + i*redunAckSize);
+			redunSeqNum = *(unsigned short int *)(packetData + globalConsts::minAckPacketSize + i*globalConsts::redunAckSize);
 			listIterator = sentPacketList.end();
 
 			// Check whether the packet that this redundant ACK refers to exists
@@ -108,18 +129,24 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 			// from the list and consider it acked.
 			if(listIterator != curPacketIterator && listIterator != sentPacketList.end())
 			{
-				udpStateInfo.recentSentPackets.push_back(new UdpPacketInfo((*listIterator)->seqNum, (*listIterator)->packetSize, (*listIterator)->timeStamp, (*listIterator)->isFastPacket) );
+				tmpPacketInfo.seqNum = (*listIterator).seqNum;
+				tmpPacketInfo.packetSize = (*listIterator).packetSize;
+				tmpPacketInfo.timeStamp = (*listIterator).timeStamp;
+				tmpPacketInfo.isFake = (*listIterator).isFake;
 
-				if( (*listIterator)->timeStamp < udpStateInfo.lastSentTime)
-					udpStateInfo.lastSentTime = (*listIterator)->timeStamp;
+				udpStateInfo.recentSentPackets.push_back(tmpPacketInfo);
 
-				delete (*listIterator);
 				sentPacketList.erase(listIterator);
 			}
 		}
 	}
 
-	udpStateInfo.recentSentPackets.push_back(new UdpPacketInfo((*curPacketIterator)->seqNum, (*curPacketIterator)->packetSize, (*curPacketIterator)->timeStamp, (*curPacketIterator)->isFastPacket));
+	tmpPacketInfo.seqNum = (*curPacketIterator).seqNum;
+	tmpPacketInfo.packetSize = (*curPacketIterator).packetSize;
+	tmpPacketInfo.timeStamp = (*curPacketIterator).timeStamp;
+	tmpPacketInfo.isFake = (*curPacketIterator).isFake;
+
+	udpStateInfo.recentSentPackets.push_back(tmpPacketInfo);
 
 	// Check for packet loss - if we have any unacked packets with sequence
 	// numbers less than the received ACK seq number, then the packets/or their ACKS
@@ -127,18 +154,12 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 
 	// Find out how many packets were lost.
 
-	listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), seqNum  )); 
+	listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), seqNum)); 
 
 	if( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator ))
 	{
 
 		do{
-			if( (*listIterator)->timeStamp < udpStateInfo.lastSentTime)
-				udpStateInfo.lastSentTime = (*listIterator)->timeStamp;
-
-			udpStateInfo.lostPacketDelay += (*listIterator)->lastTimeDiff;
-
-			delete (*listIterator);
 			sentPacketList.erase(listIterator);
 			listIterator = sentPacketList.end();
 
@@ -151,8 +172,5 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 
 	}
 
-	if( (*curPacketIterator)->timeStamp < udpStateInfo.lastSentTime)
-		udpStateInfo.lastSentTime = (*curPacketIterator)->timeStamp;
-	delete (*curPacketIterator);
 	sentPacketList.erase(curPacketIterator);
 }

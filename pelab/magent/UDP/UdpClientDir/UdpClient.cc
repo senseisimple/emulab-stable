@@ -22,7 +22,7 @@
 
 #define REMOTE_SERVER_PORT 1500
 #define MAX_MSG 1600
-#define SNAPLEN 128
+#define SNAPLEN 1600
 
 #include "UdpThroughputSensor.h"
 #include "UdpMinDelaySensor.h"
@@ -50,71 +50,12 @@ unsigned long long getTimeMicro()
         return (tmpSecVal*1000*1000 + tmpUsecVal);
 }
 
-// This is not being used  - because we are using libpcap.
-// This is useful if SO_TIMESTAMP option is used instead of the timestamps given by libpcap.
-void handleUDPMsg(struct sockaddr_in *clientAddr, char *udpMessage, int messageLen, struct timeval *timeStampVal)
-{
-	/*
-	printf("Destination IP address = %s\n", inet_ntoa(ipPacket->ip_dst));
-	printf("Source port = %d\n", ntohs(udpHdr->source));
-	printf("Dest port = %d\n\n", ntohs(udpHdr->dest));
-	*/
-
-	//printf("Data being received = %c, %u, %lld, %u\n", *(unsigned char *)(dataPtr), *(unsigned int *)(dataPtr + 1), *(unsigned long long*)(dataPtr + 5), udpLen);
-
-
-        unsigned char packetType = udpMessage[0];
-	unsigned long long timeStamp = 0;
-	unsigned long long tmpSecVal = timeStampVal->tv_sec;
-	unsigned long long tmpUsecVal = timeStampVal->tv_usec;
-
-	timeStamp =  (tmpSecVal*1000*1000 + tmpUsecVal);
-
-	int overheadLen = 46;
-
-        if(packetType == '0')// This is a udp data packet arriving here. Send an
-            // application level acknowledgement packet for it.
-
-            // TODO:The packet can also be leaving from this host - our libpcap filter
-           //  ignores those for now - as such, nothing needs to be done for such packets.
-        {
-		/*
-		if(strcmp( inet_ntoa(ipPacket->ip_dst),"10.1.2.2" ) != 0 )
-		{
-		    packetSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen - 8, overheadLen, timeStamp);
-		}
-		*/
-	}
-	else if(packetType == '1')
-	{
-		// We received an ACK, pass it on to the sensors.
-		// TODO: Ignore the ACKs being sent out from this host.
-
-		// TODO: For now, we are just passing the packet data part.
-		// For this to work correctly when integrated with magent,
-		// we also need to pass the local port, remote port and
-		// remote IP address, so that the connection can be looked up.
-
-		//Pass the received packet to udp sensors:
-		packetSensor->capturePacket(udpMessage, messageLen, overheadLen, timeStamp);
-		minDelaySensor->capturePacket(udpMessage, messageLen, overheadLen, timeStamp);
-		maxDelaySensor->capturePacket(udpMessage, messageLen,overheadLen, timeStamp);
-		throughputSensor->capturePacket(udpMessage, messageLen, overheadLen, timeStamp);
-	}
-	else
-	{
-		printf("ERROR: Unknown UDP packet received from remote agent\n");
-		return;
-	}
-}
-
-
 void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr, u_char *const udpPacketStart, struct ip const *ipPacket)
 {
 
 	// Get a pointer to the data section of the UDP packet.
 	u_char *dataPtr = udpPacketStart + 8;
-	unsigned short udpLen = ntohs(udpHdr->len);
+	unsigned short udpLen = ntohs(udpHdr->len) - 8;
 
 	//printf("Data being received = %c, %u, %lld, %u\n", *(unsigned char *)(dataPtr), *(unsigned int *)(dataPtr + 1), *(unsigned long long*)(dataPtr + 5), udpLen);
 
@@ -143,7 +84,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         {
 		if(strcmp( inet_ntoa(ipPacket->ip_dst),localIP ) != 0 )
 		{
-		    packetSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen - 8, overheadLen, timeStamp);
+		    packetSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
 		}
 	}
 	else if(packetType == '1')
@@ -160,10 +101,10 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		if(strcmp( inet_ntoa(ipPacket->ip_dst),localIP ) == 0 )
 		{
 			// Pass the captured packet to the udp sensors.
-			packetSensor->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen - 8, overheadLen, timeStamp);
-			minDelaySensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen - 8, overheadLen, timeStamp);
-			maxDelaySensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen - 8, overheadLen, timeStamp);
-			throughputSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen - 8, overheadLen, timeStamp);
+			packetSensor->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp);
+			minDelaySensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
+			maxDelaySensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
+			throughputSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
 		}
 	}
 	else
@@ -356,19 +297,18 @@ int main(int argc, char *argv[])
 	init_pcap(argv[1], htons(cliAddr.sin_port));
 
 	// Open a file and pass the handle to the throughput sensor.
-	std::ofstream throughputStream;
+	std::ofstream logStream;
 
-	throughputStream.open("Throughput.log", std::ios::out);
+	logStream.open("stats.log", std::ios::out);
 
 	// Initialize the sensors.
 	packetSensor = new UdpPacketSensor(globalUdpState);
-	throughputSensor = new UdpThroughputSensor(globalUdpState, throughputStream);
-	maxDelaySensor = new UdpMaxDelaySensor(globalUdpState);
-	minDelaySensor = new UdpMinDelaySensor(globalUdpState);
+	throughputSensor = new UdpThroughputSensor(globalUdpState, logStream);
+	maxDelaySensor = new UdpMaxDelaySensor(globalUdpState, logStream);
+	minDelaySensor = new UdpMinDelaySensor(globalUdpState, logStream);
 
 	char packetData[1600];
-	unsigned int curSeqNum = 0;
-	unsigned long long sendTime;
+	unsigned short int curSeqNum = 0;
 
 	// Timeout for the non-blocking socket reads and writes.
 	struct timeval selectTimeout;
@@ -384,7 +324,8 @@ int main(int argc, char *argv[])
 	// Number of packets, Size of the packets to be sent, and their sending rate.
 	packetCount = atoi(argv[4]);
 	unsigned long long lastSendTime = 0;
-	int packetLen = atoi(argv[5]);
+	unsigned long long curTime;
+	unsigned short int packetLen = atoi(argv[5]);
 	long sendRate = atoi(argv[6]);
 
 	int overheadLen = 20 + 8 + 14 + 4;
@@ -395,6 +336,8 @@ int main(int argc, char *argv[])
 
 	lastSendTime = getTimeMicro();
 	echoLen = sizeof(echoServAddr);
+
+	FILE *sendDevFile = fopen("SendDeviation.log", "w");
 
 	/* send data */
 	while(true) 
@@ -417,18 +360,35 @@ int main(int argc, char *argv[])
 				// For now, take a command line argument giving the rate
 				// at which UDP packets should be sent ( this rate includes
 				// the overhead for UDP, IP & ethernet headers ( &ethernet checksum)
-				if(getTimeMicro() - lastSendTime > timeInterval)
+				curTime = getTimeMicro();
+				if(curTime - lastSendTime > timeInterval)
 				{
+					logStream << "SendDeviation:TIME="<<curTime<<",Deviation="<< curTime - lastSendTime - timeInterval<<std::endl;
+
 					curSeqNum++;
 					// Indicate that this is a data UDP packet - not an ACK.
 					packetData[0] = '0';
 
 					// Put the sequence number of the packet.
-					memcpy(&packetData[1],&curSeqNum, sizeof(unsigned int));
+					memcpy(&packetData[1],&curSeqNum, globalConsts::USHORT_INT_SIZE);
 
-					memcpy(&packetData[1 + sizeof(unsigned int)],&packetLen, sizeof(unsigned int));
-					sendTime = getTimeMicro();
-					lastSendTime = sendTime;
+					// Copy the size of the packet.. This can be 
+					// by the sensors in case they miss this packet
+					// because of libpcap buffer overflow.
+					// The size of the packet & its timestamp at the 
+					// sender are echoed in the ACKs.
+
+					memcpy(&packetData[1 + globalConsts::USHORT_INT_SIZE],&packetLen, globalConsts::USHORT_INT_SIZE);
+
+					// Copy the timestamp of when this packet is being sent.
+
+					// This timestamp will not be as accurate as 
+					// the one captured by libpcap, but can be
+					// used as a fallback option in case we miss
+					// this packet because of a libpcap buffer overflow.
+					memcpy(&packetData[1 + 2*globalConsts::USHORT_INT_SIZE], &curTime, globalConsts::ULONG_LONG_SIZE);
+
+					lastSendTime = curTime;
 
 					rc = sendto(sd, packetData, packetLen, flags, 
 					(struct sockaddr *) &remoteServAddr, 
@@ -464,5 +424,6 @@ int main(int argc, char *argv[])
 
 
 	}
+	fclose(sendDevFile);
 	return 0;
 }

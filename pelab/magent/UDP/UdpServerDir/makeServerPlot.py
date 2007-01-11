@@ -13,6 +13,7 @@ initTime = 0
 timeDiff = 0;
 lastTime = 0;
 currentTime = 0;
+line = ""
 
 for line in inFile:
 	match = regExp.match(line)
@@ -29,5 +30,4 @@ for line in inFile:
 		lastTime = currentTime
 
 	outFile.write(str(timeDiff) + "  " + str(bandWidth) + "\n" )
-
 

@@ -1,8 +1,9 @@
 #include "UdpMaxDelaySensor.h"
 
-UdpMaxDelaySensor::UdpMaxDelaySensor(UdpState &udpStateVal)
+UdpMaxDelaySensor::UdpMaxDelaySensor(UdpState &udpStateVal, ofstream &outStreamVal)
 	: maxDelay(0),
-	udpStateInfo(udpStateVal)
+	udpStateInfo(udpStateVal),
+	outStream(outStreamVal)
 {
 
 }
@@ -15,36 +16,47 @@ void UdpMaxDelaySensor::localSend(char *packetData, int Len,int overheadLen, uns
 
 void UdpMaxDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp)
 {
-	int minSize = 1 + sizeof(unsigned int) + sizeof(unsigned long long);
-
-        if(Len < minSize)
+        if(Len < globalConsts::minAckPacketSize)
         {
                 cout << "Error: UDP packet data sent to MaxDelaySensor::localAck was less than the "
-                        " required minimum "<< minSize << " bytes\n";
-		udpStateInfo.ackError = true;
+                        " required minimum "<< globalConsts::minAckPacketSize << " bytes\n";
                 return;
         }
 
-	// Something went wrong with this packet - either the packet was not
-	// the minimum size or it was a re-ordered ACK - don't do anything
+	 // This is a re-ordered ACK - don't do anything
 	// with it - just return.
 	if( udpStateInfo.ackError == true )
 		return;
 
-        int numRedunAcks = static_cast<int>(packetData[0]);
-        vector<UdpPacketInfo * >::iterator vecIterator;
-        unsigned int seqNum = *(unsigned int *)(packetData + 1);
+        unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
+        unsigned short int echoedPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::USHORT_INT_SIZE);
+	unsigned long long echoedTimestamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE);
         unsigned long long oneWayQueueDelay;
         bool eventFlag = false;
 
+        vector<UdpPacketInfo>::iterator vecIterator;
         vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// Find the one way RTT for this packet.
-        oneWayQueueDelay = (timeStamp - (*vecIterator)->timeStamp)/2;
+
+	// We lost this packet send time due to loss in libpcap, use the
+	// time echoed in the ACK packet.
+	if(udpStateInfo.isAckFake == true)
+		oneWayQueueDelay = (timeStamp - echoedTimestamp)/2;
+	else
+		oneWayQueueDelay = (timeStamp - (*vecIterator).timeStamp)/2;
 
 	// Scale the value of one way RTT, so that it is correct for a transmission
-	// size of 1500 bytes.
-	oneWayQueueDelay = ( oneWayQueueDelay )*1500 / (overheadLen + Len + 1);
+	// size of 1518 bytes.
+
+	// We lost this packet size details due to loss in libpcap, use the
+	// size echoed in the ACK packet - this does not included the header
+	// overhead for the packet - we assume that the packet on the reverse path
+	// has the same overhead length as the original packet.
+	if(udpStateInfo.isAckFake == true)
+		oneWayQueueDelay = ( oneWayQueueDelay )*1518 / (overheadLen + echoedPacketSize);
+	else
+		oneWayQueueDelay = ( oneWayQueueDelay )*1518 / ((*vecIterator).packetSize);
 
 	// Find the queuing delay for this packet, by subtracting the
 	// one way minimum delay from the above value.
@@ -63,6 +75,7 @@ void UdpMaxDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 		// Report the maximum delay
 		cout << "New Max Delay = " << maxDelay << "\n";
         }
+	outStream << "MAXD:TIME="<<timeStamp<<",MAXD="<<maxDelay<<endl;
 
 	udpStateInfo.maxDelay = maxDelay;
 }

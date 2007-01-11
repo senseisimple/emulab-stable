@@ -10,13 +10,14 @@ class UdpSensor;
 class UdpMinDelaySensor:public UdpSensor{
 	public:
 
-		explicit UdpMinDelaySensor(UdpState &udpStateVal);
+		explicit UdpMinDelaySensor(UdpState &udpStateVal, ofstream &outStreamVal);
 		void localSend(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
 		void localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
 
 	private:
 		unsigned long long minDelay;
 		UdpState &udpStateInfo;
+		ofstream &outStream;
 };
 
 #endif

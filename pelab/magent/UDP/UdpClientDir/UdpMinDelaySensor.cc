@@ -1,8 +1,9 @@
 #include "UdpMinDelaySensor.h"
 
-UdpMinDelaySensor::UdpMinDelaySensor(UdpState &udpStateVal)
+UdpMinDelaySensor::UdpMinDelaySensor(UdpState &udpStateVal, ofstream &outStreamVal)
 	: minDelay(ULONG_LONG_MAX),
-	udpStateInfo(udpStateVal)
+	udpStateInfo(udpStateVal),
+	outStream(outStreamVal)
 {
 
 }
@@ -16,36 +17,47 @@ void UdpMinDelaySensor::localSend(char *packetData, int Len,int overheadLen,unsi
 
 void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp)
 {
-	int minSize = 1 + sizeof(unsigned int) + sizeof(unsigned long long);
-
-        if(Len < minSize)
+        if(Len < globalConsts::minAckPacketSize)
         {
                 cout << "Error: UDP packet data sent to MinDelaySensor::localAck was less than the "
-                        " required minimum "<< minSize << " bytes\n";
-		udpStateInfo.ackError = true;
+                        " required minimum "<< globalConsts::minAckPacketSize << " bytes\n";
                 return;
         }
 
-	// Something went wrong with this packet - either the packet was not
-	// the minimum size or it was a re-ordered ACK - don't do anything
+	 // This is a re-ordered ACK - don't do anything
 	// with it - just return.
 	if( udpStateInfo.ackError == true )
 		return;
 
+	unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
+	unsigned short int echoedPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::USHORT_INT_SIZE);
+	unsigned long long echoedTimestamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE);
 
-	int numRedunAcks = static_cast<int>(packetData[0]);
-	vector<UdpPacketInfo * >::iterator vecIterator;
-	unsigned int seqNum = *(unsigned int *)(packetData + 1);
 	unsigned long long oneWayDelay;
 	bool eventFlag = false;
 
+	vector<UdpPacketInfo >::iterator vecIterator;
 	vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// Calculate the one way delay as half of RTT.
-	oneWayDelay = (timeStamp - (*vecIterator)->timeStamp)/2;
+
+	// We lost this packet send time due to loss in libpcap, use the 
+	// time echoed in the ACK packet.
+	if(udpStateInfo.isAckFake == true)
+		oneWayDelay = (timeStamp - echoedTimestamp)/2;
+	else
+		oneWayDelay = (timeStamp - (*vecIterator).timeStamp)/2;
 
 	// Calculate the delay for the maximum sized packet.
-	oneWayDelay = ( oneWayDelay ) * 1500 / (overheadLen + Len + 1);
+
+	// We lost this packet size details due to loss in libpcap, use the 
+	// size echoed in the ACK packet - this does not included the header
+	// overhead for the packet - we assume that the packet on the reverse path
+	// has the same overhead length as the original packet.
+	if(udpStateInfo.isAckFake == true)
+		oneWayDelay = ( oneWayDelay ) * 1518 / (overheadLen + echoedPacketSize);
+	else
+		oneWayDelay = ( oneWayDelay ) * 1518 / ( (*vecIterator).packetSize);
 
 	// Set this as the new minimum one way delay.
 	if(oneWayDelay < minDelay)
@@ -54,47 +66,15 @@ void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 		minDelay = oneWayDelay;
 	}
 
-	int redunAckSize = sizeof(unsigned int) + sizeof(unsigned long);
-	int seqNumSize = sizeof(unsigned int);
-
 	// We should not be calculating the minimum delay based on the
 	// redundant ACKs - because we cannot exactly calculate their
 	// RTT values, from just the receiver timestamps.
-	/*
-	if(numRedunAcks > 0)
-	{
-		int i;
-		unsigned int redunSeqNum;
-		unsigned long timeDiff;
-
-		for(i = 0;i < numRedunAcks; i++)
-		{
-			redunSeqNum = *(unsigned int *)(packetData + minSize + i*redunAckSize);
-			timeDiff = *(unsigned long *)(packetData + minSize + i*redunAckSize + seqNumSize);
-
-			vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
-
-			if(vecIterator != udpStateInfo.recentSentPackets.end())
-			{
-				oneWayDelay = (timeStamp - timeDiff - (*vecIterator)->timeStamp ) /2;
-				oneWayDelay = ( oneWayDelay ) * 1500 / ( (*vecIterator)->packetSize + overheadLen );
-
-				if(oneWayDelay > 0 && oneWayDelay < minDelay)
-				{
-					eventFlag = true;
-					minDelay = oneWayDelay;
-					minDelayBytes = (*vecIterator)->packetSize + overheadLen;
-				}
-			}
-		}
-
-	}
-	*/
 
 	// Send an event message to the monitor to change the value of minimum one way delay.
 	if(eventFlag == true)
 	{
 		cout << "New Min delay = " << minDelay << "\n";
 	}
+	outStream << "MIND:TIME="<<timeStamp<<",MIND="<<minDelay<<endl;
 	udpStateInfo.minDelay = minDelay;
 }

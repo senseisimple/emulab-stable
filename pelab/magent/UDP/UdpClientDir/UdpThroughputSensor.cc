@@ -17,35 +17,28 @@ void UdpThroughputSensor::localSend(char *packetData, int Len, int overheadLen, 
 
 void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp)
 {
-	int minSize = 1 + sizeof(unsigned int) + sizeof(unsigned long long);
-
-	if(Len < minSize)
+	if(Len < globalConsts::minAckPacketSize )
         {
                 cout << "Error: UDP packet data sent to ThroughputSensor::localAck was less than the "
-                        " required minimum "<< minSize << " bytes\n";
-		udpStateInfo.ackError = true;
+                        " required minimum "<< globalConsts::minAckPacketSize<< " bytes\n";
                 return;
         }
 
-	// Something went wrong with this packet - either the packet was not
-	// the minimum size or it was a re-ordered ACK - don't do anything
+	// This is a re-ordered ACK - don't do anything
 	// with it - just return.
 	if( udpStateInfo.ackError == true )
 		return;
 
-
-	int redunAckSize = sizeof(unsigned int) + sizeof(unsigned long);
-	int seqNumSize = sizeof(unsigned int);
-
-	// Find out how many redundant ACKs this packet is carrying - 0 to 3.
-	int numRedunAcks = static_cast<int>(packetData[0]);
-	packetData++;
+	// Find out how many redundant ACKs this packet is carrying - 0 to 121.
+	unsigned char numRedunAcksChar = 0;
+	memcpy(&numRedunAcksChar, &packetData[0], globalConsts::UCHAR_SIZE);
+	int numRedunAcks = static_cast<int>(numRedunAcksChar);
 
 	int numThroughputAcks = 1;
 	double avgThroughput = 0;
 
 	// This is the timestamp at the receiver, when the original packet was received.
-	unsigned long long currentAckTimeStamp = *(unsigned long long *)(packetData + sizeof(unsigned int)); 
+	unsigned long long currentAckTimeStamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE ); 
 
 	// This is the first ACK we have seen, store its receiver timestamp
 	// and return, we cannot calculate throughput from just one ACK - at least 2.
@@ -55,21 +48,24 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 		return;
 	}
 
-	unsigned int seqNum = *(unsigned int *)(packetData);
+	unsigned short int seqNum = *(unsigned int *)(packetData + 1);
+	unsigned short int echoedPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::USHORT_INT_SIZE);
 
-	unsigned long ackTimeDiff = currentAckTimeStamp - lastAckTime;
-	unsigned long timeDiff = 0;
-	vector<UdpPacketInfo * >::iterator vecIterator;
+	unsigned long long ackTimeDiff = currentAckTimeStamp - lastAckTime;
+	unsigned long long timeDiff = 0;
+	vector<UdpPacketInfo>::iterator vecIterator;
 
 	// Average the throughput over all the packets being acknowledged.
 	if(numRedunAcks > 0)
 	{
 		int i;
-		unsigned int redunSeqNum;
+		unsigned short int redunSeqNum;
+		unsigned short int redunPacketSize;
 
 		for(i = 0;i < numRedunAcks; i++)
 		{
-			redunSeqNum = *(unsigned int *)(packetData + minSize + i*redunAckSize);
+			redunSeqNum = *(unsigned short int *)(packetData + 1 + globalConsts::minAckPacketSize + i*globalConsts::redunAckSize);
+			redunPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::minAckPacketSize + i*globalConsts::redunAckSize + globalConsts::USHORT_INT_SIZE);
 
 			// Find if this redundant ACK is useful - or it was acked before.
 			vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
@@ -80,9 +76,14 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 				// the redundant ACK.
 				numThroughputAcks++;
 
-				timeDiff = *(unsigned long *)(packetData + minSize + i*redunAckSize + seqNumSize);
+				timeDiff = *(unsigned long long *)(packetData + 1 + globalConsts::minAckPacketSize + i*globalConsts::redunAckSize + globalConsts::seqNumSize);
 
-				avgThroughput += 8000000.0*( static_cast<double> ( (*vecIterator)->packetSize + overheadLen ))  / ( static_cast<double>(ackTimeDiff - timeDiff)*1024.0 );
+				// We lost the record of the size of this packet due to libpcap
+				// loss, use the length echoed back in the ACK.
+				if((*vecIterator).isFake == true)
+					avgThroughput += 8000000.0*( static_cast<double> ( redunPacketSize ))  / ( static_cast<double>(ackTimeDiff - timeDiff)*1024.0 );
+				else
+					avgThroughput += 8000000.0*( static_cast<double> ( (*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff - timeDiff)*1024.0 );
 
 					ackTimeDiff = timeDiff;
 			}
@@ -93,7 +94,12 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 	// Calculate the throughput for the current packet being ACKed.
 	vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
-	avgThroughput += 8000000.0*( static_cast<double> ((*vecIterator)->packetSize + overheadLen ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
+	// We lost the record of the size of this packet due to libpcap
+	// loss, use the length echoed back in the ACK.
+	if(udpStateInfo.isAckFake == true)
+		avgThroughput += 8000000.0*( static_cast<double> (echoedPacketSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
+	else
+		avgThroughput += 8000000.0*( static_cast<double> ((*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
 
 	throughputKbps = avgThroughput / (static_cast<double> (numThroughputAcks) );
 
@@ -105,13 +111,15 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 		// than the last seen value.
 		cout << "Tentative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"acktimeDiff = "<<ackTimeDiff<<"\n";
 
-		outStream << "TIME="<<timeStamp<<",TENTATIVE="<<throughputKbps<<endl;
+		outStream << "TPUT:TIME="<<timeStamp<<",TENTATIVE="<<throughputKbps<<endl;
+		outStream << "LOSS:TIME="<<timeStamp<<",LOSS=0"<<endl;
 	}
 	else
 	{
 		// Send this as the authoritative available bandwidth value.
 		cout << "Authoritative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"ackTimeDiff = "<<ackTimeDiff<<"\n";
-		outStream << "TIME="<<timeStamp<<",AUTHORITATIVE="<<throughputKbps<<endl;
+		outStream << "TPUT:TIME="<<timeStamp<<",AUTHORITATIVE="<<throughputKbps<<endl;
+		outStream << "LOSS:TIME="<<timeStamp<<",LOSS="<<udpStateInfo.packetLoss<<endl;
 	}
 
 	// Save the receiver timestamp of this ACK packet, so that we can

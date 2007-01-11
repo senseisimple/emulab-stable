@@ -1,11 +1,13 @@
 #include "UdpPacketInfo.h"
 
-UdpPacketInfo::UdpPacketInfo(unsigned int seqVal, unsigned int packetSizeVal, unsigned long long timeStampVal, bool isFastPacketVal)
+UdpPacketInfo::UdpPacketInfo()
+{
+
+}
+UdpPacketInfo::UdpPacketInfo(unsigned short int seqVal,unsigned short int packetSizeVal, unsigned long long timeStampVal)
 	:seqNum(seqVal),
 	packetSize(packetSizeVal),
-	timeStamp(timeStampVal),
-	isFastPacket(isFastPacketVal),
-	lastTimeDiff(0)
+	timeStamp(timeStampVal)
 {
 
 }

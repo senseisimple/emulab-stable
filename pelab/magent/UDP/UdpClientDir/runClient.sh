@@ -14,4 +14,4 @@
 
 # NOTE: The UdpServer needs to be restarted before running the client for a second time.
 
-sudo ./UdpClient eth1 10.1.1.2 udpnode2 200000 958 500000
+sudo ./UdpClient eth0 10.1.1.2 node1 600 1470 200000
