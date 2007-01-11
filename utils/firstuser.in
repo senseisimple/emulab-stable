@@ -182,7 +182,7 @@ if (!defined($opts{u})) {
     print "Creating project in database...\n";
     DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
 		 "name='$protoproj_desc', head_uid='$protouser', ".
-		 "unix_gid=$gid,approved=1,pid_idx=$gid");
+		 "head_idx=$uid, unix_gid=$gid,approved=1,pid_idx=$gid");
     DBQueryFatal("insert into project_stats set ".
 		 "pid='$protoproj',pid_idx=$gid");
 
