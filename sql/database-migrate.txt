@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Anytime you change database-create.sql, but sure to put any special
@@ -3873,7 +3873,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  timeout varchar(10) NOT NULL default '',
 	  adminon tinyint(1) NOT NULL default '0',
 	  PRIMARY KEY  (uid_idx,hashkey),
-	  UNIQUE KEY hashhash (uid_idx,hashhash)
+	  UNIQUE KEY hashhash (uid_idx,hashhash),
 	  UNIQUE KEY uidkey (uid,hashkey)
 	) TYPE=MyISAM;
        
