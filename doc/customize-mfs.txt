@@ -9,13 +9,13 @@ README
 	This file
 
 freebsd*/
-	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 5.3 system.
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 6.2 system.
 	We use this MFS for creating disk images and general maintenance
 	tasks on a node (e.g., when the node's disk is scrogged).
 	The MFS contains a pretty small set of utilities.
 
 frisbee*/
-	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 5.3 system.
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 6.2 system.
 	This MFS is considerably smaller than the "freebsd" one.
 	It is used to reload node disks with frisbee.  Since it may be loaded
 	simultaneously by many nodes to reload their disks, we wanted
@@ -23,7 +23,7 @@ frisbee*/
 	environment, its rc.local script invokes frisbee and then reboots.
 
 freebsd.newnode*/
-	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 5.3 system.
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 6.2 system.
 	A specialized version of the freebsd MFS for loading on nodes
 	which are not yet part of Emulab.  Has a generic kernel and specialized
 	scripts for figuring out the network connections, etc.
@@ -50,14 +50,14 @@ If you are reading this file, then I guess you have succeeded in unpacking
 the tarball.  Hopefully, you have unpacked it into /tftpboot.  If not, go
 do that now, I'll wait...
 
-...ok.  First, you have to choose between using FreeBSD 4.7 or FreeBSD 5.3
-MFSes.  You almost certainly want to use the 5.3 versions since 5.3 supports
+...ok.  First, you have to choose between using FreeBSD 4.7 or FreeBSD 6.2
+MFSes.  You almost certainly want to use the 6.2 versions since 6.2 supports
 more hardware.  If you have any problems with those, then try the 4.7 versions.
-Otherwise just use the 4.7 version.  In summary, I recommend:
+In summary, I recommend:
 
-	frisbee53 (rename to "frisbee")
-	freebsd53 (rename to "freebsd")
-	freebsd53.newnode (rename to "freebsd.newnode")
+	frisbee62 (rename to "frisbee")
+	freebsd62 (rename to "freebsd")
+	freebsd62.newnode (rename to "freebsd.newnode")
 
 Anyway, after choosing your MFSes, you should have three generic MFSes
 (frisbee, freebsd, freebsd.newnode).  The three MFSes unloaded are "generic"
@@ -74,4 +74,4 @@ loader to drop into interactive mode.  Make sure you replace the loader.conf
 file in the three subdirectories with the -null version as well.
 
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
-[ Last updated 04/10/06 ]
+[ Last updated 01/10/07 ]
