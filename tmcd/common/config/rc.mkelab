@@ -1335,11 +1335,6 @@ sub SetupBossNode()
     mysystem("cd /tftpboot; mv frisbee${fv} frisbee");
     print "Using frisbee${fv} version of disk load MFS...\n";
 
-    # XXX frisbee-53 appears in the os_info table for some images still
-    # XXX note: must copy, symlink won't work
-    mysystem("cd /tftpboot; cp -rp frisbee frisbee-53")
-	if ($fv ne "47");
-
     #
     # Have recently added a 6.2 based newnode MFS
     #
