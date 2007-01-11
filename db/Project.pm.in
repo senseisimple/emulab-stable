@@ -63,7 +63,7 @@ sub Lookup($$)
 	$query_result =
 	    DBQueryWarn("select * from projects where pid_idx='$token'");
     }
-    elsif ($token =~ /^\w*$/) {
+    elsif ($token =~ /^[-\w]*$/) {
 	$query_result =
 	    DBQueryWarn("select * from projects where pid='$token'");
     }
