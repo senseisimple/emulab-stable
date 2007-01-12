@@ -33,7 +33,10 @@ def ptOffset(p, v, scale=1.0):          # Any dimension.
 def ptBlend(p1, p2, t=0.5):             # Any dimension.
     return ptOffset(p1, vecFrom2Pts(p1, p2), t)
 
-# Line - Line equation is Ax+By+C, == 0 on the line, positive inside.
+# Line - Line equation is Bx-Ay+C, == 0 on the line, positive inside.
+# [A,B] is a vector perpendicular to the line, positive to the right.
+# Notice that this is not the Ax+By+C form you learned in Algebra class.
+# It makes for efficient calculation of the distance from a point to a line.
 class Line:
 
     # Construct a line through two points.
