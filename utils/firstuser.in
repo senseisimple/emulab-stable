@@ -151,19 +151,6 @@ if (!$batchmode) {
     }
 }
 
-#
-# what a mess. For elabinelab, we need to find out what the idx for the
-# emulab-ops project was on the outer boss since we have tables with that
-# idx already in it.
-#
-if ($ELABINELAB) {
-    $result = DBQueryFatal("select distinct pid_idx from group_membership ".
-			   "where pid='$protoproj' and pid=gid");
-    if ($result->numrows) {
-	($pid_idx) = $result->fetchrow_array();
-    }
-}
-
 print "Creating user on boss...\n";
 if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G \"$Ggid\" -h - " .
     "-m -d $HOMEDIR/$protouser -s /bin/nologin -c \"$protouser_name\"\n") {
