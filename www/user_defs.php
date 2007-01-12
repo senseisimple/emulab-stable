@@ -1041,7 +1041,7 @@ class User
 	    if (! array_key_exists("$uid_idx", $result)) {
 		$result["$uid_idx"] = array();
 	    }
-	    $result["$uid_idx"][] =& $group;
+	    $result["$uid_idx"][] = $group;
 	}
 	return $result;
     }
