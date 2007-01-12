@@ -95,7 +95,7 @@ $EUID = $UID;
 #
 # Build the project.
 #
-mysystem("$TB/sbin/mkproj $pid");
+mysystem("$TB/sbin/mkproj -s $pid");
 
 #
 # Get the list of users and admin status. Admin users get a real shell
