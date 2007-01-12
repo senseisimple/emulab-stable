@@ -245,7 +245,7 @@ sub handleincomingmsgs()
                     return -1;
                 };
             my %results = %{ deserialize_hash($db{$index}) };
-            print time()." Ack for index $index. Deleting cache entry\n";
+#            print time()." Ack for index $index. Deleting cache entry\n";
             print "rcved ACK, but UDP/tstamp not defined\n" 
                 if( !defined $tstamp );
             print "rcved ACK, but dbfile/tstamp not defined\n" 
@@ -262,16 +262,14 @@ sub handleincomingmsgs()
             initTestEv($linkdest,$testtype);
             my $testev = \%{ $testevents{$linkdest}{$testtype} };
 
-            print time()." EDIT:\n";
-            print( "linkdest=$linkdest\n".
-                   "testype =$testtype\n".
-                   "testper=$newtestper\n" );
-            print "duration=".$sockIn{duration}."\n" 
-                if( defined $sockIn{duration} );
+#            print time()." EDIT:\n";
+#            print( "linkdest=$linkdest\n".
+#                   "testype =$testtype\n".
+#                   "testper=$newtestper\n" );
+#            print "duration=".$sockIn{duration}."\n" 
+#                if( defined $sockIn{duration} );
 
             #add new cmd to queue
-#           my $cmd = Cmd->new($managerID, $newtestper, $duration);
-#           $testev->{cmdq}->add( $cmd );
             addCmd( $testev, Cmd->new($managerID, $newtestper, $duration) );
         }
         elsif( $cmdtype eq "INIT" ){
@@ -358,11 +356,11 @@ while (1) {
         foreach my $testtype (keys %waitq){
 
             if( scalar(@{$waitq{$testtype}}) != 0 ){
-                print time_all()." $testtype QUEUE: ";
-                foreach my $node (@{$waitq{$testtype}}){
-                    print "$node ";
-                }
-                print "\n";
+#                print time_all()." $testtype QUEUE: ";
+#                foreach my $node (@{$waitq{$testtype}}){
+#                    print "$node ";
+#                }
+#                print "\n";
             }
             #
             # Run next scheduled test
@@ -380,10 +378,10 @@ while (1) {
         my $testtype = $runningtestPIDs{$pid}[1];
         my $testev = \%{ $testevents{$destaddr}{$testtype} };
         # handle the case where a test (iperf) times out and bgmon kills it
-        #TODO: MADE A CHANGE HERE (9/25/06)... IN CASE IT BREAKS, LOOK HERE
         if( $testev->{"timedout"} == 1 ){
             $testev->{"flag_scheduled"} = 0;
             $testev->{"timedout"} = 0;
+            
         }elsif( defined $testev ){
             $testev->{"flag_finished"} = 1;
         }
@@ -420,6 +418,7 @@ while (1) {
                  "result" => $ERRID{timeout},
                  "tstamp" => $testev->{tstamp},
                  "magic"  => "$magic",
+                 "ts_finished" => time()
                  );
             #save result to local DB
             my $index = saveTestToLocalDB(\%results);
@@ -567,6 +566,7 @@ sub sendOldResults()
     while( ($count < $maxcount && $count < scalar(@ids)) 
         || ($iterSinceLastRun > (1/($pollPer*$cacheSendRate))) )
     {
+        $count++;
         if( scalar(@ids) == 0 ){
             last;
         }
@@ -575,7 +575,7 @@ sub sendOldResults()
         next if( (defined $cacheLastSentAt{$index})  &&
                  time() - $cacheLastSentAt{$index} < 
                  $cacheIndxWaitPer );
-
+        next if( !defined $results{ts_finished} );
         if (!exists($results{"magic"}) || $results{"magic"} ne $magic) {
             # Hmm, something went wrong!
             print "Old results for index $index are scrogged; deleting!\n";
@@ -584,7 +584,6 @@ sub sendOldResults()
 #           next;
         }
 
-        $count++;
         $iterSinceLastRun = 0;
 
         #don't send recently completed tests
@@ -649,7 +648,7 @@ sub spawnTest($$)
     }
     $linkdest = pop @{$waitq{$testtype}};
     my $fpingTimeout = $testevents{$linkdest}{$testtype}{fpingTimeout};
-    print time()." running $linkdest / $testtype\n";
+#    print time()." running $linkdest / $testtype\n";
 
   FORK:{
       if( my $pid = fork ){
@@ -795,7 +794,7 @@ sub parsedata($$)
         }
 #       print "parsed=$parsed\n";
     }elsif( $type eq "outage" ){
-        print "parsing Outage data\n";
+        #print "parsing Outage data\n";
         if( /loss = \d+\/\d+\/([\d.]+)%/ ){
             $parsed = $1;
         }else{
@@ -808,7 +807,7 @@ sub parsedata($$)
         }elsif( $parsed == 100 ){
             $parsed = "down";
         }
-        print "parsed data = $parsed\n";
+        #print "parsed data = $parsed\n";
     }
            
     return $parsed;
