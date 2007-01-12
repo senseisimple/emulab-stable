@@ -27,6 +27,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ELABINELAB  = @ELABINELAB@;
 my $SAVEUID     = $UID;
+my $TBOPSPID    = TBOPSPID();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
@@ -81,6 +82,10 @@ if ($pid =~ /^([-\w]+)$/) {
 else {
     die("Tainted argument $pid!\n");
 }
+
+# Temporary ...
+DBQueryFatal("update group_membership set pid_idx=1,gid_idx=1 ".
+	     "where pid='$TBOPSPID' and pid=gid");
 
 #
 # Shift to real user for these scripts.
