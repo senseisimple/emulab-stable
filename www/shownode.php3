@@ -180,11 +180,11 @@ if ($isadmin || STUDLY() || OPSGUY()) {
 if ($isadmin) {
     if (!isset($reserved_pid)) {
 	WRITESUBMENUBUTTON("Pre-Reserve Node",
-			   "prereserve_node?node_id=$node_id");
+			   "prereserve_node.php3?node_id=$node_id");
     }
     else {
 	WRITESUBMENUBUTTON("Clear Pre-Reserve",
-			   "prereserve_node?node_id=$node_id&clear=1");
+			   "prereserve_node.php3?node_id=$node_id&clear=1");
     }
 }
 
