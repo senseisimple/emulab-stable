@@ -8,18 +8,29 @@
 #
 # Assumes you are already logged in to Emulab, with a valid cookies.txt file.
 #
-#   Intput is a set of page URL's including appended ?args.
+#   Input is a set of page URL's including appended ?args.
+#   Interspersed action lines may be prefixed by a "!".
 #   The Get arg method is default.  Post is indicated by a post: prefix.
+#
+#   A -v COOKIES= awk arg gives the path to an alternate cookies.txt file.
+#   A -v OUTDIR= awk arg gives the path to an alternate output directory.
 #
 
 BEGIN{
     verbose = "-S ";
 
-    COOKIES	= "cookies.txt";
+    if ( COOKIES == "" ) COOKIES = "cookies.txt";
     ld_cookies	= "--load-cookies " COOKIES;
+
+    outpath = OUTDIR;
+    if ( length(outpath) && !match(outpath, "/$") ) outpath = outpath "/";
+
     # Don't get prerequisites (-p) so we can redirect the output page (-O).
     wget_args	= verbose "-k --keep-session-cookies --no-check-certificate"
 }
+
+# Action lines start with an exclamation point.  Just pass through.
+/^!/ { print substr($0,2); next; }
 
 { 
     # Encode a few characters as %escapes.
@@ -42,13 +53,14 @@ BEGIN{
     else
 	url_args = sprintf("\"%s\"", url);
 
-    # Make a local destination file with a numeric suffix if needed.
+    # Make a local destination file, with a numeric suffix if needed.
+    # (We may hit the same page many times when probing.)
     file = p[2];		# Null string initially, then 1, 2, 3...
     suffix = files[file];
     files[file]++;		# Increment for next time.
     if ( suffix ) file = file "." suffix;
     file = file ".html";	# html suffix for web browser.
-    file_args = "-O " file;
+    file_args = "-O " outpath file;
 
 
     print "wget", wget_args, ld_cookies, file_args, url_args;

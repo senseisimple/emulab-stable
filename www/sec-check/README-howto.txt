@@ -87,7 +87,9 @@ sec-check/README-howto.txt - Documentation outline.
 	 You make: input_values.list
       At first, Copy input_names.list to input_values.list,
       then edit default values onto the lines for auto-form-fill-in.
+      Values with a leading "!" over-ride an action= arg in the form page URL.
       After the first time, you can merge new ones into input_values.list .
+      Lines with no value are ignored and may be flushed if you want.
 
      - 1631 <input lines in admin-base, 511 unique, with 156 unique field names.
          gmake input_msg

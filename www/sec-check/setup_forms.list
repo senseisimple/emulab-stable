@@ -1,0 +1,21 @@
+/login.php3
+! gmake admin
+/newproject.php3
+/approveproject.php3
+! gmake logout
+/joinproject.php3
+! gmake admin
+/approveuser.php3
+/beginexp_html.php3
+/modifyexp.php3
+/editexp.php3
+/newgroup_form.php3
+/newgroup.php3
+/editgroup.php3
+/newosid.php3
+/newimageid_ez.php3
+/newimageid.php3
+/loadimage.php3
+/newmmlist.php3
+/template_create.php
+/template_swapin.php

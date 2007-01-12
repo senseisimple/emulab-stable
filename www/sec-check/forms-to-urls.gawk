@@ -9,15 +9,19 @@
 #   form-input.gawk's output format is the input format for this script.
 #
 #   A site_values.list file path is provided by a -v VALUES= awk arg.
-#   Contents are 'name="..." value'.  Optional value (to end of line)
-#   is used for auto-form-fill-in.
+#   Contents are 'name="..." value'.  An optional value (to end of line) is
+#   the default used for auto-form-fill-in.  The Value may be prefixed with a
+#   ! to cause it to over-ride an action= arg in the form page URL.
 #
 #   Output is a set of page URL's including appended ?args.
 #   The Get arg method is default.  Post is indicated by a post: prefix.
 #
 #   A -v MAX_TIMES= awk arg specifies how many times to target a form.
 #
-
+#   A -v PROBE=1 awk arg turns on SQL injection probing.  A separate URL is
+#   generated for each ?argument, substituting a labeled mock SQL injection
+#   attack probe string for the proper value.
+#
 BEGIN {
     if ( ! MAX_TIMES ) MAX_TIMES = 1; # Default.
 
@@ -41,11 +45,14 @@ BEGIN {
     action = gensub(".* action=\"([^\"]*)\".*", "\\1", 1);
     method = gensub(".* method=\"([^\"]*)\".*", "\\1", 1);
 
-    # Action= URL can have args specified.  Use the values over anything else.
+    # Action= URL can have args specified.  Use the values over anything else,
+    # unless the default value is prefixed with a ! .
     url = action;
+    action_file = gensub(".*/", "", 1, gensub("?.*", "", 1, url));
     delete args; 
     if ( q = index(action, "?") ) {
 	url = substr(action, 1, q-1);
+
 	# The "&" arg separator is escaped in HTML.
 	n = split(substr(action, q+1), url_args, "&amp;");
 	for (i = 1; i <= n; i++) {
@@ -66,7 +73,7 @@ BEGIN {
     # Add host path to relative url's.
     if (! index(url, ":") ) url = "https://" host_path "/" url;
     
-    ##printf "url %s, method %s, args", url, method;
+    ##printf "url %s, file %s, method %s, action args", url, action_file, method;
     ##for (i in args) printf " %s", args[i]; printf "\n";
 
     target[url]++;
@@ -122,12 +129,26 @@ form && /^<input/ {		# <input type="..." name="..." value=... ...>
 form && /^$/ {			# Blank line terminates each form section.
     arg_str = "";
     for (arg in args) {
-	###if ( args[arg] != "" )
-	    if ( arg_str == "" ) arg_str = arg "=" args[arg];
-	    else arg_str = arg_str "&" arg "=" args[arg];
+	if ( arg_str == "" ) arg_str = arg "=" args[arg];
+	else arg_str = arg_str "&" arg "=" args[arg];
     }
 
     post = (method=="post" ? "post:" : "");
-    if (arg_vals)		# Ignore if no argument values to supply.
-	print post url "?" arg_str;
-}    
+    if (arg_vals) {		# Ignore if no argument values to supply.
+
+	if ( ! PROBE ) print post url "?" arg_str; # Not probing.
+	else {
+	    # Substitute a labeled mock SQL injection attack probe string for
+	    # EACH ?argument value.  Generates N urls.
+	    for (arg in args) {
+		lbl = "**{" action_file ":" arg "}**";
+		# Quote square-brackets in argument names.
+		a = gensub("\\[", "\\\\[", 1, gensub("\\]", "\\\\]", 1, arg));
+
+		# Notice the single-quote at the head of the inserted probe string.
+		probe_str = gensub("(\\<" a ")=([^?&]*)", "\\1='" lbl, 1, arg_str);
+		print post url "?" probe_str;
+	    }
+	}
+    }
+}

