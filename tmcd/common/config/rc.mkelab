@@ -878,6 +878,8 @@ sub SetupOpsNode($)
     print RC "nfs_server_enable=\"YES\"\n";
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
+    print RC "smbd_enable=\"YES\"\n"
+	if ($WINSUPPORT);
     print RC "mountd_flags=\"-r -p 900\"\n";
 
     print RC "syslogd_flags=\"-a $control_network\"\n";
