@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -175,7 +175,7 @@ TBScriptLock("mkusercert") == 0 or
 my $fullname    = $target_user->name();
 my $user_email  = $target_user->email();
 my $usr_admin   = $target_user->admin();
-my $user_number = $target_user->uid_idx();
+my $user_number = $target_user->unix_uid();
 my $user_uid    = $target_user->uid();
 my $user_dbid   = $target_user->dbid();
 
