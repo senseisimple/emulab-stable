@@ -142,21 +142,48 @@ enum
   UDP_CONNECTION = 1
 };
 
-struct Order
+struct ElabOrder
+{
+  static const size_t idSize = 32;
+  char id[idSize];
+
+  ElabOrder()
+  {
+    memset(id, '\0', idSize);
+  }
+  bool operator<(ElabOrder const & right) const
+  {
+    return memcmp(id, right.id, idSize) < 0;
+  }
+  bool operator==(ElabOrder const & right) const
+  {
+    return memcmp(id, right.id, idSize) == 0;
+  }
+  bool operator!=(ElabOrder const & right) const
+  {
+    return memcmp(id, right.id, idSize) != 0;
+  }
+  std::string toString(void) const
+  {
+    return std::string(id, idSize);
+  }
+};
+
+struct PlanetOrder
 {
   unsigned char transport;
   unsigned int ip;
   unsigned short localPort;
   unsigned short remotePort;
 
-  Order()
+  PlanetOrder()
   {
     transport = TCP_CONNECTION;
     ip = 0;
     localPort = 0;
     remotePort = 0;
   }
-  bool operator<(Order const & right) const
+  bool operator<(PlanetOrder const & right) const
   {
     return std::make_pair(transport,
                           std::make_pair(ip,
@@ -167,14 +194,14 @@ struct Order
                                       std::make_pair(right.localPort,
                                                      right.remotePort)));
   }
-  bool operator==(Order const & right) const
+  bool operator==(PlanetOrder const & right) const
   {
     return transport == right.transport
       && ip == right.ip
       && localPort == right.localPort
       && remotePort == right.remotePort;
   }
-  bool operator!=(Order const & right) const
+  bool operator!=(PlanetOrder const & right) const
   {
     return !(*this == right);
   }
@@ -198,7 +225,7 @@ struct WriteResult
 {
   bool isConnected;
   bool bufferFull;
-  Order planet;
+  PlanetOrder planet;
   Time nextWrite;
 };
 
@@ -214,6 +241,9 @@ struct PacketInfo
 {
   size_t census(void) const;
 
+  // This should come first because it determines which of the other
+  // two options are selected.
+  unsigned char transport;
   Time packetTime;
   int packetLength;
   /* ---IMPORTANT NOTE--- The tcp_info structure is built at the time of
@@ -226,7 +256,13 @@ struct PacketInfo
   std::list<Option> * ipOptions;
   struct tcphdr const * tcp;
   std::list<Option> * tcpOptions;
-  Order elab;
+  struct udphdr const * udp;
+  // The size of the captured payload. This may be less than the
+  // payload actually received (due to snaplen).
+  unsigned int payloadSize;
+  // A pointer to the first character of a packet after the headers
+  unsigned char const * payload;
+  ElabOrder elab;
   bool bufferFull;
   unsigned char packetType;
 };
@@ -252,6 +288,7 @@ class CommandOutput;
 namespace global
 {
   extern int connectionModelArg;
+  extern unsigned short peerUdpServerPort;
   extern unsigned short peerServerPort;
   extern unsigned short monitorServerPort;
   extern bool doDaemonize;
@@ -265,9 +302,9 @@ namespace global
   // file descriptor, IP address string
   extern std::list< std::pair<int, std::string> > peers;
 
-  extern std::map<Order, Connection> connections;
+  extern std::map<ElabOrder, Connection> connections;
   // A connection is in this map only if it is currently connected.
-  extern std::map<Order, Connection *> planetMap;
+  extern std::map<PlanetOrder, Connection *> planetMap;
 
   extern fd_set readers;
   extern int maxReader;
@@ -276,5 +313,7 @@ namespace global
   extern std::auto_ptr<CommandOutput> output;
 
   extern int logFlags;
+
+  extern const unsigned char CONTROL_VERSION;
 }
 #endif

@@ -14,7 +14,6 @@
 class Time;
 class ConnectionModel;
 class TrafficModel;
-class Sensor;
 class ConnectionModelCommand;
 class TrafficWriteCommand;
 class SensorCommand;
@@ -27,9 +26,12 @@ public:
   Connection & operator=(Connection const & right);
 
   // Called after the Connection is added to the map. Sets the
-  // elabOrder sorting element and sets up the Connection Model.
-  void reset(Order const & newElab,
-             std::auto_ptr<ConnectionModel> newPeer);
+  // elabOrder sorting element and sets up the Connection Model. Also
+  // sets the transport protocol of this connection (TCP_CONNECTION or
+  // UDP_CONNECTION)
+  void reset(ElabOrder const & newElab,
+             std::auto_ptr<ConnectionModel> newPeer,
+             unsigned char transport);
   // Called when the monitor specifies which traffic model to use.
   void setTraffic(std::auto_ptr<TrafficModel> newTraffic);
   // Set a connection model parameter. Things like socket buffer
@@ -37,7 +39,7 @@ public:
   void addConnectionModelParam(ConnectionModelCommand const & param);
   // This starts an attempt to connect through the connection
   // model. Called when the monitor notifies of a connect.
-  void connect(void);
+  void connect(unsigned int ip);
   // Notifies the traffic model of write information from the monitor.
   void addTrafficWrite(TrafficWriteCommand const & newWrite,
                        std::multimap<Time, Connection *> & schedule);
@@ -55,8 +57,8 @@ public:
 private:
   // There are two kinds of ordering. One is for commands from
   // emulab. One is for the pcap analysis.
-  Order elab;
-  Order planet;
+  ElabOrder elab;
+  PlanetOrder planet;
 
   std::auto_ptr<ConnectionModel> peer;
   std::auto_ptr<TrafficModel> traffic;

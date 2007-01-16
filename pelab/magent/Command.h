@@ -16,7 +16,7 @@ class Command
 public:
   virtual void run(std::multimap<Time, Connection *> & schedule)
   {
-    std::map<Order, Connection>::iterator pos
+    std::map<ElabOrder, Connection>::iterator pos
       = global::connections.find(key);
     if (pos != global::connections.end())
     {
@@ -32,16 +32,19 @@ public:
   // We use a key here and look up the connection only on a run()
   // because some commands delete a connection and we don't want later
   // commands to keep the reference around.
-  Order key;
+  ElabOrder key;
 };
 
 class NewConnectionCommand : public Command
 {
 public:
+  NewConnectionCommand() : transport(TCP_CONNECTION) {}
   virtual void run(std::multimap<Time, Connection *> &);
 protected:
   virtual void runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &);
+public:
+  unsigned char transport;
 };
 
 class TrafficModelCommand : public Command
@@ -73,9 +76,13 @@ public:
 
 class ConnectCommand : public Command
 {
+public:
+  ConnectCommand() : ip(0) {}
 protected:
   virtual void runConnect(Connection * conn,
                           std::multimap<Time, Connection *> &);
+public:
+  unsigned int ip;
 };
 
 class TrafficWriteCommand : public Command

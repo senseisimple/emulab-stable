@@ -32,7 +32,7 @@ public:
   };
 public:
   virtual ~CommandOutput() {}
-  void eventMessage(std::string const & message, Order const & key,
+  void eventMessage(std::string const & message, ElabOrder const & key,
                     PathDirection dir=FORWARD_PATH)
   {
     if (dir == FORWARD_PATH)
@@ -45,7 +45,8 @@ public:
     }
   }
 
-  void genericMessage(int type, std::string const & message, Order const & key)
+  void genericMessage(int type, std::string const & message,
+                      ElabOrder const & key)
   {
     if (message.size() <= 0xffff && message.size() > 0)
     {

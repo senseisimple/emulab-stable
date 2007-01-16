@@ -25,6 +25,7 @@ private:
   enum MonitorState
   {
     ACCEPTING,
+    HEADER_PREFIX,
     HEADER,
     BODY
   };
@@ -34,6 +35,7 @@ private:
   int monitorSocket;
   int index;
   char headerBuffer[Header::headerSize];
+  int versionSize;
   Header commandHeader;
   enum { bodyBufferSize = 0xffff };
   char bodyBuffer[bodyBufferSize];

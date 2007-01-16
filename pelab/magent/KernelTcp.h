@@ -23,12 +23,15 @@ public:
   KernelTcp();
   virtual ~KernelTcp();
   virtual std::auto_ptr<ConnectionModel> clone(void);
-  virtual void connect(Order & planet);
+  virtual void connect(PlanetOrder & planet);
   virtual void addParam(ConnectionModelCommand const & param);
   virtual int writeMessage(int size, WriteResult & result);
   virtual bool isConnected(void);
 
   int getSock(void) const;
+private:
+  int writeTcpMessage(int size, WriteResult & result);
+  int writeUdpMessage(int size, WriteResult & result);
 private:
   ConnectionState state;
   int peersock;
@@ -36,7 +39,6 @@ private:
   int receiveBufferSize;
   int maxSegmentSize;
   int useNagles;
-  static const int MAX_WRITESIZE;
 private:
   Time debugPrevTime;
   int debugByteCount;

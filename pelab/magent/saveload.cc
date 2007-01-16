@@ -142,10 +142,12 @@ char * saveHeader(char * buffer, Header const & value)
   char * pos = buffer;
   pos = saveChar(pos, value.type);
   pos = saveShort(pos, value.size);
-  pos = saveChar(pos, value.key.transport);
-  pos = saveInt(pos, value.key.ip);
-  pos = saveShort(pos, value.key.localPort);
-  pos = saveShort(pos, value.key.remotePort);
+  pos = saveChar(pos, value.version);
+  logReplay("key", 0);
+  pos = saveBuffer(pos, value.key.id, ElabOrder::idSize);
+//  pos = saveInt(pos, value.key.ip);
+//  pos = saveShort(pos, value.key.localPort);
+//  pos = saveShort(pos, value.key.remotePort);
   return pos;
 }
 
@@ -184,6 +186,10 @@ char * savePacket(char * buffer, PacketInfo const & value)
   logReplay("savePacket", 0);
   char * pos = buffer;
   struct tcp_info const * kernel = value.kernel;
+
+  // Save transport protocol
+  logReplay("transport", 0);
+  pos = saveChar(pos, value.transport);
 
   // Save packet time
   logReplay("packetTime", 0);
@@ -232,10 +238,13 @@ char * savePacket(char * buffer, PacketInfo const & value)
   pos = saveInt(pos, kernel->tcpi_reordering);
 */
 
-  logReplay("tcp_info", 0);
-  pos = saveBuffer(pos, kernel, sizeof(struct tcp_info));
-//  memcpy(pos, kernel, sizeof(struct tcp_info));
-//  pos += sizeof(struct tcp_info);
+  if (value.transport == TCP_CONNECTION)
+  {
+    logReplay("tcp_info", 0);
+    pos = saveBuffer(pos, kernel, sizeof(struct tcp_info));
+    //  memcpy(pos, kernel, sizeof(struct tcp_info));
+    //  pos += sizeof(struct tcp_info);
+  }
 
   // Save IP header
   logReplay("IP header", 0);
@@ -247,22 +256,40 @@ char * savePacket(char * buffer, PacketInfo const & value)
   logReplay("IP options", 0);
   pos = saveOptions(pos, * value.ipOptions);
 
-  // Save TCP header
-  logReplay("TCP header", 0);
-  pos = saveBuffer(pos, value.tcp, sizeof(struct tcphdr));
-//  memcpy(pos, value.tcp, sizeof(struct tcphdr));
-//  pos += sizeof(struct tcphdr);
+  if (value.transport == TCP_CONNECTION)
+  {
+    // Save TCP header
+    logReplay("TCP header", 0);
+    pos = saveBuffer(pos, value.tcp, sizeof(struct tcphdr));
+    //  memcpy(pos, value.tcp, sizeof(struct tcphdr));
+    //  pos += sizeof(struct tcphdr);
 
-  // Save TCP options
-  logReplay("TCP options", 0);
-  pos = saveOptions(pos, * value.tcpOptions);
+    // Save TCP options
+    logReplay("TCP options", 0);
+    pos = saveOptions(pos, * value.tcpOptions);
+  }
+
+  if (value.transport == UDP_CONNECTION)
+  {
+    // Save UDP header
+    logReplay("UDP header", 0);
+    pos = saveBuffer(pos, value.udp, sizeof(struct udphdr));
+  }
+
+  // Save payload
+  logReplay("payload size", 0);
+  pos = saveInt(pos, value.payloadSize);
+
+  logReplay("payload buffer", 0);
+  pos = saveBuffer(pos, value.payload, value.payloadSize);
 
   // Save elab stuff
   logReplay("elab key", 0);
-  pos = saveChar(pos, value.elab.transport);
-  pos = saveInt(pos, value.elab.ip);
-  pos = saveShort(pos, value.elab.localPort);
-  pos = saveShort(pos, value.elab.remotePort);
+  pos = saveBuffer(pos, value.elab.id, ElabOrder::idSize);
+//  pos = saveChar(pos, value.elab.transport);
+//  pos = saveInt(pos, value.elab.ip);
+//  pos = saveShort(pos, value.elab.localPort);
+//  pos = saveShort(pos, value.elab.remotePort);
 
   // Save bufferFull measurement
   logReplay("bufferFull", 0);
@@ -388,10 +415,27 @@ char * loadHeader(char * buffer, Header * value)
     char * pos = buffer;
     pos = loadChar(pos, &(value->type));
     pos = loadShort(pos, &(value->size));
-    pos = loadChar(pos, &(value->key.transport));
-    pos = loadInt(pos, &(value->key.ip));
-    pos = loadShort(pos, &(value->key.localPort));
-    pos = loadShort(pos, &(value->key.remotePort));
+    pos = loadChar(pos, &(value->version));
+    switch(value->version)
+    {
+    case 0:
+      logReplay("Version 0", 0);
+      pos = loadBuffer(pos, value->key.id, Header::VERSION_0_SIZE);
+      memset(value->key.id + Header::VERSION_0_SIZE, '\0',
+             ElabOrder::idSize - Header::VERSION_0_SIZE);
+      break;
+    case 1:
+      logReplay("Version 1", 0);
+      pos = loadBuffer(pos, value->key.id, ElabOrder::idSize);
+      break;
+    default:
+      logWrite(ERROR, "Unknown version: %d", value->version);
+      logWrite(ERROR, "!!!! Undefined behaviour will follow !!!!");
+      break;
+    }
+//      pos = loadInt(pos, &(value->key.ip));
+//      pos = loadShort(pos, &(value->key.localPort));
+//      pos = loadShort(pos, &(value->key.remotePort));
     return pos;
   }
 }
@@ -439,8 +483,15 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
   switch (head->type)
   {
   case NEW_CONNECTION_COMMAND:
-    result.reset(new NewConnectionCommand());
+  {
+    NewConnectionCommand * newConnect = new NewConnectionCommand();
+    unsigned char temp;
+    char * buffer = body;
+    loadChar(buffer, &temp);
+    newConnect->transport = temp;
+    result.reset(newConnect);
     break;
+  }
   case TRAFFIC_MODEL_COMMAND:
     result.reset(new TrafficModelCommand());
     break;
@@ -467,8 +518,15 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
     break;
   }
   case CONNECT_COMMAND:
-    result.reset(new ConnectCommand());
+  {
+    ConnectCommand * connect = new ConnectCommand();
+    char * buffer = body;
+    unsigned int tempIp;
+    buffer = loadInt(buffer, &tempIp);
+    connect->ip = tempIp;
+    result.reset(connect);
     break;
+  }
   case TRAFFIC_WRITE_COMMAND:
   {
     TrafficWriteCommand * model = new TrafficWriteCommand();
@@ -493,9 +551,11 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
 }
 
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
-                  struct ip & ip, struct tcphdr & tcp,
+                  struct ip & ip, struct tcphdr & tcp, struct udphdr & udp,
                   std::list<Option> & ipOptions,
-                  std::list<Option> & tcpOptions)
+                  std::list<Option> & tcpOptions,
+                  std::vector<unsigned char> & payload,
+                  unsigned char version)
 {
   count = 0;
   FileLevel up;
@@ -504,12 +564,30 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
     logFlag = REPLAY;
   }
   logReplay("loadPacket", 0);
+  if (version == 0)
+  {
+    logReplay("Backwards compatability to version 0", 0);
+  }
   char * pos = buffer;
   value->kernel = &kernel;
   value->ip = &ip;
   value->ipOptions = &ipOptions;
   value->tcp = &tcp;
   value->tcpOptions = &tcpOptions;
+  value->udp = &udp;
+  value->payload = & payload[0];
+
+  if (version < 1)
+  {
+    value->transport = TCP_CONNECTION;
+  }
+  else
+  {
+    logReplay("transport", 0);
+    unsigned char transport = TCP_CONNECTION;
+    pos = loadChar(pos, & transport);
+    value->transport = transport;
+  }
 
   // Load packet time
   logReplay("packetTime", 0);
@@ -565,10 +643,17 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadInt(pos, & kernel.tcpi_reordering);
 */
 
-  logReplay("tcp_info", 0);
-  pos = loadBuffer(pos, &kernel, sizeof(struct tcp_info));
-//  memcpy(&kernel, pos, sizeof(struct tcp_info));
-//  pos += sizeof(struct tcp_info);
+  if (value->transport == TCP_CONNECTION)
+  {
+    logReplay("tcp_info", 0);
+    pos = loadBuffer(pos, &kernel, sizeof(struct tcp_info));
+    //  memcpy(&kernel, pos, sizeof(struct tcp_info));
+    //  pos += sizeof(struct tcp_info);
+  }
+  else
+  {
+    value->kernel = NULL;
+  }
 
   // Load IP header
   logReplay("IP header", 0);
@@ -584,24 +669,68 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
   pos = loadOptions(pos, &ipOptions);
 
   // Load TCP header
-  logReplay("TCP header", 0);
-  pos = loadBuffer(pos, &tcp, sizeof(struct tcphdr));
-//  memcpy(&tcp, pos, sizeof(struct tcphdr));
-//  pos += sizeof(struct tcphdr);
+  if (value->transport == TCP_CONNECTION)
+  {
+    logReplay("TCP header", 0);
+    pos = loadBuffer(pos, &tcp, sizeof(struct tcphdr));
+    //  memcpy(&tcp, pos, sizeof(struct tcphdr));
+    //  pos += sizeof(struct tcphdr);
 
-  //logWrite(REPLAY,"TCP sport=%i dport=%i",htons(tcp.source),
-  //        htons(tcp.dest));
+    //logWrite(REPLAY,"TCP sport=%i dport=%i",htons(tcp.source),
+    //        htons(tcp.dest));
 
-  // Load TCP options
-  logReplay("TCP options", 0);
-  pos = loadOptions(pos, &tcpOptions);
+    // Load TCP options
+    logReplay("TCP options", 0);
+    pos = loadOptions(pos, &tcpOptions);
+  }
+  else
+  {
+    value->tcp = NULL;
+    value->tcpOptions = NULL;
+  }
+
+  if (value->transport == UDP_CONNECTION)
+  {
+    logReplay("UDP header", 0);
+    pos = loadBuffer(pos, &udp, sizeof(struct udphdr));
+  }
+  else
+  {
+    value->udp = NULL;
+  }
+
+  if (version < 1)
+  {
+    value->payloadSize = 0;
+    value->payload = NULL;
+  }
+  else
+  {
+    logReplay("payloadSize", 0);
+    pos = loadInt(pos, & value->payloadSize);
+
+    logReplay("payload", 0);
+    payload.resize(value->payloadSize);
+    pos = loadBuffer(pos, & payload[0], value->payloadSize);
+  }
 
   // Load elab
   logReplay("elab key", 0);
-  pos = loadChar(pos, & value->elab.transport);
-  pos = loadInt(pos, & value->elab.ip);
-  pos = loadShort(pos, & value->elab.localPort);
-  pos = loadShort(pos, & value->elab.remotePort);
+  switch(version)
+  {
+  case 0:
+    pos = loadBuffer(pos, value->elab.id, Header::VERSION_0_SIZE);
+    memset(value->elab.id + Header::VERSION_0_SIZE, '\0',
+           ElabOrder::idSize - Header::VERSION_0_SIZE);
+    break;
+  case 1:
+    pos = loadBuffer(pos, value->elab.id, ElabOrder::idSize);
+    break;
+  default:
+    logWrite(ERROR, "Unknown version: %d", version);
+    logWrite(ERROR, "!!!! Undefined behaviour will follow !!!!");
+    break;
+  }
   //logWrite(REPLAY,"ELAB trans=%i IP=%i.%i.%i.%.i lp=%i rp=%i",
   //        value->elab.transport,
   //        ((value->elab.ip) >> 24) & 0xff,

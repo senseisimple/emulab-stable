@@ -17,6 +17,7 @@ DirectInput::DirectInput()
   , monitorAccept(-1)
   , monitorSocket(-1)
   , index(0)
+  , versionSize(0)
 {
   logWrite(COMMAND_INPUT, "Creating the command accept socket on port %d",
            global::monitorServerPort);
@@ -53,7 +54,48 @@ void DirectInput::nextCommand(fd_set * readable)
                                  "connection was not accepted)");
     if (monitorSocket != -1)
     {
+      state = HEADER_PREFIX;
+    }
+  }
+  if (state == HEADER_PREFIX && monitorSocket != -1
+      && FD_ISSET(monitorSocket, readable))
+  {
+    int error = recv(monitorSocket, headerBuffer+index,
+                     Header::PREFIX_SIZE - index, 0);
+    if (error == Header::PREFIX_SIZE - index)
+    {
+      char version = headerBuffer[Header::PREFIX_SIZE - 1];
+      switch (version)
+      {
+      case 0:
+        versionSize = Header::PREFIX_SIZE + Header::VERSION_0_SIZE;
+        break;
+      case 1:
+        versionSize = Header::PREFIX_SIZE + Header::VERSION_1_SIZE;
+        break;
+      default:
+        logWrite(ERROR, "Unknown version: %d"
+                 ", assuming that it really means version 1", version);
+        versionSize = Header::PREFIX_SIZE + Header::VERSION_1_SIZE;
+        break;
+      }
       state = HEADER;
+    }
+    else if (error > 0)
+    {
+      index += error;
+    }
+    else if (error == 0)
+    {
+      logWrite(EXCEPTION, "Read count of 0 returned (state BODY): %s",
+               strerror(errno));
+      disconnect();
+    }
+    else if (error == -1)
+    {
+      logWrite(EXCEPTION, "Failed read on monitorSocket "
+               "(state HEADER_PREFIX) index=%d: %s", index,
+               strerror(errno));
     }
   }
 //  logWrite(COMMAND_INPUT, "Before HEADER check");
@@ -114,7 +156,7 @@ void DirectInput::nextCommand(fd_set * readable)
       }
       currentCommand = loadCommand(&commandHeader, bodyBuffer);
       index = 0;
-      state = HEADER;
+      state = HEADER_PREFIX;
     }
     else if (error > 0)
     {

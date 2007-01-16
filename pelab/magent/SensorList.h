@@ -24,7 +24,8 @@
 #ifndef SENSOR_LIST_H_STUB_2
 #define SENSOR_LIST_H_STUB_2
 
-class Sensor;
+#include "Sensor.h"
+
 class SensorCommand;
 
 class NullSensor;

@@ -61,12 +61,29 @@ Connection & Connection::operator=(Connection const & right)
   return *this;
 }
 
-void Connection::reset(Order const & newElab,
-                       std::auto_ptr<ConnectionModel> newPeer)
+void Connection::reset(ElabOrder const & newElab,
+                       std::auto_ptr<ConnectionModel> newPeer,
+                       unsigned char transport)
 {
   logWrite(CONNECTION, "Peer added to connection");
   elab = newElab;
   peer = newPeer;
+  planet.transport = transport;
+  switch (transport)
+  {
+  case TCP_CONNECTION:
+    planet.remotePort = global::peerServerPort;
+    break;
+  case UDP_CONNECTION:
+    planet.remotePort = global::peerUdpServerPort;
+    break;
+  default:
+    logWrite(ERROR, "Invalid transport protocol %d, "
+             "defaulting to TCP_CONNECTION", transport);
+    planet.transport = TCP_CONNECTION;
+    planet.remotePort = global::peerServerPort;
+    break;
+  }
 }
 
 void Connection::setTraffic(std::auto_ptr<TrafficModel> newTraffic)
@@ -89,14 +106,12 @@ void Connection::addConnectionModelParam(ConnectionModelCommand const & param)
   }
 }
 
-void Connection::connect(void)
+void Connection::connect(unsigned int ip)
 {
   logWrite(CONNECTION, "Connection connected");
+  planet.ip = ip;
   if (peer.get() != NULL)
   {
-    planet.transport = TCP_CONNECTION;
-    planet.ip = elab.ip;
-    planet.remotePort = global::peerServerPort;
     // planet is modified by ConnectionModel::connect()
     peer->connect(planet);
     isConnected = peer->isConnected();
@@ -159,9 +174,9 @@ ConnectionModel const * Connection::getConnectionModel(void)
 Time Connection::writeToConnection(Time const & previousTime)
 {
   WriteResult result;
-  result.planet.transport = TCP_CONNECTION;
-  result.planet.ip = elab.ip;
-  result.planet.remotePort = global::peerServerPort;
+  result.planet.transport = planet.transport;
+  result.planet.ip = planet.ip;
+  result.planet.remotePort = planet.remotePort;
   if (isConnected)
   {
     result.planet.localPort = planet.localPort;

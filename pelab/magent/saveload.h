@@ -14,15 +14,25 @@ class Command;
 class Header
 {
 public:
-  Header() : type(0), size(0) {}
+  Header() : type(0), size(0), version(global::CONTROL_VERSION) {}
 
   unsigned char type;
   unsigned short size;
-  Order key;
+  // The following field is co-located with the version 0 'transport'
+  // field. Since version 0 only used TCP_CONNECTION (== 0), it can be
+  // identified by that field.
+  unsigned char version;
+  ElabOrder key;
 
-  enum { headerSize = sizeof(unsigned char)*2
-         + sizeof(unsigned short)*3
+  enum { PREFIX_SIZE = sizeof(unsigned char)*2 + sizeof(unsigned short) };
+
+  enum { VERSION_0_SIZE = sizeof(unsigned short)*2
          + sizeof(unsigned int) };
+
+  enum { VERSION_1_SIZE = ElabOrder::idSize };
+
+  // headerSize is the buffer for the size of the largest version.
+  enum { headerSize = PREFIX_SIZE + VERSION_1_SIZE };
 };
 
 int getLastSaveloadSize(void);
@@ -52,8 +62,10 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body);
 // It is presumed that value contains pointers to the various
 // substructures that need to be filled.
 char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
-                  struct ip & ip, struct tcphdr & tcp,
+                  struct ip & ip, struct tcphdr & tcp, struct udphdr & udp,
                   std::list<Option> & ipOptions,
-                  std::list<Option> & tcpOptions);
+                  std::list<Option> & tcpOptions,
+                  std::vector<unsigned char> & payload,
+                  unsigned char version);
 
 #endif

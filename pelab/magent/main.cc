@@ -25,34 +25,6 @@
 
 using namespace std;
 
-namespace global
-{
-  int connectionModelArg = 0;
-  unsigned short peerServerPort = 0;
-  unsigned short monitorServerPort = 0;
-  bool doDaemonize = false;
-  int replayArg = NO_REPLAY;
-  int replayfd = -1;
-  list<int> replaySensors;
-
-  int peerAccept = -1;
-  string interface;
-  auto_ptr<ConnectionModel> connectionModelExemplar;
-  list< pair<int, string> > peers;
-
-  map<Order, Connection> connections;
-  // A connection is in this map only if it is currently connected.
-  map<Order, Connection *> planetMap;
-
-  fd_set readers;
-  int maxReader = -1;
-
-  std::auto_ptr<CommandInput> input;
-  std::auto_ptr<CommandOutput> output;
-
-  int logFlags =  LOG_EVERYTHING /*& ~SENSOR_COMPLETE*/;
-}
-
 void usageMessage(char *progname);
 void processArgs(int argc, char * argv[]);
 void init(void);
@@ -94,6 +66,7 @@ void usageMessage(char *progname)
   cerr << "Usage: " << progname << " [options]" << endl;
   cerr << "  --connectionmodel=<null|kerneltcp> " << endl;
   cerr << "  --peerserverport=<int> " << endl;
+  cerr << "  --peerudpserverport=<int> " << endl;
   cerr << "  --monitorserverport=<int> " << endl;
   cerr << "  --interface=<iface> " << endl;
   cerr << "  --daemonize " << endl;
@@ -109,6 +82,7 @@ void processArgs(int argc, char * argv[])
   // Defaults, in case the user does not pass us explicit values
   global::connectionModelArg = CONNECTION_MODEL_KERNEL;
   global::peerServerPort = 3491;
+  global::peerUdpServerPort = 3492;
   global::monitorServerPort = 4200;
   global::interface = "vnet";
   global::doDaemonize = false;
@@ -120,6 +94,7 @@ void processArgs(int argc, char * argv[])
     // too.
     {"connectionmodel",   required_argument, NULL, 'c'},
     {"peerserverport",    required_argument, NULL, 'p'},
+    {"peerudpserverport", required_argument, NULL, 'u'},
     {"monitorserverport", required_argument, NULL, 'm'},
     {"interface",         required_argument, NULL, 'i'},
     {"daemonize",         no_argument      , NULL, 'd'},
@@ -182,6 +157,17 @@ void processArgs(int argc, char * argv[])
       else
       {
         global::peerServerPort = argIntVal;
+      }
+      break;
+    case 'u':
+      if (sscanf(optarg,"%i",&argIntVal) != 1)
+      {
+        usageMessage(argv[0]);
+        exit(1);
+      }
+      else
+      {
+        global::peerUdpServerPort = argIntVal;
       }
       break;
     case 'm':
@@ -435,66 +421,6 @@ void mainLoop(void)
 }
 
 // Returns true on success
-bool replayWrite(char * source, int size)
-{
-  bool result = true;
-  if (size == 0) {
-      return true;
-  }
-  int error = write(global::replayfd, source, size);
-  if (error <= 0)
-  {
-    if (error == 0)
-    {
-      logWrite(EXCEPTION, "replayfd was closed unexpectedly");
-    }
-    else if (error == -1)
-    {
-      logWrite(EXCEPTION, "Error writing replay output: %s", strerror(errno));
-    }
-    result = false;
-  }
-  return result;
-}
-
-void replayWriteCommand(char * head, char * body, unsigned short bodySize)
-{
-  bool success = true;
-  success = replayWrite(head, Header::headerSize);
-  if (success)
-  {
-    replayWrite(body, bodySize);
-  }
-}
-
-void replayWritePacket(PacketInfo * packet)
-{
-  Header head;
-  head.type = packet->packetType;
-  head.size = packet->census();
-  head.key = packet->elab;
-  char headBuffer[Header::headerSize];
-  saveHeader(headBuffer, head);
-
-  bool success = replayWrite(headBuffer, Header::headerSize);
-  if (success)
-  {
-    char *packetBuffer;
-    packetBuffer = static_cast<char*>(malloc(head.size));
-    //logWrite(REPLAY,"Making a packet buffer of size %d",head.size);
-    char* endptr = savePacket(& packetBuffer[0], *packet);
-    // find out how many bytes were written
-    int writtensize = (endptr - packetBuffer);
-    if (writtensize != head.size) {
-        logWrite(ERROR,"replayWritePacket(): Made packet save buffer of size "
-                       "%d, but wrote %d", head.size, writtensize);
-    }
-    replayWrite(& packetBuffer[0], head.size);
-    free(packetBuffer);
-  }
-}
-
-// Returns true on success
 bool replayRead(char * dest, int size)
 {
   bool result = true;
@@ -514,6 +440,30 @@ bool replayRead(char * dest, int size)
   return result;
 }
 
+bool replayReadHeader(char * dest)
+{
+  bool result = true;
+  result = replayRead(dest, Header::PREFIX_SIZE);
+  if (result)
+  {
+    char version = dest[Header::PREFIX_SIZE - 1];
+    switch (version)
+    {
+    case 0:
+      result = replayRead(dest + Header::PREFIX_SIZE, Header::VERSION_0_SIZE);
+      break;
+    case 1:
+      result = replayRead(dest + Header::PREFIX_SIZE, Header::VERSION_1_SIZE);
+      break;
+    default:
+      logWrite(ERROR, "Unknown version: %d", version);
+      result = false;
+      break;
+    }
+  }
+  return result;
+}
+
 void replayLoop(void)
 {
   bool done = false;
@@ -525,10 +475,12 @@ void replayLoop(void)
   list<Option> ipOptions;
   struct tcphdr tcp;
   list<Option> tcpOptions;
+  struct udphdr udp;
+  vector<unsigned char> payload;
   PacketInfo packet;
-  map<Order, SensorList> streams;
+  map<ElabOrder, SensorList> streams;
 
-  done = ! replayRead(headerBuffer, Header::headerSize);
+  done = ! replayReadHeader(headerBuffer);
   while (!done)
   {
     loadHeader(headerBuffer, &head);
@@ -537,7 +489,7 @@ void replayLoop(void)
     {
     case NEW_CONNECTION_COMMAND:
     {
-      map<Order, SensorList>::iterator current =
+      map<ElabOrder, SensorList>::iterator current =
         streams.insert(make_pair(head.key, SensorList())).first;
       list<int>::iterator pos = global::replaySensors.begin();
       list<int>::iterator limit = global::replaySensors.end();
@@ -571,8 +523,8 @@ void replayLoop(void)
       done = ! replayRead(& packetBuffer[0], head.size);
       if (!done)
       {
-        loadPacket(& packetBuffer[0], &packet, kernel, ip, tcp, ipOptions,
-                   tcpOptions);
+        loadPacket(& packetBuffer[0], &packet, kernel, ip, tcp, udp, ipOptions,
+                   tcpOptions, payload, head.version);
         Sensor * sensorHead = streams[head.key].getHead();
         if (sensorHead != NULL)
         {
@@ -587,7 +539,7 @@ void replayLoop(void)
     }
     if (!done)
     {
-      done = ! replayRead(headerBuffer, Header::headerSize);
+      done = ! replayReadHeader(headerBuffer);
     }
   }
 }
@@ -673,207 +625,7 @@ void packetCapture(fd_set * readable)
   }
 }
 
-void setDescriptor(int fd)
-{
-  if (fd > -1 && fd < FD_SETSIZE)
-  {
-    FD_SET(fd, &(global::readers));
-    if (fd > global::maxReader)
-    {
-      global::maxReader = fd;
-    }
-  }
-  else
-  {
-    logWrite(ERROR, "Invalid descriptor sent to setDescriptor: "
-             "%d (FDSET_SIZE=%d)", fd, FD_SETSIZE);
-  }
-}
-
-void clearDescriptor(int fd)
-{
-  if (fd > -1 && fd < FD_SETSIZE)
-  {
-    FD_CLR(fd, &(global::readers));
-    if (fd > global::maxReader)
-    {
-      global::maxReader = fd;
-    }
-  }
-  else
-  {
-    logWrite(ERROR, "Invalid descriptor sent to clearDescriptor: "
-             "%d (FDSET_SIZE=%d)", fd, FD_SETSIZE);
-  }
-}
-
-string ipToString(unsigned int ip)
-{
-  struct in_addr address;
-  address.s_addr = ip;
-  return string(inet_ntoa(address));
-}
-
-int createServer(int port, string const & debugString)
-{
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (fd == -1)
-  {
-    logWrite(ERROR, "socket(): %s: %s", debugString.c_str(), strerror(errno));
-    return -1;
-  }
-
-  int doesReuse = 1;
-  int error = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &doesReuse,
-                         sizeof(doesReuse));
-  if (error == -1)
-  {
-    logWrite(ERROR, "setsockopt(SO_REUSEADDR): %s: %s", debugString.c_str(),
-             strerror(errno));
-    close(fd);
-    return -1;
-  }
-
-  int forcedSize = 262144;
-  error = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &forcedSize,
-                     sizeof(forcedSize));
-  if (error == -1)
-  {
-    logWrite(ERROR, "Failed to set receive buffer size: %s",
-             strerror(errno));
-    close(fd);
-    return -1;
-  }
-
-  struct sockaddr_in address;
-  address.sin_family = AF_INET;
-  address.sin_port = htons(port);
-  address.sin_addr.s_addr = htonl(INADDR_ANY);
-  error = bind(fd, reinterpret_cast<struct sockaddr *>(&address),
-               sizeof(address));
-  if (error == -1)
-  {
-    logWrite(ERROR, "bind(): %s: %s", debugString.c_str(), strerror(errno));
-    close(fd);
-    return -1;
-  }
-
-  int flags = fcntl(fd, F_GETFL, 0);
-  if (flags == -1)
-  {
-    logWrite(ERROR, "fcntl(F_GETFL): %s: %s", debugString.c_str(),
-             strerror(errno));
-    close(fd);
-    return -1;
-  }
-
-  error = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-  if (error == -1)
-  {
-    logWrite(ERROR, "fcntl(F_SETFL): %s: %s", debugString.c_str(),
-             strerror(errno));
-    close(fd);
-    return -1;
-  }
-
-  error = listen(fd, 4);
-  if (error == -1)
-  {
-    logWrite(ERROR, "listen(): %s: %s", debugString.c_str(), strerror(errno));
-    close(fd);
-    return -1;
-  }
-
-  setDescriptor(fd);
-  return fd;
-}
-
-int acceptServer(int acceptfd, struct sockaddr_in * remoteAddress,
-                 string const & debugString)
-{
-  struct sockaddr_in stackAddress;
-  struct sockaddr_in * address;
-  socklen_t addressSize = sizeof(struct sockaddr_in);
-  if (remoteAddress == NULL)
-  {
-    address = &stackAddress;
-  }
-  else
-  {
-    address = remoteAddress;
-  }
-
-  int resultfd = accept(acceptfd,
-                        reinterpret_cast<struct sockaddr *>(address),
-                        &addressSize);
-  if (resultfd == -1)
-  {
-    if (errno != EINTR && errno != EWOULDBLOCK && errno != ECONNABORTED
-        && errno != EPROTO)
-    {
-      logWrite(EXCEPTION, "accept(): %s: %s", debugString.c_str(),
-               strerror(errno));
-    }
-    return -1;
-  }
-
-  int flags = fcntl(resultfd, F_GETFL, 0);
-  if (flags == -1)
-  {
-    logWrite(EXCEPTION, "fcntl(F_GETFL): %s: %s", debugString.c_str(),
-             strerror(errno));
-    close(resultfd);
-    return -1;
-  }
-
-  int error = fcntl(resultfd, F_SETFL, flags | O_NONBLOCK);
-  if (error == -1)
-  {
-    logWrite(EXCEPTION, "fcntl(F_SETFL): %s: %s", debugString.c_str(),
-             strerror(errno));
-    close(resultfd);
-    return -1;
-  }
-
-  setDescriptor(resultfd);
-  return resultfd;
-}
-
 void exitHandler(int signal) {
     logWrite(EXCEPTION,"Killed with signal %i, cleaning up",signal);
     exit(0);
 }
-
-size_t PacketInfo::census(void) const
-{
-  /* TODO: Remove this old code. It is too easy to get wrong.
-  // packetTime + packetLength
-  size_t result = sizeof(int)*(2+1) +
-    sizeof(struct tcp_info) +
-    sizeof(struct ip) + sizeof(struct tcphdr)
-    + sizeof(unsigned char) // bufferFull
-    + sizeof(unsigned char) // packetType
-    + sizeof(unsigned char) + sizeof(int) + 2*sizeof(short); // elab
-  // Size for ipOptions and tcpOptions.
-  result += sizeof(unsigned int)*2;
-
-  std::list<Option>::iterator pos = ipOptions->begin();
-  std::list<Option>::iterator limit = ipOptions->end();
-  for (; pos != limit; ++pos)
-  {
-    result += 2 + pos->length;
-  }
-
-  pos = tcpOptions->begin();
-  limit = tcpOptions->end();
-  for (; pos != limit; ++pos)
-  {
-    result += 2 + pos->length;
-  }
-  return result;
-  */
-
-  savePacket(NULL, *this);
-  return static_cast<size_t>(getLastSaveloadSize());
-}
-

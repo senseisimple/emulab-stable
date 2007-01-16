@@ -20,12 +20,13 @@ void NewConnectionCommand::run(std::multimap<Time, Connection *> &)
 {
   logWrite(COMMAND_INPUT, "Running NEW_CONNECTION_COMMAND: %s",
            key.toString().c_str());
-  std::map<Order, Connection>::iterator pos
+  std::map<ElabOrder, Connection>::iterator pos
     = global::connections.find(key);
   if (pos == global::connections.end())
   {
     pos = global::connections.insert(make_pair(key, Connection())).first;
-    pos->second.reset(key, global::connectionModelExemplar->clone());
+    pos->second.reset(key, global::connectionModelExemplar->clone(),
+                      transport);
   }
 }
 
@@ -72,7 +73,7 @@ void ConnectCommand::runConnect(Connection * conn,
 {
   logWrite(COMMAND_INPUT, "Running CONNECT_COMMAND: %s",
            key.toString().c_str());
-  conn->connect();
+  conn->connect(ip);
 }
 
 //-----------------------
@@ -90,7 +91,7 @@ void DeleteConnectionCommand::run(std::multimap<Time, Connection *> & schedule)
 {
   logWrite(COMMAND_INPUT, "Running DELETE_CONNECTION_COMMAND: %s",
            key.toString().c_str());
-  std::map<Order, Connection>::iterator pos
+  std::map<ElabOrder, Connection>::iterator pos
     = global::connections.find(key);
   if (pos != global::connections.end())
   {

@@ -24,11 +24,14 @@ namespace
                          unsigned char const * packet);
   int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
                    unsigned char const * packet);
-  void handleTcp(struct pcap_pkthdr const * pcapInfo,
-                 struct ip const * ipPacket,
-                 struct tcphdr const * tcpPacket,
-                 unsigned char const * tcpPacketStart,
-                 list<Option> & ipOptions);
+  void handleTransport(unsigned char transport,
+                       struct pcap_pkthdr const * pcapInfo,
+                       struct ip const * ipPacket,
+                       struct tcphdr const * tcpPacket,
+                       struct udphdr const * udpPacket,
+                       unsigned char const * transportPacketStart,
+                       list<Option> & ipOptions,
+                       int bytesRemaining);
   bool handleKernel(Connection * conn, struct tcp_info * kernel);
   void parseOptions(unsigned char const * buffer, int size,
                     list<Option> * options);
@@ -69,8 +72,13 @@ auto_ptr<ConnectionModel> KernelTcp::clone(void)
   return modelResult;
 }
 
-void KernelTcp::connect(Order & planet)
+void KernelTcp::connect(PlanetOrder & planet)
 {
+  if (planet.transport == UDP_CONNECTION)
+  {
+    // PRAMOD: Insert any additional setup code for UDP connections here.
+    state = CONNECTED;
+  }
   if (state == DISCONNECTED)
   {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -182,11 +190,30 @@ void KernelTcp::addParam(ConnectionModelCommand const & param)
   }
 }
 
-// MAX_WRITESIZE is in chars, and must be a multiple of 4
-const int KernelTcp::MAX_WRITESIZE = 8192;
-
 int KernelTcp::writeMessage(int size, WriteResult & result)
 {
+  int retval = 0;
+  switch (result.planet.transport)
+  {
+  case TCP_CONNECTION:
+    retval = writeTcpMessage(size, result);
+    break;
+  case UDP_CONNECTION:
+    retval = writeUdpMessage(size, result);
+    break;
+  default:
+    logWrite(ERROR, "Failed to write message because of unknown transport "
+             "protocol %d", result.planet.transport);
+    break;
+  }
+  return retval;
+}
+
+int KernelTcp::writeTcpMessage(int size, WriteResult & result)
+{
+  // MAX_WRITESIZE is in chars, and must be a multiple of 4
+  static const int MAX_WRITESIZE = 8192;
+
   if (state == DISCONNECTED)
   {
     logWrite(CONNECTION_MODEL,
@@ -283,6 +310,19 @@ int KernelTcp::writeMessage(int size, WriteResult & result)
     return -1;
   }
 }
+
+int KernelTcp::writeUdpMessage(int size, WriteResult & result)
+{
+  // PRAMOD: Replace the following call with the UDP write code.
+  // result.planet.ip and result.planet.remotePort denote the destination.
+  // result.planet.ip is in host order
+  // result.planet.remotePort is in host order
+  // put the localport in host order in result.planet.localPort
+  // set result.bufferFull to false (UDP 'buffers' are never full)
+  // set result.isConnected to true (UDP 'connections' are always connected)
+  return writeTcpMessage(size, result);
+}
+
 bool KernelTcp::isConnected(void)
 {
   return state == CONNECTED;
@@ -477,6 +517,7 @@ namespace
     }
     struct ip const * ipPacket;
     struct tcphdr const * tcpPacket;
+    struct udphdr const * udpPacket;
     size_t bytesRemaining = pcapInfo->caplen - sizeof(struct ether_header);
 
     ipPacket = reinterpret_cast<struct ip const *>
@@ -501,11 +542,6 @@ namespace
       logWrite(ERROR, "Bad IP header length: %d", ipHeaderLength);
       return;
     }
-    if (ipPacket->ip_p != IPPROTO_TCP)
-    {
-      logWrite(ERROR, "A non TCP packet was captured");
-      return;
-    }
 
     list<Option> ipOptions;
     unsigned char const * optionsBegin = packet + sizeof(struct ether_header)
@@ -515,17 +551,49 @@ namespace
 
     // ipHeaderLength is multiplied by 4 because it is a
     // length in 4-byte words.
-    unsigned char const * tcpPacketStart = packet + sizeof(struct ether_header)
-      + ipHeaderLength*4;
-    tcpPacket = reinterpret_cast<struct tcphdr const *>(tcpPacketStart);
+    unsigned char const * transportPacketStart = packet
+        + sizeof(struct ether_header)
+        + ipHeaderLength*4;
     bytesRemaining -= ipHeaderLength*4;
-    if (bytesRemaining < sizeof(struct tcphdr))
+    switch (ipPacket->ip_p)
     {
-      logWrite(ERROR, "A captured packet was to short to contain "
-               "a TCP header");
-      return;
+    case IPPROTO_TCP:
+      tcpPacket
+        = reinterpret_cast<struct tcphdr const *>(transportPacketStart);
+      if (bytesRemaining < sizeof(struct tcphdr))
+      {
+        logWrite(ERROR, "A captured packet was to short to contain "
+                 "a TCP header");
+      }
+      else
+      {
+        logWrite(PCAP, "Captured a TCP packet");
+        bytesRemaining -= tcpPacket->doff*4;
+        handleTransport(TCP_CONNECTION, pcapInfo, ipPacket, tcpPacket, NULL,
+                        transportPacketStart, ipOptions, bytesRemaining);
+      }
+      break;
+    case IPPROTO_UDP:
+      udpPacket
+        = reinterpret_cast<struct udphdr const *>(transportPacketStart);
+      if (bytesRemaining < sizeof(struct udphdr))
+      {
+        logWrite(ERROR, "A captured packet was to short to contain "
+                 "a UDP header");
+      }
+      else
+      {
+        logWrite(PCAP, "Captured a UDP packet");
+        bytesRemaining -= sizeof(struct udphdr);
+        handleTransport(UDP_CONNECTION, pcapInfo, ipPacket, NULL, udpPacket,
+                        transportPacketStart, ipOptions, bytesRemaining);
+      }
+      break;
+    default:
+      logWrite(ERROR, "I captured a packet, "
+               "but don't know the transport protocol: %d", ipPacket->ip_p);
+      break;
     }
-    handleTcp(pcapInfo, ipPacket, tcpPacket, tcpPacketStart, ipOptions);
   }
 
   int getLinkLayer(struct pcap_pkthdr const * pcapInfo,
@@ -546,29 +614,75 @@ namespace
     }
   }
 
-  void handleTcp(struct pcap_pkthdr const * pcapInfo,
-                 struct ip const * ipPacket,
-                 struct tcphdr const * tcpPacket,
-                 unsigned char const * tcpPacketStart,
-                 list<Option> & ipOptions)
+  void handleTransport(unsigned char transport,
+                       struct pcap_pkthdr const * pcapInfo,
+                       struct ip const * ipPacket,
+                       struct tcphdr const * tcpPacket,
+                       struct udphdr const * udpPacket,
+                       unsigned char const * transportPacketStart,
+                       list<Option> & ipOptions,
+                       int bytesRemaining)
   {
-    logWrite(PCAP, "Captured a TCP packet");
     struct tcp_info kernelInfo;
 
     list<Option> tcpOptions;
-    unsigned char const * tcpOptionsBegin = tcpPacketStart
-      + sizeof(struct tcphdr);
-    int tcpOptionsSize = tcpPacket->doff*4 - sizeof(struct tcphdr);
-    parseOptions(tcpOptionsBegin, tcpOptionsSize, &tcpOptions);
+    unsigned char const * payload = NULL;
+    if (transport == TCP_CONNECTION)
+    {
+      unsigned char const * tcpOptionsBegin = transportPacketStart
+        + sizeof(struct tcphdr);
+      int tcpOptionsSize = tcpPacket->doff*4 - sizeof(struct tcphdr);
+      if (bytesRemaining >= 0)
+      {
+        parseOptions(tcpOptionsBegin, tcpOptionsSize, &tcpOptions);
+      }
+      else
+      {
+        logWrite(ERROR, "TCP Packet too short to parse TCP options");
+      }
+      payload = transportPacketStart + tcpPacket->doff*4;
+    }
+    else if (transport == UDP_CONNECTION)
+    {
+      payload = transportPacketStart + sizeof(struct udphdr);
+    }
 
     PacketInfo packet;
+    packet.transport = transport;
     packet.packetTime = Time(pcapInfo->ts);
     packet.packetLength = pcapInfo->len;
-    packet.kernel = &kernelInfo;
+    if (transport == TCP_CONNECTION)
+    {
+      packet.kernel = &kernelInfo;
+      packet.tcp = tcpPacket;
+      packet.tcpOptions = &tcpOptions;
+    }
+    else
+    {
+      packet.kernel = NULL;
+      packet.tcp = NULL;
+      packet.tcpOptions = NULL;
+    }
     packet.ip = ipPacket;
     packet.ipOptions = &ipOptions;
-    packet.tcp = tcpPacket;
-    packet.tcpOptions = &tcpOptions;
+    if (transport == UDP_CONNECTION)
+    {
+      packet.udp = udpPacket;
+    }
+    else
+    {
+      packet.udp = NULL;
+    }
+    if (bytesRemaining <= 0)
+    {
+      packet.payloadSize = 0;
+      packet.payload = NULL;
+    }
+    else
+    {
+      packet.payloadSize = bytesRemaining;
+      packet.payload = payload;
+    }
 
     /*
      * Classify this packet as outgoing or incoming, by trying to look it up
@@ -577,27 +691,36 @@ namespace
      * NOTE: We put the destination IP address in the planetMap, so we
      * reverse the sense of ip_dst and ip_src
      */
-    Order key;
-    key.transport = TCP_CONNECTION;
+    PlanetOrder key;
+    key.transport = transport;
     key.ip = ntohl(ipPacket->ip_dst.s_addr);
-    key.localPort = ntohs(tcpPacket->source);
-    key.remotePort = ntohs(tcpPacket->dest);
+    if (transport == TCP_CONNECTION)
+    {
+      key.localPort = ntohs(tcpPacket->source);
+      key.remotePort = ntohs(tcpPacket->dest);
+    }
+    else if (transport == UDP_CONNECTION)
+    {
+      key.localPort = ntohs(udpPacket->source);
+      key.remotePort = ntohs(udpPacket->dest);
+    }
 
     bool outgoing;
 
-    logWrite(PCAP,"Looking up key (outgoing): i=%s,lp=%i,rp=%i",
-        inet_ntoa(ipPacket->ip_dst),key.localPort,key.remotePort);
-    map<Order, Connection *>::iterator pos;
+    logWrite(PCAP,"Looking up key (outgoing): t=%d,i=%s,lp=%i,rp=%i",
+        transport, inet_ntoa(ipPacket->ip_dst),key.localPort,key.remotePort);
+    map<PlanetOrder, Connection *>::iterator pos;
     pos = global::planetMap.find(key);
 
     if (pos != global::planetMap.end()) {
       outgoing = true;
     } else {
       key.ip = ntohl(ipPacket->ip_src.s_addr);
-      key.localPort = ntohs(tcpPacket->dest);
-      key.remotePort = ntohs(tcpPacket->source);
-      logWrite(PCAP,"Looking up key (incoming): i=%s,lp=%i,rp=%i",
-          inet_ntoa(ipPacket->ip_src),key.localPort,key.remotePort);
+      swap(key.localPort, key.remotePort);
+//      key.localPort = ntohs(tcpPacket->dest);
+//      key.remotePort = ntohs(tcpPacket->source);
+      logWrite(PCAP,"Looking up key (incoming): t=%d,i=%s,lp=%i,rp=%i",
+          transport,inet_ntoa(ipPacket->ip_src),key.localPort,key.remotePort);
       pos = global::planetMap.find(key);
       if (pos != global::planetMap.end()) {
         outgoing = false;
@@ -615,35 +738,41 @@ namespace
 
     /*
      * Next, determine if this packet is an ACK (note that it can also be a
-     * data packet, even if it's an ACK. This is called piggybacking)
+     * data packet, even if it's an ACK. Ths is called piggybacking)
      */
-    bool isAck = (tcpPacket->ack & 0x0001);
+    // JD: Not used any more.
+//    bool isAck = (tcpPacket->ack & 0x0001);
 
     /*
      * Finally, figure out if this packet contains any data
      */
-    bool hasData;
-    uint32_t totalHeaderLength = ipPacket->ip_hl * 4 + tcpPacket->doff * 4;
-    uint32_t totalIPLen = ntohs(ipPacket->ip_len);
-    if (totalHeaderLength == totalIPLen) {
-      hasData = false;
-    } else {
-      if (totalHeaderLength < totalIPLen) {
-        hasData = true;
-      } else {
-        logWrite(ERROR,"Internal error in packet data size computation: hl=%i, il=%i",
-            totalHeaderLength, totalIPLen);
-      }
-    }
+//    bool hasData;
+//    uint32_t totalHeaderLength = ipPacket->ip_hl * 4 + tcpPacket->doff * 4;
+//    uint32_t totalIPLen = ntohs(ipPacket->ip_len);
+//    if (totalHeaderLength == totalIPLen) {
+//      hasData = false;
+//    } else {
+//      if (totalHeaderLength < totalIPLen) {
+//        hasData = true;
+//      } else {
+//        logWrite(ERROR,"Internal error in packet data size computation: hl=%i, il=%i",
+//            totalHeaderLength, totalIPLen);
+//      }
+//    }
 
     /*
      * Now that we've classified this packet, do something about it
      */
-    logWrite(PCAP,"Packet classified: outgoing=%i, isAck=%i, hasData=%i",
-        outgoing, isAck, hasData);
-    if (!handleKernel(pos->second, &kernelInfo)) {
-      logWrite(ERROR,"handleKernel() failed");
-      return;
+//    logWrite(PCAP,"Packet classified: outgoing=%i, isAck=%i, hasData=%i",
+//        outgoing, isAck, hasData);
+
+    if (transport == TCP_CONNECTION)
+    {
+      if (!handleKernel(pos->second, &kernelInfo))
+      {
+        logWrite(ERROR,"handleKernel() failed");
+        return;
+      }
     }
 
     // We want to distinguish between packets that are outgoing and
