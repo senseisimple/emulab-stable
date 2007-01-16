@@ -48,6 +48,14 @@ post-install:
 
 control-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF))
 
+# This rule says what web* script depends on which installed binary.
+$(LIBEXEC_STUFF): web%: $(INSTALL_SBINDIR)/%
+
+# And then how to turn the template into the actual script. 
+web%: $(TESTBED_SRCDIR)/WEBtemplate.in
+	@echo "Generating $@"
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^),' > $@
+
 clean:
 	rm -f *.o core
 
