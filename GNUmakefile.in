@@ -45,13 +45,11 @@ install:
 # 
 boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
 		install-subdirs install-mkdirs install-setbuildinfo
-	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 #
 # Same target, with the install-schemacheck dependency omitted
 # 
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
-	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 post-install:
 	@$(MAKE) -C db post-install
