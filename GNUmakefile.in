@@ -45,11 +45,13 @@ install:
 # 
 boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
 		install-subdirs install-mkdirs install-setbuildinfo
+	@echo "Boss node installed!"
 
 #
 # Same target, with the install-schemacheck dependency omitted
 # 
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
+	@echo "Boss node installed!"
 
 post-install:
 	@$(MAKE) -C db post-install
