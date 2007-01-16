@@ -276,7 +276,7 @@ def usage():
 # Print the usage statement for the "sync" action.
 #
 def sync_usage():
-    print "Usage: loghole sync [-nPs] [-r remotedir] [-l localdir] [node1 ...]"
+    print "Usage: loghole sync [-nPsR] [-r remotedir] [-l localdir] [node1 ...]"
     print
     print "Synchronize the experiment's log holes with a local directory."
     print
@@ -296,6 +296,8 @@ def sync_usage():
     print "               Do not do any additional post processing."
     print "  -s, --snapshot"
     print "               Send a SNAPSHOT event to any link trace agents."
+    print "  -R, --root"
+    print "               Use sudo on remote nodes to read files as root."
     print "  node1 ...    The names of the virtual or physical nodes that "
     print "               should be synced.  The default behavior is to sync "
     print "               all of the nodes in an experiment."
@@ -458,7 +460,7 @@ def validate_usage():
 # Print the usage statement for the "clean" action.
 #
 def clean_usage():
-    print "Usage: loghole clean [-fner] [node1 ...]"
+    print "Usage: loghole clean [-fneR] [node1 ...]"
     print
     print "Clean the experiment log directory by removing any subdirectories"
     print "and/or clean the log holes on the nodes.  The default behavior is"
@@ -468,7 +470,7 @@ def clean_usage():
     print "  -f, --force         Do not ask for confirmation."
     print "  -n, --nodes         Clean only the nodes log directories."
     print "  -e, --experiment    Clean only the experiment log directory."
-    print "  -r, --root          Use sudo to clean nodes as root."
+    print "  -R, --root          Use sudo to clean nodes as root."
     print
     print "Examples:"
     print "  $ loghole clean"
@@ -950,6 +952,9 @@ def rsync(host, base, dlpath = None, paths = ["/"], port = None,
         if port:
             ssh_args += " -p " + str(port)
             pass
+        if as_root:
+            cmd.append("--rsync-path=sudo rsync")
+            pass
         cmd.extend([("--rsh=" + ssh_args),
                     host + ":" + path,
                     fullpath])
@@ -1273,8 +1278,8 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     extra_logholes = []
 
     try:
-        opts, node_list = getopt.getopt(args, "nl:r:Psdc", [
-            "no-standard", "local=", "remote=", "delete", "compress"])
+        opts, node_list = getopt.getopt(args, "nl:r:PsdcR", [
+            "no-standard", "local=", "remote=", "delete", "compress", "root"])
         for opt, val in opts:
             if opt in ("-n", "--no-standard"):
                 standard_logholes = False
@@ -1300,6 +1305,8 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                 pass
             elif opt in ("-c", "--compress"):
                 compress = True
+            elif opt in ("-R", "--root"):
+                as_root = True
                 pass
             pass
         pass
