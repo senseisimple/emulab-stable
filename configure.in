@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 AC_PREREQ(2.13)
@@ -719,13 +719,13 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
+	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
-	db/update_permissions db/webchangeuid \
-	db/grabron db/webnfree db/stategraph db/readycount \
-	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
-	db/webnewwanode db/libdb.py db/elabinelab_bossinit \
+	db/update_permissions \
+	db/grabron db/stategraph db/readycount \
+	db/idletimes db/idlemail db/xmlconvert \
+	db/libdb.py db/elabinelab_bossinit \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
@@ -742,10 +742,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
 	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
-	account/GNUmakefile account/tbacct account/webtbacct \
-	account/addpubkey account/webaddpubkey \
-	account/addsfskey account/webaddsfskey \
-	account/quotamail account/mkusercert account/webmkusercert  \
+	account/GNUmakefile account/tbacct \
+	account/addpubkey account/addsfskey \
+	account/quotamail account/mkusercert \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \

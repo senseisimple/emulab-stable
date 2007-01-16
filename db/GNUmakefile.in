@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -18,8 +18,10 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
 		  idletimes idlemail setsitevar audit changeuid changepid \
 		  elabinelab_bossinit update_permissions mysqld_watchdog \
 		  dumperrorlog
-LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert \
-		  webchangeuid
+
+WEB_SBIN_SCRIPTS= webnodelog webnewwanode webidlemail webchangeuid
+WEB_BIN_SCRIPTS = webnfree
+LIBEXEC_SCRIPTS = $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS) xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
 		  NodeType.pm Interface.pm User.pm Group.pm Project.pm 
 
@@ -63,6 +65,18 @@ post-install:
 #
 control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS))
+
+# This rule says what web* script depends on which installed binary directory.
+$(WEB_SBIN_SCRIPTS): $(INSTALL_SBINDIR)
+$(WEB_BIN_SCRIPTS):  $(INSTALL_BINDIR)
+
+# Just in case the dirs are not yet created,
+$(INSTALL_SBINDIR) $(INSTALL_BINDIR):
+
+# And then how to turn the template into the actual script. 
+$(WEB_SBIN_SCRIPTS) $(WEB_BIN_SCRIPTS): $(TESTBED_SRCDIR)/WEBtemplate.in
+	@echo "Generating $@"
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$@,' > $@
 
 clean:
 

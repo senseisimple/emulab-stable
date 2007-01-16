@@ -28,6 +28,12 @@ use overload ('""' => 'Stringify');
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $CONTROL	= "@USERNODE@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBBASE      = "@TBBASE@";
+my $TBWWW       = "@TBWWW@";
+my $WIKISUPPORT = @WIKISUPPORT@;
 
 # Cache of instances to avoid regenerating them.
 my %projects   = ();
@@ -97,7 +103,18 @@ sub gid_idx($)          { return field($_[0], "pid_idx"); }
 sub head_uid($)         { return field($_[0], "head_uid"); }
 sub head_idx($)         { return field($_[0], "head_idx"); }
 sub created($)          { return field($_[0], "created"); }
-sub description($)      { return field($_[0], "description"); }
+sub description($)      { return field($_[0], "name"); }
+sub why($)		{ return field($_[0], "why"); }
+sub addr($)		{ return field($_[0], "addr"); }
+sub URL($)		{ return field($_[0], "URL"); }
+sub funders($)		{ return field($_[0], "funders"); }
+sub num_members($)      { return field($_[0], "num_members"); }
+sub num_pcs($)		{ return field($_[0], "num_pcs"); }
+sub num_pcplab($)       { return field($_[0], "num_pcplab"); }
+sub num_ron($)		{ return field($_[0], "num_ron"); }
+sub public($)		{ return field($_[0], "public"); }
+sub public_whynot($)    { return field($_[0], "public_whynot"); }
+sub linked_to_us($)     { return field($_[0], "linked_to_us"); }
 sub expt_count($)       { return field($_[0], "expt_count"); }
 sub expt_last($)        { return field($_[0], "expt_last"); }
 sub approved($)         { return field($_[0], "approved"); }
@@ -187,6 +204,177 @@ sub Update($$)
 }
 
 #
+# Class function to create new project and return object.
+#
+sub Create($$$$)
+{
+    my ($class, $pid, $leader, $argref) = @_;
+	
+    #
+    # The array of inserts is assumed to be safe already. Generate
+    # a list of actual insert clauses to be joined below.
+    #
+    my @insert_data = (!defined($argref) ? () :
+		       map("$_=" . DBQuoteSpecial($argref->{$_}),
+			   keys(%{$argref})));
+
+    # First create the underlying default group for the project.
+    my $newgroup = Group->Create(undef, $pid, $leader, 'Default Group', $pid);
+    return undef
+	if (!defined($newgroup));
+
+    # Every project gets a new unique index, which comes from the group.
+    my $pid_idx = $newgroup->gid_idx();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "pid='$pid'");
+    push(@insert_data, "pid_idx='$pid_idx'");
+    push(@insert_data, "head_uid='" . $leader->uid() . "'");
+    push(@insert_data, "head_idx='" . $leader->uid_idx() . "'");
+    push(@insert_data, "created=now()");
+
+    # Insert into DB. 
+    if (! DBQueryWarn("insert into projects set " . join(",", @insert_data))) {
+	$newgroup->Delete();
+	return undef;
+    }
+
+    if (! DBQueryWarn("insert into project_stats (pid, pid_idx) ".
+		      "values ('$pid', $pid_idx)")) {
+	$newgroup->Delete();
+	DBQueryFatal("delete from projects where pid_idx='$pid_idx'");
+	return undef;
+    }
+    my $newproject = Project->Lookup($pid_idx);
+    return undef
+	if (! $newproject);
+
+    #
+    # The creator of a group is not automatically added to the group,
+    # but we do want that for a new project. 
+    #
+    if ($newgroup->AddMemberShip($leader) < 0) {
+	$newgroup->Delete();
+	DBQueryWarn("delete from project_stats where pid_idx=$pid_idx");
+	DBQueryWarn("delete from projects where pid_idx=$pid_idx");
+	return undef;
+    }
+    return $newproject;
+}
+
+#
+# Send newproject email; separate function so email can be resent.
+#
+sub SendNewProjectEmail($;$)
+{
+    my ($self, $firstproject) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $firstproject = 0
+	if (!defined($firstproject));
+
+    my $leader             = $self->GetLeader();
+    my $usr_uid            = $leader->uid();
+    my $usr_idx            = $leader->uid_idx();
+    my $usr_title	   = $leader->title();
+    my $usr_name	   = $leader->name();
+    my $usr_affil	   = $leader->affil();
+    my $usr_email	   = $leader->email();
+    my $usr_addr	   = $leader->addr();
+    my $usr_addr2	   = $leader->addr2();
+    my $usr_city	   = $leader->city();
+    my $usr_state	   = $leader->state();
+    my $usr_zip	           = $leader->zip();
+    my $usr_country        = $leader->country();
+    my $usr_phone	   = $leader->phone();
+    my $usr_URL            = $leader->URL();
+    my $wikiname           = $leader->wikiname();
+    my $returning          = $leader->status() ne $User::USERSTATUS_NEWUSER;
+    my $usr_returning      = ($returning ? "Yes" : "No");
+    my $proj_desc	   = $self->description();
+    my $proj_URL           = $self->URL();
+    my $proj_funders       = $self->funders();
+    my $proj_public        = ($self->public() ? "Yes" : "No");
+    my $proj_linked        = ($self->linked_to_us() ? "Yes" : "No");
+    my $proj_whynotpublic  = $self->public_whynot();
+    my $proj_members       = $self->num_members();
+    my $proj_pcs           = $self->num_pcs();
+    my $proj_plabpcs       = $self->num_pcplab();
+    my $proj_ronpcs        = $self->num_ron();
+    my $proj_why	   = $self->why();
+    my $unix_gid           = $self->unix_gid();
+    my $unix_name          = $self->unix_name();
+    my $pid                = $self->pid();
+    my $pid_idx            = $self->pid_idx();
+    my $gid                = $self->pid();
+
+    $usr_addr2 = ""
+	if (!defined($usr_addr2));
+    $usr_URL = ""
+	if (!defined($usr_URL));
+
+    if ($returning || $firstproject) {
+	SENDMAIL($TBAPPROVAL,
+		 "New Project '$pid' ($usr_uid)",
+		 "'$usr_name' wants to start project '$pid'.\n".
+		 "\n".
+		 "Name:            $usr_name ($usr_uid/$usr_idx)\n".
+		 "Project IDX:     $pid_idx\n".
+		 "Returning User?: $usr_returning\n".
+		 "Email:           $usr_email\n".
+		 "User URL:        $usr_URL\n".
+		 "Description:     $proj_desc\n".
+		 "Project URL:     $proj_URL\n".
+		 "Public URL:      $proj_public\n".
+		 "Why Not Public:  $proj_whynotpublic\n".
+		 "Link to Us?:     $proj_linked\n".
+		 "Funders:         $proj_funders\n".
+		 "Job Title:       $usr_title\n".
+		 "Affiliation:     $usr_affil\n".
+		 "Address 1:       $usr_addr\n".
+		 "Address 2:       $usr_addr2\n".
+		 "City:            $usr_city\n".
+		 "State:           $usr_state\n".
+		 "ZIP/Postal Code: $usr_zip\n".
+		 "Country:         $usr_country\n".
+		 "Phone:           $usr_phone\n".
+		 "Members:         $proj_members\n".
+		 "PCs:             $proj_pcs\n".
+		 "Planetlab PCs:   $proj_plabpcs\n".
+		 "RON PCs:         $proj_ronpcs\n".
+		 "Unix GID:        $unix_name ($unix_gid)\n".
+		 "Reasons:\n$proj_why\n\n".
+		 "Please review the application and when you have made a \n".
+		 "decision, go to $TBWWW and\n".
+		 "select the 'Project Approval' page.",
+		 "$usr_name '$usr_uid' <$usr_email>",
+		 "Reply-To: $TBAPPROVAL\n".
+		 "Bcc: $TBAUDIT");
+    }
+    else {
+	SENDMAIL($TBAPPROVAL,
+		 "New Project '$pid' ($usr_uid)",
+		 "'$usr_name' wants to start project '$pid'.\n".
+		 "\n".
+		 "Name:            $usr_name ($usr_uid/$usr_idx)\n".
+		 "Project IDX:     $pid_idx\n".
+		 "Email:           $usr_email\n".
+		 "Returning User?: No\n".
+		 "\n".
+		 "No action is necessary until the user has verified the ".
+		 "account.\n",
+		 "$usr_name '$usr_uid' <$usr_email>",
+		 "Reply-To: $TBAPPROVAL\n".
+		 "Bcc: $TBAUDIT");
+    }
+
+    return 0;
+}
+
+#
 # Return user object for leader.
 #
 sub GetLeader($)
@@ -194,7 +382,7 @@ sub GetLeader($)
     my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     return User->Lookup($self->head_idx());

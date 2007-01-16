@@ -17,15 +17,22 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use User;
 use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
 
 # Configure variables
-my $TB		= "@prefix@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $CONTROL	= "@USERNODE@";
+my $TB		  = "@prefix@";
+my $BOSSNODE      = "@BOSSNODE@";
+my $CONTROL	  = "@USERNODE@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBAPPROVAL    = "@TBAPPROVALEMAIL@";
+my $TBAUDIT       = "@TBAUDITEMAIL@";
+my $TBBASE        = "@TBBASE@";
+my $TBWWW         = "@TBWWW@";
+my $MIN_UNIX_GID  = @MIN_UNIX_GID@;
 
 # Cache of instances to avoid regenerating them.
 my %groups    = ();
@@ -58,8 +65,9 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
-    my $self         = {};
-    $self->{'GROUP'} = $query_result->fetchrow_hashref();
+    my $self           = {};
+    $self->{'GROUP'}   = $query_result->fetchrow_hashref();
+    $self->{'PROJECT'} = undef;
 
     bless($self, $class);
     
@@ -75,6 +83,7 @@ sub gid($)	        { return field($_[0], "gid"); }
 sub pid_idx($)          { return field($_[0], "pid_idx"); }
 sub gid_idx($)          { return field($_[0], "gid_idx"); }
 sub leader($)           { return field($_[0], "leader"); }
+sub leader_idx($)       { return field($_[0], "leader_idx"); }
 sub created($)          { return field($_[0], "created"); }
 sub description($)      { return field($_[0], "description"); }
 sub unix_gid($)         { return field($_[0], "unix_gid"); }
@@ -166,6 +175,128 @@ sub Update($$)
 }
 
 #
+# Class function to create new group and return object.
+#
+sub Create($$$$$$)
+{
+    my ($class, $project, $gid, $leader, $description, $unix_name) = @_;
+    my $pid;
+    my $pid_idx;
+    
+    #
+    # Check that we can guarantee uniqueness of the unix group name.
+    # 
+    my $query_result =
+	DBQueryFatal("select gid from groups ".
+		     "where unix_name='$unix_name'");
+
+    if ($query_result->numrows) {
+	print "*** Could not form a unique Unix group name: $unix_name!\n";
+	return undef;
+    }
+
+    # Every group gets a new unique index.
+    my $gid_idx = TBGetUniqueIndex('next_gid');
+
+    # If project is not defined, then creating initial project group.
+    if (! $project) {
+	$pid = $gid;
+	$pid_idx = $gid_idx;
+    }
+    else {
+	$pid = $project->pid();
+	$pid_idx = $project->pid_idx();
+    }
+
+    #
+    # Get me an unused unix gid. 
+    #
+    my $unix_gid;
+
+    #
+    # Start here, and keep going if the one picked from the DB just
+    # happens to be in use (in the group file). Actually happens!
+    #
+    my $min_gid = $MIN_UNIX_GID;
+    
+    while (! defined($unix_gid)) {
+	#
+	# Get me an unused unix id. Nice query, eh? Basically, find
+	# unused numbers by looking at existing numbers plus one, and
+	# check to see if that number is taken.
+	#
+	$query_result =
+	    DBQueryWarn("select g.unix_gid + 1 as start from groups as g ".
+			"left outer join groups as r on ".
+			"  g.unix_gid + 1 = r.unix_gid ".
+			"where g.unix_gid>$min_gid and ".
+			"      g.unix_gid<50000 and ".
+			"      r.unix_gid is null limit 1");
+
+	return undef
+	    if (! $query_result);
+
+	if (! $query_result->numrows) {
+	    print "*** WARNING: Could not find an unused unix_gid!\n";
+	    return undef;
+	}
+
+	my ($unused) = $query_result->fetchrow_array();
+
+	if (getgrgid($unused)) {
+	    # Keep going.
+	    $min_gid++;
+	}
+	else {
+	    # Break out of loop.
+	    $unix_gid = $unused;
+	}
+    }
+
+    if (!DBQueryWarn("insert into groups set ".
+		     " pid='$pid', gid='$gid', ".
+		     " leader='" . $leader->uid() . "'," .
+		     " leader_idx='" . $leader->uid_idx() . "'," .
+		     " created=now(), ".
+		     " description='$description', ".
+		     " unix_name='$unix_name', ".
+		     " gid_idx=$gid_idx, ".
+		     " pid_idx=$pid_idx, ".
+		     " unix_gid=$unix_gid")) {
+	return undef;
+    }
+
+    if (! DBQueryWarn("insert into group_stats (pid, gid, gid_idx) ".
+		      "values ('$pid', '$gid', $gid_idx)")) {
+	DBQueryFatal("delete from groups where gid_idx='$gid_idx'");
+	return undef;
+    }
+    my $newgroup = Group->Lookup($gid_idx);
+    return undef
+	if (! $newgroup);
+
+    return $newgroup;
+}
+
+#
+# Delete a group.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $gid_idx = $self->gid_idx();
+
+    DBQueryWarn("delete from group_stats where gid_idx='$gid_idx'");
+    DBQueryWarn("delete from groups where gid_idx='$gid_idx'");
+    return 0;
+}
+
+#
 # Change the leader for a group.
 #
 sub ChangeLeader($$)
@@ -211,14 +342,186 @@ sub DeleteMemberShip($$)
 }
 
 #
+# Send email notification of user joining a group.
+#
+sub SendJoinEmail($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    #
+    # Grab user info.
+    #
+    my $usr_email   = $user->email();
+    my $usr_URL     = $user->URL();
+    my $usr_addr    = $user->addr();
+    my $usr_addr2   = $user->addr2();
+    my $usr_city    = $user->city();
+    my $usr_state   = $user->state();
+    my $usr_zip	    = $user->zip();
+    my $usr_country = $user->country();
+    my $usr_name    = $user->name();
+    my $usr_phone   = $user->phone();
+    my $usr_title   = $user->title();
+    my $usr_affil   = $user->affil();
+    my $uid_idx     = $user->uid_idx();
+    my $uid         = $user->uid();
+
+    # And leader info
+    my $leader      = $self->GetLeader();
+    my $leader_name = $leader->name();
+    my $leader_email= $leader->email();
+    my $leader_uid  = $leader->uid();
+    my $allleaders  = $self->LeaderMailList();
+    my $pid         = $self->pid();
+    my $gid         = $self->gid();
+	     
+    SENDMAIL("$leader_name '$leader_uid' <$leader_email>",
+	     "$uid $pid Project Join Request",
+	     "$usr_name is trying to join your group $gid in project $pid.".
+	     "\n".
+	     "\n".
+	     "Contact Info:\n".
+	     "Name:            $usr_name\n".
+	     "Emulab ID:       $uid\n".
+	     "Email:           $usr_email\n".
+	     "User URL:        $usr_URL\n".
+	     "Job Title:       $usr_title\n".
+	     "Affiliation:     $usr_affil\n".
+	     "Address 1:       $usr_addr\n".
+	     "Address 2:       $usr_addr2\n".
+	     "City:            $usr_city\n".
+	     "State:           $usr_state\n".
+	     "ZIP/Postal Code: $usr_zip\n".
+	     "Country:         $usr_country\n".
+	     "Phone:           $usr_phone\n".
+	     "\n".
+	     "Please return to $TBWWW,\n".
+	     "log in, select the 'New User Approval' page, and enter your\n".
+	     "decision regarding $usr_name's membership in your project.\n".
+	     "\n".
+	     "Thanks,\n".
+	     "Testbed Operations\n",
+	     "$TBAPPROVAL",
+	     "CC: $allleaders\n".
+	     "Bcc: $TBAUDIT");
+
+    return 0;
+}
+
+#
 # Lookup user membership in this group
 #
 sub LookupUser($$)
 {
     my ($self, $user) = @_;
 
+    # Must be a real reference. 
+    return undef
+	if (! (ref($self) && ref($user)));
+
     return Group::MemberShip->LookupUser($self, $user);
 }
+
+#
+# Is this group the default project group. Returns boolean.
+#
+sub IsProjectGroup($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    return $self->pid_idx() == $self->gid_idx();
+}
+
+#
+# Return (and cache) the project for a group.
+#
+sub GetProject($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return $self->{'PROJECT'}
+        if (defined($self->{'PROJECT'}));
+
+    $self->{'PROJECT'} = Project->Lookup($self->pid_idx());
+    return $self->{'PROJECT'};
+}
+
+#
+# Is the user the group leader.
+#
+sub IsLeader($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! (ref($self) && ref($user)));
+
+    return $self->leader_idx() == $user->uid_idx();
+}
+
+#
+# Return user object for leader.
+#
+sub GetLeader($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return User->Lookup($self->leader_idx());
+}
+
+#
+# Return a list of leaders (proj/group roots) in the format of an
+# email address list.
+#
+sub LeaderMailList($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $gid_idx   = $self->gid_idx();
+    my $projroot  = $Group::MemberShip::TRUSTSTRING_PROJROOT;
+    my $grouproot = $Group::MemberShip::TRUSTSTRING_GROUPROOT;
+    my $mailstr   = "";
+    
+    my $query_result =
+	DBQueryFatal("select distinct usr_name,u.uid,usr_email ".
+		     "  from users as u ".
+		     "left join group_membership as gm on ".
+		     "     gm.uid_idx=u.uid_idx ".
+		     "where gid_idx='$gid_idx' and ".
+		     "      (trust='$projroot' or trust='$grouproot') ".
+		     "order by trust DESC, usr_name");
+
+    while (my ($name,$uid,$email) = $query_result->fetchrow_array()) {
+	$mailstr .= ", "
+	    if ($mailstr ne "");
+
+	$mailstr .= '"' . $name . " (". $uid . ")\" <". $email . ">";
+    }
+    return $mailstr;
+}
+
+
 
 ############################################################################
 
@@ -227,13 +530,22 @@ use libdb;
 use libtestbed;
 use English;
 use overload ('""' => 'Stringify');
+use vars qw($TRUSTSTRING_NONE $TRUSTSTRING_USER
+	    $TRUSTSTRING_LOCALROOT $TRUSTSTRING_GROUPROOT
+	    $TRUSTSTRING_PROJROOT
+	    @EXPORT_OK);
 
 # Constants for membership.
-my $TRUSTSTRING_NONE		= "none";
-my $TRUSTSTRING_USER		= "user";
-my $TRUSTSTRING_LOCALROOT	= "local_root";
-my $TRUSTSTRING_GROUPROOT	= "group_root";
-my $TRUSTSTRING_PROJROOT	= "project_root";
+$TRUSTSTRING_NONE		= "none";
+$TRUSTSTRING_USER		= "user";
+$TRUSTSTRING_LOCALROOT		= "local_root";
+$TRUSTSTRING_GROUPROOT		= "group_root";
+$TRUSTSTRING_PROJROOT		= "project_root";
+
+# Why, why, why?
+@EXPORT_OK = qw($TRUSTSTRING_NONE $TRUSTSTRING_USER
+		$TRUSTSTRING_LOCALROOT $TRUSTSTRING_GROUPROOT
+		$TRUSTSTRING_PROJROOT);
 
 my @alltrustvals = ($TRUSTSTRING_NONE, $TRUSTSTRING_USER,
 		    $TRUSTSTRING_LOCALROOT, $TRUSTSTRING_GROUPROOT,
