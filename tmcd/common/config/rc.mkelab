@@ -425,7 +425,7 @@ sub SetupFsNode()
     # From this point on will need to log in as root,
     #
     print "Clearing out existing accounts and such\n";
-    mysystem("$BINDIR/prepare");
+    mysystem("$BINDIR/prepare -N");
 
     #
     # Remove the outer testbed startup script.
@@ -741,7 +741,7 @@ sub SetupOpsNode($)
     # From this point on will need to log in as root,
     #
     print "Clearing out existing accounts and such\n";
-    mysystem("$BINDIR/prepare");
+    mysystem("$BINDIR/prepare -N");
 
     #
     # Remove the outer testbed startup script.
@@ -1106,7 +1106,7 @@ sub SetupBossNode()
     # From this point on will need to log in as root,
     #
     print "Clearing out existing accounts and such\n";
-    mysystem("$BINDIR/prepare");
+    mysystem("$BINDIR/prepare -N");
   
     #
     # Remove the outer testbed startup script.

@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 use English;
+use Getopt::Std;
 require 'ctime.pl';
 
 # Drag in path stuff so we can find emulab stuff.
@@ -54,6 +55,18 @@ $| = 1;
 use libsetup;
 
 #
+# XXX Elabinelab hack: option to not unmount NFS filesystems.
+#     The setup script assumes that /share is mounted after this runs.
+#
+my $noumount = 0;
+my %options = ();
+if (getopts("N", \%options)) {
+    if (defined($options{"N"})) {
+	$noumount = 1;
+    }
+}
+
+#
 # First clean up the node as it would be if free.
 #
 cleanup_node(1);
@@ -74,7 +87,7 @@ foreach my $dbfile (@DBFILES) {
 # This allows us to clean up /users and /proj.  We only do the cleanup if
 # if unmount succeeds and even then, we do it in a safe way.
 #
-if (-e "/share/freebsd") {
+if (!$noumount && -e "/share/freebsd") {
     print "Unmounting NFS filesystems ...\n";
     # XXX "unmount -t nfs" does not seem to work
     if (!system("umount -h fs")) {
