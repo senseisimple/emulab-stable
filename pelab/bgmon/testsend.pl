@@ -43,7 +43,7 @@ if (!$handle) { die "Unable to register with event system\n"; }
 my $tuple = address_tuple_alloc();
 if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
-my %cmd = ( managerID => $managerid,
+my %cmdhash = ( managerID => $managerid,
 	    srcnode => $srcnode,
 	    dstnode => $dstnode,
 	    testtype => $type,
@@ -52,7 +52,12 @@ my %cmd = ( managerID => $managerid,
 	    expid    => "$bgmonexpt"
 	    );
 
-sendcmd_evsys($cmd, \%cmd, $handle);
+sendcmd_evsys($cmd, \%cmdhash, $handle);
+
+print "$cmd\n";
+foreach my $key (keys %cmdhash){
+    print "$key => $cmdhash{$key}\n";
+}
 
 
 if (event_unregister($handle) == 0) {
