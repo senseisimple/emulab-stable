@@ -14,13 +14,42 @@ class UdpState{
         // sequence number, timestamp & size of the packet.
 	vector< UdpPacketInfo > recentSentPackets;
 
-	// Indicates the number of packets lost ( in a batch of 4 sent packets ) 
+	// Indicates the number of packets lost -
 	// updated whenever an ACK is received.
 	int packetLoss;
+
+	// This is the total number of packets lost till now for the connection.
+	int totalPacketLoss;
+
+	// Did we drop any packets in libpcap ?
+	// This number only indicates the number of sent packets that
+	// were dropped in pcap buffer - based on the differences between
+	// the sequence numbers seen.
+	int libpcapSendLoss;
+
 	unsigned long long minDelay;
 	unsigned long long maxDelay;
 
 	bool ackError, isAckFake;
+
+	UdpState()
+		:packetLoss(0),
+		totalPacketLoss(0),
+		libpcapSendLoss(0)
+	{
+
+	}
+
+	void reset()
+	{
+		packetLoss = 0;
+		totalPacketLoss = 0;
+		libpcapSendLoss = 0;
+
+		ackError = false;
+		isAckFake = false;
+
+	}
 
 	~UdpState()
 	{

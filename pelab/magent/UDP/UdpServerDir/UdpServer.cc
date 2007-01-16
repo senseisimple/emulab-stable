@@ -50,6 +50,7 @@ int sd, rc, n, flags;
 socklen_t cliLen;
 struct sockaddr_in cliAddr, servAddr;
 std::ofstream outFile;
+int packetLoss;
 
 namespace globalConsts {
 
@@ -76,6 +77,8 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 	// Subtract eight bytes to account for the UDP header.
         unsigned short udpLen = ntohs(udpHdr->len) - 8;
 
+	unsigned short int sourcePort = ntohs(udpHdr->source);
+
 	// The first byte of the data portion indicates whether this
 	// is a send packet(0) or an ACK packet(1)
 	unsigned char packetType = *(unsigned char *)(dataPtr);
@@ -92,7 +95,6 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		// will be a combination of code below and that in UdpClient.
 	{
 		unsigned short int packetSeqNum = *(unsigned short int *)(dataPtr + 1) ;
-		std::cout<<"Received seq no = "<<packetSeqNum<<std::endl;
 
 		// Calculate the header overhead, IP, 8 bytes for UDP, 14 + 4 for ethernet
 		int overhead = ipPacket->ip_hl*4 + 8 + 14 + 4;
@@ -111,6 +113,16 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 	    // TODO:Take wrap around into account.
 	    if(packetSeqNum > curSeqNum)
 	    {
+		    if(packetSeqNum > (curSeqNum + 1))
+		    {
+			    /*
+			    std::cout<<"Packet being ACKed = "<<packetSeqNum<<std::endl;
+			    packetLoss += (packetSeqNum - curSeqNum - 1);
+			    std::cout<<"Forward packet loss = "<<packetLoss<<std::endl;
+			    for(int k = 1;k < packetSeqNum - curSeqNum; k++)
+				    std::cout<<"Lost packet seqNum = "<<curSeqNum + 1<<"\n"<<std::endl;
+				    */
+		    }
 		    // Indicate that this is an ACK packet.
 		appAck[0] = '1';
 
@@ -123,6 +135,10 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		// Get the timestamp of when this packet was received by libpcap.
 		milliSec = getPcapTimeMicro(&pcap_info->ts);
 		memcpy(&appAck[2 + 2*globalConsts::USHORT_INT_SIZE], &milliSec, globalConsts::ULONG_LONG_SIZE);
+
+		// Echo the sender timestamp received in the original packet.
+		memcpy(&appAck[2 + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE], &senderTimestamp, globalConsts::ULONG_LONG_SIZE);
+
 		outFile << "TIME="<<milliSec<<",SIZE="<<udpLen + overhead<<std::endl;
 
 		// Include the sequence numbers, and ACK times of at least the last
@@ -134,8 +150,9 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		unsigned long long timeDiff = 0;
 
 		// Size of each redundant ACK - 2 bytes for sequence number + 2 bytes
-	       // for the packet size +	8 bytes for timestamp.
-		int ackSize = 2*globalConsts::USHORT_INT_SIZE +  globalConsts::ULONG_LONG_SIZE;
+	       // for the packet size +	8 bytes for receiver timestamp + 8 bytes for
+		// echoing the sender timestamp.
+		int ackSize = 2*globalConsts::USHORT_INT_SIZE +  2*globalConsts::ULONG_LONG_SIZE;
 
 		if(queueStartPtr == -1 && queueEndPtr == -1)
 		{
@@ -151,7 +168,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 
 		// This is the packet size that is needed to hold the minimum
 		// number of redundant ACKs + sequence number being ACKed + other data.
-		ackLength = minimumAcks*ackSize + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE + 2;
+		ackLength = minimumAcks*ackSize + 2*globalConsts::USHORT_INT_SIZE + 2*globalConsts::ULONG_LONG_SIZE + 2;
 
 		// Check to see if the original packet size can accommodate more
 		// than 3 redundant ACKs.
@@ -177,7 +194,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		// because our redundant ACK size is 12. These extra bytes
 		// will be accounted for by the step below which makes the
 		// packet being sent the same size as the received packet.
-		ackLength = numAcks*ackSize + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE + 2;
+		ackLength = numAcks*ackSize + 2*globalConsts::USHORT_INT_SIZE + 2*globalConsts::ULONG_LONG_SIZE + 2;
 		// The ACK packet must be the same size as the original UDP
 		// packet that was received - this is needed so that the 
 		// one way delay can be calculated as RTT/2.
@@ -185,7 +202,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 			ackLength = udpLen;
 
 		// This indicates where the redundant ACKs start in the packet.
-		int redunAckStart = 2 + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE;
+		int redunAckStart = 2 + 2*globalConsts::USHORT_INT_SIZE + 2*globalConsts::ULONG_LONG_SIZE;
 
 		// Copy the redundant ACKs.
 		for(int i = 0;i < numAcks; i++)
@@ -223,8 +240,11 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		// UDP packets which have been re-ordered.
 		curSeqNum = packetSeqNum;
 
+		cliAddr.sin_family = AF_INET;
+		cliAddr.sin_addr = ipPacket->ip_src;
+		cliAddr.sin_port = htons(sourcePort);
 		// Send the ACK off to the host we received the data packet from.
-		sendto(sd,appAck,ackLength,flags,(struct sockaddr *)&cliAddr,cliLen);
+		sendto(sd,appAck,ackLength,flags,(struct sockaddr *)&cliAddr,cliLen), errno;
 	    }
 
 	}
@@ -349,7 +369,7 @@ void init_pcap(char *interface)
         pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp);
         pcap_setfilter(pcapDescriptor, &bpfProg);
 
-	pcap_setnonblock(pcapDescriptor, 1, errBuf);
+	//pcap_setnonblock(pcapDescriptor, 1, errBuf);
 }
 
 
@@ -397,13 +417,16 @@ int main(int argc, char *argv[])
 
 	outFile.open("Throughput.log", std::ios::out);
 
+	n = 0;
 	/* server infinite loop */
 	while(true) 
 	{
 
 		/* receive message */
+		/*
 		n = recvfrom(sd, msg, MAX_MSG, flags,
 		 (struct sockaddr *) &cliAddr, &cliLen);
+		 */
 
 		pcap_dispatch(pcapDescriptor, -1, pcapCallback, NULL);
 

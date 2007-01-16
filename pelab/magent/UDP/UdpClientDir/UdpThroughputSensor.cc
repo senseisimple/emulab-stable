@@ -1,10 +1,15 @@
 #include "UdpThroughputSensor.h"
 
-UdpThroughputSensor::UdpThroughputSensor(UdpState &udpStateVal, std::ofstream &outStreamVal)
+UdpThroughputSensor::UdpThroughputSensor(UdpState &udpStateVal, std::ofstream &logStreamVal)
 	: lastAckTime(0),
 	throughputKbps(0.0),
 	udpStateInfo(udpStateVal),
-	outStream(outStreamVal)
+	logStream(logStreamVal)
+{
+
+}
+
+UdpThroughputSensor::~UdpThroughputSensor()
 {
 
 }
@@ -19,7 +24,7 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 {
 	if(Len < globalConsts::minAckPacketSize )
         {
-                cout << "Error: UDP packet data sent to ThroughputSensor::localAck was less than the "
+                logStream << "ERROR::UDP packet data sent to ThroughputSensor::localAck was less than the "
                         " required minimum "<< globalConsts::minAckPacketSize<< " bytes\n";
                 return;
         }
@@ -109,17 +114,17 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 		// Send this available bandwidth as a tentative value.
 		// To be used for dummynet events only if it is greater
 		// than the last seen value.
-		cout << "Tentative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"acktimeDiff = "<<ackTimeDiff<<"\n";
+		logStream << "VALUE::Tentative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"acktimeDiff = "<<ackTimeDiff<<"\n";
 
-		outStream << "TPUT:TIME="<<timeStamp<<",TENTATIVE="<<throughputKbps<<endl;
-		outStream << "LOSS:TIME="<<timeStamp<<",LOSS=0"<<endl;
+		logStream << "TPUT:TIME="<<timeStamp<<",TENTATIVE="<<throughputKbps<<endl;
+		logStream << "LOSS:TIME="<<timeStamp<<",LOSS=0"<<endl;
 	}
 	else
 	{
 		// Send this as the authoritative available bandwidth value.
-		cout << "Authoritative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"ackTimeDiff = "<<ackTimeDiff<<"\n";
-		outStream << "TPUT:TIME="<<timeStamp<<",AUTHORITATIVE="<<throughputKbps<<endl;
-		outStream << "LOSS:TIME="<<timeStamp<<",LOSS="<<udpStateInfo.packetLoss<<endl;
+		logStream << "VALUE::Authoritative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"ackTimeDiff = "<<ackTimeDiff<<"\n";
+		logStream << "TPUT:TIME="<<timeStamp<<",AUTHORITATIVE="<<throughputKbps<<endl;
+		logStream << "LOSS:TIME="<<timeStamp<<",LOSS="<<udpStateInfo.packetLoss<<endl;
 	}
 
 	// Save the receiver timestamp of this ACK packet, so that we can

@@ -10,7 +10,8 @@ class UdpSensor;
 class UdpThroughputSensor:public UdpSensor{
 	public:
 
-		explicit UdpThroughputSensor(UdpState &udpStateVal, ofstream &outStreamVal);
+		explicit UdpThroughputSensor(UdpState &udpStateVal, ofstream &logStreamVal);
+		~UdpThroughputSensor();
 		void localSend(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
 		void localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
 
@@ -18,7 +19,7 @@ class UdpThroughputSensor:public UdpSensor{
 		unsigned long long lastAckTime;
 		double throughputKbps;
 		UdpState &udpStateInfo;
-		ofstream &outStream;
+		ofstream &logStream;
 };
 
 #endif

@@ -16,7 +16,7 @@ class UdpPacketSensor:public UdpSensor{
 
 	public:
 
-	explicit UdpPacketSensor(UdpState &udpStateVal);
+	explicit UdpPacketSensor(UdpState &udpStateVal, ofstream &logStreamVal);
 	~UdpPacketSensor();
 	void localSend(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
 	void localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
@@ -26,6 +26,7 @@ class UdpPacketSensor:public UdpSensor{
 	list<UdpPacketInfo> sentPacketList;
 	UdpState & udpStateInfo;
 	long lastSeenSeqNum;
+	ofstream &logStream;
 };
 
 

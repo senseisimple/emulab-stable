@@ -20,7 +20,9 @@ namespace globalConsts {
 
 	const static int redunAckSize = 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
 	const static int seqNumSize = USHORT_INT_SIZE;
-	const static int minAckPacketSize = 1 + 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
+	const static int minAckPacketSize = 1 + 2*USHORT_INT_SIZE + 2*ULONG_LONG_SIZE;
 }
+
+enum {UDP_PACKET_SENSOR, UDP_THROUGHPUT_SENSOR, UDP_MINDELAY_SENSOR, UDP_MAXDELAY_SENSOR};
 
 #endif

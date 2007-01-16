@@ -10,7 +10,8 @@ OBJECTS=${COMPILE_DIR}/UdpClient.o \
 	${COMPILE_DIR}/UdpMaxDelaySensor.o \
 	${COMPILE_DIR}/UdpThroughputSensor.o \
 	${COMPILE_DIR}/UdpPacketInfo.o \
-	${COMPILE_DIR}/UdpSensor.o
+	${COMPILE_DIR}/UdpSensor.o \
+	${COMPILE_DIR}/UdpSensorList.o
 
 
 COMMON_INCLUDES=UdpLibs.h \
@@ -38,6 +39,9 @@ ${COMPILE_DIR}/UdpPacketInfo.o: UdpPacketInfo.cc UdpPacketInfo.h  ${COMMON_INCLU
 	${CC} -c ${CFLAGS} -o $@ $<
 
 ${COMPILE_DIR}/UdpSensor.o: UdpSensor.cc UdpSensor.h ${COMMON_INCLUDES}
+	${CC} -c ${CFLAGS} -o $@ $<
+
+${COMPILE_DIR}/UdpSensorList.o: UdpSensorList.cc UdpSensorList.h ${COMMON_INCLUDES}
 	${CC} -c ${CFLAGS} -o $@ $<
 
 clean:

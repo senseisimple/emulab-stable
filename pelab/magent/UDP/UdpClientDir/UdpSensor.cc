@@ -7,6 +7,11 @@ UdpSensor::UdpSensor()
 
 }
 
+UdpSensor::~UdpSensor()
+{
+
+}
+
 void UdpSensor::capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp)
 {
 	if(Len < 1)
@@ -24,4 +29,5 @@ void UdpSensor::capturePacket(char *packetData, int Len, int overheadLen, unsign
 	{
 		localAck( (packetData + 1), Len - 1,overheadLen, timeStamp );
 	}
+
 }

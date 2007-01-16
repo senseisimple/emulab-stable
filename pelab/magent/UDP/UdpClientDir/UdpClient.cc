@@ -29,6 +29,7 @@
 #include "UdpMaxDelaySensor.h"
 #include "UdpPacketSensor.h"
 #include "UdpState.h"
+#include "UdpSensorList.h"
 
 pcap_t *pcapDescriptor = NULL;
 UdpThroughputSensor *throughputSensor;
@@ -38,6 +39,19 @@ UdpPacketSensor *packetSensor;
 char localIP[16] = "";
 
 struct UdpState globalUdpState;
+
+struct pcap_stat pcapStats;
+int currentPcapLoss = 0;
+// Use this file handle to log messages - statistics and any warnings/errors.
+std::ofstream logStream;
+UdpSensorList *sensorList;
+
+/* Grab the TSC register. */
+inline volatile unsigned long long RDTSC() {
+   register unsigned long long TSC asm("eax");
+   asm volatile (".byte 0xf, 0x31" : : : "eax", "edx");
+   return TSC;
+}
 
 unsigned long long getTimeMicro()
 {
@@ -50,11 +64,19 @@ unsigned long long getTimeMicro()
         return (tmpSecVal*1000*1000 + tmpUsecVal);
 }
 
-void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr, u_char *const udpPacketStart, struct ip const *ipPacket)
+void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr, unsigned char *udpPacketStart, struct ip const *ipPacket)
 {
+	// Report any packets dropped in libpcap.
+	pcap_stats(pcapDescriptor, &pcapStats);
+
+	if(pcapStats.ps_drop > currentPcapLoss)
+	{
+		currentPcapLoss += pcapStats.ps_drop;
+		logStream <<"STAT::Number of packets lost in libpcap = "<<currentPcapLoss<<endl;
+	}
 
 	// Get a pointer to the data section of the UDP packet.
-	u_char *dataPtr = udpPacketStart + 8;
+	unsigned char *dataPtr = udpPacketStart + 8;
 	unsigned short udpLen = ntohs(udpHdr->len) - 8;
 
 	//printf("Data being received = %c, %u, %lld, %u\n", *(unsigned char *)(dataPtr), *(unsigned int *)(dataPtr + 1), *(unsigned long long*)(dataPtr + 5), udpLen);
@@ -84,7 +106,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         {
 		if(strcmp( inet_ntoa(ipPacket->ip_dst),localIP ) != 0 )
 		{
-		    packetSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
+			sensorList->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp);
 		}
 	}
 	else if(packetType == '1')
@@ -101,27 +123,24 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		if(strcmp( inet_ntoa(ipPacket->ip_dst),localIP ) == 0 )
 		{
 			// Pass the captured packet to the udp sensors.
-			packetSensor->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp);
-			minDelaySensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
-			maxDelaySensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
-			throughputSensor->capturePacket(reinterpret_cast<char *>(dataPtr), udpLen, overheadLen, timeStamp);
+			sensorList->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp);
 		}
 	}
 	else
 	{
-		printf("ERROR: Unknown UDP packet received from remote agent\n");
+		logStream <<"ERROR::Unknown format UDP packet received from remote agent"<<endl;
 		return;
 	}
 }
 
-int getLinkLayer(struct pcap_pkthdr const *pcap_info, const u_char *pkt_data)
+int getLinkLayer(struct pcap_pkthdr const *pcap_info, unsigned char const *pkt_data)
 {
 	unsigned int caplen = pcap_info->caplen;
 
 	if (caplen < sizeof(struct ether_header))
 	{
-		printf("A captured packet was too short to contain "
-		"an ethernet header");
+		logStream<<"ERROR::A captured packet was too short to contain "
+		"an ethernet header"<<endl;
 		return -1;
 	}
 	else
@@ -131,13 +150,13 @@ int getLinkLayer(struct pcap_pkthdr const *pcap_info, const u_char *pkt_data)
 	}
 }
 
-void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_char *pkt_data)
+void pcapCallback(unsigned char *user, struct pcap_pkthdr const *pcap_info, unsigned char const *pkt_data)
 {
 	int packetType = getLinkLayer(pcap_info, pkt_data);
 
 	if(packetType != ETHERTYPE_IP)
 	{
-		printf("Unknown link layer type: %d\n", packetType);
+		logStream<<"ERROR::Unknown link layer type: "<<packetType<<endl;
 		return;
 	}
 
@@ -146,7 +165,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 	if(bytesLeft < sizeof(struct ip))
 	{
-		printf("Captured packet was too short to contain an IP header.\n");
+		logStream<<"ERROR::Captured packet was too short to contain an IP header"<<endl;
 		return;
 	}
 
@@ -157,19 +176,19 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 	if(ipVersion != 4)
 	{
-		printf("Captured IP packet is not IPV4.\n");
+		logStream<<"ERROR::Captured IP packet is not IPV4."<<endl;
 		return;
 	}
 
 	if(ipHeaderLength < 5)
 	{
-		printf("Captured IP packet has header less than the minimum 20 bytes.\n");
+		logStream<<"ERROR::Captured IP packet has header less than the minimum 20 bytes.\n"<<endl;
 		return;
 	}
 
 	if(ipPacket->ip_p != IPPROTO_UDP)
 	{
-		printf("Captured packet is not a UDP packet.\n");
+		logStream<<"ERROR::Captured packet is not a UDP packet.\n"<<endl;
 		return;
 	}
 
@@ -185,14 +204,14 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 	if(bytesLeft < sizeof(struct udphdr))
 	{
-		printf("Captured packet is too small to contain a UDP header.\n");
+		logStream<<"ERROR::Captured packet is too small to contain a UDP header."<<endl;
 		return;
 	}
 
 	handleUDP(pcap_info,udpPacket,udpPacketStart, ipPacket);
 }
 
-void init_pcap(char *interface, unsigned int portNumber)
+int init_pcap(char *interface, unsigned int portNumber)
 {
 	struct bpf_program bpfProg;
 	char errBuf[PCAP_ERRBUF_SIZE];
@@ -209,7 +228,7 @@ void init_pcap(char *interface, unsigned int portNumber)
 
 	if(pcapDescriptor == NULL)
 	{
-		printf("Error opening device %s with libpcap = %s\n", interface, errBuf);
+		logStream<<"ERROR::Error opening device "<<interface<<"  with libpcap = "<< errBuf<<endl;
 		exit(1);
 	}
 
@@ -217,6 +236,8 @@ void init_pcap(char *interface, unsigned int portNumber)
 	pcap_setfilter(pcapDescriptor, &bpfProg);
 
 	pcap_setnonblock(pcapDescriptor, 1, errBuf);
+
+	return pcap_get_selectable_fd(pcapDescriptor);
 
 }
 
@@ -233,11 +254,12 @@ int main(int argc, char *argv[])
 
 
 	/* check command line args */
-	if(argc < 7) 
+	if(argc < 8) 
 	{
-		printf("usage : %s <local-interface> <local-IP> <serverName> <packetCount> <packetSize> <SendRate-bps>\n", argv[0]);
+		printf("usage : %s <local-interface> <local-IP> <serverName> <packetCount> <packetSize> <SendRate-bps> <CPU-MHZ Integer>\n", argv[0]);
 		exit(1);
 	}
+	logStream.open("stats.log", std::ios::out);
 	strcpy(localIP, argv[2]);
 
 	/* get server IP address (no check if input is IP address or DNS name */
@@ -245,7 +267,7 @@ int main(int argc, char *argv[])
 
 	if(h==NULL) 
 	{
-		printf("%s: unknown host '%s' \n", argv[0], argv[3]);
+		logStream<<"ERROR:: "<<argv[0]<<": unknown host"<< argv[3]<<endl;
 		exit(1);
 	}
 
@@ -262,7 +284,7 @@ int main(int argc, char *argv[])
 
 	if(sd<0) 
 	{
-		printf("%s: cannot open socket \n",argv[0]);
+		logStream<<"ERROR:: "<<argv[0]<<": cannot open socket."<<endl;
 		exit(1);
 	}
 
@@ -274,7 +296,7 @@ int main(int argc, char *argv[])
 	// Set the socket descriptor to be non-blocking.
 	if( fcntl(sd, F_SETFL, flags) < 0)
 	{
-		printf("Error setting non blocking socket flags with fcntl.\n");
+		logStream<<"ERROR::Error setting non blocking socket flags with fcntl."<<endl;
 		exit(1);
 	}
 
@@ -287,25 +309,23 @@ int main(int argc, char *argv[])
 
 	if(rc<0) 
 	{
-		printf("%s: cannot bind port\n", argv[0]);
+		logStream<<"ERROR::"<<argv[0]<<": cannot bind port 3200"<<endl;
 		exit(1);
 	}
 
 	flags = 0;
 
-	// Initialize the libpcap filter.
-	init_pcap(argv[1], htons(cliAddr.sin_port));
 
-	// Open a file and pass the handle to the throughput sensor.
-	std::ofstream logStream;
-
-	logStream.open("stats.log", std::ios::out);
 
 	// Initialize the sensors.
-	packetSensor = new UdpPacketSensor(globalUdpState);
-	throughputSensor = new UdpThroughputSensor(globalUdpState, logStream);
-	maxDelaySensor = new UdpMaxDelaySensor(globalUdpState, logStream);
-	minDelaySensor = new UdpMinDelaySensor(globalUdpState, logStream);
+	sensorList = new UdpSensorList(logStream);
+	sensorList->addSensor(UDP_PACKET_SENSOR);
+	sensorList->addSensor(UDP_THROUGHPUT_SENSOR);
+	sensorList->addSensor(UDP_MINDELAY_SENSOR);
+	sensorList->addSensor(UDP_MAXDELAY_SENSOR);
+
+	// Initialize the libpcap filter.
+	int pcapFD = init_pcap(argv[1], htons(cliAddr.sin_port));
 
 	char packetData[1600];
 	unsigned short int curSeqNum = 0;
@@ -330,25 +350,37 @@ int main(int argc, char *argv[])
 
 	int overheadLen = 20 + 8 + 14 + 4;
 
+	// Fill in the MHz of the CPU - should be read from /proc/cpuinfo
+	long freqDivisor = atoi(argv[7]);
+	//long freqDivisor = 601;
+
 	long long timeInterval = 800000000  / sendRate;
 	timeInterval *= (packetLen + overheadLen);
 	timeInterval /= 100;
 
-	lastSendTime = getTimeMicro();
+	//lastSendTime = getTimeMicro();
+	lastSendTime = RDTSC();
 	echoLen = sizeof(echoServAddr);
-
-	FILE *sendDevFile = fopen("SendDeviation.log", "w");
 
 	/* send data */
 	while(true) 
 	{
 		if(curSeqNum < packetCount)
 		{
-			// UDP sends do not block - we don't need to 
+			// UDP sendTo blocks in Linux - we need to 
 			// check if the socket is ready for writing.
 			FD_SET(sd, &writeFdSet);
 
-			select(sd + 1,NULL,&writeFdSet, NULL,&selectTimeout);
+			// Check whether any data is available in the pcap buffer
+			// for reading.
+			FD_SET(pcapFD, &readFdSet);
+
+			select(sd + pcapFD + 1,&readFdSet,&writeFdSet, NULL,&selectTimeout);
+
+			if(FD_ISSET(pcapFD, &readFdSet) != 0)
+			{
+				  pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL);
+			}
 
 			if(FD_ISSET(sd, &writeFdSet) != 0)
 			{
@@ -360,10 +392,16 @@ int main(int argc, char *argv[])
 				// For now, take a command line argument giving the rate
 				// at which UDP packets should be sent ( this rate includes
 				// the overhead for UDP, IP & ethernet headers ( &ethernet checksum)
-				curTime = getTimeMicro();
-				if(curTime - lastSendTime > timeInterval)
+
+			//	curTime = getTimeMicro();
+			//	if( (curTime - lastSendTime) > timeInterval)
+
+				curTime = RDTSC();
+				if( (curTime - lastSendTime) > timeInterval*freqDivisor)
 				{
-					logStream << "SendDeviation:TIME="<<curTime<<",Deviation="<< curTime - lastSendTime - timeInterval<<std::endl;
+					logStream << "SendDeviation:TIME="<<curTime<<",Deviation="<< (curTime - lastSendTime)/freqDivisor - timeInterval<<std::endl;
+
+//					logStream << "SendDeviation:TIME="<<curTime<<",Deviation="<< (curTime - lastSendTime) - timeInterval<<std::endl;
 
 					curSeqNum++;
 					// Indicate that this is a data UDP packet - not an ACK.
@@ -396,34 +434,18 @@ int main(int argc, char *argv[])
 
 					if(rc < 0)
 					{
-					    printf("WARNING:Blocked in send = %d\n",errno);
+					    logStream<<"WARNING::Blocked in send, errno = "<<errno<<endl;
 					}
-					else
-					{
-					  pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL);
-					}
+				}
+				else
+				{
+					usleep(timeInterval - ( curTime - lastSendTime)/freqDivisor );
+		//			usleep(timeInterval - ( curTime - lastSendTime));
 				}
 			}
 
 		}
 
-		// Check whether any data is available in the receive buffer
-		// for reading.
-		FD_SET(sd, &readFdSet);
-
-		select(sd + 1, &readFdSet, NULL, NULL,&selectTimeout);
-
-		if(FD_ISSET(sd, &readFdSet) != 0)
-		{
-			n = recvfrom(sd, msg, MAX_MSG, 0,
-			(struct sockaddr *) &echoServAddr, &echoLen);
-
-			if(n > 0)
-				pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL);
-		}
-
-
 	}
-	fclose(sendDevFile);
 	return 0;
 }

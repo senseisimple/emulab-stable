@@ -8,10 +8,11 @@
 # Five - Size of the data part of the UDP packets.
 # Six - The rate at which the packets should be sent ( bits per sec )
 # This rate will also include the UDP, IP & ethernet headers along with the packet size.
+# Seven - MHz of CPU clock frequency
 
 # The client runs in an infinite while loop - so when no more data is being printed on
 # screen, it is safe to kill it( Ctrl-C) and look at the results.
 
 # NOTE: The UdpServer needs to be restarted before running the client for a second time.
 
-sudo ./UdpClient eth0 10.1.1.2 node1 600 1470 200000
+sudo ./UdpClient eth1 10.1.1.2 node1 1000 1470 750000 601

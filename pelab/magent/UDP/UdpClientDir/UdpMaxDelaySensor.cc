@@ -1,9 +1,14 @@
 #include "UdpMaxDelaySensor.h"
 
-UdpMaxDelaySensor::UdpMaxDelaySensor(UdpState &udpStateVal, ofstream &outStreamVal)
+UdpMaxDelaySensor::UdpMaxDelaySensor(UdpState &udpStateVal, ofstream &logStreamVal)
 	: maxDelay(0),
 	udpStateInfo(udpStateVal),
-	outStream(outStreamVal)
+	logStream(logStreamVal)
+{
+
+}
+
+UdpMaxDelaySensor::~UdpMaxDelaySensor()
 {
 
 }
@@ -18,7 +23,7 @@ void UdpMaxDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 {
         if(Len < globalConsts::minAckPacketSize)
         {
-                cout << "Error: UDP packet data sent to MaxDelaySensor::localAck was less than the "
+                logStream << "ERROR::UDP packet data sent to MaxDelaySensor::localAck was less than the "
                         " required minimum "<< globalConsts::minAckPacketSize << " bytes\n";
                 return;
         }
@@ -30,7 +35,7 @@ void UdpMaxDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 
         unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
         unsigned short int echoedPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::USHORT_INT_SIZE);
-	unsigned long long echoedTimestamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE);
+	unsigned long long echoedTimestamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE);
         unsigned long long oneWayQueueDelay;
         bool eventFlag = false;
 
@@ -73,9 +78,10 @@ void UdpMaxDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
         if(eventFlag == true)
         {
 		// Report the maximum delay
-		cout << "New Max Delay = " << maxDelay << "\n";
+		logStream << "VALUE::New Max Delay = " << maxDelay << "\n";
         }
-	outStream << "MAXD:TIME="<<timeStamp<<",MAXD="<<maxDelay<<endl;
+	logStream << "MAXD:TIME="<<timeStamp<<",MAXD="<<maxDelay<<endl;
+	logStream << "ACTUAL_MAXD:TIME="<<timeStamp<<",ACTUAL_MAXD="<<oneWayQueueDelay<<endl;
 
 	udpStateInfo.maxDelay = maxDelay;
 }

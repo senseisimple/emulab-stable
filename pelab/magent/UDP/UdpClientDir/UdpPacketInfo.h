@@ -3,8 +3,10 @@
 
 class UdpPacketInfo{
         public:
-	UdpPacketInfo::UdpPacketInfo();
-	UdpPacketInfo::UdpPacketInfo(unsigned short int, unsigned short int, unsigned long long);
+	UdpPacketInfo();
+	UdpPacketInfo(unsigned short int, unsigned short int, unsigned long long);
+	~UdpPacketInfo();
+
         unsigned short int seqNum;
         unsigned short int packetSize;
         unsigned long long timeStamp;

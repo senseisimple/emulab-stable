@@ -11,3 +11,8 @@ UdpPacketInfo::UdpPacketInfo(unsigned short int seqVal,unsigned short int packet
 {
 
 }
+
+UdpPacketInfo::~UdpPacketInfo()
+{
+
+}

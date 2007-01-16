@@ -163,6 +163,24 @@ We currently ignore the reordering of packets/ACKs on forward/reverse paths.
 If this happens persistently and is perceived as a characteristic of some links,
 then it might need to be addressed.
 
+Optimizations:
+--------------
+
+1) The UdpClient application sends packets at a fixed rate specified at the
+command line. In order to keep of the time, gettimeofday() can be used. But,
+on planet lab using gettimeofday() may cause the program to be scheduled
+out because it is a system call. Instead, the sending times are now
+being calculated by reading the values of the TSC register. Now,
+the deviation between when we wish to send a packet and we actually send
+it is around 2 ms against the 10+ ms when using gettimeofday.
+
+2) Since we capture and process all UDP packets using libpcap, there is no
+need to make recvfrom() calls, either at the sender or at the receiver. Those
+calls have now been removed and we will not incur the overhead of the system calls
+and the time to copy the packets to user space. I ran the application in a controlled
+emulab environment and did not observe any increase in CPU usage when all the received
+UDP packets were being dropped by the kernel ( due to full socket receive buffer ).
+
 
 
 

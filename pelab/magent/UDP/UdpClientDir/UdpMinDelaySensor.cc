@@ -1,9 +1,14 @@
 #include "UdpMinDelaySensor.h"
 
-UdpMinDelaySensor::UdpMinDelaySensor(UdpState &udpStateVal, ofstream &outStreamVal)
+UdpMinDelaySensor::UdpMinDelaySensor(UdpState &udpStateVal, ofstream &logStreamVal)
 	: minDelay(ULONG_LONG_MAX),
 	udpStateInfo(udpStateVal),
-	outStream(outStreamVal)
+	logStream(logStreamVal)
+{
+
+}
+
+UdpMinDelaySensor::~UdpMinDelaySensor()
 {
 
 }
@@ -19,7 +24,7 @@ void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 {
         if(Len < globalConsts::minAckPacketSize)
         {
-                cout << "Error: UDP packet data sent to MinDelaySensor::localAck was less than the "
+                logStream << "ERROR::UDP packet data sent to MinDelaySensor::localAck was less than the "
                         " required minimum "<< globalConsts::minAckPacketSize << " bytes\n";
                 return;
         }
@@ -31,7 +36,7 @@ void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 
 	unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
 	unsigned short int echoedPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::USHORT_INT_SIZE);
-	unsigned long long echoedTimestamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE);
+	unsigned long long echoedTimestamp = *(unsigned long long *)(packetData + 1 + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE);
 
 	unsigned long long oneWayDelay;
 	bool eventFlag = false;
@@ -73,8 +78,8 @@ void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 	// Send an event message to the monitor to change the value of minimum one way delay.
 	if(eventFlag == true)
 	{
-		cout << "New Min delay = " << minDelay << "\n";
+		logStream << "VALUE::New Min delay = " << minDelay << "\n";
 	}
-	outStream << "MIND:TIME="<<timeStamp<<",MIND="<<minDelay<<endl;
+	logStream << "MIND:TIME="<<timeStamp<<",MIND="<<minDelay<<endl;
 	udpStateInfo.minDelay = minDelay;
 }

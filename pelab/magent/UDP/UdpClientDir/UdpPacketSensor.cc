@@ -1,8 +1,9 @@
 #include "UdpPacketSensor.h"
 
-UdpPacketSensor::UdpPacketSensor(UdpState &udpStateVal)
+UdpPacketSensor::UdpPacketSensor(UdpState &udpStateVal, ofstream &logStreamVal)
 	:udpStateInfo(udpStateVal),
-	lastSeenSeqNum(-1)
+	lastSeenSeqNum(-1),
+	logStream(logStreamVal)
 {
 
 }
@@ -20,7 +21,7 @@ void UdpPacketSensor::localSend(char *packetData, int Len, int overheadLen, unsi
 
 	if(Len < minSize)
 	{
-		cout << "Error: UDP packet data sent to PacketSensor::localSend was less than the "
+		logStream << "ERROR::UDP packet data sent to PacketSensor::localSend was less than the "
 			" required minimum "<< minSize << " bytes\n";
 		return;
 	}
@@ -43,6 +44,7 @@ void UdpPacketSensor::localSend(char *packetData, int Len, int overheadLen, unsi
 
 				sentPacketList.push_back(tmpPacketInfo);
 			}
+			udpStateInfo.libpcapSendLoss += (seqNum - lastSeenSeqNum - 1);
 		}
 	}
 
@@ -60,7 +62,7 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 {
 	if(Len < globalConsts::minAckPacketSize)
 	{
-		cout << "Error: UDP packet data sent to PacketSensor::localAck was less than the "
+		logStream << "ERROR::UDP packet data sent to PacketSensor::localAck was less than the "
 			" minimum "<< globalConsts::minAckPacketSize << " bytes\n";
 		return;
 	}
@@ -75,7 +77,7 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 
 	if(listIterator == sentPacketList.end())
 	{
-		cout << "WARNING: Unknown seq number "<<seqNum<<" is being ACKed. "
+		logStream << "WARNING::Unknown seq number "<<seqNum<<" is being ACKed. "
 			"We might have received "
 			" a reordered ACK, which has already been ACKed using redundant ACKs .\n";
 		udpStateInfo.ackError = true;
@@ -158,18 +160,21 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 
 	if( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator ))
 	{
+		logStream<<"STAT::Packet being ACKed = "<<seqNum<<endl;
 
 		do{
+			logStream<<"STAT::Lost packet seqnum = "<<(*listIterator).seqNum<<endl;
 			sentPacketList.erase(listIterator);
 			listIterator = sentPacketList.end();
 
 			udpStateInfo.packetLoss++;
+			udpStateInfo.totalPacketLoss++;
 
 			listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), seqNum )); 
 
 		}
 		while( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator) );
-
+		logStream<<"STAT::Total packet loss = "<<udpStateInfo.totalPacketLoss<<"\n"<<endl;
 	}
 
 	sentPacketList.erase(curPacketIterator);
