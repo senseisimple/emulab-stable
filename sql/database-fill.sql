@@ -573,7 +573,15 @@ REPLACE INTO table_regex VALUES ('nseconfigs','vname','text','redirect','virt_no
 REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\011\\015]*$',0,16777215,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
 REPLACE INTO table_regex VALUES ('projects','newpid','text','regex','^[a-zA-Z][-a-zA-Z0-9]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('projects','head_uid','text','redirect','users:uid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('projects','name','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','funders','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','public','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('projects','linked_to_us','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('projects','public_whynot','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','default_user_interface','text','regex','^(emulab|plab)$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[-\\w]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('projects','URL','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);

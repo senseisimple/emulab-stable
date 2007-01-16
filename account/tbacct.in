@@ -24,7 +24,8 @@ use Getopt::Std;
 sub usage()
 {
     print("Usage: tbacct [-f] [-b] ".
-	  "<add|del|mod|passwd|wpasswd|email|freeze|thaw> <user> [args]\n");
+	  "<add|del|mod|passwd|wpasswd|email|freeze|thaw|verify> ".
+	  "<user> [args]\n");
     exit(-1);
 }
 my $optlist = "fb";
@@ -135,6 +136,7 @@ sub UpdateWindowsPassword();
 sub UpdateUser(;$);
 sub FreezeUser();
 sub ThawUser();
+sub VerifyUser();
 sub UpdateEmail();
 sub CheckDotFiles();
 sub GenerateSFSKey();
@@ -181,7 +183,7 @@ if ($user =~ /^([-\w]+)$/i) {
 else {
     die("Tainted argument: $user\n");
 }
-if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw|email)$/) {
+if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw|email|verify)$/) {
     $cmd = $1;
 }
 else {
@@ -211,7 +213,7 @@ if (getpwuid($UID) eq "nobody") {
     $this_user = $target_user;
 }
 else {
-    $this_user = User->LookupByUnixId($UID);
+    $this_user = User->ThisUser();
 
     if (! defined($this_user)) {
 	fatal("You ($UID) do not exist!");
@@ -300,6 +302,10 @@ SWITCH: for ($cmd) {
     };
     /^thaw$/ && do {
 	ThawUser();
+	last SWITCH;
+    };
+    /^verify$/ && do {
+	VerifyUser();
 	last SWITCH;
     };
 }
@@ -865,6 +871,34 @@ sub ThawUser()
     $sfsupdate = 1;
 
     return UpdateUser(0);
+}
+
+#
+# Verify a user. Converts status and sends email
+#
+sub VerifyUser()
+{
+    #
+    # Only admin people can do this unless its the user himself.
+    #
+    if (! $target_user->SameUser($this_user) && ! TBAdmin()) {
+	fatal("You do not have permission to verify user $user.");
+    }
+
+    if ($target_user->status() ne USERSTATUS_NEWUSER) {
+	fatal("$user is not a newuser! Cannot verify the account!");
+    }
+
+    my $newstatus = ($target_user->wikionly() ?
+		     USERSTATUS_ACTIVE() : USERSTATUS_UNAPPROVED());
+
+    $target_user->SetStatus($newstatus) == 0 or
+	fatal("Could not set user status to '$newstatus' for $target_user");
+
+    $target_user->SendVerifiedEmail() == 0 or
+	fatal("Could not send verified email for $target_user");
+
+    return 0;
 }
 
 #

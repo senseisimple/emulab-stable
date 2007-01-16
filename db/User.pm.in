@@ -618,9 +618,9 @@ sub SetPassword($$$)
 }
 
 #
-# User approved; find users groups and send email.
+# User verified; find users groups and send email.
 #
-sub SendApprovalEmail($)
+sub SendVerifiedEmail($)
 {
     my ($self) = @_;
 

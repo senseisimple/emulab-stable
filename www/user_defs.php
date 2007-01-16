@@ -427,6 +427,81 @@ class User
 	return $newuser;
     }
 
+    function NewNewUser($flags, $args, &$error) {
+	global $suexec_output, $suexec_output_array;
+	$typearg = "";
+
+	if ($flags & TBDB_NEWACCOUNT_PROJLEADER)
+	    $typearg = "-t leader";
+	elseif ($flags & TBDB_NEWACCOUNT_WIKIONLY)
+	    $typearg = "-t wikionly";
+	elseif ($flags & TBDB_NEWACCOUNT_WEBONLY)
+	    $typearg = "-t webonly";
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "newuser");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $error = "Transient error; please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $error = "Transient error; please try again later.";
+	    return null;
+	}
+
+	fwrite($fp, "<user>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</user>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	$retval = SUEXEC("nobody", "nobody", "webnewuser $typearg $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$error = "Transient error; please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		$error = $suexec_output;
+	    }
+	    return null;
+	}
+
+        #
+        # Parse the last line of output. Ick.
+        #
+	unset($matches);
+	
+	if (!preg_match("/^User\s+(\w+)\/(\d+)\s+/",
+			$suexec_output_array[count($suexec_output_array)-1],
+			$matches)) {
+	    $error = "Transient error; please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    return null;
+	}
+	$uid_idx = $matches[2];
+	$newuser = User::Lookup($uid_idx);
+	if (! $newuser) {
+	    $error = "Transient error; please try again later.";
+	    TBERROR("Could not lookup new user $uid_idx", 0);
+	    return null;
+	}
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then create the user by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return $newuser;	    
+    }    
+
     #
     # Delete a user, but JUST from the users table. 
     #

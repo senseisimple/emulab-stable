@@ -171,22 +171,25 @@ if (defined($user)) {
     $user_email = $target_user->email();
     $user_dbid  = $target_user->dbid();
     $user_uid   = $target_user->uid();
+    $USERUID    = $user_uid;
 }
 
 #
-# If invoked as "nobody" its for a user with no actual account.
+# If invoked as "nobody" we came from the web interface. We have to have
+# a credential in the environment, unless its just a key verification
+# operation, which anyone can do. 
 # 
 if (getpwuid($UID) eq "nobody") {
-    if ($initmode || $genmode) {
-	fatal("Bad usage as 'nobody'");
+    $this_user = User->ImpliedUser();
+    
+    if (($initmode || $genmode || !$verify) && !defined($this_user)) {
+	fatal("Bad usage from web interface");
     }
     $nobody = 1;
 }
 else {
-    $USERUID = getpwnam($user);
-
-    # Map invoking user to object.
-    $this_user = User->LookupByUnixId($UID);
+    # From the command line; map invoking user to object.
+    $this_user = User->ThisUser();
 
     if (! defined($this_user)) {
 	fatal("You ($UID) do not exist!");
@@ -194,16 +197,17 @@ else {
 }
 
 #
-# Initmode or genmode, do it and exit.
+# Initmode or genmode, do it and exit. Eventually get rid of the switch
+# to the target user.
 #
 if ($initmode) {
     # Drop root privs, switch to target user.
-    $EUID = $USERUID;
+    $EUID = $UID = $USERUID;
     exit InitUser();
 }
 if ($genmode) {
     # Drop root privs, switch to target user.
-    $EUID = $USERUID;
+    $EUID = $UID = $USERUID;
     exit GenerateKeyFile();
 }
 
@@ -235,10 +239,12 @@ else {
 #
 if (!$verify) {
     # If its the user himself, then we can generate a new authkeys file. 
-    if (!$nobody && !TBAdmin() && !$target_user->SameUser($this_user)) {
+    if (!$target_user->SameUser($this_user) && !TBAdmin()) {
 	fatal("You are not allowed to set pubkeys for $target_user\n");
     }
     if (-d "$HOMEDIR/$user_uid/.ssh") {
+	# Drop root privs, switch to target user.
+	$EUID = $UID = $USERUID;
 	$genmode = 1;
     }
     
@@ -248,11 +254,6 @@ if (!$verify) {
     # keys.
     #
     AuditStart(0);
-}
-
-# Drop root privs, switching to user.
-if (!$nobody) {
-    $EUID = $USERUID;
 }
 
 #

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -139,7 +139,7 @@ DBQueryFatal("delete from user_pubkeys ".
 # will complain and die!
 #
 if (HASREALACCOUNT($target_uid)) {
-    ADDPUBKEY($uid, "webaddpubkey -w $target_uid");
+    ADDPUBKEY("-w $target_uid");
 }
 
 header("Location: " . CreateURL("showpubkeys", $target_user));

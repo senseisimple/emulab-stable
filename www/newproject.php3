@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -869,74 +869,6 @@ if (count($errors)) {
     return;
 }
 
-# Okay, do pubkey checks.
-if (!$returning) {
-    #
-    # Pub Key.
-    #
-    if (isset($formfields[usr_key]) &&
-	strcmp($formfields[usr_key], "")) {
-        #
-        # This is passed off to the shell, so taint check it.
-        # 
-	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	    $errors["PubKey"] = "Invalid characters";
-	}
-	else {
-            #
-            # Replace any embedded newlines first.
-            #
-	    $formfields[usr_key] =
-		ereg_replace("[\n]", "", $formfields[usr_key]);
-	    $usr_key = $formfields[usr_key];
-
-            #
-            # Verify key format.
-            #
-	    if (ADDPUBKEY(null, "webaddpubkey -n -k '$usr_key' ")) {
-		$errors["Pubkey Format"] =
-		    "Could not be parsed. Is it a public key?";
-	    }
-	    else {
-		$addpubkeyargs = "-k '$usr_key' ";
-	    }
-	}
-    }
-
-    #
-    # If usr provided a file for the key, it overrides the paste in text.
-    #
-    if (isset($_FILES['usr_keyfile']) &&
-	$_FILES['usr_keyfile']['name'] != "" &&
-	$_FILES['usr_keyfile']['name'] != "none") {
-
-	$localfile = $_FILES['usr_keyfile']['tmp_name'];
-
-	if (! stat($localfile)) {
-	    $errors["PubKey File"] = "No such file";
-	}
-        # Taint check shell arguments always! 
-	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
-	    $errors["PubKey File"] = "Invalid characters";
-	}
-	else {
-	    chmod($localfile, 0644);
-
-            #
-            # Verify key format.
-            #
-	    if (ADDPUBKEY(null, "webaddpubkey -n $localfile ")) {
-		$errors["Pubkey Format"] =
-		    "Could not be parsed. Is it a public key?";
-	    }
-	    else {
-		$addpubkeyargs = "$localfile";
-	    }
-	    
-	}
-    }
-}
-
 # Done with sanity checks!
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
@@ -948,235 +880,105 @@ if (count($errors)) {
 # Certain of these values must be escaped or otherwise sanitized.
 #
 if (!$returning) {
-    $proj_head_uid     = (($USERSELECTUIDS ||
-			   $FirstInitState == "createproject") ?
-			  $formfields[proj_head_uid] : null);
-    $usr_title         = addslashes($formfields[usr_title]);
-    $usr_name          = addslashes($formfields[usr_name]);
-    $usr_affil         = addslashes($formfields[usr_affil]);
-    $usr_email         = $formfields[usr_email];
-    $usr_addr          = addslashes($formfields[usr_addr]);
-    $usr_city          = addslashes($formfields[usr_city]);
-    $usr_state         = addslashes($formfields[usr_state]);
-    $usr_zip           = addslashes($formfields[usr_zip]);
-    $usr_country       = addslashes($formfields[usr_country]);
-    $usr_phone         = $formfields[usr_phone];
-    $password1         = $formfields[password1];
-    $password2         = $formfields[password2];
-    $wikiname          = ($WIKISUPPORT ? $formfields[wikiname] : "");
-    $usr_returning     = "No";
-
-    if (! isset($formfields[usr_URL]) ||
-	strcmp($formfields[usr_URL], "") == 0 ||
-	strcmp($formfields[usr_URL], $HTTPTAG) == 0) {
-	$usr_URL = "";
-    }
-    else {
-	$usr_URL = addslashes($formfields[usr_URL]);
-    }
-    
-    if (! isset($formfields[usr_addr2])) {
-	$usr_addr2 = "";
-    }
-    else {
-	$usr_addr2 = addslashes($formfields[usr_addr2]);
-    }
-
     $args = array();
-    $args["usr_expires"]   = $proj_expires;
-    $args["usr_name"]	   = $usr_name;
-    $args["usr_email"]     = $usr_email;
-    $args["usr_addr"]      = $usr_addr;
-    $args["usr_addr2"]     = $usr_addr2;
-    $args["usr_city"]      = $usr_city;
-    $args["usr_state"]     = $usr_state;
-    $args["usr_zip"]       = $usr_zip;
-    $args["usr_country"]   = $usr_country;
-    $args["usr_URL"]       = $usr_URL;
-    $args["usr_phone"]     = $usr_phone;
-    $args["usr_shell"]     = 'tcsh';
-    $args["usr_title"]     = $usr_title;
-    $args["usr_affil"]     = $usr_affil;
-    $args["usr_pswd"]      = crypt("$password1");
-    $args["wikiname"]      = $wikiname;
+    $args["name"]	   = $formfields[usr_name];
+    $args["email"]         = $formfields[usr_email];
+    $args["address"]       = $formfields[usr_addr];
+    $args["address2"]      = $formfields[usr_addr2];
+    $args["city"]          = $formfields[usr_city];
+    $args["state"]         = $formfields[usr_state];
+    $args["zip"]           = $formfields[usr_zip];
+    $args["country"]       = $formfields[usr_country];
+    $args["phone"]         = $formfields[usr_phone];
+    $args["shell"]         = 'tcsh';
+    $args["title"]         = $formfields[usr_title];
+    $args["affiliation"]   = $formfields[usr_affil];
+    $args["password"]      = $formfields[password1];
+    $args["wikiname"]      = ($WIKISUPPORT ? $formfields[wikiname] : "");
 
-    if (! ($leader = User::NewUser($proj_head_uid,
-				   TBDB_NEWACCOUNT_PROJLEADER, $args))) {
-	TBERROR("Could not create new user '$usr_email'!", 1);
+    if (isset($formfields[usr_URL]) &&
+	$formfields[usr_URL] != $HTTPTAG && $formfields[usr_URL] != "") {
+	$args["URL"] = $formfields[usr_URL];
+    }
+    if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	$args["login"] = $formfields[proj_head_uid];
+    }
+
+    # Backend verifies pubkey and returns error.
+    if (isset($_FILES['usr_keyfile']) &&
+	$_FILES['usr_keyfile']['name'] != "" &&
+	$_FILES['usr_keyfile']['name'] != "none") {
+
+	$localfile = $_FILES['usr_keyfile']['tmp_name'];
+	$args["pubkey"] = file_get_contents($localfile);
+    }
+    elseif (isset($formfields['usr_key']) &&
+	    $formfields['usr_key'] != "") {
+	$args["pubkey"] = $formfields[usr_key];
+    }
+
+    if (! ($leader = User::NewNewUser(TBDB_NEWACCOUNT_PROJLEADER,
+				      $args,
+				      $error)) != 0) {
+	$errors["Error Creating User"] = $error;
+	SPITFORM($formfields, $returning, $errors);
+	PAGEFOOTER();
+	return;
     }
     # If null; used below
     $proj_head_uid = $leader->uid();
-
-    if (isset($addpubkeyargs)) {
-	ADDPUBKEY($proj_head_uid,
-		  "webaddpubkey -u $proj_head_uid $addpubkeyargs");
-    }
 }
 else {
     $leader = $this_user;
-    $usr_title	   = $leader->title();
-    $usr_name	   = $leader->name();
-    $usr_affil	   = $leader->affil();
-    $usr_email	   = $leader->email();
-    $usr_addr	   = $leader->addr();
-    $usr_addr2     = $leader->addr2();
-    $usr_city	   = $leader->city();
-    $usr_state	   = $leader->state();
-    $usr_zip	   = $leader->zip();
-    $usr_country   = $leader->country();
-    $usr_phone	   = $leader->phone();
-    $usr_URL       = $leader->URL();
-    $wikiname      = $leader->wikiname();
-    $usr_returning = "Yes";
 }
-
-# And the project details.
-$pid               = $formfields[pid];
-$proj_name	   = addslashes($formfields[proj_name]);
-$proj_URL          = addslashes($formfields[proj_URL]);
-$proj_funders      = addslashes($formfields[proj_funders]);
-$proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
-$proj_members      = $formfields[proj_members];
-$proj_pcs          = $formfields[proj_pcs];
-$proj_why	   = addslashes($formfields[proj_why]);
-$proj_expires      = date("Y:m:d", time() + (86400 * 120));
-
-if (!isset($formfields[proj_public]) ||
-    strcmp($formfields[proj_public], "checked")) {
-    $proj_public = "No";
-    $public = 0;
-}
-else {
-    $proj_public = "Yes";
-    $public = 1;
-}
-if (!isset($formfields[proj_linked]) ||
-    strcmp($formfields[proj_linked], "checked")) {
-    $proj_linked = "No";
-    $linked = 0;
-}
-else {
-    $proj_linked = "Yes";
-    $linked = 1;
-}
-if (isset($formfields[proj_plabpcs]) &&
-    $formfields[proj_plabpcs] == "checked") {
-    $proj_plabpcs = "Yes";
-    $plabpcs = 1;
-}
-else {
-    $proj_plabpcs = "No";
-    $plabpcs = 0;
-}
-if (isset($formfields[proj_ronpcs]) &&
-    $formfields[proj_ronpcs] == "checked") {
-    $proj_ronpcs = "Yes";
-    $ronpcs = 1;
-}
-else {
-    $proj_ronpcs = "No";
-    $ronpcs = 0;
-}
-
 
 #
 # Now for the new Project
 #
 $args = array();
-$args["expires"]       = $proj_expires;
-$args["name"]	       = $proj_name;
-$args["URL"]           = $proj_URL;
-$args["num_members"]   = $proj_members;
-$args["num_pcs"]       = $proj_pcs;
-$args["why"]           = $proj_why;
-$args["funders"]       = $proj_funders;
-$args["num_pcplab"]    = $plabpcs;
-$args["num_ron"]       = $ronpcs;
-$args["public"]        = $public;
-$args["public_whynot"] = $proj_whynotpublic;
-$args["linked_to_us"]  = $linked;
+$args["name"]              = $formfields["pid"];
+$args["short description"] = $formfields["proj_name"];
+$args["URL"]               = $formfields["proj_URL"];
+$args["members"]           = $formfields["proj_members"];
+$args["num_pcs"]           = $formfields["proj_pcs"];
+$args["long description"]  = $formfields["proj_why"];
+$args["funders"]           = $formfields["proj_funders"];
+$args["whynotpublic"]      = $formfields["proj_whynotpublic"];
 
-if (! ($project = Project::NewProject($pid, $leader, $args))) {
-	TBERROR("Could not create new project '$pid'!", 1);
-}
-
-#
-# If a new user, do not send the full blown message until verified.
-#
-if ($returning || $FirstInitState) {
-    $unix_gid  = $project->unix_gid();
-    $unix_name = $project->unix_name();
-
-    #
-    # The mail message to the approval list.
-    # 
-    TBMAIL($TBMAIL_APPROVAL,
-	   "New Project '$pid' ($proj_head_uid)",
-	   "'$usr_name' wants to start project '$pid'.\n".
-	   "\n".
-	   "Name:            $usr_name ($proj_head_uid)\n".
-	   "Returning User?: $usr_returning\n".
-	   "Email:           $usr_email\n".
-	   "User URL:        $usr_URL\n".
-	   "Project:         $proj_name\n".
-	   "Expires:         $proj_expires\n".
-	   "Project URL:     $proj_URL\n".
-	   "Public URL:      $proj_public\n".
-	   "Why Not Public:  $proj_whynotpublic\n".
-	   "Link to Us?:     $proj_linked\n".
-	   "Funders:         $proj_funders\n".
-	   "Job Title:       $usr_title\n".
-	   "Affiliation:     $usr_affil\n".
-	   "Address 1:       $usr_addr\n".
-	   "Address 2:       $usr_addr2\n".
-	   "City:            $usr_city\n".
-	   "State:           $usr_state\n".
-	   "ZIP/Postal Code: $usr_zip\n".
-	   "Country:         $usr_country\n".
-	   "Phone:           $usr_phone\n".
-	   "Members:         $proj_members\n".
-	   "PCs:             $proj_pcs\n".
-	   "Planetlab PCs:   $proj_plabpcs\n".
-	   "RON PCs:         $proj_ronpcs\n".
-	   "Unix GID:        $unix_name ($unix_gid)\n".
-	   "Reasons:\n$proj_why\n\n".
-	   "Please review the application and when you have made a \n".
-	   "decision, go to $TBWWW and\n".
-	   "select the 'Project Approval' page.\n\n".
-	   "They are expecting a result within 72 hours.\n", 
-	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-	   "Reply-To: $TBMAIL_APPROVAL\n".
-	   "Errors-To: $TBMAIL_WWW");
+if (!isset($formfields[proj_public]) ||
+    $formfields[proj_public] != "checked") {
+    $args["public"] = 0;
 }
 else {
-    TBMAIL($TBMAIL_APPROVAL,
-	   "New Project '$pid' ($proj_head_uid)",
-	   "'$usr_name' wants to start project '$pid'.\n".
-	   "\n".
-	   "Name:            $usr_name ($proj_head_uid)\n".
-	   "Email:           $usr_email\n".
-	   "Returning User?: No\n".
-	   "\n".
-	   "No action is necessary until the user has verified the account.\n",
-	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-	   "Reply-To: $TBMAIL_APPROVAL\n".
-	   "Errors-To: $TBMAIL_WWW");
+    $args["public"] = 1;
+}
+if (!isset($formfields[proj_linked]) ||
+    $formfields[proj_linked] != "checked") {
+    $args["linkedtous"] = 0;
+}
+else {
+    $args["linkedtous"] = 1;
+}
+if (isset($formfields[proj_plabpcs]) &&
+    $formfields[proj_plabpcs] == "checked") {
+    $args["plab"] = 1;
+}
+if (isset($formfields[proj_ronpcs]) &&
+    $formfields[proj_ronpcs] == "checked") {
+    $args["ron"] = 1;
 }
 
+if (! ($project = Project::NewNewProject($leader, $args, $error))) {
+    $errors["Error Creating Project"] = $error;
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Need to do some extra work for the first project; eventually move to backend
+# 
 if ($FirstInitState) {
-    #
-    # The first user gets admin status and some extra groups, etc.
-    #
-    DBQueryFatal("update users set ".
-		 "  admin=1,status='". TBDB_USERSTATUS_UNAPPROVED . "' " .
-		 "where uid='$proj_head_uid'");
-
-    DBQueryFatal("insert into unixgroup_membership set ".
-		 "uid='$proj_head_uid', gid='wheel'");
-    
-    DBQueryFatal("insert into unixgroup_membership set ".
-		 "uid='$proj_head_uid', gid='$TBADMINGROUP'");
-
     Group::Initialize($proj_head_uid, $pid);
     
     #

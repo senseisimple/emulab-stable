@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -676,73 +676,6 @@ if (count($errors)) {
     return;
 }
 
-# Okay, do pubkey checks.
-if (!$returning && !$forwikionly) {
-    #
-    # Pub key provided in form (paste in).
-    #
-    if (isset($formfields[usr_key]) &&
-	strcmp($formfields[usr_key], "")) {
-        #
-        # This is passed off to the shell, so taint check it.
-        # 
-	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	    $errors["PubKey"] = "Invalid characters";
-	}
-	else {
-            #
-            # Replace any embedded newlines first.
-            #
-	    $formfields[usr_key] =
-		ereg_replace("[\n]", "", $formfields[usr_key]);
-	    $usr_key = $formfields[usr_key];
-
-            #
-            # Verify key format.
-            #
-	    if (ADDPUBKEY(null, "webaddpubkey -n -k '$usr_key' ")) {
-		$errors["Pubkey Format"] =
-		    "Could not be parsed. Is it a public key?";
-	    }
-	    else {
-		$addpubkeyargs = "-k '$usr_key' ";
-	    }
-	}
-    }
-
-    #
-    # If usr provided a file for the key, it overrides the paste in text.
-    #
-    if (isset($_FILES['usr_keyfile']) &&
-	$_FILES['usr_keyfile']['name'] != "" &&
-	$_FILES['usr_keyfile']['name'] != "none") {
-
-	$localfile = $_FILES['usr_keyfile']['tmp_name'];
-
-	if (! stat($localfile)) {
-	    $errors["PubKey File"] = "No such file";
-	}
-        # Taint check shell arguments always! 
-	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
-	    $errors["PubKey File"] = "Invalid characters";
-	}
-	else {
-	    chmod($localfile, 0644);
-
-            #
-            # Verify key format.
-            #
-	    if (ADDPUBKEY(null, "webaddpubkey -n $localfile ")) {
-		$errors["Pubkey Format"] =
-		    "Could not be parsed. Is it a public key?";
-	    }
-	    else {
-		$addpubkeyargs = "$localfile";
-	    }
-	}
-    }
-}
-
 #
 # Need the user, project and group objects for the rest of this.
 #
@@ -769,84 +702,57 @@ if (count($errors)) {
 }
 
 #
-# Create a new user.
+# Create a new user. We do this by creating a little XML file to pass to
+# the newuser script.
 #
 if (! $returning) {
-    #
-    # Certain of these values must be escaped or otherwise sanitized.
-    #
-    $joining_uid       = ($USERSELECTUIDS ? $formfields[joining_uid] : null);
-    $usr_name          = addslashes($formfields[usr_name]);
-    $usr_email         = $formfields[usr_email];
-    $password1         = $formfields[password1];
-    $password2         = $formfields[password2];
-    $wikiname          = ($WIKISUPPORT ? $formfields[wikiname] : "");
-
-    if (!$forwikionly) {
-	$usr_affil         = addslashes($formfields[usr_affil]);
-	$usr_title         = addslashes($formfields[usr_title]);
-	$usr_addr          = addslashes($formfields[usr_addr]);
-	$usr_city          = addslashes($formfields[usr_city]);
-	$usr_state         = addslashes($formfields[usr_state]);
-	$usr_zip           = addslashes($formfields[usr_zip]);
-	$usr_country       = addslashes($formfields[usr_country]);
-	$usr_phone         = $formfields[usr_phone];
-    }
-    else {
-	$usr_affil         = "";
-	$usr_title         = "";
-	$usr_addr          = "";
-	$usr_city          = "";
-	$usr_state         = "";
-	$usr_zip           = "";
-	$usr_country       = "";
-	$usr_phone         = "";
-    }
-
-    if (! isset($formfields[usr_URL]) ||
-	strcmp($formfields[usr_URL], "") == 0 ||
-	strcmp($formfields[usr_URL], $HTTPTAG) == 0) {
-	$usr_URL = "";
-    }
-    else {
-	$usr_URL = addslashes($formfields[usr_URL]);
-    }
-
-    if (! isset($formfields[usr_addr2])) {
-	$usr_addr2 = "";
-    }
-    else {
-	$usr_addr2 = addslashes($formfields[usr_addr2]);
-    }
-
     $args = array();
-    $args["usr_expires"]   = date("Y:m:d", time() + (86400 * 120));
-    $args["usr_name"]	   = $usr_name;
-    $args["usr_email"]     = $usr_email;
-    $args["usr_addr"]      = $usr_addr;
-    $args["usr_addr2"]     = $usr_addr2;
-    $args["usr_city"]      = $usr_city;
-    $args["usr_state"]     = $usr_state;
-    $args["usr_zip"]       = $usr_zip;
-    $args["usr_country"]   = $usr_country;
-    $args["usr_URL"]       = $usr_URL;
-    $args["usr_phone"]     = $usr_phone;
-    $args["usr_shell"]     = 'tcsh';
-    $args["usr_title"]     = $usr_title;
-    $args["usr_affil"]     = $usr_affil;
-    $args["usr_pswd"]      = crypt("$password1");
-    $args["wikiname"]      = $wikiname;
+    $args["name"]	   = $formfields[usr_name];
+    $args["email"]         = $formfields[usr_email];
+    $args["address"]       = $formfields[usr_addr];
+    $args["address2"]      = $formfields[usr_addr2];
+    $args["city"]          = $formfields[usr_city];
+    $args["state"]         = $formfields[usr_state];
+    $args["zip"]           = $formfields[usr_zip];
+    $args["country"]       = $formfields[usr_country];
+    $args["phone"]         = $formfields[usr_phone];
+    $args["shell"]         = 'tcsh';
+    $args["title"]         = $formfields[usr_title];
+    $args["affiliation"]   = $formfields[usr_affil];
+    $args["password"]      = $formfields[password1];
+    $args["wikiname"]      = ($WIKISUPPORT ? $formfields[wikiname] : "");
 
-    if (! ($user = User::NewUser($joining_uid,
-				 ($forwikionly ? TBDB_NEWACCOUNT_WIKIONLY : 0),
-				 $args))) {
-	TBERROR("Could not create new user '$usr_email'!", 1);
+    if (isset($formfields[usr_URL]) &&
+	$formfields[usr_URL] != $HTTPTAG && $formfields[usr_URL] != "") {
+	$args["URL"] = $formfields[usr_URL];
+    }
+    if ($USERSELECTUIDS) {
+	$args["login"] = $formfields[joining_uid];
+    }
+
+    # Backend verifies pubkey and returns error.
+    if (!$forwikionly) {
+	if (isset($_FILES['usr_keyfile']) &&
+	    $_FILES['usr_keyfile']['name'] != "" &&
+	    $_FILES['usr_keyfile']['name'] != "none") {
+
+	    $localfile = $_FILES['usr_keyfile']['tmp_name'];
+	    $args["pubkey"] = file_get_contents($localfile);
+	}
+	elseif (isset($formfields['usr_key']) &&
+		$formfields['usr_key'] != "") {
+	    $args["pubkey"] = $formfields[usr_key];
+	}
+    }
+    if (! ($user = User::NewNewUser(($forwikionly ? TBDB_NEWACCOUNT_WIKIONLY : 0),
+				    $args,
+				    $error)) != 0) {
+	$errors["Error Creating User"] = $error;
+	SPITFORM($formfields, $returning, $errors);
+	PAGEFOOTER();
+	return;
     }
     $joining_uid = $user->uid();
-
-    if (!$forwikionly && isset($addpubkeyargs)) {
-	ADDPUBKEY($joining_uid, "webaddpubkey -u $joining_uid $addpubkeyargs");
-    }
 }
 
 #

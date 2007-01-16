@@ -717,7 +717,7 @@ if (!$returning) {
             #
             # Verify key format.
             #
-	    if (ADDPUBKEY(null, "webaddpubkey -n -k '$usr_key' ")) {
+	    if (ADDPUBKEY("-n -k '$usr_key' ")) {
 		$errors["Pubkey Format"] =
 		    "Could not be parsed. Is it a public key?";
 	    }
@@ -749,7 +749,7 @@ if (!$returning) {
             #
             # Verify key format.
             #
-	    if (ADDPUBKEY(null, "webaddpubkey -n $localfile ")) {
+	    if (ADDPUBKEY("-n $localfile ")) {
 		$errors["Pubkey Format"] =
 		    "Could not be parsed. Is it a public key?";
 	    }
@@ -867,7 +867,7 @@ if (!$returning) {
     $usr_dbid = $user->dbid();
 
     if (isset($addpubkeyargs)) {
-	ADDPUBKEY($usr_uid, "webaddpubkey -u $usr_uid $addpubkeyargs");
+	ADDPUBKEY("-u $usr_uid $addpubkeyargs");
     }
 }
 else {

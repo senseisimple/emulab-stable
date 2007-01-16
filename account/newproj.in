@@ -1,0 +1,306 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Create a new user from a XML description. 
+#
+sub usage()
+{
+    print("Usage: newproj <xmlfile>\n");
+    print("       newproj -m <pid_idx>\n");
+    exit(-1);
+}
+my $optlist = "dm:";
+my $debug   = 1;
+my $resend;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBBASE      = "@TBBASE@";
+my $TBWWW       = "@TBWWW@";
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($EUID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Project;
+use User;
+
+# Protos
+sub fatal($);
+sub UserError($);
+
+# Locals
+my $SAVEUID	= $UID;
+my $xmlfile;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"m"})) {
+    $resend = $options{"m"};
+
+    if ($resend =~ /^(\d*)$/) {
+	$resend = $1;
+    }
+    else {
+	fatal("Bad characters in -m option: $resend");
+    }
+}
+else {
+    usage()
+	if (@ARGV != 1);
+
+    $xmlfile  = shift(@ARGV);
+}
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and there
+# is no current user context.
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    fatal("You must have admin privledges to create new projects!")
+	if (!TBAdmin());
+}
+
+#
+# Resend email message and exit.
+#
+if (defined($resend)) {
+    my $project = Project->Lookup($resend);
+    fatal("Could not map project $resend to object!")
+	if (!defined($project));
+
+    exit($project->SendNewProjectEmail());
+}
+
+#
+# Check the filename when invoked from the web interface; must be a
+# file in /tmp.
+#
+if (! defined($this_user)) {
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my %required = ("name"		    => "pid",
+		"leader"	    => "head_uid",
+		"short description" => "name",
+		"URL"		    => "URL",
+		"funders"	    => "funders",
+		"long description"  => "why",
+		"public"	    => "public",
+		"num_pcs"	    => "num_pcs",
+		"linkedtous"	    => "linked_to_us");
+		
+my %optional = ("members"	 => "num_members",
+		"ron"            => "num_ron",
+		"plab"           => "num_pcplab",
+		"whynotpublic"	 => "public_whynot",
+		"user_interface" => "default_user_interface");
+
+#
+# This script is not audited cause we want the output to be sent back
+# to the web interface. Thats okay since we send email from the script
+# anyway.
+#
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+
+#
+# Make sure all the required arguments were provided.
+#
+foreach my $key (keys(%required)) {
+    
+    fatal("Missing required attribute '$key'")
+	if (! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+
+#
+# We build up an array of arguments to pass to User->Create() as we check
+# the attributes.
+#
+my %newproj_args = ();
+
+foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+
+    if ($debug) {
+	print STDERR "Project attribute: '$key' -> '$value'\n";
+    }
+
+    my $dbslot;
+
+    # Must be in the allowed lists above, with exceptions handled below
+    if (exists($required{$key})) {
+	$dbslot = $required{$key};
+	next
+	    if (!defined($dbslot));
+	fatal("Null value for required field $key")
+	    if (!defined($value));
+    }
+    elsif (exists($optional{$key})) {
+	$dbslot = $optional{$key};
+	next
+	    if (!defined($dbslot) || !defined($value));
+    }
+    else {
+	fatal("Invalid attribute in XML: '$key' -> '$value'\n");
+    }
+
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "projects", $dbslot,
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	UserError("Illegal data: $key - $value");
+    }
+
+    #
+    # Do a taint check to avoid warnings, since the values are abviously okay.
+    #
+    if ($value =~ /^(.*)$/) {
+	$value = $1;
+    }
+    $newproj_args{$dbslot} = $value;
+}
+
+#
+# Now do special checks.
+#
+UserError("Project already exists; pick another name!")
+    if (Project->Lookup($newproj_args{'pid'}));
+
+my $leader = User->Lookup($newproj_args{'head_uid'});
+UserError("Project leader does not exist!")
+    if (!defined($leader));
+   
+#
+# Now safe to create the project. Move the pid out of the argument array
+# since its actually an argument to the Create() routine. Ditto for the
+# project leader.
+#
+my $new_pid = $newproj_args{'pid'};
+delete($newproj_args{'pid'});
+delete($newproj_args{'head_uid'});
+
+my $newproj = Project->Create($new_pid, $leader, \%newproj_args);
+if (!defined($newproj)) {
+    fatal("Could not create new project!");
+}
+my $new_idx = $newproj->pid_idx();
+
+#
+# See if we are in an initial Emulab setup. If so, no email sent.
+#
+my $firstinitstate;
+TBGetSiteVar("general/firstinit/state", \$firstinitstate);
+
+#
+# Send the email notification.
+#
+$newproj->SendNewProjectEmail($firstinitstate eq "createproject");
+
+# The web interface requires this line to be printed!
+print "User $new_pid/$new_idx has been created\n";
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+sub UserError($) {
+    my($mesg) = $_[0];
+
+    print $mesg;
+    exit(1);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/(')/'\\''/g;
+    return $str;
+}
+	   
+
+	       

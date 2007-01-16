@@ -12,8 +12,10 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys
-LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert
+SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys \
+		  newuser newproj
+LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert \
+		  webnewuser webnewproj
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

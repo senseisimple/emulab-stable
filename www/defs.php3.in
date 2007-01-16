@@ -340,20 +340,16 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
     return $suexec_retval;
 }
 
-function ADDPUBKEY($uid, $cmdandargs) {
+#
+# We invoke addpubkey as user nobody all the time. The implied user is passed
+# along in an HTTP_ variable (see tbauth). This avoids a bunch of confusion
+# that results from new users who do not have a context yet. 
+#
+function ADDPUBKEY($cmdandargs) {
     global $TBSUEXEC_PATH;
 
-    #
-    # Complication. User might not have an actual account if setting or
-    # changing his own pubkeys. webonly, unapproved, and unverified users
-    # can still muck with their personal info. So, just invoke as user
-    # nobody. We will get audit email in case we need to track what has
-    # happened. 
-    #
-    if (!$uid || !HASREALACCOUNT($uid)) {
-	$uid = "nobody";
-    }
-    return SUEXEC($uid, "nobody", $cmdandargs, 0);
+    return SUEXEC("nobody", "nobody", "webaddpubkey $cmdandargs",
+		  SUEXEC_ACTION_CONTINUE);
 }
 
 #

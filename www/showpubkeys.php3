@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -324,7 +324,7 @@ if (count($errors)) {
 # Okay, first run the script in verify mode to see if the key is
 # parsable. If it is, then do it for real.
 #
-if (ADDPUBKEY($uid, "webaddpubkey -n -u $target_uid $addpubkeyargs")) {
+if (ADDPUBKEY("-n -u $target_uid $addpubkeyargs")) {
     $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -333,7 +333,7 @@ if (ADDPUBKEY($uid, "webaddpubkey -n -u $target_uid $addpubkeyargs")) {
 #
 # Insert key, update authkeys files and nodes if appropriate.
 #
-ADDPUBKEY($uid, "webaddpubkey -u $target_uid $addpubkeyargs");
+ADDPUBKEY("-u $target_uid $addpubkeyargs");
 
 #
 # Redirect back, avoiding a POST in the history.
