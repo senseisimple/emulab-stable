@@ -59,7 +59,7 @@ $(INSTALL_SBINDIR):
 # And then how to turn the template into the actual script. 
 $(LIBEXEC_STUFF): $(TESTBED_SRCDIR)/WEBtemplate.in
 	@echo "Generating $@"
-	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$@,' > $@
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$(subst web,,$@),' > $@
 
 clean:
 	rm -f *.o core

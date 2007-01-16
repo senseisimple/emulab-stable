@@ -76,7 +76,7 @@ $(INSTALL_SBINDIR) $(INSTALL_BINDIR):
 # And then how to turn the template into the actual script. 
 $(WEB_SBIN_SCRIPTS) $(WEB_BIN_SCRIPTS): $(TESTBED_SRCDIR)/WEBtemplate.in
 	@echo "Generating $@"
-	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$@,' > $@
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$(subst web,,$@),' > $@
 
 clean:
 
