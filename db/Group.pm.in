@@ -378,7 +378,12 @@ sub SendJoinEmail($$)
     my $allleaders  = $self->LeaderMailList();
     my $pid         = $self->pid();
     my $gid         = $self->gid();
-	     
+
+    $usr_addr2 = ""
+	if (!defined($usr_addr2));
+    $usr_URL = ""
+	if (!defined($usr_URL));
+
     SENDMAIL("$leader_name '$leader_uid' <$leader_email>",
 	     "$uid $pid Project Join Request",
 	     "$usr_name is trying to join your group $gid in project $pid.".
