@@ -65,10 +65,7 @@ my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
 
 # Locals
-my $user_name;
-my $user_email;
 my $template;
-my $dbuid;
 my $guid;
 my $vers;
 my $eid;
