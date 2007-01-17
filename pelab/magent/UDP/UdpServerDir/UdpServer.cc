@@ -42,7 +42,7 @@ unsigned long long milliSec = 0;
 
 int queueStartPtr = -1;
 int queueEndPtr = -1;
-const int ackQueueSize = 121;
+const int ackQueueSize = 71;
 const int minNoOfAcks = 3;
 struct udpAck ackQueue[ackQueueSize];
 
@@ -115,13 +115,13 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 	    {
 		    if(packetSeqNum > (curSeqNum + 1))
 		    {
-			    /*
 			    std::cout<<"Packet being ACKed = "<<packetSeqNum<<std::endl;
 			    packetLoss += (packetSeqNum - curSeqNum - 1);
 			    std::cout<<"Forward packet loss = "<<packetLoss<<std::endl;
 			    for(int k = 1;k < packetSeqNum - curSeqNum; k++)
-				    std::cout<<"Lost packet seqNum = "<<curSeqNum + 1<<"\n"<<std::endl;
-				    */
+				    std::cout<<"Lost packet seqNum = "<<curSeqNum + k<<"\n"<<std::endl;
+
+			    std::cout<<std::endl;
 		    }
 		    // Indicate that this is an ACK packet.
 		appAck[0] = '1';
@@ -150,9 +150,8 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		unsigned long long timeDiff = 0;
 
 		// Size of each redundant ACK - 2 bytes for sequence number + 2 bytes
-	       // for the packet size +	8 bytes for receiver timestamp + 8 bytes for
-		// echoing the sender timestamp.
-		int ackSize = 2*globalConsts::USHORT_INT_SIZE +  2*globalConsts::ULONG_LONG_SIZE;
+	       // for the packet size +	8 bytes for receiver timestamp 
+		int ackSize = 2*globalConsts::USHORT_INT_SIZE +  globalConsts::ULONG_LONG_SIZE;
 
 		if(queueStartPtr == -1 && queueEndPtr == -1)
 		{
@@ -183,6 +182,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		// packet being sent.
 		if(numAcks > minimumAcks)
 			numAcks = minimumAcks;
+		//printf("Num of Acks = %d\n", numAcks);
 
 		// Print in the second byte of the ACK how many redundant
 		// ACKs it is carrying.( minimum 3, maximum 121 )
@@ -208,6 +208,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 		for(int i = 0;i < numAcks; i++)
 		{
 			// Copy the seq. number this redun ACK is acking.
+//			printf("Copying redunAck = %u for seqNum = %u\n", ackQueue[(queueStartPtr + i)%ackQueueSize].seqNo, packetSeqNum);
 		    memcpy(&appAck[redunAckStart + i*ackSize], &ackQueue[(queueStartPtr + i)%ackQueueSize].seqNo, globalConsts::USHORT_INT_SIZE);
 
 		    // Copy the size of the packet being acked.
