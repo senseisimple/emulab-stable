@@ -47,7 +47,8 @@ FSBIN_STUFF	= exports_setup.proxy smbpasswd_setup.proxy
 
 WEB_SBIN_SCRIPTS= webrmproj webpanic webnode_update webrmgroup \
                   webnode_control webmkgroup websetgroups webmkproj \
-                  webrmuser webmodgroups webidleswap webnode_attributes \
+                  webrmuser webmodgroups webidleswap webnode_attributes
+
 WEB_BIN_SCRIPTS = webnscheck webendexp webtbreport webbatchexp \
 		  webnode_history webswapexp webeventsys_control \
 		  webnode_reboot webtarfiles_setup webarchive_control \
