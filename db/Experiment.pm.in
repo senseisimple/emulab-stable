@@ -491,16 +491,18 @@ sub Stringify($)
 }
 
 #
-# Check permissions
+# Check permissions. Allow for either uid or a user ref until all code
+# updated.
 #
 sub AccessCheck($$$)
 {
-    my ($self, $uid, $access_type) = @_;
+    my ($self, $user, $access_type) = @_;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
 
+    my $uid = (ref($user) ? $user->uid() : $user);
     my $pid = $self->pid();
     my $eid = $self->eid();
 

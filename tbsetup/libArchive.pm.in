@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX Need to deal with locking at some point ...
@@ -413,7 +413,7 @@ sub ArchiveAdd($$;$$$)
     # files in the target that are not present in the source). 
     #
     if (! -e "$checkin/$rootdir") {
-	mysystem("$MKDIR $checkin/$rootdir") == 0 or return -1;
+	mysystem("$MKDIR $checkin/$rootdir") == 0 or return -1
     }
     
     if (-f "/${sourcedir}/${sourcefile}" || !$exact) {
@@ -533,6 +533,108 @@ sub ArchiveSavePoint($;$$$)
 		"  archive_idx='$archive_idx', ".
 		"  tagtype='$TAGTYPE_SAVEPOINT', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
+
+  okay:
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return 0;
+
+  bad:
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return -1;
+}
+
+#
+# Add an informational tag to an archive, in the tags directory. This just
+# does a copy of the current trunk, and is intended to allow users to add
+# their own named tags as they like.
+#
+sub ArchiveTag($;$$$)
+{
+    my ($archive_idx, $savetag, $subdir, $view) = @_;
+    my $cwd;
+
+    $view = $defaultview
+	if (!defined($view));
+
+    return -1
+	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	    TBSCRIPTLOCK_OKAY());
+
+    #
+    # See if the archive exists and if it does, get the pathname to it.
+    #
+    my $directory;
+    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
+	print STDERR "ArchiveTag: ".
+	    "Archive '$archive_idx' does not exist in the DB!\n";
+	goto bad;
+    }
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ArchiveTag: $directory cannot be written!\n";
+	goto bad;
+    }
+    my $repodir   = "$directory/repo";
+
+    # Need to remember where we came from!
+    chomp($cwd = `pwd`);
+    # Must do the taint check too.
+    if ($cwd =~ /^([-\w\.\/]+)$/) {
+	$cwd = $1;
+    }
+    else {
+	print STDERR "ArchiveTag: Bad data in $cwd!\n";
+	goto bad;
+    }
+
+    # Tags must start with a letter.
+    if ($savetag =~ /^\d+/) {
+	$savetag = "T" . $savetag;
+    }
+
+    #
+    # Check to see if the subdir needs to be created. I cannot find a
+    # better way then the svn list command ...
+    #
+    if (defined($subdir)) {
+	my @tokens = split("/", $subdir);
+	my $path   = "";
+
+	while (@tokens) {
+	    my $token = shift(@tokens);
+
+	    $path = "$path/$token";
+
+	    mysystem("$SVN list file://$repodir/$view/tags${path} ".
+		     "  > /dev/null");
+	    if ($?) {
+		mysystem("$SVN mkdir $svnopt -m 'ArchiveTag mkdir' ".
+			 "          file://$repodir/$view/tags${path}")
+		    == 0 or goto bad;
+	    }
+	}
+
+	# Prepend subdir to tag
+	$savetag = "$subdir/$savetag";
+    }
+
+    # Check to make sure the complete path does not already exist
+    mysystem("$SVN list file://$repodir/$view/tags/${savetag} > /dev/null");
+    if (! $?) {
+	print STDERR "ArchiveTag: tag already exists!\n";
+	goto bad;
+    }
+    
+    #
+    # Create the tag ...
+    # 
+    mysystem("$SVN copy $svnopt -m 'ArchiveTag' ".
+	     "          file://$repodir/$view/trunk ".
+	     "          file://$repodir/$view/tags/${savetag}")
+	== 0 or goto bad;
 
   okay:
     TBScriptUnlock();
@@ -1949,6 +2051,56 @@ sub TBCommitExperimentArchive($$$;$$)
 		"Could not update user tag: $newtag\n";
 	}
     }
+    return 0;
+}
+
+#
+# Tag an experiment archive. 
+#
+sub TBTagExperimentArchive($$$;$$)
+{
+    my ($pid, $eid, $tagext, $usertagged, $subdir) = @_;
+    my ($archive_idx, $view);
+
+    return 0
+	if (!doarchiving($pid));
+    
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    #
+    # Need this below.
+    #
+    my $query_result =
+	DBQueryWarn("select s.rsrcidx from experiments as e ".
+		    "left join experiment_stats as s on e.idx=s.exptidx ".
+		    "where e.pid='$pid' and e.eid='$eid'");
+    if (!$query_result || !$query_result->numrows) {
+	return -1;
+    }
+    my ($rsrcidx) = $query_result->fetchrow_array();
+
+    #
+    # Derive a tag, unless its a user specified tag. In that case it
+    # has to be unique cause we are going to use the whole thing as is.
+    #
+    my $newtag;
+    if (! $usertagged) {
+	my ($seconds, $microseconds) = gettimeofday();
+	$newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
+	$newtag .= int($microseconds / 1000);
+	$newtag .= "_${tagext}";
+    }
+    else {
+	$newtag = $tagext;
+    }
+
+    return -1
+	if (ArchiveTag($archive_idx, $newtag, $subdir, $view) != 0);
+
     return 0;
 }
 

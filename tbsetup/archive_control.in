@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,10 +15,11 @@ sub usage()
     print STDERR
 	"Usage: archive_control [-f] [-t tag [-u]] [-m file] commit <pid> <eid>\n".
 	"       archive_control [-f] [-a] addfile <pid> <eid> [files ...]\n".
+	"       archive_control tag [-u] [-s subdir] <pid> <eid> <tag>\n".
 	"       archive_control checktag <pid> <eid> <tag>\n";
     exit(-1);
 }
-my $optlist = "dfat:m:u";
+my $optlist = "dfat:m:us:";
 my $debug   = 0;
 my $force   = 0;
 my $dbuid;
@@ -51,15 +52,17 @@ use libdb;
 use libtestbed;
 use libaudit;
 use libArchive;
+use User;
+use Experiment;
 
 my $SHAREROOT = SHAREROOT();
 
 #
-# Verify user and get his DB uid.
+# Map invoking user to object.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database!\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
 #
@@ -86,7 +89,7 @@ my $eid    = shift(@ARGV);
 #
 # Untaint args.
 #
-if ($action =~ /^(commit|addfile|checktag|list|missing|addtoarchive)$/) {
+if ($action =~ /^(commit|addfile|checktag|tag|list|missing|addtoarchive)$/) {
     $action = $1;
 }
 else {
@@ -105,15 +108,16 @@ else {
     die("Bad data in eid: $eid.");
 }
 
-if (! ($expstate = ExpState($pid, $eid))) {
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
     fatal("No such experiment $pid/$eid!");
 }
+$expstate = $experiment->state();
 
 #
-# Check permission. Only people with permission to destroy the experiment
-# can do this.
+# Check permission. 
 #
-if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_UPDATE)) {
+if (! $experiment->AccessCheck($this_user, TB_EXPT_UPDATE)) {
     fatal("You do not have permission to control the archive for $pid/$eid!");
 }
 
@@ -223,6 +227,43 @@ if ($action eq "commit") {
     if (libArchive::TBCommitExperimentArchive($pid, $eid, $tag,
 					      $usertag, $mfile) < 0) {
 	  fatal("Failed to commit experiment archive!");
+    }
+}
+elsif ($action eq "tag") {
+    usage()
+	if (! @ARGV);
+
+    my $tag = $ARGV[0];
+
+    if (! TBcheck_dbslot($tag, "archive_tags", "tag",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	fatal("Illegal characters in tag");
+    }
+    # Force a taint check; the library will escape it for the shell.
+    $tag =~ /(.*)/;
+    $tag = $1;
+
+    my $usertag = 0;
+    if (defined($options{"u"})) {
+	$usertag = 1;
+    }
+
+    # Subdir to place the tag into.
+    my $subdir = undef;
+    if (defined($options{"s"})) {
+	$subdir = $options{"s"};
+
+	if ($subdir =~ /^([-\w\/]+)$/) {
+	    $subdir = $1;
+	}
+	else {
+	    fatal("Illegal characters in subdir");
+	}
+    }
+    print "Adding tag $tag to the experiment archive ...\n";
+    if (libArchive::TBTagExperimentArchive($pid, $eid, $tag,
+					   $usertag, $subdir) < 0) {
+	  fatal("Failed to tag experiment archive!");
     }
 }
 elsif ($action eq "addfile") {

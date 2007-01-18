@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -469,6 +469,15 @@ if (defined($instance->runidx())) {
     $instance->FinalizeCurrentRun() == 0
 	or fatal(-1, "Could not finalize experiment run for $instance!");
 
+    #
+    # And create a tag (and subdir) for this. This is primarily a
+    # convenience function for the web interface. The tag is simply an
+    # alias to the current trunk and does not cause a savepoint or a
+    # commit.
+    #
+    system("$archcontrol -d -u -s runs/$this_runid tag $pid $eid stoprun")
+	== 0 or fatal(-1, "Could not tag archive!");
+    
     print "Experiment run '$this_runid' has been stopped.\n";    
 }
 
@@ -603,6 +612,14 @@ $experiment->CopyLogFiles()
 
 # We lose the log info for this commit.
 system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
+
+#
+# And create a tag (and subdir) for this. This is primarily a
+# convenience function for the web interface. The tag is simply an
+# alias to the current trunk and does not cause a savepoint or a
+# commit.
+#
+system("$archcontrol -d -u -s runs/$runid tag $pid $eid startrun");
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)

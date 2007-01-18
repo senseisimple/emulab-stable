@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -1135,6 +1135,17 @@ class TemplateInstance
 	if ($detailed) {
 	    $this->ShowRunList(1);
 	}
+
+	if ($detailed) {
+	    $archive_url =
+		"cvsweb/cvsweb.php3/$exptidx/tags/runs/?exptidx=$exptidx".
+		"&embedded=1";
+
+	    echo "<br>
+                  <iframe width=100% height=300
+                          scrolling=yes src='$archive_url' border=0>".
+                 "</iframe>\n";
+	}
     }
 
     #
@@ -1297,8 +1308,6 @@ class TemplateInstance
 	echo "<table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
 	echo "<tr>
-               <th align=center>Show</th>
-               <th align=center>Archive</th>
                <th>RunID</th>
                <th>ID</th>
                <th>Start Time</th>
@@ -1346,10 +1355,8 @@ class TemplateInstance
 		    MakeLink("run",
 			     "guid=$guid&version=$vers".
 			     "&exptidx=$exptidx&runidx=$runidx",
-			     "<img border=0 alt='i' src='greenball.gif'>");
+			     "$runid");
 	    echo " </td>
-                    <td align=center>$archive_link</td>
-                    <td>$runid</td>
   		    <td>$runidx</td>
                     <td>$start</td>
                     <td>$stop</td>
@@ -1394,6 +1401,7 @@ class TemplateInstance
 	$row   = mysql_fetch_array($query_result);
 	$start = $row['start_time'];
 	$stop  = $row['stop_time'];
+	$runid = $row['runid'];
 	$start_tag   = $row['starting_archive_tag'];
 	$end_tag     = $row['ending_archive_tag'];
 	$description = $row['description'];
@@ -1478,6 +1486,15 @@ class TemplateInstance
 	}
 	echo "</tr>\n";
 	echo "</table>\n";
+
+	$archive_url =
+	    "cvsweb/cvsweb.php3/$exptidx/tags/runs/$runid/?exptidx=$exptidx".
+	    "&embedded=1";
+
+	    echo "<br>
+                  <iframe width=100% height=300
+                          scrolling=yes src='$archive_url' border=0>".
+                 "</iframe>\n";
     }
 
     #

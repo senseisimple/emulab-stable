@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -206,11 +206,12 @@ $shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
             "HTTP_ACCEPT_ENCODING=$encoding ";
 
 if (isset($repodir)) {
-    $prog = ($use_viewvc ? webviewvc : webcvsweb);
+    $prog  = ($use_viewvc ? webviewvc : webcvsweb);
+    $embed = ($embedded ? "--embedded" : "");
     
     # I know, I added an argument to a script that is not supposed to
     # take any. So be it; it was easy.
-    $shellcmd .= "$TBSUEXEC_PATH $uid $pid $prog -repo $repodir";
+    $shellcmd .= "$TBSUEXEC_PATH $uid $pid $prog $embed --repo=$repodir";
 }
 else {
     $shellcmd .= "$script";

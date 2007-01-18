@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -384,6 +384,16 @@ if ($?) {
 $run = $instance->NewRun($eid, $instance->description());
 if (!defined($run)) {
     fatal(-1, "Could not create new experiment run for $instance!");
+}
+
+#
+# And create a tag (and subdir) for this run. This is primarily a convenience
+# function for the web interface. The tag is simply an alias to the current
+# trunk and does not cause a savepoint or a commit.
+#
+system("$archcontrol -u -s runs/$eid tag $pid $eid startrun");
+if ($?) {
+    fatal(-1, "Could not commit archive!");
 }
 
 #
