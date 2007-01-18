@@ -293,6 +293,7 @@ sub addNew($){
     #** check if this node satisfies the constraints **
 
     my $qstr = "select latency from pair_data ".
+                     "force index (unixstamp) ".
                      "where latency is not NULL and ".
                      "dstsite_idx=$siteidx and ".
                      "unixstamp > $t0 and ".
@@ -354,7 +355,6 @@ sub getNodeIDs($){
 # - bwConnB is 0, 1 / for bw from dst to src
 #
 sub checkConn($$){
-#    my ($srcnode, $dstnode)    = @_;
     my ($srcsite, $dstsite) = @_;
     my ($latConn, $bwConnF, $bwConnB) = (0,0,0);
     my $latTestStr= "> 0";
@@ -362,6 +362,7 @@ sub checkConn($$){
     my $bwTestStr = "> 0";
     
     my $qstr = "select * from pair_data ".
+                     "force index (unixstamp) ".
                      "where (latency $latTestStr  and ".
                      "unixstamp > $t0 and ".
                      "unixstamp < $t1) and ".
@@ -371,12 +372,14 @@ sub checkConn($$){
                      "dstsite_idx=$srcsite)) ".
                      "limit 1";
     my @results = getRows($qstr);
+    print "getRows (latency) finished for query\n$qstr\n";
     if( !scalar(@results) ){
     }else{
         $latConn = 1;
     }
     
     $qstr = "select * from pair_data ".
+        "force index (unixstamp) ".
             "where bw $bwTestStr and ".
             "unixstamp > $t0 and ".
             "unixstamp < $t1 and ".
@@ -390,6 +393,7 @@ sub checkConn($$){
     }
 
     $qstr = "select * from pair_data ".
+        "force index (unixstamp) ".
             "where bw $bwTestStr and ".
             "unixstamp > $t0 and ".
             "unixstamp < $t1 and ".
