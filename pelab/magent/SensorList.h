@@ -25,6 +25,10 @@
 #define SENSOR_LIST_H_STUB_2
 
 #include "Sensor.h"
+#include "UdpPacketSensor.h"
+#include "UdpThroughputSensor.h"
+#include "UdpMinDelaySensor.h"
+#include "UdpMaxDelaySensor.h"
 
 class SensorCommand;
 
@@ -38,6 +42,14 @@ class ThroughputSensor;
 class TSThroughputSensor;
 class EwmaThroughputSensor;
 class LeastSquaresThroughput;
+
+
+// Udp - CHANGES - Begin
+class UdpPacketSensor;
+class UdpThroughputSensor;
+class UdpMaxDelaySensor;
+class UdpMinDelaySensor;
+// Udp - CHANGES - End
 
 class SensorList
 {
@@ -66,6 +78,14 @@ private:
   void pushEwmaThroughputSensor(void);
   void pushLeastSquaresThroughput(void);
   void pushAverageThroughputSensor(void);
+
+  // Udp - CHANGES - Begin
+  void pushUdpPacketSensor(void);
+  void pushUdpThroughputSensor(void);
+  void pushUdpMinDelaySensor(void);
+  void pushUdpMaxDelaySensor(void);
+  // Udp - CHANGES - End
+
 private:
   // Example dependency
   NullSensor const * depNullSensor;
@@ -76,6 +96,14 @@ private:
   MinDelaySensor const * depMinDelaySensor;
   ThroughputSensor const * depThroughputSensor;
   TSThroughputSensor const * depTSThroughputSensor;
+
+  // Udp - CHANGES - Begin
+  UdpPacketSensor const * depUdpPacketSensor;
+  UdpThroughputSensor const * depUdpThroughputSensor;
+  UdpMinDelaySensor const * depUdpMinDelaySensor;
+  UdpMaxDelaySensor const * depUdpMaxDelaySensor;
+  // Udp - CHANGES - End
+
 };
 
 #endif

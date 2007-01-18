@@ -11,16 +11,16 @@ class UdpPacketSensor;
 class UdpMinDelaySensor:public Sensor{
 	public:
 
-		explicit UdpMinDelaySensor(UdpPacketSensor *udpPacketSensorVal);
+		explicit UdpMinDelaySensor(UdpPacketSensor const *udpPacketSensorVal);
 		~UdpMinDelaySensor();
 
-		unsigned long long getMinDelay();
+		unsigned long long getMinDelay() const;
 		void localSend(PacketInfo *packet);
 		void localAck(PacketInfo *packet);
 
 	private:
 		unsigned long long minDelay;
-		UdpPacketSensor *packetHistory;
+		UdpPacketSensor const *packetHistory;
 };
 
 #endif

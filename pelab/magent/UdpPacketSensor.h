@@ -4,8 +4,6 @@
 #include "lib.h"
 #include "Sensor.h"
 
-using namespace std;
-
 class UdpPacketInfo;
 class equalSeqNum;
 class Sensor;
@@ -19,14 +17,15 @@ class UdpPacketSensor:public Sensor{
     ~UdpPacketSensor();
     void localSend(PacketInfo *packet);
     void localAck(PacketInfo *packet);
-    bool isAckFake();
-    int getPacketLoss();
+    bool isAckFake() const;
+    int getPacketLoss() const;
+    std::vector<UdpPacketInfo> getAckedPackets() const;
 
-    vector< UdpPacketInfo > ackedPackets;
 
   private:
 
-    list<UdpPacketInfo> sentPacketList;
+    std::list<UdpPacketInfo> sentPacketList;
+    std::vector< UdpPacketInfo > ackedPackets;
 
     long lastSeenSeqNum;
     int packetLoss;

@@ -93,6 +93,18 @@ void SensorList::addSensor(SensorCommand const & newSensor)
   case AVERAGE_THROUGHPUT_SENSOR:
     pushAverageThroughputSensor();
     break;
+  case UDP_PACKET_SENSOR:
+    pushUdpPacketSensor();
+    break;
+  case UDP_THROUGHPUT_SENSOR:
+    pushUdpThroughputSensor();
+    break;
+  case UDP_MINDELAY_SENSOR:
+    pushUdpMinDelaySensor();
+    break;
+  case UDP_MAXDELAY_SENSOR:
+    pushUdpMaxDelaySensor();
+    break;
   default:
     logWrite(ERROR,
              "Incorrect sensor type (%d). Ignoring add sensor command.",
@@ -316,4 +328,76 @@ void SensorList::pushAverageThroughputSensor(void)
     new LeastSquaresThroughput(depTSThroughputSensor, depDelaySensor,
                                LeastSquaresThroughput::DEFAULT_MAX_PERIOD));
   pushSensor(current);
+}
+
+void SensorList::pushUdpPacketSensor()
+{
+  // Example dependency check
+  if (depUdpPacketSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpPacketSensor");
+    UdpPacketSensor * newSensor = new UdpPacketSensor();
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpPacketSensor = newSensor;
+  }
+
+}
+void SensorList::pushUdpThroughputSensor()
+{
+  pushUdpPacketSensor();
+
+  // Example dependency check
+  if (depUdpThroughputSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpThroughputSensor");
+    UdpThroughputSensor * newSensor = new UdpThroughputSensor(depUdpPacketSensor);
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpThroughputSensor = newSensor;
+  }
+
+}
+void SensorList::pushUdpMinDelaySensor()
+{
+  pushUdpPacketSensor();
+
+  // Example dependency check
+  if (depUdpMinDelaySensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpMinDelaySensor");
+    UdpMinDelaySensor * newSensor = new UdpMinDelaySensor(depUdpPacketSensor);
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpMinDelaySensor = newSensor;
+  }
+
+}
+void SensorList::pushUdpMaxDelaySensor()
+{
+  pushUdpPacketSensor();
+  pushUdpMinDelaySensor();
+
+  // Example dependency check
+  if (depUdpMaxDelaySensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpMaxDelaySensor");
+    UdpMaxDelaySensor * newSensor = new UdpMaxDelaySensor(depUdpPacketSensor, depUdpMinDelaySensor);
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpMaxDelaySensor = newSensor;
+  }
+
 }

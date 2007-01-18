@@ -10,7 +10,7 @@ class UdpPacketSensor;
 
 class UdpThroughputSensor:public Sensor{
 	public:
-		explicit UdpThroughputSensor( UdpPacketSensor * udpPacketSensorVal);
+		explicit UdpThroughputSensor( UdpPacketSensor const * udpPacketSensorVal);
 		~UdpThroughputSensor();
 		void localSend(PacketInfo *packet);
 		void localAck(PacketInfo *packet);
@@ -19,7 +19,7 @@ class UdpThroughputSensor:public Sensor{
 
 		unsigned long long lastAckTime;
 		double throughputKbps;
-		UdpPacketSensor *packetHistory; 
+		UdpPacketSensor const *packetHistory; 
 };
 
 #endif

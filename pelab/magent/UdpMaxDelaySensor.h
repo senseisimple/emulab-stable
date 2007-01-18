@@ -9,11 +9,12 @@
 class Sensor;
 class UdpPacketSensor;
 class UdpMinDelaySensor;
+struct UdpPacketInfo;
 
 class UdpMaxDelaySensor:public Sensor{
 	public:
 
-		explicit UdpMaxDelaySensor(UdpPacketSensor *udpPacketSensorVal, UdpMinDelaySensor *minDelaySensorVal);
+		explicit UdpMaxDelaySensor(UdpPacketSensor const *udpPacketSensorVal, UdpMinDelaySensor const *minDelaySensorVal);
 		~UdpMaxDelaySensor();
 
 
@@ -22,8 +23,8 @@ class UdpMaxDelaySensor:public Sensor{
 
 	private:
 		unsigned long long maxDelay;
-		UdpPacketSensor *packetHistory;
-		UdpMinDelaySensor *minDelaySensor;
+		UdpPacketSensor const *packetHistory;
+		UdpMinDelaySensor const *minDelaySensor;
 };
 
 #endif

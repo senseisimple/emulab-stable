@@ -1,6 +1,8 @@
 #include "UdpMaxDelaySensor.h"
 
-UdpMaxDelaySensor::UdpMaxDelaySensor(UdpPacketSensor *udpPacketSensorVal, UdpMinDelaySensor *minDelaySensorVal)
+using namespace std;
+
+UdpMaxDelaySensor::UdpMaxDelaySensor(UdpPacketSensor const *udpPacketSensorVal, UdpMinDelaySensor const *minDelaySensorVal)
 	: maxDelay(0),
 	packetHistory(udpPacketSensorVal),
 	minDelaySensor(minDelaySensorVal)
@@ -33,8 +35,9 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
         unsigned long long oneWayQueueDelay;
         bool eventFlag = false;
 
-        vector<UdpPacketInfo>::iterator vecIterator;
-        vecIterator = find_if(packetHistory->ackedPackets.begin(), packetHistory->ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
+	vector<UdpPacketInfo>::iterator vecIterator;
+	vector<UdpPacketInfo> ackedPackets = packetHistory->getAckedPackets();
+        vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// Find the one way RTT for this packet.
 

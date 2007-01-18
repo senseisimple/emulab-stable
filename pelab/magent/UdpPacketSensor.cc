@@ -1,5 +1,7 @@
 #include "UdpPacketSensor.h"
 
+using namespace std;
+
 UdpPacketSensor::UdpPacketSensor()
   :lastSeenSeqNum(-1),
   packetLoss(0),
@@ -17,13 +19,18 @@ UdpPacketSensor::~UdpPacketSensor()
 
 }
 
-int UdpPacketSensor::getPacketLoss()
+int UdpPacketSensor::getPacketLoss() const
 {
 	return packetLoss;
 
 }
 
-bool UdpPacketSensor::isAckFake()
+std::vector<UdpPacketInfo> UdpPacketSensor::getAckedPackets() const
+{
+	return ackedPackets;
+}
+
+bool UdpPacketSensor::isAckFake() const
 {
 	return ackFake;
 }

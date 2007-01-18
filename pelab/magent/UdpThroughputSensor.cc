@@ -1,6 +1,8 @@
 #include "UdpThroughputSensor.h"
 
-UdpThroughputSensor::UdpThroughputSensor(UdpPacketSensor * udpPacketSensorVal)
+using namespace std;
+
+UdpThroughputSensor::UdpThroughputSensor(UdpPacketSensor const * udpPacketSensorVal)
 	: lastAckTime(0),
 	throughputKbps(0.0),
 	packetHistory(udpPacketSensorVal)
@@ -58,6 +60,7 @@ void UdpThroughputSensor::localAck(PacketInfo *packet)
 
 	unsigned long long ackTimeDiff = currentAckTimeStamp - lastAckTime;
 	unsigned long long timeDiff = 0;
+	vector<UdpPacketInfo > ackedPackets = packetHistory->getAckedPackets();
 	vector<UdpPacketInfo>::iterator vecIterator;
 
 	// Average the throughput over all the packets being acknowledged.
@@ -73,9 +76,9 @@ void UdpThroughputSensor::localAck(PacketInfo *packet)
 			redunPacketSize = *(unsigned short int *)(packet->payload + 1 + global::udpMinAckPacketSize + i*global::udpRedunAckSize + global::USHORT_INT_SIZE);
 
 			// Find if this redundant ACK is useful - or it was acked before.
-			vecIterator = find_if(packetHistory->ackedPackets.begin(), packetHistory->ackedPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
+			vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
 
-			if(vecIterator != packetHistory->ackedPackets.end())
+			if(vecIterator != ackedPackets.end())
 			{
 				// Calculate throughput for the packet being acked by
 				// the redundant ACK.
@@ -97,7 +100,7 @@ void UdpThroughputSensor::localAck(PacketInfo *packet)
 	}
 
 	// Calculate the throughput for the current packet being ACKed.
-	vecIterator = find_if(packetHistory->ackedPackets.begin(), packetHistory->ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
+	vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// We lost the record of the size of this packet due to libpcap
 	// loss, use the length echoed back in the ACK.

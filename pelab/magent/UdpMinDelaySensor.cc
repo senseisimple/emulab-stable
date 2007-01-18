@@ -1,6 +1,8 @@
 #include "UdpMinDelaySensor.h"
 
-UdpMinDelaySensor::UdpMinDelaySensor(UdpPacketSensor *udpPacketSensorVal)
+using namespace std;
+
+UdpMinDelaySensor::UdpMinDelaySensor(UdpPacketSensor const *udpPacketSensorVal)
 	: minDelay(ULONG_LONG_MAX),
 	packetHistory(udpPacketSensorVal)
 {
@@ -12,7 +14,7 @@ UdpMinDelaySensor::~UdpMinDelaySensor()
 
 }
 
-unsigned long long UdpMinDelaySensor::getMinDelay()
+unsigned long long UdpMinDelaySensor::getMinDelay() const
 {
 	return minDelay;
 }	
@@ -57,7 +59,8 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	bool eventFlag = false;
 
 	vector<UdpPacketInfo >::iterator vecIterator;
-	vecIterator = find_if(packetHistory->ackedPackets.begin(), packetHistory->ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
+	vector<UdpPacketInfo > ackedPackets = packetHistory->getAckedPackets();
+	vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// Calculate the one way delay as half of RTT.
 
