@@ -17,6 +17,7 @@ enum ConnectionState
   CONNECTED
 };
 
+
 class KernelTcp : public ConnectionModel
 {
 public:
@@ -34,6 +35,11 @@ private:
   int writeUdpMessage(int size, WriteResult & result);
 private:
   ConnectionState state;
+  // Udp - CHANGES - Begin
+  unsigned short udpCurSeqNum;
+  char udpPacketBuffer[1530];
+  struct sockaddr_in udpLocalAddr;
+  // Udp - CHANGES - End
   int peersock;
   int sendBufferSize;
   int receiveBufferSize;

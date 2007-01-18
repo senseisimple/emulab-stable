@@ -45,6 +45,19 @@ namespace global
   // has a char 'transport' that was always set to 0 for
   // TCP_CONNECTION.
   const unsigned char CONTROL_VERSION = 1;
+
+  // Udp-CHANGES-Begin
+  const short int USHORT_INT_SIZE = sizeof(unsigned short int);
+  const short int ULONG_LONG_SIZE = sizeof(unsigned long long);
+  const short int UCHAR_SIZE = sizeof(unsigned char);
+
+  const int udpRedunAckSize = 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
+  const int udpSeqNumSize = USHORT_INT_SIZE;
+  const int udpMinAckPacketSize = 1 + 2*USHORT_INT_SIZE + 2*ULONG_LONG_SIZE;
+  const int udpMinSendPacketSize = 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
+  // Udp-CHANGES-End
+
+
 }
 
 size_t PacketInfo::census(void) const

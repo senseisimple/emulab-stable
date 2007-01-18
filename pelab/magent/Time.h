@@ -15,6 +15,9 @@ public:
   Time();
   Time(struct timeval const & newData);
   long long toMilliseconds(void) const;
+  // Udp - CHANGES - Begin
+  unsigned long long toMicroseconds(void) const;
+  // Udp - CHANGES - End
   double toDouble(void) const;
   struct timeval * getTimeval(void);
   struct timeval const * getTimeval(void) const;

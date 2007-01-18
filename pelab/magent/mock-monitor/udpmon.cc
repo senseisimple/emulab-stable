@@ -73,19 +73,32 @@ int main(int argc, char * argv[])
   sendCommand(connection, TRAFFIC_MODEL_COMMAND, key, command);
 
   command.resize(sizeof(unsigned int));
-  // PRAMOD: Replace with your own sensors
-  saveInt(& command[0], MIN_DELAY_SENSOR);
+  // PRAMOD: Replace with your own sensors - Done
+  saveInt(& command[0], UDP_PACKET_SENSOR);
   sendCommand(connection, SENSOR_COMMAND, key, command);
 
-  saveInt(& command[0], MAX_DELAY_SENSOR);
+  saveInt(& command[0], UDP_THROUGHPUT_SENSOR);
   sendCommand(connection, SENSOR_COMMAND, key, command);
 
-  saveInt(& command[0], AVERAGE_THROUGHPUT_SENSOR);
+  saveInt(& command[0], UDP_MINDELAY_SENSOR);
+  sendCommand(connection, SENSOR_COMMAND, key, command);
+
+  saveInt(& command[0], UDP_MAXDELAY_SENSOR);
   sendCommand(connection, SENSOR_COMMAND, key, command);
 
   command.resize(sizeof(unsigned int));
-  // PRAMOD: Replace with destination PlanetLab IP
-  int ip = (127 << 24) + 1;
+  // PRAMOD: Replace with destination PlanetLab IP - Done
+  //int ip = (127 << 24) + 1;
+  struct in_addr destAddr;
+
+  // Update the string below with the IP address of the 
+  // planet lab host we are running on.
+  inet_aton("127.24.53.12", &destAddr);
+
+  // Note: This ip value is in network byte order - convert it
+  // to host order in the magent before using it.
+  int ip = destAddr.s_addr;
+
   saveInt(& command[0], ip);
   sendCommand(connection, CONNECT_COMMAND, key, command);
 

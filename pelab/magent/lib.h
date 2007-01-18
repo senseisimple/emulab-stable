@@ -51,6 +51,52 @@ extern char * optarg;
 #include <algorithm>
 #include <iomanip>
 
+// Udp-CHANGES-Begin
+#include <iostream>
+#include <fstream>
+#include <functional>
+#include <climits>
+#include <limits.h>
+#include <sys/param.h>
+#include <endian.h>
+
+#if !defined(BIG_ENDIAN) && defined(__BIG_ENDIAN)
+#define BIG_ENDIAN __BIG_ENDIAN
+#endif
+
+#if !defined(LITTLE_ENDIAN) && defined(__LITTLE_ENDIAN)
+#define LITTLE_ENDIAN __LITTLE_ENDIAN
+#endif
+
+#if !defined(__BYTEORDER) && !defined(BYTEORDER)
+
+#if defined(i386) || defined(__i386__) || defined(__x86__)
+#define BYTEORDER LITTLE_ENDIAN
+#else
+#define BYTEORDER BIG_ENDIAN
+#endif
+
+#endif
+
+
+#if BYTEORDER == BIG_ENDIAN
+
+#define htonll(A) (A)
+
+#elif BYTEORDER == LITTLE_ENDIAN
+
+#define htonll(A) ( 	(((uint64_t)(A) & 0xff00000000000000ULL) >> 56) | \
+			(((uint64_t)(A) & 0x00ff000000000000ULL) >> 40) | \
+			(((uint64_t)(A) & 0x0000ff0000000000ULL) >> 24) | \
+			(((uint64_t)(A) & 0x000000ff00000000ULL) >> 8) | \
+			(((uint64_t)(A) & 0x00000000ff000000ULL) << 8) | \
+			(((uint64_t)(A) & 0x0000000000ff0000ULL) << 24) | \
+			(((uint64_t)(A) & 0x000000000000ff00ULL) << 40) | \
+			(((uint64_t)(A) & 0x00000000000000ffULL) << 56)   )
+#endif
+
+// Udp-CHANGES-End
+
 #include "Time.h"
 
 void setDescriptor(int fd);
@@ -124,7 +170,14 @@ enum SensorType
   EWMA_THROUGHPUT_SENSOR = 7,
   LEAST_SQUARES_THROUGHPUT = 8,
   TSTHROUGHPUT_SENSOR = 9,
-  AVERAGE_THROUGHPUT_SENSOR = 10
+  AVERAGE_THROUGHPUT_SENSOR = 10,
+// Udp-CHANGES-Begin
+  UDP_STATE_SENSOR = 11,
+  UDP_PACKET_SENSOR = 12,
+  UDP_THROUGHPUT_SENSOR = 13,
+  UDP_MINDELAY_SENSOR = 14,
+  UDP_MAXDELAY_SENSOR = 15
+// Udp-CHANGES-End
 };
 
 // This is used for the type field in the ConnectionModelCommand.
@@ -315,5 +368,48 @@ namespace global
   extern int logFlags;
 
   extern const unsigned char CONTROL_VERSION;
+
+// Udp-CHANGES-Begin
+  extern const short int USHORT_INT_SIZE;
+  extern const short int ULONG_LONG_SIZE;
+  extern const short int UCHAR_SIZE;
+
+  extern const int udpRedunAckSize;
+  extern const int udpSeqNumSize;
+  extern const int udpMinAckPacketSize;
+  extern const int udpMinSendPacketSize;
+// Udp-CHANGES-End
+
+
 }
+
+// Udp-CHANGES-Begin
+struct UdpPacketInfo
+{
+	unsigned short int seqNum;
+	unsigned short int packetSize;
+	unsigned long long timeStamp;
+	bool isFake;
+};
+
+class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool> 
+{
+  public:
+  bool operator()(const UdpPacketInfo& packet, unsigned short int seqNum) const
+  {
+    return (packet.seqNum == seqNum);
+  }
+};
+
+class lessSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool> 
+{
+  public:
+  bool operator()(const UdpPacketInfo& packet,unsigned short int seqNum) const
+  {
+    return (packet.seqNum < seqNum);
+  }
+};
+
+
+// Udp-CHANGES-End
 #endif

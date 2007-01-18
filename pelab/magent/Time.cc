@@ -28,6 +28,14 @@ long long Time::toMilliseconds(void) const
   return result;
 }
 
+// Udp - CHANGES - Begin
+unsigned long long Time::toMicroseconds(void) const
+{
+  unsigned long long result = data.tv_sec * 1000 * 1000 + data.tv_usec;
+  return result;
+}
+// Udp - CHANGES - End
+
 double Time::toDouble(void) const
 {
   double result = data.tv_sec + data.tv_usec / 1000000.0;
