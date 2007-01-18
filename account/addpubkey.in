@@ -171,7 +171,7 @@ if (defined($user)) {
     $user_email = $target_user->email();
     $user_dbid  = $target_user->dbid();
     $user_uid   = $target_user->uid();
-    $USERUID    = $user_uid;
+    $USERUID    = $target_user->unix_uid();
 }
 
 #
