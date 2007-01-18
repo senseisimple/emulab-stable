@@ -2363,14 +2363,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
-	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
+	tbsetup/node_reboot tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmuser tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \
-	tbsetup/webdelay_config tbsetup/webbatchexp tbsetup/webreport \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
-	tbsetup/webswapexp tbsetup/swapexp \
-	tbsetup/endexp tbsetup/webendexp tbsetup/elabinelab \
+	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
 	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
@@ -2386,25 +2384,23 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/assign_wrapper2 \
-	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
-	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
-	tbsetup/savelogs.proxy \
-	tbsetup/rmgroup tbsetup/webrmuser tbsetup/webrmgroup tbsetup/mkexpdir \
-	tbsetup/webnodecontrol tbsetup/node_control tbsetup/node_attributes \
-        tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
-	tbsetup/eventsys_control tbsetup/webeventsys_control \
-	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
+	tbsetup/frisbeelauncher tbsetup/node_update \
+	tbsetup/savelogs tbsetup/setgroups \
+	tbsetup/savelogs.proxy tbsetup/rmgroup tbsetup/mkexpdir \
+	tbsetup/node_control tbsetup/node_attributes \
+        tbsetup/mkgroup tbsetup/eventsys_start \
+	tbsetup/eventsys_control \
+	tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/checkports tbsetup/webnodereboot tbsetup/libaudit.pm \
+	tbsetup/checkports tbsetup/libaudit.pm \
 	tbsetup/libreboot.pm tbsetup/libosload.pm tbsetup/libadminmfs.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
-	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
-	tbsetup/newnode_reboot tbsetup/webnodeattributes \
+	tbsetup/idleswap tbsetup/switchmac \
+	tbsetup/newnode_reboot \
         tbsetup/libtestbed.py \
 	tbsetup/libArchive.pm tbsetup/archive_control \
-	tbsetup/webarchive_control \
-	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
+	tbsetup/tarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
@@ -2420,8 +2416,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
-	tbsetup/panic tbsetup/webpanic \
-        tbsetup/tbrsync tbsetup/nfstrace \
+	tbsetup/panic tbsetup/tbrsync tbsetup/nfstrace \
 	tbsetup/checkup/GNUmakefile tbsetup/checkup/checkup_daemon \
 	tbsetup/libtblog.pm \
 	tip/GNUmakefile tip/console \
@@ -2441,16 +2436,16 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/cygwinxp/GNUmakefile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
-	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
+	utils/sshtb utils/create_image utils/node_admin \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	utils/link_config utils/import_commitlog \
-	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
+	utils/opsreboot utils/deletenode utils/spewleds \
 	utils/grabwebcams utils/loghole utils/webcopy \
-	utils/setdest utils/websetdest utils/grabswitchconfig \
+	utils/setdest utils/grabswitchconfig \
         utils/backupswitches utils/setbuildinfo utils/checkquota \
-	utils/spewconlog utils/webspewconlog utils/xlogin \
+	utils/spewconlog utils/xlogin \
 	utils/opsdb_control utils/opsdb_control.proxy \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
 	www/xmlrpcpipe.php3 \
