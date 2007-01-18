@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -135,11 +135,11 @@ register_shutdown_function("SPEWCLEANUP");
 ignore_user_abort(1);
 
 if ($nodemode) {
-    $fp = popen("$TBSUEXEC_PATH $uid nobody webnodereboot -w $node_id",
+    $fp = popen("$TBSUEXEC_PATH $uid nobody webnode_reboot -w $node_id",
 		"r");
 }
 else {
-    $fp = popen("$TBSUEXEC_PATH $uid nobody webnodereboot -w -e $pid,$eid",
+    $fp = popen("$TBSUEXEC_PATH $uid nobody webnode_reboot -w -e $pid,$eid",
 		"r");
 }
 if (! $fp) {

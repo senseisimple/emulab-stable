@@ -128,7 +128,7 @@ elseif (strcmp($approval, "moreinfo") == 0) {
 }
 elseif ((strcmp($approval, "deny") == 0) ||
 	(strcmp($approval, "destroy") == 0)) {
-    SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 1);
+    SUEXEC($uid, $TBADMINGROUP, "webrmproj $pid", 1);
 
     $sendemail = 1;
     if (isset($silent) && $silent == "Yep") {

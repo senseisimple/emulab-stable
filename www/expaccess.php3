@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -120,7 +120,7 @@ if (isset($addpid) && strcmp($addpid, "")) {
 #
 TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
-SUEXEC($uid, $unix_gid, "webnodeupdate -b $pid $eid", 1);
+SUEXEC($uid, $unix_gid, "webnode_update -b $pid $eid", 1);
 
 echo "<center>
       <h3>Access Permissions Changed.</h3>

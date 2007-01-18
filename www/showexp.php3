@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -88,7 +88,7 @@ function Show($which, $arg1, $arg2)
         $flags = ($showevents ? "-e -a" : "-b -e -f");
 
 	$result = exec("$TBSUEXEC_PATH $uid $TBADMINGROUP ".
-		       "webreport $flags $pid $eid",
+		       "webtbreport $flags $pid $eid",
 		       $output, $retval);
 
 	$html = "<pre><div align=left id=\"showexp_details\" ".

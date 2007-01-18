@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -76,7 +76,7 @@ if ($isadmin) {
 #
 # Pass it off to the script. It will check the arguments.
 #
-SUEXEC($uid, "nobody", "webnodecontrol $command_string $node_id",
+SUEXEC($uid, "nobody", "webnode_control $command_string $node_id",
        SUEXEC_ACTION_DIE);
 
 echo "<center>

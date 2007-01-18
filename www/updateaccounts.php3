@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -140,7 +140,7 @@ echo "<h2>Starting node update. Please wait a moment ...
 flush();
 
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webnodeupdate -b $pid $eid" .
+		 "webnode_update -b $pid $eid" .
 		 (isset($nodeid) ? " $nodeid" : ""),
 		 SUEXEC_ACTION_IGNORE);
 

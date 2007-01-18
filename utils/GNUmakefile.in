@@ -24,7 +24,8 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  spewconlog opsdb_control newnode
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog
-WEB_BIN_SCRIPTS = webcreate_image websetdest weblinkmon_ctl webspewevents
+WEB_BIN_SCRIPTS = webcreate_image websetdest weblinkmon_ctl webspewevents \
+		  webdelay_config
 LIBEXEC_SCRIPTS	= spewleds webcopy spewsource webcvsweb xlogin webviewvc \
                   $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS)
 

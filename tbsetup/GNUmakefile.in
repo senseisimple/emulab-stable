@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,7 +35,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic repos_daemon node_attributes \
-		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy
+		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
+		  rmproj
 
 CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
@@ -44,23 +45,26 @@ CTRLBIN_STUFF	= fetchtar.proxy
 
 FSBIN_STUFF	= exports_setup.proxy smbpasswd_setup.proxy
 
-LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
-		  os_setup mkexpdir console_setup webnscheck webreport \
-		  webendexp webbatchexp webpanic \
-		  assign_wrapper assign_wrapper2 \
-		  assign_prepass ptopgen webnodeupdate \
-		  webdelay_config webnodehistory \
-		  webrmgroup webswapexp webnodecontrol webeventsys_control \
-		  webmkgroup websetgroups webmkproj webmodgroups \
-		  spewlogfile staticroutes routecalc wanassign \
-		  webnodereboot webrmuser webidleswap switchmac \
-		  spewrpmtar webtarfiles_setup webfrisbeekiller gentopofile \
-		  webnodeattributes webarchive_control webtemplate_create \
+WEB_SBIN_SCRIPTS= webrmproj webpanic webnode_update webrmgroup \
+                  webnode_control webmkgroup websetgroups webmkproj \
+                  webrmuser webmodgroups webidleswap webnode_attributes \
+WEB_BIN_SCRIPTS = webnscheck webendexp webtbreport webbatchexp \
+		  webnode_history webswapexp webeventsys_control \
+		  webnode_reboot webtarfiles_setup webarchive_control \
+		  webtemplate_create \
 		  webtemplate_swapin webtemplate_swapout webtemplate_exprun \
 		  webtemplate_graph webtemplate_metadata webtemplate_export \
 		  webtemplate_control webtemplate_commit webtemplate_analyze \
 		  webtemplate_linkgraph webtemplate_instantiate \
 		  webtemplate_delete
+
+LIBEXEC_STUFF	= wanlinksolve wanlinkinfo os_setup mkexpdir console_setup \
+		  assign_wrapper assign_wrapper2 \
+		  assign_prepass ptopgen \
+		  spewlogfile staticroutes routecalc wanassign \
+		  switchmac \
+		  spewrpmtar webfrisbeekiller gentopofile \
+                  $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS)
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
@@ -273,6 +277,18 @@ subdir-distclean:
 #
 %: %.tcl
 	cp -p $< $@
+
+# This rule says what web* script depends on which installed binary directory.
+$(WEB_SBIN_SCRIPTS): $(INSTALL_SBINDIR)
+$(WEB_BIN_SCRIPTS):  $(INSTALL_BINDIR)
+
+# Just in case the dirs are not yet created,
+$(INSTALL_SBINDIR) $(INSTALL_BINDIR):
+
+# And then how to turn the template into the actual script. 
+$(WEB_SBIN_SCRIPTS) $(WEB_BIN_SCRIPTS): $(TESTBED_SRCDIR)/WEBtemplate.in
+	@echo "Generating $@"
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$(subst web,,$@),' > $@
 
 $(INSTALL_DIR)/opsdir/lib/%: %
 	@echo "Installing $<"

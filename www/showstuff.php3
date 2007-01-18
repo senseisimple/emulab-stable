@@ -2517,7 +2517,8 @@ function SHOWNODEHISTORY($node_id, $showall = 0, $count = 20, $reverse = 1)
     if ($count) {
 	    $opt .= " -n $count";
     }
-    if ($fp = popen("$TBSUEXEC_PATH nobody nobody webnodehistory $opt $node_id", "r")) {
+    if ($fp = popen("$TBSUEXEC_PATH nobody nobody ".
+		    "  webnode_history $opt $node_id", "r")) {
 	if (!$showall) {
 	    $str = "Allocation";
 	} else {

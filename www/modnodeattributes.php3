@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -97,19 +97,19 @@ if ($_delattrs) {
 
 # Fire off the modify operation first
 if ($mod_command_string) {
-  SUEXEC($uid, "nobody", "webnodeattributes -m ".
+  SUEXEC($uid, "nobody", "webnode_attributes -m ".
          "$mod_command_string $node_id",
          SUEXEC_ACTION_DIE);
 }
 # Next, add attributes
 if ($add_command_string) {
-  SUEXEC($uid, "nobody", "webnodeattributes -a ".
+  SUEXEC($uid, "nobody", "webnode_attributes -a ".
          "$add_command_string $node_id",
          SUEXEC_ACTION_DIE);
 }
 # Finally, delete attributes.
 if ($del_command_string) {
-  SUEXEC($uid, "nobody", "webnodeattributes -r ".
+  SUEXEC($uid, "nobody", "webnode_attributes -r ".
          "$del_command_string $node_id",
          SUEXEC_ACTION_DIE);
 }
