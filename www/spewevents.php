@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -58,7 +58,7 @@ function SPEWCLEANUP()
 }
 register_shutdown_function("SPEWCLEANUP");
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewevents -w $pid $eid", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $uid $pid webspewevents -w $pid $eid", "r")) {
     header("Content-Type: text/plain");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     header("Cache-Control: no-cache, must-revalidate");

@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -108,7 +108,7 @@ if ($create) {
     echo "<h3>Creating nodes - this could take a while, please wait</h3>\n";
     echo "<hr>\n";
     echo "<pre>\n";
-    passthru("$TBSUEXEC_PATH $uid $gid newnode $nodelist 2>&1");
+    passthru("$TBSUEXEC_PATH $uid $gid webnewnode $nodelist 2>&1");
     echo "</pre>\n";
     echo "<hr>\n";
 }

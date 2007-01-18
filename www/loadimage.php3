@@ -123,7 +123,7 @@ flush();
 
 SUEXEC($uid,
        "$image_pid,$unix_gid" . ($image_pid != $node_pid ? ",$node_pid" : ""),
-       "webcreateimage -p $image_pid $image_name $node",
+       "webcreate_image -p $image_pid $image_name $node",
        SUEXEC_ACTION_DUPDIE);
 
 echo "This will take 10 minutes or more; you will receive email

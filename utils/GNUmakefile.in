@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,15 +16,18 @@ SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
                   setdest loghole webcopy linkmon_ctl snmp-if-deref.sh \
-		  template_record
+		  template_record spewevents
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog daemon_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches cvsinit checkquota \
-		  spewconlog opsdb_control
-LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
-                  websetdest spewsource weblinkmon_ctl webcvsweb \
-		  webspewconlog xlogin webviewvc spewevents
+		  spewconlog opsdb_control newnode
+
+WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog
+WEB_BIN_SCRIPTS = webcreate_image websetdest weblinkmon_ctl webspewevents
+LIBEXEC_SCRIPTS	= spewleds webcopy spewsource webcvsweb xlogin webviewvc \
+                  $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS)
+
 CTRLSBIN_SCRIPTS= opsdb_control.proxy daemon_wrapper
 
 # These scripts installed setuid, with sudo. 
@@ -74,6 +77,18 @@ post-install:
 # Control node installation (okay, plastic)
 #
 control-install:
+
+# This rule says what web* script depends on which installed binary directory.
+$(WEB_SBIN_SCRIPTS): $(INSTALL_SBINDIR)
+$(WEB_BIN_SCRIPTS):  $(INSTALL_BINDIR)
+
+# Just in case the dirs are not yet created,
+$(INSTALL_SBINDIR) $(INSTALL_BINDIR):
+
+# And then how to turn the template into the actual script. 
+$(WEB_SBIN_SCRIPTS) $(WEB_BIN_SCRIPTS): $(TESTBED_SRCDIR)/WEBtemplate.in
+	@echo "Generating $@"
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$(subst web,,$@),' > $@
 
 #
 # Automate this part at some point.
