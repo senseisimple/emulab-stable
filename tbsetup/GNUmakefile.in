@@ -183,8 +183,8 @@ endif
 	chmod 775 $(INSTALL_LIBEXECDIR)
 	chown root $(INSTALL_SBINDIR)/mkproj
 	chmod u+s $(INSTALL_SBINDIR)/mkproj
-	chown root $(INSTALL_LIBEXECDIR)/rmproj
-	chmod u+s $(INSTALL_LIBEXECDIR)/rmproj
+	chown root $(INSTALL_SBINDIR)/rmproj
+	chmod u+s $(INSTALL_SBINDIR)/rmproj
 	chown root $(INSTALL_SBINDIR)/rmgroup
 	chmod u+s $(INSTALL_SBINDIR)/rmgroup
 	chown root $(INSTALL_SBINDIR)/mkgroup
