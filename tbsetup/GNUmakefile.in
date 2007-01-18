@@ -81,8 +81,8 @@ SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
 SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeelauncher frisbeeimage \
 			rmuser idleswap named_setup exports_setup \
 			sfskey_update setgroups newnode_reboot vnode_setup \
-			elabinelab nfstrace
-SETUID_LIBX_SCRIPTS  = rmproj console_setup spewlogfile
+			elabinelab nfstrace rmproj
+SETUID_LIBX_SCRIPTS  = console_setup spewlogfile
 
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
