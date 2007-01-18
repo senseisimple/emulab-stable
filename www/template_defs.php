@@ -1100,6 +1100,7 @@ class TemplateInstance
 	}
 	$showuser_url = CreateURL("showuser", $user);
 	
+	echo "<center>\n";
 	if ($detailed && $pcount) {
 	    echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
 		 " cellpadding=0 cellspacing=0 align=center>\n";
@@ -1143,9 +1144,11 @@ class TemplateInstance
 
 	    echo "<br>
                   <iframe width=100% height=300
-                          scrolling=yes src='$archive_url' border=0>".
+                          scrolling=yes src='$archive_url' border=2>Sorry".
                  "</iframe>\n";
 	}
+	echo "</center>\n";
+	
     }
 
     #
@@ -1493,8 +1496,10 @@ class TemplateInstance
 
 	    echo "<br>
                   <iframe width=100% height=300
-                          scrolling=yes src='$archive_url' border=0>".
+                          scrolling=yes src='$archive_url' border=2>Sorry".
                  "</iframe>\n";
+	    
+	echo "</center>\n";
     }
 
     #

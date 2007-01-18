@@ -6,9 +6,11 @@
 #
 include("defs.php3");
 include_once("template_defs.php");
+if (0) {
 require("Sajax.php");
 sajax_init();
 sajax_export("GraphShow");
+} 
 
 #
 # Only known and logged in users ...
@@ -78,7 +80,9 @@ function GraphShow($which, $arg0, $arg1)
 # See if this request is to the above function. Does not return
 # if it is. Otherwise return and continue on.
 #
+if (0) {
 sajax_handle_client_request();
+} 
 
 #
 # Standard Testbed Header after argument checking.
@@ -89,6 +93,7 @@ echo $instance->PageHeader();
 echo "<br><br>\n";
 $instance->Show(1);
 
+if (0) {
 echo "<script type='text/javascript' language='javascript'>\n";
 sajax_show_javascript();
 echo "</script>\n";
@@ -96,7 +101,6 @@ echo "</script>\n";
 #
 # Throw up graph stuff.
 #
-if (0) {
 echo "<center>\n";
 echo "<br>";
 $instance->ShowGraphArea("pps");

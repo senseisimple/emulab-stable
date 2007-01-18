@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -923,7 +923,7 @@ function PAGEFOOTER($view = NULL) {
     ENDPAGE();
 
     # Plug the home site from all others.
-    echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
+    echo "\n<br><a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
     # This has to be after all the tooltip definitions.
     echo "<script type='text/javascript' src='${TBBASE}/js/wz_tooltip.js'>".
