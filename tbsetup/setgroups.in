@@ -59,8 +59,6 @@ my $SAVEUID = $UID;
 my $dbuid;
 my @userlist = ();
 my $pid;
-my $user_name;
-my $user_email;
 my $logname;
 my @db_row;
 my $query_result;
