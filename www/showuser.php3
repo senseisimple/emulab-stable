@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -108,9 +108,8 @@ $query_result =
 		 "left join group_membership as g2 on g2.pid=g.pid and ".
 		 "     g2.gid=g.gid and ".
 		 "     g2.uid_idx='" . $this_user->uid_idx() . "' ".
-		 "where g.uid_idx='$target_idx' and ".
-		 ($isadmin ? "" : "g2.uid_idx is not null and ") .
-		 "g.trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
+		 "where g.uid_idx='$target_idx' ".
+		 ($isadmin ? "" : "and g2.uid_idx is not null ") .
 		 "group by g.pid, g.gid ".
 		 "order by g.pid,gr.created");
 
@@ -136,35 +135,36 @@ if (mysql_num_rows($query_result)) {
 	$desc  = $projrow[description];
 	$trust = $projrow[trust];
 	$nodes = $projrow[ncount];
-	
-	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
-	    echo "<tr>
-                     <td><A href='showproject.php3?pid=$pid'>
-                            $pid</A></td>
-                     <td><A href='showgroup.php3?pid=$pid&gid=$gid'>
-                            $gid</A></td>\n";
 
-	    echo "<td>$nodes</td>\n";
+	echo "<tr>
+                 <td><A href='showproject.php3?pid=$pid'>
+                        $pid</A></td>
+                 <td><A href='showgroup.php3?pid=$pid&gid=$gid'>
+                        $gid</A></td>\n";
 
-	    if (strcmp($pid,$gid)) {
-		echo "<td>$desc</td>\n";
-		$mail  = $pid . "-" . $gid . "-users@" . $OURDOMAIN;
-	    }
-	    else {
-		echo "<td>$name</td>\n";
-		$mail  = $pid . "-users@" . $OURDOMAIN;
-	    }
-	    echo "<td>$trust</td>\n";
+	echo "<td>$nodes</td>\n";
 
-	    if ($MAILMANSUPPORT) {
-		# Not sure what I want to do here ...
-		echo "<td nowrap><a href=mailto:$mail>$mail</a></td>";
-	    }
-	    else {
-		echo "<td nowrap><a href=mailto:$mail>$mail</a></td>";
-	    }
-	    echo "</tr>\n";
-        }
+	if (strcmp($pid,$gid)) {
+	    echo "<td>$desc</td>\n";
+	    $mail  = $pid . "-" . $gid . "-users@" . $OURDOMAIN;
+	}
+	else {
+	    echo "<td>$name</td>\n";
+	    $mail  = $pid . "-users@" . $OURDOMAIN;
+	}
+
+	$color = ($trust == TBDB_TRUSTSTRING_NONE ? "red" : "black");
+
+	echo "<td><font color=$color>$trust</font></td>\n";
+
+	if ($MAILMANSUPPORT) {
+            # Not sure what I want to do here ...
+	    echo "<td nowrap><a href=mailto:$mail>$mail</a></td>";
+	}
+	else {
+	    echo "<td nowrap><a href=mailto:$mail>$mail</a></td>";
+	}
+	echo "</tr>\n";
     }
     echo "</table>\n";
 

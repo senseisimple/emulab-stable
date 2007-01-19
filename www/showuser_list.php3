@@ -154,14 +154,19 @@ echo "<center>
 #
 $projmemb_array  = array();
 $projmemb_result =
-   DBQueryFatal("select distinct uid,pid from group_membership ".
+   DBQueryFatal("select distinct uid,pid,trust from group_membership ".
 		"order by uid");
 
 while ($row = mysql_fetch_array($projmemb_result)) {
     $uid   = $row[0];
     $pid   = $row[1];
+    $trust = $row[2];
 
-    $projmemb_array[$uid][] = $pid;
+    $foo   = array();
+    $foo["pid"]   = $pid;
+    $foo["trust"] = $trust;
+
+    $projmemb_array[$uid][] = $foo;
 }
 
 echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2
@@ -219,8 +224,19 @@ while ($row = mysql_fetch_array($query_result)) {
 	reset($projmemb_array[$thisuid]);
 	
 	echo "<td> ";
-	while (list ($idx, $pid) = each($projmemb_array[$thisuid])) {
-	    echo "<A href='showproject.php3?pid=$pid'>$pid</A>";
+	while (list ($idx, $foo) = each($projmemb_array[$thisuid])) {
+	    $pid   = $foo["pid"];
+	    $trust = $foo["trust"];
+	    
+	    echo "<A href='showproject.php3?pid=$pid'>";
+	    if ($trust == TBDB_TRUSTSTRING_NONE) {
+		echo "<font color=red>";
+	    }
+	    echo $pid;
+	    if ($trust == TBDB_TRUSTSTRING_NONE) {
+		echo "</font>";
+	    }
+	    echo "</A>";
 	    if ($idx != (count($projmemb_array[$thisuid]) - 1))
 		echo ", ";
 	}
