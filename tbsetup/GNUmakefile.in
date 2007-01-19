@@ -21,7 +21,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
 		  tbswap nseswap tarfiles_setup node_history tbrsync \
-		  node_attributes archive_control template_create \
+		  archive_control template_create \
 		  template_swapin template_swapout template_graph \
 		  template_exprun template_delete template_metadata \
 		  template_export template_control template_commit \
@@ -45,14 +45,14 @@ CTRLBIN_STUFF	= fetchtar.proxy
 
 FSBIN_STUFF	= exports_setup.proxy smbpasswd_setup.proxy
 
-WEB_SBIN_SCRIPTS= webrmproj webpanic webnode_update webrmgroup \
-                  webnode_control webmkgroup websetgroups webmkproj \
+WEB_SBIN_SCRIPTS= webrmproj webpanic webrmgroup \
+                  webmkgroup websetgroups webmkproj \
                   webrmuser webmodgroups webidleswap webnode_attributes
 
 WEB_BIN_SCRIPTS = webnscheck webendexp webtbreport webbatchexp \
 		  webnode_history webswapexp webeventsys_control \
 		  webnode_reboot webtarfiles_setup webarchive_control \
-		  webtemplate_create \
+		  webnode_control webnode_update webtemplate_create \
 		  webtemplate_swapin webtemplate_swapout webtemplate_exprun \
 		  webtemplate_graph webtemplate_metadata webtemplate_export \
 		  webtemplate_control webtemplate_commit webtemplate_analyze \
