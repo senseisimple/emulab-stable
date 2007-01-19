@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -110,6 +110,12 @@ $EUID = $UID;
 
 my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
 $cmdargs .= " -u $dbuid -v -- $pid $gid $eid";
+
+# create the output file as the user for quota purposes
+unlink $outfile;
+open(FOO, ">$outfile") ||
+    tbdie("Cannot create parser output file $outfile");
+close(FOO);
 
 $EUID = $UID = 0;
 system("sshtb -host $CONTROL $cmdargs < $nsfile > $outfile");
