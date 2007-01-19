@@ -435,7 +435,7 @@ class Group
     #
     # Return list of approved members in this group. 
     #
-    function MemberList($exclude_leader = 1) {
+    function &MemberList($exclude_leader = 1) {
 	$gid_idx    = $this->gid_idx();
 	$pid_idx    = $this->pid_idx();
 	$trust_none = TBDB_TRUSTSTRING_NONE;
@@ -458,14 +458,14 @@ class Group
 	    if ($exclude_leader && $leader->uid_idx() == $uid_idx)
 		continue;
 
-	    if (! ($user =& User::Lookup($uid_idx))) {
+	    if (! ($user = User::Lookup($uid_idx))) {
 		TBERROR("Group::MemberList: ".
 			"Could not load user $uid_idx!", 1);
 	    }
 	    # So caller can get this.
 	    $user->SetTempData($trust);
 	    
-	    $result[] =& $user;
+	    $result["$uid_idx"] = $user;
 	}
 	return $result;
     }

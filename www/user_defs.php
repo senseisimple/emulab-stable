@@ -219,10 +219,10 @@ class User
     function mailman_password() { return $this->field("mailman_password"); }
 
     # Temporary data storage ... useful.
-    function SetTempData(&$value) {
-	$this->tempdata =& $value;
+    function SetTempData($value) {
+	$this->tempdata = $value;
     }
-    function &GetTempData() {
+    function GetTempData() {
 	return $this->tempdata;
     }
 
