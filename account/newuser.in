@@ -337,18 +337,19 @@ if (TBGetSiteVar("general/firstinit/state", \$firstinitstate)) {
     #
     # The first user gets admin status and some extra groups, etc.
     #
-    DBQueryFatal("update users set ".
-		 "  admin=1,status='". $User::USERSTATUS_UNAPPROVED . "' " .
-		 "where uid='$new_uid'");
+    if ($firstinitstate eq "createproject") {
+	DBQueryFatal("update users set ".
+		     " admin=1,status='". $User::USERSTATUS_UNAPPROVED . "' " .
+		     "where uid='$new_uid'");
 
-    DBQueryFatal("insert into unixgroup_membership set ".
-		 "uid='$new_uid', gid='wheel'");
+	DBQueryFatal("insert into unixgroup_membership set ".
+		     "uid='$new_uid', gid='wheel'");
     
-    DBQueryFatal("insert into unixgroup_membership set ".
-		 "uid='$new_uid', gid='$TBADMINGROUP'");
-
-    exit(0)
-	if ($firstinitstate eq "createproject");
+	DBQueryFatal("insert into unixgroup_membership set ".
+		     "uid='$new_uid', gid='$TBADMINGROUP'");
+	
+	exit(0);
+    }
 }
 
 #
