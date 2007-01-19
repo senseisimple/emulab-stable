@@ -1137,16 +1137,6 @@ class TemplateInstance
 	    $this->ShowRunList(1);
 	}
 
-	if ($detailed) {
-	    $archive_url =
-		"cvsweb/cvsweb.php3/$exptidx/tags/runs/?exptidx=$exptidx".
-		"&embedded=1";
-
-	    echo "<br>
-                  <iframe width=100% height=300
-                          scrolling=yes src='$archive_url' border=2>Sorry".
-                 "</iframe>\n";
-	}
 	echo "</center>\n";
 	
     }
@@ -1419,7 +1409,7 @@ class TemplateInstance
 	echo "<td class=stealth align=center>\n";
 	
 	echo "<center>
-               <h3>Details</h3>
+               <h3>Run Details</h3>
              </center>\n";
 
 	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
@@ -1463,7 +1453,7 @@ class TemplateInstance
 	    echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
 	    echo "<td align=center class=stealth>\n";
 	    echo "<center>
-                   <h3>Bindings</h3>
+                   <h3>Run Bindings</h3>
                   </center> 
                   <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -1494,10 +1484,10 @@ class TemplateInstance
 	    "cvsweb/cvsweb.php3/$exptidx/tags/runs/$runid/?exptidx=$exptidx".
 	    "&embedded=1";
 
-	    echo "<br>
-                  <iframe width=100% height=300
-                          scrolling=yes src='$archive_url' border=2>Sorry".
-                 "</iframe>\n";
+	echo "<br>
+              <center><h3>File Archive</h3></center>
+	      <iframe width=100% height=300
+                      scrolling=yes src='$archive_url' border=2></iframe>\n";
 	    
 	echo "</center>\n";
     }
