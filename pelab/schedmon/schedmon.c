@@ -27,7 +27,7 @@ void
 usage()
 {
 	fprintf(stderr,
-		"Usage: %s [-s usecs] [-n numsamples] [-t] [-l seconds]\n",
+		"Usage: %s [-s usecs] [-n numsamples] [-t] [-l seconds] [-r numruns]\n",
 		progname);
 	exit(-1);
 }
