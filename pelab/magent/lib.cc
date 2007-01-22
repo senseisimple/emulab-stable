@@ -54,7 +54,7 @@ namespace global
   const int udpRedunAckSize = 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
   const int udpSeqNumSize = USHORT_INT_SIZE;
   const int udpMinAckPacketSize = 1 + 2*USHORT_INT_SIZE + 2*ULONG_LONG_SIZE;
-  const int udpMinSendPacketSize = 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
+  const int udpMinSendPacketSize = 1 + 2*USHORT_INT_SIZE + ULONG_LONG_SIZE;
   // Udp-CHANGES-End
 
 

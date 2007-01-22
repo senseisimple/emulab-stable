@@ -81,7 +81,7 @@ void KernelTcp::connect(PlanetOrder & planet)
     // Udp - CHANGES - Begin
     udpCurSeqNum = 0;
 
-    // Create a datagram socket and bind it the local address.
+    // Create a datagram socket, for use by later writeUdpMessage calls.
     if(peersock == -1)
     {
 	peersock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -93,8 +93,8 @@ void KernelTcp::connect(PlanetOrder & planet)
 
 	udpLocalAddr.sin_family = AF_INET;
 	udpLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	udpLocalAddr.sin_port = htons(0);
 
-	bind(peersock, (struct sockaddr *)&udpLocalAddr, sizeof(udpLocalAddr));
     }
     // Udp - CHANGES - End
   }
@@ -343,9 +343,13 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   if(size < global::udpMinSendPacketSize)
     size = global::udpMinSendPacketSize;
 
+  // Indicate to the server the version of the format in which our data packets are.
+  unsigned char serverVersion = 2;
+  memcpy(&udpPacketBuffer[0], &serverVersion, sizeof(unsigned char));
+
   // Put the sequence number of the packet.
   unsigned short networkOrder_udpCurSeqNum = htons(udpCurSeqNum);
-  memcpy(&udpPacketBuffer[0],&networkOrder_udpCurSeqNum, global::USHORT_INT_SIZE);
+  memcpy(&udpPacketBuffer[1],&networkOrder_udpCurSeqNum, global::USHORT_INT_SIZE);
 
   // Copy the size of the packet.. This can be used
   // by the sensors in case they miss this packet
@@ -354,7 +358,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // sender are echoed in the ACKs.
 
   unsigned short networkOrder_size = htons(size);
-  memcpy(&udpPacketBuffer[global::USHORT_INT_SIZE],&networkOrder_size, global::USHORT_INT_SIZE);
+  memcpy(&udpPacketBuffer[1 + global::USHORT_INT_SIZE],&networkOrder_size, global::USHORT_INT_SIZE);
 
   // Copy the timestamp of when this packet is being sent.
 
@@ -364,10 +368,13 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // this packet because of a libpcap buffer overflow.
   unsigned long long curTime = getCurrentTime().toMicroseconds();
   curTime = htonll(curTime);
-  memcpy(&udpPacketBuffer[2*global::USHORT_INT_SIZE], &curTime, global::ULONG_LONG_SIZE);
+  memcpy(&udpPacketBuffer[1 + 2*global::USHORT_INT_SIZE], &curTime, global::ULONG_LONG_SIZE);
+
+  bool socketConnectedFlag = true;
 
   if(peersock == -1)
   {
+	  socketConnectedFlag = false;
 	  logWrite(EXCEPTION, "udpWriteMessage called in KernelTcp before connect()ing the socket");
 
 	  peersock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -377,11 +384,6 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
 		  logWrite(ERROR, "Could not create a datagram socket in writeUdpMessage");
 		  return -1;
 	  }
-
-	  udpLocalAddr.sin_family = AF_INET;
-	  udpLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	  bind(peersock, (struct sockaddr *)&udpLocalAddr, sizeof(udpLocalAddr));
   }
   // result.planet.ip and result.planet.remotePort denote the destination.
   // result.planet.ip is in host order
@@ -395,6 +397,14 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   int bytesWritten = sendto(peersock, udpPacketBuffer, size, flags,
   (struct sockaddr *) &remoteServAddr,
   sizeof(remoteServAddr));
+
+  // If this is the first sendto call, then get the port number
+  // which was assigned to the socket.
+  if(!socketConnectedFlag || ntohs(udpLocalAddr.sin_port) == 0 )
+  {
+	  socklen_t udpLocalLen;
+	  getsockname(peersock, (sockaddr *)&udpLocalAddr, &udpLocalLen);
+  }
 
   // put the localport in host order in result.planet.localPort
   // set result.bufferFull to false (UDP 'buffers' are never full)
