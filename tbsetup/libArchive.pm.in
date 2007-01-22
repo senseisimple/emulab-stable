@@ -40,6 +40,7 @@ my $ELABINELAB  = @ELABINELAB@;
 my $MD5		= "/sbin/md5";
 my $MKDIR       = "/bin/mkdir";
 my $CHMOD       = "/bin/chmod";
+my $SUCHOWN     = "$TB/sbin/suchown";
 my $CHGRP       = "/usr/bin/chgrp";
 my $TAR		= "/usr/bin/tar";
 my $RSYNC	= "/usr/local/bin/rsync";
@@ -405,6 +406,15 @@ sub ArchiveAdd($$;$$$)
     }
     my $repodir   = "$directory/repo";
     my $checkin   = "$directory/checkins/$view";
+
+    #
+    # If the target rootdir exists and is not writable by the current
+    # user, then run a chown over the whole subdir. This will avoid
+    # avoid permission problems later during the rsync/tar ops below.
+    #
+    if (-e "$checkin/$rootdir" && ! -o "$checkin/$rootdir") {
+	mysystem("$SUCHOWN $checkin/$rootdir") == 0 or return -1
+    }
     
     #
     # Copy the file in. We use tar on individual files (to retain the

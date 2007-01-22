@@ -1,0 +1,117 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use File::Basename;
+
+#
+# Forceably chown a directory hierarchy to the real uid of the invoker.
+#
+sub usage()
+{
+    warn "Usage: $0 <dst>\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB			= "@prefix@";
+my $FSDIR_PROJ		= "@FSDIR_PROJ@";
+my $FSDIR_GROUPS	= "@FSDIR_GROUPS@";
+my $ARCHIVE_DIR		= "/usr/testbed/exparchive";
+my $CHOWN               = "/usr/sbin/chown";
+
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+usage()
+    if (@ARGV != 1);
+
+my $pathname = $ARGV[0];
+
+#
+# Taint check both before and after the realpath call.
+#
+if ($pathname =~ /^([-\w\/.]+)$/) {
+    $pathname = $1;
+}
+else {
+    die("*** Tainted source: $pathname\n");
+}
+
+$pathname = `realpath $pathname`;
+
+if ($pathname =~ /^([-\w\/.]+)$/) {
+    $pathname = $1;
+}
+else {
+    die("*** Tainted translated path: $pathname\n");
+}
+
+my $pr = PROJROOT();
+my $gr = GROUPROOT();
+my $ar = $ARCHIVE_DIR;
+
+if ($pathname =~ /^(($ar|$pr|$FSDIR_PROJ|$gr|$FSDIR_GROUPS)\/[-\w\/.]+)$/) {
+    $pathname = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Destination must be in $pr, $gr, or $ar\n");
+}
+
+#
+# The user must have write permission on the enclosing directory. 
+#
+my $dir = dirname($pathname);
+if (! -W $dir) {
+    die("*** $0:\n".
+	"    No write permission in '$dir'\n");
+}
+
+#
+# Chmod to real UID of the invoker.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("You ($UID) do not exist!\n");
+}
+my $this_uid = $this_user->uid();
+
+if (system("$CHOWN -R $this_uid $pathname")) {
+    die("*** $0:\n".
+	"    Failed: '$CHOWN -R $this_uid $pathname'\n");
+}
+exit(0);
