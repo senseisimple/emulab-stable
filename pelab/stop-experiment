@@ -92,7 +92,7 @@ if (system "$TEVC -e $pid/$eid now allservers stop") {
 #
 if (!$nologs) {
     print "##### Gathering logfiles\n";
-    if (system "$LOGHOLE -e $pid/$eid sync") {
+    if (system "$LOGHOLE -e $pid/$eid sync -P") {
 	die "Error running loghole\n";
     }
 
