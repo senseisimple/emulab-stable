@@ -659,36 +659,36 @@ if {$NO_PLAB || $REAL_PLAB} {
     #     deleted before the next loghole sync
 
   set stop_real [$ns event-sequence]
-    stop_real append "$ns log \"Stopping REAL plab experiment\""
+    $stop_real append "$ns log \"Stopping REAL plab experiment\""
 
     # stop stubs and monitors
-    stop_real append "$ns log \"##### Stopping stubs and monitors...\""
+    $stop_real append "$ns log \"##### Stopping stubs and monitors...\""
     if {!$NO_STUB && $REAL_PLAB} {
-	stop_real append "$planetstubs stop"
+	$stop_real append "$planetstubs stop"
     }
-    stop_real append "$monitorgroup stop"
+    $stop_real append "$monitorgroup stop"
 
     # stop servers
     if {$SERVERPROG != ""} {
-	stop_real append "$ns log \"##### Stopping servers...\""
-	stop_real append "$allservers stop"
+	$stop_real append "$ns log \"##### Stopping servers...\""
+	$stop_real append "$allservers stop"
     }
 
     # stop link logging and save logs
-    stop_real append "$ns log \"##### Stop link tracing...\""
+    $stop_real append "$ns log \"##### Stop link tracing...\""
     foreach link $tracelist {
-        stop_real append "$link trace snapshot"
-        stop_real append "$link trace stop"
+        $stop_real append "$link trace snapshot"
+        $stop_real append "$link trace stop"
     }
 
     # reset shaping characteristics for all nodes
-    stop_real append "$ns log \"##### Resetting links...\""
-    stop_real append "$elabc clear"
-    stop_real append "$elabc reset"
+    $stop_real append "$ns log \"##### Resetting links...\""
+    $stop_real append "$elabc clear"
+    $stop_real append "$elabc reset"
 
     # gather up the data and inform the user
-    stop_real append "$ns log \"##### Experiment run stopped!\""
-    stop_real append "$ns report"
+    $stop_real append "$ns log \"##### Experiment run stopped!\""
+    $stop_real append "$ns report"
 }
 
 #
