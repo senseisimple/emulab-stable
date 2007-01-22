@@ -164,24 +164,16 @@ function SPITFORM($formfields, $errors)
     # SSH public key
     # 
     echo "<tr>
-              <td rowspan><center>Upload (4K max)[<b>3,4</b>]<br>
-                              <b>Or</b><br>
-                           Insert Key
-                          </center></td>
+              <td>Upload Public Key[<b>3,4</b>]:<br>
+                    (4K max)
+              </td>
 
-              <td rowspan>
+              <td>
                   <input type=hidden name=MAX_FILE_SIZE value=4096>
 	          <input type=file
                          name=usr_keyfile
                          value=\"" . $_FILES['usr_keyfile']['name'] . "\"
 	                 size=50>
-                  <br>
-                  <br>
-	          <input type=text
-                         name=\"formfields[usr_key]\"
-                         value=\"$formfields[usr_key]\"
-	                 size=50
-	                 maxlength=1024>
               </td>
           </tr>\n";
 
@@ -234,8 +226,7 @@ function SPITFORM($formfields, $errors)
           different protocol 2 public key format than some of the commercial 
           vendors such as <a href=www.ssh.com>SSH Communications</a>. If you
           use one of these commercial vendors, then please upload the public
-          key file and we will convert it for you. <i>Please do not paste
-          it in.</i>\n";
+          key file and we will convert it for you.\n";
 }
 
 #
@@ -254,27 +245,8 @@ if (! isset($_POST['submit'])) {
 #
 $errors = array();
 
-if (isset($formfields[usr_key]) &&
-    strcmp($formfields[usr_key], "")) {
-
-    #
-    # This is passed off to the shell, so taint check it.
-    # 
-    if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	$errors["PubKey"] = "Invalid characters";
-    }
-    else {
-        #
-        # Replace any embedded newlines first.
-        #
-	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
-	$usr_key = $formfields[usr_key];
-	$addpubkeyargs = "-k '$usr_key' ";
-    }
-}
-
 #
-# If usr provided a file for the key, it overrides the paste in text.
+# If usr provided a file for the key ...
 #
 if (isset($_FILES['usr_keyfile']) &&
     $_FILES['usr_keyfile']['name'] != "" &&
@@ -310,7 +282,7 @@ if (isset($addpubkeyargs)) {
     }
 }
 else {
-    $errors["Missing Args"] = "Please supply a key or a keyfile";
+    $errors["Missing Args"] = "Please supply keyfile";
 }
 
 # Spit the errors

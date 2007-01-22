@@ -307,30 +307,16 @@ function SPITFORM($formfields, $returning, $errors)
 	    # SSH public key
 	    #
 	    echo "<tr>
-                     <td rowspan><center>
-                                   Your SSH Pub Key: &nbsp<br>
-                                        [<b>2</b>]
-                                  </center></td>
-    
-                      <td rowspan><center>Upload (1K max)[<b>3</b>]<br>
-                                      <b>Or</b><br>
-                                   Insert Key
-                                 </center></td>
-    
-                      <td rowspan>
+                     <td colspan=2>Upload your SSH Pub Key[<b>2</b>]:<br>
+                                       (1K max)</td>
+   
+                     <td>
                           <input type=hidden name=MAX_FILE_SIZE value=1024>
                           <input type=file
                                  name=usr_keyfile
                                  value=\"" . $_FILES['usr_keyfile']['name'] .
 		                       "\"
 	                         size=50>
-                          <br>
-                          <br>
-	                  <input type=text
-                                 name=\"formfields[usr_key]\"
-                                 value=\"$formfields[usr_key]\"
-	                         size=50
-	                         maxlength=1024>
                       </td>
                   </tr>\n";
 	}
@@ -404,7 +390,7 @@ function SPITFORM($formfields, $returning, $errors)
                  regarding passwords and email addresses.\n";
     if (!$returning && !$forwikionly) {
 	echo "<li> If you want us to use your existing ssh public key,
-                   then either paste it in or specify the path to your
+                   then please specify the path to your
                    your identity.pub file.  <font color=red>NOTE:</font>
                    We use the <a href=http://www.openssh.org target='_blank'>OpenSSH</a>
                    key format,
@@ -412,13 +398,8 @@ function SPITFORM($formfields, $returning, $errors)
                    than some of the commercial vendors such as
                    <a href=http://www.ssh.com target='_blank'>SSH Communications</a>. If you
                    use one of these commercial vendors, then please
-                   upload the public  key file and we will convert it
-                   for you. <i>Please do not paste it in.</i>\n
-
-              <li> Note to <a href=http://www.opera.com target='_blank'><b>Opera 5</b></a>
-                   users: The file upload mechanism is broken in Opera, so
-                   you cannot specify a local file for upload. Instead,
-                   please paste your public key in.\n";
+                   upload the public key file and we will convert it
+                   for you.";
     }
     echo "</ol>
           </blockquote></blockquote>
@@ -738,10 +719,6 @@ if (! $returning) {
 
 	    $localfile = $_FILES['usr_keyfile']['tmp_name'];
 	    $args["pubkey"] = file_get_contents($localfile);
-	}
-	elseif (isset($formfields['usr_key']) &&
-		$formfields['usr_key'] != "") {
-	    $args["pubkey"] = $formfields[usr_key];
 	}
     }
     if (! ($user = User::NewNewUser(($forwikionly ? TBDB_NEWACCOUNT_WIKIONLY : 0),
