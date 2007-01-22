@@ -137,6 +137,18 @@ if( defined($pid) && defined($eid) ){
         }
     }
 #    chomp @allnodes;
+}else{
+    #remove blacknodes
+    for( my $i=0; $i < scalar(@allnodes); $i++ ){
+        if( defined $blacknodes{$allnodes[$i]})
+        {
+#            print "removing $allnodes[$i] from set\n";
+            splice( @allnodes, $i, 1 );
+            $i--;
+        }else{
+#            print "$allnodes[$i]\n";
+        }
+    }
 }
 
 #print "allnodes[".scalar(@allnodes-1]=$allnodes
@@ -372,7 +384,7 @@ sub checkConn($$){
                      "dstsite_idx=$srcsite)) ".
                      "limit 1";
     my @results = getRows($qstr);
-    print "getRows (latency) finished for query\n$qstr\n";
+#    print "getRows (latency) finished for query\n$qstr\n";
     if( !scalar(@results) ){
     }else{
         $latConn = 1;
