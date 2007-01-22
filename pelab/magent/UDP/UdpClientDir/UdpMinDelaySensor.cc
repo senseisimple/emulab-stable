@@ -60,7 +60,7 @@ void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 	// overhead for the packet - we assume that the packet on the reverse path
 	// has the same overhead length as the original packet.
 	if(udpStateInfo.isAckFake == true)
-		oneWayDelay = ( oneWayDelay ) * 1518 / (overheadLen + echoedPacketSize);
+		oneWayDelay = ( oneWayDelay ) * 1518 / (echoedPacketSize);
 	else
 		oneWayDelay = ( oneWayDelay ) * 1518 / ( (*vecIterator).packetSize);
 

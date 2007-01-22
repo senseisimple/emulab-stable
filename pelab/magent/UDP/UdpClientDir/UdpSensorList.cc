@@ -33,13 +33,13 @@ UdpSensorList::~UdpSensorList()
 	delete depMaxDelaySensor;
 }
 
-void UdpSensorList::capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp)
+void UdpSensorList::capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp, int packetDirection)
 {
 	UdpSensor *listIter = sensorListHead;
 
 	while(listIter != NULL)
 	{
-		listIter->capturePacket(packetData, Len, overheadLen, timeStamp);
+		listIter->capturePacket(packetData, Len, overheadLen, timeStamp, packetDirection);
 		listIter = listIter->next;
 	}
 

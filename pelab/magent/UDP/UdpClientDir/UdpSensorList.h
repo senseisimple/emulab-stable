@@ -19,7 +19,7 @@ class UdpSensorList {
 	~UdpSensorList();
 
 	void addSensor(int);
-	void capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
+	void capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp, int packetDirection);
 	void reset();
 	void testFunc();
 

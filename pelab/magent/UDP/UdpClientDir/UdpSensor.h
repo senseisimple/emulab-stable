@@ -7,7 +7,7 @@ class UdpSensor{
 	public:
 		UdpSensor();
 		virtual ~UdpSensor();
-		void capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
+		void capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp, int packetDirection);
 
 
 		UdpSensor *next;

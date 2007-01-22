@@ -42,6 +42,7 @@ struct UdpState globalUdpState;
 
 struct pcap_stat pcapStats;
 int currentPcapLoss = 0;
+
 // Use this file handle to log messages - statistics and any warnings/errors.
 std::ofstream logStream;
 UdpSensorList *sensorList;
@@ -100,36 +101,20 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 	// size is less than the min. ethernet packet size 64 bytes.
 	int overheadLen = ipPacket->ip_hl*4 + 8 + 14 + 4;
 
-        if(packetType == '0')// This is a udp data packet being sent from here. 
+        if(ntohs(udpHdr->dest) == (REMOTE_SERVER_PORT))// This is a udp data packet being sent from here. 
+        {
 		// Pass it to the packet sensor so that the send event, time
 		// of sending and packet size are recorded.
-        {
-		if(strcmp( inet_ntoa(ipPacket->ip_dst),localIP ) != 0 )
-		{
-			sensorList->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp);
-		}
+		sensorList->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp, 0);
 	}
-	else if(packetType == '1')
+	else 
 	{
 		// We received an app-level UDP ACK, pass it on to the sensors.
 		// Ignore the ACKs being sent out from this host. We do not
 		// need to record anything about them.
 
-		// TODO: For now, we are just passing the packet data part.
-		// For this to work correctly when integrated with magent,
-		// we also need to pass the local port, remote port and
-		// remote IP address, so that the connection can be looked up.
-
-		if(strcmp( inet_ntoa(ipPacket->ip_dst),localIP ) == 0 )
-		{
-			// Pass the captured packet to the udp sensors.
-			sensorList->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp);
-		}
-	}
-	else
-	{
-		logStream <<"ERROR::Unknown format UDP packet received from remote agent"<<endl;
-		return;
+		// Pass the captured packet to the udp sensors.
+		sensorList->capturePacket(reinterpret_cast<char *> (dataPtr), udpLen, overheadLen, timeStamp, 1);
 	}
 }
 
@@ -211,13 +196,13 @@ void pcapCallback(unsigned char *user, struct pcap_pkthdr const *pcap_info, unsi
 	handleUDP(pcap_info,udpPacket,udpPacketStart, ipPacket);
 }
 
-int init_pcap(char *interface, unsigned int portNumber)
+int init_pcap(char *interface)
 {
 	struct bpf_program bpfProg;
 	char errBuf[PCAP_ERRBUF_SIZE];
 	char filter[32] = "";
 
-	sprintf(filter," udp and port %d ", portNumber);
+	sprintf(filter," udp ");
 	// IP Address and sub net mask.
 	bpf_u_int32 maskp, netp;
 	struct in_addr localAddress;
@@ -244,8 +229,8 @@ int init_pcap(char *interface, unsigned int portNumber)
 int main(int argc, char *argv[]) 
 {
 
-	int sd, rc, i, n, flags, error;
-	socklen_t echoLen;
+	int sd, rc = 0, i, n, flags, error;
+	socklen_t echoLen, cliLen;
 	struct sockaddr_in cliAddr, remoteServAddr, echoServAddr;
 	struct hostent *h;
 	char msg[MAX_MSG];
@@ -254,20 +239,19 @@ int main(int argc, char *argv[])
 
 
 	/* check command line args */
-	if(argc < 8) 
+	if(argc < 7) 
 	{
-		printf("usage : %s <local-interface> <local-IP> <serverName> <packetCount> <packetSize> <SendRate-bps> <CPU-MHZ Integer>\n", argv[0]);
+		printf("usage : %s <local-interface> <serverName> <packetCount> <packetSize> <SendRate-bps> <CPU-MHZ Integer>\n", argv[0]);
 		exit(1);
 	}
 	logStream.open("stats.log", std::ios::out);
-	strcpy(localIP, argv[2]);
 
 	/* get server IP address (no check if input is IP address or DNS name */
-	h = gethostbyname(argv[3]);
+	h = gethostbyname(argv[2]);
 
 	if(h==NULL) 
 	{
-		logStream<<"ERROR:: "<<argv[0]<<": unknown host"<< argv[3]<<endl;
+		logStream<<"ERROR:: "<<argv[0]<<": unknown host"<< argv[2]<<endl;
 		exit(1);
 	}
 
@@ -300,22 +284,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	/* bind any port */
-	cliAddr.sin_family = AF_INET;
-	cliAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	cliAddr.sin_port = htons(3200);
-
-	rc = bind(sd, (struct sockaddr *) &cliAddr, sizeof(cliAddr));
-
-	if(rc<0) 
-	{
-		logStream<<"ERROR::"<<argv[0]<<": cannot bind port 3200"<<endl;
-		exit(1);
-	}
-
 	flags = 0;
-
-
 
 	// Initialize the sensors.
 	sensorList = new UdpSensorList(logStream);
@@ -325,7 +294,7 @@ int main(int argc, char *argv[])
 	sensorList->addSensor(UDP_MAXDELAY_SENSOR);
 
 	// Initialize the libpcap filter.
-	int pcapFD = init_pcap(argv[1], htons(cliAddr.sin_port));
+	int pcapFD = init_pcap(argv[1]);
 
 	char packetData[1600];
 	unsigned short int curSeqNum = 0;
@@ -342,16 +311,16 @@ int main(int argc, char *argv[])
 
 	// Read the command line arguments.
 	// Number of packets, Size of the packets to be sent, and their sending rate.
-	packetCount = atoi(argv[4]);
+	packetCount = atoi(argv[3]);
 	unsigned long long lastSendTime = 0;
 	unsigned long long curTime;
-	unsigned short int packetLen = atoi(argv[5]);
-	long sendRate = atoi(argv[6]);
+	unsigned short int packetLen = atoi(argv[4]);
+	long sendRate = atoi(argv[5]);
 
 	int overheadLen = 20 + 8 + 14 + 4;
 
 	// Fill in the MHz of the CPU - should be read from /proc/cpuinfo
-	long freqDivisor = atoi(argv[7]);
+	long freqDivisor = atoi(argv[6]);
 	//long freqDivisor = 601;
 
 	long long timeInterval = 800000000  / sendRate;
@@ -404,8 +373,8 @@ int main(int argc, char *argv[])
 //					logStream << "SendDeviation:TIME="<<curTime<<",Deviation="<< (curTime - lastSendTime) - timeInterval<<std::endl;
 
 					curSeqNum++;
-					// Indicate that this is a data UDP packet - not an ACK.
-					packetData[0] = '0';
+					// We want the server to be Version - 1.
+					packetData[0] = 1;
 
 					// Put the sequence number of the packet.
 					memcpy(&packetData[1],&curSeqNum, globalConsts::USHORT_INT_SIZE);
@@ -431,6 +400,11 @@ int main(int argc, char *argv[])
 					rc = sendto(sd, packetData, packetLen, flags, 
 					(struct sockaddr *) &remoteServAddr, 
 					sizeof(remoteServAddr));
+
+					// Get the port number which the socket was
+					// assigned, after the first the sendTo call.
+					if(curSeqNum == 1)
+						getsockname(sd, (sockaddr *)&cliAddr, &cliLen);
 
 					if(rc < 0)
 					{

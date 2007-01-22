@@ -12,7 +12,7 @@ UdpSensor::~UdpSensor()
 
 }
 
-void UdpSensor::capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp)
+void UdpSensor::capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp, int packetDirection)
 {
 	if(Len < 1)
 	{
@@ -21,13 +21,13 @@ void UdpSensor::capturePacket(char *packetData, int Len, int overheadLen, unsign
 		return;
 	}
 
-	if(packetData[0] == '0')
+	if(packetDirection == 0)
 	{
-		localSend( (packetData+1), Len - 1,overheadLen, timeStamp );
+		localSend( (packetData + 1), Len - 1,overheadLen, timeStamp );
 	}
-	else if(packetData[0] == '1')
+	else if(packetDirection == 1)
 	{
-		localAck( (packetData + 1), Len - 1,overheadLen, timeStamp );
+		localAck( (packetData), Len ,overheadLen, timeStamp );
 	}
 
 }
