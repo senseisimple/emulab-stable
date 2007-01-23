@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -433,25 +433,18 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	# users being added to their first project. After this, the status is
         # going to be "active", and we just leave it that way.
 	#
-        if (strcmp($curstatus, "active")) {
-	    if (strcmp($curstatus, "newuser") == 0) {
-		$newstatus = "unverified";
-            }
-	    elseif (strcmp($curstatus, "unapproved") == 0) {
-		$newstatus = "active";
-	    }
-	    elseif (strcmp($curstatus, "unverified") == 0) {
-		$newstatus = "unverified";
+	if ($curstatus != TBDB_USERSTATUS_ACTIVE) {
+	    if ($curstatus == TBDB_USERSTATUS_UNAPPROVED) {
+		$target_user->SetStatus(TBDB_USERSTATUS_ACTIVE);
 	    }
 	    else {
-	        TBERROR("Invalid $user status $curstatus in approveuser.php3",
-                         1);
+	        TBERROR("Invalid $user status $curstatus", 1);
 	    }
-	    if (!($user_interface = TBGetDefaultProjectUserInterface($project)))
+	    if (!($user_interface =
+		  $target_project->default_user_interface())) {
 		$user_interface = TBDB_USER_INTERFACE_EMULAB;
-
+	    }
 	    $target_user->SetUserInterface($user_interface);
-	    $target_user->SetStatus($newstatus);
 
             #
             # Create user account on control node.
@@ -463,20 +456,6 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	# 
 	SUEXEC($uid, $TBADMINGROUP,
 	       "webmodgroups -a $project:$group:$newtrust $user", 1);
-
-        TBMAIL("$user_name '$user' <$user_email>",
-             "Membership Approved in '$project/$group' ",
-	     "\n".
-	     "This message is to notify you that you have been approved\n".
-	     "as a member of project/group $project/$group with\n".
-	     "$newtrust permissions.\n".
-             "\n\n".
-             "Thanks,\n".
-             "Testbed Operations\n",
-             "From: $uid_name <$uid_email>\n".
-             "Cc:  $leaders\n".
-             "Bcc: $TBMAIL_AUDIT\n".
-             "Errors-To: $TBMAIL_WWW");
 
 	echo "<p>
                   User $user was <b>granted</b> membership in $project/$group

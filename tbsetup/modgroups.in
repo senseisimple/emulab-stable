@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use strict;
 
 #
 # Modify groups (add and subtract in DB) for a user, and then call
@@ -49,9 +50,6 @@ my $SETGROUPS	   = "$TB/sbin/setgroups";
 my $SSH		   = "$TB/bin/sshtb";
 my $SAVEUID	   = $UID;
 
-# Locals
-my $dbuid;
-
 #
 # Untaint the path
 #
@@ -70,6 +68,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
 # Protos
 sub fatal($);
@@ -86,7 +85,7 @@ if ($UID == 0) {
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -151,18 +150,16 @@ else {
     die("Bad user name: $user.");
 }
 
-#
-# Lookup current user (person running this command).
-#
-if (! ($dbuid = User->LookupByUnixId($UID))) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
-# And the target user ...
-if (! ($target_user = User->LookupByUid($user))) {
-    die("*** $0:\n".
-        "    $user does not exist in the Emulab Database!\n");
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
 }
 
 #
@@ -208,13 +205,13 @@ foreach my $token (@addlist) {
 	    if ($curtrust ne "none" && $curtrust ne $trust && !$ELABINELAB);
 
 	$membership->ModifyTrust($trust) == 0
-	    or fatal("Could not modify $membership to '$trust'");
+	    or fatal("Could not modify $membership to $trust");
     }
     else {
 	$group->AddMemberShip($target_user, $trust) == 0
-	    or fatal("Could not add $user to $pid/$gid with trust $trust");
+	    or fatal("Could not add $user to $group with trust $trust");
     }
-    
+
     #
     # Tell chat subsystem to change groups ...
     #
@@ -228,6 +225,9 @@ foreach my $token (@addlist) {
 		fatal("$SETCHATMEMBERS '-g $gid $pid' failed!");
 	}
     }
+    
+    $group->SendApprovalEmail($this_user, $target_user) == 0
+	or fatal("Could not send approval email to $target_user in $group");
 }
 
 #
@@ -246,6 +246,9 @@ foreach my $token (@modlist) {
     }
     $membership->ModifyTrust($trust) == 0
 	    or fatal("Could not modify $membership to '$trust'");
+
+    $group->SendTrustChangeEmail($this_user, $target_user) == 0
+	or fatal("Could not send trust change email to $target_user");
 }
 
 #

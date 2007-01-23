@@ -324,6 +324,12 @@ sub AddMemberShip($$;$)
     return -1
 	if (! (ref($self) && ref($user)));
 
+    my $membership = $self->LookupUser($user);
+
+    if (defined($membership)) {
+	print "*** AddMemberShip: $user is already a member of $self!\n";
+	return -1;
+    }
     return Group::MemberShip->NewMemberShip($self, $user, $trust);
 }
 
@@ -411,6 +417,86 @@ sub SendJoinEmail($$)
 	     "Thanks,\n".
 	     "Testbed Operations\n",
 	     "$TBAPPROVAL",
+	     "CC: $allleaders\n".
+	     "Bcc: $TBAUDIT");
+
+    return 0;
+}
+
+#
+# Send email notifying of initial approval testbed approval in a group.
+#
+sub SendApprovalEmail($$$)
+{
+    my ($self, $this_user, $target_user) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($this_user) && ref($target_user)));
+
+    my $usr_email   = $target_user->email();
+    my $usr_name    = $target_user->name();
+    my $usr_uid     = $target_user->uid();
+    my $this_name   = $this_user->name();
+    my $this_email  = $this_user->email();
+    my $pid         = $self->pid();
+    my $gid         = $self->gid();
+    my $allleaders  = $self->LeaderMailList();
+    my $membership  = $self->LookupUser($target_user);
+
+    return -1
+	if (!defined($membership));
+
+    my $trust = $membership->trust();
+
+    SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
+             "Membership Approved in '$pid/$gid' ",
+	     "\n".
+	     "This message is to notify you that you have been approved as\n".
+	     "a member of $pid/$gid with '$trust' permission.\n".
+             "\n\n".
+             "Thanks,\n".
+             "Testbed Operations\n",
+             "$this_name <$this_email>",
+	     "CC: $allleaders\n".
+	     "Bcc: $TBAUDIT");
+
+    return 0;
+}
+
+sub SendTrustChangeEmail($$$)
+{
+    my ($self, $this_user, $target_user) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($this_user) && ref($target_user)));
+
+    my $usr_email   = $target_user->email();
+    my $usr_name    = $target_user->name();
+    my $usr_uid     = $target_user->uid();
+    my $this_name   = $this_user->name();
+    my $this_email  = $this_user->email();
+    my $pid         = $self->pid();
+    my $gid         = $self->gid();
+    my $allleaders  = $self->LeaderMailList();
+    my $membership  = $self->LookupUser($target_user);
+
+    return -1
+	if (!defined($membership));
+
+    my $trust = $membership->trust();
+
+    SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
+             "Membership Change in '$pid/$gid' ",
+	     "\n".
+	     "This message is to notify you that your permission in $pid/$gid".
+	     "\n".
+	     "has been changed to '$trust'\n".
+             "\n\n".
+             "Thanks,\n".
+             "Testbed Operations\n",
+             "$this_name <$this_email>",
 	     "CC: $allleaders\n".
 	     "Bcc: $TBAUDIT");
 
