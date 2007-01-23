@@ -300,6 +300,9 @@ class Project
 	$this->group = $group;
 	return $group;
     }
+    function Group() {
+	return $this->LoadGroup();
+    }
 
     #
     # Return user object for leader.
@@ -424,8 +427,262 @@ class Project
 
 	$this->project["pcremote_ok"] = $ok;
 	return 0;
-	
-
     }
 
+    function Show() {
+	global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR, $TBCVSREPO_DIR;
+	global $MAILMANSUPPORT, $OPSCVSURL, $USERNODE;
+
+	$group = $this->Group();
+
+	$pid                    = $this->pid();
+	$proj_idx		= $this->pid_idx();
+	$proj_created		= $this->created();
+	$proj_name		= $this->name();
+	$proj_URL		= $this->URL();
+	$proj_public		= YesNo($this->public());
+	$proj_funders		= $this->funders();
+	$proj_head_idx		= $this->head_idx();
+	$proj_members		= $this->num_members();
+	$proj_pcs		= $this->num_pcs();
+        # These are now booleans, not actual counts.
+	$proj_ronpcs		= YesNo($this->num_ron());
+	$proj_plabpcs		= YesNo($this->num_pcplab());
+	$proj_linked		= YesNo($this->linked_to_us());
+	$proj_why		= nl2br($this->why());
+	$approved		= YesNo($this->approved());
+	$expt_count		= $this->expt_count();
+	$expt_last		= $this->expt_last();
+	$wikiname		= $group->wikiname();
+	$cvsrepo_public		= $this->cvsrepo_public();
+
+	if (! ($head_user = User::Lookup($proj_head_idx))) {
+	    TBERROR("Could not lookup object for user $proj_head_idx", 1);
+	}
+	$showuser_url  = CreateURL("showuser", $head_user);
+	$showproj_url  = CreateURL("showproject", $this);
+	$proj_head_uid = $head_user->uid();
+
+	if (!$expt_last) {
+	    $expt_last = "&nbsp;";
+	}
+
+	echo "<center>
+              <h3>Project Profile</h3>
+              </center>
+              <table align=center cellpadding=2 border=1>\n";
+    
+        #
+        # Generate the table.
+        # 
+	echo "<tr>
+                  <td>Name: </td>
+                  <td class=\"left\">
+                      <a href='showproj_url'>$pid ($proj_idx)</a></td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Description: </td>
+                  <td class=\"left\">$proj_name</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Project Head: </td>
+                  <td class=\"left\">
+                      <a href='$showuser_url'>$proj_head_uid</a></td>
+              </tr>\n";
+    
+	echo "<tr>
+              <td>URL: </td>
+                  <td class=\"left\">
+                      <a href='$proj_URL'>$proj_URL</a></td>
+              </tr>\n";
+
+	if ($WIKISUPPORT && isset($wikiname)) {
+	    $wikiurl = "gotowiki.php3?redurl=$wikiname/WebHome";
+	
+	    echo "<tr>
+                      <td>Project Wiki:</td>
+                      <td class=\"left\">
+                          <a href='$wikiurl'>$wikiname</a></td>
+                  </tr>\n";
+	}
+	if ($CVSSUPPORT) {
+	    $cvsdir = "$TBCVSREPO_DIR/$pid";
+	    $cvsurl = "cvsweb/cvsweb.php3?pid=$pid";
+	
+	    echo "<tr>
+                      <td>Project CVS Repository:</td>
+                      <td class=\"left\">
+                          $cvsdir <a href='$cvsurl'>(CVSweb)</a></td>
+                  </tr>\n";
+
+	    $YesNo = YesNo($cvsrepo_public);
+	    $flip  = ($cvsrepo_public ? 0 : 1);
+	    echo "<tr>
+                      <td>CVS Repository Publically Readable?:</td>
+                      <td><a href=toggle.php?pid=$pid&type=cvsrepo_public".
+		          "&value=$flip>$YesNo</a> (Click to toggle)</td>
+                  </tr>\n";
+
+	    if ($cvsrepo_public) {
+		$puburl  = "$OPSCVSURL/?cvsroot=$pid";
+		$pserver = ":pserver:anoncvs@$USERNODE:/cvsrepos/$pid";
+		
+		echo "<tr>
+                          <td>Public CVSWeb Address:</td>
+                          <td><a href=$puburl>" .
+		                 htmlspecialchars($puburl) . "</a></td>
+                      </tr>\n";
+
+		echo "<tr>
+                          <td>CVS pserver Address:</td>
+                          <td>" . htmlspecialchars($pserver) . "</td>
+                      </tr>\n";
+	    }
+	}
+
+	if ($MAILMANSUPPORT) {
+	    $mmurl   = "gotommlist.php3?pid=$pid";
+
+	    echo "<tr>
+                      <td>Project Mailing List:</td>
+                      <td class=\"left\">
+                          <a href='$mmurl'>${pid}-users</a> ";
+	    if (ISADMIN()) {
+		$mmurl .= "&wantadmin=1";
+		echo "<a href='$mmurl'>(admin access)</a>";
+	    }
+	    echo "    </td>
+                  </tr>\n";
+	}
+
+	echo "<tr>
+                  <td>Publicly Visible: </td>
+                  <td class=\"left\">$proj_public</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Link to Us?: </td>
+                  <td class=\"left\">$proj_linked</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Funders: </td>
+                  <td class=\"left\">$proj_funders</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>#Project Members: </td>
+                  <td class=\"left\">$proj_members</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>#PCs: </td>
+                  <td class=\"left\">$proj_pcs</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Planetlab Access: </td>
+                  <td class=\"left\">$proj_plabpcs</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>RON Access: </td>
+                  <td class=\"left\">$proj_ronpcs</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Created: </td>
+                  <td class=\"left\">$proj_created</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Experiments Created:</td>
+                  <td class=\"left\">$expt_count</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Date of last experiment:</td>
+                  <td class=\"left\">$expt_last</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Approved?: </td>
+                  <td class=\"left\">$approved</td>
+	      </tr>\n";
+
+	echo "<tr>
+                  <td colspan='2'>Why?:</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td colspan='2' width=600>$proj_why</td>
+              </tr>\n";
+    
+	echo "</table>\n";
+    }
+
+    function ShowGroupList() {
+	$pid_idx  = $this->pid_idx();
+
+	$query_result =
+	    DBQueryFatal("select * from groups where pid_idx='$pid_idx'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    return;
+	}
+
+	echo "<h3>Project Groups</h3>\n";
+	echo "<table align=center border=1>\n";
+	echo "<tr>
+               <th>GID</th>
+               <th>Description</th>
+               <th>Leader</th>
+              </tr>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $gid      = $row[gid];
+	    $desc     = $row[description];
+	    $leader   = $row[leader];
+
+	    if (! ($leader_user = User::Lookup($leader))) {
+		TBERROR("Could not lookup object for user $leader", 1);
+	    }
+	    $showuser_url = CreateURL("showuser", $leader_user);
+
+	    echo "<tr>
+                   <td><A href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
+                   <td>$desc</td>
+                   <td><A href='$showuser_url'>$leader</A></td>
+                 </tr>\n";
+	}
+	echo "</table>\n";
+    }
+
+    function ShowStats() {
+	$pid_idx  = $this->pid_idx();
+
+	$query_result =
+	    DBQueryFatal("select * from project_stats ".
+			 "where pid_idx='$pid_idx'");
+
+	if (! mysql_num_rows($query_result)) {
+	    return;
+	}
+	$row = mysql_fetch_assoc($query_result);
+
+        #
+        # Not pretty printed yet.
+        #
+	echo "<table align=center border=1>\n";
+    
+	foreach($row as $key => $value) {
+	    echo "<tr>
+                      <td>$key:</td>
+                      <td>$value</td>
+                  </tr>\n";
+	}
+	echo "</table>\n";
+    }
 }

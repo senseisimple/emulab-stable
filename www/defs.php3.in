@@ -457,6 +457,13 @@ function ARRAY_PRINT($arr) {
 }
 
 #
+# Return Yes or No given boolean
+#
+function YesNo($bool) {
+    return ($bool ? "Yes" : "No");
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 require("tbauth.php3");

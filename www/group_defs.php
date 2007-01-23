@@ -125,6 +125,13 @@ class Group
     }
 
     #
+    # Is this group the default project group. Returns boolean.
+    #
+    function IsProjectGroup() {
+	return $this->pid_idx() == $this->gid_idx();
+    }
+
+    #
     # Access Check, which for now uses the global function to avoid duplication
     # until all code is changed.
     #
@@ -685,5 +692,216 @@ class Group
 		$row[usr_email] . ">";
 	}
 	return $mailstr;
+    }
+
+    function Show() {
+	global $OURDOMAIN;
+	global $MAILMANSUPPORT;
+
+	echo "<center>
+               <h3>Group Profile</h3>
+              </center>
+              <table align=center border=1>\n";
+
+	$pid         = $this->pid();
+	$gid         = $this->gid();
+	$gid_idx     = $this->gid_idx();
+	$created     = $this->created();
+	$leader	     = $this->leader();
+	$description = $this->description();
+	$expt_count  = $this->expt_count();
+	$expt_last   = $this->expt_last();
+	$unix_gid    = $this->unix_gid();
+	$unix_name   = $this->unix_name();
+
+	if ($this->IsProjectGroup()) 
+	    $mail = "$pid" . "-users@" . $OURDOMAIN;
+	else
+	    $mail = "$pid-$gid" . "-users@" . $OURDOMAIN;
+
+	if (!$expt_last) {
+	    $expt_last = "&nbsp;";
+	}
+
+	if (! ($leader_user = $this->GetLeader())) {
+	    TBERROR("Could not lookup object for user $leader", 1);
+	}
+	$showuser_url = CreateURL("showuser", $leader_user);
+
+	echo "<tr>
+                  <td>GID: </td>
+                  <td class=\"left\">
+                   <a href='showgroup.php3?pid=$pid&gid=$gid'>$gid ($gid_idx)".
+	          "</a></td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>PID: </td>
+                  <td class=\"left\">
+                    <a href='showproject.php3?pid=$pid'>$pid</a></td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Description: </td>
+                  <td class=\"left\">$description</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Unix GID: </td>
+                  <td class=\"left\">$unix_gid</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Unix Group Name: </td>
+                  <td class=\"left\">$unix_name</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Group Leader: </td>
+                  <td class=\"left\">
+                     <a href='$showuser_url'>$leader</a></td>
+              </tr>\n";
+    
+	if ($MAILMANSUPPORT) {
+	    $mmurl   = "gotommlist.php3?pid=$pid&gid=$gid";
+
+	    echo "<tr>
+                      <td>Email List:</td>
+                      <td class=\"left\">
+                          <a href='$mmurl'>$mail</a> ";
+
+	    if (ISADMIN()) {
+		$mmurl .= "&wantadmin=1";
+		echo "<a href='$mmurl'>(admin page)</a>";
+	    }
+	    echo "    </td>
+                  </tr>\n";
+	}
+	else {
+	    echo "<tr>
+                      <td>Email List: </td>
+                      <td class=\"left\">$mail</td>
+                  </tr>\n";
+	}
+
+	echo "<tr>
+                  <td>Created: </td>
+                  <td class=\"left\">$created</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Experiments Created:</td>
+                  <td class=\"left\">$expt_count</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Date of last experiment:</td>
+                  <td class=\"left\">$expt_last</td>
+              </tr>\n";
+    
+	echo "</table>\n";
+    }
+
+    #
+    # Pretty display of group members.
+    #
+    function ShowMembers($prived = 0) {
+	$gid_idx = $this->gid_idx();
+	$pid_idx = $this->pid_idx();
+
+	$query_result =
+	    DBQueryFatal("select uid_idx,trust from group_membership ".
+			 "where pid_idx='$pid_idx' and gid_idx='$gid_idx'");
+    
+	if (! mysql_num_rows($query_result)) {
+	    return;
+	}
+	$showdel  = (($prived && $pid_idx == $gid_idx) ? 1 : 0);
+	$projgrp  = (($pid_idx == $gid_idx) ? 1 : 0);
+
+	echo "<center>\n";
+	if ($projgrp)
+	    echo "<h3>Project Members</h3>\n";
+	else
+	    echo "<h3>Group Members</h3>\n";
+
+	echo "</center>
+              <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+	echo "<tr>
+                  <th>Name</th>\n";
+	if (! $projgrp) {
+	    echo "<th>Email</th>\n";
+	}
+	echo "    <th>UID</th>
+                  <th>Privs</th>\n";
+	if ($showdel) {
+	    echo "<th>Remove</th>\n";
+	}
+	echo "</tr>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $uid_idx = $row["uid_idx"];
+	    $trust   = $row["trust"];
+
+	    if (! ($target_user = User::Lookup($uid_idx))) {
+		TBERROR("Could not lookup object for user $target_uid", 1);
+	    }
+	    $usr_name     = $target_user->name();
+	    $usr_email    = $target_user->email();
+	    $usr_uid      = $target_user->uid();
+	    $showuser_url = CreateURL("showuser", $target_user);
+	    $deluser_url  = CreateURL("deleteuser", $target_user,
+				      URLARG_PID, $pid);
+
+	    echo "<tr>
+                      <td>$usr_name</td>\n";
+
+	    if (! $projgrp) {
+		echo "<td>$usr_email</td>\n";
+	    }
+	    echo "    <td>
+                        <a href='$showuser_url'>$usr_uid</a>
+                      </td>\n";
+
+	    if ($trust == TBDB_TRUSTSTRING_NONE) 
+		echo "<td><font color=red>$trust</font></td>\n";
+	    else
+		echo "<td>$trust</td>\n";
+
+	    if ($showdel) {
+		echo "<td align=center>
+		          <a href='$deluser_url'>
+                             <img alt='Delete User' src=redball.gif></td>\n";
+	    }
+	    echo "</tr>\n";
+	}
+	echo "</table>\n";
+    }
+
+    function ShowStats() {
+	$gid_idx = $this->gid_idx();
+
+	$query_result =
+	    DBQueryFatal("SELECT * from group_stats ".
+			 "where gid_idx='$gid_idx'");
+
+	if (! mysql_num_rows($query_result)) {
+	    return;
+	}
+	$row = mysql_fetch_assoc($query_result);
+
+        #
+        # Not pretty printed yet.
+        #
+	echo "<table align=center border=1>\n";
+    
+	foreach($row as $key => $value) {
+	    echo "<tr>
+                      <td>$key:</td>
+                      <td>$value</td>
+                  </tr>\n";
+	}
+	echo "</table>\n";
     }
 }

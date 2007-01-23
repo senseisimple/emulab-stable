@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -42,14 +42,15 @@ if (!TBvalid_pid($pid)) {
 #
 # Check to make sure thats this is a valid PID.
 #
-if (! TBValidProject($pid)) {
+if (! ($project = Project::Lookup($pid))) {
     USERERROR("The project '$pid' is not a valid project.", 1);
 }
+$group = $project->Group();
 
 #
 # Verify that this uid is a member of the project being displayed.
 #
-if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
+if (! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
     USERERROR("You are not a member of Project $pid.", 1);
 }
 
@@ -86,7 +87,7 @@ if ($numpcs) {
     echo "</font></center>\n";
 }
 
-SHOWPROJECT($pid, $uid);
+$project->Show();
 SUBPAGEEND();
 
 echo "<center>\n";
@@ -96,41 +97,15 @@ echo "<tr valign=top><td class=stealth align=center>\n";
 #
 # A list of project members (from the default group).
 #
-SHOWGROUPMEMBERS($pid, $pid, 0);
+$group->ShowMembers();
 
 echo "</td><td align=center class=stealth>\n";
 
 #
 # A list of project Groups
 #
-echo "<h3>Project Groups</h3>\n";
+$project->ShowGroupList();
 
-$query_result =
-    DBQueryFatal("SELECT * FROM groups WHERE pid='$pid'");
-echo "<table align=center border=1>\n";
-echo "<tr>
-          <th>GID</th>
-          <th>Description</th>
-          <th>Leader</th>
-      </tr>\n";
-
-while ($row = mysql_fetch_array($query_result)) {
-    $gid      = $row[gid];
-    $desc     = stripslashes($row[description]);
-    $leader   = $row[leader];
-
-    if (! ($leader_user = User::Lookup($leader))) {
-	TBERROR("Could not lookup object for user $leader", 1);
-    }
-    $showuser_url = CreateURL("showuser", $leader_user);
-
-    echo "<tr>
-              <td><A href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
-              <td>$desc</td>
-              <td><A href='$showuser_url'>$leader</A></td>
-          </tr>\n";
-}
-echo "</table>\n";
 echo "</td></table>\n";
 echo "</center>\n";
 
@@ -149,7 +124,7 @@ if ($isadmin) {
           <h3>Project Stats</h3>
          </center>\n";
 
-    SHOWPROJSTATS($pid);
+    $project->ShowStats();
 }
 
 #

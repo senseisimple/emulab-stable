@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -74,7 +74,7 @@ if ($group->AccessCheck($this_user, $TB_PROJECT_BESTOWGROUPROOT)) {
 # to main group either! This will force them to go through the approval
 # page first.
 #
-$curmembers = $group->MemberList();
+$curmembers =& $group->MemberList();
 
 #
 # Grab the user list from the project. These are the people who can be
@@ -87,7 +87,7 @@ $nonmembers = $group->NonMemberList();
 #
 # We do not allow the actual group info to be edited. Just the membership.
 #
-SHOWGROUP($pid, $gid, $uid);
+$group->Show();
 
 echo "<br><center>
        Important <a href='docwrapper.php3?docname=groups.html#SECURITY'>

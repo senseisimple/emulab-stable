@@ -1443,21 +1443,6 @@ function TBGetExptIdleIgnore($pid,$eid) {
 }
 
 #
-# Get the default user interface that has been selected for the project.
-#
-function TBGetDefaultProjectUserInterface($pid) {
-    $query_result =
-	DBQueryWarn("select default_user_interface from projects ".
-		    "where pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return $row[0];
-}
-
-#
 # Check if a site-specific variable exists. 
 #
 # usage: TBSiteVarExists($name)
