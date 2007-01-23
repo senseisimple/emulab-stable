@@ -221,7 +221,7 @@ if ($eid =~ /^([-\w\.]+)$/) {
 else {
     tbdie("Tainted argument $eid!");
 }
-my $repfile = "report";
+my $repfile = "tbreport.log";
 my $tempnsfile;
 my $modnsfile;
 my $nsfile;
