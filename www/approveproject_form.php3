@@ -77,7 +77,7 @@ echo "<center><h3>You have the following choices:</h3></center>
 #
 # Show stuff
 #
-SHOWPROJECT($pid, $uid);
+$this_project->Show();
 
 $projleader = $this_project->GetLeader();
 

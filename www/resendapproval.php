@@ -40,7 +40,7 @@ if (! ($target_project = Project::Lookup($pid))) {
 #
 function SPITFORM($pid, $message, $errors)
 {
-    global $this_user;
+    global $this_user, $target_project;
     
     if ($errors) {
 	echo "<table class=nogrid
@@ -67,7 +67,7 @@ function SPITFORM($pid, $message, $errors)
     #
     # Show stuff
     #
-    SHOWPROJECT($pid, $this_user->uid());
+    $target_project->Show();
 
     echo "<br>";
     echo "<table align=center border=1>\n";
