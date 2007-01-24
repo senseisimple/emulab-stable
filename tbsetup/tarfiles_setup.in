@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -315,8 +315,11 @@ while (my ($URL, $localfile) = each %tofetch) {
 # Now add to the archive.
 #
 while (my ($localfile, $ignored) = each %toarchive) {
+    # Lets not do this as root. 
+    $EUID = $UID;
     libArchive::TBExperimentArchiveAddFile($pid, $eid, $localfile) == 0 or
 	tbdie("Failed to add $localfile to the archive!");
+    $EUID = 0;
 }
 
 #
