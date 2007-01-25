@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <sched.h>
+#include <signal.h>
 
 #define MAX_SAMPLES    100000
 
@@ -27,7 +28,7 @@ void
 usage()
 {
 	fprintf(stderr,
-		"Usage: %s [-s usecs] [-n numsamples] [-t] [-l seconds] [-r numruns]\n",
+		"Usage: %s [-s usecs] [-n numsamples] [-t] [-l seconds] [-r numruns] [-b]\n",
 		progname);
 	exit(-1);
 }
@@ -42,6 +43,7 @@ int main (int argc, char **argv) {
   unsigned long run = 0;
   char c;
   int i;
+  sigset_t block_sig;
 
   /* config variables */
   int sleepusecs = 0;
@@ -49,10 +51,11 @@ int main (int argc, char **argv) {
   int usegettimeofday = 0;
   int loopdelay = 1;
   int numruns = 0;
+  int block = 0;
 
   progname = argv[0];
 
-  while ((c = getopt(argc, argv, "s:n:tl:r:")) != -1) {
+  while ((c = getopt(argc, argv, "s:n:tl:r:b")) != -1) {
     switch (c) {
     case 's':
       sleepusecs = atoi(optarg);
@@ -83,6 +86,9 @@ int main (int argc, char **argv) {
       numruns = atoi(optarg);
       printf("Runs: %u\n", numruns);
       break;
+    case 'b':
+      block = 1;
+      break;
     default:
       usage();
     }
@@ -90,16 +96,23 @@ int main (int argc, char **argv) {
   argc -= optind;
   argv += optind;
 
+  sigemptyset (&block_sig);
+  sigaddset (&block_sig, SIGTERM);
+  sigaddset (&block_sig, SIGHUP);
+ 
   run = 1;
   while(!numruns || run <= numruns) {
     struct timeval now;
 
+    if (block) 
+      sigprocmask (SIG_BLOCK, &block_sig, NULL);
     gettimeofday(&now, &dummytz);
     printf("*** Run: %lu ***\n", run);
     printf("Time: %lu %lu\n", now.tv_sec, now.tv_usec);
     
     getloadavg(loadavg, 3);
     printf("Load: %f %f %f\n", loadavg[0], loadavg[1], loadavg[2]);
+    fflush(stdout);
 
     for (i = 0; i < numsamples; ++i) {
       usegettimeofday ? 
@@ -109,8 +122,6 @@ int main (int argc, char **argv) {
         nanosleep(&sleepintvl, &sleptintvl) : 
         sched_yield();
     }
-
-    sleep(loopdelay);
 
     for (i = 1; i < numsamples; ++i) {
       if (usegettimeofday) {
@@ -124,7 +135,16 @@ int main (int argc, char **argv) {
       }
     }
     run++;
+    fflush(stdout);
+    if (block)
+      sigprocmask (SIG_UNBLOCK, &block_sig, NULL);
+
+    sleep(loopdelay);
   }
 
   return 0;
 }
+
+
+
+
