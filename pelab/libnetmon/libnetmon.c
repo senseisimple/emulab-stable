@@ -603,8 +603,6 @@ void printlog(logmsg_t type, int fd, ...) {
         case LOG_CONNECTED:
             // No Value
             print_value = false;
-            // Old version didn't include a timestamp
-            if (output_version < 3) { print_timestamp = false; }
             // This message only showed up in version 2
             if (output_version < 2) { print = false; }
             // Allow global turning on/off of this message type
