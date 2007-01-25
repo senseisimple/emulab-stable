@@ -24,8 +24,7 @@ $isadmin   = ISADMIN();
 if (!isset($user) || $user == "") {
     USERERROR("You must provide a User ID.", 1);
 }
-if (isset($target_pid) &&
-    strcmp($target_pid, "") == 0) {
+if (isset($pid) && $pid == "") {
     USERERROR("You must provide a valid project ID.", 1);
 }
 
@@ -67,10 +66,12 @@ if (isset($request) && $request) {
 #
 # Confirm optional pid is a real pid and check permission
 #
-if (isset($target_pid)) {
-    if (! ($target_project = Project::Lookup($target_pid))) {
-	USERERROR("No such project '$target_pid'", 1);
+if (isset($pid)) {
+    if (! ($target_project = Project::Lookup($pid))) {
+	USERERROR("No such project '$pid'", 1);
     }
+    $target_pid = $target_project->pid();
+    
     if (! $isadmin &&
 	! $target_project->AccessCheck($this_user, $TB_PROJECT_DELUSER)) {
 	USERERROR("You do not have permission to remove user ".
@@ -82,7 +83,7 @@ if (isset($target_pid)) {
 # Must not be the head of the project being removed from, or any projects
 # if being completely removed.
 #
-if (isset($target_pid)) {
+if (isset($target_project)) {
     $leader = $target_project->GetLeader();
 
     if ($leader->SameUser($target_user)) {
@@ -101,7 +102,7 @@ else {
 # Must not be the head of any groups in the project, or any groups if
 # being deleted from the testbed.
 #
-if (isset($target_pid)) {
+if (isset($target_project)) {
     $query_result =
 	DBQueryFatal("select pid,gid from groups ".
 		     "where leader='$target_uid' and pid='$target_pid'");
@@ -128,12 +129,12 @@ else {
 $query_result =
     DBQueryFatal("SELECT * FROM experiments ".
 		 "where expt_head_uid='$target_dbuid' ".
-		 (isset($target_pid) ? "and pid='$target_pid'" : ""));
+		 (isset($target_project) ? "and pid='$target_pid'" : ""));
 
 if (mysql_num_rows($query_result)) {
     echo "<center><h3>
           User '$target_uid' is heading up the following experiments ".
-	  (isset($target_pid) ? "in project '$target_pid' " : "") .
+	  (isset($target_project) ? "in project '$target_pid' " : "") .
 	  ":</h3></center>\n";
 
     echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
@@ -181,7 +182,7 @@ if ($canceled) {
 if (!$confirmed) {
     echo "<center><br>\n";
 
-    if (isset($target_pid)) {
+    if (isset($target_project)) {
 	echo "Are you <b>REALLY</b> sure you want to remove user
               '$target_uid' from project '$target_pid'?\n";
     }
@@ -190,11 +191,12 @@ if (!$confirmed) {
               '$target_uid' from the testbed?\n";
     }
     
-    echo "<form action=deleteuser.php3 method=post>";
-    echo "<input type=hidden name=user value=\"$user\">\n";
-    if (isset($target_pid)) {
-	echo "<input type=hidden name=target_pid value=\"$target_pid\">\n";
-    }
+    if (isset($target_project))
+	$url = CreateURL("deleteuser", $target_user, $target_project);
+    else
+	$url = CreateURL("deleteuser", $target_user);
+    
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -208,7 +210,7 @@ if (!$confirmed_twice) {
     echo "<center><br>
 	  Okay, let's be sure.<br>\n";
 
-    if (isset($target_pid)) {
+    if (isset($target_project)) {
 	echo "Are you <b>REALLY REALLY</b> sure you want to remove user
               '$target_uid' from project '$target_pid'?\n";
     }
@@ -216,12 +218,13 @@ if (!$confirmed_twice) {
 	echo "Are you <b>REALLY REALLY</b> sure you want to delete user 
               '$target_uid' from the testbed?\n";
     }
+
+    if (isset($target_project))
+	$url = CreateURL("deleteuser", $target_user, $target_project);
+    else
+	$url = CreateURL("deleteuser", $target_user);
     
-    echo "<form action=deleteuser.php3 method=post>";
-    echo "<input type=hidden name=user value=\"$user\">\n";
-    if (isset($target_pid)) {
-	echo "<input type=hidden name=target_pid value=\"$target_pid\">\n";
-    }
+    echo "<form action='$url' method=post>";
     echo "<input type=hidden name=confirmed value=Confirm>\n";
     echo "<b><input type=submit name=confirmed_twice value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
@@ -238,7 +241,7 @@ STARTBUSY("User '$target_uid' is being removed!");
 # All the real work is done in the script.
 #
 SUEXEC($uid, $TBADMINGROUP,
-       "webrmuser " . (isset($target_pid) ? "-p $target_pid " : " ") .
+       "webrmuser " . (isset($target_project) ? "-p $target_pid " : " ") .
        "$target_uid",
        SUEXEC_ACTION_DIE);
 
@@ -250,7 +253,7 @@ STOPBUSY();
 # people can act on it immediately of couse, but mere users, even
 # project leaders, must send us a request for it.
 #
-if (isset($target_pid)) {
+if (isset($target_project)) {
     $projlist = $target_user->ProjectMembershipList();
     
     if (! count($projlist)) {
@@ -269,7 +272,7 @@ if (isset($target_pid)) {
 	}
     }
     else {
-	if (isset($target_pid)) {
+	if (isset($target_project)) {
 	    PAGEREPLACE(CreateURL("showgroup", URLARG_PID, $target_pid,
 				  URLARG_GID, $target_pid));
 	}

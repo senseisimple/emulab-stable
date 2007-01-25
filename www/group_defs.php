@@ -808,6 +808,7 @@ class Group
     function ShowMembers($prived = 0) {
 	$gid_idx = $this->gid_idx();
 	$pid_idx = $this->pid_idx();
+	$project = $this->Project();
 
 	$query_result =
 	    DBQueryFatal("select uid_idx,trust from group_membership ".
@@ -817,7 +818,7 @@ class Group
 	    return;
 	}
 	$showdel  = (($prived && $pid_idx == $gid_idx) ? 1 : 0);
-	$projgrp  = (($pid_idx == $gid_idx) ? 1 : 0);
+	$projgrp  = $this->IsProjectGroup();
 
 	echo "<center>\n";
 	if ($projgrp)
@@ -851,8 +852,7 @@ class Group
 	    $usr_email    = $target_user->email();
 	    $usr_uid      = $target_user->uid();
 	    $showuser_url = CreateURL("showuser", $target_user);
-	    $deluser_url  = CreateURL("deleteuser", $target_user,
-				      URLARG_PID, $pid);
+	    $deluser_url  = CreateURL("deleteuser", $target_user, $project);
 
 	    echo "<tr>
                       <td>$usr_name</td>\n";
