@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -131,8 +131,10 @@ API = {
                             "help" : "Commit changes to template (modify)" },
     "template_export"   : { "func" : "template_export",
                             "help" : "Export template record" },
-    "template_swapin"   : { "func" : "template_swapin",
+    "template_instantiate": { "func" : "template_instantiate",
                             "help" : "Instantiate a template" },
+    "template_swapin":    { "func" : "template_swapin",
+                            "help" : "Swapin a preloaded template instance" },
     "template_swapout"  : { "func" : "template_swapout",
                             "help" : "Terminate template instance" },
     "template_startrun" : { "func" : "template_startrun",
@@ -1929,9 +1931,9 @@ class template_export:
     pass
 
 #
-# template_swapin
+# template_instantiate
 #
-class template_swapin:
+class template_instantiate:
     def __init__(self, argv=None):
         self.argv = argv;
         return
@@ -1987,6 +1989,9 @@ class template_swapin:
             elif opt == "-w":
                 params["wait"] = "yes"
                 pass
+            elif opt == "-p":
+                params["preload"] = "yes"
+                pass
             pass
 
         # Try to infer the template guid/vers from the current path.
@@ -2014,15 +2019,16 @@ class template_swapin:
                 return -1;
             pass
         
-        rval,response = do_method("template", "swapin", params);
+        rval,response = do_method("template", "instantiate", params);
         return rval;
 
     def usage(self):
-        print "template_swapin [-q] [-b] [-E description] [-p xmlfilename] ";
-        print "         [-S reason] [-L reason] [-a <time>] [-l <time>]";
+        print "template_instantiate [-q] [-b] [-E description] [-p xmlfilename] ";
+        print "         [-p] [-S reason] [-L reason] [-a <time>] [-l <time>]";
         print "         -e <eid> <guid>";
 	print "where:";
         print "   -b   - queue for the batch system";
+        print "   -p   - preload only; do not swapin";
         print "   -w   - wait for non-batchmode experiment to instantiate";
         print "   -q   - be less chatty";
         print "   -S   - Instance cannot be swapped; must provide reason";
@@ -2033,6 +2039,75 @@ class template_swapin:
         print "   -x   - XML file of parameter bindings";
         print "   -e   - The instance name (unique, alphanumeric, no blanks)";
         print "   guid - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_swapin
+#
+class template_swapin:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "wqe:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        guid   = None
+        params = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-q":
+                params["quiet"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+        else:
+            self.usage();
+            return -1
+            
+        params["guid"] = guid
+
+        rval,response = do_method("template", "swapin", params);
+        return rval;
+
+    def usage(self):
+	print "template_swapin -e id [<guid/vers>]";
+	print "where:";
+        print "     -e   - Instance ID (aka eid)";
+        print "     -q   - be less chatty";
+	print "     -w   - Wait for instance to finish swapping in";
+        print "    guid  - Template GUID";
         print ""
         print "Environment:"
         print "  cwd   The template GUID will be inferred from the current"
