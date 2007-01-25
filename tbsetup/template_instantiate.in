@@ -28,7 +28,7 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_swapin [-q] [-w] [-s]\n".
+	  "Usage: template_instantiate [-q] [-w] [-s]\n".
 	  "         [-S reason] [-L reason] [-a <time>] [-l <time>] ".
 	  "-e <eid> <guid/vers>\n".
 	  "switches and arguments:\n".
