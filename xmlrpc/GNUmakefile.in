@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,7 +33,7 @@ SYMLINKS        = node_admin node_reboot os_load create_image node_list \
 		  readycount nscheck startexp batchexp startexp swapexp endexp \
 		  modexp expinfo node_avail tbuisp expwait template_commit \
 		  template_export template_swapin template_swapout \
-		  template_stoprun
+		  template_stoprun template_instantiate
 
 #
 # Force dependencies on the scripts so that they will be rerun through
