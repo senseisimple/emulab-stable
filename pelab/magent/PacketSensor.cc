@@ -645,7 +645,7 @@ bool PacketSensor::SentPacket::inSequenceBlock(unsigned int sequence)
            "PacketSensor::inSequenceBlock(): Is %u between %u and %u?",
            sequence, seqStart, seqEnd);
   bool result = false;
-  if (seqStart < seqEnd)
+  if (seqStart <= seqEnd)
   {
     result = sequence >= seqStart && sequence <= seqEnd;
   }
