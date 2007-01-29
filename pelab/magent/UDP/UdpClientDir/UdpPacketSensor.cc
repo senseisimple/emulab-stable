@@ -5,6 +5,7 @@ UdpPacketSensor::UdpPacketSensor(UdpState &udpStateVal, ofstream &logStreamVal)
 	lastSeenSeqNum(-1),
 	logStream(logStreamVal)
 {
+	statReorderedPackets = 0;
 
 }
 
@@ -67,6 +68,10 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 		return;
 	}
 
+	// Remove the old state information.
+	udpStateInfo.currentAckedPackets.clear();
+	udpStateInfo.packetLoss = 0;
+
 	unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
 
 	// Find the entry for the packet this ACK is acknowledging, and
@@ -75,7 +80,9 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 
 	listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(equalSeqNum(), seqNum)); 
 
-	if(listIterator == sentPacketList.end())
+	bool isReordered = handleReorderedAck(packetData, Len, overheadLen, timeStamp);
+
+	if( ( listIterator == sentPacketList.end() ) && ( isReordered == false ) )
 	{
 		logStream << "WARNING::Unknown seq number "<<seqNum<<" is being ACKed. "
 			"We might have received "
@@ -94,9 +101,6 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 		udpStateInfo.isAckFake = false;
 
 
-	// Remove the old state information.
-	udpStateInfo.recentSentPackets.clear();
-	udpStateInfo.packetLoss = 0;
 
 	int i;
 	unsigned char numRedunAcksChar = 0; 
@@ -136,9 +140,33 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 				tmpPacketInfo.timeStamp = (*listIterator).timeStamp;
 				tmpPacketInfo.isFake = (*listIterator).isFake;
 
-				udpStateInfo.recentSentPackets.push_back(tmpPacketInfo);
+				udpStateInfo.currentAckedPackets.push_back(tmpPacketInfo);
 
 				sentPacketList.erase(listIterator);
+			}
+			else
+			{
+				// Check whether this ACK corresponds to a packet reordered
+				// on the forward path.
+				list<UdpPacketInfo >::iterator reOrderedPacketIterator ;
+				reOrderedPacketIterator = find_if(unAckedPacketList.begin(), unAckedPacketList.end(), bind2nd(equalSeqNum(), redunSeqNum)); 
+
+				// An unacked packet exists with this sequence number, delete it 
+				// from the list and consider it acked.
+				if(reOrderedPacketIterator != unAckedPacketList.end())
+				{
+					tmpPacketInfo.seqNum = (*reOrderedPacketIterator).seqNum;
+					tmpPacketInfo.packetSize = (*reOrderedPacketIterator).packetSize;
+					tmpPacketInfo.timeStamp = (*reOrderedPacketIterator).timeStamp;
+					tmpPacketInfo.isFake = (*reOrderedPacketIterator).isFake;
+
+					udpStateInfo.currentAckedPackets.push_back(tmpPacketInfo);
+
+					unAckedPacketList.erase(reOrderedPacketIterator);
+					statReorderedPackets++;
+					logStream << "STAT:: Number of reordered packets = "<<statReorderedPackets<<endl;
+				}
+
 			}
 		}
 	}
@@ -148,7 +176,7 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 	tmpPacketInfo.timeStamp = (*curPacketIterator).timeStamp;
 	tmpPacketInfo.isFake = (*curPacketIterator).isFake;
 
-	udpStateInfo.recentSentPackets.push_back(tmpPacketInfo);
+	udpStateInfo.currentAckedPackets.push_back(tmpPacketInfo);
 
 	// Check for packet loss - if we have any unacked packets with sequence
 	// numbers less than the received ACK seq number, then the packets/or their ACKS
@@ -164,6 +192,15 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 
 		do{
 			logStream<<"STAT::Lost packet seqnum = "<<(*listIterator).seqNum<<endl;
+
+			// This packet might have been lost - but store it as UnAcked
+			// to account for reordering on the forward path.
+			tmpPacketInfo.seqNum = (*listIterator).seqNum;
+			tmpPacketInfo.packetSize = (*listIterator).packetSize;
+			tmpPacketInfo.timeStamp = (*listIterator).timeStamp;
+			tmpPacketInfo.isFake = (*listIterator).isFake;
+
+			unAckedPacketList.push_back(tmpPacketInfo);
 			sentPacketList.erase(listIterator);
 			listIterator = sentPacketList.end();
 
@@ -178,4 +215,29 @@ void UdpPacketSensor::localAck(char *packetData, int Len, int overheadLen, unsig
 	}
 
 	sentPacketList.erase(curPacketIterator);
+}
+
+list<UdpPacketInfo>& UdpPacketSensor::getUnAckedPacketList()
+{
+	return unAckedPacketList;
+}
+
+bool UdpPacketSensor::handleReorderedAck(char *packetData, int Len, int overheadLen, unsigned long long timeStamp)
+{
+	list<UdpPacketInfo >::iterator listIterator;
+	unsigned short int seqNum = *(unsigned short int *)(packetData + 1);
+	bool retVal = false;
+
+	listIterator = find_if(unAckedPacketList.begin(), unAckedPacketList.end(), bind2nd(equalSeqNum(), seqNum)); 
+
+	if(listIterator == unAckedPacketList.end())
+		retVal = false;
+	else
+	{
+		retVal = true;
+		statReorderedPackets++;
+		logStream << "STAT:: Number of reordered packets = "<<statReorderedPackets<<endl;
+	}
+
+	return retVal;
 }

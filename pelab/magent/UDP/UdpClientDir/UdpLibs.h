@@ -23,6 +23,13 @@ namespace globalConsts {
 	const static int minAckPacketSize = 2*USHORT_INT_SIZE + 2*ULONG_LONG_SIZE;
 }
 
-enum {UDP_PACKET_SENSOR, UDP_THROUGHPUT_SENSOR, UDP_MINDELAY_SENSOR, UDP_MAXDELAY_SENSOR};
+enum {UDP_PACKET_SENSOR, UDP_THROUGHPUT_SENSOR, UDP_MINDELAY_SENSOR, UDP_MAXDELAY_SENSOR, UDP_RTT_SENSOR, UDP_LOSS_SENSOR, UDP_AVG_THROUGHPUT_SENSOR};
+
+struct UdpAck {
+
+	unsigned long long timeTaken;
+	long packetSize;
+
+};
 
 #endif

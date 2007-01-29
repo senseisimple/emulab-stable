@@ -56,10 +56,12 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 	unsigned short int seqNum = *(unsigned int *)(packetData + 1);
 	unsigned short int echoedPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::USHORT_INT_SIZE);
 
-	unsigned long long ackTimeDiff = currentAckTimeStamp - lastAckTime;
-	unsigned long long timeDiff = 0;
+
+
+	unsigned long long ackTimeDiff = (currentAckTimeStamp - lastAckTime);
 	vector<UdpPacketInfo>::iterator vecIterator;
 
+	unsigned long long timeDiff = 0;
 	// Average the throughput over all the packets being acknowledged.
 	if(numRedunAcks > 0)
 	{
@@ -73,9 +75,9 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 			redunPacketSize = *(unsigned short int *)(packetData + 1 + globalConsts::minAckPacketSize + i*globalConsts::redunAckSize + globalConsts::USHORT_INT_SIZE);
 
 			// Find if this redundant ACK is useful - or it was acked before.
-			vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
+			vecIterator = find_if(udpStateInfo.currentAckedPackets.begin(), udpStateInfo.currentAckedPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
 
-			if(vecIterator != udpStateInfo.recentSentPackets.end())
+			if(vecIterator != udpStateInfo.currentAckedPackets.end())
 			{
 				// Calculate throughput for the packet being acked by
 				// the redundant ACK.
@@ -96,8 +98,10 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 		}
 	}
 
+	if(ackTimeDiff == 0)
+		return;
 	// Calculate the throughput for the current packet being ACKed.
-	vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), seqNum));
+	vecIterator = find_if(udpStateInfo.currentAckedPackets.begin(), udpStateInfo.currentAckedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// We lost the record of the size of this packet due to libpcap
 	// loss, use the length echoed back in the ACK.
@@ -117,14 +121,14 @@ void UdpThroughputSensor::localAck(char *packetData, int Len,int overheadLen, un
 		logStream << "VALUE::Tentative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"acktimeDiff = "<<ackTimeDiff<<"\n";
 
 		logStream << "TPUT:TIME="<<timeStamp<<",TENTATIVE="<<throughputKbps<<endl;
-		logStream << "LOSS:TIME="<<timeStamp<<",LOSS=0"<<endl;
+//		logStream << "LOSS:TIME="<<timeStamp<<",LOSS=0"<<endl;
 	}
 	else
 	{
 		// Send this as the authoritative available bandwidth value.
 		logStream << "VALUE::Authoritative bandwidth for seqNum = "<<seqNum<<", value = "<< throughputKbps <<"ackTimeDiff = "<<ackTimeDiff<<"\n";
 		logStream << "TPUT:TIME="<<timeStamp<<",AUTHORITATIVE="<<throughputKbps<<endl;
-		logStream << "LOSS:TIME="<<timeStamp<<",LOSS="<<udpStateInfo.packetLoss<<endl;
+//		logStream << "LOSS:TIME="<<timeStamp<<",LOSS="<<udpStateInfo.packetLoss<<endl;
 	}
 
 	// Save the receiver timestamp of this ACK packet, so that we can

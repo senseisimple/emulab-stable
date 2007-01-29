@@ -7,7 +7,10 @@ UdpSensorList::UdpSensorList(ofstream &logStreamVal)
 	depPacketSensor(NULL),
 	depThroughputSensor(NULL),
 	depMinDelaySensor(NULL),
-	depMaxDelaySensor(NULL)
+	depMaxDelaySensor(NULL),
+	depRttSensor(NULL),
+	depLossSensor(NULL),
+	depAvgThroughputSensor(NULL)
 {
 }
 
@@ -31,6 +34,9 @@ UdpSensorList::~UdpSensorList()
 	delete depThroughputSensor;
 	delete depMinDelaySensor;
 	delete depMaxDelaySensor;
+	delete depRttSensor;
+	delete depLossSensor;
+	delete depAvgThroughputSensor;
 }
 
 void UdpSensorList::capturePacket(char *packetData, int Len, int overheadLen, unsigned long long timeStamp, int packetDirection)
@@ -64,6 +70,14 @@ void UdpSensorList::addSensor(int sensorName)
 		case UDP_MAXDELAY_SENSOR:
 			addMaxDelaySensor();
 			break;
+		case UDP_RTT_SENSOR:
+			addRttSensor();
+			break;
+		case UDP_LOSS_SENSOR:
+			addLossSensor();
+			break;
+		case UDP_AVG_THROUGHPUT_SENSOR:
+			addAvgThroughputSensor();
 
 		default:
 			break;
@@ -124,6 +138,7 @@ void UdpSensorList::addPacketSensor()
 {
 	if(depPacketSensor == NULL)
 	{
+		//printf("Adding packet sensor\n");
 		depPacketSensor = new UdpPacketSensor(udpStateInfo, logStream);
 
 		pushSensor(depPacketSensor);
@@ -136,6 +151,7 @@ void UdpSensorList::addThroughputSensor()
 
 	if(depThroughputSensor == NULL)
 	{
+		//printf("Adding throughput sensor\n");
 		depThroughputSensor = new UdpThroughputSensor(udpStateInfo, logStream);
 
 		pushSensor(depThroughputSensor);
@@ -148,6 +164,7 @@ void UdpSensorList::addMinDelaySensor()
 
 	if(depMinDelaySensor == NULL)
 	{
+		//printf("Adding mindelay sensor\n");
 		depMinDelaySensor = new UdpMinDelaySensor(udpStateInfo, logStream);
 
 		pushSensor(depMinDelaySensor);
@@ -162,8 +179,53 @@ void UdpSensorList::addMaxDelaySensor()
 
 	if(depMaxDelaySensor == NULL)
 	{
+		//printf("Adding maxdelay sensor\n");
 		depMaxDelaySensor = new UdpMaxDelaySensor(udpStateInfo, logStream);
 
 		pushSensor(depMaxDelaySensor);
 	}
+}
+
+void UdpSensorList::addRttSensor()
+{
+	addPacketSensor();
+
+	if(depRttSensor == NULL)
+	{
+		//printf("Adding rtt sensor\n");
+		depRttSensor = new UdpRttSensor(udpStateInfo, logStream);
+
+		pushSensor(depRttSensor);
+	}
+
+
+}
+
+void UdpSensorList::addLossSensor()
+{
+	addPacketSensor();
+	addRttSensor();
+
+	if(depLossSensor == NULL)
+	{
+		//printf("Adding loss sensor\n");
+		depLossSensor = new UdpLossSensor(depPacketSensor, depRttSensor,udpStateInfo, logStream);
+
+		pushSensor(depLossSensor);
+
+	}
+
+}
+
+void UdpSensorList::addAvgThroughputSensor()
+{
+	addLossSensor();
+
+	if(depAvgThroughputSensor == NULL)
+	{
+		//printf("Adding avgThroughput sensor\n");
+		depAvgThroughputSensor = new UdpAvgThroughputSensor(depLossSensor, udpStateInfo, logStream);
+		pushSensor(depAvgThroughputSensor);
+	}
+
 }

@@ -28,17 +28,13 @@
 #include "UdpMinDelaySensor.h"
 #include "UdpMaxDelaySensor.h"
 #include "UdpPacketSensor.h"
+#include "UdpRttSensor.h"
+#include "UdpLossSensor.h"
+#include "UdpAvgThroughputSensor.h"
 #include "UdpState.h"
 #include "UdpSensorList.h"
 
 pcap_t *pcapDescriptor = NULL;
-UdpThroughputSensor *throughputSensor;
-UdpMaxDelaySensor *maxDelaySensor;
-UdpMinDelaySensor *minDelaySensor;
-UdpPacketSensor *packetSensor;
-char localIP[16] = "";
-
-struct UdpState globalUdpState;
 
 struct pcap_stat pcapStats;
 int currentPcapLoss = 0;
@@ -289,9 +285,13 @@ int main(int argc, char *argv[])
 	// Initialize the sensors.
 	sensorList = new UdpSensorList(logStream);
 	sensorList->addSensor(UDP_PACKET_SENSOR);
-	sensorList->addSensor(UDP_THROUGHPUT_SENSOR);
+	//sensorList->addSensor(UDP_THROUGHPUT_SENSOR);
 	sensorList->addSensor(UDP_MINDELAY_SENSOR);
 	sensorList->addSensor(UDP_MAXDELAY_SENSOR);
+	sensorList->addSensor(UDP_RTT_SENSOR);
+	sensorList->addSensor(UDP_LOSS_SENSOR);
+	sensorList->addSensor(UDP_AVG_THROUGHPUT_SENSOR);
+
 
 	// Initialize the libpcap filter.
 	int pcapFD = init_pcap(argv[1]);
@@ -419,7 +419,13 @@ int main(int argc, char *argv[])
 			}
 
 		}
-
+		else
+		{
+			break;
+		}
 	}
+	logStream.close();
+	close(sd);
+
 	return 0;
 }

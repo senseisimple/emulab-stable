@@ -12,7 +12,7 @@ class UdpState{
 	public:
 	// vector of info about packets sent from this host,
         // sequence number, timestamp & size of the packet.
-	vector< UdpPacketInfo > recentSentPackets;
+	vector< UdpPacketInfo > currentAckedPackets;
 
 	// Indicates the number of packets lost -
 	// updated whenever an ACK is received.
@@ -54,7 +54,7 @@ class UdpState{
 	~UdpState()
 	{
 		// Remove any packets stored in the vector.
-		recentSentPackets.clear();
+		currentAckedPackets.clear();
 	}
 };
 

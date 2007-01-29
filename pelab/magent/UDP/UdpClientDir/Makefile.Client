@@ -11,7 +11,10 @@ OBJECTS=${COMPILE_DIR}/UdpClient.o \
 	${COMPILE_DIR}/UdpThroughputSensor.o \
 	${COMPILE_DIR}/UdpPacketInfo.o \
 	${COMPILE_DIR}/UdpSensor.o \
-	${COMPILE_DIR}/UdpSensorList.o
+	${COMPILE_DIR}/UdpSensorList.o \
+	${COMPILE_DIR}/UdpRttSensor.o \
+	${COMPILE_DIR}/UdpLossSensor.o \
+	${COMPILE_DIR}/UdpAvgThroughputSensor.o 
 
 
 COMMON_INCLUDES=UdpLibs.h \
@@ -21,6 +24,15 @@ ${EXECUTABLE}: ${OBJECTS}
 	${CC} -o $@ ${CFLAGS} $+ -lpcap
 
 ${COMPILE_DIR}/UdpClient.o: UdpClient.cc UdpPacketSensor.h ${COMMON_INCLUDES}
+	${CC} -c ${CFLAGS} -o $@ $<
+
+${COMPILE_DIR}/UdpAvgThroughputSensor.o: UdpAvgThroughputSensor.cc UdpAvgThroughputSensor.h ${COMMON_INCLUDES}
+	${CC} -c ${CFLAGS} -o $@ $<
+
+${COMPILE_DIR}/UdpLossSensor.o: UdpLossSensor.cc UdpLossSensor.h ${COMMON_INCLUDES}
+	${CC} -c ${CFLAGS} -o $@ $<
+
+${COMPILE_DIR}/UdpRttSensor.o: UdpRttSensor.cc UdpRttSensor.h ${COMMON_INCLUDES}
 	${CC} -c ${CFLAGS} -o $@ $<
 
 ${COMPILE_DIR}/UdpMinDelaySensor.o: UdpMinDelaySensor.cc UdpMinDelaySensor.h  ${COMMON_INCLUDES}

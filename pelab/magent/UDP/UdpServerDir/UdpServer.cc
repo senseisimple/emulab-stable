@@ -127,7 +127,7 @@ void handleUDP_Version_1(struct pcap_pkthdr const *pcap_info, struct udphdr cons
 	    // packet - it arrived out of order.
 
 	    // TODO:Take wrap around into account.
-	    if(packetSeqNum > curSeqNum)
+//	    if(packetSeqNum > curSeqNum)
 	    {
 		    if(packetSeqNum > (curSeqNum + 1))
 		    {
@@ -258,6 +258,11 @@ void handleUDP_Version_1(struct pcap_pkthdr const *pcap_info, struct udphdr cons
 		cliAddr.sin_port = htons(sourcePort);
 		// Send the ACK off to the host we received the data packet from.
 		sendto(sd,appAck,ackLength,flags,(struct sockaddr *)&cliAddr,cliLen), errno;
+	    }
+	 //   else // This packet might be a re-ordered packet.
+	    {
+	//	    printf("Received reordered packet = %d\n", packetSeqNum);
+
 	    }
 }
 

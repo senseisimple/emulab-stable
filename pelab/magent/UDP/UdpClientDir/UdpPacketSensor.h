@@ -20,13 +20,18 @@ class UdpPacketSensor:public UdpSensor{
 	~UdpPacketSensor();
 	void localSend(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
 	void localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
+	list<UdpPacketInfo>& getUnAckedPacketList();
 
 	private:
 
+	bool handleReorderedAck(char *packetData, int Len, int overheadLen, unsigned long long timeStamp);
+
 	list<UdpPacketInfo> sentPacketList;
+	list<UdpPacketInfo> unAckedPacketList;
 	UdpState & udpStateInfo;
 	long lastSeenSeqNum;
 	ofstream &logStream;
+	long statReorderedPackets;
 };
 
 

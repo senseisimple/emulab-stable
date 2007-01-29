@@ -100,7 +100,7 @@ Note: UDP packets sent by from nodeA may not always be the maximum sized packets
 often the case with TCP. So, the minimum and maximum delay values need to be calculated ( ideally for
 every packet size), keeping the maximum sized UDP packet in mind. The one way delay values are
 thus scaled to represent maximum sized packets. ( we divide the one way delay by number of bytes in
-the packet + overhead, and then multiply it by 1500 ).
+the packet + overhead, and then multiply it by 1518 ).
 
 Throughput: 
 -----------
@@ -182,6 +182,27 @@ emulab environment and did not observe any increase in CPU usage when all the re
 UDP packets were being dropped by the kernel ( due to full socket receive buffer ).
 
 
+Handling reordering on the forward path:
+----------------------------------------
 
+RTT and DevRTT are calculated for the packets sent out, by using EWMA (similar to TCP)
+for each received acknowledgement packet.
 
+We consider a packet to be lost if 
+
+1) We did not receive an Ack for the packet and,
+2) we received ACKs for 10 packets sent after it ( OR ) The current timestamp is greater
+than the time at which the packet was sent + 10*( ewmaRTT + 4*ewmaDevRTT).
+
+Note: The UdpServer application is not concerned with reordering and replies to all the packets that
+it receives ( they can be out of order ). When an ACK has been received, UDP sensors detect
+that the ACK corresponds to a reordered packet - if they have seen ACKs for packets which
+had greater sequence numbers than this packet.
+
+Averaging of throughput:
+------------------------
+
+Throughput is averaged over the last received 100 ACKs or ACKs received in the last 500ms.
+The throughput value is a simple moving average. If any packet loss is detected, then the 
+value is reported as authoritative, else it is a tentative value.
 

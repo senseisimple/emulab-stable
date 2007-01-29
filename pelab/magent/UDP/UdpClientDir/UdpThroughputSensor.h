@@ -16,7 +16,7 @@ class UdpThroughputSensor:public UdpSensor{
 		void localAck(char *packetData, int Len,int overheadLen, unsigned long long timeStamp);
 
 	private:
-		unsigned long long lastAckTime;
+		unsigned long long lastAckTime, lastRecvAckTime;
 		double throughputKbps;
 		UdpState &udpStateInfo;
 		ofstream &logStream;

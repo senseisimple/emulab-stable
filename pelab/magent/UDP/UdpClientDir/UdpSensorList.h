@@ -6,12 +6,18 @@
 #include "UdpThroughputSensor.h"
 #include "UdpMinDelaySensor.h"
 #include "UdpMaxDelaySensor.h"
+#include "UdpRttSensor.h"
+#include "UdpLossSensor.h"
+#include "UdpAvgThroughputSensor.h"
 
 class UdpSensor;
 class UdpPacketSensor;
 class UdpThroughputSensor;
 class UdpMinDelaySensor;
 class UdpMaxDelaySensor;
+class UdpRttSensor;
+class UdpLossSensor;
+class UdpAvgThroughputSensor;
 
 class UdpSensorList {
 	public:
@@ -29,6 +35,9 @@ class UdpSensorList {
 	void addThroughputSensor();
 	void addMinDelaySensor();
 	void addMaxDelaySensor();
+	void addRttSensor();
+	void addLossSensor();
+	void addAvgThroughputSensor();
 
 	UdpSensor *sensorListHead;
         UdpSensor *sensorListTail;
@@ -36,10 +45,13 @@ class UdpSensorList {
 	UdpState udpStateInfo;
 	ofstream &logStream;
 
-	UdpSensor *depPacketSensor;
-	UdpSensor *depThroughputSensor;
-	UdpSensor *depMinDelaySensor;
-	UdpSensor *depMaxDelaySensor;
+	UdpPacketSensor *depPacketSensor;
+	UdpThroughputSensor *depThroughputSensor;
+	UdpMinDelaySensor *depMinDelaySensor;
+	UdpMaxDelaySensor *depMaxDelaySensor;
+	UdpRttSensor *depRttSensor;
+	UdpLossSensor *depLossSensor;
+	UdpAvgThroughputSensor *depAvgThroughputSensor;
 };
 
 

@@ -42,7 +42,7 @@ void UdpMinDelaySensor::localAck(char *packetData, int Len,int overheadLen, unsi
 	bool eventFlag = false;
 
 	vector<UdpPacketInfo >::iterator vecIterator;
-	vecIterator = find_if(udpStateInfo.recentSentPackets.begin(), udpStateInfo.recentSentPackets.end(), bind2nd(equalSeqNum(), seqNum));
+	vecIterator = find_if(udpStateInfo.currentAckedPackets.begin(), udpStateInfo.currentAckedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
 	// Calculate the one way delay as half of RTT.
 

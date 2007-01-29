@@ -7,6 +7,7 @@ inFile = open(sys.argv[1], 'r')
 
 bandwidthFile = "AvailBandwidth.log"
 throughputFile = "Throughput.log"
+avgThroughputFile = "AvgThroughput.log"
 lossFile = "Loss.log"
 minDelayFile = "MinDelay.log"
 maxDelayFile = "MaxDelay.log"
@@ -19,6 +20,7 @@ messageFile = "Messages.log"
 # with GnuPlot.
 outFileBandwidth = open(bandwidthFile, 'w')
 outFileThroughput = open(throughputFile, 'w')
+outFileAvgThroughput = open(avgThroughputFile, 'w')
 outFileLoss = open(lossFile, 'w')
 outFileMinD = open(minDelayFile, 'w')
 outFileMaxD = open(maxDelayFile, 'w')
@@ -34,9 +36,10 @@ throughputBps = 0
 
 # Array indices, 0 - throughput, 1 - loss, 2 - minimum delay, 3 - queue size
 # 4 - deviation in send times, 5 - actual queuing delay per packet
-initTimeArray = [0,0,0,0,0,0]
-timeDiffArray = [0,0,0,0,0,0]
-initFlagsArray = [0,0,0,0,0,0]
+# 6 - average throughput
+initTimeArray = [0,0,0,0,0,0,0]
+timeDiffArray = [0,0,0,0,0,0,0]
+initFlagsArray = [0,0,0,0,0,0,0]
 
 for line in inFile:
 	match = regExp.match(line)
@@ -109,6 +112,24 @@ for line in inFile:
 				timeDiffArray[5] = int(match.group(3)) - initTimeArray[5]
 
 			outFileQueueD.write(str(timeDiffArray[5]) + "  " + match.group(5) + "\n" )
+		elif match.group(1) == 'AVGTPUT':
+			if initFlagsArray[6] == 0:
+				initTimeArray[6] = int(match.group(3))
+				timeDiffArray[6] = 0
+				initFlagsArray[6] = 1
+			else:
+				timeDiffArray[6] = int(match.group(3)) - initTimeArray[6]
+
+			if match.group(4) == 'AUTHORITATIVE':
+				availBandwidth = float(match.group(5))
+			elif match.group(4) == 'TENTATIVE':
+				if float(match.group(5)) > availBandwidth:
+					availBandwidth = float(match.group(5))
+
+			bandWidthBps = 1024*availBandwidth / ( 8 )
+			
+			outFileAvgThroughput.write(str(timeDiffArray[6]) + "  " + str(bandWidthBps) + "\n" )
+
 	else:
 		outFileMessages.write(line)
 
