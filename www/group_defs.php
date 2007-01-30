@@ -360,7 +360,7 @@ class Group
 	}
 	$project	= $this->project;
 	$pid            = $project->pid();
-	$gid            = $project->gid();
+	$gid            = $this->gid();
 	$leader		= $project->GetLeader();
 	$leader_name	= $leader->name();
 	$leader_email	= $leader->email();
