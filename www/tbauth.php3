@@ -71,7 +71,7 @@ function GENHASH() {
     $random_bytes = fread($fp, 128);
     fclose($fp);
 
-    $hash  = mhash (MHASH_MD5, bin2hex($retval) . " " . microtime());
+    $hash  = mhash (MHASH_MD5, bin2hex($random_bytes) . " " . microtime());
     return bin2hex($hash);
 }
 
@@ -183,10 +183,13 @@ function LoginStatus() {
     # rather than passing it is a cookie.
     if (isset($nocookieauth)) {
 	$curhash = $nocookieauth;
-    } else {
+    }
+    elseif (array_key_exists($TBAUTHCOOKIE, $HTTP_COOKIE_VARS)) {
 	$curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
     }
-    $hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+    if (array_key_exists($TBLOGINCOOKIE, $HTTP_COOKIE_VARS)) {
+	$hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+    }
 
     #
     # We have to get at least one of the hashes. The Java applets do not
@@ -439,7 +442,7 @@ function LoginStatus() {
 #
 function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     global $TBBASE, $BASEPATH;
-    global $TBAUTHTIMEOUT, $CHECKLOGIN_HASHKEY;
+    global $TBAUTHTIMEOUT, $CHECKLOGIN_HASHKEY, $CHECKLOGIN_IDX;
 
     #
     # We now ignore the $uid argument and let LoginStatus figure it out.
@@ -1093,7 +1096,7 @@ function LASTWEBLOGIN($uid) {
     
     if (mysql_num_rows($query_result)) {
 	$lastrow      = mysql_fetch_array($query_result);
-	return $lastrow[weblogin_last];
+	return $lastrow["weblogin_last"];
     }
     return 0;
 }
