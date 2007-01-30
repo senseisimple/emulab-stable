@@ -265,7 +265,7 @@ sub callbackFunc($$$) {
 	    print "got $eventtype:$srcnode,$managerID,$bgmonexpt\n";
 	    stopnode($srcnode, $managerID);
 	}
-        elseif( $eventtype eq "DIE" ){
+        elsif( $eventtype eq "DIE" ){
             #TODO!
         }
 
