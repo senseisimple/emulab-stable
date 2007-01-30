@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -286,9 +286,11 @@ sub LinkDelaySetup()
             print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
             print DEL "parent ". ($pipeno+10) .":1 htb default 1\n";
 
-            print DEL "$TC class add dev $iface classid ". ($pipeno+20) .":1 ";
-            print DEL "parent ". ($pipeno+20) ." htb rate ${bandw} ";
-            print DEL "ceil ${bandw}\n";
+	    if ($bandw != 0) {
+		print DEL "$TC class add dev $iface classid ". ($pipeno+20) .":1 ";
+		print DEL "parent ". ($pipeno+20) ." htb rate ${bandw} ";
+		print DEL "ceil ${bandw}\n";
+	    }
 
             $iface =~ /\D+(\d+)/;
             my $imqnum = $1;
@@ -305,9 +307,11 @@ sub LinkDelaySetup()
                 print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
                 print DEL "htb default 1\n";
 
-                print DEL "$TC class add dev imq${imqnum} classid ";
-                print DEL "". ($pipeno+20) .":1 parent ". ($pipeno+20) ." ";
-                print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
+		if ($rbandw != 0) {
+		    print DEL "$TC class add dev imq${imqnum} classid ";
+		    print DEL "". ($pipeno+20) .":1 parent ". ($pipeno+20) ." ";
+		    print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
+		}
                 
                 print DEL "$IPTABLES -t mangle -A PREROUTING -i $iface ";
                 print DEL "-j IMQ --todev $imqnum\n";
