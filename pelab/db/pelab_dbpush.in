@@ -14,11 +14,12 @@ use Fcntl;
 # Check DB consistency.
 #
 sub usage() {
-    print STDOUT "Usage: pelab_dbpush [-d]\n";
+    print STDOUT "Usage: pelab_dbpush [-d] [-l limit] [-r]\n";
     exit(-1);
 }
-my $optlist  = "dl:";
+my $optlist  = "dl:r";
 my $debug    = 0;
+my $remove_archived = 0;
 my $limit;
 
 #
@@ -88,6 +89,9 @@ if (@ARGV) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"r"})) {
+    $remove_archived = 1;
 }
 if (defined($options{"l"})) {
     $limit = $options{"l"};
@@ -182,6 +186,13 @@ my ($maxidx) = $query_result->fetchrow_array();
 #
 # Grab all of the new entries and store to the file
 #
+if ($debug) {
+    print "pair_data query: select * from pair_data ".
+          "where idx > $lastidx and idx <= $maxidx ".
+          "into outfile '${tempfile}.pair_data' ".
+          "     fields terminated by ' '\n";
+}
+
 if ($maxidx > $lastidx) {
     DBQueryFatal("select * from pair_data ".
 		 "where idx > $lastidx and idx <= $maxidx ".
@@ -195,9 +206,6 @@ DBQueryFatal("unlock tables");
 # Might not be any new entries ...
 # 
 if ($maxidx > $lastidx) {
-    # New last, used below.
-    $lastidx = $maxidx;
-    
     #
     # Does not return if any error!
     #
@@ -206,17 +214,27 @@ if ($maxidx > $lastidx) {
     #
     # Okay, now that we have really archived them away, update the idx
     # 
-    DBQueryFatal("update emulab_indicies set idx='$lastidx' ".
+    DBQueryFatal("update emulab_indicies set idx='$maxidx' ".
 		 "where name='pair_data_idx'");
 
     $cutoffage = (time() - $MAXAGE) * 1.0;
 
-    #
-    # Delete anything older then MAXAGE that has been archived. This leaves
-    # a cache of data on ops.
-    #
-    DBQueryFatal("delete from pair_data ".
-		 "where idx <= $lastidx and unixstamp < $cutoffage");
+    if ($remove_archived) {
+        #
+        # Delete all rows that we just archived
+        #
+        print("delete from pair_data ".
+                     "where idx > $lastidx and idx <= $maxidx\n");
+        DBQueryFatal("delete from pair_data ".
+                     "where idx > $lastidx and idx <= $maxidx");
+    } else {
+        #
+        # Delete anything older then MAXAGE that has been archived. This leaves
+        # a cache of data on ops.
+        #
+        DBQueryFatal("delete from pair_data ".
+                     "where idx <= $lastidx and unixstamp < $cutoffage");
+    }
 }
 
 unlink("${tempfile}.pair_data")
