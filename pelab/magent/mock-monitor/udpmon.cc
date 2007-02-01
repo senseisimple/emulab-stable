@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int SEND_COUNT = 12000;
+int SEND_COUNT = 4200;
 int PACKET_DELTA = 5;
 int PACKET_SIZE = 1000;
 
@@ -40,11 +40,13 @@ int main(int argc, char * argv[])
   ElabOrder key;
   vector<char> command;
 
-  if (argc != 3)
+  if (argc != 6)
   {
-    printf("Usage: %s <server-ip> <server-port>\n", argv[0]);
+    printf("Usage: %s <server-ip> <server-port> <udpserver-ip> <num-sends> <send-delta>\n", argv[0]);
     return 1;
   }
+  SEND_COUNT = atoi(argv[4]);
+  PACKET_DELTA = atoi(argv[5]);
 
   connection = socket(AF_INET, SOCK_STREAM, 0);
   if (connection == -1)
@@ -77,8 +79,8 @@ int main(int argc, char * argv[])
   saveInt(& command[0], UDP_PACKET_SENSOR);
   sendCommand(connection, SENSOR_COMMAND, key, command);
 
-  saveInt(& command[0], UDP_THROUGHPUT_SENSOR);
-  sendCommand(connection, SENSOR_COMMAND, key, command);
+//  saveInt(& command[0], UDP_THROUGHPUT_SENSOR);
+//  sendCommand(connection, SENSOR_COMMAND, key, command);
 
   saveInt(& command[0], UDP_MINDELAY_SENSOR);
   sendCommand(connection, SENSOR_COMMAND, key, command);
@@ -86,18 +88,26 @@ int main(int argc, char * argv[])
   saveInt(& command[0], UDP_MAXDELAY_SENSOR);
   sendCommand(connection, SENSOR_COMMAND, key, command);
 
+  saveInt(& command[0], UDP_RTT_SENSOR);
+  sendCommand(connection, SENSOR_COMMAND, key, command);
+
+  saveInt(& command[0], UDP_LOSS_SENSOR);
+  sendCommand(connection, SENSOR_COMMAND, key, command);
+
+  saveInt(& command[0], UDP_AVG_THROUGHPUT_SENSOR);
+  sendCommand(connection, SENSOR_COMMAND, key, command);
+
   command.resize(sizeof(unsigned int));
   // PRAMOD: Replace with destination PlanetLab IP - Done
-  //int ip = (127 << 24) + 1;
   struct in_addr destAddr;
 
   // Update the string below with the IP address of the 
   // planet lab host we are running on.
-  inet_aton("127.24.53.12", &destAddr);
+  inet_aton(argv[3], &destAddr);
 
   // Note: This ip value is in network byte order - convert it
   // to host order in the magent before using it.
-  int ip = destAddr.s_addr;
+  unsigned int ip = htonl(destAddr.s_addr);
 
   saveInt(& command[0], ip);
   sendCommand(connection, CONNECT_COMMAND, key, command);
