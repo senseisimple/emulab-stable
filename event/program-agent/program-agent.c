@@ -792,10 +792,13 @@ main(int argc, char **argv)
 	/*
 	 * Register with the event system. 
 	 */
-	if (remote){
+#if 0
+	if (remote) {
 	        handle = event_register_withkeyfile_withretry(server, 0, 
 							      keyfile, 3);
-	} else {
+	} else
+#endif
+	{
 	        handle = event_register_withkeyfile(server, 0, keyfile);
 	}
 	if (handle == NULL) {
