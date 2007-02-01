@@ -620,9 +620,11 @@ main(int argc, char **argv)
 		if (system(buf) != 0) {
 			fatal("Could not make directory: %s", LOGDIR);
 		}
+
+		(void) stat(LOGDIR, &st);
 	}
 
-	if (st.st_uid != pw->pw_uid) {
+	if (st.st_uid != pw->pw_uid || st.st_gid != pw->pw_gid) {
 		chown(LOGDIR, pw->pw_uid, pw->pw_gid);
 	}
 
