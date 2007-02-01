@@ -13,4 +13,4 @@
 # The server runs in an infinite while loop - it can be terminated after the session
 # is determined to be done at the client - kill using Ctrl-C.
 
-sudo ./UdpServer eth0
+sudo ./UdpServer eth0 3492
