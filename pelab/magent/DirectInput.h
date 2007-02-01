@@ -34,7 +34,7 @@ private:
   int monitorAccept;
   int monitorSocket;
   int index;
-  char headerBuffer[Header::headerSize];
+  char headerBuffer[Header::maxHeaderSize];
   int versionSize;
   Header commandHeader;
   enum { bodyBufferSize = 0xffff };

@@ -44,7 +44,7 @@ namespace global
   // compatible by taking advantage of the fact that the old headers
   // has a char 'transport' that was always set to 0 for
   // TCP_CONNECTION.
-  const unsigned char CONTROL_VERSION = 1;
+  unsigned char CONTROL_VERSION = 1;
 
   // Udp-CHANGES-Begin
   const short int USHORT_INT_SIZE = sizeof(unsigned short int);
@@ -260,7 +260,7 @@ bool replayWrite(char * source, int size)
 void replayWriteCommand(char * head, char * body, unsigned short bodySize)
 {
   bool success = true;
-  success = replayWrite(head, Header::headerSize);
+  success = replayWrite(head, Header::headerSize());
   if (success)
   {
     replayWrite(body, bodySize);
@@ -273,10 +273,10 @@ void replayWritePacket(PacketInfo * packet)
   head.type = packet->packetType;
   head.size = packet->census();
   head.key = packet->elab;
-  char headBuffer[Header::headerSize];
+  char headBuffer[Header::maxHeaderSize];
   saveHeader(headBuffer, head);
 
-  bool success = replayWrite(headBuffer, Header::headerSize);
+  bool success = replayWrite(headBuffer, Header::headerSize());
   if (success)
   {
     char *packetBuffer;

@@ -467,7 +467,7 @@ bool replayReadHeader(char * dest)
 void replayLoop(void)
 {
   bool done = false;
-  char headerBuffer[Header::headerSize];
+  char headerBuffer[Header::maxHeaderSize];
   Header head;
   vector<char> packetBuffer;
   struct tcp_info kernel;

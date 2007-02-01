@@ -31,8 +31,22 @@ public:
 
   enum { VERSION_1_SIZE = ElabOrder::idSize };
 
-  // headerSize is the buffer for the size of the largest version.
-  enum { headerSize = PREFIX_SIZE + VERSION_1_SIZE };
+  // headerSize() yields the header size for the current version.
+  static int headerSize(void)
+  {
+    switch (global::CONTROL_VERSION)
+    {
+    case 0:
+      return PREFIX_SIZE + VERSION_0_SIZE;
+    case 1:
+      return PREFIX_SIZE + VERSION_1_SIZE;
+    default:
+      return PREFIX_SIZE + VERSION_1_SIZE;
+    }
+  }
+
+  // maxHeaderSize is the buffer for the size of the largest version.
+  enum { maxHeaderSize = PREFIX_SIZE + VERSION_1_SIZE };
 };
 
 int getLastSaveloadSize(void);

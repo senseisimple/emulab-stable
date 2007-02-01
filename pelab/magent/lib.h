@@ -85,14 +85,14 @@ extern char * optarg;
 
 #elif BYTEORDER == LITTLE_ENDIAN
 
-#define htonll(A) ( 	(((uint64_t)(A) & 0xff00000000000000ULL) >> 56) | \
-			(((uint64_t)(A) & 0x00ff000000000000ULL) >> 40) | \
-			(((uint64_t)(A) & 0x0000ff0000000000ULL) >> 24) | \
-			(((uint64_t)(A) & 0x000000ff00000000ULL) >> 8) | \
-			(((uint64_t)(A) & 0x00000000ff000000ULL) << 8) | \
-			(((uint64_t)(A) & 0x0000000000ff0000ULL) << 24) | \
-			(((uint64_t)(A) & 0x000000000000ff00ULL) << 40) | \
-			(((uint64_t)(A) & 0x00000000000000ffULL) << 56)   )
+#define htonll(A) (     (((uint64_t)(A) & 0xff00000000000000ULL) >> 56) | \
+                        (((uint64_t)(A) & 0x00ff000000000000ULL) >> 40) | \
+                        (((uint64_t)(A) & 0x0000ff0000000000ULL) >> 24) | \
+                        (((uint64_t)(A) & 0x000000ff00000000ULL) >> 8) | \
+                        (((uint64_t)(A) & 0x00000000ff000000ULL) << 8) | \
+                        (((uint64_t)(A) & 0x0000000000ff0000ULL) << 24) | \
+                        (((uint64_t)(A) & 0x000000000000ff00ULL) << 40) | \
+                        (((uint64_t)(A) & 0x00000000000000ffULL) << 56)   )
 #endif
 
 // Udp-CHANGES-End
@@ -370,7 +370,7 @@ namespace global
 
   extern int logFlags;
 
-  extern const unsigned char CONTROL_VERSION;
+  extern unsigned char CONTROL_VERSION;
 
 // Udp-CHANGES-Begin
   extern const short int USHORT_INT_SIZE;
@@ -389,13 +389,13 @@ namespace global
 // Udp-CHANGES-Begin
 struct UdpPacketInfo
 {
-	unsigned short int seqNum;
-	unsigned short int packetSize;
-	unsigned long long timeStamp;
-	bool isFake;
+        unsigned short int seqNum;
+        unsigned short int packetSize;
+        unsigned long long timeStamp;
+        bool isFake;
 };
 
-class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool> 
+class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool>
 {
   public:
   bool operator()(const UdpPacketInfo& packet, unsigned short int seqNum) const
@@ -404,7 +404,7 @@ class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int
   }
 };
 
-class lessSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool> 
+class lessSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool>
 {
   public:
   bool operator()(const UdpPacketInfo& packet,unsigned short int seqNum) const

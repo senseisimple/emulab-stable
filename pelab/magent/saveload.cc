@@ -144,7 +144,14 @@ char * saveHeader(char * buffer, Header const & value)
   pos = saveShort(pos, value.size);
   pos = saveChar(pos, value.version);
   logReplay("key", 0);
-  pos = saveBuffer(pos, value.key.id, ElabOrder::idSize);
+  if (global::CONTROL_VERSION < 1)
+  {
+    pos = saveBuffer(pos, value.key.id, Header::VERSION_0_SIZE);
+  }
+  else
+  {
+    pos = saveBuffer(pos, value.key.id, ElabOrder::idSize);
+  }
 //  pos = saveInt(pos, value.key.ip);
 //  pos = saveShort(pos, value.key.localPort);
 //  pos = saveShort(pos, value.key.remotePort);
@@ -485,10 +492,17 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
   case NEW_CONNECTION_COMMAND:
   {
     NewConnectionCommand * newConnect = new NewConnectionCommand();
-    unsigned char temp;
-    char * buffer = body;
-    loadChar(buffer, &temp);
-    newConnect->transport = temp;
+    if (head->version < 1)
+    {
+      newConnect->transport = TCP_CONNECTION;
+    }
+    else
+    {
+      unsigned char temp = 0;
+      char * buffer = body;
+      loadChar(buffer, &temp);
+      newConnect->transport = temp;
+    }
     result.reset(newConnect);
     break;
   }
@@ -498,7 +512,7 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
   case CONNECTION_MODEL_COMMAND:
   {
     ConnectionModelCommand * model = new ConnectionModelCommand();
-    unsigned int temp;
+    unsigned int temp = 0;
     char * buffer = body;
     buffer = loadInt(buffer, &temp);
     model->type = temp;
@@ -511,7 +525,7 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
   {
     SensorCommand * model = new SensorCommand();
     char * buffer = body;
-    unsigned int temp;
+    unsigned int temp = 0;
     buffer = loadInt(buffer, &temp);
     model->type = temp;
     result.reset(model);
@@ -520,8 +534,16 @@ std::auto_ptr<Command> loadCommand(Header * head, char * body)
   case CONNECT_COMMAND:
   {
     ConnectCommand * connect = new ConnectCommand();
-    char * buffer = body;
-    unsigned int tempIp;
+    unsigned int tempIp = 0;
+    char * buffer = NULL;
+    if (head->version < 1)
+    {
+      buffer = head->key.id;
+    }
+    else
+    {
+      buffer = body;
+    }
     buffer = loadInt(buffer, &tempIp);
     connect->ip = tempIp;
     result.reset(connect);

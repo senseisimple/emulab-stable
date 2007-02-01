@@ -64,21 +64,10 @@ void DirectInput::nextCommand(fd_set * readable)
                      Header::PREFIX_SIZE - index, 0);
     if (error == Header::PREFIX_SIZE - index)
     {
-      char version = headerBuffer[Header::PREFIX_SIZE - 1];
-      switch (version)
-      {
-      case 0:
-        versionSize = Header::PREFIX_SIZE + Header::VERSION_0_SIZE;
-        break;
-      case 1:
-        versionSize = Header::PREFIX_SIZE + Header::VERSION_1_SIZE;
-        break;
-      default:
-        logWrite(ERROR, "Unknown version: %d"
-                 ", assuming that it really means version 1", version);
-        versionSize = Header::PREFIX_SIZE + Header::VERSION_1_SIZE;
-        break;
-      }
+      unsigned char version = headerBuffer[Header::PREFIX_SIZE - 1];
+      global::CONTROL_VERSION = version;
+      versionSize = Header::headerSize();
+      index += error;
       state = HEADER;
     }
     else if (error > 0)
@@ -103,8 +92,8 @@ void DirectInput::nextCommand(fd_set * readable)
       && FD_ISSET(monitorSocket, readable))
   {
     int error = recv(monitorSocket, headerBuffer + index,
-                     Header::headerSize - index, 0);
-    if (error == Header::headerSize - index)
+                     Header::headerSize() - index, 0);
+    if (error == Header::headerSize() - index)
     {
 //      logWrite(COMMAND_INPUT, "Finished reading a command header");
       loadHeader(headerBuffer, &commandHeader);
@@ -203,7 +192,7 @@ int DirectInput::checksum(void)
   int flip = 1;
   int total = 0;
   int i = 0;
-  for (i = 0; i < Header::headerSize; ++i)
+  for (i = 0; i < Header::headerSize(); ++i)
   {
     total += (headerBuffer[i] & 0xff) * flip;
 //    flip *= -1;

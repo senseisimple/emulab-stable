@@ -72,12 +72,12 @@ public:
       }
       prefix.size = message.size();
       prefix.key = key;
-      char headerBuffer[Header::headerSize];
+      char headerBuffer[Header::maxHeaderSize];
       saveHeader(headerBuffer, prefix);
-      int result = startMessage(Header::headerSize + message.size());
+      int result = startMessage(Header::headerSize() + message.size());
       if (result == SENDING_MESSAGE)
       {
-        writeMessage(headerBuffer, Header::headerSize);
+        writeMessage(headerBuffer, Header::headerSize());
         writeMessage(message.c_str(), message.size());
         endMessage();
       }
