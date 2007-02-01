@@ -181,6 +181,7 @@ if (AuditStart(0)) {
 #
 foreach my $token (@addlist) {
     my ($pid,$gid,$trust) = split(":", $token);
+    my $sendemail = 1;
 
     my $group = Group->LookupByPidGid($pid, $gid);
     if (! defined($group)) {
@@ -206,6 +207,10 @@ foreach my $token (@addlist) {
 
 	$membership->ModifyTrust($trust) == 0
 	    or fatal("Could not modify $membership to $trust");
+
+	$sendemail = 0
+	    if ($ELABINELAB &&
+		$group->IsProjectGroup() && $group->IsLeader($target_user));
     }
     else {
 	$group->AddMemberShip($target_user, $trust) == 0
@@ -225,9 +230,11 @@ foreach my $token (@addlist) {
 		fatal("$SETCHATMEMBERS '-g $gid $pid' failed!");
 	}
     }
-    
-    $group->SendApprovalEmail($this_user, $target_user) == 0
-	or fatal("Could not send approval email to $target_user in $group");
+
+    if ($sendemail) {
+	$group->SendApprovalEmail($this_user, $target_user) == 0 or
+	    fatal("Could not send approval email to $target_user in $group");
+    }
 }
 
 #
