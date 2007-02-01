@@ -150,7 +150,7 @@ void UdpAvgThroughputSensor::localAck(char *packetData, int Len,int overheadLen,
 	tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
 
 	ackList[queuePtr] = tmpUdpAck;
-	queuePtr = queuePtr + 1;
+	queuePtr = (queuePtr + 1)%100;
 	minSamples++;
 
 	if(minSamples < 100)
@@ -176,7 +176,7 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp)
 
 	for(i = 0;(i < sampleCount&& timePeriod < 500000); i++)
 	{
-		index = (queuePtr - i + 100)%100;
+		index = (queuePtr -1 - i + 100)%100;
 
 		timePeriod += ackList[index].timeTaken;
 		packetSizeSum += ackList[index].packetSize;
