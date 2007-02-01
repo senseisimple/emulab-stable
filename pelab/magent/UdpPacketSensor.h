@@ -20,19 +20,29 @@ class UdpPacketSensor:public Sensor{
     bool isAckFake() const;
     int getPacketLoss() const;
     std::vector<UdpPacketInfo> getAckedPackets() const;
+    //CHANGE:
+    std::list<UdpPacketInfo>& getUnAckedPacketList();
 
 
   private:
 
+    //CHANGE:
+    bool handleReorderedAck(PacketInfo *packet);
+
     std::list<UdpPacketInfo> sentPacketList;
     std::vector< UdpPacketInfo > ackedPackets;
+    //CHANGE:
+    std::list<UdpPacketInfo> unAckedPacketList;
 
     long lastSeenSeqNum;
     int packetLoss;
     int totalPacketLoss;
 
     int libpcapSendLoss;
+    //CHANGE:
+    int statReorderedPackets;
     bool ackFake;
+
 
 };
 

@@ -80,11 +80,16 @@ void UdpThroughputSensor::localAck(PacketInfo *packet)
 
 			if(vecIterator != ackedPackets.end())
 			{
+
+				timeDiff = *(unsigned long long *)(packet->payload + 1 + global::udpMinAckPacketSize + i*global::udpRedunAckSize + global::udpSeqNumSize);
+
+				// Avoid dividing by zero.
+				if(ackTimeDiff - timeDiff == 0)
+					continue;
+
 				// Calculate throughput for the packet being acked by
 				// the redundant ACK.
 				numThroughputAcks++;
-
-				timeDiff = *(unsigned long long *)(packet->payload + 1 + global::udpMinAckPacketSize + i*global::udpRedunAckSize + global::udpSeqNumSize);
 
 				// We lost the record of the size of this packet due to libpcap
 				// loss, use the length echoed back in the ACK.
@@ -102,12 +107,16 @@ void UdpThroughputSensor::localAck(PacketInfo *packet)
 	// Calculate the throughput for the current packet being ACKed.
 	vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
-	// We lost the record of the size of this packet due to libpcap
-	// loss, use the length echoed back in the ACK.
-	if(packetHistory->isAckFake() == true)
-		avgThroughput += 8000000.0*( static_cast<double> (echoedPacketSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
-	else
-		avgThroughput += 8000000.0*( static_cast<double> ((*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
+	// Avoid dividing by zero.
+	if(ackTimeDiff != 0)
+	{
+		// We lost the record of the size of this packet due to libpcap
+		// loss, use the length echoed back in the ACK.
+		if(packetHistory->isAckFake() == true)
+			avgThroughput += 8000000.0*( static_cast<double> (echoedPacketSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
+		else
+			avgThroughput += 8000000.0*( static_cast<double> ((*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
+	}
 
 	throughputKbps = avgThroughput / (static_cast<double> (numThroughputAcks) );
 
@@ -118,17 +127,18 @@ void UdpThroughputSensor::localAck(PacketInfo *packet)
 		// Send this available bandwidth as a tentative value.
 		// To be used for dummynet events only if it is greater
 		// than the last seen value.
-		logWrite(SENSOR, "VALUE::Tentative bandwidth for seqNum = %d , value = %f, acktimeDiff = %llu",seqNum, throughputKbps, ackTimeDiff);
+		logWrite(SENSOR, "VALUE::Tentative bandwidth for seqNum = %d , value = %f, acktimeDiff = %llu,packet size = %u",seqNum, throughputKbps, ackTimeDiff, (*vecIterator).packetSize);
 
-		logWrite(SENSOR, "TPUT:TIME= %llu,TENTATIVE=%f",timeStamp,throughputKbps);
-		logWrite(SENSOR, "LOSS:TIME=%llu,LOSS=0", timeStamp);
+		//CHANGE:
+		logWrite(SENSOR, "TPUT:TIME=%llu,TENTATIVE=%f",timeStamp,throughputKbps);
+		//logWrite(SENSOR, "LOSS:TIME=%llu,LOSS=0", timeStamp);
 	}
 	else
 	{
 		// Send this as the authoritative available bandwidth value.
 		logWrite(SENSOR,"VALUE::Authoritative bandwidth for seqNum = %d , value = %f ,ackTimeDiff = %llu ",seqNum,throughputKbps,ackTimeDiff);
 		logWrite(SENSOR, "TPUT:TIME=%llu,AUTHORITATIVE=%f",timeStamp,throughputKbps);
-		logWrite(SENSOR,"LOSS:TIME=%llu,LOSS=%d",timeStamp,packetHistory->getPacketLoss());
+		//logWrite(SENSOR,"LOSS:TIME=%llu,LOSS=%d",timeStamp,packetHistory->getPacketLoss());
 	}
 
 	// Save the receiver timestamp of this ACK packet, so that we can

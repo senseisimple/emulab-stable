@@ -105,6 +105,15 @@ void SensorList::addSensor(SensorCommand const & newSensor)
   case UDP_MAXDELAY_SENSOR:
     pushUdpMaxDelaySensor();
     break;
+  case UDP_RTT_SENSOR:
+    pushUdpRttSensor();
+    break;
+  case UDP_LOSS_SENSOR:
+    pushUdpLossSensor();
+    break;
+  case UDP_AVG_THROUGHPUT_SENSOR:
+    pushUdpAvgThroughputSensor();
+    break;
   default:
     logWrite(ERROR,
              "Incorrect sensor type (%d). Ignoring add sensor command.",
@@ -398,6 +407,65 @@ void SensorList::pushUdpMaxDelaySensor()
 
     // Example dependency set
     depUdpMaxDelaySensor = newSensor;
+  }
+
+}
+
+void SensorList::pushUdpRttSensor()
+{
+  pushUdpPacketSensor();
+
+  // Example dependency check
+  if (depUdpRttSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpRttSensor");
+    UdpRttSensor * newSensor = new UdpRttSensor(depUdpPacketSensor);
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpRttSensor = newSensor;
+  }
+
+}
+
+void SensorList::pushUdpLossSensor()
+{
+  pushUdpPacketSensor();
+  pushUdpRttSensor();
+
+  // Example dependency check
+  if (depUdpLossSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpLossSensor");
+    UdpLossSensor * newSensor = new UdpLossSensor(depUdpPacketSensor, depUdpRttSensor);
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpLossSensor = newSensor;
+  }
+
+}
+
+void SensorList::pushUdpAvgThroughputSensor()
+{
+  pushUdpPacketSensor();
+  pushUdpLossSensor();
+
+  // Example dependency check
+  if (depUdpAvgThroughputSensor == NULL)
+  {
+    logWrite(SENSOR, "Adding UdpAvgThroughputSensor");
+    UdpAvgThroughputSensor * newSensor = new UdpAvgThroughputSensor(depUdpPacketSensor, depUdpLossSensor);
+
+    std::auto_ptr<Sensor> current(newSensor);
+    pushSensor(current);
+
+    // Example dependency set
+    depUdpAvgThroughputSensor = newSensor;
   }
 
 }

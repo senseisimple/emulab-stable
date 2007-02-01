@@ -50,7 +50,6 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	ackValid = true;
 	sendValid = false;
 
-	int overheadLen = 14 + 4 + 8 + packet->ip->ip_hl*4;
 	unsigned short int seqNum = *(unsigned short int *)(packet->payload + 1);
 	unsigned short int echoedPacketSize = *(unsigned short int *)(packet->payload + 1 + global::USHORT_INT_SIZE);
 	unsigned long long echoedTimestamp = *(unsigned long long *)(packet->payload + 1 + 2*global::USHORT_INT_SIZE + global::ULONG_LONG_SIZE);
@@ -75,11 +74,9 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	// Calculate the delay for the maximum sized packet.
 
 	// We lost this packet size details due to loss in libpcap, use the 
-	// size echoed in the ACK packet - this does not included the header
-	// overhead for the packet - we assume that the packet on the reverse path
-	// has the same overhead length as the original packet.
+	// size echoed in the ACK packet 
 	if(packetHistory->isAckFake() == true)
-		oneWayDelay = ( oneWayDelay ) * 1518 / (overheadLen + echoedPacketSize);
+		oneWayDelay = ( oneWayDelay ) * 1518 / (echoedPacketSize);
 	else
 		oneWayDelay = ( oneWayDelay ) * 1518 / ( (*vecIterator).packetSize);
 

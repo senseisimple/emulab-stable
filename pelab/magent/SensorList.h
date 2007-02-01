@@ -29,6 +29,9 @@
 #include "UdpThroughputSensor.h"
 #include "UdpMinDelaySensor.h"
 #include "UdpMaxDelaySensor.h"
+#include "UdpRttSensor.h"
+#include "UdpLossSensor.h"
+#include "UdpAvgThroughputSensor.h"
 
 class SensorCommand;
 
@@ -49,6 +52,9 @@ class UdpPacketSensor;
 class UdpThroughputSensor;
 class UdpMaxDelaySensor;
 class UdpMinDelaySensor;
+class UdpRttSensor;
+class UdpLossSensor;
+class UdpAvgThroughputSensor;
 // Udp - CHANGES - End
 
 class SensorList
@@ -84,6 +90,9 @@ private:
   void pushUdpThroughputSensor(void);
   void pushUdpMinDelaySensor(void);
   void pushUdpMaxDelaySensor(void);
+  void pushUdpRttSensor(void);
+  void pushUdpLossSensor(void);
+  void pushUdpAvgThroughputSensor(void);
   // Udp - CHANGES - End
 
 private:
@@ -102,7 +111,10 @@ private:
   UdpThroughputSensor const * depUdpThroughputSensor;
   UdpMinDelaySensor const * depUdpMinDelaySensor;
   UdpMaxDelaySensor const * depUdpMaxDelaySensor;
-  // Udp - CHANGES - End
+  UdpRttSensor const * depUdpRttSensor;  
+  UdpLossSensor const * depUdpLossSensor;
+  UdpAvgThroughputSensor const * depUdpAvgThroughputSensor;
+  //Udp - CHANGES - End
 
 };
 
