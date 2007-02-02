@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,15 @@ SYSTEM	       := $(shell uname -s)
 RHLVERSION     := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\).*/Linux\1/' | sed -e 's/Fedora Core release \([0-9]\).*/FC\1/')
 
 include $(OBJDIR)/Makeconf
+
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+CCSTATIC	= -static
+LDSTATIC	= -static
+else
+CCSTATIC	=
+LDSTATIC	= 
+endif
 
 all: pcapper
 
@@ -31,10 +40,10 @@ TBLIBS        = $(EVENTOBJS) $(OBJDIR)/lib/libtb/libtb.a $(EVENTLIBS)
 
 PCAPLIBS=-lpcap
 
-CFLAGS  = -Wall -static $(PTHREADCFLAGS) \
+CFLAGS  = -Wall $(CCSTATIC) $(PTHREADCFLAGS) \
 	  -DEMULAB -g -DDROPROOT -DBOSSNODE=\"@BOSSNODE@\" \
 	  -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
-LDFLAGS = -static
+LDFLAGS = $(LDSTATIC)
 
 CFLAGS_FBSD    = $(CFLAGS) $(TBCFLAGS)
 CFLAGS_FBSD_NE = $(CFLAGS)

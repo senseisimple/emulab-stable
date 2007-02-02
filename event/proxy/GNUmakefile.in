@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,6 +16,13 @@ PROGRAMS       += evproxyclient evproxyserver
 endif
 
 include $(OBJDIR)/Makeconf
+
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
 
 all:	$(PROGRAMS)
 
@@ -50,10 +57,14 @@ CPPC     = g++
 
 ifeq ($(host_cpu),arm)
 else
-LDFLAGS  += -static
-PLDFLAGS  += -static
+LDFLAGS  += $(LDSTATIC)
+PLDFLAGS  += $(LDSTATIC)
 ifeq ($(SYSTEM),Linux)
+ifeq ($(NOSTATIC),)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NEEDKERB := 1
+endif
 ifeq ($(NEEDKERB),0)
  CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
  LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
@@ -88,7 +99,7 @@ evproxyplab.o: evproxyplab.cc
 evproxyplab:    evproxyplab.o ../lib/libevent.a ../lib/event.h
 	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
-elvindtest:     elvindtest.o
+elvindtest-debug: elvindtest.o
 	$(CC) $(LDFLAGS) -o $@ elvindtest.o $(LIBS)
 
 

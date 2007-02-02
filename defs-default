@@ -53,7 +53,7 @@ ARCHIVESUPPORT=1
 OPSDBSUPPORT=1
 PELABSUPPORT=1
 PLABSUPPORT=1
-PLAB_ROOTBALL="plabroot-19.tar.bz2"
+PLAB_ROOTBALL="plabroot-20.tar.bz2"
 
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.

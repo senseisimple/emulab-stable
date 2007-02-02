@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,8 +16,15 @@ CFLAGS	= -Wall -O2 -g \
 LIBS	= ${OBJDIR}/lib/libtb/libtb.a
 LDFLAGS =
 
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
+
 ifneq ($(host_cpu),arm)
-LDFLAGS  += -static
+LDFLAGS  += $(LDSTATIC)
 endif
 
 TESTS = $(SRCDIR)/syncd_test.sh
