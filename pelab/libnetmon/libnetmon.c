@@ -125,7 +125,7 @@ void lnm_init() {
 
         /*
          * Connect to netmond if we've been asked to
-         */ 
+         */
 
         /*
          * If this is set at all, use the standard data and control sockets for
@@ -146,7 +146,7 @@ void lnm_init() {
             struct sockaddr_un servaddr;
 
             DEBUG(printf("Opening socket at path %s\n",sockpath));
-            
+
             sockfd = real_socket(AF_LOCAL, SOCK_STREAM, 0);
             if (!sockfd) {
                 croak("Unable to create socket\n");
@@ -155,23 +155,23 @@ void lnm_init() {
             servaddr.sun_family = AF_LOCAL;
             strcpy(servaddr.sun_path,sockpath);
 
-	    char *contimo_s = getenv("LIBNETMON_CONNECTTIMO");
+            char *contimo_s = getenv("LIBNETMON_CONNECTTIMO");
             if (contimo_s && sscanf(contimo_s,"%i", &contimo) == 1)
-		    printf("libnetmon: Setting connection timeout to %i seconds\n",
-			   contimo);
-	    else
-		    contimo = 1;
+                    printf("libnetmon: Setting connection timeout to %i seconds\n",
+                           contimo);
+            else
+                    contimo = 1;
 
-	    while (1) {
-		    if (real_connect(sockfd, (struct sockaddr*) &servaddr,
-				     sizeof(servaddr)) == 0) {
-			    break;
-		    }
-		    if (contimo && --contimo == 0) {
-			    croak("Unable to connect to netmond socket\n");
-		    }
-		    printf("libnetmon: Failed to connect, trying again...\n");
-		    sleep(1);
+            while (1) {
+                    if (real_connect(sockfd, (struct sockaddr*) &servaddr,
+                                     sizeof(servaddr)) == 0) {
+                            break;
+                    }
+                    if (contimo && --contimo == 0) {
+                            croak("Unable to connect to netmond socket\n");
+                    }
+                    printf("libnetmon: Failed to connect, trying again...\n");
+                    sleep(1);
             }
 
             outstream = fdopen(sockfd,"w");
@@ -201,7 +201,7 @@ void lnm_init() {
             struct sockaddr_un servaddr;
 
             DEBUG(printf("Opening control socket at path %s\n",ctrl_sockpath));
-            
+
             controlfd = real_socket(AF_LOCAL, SOCK_STREAM, 0);
             if (!controlfd) {
                 croak("Unable to create socket\n");
@@ -221,7 +221,7 @@ void lnm_init() {
              *
              * Note: Another possibility would be to use O_ASYNC on this
              * file descriptor, so that we get a signal when data is
-             * available. But, this could interact poorly with apps that 
+             * available. But, this could interact poorly with apps that
              * use this signal themselves, so this is probably not a
              * good idea.
              */
@@ -345,7 +345,7 @@ void lnm_control_wait() {
     DEBUG(printf("Done waiting for a control message\n"));
 
     lnm_control();
-    
+
     return;
 }
 
@@ -364,7 +364,7 @@ void nameFD(int fd, const struct sockaddr *localname,
 
     if (remotename == NULL) {
         int gpn_rv;
-	namelen = sizeof(sockname.data);
+        namelen = sizeof(sockname.data);
         gpn_rv = getpeername(fd,(struct sockaddr *)sockname.data,&namelen);
         if (gpn_rv != 0) {
             croak("Unable to get remote socket name: %s\n", strerror(errno));
@@ -381,14 +381,14 @@ void nameFD(int fd, const struct sockaddr *localname,
      * later
      */
     monitorFDs[fd].remote_port = ntohs(remoteaddr->sin_port);
-    monitorFDs[fd].remote_hostname = inet_ntoa(remoteaddr->sin_addr);
+    monitorFDs[fd].remote_hostname = remoteaddr->sin_addr;
 
     /*
      * Get the local port number
      */
     int gsn_rv;
     if (localname == NULL) {
-	namelen = sizeof(sockname.data);
+        namelen = sizeof(sockname.data);
         gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
         if (gsn_rv != 0) {
             croak("Unable to get local socket name: %s\n", strerror(errno));
@@ -465,13 +465,13 @@ void startFD(int fd) {
     rcvsize = getNewSockbuf(fd,SO_RCVBUF);
 
     if (forced_bufsize && (sndsize > forced_bufsize)) {
-	printf("Warning: Tried to force SO_SNBUF to %i but got %i\n",
-		forced_bufsize, sndsize);
+        printf("Warning: Tried to force SO_SNBUF to %i but got %i\n",
+                forced_bufsize, sndsize);
     }
 
     if (forced_bufsize && (rcvsize > forced_bufsize)) {
-	printf("Warning: Tried to force SO_RCVBUF to %i but got %i\n",
-		forced_bufsize, rcvsize);
+        printf("Warning: Tried to force SO_RCVBUF to %i but got %i\n",
+                forced_bufsize, rcvsize);
     }
 
     /*
@@ -507,11 +507,12 @@ void stopFD(int fd) {
     printlog(LOG_CLOSED,fd);
 
     monitorFDs[fd].monitoring = false;
-
+/* // XXX: If changed to dynamic memory, remove memory leak here.
     // XXX: Possible memory leak?
     if (monitorFDs[fd].remote_hostname != NULL) {
         monitorFDs[fd].remote_hostname = NULL;
     }
+*/
 }
 
 /*
@@ -687,7 +688,7 @@ void fprintID(FILE *f, int fd) {
          * so that we can report on a connection before connect() finishes
          */
         fprintf(f,"%i:%s:%i", fd,
-                monitorFDs[fd].remote_hostname,
+                inet_ntoa(monitorFDs[fd].remote_hostname),
                 monitorFDs[fd].remote_port);
     } else if (output_version == 3) {
         fprintf(f,"%i:%i",pid,fd);
@@ -723,7 +724,7 @@ void process_control_packet(generic_m *m) {
     monitorudp_m *monitorudpmsg;
 
     DEBUG(printf("Processing control packet\n"));
-        
+
     switch (m->type) {
         case CM_MAXSOCKSIZE:
             /*
@@ -791,7 +792,7 @@ void process_control_packet(generic_m *m) {
             break;
         default:
             croak("Got an unexpected control message type: %i\n",
-		   (void *)m->type);
+                   (void *)m->type);
     }
 }
 
@@ -897,7 +898,7 @@ void allocFDspace() {
 
 void allocFDspaceFor(int fd) {
     while (fd >= fdSize) {
-	allocFDspace();
+        allocFDspace();
     }
 }
 
@@ -945,7 +946,7 @@ void log_packet(int fd, size_t len, const struct sockaddr *srvaddr) {
             break;
         case 1:
             fprintf(outstream,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec,
-                    time.tv_usec, monitorFDs[fd].remote_hostname,
+                    time.tv_usec, inet_ntoa(monitorFDs[fd].remote_hostname),
                     monitorFDs[fd].remote_port, len);
             break;
         case 2:
@@ -986,7 +987,7 @@ void log_packet(int fd, size_t len, const struct sockaddr *srvaddr) {
                         croak("Attempted to call sendto() on an unconnected "
                                "socket without a srvaddr");
                     }
-                    remote_ip = monitorFDs[fd].remote_hostname;
+                    remote_ip = inet_ntoa(monitorFDs[fd].remote_hostname);
                     remote_port = monitorFDs[fd].remote_port;
                 }
                 fprintf(outstream,"SendTo: ");
@@ -1045,7 +1046,7 @@ void informConnect(int fd) {
      * sendto()
      */
     if (monitorFDs[fd].socktype == SOCK_STREAM){
-        printlog(LOG_REMOTEIP,fd,"%s",monitorFDs[fd].remote_hostname);
+        printlog(LOG_REMOTEIP,fd,"%s",inet_ntoa(monitorFDs[fd].remote_hostname));
         printlog(LOG_REMOTEPORT,fd,"%i",monitorFDs[fd].remote_port);
     }
 
@@ -1065,17 +1066,17 @@ int getNewSockbuf(int fd, int which) {
     int optsize;
     optsize = sizeof(newsize);
     if (getsockopt(fd,SOL_SOCKET,which,&newsize,&optsize)) {
-	croak("Unable to get socket buffer size");
-	/* Make GCC happy - won't get called */
-	return 0;
+        croak("Unable to get socket buffer size");
+        /* Make GCC happy - won't get called */
+        return 0;
     } else {
-	if (which == SO_SNDBUF) {
-	    monitorFDs[fd].sndbuf = newsize;
-	} else {
-	    monitorFDs[fd].rcvbuf = newsize;
-	}
+        if (which == SO_SNDBUF) {
+            monitorFDs[fd].sndbuf = newsize;
+        } else {
+            monitorFDs[fd].rcvbuf = newsize;
+        }
 
-	return newsize;
+        return newsize;
     }
 }
 
@@ -1088,7 +1089,7 @@ int socket(int domain, int type, int protocol) {
     DEBUG(printf("socket() called\n"));
     returnedFD = real_socket(domain, type, protocol);
     if (returnedFD > 0) {
-	startFD(returnedFD);
+        startFD(returnedFD);
     }
 
     return returnedFD;
@@ -1197,8 +1198,8 @@ int accept(int s, struct sockaddr * addr,
     rv = real_accept(s, addr, addrlen);
 
     if (!monitorFD_p(s)) {
-	return rv;
-    } 
+        return rv;
+    }
 
     if (rv > 0) {
         /*
@@ -1353,29 +1354,29 @@ int setsockopt (int s, int level, int optname, const void *optval,
      * make us ignore or cap this call.
      */
     if (monitorFD_p(s)) {
-	/*
-	 * Note, we do this on all sockets, not just those we are currently
-	 * monitoring, since it's likely they'll call setsockopt() before
-	 * connect()
-	 */
-	if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
-				      (optname == SO_RCVBUF))) {
-	    if (forced_bufsize) {
-		/*
-		 * I believe this is the right thing to do - return success but
-		 * don't do anything - I think that this is what you normally get
-		 * when you, say, pick a socket buffer size that is too big.
-		 */
-		printf("Warning: Ignored attempt to change SO_SNDBUF or "
-		       "SO_RCVBUF\n");
-		return 0;
-	    } else if (max_bufsize && (*((int *)optval) > max_bufsize)) {
-		printf("Warning: Capped attempt to change SO_SNDBUF or "
-		       "SO_RCVBUF\n");
-		*((int *)optval) = max_bufsize;
-	    }
+        /*
+         * Note, we do this on all sockets, not just those we are currently
+         * monitoring, since it's likely they'll call setsockopt() before
+         * connect()
+         */
+        if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
+                                      (optname == SO_RCVBUF))) {
+            if (forced_bufsize) {
+                /*
+                 * I believe this is the right thing to do - return success but
+                 * don't do anything - I think that this is what you normally get
+                 * when you, say, pick a socket buffer size that is too big.
+                 */
+                printf("Warning: Ignored attempt to change SO_SNDBUF or "
+                       "SO_RCVBUF\n");
+                return 0;
+            } else if (max_bufsize && (*((int *)optval) > max_bufsize)) {
+                printf("Warning: Capped attempt to change SO_SNDBUF or "
+                       "SO_RCVBUF\n");
+                *((int *)optval) = max_bufsize;
+            }
 
-	}
+        }
     }
 
     /*
@@ -1387,39 +1388,39 @@ int setsockopt (int s, int level, int optname, const void *optval,
      * If the call succeeded, we have to record some more information about it
      */
     if (rv == 0 && monitorFD_p(s)) {
-	if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
-				      (optname == SO_RCVBUF))) {
-	    /*
-	     * We have to get the socket buffer size the kernel chose: it might
-	     * not be exactly what the user asked for
-	     */
-	    getNewSockbuf(s,optname);
-	    if (connectedFD_p(s)) {
-		informBufsize(s,optname);
-	    }
-	}
+        if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
+                                      (optname == SO_RCVBUF))) {
+            /*
+             * We have to get the socket buffer size the kernel chose: it might
+             * not be exactly what the user asked for
+             */
+            getNewSockbuf(s,optname);
+            if (connectedFD_p(s)) {
+                informBufsize(s,optname);
+            }
+        }
 
-	/*
-	 * There are some TCP options we have to watch for
-	 */
-	if (level == IPPROTO_TCP) {
-	    if (optname == TCP_NODELAY) {
-		monitorFDs[s].tcp_nodelay = *((int *)optval);
+        /*
+         * There are some TCP options we have to watch for
+         */
+        if (level == IPPROTO_TCP) {
+            if (optname == TCP_NODELAY) {
+                monitorFDs[s].tcp_nodelay = *((int *)optval);
 
-		if (connectedFD_p(s)) {
-		     /* If connected, inform user of this call */
-		    informNodelay(s);
-		}
-	    }
-	    if (optname == TCP_MAXSEG) {
-		monitorFDs[s].tcp_maxseg = *((int *)optval);
+                if (connectedFD_p(s)) {
+                     /* If connected, inform user of this call */
+                    informNodelay(s);
+                }
+            }
+            if (optname == TCP_MAXSEG) {
+                monitorFDs[s].tcp_maxseg = *((int *)optval);
 
-		if (connectedFD_p(s)) {
-		    /* If connected, inform user of this call */
-		    informMaxseg(s);
-		}
-	    }
-	}
+                if (connectedFD_p(s)) {
+                    /* If connected, inform user of this call */
+                    informMaxseg(s);
+                }
+            }
+        }
     }
 
     /*
@@ -1442,12 +1443,12 @@ ssize_t read(int d, void *buf, size_t nbytes) {
     DEBUG(printf("read() called\n"));
 
     rv = real_read(d,buf,nbytes);
-    
+
     if ((rv == 0) && monitorFD_p(d)) {
         DEBUG(printf("Detected a closed socket with a zero-length read()\n"));
         stopFD(d);
     }
-    
+
     return rv;
 }
 
@@ -1461,7 +1462,7 @@ ssize_t recv(int s, void *buf, size_t len, int flags) {
     lnm_control();
 
     rv = real_recv(s,buf,len,flags);
-    
+
     DEBUG(printf("recv() returned %i\n",rv));
 
     if ((rv == 0) && monitorFD_p(s)) {
@@ -1469,7 +1470,7 @@ ssize_t recv(int s, void *buf, size_t len, int flags) {
         stopFD(s);
     }
 
-    
+
     return rv;
 }
 
@@ -1483,11 +1484,11 @@ ssize_t recvmsg(int s, struct msghdr *msg, int flags) {
     lnm_control();
 
     rv = real_recvmsg(s,msg,flags);
-    
+
     if ((rv == 0) && monitorFD_p(s)) {
         DEBUG(printf("Detected a closed socket with zero-length recvmsg()\n"));
         stopFD(s);
     }
-    
+
     return rv;
 }

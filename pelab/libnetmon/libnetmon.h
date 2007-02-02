@@ -97,7 +97,7 @@ static bool connectedFD_p(int);
  * ASCII strings
  */
 typedef enum { LOG_NEW = 0,
-               LOG_REMOTEIP, 
+               LOG_REMOTEIP,
                LOG_REMOTEPORT,
                LOG_LOCALPORT,
                LOG_TCP_NODELAY,
@@ -142,10 +142,14 @@ static void log_packet(int, size_t, const struct sockaddr*);
 /*
  * The information we keep about each FD we're monitoring
  */
-typedef struct { 
+typedef struct {
     bool monitoring;
-    char *remote_hostname; /* We keep the char* so that we don't have to
-                              convert every time we want to report */
+//    char *remote_hostname; /* We keep the char* so that we don't have to
+//                              convert every time we want to report */
+    struct in_addr remote_hostname; /* We keep this as an in_addr
+                                       because inet_ntoa is not
+                                       re-entrant and uses static
+                                       memory for its result. */
     int remote_port;
     int local_port;
 
@@ -161,7 +165,7 @@ typedef struct {
     bool tcp_nodelay;
     int tcp_maxseg;
 
-    
+
 } fdRecord;
 
 /*
@@ -267,7 +271,7 @@ typedef ssize_t read_proto_t(int, void *, size_t);
 typedef ssize_t recv_proto_t(int, void *, size_t, int);
 typedef ssize_t recvmsg_proto_t(int,struct msghdr *, int);
 typedef ssize_t accept_proto_t(int,struct sockaddr *, socklen_t *);
-typedef ssize_t	sendto_proto_t(int, const void *, size_t, int,
+typedef ssize_t sendto_proto_t(int, const void *, size_t, int,
                                const struct sockaddr *, socklen_t);
 
 /*
