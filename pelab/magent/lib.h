@@ -395,6 +395,11 @@ struct UdpPacketInfo
         bool isFake;
 };
 
+struct UdpPacketCmp{
+	unsigned short seqNum;
+	unsigned long long timeStamp;
+};
+
 class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool>
 {
   public:
@@ -404,12 +409,12 @@ class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int
   }
 };
 
-class lessSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool>
+class lessSeqNum:public std::binary_function<UdpPacketInfo , UdpPacketCmp *,bool>
 {
   public:
-  bool operator()(const UdpPacketInfo& packet,unsigned short int seqNum) const
+  bool operator()(const UdpPacketInfo& packet,UdpPacketCmp *cmpPacket) const
   {
-    return (packet.seqNum < seqNum);
+    return ( (packet.seqNum < cmpPacket->seqNum) && (packet.timeStamp < cmpPacket->timeStamp));
   }
 };
 

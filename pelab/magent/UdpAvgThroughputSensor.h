@@ -13,6 +13,8 @@ class UdpLossSensor;
 struct UdpAck {
 	unsigned long long timeTaken;
 	long packetSize;
+	unsigned short seqNum;
+	bool isRedun;
 };
 
 

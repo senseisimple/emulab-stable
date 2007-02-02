@@ -1,6 +1,5 @@
 import sys
 import re
-import math
 
 # Read stats from the log output by UdpClient.
 inFile = open(sys.argv[1], 'r')

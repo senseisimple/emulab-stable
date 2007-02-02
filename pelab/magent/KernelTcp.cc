@@ -357,7 +357,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // The size of the packet & its timestamp at the
   // sender are echoed in the ACKs.
 
-  unsigned short networkOrder_size = htons(size);
+  unsigned short networkOrder_size = (size);
   memcpy(&udpPacketBuffer[1 + global::USHORT_INT_SIZE],&networkOrder_size, global::USHORT_INT_SIZE);
 
   // Copy the timestamp of when this packet is being sent.
@@ -367,7 +367,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // used as a fallback option in case we miss
   // this packet because of a libpcap buffer overflow.
   unsigned long long curTime = getCurrentTime().toMicroseconds();
-  curTime = htonll(curTime);
+  curTime = (curTime);
   memcpy(&udpPacketBuffer[1 + 2*global::USHORT_INT_SIZE], &curTime, global::ULONG_LONG_SIZE);
 
   bool socketConnectedFlag = true;
@@ -402,7 +402,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // which was assigned to the socket.
   if(!socketConnectedFlag || ntohs(udpLocalAddr.sin_port) == 0 )
   {
-	  socklen_t udpLocalLen;
+	  socklen_t udpLocalLen = sizeof(udpLocalAddr);
 	  getsockname(peersock, (sockaddr *)&udpLocalAddr, &udpLocalLen);
   }
 
@@ -460,7 +460,8 @@ void KernelTcp::init(void)
 
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(global::interface.c_str(), &netp, &maskp, errbuf);
-    filter << "port " << global::peerServerPort << " and tcp";
+    filter << "\(port " << global::peerServerPort << " and tcp\)"
+	    " or \(port " << global::peerUdpServerPort << " and udp \)";
 
     /* open device for reading.
      * NOTE: We use non-promiscuous */

@@ -93,6 +93,8 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 				numThroughputAcks++;
 
 				tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
+				tmpUdpAck.isRedun = true;
+				tmpUdpAck.seqNum = redunSeqNum;
 
 
 				// We lost the record of the size of this packet due to libpcap
@@ -154,6 +156,8 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 	}
 
 	tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
+	tmpUdpAck.isRedun = false;
+	tmpUdpAck.seqNum = seqNum;
 
 	ackList[queuePtr] = tmpUdpAck;
 	queuePtr = (queuePtr + 1)%MAX_SAMPLES;
@@ -195,8 +199,22 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp)
 		return;
 	}
 
+	if(timePeriod > 500000)
+	{
+		logWrite(ERROR, " Incorrect UdpAvgThroughput timePeriod = %llu, bytes = %d, i = %d, queuePtr = %d", timePeriod, packetSizeSum, i, queuePtr);
+		int k;
+		for(k = 0; k < i; k++)
+		{
+			index = (queuePtr -1 - k + MAX_SAMPLES)%MAX_SAMPLES;
+			logWrite(ERROR, "Wrong UDP seqnum = %d, bytes = %d, timePeriod = %llu, isRedun = %d", ackList[index].seqNum, ackList[index].packetSize, ackList[index].timeTaken, ackList[index].isRedun);
+		}
+
+		return;
+	}
+
 	// Calculate the average throughput.
 	throughputKbps = 8000000.0*( static_cast<double> (packetSizeSum ))  / ( static_cast<double>(timePeriod)*1024.0 );
+
 
 	// Send a message to the monitor with the new bandwidth.
 	if(lossSensor->getPacketLoss() == 0)

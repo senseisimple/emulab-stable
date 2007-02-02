@@ -16,7 +16,7 @@ int SEND_COUNT = 4200;
 int PACKET_DELTA = 5;
 int PACKET_SIZE = 1000;
 
-void sendCommand(int conn, unsigned char commandId, ElabOrder const & key,
+void sendCommand(int connection, unsigned char commandId, ElabOrder const & key,
                  vector<char> const & command)
 {
   static char buffer[8096] = {0};
@@ -29,7 +29,7 @@ void sendCommand(int conn, unsigned char commandId, ElabOrder const & key,
 
   pos = saveHeader(pos, head);
   pos = saveBuffer(pos, & command[0], command.size());
-  send(conn, buffer, Header::headerSize + command.size(), 0);
+  send(connection, buffer, Header::headerSize() + command.size(), 0);
 }
 
 int main(int argc, char * argv[])

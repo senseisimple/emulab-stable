@@ -116,6 +116,7 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 				"We might have received "
 				" a reordered ACK, which has already been ACKed using redundant ACKs .\n", seqNum);
 			ackValid = false;
+			return;
 		}
 		else
 			ackValid = true;
@@ -218,8 +219,12 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 	// were lost - treat this as congestion on the forward path.
 
 	// Find out how many packets were lost.
+	struct UdpPacketCmp comparePacket;
 
-	listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), seqNum)); 
+	comparePacket.seqNum = seqNum;
+	comparePacket.timeStamp = (*curPacketIterator).timeStamp;
+
+	listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), &comparePacket)); 
 
 	if( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator ))
 	{
@@ -243,7 +248,7 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 			packetLoss++;
 			totalPacketLoss++;
 
-			listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), seqNum )); 
+			listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), &comparePacket )); 
 
 		}
 		while( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator) );
