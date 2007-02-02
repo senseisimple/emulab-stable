@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,7 +18,7 @@ if (!isset($nid) ||
     echo "</form><P>\n";
     exit;
 }
-$pid = addslashes($pid);
+$nid = addslashes($nid);
 
 $query_result = DBQueryFatal("SELECT * from wires where node_id1='$nid'");
 
