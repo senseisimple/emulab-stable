@@ -34,19 +34,6 @@
 <input type="radio" name="query_which" value="both" checked >
 <input type="submit" name="submit" value='Submit Query' >
 
-./myboss.vulnelab.testbed.emulab.net/login.php3
-<form action="login.php3" method="post">
-<input type="text" name="uid" value="fish@cs.utah.edu" size=30>
-<input type="password" name="password" size=12>
-<input type="submit" name="login" value="Login" >
-
-./myboss.vulnelab.testbed.emulab.net/login.php3?refer=1
-<form action="login.php3" method="post">
-<input type="text" name="uid" value="fish@cs.utah.edu" size=30>
-<input type="password" name="password" size=12>
-<input type="submit" name="login" value="Login" >
-<input type="hidden" name="referrer" value="https://myboss.vulnelab.testbed.emulab.net/joinproject.php3" >
-
 ./myboss.vulnelab.testbed.emulab.net/newproject.php3
 <form enctype=multipart/form-data name=myform action="newproject.php3" method="post">
 <input type="text" name="formfields[proj_head_uid]" value="" size=8 maxlength=8>
@@ -82,12 +69,6 @@
 <input type="textarea" name="formfields[proj_why]" rows=10 cols=60>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/password.php3
-<form action="password.php3" method="post">
-<input type="text" name="email" value="" size=30>
-<input type="text" name="phone" value="" size=20>
-<input type="submit" name="reset" value="Reset Password" >
-
 ./myboss.vulnelab.testbed.emulab.net/approveproject_form.php3?pid=testproj2
 <form action="https://myboss.vulnelab.testbed.emulab.net/approveproject.php3?pid=testproj2" method="post">
 <input type="select" name="approval" value='approve' >
@@ -97,15 +78,10 @@
 <input type="textarea" name="message" rows=15 cols=70>
 <input type="submit" name="OK" value='Submit' >
 
-./myboss.vulnelab.testbed.emulab.net/approveproject_form.php3?pid=testproj3
-<form action="https://myboss.vulnelab.testbed.emulab.net/approveproject.php3?pid=testproj3" method="post">
-<input type="select" name="approval" value='approve' >
-<input type="checkbox" name="silent" value="Yep" >
-<input type="select" name="head_uid" value='fish' >
-<input type="select" name="user_interface" value='emulab' >
-<input type="checkbox" name="pcplab_okay" value="Yep" checked >
-<input type="checkbox" name="ron_okay" value="Yep" checked >
-<input type="textarea" name="message" rows=15 cols=70>
+./myboss.vulnelab.testbed.emulab.net/approveuser_form.php3
+<form action="https://myboss.vulnelab.testbed.emulab.net/approveuser.php3" method="post">
+<input type="select" name="testusr2$$approval-testproj/testproj" value='postpone' >
+<input type="select" name="testusr2$$trust-testproj/testproj" value='user' >
 <input type="submit" name="OK" value='Submit' >
 
 ./myboss.vulnelab.testbed.emulab.net/archive_view.php3?exptidx=1
@@ -340,7 +316,7 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=7:T20061221-111135-12_preswapmod
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=7:T20070109-113223-72_preswapmod
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
@@ -348,7 +324,7 @@
 <input type="text" name="formfields[exp_id]" value="testexp1-Copy0" size=19 maxlength=19>
 <input type="text" name="formfields[exp_description]" value="testexp1 experiment." size=60>
 <input type="checkbox" name="formfields[exp_branch]" value='1' >
-<input type="hidden" name="formfields[copyid]" value='7:T20061221-111135-12_preswapmod' >
+<input type="hidden" name="formfields[copyid]" value='7:T20070109-113223-72_preswapmod' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -362,29 +338,7 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=7:tag2
-<form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
-<input type="hidden" name="beginexp" value="Submit" >
-<input type="select" name="formfields[exp_pid]" value=''>
-<input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="testexp1-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="testexp1 experiment." size=60>
-<input type="checkbox" name="formfields[exp_branch]" value='1' >
-<input type="hidden" name="formfields[copyid]" value='7:tag2' >
-<input type="hidden" name="formfields[exp_swappable]" value='1' >
-<input type="hidden" name="formfields[exp_noswap_reason]" value=''>
-<input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
-<input type="text" name="formfields[exp_idleswap_timeout]" value='4' size='3'>
-<input type="textarea" name="formfields[exp_noidleswap_reason]" rows=2 cols=50 >
-<input type="checkbox" name="formfields[exp_autoswap]" value='1' checked='1'>
-<input type="text" name="formfields[exp_autoswap_timeout]" value='16' size='3'>
-<input type="checkbox" name="formfields[exp_savedisk]" value='Yep' >
-<input type="select" name="formfields[exp_linktest]" value="0" >
-<input type="checkbox" name="formfields[exp_batched]" value='Yep' >
-<input type="checkbox" name="formfields[exp_preload]" value='Yep' >
-<input type="button" name="beginexp" value="Submit" >
-
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=8:T20061219-163552-223_preswapmod
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=8:T20070108-180745-272_preswapmod
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
@@ -392,7 +346,7 @@
 <input type="text" name="formfields[exp_id]" value="testexp2-Copy0" size=19 maxlength=19>
 <input type="text" name="formfields[exp_description]" value="testexp2 experiment." size=60>
 <input type="checkbox" name="formfields[exp_branch]" value='1' >
-<input type="hidden" name="formfields[copyid]" value='8:T20061219-163552-223_preswapmod' >
+<input type="hidden" name="formfields[copyid]" value='8:T20070108-180745-272_preswapmod' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -618,21 +572,21 @@
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc20
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc120
 <form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method="post">
-<input type="hidden" name="node_id" value="pc20" >
+<input type="hidden" name="node_id" value="pc120" >
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc32
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc158
 <form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method="post">
-<input type="hidden" name="node_id" value="pc32" >
+<input type="hidden" name="node_id" value="pc158" >
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc39
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc165
 <form action="https://myboss.vulnelab.testbed.emulab.net/boot.php3" target=_blank method="post">
-<input type="hidden" name="node_id" value="pc39" >
+<input type="hidden" name="node_id" value="pc165" >
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
@@ -642,6 +596,12 @@
 <input type="hidden" name="eid" value="testexp1" >
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
+
+./myboss.vulnelab.testbed.emulab.net/changeuid.php?target_uid=testusr2
+<form action="https://myboss.vulnelab.testbed.emulab.net/changeuid.php" method="post">
+<input type="text" name="new_uid" value="" size=8 maxlength=8>
+<input type="submit" name="submit" value="Change UID" >
+<input type="hidden" name="target_uid" value="testusr2" >
 
 ./myboss.vulnelab.testbed.emulab.net/delaycontrol.php3?pid=testbed&eid=testexp1
 <form action="https://myboss.vulnelab.testbed.emulab.net/delaycontrol.php3" method="post">
@@ -846,12 +806,6 @@
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=emulab-ops-FBSD60-UPDATE
-<form action="https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3" method="post">
-<input type="hidden" name="imageid" value='emulab-ops-FBSD60-UPDATE' >
-<input type="submit" name="confirmed" value="Confirm" >
-<input type="submit" name="canceled" value="Cancel" >
-
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=emulab-ops-FBSD61-STD
 <form action="https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3" method="post">
 <input type="hidden" name="imageid" value='emulab-ops-FBSD61-STD' >
@@ -861,6 +815,12 @@
 ./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=emulab-ops-FBSD61-UPDATE
 <form action="https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3" method="post">
 <input type="hidden" name="imageid" value='emulab-ops-FBSD61-UPDATE' >
+<input type="submit" name="confirmed" value="Confirm" >
+<input type="submit" name="canceled" value="Cancel" >
+
+./myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=emulab-ops-FBSD7-WITHSRC
+<form action="https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3" method="post">
+<input type="hidden" name="imageid" value='emulab-ops-FBSD7-WITHSRC' >
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
@@ -1935,12 +1895,6 @@
 ./myboss.vulnelab.testbed.emulab.net/deleteproject.php3?pid=testproj2
 <form action="https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3" method="post">
 <input type="hidden" name="pid" value="testproj2" >
-<input type="submit" name="confirmed" value="Confirm" >
-<input type="submit" name="canceled" value="Cancel" >
-
-./myboss.vulnelab.testbed.emulab.net/deleteproject.php3?pid=testproj3
-<form action="https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3" method="post">
-<input type="hidden" name="pid" value="testproj3" >
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
@@ -3167,7 +3121,7 @@
 ./myboss.vulnelab.testbed.emulab.net/editexp.php3?pid=testbed&eid=testexp1
 <form action="editexp.php3?pid=testbed&amp;eid=testexp1" method="post">
 <input type="text" name="formfields[description]" value='testexp1 experiment.' size=30>
-<input type="checkbox" name="formfields[idle_ignore]" value="1" checked='1'>
+<input type="checkbox" name="formfields[idle_ignore]" value="1" >
 <input type="checkbox" name="formfields[swappable]" value='1' checked='1'>
 <input type="textarea" name="formfields[noswap_reason]" rows=2 cols=50 >
 <input type="checkbox" name="formfields[idleswap]" value='1' >
@@ -3236,6 +3190,8 @@
 
 ./myboss.vulnelab.testbed.emulab.net/editgroup_form.php3?pid=testbed&gid=lbsgroup
 <form action="https://myboss.vulnelab.testbed.emulab.net/editgroup.php3?pid=testbed&amp;gid=lbsgroup" method="post">
+<input type="checkbox" name="change_rricci" value="permit" checked >
+<input type="select" name="rricci$$trust" value='user' >
 <input type="checkbox" name="add_mike" value="permit" >
 <input type="select" name="mike$$trust" value='local_root' >
 <input type="checkbox" name="add_danderse" value="permit" >
@@ -3252,8 +3208,6 @@
 <input type="select" name="ee$$trust" value='local_root' >
 <input type="checkbox" name="add_kwebb" value="permit" >
 <input type="select" name="kwebb$$trust" value='local_root' >
-<input type="checkbox" name="add_rricci" value="permit" >
-<input type="select" name="rricci$$trust" value='user' >
 <input type="checkbox" name="add_bwhite" value="permit" >
 <input type="select" name="bwhite$$trust" value='local_root' >
 <input type="checkbox" name="add_johnsond" value="permit" >
@@ -3382,7 +3336,7 @@
 <form action="editimageid.php3?imageid=FBSD45-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of FreeBSD 4.5" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/wd0-fbsd4.5-RPR.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3391,7 +3345,7 @@
 <form action="editimageid.php3?imageid=RHL71-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed PC Disk Image (Redhat 7.1 Slice)" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL71-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3400,7 +3354,7 @@
 <form action="editimageid.php3?imageid=UTAHPC-FBSD43+LINUX71-BETA" method="post" name=idform>
 <input type="text" name="formfields[description]" value=" Tested PC Disk Image with FreeBSD 4.3 and RedHat 7.1" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/wd0-all-4.3+7.1-RPR.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3409,7 +3363,7 @@
 <form action="editimageid.php3?imageid=UTAHPC-FBSD43+LINUX71" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Tested PC Disk Image with FreeBSD 4.3 and RedHat 7.1" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/wd0-all-4.3+7.1-RPR-3.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3418,7 +3372,7 @@
 <form action="editimageid.php3?imageid=UTAHPC-FBSD43" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed PC Disk Image (FreeBSD 4.3 Slice)" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/wd0-fbsd4.3-RPR-3.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3427,7 +3381,7 @@
 <form action="editimageid.php3?imageid=UTAHPC-FBSD45+LINUX71" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed PC Disk Image with FreeBSD 4.5 and RedHat 7.1" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/wd0-all-4.5+7.1-RPR.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3436,7 +3390,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD-NSE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FBSD45 with 1000HZ, IPFIREWALL_FORWARD and PERFMON options" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47-NSE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3445,7 +3399,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD-RON" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RON FreeBSD Image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-RON.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3454,7 +3408,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410+RHL90-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 and RedHat 9.0" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410+RHL90-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3463,7 +3417,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410+RHL90-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Update Image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410+RHL90-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3472,7 +3426,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410+RHL90-WIRELESS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Combo image for all wireless nodes" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410+RHL90-WIRELESS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3481,7 +3435,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410-DISK" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 whole disk image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-DISK.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3490,7 +3444,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410-IPFW2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 with built-in IPFW2 support" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-IPFW2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3499,7 +3453,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410-JDK14" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 with Sun JDK 1.4 preinstalled" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-JDK14.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3508,7 +3462,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410-PERL58" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD with perl 5.8.5" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-PERL58.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3517,7 +3471,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of FreeBSD 4.10" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3526,7 +3480,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD410-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 update image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3535,7 +3489,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD45-WITHSFS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of FreeBSD 4.5 with SFS support" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD45-WITHSFS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3544,7 +3498,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD47+RHL71-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Latest full disk image with FreeBSD 4.7 and RedHat 7.1" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/wd0-all-4.7+7.1.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3553,7 +3507,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD47+RHL73-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Latest full disk image with FreeBSD 4.7 and RedHat 7.3" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47+RHL73-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3562,7 +3516,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD47+RHL73-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.7 plus Redhat 7.3 update image - Not for public use" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47+RHL73-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3571,7 +3525,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD47-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of FreeBSD 4.7" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3580,7 +3534,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD47-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.7 update image - Not for public use" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3589,7 +3543,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD49+RHL73-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.9 and RedHat 7.3" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD49+RHL73-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3598,7 +3552,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD49-MODELNET96" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Modelnet 0.96 on FreeBSD 4.9 image. Core nodes only" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD49-MODELNET96.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3607,7 +3561,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD49-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of FreeBSD 4.9" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD49-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3616,7 +3570,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD52-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of FreeBSD 5.2.1" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD52-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3625,7 +3579,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD53-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.3-STABLE (12/29/04)" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD53-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3634,7 +3588,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD53-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.3-STABLE (12/29/04)" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD53-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3643,7 +3597,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD53-WITHSRC" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.3-STABLE (12/29/04) with /usr/src tree" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD53-WITHSRC.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3652,7 +3606,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD54+FC4-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Next gen image: FreeBSD 5.4 + Fedora Core 4" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD54+FC4-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3661,7 +3615,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD54-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.4-RELEASE-p6" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD54-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3670,7 +3624,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD54-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.4-RELEASE-p7" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD54-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3679,16 +3633,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD60-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 6.0 STABLE (1/5/06)" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD60-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
-<input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
-<input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
-<input type="submit" name="submit" value="Submit" >
-
-./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=emulab-ops-FBSD60-UPDATE
-<form action="editimageid.php3?imageid=emulab-ops-FBSD60-UPDATE" method="post" name=idform>
-<input type="text" name="formfields[description]" value="FreeBSD 6.0 STABLE (1/5/06)" size=50>
-<input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD60-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3697,7 +3642,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD61-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard FBSD6.1 image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD61-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3706,7 +3651,16 @@
 <form action="editimageid.php3?imageid=emulab-ops-FBSD61-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Test version of FBSD61-STD image (use at your own risk!)" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD61-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
+<input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
+<input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
+<input type="submit" name="submit" value="Submit" >
+
+./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=emulab-ops-FBSD7-WITHSRC
+<form action="editimageid.php3?imageid=emulab-ops-FBSD7-WITHSRC" method="post" name=idform>
+<input type="text" name="formfields[description]" value="FreeBSD 7.0 current with source tree" size=50>
+<input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD7-WITHSRC.ndz" size=50>
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3715,7 +3669,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FC4-GR" method="post" name=idform>
 <input type="text" name="formfields[description]" value="The Emulab FC4-STD image with software and drivers to support GNU Radio USRP hardware" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FC4-GR.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3724,7 +3678,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FC4-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Emulab Standard Fedora Core 4 image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FC4-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3733,7 +3687,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FC4-TOS-1-1-15" method="post" name=idform>
 <input type="text" name="formfields[description]" value="TinyOS 1.1.15 CVS snapshot on Fedora Core 4." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FC4-TOS-1-1-15.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3742,7 +3696,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FC4-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Fedora Core 4" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FC4-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3751,7 +3705,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-FEDORA2-NONSTD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Fedora Core 2 test image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FEDORA2-NONSTD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3760,7 +3714,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-M1-TinyOS-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard Blink TinyOS kernel for Mica1" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/mote/blink.mica1.srec" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3769,7 +3723,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-PLAB-DEVBOX-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="PlanetLab development environment, updated" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/PLAB-DEVBOX-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3778,7 +3732,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-PLAB-DEVBOX" method="post" name=idform>
 <input type="text" name="formfields[description]" value="PlanetLab development environment" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/PLAB-NONSTD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3787,7 +3741,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-PLAB-PLBOX" method="post" name=idform>
 <input type="text" name="formfields[description]" value="PlanetLab -in-a-box PLC image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/PLAB-PLBOX.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3796,7 +3750,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-PLAB-PLC" method="post" name=idform>
 <input type="text" name="formfields[description]" value="PlanetLab MyPLC-based image for PLC nodes in Plab-in-Elab" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/PLAB-PLC.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3805,7 +3759,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL-ECLIPSE31" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Eclipse 3.1 on RHL90-WIRELESS" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL-ECLIPSE31.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3814,7 +3768,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL71-WITHSFS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed version of Redhat 7.1 with SFS support" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL71-WITHSFS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3823,7 +3777,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL73-IXPHOST" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RHL 7.3 image with IXP tools and environment" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-IXPHOST.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3832,7 +3786,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL73-MODELNET96" method="post" name=idform>
 <input type="text" name="formfields[description]" value="ModelNet 0.96 on Redhat 7.3 Image. Edge nodes only" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-MODELNET96.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3841,7 +3795,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL73-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 7.3 slice Disk Image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3850,7 +3804,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL73-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 7.3 update image - Not for public use" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3859,7 +3813,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL73-XENSELFBUILD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Xen 1.1 with RedHat 7.3 and tools to self-build" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-XENSELFBUILD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3868,7 +3822,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL9-NONSTD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="User generated, NON-STANDARD, unsupported RedHat 9 image, courtesy of Craig Rodrigues" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL9-NONSTD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3877,7 +3831,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-CLICK-UNSUP" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Unsupported: Click-1.4.3 installed as kernel module with click polling driver" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-CLICK-UNSUP.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3886,7 +3840,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 9.0 slice disk image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3895,7 +3849,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-TINYOS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="TinyOS 1.1.14 CVS snapshot running on RedHat 9." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-TINYOS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3904,7 +3858,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-TOS-1-1-14" method="post" name=idform>
 <input type="text" name="formfields[description]" value="TinyOS 1.1.14 CVS snapshot on rh9." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-TOS-1-1-14.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3913,7 +3867,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 9.0 Update image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3922,7 +3876,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-WIRELESS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="An RHL90-based image with wifi support for Emulab's wireless nodes." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-WIRELESS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3931,7 +3885,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-RHL90-XSCALE-CROSS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RHL9 image with xscale (ARM) cross compiler toolchain" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-XSCALE-CROSS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3940,7 +3894,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-TinyOS-CntRfm" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard CntToLedsAndRfm TinyOS kernel" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/mote/RobCntToLedsAndRfm.srec" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3949,7 +3903,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-TinyOS-RfmLed" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard RfmToLeds TinyOS kernel" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/mote/RobRfmToLeds.srec" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3958,7 +3912,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-TinyOS-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard Blink TinyOS kernel" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/mote/ElabRadioDumpFH.srec" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3967,7 +3921,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-02-16" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Now an alias for WINXP-UPDATE." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3976,7 +3930,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP0-pc3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP 2001, everything working, pc3000 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP0-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3985,7 +3939,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP0" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP with SP0, hardware-independent." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP0.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -3994,7 +3948,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP1-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value=" Testing new SP1-pc850 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP1-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4003,7 +3957,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP1-pc3000-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new SP1-pc3000 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP1-pc3000-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4012,7 +3966,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP1-pc3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP with SP1a, everything working, pc3000 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP1-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4021,7 +3975,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP1" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP with SP1a, hardware-independent." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP1.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4030,7 +3984,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP2-pc3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP with SP2, everything working, pc3000 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP2-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4039,7 +3993,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-SP2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP with SP2, hardware-independent." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4048,7 +4002,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-UPDATE-pc3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP, SP2 and Windows Update, everything working, pc3000 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4057,7 +4011,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-WINXP-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Windows XP with SP2+, hardware-independent." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4066,7 +4020,7 @@
 <form action="editimageid.php3?imageid=emulab-ops-XEN3-pc3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="XEN 3.0 (unstable) with Fedora Core 4" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/XEN3-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4075,7 +4029,7 @@
 <form action="editimageid.php3?imageid=testbed-EEIDE-FC2-0915" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Fedora Core 2 test, Sep 15" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/EEIDE-FC2-0915.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4084,7 +4038,7 @@
 <form action="editimageid.php3?imageid=testbed-EEIDE-RHL90-0827" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Red Hat Linux 9 test image, Aug 27" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/EEIDE-RHL90-0827.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4093,7 +4047,7 @@
 <form action="editimageid.php3?imageid=testbed-EEIDE-RHL90-BASE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Base RHL90 image, created from Red Hat 9.0 CDs" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/EEIDE-RHL90-BASE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4102,7 +4056,7 @@
 <form action="editimageid.php3?imageid=testbed-EEIDE-SF" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FC4 with SmartFrog 3.08" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/EEIDE-SF.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4111,7 +4065,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-45-ISS0" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.5 with an Initial Sequence Number of 0" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-45-ISS0.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4120,7 +4074,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-BOSSCLONE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="A boss impostor" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD-BOSSCLONE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4129,7 +4083,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-LT" method="post" name=idform>
 <input type="text" name="formfields[description]" value="freebsd with new linktest" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-LT.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4138,7 +4092,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-PARTIALBOSS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Partially-completed boss install" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD-PARTIALBOSS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4147,7 +4101,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-PARTIALOPS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Partially-completed ops install" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD-PARTIALOPS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4156,7 +4110,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-RON+FBSD47-WITHSRC" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RON Image on slice 1, FBSD47 on slice 2 and bootable, CDROM boot on slice 3" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD-RON+FBSD47+CDBOOT.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4165,7 +4119,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-TEST2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Another test" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-TEST2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4174,7 +4128,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-TEST3" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Another test" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-TEST3.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4183,7 +4137,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-TEST4" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Another FreeBSD test" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-TEST4.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4192,7 +4146,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD-TEST" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Just a test" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD-TEST.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4201,7 +4155,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD10+RHL90-ElabInElab" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Moderately hacked images for ElabInElab" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD10+RHL90-ElabInElab.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4210,7 +4164,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD410-CLEAN" method="post" name=idform>
 <input type="text" name="formfields[description]" value="A clean FreeBSD 4.10 disk image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-CLEAN.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4219,7 +4173,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD410-FORBOSS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 with boss ports installed" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-FORBOSS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4228,7 +4182,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD410-FOROPS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.10 with ops ports installed" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-FOROPS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4237,7 +4191,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD410-LBS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Nothing special" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD410-LBS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4246,7 +4200,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD410-TMP" method="post" name=idform>
 <input type="text" name="formfields[description]" value="temp" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD410-TMP.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4255,7 +4209,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD411-BAREBONES" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FBSD411-CLEAN with client install" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD411-BAREBONES.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4264,7 +4218,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD411-CLEAN" method="post" name=idform>
 <input type="text" name="formfields[description]" value="A clean FreeBSD 4.11 disk image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD411-CLEAN.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4273,7 +4227,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD411-SERVER" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.11 for boss/ops node" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD411-SERVER.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4282,7 +4236,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD45-BOSSNODE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Base image (without any localized information) of a boss node" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD45-BOSSNODE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4291,7 +4245,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD47+RHL73-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.7 and Redhat 7.3 update image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47+RHL73-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4300,7 +4254,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD47-CLEANOPS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Clean (no local customization) ops node image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD47-CLEANOPS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4309,7 +4263,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD47-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.7 update image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD47-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4318,7 +4272,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD47-onslice2of-RON" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FBSD47 withsrc for slice2 of RON Image only" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD47-onslice2of-RON.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4327,7 +4281,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD49-CLEAN" method="post" name=idform>
 <input type="text" name="formfields[description]" value="A clean installation of FreeBSD 4.9" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD49-CLEAN.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4336,7 +4290,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD49-STABLE-BOSS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="A proto-boss image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD49-STABLE-BOSS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4345,7 +4299,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD49-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 4.9 update image" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD49-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4354,7 +4308,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD54-MROUTING" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.4 + MROUTING option enabled" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD54-MROUTING.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4363,7 +4317,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD54-NEWPORTS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.4 with new base ports, working on Emulab ports" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD54-NEWPORTS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4372,7 +4326,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD54-PORTSRC" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 5.4 with ports ungraded to current and source" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD54-PORTSRC.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4381,7 +4335,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD60-NEWPORTS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 6.0 with new ports installed" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD60-NEWPORTS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4390,7 +4344,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD61-STD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard FBSD6.1 image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD61-STD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4399,7 +4353,7 @@
 <form action="editimageid.php3?imageid=testbed-FBSD7-TEST" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FreeBSD 7 (CURRENT) test image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FBSD7-TEST.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4408,7 +4362,7 @@
 <form action="editimageid.php3?imageid=testbed-FC4-ANDRE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FC4 image with updated kernel from ReplicaTools project - testing" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FC4-UPDATE-2.6.17.7.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4417,7 +4371,7 @@
 <form action="editimageid.php3?imageid=testbed-FC4-EVAL" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FC4 updated to work on the eval Dell boxes" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FC4-EVAL.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4426,7 +4380,7 @@
 <form action="editimageid.php3?imageid=testbed-FC4-LBS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="FC4 image, nothing special about it" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/FC4-LBS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4435,7 +4389,7 @@
 <form action="editimageid.php3?imageid=testbed-IXP-DELAY-HOST" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Linux 7.1 system with support for IXP delay nodes" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/IXP-DELAY-HOST.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4444,7 +4398,7 @@
 <form action="editimageid.php3?imageid=testbed-LBS-DELAY" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing minor changes to dummynet" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/LBS-DELAY.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4453,7 +4407,7 @@
 <form action="editimageid.php3?imageid=testbed-MIKEFOO" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Mike Foo Image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/MIKEFOO.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4462,7 +4416,7 @@
 <form action="editimageid.php3?imageid=testbed-MIKES-WORLD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Mike FreeBSD 4.7 build environment" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/MIKES-WORLD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4471,7 +4425,7 @@
 <form action="editimageid.php3?imageid=testbed-MyCutsomImage" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Roopesh's custom image." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/roop_gateway.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4480,7 +4434,7 @@
 <form action="editimageid.php3?imageid=testbed-OBSD-TMP" method="post" name=idform>
 <input type="text" name="formfields[description]" value="OpenBSD prototype" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/OBSD-TMP.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4489,7 +4443,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL-NETPERF" method="post" name=idform>
 <input type="text" name="formfields[description]" value="standard rhl with netperf installed and netserver running on startup" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL-NETPERF.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4498,7 +4452,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL73-IXPHOST-TEMP" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Temp image until leigh gets a chance to look at it" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL73-IXPHOST-TEMP.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4507,7 +4461,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL73-IXPHOST-TEST" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing some changes to the ixphost image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL73-IXPHOST-TEST.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4516,7 +4470,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL73-UPDATE2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 7.3 update image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL73-UPDATE2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4525,7 +4479,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL73-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 7.3 update image - Not for public use" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4534,7 +4488,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL73-VSERV" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testbed RHL73 image with vserver patched kernel and vtun" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL73-VSERV.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4543,7 +4497,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL73-XENSELFBUILD" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Xen 1.1 with RedHat 7.3 and tools to self-build" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL73-XENSELFBUILD.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4552,7 +4506,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-EMSTAR" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RHL90-WIRELESS with emstar installed and configured" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-EMSTAR.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4561,7 +4515,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-LBS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RedHat 9.0 with wireless support" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-LBS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4570,7 +4524,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-LBSTOO" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 9.0 image, nothing special about it." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-LBSTOO." size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4579,7 +4533,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-LINKDELAY" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Link delay test and build image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-LINKDELAY.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4588,7 +4542,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-LT" method="post" name=idform>
 <input type="text" name="formfields[description]" value="redhat with new linktest stuff" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-LT.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4597,7 +4551,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-NEWWIFI" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Image with new madwifi-ng driver" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-NEWWIFI.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4606,7 +4560,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-STOLEN" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Sai's 9.0 image borrowed for compiling stuff" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-STOLEN.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4615,7 +4569,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-UPDATE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Redhat 9.0 Update image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4624,7 +4578,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-USRP" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RedHat 9.0 with USRP software" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-USRP.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4633,7 +4587,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-XSCALE-CROSS-2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="With gcc-3.3.2 toolchain" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-XSCALE-CROSS-2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4642,7 +4596,7 @@
 <form action="editimageid.php3?imageid=testbed-RHL90-XSCALE-CROSS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="RHL9 image with xscale (ARM) cross compiler toolchain" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/RHL90-XSCALE-CROSS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4651,7 +4605,7 @@
 <form action="editimageid.php3?imageid=testbed-TOSSurge" method="post" name=idform>
 <input type="text" name="formfields[description]" value="TinyOS Surge kernel" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/TOSSurge.exe" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4660,7 +4614,7 @@
 <form action="editimageid.php3?imageid=testbed-TinyOS-CntRfm" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard CntToLedsAndRfm TinyOS kernel" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/mote/RobCntToLedsAndRfm.srec" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4669,7 +4623,7 @@
 <form action="editimageid.php3?imageid=testbed-TinyOS-RfmLed" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Standard RfmToLeds TinyOS kernel" size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/mote/RobRfmToLeds.srec" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4678,7 +4632,7 @@
 <form action="editimageid.php3?imageid=testbed-UMASS-BOSSOPS2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Half-done attempt to make a combined boss/ops image for UMass" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/UMASS-BOSSOPS2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4687,7 +4641,7 @@
 <form action="editimageid.php3?imageid=testbed-UMASS-BOSSOPS" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Half-done attempt to make a combined boss/ops node for umass" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/UMASS-BOSSOPS.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4696,7 +4650,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-02-16" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Now an alias for WINXP-UPDATE." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4705,7 +4659,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-10-24" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Now an alias for WINXP-UPDATE." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/WINXP-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4714,7 +4668,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-12-08" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Now an alias for WINXP-UPDATE." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/WINXP-UPDATE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4723,7 +4677,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-BASE-SP1-cygwn" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Bare WinXP install, with SP1a and Cygwin added, pc850 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-BASE-SP1-cygwn.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4732,7 +4686,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-BASE-SP1" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Bare WinXP install, with SP1a added, pc850 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-BASE-SP1.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4741,7 +4695,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-BASE-SP2-3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Bare WinXP install for the PC3000, with SP2 and Windows Update." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-BASE-SP2-3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4750,7 +4704,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-BASE-SP2-cygwn" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Bare WinXP install, with Cygwin and SP2 added, pc850 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-BASE-SP2-cygwn.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4759,7 +4713,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-BASE-pc3000" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Bare MSDN Windows XP 2001, pc3000 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-BASE-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4768,7 +4722,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-BASE" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Bare WinXP install, pc850 only." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-BASE.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4777,7 +4731,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-CURRENT" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Now an alias for WINXP-UPDATE-pc3000." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE-pc3000.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4786,7 +4740,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-PPT" method="post" name=idform>
 <input type="text" name="formfields[description]" value="WIndows XP update image with Powerpoint installed" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/WINXP-PPT.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4795,7 +4749,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-SP0-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new SP0-pc850 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP0-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4804,7 +4758,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-SP0-pc3000-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new SP0-pc3000 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP0-pc3000-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4813,7 +4767,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-SP1-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value=" Testing new SP1-pc850 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP1-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4822,7 +4776,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-SP1-pc3000-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new SP1-pc3000 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP1-pc3000-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4831,7 +4785,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-SP2-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new SP2-pc850 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP2-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4840,7 +4794,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-SP2-pc3000-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new SP2-pc3000 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-SP2-pc3000-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4849,7 +4803,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-TMP" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Temporary WINXP image for testing." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/WINXP-TMP.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4858,7 +4812,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-UPD-pc3000-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new UPDATE-pc3000 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE-pc3000-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4867,7 +4821,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-UPDATE-new" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing new UPDATE-pc850 image." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/WINXP-UPDATE-new.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4876,7 +4830,7 @@
 <form action="editimageid.php3?imageid=testbed-WINXP-UPDATE-sysprep" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Try making a hardware independent image with SysPrep." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/WINXP-UPDATE-sysprep.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4885,7 +4839,7 @@
 <form action="editimageid.php3?imageid=testbed-XPizzo4" method="post" name=idform>
 <input type="text" name="formfields[description]" value="copy of ITIS6167/XPizzo4" size=50>
 <input type="text" name="formfields[path]" value="/groups/testbed/windows/images/XPizzo4.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4894,7 +4848,7 @@
 <form action="editimageid.php3?imageid=testbed-XPizzo" method="post" name=idform>
 <input type="text" name="formfields[description]" value="copy of ITIS6167/XPizzo" size=50>
 <input type="text" name="formfields[path]" value="/groups/testbed/windows/images/XPizzo.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4903,7 +4857,7 @@
 <form action="editimageid.php3?imageid=testbed-fc3-proto" method="post" name=idform>
 <input type="text" name="formfields[description]" value="fc3" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/fc3-proto.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4912,7 +4866,7 @@
 <form action="editimageid.php3?imageid=testbed-linux-2.4.9-click" method="post" name=idform>
 <input type="text" name="formfields[description]" value="linux version 2.4.9 with click modifications" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/linux-2.4.9-click.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4921,7 +4875,7 @@
 <form action="editimageid.php3?imageid=testbed-motdisk" method="post" name=idform>
 <input type="text" name="formfields[description]" value="speaical motd" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/motdisk.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4930,7 +4884,7 @@
 <form action="editimageid.php3?imageid=testbed-robtest" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Rob's test image" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/robtest.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4939,7 +4893,7 @@
 <form action="editimageid.php3?imageid=testbed-russ_winxp_base" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Base WinXP image that Russ maintains" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/russ_winxp_base.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4948,7 +4902,7 @@
 <form action="editimageid.php3?imageid=testbed-russ_xp_test2" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing." size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/russ_xp_test2.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4957,7 +4911,7 @@
 <form action="editimageid.php3?imageid=testbed-russ_xp_test3" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Testing. " size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/russ_xp_test3.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4966,7 +4920,7 @@
 <form action="editimageid.php3?imageid=testbed-russ_xp_test" method="post" name=idform>
 <input type="text" name="formfields[description]" value="Test XP image loading." size=50>
 <input type="text" name="formfields[path]" value="/usr/testbed/images/russ_xp_test.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -4975,7 +4929,7 @@
 <form action="editimageid.php3?imageid=testbed-tdj-fc4-univ" method="post" name=idform>
 <input type="text" name="formfields[description]" value="new fc4" size=50>
 <input type="text" name="formfields[path]" value="/proj/testbed/images/tdj-fc4-univ.ndz" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="" size=20 maxlength=256>
 <input type="text" name="formfields[frisbee_pid]" value="0" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
@@ -5045,8 +4999,8 @@
 <input type="radio" name="newattribute_type" value="string" >
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/editnodetype.php3?node_type=pc600
-<form action="editnodetype.php3?node_type=pc600" method="post"  name=typeform>
+./myboss.vulnelab.testbed.emulab.net/editnodetype.php3?node_type=pc850
+<form action="editnodetype.php3?node_type=pc850" method="post"  name=typeform>
 <input type="text" name="formfields[isvirtnode]" value="0" size=2>
 <input type="text" name="formfields[isjailed]" value="0" size=2>
 <input type="text" name="formfields[isdynamic]" value="0" size=2>
@@ -5057,17 +5011,17 @@
 <input type="checkbox" name="deletes[processor]" value="checked" >
 <input type="text" name="attributes[processor]" value="PIII" >
 <input type="checkbox" name="deletes[frequency]" value="checked" >
-<input type="text" name="attributes[frequency]" value="600" >
+<input type="text" name="attributes[frequency]" value="850" >
 <input type="checkbox" name="deletes[memory]" value="checked" >
 <input type="text" name="attributes[memory]" value="256" >
 <input type="checkbox" name="deletes[disksize]" value="checked" >
-<input type="text" name="attributes[disksize]" value="13.00" >
+<input type="text" name="attributes[disksize]" value="39.00" >
 <input type="checkbox" name="deletes[max_interfaces]" value="checked" >
 <input type="text" name="attributes[max_interfaces]" value="5" >
 <input type="checkbox" name="deletes[default_osid]" value="checked" >
 <input type="select" name="attributes[default_osid]" value="X" >
 <input type="checkbox" name="deletes[control_network]" value="checked" >
-<input type="text" name="attributes[control_network]" value="4" >
+<input type="text" name="attributes[control_network]" value="2" >
 <input type="checkbox" name="deletes[power_delay]" value="checked" >
 <input type="text" name="attributes[power_delay]" value="60" >
 <input type="checkbox" name="deletes[default_imageid]" value="checked" >
@@ -5077,9 +5031,9 @@
 <input type="checkbox" name="deletes[delay_capacity]" value="checked" >
 <input type="text" name="attributes[delay_capacity]" value="1" >
 <input type="checkbox" name="deletes[virtnode_capacity]" value="checked" >
-<input type="text" name="attributes[virtnode_capacity]" value="10" >
+<input type="text" name="attributes[virtnode_capacity]" value="20" >
 <input type="checkbox" name="deletes[control_interface]" value="checked" >
-<input type="text" name="attributes[control_interface]" value="eth4" >
+<input type="text" name="attributes[control_interface]" value="eth2" >
 <input type="checkbox" name="deletes[disktype]" value="checked" >
 <input type="text" name="attributes[disktype]" value="ad" >
 <input type="checkbox" name="deletes[bootdisk_unit]" value="checked" >
@@ -5089,7 +5043,7 @@
 <input type="checkbox" name="deletes[jail_osid]" value="checked" >
 <input type="select" name="attributes[jail_osid]" value="X" >
 <input type="checkbox" name="deletes[simnode_capacity]" value="checked" >
-<input type="text" name="attributes[simnode_capacity]" value="600" >
+<input type="text" name="attributes[simnode_capacity]" value="650" >
 <input type="checkbox" name="deletes[trivlink_maxspeed]" value="checked" >
 <input type="text" name="attributes[trivlink_maxspeed]" value="400000" >
 <input type="checkbox" name="deletes[rebootable]" value="checked" >
@@ -5200,7 +5154,7 @@
 <form action="editsitevars.php3" method="post">
 <input type="hidden" name="name" value='general/mailman/password' >
 <input type="submit" name="defaulted" value='Reset to Default Value' >
-<input type="text" name="value" value='c16da167fb' size='60' >
+<input type="text" name="value" value='150ba810e3' size='60' >
 <input type="submit" name="edited" value='Change to New Value' >
 <input type="submit" name="canceled" value='Cancel' >
 
@@ -5232,7 +5186,7 @@
 <form action="editsitevars.php3" method="post">
 <input type="hidden" name="name" value='general/version/build' >
 <input type="submit" name="defaulted" value='Reset to Default Value' >
-<input type="text" name="value" value='12/19/2006' size='60' >
+<input type="text" name="value" value='01/08/2007' size='60' >
 <input type="submit" name="edited" value='Change to New Value' >
 <input type="submit" name="canceled" value='Cancel' >
 
@@ -5296,7 +5250,7 @@
 <form action="editsitevars.php3" method="post">
 <input type="hidden" name="name" value='node/ssh_pubkey' >
 <input type="submit" name="defaulted" value='Reset to Default Value' >
-<input type="text" name="value" value='2048 35 24202138654561926703082796455553884240205791132899476541645432594371144024680227166049013265952078113333551046550460335825811314526789680710436360152424177437508133089626603160162564225578335151477109018825023638881749461724092162673526056297894052642782177017169870358234670678710556032835926634669875129925647428832367413992754015414510870172234898084078748135899930386131260858670633185206840962610707310498428780998180994640722137648172216718675061280997612322984578719314046003683598161456682959818118917210688335084834223104773923696464031379494135936244584379760702702434370793814688848669660593092157286153049 root@myboss.vulnelab.testbed.emulab.net' size='60' >
+<input type="text" name="value" value='2048 35 24332007964895546241253846528564448272387142322591588839515549178629159353296904467662894073310610053590104893440411877667253001392194557135647501774268147814227644117265258295313317601223882250602021810926727238074561489719981328529511217885326409358248749935675634784346464026935823296952258928949705714556886539939504880918528664448216819093794364013916120790333441728805521731786676360628388532765581010237335959243084853000758138267251132162199068554265243022921324056427265105031148963896269704350495152843435954796702179599327781909622901998487673968376045324018673452929557160500060797220460647425318212934259 root@myboss.vulnelab.testbed.emulab.net' size='60' >
 <input type="submit" name="edited" value='Change to New Value' >
 <input type="submit" name="canceled" value='Cancel' >
 
@@ -5637,18 +5591,18 @@
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc20
-<form action="freenode.php3?node_id=pc20" method="post">
+./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc120
+<form action="freenode.php3?node_id=pc120" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc32
-<form action="freenode.php3?node_id=pc32" method="post">
+./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc158
+<form action="freenode.php3?node_id=pc158" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc39
-<form action="freenode.php3?node_id=pc39" method="post">
+./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc165
+<form action="freenode.php3?node_id=pc165" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
@@ -10187,6 +10141,30 @@
 <input type="textarea" name="formfields[body]" rows=30 cols=80>
 <input type="submit" name="submit" value="Modify" >
 
+./myboss.vulnelab.testbed.emulab.net/kb-manage.php3?idx=261&action=delete
+<form action="kb-manage.php3" method="post">
+<input type="hidden" name="idx" value='261' >
+<input type="hidden" name="action" value='delete' >
+<input type="select" name="formfields[section]" value="none" >
+<input type="text" name="formfields[new_section]" value="" size=50>
+<input type="text" name="formfields[title]" value="Test title." size=70>
+<input type="checkbox" name="formfields[faq_entry]" value="1" >
+<input type="text" name="formfields[xref_tag]" value="test_tag" size=20>
+<input type="textarea" name="formfields[body]" rows=30 cols=80>
+<input type="submit" name="submit" value="Delete" >
+
+./myboss.vulnelab.testbed.emulab.net/kb-manage.php3?idx=261&action=edit
+<form action="kb-manage.php3" method="post">
+<input type="hidden" name="idx" value='261' >
+<input type="hidden" name="action" value='edit' >
+<input type="select" name="formfields[section]" value="none" >
+<input type="text" name="formfields[new_section]" value="" size=50>
+<input type="text" name="formfields[title]" value="Test title." size=70>
+<input type="checkbox" name="formfields[faq_entry]" value="1" >
+<input type="text" name="formfields[xref_tag]" value="test_tag" size=20>
+<input type="textarea" name="formfields[body]" rows=30 cols=80>
+<input type="submit" name="submit" value="Modify" >
+
 ./myboss.vulnelab.testbed.emulab.net/kb-manage.php3?idx=27&action=delete
 <form action="kb-manage.php3" method="post">
 <input type="hidden" name="idx" value='27' >
@@ -12305,12 +12283,6 @@
 <input type="hidden" name="imageid" value='emulab-ops-FBSD60-STD' >
 <input type="submit" name="submit" value='Go!' >
 
-./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=emulab-ops-FBSD60-UPDATE
-<form action="https://myboss.vulnelab.testbed.emulab.net/loadimage.php3" method="post">
-<input type="text" name="node" value=''>
-<input type="hidden" name="imageid" value='emulab-ops-FBSD60-UPDATE' >
-<input type="submit" name="submit" value='Go!' >
-
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=emulab-ops-FBSD61-STD
 <form action="https://myboss.vulnelab.testbed.emulab.net/loadimage.php3" method="post">
 <input type="text" name="node" value=''>
@@ -12321,6 +12293,12 @@
 <form action="https://myboss.vulnelab.testbed.emulab.net/loadimage.php3" method="post">
 <input type="text" name="node" value=''>
 <input type="hidden" name="imageid" value='emulab-ops-FBSD61-UPDATE' >
+<input type="submit" name="submit" value='Go!' >
+
+./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=emulab-ops-FBSD7-WITHSRC
+<form action="https://myboss.vulnelab.testbed.emulab.net/loadimage.php3" method="post">
+<input type="text" name="node" value=''>
+<input type="hidden" name="imageid" value='emulab-ops-FBSD7-WITHSRC' >
 <input type="submit" name="submit" value='Go!' >
 
 ./myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=emulab-ops-FC4-GR
@@ -13231,23 +13209,23 @@
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc20
+./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc120
 <form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?refer=" method="post">
-<input type="hidden" name="node_id" value="pc20" >
+<input type="hidden" name="node_id" value="pc120" >
 <input type="text" name="_newattrs[0]" size="32">
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc32
+./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc158
 <form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?refer=" method="post">
-<input type="hidden" name="node_id" value="pc32" >
+<input type="hidden" name="node_id" value="pc158" >
 <input type="text" name="_newattrs[0]" size="32">
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc39
+./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc165
 <form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?refer=" method="post">
-<input type="hidden" name="node_id" value="pc39" >
+<input type="hidden" name="node_id" value="pc165" >
 <input type="text" name="_newattrs[0]" size="32">
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
@@ -13438,7 +13416,7 @@
 <input type="text" name="formfields[usr_phone]" value="" size=15>
 <input type="password" name="formfields[password1]" size=8>
 <input type="password" name="formfields[password2]" size=8>
-<input type="text" name="formfields[w_password1]" value="zG" size=8>
+<input type="text" name="formfields[w_password1]" value="ao" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13462,7 +13440,7 @@
 <input type="text" name="formfields[usr_phone]" value="" size=15>
 <input type="password" name="formfields[password1]" size=8>
 <input type="password" name="formfields[password2]" size=8>
-<input type="text" name="formfields[w_password1]" value="pL" size=8>
+<input type="text" name="formfields[w_password1]" value="HM" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13475,7 +13453,7 @@
 <input type="text" name="formfields[usr_title]" value="C.S. Researcher" size=30>
 <input type="text" name="formfields[usr_affil]" value="School of Computing, University of Utah" size=40>
 <input type="text" name="formfields[usr_URL]" value="http://www.cs.utah.edu/~fish" size=45>
-<input type="text" name="formfields[usr_email]" value="fish@cs.utah.edu" size=30>
+<input type="text" name="formfields[usr_email]" value="fish@flux.utah.edu" size=30>
 <input type="text" name="formfields[usr_addr]" value="1618 East Meadow Moor Road" size=45>
 <input type="text" name="formfields[usr_addr2]" value="" size=45>
 <input type="text" name="formfields[usr_city]" value="Holladay" size=25>
@@ -13811,7 +13789,7 @@
 <input type="text" name="formfields[usr_title]" value="Tester" size=30>
 <input type="text" name="formfields[usr_affil]" value="Emulab Scripts" size=40>
 <input type="text" name="formfields[usr_URL]" value="http://www.emulab.net" size=45>
-<input type="text" name="formfields[usr_email]" value="fish@flux.utah.edu" size=30>
+<input type="text" name="formfields[usr_email]" value="TestUser1@flux.utah.edu" size=30>
 <input type="text" name="formfields[usr_addr]" value="Silly" size=45>
 <input type="text" name="formfields[usr_addr2]" value="Address" size=45>
 <input type="text" name="formfields[usr_city]" value="Salt Lake Silly" size=25>
@@ -13822,7 +13800,7 @@
 <input type="text" name="formfields[usr_phone]" value="(801) 123-4567" size=15>
 <input type="password" name="formfields[password1]" size=8>
 <input type="password" name="formfields[password2]" size=8>
-<input type="text" name="formfields[w_password1]" value="WcwKs6rX" size=8>
+<input type="text" name="formfields[w_password1]" value="nZ.MYpMR" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13846,7 +13824,7 @@
 <input type="text" name="formfields[usr_phone]" value="(801) 123-4567" size=15>
 <input type="password" name="formfields[password1]" size=8>
 <input type="password" name="formfields[password2]" size=8>
-<input type="text" name="formfields[w_password1]" value="jJlr8iTa" size=8>
+<input type="text" name="formfields[w_password1]" value="KGSSEoo6" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13876,14 +13854,6 @@
 <input type="text" name="group_leader" value='fish' size=8 maxlength=8>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newgroup_form.php3?pid=testproj3
-<form action="https://myboss.vulnelab.testbed.emulab.net/newgroup.php3" method="post">
-<input type="text" name="group_pid" value='testproj3' >
-<input type="text" name="group_id" size=12 maxlength=12>
-<input type="text" name="group_description" size=50>
-<input type="text" name="group_leader" value='fish' size=8 maxlength=8>
-<input type="submit" value="Submit" >
-
 ./myboss.vulnelab.testbed.emulab.net/newgroup_form.php3?pid=testproj
 <form action="https://myboss.vulnelab.testbed.emulab.net/newgroup.php3" method="post">
 <input type="text" name="group_pid" value='testproj' >
@@ -13906,7 +13876,7 @@
 <input type="select" name="formfields[part4_osid]" value="X" >
 <input type="select" name="formfields[default_osid]" value="X" >
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" >
 <input type="text" name="formfields[node]" value="" size=10 maxlength=10>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
 <input type="checkbox" name="formfields[global]" value="Yep" >
@@ -13933,7 +13903,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -13961,7 +13931,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -13989,7 +13959,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14017,7 +13987,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14045,7 +14015,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14073,7 +14043,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14101,7 +14071,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14109,7 +14079,7 @@
 <input type="text" name="formfields[reboot_waittime]" value="" size=4 maxlength=4>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc20
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc120
 <form action="newimageid_ez.php3" enctype="multipart/form-data" method="post" name=idform>
 <input type="select" name="formfields[pid]" value=''>
 <input type="select" name="formfields[gid]" value=''>
@@ -14119,7 +14089,7 @@
 <input type="select" name="formfields[os_name]" value="none" >
 <input type="text" name="formfields[os_version]" value="" size=12 maxlength=12>
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="text" name="formfields[node]" value="pc20" size=10 maxlength=10>
+<input type="text" name="formfields[node]" value="pc120" size=10 maxlength=10>
 <input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
@@ -14129,7 +14099,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14137,7 +14107,7 @@
 <input type="text" name="formfields[reboot_waittime]" value="" size=4 maxlength=4>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc32
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc158
 <form action="newimageid_ez.php3" enctype="multipart/form-data" method="post" name=idform>
 <input type="select" name="formfields[pid]" value=''>
 <input type="select" name="formfields[gid]" value=''>
@@ -14147,7 +14117,7 @@
 <input type="select" name="formfields[os_name]" value="none" >
 <input type="text" name="formfields[os_version]" value="" size=12 maxlength=12>
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="text" name="formfields[node]" value="pc32" size=10 maxlength=10>
+<input type="text" name="formfields[node]" value="pc158" size=10 maxlength=10>
 <input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
@@ -14157,7 +14127,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14165,7 +14135,7 @@
 <input type="text" name="formfields[reboot_waittime]" value="" size=4 maxlength=4>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc39
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node]=pc165
 <form action="newimageid_ez.php3" enctype="multipart/form-data" method="post" name=idform>
 <input type="select" name="formfields[pid]" value=''>
 <input type="select" name="formfields[gid]" value=''>
@@ -14175,7 +14145,7 @@
 <input type="select" name="formfields[os_name]" value="none" >
 <input type="text" name="formfields[os_version]" value="" size=12 maxlength=12>
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="text" name="formfields[node]" value="pc39" size=10 maxlength=10>
+<input type="text" name="formfields[node]" value="pc165" size=10 maxlength=10>
 <input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
@@ -14185,7 +14155,7 @@
 <input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" >
 <input type="select" name="formfields[op_mode]" value="none" >
-<input type="checkbox" name="formfields[mtype_pc600]" value="Yep" checked >
+<input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="checkbox" name="formfields[wholedisk]" value="Yep" >
 <input type="text" name="formfields[max_concurrent]" value="" size=4 maxlength=4>
 <input type="checkbox" name="formfields[shared]" value="Yep" >
@@ -14262,23 +14232,23 @@
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc20
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc120
 <form action="https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3" method="post">
-<input type="text" name="node_id" value="pc20" size=10 maxlength=10>
+<input type="text" name="node_id" value="pc120" size=10 maxlength=10>
 <input type="select" name="log_type" value='misc' >
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc32
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc158
 <form action="https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3" method="post">
-<input type="text" name="node_id" value="pc32" size=10 maxlength=10>
+<input type="text" name="node_id" value="pc158" size=10 maxlength=10>
 <input type="select" name="log_type" value='misc' >
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc39
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc165
 <form action="https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3" method="post">
-<input type="text" name="node_id" value="pc39" size=10 maxlength=10>
+<input type="text" name="node_id" value="pc165" size=10 maxlength=10>
 <input type="select" name="log_type" value='misc' >
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
@@ -14437,11 +14407,11 @@
 <input type="text" name="tarballs" size="60" maxlength="1024" value="">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc20
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc120
 <form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer=" method="post">
-<input type="text" name="node_id" value="pc20" readonly >
+<input type="text" name="node_id" value="pc120" readonly >
 <input type="text" name="vname" value='tbsdelay0' readonly >
-<input type="text" name="node_type" value="pc600" readonly >
+<input type="text" name="node_type" value="pc850" readonly >
 <input type="select" name="def_boot_osid" value='emulab-ops-FBSD410-STD' >
 <input type="text" name="def_boot_cmd_line" value="/kernel.delay" size="40" >
 <input type="select" name="next_boot_osid" value="">
@@ -14452,11 +14422,11 @@
 <input type="text" name="tarballs" size="60" maxlength="1024" value="">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc32
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc158
 <form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer=" method="post">
-<input type="text" name="node_id" value="pc32" readonly >
+<input type="text" name="node_id" value="pc158" readonly >
 <input type="text" name="vname" value='node1' readonly >
-<input type="text" name="node_type" value="pc600" readonly >
+<input type="text" name="node_type" value="pc850" readonly >
 <input type="select" name="def_boot_osid" value='emulab-ops-RHL90-STD' >
 <input type="text" name="def_boot_cmd_line" size="40" value="">
 <input type="select" name="next_boot_osid" value="">
@@ -14467,11 +14437,11 @@
 <input type="text" name="tarballs" size="60" maxlength="1024" value="">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc39
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc165
 <form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?refer=" method="post">
-<input type="text" name="node_id" value="pc39" readonly >
+<input type="text" name="node_id" value="pc165" readonly >
 <input type="text" name="vname" value='node2' readonly >
-<input type="text" name="node_type" value="pc600" readonly >
+<input type="text" name="node_type" value="pc850" readonly >
 <input type="select" name="def_boot_osid" value='emulab-ops-RHL90-STD' >
 <input type="text" name="def_boot_cmd_line" size="40" value="">
 <input type="select" name="next_boot_osid" value="">
@@ -14555,21 +14525,21 @@
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc20
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc120
 <form action="https://myboss.vulnelab.testbed.emulab.net/powertime.php3" method="get">
-<input type="checkbox" name="nodes[]" value="pc20" checked>
+<input type="checkbox" name="nodes[]" value="pc120" checked>
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc32
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc158
 <form action="https://myboss.vulnelab.testbed.emulab.net/powertime.php3" method="get">
-<input type="checkbox" name="nodes[]" value="pc32" checked>
+<input type="checkbox" name="nodes[]" value="pc158" checked>
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc39
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc165
 <form action="https://myboss.vulnelab.testbed.emulab.net/powertime.php3" method="get">
-<input type="checkbox" name="nodes[]" value="pc39" checked>
+<input type="checkbox" name="nodes[]" value="pc165" checked>
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
@@ -14603,18 +14573,18 @@
 <input type="select" name="reserved_pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc20
-<form action="https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc20" method="post">
+./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc120
+<form action="https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc120" method="post">
 <input type="select" name="reserved_pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc32
-<form action="https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc32" method="post">
+./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc158
+<form action="https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc158" method="post">
 <input type="select" name="reserved_pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc39
-<form action="https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc39" method="post">
+./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc165
+<form action="https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc165" method="post">
 <input type="select" name="reserved_pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
@@ -15587,23 +15557,23 @@
 <input type="submit" name="canceled" value="Cancel" >
 <input type="hidden" name="nodeid" value="ops" >
 
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc20
+./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc120
 <form action="updateaccounts.php3?pid=testbed&amp;eid=testexp1" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
-<input type="hidden" name="nodeid" value="pc20" >
+<input type="hidden" name="nodeid" value="pc120" >
 
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc32
+./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc158
 <form action="updateaccounts.php3?pid=testbed&amp;eid=testexp1" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
-<input type="hidden" name="nodeid" value="pc32" >
+<input type="hidden" name="nodeid" value="pc158" >
 
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc39
+./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc165
 <form action="updateaccounts.php3?pid=testbed&amp;eid=testexp1" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
-<input type="hidden" name="nodeid" value="pc39" >
+<input type="hidden" name="nodeid" value="pc165" >
 
 ./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1
 <form action="updateaccounts.php3?pid=testbed&amp;eid=testexp1" method="post">

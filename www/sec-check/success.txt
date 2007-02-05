@@ -1,33 +1,55 @@
 Experiment Options
 Show Group Information
-has been successfully queued.
-is being created.
-has been approved.
+has been successfully queued
+is being created
+has been approved
 Creating project group
 This will take a few moments
+please be patient
 As a pending user of the Testbed
-you will receive a key via email.
+you will receive a key via email
 Membership status for user
 was <b>granted</b> membership
 Starting experiment configuration
 You will be notified via email
 Attempting to reboot
 Successful
-Snapshot Node Disk into Existing Image Descriptor
 Knowledge Base Entry:
+Knowledge Base search results
 Your new SSL certificate has been created
 Log for node
 Commit/Tag Archive
 has been deleted
 let's be sure
-Are you REALLY REALLY sure
+Are you <b>REALLY REALLY</b> sure
 Your NS file looks good
 This template is for creating
 To finish creating your slice
 public keys for user
-Knowledge Base search results
 Click to visit archive
 Done!
 Continue only if this is what you want
+Are you sure you want to continue
 mailing list administration
-Create a new OS Descriptor
+Basic Options
+More Options
+Node Options
+Use this page to alter the
+Starting event replay
+There are [0-9 a-z]* users
+you want to run linktest
+New Users Approved
+successfully modified
+Your experiment has been dequeued
+is being removed
+Updated power time for
+Range: 
+#{ The following few lines are for pages that don't have any success text,
+#  to keep them from being UNKNOWN.
+# archive_missing.php3
+Add Missing Files
+# editnodetype.php3
+Edit Node Type
+# editsitevars.php3
+batch/retry_wait
+#}

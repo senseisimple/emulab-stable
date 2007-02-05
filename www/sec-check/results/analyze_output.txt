@@ -1,0 +1,140 @@
+================ success ================
+approveproject.php3.html
+      Project 'testproj3' is being created!<br><br>
+      Project testproj3 (User: fish) has been approved.
+approveuser.php3.html
+     	 <title>MyEmulab.Net - New Users Approved</title>
+     New Users Approved</h2>
+      User testusr3 was <b>granted</b> membership in testproj3/testproj3
+archive_missing.php3.html
+     	 <title>MyEmulab.Net - Add Missing Files</title>
+     Add Missing Files</h2>
+archive_tag.php3.html
+      Commit/Tag Archive
+archive_tags.php3.html
+      <tr> <th>Run</th> <th>Tag (Click to visit archive)</th> <th>Date</th> <th>Description</th></tr>
+beginexp_html.php3.html
+     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
+boot.php3.html
+     reboot (pc158): Attempting to reboot ...
+     reboot (pc158): Successful!
+delaycontrol.php3.html
+     Use this page to alter the traffic shaping parameters of your
+deletegroup.php3.html
+     <b>Group 'testgroup3' in project 'testproj3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+deleteimageid.php3.html
+      Image 'testproj3-testimg3' in project testproj3 has been deleted!
+deleteosid.php3.html
+      OS Descriptor 'testosid3' in Project testproj3 has been deleted!
+deleteproject.php3.html
+      Project 'testproj3' is being removed!<br><br>
+      <b>Done!</b>
+deleteuser.php3.1.html
+     <b>User 'testusr3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+deleteuser.php3.html
+     <b>User 'testusr3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+editexp.php3.html
+      <h3 class="submenuheader">Experiment Options</h3>
+editgroup.php3.html
+     	 <title>MyEmulab.Net - Show Group Information</title>
+     Show Group Information</h2>
+editimageid.php3.html
+      <h3 class="submenuheader">More Options</h3>
+editnodetype.php3.html
+     	 <title>MyEmulab.Net - Edit Node Type</title>
+     Edit Node Type</h2>
+editsitevars.php3.html
+      </tr><tr><td>&nbsp;<b>batch/retry_wait</b>&nbsp;</td>
+endexp.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+      You will be notified via email when the experiment has been torn
+feedback.php3.html
+     <center><h3><br>Done!</h3></center>
+freezeuser.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+gensslcert.php3.html
+     Your new SSL certificate has been created. You can
+joinproject.php3.html
+      As a pending user of the Testbed you will receive a key via email.
+kb-manage.php3.html
+     <center><b>Knowledge Base Entry: 265 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+kb-search.php3.html
+     <font size=+2>Knowledge Base search results</font>
+linktest.php3.html
+      Are you <b>sure</b> you want to run linktest?
+loadimage.php3.html
+     <h2><b>Warning!</b><br />Doing a snapshot of node 'pc158' into image 'testproj3-testimg3' will overwrite any previous snapshot for that image. Are you sure you want to continue?</h2><input type='hidden' name='node' value='pc158'></input><input type='hidden' name='imageid' value='testproj3-testimg3'></input><input type='submit' name='confirmed' value='Confirm'></input>&nbsp;<input type='submit' name='cancelled' value='Cancel'></input>
+modifyexp.php3.html
+     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+modnodeattributes.php3.html
+      <h3>Node attributes successfully modified!</h3><p>
+moduserinfo.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+newgroup.php3.html
+     <b>Creating project group testgroup3.</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+newimageid.php3.html
+      <h3 class="submenuheader">More Options</h3>
+newimageid_ez.php3.html
+      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.html'
+newmmlist.php3.html
+     <center><h2>testproj3-testlist mailing list administration<br>General Options Section</h2></center><hr>
+newnodelog.php3.html
+      Log for node pc158.
+newosid.php3.html
+      <h3 class="submenuheader">More Options</h3>
+newproject.php3.html
+      Your project request has been successfully queued.
+nodecontrol.php3.html
+      <h3>Node parameters successfully modified!</h3><p>
+nscheck.php3.html
+     <center><br><br><h2>Your NS file looks good!</h2></center>
+nsgen.php3.html
+      This template is for creating a DevBox for building software
+plab_ez.php3.html
+      <p><b>To finish creating your slice, edit the 
+powertime.php3.html
+     <center>Updated power time for:<br><br><b>pc158</b><br></center><!-- end content -->
+prereserve_node.php3.html
+      <h3 class="submenuheader">Node Options</h3>
+replayexp.php3.html
+     <center><h2>Starting event replay. Please wait a moment ...
+showpubkeys.php3.html
+      Current ssh public keys for user fish.
+      Enter ssh public keys for user
+showsfskeys.php3.html
+      Enter sfs public keys for user fish[<b>1</b>].
+showsumstats.php3.html
+     <b>Range: <a class='static'
+showuser_list.php3.html
+      There are 2 logged in users.
+template_create.php.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+updateaccounts.php3.html
+     You will be notified via email when the update has completed on
+================ failure ================
+changeuid.php.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      The user fish must be unapproved (but verified) to change!
+deletepubkey.php3.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Public Key for user 'testusr3' does not exist!
+kb-search.php3.html
+     <li><a href="https://myboss.vulnelab.testbed.emulab.net/kb-show.php3?idx=174">What does "invalid migration assumptions" mean from "assign"?</a>
+newnodes_list.php3.html
+      At least one node must be selected!
+swapexp.php3.html
+     <h3>swapout and dequeue could not proceed</h3><blockquote><pre>*** swapexp:
+================ UNKNOWN ================

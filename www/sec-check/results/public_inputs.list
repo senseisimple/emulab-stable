@@ -34,19 +34,6 @@
 <input type="radio" name="query_which" value="both" checked >
 <input type="submit" name="submit" value='Submit Query' >
 
-./myboss.vulnelab.testbed.emulab.net/login.php3
-<form action="login.php3" method="post">
-<input type="text" name="uid" value="fish@cs.utah.edu" size=30>
-<input type="password" name="password" size=12>
-<input type="submit" name="login" value="Login" >
-
-./myboss.vulnelab.testbed.emulab.net/login.php3?refer=1
-<form action="login.php3" method="post">
-<input type="text" name="uid" value="fish@cs.utah.edu" size=30>
-<input type="password" name="password" size=12>
-<input type="submit" name="login" value="Login" >
-<input type="hidden" name="referrer" value="https://myboss.vulnelab.testbed.emulab.net/joinproject.php3" >
-
 ./myboss.vulnelab.testbed.emulab.net/newproject.php3
 <form enctype=multipart/form-data name=myform action="newproject.php3" method="post">
 <input type="text" name="formfields[proj_head_uid]" value="" size=8 maxlength=8>
@@ -81,10 +68,4 @@
 <input type="checkbox" name="formfields[proj_ronpcs]" value="checked" >
 <input type="textarea" name="formfields[proj_why]" rows=10 cols=60>
 <input type="submit" name="submit" value="Submit" >
-
-./myboss.vulnelab.testbed.emulab.net/password.php3
-<form action="password.php3" method="post">
-<input type="text" name="email" value="" size=30>
-<input type="text" name="phone" value="" size=20>
-<input type="submit" name="reset" value="Reset Password" >
 

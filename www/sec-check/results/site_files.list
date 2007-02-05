@@ -1,7 +1,9 @@
 approveproject_form.php3
+approveuser_form.php3
 archive_view.php3
 beginexp_form.php3
 boot.php3
+changeuid.php
 delaycontrol.php3
 deletegroup.php3
 deleteimageid.php3
@@ -24,7 +26,6 @@ kb-manage.php3
 kb-search.php3
 linktest.php3
 loadimage.php3
-login.php3
 modifyexp.php3
 modnodeattributes_form.php3
 moduserinfo.php3
@@ -40,7 +41,6 @@ news.php3
 nodecontrol_form.php3
 nscheck_form.php3
 nsgen.php3
-password.php3
 plab_ez.php3
 powertime.php3
 prereserve_node.php3

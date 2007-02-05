@@ -1,15 +1,35 @@
+            Probe label: '**{approveproject.php3:head_uid}**
+            Probe label: '**{approveproject.php3:pid}**
             Probe label: '**{boot.php3:node_id}**
+            Probe label: '**{deletegroup.php3:gid}**
+            Probe label: '**{deletegroup.php3:pid}**
+            Probe label: '**{deleteimageid.php3:imageid}**
+            Probe label: '**{deleteosid.php3:osid}**
             Probe label: '**{deleteproject.php3:pid}**
-            Probe label: '**{editnodetype.php3:node_type}**
+            Probe label: '**{deleteuser.php3:target_pid}**
+            Probe label: '**{deleteuser.php3:target_pid}**
+            Probe label: '**{deleteuser.php3:target_uid}**
+            Probe label: '**{deleteuser.php3:target_uid}**
+            Probe label: '**{editgroup.php3:gid}**
+            Probe label: '**{editgroup.php3:pid}**
+            Probe label: '**{freenode.php3:node_id}**
+            Probe label: '**{freezeuser.php3:target_uid}**
             Probe label: '**{modnodeattributes.php3:node_id}**
+            Probe label: '**{newgroup.php3:group_pid}**
             Probe label: '**{newimageid.php3:formfields[default_osid]}**
             Probe label: '**{newimageid.php3:formfields[node]}**
             Probe label: '**{newimageid.php3:formfields[part1_osid]}**
             Probe label: '**{newimageid.php3:formfields[pid]}**
+            Probe label: '**{newimageid_ez.php3:formfields[gid]}**
+            Probe label: '**{newimageid_ez.php3:formfields[node]}**
+            Probe label: '**{newimageid_ez.php3:formfields[pid]}**
             Probe label: '**{newnodelog.php3:node_id}**
+            Probe label: '**{newosid.php3:pid}**
             Probe label: '**{nodecontrol.php3:node_id}**
             Probe label: '**{replayexp.php3:eid}**
             Probe label: '**{replayexp.php3:pid}**
             Probe label: '**{showuser_list.php3:searchfor}**
+            Probe label: '**{swapexp.php3:eid}**
+            Probe label: '**{swapexp.php3:pid}**
             Probe label: '**{updateaccounts.php3:eid}**
             Probe label: '**{updateaccounts.php3:pid}**

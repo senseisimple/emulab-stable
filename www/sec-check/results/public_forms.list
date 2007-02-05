@@ -1,6 +1,3 @@
 ./myboss.vulnelab.testbed.emulab.net/joinproject.php3:103:          <form name=myform enctype=multipart/form-data
 ./myboss.vulnelab.testbed.emulab.net/kb-search.php3:61:          <form action="kb-search.php3" method=get>
-./myboss.vulnelab.testbed.emulab.net/login.php3:67:          <form action='login.php3' method=post>
-./myboss.vulnelab.testbed.emulab.net/login.php3?refer=1:67:          <form action='login.php3' method=post>
 ./myboss.vulnelab.testbed.emulab.net/newproject.php3:108:          <form enctype=multipart/form-data name=myform
-./myboss.vulnelab.testbed.emulab.net/password.php3:66:          <form action="password.php3" method=post>

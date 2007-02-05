@@ -10,10 +10,10 @@
 # - Spidered filename lines are from wget: ./host.path/page.php?getargs
 # - Files may have multiple form sections, terminated by blank lines.
 # - Each form section has one <form line, possibly many <input lines.
-# - Attributes of <input elements are canonicalized and reordered:
+# - Attributes of <input tags are canonicalized and reordered, e.g.:
 #     <input type="..." name="..." value=... ...>
-# - <textarea become <input type="textarea" for uniformity.
-# - <select become <input type="select" for uniformity.
+# - <textarea tags become <input type="textarea" for uniformity.
+# - <select tags become <input type="select" for uniformity.
 
 # Beginning of file.
 FNR == 1 {

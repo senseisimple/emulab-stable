@@ -1,21 +1,38 @@
-/login.php3
+# Blank lines are currently not allowed in this file, but comments are okay.
+#
+# Gotta do this stuff with admin privs.
 ! gmake admin
 /newproject.php3
 /approveproject.php3
+#
+# Log out to create a new user, then back in again.
 ! gmake logout
 /joinproject.php3
 ! gmake admin
+# Pretend the user sent in his e-mail confirmation, allowing approval.
+!sql "update users set status='unapproved' where uid='testusr3'"
+/changeuid.php
 /approveuser.php3
+#
 /beginexp_html.php3
+- $SRCDIR/undo-probe.pl -s exp testproj3/testexp3
+#
 /modifyexp.php3
 /editexp.php3
+#
 /newgroup_form.php3
 /newgroup.php3
 /editgroup.php3
+#
 /newosid.php3
 /newimageid_ez.php3
 /newimageid.php3
 /loadimage.php3
+#
 /newmmlist.php3
 /template_create.php
 /template_swapin.php
+#
+# Avoid xref_tag conflicts.
+! echo "delete from knowledge_base_entries where xref_tag like'test_tag%'" | ssh $MYBOSS mysql tbdb
+/kb-manage.php3

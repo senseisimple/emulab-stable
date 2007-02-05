@@ -1,10 +1,26 @@
+# Blank lines are currently not allowed in this file, but comments are okay.
+#
+# Gotta do this stuff with admin privs.
+#
 /swapexp.php3
-/deleteuser.php3
-/deletegroup.php3
+/endexp.php3
+- $SRCDIR/undo-probe.pl -t exp testproj3/testexp3
+#
+/freenode.php3
 /deleteimageid.php3
 /deleteosid.php3
-/endexp.php3
+#
 /deletepubkey.php3
 /deletesfskey.php3
-/freenode.php3
 /freezeuser.php3
+/deleteuser.php3
+# Allow creating testusr3 again in setup.
+!sql "delete from deleted_users where uid='testusr3'"
+#
+/deletegroup.php3
+# Currently, once a template has been created, a project can never be deleted.
+!sql "delete from experiments where pid = 'testproj3' and eid like'T%-%'"
+/deleteproject.php3
+#
+# No other way to delete xref_tags?
+!sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"

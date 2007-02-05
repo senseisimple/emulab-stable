@@ -1,7 +1,9 @@
 approveproject_form.php3
+approveuser_form.php3
 archive_view.php3
 beginexp_html.php3
 boot.php3
+changeuid.php
 delaycontrol.php3
 deletegroup.php3
 deleteimageid.php3

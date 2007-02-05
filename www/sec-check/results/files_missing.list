@@ -1,4 +1,3 @@
-< approveuser_form.php3
 < approvewauser_form.php3
 < archive_missing.php3
 < archive_tag.php3
@@ -6,16 +5,19 @@
 < cdromqueue.php3
 < cdromrequest.php3
 < chpasswd.php3
+> changeuid.php
 < deletenodelog.php3
 < deletesfskey.php3
 < delmmlist.php3
 < expaccess_form.php3
 < floormap.php3
+< login.php3
 < menu.php3
 < newnode_edit.php3
 < nodemon.php3
 < nodemon_all.php3
 < panicbutton.php3
+< password.php3
 < remapexp.php3
 < request_idleinfo.php3
 < request_swapexp.php3

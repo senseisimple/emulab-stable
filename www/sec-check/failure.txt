@@ -1,6 +1,6 @@
-Invalid form arguments
-Invalid page arguments
-Invalid node
+[Ii]nvalid
+[Ii]llegal
+Probe label
 No tags
 Could not continue
 You are not authorized
@@ -34,3 +34,15 @@ Please log out first
 You do not appear to be logged in
 Please log in again
 You cannot modify an experiment in transition
+has active experiments
+Must supply a project name
+No such image
+already exists
+must be unapproved
+could not proceed
+cannot freeze
+does not exist
+must be alphanumeric
+must consist of
+funky
+You can freeze a user or you can thaw a user
