@@ -161,7 +161,6 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 
 	ackList[queuePtr] = tmpUdpAck;
 	queuePtr = (queuePtr + 1)%MAX_SAMPLES;
-	numSamples++;
 
 	if(numSamples < MAX_SAMPLES)
 		numSamples++;
@@ -199,14 +198,14 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp)
 		return;
 	}
 
-	if(timePeriod > 500000)
+	if(timePeriod > 5000000)
 	{
-		logWrite(ERROR, " Incorrect UdpAvgThroughput timePeriod = %llu, bytes = %d, i = %d, queuePtr = %d", timePeriod, packetSizeSum, i, queuePtr);
+		logWrite(ERROR, " Incorrect UdpAvgThroughput timePeriod = %llu, bytes = %d, i = %d, numSamples = %d, sampleCount = %d queuePtr = %d", timePeriod, packetSizeSum, i,numSamples,sampleCount, queuePtr);
 		int k;
 		for(k = 0; k < i; k++)
 		{
 			index = (queuePtr -1 - k + MAX_SAMPLES)%MAX_SAMPLES;
-			logWrite(ERROR, "Wrong UDP seqnum = %d, bytes = %d, timePeriod = %llu, isRedun = %d", ackList[index].seqNum, ackList[index].packetSize, ackList[index].timeTaken, ackList[index].isRedun);
+			logWrite(ERROR, "Wrong UDP seqnum = %d, index = %d, bytes = %d, timePeriod = %llu, isRedun = %d", ackList[index].seqNum,index, ackList[index].packetSize, ackList[index].timeTaken, ackList[index].isRedun);
 		}
 
 		return;

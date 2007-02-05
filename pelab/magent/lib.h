@@ -414,7 +414,7 @@ class lessSeqNum:public std::binary_function<UdpPacketInfo , UdpPacketCmp *,bool
   public:
   bool operator()(const UdpPacketInfo& packet,UdpPacketCmp *cmpPacket) const
   {
-    return ( (packet.seqNum < cmpPacket->seqNum) && (packet.timeStamp < cmpPacket->timeStamp));
+    return ( (packet.timeStamp < cmpPacket->timeStamp));
   }
 };
 
