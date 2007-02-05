@@ -38,7 +38,8 @@ namespace global
   std::auto_ptr<CommandInput> input;
   std::auto_ptr<CommandOutput> output;
 
-  int logFlags =  LOG_EVERYTHING /*& ~SENSOR_COMPLETE*/;
+  int logFlags = LOG_EVERYTHING &
+  ~(SENSOR_COMPLETE | SENSOR_DETAIL | SENSOR | MAIN_LOOP);
 
   // The versionless pre-history was '0'. We can be backwards
   // compatible by taking advantage of the fact that the old headers

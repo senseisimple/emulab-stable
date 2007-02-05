@@ -336,6 +336,11 @@ enum
   REPLAY_SAVE = 2
 };
 
+enum
+{
+  SNAPLEN_SIZE = 100
+};
+
 class ConnectionModel;
 class Connection;
 class CommandInput;
@@ -396,8 +401,8 @@ struct UdpPacketInfo
 };
 
 struct UdpPacketCmp{
-	unsigned short seqNum;
-	unsigned long long timeStamp;
+        unsigned short seqNum;
+        unsigned long long timeStamp;
 };
 
 class equalSeqNum:public std::binary_function<UdpPacketInfo , unsigned short int, bool>

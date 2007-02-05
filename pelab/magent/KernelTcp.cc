@@ -84,16 +84,16 @@ void KernelTcp::connect(PlanetOrder & planet)
     // Create a datagram socket, for use by later writeUdpMessage calls.
     if(peersock == -1)
     {
-	peersock = socket(AF_INET, SOCK_DGRAM, 0);
+        peersock = socket(AF_INET, SOCK_DGRAM, 0);
 
-	if(peersock < 0)
-	{
-	    logWrite(ERROR, "Could not create a datagram socket in KernelTcp::connect");
-	}
+        if(peersock < 0)
+        {
+            logWrite(ERROR, "Could not create a datagram socket in KernelTcp::connect");
+        }
 
-	udpLocalAddr.sin_family = AF_INET;
-	udpLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	udpLocalAddr.sin_port = htons(0);
+        udpLocalAddr.sin_family = AF_INET;
+        udpLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        udpLocalAddr.sin_port = htons(0);
 
     }
     // Udp - CHANGES - End
@@ -374,16 +374,16 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
 
   if(peersock == -1)
   {
-	  socketConnectedFlag = false;
-	  logWrite(EXCEPTION, "udpWriteMessage called in KernelTcp before connect()ing the socket");
+          socketConnectedFlag = false;
+          logWrite(EXCEPTION, "udpWriteMessage called in KernelTcp before connect()ing the socket");
 
-	  peersock = socket(AF_INET, SOCK_DGRAM, 0);
+          peersock = socket(AF_INET, SOCK_DGRAM, 0);
 
-	  if(peersock < 0)
-	  {
-		  logWrite(ERROR, "Could not create a datagram socket in writeUdpMessage");
-		  return -1;
-	  }
+          if(peersock < 0)
+          {
+                  logWrite(ERROR, "Could not create a datagram socket in writeUdpMessage");
+                  return -1;
+          }
   }
   // result.planet.ip and result.planet.remotePort denote the destination.
   // result.planet.ip is in host order
@@ -402,8 +402,8 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // which was assigned to the socket.
   if(!socketConnectedFlag || ntohs(udpLocalAddr.sin_port) == 0 )
   {
-	  socklen_t udpLocalLen = sizeof(udpLocalAddr);
-	  getsockname(peersock, (sockaddr *)&udpLocalAddr, &udpLocalLen);
+          socklen_t udpLocalLen = sizeof(udpLocalAddr);
+          getsockname(peersock, (sockaddr *)&udpLocalAddr, &udpLocalLen);
   }
 
   // put the localport in host order in result.planet.localPort
@@ -460,12 +460,12 @@ void KernelTcp::init(void)
 
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(global::interface.c_str(), &netp, &maskp, errbuf);
-    filter << "\(port " << global::peerServerPort << " and tcp\)"
-	    " or \(port " << global::peerUdpServerPort << " and udp \)";
+    filter << "(port " << global::peerServerPort << " and tcp)"
+            " or (port " << global::peerUdpServerPort << " and udp )";
 
     /* open device for reading.
      * NOTE: We use non-promiscuous */
-    pcapDescriptor = pcap_open_live(global::interface.c_str(), BUFSIZ, 0,
+    pcapDescriptor = pcap_open_live(global::interface.c_str(), SNAPLEN_SIZE, 0,
                                     SNIFF_WAIT, errbuf);
     if(pcapDescriptor == NULL)
     {
