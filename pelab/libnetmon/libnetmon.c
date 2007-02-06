@@ -542,7 +542,7 @@ void printlog(logmsg_t type, int fd, ...) {
      */
     bool print = true;
 
-    DEBUG(printf("printlog(%i,%i,...) called\n");)
+    DEBUG(printf("printlog(%i,%i,...) called\n",type,fd));
 
     /*
      * Decide what to print based on the type of the log message and the output
