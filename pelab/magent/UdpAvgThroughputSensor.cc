@@ -39,7 +39,6 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 	memcpy(&numRedunAcksChar, &packet->payload[0], global::UCHAR_SIZE);
 	int numRedunAcks = static_cast<int>(numRedunAcksChar);
 
-	int numThroughputAcks = 1;
 	double avgThroughput = 0;
 
 	// This is the timestamp at the receiver, when the original packet was received.
@@ -90,8 +89,6 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 				if(ackTimeDiff - timeDiff == 0)
 					continue;
 
-				numThroughputAcks++;
-
 				tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
 				tmpUdpAck.isRedun = true;
 				tmpUdpAck.seqNum = redunSeqNum;
@@ -109,11 +106,6 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 					avgThroughput += 8000000.0*( static_cast<double> ( (*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff - timeDiff)*1024.0 );
 					tmpUdpAck.packetSize = (*vecIterator).packetSize;
 				}
-	if(tmpUdpAck.packetSize < 0)
-	{
-		printf("Packetsize negative for redunAck = %d, isFake = %d\n", redunSeqNum,packetHistory->isAckFake());
-
-	}
 
 				ackList[queuePtr] = tmpUdpAck;
 				queuePtr = (queuePtr + 1)%MAX_SAMPLES;

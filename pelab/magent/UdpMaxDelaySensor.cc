@@ -25,13 +25,12 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 {
 	 // This is a re-ordered ACK or a corrupted packet - don't do anything
 	// with it - just return.
-	if( packetHistory->isAckValid() == false )
+	// If this packet is ACKing a packet that we lost due to libpcap send loss,
+	// dont use this packet timestamp for RTT calculations.
+	if( packetHistory->isAckValid() == false || packetHistory->isAckFake() == true)
 		return;
 
-	int overheadLen = 14 + 4 + 8 + packet->ip->ip_hl*4;
         unsigned short int seqNum = *(unsigned short int *)(packet->payload + 1);
-        unsigned short int echoedPacketSize = *(unsigned short int *)(packet->payload + 1 + global::USHORT_INT_SIZE);
-	unsigned long long echoedTimestamp = *(unsigned long long *)(packet->payload + 1 + 2*global::USHORT_INT_SIZE + global::ULONG_LONG_SIZE);
         unsigned long long oneWayQueueDelay;
         bool eventFlag = false;
 
@@ -39,15 +38,11 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 	vector<UdpPacketInfo> ackedPackets = packetHistory->getAckedPackets();
         vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
-	// Find the one way RTT for this packet.
 
 	unsigned long long timeStamp = packet->packetTime.toMicroseconds();
-	// We lost this packet send time due to loss in libpcap, use the
-	// time echoed in the ACK packet.
-	if(packetHistory->isAckFake() == true)
-		oneWayQueueDelay = (timeStamp - echoedTimestamp)/2;
-	else
-		oneWayQueueDelay = (timeStamp - (*vecIterator).timeStamp)/2;
+
+	// Find the one way RTT for this packet.
+	oneWayQueueDelay = (timeStamp - (*vecIterator).timeStamp)/2;
 
 	// Scale the value of one way RTT, so that it is correct for a transmission
 	// size of 1518 bytes.
@@ -56,14 +51,14 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 	// size echoed in the ACK packet - this does not included the header
 	// overhead for the packet - we assume that the packet on the reverse path
 	// has the same overhead length as the original packet.
-	if(packetHistory->isAckFake() == true)
-		oneWayQueueDelay = ( oneWayQueueDelay )*1518 / (overheadLen + echoedPacketSize);
-	else
-		oneWayQueueDelay = ( oneWayQueueDelay )*1518 / ((*vecIterator).packetSize);
+	oneWayQueueDelay = ( oneWayQueueDelay )*1518 / ((*vecIterator).packetSize);
 
 	// Find the queuing delay for this packet, by subtracting the
 	// one way minimum delay from the above value.
 	oneWayQueueDelay = oneWayQueueDelay - minDelaySensor->getMinDelay();
+
+	if(oneWayQueueDelay > 9000000)
+		logWrite(ERROR,"Incorrect oneWayQueueDelay value = %llu, minDelay = %llu", oneWayQueueDelay, minDelaySensor->getMinDelay());
 
         // Set this as the new maximum one way queuing delay.
         if(oneWayQueueDelay > maxDelay)

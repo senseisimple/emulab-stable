@@ -341,6 +341,8 @@ void SensorList::pushAverageThroughputSensor(void)
 
 void SensorList::pushUdpPacketSensor()
 {
+  pushNullSensor();
+
   // Example dependency check
   if (depUdpPacketSensor == NULL)
   {

@@ -54,7 +54,6 @@ void UdpPacketSensor::localSend(PacketInfo *packet)
 	sendValid = true;
 	ackValid = false;
 
-	// CHANGE:
 	unsigned short int seqNum = ntohs(*(unsigned short int *)(packet->payload + 1));
 	unsigned short int packetSize = (*(unsigned short int *)(packet->payload + 1 + global::USHORT_INT_SIZE)) + overheadLen;
 	UdpPacketInfo tmpPacketInfo;
@@ -74,6 +73,8 @@ void UdpPacketSensor::localSend(PacketInfo *packet)
 				sentPacketList.push_back(tmpPacketInfo);
 			}
 			libpcapSendLoss += (seqNum - lastSeenSeqNum - 1);
+
+			logWrite(SENSOR,"STAT: libpcap send loss = %d", libpcapSendLoss);
 		}
 	}
 
@@ -106,9 +107,10 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 
 	listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(equalSeqNum(), seqNum)); 
 
+	bool isReordered = false;
 	if(listIterator == sentPacketList.end())
 	{
-		bool isReordered = handleReorderedAck(packet);
+		isReordered = handleReorderedAck(packet);
 
 		if(isReordered == false)
 		{
@@ -119,10 +121,15 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 			return;
 		}
 		else
+		{
 			ackValid = true;
+			listIterator = find_if(unAckedPacketList.begin(), unAckedPacketList.end(), bind2nd(equalSeqNum(), seqNum));
+		}
 	}
 	else
+	{
 		ackValid = true;
+	}
 
 	// We received an ACK correctly(without reordering), but we dont have any record of ever
 	// sending the original packet(Actually, we have a fake packet inserted into our send list)
@@ -151,6 +158,7 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 
 	// Look at the redundant ACKs first.
 	UdpPacketInfo tmpPacketInfo;
+	std::vector<int> redunAckVector;
 
 	if(numRedunAcks > 0)
 	{
@@ -164,11 +172,16 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 			// Check whether the packet that this redundant ACK refers to exists
 			// in our list of sent ( but unacked ) packets. It might not exist
 			// if its ACK was not lost earlier.
-			listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(equalSeqNum(), redunSeqNum)); 
+			if(isReordered == false)
+				listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(equalSeqNum(), redunSeqNum)); 
+			else
+				listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(equalSeqNum(), redunSeqNum)); 
+
+			redunAckVector.push_back(redunSeqNum);
 
 			// An unacked packet exists with this sequence number, delete it 
 			// from the list and consider it acked.
-			if(listIterator != curPacketIterator && listIterator != sentPacketList.end())
+			if((isReordered == false && listIterator != curPacketIterator) ||(isReordered == true &&  listIterator != sentPacketList.end()) )
 			{
 				tmpPacketInfo.seqNum = (*listIterator).seqNum;
 				tmpPacketInfo.packetSize = (*listIterator).packetSize;
@@ -224,14 +237,21 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 	comparePacket.seqNum = seqNum;
 	comparePacket.timeStamp = (*curPacketIterator).timeStamp;
 
-	listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), &comparePacket)); 
+	if(isReordered == false)
+	{
+		listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), &comparePacket)); 
+	}
+	else
+	{
+		listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(lessSeqNum(), &comparePacket)); 
+	}
 
-	if( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator ))
+	if( ( isReordered == true && listIterator != sentPacketList.end()) || (isReordered == false && listIterator != curPacketIterator ))
 	{
 		logWrite(SENSOR, "STAT::Packet being ACKed = %d",seqNum);
 
 		do{
-			logWrite(SENSOR, "STAT::Lost packet seqnum = %d",(*listIterator).seqNum);
+			logWrite(SENSOR, "STAT::Lost packet seqnum = %d, curTimestamp = %llu, lost packet Timestamp = %llu",(*listIterator).seqNum, (*curPacketIterator).timeStamp, (*listIterator).timeStamp);
 
                         // This packet might have been lost - but store it as UnAcked
                         // to account for reordering on the forward path.
@@ -248,14 +268,21 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 			packetLoss++;
 			totalPacketLoss++;
 
-			listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), &comparePacket )); 
+			if(isReordered == false)
+				listIterator = find_if(sentPacketList.begin(), curPacketIterator, bind2nd(lessSeqNum(), &comparePacket )); 
+			else
+				listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(lessSeqNum(), &comparePacket )); 
 
 		}
-		while( (listIterator != sentPacketList.end()) && (listIterator != curPacketIterator) );
-		logWrite(SENSOR,"STAT::Total packet loss = %d",totalPacketLoss);
+		while( (isReordered == true && listIterator != sentPacketList.end()) || (isReordered == false && listIterator != curPacketIterator) );
+
+		logWrite(SENSOR,"STAT::UdpPacketSensor:Total packet loss = %d",totalPacketLoss);
 	}
 
-	sentPacketList.erase(curPacketIterator);
+	if(isReordered == false)
+		sentPacketList.erase(curPacketIterator);
+	else
+		unAckedPacketList.erase(curPacketIterator);
 }
 
 bool UdpPacketSensor::handleReorderedAck(PacketInfo *packet)

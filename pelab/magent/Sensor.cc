@@ -104,11 +104,14 @@ void NullSensor::localAck(PacketInfo * packet)
   logWrite(SENSOR, "----------------------------------------");
   logWrite(SENSOR, "Stream ID: %s", packet->elab.toString().c_str());
   logWrite(SENSOR, "Ack received: Time: %f", packet->packetTime.toDouble());
-  list<Option>::iterator pos = packet->tcpOptions->begin();
-  list<Option>::iterator limit = packet->tcpOptions->end();
-  for (; pos != limit; ++pos)
+  if(packet->transport == TCP_CONNECTION)
   {
-    logWrite(SENSOR, "TCP Option: %d", pos->type);
+    list<Option>::iterator pos = packet->tcpOptions->begin();
+    list<Option>::iterator limit = packet->tcpOptions->end();
+    for (; pos != limit; ++pos)
+    {
+      logWrite(SENSOR, "TCP Option: %d", pos->type);
+    }
   }
   if (packet->packetTime < lastPacketTime) {
     logWrite(EXCEPTION,"Reordered packets! Old %f New %f",lastPacketTime.toDouble(),

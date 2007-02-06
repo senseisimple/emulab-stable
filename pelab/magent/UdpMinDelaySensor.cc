@@ -30,18 +30,11 @@ void UdpMinDelaySensor::localSend(PacketInfo *packet)
 
 void UdpMinDelaySensor::localAck(PacketInfo *packet)
 {
-        if( ( ntohs(packet->udp->len) - 8 ) < global::udpMinAckPacketSize )
-        {
-                logWrite(ERROR, "UDP packet data sent to UdpMinDelaySensor::localAck was less than the "
-                        " required minimum %d bytes",global::udpMinAckPacketSize);
-		ackValid = false;
-		sendValid = false;
-                return;
-        }
-
 	 // This is a re-ordered ACK or an incorrect packet - don't do anything
 	// with it - just return.
-	if( packetHistory->isAckValid() == false )
+	// If this packet is ACKing a packet that we lost due to libpcap send loss,
+	// dont use this packet timestamp for RTT calculations.
+	if( packetHistory->isAckValid() == false || packetHistory->isAckFake() == true )
 	{
 		ackValid = false;
 		sendValid = false;
@@ -51,8 +44,6 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	sendValid = false;
 
 	unsigned short int seqNum = *(unsigned short int *)(packet->payload + 1);
-	unsigned short int echoedPacketSize = *(unsigned short int *)(packet->payload + 1 + global::USHORT_INT_SIZE);
-	unsigned long long echoedTimestamp = *(unsigned long long *)(packet->payload + 1 + 2*global::USHORT_INT_SIZE + global::ULONG_LONG_SIZE);
 
 	unsigned long long oneWayDelay;
 	bool eventFlag = false;
@@ -61,24 +52,13 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	vector<UdpPacketInfo > ackedPackets = packetHistory->getAckedPackets();
 	vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
-	// Calculate the one way delay as half of RTT.
-
 	unsigned long long timeStamp = packet->packetTime.toMicroseconds();
-	// We lost this packet send time due to loss in libpcap, use the 
-	// time echoed in the ACK packet.
-	if(packetHistory->isAckFake() == true)
-		oneWayDelay = (timeStamp - echoedTimestamp)/2;
-	else
-		oneWayDelay = (timeStamp - (*vecIterator).timeStamp)/2;
+
+	oneWayDelay = (timeStamp - (*vecIterator).timeStamp)/2;
 
 	// Calculate the delay for the maximum sized packet.
 
-	// We lost this packet size details due to loss in libpcap, use the 
-	// size echoed in the ACK packet 
-	if(packetHistory->isAckFake() == true)
-		oneWayDelay = ( oneWayDelay ) * 1518 / (echoedPacketSize);
-	else
-		oneWayDelay = ( oneWayDelay ) * 1518 / ( (*vecIterator).packetSize);
+	oneWayDelay = ( oneWayDelay ) * 1518 / ( (*vecIterator).packetSize);
 
 	// Set this as the new minimum one way delay.
 	if(oneWayDelay < minDelay)

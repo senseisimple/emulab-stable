@@ -57,7 +57,9 @@ void UdpRttSensor::localAck(PacketInfo *packet)
 	// has the same overhead length as the original packet.
 	currentRtt = ( currentRtt )*1518 / ((*vecIterator).packetSize);
 
-	double alpha = 0.25, beta = 0.125;
+	// Avoid conversion to double and back to long long.
+	//double alpha = 0.25, beta = 0.125;
+
 	if(ewmaRtt == 0)
 	{
 		ewmaRtt = currentRtt;
@@ -74,12 +76,22 @@ void UdpRttSensor::localAck(PacketInfo *packet)
 		else
 		{
 			if(currentRtt > ewmaRtt)
-				ewmaDevRtt = ewmaDevRtt*(1 - beta) + beta*(currentRtt - ewmaRtt);
+			{
+				// Avoid conversion to double and back to long long.
+				//ewmaDevRtt = ewmaDevRtt*(1 - beta) + beta*(currentRtt - ewmaRtt);
+				ewmaDevRtt = ewmaDevRtt*7/8 + (currentRtt - ewmaRtt)/8;
+			}
 			else
-				ewmaDevRtt = ewmaDevRtt*(1 - beta) + beta*(ewmaRtt - currentRtt );
+			{
+				// Avoid conversion to double and back to long long.
+				//ewmaDevRtt = ewmaDevRtt*(1 - beta) + beta*(ewmaRtt - currentRtt );
+				ewmaDevRtt = ewmaDevRtt*7/8 + (ewmaRtt - currentRtt )/8;
+			}
 		}
 
-		ewmaRtt = ewmaRtt*(1 - alpha) + currentRtt*alpha;
+			// Avoid conversion to double and back to long long.
+		//ewmaRtt = ewmaRtt*(1 - alpha) + currentRtt*alpha;
+		ewmaRtt = ewmaRtt*3/4 + currentRtt/4;
 	}
 }
 

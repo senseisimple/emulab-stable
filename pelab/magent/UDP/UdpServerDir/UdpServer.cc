@@ -304,6 +304,8 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
         // we saw, then send an acknowledgement for it. Otherwise, ignore the
         // packet - it arrived out of order.
 
+//	printf("Received seqNum = %d\n", packetSeqNum);
+//	printf("Packet loss = %d\n", clientIter->second.packetLoss);
         // TODO:Take wrap around into account.
         {
                 if(packetSeqNum > (clientIter->second.curSeqNum + 1))
@@ -323,7 +325,7 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
                 // Echo the sender timestamp received in the original packet.
                 memcpy(&appAck[1 + 2*globalConsts::USHORT_INT_SIZE + globalConsts::ULONG_LONG_SIZE], &senderTimestamp, globalConsts::ULONG_LONG_SIZE);
 
-                outFile<<"TIME="<<packetLibpcapTimestamp<<",SIZE=udpLen + overhead"<<std::endl;
+                outFile<<"TIME="<<packetLibpcapTimestamp<<",SIZE="<<udpLen + overhead<<std::endl;
 
                 // Include the sequence numbers, and ACK times of at least the last
                 // seen three packets - more than 3 if the packet size allows.
@@ -386,20 +388,23 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
 
                 // This indicates where the redundant ACKs start in the packet.
                 int redunAckStart = 1 + 2*globalConsts::USHORT_INT_SIZE + 2*globalConsts::ULONG_LONG_SIZE;
+		int index = (clientIter->second.queueEndPtr + 1 - numAcks + ackQueueSize)%ackQueueSize;
                // Copy the redundant ACKs.
                 for(int i = 0;i < numAcks; i++)
                 {
                         // Copy the seq. number this redun ACK is acking.
-                        memcpy(&appAck[redunAckStart + i*ackSize], &clientIter->second.ackQueue[(clientIter->second.queueStartPtr + i)%ackQueueSize].seqNo, globalConsts::USHORT_INT_SIZE);
+                        memcpy(&appAck[redunAckStart + i*ackSize], &clientIter->second.ackQueue[index].seqNo, globalConsts::USHORT_INT_SIZE);
 
                         // Copy the size of the packet being acked.
-                        memcpy(&appAck[redunAckStart + i*ackSize + globalConsts::USHORT_INT_SIZE], &clientIter->second.ackQueue[(clientIter->second.queueStartPtr + i)%ackQueueSize].packetSize, globalConsts::USHORT_INT_SIZE);
+                        memcpy(&appAck[redunAckStart + i*ackSize + globalConsts::USHORT_INT_SIZE], &clientIter->second.ackQueue[index].packetSize, globalConsts::USHORT_INT_SIZE);
 
-                        timeDiff = packetLibpcapTimestamp - clientIter->second.ackQueue[(clientIter->second.queueStartPtr + i)%ackQueueSize].ackTime;
+                        timeDiff = packetLibpcapTimestamp - clientIter->second.ackQueue[index].ackTime;
 
                         // Copy the time diffrence between when this packet was received
                         // and when the latest packet being ACKed was received here.
                         memcpy(&appAck[redunAckStart + i*ackSize + 2*globalConsts::USHORT_INT_SIZE], &timeDiff, globalConsts::ULONG_LONG_SIZE);
+
+			index = (index + 1)%ackQueueSize;
                 }
 
                 // Always maintain the sequence numbers and ack send times
@@ -428,8 +433,6 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
                 // Send the ACK off to the host we received the data packet from.
                 sendto(sd,appAck,ackLength,flags,(struct sockaddr *)&cliAddr,cliLen), errno;
         }
-
-
 }
 
 int getLinkLayer(struct pcap_pkthdr const *pcap_info, const u_char *pkt_data)
