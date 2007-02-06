@@ -20,7 +20,7 @@ TARGETS=$MAGENT
 #
 # Start up our own measurement agent
 #
-if [ $MAGENT_NORECV -ne 0 ]; then
+if [ ${MAGENT_NORECV:-0} -ne 0 ]; then
     port=`echo $ARGS | sed -e 's/.*--peerserverport=\([0-9][0-9]*\).*/\1/'`
     ARGS=`echo $ARGS | sed -e "s/--peerserverport=$port/--peerserverport=0/"`
     echo "${IPERFD_DIR}/$IPERFD -p $port"
