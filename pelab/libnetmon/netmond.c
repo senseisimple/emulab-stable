@@ -364,7 +364,7 @@ int main(int argc, char **argv) {
                          * If we get back a 0 length read, or an error, boot the
                          * client
                          */
-                        printf("A client disconnected\n");
+                        //printf("A client disconnected\n");
                         close(i);
                         FD_CLR(i,&real_fdset);
                     }
@@ -390,7 +390,7 @@ int main(int argc, char **argv) {
                             }
                         }
                     } else {
-                        printf("A control client disconnected\n");
+                        //printf("A control client disconnected\n");
                         close(i);
                         FD_CLR(i,&real_fdset);
                     }
