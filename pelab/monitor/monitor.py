@@ -83,13 +83,13 @@ class Connection:
     # A throughput measurement is only passed on as an event if it is
     # larger than the last bandwidth from that connection
     self.last_bandwidth = 0
+    self.prev_time = 0.0
 
 initial_connection_bandwidth = {}
 connection_map = {}
 
 total_size = 0
 last_total = -1
-prev_time = 0.0
 
 ##########################################################################
 
@@ -244,7 +244,7 @@ def read_initial_conditions():
 ##########################################################################
 
 def get_next_packet(conn):
-  global total_size, last_total, prev_time, connection_map
+  global total_size, last_total, connection_map
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
@@ -283,10 +283,11 @@ def get_next_packet(conn):
         size = 0
       if emulated_to_real.has_key(ipaddr):
         total_size = total_size + size
-        send_command(conn, TRAFFIC_WRITE_COMMAND, TCP_CONNECTION, ipaddr,
+      key = (ipaddr, localport, remoteport)
+      send_command(conn, TRAFFIC_WRITE_COMMAND, TCP_CONNECTION, ipaddr,
                      localport, remoteport,
-                     save_int(int((time - prev_time)*1000)) + save_int(size))
-        prev_time = time
+                     save_int(int((time - connection_map[key].prev_time)*1000)) + save_int(size))
+        connection_map[key].prev_time = time
   elif ((netmon_output_version == 2) and cmatch):
       #
       # Watch for new or closed connections
@@ -331,7 +332,7 @@ def get_next_packet(conn):
         elif event == 'Connected':
           send_command(conn, CONNECT_COMMAND, TCP_CONNECTION, ipaddr,
                       localport, remoteport, '')
-          prev_time = float(value)
+          connection_map[key].prev_time = float(value)
 #        elif event == 'LocalPort':
         elif event == 'SO_RCVBUF':
           send_command(conn, CONNECTION_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
