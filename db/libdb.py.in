@@ -51,11 +51,12 @@ __dbName = "@TBDBNAME@"
 __dbQueryMaxtries = 1
 __dbConnMaxtries = 5
 
+# XXX: Maintain only one connection for now
 __dbConnection = None
 
 def TBDBConnect():
     global __dbConnection
-    
+
     if __dbConnection:
         return
 
@@ -75,25 +76,109 @@ def TBDBConnect():
         try:
             __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
         except:
-            time.sleep(1)
+            time.sleep(5)
         else:
             break
     else:
         raise RuntimeError, "Cannot connect to DB after several attempts!"
 
+def TBDBReconnect(retry = False):
+    global __dbConnMaxtries, __dbConnection
+    
+    if retry:
+        tmpConnMaxtries = __dbConnMaxtries
+        # "forever"
+        __dbConnMaxtries = 10000
+        pass
+
+    # Force closed if not closed yet.
+    try:
+        __dbConnection.close()
+    except:
+        pass
+    __dbConnection = None
+
+    try:
+        TBDBConnect()
+    except RuntimeError:
+        # restore old value, even though the program will probably choose
+        # to die if it can't reconnect...
+        if retry:
+            __dbConnMaxtries = tmpConnMaxtries
+            pass
+        raise RuntimeError, "Cannot reconnect to DB after %d attempts!" \
+              % (__dbConnMaxtries)
+
+    if retry:
+        __dbConnMaxtries = tmpConnMaxtries
+        pass
+
+    return
+
+#
+# XXX: Ugh.
+# The reason for this hack is the limited functionality across fork supported
+# by MySQLdb.  The desire is that child processes, on their first query
+# post-fork, should notice if they inherited the parent's connection, stop
+# using that connection, and let its resources be garbage-collected, BUT NOT
+# send a disconnect to the server.  Unfortunately, since MySQLdb takes all its
+# functionality from a C wrapper around the MySQL libs, there is no way to both
+# garbage-collect the resources and not officially disconnect.  If you set the
+# connection obj to None, you call the destructor and this disconnects from the
+# server.  No way to both dealloc the C resources and not disconnect.  There's
+# a simple one-line fix to allow for this in the C wrapper (and better multi-
+# line fixes), but I don't want to hack this in right now.
+#
+
+#
+# Thus, processes that os.fork off children should call TBDBPreFork() just
+# before the actual fork syscall.  Note that this method does not perform the
+# fork; it merely forces a disconnect from the server.  Both the parent and the
+# child will reconnect transparently upon the first query.  At this point, this
+# is the best transparent sol'n, even though it's terrible!
+# Of course, if you're not planning to 1) touch the connection, or 2) close
+# all open filehandles in the child, you don't need to call this.
+# WARNING: do not call this function if you have any connection state (i.e.,
+# are in the middle of a transaction)!
+#
+def TBDBPreFork():
+    global __dbConnection
+    
+    if not TBDBDisconnect():
+        # don't just null out object; this could perhaps fail if there's an
+        # uncommitted transaction or something...
+        raise RuntimeError, "Could not close db connection in prefork!"
+    
+    return
+
+def TBDBDisconnect():
+    global __dbConnection
+
+    if __dbConnection:
+        try:
+            __dbConnection.close()
+            __dbConnection = None
+        except:
+            print "Could not close db connection!"
+            return False
+        pass
+    
+    return True
+
 def DBQuery(queryPat, querySub = (), asDict = False):
     TBDBConnect()
-    
-    if asDict:
-        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
-    else:
-        cursor = __dbConnection.cursor()
 
     if debug:
         print "Executing DB query %s" % queryPat
 
     tries = __dbQueryMaxtries
     while tries:
+        if asDict:
+            cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
+        else:
+            cursor = __dbConnection.cursor()
+            pass
+
         try:
             cursor.execute(queryPat, querySub)
             ret = cursor.fetchall()
@@ -107,16 +192,25 @@ def DBQuery(queryPat, querySub = (), asDict = False):
                 return ()
             return ret
         except MySQLdb.MySQLError, e:
+            try:
+                __dbConnection.ping()
+            except MySQLdb.MySQLError:
+                # Connection is dead; need a reconnect
+                try:
+                    TBDBReconnect(True)
+                    continue
+                except RuntimeError:
+                    print "Error: could not reconnect to mysqld!"
+                    time.sleep(1)
+                    pass
+                pass
+
             tries -= 1
             if tries == 0:
                 break
-            else:
-                time.sleep(1)
-                try:
-                    __dbConnection.ping()
-                except MySQLdb.MySQLError:
-                    pass
-                
+            pass
+        pass
+
     tbmsg  = queryPat % cursor.connection.literal(querySub)
     tbmsg += "\n\n"
     tbmsg += "".join(traceback.format_exception(*sys.exc_info()))
