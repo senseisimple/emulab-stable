@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2001-2006 University of Utah and the Flux Group.
+# Copyright (c) 2001-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -77,7 +77,8 @@ publicly routed IP space. If this is not possible, then boss, ops and fs
 should be given two interfaces: One in the nodes' control network, and one in
 public IP space. If you must use private IP space for the nodes' control net,
 we suggest using the 192.168/16 subnet, which leaves the larger 10/8 subnet
-available for the experimental network.
+available for the experimental network.  The defs-example-privatecnet file
+shows an example configuration like this.
 
 (3) If you have a firewall, you will need to be able to get certain standard
 ports through to boss and ops, such as the ports for http, https, ssh, named
@@ -166,6 +167,8 @@ nodes, and email addresses that certain types of mail will be sent to.
 
 Use the 'defs-example' file in the root of our source distribution as a
 template. It contains comments explaining the important variables to set.
+defs-example-privatecnet is the same configuration but with an unroutable
+control net.
 
 ##### Step 5 - Configuring an object tree
 
