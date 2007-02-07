@@ -1,4 +1,9 @@
 #/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 SCHEDMON="/local/schedmon/schedmon -s 10000 -n 100 -t -l 59 -b"
 ACTIVELOG=/tmp/schedmon.log
