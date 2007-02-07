@@ -137,8 +137,8 @@ fatal("Could not get object for emulab-ops user")
 my $ev_uid   = $user->unix_uid();
 
 # and need the unix gid for the group.
-my $project = Project->Lookup($REPOSEID);
-fatal("Could not get object for $REPOSEID project")
+my $project = Project->Lookup($REPOSPID);
+fatal("Could not get object for $REPOSPID project")
     if (!defined($project));
 my $unix_gid = $project->unix_gid();
 
