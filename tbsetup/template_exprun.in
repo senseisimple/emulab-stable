@@ -586,6 +586,21 @@ print "Asking the event system to replay events ...\n";
 system("$eventcontrol replay $pid $eid") == 0
     or fatal(-1, "Could not restart the event system!");
 
+# We lose the log info for this commit if we do not copy it out to the
+# user directory.
+$experiment->CopyLogFiles()
+    if (defined($logname));
+
+system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
+
+#
+# And create a tag (and subdir) for this. This is primarily a
+# convenience function for the web interface. The tag is simply an
+# alias to the current trunk and does not cause a savepoint or a
+# commit.
+#
+system("$archcontrol -d -u -s runs/$runid tag $pid $eid startrun");
+
 print "Experiment run '$runid' has been started.\n";
 done:
 
@@ -609,17 +624,6 @@ if (keys(%deadnodes)) {
 # log file gets copied out to the user directory.
 $experiment->CopyLogFiles()
     if (defined($logname));
-
-# We lose the log info for this commit.
-system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
-
-#
-# And create a tag (and subdir) for this. This is primarily a
-# convenience function for the web interface. The tag is simply an
-# alias to the current trunk and does not cause a savepoint or a
-# commit.
-#
-system("$archcontrol -d -u -s runs/$runid tag $pid $eid startrun");
 
 # Stop the web interface from spewing.
 TBExptCloseLogFile($pid, $eid)
