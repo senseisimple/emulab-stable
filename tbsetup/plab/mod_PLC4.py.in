@@ -28,6 +28,8 @@ from libtestbed import *
 from aspects import wrap_around
 from timer_advisories import timeAdvice
 
+#import sshhttp
+
 #
 # output control vars
 #
@@ -37,13 +39,14 @@ debug = 0
 #
 # PLC constants
 #
-DEF_PLC_URI = "https://www2.planet-lab.org/xmlrpc.php"
+DEF_PLC_URI = "https://www2.planet-lab.org/PLCAPI/"
+#DEF_PLC_URI = "https://n.djplc.tbres.emulab.net/PLCAPI/"
 # these are now sucked in from a file
 DEF_PLC_USER = ""
 DEF_PLC_PASS = ""
 DEF_PLC_PASS_FILE = "@prefix@/etc/plab/plc.pw"
 
-DEF_NM_PORT = "814"
+DEF_NM_PORT = "812"
 
 #
 # A bunch of time constants / intervals (in seconds)
@@ -54,9 +57,6 @@ MAX_LEASE_SLOP = 600 # (ten minutes)
 MAX_CACHE_TIME = HOUR # (one hour)
 
 EMULABMAN_EMAIL = "emulabman@emulab.net"
-
-PLC_LOCKFILE = "/tmp/.PLC.4-lock"
-DEF_PLC_SPACING = 3 # seconds
 
 DEF_SLICE_DESC = "Slice created by Emulab"
 DEF_EMULAB_URL = "http://www.emulab.net"
@@ -71,10 +71,14 @@ MINOR_VERS = 0
 MIN_REV    = 10
 
 # XXX: need to change this to talk over an ssh tunnel, sigh.
+# until the delegate account proxy works, 
 class NMagent:
     def __init__(self, IP, nodeid, nmport = DEF_NM_PORT):
-        self.__server = xmlrpclib.ServerProxy("http://" + IP + ":" +
-                                              nmport + "/")
+        # XXX: fix
+        #self.__sshconnmethod = sshhttp.SshConnection("@prefix@/bin/sshtb")
+        #self.__transport = sshhttp.SshHttpTransport(self.__sshconnmethod)
+        #self.__server = xmlrpclib.ServerProxy("http://"+IP+":"+nmport+"/",
+        #                                      transport=self.__transport)
         self.__vers = [0,0,0]
         self.IP = IP
         self.nodeid = nodeid
@@ -82,11 +86,15 @@ class NMagent:
 
     # XXX
     def create_sliver(self, ticket):
+        #self.__server.Ticket(xmlrpclib.Binary(ticket))
+        #self.__server.Create()
         #return self.__server.create_sliver(xmlrpclib.Binary(ticket))
         return 1
 
     # XXX
     def delete_sliver(self, rcap):
+        #self.__server.Ticket(xmlrpclib.Binary(ticket))
+        #self.__server
         #return self.__server.delete_sliver(rcap)
         return 1
 
@@ -139,7 +147,10 @@ class PLCagent:
         self.__auth['Role'] = "pi"
         self.__insmeth = "delegated"
         try:
-            self.__server = xmlrpclib.ServerProxy(uri)
+            # Need allow_none=1 to marshal `None' since PLC4 uses it
+            # in wildcard situations...
+            self.__server = xmlrpclib.ServerProxy(uri,allow_none=1)
+            self.server = self.__server
         except:
             print "Failed to create XML-RPC proxy"
             raise
@@ -188,18 +199,22 @@ class PLCagent:
     def SliceNodesList(self):
         # use a return filter to get only the node ids.
         retval = self.__server.GetSlices(self.__auth,
-                                         [ self.__slicename ],
-                                         [ 'node_ids' ])
-        nidlist = retval[0]['node_ids']
-        # then use a node filter to GetNodes to get the names.
-        # XXX: probably should convert over to using node ids at some point.
-        retval = self.__server.GetNodes(self.__auth,
-                                        nidlist,
-                                        [ 'hostname' ])
-        nhostlist = []
-        for ni in retval:
-            nhostlist.append(str(ni['hostname']))
-            pass
+                                         [ self.__slicename ])
+        # well, there's a bug in PLC with return filters in GetSlices...
+        #                                 [ 'node_ids' ])
+
+        if len(retval) > 0 and retval[0]['name'] == self.__slicename:
+            nidlist = retval[0]['node_ids']
+            # then use a node filter to GetNodes to get the names.
+            # XXX: probably should convert over to using node ids at
+            # some point.
+            retval = self.__server.GetNodes(self.__auth,
+                                            nidlist,
+                                            [ 'hostname' ])
+        else:
+            retval = []
+        
+        nhostlist = map(lambda x: x['hostname'], retval)
 
         return nhostlist
 
@@ -235,18 +250,19 @@ class PLCagent:
     # Ick, have to implement this in terms of GetSlices and GetPersons
     # just as for the node hostnames in SliceNodesList.
     def SliceUsersList(self):
-
         retval = self.__server.GetSlices(self.__auth,
-                                         [ self.__slicename ],
-                                         [ 'person_ids' ])
-        uidlist = retval[0]['person_ids']
-        retval = self.__server.GetPersons(self.__auth,
-                                          uidlist,
-                                          [ 'email' ])
-        usernamelist = []
-        for user in retval:
-            usernamelist.append(str(user['email']))
-            pass
+                                         [ self.__slicename ])
+        # XXX PLC bug
+        #                                 [ 'name','person_ids' ])
+        if len(retval) > 0 and retval[0]['name'] == self.__slicename:
+            uidlist = retval[0]['person_ids']
+            retval = self.__server.GetPersons(self.__auth,
+                                              uidlist,
+                                              [ 'email' ])
+        else:
+            retval = []
+        
+        usernamelist = map(lambda x: x['email'], retval)
 
         return usernamelist
 
@@ -260,8 +276,11 @@ class PLCagent:
 
     # XXX: this returns a lot more crap than we use, but we'll keep it intact
     # for the future...
-    def SliceInfo(self,slicelist=[],infofilter=[]):
-        return self.__server.GetSlices(self.__auth,slicelist,infofilter)
+    def SliceInfo(self,slicefilter=None,returnfilter=None):
+        return self.__server.GetSlices(self.__auth,slicefilter,returnfilter)
+
+    def AuthCheck(self):
+        return self.__server.AuthCheck(self.__auth)
 
     pass # end of PLCagent class
 
@@ -280,8 +299,8 @@ class mod_PLC4:
         try:
             file = open(DEF_PLC_PASS_FILE,'r')
             lines = file.readlines()
-            mod_PLCNM.username = lines[0].strip('\n')
-            mod_PLCNM.password = lines[1].strip('\n')
+            mod_PLC4.username = lines[0].strip('\n')
+            mod_PLC4.password = lines[1].strip('\n')
             pass
         except:
             print "Failed to retrive master passwd from %s" % DEF_PLC_PASS_FILE
@@ -289,7 +308,7 @@ class mod_PLC4:
         
         return
 
-    def createSlice(self, slice):
+    def createSlice(self,slice):
 
         agent = self.__getAgent(slice.slicename)
         res = None
@@ -316,28 +335,23 @@ class mod_PLC4:
             print "Failed to assign emulabman to slice %s" % slice.slicename
             raise
 
-        # PLC has a limit on the size of XMLRPC responses, so trying to
-        # get back a ticket with all Plab nodes included was getting truncated.
-        # The workaround is to _not_ add _any_ nodes to the slice via PLC!
-        #
-        # Steve Muir sez:
-        #  "tickets don't actually need any nodes in them, the PLC
-        #  agent currently ignores the node list.  i suppose it's possible
-        #  that in the future we might start checking the node list but my
-        #  feeling is that we probably won't.  so in the short-term you can
-        #  just leave the node list empty."
+        # The new NM will check to see if the slice has been added to the
+        # nodes, and will delete the ticket if when it contacts PLC it finds
+        # that the slice doesn't include the local NM's node... or something
+        # like that... so we must add the nodes to the slice.
+        try:
+            # XXX: test hack
+            nodelist = ['pcwf3.emulab.net']
+            #nodelist = map(lambda x: x[2], slice.getSliceNodes())
+            res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
+            if debug:
+                print "SliceNodesAdd result: %s" % res
+                pass
+            pass
+        except:
+            print "Failed to add nodes to slice %s" % slice.slicename
+            raise
 
-        #try:
-        #    nodelist = map(lambda x: x[2], slice.getSliceNodes())
-        #    res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
-        #    if debug:
-        #        print "SliceNodesAdd result: %s" % res
-        #        pass
-        #    pass
-        #except:
-        #    print "Failed to add nodes to slice %s" % slice.slicename
-        #    raise
-        
         try:
             PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
             if debug:
@@ -347,11 +361,11 @@ class mod_PLC4:
         except:
             print "Failed to get PLC ticket for slice %s" % slice.slicename
             raise
-
+        
         # XXX: fix for PLC 4
         leaseend = now + MAX_PLC_LEASELEN
         return (res, cPickle.dumps(PLCticket), leaseend)
-
+    
     def deleteSlice(self, slice):
         agent = self.__getAgent(slice.slicename)
         # XXX: fix OKstrs based on what plc actually returns
@@ -506,9 +520,19 @@ class mod_PLC4:
         
         return res
 
+    # XXX: fix
     def renewNode(self, node, length = 0):
         return  self.createNode(node)
 
+    # XXX: add, now that the NM can do this...
+    def startNode(self,node):
+        return None
+
+    # XXX: add, now that the NM can do this...
+    def stopNode(self,node):
+        return None
+
+    # XXX: this is broken, appears to be bug in GetSlices xmlrpc call in PLC4
     def getSliceExpTime(self, slicename):
         """
         Grab the expiration time for a slice according to PLC.
@@ -530,9 +554,10 @@ class mod_PLC4:
             # GetSlices in PLC 4 doesn't give you everything if you ask for
             # nothing.
             #
-            sdict = tryXmlrpcCmd(agent.SliceInfo,
-                                 [slicename],
-                                 ['name','expires'])
+            print "calling getSliceExpTime with slicename %s" % slicename
+            sdict = tryXmlrpcCmd(agent.SliceInfo,[slicename])
+            # bug in PLC return filter...
+            #                     ([slicename],['name','expires']))
             for entry in sdict:
                 self.__sliceexpdict[entry['name']] = entry
                 pass
@@ -546,6 +571,9 @@ class mod_PLC4:
         leaseend = self.__sliceexpdict[slicename]['expires']
 
         return leaseend
+
+    def doAuthCheck(self,slicename):
+        return tryXmlrpcCmd(self.__getAgent(slicename).AuthCheck)
 
     def __getAgent(self, slicename):
         """

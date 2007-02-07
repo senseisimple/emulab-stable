@@ -29,7 +29,8 @@ debug = 0
 #
 # PLC constants
 #
-DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
+#DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
+DEF_PLC_URI = "https://delta.cs.princeton.edu/PLCAPI/"
 # these are now sucked in from a file
 DEF_PLC_USER = ""
 DEF_PLC_PASS = ""

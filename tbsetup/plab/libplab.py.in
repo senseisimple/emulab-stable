@@ -46,10 +46,12 @@ from libdb import *
 from mod_PLC import mod_PLC
 from mod_dslice import mod_dslice
 from mod_PLCNM import mod_PLCNM
+from mod_PLC4 import mod_PLC4
 
 agents = {'PLC'    : mod_PLC,
           'dslice' : mod_dslice,
-          'PLCNM'  : mod_PLCNM}
+          'PLCNM'  : mod_PLCNM,
+          'PLC4'   : mod_PLC4}
 
 #
 # Initialize the AOP stuff
@@ -68,6 +70,13 @@ debug = 0
 # Constants
 #
 DEF_AGENT = "PLCNM";
+#
+# Add a compatibility agent --- libplab will make all PLC calls on this agent
+# in addition to the default agent.
+#
+COMPAT_AGENT = "PLC4";
+# if this is set, do all PLC calls on COMPAT_AGENT as well as DEF_AGENT
+compat_mode = 1
 
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
@@ -255,8 +264,12 @@ class Plab:
         if not agent:
             self.agent = agents[DEF_AGENT]()
             pass
+        if compat_mode:
+            self.compat_agent = agents[COMPAT_AGENT]()
         if debug:
             print "Using module: %s" % self.agent.modname
+            if compat_mode:
+                print "COMPAT: Using module: %s" % self.compat_agent.modname
             pass
         pass
 
@@ -1065,6 +1078,16 @@ class Slice:
         try:
             res, self.slicemeta, self.leaseend = \
                  self.plab.agent.createSlice(self)
+            
+            # Do compat calls right after main agent calls.
+            if compat_mode:
+                try:
+                    self.plab.compat_agent.createSlice(self)
+                except:
+                    print "WARNING: compat agent failed in createSlice; " \
+                          "\n  watch for inconsistent DB state!"
+                    pass
+                pass
 
             DBQueryFatal("insert into plab_slices"
                          " (pid, eid, slicename, slicemeta, leaseend, admin)"
@@ -1077,6 +1100,16 @@ class Slice:
             pass
         except:
             self.plab.agent.deleteSlice(self)
+            
+            if compat_mode:
+                try:
+                    self.plab.compat_agent.deleteSlice(self)
+                except:
+                    print "WARNING: compat agent failed in deleteSlice; " \
+                          "\n  watch for inconsistent DB state!"
+                    pass
+                pass
+
             DBQueryFatal("delete from plab_slices where slicename=%s",
                          (self.slicename,))
             raise
@@ -1138,6 +1171,16 @@ class Slice:
 
         try:
             ret = self.plab.agent.renewSlice(self, force)
+
+            if compat_mode:
+                try:
+                    self.plab.compat_agent.renewSlice(self)
+                except:
+                    print "WARNING: compat agent failed in renewSlice; " \
+                          "\n  watch for inconsistent DB state!"
+                    pass
+                pass
+            
             DBQueryFatal("update plab_slices "
                          " set slicemeta=%s, leaseend=%s "
                          " where slicename=%s",
@@ -1219,6 +1262,15 @@ class Slice:
             print "Failed to delete slice!"
             traceback.print_exc()
             pass
+
+        if compat_mode:
+            try:
+                self.plab.compat_agent.deleteSlice(self)
+            except:
+                print "WARNING: compat agent failed in deleteSlice; " \
+                      "\n  watch for inconsistent DB state!"
+                pass
+            pass
         
         try:
             print "\tRemoving slice DB entry."
@@ -1274,6 +1326,9 @@ class Slice:
         Grab current slice metadata from Planetlab and store in db
         """
         try:
+            # XXX: no handling of compat agent here---this is about getting
+            # a ticket to the local NM---and there is only one NM per node,
+            # so having a compat call here doesn't make a difference.
             self.slicemeta = self.plab.agent.getSliceMeta(self)
             DBQueryFatal("update plab_slices set "
                          "slicemeta=%s where slicename=%s",
