@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #include "UdpMaxDelaySensor.h"
 
 UdpMaxDelaySensor::UdpMaxDelaySensor(UdpState &udpStateVal, ofstream &logStreamVal)

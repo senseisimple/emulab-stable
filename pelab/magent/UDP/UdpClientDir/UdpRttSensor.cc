@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #include "UdpRttSensor.h"
 
 UdpRttSensor::UdpRttSensor(UdpState &udpStateVal, ofstream &logStreamVal)

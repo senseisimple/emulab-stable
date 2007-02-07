@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 
 # The argument below should be the interface on which this emulab node
 # is connected to the other node ( running the client ) - not the 

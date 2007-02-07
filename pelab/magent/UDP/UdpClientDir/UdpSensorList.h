@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef _UDP_SENSORLIST_PELAB_H
 #define _UDP_SENSORLIST_PELAB_H
 #include "UdpLibs.h"

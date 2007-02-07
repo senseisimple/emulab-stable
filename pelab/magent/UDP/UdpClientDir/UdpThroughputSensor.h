@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef UDP_THROUGHPUT_SENSOR_PELAB_H
 #define UDP_THROUGHPUT_SENSOR_PELAB_H
 

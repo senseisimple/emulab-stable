@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 
 # UdpClient saves the throughput calculated after receiving each packet.
 

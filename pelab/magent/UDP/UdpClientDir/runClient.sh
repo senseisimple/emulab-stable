@@ -1,5 +1,12 @@
 #!/bin/sh
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
 # Command line arguments:
 # First argument - Interface on which we are connected to the server node ( not the control conn ).
 # Second - Address/hostname of the node running the server program.
