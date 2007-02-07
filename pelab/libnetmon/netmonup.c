@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ */
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
