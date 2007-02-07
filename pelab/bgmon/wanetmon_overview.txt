@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -53,6 +53,8 @@ line parameters not used can be set to anything for placeholders.
 + libwanetmon.pm - Common subroutines and variables used in many
 scripts in this system.
 
++ pelab.sh - Daemon startup script that goes in /usr/local/etc/rc.d on
+our ops node.
 
 (Overview - bgmon.pl) 
 
