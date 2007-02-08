@@ -16,9 +16,9 @@ no way to correlate individual streams on one elab with those on
 PlanetLab with streams of the other without more information.";
 
 $stubPort = 3249;
-$usePeriod = 1;
-$averageCount = 50;
-$averagePeriod = 0.3;
+$usePeriod = 0;
+$averageCount = 100;
+$averagePeriod = 1.0;
 
 sub offeredLoad
 {

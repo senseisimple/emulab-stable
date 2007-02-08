@@ -4,14 +4,7 @@
 # All rights reserved.
 #
 
-#Usage: tcpdump | python monitor.py <mapping-file> <experiment-name>
-#                                   <my-address> [stub-address]
-# mapping-file is a file which maps emulated addresses to real addresses.
-# experiment-name is the project/experiment name on emulab. For instance
-#   'tbres/pelab'.
-# my-address is the IP address of the current node.
-# stub-address is the IP address of the corresponding planet-lab node. If this
-#   is left out, then the mapping-file is used to determine it.
+# Monitors the application's behaviour and report to the network model.
 
 import sys
 import os
@@ -47,6 +40,14 @@ EWMA_THROUGHPUT_SENSOR = 7
 LEAST_SQUARES_THROUGHPUT = 8
 TSTHROUGHPUT_SENSOR = 9
 AVERAGE_THROUGHPUT_SENSOR = 10
+UDP_STATE_SENSOR = 11
+UDP_PACKET_SENSOR = 12
+UDP_THROUGHPUT_SENSOR = 13
+UDP_MINDELAY_SENSOR = 14
+UDP_MAXDELAY_SENSOR = 15
+UDP_RTT_SENSOR = 16
+UDP_LOSS_SENSOR = 17
+UDP_AVG_THROUGHPUT_SENSOR = 18
 
 CONNECTION_SEND_BUFFER_SIZE = 0
 CONNECTION_RECEIVE_BUFFER_SIZE = 1
@@ -55,6 +56,8 @@ CONNECTION_USE_NAGLES = 3
 
 TCP_CONNECTION = 0
 UDP_CONNECTION = 1
+
+KEY_SIZE = 32
 
 # Client connection to event server.  Make this global since we don't
 # want to be continually connecting and disconnecting (and creating/destroying
@@ -74,19 +77,57 @@ eid = ''
 this_ip = ''
 stub_ip = ''
 stub_port = 0
-netmon_output_version = 2
+netmon_output_version = 3
+magent_version = 1
+
+class Dest:
+  def __init__(self):
+    self.local_port = ''
+    self.remote_port = ''
+    self.remote_ip = ''
 
 class Connection:
-  def __init__(self):
+  def __init__(self, new_dest, new_number):
     # The actual local port bound to a connection. Used for events.
-    self.local_port = ''
+    self.dest = new_dest
     # A throughput measurement is only passed on as an event if it is
     # larger than the last bandwidth from that connection
+
+    # Initialized when a RemoteIP or SendTo command is received
     self.last_bandwidth = 0
+    # Initialized when a Connect or SendTo command is received
     self.prev_time = 0.0
+    # Initialized by start_real_connection() or lookup()
+    self.number = new_number
+    # Initialized by finalize_real_connection() or lookup()
+    self.is_connected = False
+
+class Socket:
+  def __init__(self):
+    # Initialized when a New is received
+    self.protocol = TCP_CONNECTION
+    self.dest_to_number = {}
+    self.number_to_connection = {}
+    # Kept consistent by lookup() and start_real_connection() and
+    # finalize_real_connection()
+    self.count = 0
+    # Initialized by SO_RCVBUF and SO_SNDBUF
+    self.receive_buffer_size = 0
+    self.send_buffer_size = 0
+
+# Searches for a dest, inserts if dest not found. Returns the connection associated with dest.
+  def lookup(self, dest):
+    if self.dest_to_number.has_key(dest):
+      number = self.dest_to_number[dest]
+      return self.number_to_connection[number]
+    else:
+      self.dest_to_number[dest] = self.count
+      self.number_to_connection[self.count] = Connection(dest, self.count)
+      self.count = self.count + 1
 
 initial_connection_bandwidth = {}
-connection_map = {}
+socket_map = {}
+
 
 total_size = 0
 last_total = -1
@@ -121,7 +162,7 @@ def main_loop():
 #            sys.stdout.write('get_next_packet()\n')
             get_next_packet(conn)
           except EOFError:
-            sys.stdout.write('Done: Got EOF on stdin\n')
+            sys.stderr.write('Done: Got EOF on stdin\n')
             done = 1
       elif pos[0] == conn.fileno() and (pos[1] & select.POLLIN) != 0 and not done:
         sys.stdout.write('receive_characteristic()\n')
@@ -244,7 +285,7 @@ def read_initial_conditions():
 ##########################################################################
 
 def get_next_packet(conn):
-  global total_size, last_total, connection_map
+  global total_size, last_total
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
@@ -253,137 +294,271 @@ def get_next_packet(conn):
   #
   # Could move this elsewhere to avoid re-compiling, but I'd like to keep it
   # with this code for better readability
-  if netmon_output_version == 1:
-    linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?')
-  elif netmon_output_version == 2:
-    linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
-
+#  if netmon_output_version == 1:
+#    linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?')
+#  elif netmon_output_version == 2:
+#    linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
+#  elif netmon_output_version == 3:
+  if netmon_output_version == 3:
+    linexp = re.compile('^(New|RemoteIP|RemotePort|LocalPort|TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|Connected|Send|SendTo|Closed): ([^ ]*) (\d+\.\d+) ([^ ]*)\n$')
+  else:
+    sys.stderr.write("ERROR: Only input version 3 is supported\n");
+    raise None
   match = linexp.match(line)
-  conexp = re.compile('^(New|Connected|LocalPort|Closed|SO_RCVBUF|SO_SNDBUF): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)( ((?:\d+)(?:\.(?:\d+))?))?')
-  cmatch = conexp.match(line)
   if match:
-    localport = 0 # We may not get this one
-    if netmon_output_version == 1:
-      time = float(match.group(1))
-      ipaddr = match.group(2)
-      remoteport = int(match.group(3))
-      size_given = match.group(4) != ''
-      size = int(match.group(5))
-    elif (netmon_output_version == 2):
-      time = float(match.group(1))
-      localport = int(match.group(2))
-      ipaddr = match.group(3)
-      remoteport = int(match.group(4))
-      size_given = match.group(5) != ''
-      size = int(match.group(6))
+    event = match.group(1)
+    key = match.group(2)
+    timestamp = float(match.group(3))
+    value = match.group(4)
+    process_event(conn, event, key, timestamp, value)
+#  conexp = re.compile('^(New|Connected|LocalPort|Closed|SO_RCVBUF|SO_SNDBUF): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)( ((?:\d+)(?:\.(?:\d+))?))?')
+#  cmatch = conexp.match(line)
+#  if match:
+#    localport = 0 # We may not get this one
+#    if netmon_output_version == 1:
+#      time = float(match.group(1))
+#      ipaddr = match.group(2)
+#      remoteport = int(match.group(3))
+#      size_given = match.group(4) != ''
+#      size = int(match.group(5))
+
+#    elif (netmon_output_version == 2):
+#      time = float(match.group(1))
+#      localport = int(match.group(2))
+#      ipaddr = match.group(3)
+#      remoteport = int(match.group(4))
+#      size_given = match.group(5) != ''
+#      size = int(match.group(6))
+
+#    event = 'Write'
+#    key = str(localport)+':'+ipaddr+':'+str(remoteport))
+#    if not size_given:
+#      size = 0
+#    process_event(event, key, time, str(size))
 
       #sys.stdout.write('dest: ' + ipaddr + ' destport: ' + str(remoteport) +
       #        ' srcport: ' + str(localport) + ' size: ' + str(size) + '\n')
-      if not size_given:
-        size = 0
-      if emulated_to_real.has_key(ipaddr):
-        total_size = total_size + size
-      key = (ipaddr, localport, remoteport)
-      send_command(conn, TRAFFIC_WRITE_COMMAND, TCP_CONNECTION, ipaddr,
-                     localport, remoteport,
-                     save_int(int((time - connection_map[key].prev_time)*1000)) + save_int(size))
-        connection_map[key].prev_time = time
-  elif ((netmon_output_version == 2) and cmatch):
+#      if not size_given:
+#        size = 0
+#      if emulated_to_real.has_key(ipaddr):
+#        total_size = total_size + size
+#        send_command(conn, TRAFFIC_WRITE_COMMAND, TCP_CONNECTION, ipaddr,
+#                     localport, remoteport,
+#                     save_int(int((time - prev_time)*1000)) + save_int(size))
+#        prev_time = time
+#  elif ((netmon_output_version == 2) and cmatch):
       #
       # Watch for new or closed connections
       #
-      event = cmatch.group(1)
-      localport = int(cmatch.group(2))
-      ipaddr = cmatch.group(3)
-      remoteport = int(cmatch.group(4))
-      value_given = cmatch.group(5) != ''
-      value = cmatch.group(6)
-      if not value_given:
-        value = '0'
-      key = (ipaddr, localport, remoteport)
-      if emulated_to_real.has_key(ipaddr):
-        sys.stdout.write("Got a connection event: " + event + "\n")
-        if event == 'New':
-          connection_map[key] = Connection()
-          if initial_connection_bandwidth.has_key(ipaddr):
-            connection_map[key].last_bandwidth = initial_connection_bandwidth[ipaddr]
-          else:
-            sys.stderr.write("No initial condition for " + ipaddr + "\n")
-            connection_map[key].last_bandwidth = 0
-          send_command(conn, NEW_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
-                      localport, remoteport, '')
-          send_command(conn, TRAFFIC_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, '')
-          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, save_int(MIN_DELAY_SENSOR))
-          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-#                       localport, remoteport, save_int(NULL_SENSOR))
-#          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, save_int(MAX_DELAY_SENSOR))
-#          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-#                       localport, remoteport, save_int(EWMA_THROUGHPUT_SENSOR))
-          send_command(conn, SENSOR_COMMAND, TCP_CONNECTION, ipaddr,
-                       localport, remoteport, save_int(AVERAGE_THROUGHPUT_SENSOR))
-        elif event == 'Closed':
-          send_command(conn, DELETE_CONNECTION_COMMAND, TCP_CONNECTION, ipaddr,
-                      localport, remoteport, '')
-          set_connection(this_ip, connection_map[key].local_port, ipaddr,
-                         str(remoteport), '', 'CLEAR')
-        elif event == 'Connected':
-          send_command(conn, CONNECT_COMMAND, TCP_CONNECTION, ipaddr,
-                      localport, remoteport, '')
-          connection_map[key].prev_time = float(value)
-#        elif event == 'LocalPort':
-        elif event == 'SO_RCVBUF':
-          send_command(conn, CONNECTION_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
-                      localport, remoteport,
-                      save_int(CONNECTION_RECEIVE_BUFFER_SIZE)
-                      + save_int(int(value)))
-        elif event == 'SO_SNDBUF':
-          send_command(conn, CONNECTION_MODEL_COMMAND, TCP_CONNECTION, ipaddr,
-                      localport, remoteport,
-                      save_int(CONNECTION_SEND_BUFFER_SIZE)
-                       + save_int(int(value)))
-        elif event == 'LocalPort':
-          connection_map[key].local_port = value
-          set_connection(this_ip, value,
-                         ipaddr, str(remoteport), '', 'CREATE')
-        else:
-          sys.stdout.write('skipped line with an invalid event: '
-                           + event + '\n')
-      else:
-        sys.stdout.write('skipped line with an invalid destination: '
-                         + ipaddr + '\n')
+#      event = cmatch.group(1)
+#      localport = int(cmatch.group(2))
+#      ipaddr = cmatch.group(3)
+#      remoteport = int(cmatch.group(4))
+#      value_given = cmatch.group(5) != ''
+#      value = cmatch.group(6)
+#      if not value_given:
+#        value = '0'
+#      key = str(localport)+':'+ipaddr+':'+str(remoteport))
+#      process_event(event, key, 
+#      key = (ipaddr, localport, remoteport)
+#      if emulated_to_real.has_key(ipaddr):
+#        sys.stdout.write("Got a connection event: " + event + "\n")
+#      else:
+#        sys.stdout.write('skipped line with an invalid destination: '
+#                         + ipaddr + '\n')
   else:
-      sys.stdout.write('skipped line in the wrong format: ' + line)
+      sys.stderr.write('ERROR: skipped line in the wrong format: ' + line)
+
+##########################################################################
+
+def process_event(conn, event, key, timestamp, value):
+  global socket_map
+  if len(key) > KEY_SIZE - 2:
+    sys.stderr.write('Event has a key with > KEY_SIZE - 2 characters. Truncating: ' + key + '\n')
+    key = key[:KEY_SIZE - 2]
+  key = key.ljust(KEY_SIZE - 2)
+  if event == 'New':
+    socket_map[key] = Socket()
+  if not socket_map.has_key(key):
+    sys.stderr.write('ERROR: libnetmon event received that does not correspond to a socket. Key: ' + key + '\n')
+    return
+  sock = socket_map[key]
+  if event == 'New':
+    if value == 'TCP':
+      sock.protocol = TCP_CONNECTION
+    elif value == 'UDP':
+      sock.protocol = UDP_CONNECTION
+    else:
+      sock.protocol = TCP_CONNECTION
+      sys.stderr.write('Received "New" event with invalid protocol: '
+                       + value + '\n')
+      return
+  elif event == 'RemoteIP':
+    start_real_connection(sock)
+    sock.number_to_connection[0].dest.remote_ip = value
+    app_connection = sock.number_to_connection[0]
+    finalize_real_connection(conn, key, sock, app_connection)
+    if initial_connection_bandwidth.has_key(value):
+      sock.number_to_connection[0].last_bandwidth = initial_connection_bandwidth[value]
+    else:
+      sys.stderr.write("No initial condition for " + value + "\n")
+      sock.number_to_connection[0].last_bandwidth = 0
+  elif event == 'RemotePort':
+    start_real_connection(sock)
+    sock.number_to_connection[0].dest.remote_port = value
+    app_connection = sock.number_to_connection[0]
+    finalize_real_connection(conn, key, sock, app_connection)
+  elif event == 'LocalPort':
+    start_real_connection(sock)
+    sock.number_to_connection[0].dest.local_port = value
+    app_connection = sock.number_to_connection[0]
+    finalize_real_connection(conn, key, sock, app_connection)
+  elif event == 'SO_RCVBUF':
+    sock.receive_buffer_size = int(value)
+  elif event == 'SO_SNDBUF':
+    sock.send_buffer_size = int(value)
+  elif event == 'Connected':
+    app_connection = sock.number_to_connection[0]
+    finalize_real_connection(conn, key, sock, app_connection)
+    sock.number_to_connection[0].prev_time = timestamp
+  elif event == 'Send':
+    app_connection = sock.number_to_connection[0]
+    send_write(conn, key, timestamp, app_connection, value)
+    app_connection.prev_time = timestamp
+  elif event == 'SendTo':
+    # If this is a 'new connection' as well, then do not actually send
+    # the sendto command. This is so that there is no '0' delta, and
+    # so that trivial (single packet) connections do cause wierd
+    # measurements.
+    regexp = re.compile('^(\d+):(\d+\.\d+\.\d+\.\d+):(\d+):(\d+)')
+    match = regexp.match(value)
+    if match:
+      dest = Dest()
+      dest.local_port = match.group(1)
+      dest.remote_ip = match.group(2)
+      dest.remote_ip = match.group(3)
+      size = int(match.group(4))
+      app_connection = sock.lookup(dest)
+      if app_connection.is_connected == False:
+        app_connection.last_bandwidth = initial_connection_bandwidth[app_connection.dest.remote_ip]
+        app_connection.prev_time = timestamp
+        app_connection.is_connected = True
+        send_connect(conn, key + save_short(app_connection.number),
+                     sock, app_connection)
+      else:
+        send_write(conn, key, timestamp, app_connection, value)
+        app_connection.prev_time = timestamp
+  elif event == 'Closed':
+    for pos in sock.number_to_connection.itervalues():
+      send_command(conn, key + save_short(pos.number),
+                   DELETE_CONNECTION_COMMAND, '')
+      set_connection(this_ip, pos.dest.local_port,
+                     pos.dest.remote_ip, pos.dest.remote_port,
+                     '', 'CLEAR')
+  else:
+    sys.stderr.write('ERROR: skipped line with an invalid event: '
+                     + event + '\n')
+
+def start_real_connection(sock):
+  if sock.count == 0:
+    sock.number_to_connection[0] = Connection(Dest(), 0)
+    sock.count = 1
+
+def finalize_real_connection(conn, key, sock, app_connection):
+  dest = sock.number_to_connection[0].dest
+  if (dest.local_port != ''
+      and dest.remote_port != ''
+      and dest.remote_ip != ''
+      and not sock.number_to_connection[0].is_connected):
+    sock.number_to_connection[0].is_connected = True
+    sock.dest_to_number[dest] = 0
+    set_connection(this_ip, app_connection.dest.local_port,
+                   app_connection.dest.remote_ip,
+                   app_connection.dest.remote_port,
+                   '', 'CREATE')
+    send_connect(conn, key + save_short(0), sock, app_connection)
+
+def send_connect(conn, key, sock, app_connection):
+  if sock.protocol == TCP_CONNECTION:
+    min_delay = MIN_DELAY_SENSOR
+    max_delay = MAX_DELAY_SENSOR
+    average_throughput = AVERAGE_THROUGHPUT_SENSOR
+  elif sock.protocol == UDP_CONNECTION:
+    min_delay = UDP_MINDELAY_SENSOR
+    max_delay = UDP_MAXDELAY_SENSOR
+    average_throughput = UDP_AVG_THROUGHPUT_SENSOR
+  else:
+    return
+  send_command(conn, key, NEW_CONNECTION_COMMAND,
+               save_char(sock.protocol))
+  send_command(conn, key, TRAFFIC_MODEL_COMMAND, '')
+  send_command(conn, key, SENSOR_COMMAND, save_int(min_delay))
+  send_command(conn, key, SENSOR_COMMAND, save_int(max_delay))
+  #send_command(conn, key, SENSOR_COMMAND, save_int(NULL_SENSOR))
+  #send_command(conn, key, SENSOR_COMMAND, save_int(EWMA_THROUGHPUT_SENSOR)
+  send_command(conn, key, SENSOR_COMMAND,
+               save_int(average_throughput))
+  send_command(conn, key, CONNECTION_MODEL_COMMAND,
+               save_int(CONNECTION_RECEIVE_BUFFER_SIZE)
+               + save_int(sock.receive_buffer_size))
+  send_command(conn, key, CONNECTION_MODEL_COMMAND,
+               save_int(CONNECTION_SEND_BUFFER_SIZE)
+               + save_int(sock.send_buffer_size))
+  send_command(conn, key, CONNECT_COMMAND,
+               save_int(ip_to_int(
+                 emulated_to_real[app_connection.dest.remote_ip])))
+
+def send_write(conn, key, timestamp, app_connection, size):
+  send_command(conn, key + save_short(app_connection.number),
+               TRAFFIC_WRITE_COMMAND,
+               save_int(int((timestamp - app_connection.prev_time)*1000))
+               + save_int(int(size)))
 
 ##########################################################################
 
 def receive_characteristic(conn):
-  global connection_map
-  buf = conn.recv(12)
-  if len(buf) != 12:
-    sys.stdout.write('Event header is the wrong size. Length: '
+  global socket_map
+  buf = conn.recv(36)
+  if len(buf) != 36:
+    sys.stderr.write('ERROR: Event header is the wrong size. Length: '
                      + str(len(buf)) + '\n')
     return False
   eventType = load_char(buf[0:1]);
   size = load_short(buf[1:3]);
-  transport = load_char(buf[3:4]);
-  dest = real_to_emulated[int_to_ip(load_int(buf[4:8]))]
-  source_port = load_short(buf[8:10])
-  dest_port = load_short(buf[10:12])
-  key = (dest, source_port, dest_port);
-  real_local_port = connection_map[key].local_port
+  version = load_char(buf[3:4]);
+  if version != magent_version:
+    sys.stderr.write("ERROR: Wrong version from magent.");
+    return False
+  socketKey = buf[4:34];
+  connectionKey = load_short(buf[34:36]);
+
+  if not socket_map.has_key(socketKey):
+    sys.stderr.write('ERROR: magent event received that does not correspond to a socket. Key: ' + socketKey + '\n')
+    return False
+
+  sock = socket_map[socketKey]
+
+  if not sock.number_to_connection.has_key(connectionKey):
+    sys.stderr.write('ERROR: magent event received that does not correspond to a connection. socketKey: ' + socketKey + ' connectionKey: ' + connectionKey + '\n')
+    return False
+  app_connection = sock.number_to_connection[connectionKey]
+#  dest = real_to_emulated[int_to_ip(load_int(buf[4:8]))]
+#  source_port = load_short(buf[8:10])
+#  dest_port = load_short(buf[10:12])
+#  key = (dest, source_port, dest_port);
+#  real_local_port = connection_map[key].local_port
   buf = conn.recv(size);
   if len(buf) != size:
-    sys.stdout.write('Event body is the wrong size.\n')
+    sys.stderr.write('ERROR: magent event body is the wrong size.\n')
     return False
   if eventType == EVENT_FORWARD_PATH:
-    # set_link(this_ip, dest, buf)
-    set_connection(this_ip, real_local_port, dest, str(dest_port), buf)
+    set_connection(this_ip, app_connection.dest.local_port,
+                   app_connection.dest.remote_ip,
+                   app_connection.dest.remote_port, buf)
   elif eventType == EVENT_BACKWARD_PATH:
-    # set_link(dest, this_ip, buf)
-    set_connection(dest, str(dest_port), this_ip, real_local_port, buf)
+    set_connection(app_connection.dest.remote_ip,
+                   app_connection.dest.remote_port,
+                   this_ip, app_connection.dest.local_port, buf)
   elif eventType == TENTATIVE_THROUGHPUT:
     # There is a throughput number, but we don't know whether the link
     # is saturated or not. If the link is not saturated, then we just
@@ -399,63 +574,27 @@ def receive_characteristic(conn):
     # AUTHORITATIVE_BANDWIDTH. Therefore, we assume that it is
     # authoritative if it is greater than the previous measurement,
     # and that it is just a throughput number if it is less.
-    if connection_map.has_key(key):
-      if int(buf) > connection_map[key].last_bandwidth:
-          connection_map[key].last_bandwidth = int(buf)
-          # set_link(this_ip, dest, 'bandwidth=' + buf)
-          set_connection(this_ip, real_local_port, dest, str(dest_port),
-                         'bandwidth=' + buf)
-      else:
-        sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - %i vs %i\n'
-                         % (dest,int(buf),connection_map[key].last_bandwidth))
+    if int(buf) > app_connection.last_bandwidth:
+      app_connection.last_bandwidth = int(buf)
+      # set_link(this_ip, dest, 'bandwidth=' + buf)
+      set_connection(this_ip, app_connection.dest.local_port,
+                     app_connection.dest.remote_ip,
+                     app_connection.dest.remote_port,
+                     'bandwidth=' + buf)
     else:
-      sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - no data\n' % (dest))
+      sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - %i vs %i\n'
+                       % (app_connection.dest.remote_ip,int(buf),app_connection.last_bandwidth))
   elif eventType == AUTHORITATIVE_BANDWIDTH and int(buf) > 0:
     # We know that the bandwidth has definitely changed. Reset everything.
-    connection_map[key].last_bandwidth = int(buf)
+    app_connection.last_bandwidth = int(buf)
     # set_link(this_ip, dest, 'bandwidth=' + buf)
-    set_connection(this_ip, real_local_port, dest, str(dest_port),
+    set_connection(this_ip, app_connection.dest.local_port,
+                   app_connection.dest.remote_ip,
+                   app_connection.dest.remote_port,
                    'bandwidth=' + buf)
   else:
-    sys.stdout.write('Other: ' + str(eventType) + ', ' + str(value) + '\n');
+    sys.stderr.write('ERROR: Other: ' + str(eventType) + ', ' + str(value) + '\n');
   return True
-
-##########################################################################
-
-def set_bandwidth(kbps, dest):
-#  sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
-  now = time.time()
-  sys.stderr.write('BANDWIDTH!purple\n')
-  sys.stderr.write('BANDWIDTH!line ' + ('%0.6f' % now) + ' 0 '
-                   + ('%0.6f' % now)
-                   + ' ' + str(kbps*1000/8) + '\n')
-  return set_link(this_ip, dest, 'bandwidth=' + str(kbps))
-
-##########################################################################
-
-# Set delay on the link. We are given round trip time.
-def set_delay(milliseconds, dest):
-  now = time.time()
-  sys.stderr.write('RTT!orange\n')
-  sys.stderr.write('RTT!line ' + ('%0.6f' % now) + ' 0 ' + ('%0.6f' % now)
-	+ ' ' + str(milliseconds) + '\n')
-  # Set the delay from here to there to 1/2 rtt.
-  error = set_link(this_ip, dest, 'delay=' + str(milliseconds/2))
-  if error == 0:
-    # If that succeeded, set the delay from there to here.
-    return set_link(dest, this_ip, 'delay=' + str(milliseconds/2))
-  else:
-    return error
-
-##########################################################################
-
-def set_loss(probability, dest):
-  return set_link(this_ip, dest, 'plr=' + str(probability))
-
-##########################################################################
-
-def set_max_delay(milliseconds, dest):
-  return set_link(this_ip, dest, 'MAXINQ=' + str(milliseconds))
 
 ##########################################################################
 
@@ -495,42 +634,50 @@ def set_link(source, dest, ending, event_type='MODIFY'):
 
 ##########################################################################
 
-def send_command(conn, command_id, protocol, ipaddr, localport, remoteport,
-                 command):
+def send_command(conn, key, command_id, command):
   output = (save_char(command_id)
             + save_short(len(command))
-            + save_char(protocol)
-            + save_int(ip_to_int(emulated_to_real[ipaddr]))
-            + save_short(localport)
-            + save_short(remoteport)
+            + save_char(magent_version)
+            + key
             + command)
-#  sys.stdout.write('Sending command: CHECKSUM=' + str(checksum(output)) + '\n')
   conn.sendall(output)
+
+#def send_command(conn, command_id, protocol, ipaddr, localport, remoteport,
+#                 command):
+#  output = (save_char(command_id)
+#            + save_short(len(command))
+#            + save_char(protocol)
+#            + save_int(ip_to_int(emulated_to_real[ipaddr]))
+#            + save_short(localport)
+#            + save_short(remoteport)
+#            + command)
+#  sys.stdout.write('Sending command: CHECKSUM=' + str(checksum(output)) + '\n')
+#  conn.sendall(output)
 
 ##########################################################################
 
-def send_destinations(conn, packet_list):
+#def send_destinations(conn, packet_list):
 #  sys.stdout.write('<send> total size:' + str(total_size) + ' packet count:' + str(len(packet_list)) + '\n')# + ' -- '
 #                   + str(packet_list) + '\n')
-  output = save_int(0) + save_int(len(packet_list))
-  prev_time = 0.0
-  if len(packet_list) > 0:
-    prev_time = packet_list[0][3]
-  for packet in packet_list:
-    ip = ip_to_int(emulated_to_real[packet[0]])
-    if prev_time == 0.0:
-      prev_time = packet[3]
-    delta = int((packet[3] - prev_time) * 1000)
-    if packet[3] == 0:
-      delta = 0
-    output = (output + save_int(ip) + save_short(packet[1])
-              + save_short(packet[2])
-              + save_int(delta)
-              + save_int(packet[4])
-              + save_short(packet[5]))
-    if packet[3] != 0:
-      prev_time = packet[3]
-  conn.sendall(output)
+#  output = save_int(0) + save_int(len(packet_list))
+#  prev_time = 0.0
+#  if len(packet_list) > 0:
+#    prev_time = packet_list[0][3]
+#  for packet in packet_list:
+#    ip = ip_to_int(emulated_to_real[packet[0]])
+#    if prev_time == 0.0:
+#      prev_time = packet[3]
+#    delta = int((packet[3] - prev_time) * 1000)
+#    if packet[3] == 0:
+#      delta = 0
+#    output = (output + save_int(ip) + save_short(packet[1])
+#              + save_short(packet[2])
+#              + save_int(delta)
+#              + save_int(packet[4])
+#              + save_short(packet[5]))
+#    if packet[3] != 0:
+#      prev_time = packet[3]
+#  conn.sendall(output)
 
 ##########################################################################
 

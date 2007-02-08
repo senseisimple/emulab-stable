@@ -39,7 +39,7 @@ const unsigned int MAX_SOCKS = 256;
 /*
  * Output version clients should use
  */
-unsigned int output_version = 2;
+unsigned int output_version = 3;
 
 /*
  * Limit the maximum socket size
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     unlink(SOCKPATH);
     servaddr.sun_family = AF_LOCAL;
     strcpy(servaddr.sun_path, SOCKPATH);
-    
+
     if (bind(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr))) {
         perror("Failed to bind() socket\n");
         return 1;
@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
     unlink(CONTROLSOCK);
     cservaddr.sun_family = AF_LOCAL;
     strcpy(cservaddr.sun_path, CONTROLSOCK);
-    
+
     if (bind(controlsockfd, (struct sockaddr*) &cservaddr, sizeof(cservaddr))) {
         perror("Failed to bind() control socket\n");
         return 1;
@@ -269,14 +269,14 @@ int main(int argc, char **argv) {
 
     while (1) {
         /*
-         * Make a blocking call to select() to wait for a client to connect or 
+         * Make a blocking call to select() to wait for a client to connect or
          * send us data
          */
         /* fprintf(stderr,"Waiting for clients\n"); */
         bcopy(&real_fdset,&returned_fdset,sizeof(fd_set));
 
         if (select(max_clientfd + 1,&returned_fdset,NULL,NULL,NULL) <= 0) {
-            /* 
+            /*
              * Just repeat in case of failure
              */
             continue;
