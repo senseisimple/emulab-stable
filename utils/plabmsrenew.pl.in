@@ -76,10 +76,13 @@ my $passwd = $creds[1];
 #print "DEBUG: uid=$uid,passwd=$passwd\n";
 
 
-$PLC_LOGIN = 'https://www.planet-lab.org/db/login/login.php';
-$PLC_SLICE_DETAIL = 'https://www.planet-lab.org/db/slices/detail.php?slice_name=';
-$PLC_RENEW = 'https://www.planet-lab.org/db/slices/renew_slice.php?slice_name=';
-$PLC_LOGOUT = 'https://www.planet-lab.org/db/login/logout.php';
+$PLC_LOGIN = 'https://www.planet-lab.org/db/login.php';
+$PLC_SLICE_LIST = 'https://www.planet-lab.org/db/slices/index.php';
+# this doesn't give us hh:mm:ss of the exp date; have to check renew page.
+#$PLC_SLICE_DETAIL = 'https://www.planet-lab.org/db/slices/index.php?id=';
+$PLC_RENEW = 'https://www.planet-lab.org/db/slices/renew_slice.php?id=';
+$PLC_SLICE_DETAIL = $PLC_RENEW;
+$PLC_LOGOUT = 'https://www.planet-lab.org/db/logout.php';
 
 print "Checking slices";
 foreach my $slice (@slices) {
@@ -105,6 +108,23 @@ $res = $ua->request($req);
 
 #@slices = ('utah_allnodes');
 
+# ugh, now we have to dig out the slice_name->slice_id mapping so we can get
+# to the details page for each slice.
+
+my %slicemap = ();
+
+$req = HTTP::Request->new(GET => "$PLC_SLICE_LIST");
+$res = $ua->request($req);
+
+my $page = $res->content();
+my @plines = split('\n',$page);
+
+foreach my $line (@plines) {
+    if ($line =~ /href=\'index\.php\?id\=(\d+)\'>([\_a-zA-Z0-9]+)/) {
+	$slicemap{$2} = $1;
+    }
+}
+
 # now figure out, for each slice, what is the current exp date
 # if the slice is due to expire in less than a week, renew it
 #   by selecting one of the options in the drop-down box
@@ -115,11 +135,19 @@ my %sliceexp;
 
 my $now = time();
 foreach my $slice (@slices) {
+
+    # check if we actually got this slice in the map from PLC:
+    if (!defined($slicemap{$slice})) {
+	print "WARNING: cannot determine id for slice '$slice'!\n";
+	$errors{$slice} = "Cannot determine id for slice '$slice'!\n";
+	continue;
+    }
+
     # dig out the exp date
     # we have to look at the detail page, not the renew page, to get the date,
     # because the renew page will just tell us we can't renew if the slice has
     # has been recently renewed.
-    $req = HTTP::Request->new(GET => "$PLC_SLICE_DETAIL" . "$slice");
+    $req = HTTP::Request->new(GET => "$PLC_SLICE_DETAIL" . $slicemap{$slice});
     $res = $ua->request($req);
 
     #print $res->as_string();
@@ -133,15 +161,18 @@ foreach my $slice (@slices) {
     my $sdesc = '';
 
     foreach my $line (@plines) {
-	if ($line =~ /Slice expiration:[\<\/\w\>]+\s+(\d+\-\w+\-\d+ \d+:\d+:\d+ \w+)/) {
+	if ($line =~ /Expiration Date: .+(\w+\-\d+\-\d+ \d+:\d+:\d+ \w+)/) {
 	    $expdate_str = $1;
-	    $sliceexp{$slice} = $1;
+	    $expdate_str =~ tr/\-/ /;
+	    $sliceexp{$slice} = $expdate_str;
 	    #print "$slice expires at '$expdate_str'\n";
 	    last;
 	}
     }
     
     if ($expdate_str ne '') {
+	# this should be the same exptime as in the 'expires' hidden field
+        # in the renew form.
 	my $exptime = str2time($expdate_str);
 	#print "slice '$slice' expires in " . ($exptime - $now) . "s\n";
 
@@ -156,7 +187,7 @@ foreach my $slice (@slices) {
 	    # need a renew:
 	    # first GET the renew page so we can parse out the description
 	    # and url fields in the form (they're easiest to grab here)
-	    $req = HTTP::Request->new(GET => "$PLC_RENEW" . "$slice");
+	    $req = HTTP::Request->new(GET => "$PLC_RENEW" . $slicemap{$slice});
 	    $res = $ua->request($req);
 
 	    $page = $res->content();
@@ -180,10 +211,11 @@ foreach my $slice (@slices) {
 		# always push it out for a month -- the longest item in the 
 		# page (at least it was when I looked in 12/2006)
 		# the page should accept renews up to 8 weeks though...
-		$req = POST $PLC_RENEW . "$slice", [ submitted => "Renew", 
-					  url => $surl,
-					  description => $sdesc,
-					  length => 4 ];
+		$req = POST $PLC_RENEW . $slicemap{$slice}, 
+		           [ 'Renew Slice' => "Renew", 
+			     url => $surl,
+			     description => $sdesc,
+			     'expire_len' => 4 ];
 		$res = $ua->request($req);
 
 		print $res->as_string();
