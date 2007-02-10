@@ -39,14 +39,15 @@ debug = 0
 #
 # PLC constants
 #
-DEF_PLC_URI = "https://www2.planet-lab.org/PLCAPI/"
+DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
 #DEF_PLC_URI = "https://n.djplc.tbres.emulab.net/PLCAPI/"
 # these are now sucked in from a file
 DEF_PLC_USER = ""
 DEF_PLC_PASS = ""
 DEF_PLC_PASS_FILE = "@prefix@/etc/plab/plc.pw"
 
-DEF_NM_PORT = "812"
+#DEF_NM_PORT = "812"
+DEF_NM_PORT = "814"
 
 #
 # A bunch of time constants / intervals (in seconds)
@@ -70,45 +71,31 @@ MAJOR_VERS = 1
 MINOR_VERS = 0
 MIN_REV    = 10
 
-# XXX: need to change this to talk over an ssh tunnel, sigh.
-# until the delegate account proxy works, 
 class NMagent:
     def __init__(self, IP, nodeid, nmport = DEF_NM_PORT):
-        # XXX: fix
-        #self.__sshconnmethod = sshhttp.SshConnection("@prefix@/bin/sshtb")
-        #self.__transport = sshhttp.SshHttpTransport(self.__sshconnmethod)
-        #self.__server = xmlrpclib.ServerProxy("http://"+IP+":"+nmport+"/",
-        #                                      transport=self.__transport)
+        self.__server = xmlrpclib.ServerProxy("http://" + IP + ":" +
+                                              nmport + "/")
         self.__vers = [0,0,0]
         self.IP = IP
         self.nodeid = nodeid
         pass
 
-    # XXX
     def create_sliver(self, ticket):
-        #self.__server.Ticket(xmlrpclib.Binary(ticket))
-        #self.__server.Create()
-        #return self.__server.create_sliver(xmlrpclib.Binary(ticket))
-        return 1
+        return self.__server.create_sliver(xmlrpclib.Binary(ticket))
 
-    # XXX
     def delete_sliver(self, rcap):
-        #self.__server.Ticket(xmlrpclib.Binary(ticket))
-        #self.__server
-        #return self.__server.delete_sliver(rcap)
-        return 1
+        return self.__server.delete_sliver(rcap)
 
-    # XXX
     def version(self):
-        #if self.__vers == [0,0,0]:
-        #    res = self.__server.version()
-        #    if type(res) == list and len(res) == 2 and res[0] == 0:
-        #        verslist = res[1].split(".")
-        #        major = verslist[0]
-        #        minor, revision = verslist[1].split("-")
-        #        self.__vers = [int(major), int(minor), int(revision)]
-        #        pass
-        #    pass
+        if self.__vers == [0,0,0]:
+            res = self.__server.version()
+            if type(res) == list and len(res) == 2 and res[0] == 0:
+                verslist = res[1].split(".")
+                major = verslist[0]
+                minor, revision = verslist[1].split("-")
+                self.__vers = [int(major), int(minor), int(revision)]
+                pass
+            pass
         return self.__vers
 
     pass
@@ -268,8 +255,8 @@ class PLCagent:
 
     # XXX: keep the commented version around to get tickets for the old
     # NMs.
-    #    def SliceGetTicket(self):
-    #        return self.__server.SliceGetTicket(self.__auth, self.__slicename)
+    def SliceGetTicketLegacy(self):
+        return self.__server.SliceGetTicket(self.__auth,self.__slicename)
     
     def SliceGetTicket(self):
         return self.__server.GetSliceTicket(self.__auth,self.__slicename)
@@ -341,8 +328,8 @@ class mod_PLC4:
         # like that... so we must add the nodes to the slice.
         try:
             # XXX: test hack
-            nodelist = ['pcwf3.emulab.net']
-            #nodelist = map(lambda x: x[2], slice.getSliceNodes())
+            #nodelist = ['pcwf3.emulab.net']
+            nodelist = map(lambda x: x[2], slice.getSliceNodes())
             res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
             if debug:
                 print "SliceNodesAdd result: %s" % res
@@ -353,7 +340,7 @@ class mod_PLC4:
             raise
 
         try:
-            PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
+            PLCticket = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
             if debug:
                 print PLCticket
                 pass
@@ -441,7 +428,7 @@ class mod_PLC4:
         agent = self.__getAgent(slice.slicename)
         
         try:
-            PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
+            PLCticket = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
             if debug:
                 print PLCticket
                 pass

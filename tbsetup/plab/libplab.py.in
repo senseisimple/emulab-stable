@@ -69,14 +69,14 @@ debug = 0
 #
 # Constants
 #
-DEF_AGENT = "PLCNM";
+DEF_AGENT = "PLC4";
 #
 # Add a compatibility agent --- libplab will make all PLC calls on this agent
 # in addition to the default agent.
 #
-COMPAT_AGENT = "PLC4";
+COMPAT_AGENT = "PLCNM";
 # if this is set, do all PLC calls on COMPAT_AGENT as well as DEF_AGENT
-compat_mode = 1
+compat_mode = 0
 
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
