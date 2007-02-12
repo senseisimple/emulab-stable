@@ -183,7 +183,7 @@ $agent = escapeshellcmd($_SERVER["HTTP_USER_AGENT"]);
 $encoding = escapeshellcmd($_SERVER["HTTP_ACCEPT_ENCODING"]);
 
 # This is special ...
-if (isset($_SERVER["PATH_INFO"])) {
+if (isset($_SERVER["PATH_INFO"]) && $_SERVER["PATH_INFO"] != "") {
     $path = escapeshellcmd($_SERVER["PATH_INFO"]);
 }
 else {

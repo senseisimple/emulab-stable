@@ -36,7 +36,8 @@ else {
 #
 # Form the real url.
 #
-$newurl = preg_replace("/cvswebwrap/", "cvsweb", $_SERVER['REQUEST_URI']);
+$newurl  = preg_replace("/cvswebwrap/", "cvsweb", $_SERVER['REQUEST_URI']);
+$newurl .= "/";
 
 #
 # Standard Testbed Header
