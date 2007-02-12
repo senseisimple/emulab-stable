@@ -60,91 +60,127 @@ if ($message != "") {
 
 ?>
 
-<p><em>Emulab</em> provides
-integrated access to a wide range of experimental environments:
-from <a href="tutorial/docwrapper.php3?docname=nse.html">simulated</a> to
-emulated to <a href=widearea.html>wide-area</a> network
-testbeds.  Emulab strives to preserve the control and ease of use of
-simulation, without sacrificing the realism of emulation and live
-network experimentation. 
+<p>
+    <em>Emulab</em> is a network testbed, giving researchers a wide range of
+        environments in which to develop, debug, and evaluate their systems.
+    The name Emulab refers both to a <strong>facility</strong> and to a <strong>software system</strong>.
+    The <a href="http://www.emulab.net">primary Emulab installation</a> is run
+        by the
+        <a href="http://www.flux.utah.edu">Flux Group</a>, part of the
+        <a href="http://www.cs.utah.edu">School of Computing</a> at the
+        <a href="http://www.utah.edu">University of Utah</a>.
+    There are also installations of the Emulab software at more than
+        <a href="http://www.emulab.net/docwrapper.php3?docname=otheremulabs.html">two
+        dozen sites</a> around the world, ranging from testbeds with a handful
+        of nodes up to testbeds with hundreds of nodes.
+    Emulab is <a href="http://www.emulab.net/doc/docwrapper.php3?docname=expubs.html">widely used</a>
+        by computer science researchers in the fields of networking and
+        distributed systems.
+    It is also used to <a href="http://www.emulab.net/doc/docwrapper.php3?docname=exclasses.html">teach
+        classes</a> in those fields.
 </p>
+
+<?php if ($TBMAINSITE) { ?>
+<!-- Note - this stuff is fairly Utah-specific, so it's only displayed there
+     for now. But, feel free to use any of it if it applies to your testbed -->
+<p>
+    Emulab is a <strong>public facility</strong>, available without charge to most
+        researchers worldwide.
+    If you are unsure if you qualify for use, please see our
+        <a href="docwrapper.php3?docname=policies.html">policies document</a>,
+        or <a href="mailto:<? $TBMAILADDR_OPS ?>">ask us</a>.
+    If you think you qualify, you can
+        <a href="docwrapper.php3?docname=auth.html">apply to start a new
+        project</a>.
+</p>
+
+<p>
+    <em>Emulab</em> provides integrated access to a wide range of experimental
+        environments:
+</p>
+
+<dl class="envlist">
+
+    <dt><img height=10 width=20 src="bullet-red.png" />
+        <a href="tutorial/docwrapper.php3?docname=tutorial.html">Emulation</a></dt>
+    <dd>An emulated experiment allows you to specify an arbitrary network
+    topology, giving you a <em>controllable, predictable, and repealable
+    environment</em>, including PC nodes on which you have
+    <em>full &quot;root&quot; access</em>, running an operating system of
+    your choice.</dd>
+
+    <dt><img height=10 width=20 src="bullet-blue.png" />
+    <a href="doc/docwrapper.php3?docname=plab.html">Live-Internet Experimentation</a></dt>
+    <dd>Using the RON and <a href="http://www.planet-lab.org">PlanetLab</a>
+    testbeds, Emulab provides you with a
+    <em>full-featured environment</em> for <em>deploying, running, and
+    controlling</em> your application at hundreds of sites around the
+    world.</dd>
+
+    <dt><img height=10 width=20 src="bullet-green.png" />
+    <a href="tutorial/docwrapper.php3?docname=wireless.html">802.11 Wireless</a></dt>
+    <dd>Emulab's 802.11a/b/g testbed is deployed on multiple floors of an
+    office building. Nodes are <em>under your full control</em> and may act as
+    access points, clients, or in ad-hoc mode. All nodes have two wireless
+    interfaces, plus a <em>wired control network</em>.</dd>
+
+    <dt><img height=10 width=20 src="bullet-yellow.png" />
+    <a href="tutorial/docwrapper.php3?docname=gnuradio.html">Software-Defined Radio</a></dt>
+    <dd><a href="http://www.ettus.com/downloads/usrp_v4.pdf">USRP</a> devices from the <a href="http://www.gnu.org/software/gnuradio/index.html">GNU Radio</a> project give you <em>control over Layer 1 of a
+    wireless network</em> - everything from signal processing up is done in
+    software.</dd>
+
+    <dt><img height=10 width=20 src="bullet-orange.png" />
+    <a href="tutorial/mobilewireless.php3">Sensor Networks</a></dt>
+    <dd>Emulab's sensor network testbed includes 25 <a href="http://www.xbow.com/Products/productdetails.aspx?sid=174">Mica2</a> motes. All motes
+    are equipped with a serial port, for <em>maximum control and debugging</em>
+    capability.</dd>
+
+    <dt><img height=10 width=20 src="bullet-aqua.png" />
+    <a href="tutorial/mobilewireless.php3">Mobile Wireless</a></dt>
+    <dd>A fleet of six <a href="http://www.acroname.com/garcia/garcia.html">Garcia robots</a> from <a href="http://www.acroname.com/">Acroname</a> are equipped with Stargate
+    single-board computers and Mica2 motes. These robots have
+    <em>full mobility</em> within our sensor network testbed.</dd>
+
+    <dt><img height=10 width=20 src="bullet-purple.png" />
+    <a href="tutorial/docwrapper.php3?docname=nse.html">Simulation</a></dt>
+    <dd>Using NSE, ns-2's emulation facility, simulated networks can interact
+    with real networks; not only the emulator, but <em>any network
+    resource in Emulab</em>.</dd>
+    </dl>
 
 <p>
 Emulab unifies all of these environments under a common user interface,
-and integrates the three into a common framework.  This framework
+and integrates them into a common framework.  This framework
 provides abstractions, services, and namespaces common to all, such as
 allocation and naming of nodes and links.  By mapping the abstractions
 into domain-specific mechanisms and internal names, Emulab masks much
-of the heterogeneity of the different approaches.
+of the heterogeneity of the different resources.
 </p>
+<?php } else { ?>
 
-<p>
-Emulab's emulation testbed consists of three sub-testbeds
-(nodes from each can be mixed and matched), each catering to a
-different research target:  
-
-<ul>
-<li> <b>Mobile Wireless</b>: Emulab has deployed and opened to public
-external use, a small
-<a href="tutorial/mobilewireless.php3">robotic testbed</a> that will
-grow into a large mobile robotic wireless testbed. The small version
-(5 Motes and 5 Stargates on 5 robots, all remotely controllable, plus
-25 static Motes, many with attached sensor boards) is in an open area
-within our offices.  An overview of this new mobile testbed is presented in 
-<a href="http://www.cs.utah.edu/flux/testbed-docs/teapot05-emulab-only.pdf">
-this article</a>.
-<br><br>
-<li> <b>Fixed 802.11 Wireless</b>: Emulab's
-<a href="tutorial/docwrapper.php3?docname=wireless.html">Fixed Wireless</a>
-testbed consists of PC nodes that contain 802.11 a/b/g wifi
-interfaces, and are scattered around our building at various
-locations on multiple floors. Experimenters can pick what nodes they
-want to use, and as with other fixed nodes, can replace the software
-that runs on the nodes, all the way down to operating system.
-<br><br>
-<li> <b>Emulab Classic</b>: a universally available
+<p>Emulab is a universally available
 time- and space-shared network emulator which achieves new levels of
 ease of use. Several hundred PCs in racks, combined with secure,
 user-friendly web-based tools, and driven by <i>ns</i>-compatible
 scripts or a Java GUI, allow you to remotely configure and control
 machines and links down to the hardware level.  Packet loss, latency,
-bandwidth, queue sizes--all can be user-defined.  Even the OS disk
+bandwidth, queue sizes-all can be user-defined.  Even the OS disk
 contents can be fully and securely replaced with custom images by any
 experimenter; Emulab can load ten or a hundred disks in less than two
 minutes. 
-
-<br><br>
-Utah's local installation features high-speed Cisco switches connecting 5
-100Mbit interfaces on each of 328 PCs (now including <b>160</b>
-<a href="docwrapper.php3?docname=hardware.html">3GHz Dell PowerEdge 2850s</a>).
-The PC nodes can be used as
-edge nodes running arbitrary programs, simulated routers,
-traffic-shaping nodes, or traffic generators.  While an "experiment"
-is running, the experiment (and its associated researchers) get
-exclusive use of the assigned machines, including root access.
-We provide default OS software (<b>Redhat Linux 9.0, FreeBSD 4.10,
-and Windows XP</b>); the default configuration on your nodes includes
-accounts for project members, root access, DNS service, and standard
-compilers, linkers, and editors. Fundamentally, however,
-all the software you run on it, including all bits on the disks, is
-replaceable and entirely your choice.  The same applies to the network's
-characteristics, including its topology: configurable by users.
-</li>
-</ul>
-
-
-<p>
-Numerous <a href=otheremulabs.html>other sites</a> have set
-up their own network emulators using Emulab's software, including the
-<a href = "http://www.uky.emulab.net">University of Kentucky</a> testbed,
-and the <a href = "http://www.netlab.cc.gatech.edu">Georgia Tech</a>
-Testbed. 
+Emulab strives to preserve the control and ease of use of
+simulation, without sacrificing the realism of emulation and live
+network experimentation. 
 </p>
+<?php } ?>
 
-<a href='pix/pc3k-back.jpg'>
-   <img src='pix/pc3k-back-thumb.jpg' align=right /></a>
+<?php if ($TBMAINSITE) { ?>
 <a href='pix/pc3k-front.jpg'>
-   <img src='pix/pc3k-front-thumb.jpg' align=right /></a>
+   <img src='pix/pc3k-front-thumb.jpg' class='tbpic'/></a>
+<a href='pix/pc3k-back.jpg'>
+    <img src='pix/pc3k-back-thumb.jpg' class='tbpic' /></a>
+<?php } ?>
 
 <h3>Links to help you get started:</h3>
 <ul>
