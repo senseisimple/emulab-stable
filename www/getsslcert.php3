@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,26 +14,18 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page/form arguments.
+# Verify page arguments
 #
-if (! isset($_GET['user']))
-    $user = $uid;
-else
-    $user = $_GET['user'];
+$optargs = OptionalPageArguments("target_user", PAGEARG_USER);
 
-# Pedantic check of uid before continuing.
-if ($user == "" || !User::ValidWebID($user)) {
-    PAGEARGERROR("Invalid uid: '$user'");
+# Default to current user if not provided.
+if (!isset($target_user)) {
+     $target_user = $this_user;
 }
 
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
-$target_uid   = $target_user->uid();
-$target_idx   = $target_user->uid_idx();
+# Need these below
+$target_uid = $target_user->uid();
+$target_idx = $target_user->uid_idx();
 
 #
 # Only admin people can create SSL certs for another user.

@@ -1,23 +1,23 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
-# Display a simpler version of this page
-$simple = 0;
-if (isset($_REQUEST['simple'])) {
-    $simple = $_REQUEST['simple'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("simple", PAGEARG_BOOLEAN,
+				 "reset",  PAGEARG_STRING,
+				 "email",  PAGEARG_STRING,
+				 "phone",  PAGEARG_STRING);
+
+# Display a simpler version of this page.
+if (!isset($simple)) {
+    $simple = 0;
 }
-
-# Form arguments.
-$reset = $_POST['reset'];
-
-# Might come from URL
-$email = $_REQUEST['email'];
-$phone = $_REQUEST['phone'];
 
 #
 # Turn off some of the decorations and menus for the simple view
@@ -30,7 +30,7 @@ if ($simple) {
 }
 
 # Must use https!
-if (!isset($SSL_PROTOCOL)) {
+if (!isset($_SERVER["SSL_PROTOCOL"])) {
     PAGEHEADER("Forgot Your Password?", $view);
     USERERROR("Must use https:// to access this page!", 1);
 }
@@ -121,7 +121,7 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
 #
 # If not clicked, then put up a form.
 #
-if (!isset($reset) && !isset($tellme)) {
+if (!isset($reset)) {
     if (!isset($email))
 	$email = "";
     if (!isset($phone))

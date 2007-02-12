@@ -1,10 +1,13 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
+
+# No page arguments, but make sure that the environment is clean
+RequiredPageArguments();
 
 #
 # Standard Testbed Header

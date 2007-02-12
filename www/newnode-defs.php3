@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -117,7 +117,10 @@ function guess_node_type($proc,$disk) {
 # and default OSID for types other than ops
 #
 function make_node_type($type,$speed,$disk) {
-
+    $type  = addslashes($type);
+    $speed = addslashes($speed);
+    $disk  = addslashes($disk);
+    
     #
     # Just insert a stub entry for this type
     #

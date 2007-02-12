@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,37 +14,15 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page/form arguments. Note that the target uid comes initially as a
-# page arg, but later as a form argument, hence this odd check.
+# Verify page/form arguments.
 #
-if (! isset($_POST['submit'])) {
-    # First page load. Default to current user.
-    if (! isset($_GET['user']))
-	$user = $uid;
-    else
-	$user = $_GET['user'];
-}
-else {
-    # Form submitted. Make sure we have a formfields array and a user.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['user'])) {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $formfields = $_POST['formfields'];
-    $user       = $formfields['user'];
-}
+$optargs = OptionalPageArguments("target_user",   PAGEARG_USER,
+				 "submit",        PAGEARG_STRING,
+				 "formfields",    PAGEARG_ARRAY);
 
-# Pedantic check of uid before continuing.
-if ($user == "" || !User::ValidWebID($user)) {
-    PAGEARGERROR("Invalid uid: '$user'");
-}
-
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
+# Default to current user.
+if (!isset($target_user)) {
+    $target_user = $this_user;
 }
 $target_uid = $target_user->uid();
 
@@ -54,7 +32,7 @@ $target_uid = $target_user->uid();
 #
 if (!$isadmin && 
     !$target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
-    USERERROR("You do not have permission to view ${user}'s keys!", 1);
+    USERERROR("You do not have permission to view ${target_uid}'s keys!", 1);
 }
 
 function SPITFORM($formfields, $errors)
@@ -153,12 +131,11 @@ function SPITFORM($formfields, $errors)
 	}
 	echo "</table><br>\n";
     }
+    $url = CreateURL("showpubkeys", $target_user);
 
     echo "<table align=center border=1> 
           <form enctype=multipart/form-data
-                action=showpubkeys.php3 method=post>\n";
-    echo "<input type=hidden name=\"formfields[user]\" ".
-	         "value=$webid>\n";
+                action='$url' method=post>\n";
 
     #
     # SSH public key
@@ -172,7 +149,9 @@ function SPITFORM($formfields, $errors)
                   <input type=hidden name=MAX_FILE_SIZE value=4096>
 	          <input type=file
                          name=usr_keyfile
-                         value=\"" . $_FILES['usr_keyfile']['name'] . "\"
+                         value=\"" .
+	                           (isset($_FILES['usr_keyfile']) ?
+				    $_FILES['usr_keyfile']['name'] : "") . "\"
 	                 size=50>
               </td>
           </tr>\n";
@@ -232,12 +211,17 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a form of current values.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($submit)) {
     $defaults = array();
-    
+    $defaults["password"] = "";
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
+}
+
+# Form submitted. Make sure we have a formfields array.
+if (!isset($formfields)) {
+    PAGEARGERROR("Invalid form arguments.");
 }
 
 #
@@ -262,7 +246,7 @@ if (isset($_FILES['usr_keyfile']) &&
 	$errors["PubKey File"] = "Invalid characters";
     }
     else {
-	$addpubkeyargs = "$localfile";
+	$addpubkeyargs = escapeshellarg($localfile);
 	chmod($localfile, 0644);	
     }
 }
@@ -272,11 +256,11 @@ if (isset($_FILES['usr_keyfile']) &&
 #
 if (isset($addpubkeyargs)) {
     if (! $isadmin) {
-	if (!isset($formfields[password]) ||
-	    strcmp($formfields[password], "") == 0) {
+	if (!isset($formfields["password"]) ||
+	    strcmp($formfields["password"], "") == 0) {
 	    $errors["Password"] = "Must supply a verification password";
 	}
-	elseif (VERIFYPASSWD($target_uid, $formfields[password]) != 0) {
+	elseif (VERIFYPASSWD($target_uid, $formfields["password"]) != 0) {
 	    $errors["Password"] = "Incorrect password";
 	}
     }

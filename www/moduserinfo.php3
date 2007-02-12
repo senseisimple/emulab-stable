@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -25,6 +24,13 @@ $defaultshell = 'tcsh';
 
 # See below.
 $wikionly = 0;
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("target_user", PAGEARG_USER,
+				 "submit",      PAGEARG_STRING,
+				 "formfields",  PAGEARG_ARRAY);
 
 #
 # Spit the form out using the array of data and error strings (if any).
@@ -69,6 +75,7 @@ function SPITFORM($formfields, $errors)
 
     # For indicating that fields are optional or not.
     $optfield = ($wikionly ? "" : "*");
+    $url      = CreateURL("moduserinfo", $target_user);
 
     echo "<table align=center border=1> 
           <tr>
@@ -77,7 +84,7 @@ function SPITFORM($formfields, $errors)
             </td>
           </tr>\n
 
-          <form action=moduserinfo.php3 method=post>\n";
+          <form action='$url' method=post>\n";
 
         #
         # UserName. This is a constant field. 
@@ -85,10 +92,6 @@ function SPITFORM($formfields, $errors)
         echo "<tr>
                   <td colspan=2>Username:</td>
                   <td class=left>$username ($uid_idx)
-                      <input type=hidden
-                             name=\"formfields[user]\"
-                             value=\"" . $webid . "\"
-                             size=$TBDB_UIDLEN>
               </td>
              </tr>\n";
 
@@ -100,7 +103,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_name]\"
-                             value=\"" . $formfields[usr_name] . "\"
+                             value=\"" . $formfields["usr_name"] . "\"
 	                     size=30>
                   </td>
               </tr>\n";
@@ -113,7 +116,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
-                             value=\"" . $formfields[usr_title] . "\"
+                             value=\"" . $formfields["usr_title"] . "\"
 	                     size=30>
                   </td>
                </tr>\n";
@@ -126,7 +129,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_affil]\"
-                             value=\"" . $formfields[usr_affil] . "\"
+                             value=\"" . $formfields["usr_affil"] . "\"
 	                     size=40>
                   </td>
               </tr>\n";
@@ -139,7 +142,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_URL]\"
-                             value=\"" . $formfields[usr_URL] . "\"
+                             value=\"" . $formfields["usr_URL"] . "\"
 	                     size=45>
                   </td>
               </tr>\n";
@@ -157,7 +160,7 @@ function SPITFORM($formfields, $errors)
                       <input type=hidden ";
 
 	echo "               name=\"formfields[usr_email]\"
-                             value=\"" . $formfields[usr_email] . "\"
+                             value=\"" . $formfields["usr_email"] . "\"
 	                     size=30>";
         echo "    </td>
               </tr>\n";
@@ -165,7 +168,7 @@ function SPITFORM($formfields, $errors)
         #
         # Country needs a default for older users.
         #
-	if (! strcmp($formfields[usr_country], "")) {
+	if (! strcmp($formfields["usr_country"], "")) {
 	    $formfields[usr_country] = "USA";
 	}
 
@@ -177,32 +180,32 @@ function SPITFORM($formfields, $errors)
 		  <tr><td>Line 1</td><td colspan=3>
                     <input type=text
                            name=\"formfields[usr_addr]\"
-                           value=\"" . $formfields[usr_addr] . "\"
+                           value=\"" . $formfields["usr_addr"] . "\"
 	                   size=45></td></tr>
 		  <tr><td>Line 2</td><td colspan=3>
                     <input type=text
                            name=\"formfields[usr_addr2]\"
-                           value=\"" . $formfields[usr_addr2] . "\"
+                           value=\"" . $formfields["usr_addr2"] . "\"
 	                   size=45></td></tr>
 		  <tr><td>City</td><td>
                     <input type=text
                            name=\"formfields[usr_city]\"
-                           value=\"" . $formfields[usr_city] . "\"
+                           value=\"" . $formfields["usr_city"] . "\"
 	                   size=25></td>
 		      <td>State/Province</td><td>
                     <input type=text
                            name=\"formfields[usr_state]\"
-                           value=\"" . $formfields[usr_state] . "\"
+                           value=\"" . $formfields["usr_state"] . "\"
 	                   size=2></td></tr>
 		  <tr><td>ZIP/Postal Code</td><td>
                     <input type=text
                            name=\"formfields[usr_zip]\"
-                           value=\"" . $formfields[usr_zip] . "\"
+                           value=\"" . $formfields["usr_zip"] . "\"
 	                   size=10></td>
 		      <td>Country</td><td>
                     <input type=text
                            name=\"formfields[usr_country]\"
-                           value=\"" . $formfields[usr_country] . "\"
+                           value=\"" . $formfields["usr_country"] . "\"
 	                   size=15></td></tr>
                </table></center></td></tr>";
 
@@ -211,9 +214,9 @@ function SPITFORM($formfields, $errors)
                   <td class=left>";
 	echo "<select name=\"formfields[usr_shell]\">";
 	foreach ($shelllist as $s) {
-	    if ((!isset($formfields[usr_shell]) &&
+	    if ((!isset($formfields["usr_shell"]) &&
 		 0 == strcmp($defaultshell, $s)) ||
-		0 == strcmp($formfields[usr_shell],$s)) {
+		0 == strcmp($formfields["usr_shell"],$s)) {
 		$sel = "selected='1'";
 	    } else {
 		$sel = "";
@@ -230,7 +233,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_phone]\"
-                             value=\"" . $formfields[usr_phone] . "\"
+                             value=\"" . $formfields["usr_phone"] . "\"
 	                     size=15>
                   </td>
               </tr>\n";
@@ -245,7 +248,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
-                             value=\"" . $formfields[password1] . "\"
+                             value=\"" . $formfields["password1"] . "\"
                              size=8></td>
               </tr>\n";
 
@@ -254,7 +257,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
-                             value=\"" . $formfields[password2] . "\"
+                             value=\"" . $formfields["password2"] . "\"
                              size=8></td>
              </tr>\n";
 
@@ -274,7 +277,7 @@ function SPITFORM($formfields, $errors)
                       <td class=left>
                           <input type=text
                                  name=\"formfields[w_password1]\"
-                                 value=\"" . $formfields[w_password1] . "\"
+                                 value=\"" . $formfields["w_password1"] . "\"
                                  size=8></td>
                   </tr>\n";
 
@@ -290,7 +293,7 @@ function SPITFORM($formfields, $errors)
 	    # Planetlab bit. This should really be a drop down menu of the
 	    #                choices.
             #
-	    if ($formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
+	    if ($formfields["user_interface"] == TBDB_USER_INTERFACE_PLAB) {
 		$checked = "checked";
 	    } else {
 		$checked = "";
@@ -316,7 +319,8 @@ function SPITFORM($formfields, $errors)
                       <td class=left>
                          <textarea name=\"formfields[notes]\"
                                    rows=2 cols=40>" .
-		                   ereg_replace("\r", "", $formfields[notes]) .
+		                   ereg_replace("\r", "",
+						$formfields["notes"]) .
 		        "</textarea>
                       </td>
                   </tr>\n";
@@ -361,38 +365,20 @@ function SPITFORM($formfields, $errors)
 #
 # The target uid and the current uid will be the same, unless its a priv user
 # (admin,PI) modifying someone elses data. Must verify this case. Note that
-# the target uid comes initially as a page arg, but later as a form argument,
-# hence this odd check.
+# the target uid comes initially as a page arg, but later as a form argument
 #
-if (! isset($_POST['submit'])) {
-    # First page load. Default to current user.
-    if (! isset($_GET['user']))
-	$user = $uid;
-    else
-	$user = $_GET['user'];
+if (! isset($submit)) {
+    if (!isset($target_user)) {
+	$target_user = $this_user;
+    }
 }
 else {
-    # Form submitted. Make sure we have a formfields array and a user.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['user'])) {
+    if (!isset($target_user) || !isset($formfields)) {
 	PAGEARGERROR("Invalid form arguments!");
     }
-    $formfields = $_POST['formfields'];
-    $user       = $formfields['user'];
 }
 
-# Pedantic check of uid before continuing.
-if ($user == "" || !User::ValidWebID($user)) {
-    PAGEARGERROR("Invalid uid: '$user'");
-}
-
-#
-# Confirm target is a real user.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("No such user '$user'", 1);
-}
+# Need this below.
 $target_uid = $target_user->uid();
 
 #
@@ -410,29 +396,32 @@ if (!$isadmin &&
 # the passwd file for no reason, given that most people use this page
 # simply to change their password. 
 #
-$defaults	       = array();
-$defaults[user]        = $target_user->webid();
-$defaults[usr_email]   = $target_user->email();
-$defaults[usr_URL]     = $target_user->URL();
-$defaults[usr_addr]    = $target_user->addr();
-$defaults[usr_addr2]   = $target_user->addr2();
-$defaults[usr_city]    = $target_user->city();
-$defaults[usr_state]   = $target_user->state();
-$defaults[usr_zip]     = $target_user->zip();
-$defaults[usr_country] = $target_user->country();
-$defaults[usr_name]    = $target_user->name();
-$defaults[usr_phone]   = $target_user->phone();
-$defaults[usr_title]   = $target_user->title();
-$defaults[usr_affil]   = $target_user->affil();
-$defaults[usr_shell]   = $target_user->shell();
-$defaults[notes]       = $target_user->notes();
-$defaults[user_interface] = $target_user->user_interface();
-$wikionly              = $target_user->wikionly();
+$defaults	         = array();
+$defaults["user"]        = $target_user->webid();
+$defaults["usr_email"]   = $target_user->email();
+$defaults["usr_URL"]     = $target_user->URL();
+$defaults["usr_addr"]    = $target_user->addr();
+$defaults["usr_addr2"]   = $target_user->addr2();
+$defaults["usr_city"]    = $target_user->city();
+$defaults["usr_state"]   = $target_user->state();
+$defaults["usr_zip"]     = $target_user->zip();
+$defaults["usr_country"] = $target_user->country();
+$defaults["usr_name"]    = $target_user->name();
+$defaults["usr_phone"]   = $target_user->phone();
+$defaults["usr_title"]   = $target_user->title();
+$defaults["usr_affil"]   = $target_user->affil();
+$defaults["usr_shell"]   = $target_user->shell();
+$defaults["notes"]       = $target_user->notes();
+$defaults["password1"]   = "";
+$defaults["password2"]   = "";
+$defaults["user_interface"] = $target_user->user_interface();
+$wikionly                = $target_user->wikionly();
 
 # Show and keep the Windows password if user-set, otherwise fill in the
 # random one. 
 if ($target_user->w_pswd() != "") {
-    $defaults[w_password1] = $defaults[w_password2] = $target_user->w_pswd();
+    $defaults["w_password1"] =
+	$defaults["w_password2"] = $target_user->w_pswd();
 }
 else {
     #
@@ -446,13 +435,13 @@ else {
 	$randpwd = substr($unixpwd[0],0,8);
     else
 	$randpwd = substr($unixpwd[2],0,8); # The MD5 salt string.
-    $defaults[w_password1] = $defaults[w_password2] = $randpwd;
+    $defaults["w_password1"] = $defaults["w_password2"] = $randpwd;
 }
 
 #
 # On first load, display a form consisting of current user values, and exit.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($submit)) {
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -466,145 +455,146 @@ $errors = array();
 #
 # These fields are required!
 #
-if (!isset($formfields[usr_name]) ||
-    strcmp($formfields[usr_name], "") == 0) {
+if (!isset($formfields["usr_name"]) ||
+    strcmp($formfields["usr_name"], "") == 0) {
     $errors["Full Name"] = "Missing Field";
 }
-elseif (! TBvalid_usrname($formfields[usr_name])) {
+elseif (! TBvalid_usrname($formfields["usr_name"])) {
     $errors["Full Name"] = TBFieldErrorString();
 }
 # Make sure user name has at least two tokens!
-$tokens = preg_split("/[\s]+/", $formfields[usr_name],
+$tokens = preg_split("/[\s]+/", $formfields["usr_name"],
 		     -1, PREG_SPLIT_NO_EMPTY);
 if (count($tokens) < 2) {
     $errors["Full Name"] = "Please provide a first and last name";
 }
 if (!$wikionly) {
     # WikiOnly can leave these fields blank, but must error check them anyway.
-    if (!isset($formfields[usr_title]) ||
-	strcmp($formfields[usr_title], "") == 0) {
+    if (!isset($formfields["usr_title"]) ||
+	strcmp($formfields["usr_title"], "") == 0) {
 	$errors["Job Title/Position"] = "Missing Field";
     }
-    if (!isset($formfields[usr_affil]) ||
-	strcmp($formfields[usr_affil], "") == 0) {
+    if (!isset($formfields["usr_affil"]) ||
+	strcmp($formfields["usr_affil"], "") == 0) {
 	$errors["Affiliation"] = "Missing Field";
     }
 }
-if (isset($formfields[usr_title]) &&
-    ! TBvalid_title($formfields[usr_title])) {
+if (isset($formfields["usr_title"]) &&
+    ! TBvalid_title($formfields["usr_title"])) {
     $errors["Job Title/Position"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_affil]) &&
-    ! TBvalid_affiliation($formfields[usr_affil])) {
+if (isset($formfields["usr_affil"]) &&
+    ! TBvalid_affiliation($formfields["usr_affil"])) {
     $errors["Affiliation"] = TBFieldErrorString();
 }
-if (!isset($formfields[usr_shell]) ||
-    !in_array($formfields[usr_shell], $shelllist)) {
+if (!isset($formfields["usr_shell"]) ||
+    !in_array($formfields["usr_shell"], $shelllist)) {
     $errors["Shell"] = "Invalid Shell";
 }
-if (isset($formfields[usr_URL]) &&
-    strcmp($formfields[usr_URL], "") &&
-    strcmp($formfields[usr_URL], $HTTPTAG) &&
-    ! CHECKURL($formfields[usr_URL], $urlerror)) {
+if (isset($formfields["usr_URL"]) &&
+    strcmp($formfields["usr_URL"], "") &&
+    strcmp($formfields["usr_URL"], $HTTPTAG) &&
+    ! CHECKURL($formfields["usr_URL"], $urlerror)) {
     $errors["Home Page URL"] = $urlerror;
 }
-if (!isset($formfields[usr_email]) ||
-    strcmp($formfields[usr_email], "") == 0) {
+if (!isset($formfields["usr_email"]) ||
+    strcmp($formfields["usr_email"], "") == 0) {
     $errors["Email Address"] = "Missing Field";
 }
-elseif (! TBvalid_email($formfields[usr_email])) {
+elseif (! TBvalid_email($formfields["usr_email"])) {
     $errors["Email Address"] = TBFieldErrorString();
 }
-elseif (($temp_user = User::LookupByEmail($formfields[usr_email])) &&
+elseif (($temp_user = User::LookupByEmail($formfields["usr_email"])) &&
 	!$target_user->SameUser($temp_user)) {
     $errors["Email Address"] = "Already in use by another user!";
 }
 if (!$isadmin && !$wikionly) {
     # Admins can leave these fields blank, but must error check them anyway.
-    if (!isset($formfields[usr_addr]) ||
-	strcmp($formfields[usr_addr], "") == 0) {
+    if (!isset($formfields["usr_addr"]) ||
+	strcmp($formfields["usr_addr"], "") == 0) {
 	$errors["Postal Address 1"] = "Missing Field";
     }
-    if (!isset($formfields[usr_city]) ||
-	strcmp($formfields[usr_city], "") == 0) {
+    if (!isset($formfields["usr_city"]) ||
+	strcmp($formfields["usr_city"], "") == 0) {
 	$errors["City"] = "Missing Field";
     }
-    if (!isset($formfields[usr_state]) ||
-	strcmp($formfields[usr_state], "") == 0) {
+    if (!isset($formfields["usr_state"]) ||
+	strcmp($formfields["usr_state"], "") == 0) {
 	$errors["State"] = "Missing Field";
     }
-    if (!isset($formfields[usr_zip]) ||
-	strcmp($formfields[usr_zip], "") == 0) {
+    if (!isset($formfields["usr_zip"]) ||
+	strcmp($formfields["usr_zip"], "") == 0) {
 	$errors["ZIP/Postal Code"] = "Missing Field";
     }
-    if (!isset($formfields[usr_country]) ||
-	strcmp($formfields[usr_country], "") == 0) {
+    if (!isset($formfields["usr_country"]) ||
+	strcmp($formfields["usr_country"], "") == 0) {
 	$errors["Country"] = "Missing Field";
     }
-    if (!isset($formfields[usr_phone]) ||
-	strcmp($formfields[usr_phone], "") == 0) {
+    if (!isset($formfields["usr_phone"]) ||
+	strcmp($formfields["usr_phone"], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     } 
 }
-if (isset($formfields[usr_addr]) &&
-    !TBvalid_addr($formfields[usr_addr])) {
+if (isset($formfields["usr_addr"]) &&
+    !TBvalid_addr($formfields["usr_addr"])) {
     $errors["Postal Address 1"] = TBFieldErrorString();
 }
 # Optional
-if (isset($formfields[usr_addr2]) &&
-    !TBvalid_addr($formfields[usr_addr2])) {
+if (isset($formfields["usr_addr2"]) &&
+    !TBvalid_addr($formfields["usr_addr2"])) {
     $errors["Postal Address 2"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_city]) &&
-    !TBvalid_city($formfields[usr_city])) {
+if (isset($formfields["usr_city"]) &&
+    !TBvalid_city($formfields["usr_city"])) {
     $errors["City"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_state]) &&
-    !TBvalid_state($formfields[usr_state])) {
+if (isset($formfields["usr_state"]) &&
+    !TBvalid_state($formfields["usr_state"])) {
     $errors["State"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_zip]) &&
-    !TBvalid_zip($formfields[usr_zip])) {
+if (isset($formfields["usr_zip"]) &&
+    !TBvalid_zip($formfields["usr_zip"])) {
     $errors["Zip/Postal Code"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_country]) &&
-    !TBvalid_country($formfields[usr_zip])) {
+if (isset($formfields["usr_country"]) &&
+    !TBvalid_country($formfields["usr_zip"])) {
     $errors["Zip/Postal Code"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_phone]) && $formfields[usr_phone] != "" &&
-    !TBvalid_phone($formfields[usr_phone])) {
+if (isset($formfields["usr_phone"]) && $formfields["usr_phone"] != "" &&
+    !TBvalid_phone($formfields["usr_phone"])) {
     $errors["Phone #"] = TBFieldErrorString();
 }
-if (isset($formfields[password1]) &&
-    strcmp($formfields[password1], "")) {
-    if (!isset($formfields[password2]) ||
-	strcmp($formfields[password2], "") == 0) {
+if (isset($formfields["password1"]) &&
+    strcmp($formfields["password1"], "")) {
+    if (!isset($formfields["password2"]) ||
+	strcmp($formfields["password2"], "") == 0) {
 	$errors["Retype Password"] = "Missing Field";
     }
-    elseif (strcmp($formfields[password1], $formfields[password2])) {
+    elseif (strcmp($formfields["password1"], $formfields["password2"])) {
 	$errors["Retype Password"] = "Two Passwords Do Not Match";
     }
     elseif (! CHECKPASSWORD($target_uid,
-			    $formfields[password1],
-			    $formfields[usr_name],
-			    $formfields[usr_email], $checkerror)) {
+			    $formfields["password1"],
+			    $formfields["usr_name"],
+			    $formfields["usr_email"], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
 }
-if (isset($formfields[w_password1]) &&
-    strcmp($formfields[w_password1], "") &&
-    $formfields[w_password1] != $defaults[w_password1]) {
-    if (!isset($formfields[w_password2]) ||
-	strcmp($formfields[w_password2], "") == 0) {
+if (isset($formfields["w_password1"]) &&
+    strcmp($formfields["w_password1"], "") &&
+    $formfields["w_password1"] != $defaults["w_password1"]) {
+    if (!isset($formfields["w_password2"]) ||
+	strcmp($formfields["w_password2"], "") == 0) {
 	$errors["Retype Windows Password"] = "Missing Field";
     }
-    elseif (strcmp($formfields[w_password1], $formfields[w_password2])) {
-	$errors["Retype Windows Password"] = "Two Windows Passwords Do Not Match";
+    elseif (strcmp($formfields["w_password1"], $formfields["w_password2"])) {
+	$errors["Retype Windows Password"] =
+	    "Two Windows Passwords Do Not Match";
     }
     elseif (! CHECKPASSWORD($target_uid,
 			    $formfields[w_password1],
-			    $formfields[usr_name],
-			    $formfields[usr_email], $checkerror)) {
+			    $formfields["usr_name"],
+			    $formfields["usr_email"], $checkerror)) {
 	$errors["Windows Password"] = "$checkerror";
     }
 }
@@ -702,8 +692,8 @@ if ($isadmin && $target_user->notes() != $formfields["notes"]) {
 #
 # Set the plab bit seperately since no need to call out to the backend.
 #
-if (isset($formfields[user_interface]) &&
-    $formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
+if (isset($formfields["user_interface"]) &&
+    $formfields["user_interface"] == TBDB_USER_INTERFACE_PLAB) {
     $user_interface = TBDB_USER_INTERFACE_PLAB;
 }
 else {
@@ -715,32 +705,32 @@ if ($target_user->user_interface() != $user_interface) {
 
 #
 # Now change the rest of the information.
-$usr_name     = $formfields[usr_name];
-$usr_email    = $formfields[usr_email];
-$usr_title    = $formfields[usr_title];
-$usr_affil    = $formfields[usr_affil];
-$usr_addr     = $formfields[usr_addr];
-$usr_city     = $formfields[usr_city];
-$usr_state    = $formfields[usr_state];
-$usr_zip      = $formfields[usr_zip];
-$usr_country  = $formfields[usr_country];
-$usr_phone    = $formfields[usr_phone];
-$usr_shell    = $formfields[usr_shell];
+$usr_name     = $formfields["usr_name"];
+$usr_email    = $formfields["usr_email"];
+$usr_title    = $formfields["usr_title"];
+$usr_affil    = $formfields["usr_affil"];
+$usr_addr     = $formfields["usr_addr"];
+$usr_city     = $formfields["usr_city"];
+$usr_state    = $formfields["usr_state"];
+$usr_zip      = $formfields["usr_zip"];
+$usr_country  = $formfields["usr_country"];
+$usr_phone    = $formfields["usr_phone"];
+$usr_shell    = $formfields["usr_shell"];
 
-if (! isset($formfields[usr_URL]) ||
-    strcmp($formfields[usr_URL], "") == 0 ||
-    strcmp($formfields[usr_URL], $HTTPTAG) == 0) {
+if (! isset($formfields["usr_URL"]) ||
+    strcmp($formfields["usr_URL"], "") == 0 ||
+    strcmp($formfields["usr_URL"], $HTTPTAG) == 0) {
     $usr_URL = "";
 }
 else {
-    $usr_URL = $formfields[usr_URL];
+    $usr_URL = $formfields["usr_URL"];
 }
 
-if (! isset($formfields[usr_addr2])) {
+if (! isset($formfields["usr_addr2"])) {
     $usr_addr2 = "";
 }
 else {
-    $usr_addr2 = $formfields[usr_addr2];
+    $usr_addr2 = $formfields["usr_addr2"];
 }
 
 $modified = $target_user->ChangeProfile($usr_name,  $usr_title,

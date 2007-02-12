@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 PAGEHEADER("Remap Virtual Nodes");
 
@@ -17,29 +16,25 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid experiment.
+# Verify page arguments.
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBvalid_eid($eid)) {
-	PAGEARGERROR("$eid is contains invalid characters!");
-    }
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("$pid is contains invalid characters!");
-    }
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run remap on $pid/$eid!",
-		  1);
-    }
-}
-else {
-    PAGEARGERROR("Must specify pid and eid!");
-}
+$reqargs = RequiredPageArguments("experiment",   PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("canceled",     PAGEARG_STRING,
+				 "reboot",       PAGEARG_BOOLEAN,
+				 "eventrestart", PAGEARG_BOOLEAN,
+				 "confirmed",    PAGEARG_STRING);
 
-$expstate = TBExptState($pid, $eid);
+#
+# Need these below
+#
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
+$expstate = $experiment->state();
+
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to run remap on $pid/$eid!", 1);
+}
 
 if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
@@ -55,8 +50,7 @@ else {
 	$eventrestart = 0;
 }
 
-if ($canceled) {
-	
+if (isset($canceled) && $canceled) {
     echo "<center><h3><br>
           Operation canceled!
           </h3></center>\n";
@@ -65,22 +59,19 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
-
-    echo "<font size=+2>Experiment <b>".
-	"<a href='showproject.php3?pid=$pid'>$pid</a>/".
-	"<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+if (!isset($confirmed)) {
+    echo $experiment->PageHeader();
+    echo "<br>\n";
 
     echo "<center><font size=+2><br>
               Are you sure you want to remap your experiment?
               </font>\n";
 
-    SHOWEXP($pid, $eid, 1);
+    $experiment->Show(1);
 
-    echo "<form action=remapexp.php3 method=post>";
-    echo "<input type=hidden name=pid value=$pid>\n";
-    echo "<input type=hidden name=eid value=$eid>\n";
+    $url = CreateURL("remapexp", $experiment);
 
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -90,29 +81,12 @@ if (!$confirmed) {
     return;
 }
 
-# For backend.
-TBExptGroup($pid, $eid, $gid);
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-echo "<center>";
-echo "<h2>Starting experiment remap. Please wait a moment ...
-      </h2></center>";
-
-flush();
-
-#	
-# Avoid SIGPROF in child.
-# 
-set_time_limit(0);
-
-$query_result = DBQueryFatal("SELECT nsfile from nsfiles ".
-			     "where pid='$pid' and eid='$eid'");
-if (mysql_num_rows($query_result)) {
-    $row    = mysql_fetch_array($query_result);
-    $nsdata = $row[nsfile];
-}
-else {
-    $nsdata = ""; # XXX what to do...
+#
+# Need to pass out the NS data.
+#
+if (! ($nsdata = $experiment->NSFile())) {
+    # XXX what to do...
+    $nsdata = "";
 }
 
 list($usec, $sec) = explode(' ', microtime());
@@ -127,12 +101,25 @@ fwrite($fp, $nsdata);
 fclose($fp);
 chmod($nsfile, 0666);
 
-$retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webswapexp " . ($reboot ? "-r " : "") .
-		 ($eventrestart ? "-e " : "") .
-  		 "-s modify $pid $eid $nsfile",
-		 SUEXEC_ACTION_IGNORE);
+#	
+# Avoid SIGPROF in child.
+# 
+set_time_limit(0);
 
+# optargs.
+$optargs = "";
+if (isset($reboot) && $reboot) {
+     $optargs .= " -r ";
+}
+if (isset($eventrestart) && $eventrestart) {
+     $optargs .= " -e ";
+}
+
+STARTBUSY("Starting experiment remap");
+$retval = SUEXEC($uid, "$pid,$unix_gid",
+		 "webswapexp $optargs -s modify $pid $eid $nsfile",
+		 SUEXEC_ACTION_IGNORE);
+CLEARBUSY();
 unlink($nsfile);
 
 #
@@ -147,17 +134,16 @@ if ($retval < 0) {
     die("");
 }
 
-#
-# Exit status 0 means the experiment is swapping, or will be.
-#
 echo "<br>\n";
 if ($retval) {
     echo "<h3>Experiment remap could not proceed: $retval</h3>";
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
+    $showlog_url = CreateURL("showlogfile", $experiment);
+    
     #
-    # Exit status 0 means the experiment is modifying.
+    # Exit status 0 means the experiment is remapping.
     #
     echo "<br>";
     echo "Your experiment is being remapped!<br><br>";
@@ -171,8 +157,7 @@ else {
 	"<br><br>".
 	"While you are waiting, you can watch the log of experiment ".
 	"modification in ".
-	"<a href=showlogfile.php3?pid=$pid&eid=$eid> ".
-	"realtime</a>.\n";
+	"<a href='$url'>realtime</a>.\n";
 }
 
 #

@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # This page needs more work to make user friendly and flexible.
@@ -25,10 +24,15 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("record", PAGEARG_INTEGER);
+
+#
 # Right now we show just the last N records entered, unless the user
 # requested a specific record. 
 #
-if (isset($record) && strcmp($record, "")) {
+if (isset($record)) {
     $wclause = "";
     if (! $isadmin) {
 	$wclause = "and s.creator='$uid'";
@@ -84,8 +88,8 @@ $print_header = 0;
 $last_exptidx = 0;
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $rsrcidx = $row[idx];
-    $exptidx = $row[exptidx];
+    $rsrcidx = $row["idx"];
+    $exptidx = $row["exptidx"];
 
     $skipping = 1;
 

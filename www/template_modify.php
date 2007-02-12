@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -15,12 +15,34 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Experiment Template");
+
+#
+# Verify page arguments
+#
+$reqargs = RequiredPageArguments("template",   PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("modify",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
+
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$unix_gid = $template->UnixGID();
+
+if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to export in template ".
+	      "$guid/$vers!", 1);
+}
+
+#
 # Spit the form out using the array of data.
 #
 function SPITFORM($template, $formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
-    global $guid, $version;
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -47,8 +69,9 @@ function SPITFORM($template, $formfields, $errors)
     echo $template->PageHeader();
     echo "<br><br>\n";
 
-    echo "<form action='template_modify.php?guid=$guid&version=$version'
-                method='post'>";
+    $url = CreateURL("template_modify", $template);
+
+    echo "<form action='$url' method='post'>";
     echo "<table align=center border=1>\n";
 
     #
@@ -60,7 +83,7 @@ function SPITFORM($template, $formfields, $errors)
               <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[tid]\"
-                         value=\"" . $formfields[tid] . "\"
+                         value=\"" . $formfields["tid"] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
               &nbsp (optionally change this to something informative).
@@ -76,7 +99,7 @@ function SPITFORM($template, $formfields, $errors)
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[description]\"
                     rows=4 cols=100>" .
-	            ereg_replace("\r", "", $formfields[description]) .
+	            ereg_replace("\r", "", $formfields["description"]) .
 	           "</textarea>
               </td>
           </tr>\n";
@@ -85,7 +108,7 @@ function SPITFORM($template, $formfields, $errors)
     echo "<tr>
               <td colspan=2>
               <textarea name=\"formfields[nsdata]\"
-                   cols=100 rows=40>" . $formfields[nsdata] . "</textarea>
+                   cols=100 rows=40>" . $formfields["nsdata"] . "</textarea>
               </td>
           </tr>\n";
 
@@ -96,42 +119,6 @@ function SPITFORM($template, $formfields, $errors)
          </tr>
         </form>
         </table>\n";
-}
-
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Experiment Template");
-
-#
-# Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a Template ID.", 1);
-}
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a Template version", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-
-#
-# Check to make sure this is a valid template and user has permission.
-#
-$template = Template::Lookup($guid, $version);
-if (!$template) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-if (! $template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to modify experiment template ".
-	      "$guid/$version!", 1);
 }
 
 #
@@ -169,44 +156,38 @@ srand((float) $sec + ((float) $usec * 100000));
 $foo = rand();
 
 #
-# Need these below,
-#
-$pid = $template->pid();
-$gid = $template->gid();
-    
-#
 # TID
 #
-if (!isset($formfields[tid]) || $formfields[tid] == "") {
+if (!isset($formfields["tid"]) || $formfields["tid"] == "") {
     #
     # Generate a new one.
     #
     $tid = $template->NextTID();
 }
-elseif (!TBvalid_eid($formfields[tid])) {
+elseif (!TBvalid_eid($formfields["tid"])) {
     $errors["Template ID"] = TBFieldErrorString();
 }
 else {
-    $tid = $formfields[tid];
+    $tid = $formfields["tid"];
 }
 
 #
 # Description:
 # 
-if (!isset($formfields[description]) || $formfields[description] == "") {
+if (!isset($formfields["description"]) || $formfields["description"] == "") {
     $errors["Description"] = "Missing Field";
 }
-elseif (!TBvalid_template_description($formfields[description])) {
+elseif (!TBvalid_template_description($formfields["description"])) {
     $errors["Description"] = TBFieldErrorString();
 }
 else {
-    $command_args .= " -E " . escapeshellarg($formfields[description]);
+    $command_args .= " -E " . escapeshellarg($formfields["description"]);
 }
 
 #
 # NS File.
 #
-if (!isset($formfields[nsdata]) || $formfields[nsdata] == "") {
+if (!isset($formfields["nsdata"]) || $formfields["nsdata"] == "") {
     $errors["NS File"] = "Missing Field";
 }
 
@@ -228,19 +209,16 @@ $nsfile = "/tmp/$uid-$foo.nsfile";
 if (! ($fp = fopen($nsfile, "w"))) {
     TBERROR("Could not create temporary file $nsfile", 1);
 }
-fwrite($fp, $formfields[nsdata]);
+fwrite($fp, $formfields["nsdata"]);
 fclose($fp);
 chmod($nsfile, 0666);
-
-# Need this for running scripts.
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 STARTBUSY("Starting template modification!");
 
 # And run that script!
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webtemplate_create -w -q ".
-		 "-m $guid/$version $command_args $pid $tid $nsfile",
+		 "-m $guid/$vers $command_args $pid $tid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 
 unlink($nsfile);
@@ -271,7 +249,9 @@ if (preg_match("/^Template\s+(\w+)\/(\w+)\s+/",
     $guid = $matches[1];
     $vers = $matches[2];
 
-    PAGEREPLACE("template_show.php?guid=$guid&version=$vers");
+    if (($template = Template::Lookup($guid, $vers))) {
+	PAGEREPLACE(CreateURL("template_show", $template));
+    }
 }
 
 #

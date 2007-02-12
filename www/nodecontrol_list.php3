@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # This page is used for both admin node control, and for mere user
@@ -26,18 +27,13 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (isset($user)) {
-    if ($user == "") {
-	$user = $uid;
-    }
-    elseif (! User::ValidWebID($user)) {
-	PAGEARGERROR("Invalid characters in '$user'");
-    }
-    elseif (! ($target_user = User::Lookup($user))) {
-	USERERROR("The user $user is not a valid user", 1);
-    }
-    elseif (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+#
+$optargs = OptionalPageArguments("target_user",	PAGEARG_USER,
+				 "showtype",    PAGEARG_STRING,
+				 "bypid",       PAGEARG_STRING);
+
+if (isset($target_user)) {
+    if (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
 	USERERROR("You do not have permission to do this!", 1);
     }
     $target_uid  = $target_user->uid();
@@ -163,11 +159,11 @@ if (! strcmp($showtype, "summary")) {
 	    if ($bypid == "" || !TBvalid_pid($bypid)) {
 		PAGEARGERROR("Invalid characters in 'bypid' argument!");
 	    }
-	    if (! TBValidProject($bypid)) {
+	    if (! ($target_project = Project::Lookup($bypid))) {
 		PAGEARGERROR("No such project '$bypid'!");
 	    }
-	    if (! TBProjAccessCheck($target_uid,
-				    $bypid, $bypid, $TB_PROJECT_READINFO)){
+	    if (!$target_project->AccessCheck($this_user,
+					      $TB_PROJECT_READINFO)){
 		USERERROR("You are not a member of project '$bypid!", 1);
 	    }
 	    $pidclause = "and g.pid='$bypid'";
@@ -348,9 +344,9 @@ $num_unk  = 0;
 $freetypes= array();
 
 while ($row = mysql_fetch_array($query_result)) {
-    $pid                = $row[pid];
-    $status             = $row[status];
-    $type               = $row[type];
+    $pid                = $row["pid"];
+    $status             = $row["status"];
+    $type               = $row["type"];
 
     if (! isset($freetypes[$type])) {
 	$freetypes[$type] = 0;
@@ -471,23 +467,22 @@ if (!strcmp($showtype, "widearea")) {
 echo "</tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
-    $node_id            = $row[node_id]; 
-    $phys_nodeid        = $row[phys_nodeid]; 
-    $type               = $row[type];
+    $node_id            = $row["node_id"]; 
+    $phys_nodeid        = $row["phys_nodeid"]; 
+    $type               = $row["type"];
     $class              = $row["class"];
-    $def_boot_osid      = $row[def_boot_osid];
-    $pid                = $row[pid];
-    $eid                = $row[eid];
-    $vname              = $row[vname];
-    $hostname           = $row[hostname];
-    $status             = $row[status];
+    $def_boot_osid      = $row["def_boot_osid"];
+    $pid                = $row["pid"];
+    $eid                = $row["eid"];
+    $vname              = $row["vname"];
+    $status             = $row["status"];
 
     if (!strcmp($showtype, "widearea")) {	
-	$site         = $row[site];
-	$machine_type = $row[machine_type];
-	$location     = $row[location];
-	$connect_type = $row[connect_type];
-	$vname        = $row[hostname];
+	$site         = $row["site"];
+	$machine_type = $row["machine_type"];
+	$location     = $row["location"];
+	$connect_type = $row["connect_type"];
+	$vname        = $row["hostname"];
     } 
 
     echo "<tr>";
@@ -541,8 +536,11 @@ while ($row = mysql_fetch_array($query_result)) {
 	    echo "<td>--</td>
    	          <td>--</td>\n";
 	}
-	if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid))
+	if ($def_boot_osid &&
+	    ($osinfo = OSinfo::Lookup($def_boot_osid))) {
+	    $osname = $osinfo->osname();
 	    echo "<td>$osname</td>\n";
+	}
 	else
 	    echo "<td>&nbsp</td>\n";
     }

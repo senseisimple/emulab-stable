@@ -19,21 +19,16 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify arguments.
-# 
-if (!isset($user) || $user == "") {
-    USERERROR("You must provide a User ID.", 1);
-}
-if (isset($pid) && $pid == "") {
-    USERERROR("You must provide a valid project ID.", 1);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("target_user",     PAGEARG_USER);
+$optargs = OptionalPageArguments("target_project",  PAGEARG_PROJECT,
+				 "canceled",        PAGEARG_BOOLEAN,
+				 "confirmed",       PAGEARG_BOOLEAN,
+				 "confirmed_twice", PAGEARG_BOOLEAN,
+				 "request",         PAGEARG_BOOLEAN);
 
-#
-# Confirm target is a real user.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
+# Need these below.
 $target_dbuid = $target_user->uid();
 $target_uid   = $target_user->uid();
 
@@ -64,12 +59,10 @@ if (isset($request) && $request) {
 }
 
 #
-# Confirm optional pid is a real pid and check permission
+# Must not be the head of the project being removed from, or any projects
+# if being completely removed.
 #
-if (isset($pid)) {
-    if (! ($target_project = Project::Lookup($pid))) {
-	USERERROR("No such project '$pid'", 1);
-    }
+if (isset($target_project)) {
     $target_pid = $target_project->pid();
     
     if (! $isadmin &&
@@ -77,13 +70,7 @@ if (isset($pid)) {
 	USERERROR("You do not have permission to remove user ".
 		  "$target_uid from project $target_pid!", 1);
     }
-}
-
-#
-# Must not be the head of the project being removed from, or any projects
-# if being completely removed.
-#
-if (isset($target_project)) {
+    
     $leader = $target_project->GetLeader();
 
     if ($leader->SameUser($target_user)) {
@@ -125,13 +112,12 @@ else {
 # User must not be heading up any experiments at all. If deleting from
 # just a specific project, must not be heading up experiments in that
 # project. 
-# 
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments ".
-		 "where expt_head_uid='$target_dbuid' ".
-		 (isset($target_project) ? "and pid='$target_pid'" : ""));
+#
+$experimentlist =
+    $target_user->ExperimentList(1, ((isset($target_project)) ?
+				     $target_project->DefaultGroup() : null));
 
-if (mysql_num_rows($query_result)) {
+if (count($experimentlist)) {
     echo "<center><h3>
           User '$target_uid' is heading up the following experiments ".
 	  (isset($target_project) ? "in project '$target_pid' " : "") .
@@ -146,14 +132,18 @@ if (mysql_num_rows($query_result)) {
               <th align=center>Description</td>
           </tr>\n";
 
-    while ($projrow = mysql_fetch_array($query_result)) {
-	$pid  = $projrow[pid];
-	$eid  = $projrow[eid];
-	$state= $projrow[state];
-	$name = stripslashes($projrow[expt_name]);
-	if ($projrow[swap_requests] > 0) {
-	  $state .= "&nbsp;(idle)";
+    foreach ($experimentlist as $experiment) {
+	$pid   = $experiment->pid();
+	$eid   = $experiment->eid();
+	$state = $experiment->state();
+	$desc  = $experiment->description();
+	
+	if ($experiment->swap_requests() > 0) {
+	    $state .= "&nbsp;(idle)";
 	}
+
+	$showproj_url = CreateURL("showproject", $experiment->Project());
+	$showexp_url  = CreateURL("showexp", $experiment);
 	
         echo "<tr>
                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -170,7 +160,7 @@ if (mysql_num_rows($query_result)) {
 #
 # We do a double confirmation, running this script multiple times. 
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     echo "<center><h2><br>
           User Removal Canceled!
           </h2></center>\n";
@@ -179,7 +169,7 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><br>\n";
 
     if (isset($target_project)) {
@@ -206,7 +196,7 @@ if (!$confirmed) {
     return;
 }
 
-if (!$confirmed_twice) {
+if (!isset($confirmed_twice)) {
     echo "<center><br>
 	  Okay, let's be sure.<br>\n";
 
@@ -273,8 +263,8 @@ if (isset($target_project)) {
     }
     else {
 	if (isset($target_project)) {
-	    PAGEREPLACE(CreateURL("showgroup", URLARG_PID, $target_pid,
-				  URLARG_GID, $target_pid));
+	    PAGEREPLACE(CreateURL("showgroup",
+				  $target_project->DefaultGroup()));
 	}
     }
 }

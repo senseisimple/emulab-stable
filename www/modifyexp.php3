@@ -1,13 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
-$parser   = "$TB/libexec/ns2ir/parse-ns";
 $TMPDIR   = "/tmp/";
 
 #
@@ -17,10 +15,6 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-if (isset($formfields['exp_localnsfile'])) {
-    $exp_localnsfile = $formfields['exp_localnsfile'];
-}
-
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
@@ -29,41 +23,28 @@ include("showlogfile_sup.php3");
 #
 PAGEHEADER("Modify Experiment");
 
-#
-# Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
+$reqargs = RequiredPageArguments("experiment",      PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("go",              PAGEARG_STRING,
+				 "syntax",          PAGEARG_STRING,
+				 "reboot",          PAGEARG_BOOLEAN,
+				 "eventrestart",    PAGEARG_BOOLEAN,
+				 "nsdata",          PAGEARG_ANYTHING,
+				 "exp_localnsfile", PAGEARG_STRING,
+				 "formfields",      PAGEARG_ARRAY);
 
-#
-# Be paranoid.
-#
-$pid = addslashes($pid);
-$eid = addslashes($eid);
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
+$expstate = $experiment->state();
 
-#
-# Check to make sure this is a valid experiment.
-#
-if (! TBValidExperiment($pid, $eid)) {
-    USERERROR("The experiment $eid is not a valid experiment ".
-	      "in project $pid.", 1);
-}
-
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to modify this experiment.", 1);
 }
 
-if (TBExptLockedDown($pid, $eid)) {
+if ($experiment->lockdown()) {
     USERERROR("Cannot proceed; experiment is locked down!", 1);
 }
-
-$expstate = TBExptState($pid, $eid);
 
 if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
@@ -71,9 +52,7 @@ if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
 }
 
 # Okay, start.
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo $experiment->PageHeader();
 echo "<br>\n";
 flush();
 
@@ -97,7 +76,7 @@ if (! isset($go)) {
               var action = document.form1.action;
               var target = document.form1.target;
 
-              document.form1.action='nscheck.php3';
+              document.form1.action='nscheck.php3?fromform=1';
               document.form1.target='nscheck';
               document.form1.submit();
 
@@ -109,29 +88,35 @@ if (! isset($go)) {
 
     echo "<table align=center border=1>\n";
     if (STUDLY()) {
+	$ui_url = CreateURL("clientui", $experiment);
+	
 	echo "<tr><th colspan=2><font size='+1'>".
-	    "<a href='clientui.php3?pid=$pid&eid=$eid'>GUI Editor</a>".
+	    "<a href='$ui_url'>GUI Editor</a>".
 	    " - Edit the topology using a Java applet.</font>";
 	echo "</th></tr>";
     }
 
-    echo "<form name='form1' action='modifyexp.php3?pid=$pid&eid=$eid&go=1' method='post' onsubmit=\"return false;\" enctype=multipart/form-data>";
+    $url = CreateURL("modifyexp", $experiment, "go", 1);
+    
+    echo "<form name='form1' action='$url' method='post'
+             onsubmit=\"return false;\" enctype=multipart/form-data>";
+    
     echo "<tr><th>Upload new NS file: </th>";
     echo "<td><input type=hidden name=MAX_FILE_SIZE value=512000>";
-    echo "<input type=file name=exp_nsfile size=30 onchange=\"this.form.syntax.disabled=(this.value=='')\" /></td></tr>\n";
+    echo "    <input type=file name=exp_nsfile size=30
+                      onchange=\"this.form.syntax.disabled=(this.value=='')\"/>
+           </td></tr>\n";
     echo "<tr><th><em>or</em> NS file on server: </th> ";
-    echo "<td><input type=text name=\"formfields[exp_localnsfile]\" size=40 onchange=\"this.form.syntax.disabled=(this.value=='')\" /> </td</tr>\n";
+    echo "<td><input type=text name=\"exp_localnsfile\" size=40
+                     onchange=\"this.form.syntax.disabled=(this.value=='')\" />
+          </td</tr>\n";
     
     echo "<tr><td colspan=2><b><em>or</em> Edit:</b><br>\n";
-    echo "<textarea cols='100' rows='40' name='nsdata' onchange=\"this.form.syntax.disabled=(this.value=='')\">";
+    echo "<textarea cols='100' rows='40' name='nsdata'
+                    onchange=\"this.form.syntax.disabled=(this.value=='')\">";
 
-    $query_result =
-	DBQueryFatal("SELECT nsfile from nsfiles ".
-		     "where pid='$pid' and eid='$eid'");
-    if (mysql_num_rows($query_result)) {
-	$row    = mysql_fetch_array($query_result);
-	$nsfile = $row[nsfile];
-	    
+    $nsfile = $experiment->NSFile();
+    if ($nsfile) {
 	echo "$nsfile";
     }
     else {
@@ -153,13 +138,16 @@ if (! isset($go)) {
 	      nodes.</p>";
 	echo "<input type='checkbox' name='reboot' value='1' checked='1'>
 	      Reboot nodes in experiment (Highly Recommended)</input>";
-	echo "<br><input type='checkbox' name='eventrestart' value='1' checked='1'>
+	echo "<br><input type='checkbox' name='eventrestart'
+                         value='1' checked='1'>
 	      Restart Event System in experiment (Highly Recommended)</input>";
       echo "</td></tr>";
     }
     echo "<tr><th colspan=2><center>";
-    echo "<input type=submit disabled id=syntax name=syntax value='Syntax Check' onclick=\"SyntaxCheck();\"> ";
-    echo "<input type=button name='go' value='Modify' onclick='NormalSubmit();'>\n";
+    echo "<input type=submit disabled id=syntax name=syntax
+                 value='Syntax Check' onclick=\"SyntaxCheck();\"> ";
+    echo "<input type=button name='go' value='Modify'
+                 onclick='NormalSubmit();'>\n";
     echo "<input type='reset'>";
     echo "</center></th></tr>\n";
     echo "</table>\n";
@@ -180,8 +168,9 @@ $tmpfile    = 0;
 if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
     $speclocal = 1;
 }
-if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
-    strcmp($exp_nsfile, "none")) {
+if (isset($_FILES['exp_nsfile']) &&
+    $_FILES['exp_nsfile']['name'] != "" &&
+    $_FILES['exp_nsfile']['tmp_name'] != "") {
     $specupload = 1;
 }
 if (!$speclocal && !$specupload && isset($nsdata))  {
@@ -192,14 +181,6 @@ if ($speclocal + $specupload + $specform > 1) {
     USERERROR("You may not specify both an uploaded NS file and an ".
 	      "NS file that is located on the Emulab server", 1);
 }
-if (!$specupload && strcmp($exp_nsfile_name, "")) {
-    #
-    # Catch an invalid filename.
-    #
-    USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
-	      "valid filename. Please go back and try again.", 1);
-}
-
 #
 # Gotta be one of them!
 #
@@ -236,11 +217,11 @@ elseif ($specupload) {
     # script open for a short time. A potential security hazard we should
     # deal with at some point.
     #
-    chmod($exp_nsfile, 0666);
-    $nsfile = $exp_nsfile;
+    $nsfile = $_FILES['exp_nsfile']['tmp_name'];
+    chmod($nsfile, 0666);
     $nonsfile = 0;
-} else # $specform
-if ($specform) {
+}
+elseif ($specform) {
     #
     # Take the NS file passed in from the form and write it out to a file
     #
@@ -260,12 +241,6 @@ if ($specform) {
     fclose($handle);
     chmod($nsfile, 0666);
 }
-
-#
-# Get exp group so we can get the unix_gid.
-#
-TBExptGroup($pid, $eid, $gid);
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 #
 # Do an initial parse test.
@@ -290,16 +265,21 @@ if ($retval != 0) {
     exit();
 }
 
-#	
 # Avoid SIGPROF in child.
-# 
 set_time_limit(0);
+
+# args.
+$optargs = "";
+if (isset($reboot) && $reboot) {
+     $optargs .= " -r ";
+}
+if (isset($eventrestart) && $eventrestart) {
+     $optargs .= " -e ";
+}
 
 # Run the script.
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webswapexp $rebootswitch " . ($reboot ? "-r " : "") .
-		 ($eventrestart ? "-e " : "") .
-		 "-s modify $pid $eid $nsfile",
+		 "webswapexp $optargs -s modify $pid $eid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 		 
 # It has been copied out by the program!
@@ -341,7 +321,7 @@ else {
 	"<br><br>".
 	"While you are waiting, you can watch the log of experiment ".
 	"modification in realtime:<br><br>\n";
-    STARTLOG($pid, $eid);    
+    STARTLOG($experiment);    
 }
 
 #

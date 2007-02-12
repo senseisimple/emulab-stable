@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # Standard Testbed Header
@@ -19,34 +20,28 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
-
-#
-# Check to make sure that this is a valid nodeid
-#
-$query_result =
-    DBQueryFatal("select * from nodes where node_id='$node_id'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The node $node_id is not a valid nodeid!", 1);
-}
-$noderow = mysql_fetch_array($query_result);
-
-#
 # Only admin users can modify node attributes.
 #
 if (! $isadmin) {
-  USERERROR("You do not have permission to modify node $node_id!", 1);
+    USERERROR("You do not have permission to modify node attributes!", 1);
 }
 
 #
-# Set up some variables from the nodes table
+# Verify form arguments.
 #
-$type    = $noderow[type];
+$reqargs = RequiredPageArguments("node",         PAGEARG_NODE);
+$optargs = OptionalPageArguments("refer",        PAGEARG_STRING,
+				 "add_numattrs", PAGEARG_INTEGER);
+
+# Need these below ...
+$node_id = $node->node_id();
+$type    = $node->type();
+$url     = CreateURL("modnodeattributes", $node);
+# Note that $refer is set by the caller so we know how we got to
+# the webmodnodeattributes page. 
+if (isset($refer)) {
+    $url .= "&refer=$refer";
+}
 
 #
 # Get any node attributes that might exist
@@ -56,7 +51,7 @@ $attr_result =
     DBQueryFatal("select attrkey,attrvalue from node_attributes ".
 		 "where node_id='$node_id'");
 while($row = mysql_fetch_array($attr_result)) {
-  $node_attrs[$row[attrkey]] = $row[attrvalue];
+    $node_attrs[$row["attrkey"]] = $row["attrvalue"];
 }
 
 #
@@ -76,14 +71,11 @@ echo "<tr>
 echo "</table><br><br><br><br>\n";
 
 #
-# Generate the form. Note that $refer is set by the caller so we know
-# how we got to the webmodnodeattributes page. 
+# Generate the form. 
 # 
 echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
-echo "<form action=\"modnodeattributes.php3?refer=$refer\"
-            method=\"post\">\n";
-echo "<input type=\"hidden\" name=\"node_id\" value=\"$node_id\">\n";
+echo "<form action='$url' method=\"post\">\n";
 #
 # Print out any node attributes already set
 #
@@ -121,9 +113,8 @@ echo "<tr>
           <td align=\"center\" colspan=\"0\"><b>Add Node Attribute</b></td>
       </tr>\n";
 
-if (!$add_numattrs) {
-  global $add_numattrs;
-  $add_numattrs = 1;
+if (!isset($add_numattrs)) {
+    $add_numattrs = 1;
 }
 
 for ($i = 0; $i < $add_numattrs; $i++) {

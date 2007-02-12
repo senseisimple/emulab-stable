@@ -4,10 +4,16 @@
 # Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+# A cache of groups to avoid lookups. Indexed by pid_idx;
+#
+$project_cache = array();
+
 class Project
 {
     var	$project;
     var $group;
+    var $_grouplist;		# All subgroups
+    var $tempdata;		# For temporary data values ...
 
     #
     # Constructor by lookup on unique index.
@@ -23,8 +29,9 @@ class Project
 	    $this->project = NULL;
 	    return;
 	}
-	$this->project = mysql_fetch_array($query_result);
-	$this->group   = null;
+	$this->project   = mysql_fetch_array($query_result);
+	$this->group     = null;
+	$this->_grouplist = null;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -34,6 +41,12 @@ class Project
 
     # Lookup by pid_idx.
     function Lookup($pid_idx) {
+	global $project_cache;
+
+        # Look in cache first
+	if (array_key_exists("$pid_idx", $project_cache))
+	    return $project_cache["$pid_idx"];
+	
 	$foo = new Project($pid_idx);
 
 	if (! $foo->IsValid()) {
@@ -43,9 +56,11 @@ class Project
 	    if (!$foo || !$foo->IsValid())
 		return null;
 
-	    # Return here, in case I add a cache and forget to do this.
+	    # Return here, already in the cache.
 	    return $foo;
 	}
+	# Insert into cache.
+	$project_cache["$pid_idx"] = $foo;
 	return $foo;
     }
 
@@ -86,8 +101,13 @@ class Project
 	    $this->project = NULL;
 	    return -1;
 	}
-	$this->project = mysql_fetch_array($query_result);
-	$this->group   = null;
+	$this->project   = mysql_fetch_array($query_result);
+
+	if ($this->group) {
+	    $foo = $this->group;
+	    $foo->Refresh();
+	}
+	$this->_grouplist = null;
 	return 0;
     }
 
@@ -126,14 +146,21 @@ class Project
     function cvsrepo_public(){ return $this->field("cvsrepo_public"); }
 
     function unix_gid() {
-	$group = $this->LoadGroup();
+	$group = $this->DefaultGroup();
 	
 	return $group->unix_gid();
     }
     function unix_name() {
-	$group = $this->LoadGroup();
+	$group = $this->DefaultGroup();
 
 	return $group->unix_name();
+    }
+    # Temporary data storage ... useful.
+    function SetTempData($value) {
+	$this->tempdata = $value;
+    }
+    function GetTempData() {
+	return $this->tempdata;
     }
 
     #
@@ -278,30 +305,105 @@ class Project
     }    
 
     #
-    # Access Check, which for now uses the global function to avoid duplication
-    # until all code is changed.
+    # Class function to return a list of pending (unapproved) projects.
     #
+    function PendingProjectList() {
+	$result     = array();
+
+	$query_result =
+	    DBQueryFatal("select pid_idx, ".
+			 " DATE_FORMAT(created, '%m/%d/%y') as day_created ".
+			 " from projects ".
+			 "where approved='0' order by created desc");
+			     
+	while ($row = mysql_fetch_array($query_result)) {
+	    $pid_idx = $row["pid_idx"];
+	    $created = $row["day_created"];
+
+	    if (! ($project = Project::Lookup($pid_idx))) {
+		TBERROR("Project::PendingProjectList: ".
+			"Could not load project $pid_idx!", 1);
+	    }
+	    $project->SetTempData($created);
+	    
+	    $result[] = $project;
+	}
+	return $result;
+    }
+    
     function AccessCheck($user, $access_type) {
-	return TBProjAccessCheck($user->uid(),
-				 $this->pid(), $this->pid(),
-				 $access_type);
+	$group = $this->DefaultGroup();
+	
+	return $group->AccessCheck($user, $access_type);
+    }
+
+    # Return the user trust within the project, which is really for the
+    # default group.
+    function UserTrust($user) {
+	$group = $this->DefaultGroup();
+	
+	return $group->UserTrust($user);
     }
 
     #
     # Load the default group for a project lazily.
     #
-    function LoadGroup() {
+    function LoadDefaultGroup() {
+	if ($this->group) {
+	    return $this->group;
+	}
+	
 	# Note: pid_idx=gid_idx for the default group
 	$gid_idx = $this->pid_idx();
 
 	if (! ($group = Group::Lookup($gid_idx))) {
-	    TBERROR("Project::LoadGroup: Could not load group $gid_idx!", 1);
+	    TBERROR("Project::LoadDefaultGroup: ".
+		    "Could not load group $gid_idx!", 1);
 	}
 	$this->group = $group;
 	return $group;
     }
-    function Group() {
-	return $this->LoadGroup();
+    function DefaultGroup() { return $this->LoadDefaultGroup(); }
+    function Group()        { return $this->DefaultGroup(); }
+
+    #
+    # Lookup a project subgroup by its name.
+    #
+    function LookupSubgroupByName($name) {
+	$pid = $this->pid();
+
+	return Group::LookupByPidGid($pid, $name);
+    }
+
+    #
+    # Load all subgroups for this project.
+    #
+    function LoadSubGroups() {
+	if ($this->_grouplist)
+	    return 0;
+	
+	$pid_idx = $this->pid_idx();
+	$result  = array();
+
+	$query_result =
+	    DBQueryFatal("select gid_idx from groups ".
+			 "where pid_idx='$pid_idx'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $gid_idx = $row["gid_idx"];
+
+	    if (! ($group = Group::Lookup($gid_idx))) {
+		TBERROR("Project::LoadSubGroups: ".
+			"Could not load group $gid_idx!", 1);
+	    }
+	    $result[] = $group;
+	}
+	$this->_grouplist = $result;
+	return 0;
+    }
+    function SubGroups() {
+	$this->LoadSubGroups();
+	return $this->_grouplist;
     }
 
     #
@@ -320,7 +422,7 @@ class Project
     # Add *new* member to project group; starts out with trust=none.
     #
     function AddNewMember($user) {
-	$group = $this->LoadGroup();
+	$group = $this->DefaultGroup();
 
 	return $group->AddNewMember($user);
     }
@@ -329,11 +431,37 @@ class Project
     # Check if user is a member of this project (well, group)
     #
     function IsMember($user, &$approved) {
-	$group = $this->LoadGroup();
+	$group = $this->DefaultGroup();
 
 	return $group->IsMember($user, $approved);
     }
 
+    #
+    # Lookup an experiment within a project.
+    #
+    function LookupExperiment($eid) {
+	return Experiment::LookupByPidEid($this->pid(), $eid);
+    }
+
+    #
+    # How many PCs is project using. 
+    #
+    function PCsInUse() {
+	$pid = $this->pid();
+	
+	$query_result =
+	    DBQueryFatal("select count(r.node_id) from reserved as r ".
+			 "left join nodes as n on n.node_id=r.node_id ".
+			 "left join node_types as nt on nt.type=n.type ".
+			 "where nt.class='pc' and r.pid='$pid'");
+    
+	if (mysql_num_rows($query_result) == 0) {
+	    return 0;
+	}
+	$row = mysql_fetch_row($query_result);
+	return $row[0];
+    }
+    
     #
     # Member list for a group.
     #
@@ -383,11 +511,20 @@ class Project
     }
 
     #
+    # List of experiments for a project, or just the count.
+    #
+    function ExperimentList($listify = 1) {
+	$group = $this->DefaultGroup();
+
+	return $group->ExperimentList($listify);
+    }
+
+    #
     # Change the leader for a project. Done *only* before project is
     # approved.
     #
     function ChangeLeader($leader) {
-	$group   = $this->LoadGroup();
+	$group   = $this->DefaultGroup();
 	$idx     = $this->pid_idx();
 	$uid     = $leader->uid();
 	$uid_idx = $leader->uid_idx();
@@ -429,11 +566,21 @@ class Project
 	return 0;
     }
 
+    function SetCVSRepoPublic($public) {
+	$idx    = $this->pid_idx();
+	$public = ($public ? 1 : 0);
+
+	DBQueryFatal("update projects set cvsrepo_public='$public' ".
+		     "where pid_idx='$idx'");
+
+	return 0;
+    }
+
     function Show() {
 	global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR, $TBCVSREPO_DIR;
 	global $MAILMANSUPPORT, $OPSCVSURL, $USERNODE;
 
-	$group = $this->Group();
+	$group = $this->DefaultGroup();
 
 	$pid                    = $this->pid();
 	$proj_idx		= $this->pid_idx();
@@ -624,14 +771,7 @@ class Project
     }
 
     function ShowGroupList() {
-	$pid_idx  = $this->pid_idx();
-
-	$query_result =
-	    DBQueryFatal("select * from groups where pid_idx='$pid_idx'");
-
-	if (!$query_result || !mysql_num_rows($query_result)) {
-	    return;
-	}
+	$groups    = $this->SubGroups();
 
 	echo "<h3>Project Groups</h3>\n";
 	echo "<table align=center border=1>\n";
@@ -641,18 +781,17 @@ class Project
                <th>Leader</th>
               </tr>\n";
 
-	while ($row = mysql_fetch_array($query_result)) {
-	    $gid      = $row[gid];
-	    $desc     = $row[description];
-	    $leader   = $row[leader];
+	foreach ($groups as $group) {
+	    $gid         = $group->gid();
+	    $desc        = $group->description();
+	    $leader      = $group->leader();
+	    $leader_user = $group->GetLeader();
 
-	    if (! ($leader_user = User::Lookup($leader))) {
-		TBERROR("Could not lookup object for user $leader", 1);
-	    }
-	    $showuser_url = CreateURL("showuser", $leader_user);
+	    $showuser_url  = CreateURL("showuser", $leader_user);
+	    $showgroup_url = CreateURL("showgroup", $group);
 
 	    echo "<tr>
-                   <td><A href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
+                   <td><A href='$showgroup_url'>$gid</a></td>
                    <td>$desc</td>
                    <td><A href='$showuser_url'>$leader</A></td>
                  </tr>\n";
@@ -685,4 +824,5 @@ class Project
 	}
 	echo "</table>\n";
     }
+
 }

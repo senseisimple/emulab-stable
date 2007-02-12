@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,46 +14,33 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid experiment.
+# Verify page arguments.
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBvalid_eid($eid)) {
-	PAGEARGERROR("$eid contains invalid characters!");
-    }
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("$pid contains invalid characters!");
-    }
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
-    if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
-	USERERROR("$pid/$eid is not currently swapped in!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run linktest on $pid/$eid!",
-		  1);
-    }
-}
-else {
-    PAGEARGERROR("Must specify pid and eid!");
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "linklan",    PAGEARG_STRING,
+				 "vnode",      PAGEARG_STRING);
+$optargs = OptionalPageArguments("action",     PAGEARG_STRING,
+				 "updatefreq", PAGEARG_INTEGER);
+
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to run linktest on $pid/$eid!", 1);
 }
 
 #
-# Verify the object name (a link/lan and maybe the vnode on that link/lan)
+# Must be active. The backend can deal with changing the base experiment
+# when the experiment is swapped out, but we need to generate a form based
+# on virt_lans instead of delays/linkdelays. Thats harder to do. 
 #
-if (!isset($linklan) || strcmp($linklan, "") == 0) {
-    USERERROR("You must provide a link name.", 1);
+if ($experiment->state() != $TB_EXPTSTATE_ACTIVE) {
+    USERERROR("Experiment $eid must be active to monitor its links!", 1);
 }
+
 if (! TBvalid_linklanname($linklan)) {
     PAGEARGERROR("$linklan contains invalid characters!");
-}
-
-#
-# Must also supply the node on the link or lan we care about.
-# 
-if (!isset($vnode) || strcmp($vnode, "") == 0) {
-    USERERROR("You must provide a node name.", 1);
 }
 if (! TBvalid_vnode_id($vnode)) {
     PAGEARGERROR("$vnode contains invalid characters!");
@@ -68,13 +55,6 @@ $freq = 1000;
 if (isset($updatefreq) && $updatefreq != "" &&
     TBvalid_tinyint($updatefreq)) {
     $freq = $updatefreq * 1000;
-}
-
-#
-# Verify Permission.
-#
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view experiment $pid/$eid!", 1);
 }
 
 #

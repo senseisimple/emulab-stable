@@ -16,6 +16,16 @@ include("defs.php3");
 $this_user = CheckLogin($check_status);
 
 #
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
+				 "forwikionly",  PAGEARG_BOOLEAN,
+				 "finished",     PAGEARG_BOOLEAN,
+				 "target_pid",   PAGEARG_STRING,
+				 "target_gid",   PAGEARG_STRING,
+				 "formfields",   PAGEARG_ARRAY);
+
+#
 # If a uid came in, then we check to see if the login is valid.
 # We require that the user be logged in to start a second project.
 #
@@ -159,7 +169,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <td class=left>
                           <input type=text
                                  name=\"formfields[joining_uid]\"
-                                 value=\"" . $formfields[joining_uid] . "\"
+                                 value=\"" . $formfields["joining_uid"] . "\"
 	                         size=$TBDB_UIDLEN
                                  onchange=\"alert('$ACCOUNTWARNING')\"
 	                         maxlength=$TBDB_UIDLEN>
@@ -176,7 +186,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <input type=text
                              name=\"formfields[usr_name]\"
                              onchange=\"SetWikiName(myform);\"
-                             value=\"" . $formfields[usr_name] . "\"
+                             value=\"" . $formfields["usr_name"] . "\"
 	                     size=30>
                   </td>
               </tr>\n";
@@ -191,7 +201,7 @@ function SPITFORM($formfields, $returning, $errors)
                             target=_blank>WikiName</a>:<td class=left>
                           <input type=text
                                  name=\"formfields[wikiname]\"
-                                 value=\"" . $formfields[wikiname] . "\"
+                                 value=\"" . $formfields["wikiname"] . "\"
 	                         size=30>
                       </td>
                   </tr>\n";
@@ -206,7 +216,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <td class=left>
                           <input type=text
                                  name=\"formfields[usr_title]\"
-                                 value=\"" . $formfields[usr_title] . "\"
+                                 value=\"" . $formfields["usr_title"] . "\"
   	                         size=30>
                       </td>
                   </tr>\n";
@@ -219,7 +229,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <td class=left>
                           <input type=text
                                  name=\"formfields[usr_affil]\"
-                                 value=\"" . $formfields[usr_affil] . "\"
+                                 value=\"" . $formfields["usr_affil"] . "\"
 	                         size=40>
                       </td>
                   </tr>\n";
@@ -227,12 +237,12 @@ function SPITFORM($formfields, $returning, $errors)
 	    #
 	    # User URL
 	    #
-	        echo "<tr>
+	    echo "<tr>
                       <td colspan=2>Home Page URL:</td>
                       <td class=left>
                           <input type=text
                                  name=\"formfields[usr_URL]\"
-                                 value=\"" . $formfields[usr_URL] . "\"
+                                 value=\"" . $formfields["usr_URL"] . "\"
 	                         size=45>
                       </td>
                   </tr>\n";
@@ -246,7 +256,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_email]\"
-                             value=\"" . $formfields[usr_email] . "\"
+                             value=\"" . $formfields["usr_email"] . "\"
                              onchange=\"alert('$EMAILWARNING')\"
 	                     size=30>
                   </td>
@@ -261,32 +271,32 @@ function SPITFORM($formfields, $returning, $errors)
 		      <tr><td>Line 1</td><td colspan=3>
                         <input type=text
                                name=\"formfields[usr_addr]\"
-                               value=\"" . $formfields[usr_addr] . "\"
+                               value=\"" . $formfields["usr_addr"] . "\"
 	                       size=45></td></tr>
 		      <tr><td>Line 2</td><td colspan=3>
                         <input type=text
                                name=\"formfields[usr_addr2]\"
-                               value=\"" . $formfields[usr_addr2] . "\"
+                               value=\"" . $formfields["usr_addr2"] . "\"
 	                       size=45></td></tr>
 		      <tr><td>City</td><td>
                         <input type=text
                                name=\"formfields[usr_city]\"
-                               value=\"" . $formfields[usr_city] . "\"
+                               value=\"" . $formfields["usr_city"] . "\"
 	                       size=25></td>
 		          <td>State/Province</td><td>
                         <input type=text
                                name=\"formfields[usr_state]\"
-                               value=\"" . $formfields[usr_state] . "\"
+                               value=\"" . $formfields["usr_state"] . "\"
 	                       size=2></td></tr>
 		      <tr><td>ZIP/Postal Code</td><td>
                         <input type=text
                                name=\"formfields[usr_zip]\"
-                               value=\"" . $formfields[usr_zip] . "\"
+                               value=\"" . $formfields["usr_zip"] . "\"
 	                       size=10></td>
 		          <td>Country</td><td>
                         <input type=text
                                name=\"formfields[usr_country]\"
-                               value=\"" . $formfields[usr_country] . "\"
+                               value=\"" . $formfields["usr_country"] . "\"
 	                       size=15></td></tr>
                    </table></center></td></tr>";
 
@@ -298,7 +308,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <td class=left>
                           <input type=text
                                  name=\"formfields[usr_phone]\"
-                                 value=\"" . $formfields[usr_phone] . "\"
+                                 value=\"" . $formfields["usr_phone"] . "\"
 	                         size=15>
                       </td>
                   </tr>\n";
@@ -313,10 +323,13 @@ function SPITFORM($formfields, $returning, $errors)
                      <td>
                           <input type=hidden name=MAX_FILE_SIZE value=1024>
                           <input type=file
-                                 name=usr_keyfile
-                                 value=\"" . $_FILES['usr_keyfile']['name'] .
-		                       "\"
-	                         size=50>
+                                 size=50
+                                 name=usr_keyfile ";
+	    if (isset($_FILES['usr_keyfile'])) {
+		echo "        value=\"" .
+		    $_FILES['usr_keyfile']['name'] . "\"";
+	    }
+	    echo "    ">";                     
                       </td>
                   </tr>\n";
 	}
@@ -330,7 +343,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
-                             value=\"$formfields[password1]\"
+                             value=\"" . $formfields["password1"] . "\"
                              size=8></td>
               </tr>\n";
 
@@ -339,7 +352,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
-                             value=\"$formfields[password2]\"
+                             value=\"" . $formfields["password2"] . "\"
                              size=8></td>
              </tr>\n";
     }
@@ -353,7 +366,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[pid]\"
-                             value=\"" . $formfields[pid] . "\"
+                             value=\"" . $formfields["pid"] . "\"
 	                     size=$TBDB_PIDLEN maxlength=$TBDB_PIDLEN>
                   </td>
               </tr>\n";
@@ -367,7 +380,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[gid]\"
-                             value=\"" . $formfields[gid] . "\"
+                             value=\"" . $formfields["gid"] . "\"
 	                     size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN>
                   </td>
               </tr>\n";
@@ -409,7 +422,7 @@ function SPITFORM($formfields, $returning, $errors)
 #
 # The conclusion of a join request. See below.
 # 
-if (isset($_GET['finished'])) {
+if (isset($finished)) {
     if ($forwikionly) 
 	PAGEHEADER("Wiki Registration");
     else
@@ -450,32 +463,45 @@ if (isset($_GET['finished'])) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($submit)) {
     $defaults = array();
-    $defaults[usr_URL] = "$HTTPTAG";
-    $defaults[usr_country] = "USA";
+    $defaults["pid"]         = "";
+    $defaults["gid"]         = "";
+    $defaults["joining_uid"] = "";
+    $defaults["usr_name"]    = "";
+    $defaults["usr_email"]   = "";
+    $defaults["usr_addr"]    = "";
+    $defaults["usr_addr2"]   = "";
+    $defaults["usr_city"]    = "";
+    $defaults["usr_state"]   = "";
+    $defaults["usr_zip"]     = "";
+    $defaults["usr_country"] = "";
+    $defaults["usr_phone"]   = "";
+    $defaults["usr_title"]   = "";
+    $defaults["usr_affil"]   = "";
+    $defaults["password1"]   = "";
+    $defaults["password2"]   = "";
+    $defaults["wikiname"]    = "";
+    $defaults["usr_URL"]     = "$HTTPTAG";
+    $defaults["usr_country"] = "USA";
 
     #
     # These two allow presetting the pid/gid.
     # 
     if (isset($target_pid) && strcmp($target_pid, "")) {
-	$defaults[pid] = $target_pid;
+	$defaults["pid"] = $target_pid;
     }
     if (isset($target_gid) && strcmp($target_gid, "")) {
-	$defaults[gid] = $target_gid;
+	$defaults["gid"] = $target_gid;
     }
     
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();
     return;
 }
-else {
-    # Form submitted. Make sure we have a formfields array.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields'])) {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $formfields = $_POST['formfields'];
+# Form submitted. Make sure we have a formfields array.
+if (!isset($formfields)) {
+    PAGEARGERROR("Invalid form arguments.");
 }
 
 #
@@ -488,163 +514,163 @@ $errors = array();
 #
 if (! $returning) {
     if ($USERSELECTUIDS) {
-	if (!isset($formfields[joining_uid]) ||
-	    strcmp($formfields[joining_uid], "") == 0) {
+	if (!isset($formfields["joining_uid"]) ||
+	    strcmp($formfields["joining_uid"], "") == 0) {
 	    $errors["Username"] = "Missing Field";
 	}
-	elseif (!TBvalid_uid($formfields[joining_uid])) {
+	elseif (!TBvalid_uid($formfields["joining_uid"])) {
 	    $errors["UserName"] = TBFieldErrorString();
 	}
-	elseif (User::Lookup($formfields[joining_uid]) ||
-		posix_getpwnam($formfields[joining_uid])) {
+	elseif (User::Lookup($formfields["joining_uid"]) ||
+		posix_getpwnam($formfields["joining_uid"])) {
 	    $errors["UserName"] = "Already in use. Pick another";
 	}
     }
-    if (!isset($formfields[usr_name]) ||
-	strcmp($formfields[usr_name], "") == 0) {
+    if (!isset($formfields["usr_name"]) ||
+	strcmp($formfields["usr_name"], "") == 0) {
 	$errors["Full Name"] = "Missing Field";
     }
-    elseif (! TBvalid_usrname($formfields[usr_name])) {
+    elseif (! TBvalid_usrname($formfields["usr_name"])) {
 	$errors["Full Name"] = TBFieldErrorString();
     }
     # Make sure user name has at least two tokens!
-    $tokens = preg_split("/[\s]+/", $formfields[usr_name],
+    $tokens = preg_split("/[\s]+/", $formfields["usr_name"],
 			 -1, PREG_SPLIT_NO_EMPTY);
     if (count($tokens) < 2) {
 	$errors["Full Name"] = "Please provide a first and last name";
     }
     if ($WIKISUPPORT) {
-	if (!isset($formfields[wikiname]) ||
-	    strcmp($formfields[wikiname], "") == 0) {
+	if (!isset($formfields["wikiname"]) ||
+	    strcmp($formfields["wikiname"], "") == 0) {
 	    $errors["WikiName"] = "Missing Field";
 	}
-	elseif (! TBvalid_wikiname($formfields[wikiname])) {
+	elseif (! TBvalid_wikiname($formfields["wikiname"])) {
 	    $errors["WikiName"] = TBFieldErrorString();
 	}
-	elseif (User::LookupByWikiName($formfields[wikiname])) {
+	elseif (User::LookupByWikiName($formfields["wikiname"])) {
 	    $errors["WikiName"] = "Already in use. Pick another";
 	}
     }
     if (!$forwikionly) {
-	if (!isset($formfields[usr_title]) ||
-	    strcmp($formfields[usr_title], "") == 0) {
+	if (!isset($formfields["usr_title"]) ||
+	    strcmp($formfields["usr_title"], "") == 0) {
 	    $errors["Job Title/Position"] = "Missing Field";
 	}
-	elseif (! TBvalid_title($formfields[usr_title])) {
+	elseif (! TBvalid_title($formfields["usr_title"])) {
 	    $errors["Job Title/Position"] = TBFieldErrorString();
 	}
-	if (!isset($formfields[usr_affil]) ||
-	    strcmp($formfields[usr_affil], "") == 0) {
+	if (!isset($formfields["usr_affil"]) ||
+	    strcmp($formfields["usr_affil"], "") == 0) {
 	    $errors["Affiliation"] = "Missing Field";
 	}
-	elseif (! TBvalid_affiliation($formfields[usr_affil])) {
+	elseif (! TBvalid_affiliation($formfields["usr_affil"])) {
 	    $errors["Affiliation"] = TBFieldErrorString();
 	}
     }	
-    if (!isset($formfields[usr_email]) ||
-	strcmp($formfields[usr_email], "") == 0) {
+    if (!isset($formfields["usr_email"]) ||
+	strcmp($formfields["usr_email"], "") == 0) {
 	$errors["Email Address"] = "Missing Field";
     }
-    elseif (! TBvalid_email($formfields[usr_email])) {
+    elseif (! TBvalid_email($formfields["usr_email"])) {
 	$errors["Email Address"] = TBFieldErrorString();
     }
-    elseif (User::LookupByEmail($formfields[usr_email])) {
+    elseif (User::LookupByEmail($formfields["usr_email"])) {
 	$errors["Email Address"] =
 	    "Already in use. <b>Did you forget to login?</b>";
     }
     if (! $forwikionly) {
-	if (isset($formfields[usr_URL]) &&
-	    strcmp($formfields[usr_URL], "") &&
-	    strcmp($formfields[usr_URL], $HTTPTAG) &&
-	    ! CHECKURL($formfields[usr_URL], $urlerror)) {
+	if (isset($formfields["usr_URL"]) &&
+	    strcmp($formfields["usr_URL"], "") &&
+	    strcmp($formfields["usr_URL"], $HTTPTAG) &&
+	    ! CHECKURL($formfields["usr_URL"], $urlerror)) {
 	    $errors["Home Page URL"] = $urlerror;
 	}
-	if (!isset($formfields[usr_addr]) ||
-	    strcmp($formfields[usr_addr], "") == 0) {
+	if (!isset($formfields["usr_addr"]) ||
+	    strcmp($formfields["usr_addr"], "") == 0) {
 	    $errors["Address 1"] = "Missing Field";
 	}
-	elseif (! TBvalid_addr($formfields[usr_addr])) {
+	elseif (! TBvalid_addr($formfields["usr_addr"])) {
 	    $errors["Address 1"] = TBFieldErrorString();
 	}
         # Optional
-	if (isset($formfields[usr_addr2]) &&
-	    !TBvalid_addr($formfields[usr_addr2])) {
+	if (isset($formfields["usr_addr2"]) &&
+	    !TBvalid_addr($formfields["usr_addr2"])) {
 	    $errors["Address 2"] = TBFieldErrorString();
 	}
-	if (!isset($formfields[usr_city]) ||
-	    strcmp($formfields[usr_city], "") == 0) {
+	if (!isset($formfields["usr_city"]) ||
+	    strcmp($formfields["usr_city"], "") == 0) {
 	    $errors["City"] = "Missing Field";
 	}
-	elseif (! TBvalid_city($formfields[usr_city])) {
+	elseif (! TBvalid_city($formfields["usr_city"])) {
 	    $errors["City"] = TBFieldErrorString();
 	}
-	if (!isset($formfields[usr_state]) ||
-	    strcmp($formfields[usr_state], "") == 0) {
+	if (!isset($formfields["usr_state"]) ||
+	    strcmp($formfields["usr_state"], "") == 0) {
 	    $errors["State"] = "Missing Field";
 	}
-	elseif (! TBvalid_state($formfields[usr_state])) {
+	elseif (! TBvalid_state($formfields["usr_state"])) {
 	    $errors["State"] = TBFieldErrorString();
 	}
-	if (!isset($formfields[usr_zip]) ||
-	    strcmp($formfields[usr_zip], "") == 0) {
+	if (!isset($formfields["usr_zip"]) ||
+	    strcmp($formfields["usr_zip"], "") == 0) {
 	    $errors["ZIP/Postal Code"] = "Missing Field";
 	}
-	elseif (! TBvalid_zip($formfields[usr_zip])) {
+	elseif (! TBvalid_zip($formfields["usr_zip"])) {
 	    $errors["Zip/Postal Code"] = TBFieldErrorString();
 	}
-	if (!isset($formfields[usr_country]) ||
-	    strcmp($formfields[usr_country], "") == 0) {
+	if (!isset($formfields["usr_country"]) ||
+	    strcmp($formfields["usr_country"], "") == 0) {
 	    $errors["Country"] = "Missing Field";
 	}
-	elseif (! TBvalid_country($formfields[usr_country])) {
+	elseif (! TBvalid_country($formfields["usr_country"])) {
 	    $errors["Country"] = TBFieldErrorString();
 	}
-	if (!isset($formfields[usr_phone]) ||
-	    strcmp($formfields[usr_phone], "") == 0) {
+	if (!isset($formfields["usr_phone"]) ||
+	    strcmp($formfields["usr_phone"], "") == 0) {
 	    $errors["Phone #"] = "Missing Field";
 	}
-	elseif (!TBvalid_phone($formfields[usr_phone])) {
+	elseif (!TBvalid_phone($formfields["usr_phone"])) {
 	    $errors["Phone #"] = TBFieldErrorString();
 	}
     }
-    if (!isset($formfields[password1]) ||
-	strcmp($formfields[password1], "") == 0) {
+    if (!isset($formfields["password1"]) ||
+	strcmp($formfields["password1"], "") == 0) {
 	$errors["Password"] = "Missing Field";
     }
-    if (!isset($formfields[password2]) ||
-	strcmp($formfields[password2], "") == 0) {
+    if (!isset($formfields["password2"]) ||
+	strcmp($formfields["password2"], "") == 0) {
 	$errors["Confirm Password"] = "Missing Field";
     }
-    elseif (strcmp($formfields[password1], $formfields[password2])) {
+    elseif (strcmp($formfields["password1"], $formfields["password2"])) {
 	$errors["Confirm Password"] = "Does not match Password";
     }
     elseif (! CHECKPASSWORD(($USERSELECTUIDS ?
-			     $formfields[joining_uid] : "ignored"),
-			    $formfields[password1],
-			    $formfields[usr_name],
-			    $formfields[usr_email], $checkerror)) {
+			     $formfields["joining_uid"] : "ignored"),
+			    $formfields["password1"],
+			    $formfields["usr_name"],
+			    $formfields["usr_email"], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
 }
 if (!$forwikionly) {
-    if (!isset($formfields[pid]) || $formfields[pid] == "") {
+    if (!isset($formfields["pid"]) || $formfields["pid"] == "") {
 	$errors["Project Name"] = "Missing Field";
     }
     else {
         # Confirm pid/gid early to avoid spamming the page.
-	$pid = $formfields[pid];
+	$pid = $formfields["pid"];
 
-	if (isset($formfields[gid]) && $formfields[gid] != "") {
-	    $gid = $formfields[gid];
+	if (isset($formfields["gid"]) && $formfields["gid"] != "") {
+	    $gid = $formfields["gid"];
 	}
 	else {
 	    $gid = $pid;
 	}
 
-	if (!TBvalid_pid($pid) || !TBValidProject($pid)) {
+	if (!TBvalid_pid($pid) || !Project::Lookup($pid)) {
 	    $errors["Project Name"] = "Invalid Project Name";
 	}
-	elseif (!TBvalid_gid($gid) || !TBValidGroup($pid, $gid)) {
+	elseif (!TBvalid_gid($gid) || !Group::LookupByPidGid($pid, $gid)) {
 	    $errors["Group Name"] = "Invalid Group Name";
 	}
     }
@@ -688,27 +714,27 @@ if (count($errors)) {
 #
 if (! $returning) {
     $args = array();
-    $args["name"]	   = $formfields[usr_name];
-    $args["email"]         = $formfields[usr_email];
-    $args["address"]       = $formfields[usr_addr];
-    $args["address2"]      = $formfields[usr_addr2];
-    $args["city"]          = $formfields[usr_city];
-    $args["state"]         = $formfields[usr_state];
-    $args["zip"]           = $formfields[usr_zip];
-    $args["country"]       = $formfields[usr_country];
-    $args["phone"]         = $formfields[usr_phone];
+    $args["name"]	   = $formfields["usr_name"];
+    $args["email"]         = $formfields["usr_email"];
+    $args["address"]       = $formfields["usr_addr"];
+    $args["address2"]      = $formfields["usr_addr2"];
+    $args["city"]          = $formfields["usr_city"];
+    $args["state"]         = $formfields["usr_state"];
+    $args["zip"]           = $formfields["usr_zip"];
+    $args["country"]       = $formfields["usr_country"];
+    $args["phone"]         = $formfields["usr_phone"];
     $args["shell"]         = 'tcsh';
-    $args["title"]         = $formfields[usr_title];
-    $args["affiliation"]   = $formfields[usr_affil];
-    $args["password"]      = $formfields[password1];
-    $args["wikiname"]      = ($WIKISUPPORT ? $formfields[wikiname] : "");
+    $args["title"]         = $formfields["usr_title"];
+    $args["affiliation"]   = $formfields["usr_affil"];
+    $args["password"]      = $formfields["password1"];
+    $args["wikiname"]      = ($WIKISUPPORT ? $formfields["wikiname"] : "");
 
-    if (isset($formfields[usr_URL]) &&
-	$formfields[usr_URL] != $HTTPTAG && $formfields[usr_URL] != "") {
+    if (isset($formfields["usr_URL"]) &&
+	$formfields["usr_URL"] != $HTTPTAG && $formfields["usr_URL"] != "") {
 	$args["URL"] = $formfields[usr_URL];
     }
     if ($USERSELECTUIDS) {
-	$args["login"] = $formfields[joining_uid];
+	$args["login"] = $formfields["joining_uid"];
     }
 
     # Backend verifies pubkey and returns error.
@@ -721,7 +747,8 @@ if (! $returning) {
 	    $args["pubkey"] = file_get_contents($localfile);
 	}
     }
-    if (! ($user = User::NewNewUser(($forwikionly ? TBDB_NEWACCOUNT_WIKIONLY : 0),
+    if (! ($user = User::NewNewUser(($forwikionly ?
+				     TBDB_NEWACCOUNT_WIKIONLY : 0),
 				    $args,
 				    $error)) != 0) {
 	$errors["Error Creating User"] = $error;

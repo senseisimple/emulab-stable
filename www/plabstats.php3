@@ -5,11 +5,14 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
-# Standard Testbed Header
+# Standard Testbed Header if not looking for xml returned.
 #
+$optargs = OptionalPageArguments("xml",     PAGEARG_STRING,
+				 "slice",   PAGEARG_STRING,
+				 "records", PAGEARG_INTEGER);
+
 if (!isset($xml)) {
     PAGEHEADER("Emulab on Planetlab Stats");
 }
@@ -24,7 +27,7 @@ if ($this_user) {
     CheckLoginOrDie();
     $isadmin = ISADMIN();
 
-    if (!$isadmin)) {
+    if (!$isadmin) {
 	USERERROR("You do not have permission to view this page!", 1);
     }
 }
@@ -117,16 +120,16 @@ else {
 }
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $pid     = $row[pid];
-    $eid     = $row[eid];
-    $uid     = $row[uid];
-    $name    = $row[usr_name];
-    $email   = $row[usr_email];
-    $start   = $row[start_time];
-    $ustart  = $row[ustart];
-    $action  = $row[action];
-    $pnodes  = $row[plabnodes];
-    $exptidx = $row[exptidx];
+    $pid     = $row["pid"];
+    $eid     = $row["eid"];
+    $uid     = $row["uid"];
+    $name    = $row["usr_name"];
+    $email   = $row["usr_email"];
+    $start   = $row["start_time"];
+    $ustart  = $row["ustart"];
+    $action  = $row["action"];
+    $pnodes  = $row["plabnodes"];
+    $exptidx = $row["exptidx"];
     $slice   = "emulab_${exptidx}";
 
     if (!strcmp($action, "start")) {

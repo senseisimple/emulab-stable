@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -23,31 +23,18 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($user) ||
-    strcmp($user, "") == 0) {
-    PAGEARGERROR("You must provide a User ID!");
-}
-else {
-    if (! User::ValidWebID($user)) {
-	PAGEARGERROR("Invalid characters in $user!");
-    }
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("target_user", PAGEARG_USER);
 
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
+# Need these below.
 $userstatus = $target_user->status();
 $target_uid = $target_user->uid();
 
 #
 # Standard Testbed Header, now that we know what we want to say.
 #
-if (strcmp($uid, $user)) {
+if ($uid != $target_uid) {
     PAGEHEADER("CVS Repositories for: $target_uid");
 }
 else {

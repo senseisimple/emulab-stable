@@ -26,14 +26,12 @@ if (! $isadmin) {
     USERERROR("You do not have permission to view the user list!", 1);
 }
 
-echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
-               <a href='showuser_list.php3?showtype=recent'>recent</a>,
-               <a href='showuser_list.php3?showtype=widearea'>widearea</a>,
-               <a href='showuser_list.php3?showtype=homeless'>homeless</a>,
-               <a href='showuser_list.php3?showtype=active'>active</a>,
-               <a href='showuser_list.php3?showtype=inactive'>inactive</a>,
-               <a href='showuser_list.php3?showtype=archived'>archived</a>,
-               <a href='showuser_list.php3?showtype=all'>all</a>.</b>\n";
+#
+# Verify Page Arguments.
+#
+$optargs = OptionalPageArguments("showtype",   PAGEARG_STRING,
+				 "sortby",     PAGEARG_STRING,
+				 "searchfor",  PAGEARG_STRING);
 
 if (!isset($showtype)) {
     $showtype='loggedin';
@@ -44,6 +42,15 @@ if (!isset($sortby)) {
 if (!isset($searchfor)) {
     $searchfor = "";
 }
+
+echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
+               <a href='showuser_list.php3?showtype=recent'>recent</a>,
+               <a href='showuser_list.php3?showtype=widearea'>widearea</a>,
+               <a href='showuser_list.php3?showtype=homeless'>homeless</a>,
+               <a href='showuser_list.php3?showtype=active'>active</a>,
+               <a href='showuser_list.php3?showtype=inactive'>inactive</a>,
+               <a href='showuser_list.php3?showtype=archived'>archived</a>,
+               <a href='showuser_list.php3?showtype=all'>all</a>.</b>\n";
 
 #
 # Spit out a search form!
@@ -196,13 +203,13 @@ echo "    <th><a href='showuser_list.php3?showtype=$showtype&sortby=widle".
 echo "</tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
-    $thisuid  = $row[uid];
-    $webid    = $row[uid_idx];
-    $name     = $row[usr_name];
-    $status   = $row[status];
-    $unix_uid = $row[unix_uid];
-    $webidle  = $row[webidle];
-    $usersidle= $row[usersidle];
+    $thisuid  = $row["uid"];
+    $webid    = $row["uid_idx"];
+    $name     = $row["usr_name"];
+    $status   = $row["status"];
+    $unix_uid = $row["unix_uid"];
+    $webidle  = $row["webidle"];
+    $usersidle= $row["usersidle"];
 
     $showuser_url = CreateURL("showuser", URLARG_UID, $webid);
 

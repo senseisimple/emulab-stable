@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # Only known and logged in admins can update last_power times.
@@ -18,22 +19,27 @@ if (!$isadmin && !STUDLY()) {
 }
 
 #
-# Verify page arguments.
+# Verify page arguments. Note that "node_id" appears to be a comma separated
+# list of nodes, while "nodes" is an array passed by the form.
 #
+$optargs = OptionalPageArguments("node_id",   PAGEARG_STRING,
+				 "nodes",     PAGEARG_STRING,
+				 "poweron",   PAGEARG_STRING,
+				 "confirmed", PAGEARG_STRING);
+
 if ((!isset($node_id) || strcmp($node_id, "") == 0) && !isset($nodes)) {
     USERERROR("You must provide a node ID.", 1);
 }
 
 $body_str = "<center>";
 
-if ($confirmed) {
+if (isset($confirmed)) {
     $body_str .= "Updated power time for:<br><br>";
     foreach ($nodes as $ni) {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
-	
-	if (!TBValidNodeName($ni)) {
+	if (! ($node = Node::Lookup($ni))) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
 
@@ -59,8 +65,7 @@ else {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
-	
-	if (!TBValidNodeName($ni)) {
+	if (! ($node = Node::Lookup($ni))) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
 	

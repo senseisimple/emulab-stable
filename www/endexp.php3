@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can end experiments.
@@ -18,24 +17,15 @@ $isadmin   = ISADMIN();
 include("showlogfile_sup.php3");
 
 #
-# Must provide the pid,eid
-# 
-if (!isset($pid) || $pid == "") {
-  USERERROR("The project ID was not provided!", 1);
-}
-if (!isset($eid) || $eid == "") {
-  USERERROR("The experiment ID was not provided!", 1);
-}
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid project ID.");
-}
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid experiment ID.");
-}
-
+# Verify Page Arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING);
+				 
 # Canceled operation redirects back to showexp page. See below.
-if ($canceled) {
-    header("Location: showexp.php3?pid=$pid&eid=$eid");
+if (isset($canceled) && $canceled) {
+    header("Location: ". CreateURL("showexp", $experiment));
     return;
 }
 
@@ -44,15 +34,11 @@ if ($canceled) {
 #
 PAGEHEADER("Terminate Experiment");
 
-#
-# Check to make sure thats this is a valid pid,eid.
-#
-$experiment = Experiment::LookupByPidEid($pid, $eid);
-if (! $experiment) {
-    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-}
+# Need these below.
 $lockdown = $experiment->lockdown();
 $exptidx  = $experiment->idx();
+$pid      = $experiment->pid();
+$eid      = $experiment->eid();
 
 #
 # Verify permissions.
@@ -83,15 +69,17 @@ if ($lockdown) {
 # set. Or, the user can hit the cancel button, in which case redirect the
 # browser back up a level.
 #
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><br><font size=+2>Are you <b>REALLY</b> sure ";
     echo "you want to terminate " . ($instance ? "Instance " : "Experiment ");
     echo "'$eid?' </font>\n";
     echo "<br>(This will <b>completely</b> destroy all trace)<br><br>\n";
 
-    SHOWEXP($pid, $eid, 1);
+    $experiment->Show(1);
+
+    $url = CreateURL("endexp", $experiment);
     
-    echo "<form action='endexp.php3?pid=$pid&eid=$eid' method=post>";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -156,7 +144,7 @@ else {
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
     echo "<br><br>\n";
-    STARTLOG($pid, $eid);
+    STARTLOG($experiment);
 }
 
 #

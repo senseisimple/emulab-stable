@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can do this.
@@ -17,6 +16,13 @@ $isadmin   = ISADMIN();
 if (!$isadmin) {
     USERERROR("You do not have permission to view this page!", 1);
 }
+
+#
+# Verify Page arguments
+#
+$optargs = OptionalPageArguments("deletekey",  PAGEARG_STRING,
+				 "canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING);
 
 if (isset($deletekey)) {
     #
@@ -31,11 +37,11 @@ if (isset($deletekey)) {
 	USERERROR("No such widearea private key!", 1);
     }
     $row     = mysql_fetch_array($query_result);
-    $name    = $row[user_name];
-    $email   = $row[user_email];
-    $when    = $row[requested];
-    $IP      = $row[IP];
-    $nodeid  = $row[node_id];
+    $name    = $row["user_name"];
+    $email   = $row["user_email"];
+    $when    = $row["requested"];
+    $IP      = $row["IP"];
+    $nodeid  = $row["node_id"];
 
     #
     # We run this twice. The first time we are checking for a confirmation
@@ -43,7 +49,7 @@ if (isset($deletekey)) {
     # set. Or, the user can hit the cancel button, in which case we should
     # Probably redirect the browser back up a level.
     #
-    if ($canceled) {
+    if (isset($canceled) && $canceled) {
         PAGEHEADER("Widearea Private Key Deletion Request");
     
         echo "<center><h2><br>
@@ -57,7 +63,7 @@ if (isset($deletekey)) {
         return;
     }
 
-    if (!$confirmed) {
+    if (!isset($confirmed)) {
         PAGEHEADER("Widearea Private Key Deletion Request");
 
 	echo "<center><h3><br>
@@ -135,14 +141,14 @@ echo "<tr>
       </tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
-    $name    = $row[user_name];
-    $email   = $row[user_email];
-    $requested = $row[requested];
-    $updated  = $row[updated];
-    $privkey = $row[privkey];
-    $IP      = $row[IP];
-    $nodeid  = $row[node_id];
-    $cdvers  = $row[version];
+    $name    = $row["user_name"];
+    $email   = $row["user_email"];
+    $requested = $row["requested"];
+    $updated  = $row["updated"];
+    $privkey = $row["privkey"];
+    $IP      = $row["IP"];
+    $nodeid  = $row["node_id"];
+    $cdvers  = $row["version"];
 
     echo "<tr>
               <td align=center>

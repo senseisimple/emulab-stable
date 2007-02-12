@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -13,6 +13,16 @@ include_once("template_defs.php");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("experiment",   PAGEARG_EXPERIMENT,
+				 "template",     PAGEARG_TEMPLATE,
+				 "copyid",       PAGEARG_STRING,
+				 "nsref",        PAGEARG_INTEGER,
+				 "guid",         PAGEARG_INTEGER,
+				 "nsdata",       PAGEARG_ANYTHING);
 
 #
 # This comes from the begin_experiment page, when cloning an experiment
@@ -35,15 +45,9 @@ if (isset($copyid) && $copyid != "") {
             #
 	    # See if its a current experiment.
 	    #
-	    $query_result =
-		DBQueryFatal("select pid,eid from experiments ".
-			     "where idx='$exptidx'");
-		
-	    if (mysql_num_rows($query_result)) {
-		$row = mysql_fetch_row($query_result);
-
-		$copypid = $row[0];
-		$copyeid = $row[1];
+	    if (($experiment = Experiment::Lookup($exptidx))) {
+		$copypid = $experiment->pid();
+		$copyeid = $experiment->eid();
 	    }
 	}
     }
@@ -103,23 +107,8 @@ if (isset($copyid) && $copyid != "") {
 #
 # A template.
 #
-if (isset($guid) && isset($version)) {
-    if (!TBvalid_guid($guid)) {
-	PAGEARGERROR("Invalid GUID.");
-    }
-    if (!TBvalid_tinyint($version)) {
-	PAGEARGERROR("Invalid GUID version");
-    }
-
-    #
-    # Check to make sure this is a valid template and user has permission.
-    #
-    $template = Template::Lookup($guid, $version);
-    if (!$template) {
-	USERERROR("The experiment template $guid/$version is not a valid ".
-		  "experiment template!", 1);
-    }
-    if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
+if (isset($template)) {
+    if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to modify experiment template ".
 		  "$guid/$version!", 1);
     }
@@ -149,19 +138,11 @@ if (isset($guid) && isset($version)) {
 #
 # if requesting a specific pid,eid must have permission.
 #
-if (isset($pid) && isset($eid)) {
-    #
-    # Check to make sure this is a valid PID/EID tuple.
-    #
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("Experiment $eid is not a valid experiment ".
-		  "in project $pid.", 1);
-    }
-
+if (isset($experiment)) {
     #
     # Verify Permission.
     #
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view the NS file for ".
 		  "experiment $eid in project $pid!", 1);
     }
@@ -169,18 +150,14 @@ if (isset($pid) && isset($eid)) {
     #
     # Grab the NS file from the DB.
     #
-    $query_result =
-	DBQueryFatal("select nsfile from nsfiles ".
-		     "where pid='$pid' and eid='$eid'");
-    if (mysql_num_rows($query_result) == 0) {
+    if (($nsfile = $experiment->NSFile())) {
+	header("Content-Type: text/plain");
+	echo "$nsfile\n";
+    }
+    else {
 	USERERROR("There is no NS file recorded for ".
 		  "experiment $eid in project $pid!", 1);
     }
-    $row    = mysql_fetch_array($query_result);
-    $nsfile = $row["nsfile"];
-    
-    header("Content-Type: text/plain");
-    echo "$nsfile\n";
     return;
 }
 

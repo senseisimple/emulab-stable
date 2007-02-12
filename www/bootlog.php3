@@ -1,11 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # No PAGEHEADER since we spit out plain text.
@@ -19,39 +19,31 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid nodeid.
+# Verify page arguments.
 #
-if (isset($node_id) && strcmp($node_id, "")) {
-    if (! TBValidNodeName($node_id)) {
-	USERERROR("$node_id is not a valid node name!", 1);
-    }
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
 
-    if (!$isadmin &&
-	!TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
-        USERERROR("You do not have permission to view bootlog for $node_id!", 1);
-    }
+if (! $isadmin &&
+    ! $node->AccessCheck($this_user, $TB_NODEACCESS_REBOOT)) {
+    USERERROR("You do not have permission to view the bootlog node", 1);
 }
-else {
-    USERERROR("Must specify a node ID!", 1);
-}
+$node_id = $node->node_id();
 
 #
 # See if we have a bootlog recorded. 
 #
-$query_result =
-    DBQueryFatal("select * from node_bootlogs where node_id='$node_id'");
-
-if (mysql_num_rows($query_result) == 0) {
+$log   = null;
+$stamp = null;
+if ($node->BootLog($log, $stamp) || is_null($log)) {
     USERERROR("There is no bootlog for $node_id", 1);
 }
-$row = mysql_fetch_array($query_result);
 
 header("Content-Type: text/plain");
 header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
 header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
 
-echo "Bootlog reported on ". $row["bootlog_timestamp"] . "\n\n";
-echo $row["bootlog"];
+echo "Bootlog reported on $stamp\n\n";
+echo $log;
 
 ?>

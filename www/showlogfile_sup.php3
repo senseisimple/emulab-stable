@@ -15,9 +15,12 @@ if (sajax_client_request()) {
     $session_interactive = 0;
 }
 
+#
+# This will return the experiment object to the caller.
+#
 function CHECKPAGEARGS($pid, $eid) {
     global $this_user, $TB_EXPT_READINFO;
-    
+
     #
     # Verify page arguments.
     # 
@@ -57,11 +60,12 @@ function CHECKPAGEARGS($pid, $eid) {
     if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view the log for $pid/$eid!", 1);
     }
+    return $experiment;
 }
 
 function GetPNodes($pid, $eid) {
     CHECKPAGEARGS($pid, $eid);
-    
+
     $retval = array();
 
     $query_result = DBQueryFatal(
@@ -77,31 +81,35 @@ function GetPNodes($pid, $eid) {
 
 function GetExpState($pid, $eid)
 {
-    CHECKPAGEARGS($pid, $eid);
-    
-    $expstate = TBExptState($pid, $eid);
+    $experiment = CHECKPAGEARGS($pid, $eid);
+    $expstate   = $experiment->state();
 
     return $expstate;
 }
 
-function STARTWATCHER($pid, $eid)
+function STARTWATCHER($experiment)
 {
     echo "<script type='text/javascript' language='javascript'
                   src='showexp.js'></script>\n";
 
-    $currentstate = TBExptState($pid, $eid);
+    $pid   = $experiment->pid();
+    $eid   = $experiment->eid();
+    $state = $experiment->state();
     
     echo "<script type='text/javascript' language='javascript'>\n";
     sajax_show_javascript();
-    echo "StartStateChangeWatch('$pid', '$eid', '$currentstate');\n";
+    echo "StartStateChangeWatch('$pid', '$eid', '$state');\n";
     echo "</script>\n";
 }
 
-function STARTLOG($pid, $eid)
+function STARTLOG($experiment)
 {
     global $BASEPATH;
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    $url = CreateURL("spewlogfile", $experiment);
 
-    STARTWATCHER($pid, $eid);
+    STARTWATCHER($experiment);
 
     echo "<center>\n";
     echo "<img id='busy' src='busy.gif'>
@@ -124,8 +132,7 @@ function STARTLOG($pid, $eid)
     echo "exp_pid = \"$pid\";\n";
     echo "exp_eid = \"$eid\";\n";
     echo "</script><div>
-         <iframe id='downloader' name='downloader' width=0 height=0
-                 src='spewlogfile.php3?pid=$pid&eid=$eid'
+         <iframe id='downloader' name='downloader' width=0 height=0 src='$url'
                  onload='ml_handleReadyState(LOG_STATE_LOADED);'
                  border=0 frameborder=0>
          </iframe></div>\n";

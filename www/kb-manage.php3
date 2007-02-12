@@ -24,6 +24,15 @@ $uid       = $this_user->uid();
 $dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
+#
+# Verify Page arguments.
+#
+$optargs = OptionalPageArguments("idx",        PAGEARG_INTEGER,
+				 "action",     PAGEARG_STRING,
+				 "submit",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
+				 
+
 if (!$isadmin) {
     USERERROR("You are not allowed to view this page!", 1);
 }
@@ -96,20 +105,20 @@ function SPITFORM($formfields, $errors)
 
 	echo "<tr>
                   <td>Posted by:</td>
-                  <td>$formfields[creator_uid]</td>
+                  <td>" . $formfields["creator_uid"] . "</td>
               </tr>\n";
 	echo "<tr>
                   <td>Posted on:</td>
-                  <td>$formfields[date_created]</td>
+                  <td>" . $formfields["date_created"] . "</td>
               </tr>\n";
-	if (isset($formfields[date_modified])) {
+	if (isset($formfields["date_modified"])) {
 	    echo "<tr>
                      <td>Last Modified by:</td>
-                     <td>$formfields[modifier_uid]</td>
+                     <td>" . $formfields["modifier_uid"] . "</td>
                   </tr>\n";
 	    echo "<tr>
                       <td>Modified on:</td>
-                      <td>$formfields[date_modified]</td>
+                      <td>" . $formfields["date_modified"] . "</td>
                   </tr>\n";
 	}
 	echo "<tr></tr>\n";
@@ -127,8 +136,8 @@ function SPITFORM($formfields, $errors)
 	$section  = $section_row['section'];
 	$selected = "";
 
-	if (isset($formfields[section]) &&
-	    strcmp($formfields[section], $section) == 0)
+	if (isset($formfields["section"]) &&
+	    strcmp($formfields["section"], $section) == 0)
 	    $selected = "selected";
 
 	echo "<option $selected value='$section'>$section &nbsp; </option>\n";
@@ -139,7 +148,8 @@ function SPITFORM($formfields, $errors)
     echo "    or add: ";
     echo "    <input type=text
                      name=\"formfields[new_section]\"
-                     value=\"" . $formfields[new_section] . "\"
+                     value=\"" . (isset($formfields["new_section"]) ?
+				  $formfields["new_section"] : "") . "\"
    	             size=50>\n";
     echo "   </td>
 	  </tr>\n";
@@ -153,7 +163,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[title]\"
-                         value=\"" . $formfields[title] . "\"
+                         value=\"" . $formfields["title"] . "\"
 	                 size=70>
               </td>
           </tr>\n";
@@ -169,7 +179,7 @@ function SPITFORM($formfields, $errors)
                           name=\"formfields[faq_entry]\"
                           value=1";
 
-    if (isset($formfields[faq_entry]) && $formfields[faq_entry] == "1")
+    if (isset($formfields["faq_entry"]) && $formfields["faq_entry"] == "1")
 	echo "           checked";
 	
     echo "                       > Yes
@@ -184,7 +194,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[xref_tag]\"
-                         value=\"" . $formfields[xref_tag] . "\"
+                         value=\"" . $formfields["xref_tag"] . "\"
 	                 size=20>
               </td>
           </tr>\n";
@@ -200,7 +210,7 @@ function SPITFORM($formfields, $errors)
           <tr>
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[body]\"
-                    rows=30 cols=80>$formfields[body]</textarea>
+                    rows=30 cols=80>" . $formfields["body"] . "</textarea>
               </td>
           </tr>\n";
 
@@ -250,19 +260,25 @@ if (isset($idx)) {
 	USERERROR("No such knowledge_base entry: $idx", 1);
     }
     $defaults = mysql_fetch_array($query_result);
-    $defaults[body] = htmlspecialchars($defaults[body], ENT_QUOTES);
+    $defaults["body"] = htmlspecialchars($defaults["body"], ENT_QUOTES);
 }
 
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
+if (! isset($submit)) {
     #
-    # If doing an edit of an existing entry, then need to get that from
-    # the DB. 
-    #
+    # New entry?
+    # 
     if (!isset($idx)) {
 	$defaults = array();
+	$defaults["body"]        = "";
+	$defaults["title"]       = "";
+	$defaults["section"]     = "";
+	$defaults["new_section"] = "";
+	$defaults["title"]       = "";
+	$defaults["faq_entry"]   = 0;
+	$defaults["xref_tag"]    = "";
 
         #
         # Allow formfields that are already set to override defaults
@@ -296,29 +312,29 @@ $errors = array();
 #
 # Section Name.
 #
-if (isset($formfields[new_section]) && $formfields[new_section] != "") {
-    if (! TBvalid_userdata($formfields[new_section])) {
+if (isset($formfields["new_section"]) && $formfields["new_section"] != "") {
+    if (! TBvalid_userdata($formfields["new_section"])) {
 	$errors["Section"] = "Invalid characters";
     }
-    elseif (strlen($formfields[new_section]) > TBDB_KB_SECTIONLEN) {
+    elseif (strlen($formfields["new_section"]) > TBDB_KB_SECTIONLEN) {
 	$errors["Section"] =
 	    "Too long! ".
 	    "Must be less than or equal to " . TBDB_KB_SECTIONLEN;
     }
-    $section = addslashes($formfields[new_section]);
+    $section = addslashes($formfields["new_section"]);
 }
-elseif (isset($formfields[section]) &&
-	$formfields[section] != "" && $formfields[section] != "none") {
+elseif (isset($formfields["section"]) &&
+	$formfields["section"] != "" && $formfields["section"] != "none") {
     
-    if (! TBvalid_userdata($formfields[section])) {
+    if (! TBvalid_userdata($formfields["section"])) {
 	$errors["Section"] = "Invalid characters";
     }
-    elseif (strlen($formfields[section]) > TBDB_KB_SECTIONLEN) {
+    elseif (strlen($formfields["section"]) > TBDB_KB_SECTIONLEN) {
 	$errors["Section"] =
 	    "Too long! ".
 	    "Must be less than or equal to " . TBDB_KB_SECTIONLEN;
     }
-    $section = addslashes($formfields[section]);
+    $section = addslashes($formfields["section"]);
 }
 else {
     $errors["Section"] = "Missing Field";
@@ -327,16 +343,16 @@ else {
 #
 # Title
 #
-if (isset($formfields[title]) && $formfields[title] != "") {
-    if (! TBvalid_userdata($formfields[title])) {
+if (isset($formfields["title"]) && $formfields["title"] != "") {
+    if (! TBvalid_userdata($formfields["title"])) {
 	$errors["Title"] = "Invalid characters";
     }
-    elseif (strlen($formfields[title]) > TBDB_KB_TITLELEN) {
+    elseif (strlen($formfields["title"]) > TBDB_KB_TITLELEN) {
 	$errors["Title"] =
 	    "Too long! ".
 	    "Must be less than or equal to " . TBDB_KB_TITLELEN;
     }
-    $title = addslashes($formfields[title]);
+    $title = addslashes($formfields["title"]);
 }
 else {
     $errors["Title"] = "Missing Field";
@@ -345,7 +361,7 @@ else {
 #
 # Faq Entry?
 #
-if (isset($formfields[faq_entry]) && $formfields[faq_entry] == "1") {
+if (isset($formfields["faq_entry"]) && $formfields["faq_entry"] == "1") {
     $faq_entry = 1;
 }
 else {
@@ -355,16 +371,16 @@ else {
 #
 # Cross Reference Tag
 #
-if (isset($formfields[xref_tag]) && $formfields[xref_tag] != "") {
-    if (! preg_match("/^[-\w]+$/", $formfields[xref_tag])) {
+if (isset($formfields["xref_tag"]) && $formfields["xref_tag"] != "") {
+    if (! preg_match("/^[-\w]+$/", $formfields["xref_tag"])) {
 	$errors["Cross Reference Tag"] = "Invalid characters";
     }
-    elseif (strlen($formfields[xref_tag]) > TBDB_KB_XREFTAGLEN) {
+    elseif (strlen($formfields["xref_tag"]) > TBDB_KB_XREFTAGLEN) {
 	$errors["Cross Reference Tag"] =
 	    "Too long! ".
 	    "Must be less than or equal to " . TBDB_KB_XREFTAGLEN;
     }
-    $xref_tag = addslashes($formfields[xref_tag]);
+    $xref_tag = addslashes($formfields["xref_tag"]);
     $xref_tag = "'$xref_tag'";
     
     #
@@ -386,16 +402,16 @@ else {
 #
 # Body
 #
-if (isset($formfields[body]) && $formfields[body] != "") {
-    if (! TBvalid_fulltext($formfields[body])) {
+if (isset($formfields["body"]) && $formfields["body"] != "") {
+    if (! TBvalid_fulltext($formfields["body"])) {
 	$errors["Body"] = "Invalid characters";
     }
-    elseif (strlen($formfields[body]) > TBDB_KB_BODYLEN) {
+    elseif (strlen($formfields["body"]) > TBDB_KB_BODYLEN) {
 	$errors["Body"] =
 	    "Too long! ".
 	    "Must be less than or equal to " . TBDB_KB_BODYLEN;
     }
-    $body = addslashes($formfields[body]);
+    $body = addslashes($formfields["body"]);
 }
 else {
     $errors["Body"] = "Missing Field";
@@ -449,7 +465,7 @@ else {
     $idx = $row[0];
 }
 
-if (isset($idx) && $action != "delete") {
+if (isset($idx) && (!isset($action) || $action != "delete")) {
     #
     # Okay, redirect the user over to the show page so they can see it.
     #

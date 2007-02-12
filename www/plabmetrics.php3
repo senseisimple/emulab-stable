@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -18,6 +17,8 @@ PAGEHEADER("PlanetLab Metrics");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+$optargs = OptionalPageArguments("sortby", PAGEARG_STRING);
 
 #
 # This is very simple; just invoke the script and spit the results back
@@ -118,6 +119,10 @@ if ($fp = popen("$TBSUEXEC_PATH nobody nobody webplabstats -i", "r")) {
     while (!feof($fp)) {
 	$string = fgets($fp, 1024);
 	$results = preg_split("/[\s]+/", $string, -1, PREG_SPLIT_NO_EMPTY);
+
+	# This appears to happen ...
+	if (count($results) < 7)
+	    continue;
 
 	$ip     = $results[6];
 	$nodeid = $nodemap["$ip"];

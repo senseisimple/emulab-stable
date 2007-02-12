@@ -1,11 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # Standard Testbed Header
@@ -20,23 +20,28 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure that this is a valid nodeid
+# Verify page arguments.
 #
-$query_result =
-    DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("The node $node_id is not a valid nodeid!", 1);
-}
-$row = mysql_fetch_array($query_result);
+$reqargs = RequiredPageArguments("node",	      PAGEARG_NODE,
+				 "def_boot_osid",     PAGEARG_STRING,
+				 "def_boot_cmd_line", PAGEARG_STRING,
+				 "startupcmd",        PAGEARG_STRING,
+				 "tarballs",          PAGEARG_STRING,
+				 "rpms",              PAGEARG_STRING);
+$optargs = OptionalPageArguments("next_boot_osid",     PAGEARG_STRING,
+				 "next_boot_cmd_line", PAGEARG_STRING,
+				 "temp_boot_osid",     PAGEARG_STRING);
+
+# Need these below.
+$node_id = $node->node_id();
 
 #
 # Admin users can control any node, but normal users can only control
 # nodes in their own experiments.
 #
-if (! $isadmin) {
-    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
-        USERERROR("You do not have permission to modify node $node_id!", 1);
-    }
+if (!$isadmin &&
+    !$node->AccessCheck($this_user, $TB_NODEACCESS_MODIFYINFO)) {
+    USERERROR("You do not have permission to modify node parameters!", 1);
 }
 
 #
@@ -45,54 +50,43 @@ if (! $isadmin) {
 #
 $command_string = "";
 
-if ($def_boot_osid != $row[def_boot_osid]) {
+if ($def_boot_osid != $node->def_boot_osid()) {
     $command_string .= "default_boot_osid='$def_boot_osid' ";
 }
-if ($def_boot_cmd_line != $row[def_boot_cmd_line]) {
+if ($def_boot_cmd_line != $node->def_boot_cmd_line()) {
     $command_string .= "default_boot_cmdline='$def_boot_cmd_line' ";
 }
-if ($startupcmd != $row[startupcmd]) {
+if ($startupcmd != $node->startupcmd()) {
     $command_string .= "startup_command='$startupcmd' ";
 }
-if ($tarballs != $row[tarballs]) {
+if ($tarballs != $node->tarballs()) {
     $command_string .= "tarfiles='$tarballs' ";
 }
-if ($rpms != $row[rpms]) {
+if ($rpms != $node->rpms()) {
     $command_string .= "rpms='$rpms' ";
 }
 
 if ($isadmin) {
-    if ($next_boot_osid != $row[next_boot_osid]) {
+    if (isset($next_boot_osid) &&
+	$next_boot_osid != $node->next_boot_osid()) {
 	$command_string .= "next_boot_osid='$next_boot_osid' ";
     }
-    if ($next_boot_cmd_line != $row[next_boot_cmd_line]) {
+    if (isset($next_boot_cmd_line) &&
+	$next_boot_cmd_line != $node->next_boot_cmd_line()) {
 	$command_string .= "next_boot_cmdline='$next_boot_cmd_line' ";
     }
-    if ($temp_boot_osid != $row[temp_boot_osid]) {
+    if (isset($temp_boot_osid) &&
+	$temp_boot_osid != $node->temp_boot_osid()) {
 	$command_string .= "temp_boot_osid='$temp_boot_osid' ";
     }
 }
 
-#
-# Pass it off to the script. It will check the arguments.
-#
+STARTBUSY("Making changes to $node_id");
 SUEXEC($uid, "nobody", "webnode_control $command_string $node_id",
        SUEXEC_ACTION_DIE);
+STOPBUSY();
 
-echo "<center>
-      <br>
-      <h3>Node parameters successfully modified!</h3><p>
-      </center>\n";
-
-SHOWNODE($node_id, SHOWNODE_NOFLAGS);
-
-#
-# Edit option.
-#
-echo "<br><center>
-           <A href='nodecontrol_form.php3?node_id=$node_id'>
-           Edit this the node info?</a>
-         </center>\n";
+PAGEREPLACE(CreateURL("shownode", $node));
 
 #
 # Standard Testbed Footer

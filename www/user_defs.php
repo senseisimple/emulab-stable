@@ -28,7 +28,7 @@ class User
     #
     # Constructor by lookup on unique index.
     #
-    function &User($uid_idx) {
+    function User($uid_idx) {
 	$safe_uid_idx = addslashes($uid_idx);
 
 	$query_result =
@@ -38,7 +38,7 @@ class User
 	    $this->user = NULL;
 	    return;
 	}
-	$this->user =& mysql_fetch_array($query_result);
+	$this->user = mysql_fetch_array($query_result);
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -47,18 +47,18 @@ class User
     }
 
     # Lookup by uid_idx.
-    function &Lookup($uid_idx) {
+    function Lookup($uid_idx) {
 	global $user_cache;
 
         # Look in cache first
 	if (array_key_exists("$uid_idx", $user_cache))
 	    return $user_cache["$uid_idx"];
 
-	$foo =& new User($uid_idx);
+	$foo = new User($uid_idx);
 
 	if (! $foo->IsValid()) {
 	    # Try lookup by plain uid.
-	    $foo =& User::LookupByUid($uid_idx);
+	    $foo = User::LookupByUid($uid_idx);
 	    
 	    if (!$foo || !$foo->IsValid())
 		return null;
@@ -72,7 +72,7 @@ class User
     }
 
     # Backwards compatable lookup by uid. Will eventually flush this.
-    function &LookupByUid($uid) {
+    function LookupByUid($uid) {
 	$safe_uid = addslashes($uid);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
 
@@ -92,7 +92,7 @@ class User
 
     # Used in the change password code and to make sure that emails are
     # locally unique.
-    function &LookupByEmail($email) {
+    function LookupByEmail($email) {
 	$safe_email = addslashes($email);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
 
@@ -112,7 +112,7 @@ class User
     
     # Used in new/join project code to make sure that wikinames are
     # locally unique.
-    function &LookupByWikiName($wikiname) {
+    function LookupByWikiName($wikiname) {
 	$safe_wikiname = addslashes($wikiname);
 	$status_archived = TBDB_USERSTATUS_ARCHIVED;
 
@@ -813,10 +813,22 @@ class User
     }
 
     #
-    # How many PCs is user using. Again, use global function for now.
+    # How many PCs is user using. 
     #
     function PCsInUse() {
-	return TBUserPCs($this->uid());
+	$uid_idx = $this->uid_idx();
+	
+	$query_result =
+	    DBQueryFatal("select a.node_id from nodes as a ".
+			 "left join reserved as b on a.node_id=b.node_id ".
+			 "left join node_types as nt on a.type=nt.type ".
+			 "left join experiments as e on b.pid=e.pid and ".
+			 "     b.eid=e.eid ".
+			 "where e.swapper_idx='$uid_idx' and ".
+			 "      e.pid!='emulab-ops' and ".
+			 "      a.role='testnode' and nt.class = 'pc'");
+
+	return mysql_num_rows($query_result);
     }
 
     #
@@ -1117,6 +1129,43 @@ class User
 		$result["$uid_idx"] = array();
 	    }
 	    $result["$uid_idx"][] = $group;
+	}
+	return $result;
+    }
+
+    #
+    # Return list of experiments for a user, or just a count.
+    #
+    function ExperimentList($listify = 1, $group = null) {
+	$uid_idx = $this->uid_idx();
+	$gclause = "";
+
+	# within optional group only.
+	if ($group) {
+	    $pid     = $group->pid();
+	    $gid     = $group->gid();
+	    $gclause = "and pid='$pid' and gid='$gid'";
+	}
+
+	$query_result =
+	    DBQueryFatal("select idx from experiments ".
+			 "where creator_idx='$uid_idx' $gclause");
+
+	if (! $listify) {
+	    return mysql_num_rows($query_result);
+	}
+
+	# Else, create a list of the groups.
+	$result  = array();
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $idx = $row["idx"];
+
+	    if (! ($experiment = Experiment::Lookup($idx))) {
+		TBERROR("Group::ExperimentList: ".
+			"Could not load experiment $idx!", 1);
+	    }
+	    $result[] = $experiment;
 	}
 	return $result;
     }

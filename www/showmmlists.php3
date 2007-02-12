@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,10 +20,16 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 $user_email = $this_user->email();
 
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("sortby",      PAGEARG_STRING,
+				 "showallmm",   PAGEARG_BOOLEAN,
+				 "target_user", PAGEARG_USER);
+
 if (! isset($sortby)) {
     $sortby = "listname";
 }
-
 if ($sortby == "listname") {
     $order = "mm.listname";
 }
@@ -37,13 +43,7 @@ else {
 #
 # Allow admin users to view the lists for a specific uid.
 #
-if (isset($user)) {
-    if ($user == "" || !User::ValidWebID($user)) {
-	PAGEARGERROR("Invalid characters in $target_uid");
-    }
-    if (! ($target_user = User::Lookup($user))) {
-	USERERROR("The user $user is not a valid user", 1);
-    }
+if (isset($target_user)) {
     if (!$isadmin &&
 	!$target_user->SameUser($this_user)) {
 	USERERROR("You do not have permission to list mailman lists for ".
@@ -134,7 +134,7 @@ if (mysql_num_rows($query_result)) {
     echo "<br>
            <center><font size=+1>";
 
-    if ($showallmm) {
+    if (isset($showallmm)) {
 	echo "User-Created Mailman lists";
     }
     else {

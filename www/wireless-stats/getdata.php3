@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -15,9 +15,14 @@ function death($msg) {
     PAGEHEADER("Wireless Connectivity Data");
     PAGEARGERROR($msg);
     PAGEFOOTER();
-
     exit(1);
 }
+
+#
+# Verify page arguments
+#
+$reqargs = RequiredPageArguments("type",    PAGEARG_STRING.
+				 "dataset", PAGEARG_STRING);
 
 ## we need a type and a dataset.
 if (isset($type) && isset($dataset) && preg_match("/^[a-zA-Z0-9\-_]+$/", $dataset)) {

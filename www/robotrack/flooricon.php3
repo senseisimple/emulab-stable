@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -15,25 +15,17 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page arguments. Allow user to optionally specify building/floor.
+# Verify page args
 #
-if (isset($building) && $building != "") {
-    # Sanitize for the shell.
-    if (!preg_match("/^[-\w]+$/", $building)) {
-	PAGEARGERROR("Invalid building argument.");
-    }
-}
-else {
-    PAGEARGERROR("Must supply a building.");
-}
+$reqargs = RequiredPageArguments("building",      PAGEARG_STRING,
+				 "floor",         PAGEARG_STRING);
 
-if (isset($floor) && $floor != "") {
-    if (!preg_match("/^[-\w]+$/", $floor)) {
-	PAGEARGERROR("Invalid floor argument.");
-    }
+# Sanitize for the shell.
+if (!preg_match("/^[-\w]+$/", $building)) {
+    PAGEARGERROR("Invalid building argument.");
 }
-else {
-    PAGEARGERROR("Must supply a floor.");
+if (!preg_match("/^[-\w]+$/", $floor)) {
+    PAGEARGERROR("Invalid floor argument.");
 }
 
 #
@@ -59,7 +51,8 @@ function CLEANUP()
     # the easiest way to do it.
     # 
     if (isset($prefix)) {
-	SUEXEC($uid, "nobody", "webfloormap -o $prefix -k ");
+	SUEXEC($uid, "nobody", "webfloormap -o $prefix -k ",
+	       SUEXEC_ACTION_IGNORE);
 	# This file does belong to the web server.
 	unlink($prefix);
     }

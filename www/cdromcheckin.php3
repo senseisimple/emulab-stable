@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
+include_once("node_defs.php");
 
 # These error codes must match whats in register.pl on the cd.
 define("CDROMSTATUS_OKAY"	,	0);
@@ -19,7 +20,7 @@ define("CDROMSTATUS_UPGRADEERROR",	107);
 define("CDROMSTATUS_OTHER",		199);
 
 #
-# Config setup.  This shouldn't be hard-coded in the long term.
+# Config setup.  This should not be hard-coded in the long term.
 
 $slicexbase = "slicex_slice=3\nslicex_mount=/users\n";
 $confslicex = "slicex_tarball=slicex.tar.gz
@@ -64,6 +65,29 @@ function SPITSTATUS($status)
 	    TBERROR("CDROM Checkin Error ($status) from $REMOTE_ADDR:\n\n".
 		    "$REQUEST_URI\n", 0);
     }
+}
+
+# Shuffle stuff out of REQUEST to avoid a bunch of silly changes.
+if (isset($_REQUEST["cdkey"])) {
+    $cdkey = $_REQUEST["cdkey"];
+}
+if (isset($_REQUEST["needscript"])) {
+    $needscript = $_REQUEST["needscript"];
+}
+if (isset($_REQUEST["privkey"])) {
+    $privkey = $_REQUEST["privkey"];
+}
+if (isset($_REQUEST["IP"])) {
+    $IP = $_REQUEST["IP"];
+}
+if (isset($_REQUEST["wahostname"])) {
+    $wahostname = $_REQUEST["wahostname"];
+}
+if (isset($_REQUEST["roottag"])) {
+    $roottag = $_REQUEST["roottag"];
+}
+if (isset($_REQUEST["updated"])) {
+    $updated = $_REQUEST["updated"];
 }
 
 #
@@ -253,8 +277,9 @@ if (isset($updated) && $updated == 1) {
     # Update with new nickname. Nice if node changes its real hostname.
     #
     if (isset($nickname)) {
-	$nodeid = TBIPtoNodeID($IP);
-	if ($nodeid) {
+	if (($node = Node::LookupByIP($IP))) {
+	    $nodeid = $node->node_id();
+	    
 	    DBQueryFatal("update reserved set vname='$nickname' ".
 			 "where node_id='$nodeid'");
 	}

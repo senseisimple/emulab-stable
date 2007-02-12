@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 include("xmlrpc.php3");
 
 #
@@ -20,11 +21,11 @@ $isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
+#
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
+
+# Need these below
+$node_id = $node->node_id();
 
 #
 # Admin users can look at any node, but normal users can only control
@@ -32,10 +33,9 @@ if (!isset($node_id) ||
 #
 # XXX is MODIFYINFO the correct one to check? (probably)
 #
-if (! $isadmin) {
-    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) {
-        USERERROR("You do not have permission to tip to node $node_id!", 1);
-    }
+if (!$isadmin &&
+    !$node->AccessCheck($this_user, $TB_NODEACCESS_READINFO)) {
+    USERERROR("You do not have permission to tip to node $node_id!", 1);
 }
 
 #
@@ -69,10 +69,10 @@ else {
 		  "or does not have a tipline!", 1);
     }
     $row = mysql_fetch_array($query_result);
-    $server  = $row[server];
-    $portnum = $row[portnum];
-    $keylen  = $row[keylen];
-    $keydata = $row[keydata];
+    $server  = $row["server"];
+    $portnum = $row["portnum"];
+    $keylen  = $row["keylen"];
+    $keydata = $row["keydata"];
 
     #
     # Read in the fingerprint of the capture certificate

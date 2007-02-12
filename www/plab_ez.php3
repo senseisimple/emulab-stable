@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -13,19 +13,25 @@ $NSGEN         = "webnsgen";
 $PLAB_TEMPLATE = "$TBDIR/etc/nsgen/planetlab.xml";
 
 #
-# Figure out which view to present
-#
-if (isset($advanced) || $advanced || (isset($submit)
-	&& ($submit != "Create it"))) {
-    $advanced = 1;
-}
-
-#
 # Only known and logged in users can get this page
 #
 $this_user = CheckLoginOrDie(0, "$TBBASE/login_plab.php3?refer=1");
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+$optargs = OptionalPageArguments("submit",          PAGEARG_STRING,
+				 "advanced",        PAGEARG_STRING,
+				 "formfields",      PAGEARG_ARRAY);
+#
+# Figure out which view to present
+#
+if ((isset($advanced) && $advanced) ||
+    (isset($submit) && ($submit != "Create it"))) {
+    $advanced = 1;
+}
+else {
+    $advanced = 0;
+}
 
 #
 # The reason for this apparently redundant pair of arrays is so that we can
@@ -127,8 +133,8 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     #
     # How many nodes
     #
-    if ($formfields[count]) {
-	$nnodes = $formfields[count];
+    if (isset($formfields["count"])) {
+	$nnodes = $formfields["count"];
     } else {
 	$nnodes = 10;
     }
@@ -192,6 +198,9 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	 echo "<input type='hidden' name='formfields[resusage]' value='3'>\n";
          echo "<input type='hidden' name='formfields[units]' value='$aswapunits'>\n";         
          echo "<input type='hidden' name='formfields[when]' value='$aswaptime'>\n";
+         echo "<input type='hidden' name='formfields[tarball]' value=''>\n";
+         echo "<input type='hidden' name='formfields[rpm]' value=''>\n";
+         echo "<input type='hidden' name='formfields[startupcmd]' value=''>\n";
      }
 
     #
@@ -211,14 +220,12 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		    <select name='formfields[type]'>\n";
 	while (list($junk,$type) = each($plab_types)) {
 	    $descr = $plab_type_descr[$type];
-	    list($acount,$asites) = $plab_counts[$type];
-	    if (!$acount) {
-		$acount = 0;
+	    $acount = 0;
+	    $asites = 0;
+	    if (isset($plab_counts[$type])) {
+		list($acount,$asites) = $plab_counts[$type];
 	    }
-	    if (!$asites) {
-		$asites = 0;
-	    }
-	    if ($formfields[type] && ($formfields[type] == $type)) {
+	    if (isset($formfields["type"]) && ($formfields["type"] == $type)) {
 		$selected = "selected";
 	    } else {
 		$selected = "";
@@ -242,21 +249,21 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		 <td>
 		    <select name='formfields[resusage]'>
 		    <option value='5'";
-	if ($formfields[resusage] == 5) { echo " selected"; }
+	if ($formfields["resusage"] == 5) { echo " selected"; }
 	echo ">Very High</option>
 		    <option value='4'";
-	if ($formfields[resusage] == 4) { echo " selected"; }
+	if ($formfields["resusage"] == 4) { echo " selected"; }
 	echo ">High</option>
 		    <option value='3'";
-	if (!$formfields[resusage] || $formfields[resusage] == 3) {
+	if (!$formfields["resusage"] || $formfields["resusage"] == 3) {
 	    echo " selected";
 	}
 	echo ">Medium</option>
 		    <option value='2'";
-	if ($formfields[resusage] == 2) { echo " selected"; }
+	if ($formfields["resusage"] == 2) { echo " selected"; }
 	echo ">Low</option>
 		    <option value='1'";
-	if ($formfields[resusage] == 1) { echo " selected"; }
+	if ($formfields["resusage"] == 1) { echo " selected"; }
 	echo ">Very Low</option>
 		    </select>
 		 </td>
@@ -265,7 +272,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	#
 	# Batch
 	#
-	if ($formfields[batched]) {
+	if (isset($formfields["batched"]) && $formfields["batched"]) {
 	    $checked = "checked";
 	} else {
 	    $checked = "";
@@ -295,7 +302,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
         #
 	# Auto-swap
 	#
-        if (!$formfields['when']) {
+        if (!isset($formfields['when'])) {
           $when  = $aswaptime;
           $units = $aswapunits;
         } else {
@@ -337,7 +344,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		        target='emulabfootnote'>Tarball(s)</a> to install:</td>
 		 <td>
 		    <input type='text' size=50 name=formfields[tarball]
-		           value='$formfields[tarball]'>
+		           value='" . $formfields["tarball"] . "'>
 		 </td>
 	      </tr>\n";
 
@@ -349,7 +356,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		        target='emulabfootnote'>RPM(s)</a> to install:</td>
 	         <td>
 		    <input type='text' name='formfields[rpm]'
-		           value='$formfields[rpm]' size=50>
+		           value='" . $formfields["rpm"] . "' size=50>
 	         </td>
               </tr>\n";
 
@@ -362,7 +369,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		</td>
 	         <td>
 		    <input type='text' name='formfields[startupcmd]'
-		           value='$formfields[startupcmd]' size=50>
+		           value='" . $formfields["startupcmd"] . "' size=50>
 		 </td>
                </tr>\n";
     } # if ($advanced)
@@ -421,6 +428,8 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 # given. Returns any errors.
 #
 function CHECKTARS($formfields) {
+    # Return error array
+    $errors = array();
 
     #
     # Make a list of files that will ahve to be fetched
@@ -512,14 +521,14 @@ function MAKENS($formfields) {
     #
     # Batched?
     #
-    if ($formfields['batched']) {
+    if (isset($formfields['batched']) && $formfields['batched']) {
 	$url .= '&formfields[exp_batched]=Yep';
     }
 
     #
     # Determine the auto-swap time
     #
-    if ($formfields['when']) {
+    if (isset($formfields['when'])) {
         if (strcmp($formfields['when'], 'never') == 0) {
             $url .= "&formfields[exp_autoswap]=0";
         } else {
@@ -609,7 +618,8 @@ function CHECKFORM($formfields) {
 #
 # Actually do it!
 #
-if (($submit == "Submit") || ($submit == "Create it")) {
+if (isset($submit) &&
+    ($submit == "Submit" || $submit == "Create it")) {
     $errors = CHECKFORM($formfields);
     if (!count($errors)) {
 	$errors = CHECKTARS($formfields);
@@ -620,6 +630,12 @@ if (($submit == "Submit") || ($submit == "Create it")) {
 	SPITFORM($advanced, $formfields, $errors);
     }
 } else {
+    if (! isset($formfields)) {
+	$formfields = array();
+	$formfields["tarball"] = "";
+	$formfields["rpm"] = "";
+	$formfields["startupcmd"] = "";
+    }
     SPITFORM($advanced, $formfields);
 }
 

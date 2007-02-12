@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,28 +18,15 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-#
-# Must provide the PID/EID!
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("The project ID was not provided!", 1);
-}
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("modbase",    PAGEARG_BOOLEAN,
+				 "dochange",   PAGEARG_BOOLEAN);
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("The experiment ID was not provided!", 1);
-}
-
-if (!TBValidExperiment($pid, $eid)) {
-    USERERROR("No such experiment $eid in project $eid!", 1);
-}
-$query_result =
-    DBQueryFatal("SELECT gid,state FROM experiments WHERE ".
-		 "eid='$eid' and pid='$pid'");
-$row = mysql_fetch_array($query_result);
-$gid         = $row[gid];
-$state       = $row[state];
+# Need these below.
+$pid   = $experiment->pid();
+$eid   = $experiment->eid();
+$gid   = $experiment->gid();
+$state = $experiment->state();
 
 #
 # Look for transition and exit with error.
@@ -56,7 +43,7 @@ if ($state != $TB_EXPTSTATE_ACTIVE &&
 # when the experiment is swapped out, but we need to generate a form based
 # on virt_lans instead of delays/linkdelays. Thats harder to do. 
 #
-if (strcmp($state, $TB_EXPTSTATE_ACTIVE)) {
+if ($state != $TB_EXPTSTATE_ACTIVE) {
     USERERROR("Experiment $eid must be active to change its traffic ".
 	      "shaping configuration!", 1);
 }
@@ -64,11 +51,11 @@ if (strcmp($state, $TB_EXPTSTATE_ACTIVE)) {
 #
 # Verify permission.
 #
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
+if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to modify experiment $eid!", 1);
 }
 
-if ($dochange == "1") {
+if (isset($dochange)) {
     #
     # Array of changes, indexed by [lan:node]
     # 
@@ -85,7 +72,7 @@ if ($dochange == "1") {
     #
     # Grab the unix GID for running scripts.
     #
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    $unix_gid = $experiment->UnixGID();
     
     while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	$changestring = strstr($header, "DC::");
@@ -133,10 +120,20 @@ if ($dochange == "1") {
 	    }
 	}
 
-	if (!isset($vnode) || !strcmp($vnode, "")) {
+	if (! array_key_exists($lan, $changes)) {
+	    $changes["$lan"] = array();
+	}
+
+	if (!isset($vnode) || $vnode == "") {
+	    if (! array_key_exists("allnodes", $changes["$lan"])) {
+		$changes["$lan"]["allnodes"] = "";
+	    }
 	    $changes["$lan"]["allnodes"] .= "${param}=${value} $qlimitarg ";
 	}
 	else {
+	    if (! array_key_exists("$vnode", $changes["$lan"])) {
+		$changes["$lan"]["$vnode"] = "";
+	    }
 	    $changes["$lan"]["$vnode"] .= "${param}=${value} $qlimitarg ";
 	}
     }
@@ -192,9 +189,7 @@ if (mysql_num_rows($result_delays) == 0 &&
     USERERROR("No running delay nodes with eid='$eid' and pid='$pid'!", 1);
 }
 
-echo "<font size=+1>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo $experiment->PageHeader();
 echo "<br><br>\n";
 
 echo "Use this page to alter the traffic shaping parameters of your
@@ -208,10 +203,10 @@ echo "Use this page to alter the traffic shaping parameters of your
       form. If you want these changes to be saved across swapout, then
       check the Save box.<br><br>\n";
 
-print "<form action='delaycontrol.php3' method=post>\n" .
+$url = CreateURL("delaycontrol", $experiment);
+
+print "<form action='$url' method=post>\n" .
       "<input type=hidden name=dochange value=1 />\n" .
-      "<input type=hidden name=eid value='$eid' />\n" .
-      "<input type=hidden name=pid value='$pid' />\n" .
       "<table>\n" .
       "<tr>" .
       " <th rowspan=2>Link Name</th>".

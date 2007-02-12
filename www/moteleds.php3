@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,16 +17,12 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
+# Need these below
+$pid = $experiment->pid();
+$eid = $experiment->eid();
 
 #
 # Define a stripped-down view of the web interface - less clutter
@@ -45,8 +41,8 @@ PAGEHEADER("Mote LEDs ($pid/$eid)",$view);
 #
 # Make sure they have permission to view this experiment
 #
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view experiment $exp_eid!", 1);
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment $eid!", 1);
 }
 
 #
@@ -62,15 +58,19 @@ $query_result =
 
 if (mysql_num_rows($query_result) == 0) {
    echo "<h3>No nodes to display in this experiment!</h3>\n";
-} else {
+}
+else {
     echo "<table align=center cellpadding=2 border=1>
 	  <tr><th>Mote</th><th>Phys Name</th><th>LEDs</th>\n";
     while ($row = mysql_fetch_array($query_result)) {
-	echo "<tr><th>$row[vname]</th>";
-	echo "<td>$row[phys_nodeid]</td><td>";
+	$vname = $row["vname"];
+	$pnode = $row["phys_nodeid"];
+	
+	echo "<tr><th>$vname</th>";
+	echo "<td>$pnode</td><td>";
 	SHOWBLINKENLICHTEN($uid,
 			   $HTTP_COOKIE_VARS[$TBAUTHCOOKIE],
-			   "ledpipe.php3?node=$row[phys_nodeid]");
+			   CreateURL("ledpipe", $pnode));
     }
     echo "</table>\n";
 

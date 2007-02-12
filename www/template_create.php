@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,6 +17,12 @@ include_once("template_defs.php");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("create",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY); 
 
 #
 # Spit the form out using the array of data.
@@ -70,7 +76,7 @@ function SPITFORM($formfields, $errors)
     while (list($project) = each($projlist)) {
 	$selected = "";
 
-	if (strcmp($formfields[pid], $project) == 0)
+	if (strcmp($formfields["pid"], $project) == 0)
 	    $selected = "selected";
 
 	echo "        <option $selected value=\"$project\">
@@ -96,10 +102,10 @@ function SPITFORM($formfields, $errors)
 	    if (strcmp($project, $group)) {
 		$selected = "";
 
-		if (isset($formfields[gid]) &&
-		    isset($formfields[pid]) &&
-		    strcmp($formfields[pid], $project) == 0 &&
-		    strcmp($formfields[gid], $group) == 0)
+		if (isset($formfields["gid"]) &&
+		    isset($formfields["pid"]) &&
+		    strcmp($formfields["pid"], $project) == 0 &&
+		    strcmp($formfields["gid"], $group) == 0)
 		    $selected = "selected";
 
 		echo "<option $selected value=\"$group\">
@@ -122,7 +128,7 @@ function SPITFORM($formfields, $errors)
               <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[tid]\"
-                         value=\"" . $formfields[tid] . "\"
+                         value=\"" . $formfields["tid"] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
               </td>
@@ -131,11 +137,11 @@ function SPITFORM($formfields, $errors)
     #
     # NS file
     #
-    if (isset($formfields[nsref])) {
-	$nsref = $formfields[nsref];
+    if (isset($formfields["nsref"])) {
+	$nsref = $formfields["nsref"];
 	
-	if (isset($formfields[guid])) {
-	    $guid = $formfields[guid];
+	if (isset($formfields["guid"])) {
+	    $guid = $formfields["guid"];
 	    
 	    echo "<tr>
                   <td class='pad4'>Your auto-generated NS file: &nbsp</td>
@@ -171,7 +177,7 @@ function SPITFORM($formfields, $errors)
                         <input type=hidden name=MAX_FILE_SIZE value=512000>
 	                <input type=file
                                name=nsfile
-                               value=\"" . $formfields[nsfile] . "\"
+                               value=\"" . $formfields["nsfile"] . "\"
 	                       size=30>
                       </td>
                     </tr><tr>
@@ -182,7 +188,7 @@ function SPITFORM($formfields, $errors)
                       <td class='pad4'>
 	                <input type=text
                                name=\"formfields[localnsfile]\"
-                               value=\"" . $formfields[localnsfile] . "\"
+                               value=\"" . $formfields["localnsfile"] . "\"
 	                       size=40>
                       </td>
                      </tr>
@@ -200,7 +206,7 @@ function SPITFORM($formfields, $errors)
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[description]\"
                     rows=10 cols=80>" .
-	            ereg_replace("\r", "", $formfields[description]) .
+	            ereg_replace("\r", "", $formfields["description"]) .
 	           "</textarea>
               </td>
           </tr>\n";
@@ -236,6 +242,16 @@ if (! count($projlist)) {
 # On first load, display virgin form and exit.
 #
 if (!isset($create)) {
+    $defaults = array();
+
+    $defaults["pid"]               = "";
+    $defaults["gid"]               = "";
+    $defaults["tid"]               = "";
+    $defaults["pid"]               = "";
+    $defaults["description"]       = "";
+    $defaults["localnsfile"]       = "";
+    $defaults["nsfile"]            = ""; # Multipart data.
+
     #
     # For users that are in one project and one subgroup, it is usually
     # the case that they should use the subgroup, and since they also tend
@@ -254,9 +270,6 @@ if (!isset($create)) {
 	reset($projlist);
     }
 
-    $defaults[localnsfile]       = "";
-    $defaults[nsfile]            = ""; # Multipart data.
-
     #
     # Allow formfields that are already set to override defaults
     #
@@ -270,7 +283,9 @@ if (!isset($create)) {
     PAGEFOOTER();
     return;
 }
-elseif (! isset($formfields)) {
+
+# Make sure we got that formfields array!
+if (! isset($formfields)) {
     PAGEARGERROR();
 }
 
@@ -287,72 +302,78 @@ $deletensfile    = 0;
 #
 # Project:
 #
-if (!isset($formfields[pid]) || $formfields[pid] == "") {
+if (!isset($formfields["pid"]) || $formfields["pid"] == "") {
     $errors["Project"] = "Not Selected";
 }
-elseif (!TBvalid_pid($formfields[pid])) {
+elseif (!TBvalid_pid($formfields["pid"])) {
     $errors["Project"] = TBFieldErrorString();
 }
-elseif (!TBValidProject($formfields[pid])) {
+elseif (! ($project = Project::Lookup($formfields["pid"]))) {
     $errors["Project"] = "No such project";
 }
-
-#
-# Group: If none specified, then use default group (see below).
-#
-if (isset($formfields[gid]) && $formfields[gid] != "") {
-    if (!TBvalid_gid($formfields[gid])) {
-	$errors["Group"] = TBFieldErrorString();
+else {
+    #
+    # Group: If none specified, then use default group (see below).
+    #
+    if (isset($formfields["gid"]) && $formfields["gid"] != "") {
+	if (!TBvalid_gid($formfields["gid"])) {
+	    $errors["Group"] = TBFieldErrorString();
+	}
+	elseif (! ($group = Group::LookupByPidGid($formfields["pid"],
+						  $formfields["gid"]))) {
+	    $errors["Group"] = "No such group in project'";
+	}
     }
-    elseif (!TBValidGroup($formfields[pid], $formfields[gid])) {
-	$errors["Group"] = "Group '$gid' is not in project '$pid'";
+    else {
+	$group = $project->DefaultGroup();
     }
 }
 
 #
 # TID
 #
-if (!isset($formfields[tid]) || $formfields[tid] == "") {
+if (!isset($formfields["tid"]) || $formfields["tid"] == "") {
     $errors["Template ID"] = "Missing Field";
 }
-elseif (!TBvalid_eid($formfields[tid])) {
+elseif (!TBvalid_eid($formfields["tid"])) {
     $errors["Template ID"] = TBFieldErrorString();
 }
 
 #
 # Description:
 # 
-if (!isset($formfields[description]) || $formfields[description] == "") {
+if (!isset($formfields["description"]) || $formfields["description"] == "") {
     $errors["Description"] = "Missing Field";
 }
-elseif (!TBvalid_template_description($formfields[description])) {
+elseif (!TBvalid_template_description($formfields["description"])) {
     $errors["Description"] = TBFieldErrorString();
 }
 
 #
 # The NS file. There is a bunch of stuff here for Netbuild.
 #
-$formfields[nsfile] = "";
+$formfields["nsfile"] = "";
 
-if (isset($formfields[guid])) {
-    if ($formfields[guid] == "" ||
-	!preg_match("/^\d+$/", $formfields[guid])) {
+if (isset($formfields["guid"])) {
+    if ($formfields["guid"] == "" ||
+	!preg_match("/^\d+$/", $formfields["guid"])) {
 	$errors["NS File GUID"] = "Invalid characters";
     }
     $nsfilelocale = "nsref";
 }
-elseif (isset($formfields[nsref])) {
-    if ($formfields[nsref] == "" ||
-	!preg_match("/^\d+$/", $formfields[nsref])) {
+elseif (isset($formfields["nsref"])) {
+    if ($formfields["nsref"] == "" ||
+	!preg_match("/^\d+$/", $formfields["nsref"])) {
 	$errors["NS File Reference"] = "Invalid characters";
     }
     $nsfilelocale = "nsref";
 }
-elseif (isset($formfields[localnsfile]) && $formfields[localnsfile] != "") {
-    if (!preg_match("/^([-\@\w\.\/]+)$/", $formfields[localnsfile])) {
+elseif (isset($formfields["localnsfile"]) &&
+	$formfields["localnsfile"] != "") {
+    if (!preg_match("/^([-\@\w\.\/]+)$/", $formfields["localnsfile"])) {
 	$errors["Server NS File"] = "Pathname includes illegal characters";
     }
-    elseif (! VALIDUSERPATH($formfields[localnsfile])) {
+    elseif (! VALIDUSERPATH($formfields["localnsfile"])) {
 	$errors["Server NS File"] =
 		"Must reside in one of: $TBVALIDDIRS";
     }
@@ -395,10 +416,10 @@ if (count($errors)) {
 #
 # Okay, we can run the backend script.
 #
-$description  = escapeshellarg($formfields[description]);
-$pid          = $formfields[pid];
-$gid          = $formfields[gid];
-$tid          = $formfields[tid];
+$description  = escapeshellarg($formfields["description"]);
+$pid          = $formfields["pid"];
+$gid          = $formfields["gid"];
+$tid          = $formfields["tid"];
 
 # Default to pid=gid;
 if (!isset($gid) || $gid == "") {
@@ -408,7 +429,7 @@ if (!isset($gid) || $gid == "") {
 #
 # Verify permissions. We do this here since pid/eid/gid could be bogus above.
 #
-if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_CREATEEXPT)) {
+if (! $group->AccessCheck($this_user, $TB_PROJECT_CREATEEXPT)) {
     $errors["Project/Group"] = "Not enough permission to create template";
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -425,13 +446,13 @@ if ($nsfilelocale == "local") {
     # for the file so the user will get immediate feedback if the filename
     # is bogus.
     #
-    $thensfile = $formfields[localnsfile];
+    $thensfile = $formfields["localnsfile"];
 }
 elseif ($nsfilelocale == "nsref") {
-    $nsref = $formfields[nsref];
+    $nsref = $formfields["nsref"];
     
-    if (isset($formfields[guid])) {
-	$guid      = $formfields[guid];
+    if (isset($formfields["guid"])) {
+	$guid      = $formfields["guid"];
 	$thensfile = "/tmp/$guid-$nsref.nsfile";
     }
     else {
@@ -463,7 +484,7 @@ elseif ($nsfilelocale == "remote") {
 #
 # Grab the unix GID for running scripts.
 #
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+$unix_gid = $group->unix_gid();
 
 # Okay, we can spit back a header now that there is no worry of redirect.
 PAGEHEADER("Create an Experiment Template");
@@ -510,7 +531,9 @@ if (preg_match("/^Template\s+(\w+)\/(\w+)\s+/",
     $guid = $matches[1];
     $vers = $matches[2];
 
-    PAGEREPLACE("template_show.php?guid=$guid&version=$vers");
+    if (($template = Template::Lookup($guid, $vers))) {
+	PAGEREPLACE(CreateURL("template_show", $template));
+    }
 }
 
 #

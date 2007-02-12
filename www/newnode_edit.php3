@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -27,15 +27,16 @@ if (! $isadmin) {
     USERERROR("You do not have admin privileges!", 1);
 }
 
-
-if (!$id) {
-    USERERROR("Must specify a node ID!",1);
-}
+$reqargs = RequiredPageArguments("id",         PAGEARG_STRING);
+$optargs = OptionalPageArguments("node_id",    PAGEARG_STRING,
+				 "type",       PAGEARG_STRING,
+				 "IP",         PAGEARG_STRING,
+				 "identifier", PAGEARG_STRING);
 
 #
 # If we had any update information passed to us, do the update now
 #
-if ($node_id) {
+if (isset($node_id)) {
     DBQueryFatal("UPDATE new_nodes SET node_id='$node_id', type='$type', " .
     	"IP='$IP', identifier='$identifier' WHERE new_node_id='$id'");
 }

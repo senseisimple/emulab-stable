@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -19,21 +19,13 @@ PAGEBEGINNING("Experiment State Change", 0, 1);
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    PAGEARGERROR("You must provide a Project ID.");
-}
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "state",      PAGEARG_STRING);
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    PAGEARGERROR("You must provide an Experiment ID.");
-}
-
-if (!isset($state) ||
-    strcmp($state, "") == 0) {
-    PAGEARGERROR("You must provide the new state.");
-}
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
 
 echo "<div class=contentbody id=statechange>\n";
 echo "<br><br><font size=+1>

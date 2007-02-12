@@ -1,11 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -19,30 +19,31 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid nodeid
+# Verify page arguments.
 #
-if (!isset($node_id) || !strcmp($node_id, "") || !TBValidNodeName($node_id)) {
-    USERERROR("The node '$node_id' is not a valid node!", 1);
-}
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
+$optargs = OptionalPageArguments("canceled", PAGEARG_BOOLEAN,
+				 "confirmed", PAGEARG_BOOLEAN);
 
 #
-# Has to be reserved of course!
+# Has to be reserved of course.
 #
-$query_result =
-    DBQueryFatal("select pid,eid from reserved where node_id='$node_id'");
+$experiment = $node->Reservation();
 
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("$node_id is not currently reserved!", 1);
+if (! $experiment) {
+    USERERROR($node->node_id() . " is not currently reserved!", 1);
 }
-$row = mysql_fetch_array($query_result);
-$pid = $row[pid];
-$eid = $row[eid];
+
+# Need these below.
+$node_id = $node->node_id();
+$pid     = $experiment->pid();
+$eid     = $experiment->eid();
 
 #
 # Perm check.
 #
 if (! ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
-    USERERROR("Not enough permission to free nodes from the web interface!", 1);
+    USERERROR("Not enough permission to free nodes!", 1);
 }
 
 #
@@ -51,7 +52,7 @@ if (! ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     PAGEHEADER("Free Node");
 	
     echo "<center><h3><br>
@@ -62,7 +63,7 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("Free Node");
 
     echo "<center><h2><br>
@@ -70,9 +71,11 @@ if (!$confirmed) {
           sure you want to free node '$node_id?'
           </h2>\n";
 
-    SHOWNODE($node_id, SHOWNODE_NOFLAGS);
+    $node->Show(SHOWNODE_NOFLAGS);
+
+    $url = CreateURL("freenode", $node);
     
-    echo "<form action='freenode.php3?node_id=$node_id' method=post>";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -85,7 +88,9 @@ if (!$confirmed) {
 #
 # Pass it off to the script.
 #
-SUEXEC($uid, "nobody", "webnfree $pid $eid $node_id", 1);
+STARTBUSY("Releasing node $node_id");
+SUEXEC($uid, "nobody", "webnfree $pid $eid $node_id", SUEXEC_ACTION_DIE);
+STOPBUSY();
 
 #
 # And send an audit message.
@@ -104,6 +109,6 @@ TBMAIL($TBMAIL_AUDIT,
 # in it. The back button skips over the post and to the form.
 # See above for conclusion.
 # 
-header("Location: shownode.php3?node_id=$node_id");
+header("Location: ". CreateURL("shownode", $node));
 
 ?>

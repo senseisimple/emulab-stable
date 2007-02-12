@@ -5,7 +5,8 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("imageid_defs.php");
+include_once("osinfo_defs.php");
 include("osiddefs.php3");
 
 #
@@ -14,12 +15,28 @@ include("osiddefs.php3");
 # and that causes problems since we use the same id for both tables. For
 # now, test for the shorted of the two.
 # 
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
+				 "nodetype",     PAGEARG_STRING,
+				 "canceled",     PAGEARG_BOOLEAN,
+				 "confirmed",    PAGEARG_BOOLEAN,
+				 "formfields",   PAGEARG_ARRAY);
 
 #
 # Options for using this page with different types of nodes
 #
 $nodetypes = array( "mote" );
-if ($nodetype == "mote") {
+if (isset($nodetype) && $nodetype == "mote") {
     $view = array('hide_partition' => 1, 'hide_os' => 1, 'hide_version' => 1,
 		  'hide_snapshot' => 1, 'hide_features' => 1,
 		  'hide_opmode' => 1, 'hide_footnotes' => 1);
@@ -40,19 +57,10 @@ if ($nodetype == "mote") {
           <a href=tutorial/docwrapper.php3?docname=tutorial.html#CustomOS>
           tutorial</a> for more info on creating/using custom Images.";
 }
-
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Create a new Image Descriptor ($title)");
-
-#
-# Only known and logged in users.
-#
-$this_user = CheckLoginOrDie();
-$uid       = $this_user->uid();
-$dbid      = $this_user->dbid();
-$isadmin   = ISADMIN();
 
 #
 # See what projects the uid can do this in.
@@ -86,20 +94,19 @@ $types_result = DBQueryFatal($types_querystring);
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $uid, $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
-      $osid_featurelist, $nodetype, $filename_extension, $help_message;
+    global $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
+	$osid_featurelist, $nodetype, $filename_extension, $help_message;
     global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
-    global $TBDB_OSID_VERSLEN, $TBBASE, $TBPROJ_DIR;
-
+    global $TBDB_OSID_VERSLEN, $TBBASE, $TBPROJ_DIR, $TBGROUP_DIR;
     global $view;
+    
     #
     # Explanation of the $view argument: used to turn on and off display of
     # various parts of the form, so that it can be used for different types
-    # of nodes. It's an associative array, with contents like: 'hide_partition'.
+    # of nodes. It's an associative array, with contents like:'hide_partition'.
     # In general, when an option is hidden, it is replaced with a hidden
     # field from $formfields
     #
-
     if ($help_message) {
         echo "<center><b>$help_message</b></center>\n";
     }
@@ -218,7 +225,7 @@ function SPITFORM($formfields, $errors)
     while (list($project) = each($projlist)) {
 	$selected = "";
 
-	if ($formfields[pid] == $project)
+	if ($formfields["pid"] == $project)
 	    $selected = "selected";
 	
 	echo "        <option $selected value='$project'>$project </option>\n";
@@ -244,10 +251,10 @@ function SPITFORM($formfields, $errors)
 	    if (strcmp($project, $group)) {
 		$selected = "";
 
-		if (isset($formfields[gid]) &&
-		    isset($formfields[pid]) &&
-		    strcmp($formfields[pid], $project) == 0 &&
-		    strcmp($formfields[gid], $group) == 0)
+		if (isset($formfields["gid"]) &&
+		    isset($formfields["pid"]) &&
+		    strcmp($formfields["pid"], $project) == 0 &&
+		    strcmp($formfields["gid"], $group) == 0)
 		    $selected = "selected";
 		
 		echo "<option $selected value=\"$group\">
@@ -268,7 +275,7 @@ function SPITFORM($formfields, $errors)
                   <input type=text
                          onChange='SetPrefix(idform);'
                          name=\"formfields[imagename]\"
-                         value=\"" . $formfields[imagename] . "\"
+                         value=\"" . $formfields["imagename"] . "\"
 	                 size=$TBDB_OSID_OSNAMELEN
                          maxlength=$TBDB_OSID_OSNAMELEN>
               </td>
@@ -283,7 +290,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[description]\"
-                         value=\"" . $formfields[description] . "\"
+                         value=\"" . $formfields["description"] . "\"
 	                 size=50>
               </td>
           </tr>\n";
@@ -291,7 +298,7 @@ function SPITFORM($formfields, $errors)
     #
     # Load Partition
     #
-    if ($view[hide_partition]) {
+    if (isset($view["hide_partition"])) {
 	spithidden($formfields, 'loadpart');
     } else {
 	echo "<tr>
@@ -303,7 +310,7 @@ function SPITFORM($formfields, $errors)
 	for ($i = 1; $i <= 4; $i++) {
 	    $selected = "";
 
-	    if (strcmp($formfields[loadpart], "$i") == 0)
+	    if (strcmp($formfields["loadpart"], "$i") == 0)
 		$selected = "selected";
 	    
 	    echo "        <option $selected value=$i>$i </option>\n";
@@ -316,7 +323,7 @@ function SPITFORM($formfields, $errors)
     #
     # Select an OS
     # 
-    if ($view[hide_os]) {
+    if (isset($view["hide_os"])) {
 	spithidden($formfields, 'os_name');
     } else {
 	echo "<tr>
@@ -331,8 +338,8 @@ function SPITFORM($formfields, $errors)
 	    if (!$userokay && !$isadmin)
 		continue;
 
-	    if (isset($formfields[os_name]) &&
-		strcmp($formfields[os_name], $os) == 0)
+	    if (isset($formfields["os_name"]) &&
+		strcmp($formfields["os_name"], $os) == 0)
 		$selected = "selected";
 
 	    echo "<option $selected value=$os>$os &nbsp; </option>\n";
@@ -345,7 +352,7 @@ function SPITFORM($formfields, $errors)
     #
     # Version String
     #
-    if ($view[hide_version]) {
+    if (isset($view["hide_version"])) {
 	spithidden($formfields, 'os_version');
     } else {
 	echo "<tr>
@@ -354,7 +361,7 @@ function SPITFORM($formfields, $errors)
 		  <td class=left>
 		      <input type=text
 			     name=\"formfields[os_version]\"
-			     value=\"" . $formfields[os_version] . "\"
+			     value=\"" . $formfields["os_version"] . "\"
 			     size=$TBDB_OSID_VERSLEN
 			     maxlength=$TBDB_OSID_VERSLEN>
 		  </td>
@@ -370,7 +377,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[path]\"
-                         value=\"" . $formfields[path] . "\"
+                         value=\"" . $formfields["path"] . "\"
 	                 size=50>
               </td>
           </tr>\n";
@@ -378,15 +385,15 @@ function SPITFORM($formfields, $errors)
     #
     # Node to Snapshot image from.
     #
-    if ($view[hide_snapshot]) {
+    if (isset($view["hide_snapshot"])) {
 	spithidden($formfields, 'node');
     } else {
 	echo "<tr>
 		  <td>Node to Obtain Snapshot from[<b>2</b>]:</td>
 		  <td class=left>
 		      <input type=text
-			     name=\"formfields[node]\"
-			     value=\"" . $formfields[node] . "\"
+			     name=\"formfields[node_id]\"
+			     value=\"" . $formfields["node_id"] . "\"
 			     size=$TBDB_NODEIDLEN maxlength=$TBDB_NODEIDLEN>
 		  </td>
 	      </tr>\n";
@@ -395,7 +402,7 @@ function SPITFORM($formfields, $errors)
     #
     # OS Features.
     # 
-    if ($view[hide_features]) {
+    if (isset($view["hide_features"])) {
         reset($osid_featurelist);
         while (list ($feature, $userokay) = each($osid_featurelist)) {
             spithidden($formfields, "os_feature_$feature");
@@ -427,7 +434,7 @@ function SPITFORM($formfields, $errors)
     #
     # Operational Mode
     # 
-    if ($view[hide_opmode]) {
+    if (isset($view["hide_opmode"])) {
 	spithidden($formfields, 'op_mode');
     } else {
 	echo "<tr>
@@ -441,8 +448,8 @@ function SPITFORM($formfields, $errors)
 	    if (!$userokay && !$isadmin)
 		continue;
 
-	    if (isset($formfields[op_mode]) &&
-		strcmp($formfields[op_mode], $mode) == 0)
+	    if (isset($formfields["op_mode"]) &&
+		strcmp($formfields["op_mode"], $mode) == 0)
 		$selected = "selected";
 
 	    echo "<option $selected value=$mode>$mode &nbsp; </option>\n";
@@ -455,7 +462,7 @@ function SPITFORM($formfields, $errors)
     #
     # Node Types.
     #
-    if (!$view[hide_footnotes]) {
+    if (!isset($view["hide_footnotes"])) {
 	$footnote = "[<b>5</b>]";
     }
     echo "<tr>
@@ -464,12 +471,15 @@ function SPITFORM($formfields, $errors)
 
     mysql_data_seek($types_result, 0);
     while ($row = mysql_fetch_array($types_result)) {
-        $type    = $row[type];
+        $type    = $row["type"];
         $checked = "";
 
-        if (strcmp($formfields["mtype_$type"], "Yep") == 0
-	    || strcmp($formfields["mtype_all"], "Yep") == 0)
+        if ((isset($formfields["mtype_$type"]) &&
+	     $formfields["mtype_$type"] == "Yep") ||
+	    (isset($formfields["mtype_all"]) &&
+	     $formfields["mtype_all"] == "Yep")) {
 	    $checked = "checked";
+	}
     
         echo "<input $checked type=checkbox
                      value=Yep name=\"formfields[mtype_$type]\">
@@ -482,7 +492,7 @@ function SPITFORM($formfields, $errors)
     #
     # Whole Disk Image
     #
-    if ($view[hide_snapshot]) {
+    if (isset($view["hide_snapshot"])) {
 	spithidden($formfields, 'wholedisk');
     } else {
 	echo "<tr>
@@ -492,8 +502,8 @@ function SPITFORM($formfields, $errors)
 			     name=\"formfields[wholedisk]\"
 			     value=Yep";
 
-	if (isset($formfields[wholedisk]) &&
-	    strcmp($formfields[wholedisk], "Yep") == 0)
+	if (isset($formfields["wholedisk"]) &&
+	    strcmp($formfields["wholedisk"], "Yep") == 0)
 	    echo "           checked";
 	    
 	echo "                       > Yes
@@ -504,7 +514,7 @@ function SPITFORM($formfields, $errors)
     #
     # Maxiumum concurrent loads
     #
-    if ($view[hide_snapshot]) {
+    if (isset($view["hide_snapshot"])) {
 	spithidden($formfields, 'max_concurrent');
     } else {
 	echo "<tr>
@@ -512,7 +522,7 @@ function SPITFORM($formfields, $errors)
 		  <td class=left>
 		      <input type=text
 			     name=\"formfields[max_concurrent]\"
-			     value=\"" . $formfields[max_concurrent] . "\"
+			     value=\"" . $formfields["max_concurrent"] . "\"
 			     size=4 maxlength=4>
 		  </td>
 	      </tr>\n";
@@ -522,7 +532,7 @@ function SPITFORM($formfields, $errors)
     #
     # Shared?
     #
-    if ($view[hide_snapshot]) {
+    if (isset($view["hide_snapshot"])) {
 	spithidden($formfields, 'shared');
     } else {
 	echo "<tr>
@@ -534,8 +544,8 @@ function SPITFORM($formfields, $errors)
 			     name=\"formfields[shared]\"
 			     value=Yep";
 
-	if (isset($formfields[shared]) &&
-	    strcmp($formfields[shared], "Yep") == 0)
+	if (isset($formfields["shared"]) &&
+	    strcmp($formfields["shared"], "Yep") == 0)
 	    echo "           checked";
 	    
 	echo "                       > Yes
@@ -546,9 +556,10 @@ function SPITFORM($formfields, $errors)
     #
     # Upload an image file
     #
-    if ($view[hide_upload]) {
-        #spithidden($formfields, 'upload_file');
-    } else {
+    if (isset($view["hide_upload"])) {
+	;
+    }
+    else {
 	echo "<tr>
 		  <td>Upload a file:</td>
 		  <td class=left>
@@ -588,7 +599,7 @@ function SPITFORM($formfields, $errors)
 		  <td class=left>
 		      <input type=text
 			     name=\"formfields[reboot_waittime]\"
-			     value=\"" . $formfields[reboot_waittime] . "\"
+			     value=\"" . $formfields["reboot_waittime"] . "\"
 			     size=4 maxlength=4>
 		  </td>
 	      </tr>\n";
@@ -603,7 +614,7 @@ function SPITFORM($formfields, $errors)
     echo "</form>
           </table>\n";
 
-    if (!$view[hide_footnotes]) {
+    if (!isset($view["hide_footnotes"])) {
 	echo "<h4><blockquote>
 	      <ol type=1 start=1>
 		 <li> If you don't know what partition you have customized,
@@ -697,34 +708,49 @@ function spithidden($formfields, $field) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
+if (!isset($submit)) {
     $defaults = array();
-    $defaults[path]     = "$TBPROJ_DIR/";
-    $defaults[shared]   = "Nope";
+    $defaults["pid"]           = "";
+    $defaults["gid"]           = "";
+    $defaults["imagename"]     = "";
+    $defaults["description"]   = "";
+    $defaults["loadpart"]      = "X";
+    $defaults["os_name"]       = "";
+    $defaults["os_version"]    = "";
+    $defaults["node_id"]       = "";
+    $defaults["op_mode"]       = "";
+    $defaults["max_concurrent"]= "";
+    $defaults["wholedisk"]     = "No";
+    $defaults["shared"]        = "No";
+    $defaults["global"]        = "No";
+    $defaults["makedefault"]   = "No";
+    $defaults["reboot_waittime"] = "";
+    $defaults["path"]          = "$TBPROJ_DIR/";
+    
 
-    if ($nodetype == "mote") {
+    if (isset($nodetype) && $nodetype == "mote") {
 	# Defaults for mote-type nodes
-	$defaults[loadpart]    = "1";
-	$defaults[op_mode]     = TBDB_ALWAYSUP_OPMODE;
-	$defaults[os_name]     = "TinyOS";
-	$defaults[os_version]  = "1.1.0";
+	$defaults["loadpart"]    = "1";
+	$defaults["op_mode"]     = TBDB_ALWAYSUP_OPMODE;
+	$defaults["os_name"]     = "TinyOS";
+	$defaults["os_version"]  = "1.1.0";
 
 	# Default to 'srec' files for use with uisp
 	$filename_extension    = "srec";
     } else {
 	# Defaulys for PC-type nodes
-	$defaults[loadpart] = "X";
-	$defaults[path]     = "$TBPROJ_DIR/";
-	$defaults[op_mode]  = TBDB_DEFAULT_OSID_OPMODE;
-	$defaults[os_feature_ping] = "checked";
-	$defaults[os_feature_ssh]  = "checked";
-	$defaults[os_feature_ipod] = "checked";
-	$defaults[os_feature_isup] = "checked";
-	$defaults[os_feature_linktest] = "checked";
+	$defaults["loadpart"] = "X";
+	$defaults["path"]     = "$TBPROJ_DIR/";
+	$defaults["op_mode"]  = TBDB_DEFAULT_OSID_OPMODE;
+	$defaults["os_feature_ping"] = "checked";
+	$defaults["os_feature_ssh"]  = "checked";
+	$defaults["os_feature_ipod"] = "checked";
+	$defaults["os_feature_isup"] = "checked";
+	$defaults["os_feature_linktest"] = "checked";
 
 	# mtype_all is a "fake" variable which makes all
 	# mtypes checked in the virgin form.
-	$defaults[mtype_all] = "Yep";
+	$defaults["mtype_all"] = "Yep";
 
 	# Default to imagezip ndz files
 	$filename_extension    = "ndz";
@@ -739,18 +765,18 @@ if (! $submit) {
 	list($project, $grouplist) = each($projlist);
 	
 	if (count($grouplist) <= 2) {
-	    $defaults[pid] = $project;
+	    $defaults["pid"] = $project;
 	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0]))
 		$group = $grouplist[0];
 	    else {
 		$group = $grouplist[1];
 	    }
-	    $defaults[gid] = $group;
+	    $defaults["gid"] = $group;
 	    
 	    if (!strcmp($project, $group))
-		$defaults[path]     = "$TBPROJ_DIR/$project/images/";
+		$defaults["path"]     = "$TBPROJ_DIR/$project/images/";
 	    else
-		$defaults[path]     = "$TBGROUP_DIR/$project/$group/images/";
+		$defaults["path"]     = "$TBGROUP_DIR/$project/$group/images/";
 	}
 	reset($projlist);
     }
@@ -773,48 +799,60 @@ if (! $submit) {
 #
 # Otherwise, must validate and redisplay if errors
 #
-$errors = array();
+$errors  = array();
+$project = null;
+$group   = null;
 
 #
 # Project:
-# 
-if (!isset($formfields[pid]) ||
-    strcmp($formfields[pid], "") == 0) {
+#
+if (!isset($formfields["pid"]) ||
+    strcmp($formfields["pid"], "") == 0) {
     $errors["Project"] = "Not Selected";
 }
-elseif (!TBValidProject($formfields[pid])) {
-    $errors["Project"] = "No such project";
+elseif (!TBvalid_pid($formfields["pid"])) {
+    $errors["Project"] = "Invalid project name";
 }
-elseif (isset($formfields[gid]) &&
-	strcmp($formfields[gid], "")) {
-    if (!TBValidGroup($formfields[pid], $formfields[gid])) {
-	$errors["Group"] = "Group '" . $formfields[gid] . "' " .
-	                   "is not in project '" . $formfields[pid] ."'";
-    }
-    elseif (!TBProjAccessCheck($uid, $formfields[pid],
-			       $formfields[gid], $TB_PROJECT_MAKEIMAGEID)) {
-	$errors["Project/Group"] = "Not enough permission";
-    }
-}
-elseif (!TBProjAccessCheck($uid, $formfields[pid],
-			   $formfields[pid], $TB_PROJECT_MAKEIMAGEID)) {
-    $errors["Project/Group"] = "Not enough permission";
+elseif (! ($project = Project::Lookup($formfields["pid"]))) {
+    $errors["Project"] = "Invalid project name";
 }
 
+if (isset($formfields["gid"]) && $formfields["gid"] != "") {
+    if ($formfields["pid"] == $formfields["gid"] && $project) {
+	$group = $project->DefaultGroup();
+    }
+    elseif (!TBvalid_gid($formfields["gid"])) {
+	$errors["Group"] = "Invalid group name";
+    }
+    elseif ($project &&
+	    ! ($group = $project->LookupSubgroupByName($formfields["gid"]))) {
+	$errors["Group"] = "Invalid group name";
+    }
+}
+elseif ($project) {
+    $group = $project->DefaultGroup();
+}
+
+# Permission check if we managed to get a proper group above.
+if ($group &&
+    ! $group->AccessCheck($this_user, $TB_PROJECT_MAKEIMAGEID)) {
+    $errors["Project"] = "Not enough permission";
+}
+ 
 #
 # Image Name:
 # 
-if (!isset($formfields[imagename]) ||
-    strcmp($formfields[imagename], "") == 0) {
+if (!isset($formfields["imagename"]) ||
+    strcmp($formfields["imagename"], "") == 0) {
     $errors["Descriptor Name"] = "Missing Field";
 }
 else {
-    if (! ereg("^[a-zA-Z0-9][-_a-zA-Z0-9\.\+]+$", $formfields[imagename])) {
+    if (! ereg("^[a-zA-Z0-9][-_a-zA-Z0-9\.\+]+$", $formfields["imagename"])) {
 	$errors["Descriptor Name"] =
 	    "Must be alphanumeric (includes _, -, +, and .)<br>" .
 	    "and must begin with an alphanumeric";
     }
-    elseif (strlen($formfields[imagename]) > $TBDB_OSID_OSNAMELEN) {
+    elseif (strlen($formfields["imagename"]) > $TBDB_OSID_OSNAMELEN) {
 	$errors["Descriptor Name"] =
 	    "Too long! ".
 	    "Must be less than or equal to $TBDB_OSID_OSNAMELEN";
@@ -824,50 +862,50 @@ else {
 #
 # Description
 #
-if (!isset($formfields[description]) ||
-    strcmp($formfields[description], "") == 0) {
+if (!isset($formfields["description"]) ||
+    strcmp($formfields["description"], "") == 0) {
     $errors["Description"] = "Missing Field";
 }
 
 #
 # Load Partition
 #
-if (!isset($formfields[loadpart]) ||
-    strcmp($formfields[loadpart], "") == 0 ||
-    strcmp($formfields[loadpart], "X") == 0) {
+if (!isset($formfields["loadpart"]) ||
+    strcmp($formfields["loadpart"], "") == 0 ||
+    strcmp($formfields["loadpart"], "X") == 0) {
     $errors["DOS Partition"] = "Not Selected";
 }
-elseif (! ereg("^[0-9]+$", $formfields[loadpart]) ||
-	$formfields[loadpart] <= 0 || $formfields[loadpart] > 4) {
+elseif (! ereg("^[0-9]+$", $formfields["loadpart"]) ||
+	$formfields["loadpart"] <= 0 || $formfields["loadpart"] > 4) {
     $errors["DOS Partition"] = "Must be 1,2,3, or 4!";
 }
 
 #
 # Select an OS
 # 
-if (!isset($formfields[os_name]) ||
-    strcmp($formfields[os_name], "") == 0 ||
-    strcmp($formfields[os_name], "none") == 0) {
+if (!isset($formfields["os_name"]) ||
+    strcmp($formfields["os_name"], "") == 0 ||
+    strcmp($formfields["os_name"], "none") == 0) {
     $errors["OS"] = "Not Selected";
 }
-elseif (! preg_match("/^[-\w]+$/", $formfields[os_name])) {
+elseif (! preg_match("/^[-\w]+$/", $formfields["os_name"])) {
     $errors["OS"] = "Illegal Characters";
 }
-elseif (! array_key_exists($formfields[os_name], $osid_oslist)) {
+elseif (! array_key_exists($formfields["os_name"], $osid_oslist)) {
     $errors["OS"] = "Invalid OS";
 }
-elseif (! $osid_oslist[$formfields[os_name]] && !$isadmin) {
+elseif (! $osid_oslist[$formfields["os_name"]] && !$isadmin) {
     $errors["OS"] = "No enough permission";
 }
 
 #
 # Version String
 #
-if (!isset($formfields[os_version]) ||
-    strcmp($formfields[os_version], "") == 0) {
+if (!isset($formfields["os_version"]) ||
+    strcmp($formfields["os_version"], "") == 0) {
     $errors["OS Version"] = "Missing Field";
 }
-elseif (! ereg("^[-_a-zA-Z0-9\.]+$", $formfields[os_version])) {
+elseif (! ereg("^[-_a-zA-Z0-9\.]+$", $formfields["os_version"])) {
     $errors["OS Version"] = "Contains invalid characters";
 }
 
@@ -885,8 +923,8 @@ if ($isadmin &&
 # Image shared amongst subgroups
 #
 $shared = 0;
-if (isset($formfields[shared]) &&
-    strcmp($formfields[shared], "Yep") == 0) {
+if (isset($formfields["shared"]) &&
+    strcmp($formfields["shared"], "Yep") == 0) {
     $shared = 1;
 }
 # Does not make sense to do this. 
@@ -899,27 +937,28 @@ if ($global && $shared) {
 # /proj/$pid/images or /groups/$pid/$gid. Admins can do whatever
 # they like of course.
 # 
-if (!isset($formfields[path]) ||
-    strcmp($formfields[path], "") == 0) {
+if (!isset($formfields["path"]) ||
+    strcmp($formfields["path"], "") == 0) {
     $errors["Path"] = "Missing Field";
 }
-elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields[path])) {
+elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields["path"])) {
     $errors["Path"] = "Contains invalid characters";
 }
 elseif (! $isadmin) {
     $pdef = "";
     
     if (!$shared &&
-	isset($formfields[gid]) &&
-	strcmp($formfields[gid], "") &&
-	strcmp($formfields[gid], $formfields[pid])) {
-	$pdef = "$TBGROUP_DIR/" . $formfields[pid] . "/" . $formfields[gid] . "/";
+	isset($formfields["gid"]) &&
+	strcmp($formfields["gid"], "") &&
+	strcmp($formfields["gid"], $formfields["pid"])) {
+	$pdef = "$TBGROUP_DIR/" .
+	    $formfields["pid"] . "/" . $formfields["gid"] . "/";
     }
     else {
-	$pdef = "$TBPROJ_DIR/" . $formfields[pid] . "/images/";
+	$pdef = "$TBPROJ_DIR/" . $formfields["pid"] . "/images/";
     }
 
-    if (strpos($formfields[path], $pdef) === false) {
+    if (strpos($formfields["path"], $pdef) === false) {
 	$errors["Path"] = "Invalid Path";
     }
 }
@@ -948,18 +987,18 @@ $os_features = join(",", $os_features_array);
 #
 # Operational Mode
 # 
-if (!isset($formfields[op_mode]) ||
-    strcmp($formfields[op_mode], "") == 0 ||
-    strcmp($formfields[op_mode], "none") == 0) {
+if (!isset($formfields["op_mode"]) ||
+    strcmp($formfields["op_mode"], "") == 0 ||
+    strcmp($formfields["op_mode"], "none") == 0) {
     $errors["Op. Mode"] = "Not Selected";
 }
-elseif (! preg_match("/^[-\w]+$/", $formfields[op_mode])) {
+elseif (! preg_match("/^[-\w]+$/", $formfields["op_mode"])) {
     $errors["Op. Mode"] = "Illegal Characters";
 }
-elseif (! array_key_exists($formfields[op_mode], $osid_opmodes)) {
+elseif (! array_key_exists($formfields["op_mode"], $osid_opmodes)) {
     $errors["Op. Mode"] = "Invalid Operation Mode";
 }
-elseif (! $osid_opmodes[$formfields[op_mode]] && !$isadmin) {
+elseif (! $osid_opmodes[$formfields["op_mode"]] && !$isadmin) {
     $errors["Op. Mode"] = "No enough permission";
 }
 
@@ -971,14 +1010,13 @@ elseif (! $osid_opmodes[$formfields[op_mode]] && !$isadmin) {
 $mtypes_array = array();
 
 while ($row = mysql_fetch_array($types_result)) {
-    $type = $row[type];
-    $foo  = $formfields["mtype_$type"];
+    $type = $row["type"];
 
     #
     # Look for a post variable with name.
     # 
-    if (isset($foo) &&
-	strcmp($foo, "Yep") == 0) {
+    if (isset($formfields["mtype_$type"]) &&
+	$formfields["mtype_$type"] == "Yep") {
 	$mtypes_array[] = $type;
     }
 }
@@ -989,31 +1027,35 @@ if (! count($mtypes_array)) {
 #
 # Node.
 #
-if (isset($formfields[node]) &&
-    strcmp($formfields[node], "")) {
+unset($node);
+if (isset($formfields["node_id"]) &&
+    strcmp($formfields["node_id"], "")) {
 
-    if (! TBValidNodeName($formfields[node])) {
+    if (!TBvalid_node_id($formfields["node_id"])) {
 	$errors["Node"] = "Invalid node name";
     }
-    
-    if (! TBNodeAccessCheck($uid, $formfields[node],
-			    $TB_NODEACCESS_LOADIMAGE)) {
+    elseif (! ($node = Node::Lookup($formfields["node_id"]))) {
+	$errors["Node"] = "Invalid node name";
+    }
+    elseif (!$node->AccessCheck($this_user, $TB_NODEACCESS_LOADIMAGE)) {
 	$errors["Node"] = "Not enough permission";
     }
-    $node = $formfields[node];
+    else {
+	$node_id = $node->node_id();
+    }
 }
 
 #
 # Max concurrent
 # 
-if (isset($formfields[max_concurrent]) &&
-    strcmp($formfields[max_concurrent],"")) {
+if (isset($formfields["max_concurrent"]) &&
+    strcmp($formfields["max_concurrent"],"")) {
     
-    if (!preg_match ("/^\d+$/",$formfields[max_concurrent])) {
+    if (!preg_match ("/^\d+$/",$formfields["max_concurrent"])) {
     	$errors["Maximum Concurrent Loads"] = "Invalid number";
     }
 
-    $max_concurrent = "'" . $formfields[max_concurrent] . "'";
+    $max_concurrent = "'" . $formfields["max_concurrent"] . "'";
 } else {
     $max_concurrent = "NULL";
 }
@@ -1022,22 +1064,22 @@ if (isset($formfields[max_concurrent]) &&
 # Reboot waittime. Only admin users can set this. Grab default
 # if not set.
 #
-if (isset($formfields[reboot_waittime]) &&
-    strcmp($formfields[reboot_waittime],"")) {
+if (isset($formfields["reboot_waittime"]) &&
+    strcmp($formfields["reboot_waittime"],"")) {
     if (!$isadmin) {
 	$errors["Reboot Waittime"] = "Not enough permission";
     }
-    elseif (!TBvalid_integer($formfields[reboot_waittime])) {
+    elseif (!TBvalid_integer($formfields["reboot_waittime"])) {
 	$errors["Reboot Waittime"] = TBFieldErrorString();
     }
-    $reboot_waittime = $formfields[reboot_waittime];
+    $reboot_waittime = $formfields["reboot_waittime"];
 }
 else {
-    if (! array_key_exists($formfields[os_name], $osid_reboot_waitlist)) {
+    if (! array_key_exists($formfields["os_name"], $osid_reboot_waitlist)) {
 	$errors["Reboot Waittime"] = "No default reboot waittime for OS";
     }
     else {
-	$reboot_waittime = $osid_reboot_waitlist[$formfields[os_name]];
+	$reboot_waittime = $osid_reboot_waitlist[$formfields["os_name"]];
     }
 }
 
@@ -1061,7 +1103,7 @@ if (count($errors)) {
 # which will respit the form with their old values still filled in.
 #
 
-if ($cancelled) {
+if (isset($canceled) && $canceled) {
     SPITFORM($formfields, 0);    
     PAGEFOOTER();
     return;
@@ -1073,7 +1115,7 @@ $confirmationWarning = "";
 # If user does not define a node to suck the image from,
 # we seek confirmation.
 #
-if ($nodetype == "mote") {
+if (isset($nodetype) && $nodetype == "mote") {
     # We expect them to give us a file to upload
     if (! isset($_FILES['upload_file'])) {
         # We expect them to pick a node to take a snapshot from
@@ -1118,7 +1160,7 @@ if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
     }
     echo "<input type=hidden name='submit' value='Submit'>\n";
     echo "<input type=submit name=confirmed value=Confirm>&nbsp;";
-    echo "<input type=submit name=cancelled  value=Back>\n";
+    echo "<input type=submit name=canceled  value=Back>\n";
     echo "</form></center>";
 
     PAGEFOOTER();
@@ -1129,18 +1171,15 @@ if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
 #
 # For the rest, sanitize and convert to locals to make life easier.
 # 
-$description = addslashes($formfields[description]);
-$pid         = $formfields[pid];
-$gid         = $formfields[gid];
-$imagename   = $formfields[imagename];
-$bootpart    = $formfields[loadpart];
-$path        = $formfields[path];
-$os_name     = $formfields[os_name];
-$os_version  = $formfields[os_version];
-$op_mode     = $formfields[op_mode];
-if (!isset($gid) || !strcmp($gid, "")) {
-    $gid = $pid;
-}
+$description = addslashes($formfields["description"]);
+$pid         = $project->pid();
+$gid         = $group->gid();
+$imagename   = $formfields["imagename"];
+$bootpart    = $formfields["loadpart"];
+$path        = $formfields["path"];
+$os_name     = $formfields["os_name"];
+$os_version  = $formfields["os_version"];
+$op_mode     = $formfields["op_mode"];
 
 #
 # Special option. Whole disk image, but only one partition that actually
@@ -1149,8 +1188,8 @@ if (!isset($gid) || !strcmp($gid, "")) {
 $loadlen   = 1;
 $loadpart  = $bootpart;
 
-if (isset($formfields[wholedisk]) &&
-    strcmp($formfields[wholedisk], "Yep") == 0) {
+if (isset($formfields["wholedisk"]) &&
+    strcmp($formfields["wholedisk"], "Yep") == 0) {
     $loadlen   = 4;
     $loadpart  = 0;
 }
@@ -1160,7 +1199,8 @@ DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 #
 # Of course, the Image/OS records may not already exist in the DB.
 #
-if (TBValidImage($pid, $imagename) || TBValidOS($pid, $imagename)) {
+if (($image  = Image::LookupByName($project, $imagename)) ||
+    ($osinfo = OSInfo::LookupByName($project, $imagename))) {
     DBQueryFatal("unlock tables");
 
     $errors["Descriptor Name"] = "Already in use in selected project";
@@ -1173,7 +1213,8 @@ if (TBValidImage($pid, $imagename) || TBValidOS($pid, $imagename)) {
 # Just concat them to form a unique imageid and osid.
 # 
 $imageid = "$pid-$imagename";
-if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
+if (($image  = Image::Lookup($imageid)) ||
+    ($osinfo = OSInfo::Lookup($imageid))) {
     DBQueryFatal("unlock tables");
     TBERROR("Could not form a unique ID for $pid/$imagename!", 1);
 }
@@ -1203,8 +1244,14 @@ for ($i = 0; $i < count($mtypes_array); $i++) {
 		 "(osid, type, imageid) ".
 		 "VALUES ('$imageid', '$mtypes_array[$i]', '$imageid')");
 }
-
 DBQueryFatal("unlock tables");
+
+#
+# Get the object for rest of the script.
+#
+if (! ($image = Image::Lookup($imageid))) {
+    TBERROR("Could not look up object for image $imageid", 1);
+}
 
 SUBPAGESTART();
 SUBMENUSTART("More Options");
@@ -1229,8 +1276,8 @@ SUBMENUEND();
 
 #
 # Dump os_info record.
-# 
-SHOWIMAGEID($imageid, 0);
+#
+$image->Show();
 SUBPAGEEND();
 
 if (isset($node)) {
@@ -1244,14 +1291,16 @@ if (isset($node)) {
     #
     # Grab the unix GID for running script.
     #
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    $unix_gid  = $group->unix_gid();
+    $safe_name = escapeshellarg($imagename);
 
     echo "<br>
-	  Taking a snapshot of node '$node' for image ...
+	  Taking a snapshot of node '$node_id' for image ...
           <br><br>\n";
     flush();
 
-    SUEXEC($uid, "$pid,$unix_gid", "webcreate_image -p $pid $imagename $node",
+    SUEXEC($uid, "$pid,$unix_gid",
+	   "webcreate_image -p $pid $safe_name $node_id",
 	   SUEXEC_ACTION_DUPDIE);
 
     echo "This will take 10 minutes or more; you will receive email
@@ -1270,7 +1319,7 @@ if (isset($_FILES['upload_file']) &&
     $_FILES['upload_file']['name'] != "none") {
         
     # Get the correct group information for this image
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    $unix_gid  = $group->unix_gid();
 
     $tmpfile   = $_FILES['upload_file']['tmp_name'];
     $localfile = $formfields['path'];
@@ -1284,8 +1333,9 @@ if (isset($_FILES['upload_file']) &&
 	# Note - the script we call takes care of making sure that the local
         # filename is in /proj or /groups
         $retval = SUEXEC($uid, "$pid,$unix_gid",
-            "webcopy " . escapeshellarg($tmpfile) . " " . escapeshellarg($localfile),
-            SUEXEC_ACTION_DUPDIE);
+			 "webcopy " . escapeshellarg($tmpfile) . " " .
+			 escapeshellarg($localfile),
+			 SUEXEC_ACTION_DUPDIE);
     }
 }
 

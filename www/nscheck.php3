@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,16 +16,21 @@ $view = array(
 );
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Syntax Check an NS File", $view);
-
-#
 # Only known and logged in users can begin experiments.
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+$optargs = OptionalPageArguments("nsdata",          PAGEARG_ANYTHING,
+				 "formfields",      PAGEARG_ARRAY,
+				 "fromform",        PAGEARG_BOOLEAN);
+
+#
+# Standard Testbed Header (not that we know if want the stripped version).
+#
+PAGEHEADER("Syntax Check an NS File",
+	   (isset($fromform) || isset($nsdata) ? $view : null));
 
 #
 # Not allowed to specify both a local and an upload!
@@ -35,13 +40,17 @@ $specupload = 0;
 $specform   = 0;
 $nsfile     = "";
 $tmpfile    = 0;
-$exp_localnsfile = $formfields['exp_localnsfile'];
+
+if (isset($formfields)) {
+    $exp_localnsfile = $formfields['exp_localnsfile'];
+}
 
 if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
     $speclocal = 1;
 }
-if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
-    strcmp($exp_nsfile, "none")) {
+if (isset($_FILES['exp_nsfile']) &&
+    $_FILES['exp_nsfile']['name'] != "" &&
+    $_FILES['exp_nsfile']['tmp_name'] != "") {
     $specupload = 1;
 }
 if (!$speclocal && !$specupload && isset($nsdata))  {
@@ -52,14 +61,6 @@ if ($speclocal + $specupload + $specform > 1) {
     USERERROR("You may not specify both an uploaded NS file and an ".
 	      "NS file that is located on the Emulab server", 1);
 }
-if (!$specupload && strcmp($exp_nsfile_name, "")) {
-    #
-    # Catch an invalid filename.
-    #
-    USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
-	      "valid filename. Please go back and try again.", 1);
-}
-
 #
 # Gotta be one of them!
 #
@@ -96,8 +97,8 @@ elseif ($specupload) {
     # script open for a short time. A potential security hazard we should
     # deal with at some point.
     #
-    chmod($exp_nsfile, 0666);
-    $nsfile = $exp_nsfile;
+    $nsfile = $_FILES['exp_nsfile']['tmp_name'];
+    chmod($nsfile, 0666);
     $nonsfile = 0;
 } else # $specform
 {
@@ -120,27 +121,11 @@ elseif ($specupload) {
     fclose($handle);
 }
 
-echo "<center>";
-echo "<h2>Starting Syntax Check. Please wait a moment ...</h2>";
-echo "Checking $nsfile - ";
-if ($speclocal) {
-    echo "local file\n";
-}
-if ($specupload) {
-    echo "uploaded file\n";
-}
-if ($specform) {
-    echo "From form\n";
-}
-echo "<br>\n";
-echo "</center>\n";
-flush();
-
-#
-# Run the script. 
-#
-$retval = SUEXEC($uid, "nobody", "webnscheck $nsfile",
-		 SUEXEC_ACTION_IGNORE);
+STARTBUSY("Starting NS syntax check from " .
+	  ($speclocal ? "local file" :
+	   ($specupload ? "uploaded file" :
+	    ($specform ? "form" : "???"))));
+$retval = SUEXEC($uid, "nobody", "webnscheck $nsfile", SUEXEC_ACTION_IGNORE);
 
 if ($tmpfile) {
     unlink($nsfile);
@@ -157,6 +142,7 @@ if ($retval < 0) {
     #
     die("");
 }
+STOPBUSY();
 
 # Parse Error.	 
 if ($retval) {
@@ -169,7 +155,7 @@ if ($retval) {
     die("");
 }
 
-echo "<center><br>";
+echo "<center>";
 echo "<br>";
 echo "<h2>Your NS file looks good!</h2>";
 echo "</center>\n";

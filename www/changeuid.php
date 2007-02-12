@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only admin users ...
@@ -15,39 +14,16 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 if (!$isadmin) {
-    USERERROR("You do not have permission to login names!", 1);
+    USERERROR("You do not have permission to change login names!", 1);
 }
 
 #
-# Verify page/form arguments. Note that the target uid comes initially as a
-# page arg, but later as a form argument, hence this odd check.
+# Verify page/form arguments.
 #
-if (! isset($_POST['submit'])) {
-    # First page load. Default to current user.
-    if (! isset($_GET['user']))
-	$user = $uid;
-    else
-	$user = $_GET['user'];
-}
-else {
-    # Form submitted. Make sure we have a target user and a new_uid.
-    if (! isset($_POST['user']) || $_POST['user'] == "" ||
-	! isset($_POST['new_uid']) || $_POST['new_uid'] == "") {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $user    = $_POST['user'];
-    $new_uid = $_POST['new_uid'];
-}
+$reqargs = RequiredPageArguments("target_user", PAGEARG_USER);
+$optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
+				 "new_uid",     PAGEARG_STRING);
 
-# Pedantic check of uid before continuing.
-if ($user == "" || !User::ValidWebID($user)) {
-    PAGEARGERROR("Invalid uid: 'user'");
-}
-
-# Find user. Must be unapproved (verified user). Any other state is too hard.
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
 $target_uid = $target_user->uid();
 $target_idx = $target_user->uid_idx();
 
@@ -103,7 +79,7 @@ function SPITFORM($target_user, $new_uid, $error)
 
     echo "<br><br>\n";
     echo "<center>\n";
-    SHOWUSER($target_uid);
+    $target_user->Show();
     echo "</center>\n";
 
     PAGEFOOTER();
@@ -113,7 +89,7 @@ function SPITFORM($target_user, $new_uid, $error)
 #
 # If not clicked, then put up a form.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($submit)) {
     SPITFORM($target_user, "", null);
     return;
 }
@@ -121,7 +97,10 @@ if (! isset($_POST['submit'])) {
 # Sanity checks
 $error = null;
 
-if (!TBvalid_uid($new_uid)) {
+if (! isset($new_uid) || $new_uid == "") {
+    $error = "UID: Must supply a new UID";
+}
+elseif (!TBvalid_uid($new_uid)) {
     $error = "UID: " . TBFieldErrorString();
 }
 elseif (User::Lookup($new_uid) || posix_getpwnam($new_uid)) {

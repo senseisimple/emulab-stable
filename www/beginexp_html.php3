@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -29,7 +29,18 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
+# Does not return if this a request.
 include("showlogfile_sup.php3");
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("view_style", PAGEARG_STRING,
+				 "beginexp", PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY,
+				 "nsref", PAGEARG_INTEGER,
+				 "guid", PAGEARG_INTEGER,
+				 "copyid", PAGEARG_STRING);
 
 #
 # Handle pre-defined view styles
@@ -59,8 +70,12 @@ if (! count($projlist)) {
 # On first load, display virgin form and exit.
 #
 if (!isset($beginexp)) {
-    # Allow initial formfields data. 
-    INITFORM($formfields, $projlist);
+    # Allow initial formfields data.
+    if (isset($formfields))
+	$defaults = $formfields;
+    else
+	$defaults = array();
+    INITFORM($defaults, $projlist);
     PAGEFOOTER();
     return;
 }
@@ -152,17 +167,17 @@ if (!isset($foo)) {
 }
 $results = $foo[0];
 
-if ($results[status] != "success") {
-    if ($results[status] == "xmlerror") {
+if ($results["status"] != "success") {
+    if ($results["status"] == "xmlerror") {
 	#
 	# A formerror means we should respit the form with the error array.
 	#
-	SPITFORM($formfields, $results[errors]);
+	SPITFORM($formfields, $results["errors"]);
     }
     else {
 	PAGEHEADER("Begin a Testbed Experiment");
 	echo "<br><xmp>";
-	echo $results[message];
+	echo $results["message"];
 	echo "</xmp><br>";
     }
     PAGEFOOTER();
@@ -172,24 +187,22 @@ if ($results[status] != "success") {
 # Okay, we can spit back a header now that there is no worry of redirect.
 PAGEHEADER("Begin a Testbed Experiment");
 
-# Need these for output messages.
-$exp_pid = $formfields[exp_pid];
-$exp_id  = $formfields[exp_id];
-
-#
-# Okay, time to do it.
-#
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$exp_pid'>$exp_pid</a>/".
-     "<a href='showexp.php3?pid=$exp_pid&eid=$exp_id'>$exp_id</a></b>\n".
-     "</font>\n";
-echo "<br><br>\n";
-
-echo "<b>Starting experiment configuration!</b> " . $results[message];
-echo "<br><br>\n";
-echo "</font>\n";
-STARTLOG($exp_pid, $exp_id);
-
+# Map to the actual experiment and show the log.
+if (($experiment = Experiment::LookupByPidEid($formfields["exp_pid"],
+					      $formfields["exp_id"]))) {
+    echo $experiment->PageHeader();
+    echo "<br><br>\n";
+    echo "<b>Starting experiment configuration!</b> " . $results["message"];
+    echo "<br><br>\n";
+    echo "</font>\n";
+    STARTLOG($experiment);
+}
+else {
+    echo "<br>\n";
+    echo "<b>Starting experiment configuration!</b> " . $results["message"];
+    echo "<br>\n";
+}
+						
 #
 # Standard Testbed Footer
 #

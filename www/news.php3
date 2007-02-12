@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,6 +9,22 @@ include("defs.php3");
 #
 # Standard Testbed Header is sent below.
 #
+$optargs = OptionalPageArguments("show_archived",   PAGEARG_BOOLEAN,
+				 "archive",         PAGEARG_STRING,
+				 "single",          PAGEARG_BOOLEAN,
+				 "restore",         PAGEARG_STRING,
+				 "delete" ,         PAGEARG_STRING,
+				 "delete_confirm",  PAGEARG_STRING,
+				 "add",             PAGEARG_STRING,
+				 "addnew",          PAGEARG_STRING,
+				 "edit",            PAGEARG_STRING,
+				 "subject",         PAGEARG_STRING,
+				 "author",          PAGEARG_STRING,
+				 "bodyfile",        PAGEARG_STRING,
+				 "body",            PAGEARG_ANYTHING,
+				 "msgid",           PAGEARG_STRING,
+				 "date",            PAGEARG_STRING);
+
 #
 # If user is an admin, present edit options.
 #
@@ -28,8 +44,8 @@ else {
 }
 
 if ($isadmin) {
-    if (isset($deletec)) {
-	$safeid = addslashes($deletec);
+    if (isset($delete_confirm)) {
+	$safeid = addslashes($delete_confirm);
 
 	DBQueryFatal("DELETE FROM webnews WHERE msgid='$safeid'");
 
@@ -62,7 +78,7 @@ if ($isadmin) {
 	echo "<center>";
 	echo "<h2>Are you sure you want to delete message #$delete?</h2>";
 	echo "<form action='news.php3' method='post'>\n";
-	echo "<button name='deletec' value='$delete'>Yes</button>\n";
+	echo "<button name='delete_confirm' value='$delete'>Yes</button>\n";
 	echo "&nbsp;&nbsp;";
 	echo "<button name='nothin'>No</button>\n";
 	echo "</form>";
@@ -114,14 +130,15 @@ if ($isadmin) {
 			 "date='$date', ".
 			 "body='$body' ".			
 			 "WHERE msgid='$msgid'");
-	    echo "<h2>Updated message with subject '$subject'.</h2><br />";
+	    echo "<h3>Updated message with subject '$subject'.</h3><br />";
 	} else {	    
 	    DBQueryFatal("INSERT INTO webnews (subject, date, author, body) ".
 			 "VALUES ('$subject', NOW(), '$author', '$body')");
-	    echo "<h2>Posted message with subject '$subject'.</h2><br />";
+	    echo "<h3>Posted message with subject '$subject'.</h3><br />";
 	}
-
-	echo "<h3><a href='news.php3'>Back to news</a></h3>";
+	flush();
+	sleep(1);
+	PAGEREPLACE("news.php3");
 	PAGEFOOTER();
 	die("");
     }
@@ -138,11 +155,11 @@ if ($isadmin) {
 	} 
 
 	$row = mysql_fetch_array($query_result);
-	$subject = htmlspecialchars($row[subject], ENT_QUOTES);
-	$date    = htmlspecialchars($row[date],    ENT_QUOTES);
-	$author  = htmlspecialchars($row[author],  ENT_QUOTES);
-	$body    = htmlspecialchars($row[body],    ENT_QUOTES);
-	$msgid   = htmlspecialchars($row[msgid],   ENT_QUOTES);
+	$subject = htmlspecialchars($row["subject"], ENT_QUOTES);
+	$date    = htmlspecialchars($row["date"],    ENT_QUOTES);
+	$author  = htmlspecialchars($row["author"],  ENT_QUOTES);
+	$body    = htmlspecialchars($row["body"],    ENT_QUOTES);
+	$msgid   = htmlspecialchars($row["msgid"],   ENT_QUOTES);
     }
 
     if (isset($edit) || isset($addnew)) {	
@@ -161,9 +178,9 @@ if ($isadmin) {
 	    echo "<input type='hidden' name='msgid' value='$msgid' />";
 	}
 	
-#	if (isset($date)) {
-#	    echo "<input type='hidden' name='date' value='$date' />";
-#	}
+	if (!isset($subject)) {
+	    $subject = "";
+	}
 	
 	echo "<b>Subject:</b><br />".
 	     "<input type='text' name='subject' size='50' value='$subject'>".
@@ -214,12 +231,12 @@ else {
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
 <?php
-if ($TBMAINSITE && !$single) {
+if ($TBMAINSITE && ! (isset($single) || $single)) {
     echo "<tr><td class=stealth align=center>
                   <a href = 'doc/changelog.php3'>
                      (Changelog/Technical Details)</a></td></tr>\n";
 }
-if (!$single) {
+if (!isset($single) || !$single) {
     echo "<tr><td class=stealth align=center>
                   <a href = '$TBDOCBASE/news-rss.php3'>
                   <img src='rss.png' width=27 height=14 border=0>
@@ -273,14 +290,14 @@ if (!mysql_num_rows($query_result)) {
     }
 
     while ($row = mysql_fetch_array($query_result)) {
-	$subject = $row[subject];
-	$date    = $row[prettydate];
-	$author  = $row[author];
-	$body    = $row[body];
-	$msgid   = $row[msgid];
-	$age     = $row[age];
-	$archived = $row[archived];
-	$archived_date = $row[archived_date];
+	$subject = $row["subject"];
+	$date    = $row["prettydate"];
+	$author  = $row["author"];
+	$body    = $row["body"];
+	$msgid   = $row["msgid"];
+	$age     = $row["age"];
+	$archived = $row["archived"];
+	$archived_date = $row["archived_date"];
 
 	echo "<a name=\"$msgid\"></a>\n";
 	echo "<table class='nogrid' 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -21,6 +21,27 @@ $isadmin   = ISADMIN();
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
+#
+# Verify page arguments
+#
+$reqargs = RequiredPageArguments("template",   PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("swapin",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY,
+				 "parameters", PAGEARG_ARRAY,
+				 "replay_instance_idx", PAGEARG_INTEGER,
+				 "replay_run_idx",      PAGEARG_INTEGER);
+
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$unix_gid = $template->UnixGID();
+
+if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to export in template ".
+	      "$guid/$vers!", 1);
+}
+
 # Used below
 unset($parameter_xmlfile);
 $deletexmlfile = 0;
@@ -31,8 +52,8 @@ $batchmode     = 0;
 #
 function SPITFORM($template, $formfields, $parameters, $errors)
 {
-    global $TBDB_EIDLEN, $EXPOSELINKTEST, $EXPOSESTATESAVE;
-    global $TBVALIDDIRS_HTML;
+    global $TBDB_EIDLEN, $EXPOSELINKTEST, $EXPOSESTATESAVE, $TBDOCBASE;
+    global $TBVALIDDIRS_HTML, $linktest_levels;
 
     PAGEHEADER("Instantiate an Experiment Template");
 
@@ -42,7 +63,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     echo "<br>\n";
 
     $guid = $template->guid();
-    $version = $template->vers();
+    $vers = $template->vers();
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -74,8 +95,8 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	echo "</font></blockquote></blockquote><br>\n";
     }
 
-    echo "<form action=template_swapin.php?guid=$guid&version=$version ".
-	 "      method=post>\n";
+    $url = CreateURL("template_swapin", $template);
+    echo "<form action='$url' method=post>\n";
     echo "<table align=center border=1>\n";
 
     #
@@ -100,7 +121,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
               <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[eid]\"
-                         value=\"" . $formfields[eid] . "\"
+                         value=\"" . $formfields["eid"] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
               </td>
@@ -114,7 +135,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     echo "<input type=hidden name=\"formfields[exp_swappable]\"
                  value='$formfields[exp_swappable]'>\n";
     echo "<input type=hidden name=\"formfields[exp_noswap_reason]\" value='";
-    echo htmlspecialchars($formfields[exp_noswap_reason], ENT_QUOTES);
+    echo htmlspecialchars($formfields["exp_noswap_reason"], ENT_QUOTES);
     echo "'>\n";
     
     if (isset($view['hide_swap'])) {
@@ -139,7 +160,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 		  <td><input type='checkbox'
 			 name='formfields[exp_idleswap]'
 			 value='1'";
-	if ($formfields[exp_idleswap] == "1") {
+	if ($formfields["exp_idleswap"] == "1") {
 	    echo " checked='1'";
 	}
 	echo "></td>
@@ -149,20 +170,20 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 		  after 
 		  <input type='text' name='formfields[exp_idleswap_timeout]'
 			 value='";
-	echo htmlspecialchars($formfields[exp_idleswap_timeout], ENT_QUOTES);
+	echo htmlspecialchars($formfields["exp_idleswap_timeout"], ENT_QUOTES);
 	echo "' size='3'> hours idle.</td>
 		  </tr><tr>
 		  <td> </td>
 		  <td>If not, why not?<br><textarea rows=2 cols=50
 			      name='formfields[exp_noidleswap_reason]'>";
 			      
-	echo htmlspecialchars($formfields[exp_noidleswap_reason], ENT_QUOTES);
+	echo htmlspecialchars($formfields["exp_noidleswap_reason"],ENT_QUOTES);
 	echo "</textarea></td>
 		  </tr><tr>
 		  <td><input type='checkbox'
 			 name='formfields[exp_autoswap]'
 			 value='1' ";
-	if ($formfields[exp_autoswap] == "1") {
+	if ($formfields["exp_autoswap"] == "1") {
 	    echo " checked='1'";
 	}
 	echo "></td>
@@ -171,7 +192,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 		  <b>Max. Duration:</b></a> Swap out after
 		  <input type='text' name='formfields[exp_autoswap_timeout]'
 			 value='";
-	echo htmlspecialchars($formfields[exp_autoswap_timeout], ENT_QUOTES);
+	echo htmlspecialchars($formfields["exp_autoswap_timeout"], ENT_QUOTES);
 	echo "' size='3'> hours, even if not idle.</td>
 		  </tr>";
 
@@ -180,8 +201,8 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	         <input type=checkbox name='formfields[exp_savedisk]'
 	         value='Yep'";
 
-	    if (isset($formfields[exp_savedisk]) &&
-		strcmp($formfields[exp_savedisk], "Yep") == 0) {
+	    if (isset($formfields["exp_savedisk"]) &&
+		strcmp($formfields["exp_savedisk"], "Yep") == 0) {
 		    echo " checked='1'";
 	    }
 
@@ -234,7 +255,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
                   <td class='pad4'>
 	              <input type=text
                              name=\"formfields[parameter_xmlfile]\"
-                             value=\"" . $formfields[parameter_xmlfile] . "\"
+                             value=\"" . $formfields["parameter_xmlfile"] . "\"
 	                     size=60>\n";
 	echo "</td></tr>\n";
 	echo "</table></td></tr>";
@@ -252,7 +273,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[description]\"
                     rows=5 cols=80>" .
-	            ereg_replace("\r", "", $formfields[description]) .
+	            ereg_replace("\r", "", $formfields["description"]) .
 	           "</textarea>
               </td>
           </tr>\n";
@@ -264,8 +285,8 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	      <td class='pad4' colspan=2>
 	      <input type=checkbox name='formfields[batched]' value='Yep'";
 
-    if (isset($formfields[batched]) &&
-	strcmp($formfields[batched], "Yep") == 0) {
+    if (isset($formfields["batched"]) &&
+	strcmp($formfields["batched"], "Yep") == 0) {
 	echo " checked='1'";
     }
     echo ">\n";
@@ -284,8 +305,8 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 		  <input type=checkbox name='formfields[preload]'
                          value='Yep'";
 
-    if (isset($formfields[preload]) &&
-	strcmp($formfields[preload], "Yep") == 0) {
+    if (isset($formfields["preload"]) &&
+	strcmp($formfields["preload"], "Yep") == 0) {
 	echo " checked='1'";
     }
     echo ">\n";
@@ -305,7 +326,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
 	    $selected = "";
 
-	    if (strcmp($formfields[exp_linktest], "$i") == 0)
+	    if (strcmp($formfields["exp_linktest"], "$i") == 0)
 		$selected = "selected";
 	
 	    echo "        <option $selected value=$i>Level $i - " .
@@ -328,51 +349,25 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 }
 
 #
-# Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a template GUID.", 1);
-}
-
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a template version number", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-
-#
-# Check to make sure this is a valid template and enough permission.
-#
-$template = Template::Lookup($guid, $version);
-if (!$template) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-if (! $template->AccessCheck($uid, $TB_EXPT_UPDATE)) {
-    USERERROR("You do not have permission to instantiate experiment template ".
-	      "$guid/$version!", 1);
-}
-
-#
 # On first load, display virgin form and exit.
 #
 if (!isset($swapin)) {
-    $defaults[eid]		     = $template->tid();
-    $defaults[preload]               = "no";    
-    $defaults[exp_swappable]         = "1";
-    $defaults[exp_noswap_reason]     = "";
-    $defaults[exp_idleswap]          = "1";
-    $defaults[exp_linktest]          = 3;    
-    $defaults[exp_noidleswap_reason] = "";
-    $defaults[exp_idleswap_timeout]  = TBGetSiteVar("idle/threshold");
-    $defaults[exp_autoswap]          = TBGetSiteVar("general/autoswap_mode");
-    $defaults[exp_autoswap_timeout]  = TBGetSiteVar("general/autoswap_threshold");
+    $defaults = array();
+    
+    $defaults["eid"]		       = $template->tid();
+    $defaults["description"]           = "";
+    $defaults["preload"]               = "no";
+    $defaults["savedisk"]              = "";
+    $defaults["batched"]               = "";
+    $defaults["exp_swappable"]         = "1";
+    $defaults["parameter_xmlfile"]     = "";
+    $defaults["exp_noswap_reason"]     = "";
+    $defaults["exp_idleswap"]          = "1";
+    $defaults["exp_linktest"]          = 3;    
+    $defaults["exp_noidleswap_reason"] = "";
+    $defaults["exp_idleswap_timeout"]  = TBGetSiteVar("idle/threshold");
+    $defaults["exp_autoswap"]          = TBGetSiteVar("general/autoswap_mode");
+    $defaults["exp_autoswap_timeout"]  = TBGetSiteVar("general/autoswap_threshold");
 
     #
     # Optional replay instance/run.
@@ -426,10 +421,6 @@ elseif (! isset($formfields)) {
     PAGEARGERROR();
 }
 
-# Need this below.
-$pid = $template->pid();
-$gid = $template->gid();
-
 #
 # Okay, validate form arguments.
 #
@@ -439,17 +430,17 @@ $eid    = "";
 #
 # EID:
 #
-if (!isset($formfields[eid]) || $formfields[eid] == "") {
+if (!isset($formfields["eid"]) || $formfields["eid"] == "") {
     $errors["ID"] = "Missing Field";
 }
-elseif (!TBvalid_eid($formfields[eid])) {
+elseif (!TBvalid_eid($formfields["eid"])) {
     $errors["ID"] = TBFieldErrorString();
 }
-elseif (TBValidExperiment($pid, $formfields[eid])) {
+elseif (Experiment::Lookup($pid, $formfields["eid"])) {
     $errors["ID"] = "Already in use";
 }
 else {
-    $eid = $formfields[eid];
+    $eid = $formfields["eid"];
 }
 
 # Set up command options
@@ -458,101 +449,101 @@ $command_options = "";
 #
 # Swappable
 #
-if (!isset($formfields[exp_swappable]) ||
-    strcmp($formfields[exp_swappable], "1")) {
-    $formfields[exp_swappable] = 0;
+if (!isset($formfields["exp_swappable"]) ||
+    strcmp($formfields["exp_swappable"], "1")) {
+    $formfields["exp_swappable"] = 0;
 
-    if (!isset($formfields[exp_noswap_reason]) ||
-        !strcmp($formfields[exp_noswap_reason], "")) {
+    if (!isset($formfields["exp_noswap_reason"]) ||
+        !strcmp($formfields["exp_noswap_reason"], "")) {
 
         if (! $isadmin) {
 	    $errors["Not Swappable"] = "No justification provided";
         }
 	else {
-	    $formfields[exp_noswap_reason] = "ADMIN";
+	    $formfields["exp_noswap_reason"] = "ADMIN";
         }
     }
-    elseif (!TBvalid_description($formfields[exp_noswap_reason])) {
+    elseif (!TBvalid_description($formfields["exp_noswap_reason"])) {
 	$errors["Not Swappable"] = TBFieldErrorString();
     }
     else {
 	$command_options .=
-	    " -S " . escapeshellarg($formfields[exp_noswap_reason]);
+	    " -S " . escapeshellarg($formfields["exp_noswap_reason"]);
     }
 }
 else {
     # For form redisplay.
-    $formfields[exp_swappable]     = 1;
-    $formfields[exp_noswap_reason] = "";
+    $formfields["exp_swappable"]     = 1;
+    $formfields["exp_noswap_reason"] = "";
 }
 
 #
 # Idle swap
 #
-if (!isset($formfields[exp_idleswap]) ||
-    strcmp($formfields[exp_idleswap], "1")) {
-    $formfields[exp_idleswap] = 0;
+if (!isset($formfields["exp_idleswap"]) ||
+    strcmp($formfields["exp_idleswap"], "1")) {
+    $formfields["exp_idleswap"] = 0;
 
-    if (!isset($formfields[exp_noidleswap_reason]) ||
-	!strcmp($formfields[exp_noidleswap_reason], "")) {
+    if (!isset($formfields["exp_noidleswap_reason"]) ||
+	!strcmp($formfields["exp_noidleswap_reason"], "")) {
 	if (! $isadmin) {
 	    $errors["Not Idle-Swappable"] = "No justification provided";
 	}
 	else {
-	    $formfields[exp_noidleswap_reason] = "ADMIN";
+	    $formfields["exp_noidleswap_reason"] = "ADMIN";
 	}
     }
-    elseif (!TBvalid_description($formfields[exp_noidleswap_reason])) {
+    elseif (!TBvalid_description($formfields["exp_noidleswap_reason"])) {
 	$errors["Not Idle-Swappable"] = TBFieldErrorString();
     }
     else {
 	$command_options .= " -L " .
-	    escapeshellarg($formfields[exp_noidleswap_reason]);
+	    escapeshellarg($formfields["exp_noidleswap_reason"]);
     }
 }
 else {
-    $formfields[exp_idleswap]          = 1;
-    $formfields[exp_noidleswap_reason] = "";
+    $formfields["exp_idleswap"]          = 1;
+    $formfields["exp_noidleswap_reason"] = "";
 
     # Need this below;
     $idleswaptimeout = TBGetSiteVar("idle/threshold");
 
     # Proper idleswap timeout must be provided.
-    if (!isset($formfields[exp_idleswap_timeout]) ||
-	!preg_match("/^[\d]+$/", $formfields[exp_idleswap_timeout]) ||
-	($formfields[exp_idleswap_timeout] + 0) <= 0 ||
-	($formfields[exp_idleswap_timeout] + 0) > $idleswaptimeout) {
+    if (!isset($formfields["exp_idleswap_timeout"]) ||
+	!preg_match("/^[\d]+$/", $formfields["exp_idleswap_timeout"]) ||
+	($formfields["exp_idleswap_timeout"] + 0) <= 0 ||
+	($formfields["exp_idleswap_timeout"] + 0) > $idleswaptimeout) {
 	$errors["Idleswap"] = "Invalid time provided - ".
 	    "must be non-zero and less than $idleswaptimeout";
     }
-    $command_options .= " -l " . (60 * $formfields[exp_idleswap_timeout]);
+    $command_options .= " -l " . (60 * $formfields["exp_idleswap_timeout"]);
 }
 
 #
 # Autoswap.
 #
-if (!isset($formfields[exp_autoswap]) ||
-    strcmp($formfields[exp_autoswap], "1")) {
-    $formfields[exp_autoswap] = 0;
+if (!isset($formfields["exp_autoswap"]) ||
+    strcmp($formfields["exp_autoswap"], "1")) {
+    $formfields["exp_autoswap"] = 0;
 }
 else {
-    $formfields[exp_autoswap] = 1;
+    $formfields["exp_autoswap"] = 1;
     
-    if (!isset($formfields[exp_autoswap_timeout]) ||
-	!preg_match("/^[\d]+$/", $formfields[exp_idleswap_timeout]) ||
-	($formfields[exp_autoswap_timeout] + 0) <= 0) {
+    if (!isset($formfields["exp_autoswap_timeout"]) ||
+	!preg_match("/^[\d]+$/", $formfields["exp_idleswap_timeout"]) ||
+	($formfields["exp_autoswap_timeout"] + 0) <= 0) {
 	$errors["Max. Duration"] = "No or invalid time provided";
     }
     else {
-	$command_options .= " -a " . (60 * $formfields[exp_autoswap_timeout]);
+	$command_options .= " -a " . (60*$formfields["exp_autoswap_timeout"]);
     }
 }
 
 #
 # Save Disk
 #
-if (isset($formfields[exp_savedisk]) &&
-    strcmp($formfields[exp_savedisk], "Yep") == 0) {
+if (isset($formfields["exp_savedisk"]) &&
+    strcmp($formfields["exp_savedisk"], "Yep") == 0) {
     $command_options .= " -s";
 }
 
@@ -561,10 +552,10 @@ if (isset($formfields[exp_savedisk]) &&
 #
 $template->FormalParameters($parameter_masterlist);
 if (count($parameter_masterlist)) {
-    if (isset($formfields[parameter_xmlfile]) &&
-	$formfields[parameter_xmlfile] != "") {
+    if (isset($formfields["parameter_xmlfile"]) &&
+	$formfields["parameter_xmlfile"] != "") {
 
-	$parameter_xmlfile = $formfields[parameter_xmlfile];
+	$parameter_xmlfile = $formfields["parameter_xmlfile"];
 	    
 	if (!preg_match("/^([-\@\w\.\/]+)$/", $parameter_xmlfile)) {
 	    $errors["Parameter XML File"] =
@@ -629,19 +620,19 @@ if (count($parameter_masterlist)) {
 #
 # Description:
 # 
-if (isset($formfields[description]) && $formfields[description] != "") {
-    if (!TBvalid_template_description($formfields[description])) {
+if (isset($formfields["description"]) && $formfields["description"] != "") {
+    if (!TBvalid_template_description($formfields["description"])) {
 	$errors["Description"] = TBFieldErrorString();
     }
     else {
-	$command_options .= " -E " . escapeshellarg($formfields[description]);
+	$command_options .= " -E ". escapeshellarg($formfields["description"]);
     }
 }
 
 #
 # Batchmode
 #
-if (isset($formfields[batched]) && $formfields[batched] == "Yep") {
+if (isset($formfields["batched"]) && $formfields["batched"] == "Yep") {
     $command_options .= " -b";
     $batchmode = 1;
 }
@@ -649,20 +640,20 @@ if (isset($formfields[batched]) && $formfields[batched] == "Yep") {
 #
 # Preload?
 #
-if (isset($formfields[preload]) && $formfields[preload] == "Yep") {
+if (isset($formfields["preload"]) && $formfields["preload"] == "Yep") {
     $command_options .= " -p";
 }
 
 #
 # LinkTest
 #
-if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
-    if (!preg_match("/^[\d]+$/", $formfields[exp_linktest]) ||
-	$formfields[exp_linktest] < 0 || $formfields[exp_linktest] > 4) {
+if (isset($formfields["exp_linktest"]) && $formfields["exp_linktest"] != "") {
+    if (!preg_match("/^[\d]+$/", $formfields["exp_linktest"]) ||
+	$formfields["exp_linktest"] < 0 || $formfields["exp_linktest"] > 4) {
 	$errors["Linktest Option"] = "Invalid level selection";
     }
     else {
-	$command_options .= " -t " . $formfields[exp_linktest];
+	$command_options .= " -t " . $formfields["exp_linktest"];
     }
 }
 
@@ -695,11 +686,6 @@ if (count($errors)) {
 }
 
 #
-# Grab the unix GID for running scripts.
-#
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-#
 # Avoid SIGPROF in child.
 #
 set_time_limit(0);
@@ -725,7 +711,7 @@ STARTBUSY("Starting template instantiation!");
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webtemplate_instantiate ".
-		    "$command_options -e $eid $guid/$version",
+		    "$command_options -e $eid $guid/$vers",
 		 SUEXEC_ACTION_IGNORE);
 
 CLEARBUSY();
@@ -745,6 +731,13 @@ if ($retval) {
 }
 
 #
+# We need to locate this for watchlog.
+#
+if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
+    TBERROR("Could not locate experiment object for $pid/$eid", 1);
+}
+
+#
 # This does both the log output, and the state change watcher popup
 #
 if ($batchmode) {
@@ -757,10 +750,10 @@ if ($batchmode) {
           to see how many attempts have been made, and when the
           last attempt was.\n";
   
-    STARTWATCHER($pid, $eid);
+    STARTWATCHER($experiment);
 }
 else {
-    STARTLOG($pid, $eid);
+    STARTLOG($experiment);
 }
 
 #

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,6 +17,16 @@ PAGEHEADER("Robot Web Cams");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("camheight",   PAGEARG_INTEGER,
+				 "camwidth",    PAGEARG_INTEGER,
+				 "camfps",      PAGEARG_INTEGER,
+				 "refreshrate", PAGEARG_INTEGER,
+				 "camera",      PAGEARG_INTEGER,
+				 "applet",      PAGEARG_BOOLEAN);
 
 # Helper function.
 function MyError($msg)

@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("template_defs.php");
 
 #
 # Standard Testbed Header
@@ -27,25 +27,12 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a project ID.", 1);
-}
-
-if (!isset($gid) ||
-    strcmp($gid, "") == 0) {
-    USERERROR("You must provide a group ID.", 1);
-}
-
+# Verify page arguments.
 #
-# Check to make sure thats this is a valid PID/GID.
-#
-if (! ($group = Group::LookupByPidGid($pid, $gid))) {
-    USERERROR("No such group group $gid in project $pid!", 1);
-}
+$reqargs = RequiredPageArguments("group", PAGEARG_GROUP);
 $project = $group->Project();
+$pid     = $group->pid();
+$gid     = $group->gid();
 
 #
 # Verify permission to look at the group. This is a little different,
@@ -109,7 +96,7 @@ if ($EXPOSETEMPLATES) {
 #
 # A list of Group experiments.
 #
-SHOWEXPLIST("GROUP", $uid, $pid, $gid);
+ShowExperimentList("GROUP", $this_user, $group);
 
 if ($isadmin) {
     echo "<center>

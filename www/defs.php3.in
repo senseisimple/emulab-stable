@@ -4,7 +4,11 @@
 # Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# Standard definitions! 
+# Lets emulate register_globals=off for a while.
+include("unregister_globals.php");
+
+#
+# Standard definitions.
 #
 $TBDIR          = "@prefix@/";
 $OURDOMAIN      = "@OURDOMAIN@";
@@ -252,10 +256,10 @@ function PAGEARGERROR($msg = 0) {
 #
 # Save this stuff so we can generate better error messages and such.
 # 
-$suexec_cmdandargs = "";
-$suexec_retval     = 0;
-$suexec_output     = "";
-$suexec_output_array;
+$suexec_cmdandargs   = "";
+$suexec_retval       = 0;
+$suexec_output       = "";
+$suexec_output_array = null;
 
 #
 # Actions for suexec. 
@@ -394,6 +398,12 @@ function CHECKURL($url, &$error) {
 function CHECKPASSWORD($uid, $password, $name, $email, &$error)
 {
     global $TBCHKPASS_PATH;
+
+    # Watch for caller errors since this calls to the shell.
+    if (empty($uid) || empty($password) || empty($name) || empty($email)) {
+	$error = "";
+	return 0;
+    }
 
     $uid      = escapeshellarg($uid);
     $password = escapeshellarg($password);

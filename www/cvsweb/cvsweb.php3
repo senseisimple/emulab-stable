@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,6 +10,7 @@
 #
 chdir("../");
 require("defs.php3");
+include_once("template_defs.php");
 
 unset($uid);
 unset($repodir);
@@ -31,13 +32,21 @@ $use_viewvc = 0;
 #
 # Verify form arguments.
 #
-if (isset($pid) && $pid != "") {
+$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "instance",   PAGEARG_INSTANCE,
+				 "template",   PAGEARG_TEMPLATE,
+				 "project",    PAGEARG_PROJECT,
+				 "embedded",   PAGEARG_BOOLEAN);
+if (!isset($embedded)) {
+    $embedded = 0;
+}
+
+if (isset($project)) {
     if (!$CVSSUPPORT) {
 	USERERROR("Project CVS support is not enabled!", 1);
     }
-    if (!TBvalid_pid($pid)) {
-	PAGEARGERROR("Invalid project ID.");
-    }
+    $pid = $project->pid();
+    
     # Redirect now, to avoid phishing.
     if ($this_user) {
 	CheckLoginOrDie();
@@ -48,21 +57,15 @@ if (isset($pid) && $pid != "") {
 	header("Location: $url");
 	return;
     }
-    if (! TBValidProject($pid)) {
-	USERERROR("The project '$pid' is not a valid project.", 1);
-    }
-    if (isset($eid) && $eid != "") {
+    if (isset($experiment)) {
 	#
 	# Wants access to the experiment archive, which is really a repo.
 	#
-	if (!TBvalid_eid($eid)) {
-	    PAGEARGERROR("Invalid experiment ID.");
-	}
-	if (! TBValidExperiment($pid, $eid)) {
-	    USERERROR("Experiment '$pid/$eid' is not a valid experiment", 1);
-	}
+	$pid = $experiment->pid();
+	$eid = $experiment->eid();
+	
 	if (! ISADMIN() &&
-	    ! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	    ! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	    USERERROR("Not enough permission to view '$pid/$eid'", 1);
 	}
 	# Get the repo index for the experiment.
@@ -87,7 +90,7 @@ if (isset($pid) && $pid != "") {
 	# Wants access to the project repo.
 	#
 	if (! ISADMIN() &&
-	    ! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+	    ! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
             # Then check to see if the project cvs repo is public.
 	    $query_result =
 		DBQueryFatal("select cvsrepo_public from projects ".
@@ -103,41 +106,52 @@ if (isset($pid) && $pid != "") {
 	$repodir = "$TBCVSREPO_DIR/$pid";
     }
 }
-elseif (isset($exptidx) && $exptidx != "") {
+elseif (isset($experiment) || isset($instance) || isset($template)) {
     if (!$CVSSUPPORT) {
 	USERERROR("Project CVS support is not enabled!", 1);
-    }
-    if (!TBvalid_integer($exptidx)) {
-	PAGEARGERROR("Invalid experiment index.");
     }
 
     # Must be logged in for this!
     if ($this_user) {
 	CheckLoginOrDie();
     }
+
+    if (isset($template)) {
+	$experiment = $template->GetExperiment();
+    }
+    
+    if (isset($instance)) {
+	$pid = $instance->pid();
+	$eid = $instance->eid();
+	$idx = $instance->exptidx();
+	$project = $instance->Project();
+    }
+    else {
+	$pid = $experiment->pid();
+	$eid = $experiment->eid();
+	$idx = $experiment->idx();
+	$project = $experiment->Project();
+    }
     
     # Need the pid/eid/gid. Access the stats table since we want to provide
     # cvs access to terminated experiments via the archive.
     $query_result =
-	DBQueryFatal("select s.pid,s.eid,s.gid,s.archive_idx,a.archived ".
+	DBQueryFatal("select s.archive_idx,a.archived ".
 		     "   from experiment_stats as s ".
 		     "left join archives as a on a.idx=s.archive_idx ".
-		     "where s.exptidx='$exptidx'");
+		     "where s.exptidx='$idx'");
     if (!mysql_num_rows($query_result)) {
-	USERERROR("Experiment '$exptidx' is not a valid experiment", 1);
+	USERERROR("Experiment '$idx' is not a valid experiment", 1);
     }
     $row = mysql_fetch_array($query_result);
-    $pid = $row[0];
-    $eid = $row[1];
-    $gid = $row[2];
-    $repoidx  = $row[3];
-    $archived = $row[4];
+    $repoidx  = $row[0];
+    $archived = $row[1];
 
     # Lets do group level check since it might not be a current experiment.
     if (!$archived) {
 	if (! ISADMIN() &&
-	    ! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
-	    USERERROR("Not enough permission to view '$pid/$eid'", 1);
+	    ! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+	    USERERROR("Not enough permission to view archive", 1);
 	}
 	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";
     }
@@ -163,11 +177,18 @@ $script = "cvsweb.cgi";
 # Sine PHP helpfully scrubs out environment variables that we _want_, we
 # have to pass them to env.....
 #
-$query = escapeshellcmd($QUERY_STRING);
-$path = escapeshellcmd($PATH_INFO);
-$name = escapeshellcmd($SCRIPT_NAME);
-$agent = escapeshellcmd($HTTP_USER_AGENT);
-$encoding = escapeshellcmd($HTTP_ACCEPT_ENCODING);
+$query = escapeshellcmd($_SERVER["QUERY_STRING"]);
+$name = escapeshellcmd($_SERVER["SCRIPT_NAME"]);
+$agent = escapeshellcmd($_SERVER["HTTP_USER_AGENT"]);
+$encoding = escapeshellcmd($_SERVER["HTTP_ACCEPT_ENCODING"]);
+
+# This is special ...
+if (isset($_SERVER["PATH_INFO"])) {
+    $path = escapeshellcmd($_SERVER["PATH_INFO"]);
+}
+else {
+    $path = '/';
+}
 
 #
 # Helpfully enough, escapeshellcmd does not escape spaces. Sigh.
@@ -206,7 +227,7 @@ $shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
             "HTTP_ACCEPT_ENCODING=$encoding ";
 
 if (isset($repodir)) {
-    $prog  = ($use_viewvc ? webviewvc : webcvsweb);
+    $prog  = ($use_viewvc ? "webviewvc" : "webcvsweb");
     $embed = ($embedded ? "--embedded" : "");
     
     # I know, I added an argument to a script that is not supposed to
@@ -216,6 +237,9 @@ if (isset($repodir)) {
 else {
     $shellcmd .= "$script";
 }
+
+#TBERROR(print_r($_SERVER, true), 0);
+#TBERROR($shellcmd, 0);
 
 $fp = popen($shellcmd, 'r');
 

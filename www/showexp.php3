@@ -7,6 +7,7 @@
 include("defs.php3");
 require("Sajax.php");
 include("showstuff.php3");
+include("template_defs.php");
 sajax_init();
 sajax_export("GetExpState", "Show");
 
@@ -17,41 +18,31 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-$tag = "Experiment";
-
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("sortby",     PAGEARG_STRING,
+				 "showclass",  PAGEARG_STRING);
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
 if (!isset($sortby)) {
-    if ($pid == $TBOPSPID)
+    if ($experiment->pid() == $TBOPSPID)
 	$sortby = "rsrvtime-down";
     else
 	$sortby = "";
 }
-$exp_eid = $eid;
-$exp_pid = $pid;
+if (!isset($showclass))
+     $showclass = null;
 
-#
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! TBValidExperiment($exp_pid, $exp_eid)) {
-  USERERROR("The experiment $exp_eid is not a valid experiment ".
-            "in project $exp_pid.", 1);
-}
+# Need these below.
+$exp_eid = $eid = $experiment->eid();
+$exp_pid = $pid = $experiment->pid();
+$tag = "Experiment";
 
 #
 # Verify Permission.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
@@ -60,21 +51,21 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 #
 function GetExpState($a, $b)
 {
-    global $pid, $eid;
-    
-    $expstate = TBExptState($pid, $eid);
+    global $experiment;
 
-    return $expstate;
+    return $experiment->state();
 }
 
 function Show($which, $arg1, $arg2)
 {
-    global $pid, $eid, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    global $experiment, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    $pid  = $experiment->pid();
+    $eid  = $experiment->eid();
     $html = "";
 
     if ($which == "settings") {
 	ob_start();
-	SHOWEXP($pid, $eid);
+	$experiment->Show();
 	$html = ob_get_contents();
 	ob_end_clean();
     }
@@ -115,7 +106,7 @@ function Show($which, $arg1, $arg2)
 	if (!isset($graphtype) || !$graphtype)
 	    $graphtype = "pps";
 	
-	$exptidx = TBExptIndex($pid, $eid);
+	$exptidx = $experiment->idx();
 	# Make the link unique to force reload on the client side.
 	$now     = time();
 	
@@ -265,7 +256,7 @@ if ($EXPOSETEMPLATES) {
      $instance = TemplateInstance::LookupByExptidx($expindex);
 
      if (! is_null($instance)) {
-	 $tag = "Template Instance";
+	 $tag = "Instance";
 	 $guid = $instance->guid();
 	 $vers = $instance->vers();
      }
@@ -310,18 +301,16 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 }
 
-echo "<font size=+2>$tag <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo $experiment->PageHeader();
 echo "<br /><br />\n";
 SUBPAGESTART();
 
 SUBMENUSTART("$tag Options");
 
 if ($expstate) {
-    if (TBExptLogFile($exp_pid, $exp_eid)) {
+    if ($experiment->logfile() && $experiment->logfile() != "") {
 	WRITESUBMENUBUTTON("View Activity Logfile",
-			   "showlogfile.php3?pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("showlogfile", $experiment));
     }
     WRITESUBMENUDIVIDER();
 
@@ -330,16 +319,19 @@ if ($expstate) {
 	if ($isbatch) {
 	    if ($expstate == $TB_EXPTSTATE_SWAPPED) {
 		WRITESUBMENUBUTTON("Queue Batch Experiment",
-			 "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+				   CreateURL("swapexp", $experiment,
+					     "inout", "in"));
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
 		    $expstate == $TB_EXPTSTATE_ACTIVATING) {
 		WRITESUBMENUBUTTON("Stop Batch Experiment",
-			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+				   CreateURL("swapexp", $experiment,
+					     "inout", "out"));
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_QUEUED) {
 		WRITESUBMENUBUTTON("Dequeue Batch Experiment",
-			 "swapexp.php3?inout=pause&pid=$exp_pid&eid=$exp_eid");
+				   CreateURL("swapexp", $experiment,
+					     "inout", "pause"));
 	    }
 	}
 	else {
@@ -347,101 +339,102 @@ if ($expstate) {
 		WRITESUBMENUBUTTON(($instance ?
 				    "Swap Instance In" :
 				    "Swap Experiment In"),
-			 "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+				   CreateURL("swapexp", $experiment,
+					     "inout", "in"));
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
 		    ($expstate == $TB_EXPTSTATE_PANICED && $isadmin)) {
 		WRITESUBMENUBUTTON(($instance ?
 				    "Terminate Instance" :
 				    "Swap Experiment Out"),
-			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+				   CreateURL("swapexp", $experiment,
+					     "inout", "out"));
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVATING) {
 		WRITESUBMENUBUTTON(($instance ?
 				   "Cancel Template Instantiation" :
   				   "Cancel Experiment Swapin"),
-				   "swapexp.php3?inout=out".
-				   "&pid=$exp_pid&eid=$exp_eid");
+				   CreateURL("swapexp", $experiment,
+					     "inout", "out"));
 	    }
 	}
     
 	if (!$instance && $expstate != $TB_EXPTSTATE_PANICED) {
 	    WRITESUBMENUBUTTON("Terminate Experiment",
-			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
+			       CreateURL("endexp", $experiment));
 	}
 	elseif ($instance && $expstate == $TB_EXPTSTATE_SWAPPED) {
 	    WRITESUBMENUBUTTON("Terminate Instance",
-			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
+			       CreateURL("endexp", $experiment));
 	}
 
         # Batch experiments can be modifed only when paused.
 	if (!$instance && ($expstate == $TB_EXPTSTATE_SWAPPED ||
 	    (!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE))) {
 	    WRITESUBMENUBUTTON("Modify Experiment",
-			       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+			       CreateURL("modifyexp", $experiment));
 	}
     }
 
     if ($instance && $expstate == $TB_EXPTSTATE_ACTIVE) {
 	if ($instance->runidx()) {
 	    WRITESUBMENUBUTTON("Stop Current Experiment Run",
-			       "template_exprun.php?action=stop&guid=$guid".
-			       "&version=$vers&eid=$exp_eid");
+			       CreateURL("template_exprun", $instance,
+					 "action", "stop"));
 	    WRITESUBMENUBUTTON("Abort Current Experiment Run",
-			       "template_exprun.php?action=abort&guid=$guid".
-			       "&version=$vers&eid=$exp_eid");
+			       CreateURL("template_exprun", $instance,
+					 "action", "abort"));
 	}
 
 	WRITESUBMENUBUTTON("Start New Experiment Run",
-			   "template_exprun.php?action=start&guid=$guid".
-			   "&version=$vers&eid=$exp_eid");
+			   CreateURL("template_exprun", $instance,
+				     "action", "start"));
 
 	if ($instance->pause_time()) {
 	    WRITESUBMENUBUTTON("Continue Experiment RunTime",
-		       "template_exprun.php?action=continue&guid=$guid".
-		       "&version=$vers&eid=$exp_eid");
+			       CreateURL("template_exprun", $instance,
+					 "action", "continue"));
 	}
 	else {
 	    WRITESUBMENUBUTTON("Pause Experiment Runtime",
-		       "template_exprun.php?action=pause&guid=$guid".
-		       "&version=$vers&eid=$exp_eid");
+			       CreateURL("template_exprun", $instance,
+					 "action", "pause"));
 	}
 
 	WRITESUBMENUBUTTON("Create New Template",
-			   "template_commit.php?&guid=$guid".
-			   "&version=$vers&exptidx=$expindex");
+			   CreateURL("template_commit", $instance));
     }
     
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Modify Traffic Shaping",
-			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("delaycontrol", $experiment));
     }
 }
 
 WRITESUBMENUBUTTON("Modify Metadata",
-		   "editexp.php3?pid=$exp_pid&eid=$exp_eid");
+		   CreateURL("editexp", $experiment));
 
 WRITESUBMENUDIVIDER();
 
 if ($expstate == $TB_EXPTSTATE_ACTIVE) {
     WRITESUBMENUBUTTON("Link Tracing/Monitoring",
-		       "linkmon_list.php3?pid=$exp_pid&eid=$exp_eid");
+		       CreateURL("linkmon_list", $experiment));
     
     WRITESUBMENUBUTTON("Event Viewer",
-		       "showevents.php?pid=$exp_pid&eid=$exp_eid");
+		       CreateURL("showevents", $experiment));
     
     #
     # Admin and project/experiment leaders get this option.
     #
-    if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATE)) {
+    if ($experiment->AccessCheck($this_user, $TB_EXPT_UPDATE)) {
 	WRITESUBMENUBUTTON("Update All Nodes",
-			   "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("updateaccounts", $experiment));
     }
 
     # Reboot option
-    if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
+    if ($experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 	WRITESUBMENUBUTTON("Reboot All Nodes",
-			   "boot.php3?pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("boot", $experiment));
     }
 }
 
@@ -450,16 +443,16 @@ if (($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_MODIFY_RESWAP) &&
     (STUDLY() || $EXPOSELINKTEST)) {
     WRITESUBMENUBUTTON(($linktest_running ?
-			"Stop LinkTest" : "Run LinkTest"), 
-		       "linktest.php3?pid=$exp_pid&eid=$exp_eid".
+			"Stop LinkTest" : "Run LinkTest"),
+		       CreateURL("linktest", $experiment) . 
 		       ($linktest_running ? "&kill=1" : ""));
 }
 
 if ($expstate == $TB_EXPTSTATE_ACTIVE) {
-    if (STUDLY() && $classes['pcvm']) {
+    if (STUDLY() && isset($classes['pcvm'])) {
 	WRITESUBMENUBUTTON("Record Feedback Data",
-			   "feedback.php3?pid=$exp_pid&".
-			   "eid=$exp_eid&mode=record");
+			   CreateURL("feedback", $experiment) .
+			   "&mode=record");
     }
 }
 
@@ -467,10 +460,10 @@ if (($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_SWAPPED) &&
     STUDLY()) {
     WRITESUBMENUBUTTON("Clear Feedback Data",
-		       "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=clear");
-    if ($classes['pcvm']) {
+		       CreateURL("feedback", $experiment) . "&mode=clear");
+    if (isset($classes['pcvm'])) {
 	    WRITESUBMENUBUTTON("Remap Virtual Nodes",
-			       "remapexp.php3?pid=$exp_pid&eid=$exp_eid");
+			       CreateURL("remapexp", $experiment));
     }
 }
     
@@ -485,20 +478,24 @@ if ($wireless) {
 WRITESUBMENUDIVIDER();
 
 # History
-WRITESUBMENUBUTTON("Show History",
-		   "showstats.php3?showby=expt&which=$expindex");
+if (! $instance) {
+    WRITESUBMENUBUTTON("Show History",
+		       "showstats.php3?showby=expt&exptidx=$expindex");
+}
 
 if (!$instance && STUDLY()) {
     WRITESUBMENUBUTTON("Duplicate Experiment",
 		       "beginexp_html.php3?copyid=${exp_pid},${exp_eid}");
 }
 
-if ($EXPOSEARCHIVE) {
+if ($EXPOSEARCHIVE && !$instance) {
     WRITESUBMENUBUTTON("Experiment File Archive",
-		       "archive_view.php3?exptidx=$expindex");
+		       "archive_view.php3?experiment=$expindex");
 }
 
-if ($types['garcia'] || $types['static-mica2'] || $types['robot']) {
+if (isset($types['garcia']) ||
+    isset($types['static-mica2']) ||
+    isset($types['robot'])) {
     SUBMENUSECTION("Robot/Mote Options");
     WRITESUBMENUBUTTON("Robot/Mote Map",
 		       "robotmap.php3".
@@ -514,40 +511,37 @@ if ($types['garcia'] || $types['static-mica2'] || $types['robot']) {
     elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
 	    $expstate == $TB_EXPTSTATE_ACTIVATING) {
 	WRITESUBMENUBUTTON("Tracker Applet",
-			   "robotrack/robotrack.php3?".
-			   "pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("robotrack/robotrack", $experiment));
     }
 }
 
 # Blinky lights - but only if they have nodes of the correct type in their
 # experiment
-if ($classes['mote'] && $expstate == $TB_EXPTSTATE_ACTIVE) {
+if (isset($classes['mote']) && $expstate == $TB_EXPTSTATE_ACTIVE) {
     WRITESUBMENUBUTTON("Show Blinky Lights",
-		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid","moteleds");
+		       CreateURL("moteleds", $experiment), "moteleds");
 }
 
 if ($isadmin) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	SUBMENUSECTION("Beta-Test Options");
 	WRITESUBMENUBUTTON("Restart Experiment",
-			   "swapexp.php3?inout=restart&pid=$exp_pid".
-			   "&eid=$exp_eid");
+			   CreateURL("swapexp", $experiment,
+				     "inout", "restart"));
 	WRITESUBMENUBUTTON("Replay Events",
-			   "replayexp.php3?&pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("replayexp", $experiment));
 
 	SUBMENUSECTION("Admin Options");
 	
 	WRITESUBMENUBUTTON("Send an Idle Info Request",
-			   "request_idleinfo.php3?".
-			   "&pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("request_idleinfo", $experiment));
 	
 	WRITESUBMENUBUTTON("Send a Swap Request",
-			   "request_swapexp.php3?".
-			   "&pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("request_swapexp", $experiment));
 	
 	WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
-			   "swapexp.php3?inout=out&force=1".
-			   "&pid=$exp_pid&eid=$exp_eid");
+			   CreateURL("swapexp", $experiment,
+				     "inout", "out", "force", 1));
 	
 	SUBMENUSECTIONEND();
     }
@@ -559,6 +553,10 @@ echo "<br>
       <a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>
          <img border=1 alt='experiment vis'
               src='showthumb.php3?idx=$rsrcidx'></a>";
+
+if ($instance) {
+    $instance->ShowCurrentBindings();
+}
 
 SUBMENUEND_2B();
 
@@ -651,11 +649,11 @@ echo "</ul>\n";
 # Start out with details ...
 #
 echo "<div align=center width=\"100%\" id=\"showexp_visarea\">\n";
-SHOWEXP($exp_pid, $exp_eid);
+$experiment->Show();
 echo "</div>\n";
 echo "</div>\n";
 
-if (TBExptFirewall($exp_pid, $exp_eid) &&
+if ($experiment->Firewalled() &&
     ($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_PANICED ||
      $expstate == $TB_EXPTSTATE_ACTIVATING ||
@@ -684,7 +682,9 @@ if (TBExptFirewall($exp_pid, $exp_eid) &&
   	     "changes (swap, terminate) to your experiment.</blink></font>";
     }
     else {
-	echo "<br><a href='panicbutton.php3?pid=$exp_pid&eid=$exp_eid'>
+	$panic_url = CreateURL("panicbutton", $experiment);
+	
+	echo "<br><a href='$panic_url'>
                  <img border=1 alt='panic button' src='panicbutton.gif'></a>";
 	echo "<br><font color=red size=+2>".
 	     " Press the Panic Button to contain your experiment".
@@ -711,7 +711,7 @@ if ($isadmin) {
           <h3>Experiment Stats</h3>
          </center>\n";
 
-    SHOWEXPTSTATS($exp_pid, $exp_eid);
+    $experiment->ShowStats();
 }
 
 #

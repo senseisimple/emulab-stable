@@ -17,18 +17,12 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($user) ||
-    strcmp($user, "") == 0) {
-    USERERROR("You must provide a User ID.", 1);
-}
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("target_user", PAGEARG_USER);
 
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("Could not lookup user '$user'!", 1);
+if (! isset($target_user)) {
+    $target_user = $this_user;
 }
 $userstatus = $target_user->status();
 $wikionly   = $target_user->wikionly();
@@ -92,7 +86,7 @@ if ($EXPOSETEMPLATES) {
 #
 # Lets show Experiments.
 #
-SHOWEXPLIST("USER", $uid, $target_uid);
+ShowExperimentList("USER", $this_user, $target_user);
 
 #
 # Lets show project and group membership.
@@ -129,12 +123,12 @@ if (mysql_num_rows($query_result)) {
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
-	$pid   = $projrow[pid];
-	$gid   = $projrow[gid];
-	$name  = $projrow[name];
-	$desc  = $projrow[description];
-	$trust = $projrow[trust];
-	$nodes = $projrow[ncount];
+	$pid   = $projrow["pid"];
+	$gid   = $projrow["gid"];
+	$name  = $projrow["name"];
+	$desc  = $projrow["description"];
+	$trust = $projrow["trust"];
+	$nodes = $projrow["ncount"];
 
 	echo "<tr>
                  <td><A href='showproject.php3?pid=$pid'>

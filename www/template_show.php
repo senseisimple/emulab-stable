@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,59 +17,34 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-# Need these below, set in CheckArguments.
-$pid = "";
-$eid = "";
-$gid = "";
-$template = NULL;
-$exptidx  = 0;
+#
+# Verify page arguments 
+#
+$reqargs = RequiredPageArguments("template", PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("action",   PAGEARG_STRING,
+				 "show",     PAGEARG_STRING,
+				 "confirmed",PAGEARG_STRING);
 
-function CheckArguments($guid, $version) {
-    global $TB_EXPT_READINFO;
-    global $uid, $pid, $eid, $gid, $template, $exptidx;
-
-    #
-    # Verify page arguments.
-    # 
-    if (!isset($guid) ||
-	strcmp($guid, "") == 0) {
-	USERERROR("You must provide a template GUID.", 1);
-    }
-    
-    if (!isset($version) ||
-	strcmp($version, "") == 0) {
-	USERERROR("You must provide a template version number", 1);
-    }
-    if (!TBvalid_guid($guid)) {
-	PAGEARGERROR("Invalid characters in GUID!");
-    }
-    if (!TBvalid_integer($version)) {
-	PAGEARGERROR("Invalid characters in version!");
-    }
-    
-    #
-    # Check to make sure this is a valid template.
-    #
-    $template = Template::Lookup($guid, $version);    
-    if (!$template) {
-	USERERROR("The experiment template $guid/$version is not a ".
-		  "valid experiment template!", 1);
-    }
-    $pid = $template->pid();
-    $gid = $template->gid();
-    $eid = $template->eid();
-    $exptidx = TBExptIndex($pid, $eid);
-    
-    #
-    # Verify Permission.
-    #
-    if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view experiment ".
-		  "template $guid/$version!", 1);
-    }
+if (! ($experiment = $template->GetExperiment())) {
+    TBERROR("Could not find experiment object for template!", 1);
 }
 
-CheckArguments($guid, $version);
+# Need these below
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$eid  = $template->eid();
+$exptidx  = $experiment->idx();
+$unix_gid = $experiment->UnixGID();
+$this_url = CreateURL("template_show", $template);
+
+#
+# Verify Permission.
+#
+if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment ".
+	      "template $guid/$vers", 1);
+}
 
 #
 # For the Sajax Interface
@@ -183,6 +158,7 @@ function Show($which, $zoom, $detail)
 	$html .= " onclick=\"SaveNS();\">";
 	$html .= "Save</button>\n";
     }
+    
     return $html;
 }
 
@@ -191,13 +167,10 @@ function Show($which, $zoom, $detail)
 #
 function GraphChange($action, $recursive = 0, $no_output = 0)
 {
-    global $pid, $gid, $eid, $uid, $guid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    global $pid, $unix_gid, $eid, $uid, $guid, $TBSUEXEC_PATH, $TBADMINGROUP;
     global $template;
     $html = "";
 
-    # Need this for scripts.
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-    
     $reqarg  = "-a ";
     $versarg = $template->vers();
 
@@ -276,15 +249,12 @@ if (isset($action) && ($action == "activate" || $action == "inactivate")) {
 if (isset($action) && $action == "deletetemplate" &&
     isset($confirmed) && $confirmed == "yep") {
 
-    # Need this for scripts.
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-    PAGEHEADER("Delete Template: $guid/$version");
-    STARTBUSY("Deleting template $guid/$version recursively");
+    PAGEHEADER("Delete Template: $guid/$vers");
+    STARTBUSY("Deleting template $guid/$vers recursively");
 
     # Pass recursive option all the time.
     $retval = SUEXEC($uid, "$pid,$unix_gid",
-		     "webtemplate_delete -r $guid/$version",
+		     "webtemplate_delete -r $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 
     CLEARBUSY();
@@ -318,7 +288,7 @@ if (isset($action) && $action == "deletetemplate" &&
 #
 # Standard Testbed Header after argument checking.
 #
-PAGEHEADER("Experiment Template: $guid/$version");
+PAGEHEADER("Template: $guid/$vers");
 
 SUBPAGESTART();
 
@@ -326,47 +296,47 @@ SUBMENUSTART("Template Options");
 
 if ($template->IsActive()) {
     WRITESUBMENUBUTTON("InActivate Template &nbsp &nbsp",
-		       "template_show.php?guid=$guid".
-		       "&version=$version&action=inactivate");
+		       "${this_url}&action=inactivate");
 }
 else {
     WRITESUBMENUBUTTON("Activate Template &nbsp &nbsp",
-		       "template_show.php?guid=$guid".
-		       "&version=$version&action=activate");
+		       "${this_url}&action=activate");
 }
 
 WRITESUBMENUBUTTON("Modify Template",
-		   "template_modify.php?guid=$guid&version=$version");
+		   CreateURL("template_modify", $template));
 
 WRITESUBMENUBUTTON("Instantiate Template",
-		   "template_swapin.php?guid=$guid&version=$version");
+		   CreateURL("template_swapin", $template));
 
 WRITESUBMENUBUTTON("Add Metadata",
-		   "template_metadata.php?action=add&".
-		   "guid=$guid&version=$version");
+		   CreateURL("template_metadata", $template) . "&action=add");
 
 if ($template->EventCount() > 0) {
     WRITESUBMENUBUTTON("Edit Template Events",
-		       "template_editevents.php?guid=$guid&version=$version");
+		       CreateURL("template_editevents", $template));
 }
 
-# We show the user the datastore for the template; the rest of it is not important.
-WRITESUBMENUBUTTON("Template Archive",
-		   "archive_view.php3/$exptidx/trunk?exptidx=$exptidx");
+# We show the user the datastore for the template;
+# the rest of it is not important.
+WRITESUBMENUBUTTON("Browse Datastore",
+		   CreateURL("archive_view", $template));
 
-WRITESUBMENUBUTTON("Template Record",
-		   "template_history.php?guid=$guid&version=$version");
+WRITESUBMENUBUTTON("View Records",
+		   CreateURL("template_history", $template));
 
 SUBMENUEND_2A();
 
 #
 # Ick.
 #
-$rsrcidx = TBrsrcIndex($pid, $eid);
+if (($stats = $experiment->GetStats())) {
+    $rsrcidx = $stats->rsrcidx();
 
-echo "<br>
-      <img border=1 alt='template visualization'
-           src='showthumb.php3?idx=$rsrcidx'>";
+    echo "<br>
+          <img border=1 alt='template visualization'
+               src='showthumb.php3?idx=$rsrcidx'>";
+}
 
 if ($template->InstanceCount()) {
     $template->ShowInstances();
@@ -405,7 +375,7 @@ echo "<script type='text/javascript' language='javascript'>
         function ShowGraphInit() {
  	    ADD_DHTML(\"mygraphdiv\");
   	    SetActiveTemplate(\"mygraphimg\", \"CurrentTemplate\", 
-			      \"Tarea${version}\");
+			      \"Tarea${vers}\");
             tt_Init();
         }
         function VisChange(zoom, detail) {
@@ -422,8 +392,8 @@ echo "<script type='text/javascript' language='javascript'>
             if (confirm_flag == 0) {
                 return false;
             }
-	    window.location.replace('template_show.php?guid=$guid" .
-                  "&version=$version&action=deletetemplate&confirmed=yep');
+	    window.location.replace('$this_url" .
+                  "&action=deletetemplate&confirmed=yep');
             return false;
         }
         function GraphChange(action) {
@@ -438,7 +408,7 @@ echo "<script type='text/javascript' language='javascript'>
             return false;
         }
         function SaveNS() {
-            window.open('spitnsdata.php3?guid=$guid&version=$version',
+            window.open('" . CreateURL("spitnsdata", $template) . "',
                         'Save NS File','width=650,height=400,toolbar=no,".
                         "resizeable=yes,scrollbars=yes,status=yes,".
 	                "menubar=yes');
@@ -458,18 +428,18 @@ $bodyclosestring = "<script type='text/javascript'>SET_DHTML();</script>\n";
 echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
-          <a href=\"template_show.php?guid=$guid&version=$version&show=vis\"
+          <a href=\"${this_url}&show=vis\"
                style=\"background-color:white\" ".
                "id=\"li_vis\" onclick=\"Show('vis');\">".
                "Visualization</a></li>\n";
 echo "<li>
-          <a href=\"template_show.php?guid=$guid&version=$version&show=nsfile\"
+          <a href=\"${this_url}&show=nsfile\"
               id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
               "NS File</a></li>\n";
 echo "<li>
-          <a href=\"template_show.php?guid=$guid&version=$version&show=graph\"
+          <a href=\"${this_url}&show=graph\"
               id=\"li_graph\" onclick=\"Show('graph');\">".
-              "Graph</a></li>\n";
+              "History</a></li>\n";
 echo "</ul>\n";
 
 #

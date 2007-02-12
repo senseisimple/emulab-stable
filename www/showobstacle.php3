@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,16 +20,9 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($id) ||
-    strcmp($id, "") == 0) {
-    USERERROR("You must provide an Obstacle ID!", 1);
-}
-# Sanitize.
-if (!preg_match("/^[\d]+$/", $id)) {
-    PAGEARGERROR("Invalid characters in arguments.");
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("id",  PAGEARG_INTEGER);
 
 $query_result =
     DBQueryFatal("select o.*,f.pixels_per_meter from obstacles as o ".

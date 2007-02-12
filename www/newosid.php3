@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("osinfo_defs.php");
 include("osiddefs.php3");
 
 #
@@ -22,23 +22,34 @@ $dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 #
-# First off, sanity check the form to make sure all the required fields
-# were provided. I do this on a per field basis so that we can be
-# informative. Be sure to correlate these checks with any changes made to
-# the project form. 
+# Verify page arguments.
 #
+$optargs = OptionalPageArguments("osname",      PAGEARG_STRING,
+				 "project",     PAGEARG_PROJECT,
+				 "description", PAGEARG_STRING,
+				 "os_path",     PAGEARG_STRING,
+				 "os_version",  PAGEARG_STRING,
+				 "OS",          PAGEARG_STRING,
+				 "os_magic",    PAGEARG_STRING,
+				 "op_mode",     PAGEARG_STRING,
+				 "os_shared",   PAGEARG_STRING,
+				 "os_clean",    PAGEARG_STRING,
+				 "os_reboot_waittime", PAGEARG_STRING);
+
 if (!isset($osname) ||
     strcmp($osname, "") == 0) {
   FORMERROR("Descriptor Name");
 }
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
+if (!isset($project)) {
   FORMERROR("Select Project");
 }
+$pid = $project->pid();
+
 if (!isset($description) ||
     strcmp($description, "") == 0) {
   FORMERROR("Description");
-}
+}				 
+
 if (isset($os_path) &&
     strcmp($os_path, "") == 0) {
     unset($os_path);
@@ -115,7 +126,7 @@ else {
 #
 # Verify permission.
 #
-if (!TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEOSID)) {
+if (!$project->AccessCheck($this_user, $TB_PROJECT_MAKEOSID)) {
     USERERROR("You do not have permission to create OS Descriptors ".
 	      "in Project $pid!", 1);
 }
@@ -182,7 +193,7 @@ elseif (! preg_match("/^[-\w]+$/", $op_mode)) {
 elseif (! array_key_exists($op_mode, $osid_opmodes)) {
     USERERROR("Operational Mode (op_mode) - Invalid op_mode", 1);
 }
-elseif (! $osid_opmodes[$OS] && !$isadmin) {
+elseif (! $osid_opmodes[$op_mode] && !$isadmin) {
     USERERROR("Operational Mode (o_mode) - Not enough permission", 1);
 }
 
@@ -198,7 +209,7 @@ if (isset($nextosid)) {
     elseif (!TBvalid_osid($nextosid)) {
 	USERERROR("NextOsid: ". TBFieldErrorString(), 1);
     }
-    elseif (! TBValidOSID($nextosid)) {
+    elseif (! OSInfo::Lookup($nextosid)) {
 	USERERROR("NextOsid: $nextosid is not a known osid!", 1);
     }
 }
@@ -207,11 +218,11 @@ if (isset($nextosid)) {
 # Check the reboot_waittime. Only admin users can set this. Grab default
 # if not set.
 #
-if (isset($reboot_waittime) && $reboot_waittime != "") {
+if (isset($os_reboot_waittime) && $os_reboot_waittime != "") {
     if (!$isadmin) {
 	USERERROR("Setting reboot waittime requires admin mode!", 1);
     }
-    elseif (!TBvalid_integer($reboot_waittime)) {
+    elseif (!TBvalid_integer($os_reboot_waittime)) {
 	USERERROR("Reboot Waittime: ". TBFieldErrorString(), 1);
     }
 }
@@ -220,7 +231,7 @@ else {
 	USERERROR("Operating System (OS) - No default reboot waittime", 1);
     }
     else {
-	$reboot_waittime = $osid_reboot_waitlist[$OS];
+	$os_reboot_waittime = $osid_reboot_waitlist[$OS];
     }
 }
 
@@ -239,7 +250,7 @@ DBQueryFatal("lock tables os_info write");
 #
 # Of course, the OS record may not already exist in the DB.
 #
-if (TBValidOS($pid, $osname)) {
+if (OSInfo::LookupByName($project, $osname)) {
     DBQueryFatal("unlock tables");
     USERERROR("The OS Descriptor '$osname' already exists in Project $pid! ".
               "Please select another.", 1);
@@ -249,7 +260,7 @@ if (TBValidOS($pid, $osname)) {
 # Just concat them to form a unique imageid. 
 # 
 $osid = "$pid-$osname";
-if (TBValidOSID($osid)) {
+if (OSInfo::Lookup($osid)) {
     DBQueryFatal("unlock tables");
     TBERROR("Could not form a unique osid for $pid/$osname!", 1);
 }
@@ -263,7 +274,7 @@ $query_result =
 		 "        '$os_version', $os_path, '$os_magic', '$op_mode', ".
 		 "        '$os_features', '$pid', $os_shared, ".
 	         "        '$uid', '$dbid', $os_mustclean, now(), ".
-		 "        $reboot_waittime)");
+		 "        $os_reboot_waittime)");
 
 DBQueryFatal("unlock tables");
 
@@ -271,26 +282,13 @@ if (isset($nextosid)) {
     DBQueryFatal("update os_info set nextosid='$nextosid' where osid='$osid'");
 }
 
-SUBPAGESTART();
-SUBMENUSTART("More Options");
-WRITESUBMENUBUTTON("Delete this OS Descriptor",
-		   "deleteosid.php3?osid=$osid");
-WRITESUBMENUBUTTON("Create a new OS Descriptor",
-		   "newosid_form.php3");
-WRITESUBMENUBUTTON("Create a new Image Descriptor",
-		   "newimageid_ez.php3");
-WRITESUBMENUBUTTON("OS Descriptor list",
-		   "showosid_list.php3");
-WRITESUBMENUBUTTON("Image Descriptor list",
-		   "showimageid_list.php3");
-SUBMENUEND();
+# Need the object for the rest of the script
+if (! ($osinfo = OSInfo::Lookup($osid))) {
+    TBERROR("Could not lookup osinfo object for $osid", 1);
+}
 
-#
-# Dump os_info record.
-# 
-SHOWOSINFO($osid);
-
-SUBPAGEEND();
+echo "<center><h3>Done!</h3></center>\n";
+PAGEREPLACE(CreateURL("showosinfo", $osinfo));
 
 #
 # Standard Testbed Footer

@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("imageid_defs.php");
 include("osiddefs.php3");
 
 #
@@ -57,7 +58,7 @@ for use with the <tt>tb-set-node-os</tt> command in your NS file.
 #
 echo "<tr>
           <td>*Select Project:</td>";
-echo "    <td><select name=pid>
+echo "    <td><select name=project>
               <option value=''>Please Select &nbsp</option>\n";
 
 	      while (list($project) = each($projlist)) {

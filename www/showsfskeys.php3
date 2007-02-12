@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can do this.
@@ -15,39 +14,17 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page/form arguments. Note that the target uid comes initially as a
-# page arg, but later as a form argument, hence this odd check.
+# Verify page/form arguments.
 #
-if (! isset($_POST['submit'])) {
-    # First page load. Default to current user.
-    if (! isset($_GET['user']))
-	$user = $uid;
-    else
-	$user = $_GET['user'];
-}
-else {
-    # Form submitted. Make sure we have a formfields array and a user.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['user'])) {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $formfields = $_POST['formfields'];
-    $user       = $formfields['user'];
-}
+$optargs = OptionalPageArguments("target_user",   PAGEARG_USER,
+				 "submit",        PAGEARG_STRING,
+				 "formfields",    PAGEARG_ARRAY);
 
-# Pedantic check of uid before continuing.
-if ($user == "" || !User::ValidWebID($user)) {
-    PAGEARGERROR("Invalid uid: '$user'");
+# Default to current user.
+if (!isset($target_user)) {
+    $target_user = $this_user;
 }
-
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
-$target_uid  = $target_user->uid();
+$target_uid = $target_user->uid();
 $target_dbid = $target_user->dbid();
 
 #
@@ -56,12 +33,12 @@ $target_dbid = $target_user->dbid();
 #
 if (!$isadmin && 
     !$target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
-    USERERROR("You do not have permission to view ${uid}'s keys!", 1);
+    USERERROR("You do not have permission to view ${target_uid}'s keys!", 1);
 }
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $target_user, $BOSSNODE;
+    global $isadmin, $target_user, $BOSSNODE. $OURDOMAIN;
 
     $target_uid = $target_user->uid();
     $uid_idx    = $target_user->uid_idx();
@@ -152,12 +129,11 @@ function SPITFORM($formfields, $errors)
 	}
 	echo "</table><br>\n";
     }
+    $url = CreateURL("showsfskeys", $target_user);
 
     echo "<table align=center border=1> 
           <form enctype=multipart/form-data
-                action=showsfskeys.php3 method=post>\n";
-    echo "<input type=hidden name=\"formfields[user]\" ".
-	         "value=$webid>\n";
+                action='$url' method=post>\n";
 
     #
     # SFS public key
@@ -228,12 +204,18 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a form of current values.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($submit)) {
     $defaults = array();
-    
+    $defaults["password"] = "";
+    $defaults["usr_key"]  = "";
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
+}
+
+# Form submitted. Make sure we have a formfields array.
+if (!isset($formfields)) {
+    PAGEARGERROR("Invalid form arguments.");
 }
 
 #
@@ -242,29 +224,30 @@ if (! isset($_POST['submit'])) {
 $errors  = array();
 $matches = array();
 
-if (isset($formfields[usr_key]) &&
-    strcmp($formfields[usr_key], "")) {
+if (isset($formfields["usr_key"]) &&
+    strcmp($formfields["usr_key"], "")) {
 
     #
     # This is passed off to the shell, so taint check it.
     # 
-    if (! preg_match("/^[\w:\n\,\@\.\#]*$/", $formfields[usr_key])) {
+    if (! preg_match("/^[\w:\n\,\@\.\#]*$/", $formfields["usr_key"])) {
 	$errors["SFSKey"] = "Invalid characters";
     }
     else {
         #
         # Replace any embedded newlines first.
         #
-	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
+	$formfields["usr_key"] =
+	    ereg_replace("[\n]", "", $formfields["usr_key"]);
 
 	#
 	# Must parse it and construct a key for the DB. Accept both version
 	# 6 and version 7 (, vs :). 
 	#
 	if (! preg_match("/(\w*),([-\w\@\.]*)/",
-			 $formfields[usr_key], $matches) &&
+			 $formfields["usr_key"], $matches) &&
 	    ! preg_match("/(\w*):([-\w\@\.\#]*)/",
-			 $formfields[usr_key], $matches)) {
+			 $formfields["usr_key"], $matches)) {
 	    $errors["SFSKey"] = "Invalid Key Format";
 	}
 	$pubkey  = $matches[1];
@@ -276,11 +259,11 @@ if (isset($formfields[usr_key]) &&
         # Must verify passwd to add keys.
         #
 	if (! $isadmin) {
-	    if (!isset($formfields[password]) ||
-		strcmp($formfields[password], "") == 0) {
+	    if (!isset($formfields["password"]) ||
+		strcmp($formfields["password"], "") == 0) {
 		$errors["Password"] = "Must supply a verification password";
 	    }
-	    elseif (VERIFYPASSWD($target_uid, $formfields[password]) != 0) {
+	    elseif (VERIFYPASSWD($target_uid, $formfields["password"]) != 0) {
 		$errors["Password"] = "Incorrect password";
 	    }
 	}

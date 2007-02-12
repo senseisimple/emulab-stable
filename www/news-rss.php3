@@ -30,12 +30,12 @@ $query_result=
 
 $first = 1;
 while ($row = mysql_fetch_array($query_result)) {
-    $subject     = $row[subject];
+    $subject     = $row["subject"];
     $timestamp   = $row['date'];
-    $author      = $row[author];
-    $author_name = $row[usr_name];
-    $body        = $row[body];
-    $msgid       = $row[msgid];
+    $author      = $row["author"];
+    $author_name = $row["usr_name"];
+    $body        = $row["body"];
+    $msgid       = $row["msgid"];
 
     # Strip HTML from the body
     $stripped = strip_tags($body);
@@ -55,7 +55,7 @@ while ($row = mysql_fetch_array($query_result)) {
     list($date, $hours) = split(' ', $timestamp);
     list($year,$month,$day) = split('-',$date);
     list($hour,$min,$sec) = split(':',$hours);
-    $rfc822date = date(r,mktime($hour, $min, $sec, $month, $day, $year));
+    $rfc822date = date("r",mktime($hour, $min, $sec, $month, $day, $year));
 
     if ($first) {
         # If this is the 'first' article (the most recent), include it as

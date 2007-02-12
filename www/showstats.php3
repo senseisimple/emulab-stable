@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -19,25 +18,26 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-if (!isset($verbose)) {
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("showby",	      PAGEARG_STRING,
+				 "target_user",	      PAGEARG_USER,
+				 "target_project",    PAGEARG_PROJECT,
+				 "exptidx",           PAGEARG_INTEGER,
+				 "records",           PAGEARG_INTEGER);
+if (! isset($verbose)) {
      $verbose = 0;
 }
-
-# Page args,
 if (! isset($showby)) {
     if ($isadmin) 
 	$showby = "all";
     else
 	$showby = "user";
 }
-if (! isset($which))
-    $which = null;
 # Show just the last N records unless request is different.
-if (!isset($records) || !strcmp($records, "")) {
+if (!isset($records)) {
     $records = 100;
-}
-elseif (! TBvalid_integer($records)) {
-    PAGEARGERROR("Invalid argument: $records!");
 }
 
 echo "<b>Show: <a class='static' href='showexpstats.php3'>
@@ -75,31 +75,12 @@ else {
 	echo "Project</a>.";
 }
 echo "</b><br>\n";
-
-# Refresh option
-if ($isadmin) {
-    echo "<b>Refresh every: ";
-    echo "<a class='static' ".
-	     "href='showstats.php3?showby=$showby&refreshrate=30'>30</a>, ";
-    echo "<a class='static' ".
-	     "href='showstats.php3?showby=$showby&refreshrate=60'>60</a>, ";
-    echo "<a class='static' ".
-	     "href='showstats.php3?showby=$showby&refreshrate=120'>120</a> ";
-    echo "seconds.\n";
-    echo "</b><br>\n";
-}
 echo "<br>\n";
 
 # Determine what to do.
 if ($showby == "user") {
-    if (!isset($user) || $user == "") {
+    if (!isset($target_user)) {
 	$target_user = $this_user;
-    }
-    elseif (! TBvalid_uididx($user)) {
-	PAGEARGERROR("Invalid characters in user ID");
-    }
-    elseif (! ($target_user = User::Lookup($user))) {
-	USERERROR("User '$user' is not a valid user", 1);
     }
     elseif (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
 	USERERROR("You do not have permission to view ${user}'s stats!", 1);
@@ -107,66 +88,66 @@ if ($showby == "user") {
     $wclause = "where t.uid='" . $target_user->uid() . "'";
 }
 elseif ($showby == "project") {
-    if (! $which) {
+    if (!isset($target_project)) {
 	USERERROR("Must supply a project to view!", 1);
     }
-    if (! TBProjAccessCheck($uid, $which, $which, $TB_PROJECT_READINFO)) {
-	    USERERROR("You do not have permission to view stats for ".
-		      "project $which!", 1);
+    $pid = $target_project->pid();
+    
+    if (!$target_project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+	USERERROR("You do not have permission to view stats for ".
+		  "project $pid!", 1);
     }
-    $wclause = "where s.pid='$which'";
+    $wclause = "where s.pid='$pid'";
 }
 elseif ($showby == "expt") {
-    if (!$which) {
-	USERERROR("Must supply an experiment to view!", 1);
-    }
-    if (!TBvalid_integer($which)) {
-	USERERROR("Invalid characters in $which!", 1);
-    }
-
     #
-    # We get an index. Must map that to a pid/eid to do the permission
-    # check, and note that it might not be an current experiment. Not
+    # We get an index, which may or may not map to a current experiment.
+    # If not a current experiment, then need to check in the stats table
+    # so we can map it to a pid/eid to do the permission check. Not
     # sure I like this so I am not going to permit it for mere users
     # just yet.
     #
-    $query_result =
-	DBQueryFatal("select pid,eid from experiments where idx='$which'");
-    if (mysql_num_rows($query_result) == 0) {
-	USERERROR("No such experiment index $which!", 1);
+    if (!isset($exptidx)) {
+	USERERROR("Must supply an experiment to view!", 1);
     }
-    $row   = mysql_fetch_array($query_result);
-    $pid   = $row[pid];
-    $eid   = $row[eid];
-
-    if (!$isadmin) {
-	if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+    if (!TBvalid_integer($exptidx)) {
+	USERERROR("Invalid characters in $exptidx!", 1);
+    }
+    if (! ($experiment = Experiment::Lookup($exptidx))) {
+	if (! ($stats = ExperimentStats::Lookup($exptidx))) {
+	    USERERROR("No such experiment index $exptidx!", 1);
+	}
+	if (!$isadmin) {
+	    # XXX
 	    USERERROR("You do not have permission to view stats for ".
-		      "experiment $which!", 1);
+		      "historical experiment $exptidx!", 1);
 	}
     }
-    $wclause = "where t.exptidx='$which'";
+    elseif (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view stats for ".
+		  "experiment $exptidx!", 1);
+    }
+    $wclause = "where t.exptidx='$exptidx'";
 
-    #
-    # When showing a single experiment, put uid,pid,eid,idx in a header.
-    # Less crap to look at.
-    #
-    echo "<center><font size=+1>".
-	 "Experiment <b>".
-         "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-	 "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a> ".
-	 "(<a href='showexpstats.php3?record=$which'>$which</a>) ".
-	 "</b></font>\n";
-         "</center><br>";
+    echo "<center>";
+    if ($experiment) {
+	echo $experiment->PageHeader();
+    }
+    echo "<font size=+2>";
+    echo "(<a href='showexpstats.php3?record=$exptidx'>$exptidx</a>) ";
+    echo "</font>";
+    echo "</center>\n";
     echo "<br>\n";
 }
 elseif ($showby == "all") {
-    if ($which) {
-	if (! TBProjAccessCheck($uid, $which, $which, $TB_PROJECT_READINFO)) {
+    if (isset($target_project)) {
+	$pid = $target_project->pid();
+    
+	if (!$target_project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
 	    USERERROR("You do not have permission to view stats for ".
-		      "project $which!", 1);
+		      "project $pid!", 1);
 	}
-	$wclause = "where s.pid='$which'";
+	$wclause = "where s.pid='$pid'";
     }
     elseif (!$isadmin) {
         #
@@ -225,18 +206,18 @@ if ($EXPOSEARCHIVE) {
 echo " </tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $idx     = $row[statno];
-    $exptidx = $row[exptidx];
-    $pid     = $row[pid];
-    $eid     = $row[eid];
-    $uid     = $row[uid];
-    $start   = $row[start_time];
-    $end     = $row[end_time];
-    $action  = $row[action];
-    $ecode   = $row[exitcode];
-    $pnodes  = $row[pnodes];
-    $archive_idx = $row[archive_idx];
-    $archive_tag = $row[archive_tag];
+    $idx     = $row["statno"];
+    $exptidx = $row["exptidx"];
+    $pid     = $row["pid"];
+    $eid     = $row["eid"];
+    $uid     = $row["uid"];
+    $start   = $row["start_time"];
+    $end     = $row["end_time"];
+    $action  = $row["action"];
+    $ecode   = $row["exitcode"];
+    $pnodes  = $row["pnodes"];
+    $archive_idx = $row["archive_idx"];
+    $archive_tag = $row["archive_tag"];
 
     if (!isset($end))
 	$end = "&nbsp";

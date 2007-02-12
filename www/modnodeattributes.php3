@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # Standard Testbed Header
@@ -20,31 +20,36 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure that this is a valid nodeid
+# Only admin users may modify node attributes.
 #
-$query_result =
-    DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("The node $node_id is not a valid nodeid!", 1);
+if (! $isadmin) {
+    USERERROR("You do not have permission to modify node atrributes!", 1);
 }
-$noderow = mysql_fetch_array($query_result);
+
+#
+# Verify form arguments.
+#
+$reqargs = RequiredPageArguments("node",       PAGEARG_NODE);
+$optargs = OptionalPageArguments("refer",      PAGEARG_STRING,
+				 "submit",     PAGEARG_STRING,
+				 "_delattrs",  PAGEARG_ARRAY,
+				 "_modattrs",  PAGEARG_ARRAY,
+				 "_newattrs",  PAGEARG_ARRAY,
+				 "_newvals",   PAGEARG_ARRAY);
+
+# Need these below ...
+$node_id = $node->node_id();
+$type    = $node->type();
 
 #
 # Get current set of attributes for node - used in comparison below
 #
-$node_attrs = array();
+$cur_node_attrs = array();
 $attr_result =
     DBQueryFatal("select attrkey,attrvalue from node_attributes ".
 		 "where node_id='$node_id'");
 while($row = mysql_fetch_array($attr_result)) {
-  $cur_node_attrs[$row[attrkey]] = $row[attrvalue];
-}
-
-#
-# Only admin users may modify node attributes.
-#
-if (! $isadmin) {
-  USERERROR("You do not have permission to modify node $node_id!", 1);
+    $cur_node_attrs[$row["attrkey"]] = $row["attrvalue"];
 }
 
 #
@@ -60,7 +65,7 @@ $del_command_string = "";
 
 # Find attributes needing modification - make sure they are actually
 # different than the current value before adding them to the command string.
-if ($_modattrs) {
+if (isset($_modattrs)) {
   foreach ($_modattrs as $attrkey => $attrval) {
     if ($cur_node_attrs[$attrkey] != $attrval) {
       $mod_command_string .= "$attrkey='$attrval' ";
@@ -69,7 +74,7 @@ if ($_modattrs) {
 }
 
 # Check for new attributes - make sure they are unique.
-if ($_newattrs) {
+if (isset($_newattrs)) {
   for ($i = 0; $i < count($_newattrs); $i++) {
     if ($cur_node_attrs && 
         array_key_exists($_newattrs[$i], $cur_node_attrs)) {
@@ -82,7 +87,7 @@ if ($_newattrs) {
 }
 
 # Finally, see if any attributes need to be deleted.
-if ($_delattrs) {
+if (isset($_delattrs)) {
   foreach ($_delattrs as $attrkey => $attrval) {
     $del_command_string .= "$attrkey ";
   }
@@ -119,13 +124,14 @@ echo "<center>
       <h3>Node attributes successfully modified!</h3><p>
       </center>\n";
 
-SHOWNODE($node_id, SHOWNODE_NOFLAGS);
+$node->Show(SHOWNODE_NOFLAGS);
 
 #
 # Edit option.
 #
+$url = CreateURL("modnodeattributes_form", $node);
 echo "<br><center>
-           <A href='modnodeattributes_form.php3?node_id=$node_id'>
+           <A href='$url'>
            Edit this node's attributes again?</a>
          </center>\n";
 

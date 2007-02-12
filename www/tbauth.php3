@@ -163,7 +163,7 @@ function LoginStatus() {
     global $CHECKLOGIN_WIKINAME, $TBOPSPID;
     global $EXPOSEARCHIVE, $EXPOSETEMPLATES;
     global $CHECKLOGIN_HASHKEY, $CHECKLOGIN_HASHHASH;
-    global $nocookieauth, $CHECKLOGIN_IDX, $CHECKLOGIN_USER;
+    global $CHECKLOGIN_IDX, $CHECKLOGIN_USER;
     
     #
     # If we already figured this out, do not duplicate work!
@@ -181,8 +181,8 @@ function LoginStatus() {
 
     # for java applet, we can send the key in the $auth variable,
     # rather than passing it is a cookie.
-    if (isset($nocookieauth)) {
-	$curhash = $nocookieauth;
+    if (isset($_GET['nocookieauth'])) {
+	$curhash = $_GET['nocookieauth'];
     }
     elseif (array_key_exists($TBAUTHCOOKIE, $HTTP_COOKIE_VARS)) {
 	$curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
@@ -1059,8 +1059,10 @@ function DOLOGOUT($user) {
 		  "hashhash='$safe_hashhash'"));
 
     #
-    # Issue a cookie request to delete the cookies. 
+    # Issue a cookie request to delete the cookies. Delete with timeout in past
     #
+    $timeout = time() - 3600;
+    
     setcookie($TBAUTHCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     if ($WIKISUPPORT) {

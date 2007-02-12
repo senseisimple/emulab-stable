@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can do this.
@@ -22,25 +21,18 @@ if (!$isadmin) {
 
 #
 # Verify form arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-
 #
-# Confirm target is a real project,
-#
-if (! ($target_project = Project::Lookup($pid))) {
-    USERERROR("The project $pid is not a valid project", 1);
-}
+$reqargs = RequiredPageArguments("project", PAGEARG_PROJECT);
+$optargs = OptionalPageArguments("submit",  PAGEARG_STRING,
+				 "message", PAGEARG_ANYTHING);
+$pid = $project->pid();
 
 #
 # Form to allow text input.
 #
-function SPITFORM($pid, $message, $errors)
+function SPITFORM($project, $message, $errors)
 {
-    global $this_user, $target_project;
+    global $this_user;
     
     if ($errors) {
 	echo "<table class=nogrid
@@ -67,11 +59,13 @@ function SPITFORM($pid, $message, $errors)
     #
     # Show stuff
     #
-    $target_project->Show();
+    $project->Show();
+
+    $url = CreateURL("resendapproval", $project);
 
     echo "<br>";
     echo "<table align=center border=1>\n";
-    echo "<form action='resendapproval.php?pid=$pid' method='post'>\n";
+    echo "<form action='$url' method='post'>\n";
 
     echo "<tr>
               <td>Use the text box (70 columns wide) to add a message to the
@@ -95,8 +89,8 @@ function SPITFORM($pid, $message, $errors)
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
-    SPITFORM($pid, "", null);
+if (! isset($submit)) {
+    SPITFORM($project, "", null);
     PAGEFOOTER();
     return;
 }
@@ -106,7 +100,7 @@ if (! isset($message)) {
     $message = "";
 }
 
-if (! ($leader = $target_project->GetLeader())) {
+if (! ($leader = $project->GetLeader())) {
     TBERROR("Error getting leader for $pid", 1);
 }
 $headuid       = $leader->uid();
@@ -136,7 +130,7 @@ echo "<center>
 
 sleep(1);
 
-PAGEREPLACE(CreateURL("showproject", $target_project));
+PAGEREPLACE(CreateURL("showproject", $project));
 
 #
 # Standard Testbed Footer

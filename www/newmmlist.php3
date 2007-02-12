@@ -19,6 +19,12 @@ $dbid      = $this_user->dbid();
 $isadmin   = ISADMIN();
 
 #
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
+				 "formfields",   PAGEARG_ARRAY);
+
+#
 # See what projects the uid can do this in.
 #
 $projlist = $this_user->ProjectAccessList($TB_PROJECT_READINFO);
@@ -117,7 +123,7 @@ function SPITFORM($formfields, $errors)
     while (list($project) = each($projlist)) {
 	$selected = "";
 
-	if ($formfields[pid] == $project)
+	if ($formfields["pid"] == $project)
 	    $selected = "selected";
 	
 	echo "        <option $selected value='$project'>$project </option>\n";
@@ -135,7 +141,7 @@ function SPITFORM($formfields, $errors)
                   <input type=text
                          onChange='Changed(myform);'
                          name=\"formfields[listname]\"
-                         value=\"" . $formfields[listname] . "\"
+                         value=\"" . $formfields["listname"] . "\"
 	                 size=$TBDB_MMLENGTH
                          maxlength=$TBDB_MMLENGTH>
               </td>
@@ -150,7 +156,7 @@ function SPITFORM($formfields, $errors)
                   <input type=text
                          readonly 
                          name=\"formfields[fullname]\"
-                         value=\"" . $formfields[fullname] . "\"
+                         value=\"" . $formfields["fullname"] . "\"
 	                 size=$TBDB_MMLENGTH
                          maxlength=$TBDB_MMLENGTH>
               </td>
@@ -165,6 +171,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=password
                          name=\"formfields[password1]\"
+                         value=\"" . $formfields["password1"] . "\"
                          size=8></td>
           </tr>\n";
 
@@ -173,6 +180,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=password
                          name=\"formfields[password2]\"
+                         value=\"" . $formfields["password2"] . "\"
                          size=8></td>
          </tr>\n";
 
@@ -206,8 +214,13 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
+if (!isset($submit)) {
     $defaults = array();
+    $defaults["pid"]  = "";
+    $defaults["password1"]   = "";
+    $defaults["password2"]   = "";
+    $defaults["listname"]    = "";
+    $defaults["fullname"]    = "";
 
     #
     # Allow formfields that are already set to override defaults
@@ -226,35 +239,36 @@ if (! $submit) {
 #
 # Otherwise, must validate and redisplay if errors
 #
-$errors = array();
+$errors  = array();
+$project = null;
 
 #
 # Project:
-# 
-if (!isset($formfields[pid]) ||
-    strcmp($formfields[pid], "") == 0) {
+#
+if (!isset($formfields["pid"]) ||
+    strcmp($formfields["pid"], "") == 0) {
     $errors["Project"] = "Not Selected";
 }
-elseif (!TBvalid_pid($formfields[pid])) {
-    $errors["Project"] = "Invalid Characters";
+elseif (!TBvalid_pid($formfields["pid"])) {
+    $errors["Project"] = "Invalid project name";
 }
-elseif (!TBValidProject($formfields[pid])) {
-    $errors["Project"] = "No such project";
+elseif (! ($project = Project::Lookup($formfields["pid"]))) {
+    $errors["Project"] = "Invalid project name";
 }
-elseif (!TBProjAccessCheck($uid, $formfields[pid],
-			   $formfields[pid], $TB_PROJECT_READINFO)) {
+elseif (! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
     $errors["Project"] = "Not enough permission";
 }
-else {
-    #
-    # List Name, but only if pid was okay.
-    #
-    if (!isset($formfields[listname]) ||
-	strcmp($formfields[listname], "") == 0) {
+
+#
+# List Name, but only if pid was okay.
+#
+if ($project) {
+    if (!isset($formfields["listname"]) ||
+	strcmp($formfields["listname"], "") == 0) {
 	$errors["List Name"] = "Missing Field";
     }
     else {
-	$listname = $formfields[pid] . "-" . $formfields[listname];
+	$listname = $project->pid() . "-" . $formfields["listname"];
 	
 	if (! TBvalid_mailman_listname($listname)) {
 	    $errors["List Name"] =
@@ -269,9 +283,11 @@ else {
             #
             # Before we proceed, lets see if the list already exists.
             #
+	    $safe_name = addslashes($listname);
+	    
 	    $query_result =
 		DBQueryFatal("select * from mailman_listnames ".
-			     "where listname='$listname'");
+			     "where listname='$safe_name'");
 	
 	    if (mysql_num_rows($query_result)) {
 		$errors["List Name"] = "Name already in use; pick another";
@@ -283,18 +299,18 @@ else {
 #
 # Password
 #
-if (!isset($formfields[password1]) ||
-    strcmp($formfields[password1], "") == 0) {
+if (!isset($formfields["password1"]) ||
+    strcmp($formfields["password1"], "") == 0) {
     $errors["Password"] = "Missing Field";
 }
-if (!isset($formfields[password2]) ||
-    strcmp($formfields[password2], "") == 0) {
+if (!isset($formfields["password2"]) ||
+    strcmp($formfields["password2"], "") == 0) {
     $errors["Confirm Password"] = "Missing Field";
 }
-elseif (strcmp($formfields[password1], $formfields[password2])) {
+elseif (strcmp($formfields["password1"], $formfields["password2"])) {
     $errors["Confirm Password"] = "Does not match Password";
 }
-elseif (! TBvalid_userdata($formfields[password1])) {
+elseif (! TBvalid_userdata($formfields["password1"])) {
     $errors["Password"] = "Invalid Characters";
 }
 
@@ -308,8 +324,9 @@ if (count($errors)) {
     return;
 }
 
-$listname = $formfields[pid] . "-" . $formfields[listname];
-$password = $formfields[password1];
+$listname = $project->pid() . "-" . $formfields["listname"];
+$safename = addslashes($listname);
+$password = $formfields["password1"];
 
 #
 # Need to lock the table for this. 
@@ -318,7 +335,7 @@ DBQueryFatal("lock tables mailman_listnames write");
 
 $query_result =
     DBQueryFatal("select * from mailman_listnames ".
-		 "where listname='$listname'");
+		 "where listname='$safename'");
 if (mysql_num_rows($query_result)) {
     DBQueryFatal("unlock tables");
     $errors["List Name"] = "Name already in use; pick another";
@@ -329,20 +346,21 @@ if (mysql_num_rows($query_result)) {
 
 DBQueryFatal("insert into mailman_listnames ".
 	     " (listname, owner_uid, owner_idx, created) ".
-	     "values ('$listname', '$uid', '$dbid', now())");
+	     "values ('$safename', '$uid', '$dbid', now())");
 DBQueryFatal("unlock tables");
 
 #
 # Okay, call out to the backend to create the actual list. 
 #
 $retval = SUEXEC($uid, $TBADMINGROUP,
-		 "webaddmmlist -u $listname $uid " . escapeshellarg($password),
+		 "webaddmmlist -u " . escapeshellarg($listname) . " $uid " .
+		           escapeshellarg($password),
 		 SUEXEC_ACTION_IGNORE);
 
 # Failed? Remove the DB entry.
 if ($retval != 0) {
     DBQueryFatal("delete from mailman_listnames ".
-		 "where listname='$listname'");
+		 "where listname='$safename'");
     SUEXECERROR(SUEXEC_ACTION_DIE);
 }
 

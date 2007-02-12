@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Stuff to support checking field data before we insert it into the DB.
@@ -132,7 +132,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
 
     switch ($column_type) {
         case "text":
-	    if ((!$min && !max) ||
+	    if ((!$min && !$max) ||
 		(strlen("$token") >= $min && strlen("$token") <= $max))
 		return 1;
 	    break;
@@ -140,7 +140,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
         case "int":
         case "float":
 	    # If both min/max are zero, then skip check; allow anything. 
-	    if ((!$min && !max) || ($token >= $min && $token <= $max))
+	    if ((!$min && !$max) || ($token >= $min && $token <= $max))
 		return 1;
 	    break;
 	    

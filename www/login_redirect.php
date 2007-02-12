@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,11 +9,9 @@ include("defs.php3");
 # No Pageheader since we spit out a redirection below.
 
 #
-# We must get the redirection target.
+# We must get the redirection arguments,
 #
-if (!isset($redirect_to) || $redirect_to == "") {
-    PAGEARGERROR("Must supply a redirection target!");
-}
+$reqargs = RequiredPageArguments("redirect_to", PAGEARG_STRING);
 
 #
 # Check format. Also figure out the target.

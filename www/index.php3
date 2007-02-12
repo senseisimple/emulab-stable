@@ -1,10 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
+
+$optargs = OptionalPageArguments("stayhome", PAGEARG_BOOLEAN);
 
 #
 # The point of this is to redirect logged in users to their My Emulab

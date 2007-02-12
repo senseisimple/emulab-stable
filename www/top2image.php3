@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,48 +20,31 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid project ID.");
-}
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid experiment ID.");
-}
-$exp_eid = $eid;
-$exp_pid = $pid;
+#
+$reqargs = RequiredPageArguments("experiment",   PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("zoom",         PAGEARG_NUMERIC,
+				 "detail",       PAGEARG_BOOLEAN,
+				 "thumb",        PAGEARG_INTEGER);
+
+#
+# Need these below
+#
+$pid = $experiment->pid();
+$eid = $experiment->eid();
 
 # if they dont exist, or are non-numeric, use defaults.
-# note: one can use is_numeric in php4 instead of ereg.
-if (!isset($zoom) || !ereg("^[0-9]{1,50}.?[0-9]{0,50}$", $zoom)) { $zoom = 1; }
-if (!isset($detail) || !ereg("^[0-9]{1,50}$", $detail)) { $detail = 0; }
-if (!isset($thumb) || !ereg("^[0-9]{1,50}$", $detail)) { $thumb = 0; }
-
-if ($zoom > 8.0) { $zoom = 8.0; }
-if ($zoom <= 0.0) { $zoom = 1.0; }
-
+if (!isset($zoom))       { $zoom   = 1; }
+if (!isset($detail))     { $detail = 0; }
+if (!isset($thumb))      { $thumb  = 0; }
+if ($zoom > 8.0)   { $zoom = 8.0; }
+if ($zoom <= 0.0)  { $zoom = 1.0; }
 if ($thumb > 1024) { $thumb = 1024; }
-
-#
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! TBValidExperiment($exp_pid, $exp_eid)) {
-  USERERROR("The experiment $exp_eid is not a valid experiment ".
-            "in project $exp_pid.", 1);
-}
 
 #
 # Verify Permission.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view experiment $exp_eid!", 1);
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment $eid!", 1);
 }
 
 #

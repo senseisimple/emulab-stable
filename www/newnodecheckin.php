@@ -1,7 +1,7 @@
-e<?php
+<?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -16,6 +16,17 @@ include("xmlrpc.php3");
 # to leave 'in the open' - the worst someone can do is annoy the testbed admins
 # with it!
 #
+
+$reqargs = RequiredPageArguments("cpuspeed",    PAGEARG_STRING,
+				 "diskdev",     PAGEARG_STRING,
+				 "disksize",    PAGEARG_STRING,
+				 "role",        PAGEARG_STRING,
+				 "messages",    PAGEARG_STRING);
+
+$optargs = OptionalPageArguments("node_id",     PAGEARG_STRING,
+				 "identifier",  PAGEARG_STRING,
+				 "use_temp_IP", PAGEARG_STRING,
+				 "type",        PAGEARG_STRING);
 
 #
 # Grab the IP address that this node has right now, so that we can contact it
@@ -101,7 +112,7 @@ if (count($interfaces)) {
 # Attempt to come up with a node_id and an IP address for it - unless one was
 # provided by the client.
 #
-if (!$node_id) {
+if (!isset($node_id)) {
     $name_info = find_free_id("pc");
     $node_prefix = $name_info[0];
     $node_num = $name_info[1];
@@ -110,7 +121,7 @@ if (!$node_id) {
     $hostname = $node_id;
 }
 
-if ($use_temp_IP) {
+if (isset($use_temp_IP)) {
     $IP = $tmpIP;
 } else {
     $IP = guess_IP($node_prefix,$node_num);
@@ -123,6 +134,10 @@ if ($type) {
     #
     # If they gave us a type, lets see if that type exists or not
     #
+    if (!preg_match("/^[-\w]*$/", $type)) {
+	echo "Illegal characters in type: '$type'\n";
+	exit;
+    }
     if (TBValidNodeType($type)) {
 	#
 	# Great, it already exists, nothin' else to do
@@ -143,18 +158,19 @@ if ($type) {
 #
 # Default the role to 'testnode' if the node didn't supply a role
 #
-if (!$role) {
-    $role = "testnode";
-}
+$role = (isset($role) ? addslashes($role) : "testnode");
 
 #
 # Stash this information in the database
 #
 if ($identifier) {
-    $identifier = "'$identifier'";
+    $identifier = "'" . addslashes($identifier) . "'";
 } else {
     $identifier = "NULL";
 }
+$messages = (isset($messages) ? addslashes($messages) : "");
+$hostname = (isset($hostname) ? addslashes($hostname) : "");
+
 DBQueryFatal("insert into new_nodes set node_id='$hostname', type='$type', " .
 	"IP='$IP', temporary_IP='$tmpIP', dmesg='$messages', created=now(), " .
 	"identifier=$identifier, role='$role'");
@@ -180,6 +196,8 @@ foreach ($interfaces as $interface) {
 TBMAIL($TBMAIL_OPS,"New Node","A new node, $hostname, has checked in");
 
 function check_node_exists($node_id) {
+    $node_id = addslashes($node_id);
+    
     #
     # Just check to see if this node already exists in one of the
     # two tables - return 1 if it does, 0 if not

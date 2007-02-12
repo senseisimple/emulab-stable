@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -10,6 +10,12 @@ require("defs.php3");
 # Standard Testbed Header
 #
 PAGEHEADER("Search Emulab Documentation");
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
+				 "query",       PAGEARG_STRING);
 
 #
 # We no longer support an advanced search option. We might bring it back
@@ -87,11 +93,12 @@ $embedded    = 1;
 $query_type  = "and";
 $query_which = "both";
 include("kb-search.php3");
+$safe_query  = escapeshellarg($query);
 
 echo "<br>\n";
 echo "<font size=+2>Documentation search results</font><br>\n";
 
-if ($fp = popen("$TBSUEXEC_PATH nobody nobody websearch '$query'", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH nobody nobody websearch $safe_query", "r")) {
     while (!feof($fp)) {
 	$string = fgets($fp, 1024);
 	echo "$string";

@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # Only admins.
@@ -27,8 +28,8 @@ $isadmin   = ISADMIN();
 # * We get all of the above arguments on the final click, including x,y. Verify
 #   all the aguments, and then do the insert.
 # * If user goes to reset the node location, form includes an additional submit
-#   button that says to use the old coords. This allows us to change the contact
-#   info for a node without actually changing the location. 
+#   button that says to use the old coords. This allows us to change the 
+#   contact info for a node without actually changing the location. 
 #
 
 # Only admins cat set node location
@@ -39,20 +40,24 @@ if (!$isadmin) {
 #
 # Check page args. Must always supply a nodeid.
 #
-if (!isset($node_id) || $node_id == "") {
-    PAGEARGERROR("Must supply node_id");
-}
-elseif (isset($isnewid) && $isnewid == 1) {
-    if (!TBvalid_integer($node_id)) {
-	PAGEARGERROR("Must supply new node identifier in node_id");
-    }
-}
-elseif (!TBvalid_node_id($node_id)) {	
-    PAGEARGERROR("Invalid characters in node_id");
-}
-elseif (!TBValidNodeName($node_id)) {
-    PAGEARGERROR("Invalid node_id $node_id");
-}
+$reqargs = RequiredPageArguments("node",       PAGEARG_NODE);
+$optargs = OptionalPageArguments("building",   PAGEARG_STRING,
+				 "floor",      PAGEARG_STRING,
+				 "x",          PAGEARG_STRING,
+				 "y",          PAGEARG_STRING,
+				 "contact",    PAGEARG_STRING,
+				 "room",       PAGEARG_STRING,
+				 "phone",      PAGEARG_STRING,
+				 "submit",     PAGEARG_STRING,
+				 "dodelete",   PAGEARG_STRING,
+				 "isnewid",    PAGEARG_BOOLEAN,
+				 "delete",     PAGEARG_BOOLEAN);
+
+#
+# Need these below.
+#
+$node_id = $node->node_id();
+$isnewid = (isset($isnewid) ? $isnewid : 0);
 
 #
 # This routine spits out the selectable image for getting x,y coords plus
@@ -149,7 +154,7 @@ function SPITFORM($errors, $node_id, $isnewid, $building, $floor,
                         size=30>
               </td>
           </tr>\n";
-    if (isset($old_x) && isset($old_y) && $old_x && $old_y) {
+    if ($old_x && $old_y) {
 	echo "<tr>
                  <td colspan=2 align=center>
                      <b><input type=submit name=submit
@@ -212,6 +217,8 @@ else {
 	$room = "";
     if (! isset($phone))
 	$phone = "";
+    $old_x = null;
+    $old_y = null;
 }
 
 #

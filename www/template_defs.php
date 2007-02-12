@@ -28,20 +28,16 @@ class Template
 	$this->template = mysql_fetch_array($query_result);
 
 	# 
-	# Underlying experiment for easy access. Experiment should be its own class!
+	# Underlying experiment for easy access.
 	#
 	$pid = $this->pid();
 	$eid = $this->eid();
-	
-	$query_result =
-	    DBQueryWarn("select * from experiments ".
-			"where pid='$pid' and eid='$eid'");
 
-	if (!$query_result || !mysql_num_rows($query_result)) {
+	if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
 	    $this->template = NULL;
 	    return;
 	}
-	$this->experiment = mysql_fetch_array($query_result);
+	$this->experiment = $experiment;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -130,7 +126,10 @@ class Template
 	return (is_null($this->template) ? -1 : $this->template['uid']);
     }
     function path() {
-	return (is_null($this->template) ? -1 :	$this->experiment['path']);
+	if (!$this->experiment)
+	    return -1;
+	$experiment = $this->experiment;
+	return $experiment->path();
     }
     function IsHidden() {
 	return (is_null($this->template) ? -1 : $this->template['hidden']);
@@ -163,7 +162,19 @@ class Template
 	return is_null($this->template['parent_guid']);
     }
 
-    function AccessCheck($uid, $access_type) {
+    # Return the underlying experiment for this template.
+    function GetExperiment() {
+	return $this->experiment;
+    }
+
+    # Return the unixgid for operating on this template.
+    function UnixGID() {
+	$experiment = $this->experiment;
+
+	return $experiment->UnixGID();
+    }
+
+    function AccessCheck($user, $access_type) {
 	global $TB_EXPT_READINFO;
 	global $TB_EXPT_MODIFY;
 	global $TB_EXPT_DESTROY;
@@ -174,7 +185,7 @@ class Template
 	global $TBDB_TRUST_LOCALROOT;
 	global $TBDB_TRUST_GROUPROOT;
 	global $TBDB_TRUST_PROJROOT;
-	$mintrust;
+	$mintrust = $TB_EXPT_READINFO;
 
 	if ($access_type < $TB_EXPT_MIN ||
 	    $access_type > $TB_EXPT_MAX) {
@@ -189,6 +200,7 @@ class Template
 	}
 	$pid = $this->pid();
 	$gid = $this->gid();
+	$uid = $user->uid();
 
 	if ($access_type == $TB_EXPT_READINFO) {
 	    $mintrust = $TBDB_TRUST_USER;
@@ -257,10 +269,9 @@ class Template
 			  "guid=$guid&version=$vers", "$guid/$vers"));
 	
 	ShowItem("ID",
-		 MakeLink("metadata",
-			  "action=modify&guid=$guid&version=$vers".
-			  "&metadata_guid=$tid_guid&metadata_vers=$tid_vers",
-			  $tid));
+		 MakeAnchor(CreateURL("template_metadata", $this) .
+			    "&action=modify".
+			    "&metadata=${tid_guid}/${tid_vers}", $tid));
 	
 	ShowItem("Project", MakeLink("project", "pid=$pid", $pid));
 	ShowItem("Group",   $gid);
@@ -274,12 +285,11 @@ class Template
 	if (strlen($description) > 40) {
 	    $description = substr($description, 0, 40) . " <b>... </b>";
 	}
-	ShowItem("Description", 
-		 MakeLink("metadata",
-			  "action=modify&guid=$guid&version=$vers".
-			  "&metadata_guid=$desc_guid&metadata_vers=$desc_vers".
-			  " $onmouseover",
-			  $description));
+	ShowItem("Description",
+		 MakeAnchor(CreateURL("template_metadata", $this) .
+			    "&action=modify".
+			    "&metadata=${desc_guid}/${desc_vers}",
+			    $description, $onmouseover));
     
 	if (! $this->IsRoot()) {
 	    $parent_guid = $this->parent_guid();
@@ -356,10 +366,12 @@ class Template
                    <td>$value</td>";
 
 	    if (is_null($description)) {
+		$url = CreateURL("template_metadata", $this);
+		
 		echo "<td>".
-		     "<a href=template_metadata.php?action=add&".
-		     "guid=$guid&version=$vers&type=parameter_description&".
-		     "formfields[name]=${name}>Click to add</a></td>\n";
+		     "<a href='${url}&action=add&".
+		     "metadata_type=parameter_description&".
+		     "formfields[name]=${name}'>Click to add</a></td>\n";
 	    }
 	    else {
 		$onmouseover = MakeMouseOver($description);
@@ -367,11 +379,11 @@ class Template
 		    $description =
 			substr($description, 0, 30) . " <b>... </b>";
 		}
-		echo "<td><a href='template_metadata.php?action=modify".
-		     "&guid=$guid&version=$vers".
-		     "&metadata_guid=$metadata_guid".
-		     "&metadata_vers=$metadata_vers' $onmouseover>".
-  		     "$description</a></td>\n";
+		$url = CreateURL("template_metadata", $this);
+		
+		echo "<td><a href='${url}&action=modify".
+		     "&metadata=${metadata_guid}/${metadata_vers}' " .
+		     "$onmouseover>$description</a></td>\n";
 	    }
 	    echo "</tr>\n";
 	    }
@@ -427,19 +439,16 @@ class Template
 		}
 	    }
 
+	    $meta_url = CreateURL("template_metadata", $this) .
+		"&metadata=${metadata_guid}/${metadata_vers}";
+		
 	    echo "<tr>
    	           <td align=center>
-                     <a href='template_metadata.php?action=modify".
-		        "&guid=$guid&version=$vers".
-		        "&metadata_guid=$metadata_guid".
-		        "&metadata_vers=$metadata_vers'>
-                     <img border=0 alt='modify' src='greenball.gif'></A></td>
+                     <a href='${meta_url}&action=modify'>
+                       <img border=0 alt='modify' src='greenball.gif'></A></td>
    	           <td align=center>
-                     <a href='template_metadata.php?action=delete".
-		        "&guid=$guid&version=$vers".
-		        "&metadata_guid=$metadata_guid".
-		        "&metadata_vers=$metadata_vers'>
-                     <img border=0 alt='delete' src='redball.gif'></A></td>
+                     <a href='${meta_url}&action=delete'>
+                       <img border=0 alt='delete' src='redball.gif'></A></td>
                    <td>$name</td>
                    <td $onmouseover>$value</td>
                   </tr>\n";
@@ -490,15 +499,19 @@ class Template
 	    $state     = $row['state'];
 	    $nodes     = $row['nodes'];
 	    $minnodes  = $row['min_nodes'];
-	    $idlehours = TBGetExptIdleTime($pid, $eid);
-	    $stale     = TBGetExptIdleStale($pid, $eid);
 	    $ignore    = $row['idle_ignore'];
 	    $name      = $row['expt_name'];
+
+	    if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
+		TBERROR("Could not map $pid/$eid to its object", 1);
+	    }
+	    $idlehours = $experiment->IdleTime();
+	    $stale     = $experiment->IdleStale();
 	    
 	    if ($nodes == 0) {
 		$nodes = "<font color=green>$minnodes</font>";
 	    }
-	    elseif ($row[swap_requests] > 0) {
+	    elseif ($row["swap_requests"] > 0) {
 		$nodes .= $idlemark;
 	    }
 
@@ -603,14 +616,13 @@ class Template
                    <td>$stop</td>\n";
 
 	    echo " <td align=center>".
- 		    MakeLink("instance",
-			     "guid=$guid&version=$vers&exptidx=$exptidx",
+		    MakeLink("instance", "instance=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 	    echo " </td>\n";
 
  	    echo " <td align=center>
                      <a href=archive_view.php3/$exptidx/history/$tag/".
-		        "?exptidx=$exptidx>
+		        "?instance=$exptidx>
                      <img border=0 alt='i' src='greenball.gif'></a></td>";
 	    
 	    echo " <td align=center>".
@@ -680,7 +692,7 @@ class Template
 	echo "<img id=\"mygraphimg\" border=0 usemap=\"#TemplateGraph\" ";
 	echo "      onLoad=\"setTimeout('ShowGraphInit();', 10);\" ";
 	echo "      style='cursor: move;' ";
-	echo "      src='template_graph.php?guid=$guid&now=$now'>\n";
+	echo "      src='template_graph.php?guid=$guid&version=1&now=$now'>\n";
 	echo "</div>\n";
 	echo "</div>\n";
     }
@@ -990,6 +1002,7 @@ class TemplateInstance
 {
     var	$template;
     var $instance;
+    var $experiment;
 
     #
     # Instances are found by their experiment index. 
@@ -1010,6 +1023,7 @@ class TemplateInstance
 	$this->instance = mysql_fetch_array($query_result);
 	$this->template = new Template($this->instance['parent_guid'],
 				       $this->instance['parent_vers']);
+	$this->experiment = Experiment::Lookup($exptidx);
     }
     
     # Hmm, how does one cause an error in a php constructor?
@@ -1068,16 +1082,28 @@ class TemplateInstance
     function template() {
 	return (is_null($this->instance) ? -1 : $this->template);
     }
+    function GetTemplate() {
+	return $this->template;
+    }
+    function GetExperiment() {
+	return $this->experiment;
+    }
+
+    #
+    # Load the project object for an experiment.
+    #
+    function Project() {
+	$pid = $this->pid();
+
+	if (! ($project = Project::Lookup($pid))) {
+	    TBERROR("Could not lookup project $pid!", 1);
+	}
+	return $project;
+    }
 
     # Is instance actually running (current experiment).
     function Instantiated() {
-	$exptidx = $this->exptidx();
-
-	$query_result =
-	    DBQueryFatal("select pid,eid from experiments ".
-			 "where idx='$exptidx'");
-	
-	return mysql_num_rows($query_result);
+	return ($this->experiment ? 1 : 0);
     }
 
     #
@@ -1099,6 +1125,12 @@ class TemplateInstance
 	    TBERROR("Could not lookup object for user $uid", 1);
 	}
 	$showuser_url = CreateURL("showuser", $user);
+
+	# If the instance is swapped in, we can provide a link to
+	# experiment.
+	if ($this->experiment) {
+	    $showexp_url  = CreateURL("showexp", $this->experiment);
+	}
 	
 	echo "<center>\n";
 	if ($detailed && $pcount) {
@@ -1117,8 +1149,11 @@ class TemplateInstance
 		 MakeLink("template",
 			  "guid=$guid&version=$vers", "$guid/$vers"));
 	ShowItem("ID",          $exptidx);
+	if ($this->experiment) {
+	    ShowItem("Experiment",  MakeAnchor($showexp_url, $this->eid()));
+	}
 	ShowItem("Project",     MakeLink("project", "pid=$pid", $pid));
-	ShowItem("Creator",     MakeAnchor($url, $uid));
+	ShowItem("Creator",     MakeAnchor($showuser_url, $uid));
 	ShowItem("Started",     $start);
 	ShowItem("Stopped",     (isset($stop) ? $stop : "&nbsp"));
 	ShowItem("Current Run", (isset($runidx) ? $runidx : "&nbsp"));
@@ -1153,8 +1188,7 @@ class TemplateInstance
 	$eid      = $this->eid();
 
 	$html .= "<font size=+2>, Instance <b>" .
-	    MakeLink("instance",
-		     "guid=$guid&version=$vers&exptidx=$exptidx", $eid) .
+	    MakeLink("instance", "instance=$exptidx", $eid) .
 	    "</b></font>";
 	return $html;
     }
@@ -1191,11 +1225,33 @@ class TemplateInstance
 	$runid    = $this->GetRunID($runidx);
 
 	$html .= "<font size=+2>, Run <b>" .
-	    MakeLink("run",
-		     "guid=$guid&version=$vers&exptidx=$exptidx".
-		     "&runidx=$runidx", $runid) .
+	    MakeAnchor(CreateURL("experimentrun_show", $this,
+				 "runidx", $runidx), $runid) .
 	    "</b></font>";
 	return $html;
+    }
+
+    #
+    # Show the current bindings. This depends on the state of the instance.
+    # If not swapped in, the instance bindings are current. If swapped in,
+    # the most recent run bindings are current (current run, or last run).
+    #
+    function ShowCurrentBindings() {
+	global $TB_EXPTSTATE_SWAPPED;
+	
+	if ($this->experiment) {
+	    $experiment = $this->experiment;
+
+	    if ($experiment->state() == $TB_EXPTSTATE_SWAPPED) {
+		# Show the instance bindings is swapped.
+		return $this->ShowBindings();
+	    }
+	    elseif ($this->runidx()) {
+		return $this->ShowRunBindings();
+	    }
+	    return $this->ShowLastRunBindings();
+	}
+	return $this->ShowBindings();
     }
     
     #
@@ -1238,12 +1294,15 @@ class TemplateInstance
     }
 
     #
-    # Display last run bindings in a table
+    # Display run bindings in a table
     #
-    function ShowLastRunBindings() {
+    function ShowRunBindings($runidx = null) {
 	$exptidx      = $this->exptidx();
-	$runidx       = $this->LastRunIdx();
 
+	if (! $runidx) {
+	    $runidx = $this->runidx();
+	}
+	
 	$query_result =
 	    DBQueryWarn("select * from experiment_run_bindings ".
 			 "where exptidx='$exptidx' and runidx='$runidx' ".
@@ -1253,7 +1312,7 @@ class TemplateInstance
 	    return 0;
 
 	echo "<center>
-               <h3>Last Run Bindings</h3>
+               <h3>Run Bindings</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -1276,6 +1335,13 @@ class TemplateInstance
   	}
 	echo "</table>\n";
 	return 1;
+    }
+
+    #
+    # Display last run bindings in a table
+    #
+    function ShowLastRunBindings() {
+	return $this->ShowRunBindings($this->LastRunIdx());
     }
 
     #
@@ -1336,7 +1402,7 @@ class TemplateInstance
 	    if (isset($end_tag) && $end_tag != "") {
 		$archive_link =
 		    "<a href=archive_view.php3".
-		    "/$exptidx/history/$end_tag/?exptidx=$exptidx>".
+		    "/$exptidx/history/$end_tag/?instance=$exptidx>".
 		    "<img border=0 alt='i' src='greenball.gif'></a>";
 	    }
 	    else {
@@ -1345,10 +1411,8 @@ class TemplateInstance
 	    
 	    echo "<tr>\n";
 	    echo " <td align=center>".
-		    MakeLink("run",
-			     "guid=$guid&version=$vers".
-			     "&exptidx=$exptidx&runidx=$runidx",
-			     "$runid");
+		MakeAnchor(CreateURL("experimentrun_show", $this,
+				     "runidx", $runidx), "$runid");
 	    echo " </td>
   		    <td>$runidx</td>
                     <td>$start</td>
@@ -1417,10 +1481,8 @@ class TemplateInstance
 	ShowItem("Template",
 		 MakeLink("template",
 			  "guid=$guid&version=$vers", "$guid/$vers"));
-	ShowItem("Experiment",
-		 MakeLink("instance",
-			  "guid=$guid&version=$vers&exptidx$exptidx",
-			  "$exptidx"));
+	ShowItem("Instance",
+		 MakeLink("instance", "instance=$exptidx", "$exptidx"));
 	ShowItem("ID",          $runidx);
 	ShowItem("Started",     $start);
 	ShowItem("Stopped",     $stop);
@@ -1481,7 +1543,7 @@ class TemplateInstance
 	echo "</table>\n";
 
 	$archive_url =
-	    "cvsweb/cvsweb.php3/$exptidx/tags/runs/$runid/?exptidx=$exptidx".
+	    "cvsweb/cvsweb.php3/$exptidx/tags/runs/$runid/?instance=$exptidx".
 	    "&embedded=1";
 
 	echo "<br>
@@ -1963,9 +2025,9 @@ function MakeLink($which, $args, $text)
 #
 # New version of above function, will replace it eventually.
 #
-function MakeAnchor($url, $text)
+function MakeAnchor($url, $text, $anchor_args = "")
 {
-    return "<a href='${url}'>$text</a>";
+    return "<a href='${url}' $anchor_args>$text</a>";
 }
 
 #

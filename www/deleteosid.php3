@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("osinfo_defs.php");
 
 #
 # Standard Testbed Header
@@ -19,29 +20,22 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Must provide the OSID!
-# 
-if (!isset($osid) ||
-    strcmp($osid, "") == 0) {
-  USERERROR("The OSID was not provided!", 1);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("osinfo", PAGEARG_OSINFO);
+$optargs = OptionalPageArguments("canceled", PAGEARG_BOOLEAN,
+				 "confirmed", PAGEARG_BOOLEAN);
 
-if (! TBValidOSID($osid)) {
-    USERERROR("The OSID '$osid' is not valid!", 1);
-}
+# Need these below
+$osid   = $osinfo->osid();
+$pid    = $osinfo->pid();
+$osname = $osinfo->osname();
 
 #
 # Verify permission.
 #
-if (!TBOSIDAccessCheck($uid, $osid, $TB_OSID_DESTROY)) {
+if (!$osinfo->AccessCheck($this_user, $TB_OSID_DESTROY)) {
     USERERROR("You do not have permission to delete OS Descriptor $osid!", 1);
-}
-
-#
-# Get user level info.
-#
-if (!TBOSInfo($osid, $osname, $pid)) {
-    USERERROR("OS Descriptor '$osid' is no longer valid!", 1);
 }
 
 $conflicts = 0;
@@ -71,7 +65,7 @@ if (mysql_num_rows($query_result)) {
 	$imageid   = $row['imageid'];
 	$url       = rawurlencode($imageid);
 	$imagename = $row['imagename'];
-	$pid       = $row[pid];
+	$pid       = $row['pid'];
 
 	echo "<tr>
                 <td><A href='showimageid.php3?imageid=$url'>$imagename</A>
@@ -130,7 +124,7 @@ if ($conflicts) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     echo "<center><h2><br>
           OS Descriptor removal canceled!
           </h2></center>\n";
@@ -139,14 +133,15 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><h2><br>
           Are you <b>REALLY</b>
           sure you want to delete OS Descriptor '$osname' in Project $pid?
           </h2>\n";
+
+    $url = CreateURL("deleteosid", $osinfo);
     
-    echo "<form action=\"deleteosid.php3\" method=\"post\">";
-    echo "<input type=hidden name=osid value=\"$osid\">\n";
+    echo "<form action='$url' method=\"post\">";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";

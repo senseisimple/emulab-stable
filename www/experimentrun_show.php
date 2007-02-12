@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -19,52 +19,20 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($exptidx) ||
-    strcmp($exptidx, "") == 0) {
-    USERERROR("You must provide an instance ID", 1);
-}
-if (!isset($runidx) ||
-    strcmp($runidx, "") == 0) {
-    USERERROR("You must provide an run ID", 1);
-}
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a template ID", 1);
-}
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a template version number", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-if (!TBvalid_integer($exptidx)) {
-    PAGEARGERROR("Invalid characters in instance ID!");
-}
-if (!TBvalid_integer($runidx)) {
-    PAGEARGERROR("Invalid characters in run ID!");
-}
+#
+$reqargs = RequiredPageArguments("instance",  PAGEARG_INSTANCE,
+				 "runidx",    PAGEARG_INTEGER);
 
-#
-# Check to make sure this is a valid template and user has permission.
-#
-$template = Template::Lookup($guid, $version);
-if (!$template) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
+$template = $instance->GetTemplate();
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$eid  = $instance->eid();
+
+if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
 	      "$guid/$version!", 1);
-}
-$instance = TemplateInstance::LookupByExptidx($exptidx);
-if (!$instance) {
-    USERERROR("The instance $exptidx is not a valid instance in ".
-              "template $guid/$version!", 1);
 }
 if (! $instance->ValidRun($runidx)) {
     USERERROR("The run $runidx is not a valid experiment run!", 1);

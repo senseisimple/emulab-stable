@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users.
@@ -13,6 +12,12 @@ include("showstuff.php3");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("showtype", PAGEARG_STRING,
+				 "plain",    PAGEARG_BOOLEAN);
 
 #
 # Show argument.
@@ -68,24 +73,24 @@ function SPITDATA($table, $title, $showtype, $plain)
     $nodenamescol = array();
 
     while ($row = mysql_fetch_array($query_result1)) {
-	$node_id1 = $row[node_id1];
-	$iface1   = $row[iface1];
-	$node_id2 = $row[node_id2];
-	$iface2   = $row[iface2];
-	$time     = $row[time];
-	$bw       = $row[bandwidth];
-	$plr      = $row[lossrate];
-	$start    = $row[start_time];
-	$end      = $row[end_time];
-	$pri      = $row[priority];
+	$node_id1 = $row["node_id1"];
+	$iface1   = $row["iface1"];
+	$node_id2 = $row["node_id2"];
+	$iface2   = $row["iface2"];
+	$time     = $row["time"];
+	$bw       = $row["bandwidth"];
+	$plr      = $row["lossrate"];
+	$start    = $row["start_time"];
+	$end      = $row["end_time"];
+	$pri      = $row["priority"];
     
 	$glom1    = $node_id1;
 	$glom2    = $node_id2;
 
         #echo "Got $glom1 to $glom2 $pri<br>\n";
 	
-	$nodenamesrow[$glom1] = $pri;
-	$nodenamescol[$glom1] = $pri;
+	$nodenamesrow["$glom1"] = $pri;
+	$nodenamescol["$glom1"] = $pri;
 
 #	$nodenamesrow[$glom2] = 1;
 #	$nodenamescol[$glom2] = 1;

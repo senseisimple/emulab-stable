@@ -31,9 +31,9 @@ function GENPLIST ($query_result)
           </tr>\n";
 
     while ($projectrow = mysql_fetch_array($query_result)) {
-	$pname  = $projectrow[name];
-	$url    = $projectrow[URL];
-	$affil  = $projectrow[usr_affil];
+	$pname  = $projectrow["name"];
+	$url    = $projectrow["URL"];
+	$affil  = $projectrow["usr_affil"];
 
 	echo "<tr>\n";
 

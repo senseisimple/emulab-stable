@@ -1,31 +1,43 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
-# Page arguments. First two are for verification passthru.
-$key	   = $_GET['key'];
-$vuid      = $_GET['vuid'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("login",    PAGEARG_STRING,
+				 "uid",      PAGEARG_STRING,
+				 "password", PAGEARG_STRING,
+				 "key",      PAGEARG_STRING,
+				 "vuid",     PAGEARG_STRING,
+				 "simple",   PAGEARG_BOOLEAN,
+				 "adminmode",PAGEARG_BOOLEAN,
+				 "refer",    PAGEARG_BOOLEAN,
+				 "referrer", PAGEARG_STRING);
+				 
 # Allow adminmode to be passed along to new login. Handy for letting admins
-# log in when NOLOGINS() is on. 
-$adminmode = $_GET['adminmode'];
-# Display a simpler version of this page
-if (isset($_REQUEST['simple'])) {
-    $simple = $_REQUEST['simple'];
+# log in when NOLOGINS() is on.
+if (!isset($adminmode)) {
+    $adminmode = 0;
 }
-# Form arguments.
-$login     = $_POST['login'];
-$uid       = $_POST['uid'];
-$password  = $_POST['password'];
-# Allow referrer to be passed along to new login.
-$referrer  = $_POST['referrer'];
+# Display a simpler version of this page
+if (! isset($simple)) {
+    $simple = 0;
+}
+if (! isset($key)) {
+    $key = null;
+}
+if (! isset($referrer)) {
+    $referrer = null;
+}
 
 # See if referrer page requested that it be passed along so that it can be
 # redisplayed after login. Save the referrer for form below.
-if (isset($_GET['refer']) && $_GET['refer'] &&
+if (isset($refer) &&
     isset($_SERVER['HTTP_REFERER']) && $_SERVER['HTTP_REFERER'] != "") {
     $referrer = $_SERVER['HTTP_REFERER'];
 
@@ -44,7 +56,6 @@ if ($simple) {
 } else {
     $view = array();
 }
-
 
 #
 # Must not be logged in already.

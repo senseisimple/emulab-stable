@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 include_once("template_defs.php");
 
 #
@@ -29,23 +28,12 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a project ID.", 1);
-}
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid characters in $pid!");
-}
-
+# Verify page arguments.
 #
-# Check to make sure thats this is a valid PID.
-#
-if (! ($project = Project::Lookup($pid))) {
-    USERERROR("The project '$pid' is not a valid project.", 1);
-}
-$group = $project->Group();
+$reqargs  = RequiredPageArguments("project", PAGEARG_PROJECT);
+$project  = $reqargs["project"];
+$group    = $project->Group();
+$pid      = $project->pid();
 
 #
 # Verify that this uid is a member of the project being displayed.
@@ -63,7 +51,7 @@ WRITESUBMENUBUTTON("Edit User Privs",
 WRITESUBMENUBUTTON("Remove Users",
 		   "showgroup.php3?pid=$pid&gid=$pid");
 WRITESUBMENUBUTTON("Show Project History",
-		   "showstats.php3?showby=project&which=$pid");
+		   "showstats.php3?showby=project&pid=$pid");
 WRITESUBMENUBUTTON("Free Node Summary",
 		   "nodecontrol_list.php3?showtype=summary&bypid=$pid");
 if ($isadmin) {
@@ -79,7 +67,7 @@ SUBMENUEND();
 #
 # Show number of PCS
 #
-$numpcs = TBProjPCs($pid);
+$numpcs = $project->PCsInUse();
 
 if ($numpcs) {
     echo "<center><font color=Red size=+2>\n";
@@ -117,7 +105,7 @@ if ($EXPOSETEMPLATES) {
 #
 # A list of project experiments.
 #
-SHOWEXPLIST("PROJ", $uid, $pid);
+ShowExperimentList("PROJ", $this_user, $project);
 
 if ($isadmin) {
     echo "<center>

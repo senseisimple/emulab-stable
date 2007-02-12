@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -26,13 +26,38 @@ unset($parameter_xmlfile);
 $deletexmlfile = 0;
 
 #
+# Verify page arguments.
+#
+$reqargs  = RequiredPageArguments("instance",   PAGEARG_INSTANCE);
+$optargs  = OptionalPageArguments("action",     PAGEARG_STRING,
+				  "exprun",     PAGEARG_STRING,
+				  "parameters", PAGEARG_ARRAY,
+				  "formfields", PAGEARG_ARRAY);
+$template = $instance->GetTemplate();
+
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$eid  = $instance->eid();
+$unix_gid = $template->UnixGID();
+$exptidx  = $instance->exptidx();
+
+if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to export in template ".
+	      "$guid/$vers!", 1);
+}
+
+#
 # Run the script backend
 #
 function DOIT($instance, $action, $command_options)
 {
-    global $guid, $version, $pid, $gid, $eid, $uid;
+    global $guid, $vers, $pid, $unix_gid, $eid, $uid;
     global $deletexmlfile, $parameter_xmlfile;
-    $message = "";
+    $message    = "";
+    $template   = $instance->GetTemplate();
+    $experiment = $instance->GetExperiment();
 
     $command_options = "-e $eid " . $command_options;
     
@@ -53,22 +78,11 @@ function DOIT($instance, $action, $command_options)
     }	
 
     #
-    # Grab the unix GID for running scripts.
-    #
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-    #
     # Avoid SIGPROF in child.
     #
     set_time_limit(0);
 
-    echo "<font size=+2>Template <b>" .
-            MakeLink("template",
-		     "guid=$guid&version=$version", "$guid/$version") .
-            "</b>, Instance <b>" .
-            MakeLink("project", "pid=$pid", $pid) . "/" .
-            MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
-    echo "</b></font>\n";
+    echo $instance->PageHeader();
     echo "<br><br>\n";
 
     echo "<script type='text/javascript' language='javascript' ".
@@ -81,7 +95,7 @@ function DOIT($instance, $action, $command_options)
     # Run the backend script.
     #
     $retval = SUEXEC($uid, "$pid,$unix_gid",
-		     "webtemplate_exprun $command_options $guid/$version",
+		     "webtemplate_exprun $command_options $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 
     CLEARBUSY();
@@ -104,7 +118,7 @@ function DOIT($instance, $action, $command_options)
 	return;
     }
 
-    STARTLOG($pid, $eid);
+    STARTLOG($experiment);
 }
 
 #
@@ -112,8 +126,10 @@ function DOIT($instance, $action, $command_options)
 #
 function DOTIME($instance, $action)
 {
-    global $guid, $version, $pid, $gid, $eid, $uid;
-    $message = "";
+    global $guid, $vers, $pid, $unix_gid, $eid, $uid;
+    $message    = "";
+    $template   = $instance->GetTemplate();
+    $experiment = $instance->GetExperiment();
 
     if ($action == "pause") {
 	PAGEHEADER("Pause Experiment Time");
@@ -127,22 +143,11 @@ function DOTIME($instance, $action)
     $command_options = "-e $eid -a $action ";
     
     #
-    # Grab the unix GID for running scripts.
-    #
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-    #
     # Avoid SIGPROF in child.
     #
     set_time_limit(0);
 
-    echo "<font size=+2>Template <b>" .
-            MakeLink("template",
-		     "guid=$guid&version=$version", "$guid/$version") .
-            "</b>, Instance <b>" .
-            MakeLink("project", "pid=$pid", $pid) . "/" .
-            MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
-    echo "</b></font>\n";
+    echo $instance->PageHeader();
     echo "<br><br>\n";
 
     echo "<script type='text/javascript' language='javascript' ".
@@ -155,7 +160,7 @@ function DOTIME($instance, $action)
     # Run the backend script.
     #
     $retval = SUEXEC($uid, "$pid,$unix_gid",
-		     "webtemplate_exprun $command_options $guid/$version",
+		     "webtemplate_exprun $command_options $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 
     CLEARBUSY();
@@ -174,7 +179,7 @@ function DOTIME($instance, $action)
 	return;
     }
 
-    PAGEREPLACE("showexp.php3?pid=$pid&eid=$eid");
+    PAGEREPLACE(CreateURL("showexp", $experiment));
 }
 
 #
@@ -183,22 +188,16 @@ function DOTIME($instance, $action)
 function SPITFORM($instance, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
-    global $guid, $version, $pid, $eid;
     global $TBVALIDDIRS_HTML;
+    $template   = $instance->GetTemplate();
+    $experiment = $instance->GetExperiment();
 
     PAGEHEADER("Start new Experiment Run");
 
-    echo "<font size=+2>Template <b>" .
-            MakeLink("template",
-		     "guid=$guid&version=$version", "$guid/$version") .
-            "</b>, Instance <b>" .
-            MakeLink("project", "pid=$pid", $pid) . "/" .
-            MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
-    echo "</b></font>\n";
+    echo $instance->PageHeader();
     echo "<br><br>\n";
 
     echo "<center>\n";
-    $template = $instance->template();
     $template->Show();
     echo "</center>\n";
     echo "<br><br>\n";
@@ -264,11 +263,10 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 	$i++;
     }
     echo "</script>\n";
-    
 
-    echo "<form action=template_exprun.php".
-	    "?action=start&guid=$guid&version=$version&eid=$eid ".
-	 "      method=post>\n";
+    $url = CreateURL("template_exprun", $instance);
+
+    echo "<form action='${url}&action=start' method=post>\n";
     echo "<table align=center border=1>\n";
     
     #
@@ -280,7 +278,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
               <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[runid]\"
-                         value=\"" . $formfields[runid] . "\"
+                         value=\"" . $formfields["runid"] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
               &nbsp (optional; we will make up one for you)
@@ -295,8 +293,8 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
               <td class='pad4' class=left>
   	          <input type=checkbox name='formfields[clean]' value='Yep'";
 
-    if (isset($formfields[clean]) &&
-	strcmp($formfields[clean], "Yep") == 0) {
+    if (isset($formfields["clean"]) &&
+	strcmp($formfields["clean"], "Yep") == 0) {
 	echo " checked='1'";
     }
     echo ">";
@@ -312,8 +310,8 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
               <td class='pad4' class=left>
   	          <input type=checkbox name='formfields[swapmod]' value='Yep'";
 
-    if (isset($formfields[swapmod]) &&
-	strcmp($formfields[swapmod], "Yep") == 0) {
+    if (isset($formfields["swapmod"]) &&
+	strcmp($formfields["swapmod"], "Yep") == 0) {
 	echo " checked='1'";
     }
     echo ">";
@@ -330,7 +328,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[description]\"
                     rows=4 cols=80>" .
-	            ereg_replace("\r", "", $formfields[description]) .
+	            ereg_replace("\r", "", $formfields["description"]) .
 	           "</textarea>
               </td>
           </tr>\n";
@@ -385,7 +383,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
                   <td class='pad4'>
 	              <input type=text
                              name=\"formfields[parameter_xmlfile]\"
-                             value=\"" . $formfields[parameter_xmlfile] . "\"
+                             value=\"" . $formfields["parameter_xmlfile"] . "\"
 	                     size=60>\n";
 	echo "</td></tr>\n";
 	echo "</table></td></tr>";
@@ -398,61 +396,6 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
          </tr>
         </form>
         </table>\n";
-}
-
-#
-# Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a template GUID.", 1);
-}
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a template version number", 1);
-}
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide a template instance ID", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid characters in instance ID!");
-}
-
-#
-# Check to make sure this is a valid template and user has permission.
-#
-$template = Template::Lookup($guid, $version);
-if (!$template) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-if (! $template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to modify experiment template ".
-	      "$guid/$version!", 1);
-}
-
-# Need these below.
-$pid = $template->pid();
-$gid = $template->gid();
-
-if (($exptidx = TBExptIndex($pid, $eid)) < 0) {
-    TBERROR("No such experiment '$eid' for template $guid/$version/$eid", 1);
-}
-
-#
-# Check to make sure and a valid instance that is actually swapped in.
-#
-$instance = TemplateInstance::LookupByExptidx($exptidx);
-if (!$instance) {
-    TBERROR("Template Instance $guid/$version/$exptidx is not ".
-	    "a valid experiment template instance!", 1);
 }
 
 if (isset($action) && ($action == "stop" || $action == "abort")) {
@@ -468,10 +411,16 @@ elseif (isset($action) && ($action == "pause" || $action == "continue")) {
     return;
 }
 elseif (!isset($exprun)) {
+    $defaults = array();
+    
     #
     # On first load, display virgin form and exit.
     #
-    $defaults['runid'] = $instance->NextRunID();
+    $defaults['runid']   = $instance->NextRunID();
+    $defaults['clean']   = "";
+    $defaults['swapmod'] = "";
+    $defaults['description'] = "";
+    $defaults['parameter_xmlfile'] = "";
 
     #
     # Get the current bindings of the current run.
@@ -506,42 +455,42 @@ $command_options = " ";
 #
 # RunID:
 #
-if (!isset($formfields[runid]) || $formfields[runid] == "") {
+if (!isset($formfields["runid"]) || $formfields["runid"] == "") {
     $errors["ID"] = "Missing Field";
 }
-elseif (!TBvalid_eid($formfields[runid])) {
+elseif (!TBvalid_eid($formfields["runid"])) {
     $errors["ID"] = TBFieldErrorString();
 }
-elseif (TBValidExperiment($pid, $formfields[runid])) {
+elseif (Experiment::Lookup($pid, $formfields["runid"])) {
     $errors["ID"] = "Already in use";
 }
 else {
-    $command_options .= " -r " . escapeshellarg($formfields[runid]);
+    $command_options .= " -r " . escapeshellarg($formfields["runid"]);
 }
 
 #
 # Clean?
 #
-if (isset($formfields[clean]) && $formfields[clean] == "Yep") {
+if (isset($formfields["clean"]) && $formfields["clean"] == "Yep") {
     $command_options .= " -c";
 }
 
 #
 # Swapmod?
 #
-if (isset($formfields[swapmod]) && $formfields[swapmod] == "Yep") {
+if (isset($formfields["swapmod"]) && $formfields["swapmod"] == "Yep") {
     $command_options .= " -m";
 }
 
 #
 # Description:
 # 
-if (isset($formfields[description]) && $formfields[description] != "") {
-    if (!TBvalid_template_description($formfields[description])) {
+if (isset($formfields["description"]) && $formfields["description"] != "") {
+    if (!TBvalid_template_description($formfields["description"])) {
 	$errors["Description"] = TBFieldErrorString();
     }
     else {
-	$command_options .= " -E " . escapeshellarg($formfields[description]);
+	$command_options .= " -E ". escapeshellarg($formfields["description"]);
     }
 }
 
@@ -550,10 +499,10 @@ if (isset($formfields[description]) && $formfields[description] != "") {
 #
 $template->FormalParameters($parameter_masterlist);
 if (count($parameter_masterlist)) {
-    if (isset($formfields[parameter_xmlfile]) &&
-	$formfields[parameter_xmlfile] != "") {
+    if (isset($formfields["parameter_xmlfile"]) &&
+	$formfields["parameter_xmlfile"] != "") {
 
-	$parameter_xmlfile = $formfields[parameter_xmlfile];
+	$parameter_xmlfile = $formfields["parameter_xmlfile"];
 	    
 	if (!preg_match("/^([-\@\w\.\/]+)$/", $parameter_xmlfile)) {
 	    $errors["Parameter XML File"] =

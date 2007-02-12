@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -9,21 +9,24 @@ require("defs.php3");
 $NSGEN         = "webnsgen";
 $TMPDIR        = "/tmp/";
 
-# Page arguments.
-$template = $_GET['template'];
-$advanced = $_GET['advanced'];
-$pid      = $_GET['pid'];
-
-if (!isset($template)) {
-    PAGEARGERROR();
-}
-
 #
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify Page Arguments.
+#
+$reqargs = RequiredPageArguments("template",        PAGEARG_STRING);
+$optargs = OptionalPageArguments("submit",          PAGEARG_STRING,
+				 "advanced",        PAGEARG_STRING,
+				 "templatevalues",  PAGEARG_ARRAY);
+
+if (!isset($advanced)) {
+    $advanced = 0;
+}
 
 #
 # Check to see if the template file actually exists
@@ -64,7 +67,8 @@ xml_parser_free($xml_parser);
 #
 # Body - Either make the NS file or ask the user for the form parameters 
 #
-if ($submit == "Begin Experiment" || $submit == "Show NS File") {
+if (isset($submit) &&
+    ($submit == "Begin Experiment" || $submit == "Show NS File")) {
     global $TMPDIR;
     $nsref = MAKENS($template,$templatefields,$templatevalues);
     if ($submit == "Begin Experiment") {
@@ -128,8 +132,9 @@ function SPITFORM($advanced,$templatefields,$templateorder) {
     echo "<tr><th colspan=2>Template Parameters</th></tr>";
     for ($i = 0; $i < sizeof($templateorder); $i++) {
         $param = $templateorder[$i];
-        if ($templatefields[$param]['advanced'] && $advanced = 0) {
-            next;
+        if (isset($templatefields[$param]['advanced']) &&
+	    $templatefields[$param]['advanced'] && $advanced = 0) {
+            continue;
         }
         
         $default = $templatefields[$param]['default'];
@@ -185,7 +190,7 @@ function startElement($parser,$name,$attrs)
     if ($name == "VARIABLE") {
 
         #
-        # Let's assume the template file is well-formed. I should write a DTD
+        # Lets assume the template file is well-formed. I should write a DTD
         # and validate it.
         #
         $varname = $attrs['NAME'];
@@ -272,10 +277,11 @@ function MAKENS($template,$templatefields,$templatevalues) {
         }
 
         #
-        # Don't include default values as command-line args
+        # Do not include default values as command-line args
         #
-        if ($value == $templatefields[$name]['default']) {
-            next;
+	if (isset($templatefields[$name]['default']) &&
+	    $templatefields[$name]['default'] == $value) {
+            continue;
         }
 
         #

@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include("imageid_defs.php");
 
 #
 # Standard Testbed Header
@@ -14,24 +15,11 @@ PAGEHEADER("Node Type Information");
 #
 # Anyone can access this info, its a PUBLIC PAGE!
 #
+$reqargs = RequiredPageArguments("node_type", PAGEARG_STRING);
 
-#
-# Verify form arguments.
-# 
-if (!isset($node_type) ||
-    strcmp($node_type, "") == 0) {
-    USERERROR("You must provide a node type.", 1);
-}
 # Sanitize.
 if (!preg_match("/^[-\w]+$/", $node_type)) {
     PAGEARGERROR("Invalid characters in arguments.");
-}
-
-#
-# Check to make sure that this is a valid nodeid
-#
-if (! TBValidNodeType($node_type)) {
-    USERERROR("$node_type is not a valid node type!", 1);
 }
 
 $query_result =
@@ -39,7 +27,7 @@ $query_result =
 		 "where type='$node_type'");
 
 if (! mysql_num_rows($query_result) != 0) {
-    TBERROR("No entry for node_type $node_type!", 1);
+    USERERROR("No such node_type $node_type!", 1);
 }
 $noderow = mysql_fetch_assoc($query_result);
 
@@ -95,12 +83,14 @@ while ($row = mysql_fetch_array($query_result)) {
     if ($key == "default_osid" ||
 	$key == "jail_osid" ||
 	$key == "delay_osid") {
-	TBOSInfo($val, $osname, $pid);
-	$val = $osname;
+	if ($osinfo = OSinfo::Lookup($val)) {
+	    $val = $osinfo->osname();
+	}
     }
     elseif ($key == "default_imageid") {
-	TBImageInfo($val, $imagename, $pid);
-	$val = $imagename;
+	if ($image = Image::Lookup($val)) {
+	    $val = $image->imagename();
+	}
     }
     echo "<tr>\n";
     echo "<td>$key:</td>\n";

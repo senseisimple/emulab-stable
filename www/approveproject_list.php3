@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,14 +16,19 @@ PAGEHEADER("New Project Approval List");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Of course verify that this uid has admin privs!
 #
-$isadmin = ISADMIN();
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to approve projects!", 1);
 }
+
+#
+# The reason for this call is to make sure that globals are set properly.
+#
+$reqargs = RequiredPageArguments();
 
 #
 # Look in the projects table to see which projects have not been approved.
@@ -32,12 +37,9 @@ if (! $isadmin) {
 # implies denying the project leader account, when there is just a single
 # project pending for that project leader. 
 #
-$query_result = DBQueryFatal("SELECT pid_idx, ".
-			     " DATE_FORMAT(created, '%m/%d/%y') as day_created ".
-			     " from projects ".
-			     "where approved='0' order by created desc");
-			     
-if (mysql_num_rows($query_result) == 0) {
+$projlist = Project::PendingProjectList();
+
+if (count($projlist) == 0) {
     USERERROR("There are no projects to approve!", 1);
 }
 
@@ -63,13 +65,10 @@ echo "<tr>
           <th>Phone</th>
       </tr>\n";
 
-while ($projectrow = mysql_fetch_array($query_result)) {
-    $pid_idx  = $projectrow["pid_idx"];
-    $Pcreated = $projectrow["day_created"];
+foreach ($projlist as $project) {
+    $pid_idx  = $project->pid_idx();
+    $Pcreated = $project->GetTempData();
 
-    if (! ($project = Project::Lookup($pid_idx))) {
-	TBERROR("Could not lookup project $pid_idx", 1);
-    }
     if (! ($leader = $project->GetLeader())) {
 	TBERROR("Could not get leader for project $pid_idx", 1);
     }

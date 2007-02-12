@@ -17,6 +17,14 @@ PAGEHEADER("New Project Approved");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 
+# Verify page arguments.
+$reqargs = RequiredPageArguments("project",  PAGEARG_PROJECT,
+				 "approval", PAGEARG_STRING);
+$optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
+				 "user_interface", PAGEARG_STRING,
+				 "message", PAGEARG_STRING,
+				 "silent", PAGEARG_BOOLEAN);
+
 #
 # Of course verify that this uid has admin privs!
 #
@@ -30,16 +38,19 @@ if (! $isadmin) {
 #
 $FirstInitState = (TBGetFirstInitState() == "approveproject");
 
-echo "<center><h1>
-      Approving Project '$pid' ...
-      </h1></center>";
-
 #
 # Grab the head_uid for this project. This verifies it is a valid project.
 #
-if (! ($this_project = Project::Lookup($pid))) {
-    TBERROR("Unknown project $pid", 1);
+if (! ($this_project = $project)) {
+    TBERROR("Unknown project", 1);
 }
+# For error messages.
+$pid = $this_project->pid();
+
+echo "<center><h2>
+      Approving Project '$pid' ...
+      </h2></center>";
+
 if (! ($leader = $this_project->GetLeader())) {
     TBERROR("Error getting leader for $pid", 1);
 }
@@ -131,7 +142,7 @@ elseif ((strcmp($approval, "deny") == 0) ||
     SUEXEC($uid, $TBADMINGROUP, "webrmproj $pid", 1);
 
     $sendemail = 1;
-    if (isset($silent) && $silent == "Yep") {
+    if (isset($silent) && $silent) {
 	$sendemail = 0;
     }
     

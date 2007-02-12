@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -14,16 +14,30 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("target_user", PAGEARG_USER,
+				 "submit",      PAGEARG_STRING,
+				 "finished",    PAGEARG_BOOLEAN,
+				 "formfields",  PAGEARG_ARRAY);
+
+# Default to current user if not provided.
+if (!isset($target_user)) {
+     $target_user = $this_user;
+}
+
+# Need these below
+$target_uid = $target_user->uid();
+
+#
+# Standard Testbed Header, now that we know what we want to say.
+#
+PAGEHEADER("Generate SSL Certificate for user: $target_uid");
+
+#
 # The conclusion.
 # 
-if (isset($_GET['finished'])) {
-    PAGEHEADER("Generate SSL Certificate");
-
-    $user = $_GET['user'];
-
-    if (! ($target_user = User::Lookup($user))) {
-	USERERROR("The user $user is not a valid user", 1);
-    }
+if (isset($finished)) {
     $url = CreateURL("getsslcert", $target_user);
     
     echo "Your new SSL certificate has been created. You can
@@ -36,41 +50,6 @@ if (isset($_GET['finished'])) {
 }
 
 #
-# Verify page/form arguments. Note that the target uid comes initially as a
-# page arg, but later as a form argument, hence this odd check.
-#
-if (! isset($_POST['submit'])) {
-    # First page load. Default to current user.
-    if (! isset($_GET['user']))
-	$user = $uid;
-    else
-	$user = $_GET['user'];
-}
-else {
-    # Form submitted. Make sure we have a formfields array and a user.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['user'])) {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $formfields = $_POST['formfields'];
-    $user = $formfields['user'];
-}
-
-# Pedantic check of uid before continuing.
-if ($user == "" || !User::ValidWebID($user)) {
-    PAGEARGERROR("Invalid uid: '$user'");
-}
-
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
-$target_uid = $target_user->uid();
-
-#
 # Only admin people can create SSL certs for another user.
 #
 if (!$isadmin && !$target_user->SameUser($this_user)) {
@@ -78,17 +57,12 @@ if (!$isadmin && !$target_user->SameUser($this_user)) {
 	      "for $target_uid!", 1);
 }
 
-function SPITFORM($formfields, $errors)
+function SPITFORM($target_user, $formfields, $errors)
 {
-    global $isadmin, $target_user, $BOSSNODE;
+    global $isadmin, $BOSSNODE;
 
     $target_uid    = $target_user->uid();
     $target_webid  = $target_user->webid();
-
-    #
-    # Standard Testbed Header, now that we know what we want to say.
-    #
-    PAGEHEADER("Generate SSL Certificate for user: $target_uid");
 
     echo "<blockquote>
           By downloading an encrypted SSL certificate, you are able to use
@@ -186,9 +160,14 @@ function SPITFORM($formfields, $errors)
 if (! isset($_POST['submit'])) {
     $defaults = array();
     
-    SPITFORM($defaults, 0);
+    SPITFORM($target_user, $defaults, 0);
     PAGEFOOTER();
     return;
+}
+
+# Must get formfields.
+if (!isset($formfields)) {
+    PAGEARGERROR("Invalid form arguments; no formfields arrary.");
 }
 
 #
@@ -208,19 +187,19 @@ $user_email = $target_user->email();
 #
 # Must supply a reasonable passphrase.
 # 
-if (!isset($formfields[passphrase1]) ||
-    strcmp($formfields[passphrase1], "") == 0) {
+if (!isset($formfields["passphrase1"]) ||
+    strcmp($formfields["passphrase1"], "") == 0) {
     $errors["Passphrase"] = "Missing Field";
 }
-if (!isset($formfields[passphrase2]) ||
-    strcmp($formfields[passphrase2], "") == 0) {
+if (!isset($formfields["passphrase2"]) ||
+    strcmp($formfields["passphrase2"], "") == 0) {
     $errors["Confirm Passphrase"] = "Missing Field";
 }
-elseif (strcmp($formfields[passphrase1], $formfields[passphrase2])) {
+elseif (strcmp($formfields["passphrase1"], $formfields["passphrase2"])) {
     $errors["Confirm Passphrase"] = "Does not match Passphrase";
 }
 elseif (! CHECKPASSWORD($target_uid,
-			$formfields[passphrase1],
+			$formfields["passphrase1"],
 			$user_name,
 			$user_email, $checkerror)) {
     $errors["Passphrase"] = "$checkerror";
@@ -230,18 +209,18 @@ elseif (! CHECKPASSWORD($target_uid,
 # Must verify passwd to create an SSL key.
 #
 if (! $isadmin) {
-    if (!isset($formfields[password]) ||
-	strcmp($formfields[password], "") == 0) {
+    if (!isset($formfields["password"]) ||
+	strcmp($formfields["password"], "") == 0) {
 	$errors["Password"] = "Must supply a verification password";
     }
-    elseif (VERIFYPASSWD($target_uid, $formfields[password]) != 0) {
+    elseif (VERIFYPASSWD($target_uid, $formfields["password"]) != 0) {
 	$errors["Password"] = "Incorrect password";
     }
 }
 
 # Spit the errors
 if (count($errors)) {
-    SPITFORM($formfields, $errors);
+    SPITFORM($target_user, $formfields, $errors);
     PAGEFOOTER();
     return;
 }
@@ -249,14 +228,17 @@ if (count($errors)) {
 #
 # Insert key, update authkeys files and nodes if appropriate.
 #
+STARTBUSY("Generating Certificate");
 SUEXEC($target_uid, "nobody",
        "webmkusercert -p " .
-       escapeshellarg($formfields[passphrase1]) . " $target_uid",
+       escapeshellarg($formfields["passphrase1"]) . " $target_uid",
        SUEXEC_ACTION_DIE);
+STOPBUSY();
 
 #
 # Redirect back, avoiding a POST in the history.
-# 
-header("Location: ". CreateURL("getsslcert", $target_user, "finished", 1));
+#
+PAGEREPLACE(CreateURL("gensslcert", $target_user, "finished", 1));
 
+PAGEFOOTER();
 ?>

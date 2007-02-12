@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -13,29 +13,26 @@ include_once("template_defs.php");
 #
 
 #
+# Capture script errors and report back to user.
+#
+function SPITERROR($message = "", $death = 1)
+{
+    header("Content-type: image/gif");
+    readfile("coming-soon-thumb.gif");
+}
+$session_interactive  = 0;
+$session_errorhandler = 'SPITERROR';
+
+#
 # Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a Template ID.", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
+#
+$reqargs = RequiredPageArguments("template", PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("zoom",     PAGEARG_STRING);
 
 if (isset($zoom)) {
     if ($zoom != "in" && $zoom != "out") {
 	PAGEARGERROR("Invalid characters in zoom factor!");
     }
-}
-else {
-    unset($zoom);
-}
-
-function SPITERROR()
-{
-    header("Content-type: image/gif");
-    readfile("coming-soon-thumb.gif");
 }
 
 function SPITGRAPH($template)
@@ -49,13 +46,6 @@ function SPITGRAPH($template)
 	header("Content-type: image/png");
 	echo "$data";
     }
-}
-
-$template = Template::LookupRoot($guid);
-if (!$template) {
-# Bad template; spit back a stub image.
-    SPITERROR();
-    return;
 }
 
 #
@@ -73,7 +63,7 @@ $optarg = "-z " . ($zoom == "in" ? "in" : "out");
 
 $pid = $template->pid();
 $gid = $template->gid();
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+$unix_gid = $template->UnixGID();
 
 $retval = SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
 		 SUEXEC_ACTION_CONTINUE);

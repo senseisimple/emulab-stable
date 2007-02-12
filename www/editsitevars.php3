@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -22,6 +22,15 @@ if (! $isadmin) {
     USERERROR("You do not have admin privileges to edit site variables!", 1);
 }
 
+#
+# Verify Page agruments.
+#
+$optargs = OptionalPageArguments("edit",       PAGEARG_STRING,
+				 "name",       PAGEARG_STRING,
+				 "value",      PAGEARG_ANYTHING,
+				 "defaulted",  PAGEARG_STRING,
+				 "edited",     PAGEARG_STRING,
+				 "canceled",   PAGEARG_STRING);
 
 if (isset($edit)) {
 

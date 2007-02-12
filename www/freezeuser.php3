@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -19,11 +19,15 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify arguments.
-# 
-if (!isset($user) || $user == "") {
-    USERERROR("You must provide a User ID.", 1);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("target_user",     PAGEARG_USER);
+$optargs = OptionalPageArguments("action",	    PAGEARG_STRING,
+				 "request",	    PAGEARG_BOOLEAN,
+				 "canceled",        PAGEARG_STRING,
+				 "confirmed",       PAGEARG_STRING,
+				 "confirmed_twice", PAGEARG_STRING);
+
 if (isset($action)) {
     if (strcmp($action, "freeze") && strcmp($action, "thaw")) {
 	USERERROR("You can freeze a user or you can thaw a user!", 1);
@@ -42,18 +46,13 @@ else {
     $dbaction = TBDB_USERSTATUS_FROZEN;
 }
 
-#
-# Confirm target is a real user.
-#
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("No such user '$user'", 1);
-}
+# Need these below.
 $target_uid = $target_user->uid();
+$userstatus = $target_user->status();
 
 #
 # Confirm a valid op.
 #
-$userstatus = $target_user->status();
 if (!strcmp($action, "thaw") &&
      strcmp($userstatus, TBDB_USERSTATUS_FROZEN)) {
     USERERROR("You cannot thaw someone who is not frozen!", 1);
@@ -101,7 +100,7 @@ if (!$isadmin) {
 #
 # We do a double confirmation, running this script multiple times. 
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     echo "<center><h2><br>
           The $action has been canceled!
           </h2></center>\n";
@@ -110,14 +109,14 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><br>\n";
 
     echo "Are you <b>REALLY</b> sure you want to $action user '$target_uid'\n";
+
+    $url = CreateURL("freezeuser", $target_user, "action", $action);
     
-    echo "<form action=freezeuser.php3 method=post>";
-    echo "<input type=hidden name=user value=\"$user\">\n";
-    echo "<input type=hidden name=action value=\"$action\">\n";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -127,17 +126,17 @@ if (!$confirmed) {
     return;
 }
 
-if (!$confirmed_twice) {
+if (!isset($confirmed_twice)) {
     echo "<center><br>
 	  Okay, lets be sure.<br>\n";
 
     echo "Are you <b>REALLY REALLY</b> sure you want to $action user
               '$target_uid'\n";
     
-    echo "<form action=freezeuser.php3 method=post>";
-    echo "<input type=hidden name=user value=\"$user\">\n";
+    $url = CreateURL("freezeuser", $target_user, "action", $action);
+    
+    echo "<form action='$url' method=post>";
     echo "<input type=hidden name=confirmed value=Confirm>\n";
-    echo "<input type=hidden name=action value=\"$action\">\n";
     echo "<b><input type=submit name=confirmed_twice value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -151,15 +150,11 @@ if (!$confirmed_twice) {
 $target_user->SetStatus($dbaction);
 
 STARTBUSY("User '$target_uid' is being ${tag}!");
-
-#
-# All the real work is done in the script.
-#
-SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid",
-       SUEXEC_ACTION_DIE);
-
-/* Clear indicators */
+SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid",SUEXEC_ACTION_DIE);
 STOPBUSY();
+
+# Back to user display.
+PAGEREPLACE(CreateURL("showuser", $target_user));
 
 #
 # Standard Testbed Footer

@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -20,28 +19,18 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# First off, sanity check page args.
+# Verify page arguments.
 #
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("Must provide a Project ID!", 1);
-}
-if (!isset($gid) ||
-    strcmp($gid, "") == 0) {
-    USERERROR("Must privide a Group ID!", 1);
-}
+$reqargs = RequiredPageArguments("group", PAGEARG_GROUP);
+
+# Need these below;
+$pid = $group->pid();
+$gid = $group->gid();
 
 #
 # The default group membership cannot be changed, but the trust levels can.
 #
-$defaultgroup = 0;
-if (strcmp($gid, $pid) == 0) {
-    $defaultgroup = 1;
-}
-
-if (! ($group = Group::LookupByPidGid($pid, $gid))) {
-    USERERROR("No such group group $gid in project $pid!", 1);
-}
+$defaultgroup = $group->IsProjectGroup();
 
 #
 # Verify permission.
@@ -97,8 +86,9 @@ echo "<br><center>
 
 if (count($curmembers) ||
     ($grabusers && count($nonmembers))) {
+    $url = CreateURL("editgroup", $group);
     echo "<br>
-          <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
+          <form action='$url' method=post>
           <table align=center border=1>\n";
 }
 
@@ -124,13 +114,14 @@ if (count($curmembers)) {
 
     foreach ($curmembers as $target_user) {
 	$target_uid = $target_user->uid();
+	$target_idx = $target_user->uid_idx();
 	$trust      = $target_user->GetTempData();
 	$showurl    = CreateURL("showuser", $target_user);
 
 	if ($defaultgroup) {
 	    echo "<tr>
                      <td>
-                       <input type=hidden name='change_$target_uid'
+                       <input type=hidden name='change_$target_idx'
                                value=permit>
                           <A href='$showurl'>$target_uid &nbsp</A>
                      </td>\n";
@@ -139,13 +130,13 @@ if (count($curmembers)) {
 	    echo "<tr>
                      <td>   
                        <input checked type=checkbox value=permit
-                              name='change_$target_uid'>
+                              name='change_$target_idx'>
                           <A href='$showurl'>$target_uid &nbsp</A>
                      </td>\n";
 	}
 
 	echo "   <td align=center>
-                    <select name='$target_uid\$\$trust'>\n";
+                    <select name='U${target_idx}\$\$trust'>\n";
 
 	#
 	# We want to have the current trust value selected in the menu.
@@ -190,17 +181,18 @@ if ($grabusers && count($nonmembers)) {
 
     foreach ($nonmembers as $target_user) {
 	$target_uid = $target_user->uid();
+	$target_idx = $target_user->uid_idx();
 	$trust      = $target_user->GetTempData();
 	$showurl    = CreateURL("showuser", $target_user);
 
 	echo "<tr>
                  <td>
-                   <input type=checkbox value=permit name='add_$target_uid'>
+                   <input type=checkbox value=permit name='add_$target_idx'>
                       <A href='$showurl'>$target_uid &nbsp</A>
                  </td>\n";
 
 	echo "   <td align=center>
-                   <select name='$target_uid\$\$trust'>\n";
+                   <select name='U${target_idx}\$\$trust'>\n";
 
 	if ($group->CheckTrustConsistency($target_user,
 					  TBDB_TRUSTSTRING_USER, 0)) {

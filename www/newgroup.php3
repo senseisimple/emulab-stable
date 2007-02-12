@@ -1,44 +1,15 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
-#
-# Standard Header
-#
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Create a Project Group");
-
-ignore_user_abort(1);
-
-#
-# First off, sanity check the form to make sure all the required fields
-# were provided. I do this on a per field basis so that we can be
-# informative. Be sure to correlate these checks with any changes made to
-# the project form. 
-#
-if (!isset($group_pid) ||
-    strcmp($group_pid, "") == 0) {
-  FORMERROR("Select Project");
-}
-if (!isset($group_id) ||
-    strcmp($group_id, "") == 0) {
-  FORMERROR("Group Name");
-}
-if (!isset($group_description) ||
-    strcmp($group_description, "") == 0) {
-  FORMERROR("Group Description");
-}
-if (!isset($group_leader) ||
-    strcmp($group_leader, "") == 0) {
-  FORMERROR("Group leader");
-}
 
 #
 # Only known and logged in users.
@@ -48,17 +19,29 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check ID for sillyness.
+# Verify page arguments
 #
-if (! ereg("^[-_a-zA-Z0-9]+$", $group_id)) {
-    USERERROR("The group name must be alphanumeric characters only!", 1);
-}
+$reqargs = RequiredPageArguments("project",           PAGEARG_PROJECT,
+				 "group_id",          PAGEARG_STRING,
+				 "group_description", PAGEARG_ANYTHING,
+				 "group_leader",      PAGEARG_STRING);
+
+# Need these below
+$group_pid = $project->pid();
+$unix_gid  = $project->unix_gid();
+$safe_id   = escapeshellarg($group_id);
 
 #
-# Database limits
+# Check ID for sillyness.
 #
-if (strlen($group_id) > $TBDB_GIDLEN) {
-    USERERROR("The Group name is too long! Please select another.", 1);
+if ($group_id == "") {
+    USERERROR("Must provide a group name!", 1);
+}
+elseif (! TBvalid_gid($group_id)) {
+    USERERROR("Invalid group name: " . TBFieldErrorString(), 1);
+}
+if ($group_leader == "") {
+    USERERROR("Must provide a group leader!", 1);
 }
 
 #
@@ -69,23 +52,30 @@ $group_description = addslashes($group_description);
 #
 # Verify permission.
 #
-if (! TBProjAccessCheck($uid, $group_pid, 0, $TB_PROJECT_MAKEGROUP)) {
+if (!$project->AccessCheck($this_user, $TB_PROJECT_MAKEGROUP)) {
     USERERROR("You do not have permission to create groups in project ".
 	      "$group_pid!", 1);
 }
 
+# Need the user object for creating the group.
+if (! ($leader = User::Lookup($group_leader))) {
+    USERERROR("User '$group_leader' is an unknown user!", 1);
+}
+
 #
-# Verify project and leader. Any user can lead a group.
+# Verify leader. Any user can lead a group, but they must be a member of
+# the project, and we have to avoid an ISADMIN() check in AccessCheck().
 #
-if (! TBProjAccessCheck($group_leader, $group_pid, 0, $TB_PROJECT_LEADGROUP)) {
+if (!$project->IsMember($leader, $isapproved) ||
+    !$project->AccessCheck($leader, $TB_PROJECT_LEADGROUP)) {
     USERERROR("$group_leader does not have enough permission to lead a group ".
 	      "in project $group_pid!", 1);
 }
-	       
+
 #
 # Make sure the GID is not already there.
 #
-if (TBValidGroup($group_pid, $group_id)) {
+if (($oldgroup = Group::LookupByPidGid($group_pid, $group_id))) {
     USERERROR("The group $group_id already exists! Please select another.", 1);
 }
 
@@ -116,15 +106,6 @@ if ($count == $maxtries) {
     TBERROR("Could not form a unique Unix group name!", 1);
 }
 
-# Need the user object for creating the group.
-if (! ($leader = User::Lookup($group_leader))) {
-    TBERROR("Could not lookup user '$group_leader'!", 1);
-}
-# and the project.
-if (! ($project = Project::Lookup($group_pid))) {
-    TBERROR("Could not lookup project '$group_pid'!", 1);
-}
-
 #
 # Create the new group and set up the initial membership for the leader.
 #
@@ -136,23 +117,20 @@ if (! ($newgroup = Group::NewGroup($project, $group_id, $leader,
     TBERROR("Could not create new group $group_pid/$group_id!", 1);
 }
 
-#
-# Grab the unix GID for running scripts.
-#
-TBGroupUnixInfo($group_pid, $group_pid, $unix_gid, $unix_name);
-
 STARTBUSY("Creating project group $group_id.");
 
 #
 # Run the script. This will make the group directory, set the perms, etc.
 #
-SUEXEC($uid, $unix_gid, "webmkgroup $group_pid $group_id", 1);
+SUEXEC($uid, $unix_gid,
+       "webmkgroup $group_pid $safe_id", SUEXEC_ACTION_DIE);
 
 #
 # Now add the group leader to the group.
 # 
 SUEXEC($uid, $unix_gid,
-       "webmodgroups -a $group_pid:$group_id:group_root $group_leader", 1);
+       "webmodgroups -a $group_pid:$safe_id:group_root $group_leader",
+       SUEXEC_ACTION_DIE);
 
 STOPBUSY();
 
@@ -181,7 +159,7 @@ TBMAIL("$group_leader_name '$group_leader' <$group_leader_email>",
 #
 # Redirect back to project page.
 #
-PAGEREPLACE("showgroup.php3?pid=$group_pid&gid=$group_id");
+PAGEREPLACE(CreateURL("showgroup", $newgroup));
 
 #
 # Standard Testbed Footer

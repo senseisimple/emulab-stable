@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -22,11 +22,11 @@ if (! ($this_user = CheckLogin($check_status)) ||
 }
 $uid = $this_user->uid();
 
-#
-# Optional pid,eid. Without a building/floor, show all the nodes for the
-# experiment in all buildings/floors. Without pid,eid show all wireless
-# nodes in the specified building/floor.
-#
+$reqargs = RequiredPageArguments("pid",        PAGEARG_STRING,
+				 "eid",        PAGEARG_STRING);
+$optargs = OptionalPageArguments("building",   PAGEARG_STRING,
+				 "floor",      PAGEARG_STRING);
+
 if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
     if (!TBvalid_pid($pid)) {
 	SPITERROR(400, "Invalid project ID.");
@@ -35,10 +35,10 @@ if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
 	SPITERROR(400, "Invalid experiment ID.");
     }
 
-    if (! TBValidExperiment($pid, $eid)) {
+    if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
 	SPITERROR(400, "The experiment $pid/$eid is not a valid experiment!");
     }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR(401,
 		  "You do not have permission to view experiment $pid/$eid!");
     }

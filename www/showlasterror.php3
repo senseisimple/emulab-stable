@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -21,21 +20,8 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid project ID.");
-}
-
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid experiment ID.");
-}
- 
 #
-# Check to make sure this is a valid PID/EID.
-#
-if (! ($experiment = Experiment::Lookup($pid, $eid))) {
-    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-}
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 $exptidx = $experiment->idx();
 
 #

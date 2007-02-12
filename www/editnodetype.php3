@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -22,9 +22,15 @@ if (! $isadmin) {
     USERERROR("You do not have permission to edit node types!", 1);
 }
 
-if (!$new_type && (!isset($node_type) || !strcmp($node_type,""))) {
-    USERERROR("No type given!", 1);
-}
+$reqargs = RequiredPageArguments("node_type",  PAGEARG_STRING);
+$optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
+				 "new_type",   PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY,
+				 "deletes",    PAGEARG_ARRAY,
+				 "attributes", PAGEARG_ARRAY,
+				 "newattribute_type",  PAGEARG_STRING,
+				 "newattribute_name",  PAGEARG_STRING,
+				 "newattribute_value", PAGEARG_STRING);
 
 # This belongs elsewhere!
 $initial_attributes = array(
@@ -87,7 +93,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
     #
     # Standard Testbed Header
     #
-    if (! $new_type) {
+    if (! isset($new_type)) {
 	PAGEHEADER("Edit Node Type");
 
 	echo "<font size=+2>Node Type <b>".
@@ -125,7 +131,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 
 
     $formargs = "node_type=$node_type";
-    if ($new_type) {
+    if (isset($new_type)) {
 	$formargs .= "&new_type=1";
     }
 
@@ -135,7 +141,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 
     echo "<tr>
               <td colspan=2>Type:</td>\n";
-    if ($new_type) {
+    if (isset($new_type)) {
         echo "<td class=left>
                  <input type=text
                         name=\"node_type\"
@@ -149,7 +155,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 
     echo "<tr>
               <td colspan=2>Class:</td>\n";
-    if ($new_type) {
+    if (isset($new_type)) {
         echo "<td class=left>
                  <input type=text
                         name=\"formfields[class]\"
@@ -157,7 +163,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 	                size=10>
              </td>\n";
     } else {
-	echo "<td class=left>$formfields[class]</td>
+	echo "<td class=left>" . $formfields["class"] . "</td>
           </tr>\n";
     }
 
@@ -166,7 +172,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[isvirtnode]\"
-                        value=\"" . $formfields[isvirtnode] . "\"
+                        value=\"" . $formfields["isvirtnode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -176,7 +182,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[isjailed]\"
-                        value=\"" . $formfields[isjailed] . "\"
+                        value=\"" . $formfields["isjailed"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -186,7 +192,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[isdynamic]\"
-                        value=\"" . $formfields[isdynamic] . "\"
+                        value=\"" . $formfields["isdynamic"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -196,7 +202,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[isremotenode]\"
-                        value=\"" . $formfields[isremotenode] . "\"
+                        value=\"" . $formfields["isremotenode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -206,7 +212,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[issubnode]\"
-                        value=\"" . $formfields[issubnode] . "\"
+                        value=\"" . $formfields["issubnode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -216,7 +222,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[isplabdslice]\"
-                        value=\"" . $formfields[isplabdslice] . "\"
+                        value=\"" . $formfields["isplabdslice"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -226,7 +232,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[issimnode]\"
-                        value=\"" . $formfields[issimnode] . "\"
+                        value=\"" . $formfields["issimnode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -315,7 +321,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
           </table>\n";
 }
 
-if ($new_type) {
+if (isset($new_type)) {
     #
     # Starting a new node type - give some reasonable defaults
     #
@@ -391,7 +397,7 @@ if (! isset($submit)) {
 #
 # We do not allow these to be changed.
 #
-if (!$new_type) {
+if (!isset($new_type)) {
     $formfields["class"] = $defaults["class"];
 }
 
@@ -403,7 +409,8 @@ $errors  = array();
 $inserts = array();
 
 # Class (only for new types)
-if ($new_type && isset($formfields['class']) && $formfields['class'] != "") {
+if (isset($new_type) &&
+    isset($formfields['class']) && $formfields['class'] != "") {
     if (! TBvalid_description($formfields['class'])) {
 	$errors["Class"] = TBFieldErrorString();
     }
@@ -413,72 +420,72 @@ if ($new_type && isset($formfields['class']) && $formfields['class'] != "") {
 }
 
 # isvirtnode
-if (isset($formfields[isvirtnode]) && $formfields[isvirtnode] != "") {
-    if (! TBvalid_boolean($formfields[isvirtnode])) {
+if (isset($formfields["isvirtnode"]) && $formfields["isvirtnode"] != "") {
+    if (! TBvalid_boolean($formfields["isvirtnode"])) {
 	$errors["isvirtnode"] = TBFieldErrorString();
     }
     else {
-	$inserts["isvirtnode"] = $formfields[isvirtnode];
+	$inserts["isvirtnode"] = $formfields["isvirtnode"];
     }
 }
 
 # isjailed
-if (isset($formfields[isjailed]) && $formfields[isjailed] != "") {
-    if (! TBvalid_boolean($formfields[isjailed])) {
+if (isset($formfields["isjailed"]) && $formfields["isjailed"] != "") {
+    if (! TBvalid_boolean($formfields["isjailed"])) {
 	$errors["isjailed"] = TBFieldErrorString();
     }
     else {
-	$inserts["isjailed"] = $formfields[isjailed];
+	$inserts["isjailed"] = $formfields["isjailed"];
     }
 }
 
 # isdynamic
-if (isset($formfields[isdynamic]) && $formfields[isdynamic] != "") {
-    if (! TBvalid_boolean($formfields[isdynamic])) {
+if (isset($formfields["isdynamic"]) && $formfields["isdynamic"] != "") {
+    if (! TBvalid_boolean($formfields["isdynamic"])) {
 	$errors["isdynamic"] = TBFieldErrorString();
     }
     else {
-	$inserts["isdynamic"] = $formfields[isdynamic];
+	$inserts["isdynamic"] = $formfields["isdynamic"];
     }
 }
 
 # isremotenode
-if (isset($formfields[isremotenode]) && $formfields[isremotenode] != "") {
-    if (! TBvalid_boolean($formfields[isremotenode])) {
+if (isset($formfields["isremotenode"]) && $formfields["isremotenode"] != "") {
+    if (! TBvalid_boolean($formfields["isremotenode"])) {
 	$errors["isremotenode"] = TBFieldErrorString();
     }
     else {
-	$inserts["isremotenode"] = $formfields[isremotenode];
+	$inserts["isremotenode"] = $formfields["isremotenode"];
     }
 }
 
 # issubnode
-if (isset($formfields[issubnode]) && $formfields[issubnode] != "") {
-    if (! TBvalid_boolean($formfields[issubnode])) {
+if (isset($formfields["issubnode"]) && $formfields["issubnode"] != "") {
+    if (! TBvalid_boolean($formfields["issubnode"])) {
 	$errors["issubnode"] = TBFieldErrorString();
     }
     else {
-	$inserts["issubnode"] = $formfields[issubnode];
+	$inserts["issubnode"] = $formfields["issubnode"];
     }
 }
 
 # isplabdslice
-if (isset($formfields[isplabdslice]) && $formfields[isplabdslice] != "") {
-    if (! TBvalid_boolean($formfields[isplabdslice])) {
+if (isset($formfields["isplabdslice"]) && $formfields["isplabdslice"] != "") {
+    if (! TBvalid_boolean($formfields["isplabdslice"])) {
 	$errors["isplabdslice"] = TBFieldErrorString();
     }
     else {
-	$inserts["isplabdslice"] = $formfields[isplabdslice];
+	$inserts["isplabdslice"] = $formfields["isplabdslice"];
     }
 }
 
 # issimnode
-if (isset($formfields[issimnode]) && $formfields[issimnode] != "") {
-    if (! TBvalid_boolean($formfields[issimnode])) {
+if (isset($formfields["issimnode"]) && $formfields["issimnode"] != "") {
+    if (! TBvalid_boolean($formfields["issimnode"])) {
 	$errors["issimnode"] = TBFieldErrorString();
     }
     else {
-	$inserts["issimnode"] = $formfields[issimnode];
+	$inserts["issimnode"] = $formfields["issimnode"];
     }
 }
 
@@ -584,7 +591,7 @@ foreach ($inserts as $name => $value) {
     $insert_data[] = "$name='$value'";
 }
 
-if ($new_type) {
+if (isset($new_type)) {
     DBQueryFatal("insert into node_types set type='$node_type', ".
 		 implode(",", $insert_data));
     if ($formfields["class"] == "pc") {

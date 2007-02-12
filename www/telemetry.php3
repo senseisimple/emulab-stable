@@ -1,12 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Make sure they are logged in
@@ -18,21 +17,13 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-if (!isset($node) || strcmp($node, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
 
-if (!TBvalid_node_id($node)) {
-    USERERROR("Invalid node ID.", 1);
-}
-
-if (!TBValidNodeName($node)) {
-    USERERROR("Invalid node ID.", 1);
-}
-
-if (!TBNodeAccessCheck($uid, $node, $TB_NODEACCESS_READINFO)) {
+if (!$node->AccessCheck($this_user, $TB_NODEACCESS_READINFO)) {
     USERERROR("Not enough permission.", 1);
 }
+$node_id = $node->node_id();
+$status  = $node->NodeStatus();
 
 #
 # Define a stripped-down view of the web interface - less clutter
@@ -46,22 +37,22 @@ $view = array(
 #
 # Standard Testbed Header now that we have the pid/eid okay.
 #
-PAGEHEADER("Telemetry for $node", $view);
+PAGEHEADER("Telemetry for $node_id", $view);
 
-if (TBNodeStatus($node) == "up") {
+if ($status == "up") {
     echo "
     <applet code='thinlet.AppletLauncher.class'
             archive='thinlet.jar,oncrpc.jar,mtp.jar,garcia-telemetry.jar'
             width='300' height='400'
             alt='You need java to run this applet'>
         <param name='class' value='GarciaTelemetry'>
-        <param name='pipeurl' value='servicepipe.php3?node=$node'>
+        <param name='pipeurl' value='servicepipe.php3?node_id=$node_id'>
         <param name='uid' value='$uid'>
         <param name='auth' value='$HTTP_COOKIE_VARS[$TBAUTHCOOKIE]'>
     </applet>\n";
 }
 else {
-    USERERROR("Robot is not alive. ". TBNodeStatus($node), 1);
+    USERERROR("Robot is not alive: $status", 1);
 }
 
 #

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -19,7 +19,6 @@ function MyError($msg)
     exit(0);
 }
 
-
 #
 # Only known and logged in users.
 #
@@ -28,16 +27,14 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page arguments.
-# 
-if (!isset($webcamid) ||
-    strcmp($webcamid, "") == 0) {
-    MyError("You must provide a WebCam ID.");
-}
-
-if (! preg_match("/^[\d]+$/", $webcamid)) {
-    MyError("Invalid characters in WebCam ID.");
-}
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("camheight",   PAGEARG_INTEGER,
+				 "camwidth",    PAGEARG_INTEGER,
+				 "camfps",      PAGEARG_INTEGER,
+				 "fromtracker", PAGEARG_INTEGER,
+				 "webcamid",    PAGEARG_INTEGER,
+				 "applet",      PAGEARG_BOOLEAN);
 
 #
 # And check for entry in webcams table, which tells us the server name

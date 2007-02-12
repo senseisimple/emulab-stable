@@ -29,6 +29,20 @@ if (! $isadmin) {
 }
 
 #
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
+				 "delete",       PAGEARG_STRING,
+				 "calc",         PAGEARG_STRING,
+				 "create",       PAGEARG_STRING,
+				 "research",     PAGEARG_STRING,
+				 "swap",         PAGEARG_STRING,
+				 "newtype",      PAGEARG_STRING,
+				 "newprefix",    PAGEARG_STRING,
+				 "addnumber",    PAGEARG_STRING,
+				 "renumber",     PAGEARG_STRING);
+
+#
 # XXX - a hack
 #
 $gid = "nobody";
@@ -36,7 +50,7 @@ $gid = "nobody";
 #
 # Start out by performing any operations they may have asked for
 #
-if ($selected) {
+if (isset($selected)) {
     $selected_nodes = $selected;
 } else {
     $selected_nodes = array();
@@ -54,8 +68,9 @@ if (count($selected_nodes)) {
     $whereclause = implode(" OR ",$equal_clauses);
     $whereclause_qualified = implode(" OR ",$equal_clauses_qualified);
 } else {
-    if ($delete || $calc || $create || $research || $swap || $newtype ||
-	    $newprefix || $addnumber || $renumber) {
+    if (isset($delete) || isset($calc) || isset($create) ||
+	isset($research) || isset($swap) || isset($newtype) ||
+	isset($newprefix) || isset($addnumber) || isset($renumber)) {
 	USERERROR("At least one node must be selected!",1);
     }
 }
@@ -63,7 +78,7 @@ if (count($selected_nodes)) {
 #
 # Delete nodes
 #
-if ($delete) {
+if (isset($delete)) {
     DBQueryFatal("DELETE FROM new_nodes WHERE $whereclause");
     DBQueryFatal("DELETE FROM new_interfaces WHERE $whereclause");
 }
@@ -71,7 +86,7 @@ if ($delete) {
 #
 # Recalculate IPs
 #
-if ($calc) {
+if (isset($calc)) {
    $query_result = DBQueryFatal("SELECT new_node_id, node_id FROM new_nodes " .
    	"WHERE $whereclause ORDER BY new_node_id");
     while ($row = mysql_fetch_array($query_result)) {
@@ -97,7 +112,7 @@ if ($calc) {
 #
 # Create the nodes in the real database
 #
-if ($create) {
+if (isset($create)) {
     $nodenames = array();
     $query_result = DBQueryFatal("SELECT node_id FROM new_nodes " .
 	"WHERE $whereclause");
@@ -116,7 +131,7 @@ if ($create) {
 #
 # Look for the nodes on the switch again
 #
-if ($research) {
+if (isset($research)) {
     #
     # Get the MACs we are supposed to be looking for
     #
@@ -223,7 +238,7 @@ if ($research) {
 #
 # Swap the IDs and IPs of two nodes
 #
-if ($swap) {
+if (isset($swap)) {
     if (count($selected_nodes) != 2) {
        USERERROR("Exactly two nodes must be selected for swapping",0);
     } else {
@@ -250,14 +265,14 @@ if ($swap) {
 #
 # Change node types
 #
-if ($newtype) {
+if (isset($newtype)) {
     DBQueryFatal("UPDATE new_nodes SET type='$newtype' WHERE $whereclause");
 }
 
 #
 # Change node name prefix
 #
-if ($newprefix || $addnumber) {
+if (isset($newprefix) || isset($addnumber)) {
    $query_result = DBQueryFatal("SELECT new_node_id, node_id FROM new_nodes " .
    	"WHERE $whereclause");
     while ($row = mysql_fetch_array($query_result)) {
@@ -274,7 +289,7 @@ if ($newprefix || $addnumber) {
 		    $number = chr(ord($number) + $addnumber);
 		}
 	    }
-	    if ($newprefix) {
+	    if (isset($newprefix)) {
 	        $prefix = $newprefix;
 	    }
 	    $newname = $prefix . $number;
@@ -289,7 +304,7 @@ if ($newprefix || $addnumber) {
 #
 # Re-number interfaces
 #
-if ($renumber) {
+if (isset($renumber)) {
     #
     # Move them out of the way
     #
@@ -370,6 +385,8 @@ while ($row = mysql_fetch_array($nodes_result)) {
 	$dmesg      = $row["dmesg"];
 	$identifier = $row["identifier"];
 	$building   = $row["building"];
+	$mac        = "";
+	$port       = "";
 
 	# Get the control interface token for the type.
 	NodeTypeAttribute($type, "control_interface", $control_iface);

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,11 +20,10 @@ $isadmin   = ISADMIN();
 
 #
 # Verify arguments.
-# 
-if (!isset($prefix) ||
-    strcmp($prefix, "") == 0) {
-    PAGEARGERROR("You must provide a prefix argument.");
-}
+#
+$reqargs = RequiredPageArguments("prefix", PAGEARG_STRING);
+
+# Sanity check for shell.
 if (!preg_match("/^floormap[-\w]+$/", $prefix)) {
     PAGEARGERROR("Invalid prefix argument.");
 }
@@ -43,7 +42,8 @@ function CLEANUP()
     # the easiest way to do it.
     # 
     if (isset($prefix)) {
-	SUEXEC($uid, "nobody", "webfloormap -o $prefix -k ");
+	SUEXEC($uid, "nobody", "webfloormap -o $prefix -k ",
+	       SUEXEC_ACTION_IGNORE);
 	# This file does belong to the web server.
 	unlink($prefix);
     }

@@ -19,12 +19,17 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("splitview",   PAGEARG_BOOLEAN,
+				 "sortby",      PAGEARG_STRING);
+
+#
 # Admin users can see all projects, while normal users can only see
 # projects for which they are the leader.
 #
 # XXX Should we form the list from project members instead of leaders?
 #
-
 if (!isset($splitview) || !$isadmin)
     $splitview = 0;
 if (!isset($sortby))
@@ -123,7 +128,7 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 while ($projectrow = mysql_fetch_array($allproj_result)) {
-    $pid = $projectrow[pid];
+    $pid = $projectrow["pid"];
 
     if (!isset($ecounts[$pid])) 
 	$ecounts[$pid] = 0;
@@ -155,7 +160,7 @@ if ($isadmin) {
     $active_projects = 0;
 
     while ($projectrow = mysql_fetch_array($allproj_result)) {
-	$expt_count = $projectrow[expt_count];
+	$expt_count = $projectrow["expt_count"];
 
 	if ($expt_count > 0) {
 	    $active_projects++;
@@ -221,7 +226,7 @@ function GENPLIST ($query_result)
     #
     $projectrows = array();
     while ($projectrow = mysql_fetch_array($query_result)) {
-	$pid = $projectrow[pid];
+	$pid = $projectrow["pid"];
 
 	$projectrows[$pid] = $projectrow;
     }
@@ -242,13 +247,13 @@ function GENPLIST ($query_result)
     echo "</tr>\n";
 
     while (list($pid, $foo) = each($showby)) {
-	$projectrow = $projectrows[$pid];
-	$headidx    = $projectrow[head_idx];
-	$Pname      = stripslashes($projectrow[name]);
-	$approved   = $projectrow[approved];
-	$expt_count = $projectrow[expt_count];
-	$public     = $projectrow[public];
-	$idle       = $projectrow[idle];
+	$projectrow = $projectrows["$pid"];
+	$headidx    = $projectrow["head_idx"];
+	$Pname      = $projectrow["name"];
+	$approved   = $projectrow["approved"];
+	$expt_count = $projectrow["expt_count"];
+	$public     = $projectrow["public"];
+	$idle       = $projectrow["idle"];
 	$ecount     = $ecounts[$pid];
 	$ncount     = $ncounts[$pid];
 	$pcount     = $pcounts[$pid];

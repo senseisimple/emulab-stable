@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # This script uses Sajax ... BEWARE!
@@ -39,56 +38,36 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
+# This stuff will be setup below in CHECKPAGEARGS()
+$pid            = "";
+$eid            = "";
+$unix_gid       = "";
+$linktest_level = 0;
+$linktest_pid   = 0;
+
 #
 # Need this argument checking in a function so it can called from the
 # request handlers.
 #
 function CHECKPAGEARGS() {
-    global $uid, $TB_EXPTSTATE_ACTIVE, $TB_EXPT_MODIFY;
-    
-    #
-    # Check to make sure a valid experiment.
-    #
-    $pid = $_GET['pid'];
-    $eid = $_GET['eid'];
-    
-    if (isset($pid) && strcmp($pid, "") &&
-	isset($eid) && strcmp($eid, "")) {
-	if (! TBvalid_eid($eid)) {
-	    PAGEARGERROR("$eid is contains invalid characters!");
-	}
-	if (! TBvalid_pid($pid)) {
-	    PAGEARGERROR("$pid is contains invalid characters!");
-	}
-	if (! TBValidExperiment($pid, $eid)) {
-	    USERERROR("$pid/$eid is not a valid experiment!", 1);
-	}
-	if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	    USERERROR("You do not have permission to run linktest on ".
-		      "$pid/$eid!", 1);
-	}
-    }
-    else {
-	PAGEARGERROR("Must specify pid and eid!");
-    }
-}
+    global $this_user, $TB_EXPTSTATE_ACTIVE, $TB_EXPT_MODIFY;
+    global $pid, $eid, $experiment;
+    global $unix_gid, $linktest_level, $linktest_pid;
 
-#
-# Grab DB data we need.
-#
-function GRABDBDATA() {
-    global $pid, $eid;
-    global $gid, $linktest_level, $linktest_pid;
+    $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
     
-    # Need the GID, plus current level and the pid.
-    $query_result =
-	DBQueryFatal("select gid,linktest_level,linktest_pid ".
-		     "  from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-    $row = mysql_fetch_array($query_result);
-    $gid            = $row[0];
-    $linktest_level = $row[1];
-    $linktest_pid   = $row[2];
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+	USERERROR("You do not have permission to run linktest ".
+		  "on $pid/$eid!", 1);
+    }
+    if ($experiment->state() != $TB_EXPTSTATE_ACTIVE) {
+	USERERROR("Experiment $eid must be active run linktest!", 1);
+    }
+    $pid            = $experiment->pid();
+    $eid            = $experiment->eid();
+    $unix_gid       = $experiment->UnixGID();
+    $linktest_level = $experiment->linktest_level();
+    $linktest_pid   = $experiment->linktest_pid();
 }
 
 #
@@ -96,11 +75,10 @@ function GRABDBDATA() {
 # 
 function stop_linktest() {
     global $linktest_pid;
-    global $uid, $pid, $gid, $eid, $suexec_output, $session_interactive;
+    global $uid, $pid, $unix_gid, $eid, $suexec_output, $session_interactive;
 
     # Must do this!
     CHECKPAGEARGS();
-    GRABDBDATA();
 
     if (! $linktest_pid) {
 	if ($session_interactive) {
@@ -108,9 +86,6 @@ function stop_linktest() {
 	}
 	return "stopped:Linktest is not running on experiment $pid/$eid!";
     }
-    # For backend script call.
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-    
     $retval = SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
 		     SUEXEC_ACTION_IGNORE);
 
@@ -127,9 +102,7 @@ $linktest_running = 0;
 
 function SPEWCLEANUP()
 {
-    global $pid, $gid, $linktest_running;
-
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    global $pid, $unix_gid, $eid, $linktest_running;
 
     if (connection_aborted() && $linktest_running) {
 	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
@@ -142,11 +115,10 @@ function SPEWCLEANUP()
 # 
 function start_linktest($level) {
     global $linktest_pid, $linktest_running, $TBSUEXEC_PATH;
-    global $uid, $pid, $gid, $eid, $suexec_output;
+    global $uid, $pid, $unix_gid, $eid, $suexec_output;
 
     # Must do this!
     CHECKPAGEARGS();
-    GRABDBDATA();
 
     if ($linktest_pid) {
 	return "failed:Linktest is already running on experiment $pid/$eid!";
@@ -157,9 +129,6 @@ function start_linktest($level) {
 	    "1 <= level <= ". TBDB_LINKTEST_MAX;
     }
     
-    # For backend script call.
-    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
     # Make sure we shutdown if client goes away.
     register_shutdown_function("SPEWCLEANUP");
     set_time_limit(0);
@@ -218,14 +187,13 @@ sajax_handle_client_request();
 # In plain kill mode, just use the stop_linktest function and then
 # redirect back to the showexp page.
 #
-if (isset($kill) && $kill == 1) {
+if (isset($_REQUEST["kill"])) {
     stop_linktest();
-    
     header("Location: showexp.php3?pid=$pid&eid=$eid");
     return;
 }
-if (isset($start) && isset($level)) {
-    start_linktest($level);
+if (isset($_REQUEST["start"]) && isset($_REQUEST["level"])) {
+    start_linktest($_REQUEST["level"]);
     return;
 }
 
@@ -236,7 +204,6 @@ PAGEHEADER("Run Linktest");
 
 # Must do this!
 CHECKPAGEARGS();
-GRABDBDATA();
 
 echo "<script>\n";
 sajax_show_javascript();
@@ -354,7 +321,7 @@ echo "<center><font size=+2><br>
          Are you <b>sure</b> you want to run linktest?
          </font><br><br>\n";
 
-SHOWEXP($pid, $eid, 1);
+$experiment->Show(1);
 
 echo "<br>\n";
 echo "<form action=linktest.php3 method=post name=myform id=myform>";
@@ -371,7 +338,7 @@ echo "<tr>
 for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
     $selected = "";
 
-    if (strcmp("$level", "$i") == 0)
+    if (strcmp("$linktest_level", "$i") == 0)
 	$selected = "selected";
 	
     echo "        <option $selected value=$i>Level $i - " .

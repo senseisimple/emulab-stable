@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,28 +16,12 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a template GUID.", 1);
-}
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a template version number", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-if (isset($expand) && $expand != "") {
-    if (!TBvalid_integer($expand)) {
-	PAGEARGERROR("Invalid characters in expand index!");
-    }
-}
-else {
-    unset($expand);
+#
+$reqargs = RequiredPageArguments("template", PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("expand",   PAGEARG_INTEGER);
+
+if (!isset($expand)) {
+    $expand = 0;
 }
 
 #
@@ -46,14 +30,9 @@ else {
 PAGEHEADER("Experiment Template History");
 
 #
-# Check to make sure this is a valid template and user has permission.
+# Check permission.
 #
-$template = Template::Lookup($guid, $version);
-if (!$template) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-if (! $template->AccessCheck($uid, $TB_EXPT_READINFO)) {
+if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
 	      "$guid/$version!", 1);
 }

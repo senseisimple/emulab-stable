@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 include_once("template_defs.php");
 
 #
@@ -19,18 +18,17 @@ $isadmin   = ISADMIN();
 include("showlogfile_sup.php3");
 
 #
-# Must provide the EID!
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("The project ID was not provided!", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("The experiment ID was not provided!", 1);
-}
-
+# Verify Page Arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "inout",      PAGEARG_STRING);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING,
+				 "force",      PAGEARG_BOOLEAN,
+				 "forcetype",  PAGEARG_STRING,
+				 "idleswap",   PAGEARG_BOOLEAN,
+				 "autoswap",   PAGEARG_BOOLEAN);
+				 
 if (!isset($inout) ||
     (strcmp($inout, "in") && strcmp($inout, "out") &&
      strcmp($inout, "pause") && strcmp($inout, "restart") &&
@@ -39,8 +37,8 @@ if (!isset($inout) ||
 }
 
 # Canceled operation redirects back to showexp page. See below.
-if ($canceled) {
-    header("Location: showexp.php3?pid=$pid&eid=$eid");
+if (isset($canceled) && $canceled) {
+    header("Location: ". CreateURL("showexp", $experiment));
     return;
 }
 
@@ -69,36 +67,26 @@ else {
 	$autoswap=0;
 }
 
-$exp_eid = $eid;
-$exp_pid = $pid;
-
-#
-# Check to make sure thats this is a valid PID/EID tuple.
-#
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE ".
-		 "eid='$exp_eid' and pid='$exp_pid'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("The experiment $exp_eid is not a valid experiment ".
-	      "in project $exp_pid.", 1);
-}
-$row           = mysql_fetch_array($query_result);
-$exp_gid       = $row[gid];
-$isbatch       = $row[batchmode];
-$state         = $row[state];
-$exptidx       = $row[idx];
-$swappable     = $row[swappable];
-$idleswap_bit  = $row[idleswap];
-$idleswap_time = $row[idleswap_timeout];
-$idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
-$lockdown      = $row["lockdown"];
+# Need these below
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
 
 #
 # Verify permissions.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission for $exp_eid!", 1);
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission for $eid!", 1);
 }
+
+$isbatch       = $experiment->batchmode();
+$state         = $experiment->state();
+$exptidx       = $experiment->idx();
+$swappable     = $experiment->swappable();
+$idleswap_bit  = $experiment->idleswap();
+$idleswap_time = $experiment->idleswap_timeout();
+$idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
+$lockdown      = $experiment->lockdown();
 
 # Template Instance Experiments get special treatment in this page.
 $instance = TemplateInstance::LookupByExptidx($exptidx);
@@ -163,7 +151,7 @@ if ($lockdown) {
 # set. Or, the user can hit the cancel button, in which case we 
 # redirect the browser back to the experiment page (see above).
 #
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><h2><br>
           Are you sure you want to ";
     if ($force) {
@@ -175,12 +163,12 @@ if (!$confirmed) {
     else {
 	echo "$action experiment";
     }
-    echo " '$exp_eid?'
+    echo " '$eid?'
           </h2>\n";
     
-    SHOWEXP($exp_pid, $exp_eid, 1);
+    $experiment->Show(1);
 
-    echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
+    echo "<form action='swapexp.php3?inout=$inout&pid=$pid&eid=$eid'
                 method=post>";
 
     if ($force) {
@@ -227,12 +215,6 @@ if (!$confirmed) {
     return;
 }
 
-#
-# We need the unix gid for the project for running the scripts below.
-# Note usage of default group in project.
-#
-TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
-
 if ($instance) {
     $guid = $instance->guid();
     $version = $instance->vers();
@@ -254,12 +236,12 @@ set_time_limit(0);
 # plain force swap, it passes -f for us.
 $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
-$retval = SUEXEC($uid, "$exp_pid,$unix_gid",
+$retval = SUEXEC($uid, "$pid,$unix_gid",
 		  ($force ?
-		   "webidleswap $args $exp_pid $exp_eid" :
+		   "webidleswap $args $pid $eid" :
 		   ($instance ?
-		    "webtemplate_swap$inout -e $exp_eid $guid/$version" :
-		    "webswapexp -s $inout $exp_pid $exp_eid")),
+		    "webtemplate_swap$inout -e $eid $guid/$version" :
+		    "webswapexp -s $inout $pid $eid")),
 		 SUEXEC_ACTION_IGNORE);
 
 if ($instance) {
@@ -288,7 +270,7 @@ if ($retval) {
 }
 else {
     if ($instance) {
-	STARTLOG($pid, $eid);
+	STARTLOG($experiment);
     }
     elseif ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
@@ -314,7 +296,7 @@ else {
 	    echo "Your experiment has been dequeued. You may requeue your
 		  experiment at any time.\n";
 	}
-	STARTWATCHER($pid, $eid);
+	STARTWATCHER($experiment);
     }
     else {
 	echo "<div>";
@@ -346,7 +328,7 @@ else {
               While you are waiting, you can watch the log in realtime:<br>\n";
 	echo "</div>";
 	echo "<br>\n";
-	STARTLOG($pid, $eid);
+	STARTLOG($experiment);
     }
 }
 

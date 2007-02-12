@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -19,29 +19,26 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid nodeid, *or* a valid experiment.
+# Verify page arguments.
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
+$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "node", PAGEARG_NODE,
+				 "canceled", PAGEARG_BOOLEAN,
+				 "confirmed", PAGEARG_BOOLEAN);
 
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to reboot nodes in ".
-		  "experiment $exp_eid!", 1);
+if (isset($experiment)) {
+    if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+	USERERROR("You do not have permission to reboot nodes in this ".
+		  "experiment", 1);
     }
-    $nodemode = 0;
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
 }
-elseif (isset($node_id) && strcmp($node_id, "")) {
-    if (! TBValidNodeName($node_id)) {
-	USERERROR("$node_id is not a valid node name!", 1);
+elseif (isset($node)) {
+    if (! $node->AccessCheck($this_user, $TB_NODEACCESS_REBOOT)) {
+        USERERROR("You do not have permission to reboot this node", 1);
     }
-
-    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
-        USERERROR("You do not have permission to reboot $node_id!", 1);
-    }
-    $nodemode = 1;
+    $node_id = $node->node_id();
 }
 else {
     USERERROR("Must specify a node or an experiment!", 1);
@@ -53,7 +50,7 @@ else {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     PAGEHEADER("Reboot Nodes");
 	
     echo "<center><h3><br>
@@ -64,39 +61,31 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("Reboot Nodes");
 
-    if ($nodemode) {
+    if (isset($node)) {
 	echo "<center><h2><br>
               Are you <b>REALLY</b>
                 sure you want to reboot node '$node_id?'
               </h2>\n";
 	
-	SHOWNODE($node_id, SHOWNODE_SHORT);
+	$node->Show(SHOWNODE_SHORT);
     }
     else {
-        echo "<font size=+2>Experiment <b>".
-             "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-             "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+	echo $experiment->PageHeader();
 
 	echo "<center><font size=+2><br>
               Are you <b>REALLY</b>
                 sure you want to reboot all nodes?
               </font>\n";
 
-	SHOWEXP($pid, $eid, 1);
+	$experiment->Show(1);
     }
 
+    $url = CreateURL("boot", ((isset($node) ? $node : $experiment)));
     
-    echo "<form action=boot.php3 target=_blank method=post>";
-    if ($nodemode) {
-	echo "<input type=hidden name=node_id value=$node_id>\n";
-    }
-    else {
-	echo "<input type=hidden name=pid value=$pid>\n";
-	echo "<input type=hidden name=eid value=$eid>\n";
-    }
+    echo "<form action='$url' target=_blank method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -106,7 +95,7 @@ if (!$confirmed) {
     return;
 }
 
-if ($nodemode) {
+if (isset($node)) {
     $message = "$node_id was rebooted via the web interface by $uid\n";
     $subject = "Node Reboot: $node_id";
 }
@@ -134,7 +123,7 @@ function SPEWCLEANUP()
 register_shutdown_function("SPEWCLEANUP");
 ignore_user_abort(1);
 
-if ($nodemode) {
+if (isset($node)) {
     $fp = popen("$TBSUEXEC_PATH $uid nobody webnode_reboot -w $node_id",
 		"r");
 }

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,10 +20,10 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) || strcmp($pid, "") == 0) {
-    unset($pid);
+#
+$optargs = OptionalPageArguments("project", PAGEARG_PROJECT);
 
+if (!isset($project)) {
     #
     # See what projects the uid can do this in.
     #
@@ -36,9 +36,11 @@ if (!isset($pid) || strcmp($pid, "") == 0) {
 }
 else {
     #
-    # Verify permission for specific group.
+    # Verify permission for specific project.
     #
-    if (! TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEGROUP)) {
+    $pid = $project->pid();
+    
+    if (!$project->AccessCheck($this_user, $TB_PROJECT_MAKEGROUP)) {
 	USERERROR("You do not have permission to create groups in ".
 		  "project $pid!", 1);
     }
@@ -53,18 +55,18 @@ echo "<form action=newgroup.php3 method=post>
         </td>
       </tr>\n";
 
-if (isset($pid)) {
+if (isset($project)) {
     echo "<tr>
               <td>* Project:</td>
               <td class=left>
-                  <input name=group_pid type=readonly value='$pid'>
+                  <input name=project type=readonly value='$pid'>
               </td>
           </tr>\n";
 }
 else {
     echo "<tr>
               <td>*Select Project:</td>";
-    echo "    <td><select name=group_pid>";
+    echo "    <td><select name=project>";
 
     while (list($project) = each($projlist)) {
 	echo "<option value='$project'>$project </option>\n";

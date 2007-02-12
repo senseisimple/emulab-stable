@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -20,19 +19,6 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-
-#
 # Only admins can do this!
 #
 if (!$isadmin) {
@@ -40,10 +26,27 @@ if (!$isadmin) {
 }
 
 #
-# Check to make sure this is a valid PID/EID tuple.
+# Verify page arguments.
 #
-if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
-    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING);
+
+#
+# Need these below
+#
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$pcs = $experiment->PCCount();
+
+echo $experiment->PageHeader();
+echo "<br>";
+
+if (!$pcs) {
+    echo "<center><h3>Idle info request canceled because there are no PCs!</h3>
+          </center>\n";
+    PAGEFOOTER();
+    return;
 }
 
 #
@@ -52,49 +55,27 @@ if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
-    echo "<center><h2>Idle info request canceled!</h2>
-          <br><br>
-          <a href='showexp.php3?pid=$pid&eid=$eid'>
-             Back to experiment $pid/$eid</a>
+if (isset($canceled) && $canceled) {
+    echo "<center><h3>Idle info request canceled!</h3>
           </center>\n";
     PAGEFOOTER();
     return;
 }
 
-#
-# See how many PCs the experiment is holding.
-# 
-$query_result =
-    DBQueryFatal("select count(*) as count from reserved as r ".
-		 "left join nodes as n on r.node_id=n.node_id ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "where nt.class='pc' and pid='$pid' and eid='$eid'");
-
-if (!mysql_num_rows($query_result)) {
-    echo "<center><h2>Idle info request canceled cause there are no PCs!</h2>
-          <br><br>
-          <a href='showexp.php3?pid=$pid&eid=$eid'>
-             Back to experiment $pid/$eid</a>
-          </center>\n";
-    PAGEFOOTER();
-    return;
-}
-$row = mysql_fetch_array($query_result);
-$pcs = $row["count"];
-
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<br><center><h3>
           Are your <b>SURE</b> you want to send an Idle Info request
           email message to the swapper of $pid/$eid?
-          </h3></center>\n";
+          </h3>\n";
 
     #
     # Dump experiment record.
-    # 
-    SHOWEXP($pid, $eid);
+    #
+    $experiment->Show();
+
+    $url = CreateURL("request_idleinfo", $experiment);
     
-    echo "<form action='request_idleinfo.php3?pid=$pid&eid=$eid' method=post>";
+    echo "<form action='$url' method=post>";
     echo "<input type=submit name=confirmed value=Confirm>\n";
     echo "<input type=submit name=canceled value=Cancel>\n";
     echo "</form>\n";
@@ -105,29 +86,14 @@ if (!$confirmed) {
 }
 
 # Info about experiment.
-$query_result =
-    DBQueryFatal("select e.expt_swap_uid as swapper, ".
-		 "       e.expt_head_uid as creator, ".
-		 "       UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped)".
-		 "   as swapseconds, r.pnodes ".
-		 " from experiments as e ".
-		 "left join experiment_stats as s on s.exptidx=e.idx ".
-		 "left join experiment_resources as r on ".
-		 "     s.rsrcidx=r.idx ".
-		 "where e.pid='$pid' and e.eid='$eid'");
-
-$row = mysql_fetch_array($query_result);
-$swapper = $row["swapper"];
-$creator = $row["creator"];
-$pcs     = $row["pnodes"];
-$seconds = $row["swapseconds"];
+$seconds = $experiment->SwapSeconds();
 $hours   = intval($seconds / 3600);
 
-if (! ($creator_user = User::Lookup($creator))) {
-    TBERROR("Could not lookup object for user $creator!", 1);
+if (! ($creator = $experiment->GetCreator())) {
+    TBERROR("Could not lookup object for experiment creator!", 1);
 }
-if (! ($swapper_user = User::Lookup($swapper))) {
-    TBERROR("Could not lookup object for user $swapper!", 1);
+if (! ($swapper = $experiment->GetSwapper())) {
+    TBERROR("Could not lookup object for experiment swapper!", 1);
 }
 if (! ($group = $experiment->Group())) {
     TBERROR("Could not lookup object for experiment group!", 1);
@@ -135,11 +101,11 @@ if (! ($group = $experiment->Group())) {
 
 # Lots of email addresses!
 $allleaders    = $group->LeaderMailList();
-$swapper_name  = $swapper_user->name();
-$swapper_email = $swapper_user->email();
-$creator_name  = $creator_user->name();
-$creator_email = $creator_user->email();
-if ($swapper != $creator) {
+$swapper_name  = $swapper->name();
+$swapper_email = $swapper->email();
+$creator_name  = $creator->name();
+$creator_email = $creator->email();
+if (! $swapper->SameUser($creator)) {
     $allleaders .= ", \"$creator_name\" <$creator_email>";
 }
 
@@ -162,8 +128,6 @@ TBMAIL("$swapper_name <$swapper_email>",
        "Errors-To: $TBMAIL_WWW");
 
 echo "<center><h2>Message sent!</h2>
-      <br><br>
-      <a href='showexp.php3?pid=$pid&eid=$eid'>Back to experiment $pid/$eid</a>
       </center>\n";
 
 #

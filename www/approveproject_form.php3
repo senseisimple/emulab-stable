@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -27,19 +26,18 @@ if (! $isadmin) {
 }
 
 #
-# Verify arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a project ID.", 1);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("project", PAGEARG_PROJECT);
 
 #
 # Check to make sure thats this is a valid PID.
 #
-if (! ($this_project = Project::Lookup($pid))) {
-    USERERROR("Unknown project $pid", 1);
+if (! ($this_project = $reqargs["project"])) {
+    USERERROR("Unknown project", 1);
 }
+$pid = $this_project->pid();
+$projleader = $this_project->GetLeader();
 
 echo "<center><h3>You have the following choices:</h3></center>
       <table class=stealth align=center border=0>
@@ -86,7 +84,7 @@ echo "<center>
       </center>
       <table align=center border=0>\n";
 
-SHOWUSER($projleader->uid());
+$projleader->Show();
 
 #
 # Check to make sure that the head user is 'unapproved' or 'active'
@@ -106,7 +104,8 @@ echo "<center>
       <h3>What would you like to do?</h3>
       </center>
       <table align=center border=1>
-      <form action='approveproject.php3?pid=$pid' method='post'>\n";
+      <form action='" . CreateURL("approveproject", $project) .
+             "' method='post'>\n";
 
 echo "<tr>
           <td align=center>
@@ -177,13 +176,9 @@ echo "        </select>
 # Temporary Plab hack.
 # See if remote nodes requested and put up checkboxes to allow override.
 #
-$query_result =
-    DBQueryFatal("select num_pcplab,num_ron from projects where pid='$pid'");
-
-$row = mysql_fetch_array($query_result);
 # These are now booleans, not actual counts.
-$num_pcplab = $row[num_pcplab];
-$num_ron    = $row[num_ron];
+$num_pcplab = $this_project->num_pcplab();
+$num_ron    = $this_project->num_ron();
 
 if ($num_ron || $num_pcplab) {
 	echo "<tr>

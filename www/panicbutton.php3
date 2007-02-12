@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users.
@@ -15,24 +14,20 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Must provide the EID!
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-  USERERROR("The project ID was not provided!", 1);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_BOOLEAN,
+				 "confirmed",  PAGEARG_BOOLEAN);
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-  USERERROR("The experiment ID was not provided!", 1);
-}
-
-$exp_eid = $eid;
-$exp_pid = $pid;
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
 
 # Canceled operation redirects back to showexp page. See below.
-if ($canceled) {
-    header("Location: showexp.php3?pid=$pid&eid=$eid");
+if (isset($canceled) && $canceled) {
+    header("Location: " . CreateURL("showexp", $experiment));
     return;
 }
 
@@ -42,26 +37,15 @@ if ($canceled) {
 PAGEHEADER("Press the Panic Button!");
 
 #
-# Check to make sure thats this is a valid PID/EID, while getting the
-# experiment GID.
-#
-if (! TBExptGroup($exp_pid, $exp_eid, $exp_gid)) {
-    USERERROR("The experiment $exp_eid is not a valid experiment ".
-	      "in project $exp_pid.", 1);
-}
-
-#
 # Verify permissions.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to press the panic button for ".
-	      "experiment $exp_eid!", 1);
+	      "experiment $eid!", 1);
 }
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$exp_pid'>$exp_pid</a>/".
-     "<a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>".
-     "</b></font>\n";
+echo $experiment->PageHeader();
+echo "<br>\n";
     
 #
 # We run this twice. The first time we are checking for a confirmation
@@ -69,17 +53,17 @@ echo "<font size=+2>Experiment <b>".
 # set. Or, the user can hit the cancel button, in which case redirect the
 # browser back up a level.
 #
-if (!$confirmed) {
-    echo "<center><h2><br>
+if (!isset($confirmed)) {
+    echo "<center><h3><br>
           Are you <b>REALLY</b>
-          sure you want to press the panic button for Experiment '$exp_eid?'
-          </h2>\n";
+          sure you want to press the panic button for Experiment '$eid?'
+          </h3>\n";
 
-    SHOWEXP($exp_pid, $exp_eid, 1);
+    $experiment->Show(1);
+
+    $url = CreateURL("panicbutton", $experiment);
     
-    echo "<form action='panicbutton.php3?pid=$exp_pid&eid=$exp_eid'".
-	   "method=post>";
-    echo "<input type=hidden name=exp_pideid value=\"$exp_pideid\">\n";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -90,24 +74,10 @@ if (!$confirmed) {
 }
 
 #
-# We need the unix gid for the project for running the scripts below.
-# Note usage of default group in project.
-#
-TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
-
-#
 # We run a wrapper script that does all the work.
 #
-echo "<center><br>";
-echo "<h2>Pressing the panic button. Please wait a moment ...
-      </h2></center>";
-
-flush();
-
-#
-# Run the backend script.
-#
-$retval = SUEXEC($uid, "$exp_pid,$unix_gid", "webpanic $exp_pid $exp_eid",
+STARTBUSY("Pressing the panic button");
+$retval = SUEXEC($uid, "$pid,$unix_gid", "webpanic $pid $eid",
 		 SUEXEC_ACTION_IGNORE);
 
 #
@@ -121,6 +91,7 @@ if ($retval < 0) {
     #
     die("");
 }
+STOPBUSY();
 
 #
 # Exit status >0 means the operation could not proceed.

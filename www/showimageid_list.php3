@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -23,6 +23,8 @@ $isadmin   = ISADMIN();
 # Admin users can see all ImageIDs, while normal users can only see
 # ones in their projects or ones that are globally available.
 #
+$optargs = OptionalPageArguments("sortby",   PAGEARG_STRING,
+				 "creator",  PAGEARG_USER);
 
 if (! isset($sortby))
     $sortby = "normal";
@@ -41,14 +43,15 @@ $extraclause = "";
 #
 # Allow for creator restriction
 #
-if (isset($creator) && $creator != "") {
-    if (! User::ValidWebID($creator)) {
-	PAGEARGERROR("Invalid characters in creator");
+if (isset($creator)) {
+    $creator_idx = $creator->uid_idx();
+    
+    if ($isadmin) {
+	$extraclause = "where i.creator_idx='$creator_idx' ";
     }
-    if ($isadmin) 
-	$extraclause = "where i.creator='$creator' ";
-    else
-	$extraclause = "and i.creator='$creator' ";
+    elseif ($creator->SameUser($this_user)) {
+	$extraclause = "and i.creator_idx='$creator_idx' ";
+    }
 }
 
 #
@@ -120,17 +123,14 @@ if (mysql_num_rows($query_result)) {
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
-	$imageid    = $row[imageid];
-        # Must encode the imageid since Rob started using plus signs in
-	# the names.
-	$url        = rawurlencode($imageid);
-	$descrip    = stripslashes($row[description]);
-	$imagename  = $row[imagename];
-	$pid        = $row[pid];
+	$imageid    = $row["imageid"];
+	$descrip    = $row["description"];
+	$imagename  = $row["imagename"];
+	$pid        = $row["pid"];
+	$url        = CreateURL("showimageid", URL_IMAGEID, $imageid);
 
 	echo "<tr>
-                  <td><A href='showimageid.php3?imageid=$url'>
-                         $imagename</A></td>
+                  <td><A href='$url'>$imagename</A></td>
                   <td>$pid</td>
                   <td>$descrip</td>\n";
         echo "</tr>\n";

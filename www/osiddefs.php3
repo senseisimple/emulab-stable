@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Stuff for OSIDs. All this stuff should come from the DB instead!
@@ -72,9 +72,9 @@ function WRITEOSIDMENU($caption, $value, $osid_result, $previous,
     mysql_data_seek($osid_result, 0);
 
     while ($row = mysql_fetch_array($osid_result)) {
-	$osid   = $row[osid];
-	$osname = $row[osname];
-	$pid    = $row[pid];
+	$osid   = $row["osid"];
+	$osname = $row["osname"];
+	$pid    = $row["pid"];
 	$selected = "";
 
 	if (strcmp($previous, "$osid") == 0)
@@ -109,9 +109,9 @@ function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous,
     mysql_data_seek($imageid_result, 0);
 
     while ($row = mysql_fetch_array($imageid_result)) {
-	$imageid   = $row[imageid];
-	$imagename = $row[imagename];
-	$pid       = $row[pid];
+	$imageid   = $row["imageid"];
+	$imagename = $row["imagename"];
+	$pid       = $row["pid"];
 	$selected  = "";
 
 	if (strcmp($previous, "$imageid") == 0)

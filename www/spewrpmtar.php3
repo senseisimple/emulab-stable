@@ -1,15 +1,27 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 function SPITERROR($code, $msg)
 {
     header("HTTP/1.0 $code $msg");
     exit();
+}
+
+#
+# Capture script errors and report back to user.
+#
+$session_interactive  = 0;
+$session_errorhandler = 'handle_error';
+
+function handle_error($message, $death)
+{
+    SPITERROR(400, $message);
 }
 
 #
@@ -21,16 +33,15 @@ if (!isset($SSL_PROTOCOL)) {
 
 #
 # Verify page arguments.
-# 
-if (!isset($nodeid) ||
-    strcmp($nodeid, "") == 0) {
-    SPITERROR(400, "You must provide a node ID.");
-}
-$nodeid = addslashes($nodeid);
-if (!isset($key) ||
-    strcmp($key, "") == 0) {
-    SPITERROR(400, "You must provide an key.");
-}
+#
+$reqargs = RequiredPageArguments("node",    PAGEARG_NODE,
+				 "key",     PAGEARG_STRING);
+$optargs = OptionalPageArguments("elabinelab_source", PAGEARG_STRING,
+				 "file",              PAGEARG_STRING,
+				 "stamp",             PAGEARG_INTEGER,
+				 "md5",               PAGEARG_STRING,
+				 "cvstag",            PAGEARG_STRING);
+$node_id = $node->node_id();
 
 #
 # A variant allows us to pass the Emulab source code back to an ElabInElab
@@ -53,28 +64,24 @@ if (!isset($elabinelab_source)) {
 #
 # Make sure a reserved node.
 #
-if (! TBNodeIDtoExpt($nodeid, $pid, $eid, $gid)) {
-    SPITERROR(400, "$nodeid is not reserved to an experiment!");
+if (! ($experiment = $node->Reservation())) {
+    SPITERROR(400, "$node_id is not reserved to an experiment!");
 }
-TBExpLeader($pid, $eid, $creator);
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+if (! ($creator = $experiment->GetCreator())) {
+    SPITERROR(400, "Could not map experiment creator to object!");
+}
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
+$creator_uid = $creator->uid();
 
 #
-# We need the secret key. 
+# We need the secret key to match
 #
-$query_result =
-    DBQueryFatal("select keyhash,elab_in_elab from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-
-if (mysql_num_rows($query_result) == 0) {
+if (!$experiment->keyhash() || $experiment->keyhash() == "") {
     SPITERROR(403, "No key defined for this experiment!");
 }
-$row = mysql_fetch_array($query_result);
-
-if (!isset($row["keyhash"]) || !$row["keyhash"]) {
-    SPITERROR(403, "No key defined for this experiment!");
-}
-if (strcmp($row["keyhash"], $key)) {
+if ($experiment->keyhash() != $key) {
     SPITERROR(403, "Wrong Key!");
 }
 
@@ -105,15 +112,17 @@ if (isset($elabinelab_source)) {
     #
     # Make sure the IP really matches. 
     #
-    $realid = TBIPtoNodeID($REMOTE_ADDR);
-    if ($realid != $nodeid) {
+    if (! ($realnode = Node::LookupByIP($REMOTE_ADDR))) {
+	SPITERROR(403, "Could not map $REMOTE_ADDR to node object!");
+    }
+    if ($realnode->node_id() != $node_id) {
 	SPITERROR(403, "Not an elabinelab experiment!");
     }
     
     #
     # Must be an elabinelab experiment of course.
     #
-    if ($row["elab_in_elab"] != "1") {
+    if (! $experiment->elabinelab()) {
 	SPITERROR(403, "Not an elabinelab experiment!");
     }
 
@@ -129,7 +138,7 @@ if (isset($elabinelab_source)) {
 	# Do it anyway.
 	$cvstag = escapeshellarg($cvstag);
 
-	if ($fp = popen("$TBSUEXEC_PATH $creator $pid,$unix_gid ".
+	if ($fp = popen("$TBSUEXEC_PATH $creator_uid $pid,$unix_gid ".
 			"spewsource -t $cvstag", "r")) {
 	    header("Content-Type: application/x-gzip");
 	    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
@@ -163,7 +172,6 @@ if (isset($elabinelab_source)) {
 #
 # MUST DO THIS!
 #
-$nodeid = escapeshellarg($nodeid);
 $file   = escapeshellarg($file);
 $arg    = (isset($stamp) ? "-t " . escapeshellarg($stamp) : "");
 
@@ -172,8 +180,8 @@ $arg    = (isset($stamp) ? "-t " . escapeshellarg($stamp) : "");
 # Then do it for real, spitting out the data. Sure, the user could
 # delete the file in the meantime, but thats his problem. 
 #
-$retval = SUEXEC($creator, "$pid,$unix_gid",
-		 "spewrpmtar -v $arg $nodeid $file",
+$retval = SUEXEC($creator_uid, "$pid,$unix_gid",
+		 "spewrpmtar -v $arg $node_id $file",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval < 0) {
@@ -194,8 +202,8 @@ if ($retval) {
 #
 # Okay, now do it for real. 
 # 
-if ($fp = popen("$TBSUEXEC_PATH $creator $pid,$unix_gid ".
-		"spewrpmtar $nodeid $file", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $creator_uid $pid,$unix_gid ".
+		"spewrpmtar $node_id $file", "r")) {
     header("Content-Type: application/octet-stream");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     header("Cache-Control: no-cache, must-revalidate");

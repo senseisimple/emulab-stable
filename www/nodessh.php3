@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # This script generates an "tbc" file, to be passed to ./ssh-mime.pl
@@ -20,17 +21,17 @@ $isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
+#
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
+
+# Need these below
+$node_id = $node->node_id();
 
 $query_result =
     DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
 		 "       r.vname,r.pid,r.eid, ".
 		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, ".
-		 "       t.issubnode,t.class,oi.OS ".
+		 "       t.issubnode,t.class ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
@@ -42,18 +43,17 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 $row = mysql_fetch_array($query_result);
-$jailflag = $row[jailflag];
-$jailip   = $row[jailip];
-$sshdport = $row[sshdport];
-$vname    = $row[vname];
-$pid      = $row[pid];
-$eid      = $row[eid];
-$isvirt   = $row[isvirtnode];
-$iswindowsnode = $row[OS]=='Windows';
-$isremote = $row[isremotenode];
-$isplab   = $row[isplabdslice];
-$issubnode = $row[issubnode];
-$class    = $row['class'];
+$jailflag = $row["jailflag"];
+$jailip   = $row["jailip"];
+$sshdport = $row["sshdport"];
+$vname    = $row["vname"];
+$pid      = $row["pid"];
+$eid      = $row["eid"];
+$isvirt   = $row["isvirtnode"];
+$isremote = $row["isremotenode"];
+$isplab   = $row["isplabdslice"];
+$issubnode= $row["issubnode"];
+$class    = $row["class"];
 
 if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);

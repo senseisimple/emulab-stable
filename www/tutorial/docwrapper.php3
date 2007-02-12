@@ -1,22 +1,19 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 require("defs.php3");
 chdir("tutorial");
 
-# Page arguments.
-$printable = $_GET['printable'];
-$docname   = $_GET['docname'];
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("docname",    PAGEARG_STRING);
+$optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 
-# Pedantic page argument checking. Good practice!
-if (!isset($docname) ||
-    (isset($printable) && !($printable == "1" || $printable == "0"))) {
-    PAGEARGERROR();
-}
 if (!isset($printable))
     $printable = 0;
 

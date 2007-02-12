@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # No PAGEHEADER since we spit out a redirect later.
@@ -18,22 +17,15 @@ $this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-# Page arguments.
-$user = $_GET['user'];
-$key  = $_GET['key'];
-
-# Pedantic argument checking.
-if (!isset($user) || $user == "" || !User::ValidWebID($user) ||
-    !isset($key) || $key == "" || !preg_match("/^[\d]+$/", $key)) {
-    PAGEARGERROR();
-}
-
 #
-# Check to make sure thats this is a valid UID.
+# Verify page arguments.
 #
-if (! ($target_user = User::Lookup($user))) {
-    USERERROR("The user $user is not a valid user", 1);
-}
+$reqargs = RequiredPageArguments("target_user", PAGEARG_USER,
+				 "key",         PAGEARG_INTEGER);
+$optargs = OptionalPageArguments("canceled",    PAGEARG_BOOLEAN,
+				 "confirmed",   PAGEARG_BOOLEAN);
+
+# Need these below.
 $target_dbid = $target_user->dbid();
 $target_uid  = $target_user->uid();
 
@@ -65,7 +57,7 @@ $chunky = chunk_split($pubkey, 70, "<br>\n");
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     PAGEHEADER("SSH Public Key Maintenance");
     
     echo "<center><h2><br>
@@ -81,7 +73,7 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("SSH Public Key Maintenance");
 
     echo "<center><h3><br>

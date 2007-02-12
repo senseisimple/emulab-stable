@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -19,29 +18,22 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid experiment.
+# Verify Page arguments
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBvalid_eid($eid)) {
-	PAGEARGERROR("$eid contains invalid characters!");
-    }
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("$pid contains invalid characters!");
-    }
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run feedback on $pid/$eid!",
-		  1);
-    }
-}
-else {
-    PAGEARGERROR("Must specify pid and eid!");
-}
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "mode",       PAGEARG_STRING);
+$optargs = OptionalPageArguments("duration",   PAGEARG_INTEGER,
+				 "canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING,
+				 "clear_last", PAGEARG_BOOLEAN,
+				 "clear_bootstrap", PAGEARG_BOOLEAN);
 
-$expstate = TBExptState($pid, $eid);
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$gid = $experiment->gid();
+$expstate = $experiment->state();
+$unix_gid = $experiment->UnixGID();
 
 if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
@@ -57,29 +49,19 @@ else {
 	$eventrestart = 0;
 }
 
-if (isset($mode) && strcmp($mode, "")) {
-    if (strcmp($mode, "record") && strcmp($mode, "clear")) {
-	PAGEARGERROR("Mode value, $mode, is not 'record' or 'clear'!");
-    }
+if (strcmp($mode, "record") && strcmp($mode, "clear")) {
+    PAGEARGERROR("Mode value, $mode, is not 'record' or 'clear'!");
 }
-else {
-    PAGEARGERROR("Must specify mode!");
-}
-
-$query_result = DBQueryFatal("select gid from experiments ".
-			     "where pid='$pid' and eid='$eid'");
-$row = mysql_fetch_array($query_result);
-$gid = $row[0];
 
 #
 # Get the duration of the feedback run, default to 30 seconds if nothing was
 # given.
 #
-if (!isset($duration) || $duration == "") {
-	$duration = 30; # seconds
+if (!isset($duration)) {
+     $duration = 30; # seconds
 }
-elseif (! TBvalid_tinyint($duration) || $duration < 3) {
-	PAGEARGERROR("Duration must be an integer >= 3");
+elseif ($duration < 3) {
+    PAGEARGERROR("Duration must be an integer >= 3");
 }
 
 #
@@ -88,7 +70,7 @@ elseif (! TBvalid_tinyint($duration) || $duration < 3) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     PAGEHEADER("$mode Feedback");
 	
     echo "<center><h3><br>
@@ -99,12 +81,10 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("$mode feedback");
 
-    echo "<font size=+2>Experiment <b>".
-	"<a href='showproject.php3?pid=$pid'>$pid</a>/".
-	"<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+    echo $experiment->PageHeader();
 
     if(strcmp($mode, "record") == 0) {
 	echo "<center><font size=+2><br>
@@ -118,12 +98,11 @@ if (!$confirmed) {
                       </font>\n";
     }
     
-    SHOWEXP($pid, $eid, 1);
+    $experiment->Show(1);
+
+    $url = CreateURL("feedback", $experiment, "mode", $mode);
     
-    echo "<form action=feedback.php3 method=get>";
-    echo "<input type=hidden name=pid value=$pid>\n";
-    echo "<input type=hidden name=eid value=$eid>\n";
-    echo "<input type=hidden name=mode value=$mode>\n";
+    echo "<form action='$url' method=post>";
 
     if(strcmp($mode, "record") == 0) {
 	echo "<table align=center border=1>\n";
@@ -168,9 +147,6 @@ function SPEWCLEANUP()
     }
     exit();
 }
-
-# For backend.
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 if (strcmp($mode, "record") == 0) {
     #
@@ -234,7 +210,7 @@ else if (strcmp($mode, "clear") == 0) {
 				     "where pid='$pid' and eid='$eid'");
 	if (mysql_num_rows($query_result)) {
 	    $row    = mysql_fetch_array($query_result);
-	    $nsdata = $row[nsfile];
+	    $nsdata = $row["nsfile"];
 	}
 	else {
 	    $nsdata = ""; # XXX what to do...

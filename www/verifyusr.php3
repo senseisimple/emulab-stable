@@ -20,7 +20,9 @@ $uid       = $this_user->uid();
 
 #
 # Must provide the key!
-# 
+#
+$optargs = OptionalPageArguments("key", PAGEARG_STRING);
+
 if (!isset($key) || strcmp($key, "") == 0) {
     USERERROR("Missing field; ".
               "Please go back and fill out the \"key\" field!", 1);

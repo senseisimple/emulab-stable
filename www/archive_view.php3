@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 include_once("template_defs.php");
 
 #
@@ -16,71 +15,116 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Standard Testbed Header.
-#
-PAGEHEADER("Experiment Archive ($exptidx)");
-
-#
 # Verify page arguments.
 #
-if (! isset($exptidx) || $exptidx == "") {
-    USERERROR("Must supply an experiment to view!", 1);
+$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "template",   PAGEARG_TEMPLATE,
+				 "instance",   PAGEARG_INSTANCE,
+				 "exptidx",    PAGEARG_INTEGER,
+				 "records",    PAGEARG_INTEGER);
+
+#
+# Standard Testbed Header now that we know what to say.
+#
+PAGEHEADER((isset($instance) || isset($template) ?
+	    "Template Datastore" : "Experiment Archive"));
+
+#
+# An instance might be a current or historical. If its a template, use
+# the underlying experiment of the template.
+#
+if (isset($instance)) {
+    if (($foo = $instance->GetExperiment()))
+	$experiment = $foo;
+    else
+	$exptidx = $instance->exptidx();
+    $template = $instance->GetTemplate();
 }
-if (!TBvalid_integer($exptidx)) {
-    USERERROR("Invalid characters in $exptidx!", 1);
+elseif (isset($template)) {
+    $experiment = $template->GetExperiment();
 }
 
 #
-# We get an index. Must map that to a pid/gid to do a group level permission
-# check, since it might not be an current experiment.
+# If we got a current experiment, great. Otherwise we have to lookup
+# data for a historical experiment.
 #
-unset($pid);
-unset($eid);
-unset($gid);
-if (TBExptidx2PidEid($exptidx, $pid, $eid, $gid) < 0) {
-    USERERROR("No such experiment index $exptidx!", 1);
-}
+if (isset($experiment)) {
+    # Need these below.
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
 
-if (!$isadmin &&
-    !TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
-    USERERROR("You do not have permission to view tags for ".
-	      "archive in $pid/$gid ($exptidx)!", 1);
+    # Permission
+    if (!$isadmin &&
+	!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view tags for ".
+		  "archive in $pid/$eid!", 1);
+    }
 }
-$current  = TBCurrentExperiment($exptidx);
-$template = Template::LookupbyEid($pid, $eid);
+elseif (isset($exptidx)) {
+    $stats = ExperimentStats::Lookup($exptidx);
+    if (!$stats) {
+	PAGEARGERROR("Invalid experiment index: $exptidx");
+    }
+
+    # Need these below.
+    $pid = $stats->pid();
+    $eid = $stats->eid();
+
+    # Permission
+    if (!$isadmin &&
+	!$stats->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+	USERERROR("You do not have permission to view tags for ".
+		  "archive in $pid/$eid!", 1);
+    }
+}
+else {
+    PAGEARGERROR("Must provide a current or former experiment index");
+}
 
 $url = preg_replace("/archive_view/", "cvsweb/cvsweb",
 		    $_SERVER['REQUEST_URI']);
 
 # This is how you get forms to align side by side across the page.
-if ($template) {
+if (isset($experiment)) 
     $style = 'style="float:left; width:50%;"';
-}
-elseif ($current) {
-    $style = 'style="float:left; width:33%;"';
-}
-else {
+else
     $style = "";
-}
 
 echo "<center>\n";
 echo "<font size=+1>";
 
-if ($template) {
-    $guid = $template->guid();
-    $vers = $template->vers();
-    $path = $template->path();
+if (isset($template)) {
+    $path = null;
     
-    echo "This is the (Subversion) datastore for Template $guid/$vers<br>";
-    echo "(located at $USERNODE:$path)\n";
+    if (isset($instance)) {
+	$id = $instance->exptidx();
+	if ($experiment)
+	    $path = $experiment->path();
+
+	echo "Subversion datastore for Instance $id";
+    }
+    else {
+	$guid = $template->guid();
+	$vers = $template->vers();
+	$path = $template->path();
+
+	echo "Subversion datastore for Template $guid/$vers";
+    }
+
+    if ($path) {
+	echo "<br>(located at $USERNODE:$path)\n";
+    }
+}
+elseif ($experiment) {
+    echo "Subversion archive for experiment $pid/$eid";
 }
 else {
-    echo "This is the (Subversion) archive for experiment $exptidx.";
+    echo "Subversion archive for experiment $exptidx.";
 }
 
 echo "<br><br></font>";
 
-if ($current || $template) {
+if (isset($experiment)) {
     echo "<form action='${TBBASE}/archive_tag.php3' $style method=get>\n";
     echo "<b><input type=submit name=tag value='Tag Archive'></b>";
     echo "<input type=hidden name=exptidx value='$exptidx'>";
@@ -91,13 +135,6 @@ echo "<form action='${TBBASE}/archive_tags.php3' $style method=get>";
 echo "<b><input type=submit name=tag value='Show Tags'></b>";
 echo "<input type=hidden name=exptidx value='$exptidx'>";
 echo "</form>";
-
-if ($current && !$template) {
-    echo "<form action='${TBBASE}/archive_missing.php3' $style method=get>";
-    echo "<b><input type=submit name=missing value='Show Missing Files'></b>";
-    echo "<input type=hidden name=exptidx value='$exptidx'>";
-    echo "</form>";
-} 
 
 echo "<iframe width=100% height=800 scrolling=yes src='$url' border=2>".
      "</iframe>\n";

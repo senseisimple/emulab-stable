@@ -1,11 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # Standard Testbed Header
@@ -20,22 +20,12 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
-if (!TBvalid_node_id($node_id)) {
-    PAGEARGERROR("Illegal characters in arguments");
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
 
-#
-# Check to make sure that this is a valid nodeid
-#
-if (! TBValidNodeName($node_id)) {
-    USERERROR("$node_id is not a valid node name!", 1);
-}
+# Need these below
+$node_id = $node->node_id();
 
 echo "<font size=+2>".
      "Node <b>$node_id</b></font>";
@@ -45,14 +35,14 @@ echo "<font size=+2>".
 # nodes in their own experiments.
 #
 if (! $isadmin &&
-    ! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
+    ! $node->AccessCheck($this_user, $TB_NODEACCESS_MODIFYINFO)) {
 
     $power_id = "";
     $query_result = DBQueryFatal("select power_id from outlets ".
 				 "where node_id='$node_id'");
     if (mysql_num_rows($query_result) > 0) {
 	$row = mysql_fetch_array($query_result);
-	$power_id = $row[power_id];
+	$power_id = $row["power_id"];
     }
     if (STUDLY() && ($power_id == "mail")) {
 	    SUBPAGESTART();
@@ -61,34 +51,23 @@ if (! $isadmin &&
 	    WRITESUBMENUBUTTON("Update Power State",
 			       "powertime.php3?node_id=$node_id");
 	    SUBMENUEND();
-	    
-	    SHOWNODE($node_id, SHOWNODE_NOPERM);
-	    
+	    $node->Show(SHOWNODE_NOPERM);
 	    SUBPAGEEND();
     }
     else {
-	    SHOWNODE($node_id, SHOWNODE_NOPERM);
+	    $node->Show(SHOWNODE_NOPERM);
     }
     PAGEFOOTER();
     return;
 }
 
-$query_result =
-    DBQueryFatal("select r.vname,r.pid,r.eid,n.reserved_pid from nodes as n ".
-		 "left join reserved as r on n.node_id=r.node_id ".
-		 "where n.node_id='$node_id'");
-
-if (! mysql_num_rows($query_result) != 0) {
-    TBERROR("Node $node id does not have a nodes table entry!", 1);
+# If reserved, more menu options.
+if (($experiment = $node->Reservation())) {
+    $pid   = $experiment->pid();
+    $eid   = $experiment->eid();
+    $vname = $node->VirtName();
 }
-
-$row = mysql_fetch_array($query_result);
-$vname		= $row[vname];
-$pid 		= $row[pid];
-$eid		= $row[eid];
-$reserved_pid   = $row[reserved_pid];
-
-if (isset($pid) && $vname != "") {
+if ($experiment && $vname != "") {
     echo " (<b>".
 	 "   $vname.".
 	 "   <a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
@@ -105,7 +84,7 @@ SUBMENUSTART("Node Options");
 #
 # Tip to node option
 #
-if (TBHasSerialConsole($node_id)) {
+if ($node->HasSerialConsole()) {
     WRITESUBMENUBUTTON("Connect to Serial Line</a> " . 
 	"<a href=\"faq.php3#tiptunnel\">(howto)",
 	"nodetipacl.php3?node_id=$node_id");
@@ -117,7 +96,7 @@ if (TBHasSerialConsole($node_id)) {
 #
 # SSH to option.
 # 
-if (isset($pid)) {
+if ($experiment) {
     WRITESUBMENUBUTTON("SSH to node</a> ".
 		       "<a href='docwrapper.php3?docname=ssh-mime.html'>".
 		       "(howto)", "nodessh.php3?node_id=$node_id");
@@ -129,8 +108,9 @@ if (isset($pid)) {
 WRITESUBMENUBUTTON("Edit Node Info",
 		   "nodecontrol_form.php3?node_id=$node_id");
 
-if ($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
-    if (isset($pid)) {
+if ($isadmin ||
+    $node->AccessCheck($this_user, $TB_NODEACCESS_REBOOT)) {
+    if ($experiment) {
 	WRITESUBMENUBUTTON("Update Node",
 			   "updateaccounts.php3?pid=$pid&eid=$eid".
 			   "&nodeid=$node_id");
@@ -142,15 +122,16 @@ if ($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
 		       "bootlog.php3?node_id=$node_id");
 }
 
-if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_LOADIMAGE)) {
+if ($node->AccessCheck($this_user, $TB_NODEACCESS_LOADIMAGE)) {
     WRITESUBMENUBUTTON("Create a Disk Image",
 		       "newimageid_ez.php3?formfields[node]=$node_id");
 }
 
-if (($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) &&
-    (TBNodeClass($node_id) == "robot")) {
+if (($isadmin ||
+     $node->AccessCheck($this_user, $TB_NODEACCESS_READINFO)) &&
+    ($node->TypeClass() == "robot")) {
     WRITESUBMENUBUTTON("Show Telemetry",
-		       "telemetry.php3?node=$node_id",
+		       "telemetry.php3?node_id=$node_id",
 		       "telemetry");
 }
 
@@ -160,7 +141,7 @@ if ($isadmin || OPSGUY()) {
     WRITESUBMENUBUTTON("Show Node History",
 		       "shownodehistory.php3?node_id=$node_id");
 }
-if (isset($pid) && ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
+if ($experiment && ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
     WRITESUBMENUBUTTON("Free Node",
 		       "freenode.php3?node_id=$node_id");
 }
@@ -178,7 +159,7 @@ if ($isadmin || STUDLY() || OPSGUY()) {
 }
 
 if ($isadmin) {
-    if (!isset($reserved_pid)) {
+    if (!$node->reserved_pid()) {
 	WRITESUBMENUBUTTON("Pre-Reserve Node",
 			   "prereserve_node.php3?node_id=$node_id");
     }
@@ -193,7 +174,7 @@ SUBMENUEND();
 #
 # Dump record.
 # 
-SHOWNODE($node_id);
+$node->Show(SHOWNODE_NOFLAGS);
 
 SUBPAGEEND();
 

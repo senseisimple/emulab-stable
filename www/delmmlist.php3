@@ -18,12 +18,12 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# First off, sanity check page args.
+# Verify page arguments.
 #
-if (!isset($listname) ||
-    strcmp($listname, "") == 0) {
-    USERERROR("Must provide a Listname!", 1);
-}
+$reqargs = RequiredPageArguments("listname",        PAGEARG_STRING);
+$optargs = OptionalPageArguments("canceled",        PAGEARG_BOOLEAN,
+				 "confirmed",       PAGEARG_BOOLEAN);
+
 if (! TBvalid_mailman_listname($listname)) {
     PAGEARGERROR("Invalid characters in $listname!");
 }
@@ -31,19 +31,19 @@ if (! TBvalid_mailman_listname($listname)) {
 #
 # Grab the DB state.
 #
-$query_result = DBQueryFatal("select * from mailman_listnames ".
+$query_result = DBQueryFatal("select owner_idx from mailman_listnames ".
 			     "where listname='$listname'");
 
 if (!mysql_num_rows($query_result)) {
     USERERROR("No such list $listname!", 1);
 }
 $row = mysql_fetch_array($query_result);
-$owner_uid = $row['owner_uid'];
+$owner_idx = $row['owner_idx'];
 
 #
 # Verify permission.
 #
-if ($uid != $owner_uid && !$isadmin) {
+if ($this_user->uid_idx() != $owner_idx && !$isadmin) {
     USERERROR("You do not have permission to delete list $listname!", 1);
 }
 
@@ -53,7 +53,7 @@ if ($uid != $owner_uid && !$isadmin) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     PAGEHEADER("Delete a Mailman List");
     
     echo "<center><h2>
@@ -64,7 +64,7 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("Delete a Mailman List");
     
     echo "<center><h2>
@@ -81,10 +81,9 @@ if (!$confirmed) {
     return;
 }
 
-#
-# Okay, call out to the backend to delete the list. 
-#
+STARTBUSY("Deleting list $listname");
 SUEXEC($uid, $TBADMINGROUP, "webdelmmlist -u $listname", SUEXEC_ACTION_DIE);
+STOPBUSY();
 
 #
 # Worked, so delete the record from the DB.

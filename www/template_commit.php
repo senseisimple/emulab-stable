@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,80 +16,50 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a template GUID.", 1);
-}
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a template version number", 1);
-}
-if (!isset($exptidx) ||
-    strcmp($exptidx, "") == 0) {
-    USERERROR("You must provide a template instance ID", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-if (!TBvalid_integer($exptidx)) {
-    PAGEARGERROR("Invalid characters in instance ID!");
-}
+#
+$reqargs = RequiredPageArguments("instance",  PAGEARG_INSTANCE);
+$optargs = OptionalPageArguments("canceled",  PAGEARG_BOOLEAN,
+				 "confirmed", PAGEARG_BOOLEAN);
+$template = $instance->GetTemplate();
 
 # Canceled operation redirects back to template page.
-if ($canceled) {
-    header("Location: template_show.php?guid=$guid&version=$version");
+if (isset($canceled) && $canceled) {
+    header("Location: ". CreateURL("template_show", $template));
     return;
 }
 
-#
-# Check to make sure this is a valid template and user has permission.
-#
-$template = Template::Lookup($guid, $version);
-if (!$template) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-if (! $template->AccessCheck($uid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to commit experiment template ".
-	      "$guid/$version!", 1);
-}
-
-#
-# Check to make sure a valid instance that is actually swapped in.
-#
-$instance = TemplateInstance::LookupByExptidx($exptidx);
-if (!$instance) {
-    TBERROR("Template Instance $guid/$version/$exptidx is not ".
-	    "a valid experiment template instance!", 1);
-}
-
 # Need these below.
-$pid = $template->pid();
-$gid = $template->gid();
-$eid = $instance->eid();
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$eid  = $instance->eid();
+$unix_gid = $template->UnixGID();
+
+#
+# Check permission.
+#
+if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to commit experiment template ".
+	      "$guid/$vers!", 1);
+}
 
 #
 # Confirm
 #
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("Create Template from Instance");
     echo $instance->ExpPageHeader();
     
     echo "<center><br><font size=+1>
           Create new Template from instance $eid 
-             in Template $guid/$version?</font>\n";
+             in Template $guid/$vers?</font>\n";
     
     $template->Show();
     echo "<br>";
     $instance->Show(0);
 
-    echo "<form action='template_commit.php?guid=$guid&version=$version".
-	"&exptidx=$exptidx' method=post>\n";
-
+    $url = CreateURL("template_commit", $instance);
+    echo "<form action='$url' method=post>\n";
     echo "<br>\n";
     echo "<br>\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
@@ -100,12 +70,6 @@ if (!$confirmed) {
     PAGEFOOTER();
     return;
 }
-
-#
-# We need the unix gid for the project for running the scripts below.
-# Note usage of default group in project.
-#
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 #
 # Avoid SIGPROF in child.
@@ -121,14 +85,9 @@ echo "<script type='text/javascript' language='javascript' ".
 	"        src='template_sup.js'>\n";
 echo "</script>\n";
 
-STARTBUSY("Starting export");
-sleep(1);
-
-#
-# Run script.
-#
+STARTBUSY("Starting commit");
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_commit -e $eid $guid/$version",
+		 "webtemplate_commit -e $eid $guid/$vers",
 		 SUEXEC_ACTION_IGNORE);
 
 /* Clear the 'loading' indicators above */

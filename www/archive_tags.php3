@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -19,53 +18,65 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "exptidx", PAGEARG_INTEGER,
+				 "records", PAGEARG_INTEGER);
+
+#
+# If we got a current experiment, great. Otherwise we have to lookup
+# data for a historical experiment.
+#
+if ($experiment) {
+    # Need these below.
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    $gid = $experiment->gid();
+
+    # Permission
+    if (!$isadmin &&
+	!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view tags for ".
+		  "archive in $pid/$eid!", 1);
+    }
+}
+elseif (isset($exptidx)) {
+    $stats = ExperimentStats::Lookup($exptidx);
+    if (!$stats) {
+	PAGEARGERROR("Invalid experiment index: $exptidx");
+    }
+
+    # Need these below.
+    $pid = $stats->pid();
+    $eid = $stats->eid();
+    $gid = $stats->gid();
+
+    # Permission
+    if (!$isadmin &&
+	!$stats->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+	USERERROR("You do not have permission to view tags for ".
+		  "archive in $pid/$eid!", 1);
+    }
+}
+else {
+    PAGEARGERROR("Must provide a current or former experiment index");
+}
+
 # Show just the last N records unless request is different.
-if (!isset($records) || !strcmp($records, "")) {
+if (!isset($records)) {
     $records = 100;
 }
 
-# An experiment idx.
-if (! isset($exptidx) || $exptidx == "") {
-    USERERROR("Must supply an experiment index!", 1);
-}
-if (!TBvalid_integer($exptidx)) {
-    USERERROR("Invalid characters in $exptidx!", 1);
-}
-
-#
-# We get an index. Must map that to a pid/gid to do a group level permission
-# check, since it might not be an current experiment.
-#
-unset($pid);
-unset($eid);
-unset($gid);
-if (TBExptidx2PidEid($exptidx, $pid, $eid, $gid) < 0) {
-    USERERROR("No such experiment index $exptidx!", 1);
-}
-
-if (!$isadmin &&
-    !TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
-    USERERROR("You do not have permission to view tags for ".
-	      "archive in $pid/$gid ($exptidx)!", 1);
-}
-
-if (TBCurrentExperiment($exptidx)) {
-    echo "<center><font size=+1>".
-	"Experiment <b>".
-	"<a href='showproject.php3?pid=$pid'>$pid</a>/".
-        "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a> ".
-        "(<a href='showstats.php3?showby=expt&exptidx=$exptidx'>$exptidx</a>) ".
-        "</b></font>\n";
-        "</center><br>";
+echo "<center>\n";
+if ($experiment) {
+    echo $experiment->PageHeader();
 }
 else {
-    echo "<center><font size=+1>".
-	"Experiment ".
-        "<a href='showstats.php3?showby=expt&exptidx=$exptidx'>$exptidx</a> ".
-        "</b></font>\n";
-        "</center><br>";
+    echo $stats->PageHeader();
 }
-
+echo "</center>\n";
 echo "<br>\n";
 
 #

@@ -1,12 +1,13 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
-include("osiddefs.php3");
+include_once("osiddefs.php3");
+include_once("imageid_defs.php");
+include_once("osinfo_defs.php");
 
 #
 # Standard Testbed Header
@@ -21,20 +22,19 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Must get the imageid as a page argument.
+# Verify page arguments.
 #
-if (!isset($imageid) || $imageid == "") {
-    PAGEARGERROR("Must supply an imageid!");
-}
-if (!TBvalid_imageid($imageid)) {
-    PAGEARGERROR("Invalid characters in imageid!");
-}
-if (!TBValidImageID($imageid)) {
-    PAGEARGERROR("No such imageid!");
-}
+$reqargs = RequiredPageArguments("image",      PAGEARG_IMAGE);
+$optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
+
+# Need these below.
+$imageid = $image->imageid();
+
+#
 # Verify permission.
 #
-if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
+if (!$image->AccessCheck($this_user, $TB_IMAGEID_MODIFYINFO)) {
     USERERROR("You do not have permission to access ImageID $imageid!", 1);
 }
 
@@ -52,7 +52,7 @@ $types_result =
 #
 # Spit the form out using the array of data. 
 # 
-function SPITFORM($imageid, $formfields, $errors)
+function SPITFORM($image, $formfields, $errors)
 {
     global $uid, $isadmin, $types_result;
     global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
@@ -81,18 +81,17 @@ function SPITFORM($imageid, $formfields, $errors)
 
     # Must encode the imageid since Rob started using plus signs in
     # the names.
-    $url = rawurlencode($imageid);
+    $url = CreateURL("editimageid", $image);
     echo "<br>
           <table align=center border=1> 
-          <form action='editimageid.php3?imageid=$url'
-                method=post name=idform>\n";
+          <form action='$url' method=post name=idform>\n";
 
     #
     # Imagename
     #
     echo "<tr>
               <td>ImageID:</td>
-              <td class=left>" . $formfields[imagename] . "</td>
+              <td class=left>" . $formfields["imagename"] . "</td>
           </tr>\n";
 
     #
@@ -100,7 +99,7 @@ function SPITFORM($imageid, $formfields, $errors)
     #
     echo "<tr>
               <td>Project:</td>
-              <td class=left>" . $formfields[pid] . "</td>
+              <td class=left>" . $formfields["pid"] . "</td>
           </tr>\n";
 
     #
@@ -108,7 +107,7 @@ function SPITFORM($imageid, $formfields, $errors)
     # 
     echo "<tr>
               <td>Group:</td>
-              <td class=left>" . $formfields[gid] . "</td>
+              <td class=left>" . $formfields["gid"] . "</td>
           </tr>\n";
 
     #
@@ -116,7 +115,7 @@ function SPITFORM($imageid, $formfields, $errors)
     #
     echo "<tr>
               <td>Descriptor Name:</td>
-              <td class=left>" . $formfields[imagename] . "</td>
+              <td class=left>" . $formfields["imagename"] . "</td>
           </tr>\n";
 
     #
@@ -127,7 +126,7 @@ function SPITFORM($imageid, $formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[description]\"
-                         value=\"" . $formfields[description] . "\"
+                         value=\"" . $formfields["description"] . "\"
 	                 size=50>
               </td>
           </tr>\n";
@@ -137,7 +136,7 @@ function SPITFORM($imageid, $formfields, $errors)
     #
     echo "<tr>
               <td>Load Partition:</td>
-              <td class=left>" . $formfields[loadpart] . "</td>
+              <td class=left>" . $formfields["loadpart"] . "</td>
           </tr>\n";
 
     #
@@ -145,14 +144,14 @@ function SPITFORM($imageid, $formfields, $errors)
     #
     echo "<tr>
               <td>Load Partition:</td>
-              <td class=left>" . $formfields[loadlength] . "</td>
+              <td class=left>" . $formfields["loadlength"] . "</td>
           </tr>\n";
 
     echo "<tr>
              <td>Partition 1 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields[part1_osid]))
-	SPITOSINFOLINK($formfields[part1_osid]);
+    if (isset($formfields["part1_osid"]))
+	SpitOSIDLink($formfields["part1_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -161,8 +160,8 @@ function SPITFORM($imageid, $formfields, $errors)
     echo "<tr>
              <td>Partition 2 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields[part2_osid]))
-	SPITOSINFOLINK($formfields[part2_osid]);
+    if (isset($formfields["part2_osid"]))
+	SpitOSIDLink($formfields["part2_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -171,8 +170,8 @@ function SPITFORM($imageid, $formfields, $errors)
     echo "<tr>
              <td>Partition 3 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields[part3_osid]))
-	SPITOSINFOLINK($formfields[part3_osid]);
+    if (isset($formfields["part3_osid"]))
+	SpitOSIDLink($formfields["part3_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -181,8 +180,8 @@ function SPITFORM($imageid, $formfields, $errors)
     echo "<tr>
              <td>Partition 4 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields[part4_osid]))
-	SPITOSINFOLINK($formfields[part4_osid]);
+    if (isset($formfields["part4_osid"]))
+	SpitOSIDLink($formfields["part4_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -191,8 +190,8 @@ function SPITFORM($imageid, $formfields, $errors)
     echo "<tr>
              <td>Boot OS: </td>
              <td class=\"left\">";
-    if (isset($formfields[default_osid]))
-	SPITOSINFOLINK($formfields[default_osid]);
+    if (isset($formfields["default_osid"]))
+	SpitOSIDLink($formfields["default_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -206,7 +205,7 @@ function SPITFORM($imageid, $formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[path]\"
-                         value=\"" . $formfields[path] . "\"
+                         value=\"" . $formfields["path"] . "\"
 	                 size=50>
               </td>
           </tr>\n";
@@ -220,11 +219,13 @@ function SPITFORM($imageid, $formfields, $errors)
 
     mysql_data_seek($types_result, 0);
     while ($row = mysql_fetch_array($types_result)) {
-        $type    = $row[type];
+        $type    = $row["type"];
         $checked = "";
 
-        if (strcmp($formfields["mtype_$type"], "Yep") == 0)
+        if (isset($formfields["mtype_$type"]) &&
+	    $formfields["mtype_$type"] == "Yep") {
 	    $checked = "checked";
+	}
     
         echo "<input $checked type=checkbox
                      value=Yep name=\"formfields[mtype_$type]\">
@@ -239,7 +240,7 @@ function SPITFORM($imageid, $formfields, $errors)
     #
     echo "<tr>
   	      <td>Shared?:</td>
-              <td class=left>" . ($formfields[shared] ? "Yes" : "No") . "</td>
+              <td class=left>". ($formfields["shared"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
     #
@@ -247,7 +248,7 @@ function SPITFORM($imageid, $formfields, $errors)
     #
     echo "<tr>
   	      <td>Global?:</td>
-              <td class=left>" . ($formfields[shared] ? "Yes" : "No") . "</td>
+              <td class=left>". ($formfields["global"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
     echo "<tr>
@@ -257,11 +258,11 @@ function SPITFORM($imageid, $formfields, $errors)
     if ($isadmin) {
 	echo "  <input type=text
                        name=\"formfields[load_address]\"
-                       value=\"" . $formfields[load_address] . "\"
+                       value=\"" . $formfields["load_address"] . "\"
 	               size=20 maxlength=256>";
     }
     else {
-	echo $formfields[load_address];
+	echo $formfields["load_address"];
     }
     echo "  </td>
           </tr>\n";
@@ -273,11 +274,11 @@ function SPITFORM($imageid, $formfields, $errors)
     if ($isadmin) {
 	echo "  <input type=text
                        name=\"formfields[frisbee_pid]\"
-                       value=\"" . $formfields[frisbee_pid] . "\"
+                       value=\"" . $formfields["frisbee_pid"] . "\"
 	               size=6 maxlength=10>";
     }
     else {
-	echo $formfields[frisbee_pid];
+	echo $formfields["frisbee_pid"];
     }
     echo "  </td>
           </tr>\n";
@@ -293,25 +294,18 @@ function SPITFORM($imageid, $formfields, $errors)
 }
 
 # Need this below.
-$query_result =
-   DBQueryFatal("select * from images where imageid='$imageid'");
-$defaults = mysql_fetch_array($query_result);
+$defaults = $image->DBData();
    
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
-    # Generate the current types array.
-    $image_types =
-	DBQueryFatal("select type from osidtoimageid ".
-		     "where imageid='$imageid'");
-    while ($row = mysql_fetch_array($image_types)) {
-	$type = $row['type'];
-
+if (! isset($submit)) {
+    # Generate the current types array for the form.
+    foreach ($image->Types() as $type) {
 	$defaults["mtype_${type}"] = "Yep";
     }
 
-    SPITFORM($imageid, $defaults, 0);
+    SPITFORM($image, $defaults, 0);
     PAGEFOOTER();
     return;
 }
@@ -323,26 +317,26 @@ $errors     = array();
 $updates    = array();
 $osid_array = array();
 
-if (!isset($formfields[description]) ||
-    strcmp($formfields[description], "") == 0) {
+if (!isset($formfields["description"]) ||
+    strcmp($formfields["description"], "") == 0) {
     $errors["Description"] = "Missing Field";
 }
-elseif (! TBvalid_description($formfields[description])) {
+elseif (! TBvalid_description($formfields["description"])) {
     $errors["Description"] = TBFieldErrorString();
 }
 else {
-    $updates[] = "description='" . addslashes($formfields[description]) . "'";
+    $updates[] = "description='" . addslashes($formfields["description"]) . "'";
 }
 
-if (!isset($formfields[path]) ||
-    strcmp($formfields[path], "") == 0) {
+if (!isset($formfields["path"]) ||
+    strcmp($formfields["path"], "") == 0) {
     $errors["Path"] = "Missing Field";
 }
-elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields[path])) {
+elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields["path"])) {
     $errors["Path"] = "Contains invalid characters";
 }
 elseif ($isadmin) {
-    $updates[] = "path='" . $formfields[path] . "'";
+    $updates[] = "path='" . $formfields["path"] . "'";
 }    
 else {
     $pdef    = "";
@@ -357,10 +351,10 @@ else {
 	$pdef = "$TBPROJ_DIR/" . $pid . "/";
     }
 
-    if (strpos($formfields[path], $pdef) === false) {
+    if (strpos($formfields["path"], $pdef) === false) {
 	$errors["Path"] = "Must reside in $pdef";
     }
-    $updates[] = "path='" . $formfields[path] . "'";
+    $updates[] = "path='" . $formfields["path"] . "'";
 }
 
 #
@@ -370,14 +364,13 @@ else {
 $mtypes_array = array();
 
 while ($row = mysql_fetch_array($types_result)) {
-    $type = $row[type];
-    $foo  = $formfields["mtype_$type"];
+    $type = $row["type"];
 
     #
     # Look for a post variable with name.
     # 
-    if (isset($foo) &&
-	strcmp($foo, "Yep") == 0) {
+    if (isset($formfields["mtype_$type"]) &&
+	$formfields["mtype_$type"] == "Yep") {
 	$mtypes_array[] = $type;
     }
 }
@@ -389,10 +382,11 @@ if (! count($mtypes_array)) {
 # Only admins can edit the load_address or the frisbee pid.
 # 
 if ($isadmin) {
-    if (isset($formfields[load_address]) && $formfields[load_address] != "") {
-	$foo = addslashes($formfields[load_address]);
+    if (isset($formfields["load_address"]) &&
+	$formfields["load_address"] != "") {
+	$foo = addslashes($formfields["load_address"]);
 
-	if (strcmp($formfields[load_address], $foo)) {
+	if (strcmp($formfields["load_address"], $foo)) {
 	    $errors["Load Address"] = "Contains	illegal characters!";
 	}
 	$updates[] = "load_address='$foo'";
@@ -401,11 +395,12 @@ if ($isadmin) {
 	$updates[] = "load_address=NULL";
     }
 
-    if (isset($formfields[frisbee_pid]) && $formfields[frisbee_pid] != "") {
-	if (! TBvalid_integer($formfields[frisbee_pid])) {
+    if (isset($formfields["frisbee_pid"]) &&
+	$formfields["frisbee_pid"] != "") {
+	if (! TBvalid_integer($formfields["frisbee_pid"])) {
 	    $errors["Frisbee PID"] = "Must must be a valid integer!";
 	}
-	$updates[] = "frisbee_pid='" . $formfields[frisbee_pid] . "'";
+	$updates[] = "frisbee_pid='" . $formfields["frisbee_pid"] . "'";
     }
     else {
 	$updates[] = "frisbee_pid=NULL";
@@ -417,7 +412,7 @@ if ($isadmin) {
 # error messages displayed. Iterate until happy.
 # 
 if (count($errors)) {
-    SPITFORM($imageid, $formfields, $errors);
+    SPITFORM($image, $formfields, $errors);
     PAGEFOOTER();
     return;
 }
@@ -484,16 +479,15 @@ if (mysql_num_rows($query_result)) {
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $imageid   = $row['imageid'];
-	    $url       = rawurlencode($imageid);
-	    $osid      = $row[osid];
-	    $type      = $row[type];
-	    $imagename = $row[imagename];
+	    $url       = CreateURL("showimageid", URLARG_IMAGEID, $imageid);
+	    $osid      = $row["osid"];
+	    $type      = $row["type"];
+	    $imagename = $row["imagename"];
 	    
 	    echo "<tr>
                       <td>$osid</td>
 	              <td>$type</td>
-                      <td><A href='showimageid.php3?&imageid=$url'>
-                             $imagename</A></td>
+                      <td><A href='$url'>$imagename</A></td>
 	          </tr>\n";
 	}
 	echo "</table><br><br>\n";
@@ -526,28 +520,13 @@ for ($i = 0; $i < count($mtypes_array); $i++) {
 }
 DBQueryFatal("unlock tables");
 
-SUBPAGESTART();
-SUBMENUSTART("More Options");
-$fooid = rawurlencode($imageid);
-WRITESUBMENUBUTTON("Edit this Image Descriptor",
-		   "editimageid.php3?imageid=$fooid");
-WRITESUBMENUBUTTON("Delete this Image Descriptor",
-		   "deleteimageid.php3?imageid=$fooid");
-WRITESUBMENUBUTTON("Create a new Image Descriptor",
-		   "newimageid_ez.php3");
-WRITESUBMENUBUTTON("Create a new OS Descriptor",
-		   "newosid_form.php3");
-WRITESUBMENUBUTTON("Image Descriptor list",
-		   "showimageid_list.php3");
-WRITESUBMENUBUTTON("OS Descriptor list",
-		   "showosid_list.php3");
-SUBMENUEND();
+PAGEREPLACE(CreateURL("showimageid", $image));
 
 #
-# Dump record.
+# Dump record in case the redirect fails.
 # 
-SHOWIMAGEID($imageid, 0);
-SUBPAGEEND();
+$image->Refresh();
+$image->Show();
 
 #
 # Standard Testbed Footer

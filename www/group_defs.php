@@ -28,7 +28,7 @@ class Group
 	    $this->group = NULL;
 	    return;
 	}
-	$this->group   =& mysql_fetch_array($query_result);
+	$this->group   = mysql_fetch_array($query_result);
 	$this->project =  null;
     }
 
@@ -132,12 +132,136 @@ class Group
     }
 
     #
-    # Access Check, which for now uses the global function to avoid duplication
-    # until all code is changed.
+    # Project permission checks.
     #
+    #	returns 0 if not allowed.
+    #   returns 1 if allowed.
+    # 
     function AccessCheck($user, $access_type) {
-	return TBProjAccessCheck($user->uid(), $this->pid(), $this->gid(),
-				 $access_type);
+	global $TB_PROJECT_READINFO;
+	global $TB_PROJECT_MAKEGROUP;
+	global $TB_PROJECT_EDITGROUP;
+	global $TB_PROJECT_GROUPGRABUSERS;
+	global $TB_PROJECT_BESTOWGROUPROOT;
+	global $TB_PROJECT_DELGROUP;
+	global $TB_PROJECT_LEADGROUP;
+	global $TB_PROJECT_ADDUSER;
+	global $TB_PROJECT_DELUSER;
+	global $TB_PROJECT_MAKEOSID;
+	global $TB_PROJECT_DELOSID;
+	global $TB_PROJECT_MAKEIMAGEID;
+	global $TB_PROJECT_DELIMAGEID;
+	global $TB_PROJECT_CREATEEXPT;
+	global $TB_PROJECT_MIN;
+	global $TB_PROJECT_MAX;
+	global $TBDB_TRUST_USER;
+	global $TBDB_TRUST_LOCALROOT;
+	global $TBDB_TRUST_GROUPROOT;
+	global $TBDB_TRUST_PROJROOT;
+        # Min declaration.
+	$mintrust = $TB_PROJECT_READINFO;
+
+	$pid = $this->pid();
+	$gid = $this->gid();
+	$uid = $user->uid();
+
+	if ($access_type < $TB_PROJECT_MIN ||
+	    $access_type > $TB_PROJECT_MAX) {
+	    TBERROR("Invalid access type: $access_type!", 1);
+	}
+ 
+        #
+        # Admins do whatever they want!
+        # 
+	if (ISADMIN()) {
+	    return 1;
+	}
+
+	if ($access_type == $TB_PROJECT_READINFO) {
+	    $mintrust = $TBDB_TRUST_USER;
+	}
+	elseif ($access_type == $TB_PROJECT_MAKEGROUP ||
+		$access_type == $TB_PROJECT_DELGROUP) {
+	    $mintrust = $TBDB_TRUST_GROUPROOT;
+	}
+	elseif ($access_type == $TB_PROJECT_LEADGROUP) {
+            #
+            # Allow mere user (in default group) to lead a subgroup.
+            # 
+	    $mintrust = $TBDB_TRUST_USER;
+	}
+	elseif ($access_type == $TB_PROJECT_MAKEOSID ||
+		$access_type == $TB_PROJECT_MAKEIMAGEID ||
+		$access_type == $TB_PROJECT_CREATEEXPT) {
+	    $mintrust = $TBDB_TRUST_LOCALROOT;
+	}
+	elseif ($access_type == $TB_PROJECT_ADDUSER ||
+		$access_type == $TB_PROJECT_EDITGROUP) {
+	    #
+	    # If user is project_root or group_root in default group, 
+	    # allow them to add/edit/remove users in any group.
+	    #
+	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
+			   $TBDB_TRUST_GROUPROOT)) {
+		return 1;
+	    }
+	    #
+	    # Otherwise, editing a group requires group_root 
+	    # in that group.
+	    #	
+	    $mintrust = $TBDB_TRUST_GROUPROOT;
+	}
+	elseif ($access_type == $TB_PROJECT_BESTOWGROUPROOT) {
+            #
+	    # If user is project_root, 
+	    # allow them to bestow group_root in any group.
+ 	    #
+	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
+			   $TBDB_TRUST_PROJROOT)) {
+		return 1;
+	    }
+	    
+	    if ($gid == $pid)  {
+	        #
+	        # Only project_root can bestow group_root in default group, 
+	        # and we already established that they are not project_root,
+		# so fail.
+	        #
+		return 0;
+	    }
+	    else {
+	        #
+	        # Non-default group.
+	        # group_root in default group may bestow group_root.
+	        #
+	        if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
+			       $TBDB_TRUST_GROUPROOT)) {
+		    return 1;
+		}
+
+                #
+	        # group_root in the group in question may also bestow
+		# group_root.
+	        #
+		$mintrust = $TBDB_TRUST_GROUPROOT;
+	    }
+	}
+	elseif ($access_type == $TB_PROJECT_GROUPGRABUSERS) {
+	    #
+	    # Only project_root or group_root in default group
+	    # may grab (involuntarily add) users into groups.
+	    #
+	    $gid = $pid;
+	    $mintrust = $TBDB_TRUST_GROUPROOT;
+	}
+	elseif ($access_type == $TB_PROJECT_DELUSER) {
+	    $mintrust = $TBDB_TRUST_PROJROOT;
+	}
+	else {
+	    TBERROR("Unexpected access type: $access_type!", 1);
+	}
+
+	return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
     }
 
     #
@@ -162,7 +286,7 @@ class Group
 	    return $TBDB_TRUST_NONE;
 	}
 	$row = mysql_fetch_array($query_result);
-	$trust_string = $row[trust];
+	$trust_string = $row["trust"];
 
 	# Convert string to number.      
 	return TBTrustConvert($trust_string);
@@ -539,6 +663,7 @@ class Group
 	$pid_idx = $this->pid_idx();
 	$gid_idx = $this->gid_idx();
 	$trust_none = TBDB_TRUSTSTRING_NONE;
+	$project = $this->Project();
 	
         # 
         # set $newtrustisroot to 1 if attempting to set a rootful trust,
@@ -559,7 +684,7 @@ class Group
 	    # the subgroup as well.
 	    #
 	    $projtrustisroot =
-		TBProjTrust($uid, $pid) > $TBDB_TRUST_USER ? 1 : 0;
+		($project->UserTrust($user) > $TBDB_TRUST_USER ? 1 : 0);
 
 	    if ($projtrustisroot > $newtrustisroot) {
 		if (!$fail)
@@ -688,8 +813,8 @@ class Group
 	    if ($mailstr != "")
 		$mailstr .= ", ";
 	    
-	    $mailstr .= '"' . $row[usr_name] . " (". $row[uid] . ")\" <" .
-		$row[usr_email] . ">";
+	    $mailstr .= '"' . $row["usr_name"] . " (". $row["uid"] . ")\" <" .
+		$row["usr_email"] . ">";
 	}
 	return $mailstr;
     }
@@ -904,4 +1029,62 @@ class Group
 	}
 	echo "</table>\n";
     }
+
+    #
+    # Return list of experiments for a group, or just a count.
+    #
+    function ExperimentList($listify = 1) {
+	$pid = $this->pid();
+	$gid = $this->gid();
+
+	$query_result =
+	    DBQueryFatal("select idx from experiments ".
+			 "where pid='$pid' and gid='$gid'");
+
+	if (! $listify) {
+	    return mysql_num_rows($query_result);
+	}
+
+	# Else, create a list of the groups.
+	$result  = array();
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $idx = $row["idx"];
+
+	    if (! ($experiment = Experiment::Lookup($idx))) {
+		TBERROR("Group::ExperimentList: ".
+			"Could not load experiment $idx!", 1);
+	    }
+	    $result[] = $experiment;
+	}
+	return $result;
+    }
 }
+
+#
+# Until all the code is fixed, this is a global function that loads the
+# group object and passes the call off.
+#
+# Determine the trust level for a uid/pid/gid. That is, each uid will have
+# a different trust level depending on the project/group in question.
+# Return that trust level as one of the numeric values above. 
+# 
+function TBGrpTrust($uid, $pid, $gid)
+{
+    #
+    # No group, then use the default group.
+    #
+    if (! $gid) {
+	$gid = $pid;
+    }
+
+    if (! ($group = Group::LookupByPidGid($pid, $gid))) {
+        TBERROR("TBGrpTrust: Could not look up group object for $pid/$eid!",1);
+    }
+    
+    if (! ($user = User::Lookup($uid))) {
+        TBERROR("TBGrpTrust: Could not look up user object for $uid!", 1);
+    }
+    return $group->UserTrust($user);
+}
+

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,6 +9,14 @@ chdir("..");
 include("defs.php3");
 
 # this is just saving data; it isnt human readable.
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("guid", PAGEARG_INTEGER,
+				 "nsref", PAGEARG_INTEGER,
+				 "nsdata", PAGEARG_ANYTHING,
+				 "uid", PAGEARG_STRING);
 
 #
 # Only known and logged in users.
@@ -22,16 +30,16 @@ else {
 	        $uid       = $this_user->uid();
 	}
 	else {
-		USERERROR( "Need to send guid or uid!" );
+		USERERROR("Need to send guid or uid!", 1);
         } 
 }
 
 if (!isset($nsdata)) {
-	USERERROR( "Need to send NSFILE!" );
+	USERERROR("Need to send NSFILE!", 1);
 } 
 
 if (!isset($nsref) || !ereg("^[0-9]+$", $nsref)) {
-	USERERROR( "Need to send valid NSREF!" );
+	USERERROR("Need to send valid NSREF!", 1);
 }
 
 $nsfilename = "/tmp/$uid-$nsref.nsfile";

@@ -1,11 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 require("defs.php3");
+chdir("buildui");
 
 PAGEHEADER("NetBuild");
 
@@ -16,13 +17,18 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-#if (!$isadmin) {
-#    USERERROR("You do not have permission to use this interface!", 1);
-#}
-
-chdir("buildui");
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("action", PAGEARG_STRING,
+				 "experiment", PAGEARG_EXPERIMENT);
 
 if (isset($action) && $action == "modify") {
+    if (!isset($experiment)) {
+	USERERROR("Must provide experiment to modify!", 1);
+    }
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
     echo "<h3>Modifying $pid/$eid:</h3>";
 }
 

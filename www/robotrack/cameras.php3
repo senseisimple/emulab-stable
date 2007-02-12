@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -13,6 +13,12 @@ include("defs.php3");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify page args
+#
+$optargs = OptionalPageArguments("building",      PAGEARG_STRING,
+				 "floor",         PAGEARG_STRING);
 
 #
 # Verify page arguments. Allow user to optionally specify building/floor.

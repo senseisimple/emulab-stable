@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,6 +17,11 @@ PAGEHEADER("New User Approval");
 $this_user   = CheckLoginOrDie();
 $auth_usr    = $this_user->uid();
 $auth_usridx = $this_user->uid_idx();
+
+#
+# The reason for this call is to make sure that globals are set properly.
+#
+$reqargs = RequiredPageArguments();
 
 #
 # Find all of the groups that this person has project/group root in, and 
@@ -167,7 +172,7 @@ while (list ($uid_idx, $grouplist) = each ($approvelist)) {
               <td rowspan=2>$gid</td>
               <td rowspan=2>$date_applied</td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$approval-$pid/$gid\">
+                  <select name=\"U${uid_idx}\$\$approval-$pid/$gid\">
                           <option value='postpone'>Postpone </option>
                           <option value='approve'>Approve </option>
                           <option value='deny'>Deny </option>
@@ -175,7 +180,7 @@ while (list ($uid_idx, $grouplist) = each ($approvelist)) {
                   </select>
               </td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$trust-$pid/$gid\">\n";
+                  <select name=\"U${uid_idx}\$\$trust-$pid/$gid\">\n";
      
     if ($group->CheckTrustConsistency($user, TBDB_TRUSTSTRING_USER, 0)) {
 	echo  "<option value='user'>User </option>\n";

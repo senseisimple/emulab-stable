@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users.
@@ -22,24 +21,29 @@ include("showlogfile_sup.php3");
 #
 PAGEHEADER("Experiment Activity Log");
 
-# Otherwise, check page arguments.
-CHECKPAGEARGS($pid, $eid);
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+
+if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view the log for $pid/$eid!", 1);
+}
 
 #
 # Check for a logfile. This file is transient, so it could be gone by
 # the time we get to reading it.
 #
-if (! TBExptLogFile($pid, $eid)) {
+if (! $experiment->logfile()) {
     USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
 }
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo $experiment->PageHeader();
 echo "<br /><br />\n";
 
 # This spits out the frame.
-STARTLOG($pid, $eid);
+STARTLOG($experiment);
 
 #
 # Standard Testbed Footer

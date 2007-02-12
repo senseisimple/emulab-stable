@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,15 +18,10 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# The project to zap to on the other side
+# Verify page arguments. project_title is the project to zap to.
 #
-if (isset($project_title) && $project_title == "") {
-    unset($project_title);
-}
-
-if (isset($do) && $do == "") {
-    unset($do);
-}
+$optargs = OptionalPageArguments("project_title", PAGEARG_STRING,
+				 "do",            PAGEARG_STRING);
 
 #
 # Look for our cookie. If the browser has it, then there is nothing

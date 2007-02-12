@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -20,28 +19,19 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# First off, sanity check page args.
+# Verify page arguments.
 #
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("Must provide a Project ID!", 1);
-}
-if (!isset($gid) ||
-    strcmp($gid, "") == 0) {
-    USERERROR("Must privide a Group ID!", 1);
-}
+$reqargs = RequiredPageArguments("group", PAGEARG_GROUP);
+$optargs = OptionalPageArguments("submit", PAGEARG_STRING);
 
 #
 # The default group membership cannot be changed, but the trust levels can.
 #
-$defaultgroup = 0;
-if (strcmp($gid, $pid) == 0) {
-    $defaultgroup = 1;
-}
+$defaultgroup = $group->IsProjectGroup();
 
-if (! ($group = Group::LookupByPidGid($pid, $gid))) {
-    USERERROR("No such group group $gid in project $pid!", 1);
-}
+# Need these below;
+$pid = $group->pid();
+$gid = $group->gid();
 
 #
 # Verify permission. 
@@ -95,14 +85,15 @@ $nonmembers = $group->NonMemberList();
 if (count($curmembers)) {
     foreach ($curmembers as $target_user) {
 	$target_uid = $target_user->uid();
+	$target_idx = $target_user->uid_idx();
 	$oldtrust   = $target_user->GetTempData();
-	$foo        = "change_$target_uid";    
+	$foo        = "change_$target_idx";
 
 	#
 	# Is member to be deleted?
 	# 
-	if (!$defaultgroup && !isset($$foo)) {
-	    # Yes.
+	if (!$defaultgroup && !isset($HTTP_POST_VARS[$foo])) {
+            # Yes.
 	    continue;
 	}
 
@@ -110,8 +101,8 @@ if (count($curmembers)) {
         # There should be a corresponding trust variable in the POST vars.
         # Note that we construct the variable name and indirect to it.
         #
-        $foo      = "$target_uid\$\$trust";
-	$newtrust = $$foo;
+        $foo      = "U${target_idx}\$\$trust";
+	$newtrust = $HTTP_POST_VARS[$foo];
 	
 	if (!$newtrust || strcmp($newtrust, "") == 0) {
 	    TBERROR("Error finding trust for $target_uid in editgroup", 1);
@@ -150,15 +141,16 @@ if (count($curmembers)) {
 if ($grabusers && !$defaultgroup && count($nonmembers)) {
     foreach ($nonmembers as $target_user) {
 	$target_uid = $target_user->uid();
-	$foo        = "add_$target_uid";    
+	$target_idx = $target_user->uid_idx();
+	$foo        = "add_$target_idx";    
 	
-	if (isset($$foo)) {
+	if (isset($HTTP_POST_VARS[$foo]) && $HTTP_POST_VARS[$foo] == "permit"){
 	    #
 	    # There should be a corresponding trust variable in the POST vars.
 	    # Note that we construct the variable name and indirect to it.
 	    #
-	    $bar      = "$target_uid\$\$trust";
-	    $newtrust = $$bar;
+	    $bar      = "U${target_idx}\$\$trust";
+	    $newtrust = $HTTP_POST_VARS[$bar];
 	    
 	    if (!$newtrust || strcmp($newtrust, "") == 0) {
 		TBERROR("Error finding trust for $target_uid", 1);
@@ -199,10 +191,11 @@ STARTBUSY("Applying group membership changes");
 if (count($curmembers)) {
     foreach ($curmembers as $target_user) {
 	$target_uid = $target_user->uid();
+	$target_idx = $target_user->uid_idx();
 	$oldtrust   = $target_user->GetTempData();
-	$foo        = "change_$target_uid";    
+	$foo        = "change_$target_idx";    
 
-	if (!$defaultgroup && !isset($$foo)) {
+	if (!$defaultgroup && !isset($HTTP_POST_VARS[$foo])) {
 	    SUEXEC($uid, $unix_gid, "webmodgroups -r $pid:$gid $target_uid",
 		   SUEXEC_ACTION_DIE);
 	    continue;
@@ -211,8 +204,8 @@ if (count($curmembers)) {
         # There should be a corresponding trust variable in the POST vars.
         # Note that we construct the variable name and indirect to it.
         #
-        $foo      = "$target_uid\$\$trust";
-	$newtrust = $$foo;
+        $foo      = "U${target_idx}\$\$trust";
+	$newtrust = $HTTP_POST_VARS[$foo];
 	
 	if (strcmp($oldtrust,$newtrust)) {
 	    SUEXEC($uid, $unix_gid,
@@ -231,15 +224,16 @@ if (count($curmembers)) {
 if ($grabusers && !$defaultgroup && count($nonmembers)) {
     foreach ($nonmembers as $target_user) {
 	$target_uid = $target_user->uid();
-	$foo        = "add_$target_uid";    
+	$target_idx = $target_user->uid_idx();
+	$foo        = "add_$target_idx";    
 	
-	if (isset($$foo)) {
+	if (isset($HTTP_POST_VARS[$foo]) && $HTTP_POST_VARS[$foo] == "permit"){
 	    #
 	    # There should be a corresponding trust variable in the POST vars.
 	    # Note that we construct the variable name and indirect to it.
 	    #
-	    $bar      = "$target_uid\$\$trust";
-	    $newtrust = $$bar;
+	    $bar      = "U${target_idx}\$\$trust";
+	    $newtrust = $HTTP_POST_VARS[$bar];
 
 	    SUEXEC($uid, $unix_gid,
 		   "webmodgroups -a $pid:$gid:$newtrust $target_uid",
@@ -254,7 +248,7 @@ STOPBUSY();
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 # 
-PAGEREPLACE("showgroup.php3?pid=$pid&gid=$gid");
+PAGEREPLACE(CreateUrl("showgroup", $group));
 
 #
 # Standard Testbed Footer

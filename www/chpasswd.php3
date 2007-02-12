@@ -1,22 +1,28 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
-# Display a simpler version of this page
-$simple = 0;
-if (isset($_REQUEST['simple'])) {
-    $simple = $_REQUEST['simple'];
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("user",   PAGEARG_STRING);
+$optargs = OptionalPageArguments("simple", PAGEARG_BOOLEAN,
+				 "key",    PAGEARG_STRING,
+				 "reset",  PAGEARG_STRING);
+
+# Display a simpler version of this page.
+if (!isset($simple)) {
+    $simple = 0;
 }
 
-# Form arguments.
-$user      = $_REQUEST['user'];
-$keyB      = $_REQUEST['key'];
+# Half the key in the URL.
+$keyB = $key;
 # We also need the other half of the key from the browser.
-$keyA      = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+$keyA = (isset($_COOKIE[$TBAUTHCOOKIE]) ? $_COOKIE[$TBAUTHCOOKIE] : "");
 
 # If the browser part is missing, direct user to answer
 if ((isset($keyB) && $keyB != "") && (!isset($keyA) || $keyA == "")) {
@@ -37,7 +43,7 @@ if (!isset($user) || $user == "" || !User::ValidWebID($user) ||
 $key = $keyA . $keyB;
 
 # Must use https!
-if (!isset($SSL_PROTOCOL)) {
+if (!isset($_SERVER["SSL_PROTOCOL"])) {
     PAGEHEADER("Reset Your Password", $view);
     USERERROR("Must use https:// to access this page!", 1);
 }

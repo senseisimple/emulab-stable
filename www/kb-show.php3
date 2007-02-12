@@ -1,13 +1,16 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 # Page arguments.
-$printable = $_GET['printable'];
+$optargs = OptionalPageArguments("printable", PAGEARG_BOOLEAN,
+				 "idx",       PAGEARG_INTEGER,
+				 "xref_tag",  PAGEARG_STRING);
+
 if (!isset($printable))
     $printable = 0;
 

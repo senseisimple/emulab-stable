@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can end experiments.
@@ -17,31 +16,18 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-# An experiment idx.
-if (! isset($exptidx) || $exptidx == "") {
-    USERERROR("Must supply an experiment index!", 1);
-}
-if (!TBvalid_integer($exptidx)) {
-    USERERROR("Invalid characters in $exptidx!", 1);
-}
+$reqargs  = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 
-#
-# We get an index. Must map that to a pid/gid to do a group level permission
-# check, since it might not be an current experiment.
-#
-unset($pid);
-unset($eid);
-unset($gid);
-if (TBExptidx2PidEid($exptidx, $pid, $eid, $gid) < 0) {
-    USERERROR("No such experiment index $exptidx!", 1);
-}
-if (!TBCurrentExperiment($exptidx)) {
-    USERERROR("Experiment index $exptidx is not a current experiment!", 1);
-}
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$gid = $experiment->gid();
+
+# Permission
 if (!$isadmin &&
-    !TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+    !$experiment->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
     USERERROR("You do not have permission to view missing files for ".
-	      "archive in $pid/$gid ($exptidx)!", 1);
+	      "archive in $pid/$eid!", 1);
 }
 
 #
@@ -63,7 +49,7 @@ if (isset($movesome)) {
 	   "webarchive_control addtoarchive $pid $eid $fileargs",
 	   SUEXEC_ACTION_DUPDIE);
     
-    header("Location: archive_missing.php3?exptidx=$exptidx");
+    header("Location: " . CreateURL("archive_missing", $experiment));
     return;
 }
 
@@ -102,13 +88,8 @@ echo "<script language=JavaScript>
           //-->
           </script>\n";
 
-echo "<font size=+2>".
-     "Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a> ".
-     "</b></font>\n";
-     "<br>";
-echo "<br>\n";
+echo $experiment->PageHeader();
+echo "<br><br>\n";
 
 #
 # We ask an external script for the list of missing files. 
@@ -129,8 +110,9 @@ if (count($suexec_output_array)) {
     echo "</b><br><br>";
 
     echo "<table border=1>\n";
-    echo "<form action='archive_missing.php3?exptidx=$exptidx'
-                onsubmit=\"return false;\"
+    echo "<form action='" .
+	          CreateURL("archive_missing", $experiment) . "' " .
+	       "onsubmit=\"return false;\"
                 name=form1 method=post>\n";
     echo "<input type=hidden name=movesome value=Submit>\n";    
     echo "<tr><td align=center colspan=2>\n";

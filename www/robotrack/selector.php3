@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -16,6 +16,10 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments. Allow user to optionally specify building/floor.
 #
+$optargs = OptionalPageArguments("building",    PAGEARG_STRING,
+				 "floor",       PAGEARG_STRING,
+				 "experiment",  PAGEARG_EXPERIMENT);
+
 if (isset($building) && $building != "") {
     # Sanitize for the shell.
     if (!preg_match("/^[-\w]+$/", $building)) {
@@ -33,25 +37,6 @@ if (isset($building) && $building != "") {
 else {
     $building = "MEB-ROBOTS";
     $floor    = 4;
-}
-
-if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
-    if (!preg_match("/^[-\w]+$/", $pid)) {
-	PAGEARGERROR("Invalid pid argument.");
-    }
-    if (!preg_match("/^[-\w]+$/", $eid)) {
-	PAGEARGERROR("Invalid eid argument.");
-    }
-    #
-    # Check to make sure this is a valid PID/EID tuple.
-    #
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("Experiment $pid/$eid is not a valid experiment.", 1);
-    }
-}
-else {
-    unset($pid);
-    unset($eid);
 }
 
 #
@@ -132,7 +117,10 @@ while (($row = mysql_fetch_array($query_result))) {
     $index++;
 }
 echo "      <param name='ppm' value='$ppm'>";
-if (isset($pid)) {
+if (isset($experiment)) {
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    
     echo "  <param name='pid' value='$pid'>
             <param name='eid' value='$eid'>\n";
 }

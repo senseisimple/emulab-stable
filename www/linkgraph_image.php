@@ -1,7 +1,7 @@
-<?php
+nnnn<?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,20 +16,12 @@ $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($exptidx) ||
-    strcmp($exptidx, "") == 0) {
-    USERERROR("You must provide an instance ID", 1);
-}
-if (!TBvalid_integer($exptidx)) {
-    PAGEARGERROR("Invalid characters in instance ID!");
-}
-
-# Only template instances right now.
-$instance = TemplateInstance::LookupByExptidx($exptidx);
-if (!$instance) {
-    USERERROR("The instance $exptidx is not a valid instance!", 1);
-}
+#
+$reqargs  = RequiredPageArguments("instance",  PAGEARG_INSTANCE);
+$optargs  = OptionalPageArguments("runidx",    PAGEARG_INTEGER,
+				  "srcvnode",  PAGEARG_STRING,
+				  "dstvnode",  PAGEARG_STRING,
+				  "graphtype", PAGEARG_STRING);
 $template = $instance->template();
 
 # Optional runidx for graphing just a specific run.
@@ -68,9 +60,10 @@ if (isset($dstvnode) && $dstvnode != "") {
 #
 $eid    = $instance->eid();
 $pid    = $instance->pid();
-$gid    = $template->gid();
 $guid   = $instance->guid();
 $vers   = $instance->vers();
+$exptidx= $instance->exptidx();
+$unix_gid = $template->UnixGID();
 $which  = "pps";
 
 #
@@ -80,12 +73,10 @@ if (isset($graphtype) && $graphtype != "") {
     if (! preg_match('/^[\w]*$/', $graphtype)) {
 	PAGEARGERROR("Invalid characters in graphtype!");
     }
-    $which = $graphtype;
+    $which = escapeshellarg($graphtype);
 }
 
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-if ($fp = popen("$TBSUEXEC_PATH $uid $unix_name webtemplate_linkgraph " .
+if ($fp = popen("$TBSUEXEC_PATH $uid $unix_gid webtemplate_linkgraph " .
 		"-i $exptidx $runarg $vnodes $guid/$vers $which", "r")) {
     header("Content-type: image/gif");
     fpassthru($fp);

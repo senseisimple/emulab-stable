@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -22,36 +21,25 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-if (! isset($exptidx) || $exptidx == "") {
-    USERERROR("Must supply an experiment to view!", 1);
-}
-if (!TBvalid_integer($exptidx)) {
-    USERERROR("Invalid characters in $exptidx!", 1);
-}
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("submit", PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
 
-#
-# We get an index. Must map that to a pid/gid to do a group level permission
-# check, since it might not be an current experiment.
-#
-unset($pid);
-unset($eid);
-unset($gid);
-if (TBExptidx2PidEid($exptidx, $pid, $eid, $gid) < 0) {
-    USERERROR("No such experiment index $exptidx!", 1);
-}
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$gid = $experiment->gid();
 
+# Permission
 if (!$isadmin &&
-    !TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+    !$experiment->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
     USERERROR("You do not have permission to view tags for ".
-	      "archive in $pid/$gid ($exptidx)!", 1);
-}
-if (!TBCurrentExperiment($exptidx)) {
-    USERERROR("Experiment index $exptidx is not a current experiment!", 1);
+	      "archive in $pid/$eid!", 1);
 }
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $exptidx, $TBDB_ARCHIVE_TAGLEN, $referrer;
+    global $experiment, $TBDB_ARCHIVE_TAGLEN, $referrer;
 
     echo "<center>
           Commit/Tag Archive
@@ -80,7 +68,8 @@ function SPITFORM($formfields, $errors)
     }
 
     echo "<table align=center border=1> 
-          <form action=archive_tag.php3?exptidx=$exptidx method=post>\n";
+          <form action='" . CreateURL("archive_tag", $experiment) . "' ".
+	        "method=post>\n";
 
     if (isset($referrer)) {
 	echo "<input type=hidden name=referrer value=$referrer>\n";
@@ -96,7 +85,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[tag]\"
-                         value=\"" . $formfields[tag] . "\"
+                         value=\"" . $formfields["tag"] . "\"
 	                 size=$TBDB_ARCHIVE_TAGLEN
                          maxlength=$TBDB_ARCHIVE_TAGLEN>
           </tr>\n";
@@ -112,7 +101,7 @@ function SPITFORM($formfields, $errors)
               <td align=center class=left>
                   <textarea name=\"formfields[message]\"
                     rows=10 cols=70>" .
-	            ereg_replace("\r", "", $formfields[message]) .
+	            ereg_replace("\r", "", $formfields["message"]) .
 	            "</textarea>
               </td>
           </tr>\n";
@@ -140,8 +129,11 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
+if (! isset($submit)) {
     $defaults = array();
+    $defaults["tag"]     = "";
+    $defaults["message"] = "";
+    
     if (!isset($referrer))
 	$referrer = $_SERVER['HTTP_REFERER'];
     
@@ -220,28 +212,30 @@ STARTBUSY("Committing and Tagging!");
 #
 # First lets make sure the tag is unique. 
 #
-$retval = SUEXEC($uid, "$pid,$gid",
-		 "webarchive_control checktag $pid $eid $tag",
-		 SUEXEC_ACTION_IGNORE);
+if ($tag != "") {
+    $retval = SUEXEC($uid, "$pid,$gid",
+		     "webarchive_control checktag $pid $eid $tag",
+		     SUEXEC_ACTION_IGNORE);
 
-/* Clear the various 'loading' indicators. */
-if ($retval) 
-    STOPBUSY();
+    /* Clear the various 'loading' indicators. */
+    if ($retval) 
+	CLEARBUSY();
 
-#
-# Fatal Error. 
-# 
-if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_DIE);
-}
+    #
+    # Fatal Error. 
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_DIE);
+    }
 
-# User error. Tell user and exit.
-if ($retval) {
-    $errors["Tag"] = "Already in use; pick another";
+    # User error. Tell user and exit.
+    if ($retval) {
+	$errors["Tag"] = "Already in use; pick another";
     
-    SPITFORM($formfields, $errors);
-    PAGEFOOTER();
-    return;
+	SPITFORM($formfields, $errors);
+	PAGEFOOTER();
+	return;
+    }
 }
 
 SUEXEC($uid, "$pid,$gid",
@@ -250,8 +244,10 @@ SUEXEC($uid, "$pid,$gid",
 
 STOPBUSY();
 
-if (!isset($referrer))
+if (!isset($referrer)) {
+    $exptidx  = $experiment->idx();
     $referrer = "archive_view.php3/$exptidx/?exptidx=$exptidx";
+}
 
 PAGEREPLACE($referrer);
 

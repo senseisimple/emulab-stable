@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -41,13 +41,11 @@ $optargs = array("adminon"        => array(),
 		 "cvsrepo_public" => array("pid" => 1));
 
 # Mandatory page arguments.
-$type  = $_GET['type'];
-$value = $_GET['value'];
+$reqargs = RequiredPageArguments("type",  PAGEARG_STRING,
+				 "value", PAGEARG_STRING);
 
-# Pedantic page argument checking. Good practice!
-if (!isset($type) || !isset($value)) {
-    PAGEARGERROR();
-}
+# Where we zap to.
+$zapurl = null;
 
 if (! in_array($type, $toggles)) {
     PAGEARGERROR("There is no toggle for $type!");
@@ -89,6 +87,7 @@ elseif ($type == "webfreeze") {
     if (! ($target_user = User::Lookup($user))) {
 	PAGEARGERROR("Target user '$user' is not a valid user!");
     }
+    $zapurl = CreateURL("showuser", $target_user);
     $target_user->SetWebFreeze($value);
 }
 elseif ($type == "cvsweb") {
@@ -99,6 +98,7 @@ elseif ($type == "cvsweb") {
     if (! ($target_user = User::Lookup($user))) {
 	PAGEARGERROR("Target user '$user' is not a valid user!");
     }
+    $zapurl = CreateURL("showuser", $target_user);
     $target_user->SetCVSWeb($value);
 }
 elseif ($type == "lockdown") {
@@ -106,18 +106,18 @@ elseif ($type == "lockdown") {
     if (! $isadmin) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
-    if (!TBValidExperiment($pid, $eid)) {
+    if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
 	PAGEARGERROR("Experiment $pid/$eid is not a valid experiment!");
     }
-    DBQueryFatal("update experiments set lockdown='$value' ".
-		 "where pid='$pid' and eid='$eid'");
+    $zapurl = CreateURL("showexp", $experiment);
+    $experiment->SetLockDown($value);
 }
 elseif ($type == "cvsrepo_public") {
     # Must validate the pid since we allow non-admins to do this.
     if (! TBvalid_pid($pid)) {
 	PAGEARGERROR("Invalid characters in $pid");
     }
-    if (!TBValidProject($pid)) {
+    if (! ($project = Project::Lookup($pid))) {
 	PAGEARGERROR("Project $pid is not a valid project!");
     }
     # Must be admin or project/group root.
@@ -125,8 +125,8 @@ elseif ($type == "cvsrepo_public") {
 	! TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
-    DBQueryFatal("update projects set cvsrepo_public='$value' ".
-		 "where pid='$pid'");
+    $zapurl = CreateURL("showproject", $project);
+    $project->SetCVSRepoPublic($value);
     SUEXEC($uid, $pid, "webcvsrepo_ctrl $pid", SUEXEC_ACTION_DIE);
 }
 else {
@@ -137,18 +137,15 @@ else {
 # Spit out a redirect 
 #
 if (isset($HTTP_REFERER) && $HTTP_REFERER != "" &&
-    strpos($HTTP_REFERER,$_SERVER[SCRIPT_NAME])===false) {
+    strpos($HTTP_REFERER,$_SERVER["SCRIPT_NAME"])===false) {
     # Make sure the referer is not me!
     header("Location: $HTTP_REFERER");
 }
+elseif ($zapurl) {
+    header("Location: $zapurl");
+}
 else {
-    if (isset($user)) {
-	header("Location: " . CreateURL("showuser", $target_user));
-    } elseif (isset($pid) && isset($eid)) {
-	header("Location: $TBBASE/showexp.php3?pid=$pid&eid=$eid");
-    } else {
-	header("Location: $TBBASE/showuser.php3");
-    }
+    header("Location: $TBBASE/showuser.php3");
 }
 
 ?>

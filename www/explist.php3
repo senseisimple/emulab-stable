@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,6 +9,9 @@ include("defs.php3");
 #
 # We let anyone access this page. No details are leaked out, hopefully.
 #
+$optargs = OptionalPageArguments("keymaster", PAGEARG_STRING);
+
+# Locals
 $thumbCount = 0;
 $thumbMax   = 0;
 

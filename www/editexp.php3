@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -21,22 +21,9 @@ $idleswaptimeout = TBGetSiteVar("idle/threshold");
 #
 # Verify page arguments.
 #
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-
-#
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! ($experiment = Experiment::Lookup($pid, $eid))) {
-    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-}
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
 
 #
 # Verify Permission.
@@ -48,19 +35,16 @@ if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($formfields, $errors)
+function SPITFORM($experiment, $formfields, $errors)
 {
-    global $eid, $pid, $TBDOCBASE, $linktest_levels, $EXPOSELINKTEST;
+    global $TBDOCBASE, $linktest_levels, $EXPOSELINKTEST;
 
     #
     # Standard Testbed Header
     #
     PAGEHEADER("Edit Experiment Metadata");
 
-    echo "<font size=+2>Experiment <b>".
-         "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b>\n".
-         "</font>\n";
+    echo $experiment->PageHeader();
     echo "<br><br>\n";
 
     if ($errors) {
@@ -85,15 +69,16 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
 
+    $url = CreateURL("editexp", $experiment);
     echo "<table align=center border=1>
-          <form action=editexp.php3?pid=$pid&eid=$eid method=post>\n";
+          <form action='$url' method=post>\n";
 
     echo "<tr>
              <td>Description:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[description]\"
-                        value='" . htmlspecialchars($formfields[description],
+                        value='" . htmlspecialchars($formfields['description'],
 						    ENT_QUOTES) . "'
 	                size=30>
              </td>
@@ -120,8 +105,8 @@ function SPITFORM($formfields, $errors)
                                   name='formfields[idle_ignore]'
                                   value=1";
 
-	if (isset($formfields[idle_ignore]) &&
-	    strcmp($formfields[idle_ignore], "1") == 0) {
+	if (isset($formfields["idle_ignore"]) &&
+	    strcmp($formfields["idle_ignore"], "1") == 0) {
 	    echo " checked='1'";
 	}
 
@@ -138,7 +123,7 @@ function SPITFORM($formfields, $errors)
 	                         name='formfields[swappable]'
 	                         value='1'";
 
-	if ($formfields[swappable] == "1") {
+	if ($formfields["swappable"] == "1") {
 	    echo " checked='1'";
 	}
 	echo ">
@@ -154,7 +139,7 @@ function SPITFORM($formfields, $errors)
    	              <td>If not, why not (administrators option)?<br>
                           <textarea rows=2 cols=50
                                     name='formfields[noswap_reason]'>" .
-	                    htmlspecialchars($formfields[noswap_reason],
+	                    htmlspecialchars($formfields["noswap_reason"],
 					     ENT_QUOTES) .
 	                 "</textarea>
                       </td>
@@ -165,7 +150,7 @@ function SPITFORM($formfields, $errors)
 	                     name='formfields[idleswap]'
 	                     value='1'";
 
-    if ($formfields[idleswap] == "1") {
+    if ($formfields["idleswap"] == "1") {
 	echo " checked='1'";
     }
     echo ">
@@ -176,7 +161,7 @@ function SPITFORM($formfields, $errors)
                          Swap out this experiment after
                          <input type='text'
                                 name='formfields[idleswap_timeout]'
-		                value='" . $formfields[idleswap_timeout] . "'
+		                value='" . $formfields["idleswap_timeout"] . "'
                                 size='3'>
                          hours idle.
                   </td>
@@ -186,7 +171,7 @@ function SPITFORM($formfields, $errors)
    	          <td>If not, why not?<br>
                       <textarea rows=2 cols=50
                                 name='formfields[noidleswap_reason]'>" .
-	                    htmlspecialchars($formfields[noidleswap_reason],
+	                    htmlspecialchars($formfields["noidleswap_reason"],
 					     ENT_QUOTES) .
 	             "</textarea>
                   </td>
@@ -196,7 +181,7 @@ function SPITFORM($formfields, $errors)
 		             name='formfields[autoswap]'
 		             value='1' ";
 
-    if ($formfields[autoswap] == "1") {
+    if ($formfields["autoswap"] == "1") {
 	echo " checked='1'";
     }
     echo ">
@@ -207,7 +192,7 @@ function SPITFORM($formfields, $errors)
                       Swap out after
                         <input type='text'
                                name='formfields[autoswap_timeout]'
-		               value='" . $formfields[autoswap_timeout] . "'
+		               value='" . $formfields["autoswap_timeout"] . "'
                                size='3'>
                       hours, even if not idle.
                   </td>
@@ -224,7 +209,7 @@ function SPITFORM($formfields, $errors)
 		             name='formfields[savedisk]'
 	                     value='1' ";
 
-    if ($formfields[savedisk] == "1") {
+    if ($formfields["savedisk"] == "1") {
 	echo " checked='1'";
     }
     echo ">
@@ -247,7 +232,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[cpu_usage]\"
-                         value=\"" . $formfields[cpu_usage] . "\"
+                         value=\"" . $formfields["cpu_usage"] . "\"
 	                 size=2>
                   (PlanetLab Nodes Only: 1 &lt= X &lt= 5)
               </td>
@@ -258,7 +243,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[mem_usage]\"
-                         value=\"" . $formfields[mem_usage] . "\"
+                         value=\"" . $formfields["mem_usage"] . "\"
 	                 size=2>
                   (PlanetLab Nodes Only: 1 &lt= X &lt= 5)
               </td>
@@ -271,8 +256,8 @@ function SPITFORM($formfields, $errors)
   	      <td class=left colspan=2>
               <input type=checkbox name='formfields[batchmode]' value='1'";
 
-    if (isset($formfields[batchmode]) &&
-	strcmp($formfields[batchmode], "1") == 0) {
+    if (isset($formfields["batchmode"]) &&
+	strcmp($formfields["batchmode"], "1") == 0) {
 	    echo " checked='1'";
     }
 
@@ -297,7 +282,7 @@ function SPITFORM($formfields, $errors)
     for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
 	$selected = "";
 
-	if (strcmp($formfields[linktest_level], "$i") == 0)
+	if (strcmp($formfields["linktest_level"], "$i") == 0)
 	    $selected = "selected";
 	
 	echo "        <option $selected value=$i>Level $i - " .
@@ -321,57 +306,47 @@ function SPITFORM($formfields, $errors)
 }
 
 #
-# Suck the current info out of the database.
-#
-$query_result =
-    DBQueryFatal("select * from experiments where pid='$pid' and eid='$eid'");
-
-if (($row = mysql_fetch_array($query_result)) == 0) {
-    USERERROR("Experiment $eid in project $pid is gone!\n", 1);
-}
-#
 # We might need these later for email.
 #
-$creator = $row[expt_head_uid];
-$swapper = $row[expt_swap_uid];
+$creator = $experiment->creator();
+$swapper = $experiment->swapper();
 $doemail = 0;
 
 #
 # Construct a defaults array based on current DB info. Used for the initial
 # form, and to determine if any changes were made and to send email.
 #
-$defaults                    = array();
-$defaults[description]       = $row[expt_name];
-$defaults[idle_ignore]       = $row[idle_ignore];
-$defaults[batchmode]         = $row[batchmode];
-$defaults[swappable]         = $row[swappable];
-$defaults[noswap_reason]     = $row[noswap_reason];
-$defaults[idleswap]          = $row[idleswap];
-$defaults[idleswap_timeout]  = $row[idleswap_timeout] / 60.0;
-$defaults[noidleswap_reason] = $row[noidleswap_reason];
-$defaults[autoswap]          = $row[autoswap];
-$defaults[autoswap_timeout]  = $row[autoswap_timeout] / 60.0;
-$defaults[idle_ignore]       = $row[idle_ignore];
-$defaults[savedisk]          = $row[savedisk];
-$defaults[mem_usage]         = $row["mem_usage"];
-$defaults[cpu_usage]         = $row["cpu_usage"];
-$defaults[linktest_level]    = $row["linktest_level"];
+$defaults                      = array();
+$defaults["description"]       = $experiment->description();
+$defaults["idle_ignore"]       = $experiment->idle_ignore();
+$defaults["batchmode"]         = $experiment->batchmode();
+$defaults["swappable"]         = $experiment->swappable();
+$defaults["noswap_reason"]     = $experiment->noswap_reason();
+$defaults["idleswap"]          = $experiment->idleswap();
+$defaults["idleswap_timeout"]  = $experiment->idleswap_timeout() / 60.0;
+$defaults["noidleswap_reason"] = $experiment->noidleswap_reason();
+$defaults["autoswap"]          = $experiment->autoswap();
+$defaults["autoswap_timeout"]  = $experiment->autoswap_timeout() / 60.0;
+$defaults["savedisk"]          = $experiment->savedisk();
+$defaults["mem_usage"]         = $experiment->mem_usage();
+$defaults["cpu_usage"]         = $experiment->cpu_usage();
+$defaults["linktest_level"]    = $experiment->linktest_level();
 
 #
 # A couple of defaults for turning things on.
 #
-if (!$defaults[autoswap]) {
-     $defaults[autoswap_timeout] = 10;
+if (!$defaults["autoswap"]) {
+     $defaults["autoswap_timeout"] = 10;
 }
-if (!$defaults[idleswap]) {
-     $defaults[idleswap_timeout] = $idleswaptimeout;
+if (!$defaults["idleswap"]) {
+     $defaults["idleswap_timeout"] = $idleswaptimeout;
 }
 
 #
 # On first load, display initial values.
 #
 if (! isset($submit)) {
-    SPITFORM($defaults, 0);
+    SPITFORM($experiment, $defaults, 0);
     PAGEFOOTER();
     return;
 }
@@ -386,12 +361,12 @@ $inserts = array();
 #
 # Description
 #
-if (!isset($formfields[description]) ||
-    strcmp($formfields[description], "") == 0) {
+if (!isset($formfields["description"]) ||
+    strcmp($formfields["description"], "") == 0) {
     $errors["Description"] = "Missing Field";
 }
 else {
-    $inserts[] = "expt_name='" . addslashes($formfields[description]) . "'";
+    $inserts[] = "expt_name='" . addslashes($formfields["description"]) . "'";
 }
 
 #
@@ -400,125 +375,123 @@ else {
 #
 # Idle Ignore
 #
-if (!isset($formfields[idle_ignore]) ||
-    strcmp($formfields[idle_ignore], "1")) {
-    $formfields[idle_ignore] = 0;
+if (!isset($formfields["idle_ignore"]) ||
+    strcmp($formfields["idle_ignore"], "1")) {
+    $formfields["idle_ignore"] = 0;
     $inserts[] = "idle_ignore=0";
 }
 else {
-    $formfields[idle_ignore] = 1;
+    $formfields["idle_ignore"] = 1;
     $inserts[] = "idle_ignore=1";
 }
 
 #
 # Swappable
 #
-if (ISADMIN() && (!isset($formfields[swappable]) ||
-    strcmp($formfields[swappable], "1"))) {
-    $formfields[swappable] = 0;
+if (ISADMIN() && (!isset($formfields["swappable"]) ||
+    strcmp($formfields["swappable"], "1"))) {
+    $formfields["swappable"] = 0;
 
-    if (!isset($formfields[noswap_reason]) ||
-        !strcmp($formfields[noswap_reason], "")) {
+    if (!isset($formfields["noswap_reason"]) ||
+        !strcmp($formfields["noswap_reason"], "")) {
 
         if (!ISADMIN()) {
 	    $errors["Swappable"] = "No justification provided";
         }
 	else {
-	    $formfields[noswap_reason] = "ADMIN";
+	    $formfields["noswap_reason"] = "ADMIN";
         }
     }
-    if ($defaults[swappable])
+    if ($defaults["swappable"])
 	$doemail = 1;
     $inserts[] = "swappable=0";
     $inserts[] = "noswap_reason='" .
-	         addslashes($formfields[noswap_reason]) . "'";
+	         addslashes($formfields["noswap_reason"]) . "'";
 }
 else {
     $inserts[] = "swappable=1";
-    $inserts[] = "noswap_reason='" .
-	         addslashes($formfields[noswap_reason]) . "'";
 }
 
 #
 # IdleSwap
 #
-if (!isset($formfields[idleswap]) ||
-    strcmp($formfields[idleswap], "1")) {
-    $formfields[idleswap] = 0;
+if (!isset($formfields["idleswap"]) ||
+    strcmp($formfields["idleswap"], "1")) {
+    $formfields["idleswap"] = 0;
 
-    if (!isset($formfields[noidleswap_reason]) ||
-	!strcmp($formfields[noidleswap_reason], "")) {
+    if (!isset($formfields["noidleswap_reason"]) ||
+	!strcmp($formfields["noidleswap_reason"], "")) {
 
 	if (! ISADMIN()) {
 	    $errors["IdleSwap"] = "No justification provided";
 	}
 	else {
-	    $formfields[noidleswap_reason] = "ADMIN";
+	    $formfields["noidleswap_reason"] = "ADMIN";
 	}
     }
-    if ($defaults[idleswap])
+    if ($defaults["idleswap"])
 	$doemail = 1;
     $inserts[] = "idleswap=0";
     $inserts[] = "idleswap_timeout=0";
     $inserts[] = "noidleswap_reason='" .
-	         addslashes($formfields[noidleswap_reason]) . "'";
+	         addslashes($formfields["noidleswap_reason"]) . "'";
 }
-elseif (!isset($formfields[idleswap_timeout]) ||
-	($formfields[idleswap_timeout] + 0) <= 0 ||
-	( (($formfields[idleswap_timeout] + 0) > $idleswaptimeout) &&
+elseif (!isset($formfields["idleswap_timeout"]) ||
+	($formfields["idleswap_timeout"] + 0) <= 0 ||
+	( (($formfields["idleswap_timeout"] + 0) > $idleswaptimeout) &&
 	  !ISADMIN()) ) {
     $errors["Idleswap"] = "Invalid time provided (0 < X <= $idleswaptimeout)";
 }
 else {
     $inserts[] = "idleswap=1";
-    $inserts[] = "idleswap_timeout=" . 60 * $formfields[idleswap_timeout];
+    $inserts[] = "idleswap_timeout=" . 60 * $formfields["idleswap_timeout"];
     $inserts[] = "noidleswap_reason='" .
-	         addslashes($formfields[noidleswap_reason]) . "'";
+	         addslashes($formfields["noidleswap_reason"]) . "'";
 }
 
 #
 # AutoSwap
 #
-if (!isset($formfields[autoswap]) ||
-    strcmp($formfields[autoswap], "1")) {
-    $formfields[autoswap] = 0;
+if (!isset($formfields["autoswap"]) ||
+    strcmp($formfields["autoswap"], "1")) {
+    $formfields["autoswap"] = 0;
     $inserts[] = "autoswap=0";
     $inserts[] = "autoswap_timeout=0";
 }
-elseif (!isset($formfields[autoswap_timeout]) ||
-	($formfields[autoswap_timeout] + 0) == 0) {
+elseif (!isset($formfields["autoswap_timeout"]) ||
+	($formfields["autoswap_timeout"] + 0) == 0) {
     $errors["Max Duration"] = "Invalid time provided";
 }
 else {
     $inserts[] = "autoswap=1";
-    $inserts[] = "autoswap_timeout=" . 60 * $formfields[autoswap_timeout];
+    $inserts[] = "autoswap_timeout=" . 60 * $formfields["autoswap_timeout"];
 }
 
 #
 # Swapout disk state saving
 #
-if (!isset($formfields[savedisk]) ||
-    strcmp($formfields[savedisk], "1")) {
-    $formfields[savedisk] = 0;
+if (!isset($formfields["savedisk"]) ||
+    strcmp($formfields["savedisk"], "1")) {
+    $formfields["savedisk"] = 0;
     $inserts[] = "savedisk=0";
 }
 else {
-    $formfields[savedisk] = 1;
+    $formfields["savedisk"] = 1;
     $inserts[] = "savedisk=1";
 }
 
 #
 # CPU Usage
 #
-if (isset($formfields[cpu_usage]) &&
-    strcmp($formfields[cpu_usage], "")) {
+if (isset($formfields["cpu_usage"]) &&
+    strcmp($formfields["cpu_usage"], "")) {
 
-    if (($formfields[cpu_usage] + 0) < 0 ||
-	($formfields[cpu_usage] + 0) > 5) {
+    if (($formfields["cpu_usage"] + 0) < 0 ||
+	($formfields["cpu_usage"] + 0) > 5) {
 	$errors["CPU Usage"] = "Invalid (0 <= X <= 5)";
     }
     else {
-	$inserts[] = "cpu_usage=$formfields[cpu_usage]";
+	$inserts[] = "cpu_usage=" . $formfields["cpu_usage"];
     }
 }
 else {
@@ -528,15 +501,15 @@ else {
 #
 # Mem Usage
 #
-if (isset($formfields[mem_usage]) &&
-    strcmp($formfields[mem_usage], "")) {
+if (isset($formfields["mem_usage"]) &&
+    strcmp($formfields["mem_usage"], "")) {
 
-    if (($formfields[mem_usage] + 0) < 0 ||
-	($formfields[mem_usage] + 0) > 5) {
+    if (($formfields["mem_usage"] + 0) < 0 ||
+	($formfields["mem_usage"] + 0) > 5) {
 	$errors["Mem Usage"] = "Invalid (0 <= X <= 5)";
     }
     else {
-	$inserts[] = "mem_usage=$formfields[mem_usage]";
+	$inserts[] = "mem_usage=" . $formfields["mem_usage"];
     }
 }
 else {
@@ -546,15 +519,15 @@ else {
 #
 # Linktest level
 #
-if (isset($formfields[linktest_level]) &&
-    strcmp($formfields[linktest_level], "")) {
+if (isset($formfields["linktest_level"]) &&
+    strcmp($formfields["linktest_level"], "")) {
 
-    if (($formfields[linktest_level] + 0) < 0 ||
-	($formfields[linktest_level] + 0) > 4) {
+    if (($formfields["linktest_level"] + 0) < 0 ||
+	($formfields["linktest_level"] + 0) > 4) {
 	$errors["Linktest Level"] = "Invalid linktest level";
     }
     else {
-	$inserts[] = "linktest_level=$formfields[linktest_level]";
+	$inserts[] = "linktest_level=" . $formfields["linktest_level"];
     }
 }
 else {
@@ -565,7 +538,7 @@ else {
 # Spit any errors before dealing with batchmode, which changes the DB.
 #
 if (count($errors)) {
-    SPITFORM($formfields, $errors);
+    SPITFORM($experiment, $formfields, $errors);
     PAGEFOOTER();
     return;
 }
@@ -576,42 +549,25 @@ if (count($errors)) {
 # the swapped state. If the query fails, we know that the experiment
 # was in transition.
 #
-if (!isset($formfields[batchmode])) {
-    $formfields[batchmode] = 0;
+if (!isset($formfields["batchmode"])) {
+    $formfields["batchmode"] = 0;
 }
-if ($defaults[batchmode] != $formfields[batchmode]) {
-    $reqstate = $TB_EXPTSTATE_SWAPPED;
+if ($defaults["batchmode"] != $formfields["batchmode"]) {
     $success  = 0;
 
-    if (strcmp($formfields[batchmode], "1")) {
+    if (strcmp($formfields["batchmode"], "1")) {
 	$batchmode = 0;
-	$formfields[batchmode] = 0;
+	$formfields["batchmode"] = 0;
     }
     else {
 	$batchmode = 1;
-	$formfields[batchmode] = 1;
+	$formfields["batchmode"] = 1;
     }
-
-    DBQueryFatal("lock tables experiments write");
-
-    $query_result =
-	DBQueryFatal("update experiments set ".
-		     "   batchmode=$batchmode ".
-		     "where pid='$pid' and eid='$eid' and ".
-		     "     expt_locked is NULL and state='$reqstate'");
-
-    $success = DBAffectedRows();
-
-    DBQueryFatal("unlock tables");
-
-    #
-    # Lets see if that worked.
-    #
-    if (! $query_result || !$success) {
+    if ($experiment->SetBatchMode($batchmode) != 0) {
 	$errors["Batch Mode"] = "Experiment is running or in transition; ".
 	    "try again later";
 
-	SPITFORM($formfields, $errors);
+	SPITFORM($experiment, $formfields, $errors);
 	PAGEFOOTER();
 	return;
     }
@@ -620,9 +576,12 @@ if ($defaults[batchmode] != $formfields[batchmode]) {
 #
 # Otherwise, do the other inserts.
 #
-DBQueryFatal("update experiments set ".
-	     implode(",", $inserts) . " ".
-	     "where pid='$pid' and eid='$eid'");
+if ($experiment->UpdateOldStyle($inserts) != 0) {
+    $errors["Updating"] = "Error updating experiment; please try again later";
+    SPITFORM($experiment, $formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
 
 #
 # Do not send this email if the user is an administrator
@@ -642,21 +601,21 @@ if ($doemail &&
     $sname      = $target_swapper->name();
     $semail     = $target_swapper->email();
 
-    $olds = ($defaults[swappable] ? "Yes" : "No");
-    $oldsr= $defaults[noswap_reason];
-    $oldi = ($defaults[idleswap] ? "Yes" : "No");
-    $oldit= $defaults[idleswap_timeout];
-    $oldir= $defaults[noidleswap_reason];
-    $olda = ($defaults[autoswap] ? "Yes" : "No");
-    $oldat= $defaults[autoswap_timeout];
+    $olds = ($defaults["swappable"] ? "Yes" : "No");
+    $oldsr= $defaults["noswap_reason"];
+    $oldi = ($defaults["idleswap"] ? "Yes" : "No");
+    $oldit= $defaults["idleswap_timeout"];
+    $oldir= $defaults["noidleswap_reason"];
+    $olda = ($defaults["autoswap"] ? "Yes" : "No");
+    $oldat= $defaults["autoswap_timeout"];
 
-    $s    = ($formfields[swappable] ? "Yes" : "No");
-    $sr   = $formfields[noswap_reason];
-    $i    = ($formfields[idleswap] ? "Yes" : "No");
-    $it   = $formfields[idleswap_timeout];
-    $ir   = $formfields[noidleswap_reason];
-    $a    = ($formfields[autoswap] ? "Yes" : "No");
-    $at   = $formfields[autoswap_timeout];
+    $s    = ($formfields["swappable"] ? "Yes" : "No");
+    $sr   = $formfields["noswap_reason"];
+    $i    = ($formfields["idleswap"] ? "Yes" : "No");
+    $it   = $formfields["idleswap_timeout"];
+    $ir   = $formfields["noidleswap_reason"];
+    $a    = ($formfields["autoswap"] ? "Yes" : "No");
+    $at   = $formfields["autoswap_timeout"];
 
     TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
 	   "\nThe swap settings for $pid/$eid have changed.\n".
@@ -683,6 +642,6 @@ if ($doemail &&
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 #
-header("Location: showexp.php3?pid=$pid&eid=$eid");
+header("Location: " . CreateURL("showexp", $experiment));
 
 ?>

@@ -17,8 +17,15 @@ PAGEHEADER("New Users Approved");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 
+#
+# The reason for this call is to make sure that globals are set properly.
+#
+$reqargs = RequiredPageArguments();
+
+# Local used below.
 $projectchecks = array();
 
+# Hmm, is this needed?
 ignore_user_abort(1);
 
 #
@@ -26,8 +33,8 @@ ignore_user_abort(1);
 # See approveuser_form.php3:
 #
 #             uid     menu     project/group
-#	name=stoller$$approval-testbed/testbed value=approved,denied,postpone
-#	name=stoller$$trust-testbed/testbed value=user,local_root
+#	name=Uxxxx$$approval-testbed/testbed value=approved,denied,postpone
+#	name=Uxxxx$$trust-testbed/testbed value=user,local_root
 #
 # We make two passes over the post vars. The first does a sanity check so
 # that we can bail out without doing anything. This allows the user to
@@ -52,7 +59,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	continue;
     }
 
-    $user     = substr($header, 0, strpos($header, "\$\$", 0));
+    $user     = substr($header, 1, strpos($header, "\$\$", 0) - 1);
     $projgrp  = substr($approval_string, strlen("\$\$approval-"));
     $project  = substr($projgrp, 0, strpos($projgrp, "/", 0));
     $group    = substr($projgrp, strpos($projgrp, "/", 0) + 1);
@@ -75,8 +82,10 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     # There should be a corresponding trust variable in the POST vars.
     # Note that we construct the variable name and indirect to it.
     #
-    $foo      = "$user\$\$trust-$project/$group";
-    $newtrust = $$foo;
+    $foo      = "U${user}\$\$trust-$project/$group";
+    #echo "$foo<br>\n";
+    
+    $newtrust = $HTTP_POST_VARS[$foo];
     if (!$newtrust || strcmp($newtrust, "") == 0) {
 	TBERROR("Parse error finding trust in approveuser.php3", 1);
     }
@@ -95,6 +104,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     if (! ($target_user = User::Lookup($user))) {
 	TBERROR("Trying to approve unknown user $user.", 1);
     }
+    $target_uid = $target_user->uid();
 
     # Ditto the project.
     if (! ($target_project = Project::Lookup($project))) {
@@ -129,7 +139,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #
     $target_group->IsMember($target_user, $isapproved);
     if ($isapproved) {
-	USERERROR("$user is already an approved member of ".
+	USERERROR("$target_uid is already an approved member of ".
 		  "$project/$group!", 1);
     }
 
@@ -170,9 +180,10 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	    if (!$subgroup_approval ||
 		(strcmp($subgroup_approval, "deny") &&
 		 strcmp($subgroup_approval, "nuke"))) {
-		USERERROR("If you wish to deny/nuke user $user in project ".
-			  "$project then you must deny/nuke in all of the ".
-			  "subgroups $user is attempting to join.", 1);
+		USERERROR("If you wish to deny/nuke user $target_uid in ".
+			  "project $project then you must deny/nuke in all ".
+			  "of the subgroups $target_uid is attempting to ".
+			  "join.", 1);
 	    }
 	}
     }
@@ -198,9 +209,9 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #
     # Create and indirect through post var for project approval value.
     #
-    $foo = "$user\$\$approval-$project/$project";
-    $bar = "$user\$\$trust-$project/$project";
-    $default_approval = $$foo;
+    $foo = "U${user}\$\$approval-$project/$project";
+    $bar = "U${user}\$\$trust-$project/$project";
+    $default_approval = $HTTP_POST_VARS[$foo];
     
     if (!$default_approval || strcmp($default_approval, "") == 0) {
 	# Implicit group approval as user.
@@ -222,7 +233,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     }
     if (strcmp($approval, "approve") == 0 &&
 	strcmp($default_approval, "approve")) {
-	USERERROR("You cannot approve $user in $project/$group without ".
+	USERERROR("You cannot approve $target_uid in $project/$group without ".
 		  "approval in the default group ($project/$project)!", 1);
     }
 }
@@ -251,6 +262,7 @@ while (list ($user, $value) = each ($projectchecks)) {
 	if (! ($target_user = User::Lookup($user))) {
 	    TBERROR("Could not find user object for $user", 1);
 	}
+	$target_uid = $target_user->uid();
 	
 	#
 	# This looks for different trust levels in different subgroups
@@ -260,8 +272,8 @@ while (list ($user, $value) = each ($projectchecks)) {
 	if (strcmp($pid, $gid)) {
 	    if (isset($grouptrust[$pid]) &&
 		strcmp($grouptrust[$pid], $trust)) {
-		USERERROR("User $user may not have different trust levels in ".
-			  "different subgroups of $pid!", 1);
+		USERERROR("User $target_uid may not have different trust ".
+			  "levels in different subgroups of $pid!", 1);
 	    }
 	    $grouptrust[$pid] = $trust;
 	}
@@ -293,7 +305,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	continue;
     }
 
-    $user     = substr($header, 0, strpos($header, "\$\$", 0));
+    $user     = substr($header, 1, strpos($header, "\$\$", 0) - 1);
     $projgrp  = substr($approval_string, strlen("\$\$approval-"));
     $project  = substr($projgrp, 0, strpos($projgrp, "/", 0));
     $group    = substr($projgrp, strpos($projgrp, "/", 0) + 1);
@@ -302,8 +314,8 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     #
     # Corresponding trust value.
     #
-    $foo      = "$user\$\$trust-$project/$group";
-    $newtrust = $$foo;
+    $foo      = "U${user}\$\$trust-$project/$group";
+    $newtrust = $HTTP_POST_VARS[$foo];
 
     #
     # Get the current status for the user, which we might need to change.
@@ -319,6 +331,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     $curstatus  = $target_user->status();
     $user_email = $target_user->email();
     $user_name  = $target_user->name();
+    $user_uid   = $target_user->uid();
     #echo "Status = $curstatus, Email = $user_email<br>\n";
 
     # Ditto the project and group
@@ -346,7 +359,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     #
     if (strcmp($approval, "postpone") == 0) {
 	echo "<p>
-                  Membership status for user $user in $project/$group was
+                  Membership status for user $user_uid in $project/$group was
                   <b>postponed</b> for later decision.\n";
         continue;
     }
@@ -357,7 +370,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
         #
 	$target_group->DeleteMember($target_user);
 
-        TBMAIL("$user_name '$user' <$user_email>",
+        TBMAIL("$user_name '$user_uid' <$user_email>",
              "Membership Denied in '$project/$group'",
 	     "\n".
              "This message is to notify you that you have been denied\n".
@@ -371,7 +384,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
              "Errors-To: $TBMAIL_WWW");
 
 	echo "<p>
-                User $user was <b>denied</b> membership in $project/$group.
+                User $user_uid was <b>denied</b> membership in $project/$group.
                 <br>
                 The user will need to reapply again if this was in error.\n";
 
@@ -394,7 +407,8 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	#
 	if (count($project_list)) {
 	    echo "<p>
-                  User $user was <b>denied</b> membership in $project/$group.
+                  User $user_uid was <b>denied</b> membership in
+                  $project/$group.
                   <br>
                   Since the user is a member (or requesting membership)
 		  in other projects, the account cannot be safely removed.\n";
@@ -411,17 +425,18 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	if (strcmp($curstatus, "newuser") &&
 	    strcmp($curstatus, "unapproved")) {
 	    echo "<p>
-                  User $user was <b>denied</b> membership in $project/$group.
+                  User $user_uid was <b>denied</b> membership in
+                  $project/$group.
                   <br>
                   Since the user has been approved by, or was active in other
 		  projects in the past, the account cannot be safely removed.
                   \n";
 	    continue;
 	}
-	SUEXEC($uid, $TBADMINGROUP, "webrmuser -n -p $project $user", 1); 
+	SUEXEC($uid, $TBADMINGROUP, "webrmuser -n -p $project $user_uid", 1); 
 
 	echo "<p>
-                User $user was <b>denied</b> membership in $project/$group.
+                User $user_uid was <b>denied</b> membership in $project/$group.
                 <br>
 		The account has also been <b>terminated</b>!\n";
 
@@ -449,17 +464,17 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
             #
             # Create user account on control node.
             #
-	    SUEXEC($uid, $TBADMINGROUP, "webtbacct add $user", 1);
+	    SUEXEC($uid, $TBADMINGROUP, "webtbacct add $user_uid", 1);
 	}
         #
 	# Only need to add new membership.
 	# 
 	SUEXEC($uid, $TBADMINGROUP,
-	       "webmodgroups -a $project:$group:$newtrust $user", 1);
+	       "webmodgroups -a $project:$group:$newtrust $user_uid", 1);
 
 	echo "<p>
-                  User $user was <b>granted</b> membership in $project/$group
-                  with $newtrust permissions.\n";
+                  User $user_uid was <b>granted</b> membership in
+                  $project/$group with $newtrust permissions.\n";
 		
 	continue;
     }

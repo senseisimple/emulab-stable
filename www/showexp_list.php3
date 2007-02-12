@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,6 +17,14 @@ PAGEHEADER("Experiment Information Listing");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify Page arguments.
+#
+$optarg = OptionalPageArguments("showtype",   PAGEARG_STRING,
+				"sortby",     PAGEARG_STRING,
+				"thumb",      PAGEARG_BOOLEAN,
+				"noignore",   PAGEARG_BOOLEAN);
 
 $clause      = 0;
 $having      = "";
@@ -38,9 +46,14 @@ function MakeMouseOver($string)
 #
 $openlist        = TBGetSiteVar("general/open_showexplist");
 $openlist_member = 0;
+$openlist_join   = "";
+$openlist_clause = "";
 if (!$isadmin && isset($openlist) && $openlist != "") {
+    if (! ($project = Project::Lookup($openlist))) {
+	TBERROR("Could not map project $openlist to its object", 1);
+    }
     $openlist_member =
-	TBMinTrust(TBProjTrust($uid,$openlist), $TBDB_TRUST_USER);
+	TBMinTrust($project->UserTrust($this_user), $TBDB_TRUST_USER);
     $openlist_join =
 	" left join group_membership as g on ".
 	"     g.uid=e.expt_swap_uid and g.pid='$openlist' and g.pid=g.gid ";
@@ -526,11 +539,15 @@ if ($thumb && !$idle) {
 	$idlesec= $row["idlesec"];
 	$swapreqs = $row["swap_requests"];
 	$isidle = ($idlesec >= 3600*$idlehours);
-	$stale = TBGetExptIdleStale($pid,$eid);
 	$daysidle=0;
 	$idletime = ($idlesec > 300 ? round($idlesec/3600,1) : 0);
 	# reset pcs
 	$pcs=0;
+
+	if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
+	    TBERROR("Could not map $pid/$eid to its object", 1);
+	}
+	$stale = $experiment->IdleStale();
 
 	if (! ($head_user = User::Lookup($huid))) {
 	    TBERROR("Could not lookup object for user $huid", 1);

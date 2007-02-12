@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -15,41 +15,18 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page arguments. Allow user to optionally specify building/floor.
-#
-#
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    PAGEARGERROR("You must provide a Project ID.");
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    PAGEARGERROR("You must provide an Experiment ID.");
-}
-
-if (!preg_match("/^[-\w]+$/", $pid)) {
-    PAGEARGERROR("Invalid pid argument.");
-}
-if (!preg_match("/^[-\w]+$/", $eid)) {
-    PAGEARGERROR("Invalid eid argument.");
-}
-
 #
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! TBValidExperiment($pid, $eid)) {
-  USERERROR("Experiment $pid/$eid is not a valid experiment.", 1);
-}
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 
 #
 # Verify Permission.
 #
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to access experiment $pid/$eid!", 1);
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to access experiment!", 1);
 }
+$pid = $experiment->pid();
+$eid = $experiment->eid();
 
 # Initial goo.
 header("Content-Type: text/plain");
