@@ -905,7 +905,7 @@ class User
 
 	DBQueryFatal("update users set ".
 		     "       weblogin_failcount=weblogin_failcount+1, ".
-		     "       weblogin_failstamp='$now' ".
+		     "       weblogin_failstamp='now()' ".
 		     "where uid_idx='$idx'");
 
 	return $this->Refresh();

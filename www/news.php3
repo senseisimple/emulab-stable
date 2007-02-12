@@ -231,7 +231,7 @@ else {
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
 <?php
-if ($TBMAINSITE && ! (isset($single) || $single)) {
+if ($TBMAINSITE && ! (isset($single) && $single)) {
     echo "<tr><td class=stealth align=center>
                   <a href = 'doc/changelog.php3'>
                      (Changelog/Technical Details)</a></td></tr>\n";
