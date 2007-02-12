@@ -22,18 +22,28 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
-				 "exptidx", PAGEARG_INTEGER,
-				 "records", PAGEARG_INTEGER);
+				 "exptidx",    PAGEARG_INTEGER,
+				 "records",    PAGEARG_INTEGER);
+
+if (isset($exptidx)) {
+    #
+    # Just in case we get here via a current experiment link.
+    #
+    if (($foo = Experiment::Lookup($exptidx))) {
+	$experiment = $foo;
+    }
+}
 
 #
 # If we got a current experiment, great. Otherwise we have to lookup
 # data for a historical experiment.
 #
-if ($experiment) {
+if (isset($experiment)) {
     # Need these below.
     $pid = $experiment->pid();
     $eid = $experiment->eid();
     $gid = $experiment->gid();
+    $exptidx = $experiment->idx();
 
     # Permission
     if (!$isadmin &&

@@ -40,6 +40,14 @@ if (isset($instance)) {
 	$exptidx = $instance->exptidx();
     $template = $instance->GetTemplate();
 }
+elseif (isset($exptidx)) {
+    #
+    # Just in case we get here via a current experiment link.
+    #
+    if (($foo = Experiment::Lookup($exptidx))) {
+	$experiment = $foo;
+    }
+}
 elseif (isset($template)) {
     $experiment = $template->GetExperiment();
 }
@@ -52,6 +60,7 @@ if (isset($experiment)) {
     # Need these below.
     $pid = $experiment->pid();
     $eid = $experiment->eid();
+    $exptidx = $experiment->idx();
 
     # Permission
     if (!$isadmin &&
@@ -98,7 +107,7 @@ if (isset($template)) {
     
     if (isset($instance)) {
 	$id = $instance->exptidx();
-	if ($experiment)
+	if (isset($experiment))
 	    $path = $experiment->path();
 
 	echo "Subversion datastore for Instance $id";
@@ -124,16 +133,19 @@ else {
 
 echo "<br><br></font>";
 
+#
+# Only current experiments can be tagged.
+#
 if (isset($experiment)) {
     echo "<form action='${TBBASE}/archive_tag.php3' $style method=get>\n";
+    echo "<b><input type=hidden name=experiment value='$exptidx'></b>";
     echo "<b><input type=submit name=tag value='Tag Archive'></b>";
-    echo "<input type=hidden name=exptidx value='$exptidx'>";
     echo "</form>";
 }
 
 echo "<form action='${TBBASE}/archive_tags.php3' $style method=get>";
+echo "<b><input type=hidden name=experiment value='$exptidx'></b>";
 echo "<b><input type=submit name=tag value='Show Tags'></b>";
-echo "<input type=hidden name=exptidx value='$exptidx'>";
 echo "</form>";
 
 echo "<iframe width=100% height=800 scrolling=yes src='$url' border=2>".
