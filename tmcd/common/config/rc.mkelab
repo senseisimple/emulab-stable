@@ -114,6 +114,9 @@ my $NOSETUP    = 0;
 # Whether we configure a /scratch FS, turned on/off below
 my $SCRATCHFS  = 0;
 
+# Whether installation of collab tools should be disabled
+my $NOCOLLAB   = 0;
+
 # Single or dual control network.
 my $SINGLE_CONTROLNET = 0;
 
@@ -1627,7 +1630,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^MAILMANSUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6) {
+		    if (!$NOCOLLAB && $FBSD_VERSION >= 6) {
 			print OUTDEFS "MAILMANSUPPORT=1\n";
 		    }
 		    else {
@@ -1636,7 +1639,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^CVSSUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6) {
+		    if (!$NOCOLLAB && $FBSD_VERSION >= 6) {
 			print OUTDEFS "CVSSUPPORT=1\n";
 		    }
 		    else {
@@ -1645,7 +1648,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^BUGDBSUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6) {
+		    if (!$NOCOLLAB && $FBSD_VERSION >= 6) {
 			print OUTDEFS "BUGDBSUPPORT=1\n";
 		    }
 		    else {
@@ -1654,7 +1657,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^OPSDBSUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6) {
+		    if (!$NOCOLLAB && $FBSD_VERSION >= 6) {
 			print OUTDEFS "OPSDBSUPPORT=1\n";
 		    }
 		    else {
@@ -1663,7 +1666,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^WIKISUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6) {
+		    if (!$NOCOLLAB && $FBSD_VERSION >= 6) {
 			print OUTDEFS "WIKISUPPORT=1\n";
 		    }
 		    else {
@@ -1672,7 +1675,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^ARCHIVESUPPORT$/ && do {
-		    if ($FBSD_VERSION >= 6.1) {
+		    if (!$NOCOLLAB && $FBSD_VERSION >= 6.1) {
 			print OUTDEFS "ARCHIVESUPPORT=1\n";
 		    }
 		    else {
