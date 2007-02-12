@@ -554,10 +554,6 @@ echo "<br>
          <img border=1 alt='experiment vis'
               src='showthumb.php3?idx=$rsrcidx'></a>";
 
-if ($instance) {
-    $instance->ShowCurrentBindings();
-}
-
 SUBMENUEND_2B();
 
 #
@@ -694,11 +690,8 @@ if ($experiment->Firewalled() &&
 }
 SUBPAGEEND();
 
-if ($instance &&
-    ($expstate == $TB_EXPTSTATE_ACTIVE ||
-     $expstate == $TB_EXPTSTATE_PANICED ||
-     $expstate == $TB_EXPTSTATE_ACTIVATING)) {
-    $instance->ShowLastRunBindings();
+if ($instance) {
+    $instance->ShowCurrentBindings();
 }
 
 #
