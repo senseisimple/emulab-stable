@@ -730,7 +730,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 {
-    global $TBMAINSITE, $login_user;
+    global $TBMAINSITE, $TBBASE, $BASEPATH, $login_user;
 
     if (!$nocontent) {
 	if (!$TBMAINSITE) {
@@ -807,20 +807,20 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 	header("Expires: " . gmdate("D, d M Y H:i:s", time() + 300) . " GMT"); 
     }
 
-    if (isset($view['hide_banner'])) {
+    if (VIEWSET($view, 'hide_banner')) {
 	$nobanner = 1;
     } else {
 	$nobanner = 0;
     }
     $contentname = "content";
-    $nocontent = isset($view['hide_sidebar']) && !isset($view['menu']);
+    $nocontent = VIEWSET($view, 'hide_sidebar') && !VIEWSET($view, 'menu');
     PAGEBEGINNING( $title, $nobanner,
 		   $nocontent,
 		   $extra_headers );
-    if (!isset($view['hide_sidebar'])) {
+    if (!VIEWSET($view, 'hide_sidebar')) {
 	WRITESIDEBAR();
     }
-    elseif (isset($view['menu'])) {
+    elseif (VIEWSET($view, 'menu')) {
 	WRITESIMPLESIDEBAR($view['menu']);
     }
     else {
@@ -843,7 +843,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     $minor = "";
     $build = "";
     TBGetVersionInfo($major, $minor, $build);
-    if ($view['hide_versioninfo'] == 1)
+    if (VIEWSET($view, 'hide_versioninfo'))
 	$versioninfo = "";
     else
 	$versioninfo = "Vers: $major.$minor Build: $build";
@@ -870,9 +870,13 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     }
     echo "$title</h2>\n";
 
-    echo "<div class='cbody'>\n";
+    if ($login_user) {
+	echo "<div class=pagenotworking>Page not working properly? ";
+	echo "<a href=pagenotworking.php>Click here</a></div>";
+    }
+
     echo "<!-- begin content -->\n";
-    if ($view['show_topbar'] == "plab") {
+    if (VIEWSET($view, 'show_topbar', "plab")) {
 	WRITEPLABTOPBAR();
     }
 }
@@ -907,13 +911,13 @@ function PAGEFOOTER($view = NULL) {
     echo "<!-- end content -->\n";
     echo "</div>\n";
 
-    if ($view['show_bottombar'] == "plab") {
+    if (VIEWSET($view, 'show_bottombar', "plab")) {
 	WRITEPLABBOTTOMBAR();
     }
 
     echo "
               <div class='contentfooter'>\n";
-    if (!$view['hide_copyright']) {
+    if (!VIEWSET($view, 'hide_copyright')) {
 	echo "
                 <ul class='navlist'>
 		<li>[&nbsp;<a href=\"http://www.cs.utah.edu/flux/\"
@@ -984,6 +988,7 @@ function WRITESUBMENUBUTTON($text, $link, $target = "") {
     #
     # Optional 'target' agument, so that we can pop up new windows
     #
+    $targettext = "";
     if ($target) {
 	$targettext = "target='$target'";
     }
@@ -1080,14 +1085,26 @@ function SUBMENUEND_2B() {
 # Get a view, for use with PAGEHEADER and PAGEFOOTER, for the current user
 #
 function GETUSERVIEW() {
-    if (GETUID() && ISPLABUSER()) {
+    if (GETUID() && (ISPLABUSER() || isset($_REQUEST["plab_interface"]))) {
 	return array('hide_sidebar' => 1, 'hide_banner' => 1,
 	    'show_topbar' => "plab", 'show_bottombar' => 'plab',
 	    'hide_copyright' => 1);
     } else {
-	# Most users get the default view
 	return array();
     }
+}
+
+#
+# Do we view something.
+#
+function VIEWSET($view, $thing, $value = null) {
+    if (! array_key_exists($thing, $view))
+	return 0;
+    if ($value) {
+	return $view[$thing] == $value;
+    }
+    $val = $view[$thing];
+    return ! empty($val);
 }
 
 function STARTBUSY($msg) {
