@@ -875,6 +875,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 	echo "<a href=pagenotworking.php>Click here</a></div>";
     }
 
+    echo "<div class='cbody'>\n";
     echo "<!-- begin content -->\n";
     if (VIEWSET($view, 'show_topbar', "plab")) {
 	WRITEPLABTOPBAR();
