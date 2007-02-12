@@ -235,8 +235,8 @@ function WRITESIDEBAR() {
     }
 
     if ($row = mysql_fetch_array($query_result)) {
-	$newsDate = "(".$row[prettydate].")";
-	if ($row[age] < 7) {
+	$newsDate = "(".$row["prettydate"].")";
+	if ($row["age"] < 7) {
 	    $newNews = 1;
 	}
     }
