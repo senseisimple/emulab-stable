@@ -71,6 +71,7 @@ function INITFORM($formfields, $projlist)
 	    $defaults["exp_id"]  = "${copyeid}-${copycount}";
 	}
 	$defaults["copyid"] = $copyid;
+	$defaults["exp_branch"] = 0;
     }
     else {
 	unset($copyid);
@@ -187,7 +188,7 @@ function CHECKFORM(&$formfields, $projlist)
 	    PAGEFOOTER();
 	    exit(1);
 	}
-	$formfields[exp_nsfile_contents] = urlencode($file_contents);
+	$formfields["exp_nsfile_contents"] = urlencode($file_contents);
     }
     $args    = array();
     $args[0] = $formfields;

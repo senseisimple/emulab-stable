@@ -318,10 +318,10 @@ if ($nsfilelocale == "copyid") {
 	# Project level check if not a current experiment.
 	#
 	if (($experiment = Experiment::LookupByPidEid($copypid, $copyeid))) {
-	    okay = $experiment->AccessCheck($this_user, $TB_EXPT_READINFO);
+	    $okay = $experiment->AccessCheck($this_user, $TB_EXPT_READINFO);
 	}
 	elseif (($project = Project::Lookup($copypid))) {
-	    okay = $project->AccessCheck($this_user, $TB_PROJECT_READINFO);
+	    $okay = $project->AccessCheck($this_user, $TB_PROJECT_READINFO);
 	}
 
 	if (! $okay) {
