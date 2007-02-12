@@ -191,19 +191,19 @@ sub getnodeinfo
     }else{ return; }
 
     #remove old node-listing file
-    my $nodesfilename = "allnodelisting_automanage.txt";
-    unlink $nodesfilename or warn "can't delete node-listing file";
-    open FILE, "> $nodesfilename"
-	or warn "can't open file $nodesfilename\n";
+    #my $nodesfilename = "allnodelisting_automanage.txt";
+    #unlink $nodesfilename or warn "can't delete node-listing file";
+    #open FILE, "> $nodesfilename"
+    #	or warn "can't open file $nodesfilename\n";
 
     #populate sitenodes
     foreach my $node (keys %allnodes){
 	my $siteid = $allnodes{$node}{site};
 	push @{$sitenodes{$siteid}}, $node;
 #       print @{$sitenodes{$siteid}}."\n";
-	print FILE "$node\n";
+    #	print FILE "$node\n";
     }
-    close FILE;
+    #close FILE;
 }
 
 sub printNodeInfo($)
@@ -366,23 +366,9 @@ sub choosebestnode($)
    
     my $flag_siteIncluded = 0;  #set if any node at site is in constraint set
 
-=pod
-    print "site: $site ";
+
     foreach my $node ( @{$sitenodes{$site}} ){
-	print "$node ";
-    }
-    print "\n";
-=cut
-    foreach my $node ( @{$sitenodes{$site}} ){
-=pod
-	if(isnodeinconstrset($node)){
-	    print "node $node is in constr set ";
-	    if( $allnodes{$node}{free} == 1 ){
-		print "and free";
-	    }
-	    print "\n";
-	}
-=cut
+
         if( isnodeinconstrset($node) ){
 	    $flag_siteIncluded = 1;
 #	    print "SETTING SITEINCLUDED=1 for $node at $site\n";
@@ -394,17 +380,13 @@ sub choosebestnode($)
 	    #first time thru loop...
 	    if( $bestnode eq "NONE" ){
 		#set this to be best node if it responds to a command
-		
-#		if( edittest($node,"NOADDR",0,"bw") == 1 ){
-#		    $bestnode = $node;
-#		}
+
 		if( getstatus($node) ne "error" ){
 		    $bestnode = $node;
 		}
 	    }else{
 		if( ($allnodes{$node}{cpu} < $allnodes{$bestnode}{cpu}
 		    - $CPUUSAGETHRESHOLD) &&
-#		    (edittest($node,"NOADDR",0,"bw") == 1) )
 		    getstatus($node) ne "error" )
 		{
 		    print '$allnodes{$node}{cpu}'.
