@@ -395,6 +395,14 @@ ul.submenu li.newgroup {
   text-align: right;
   margin-bottom: 0px;
 }
+.pagenotworking {
+  background-color:#FFF;
+  font-size: x-small;
+  text-align: left;
+  margin-bottom: 6px;
+  margin-top: 0px;
+  font-weight: bold;
+}
 .reportbug {
   background-color:#FFF;
   font-size: x-small;
