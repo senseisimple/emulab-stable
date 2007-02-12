@@ -235,15 +235,15 @@ function WRITESIDEBAR() {
     }
 
     if ($row = mysql_fetch_array($query_result)) {
-	$newsDate = "(".$row["prettydate"].")";
-	if ($row["age"] < 7) {
+	$newsDate = "(".$row[prettydate].")";
+	if ($row[age] < 7) {
 	    $newNews = 1;
 	}
     }
 
     echo "<script type='text/javascript' language='javascript'
                   src='${BASEPATH}/textbox.js'></script>\n";
-    echo "<h3 class=menuheader>Information</h3><ul class=menu>\n";
+    echo "<h3 class=menuheader id=informationheader>Information</h3><ul class=menu id=information>\n";
 
     if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
 	$rootEmulab = 1;
@@ -273,7 +273,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave _NEW here about 2 weeks
-	WRITESIDEBARBUTTON("Papers and Talks (Dec 21)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON_NEW("Papers and Talks (Dec 21)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software (Jul 18)",
 			       $TBDOCBASE, "software.php3");
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
@@ -390,8 +390,8 @@ function WRITESIDEBAR() {
 
     # Start Interaction section if going to spit out interaction options.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-	echo "<h3 class='menuheader'>Experimentation</h3>
-              <ul class='menu'>\n";
+	echo "<h3 class='menuheader' id='experimentationheader'>Experimentation</h3>
+              <ul class='menu' id='experimentation'>\n";
     }
 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
@@ -511,8 +511,8 @@ function WRITESIDEBAR() {
     if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
 	($WIKISUPPORT || $MAILMANSUPPORT || $BUGDBSUPPORT ||
 	 $CVSSUPPORT  || $CHATSUPPORT)) {
-	echo "<h3 class='menuheader'>Collaboration</h3>
-              <ul class='menu'>";
+	echo "<h3 class='menuheader' id='collaborationheader'>Collaboration</h3>
+              <ul class='menu' id='collaboration'>";
 
 	if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
 	    $wikiname = $CHECKLOGIN_WIKINAME;
@@ -555,8 +555,8 @@ function WRITESIDEBAR() {
 
     # Optional ADMIN menu.
     if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN()) {
-	echo "<h3 class='menuheader'>Administration</h3>
-              <ul class='menu'>";
+	echo "<h3 class='menuheader' id='administrationheader'>Administration</h3>
+              <ul class='menu' id='administration'>";
 	
 	echo "<li>List <a " .
 	    " href=\"$TBBASE/showproject_list.php3\">" .
@@ -615,7 +615,7 @@ function WRITESIMPLESIDEBAR($menudefs) {
 #
 function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
         $extra_headers = NULL ) {
-    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB;
+    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB, $FANCYBANNER;
     global $TBDIR, $WWW;
     global $MAINPAGE;
     global $TBDOCBASE;
@@ -666,31 +666,57 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
                   src='${BASEPATH}/emulab_sup.js'></script>\n";
 
     if (! $nobanner ) {
-	echo "<map name='overlaymap'>
-                 <area shape=\"rect\" coords=\"100,60,339,100\"
-                       href='http://www.emulab.net/index.php3'>
-                 <area shape=\"rect\" coords=\"0,0,339,100\"
-                       href='$TBDOCBASE/index.php3'>
-              </map>
-            <div class='bannercell'>\n";
+        #
+        # We do the banner differently for the Utah site and other sites.
+        # The process of generating the fancy Utah banner is kind of 
+        # complicated
+        #
+        if ($FANCYBANNER) {
+            echo "<div id='fancybannercell'>\n";
+        } else {
+            echo "<div id='bannercell'>\n";
+        }
+
+        # NOTE: This has to come before any images in the div for the float to
+        # work correctly.
 	if ($currentusage) {
-	    echo "<iframe src='$BASEPATH/currentusage.php3' class='usageframe'
+            if ($FANCYBANNER) {
+                $class = "transparentusageframe";
+            } else {
+                $class = "usageframe";
+            }
+	    echo "<iframe src='$BASEPATH/currentusage.php3' class='$class'
                           scrolling='no' frameborder='0'></iframe>\n";
 	}
-	echo "<img height='100' border='0' usemap=\"#overlaymap\" ";
 
-	if ($ELABINELAB) {
-	    echo "width='239' ";
-	    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
-	}
-	else {
-	    echo "width='339' ";
-	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
-	}
-	echo "alt='$THISHOMEBASE - the network testbed'>\n";
-        if (0 && !$MAINPAGE) {
-	     echo "<span class='devpagename'>$WWW</span>";
-	}
+        if ($FANCYBANNER) {
+            # This transparent image gives the illusion of being able to click
+            # on the logo part of the banner image.
+            echo "<a href='$TBDOCBASE/index.php3'>
+                  <img height='100px' width='360px' border='0' src='$BASEPATH/transparent.gif' />
+                  </a>\n";
+        } else {
+            echo "<map name='overlaymap'>
+                     <area shape=\"rect\" coords=\"100,60,339,100\"
+                           href='http://www.emulab.net/index.php3'>
+                     <area shape=\"rect\" coords=\"0,0,339,100\"
+                           href='$TBDOCBASE/index.php3'>
+                  </map>\n";
+                  echo "<img height='100' border='0' usemap=\"#overlaymap\" ";
+            if ($ELABINELAB) {
+                echo "width='239' ";
+                echo "src='$BASEPATH/overlay.elabinelab.gif' ";
+            }
+            else {
+                echo "width='339' ";
+                echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
+                echo "src='$BASEPATH/banner-rgb.png' ";
+            }
+            echo "alt='$THISHOMEBASE - the network testbed'>\n";
+            if (0 && !$MAINPAGE) {
+                echo "<span class='devpagename'>$WWW</span>";
+            }
+        }
         echo "</div>\n";
     }
     if (! $nocontent ) {
@@ -704,7 +730,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 {
-    global $TBMAINSITE, $TBBASE, $BASEPATH, $login_user;
+    global $TBMAINSITE, $login_user;
 
     if (!$nocontent) {
 	if (!$TBMAINSITE) {
@@ -781,20 +807,20 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 	header("Expires: " . gmdate("D, d M Y H:i:s", time() + 300) . " GMT"); 
     }
 
-    if (VIEWSET($view, 'hide_banner')) {
+    if (isset($view['hide_banner'])) {
 	$nobanner = 1;
     } else {
 	$nobanner = 0;
     }
     $contentname = "content";
-    $nocontent = VIEWSET($view, 'hide_sidebar') && !VIEWSET($view, 'menu');
+    $nocontent = isset($view['hide_sidebar']) && !isset($view['menu']);
     PAGEBEGINNING( $title, $nobanner,
 		   $nocontent,
 		   $extra_headers );
-    if (!VIEWSET($view, 'hide_sidebar')) {
+    if (!isset($view['hide_sidebar'])) {
 	WRITESIDEBAR();
     }
-    elseif (VIEWSET($view, 'menu')) {
+    elseif (isset($view['menu'])) {
 	WRITESIMPLESIDEBAR($view['menu']);
     }
     else {
@@ -817,7 +843,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     $minor = "";
     $build = "";
     TBGetVersionInfo($major, $minor, $build);
-    if (VIEWSET($view, 'hide_versioninfo'))
+    if ($view['hide_versioninfo'] == 1)
 	$versioninfo = "";
     else
 	$versioninfo = "Vers: $major.$minor Build: $build";
@@ -844,13 +870,9 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     }
     echo "$title</h2>\n";
 
-    if ($login_user) {
-	echo "<div class=pagenotworking>Page not working properly? ";
-	echo "<a href=pagenotworking.php>Click here</a></div>";
-    }
-
+    echo "<div class='cbody'>\n";
     echo "<!-- begin content -->\n";
-    if (VIEWSET($view, 'show_topbar', "plab")) {
+    if ($view['show_topbar'] == "plab") {
 	WRITEPLABTOPBAR();
     }
 }
@@ -883,14 +905,15 @@ function PAGEFOOTER($view = NULL) {
     $year  = $today["year"];
 
     echo "<!-- end content -->\n";
+    echo "</div>\n";
 
-    if (VIEWSET($view, 'show_bottombar', "plab")) {
+    if ($view['show_bottombar'] == "plab") {
 	WRITEPLABBOTTOMBAR();
     }
 
     echo "
               <div class='contentfooter'>\n";
-    if (!VIEWSET($view, 'hide_copyright')) {
+    if (!$view['hide_copyright']) {
 	echo "
                 <ul class='navlist'>
 		<li>[&nbsp;<a href=\"http://www.cs.utah.edu/flux/\"
@@ -928,7 +951,7 @@ function PAGEFOOTER($view = NULL) {
     ENDPAGE();
 
     # Plug the home site from all others.
-    echo "\n<br><a href=\"www.emulab.net/netemu.php3\"></a>\n";
+    echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
     # This has to be after all the tooltip definitions.
     echo "<script type='text/javascript' src='${TBBASE}/js/wz_tooltip.js'>".
@@ -961,7 +984,6 @@ function WRITESUBMENUBUTTON($text, $link, $target = "") {
     #
     # Optional 'target' agument, so that we can pop up new windows
     #
-    $targettext = "";
     if ($target) {
 	$targettext = "target='$target'";
     }
@@ -1058,26 +1080,14 @@ function SUBMENUEND_2B() {
 # Get a view, for use with PAGEHEADER and PAGEFOOTER, for the current user
 #
 function GETUSERVIEW() {
-    if (GETUID() && (ISPLABUSER() || isset($_REQUEST["plab_interface"]))) {
+    if (GETUID() && ISPLABUSER()) {
 	return array('hide_sidebar' => 1, 'hide_banner' => 1,
 	    'show_topbar' => "plab", 'show_bottombar' => 'plab',
 	    'hide_copyright' => 1);
     } else {
+	# Most users get the default view
 	return array();
     }
-}
-
-#
-# Do we view something.
-#
-function VIEWSET($view, $thing, $value = null) {
-    if (! array_key_exists($thing, $view))
-	return 0;
-    if ($value) {
-	return $view[$thing] == $value;
-    }
-    $val = $view[$thing];
-    return ! empty($val);
 }
 
 function STARTBUSY($msg) {

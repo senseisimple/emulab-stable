@@ -117,6 +117,7 @@ AC_SUBST(TBCOOKIESUFFIX)
 AC_SUBST(TBAUTHDOMAIN)
 AC_SUBST(TBAUTHTIMEOUT)
 AC_SUBST(TBMAINSITE)
+AC_SUBST(FANCYBANNER)
 AC_SUBST(SFSSUPPORT)
 AC_SUBST(ELABINELAB)
 AC_SUBST(OUTERBOSS_NODENAME)
@@ -207,6 +208,7 @@ CLIENT_VARDIR="/var/emulab"
 CLIENT_MANDIR="/usr/local/man"
 TBSECURECOOKIES=1
 TBMAINSITE=0
+FANCYBANNER=0
 JAILIPBASE=172.16.0.0
 JAILIPMASK=255.240.0.0
 IPBASE=10
@@ -708,6 +710,12 @@ esac]
 AC_PATH_PROG(RSYNC, rsync, "", [${PATH}])
 if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
     AC_MSG_WARN([Rsync is required for logholes to work, see www.rsync.org.])
+fi
+
+# Turn on the new fancy banner - normally turned on only at Utah, but
+# overridable for other sites
+if test "$TBMAINSITE" = 1; then
+    FANCYBANNER=1
 fi
 
 outfiles="$outfiles Makeconf GNUmakefile \
