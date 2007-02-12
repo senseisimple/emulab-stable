@@ -29,6 +29,14 @@ CONNECT_COMMAND = 4
 TRAFFIC_WRITE_COMMAND = 5
 DELETE_CONNECTION_COMMAND = 6
 
+command_to_string = {NEW_CONNECTION_COMMAND: 'New Connection',
+                     TRAFFIC_MODEL_COMMAND: 'Traffic Model',
+                     CONNECTION_MODEL_COMMAND: 'Connection Model',
+                     SENSOR_COMMAND: 'Sensor',
+                     CONNECT_COMMAND: 'Connect',
+                     TRAFFIC_WRITE_COMMAND: 'Write',
+                     DELETE_CONNECTION_COMMAND: 'Delete'}
+
 NULL_SENSOR = 0
 STATE_SENSOR = 1
 PACKET_SENSOR = 2
@@ -80,6 +88,8 @@ stub_port = 0
 netmon_output_version = 3
 magent_version = 1
 
+is_fake = False
+
 class Dest:
   def __init__(self):
     self.local_port = ''
@@ -128,53 +138,44 @@ class Socket:
 initial_connection_bandwidth = {}
 socket_map = {}
 
-
-total_size = 0
-last_total = -1
-
 ##########################################################################
 
 def main_loop():
-  global total_size, last_total
-
   # Initialize
   read_args()
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#  conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-  sys.stdout.write("stub_ip is " + stub_ip + ":" + str(stub_port) + "\n")
-  sys.stdout.flush()
-  conn.connect((stub_ip, stub_port))
+  if not is_fake:
+    #conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    sys.stdout.write("Connect: stub_ip is " + stub_ip + ":" + str(stub_port)
+                     + "\n")
+    conn.connect((stub_ip, stub_port))
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
-  poll.register(conn, select.POLLIN)
+  if not is_fake:
+    poll.register(conn, select.POLLIN)
   done = False
 
   while not done:
-    # Reset
-#    max_time = time.time() + quanta
-
     # Collect data until the next quanta boundary
-    fdlist = poll.poll()
-    for pos in fdlist:
-      if pos[0] == sys.stdin.fileno() and (pos[1] & select.POLLIN) != 0 and not done:
+    try:
+      fdlist = poll.poll()
+      for pos in fdlist:
+        if (pos[0] == sys.stdin.fileno() and (pos[1] & select.POLLIN) != 0
+            and not done):
           # A line of data from tcpdump is available.
-          try:
-#            sys.stdout.write('get_next_packet()\n')
-            get_next_packet(conn)
-          except EOFError:
-            sys.stderr.write('Done: Got EOF on stdin\n')
-            done = 1
-      elif pos[0] == conn.fileno() and (pos[1] & select.POLLIN) != 0 and not done:
-        sys.stdout.write('receive_characteristic()\n')
-        # A record for change in link characteristics is available.
-        done = not receive_characteristic(conn)
-      elif not done:
-        sys.stdout.write('fd: ' + str(pos[0]) + ' conn-fd: ' + str(conn.fileno()) + '\n')
-      # Update the stub
-    if total_size != last_total:
-#      sys.stdout.write('Total Size: ' + str(total_size) + '\n')
-      last_total = total_size
-#    sys.stdout.write('Loop end\n')
+          get_next_packet(conn)
+        elif (pos[0] == conn.fileno() and (pos[1] & select.POLLIN) != 0
+              and not done):
+          # A record for change in link characteristics is available.
+          receive_characteristic(conn)
+        elif not done:
+          raise Exception('ERROR: Unknown fd on select: fd: ' + str(pos[0])
+                          + ' conn-fd: ' + str(conn.fileno()))
+    except EOFError:
+      sys.stdout.write('Done: Got an EOF on stdin\n')
+      done = True
+    except Exception, err:
+      sys.stderr.write(str(err) + '\n')
 
 ##########################################################################
 
@@ -182,6 +183,7 @@ def read_args():
   global ip_mapping_filename, this_experiment, this_ip, stub_ip, stub_port
   global pid, eid, evclient
   global initial_filename
+  global is_fake
 
   usage = "usage: %prog [options]"
   parser = OptionParser(usage=usage)
@@ -203,6 +205,7 @@ def read_args():
   parser.add_option("--initial", action="store", type="string",
                     dest="initial_filename", metavar="INITIAL_CONDITIONS_FILE",
                     help="File giving initial conditions for connections (defaults to no shaping)")
+  parser.add_option("--fake", action="store_true", dest="is_fake")
 
   (options, args) = parser.parse_args()
   ip_mapping_filename = options.ip_mapping_filename
@@ -211,6 +214,12 @@ def read_args():
   stub_ip = options.stub_ip
   stub_port = options.stub_port
   initial_filename = options.initial_filename
+  is_fake = options.is_fake
+
+  if is_fake:
+    sys.stderr.write('***FAKE***\n')
+  else:
+    sys.stderr.write('***REAL***\n')
 
   if len(args) != 0:
     parser.print_help()
@@ -232,17 +241,23 @@ def read_args():
   #      line option to set it if needed.
   # XXX: This HAS to be done before here, becuase read_args can fire
   #      off set_link().
-  #      
-  evclient = EventClient(server=TBEVENT_SERVER,
-                         keyfile="/proj/%s/exp/%s/tbdata/eventkey" % (pid,eid))
+  #
+  if not is_fake:
+    evclient = EventClient(server=TBEVENT_SERVER,
+                           keyfile="/proj/%s/exp/%s/tbdata/eventkey"
+                           % (pid,eid))
 
   populate_ip_tables()
   if stub_ip == None:
-    sys.stdout.write('stub_ip was None before\n')
-    stub_ip = emulated_to_real[this_ip]
-  sys.stdout.write('stub_ip: ' + stub_ip + '\n')
-  sys.stdout.write('this_ip: ' + this_ip + '\n')
-  sys.stdout.write('emulated_to_real: ' + str(emulated_to_real) + '\n')
+    if emulated_to_real.has_key(this_ip):
+      sys.stdout.write('Init: stub_ip was None before. '
+                       + 'Using ip-mapping to find stub.\n')
+      stub_ip = emulated_to_real[this_ip]
+    elif is_fake:
+      stub_ip = 'stub_ip'
+    else:
+      raise Exception('ERROR: No stub_ip was given. '
+                      + 'Could not look one up in ip_mapping.')
   if initial_filename != None:
     read_initial_conditions()
 
@@ -285,25 +300,13 @@ def read_initial_conditions():
 ##########################################################################
 
 def get_next_packet(conn):
-  global total_size, last_total
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
-  #
-  # Check for a packet from netmond
-  #
-  # Could move this elsewhere to avoid re-compiling, but I'd like to keep it
-  # with this code for better readability
-#  if netmon_output_version == 1:
-#    linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?')
-#  elif netmon_output_version == 2:
-#    linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
-#  elif netmon_output_version == 3:
   if netmon_output_version == 3:
     linexp = re.compile('^(New|RemoteIP|RemotePort|LocalPort|TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|Connected|Send|SendTo|Closed): ([^ ]*) (\d+\.\d+) ([^ ]*)\n$')
   else:
-    sys.stderr.write("ERROR: Only input version 3 is supported\n");
-    raise None
+    raise Exception("ERROR: Only input version 3 is supported")
   match = linexp.match(line)
   if match:
     event = match.group(1)
@@ -311,77 +314,23 @@ def get_next_packet(conn):
     timestamp = float(match.group(3))
     value = match.group(4)
     process_event(conn, event, key, timestamp, value)
-#  conexp = re.compile('^(New|Connected|LocalPort|Closed|SO_RCVBUF|SO_SNDBUF): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)( ((?:\d+)(?:\.(?:\d+))?))?')
-#  cmatch = conexp.match(line)
-#  if match:
-#    localport = 0 # We may not get this one
-#    if netmon_output_version == 1:
-#      time = float(match.group(1))
-#      ipaddr = match.group(2)
-#      remoteport = int(match.group(3))
-#      size_given = match.group(4) != ''
-#      size = int(match.group(5))
-
-#    elif (netmon_output_version == 2):
-#      time = float(match.group(1))
-#      localport = int(match.group(2))
-#      ipaddr = match.group(3)
-#      remoteport = int(match.group(4))
-#      size_given = match.group(5) != ''
-#      size = int(match.group(6))
-
-#    event = 'Write'
-#    key = str(localport)+':'+ipaddr+':'+str(remoteport))
-#    if not size_given:
-#      size = 0
-#    process_event(event, key, time, str(size))
-
-      #sys.stdout.write('dest: ' + ipaddr + ' destport: ' + str(remoteport) +
-      #        ' srcport: ' + str(localport) + ' size: ' + str(size) + '\n')
-#      if not size_given:
-#        size = 0
-#      if emulated_to_real.has_key(ipaddr):
-#        total_size = total_size + size
-#        send_command(conn, TRAFFIC_WRITE_COMMAND, TCP_CONNECTION, ipaddr,
-#                     localport, remoteport,
-#                     save_int(int((time - prev_time)*1000)) + save_int(size))
-#        prev_time = time
-#  elif ((netmon_output_version == 2) and cmatch):
-      #
-      # Watch for new or closed connections
-      #
-#      event = cmatch.group(1)
-#      localport = int(cmatch.group(2))
-#      ipaddr = cmatch.group(3)
-#      remoteport = int(cmatch.group(4))
-#      value_given = cmatch.group(5) != ''
-#      value = cmatch.group(6)
-#      if not value_given:
-#        value = '0'
-#      key = str(localport)+':'+ipaddr+':'+str(remoteport))
-#      process_event(event, key, 
-#      key = (ipaddr, localport, remoteport)
-#      if emulated_to_real.has_key(ipaddr):
-#        sys.stdout.write("Got a connection event: " + event + "\n")
-#      else:
-#        sys.stdout.write('skipped line with an invalid destination: '
-#                         + ipaddr + '\n')
   else:
-      sys.stderr.write('ERROR: skipped line in the wrong format: ' + line)
+    raise Exception('ERROR: skipped line in the wrong format: ' + line)
 
 ##########################################################################
 
 def process_event(conn, event, key, timestamp, value):
   global socket_map
   if len(key) > KEY_SIZE - 2:
-    sys.stderr.write('Event has a key with > KEY_SIZE - 2 characters. Truncating: ' + key + '\n')
+    sys.stderr.write('ERROR: Event has a key with > KEY_SIZE - 2 characters.'
+                     + ' Truncating: ' + key + '\n')
     key = key[:KEY_SIZE - 2]
   key = key.ljust(KEY_SIZE - 2)
   if event == 'New':
     socket_map[key] = Socket()
   if not socket_map.has_key(key):
-    sys.stderr.write('ERROR: libnetmon event received that does not correspond to a socket. Key: ' + key + '\n')
-    return
+    raise Exception('ERROR: libnetmon event received that does not '
+                    + 'correspond to a socket. Key: ' + key)
   sock = socket_map[key]
   if event == 'New':
     if value == 'TCP':
@@ -390,9 +339,8 @@ def process_event(conn, event, key, timestamp, value):
       sock.protocol = UDP_CONNECTION
     else:
       sock.protocol = TCP_CONNECTION
-      sys.stderr.write('Received "New" event with invalid protocol: '
-                       + value + '\n')
-      return
+      sys.stderr.write('ERROR: Received "New" event with invalid protocol.'
+                       'Assuming TCP_CONNECTION. Protocol: ' + value + '\n')
   elif event == 'RemoteIP':
     start_real_connection(sock)
     sock.number_to_connection[0].dest.remote_ip = value
@@ -401,7 +349,7 @@ def process_event(conn, event, key, timestamp, value):
     if initial_connection_bandwidth.has_key(value):
       sock.number_to_connection[0].last_bandwidth = initial_connection_bandwidth[value]
     else:
-      sys.stderr.write("No initial condition for " + value + "\n")
+      sys.stderr.write("ERROR: No initial condition for " + value + "\n")
       sock.number_to_connection[0].last_bandwidth = 0
   elif event == 'RemotePort':
     start_real_connection(sock)
@@ -456,14 +404,18 @@ def process_event(conn, event, key, timestamp, value):
                      pos.dest.remote_ip, pos.dest.remote_port,
                      '', 'CLEAR')
   else:
-    sys.stderr.write('ERROR: skipped line with an invalid event: '
-                     + event + '\n')
+    raise Exception('ERROR: skipped line with an invalid event: '
+                     + event)
 
+##########################################################################
+  
 def start_real_connection(sock):
   if sock.count == 0:
     sock.number_to_connection[0] = Connection(Dest(), 0)
     sock.count = 1
 
+##########################################################################
+    
 def finalize_real_connection(conn, key, sock, app_connection):
   dest = sock.number_to_connection[0].dest
   if (dest.local_port != ''
@@ -478,6 +430,8 @@ def finalize_real_connection(conn, key, sock, app_connection):
                    '', 'CREATE')
     send_connect(conn, key + save_short(0), sock, app_connection)
 
+##########################################################################
+    
 def send_connect(conn, key, sock, app_connection):
   if sock.protocol == TCP_CONNECTION:
     min_delay = MIN_DELAY_SENSOR
@@ -520,37 +474,30 @@ def receive_characteristic(conn):
   global socket_map
   buf = conn.recv(36)
   if len(buf) != 36:
-    sys.stderr.write('ERROR: Event header is the wrong size. Length: '
-                     + str(len(buf)) + '\n')
-    return False
+    raise Exception('ERROR: Event header is the wrong size. Length: '
+                     + str(len(buf)))
   eventType = load_char(buf[0:1]);
   size = load_short(buf[1:3]);
   version = load_char(buf[3:4]);
   if version != magent_version:
-    sys.stderr.write("ERROR: Wrong version from magent.");
-    return False
+    raise Exception('ERROR: Wrong version from magent.');
   socketKey = buf[4:34];
   connectionKey = load_short(buf[34:36]);
 
   if not socket_map.has_key(socketKey):
-    sys.stderr.write('ERROR: magent event received that does not correspond to a socket. Key: ' + socketKey + '\n')
-    return False
+    raise Exception('ERROR: magent event received that does not '
+                    + 'correspond to a socket. Key: ' + socketKey)
 
   sock = socket_map[socketKey]
 
   if not sock.number_to_connection.has_key(connectionKey):
-    sys.stderr.write('ERROR: magent event received that does not correspond to a connection. socketKey: ' + socketKey + ' connectionKey: ' + connectionKey + '\n')
-    return False
+    raise Exception('ERROR: magent event received that does not '
+                    + 'correspond to a connection. socketKey: ' + socketKey
+                    + ' connectionKey: ' + connectionKey)
   app_connection = sock.number_to_connection[connectionKey]
-#  dest = real_to_emulated[int_to_ip(load_int(buf[4:8]))]
-#  source_port = load_short(buf[8:10])
-#  dest_port = load_short(buf[10:12])
-#  key = (dest, source_port, dest_port);
-#  real_local_port = connection_map[key].local_port
   buf = conn.recv(size);
   if len(buf) != size:
-    sys.stderr.write('ERROR: magent event body is the wrong size.\n')
-    return False
+    raise Exception('ERROR: magent event body is the wrong size.')
   if eventType == EVENT_FORWARD_PATH:
     set_connection(this_ip, app_connection.dest.local_port,
                    app_connection.dest.remote_ip,
@@ -582,8 +529,9 @@ def receive_characteristic(conn):
                      app_connection.dest.remote_port,
                      'bandwidth=' + buf)
     else:
-      sys.stdout.write('ignored TENTATIVE_THROUGHPUT for %s - %i vs %i\n'
-                       % (app_connection.dest.remote_ip,int(buf),app_connection.last_bandwidth))
+      sys.stdout.write('Recieve: Ignored TENTATIVE_THROUGHPUT for '
+                       + app_connection.dest.remote_ip + ' - '
+                       + buf + ' vs ' + app_connection.last_bandwidth + '\n')
   elif eventType == AUTHORITATIVE_BANDWIDTH and int(buf) > 0:
     # We know that the bandwidth has definitely changed. Reset everything.
     app_connection.last_bandwidth = int(buf)
@@ -593,8 +541,8 @@ def receive_characteristic(conn):
                    app_connection.dest.remote_port,
                    'bandwidth=' + buf)
   else:
-    sys.stderr.write('ERROR: Other: ' + str(eventType) + ', ' + str(value) + '\n');
-  return True
+    raise Exception('ERROR: Unknown command type: ' + str(eventType)
+                    + ', ' + str(value));
 
 ##########################################################################
 
@@ -605,6 +553,10 @@ def set_connection(source, source_port, dest, dest_port, ending, event_type='MOD
 ##########################################################################
 
 def set_link(source, dest, ending, event_type='MODIFY'):
+  sys.stdout.write('Event: ' + source + ' -> ' + dest + '(' + event_type
+                   + '): ' + ending + '\n')
+  if is_fake:
+    return 0
   # Create event system address tuple to identify the notification.
   # The event is not sent through the scheduler; it is sent as an
   # immediate notification.
@@ -626,8 +578,8 @@ def set_link(source, dest, ending, event_type='MODIFY'):
     pass
   evargstr = ' '.join(evargs)
   evnotification.setArguments(evargstr)
-  sys.stdout.write('event: ' + '(' + event_type.upper() + ') '
-                   + evargstr + '\n')
+#  sys.stdout.write('event: ' + '(' + event_type.upper() + ') '
+#                   + evargstr + '\n')
   # Must invert the return value of the notification send function as the
   # original code here returned the exit code of tevc (hence 0 means success).
   return not evclient.notify(evnotification)
@@ -635,6 +587,10 @@ def set_link(source, dest, ending, event_type='MODIFY'):
 ##########################################################################
 
 def send_command(conn, key, command_id, command):
+  if is_fake:
+    sys.stdout.write('Command: ' + key + ' ' + command_to_string[command_id]
+                     + '\n')
+    return
   output = (save_char(command_id)
             + save_short(len(command))
             + save_char(magent_version)
@@ -642,49 +598,10 @@ def send_command(conn, key, command_id, command):
             + command)
   conn.sendall(output)
 
-#def send_command(conn, command_id, protocol, ipaddr, localport, remoteport,
-#                 command):
-#  output = (save_char(command_id)
-#            + save_short(len(command))
-#            + save_char(protocol)
-#            + save_int(ip_to_int(emulated_to_real[ipaddr]))
-#            + save_short(localport)
-#            + save_short(remoteport)
-#            + command)
-#  sys.stdout.write('Sending command: CHECKSUM=' + str(checksum(output)) + '\n')
-#  conn.sendall(output)
-
-##########################################################################
-
-#def send_destinations(conn, packet_list):
-#  sys.stdout.write('<send> total size:' + str(total_size) + ' packet count:' + str(len(packet_list)) + '\n')# + ' -- '
-#                   + str(packet_list) + '\n')
-#  output = save_int(0) + save_int(len(packet_list))
-#  prev_time = 0.0
-#  if len(packet_list) > 0:
-#    prev_time = packet_list[0][3]
-#  for packet in packet_list:
-#    ip = ip_to_int(emulated_to_real[packet[0]])
-#    if prev_time == 0.0:
-#      prev_time = packet[3]
-#    delta = int((packet[3] - prev_time) * 1000)
-#    if packet[3] == 0:
-#      delta = 0
-#    output = (output + save_int(ip) + save_short(packet[1])
-#              + save_short(packet[2])
-#              + save_int(delta)
-#              + save_int(packet[4])
-#              + save_short(packet[5]))
-#    if packet[3] != 0:
-#      prev_time = packet[3]
-#  conn.sendall(output)
-
 ##########################################################################
 
 def load_int(str):
   return load_n(str, 4)
-
-##########################################################################
 
 def save_int(number):
   return save_n(number, 4)
@@ -694,8 +611,6 @@ def save_int(number):
 def load_short(str):
   return load_n(str, 2)
 
-##########################################################################
-
 def save_short(number):
   return save_n(number, 2)
 
@@ -703,8 +618,6 @@ def save_short(number):
 
 def load_char(str):
   return load_n(str, 1)
-
-##########################################################################
 
 def save_char(number):
   return save_n(number, 1)
@@ -716,8 +629,6 @@ def load_n(str, n):
   for i in range(n):
     result = result | ((ord(str[i]) & 0xff) << (8*(n-1-i)))
   return result
-
-##########################################################################
 
 def save_n(number, n):
   result = ''
@@ -735,32 +646,12 @@ def ip_to_int(ip):
     result = result | (int(ip_byte, 10) & 0xff)
   return result
 
-#def int_to_ip(num):
-#  ip_list = ['0', '0', '0', '0']
-#  for ip_byte in ip_list:
-#    ip_byte = str(num & 0xff)
-#    num = num >> 8
-#  ip_list.reverse()
-#  return '.'.join(ip_list)
-
-##########################################################################
-
 def int_to_ip(num):
   ip_list = ['0', '0', '0', '0']
   for index in range(4):
     ip_list[3-index] = str(num & 0xff)
     num = num >> 8
   return '.'.join(ip_list)
-
-##########################################################################
-
-def checksum(buf):
-  total = 0
-  flip = 1
-  for index in range(len(buf)):
-    total += (ord(buf[index]) & 0xff) * flip
-#    flip *= -1
-  return total
 
 ##########################################################################
 
