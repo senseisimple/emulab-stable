@@ -23,7 +23,7 @@ $isadmin   = ISADMIN();
 #
 $optarg = OptionalPageArguments("showtype",   PAGEARG_STRING,
 				"sortby",     PAGEARG_STRING,
-				"thumb",      PAGEARG_BOOLEAN,
+				"thumb",      PAGEARG_INTEGER,
 				"noignore",   PAGEARG_BOOLEAN);
 
 $clause      = 0;
@@ -409,8 +409,8 @@ if ($thumb && !$idle) {
 		     "</b>".
 		     "</td>";
 
-		$thumbcount++;
-		if (($thumbcount % 4) == 0) { echo "</tr><tr>\n"; }
+		$thumbCount++;
+		if (($thumbCount % 4) == 0) { echo "</tr><tr>\n"; }
 	    }
 	} else {
 
@@ -483,8 +483,8 @@ if ($thumb && !$idle) {
 	    echo "</td></tr></table> \n";
 	    echo "</td>";
 
-	    $thumbcount++;
-	    if (($thumbcount % 2) == 0) { echo "</tr><tr>\n"; }
+	    $thumbCount++;
+	    if (($thumbCount % 2) == 0) { echo "</tr><tr>\n"; }
 	}
     }
 
