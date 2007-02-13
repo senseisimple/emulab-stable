@@ -229,7 +229,7 @@ sub Create($$$$$$)
 	    DBQueryWarn("select g.unix_gid + 1 as start from groups as g ".
 			"left outer join groups as r on ".
 			"  g.unix_gid + 1 = r.unix_gid ".
-			"where g.unix_gid>$min_gid and ".
+			"where g.unix_gid>=$min_gid and ".
 			"      g.unix_gid<50000 and ".
 			"      r.unix_gid is null limit 1");
 
