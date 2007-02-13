@@ -31,8 +31,8 @@ if (isset($experiment)) {
     if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view this experiment!", 1);
     }
-    $pid = $experiment->pid()
-    $eid = $experiment->eid()
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
 }
 else {
     #
