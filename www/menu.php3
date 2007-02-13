@@ -691,7 +691,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 
         if ($FANCYBANNER) {
             echo "<a href='$TBDOCBASE/index.php3'>
-                  <img height='100px' width='365px' border='0' src='$BASEPATH/fancy-banner.png' />
+                  <img height='100px' width='365px' border='0' src='$BASEPATH/fancy-header.png' />
                   </a>\n";
         } else {
             echo "<map name='overlaymap'>

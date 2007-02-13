@@ -9,7 +9,7 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="1174"
+   width="365"
    height="100"
    id="svg2"
    sodipodi:version="0.32"
@@ -21,7 +21,7 @@
    inkscape:export-xdpi="90"
    inkscape:export-ydpi="90"
    inkscape:output_extension="org.inkscape.output.svg.inkscape"
-   sodipodi:modified="TRUE">
+   sodipodi:modified="true">
   <sodipodi:namedview
      id="base"
      pagecolor="#000000"
@@ -39,7 +39,7 @@
      inkscape:window-x="411"
      inkscape:window-y="90"
      height="100px"
-     width="1174px" />
+     width="365px" />
   <defs
      id="defs4">
     <linearGradient
@@ -105,7 +105,7 @@
        id="filter22848"
        width="1.1289901"
        y="-0.22247258"
-       x="-0.064495058"
+       x="-0.064495057"
        height="1.4449452"
        inkscape:collect="always">
       <feGaussianBlur
@@ -164,7 +164,8 @@
      inkscape:label="Text Glow 2"
      style="display:inline"
      id="layer16"
-     inkscape:groupmode="layer">
+     inkscape:groupmode="layer"
+     sodipodi:insensitive="true">
     <g
        style="opacity:0.75;fill:#ffffff;fill-opacity:1;filter:url(#filter22848)"
        id="g22101">
