@@ -250,10 +250,8 @@ while (list ($user, $value) = each ($projectchecks)) {
 	$pid   = $b[0];
 	$gid   = $b[1];
 	$trust = $b[2];
-	$foo   = $projtrust[$pid];
-	$bar   = $grouptrust[$pid];
 
-	#echo "$user $pid $gid $trust $foo $bar<br>\n";
+	#echo "$user $pid $gid $trust<br>\n";
 
 	if (! ($target_group = Group::LookupByPidGid($pid, $gid))) {
 	    TBERROR("Could not find group object for $project/$group", 1);
