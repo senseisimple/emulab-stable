@@ -13,5 +13,6 @@ if [ "x$LIBNETMON_OUTPUTVERSION" = "x" ]; then
 else
     export LIBNETMON_OUTPUTVERSION
 fi
+#export LIBNETMON_NETMOND=1
 
 $*

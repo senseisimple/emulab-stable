@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  *
  * netmond, a 'server' for libnetmon - simply repeat what a process being
  * monitored with libnetmon tell us on a unix-domian socket
@@ -173,17 +173,17 @@ int main(int argc, char **argv) {
     while ((ch = getopt(argc, argv, "f:l:v:r:u")) != -1) {
         switch(ch) {
             case 'f':
-                if (sscanf(optarg,"%i",&forced_socksize) != 1) {
+                if (sscanf(optarg,"%u",&forced_socksize) != 1) {
                     usage();
                 }
                 break;
             case 'l':
-                if (sscanf(optarg,"%i",&max_socksize) != 1) {
+                if (sscanf(optarg,"%u",&max_socksize) != 1) {
                     usage();
                 }
                 break;
             case 'v':
-                if (sscanf(optarg,"%i",&output_version) != 1) {
+                if (sscanf(optarg,"%u",&output_version) != 1) {
                     usage();
                 }
                 break;

@@ -43,7 +43,7 @@ typedef enum {
  */
 typedef struct {
     unsigned int type;
-    unsigned char payload[CONTROL_MESSAGE_PAYLOAD_SIZE];
+    char payload[CONTROL_MESSAGE_PAYLOAD_SIZE];
 } generic_m;
 
 
@@ -78,7 +78,7 @@ typedef struct {
  */
 typedef struct {
     unsigned int type;
-    unsigned char reports[CONTROL_MESSAGE_PAYLOAD_SIZE];
+    char reports[CONTROL_MESSAGE_PAYLOAD_SIZE];
 } reports_m;
 
 /*

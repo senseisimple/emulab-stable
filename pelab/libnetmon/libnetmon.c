@@ -1,11 +1,17 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  *
  * libnetmon, a library for monitoring network traffic sent by a process. See
  * README for instructions.
  */
 #include "libnetmon.h"
+
+/*
+ * So that we can find out the name of the process that we're instrumenting
+ */
+extern int argc;
+extern char** argv;
 
 /*
  * Die with a standard Emulab-type error message format. In the future, I might
@@ -28,13 +34,13 @@ static void croak(const char *format, ...) {
  */
 void lnm_init() {
 
-    static bool intialized = false;
+    static bool initialized = false;
     char *sockpath;
     char *ctrl_sockpath;
     char *filepath;
     char *std_netmond;
 
-    if (intialized == false) {
+    if (initialized == false) {
         DEBUG(printf("Initializing\n"));
 
         /*
@@ -56,7 +62,7 @@ void lnm_init() {
         char *outversion_s;
         outversion_s = getenv("LIBNETMON_OUTPUTVERSION");
         if (outversion_s) {
-            if (!sscanf(outversion_s,"%i",&output_version) == 1) {
+            if (!sscanf(outversion_s,"%u",&output_version) == 1) {
                 croak("Bad output version: %s\n",outversion_s);
             }
         } else {
@@ -94,7 +100,7 @@ void lnm_init() {
          * Default to reporting on everything - the individual reporting
          * options will get turned on later if report_all is true
          */
-        report_io = report_sockopt = report_connect = false;
+        report_io = report_sockopt = report_connect = report_init = false;
         report_all = true;
         char *reports_s;
         reports_s = getenv("LIBNETMON_REPORTS");
@@ -122,6 +128,7 @@ void lnm_init() {
         FIND_REAL_FUN(recvmsg);
         FIND_REAL_FUN(accept);
         FIND_REAL_FUN(sendto);
+        FIND_REAL_FUN(sendmsg);
 
         /*
          * Connect to netmond if we've been asked to
@@ -247,7 +254,7 @@ void lnm_init() {
          * others now
          */
         if (report_all) {
-            report_io = report_sockopt = report_connect = true;
+            report_io = report_sockopt = report_connect = report_init = true;
         }
 
         /*
@@ -273,7 +280,51 @@ void lnm_init() {
             croak("Unable to register atexit() function\n");
         }
 
-        intialized = true;
+        /*
+         * Get our command line. I really don't like going into the /proc
+         * filesystem to get it, but it beats mucking around in the stack.
+         */
+        char cmdfile[1024];
+        char *cmdline;
+        char cmdbuf[4096];
+        snprintf(cmdfile,1024,"/proc/%i/cmdline",pid);
+        DEBUG(printf("Opening %s\n",cmdfile));
+        int cmdfd = open(cmdfile,O_RDONLY);
+        /*
+         * If we couldn't open it, report why in lieu of the command line
+         */
+        if (cmdfd < 0) {
+            cmdline = strerror(errno);
+        } else {
+            /*
+             * Read as much of the command line as we can, and null terminate
+             * it
+             */
+            int bytesread = real_read(cmdfd,cmdbuf,sizeof(cmdbuf) - 1);
+            real_close(cmdfd);
+            cmdbuf[bytesread] = '\0';
+
+            /*
+             * But wait, there's more! What we got out of /proc is
+             * null-separated, so we have to change it into a tidy
+             * space-separated string.
+             */
+            for (int i = 0; i < bytesread - 1; i++) {
+                if (cmdbuf[i] == '\0') {
+                    cmdbuf[i] = ' ';
+                }
+            }
+
+            cmdline = cmdbuf;
+        }
+
+        /*
+         * XXX: Should escape 's, so as not to confuse the monitor
+         */
+        printlog(LOG_INIT,NO_FD,"'%s'",cmdline);
+
+        initialized = true;
+        DEBUG(printf("Done initializing\n"));
     } else {
         /* DEBUG(printf("Skipping intialization\n")); */
     }
@@ -336,9 +387,9 @@ void lnm_control_wait() {
 
     DEBUG(printf("Waiting for a control message\n"));
     selectrv = select(controlfd + 1, &fds, NULL, NULL, &tv);
-    if (select == 0) {
+    if (selectrv == 0) {
         croak("Timed out waiting for a control message\n");
-    } else if (select < 0) {
+    } else if (selectrv < 0) {
         croak("Bad return value from select() in lnm_control_wait()\n");
     }
 
@@ -525,6 +576,7 @@ void stopWatchingAll() {
             stopFD(i);
         }
     }
+    printlog(LOG_EXIT,NO_FD);
 }
 
 void printlog(logmsg_t type, int fd, ...) {
@@ -534,6 +586,7 @@ void printlog(logmsg_t type, int fd, ...) {
      */
     bool print_name = true;
     bool print_id = true;
+    bool id_is_pid = false;
     bool print_timestamp = true;
     bool print_value = true;
 
@@ -627,6 +680,25 @@ void printlog(logmsg_t type, int fd, ...) {
             // Allow global turning on/off of this message type
             if (!report_connect) { print = false; }
             break;
+        case LOG_INIT:
+            if (output_version < 3) { print = false; }
+            if (!report_init) { print = false; }
+            id_is_pid = true;
+            break;
+        case LOG_EXIT:
+            if (output_version < 3) { print = false; }
+            if (!report_init) { print = false; }
+            id_is_pid = true;
+            print_value = false;
+            break;
+        case LOG_SENDMSG:
+            // In version 3, we don't actually log anything about the contents
+            // of the call - we just want to make sure it isn't sneaking past
+            // us. Techinically, it doesn't have to be UDP, but we'll lump it
+            // in for now
+            if (output_version < 3) { print = false; }
+            if (!monitor_udp) { print = false; }
+            print_value = false;
         default:
             croak("Invalid type (%) passed to printlog()\n",type);
     }
@@ -647,11 +719,16 @@ void printlog(logmsg_t type, int fd, ...) {
     }
 
     /*
-     * Print out the ID of the socket the action is for
+     * Print out the ID of the socket the action is for. Some actions are not
+     * associated with a specific socket, so we use the pid as the identifier
      */
     if (print_id) {
-        fprintID(outstream,fd);
-        fprintf(outstream," ");
+        if (id_is_pid) {
+            fprintf(outstream,"%i ",pid);
+        } else {
+            fprintID(outstream,fd);
+            fprintf(outstream," ");
+        }
     }
 
     /*
@@ -681,6 +758,12 @@ void printlog(logmsg_t type, int fd, ...) {
  * Print the unique identifier for a connection to the given filestream
  */
 void fprintID(FILE *f, int fd) {
+
+    if (fd == NO_FD) {
+        croak("NO_FD passed to fprintID");
+    } else if (fd < 0) {
+        croak("Negative pid (%i) passed to fprintID");
+    }
 
     if (output_version <= 2) {
         /*
@@ -857,6 +940,8 @@ static void lnm_parse_reportopt(char *s) {
             report_connect = true;
         } else if (!strncmp(p,"sockopt",numchars)) {
             report_sockopt = true;
+        } else if (!strncmp(p,"init",numchars)) {
+            report_init = true;
         } else {
             croak("Bad report: %s\n",p);
         }
@@ -1062,8 +1147,8 @@ void informConnect(int fd) {
 }
 
 int getNewSockbuf(int fd, int which) {
-    int newsize;
-    int optsize;
+    socklen_t newsize;
+    socklen_t optsize;
     optsize = sizeof(newsize);
     if (getsockopt(fd,SOL_SOCKET,which,&newsize,&optsize)) {
         croak("Unable to get socket buffer size");
@@ -1160,7 +1245,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          * Get the local port number so that we can monitor it
          */
         struct sockaddr_in localaddr;
-        int namelen = sizeof(localaddr);
+        socklen_t namelen = sizeof(localaddr);
         if (getsockname(sockfd, (struct sockaddr*)&localaddr,&namelen) != 0) {
             croak("Unable to get local socket name: %s\n", strerror(errno));
         }
@@ -1244,7 +1329,6 @@ int close(int d) {
  *
  * TODO: Need to write wrappers for other functions that can be used to send
  * data on a socket:
- * sendmsg
  * writev
  * others?
  */
@@ -1334,6 +1418,30 @@ ssize_t sendto(int fd, const void *buf, size_t count, int flags,
          * Report on the actual packet
          */
         log_packet(fd,rv,serv_addr);
+    }
+
+    return rv;
+
+}
+
+/*
+ * Wrap the sendmsg() function 
+ */
+ssize_t sendmsg(int s, const struct msghdr *msg, int flags) {
+    ssize_t rv;
+
+    lnm_init();
+    lnm_control();
+
+    /*
+     * Wait until _after_ the packet is sent to log it, since the call might
+     * block, and we basically want to report when the kernel acked receipt of
+     * the packet
+     */
+    rv = real_sendmsg(s,msg,flags);
+
+    if ((rv > 0) && monitorFD_p(s)) {
+        printlog(LOG_SENDMSG,s);
     }
 
     return rv;

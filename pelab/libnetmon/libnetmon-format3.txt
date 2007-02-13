@@ -26,6 +26,9 @@ Connected (no value) (RemoteIP and RemotePort MUST be sent before this command)
 Send (value is the size of the write or sendto)
 SendTo (value is <localPort>:<remoteIP>:<remotePort>:<size>
 Closed (no value)
+Init (value is command line, enclosed in ' ')
+Exit (no value)
+SendMsg (no value yet)
 
 On a TCP connection, there should be the following sequence:
 

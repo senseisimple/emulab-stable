@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  *
  * Header for libnetmon, a library for monitoring network traffic sent by a
  * process. See README for instructions.
@@ -32,7 +32,7 @@
 
 #include "netmon.h"
 
-/* #define DEBUGGING */
+// #define DEBUGGING
 
 #ifdef DEBUGGING
 #define DEBUG(x) (x)
@@ -107,7 +107,10 @@ typedef enum { LOG_NEW = 0,
                LOG_CONNECTED,
                LOG_SEND,
                LOG_SENDTO,
-               LOG_CLOSED
+               LOG_CLOSED,
+               LOG_INIT,
+               LOG_EXIT,
+               LOG_SENDMSG
 } logmsg_t;
 static char *log_type_names[] = {
     "New",
@@ -121,7 +124,10 @@ static char *log_type_names[] = {
     "Connected",
     "Send",
     "SendTo",
-    "Closed"
+    "Closed",
+    "Init",
+    "Exit",
+    "SendMsg"
 };
 
 /*
@@ -131,6 +137,12 @@ static char *log_type_names[] = {
  * arguments to be interpolated into the format string)
  */
 static void printlog(logmsg_t,int, ... );
+
+/*
+ * A constant passed to printlog() to indicate that there is no file descriptor
+ * associated with this message
+ */
+static int NO_FD = -42;
 
 /*
  * Log that a packet has been sent to the kernel on a given FD with a given
@@ -254,6 +266,7 @@ static bool report_all;
 static bool report_io;
 static bool report_sockopt;
 static bool report_connect;
+static bool report_init;
 
 /*
  * Prototypes for the real library functions - just makes it easier to declare
@@ -261,7 +274,7 @@ static bool report_connect;
  */
 typedef int open_proto_t(const char *, int, ...);
 typedef int stat_proto_t(const char *, struct stat *sb);
-typedef int socket_proto_t(int,int,int);
+typedef int socket_proto_t(int, int,int);
 typedef int close_proto_t(int);
 typedef int connect_proto_t(int, const struct sockaddr*, socklen_t);
 typedef ssize_t write_proto_t(int, const void *, size_t);
@@ -269,10 +282,11 @@ typedef ssize_t send_proto_t(int, const void *, ssize_t, int);
 typedef int setsockopt_proto_t(int, int, int, const void*, socklen_t);
 typedef ssize_t read_proto_t(int, void *, size_t);
 typedef ssize_t recv_proto_t(int, void *, size_t, int);
-typedef ssize_t recvmsg_proto_t(int,struct msghdr *, int);
-typedef ssize_t accept_proto_t(int,struct sockaddr *, socklen_t *);
+typedef ssize_t recvmsg_proto_t(int, struct msghdr *, int);
+typedef ssize_t accept_proto_t(int, struct sockaddr *, socklen_t *);
 typedef ssize_t sendto_proto_t(int, const void *, size_t, int,
                                const struct sockaddr *, socklen_t);
+typedef ssize_t sendmsg_proto_t(int, const struct msghdr *, int);
 
 /*
  * Locations of the real library functions
@@ -288,6 +302,7 @@ static recv_proto_t       *real_recv;
 static recvmsg_proto_t    *real_recvmsg;
 static accept_proto_t     *real_accept;
 static sendto_proto_t     *real_sendto;
+static sendmsg_proto_t    *real_sendmsg;
 
 /*
  * Note: Functions that we're wrapping are in the .c file
