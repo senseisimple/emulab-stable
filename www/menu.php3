@@ -635,7 +635,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import url($BASEPATH/style-new.css); -->";
+            <!-- @import url($BASEPATH/style-new2.css); -->";
 
     if (!$MAINPAGE) {
 	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
@@ -690,10 +690,8 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	}
 
         if ($FANCYBANNER) {
-            # This transparent image gives the illusion of being able to click
-            # on the logo part of the banner image.
             echo "<a href='$TBDOCBASE/index.php3'>
-                  <img height='100px' width='360px' border='0' src='$BASEPATH/transparent.gif' />
+                  <img height='100px' width='365px' border='0' src='$BASEPATH/fancy-banner.png' />
                   </a>\n";
         } else {
             echo "<map name='overlaymap'>

@@ -54,7 +54,7 @@ td.paddedcell2 { padding: 0.5em; }
 
 #fancybannercell {
   background-color: #000000;
-  background-image: url("fancy-banner.png");
+  background-image: url("fancy-banner-background.jpg");
   background-repeat: no-repeat;
   border-bottom: solid 2px #666666;
   padding: 0px;
