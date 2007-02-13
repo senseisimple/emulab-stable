@@ -188,7 +188,6 @@ def main_loop():
       sys.stdout.write('Done: Got an EOF on stdin\n')
       done = True
     except Exception, err:
-      sys.stderr.write(str(err) + '\n')
       traceback.print_exc(10, sys.stderr)
       sys.stderr.write('----\n')
 
@@ -330,7 +329,7 @@ def get_next_packet(conn):
     value = match.group(4)
     process_event(conn, event, key, timestamp, value)
   else:
-    raise Exception('ERROR: skipped line in the wrong format: ' + line)
+    sys.stderr.write('ERROR: skipped line in the wrong format: ' + line + '\n')
 
 ##########################################################################
 
@@ -424,8 +423,8 @@ def process_event(conn, event, key, timestamp, value):
                      pos.dest.remote_ip, pos.dest.remote_port,
                      '', 'CLEAR')
   else:
-    raise Exception('ERROR: skipped line with an invalid event: '
-                     + event)
+    sys.stderr.write('ERROR: skipped line with an invalid event: '
+                     + event + '\n')
 
 ##########################################################################
   
