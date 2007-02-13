@@ -492,14 +492,15 @@ def send_write(conn, key, timestamp, app_connection, size):
 def receive_characteristic(conn):
   global socket_map
   buf = conn.recv(36)
-  if len(buf) != 36:
-    raise Exception('ERROR: Event header is the wrong size. Length: '
-                     + str(len(buf)))
   eventType = load_char(buf[0:1]);
   size = load_short(buf[1:3]);
   version = load_char(buf[3:4]);
   if version != magent_version:
-    raise Exception('ERROR: Wrong version from magent.');
+    raise Exception('ERROR: Wrong version from magent: version('
+                    + str(version) + ') buf_size(' + len(buf) + ')');
+  if len(buf) != 36:
+    raise Exception('ERROR: Event header is the wrong size. Length: '
+                     + str(len(buf)))
   socketKey = buf[4:34];
   connectionKey = load_short(buf[34:36]);
 
@@ -550,7 +551,8 @@ def receive_characteristic(conn):
     else:
       sys.stdout.write('Recieve: Ignored TENTATIVE_THROUGHPUT for '
                        + app_connection.dest.remote_ip + ' - '
-                       + buf + ' vs ' + app_connection.last_bandwidth + '\n')
+                       + buf + ' vs ' + str(app_connection.last_bandwidth)
+                       + '\n')
   elif eventType == AUTHORITATIVE_BANDWIDTH and int(buf) > 0:
     # We know that the bandwidth has definitely changed. Reset everything.
     app_connection.last_bandwidth = int(buf)
@@ -607,8 +609,8 @@ def set_link(source, dest, ending, event_type='MODIFY'):
 
 def send_command(conn, key, command_id, command):
   if is_fake:
-    sys.stdout.write('Command: ' + key + ' ' + command_to_string[command_id]
-                     + '\n')
+    sys.stdout.write('Command: ' + key + ' version(' + str(magent_version)
+                     + ') ' + command_to_string[command_id] + '\n')
     return
   output = (save_char(command_id)
             + save_short(len(command))

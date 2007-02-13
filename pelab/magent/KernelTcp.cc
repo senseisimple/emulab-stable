@@ -809,8 +809,10 @@ namespace
 
     bool outgoing;
 
-    logWrite(PCAP,"Looking up key (outgoing): t=%d,i=%s,lp=%i,rp=%i",
-        transport, inet_ntoa(ipPacket->ip_dst),key.localPort,key.remotePort);
+//    logWrite(PCAP,"Looking up key (outgoing): t=%d,i=%s,lp=%i,rp=%i",
+//        transport, inet_ntoa(ipPacket->ip_dst),key.localPort,key.remotePort);
+    logWrite(PCAP, "Looking up key (outgoing): %s",
+             key.toString().c_str());
     map<PlanetOrder, Connection *>::iterator pos;
     pos = global::planetMap.find(key);
 
@@ -821,8 +823,10 @@ namespace
       swap(key.localPort, key.remotePort);
 //      key.localPort = ntohs(tcpPacket->dest);
 //      key.remotePort = ntohs(tcpPacket->source);
-      logWrite(PCAP,"Looking up key (incoming): t=%d,i=%s,lp=%i,rp=%i",
-          transport,inet_ntoa(ipPacket->ip_src),key.localPort,key.remotePort);
+      logWrite(PCAP, "Looking up key (incoming): %s",
+               key.toString().c_str());
+//      logWrite(PCAP,"Looking up key (incoming): t=%d,i=%s,lp=%i,rp=%i",
+//          transport,inet_ntoa(ipPacket->ip_src),key.localPort,key.remotePort);
       pos = global::planetMap.find(key);
       if (pos != global::planetMap.end()) {
         outgoing = false;

@@ -117,7 +117,7 @@ void Connection::connect(unsigned int ip)
     isConnected = peer->isConnected();
     if (isConnected)
     {
-      logWrite(CONNECTION, "Inserting a connection with key %s",
+      logWrite(PCAP,"Inserting key: %s",
                planet.toString().c_str());
       global::planetMap[planet] = this;
     }
@@ -185,6 +185,8 @@ Time Connection::writeToConnection(Time const & previousTime)
   if (!isConnected && result.isConnected)
   {
     planet = result.planet;
+    logWrite(PCAP,"Inserting key: %s",
+             planet.toString().c_str());
     global::planetMap[planet] = this;
   }
   else if (isConnected && result.isConnected
@@ -193,8 +195,9 @@ Time Connection::writeToConnection(Time const & previousTime)
     logWrite(CONNECTION, "OldKey: %s", planet.toString().c_str());
     global::planetMap[planet] = NULL;
     planet = result.planet;
+    logWrite(PCAP,"Inserting key: %s",
+             planet.toString().c_str());
     global::planetMap[planet] = this;
-    logWrite(CONNECTION, "NewKey: %s", planet.toString().c_str());
   }
   isConnected = result.isConnected;
   bufferFull = result.bufferFull;

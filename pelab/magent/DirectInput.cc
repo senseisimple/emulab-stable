@@ -65,7 +65,11 @@ void DirectInput::nextCommand(fd_set * readable)
     if (error == Header::PREFIX_SIZE - index)
     {
       unsigned char version = headerBuffer[Header::PREFIX_SIZE - 1];
-      global::CONTROL_VERSION = version;
+      if (global::CONTROL_VERSION != version)
+      {
+        logWrite(COMMAND_INPUT, "Setting version to %d", version);
+        global::CONTROL_VERSION = version;
+      }
       versionSize = Header::headerSize();
       index += error;
       state = HEADER;
