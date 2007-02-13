@@ -592,7 +592,7 @@ if (isset($formfields["w_password1"]) &&
 	    "Two Windows Passwords Do Not Match";
     }
     elseif (! CHECKPASSWORD($target_uid,
-			    $formfields[w_password1],
+			    $formfields["w_password1"],
 			    $formfields["usr_name"],
 			    $formfields["usr_email"], $checkerror)) {
 	$errors["Windows Password"] = "$checkerror";
