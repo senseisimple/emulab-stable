@@ -7,6 +7,7 @@
 include("defs.php3");
 include_once("imageid_defs.php");
 include_once("osinfo_defs.php");
+include_once("node_defs.php");
 include("osiddefs.php3");
 
 #
