@@ -228,8 +228,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    if (! ($node = Node::Lookup($node_id))) {
 		TBERROR("SHOWNODES: Could not map $node_id to its object", 1);
 	    }
-	    $idlehours = $node->IdleTime($node_id);
-	    $stale     = $node->IdleStale($node_id);
+	    $idlehours = $node->IdleTime();
+	    $stale     = $node->IdleStale();
 
 	    $idlestr = $idlehours;
 	    if ($idlehours > 0) {
