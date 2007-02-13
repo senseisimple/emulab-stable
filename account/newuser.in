@@ -143,14 +143,15 @@ my %required = ("name"		=> "usr_name",
 		"phone"		=> "usr_phone",
 		"title"		=> "usr_title",
 		"affiliation"	=> "usr_affil",
-		"password"	=> undef,
-		"wikiname"	=> "wikiname");
+		"password"	=> undef);
 
 my %optional = ("login"		=> "uid",
 		"address2"	=> "usr_addr2",
 		"URL"		=> "usr_URL",
 		"shell"		=> "usr_shell",
 		"pubkey"        => undef);
+
+($WIKISUPPORT ? \%required : \%optional)->{"wikiname"} = "wikiname";
 
 #
 # Must wrap the parser in eval since it exits on error.
