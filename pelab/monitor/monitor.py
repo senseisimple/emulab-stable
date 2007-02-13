@@ -12,6 +12,7 @@ import time
 import socket
 import select
 import re
+import traceback
 from optparse import OptionParser
 sys.path.append("/usr/testbed/lib")
 from tbevent import EventClient, address_tuple, ADDRESSTUPLE_ALL
@@ -91,10 +92,18 @@ magent_version = 1
 is_fake = False
 
 class Dest:
-  def __init__(self):
-    self.local_port = ''
-    self.remote_port = ''
-    self.remote_ip = ''
+  def __init__(self, tup=None):
+    if tup == None:
+      self.local_port = ''
+      self.remote_ip = ''
+      self.remote_port = ''
+    else:
+      self.local_port = tup[0]
+      self.remote_ip = tup[1]
+      self.remote_port = tup[2]
+
+  def toTuple(self):
+    return (self.local_port, self.remote_ip, self.remote_port)
 
 class Connection:
   def __init__(self, new_dest, new_number):
@@ -127,13 +136,17 @@ class Socket:
 
 # Searches for a dest, inserts if dest not found. Returns the connection associated with dest.
   def lookup(self, dest):
-    if self.dest_to_number.has_key(dest):
-      number = self.dest_to_number[dest]
+    sys.stdout.write('Looking up: ' + dest.local_port + ':'
+                     + dest.remote_ip + ':' + dest.remote_port + '\n')
+    if self.dest_to_number.has_key(dest.toTuple()):
+      number = self.dest_to_number[dest.toTuple()]
       return self.number_to_connection[number]
     else:
-      self.dest_to_number[dest] = self.count
+      sys.stdout.write('Lookup: Failed, creating new connection\n')
+      self.dest_to_number[dest.toTuple()] = self.count
       self.number_to_connection[self.count] = Connection(dest, self.count)
       self.count = self.count + 1
+      return self.number_to_connection[self.count - 1]
 
 initial_connection_bandwidth = {}
 socket_map = {}
@@ -176,6 +189,8 @@ def main_loop():
       done = True
     except Exception, err:
       sys.stderr.write(str(err) + '\n')
+      traceback.print_exc(10, sys.stderr)
+      sys.stderr.write('----\n')
 
 ##########################################################################
 
@@ -366,9 +381,10 @@ def process_event(conn, event, key, timestamp, value):
   elif event == 'SO_SNDBUF':
     sock.send_buffer_size = int(value)
   elif event == 'Connected':
-    app_connection = sock.number_to_connection[0]
-    finalize_real_connection(conn, key, sock, app_connection)
-    sock.number_to_connection[0].prev_time = timestamp
+    if sock.protocol != UDP_CONNECTION:
+      app_connection = sock.number_to_connection[0]
+      finalize_real_connection(conn, key, sock, app_connection)
+      sock.number_to_connection[0].prev_time = timestamp
   elif event == 'Send':
     app_connection = sock.number_to_connection[0]
     send_write(conn, key, timestamp, app_connection, value)
@@ -384,17 +400,21 @@ def process_event(conn, event, key, timestamp, value):
       dest = Dest()
       dest.local_port = match.group(1)
       dest.remote_ip = match.group(2)
-      dest.remote_ip = match.group(3)
+      dest.remote_port = match.group(3)
       size = int(match.group(4))
       app_connection = sock.lookup(dest)
       if app_connection.is_connected == False:
-        app_connection.last_bandwidth = initial_connection_bandwidth[app_connection.dest.remote_ip]
+        app_connection.is_connected = True
+        if initial_connection_bandwidth.has_key(app_connection.dest.remote_ip):
+          app_connection.last_bandwidth = initial_connection_bandwidth[app_connection.dest.remote_ip]
+        else:
+          app_connection.last_bandwidth = 0
         app_connection.prev_time = timestamp
         app_connection.is_connected = True
         send_connect(conn, key + save_short(app_connection.number),
                      sock, app_connection)
       else:
-        send_write(conn, key, timestamp, app_connection, value)
+        send_write(conn, key, timestamp, app_connection, size)
         app_connection.prev_time = timestamp
   elif event == 'Closed':
     for pos in sock.number_to_connection.itervalues():
@@ -423,7 +443,7 @@ def finalize_real_connection(conn, key, sock, app_connection):
       and dest.remote_ip != ''
       and not sock.number_to_connection[0].is_connected):
     sock.number_to_connection[0].is_connected = True
-    sock.dest_to_number[dest] = 0
+    sock.dest_to_number[dest.toTuple()] = 0
     set_connection(this_ip, app_connection.dest.local_port,
                    app_connection.dest.remote_ip,
                    app_connection.dest.remote_port,
