@@ -731,7 +731,7 @@ if (! $returning) {
 
     if (isset($formfields["usr_URL"]) &&
 	$formfields["usr_URL"] != $HTTPTAG && $formfields["usr_URL"] != "") {
-	$args["URL"] = $formfields[usr_URL];
+	$args["URL"] = $formfields["usr_URL"];
     }
     if ($USERSELECTUIDS) {
 	$args["login"] = $formfields["joining_uid"];
