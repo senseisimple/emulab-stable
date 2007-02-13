@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can end experiments.
