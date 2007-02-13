@@ -146,7 +146,7 @@ class User
 	    $this->user = NULL;
 	    return -1;
 	}
-	$this->user =& mysql_fetch_array($query_result);
+	$this->user = mysql_fetch_array($query_result);
 	return 0;
     }
 
