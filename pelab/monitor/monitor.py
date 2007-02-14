@@ -421,11 +421,20 @@ def process_event(conn, event, key, timestamp, value):
                    DELETE_CONNECTION_COMMAND, '')
       set_connection(this_ip, pos.dest.local_port,
                      pos.dest.remote_ip, pos.dest.remote_port,
-                     '', 'CLEAR')
+                     proto_to_string(sock.protocol), 'CLEAR')
   else:
     sys.stderr.write('ERROR: skipped line with an invalid event: '
                      + event + '\n')
 
+def proto_to_string(proto):
+  if proto == TCP_CONNECTION:
+    return 'protocol=tcp'
+  elif proto == UDP_CONNECTION:
+    return 'protocol=udp'
+  else:
+    sys.stderr.write('ERROR: Invalid protocol received in proto_to_string: '
+                     + str(proto) + '\n')
+    return 'protocol=tcp'
 ##########################################################################
   
 def start_real_connection(sock):
@@ -446,7 +455,7 @@ def finalize_real_connection(conn, key, sock, app_connection):
     set_connection(this_ip, app_connection.dest.local_port,
                    app_connection.dest.remote_ip,
                    app_connection.dest.remote_port,
-                   '', 'CREATE')
+                   proto_to_string(sock.protocol), 'CREATE')
     send_connect(conn, key + save_short(0), sock, app_connection)
 
 ##########################################################################
@@ -489,20 +498,48 @@ def send_write(conn, key, timestamp, app_connection, size):
 
 ##########################################################################
 
+RECEIVE_HEAD = 0
+RECEIVE_BODY = 1
+
+receive_head_buffer = ''
+receive_body_buffer = ''
+receive_state = RECEIVE_HEAD
+receive_head_size = 36
+receive_body_size = 0
+
 def receive_characteristic(conn):
+  global receive_head_buffer, receive_body_buffer, receive_state
+  global receive_body_size
+
+  if receive_state == RECEIVE_HEAD:
+    receive_head_buffer = (receive_head_buffer
+                           + conn.recv(receive_head_size
+                                       - len(receive_head_buffer),
+                                       socket.MSG_DONTWAIT))
+    if len(receive_head_buffer) == receive_head_size:
+      receive_state = RECEIVE_BODY
+      receive_body_buffer = ''
+      receive_body_size = load_short(receive_head_buffer[1:3])
+  if receive_state == RECEIVE_BODY:
+    receive_body_buffer = (receive_body_buffer
+                           + conn.recv(receive_body_size
+                                       - len(receive_body_buffer),
+                                       socket.MSG_DONTWAIT))
+    if len(receive_body_buffer) == receive_body_size:
+      receive_state = RECEIVE_HEAD
+      receive_head_buffer = ''
+      receive_parse_body()
+
+def receive_parse_body():
   global socket_map
-  buf = conn.recv(36)
-  eventType = load_char(buf[0:1]);
-  size = load_short(buf[1:3]);
-  version = load_char(buf[3:4]);
+  eventType = load_char(receive_head_buffer[0:1])
+  size = load_short(receive_head_buffer[1:3])
+  version = load_char(receive_head_buffer[3:4])
   if version != magent_version:
     raise Exception('ERROR: Wrong version from magent: version('
-                    + str(version) + ') buf_size(' + len(buf) + ')');
-  if len(buf) != 36:
-    raise Exception('ERROR: Event header is the wrong size. Length: '
-                     + str(len(buf)))
-  socketKey = buf[4:34];
-  connectionKey = load_short(buf[34:36]);
+                    + str(version) + ')')
+  socketKey = receive_head_buffer[4:34];
+  connectionKey = load_short(receive_head_buffer[34:36]);
 
   if not socket_map.has_key(socketKey):
     raise Exception('ERROR: magent event received that does not '
@@ -515,17 +552,16 @@ def receive_characteristic(conn):
                     + 'correspond to a connection. socketKey: ' + socketKey
                     + ' connectionKey: ' + connectionKey)
   app_connection = sock.number_to_connection[connectionKey]
-  buf = conn.recv(size);
-  if len(buf) != size:
-    raise Exception('ERROR: magent event body is the wrong size.')
   if eventType == EVENT_FORWARD_PATH:
     set_connection(this_ip, app_connection.dest.local_port,
                    app_connection.dest.remote_ip,
-                   app_connection.dest.remote_port, buf)
+                   app_connection.dest.remote_port,
+                   proto_to_string(sock.protocol) + ' ' + receive_body_buffer)
   elif eventType == EVENT_BACKWARD_PATH:
     set_connection(app_connection.dest.remote_ip,
                    app_connection.dest.remote_port,
-                   this_ip, app_connection.dest.local_port, buf)
+                   this_ip, app_connection.dest.local_port,
+                   proto_to_string(sock.protocol) + ' ' + receive_body_buffer)
   elif eventType == TENTATIVE_THROUGHPUT:
     # There is a throughput number, but we don't know whether the link
     # is saturated or not. If the link is not saturated, then we just
@@ -541,26 +577,27 @@ def receive_characteristic(conn):
     # AUTHORITATIVE_BANDWIDTH. Therefore, we assume that it is
     # authoritative if it is greater than the previous measurement,
     # and that it is just a throughput number if it is less.
-    if int(buf) > app_connection.last_bandwidth:
-      app_connection.last_bandwidth = int(buf)
-      # set_link(this_ip, dest, 'bandwidth=' + buf)
+    if int(receive_body_buffer) > app_connection.last_bandwidth:
+      app_connection.last_bandwidth = int(receive_body_buffer)
       set_connection(this_ip, app_connection.dest.local_port,
                      app_connection.dest.remote_ip,
                      app_connection.dest.remote_port,
-                     'bandwidth=' + buf)
+                     proto_to_string(sock.protocol)
+                     + ' bandwidth=' + receive_body_buffer)
     else:
       sys.stdout.write('Recieve: Ignored TENTATIVE_THROUGHPUT for '
                        + app_connection.dest.remote_ip + ' - '
-                       + buf + ' vs ' + str(app_connection.last_bandwidth)
+                       + receive_body_buffer + ' vs '
+                       + str(app_connection.last_bandwidth)
                        + '\n')
-  elif eventType == AUTHORITATIVE_BANDWIDTH and int(buf) > 0:
+  elif eventType == AUTHORITATIVE_BANDWIDTH and int(receive_body_buffer) > 0:
     # We know that the bandwidth has definitely changed. Reset everything.
-    app_connection.last_bandwidth = int(buf)
-    # set_link(this_ip, dest, 'bandwidth=' + buf)
+    app_connection.last_bandwidth = int(receive_body_buffer)
     set_connection(this_ip, app_connection.dest.local_port,
                    app_connection.dest.remote_ip,
                    app_connection.dest.remote_port,
-                   'bandwidth=' + buf)
+                   proto_to_string(sock.protocol)
+                   + ' bandwidth=' + receive_body_buffer)
   else:
     raise Exception('ERROR: Unknown command type: ' + str(eventType)
                     + ', ' + str(value));
@@ -569,7 +606,7 @@ def receive_characteristic(conn):
 
 def set_connection(source, source_port, dest, dest_port, ending, event_type='MODIFY'):
   set_link(source, dest, 'srcport=' + source_port
-           + ' dstport=' + dest_port + ' protocol=tcp ' + ending, event_type)
+           + ' dstport=' + dest_port + ' ' + ending, event_type)
 
 ##########################################################################
 
@@ -607,7 +644,10 @@ def set_link(source, dest, ending, event_type='MODIFY'):
 
 ##########################################################################
 
+send_buffer = ''
+
 def send_command(conn, key, command_id, command):
+  global send_buffer
   if is_fake:
     sys.stdout.write('Command: ' + key + ' version(' + str(magent_version)
                      + ') ' + command_to_string[command_id] + '\n')
@@ -617,7 +657,9 @@ def send_command(conn, key, command_id, command):
             + save_char(magent_version)
             + key
             + command)
-  conn.sendall(output)
+  send_buffer = send_buffer + output
+  sent = conn.send(send_buffer, socket.MSG_DONTWAIT)
+  send_buffer = send_buffer[sent:]
 
 ##########################################################################
 
