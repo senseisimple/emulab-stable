@@ -705,7 +705,7 @@ function NODETYPE_ALLOWED($type) {
     if (! GETUID())
 	return 0;
 
-    if ($CHECKLOGIN_NODETYPES[$type]) {
+    if (isset($CHECKLOGIN_NODETYPES[$type])) {
 	return 1;
     } else {
 	return 0;

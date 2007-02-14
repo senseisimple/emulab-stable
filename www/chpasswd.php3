@@ -15,8 +15,15 @@ $optargs = OptionalPageArguments("simple", PAGEARG_BOOLEAN,
 				 "reset",  PAGEARG_STRING);
 
 # Display a simpler version of this page.
-if (!isset($simple)) {
+if (isset($simple) && $simple) {
+    $simple = 1;
+    $view = array('hide_banner' => 1,
+		  'hide_copyright' => 1,
+		  'hide_sidebar' => 1);
+}
+else {
     $simple = 0;
+    $view   = $array();
 }
 
 # Half the key in the URL.
@@ -46,16 +53,6 @@ $key = $keyA . $keyB;
 if (!isset($_SERVER["SSL_PROTOCOL"])) {
     PAGEHEADER("Reset Your Password", $view);
     USERERROR("Must use https:// to access this page!", 1);
-}
-
-#
-# Turn off some of the decorations and menus for the simple view
-#
-if ($simple) {
-    $view = array('hide_banner' => 1, 'hide_copyright' => 1,
-	'hide_sidebar' => 1);
-} else {
-    $view = array();
 }
 
 #
