@@ -310,7 +310,7 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
         // we saw, then send an acknowledgement for it. Otherwise, ignore the
         // packet - it arrived out of order.
 
-//	printf("Received seqNum = %d\n", packetSeqNum);
+	//printf("Received seqNum = %d, from IP = %s, port = %d\n", packetSeqNum, inet_ntoa(ipPacket->ip_src),sourcePort );
 //	printf("Packet loss = %d\n", clientIter->second.packetLoss);
         // TODO:Take wrap around into account.
         {
@@ -527,12 +527,15 @@ void init_pcap(char *interface)
         char errBuf[PCAP_ERRBUF_SIZE];
         char filter[32] = "";
 
-        sprintf(filter," udp and dst port %d", ( localServerPort ) );
         // IP Address and sub net mask.
         bpf_u_int32 maskp, netp;
-
+	struct in_addr tempAddr;
 
         pcap_lookupnet(interface, &netp, &maskp, errBuf);
+
+	tempAddr.s_addr = netp;
+	printf("Server address = %s\n", inet_ntoa(tempAddr));
+        sprintf(filter," udp and dst port %d and dst host %s", localServerPort, inet_ntoa(tempAddr));
         pcapDescriptor = pcap_open_live(interface, SNAPLEN, 0, 0, errBuf);
 
         if(pcapDescriptor == NULL)

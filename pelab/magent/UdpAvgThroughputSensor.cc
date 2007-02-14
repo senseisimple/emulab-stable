@@ -79,8 +79,8 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 
 		for(i = 0;i < numRedunAcks; i++)
 		{
-			redunSeqNum = *(unsigned short int *)(packet->payload + 1 + global::udpMinAckPacketSize + i*global::udpRedunAckSize);
-			redunPacketSize = *(unsigned short int *)(packet->payload + 1 + global::udpMinAckPacketSize + i*global::udpRedunAckSize + global::USHORT_INT_SIZE);
+			redunSeqNum = *(unsigned short int *)(packet->payload + global::udpMinAckPacketSize + i*global::udpRedunAckSize);
+			redunPacketSize = *(unsigned short int *)(packet->payload + global::udpMinAckPacketSize + i*global::udpRedunAckSize + global::USHORT_INT_SIZE);
 
 			// Find if this redundant ACK is useful - or it was acked before.
 			vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), redunSeqNum));
@@ -90,10 +90,13 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 				// Calculate throughput for the packet being acked by
 				// the redundant ACK.
 
-				timeDiff = *(unsigned long long *)(packet->payload + 1 + global::udpMinAckPacketSize + i*global::udpRedunAckSize + global::udpSeqNumSize);
+				timeDiff = *(unsigned long long *)(packet->payload + global::udpMinAckPacketSize + i*global::udpRedunAckSize + 2*global::USHORT_INT_SIZE);
 
-				if(ackTimeDiff - timeDiff == 0)
+				if((timeDiff > ackTimeDiff) || (ackTimeDiff - timeDiff == 0))
+				{
+					logWrite(EXCEPTION, "Error using UDP redun Seqnum = %d, for seqNum = %d, time taken = %llu,ackTimeDiff = %llu, timeDiff = %llu, i = %d, numAcks = %d",redunSeqNum,seqNum, ackTimeDiff - timeDiff,ackTimeDiff,timeDiff, i, numRedunAcks);
 					continue;
+				}
 
 				tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
 				tmpUdpAck.isRedun = true;

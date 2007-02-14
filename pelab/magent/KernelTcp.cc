@@ -457,11 +457,15 @@ void KernelTcp::init(void)
     bpf_u_int32 maskp;          /* subnet mask               */
     bpf_u_int32 netp;           /* ip                        */
     ostringstream filter;
+    struct in_addr tempAddr;
 
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(global::interface.c_str(), &netp, &maskp, errbuf);
+    tempAddr.s_addr = netp;
+
+    char *localIPAddr = inet_ntoa(tempAddr);
     filter << "(port " << global::peerServerPort << " and tcp)"
-            " or (port " << global::peerUdpServerPort << " and udp )";
+            " or ( udp and ( (src port " << global::peerUdpServerPort << " and dst host " << localIPAddr<< "  ) or (dst port " << global::peerUdpServerPort << " and src host "<<localIPAddr<<" )  ) )";
 
     /* open device for reading.
      * NOTE: We use non-promiscuous */
@@ -830,6 +834,7 @@ namespace
       pos = global::planetMap.find(key);
       if (pos != global::planetMap.end()) {
         outgoing = false;
+	logWrite(PCAP, "Captured an Incoming UDP packet");
       } else {
         logWrite(ERROR,"Unable to find packet in planetMap");
         return;
@@ -885,6 +890,7 @@ namespace
     // packets that are incoming. All other separation can be done
     // inside the sensors themselves. We call these 'Send' and 'Ack'
     // packets because my thinking was originally muddied about this.
+logWrite(PCAP, "Before Capturing an Incoming UDP packet with UDP sensors");
     if (outgoing) {
       /*
        * Outgoing packets
@@ -895,6 +901,7 @@ namespace
       /*
        * Incoming packets
        */
+	logWrite(PCAP, "Capturing an Incoming UDP packet with UDP sensors");
       packet.packetType = PACKET_INFO_ACK_COMMAND;
       pos->second->capturePacket(&packet);
     }

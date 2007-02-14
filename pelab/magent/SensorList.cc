@@ -139,7 +139,19 @@ void SensorList::reset(void)
   depThroughputSensor = NULL;
   depTSThroughputSensor = NULL;
   depMinDelaySensor = NULL;
+
+  depUdpPacketSensor = NULL;
+  depUdpThroughputSensor = NULL;
+  depUdpMinDelaySensor = NULL;
+  depUdpMaxDelaySensor = NULL;
+  depUdpRttSensor = NULL;
+  depUdpLossSensor = NULL;
+  depUdpAvgThroughputSensor = NULL;
+
+
+
 }
+
 
 void SensorList::pushSensor(std::auto_ptr<Sensor> newSensor)
 {
