@@ -14,8 +14,8 @@ include $(OBJDIR)/Makeconf
 BIN_SCRIPTS	= tbuisp tbsgmotepower newmote set-mote-id
 
 # These scripts installed setuid, with sudo. 
-SETUID_BIN_SCRIPTS   = 
-SETUID_SBIN_SCRIPTS  = tbuisp tbsgmotepower
+SETUID_BIN_SCRIPTS   = tbuisp tbsgmotepower
+SETUID_SBIN_SCRIPTS  = 
 SETUID_LIBX_SCRIPTS  =
 
 #
