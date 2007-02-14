@@ -560,7 +560,11 @@ function VerifyPageArguments($argspec, $required)
 	    $GLOBALS[$name] = $object;
 	}
 	elseif ($yep) {
-	    PAGEARGERROR("Invalid value for $name");
+	    #
+	    # Value supplied but could not be mapped to object.
+	    # Lets make that clear in the error message.
+	    #
+	    USERERROR("Could not map page arguments to '$name'", 1);
 	}
 	elseif ($required) {
 	    PAGEARGERROR("Must provide '$name' page argument");
