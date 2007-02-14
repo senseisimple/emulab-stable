@@ -101,49 +101,42 @@ if ($message != "") {
 
 <dl class="envlist">
 
-    <dt><img height=10 width=20 src="bullet-red.png" />
-        <a href="tutorial/docwrapper.php3?docname=tutorial.html">Emulation</a></dt>
+    <dt><a href="tutorial/docwrapper.php3?docname=tutorial.html">Emulation</a></dt>
     <dd>An emulated experiment allows you to specify an arbitrary network
     topology, giving you a <em>controllable, predictable, and repealable
     environment</em>, including PC nodes on which you have
     <em>full &quot;root&quot; access</em>, running an operating system of
     your choice.</dd>
 
-    <dt><img height=10 width=20 src="bullet-blue.png" />
-    <a href="doc/docwrapper.php3?docname=plab.html">Live-Internet Experimentation</a></dt>
+    <dt><a href="doc/docwrapper.php3?docname=plab.html">Live-Internet Experimentation</a></dt>
     <dd>Using the RON and <a href="http://www.planet-lab.org">PlanetLab</a>
     testbeds, Emulab provides you with a
     <em>full-featured environment</em> for <em>deploying, running, and
     controlling</em> your application at hundreds of sites around the
     world.</dd>
 
-    <dt><img height=10 width=20 src="bullet-green.png" />
-    <a href="tutorial/docwrapper.php3?docname=wireless.html">802.11 Wireless</a></dt>
+    <dt><a href="tutorial/docwrapper.php3?docname=wireless.html">802.11 Wireless</a></dt>
     <dd>Emulab's 802.11a/b/g testbed is deployed on multiple floors of an
     office building. Nodes are <em>under your full control</em> and may act as
     access points, clients, or in ad-hoc mode. All nodes have two wireless
     interfaces, plus a <em>wired control network</em>.</dd>
 
-    <dt><img height=10 width=20 src="bullet-yellow.png" />
-    <a href="tutorial/docwrapper.php3?docname=gnuradio.html">Software-Defined Radio</a></dt>
+    <dt><a href="tutorial/docwrapper.php3?docname=gnuradio.html">Software-Defined Radio</a></dt>
     <dd><a href="http://www.ettus.com/downloads/usrp_v4.pdf">USRP</a> devices from the <a href="http://www.gnu.org/software/gnuradio/index.html">GNU Radio</a> project give you <em>control over Layer 1 of a
     wireless network</em> - everything from signal processing up is done in
     software.</dd>
 
-    <dt><img height=10 width=20 src="bullet-orange.png" />
-    <a href="tutorial/mobilewireless.php3">Sensor Networks</a></dt>
+    <dt><a href="tutorial/mobilewireless.php3">Sensor Networks</a></dt>
     <dd>Emulab's sensor network testbed includes 25 <a href="http://www.xbow.com/Products/productdetails.aspx?sid=174">Mica2</a> motes. All motes
     are equipped with a serial port, for <em>maximum control and debugging</em>
     capability.</dd>
 
-    <dt><img height=10 width=20 src="bullet-aqua.png" />
-    <a href="tutorial/mobilewireless.php3">Mobile Wireless</a></dt>
+    <dt><a href="tutorial/mobilewireless.php3">Mobile Wireless</a></dt>
     <dd>A fleet of six <a href="http://www.acroname.com/garcia/garcia.html">Garcia robots</a> from <a href="http://www.acroname.com/">Acroname</a> are equipped with Stargate
     single-board computers and Mica2 motes. These robots have
     <em>full mobility</em> within our sensor network testbed.</dd>
 
-    <dt><img height=10 width=20 src="bullet-purple.png" />
-    <a href="tutorial/docwrapper.php3?docname=nse.html">Simulation</a></dt>
+    <dt><a href="tutorial/docwrapper.php3?docname=nse.html">Simulation</a></dt>
     <dd>Using NSE, ns-2's emulation facility, simulated networks can interact
     with real networks; not only the emulator, but <em>any network
     resource in Emulab</em>.</dd>
@@ -175,13 +168,6 @@ network experimentation.
 </p>
 <?php } ?>
 
-<?php if ($TBMAINSITE) { ?>
-<a href='pix/pc3k-front.jpg'>
-   <img src='pix/pc3k-front-thumb.jpg' class='tbpic'/></a>
-<a href='pix/pc3k-back.jpg'>
-    <img src='pix/pc3k-back-thumb.jpg' class='tbpic' /></a>
-<?php } ?>
-
 <h3>Links to help you get started:</h3>
 <ul>
 <li><b><a href = "docwrapper.php3?docname=auth.html">
@@ -195,6 +181,13 @@ network experimentation.
 <li><b><a href = "docwrapper.php3?docname=policies.html">
           Administrative Policies and Disclaimer</a></b>
 </ul>
+
+<?php if ($TBMAINSITE) { ?>
+<a href='pix/pc3k-front.jpg'>
+   <img src='pix/pc3k-front-thumb.jpg'/></a>
+<a href='pix/pc3k-back.jpg'>
+    <img src='pix/pc3k-back-thumb.jpg'/></a>
+<?php } ?>
 
 <?php
 #

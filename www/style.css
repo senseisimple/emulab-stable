@@ -30,7 +30,6 @@ table.nogrid { border: solid 1px #669; background-color:#99A; }
 table.stealth { border: 0px; background-color:#FFF; }
 td.stealth { background-color:#FFF; }
 img.stealth { background-color:#FFF; }
-img.tbpic { float: right; clear: both; }
 
 table.topbar { border-bottom: solid 2px #000; }
 table.bottombar { border-top: solid 2px #000; }
@@ -77,6 +76,8 @@ iframe.transparentusageframe {
   opacity: 0.85;
   /* Why, IE, why?! */
   filter: alpha(opacity=85);
+  /* Mozilla at least has an excuse - they support 'opacity', now that it's a
+     standard */
   -moz-opacity: 0.85;
 }
 
