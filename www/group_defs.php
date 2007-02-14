@@ -319,8 +319,7 @@ class Group
 	global $TBBASE, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
 	global $MIN_UNIX_GID;
 
-	# There appear to be a lot of old groups still around on boss/ops.
-	$starting_gid = $MIN_UNIX_GID + 200;
+	$starting_gid = $MIN_UNIX_GID;
 	$ending_gid   = 50000;
 
         #
@@ -354,7 +353,7 @@ class Group
 	    DBQueryWarn("select g.unix_gid + 1 as start from groups as g ".
 			"left outer join groups as r on ".
 			"  g.unix_gid + 1 = r.unix_gid ".
-			"where g.unix_gid>$starting_gid and ".
+			"where g.unix_gid>=$starting_gid and ".
 			"      g.unix_gid<$ending_gid and ".
 			"      r.unix_gid is null limit 1");
 
