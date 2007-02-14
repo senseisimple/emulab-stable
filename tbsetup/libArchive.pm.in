@@ -1127,10 +1127,13 @@ sub ArchiveCheckout($$;$$$)
 # I intend this to be run only when an experiment is terminated.
 # No need to have two copies.
 #
-sub ArchiveArchive($)
+sub ArchiveArchive($$)
 {
-    my ($archive_idx) = @_;
+    my ($archive_idx, $view) = @_;
     my $target = "$ARCHIVEDIR/Archive/$archive_idx";
+
+    $view = $defaultview
+	if (!defined($view));
 
     #
     # See if the archive exists and if it does, get the pathname to it.
@@ -1157,6 +1160,11 @@ sub ArchiveArchive($)
 	return 0;
     }
 
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ArchiveArchive: $directory cannot be written!\n";
+	return -1;
+    }
+
     # Is it shared? If so, certainly do not archive it!
     my $shared;
     if (IsArchiveShared($archive_idx, \$shared) < 0) {
@@ -1165,14 +1173,29 @@ sub ArchiveArchive($)
     if ($shared) {
 	print STDERR "ArchiveArchive: ".
 	    "Archive '$archive_idx' is shared; not archiving!\n";
+
+	#
+	# Even if shared, we want to clean out the current view since
+	# those files are no longer needed.
+	#
+	my $checkouts = "$directory/checkouts/$view";
+	my $checkins  = "$directory/checkins/$view";
+
+	#
+	# If the target dir exists and is not writable by the current
+	# user, then run a chown over the whole subdir. This will avoid
+	# avoid permission problems during the rm.
+	#
+	if (-e "$checkouts" && ! -o "$checkouts") {
+	    mysystem("$SUCHOWN $checkouts");
+	}
+	if (-e "$checkins" && ! -o "$checkins") {
+	    mysystem("$SUCHOWN $checkins");
+	}
+	mysystem("/bin/rm -rf $checkins $checkouts");
 	return 0;
     }
     
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveArchive: $directory cannot be written!\n";
-	return -1;
-    }
-
     if (! -e $target) {
 	if (! mkdir("$target", 0777)) {
 	    print STDERR "ArchiveArchive: Could not mkdir $target: $!\n";
@@ -2181,7 +2204,7 @@ sub TBArchiveExperimentArchive($$)
     return -1
 	if ($rval < 0);
 
-    return ArchiveArchive($archive_idx);
+    return ArchiveArchive($archive_idx, $view);
 }
 
 #
