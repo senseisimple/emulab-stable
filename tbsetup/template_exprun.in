@@ -78,6 +78,7 @@ my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
 my $PARAMS      = "parameters.xml";
+my $STAMPS      = @STAMPS@;
 
 # Locals
 my $user_name;
@@ -269,6 +270,10 @@ elsif ($action eq "start" && !defined($runid)) {
     }
 }
 
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting", "action", $action);
+}
+
 #
 # If we have a parameter file, we need to copyin the values and store
 # them in the DB for this experiment. Note that these override existing
@@ -426,10 +431,17 @@ if (defined($instance->runidx())) {
 	tbdie("Cannot get current run object for $instance!");
     }
 	
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "stopping agents");
+    }
     print "Asking program agents to stop ... this will take a moment.\n";
     SignalProgAgents("HALT") == 0
 	or $ignoreerrors
 	or CheckForDeadNodes($thisrun);
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "agents stopped");
+    }
 
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
@@ -447,16 +459,30 @@ if (defined($instance->runidx())) {
 	goto done;
     }
 
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "loghole starting");
+    }
     # This runs loghole.
     print "Asking loghole to sync the logfiles ... this will take a minute.\n";
     $instance->LogHole() == 0
 	or $ignoreerrors
         or CheckForDeadNodes($thisrun);
 
+    if ($STAMPS) {
+	my $du = 0;
+	$experiment->DU(\$du);
+	$instance->Stamp("template_exprun", "loghole done", "userdu", $du);
+	$instance->Stamp("template_exprun", "dumpdb starting");
+    }
+
     print "Dumping the instance database ... this will take a minute.\n";
     $instance->DumpDB() == 0
 	or $ignoreerrors
 	or fatal(-1, "Dump Database failed");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "dumpdb done");
+    }
 
     #
     # Commit the archive. 
@@ -478,7 +504,11 @@ if (defined($instance->runidx())) {
     system("$archcontrol -d -u -s runs/$this_runid tag $pid $eid stoprun")
 	== 0 or fatal(-1, "Could not tag archive!");
     
-    print "Experiment run '$this_runid' has been stopped.\n";    
+    print "Experiment run '$this_runid' has been stopped.\n";
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "run stopped");
+    }
 }
 
 if ($action eq "stop") {
@@ -500,6 +530,10 @@ if ($clean) {
     print "Cleaning the instance database ... this will take a moment.\n";
     $instance->CleanDB() == 0
 	or fatal(-1, "Dump Database failed");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "cleaned");
+    }
 }
 
 #
@@ -591,6 +625,9 @@ system("$eventcontrol replay $pid $eid") == 0
 $experiment->CopyLogFiles()
     if (defined($logname));
 
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting commit");
+}
 system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
 
 #
@@ -601,6 +638,9 @@ system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
 #
 system("$archcontrol -d -u -s runs/$runid tag $pid $eid startrun");
 
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "run started");
+}
 print "Experiment run '$runid' has been started.\n";
 done:
 

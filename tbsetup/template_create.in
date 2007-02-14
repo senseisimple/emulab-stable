@@ -26,7 +26,7 @@ use Errno qw(EDQUOT);
 sub usage()
 {
     print(STDERR
-	  "Usage: create_expt_template [-q] [-w] [-E description]\n".
+	  "Usage: template_create [-q] [-w] [-E description]\n".
 	  "          [-m guid/vers] [-g gid] <pid> <tid> <input file>\n".
 	  "switches and arguments:\n".
 	  "-w        - wait for template to be created.\n".
@@ -63,6 +63,7 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
+my $STAMPS      = @STAMPS@;
 
 # Locals
 my $template;
@@ -204,6 +205,10 @@ if (! ($template = Template->Create(\%args))) {
     tbdie("Could not create a new template record!");
 }
 
+if ($STAMPS && $modify) {
+    $parent_template->Stamp("template_create", "modified");
+}
+
 #
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
@@ -218,7 +223,8 @@ $eid  = $template->eid();
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
-if (my $childpid = AuditStart(LIBAUDIT_DAEMON, undef, LIBAUDIT_LOGONLY|LIBAUDIT_FANCY)) {
+if (my $childpid =
+    AuditStart(LIBAUDIT_DAEMON, undef, LIBAUDIT_LOGONLY|LIBAUDIT_FANCY)) {
     #
     # Parent exits normally, unless in waitmode. We have to set
     # justexit to make sure the END block below does not run.
@@ -319,6 +325,10 @@ fatal($? >> 8, "Oops")
 
 # Need to kill the experiment if we fail after this point.
 $exptcreated = 1;
+
+if ($STAMPS) {
+    $template->Stamp("template_create", "batchexp");
+}
 
 # Input files are kept in the DB, with the template.
 fatal(-1, "Could not add NS file to template store")
@@ -421,7 +431,9 @@ if ($modify) {
     $parent_template->Update(\%args) == 0
 	or fatal(-1, "Could not update parent template record!");
 }
-
+if ($STAMPS) {
+    $template->Stamp("template_create", "created");
+}
 exit(0);
 
 #

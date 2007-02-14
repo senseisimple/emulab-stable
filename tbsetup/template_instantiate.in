@@ -74,11 +74,9 @@ my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $OPSDBSUPPORT= @OPSDBSUPPORT@;
+my $STAMPS      = @STAMPS@;
 
 # Locals
-my $user_name;
-my $user_email;
-my $dbuid;
 my $EVhandle;
 my $exptidx;
 my $template;
@@ -195,6 +193,10 @@ if (! TBProjAccessCheck($user_uid,
     exit(1);
 }
 
+if ($STAMPS) {
+    $template->Stamp("template_instantiate", "start");
+}
+
 #
 # Grab instance and/or run if this is a replay.
 #
@@ -285,6 +287,10 @@ if (!defined($instance)) {
 # See the END block below.
 #
 $justexit = 0;
+
+if ($STAMPS) {
+    $instance->Stamp("template_instantiate", "created");
+}
 
 #
 # Now insert the binding records for the instance so that the parser
@@ -423,6 +429,10 @@ if (! ($foreground || $batchmode)) {
     AddAuditInfo("success_frag", "New T. Instance Created");
 }
 
+if ($STAMPS) {
+    $instance->Stamp("template_instantiate", "batchexp start");
+}
+
 #
 # Build up arguments to batchexp. I do not want to bother with shell
 # escapes, hence the list argument to system instead of a long string.
@@ -462,6 +472,10 @@ fatal($? >> 8, "Could not pre-instantiate the experiment")
 
 # Need to kill the experiment if we fail after this point.
 $exptcreated = 1;
+
+if ($STAMPS) {
+    $instance->Stamp("template_instantiate", "batchexp done");
+}
 
 #
 # Now we can do this ...
@@ -564,6 +578,10 @@ $instance->WriteProgramAgents() == 0
     or fatal(-1, "Could not write program agent info");
 
 if (! $preload) {
+    if ($STAMPS) {
+	$instance->Stamp("template_instantiate", "swapin starting");
+    }
+    
     #
     # Now do the swapin (or it gets queued if a batch experiment).
     #
@@ -573,6 +591,10 @@ if (! $preload) {
     }
 }
 else {
+    if ($STAMPS) {
+	$instance->Stamp("template_instantiate", "preload commit");
+    }
+    
     #
     # Lets commit the experiment archive now. The experiment might already
     # be running, but thats not a big deal.
@@ -581,6 +603,10 @@ else {
     if ($?) {
 	fatal(-1, "Could not commit archive!");
     }
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_instantiate", "done");
 }
 
 # Stop the web interface from spewing.

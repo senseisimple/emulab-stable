@@ -20,6 +20,7 @@ use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use libtblog;
+use libArchive;
 use Experiment;
 use English;
 use HTML::Entities;
@@ -28,6 +29,7 @@ use overload ('""' => 'Stringify');
 # Configure variables
 my $TB		= "@prefix@";
 my $CONTROL	= "@USERNODE@";
+my $STAMPS      = @STAMPS@;
 my $MD5         = "/sbin/md5";
 my $MKDIR       = "/bin/mkdir";
 my $RMDIR       = "/bin/rmdir";
@@ -1640,6 +1642,47 @@ sub CreateDirectory($)
     return 0;
 }
 
+#
+# Record a stamp event.
+#
+sub Stamp($$;$$$)
+{
+    my ($self, $type, $modifier, $aux_type, $aux_data) = @_;
+
+    return 0
+	if (! $STAMPS);
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid     = $self->guid();
+    my $vers     = $self->vers();
+    $modifier    = (defined($modifier) ? "'$modifier'" : "NULL");
+
+    if (!defined($aux_type)) {
+	#
+	# Grab a du.
+	#
+	my $du;
+
+	if (libArchive::TBDUExperimentArchive($self->pid(),
+					      $self->eid(), \$du) == 0) {
+	    $aux_type = "du";
+	    $aux_data = $du;
+	}
+    }
+    DBQueryWarn("insert into template_stamps set ".
+		"  guid='$guid', vers='$vers', id=NULL, instance=NULL, ".
+		"  stamp_type='$type', modifier=$modifier, ".
+		"  stamp=UNIX_TIMESTAMP(now()) ".
+		(defined($aux_type) ?
+		 ",aux_type='$aux_type',aux_data='$aux_data'" : ""))
+	or return -1;
+
+    return 0;
+}
+
 ############################################################################
 
 package Template::Instance;
@@ -3222,6 +3265,48 @@ sub InitializeEnvVariables($;$)
 		or return -1;
 	}
     }
+    return 0;
+}
+
+#
+# Record a stamp event.
+#
+sub Stamp($$;$$$)
+{
+    my ($self, $type, $modifier, $aux_type, $aux_data) = @_;
+
+    return 0
+	if (! $STAMPS);
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid     = $self->guid();
+    my $vers     = $self->vers();
+    my $exptidx  = $self->exptidx();
+    $modifier    = (defined($modifier) ? "'$modifier'" : "NULL");
+
+    if (!defined($aux_type)) {
+	#
+	# Grab a du.
+	#
+	my $du;
+
+	if (libArchive::TBDUExperimentArchive($self->pid(),
+					      $self->eid(), \$du) == 0) {
+	    $aux_type = "du";
+	    $aux_data = $du;
+	}
+    }
+    DBQueryWarn("insert into template_stamps set ".
+		"  guid='$guid', vers='$vers', id=NULL, instance='$exptidx', ".
+		"  stamp_type='$type', modifier=$modifier, ".
+		"  stamp=UNIX_TIMESTAMP(now()) ".
+		(defined($aux_type) ?
+		 ",aux_type='$aux_type',aux_data='$aux_data'" : ""))
+	or return -1;
+
     return 0;
 }
 

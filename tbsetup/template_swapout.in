@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -53,6 +53,7 @@ my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
+my $STAMPS      = @STAMPS@;
 
 # Locals
 my $user_name;
@@ -188,6 +189,10 @@ if (! $batchmode) {
 #
 $justexit = 0;
 
+if ($STAMPS) {
+    $instance->Stamp("template_swapout", "starting");
+}
+
 #
 # Catch this so we can clean up.
 #
@@ -267,12 +272,24 @@ if ($waitmode) {
 if (defined($instance->start_time())) {
     my $opt = ($force ? "-i" : "");
 
+    if ($STAMPS) {
+	$instance->Stamp("template_swapout", "stoprun starting");
+    }
+
     system("$endrun $opt -a stop -f -e $eid $guid/$version") == 0
 	or fatal(-1, "Could not stop the current run!");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_swapout", "stoprun done");
+    }
 
     # This sets the stop time.
     $instance->Stop() == 0
 	or fatal(-1, "Could not stop experiment instance!");
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_swapout", "endexp starting");
 }
 
 #
@@ -289,6 +306,10 @@ push(@arguments, ($pid, $eid));
 system(@arguments);
 fatal($? >> 8, "Could not terminate template instance")
     if ($?);
+
+if ($STAMPS) {
+    $instance->Stamp("template_swapout", "endexp done");
+}
 
 if (defined($instance->start_time())) {
     # Reminder; instance records are not deleted.
