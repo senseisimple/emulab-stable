@@ -3295,7 +3295,7 @@ sub Stamp($$;$$$)
 
 	if (libArchive::TBDUExperimentArchive($self->pid(),
 					      $self->eid(), \$du) == 0) {
-	    $aux_type = "du";
+	    $aux_type = "repodu";
 	    $aux_data = $du;
 	}
     }
