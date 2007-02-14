@@ -480,7 +480,7 @@ class Project
 		TBERROR("Project::MemberList: ".
 			"Could not load user $uid_idx!", 1);
 	    }
-	    $result[] =& $user;
+	    $result[] = $user;
 	}
 	return $result;
     }
