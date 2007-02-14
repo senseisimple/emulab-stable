@@ -526,9 +526,11 @@ def receive_characteristic(conn):
                                        - len(receive_body_buffer),
                                        socket.MSG_DONTWAIT))
     if len(receive_body_buffer) == receive_body_size:
-      receive_state = RECEIVE_HEAD
-      receive_head_buffer = ''
-      receive_parse_body()
+      try:
+        receive_parse_body()
+      finally:
+        receive_state = RECEIVE_HEAD
+        receive_head_buffer = ''
 
 def receive_parse_body():
   global socket_map
