@@ -428,16 +428,16 @@ $bodyclosestring = "<script type='text/javascript'>SET_DHTML();</script>\n";
 echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
-          <a href=\"${this_url}&show=vis\"
+          <a href=\"#A\"
                style=\"background-color:white\" ".
                "id=\"li_vis\" onclick=\"Show('vis');\">".
                "Visualization</a></li>\n";
 echo "<li>
-          <a href=\"${this_url}&show=nsfile\"
+          <a href=\"#B\"
               id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
               "NS File</a></li>\n";
 echo "<li>
-          <a href=\"${this_url}&show=graph\"
+          <a href=\"#C\"
               id=\"li_graph\" onclick=\"Show('graph');\">".
               "History</a></li>\n";
 echo "</ul>\n";
