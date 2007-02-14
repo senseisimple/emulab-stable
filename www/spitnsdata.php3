@@ -109,27 +109,17 @@ if (isset($copyid) && $copyid != "") {
 #
 if (isset($template)) {
     if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to modify experiment template ".
-		  "$guid/$version!", 1);
+	USERERROR("You do not have permission to view template!", 1);
     }
     header("Content-Type: text/plain");
 
     #
     # Grab all of the input files. Display each one. 
     #
-    $query_result =
-	DBQueryFatal("select * from experiment_template_inputs ".
-		     "where parent_guid='$guid' and parent_vers='$version'");
+    $input_list = $template->InputFiles();
 
-    while ($row = mysql_fetch_array($query_result)) {
-	$input_idx = $row['input_idx'];
-
-	$input_query =
-	    DBQueryFatal("select input from experiment_template_input_data ".
-			 "where idx='$input_idx'");
-
-	$input_row = mysql_fetch_array($input_query);
-	echo $input_row['input'];
+    for ($i = 0; $i < count($input_list); $i++) {
+	echo $input_list[$i];
 	echo "\n\n";
     }
     return;
