@@ -82,7 +82,7 @@ function DOIT($instance, $action, $command_options)
     #
     set_time_limit(0);
 
-    echo $instance->PageHeader();
+    echo $instance->ExpPageHeader();
     echo "<br><br>\n";
 
     echo "<script type='text/javascript' language='javascript' ".
@@ -147,7 +147,7 @@ function DOTIME($instance, $action)
     #
     set_time_limit(0);
 
-    echo $instance->PageHeader();
+    echo $instance->ExpPageHeader();
     echo "<br><br>\n";
 
     echo "<script type='text/javascript' language='javascript' ".
@@ -194,7 +194,7 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 
     PAGEHEADER("Start new Experiment Run");
 
-    echo $instance->PageHeader();
+    echo $instance->ExpPageHeader();
     echo "<br><br>\n";
 
     echo "<center>\n";
