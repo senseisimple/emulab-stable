@@ -154,7 +154,8 @@ foreach my $hit (@order) {
     print "<li> $rank - <b><a href=$url>$path</a></b>, $mod<br>\n";
     print "<ul>\n";
     foreach my $line (@{ $lines{$hit} }) {
-	$line =~ s/<([^>]*)>//ig;	
+	$line =~ s/<([^>]*)>//ig;	# Matched <...>
+	$line =~ s/<[^>]*//ig;		# Unmatched <...
 	#$line =~ s/<.*>//ig; 	
 	#$line =~ s/<li>//ig;
 	#$line =~ s/<\/li>//ig;
