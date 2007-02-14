@@ -22,6 +22,7 @@ char *middleman_host = "localhost";
 /** -R <middleman hostport> */
 short middleman_port = MIDDLEMAN_RECV_CLIENT_PORT;
 int debug = 0;
+int udp = 0;
 
 char *deadbeef = "deadbeef";
 
@@ -30,10 +31,11 @@ char *deadbeef = "deadbeef";
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -cudR  (option defaults in parens)\n"
+	    "USAGE: %s -smMUdu  (option defaults in parens)\n"
 	    "  -s <block_size>  rx block size (%d)\n"
 	    "  -m <hostname>    Middleman host to connect to (%s)\n"
-	    "  -R <port>        Middle port to connect to (%d)\n"
+	    "  -M <port>        Middle port to connect to (%d)\n"
+	    "  -U               Use udp instead of tcp\n"
 	    "  -d[d..d]         Enable various levels of debug output\n"
 	    "  -u               Print this msg\n",
 	    bin,block_size,middleman_host,middleman_port
@@ -44,7 +46,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:m:R:h:ud")) != -1) {
+    while ((c = getopt(argc,argv,"s:m:M:udU")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -53,10 +55,10 @@ void parse_args(int argc,char **argv) {
 		exit(-1);
 	    }
 	    break;
-	case 'h':
+	case 'm':
 	    middleman_host = optarg;
 	    break;
-	case 'R':
+	case 'M':
 	    middleman_port = (short)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
@@ -68,6 +70,9 @@ void parse_args(int argc,char **argv) {
 	    exit(0);
 	case 'd':
 	    ++debug;
+	    break;
+	case 'U':
+	    udp = 1;
 	    break;
 	default:
 	    break;
@@ -95,6 +100,10 @@ int main(int argc,char **argv) {
     int blocksRead = 0;
     struct timeval t1;
     int block_count = 0;
+    char *crbuf = "foo";
+    struct sockaddr_in client_sin;
+    int slen;
+    block_hdr_t hdr;
     
     parse_args(argc,argv);
 
@@ -127,60 +136,93 @@ int main(int argc,char **argv) {
     }
 
     /* startup recv client... */
-    if ((recv_sock = socket(PF_INET,SOCK_STREAM,0)) == -1) {
+    if ((recv_sock = socket(PF_INET,(udp)?SOCK_DGRAM:SOCK_STREAM,0)) == -1) {
 	efatal("could not get recv socket");
     }
 
-    /* connect to the middleman if we can... */
-    if (connect(recv_sock,
-		(struct sockaddr *)&recv_sa,
-		sizeof(struct sockaddr_in)) < 0) {
-	efatal("could not connect to middleman");
+    if (!udp) {
+	/* connect to the middleman if we can... */
+	if (connect(recv_sock,
+		    (struct sockaddr *)&recv_sa,
+		    sizeof(struct sockaddr_in)) < 0) {
+	    efatal("could not connect to middleman");
+	}
+    }
+    else {
+	/* just send the middleman a "register" msg */
+	sendto(recv_sock,crbuf,sizeof(crbuf),0,
+	       (struct sockaddr *)&recv_sa,sizeof(struct sockaddr_in));
+    }
+
+    if (debug > 1) {
+	fprintf(stdout,"DEBUG: connected to %s:%d\n",
+		inet_ntoa(recv_sa.sin_addr),ntohs(recv_sa.sin_port));
     }
 
     /**
      * read blocks forever, noting times at which a block was completely read.
      */
 
+    if (debug > 1) {
+	fprintf(stdout,"DEBUG: Receiving blocks...\n");
+    }
+
     while (1) {
 	bytesRead = 0;
-	while (bytesRead < block_size) {
-	    retval = read(recv_sock,
-			  &buf[(block_size - bytesRead)],
-			  (block_size - bytesRead));
 
-	    if (retval < 0) {
-		if (errno == ECONNRESET) {
-		    /* middleman must've dumped out. */
+	if (!udp) {
+	    while (bytesRead < block_size) {
+		retval = read(recv_sock,
+			      &buf[(block_size - bytesRead)],
+			      (block_size - bytesRead));
+		
+		if (retval < 0) {
+		    if (errno == ECONNRESET) {
+			/* middleman must've dumped out. */
+			efatal("middleman appears to have disappeared");
+		    }
+		    else if (errno == EAGAIN) {
+			;
+		    }
+		    else {
+			ewarn("weird");
+		    }
+		}
+		else if (retval == 0) {
+		    /* middleman dumped out */
 		    efatal("middleman appears to have disappeared");
 		}
-		else if (errno == EAGAIN) {
-		    ;
-		}
 		else {
-		    ewarn("weird");
+		    bytesRead += retval;
 		}
 	    }
-	    else if (retval == 0) {
-		/* middleman dumped out */
-		efatal("middleman appears to have disappeared");
+	}
+	else {
+	    slen = sizeof(struct sockaddr_in);
+	    retval = recvfrom(recv_sock,buf,block_size,0,
+			      (struct sockaddr *)&client_sin,
+			      (socklen_t *)&slen);
+	    if (retval < 0) {
+		ewarn("error while recvfrom middleman");
 	    }
 	    else {
-		bytesRead += retval;
+		bytesRead = retval;
 	    }
 	}
 
-
 	gettimeofday(&t1,NULL);
 
-	fprintf(stdout,"TIME %d %.4f\n",
-		block_count,
+	/* unmarshall to get id numbers */
+	unmarshall_block_hdr(buf,&hdr);
+	
+	fprintf(stdout,"TIME m%d b%d f%d %.4f\n",
+		hdr.msg_id,hdr.block_id,hdr.frag_id,
 		t1.tv_sec + t1.tv_usec / 1000000.0f);
 	++block_count;
 	
 	fprintf(stdout,
-		"INFO: read %d bytes (a block) at %.6f\n",
-		block_size,
+		"INFO: read %d bytes at %.6f\n",
+		bytesRead,
 		t1.tv_sec + t1.tv_usec / 1000000.0f);
     }
 

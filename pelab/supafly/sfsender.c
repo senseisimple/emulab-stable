@@ -38,6 +38,9 @@ int ack_count = 0;
 
 int unack_threshold = -1;
 
+int udp = 0;
+int udp_frag_size = 0;
+
 /** 
  * functions
  */
@@ -51,7 +54,14 @@ void usage(char *bin) {
 	    "  -P <time>        Microseconds to pause between msg sends (%d)\n"
 	    "  -m <hostname>    Middleman host to connect to (%s)\n"
 	    "  -M <port>        Middle port to connect to (%d)\n"
-	    "  -a <threshold>   Stop sending if gte threshold unack'd blocks remain (if less than 0, never wait) (%d)\n"
+	    "  -a <threshold>   Stop sending if gte threshold unack'd blocks "
+	    "remain (if less than 0, \n"
+	    "                     never wait) (%d)\n"
+	    "                     (NOTE: cannot use with udp)\n"
+	    "  -U               Use udp instead of tcp\n"
+	    "  -F <frag_size>   Application fragment size for udp (i.e. if \n"
+	    "                     -s 1024 and -F 512, fragment each block \n"
+	    "                     into two chunks)\n"
 	    "  -d[d..d]         Enable various levels of debug output\n"
 	    "  -u               Print this msg\n",
 	    bin,block_size,block_count,msg_count,block_pause_us,msg_pause_us,
@@ -63,12 +73,19 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:uda:b")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:uda:bUF:")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
+		exit(-1);
+	    }
+	    if (block_size < sizeof(block_hdr_t)) {
+		fprintf(stderr,
+			"ERROR: block size must be at least %d bytes "
+			"(sizeof msg hdr)!\n",
+			sizeof(block_hdr_t));
 		exit(-1);
 	    }
 	    break;
@@ -87,23 +104,23 @@ void parse_args(int argc,char **argv) {
 	    }
 	    break;
 	case 'p':
-	    block_pause_us = strtol(optarg,&ep,10);
+	    block_pause_us = (int)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
 		exit(-1);
 	    }
 	    break;
 	case 'P':
-	    msg_pause_us = strtol(optarg,&ep,10);
+	    msg_pause_us = (int)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
 		exit(-1);
 	    }
 	    break;
-	case 'h':
+	case 'm':
 	    middleman_host = optarg;
 	    break;
-	case 'S':
+	case 'M':
 	    middleman_port = (short)strtol(optarg,&ep,10);
 	    if (ep == optarg) {
 		usage(argv[0]);
@@ -123,6 +140,16 @@ void parse_args(int argc,char **argv) {
 		exit(-1);
 	    }
 	    break;
+	case 'U':
+	    udp = 1;
+	    break;
+	case 'F':
+	    udp_frag_size = (int)strtol(optarg,&ep,10);
+	    if (ep == optarg) {
+		usage(argv[0]);
+		exit(-1);
+	    }
+	    break;
 	default:
 	    break;
 	}
@@ -134,42 +161,65 @@ void parse_args(int argc,char **argv) {
 	exit(-1);
     }
 
-    return;
+    if (unack_threshold > -1 && udp) {
+	fprintf(stderr,
+		"ERROR: cannot use an ack window with udp since this program\n"
+		"does not retransmit unack'd msgs!\n");
+	exit(-1);
+    }
 
+    if ((udp_frag_size > 0 && udp_frag_size < sizeof(block_hdr_t)) 
+	|| block_size < sizeof(block_hdr_t)) {
+	fprintf(stderr,
+		"ERROR: requested block/frag size is less than hdr size\n"
+		"of %d bytes\n!",
+		sizeof(block_hdr_t));
+	exit(-1);
+    }
+
+    return;
 }
 
 
 int main(int argc,char **argv) {
-    char *buf,*outbuf;
+    char *buf;
     struct sockaddr_in send_sa;
     int send_sock;
     int remaining_block_count;
     int remaining_msg_count;
+    int remaining_frag_count;
     int i;
     int retval;
     int bytesWritten;
     struct timeval tv;
     int ack_count;
+    int frag_count;
+    /** might be block_size or udp_frag_size */
+    int udp_msg_size;
+    int bsize;
     
     parse_args(argc,argv);
-
-    remaining_block_count = block_count;
-    remaining_msg_count = msg_count;
-    ack_count = 0;
 
     /* initialize ourself... */
     srand(time(NULL));
 
-    /* grab some buf! */
-    if ((buf = (char *)malloc(sizeof(char)*block_size)) == NULL) {
-	efatal("no memory for data buf");
+    if (udp_frag_size) {
+	frag_count = (block_size % udp_frag_size)?(block_size/udp_frag_size + 1):(block_size/udp_frag_size);
+	udp_msg_size = udp_frag_size;
     }
-    if ((outbuf = (char *)malloc(sizeof(char)*block_size)) == NULL) {
-	efatal("no memory for output data buf");
+    else {
+	frag_count = 1;
+	udp_msg_size = block_size;
+    }
+    bsize = udp_msg_size;
+
+    /* grab some buf! */
+    if ((buf = (char *)malloc(sizeof(char)*bsize)) == NULL) {
+	efatal("no memory for data buf");
     }
     
     /* fill with deadbeef */
-    for (i = 0; i < block_size; i += 8) {
+    for (i = 0; i < bsize; i += 8) {
 	memcpy(&buf[i],deadbeef,8);
     }
     
@@ -186,15 +236,17 @@ int main(int argc,char **argv) {
     }
 
     /* startup send client... */
-    if ((send_sock = socket(PF_INET,SOCK_STREAM,0)) == -1) {
+    if ((send_sock = socket(PF_INET,(udp)?SOCK_DGRAM:SOCK_STREAM,0)) == -1) {
 	efatal("could not get send socket");
     }
 
-    /* connect to the middleman if we can... */
-    if (connect(send_sock,
-		(struct sockaddr *)&send_sa,
-		sizeof(struct sockaddr_in)) < 0) {
-	efatal("could not connect to middleman");
+    if (!udp) {
+	/* connect to the middleman if we can... */
+	if (connect(send_sock,
+		    (struct sockaddr *)&send_sa,
+		    sizeof(struct sockaddr_in)) < 0) {
+	    efatal("could not connect to middleman");
+	}
     }
 
     /* set nonblocking so we can read acks at low priority */
@@ -205,33 +257,78 @@ int main(int argc,char **argv) {
      * deadbeef to the sfreceiver.  nasty, but whatever.  provides a little
      * testing.
      */
-
+    remaining_msg_count = msg_count;
+    ack_count = 0;
     while (remaining_msg_count > 0) {
 	/* prepare to send a msg... */
+	remaining_block_count = block_count;
 
 	while (remaining_block_count > 0) {
 	    /* send a block */
 	    bytesWritten = 0;
 
-	    while (bytesWritten < block_size) {
-		retval = write(send_sock,buf,block_size - bytesWritten);
-		
-		if (retval < 0) {
-		    if (errno == EPIPE) {
-			efatal("while writing to middleman");
+	    remaining_frag_count = frag_count;
+	    
+	    if (udp) {
+		while (remaining_frag_count) {
+		    gettimeofday(&tv,NULL);
+		    marshall_block_hdr_send(buf,
+					    msg_count-remaining_msg_count,
+					    block_count-remaining_block_count,
+					    frag_count-remaining_frag_count,
+					    &tv);
+		    retval = sendto(send_sock,buf,udp_msg_size,0,
+				    (struct sockaddr *)&send_sa,
+				    sizeof(send_sa));
+		    if (retval < 0) {
+			if (errno == EAGAIN) {
+			    ewarn("EAGAIN while sending udp");
+			}
+			else if (errno == EMSGSIZE) {
+			    efatal("msg size too big for atomic send");
+			}
+			else if (retval == EPIPE) {
+			    efatal("while writing udp to middleman");
+			}
+			else {
+			    efatal("uncaught error");
+			}
 		    }
-		    else if (errno == EAGAIN) {
-			;
+		    else if (retval == udp_msg_size) {
+			--remaining_frag_count;
 		    }
 		    else {
-			ewarn("while writing to middleman");
+			--remaining_frag_count;
+			fprintf(stderr,"WARNING: only sent %d of %d bytes\n",
+				retval,udp_msg_size);
 		    }
 		}
-		else {
-		    bytesWritten += retval;
+	    }
+	    else {
+		while (bytesWritten < block_size) {
+		    marshall_block_hdr_send(buf,
+					    msg_count-remaining_msg_count,
+					    block_count-remaining_block_count,
+					    frag_count-remaining_frag_count,
+					    &tv);
+		    retval = write(send_sock,buf,block_size - bytesWritten);
+		    
+		    if (retval < 0) {
+			if (errno == EPIPE) {
+			    efatal("while writing to middleman");
+			}
+			else if (errno == EAGAIN) {
+			    ;
+			}
+			else {
+			    ewarn("while writing to middleman");
+			}
+		    }
+		    else {
+			bytesWritten += retval;
+		    }
 		}
 	    }
-
 	    gettimeofday(&tv,NULL);
 
 	    fprintf(stdout,"TIME %d %.4f\n",
@@ -255,13 +352,15 @@ int main(int argc,char **argv) {
 		}
 	    }
 
-	    /* check for acks... */
-	    /* just read one right away to stay ahead of the game... */
-	    while (read(send_sock,&buf[0],sizeof(char)) == sizeof(char)) {
-		++ack_count;
+	    if (!udp) {
+		/* check for acks... */
+		/* just read one right away to stay ahead of the game... */
+		while (read(send_sock,&buf[0],sizeof(char)) == sizeof(char)) {
+		    ++ack_count;
+		}
 	    }
 
-	    if (unack_threshold > -1) {
+	    if (!udp && unack_threshold > -1) {
 		while (((block_count - remaining_block_count) - ack_count) > unack_threshold) {
 		    warn("hit the unack threshold!");
 		    
