@@ -5,6 +5,7 @@
  */
 
 #include "UdpMaxDelaySensor.h"
+#include "CommandOutput.h"
 
 using namespace std;
 
@@ -77,6 +78,10 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
         if(eventFlag == true)
         {
 		// Report the maximum delay
+		ostringstream messageBuffer;
+		messageBuffer<<"MAXINQ="<<maxDelay;
+		global::output->eventMessage(messageBuffer.str(), packet->elab);
+
 		logWrite(SENSOR,"VALUE::New Max Delay = %llu",maxDelay);
         }
 	logWrite(SENSOR,"MAXD:TIME=%llu,MAXD=%llu",timeStamp,maxDelay);

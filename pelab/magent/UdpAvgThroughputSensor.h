@@ -33,7 +33,7 @@ class UdpAvgThroughputSensor:public Sensor{
 		void localAck(PacketInfo *packet);
 
 	private:
-		void calculateTput(unsigned long long timeStamp);
+		void calculateTput(unsigned long long timeStamp, PacketInfo *packet);
 
 		UdpPacketSensor const *packetHistory;
 		UdpLossSensor const *lossSensor;
@@ -44,6 +44,7 @@ class UdpAvgThroughputSensor:public Sensor{
 
 		unsigned long long lastAckTime;
 		double throughputKbps;
+		int lastSeenThroughput;
 
 		UdpAck ackList[100];
 		int numSamples;

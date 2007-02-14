@@ -5,6 +5,7 @@
  */
 
 #include "UdpMinDelaySensor.h"
+#include "CommandOutput.h"
 
 using namespace std;
 
@@ -80,6 +81,9 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	// Send an event message to the monitor to change the value of minimum one way delay.
 	if(eventFlag == true)
 	{
+		ostringstream messageBuffer;
+		messageBuffer << "delay="<<minDelay;
+		global::output->eventMessage(messageBuffer.str(), packet->elab, CommandOutput::FORWARD_PATH);
 		logWrite(SENSOR,"VALUE::New Min delay = %llu",minDelay);
 	}
 	logWrite(SENSOR,"MIND:TIME=%llu,MIND=%llu",timeStamp,minDelay);

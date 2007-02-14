@@ -30,6 +30,8 @@ int localServerPort;
 // current sequence number, redundant ACKs, and packet loss of the connection.
 std::map<struct ClientAddress, ClientInfo, CompareAddresses> ClientMap;
 
+bool useMinAcksFlag = true;
+
 // Convert the argument to microseconds.
 unsigned long long getPcapTimeMicro(const struct timeval *tp)
 {
@@ -365,6 +367,10 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
                 // than 3 redundant ACKs.
                 int spaceLeft = udpLen - ackLength;
 
+		// Use only 3 ACKs if specified at the command line.
+		if(useMinAcksFlag == true)
+			spaceLeft = 0;
+
                 // Accommodate as many redundant ACKs as possible.
                 if(spaceLeft > ackSize)
                         minimumAcks = minimumAcks + spaceLeft / ackSize;
@@ -558,10 +564,15 @@ int main(int argc, char *argv[])
 
 	if(argc < 3)
 	{
-		fprintf(stderr,"ERROR: Usage: ./UdpServer <interface_name> <port-num>\n");
+		fprintf(stderr,"ERROR: Usage: ./UdpServer <interface_name> <port-num> -maxAcks\n");
 		exit(1);
 	}
 	localServerPort = atoi(argv[2]);
+
+	// Fit as many redundant ACKs as possible into the ACK packets.
+	if(argc >= 4)
+		if(strcmp(argv[3], "-maxAcks"))
+			useMinAcksFlag = false;
 
 	/* socket creation */
 	sd=socket(AF_INET, SOCK_DGRAM, 0);

@@ -5,6 +5,7 @@
  */
 
 #include "UdpAvgThroughputSensor.h"
+#include "CommandOutput.h"
 
 using namespace std;
 
@@ -13,6 +14,7 @@ UdpAvgThroughputSensor::UdpAvgThroughputSensor(UdpPacketSensor const *packetHist
 	lossSensor(lossSensorVal),
 	lastAckTime(0),
 	throughputKbps(0.0),
+	lastSeenThroughput(0),
 	numSamples(0),
 	queuePtr(0)
 {
@@ -129,7 +131,7 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 
 	if(ackTimeDiff == 0)
 	{
-		calculateTput(timeStamp);
+		calculateTput(timeStamp, packet);
 		lastAckTime = currentAckTimeStamp;
 		return;
 	}
@@ -166,14 +168,14 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 	if(numSamples < MAX_SAMPLES)
 		numSamples++;
 
-	calculateTput(timeStamp);
+	calculateTput(timeStamp, packet);
 
 	// Save the receiver timestamp of this ACK packet, so that we can
 	// use for calculating throughput for the next ACK packet.
 	lastAckTime = currentAckTimeStamp;
 }
 
-void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp)
+void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp, PacketInfo *packet)
 {
 	// We don't have enough samples to calculate the average throughput.
 	if(numSamples < MIN_SAMPLES)
@@ -217,22 +219,32 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp)
 
 
 	// Send a message to the monitor with the new bandwidth.
-	if(lossSensor->getPacketLoss() == 0)
+	if(lossSensor->getPacketLoss() == 0 )
 	{
-		// Send this available bandwidth as a tentative value.
-		// To be used for dummynet events only if it is greater
-		// than the last seen value.
+		if(static_cast<int>(throughputKbps) > lastSeenThroughput )
+		{
+			// Send this available bandwidth as a tentative value.
+			// To be used for dummynet events only if it is greater
+			// than the last seen value.
 
+			ostringstream messageBuffer;
+			messageBuffer << static_cast<int>( throughputKbps );
+			global::output->genericMessage(TENTATIVE_THROUGHPUT, messageBuffer.str(), packet->elab);
+		}
 		logWrite(SENSOR, "AVGTPUT:TIME=%llu,TENTATIVE=%f",timeStamp,throughputKbps);
 		logWrite(SENSOR, "LOSS:TIME=%llu,LOSS=0",timeStamp);
 	}
 	else
 	{
+		ostringstream messageBuffer;
+		messageBuffer << static_cast<int>( throughputKbps );
+		global::output->genericMessage(AUTHORITATIVE_BANDWIDTH, messageBuffer.str(), packet->elab);
 		// Send this as the authoritative available bandwidth value.
 		logWrite(SENSOR, "AVGTPUT:TIME=%llu,AUTHORITATIVE=%f",timeStamp,throughputKbps);
 		logWrite(SENSOR, "LOSS:TIME=%llu,LOSS=%d",timeStamp,lossSensor->getPacketLoss());
 
 		(const_cast<UdpLossSensor *>(lossSensor))->resetLoss();
 	}
+	lastSeenThroughput = static_cast<int>(throughputKbps);
 	logWrite(SENSOR, "STAT:TOTAL_LOSS = %d",lossSensor->getTotalPacketLoss());
 }
