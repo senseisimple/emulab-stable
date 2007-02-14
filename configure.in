@@ -898,8 +898,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	collab/mailman/genaliases collab/mailman/setmmlistmembers \
 	collab/mailman/mailmanproxy collab/mailman/setmmpasswd \
 	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
-	collab/cvstools/webcvsrepo_ctrl \
-	daikon/GNUmakefile daikon/daikonize daikon/find_perl "
+	collab/cvstools/webcvsrepo_ctrl "
 
 #
 # Do this for easy distclean.
