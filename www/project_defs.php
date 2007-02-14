@@ -476,7 +476,7 @@ class Project
 	while ($row = mysql_fetch_array($query_result)) {
 	    $uid_idx = $row["uid_idx"];
 
-	    if (! ($user =& User::Lookup($uid_idx))) {
+	    if (! ($user = User::Lookup($uid_idx))) {
 		TBERROR("Project::MemberList: ".
 			"Could not load user $uid_idx!", 1);
 	    }
