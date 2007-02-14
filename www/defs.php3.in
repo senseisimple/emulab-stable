@@ -376,6 +376,8 @@ function CHECKURL($url, &$error) {
 
 	$fp = @fopen($url, "r");
 	if (! $fp) {
+	    $is_redirect = 0;
+	    
 	    # Check to see if it was a redirect, in which case its OK
 	    for ($i = 0; $i < count($http_response_header); $i++) {
 		if (!strcmp("Location:", substr($http_response_header[$i],0,9))) {
