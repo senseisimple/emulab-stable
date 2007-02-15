@@ -623,7 +623,7 @@ namespace
                          struct pcap_pkthdr const * pcapInfo,
                          unsigned char const * packet)
   {
-    logWrite(PCAP, "Captured a packet");
+//    logWrite(PCAP, "Captured a packet");
     int packetType = getLinkLayer(pcapInfo, packet);
     if (packetType == -1)
     {
@@ -687,7 +687,7 @@ namespace
       }
       else
       {
-        logWrite(PCAP, "Captured a TCP packet");
+//        logWrite(PCAP, "Captured a TCP packet");
         bytesRemaining -= tcpPacket->doff*4;
         handleTransport(TCP_CONNECTION, pcapInfo, ipPacket, tcpPacket, NULL,
                         transportPacketStart, ipOptions, bytesRemaining);
@@ -703,7 +703,7 @@ namespace
       }
       else
       {
-        logWrite(PCAP, "Captured a UDP packet");
+//        logWrite(PCAP, "Captured a UDP packet");
         bytesRemaining -= sizeof(struct udphdr);
         handleTransport(UDP_CONNECTION, pcapInfo, ipPacket, NULL, udpPacket,
                         transportPacketStart, ipOptions, bytesRemaining);
@@ -829,8 +829,8 @@ namespace
 
 //    logWrite(PCAP,"Looking up key (outgoing): t=%d,i=%s,lp=%i,rp=%i",
 //        transport, inet_ntoa(ipPacket->ip_dst),key.localPort,key.remotePort);
-    logWrite(PCAP, "Looking up key (outgoing): %s",
-             key.toString().c_str());
+//    logWrite(PCAP, "Looking up key (outgoing): %s",
+//             key.toString().c_str());
     map<PlanetOrder, Connection *>::iterator pos;
     pos = global::planetMap.find(key);
 
@@ -841,8 +841,8 @@ namespace
       swap(key.localPort, key.remotePort);
 //      key.localPort = ntohs(tcpPacket->dest);
 //      key.remotePort = ntohs(tcpPacket->source);
-      logWrite(PCAP, "Looking up key (incoming): %s",
-               key.toString().c_str());
+//      logWrite(PCAP, "Looking up key (incoming): %s",
+//               key.toString().c_str());
 //      logWrite(PCAP,"Looking up key (incoming): t=%d,i=%s,lp=%i,rp=%i",
 //          transport,inet_ntoa(ipPacket->ip_src),key.localPort,key.remotePort);
       pos = global::planetMap.find(key);
