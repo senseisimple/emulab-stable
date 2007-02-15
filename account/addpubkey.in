@@ -284,6 +284,9 @@ exit 1;
 sub ParseKey($) {
     my ($keyline) = @_;
 
+    # Remove trailing newlines which screws the patterns below.
+    $keyline =~ s/\n//g;
+
     # Enforce a reasonable length on the key.
     if (length($keyline) > 4096) {
 	print "Key is too long!\n";
