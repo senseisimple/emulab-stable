@@ -141,9 +141,6 @@ if ($spew) {
     ignore_user_abort(1);
     register_shutdown_function("SPEWCLEANUP");
 
-    TBERROR("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
-	    "  webtemplate_export -s $optarg -i $exptidx", 0);
-
     if (($fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
 		     "  webtemplate_export -s -i $exptidx",
 		     "r"))) {
