@@ -115,7 +115,7 @@ function Show($which, $arg1, $arg2)
 	         "     position: relative; height: 450px; ".
 	         "     width: 90%; border: 2px solid black;'>\n";
 	$html .= "  <img border=0 ";
-	$html .= "       src='linkgraph_image.php?exptidx=$exptidx";
+	$html .= "       src='linkgraph_image.php?instance=$exptidx";
 	$html .= "&graphtype=$graphtype&now=$now'>\n";
 	$html .= "</div>\n";
 

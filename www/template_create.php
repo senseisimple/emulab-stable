@@ -400,7 +400,7 @@ elseif (isset($_FILES['nsfile']) && $_FILES['nsfile']['size'] != 0) {
     # the php temporary file name. Note that there appears to be some kind
     # of breakage, at least in opera; filename has no path.
     #
-    $formfields[nsfile] = $_FILES['nsfile']['name'];
+    $formfields["nsfile"] = $_FILES['nsfile']['name'];
     $nsfilelocale = "remote";
 }
 else {
