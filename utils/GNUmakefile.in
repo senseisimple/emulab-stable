@@ -16,7 +16,8 @@ SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
                   setdest loghole webcopy linkmon_ctl snmp-if-deref.sh \
-		  template_record spewevents
+		  template_record spewevents \
+		  wbts_dump
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog daemon_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
