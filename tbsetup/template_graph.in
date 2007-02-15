@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -224,8 +224,8 @@ foreach my $kid (sort {$a <=> $b} keys(%parents)) {
     my $vers   = $kid;
     my $parent = $parents{$vers};
     my $tid    = $tids{$vers};
-    my $url    = "$TBBASE/template_show.php?guid=$guid&version=$vers".
-	"&show=graph";
+    my $url    = "$TBBASE/template_show.php".
+	           "?show=graph&guid=$guid&version=$vers";
     my $color  = "black";
 
     print DOT "    $parent -> $kid;\n"
