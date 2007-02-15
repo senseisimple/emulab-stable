@@ -553,7 +553,7 @@ def receive_parse_body():
   if not sock.number_to_connection.has_key(connectionKey):
     raise Exception('ERROR: magent event received that does not '
                     + 'correspond to a connection. socketKey: ' + socketKey
-                    + ' connectionKey: ' + connectionKey)
+                    + ' connectionKey: ' + str(connectionKey))
   app_connection = sock.number_to_connection[connectionKey]
   if eventType == EVENT_FORWARD_PATH:
     set_connection(this_ip, app_connection.dest.local_port,
