@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,8 +20,8 @@ if [ ! -d ../pelab ]; then
 fi
 
 echo "##### cleaning up a little"
-rm -f magent/*.o stub/*.o
-strip magent/magent stub/stubd libnetmon/netmonup
+rm -f magent/*.o stub/*.o UDP/UdpServerDir/*.o
+strip magent/magent stub/stubd libnetmon/netmonup magent/UDP/UdpServerDir/UdpServer
 
 echo "##### creating tarball $path from .."
 tar czf $path -C .. $files

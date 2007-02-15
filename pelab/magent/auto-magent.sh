@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,6 +26,17 @@ if [ ${MAGENT_NORECV:-0} -ne 0 ]; then
     echo "${IPERFD_DIR}/$IPERFD -p $port"
     ${IPERFD_DIR}/$IPERFD -p $port &
     TARGETS="$TARGETS $IPERFD"
+fi
+
+#
+# Start up the UDP receiver
+#
+if [ -x ${MAGENT_DIR}/UDP/UdpServerDir/UdpServer ]; then
+    port=3492
+    args="vnet $port"
+    echo "${MAGENT_DIR}/UDP/UdpServerDir/UdpServer $args"
+    $AS_ROOT ${MAGENT_DIR}/UDP/UdpServerDir/UdpServer $args &
+    TARGETS="$TARGETS UdpServer"
 fi
 
 echo $SH ${MAGENT_DIR}/run-magent.sh $ARGS
