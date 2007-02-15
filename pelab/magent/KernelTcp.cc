@@ -434,7 +434,20 @@ int KernelTcp::getSock(void) const
   return peersock;
 }
 
-enum { SNIFF_WAIT = 10 };
+namespace
+{
+  void addFilterProtocol(ostringstream & filter, char const * proto,
+                         unsigned short port, char const * address)
+  {
+    filter << "(" << proto << " and ("
+           << "(src port " << port << " and dst host " << address << ")"
+           << " or "
+           << "(dst port " << port << " and src host " << address << ")"
+           << "))";
+  }
+
+  enum { SNIFF_WAIT = 10 };
+}
 
 void KernelTcp::init(void)
 {
@@ -464,8 +477,9 @@ void KernelTcp::init(void)
     tempAddr.s_addr = netp;
 
     char *localIPAddr = inet_ntoa(tempAddr);
-    filter << "(port " << global::peerServerPort << " and tcp)"
-            " or ( udp and ( (src port " << global::peerUdpServerPort << " and dst host " << localIPAddr<< "  ) or (dst port " << global::peerUdpServerPort << " and src host "<<localIPAddr<<" )  ) )";
+    addFilterProtocol(filter, "tcp", global::peerServerPort, localIPAddr);
+    filter << " or ";
+    addFilterProtocol(filter, "udp", global::peerUdpServerPort, localIPAddr);
 
     /* open device for reading.
      * NOTE: We use non-promiscuous */
