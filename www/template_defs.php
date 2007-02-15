@@ -627,7 +627,7 @@ class Template
 	    
 	    echo " <td align=center>".
  		    MakeLink("export",
-			     "guid=$guid&version=$vers&exptidx=$exptidx",
+			     "instance=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 
 	    echo " <td align=center>".
@@ -638,7 +638,7 @@ class Template
 
 	    echo " <td align=center>".
  		    MakeLink("analyze",
-			     "guid=$guid&version=$vers&exptidx=$exptidx",
+			     "instance=$exptidx",
 			     "<img border=0 alt='Show' src='greenball.gif'>");
 	    echo " </td>
                  </tr>\n";
