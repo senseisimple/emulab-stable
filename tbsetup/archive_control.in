@@ -149,6 +149,7 @@ if ($action eq "checktag") {
 #
 if ($expstate ne EXPTSTATE_ACTIVE &&
     $expstate ne EXPTSTATE_TERMINATING &&
+    $expstate ne EXPTSTATE_ACTIVATING &&
     $expstate ne EXPTSTATE_SWAPPED) {
     fatal("Experiment $pid/$eid must be active or swapped!");
 }
