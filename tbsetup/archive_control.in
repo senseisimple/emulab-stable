@@ -230,10 +230,10 @@ if ($action eq "commit") {
     }
 }
 elsif ($action eq "tag") {
-    usage()
-	if (! @ARGV);
-
-    my $tag = $ARGV[0];
+    my $tag = "tag";
+    
+    $tag = $ARGV[0]
+	if (@ARGV);
 
     if (! TBcheck_dbslot($tag, "archive_tags", "tag",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -244,7 +244,7 @@ elsif ($action eq "tag") {
     $tag = $1;
 
     my $usertag = 0;
-    if (defined($options{"u"})) {
+    if (scalar(@ARGV) && defined($options{"u"})) {
 	$usertag = 1;
     }
 

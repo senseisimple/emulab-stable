@@ -210,10 +210,10 @@ if ($STAMPS) {
 	$parent_template->Stamp("template_create", "modified");
 	
 	$template->Stamp("template_create", "creating",
-			 undef, "parent_version", $parent_vers);
+			 "parent_version", $parent_vers);
     }
     else {
-	$template->Stamp("template_create", "creating", undef, "new", 0);
+	$template->Stamp("template_create", "creating", "", 0);
     }
 }
 
