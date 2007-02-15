@@ -244,6 +244,7 @@ if (defined($paramfile)) {
     
     my $parse  = XMLin($paramfile,
 		       VarAttr => 'name',
+		       ForceArray => ['parameter'],
 		       ContentKey => '-content',
 		       SuppressEmpty => undef);
 
