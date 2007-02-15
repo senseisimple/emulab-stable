@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 var LOG_STATE_LOADING = 1;
@@ -91,9 +91,17 @@ function ml_getBodyText(ifr) {
     var retval = null;
 
     try {
-	var oDoc = (ifr.contentWindow || ifr.contentDocument);
-	if (oDoc.document) {
-	    oDoc = oDoc.document;
+	var oDoc;
+	
+	if (ifr.document) {
+	    // Safari
+	    oDoc = ifr.document;
+        }
+	else {
+	    oDoc = (ifr.contentWindow || ifr.contentDocument);
+	    if (oDoc.document) {
+		oDoc = oDoc.document;
+	    }
 	}
 	for (lpc = 0; lpc < oDoc.childNodes.length; lpc++) {
 	    text = ml_getInnerText(oDoc.childNodes[lpc]);
@@ -116,8 +124,8 @@ function ml_getBodyText(ifr) {
 /* @return The innerHeight of the window. */
 function ml_getInnerHeight() {
     var retval;
-    var win = document.getElementById('outputframe').contentWindow;
-    var doc = document.getElementById('outputframe').contentWindow.document;
+    var win = getObjbyName('outputframe').contentWindow;
+    var doc = getObjbyName('outputframe').contentWindow.document;
 
     if (win.innerHeight) // all except Explorer
       retval = win.innerHeight;
@@ -133,8 +141,8 @@ function ml_getInnerHeight() {
 /* @return The scrollTop of the window. */
 function ml_getScrollTop() {
     var retval;
-    var win = document.getElementById('outputframe').contentWindow;
-    var doc = document.getElementById('outputframe').contentWindow.document;
+    var win = getObjbyName('outputframe').contentWindow;
+    var doc = getObjbyName('outputframe').contentWindow.document;
 
     if (win.pageYOffset) // all except Explorer
       retval = win.pageYOffset;
@@ -149,8 +157,8 @@ function ml_getScrollTop() {
 /* @return The height of the document. */
 function ml_getScrollHeight() {
     var retval;
-    var win = document.getElementById('outputframe').contentWindow;
-    var doc = document.getElementById('outputframe').contentWindow.document;
+    var win = getObjbyName('outputframe').contentWindow;
+    var doc = getObjbyName('outputframe').contentWindow.document;
     var test1 = doc.body.scrollHeight;
     var test2 = doc.body.offsetHeight;
 
@@ -170,10 +178,10 @@ function ml_getScrollHeight() {
  * @param state The state of the download.
  */
 function ml_handleReadyState(state) {
-    var Iframe = document.getElementById('outputframe');
+    var Iframe = getObjbyName('outputframe');
     var idoc   = IframeDocument('outputframe');
     var oa     = idoc.getElementById('outputarea');
-    var dl     = document.getElementById('downloader');
+    var dl     = getObjbyName('downloader');
 
     if (docTriesLeft < 0) {
         /* Already decided we were broken; just ignore */

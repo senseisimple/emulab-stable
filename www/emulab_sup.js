@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 /*
@@ -10,8 +10,8 @@
 /* Clear the various 'loading' indicators. */
 function ClearLoadingIndicators(done_msg)
 {
-    var busyimg = document.getElementById('busy');
-    var loadingspan = document.getElementById('loading');
+    var busyimg = getObjbyName('busy');
+    var loadingspan = getObjbyName('loading');
 
     loadingspan.innerHTML = done_msg;
     busyimg.style.display = "none";
@@ -31,11 +31,16 @@ function PageReplace(URL)
 
 function IframeDocument(id) 
 {
-    var oIframe = document.getElementById(id);
+    var oIframe = getObjbyName(id);
     var oDoc    = (oIframe.contentWindow || oIframe.contentDocument);
 
+    if (oIframe.document) {
+        // Safari
+	return oIframe.document;
+    }
+    
     if (oDoc.document) {
-	oDoc = oDoc.document;
+	return oDoc.document;
     }
     return oDoc;
 }
@@ -65,7 +70,7 @@ function GraphChange(which) {
 }
 
 function GetMaxHeight(id) {
-    var Iframe    = document.getElementById(id);
+    var Iframe    = getObjbyName(id);
     var winheight = 0;
     var yoff      = 0;
 
@@ -95,7 +100,7 @@ function GetMaxHeight(id) {
 }
 
 function SetupOutputArea(id) {
-    var Iframe    = document.getElementById(id);
+    var Iframe    = getObjbyName(id);
     var IframeDoc = IframeDocument(id);
     var winheight = GetMaxHeight(id);
 
@@ -111,7 +116,7 @@ function SetupOutputArea(id) {
 }
 
 function HideFrame(id) {
-    var Iframe    = document.getElementById(id);
+    var Iframe    = getObjbyName(id);
     var IframeDoc = IframeDocument(id);
 
     Iframe.style.border = "0px none";
@@ -122,7 +127,7 @@ function HideFrame(id) {
 }
 
 function ShowDownLoader(id) {
-    var Iframe    = document.getElementById(id);
+    var Iframe    = getObjbyName(id);
     var IframeDoc = IframeDocument(id);
 
     var winheight = 0;
@@ -161,8 +166,8 @@ function ShowDownLoader(id) {
 /* @return The innerHeight of the window. */
 function getInnerHeight(id) {
     var retval;
-    var win = document.getElementById(id).contentWindow;
-    var doc = document.getElementById(id).contentWindow.document;
+    var win = getObjbyName(id).contentWindow;
+    var doc = getObjbyName(id).contentWindow.document;
 
     if (win.innerHeight)
 	// all except Explorer
@@ -180,8 +185,8 @@ function getInnerHeight(id) {
 /* @return The scrollTop of the window. */
 function getScrollTop(id) {
     var retval;
-    var win = document.getElementById(id).contentWindow;
-    var doc = document.getElementById(id).contentWindow.document;
+    var win = getObjbyName(id).contentWindow;
+    var doc = getObjbyName(id).contentWindow.document;
 
     if (win.pageYOffset)
 	// all except Explorer
@@ -199,8 +204,8 @@ function getScrollTop(id) {
 /* @return The height of the document. */
 function getScrollHeight(id) {
     var retval;
-    var win = document.getElementById(id).contentWindow;
-    var doc = document.getElementById(id).contentWindow.document;
+    var win = getObjbyName(id).contentWindow;
+    var doc = getObjbyName(id).contentWindow.document;
     var test1 = doc.body.scrollHeight;
     var test2 = doc.body.offsetHeight;
 
@@ -221,7 +226,7 @@ var lastLine   = ""; // The last line of the download text.
 var firstLine  = 1;  // Flag.
 
 function WriteOutputText(id, stuff) {
-    var Iframe = document.getElementById(id);
+    var Iframe = getObjbyName(id);
     var idoc   = IframeDocument(id);
     var output = idoc.getElementById('outputarea');
 
@@ -304,7 +309,7 @@ function GetInnerText(el) {
  * tags (mozilla, IE), they will be stripped.
  */
 function GetInputText(id) {
-    var ifr    = document.getElementById(id);
+    var ifr    = getObjbyName(id);
     var retval = null;
 
     try {
@@ -357,3 +362,32 @@ function StopOutput() {
     LookforOutput();
 }
 
+/*
+ * Cross browser support for finding objects by id.
+ */
+function getObjbyName(name) {
+    if (document.getElementById) {
+	return document.getElementById(name);
+    }
+    else if (document.all) {
+	return document.all[name];
+    }
+    else if (document.layers) {
+	return getObjNN4(document,name);
+    }
+    return null;
+}
+function getObjNN4(obj,name) {
+    var x = document.layers;
+    var foundLayer;
+    
+    for (var i=0; i < x.length; i++) {
+	if (x[i].id == name)
+	    foundLayer = x[i];
+	else if (x[i].layers.length)
+	    var tmp = getObjNN4(x[i],name);
+	
+	if (tmp) foundLayer = tmp;
+    }
+    return foundLayer;
+}

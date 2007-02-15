@@ -193,33 +193,6 @@ if (!isset($SAJAX_INCLUDED)) {
 			sajax_debug(func_name + " waiting..");
 			delete x;
 		}
-
-		function getObjbyName(name) {
-		  if (document.getElementById) {
-		    return document.getElementById(name);
-		  }
-		  else if (document.all) {
-		    return document.all[name];
-		  }
-		  else if (document.layers) {
-		    return getObjNN4(document,name);
-		  }
-		  return null;
-		}
-		function getObjNN4(obj,name) {
-		  var x = document.layers;
-		  var foundLayer;
-		    
-		  for (var i=0; i < x.length; i++) {
-		    if (x[i].id == name)
-		      foundLayer = x[i];
-		    else if (x[i].layers.length)
-		      var tmp = getObjNN4(x[i],name);
-		      
-		    if (tmp) foundLayer = tmp;
-		  }
-		  return foundLayer;
-		}
 		<?php
 		$html = ob_get_contents();
 		ob_end_clean();
