@@ -82,8 +82,9 @@ void UdpMinDelaySensor::localAck(PacketInfo *packet)
 	if(eventFlag == true)
 	{
 		ostringstream messageBuffer;
-		messageBuffer << "delay="<<minDelay;
+		messageBuffer << "delay="<<(minDelay)/1000;
 		global::output->eventMessage(messageBuffer.str(), packet->elab, CommandOutput::FORWARD_PATH);
+		global::output->eventMessage(messageBuffer.str(), packet->elab, CommandOutput::BACKWARD_PATH);
 		logWrite(SENSOR,"VALUE::New Min delay = %llu",minDelay);
 	}
 	logWrite(SENSOR,"MIND:TIME=%llu,MIND=%llu",timeStamp,minDelay);

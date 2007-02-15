@@ -834,7 +834,6 @@ namespace
       pos = global::planetMap.find(key);
       if (pos != global::planetMap.end()) {
         outgoing = false;
-	logWrite(PCAP, "Captured an Incoming UDP packet");
       } else {
         logWrite(ERROR,"Unable to find packet in planetMap");
         return;
@@ -890,7 +889,6 @@ namespace
     // packets that are incoming. All other separation can be done
     // inside the sensors themselves. We call these 'Send' and 'Ack'
     // packets because my thinking was originally muddied about this.
-logWrite(PCAP, "Before Capturing an Incoming UDP packet with UDP sensors");
     if (outgoing) {
       /*
        * Outgoing packets
@@ -901,7 +899,6 @@ logWrite(PCAP, "Before Capturing an Incoming UDP packet with UDP sensors");
       /*
        * Incoming packets
        */
-	logWrite(PCAP, "Capturing an Incoming UDP packet with UDP sensors");
       packet.packetType = PACKET_INFO_ACK_COMMAND;
       pos->second->capturePacket(&packet);
     }

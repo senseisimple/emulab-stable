@@ -218,17 +218,21 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp, PacketI
 	throughputKbps = 8000000.0*( static_cast<double> (packetSizeSum ))  / ( static_cast<double>(timePeriod)*1024.0 );
 
 
+	int tputValue = static_cast<int>(throughputKbps);
+	//Avoid sending a zero throughput value to the monitor.
+	if(tputValue == 0)
+		tputValue = 1;
 	// Send a message to the monitor with the new bandwidth.
 	if(lossSensor->getPacketLoss() == 0 )
 	{
-		if(static_cast<int>(throughputKbps) > lastSeenThroughput )
+		if(tputValue > lastSeenThroughput )
 		{
 			// Send this available bandwidth as a tentative value.
 			// To be used for dummynet events only if it is greater
 			// than the last seen value.
 
 			ostringstream messageBuffer;
-			messageBuffer << static_cast<int>( throughputKbps );
+			messageBuffer << tputValue;
 			global::output->genericMessage(TENTATIVE_THROUGHPUT, messageBuffer.str(), packet->elab);
 		}
 		logWrite(SENSOR, "AVGTPUT:TIME=%llu,TENTATIVE=%f",timeStamp,throughputKbps);
@@ -237,7 +241,7 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp, PacketI
 	else
 	{
 		ostringstream messageBuffer;
-		messageBuffer << static_cast<int>( throughputKbps );
+		messageBuffer << tputValue;
 		global::output->genericMessage(AUTHORITATIVE_BANDWIDTH, messageBuffer.str(), packet->elab);
 		// Send this as the authoritative available bandwidth value.
 		logWrite(SENSOR, "AVGTPUT:TIME=%llu,AUTHORITATIVE=%f",timeStamp,throughputKbps);
@@ -245,6 +249,6 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp, PacketI
 
 		(const_cast<UdpLossSensor *>(lossSensor))->resetLoss();
 	}
-	lastSeenThroughput = static_cast<int>(throughputKbps);
+	lastSeenThroughput = tputValue;
 	logWrite(SENSOR, "STAT:TOTAL_LOSS = %d",lossSensor->getTotalPacketLoss());
 }

@@ -91,6 +91,8 @@ void UdpPacketSensor::localSend(PacketInfo *packet)
 	tmpPacketInfo.timeStamp = packet->packetTime.toMicroseconds();
 	tmpPacketInfo.isFake = false;
 
+	logWrite(SENSOR_COMPLETE,"%s:%d SEND:SeqNum=%d,size=%d at %llu from %s:%d",inet_ntoa(packet->ip->ip_dst), ntohs(packet->udp->dest),seqNum,packetSize, tmpPacketInfo.timeStamp, inet_ntoa(packet->ip->ip_src), ntohs(packet->udp->source));
+
 	sentPacketList.push_back(tmpPacketInfo);
 }
 
@@ -106,6 +108,8 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 	}
 
 	unsigned short int seqNum = *(unsigned short int *)(packet->payload + 1);
+
+	logWrite(SENSOR_COMPLETE,"%s:%d ACK SeqNum=%d at %llu to %s:%d",inet_ntoa(packet->ip->ip_src), ntohs(packet->udp->source),seqNum, packet->packetTime.toMicroseconds(), inet_ntoa(packet->ip->ip_dst), ntohs(packet->udp->dest));
 
 	// Find the entry for the packet this ACK is acknowledging, and
 	// remove it from the sent(&unacked) packet list.

@@ -79,7 +79,7 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
         {
 		// Report the maximum delay
 		ostringstream messageBuffer;
-		messageBuffer<<"MAXINQ="<<maxDelay;
+		messageBuffer<<"MAXINQ="<<(maxDelay)/1000;
 		global::output->eventMessage(messageBuffer.str(), packet->elab);
 
 		logWrite(SENSOR,"VALUE::New Max Delay = %llu",maxDelay);
