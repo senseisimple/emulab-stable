@@ -12,6 +12,11 @@ Line format 3 for libnetmon:
 <Timestamp> is a decimal number representing absolute time
 <Value> is a command-dependent string
 
+Limits:
+
+<Key> can be at most 30 characters
+There can be no more that 2^16 independent destinations on a single UDP socket.
+
 Possible commands and their values:
 
 New (value is 'TCP' or 'UDP')

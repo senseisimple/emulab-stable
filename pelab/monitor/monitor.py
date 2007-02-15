@@ -121,6 +121,8 @@ class Connection:
     self.number = new_number
     # Initialized by finalize_real_connection() or lookup()
     self.is_connected = False
+    # Initialized when a RemoteIP is received
+    self.is_valid = True
 
 class Socket:
   def __init__(self):
@@ -358,8 +360,11 @@ def process_event(conn, event, key, timestamp, value):
                        'Assuming TCP_CONNECTION. Protocol: ' + value + '\n')
   elif event == 'RemoteIP':
     start_real_connection(sock)
-    sock.number_to_connection[0].dest.remote_ip = value
     app_connection = sock.number_to_connection[0]
+    if emulated_to_real.has_key(app_connection.dest.remote_ip):
+      app_connection.dest.remote_ip = value
+    else:
+      app_connection.is_valid = False
     finalize_real_connection(conn, key, sock, app_connection)
     if initial_connection_bandwidth.has_key(value):
       sock.number_to_connection[0].last_bandwidth = initial_connection_bandwidth[value]
@@ -387,8 +392,9 @@ def process_event(conn, event, key, timestamp, value):
       sock.number_to_connection[0].prev_time = timestamp
   elif event == 'Send':
     app_connection = sock.number_to_connection[0]
-    send_write(conn, key, timestamp, app_connection, value)
-    app_connection.prev_time = timestamp
+    if app_connection.is_valid:
+      send_write(conn, key, timestamp, app_connection, value)
+      app_connection.prev_time = timestamp
   elif event == 'SendTo':
     # If this is a 'new connection' as well, then do not actually send
     # the sendto command. This is so that there is no '0' delta, and
@@ -402,27 +408,29 @@ def process_event(conn, event, key, timestamp, value):
       dest.remote_ip = match.group(2)
       dest.remote_port = match.group(3)
       size = int(match.group(4))
-      app_connection = sock.lookup(dest)
-      if app_connection.is_connected == False:
-        app_connection.is_connected = True
-        if initial_connection_bandwidth.has_key(app_connection.dest.remote_ip):
-          app_connection.last_bandwidth = initial_connection_bandwidth[app_connection.dest.remote_ip]
+      if emulated_to_real.has_key(dest.remote_ip):
+        app_connection = sock.lookup(dest)
+        if app_connection.is_connected == False:
+          app_connection.is_connected = True
+          if initial_connection_bandwidth.has_key(app_connection.dest.remote_ip):
+            app_connection.last_bandwidth = initial_connection_bandwidth[app_connection.dest.remote_ip]
+          else:
+            app_connection.last_bandwidth = 0
+          app_connection.prev_time = timestamp
+          app_connection.is_connected = True
+          send_connect(conn, key + save_short(app_connection.number),
+                       sock, app_connection)
         else:
-          app_connection.last_bandwidth = 0
-        app_connection.prev_time = timestamp
-        app_connection.is_connected = True
-        send_connect(conn, key + save_short(app_connection.number),
-                     sock, app_connection)
-      else:
-        send_write(conn, key, timestamp, app_connection, size)
-        app_connection.prev_time = timestamp
+          send_write(conn, key, timestamp, app_connection, size)
+          app_connection.prev_time = timestamp
   elif event == 'Closed':
     for pos in sock.number_to_connection.itervalues():
-      send_command(conn, key + save_short(pos.number),
-                   DELETE_CONNECTION_COMMAND, '')
-      set_connection(this_ip, pos.dest.local_port,
-                     pos.dest.remote_ip, pos.dest.remote_port,
-                     proto_to_string(sock.protocol), 'CLEAR')
+      if pos.is_valid:
+        send_command(conn, key + save_short(pos.number),
+                     DELETE_CONNECTION_COMMAND, '')
+        set_connection(this_ip, pos.dest.local_port,
+                       pos.dest.remote_ip, pos.dest.remote_port,
+                       proto_to_string(sock.protocol), 'CLEAR')
   else:
     sys.stderr.write('ERROR: skipped line with an invalid event: '
                      + event + '\n')
@@ -453,11 +461,12 @@ def finalize_real_connection(conn, key, sock, app_connection):
       and not sock.number_to_connection[0].is_connected):
     sock.number_to_connection[0].is_connected = True
     sock.dest_to_number[dest.toTuple()] = 0
-    set_connection(this_ip, app_connection.dest.local_port,
-                   app_connection.dest.remote_ip,
-                   app_connection.dest.remote_port,
-                   proto_to_string(sock.protocol), 'CREATE')
-    send_connect(conn, key + save_short(0), sock, app_connection)
+    if app_connection.is_valid:
+      set_connection(this_ip, app_connection.dest.local_port,
+                     app_connection.dest.remote_ip,
+                     app_connection.dest.remote_port,
+                     proto_to_string(sock.protocol), 'CREATE')
+      send_connect(conn, key + save_short(0), sock, app_connection)
 
 ##########################################################################
     
