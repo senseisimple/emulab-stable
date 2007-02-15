@@ -205,8 +205,16 @@ if (! ($template = Template->Create(\%args))) {
     tbdie("Could not create a new template record!");
 }
 
-if ($STAMPS && $modify) {
-    $parent_template->Stamp("template_create", "modified");
+if ($STAMPS) {
+    if ($modify) {
+	$parent_template->Stamp("template_create", "modified");
+	
+	$template->Stamp("template_create", "creating",
+			 undef, "parent_version", $parent_vers);
+    }
+    else {
+	$template->Stamp("template_create", "creating", undef, "new", 0);
+    }
 }
 
 #
