@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -28,23 +28,21 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_export [-q] [-s] -i <exptidx> <guid/vers>\n".
+	  "Usage: template_export [-q] [-s] [-r <runidx>] -i <idx>\n".
 	  "switches and arguments:\n".
 	  "-q           - be less chatty\n".
 	  "-s           - spew to stdout (as for web page).\n".
-	  "-i <exptidx> - Instance index to export\n".
-	  "<guid/vers>  - GUID and version to swapin\n");
+	  "-i <idx>     - Instance index to export\n".
+	  "-r <runidx>  - Run index to export\n");
     exit(-1);
 }
-my $optlist	 = "qi:ds";
+my $optlist	 = "qi:dsr:";
 my %options      = ();
 my $spew         = 0;
 my $quiet        = 0;
 my $debug        = 0;
-my $eid;
 my $exptidx;
-my $guid;
-my $version;
+my $runidx;
 my %bindings;
 
 #
@@ -61,9 +59,11 @@ my $checkquota  = "$TB/sbin/checkquota";
 my $TAR         = "/usr/bin/tar";
 
 # Locals
-my $dbuid;
 my $template;
 my $instance;
+my $pid;
+my $guid;
+my $version;
 my $archive_tag;
 
 # Protos
@@ -79,6 +79,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Template;
+use User;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -108,8 +109,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
 
 # Now parse arguments.
@@ -119,31 +121,29 @@ ParseArgs();
 libArchive::setdebug($debug);
 
 #
-# Grab template info and do access check.
+# Grab instance info and do access check via the template.
 #
-$template = Template->Lookup($guid, $version);
-
-if (!defined($template)) {
-    tbdie("Experiment template $guid/$version does not exist!");
+$instance = Template::Instance->LookupByExptidx($exptidx);
+if (!defined($instance)) {
+    fatal(-1, "Could not get instance record for experiment $exptidx!");
 }
-if (! TBProjAccessCheck($dbuid,
+$template = $instance->template();
+$pid      = $template->pid();
+$guid     = $template->guid();
+$version  = $template->vers();
+
+if (! TBProjAccessCheck($this_user->uid(),
 			$template->pid(), $template->gid(),
 			TB_PROJECT_READINFO)) {
     tberror("You do not have permission to export template $guid/$version");
     exit(1);
-}
-my $pid = $template->pid();
-
-$instance = Template::Instance->LookupByExptidx($exptidx);
-if (!defined($instance)) {
-    fatal(-1, "Could not get instance record for experiment $exptidx!");
 }
 
 if ($instance->ArchiveTag(\$archive_tag) < 0) {
     fatal(-1, "Could not get current archive tag for instance $exptidx!");
 }
 
-if (system("$checkquota $dbuid") != 0) {
+if (system("$checkquota " . $this_user->uid()) != 0) {
     tberror("You are over your disk quota on $CONTROL; ".
 	    "please login there and cleanup!");
     exit(1);
@@ -253,8 +253,12 @@ if (keys(%runlist)) {
     $root->{"runs"} = {};
     foreach my $name (keys(%runlist)) {
 	my $rowref = $runlist{$name};
-	my $runidx = $rowref->{"idx"};
-	my $dir    = "$checkout/run${runidx}";
+
+	# Export only requested run.
+	next
+	    if (defined($runidx) && $runidx != $rowref->{"idx"});
+
+	my $dir    = "$checkout/run" . $rowref->{"idx"};
 	my $tag    = $rowref->{"ending_archive_tag"};
 
 	# This could happen if template still instantiated (last run).
@@ -303,23 +307,9 @@ sub ParseArgs()
 	usage();
     }
 
-    if (@ARGV != 1) {
-	usage();
-    }
+    usage()
+	if (@ARGV);
     
-    #
-    # Pick up guid/version first and untaint.
-    #
-    my $tmp = shift(@ARGV);
-
-    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
-	$guid = $1;
-	$version = $2;
-    }
-    else {
-	tbdie("Bad data in argument: $tmp");
-    }
-
     if (defined($options{"i"})) {
 	$exptidx = $options{"i"};
     
@@ -328,7 +318,7 @@ sub ParseArgs()
 	    tbdie("Improper experiment index!");
 	}
 	# real check.
-	if ($exptidx =~ /^([\w]*)$/) {
+	if ($exptidx =~ /^([\d]*)$/) {
 	    $exptidx = $1;
 	}
 	else {
@@ -337,6 +327,22 @@ sub ParseArgs()
     }
     else {
 	tbdie("You must supply the -i option!");
+    }
+
+    if (defined($options{"r"})) {
+	$runidx = $options{"r"};
+    
+	if (! TBcheck_dbslot($runidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper run index!");
+	}
+	# real check.
+	if ($runidx =~ /^([\d]*)$/) {
+	    $runidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runidx");
+	}
     }
 
     if (defined($options{"q"})) {

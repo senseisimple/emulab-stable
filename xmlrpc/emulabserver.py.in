@@ -4607,12 +4607,11 @@ class template:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        argerror = CheckRequiredArgs(argdict, ("guid", "instance"))
+        argerror = CheckRequiredArgs(argdict, ("instance",))
         if (argerror):
             return argerror
 
-        if not (re.match("^[-\w\/]*$", argdict["guid"]) and
-                re.match("^[-\w]*$", argdict["instance"])):
+        if not (re.match("^[-\w]*$", argdict["instance"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed arguments")
 
@@ -4623,11 +4622,12 @@ class template:
                 argstr += " -i "
                 argstr += escapeshellarg(val)
                 pass
+            elif opt == "run":
+                argstr += " -r "
+                argstr += escapeshellarg(val)
+                pass
             pass
 
-        argstr += " "
-        argstr += str(argdict["guid"])
-        
         (exitval, output) = runcommand(TBDIR +
                                        "/bin/template_export " + argstr)
         if exitval:

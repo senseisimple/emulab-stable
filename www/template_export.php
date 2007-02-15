@@ -20,6 +20,7 @@ $isadmin   = ISADMIN();
 $reqargs = RequiredPageArguments("instance",  PAGEARG_INSTANCE);
 $optargs = OptionalPageArguments("canceled",  PAGEARG_BOOLEAN,
 				 "confirmed", PAGEARG_BOOLEAN,
+				 "runidx",    PAGEARG_INTEGER,
 				 "spew",      PAGEARG_BOOLEAN);
 $template = $instance->GetTemplate();
 
@@ -40,17 +41,27 @@ if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to export in template ".
 	      "$guid/$vers!", 1);
 }
+if (isset($runidx) && !$instance->ValidRun($runidx)) {
+    USERERROR("Run '$runidx' is not a valid run in instance '$exptidx'", 1);
+}
 
 if (!isset($confirmed)) {
     PAGEHEADER("Template Export");
     
+    echo $template->PageHeader();
+    echo "<br><br>\n";
+    
     echo "<center><br><font size=+1>
-          Export instance $exptidx in Template
-             in Template $guid/$vers?</font>\n";
+          Export instance $exptidx " .
+	        (isset($runidx) ? "(Run $runidx)" : "") . "?";
+    echo "</font>";
     
     $template->Show();
 
     $url = CreateURL("template_export", $instance);
+    if (isset($runidx)) {
+	$url .= "&runidx=$runidx";
+    }
     
     echo "<form action='$url' method=post>\n";
     echo "<br>\n";
@@ -124,13 +135,18 @@ function SPEWCLEANUP()
 #
 # Run the backend script.
 #
+$optarg = (isset($runidx) ? "-r " . escapeshellarg($runidx) : "");
+
 if ($spew) {
     ignore_user_abort(1);
     register_shutdown_function("SPEWCLEANUP");
 
-    if ($fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
-		    "  webtemplate_export -s -i $exptidx $guid/$vers",
-		    "r")) {
+    TBERROR("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
+	    "  webtemplate_export -s $optarg -i $exptidx", 0);
+
+    if (($fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
+		     "  webtemplate_export -s -i $exptidx",
+		     "r"))) {
 	header("Content-Type: application/x-tar");
 	header("Content-Encoding: x-gzip");
 	header("Content-Disposition: attachment; filename=$exptidx.tgz");
@@ -157,8 +173,7 @@ if ($spew) {
 # Standard mode ...
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_export " . ($spew ? "-s" : "") .
-		 "-i $exptidx $guid/$vers",
+		 "webtemplate_export $optarg -i $exptidx",
 		 SUEXEC_ACTION_IGNORE);
 
 /* Clear the 'loading' indicators above */

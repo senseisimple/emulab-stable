@@ -1878,15 +1878,15 @@ class template_export:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "i:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "i:r:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
             self.usage();
             return -1;
 
-        guid   = None
-        params = {}
+        instance = None
+        params   = {}
         
         for opt, val in opts:
             if opt in ("-h", "--help"):
@@ -1894,33 +1894,26 @@ class template_export:
                 return 0
             elif opt == "-i":
                 params["instance"] = val
+                instance = val
+                pass
+            elif opt == "-r":
+                params["run"] = val
                 pass
             pass
         
         # Try to infer the template guid/vers from the current path.
-        if len(req_args) == 0:
-            guid = infer_guid(os.getcwd())
-            if guid == None:
-                self.usage();
-                return -1
-            pass
-        elif len(req_args) == 1:
-            guid = req_args[0]
-            pass
-        else:
+        if instance == None:
             self.usage();
             return -1
-        
-        params["guid"] = guid
         
         rval,response = do_method("template", "export", params);
         return rval;
     
     def usage(self):
-	print "template_export -i instance_id [<guid/vers>]";
+	print "template_export [-r runidx] -i instance_id";
 	print "where:";
         print "     -i   - Export specific template instance (idx)";
-        print "    guid  - Template GUID";
+        print "     -r   - Optional run index to export";
         print ""
         print "Environment:"
         print "  cwd   The template GUID will be inferred from the current"
