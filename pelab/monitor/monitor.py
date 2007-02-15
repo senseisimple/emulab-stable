@@ -13,6 +13,7 @@ import socket
 import select
 import re
 import traceback
+import errno
 from optparse import OptionParser
 sys.path.append("/usr/testbed/lib")
 from tbevent import EventClient, address_tuple, ADDRESSTUPLE_ALL
@@ -660,8 +661,13 @@ def send_command(conn, key, command_id, command):
             + key
             + command)
   send_buffer = send_buffer + output
-  sent = conn.send(send_buffer, socket.MSG_DONTWAIT)
-  send_buffer = send_buffer[sent:]
+  try:
+    sent = conn.send(send_buffer, socket.MSG_DONTWAIT)
+    send_buffer = send_buffer[sent:]
+  except socket.error, inst:
+    num = inst[0]
+    if num != errno.EWOULDBLOCK:
+      raise
 
 ##########################################################################
 
