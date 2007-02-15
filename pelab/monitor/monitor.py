@@ -603,7 +603,7 @@ def receive_parse_body():
                    + ' bandwidth=' + receive_body_buffer)
   else:
     raise Exception('ERROR: Unknown command type: ' + str(eventType)
-                    + ', ' + str(value));
+                    + ', ' + str(receive_body_buffer));
 
 ##########################################################################
 
