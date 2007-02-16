@@ -2626,6 +2626,24 @@ COMMAND_PROTOTYPE(dohosts)
 		host = host->next;
 		hostcount++;
 	}
+
+	/*
+	 * For plab slices, lets include boss and ops IPs as well
+	 * in case of flaky name service on the nodes.
+	 *
+	 * XXX we only do this if we were going to return something
+	 * otherwise.  In the event there are no other hosts, we would
+	 * not overwrite the existing hosts file which already has boss/ops.
+	 */
+	if (reqp->isplabdslice && hostcount > 0) {
+		OUTPUT(buf, sizeof(buf),
+		       "NAME=%s IP=%s ALIASES=''\nNAME=%s IP=%s ALIASES=''\n",
+		       BOSSNODE, EXTERNAL_BOSSNODE_IP,
+		       USERNODE, EXTERNAL_USERNODE_IP);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		hostcount += 2;
+	}
+
 #if 0
 	/*
 	 * List of control net addresses for jailed nodes.
