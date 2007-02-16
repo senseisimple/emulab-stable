@@ -18,9 +18,9 @@ function EmulateRegisterGlobals()
     $emulating_on++;
 
     # 
-    # Start out slow; just remove POST and GET variables.
+    # Start out slow ...
     #
-    $superglobals = array($_GET, $_POST);
+    $superglobals = array($_GET, $_POST, $_COOKIE);
 
     //
     // Known PHP Reserved globals and superglobals:
