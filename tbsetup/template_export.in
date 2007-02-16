@@ -64,7 +64,6 @@ my $instance;
 my $pid;
 my $guid;
 my $version;
-my $archive_tag;
 
 # Protos
 sub ParseArgs();
@@ -137,10 +136,6 @@ if (! TBProjAccessCheck($this_user->uid(),
 			TB_PROJECT_READINFO)) {
     tberror("You do not have permission to export template $guid/$version");
     exit(1);
-}
-
-if ($instance->ArchiveTag(\$archive_tag) < 0) {
-    fatal(-1, "Could not get current archive tag for instance $exptidx!");
 }
 
 if (system("$checkquota " . $this_user->uid()) != 0) {
@@ -285,7 +280,13 @@ if (keys(%runlist)) {
     }
 }
 else {
+    my $archive_tag;
+
     # This would be silly; exporting an instance with no runs.
+    if ($instance->ArchiveTag(\$archive_tag) < 0) {
+	fatal(-1, "Could not get current archive tag for instance $exptidx!");
+    }
+    
     if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
 							 $checkout,
 							 $archive_tag) < 0) {
