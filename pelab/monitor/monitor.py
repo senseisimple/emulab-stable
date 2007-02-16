@@ -321,7 +321,7 @@ def get_next_packet(conn):
   if line == "":
       raise EOFError
   if netmon_output_version == 3:
-    linexp = re.compile('^(New|RemoteIP|RemotePort|LocalPort|TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|Connected|Send|SendTo|Closed): ([^ ]*) (\d+\.\d+) ([^ ]*)\n$')
+    linexp = re.compile('^(New|RemoteIP|RemotePort|LocalPort|TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|Connected|Accepted|Send|SendTo|Closed): ([^ ]*) (\d+\.\d+) ([^ ]*)\n$')
   else:
     raise Exception("ERROR: Only input version 3 is supported")
   match = linexp.match(line)
@@ -354,6 +354,7 @@ def process_event(conn, event, key, timestamp, value):
       sock.protocol = TCP_CONNECTION
     elif value == 'UDP':
       sock.protocol = UDP_CONNECTION
+      sys.stderr.write('Notify: Set socket to UDP_CONNECTION: ' + key + '\n')
     else:
       sock.protocol = TCP_CONNECTION
       sys.stderr.write('ERROR: Received "New" event with invalid protocol.'
@@ -388,7 +389,7 @@ def process_event(conn, event, key, timestamp, value):
     sock.receive_buffer_size = int(value)
   elif event == 'SO_SNDBUF':
     sock.send_buffer_size = int(value)
-  elif event == 'Connected':
+  elif event == 'Connected' or event == 'Accepted':
     if sock.protocol != UDP_CONNECTION:
       app_connection = sock.number_to_connection[0]
       finalize_real_connection(conn, key, sock, app_connection)
