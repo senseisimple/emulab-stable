@@ -557,6 +557,8 @@ void writeToConnections(multimap<Time, Connection *> & schedule)
     multimap<Time, Connection *>::iterator pos = schedule.begin();
     if (pos->first < now)
     {
+      logWrite(MAIN_LOOP, "Schedule deadline has passed, skew = %f",
+               (now - pos->first).toDouble());
       Connection * current = pos->second;
       Time nextTime = current->writeToConnection(pos->first);
       schedule.erase(pos);
