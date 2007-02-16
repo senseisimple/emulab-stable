@@ -24,7 +24,8 @@ ulimit -c unlimited
 #
 # Get a new version of the output
 #
-export LIBNETMON_OUTPUTVERSION=2
+export LIBNETMON_OUTPUTVERSION=3
+export LIBNETMON_MONITORUDP=1
 
 echo "Instrumenting '$@' with libnetmon"
 exec $@
