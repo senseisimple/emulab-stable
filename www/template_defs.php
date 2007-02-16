@@ -679,8 +679,8 @@ class Template
 
 	echo "<center>";
 	echo "<div id=fee style='display: block; overflow: hidden; ".
-	    "position: relative; z-index:1010; height: 200px; ".
-	    "width: 575px; border: 2px solid black;'>\n";
+	    "position: relative; z-index:1010; height: 400px; ".
+	    "width: 700px; border: 2px solid black;'>\n";
 	echo "<div id=\"mygraphdiv\" style='position:relative;'>\n";
 
 	echo "<div id='CurrentTemplate' style='display: block; opacity: 1; ".
