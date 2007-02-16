@@ -34,6 +34,7 @@ $guid = $template->guid();
 $vers = $template->vers();
 $pid  = $template->pid();
 $eid  = $template->eid();
+$tid  = $template->tid();
 $exptidx  = $experiment->idx();
 $unix_gid = $experiment->UnixGID();
 $this_url = CreateURL("template_show", $template);
@@ -288,7 +289,7 @@ if (isset($action) && $action == "deletetemplate" &&
 #
 # Standard Testbed Header after argument checking.
 #
-PAGEHEADER("Template: $guid/$vers");
+PAGEHEADER("Template $tid ($guid/$vers)");
 
 SUBPAGESTART();
 
@@ -344,12 +345,29 @@ if ($template->InstanceCount()) {
 
 SUBMENUEND_2B();
 
+# See below; for getting the tab correct at the first page load.
+if (!isset($show)) {
+    $show = "vis";
+}
+if ($show == "vis") {
+    $li_current = "li_vis";
+    $init_show  = Show("vis", 0, 0);
+}
+elseif ($show == "nsfile") {
+    $li_current = "li_nsfile";
+    $init_show  = Show("nsfile", 0, 0);
+}
+elseif ($show == "graph") {
+    $li_current = "li_graph";
+    $init_show  = Show("graph", 0, 0);
+}
+
 #
 # The center area is a form that can show NS file, Template Graph, or Vis.
 #
 echo "<script type='text/javascript' src='template_sup.js'></script>\n";
 echo "<script type='text/javascript' language='javascript'>
-        var li_current = 'li_vis';
+        var li_current = '$li_current';
         function Show(which) {
 	    li = getObjbyName(li_current);
             li.style.backgroundColor = '#DDE';
@@ -428,37 +446,27 @@ $bodyclosestring = "<script type='text/javascript'>SET_DHTML();</script>\n";
 echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
-          <a href=\"#A\"
-               style=\"background-color:white\" ".
+          <a href=\"#A\" " .
+               ($show == "vis" ? "style=\"background-color:white\"" : " ") .
                "id=\"li_vis\" onclick=\"Show('vis');\">".
-               "Visualization</a></li>\n";
+               "Topology</a></li>\n";
 echo "<li>
-          <a href=\"#B\"
-              id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
-              "NS File</a></li>\n";
+          <a href=\"#B\" " .
+               ($show == "nsfile" ? "style=\"background-color:white\"" : " ") .
+               "id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
+               "NS File</a></li>\n";
 echo "<li>
-          <a href=\"#C\"
-              id=\"li_graph\" onclick=\"Show('graph');\">".
-              "History</a></li>\n";
+          <a href=\"#C\" " .
+               ($show == "graph" ? "style=\"background-color:white\"" : " ") .
+               "id=\"li_graph\" onclick=\"Show('graph');\">".
+               "History</a></li>\n";
 echo "</ul>\n";
 
 #
 # Start out with  ...
 #
 echo "<div align=center width=\"100%\" id=\"showexp_visarea\">\n";
-if (!isset($show) || $show == "vis") {
-    echo Show("vis", 0, 0);
-}
-elseif ($show == "nsfile") {
-    echo Show("nsfile", 0, 0);
-}
-elseif ($show == "graph") {
-    echo Show("graph", 0, 0);
-}
-else {
-    echo Show("vis", 0, 0);
-
-}
+echo $init_show;
 echo "</div>\n";
 echo "</div>\n";
 

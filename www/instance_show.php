@@ -6,11 +6,9 @@
 #
 include("defs.php3");
 include_once("template_defs.php");
-if (0) {
 require("Sajax.php");
 sajax_init();
-sajax_export("GraphShow");
-} 
+sajax_export("ModifyAnno");
 
 #
 # Only known and logged in users ...
@@ -38,47 +36,32 @@ if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 #
 # For the Sajax Interface
 #
-function GraphShow($which, $arg0, $arg1)
+function ModifyAnno($newtext)
 {
-    global $template, $instance;
+    global $this_user, $template, $instance;
 
-    ob_start();
-    $instance->ShowGraphArea($which, -1, $arg0, $arg1);
-    $html = ob_get_contents();
-    ob_end_clean();
-    return $html;
+    $instance->SetAnnotation($this_user, $newtext);
+    return 0;
 }
 
 #
 # See if this request is to the above function. Does not return
 # if it is. Otherwise return and continue on.
 #
-if (0) {
 sajax_handle_client_request();
-} 
 
 #
 # Standard Testbed Header after argument checking.
 #
 PAGEHEADER("Template Instance");
 
-echo $instance->PageHeader();
-echo "<br><br>\n";
-$instance->Show(1);
-
-if (0) {
 echo "<script type='text/javascript' language='javascript'>\n";
 sajax_show_javascript();
 echo "</script>\n";
 
-#
-# Throw up graph stuff.
-#
-echo "<center>\n";
-echo "<br>";
-$instance->ShowGraphArea("pps");
-echo "</center>\n";
-} 
+echo $instance->PageHeader();
+echo "<br><br>\n";
+$instance->Show(1, 1);
 
 #
 # Standard Testbed Footer

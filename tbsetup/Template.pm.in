@@ -673,7 +673,8 @@ sub NewMetadata($$$$;$)
 	if (defined($type));
 
     # Current set of allowed types;
-    my @okay_types = ("tid", "template_description", "parameter_description");
+    my @okay_types = ("tid", "template_description", "parameter_description",
+		      "annotation");
 
     if (defined($type)) {
 	if (! grep {$_ eq $type} @okay_types) {
@@ -1120,9 +1121,11 @@ sub CopyMetadata($$$)
 	# XXX Some metadata is special ...
 	#
 	if (defined($type)) {
-	    # XXX Skip the tid and template descriptions.
+	    # XXX Skip the tid and template descriptions and annotations.
 	    next
-		if ($type eq "tid" or $type eq "template_description");
+		if ($type eq "tid" ||
+		    $type eq "template_description" ||
+		    $type eq "annotation");
 
 	    #
 	    # XXX Skip parameters that were deleted or whose description

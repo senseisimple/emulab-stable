@@ -8,7 +8,7 @@ include("defs.php3");
 include_once("template_defs.php");
 require("Sajax.php");
 sajax_init();
-sajax_export("GraphShow");
+sajax_export("ModifyAnno");
 
 #
 # Only known and logged in users ...
@@ -41,15 +41,12 @@ if (! $instance->ValidRun($runidx)) {
 #
 # For the Sajax Interface
 #
-function GraphShow($which, $arg0, $arg1)
+function ModifyAnno($newtext)
 {
-    global $template, $instance, $runidx;
+    global $this_user, $template, $instance, $runidx;
 
-    ob_start();
-    $instance->ShowGraphArea($which, $runidx, $arg0, $arg1);
-    $html = ob_get_contents();
-    ob_end_clean();
-    return $html;
+    $instance->SetRunAnnotation($this_user, $runidx, $newtext);
+    return 0;
 }
 
 #
@@ -62,23 +59,14 @@ sajax_handle_client_request();
 # Standard Testbed Header after argument checking.
 #
 PAGEHEADER("Experiment Run");
-echo $instance->RunPageHeader($runidx);
-echo "<br><br>\n";
-$instance->ShowRun($runidx);
 
 echo "<script type='text/javascript' language='javascript'>\n";
 sajax_show_javascript();
 echo "</script>\n";
 
-#
-# Throw up graph stuff.
-#
-if (0) {
-echo "<center>\n";
-echo "<br>";
-$instance->ShowGraphArea("pps", $runidx);
-echo "</center>\n";
-} 
+echo $instance->RunPageHeader($runidx);
+echo "<br><br>\n";
+$instance->ShowRun($runidx);
 
 #
 # Standard Testbed Footer
