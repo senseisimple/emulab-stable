@@ -149,7 +149,7 @@ if (count($experimentlist)) {
                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
 		 <td>$state</td>
-                 <td>$name</td>
+                 <td>$desc</td>
              </tr>\n";
     }
     echo "</table>\n";
