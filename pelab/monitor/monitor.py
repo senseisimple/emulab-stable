@@ -361,9 +361,12 @@ def process_event(conn, event, key, timestamp, value):
   elif event == 'RemoteIP':
     start_real_connection(sock)
     app_connection = sock.number_to_connection[0]
-    if emulated_to_real.has_key(app_connection.dest.remote_ip):
+    if emulated_to_real.has_key(value):
+      app_connection.is_valid = True
       app_connection.dest.remote_ip = value
     else:
+      sys.stderr.write('ERROR: Connection invalid: ' + key + ': ' + value
+                       + '\n')
       app_connection.is_valid = False
     finalize_real_connection(conn, key, sock, app_connection)
     if initial_connection_bandwidth.has_key(value):
@@ -395,6 +398,8 @@ def process_event(conn, event, key, timestamp, value):
     if app_connection.is_valid:
       send_write(conn, key, timestamp, app_connection, value)
       app_connection.prev_time = timestamp
+    else:
+      sys.stderr.write('Invalid Send\n')
   elif event == 'SendTo':
     # If this is a 'new connection' as well, then do not actually send
     # the sendto command. This is so that there is no '0' delta, and
