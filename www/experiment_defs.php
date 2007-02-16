@@ -17,6 +17,7 @@ class Experiment
     var $group;
     var $project;
     var $isinstance = false;
+    var $resources;
 
     #
     # Constructor by lookup on unique index.
@@ -48,6 +49,7 @@ class Experiment
 	# Load lazily;
 	$this->group      = null;
 	$this->project    = null;
+	$this->resources  = null;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -121,11 +123,13 @@ class Experiment
 	    $this->experiment = NULL;
 	    $this->group      = null;
 	    $this->project    = null;
+	    $this->resources  = null;
 	    return -1;
 	}
 	$this->experiment = mysql_fetch_array($query_result);
 	$this->group      = null;
 	$this->project    = null;
+	$this->resources  = null;
 	return 0;
     }
 
@@ -186,6 +190,9 @@ class Experiment
     function GetStats() {
 	return ExperimentStats::Lookup($this->idx());
     }
+    function GetResources() {
+	return ExperimentResources::Lookup($this->idx());
+    }
 
     # accessors
     function field($name) {
@@ -229,6 +236,8 @@ class Experiment
     function linktest_pid()     { return $this->field('linktest_pid'); }
     function logfile()          { return $this->field('logfile'); }
     function keyhash()          { return $this->field('keyhash'); }
+    function paniced()          { return $this->field('paniced'); }
+    function panic_date()       { return $this->field('panic_date'); }
 
     #
     # Access Check. Project level check since this might not be a current
@@ -1077,6 +1086,54 @@ class ExperimentStats
 	}
 	return $project->AccessCheck($user, $TBDB_TRUST_USER);
     }
+}
+
+class ExperimentResources
+{
+    var	$resources;
+
+    #
+    # Constructor by lookup on unique index for current resources
+    #
+    function ExperimentResources($exptidx) {
+	$safe_exptidx = addslashes($exptidx);
+
+	$query_result =
+	    DBQueryWarn("select r.* from experiment_stats as s ".
+			"left join experiment_resources as r on ".
+			"    s.rsrcidx=r.idx ".
+			"where s.exptidx='$safe_exptidx'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    $this->resources = null;
+	    return;
+	}
+	$this->resources = mysql_fetch_array($query_result);
+    }
+
+    # Hmm, how does one cause an error in a php constructor?
+    function IsValid() {
+	return !is_null($this->resources);
+    }
+
+    # Lookup by exptidx.
+    function Lookup($exptidx) {
+	$foo = new ExperimentResources($exptidx);
+
+	if ($foo->IsValid())
+	    return $foo;
+
+	return null;
+    }
+
+    # accessors
+    function field($name) {
+	return (is_null($this->resources) ? -1 : $this->resources[$name]);
+    }
+    function idx()	    { return $this->field('idx'); }
+    function exptidx()	    { return $this->field('exptidx'); }
+    function lastidx()      { return $this->field('lastidx'); }
+    function wirelesslans() { return $this->field('wirelesslans'); }
 }
 
 #

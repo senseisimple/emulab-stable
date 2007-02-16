@@ -210,15 +210,8 @@ function Show($which, $arg1, $arg2)
 	$html .= "Full Screen</button>\n";
     }
     elseif ($which == "nsfile") {
-	$nsdata = "";
+	$nsdata = $experiment->NSFile();
 	
-	$query_result =
-	    DBQueryFatal("select nsfile from nsfiles ".
-			 "where pid='$pid' and eid='$eid'");
-	if (mysql_num_rows($query_result)) {
-	    $row    = mysql_fetch_array($query_result);
-	    $nsdata = htmlentities($row["nsfile"]);
-	}
 	$html = "<pre><div align=left class=\"showexp_codeblock\">".
 	    "$nsdata</div></pre>\n";
 
@@ -259,24 +252,17 @@ include_once("template_defs.php");
 #
 # Need some DB info.
 #
-$query_result =
-    DBQueryFatal("select e.idx,e.state,e.batchmode,e.linktest_pid,".
-		 "       e.paniced,e.panic_date,s.rsrcidx,r.wirelesslans, ".
-		 "       e.lockdown ".
-		 "  from experiments as e ".
-		 "left join experiment_stats as s on s.exptidx=e.idx ".
-		 "left join experiment_resources as r on s.rsrcidx=r.idx ".
-		 "where e.eid='$eid' and e.pid='$pid'");
-$row        = mysql_fetch_array($query_result);
-$expindex   = $row["idx"];
-$expstate   = $row["state"];
-$rsrcidx    = $row["rsrcidx"];
-$isbatch    = $row["batchmode"];
-$wireless   = $row["wirelesslans"];
-$linktest_running = $row["linktest_pid"];
-$paniced    = $row["paniced"];
-$panic_date = $row["panic_date"];
-$lockdown   = $row["lockdown"];
+$expindex   = $experiment->idx();
+$expstate   = $experiment->state();
+$isbatch    = $experiment->batchmode();
+$linktest_running = $experiment->linktest_pid();
+$paniced    = $experiment->paniced();
+$panic_date = $experiment->panic_date();
+$lockdown   = $experiment->lockdown();
+$experiment_stats = $experiment->GetStats();
+$rsrcidx    = $experiment_stats->rsrcidx();
+$experiment_resources = $experiment->GetResources();
+$wireless   = $experiment_resources->wirelesslans();
 
 #
 # Standard Testbed Header.
