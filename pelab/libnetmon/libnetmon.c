@@ -1296,7 +1296,6 @@ int accept(int s, struct sockaddr * addr,
         // XXX Accessors
         monitorFDs[s].connected = 1;
         monitorFDs[s].local_port = ntohs(((struct sockaddr_in*)addr)->sin_port);
-        printlog(LOG_CONNECTED,rv);
         printlog(LOG_LOCALPORT,rv,"%i",monitorFDs[s].local_port);
     }
 
