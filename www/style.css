@@ -400,8 +400,9 @@ ul.submenu li.newgroup {
   background-color:#FFF;
   font-size: x-small;
   text-align: left;
+  padding: 0px;
   margin-bottom: 6px;
-  margin-top: 0px;
+  margin-top: -16px;
   font-weight: bold;
 }
 .reportbug {
