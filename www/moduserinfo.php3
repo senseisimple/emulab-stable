@@ -293,7 +293,8 @@ function SPITFORM($formfields, $errors)
 	    # Planetlab bit. This should really be a drop down menu of the
 	    #                choices.
             #
-	    if ($formfields["user_interface"] == TBDB_USER_INTERFACE_PLAB) {
+	    if (isset($formfields["user_interface"]) &&
+		$formfields["user_interface"] == TBDB_USER_INTERFACE_PLAB) {
 		$checked = "checked";
 	    } else {
 		$checked = "";
