@@ -285,6 +285,8 @@ sub ParseKey($) {
     my ($keyline) = @_;
 
     # Remove trailing newlines which screws the patterns below.
+    # First convert dos newlines since many people upload from windoze.
+    $keyline =~ s/\r/\n/g;
     $keyline =~ s/\n//g;
 
     # Enforce a reasonable length on the key.
