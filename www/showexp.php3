@@ -9,7 +9,7 @@ require("Sajax.php");
 include("showstuff.php3");
 include("template_defs.php");
 sajax_init();
-sajax_export("GetExpState", "Show");
+sajax_export("GetExpState", "Show", "ModifyAnno");
 
 #
 # Only known and logged in users can look at experiments.
@@ -46,6 +46,18 @@ if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
+# Template Instance Experiments get special treatment in this page.
+$instance = NULL;
+if ($EXPOSETEMPLATES) {
+     $instance = TemplateInstance::LookupByExptidx($experiment->idx());
+
+     if (! is_null($instance)) {
+	 $tag = "Instance";
+	 $guid = $instance->guid();
+	 $vers = $instance->vers();
+     }
+}
+
 #
 # For the Sajax Interface
 #
@@ -56,9 +68,17 @@ function GetExpState($a, $b)
     return $experiment->state();
 }
 
+function ModifyAnno($newtext)
+{
+    global $this_user, $instance;
+
+    $instance->SetAnnotation($this_user, $newtext);
+    return 0;
+}
+
 function Show($which, $arg1, $arg2)
 {
-    global $experiment, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    global $experiment, $instance, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
     $pid  = $experiment->pid();
     $eid  = $experiment->eid();
     $html = "";
@@ -68,6 +88,14 @@ function Show($which, $arg1, $arg2)
 	$experiment->Show();
 	$html = ob_get_contents();
 	ob_end_clean();
+    }
+    if ($which == "anno") {
+	if (isset($instance)) {
+	    ob_start();
+	    $instance->ShowAnnotation(1);
+	    $html = ob_get_contents();
+	    ob_end_clean();
+	}
     }
     elseif ($which == "details") {
 	$showevents = $arg1;
@@ -249,18 +277,6 @@ $linktest_running = $row["linktest_pid"];
 $paniced    = $row["paniced"];
 $panic_date = $row["panic_date"];
 $lockdown   = $row["lockdown"];
-
-# Template Instance Experiments get special treatment in this page.
-$instance = NULL;
-if ($EXPOSETEMPLATES) {
-     $instance = TemplateInstance::LookupByExptidx($expindex);
-
-     if (! is_null($instance)) {
-	 $tag = "Instance";
-	 $guid = $instance->guid();
-	 $vers = $instance->vers();
-     }
-}
 
 #
 # Standard Testbed Header.
@@ -613,6 +629,12 @@ echo "<script type='text/javascript' language='javascript'>
         function FullScreenVis() {
 	    window.location.replace('shownsfile.php3?pid=$pid&eid=$eid');
         }
+        function ModifyAnno() {
+            textarea = getObjbyName('annotation');
+            x_ModifyAnno(textarea.value, ModifyAnno_cb);
+        }
+        function ModifyAnno_cb(val) {
+        }
       </script>\n";
 
 #
@@ -634,10 +656,10 @@ echo "<li>
           <a href=\"#D\" id=\"li_details\" onclick=\"Show('details');\">".
               "Details</a></li>\n";
 
-if ($instance && $expstate == $TB_EXPTSTATE_ACTIVE) {
+if ($instance) {
     echo "<li>
-              <a href=\"#E\" id=\"li_graphs\" onclick=\"Show('graphs');\">".
-                  "Graphs</a></li>\n";
+              <a href=\"#E\" id=\"li_anno\" onclick=\"Show('anno');\">".
+                  "Annotation</a></li>\n";
 }
 echo "</ul>\n";
 

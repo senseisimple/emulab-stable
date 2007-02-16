@@ -1506,8 +1506,9 @@ class TemplateInstance
     #
     # Display annotation in text box with button to change. 
     #
-    function ShowAnnotation() {
+    function ShowAnnotation($longform = 0) {
 	$annotation = $this->GetAnnotation();
+	$cols       = ($longform ? 25 : 5);
 	if (! $annotation) {
 	    $annotation = "";
 	}
@@ -1515,19 +1516,21 @@ class TemplateInstance
 	echo "<center>";
 	echo "<b>Annotation</b><br>\n";
 	echo "<form action='fee' method=post>\n";
-	echo "<textarea id='annotation' rows=5 cols=80>$annotation".
+	echo "<textarea id='annotation' rows=$cols cols=80>$annotation".
 	     "</textarea></form>";
 	echo "<button name=submit type=button value=submit ".
 	     "onclick=\"ModifyAnno();\">Submit Changes</button>\n";
 	echo "<center>";
-	echo "<script type='text/javascript' language='javascript'>
-              function ModifyAnno() {
-                  textarea = getObjbyName('annotation');
-                  x_ModifyAnno(textarea.value, ModifyAnno_cb);
-              }
-              function ModifyAnno_cb(val) {
-              }
-              </script>\n";
+	if (! $longform) {
+	    echo "<script type='text/javascript' language='javascript'>
+                  function ModifyAnno() {
+                      textarea = getObjbyName('annotation');
+                      x_ModifyAnno(textarea.value, ModifyAnno_cb);
+                  }
+                  function ModifyAnno_cb(val) {
+                  }
+                  </script>\n";
+	}
     }
     function ShowRunAnnotation($runidx) {
 	$annotation = $this->GetRunAnnotation($runidx);
