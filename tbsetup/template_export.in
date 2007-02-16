@@ -156,10 +156,17 @@ my $checkout = "$projroot/$pid/export/$guid/$version/$exptidx";
 
 # Cleanup existing goo.
 if (-e $checkout) {
-    system("/bin/rm -rf $checkout");
+    my $dirtoremove = $checkout;
+
+    $dirtoremove .= "/run${runidx}"
+	if (defined($runidx));
+
+    system("/bin/rm -rf $dirtoremove");
 }
-system("mkdir -p $checkout") == 0
-    or fatal(-1, "Could not mkdir $checkout");
+if (! -e $checkout) {
+    system("mkdir -p $checkout") == 0
+	or fatal(-1, "Could not mkdir $checkout");
+}
 
 #
 # Since that worked, lets create the XML representation of it and stash
@@ -239,6 +246,9 @@ if ($debug) {
 #
 # Stash this into the checkout directory we created above. 
 #
+unlink("$checkout/export.xml")
+    if (-e "$checkout/export.xml");
+
 open(DUMP, ">$checkout/export.xml")
     or fatal(-1, "Could not open $checkout/export.xml for writing");
 print DUMP "$xml\n";
