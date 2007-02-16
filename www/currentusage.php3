@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -88,6 +88,8 @@ function SHOWSTATS()
 #
 function SHOWFREENODES()
 {
+    $freecounts = array();
+    
     # Get typelist and set freecounts to zero.
     $query_result =
 	DBQueryFatal("select n.type from nodes as n ".
@@ -97,7 +99,11 @@ function SHOWFREENODES()
 	$type              = $row[0];
 	$freecounts[$type] = 0;
     }
-    
+
+    if (!count($freecounts)) {
+	return "";
+    }
+	
     # Get free totals by type.
     $query_result =
 	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
@@ -119,7 +125,7 @@ function SHOWFREENODES()
 	}
     }
     $output = "";
-	
+
     $freepcs   = TBFreePCs();
     $reloading = TBReloadingPCs();
 
