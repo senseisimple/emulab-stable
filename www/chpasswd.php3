@@ -23,7 +23,7 @@ if (isset($simple) && $simple) {
 }
 else {
     $simple = 0;
-    $view   = $array();
+    $view   = array();
 }
 
 # Half the key in the URL.
