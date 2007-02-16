@@ -19,7 +19,7 @@ SBIN_STUFF	= plabslice plabnode plabrenewd plabmetrics plabstats \
 		  plabrenewonce
 
 LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py \
-		  mod_PLC4.py \
+		  mod_PLC4.py sshhttp.py \
 		  plabmon_badpool.pm plabmon_goodpool.pm libplabmon.pm \
 		  aspects.py timer_advisories.py
 

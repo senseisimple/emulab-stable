@@ -1,0 +1,236 @@
+#
+# Need ssh transport proxy to chat with the new NM.  Until PLC deploys the
+# "delegate" ssh login to the NM shell, we ssh to the utah svc slice as
+# emulabman and talk to the NM ourselves.  Obviously, this won't work if
+# there's no utah_svc_slice sliver on the target machine.  Once the delegate
+# mechanism is introduced, this transport will still be useful.
+#
+
+import httplib
+import xmlrpclib
+import popen2
+import os
+
+#
+# We have to extend HTTPResponse because it assumes it's handed a socket.
+#
+class SshHttpResponse(httplib.HTTPResponse):
+    def __init__(self,sfile,debuglevel=0,strict=0,method=None):
+        self.fp = sfile
+        
+        ## straight from httplib.py, sadly
+        self.debuglevel = debuglevel
+        self.strict = strict
+        self._method = method
+
+        self.msg = None
+
+        # from the Status-Line of the response
+        self.version = httplib._UNKNOWN # HTTP-Version
+        self.status = httplib._UNKNOWN  # Status-Code
+        self.reason = httplib._UNKNOWN  # Reason-Phrase
+
+        self.chunked = httplib._UNKNOWN    # is "chunked" being used?
+        self.chunk_left = httplib._UNKNOWN # bytes left to read in current chunk
+        self.length = httplib._UNKNOWN     # number of bytes left in response
+        self.will_close = httplib._UNKNOWN # conn will close at end of response
+
+        pass
+
+    def begin(self):
+        print "starting response begin"
+        httplib.HTTPResponse.begin(self)
+        print "overloaded begin: http version %d, len %d" % (self.version,
+                                                             self.length)
+        print "finished response begin"
+        pass
+
+    pass
+
+class SshTransportException(Exception):
+    pass
+
+#
+# A simple ssh connection based on a popen2 to the specified command.
+#
+class SshConnection:
+
+    def __init__(self,cmd):
+        self.__cmd = cmd
+        self.connected = False
+        pass
+
+    def checkconnect(self,state):
+        if state and not self.connected:
+            raise SshTransportException('Not connected!')
+        elif not state and self.connected:
+            raise SshTransportException('Already connected!')
+
+        return None
+    
+    def connect(self):
+        self.checkconnect(False)
+        self.child = popen2.Popen3(self.__cmd)
+        self.stdout = self.child.fromchild
+        self.stdin = self.child.tochild
+        self.stderr = self.child.childerr
+        self.connected = True
+        pass
+
+    def read(self,rc):
+        self.checkconnect(True)
+        try:
+            print "trying to read %d bytes" % rc
+            retval = self.stdout.read(rc)
+            print "read '%s'" % retval
+            return retval
+        except:
+            raise SshTransportException('Could not read from "%s"!' % (self.__cmd))
+
+        # unreached
+        return None
+
+    def readline(self):
+        self.checkconnect(True)
+        #try:
+        retval = self.stdout.readline()
+        print "READ '%s'" % retval
+        return retval
+        #except:
+        #    raise SshTransportException('Could not read line from "%s"!' % (self.__cmd))
+        
+        #return None
+
+    def write(self,s):
+        self.checkconnect(True)
+        try:
+            print "WRITE: %s" % str(s)
+            retval = self.stdin.write(s)
+            self.stdin.flush()
+            return retval
+        except:
+            raise SshTransportException('Could not write to "%s"!' % (self.__cmd))
+        
+        return None
+
+    def close(self):
+        self.checkconnect(True)
+
+        if self.child.poll() < 0:
+            try:
+                i = 0
+                os.kill(self.child.pid,15)
+                while self.child.poll() < 0:
+                    time.sleep(1)
+                    ++i
+                    if i >= SSH_TIMEOUT:
+                        print "killing child %d" % self.child.pid
+                        os.kill(self.child.pid,9)
+                        break
+                    pass
+                pass
+            except:
+                raise
+            #raise SshTransportException('Could not close child!')
+            pass
+
+        print "waiting for child in close"
+        self.child.wait()
+
+        return None
+
+    pass # end SshConnection class
+
+class SshHttpConnection(httplib.HTTPConnection):
+
+    def __init__(self,host='',port=None,strict=None):
+        self.__method = None
+        # setup our custom response class...
+        self.response_class = SshHttpResponse
+        # be nice
+        httplib.HTTPConnection.__init__(self,host,port,strict)
+        pass
+
+    # this really sucks, but no other way to get around httplib
+    def setConnection(self,sshconn):
+        self.__method = sshconn
+        pass
+
+    def connect(self):
+        self.__method.connect()
+        return
+
+    def close(self):
+        self.__method.close()
+        return
+
+    def send(self,str):
+        try:
+            self.__method.write(str)
+        except SshTransportException, v:
+            # catch a disconnected ssh
+            self.__method.connect()
+            self.__method.write(str)
+            pass
+        return
+
+    def getresponse(self):
+        self.sock = self.__method
+        return httplib.HTTPConnection.getresponse(self)
+
+
+    # shouldn't have to override this; it catches a socket exception, which
+    # we don't throw
+    #def request(self,method,url,body=None,headers={}):
+        
+    pass # end SshHttpConnection
+
+class SshHttp(httplib.HTTP):
+    def __init__(self,sshconn):
+        self._connection_class = SshHttpConnection
+
+        httplib.HTTP.__init__(self,'localhost',None,None)
+        self._conn.setConnection(sshconn)
+        # whew!
+        pass
+    pass
+
+#
+# SSHs to a host:port, then uses stdin/stdout as the HTTP connection.  So, it's
+# an SSH pipe to an HTTP connection.  Useful to us since the PlanetLab NM runs
+# locally on a host and ssh is the method du jour to arrive there.
+#
+class SshHttpTransport(xmlrpclib.Transport):
+    def __init__(self,sshconn):
+        self.__sshconn = sshconn
+        pass
+    
+    def make_connection(self,host):
+        return SshHttp(self.__sshconn)
+
+    def request(self,host,handler,body,verbose=0):
+        c = self.make_connection(host)
+
+        if verbose:
+            c.set_debuglevel(1)
+            pass
+
+        self.send_request(c,handler,body)
+        self.send_host(c,host)
+        self.send_user_agent(c)
+        self.send_content(c,body)
+
+        errcode,errmsg,headers = c.getreply()
+
+        if errcode != 200:
+            raise xmlrpclib.ProtocolError(host + handler,code,msg,headers)
+
+        self.verbose = verbose
+
+        # all that, just to get to this.  We can't pass the "sock" (which for
+        # us is essentially a file_object) as the second arg, cause
+        # _parse_response will try to recv from it... which is wrong.  the
+        # alternative to all this crap would be to overload _parse_response.
+        return self._parse_response(c._conn.sock,None)
+
+    pass # end SshHttpTransport
