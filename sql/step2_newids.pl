@@ -6,7 +6,7 @@
 #
 use English;
 
-use lib "/usr/testbed/devel/stoller/lib";
+use lib "/usr/testbed/lib";
 use libdb;
 use libtestbed;
 use User;
