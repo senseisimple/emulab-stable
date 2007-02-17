@@ -45,6 +45,12 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 	vector<UdpPacketInfo> ackedPackets = packetHistory->getAckedPackets();
         vecIterator = find_if(ackedPackets.begin(), ackedPackets.end(), bind2nd(equalSeqNum(), seqNum));
 
+	if(vecIterator == ackedPackets.end())
+	{
+		logWrite(ERROR,"UdpMaxDelay: Cannot find seqNum=%d in AckedPacketList", seqNum);
+		return;
+	}
+
 
 	unsigned long long timeStamp = packet->packetTime.toMicroseconds();
 
@@ -60,12 +66,19 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 	// has the same overhead length as the original packet.
 	oneWayQueueDelay = ( oneWayQueueDelay )*1518 / ((*vecIterator).packetSize);
 
+	if(oneWayQueueDelay < minDelaySensor->getMinDelay())
+	{
+		logWrite(ERROR,"Incorrect oneWayQueueDelay value = %llu, minDelay = %llu, seqNum=%d, SENDTS=%llu,RECVTS=%llu", oneWayQueueDelay, minDelaySensor->getMinDelay(),seqNum, (*vecIterator).timeStamp, timeStamp);
+		return;
+
+	}
 	// Find the queuing delay for this packet, by subtracting the
 	// one way minimum delay from the above value.
 	oneWayQueueDelay = oneWayQueueDelay - minDelaySensor->getMinDelay();
 
+
 	if(oneWayQueueDelay > 9000000)
-		logWrite(ERROR,"Incorrect oneWayQueueDelay value = %llu, minDelay = %llu", oneWayQueueDelay, minDelaySensor->getMinDelay());
+		logWrite(ERROR,"Incorrect oneWayQueueDelay value = %llu, minDelay = %llu, seqNum=%d, SENDTS=%llu,RECVTS=%llu", oneWayQueueDelay, minDelaySensor->getMinDelay(),seqNum, (*vecIterator).timeStamp, timeStamp);
 
         // Set this as the new maximum one way queuing delay.
         if(oneWayQueueDelay > maxDelay)
