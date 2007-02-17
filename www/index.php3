@@ -103,7 +103,7 @@ if ($message != "") {
 
     <dt><a href="tutorial/docwrapper.php3?docname=tutorial.html">Emulation</a></dt>
     <dd>An emulated experiment allows you to specify an arbitrary network
-    topology, giving you a <em>controllable, predictable, and repealable
+    topology, giving you a <em>controllable, predictable, and repeatable
     environment</em>, including PC nodes on which you have
     <em>full &quot;root&quot; access</em>, running an operating system of
     your choice.</dd>
