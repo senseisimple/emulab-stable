@@ -21,15 +21,23 @@ use Getopt::Std;
 use strict;
 
 sub usage {
-	warn "Usage: $0 [-b] [-s server] [-p port] <event>\n";
+	warn "Usage: $0 [-b] [-s server] [-p port] [pid/eid]\n";
 	return 1;
 }
 
 my %opt = ();
+my $expt = "";
 getopt("s:p:hb", \%opt);
 
 if ($opt{h}) { exit &usage; }
-if (@ARGV) { exit &usage; }
+if (@ARGV) {
+    $expt = shift @ARGV;
+}
+if (@ARGV) {
+    usage();
+    exit 1;
+}
+
 
 my ($server,$port);
 if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
@@ -44,6 +52,10 @@ if (!$handle) { die "Unable to register with event system\n"; }
 
 my $tuple = address_tuple_alloc();
 if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+if ($expt) {
+    %$tuple = ( expt => $expt );
+}
 
 if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
 	die "Could not subscribe to event\n";
