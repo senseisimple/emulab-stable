@@ -417,13 +417,16 @@ def process_event(conn, event, key, timestamp, value):
       if emulated_to_real.has_key(dest.remote_ip):
         app_connection = sock.lookup(dest)
         if app_connection.is_connected == False:
-          app_connection.is_connected = True
           if initial_connection_bandwidth.has_key(app_connection.dest.remote_ip):
             app_connection.last_bandwidth = initial_connection_bandwidth[app_connection.dest.remote_ip]
           else:
             app_connection.last_bandwidth = 0
           app_connection.prev_time = timestamp
           app_connection.is_connected = True
+          set_connection(this_ip, app_connection.dest.local_port,
+                         app_connection.dest.remote_ip,
+                         app_connection.dest.remote_port,
+                         proto_to_string(sock.protocol), 'CREATE')
           send_connect(conn, key + save_short(app_connection.number),
                        sock, app_connection)
         else:
