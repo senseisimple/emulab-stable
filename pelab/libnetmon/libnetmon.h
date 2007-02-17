@@ -105,6 +105,7 @@ typedef enum { LOG_NEW = 0,
                LOG_SO_RCVBUF,
                LOG_SO_SNDBUF,
                LOG_CONNECTED,
+               LOG_ACCEPTED,
                LOG_SEND,
                LOG_SENDTO,
                LOG_CLOSED,
@@ -122,6 +123,7 @@ static char *log_type_names[] = {
     "SO_RCVBUF",
     "SO_SNDBUF",
     "Connected",
+    "Accepted",
     "Send",
     "SendTo",
     "Closed",
@@ -314,4 +316,5 @@ static sendmsg_proto_t    *real_sendmsg;
 static void informNodelay(int);
 static void informMaxseg(int);
 static void informBufsize(int, int);
-static void informConnect(int);
+typedef enum {INFORM_CONNECT, INFORM_ACCEPT} inform_which_t;
+static void informConnect(int,inform_which_t);

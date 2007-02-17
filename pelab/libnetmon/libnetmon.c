@@ -662,6 +662,14 @@ void printlog(logmsg_t type, int fd, ...) {
             // Allow global turning on/off of this message type
             if (!report_connect) { print = false; }
             break;
+        case LOG_ACCEPTED:
+            // No Value
+            print_value = false;
+            // This message only showed up in version 2
+            if (output_version < 2) { print = false; }
+            // Allow global turning on/off of this message type
+            if (!report_connect) { print = false; }
+            break;
         case LOG_SEND:
             // This should be handled by calling log_packet()
             croak("LOG_SEND passed to printlog()");
@@ -1113,7 +1121,7 @@ void informBufsize(int fd, int which) {
 
 }
 
-void informConnect(int fd) {
+void informConnect(int fd, inform_which_t which) {
     /*
      * Let the monitor know about it - note: if it's a UDP socket, we've
      * already reported on it in startFD. Note that, for version 3, we
@@ -1143,7 +1151,11 @@ void informConnect(int fd) {
     informBufsize(fd, SO_RCVBUF);
     informBufsize(fd, SO_SNDBUF);
 
-    printlog(LOG_CONNECTED,fd);
+    if (which == INFORM_CONNECT) {
+        printlog(LOG_CONNECTED,fd);
+    } else {
+        printlog(LOG_ACCEPTED,fd);
+    }
 }
 
 int getNewSockbuf(int fd, int which) {
@@ -1210,7 +1222,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
      */
     if (monitorFD_p(sockfd)) {
         nameFD(sockfd,NULL,serv_addr);
-        informConnect(sockfd);
+        informConnect(sockfd,INFORM_CONNECT);
     }
 
     rv = real_connect(sockfd, serv_addr, addrlen);
@@ -1291,12 +1303,11 @@ int accept(int s, struct sockaddr * addr,
          * Got a new client! Start it up, name it, and report on its local port
          */
         startFD(rv);
-        nameFD(rv,addr,NULL);
-        informConnect(rv);
+        nameFD(rv,NULL,addr);
+        informConnect(rv,INFORM_ACCEPT);
         // XXX Accessors
-        monitorFDs[s].connected = 1;
-        monitorFDs[s].local_port = ntohs(((struct sockaddr_in*)addr)->sin_port);
-        printlog(LOG_LOCALPORT,rv,"%i",monitorFDs[s].local_port);
+        monitorFDs[rv].connected = 1;
+        printlog(LOG_LOCALPORT,rv,"%i",monitorFDs[rv].local_port);
     }
 
     return rv;
