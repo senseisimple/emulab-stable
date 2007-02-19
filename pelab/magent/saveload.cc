@@ -12,7 +12,7 @@
 #include "Command.h"
 
 // Uncomment this to turn on the verbose input for log replay format.
-// #define LOG_REPLAY_FORMAT
+//#define LOG_REPLAY_FORMAT
 
 namespace
 {
@@ -23,7 +23,7 @@ namespace
   #endif
 
   int count = 0;
-  int logFlag = LOG_NOTHING;
+  int logFlag = REPLAY;
 
   class FileLevel
   {
@@ -144,7 +144,7 @@ char * saveHeader(char * buffer, Header const & value)
   pos = saveShort(pos, value.size);
   pos = saveChar(pos, value.version);
   logReplay("key", 0);
-  if (global::CONTROL_VERSION < 1)
+  if (value.version < 1)
   {
     pos = saveBuffer(pos, value.key.id, Header::VERSION_0_SIZE);
   }
@@ -422,6 +422,7 @@ char * loadHeader(char * buffer, Header * value)
     char * pos = buffer;
     pos = loadChar(pos, &(value->type));
     pos = loadShort(pos, &(value->size));
+//    logWrite(ERROR, "Value->size: %d", value->size);
     pos = loadChar(pos, &(value->version));
     switch(value->version)
     {
@@ -436,7 +437,7 @@ char * loadHeader(char * buffer, Header * value)
       pos = loadBuffer(pos, value->key.id, ElabOrder::idSize);
       break;
     default:
-      logWrite(ERROR, "Unknown version: %d", value->version);
+      logWrite(ERROR, "loadHeader(): Unknown version: %d", value->version);
       logWrite(ERROR, "!!!! Undefined behaviour will follow !!!!");
       break;
     }
@@ -749,7 +750,7 @@ char * loadPacket(char * buffer, PacketInfo * value, struct tcp_info & kernel,
     pos = loadBuffer(pos, value->elab.id, ElabOrder::idSize);
     break;
   default:
-    logWrite(ERROR, "Unknown version: %d", version);
+    logWrite(ERROR, "loadPacket(): Unknown version: %d", version);
     logWrite(ERROR, "!!!! Undefined behaviour will follow !!!!");
     break;
   }

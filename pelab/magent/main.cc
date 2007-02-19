@@ -102,11 +102,12 @@ void processArgs(int argc, char * argv[])
     {"replay-load",       required_argument, NULL, 'l'},
     {"replay-sensor",     required_argument, NULL, 'n'},
     {"less-logging",      no_argument      , NULL, 'L'},
+    {"more-logging",      no_argument      , NULL, 'M'},
     // Required so that getopt_long can find the end of the list
     {NULL, 0, NULL, 0}
   };
 
-  string shortOptions = "c:p:m:i:ds:l:L";
+  string shortOptions = "c:p:m:i:ds:l:LM";
 
   // Not used
   int longIndex;
@@ -282,6 +283,9 @@ void processArgs(int argc, char * argv[])
     case 'L':
       global::logFlags = ERROR & EXCEPTION;
       break;
+    case 'M':
+      global::logFlags = LOG_EVERYTHING;
+      break;
     case '?':
     default:
       usageMessage(argv[0]);
@@ -365,26 +369,26 @@ void mainLoop(void)
     {
       timeUntilWrite = nextWrite->first - now;
       waitPeriod = timeUntilWrite.getTimeval();
-      logWrite(MAIN_LOOP, "Before select, waitTime=%f",
-               timeUntilWrite.toDouble());
+//      logWrite(MAIN_LOOP, "Before select, waitTime=%f",
+//               timeUntilWrite.toDouble());
     }
     else if (nextWrite == schedule.end())
     {
       // otherwise we want to wait forever.
       timeUntilWrite = Time();
       waitPeriod = NULL;
-      logWrite(MAIN_LOOP, "Before select, waitTime=forever");
+//      logWrite(MAIN_LOOP, "Before select, waitTime=forever");
     }
     else
     {
       timeUntilWrite = Time();
       waitPeriod = timeUntilWrite.getTimeval();
-      logWrite(MAIN_LOOP, "Before select, waitTime=zero");
+//      logWrite(MAIN_LOOP, "Before select, waitTime=zero");
     }
     int error = select(global::maxReader + 1, &readable, NULL, NULL,
 //                       &debugTimeout);
                        waitPeriod);
-    logWrite(MAIN_LOOP, "After select");
+//    logWrite(MAIN_LOOP, "After select");
     if (error == -1)
     {
       switch (errno)
@@ -450,13 +454,15 @@ bool replayReadHeader(char * dest)
     switch (version)
     {
     case 0:
+      logWrite(ERROR, "case 0");
       result = replayRead(dest + Header::PREFIX_SIZE, Header::VERSION_0_SIZE);
       break;
     case 1:
+      logWrite(ERROR, "case 1");
       result = replayRead(dest + Header::PREFIX_SIZE, Header::VERSION_1_SIZE);
       break;
     default:
-      logWrite(ERROR, "Unknown version: %d", version);
+      logWrite(ERROR, "replayReadHeader(): Unknown version: %d, type[0] %d, size[1]=%d, size[2]=%d, version[3]=%d", version, dest[0], dest[1], dest[2], dest[3]);
       result = false;
       break;
     }
