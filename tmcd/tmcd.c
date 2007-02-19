@@ -6702,15 +6702,29 @@ COMMAND_PROTOTYPE(dotraceconfig)
 	}
 	while (nrows) {
 		char	*bufp = buf;
+		int     idx;
 		
 		row = mysql_fetch_row(res);
 
+		/*
+		 * XXX plab hack: add the vnode number to the idx to
+		 * prevent vnodes on the same pnode from using the same
+		 * port number!
+		 */
+		idx = atoi(row[8]);
+		if (reqp->isplabdslice &&
+		    strncmp(reqp->nodeid, "plabvm", 6) == 0) {
+		    char *cp = index(reqp->nodeid, '-');
+		    if (cp && *(cp+1))
+			idx += (atoi(cp+1) * 10);
+		}
+
 		bufp += OUTPUT(bufp, ebufp - bufp,
-			       "TRACE LINKNAME=%s IDX=%s MAC0=%s MAC1=%s "
+			       "TRACE LINKNAME=%s IDX=%d MAC0=%s MAC1=%s "
 			       "VNODE=%s VNODE_MAC=%s "
 			       "TRACE_TYPE=%s TRACE_EXPR='%s' "
 			       "TRACE_SNAPLEN=%s\n",
-			       row[0], row[8],
+			       row[0], idx,
 			       (row[1] ? row[1] : ""),
 			       (row[2] ? row[2] : ""),
 			       row[3], row[4], 
