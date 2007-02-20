@@ -259,9 +259,14 @@ $linktest_running = $experiment->linktest_pid();
 $paniced    = $experiment->paniced();
 $panic_date = $experiment->panic_date();
 $lockdown   = $experiment->lockdown();
-$experiment_stats = $experiment->GetStats();
+
+if (! ($experiment_stats = $experiment->GetStats())) {
+    TBERROR("Could not get experiment stats object for $expindex", 1);
+}
 $rsrcidx    = $experiment_stats->rsrcidx();
-$experiment_resources = $experiment->GetResources();
+if (! ($experiment_resources = $experiment->GetResources())) {
+    TBERROR("Could not get experiment resources object for $expindex", 1);
+}
 $wireless   = $experiment_resources->wirelesslans();
 
 #

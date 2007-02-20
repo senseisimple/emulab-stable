@@ -477,6 +477,12 @@ class Node
 	if (!$startupcmd)
 	    $startupcmd = "&nbsp;";
 
+	if ($node_id != $phys_nodeid) {
+	    if (! ($phys_this = Node::Lookup($phys_nodeid))) {
+		TBERROR("Cannot map physical node $phys_nodeid to object", 1);
+	    }
+	}
+
 	if (!$short) {
             #
             # Location info.
@@ -832,10 +838,10 @@ class Node
 
 	    if ($isremotenode) {
 		if ($isvirtnode) {
-		    SHOWWIDEAREANODE($phys_nodeid, 1);
+		    $phys_this->ShowWideAreaNode(1);
 		}
 		else {
-		    SHOWWIDEAREANODE($node_id, 1);
+		    $this->ShowWideAreaNode(1);
 		}
 	    }
 
@@ -970,6 +976,102 @@ class Node
 	}
 
 	echo "</table>\n";
+    }
+
+    #
+    # Show widearea node record. Just the widearea stuff, not the other.
+    #
+    function ShowWideAreaNode($embedded = 0) {
+	$node_id = $this->node_id();
+	
+	$query_result =
+	    DBQueryFatal("select * from widearea_nodeinfo ".
+			 "where node_id='$node_id'");
+
+	if (! mysql_num_rows($query_result)) {
+	    return;
+	}
+	$row = mysql_fetch_array($query_result);
+	$contact_uid	= $row["contact_uid"];
+	$machine_type   = $row["machine_type"];
+	$connect_type	= $row["connect_type"];
+	$city		= $row["city"];
+	$state		= $row["state"];
+	$zip		= $row["zip"];
+	$country	= $row["country"];
+	$hostname	= $row["hostname"];
+	$site		= $row["site"];
+
+	if (! ($user = User::Lookup($contact_uid))) {
+            # This is not an error since the field is set to "nobody" when
+            # there is no contact info. Why is that?
+	    $showuser_url = CreateURL("showuser", URLARG_UID, $contact_uid);
+	}
+	else {
+	    $showuser_url = CreateURL("showuser", $user);
+	}
+
+	if (! $embedded) {
+	    echo "<table border=2 cellpadding=0 cellspacing=2
+                         align=center>\n";
+	}
+	else {
+	    echo "<tr>
+                   <td align=center colspan=2>
+                       Widearea Info
+                   </td>
+                 </tr>\n";
+	}
+
+	echo "<tr>
+                  <td>Contact UID:</td>
+                  <td class=left>
+                      <a href='$showuser_url'>$contact_uid</a></td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>Machine Type:</td>
+                  <td class=left>$machine_type</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>connect Type:</td>
+                  <td class=left>$connect_type</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>City:</td>
+                  <td class=left>$city</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>State:</td>
+                  <td class=left>$state</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>ZIP:</td>
+                  <td class=left>$zip</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>Country:</td>
+                  <td class=left>$country</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Hostname:</td>
+                  <td class=left>$hostname</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>Site:</td>
+                  <td class=left>$site</td>
+              </tr>\n";
+
+	if (! $embedded) {
+	    echo "</table>\n";
+	}
     }
 
     #
