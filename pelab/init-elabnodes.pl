@@ -92,7 +92,7 @@ my $now     = time();
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("S:no:rC", \%options)) {
+if (! getopts("S:no:rCd", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
@@ -105,6 +105,12 @@ if (defined($options{"r"})) {
     $remote = 1;
     $PWDFILE = "/local/pelab/pelabdb.pwd";
     $DBHOST = "users.emulab.net";
+}
+if (defined($options{"d"})) {
+    $DBHOST = "datapository.net";
+    $DBNAME = "nodesamples";
+    $DBUSER = "flexlabdata";
+    $PWDFILE = "";
 }
 if (defined($options{"C"})) {
     $cloudonly = 1;
@@ -125,12 +131,17 @@ if (@ARGV != 2) {
 my ($pid,$eid) = @ARGV;
 
 # Get DB password and connect.
-my $DBPWD   = `cat $PWDFILE`;
-if ($DBPWD =~ /^([\w]*)\s([\w]*)$/) {
-    $DBPWD = $1;
-}
-else{
-    fatal("Bad chars in password!");
+my $DBPWD;
+if ($PWDFILE) {
+    $DBPWD = `cat $PWDFILE`;
+    if ($DBPWD =~ /^([\w]*)\s([\w]*)$/) {
+        $DBPWD = $1;
+    }
+    else{
+        fatal("Bad chars in password!");
+    }
+} else {
+    $DBPWD = "";
 }
 TBDBConnect($DBNAME, $DBUSER, $DBPWD, $DBHOST) == 0
     or die("Could not connect to pelab database!\n");
@@ -489,9 +500,9 @@ sub get_plabinfo($)
 			       $node_mapping{$dstvnode},
 			       24, 0.8 );
 	bless $initvalLat, "initvalres";
-#	print "initvalLat=$initvalLat\n";
+#       print "initvalLat=$initvalLat\n";
 	bless $initvalBw, "initvalres";
-#	print "initvalBw=$initvalBw\n";
+#       print "initvalBw=$initvalBw\n";
 =pod
         print "\nLATENCY\n";
 	printInitValResStruct($initvalLat);
