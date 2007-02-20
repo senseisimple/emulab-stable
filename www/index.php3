@@ -88,7 +88,7 @@ if ($message != "") {
         researchers worldwide.
     If you are unsure if you qualify for use, please see our
         <a href="docwrapper.php3?docname=policies.html">policies document</a>,
-        or <a href="mailto:<? $TBMAILADDR_OPS ?>">ask us</a>.
+        or <a href='mailto:<?php echo $TBMAILADDR_OPS; ?>'>ask us</a>.
     If you think you qualify, you can
         <a href="docwrapper.php3?docname=auth.html">apply to start a new
         project</a>.
