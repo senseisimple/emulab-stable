@@ -73,8 +73,14 @@ $idx      = $tracerow['idx'];
 
 #
 # Wow, what a kludge. The port number is the index + 4442. See rc.trace.
+# Wow, an even bigger kludge.  If this is plabvmXXX-NN, add (10 * NN) to
+# the portnum to create unique ports for each vnode on a pnode. See tmcd.c.
 #
 $portnum  = 4442 + $idx;
+if (preg_match("/^plabvm\d+-(\d+)$/", $nodeid, $matches)) {
+    $vnum = $matches[1];
+    $portnum += ($vnum * 10);
+}
 
 #
 # Clean up when the remote user disconnects
