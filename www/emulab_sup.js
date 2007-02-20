@@ -7,6 +7,13 @@
  * Some utility stuff.
  */
 
+var user_agent = navigator.userAgent.toLowerCase();
+var is_safari   = false;
+
+if (user_agent.indexOf("safari") != -1) {
+    is_safari = true;
+}
+
 /* Clear the various 'loading' indicators. */
 function ClearLoadingIndicators(done_msg)
 {
@@ -34,7 +41,7 @@ function IframeDocument(id)
     var oIframe = getObjbyName(id);
     var oDoc    = (oIframe.contentWindow || oIframe.contentDocument);
 
-    if (oIframe.document) {
+    if (oIframe.document && is_safari) {
         // Safari
 	return oIframe.document;
     }

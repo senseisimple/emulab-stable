@@ -93,7 +93,7 @@ function ml_getBodyText(ifr) {
     try {
 	var oDoc;
 	
-	if (ifr.document) {
+	if (ifr.document && is_safari) {
 	    // Safari
 	    oDoc = ifr.document;
         }
