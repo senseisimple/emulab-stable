@@ -40,13 +40,14 @@ int unack_threshold = -1;
 
 int udp = 0;
 int udp_frag_size = 0;
+int udp_max_ack_wait_us = 0;
 
 /** 
  * functions
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -scCpPmMudba  (option defaults in parens)\n"
+	    "USAGE: %s -scCpPmMudbat  (option defaults in parens)\n"
 	    "  -s <block_size>  tx block size (%d)\n"
 	    "  -c <block_count> tx block size (%d)\n"
 	    "  -C <msg_count>   number of times to send block_count msgs (%d)\n"
@@ -62,6 +63,7 @@ void usage(char *bin) {
 	    "  -F <frag_size>   Application fragment size for udp (i.e. if \n"
 	    "                     -s 1024 and -F 512, fragment each block \n"
 	    "                     into two chunks)\n"
+	    "  -t <udp_max_ack_timeout> Max udp timeout when ack threshold reached (us)\n"
 	    "  -d[d..d]         Enable various levels of debug output\n"
 	    "  -u               Print this msg\n",
 	    bin,block_size,block_count,msg_count,block_pause_us,msg_pause_us,
@@ -73,7 +75,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:uda:bUF:")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:C:p:P:m:M:R:h:uda:bUF:t:")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -150,6 +152,13 @@ void parse_args(int argc,char **argv) {
 		exit(-1);
 	    }
 	    break;
+	case 't':
+	    udp_max_ack_wait_us = (int)strtol(optarg,&ep,10);
+	    if (ep == optarg) {
+		usage(argv[0]);
+		exit(-1);
+	    }
+	    break;
 	default:
 	    break;
 	}
@@ -161,12 +170,12 @@ void parse_args(int argc,char **argv) {
 	exit(-1);
     }
 
-    if (unack_threshold > -1 && udp) {
-	fprintf(stderr,
-		"ERROR: cannot use an ack window with udp since this program\n"
-		"does not retransmit unack'd msgs!\n");
-	exit(-1);
-    }
+    //if (unack_threshold > -1 && udp) {
+    //fprintf(stderr,
+    //	"ERROR: cannot use an ack window with udp since this program\n"
+    //	"does not retransmit unack'd msgs!\n");
+    //exit(-1);
+    //}
 
     if ((udp_frag_size > 0 && udp_frag_size < sizeof(block_hdr_t)) 
 	|| block_size < sizeof(block_hdr_t)) {
@@ -197,6 +206,11 @@ int main(int argc,char **argv) {
     /** might be block_size or udp_frag_size */
     int udp_msg_size;
     int bsize;
+    int udp_last_block_id = 0;
+    /** for acks */
+    char tmpbuf[255];
+    block_hdr_t ack;
+    int slen;
     
     parse_args(argc,argv);
 
@@ -271,7 +285,6 @@ int main(int argc,char **argv) {
 	    
 	    if (udp) {
 		while (remaining_frag_count) {
-		    gettimeofday(&tv,NULL);
 		    marshall_block_hdr_send(buf,
 					    msg_count-remaining_msg_count,
 					    block_count-remaining_block_count,
@@ -280,9 +293,13 @@ int main(int argc,char **argv) {
 		    retval = sendto(send_sock,buf,udp_msg_size,0,
 				    (struct sockaddr *)&send_sa,
 				    sizeof(send_sa));
+
+		    gettimeofday(&tv,NULL);
+
 		    if (retval < 0) {
 			if (errno == EAGAIN) {
 			    ewarn("EAGAIN while sending udp");
+			    continue;
 			}
 			else if (errno == EMSGSIZE) {
 			    efatal("msg size too big for atomic send");
@@ -302,6 +319,15 @@ int main(int argc,char **argv) {
 			fprintf(stderr,"WARNING: only sent %d of %d bytes\n",
 				retval,udp_msg_size);
 		    }
+
+		    gettimeofday(&tv,NULL);
+		    
+		    fprintf(stdout,"TIME m%d b%d f%d %.4f\n",
+			    msg_count - remaining_msg_count,
+			    block_count - remaining_block_count,
+			    frag_count - (remaining_frag_count + 1),
+			    tv.tv_sec + tv.tv_usec / 1000000.0f);
+
 		}
 	    }
 	    else {
@@ -328,12 +354,15 @@ int main(int argc,char **argv) {
 			bytesWritten += retval;
 		    }
 		}
+		gettimeofday(&tv,NULL);
+		
+		fprintf(stdout,"TIME m%d b%d f%0 %.4f\n",
+			msg_count - remaining_msg_count,
+			block_count - remaining_block_count,
+			frag_count - remaining_frag_count,
+			tv.tv_sec + tv.tv_usec / 1000000.0f);
+		
 	    }
-	    gettimeofday(&tv,NULL);
-
-	    fprintf(stdout,"TIME %d %.4f\n",
-		    block_count - remaining_block_count,
-		    tv.tv_sec + tv.tv_usec / 1000000.0f);
 
 	    --remaining_block_count;
 
@@ -359,18 +388,124 @@ int main(int argc,char **argv) {
 		    ++ack_count;
 		}
 	    }
+	    else {
+		retval = recvfrom(send_sock,
+				  tmpbuf,sizeof(tmpbuf),0,
+				  (struct sockaddr *)&send_sa,&slen);
 
-	    if (!udp && unack_threshold > -1) {
+		gettimeofday(&tv,NULL);
+		
+		if (retval < 0) {
+		    if (errno == EAGAIN) {
+			;
+		    }
+		    else {
+			ewarn("while reading udp ack");
+		    }
+		}
+		else if (retval == sizeof(block_hdr_t)) {
+		    if (debug > 2) {
+			fprintf(stdout,"read %d-byte ack\n",retval);
+		    }
+
+		    ++ack_count;
+
+		    unmarshall_block_hdr(tmpbuf,&ack);
+		    if (ack.block_id > udp_last_block_id) {
+			udp_last_block_id = ack.block_id;
+		    }
+		    
+		    fprintf(stdout,"ACKTIME m%d b%d f%d %.4f\n",
+			    ack.msg_id,
+			    ack.block_id,
+			    ack.frag_id,
+			    tv.tv_sec + tv.tv_usec / 1000000.0f);
+		}
+		else {
+		    fprintf(stdout,
+			    "WARNING: read %d-byte unknown block while "
+			    "expecting ack\n",
+			    retval);
+		}
+	    }
+		
+	    
+	    if (unack_threshold > -1) {
+		struct timeval tvtmp;
+		struct timeval tvlast;
+		int sleeptime = 0;
+		gettimeofday(&tvtmp,NULL);
+
 		while (((block_count - remaining_block_count) - ack_count) > unack_threshold) {
 		    warn("hit the unack threshold!");
 		    
-		    /* sleep until we get ack'd */
-		    if (usleep(100*1000) < 0) {
-			ewarn("sleep at ack edge failed");
+		    if (!udp) {
+			/* sleep until we get ack'd */
+			if (usleep(100*1000) < 0) {
+			    ewarn("sleep at ack edge failed");
+			}
+			
+			if (read(send_sock,&buf[0],sizeof(char)) 
+			    == sizeof(char)) {
+			    ++ack_count;
+			}
 		    }
-		    
-		    if (read(send_sock,&buf[0],sizeof(char)) == sizeof(char)) {
-			++ack_count;
+		    else {
+			/* if udp, only sleep until we hit the max wait time */
+			gettimeofday(&tvlast,NULL);
+			
+			usleep(500);
+			sleeptime += 500;
+
+			if (sleeptime > udp_max_ack_wait_us) {
+			    /* reset ack_count */
+			    ack_count = block_count - remaining_block_count;
+			    fprintf(stdout,
+				    "WARNING: waited max time for udp ack "
+				    "without receiving; continuing!\n");
+			    fflush(stdout);
+			    continue;
+			}
+
+			retval = recvfrom(send_sock,
+					  tmpbuf,sizeof(tmpbuf),0,
+					  (struct sockaddr *)&send_sa,&slen);
+
+			gettimeofday(&tv,NULL);
+
+			if (retval < 0) {
+			    if (errno == EAGAIN) {
+				;
+			    }
+			    else {
+				ewarn("while reading udp ack");
+			    }
+			}
+			else if (retval == sizeof(block_hdr_t)) {
+			    if (debug > 2) {
+				fprintf(stdout,"read %d-byte ack\n",retval);
+			    }
+			    
+			    ++ack_count;
+			    
+			    unmarshall_block_hdr(tmpbuf,&ack);
+			    if (ack.block_id > udp_last_block_id) {
+				udp_last_block_id = ack.block_id;
+			    }
+			    
+			    fprintf(stdout,"ACKTIME m%d b%d f%d %.4f\n",
+				    ack.msg_id,
+				    ack.block_id,
+				    ack.frag_id,
+				    tv.tv_sec + tv.tv_usec / 1000000.0f);
+			}
+			else {
+			    fprintf(stdout,
+				    "WARNING: read %d-byte unknown block while"
+				    " expecting ack\n",
+				    retval);
+			}
+			
 		    }
 		}
 	    }

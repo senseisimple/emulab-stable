@@ -23,6 +23,7 @@ char *middleman_host = "localhost";
 short middleman_port = MIDDLEMAN_RECV_CLIENT_PORT;
 int debug = 0;
 int udp = 0;
+int udp_ack = 0;
 
 char *deadbeef = "deadbeef";
 
@@ -37,6 +38,7 @@ void usage(char *bin) {
 	    "  -M <port>        Middle port to connect to (%d)\n"
 	    "  -U               Use udp instead of tcp\n"
 	    "  -d[d..d]         Enable various levels of debug output\n"
+	    "  -a               Enable udp acks back to the sender via middleman\n"
 	    "  -u               Print this msg\n",
 	    bin,block_size,middleman_host,middleman_port
 	    );
@@ -46,7 +48,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:m:M:udU")) != -1) {
+    while ((c = getopt(argc,argv,"s:m:M:udUa")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -73,6 +75,9 @@ void parse_args(int argc,char **argv) {
 	    break;
 	case 'U':
 	    udp = 1;
+	    break;
+	case 'a':
+	    udp_ack = 1;
 	    break;
 	default:
 	    break;
@@ -104,6 +109,7 @@ int main(int argc,char **argv) {
     struct sockaddr_in client_sin;
     int slen;
     block_hdr_t hdr;
+    struct timeval tv;
     
     parse_args(argc,argv);
 
@@ -202,6 +208,7 @@ int main(int argc,char **argv) {
 	    retval = recvfrom(recv_sock,buf,block_size,0,
 			      (struct sockaddr *)&client_sin,
 			      (socklen_t *)&slen);
+
 	    if (retval < 0) {
 		ewarn("error while recvfrom middleman");
 	    }
@@ -224,6 +231,32 @@ int main(int argc,char **argv) {
 		"INFO: read %d bytes at %.6f\n",
 		bytesRead,
 		t1.tv_sec + t1.tv_usec / 1000000.0f);
+
+	fflush(stdout);
+
+	/* if udp, send a best-effort ack that the middleman will forward. */
+	if (udp && udp_ack) {
+	    retval = sendto(recv_sock,buf,sizeof(block_hdr_t),0,
+			    (struct sockaddr *)&client_sin,
+			    sizeof(struct sockaddr_in));
+
+	    gettimeofday(&tv,NULL);
+	    
+	    if (retval < 0) {
+		ewarn("while sending udp ack to client");
+	    }
+	    else if (retval != sizeof(block_hdr_t)) {
+		ewarn("only sent part of udp ack msg");
+	    }
+	    else if (retval == sizeof(block_hdr_t)) {
+		fprintf(stdout,
+			"ACKTIME: sent m%d b%d f%d at %.6f\n",
+			hdr.msg_id,hdr.block_id,hdr.frag_id,
+			tv.tv_sec+tv.tv_usec/1000000.0f);
+		fflush(stdout);
+	    }
+	}
+
     }
 
     /* never get here... */

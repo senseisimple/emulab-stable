@@ -138,6 +138,8 @@ int main(int argc,char **argv) {
     int udp_msg_size = 0;
     struct timeval t0;
     int bytesRead = 0;
+    struct sockaddr_in udp_send_client_sin;
+    struct timeval tvs,tv;
 
     /* grab some quick args */
     parse_args(argc,argv);
@@ -247,8 +249,6 @@ int main(int argc,char **argv) {
 	}
 
 	retval = select(max_fd+1,&rfds,NULL,NULL,NULL);
-
-	printf("AAA\n");
 	
 	if (retval > 0) {
 	    /* 
@@ -294,17 +294,21 @@ int main(int argc,char **argv) {
 		
 	    //} 
 	    /* add a new sfreceiver client */
+	    /* OR pass through acks. */
 	    else if (FD_ISSET(srv_recv_sock,&rfds)) {
 		struct sockaddr_in client_sin;
 		socklen_t slen;
 		int client_fd;
 		char tmpbuf[255];
+		block_hdr_t ack;
 
 		slen = sizeof(client_sin);
 
 		if (udp) {
-		    if (recvfrom(srv_recv_sock,tmpbuf,sizeof(tmpbuf),0,
-				 (struct sockaddr *)&client_sin,&slen) < 0) {
+		    if ((bytesRead = recvfrom(srv_recv_sock,
+					      tmpbuf,sizeof(tmpbuf),0,
+					      (struct sockaddr *)&client_sin,
+					      &slen)) < 0) {
 			ewarn("in recvfrom while getting a new receiver "
 			      "client");
 		    }
@@ -313,8 +317,11 @@ int main(int argc,char **argv) {
 			 * if this is a client we haven't heard from,
 			 * add it; else remove it.  Basic "connection."
 			 */
-			
 			int first_zero_idx = -1;
+
+			/* record ack time */
+			gettimeofday(&tv,NULL);
+
 			for (i = 0; i < MIDDLEMAN_MAX_CLIENTS; ++i) {
 			    if (udp_recv_client_sins[i].sin_addr.s_addr == 0 
 				&& first_zero_idx < 0) {
@@ -325,14 +332,53 @@ int main(int argc,char **argv) {
 				     && (udp_recv_client_sins[i].sin_port
 					 == client_sin.sin_port)) {
 				/* old client, wants to "disconnect" */
-				if (debug > 1) {
-				    fprintf(stdout,
-					    "removed udp client %s\n",
-					    inet_ntoa(client_sin.sin_addr));
+				/* OR it's sending an ack... if the msg size
+				 * is sizeof(hdr) instead of 1 byte, pass
+				 * the ack on to the sender.
+				 */
+
+				if (debug > 2) {
+				    fprintf(stdout,"read %d-byte msg from "
+					    "recv client %s\n",
+					    bytesRead,inet_ntoa(client_sin.sin_addr));
 				}
-				memset(&udp_recv_client_sins[i],
-				       0,
-				       sizeof(struct sockaddr_in));
+
+				if (bytesRead == sizeof(block_hdr_t)) {
+				    /* unmarshall for debug */
+				    unmarshall_block_hdr(tmpbuf,&ack);
+
+				    retval = sendto(srv_send_sock,
+						    tmpbuf,bytesRead,0,
+						    (struct sockaddr *)&udp_send_client_sin,
+						    sizeof(struct sockaddr_in));
+				    
+				    if (retval < 0) {
+					ewarn("while sending udp ack to client");
+				    }
+				    else if (retval != bytesRead) {
+					ewarn("only sent part of udp ack msg");
+				    }
+
+				    fprintf(stdout,
+					    "ACKTIME: recv m%d b%d f%d at %.6f\n",
+					    ack.msg_id,
+					    ack.block_id,
+					    ack.frag_id,
+					    tv.tv_sec+tv.tv_usec/1000000.0f);
+				    fflush(stdout);
+				    
+				}
+				else if (slen == 1) {
+				    
+				    if (debug > 1) {
+					fprintf(stdout,
+						"removed udp client %s\n",
+						inet_ntoa(client_sin.sin_addr));
+				    }
+				    memset(&udp_recv_client_sins[i],
+					   0,
+					   sizeof(struct sockaddr_in));
+				}
 
 				break;
 			    }
@@ -493,6 +539,9 @@ int main(int argc,char **argv) {
 		    retval = recvfrom(srv_send_sock,buf,block_size,0,
 				      (struct sockaddr *)&client_sin,&slen);
 
+		    /* keep the sender's sin around */
+		    udp_send_client_sin = client_sin;
+
 		    if (retval < 0) {
 			ewarn("error in recvfrom on sending client");
 			udp_msg_size = 0;
@@ -560,13 +609,6 @@ int main(int argc,char **argv) {
 			t3.tv_sec--;
 			t3.tv_usec += 1000000;
 		    }
-		    fprintf(stdout,
-			    "BLOCKTIME(%s): m%d b%d f%d %d at %.6f\n",
-			    (only_encrypt)?"e":"de",
-			    hdr.msg_id,hdr.block_id,hdr.frag_id,
-			    t3.tv_sec * 1000 + t3.tv_usec,
-			    t2.tv_sec + t2.tv_usec / 1000000.0f);
-		    fflush(stdout);
 
 		    if (!udp) {
 			/* no app fragmentation with tcp */
@@ -636,7 +678,7 @@ int main(int argc,char **argv) {
 			    if (udp_recv_client_sins[i].sin_addr.s_addr != 0) {
 				if (debug > 1) {
 				    fprintf(stdout,"sending %d-byte udp msg to"
-					    " client %s",
+					    " client %s\n",
 					    bytesRead,
 					    inet_ntoa(udp_recv_client_sins[i].sin_addr));
 				}
@@ -660,6 +702,19 @@ int main(int argc,char **argv) {
 			    }
 			}
 		    }
+
+		    gettimeofday(&tvs,NULL);
+		    
+		    /* dump times */
+		    fprintf(stdout,
+			    "BLOCKTIME(%s): m%d b%d f%d %d; read=%.6f; compute=%.6f; send=%.6f\n",
+			    (only_encrypt)?"e":"de",
+			    hdr.msg_id,hdr.block_id,hdr.frag_id,
+			    t3.tv_sec * 1000 + t3.tv_usec,
+			    t0.tv_sec + t0.tv_usec / 1000000.0f,
+			    t2.tv_sec + t2.tv_usec / 1000000.0f,
+			    tvs.tv_sec + tvs.tv_usec / 1000000.0f);
+		    fflush(stdout);
 		}
 				
 	    }
