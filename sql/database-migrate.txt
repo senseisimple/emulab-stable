@@ -3894,3 +3894,10 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiment_template_metadata change metadata_type
          metadata_type enum('tid','template_description',
               'parameter_description', 'annotation') default NULL;
+
+4.106: More new metadata_types,
+
+       alter table experiment_template_metadata change metadata_type
+         metadata_type enum('tid','template_description',
+              'parameter_description', 'annotation',
+              'instance_description', 'run_description') default NULL;
