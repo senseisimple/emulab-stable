@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -469,12 +469,23 @@ sub DumpDB(@)
 	return -1;
     }
 
+    #
+    # For NFS, lets not overwrite the samefile, but *create* a new one.
+    #
+    if (-e $filename) {
+	system("/bin/mv $filename ${filename}.old") == 0 or
+	    fatal("Could not mv $filename");
+    }
+
     open(DUMP, "| $MYSQLDUMP -u root -p -a -e $dbname | $GZIP > $filename") or
 	fatal("Could not start $MYSQLDUMP!");
     print DUMP "$dbpass\n";
     close(DUMP) or
 	fatal($! ? "Error closing $MYSQLDUMP pipe: $!"
 	         : "Exit status $? from $MYSQLDUMP");
+
+    unlink("${filename}.old")
+	if (-e "${filename}.old");
 
     return 0;
 }
