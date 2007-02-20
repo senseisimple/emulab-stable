@@ -322,7 +322,7 @@ int main(int argc,char **argv) {
 
 		    gettimeofday(&tv,NULL);
 		    
-		    fprintf(stdout,"TIME m%d b%d f%d %.4f\n",
+		    fprintf(stdout,"TIME m%d b%d f%d %.6f\n",
 			    msg_count - remaining_msg_count,
 			    block_count - remaining_block_count,
 			    frag_count - (remaining_frag_count + 1),
@@ -356,7 +356,7 @@ int main(int argc,char **argv) {
 		}
 		gettimeofday(&tv,NULL);
 		
-		fprintf(stdout,"TIME m%d b%d f%0 %.4f\n",
+		fprintf(stdout,"TIME m%d b%d f%0 %.6f\n",
 			msg_count - remaining_msg_count,
 			block_count - remaining_block_count,
 			frag_count - remaining_frag_count,
@@ -415,7 +415,7 @@ int main(int argc,char **argv) {
 			udp_last_block_id = ack.block_id;
 		    }
 		    
-		    fprintf(stdout,"ACKTIME m%d b%d f%d %.4f\n",
+		    fprintf(stdout,"ACKTIME m%d b%d f%d %.6f\n",
 			    ack.msg_id,
 			    ack.block_id,
 			    ack.frag_id,
@@ -493,7 +493,7 @@ int main(int argc,char **argv) {
 				udp_last_block_id = ack.block_id;
 			    }
 			    
-			    fprintf(stdout,"ACKTIME m%d b%d f%d %.4f\n",
+			    fprintf(stdout,"ACKTIME m%d b%d f%d %.6f\n",
 				    ack.msg_id,
 				    ack.block_id,
 				    ack.frag_id,

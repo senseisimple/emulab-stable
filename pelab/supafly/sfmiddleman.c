@@ -30,18 +30,21 @@ int pushback = 0;
 
 int udp = 0;
 
+int enc_cycles = 1;
+
 /**
  * defs
  */
 void usage(char *bin) {
     fprintf(stdout,
-	    "USAGE: %s -scohSRudb  (option defaults in parens)\n"
+	    "USAGE: %s -scohSRudbx  (option defaults in parens)\n"
 	    "  -s <block_size>  tx block size (%d)\n"
 	    "  -c <block_count> tx block size (%d)\n"
 	    "  -m <hostname>    Listen on this host/addr (INADDR_ANY)\n"
 	    "  -S <port>        Listen on this port for one sender at a time (%d)\n"
 	    "  -R <port>        Listen on this port for receivers (%d)\n"
 	    "  -o               Only encrypt (instead of dec/enc)\n"
+	    "  -x <factor>      Do encryption ops this many times\n"
 	    "  -b               Ack all received blocks from sender AFTER crypto\n"
 	    "  -U               Use udp instead of tcp\n"
 	    "  -d[d..d]         Enable various levels of debug output\n"
@@ -54,7 +57,7 @@ void parse_args(int argc,char **argv) {
     int c;
     char *ep = NULL;
 
-    while ((c = getopt(argc,argv,"s:c:S:R:m:oudbU")) != -1) {
+    while ((c = getopt(argc,argv,"s:c:S:R:m:oudbUx:")) != -1) {
 	switch(c) {
 	case 's':
 	    block_size = (int)strtol(optarg,&ep,10);
@@ -101,6 +104,13 @@ void parse_args(int argc,char **argv) {
 	    break;
 	case 'U':
 	    udp = 1;
+	    break;
+	case 'x':
+	    enc_cycles = (int)strtol(optarg,&ep,10);
+	    if (ep == optarg) {
+		usage(argv[0]);
+		exit(-1);
+	    }
 	    break;
 	default:
 	    break;
@@ -474,7 +484,7 @@ int main(int argc,char **argv) {
 		 */
 
 		//printf("going for another read\n");
-
+		int j;
 
 		if (!udp) {
 		    retval = read(send_client_fd,
@@ -588,18 +598,26 @@ int main(int argc,char **argv) {
 
 		    if (only_encrypt) {
 			gettimeofday(&t1,NULL);
-			sencrypt(buf,outbuf,bytesRead,
-				 k1,k2,iv);
+			j = enc_cycles;
+			while (j) {
+			    sencrypt(buf,outbuf,bytesRead,
+				     k1,k2,iv);
+			    --j;
+			}
 			gettimeofday(&t2,NULL);
 		    }
 		    else {
 			/* do a decrypt, then choose new iv, then encrypt. */
 			gettimeofday(&t1,NULL);
-			sdecrypt(buf,outbuf,bytesRead,
-				 k1,k2,iv);
-			iv = sgeniv();
-			sencrypt(buf,outbuf,bytesRead,
-				 k1,k2,iv);
+			j = enc_cycles;
+			while (j) {
+			    sdecrypt(buf,outbuf,bytesRead,
+				     k1,k2,iv);
+			    iv = sgeniv();
+			    sencrypt(buf,outbuf,bytesRead,
+				     k1,k2,iv);
+			    --j;
+			}
 			gettimeofday(&t2,NULL);
 		    }
 

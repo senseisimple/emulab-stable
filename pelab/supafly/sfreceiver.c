@@ -222,7 +222,7 @@ int main(int argc,char **argv) {
 	/* unmarshall to get id numbers */
 	unmarshall_block_hdr(buf,&hdr);
 	
-	fprintf(stdout,"TIME m%d b%d f%d %.4f\n",
+	fprintf(stdout,"TIME m%d b%d f%d %.6f\n",
 		hdr.msg_id,hdr.block_id,hdr.frag_id,
 		t1.tv_sec + t1.tv_usec / 1000000.0f);
 	++block_count;
