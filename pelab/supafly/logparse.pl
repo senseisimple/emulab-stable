@@ -190,7 +190,7 @@ foreach my $logtuple (@logs) {
 #			$bs{$str}{'S_send'};
 		    debug("$str oneway time = " . $tstats{$str}{'oneway'} . "\n");
 		    debug("$str rtt time = " . $tstats{$str}{'rtt'} . "\n");
-		    #debug("s = ".$bs{$str}{'S_send'}."; r = ".$bs{$str}{'R_recv'}."\n");
+		    debug("s = ".$bs{$str}{'S_send'}."; sa = ".$bs{$str}{'S_ack'}."\n");
 		}
 		
 		if (defined($bs{$str}{'M_cryptotime'})) {
