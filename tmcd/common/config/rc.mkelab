@@ -619,7 +619,7 @@ sub SetupFsNode()
     # Create the fs node.
     #
     $ENV{"PKG_PATH"} = "/packages";
-    my $pkg = "-P $emulabconfig{FS_PKG}";
+    my $pkg = "-P $emulabconfig{FS_PKG} -p /packages";
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
 	     "   perl fs-install $pkg -b");
 
