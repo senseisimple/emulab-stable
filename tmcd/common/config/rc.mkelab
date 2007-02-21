@@ -445,6 +445,9 @@ sub SetupFsNode()
     unlink("/etc/rc.d/netif-emulab")
 	if (-e "/etc/rc.d/netif-emulab");
 
+    goto skippkg
+	if ($NOSETUP);
+
     # XXX fer now: if not set, derive from the OPS info
     if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
 	$emulabconfig{FS_PKG_DIR} = $emulabconfig{OPS_PKG_DIR};
@@ -471,6 +474,7 @@ sub SetupFsNode()
 
     $ENV{"PKG_PATH"} = $emulabconfig{FS_PKG_DIR};
     mysystem("pkg_add $emulabconfig{FS_PKG} >/tmp/perrs 2>&1");
+  skippkg:
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
@@ -501,6 +505,15 @@ sub SetupFsNode()
     #
     mysystem("mkdir /share");
     mysystem("$BINDIR/mkextrafs.pl -f -s 2 /share");
+
+    #
+    # Lets mount the package dir so that we can pass off some stuff to
+    # the install scripts;
+    #
+    if (! -d "/packages") {
+	mysystem("mkdir /packages");
+    }
+    mysystem("mount ${fsname}:" . $emulabconfig{FS_PKG_DIR} . " /packages");
 
     #
     # Need these for rc.conf.
@@ -537,6 +550,8 @@ sub SetupFsNode()
     print RC "nfs_server_enable=\"YES\"\n";
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
+    print RC "smbd_enable=\"YES\"\n"
+	if ($WINSUPPORT);
     print RC "mountd_flags=\"-r -p 900\"\n";
 
     print RC "network_interfaces=\"$outer_controlif\"\n";
@@ -591,8 +606,19 @@ sub SetupFsNode()
 	     ($WINSUPPORT ? "--enable-windows" : "--disable-windows"));
 
     #
+    # XXX prepare is a destructive beast.  It will take out the ld hints
+    # file so ld.so won't have a search path.  Repair that now if it is gone
+    # since fs-install will want to start apps that need libraries from
+    # /usr/local/lib.
+    #
+    if (! -r "/var/run/ld-elf.so.hints") {
+	system("/etc/rc.d/ldconfig start");
+    }
+
+    #
     # Create the fs node.
     #
+    $ENV{"PKG_PATH"} = "/packages";
     my $pkg = "-P $emulabconfig{FS_PKG}";
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
 	     "   perl fs-install $pkg -b");
@@ -611,6 +637,23 @@ sub SetupFsNode()
     # prepare, or scale it back for inner elab. Needs more thought.
     #
     mysystem("killall mountd");
+    #
+    # Its worse on FreeBSD5! We lost the rpcbind socket too. Killing
+    # that means we have to restart nfsd so it can register.
+    #
+    if ($FBSD_VERSION >= 5) {
+	#
+	# The nfsd script will try to kill all nfsd processes, but once
+	# the master is killed, it kills all children itself.  Thus the
+	# nfsd script may fail to kill the children if they are already
+	# dead and return non-zero.  So we ignore the return value of
+	# the script by using system rather than mysystem.
+	#
+	system("/etc/rc.d/nfsd stop");
+	mysystem("killall rpcbind");
+	mysystem("rpcbind");
+	mysystem("/etc/rc.d/nfsd start");
+    }
     mysystem("mountd -r");
 
     #
@@ -634,10 +677,6 @@ sub SetupFsNode()
     mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
 	     "   >> /etc/rc.local");
 
-    # Ack, still waiting for new images.
-    mysystem("cp ${TBDIR}/testbed/src/testbed/tmcd/common/rc.inelab ".
-	     "   /usr/local/etc/emulab/rc/rc.inelab");
-
     return
 	if ($NOSETUP);
 
@@ -653,7 +692,7 @@ sub SetupFsNode()
     #
     # Copy the mirror tree into place. Do not use rsync.
     #
-    if ($domirror && -e "${TBDIR}/mirror") {
+    if (0 && -e "${TBDIR}/mirror") {
 	print "Copying mirror tree into place\n";
 	mysystem("cp -Rfp ${TBDIR}/mirror/ /");
     }
