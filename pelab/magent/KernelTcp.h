@@ -37,7 +37,6 @@ private:
   ConnectionState state;
   // Udp - CHANGES - Begin
   unsigned short udpCurSeqNum;
-  char udpPacketBuffer[1530];
   struct sockaddr_in udpLocalAddr;
   // Udp - CHANGES - End
   int peersock;
@@ -51,6 +50,7 @@ private:
 public:
   static pcap_t * pcapDescriptor;
   static int pcapfd;
+  static char udpPacketBuffer[66000];
   static void init(void);
   static void addNewPeer(fd_set * readable);
   static void readFromPeers(fd_set * readable);

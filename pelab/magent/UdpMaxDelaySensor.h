@@ -10,17 +10,19 @@
 #include "lib.h"
 #include "UdpPacketSensor.h"
 #include "UdpMinDelaySensor.h"
+#include "UdpLossSensor.h"
 #include "Sensor.h"
 
 class Sensor;
 class UdpPacketSensor;
 class UdpMinDelaySensor;
+class UdpLossSensor;
 struct UdpPacketInfo;
 
 class UdpMaxDelaySensor:public Sensor{
 	public:
 
-		explicit UdpMaxDelaySensor(UdpPacketSensor const *udpPacketSensorVal, UdpMinDelaySensor const *minDelaySensorVal);
+		explicit UdpMaxDelaySensor(UdpPacketSensor const *udpPacketSensorVal, UdpMinDelaySensor const *minDelaySensorVal, UdpLossSensor const *lossSensorVal);
 		~UdpMaxDelaySensor();
 
 
@@ -31,6 +33,7 @@ class UdpMaxDelaySensor:public Sensor{
 		unsigned long long maxDelay;
 		UdpPacketSensor const *packetHistory;
 		UdpMinDelaySensor const *minDelaySensor;
+		UdpLossSensor const *lossSensor;
 };
 
 #endif

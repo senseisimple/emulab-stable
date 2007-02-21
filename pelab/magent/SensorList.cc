@@ -409,12 +409,13 @@ void SensorList::pushUdpMaxDelaySensor()
 {
   pushUdpPacketSensor();
   pushUdpMinDelaySensor();
+  pushUdpLossSensor();
 
   // Example dependency check
   if (depUdpMaxDelaySensor == NULL)
   {
     logWrite(SENSOR, "Adding UdpMaxDelaySensor");
-    UdpMaxDelaySensor * newSensor = new UdpMaxDelaySensor(depUdpPacketSensor, depUdpMinDelaySensor);
+    UdpMaxDelaySensor * newSensor = new UdpMaxDelaySensor(depUdpPacketSensor, depUdpMinDelaySensor, depUdpLossSensor);
 
     std::auto_ptr<Sensor> current(newSensor);
     pushSensor(current);

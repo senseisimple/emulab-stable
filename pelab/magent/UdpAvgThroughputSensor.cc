@@ -47,8 +47,6 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 	memcpy(&numRedunAcksChar, &packet->payload[0], global::UCHAR_SIZE);
 	int numRedunAcks = static_cast<int>(numRedunAcksChar);
 
-	double avgThroughput = 0;
-
 	// This is the timestamp at the receiver, when the original packet was received.
 	unsigned long long currentAckTimeStamp = *(unsigned long long *)(packet->payload + 1 + 2*global::USHORT_INT_SIZE ); 
 	unsigned long long timeStamp = packet->packetTime.toMicroseconds();
@@ -103,18 +101,17 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 				tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
 				tmpUdpAck.isRedun = true;
 				tmpUdpAck.seqNum = redunSeqNum;
+				tmpUdpAck.numPackets = 1;
 
 
 				// We lost the record of the size of this packet due to libpcap
 				// loss, use the length echoed back in the ACK.
 				if((*vecIterator).isFake == true)
 				{
-					avgThroughput += 8000000.0*( static_cast<double> ( redunPacketSize ))  / ( static_cast<double>(ackTimeDiff - timeDiff)*1024.0 );
 					tmpUdpAck.packetSize = redunPacketSize;
 				}
 				else
 				{
-					avgThroughput += 8000000.0*( static_cast<double> ( (*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff - timeDiff)*1024.0 );
 					tmpUdpAck.packetSize = (*vecIterator).packetSize;
 				}
 
@@ -133,6 +130,7 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 	{
 		calculateTput(timeStamp, packet);
 		lastAckTime = currentAckTimeStamp;
+		logWrite(ERROR,"Error - Two UDP ACKs report the same receive time, for seqNum = %d",seqNum);
 		return;
 	}
 
@@ -149,18 +147,18 @@ void UdpAvgThroughputSensor::localAck(PacketInfo *packet)
 	// loss, use the length echoed back in the ACK.
 	if(packetHistory->isAckFake() == true)
 	{
-		avgThroughput += 8000000.0*( static_cast<double> (echoedPacketSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
 		tmpUdpAck.packetSize = echoedPacketSize;
 	}
 	else
 	{
-		avgThroughput += 8000000.0*( static_cast<double> ((*vecIterator).packetSize ))  / ( static_cast<double>(ackTimeDiff)*1024.0 );
 		tmpUdpAck.packetSize = (*vecIterator).packetSize;
 	}
 
-	tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
+	//tmpUdpAck.timeTaken = ackTimeDiff - timeDiff;
+	tmpUdpAck.timeTaken = ackTimeDiff;
 	tmpUdpAck.isRedun = false;
 	tmpUdpAck.seqNum = seqNum;
+	tmpUdpAck.numPackets = lossSensor->getPacketLoss() + 1;
 
 	ackList[queuePtr] = tmpUdpAck;
 	queuePtr = (queuePtr + 1)%MAX_SAMPLES;
@@ -185,23 +183,46 @@ void UdpAvgThroughputSensor::calculateTput(unsigned long long timeStamp, PacketI
 	int i, index;
 	unsigned long long timePeriod = 0;
 	long packetSizeSum = 0;
+	int packetCount = 0;
+	
+	int firstPacketIndex = (queuePtr -1 + MAX_SAMPLES)%MAX_SAMPLES;
+	bool heavyLossFlag = false;
 
-	for(i = 0;(i < sampleCount && timePeriod < MAX_TIME_PERIOD); i++)
+	if(ackList[firstPacketIndex].numPackets >= MAX_SAMPLES)
+	{
+		logWrite(SENSOR,"Setting heavy loss flag");
+		heavyLossFlag = true;
+	}
+
+	//for(i = 0;(i < sampleCount && timePeriod < MAX_TIME_PERIOD); i++)
+	for(i = 0;i < sampleCount; i = i + packetCount)
 	{
 		index = (queuePtr -1 - i + MAX_SAMPLES)%MAX_SAMPLES;
 
+		if(i + ackList[index].numPackets >= MAX_SAMPLES)
+		{
+			if(heavyLossFlag == false)
+			{
+				logWrite(SENSOR,"Breaking out of Tput loop");
+				break;
+			}
+			else
+				heavyLossFlag = false;
+		}
+
 		timePeriod += ackList[index].timeTaken;
 		packetSizeSum += ackList[index].packetSize;
+		packetCount = ackList[index].numPackets;
 	}
 
 	// Avoid dividing by zero.
 	if(timePeriod == 0)
 	{
-		logWrite(ERROR, "Timeperiod is zero in UdpAvgThroughput calculation");
+		logWrite(ERROR, "Timeperiod is zero in UdpAvgThroughput calculation, i = %d, index = %d, seqNum = %d", i, index, ackList[index].seqNum);
 		return;
 	}
 
-	if(timePeriod > 5000000)
+	if(timePeriod > 50000000)
 	{
 		logWrite(ERROR, " Incorrect UdpAvgThroughput timePeriod = %llu, bytes = %d, i = %d, numSamples = %d, sampleCount = %d queuePtr = %d", timePeriod, packetSizeSum, i,numSamples,sampleCount, queuePtr);
 		int k;

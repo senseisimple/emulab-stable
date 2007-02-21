@@ -39,6 +39,7 @@ namespace
 
 pcap_t * KernelTcp::pcapDescriptor = NULL;
 int KernelTcp::pcapfd = -1;
+char  KernelTcp::udpPacketBuffer[66000] = "";
 
 KernelTcp::KernelTcp()
   : state(DISCONNECTED)
@@ -345,11 +346,11 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
 
   // Indicate to the server the version of the format in which our data packets are.
   unsigned char serverVersion = 2;
-  memcpy(&udpPacketBuffer[0], &serverVersion, sizeof(unsigned char));
+  memcpy(&KernelTcp::udpPacketBuffer[0], &serverVersion, sizeof(unsigned char));
 
   // Put the sequence number of the packet.
-  unsigned short networkOrder_udpCurSeqNum = htons(udpCurSeqNum);
-  memcpy(&udpPacketBuffer[1],&networkOrder_udpCurSeqNum, global::USHORT_INT_SIZE);
+  unsigned short int networkOrder_udpCurSeqNum = htons(udpCurSeqNum);
+  memcpy(&KernelTcp::udpPacketBuffer[1],&networkOrder_udpCurSeqNum, global::USHORT_INT_SIZE);
 
   // Copy the size of the packet.. This can be used
   // by the sensors in case they miss this packet
@@ -358,7 +359,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // sender are echoed in the ACKs.
 
   unsigned short networkOrder_size = (size);
-  memcpy(&udpPacketBuffer[1 + global::USHORT_INT_SIZE],&networkOrder_size, global::USHORT_INT_SIZE);
+  memcpy(&KernelTcp::udpPacketBuffer[1 + global::USHORT_INT_SIZE],&networkOrder_size, global::USHORT_INT_SIZE);
 
   // Copy the timestamp of when this packet is being sent.
 
@@ -368,7 +369,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   // this packet because of a libpcap buffer overflow.
   unsigned long long curTime = getCurrentTime().toMicroseconds();
   curTime = (curTime);
-  memcpy(&udpPacketBuffer[1 + 2*global::USHORT_INT_SIZE], &curTime, global::ULONG_LONG_SIZE);
+  memcpy(&KernelTcp::udpPacketBuffer[1 + 2*global::USHORT_INT_SIZE], &curTime, global::ULONG_LONG_SIZE);
 
   bool socketConnectedFlag = true;
 
@@ -394,7 +395,7 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
   remoteServAddr.sin_port = htons(result.planet.remotePort);
 
   int flags = 0;
-  int bytesWritten = sendto(peersock, udpPacketBuffer, size, flags,
+  int bytesWritten = sendto(peersock, KernelTcp::udpPacketBuffer, size, flags,
   (struct sockaddr *) &remoteServAddr,
   sizeof(remoteServAddr));
 

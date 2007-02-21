@@ -21,6 +21,7 @@ struct UdpAck {
 	long packetSize;
 	unsigned short seqNum;
 	bool isRedun;
+	int numPackets;
 };
 
 
@@ -46,7 +47,7 @@ class UdpAvgThroughputSensor:public Sensor{
 		double throughputKbps;
 		int lastSeenThroughput;
 
-		UdpAck ackList[100];
+		UdpAck ackList[MAX_SAMPLES];
 		int numSamples;
 		int queuePtr;
 };

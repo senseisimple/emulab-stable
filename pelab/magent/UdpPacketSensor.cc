@@ -5,6 +5,7 @@
  */
 
 #include "UdpPacketSensor.h"
+#include "CommandOutput.h"
 
 using namespace std;
 

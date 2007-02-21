@@ -31,7 +31,9 @@ long long Time::toMilliseconds(void) const
 // Udp - CHANGES - Begin
 unsigned long long Time::toMicroseconds(void) const
 {
-  unsigned long long result = data.tv_sec * 1000 * 1000 + data.tv_usec;
+  unsigned long long result_sec = data.tv_sec; 
+  unsigned long long result_usec = data.tv_usec;
+  unsigned long long result = result_sec*1000000 + result_usec;
   return result;
 }
 // Udp - CHANGES - End
