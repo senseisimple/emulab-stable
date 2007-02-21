@@ -297,9 +297,9 @@ sub isCmdValid($)
 
 	    #for now, just limit duration if bw period is low
 	    if( $cmdref->{testper} < 600 && 
-		$cmdref->{duration} > 120 )
+		$cmdref->{duration} > 1200 )
 	    {
-		$cmdref->{duration} = "120";
+		$cmdref->{duration} = "1200";
 		$cmdref->{testper} = "600";
 	    }
 	    #limit duration, if testper is given with a duty-cycle
@@ -307,7 +307,8 @@ sub isCmdValid($)
 	    elsif( $cmdref->{duration} > 120 &&
 		    $cmdref->{testper} < ($numDest-1) * 5 * 1/.20 )
 	    {
-		$cmdref->{duration} = "120";
+                #TODO: Commented out to prevent problems in our own tests.
+		#$cmdref->{duration} = "120";
 	    }
 	}
     }
