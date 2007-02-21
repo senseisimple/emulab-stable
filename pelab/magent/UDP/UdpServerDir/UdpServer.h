@@ -70,6 +70,7 @@ struct ClientInfo{
 	struct udpAck ackQueue[ackQueueSize];
 	unsigned int curSeqNum;
 	int packetLoss;
+	unsigned long long clientEpoch;
 };
 
 struct CompareAddresses
