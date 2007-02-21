@@ -26,6 +26,7 @@ $optargs = OptionalPageArguments("template",      PAGEARG_TEMPLATE,
 				 "submit",        PAGEARG_STRING,
 				 "metadata",      PAGEARG_METADATA,
 				 "metadata_type", PAGEARG_STRING,
+				 "referrer",      PAGEARG_STRING,
 				 "formfields",    PAGEARG_ARRAY);
 
 # Need these below.
@@ -39,7 +40,7 @@ $unix_gid = $template->UnixGID();
 #
 function SPITFORM($action, $formfields, $errors)
 {
-    global $template, $metadata;
+    global $template, $metadata, $referrer;
     global $metadata_type;
 
     $template_guid = $template->guid();
@@ -93,6 +94,10 @@ function SPITFORM($action, $formfields, $errors)
     
     echo "<form action='${url}&action=$action' method=post>\n";
     echo "<table align=center border=1>\n";
+
+    if (isset($referrer) && $referrer != "") {
+	echo "<input type=hidden name=referrer value='$referrer'>";
+    }
 
     #
     # Template GUID and Version. These are read-only fields.
@@ -253,7 +258,8 @@ if (!isset($submit)) {
     else {
 	$defaults["name"]  = "";
 	$defaults["value"] = "";
-    }	
+    }
+    $referrer = $_SERVER['HTTP_REFERER'];
     
     #
     # Allow formfields that are already set to override defaults
@@ -333,7 +339,7 @@ if ($action == "add") {
 	$errors["Metadata Name"] = "Name already in use";
     }
     if (isset($metadata_type)) {
-	$command_opts .= "-t $metadata_type ";
+	$command_opts .= "-t " . escapeshellarg($metadata_type) . " ";
     }
     $command_opts .= "-a add " . escapeshellarg($formfields["name"]);
 }
@@ -383,6 +389,16 @@ if (isset($metadata_type)) {
     }
     elseif ($metadata_type == "parameter_description") {
 	if (!TBvalid_template_parameter_description($formfields["value"])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "instance_description") {
+	if (!TBvalid_template_instance_description($formfields["value"])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "run_description") {
+	if (!TBvalid_experiment_run_description($formfields["value"])) {
 	    $errors["Description"] = TBFieldErrorString();
 	}
     }
@@ -444,5 +460,9 @@ if ($retval) {
     return;
 }
 
-header("Location: ".
-       "template_show.php?guid=$template_guid&version=$template_vers");
+if (isset($referrer)) {
+    header("Location: $referrer");
+}
+else {
+    header("Location: ". CreateURL("template_show", $template));
+}

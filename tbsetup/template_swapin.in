@@ -59,9 +59,6 @@ my $BOSSNODE    = "@BOSSNODE@";
 my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 
 # Locals
-my $user_name;
-my $user_email;
-my $dbuid;
 my $EVhandle;
 my $template;
 my $instance;
@@ -98,6 +95,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
 use Template;
 use Experiment;
 use event;
@@ -128,22 +126,19 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $user_uid   = $this_user->uid();
 
 #
 # Before doing anything else, check for overquota ... lets not waste
 # our time. Make sure user sees the error by exiting with 1.
 #
-if (system("$checkquota $dbuid") != 0) {
+if (system("$checkquota $user_uid") != 0) {
     tberror("You are over your disk quota on $CONTROL; ".
 	    "please login there and cleanup!");
     exit(1);
@@ -169,7 +164,7 @@ $template = Template->Lookup($guid, $version);
 if (!defined($template)) {
     tbdie("Experiment template $guid/$version does not exist!");
 }
-if (! TBProjAccessCheck($dbuid,
+if (! TBProjAccessCheck($user_uid,
 			$template->pid(), $template->gid(),
 			TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to instantiate template ".
@@ -381,7 +376,7 @@ if ($?) {
 #
 # All instances currently start with a default run.
 #
-$run = $instance->NewRun($eid, $instance->description());
+$run = $instance->NewRun($eid, $this_user, $instance->description());
 if (!defined($run)) {
     fatal(-1, "Could not create new experiment run for $instance!");
 }
