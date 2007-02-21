@@ -7,7 +7,7 @@
 #include "UdpServer.h"
 
 #define MAX_MSG 1524
-#define SNAPLEN 128
+#define SNAPLEN 100
 
 // Libpcap file descriptor.
 pcap_t *pcapDescriptor = NULL;
@@ -31,6 +31,8 @@ int localServerPort;
 std::map<struct ClientAddress, ClientInfo, CompareAddresses> ClientMap;
 
 bool useMinAcksFlag = true;
+struct pcap_stat pcapStats;
+long currentPcapLoss = 0;
 
 // Convert the argument to microseconds.
 unsigned long long getPcapTimeMicro(const struct timeval *tp)
@@ -84,6 +86,7 @@ void handleUDP_Version_1(struct pcap_pkthdr const *pcap_info, struct udphdr cons
 	{
 		ClientInfo clientInfo;
 
+		
 		ClientMap[clientAddr] = clientInfo;
 		clientIter = ClientMap.find(clientAddr);
 	}
@@ -272,8 +275,17 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
 	{
 		ClientInfo clientInfo;
 
+		clientInfo.clientEpoch = getPcapTimeMicro(&pcap_info->ts);
 		ClientMap[clientAddr] = clientInfo;
 		clientIter = ClientMap.find(clientAddr);
+	}
+
+	pcap_stats(pcapDescriptor, &pcapStats);
+
+	if(pcapStats.ps_drop > currentPcapLoss)
+	{
+		 currentPcapLoss = pcapStats.ps_drop;
+		 printf("STAT::Number of packets lost in libpcap = %d\n",currentPcapLoss);
 	}
 
         // Get a pointer to the start of the data portion of the packet.
@@ -312,11 +324,13 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
         // we saw, then send an acknowledgement for it. Otherwise, ignore the
         // packet - it arrived out of order.
 
-	printf("%s:%d Received seqNum=%d,size=%d\n", inet_ntoa(ipPacket->ip_src),sourcePort , packetSeqNum,recvPacketLen);
+                packetLibpcapTimestamp = getPcapTimeMicro(&pcap_info->ts);
+//	printf("%d - %s:%d Received seqNum=%u,size=%u\n", (packetLibpcapTimestamp - clientIter->second.clientEpoch)/1000000, inet_ntoa(ipPacket->ip_src),sourcePort , packetSeqNum,recvPacketLen);
+//	printf("Received seqNum=%u,size=%u\n", packetSeqNum,recvPacketLen);
 //	printf("Packet loss = %d\n", clientIter->second.packetLoss);
 	if(packetSeqNum == clientIter->second.curSeqNum)
 	{
-		printf("This is a duplicate packet\n\n");
+		printf("This=%d is a duplicate packet\n\n",packetSeqNum);
 		return;
 	}
 	// Ignore loopback packets.
@@ -404,13 +418,16 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
                 // The ACK packet must be the same size as the original UDP
                 // packet that was received - this is needed so that the
                 // one way delay can be calculated as RTT/2.
-                if( (udpLen) > ackLength)
-                        ackLength = udpLen;
+		if(useMinAcksFlag == false)
+		{
+			if( (udpLen) > ackLength)
+				ackLength = udpLen;
+		}
 
                 // This indicates where the redundant ACKs start in the packet.
                 int redunAckStart = 1 + 2*globalConsts::USHORT_INT_SIZE + 2*globalConsts::ULONG_LONG_SIZE;
 		int index = (clientIter->second.queueEndPtr + 1 - numAcks + ackQueueSize)%ackQueueSize;
-		printf("#Redundant Acks=%d\n", numAcks);
+	//	printf("#Redundant Acks=%d\n", numAcks);
                // Copy the redundant ACKs.
                 for(int i = 0;i < numAcks; i++)
                 {
@@ -425,7 +442,7 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
                         // Copy the time diffrence between when this packet was received
                         // and when the latest packet being ACKed was received here.
                         memcpy(&appAck[redunAckStart + i*ackSize + 2*globalConsts::USHORT_INT_SIZE], &timeDiff, globalConsts::ULONG_LONG_SIZE);
-			printf("Redun Ack=%d,TimeDiff=%llu,byte=%d\n",clientIter->second.ackQueue[index].seqNo, timeDiff, redunAckStart + i*ackSize);
+	//		printf("Redun Ack=%d,TimeDiff=%llu,byte=%d\n",clientIter->second.ackQueue[index].seqNo, timeDiff, redunAckStart + i*ackSize);
 
 			index = (index + 1)%ackQueueSize;
                 }
@@ -617,7 +634,7 @@ int main(int argc, char *argv[])
 
 	/* server infinite loop */
 	while(true) 
-		pcap_dispatch(pcapDescriptor, -1, pcapCallback, NULL);
+		pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL);
 
 
 	return 0;
