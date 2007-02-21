@@ -110,7 +110,7 @@ if (! defined($this_user)) {
 }
 my $this_uid = $this_user->uid();
 
-if (system("$CHOWN -R $this_uid $pathname")) {
+if (system("$CHOWN -h -R $this_uid $pathname")) {
     die("*** $0:\n".
 	"    Failed: '$CHOWN -R $this_uid $pathname'\n");
 }
