@@ -381,7 +381,7 @@ if ($?) {
 #
 # All instances currently start with a default run.
 #
-$run = $instance->NewRun($eid, $this_user, $instance->description());
+$run = $instance->NewRun($eid, $instance->description());
 if (!defined($run)) {
     fatal(-1, "Could not create new experiment run for $instance!");
 }

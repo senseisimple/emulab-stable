@@ -1079,10 +1079,6 @@ class TemplateInstance
 	return (is_null($this->instance) ? -1 :
 		$this->instance['pause_time']);
     }
-    function description() {
-	return (is_null($this->instance) ? -1 :
-		$this->instance['description']);
-    }
     function template() {
 	return (is_null($this->instance) ? -1 : $this->template);
     }
@@ -1122,14 +1118,8 @@ class TemplateInstance
 	$uid     = $this->uid();
 	$start   = $this->start_time();
 	$stop    = $this->stop_time();
-	$description = $this->description();
-	$template    = $this->template();
-	$pcount      = $template->ParameterCount();
-
-	# Instance descriptions are metatdata that can be changed.
-	# But use a naming convention. 
-	$desc_metaname = "__instance_description_$exptidx";
-	$desc_metadata = $template->LookupMetadataByName($desc_metaname);
+	$template= $this->template();
+	$pcount  = $template->ParameterCount();
 
 	if (! ($user = User::Lookup($uid))) {
 	    TBERROR("Could not lookup object for user $uid", 1);
@@ -1159,37 +1149,6 @@ class TemplateInstance
 		 MakeLink("template",
 			  "guid=$guid&version=$vers", "$guid/$vers"));
 	ShowItem("ID",          $exptidx);
-
-	if ($description && $description != "") {
-	    $onmouseover = MakeMouseOver($description);
-	    if (strlen($description) > 40) {
-		$description = substr($description, 0, 40) . " <b>... </b>";
-	    }
-	}
-	else {
-	    $onmouseover = "";
-	    $description = "Click to Add";
-	}
-
-	# If no metadata, assume its for an instance prior to modifiable
-	# instance descriptions.
-	if ($desc_metadata) {
-	    $desc_anchor = 
-		MakeAnchor(CreateURL("template_metadata",
-				     $template, $desc_metadata) .
-			   "&action=modify",
-			   $description, $onmouseover);
-	}
-	else {
-	    $desc_anchor = 
-		MakeAnchor(CreateURL("template_metadata", $template) .
-			   "&action=add".
-			   "&metadata_type=instance_description".
-			   "&formfields[name]=${desc_metaname}",
-			   $description, $onmouseover);
-	}
-        ShowItem("Description", $desc_anchor);
-	
 	if ($this->experiment) {
 	    ShowItem("Experiment",  MakeAnchor($showexp_url, $this->eid()));
 	}
@@ -1619,7 +1578,6 @@ class TemplateInstance
 	$exptidx = $this->exptidx();
 	$guid    = $this->guid();
 	$vers    = $this->vers();
-	$template= $this->template();
 	
 	$query_result =
 	    DBQueryFatal("select r.* from experiment_runs as r ".
@@ -1637,11 +1595,6 @@ class TemplateInstance
 	$start_tag   = $row['starting_archive_tag'];
 	$end_tag     = $row['ending_archive_tag'];
 	$description = $row['description'];
-
-	# Run descriptions are metatdata that can be changed.
-	# But use a naming convention. 
-	$desc_metaname = "__run_description_${exptidx}_${runidx}";
-	$desc_metadata = $template->LookupMetadataByName($desc_metaname);
 
 	if (!isset($stop))
 	    $stop = "&nbsp";
@@ -1664,41 +1617,26 @@ class TemplateInstance
 	ShowItem("Instance",
 		 MakeLink("instance", "instance=$exptidx", "$exptidx"));
 	ShowItem("ID",          $runidx);
-
-	if ($description && $description != "") {
-	    $onmouseover = MakeMouseOver($description);
-	    if (strlen($description) > 40) {
-		$description = substr($description, 0, 40) . " <b>... </b>";
-	    }
-	}
-	else {
-	    $onmouseover = "";
-	    $description = "Click to Add";
-	}
-
-	# If no metadata, assume its for an instance prior to modifiable
-	# instance descriptions.
-	if ($desc_metadata) {
-	    $desc_anchor = 
-		MakeAnchor(CreateURL("template_metadata",
-				     $template, $desc_metadata) .
-			   "&action=modify",
-			   $description, $onmouseover);
-	}
-	else {
-	    $desc_anchor = 
-		MakeAnchor(CreateURL("template_metadata", $template) .
-			   "&action=add".
-			   "&metadata_type=run_description".
-			   "&formfields[name]=${desc_metaname}",
-			   $description, $onmouseover);
-	}
-        ShowItem("Description", $desc_anchor);
 	ShowItem("Started",     $start);
 	ShowItem("Stopped",     $stop);
 	ShowItem("Start Tag",   $start_tag);
 	ShowItem("End Tag",     $end_tag);
-	
+
+	if (isset($description) && $description != "") {
+	    echo "<tr>
+                     <td align=center colspan=2>
+                      Description
+                     </td>
+                  </tr>
+                  <tr>
+                     <td colspan=2 align=center class=left>
+                         <textarea readonly
+                            rows=5 cols=50>" .
+		            ereg_replace("\r", "", $description) .
+		         "</textarea>
+                  </td>
+              </tr>\n";
+	}
 	echo "</table>\n";
 	echo "</td>\n";
 
@@ -2333,16 +2271,6 @@ function TBvalid_template_metadata_value($token) {
 function TBvalid_template_metadata_type($token) {
     return TBcheck_dbslot($token, "experiment_template_metadata",
 			  "metadata_type",
-			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
-}
-function TBvalid_template_instance_description($token) {
-    return TBcheck_dbslot($token, "experiment_template_instances",
-			  "description",
-			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
-}
-function TBvalid_experiment_run_description($token) {
-    return TBcheck_dbslot($token, "experiment_runs",
-			  "description",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
 

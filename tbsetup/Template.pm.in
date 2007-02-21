@@ -674,7 +674,7 @@ sub NewMetadata($$$$;$)
 
     # Current set of allowed types;
     my @okay_types = ("tid", "template_description", "parameter_description",
-		      "annotation", "instance_description", "run_description");
+		      "annotation");
 
     if (defined($type)) {
 	if (! grep {$_ eq $type} @okay_types) {
@@ -712,32 +712,15 @@ sub NewMetadata($$$$;$)
     # Some metadata is special ...
     if (defined($type)) {
 	if ($type eq "parameter_description") {
-	    DBQueryWarn("update experiment_template_parameters set ".
-			"   metadata_guid='$guid', ".
-			"   metadata_vers='$version' ".
-			"where parent_guid='$template_guid' and ".
-			"      parent_vers='$template_vers' and ".
-			"      name=$safename")
-		or return -1;
- 	}
-	elsif ($type eq "instance_description" &&
-	       $name =~ /^__instance_description_(\d*)$/) {
-	    my $exptidx = $1;
-	    
-	    DBQueryWarn("update experiment_template_instances set ".
-			"  description=$safevalue ".
-			"where exptidx='$exptidx'")
-		or return -1;
-	}
-	elsif ($type eq "run_description" &&
-	       $name =~ /^__run_description_(\d*)_(\d*)$/) {
-	    my $exptidx = $1;
-	    my $runidx  = $2;
-	    
-	    DBQueryWarn("update experiment_runs set ".
-			"  description=$safevalue ".
-			"where exptidx='$exptidx' and idx='$runidx'")
-		or return -1;
+	    $query_result =
+		DBQueryWarn("update experiment_template_parameters set ".
+			    "   metadata_guid='$guid', ".
+			    "   metadata_vers='$version' ".
+			    "where parent_guid='$template_guid' and ".
+			    "      parent_vers='$template_vers' and ".
+			    "      name=$safename");
+	    return -1
+		if (!$query_result);
 	}
     }
     
@@ -812,8 +795,8 @@ sub ModifyMetadata($$$$)
     return -1
 	if ($already_exists <= 0);
 
-    my $safename  = DBQuoteSpecial($name);
-    my $safevalue = DBQuoteSpecial(encode_entities($value));
+    $name  = DBQuoteSpecial($name);
+    $value = DBQuoteSpecial(encode_entities($value));
 
     DBQueryWarn("lock tables experiment_template_metadata_items write")
 	or return -1;
@@ -838,7 +821,7 @@ sub ModifyMetadata($$$$)
 		     "     uid='$creator_uid', uid_idx='$creator_dbid', ".
 		     "     parent_guid='$parent_guid',".
 		     "     parent_vers='$parent_vers'," .
-		     "     name=$safename, value=$safevalue, created=now()")) {
+		     "     name=$name, value=$value, created=now()")) {
 	DBQueryWarn("unlock tables");
 	return -1;
     }
@@ -858,7 +841,7 @@ sub ModifyMetadata($$$$)
     #
     if (defined($metadata_type)) {
 	if ($metadata_type eq "tid") {
-	    DBQueryWarn("update experiment_templates set tid=$safevalue ".
+	    DBQueryWarn("update experiment_templates set tid=$value ".
 			"where guid='$template_guid' and ".
 			"      vers='$template_vers'")
 		or return -1;
@@ -868,8 +851,7 @@ sub ModifyMetadata($$$$)
 	    Template::mysystem("$makegraph $template_guid");
 	}
 	elsif ($metadata_type eq "template_description") {
-	    DBQueryWarn("update experiment_templates set ".
-			"   description=$safevalue ".
+	    DBQueryWarn("update experiment_templates set description=$value ".
 			"where guid='$template_guid' and ".
 			"      vers='$template_vers'")
 		or return -1;
@@ -882,27 +864,8 @@ sub ModifyMetadata($$$$)
 			"   metadata_vers='$metadata_vers' ".
 			"where parent_guid='$template_guid' and ".
 			"      parent_vers='$template_vers' and ".
-			"      name=$safename")
-		or return -1;
-	}
-	elsif ($metadata_type eq "instance_description" &&
-	       $name =~ /^__instance_description_(\d*)$/) {
-	    my $exptidx = $1;
-	    
-	    DBQueryWarn("update experiment_template_instances set ".
-			"  description=$safevalue ".
-			"where exptidx='$exptidx'")
-		or return -1;
-	}
-	elsif ($metadata_type eq "run_description" &&
-	       $name =~ /^__run_description_(\d*)_(\d*)$/) {
-	    my $exptidx = $1;
-	    my $runidx  = $2;
-	    
-	    DBQueryWarn("update experiment_runs set ".
-			"  description=$safevalue ".
-			"where exptidx='$exptidx' and idx='$runidx'")
-		or return -1;
+			"      name=$name")
+		or return -1
 	}
     }
     return 0;
@@ -1297,7 +1260,7 @@ sub MetadataList($$)
 #
 # Create a new Instance record, using the package below.
 #
-sub NewInstance($$$;$)
+sub NewInstance($$$)
 {
     my ($self, $eid, $creator, $description) = @_;
 
@@ -1313,21 +1276,10 @@ sub NewInstance($$$;$)
     $args{'eid'}         = $eid;
     $args{'uid'}         = $creator->uid();
     $args{'uid_idx'}     = $creator->uid_idx();
+    $args{'description'} = $description
+	if (defined($description));
 
-    my $newinstance = Template::Instance->Create(\%args);
-    return undef
-	if (!defined($newinstance));
-
-    #
-    # The description is versioned metadata the user can modify.
-    #
-    if (defined($description)) {
-	my $exptidx = $newinstance->exptidx();
-    
-	$self->NewMetadata("__instance_description_${exptidx}", $description,
-			   $creator, "instance_description");
-    }
-    return $newinstance;
+    return Template::Instance->Create(\%args);
 }
 
 #
@@ -1811,12 +1763,25 @@ sub LookupByExptidx($$)
 sub Create($$)
 {
     my ($class, $argref) = @_;
+    my $description;
 
     return undef
 	if (ref($class));
 
+    # must treat specially.
+    if (exists($argref->{'description'})) {
+	$description = DBQuoteSpecial($argref->{'description'});
+	delete($argref->{'description'});
+    }
+
     my $query = "insert into experiment_template_instances set ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    if (defined($description)) {
+	$query .= ", "
+	    if (defined($argref) && scalar(keys%{$argref}));
+	$query .= "description=$description";
+    }
 
     my $query_result = DBQueryWarn($query);
     return undef
@@ -2239,9 +2204,9 @@ sub DeleteBindings($)
 #
 # Run records are also integral to Template Instances. 
 #
-sub NewRun($$$;$)
+sub NewRun($$;$)
 {
-    my ($self, $runid, $this_user, $description) = @_;
+    my ($self, $runid, $description) = @_;
 
     # Must be a real reference. 
     return undef
@@ -2262,16 +2227,6 @@ sub NewRun($$$;$)
 	$run->Delete();
 	return undef;
     }
-
-    #
-    # The description is versioned metadata the user can modify.
-    #
-    if (defined($description) && $description ne "") {
-	$self->template()->NewMetadata("__run_description_${idx}_${runidx}",
-				       $description, 
-				       $this_user, "run_description");
-    }
-    
     Refresh($self);
     return $run;
 }
@@ -3389,18 +3344,24 @@ sub Stringify($)
 #
 # Create a new run object.
 #
-sub Create($$$$)
+sub Create($$$;$)
 {
     my ($class, $instance, $runid, $description) = @_;
 
     return undef
 	if (ref($class));
 
-    my $exptidx  = $instance->exptidx();
+    my $exptidx = $instance->exptidx();
+    my $dclause = "";
+
+    if (defined($description) && $description ne "") {
+	$description = DBQuoteSpecial($description);
+	$dclause     = "description=$description , ";
+    }
 
     my $query_result =
 	DBQueryWarn("insert into experiment_runs set ".
-		    "   exptidx='$exptidx', runid='$runid' ");
+		    "   $dclause exptidx='$exptidx', runid='$runid' ");
 
     return undef
 	if (! $query_result);
