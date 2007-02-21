@@ -716,7 +716,7 @@ CREATE TABLE `experiment_template_metadata` (
   `metadata_vers` smallint(5) unsigned NOT NULL default '0',
   `internal` tinyint(1) NOT NULL default '0',
   `hidden` tinyint(1) NOT NULL default '0',
-  `metadata_type` enum('tid','template_description','parameter_description', 'annotation','instance_description', 'run_description') default NULL,
+  `metadata_type` enum('tid','template_description','parameter_description','annotation','instance_description','run_description') default NULL,
   PRIMARY KEY  (`parent_guid`,`parent_vers`,`metadata_guid`,`metadata_vers`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
