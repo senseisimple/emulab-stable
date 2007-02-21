@@ -5,7 +5,7 @@
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 
 PORTNAME=	emulab-fs
-.if ${OSMAJOR} >= 5
+.if ${OSMAJOR} >= 6
 PORTVERSION=	2.0
 .else
 PORTVERSION=	1.4
@@ -36,9 +36,12 @@ MAINTAINER=	hibler@cs.utah.edu
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	sudo:${PORTSDIR}/security/sudo \
-	rsync:${PORTSDIR}/net/rsync \
-	smbd:${PORTSDIR}/net/samba3
+	rsync:${PORTSDIR}/net/rsync
 
+.if ${OSMAJOR} >= 6
+.else
+RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
+.endif
 
 NO_BUILD=	yes
 
