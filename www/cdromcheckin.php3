@@ -113,7 +113,7 @@ if (! mysql_num_rows($query_result)) {
     return;
 }
 $row    = mysql_fetch_array($query_result);
-$cdvers = $row[version];
+$cdvers = $row["version"];
 
 #
 # Node is requesting latest instructions. Give it the script. This could
@@ -201,7 +201,7 @@ if (!mysql_num_rows($query_result)) {
     return;
 }
 $warow  = mysql_fetch_array($query_result);
-$privIP = $warow[IP];
+$privIP = $warow["IP"];
 
 #
 # If the node is reporting that its finished updating, then make its
