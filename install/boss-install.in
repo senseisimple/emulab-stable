@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -65,8 +65,10 @@ my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $TOUCH      = "/usr/bin/touch";
-my $SSH        = "/usr/bin/ssh";
-my $SCP        = "/usr/bin/scp";
+my $SSH_INIT   = "/usr/bin/ssh -1";
+my $SCP_INIT   = "/usr/bin/scp -1";
+my $SSH        = "/usr/bin/ssh -2";
+my $SCP        = "/usr/bin/scp -2";
 my $CP         = "/bin/cp";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
@@ -93,7 +95,7 @@ my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $INETD_CONF      = "/etc/inetd.conf";
 
-my $ROOT_PRIVKEY    = "/root/.ssh/identity";
+my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
 my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
 
@@ -911,7 +913,7 @@ Phase "php.ini", "Creating php.ini file", sub {
 Phase "ssh", "Setting up root ssh from boss to ops", sub {
     Phase "keygen", "Creating root private key", sub {
 	DoneIfExists($ROOT_PRIVKEY);
-	ExecQuietFatal("$SSH_KEYGEN -t rsa1 -P '' -f $ROOT_PRIVKEY");
+	ExecQuietFatal("$SSH_KEYGEN -t rsa -P '' -f $ROOT_PRIVKEY");
     };
     #
     # Stick it into the DB.
@@ -935,7 +937,7 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
 	    PhaseSkip("Key already copied");
 	} else {
-	    ExecQuietFatal("$SCP -i $INIT_PRIVKEY ".
+	    ExecQuietFatal("$SCP_INIT -i $INIT_PRIVKEY ".
 			   "$ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
 
 	    # Copy hosts keys to ops.
@@ -957,7 +959,7 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${FSNODE} pwd")) {
 	    PhaseSkip("Key already copied");
 	} else {
-	    ExecQuietFatal("$SCP -i $INIT_PRIVKEY ".
+	    ExecQuietFatal("$SCP_INIT -i $INIT_PRIVKEY ".
 			   "$ROOT_PUBKEY ${FSNODE}:$ROOT_AUTHKEY");
 
 	    # Copy hosts keys to fs.
