@@ -460,7 +460,7 @@ sub ArchiveSavePoint($;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -572,7 +572,7 @@ sub ArchiveTag($;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -674,7 +674,7 @@ sub ArchiveCommit($;$$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -883,7 +883,7 @@ sub ArchiveFork($$;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -1049,7 +1049,7 @@ sub ArchiveCheckout($$;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -1135,6 +1135,10 @@ sub ArchiveArchive($$)
     $view = $defaultview
 	if (!defined($view));
 
+    return -1
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	    TBSCRIPTLOCK_OKAY());
+
     #
     # See if the archive exists and if it does, get the pathname to it.
     #
@@ -1142,7 +1146,7 @@ sub ArchiveArchive($$)
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
 	print STDERR "ArchiveArchive: ".
 	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
+	goto bad;
     }
 
     #
@@ -1152,23 +1156,23 @@ sub ArchiveArchive($$)
     my ($archived, $date_archived);
     
     if (IsArchiveArchived($archive_idx, \$archived, \$date_archived) < 0) {
-	return -1;
+	goto bad;
     }
     if ($archived) {
 	print STDERR "ArchiveArchive: ".
 	    "Archive '$archive_idx' already archived on $date_archived!\n";
-	return 0;
+	goto okay;
     }
 
     if (! -d $directory || ! -w $directory) {
 	print STDERR "ArchiveArchive: $directory cannot be written!\n";
-	return -1;
+	goto bad;
     }
 
     # Is it shared? If so, certainly do not archive it!
     my $shared;
     if (IsArchiveShared($archive_idx, \$shared) < 0) {
-	return -1;
+	goto bad;
     }
     if ($shared) {
 	print STDERR "ArchiveArchive: ".
@@ -1193,24 +1197,24 @@ sub ArchiveArchive($$)
 	    mysystem("$SUCHOWN $checkins");
 	}
 	mysystem("/bin/rm -rf $checkins $checkouts");
-	return 0;
+	goto okay;
     }
     
     if (! -e $target) {
 	if (! mkdir("$target", 0777)) {
 	    print STDERR "ArchiveArchive: Could not mkdir $target: $!\n";
-	    return -1;
+	    goto bad;
 	}
 	if (! chmod(0777, "$target")) {
 	    print STDERR "ArchiveArchive: ".
 		"Could not chmod directory $target: $!\n";
-	    return -1;
+	    goto bad;
 	}
     }    
     mysystem("$RSYNC -a --delete $directory/repo $target");
     if ($?) {
 	print STDERR "ArchiveArchive: Could not copy $directory/repo.\n";
-	return -1;
+	goto bad;
     }
 
     #
@@ -1221,15 +1225,22 @@ sub ArchiveArchive($$)
 		"   archived=1, ".
 		"   date_archived=UNIX_TIMESTAMP(now()) ".
 		"where idx='$archive_idx'")
-	or return -1;
+	or goto bad;
     
     mysystem("/bin/rm -rf $directory");
     if ($?) {
 	print STDERR "ArchiveArchive: ".
 	    "Could not remove contents of $directory!\n";
-	return -1;
+	goto bad;
     }
+
+  okay:
+    TBScriptUnlock();
     return 0;
+
+  bad:
+    TBScriptUnlock();
+    return -1;
 }
 
 #
@@ -1243,6 +1254,10 @@ sub ArchiveDestroy($$;$)
     $view = $defaultview
 	if (!defined($view));
 
+    return -1
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	    TBSCRIPTLOCK_OKAY());
+
     #
     # See if the archive exists and if it does, get the pathname to it.
     #
@@ -1250,7 +1265,7 @@ sub ArchiveDestroy($$;$)
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
 	print STDERR "ArchiveDestroy: ".
 	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
+	goto bad;
     }
 
     #
@@ -1260,22 +1275,22 @@ sub ArchiveDestroy($$;$)
     my ($archived, $date_archived);
     
     if (IsArchiveArchived($archive_idx, \$archived, \$date_archived) < 0) {
-	return -1;
+	goto bad;
     }
     if ($archived && !$clean) {
 	print STDERR "ArchiveDestroy: ".
 	    "Archive '$archive_idx' archived on $date_archived!\n";
-	return 0;
+	goto okay;
     }
     
     if (! -d $directory || ! -w $directory) {
-	return 0;
+	goto okay;
     }
 
     # Is it shared? If so, certainly do not delete it!
     my $shared;
     if (IsArchiveShared($archive_idx, \$shared) < 0) {
-	return -1;
+	goto bad;
     }
 
     if (! $shared) {
@@ -1283,7 +1298,7 @@ sub ArchiveDestroy($$;$)
 	if ($?) {
 	    print STDERR "ArchiveDestroy: ".
 		"Could not remove contents of $directory!\n";
-	    return -1;
+	    goto bad;
 	}
     }
     elsif ($clean) {
@@ -1294,7 +1309,7 @@ sub ArchiveDestroy($$;$)
 	if ($?) {
 	    print STDERR "ArchiveDestroy: ".
 		"Could not remove contents of $directory!\n";
-	    return -1;
+	    goto bad;
 	}
     }
     
@@ -1303,14 +1318,20 @@ sub ArchiveDestroy($$;$)
 		     "where archive_idx='$archive_idx' and view='$view'") &&
 	 DBQueryWarn("delete from archive_views ".
 		     "where archive_idx='$archive_idx' and view='$view'"))
-	    || return -1;
+	    || goto bad;
 	
 	if (! $shared) {
 	    DBQueryWarn("delete from archives ".
-			"where idx='$archive_idx'") || return -1;
+			"where idx='$archive_idx'") || goto bad;
 	}
     }
+  okay:
+    TBScriptUnlock();
     return 0;
+
+  bad:
+    TBScriptUnlock();
+    return -1;
 }
 
 #
