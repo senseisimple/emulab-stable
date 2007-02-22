@@ -929,7 +929,7 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	AppendToFileFatal($SSH_CONFIG,
 	    "Host *",
 	    "   StrictHostKeyChecking no",
-	    "   Protocol 1,2");
+	    "   Protocol 2,1");
     };
     Phase "keycopy", "Copy root ssh keys to ops and fs", sub {
 	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
