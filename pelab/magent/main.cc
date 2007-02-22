@@ -454,15 +454,12 @@ bool replayReadHeader(char * dest)
     switch (version)
     {
     case 0:
-      logWrite(ERROR, "case 0");
       result = replayRead(dest + Header::PREFIX_SIZE, Header::VERSION_0_SIZE);
       break;
     case 1:
-      logWrite(ERROR, "case 1");
       result = replayRead(dest + Header::PREFIX_SIZE, Header::VERSION_1_SIZE);
       break;
     default:
-      logWrite(ERROR, "replayReadHeader(): Unknown version: %d, type[0] %d, size[1]=%d, size[2]=%d, version[3]=%d", version, dest[0], dest[1], dest[2], dest[3]);
       result = false;
       break;
     }
@@ -495,15 +492,21 @@ void replayLoop(void)
     {
     case NEW_CONNECTION_COMMAND:
     {
-      map<ElabOrder, SensorList>::iterator current =
-        streams.insert(make_pair(head.key, SensorList())).first;
-      list<int>::iterator pos = global::replaySensors.begin();
-      list<int>::iterator limit = global::replaySensors.end();
-      SensorCommand tempSensor;
-      for (; pos != limit; ++pos)
+      done = ! replayRead(& packetBuffer[0], sizeof(char));
+      if (!done)
       {
-        tempSensor.type = *pos;
-        current->second.addSensor(tempSensor);
+        map<ElabOrder, SensorList>::iterator current =
+          streams.insert(make_pair(head.key, SensorList())).first;
+        list<int>::iterator pos = global::replaySensors.begin();
+        list<int>::iterator limit = global::replaySensors.end();
+        SensorCommand tempSensor;
+        for (; pos != limit; ++pos)
+        {
+          tempSensor.type = *pos;
+          current->second.addSensor(tempSensor);
+        }
+        unsigned char protocol = 0;
+        loadChar(& packetBuffer[0], & protocol);
       }
     }
       break;

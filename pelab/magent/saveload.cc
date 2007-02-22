@@ -422,7 +422,6 @@ char * loadHeader(char * buffer, Header * value)
     char * pos = buffer;
     pos = loadChar(pos, &(value->type));
     pos = loadShort(pos, &(value->size));
-//    logWrite(ERROR, "Value->size: %d", value->size);
     pos = loadChar(pos, &(value->version));
     switch(value->version)
     {
