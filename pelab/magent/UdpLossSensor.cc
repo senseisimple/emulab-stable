@@ -49,8 +49,9 @@ void UdpLossSensor::localAck(PacketInfo *packet)
 
 	while(vecIterator != unAckedPackets.end())
 	{
-		if(seqNum > (*vecIterator).seqNum + 10 || ( timeStamp > (*vecIterator).timeStamp + 10*( ewmaRtt + 4*ewmaDevRtt)) )
+		if(seqNum > ((*vecIterator).seqNum + 10) || ( timeStamp > (*vecIterator).timeStamp + 10*( ewmaRtt + 4*ewmaDevRtt)) )
 		{
+			logWrite(SENSOR,"UDP_LOSS_SENSOR: Lost packet seqNum=%d", (*vecIterator).seqNum);
 			tempIterator = vecIterator;
 			vecIterator++;
 			unAckedPackets.erase(tempIterator);

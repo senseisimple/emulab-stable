@@ -336,7 +336,7 @@ enum
 
 enum
 {
-  SNAPLEN_SIZE = 200
+  SNAPLEN_SIZE = 250
 };
 
 class ConnectionModel;

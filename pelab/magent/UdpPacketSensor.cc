@@ -76,8 +76,10 @@ void UdpPacketSensor::localSend(PacketInfo *packet)
 			{
 				tmpPacketInfo.seqNum = lastSeenSeqNum + i;
 				tmpPacketInfo.isFake = true;
+				tmpPacketInfo.timeStamp = 0;
 
 				sentPacketList.push_back(tmpPacketInfo);
+				logWrite(SENSOR,"Adding fake packet = %d", tmpPacketInfo.seqNum);
 			}
 			libpcapSendLoss += (seqNum - lastSeenSeqNum - 1);
 
@@ -189,6 +191,7 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 				listIterator = find_if(sentPacketList.begin(), sentPacketList.end(), bind2nd(equalSeqNum(), redunSeqNum)); 
 
 			redunAckVector.push_back(redunSeqNum);
+			//logWrite(SENSOR,"For SeqNum=%d, Redun Ack=%d\n",seqNum,redunSeqNum);
 
 			// An unacked packet exists with this sequence number, delete it 
 			// from the list and consider it acked.
@@ -202,6 +205,7 @@ void UdpPacketSensor::localAck(PacketInfo *packet)
 				ackedPackets.push_back(tmpPacketInfo);
 
 				sentPacketList.erase(listIterator);
+				logWrite(SENSOR,"For SeqNum=%d, using Redun Ack=%d\n",seqNum,redunSeqNum);
 			}
 			else
 			{
