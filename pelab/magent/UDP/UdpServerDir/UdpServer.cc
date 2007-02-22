@@ -40,7 +40,11 @@ unsigned long long getPcapTimeMicro(const struct timeval *tp)
 	unsigned long long tmpSecVal = tp->tv_sec;
 	unsigned long long tmpUsecVal = tp->tv_usec;
 
-	return (tmpSecVal*1000*1000 + tmpUsecVal);
+	tmpSecVal = tmpSecVal*1000*1000;
+	tmpSecVal += tmpUsecVal;
+
+	//return (tmpSecVal*1000*1000 + tmpUsecVal);
+	return tmpSecVal;
 }
 
 // Handle a packet captured by libpcap.
@@ -285,7 +289,7 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
 	if(pcapStats.ps_drop > currentPcapLoss)
 	{
 		 currentPcapLoss = pcapStats.ps_drop;
-		 printf("STAT::Number of packets lost in libpcap = %d\n",currentPcapLoss);
+		 printf("\nSTAT::Number of packets lost in libpcap = %d\n",currentPcapLoss);
 	}
 
         // Get a pointer to the start of the data portion of the packet.
@@ -324,10 +328,10 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
         // we saw, then send an acknowledgement for it. Otherwise, ignore the
         // packet - it arrived out of order.
 
-                packetLibpcapTimestamp = getPcapTimeMicro(&pcap_info->ts);
+	packetLibpcapTimestamp = getPcapTimeMicro(&pcap_info->ts);
 //	printf("%d - %s:%d Received seqNum=%u,size=%u\n", (packetLibpcapTimestamp - clientIter->second.clientEpoch)/1000000, inet_ntoa(ipPacket->ip_src),sourcePort , packetSeqNum,recvPacketLen);
-//	printf("Received seqNum=%u,size=%u\n", packetSeqNum,recvPacketLen);
-//	printf("Packet loss = %d\n", clientIter->second.packetLoss);
+	unsigned long long timeSince = (packetLibpcapTimestamp - clientIter->second.clientEpoch)/1000000;
+	printf("Time=%llu,Received seqNum=%u,size=%u\n",timeSince,packetSeqNum,recvPacketLen);
 	if(packetSeqNum == clientIter->second.curSeqNum)
 	{
 		printf("This=%d is a duplicate packet\n\n",packetSeqNum);
@@ -345,6 +349,7 @@ void handleUDP_Version_2(struct pcap_pkthdr const *pcap_info, struct udphdr cons
                 }
                // Print the sequence number being ACKed - in the second byte.
                 memcpy(&appAck[1], &packetSeqNum, globalConsts::USHORT_INT_SIZE);
+		printf("Packet loss = %d\n", clientIter->second.packetLoss);
 
                 // Print the size of the received packet.
                 memcpy(&appAck[1 + globalConsts::USHORT_INT_SIZE], &recvPacketLen, globalConsts::USHORT_INT_SIZE);

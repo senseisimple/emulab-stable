@@ -7,7 +7,7 @@
 EXECUTABLE=UdpServer
 
 
-${EXECUTABLE}: UdpServer.cc
+${EXECUTABLE}: UdpServer.cc UdpServer.h
 	g++ -o $@ UdpServer.cc -lpcap
 
 clean:
