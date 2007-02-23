@@ -1058,6 +1058,9 @@ function DOLOGOUT($user) {
 		  "hashkey='$safe_curhash'" :
 		  "hashhash='$safe_hashhash'"));
 
+    # Delete by giving timeout in the past
+    $timeout = time() - 3600;
+
     #
     # Issue a cookie request to delete the cookies. Delete with timeout in past
     #
