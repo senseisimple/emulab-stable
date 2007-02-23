@@ -460,7 +460,7 @@ sub ArchiveSavePoint($;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -572,7 +572,7 @@ sub ArchiveTag($;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -674,7 +674,7 @@ sub ArchiveCommit($;$$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -883,7 +883,7 @@ sub ArchiveFork($$;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -1049,7 +1049,7 @@ sub ArchiveCheckout($$;$$$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -1136,7 +1136,7 @@ sub ArchiveArchive($$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
@@ -1255,7 +1255,7 @@ sub ArchiveDestroy($$;$)
 	if (!defined($view));
 
     return -1
-	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 120) !=
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
 	    TBSCRIPTLOCK_OKAY());
 
     #
