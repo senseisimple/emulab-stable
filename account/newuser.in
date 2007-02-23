@@ -19,7 +19,7 @@ sub usage()
     exit(-1);
 }
 my $optlist = "dt:";
-my $debug   = 1;
+my $debug   = 0;
 my $type    = "";
 
 #
@@ -329,7 +329,12 @@ my $newuser = User->Create($new_uid, $flags, \%newuser_args);
 if (!defined($newuser)) {
     fatal("Could not create new user!");
 }
-
+my $key       = $newuser->verify_key();
+my $usr_uid   = $newuser->uid();
+my $usr_idx   = $newuser->uid_idx();
+my $usr_name  = $newuser->name();
+my $usr_email = $newuser->email();
+	    
 #
 # See if we are in an initial Emulab setup. If so, no email sent.
 #
@@ -349,6 +354,8 @@ if (TBGetSiteVar("general/firstinit/state", \$firstinitstate)) {
 	DBQueryFatal("insert into unixgroup_membership set ".
 		     "uid='$new_uid', gid='$TBADMINGROUP'");
 	
+	# The web interface requires this line to be printed!
+	print "User $usr_uid/$usr_idx has been created\n";
 	exit(0);
     }
 }
@@ -356,11 +363,6 @@ if (TBGetSiteVar("general/firstinit/state", \$firstinitstate)) {
 #
 # Send the email notification.
 #
-my $key       = $newuser->verify_key();
-my $usr_uid   = $newuser->uid();
-my $usr_name  = $newuser->name();
-my $usr_email = $newuser->email();
-	    
 SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
 	 "Your New User Key",
 	 "\n".
@@ -400,13 +402,10 @@ SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
 # Do we have a keyfile? If so, rerun addpubkey for real now that the
 # user is created and email is sent.
 #
-my $user_uid = $newuser->uid();
-my $user_idx = $newuser->uid_idx();
-
 if (defined($keyfile)) {
     # Set the implied user for addpubkey.
-    $ENV{'HTTP_INVOKING_USER'} = $user_idx;
-    my $result   = `$addpubkey -u $user_uid -f $keyfile`;
+    $ENV{'HTTP_INVOKING_USER'} = $usr_idx;
+    my $result   = `$addpubkey -u $usr_uid -f $keyfile`;
     chomp($result);
     fatal("Could not parse public key: $result")
 	if ($?);
@@ -416,7 +415,7 @@ if (defined($keyfile)) {
 }
 
 # The web interface requires this line to be printed!
-print "User $user_uid/$user_idx has been created\n";
+print "User $usr_uid/$usr_idx has been created\n";
 exit(0);
 
 sub fatal($) {
