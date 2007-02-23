@@ -404,6 +404,8 @@ class Group
     # This is strictly for initialization of a testbed.
     #
     function Initialize($uid, $pid) {
+	global $TBOPSPID;
+	
 	$emulabgroup = Group::LookupByPidGid($TBOPSPID, $TBOPSPID);
 
 	if (! $emulabgroup) {
