@@ -984,6 +984,7 @@ if (! ($project = Project::NewNewProject($leader, $args, $error))) {
 # Need to do some extra work for the first project; eventually move to backend
 # 
 if ($FirstInitState) {
+    $pid = TBGetFirstInitPid();
     Group::Initialize($proj_head_uid, $pid);
     
     #

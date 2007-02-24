@@ -418,7 +418,8 @@ class Group
 	    TBERROR("Group::Initialize: Could not find user $uid!", 1);
 	}
 
-	if ($emulabgroup->AddNewMember($user) < 0) {
+	if (!$emulabgroup->IsMember($user, $ignore) &&
+	    $emulabgroup->AddNewMember($user) < 0) {
 	    TBERROR("Group::Initialize: Could not add $uid to $TBOPSPID!", 1);
 	}
 
