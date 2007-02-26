@@ -12,6 +12,7 @@ my $msg_count = 0;
 my $frag_count = 0;
 my $outputdir = '.';
 my $basename = 'supafly.logparse';
+my $max_ms = 1000;
 
 sub usage {
     print "USAGE: -mbfOo middlemanlog,sendlog,recvlog ...\n";
@@ -20,12 +21,13 @@ sub usage {
     print "  -f  Expected number of fragments.\n";
     print "  -O  Output directory.\n";
     print "  -o  Base output filename.\n";
+    print "  -t  Max x-axis time in ms.\n";
     
     exit -1;
 }
 
 # grab args:
-my $optlist = "m:b:f:O:o:";
+my $optlist = "m:b:f:O:o:t:";
 
 my %options = ();
 if (!getopts($optlist,\%options)) {
@@ -58,6 +60,9 @@ if (defined($options{'O'})) {
 }
 if (defined($options{'o'})) {
     $basename = $options{'o'};
+}
+if (defined($options{'t'})) {
+    $max_ms = $options{'t'};
 }
 
 my @logs = ();
@@ -174,13 +179,26 @@ foreach my $logtuple (@logs) {
 		#debug("str = $str\n");
 		if (defined($bs{$str}{'S_ack'})
 		    && defined($bs{$str}{'S_send'})) {
+
 		    # rtt, including cputime, in microseconds
 		    $tstats{$str}{'rtt'} = int(($bs{$str}{'S_ack'} - 
 			$bs{$str}{'S_send'}) * 1000000.0);
+
+		    # rtt, not including cputime, in microseconds
+		    # recall that the M_cryptotime is already in microseconds.
+		    $tstats{$str}{'rtt_nocpu'} = int(($bs{$str}{'S_ack'} - 
+						      $bs{$str}{'S_send'}) * 1000000.0 - 
+						     $bs{$str}{'M_cryptotime'});
+
 		    # est oneway as rtt/2, then add back in half cputime.
 		    $tstats{$str}{'oneway'} = int((($bs{$str}{'S_ack'} - 
 		        $bs{$str}{'S_send'}) * 1000000.0) / 2 + 
-			$bs{$str}{'M_cryptotime'}/2);
+			$bs{$str}{'M_cryptotime'} / 2);
+
+		    # oneway, not including cputime
+		    $tstats{$str}{'oneway_nocpu'} = int(((($bs{$str}{'S_ack'} -
+							   $bs{$str}{'S_send'}) * 1000000.0) - 
+							 $bs{$str}{'M_cryptotime'}) / 2);
 
 		    ++$rtts;
 		    
@@ -188,9 +206,10 @@ foreach my $logtuple (@logs) {
 #			$bs{$str}{'S_send'}) * 1000000.0);
 #		    $tstats{$str}{'oneway'} = $bs{$str}{'R_recv'} - 
 #			$bs{$str}{'S_send'};
-		    debug("$str oneway time = " . $tstats{$str}{'oneway'} . "\n");
-		    debug("$str rtt time = " . $tstats{$str}{'rtt'} . "\n");
-		    debug("s = ".$bs{$str}{'S_send'}."; sa = ".$bs{$str}{'S_ack'}."\n");
+
+#		    debug("$str oneway time = " . $tstats{$str}{'oneway'} . "\n");
+#		    debug("$str rtt time = " . $tstats{$str}{'rtt'} . "\n");
+#		    debug("s = ".$bs{$str}{'S_send'}."; sa = ".$bs{$str}{'S_ack'}."\n");
 		}
 		
 		if (defined($bs{$str}{'M_cryptotime'})) {
@@ -210,24 +229,38 @@ foreach my $logtuple (@logs) {
     # ugh.
     # oneway
     my @ows = ();
+    # oneway, no cpu
+    my @owsnc = ();
     # rtt
     my @rws = ();
+    # rtt, no cpu
+    my @rwsnc = ();
     # cpu
     my @cws = ();
     
-    for (my $i = 0; $i < 1000; ++$i) {
+    for (my $i = 0; $i < $max_ms; ++$i) {
 	$ows[$i] = 0;
 	$rws[$i] = 0;
 	$cws[$i] = 0;
+	$rwsnc[$i] = 0;
+	$owsnc[$i] = 0;
     }
     foreach my $id (keys(%tstats)) {
 	if (defined($tstats{$id}{'oneway'})) {
 	    my $slot = int($tstats{$id}{'oneway'} / 1000);
 	    ++($ows[$slot]);
 	}
+	if (defined($tstats{$id}{'oneway_nocpu'})) {
+	    my $slot = int($tstats{$id}{'oneway_nocpu'} / 1000);
+	    ++($owsnc[$slot]);
+	}
 	if (defined($tstats{$id}{'rtt'})) {
 	    my $slot = int($tstats{$id}{'rtt'} / 1000);
 	    ++($rws[$slot]);
+	}
+	if (defined($tstats{$id}{'rtt_nocpu'})) {
+	    my $slot = int($tstats{$id}{'rtt_nocpu'} / 1000);
+	    ++($rwsnc[$slot]);
 	}
 
 	if (defined($tstats{$id}{'cryptotime'})) {
@@ -246,14 +279,29 @@ foreach my $logtuple (@logs) {
     open(CDFDAT,">$onewaycdfdatfile") 
 	or die "couldn't open $onewaycdfdatfile!";
     my $cdf_counter = 0;
-    for (my $i = 0; $i < 1000; ++$i) {
+    for (my $i = 0; $i < $max_ms; ++$i) {
 	$cdf_counter += $ows[$i];
 
 	print CDFDAT "$i " . ($cdf_counter/$block_count*100) . "\n";
 
-	if ($cdf_counter == $rtts) {
-	    last;
-	}
+#	if ($cdf_counter == $rtts) {
+#	    last;
+#	}
+    }
+    close(CDFDAT);
+
+    my $oneway_nocpucdfdatfile = "$outputdir/$basename.oneway_nocpucdf.dat";
+    open(CDFDAT,">$oneway_nocpucdfdatfile")
+        or die "couldn't open $oneway_nocpucdfdatfile!";
+    $cdf_counter = 0;
+    for (my $i = 0; $i < $max_ms; ++$i) {
+        $cdf_counter += $owsnc[$i];
+
+        print CDFDAT "$i " . ($cdf_counter/$block_count*100) . "\n";
+
+#        if ($cdf_counter == $rtts) {
+#            last;
+#        }
     }
     close(CDFDAT);
 
@@ -261,16 +309,32 @@ foreach my $logtuple (@logs) {
     open(DAT,">$rttcdfdatfile") 
 	or die "couldn't open $rttcdfdatfile!";
     $cdf_counter = 0;
-    for (my $i = 0; $i < 1000; ++$i) {
+    for (my $i = 0; $i < $max_ms; ++$i) {
 	$cdf_counter += $rws[$i];
 
 	print DAT "$i " . ($cdf_counter/$block_count*100) . "\n";
 
-	if ($cdf_counter == $rtts) {
-	    last;
-	}
+#	if ($cdf_counter == $rtts) {
+#	    last;
+#	}
     }
     close(DAT);
+
+    my $rtt_nocpucdfdatfile = "$outputdir/$basename.rtt_nocpucdf.dat";
+    open(DAT,">$rtt_nocpucdfdatfile") 
+	or die "couldn't open $rtt_nocpucdfdatfile!";
+    $cdf_counter = 0;
+    for (my $i = 0; $i < $max_ms; ++$i) {
+	$cdf_counter += $rwsnc[$i];
+
+	print DAT "$i " . ($cdf_counter/$block_count*100) . "\n";
+
+#	if ($cdf_counter == $rtts) {
+#	    last;
+#	}
+    }
+    close(DAT);
+    
 
     my $cpudatfile = "$outputdir/$basename.cpu.dat";
     open(CRYPTODAT,">$cpudatfile") 
@@ -286,15 +350,15 @@ foreach my $logtuple (@logs) {
 #	}
 #    }
     $cdf_counter = 0;
-    for (my $i = 0; $i < 1000; ++$i) {
+    for (my $i = 0; $i < $max_ms; ++$i) {
 	$cdf_counter += $cws[$i];
 
 	print CRYPTODAT "$i " . ($cdf_counter/$block_count*100) . "\n";
 
-	if ($cdf_counter == $cryptotime_count
-	    || ($cdf_counter/$block_count*100) == 100) {
-	    last;
-	}
+#	if ($cdf_counter == $cryptotime_count
+#	    || ($cdf_counter/$block_count*100) == 100) {
+#	    last;
+#	}
     }
 
     close(CRYPTODAT);
@@ -304,7 +368,7 @@ foreach my $logtuple (@logs) {
     my $graphfile = "$outputdir/$basename.onewaycdf.eps";
     open(CDFGNP,">$file") 
 	or die("couldn't open $file!");
-    print CDFGNP "set terminal postscript eps \n";
+    print CDFGNP "set terminal postscript eps color \n";
     print CDFGNP "set output '$graphfile'\n";
     print CDFGNP "set yrange [0:]\n";
     print CDFGNP "set xrange [0:]\n";
@@ -319,11 +383,31 @@ foreach my $logtuple (@logs) {
     # run gnuplot   
     system("gnuplot < $file");
 
+    # generate gnuplot src files:
+    $file = "$outputdir/$basename.oneway_nocpucdf.gnp";
+    $graphfile = "$outputdir/$basename.oneway_nocpucdf.eps";
+    open(CDFGNP,">$file") 
+	or die("couldn't open $file!");
+    print CDFGNP "set terminal postscript eps color \n";
+    print CDFGNP "set output '$graphfile'\n";
+    print CDFGNP "set yrange [0:]\n";
+    print CDFGNP "set xrange [0:]\n";
+    print CDFGNP "set ylabel 'Percent Complete'\n";
+    print CDFGNP "set xlabel 'Deadline (ms)'\n";
+    print CDFGNP "set key bottom right\n";
+    print CDFGNP "plot \\\n";
+    print CDFGNP "  '$oneway_nocpucdfdatfile' title \"oneway_nocpu\" with lines 2\n";
+#    print CDFGNP "\n";
+    close(CDFGNP);
+
+    # run gnuplot
+    system("gnuplot < $file");
+
     $file = "$outputdir/$basename.rttcdf.gnp";
     $graphfile = "$outputdir/$basename.rttcdf.eps";
     open(CDFGNP,">$file") 
 	or die("couldn't open $file!");
-    print CDFGNP "set terminal postscript eps \n";
+    print CDFGNP "set terminal postscript eps color \n";
     print CDFGNP "set output '$graphfile'\n";
     print CDFGNP "set yrange [0:]\n";
     print CDFGNP "set xrange [0:]\n";
@@ -338,12 +422,31 @@ foreach my $logtuple (@logs) {
     # run gnuplot   
     system("gnuplot < $file");
 
-    # both oneway and rtt cdfs
-    $file = "$outputdir/$basename.bothcdf.gnp";
-    my $graphfile = "$outputdir/$basename.bothcdf.eps";
+    $file = "$outputdir/$basename.rtt_nocpucdf.gnp";
+    $graphfile = "$outputdir/$basename.rtt_nocpucdf.eps";
     open(CDFGNP,">$file") 
 	or die("couldn't open $file!");
-    print CDFGNP "set terminal postscript eps \n";
+    print CDFGNP "set terminal postscript eps color \n";
+    print CDFGNP "set output '$graphfile'\n";
+    print CDFGNP "set yrange [0:]\n";
+    print CDFGNP "set xrange [0:]\n";
+    print CDFGNP "set ylabel 'Percent Complete'\n";
+    print CDFGNP "set xlabel 'Deadline (ms)'\n";
+    print CDFGNP "set key bottom right\n";
+    print CDFGNP "plot \\\n";
+    print CDFGNP "  '$rtt_nocpucdfdatfile' title \"rtt_nocpu\" with lines 2\n";
+    print CDFGNP "\n";
+    close(CDFGNP);
+
+    # run gnuplot   
+    system("gnuplot < $file");
+
+    # both oneway and rtt cdfs
+    $file = "$outputdir/$basename.bothcdf.gnp";
+    $graphfile = "$outputdir/$basename.bothcdf.eps";
+    open(CDFGNP,">$file") 
+	or die("couldn't open $file!");
+    print CDFGNP "set terminal postscript eps color \n";
     print CDFGNP "set output '$graphfile'\n";
     print CDFGNP "set yrange [0:]\n";
     print CDFGNP "set xrange [0:]\n";
@@ -353,7 +456,11 @@ foreach my $logtuple (@logs) {
     print CDFGNP "plot \\\n";
     print CDFGNP "  '$onewaycdfdatfile' title \"oneway\" with lines 2,\\\n";
     # combining oneway and rtt graphs
-    print CDFGNP "  '$rttcdfdatfile' title \"rtt\" with lines 2\n";
+    print CDFGNP "  '$rttcdfdatfile' title \"rtt\" with lines 2,\\\n";
+    # now add in the _nocpu ones too.
+    print CDFGNP "  '$oneway_nocpucdfdatfile' title \"oneway_nocpu\" with lines 2,\\\n";
+    print CDFGNP "  '$rtt_nocpucdfdatfile' title \"rtt_nocpu\" with lines 2\n";
+
 #    print CDFGNP "\n";
     close(CDFGNP);
 
@@ -364,7 +471,7 @@ foreach my $logtuple (@logs) {
     $graphfile = "$outputdir/$basename.cpu.eps";
     open(CDFGNP,">$file") 
 	or die("couldn't open $file!");
-    print CDFGNP "set terminal postscript eps \n";
+    print CDFGNP "set terminal postscript eps color \n";
     print CDFGNP "set output '$graphfile'\n";
     print CDFGNP "set yrange [0:]\n";
     print CDFGNP "set xrange [0:]\n";
