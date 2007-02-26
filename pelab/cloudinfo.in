@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,6 +16,7 @@ my $verbose = 1;
 my $ispelab = 1;
 my $zeroem = 0;
 my $dumpfile = 0;
+my $dofake = 0;
 
 use constant IN_SHOW  => 1;
 use constant IN_SHOWP => 2;
@@ -40,11 +41,14 @@ sub usage()
 }
 
 my %options = ();
-if (!getopts("zd", \%options)) {
+if (!getopts("zfd", \%options)) {
     usage();
 }
 if (defined($options{"z"})) {
     $zeroem = 1;
+}
+if (defined($options{"f"})) {
+    $dofake = 1;
 }
 if (defined($options{"d"})) {
     $dumpfile = 1;
@@ -145,6 +149,8 @@ sub printapipe($)
 	$node = $pipeinfo{$pipe}->{"ip"};
 	if ($node =~ /^10\.0\.0\.(\d+)$/) {
 	    $node = "elab-$1";
+	} elsif ($dofake && $node =~ /^10\.1\.0\.(\d+)$/) {
+	    $node = "plab-$1";
 	}
 	$node = sprintf "%8s", $node unless $dumpfile;
     } else {
@@ -245,6 +251,8 @@ sub parseit($)
 
 		    if ($node =~ /^elab-(\d+)$/) {
 			$nodeix = $1;
+		    } elsif ($dofake && $node =~ /^plab-(\d+)$/) {
+			$nodeix = $1;
 		    } else {
 			print STDERR "*** ignoring non-pelab rule: $rule\n";
 			$pipeinfo{$pipe}->{"ignore"} = 1;
@@ -256,7 +264,7 @@ sub parseit($)
 			}
 			next;
 		    }
-		    if ($ip =~ /^10\.0\.0\.(\d+)$/) {
+		    if ($ip =~ /^10\.[01]\.0\.(\d+)$/) {
 			$ipix = $1;
 			if (0) {
 			if ($dir eq "<" && $nodeix != $ipix ||
@@ -264,7 +272,7 @@ sub parseit($)
 			    $pipeinfo{$pipe}->{"ignore"} = 1;
 			    next;
 			}
-		    }
+		        }
 		    } else {
 			print STDERR "*** ignoring non-pelab rule: $rule\n";
 			$pipeinfo{$pipe}->{"ignore"} = 1;
