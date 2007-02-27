@@ -19,12 +19,13 @@ if (!ISADMIN()) {
 # Verify arguments.
 #
 $reqargs = RequiredPageArguments("target_user", PAGEARG_USER);
+$target_uid = $target_user->uid();
 
 if (DOLOGIN_MAGIC($target_user->uid(), $target_user->uid_idx()) < 0) {
     USERERROR("Could not log you in as $target_uid", 1);
 }
 # So the menu and headers get spit out properly.
-$_COOKIE[$TBNAMECOOKIE] = $target_user->webid();
+$_COOKIE[$TBNAMECOOKIE] = $target_uid;
 
 PAGEHEADER("SU as User");
 
