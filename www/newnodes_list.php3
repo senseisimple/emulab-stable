@@ -144,7 +144,7 @@ if (isset($research)) {
 		     "where $whereclause_qualified");
     $mac_list = array();
     while ($row = mysql_fetch_array($query_result)) {
-	$type  = $row["is_control"];
+	$type  = $row["type"];
 	$card  = $row["card"];
 	$iface = "eth${card}";
 

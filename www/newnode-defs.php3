@@ -40,7 +40,7 @@ function find_switch_macs(&$mac_list) {
 	$switch = $matches[1];
 	$card = $matches[2];
 	$port = $matches[3];
-	if ($mac_list[$MAC] &&
+	if (isset($mac_list[$MAC]) &&
 	    (is_null($mac_list[$MAC]["class"]) ||
 	     !isset($mac_list[$MAC]["class"]) ||
 	     ($mac_list[$MAC]["class"] == $class))) {
@@ -187,7 +187,7 @@ function guess_IP ($prefix, $number) {
 			 "      i.role='" . TBDB_IFACEROLE_CONTROL . "'");
         if (mysql_num_rows($query_result)) {
 	    $row = mysql_fetch_array($query_result);
-	    $IP = $row[IP];
+	    $IP = $row["IP"];
 	    break;
 	}
 
@@ -196,7 +196,7 @@ function guess_IP ($prefix, $number) {
 		"where node_id='$node'");
         if (mysql_num_rows($query_result)) {
 	    $row = mysql_fetch_array($query_result);
-	    $IP = $row[IP];
+	    $IP = $row["IP"];
 	    break;
 	}
 

@@ -130,7 +130,7 @@ if (isset($use_temp_IP)) {
 #
 # Handle the node type
 #
-if ($type) {
+if (isset($type) && $type != "") {
     #
     # If they gave us a type, lets see if that type exists or not
     #
@@ -163,7 +163,7 @@ $role = (isset($role) ? addslashes($role) : "testnode");
 #
 # Stash this information in the database
 #
-if ($identifier) {
+if (isset($identifier) && $identifier != "") {
     $identifier = "'" . addslashes($identifier) . "'";
 } else {
     $identifier = "NULL";
