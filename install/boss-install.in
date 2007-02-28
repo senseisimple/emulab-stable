@@ -196,6 +196,8 @@ my %EXPERIMENTS =
 			 "description" => "Nodes in limbo during swap modify"},
      "nfree-leases"  => {"pid"	       => "emulab-ops",
 			 "description" => "Nodes in limbo during nfree"},
+     "nfree-locked"  => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in limbo during nfree"},
      "opsnodes"	     => {"pid"	       => "emulab-ops",
 			 "description" => "Nodes designated as Ops Nodes"},
     );
