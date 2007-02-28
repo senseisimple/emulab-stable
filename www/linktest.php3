@@ -61,7 +61,7 @@ function CHECKPAGEARGS() {
 		  "on $pid/$eid!", 1);
     }
     if ($experiment->state() != $TB_EXPTSTATE_ACTIVE) {
-	USERERROR("Experiment $eid must be active run linktest!", 1);
+	USERERROR("Experiment $eid must be active to run linktest!", 1);
     }
     $pid            = $experiment->pid();
     $eid            = $experiment->eid();
