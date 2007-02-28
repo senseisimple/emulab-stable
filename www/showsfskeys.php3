@@ -38,7 +38,7 @@ if (!$isadmin &&
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $target_user, $BOSSNODE. $OURDOMAIN;
+    global $isadmin, $target_user, $BOSSNODE, $OURDOMAIN;
 
     $target_uid = $target_user->uid();
     $uid_idx    = $target_user->uid_idx();
