@@ -21,11 +21,16 @@ function death($msg) {
 #
 # Verify page arguments
 #
-$reqargs = RequiredPageArguments("type",    PAGEARG_STRING.
+$reqargs = RequiredPageArguments("type",    PAGEARG_STRING,
 				 "dataset", PAGEARG_STRING);
 
+$optargs = OptionalPageArguments("building", PAGEARG_STRING,
+				 "floor",    PAGEARG_INTEGER,
+				 "scale",    PAGEARG_INTEGER);
+
 ## we need a type and a dataset.
-if (isset($type) && isset($dataset) && preg_match("/^[a-zA-Z0-9\-_]+$/", $dataset)) {
+if (isset($type) && isset($dataset) 
+    && preg_match("/^[a-zA-Z0-9\-_]+$/", $dataset)) {
     $dbq = DBQueryFatal("select * from wireless_stats where name='$dataset'");
 
     if (mysql_num_rows($dbq)) {
@@ -109,7 +114,7 @@ if (isset($type) && isset($dataset) && preg_match("/^[a-zA-Z0-9\-_]+$/", $datase
             #header("Content-type: image/jpg");
             #header("Content-Length: " . (filesize($tmpfile)));
             if (($fp = fopen("$pushfile", "r"))) {
-                header("Content-type: image/jpg");
+                header("Content-type: image/jpeg");
                 fpassthru($fp);
             }
 	    else {

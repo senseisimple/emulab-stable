@@ -11,7 +11,7 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-PAGEHEADER("Wireless/WSN Testbed Connectivity Statistics");
+PAGEHEADER("Wireless Testbeds Connectivity Statistics");
 
 ?>
 
@@ -49,13 +49,10 @@ $namePPMs = array();
 while ($row = mysql_fetch_array($dbq)) {
     $name = $row["name"];
 
-#    if ($name == 'SensorNet-MEB') {
-#        continue;
-#    }
-
     $floor = $row["floor"];
     $building = $row["building"];
     $scale = $row["scale"];
+
     $factor = 0;
     if ($scale == 1) {
         $factor = 1;
@@ -143,7 +140,7 @@ $positurl = "getdata.php3?type=posit";
 
 echo "<applet name='wireless-stats' code='WirelessMapApplet.class'
               archive='wireless-stats.jar'
-              width='1024' height='768'
+              width='900' height='700'
               alt='You need java to run this applet'>
             <param name='uid' value='$uid'>
             <param name='auth' value='$auth'>
