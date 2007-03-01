@@ -27,6 +27,8 @@ OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o config.o score.o \
 LIBS+= -lm
 LDFLAGS+= -pipe -O3
 CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-40
+# For OSX w/ fink
+CXXFLAGS += -I/sw/include
 
 # Pick either this
 CXXFLAGS += -O3 
