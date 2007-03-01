@@ -1722,19 +1722,34 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * XXX - Old style node, not doing jails.
 		 *
-		 * Temporary hack until we figure out the right model for
-		 * remote nodes. For now, we use the pcremote-ok slot in
-		 * in the project table to determine what remote nodes are
-		 * okay'ed for the project. If connecting node type is in
-		 * that list, then return all of the project groups, for
-		 * each project that is allowed to get accounts on the type.
+		 * Added this for Dave. I love subqueries!
 		 */
 		res = mydb_query("select g.unix_name,g.unix_gid "
-				 "  from projects as p "
+				 " from projects as p "
 				 "left join groups as g on p.pid=g.pid "
 				 "where p.approved!=0 and "
-				 "      FIND_IN_SET('%s',pcremote_ok)>0",
-				 2, reqp->type);
+				 "  FIND_IN_SET(g.gid_idx, "
+				 "   (select attrvalue from node_attributes "
+				 "      where node_id='%s' and "
+				 "            attrkey='dp_projects')) > 0",
+				 2, reqp->pnodeid);
+
+		if (!res || (int)mysql_num_rows(res) == 0) {
+		 /*
+		  * Temporary hack until we figure out the right model for
+		  * remote nodes. For now, we use the pcremote-ok slot in
+		  * in the project table to determine what remote nodes are
+		  * okay'ed for the project. If connecting node type is in
+		  * that list, then return all of the project groups, for
+		  * each project that is allowed to get accounts on the type.
+		  */
+		  res = mydb_query("select g.unix_name,g.unix_gid "
+				   "  from projects as p "
+				   "left join groups as g on p.pid=g.pid "
+				   "where p.approved!=0 and "
+				   "      FIND_IN_SET('%s',pcremote_ok)>0",
+				   2, reqp->type);
+		}
 	}
 	if (!res) {
 		error("ACCOUNTS: %s: DB Error getting gids!\n", reqp->pid);
@@ -1864,6 +1879,38 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * that list, then return user info for all of the users
 		 * in those projects (crossed with group in the project). 
 		 */
+		char subclause[MYBUFSIZE];
+		int  count = 0;
+		
+		res = mydb_query("select attrvalue from node_attributes "
+				 " where node_id='%s' and "
+				 "       attrkey='dp_projects'",
+				 1, reqp->pnodeid);
+
+		if (res) {
+			if ((int)mysql_num_rows(res) > 0) {
+				row = mysql_fetch_row(res);
+
+				count = snprintf(subclause,
+					     sizeof(subclause) - 1,
+					     "FIND_IN_SET(g.gid_idx,'%s')>0",
+					     row[0]);
+			}
+			else {
+				count = snprintf(subclause,
+					     sizeof(subclause) - 1,
+					     "FIND_IN_SET('%s',pcremote_ok)>0",
+					     reqp->type);
+			}
+			mysql_free_result(res);
+			
+			if (count >= sizeof(subclause)) {
+				error("ACCOUNTS: %s: Subclause too long!\n",
+				      reqp->nodeid);
+				return 1;
+			}
+		}
+			
 		res = mydb_query("select distinct  "
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
@@ -1879,12 +1926,12 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "  g.pid=m.pid and g.gid=m.gid "
 				 "left join users as u on u.uid_idx=m.uid_idx "
 				 "where p.approved!=0 "
-				 "      and FIND_IN_SET('%s',pcremote_ok)>0 "
+				 "      and %s "
 				 "      and m.trust!='none' "
 				 "      and u.webonly=0 "
 				 "      and u.status='active' "
 				 "order by u.uid",
-				 17, reqp->type);
+				 17, subclause);
 	}
 
 	if (!res) {
