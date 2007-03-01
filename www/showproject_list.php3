@@ -166,7 +166,6 @@ if ($isadmin) {
 	    $active_projects++;
 	}
     }
-    mysql_data_seek($query_result, 0);
     $never_active = $total_projects - $active_projects;
 
     echo "<table border=0 align=center cellpadding=0 cellspacing=2>
