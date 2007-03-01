@@ -1,24 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
- */
-
-/*
- * Dataset.java
- *
- * Created on July 7, 2006, 2:53 PM
- *
- * To change this template, choose Tools | Template Manager
- * and open the template in the editor.
  */
 
 import java.util.*;
 
-/**
- *
- * @author david
- */
 public class Dataset {
     public String name;
     public String building;
@@ -31,6 +18,7 @@ public class Dataset {
     public String dataFile;
     
     public MapDataModel model;
+    // "<floor>-<scale>" :: DataCacheObject
     public Hashtable bgImages;
     public GenericWirelessData data;
     public NodePosition positions;
@@ -72,15 +60,15 @@ public class Dataset {
     // buildings.  For me, one building per dataset is good enough for our
     // needs into the foreseeable future... just like 64k.  :-)
     public java.awt.Image getImage(int floor,int scale) {
-        System.err.println("getting image for building="+this.building+",floor="+floor+",scale="+scale);
+        System.err.println("getting cache image for building="+this.building+",floor="+floor+",scale="+scale);
         String tag = "" + floor + "-" + scale;
-        return (java.awt.Image)this.bgImages.get(tag);
+        return (java.awt.Image)((DataCacheObject)this.bgImages.get(tag)).getObject();
     }
     
-    public void addImage(java.awt.Image img,int floor,int scale) {
-        System.err.println("adding image for building="+this.building+",floor="+floor+",scale="+scale);
+    public void addImage(DataCacheObject dco,int floor,int scale) {
+        System.err.println("adding cache image for building="+this.building+",floor="+floor+",scale="+scale);
         String tag = "" + floor + "-" + scale;
-        this.bgImages.put(tag,img);
+        this.bgImages.put(tag,dco);
     }
     
     public float getScaleFactor(int scale) {
@@ -134,6 +122,22 @@ public class Dataset {
             tmp[this.scale.length] = f;
             this.scale = tmp;
         }
+    }
+    
+    public int[] getScales() {
+        return this.scale;
+    }
+    
+    public boolean isScale(int f) {
+        if (this.scale == null) {
+            return false;
+        }
+        for (int i = 0; i < this.scale.length; ++i) {
+            if (this.scale[i] == f) {
+                return true;
+            }
+        }
+        return false;
     }
     
 }

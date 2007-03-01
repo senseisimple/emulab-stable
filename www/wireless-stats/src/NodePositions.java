@@ -1,32 +1,17 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
- */
-
-/*
- * NodePositions.java
- *
- * Created on July 19, 2005, 8:26 PM
- *
- * To change this template, choose Tools | Options and locate the template under
- * the Source Creation and Management node. Right-click the template and choose
- * Open. You can then make changes to the template in the Source Editor.
  */
 
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
-/**
- *
- * @author david
- */
 public class NodePositions implements NodePosition {
     
     private Hashtable positions;
     
-    /** Creates a new instance of NodePositions */
     protected NodePositions(Hashtable positions) {
         this.positions = positions;
     }
@@ -76,7 +61,7 @@ public class NodePositions implements NodePosition {
                     
                     pH.put(positM.group(1),new Position(positM.group(1),p[0],p[1],p[2],floor));
                     
-                    System.err.println(""+positM.group(1)+" ("+p[0]+","+p[1]+","+p[2]+"; "+floor+")");
+                    //System.err.println(""+positM.group(1)+" ("+p[0]+","+p[1]+","+p[2]+"; "+floor+")");
                 }
                 else {
                     System.err.println("positline '"+line+"' did not match!");

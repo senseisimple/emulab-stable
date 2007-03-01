@@ -1,14 +1,9 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
-/**
- *
- * This interface must be implemented by anything th
- *
- */
 public interface WirelessData {
     
     public String[] getNodes();

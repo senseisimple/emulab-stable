@@ -1,24 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
- */
-
-/*
- * GenericLinkStats.java
- *
- * Created on July 4, 2006, 11:08 AM
- *
- * To change this template, choose Tools | Template Manager
- * and open the template in the editor.
  */
 
 import java.util.*;
 
-/**
- *
- * @author david
- */
 public class GenericLinkStats {
     
     private GenericStats gs;

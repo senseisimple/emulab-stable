@@ -1,26 +1,13 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
- */
-
-/*
- * GenericStats.java
- *
- * Created on July 3, 2006, 8:37 PM
- *
- * To change this template, choose Tools | Template Manager
- * and open the template in the editor.
  */
 
 import java.util.*;
 import java.io.*;
 import java.util.regex.*;
 
-/**
- *
- * @author david
- */
 public class GenericStats implements GenericWirelessData {
     
     Hashtable indexMapping;
@@ -31,7 +18,6 @@ public class GenericStats implements GenericWirelessData {
     Hashtable maxPropValues;
     Hashtable indexValues;
     
-    /** Creates a new instance of GenericStats */
     protected GenericStats(String[] indices,Hashtable indexValues,
                            Vector nodes,Vector properties,
                            Hashtable minPropValues,Hashtable maxPropValues,
@@ -88,12 +74,12 @@ public class GenericStats implements GenericWirelessData {
             }
         }
         
-        System.out.println("trying dsString='"+dsString+"'");
+        //System.out.println("trying dsString='"+dsString+"'");
         Dataset ds = (Dataset)this.indexMapping.get(dsString);
         
         if (ds != null) {
             GenericLinkStats[] retval = ds.getAllStats();
-            System.out.println("allstats.length = " + retval.length);
+            //System.out.println("allstats.length = " + retval.length);
             return retval;
         }
         return null;
@@ -533,7 +519,7 @@ public class GenericStats implements GenericWirelessData {
                                         gls.addStat(statName,obj);
                                     }
                                     else {
-                                        System.out.println("line " + linecount + ": bad data line!");
+                                        System.err.println("line " + linecount + ": bad data line!");
                                     }
                                 }
                             }
@@ -551,7 +537,7 @@ public class GenericStats implements GenericWirelessData {
             throw new IOException("file read failed");
         }
         
-        System.err.println("GenericStats parsed "+linecount+" lines.");
+        System.out.println("GenericStats parsed "+linecount+" lines.");
         
         GenericStats retval = new GenericStats(indices,indexValues,
                                                nodes,properties,
@@ -645,7 +631,7 @@ public class GenericStats implements GenericWirelessData {
         }
         
         public GenericLinkStats[] getAllStats() {
-            System.out.println("real allStats.size in ds ="+allStats.size());
+            //System.out.println("real allStats.size in ds ="+allStats.size());
             GenericLinkStats[] retval = new GenericLinkStats[allStats.size()];
             int i = 0;
             for (Enumeration e1 = allStats.elements(); e1.hasMoreElements(); ) {

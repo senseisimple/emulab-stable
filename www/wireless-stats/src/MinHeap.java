@@ -1,11 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 // Don't forget: heap is from heap[1] to heap[initSize]
-
 public class MinHeap {
     private float[] heap;
     private int heapSize;

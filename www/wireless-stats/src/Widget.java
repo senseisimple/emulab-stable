@@ -1,26 +1,12 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 import java.util.*;
 import java.awt.*;
 
-/*
- * Widget.java
- *
- * Created on July 11, 2005, 8:26 AM
- *
- * To change this template, choose Tools | Options and locate the template under
- * the Source Creation and Management node. Right-click the template and choose
- * Open. You can then make changes to the template in the Source Editor.
- */
-
-/**
- *
- * @author david
- */
 public class Widget {
     
     protected String title;
@@ -32,7 +18,6 @@ public class Widget {
     
     public static Color selectedColor = new Color(37,160,231);
     
-    /** Creates a new instance of Widget */
     public Widget() {
         this.properties = new Hashtable();
         this.title = null;

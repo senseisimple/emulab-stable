@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -20,10 +20,8 @@ import java.io.*;
 
 public class WirelessMapApplet extends javax.swing.JApplet {
     
-    //private Image bgImage;
-    private java.awt.image.ImageObserver io;
     private Hashtable datasets;
-    private Hashtable imageCache;
+    private DataCache cache;
     
     public void init() {
         
@@ -33,25 +31,22 @@ public class WirelessMapApplet extends javax.swing.JApplet {
             javax.swing.SwingUtilities.invokeAndWait(new Runnable() {
                 public void run() {
                     initComponents();
+                    
+                    nodeMapPanel.setContainingScrollPane(nodeMapPanelScrollPane);
+                    
                 }
             });
-            
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             ex.printStackTrace();
         }
     }
     
     private void setup() {
         this.datasets = new Hashtable();
-        this.imageCache = new Hashtable();
+        this.cache = new DataCache(this);
         
-        io = new java.awt.Component() {
-            public boolean updateImage(Image img, int infoflags, int x, int y, int width, int height) {
-                System.out.println("w = "+width+",h = "+height);
-                
-                return true;
-            }
-        };
+        this.cache.setMinFreeThreshold(0.10f);
         
         // grab our params...
         // this is so cool, check out the cascading text!
@@ -133,7 +128,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                 }
                 else {
                     System.err.println("Data type ("+uc.getContentType()+") not plain text!");
-                    System.exit(-3);
+                    continue;
                 }
                 
                 // now try to parse the data
@@ -163,7 +158,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                 System.err.println("Could not successfully parse positfile for dataset '" +
                                    dataset+"'!");
                 e.printStackTrace();
-                System.exit(-1);
+                continue;
             }
             
             //
@@ -197,7 +192,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                 }
                 else {
                     System.err.println("Data type not zip or plain text!");
-                    System.exit(-3);
+                    continue;
                 }
                 
                 // now try to parse the data
@@ -210,16 +205,16 @@ public class WirelessMapApplet extends javax.swing.JApplet {
             }
             catch (MalformedURLException e) {
                 e.printStackTrace();
-                System.exit(-1);
+                continue;
             }
             catch (IOException e) {
                 e.printStackTrace();
-                System.exit(-1);
+                continue;
             }
             catch (Exception e) {
                 System.err.println("Couldn't parse data file!");
                 e.printStackTrace();
-                System.exit(-1);
+                continue;
             }
             
             //
@@ -234,48 +229,39 @@ public class WirelessMapApplet extends javax.swing.JApplet {
                     
                     String tag = ds.building + "-" + ds.floor[j] + "-" + ds.scale[k];
                     
-                    Image img = null;
-                    if ((img = (Image)imageCache.get(tag)) == null) {
-                        try {
-
-                            URL imgfile = new URL(base,
-                                              mapurl +
-                                              "&dataset=" + URLEncoder.encode(dataset) + 
-                                              "&building=" + URLEncoder.encode(building) + 
-                                              "&floor=" + URLEncoder.encode(""+ds.floor[j]) + 
-                                              "&scale=" + URLEncoder.encode(""+ds.scale[k]) + 
-                                              "&nocookieuid=" + URLEncoder.encode(uid) +
-                                              "&nocookieauth=" + URLEncoder.encode(auth)
-                                             );
-                            img = this.getImage(imgfile);
-                            MediaTracker tracker = new MediaTracker(this);
-                            tracker.addImage(img,0);
-                            tracker.waitForID(0);
-                            System.out.println("got image for dataset '"+dataset+"'; w = "+img.getWidth(io)+", h = "+img.getHeight(io));
-                            if (tracker.isErrorID(0)) {
-                                System.err.println("Errors with image!!!");
-                                img = null;
-                            }
-                            else {
-                                System.err.println("Image had no errors!");
-                                imageCache.put(tag,img);
-                            }
-                        }
-                        catch (Exception e) {
-                            System.err.println("Could not download image for dataset '"+dataset+"'!");
-                            e.printStackTrace();
-                            System.exit(-5);
-                        }
+                    DataCacheObject img = null;
+                    URL imgfile = null;
+                    try {
+                        imgfile = new URL(base,
+                                          mapurl +
+                                          "&dataset=" + URLEncoder.encode(dataset) + 
+                                          "&building=" + URLEncoder.encode(building) + 
+                                          "&floor=" + URLEncoder.encode(""+ds.floor[j]) + 
+                                          "&scale=" + URLEncoder.encode(""+ds.scale[k]) + 
+                                          "&nocookieuid=" + URLEncoder.encode(uid) +
+                                          "&nocookieauth=" + URLEncoder.encode(auth)
+                                         );
+                    }
+                    catch (MalformedURLException ex) {
+                        System.err.println("WARNING: bad url while trying to grab img " + tag);
+                        ex.printStackTrace();
+                        continue;
                     }
                     
-                    //System.err.println("imageCache="+imageCache+",tag="+tag+",img="+img);
-                    //imageCache.put(tag,img);
-                    if (img != null) {
-                        ds.addImage(img,ds.floor[j],ds.scale[k]);
+                    // preload if scale is 1 so that we have something to look
+                    // at right away...
+                    if (ds.scale[k] == 1) {
+                        img = cache.registerURL(imgfile,DataCache.EVICT_NEVER);
+                        cache.getURL(img);
+                        System.out.println("Retrieved img " + tag);
+                    }
+                    else {
+                        img = cache.registerURL(imgfile,DataCache.EVICT_ATNEED);
+                        // do nothing right now...
+                        System.out.println("Registered img " + tag + " but did not download");
                     }
                     
-                    
-                    System.err.println("imageRun; dataset="+ds.name+",tag="+tag+",img="+img);
+                    ds.addImage(img,ds.floor[j],ds.scale[k]);
                 }
             }
             
@@ -299,6 +285,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
 
         nodeMapPanelScrollPane = new javax.swing.JScrollPane();
         nodeMapPanel = new NodeMapPanel();
+        statusPanel = new javax.swing.JPanel();
         controlPanel = new ControlPanel(datasets,nodeMapPanel);
 
         getContentPane().setLayout(new java.awt.GridBagLayout());
@@ -306,15 +293,29 @@ public class WirelessMapApplet extends javax.swing.JApplet {
         nodeMapPanelScrollPane.setViewportView(nodeMapPanel);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.gridheight = 2;
         gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
         gridBagConstraints.weightx = 1.0;
         gridBagConstraints.weighty = 1.0;
         getContentPane().add(nodeMapPanelScrollPane, gridBagConstraints);
 
+        statusPanel.setLayout(new java.awt.GridBagLayout());
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        getContentPane().add(statusPanel, gridBagConstraints);
+
         controlPanel.setPreferredSize(new java.awt.Dimension(200, 247));
         gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
         gridBagConstraints.fill = java.awt.GridBagConstraints.VERTICAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.weighty = 1.0;
         getContentPane().add(controlPanel, gridBagConstraints);
 
     }// </editor-fold>//GEN-END:initComponents
@@ -324,6 +325,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
     private ControlPanel controlPanel;
     private NodeMapPanel nodeMapPanel;
     private javax.swing.JScrollPane nodeMapPanelScrollPane;
+    private javax.swing.JPanel statusPanel;
     // End of variables declaration//GEN-END:variables
     
 }

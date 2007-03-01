@@ -1,27 +1,14 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
- */
-
-/*
- * MapDataModel.java
- *
- * Created on January 29, 2006, 9:15 PM
- *
- * To change this template, choose Tools | Options and locate the template under
- * the Source Creation and Management node. Right-click the template and choose
- * Open. You can then make changes to the template in the Source Editor.
  */
 
 import java.util.*;
 import javax.swing.event.*;
 import java.awt.Point;
 
-/**
- *
- * @author david
- */
+
 public class MapDataModel {
     
     // these are the different display modes:
@@ -47,7 +34,6 @@ public class MapDataModel {
     private int mode;
     private int limit;
     private NodePosition positions;
-    private java.awt.Image mapImage;
     
     // new for generic...
     private String[] currentIndexValues;
@@ -61,8 +47,8 @@ public class MapDataModel {
     private int maxScale;
     
     private Dataset dataset;
+
     
-    /** Creates a new instance of MapDataModel */
     private MapDataModel() {
         this(new Dataset());
     }
@@ -97,28 +83,43 @@ public class MapDataModel {
         // find min/max scale items:
         int min = 65535;
         this.minScale = -1;
+        int max = -65535;
+        this.maxScale = -1;
         for (int i = 0; i < ds.scale.length; ++i) {
             if (ds.scale[i] < min) {
                 min = ds.scale[i];
                 this.minScale = min;
             }
-        }
-        int max = -65535;
-        this.maxScale = -1;
-        for (int i = 0; i < ds.scale.length; ++i) {
             if (ds.scale[i] > max) {
                 max = ds.scale[i];
                 this.maxScale = max;
             }
         }
         this.currentScale = this.minScale;
-        System.err.println("model set minScale="+minScale+",maxScale"+maxScale+",currentScale="+currentScale);
-        System.err.println("model set min="+min+",max"+max);
+        //System.err.println("model set minScale="+minScale+",maxScale"+maxScale+",currentScale="+currentScale);
+        //System.err.println("model set min="+min+",max"+max);
+        
         // now set floor:
         // just take the first one :-)
         this.currentFloor = ds.floor[0];
-        System.err.println("model set currentFloor="+currentFloor);
+        //System.err.println("model set currentFloor="+currentFloor);
         
+    }
+    
+    public java.awt.Image getBackgroundImage() {
+        java.awt.Image i = (java.awt.Image)this.dataset.getImage(this.currentFloor,
+                                                                 this.currentScale);
+        while (i.getWidth(null) <= 1 || i.getHeight(null) <= 1) {
+            try {
+                Thread.currentThread().sleep(10);
+                System.out.println("DEBUG: waiting for image to have valid w/h!");
+            }
+            catch (Exception ex) {
+                ;
+            }
+        }
+        
+        return i;
     }
     
     public Float getCurrentPropertyDelta() {
@@ -167,7 +168,7 @@ public class MapDataModel {
         else if (limit == LIMIT_N_BEST_NEIGHBOR) {
             retval = null;
 
-            System.out.println("neighborCount = "+neighborCount);
+            //System.out.println("neighborCount = "+neighborCount);
 
             // ok, here's what we gotta do here.
             // we are considering each node as a sender... those are its 
@@ -203,7 +204,7 @@ public class MapDataModel {
                             if (lObj instanceof Float && kObj instanceof Float) {
                             
                                 float diff = ((Float)lObj).floatValue() - ((Float)kObj).floatValue();
-                                System.out.println("computed diff = "+diff);
+                                //System.out.println("computed diff = "+diff);
                                 if (diff > 0 && diff > maxDiff) {
                                     maxDiff = diff;
                                     maxDiffIdx = j;
@@ -243,7 +244,7 @@ public class MapDataModel {
                     }
                 }
             }
-            System.out.println("added "+count+" from tmpH!");
+            //System.out.println("added "+count+" from tmpH!");
 
             retval = new GenericLinkStats[tmp.size()];
             int i = 0;
@@ -427,6 +428,11 @@ public class MapDataModel {
         }
     }
     
+    // this is a hack to make the NodeMapPanel redraw when we need it to
+    void fireChangeListeners() {
+        notifyChangeListeners();
+    }
+    
     public void setFloor(int floor) {
         this.currentFloor = floor;
         notifyChangeListeners();
@@ -443,6 +449,36 @@ public class MapDataModel {
     
     public int getScale() {
         return this.currentScale;
+    }
+    
+    public int getNextScale() {
+        if (this.currentScale != this.getMaxScale()) {
+            int i = 1;
+            while (!this.isValidScale(this.currentScale + i)) {
+                ++i;
+            }
+            return (this.currentScale + i);
+        }
+        else {
+            return this.currentScale;
+        }
+    }
+    
+    public int getPrevScale() {
+        if (this.currentScale != this.getMinScale()) {
+            int i = 1;
+            while (!this.isValidScale(this.currentScale - i)) {
+                ++i;
+            }
+            return (this.currentScale - 1);
+        }
+        else {
+            return this.currentScale;
+        }
+    }
+    
+    public boolean isValidScale(int s) {
+        return this.dataset.isScale(s);
     }
     
     public int getMinScale() {

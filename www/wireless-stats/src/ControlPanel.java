@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,6 +23,8 @@ public class ControlPanel extends javax.swing.JPanel {
     // (label,jcombobox) pairs... all of which get added to the indexPanel
     // when their model is swapped in.
     private Hashtable modelIndexComponents;
+    // placements for components in above table
+    private Hashtable modelIndexPlacements;
     
     // ummm, a gentler comment: this is needed to preserve the component's
     // identity as a bean... so I can add it to the appropriate DND panel
@@ -43,6 +45,7 @@ public class ControlPanel extends javax.swing.JPanel {
         this.currentModel = null;
         
         this.modelIndexComponents = new Hashtable();
+        this.modelIndexPlacements = new Hashtable();
         
         String tmpModelName = null;
         MapDataModel tmpModel = null;
@@ -63,6 +66,15 @@ public class ControlPanel extends javax.swing.JPanel {
         
         System.err.println("setting init model '"+tmpModelName+"' with model="+tmpModel);
         setModel(tmpModelName,tmpModel);
+        // this is the ugliest hack in the book, but the images won't display
+        // right away unless we sleep and let them settle, then reset the model.
+//        try {
+//            Thread.currentThread().sleep(500);
+//        }
+//        catch (Exception ex) {
+//            ;
+//        }
+//        tmpModel.fireChangeListeners();
     }
     
     protected void mapSetSelectedNodes(Vector nodes) {
@@ -112,29 +124,106 @@ public class ControlPanel extends javax.swing.JPanel {
         indexPanel.removeAll();
         
         Vector tv = (Vector)modelIndexComponents.get(modelName);
-        if (tv == null) {
+        Vector gbv = (Vector)modelIndexPlacements.get(modelName);
+        if (tv == null || gbv == null) {
             tv = new Vector();
             modelIndexComponents.put(modelName,tv);
+            gbv = new Vector();
+            modelIndexPlacements.put(modelName,gbv);
             
             // populate the vector...
             String[] indices = m.getData().getIndices();
             final JComboBox[] jcArray = new JComboBox[indices.length];
             
+            int cy = 0;
+            
             for (int i = 0; i < indices.length; ++i) {
                 JLabel jl = new JLabel();
                 jl.setText(indices[i] + ":");
                 jl.setFont(new java.awt.Font("Dialog",0,10));
+                tv.add(jl);
                 
-                JComboBox jc = new JComboBox();
+                GridBagConstraints gc = new GridBagConstraints();
+                gc.gridx = 0;
+                gc.gridy = cy;
+                gc.insets = new Insets(2,16,2,4);
+                gc.anchor = GridBagConstraints.WEST;
+                gc.fill = GridBagConstraints.HORIZONTAL;
+                gc.weightx = 1.0;
+                gbv.add(gc);
+                
+                final JComboBox jc = new JComboBox();
                 // bookkeep for later, so that we can use a single listener
                 // for all n comboboxen...
                 jcArray[i] = jc;
                 jc.setModel(new javax.swing.DefaultComboBoxModel(m.getData().getIndexValues(indices[i])));
                 jc.setFont(new java.awt.Font("Dialog",1,10));
-                
-                // add both to the vector:
-                tv.add(jl);
                 tv.add(jc);
+                
+                gc = new GridBagConstraints();
+                gc.gridx = 0;
+                gc.gridy = cy+1;
+                gc.insets = new Insets(2,16,2,2);
+                gc.anchor = GridBagConstraints.WEST;
+                gc.fill = GridBagConstraints.HORIZONTAL;
+                //gc.weightx = 1.0;
+                gc.gridwidth = 3;
+                gbv.add(gc);
+                
+                // prev/next buttons
+                JButton pb = new JButton();
+                pb.setFont(new java.awt.Font("Dialog",0,8));
+                pb.setText("<");
+                tv.add(pb);
+                pb.addActionListener(new ActionListener() {
+                    final JComboBox myComboBox = jc;
+                    
+                    public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        int n = jc.getItemCount();
+                        int cs = jc.getSelectedIndex();
+                        if ((cs - 1) < 0) {
+                            jc.setSelectedIndex(n-1);
+                        }
+                        else {
+                            jc.setSelectedIndex(cs-1);
+                        }
+                    }
+                });
+                
+                gc = new GridBagConstraints();
+                gc.gridx = 1;
+                gc.gridy = cy;
+                gc.insets = new Insets(0,2,0,0);
+                gc.anchor = GridBagConstraints.EAST;
+                gbv.add(gc);
+                
+                JButton nb = new JButton();
+                nb.setFont(new java.awt.Font("Dialog",0,8));
+                nb.setText(">");
+                tv.add(nb);
+                nb.addActionListener(new ActionListener() {
+                    final JComboBox myComboBox = jc;
+                    
+                    public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        int n = jc.getItemCount();
+                        int cs = jc.getSelectedIndex();
+                        if ((cs + 1) == n) {
+                            jc.setSelectedIndex(0);
+                        }
+                        else {
+                            jc.setSelectedIndex(cs+1);
+                        }
+                    }
+                });
+                
+                gc = new GridBagConstraints();
+                gc.gridx = 2;
+                gc.gridy = cy;
+                gc.insets = new Insets(0,2,0,2);
+                gc.anchor = GridBagConstraints.EAST;
+                gbv.add(gc);
+                
+                cy += 2;
             }
             
             // now create a single listener for these n comboboxen:
@@ -162,18 +251,10 @@ public class ControlPanel extends javax.swing.JPanel {
             
         }
         // now add everything in the vector to indexPanel:
-        int cy = 0;
-        GridBagConstraints gc = new GridBagConstraints();
-        gc.gridx = 0;
-        gc.insets = new Insets(2,16,2,2);
-        gc.anchor = GridBagConstraints.NORTHWEST;
-        gc.fill = GridBagConstraints.HORIZONTAL;
-        gc.weightx = 1.0;
-        
-        for (Enumeration e1 = tv.elements(); e1.hasMoreElements(); ) {
-            JComponent jc = (JComponent)e1.nextElement();
-            
-            gc.gridy = cy++;
+        for (int i = 0; i < tv.size(); ++i) {
+            JComponent jc = (JComponent)tv.get(i);
+            GridBagConstraints gc = (GridBagConstraints)gbv.get(i);
+
             indexPanel.add(jc,gc);
         }
         
@@ -209,7 +290,7 @@ public class ControlPanel extends javax.swing.JPanel {
         }
         
         // finally, set the background
-        map.setBackgroundImage(ds.getImage(m.getFloor(),m.getScale()));
+        //map.setBackgroundImage(ds.getImage(m.getFloor(),m.getScale()));
     }
     
     // <editor-fold defaultstate="collapsed" desc=" Generated Code ">//GEN-BEGIN:initComponents
@@ -218,85 +299,226 @@ public class ControlPanel extends javax.swing.JPanel {
 
         buttonGroup = new javax.swing.ButtonGroup();
         limitButtonGroup = new javax.swing.ButtonGroup();
-        nodesList = new javax.swing.JList();
-        nodesLabel = new javax.swing.JLabel();
-        nnTextField = new javax.swing.JTextField();
-        modeAllRadioButton = new javax.swing.JRadioButton();
-        indexPanel = new javax.swing.JPanel();
-        powerLevelLabel = new javax.swing.JLabel();
-        powerLevelComboBox = new javax.swing.JComboBox();
-        selectBySrcRadioButton = new javax.swing.JRadioButton();
-        selectByDstRadioButton = new javax.swing.JRadioButton();
-        kBestNeighborsCheckBox = new javax.swing.JCheckBox();
-        thresholdCheckBox = new javax.swing.JCheckBox();
+        collapsablePanelContainer = new CollapsablePanelContainer();
+        datasetOptionsCollapsablePanel = new CollapsablePanel("Dataset Options");
         datasetLabel = new javax.swing.JLabel();
         datasetComboBox = new JComboBox(new DefaultComboBoxModel(modelNames));
-        modeLabel = new javax.swing.JLabel();
-        limitLabel = new javax.swing.JLabel();
-        thresholdTextField = new javax.swing.JTextField();
-        noneCheckBox = new javax.swing.JCheckBox();
-        MSTRadioButton = new javax.swing.JRadioButton();
-        otherOptionsLabel = new javax.swing.JLabel();
-        noZeroLinksCheckBox = new javax.swing.JCheckBox();
         datasetParametersLabel = new javax.swing.JLabel();
         primaryDisplayPropertyLabel = new javax.swing.JLabel();
         primaryDisplayPropertyComboBox = new javax.swing.JComboBox();
+        indexPanel = new javax.swing.JPanel();
+        powerLevelLabel = new javax.swing.JLabel();
+        powerLevelComboBox = new javax.swing.JComboBox();
+        prevButton = new javax.swing.JButton();
+        nextButton = new javax.swing.JButton();
+        mapOptionsCollapsablePanel = new CollapsablePanel("Map Controls");
         floorLabel = new javax.swing.JLabel();
         floorComboBox = new javax.swing.JComboBox();
         scaleLabel = new javax.swing.JLabel();
         scaleSlider = new javax.swing.JSlider();
+        nodeFiltersCollapsablePanel = new CollapsablePanel("Node Filters");
+        nodesLabel = new javax.swing.JLabel();
+        modeAllRadioButton = new javax.swing.JRadioButton();
+        selectBySrcRadioButton = new javax.swing.JRadioButton();
+        selectByDstRadioButton = new javax.swing.JRadioButton();
+        modeLabel = new javax.swing.JLabel();
+        limitLabel = new javax.swing.JLabel();
+        noneCheckBox = new javax.swing.JCheckBox();
+        MSTRadioButton = new javax.swing.JRadioButton();
+        otherOptionsLabel = new javax.swing.JLabel();
+        noZeroLinksCheckBox = new javax.swing.JCheckBox();
+        kBestNeighborsContainerPanel = new javax.swing.JPanel();
+        kBestNeighborsCheckBox = new javax.swing.JCheckBox();
+        nnTextField = new javax.swing.JTextField();
+        thresholdContainerPanel = new javax.swing.JPanel();
+        thresholdCheckBox = new javax.swing.JCheckBox();
+        thresholdTextField = new javax.swing.JTextField();
+        nodesList = new javax.swing.JList();
 
         setLayout(new java.awt.GridBagLayout());
 
-        setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Options", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Dialog", 0, 12)));
         setPreferredSize(new java.awt.Dimension(250, 247));
-        nodesList.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(102, 102, 102)));
-        nodesList.setFont(new java.awt.Font("Dialog", 0, 10));
-        nodesList.setEnabled(false);
-        nodesList.setMinimumSize(new java.awt.Dimension(160, 100));
-        nodesList.setPreferredSize(new java.awt.Dimension(90, 120));
-        nodesList.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
-            public void valueChanged(javax.swing.event.ListSelectionEvent evt) {
-                nodesListValueChanged(evt);
+        datasetLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        datasetLabel.setText("Dataset:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        datasetOptionsCollapsablePanel.add(datasetLabel, gridBagConstraints);
+
+        datasetComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
+        datasetComboBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                datasetComboBoxActionPerformed(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        datasetOptionsCollapsablePanel.add(datasetComboBox, gridBagConstraints);
+
+        datasetParametersLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        datasetParametersLabel.setText("Dataset parameters:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        datasetOptionsCollapsablePanel.add(datasetParametersLabel, gridBagConstraints);
+
+        primaryDisplayPropertyLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        primaryDisplayPropertyLabel.setText("Display property:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 3;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        datasetOptionsCollapsablePanel.add(primaryDisplayPropertyLabel, gridBagConstraints);
+
+        primaryDisplayPropertyComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
+        primaryDisplayPropertyComboBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                primaryDisplayPropertyComboBoxActionPerformed(evt);
             }
         });
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 24;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
+        gridBagConstraints.gridy = 4;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
+        datasetOptionsCollapsablePanel.add(primaryDisplayPropertyComboBox, gridBagConstraints);
+
+        indexPanel.setLayout(new java.awt.GridBagLayout());
+
+        powerLevelLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        powerLevelLabel.setText("Power level:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 4);
+        indexPanel.add(powerLevelLabel, gridBagConstraints);
+
+        powerLevelComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
+        powerLevelComboBox.setPreferredSize(new java.awt.Dimension(60, 24));
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.gridwidth = 3;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
+        indexPanel.add(powerLevelComboBox, gridBagConstraints);
+
+        prevButton.setFont(new java.awt.Font("Dialog", 0, 8));
+        prevButton.setText("<");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 0);
+        indexPanel.add(prevButton, gridBagConstraints);
+
+        nextButton.setFont(new java.awt.Font("Dialog", 0, 8));
+        nextButton.setText(">");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.insets = new java.awt.Insets(2, 0, 2, 2);
+        indexPanel.add(nextButton, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        datasetOptionsCollapsablePanel.add(indexPanel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.weighty = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(nodesList, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(4, 4, 4, 4);
+        collapsablePanelContainer.add(datasetOptionsCollapsablePanel, gridBagConstraints);
 
-        nodesLabel.setFont(new java.awt.Font("Dialog", 0, 12));
+        floorLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        floorLabel.setText("Floor:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        mapOptionsCollapsablePanel.add(floorLabel, gridBagConstraints);
+
+        floorComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
+        floorComboBox.setPreferredSize(new java.awt.Dimension(60, 24));
+        floorComboBox.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                floorComboBoxItemStateChanged(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        mapOptionsCollapsablePanel.add(floorComboBox, gridBagConstraints);
+
+        scaleLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        scaleLabel.setText("Zoom:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        mapOptionsCollapsablePanel.add(scaleLabel, gridBagConstraints);
+
+        scaleSlider.setMaximum(5);
+        scaleSlider.setValue(3);
+        scaleSlider.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                scaleSliderStateChanged(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
+        mapOptionsCollapsablePanel.add(scaleSlider, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(4, 4, 4, 4);
+        collapsablePanelContainer.add(mapOptionsCollapsablePanel, gridBagConstraints);
+
+        nodesLabel.setFont(new java.awt.Font("Dialog", 0, 10));
         nodesLabel.setText("Select nodes:");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 23;
+        gridBagConstraints.gridy = 11;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(nodesLabel, gridBagConstraints);
-
-        nnTextField.setFont(new java.awt.Font("Dialog", 0, 10));
-        nnTextField.setText("3");
-        nnTextField.setMaximumSize(new java.awt.Dimension(35, 17));
-        nnTextField.setPreferredSize(new java.awt.Dimension(40, 17));
-        nnTextField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                nnTextFieldActionPerformed(evt);
-            }
-        });
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 18;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 28, 2, 2);
-        add(nnTextField, gridBagConstraints);
+        nodeFiltersCollapsablePanel.add(nodesLabel, gridBagConstraints);
 
         buttonGroup.add(modeAllRadioButton);
         modeAllRadioButton.setFont(new java.awt.Font("Dialog", 0, 10));
@@ -311,38 +533,10 @@ public class ControlPanel extends javax.swing.JPanel {
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 11;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(modeAllRadioButton, gridBagConstraints);
-
-        indexPanel.setLayout(new java.awt.GridBagLayout());
-
-        powerLevelLabel.setFont(new java.awt.Font("Dialog", 0, 10));
-        powerLevelLabel.setText("Power level:");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        indexPanel.add(powerLevelLabel, gridBagConstraints);
-
-        powerLevelComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
-        powerLevelComboBox.setPreferredSize(new java.awt.Dimension(60, 24));
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        indexPanel.add(powerLevelComboBox, gridBagConstraints);
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 7;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        add(indexPanel, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 2);
+        nodeFiltersCollapsablePanel.add(modeAllRadioButton, gridBagConstraints);
 
         buttonGroup.add(selectBySrcRadioButton);
         selectBySrcRadioButton.setFont(new java.awt.Font("Dialog", 0, 10));
@@ -356,10 +550,10 @@ public class ControlPanel extends javax.swing.JPanel {
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 12;
+        gridBagConstraints.gridy = 2;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(selectBySrcRadioButton, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 2);
+        nodeFiltersCollapsablePanel.add(selectBySrcRadioButton, gridBagConstraints);
 
         buttonGroup.add(selectByDstRadioButton);
         selectByDstRadioButton.setFont(new java.awt.Font("Dialog", 0, 10));
@@ -373,102 +567,28 @@ public class ControlPanel extends javax.swing.JPanel {
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 13;
+        gridBagConstraints.gridy = 3;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(selectByDstRadioButton, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 2);
+        nodeFiltersCollapsablePanel.add(selectByDstRadioButton, gridBagConstraints);
 
-        limitButtonGroup.add(kBestNeighborsCheckBox);
-        kBestNeighborsCheckBox.setFont(new java.awt.Font("Dialog", 0, 10));
-        kBestNeighborsCheckBox.setText("k best neighbors");
-        kBestNeighborsCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                kBestNeighborsCheckBoxActionPerformed(evt);
-            }
-        });
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 17;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(kBestNeighborsCheckBox, gridBagConstraints);
-
-        limitButtonGroup.add(thresholdCheckBox);
-        thresholdCheckBox.setFont(new java.awt.Font("Dialog", 0, 10));
-        thresholdCheckBox.setText("all links above threshold");
-        thresholdCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                thresholdCheckBoxActionPerformed(evt);
-            }
-        });
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 19;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(thresholdCheckBox, gridBagConstraints);
-
-        datasetLabel.setFont(new java.awt.Font("Dialog", 0, 12));
-        datasetLabel.setText("Change dataset:");
+        modeLabel.setFont(new java.awt.Font("Dialog", 0, 10));
+        modeLabel.setText("Mode:");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(datasetLabel, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 0, 2);
+        nodeFiltersCollapsablePanel.add(modeLabel, gridBagConstraints);
 
-        datasetComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
-        datasetComboBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                datasetComboBoxActionPerformed(evt);
-            }
-        });
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(datasetComboBox, gridBagConstraints);
-
-        modeLabel.setFont(new java.awt.Font("Dialog", 0, 12));
-        modeLabel.setText("Mode:");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 10;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(modeLabel, gridBagConstraints);
-
-        limitLabel.setFont(new java.awt.Font("Dialog", 0, 12));
+        limitLabel.setFont(new java.awt.Font("Dialog", 0, 10));
         limitLabel.setText("Limit by:");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 15;
+        gridBagConstraints.gridy = 5;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(limitLabel, gridBagConstraints);
-
-        thresholdTextField.setFont(new java.awt.Font("Dialog", 0, 10));
-        thresholdTextField.setText("70");
-        thresholdTextField.setPreferredSize(new java.awt.Dimension(40, 17));
-        thresholdTextField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                thresholdTextFieldActionPerformed(evt);
-            }
-        });
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 20;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 28, 2, 2);
-        add(thresholdTextField, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 0, 2);
+        nodeFiltersCollapsablePanel.add(limitLabel, gridBagConstraints);
 
         limitButtonGroup.add(noneCheckBox);
         noneCheckBox.setFont(new java.awt.Font("Dialog", 0, 10));
@@ -482,10 +602,10 @@ public class ControlPanel extends javax.swing.JPanel {
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 16;
+        gridBagConstraints.gridy = 6;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(noneCheckBox, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(0, 15, 0, 2);
+        nodeFiltersCollapsablePanel.add(noneCheckBox, gridBagConstraints);
 
         buttonGroup.add(MSTRadioButton);
         MSTRadioButton.setFont(new java.awt.Font("Dialog", 0, 10));
@@ -499,19 +619,19 @@ public class ControlPanel extends javax.swing.JPanel {
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 14;
+        gridBagConstraints.gridy = 4;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(MSTRadioButton, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 2);
+        nodeFiltersCollapsablePanel.add(MSTRadioButton, gridBagConstraints);
 
-        otherOptionsLabel.setFont(new java.awt.Font("Dialog", 0, 12));
+        otherOptionsLabel.setFont(new java.awt.Font("Dialog", 0, 10));
         otherOptionsLabel.setText("Other options:");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 21;
+        gridBagConstraints.gridy = 9;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(otherOptionsLabel, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(2, 2, 0, 2);
+        nodeFiltersCollapsablePanel.add(otherOptionsLabel, gridBagConstraints);
 
         noZeroLinksCheckBox.setFont(new java.awt.Font("Dialog", 0, 10));
         noZeroLinksCheckBox.setSelected(true);
@@ -524,108 +644,184 @@ public class ControlPanel extends javax.swing.JPanel {
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 22;
+        gridBagConstraints.gridy = 10;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(noZeroLinksCheckBox, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(0, 16, 0, 2);
+        nodeFiltersCollapsablePanel.add(noZeroLinksCheckBox, gridBagConstraints);
 
-        datasetParametersLabel.setFont(new java.awt.Font("Dialog", 0, 12));
-        datasetParametersLabel.setText("Dataset parameters:");
+        kBestNeighborsContainerPanel.setLayout(new java.awt.GridBagLayout());
+
+        limitButtonGroup.add(kBestNeighborsCheckBox);
+        kBestNeighborsCheckBox.setFont(new java.awt.Font("Dialog", 0, 10));
+        kBestNeighborsCheckBox.setText("k best neighbors");
+        kBestNeighborsCheckBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                kBestNeighborsCheckBoxActionPerformed(evt);
+            }
+        });
+
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 6;
+        gridBagConstraints.gridy = 0;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(datasetParametersLabel, gridBagConstraints);
+        kBestNeighborsContainerPanel.add(kBestNeighborsCheckBox, gridBagConstraints);
 
-        primaryDisplayPropertyLabel.setFont(new java.awt.Font("Dialog", 0, 12));
-        primaryDisplayPropertyLabel.setText("Primary display property:");
+        nnTextField.setFont(new java.awt.Font("Dialog", 0, 10));
+        nnTextField.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
+        nnTextField.setText("3");
+        nnTextField.setMaximumSize(new java.awt.Dimension(35, 17));
+        nnTextField.setPreferredSize(new java.awt.Dimension(40, 17));
+        nnTextField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                nnTextFieldActionPerformed(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(0, 2, 0, 0);
+        kBestNeighborsContainerPanel.add(nnTextField, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 7;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.insets = new java.awt.Insets(0, 15, 0, 2);
+        nodeFiltersCollapsablePanel.add(kBestNeighborsContainerPanel, gridBagConstraints);
+
+        thresholdContainerPanel.setLayout(new java.awt.GridBagLayout());
+
+        limitButtonGroup.add(thresholdCheckBox);
+        thresholdCheckBox.setFont(new java.awt.Font("Dialog", 0, 10));
+        thresholdCheckBox.setText("links above");
+        thresholdCheckBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                thresholdCheckBoxActionPerformed(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        thresholdContainerPanel.add(thresholdCheckBox, gridBagConstraints);
+
+        thresholdTextField.setFont(new java.awt.Font("Dialog", 0, 10));
+        thresholdTextField.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
+        thresholdTextField.setText("70");
+        thresholdTextField.setPreferredSize(new java.awt.Dimension(40, 17));
+        thresholdTextField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                thresholdTextFieldActionPerformed(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(0, 2, 0, 0);
+        thresholdContainerPanel.add(thresholdTextField, gridBagConstraints);
+
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 8;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(primaryDisplayPropertyLabel, gridBagConstraints);
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.insets = new java.awt.Insets(0, 15, 0, 2);
+        nodeFiltersCollapsablePanel.add(thresholdContainerPanel, gridBagConstraints);
 
-        primaryDisplayPropertyComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
-        primaryDisplayPropertyComboBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                primaryDisplayPropertyComboBoxActionPerformed(evt);
+        nodesList.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(102, 102, 102)));
+        nodesList.setFont(new java.awt.Font("Dialog", 0, 10));
+        nodesList.setMinimumSize(new java.awt.Dimension(160, 100));
+        nodesList.setPreferredSize(new java.awt.Dimension(90, 120));
+        nodesList.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
+            public void valueChanged(javax.swing.event.ListSelectionEvent evt) {
+                nodesListValueChanged(evt);
             }
         });
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 9;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.gridy = 12;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.weighty = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(primaryDisplayPropertyComboBox, gridBagConstraints);
+        nodeFiltersCollapsablePanel.add(nodesList, gridBagConstraints);
 
-        floorLabel.setFont(new java.awt.Font("Dialog", 0, 12));
-        floorLabel.setText("Change floor:");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 2;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(floorLabel, gridBagConstraints);
-
-        floorComboBox.setFont(new java.awt.Font("Dialog", 1, 10));
-        floorComboBox.setPreferredSize(new java.awt.Dimension(60, 24));
-        floorComboBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                floorComboBoxItemStateChanged(evt);
-            }
-        });
-
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(floorComboBox, gridBagConstraints);
-
-        scaleLabel.setFont(new java.awt.Font("Dialog", 0, 12));
-        scaleLabel.setText("Zoom:");
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 4;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
-        add(scaleLabel, gridBagConstraints);
-
-        scaleSlider.setMaximum(5);
-        scaleSlider.setValue(3);
-        scaleSlider.addChangeListener(new javax.swing.event.ChangeListener() {
-            public void stateChanged(javax.swing.event.ChangeEvent evt) {
-                scaleSliderStateChanged(evt);
-            }
-        });
+        gridBagConstraints.weighty = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(4, 4, 4, 4);
+        collapsablePanelContainer.add(nodeFiltersCollapsablePanel, gridBagConstraints);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 5;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        add(scaleSlider, gridBagConstraints);
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.weighty = 1.0;
+        add(collapsablePanelContainer, gridBagConstraints);
 
     }// </editor-fold>//GEN-END:initComponents
 
     private void floorComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_floorComboBoxItemStateChanged
         this.currentModel.setFloor(((Integer)floorComboBox.getSelectedItem()).intValue());
         // have to cheat here...
-        map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
+        
+        //map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
     }//GEN-LAST:event_floorComboBoxItemStateChanged
 
     private void scaleSliderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_scaleSliderStateChanged
-        this.currentModel.setScale(scaleSlider.getValue());
-        map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
+        int s = scaleSlider.getValue();
+        if (this.currentModel.getScale() < s) {
+            int tmps = this.currentModel.getPrevScale();
+            if (tmps != s) {
+                this.scaleSlider.setValue(tmps);
+            }
+            this.currentModel.setScale(tmps);
+            
+            //map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
+        }
+        else if (this.currentModel.getScale() > s) {
+            int tmps = this.currentModel.getNextScale();
+            if (tmps != s) {
+                this.scaleSlider.setValue(tmps);
+            }
+            this.currentModel.setScale(tmps);
+            //map.setBackgroundImage();
+        }
+        else {
+            // equal --- do nothing.
+            ;
+        }
     }//GEN-LAST:event_scaleSliderStateChanged
-
+    
+    public int getScale() {
+        return this.currentModel.getScale();
+    }
+    
+    public void setScale(int scale) {
+        if (scale <= this.currentModel.getMaxScale()
+            && scale >= this.currentModel.getMinScale()) {
+            this.currentModel.setScale(scale);
+            this.scaleSlider.setValue(scale);
+            
+            //map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
+        }
+    }
+    
     private void primaryDisplayPropertyComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_primaryDisplayPropertyComboBoxActionPerformed
         this.currentModel.setCurrentProperty((String)this.primaryDisplayPropertyComboBox.getSelectedItem());
     }//GEN-LAST:event_primaryDisplayPropertyComboBoxActionPerformed
@@ -801,25 +997,32 @@ public class ControlPanel extends javax.swing.JPanel {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JRadioButton MSTRadioButton;
     private javax.swing.ButtonGroup buttonGroup;
+    private CollapsablePanelContainer collapsablePanelContainer;
     private javax.swing.JComboBox datasetComboBox;
     private javax.swing.JLabel datasetLabel;
+    private CollapsablePanel datasetOptionsCollapsablePanel;
     private javax.swing.JLabel datasetParametersLabel;
     private javax.swing.JComboBox floorComboBox;
     private javax.swing.JLabel floorLabel;
     private javax.swing.JPanel indexPanel;
     private javax.swing.JCheckBox kBestNeighborsCheckBox;
+    private javax.swing.JPanel kBestNeighborsContainerPanel;
     private javax.swing.ButtonGroup limitButtonGroup;
     private javax.swing.JLabel limitLabel;
+    private CollapsablePanel mapOptionsCollapsablePanel;
     private javax.swing.JRadioButton modeAllRadioButton;
     private javax.swing.JLabel modeLabel;
+    private javax.swing.JButton nextButton;
     private javax.swing.JTextField nnTextField;
     private javax.swing.JCheckBox noZeroLinksCheckBox;
+    private CollapsablePanel nodeFiltersCollapsablePanel;
     private javax.swing.JLabel nodesLabel;
     private javax.swing.JList nodesList;
     private javax.swing.JCheckBox noneCheckBox;
     private javax.swing.JLabel otherOptionsLabel;
     private javax.swing.JComboBox powerLevelComboBox;
     private javax.swing.JLabel powerLevelLabel;
+    private javax.swing.JButton prevButton;
     private javax.swing.JComboBox primaryDisplayPropertyComboBox;
     private javax.swing.JLabel primaryDisplayPropertyLabel;
     private javax.swing.JLabel scaleLabel;
@@ -827,6 +1030,7 @@ public class ControlPanel extends javax.swing.JPanel {
     private javax.swing.JRadioButton selectByDstRadioButton;
     private javax.swing.JRadioButton selectBySrcRadioButton;
     private javax.swing.JCheckBox thresholdCheckBox;
+    private javax.swing.JPanel thresholdContainerPanel;
     private javax.swing.JTextField thresholdTextField;
     // End of variables declaration//GEN-END:variables
     

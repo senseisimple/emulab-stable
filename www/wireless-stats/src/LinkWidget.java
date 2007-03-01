@@ -1,26 +1,12 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  * All rights reserved.
- */
-
-/*
- * LinkWidget.java
- *
- * Created on July 11, 2005, 8:24 AM
- *
- * To change this template, choose Tools | Options and locate the template under
- * the Source Creation and Management node. Right-click the template and choose
- * Open. You can then make changes to the template in the Source Editor.
  */
 
 import java.awt.*;
 import java.awt.geom.*;
 
-/**
- *
- * @author david
- */
 public class LinkWidget extends Widget {
     
     private int x1,y1;
@@ -316,7 +302,7 @@ public class LinkWidget extends Widget {
             retvals[1] += ticks;
         }
         
-        System.out.println("getLinkColor returning {"+retvals[0]+","+retvals[1]+","+retvals[2]+"}; percent was "+percent);
+        //System.out.println("getLinkColor returning {"+retvals[0]+","+retvals[1]+","+retvals[2]+"}; percent was "+percent);
         
         return retvals;
     }
