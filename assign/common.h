@@ -7,11 +7,13 @@
 #ifndef __COMON_H
 #define __COMON_H
 
+#include "port.h"
+
 /*
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <ext/hash_map>
 #include <ext/hash_fun.h>
 using namespace __gnu_cxx;
@@ -184,7 +186,7 @@ struct eqstr
   }
 };
 
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 namespace __gnu_cxx
 {
 #endif
@@ -195,7 +197,7 @@ namespace __gnu_cxx
             return hash< const char* >()( x.c_str() );
         }
     };
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 };
 #endif
 
@@ -236,7 +238,7 @@ template <class T> struct hashptr {
  * Needed for the transition from gcc 2.95 to 3.x - the new gcc puts some
  * non-standard (ie. SGI) STL extensions in different place
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #define HASH_MAP <ext/hash_map>
 #else
 #define HASH_MAP

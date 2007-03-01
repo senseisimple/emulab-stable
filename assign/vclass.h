@@ -14,7 +14,7 @@
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <ext/hash_map>
 using namespace __gnu_cxx;
 #else

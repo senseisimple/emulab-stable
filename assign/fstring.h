@@ -21,11 +21,13 @@
  *      - O(1) hashing time for any string
  */
 
+#include "port.h"
+
 #include <iostream>
 #include <map>
 using namespace std;
 
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <ext/hash_fun.h>
 using namespace __gnu_cxx;
 #else
@@ -183,7 +185,7 @@ class fstring {
 };
 
 // A hash function for fstrings
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 namespace __gnu_cxx {
 #endif
 template<> struct hash<fstring> {
@@ -192,7 +194,7 @@ template<> struct hash<fstring> {
   	return (size_t)__str.hash();
   }
 };
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 };
 #endif
 

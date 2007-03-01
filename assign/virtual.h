@@ -7,11 +7,13 @@
 #ifndef __VIRTUAL_H
 #define __VIRTUAL_H
 
+#include "port.h"
+
 /*
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <queue>
 using namespace std;
 #else
