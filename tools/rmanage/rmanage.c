@@ -4,13 +4,14 @@
  * All rights reserved.
  */
 
+#include "rmcp.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "rmcp.h"
 
 extern char *optarg;
 extern int optopt;
@@ -97,7 +98,6 @@ int main(int argc,char **argv) {
     int roleno;
     char *uid = NULL;
     char *command = NULL;
-    int i;
 
     while ((c = getopt(argc,argv,"c:t:m:r:k:g:u:hdsH")) != -1) {
 	switch (c) {
@@ -173,6 +173,8 @@ int main(int argc,char **argv) {
     }
     
     rmcp_set_debug_level(debug);
+    rmcp_set_enable_warn_err(1);
+
     ctx = rmcp_ctx_init(timeout,retries);
 
     if (secure) {
@@ -187,14 +189,10 @@ int main(int argc,char **argv) {
 	    exit(-4);
 	}
 
-/*  	rkey_len = gkey_len = 4; */
-
 	rmcp_ctx_setsecure(ctx,
 			   roleno,
-			   //rkey,rkey_len, //"1234",4, //rkey_len,
-			   //gkey,gkey_len); //"1234",4); // gkey_len);
-	                   "1234",rkey_len,
-			   "1234",gkey_len);
+			   rkey,rkey_len,
+			   gkey,gkey_len);
 	if (uid) {
 	    rmcp_ctx_setuid(ctx,uid,strlen(uid)-1);
 	}
@@ -203,8 +201,8 @@ int main(int argc,char **argv) {
     retval = rmcp_open(ctx,client);
     if (retval != RMCP_SUCCESS) {
 	fprintf(stderr,
-		"Could not open connection to client %s: error 0x%x.\n",
-		client,retval);
+		"Could not open connection to client %s: error %s.\n",
+		client,rmcp_error_tostr(retval));
 	exit(-5);
     }
 
@@ -223,9 +221,9 @@ int main(int argc,char **argv) {
 	retval = rmcp_asf_ping(ctx,&supported);
 	if (retval != RMCP_SUCCESS) {
 	    fprintf(stderr,
-		    "Command '%s' failed: 0x%x\n",
+		    "Command '%s' failed: %s\n",
 		    command,
-		    retval);
+		    rmcp_error_tostr(retval));
 	    exit(-16);
 	}
 	rmcp_print_asf_supported(supported,NULL);
@@ -235,9 +233,9 @@ int main(int argc,char **argv) {
 	retval = rmcp_asf_get_capabilities(ctx,&capabilities);
 	if (retval != RMCP_SUCCESS) {
 	    fprintf(stderr,
-		    "Command '%s' failed: 0x%x\n",
+		    "Command '%s' failed: %s\n",
 		    command,
-		    retval);
+		    rmcp_error_tostr(retval));
 	    exit(-16);
 	}
 	rmcp_print_asf_capabilities(capabilities,NULL);
@@ -247,9 +245,9 @@ int main(int argc,char **argv) {
 	retval = rmcp_asf_get_sysstate(ctx,&sysstate);
 	if (retval != RMCP_SUCCESS) {
 	    fprintf(stderr,
-		    "Command '%s' failed: 0x%x\n",
+		    "Command '%s' failed: %s\n",
 		    command,
-		    retval);
+		    rmcp_error_tostr(retval));
 	    exit(-16);
 	}
 	rmcp_print_asf_sysstate(sysstate,NULL);
@@ -267,7 +265,8 @@ int main(int argc,char **argv) {
 	    fprintf(stdout,"Reset sent successfully.\n");
 	}
 	else {
-	    fprintf(stderr,"Reset unsuccessful: 0x%x\n",retval);
+	    fprintf(stderr,"Reset unsuccessful: %s\n",
+		    rmcp_error_tostr(retval));
 	    exit(-12);
 	}
     }
@@ -278,7 +277,8 @@ int main(int argc,char **argv) {
 	    fprintf(stdout,"Power cycle sent successfully.\n");
 	}
 	else {
-	    fprintf(stderr,"Power cycle unsuccessful: 0x%x\n",retval);
+	    fprintf(stderr,"Power cycle unsuccessful: %s\n",
+		    rmcp_error_tostr(retval));
 	    exit(-12);
 	}	
     }
@@ -289,7 +289,8 @@ int main(int argc,char **argv) {
 	    fprintf(stdout,"Power up sent successfully.\n");
 	}
 	else {
-	    fprintf(stderr,"Power up unsuccessful: 0x%x\n",retval);
+	    fprintf(stderr,"Power up unsuccessful: %s\n",
+		    rmcp_error_tostr(retval));
 	    exit(-12);
 	}	
     }
@@ -300,7 +301,8 @@ int main(int argc,char **argv) {
 	    fprintf(stdout,"Power down sent successfully.\n");
 	}
 	else {
-	    fprintf(stderr,"Power down unsuccessful: 0x%x\n",retval);
+	    fprintf(stderr,"Power down unsuccessful: %s\n",
+		    rmcp_error_tostr(retval));
 	    exit(-12);
 	}	
     }
@@ -308,8 +310,8 @@ int main(int argc,char **argv) {
     retval = rmcp_finalize(ctx);
     if (retval != RMCP_SUCCESS) {
 	fprintf(stderr,
-		"Could not close session/connection: 0x%x\n",
-		retval);
+		"Could not close session/connection: %s\n",
+		rmcp_error_tostr(retval));
 	exit(-10);
     }
 

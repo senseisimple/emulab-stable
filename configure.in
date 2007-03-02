@@ -862,7 +862,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
         tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
-        tools/selectapplet/GNUmakefile \
+        tools/selectapplet/GNUmakefile tools/rmanage/GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	$pelabfiles \

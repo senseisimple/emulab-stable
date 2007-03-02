@@ -31,7 +31,7 @@ include Makeconf
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab
+		tools/svn wiki bugdb collab tools/rmanage
 
 all:		all-subdirs 
 

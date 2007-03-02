@@ -11,7 +11,7 @@ SUBDIR		= tools
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = teachswitch webcamapplet whol svn
+SUBDIRS = teachswitch webcamapplet whol svn rmanage
 
 ifneq ($(host_cpu),arm)
 SUBDIRS += pcapper

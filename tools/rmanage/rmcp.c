@@ -4,8 +4,6 @@
  * All rights reserved.
  */
 
-#include "rmcp.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -23,8 +21,10 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#include "rmcp.h"
 
 static int rmcp_debug_level = 0;
+static int rmcp_warnerr = 0;
 
 #define INFO(level,fmt,...) { \
   if (level <= rmcp_debug_level) { \
@@ -34,17 +34,25 @@ static int rmcp_debug_level = 0;
   } \
 }
 #define WARN(fmt,...) { \
-  fputs("WARN: ",stderr); \
-  fputs(__FUNCTION__,stderr); \
-  fprintf(stderr,": " fmt "\n", ## __VA_ARGS__); \
+  if (rmcp_warnerr) { \
+      fputs("WARN: ",stderr); \
+      fputs(__FUNCTION__,stderr); \
+      fprintf(stderr,": " fmt "\n", ## __VA_ARGS__); \
+  } \
 }
 #define ERROR(fmt,...) { \
-  fprintf(stderr,"ERROR:%d: ",__LINE__); \
-  fprintf(stderr,"%s: " fmt "\n", __FUNCTION__, ## __VA_ARGS__); \
+  if (rmcp_warnerr) { \
+      fprintf(stderr,"ERROR:%d: ",__LINE__); \
+      fprintf(stderr,"%s: " fmt "\n", __FUNCTION__, ## __VA_ARGS__); \
+  } \
 }
 
 void rmcp_set_debug_level(int debug) {
     rmcp_debug_level = debug;
+}
+
+void rmcp_set_enable_warn_err(int enable) {
+    rmcp_warnerr = enable;
 }
 
 /**
@@ -55,8 +63,8 @@ void rmcp_set_debug_level(int debug) {
  * can still make use of the packet marshalling functions.
  */
 
-static u_int8_t rmcp_incr_seqno(rmcp_ctx_t *ctx);
-static u_int8_t rmcp_rsp_incr_seqno(rmcp_ctx_t *ctx);
+static void rmcp_incr_seqno(rmcp_ctx_t *ctx);
+static void rmcp_rsp_incr_seqno(rmcp_ctx_t *ctx);
 
 static void rmcp_rsp_fill_hdr(rmcp_ctx_t *ctx,rmcp_msg_t *msg);
 static void rmcp_fill_hdr(rmcp_ctx_t *ctx,rmcp_msg_t *msg);
@@ -69,8 +77,62 @@ static void rmcp_rsp_fill_tlr(rmcp_ctx_t *ctx,rmcp_msg_t *msg);
 static void rmcp_fill_all(rmcp_ctx_t *ctx,rmcp_msg_t *msg,
 			  u_int8_t type,u_int8_t data_len,u_int8_t *data);
 
-static char *rmcp_rsp_rakp_msg_code_str(int code);
+/**
+ * swig convenience functions.
+ */
+u_int8_t *swr_fill_str(char *str,int len) {
+    u_int8_t *retval = NULL;
+    retval = (u_int8_t *)malloc(sizeof(u_int8_t)*len);
+    if (retval != NULL) {
+        strncpy((char *)retval,str,len);
+    }
+    return retval;
+}
 
+rmcp_error_t swr_rmcp_asf_ping(rmcp_ctx_t *rit,
+                               rmcp_asf_supported_t *supported) {
+    rmcp_asf_supported_t *sptr = NULL;
+    rmcp_error_t retval;
+
+    retval = rmcp_asf_ping(rit,&sptr);
+    if (retval == RMCP_SUCCESS) {
+        *supported = *sptr;
+    }
+
+    free(sptr);
+
+    return retval;
+}
+
+rmcp_error_t swr_rmcp_asf_get_capabilities(rmcp_ctx_t *rit,
+                                           rmcp_asf_capabilities_t *cap) {
+    rmcp_asf_capabilities_t *cptr = NULL;
+    rmcp_error_t retval;
+
+    retval = rmcp_asf_get_capabilities(rit,&cptr);
+    if (retval == RMCP_SUCCESS) {
+        *cap = *cptr;
+    }
+
+    free(cptr);
+
+    return retval;
+}
+
+rmcp_error_t swr_rmcp_asf_get_sysstate(rmcp_ctx_t *rit,
+                                       rmcp_asf_sysstate_t *state) {
+    rmcp_asf_sysstate_t *sptr = NULL;
+    rmcp_error_t retval;
+
+    retval = rmcp_asf_get_sysstate(rit,&sptr);
+    if (retval == RMCP_SUCCESS) {
+        *state = *sptr;
+    }
+
+    free(sptr);
+
+    return retval;
+}
 
 
 rmcp_error_t rmcp_asf_ping(rmcp_ctx_t *ctx,
@@ -109,7 +171,7 @@ rmcp_error_t rmcp_asf_ping(rmcp_ctx_t *ctx,
 	return RMCP_SUCCESS;
     }
     
-    ERROR("protocol error",retval);
+    ERROR("protocol error %d",retval);
     rmcp_free_asf_msg(recv);
     return RMCP_ERR_PROTOCOL;
 }
@@ -150,7 +212,7 @@ rmcp_error_t rmcp_asf_get_capabilities(rmcp_ctx_t *ctx,
 	return RMCP_SUCCESS;
     }
     
-    ERROR("protocol error",retval);
+    ERROR("protocol error %d",retval);
     rmcp_free_asf_msg(recv);
     return RMCP_ERR_PROTOCOL;
 }
@@ -190,7 +252,7 @@ rmcp_error_t rmcp_asf_get_sysstate(rmcp_ctx_t *ctx,
 	return RMCP_SUCCESS;
     }
     
-    ERROR("protocol error",retval);
+    ERROR("protocol error %d",retval);
     rmcp_free_asf_msg(recv);
     return RMCP_ERR_PROTOCOL;
 }
@@ -200,7 +262,6 @@ rmcp_error_t rmcp_asf_get_sysstate(rmcp_ctx_t *ctx,
  */
 rmcp_error_t rmcp_asf_reset(rmcp_ctx_t *ctx) {
     rmcp_msg_t *send;
-    rmcp_msg_t *recv;
     rmcp_error_t retval;
     u_int8_t buf[4+1+2+2+2];
     int wc;
@@ -233,7 +294,6 @@ rmcp_error_t rmcp_asf_reset(rmcp_ctx_t *ctx) {
 }
 rmcp_error_t rmcp_asf_power_up(rmcp_ctx_t *ctx) {
     rmcp_msg_t *send;
-    rmcp_msg_t *recv;
     rmcp_error_t retval;
     u_int8_t buf[4+1+2+2+2];
     int wc;
@@ -266,7 +326,6 @@ rmcp_error_t rmcp_asf_power_up(rmcp_ctx_t *ctx) {
 }
 rmcp_error_t rmcp_asf_power_cycle(rmcp_ctx_t *ctx) {
     rmcp_msg_t *send;
-    rmcp_msg_t *recv;
     rmcp_error_t retval;
     u_int8_t buf[4+1+2+2+2];
     int wc;
@@ -300,7 +359,6 @@ rmcp_error_t rmcp_asf_power_cycle(rmcp_ctx_t *ctx) {
 
 rmcp_error_t rmcp_asf_power_down(rmcp_ctx_t *ctx) {
     rmcp_msg_t *send;
-    rmcp_msg_t *recv;
     rmcp_error_t retval;
     u_int8_t buf[4+1+2+2+2];
     int wc;
@@ -353,7 +411,7 @@ static char *rmcp_rsp_rakp_msg_codes[] = {
     "Invalid integrity check value",
 };
 
-static char *rmcp_rsp_rakp_msg_code_str(int code) {
+char *rmcp_rsp_rakp_msg_code_tostr(int code) {
     if (code < RMCP_RSP_RAKP_SUCCESS || code > RMCP_RSP_RAKP_ERR_INVALID_INTEGRITY_VALUE) {
 	return "UNKNOWN RSP/RAKP MSG CODE!";
     }
@@ -404,14 +462,14 @@ rmcp_error_t rmcp_finalize(rmcp_ctx_t *ctx) {
 	    }
 	    else {
 		WARN("rsp/rakp status '%s'",
-		     rmcp_rsp_rakp_msg_code_str(recv->data->data[0]));
+		     rmcp_rsp_rakp_msg_code_tostr(recv->data->data[0]));
 		rmcp_free_asf_msg(recv);
 		return RMCP_ERR_PROTOCOL;
 	    }
 	}
 	
 	rmcp_free_asf_msg(recv);
-	ERROR("protocol error",retval);
+	ERROR("protocol error %d",retval);
 	return RMCP_ERR_PROTOCOL;
     }
     
@@ -585,7 +643,7 @@ rmcp_error_t rmcp_start_secure_session(rmcp_ctx_t *ctx) {
 	else {
 	    /* error somewhere, probably on our end... */
 	    ERROR("open session response error: '%s'",
-		  rmcp_rsp_rakp_msg_code_str(rmsg->data->data[0]));
+		  rmcp_rsp_rakp_msg_code_tostr(rmsg->data->data[0]));
 	    rmcp_free_asf_msg(rmsg);
 	    return RMCP_ERR_PROTOCOL;
 	}
@@ -714,7 +772,7 @@ rmcp_error_t rmcp_start_secure_session(rmcp_ctx_t *ctx) {
 	else {
 	    /* error somewhere, probably on our end... */
 	    ERROR("RAKP2 response error: '%s'",
-		  rmcp_rsp_rakp_msg_code_str(rmsg->data->data[0]));
+		  rmcp_rsp_rakp_msg_code_tostr(rmsg->data->data[0]));
 	    rmcp_free_asf_msg(rmsg);
 	    return RMCP_ERR_PROTOCOL;
 	}
@@ -955,7 +1013,7 @@ rmcp_error_t rmcp_open(rmcp_ctx_t *ctx,char *hostname) {
     return RMCP_SUCCESS;
 }
 
-static u_int8_t rmcp_incr_seqno(rmcp_ctx_t *ctx) {
+static void rmcp_incr_seqno(rmcp_ctx_t *ctx) {
     ++(ctx->rmcp_seqno);
     /* have to jump over 0xff -- otherwise our msgs won't get ack'd */
     if (ctx->rmcp_seqno == 0xff) {
@@ -963,7 +1021,7 @@ static u_int8_t rmcp_incr_seqno(rmcp_ctx_t *ctx) {
     }
 }
 
-static u_int8_t rmcp_rsp_incr_seqno(rmcp_ctx_t *ctx) {
+static void rmcp_rsp_incr_seqno(rmcp_ctx_t *ctx) {
     if (ctx->secure) {
 	++(ctx->rmcp_rsp_seqno);
     }
@@ -1095,10 +1153,10 @@ rmcp_error_t rmcp_raw_read(rmcp_ctx_t *ctx,
 }
 
 rmcp_error_t rmcp_recv_msg_and_ack(rmcp_ctx_t *ctx,rmcp_msg_t **msg) {
-    struct timeval tv,ntv;
+    struct timeval tv; /* ,ntv; */
     u_int8_t *buf;
     int len;
-    double dt;
+    /* double dt; */
     rmcp_error_t retval;
     rmcp_msg_t *ack;
 
@@ -1233,7 +1291,6 @@ rmcp_error_t rmcp_send_msg(rmcp_ctx_t *ctx,rmcp_msg_t *msg) {
     u_int8_t *buf;
     int len;
     int wc = 0;
-    int retval;
     int tlen;
 
     buf = rmcp_marshall(ctx,msg,&len);
@@ -1799,6 +1856,22 @@ static char *rmcp_asf_wdstate_strings[] = {
     "Watchdog Timer is not expired"
 };
 
+char *rmcp_asf_wdstate_tostr(int wdstate) {
+    if (wdstate >= 0 && wdstate < 2) {
+        return rmcp_asf_wdstate_strings[wdstate];
+    }
+    
+    return "Unknown watchdog state";
+}
+
+char *rmcp_asf_sysstate_tostr(int sysstate) {
+    if (sysstate >= 0 && sysstate < 0x0f) {
+        return rmcp_asf_sysstate_strings[sysstate];
+    }
+
+    return "Unknown system state";
+}
+
 void rmcp_print_asf_sysstate(rmcp_asf_sysstate_t *rs,FILE *file) {
     FILE *of = (file == NULL)?stdout:file;
 
@@ -1813,4 +1886,27 @@ void rmcp_print_asf_sysstate(rmcp_asf_sysstate_t *rs,FILE *file) {
     fflush(of);
 
     return;
+}
+
+static char *rmcp_error_strs[] = {
+    "success",
+    "already connected",
+    "socket error",
+    "bad client hostname",
+    "no data",
+    "unknown class",
+    "no ack needed",
+    "no ack invalid",
+    "timeout",
+    "max retry threshold reached",
+    "protocol error",
+    "no secure credentials supplied",
+};
+
+char *rmcp_error_tostr(rmcp_error_t rerrno) {
+    if (rerrno >= RMCP_SUCCESS && rerrno <= RMCP_ERR_NO_SECURE_CREDS) {
+        return rmcp_error_strs[rerrno];
+    }
+    
+    return "unknown error code";
 }

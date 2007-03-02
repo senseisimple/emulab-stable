@@ -1,0 +1,238 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Handle RMCP-ASF power control.  Can be extended for IPMI later.
+# Sends cycle,off,on to node list in parallel.
+#
+
+package power_rmcp;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( rmcpctrl );
+
+use lib "@prefix@/lib";
+use libdb;
+use rmcp;
+
+
+my $debug = 0;
+my $parallelize = 0;
+
+# Turn off line buffering on output
+$| = 1;
+
+my %portinfo = ();
+
+# usage: rmcpctrl(type, cmd, nodes)
+# type = { "asf" } # can probably be extended to ipmi
+# cmd = { "cycle" | "on" | "off" }
+# nodes = list of one or more physcial node names
+#
+# Returns 0 on success. Non-zero on failure.
+# 
+sub rmcpctrl($$@) {
+    my ($type,$cmd,@nodes) = @_;
+    my $exitval = 0;
+
+    if ($debug) {
+	print "rmcpctrl called with $type,$cmd,(" . join(',',@nodes) . ")\n";
+    }
+
+    if ($cmd ne "cycle" && $cmd ne "on" && $cmd ne "off") {
+	warn "invalid power command '$cmd'; \n" . 
+	    "  valid commands are 'cycle, 'off', and 'on'.\n";
+	return scalar(@nodes);
+    }
+
+    my %rmcp_nodeinfo = ();
+
+    # grab rmcp keys and info
+    for my $n (@nodes) {
+	my $res = DBQueryFatal("select key_type,key_role,key_uid,mykey" . 
+			       " from outlets_remoteauth" . 
+			       " where node_id='$n' and key_type='$type'");
+	if (!$res || $res->num_rows() == 0) {
+	    warn "No keys of type $type in database for $n, skipping\n";
+	    ++$exitval;
+	}
+
+	while (my ($ttype,$role,$uid,$key) = $res->fetchrow()) {
+	    my $atref = [ $ttype,$role,$uid,$key ];
+
+	    if (!defined($rmcp_nodeinfo{$n})) {
+		$rmcp_nodeinfo{$n} = [];
+	    }
+
+	    if ($debug) {
+		print "DEBUG: considered key ($ttype,$role,$uid,$key) for $n\n";
+	    }
+
+	    push @{$rmcp_nodeinfo{$n}}, $atref;
+	}
+    }
+
+    if ($debug) {
+        rmcp::rmcp_set_debug_level(5);
+	rmcp::rmcp_set_enable_warn_err(1);
+    }
+
+    for my $n (keys(%rmcp_nodeinfo)) {
+	if ($debug) {
+	    print "DEBUG: selecting asf keys for $n\n";
+	}
+	if ($type eq 'asf' || $type eq 'ASF') {
+	    my ($rkey,$rolestr,$gkey);
+	    for my $keylist (@{$rmcp_nodeinfo{$n}}) {
+
+		if ($debug) {
+		    print "DEBUG: considered keylist (" . join(',',@{$keylist}) . ")\n";
+		}
+
+		if ($keylist->[0] eq "$type") {
+		    if ($keylist->[1] eq 'generation'
+			|| $keylist->[1] eq 'Generation') {
+			$gkey = $keylist->[3];
+		    }
+		    else {
+			#
+			# XXX: yes, this will use only the LAST
+			# non-"generation" key as the role key for asf.
+			#
+			$rkey = $keylist->[3];
+			$rolestr = $keylist->[1];
+		    }
+		}
+	    }
+
+	    if ($parallelize) {
+		if (my $pid = fork()) {
+		    push @kids, $pid;
+		}
+		else {
+		    my $tret = rmcpexec($type,$cmd,$n,$rolestr,$rkey,$gkey);
+		    exit $tret;
+		}
+	    }
+	    else {
+		if (rmcpexec($type,$cmd,$n,$rolestr,$rkey,$gkey)) {
+		    ++$exitval;
+		}
+	    }
+
+	    # grab child exit vals
+	    if ($parallelize) {
+		while (wait() > 0) {
+		    if ($?) {
+			++$exitval;
+		    }
+		}
+	    }
+	}
+	else {
+	    warn "Unsupported RMCP type $type for $node_id, skipping";
+	    ++$exitval;
+	}
+    }
+
+    return $exitval;
+}
+
+#
+# Arguments: $type,$cmd,$node_id,$rolestr,$role_key,$gen_key
+#
+# XXX: add support for key usernames (no rush cause we don't have machines
+# that support that functionality.
+sub rmcpexec($$$$$$) {
+    my ($type,$cmd,$node_id,$rolestr,$role_key,$gen_key) = @_;
+
+    if (!defined($type) || !defined($cmd) || !defined($node_id) 
+	|| !defined($rolestr) || !defined($role_key) || !defined($gen_key)) {
+	
+	warn "Incomplete argument list, skipping node" . 
+	    (defined($node_id)?" $node_id":"");
+	
+	return -1;
+    }
+
+    if ($type eq 'asf' || $type eq 'ASF') {
+	my $rrole;
+
+	if ($rolestr eq 'administrator' || $rolestr eq 'Administrator') {
+	    $rrole = $rmcp::RMCP_ROLE_ADM;
+	}
+	elsif ($rolestr eq 'operator' || $rolestr eq 'Operator') {
+	    $rrole = $rmcp::RMCP_ROLE_OP;
+	}
+	else {
+	    warn "Unknown RMCP role $rolestr, skipping";
+	    return -2;
+	}
+
+	if ($debug) {
+	    print "DEBUG: starting rmcp for $node_id\n";
+	}
+
+	my $rkey = rmcp::rmcp_setstrbuf($role_key,length($role_key));
+	my $gkey = rmcp::rmcp_setstrbuf($gen_key,length($gen_key));
+
+	my $ctx = rmcp::rmcp_ctx_init(5,3);
+
+	if (rmcp::rmcp_ctx_setsecure($ctx,$rrole,
+				     $rkey,length($role_key),
+				     $gkey,length($gen_key)) 
+	    != $rmcp::RMCP_SUCCESS) {
+	    warn "Could not create a secure RMCP context for " . 
+		"$node_id, skipping";
+   	    rmcp::rmcp_finalize($ctx);
+	    return -3;
+	}
+
+	if (rmcp::rmcp_open($ctx,$node_id) != $rmcp::RMCP_SUCCESS) {
+	    warn "Could not open an RMCP connection for $node_id, skipping";
+	    rmcp::rmcp_finalize($ctx);
+	    return -4;
+	}
+
+	if (rmcp::rmcp_start_secure_session($ctx) != $rmcp::RMCP_SUCCESS) {
+	    warn "Could not start a secure RMCP session for $node_id, skipping";
+	    rmcp::rmcp_finalize($ctx);
+	    return -5;
+	}
+
+	my $retval;
+	if ($cmd eq 'cycle') {
+	    $retval = rmcp::rmcp_asf_power_cycle($ctx);
+	}
+	elsif ($cmd eq 'on') {
+	    $retval = rmcp::rmcp_asf_power_up($ctx);
+	}
+	elsif ($cmd eq 'off') {
+	    $retval = rmcp::rmcp_asf_power_down($ctx);
+	}
+	else {
+	    warn "Unknown RMCP command $cmd for $node_id, skipping";
+	    return -6;
+	}
+
+	if ($retval != $rmcp::RMCP_SUCCESS) {
+	    warn "While cycling $node_id, RMCP error (" . 
+  	        rmcp::rmcp_error_tostr($retval) . ")";
+	    return $retval;
+	}
+    }
+    else {
+	warn "Unsupported RMCP type $type for $node_id, skipping";
+	return -7;
+    }
+
+    return 0;
+}
+
+1;

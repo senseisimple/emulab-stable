@@ -59,12 +59,16 @@ typedef enum {
     RMCP_FLAG_MAX = (1L << RMCP_FLAG_MAX_B),
 } rmcp_flag_t;
 
-/* typedef unsigned char u_int8_t; */
-/* typedef char int8_t; */
-/* typedef unsigned short int u_int16_t; */
-/* typedef short int int16_t; */
-/* typedef unsigned int u_int32_t; */
-/* typedef int int32_t; */
+
+#ifdef SWIG
+typedef unsigned char u_int8_t;
+//typedef char int8_t;
+typedef unsigned short int u_int16_t;
+//typedef short int int16_t;
+typedef unsigned int u_int32_t;
+//typedef int int32_t;
+#endif
+
 
 #define RMCP_CLASS_ASF 0x06
 #define RMCP_CLASS_IPMI 0x07
@@ -306,6 +310,22 @@ typedef struct rmcp_asf_sysstate {
  * A Whole Bunch O' Function Defs!
  */
 
+/**
+ * These are convenience functions that help us get the right stuff from perl
+ * to C.  Fortunately, we just need a generator from string to u_int8_t.
+ */
+u_int8_t *swr_fill_str(char *str,int len);
+
+/* since I can't figure out how to pass a pointer-to-pointer-to-struct from
+ * perl, just wrap the ping and get functions.
+ */
+rmcp_error_t swr_rmcp_asf_ping(rmcp_ctx_t *rit,
+			       rmcp_asf_supported_t *supported);
+rmcp_error_t swr_rmcp_asf_get_capabilities(rmcp_ctx_t *rit,
+					   rmcp_asf_capabilities_t *cap);
+rmcp_error_t swr_rmcp_asf_get_sysstate(rmcp_ctx_t *rit,
+				       rmcp_asf_sysstate_t *state);
+
 
 /** 
  * These are a bunch of high-level functions that perform all relevant ASF
@@ -324,12 +344,15 @@ rmcp_error_t rmcp_asf_get_sysstate(rmcp_ctx_t *rit,
 rmcp_error_t rmcp_asf_reset(rmcp_ctx_t *rit);
 rmcp_error_t rmcp_asf_power_up(rmcp_ctx_t *rit);
 rmcp_error_t rmcp_asf_power_cycle(rmcp_ctx_t *rit);
-
 rmcp_error_t rmcp_asf_power_down(rmcp_ctx_t *rit);
 
+char *rmcp_error_tostr(rmcp_error_t rerrno);
+char *rmcp_asf_sysstate_tostr(int sysstate);
+char *rmcp_asf_wdstate_tostr(int wdstate);
+char *rmcp_rsp_rakp_msg_code_tostr(int code);
 
 void rmcp_set_debug_level(int debug);
-
+void rmcp_set_enable_warn_err(int enable);
 
 /** 
  * Initialize the control structure.
