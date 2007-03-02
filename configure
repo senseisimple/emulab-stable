@@ -2346,7 +2346,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
         named/GNUmakefile firewall/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
-	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
+	db/GNUmakefile \
+	db/Group.pm db/Interface.pm db/Node.pm \
+	db/NodeType.pm db/Project.pm db/User.pm \
+	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
