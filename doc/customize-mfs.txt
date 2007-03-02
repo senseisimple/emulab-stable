@@ -36,9 +36,12 @@ mfs-entries.sql
 	at the beginning of the file to make sure it matches your DB before
 	performing the INSERT commands.
 
-pxeboot.emu-{sio,vga,null}
+pxeboot*/pxeboot.emu-{sio,vga,null}
 	This is a specialized version of the FreeBSD boot loader.
-	Serial-line (-sio), VGA (-vga), and null (-null) console versions
+	There is a version for use with the 4.7 based system (pxeboot47)
+	and one for the FreeBSD 6.2 system (pxeboot62).  In each of these
+	directories, there are three versions of the boot loader:
+	serial-line (-sio), VGA (-vga), and null (-null) console versions
 	of our standard PXE-booted startup.  Whichever you choose should
 	be renamed as /tftpboot/pxeboot.emu (or whatever your boss dhcpd.conf
 	file says).
@@ -55,6 +58,7 @@ MFSes.  You almost certainly want to use the 6.2 versions since 6.2 supports
 more hardware.  If you have any problems with those, then try the 4.7 versions.
 In summary, I recommend:
 
+	pxeboot62/pxeboot.emu-{sio,vga} (pick one and rename to "pxeboot.emu")
 	frisbee62 (rename to "frisbee")
 	freebsd62 (rename to "freebsd")
 	freebsd62.newnode (rename to "freebsd.newnode")
@@ -74,4 +78,4 @@ loader to drop into interactive mode.  Make sure you replace the loader.conf
 file in the three subdirectories with the -null version as well.
 
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
-[ Last updated 01/10/07 ]
+[ Last updated 03/02/07 ]

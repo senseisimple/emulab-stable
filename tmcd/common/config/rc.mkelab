@@ -1358,24 +1358,25 @@ sub SetupBossNode()
     #
     # Its the generic stuff; must localize.
     #
-    my $cons = $emulabconfig{"MFSCONSOLE"};
-    if (! -e "/tftpboot/pxeboot.emu-${cons}") {
-	$cons = "sio";
-    }
-    mysystem("cd /tftpboot; mv pxeboot.emu-${cons} pxeboot.emu");
-    print "Using ${cons} version of pxeboot...\n";
-
     my $fv = $emulabconfig{"MFSVERSION"};
     if (! -e "/tftpboot/freebsd${fv}") {
 	$fv = "47";
     }
+    my $pdir = ".";
+    if (-d "/tftpboot/pxeboot${fv}") {
+	$pdir = "pxeboot${fv}";
+    }
+    my $cons = $emulabconfig{"MFSCONSOLE"};
+    if (! -e "/tftpboot/$pdir/pxeboot.emu-${cons}") {
+	$cons = "sio";
+    }
+
+    mysystem("cd /tftpboot; mv $pxebootdir/pxeboot.emu-${cons} pxeboot.emu");
+    print "Using ${cons} version of pxeboot...\n";
+
     mysystem("cd /tftpboot; mv freebsd${fv} freebsd");
     print "Using freebsd${fv} version of admin MFS...\n";
 
-    $fv = $emulabconfig{"MFSVERSION"};
-    if (! -e "/tftpboot/frisbee${fv}") {
-	$fv = "47";
-    }
     mysystem("cd /tftpboot; mv frisbee${fv} frisbee");
     print "Using frisbee${fv} version of disk load MFS...\n";
 
