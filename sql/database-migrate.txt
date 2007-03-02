@@ -3903,3 +3903,20 @@ last_net_act,last_cpu_act,last_ext_act);
               'instance_description', 'run_description') default NULL;
 
 4.107: Fix to previous revision; skip to next entry.
+
+4.108: Add a table to store remote power cycling keys.  Should do fine for ASF
+       or IPMI.  Neither key_role nor key_uid is numeric since different specs
+       define the notions of roles and uids differently.  The auth_meta field
+       provides some expandability for additional operational metadata down the
+       road.
+
+       DROP TABLE IF EXISTS `outlets_remoteauth`;
+       CREATE TABLE `outlets_remoteauth` (
+         `node_id` varchar(32) NOT NULL,
+	 `key_type` varchar(64) NOT NULL,
+	 `key_role` varchar(64) NOT NULL default '',
+	 `key_uid` varchar(64) NOT NULL default '',
+	 `mykey` text NOT NULL,
+	 PRIMARY KEY  (`node_id`,`key_type`,`key_role`,`key_uid`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+

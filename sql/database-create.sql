@@ -2086,6 +2086,20 @@ CREATE TABLE `outlets` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `outlets_remoteauth`
+--
+
+DROP TABLE IF EXISTS `outlets_remoteauth`;
+CREATE TABLE `outlets_remoteauth` (
+  `node_id` varchar(32) NOT NULL,
+  `key_type` varchar(64) NOT NULL,
+  `key_role` varchar(64) NOT NULL default '',
+  `key_uid` varchar(64) NOT NULL default '',
+  `mykey` text NOT NULL,
+  PRIMARY KEY  (`node_id`,`key_type`,`key_role`,`key_uid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `partitions`
 --
 
