@@ -1371,7 +1371,7 @@ sub SetupBossNode()
 	$cons = "sio";
     }
 
-    mysystem("cd /tftpboot; mv $pxebootdir/pxeboot.emu-${cons} pxeboot.emu");
+    mysystem("cd /tftpboot; mv $pdir/pxeboot.emu-${cons} pxeboot.emu");
     print "Using ${cons} version of pxeboot...\n";
 
     mysystem("cd /tftpboot; mv freebsd${fv} freebsd");
