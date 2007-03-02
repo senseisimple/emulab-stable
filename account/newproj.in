@@ -20,7 +20,7 @@ sub usage()
     exit(-1);
 }
 my $optlist = "dm:";
-my $debug   = 1;
+my $debug   = 0;
 my $resend;
 
 #
@@ -203,7 +203,9 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
     my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
 
     if ($debug) {
-	print STDERR "Project attribute: '$key' -> '$value'\n";
+	my $prval = (defined($value) ? $value : "NULL");
+		     
+	print STDERR "Project attribute: '$key' -> '$prval'\n";
     }
 
     my $dbslot;
