@@ -2347,12 +2347,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile \
-	db/Group.pm db/Interface.pm db/Node.pm \
+	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
 	db/NodeType.pm db/Project.pm db/User.pm \
 	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
-	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
+	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
