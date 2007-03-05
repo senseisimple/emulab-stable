@@ -42,7 +42,7 @@ if (mysql_num_rows($query_result) != 0) {
   $row = mysql_fetch_array($query_result);
   echo "<h2>$row[cause_desc]</h2>\n";
   echo "<pre>\n";
-  echo htmlspecialchars($row[mesg])."\n";
+  echo htmlspecialchars($row["mesg"])."\n";
   echo "\n";
   echo "Cause: $row[cause]\n";
   echo "Confidence: $row[confidence]\n";
