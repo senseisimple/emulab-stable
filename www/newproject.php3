@@ -984,12 +984,13 @@ if (! ($project = Project::NewNewProject($leader, $args, $error))) {
 # Need to do some extra work for the first project; eventually move to backend
 # 
 if ($FirstInitState) {
-    $pid = $formfields["pid"];
-    Group::Initialize($proj_head_uid, $pid);
+    # Set up the management group (emulab-ops).
+    Group::Initialize($proj_head_uid);
     
     #
     # Move to next phase. 
     # 
+    $pid = $formfields["pid"];
     TBSetFirstInitPid($pid);
     TBSetFirstInitState("approveproject");
     header("Location: approveproject.php3?pid=$pid&approval=approve");

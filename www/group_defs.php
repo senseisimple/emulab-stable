@@ -403,7 +403,7 @@ class Group
     #
     # This is strictly for initialization of a testbed.
     #
-    function Initialize($uid, $pid) {
+    function Initialize($uid) {
 	global $TBOPSPID;
 	
 	$emulabgroup = Group::LookupByPidGid($TBOPSPID, $TBOPSPID);
@@ -427,11 +427,6 @@ class Group
 	DBQueryFatal("update group_membership set date_approved=now(), ".
 		     "  trust='" . TBDB_TRUSTSTRING_GROUPROOT . "' ".
 		     "where uid='$uid' and pid='$TBOPSPID'");
-
-	DBQueryFatal("update group_membership set date_approved=now(), ".
-		     "  trust='" . TBDB_TRUSTSTRING_PROJROOT . "' ".
-		     "where uid='$uid' and pid='$pid'");
-
 	return 0;
     }
 
