@@ -48,8 +48,11 @@ help bootstrap only and as such, does not have the power to perform many
 actions that are required later (such as adding nodes to the testbed).
 
 Login as user 'elabman' if you have not already done so. Go into 'red dot'
-mode by clicking on the green dot. You should see the "Start New Project"
-page.  Fill in your own information in the 'Project Head Information'
+mode by clicking on the green dot. You should see the "Start a New Testbed
+Project" page, with a "Create First Project" link on the left menu under
+"Experimentation".
+
+Fill in your own information in the 'Project Head Information'
 section.  It is important that you provide a working email address! Select
 your initial Project Name in the 'Project Information' section (we call
 ours 'testbed', but you can call yours whatever you call your project or
@@ -118,6 +121,43 @@ Before we continue, lets explain a few more important items:
   $PATH.
 
 Others at your site can now apply to join your project, or start their own.
+
+##### Step "-1" - Undoing Step 1 if necessary
+
+If something went wrong during Step 1, it can leave things in an inconsistent
+state.  Here's how to undo it without starting over from scratch.  The goal is
+to remove things that boss-install checks on, so it can be run again to put
+the Emulab database and directories into initial conditions.
+
+ * Remove users, groups, and directories set up by boss-install.
+     pw userdel -n elabman -r
+     pw userdel -n elabckup -r
+     ssh -n ops pw userdel -n elabman -r
+     ssh -n ops pw userdel -n elabckup -r
+
+     ls -l /users /proj /groups
+     rm -r /proj/* /groups/*
+     pw groupdel -n emulab-ops
+     ls -l /usr/testbed/{expwork,*/proj}
+     rm -r /usr/testbed/expwork/* /usr/testbed/*/proj/*
+     ls -l /usr/testbed/{expwork,*/proj}
+
+  * Remove user and group from the elabman "Create First Project" pages.
+     set me = *your-login*
+     pw userdel -n $me -r
+     pw groupdel -n testbed
+     ls -l /users /proj /groups
+
+ * Kill the database.
+     mysql -e "drop database tbdb"
+
+ * Run boss-install, checking particularly on the success of these tasks:
+   . Setting up database
+   . Setting up initial user (elabman)
+   . Setting up checkup user (elabckup)
+   . Setting up system experiments
+
+Now you can go back to Step 1 with the first login as 'elabman' and try again.
 
 ##### Step 2 - Setup web sql editor
 
