@@ -175,11 +175,10 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
             # Create and indirect through post var for subgroup approval value.
             #
 	    $foo = "$user\$\$approval-$project/$gid";
-	    $subgroup_approval = $$foo;
-
-	    if (!$subgroup_approval ||
-		(strcmp($subgroup_approval, "deny") &&
-		 strcmp($subgroup_approval, "nuke"))) {
+	    
+	    if (!isset($HTTP_POST_VARS[$foo]) ||
+		($HTTP_POST_VARS[$foo] != "deny" &&
+		 $HTTP_POST_VARS[$foo] != "nuke")) {
 		USERERROR("If you wish to deny/nuke user $target_uid in ".
 			  "project $project then you must deny/nuke in all ".
 			  "of the subgroups $target_uid is attempting to ".
@@ -211,25 +210,24 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #
     $foo = "U${user}\$\$approval-$project/$project";
     $bar = "U${user}\$\$trust-$project/$project";
-    $default_approval = $HTTP_POST_VARS[$foo];
+    $default_approval =
+	(isset($HTTP_POST_VARS[$foo]) ? $HTTP_POST_VARS[$foo] : "");
     
-    if (!$default_approval || strcmp($default_approval, "") == 0) {
+    if ($default_approval == "") {
 	# Implicit group approval as user.
 	# Short circuit all the perms-checking, and squeeze it in
 	# all the appropriate places.
 	
-	# 1. For our benefit
-	$$foo = $approval;
-	
-	# 2. For the strcmp below.
+	# 1. For the strcmp below.
 	$default_approval = $approval;
 
-	# 3. For the sanity check
+	# 2. For the sanity check
 	$projectchecks[$user][] = array($project, $project, "user");	
 
-	# 4. For the while loop which does the actual work
-	$POST_VARS_COPY[ $foo ] = $approval;
-	$$bar = "user";
+	# 3. For the while loop which does the actual work
+	$POST_VARS_COPY[$foo] = $approval;
+	$HTTP_POST_VARS[$foo] = $approval;
+	$HTTP_POST_VARS[$bar] = "user";
     }
     if (strcmp($approval, "approve") == 0 &&
 	strcmp($default_approval, "approve")) {
@@ -350,6 +348,11 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     # Email info for the proj/group leaders too.
     #
     $leaders = $target_group->LeaderMailList();
+
+    if (1) {
+	echo "$user_uid, $project, $group, $approval, $newtrust<br>\n";
+	continue;
+    }
     
     #
     # Well, looks like everything is okay. Change the project membership
