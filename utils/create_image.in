@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -244,7 +244,7 @@ my $isglobal = $imageid_row{'global'};
 # Redirect pathname for global images.
 #
 if ($isglobal && ($filename =~ /^\/usr\/testbed/)) {
-    $filename = PROJDIR() . "/$pid/images/" . basename($filename);
+    $filename = PROJROOT() . "/$pid/images/" . basename($filename);
     print "*** WARNING: Writing global descriptor to $filename instead!\n";
 }
 
