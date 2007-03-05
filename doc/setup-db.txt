@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2005 University of Utah and the Flux Group.
+# Copyright (c) 2002-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -261,9 +261,13 @@ should create a stack even if there is only one switch in it. The control
 stack should be named 'Control', and the experimental stack 'Experiment' (make
 sure to get the capitalization right). The 'leader' field should be set to the
 node_id of the master switch in the stack.  The stack_type column is used by
-snmpit to determine which module to use to talk to the stack. The currently
-supported values are 'cisco' and 'intel'. Making a control network stack is
-optional. There are a few columns in this table that you will need to set:
+snmpit to determine which module to use to talk to the stack. Most sites
+should set the stack type to 'generic', which handles all switch types
+currently supported by Emulab. If you have all Cisco switches, and are having
+problems with the 'generic' stack type, you can try setting the type to
+'cisco'.  Making a stack for the control network is optional, but will enable
+control-net firewalls. There are a few columns in this table that you will need
+to set:
 
 supports_private: (Cisco only) This switch can make private VLANs - probably
     best to leave it as 0
