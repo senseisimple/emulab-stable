@@ -282,11 +282,23 @@ table, listing the node_id of each switch and the stack_id of the stack it
 belongs to. You can leave the 'is_primary' column of these rows with its default
 value (1).
 
-After getting this set up, run 'snmpit -l', and make sure it doesn't give you
-any error messages. If it tells you that your type of device isn't supported,
-ask Utah - we have a list of supported devices in snmpit, but they are just
-the ones we've tested. Hopefully, yours will work too, we just haven't tried
-it.
+After getting this set up, run 'wap snmpit -l', and make sure it doesn't give
+you any error messages. If it tells you that your type of device isn't
+supported, ask Utah - we have a list of supported devices in snmpit, but they
+are just the ones we've tested. Hopefully, yours will work too, we just haven't
+tried it.
+
+Your snmpit output should look something like this:
+
+%wap snmpit -l
+VLAN     Project/Experiment VName     Members
+--------------------------------------------------------------------------------
+Control-                              myswitch:1
+
+Note that 'Control-' is a truncated version of the name 'Control-hardware' that
+you created in setup-network.txt . If you see any other VLANs on this list,
+that's not a problem, but if you want to delete any of them, you can do that
+with 'wap snmpit -o <name>'.
 
 ##### Step 4 - Setup control hardware
 ##### Local Only
