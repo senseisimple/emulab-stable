@@ -190,7 +190,7 @@ if (!defined($opts{u})) {
 
     print "Creating group in database...\n";
     DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', ".
-		 "leader='$protouser', created=now(), ".
+		 "leader='$protouser', leader_idx=$uid, created=now(), ".
 		 "description='Default Group', " .
 		 "unix_gid=$gid, gid_idx=$pid_idx, pid_idx=$pid_idx, ".
 		 "unix_name='$protoproj'");
