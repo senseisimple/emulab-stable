@@ -1,9 +1,10 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -17,14 +18,14 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-f] pid eid nsfile\n";
+    print STDERR "Usage: $0 [-f] -e eid nsfile\n";
     exit(-1);
 }
-my $optlist = "fz";
+my $optlist = "fze:";
+my $pideid;
 my $force   = 0;
 my $zeemode = 0;
 my $zeeopt  = "";
-my $state;
 
 #
 # Configure variables
@@ -38,7 +39,6 @@ my $batchexp = "$TBROOT/bin/batchexp";
 my $template = "$TBROOT/lib/ns2ir/elabinelab.ns";
 my $endexp   = "$TBROOT/bin/endexp";
 my $dbcontrol= "$TBROOT/sbin/opsdb_control";
-my $exptidx;
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -62,42 +62,43 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"f"})) {
     $force = 1;
 }
+if (defined($options{"e"})) {
+    $pideid = $options{"e"};
+}
 if (defined($options{"z"})) {
     $zeemode = 1;
     $zeeopt  = "-p";
 }
-if (@ARGV != 3) {
+if (!defined($pideid) || @ARGV != 1) {
     usage();
 }
-my ($pid,$eid,$nsfile) = @ARGV;
+my ($nsfile) = @ARGV;
 
 if (! -r $nsfile) {
     tbdie("NS File '$nsfile' does not exist!");
 }
 
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($pideid);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object for $pideid!")
+}
+# Need these below.
+my $pid      = $experiment->pid();
+my $eid      = $experiment->eid();
+my $state    = $experiment->state();
+my $gid      = $experiment->gid();
+my $exptidx  = $experiment->idx();
+
 print "Beginning pre run for $pid/$eid. " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("tbprerun started");
-
-if (! ($state = ExpState($pid, $eid))) {
-    tbdie("No such experiment $pid/$eid");
-}
-
-if (! ($gid = ExpGroup($pid,$eid))) {
-    tbdie("Unable to get group for $pid/$eid");
-}
-
-# Slowly convert to using Experiment module.
-my $experiment = Experiment->Lookup($pid, $eid);
-if (!defined($experiment)) {
-    tbdie("Could not lookup experiment object!")
-}
 
 #
 # These are the valid states for running this script.
@@ -119,7 +120,7 @@ sub cleanup {
 	system("prerender -r $pid $eid");
     }
     print "Removing experiment state.\n";
-    TBExptRemoveVirtualState($pid, $eid );
+    $experiment->RemoveVirtualState();
 }
 
 #
@@ -135,15 +136,12 @@ sub fatal($;$)
     tbdie($parms, $mesg);
 }
 
-# Need this below.
-TBExptIDX($pid, $eid, \$exptidx)
-    or fatal("Failed to get experiment index for $pid/$eid!");
-
 # Must kill any prerender process first!
 system("prerender -r $pid $eid");
 
 # Kill old virtual state.
-TBExptRemoveVirtualState($pid, $eid);
+$experiment->RemoveVirtualState() == 0 or
+    tbdie("Could not remove virtual state!");
 
 # This setups virt_nodes, virt_names including all IP address calculation
 # and tb-* handling.
@@ -184,13 +182,6 @@ if ($events_result->num_rows) {
 #
 # Need to know if wrapping an experiment.
 #
-my $elabinelab = 0;
-my $elabinelab_eid;
-
-TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-    or fatal("Failed to get ElabInElab attributes!");
-
-#
 # If we are, rerun the parser so that we can pass in the proper info
 # this time around. This is a side effect of allowing the elabinelab
 # bit, and the elabinelab eid, to be specified in the NS file. If we
@@ -200,13 +191,25 @@ TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
 # out the nodes. What if they clear the elabinelab bit too? Ick, not
 # going to worry about that.
 #
-if ($elabinelab) {
+if ($experiment->elabinelab()) {
     # Inner experiment better exist.
-    fatal("Inner experiment $elabinelab_eid does not exist!")
-	if (defined($elabinelab_eid) && !ExpState($pid, $elabinelab_eid));
+    if (defined($experiment->elabinelab_eid())) {
+	my $inner_experiment =
+	    Experiment->Lookup($pid, $experiment->elabinelab_eid());
+
+	fatal("Inner experiment does not exist!")
+	    if (!defined($inner_experiment));
+
+	# Wrong place to do this?
+	my %args = ("elabinelab_exptidx" => $inner_experiment->idx());
+	
+	$experiment->Update(\%args) == 0 or
+	    fatal("Could not update elabinelab_exptidx in $experiment");
+    }
     
     # Again, kill virtual state.
-    TBExptRemoveVirtualState($pid, $eid);
+    $experiment->RemoveVirtualState() == 0 or
+	tbdie("Could not remove virtual state!");
 
     print "Re-Running parser ... " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("parser started");
@@ -222,20 +225,8 @@ if ($elabinelab) {
 #
 # Put the nsfile into the DB, now that we know it parses okay.
 #
-$nsfile_string = `cat $nsfile`;
-
-if ($nsfile_string) {
-    $nsfile_string = DBQuoteSpecial($nsfile_string);
-
-    if (length($nsfile_string) >= DBLIMIT_NSFILESIZE()) {
-	fatal("NS File is way too big!");
-    }
-    if (!DBQueryWarn("delete from nsfiles where eid='$eid' and pid='$pid'") ||
-	!DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
-		     "VALUES('$pid', '$eid', $nsfile_string)")) {
-	fatal("Error storing the NS file into the database!");
-    }
-}
+$experiment->SetNSFile($nsfile) == 0 or
+    fatal("Error storing the NS file into the database!");
 
 #
 # In update mode, do not start the renderer until later. If update fails we
@@ -250,16 +241,10 @@ if ($state eq EXPTSTATE_PRERUN && !$zeemode) {
 #
 # See if using the new ipassign.
 #
-my $query_result =
-    DBQueryWarn("select use_ipassign, ipassign_args " .
-		"from experiments where pid='$pid' and eid='$eid'");
+if ($experiment->use_ipassign()) {
+    my $ipassign_args  = $experiment->ipassign_args();
 
-if (!$query_result || ($query_result->num_rows() != 1)) {
-    fatal("Error getting ipassign arguments!");
-}
-my ($use_ipassign, $ipassign_args) = $query_result->fetchrow();
-if ($use_ipassign) {
-    if (!defined $ipassign_args) {
+    if (! defined($ipassign_args)) {
 	$ipassign_args = "";
     }
     TBDebugTimeStamp("ipassign_wrapper started");
@@ -303,7 +288,7 @@ if ($OPSDBSUPPORT) {
     }
 }
 
-if (!$elabinelab) {
+if (!$experiment->elabinelab()) {
     TBDebugTimeStamp("verify-ns started");
     print "Verifying parse ...\n";
     
@@ -338,93 +323,29 @@ if (!$zeemode) {
 }
 
 #
-# If security level indicates that the experiment needs to be run ElabInElab
-# then must generate a parallel experiment for the container. When the user
-# swaps in the original experiment, it will really be this experiment that
-# is swapped in. Its sorta bogus, but hey its a prototype.
-#
-my $security_level;
-if (! TBExptSecurityLevel($pid, $eid, \$security_level)) {
-    fatal("Could not get security_level from DB!");
-}
-
-if (0 && $security_level >= TBDB_SECLEVEL_ORANGE()) {
-    my $elabinelab_eid = $eid . "-" . "elabinelab";
-    my $tempnsfile     = "/tmp/$pid-$elabinelab_eid-$$.nsfile";
-    my $maxnodes;
-    my $elabinelab_exptidx;
-
-    if (! TBExptMinMaxNodes($pid, $eid, undef, \$maxnodes)) {
-	fatal("Could not get max nodes from DB!");
-    }
-
-    #
-    # Munge the template.
-    #
-    system("cat $template | sed -e 's/\@MAXPCS\@/$maxnodes/' ".
-	   "                    -e 's/\@SECURITY_LEVEL\@/$security_level/' ".
-	   "    >$tempnsfile");
-
-    TBDebugTimeStamp("recursive batchexp started");
-    print "Creating elabinelab container experiment.\n";
-    if (system("$batchexp -q -i -w -f -n ".
-	       "  -L 'ElabInElab Container for $eid' ".
-	       "  -E 'ElabInElab Container for $eid - DO NOT DELETE' ".
-	       "  -p $pid -e $elabinelab_eid $tempnsfile")) {
-	fatal("Could not create elabinelab container experiment!");
-    }
-    TBDebugTimeStamp("recursive batchexp finished");
-
-    #
-    # Link the two experiments together.
-    #
-    if (! (DBQueryWarn("update experiments set ".
-		       " elabinelab_eid='$eid' ".
-		       "where pid='$pid' and eid='$elabinelab_eid'") &&
-	   DBQueryWarn("update experiments set ".
-		       "  elabinelab_eid='$elabinelab_eid' ".
-		       "where pid='$pid' and eid='$eid'"))) {
-	system("$endexp -w -q $pid $elabinelab_eid");
-	fatal("Could not update DB for cross linking experiments!");
-    }
-    #
-    # This stats stuff is not done in testmode.
-    # 
-    if (! $TESTMODE) {
-	# IDX for newly created elabinelab experiment.
-	TBExptIDX($pid, $elabinelab_eid, \$elabinelab_exptidx)
-	    or fatal("Failed to get experiment index for $pid/$elabinelab_eid!");
-
-	# Cross link the other experiment (code below is for this experiment).
-	DBQueryWarn("update experiment_stats set ".
-		    "   elabinelab_exptidx=$exptidx ".
-		    "where pid='$pid' and eid='$elabinelab_eid' and ".
-		    "      exptidx='$elabinelab_exptidx'");
-    }
-}
-
-#
 # If wrapping an experiment, copy over type/fixnode info to wrapper.
 # We already made sure the experiment was created with enough nodes (see
 # the parser) but now we have to make sure that the type/fixnode stuff will
 # correspond to what the wrapped experiment really wants. It is a lot easier
 # to do this here then in the parser.
 #
-if ($elabinelab && defined($elabinelab_eid)) {
+if ($experiment->elabinelab() && defined($experiment->elabinelab_eid())) {
     my $outer_result;
     my $inner_result;
-    my $maxnodes;
+    my $inner_experiment =
+	Experiment->Lookup($pid, $experiment->elabinelab_eid());
+
+    fatal("Inner experiment does not exist!")
+	if (!defined($inner_experiment));
 
     if (! ($inner_result =
-	   DBQueryWarn("select type,fixed from virt_nodes ".
-		       "where pid='$pid' and eid='$elabinelab_eid'"))) {
-	fatal("Could not get virt_node info for $pid/$elabinelab_eid!");
+	   $inner_experiment->TableLookUp("virt_nodes", "type,fixed"))) {
+	fatal("Could not get virt_node info for $inner_experiment!");
     }
     if (! ($outer_result =
-	   DBQueryWarn("select vname from virt_nodes ".
-		       "where pid='$pid' and eid='$eid' and ".
-		       "      inner_elab_role='node'"))) {
-	fatal("Could not get virt_node info for $pid/$eid!");
+	   $experiment->TableLookUp("virt_nodes", "vname",
+				    "inner_elab_role='node'"))) {
+	fatal("Could not get virt_node info for $experiment!");
     }
 
     #
@@ -439,10 +360,10 @@ if ($elabinelab && defined($elabinelab_eid)) {
 	fatal("Not enough nodes in outer experiment!")
 	    if (!defined($vname));
 
-	DBQueryWarn("update virt_nodes set ".
-		    "  type='$type',fixed='$fixed' ".
-		    "where pid='$pid' and eid='$eid' and vname='$vname'")
-	    or fatal("Could not get virt_node info for $pid/$eid!");
+	$experiment->TableUpdate("virt_nodes",
+				 "type='$type',fixed='$fixed'",
+				 "vname='$vname'")
+	    or fatal("Could not update virt_node info for $experiment!");
     }
 }
 
@@ -455,22 +376,18 @@ if (! $TESTMODE) {
     # Want to move this to the stats records. Ditto for the security stuff,
     # which was handled above.
     #
-    my $elabinelab_exptidx;
+    my %sets = ();
 
-    if ($elabinelab || $security_level) {
-	DBQueryWarn("update experiment_stats set ".
-		    "   elabinelab=$elabinelab, ".
-		    "   security_level=$security_level ".
-		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
-    }
+    $sets{"elabinelab"} = 1
+	if ($experiment->elabinelab());
+    $sets{"security_level"} = $experiment->security_level()
+	if ($experiment->security_level());
+    $sets{"elabinelab_exptidx"} = $experiment->elabinelab_exptidx()
+	if (defined($experiment->elabinelab_exptidx()));
 
-    if ($elabinelab_eid) {
-	TBExptIDX($pid, $elabinelab_eid, \$elabinelab_exptidx)
-	    or fatal("Failed to get experiment index for $pid/$elabinelab_eid!");
-    
-	DBQueryWarn("update experiment_stats set ".
-		    "   elabinelab_exptidx=$elabinelab_exptidx ".
-		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
+    if (keys(%sets)) {
+	$experiment->TableUpdate("experiment_stats", \%sets) or
+	    fatal("Could not update experiment_stats info for $experiment!");
     }
 }
 

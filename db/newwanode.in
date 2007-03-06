@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -177,6 +177,12 @@ else {
     $eid = "all";
 }
 
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    fatal("*** $0:\n".
+	  "    No such experiment $pid/$eid!\n");
+}
+
 #
 # Lets see if a known IP. If so we want to reuse the existing record.
 #
@@ -269,8 +275,9 @@ else {
 		 "        'fxp', '$control_iface', '$ifacerole')");
 
     DBQueryFatal("insert into reserved ".
-		 "(node_id, pid, eid, rsrv_time, vname) ".
-		 "values ('$nodename', '$pid', '$eid', now(), '$nickname')");
+		 "(node_id, exptidx, pid, eid, rsrv_time, vname) ".
+		 "values ('$nodename', $exptidx, ".
+		 "        '$pid', '$eid', now(), '$nickname')");
 }
 
 #

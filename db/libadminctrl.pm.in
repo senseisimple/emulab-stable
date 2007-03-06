@@ -193,6 +193,7 @@ use English;
 use libdb;
 use libtestbed;
 use libtblog;
+use Group;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -219,6 +220,9 @@ sub TBADMINCTRL_POLICY_TYPE()		{ "type"; }
 sub TBADMINCTRL_POLICY_CLASS()		{ "class"; }
 sub TBADMINCTRL_POLICY_ATTR()		{ "attribute"; }
 sub TBADMINCTRL_POLICY_MEMBERSHIP()	{ "membership"; }
+
+my $MINUS_GIDIDX	= 0;
+my $PLUS_GIDIDX		= 999999;
 
 #
 # The current usage data structure, filled in below.
@@ -771,7 +775,7 @@ sub TestPolicies($$$$)
     $query_result =
 	DBQueryWarn("select distinct * from group_policies ".
 		    "where (pid='$pid' and (pid=gid or gid='$gid')) or ".
-		    "      pid='+' or pid='-' ".
+		    "      pid='' or pid='-' ".
 		    "order by pid,gid desc");
     return -1
 	if (!$query_result);
@@ -994,6 +998,7 @@ sub UpdateNodeTypeXpidPermissions()
 	if (!$query_result);
 
     while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $gid_idx = $rowref->{'gid_idx'};
 	my $ppid    = $rowref->{'pid'};
 	my $pgid    = $rowref->{'gid'};
 	my $policy  = $rowref->{'policy'};
@@ -1007,14 +1012,18 @@ sub UpdateNodeTypeXpidPermissions()
 	next
 	    if ($count == 0);
 
+	my $group = Group->Lookup($gid_idx);
+	next
+	    if (!defined($group) || !$group->IsProjectGroup());
+
 	next
 	    if (exists($plus_policies{$auxdata}) &&
 		plus_policies{$auxdata} == 0);
 
-	$permissions{"$ppid"} = {}
-	    if (!exists($permissions{"$ppid"}));
+	$permissions{"$gid_idx"} = {}
+	    if (!exists($permissions{"$gid_idx"}));
 	
-	$permissions{"$ppid"}->{$auxdata} = 1;
+	$permissions{"$gid_idx"}->{$auxdata} = 1;
     }
 
     #
@@ -1037,13 +1046,16 @@ sub UpdateNodeTypeXpidPermissions()
     return -1
 	if (!DBQueryWarn($create_def));
     
-    foreach my $pid (keys(%permissions)) {
-	my @typelist = keys(%{ $permissions{$pid} });
+    foreach my $gid_idx (keys(%permissions)) {
+	my @typelist = keys(%{ $permissions{$gid_idx} });
+	my $group    = Group->Lookup($gid_idx);
+	my $pid      = $group->pid();
 
 	foreach my $type (@typelist) {
 	    return -1
-		if (! DBQueryWarn("insert into libadminctrl_table (pid, type)".
-				  "  values ('$pid', '$type')"));
+		if (! DBQueryWarn("insert into libadminctrl_table ".
+				  " (pid_idx, pid, type)".
+				  "  values ($gid_idx, '$pid', '$type')"));
 	}
     }
     $query_result = 

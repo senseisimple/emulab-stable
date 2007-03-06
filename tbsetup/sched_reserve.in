@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -75,6 +75,11 @@ if (! ExpLeader($pid,$eid)) {
     die("You experiment $pid/$eid does not exist.\n");
 }
 
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    die("No such experiment $pid/$eid!\n");
+}
+
 foreach my $node (@nodes) {
   my $pc = $node;
   my $allocated = 0;
@@ -100,8 +105,9 @@ foreach my $node (@nodes) {
 		       "pid='$pid' and eid='$eid'");
     if ( ($sth->num_rows()) < 1) {
       print "Reserved  - Scheduling next reservation...\n";
-      $sth = DBQueryFatal("replace into next_reserve (node_id,pid,eid) ".
-			  "values ('$pc','$pid','$eid')");
+      $sth = DBQueryFatal("replace into next_reserve ".
+			  " (node_id,exptidx,pid,eid) ".
+			  "values ('$pc','$exptidx','$pid','$eid')");
     } else {
       print "Reserved  - Already reserved to $pid/$eid\n";
     }

@@ -678,5 +678,49 @@ sub SendVerifiedEmail($)
     return 0;
 }
 
+#
+# Return group membership for a user.  
+#
+sub GroupMembershipList($$;$)
+{
+    my ($self, $prval, $desired_trust) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx     = $self->uid_idx();
+    my $none        = $Group::MemberShip::TRUSTSTRING_NONE;
+    my @result      = ();
+    my $trust_clause;
+
+    if (!defined($desired_trust)) {
+	$trust_clause = "trust!='$none'"
+    }
+    else {
+	$trust_clause = "trust='$desired_trust'"
+    }
+
+    my $query_result =
+	DBQueryWarn("select distinct gid_idx from group_membership ".
+		    "where uid_idx='$uid_idx' and $trust_clause");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($gid_idx) = $query_result->fetchrow_array()) {
+	my $group = Group->Lookup($gid_idx);
+
+	if (!defined($group)) {
+	    print("*** User::GroupMembershipList: ".
+		  "Could not load group $gid_idx!");
+	    return -1;
+	}
+	push(@result, $group);
+    }
+    @$prval = @result;
+    return 0;
+}    
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;

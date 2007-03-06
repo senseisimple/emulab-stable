@@ -664,6 +664,9 @@ class Plab:
 
         # Now perform stuff specific to node addition
         try:
+            res_exptidx = TBExptIDX(RESERVED_PID, RESERVED_EID)
+            mon_exptidx = TBExptIDX(MONITOR_PID, MONITOR_EID)
+            
             DBQueryFatal("replace into nodes"
                          " (node_id, type, phys_nodeid, role, priority,"
                          "  op_mode, def_boot_osid,"
@@ -683,9 +686,10 @@ class Plab:
                          (nodeid))
 
             DBQueryFatal("replace into reserved"
-                         " (node_id, pid, eid, rsrv_time, vname)"
-                         " values (%s, %s, %s, now(), %s)",
-                         (nodeid, RESERVED_PID, RESERVED_EID, hostonly))
+                         " (node_id, exptidx, pid, eid, rsrv_time, vname)"
+                         " values (%s, %d, %s, %s, now(), %s)",
+                         (nodeid, res_exptidx,
+                          RESERVED_PID, RESERVED_EID, hostonly))
 
             # XXX: This should probably be checked and updated if necessary
             #      when updating.
@@ -782,9 +786,10 @@ class Plab:
             
             # Put the last vnode created into the special monitoring expt.
             DBQueryFatal("insert into reserved"
-                         " (node_id, pid, eid, rsrv_time, vname)"
-                         " values (%s, %s, %s, now(), %s)",
-                         (vnodeid, MONITOR_PID, MONITOR_EID, vnodeid))
+                         " (node_id, exptidx, pid, eid, rsrv_time, vname)"
+                         " values (%s, %d, %s, %s, now(), %s)",
+                         (vnodeid, mon_exptidx,
+                          MONITOR_PID, MONITOR_EID, vnodeid))
             pass
         
         except:
@@ -1042,6 +1047,7 @@ class Slice:
         self.plab = plab
         self.pid, self.eid = pid, eid
         self.slicemeta = None
+        self.exptidx = None
         self.slicename = slicename
         self.description = DEF_SLICE_DESC
         return
@@ -1058,20 +1064,23 @@ class Slice:
             self.description = PLAB_SVC_SLICEDESC
             adminbit = 1
             pass
+
+        res = DBQueryFatal("select idx, expt_name from experiments "
+                           "where pid=%s "
+                           "and eid=%s",
+                           (self.pid, self.eid))
+        if not len(res):
+            raise RuntimeError, \
+                  "Didn't get any results while looking up info on " \
+                  "experiment %s/%s" % (self.pid, self.eid)
+        (eindex, descr) = res[0]
         
         if not self.slicename:
-            res = DBQueryFatal("select idx, expt_name from experiments "
-                               "where pid=%s "
-                               "and eid=%s",
-                               (self.pid, self.eid))
-            if not len(res):
-                raise RuntimeError, \
-                      "Didn't get any results while looking up info on " \
-                      "experiment %s/%s" % (self.pid, self.eid)
-            (eindex, descr) = res[0]
             self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
-            self.description = descr
             pass
+
+        self.description = descr
+        self.exptidx = eindex
 
         print "Creating Plab slice %s." % self.slicename
 
@@ -1089,10 +1098,10 @@ class Slice:
                     pass
                 pass
 
-            DBQueryFatal("insert into plab_slices"
-                         " (pid, eid, slicename, slicemeta, leaseend, admin)"
-                         " values (%s, %s, %s, %s, %s, %s)",
-                         (self.pid, self.eid, self.slicename,
+            DBQueryFatal("insert into plab_slices "
+                         "(exptidx,pid,eid,slicename,slicemeta,leaseend,admin)"
+                         " values (%d, %s, %s, %s, %s, %s, %s)",
+                         (self.exptidx, self.pid, self.eid, self.slicename,
                           self.slicemeta,
                           time.strftime("%Y-%m-%d %H:%M:%S",
                                         time.gmtime(self.leaseend)),
@@ -1405,10 +1414,10 @@ class Node:
              self.slice.plab.agent.createNode(self)
         
         DBQueryFatal("replace into plab_slice_nodes"
-                     " (pid, eid, slicename, node_id,"
+                     " (exptidx, pid, eid, slicename, node_id,"
                      " nodemeta, leaseend)"
-                     " values (%s, %s, %s, %s, %s, %s)",
-                     (self.slice.pid, self.slice.eid,
+                     " values (%d, %s, %s, %s, %s, %s, %s)",
+                     (self.slice.exptidx, self.slice.pid, self.slice.eid,
                       self.slice.slicename, self.nodeid,
                       self.nodemeta,
                       time.strftime("%Y-%m-%d %H:%M:%S",

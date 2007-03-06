@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -76,6 +76,12 @@ my %links = ();
 
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid!");
+}
 
 # Get node list.
 # (left join info from vis_nodes; could also left join virt_lans,
@@ -584,7 +590,8 @@ if ($noNodes) {
 # Stash in database if not a thumb.
 if (! $thumbnail) {
     DBQueryFatal("replace into vis_graphs set ".
-		 "  pid='$pid', eid='$eid', zoom='$zoom', detail='$detail', ".
+		 "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
+                 "  zoom='$zoom', detail='$detail', ".
 		 "  image=" . DBQuoteSpecial($im->png));
 }
 

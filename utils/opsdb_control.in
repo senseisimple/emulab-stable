@@ -53,6 +53,7 @@ sub AddGroup(@);
 sub DelProj(@);
 sub DelGroup(@);
 sub SetGroups(@);
+sub SetGroupsAux(@);
 sub AddExpDB(@);
 sub DelExpDB(@);
 sub AddTempDB(@);
@@ -72,6 +73,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use User;
+use Group;
+use Experiment;
 
 #
 # We don't want to run this script unless its the real version.
@@ -268,35 +271,16 @@ sub AddProj(@)
 
 sub AddGroup(@)
 {
-    my ($pid, $gid) = @_;
-
     usage()
-	if (@_ != 2);
+	if (@_ < 1 || @_ > 3);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $group = Group->Lookup($_[0], $_[1]);
+    if (!defined($group)) {
+	fatal("No such group: @_!");
     }
-    else {
-	die("Bad data in uid: $pid");
-    }
-    if ($gid =~ /^([-\w]+)$/) {
-	$gid = $1;
-    }
-    else {
-	die("Bad data in uid: $gid");
-    }
-
+    my $pid    = $group->pid();
+    my $gid    = $group->gid();
     my $dbname = ($pid eq $gid ? $pid : "$pid,$gid");
-
-    my $query_result =
-	DBQueryFatal("select pid,gid from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    fatal("No such group in DB: $pid/$gid!")
-	if (!$query_result->numrows);
 
     print "Adding DB '$dbname' to mysql database on $CONTROL.\n";
     my $retval = DoOpsStuff("adddb $dbname");
@@ -321,34 +305,16 @@ sub DelProj(@)
 
 sub DelGroup(@)
 {
-    my ($pid, $gid) = @_;
-
     usage()
-	if (@_ != 2);
+	if (@_ < 1 || @_ > 3);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $group = Group->Lookup($_[0], $_[1]);
+    if (!defined($group)) {
+	fatal("No such group: @_!");
     }
-    else {
-	die("Bad data in uid: $pid");
-    }
-    if ($gid =~ /^([-\w]+)$/) {
-	$gid = $1;
-    }
-    else {
-	die("Bad data in uid: $gid");
-    }
+    my $pid    = $group->pid();
+    my $gid    = $group->gid();
     my $dbname = ($pid eq $gid ? $pid : "$pid,$gid");
-
-    my $query_result =
-	DBQueryFatal("select pid,gid from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    fatal("No such group in DB: $pid/$gid!")
-	if (!$query_result->numrows);
 
     print "Removing DB '$dbname' from mysql database on $CONTROL.\n";
     my $retval = DoOpsStuff("deldb $dbname");
@@ -356,7 +322,6 @@ sub DelGroup(@)
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
     return 0;
-    
 }
 
 #
@@ -364,30 +329,46 @@ sub DelGroup(@)
 #
 sub SetGroups(@)
 {
-    my @uids  = @_;
-    my $input = "";
+    my @userlist  = ();
 
     usage()
 	if (@_ < 1);
 
-    foreach my $uid (@uids) {
-	my @glist = ();
-	
-	#
-	# Untaint args.
-	#
-	if ($uid =~ /^([-\w]+)$/) {
-	    $uid = $1;
+    foreach my $uid (@_) {
+	my $user = User->Lookup($uid);
+	if (! defined($user)) {
+	    fatal("No such user $uid!");
 	}
-	else {
-	    die("Bad data in uid: $uid");
-	}
+	push(@userlist, $user);
+    }
+    return SetGroupsAux(@userlist);
+}
 
-	my $query_result =
-	    DBQueryFatal("select p.pid,p.gid from group_membership as p ".
-			 "where p.uid='$uid' and p.trust!='none'");
+sub SetGroupsAux(@)
+{
+    my @userlist  = @_;
+    my @uids      = ();
+    my $input     = "";
 
-	while (my ($pid,$gid) = $query_result->fetchrow_array()) {
+    foreach my $user (@userlist) {
+	my @groups  = ();
+	my @glist   = ();
+	my $uid     = $user->uid();
+	my $uid_idx = $user->uid_idx();
+
+	next
+	    if ($user->status() ne $User::USERSTATUS_ACTIVE);
+
+	# Debug printf below.
+	push(@uids, $uid);
+
+	$user->GroupMembershipList(\@groups) == 0 or
+	    fatal("Could not get group list for $user");
+
+	foreach my $group (@groups) {
+	    my $pid = $group->pid();
+	    my $gid = $group->gid();
+
 	    if ($pid eq $gid) {
 		push(@glist, "$pid");
 	    }
@@ -399,8 +380,7 @@ sub SetGroups(@)
 	    # Now get the per-experiment DBs inside this group.
 	    #
 	    my $experiment_result =
-		DBQueryFatal("select dpdbname from experiments ".
-			     "where pid='$pid' and gid='$gid' and dpdb!=0");
+		$group->TableLookUp("experiments", "dpdbname", "dpdb!=0");
 
 	    while (my ($dbname) = $experiment_result->fetchrow_array()) {
 		if (defined($dbname) && $dbname ne "") {
@@ -412,8 +392,7 @@ sub SetGroups(@)
 	    # Now get additional temporary DBs.
 	    #
 	    my $databases_result =
-		DBQueryFatal("select dbname from datapository_databases ".
-			     "where pid='$pid' and gid='$gid'");
+		$group->TableLookUp("datapository_databases", "dbname");
 
 	    while (my ($dbname) = $databases_result->fetchrow_array()) {
 		if (defined($dbname) && $dbname ne "") {
@@ -440,63 +419,38 @@ sub SetGroups(@)
 # 
 sub AddExpDB(@)
 {
-    my ($pid, $eid) = @_;
     my @uids = ();
 
     usage()
-	if (@_ < 2 || @_ > 3);
+	if (@_ < 1 || @_ > 3);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	fatal("No such experiment: @_!");
     }
-    else {
-	die("Bad data in pid: $pid");
-    }
-    if ($eid =~ /^([-\w]+)$/) {
-	$eid = $1;
-    }
-    else {
-	die("Bad data in eid: $eid");
-    }
-    
-    my $gid = ExpGroup($pid, $eid);
+    my $pid    = $experiment->pid();
+    my $eid    = $experiment->eid();
+    my $gid    = $experiment->gid();
     my $dbname = "${pid}+${eid}";
-    my $exptidx;
+    my $exptidx= $experiment->idx();
 
-    #
-    # Check to see if the experiment actually wants its own DB.
-    #
-    my $query_result =
-	DBQueryFatal("select dpdbname,dpdbpassword from experiments ".
-		     "where pid='$pid' and eid='$eid' and dpdb!=0");
-    return 0
-	if (!$query_result->numrows);
-    
-    my ($dpdbname,$dpdbpassword) = $query_result->fetchrow_array();
-
-    if (defined($dpdbname)) {
+    if (defined($experiment->dpdbname())) {
 	# Allow override.
-	$dbname = $dpdbname;
+	$dbname = $experiment->dpdbname();
     }
+    my $dpdbpassword = $experiment->dpdbpassword();
+	
     if (!defined($dpdbpassword)) {
 	$dpdbpassword = TBGenSecretKey();
 	$dpdbpassword = substr($dpdbpassword, 0, 10);
-
-	DBQueryFatal("update experiments set dpdbpassword='$dpdbpassword' ".
-		     "where pid='$pid' and eid='$eid'");
     }
-    return -1
-	if (!TBExptIDX($pid, $eid, \$exptidx));
 
     #
     # XXX See if there are any traced links. 
     #
-    $query_result =
-	DBQueryFatal("select vname from virt_lans ".
-		     "where pid='$pid' and eid='$eid' and trace_db!=0");
+    my $query_result =
+	$experiment->TableLookUp("virt_lans", "vname", "trace_db!=0");
+					     
     my $traceflag = ($query_result->numrows ? "-s" : "");
 
     print "Adding DB '$dbname' to mysql database on $CONTROL.\n";
@@ -505,13 +459,13 @@ sub AddExpDB(@)
 	fatal("$OPSDBPROXY failed on $CONTROL!");
     }
 
-    if (!defined($dpdbname)) {
-	# Allowed override above.
-	DBQueryFatal("update experiments set dpdbname='$dbname' ".
-		     "where pid='$pid' and eid='$eid'");
-    }
-    DBQueryFatal("update experiment_stats set dpdbname='$dbname' ".
-		 "where exptidx='$exptidx'");
+    $experiment->Update({"dpdbpassword" => "$dpdbpassword",
+			 "dpdbname"     => "$dbname"}) == 0 or
+	fatal("Could not update dpdbname,dpdbpassword for $experiment");
+
+    $experiment->TableUpdate("experiment_stats",
+			     {"dpdbname" => "$dbname"}) == 0 or
+	fatal("Could not update experiment_stats for $experiment");
 
     #
     # Add a user that is named by this DB, with the password from above.
@@ -532,62 +486,35 @@ sub AddExpDB(@)
     #
     # Now we need to update the access list for everyone in the group.
     #
-    my $users_result =
-	DBQueryFatal("select distinct g.uid ".
-		     "  from group_membership as g ".
-		     "left join users as u on u.uid_idx=g.uid_idx ".
-		     "where (u.status='active' or u.status='frozen') and ".
-		     "      g.trust!='none' and ".
-  		     "      g.pid='$pid' and g.gid='$gid'");
+    my $group = $experiment->GetGroup();
+    my @userlist;
 
-    while (my ($uid) = $users_result->fetchrow_array()) {
-	push(@uids, $uid);
-    }
-    SetGroups(@uids) == 0
-	or fatal("Could not set groups for @uids!");
+    $group->MemberList(\@userlist) == 0 or
+	fatal("Could not get user list for $group");
+
+    SetGroupsAux(@userlist) == 0
+	or fatal("Could not setgroups for $experiment!");
 
     return 0;
 }
 
 sub DelExpDB(@)
 {
-    my ($pid, $eid) = @_;
-
     usage()
-	if (@_ != 2);
+	if (@_ < 1 || @_ > 3);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	return 0;
     }
-    else {
-	die("Bad data in pid: $pid");
-    }
-    if ($eid =~ /^([-\w]+)$/) {
-	$eid = $1;
-    }
-    else {
-	die("Bad data in eid: $eid");
-    }
-
-    #
-    # Always do a DB removal if the experiment has a dbname set.
-    #
-    my $query_result =
-	DBQueryFatal("select dpdbname,idx from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-    return 0
-	if (!$query_result->numrows);
-    
-    my ($dbname,$exptidx) = $query_result->fetchrow_array();
+    my $dbname = $experiment->dpdbname();
+    my $exptidx= $experiment->idx();
 
     return -1
 	if (!defined($dbname));
 
     #
-    # Delete the per-experiment DB user for the DB.
+    # Always do a DB removal if the experiment has a dbname set.
     #
     my $dbuser = "E${exptidx}";
     
@@ -611,43 +538,22 @@ sub DelExpDB(@)
 
 sub DumpExpDB(@)
 {
-    my ($pid, $eid, $filename) = @_;
-
     usage()
-	if (@_ != 3);
+	if (@_ < 2 || @_ > 4);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	return 0;
     }
-    else {
-	die("Bad data in pid: $pid");
-    }
-    if ($eid =~ /^([-\w]+)$/) {
-	$eid = $1;
-    }
-    else {
-	die("Bad data in eid: $eid");
-    }
+    my $dbname   = $experiment->dpdbname();
+    my $filename = $_[2];
+
     if ($filename =~ /^([-\w\/\.\+,]+)$/) {
 	$filename = $1;
     }
     else {
 	die("Bad data in filename: $filename");
     }
-
-    #
-    # Check to see if the experiment actually wants its own DB.
-    #
-    my $query_result =
-	DBQueryFatal("select dpdbname from experiments ".
-		     "where pid='$pid' and eid='$eid' and dpdb!=0");
-    return 0
-	if (!$query_result->numrows);
-    
-    my ($dbname) = $query_result->fetchrow_array();
 
     return -1
 	if (!defined($dbname));
@@ -662,37 +568,14 @@ sub DumpExpDB(@)
 
 sub CleanExpDB(@)
 {
-    my ($pid, $eid) = @_;
-
     usage()
-	if (@_ != 2);
+	if (@_ < 2 || @_ > 3);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	return 0;
     }
-    else {
-	die("Bad data in pid: $pid");
-    }
-    if ($eid =~ /^([-\w]+)$/) {
-	$eid = $1;
-    }
-    else {
-	die("Bad data in eid: $eid");
-    }
-
-    #
-    # Check to see if the experiment actually wants its own DB.
-    #
-    my $query_result =
-	DBQueryFatal("select dpdbname from experiments ".
-		     "where pid='$pid' and eid='$eid' and dpdb!=0");
-    return 0
-	if (!$query_result->numrows);
-    
-    my ($dbname) = $query_result->fetchrow_array();
+    my $dbname   = $experiment->dpdbname();
 
     return -1
 	if (!defined($dbname));
@@ -710,27 +593,15 @@ sub CleanExpDB(@)
 #
 sub AddTempDB(@)
 {
-    my ($pid, $gid, $dbname) = @_;
-    my @uids = ();
-
     usage()
-	if (@_ != 3);
+	if (@_ < 2 || @_ > 4);
 
-    #
-    # Untaint args.
-    #
-    if ($pid =~ /^([-\w]+)$/) {
-	$pid = $1;
+    my $group = Group->Lookup($_[0], $_[1]);
+    if (!defined($group)) {
+	fatal("No such group: @_!");
     }
-    else {
-	die("Bad data in pid: $pid");
-    }
-    if ($gid =~ /^([-\w]+)$/) {
-	$gid = $1;
-    }
-    else {
-	die("Bad data in gid: $gid");
-    }
+    my $dbname = $_[2];
+
     if ($dbname =~ /^([-\w,\+]+)$/) {
 	$dbname = $1;
     }
@@ -738,11 +609,17 @@ sub AddTempDB(@)
 	die("Bad data in dbname: $dbname");
     }
 
+    my $pid     = $group->pid();
+    my $gid     = $group->gid();
+    my $pid_idx = $group->pid_idx();
+    my $gid_idx = $group->gid_idx();
+
     #
     # Add DB record for it.
     #
     if (! DBQueryWarn("insert into datapository_databases set ".
 		      "  pid='$pid', gid='$gid', ".
+		      "  pid_idx='$pid_idx', gid_idx='$gid_idx', ".
 		      "  uid='$user_uid', uid_idx='$user_dbid', ".
 		      "  dbname='$dbname', created=now()")) {
 	fatal("Failed to add temporary dbname to database");
@@ -759,20 +636,14 @@ sub AddTempDB(@)
     #
     # Now we need to update the access list for everyone in the group.
     #
-    my $users_result =
-	DBQueryFatal("select distinct g.uid ".
-		     "  from group_membership as g ".
-		     "left join users as u on u.uid_idx=g.uid_idx ".
-		     "where (u.status='active' or u.status='frozen') and ".
-		     "      g.trust!='none' and ".
-  		     "      g.pid='$pid' and g.gid='$gid'");
+    my @userlist;
 
-    while (my ($uid) = $users_result->fetchrow_array()) {
-	push(@uids, $uid);
-    }
-    SetGroups(@uids) == 0
-	or fatal("Could not set groups for @uids!");
-    
+    $group->MemberList(\@userlist) == 0 or
+	fatal("Could not get user list for $group");
+
+    SetGroupsAux(@userlist) == 0
+	or fatal("Could not setgroups for $group!");
+
     return 0;
 }
 

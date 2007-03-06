@@ -3920,3 +3920,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	 PRIMARY KEY  (`node_id`,`key_type`,`key_role`,`key_uid`)
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+4.109: More pid/gid changes.
+
+       All of the sql changes are made in the following script:
+
+         ./step3_newids.pl

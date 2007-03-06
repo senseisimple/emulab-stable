@@ -67,9 +67,9 @@ my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
 my $savestate= 0;
-my $template_mode  = 0;	# New stuff; experiment templates.
-my $instance_idx   = 0;	# New stuff; experiment templates.
-my $archive_eid;	# New stuff; experiment templates.
+my $template;		# New stuff; experiment templates.
+my $branch_template;    # New stuff; experiment templates.
+my $instance;		# New stuff; experiment templates.
 # All of these are for experiment dup and branch. Really mucks things up.
 # These globals are set when we parse the -c argument, but used later
 my $copybranch = 0;	# A branch instead of a duplicate
@@ -103,6 +103,7 @@ use libArchive;
 use Experiment;
 use Template;
 use User;
+use Group;
 
 my $parser      = "$TB/libexec/parse-ns";
 my $checkquota  = "$TB/sbin/checkquota";
@@ -111,9 +112,6 @@ my $RSYNC	= "/usr/local/bin/rsync";
 my $errorstat=-1;
 my $exptidx;
 my $logname;
-
-# Be careful not to exit on transient error; 0 means infinite retry.
-$libdb::DBQUERY_MAXTRIES = 0;
 
 # For the END block below.
 my $cleaning = 0;
@@ -222,10 +220,16 @@ $noswap_reason = "None Given"
 $noidleswap_reason = "None Given"
     if (!defined($noidleswap_reason));
 
+# Need the group
+my $group = Group->Lookup($pid, $gid);
+if (!defined($group)) {
+    die("No such group $pid/$gid!");
+}
+
 #
 # Make sure UID is allowed to create experiments in this project.
 #
-if (! TBProjAccessCheck($user_uid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+if (! $group->AccessCheck($this_user, TB_PROJECT_CREATEEXPT)) {
     die("You do not have permission to create experiments in $pid/$gid");
 }
 
@@ -278,7 +282,6 @@ if ($waitmode) {
 #
 my %args = ();
 
-$args{'gid'}	  	   = $gid;
 $args{'expt_head_uid'}	   = $user_uid;
 $args{'expt_swap_uid'}	   = $user_uid;
 $args{'creator_idx'}	   = $user_dbid;
@@ -297,14 +300,14 @@ $args{'batchmode'}	   = $batchmode;
 $args{'batchstate'}	   = $batchstate;
 $args{'linktest_level'}    = $linktest;
 $args{'savedisk'}	   = $savestate;
-$args{'instance_idx'}	   = $instance_idx;
+$args{'instance_idx'}	   = (defined($instance) ? $instance->idx() : 0);
 # These are special; the library will DBQuote them. 
 $args{'expt_name'}	   = $description;
 $args{'noswap_reason'}	   = $noswap_reason;
 $args{'noidleswap_reason'} = $noidleswap_reason;
 
 # Now create the experiment; we get back a perl class instance.
-if (! ($experiment = Experiment->Create($pid, $eid, \%args))) {
+if (! ($experiment = Experiment->Create($group, $eid, \%args))) {
     tbdie({type => 'secondary', severity => SEV_SECONDARY,
 	   error => ['create_experiment_record_failed']},
 	  "Could not create a new experiment record!");
@@ -326,7 +329,7 @@ tblog_set_info($pid,$eid,$UID);
 # There is no need to do this for the template wrapper experiment; it was
 # already done when the template was created.
 #
-if (!$template_mode || $instance_idx) {
+if (!defined($template) || defined($instance)) {
     if ($experiment->CreateDirectory() != 0) {
 	if (($? >> 8) == EDQUOT()) {
 	    # Obey exit status protocol for web page; User should see this.
@@ -341,16 +344,18 @@ else {
     #
     # But we do need to update the experiment record with the template path.
     #
-    my $template = Template->LookupByPidEid($pid, $eid);
-
-    fatal("Could not find template record for $pid/$eid")
-	if (!defined($template));
-
     my %args = ();
     $args{'path'} = $template->path();
     
     $experiment->Update(\%args) == 0
 	or fatal("Could not update experiment record!");
+
+    # And the template with the new experiment index.
+    %args = ();
+    $args{'exptidx'} = $experiment->idx();
+
+    $template->Update(\%args) == 0
+	or fatal("Could not update template record!");
 }
 
 #
@@ -367,7 +372,9 @@ chdir("$workdir") or
 # Create a new archive, which might actually be a branch of an existing one
 # when doing an experiment branch (fork).
 #
-if ($template_mode && defined($archive_eid)) {
+if (defined($branch_template)) {
+    my $archive_eid = $branch_template->eid();
+    
     fatal({type => 'secondary', severity => SEV_SECONDARY,
 	   error => ['archive_op_failed', 'create', undef, undef]},
 	  "Could not create experiment archive!")
@@ -487,7 +494,7 @@ else {
 }
 
 goto skiplog
-    if ($template_mode);
+    if (defined($template));
 
 #
 # The rest of this goes into the background so that the user sees
@@ -684,7 +691,7 @@ libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
 # Do a SavePoint on the experiment files. In template mode, let the wrapper
 # deal with this. Avoids duplication of work.
 #
-if (! $template_mode) {
+if (! defined($template)) {
     print "Doing a savepoint on the experiment archive ...\n";
     if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
@@ -697,7 +704,7 @@ if (! $template_mode) {
 # If this is a branch, then do a commit. Otherwise, the archive looks
 # wrong cause its a branch from the original and shows all those files.
 #
-if ($copybranch && !$template_mode) {
+if ($copybranch && !defined($template)) {
     print "Doing a commit on the experiment archive ...\n";
     libArchive::TBCommitExperimentArchive($pid, $eid, "branch_merge") == 0 or
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
@@ -723,7 +730,7 @@ $experiment->SetSwapInfo($this_user);
 #
 # Close up the log file so the webpage stops.
 #
-if (!$template_mode) {
+if (!defined($template)) {
     print "Experiment $pid/$eid has been successfully created!\n";
     $experiment->CloseLogFile();
 }
@@ -748,7 +755,7 @@ $experiment->SetCancelFlag(EXPTCANCEL_CLEAR());
 # In template_mode we are done; the caller finishes up.
 #
 exit(0)
-    if ($template_mode);
+    if (defined($template));
 
 #
 # Dump the report file and the log file to the user via email. 
@@ -1100,23 +1107,39 @@ sub ParseArgs()
 	$waitmode = 1;
     }
     if (defined($options{"x"})) {
-	$template_mode = 1;
+	my $guid;
+	my $vers;
+	my $branch_guid;
+	my $branch_vers;
+	
+	if ($options{"x"} =~ /^(\d*)\/(\d*)$/) {
+	    $guid = $1;
+	    $vers = $2;
+	}
+	elsif ($options{"x"} =~ /^(\d*)\/(\d*),(\d*)\/(\d*)$/) {
+	    $guid = $1;
+	    $vers = $2;
+	    $branch_guid = $3;
+	    $branch_vers = $4;
+	}
+	else {
+	    tbdie("Bad arguments for -x option");
+	}
 
-	if ($options{"x"} ne "-") {
-	    $archive_eid   = $options{"x"};
-	    
-	    if ($archive_eid =~ /^([-\w]+)$/) {
-		$archive_eid = $1;
-	    }
-	    else {
-		tbdie({type => 'primary', severity => SEV_ERROR,
-		       error => ['bad_data', 'argument', $archive_eid]},
-		      "Bad data in argument: $archive_eid.");
+	$template = Template->Lookup($guid, $vers);
+	if (!defined($template)) {
+	    tbdie("No such template $guid/$vers");
+	}
+
+	if (defined($branch_guid)) {
+	    $branch_template = Template->Lookup($branch_guid, $branch_vers);
+	    if (!defined($branch_template)) {
+		tbdie("No such template $branch_guid/$branch_vers");
 	    }
 	}
 	
 	if (defined($options{"y"})) {
-	    $instance_idx = $options{"y"};
+	    my $instance_idx = $options{"y"};
 	    
 	    if ($instance_idx =~ /^([\d]+)$/) {
 		$instance_idx = $1;
@@ -1125,6 +1148,10 @@ sub ParseArgs()
 		tbdie({type => 'primary', severity => SEV_ERROR,
 		       error => ['bad_data', 'argument', $instance_idx]},
 		      "Bad data in argument: $instance_idx.");
+	    }
+	    $instance = Template::Instance->LookupByExptidx($instance_idx);
+	    if (!defined($instance)) {
+		tbdie("No such template instance $instance_idx");
 	    }
 	}
     }

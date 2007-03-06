@@ -325,7 +325,7 @@ $template->NewMetadata("TID", $tid, $this_user, "tid") == 0
 
 # Now invoke batchexp to preload the experiment. Note special -x option.
 system("$batchexp ". 
-       "-x " . ($modify ? $parent_template->eid() : "-") . " " .
+       "-x $guid/$vers" . ($modify ? ",$parent_guid/$parent_vers" : "") . " " .
        "-q -i -f -E 'Experiment Template Preload $guid/$vers' ".
        "-p $pid -e $eid $inputfile");
 fatal($? >> 8, "Oops")

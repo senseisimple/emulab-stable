@@ -103,7 +103,7 @@ if ($setlogin) {
 	#
 	# Find all non admins and log them out.
 	# 
-	DBQueryFatal("delete from login where adminon=0'");
+	DBQueryFatal("delete from login where adminon=0");
     }
 }
 

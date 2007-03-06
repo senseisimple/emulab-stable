@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -2054,8 +2054,8 @@ DBQueryFatal("delete from event_groups ".
 
 foreach my $lan (keys(%virt_lans)) {
     DBQueryFatal("replace into virt_agents ".
-		 " (pid, eid, vname, vnode, objecttype) ".
-		 " select '$pid', '$eid', '$lan', '*', ".
+		 " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		 " select '$experiment_idx', '$pid', '$eid', '$lan', '*', ".
 		 "   idx from event_objecttypes where ".
 		 "   event_objecttypes.type='LINK'");
 
@@ -2066,8 +2066,9 @@ foreach my $lan (keys(%virt_lans)) {
     #
     if (virtlanprotocol($lan) ne "ipv4") {
 	DBQueryFatal("insert into event_groups ".
-		     " (pid, eid, idx, group_name, agent_name) ".
-		     " values ('$pid', '$eid', NULL, '__all_lans', '$lan')");
+		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
+		     " values ('$experiment_idx', ".
+		     "         '$pid', '$eid', NULL, '__all_lans', '$lan')");
     }
 
     # Must clean these to avoid duplicates created by the loop below.
@@ -2084,26 +2085,27 @@ foreach my $lan (keys(%virt_lans)) {
 	my ($vnode) = split(":", $member);
 
 	DBQueryFatal("replace into virt_agents ".
-		     " (pid, eid, vname, vnode, objecttype) ".
-		     " select '$pid', '$eid', '${lan}-${vnode}', '*', ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$experiment_idx', '$pid', '$eid', ".
+		     "   '${lan}-${vnode}', '*', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINK'");
 
 	DBQueryFatal("replace into virt_agents ".
-		     " (pid, eid, vname, vnode, objecttype) ".
-		     " select '$pid', '$eid', '${lan}-${vnode}-tracemon', ".
-		     "   '*', ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$experiment_idx', '$pid', '$eid', ".
+		     "   '${lan}-${vnode}-tracemon', '*', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINKTRACE'");
 
 	DBQueryFatal("insert into event_groups ".
-		     " (pid, eid, idx, group_name, agent_name) ".
-		     " values ('$pid', '$eid', NULL, ".
+		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
+		     " values ('$experiment_idx', '$pid', '$eid', NULL, ".
 		     "         '__all_tracemon', '${lan}-${vnode}-tracemon')");
 
 	DBQueryFatal("insert into event_groups ".
-		     " (pid, eid, idx, group_name, agent_name) ".
-		     " values ('$pid', '$eid', NULL, ".
+		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
+		     " values ('$experiment_idx', '$pid', '$eid', NULL, ".
 		     "         '${lan}-tracemon','${lan}-${vnode}-tracemon')");
     }
 }
@@ -2148,7 +2150,7 @@ foreach $delayid (keys(%nodedelays)) {
 			  virtlanshaped($vname, $member1)) ? 0 : 1);
     
 	DBQueryFatal("insert into delays " .
-	     " (pid,eid,node_id,vname,noshaping,iface0,iface1" .
+	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
 	     ",vnode0,pipe0,delay0,bandwidth0,lossrate0" .
 	     ",vnode1,pipe1,delay1,bandwidth1,lossrate1" .
 	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
@@ -2157,8 +2159,8 @@ foreach $delayid (keys(%nodedelays)) {
 	     ",q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm" .
 	     ",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
 	     ",q1_droptail,q1_red,q1_gentle)" .
-	     " values ('$pid','$eid','$pnode','$vname',$noshaping ".
-	     ",'$int0','$int1'".
+	     " values ('$pid','$eid','$experiment_idx','$pnode','$vname' ".
+	     ",$noshaping,'$int0','$int1'".
 	     ",'$vnode0',$pipe0,$delay,$bandwidth,$lossrate".
 	     ",'$vnode1',$pipe1,$rdelay,$rbandwidth,$rlossrate".
 	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
@@ -2187,14 +2189,14 @@ foreach $delayid (keys(%nodedelays)) {
 	# when it gets to the node.
 	#
 	DBQueryFatal("insert into delays" .
-	     " (pid,eid,node_id,vname,noshaping,iface0,iface1," .
+	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1," .
 	     "  vnode0,pipe0,delay0,bandwidth0,lossrate0," .
 	     "  vnode1,pipe1,delay1,bandwidth1,lossrate1," .
 	     "  q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm," .
 	     "  q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit," .
 	     "  q0_droptail,q0_red,q0_gentle,q1_limit,q1_qinbytes) " .
-	     " values ('$pid','$eid','$pnode','$vname',$noshaping, ".
-	     "  '$int0','$int1',".
+	     " values ('$pid','$eid','$experiment_idx','$pnode','$vname', ".
+	     "  $noshaping,'$int0','$int1',".
 	     "  '$vnode0',$pipe0,$delay,$bandwidth,$lossrate,".
 	     "  '$vnode1',$pipe1,$rdelay,$rbandwidth,$rlossrate,".
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".
@@ -2264,13 +2266,14 @@ foreach $delayid (keys(%linkdelays)) {
     printdb("linkdelay ($vnode,$iface): lan = $lan, member = $member\n");
 
     DBQueryFatal("insert into linkdelays " .
-		 " (node_id,iface,type,ip,netmask,pid,eid,vlan,vnode, ".
-		 "  pipe,delay,bandwidth,lossrate, ".
+		 " (node_id,iface,type,ip,netmask,exptidx,pid,eid,vlan, ".
+		 "  vnode,pipe,delay,bandwidth,lossrate, ".
 		 "  q_limit,q_maxthresh,q_minthresh,q_weight, ".
 		 "  q_linterm,q_qinbytes,q_bytes,q_meanpsize, ".
 		 "  q_wait,q_setbit,q_droptail,q_red,q_gentle) ".
 		 " values " .
-		 " ('$pnode','$iface','simplex','$ip','$mask','$pid','$eid', ".
+		 " ('$pnode','$iface','simplex','$ip','$mask', ".
+		 "  '$experiment_idx', '$pid','$eid', ".
 		 "  '$lan','$vnode',$pipe,$delay,$bandwidth,$lossrate, ".
 		 "  $q_limit,$q_maxthresh,$q_minthresh,$q_weight, ".
 		 "  $q_linterm,$q_qinbytes,$q_bytes,$q_meanpsize, ".
@@ -2681,8 +2684,8 @@ foreach my $vnode (keys(%v2pmap)) {
 	$pnode = $v2pmap{$vnode};
     }
 
-    DBQueryFatal("insert into v2pmap (pid,eid,vname,node_id) values " .
-		 "('$pid','$eid','$vnode','$pnode')");
+    DBQueryFatal("insert into v2pmap (exptidx,pid,eid,vname,node_id) values " .
+		 "('$experiment_idx','$pid','$eid','$vnode','$pnode')");
 }
 UploadStats();
 TBDebugTimeStamp("uploading finished");
@@ -3034,8 +3037,9 @@ sub TBExptSetPortRange {
 
     if (! $impotent) {
 	DBQueryFatal("insert into ipport_ranges ".
-		     " (pid, eid, low, high) ".
-		     "values ('$pid', '$eid', $newlow, $newhigh)");
+		     " (exptidx, pid, eid, low, high) ".
+		     "values ('$experiment_idx', ".
+		     "        '$pid', '$eid', $newlow, $newhigh)");
     }
     DBQueryFatal("unlock tables");
     printdb "Setting ipport range to $newlow,$newhigh\n";
@@ -3195,8 +3199,9 @@ sub UploadVlans()
     
 	printdb "  $lan - $memberlist\n";
     
-	DBQueryFatal("insert into vlans (id,pid,eid,virtual,members) ".
-		     "values (0, '$pid', '$eid', '$lan', '$memberlist')")
+	DBQueryFatal("insert into vlans (id,exptidx,pid,eid,virtual,members) ".
+		     "values (0, '$experiment_idx', ".
+		     "        '$pid', '$eid', '$lan', '$memberlist')")
 	    if (!$impotent);
     }
 }
@@ -3407,11 +3412,12 @@ sub SetUpTracing($$$$$)
     }
 
     DBQueryFatal("insert into traces ".
-		 " (node_id, idx, iface0, iface1, pid, eid, linkvname, ".
-		 "  vnode, trace_type, trace_expr, trace_snaplen, trace_db) ".
+		 " (node_id, idx, iface0, iface1, pid, eid, exptidx, ".
+		 "  linkvname, vnode, trace_type, trace_expr, trace_snaplen, ".
+		 "  trace_db) ".
 		 "values ".
 		 "  ('$pnode', 0, '$iface0', '$iface1', '$pid', '$eid', ".
-		 "   '$lan', '$vnode', ".
+		 "   '$experiment_idx', '$lan', '$vnode', ".
 		 "   '$trace_type', '$trace_expr', $trace_snaplen, ".
 		 "   '$trace_db')");
 }

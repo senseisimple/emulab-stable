@@ -2,18 +2,12 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
-
-#
-# Testbed Support libraries
-#
-use lib "@prefix@/lib";
-use libdb;
-use libtestbed;
+use strict;
 
 #
 # This gets invoked from the Web interface. CD into the proper directory
@@ -22,9 +16,10 @@ use libtestbed;
 #
 sub usage()
 {
-    print STDOUT "Usage: mkexpdir <pid> <gid> <eid>\n";
+    print STDOUT "Usage: mkexpdir <eid>\n";
     exit(-1);
 }
+
 sub fatal($;$);
 
 #
@@ -32,17 +27,6 @@ sub fatal($;$);
 #
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
-#
-# Should be configured.
-# 
-# FIXME: Where are PROJROOT() and GROUPROOT() defined -- kevina
-my $projroot = PROJROOT();
-my $grouproot= GROUPROOT();
-
-my $tbdata   = "tbdata";
-my @dirlist  = ($tbdata, "bin", "tmp", "logs", "archive", "datastore",
-		"tftpboot", "swapinfo");
-my $exitval;
 
 #
 # Turn off line buffering on output
@@ -56,37 +40,35 @@ $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Experiment;
+
+# Locals
+my $projroot = PROJROOT();
+my $grouproot= GROUPROOT();
+my $tbdata   = "tbdata";
+my @dirlist  = ($tbdata, "bin", "tmp", "logs", "archive", "datastore",
+		"tftpboot", "swapinfo");
+my $exitval;
+
+#
 # Check args.
 # 
-if (@ARGV != 3) {
+if (@ARGV != 1) {
     usage();
 }
-my $pid   = $ARGV[0];
-my $gid   = $ARGV[1];
-my $eid   = $ARGV[2];
-
-#
-# Untaint the arguments.
-#
-if ($pid =~ /^([-\@\w.]+)$/) {
-    $pid = $1;
+my $experiment = Experiment->Lookup($ARGV[0]);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object for $ARGV[0]!")
 }
-else {
-    die("Tainted project name: $pid!\n");
-}
-if ($eid =~ /^([-\@\w.]+)$/) {
-    $eid = $1;
-}
-else {
-    die("Tainted experiment name: $eid!\n");
-}
-if ($gid =~ /^([-\@\w.]+)$/) {
-    $gid = $1;
-}
-else {
-    die("Tainted group name: $gid!\n");
-}
-
+my $pid       = $experiment->pid();
+my $eid       = $experiment->eid();
+my $gid       = $experiment->gid();
 my $piddir    = (($pid eq $gid) ? "$projroot/$pid" : "$grouproot/$pid/$gid");
 my $expdir    = "$piddir/exp";
 my $eiddir    = "$expdir/$eid";
@@ -96,12 +78,12 @@ my $workdir   = TBExptWorkDir($pid, $eid);
 #
 # Unix info for the group
 #
-my $unix_gid;
-my $unix_name;
-
-if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
-    die("*** No info for project/group $pid/$gid!");
+my $group = $experiment->GetGroup();
+if (!defined($group)) {
+    tbdie("Could not lookup group object for $experiment!")
 }
+my $unix_gid  = $group->unix_gid();
+my $unix_name = $group->unix_name();
 
 #
 # We create a directory structure for the experiment in the project directory.
@@ -141,7 +123,7 @@ if (! chdir($eid)) {
 #
 # Create the experiment directory list in the new directory.
 #
-foreach $dir (@dirlist) {
+foreach my $dir (@dirlist) {
     if (! mkdir($dir, 0770)) {
 	fatal("Could not mkdir $dir in $eiddir: $!");
     }
@@ -155,8 +137,8 @@ foreach $dir (@dirlist) {
 # Update the DB. This leaves the decision about where the directory
 # is created, in this script. 
 #
-DBQueryFatal("update experiments set path='$eiddir' ".
-	     "where pid='$pid' and eid='$eid'");
+$experiment->Update({"path" => "$eiddir"}) == 0 or
+    fatal("Could not update path for $experiment");
 
 #
 # Create the working directory.
@@ -198,9 +180,7 @@ sub fatal($;$)
     unlink($eidlink)
 	if ($pid ne $gid && -l $eidlink);
 
-    print STDERR "*** $0:\n".
-	         "    $msg\n";
-
+    tberror($msg);
     exit($exitval);
 }
 

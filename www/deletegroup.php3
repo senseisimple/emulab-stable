@@ -30,6 +30,7 @@ $pid = $group->pid();
 $gid = $group->gid();
 $project  = $group->Project();
 $unix_gid = $project->unix_gid();
+$gid_idx  = $group->gid_idx();
 
 #
 # We do not allow the default group to be deleted. Never ever!
@@ -94,7 +95,7 @@ STARTBUSY("Group '$gid' in project '$pid' is being removed!");
 # Run the script. They will remove the group directory and the unix group,
 # and the DB state.
 #
-SUEXEC($uid, $unix_gid, "webrmgroup $pid $gid", SUEXEC_ACTION_DIE);
+SUEXEC($uid, $unix_gid, "webrmgroup $gid_idx", SUEXEC_ACTION_DIE);
 STOPBUSY();
 
 PAGEREPLACE(CreateURL("showproject", $project));

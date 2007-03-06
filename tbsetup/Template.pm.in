@@ -21,7 +21,9 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libArchive;
+use User;
 use Experiment;
+use Group;
 use English;
 use HTML::Entities;
 use overload ('""' => 'Stringify');
@@ -253,6 +255,17 @@ sub Create($$)
     # hidden experiment behind each template. 
     my $eid = "T${guid}-${vers}";
     my $pid = $argref->{'pid'};
+    my $gid = $argref->{'gid'};
+
+    # Need the group object since we want to use its idx.
+    my $group = Group->LookupByPidGid($pid, $gid);
+    if (!defined($group)) {
+	DBQueryWarn("unlock tables");
+	tberror("Could not map $pid/$gid to its object!");
+	return undef;
+    }
+    $argref->{'pid_idx'} = $group->pid_idx();
+    $argref->{'gid_idx'} = $group->gid_idx();
 
     #
     # Sanity check; make sure this eid is not in use. Tables are still locked.
@@ -394,7 +407,7 @@ sub Delete($)
 #
 sub AccessCheck($$$;$)
 {
-    my ($self, $guid, $uid, $access_type);
+    my ($self, $guid, $user, $access_type);
     my $mintrust;
     
     #
@@ -403,10 +416,10 @@ sub AccessCheck($$$;$)
     $self = shift();
 
     if (ref($self)) {
-	($uid, $access_type) = @_;
+	($user, $access_type) = @_;
     }
     else {
-	($guid, $uid, $access_type) = @_;
+	($guid, $user, $access_type) = @_;
 
 	$self = Template->Lookup($guid, 1);
 	return 0
@@ -421,17 +434,23 @@ sub AccessCheck($$$;$)
     #
     # Admins do whatever they want!
     #
-    if (TBAdmin($uid)) {
+    if (TBAdmin()) {
 	return 1;
     }
-    $uid = MapNumericUID($uid);
-
-    my $pid = $self->pid();
-    my $gid = $self->gid();
 
     #
-    # An experiment may be destroyed by the experiment creator or the
-    # project/group leader.
+    # Transition to using user objects instead of uids
+    #
+    if (! ref($user)) {
+	my $uid = MapNumericUID($user);
+
+	$user = User->Lookup($uid);
+	return 0
+	    if (! defined($user));
+    }
+
+    #
+    # A template may be destroyed by the creator or the project/group leader.
     #
     if ($access_type == TB_EXPT_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER;
@@ -441,12 +460,32 @@ sub AccessCheck($$$;$)
     }
 
     #
+    # Map to group object.
+    #
+    my $group = Group->Lookup($self->gid_idx());
+    return 0
+	if (!defined($group));
+
+    #
     # Either proper permission in the group, or group_root in the project.
     # This lets group_roots muck with other people's experiments, including
     # those in groups they do not belong to.
     #
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
+    my $membership = $group->LookupUser($user);
+    return 1
+	if (defined($membership) &&
+	    TBMinTrust($membership->trust(), $mintrust));
+
+    my $project = $group->GetProject();
+    return 0
+	if (!defined($project));
+
+    $membership = $project->LookupUser($user);
+    return 1
+	if (defined($membership) &&
+	    TBMinTrust($membership->trust(), PROJMEMBERTRUST_GROUPROOT));
+
+    return 0;
 }
 
 #
@@ -1623,6 +1662,7 @@ sub CreateDirectory($)
     my $vers = $self->vers();
     my $pid  = $self->pid();
     my $eid  = $self->eid();
+    my $tid  = $self->tid();
     my $gid  = $self->gid();
     my $rval = 0;
     
@@ -2648,7 +2688,7 @@ sub NewRunBinding($$$)
 
     DBQueryWarn("replace into virt_user_environment set ".
 		"   name='$name', value=$value, ".
-		"   pid='$pid', eid='$eid'")
+		"   exptidx='$exptidx', pid='$pid', eid='$eid'")
 	or return -1;
     
     return 0;
@@ -2956,6 +2996,7 @@ sub AddEvent($$$$)
     my $vers = $self->vers();
     my $pid  = $self->pid();
     my $eid  = $self->eid();
+    my $exptidx = $self->exptidx();
     my $cmd  = DBQuoteSpecial("COMMAND=$commandline");
 
     #
@@ -2998,17 +3039,17 @@ sub AddEvent($$$$)
 
     if (! $query_result->numrows) {
 	DBQueryWarn("replace into virt_agents set ".
-		    "  pid='$pid', eid='$eid', ".
+		    "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
 		    "  vnode='*', vname='$sequence_name', ".
 		    "  objecttype='$sequence_objecttype'")
 	    or return -1;
 	
 	if (! DBQueryWarn("insert into eventlist set ".
-			  "  pid='$pid', eid='$eid', time='0', ".
+			  "  pid='$pid', eid='$eid', exptidx='$exptidx', ".
 			  "  vnode='$vnode', vname='$sequence_name', ".
 			  "  objecttype='$sequence_objecttype', ".
 			  "  eventtype='$event_eventtype', ".
-			  "  atstring='', arguments=''")) {
+			  "  atstring='', arguments='', time='0'")) {
 	    
 	    DBQueryWarn("delete from virt_agents ".
 			"where pid='$pid' and eid='$eid' and ".
@@ -3025,8 +3066,8 @@ sub AddEvent($$$$)
     #
     $query_result = 
 	DBQueryWarn("insert into eventlist set ".
-		    "  pid='$pid', eid='$eid', time='$firetime', ".
-		    "  vnode='$vnode', vname='$vname', ".
+		    "  pid='$pid', eid='$eid', exptidx='$exptidx', ".
+		    "  time='$firetime', vnode='$vnode', vname='$vname', ".
 		    "  objecttype='$program_objecttype', ".
 		    "  eventtype='$event_eventtype', ".
 		    "  atstring='', arguments=$cmd, ".
@@ -3039,7 +3080,7 @@ sub AddEvent($$$$)
 
     # Need a virt_agent entry.
     if (!DBQueryWarn("insert into virt_agents set ".
-		     "  pid='$pid', eid='$eid', ".
+		     "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
 		     "  vnode='$vnode', vname='$vname', ".
 		     "  objecttype='$program_objecttype'")) {
 	DBQueryWarn("delete from eventlist ".
@@ -3049,7 +3090,7 @@ sub AddEvent($$$$)
 
     # Need a virt_programs entry.
     if (!DBQueryWarn("insert into virt_programs set ".
-		     "  pid='$pid', eid='$eid', ".
+		     "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
 		     "  vnode='$vnode', vname='$vname', ".
 		     "  dir='', timeout=0, expected_exit_code=0, ".
 		     "  command=$cmd")) {
@@ -3099,6 +3140,7 @@ sub CopyTemplateEvents($)
     my $vers = $self->vers();
     my $pid  = $self->pid();
     my $eid  = $self->eid();
+    my $exptidx = $self->exptidx();
 
     # Need to insert a sequence to wrap these.
     my $query_result =
@@ -3140,14 +3182,14 @@ sub CopyTemplateEvents($)
 	
 	if (! $agent_result->numrows) {
 	    DBQueryWarn("replace into virt_agents set ".
-			"  pid='$pid', eid='$eid', ".
+			"  exptidx='$exptidx', pid='$pid', eid='$eid', ".
 			"  vnode='*', vname='$sequence_name', ".
 			"  objecttype='$sequence_objecttype'")
 		or return -1;
 
 	    DBQueryWarn("insert into eventlist set ".
-			"  pid='$pid', eid='$eid', time='0', ".
-			"  vnode='$vnode', vname='$sequence_name', ".
+			"  pid='$pid', eid='$eid', exptidx='$exptidx', ".
+			"  time='0', vnode='$vnode', vname='$sequence_name', ".
 			"  objecttype='$sequence_objecttype', ".
 			"  eventtype='$start_eventtype', ".
 			"  atstring='', arguments=''")
@@ -3155,12 +3197,12 @@ sub CopyTemplateEvents($)
 	}
 
 	#
-	# Any failure and and the instance will be killed by the
+	# Any failure and the instance will be killed by the
 	# caller, so no need to clean up any mess created below.
 	#
 	DBQueryWarn("insert into eventlist set ".
-		    "  pid='$pid', eid='$eid', time='$firetime', ".
-		    "  vnode='$vnode', vname='$vname', ".
+		    "  pid='$pid',eid='$eid',exptidx='$exptidx', ".
+		    "  time='$firetime', vnode='$vnode', vname='$vname', ".
 		    "  objecttype='$event_objecttype', ".
 		    "  eventtype='$event_eventtype', ".
 		    "  atstring='', arguments=$cmd, ".
@@ -3169,14 +3211,14 @@ sub CopyTemplateEvents($)
 
 	# Need a virt_agent entry.
 	DBQueryWarn("insert into virt_agents set ".
-		    "  pid='$pid', eid='$eid', ".
+		    "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
 		    "  vnode='$vnode', vname='$vname', ".
 		    "  objecttype='$event_objecttype'")
 	    or return -1;
 	    
 	# Need a virt_programs entry.
 	DBQueryWarn("insert into virt_programs set ".
-		    "  pid='$pid', eid='$eid', ".
+		    "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
 		    "  vnode='$vnode', vname='$vname', ".
 		    "  dir='', timeout=0, expected_exit_code=0, ".
 		    "  command=$cmd")

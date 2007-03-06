@@ -83,7 +83,7 @@ else {
     die("Tainted argument $pid!\n");
 }
 
-# Temporary ...
+# Temporary ... See utils/firstuser ... 
 DBQueryFatal("update group_membership set pid_idx=1,gid_idx=1 ".
 	     "where pid='$TBOPSPID' and pid=gid");
 

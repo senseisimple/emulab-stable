@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -101,6 +101,12 @@ if ($UID) {
 }
 TBDebugTimeStamp("nalloc checked exp permission");
 
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    print "*** WARNING: No such experiment $pid/$eid!\n";
+    exit -1;
+}
+
 #
 # Before locking any tables, do a quick check to make sure the project
 # is allowed to allocate the nodes, by type/class, plus other checks.
@@ -172,7 +178,7 @@ foreach my $n (@node_names) {
     #
     # Add info the list of nodes to reserve; done in a single query below.
     # 
-    push(@newvals,  "('$n','$pid','$eid','$n','','')");
+    push(@newvals,  "('$n',$exptidx,'$pid','$eid','$n','','')");
     push(@nodes, "$n");
 }
 TBDebugTimeStamp("nalloc checked all nodes");
@@ -188,7 +194,7 @@ if ((!$noalloc || $partial) && (@newvals || @oldnodes)) {
 
     if (@newvals &&
 	! DBQueryWarn("replace into reserved ".
-		      "  (node_id,pid,eid,vname,old_pid,old_eid) ".
+		      "  (node_id,exptidx,pid,eid,vname,old_pid,old_eid) ".
 		      "values ". join(",",@newvals))) {
 	$error++;
     }
@@ -197,8 +203,8 @@ if ((!$noalloc || $partial) && (@newvals || @oldnodes)) {
     # wrong; might need to rethink this.
     foreach my $node (@oldnodes) {
 	if (!DBQueryWarn("update reserved " .
-			 "set pid='$pid',eid='$eid', ".
-			 "    old_pid='', old_eid='' ".
+			 "set exptidx=$exptidx,pid='$pid',eid='$eid', ".
+			 "    old_exptidx=0, old_pid='', old_eid='' ".
 			 "where node_id='$node'")) {
 	    $error++;
 	}

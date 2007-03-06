@@ -44,6 +44,7 @@ if (!isset($project)) {
   FORMERROR("Select Project");
 }
 $pid = $project->pid();
+$pid_idx = $project->pid_idx();
 
 if (!isset($description) ||
     strcmp($description, "") == 0) {
@@ -269,12 +270,12 @@ $query_result =
     DBQueryFatal("INSERT INTO os_info ".
 		 "(osname, osid, description,OS,version,path,magic,op_mode, ".
 		 " osfeatures, pid, shared, creator, creator_idx, mustclean, ".
-		 " created, reboot_waittime) ".
+		 " created, reboot_waittime, pid_idx) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
 		 "        '$os_version', $os_path, '$os_magic', '$op_mode', ".
 		 "        '$os_features', '$pid', $os_shared, ".
 	         "        '$uid', '$dbid', $os_mustclean, now(), ".
-		 "        $os_reboot_waittime)");
+		 "        $os_reboot_waittime, $pid_idx)");
 
 DBQueryFatal("unlock tables");
 

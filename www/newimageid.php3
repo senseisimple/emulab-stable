@@ -781,6 +781,8 @@ if (count($errors)) {
 $description = addslashes($formfields["description"]);
 $pid         = $project->pid();
 $gid         = $group->gid();
+$pid_idx     = $project->pid_idx();
+$gid_idx     = $group->gid_idx();
 $imagename   = $formfields["imagename"];
 $loadpart    = $formfields["loadpart"];
 $loadlength  = $formfields["loadlength"];
@@ -888,13 +890,13 @@ $query_result =
 		 "(imagename, imageid, description, loadpart, loadlength, ".
 		 " part1_osid, part2_osid, part3_osid, part4_osid, ".
 		 " default_osid, path, pid, gid, shared, global, ".
-		 " creator, creator_idx, created) ".
+		 " creator, creator_idx, created, pid_idx, gid_idx) ".
 		 "VALUES ".
 		 "  ('$imagename', '$imageid', '$description', $loadpart, ".
 		 "   $loadlength, ".
 		 "   $part1_osid, $part2_osid, $part3_osid, $part4_osid, ".
 		 "   '$default_osid', '$path', '$pid', '$gid', $shared, ".
-	         "   $global, '$uid', '$dbid', now())");
+	         "   $global, '$uid', '$dbid', now(), $pid_idx, $gid_idx)");
 
 if (!$isadmin || $makedefault) {
     for ($i = 0; $i < count($mtypes_array); $i++) {

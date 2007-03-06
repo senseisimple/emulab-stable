@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,9 +42,13 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 60;
+
+# Locals
+my $exptidx;
 
 # Protos
 sub SetupVlans();
@@ -96,10 +100,12 @@ my $op = shift(@ARGV);
 # Sanity check. Must be an ElabInElab experiment and user must have
 # permission (be the creator).
 #
-if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
     die("*** $0:\n",
 	"    Experiment $pid/$eid is not active!\n");
 }
+$exptidx = $experiment->idx();
 if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
     die("*** $0:\n".
 	"    You do not have permission to swap or modify this experiment!\n");
@@ -261,8 +267,10 @@ sub SetupVlans()
 
 	# Insert outer vlans entry.
 	my $query_result =
-	    DBQueryWarn("insert into vlans (id,pid,eid,virtual,members) ".
-			"values (0, '$pid', '$eid', '$vtag', '$mstring')");
+	    DBQueryWarn("insert into vlans ".
+			"  (exptidx,id,pid,eid,virtual,members) ".
+			"values ($exptidx, 0, '$pid', '$eid', '$vtag', ".
+			"        '$mstring')");
 	if (!$query_result || !$query_result->numrows) {
 	    print STDERR "*** $0:\n".
 		         "    Could not insert vlan table entry for $id\n";
@@ -274,8 +282,8 @@ sub SetupVlans()
 	# Insert mapping between inner and outer vlan entries.
 	$query_result =
 	    DBQueryWarn("insert into elabinelab_vlans ".
-			 "       (pid,eid,inner_id,outer_id) ".
-			 "values ('$pid', '$eid', $id, $outer_id)");
+			 "       (exptidx,pid,eid,inner_id,outer_id) ".
+			 "values ($exptidx, '$pid', '$eid', $id, $outer_id)");
 	if (!$query_result || !$query_result->numrows) {
 	    #
 	    # Failed, must remove vlans entry too. We keep going though

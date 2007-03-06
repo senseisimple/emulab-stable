@@ -145,6 +145,11 @@ my $unix_gid = $project->unix_gid();
 print "Experiment head: $ev_uid\n"
     if ($debug);
 
+my $exptidx;
+if (!TBExptIDX($REPOSPID, $REPOSEID, \$exptidx)) {
+    fatal("No such experiment $REPOSPID/$REPOSEID!");
+}
+
 #
 # Loop, looking for nodes to reposition.
 # 
@@ -371,6 +376,7 @@ MAINLOOP: while (1) {
 		next MAINLOOP;
 	    }
 	    if (!DBQueryWarn("REPLACE virt_node_startloc set ".
+			     "exptidx='$exptidx',".
 			     "pid='$REPOSPID',eid='$REPOSEID',".
 			     "vname='$node',building='$BUILDING',".
 			     "floor=$FLOOR,loc_x=$loc_x,loc_y=$loc_y,".
@@ -385,7 +391,7 @@ MAINLOOP: while (1) {
 		print "DB Error. Waiting a bit.\n";
 		next MAINLOOP;
 	    }
-	    if (!DBQueryWarn("REPLACE virt_agents set ".
+	    if (!DBQueryWarn("REPLACE virt_agents set exptidx='$exptidx', ".
 			     "pid='$REPOSPID',eid='$REPOSEID',".
 			     "vname='$node',vnode='$node',objecttype=10")) {
 		print "DB Error. Waiting a bit.\n";
@@ -395,7 +401,7 @@ MAINLOOP: while (1) {
 
 	# Add a topography object so the locpiper will get updates for dynamic
 	# obstacles.
-	if (!DBQueryWarn("REPLACE virt_agents set ".
+	if (!DBQueryWarn("REPLACE virt_agents set exptidx='$exptidx', ".
 			 "pid='$REPOSPID',eid='$REPOSEID',".
 			 "vname='topo',vnode='*',objecttype=14")) {
 	    print "DB Error. Waiting a bit.\n";

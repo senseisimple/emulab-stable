@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -102,6 +102,11 @@ KillOldRender();
 if (defined($options{"r"})) {
     DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");
     exit 0;
+}
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    fatal("No such experiment $pid/$eid!");
 }
 
 #
@@ -484,8 +489,8 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	foreach $node (keys %nodes) {
 	    $result =
 		DBQueryWarn("INSERT INTO vis_nodes ".
-			    "(vname, pid, eid, vis_type, x, y) VALUES".
-			    " ('$node', '$pid', '$eid', " .
+			    "(vname, exptidx,pid, eid, vis_type, x, y) VALUES".
+			    " ('$node', '$exptidx', '$pid', '$eid', " .
 			    "'" . $nodes{ $node }{"type"} . "', " .
 			    "'" . $nodes{ $node }{"x"}    . "', " .
 			    "'" . $nodes{ $node }{"y"}    . "') ");

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,6 +47,8 @@ my $update_perms = "$TB/sbin/update_permissions";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Project;
+use Group;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -108,6 +110,14 @@ if (!TBAdmin($UID)) {
     die("*** $0:\n".
 	"    You are not allowed to grant permission to use node types!\n");
 }
+
+my $project = Project->Lookup($pid);
+if (!defined($project)) {
+    die("*** $0:\n".
+	"    Cannot map project $pid to its object\n");
+}
+# Need this below.
+my $pid_idx = $project->pid_idx();
 
 #
 # Check to make sure a valid type in the node_types table.
@@ -178,8 +188,9 @@ foreach my $newtype (keys(%newtypes)) {
     # number of nodes of each type. 
     # 
     DBQueryFatal("replace into group_policies ".
-		 "(pid, gid, policy, auxdata, count) ".
-		 "values ('$pid', '$pid', 'type', '$newtype', 999999)")
+		 "(pid_idx, gid_idx, pid, gid, policy, auxdata, count) ".
+		 "values ($pid_idx, $pid_idx, '$pid', '$pid', ".
+		 "        'type', '$newtype', 999999)")
 	if (!$impotent);
 }
 

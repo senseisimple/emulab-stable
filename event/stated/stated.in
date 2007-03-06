@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1265,6 +1265,12 @@ sub CheckPortRegistration($) {
     return
 	if (! NodeidToExp($node, \$pid, \$eid, \$vname));
 
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return;
+    }
+
     #
     # The point is to see if a node has come up without filling port
     # registrations that would affect backwards compatability with older
@@ -1283,7 +1289,7 @@ sub CheckPortRegistration($) {
 	
 	if ($query_result && !$query_result->num_rows) {
 	    DBQueryWarn("insert into port_registration set ".
-			"     pid='$pid', eid='$eid', ".
+			"     exptidx='$exptidx', pid='$pid', eid='$eid', ".
 			"     service='emulab_syncd', ".
 			"     node_id='$node', port='16534'");
 	}

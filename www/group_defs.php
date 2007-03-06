@@ -89,7 +89,7 @@ class Group
 	    $this->group = NULL;
 	    return -1;
 	}
-	$this->group =& mysql_fetch_array($query_result);
+	$this->group = mysql_fetch_array($query_result);
 	return 0;
     }
 
@@ -377,8 +377,8 @@ class Group
 	    return null;
 	}
 
-	if (! DBQueryWarn("insert into group_stats (pid, gid, gid_idx) ".
-			  "values ('$pid', '$gid', $gid_idx)")) {
+	if (! DBQueryWarn("insert into group_stats (pid,gid,gid_idx,pid_idx) ".
+			  "values ('$pid', '$gid', $gid_idx, $pid_idx)")) {
 	    DBQueryFatal("delete from groups where gid_idx='$gid_idx'");
 	    return null;
 	}
@@ -622,11 +622,11 @@ class Group
 	while ($row = mysql_fetch_array($query_result)) {
 	    $uid_idx = $row["uid_idx"];
 
-	    if (! ($user =& User::Lookup($uid_idx))) {
+	    if (! ($user = User::Lookup($uid_idx))) {
 		TBERROR("Group::NonMemberList: ".
 			"Could not load user $uid_idx!", 1);
 	    }
-	    $result[] =& $user;
+	    $result[] = $user;
 	}
 	return $result;
     }

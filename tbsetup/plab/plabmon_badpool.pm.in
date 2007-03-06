@@ -1,7 +1,7 @@
 # -*- perl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -417,11 +417,17 @@ sub nodesetupcomplete($$) {
     $pnode->{'consecsuccess'} = 1;
     delete $self->{'PENDING'}->{$pnode->{'name'}};
 
+    my $exptidx;
+    if (!TBExptIDX($PLABHOLDING_PID, $PLABHOLDING_EID, \$exptidx)) {
+	print "*** WARNING: No such experiment $PLABHOLDING_EID!\n";
+	return;
+    }
+
     #
     # It came up! Move the pnode out of hwdown and back into
     # normal holding experiment.
     #
-    DBQueryWarn("update reserved set ".
+    DBQueryWarn("update reserved set exptidx=$exptidx, ".
                 "  pid='$PLABHOLDING_PID',eid='$PLABHOLDING_EID' ".
                 "   where node_id=\"$pnode->{'name'}\"");
     print "$pnode->{'name'} brought back from the afterworld at ".

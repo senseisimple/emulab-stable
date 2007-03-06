@@ -341,12 +341,19 @@ def TBValidNodeLogType(type):
 def MarkPhysNodeDown(pnode):
     pid = NODEDEAD_PID;
     eid = NODEDEAD_EID;
-    
+    exptidx = 0
+
+    try:
+        exptidx = TBExptIDX(pid, eid)
+    except:
+        print "*** WARNING: No such experiment %s/%s!" % (pid,eid)
+	return
+
     DBQueryFatal("lock tables reserved write")
     DBQueryFatal("update reserved set "
-		 "  pid=%s,eid=%s,rsrv_time=now() "
+		 "  exptidx=%d,pid=%s,eid=%s,rsrv_time=now() "
 		 "where node_id=%s",
-                 (pid, eid, pnode))
+                 (exptidx,pid, eid, pnode))
     DBQueryFatal("unlock tables")
     TBSetNodeHistory(pnode, TB_NODEHISTORY_OP_MOVE, os.getuid(), pid, eid)
     return

@@ -443,7 +443,8 @@ if ($STAMPS) {
 # Note special -x option.
 #
 my @arguments =
-    ($batchexp, "-x", $template->eid(), "-y", $instance->idx(), "-q", "-f",
+    ($batchexp, "-x", "$guid/$version,$guid/$version",
+     "-y", $instance->idx(), "-q", "-f",
      "-p", $pid, "-e", $eid, "-g", $template->gid(),
      "-E", "'Experiment Template Instantiation $guid/$version' ",
      "-c" , $copyid);

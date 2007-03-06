@@ -18,6 +18,8 @@ use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use libtblog;
+use Project;
+use Group;
 use English;
 use Data::Dumper;
 use File::Basename;
@@ -65,25 +67,57 @@ sub mysystem($)
 #
 # Lookup an experiment and create a class instance to return.
 #
-sub Lookup($$$)
+sub Lookup($$;$)
 {
-    my ($class, $pid, $eid) = @_;
+    my ($class, $arg1, $arg2) = @_;
+    my $idx;
+
+    #
+    # A single arg is either an index or a "pid,eid" or "pid/eid" string.
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $idx = $1;
+	}
+	elsif ($arg1 =~ /^([-\w]*),([-\w]*)$/ ||
+	       $arg1 =~ /^([-\w]*)\/([-\w]*)$/) {
+	    $arg1 = $1;
+	    $arg2 = $2;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (! (($arg1 =~ /^[-\w]*$/) && ($arg2 =~ /^[-\w]*$/))) {
+	return undef;
+    }
+
+    #
+    # Two args means lookup by pid,eid instead of exptidx.
+    #
+    if (defined($arg2)) {
+	my $result =
+	    DBQueryWarn("select idx from experiments ".
+			"where pid='$arg1' and eid='$arg2'");
+
+	return undef
+	    if (! $result || !$result->numrows);
+
+	($idx) = $result->fetchrow_array();
+    }
 
     # Look in cache first
-    return $experiments{"$pid/$eid"}
-        if (exists($experiments{"$pid/$eid"}));
+    return $experiments{"$idx"}
+        if (exists($experiments{"$idx"}));
     
     my $query_result =
-	DBQueryWarn("select * from experiments ".
-		    "where pid='$pid' and eid='$eid'");
+	DBQueryWarn("select * from experiments where idx='$idx'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
 
     my $self         = {};
     $self->{'EXPT'}  = $query_result->fetchrow_hashref();
-
-    my $idx = $self->{'EXPT'}->{'idx'};
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
@@ -99,7 +133,7 @@ sub Lookup($$$)
     bless($self, $class);
     
     # Add to cache. 
-    $experiments{"$pid/$eid"} = $self;
+    $experiments{"$idx"} = $self;
     
     return $self;
 }
@@ -107,26 +141,30 @@ sub Lookup($$$)
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{$_[1]}); }
 sub stats($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{$_[1]}); }
 
-sub pid($)	    { return field($_[0], 'pid'); }
-sub gid($)	    { return field($_[0], 'gid'); }
-sub eid($)	    { return field($_[0], 'eid'); }
-sub idx($)	    { return field($_[0], 'idx'); }
-sub path($)	    { return field($_[0], 'path'); }
-sub state($)	    { return field($_[0], 'state'); }
-sub batchstate($)   { return field($_[0], 'batchstate'); }
-sub batchmode($)    { return field($_[0], 'batchmode'); }
-sub rsrcidx($)      { return stats($_[0], 'rsrcidx'); }
-sub creator($)      { return field($_[0], 'expt_head_uid');}
-sub canceled($)     { return field($_[0], 'canceled'); }
-sub locked($)       { return field($_[0], 'expt_locked'); }
-sub elabinelab($)   { return field($_[0], 'elab_in_elab');}
-sub lockdown($)     { return field($_[0], 'lockdown'); }
-sub created($)      { return field($_[0], 'expt_created'); }
-sub swapper($)      { return field($_[0], 'expt_swap_uid');}
-sub swappable($)    { return field($_[0], 'swappable');}
-sub idleswap($)     { return field($_[0], 'idleswap');}
-sub autoswap($)     { return field($_[0], 'autoswap');}
-sub noswap_reason($){ return field($_[0], 'noswap_reason');}
+sub pid($)		{ return field($_[0], 'pid'); }
+sub gid($)		{ return field($_[0], 'gid'); }
+sub pid_idx($)		{ return field($_[0], 'pid_idx'); }
+sub gid_idx($)		{ return field($_[0], 'gid_idx'); }
+sub eid($)		{ return field($_[0], 'eid'); }
+sub idx($)		{ return field($_[0], 'idx'); }
+sub path($)		{ return field($_[0], 'path'); }
+sub state($)		{ return field($_[0], 'state'); }
+sub batchstate($)	{ return field($_[0], 'batchstate'); }
+sub batchmode($)	{ return field($_[0], 'batchmode'); }
+sub rsrcidx($)		{ return stats($_[0], 'rsrcidx'); }
+sub creator($)		{ return field($_[0], 'expt_head_uid');}
+sub canceled($)		{ return field($_[0], 'canceled'); }
+sub locked($)		{ return field($_[0], 'expt_locked'); }
+sub elabinelab($)	{ return field($_[0], 'elab_in_elab');}
+sub elabinelab_eid($)   { return field($_[0], 'elabinelab_eid');}
+sub elabinelab_exptidx($){return field($_[0], 'elabinelab_exptidx');}
+sub lockdown($)		{ return field($_[0], 'lockdown'); }
+sub created($)		{ return field($_[0], 'expt_created'); }
+sub swapper($)		{ return field($_[0], 'expt_swap_uid');}
+sub swappable($)	{ return field($_[0], 'swappable');}
+sub idleswap($)		{ return field($_[0], 'idleswap');}
+sub autoswap($)		{ return field($_[0], 'autoswap');}
+sub noswap_reason($)	{ return field($_[0], 'noswap_reason');}
 sub noidleswap_reason($){ return field($_[0], 'noidleswap_reason');}
 sub idleswap_timeout($) { return field($_[0], 'idleswap_timeout');}
 sub autoswap_timeout($) { return field($_[0], 'autoswap_timeout');}
@@ -137,6 +175,9 @@ sub dpdbpassword($)     { return field($_[0], 'dpdbpassword');}
 sub instance_idx($)     { return field($_[0], 'instance_idx'); }
 sub creator_idx($)      { return field($_[0], 'creator_idx');}
 sub swapper_idx($)      { return field($_[0], 'swapper_idx');}
+sub use_ipassign($)     { return field($_[0], 'use_ipassign');}
+sub ipassign_args($)    { return field($_[0], 'ipassign_args');}
+sub security_level($)   { return field($_[0], 'security_level');}
 
 #
 # Lookup an experiment given an experiment index.
@@ -145,16 +186,7 @@ sub LookupByIndex($$)
 {
     my ($class, $exptidx) = @_;
 
-    my $query_result =
-	DBQueryWarn("select pid,eid from experiments ".
-		    "where idx='$exptidx'");
-
-    return undef
-	if (! $query_result || !$query_result->numrows);
-
-    my ($pid, $eid) = $query_result->fetchrow_array();
-
-    return Experiment->Lookup($pid, $eid);
+    return Experiment->Lookup($exptidx);
 }
 
 #
@@ -198,12 +230,17 @@ sub UnLockTables($)
 #
 sub Create($$$$)
 {
-    my ($class, $pid, $eid, $argref) = @_;
+    my ($class, $group, $eid, $argref) = @_;
     my $exptidx;
     my $now = time();
 
     return undef
-	if (ref($class));
+	if (ref($class) || !ref($group));
+
+    my $pid     = $group->pid();
+    my $gid     = $group->gid();
+    my $pid_idx = $group->pid_idx();
+    my $gid_idx = $group->gid_idx();
 
     #
     # The pid/eid has to be unique, so lock the table for the check/insert.
@@ -318,6 +355,7 @@ sub Create($$$$)
     # Append the rest
     $query .= ",expt_created=FROM_UNIXTIME('$now')";
     $query .= ",expt_locked=now(),pid='$pid',eid='$eid'";
+    $query .= ",pid_idx='$pid_idx',gid='$gid',gid_idx='$gid_idx'";
     $query .= ",expt_name=$description";
     $query .= ",noswap_reason=$noswap_reason";
     $query .= ",noidleswap_reason=$noidleswap_reason";
@@ -345,7 +383,6 @@ sub Create($$$$)
     my $rsrcidx     = $query_result->insertid;
     my $creator_uid = $argref->{'expt_head_uid'};
     my $creator_idx = $argref->{'creator_idx'};
-    my $gid         = $argref->{'gid'};
     my $batchmode   = $argref->{'batchmode'};
 
     #
@@ -353,10 +390,11 @@ sub Create($$$$)
     #
     if (! DBQueryWarn("insert into experiment_stats ".
 		      "(eid, pid, creator, creator_idx, gid, created, ".
-		      " batch, exptidx, rsrcidx) ".
+		      " batch, exptidx, rsrcidx, pid_idx, gid_idx) ".
 		      "values('$eid', '$pid', '$creator_uid', '$creator_idx',".
 		      "       '$gid', FROM_UNIXTIME('$now'), ".
-		      "        $batchmode, $exptidx, $rsrcidx)")) {
+		      "        $batchmode, $exptidx, $rsrcidx, ".
+		      "        $pid_idx, $gid_idx)")) {
 	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
 	DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
 	DBQueryWarn("unlock tables");
@@ -430,19 +468,15 @@ sub Refresh($)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $idx = $self->idx();
     
     my $query_result =
-	DBQueryWarn("select * from experiments ".
-		    "where pid='$pid' and eid='$eid'");
+	DBQueryWarn("select * from experiments where idx=$idx");
 
     return -1
 	if (!$query_result || !$query_result->numrows);
 
     $self->{'EXPT'}  = $query_result->fetchrow_hashref();
-
-    my $idx = $self->{'EXPT'}->{'idx'};
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
@@ -496,6 +530,61 @@ sub Stringify($)
 }
 
 #
+# Generic function to look up some table values given a set of desired
+# fields and some conditions. Pretty simple, not widely useful, but it
+# helps to avoid spreading queries around then we need to. 
+#
+sub TableLookUp($$$;$)
+{
+    my ($self, $table, $fields, $conditions) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+    
+    my $exptidx = $self->idx();
+
+    if (defined($conditions) && "$conditions" ne "") {
+	$conditions = "and ($conditions)";
+    }
+    else {
+	$conditions = "";
+    }
+
+    return DBQueryWarn("select distinct $fields from $table ".
+		       "where exptidx='$exptidx' $conditions");
+}
+
+#
+# Ditto for update.
+#
+sub TableUpdate($$$;$)
+{
+    my ($self, $table, $sets, $conditions) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    if (ref($sets) eq "HASH") {
+	$sets = join(",", map("$_='" . $sets->{$_} . "'", keys(%{$sets})));
+    }
+    my $exptidx = $self->idx();
+
+    if (defined($conditions) && "$conditions" ne "") {
+	$conditions = "and ($conditions)";
+    }
+    else {
+	$conditions = "";
+    }
+
+    return 0
+	if (DBQueryWarn("update $table set $sets ".
+			"where exptidx='$exptidx' $conditions"));
+    return -1;
+}
+
+#
 # Check permissions. Allow for either uid or a user ref until all code
 # updated.
 #
@@ -528,15 +617,53 @@ sub CreateDirectory($)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
-    my $gid = $self->gid();
+    my $idx = $self->idx();
 
-    mysystem("$MKEXPDIR $pid $gid $eid");
+    mysystem("$MKEXPDIR $idx");
     return -1
 	if ($?);
     # mkexpdir sets the path in the DB. 
     return Refresh($self)
+}
+
+#
+# Load the project object for an experiment.
+#
+sub GetProject($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $project = Project->Lookup($self->pid_idx());
+    
+    if (! defined($project)) {
+	print("*** WARNING: Could not lookup project object for $self!", 1);
+	return undef;
+    }
+    return $project;
+}
+
+#
+# Load the group object for an experiment.
+#
+sub GetGroup($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $group = Group->Lookup($self->gid_idx());
+    
+    if (! defined($group)) {
+	print("*** WARNING: Could not lookup group object for $self!\n");
+	return undef;
+    }
+    return $group;
 }
 
 #
@@ -603,6 +730,7 @@ sub AddEnvVariable($$$;$)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $exptidx = $self->idx();
 
     if (defined($value)) {
 	$value = DBQuoteSpecial($value);
@@ -629,13 +757,13 @@ sub AddEnvVariable($$$;$)
 	    
 	DBQueryWarn("replace into virt_user_environment set ".
 		    "   name='$name', value=$value, idx=$idx, ".
-		    "   pid='$pid', eid='$eid'")
+		    "   exptidx='$exptidx', pid='$pid', eid='$eid'")
 	    or return -1;
     }
     else {
 	DBQueryWarn("insert into virt_user_environment set ".
 		    "   name='$name', value=$value, idx=NULL, ".
-		    "   pid='$pid', eid='$eid'")
+		    "   exptidx='$exptidx', pid='$pid', eid='$eid'")
 	    or return -1;
     }
     
@@ -811,6 +939,39 @@ sub CreateLogFile($$$)
 }
 
 #
+# Set the experiments nsfiles table entry.
+#
+sub SetNSFile($$)
+{
+    my ($self, $nsfile) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $nsfile_string = `cat $nsfile`;
+    return 0
+	if (!$nsfile_string);
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+    $nsfile_string = DBQuoteSpecial($nsfile_string);
+    
+    if (length($nsfile_string) >= DBLIMIT_NSFILESIZE()) {
+	print "NS file is way too big!\n";
+	return -1;
+    }
+
+    return -1    
+	if (!DBQueryWarn("delete from nsfiles where exptidx='$idx'") ||
+	    !DBQueryWarn("insert into nsfiles (exptidx, pid, eid, nsfile) ".
+			 "values ($idx, '$pid', '$eid', $nsfile_string)"));
+
+    return 0;
+}
+
+#
 # Set the experiment to use the logfile. It becomes the "current" spew.
 #
 sub SetLogFile($$)
@@ -895,14 +1056,15 @@ sub PreRun($;$$)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $idx = $self->idx();
 
     $nsfile = ""
 	if (!defined($nsfile));
     $options = ""
 	if (!defined($options));
 
-    print "Running 'tbprerun $options $pid $eid $nsfile'\n";
-    mysystem("$TBPRERUN $options $pid $eid $nsfile");
+    print "Running 'tbprerun $options -e $idx $nsfile'\n";
+    mysystem("$TBPRERUN $options -e $idx $nsfile");
     return -1
 	if ($?);
     return 0;
@@ -939,12 +1101,13 @@ sub End($;$)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $idx = $self->idx();
 
     $options = ""
 	if (!defined($options));
 
-    print "Running 'tbend $options $pid $eid'\n";
-    mysystem("$TBEND $options $pid $eid");
+    print "Running 'tbend $options -e $idx'\n";
+    mysystem("$TBEND $options -e $idx");
     return -1
 	if ($?);
     return 0;
@@ -1362,6 +1525,7 @@ sub SetupProgramAgents($)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $idx = $self->idx();
 
     my $query_result =
 	DBQueryWarn("select distinct vnode from virt_programs ".
@@ -1374,16 +1538,16 @@ sub SetupProgramAgents($)
 
     while (my ($vnode) = $query_result->fetchrow_array()) {
 	DBQueryWarn("replace into virt_agents ".
-		     " (pid, eid, vname, vnode, objecttype) ".
-		     " select '$pid', '$eid', '__${vnode}_program-agent', ".
-		     "   '$vnode', ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$idx', '$pid', '$eid', ".
+		     "   '__${vnode}_program-agent', '$vnode', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='PROGRAM'")
 	    or return -1;
 
 	DBQueryWarn("replace into event_groups ".
-		    " (pid, eid, idx, group_name, agent_name) ".
-		    " values ('$pid', '$eid', NULL, ".
+		    " (exptidx, pid, eid, idx, group_name, agent_name) ".
+		    " values ('$idx', '$pid', '$eid', NULL, ".
 		    "         '__all_program-agents', ".
 		    "         '__${vnode}_program-agent')")
 	    or return -1;

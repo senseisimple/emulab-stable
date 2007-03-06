@@ -1,7 +1,7 @@
 # -*- perl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -468,10 +468,16 @@ sub movetodownpool($$) {
     $pnode->{'consecsuccess'} = 0;
     $pnode->{'consecfails'} = 1;
 
+    my $exptidx;
+    if (!TBExptIDX($PLABDOWN_PID, $PLABDOWN_EID, \$exptidx)) {
+	print "*** WARNING: No such experiment $PLABDOWN_EID!\n";
+	return;
+    }
+
     #
     # It failed to come up. Move the pnode to hwdown...
     #
-    DBQueryWarn("update reserved set ".
+    DBQueryWarn("update reserved set exptidx=$exptidx, ".
                 "  pid='$PLABDOWN_PID',eid='$PLABDOWN_EID' ".
                 "   where node_id=\"$pnode->{'name'}\"");
     print "$pnode->{'name'} failed testing; sent to hwdown at ".

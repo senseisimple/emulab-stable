@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -153,6 +153,12 @@ if (!$query_result->numrows) {
     warn("*** $0:\n".
 	 "    No links or lans in experiment $pid/$eid!\n");
     exit(0);
+}
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid!");
 }
 
 my $vindex = 0;
@@ -378,9 +384,10 @@ while (my ($vnode, $valhash) = each %vnodetab) {
         }
         else {
             DBQueryFatal("insert into virt_routes ".
-                         " (pid,eid,vname,src,dst,nexthop,dst_type,".
+                         " (exptidx,pid,eid,vname,src,dst,nexthop,dst_type,".
                          "  dst_mask) ".
-                         " values ('$pid', '$eid', '$vnode', '$srcip', ".
+                         " values ('$exptidx', ".
+			 "         '$pid', '$eid', '$vnode', '$srcip', ".
                          "         '$dstip', '$hopip', '$type', '$mask')");
         }
     }

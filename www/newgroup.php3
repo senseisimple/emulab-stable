@@ -116,6 +116,7 @@ if (! ($newgroup = Group::NewGroup($project, $group_id, $leader,
 				   $group_description, $unix_gname))) {
     TBERROR("Could not create new group $group_pid/$group_id!", 1);
 }
+$gid_idx = $newgroup->gid_idx();
 
 STARTBUSY("Creating project group $group_id.");
 
@@ -123,7 +124,7 @@ STARTBUSY("Creating project group $group_id.");
 # Run the script. This will make the group directory, set the perms, etc.
 #
 SUEXEC($uid, $unix_gid,
-       "webmkgroup $group_pid $safe_id", SUEXEC_ACTION_DIE);
+       "webmkgroup $gid_idx", SUEXEC_ACTION_DIE);
 
 #
 # Now add the group leader to the group.
@@ -133,28 +134,6 @@ SUEXEC($uid, $unix_gid,
        SUEXEC_ACTION_DIE);
 
 STOPBUSY();
-
-#
-# Send an email message with a join link.
-#
-$group_leader_name  = $leader->name();
-$group_leader_email = $leader->email();
-$user_name          = $this_user->name();
-$user_email         = $this_user->email();
-
-TBMAIL("$group_leader_name '$group_leader' <$group_leader_email>",
-       "New Group '$group_pid/$group_id' Created",
-       "\n".
-       "This message is to notify you that group '$group_id' in project\n".
-       "'$group_pid' has been created. Please save this link so that you\n".
-       "send it to people you wish to have join this group:\n".
-       "\n".
-       "    ${TBBASE}/joinproject.php3".
-                             "?target_pid=$group_pid&target_gid=$group_id\n".
-       "\n",
-       "From: $user_name '$uid' <$user_email>\n".
-       "CC: $user_name '$uid' <$user_email>\n".
-       "Errors-To: $TBMAIL_WWW");
 
 #
 # Redirect back to project page.

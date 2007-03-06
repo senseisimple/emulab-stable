@@ -275,6 +275,19 @@ def TemplateLookup(exptidx):
     return (res[0][0], res[0][1])
 
 #
+# Get an experiment index.
+#
+def ExperimentIndex(pid, eid):
+    res = DBQueryFatal("select idx from experiments "
+                       "where pid=%s and eid=%s",
+                       (pid, eid))
+    
+    if len(res) == 0:
+        return None
+    
+    return res[0][0];
+
+#
 # This is a wrapper class so that you can invoke methods in dotted form.
 # For example experiment.swapexp(...).
 #
@@ -3082,6 +3095,11 @@ class experiment:
                 tl_insert = ",parent='%s'" % (argdict["timeline"],)
                 pass
             pass
+
+        exptidx = ExperimentIndex(argdict["proj"], argdict["exp"])
+        if exptidx == None:
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="No such experiment")
         
         #
         # Check permission. 
@@ -3102,9 +3120,9 @@ class experiment:
 
             if value > 0:
                 DBQueryFatal("INSERT INTO eventlist SET "
-                             "pid=%s,eid=%s,objecttype=3,eventtype=1,"
-                             "arguments=%s" + tl_insert,
-                             (argdict["proj"], argdict["exp"], value))
+                             "exptidx=%d,pid=%s,eid=%s,objecttype=3,"
+                             "eventtype=1,arguments=%s" + tl_insert,
+                             (exptidx, argdict["proj"], argdict["exp"], value))
                 pass
             
             result = "ok"

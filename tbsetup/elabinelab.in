@@ -889,7 +889,8 @@ sub DumpDBGoo()
 	DBQueryWarn("update temp_reserved set ".
 		    "   node_id='fs', ".
 		    "   pid='$TBOPSPID', ".
-		    "   eid='opsnodes' ".
+		    "   eid='opsnodes', ".
+		    "   exptidx=1 ".
 		    "where node_id='$fsnode'")
 	    or die("*** $0:\n".
 		   "    Could not update temporary table temp_reserved\n");
@@ -897,7 +898,8 @@ sub DumpDBGoo()
     DBQueryWarn("update temp_reserved set ".
 		"   node_id='ops', ".
 		"   pid='$TBOPSPID', ".
-		"   eid='opsnodes' ".
+		"   eid='opsnodes', ".
+		"   exptidx=1 ".
 		"where node_id='$opsnode'")
 	or die("*** $0:\n".
 	       "    Could not update temporary table temp_reserved\n");

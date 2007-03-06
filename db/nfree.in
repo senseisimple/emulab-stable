@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -33,6 +33,8 @@ my $TESTMODE = @TESTMODE@;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
+use Experiment;
 use Node;
 
 my $consetup	= "$TB/libexec/console_setup";
@@ -41,7 +43,6 @@ my $nodereboot  = "$TB/bin/node_reboot";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $reloadpid	= "emulab-ops";
 my $pendingeid  = "reloadpending";
-my $reloadeid   = "reloading";
 my $rppendingeid= "repositionpending";
 my $oldreserved_pid = OLDRESERVED_PID;
 my $oldreserved_eid = OLDRESERVED_EID;
@@ -96,12 +97,42 @@ if ($eid =~ /^([-\@\w]+)$/) { $eid = $1; }
 else { die("Bad data in eid: $eid."); }
 
 # Make sure that the experiment actually exists
-if (!ExpState($pid,$eid)) {
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
     die("There is no experiment '$eid' in project '$pid'.\n");
 }
+# Need the project index below.
+my $pid_idx = $experiment->pid_idx();
+my $exptidx = $experiment->idx();
+
+my $old_exptidx;
+if (!TBExptIDX($oldreserved_pid, $oldreserved_eid, \$old_exptidx)) {
+    die("No such experiment $oldreserved_pid/$oldreserved_eid!\n");
+}
+
+my $locker_exptidx;
+if (!TBExptIDX($lockedpid, $lockedeid, \$locker_exptidx)) {
+    die("No such experiment $lockedpid/$lockedeid!\n");
+}
+
+my $reload_exptidx;
+if (!TBExptIDX($reloadpid, $pendingeid, \$reload_exptidx)) {
+    die("No such experiment $reloadpid/$pendingeid!\n");
+}
+# Only in Utah, see below
+my $rppend_exptidx;
+
+#
+# Verify user and get his DB uid for later. 
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("You ($UID) do not exist!\n");
+}
+my $user_uid = $this_user->uid();
 
 # Make sure the user has the ability to modify this experiment
-if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
     die("You do not have permission to modify '$eid' in project '$pid'.\n");
 }
 
@@ -187,10 +218,15 @@ foreach my $n (@nodes) {
     if ( $moveToOldReserved ) {
 	# Move to holding reservation. Node is not free, but is no longer
 	# owned by the pid/eid, so cannot be mucked with.
+
 	if (! DBQueryWarn("update reserved " .
-			  "set vname='$n', pid='$oldreserved_pid', ".
-			  "eid='$oldreserved_eid', old_pid='$pid', ".
-			  "old_eid='$eid' where node_id='$n'")) {
+			  "set vname='$n', ".
+			  " exptidx=$exptidx, ".
+			  " pid='$oldreserved_pid', ".
+			  " eid='$oldreserved_eid', ".
+			  " old_exptidx=$old_exptidx, ".
+			  " old_pid='$pid', ".
+			  " old_eid='$eid' where node_id='$n'")) {
 	    print "*** WARNING: Error moving node $n to holding pid/eid: ".
 	          "$oldreserved_pid/$oldreserved_eid\n";
 	    next;
@@ -198,9 +234,11 @@ foreach my $n (@nodes) {
     } else {
 	# Move to locked reservation. Node is not free, but is no longer
 	# owned by the pid/eid, so cannot be mucked with.
+	
 	if (! DBQueryWarn("update reserved " .
-			  "set vname='$n', pid='$lockedpid', eid='$lockedeid', ".
-			  "old_pid='', old_eid='' ".
+			  "set vname='$n', exptidx=$locker_exptidx, ".
+			  " pid='$lockedpid', eid='$lockedeid', ".
+			  " old_exptidx=0, old_pid='', old_eid='' ".
 			  "where node_id='$n'")) {
 	    print "*** WARNING: Error locking down node $n!\n";
 	    next;
@@ -329,10 +367,8 @@ foreach my $n (@freed_nodes) {
 		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
 	    || $error++;
 	# And log phys nodes freed from hwdown
-	my $dbuid;
-	if ($pid eq NODEDEAD_PID() && $eid eq NODEDEAD_EID()
-	    && UNIX2DBUID($UID, \$dbuid)) {
-	    TBSetNodeLogEntry($n, $dbuid, "misc",
+	if ($pid eq NODEDEAD_PID() && $eid eq NODEDEAD_EID() && $user_uid) {
+	    TBSetNodeLogEntry($n, $user_uid, "misc",
 			      "'Moved from hwdown; nfree'");
 	}
     }
@@ -411,8 +447,15 @@ foreach my $n (@freed_nodes) {
 	
 	print "Moving $n to $next_pid/$next_eid.\n";
 
-	DBQueryWarn("update reserved set pid='$next_pid',eid='$next_eid'," .
-		    "vname='$n' where node_id='$n'")
+	my $next_exptidx;
+	if (!TBExptIDX($next_pid, $next_eid, \$next_exptidx)) {
+	    die("No such experiment $next_pid/$next_eid!\n");
+	}
+
+	DBQueryWarn("update reserved set ".
+		    " exptidx=$next_exptidx,pid='$next_pid',eid='$next_eid'," .
+		    " vname='$n' ".
+		    "where node_id='$n'")
 	    || $error++;
 	
 	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
@@ -444,9 +487,18 @@ foreach my $n (@freed_nodes) {
 
     if (TBNodeType($n) eq "garcia") {
 	print "Moving $n to $reloadpid/$rppendingeid.\n";
+
+	if (!defined($rppend_exptidx)) {
+	    if (!TBExptIDX($reloadpid, $rppendingeid, \$rppend_exptidx)) {
+		die("No such experiment $reloadpid/$rppendingeid!\n");
+	    }
+	}
 	
-	DBQueryWarn("update reserved set pid='$reloadpid',".
-		    "eid='$rppendingeid',vname='$n' where node_id='$n'") ||
+	DBQueryWarn("update reserved set ".
+		    " exptidx=$rppend_exptidx, ".
+		    " pid='$reloadpid',".
+		    " eid='$rppendingeid',vname='$n' ".
+		    "where node_id='$n'") ||
 	    $error++;
 
 	DBQueryWarn("REPLACE INTO scheduled_reloads set node_id='$n'") || 
@@ -467,8 +519,11 @@ foreach my $n (@freed_nodes) {
 	    $inreloads || $mustzero{$n})) { # XXX Garcia hack
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
-	DBQueryWarn("update reserved set pid='$reloadpid',eid='$pendingeid',".
-		    "vname='$n' where node_id='$n'") || $error++;
+	DBQueryWarn("update reserved set ".
+		    " exptidx=$reload_exptidx, ".
+		    " pid='$reloadpid',eid='$pendingeid',".
+		    " vname='$n' ".
+		    "where node_id='$n'") || $error++;
 
 	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
 			 $reloadpid, $pendingeid);
@@ -488,7 +543,8 @@ foreach my $n (@freed_nodes) {
     # be an entry. Eventually, os_setup will look for this and force
     # a reload.
     if ($mustclean) {
-	DBQueryWarn("replace into last_reservation values ('$n', '$pid')");
+	DBQueryWarn("replace into last_reservation (pid_idx,node_id,pid)".
+		    "values ($pid_idx, '$n', '$pid')");
     }
 
     print "Releasing node '$n' ... ";

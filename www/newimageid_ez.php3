@@ -1175,6 +1175,8 @@ if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
 $description = addslashes($formfields["description"]);
 $pid         = $project->pid();
 $gid         = $group->gid();
+$pid_idx     = $project->pid_idx();
+$gid_idx     = $group->gid_idx();
 $imagename   = $formfields["imagename"];
 $bootpart    = $formfields["loadpart"];
 $path        = $formfields["path"];
@@ -1224,21 +1226,21 @@ DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$bootpart" . "_osid, ".
 	     " default_osid, path, pid, global, creator, creator_idx, ".
-	     " created, gid, shared) ".
+	     " created, gid, shared, pid_idx, gid_idx) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
 	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $global, ".
-             "   '$uid', '$dbid', now(), '$gid', $shared)");
+             "   '$uid', '$dbid', now(), '$gid', $shared, $pid_idx,$gid_idx)");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
 	     " osfeatures, pid, creator, creator_idx, shared, created, ".
-	     " op_mode, max_concurrent, reboot_waittime) ".
+	     " op_mode, max_concurrent, reboot_waittime, pid_idx) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
              "   '$uid', '$dbid', $global, now(), '$op_mode', ".
-             "   $max_concurrent, $reboot_waittime)");
+             "   $max_concurrent, $reboot_waittime, $pid_idx)");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".

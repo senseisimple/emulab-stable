@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -50,6 +50,7 @@ my $debug	= 0;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
 
 #
 # Turn off line buffering on output
@@ -129,6 +130,12 @@ if ($UID && !TBAdmin($UID) &&
     ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
     die("*** $0:\n".
 	"    You do not have permission to modify the delay parameters!\n");
+}
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
 }
 
 #
@@ -409,9 +416,10 @@ sub ChangeVirtSettings() {
 
 	    if (defined($val)) {
 		DBQueryFatal("replace into virt_lan_settings ".
-			     " (pid, eid, vname, capkey, capval) ".
+			     " (exptidx, pid, eid, vname, capkey, capval) ".
 			     "values ".
-			     " ('$pid', '$eid', '$link', '$key', '$val')");
+			     " ('exptidx',".
+			     "  '$pid','$eid','$link','$key','$val')");
 	    }
 	    else {
 		DBQueryFatal("delete from virt_lan_settings ".
@@ -422,9 +430,9 @@ sub ChangeVirtSettings() {
 	else {
 	    if (defined($val)) {
 		DBQueryFatal("replace into virt_lan_member_settings ".
-			     " (pid, eid, vname, member, capkey, capval) ".
+			     " (exptidx,pid,eid,vname,member,capkey,capval) ".
 			     "values ".
-			     " ('$pid', '$eid', '$link', '$member', ".
+			     " ('$exptidx','$pid','$eid','$link','$member', ".
 			     "  '$key', '$val')");
 	    }
 	    else {

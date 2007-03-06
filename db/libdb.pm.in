@@ -1915,10 +1915,16 @@ sub MarkNodeDown($)
     $pid = NODEDEAD_PID;
     $eid = NODEDEAD_EID;
 
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return -1;
+    }
+
     my $query_result =
 	DBQueryFatal("replace into next_reserve " .
-		     "(node_id, pid, eid) " .
-		     "values ('$node', '$pid', '$eid')");
+		     "(node_id, exptidx, pid, eid) " .
+		     "values ('$node', '$exptidx', '$pid', '$eid')");
 
     if ($query_result->num_rows < 1) {
 	DBWarn("WARNING: Could not mark $node down");
@@ -2989,11 +2995,17 @@ sub MarkPhysNodeDown($)
 
     $pid = NODEDEAD_PID;
     $eid = NODEDEAD_EID;
+    
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return -1;
+    }
 
     DBQueryFatal("lock tables reserved write");
 
     DBQueryFatal("update reserved set " .
-		 "  pid='$pid',eid='$eid',rsrv_time=now() ".
+		 "  exptidx=$exptidx, pid='$pid',eid='$eid',rsrv_time=now() ".
 		 "where node_id='$pnode'");
 
     DBQueryFatal("unlock tables");
@@ -4360,6 +4372,12 @@ sub TBSetExptFirewallVlan($$$$) {
 	return 0;
     }
 
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return -1;
+    }
+
     #
     # Need the virtual name since we use that to ensure uniqness in the
     # firewalls table.
@@ -4376,8 +4394,9 @@ sub TBSetExptFirewallVlan($$$$) {
     #
     # Change the firewalls table entry to reflect the VLAN
     #
-    DBQueryWarn("replace into firewalls (pid,eid,fwname,vlan,vlanid) ".
-		"values ('$pid', '$eid', '$fwname', $fwvlan, $fwvlanid)");
+    DBQueryWarn("replace into firewalls (exptidx,pid,eid,fwname,vlan,vlanid) ".
+		"values ('$exptidx', '$pid', '$eid', ".
+		"        '$fwname', $fwvlan, $fwvlanid)");
 
     #
     # Change the reserved table entries for all firewalled nodes to reflect it.

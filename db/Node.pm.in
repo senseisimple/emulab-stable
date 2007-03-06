@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Node;
@@ -269,6 +269,12 @@ sub CreateVnodes($$)
     my $vtype   = $options->{'vtype'};
     my $pnode   = $options->{'nodeid'};
 
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print STDERR "*** CreateVnodes: No such experiment $pid/$eid!\n";
+	return -1;
+    }
+
     #
     # Need the vtype node_type info. 
     #
@@ -442,9 +448,10 @@ sub CreateVnodes($$)
 	$statement =
 	         "insert into reserved set ".
 		 "       node_id='$vnodeid', " .
+		 "       exptidx=$exptidx, ".
 		 "       pid='$pid', ".
 		 "       eid='$eid', ".
-		 "       vname='$vnodeid', " .
+		 "       vname='$vnodeid', ".
 		 "       old_pid='', ".
 		 "       old_eid=''";
 

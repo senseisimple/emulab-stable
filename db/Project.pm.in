@@ -263,6 +263,23 @@ sub Create($$$$)
 }
 
 #
+# Check permissions.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid = (ref($user) ? $user->uid() : $user);
+    my $pid = $self->pid();
+
+    return TBProjAccessCheck($uid, $pid, $pid, $access_type);
+}
+
+#
 # Send newproject email; separate function so email can be resent.
 #
 sub SendNewProjectEmail($;$)
@@ -386,6 +403,34 @@ sub GetLeader($)
 	if (! ref($self));
 
     return User->Lookup($self->head_idx());
+}
+
+#
+# Return project group.
+#
+sub GetProjectGroup($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return $self->{'GROUP'};
+}
+
+#
+# Return membership for user in the default group
+#
+sub LookupUser($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! (ref($self) && ref($user)));
+
+    return $self->{'GROUP'}->LookupUser($user);
 }
 
 #

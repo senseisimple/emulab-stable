@@ -1,12 +1,11 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
+use strict;
 
 #
 # Remove a group. We delete the group directory and the we remove the
@@ -17,7 +16,7 @@ use English;
 #
 sub usage()
 {
-    print STDOUT "Usage: rmgroup <pid> <gid>\n";
+    print STDOUT "Usage: rmgroup <gid>\n";
     exit(-1);
 }
 sub fatal($);
@@ -43,20 +42,20 @@ if ($UID == 0) {
 #
 # Configure variables
 #
-my $TB       = "@prefix@";
-my $TBOPS    = "@TBOPSEMAIL@";
-my $CONTROL  = "@USERNODE@";
-my $BOSSNODE = "@BOSSNODE@";
+my $TB            = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $CONTROL       = "@USERNODE@";
+my $BOSSNODE      = "@BOSSNODE@";
 my $ELABINELAB    = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
 my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 
-my $SSH      = "$TB/bin/sshtb";
-my $GROUPDEL = "/usr/sbin/pw groupdel";
-my $DELMMLIST= "$TB/sbin/delmmlist";
-my $MODGROUPS= "$TB/sbin/modgroups";
-my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
+my $SSH           = "$TB/bin/sshtb";
+my $GROUPDEL      = "/usr/sbin/pw groupdel";
+my $DELMMLIST     = "$TB/sbin/delmmlist";
+my $MODGROUPS     = "$TB/sbin/modgroups";
+my $OPSDBCONTROL  = "$TB/sbin/opsdb_control";
 
 #
 # Untaint the path
@@ -77,69 +76,54 @@ use libaudit;
 use libdb;
 use libtestbed;
 
+# Defined in libtestbed;
 my $PROJROOT    = PROJROOT();
 my $GRPROOT     = GROUPROOT();
 
 #
 # Check args.
 #
-if (@ARGV != 2) {
+if (@ARGV != 1) {
     usage();
 }
-my $pid = $ARGV[0];
-my $gid = $ARGV[1];
 
-#
-# Untaint the argument.
-#
-if ($pid =~ /^([-\@\w.]+)$/) {
-    $pid = $1;
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
-else {
-    die("*** Invalid pid '$pid' contains illegal characters.\n");
-}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $user_uid   = $this_user->uid();
 
-if ($gid =~ /^([-\@\w.]+)$/) {
-    $gid = $1;
+# Map the group to its object.
+my $group = Group->Lookup($ARGV[0]);
+if (!defined($group)) {
+    fatal("Could not lookup group object for $ARGV[0]");
 }
-else {
-    die("*** Invalid gid '$gid' contains illegal characters.\n");
-}
+my $unix_gid   = $group->unix_gid();
+my $unix_name  = $group->unix_name();
+my $pid        = $group->pid();
+my $gid        = $group->gid();
+my $gid_idx    = $group->gid_idx();
 
 #
 # Figure out who called us. 
 #
-if (!TBAdmin($UID)) {
+if (!TBAdmin()) {
     #
     # Only admin types can remove the project group. Typically, you won't
     # do this directly, but use rmproj instead.
     #
-    if ($pid eq $gid) {
+    if ($group->IsProjectGroup()) {
 	die("*** $0:\n".
 	    "    You do not have permission to remove a project group!\n");
     }
-    
-    my $dbuid;
 
-    if (! UNIX2DBUID($UID, \$dbuid)) {
+    if (! $group->AccessCheck($this_user, TB_PROJECT_DELGROUP())) {
 	die("*** $0:\n".
-	    "    You are not a valid emulab user!\n");
+	    "    You do not have permission to remove group $group!\n");
     }
-
-    if (! TBProjAccessCheck($dbuid, $pid, $pid, TB_PROJECT_DELGROUP())) {
-	die("*** $0:\n".
-	    "    You do not have permission to remove a project group!\n");
-    }
-}
-
-#
-# Unix info for the group
-#
-my $unix_gid;
-my $unix_name;
-
-if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
-    die("*** No info for project/group $pid/$gid!");
 }
 
 #
@@ -153,12 +137,12 @@ if (AuditStart(0)) {
 }
 
 #
-# Rename the group directory as long as its not the proj directory!
+# Rename the group directory as long as its not the proj directory.
 #
-if ($pid ne $gid) {
+if (! $group->IsProjectGroup()) {
     my $groupdir  = "$GRPROOT/$pid";
     my $oldname   = "$groupdir/$gid";
-    my $newname   = "$oldname-" . TBDateTimeFSSafe();
+    my $newname   = "$groupdir/$gid_idx";
     my $grouplink = "$PROJROOT/$pid/groups/$gid";
 
     if (-e $grouplink && !unlink($grouplink)) {
@@ -189,16 +173,17 @@ if ($pid ne $gid) {
 #
 # Remove all members from the group.
 # If there was an error, the DB state is left so that this script can
-# be run again!
+# be run again.
 #
 # Must find out what users/groups to delete so that we can pass off to
 # modgroups.
 #
-my $query_result =
-    DBQueryFatal("select uid from group_membership ".
-		 "where pid='$pid' and gid='$gid'");
+my @userlist = ();
+$group->MemberList(\@userlist,
+		   $Group::MEMBERLIST_FLAGS_ALLUSERS |
+		   $Group::MEMBERLIST_FLAGS_UIDSONLY);
 
-while (my ($uid) = $query_result->fetchrow_array()) {
+foreach my $uid (@userlist) {
     # For perl
     $EUID = $UID;
     if (system("$MODGROUPS -r $pid:$gid $uid")) {
@@ -264,13 +249,11 @@ foreach my $tipserver ( TBTipServers() ) {
     }
 }
 
-DBQueryFatal("delete from group_stats ".
-	     "where pid='$pid' and gid='$gid'");
+# Last step, so we can repeat above actions on failures.
+$group->Delete() == 0 or
+    fatal("Could not delete group $group");
 
-DBQueryFatal("delete from groups ".
-	     "where pid='$pid' and gid='$gid'");
-
-print "Group $pid/$gid has been removed!\n";
+print "Group $pid/$gid ($gid_idx) has been removed!\n";
 exit(0);
 
 sub fatal($) {

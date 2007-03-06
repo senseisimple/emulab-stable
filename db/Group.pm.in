@@ -22,6 +22,7 @@ use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
+use vars qw($MEMBERLIST_FLAGS_UIDSONLY $MEMBERLIST_FLAGS_ALLUSERS);
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -38,6 +39,10 @@ my $MIN_UNIX_GID  = @MIN_UNIX_GID@;
 my %groups    = ();
 my $debug      = 0;
 
+# MemberList flags.
+$MEMBERLIST_FLAGS_UIDSONLY	= 0x01;
+$MEMBERLIST_FLAGS_ALLUSERS	= 0x02;
+
 # Little helper and debug function.
 sub mysystem($)
 {
@@ -51,9 +56,44 @@ sub mysystem($)
 #
 # Lookup by idx.
 #
-sub Lookup($$)
+sub Lookup($$;$)
 {
-    my ($class, $gid_idx) = @_;
+    my ($class, $arg1, $arg2) = @_;
+    my $gid_idx;
+
+    #
+    # A single arg is either an index or a "pid,gid" or "pid/gid" string.
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $gid_idx = $1;
+	}
+	elsif ($arg1 =~ /^([-\w]*),([-\w]*)$/ ||
+	       $arg1 =~ /^([-\w]*)\/([-\w]*)$/) {
+	    $arg1 = $1;
+	    $arg2 = $2;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (! (($arg1 =~ /^[-\w]*$/) && ($arg2 =~ /^[-\w]*$/))) {
+	return undef;
+    }
+
+    #
+    # Two args means pid/gid lookup instead of gid_idx.
+    #
+    if (defined($arg2)) {
+	my $groups_result =
+	    DBQueryWarn("select gid_idx from groups ".
+			"where pid='$arg1' and gid='$arg2'");
+
+	return undef
+	    if (! $groups_result || !$groups_result->numrows);
+
+	($gid_idx) = $groups_result->fetchrow_array();
+    }
 
     # Look in cache first
     return $groups{"$gid_idx"}
@@ -100,16 +140,7 @@ sub LookupByPidGid($$$)
 {
     my ($class, $pid, $gid) = @_;
 
-    my $query_result =
-	DBQueryWarn("select gid_idx from groups ".
-		    "where pid='$pid' and gid='$gid'");
-
-    return undef
-	if (! $query_result || !$query_result->numrows);
-
-    my ($gid_idx) = $query_result->fetchrow_array();
-
-    return Group->Lookup($gid_idx);
+    return Group->Lookup($pid, $gid);
 }
 
 #
@@ -266,8 +297,8 @@ sub Create($$$$$$)
 	return undef;
     }
 
-    if (! DBQueryWarn("insert into group_stats (pid, gid, gid_idx) ".
-		      "values ('$pid', '$gid', $gid_idx)")) {
+    if (! DBQueryWarn("insert into group_stats (pid, gid, gid_idx, pid_idx) ".
+		      "values ('$pid', '$gid', $gid_idx, $pid_idx)")) {
 	DBQueryFatal("delete from groups where gid_idx='$gid_idx'");
 	return undef;
     }
@@ -279,7 +310,7 @@ sub Create($$$$$$)
 }
 
 #
-# Delete a group.
+# Delete a group. This will eventually change to group archival.
 #
 sub Delete($)
 {
@@ -291,9 +322,88 @@ sub Delete($)
 
     my $gid_idx = $self->gid_idx();
 
-    DBQueryWarn("delete from group_stats where gid_idx='$gid_idx'");
-    DBQueryWarn("delete from groups where gid_idx='$gid_idx'");
+    # Order matters, groups table should be last so we can repeat if failure.
+    my @tables = ("group_policies", "group_stats", "groups");
+
+    foreach my $table (@tables) {
+	return -1
+	    if (!DBQueryWarn("delete from $table where gid_idx='$gid_idx'"));
+    }
+    
     return 0;
+}
+
+#
+# Generic function to look up some table values given a set of desired
+# fields and some conditions. Pretty simple, not widely useful, but it
+# helps to avoid spreading queries around then we need to. 
+#
+sub TableLookUp($$$;$)
+{
+    my ($self, $table, $fields, $conditions) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+    
+    my $gid_idx = $self->gid_idx();
+
+    if (defined($conditions) && "$conditions" ne "") {
+	$conditions = "and ($conditions)";
+    }
+    else {
+	$conditions = "";
+    }
+
+    return DBQueryWarn("select distinct $fields from $table ".
+		       "where gid_idx='$gid_idx' $conditions");
+}
+
+#
+# Ditto for update.
+#
+sub TableUpdate($$$;$)
+{
+    my ($self, $table, $sets, $conditions) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    if (ref($sets) eq "HASH") {
+	$sets = join(",", map("$_='" . $sets->{$_} . "'", keys(%{$sets})));
+    }
+    my $gid_idx = $self->gid_idx();
+
+    if (defined($conditions) && "$conditions" ne "") {
+	$conditions = "and ($conditions)";
+    }
+    else {
+	$conditions = "";
+    }
+
+    return 0
+	if (DBQueryWarn("update $table set $sets ".
+			"where gid_idx='$gid_idx' $conditions"));
+    return -1;
+}
+
+#
+# Check permissions.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid = (ref($user) ? $user->uid() : $user);
+    my $pid = $self->pid();
+    my $gid = $self->gid();
+
+    return TBProjAccessCheck($uid, $pid, $gid, $access_type);
 }
 
 #
@@ -612,7 +722,62 @@ sub LeaderMailList($)
     return $mailstr;
 }
 
+#
+# Return list of members in this group, by specific trust.
+#
 
+sub MemberList($$;$$)
+{
+    my ($self, $prval, $flags, $desired_trust) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $flags = 0
+	if (!defined($flags));
+
+    my $gid_idx    = $self->gid_idx();
+    my $pid_idx    = $self->pid_idx();
+    my @result     = ();
+    my $uids_only  = ($flags & $MEMBERLIST_FLAGS_UIDSONLY ? 1 : 0);
+    my $trust_clause;
+
+    if (defined($desired_trust)) {
+	$trust_clause = "and trust='$desired_trust'"
+    }
+    elsif ($flags & $MEMBERLIST_FLAGS_ALLUSERS) {
+	$trust_clause = "";
+    }
+    else {
+	$trust_clause = "and trust!='none'"
+    }
+
+    my $query_result =
+	DBQueryWarn("select distinct m.uid_idx ".
+		    "   from group_membership as m ".
+		    "where m.pid_idx='$pid_idx' and ".
+		    "      m.gid_idx='$gid_idx' $trust_clause");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($uid_idx) = $query_result->fetchrow_array()) {
+	if ($uids_only) {
+	    push(@result, $uid_idx);
+	    next;
+	}
+	
+	my $user = User->Lookup($uid_idx);
+	if (!defined($user)) {
+	    print "Group::Memberlist: Could not map $uid_idx to object\n";
+	    return undef;
+	}
+	push(@result, $user);
+    }
+    @$prval = @result;
+    return 0;
+}
 
 ############################################################################
 

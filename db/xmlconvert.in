@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -205,6 +205,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libArchive;
+use Experiment;
 
 sub fatal($);
 
@@ -259,6 +260,13 @@ else {
     fatal("Bad data in argument: $eid.");
 }
 
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    die("*** $0:\n",
+	"    Experiment $pid/$eid is not a current experiment!\n");
+}
+my $exptidx = $experiment->idx();
+
 my %event_objtypes;
 my $query_result = DBQueryFatal("select idx,type from event_objecttypes");
 while (my ($idx,$type) = $query_result->fetchrow_array()) {
@@ -267,11 +275,11 @@ while (my ($idx,$type) = $query_result->fetchrow_array()) {
 
 # Do it
 
-sub readXML($$$$);
+sub readXML($$$$$);
 sub writeXML_XML($$);
 
 if ($fromxml) {
-    readXML($pid, $eid, $xmlfile, $fromparser);
+    readXML($exptidx, $pid, $eid, $xmlfile, $fromparser);
 }
 else {
     writeXML_XML($pid, $eid);
@@ -291,8 +299,8 @@ my $current_row;
 my $current_slot;
 my $current_data;
 
-sub readXML($$$$) {
-    my ($pid, $eid, $xmlfile, $fromparser) = @_;
+sub readXML($$$$$) {
+    my ($exptidx, $pid, $eid, $xmlfile, $fromparser) = @_;
     my %experiment;
 
     if ($xmlfile ne "-") {
@@ -502,8 +510,8 @@ sub readXML($$$$) {
 
 	foreach my $rowref (@{$virtual_tables{$table}->{"rows"}}) {
 	    my %rowhash = %{ $rowref };
-	    my @fields  = ("pid", "eid");
-	    my @values  = ("'$pid'", "'$eid'");
+	    my @fields  = ("exptidx", "pid", "eid");
+	    my @values  = ("'$exptidx'", "'$pid'", "'$eid'");
 
 	    # If no actual rows, then skip. Might happen.
 	    last

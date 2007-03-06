@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -107,6 +107,12 @@ else {
     die("Tainted argument $eid!\n");
 }
 
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid!");
+}
+
 my $argpat  = q(SIMHOST=([-\w]+));
 if ( $eventargs =~ /$argpat/ ) {
     $simhost = $1;
@@ -151,8 +157,8 @@ while( ($vname) = $query_result->fetchrow_array() ) {
 	$nodeweight *= 2;
     }
     DBQueryFatal("replace into virt_simnode_attributes ".
-	         "(pid,eid,vname,nodeweight) values ".
-		 "('$pid','$eid','$vname','$nodeweight')");
+	         "(exptidx,pid,eid,vname,nodeweight) values ".
+		 "('$exptidx','$pid','$eid','$vname','$nodeweight')");
 }
 
 #

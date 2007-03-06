@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,6 +49,7 @@ my $dbuid;
 my $pid;
 my $gid;
 my $eid;
+my $exptidx;
 my $nsfile;
 my $experiment;
 
@@ -161,6 +162,7 @@ if (defined($pid)) {
     if (! defined($experiment)) {
 	tbdie("Cannot find the experiment object for $pid/$eid");
     }
+    $exptidx = $experiment->idx();
 }
 
 # Remove temps cause of swapin by alternates.
@@ -332,8 +334,8 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 	    my $net = inet_ntoa(inet_aton($WANETMASK) & inet_aton($ip));
 		
 	    if (! defined($subnetmap{$net})) {
-		DBQueryFatal("insert into ipsubnets ".
-			     "values ('$pid','$eid', NULL)");
+		DBQueryFatal("insert into ipsubnets (exptidx,pid,eid,idx) ".
+			     "values ('$exptidx','$pid','$eid', NULL)");
 		my ($id) =
 		    DBQueryFatal("select LAST_INSERT_ID() ".
 				 "from ipsubnets")->fetchrow_array();
