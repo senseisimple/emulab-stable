@@ -687,7 +687,7 @@ class Plab:
 
             DBQueryFatal("replace into reserved"
                          " (node_id, exptidx, pid, eid, rsrv_time, vname)"
-                         " values (%s, %d, %s, %s, now(), %s)",
+                         " values (%s, %s, %s, %s, now(), %s)",
                          (nodeid, res_exptidx,
                           RESERVED_PID, RESERVED_EID, hostonly))
 
@@ -787,7 +787,7 @@ class Plab:
             # Put the last vnode created into the special monitoring expt.
             DBQueryFatal("insert into reserved"
                          " (node_id, exptidx, pid, eid, rsrv_time, vname)"
-                         " values (%s, %d, %s, %s, now(), %s)",
+                         " values (%s, %s, %s, %s, now(), %s)",
                          (vnodeid, mon_exptidx,
                           MONITOR_PID, MONITOR_EID, vnodeid))
             pass
@@ -1100,7 +1100,7 @@ class Slice:
 
             DBQueryFatal("insert into plab_slices "
                          "(exptidx,pid,eid,slicename,slicemeta,leaseend,admin)"
-                         " values (%d, %s, %s, %s, %s, %s, %s)",
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
                          (self.exptidx, self.pid, self.eid, self.slicename,
                           self.slicemeta,
                           time.strftime("%Y-%m-%d %H:%M:%S",
@@ -1158,6 +1158,26 @@ class Slice:
         """
         if verbose:
             print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
+            pass
+
+        # grab our exptidx
+        res = DBQueryFatal("select idx, expt_name from experiments "
+                           "where pid=%s "
+                           "and eid=%s",
+                           (self.pid, self.eid))
+        if not len(res):
+            raise RuntimeError, \
+                  "Didn't get any results while looking up info on " \
+                  "experiment %s/%s" % (self.pid, self.eid)
+        (eindex, descr) = res[0]
+        
+        if not self.slicename:
+            self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+            pass
+        
+        self.description = descr
+        self.exptidx = eindex
+            
         res = DBQueryFatal("select slicename, slicemeta, leaseend "
                            " from plab_slices "
                            " where pid = %s and eid = %s",
@@ -1416,7 +1436,7 @@ class Node:
         DBQueryFatal("replace into plab_slice_nodes"
                      " (exptidx, pid, eid, slicename, node_id,"
                      " nodemeta, leaseend)"
-                     " values (%d, %s, %s, %s, %s, %s, %s)",
+                     " values (%s, %s, %s, %s, %s, %s, %s)",
                      (self.slice.exptidx, self.slice.pid, self.slice.eid,
                       self.slice.slicename, self.nodeid,
                       self.nodemeta,
