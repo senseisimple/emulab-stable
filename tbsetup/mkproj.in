@@ -183,6 +183,8 @@ my $target_project = Project->Lookup($pid);
 if (! defined($target_project)) {
     fatal("Could not map project $pid to its object!");
 }
+my $pid_idx = $target_project->pid_idx();
+my $gid_idx = $target_project->gid_idx();
 
 #
 # The welcome message ...
@@ -255,7 +257,7 @@ $leader->SetStatus(USERSTATUS_ACTIVE()) == 0 or
 #
 $EUID = $UID;
 
-system("$MKGROUP $pid $pid") == 0 or
+system("$MKGROUP $gid_idx") == 0 or
     fatal("$MKGROUP $pid failed!");
 
 if ($WIKISUPPORT) {
