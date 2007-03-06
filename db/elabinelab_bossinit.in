@@ -27,7 +27,6 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ELABINELAB  = @ELABINELAB@;
 my $SAVEUID     = $UID;
-my $TBOPSPID    = TBOPSPID();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
@@ -39,6 +38,9 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Defined in libdb ...
+my $TBOPSPID    = TBOPSPID();
 
 if (!$ELABINELAB) {
     die("*** $0:\n".
