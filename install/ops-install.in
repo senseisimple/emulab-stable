@@ -999,11 +999,11 @@ Phase "database", "Setting up database", sub {
     };
 
     Phase "dbpatch", "Patching up mysql DB", sub {
-	if (!ExecQuiet("$MYSQLDUMP -u root mysql emulab_dbs")) {
+	if (!ExecQuiet("$MYSQLDUMP -u root -p$password mysql emulab_dbs")) {
 	    PhaseSkip("DB already patched");
 	}
 
-	ExecQuietFatal("$MYSQL -u root mysql < $TOP_SRCDIR/sql/opsdb.sql");
+	ExecQuietFatal("$MYSQL -u root -p$password mysql < $TOP_SRCDIR/sql/opsdb.sql");
     };
 
     # Once the password is inserted and privs flushed, will need a password
