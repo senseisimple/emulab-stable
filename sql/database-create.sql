@@ -588,9 +588,9 @@ CREATE TABLE `experiment_stats` (
   `archive_idx` int(10) unsigned default NULL,
   `last_error` int(10) unsigned default NULL,
   `dpdbname` varchar(64) default NULL,
-  PRIMARY KEY  (`eid`,`pid`,`exptidx`),
-  KEY `exptidx` (`exptidx`),
-  KEY `rsrcidx` (`rsrcidx`)
+  PRIMARY KEY  (`exptidx`),
+  KEY `rsrcidx` (`rsrcidx`),
+  KEY `pideid` (`pid`,`eid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
