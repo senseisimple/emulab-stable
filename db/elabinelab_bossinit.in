@@ -132,7 +132,7 @@ while (my ($uid,$admin) = $users_result->fetchrow_array()) {
 my $query_result =
     DBQueryFatal("select gid_idx from groups where pid='$pid' and pid!=gid");
 while (my ($gid_idx) = $query_result->fetchrow_array()) {
-    mysystem("$TB/sbin/mkgroup $gid_idx");
+    mysystem("$TB/sbin/mkgroup -s $gid_idx");
 }
 
 #

@@ -18,12 +18,13 @@ use strict;
 #
 sub usage()
 {
-    print STDOUT "Usage: mkgroup <gid>\n";
+    print STDOUT "Usage: mkgroup [-s] <gid>\n";
     exit(-1);
 }
-sub fatal($);
+my $optlist = "s";
+my $silent  = 0;
 
-my  $optlist = "";
+sub fatal($);
 
 #
 # Configure variables
@@ -103,6 +104,9 @@ if ($UID == 0) {
 my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
+}
+if (defined($options{"s"})) {
+    $silent = 1;
 }
 if (@ARGV != 1) {
     usage();
@@ -260,24 +264,26 @@ if ($pid ne $gid) {
     }
 }
 
-#
-# Send an email message with a join link.
-#
-my $group_leader_name  = $leader->name();
-my $group_leader_email = $leader->email();
-my $group_leader_uid   = $leader->uid();
+# No email when the project group being created.
+if (!$silent && !$group->IsProjectGroup()) {
+    #
+    # Send an email message with a join link.
+    #
+    my $group_leader_name  = $leader->name();
+    my $group_leader_email = $leader->email();
+    my $group_leader_uid   = $leader->uid();
 
-SENDMAIL("$group_leader_name '$group_leader_uid' <$group_leader_email>",
-    "New Group '$pid/$pid ($gid_idx)' Created",
-    "This message is to notify you that group '$gid' in project '$pid'\n".
-    "has been created. Please save this link so that you can send it to\n".
-    "people you wish to have join this group:\n".
-    "\n".
-    "    ${TBBASE}/joinproject.php3?target_pid=$pid&target_gid=$gid\n".
-    "\n",
-    "$user_name '$user_uid' <$user_email>",
-    "CC: $user_name '$user_uid' <$user_email>");
-    
+    SENDMAIL("$group_leader_name '$group_leader_uid' <$group_leader_email>",
+     "New Group '$pid/$pid ($gid_idx)' Created",
+     "This message is to notify you that group '$gid' in project '$pid'\n".
+     "has been created. Please save this link so that you can send it to\n".
+     "people you wish to have join this group:\n".
+     "\n".
+     "    ${TBBASE}/joinproject.php3?target_pid=$pid&target_gid=$gid\n".
+     "\n",
+     "$user_name '$user_uid' <$user_email>",
+     "CC: $user_name '$user_uid' <$user_email>");
+}
 print "Group Creation Completed!\n";
 exit(0);
 
