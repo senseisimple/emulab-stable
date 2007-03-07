@@ -31,7 +31,7 @@ my @images	  = ('emulab-ops-FBSD410+RHL90-STD',
 my @osids	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
 		     'OPSNODE-BSD', 'FW-IPFW',
 		     'RHL-STD', 'FBSD-STD',
-		     'emulab-ops-FBSD-JAIL');
+		     'emulab-ops-FBSD-JAIL', 'emulab-ops-POWER-CONTROLLER');
 
 my %osidtoimageid = ("RHL-STD"  => "emulab-ops-RHL90-STD",
 		     "FBSD-STD" => "emulab-ops-FBSD410-STD");
