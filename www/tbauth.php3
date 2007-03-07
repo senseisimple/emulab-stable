@@ -1032,31 +1032,36 @@ function DOLOGOUT($user) {
 
     $CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 
-    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
-    $hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+    $curhash  = "";
+    $hashhash = "";
+
+    if (isset($HTTP_COOKIE_VARS[$TBAUTHCOOKIE])) {
+	$curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+    }
+    if (isset($HTTP_COOKIE_VARS[$TBLOGINCOOKIE])) {
+	$hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+    }
     
     #
     # We have to get at least one of the hashes. 
     #
-    if (!isset($curhash) && !isset($hashhash)) {
+    if ($curhash == "" && $hashhash == "") {
 	return 1;
     }
-    if (isset($curhash) &&
+    if ($curhash != "" &&
 	! preg_match("/^[\w]+$/", $curhash)) {
 	return 1;
     }
-    if (isset($hashhash) &&
+    if ($hashhash != "" &&
 	! preg_match("/^[\w]+$/", $hashhash)) {
 	return 1;
     }
-    $safe_curhash  = addslashes($curhash);
-    $safe_hashhash = addslashes($hashhash);
 
     DBQueryFatal("delete from login ".
 		 " where uid_idx='$uid_idx' and ".
-		 (isset($curhash) ?
-		  "hashkey='$safe_curhash'" :
-		  "hashhash='$safe_hashhash'"));
+		 ($curhash != "" ?
+		  "hashkey='$curhash'" :
+		  "hashhash='$hashhash'"));
 
     # Delete by giving timeout in the past
     $timeout = time() - 3600;

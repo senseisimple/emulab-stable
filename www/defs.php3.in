@@ -374,23 +374,12 @@ function CHECKURL($url, &$error) {
 	    return 0;
 	}
 
-	$fp = @fopen($url, "r");
-	if (! $fp) {
-	    $is_redirect = 0;
-	    
-	    # Check to see if it was a redirect, in which case its OK
-	    for ($i = 0; $i < count($http_response_header); $i++) {
-		if (!strcmp("Location:", substr($http_response_header[$i],0,9))) {
-		    $is_redirect = 1;
-		}
-	    }
-	    if (!$is_redirect) {
-		$error = "URL is not valid; Cannot be accessed!";
-		return 0;
-	    }
-	} else {
-	    fclose($fp);
+	$fp = fopen($url, "r");
+	if (!$fp) {
+	    $error = "URL is not valid; Cannot be accessed!";
+	    return 0;
 	}
+	fclose($fp);
     }
     return 1;
 }
