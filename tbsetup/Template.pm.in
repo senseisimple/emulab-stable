@@ -215,6 +215,15 @@ sub Create($$)
     return undef
 	if (ref($class));
 
+    my $pid = $argref->{'pid'};
+    my $gid = $argref->{'gid'};
+    # Need the group object since we want to use its idx.
+    my $group = Group->LookupByPidGid($pid, $gid);
+    if (!defined($group)) {
+	tberror("Could not map $pid/$gid to its object!");
+	return undef;
+    }
+
     # See if this a child of an existing template.
     if (defined($argref->{'parent_guid'})) {
 	$guid = $argref->{'parent_guid'};
@@ -254,16 +263,7 @@ sub Create($$)
     # We make up an eid using the guid and version. This is the eid for the
     # hidden experiment behind each template. 
     my $eid = "T${guid}-${vers}";
-    my $pid = $argref->{'pid'};
-    my $gid = $argref->{'gid'};
 
-    # Need the group object since we want to use its idx.
-    my $group = Group->LookupByPidGid($pid, $gid);
-    if (!defined($group)) {
-	DBQueryWarn("unlock tables");
-	tberror("Could not map $pid/$gid to its object!");
-	return undef;
-    }
     $argref->{'pid_idx'} = $group->pid_idx();
     $argref->{'gid_idx'} = $group->gid_idx();
 
