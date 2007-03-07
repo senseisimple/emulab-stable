@@ -526,5 +526,39 @@ sub DeleteUser($$;$)
     return 0;
 }
 
+#
+# List of subgroups for a project member (not including default group).
+#
+sub GroupList($$)
+{
+    my ($self, $plist) = @_;
+    my @grouplist = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self)));
+
+    my $pid_idx = $self->pid_idx();
+
+    my $query_result =
+	DBQueryWarn("select gid_idx from groups ".
+		    "where pid_idx=$pid_idx and pid_idx!=gid_idx");
+    return -1
+	if (! $query_result);
+    
+    return 0
+	if (! $query_result->numrows);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $group = Group->Lookup($idx);
+	return -1
+	    if (!defined($group));
+
+	push(@grouplist, $group);
+    }
+    @$plist = @grouplist;
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
