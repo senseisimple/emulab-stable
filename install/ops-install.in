@@ -831,8 +831,9 @@ Phase "cron", "Adding cron jobs", sub {
 
 Phase "sudoers", "Editing $SUDOERS to allow wheel group", sub {
     DoneIfEdited($SUDOERS);
-    AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
-    AppendToFileFatal($SUDOERS,"Defaults  logfile=/var/log/sudo.log");
+    AppendToFileFatal($SUDOERS,
+		      "%wheel    ALL=(ALL) NOPASSWD: ALL",
+		      "Defaults  logfile=/var/log/sudo.log");
 };
 
 Phase "samba", "Setting up Samba", sub {
