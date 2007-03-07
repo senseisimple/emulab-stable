@@ -754,7 +754,7 @@ sub MemberList($$;$$)
     }
 
     my $query_result =
-	DBQueryWarn("select distinct m.uid_idx ".
+	DBQueryWarn("select distinct m.uid_idx,m.uid ".
 		    "   from group_membership as m ".
 		    "where m.pid_idx='$pid_idx' and ".
 		    "      m.gid_idx='$gid_idx' $trust_clause");
@@ -762,9 +762,9 @@ sub MemberList($$;$$)
     return -1
 	if (!$query_result);
 
-    while (my ($uid_idx) = $query_result->fetchrow_array()) {
+    while (my ($uid_idx, $uid) = $query_result->fetchrow_array()) {
 	if ($uids_only) {
-	    push(@result, $uid_idx);
+	    push(@result, $uid);
 	    next;
 	}
 	
