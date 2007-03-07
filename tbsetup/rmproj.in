@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -199,7 +199,7 @@ $EUID = $UID;
 while (my ($gid) = $query_result->fetchrow_array()) {
     print "Removing project group $gid ...\n";
 
-    if (system("$RMGROUP $pid $gid")) {
+    if (system("$RMGROUP $pid,$gid")) {
 	fatal("Could not remove subgroup $gid in project $pid!");
     }
 }
@@ -208,7 +208,7 @@ while (my ($gid) = $query_result->fetchrow_array()) {
 # Now remove the main project group. 
 #
 print "Removing main project group ...\n";
-if (system("$RMGROUP $pid $pid")) {
+if (system("$RMGROUP $pid,$pid")) {
     fatal("Could not remove main project group $pid!");
 }
 
