@@ -374,7 +374,7 @@ function CHECKURL($url, &$error) {
 	    return 0;
 	}
 
-	$fp = fopen($url, "r");
+	$fp = @fopen($url, "r");
 	if (!$fp) {
 	    $error = "URL is not valid; Cannot be accessed!";
 	    return 0;
