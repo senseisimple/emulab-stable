@@ -1,11 +1,11 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
+use strict;
 
 #
 # Remove a project. We delete the project directory hierarchy and the
@@ -14,8 +14,6 @@ use English;
 #
 # usage: rmprojdir <pid>
 #
-
-sub fatal($);
 
 #
 # Configure variables
@@ -26,6 +24,7 @@ my $CONTROL  = "@USERNODE@";
 
 my $RMGROUP  = "$TB/sbin/rmgroup";
 my $MODGROUPS= "$TB/sbin/modgroups";
+my @grouplist= ();
 
 #
 # Untaint the path
@@ -45,9 +44,15 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use Project;
+use User;
 
+# Locals, defined in libdb.
 my $PROJROOT     = PROJROOT();
 my $SCRATCHROOT  = SCRATCHROOT();
+
+# Protos
+sub fatal($);
 
 #
 # We don't want to run this script unless its the real version.
@@ -72,37 +77,30 @@ if ($UID == 0) {
 if ($#ARGV < 0) {
     die("Usage: rmprojdir <pid>\n");
 }
-my $pid = $ARGV[0];
 
-#
-# Untaint the argument.
-#
-if ($pid =~ /^([-\@\w.]+)$/) {
-    $pid = $1;
-}
-else {
-    die("Invalid pid '$pid' contains illegal characters.\n");
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
 #
-# Figure out who called us. Only root or people with admin status
-# can run this script.
+# Figure out who called us. Must have admin status to do this.
 #
-if (!TBAdmin($UID)) {
-    die("*** $0:\n".
-	"    You must be root or TB admin to remove a project!\n");
+if (!TBAdmin()) {
+    fatal("You must be a TB administrator to run this script!");
 }
 
 #
-# Unix info for the group
+# Map project name to object.
 #
-my $unix_gid;
-my $unix_name;
-
-if (! TBGroupUnixInfo($pid, $pid, \$unix_gid, \$unix_name)) {
-    die("*** $0:\n".
-	"    No info for project $pid!\n");
+my $target_project = Project->Lookup($ARGV[0]);
+if (! defined($target_project)) {
+    fatal("Could not map project to its object!");
 }
+my $pid     = $target_project->pid();
+my $pid_idx = $target_project->pid_idx();
+my $gid_idx = $target_project->gid_idx();
 
 #
 # This script is always audited. Mail is sent automatically upon exit.
@@ -114,7 +112,7 @@ if (AuditStart(0)) {
     exit(0);
 }
 
-my $savename = "$pid-" . TBDateTimeFSSafe();
+my $savename = "${pid}-${pid_idx}";
 
 #
 # Rename the project directory.
@@ -192,15 +190,17 @@ if (-d $workdir) {
 # Note that rmgroups will handle deleting users from group_membership
 # table by calling modgroups for each user. 
 #
-my $query_result =
-    DBQueryFatal("select gid from groups where pid='$pid' and pid!=gid");
+$target_project->GroupList(\@grouplist) == 0 or
+    fatal("Could not get subgroup list for $target_project");
 
 $EUID = $UID;
-while (my ($gid) = $query_result->fetchrow_array()) {
-    print "Removing project group $gid ...\n";
+foreach my $group (@grouplist) {
+    my $idx = $group->gid_idx();
+    
+    print "Removing project group $group ...\n";
 
-    if (system("$RMGROUP $pid,$gid")) {
-	fatal("Could not remove subgroup $gid in project $pid!");
+    if (system("$RMGROUP $idx")) {
+	fatal("Could not remove subgroup $group!");
     }
 }
 
@@ -208,7 +208,7 @@ while (my ($gid) = $query_result->fetchrow_array()) {
 # Now remove the main project group. 
 #
 print "Removing main project group ...\n";
-if (system("$RMGROUP $pid,$pid")) {
+if (system("$RMGROUP $pid_idx")) {
     fatal("Could not remove main project group $pid!");
 }
 
