@@ -246,7 +246,7 @@ require Node;
 require NodeType;
 require Mysql;
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
-	    $DBCONN_EXITONERR $DBQUERY_RECONNECT
+	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG
 	    @EXPORT_OK @virtualTables @physicalTables);
 
 # Configure variables
@@ -326,8 +326,9 @@ $DBQUERY_MAXTRIES  = 1;
 $DBQUERY_RECONNECT = 1;
 $DBCONN_MAXTRIES   = 5;
 $DBCONN_EXITONERR  = 1;
+$DBQUERY_DEBUG     = 0;
 @EXPORT_OK         = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
-			$DBCONN_EXITONERR $DBCONN_MAXTRIES);
+			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
 
 sub TBDBConnect($)
 {
@@ -4620,6 +4621,10 @@ sub DBQueryN($$)
 		"  Error: Could not reconnect to mysqld";
 	    return undef;
 	}
+    }
+
+    if ($DBQUERY_DEBUG) {
+	print STDERR "Query: '$query'\n";
     }
 
     while ($maxtries) {
