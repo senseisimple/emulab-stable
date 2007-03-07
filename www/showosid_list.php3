@@ -118,7 +118,7 @@ if (mysql_num_rows($query_result)) {
         $osid    = $row["osid"];
         $descrip = $row["description"];
         $pid     = $row["pid"];
-	$url     = CreateURL("showosinfo", URL_OSID, $osid);
+	$url     = CreateURL("showosinfo", URLARG_OSID, $osid);
     
         echo "<tr>
                   <td><A href='$url'>$osname</A></td>

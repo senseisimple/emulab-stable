@@ -127,7 +127,7 @@ if (mysql_num_rows($query_result)) {
 	$descrip    = $row["description"];
 	$imagename  = $row["imagename"];
 	$pid        = $row["pid"];
-	$url        = CreateURL("showimageid", URL_IMAGEID, $imageid);
+	$url        = CreateURL("showimageid", URLARG_IMAGEID, $imageid);
 
 	echo "<tr>
                   <td><A href='$url'>$imagename</A></td>
