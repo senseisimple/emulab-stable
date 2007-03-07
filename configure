@@ -2496,6 +2496,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile \
 	install/ops-install install/boss-install install/fs-install \
+	install/load-descriptors.in install/dump-descriptors.in \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	mote/sgtools/GNUmakefile \

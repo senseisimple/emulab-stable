@@ -1,0 +1,217 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use strict;
+
+#
+# Dump out an SQL file of statements to initialize the images and osids
+# on a new testbed. Or maybe even an old testbed? Note that the output
+# of thie script is the input to load-descriptors in this directory.
+#
+sub usage()
+{
+    print STDOUT "Usage: dump-descriptors filename\n";
+    exit(-1);
+}
+
+#
+# These are the images/osids we dump out. We of course get the embedded osids.
+# We should probably add an export flag to the tables so we can avoid this
+# hardwired list.
+#
+my @images	  = ('emulab-ops-FBSD410+RHL90-STD',
+		     'emulab-ops-FBSD410-STD',
+		     'emulab-ops-RHL90-STD');
+
+my @osids	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
+		     'OPSNODE-BSD', 'FW-IPFW',
+		     'RHL-STD', 'FBSD-STD',
+		     'emulab-ops-FBSD-JAIL');
+
+my %osidtoimageid = ("RHL-STD"  => "emulab-ops-RHL90-STD",
+		     "FBSD-STD" => "emulab-ops-FBSD410-STD");
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $TFTPDIR     = "/tftpboot";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Locals
+my %tempkeys  = ();
+my $protouser = "elabman";
+my $protoproj = TBOPSPID();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+usage()
+    if (@ARGV != 1);
+my $filename = $ARGV[0];
+
+#
+# Open tempfile.
+#
+open(OUTPUT, ">$filename") or
+    die("Could not open $filename for writing!\n");
+
+#
+# Create some temporary tables to mirror the existing tables. We
+# populate these tables then spit them out. On the other side, when we
+# load this table, we will move the rows out and into the local table,
+# after adjustment.
+#
+
+#
+# The images table.
+#
+DBQueryFatal("create temporary table temp_images like images");
+DBQueryFatal("insert into temp_images ".
+	     "select * from images where ".
+	     join(" or ", map("imageid='$_'", @images)));
+
+my $query_result  = DBQueryFatal("show create table temp_images");
+my $create_string = ($query_result->fetchrow_array())[1];
+
+#
+# Kill the idx slots; they may not be valid on the remote testbeds, and
+# it simplifies backwards compatability.
+#
+DBQueryFatal("alter table temp_images ".
+	     "drop pid_idx, drop gid_idx, drop creator_idx");
+
+#
+# Before we dump the table contents, reset a few things.
+#
+DBQueryFatal("update temp_images set ".
+	     "creator='$protouser', ".
+	     "pid='$protoproj', gid='$protoproj', ".
+	     "load_address='', frisbee_pid=0, load_busy=0, ".
+	     "created=now(), updated=NULL");
+
+$query_result =
+    DBQueryFatal("select * from temp_images");
+
+while (my $rowref = $query_result->fetchrow_hashref()) {
+    my $query_string = "insert into temp_images set ";
+    my @query_sets   = ();
+
+    #
+    # Pick up the osids that are used in this image, and add them to the
+    # list of osids to dump out.
+    #
+    foreach my $key (('part1_osid', 'part2_osid',
+		      'part3_osid', 'part4_osid', 'default_osid')) {
+
+	$tempkeys{$rowref->{$key}} = 1
+	    if (defined($rowref->{$key}));
+    }
+    
+    foreach my $key (keys(%{$rowref})) {
+	if (defined($rowref->{$key})) {
+	    push(@query_sets, "${key}='" . $rowref->{$key} . "'");
+	}
+	else {
+	    push(@query_sets, "${key}=NULL");
+	}
+    }
+    $query_string .= join(",", @query_sets);
+    
+    print OUTPUT "$query_string;\n";
+}
+
+#
+# Add the osids we found above to the list.
+#
+foreach my $key (keys(%tempkeys)) {
+    push(@osids, $key);
+}
+
+#
+# Now do the osinfo table
+#
+DBQueryFatal("create temporary table temp_os_info like os_info");
+DBQueryFatal("insert into temp_os_info ".
+	     "select * from os_info where ".
+	     join(" or ", map("osid='$_'", @osids)));
+
+$query_result  = DBQueryFatal("show create table temp_os_info");
+$create_string = ($query_result->fetchrow_array())[1];
+
+#
+# Kill the idx slots; they may not be valid on the remote testbeds, and
+# it simplifies backwards compatability.
+#
+DBQueryFatal("alter table temp_os_info ".
+	     "drop pid_idx, drop creator_idx");
+
+#
+# Before we dump the table contents, reset a few things.
+#
+DBQueryFatal("update temp_os_info set ".
+	     "creator='$protouser', ".
+	     "pid='$protoproj', created=now()");
+
+#
+# We reset the nextosid slots in the -STD osids, rather then worrying
+# about the osid_map table. 
+#
+foreach my $osid (keys(%osidtoimageid)) {
+    my $nextosid = $osidtoimageid{$osid};
+
+    DBQueryFatal("update temp_os_info set nextosid='$nextosid' ".
+		 "where osid='$osid'");
+}
+
+$query_result =
+    DBQueryFatal("select * from temp_os_info");
+
+while (my $rowref = $query_result->fetchrow_hashref()) {
+    my $query_string = "insert into temp_os_info set ";
+    my @query_sets   = ();
+
+    #
+    # Replace any host:path spec with just the path; pxeboot knows what to
+    # do and does not need the hostname in it. 
+    #
+    if (defined($rowref->{'path'}) && $rowref->{'path'} ne "" &
+	$rowref->{'path'} =~ /^(.*):(.*)$/) {
+	$rowref->{'path'} = $2;
+    }
+    foreach my $key (keys(%{$rowref})) {
+	if (defined($rowref->{$key})) {
+	    push(@query_sets, "${key}='" . $rowref->{$key} . "'");
+	}
+	else {
+	    push(@query_sets, "${key}=NULL");
+	}
+    }
+    $query_string .= join(",", @query_sets);
+    
+    print OUTPUT "$query_string;\n";
+}
+close(OUTPUT);
+exit(0);

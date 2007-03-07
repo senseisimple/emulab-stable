@@ -1,0 +1,196 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use strict;
+
+#
+# Load in descriptors for images and osids. The input to this script is
+# a file created with the dump-descriptors script in this directory,
+#
+sub usage()
+{
+    print STDOUT "Usage: load-descriptors filename\n";
+    exit(-1);
+}
+
+#
+# These are the OSIDs that are used to populate the osidtoimageid table
+# using their nextosid entries.
+#
+my @standard_osids  = ('RHL-STD', 'FBSD-STD');
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $TFTPDIR     = "/tftpboot";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+
+#$libdb::DBQUERY_DEBUG = 1;
+
+# Local
+my %osidtoimageid = ();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+usage()
+    if (@ARGV != 1);
+my $filename = $ARGV[0];
+
+#
+# We need to know various indicies, for the protouser (elabman) and the
+# TBOPSPID (emulab-ops) project.
+#
+my $protouser = User->Lookup("elabman");
+if (!defined($protouser)) {
+    fatal("Could not look up object for protouser (elabman)");
+}
+my $user_uid = $protouser->uid();
+my $user_idx = $protouser->uid_idx();
+
+my $protoproj = Project->Lookup(TBOPSPID());
+if (!defined($protoproj)) {
+    fatal("Could not look up object for protoproj");
+}
+my $pid     = $protoproj->pid();
+my $pid_idx = $protoproj->pid_idx();
+my $gid     = $protoproj->gid();
+my $gid_idx = $protoproj->gid_idx();
+
+# Temp tables to hold new rows.
+DBQueryFatal("create temporary table temp_images like images");
+DBQueryFatal("create temporary table temp_os_info like os_info");
+
+#
+# Open tempfile.
+#
+open(OUTPUT, "$filename") or
+    die("Could not open $filename for reading!\n");
+
+while (<OUTPUT>) {
+    DBQueryFatal($_);
+}
+close(OUTPUT);
+
+#
+# See if the local images table has the new indicies. 
+#
+my $describe_result = DBQueryFatal("describe images");
+
+while (my $rowref = $describe_result->fetchrow_hashref()) {
+    my $slot  = $rowref->{"Field"};
+
+    if ($slot eq "pid_idx") {
+	DBQueryFatal("update temp_images set pid_idx='$pid_idx'");
+    }
+    elsif ($slot eq "gid_idx") {
+	DBQueryFatal("update temp_images set gid_idx='$gid_idx'");
+    }
+    elsif ($slot eq "creator_idx") {
+	DBQueryFatal("update temp_images set creator_idx='$user_idx'");
+    }
+}
+
+#
+# Ditto for os_info table
+#
+$describe_result = DBQueryFatal("describe os_info");
+
+while (my $rowref = $describe_result->fetchrow_hashref()) {
+    my $slot  = $rowref->{"Field"};
+
+    if ($slot eq "pid_idx") {
+	DBQueryFatal("update temp_os_info set pid_idx='$pid_idx'");
+    }
+    elsif ($slot eq "creator_idx") {
+	DBQueryFatal("update temp_os_info set creator_idx='$user_idx'");
+    }
+}
+
+#
+# Use the nextosid slot of the -STD osids to figure out what the default
+# images are.
+#
+my $query_result =
+    DBQueryFatal("select nextosid from temp_os_info ".
+		 "where nextosid is not null and (".
+		 join(" or ", map("osid='$_'", @standard_osids)) . ")");
+
+while (my ($nextosid) = $query_result->fetchrow_array()) {
+    my $subquery_result =
+	DBQueryFatal("select imageid from temp_images where ".
+		     join(" or ", map("$_='$nextosid'",
+				      ("part1_osid", "part2_osid",
+				       "part3_osid", "part4_osid"))));
+
+    if (!$subquery_result->numrows) {
+	print "*** WARNING: No osidtoimageid mapping for $nextosid\n";
+	next;
+    }
+    my ($imageid) = $subquery_result->fetchrow_array();
+    
+    $osidtoimageid{$nextosid} = $imageid;
+}
+
+#
+# Ready to populate the tables. Move the entries from temp_images and
+# temp_os_info across to the real tables.
+#
+DBQueryFatal("replace into images select * from temp_images");
+DBQueryFatal("replace into os_info select * from temp_os_info");
+
+#
+# Make up osidtoimageid entries for all local PCs. This is a shotgun
+# approach, but for a new testbed is probably the right thing.
+#
+$query_result =
+    DBQueryFatal("select type from node_types where class='pc'");
+
+while (my ($type) = $query_result->fetchrow_array()) {
+    foreach my $osid (keys(%osidtoimageid)) {
+	my $imageid = $osidtoimageid{$osid};
+
+	DBQueryFatal("replace into osidtoimageid values ".
+		     "('$osid', '$type', '$imageid')");
+    }
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+
+
