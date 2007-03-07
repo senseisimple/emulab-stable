@@ -7,9 +7,7 @@
 include("defs.php3");
 include_once("node_defs.php");
 
-#
-# No PAGEHEADER since we spit out a Location header later. See below.
-# 
+PAGEHEADER("Free Node");
 
 #
 # Only known and logged in users can do this.
@@ -53,8 +51,6 @@ if (! ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
 # probably redirect the browser back up a level.
 #
 if (isset($canceled) && $canceled) {
-    PAGEHEADER("Free Node");
-	
     echo "<center><h3><br>
           Operation canceled!
           </h3></center>\n";
@@ -64,8 +60,6 @@ if (isset($canceled) && $canceled) {
 }
 
 if (!isset($confirmed)) {
-    PAGEHEADER("Free Node");
-
     echo "<center><h2><br>
           Are you <b>REALLY</b>
           sure you want to free node '$node_id?'
@@ -104,11 +98,10 @@ TBMAIL($TBMAIL_AUDIT,
        "From: $uid_name <$uid_email>\n".
        "Errors-To: $TBMAIL_WWW");
 
-#
-# Spit out a redirect so that the history does not include a post
-# in it. The back button skips over the post and to the form.
-# See above for conclusion.
-# 
-header("Location: ". CreateURL("shownode", $node));
+PAGEREPLACE(CreateUrl("shownode", $node));
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
