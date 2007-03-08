@@ -349,11 +349,6 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     #
     $leaders = $target_group->LeaderMailList();
 
-    if (1) {
-	echo "$user_uid, $project, $group, $approval, $newtrust<br>\n";
-	continue;
-    }
-    
     #
     # Well, looks like everything is okay. Change the project membership
     # value appropriately.
