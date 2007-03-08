@@ -37,9 +37,9 @@ a missing file, is frustrating.
 
 3. Install tarballs for the standard FreeBSD packages.  These are the
    packages that contain third-party apps that Emulab uses (e.g., apache).
-   Again, use the tarball you downloaded from Emulab:
+   Again, use the tarball you downloaded from Emulab in setup-ops.txt:
 
-	http://www.emulab.net/downloads/FreeBSD-4.10-20041102.tar.gz
+	http://www.emulab.net/downloads/FreeBSD-packages-latest.tar.gz
 
    and put it in your downloads directory.
 
