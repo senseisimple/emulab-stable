@@ -81,6 +81,7 @@ $PLC_SLICE_LIST = 'https://www.planet-lab.org/db/slices/index.php';
 # this doesn't give us hh:mm:ss of the exp date; have to check renew page.
 #$PLC_SLICE_DETAIL = 'https://www.planet-lab.org/db/slices/index.php?id=';
 $PLC_RENEW = 'https://www.planet-lab.org/db/slices/renew_slice.php?id=';
+$PLC_RENEW_NOARG = 'https://www.planet-lab.org/db/slices/renew_slice.php';
 $PLC_SLICE_DETAIL = $PLC_RENEW;
 $PLC_LOGOUT = 'https://www.planet-lab.org/db/logout.php';
 
@@ -122,6 +123,7 @@ my @plines = split('\n',$page);
 foreach my $line (@plines) {
     if ($line =~ /href=\'index\.php\?id\=(\d+)\'>([\_a-zA-Z0-9]+)/) {
 	$slicemap{$2} = $1;
+	#print "DEBUG: slice id for $2 is $1\n";
     }
 }
 
@@ -134,13 +136,14 @@ my %errors;
 my %sliceexp;
 
 my $now = time();
+my $line;
 foreach my $slice (@slices) {
 
     # check if we actually got this slice in the map from PLC:
     if (!defined($slicemap{$slice})) {
 	print "WARNING: cannot determine id for slice '$slice'!\n";
 	$errors{$slice} = "Cannot determine id for slice '$slice'!\n";
-	continue;
+	next;
     }
 
     # dig out the exp date
@@ -160,12 +163,12 @@ foreach my $slice (@slices) {
     my $surl = '';
     my $sdesc = '';
 
-    foreach my $line (@plines) {
-	if ($line =~ /Expiration Date: .+(\w+\-\d+\-\d+ \d+:\d+:\d+ \w+)/) {
+    foreach $line (@plines) {
+	if ($line =~ /Expiration Date: .+ (\w+\-\d+\-\d+ \d+:\d+:\d+ \w+)/) {
 	    $expdate_str = $1;
 	    $expdate_str =~ tr/\-/ /;
 	    $sliceexp{$slice} = $expdate_str;
-	    #print "$slice expires at '$expdate_str'\n";
+	    #print "DEBUG: $slice expires at '$expdate_str'\n";
 	    last;
 	}
     }
@@ -174,7 +177,7 @@ foreach my $slice (@slices) {
 	# this should be the same exptime as in the 'expires' hidden field
         # in the renew form.
 	my $exptime = str2time($expdate_str);
-	#print "slice '$slice' expires in " . ($exptime - $now) . "s\n";
+	#print "slice '$slice' expires in " . ($exptime - $now) . "s at $exptime\n";
 
 	if ($exptime < $now) {
 	    $errors{$slice} = "Slice '$slice' already expired!";
@@ -192,12 +195,12 @@ foreach my $slice (@slices) {
 
 	    $page = $res->content();
 	    @plines = split('\n',$page);
-	    foreach my $line (@plines) {
-		if ($line =~ /\<input.*name=\"url\" value=\"(.*)\" \/\>/) {
+	    foreach $line (@plines) {
+		if ($line =~ /\<input.*name=[\"\']{1}url[\"\']{1} value=[\"\']{1}(.*)[\"\']{1} \/\>/) {
 		    # found the url
 		    $surl = $1;
 		}
-		elsif ($line =~ /\<textarea name=\"description\".*\>(.*)\<\/textarea/) {
+		elsif ($line =~ /\<textarea name=[\"\']{1}description[\"\']{1}.*\>(.*)\<\/textarea/) {
 		    # found the description
 		    $sdesc = $1;
 		}
@@ -208,17 +211,22 @@ foreach my $slice (@slices) {
 		$errors{$slice} = "could not get url and description for slice '$slice'";
 	    }
 	    else {
+
+		#print "DEBUG: got '$surl' and '$sdesc' for url and desc\n";
+
 		# always push it out for a month -- the longest item in the 
 		# page (at least it was when I looked in 12/2006)
 		# the page should accept renews up to 8 weeks though...
-		$req = POST $PLC_RENEW . $slicemap{$slice}, 
-		           [ 'Renew Slice' => "Renew", 
-			     url => $surl,
-			     description => $sdesc,
+		$req = POST $PLC_RENEW_NOARG, 
+		           [ 'id' => $slicemap{$slice},
+			     'expires' => $exptime,
+			     'submitted' => 'Renew Slice', 
+			     'url' => $surl,
+			     'description' => $sdesc,
 			     'expire_len' => 4 ];
 		$res = $ua->request($req);
 
-		print $res->as_string();
+		#print $res->as_string();
 
 		$ok{$slice} = "Renewed";
 	    }
@@ -228,7 +236,7 @@ foreach my $slice (@slices) {
 	print "WARNING: could not determine slice expiration time for '$slice'\n";
 	$errors{$slice} = "couldn't get expiration time for slice '$slice'";
     }
-
+    
 }
 
 
