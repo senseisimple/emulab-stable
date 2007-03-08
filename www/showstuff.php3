@@ -354,7 +354,7 @@ function SHOWWIDEAREAACCOUNTS($webid) {
     $none = TBDB_TRUSTSTRING_NONE;
 
     if (! ($user = User::Lookup($webid))) {
-	TBERROR("Error getting object for user $webid", 1);
+	return;
     }
     $uid = $user->uid();
     
