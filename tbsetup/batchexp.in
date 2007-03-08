@@ -1149,7 +1149,7 @@ sub ParseArgs()
 		       error => ['bad_data', 'argument', $instance_idx]},
 		      "Bad data in argument: $instance_idx.");
 	    }
-	    $instance = Template::Instance->LookupByExptidx($instance_idx);
+	    $instance = Template::Instance->LookupByID($instance_idx);
 	    if (!defined($instance)) {
 		tbdie("No such template instance $instance_idx");
 	    }
