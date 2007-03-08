@@ -231,6 +231,17 @@ if (! TableChanged("experiment_templates", "exptidx")) {
 UpdateTablePidEid("experiment_templates", "exptidx", "pid", "eid");
 DBQueryFatal("unlock tables");
 
+# experiment_templates
+DBQueryFatal("lock tables experiment_templates write");
+if (! TableChanged("experiment_templates", "pid_idx")) {
+    DBQueryFatal("alter table experiment_templates ".
+     "add pid_idx mediumint(8) unsigned NOT NULL default '0' after uid_idx, ".
+     "add gid_idx mediumint(8) unsigned NOT NULL default '0' after pid_idx");
+}
+UpdateTablePidGid("experiment_templates",
+		  "pid_idx", "gid_idx", "pid", "gid");
+DBQueryFatal("unlock tables");
+
 # firewall_rules
 DBQueryFatal("lock tables firewall_rules write");
 if (! TableChanged("firewall_rules", "exptidx")) {
