@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -652,7 +652,7 @@ sub cancelexp($)
 	system("$template_swapout -b -e $eid $guid/$vers");
     }
     else {
-	system("$endexp -b $pid $eid");
+	system("$endexp -b $pid,$eid");
     }
     if ($?) {
 	#

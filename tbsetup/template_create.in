@@ -588,7 +588,7 @@ sub cleanup()
 	exit(-1)
 	    if (!TBExptIDX($pid, $eid, \$exptidx));
 		
-	system("$endexp -x -q -w $pid $eid");
+	system("$endexp -x -q -w $exptidx");
 	exit(-1)
 	    if ($?);
 

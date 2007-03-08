@@ -225,7 +225,7 @@ MAINLOOP: while(1) {
 		# Locked waiting for human intervention...
 		if (ExpState($TBOPSPID, $eid) eq EXPTSTATE_SWAPPED) {
 		    # Swapped out...
-		    system("$TB/bin/endexp $TBOPSPID $eid");
+		    system("$TB/bin/endexp $TBOPSPID,$eid");
 		}
 		elsif (!ExptExists($TBOPSPID, $eid)) {
 		    UpdateCheckupState($object, $ctype, $mtype,

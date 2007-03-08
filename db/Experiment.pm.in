@@ -18,6 +18,7 @@ use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
 use Project;
 use Group;
 use English;
@@ -111,13 +112,18 @@ sub Lookup($$;$)
         if (exists($experiments{"$idx"}));
     
     my $query_result =
-	DBQueryWarn("select * from experiments where idx='$idx'");
+	DBQueryWarn("select e.*,i.parent_guid from experiments as e ".
+		    "left join experiment_template_instances as i on ".
+		    "     i.exptidx=e.idx ".
+		    "where e.idx='$idx'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
 
     my $self         = {};
     $self->{'EXPT'}  = $query_result->fetchrow_hashref();
+    # An Instance?
+    $self->{'ISINSTANCE'} = defined($self->{'EXPT'}->{'parent_guid'});
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
@@ -1315,6 +1321,20 @@ sub SetSwapper($$)
 }
 
 #
+# Get swapper (user) object.
+#
+sub GetSwapper($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return User->Lookup($self->swapper_idx());
+}
+
+#
 # Just the swap time.
 #
 sub SetSwapTime($)
@@ -1743,6 +1763,19 @@ sub DU($$)
     return -1;
 }
 
+#
+# Is this experiment a Template instance?
+#
+sub IsInstance($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    return $self->{'ISINSTANCE'};
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

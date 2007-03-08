@@ -103,7 +103,7 @@ if ($instance) {
     $command = "webtemplate_swapout -e $eid $guid/$vers";
 }
 else {
-    $command = "webendexp $pid $eid";
+    $command = "webendexp $exptidx";
 }
 
 STARTBUSY("Terminating " . ($instance ? "Instance." : "Experiment."));
