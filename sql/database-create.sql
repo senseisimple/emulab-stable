@@ -829,6 +829,8 @@ CREATE TABLE `experiment_templates` (
   `tid` varchar(32) NOT NULL default '',
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `pid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `description` mediumtext,
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
