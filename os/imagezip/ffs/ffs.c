@@ -416,7 +416,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t offset)
 	 * we add the bitmap offset. All blocks before cgdmin() will always
 	 * be allocated, but we scan them anyway. 
 	 */
-	assert(cgbase(fsp, cg) == cgstart(fsp, cg));
+	//assert(cgbase(fsp, cg) == cgstart(fsp, cg));
 	dbstart = fsbtodb(fsp, cgbase(fsp, cg)) + offset;
 
 	if (debug > 2)

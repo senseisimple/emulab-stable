@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -699,7 +699,7 @@ main(int argc, char *argv[])
 		 * intended.  So we just don't do it til we figure out what
 		 * the "right" behavior is.
 		 */
-		if (slice) {
+		if (dofill) {
 			fprintf(stderr,
 				"WARNING: requested zeroing in slice mode, "
 				"will NOT zero outside of slice!\n");
