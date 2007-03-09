@@ -28,6 +28,7 @@ prefix		= @prefix@
 exec_prefix	= @exec_prefix@
 
 TBROOT		= @prefix@
+TBDEFS		= @TBDEFS@
 TBDBNAME	= @TBDBNAME@
 TBADMINGROUP	= @TBADMINGROUP@
 TBOPSEMAIL	= @TBOPSEMAIL@
