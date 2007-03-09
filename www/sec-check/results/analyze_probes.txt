@@ -1,16 +1,13 @@
 ================ success ================
-approveproject.php3.1.html
-      Project 'testproj3' is being created!<br><br>
-      Project testproj3 (User: fish) has been approved.
-approveproject.php3.4.html
-      Project 'testproj3' is being created!<br><br>
-      Project testproj3 (User: fish) has been approved.
-approveproject.php3.6.html
-      Project 'testproj3' is being created!<br><br>
-      Project testproj3 (User: fish) has been approved.
+approveproject.php3.3.html
+     <b>Project 'testproj3' is being created</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+approveproject.php3.5.html
+     <b>Project 'testproj3' is being created</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
 approveproject.php3.html
-      Project 'testproj3' is being created!<br><br>
-      Project testproj3 (User: fish) has been approved.
+     <b>Project 'testproj3' is being created</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
 approveuser.php3.1.html
      	 <title>MyEmulab.Net - New Users Approved</title>
      New Users Approved</h2>
@@ -20,36 +17,13 @@ approveuser.php3.2.html
 approveuser.php3.html
      	 <title>MyEmulab.Net - New Users Approved</title>
      New Users Approved</h2>
-      User testusr3 was <b>granted</b> membership in testproj3/testproj3
-beginexp_html.php3.10.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.11.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.16.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.17.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.2.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.3.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.4.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.6.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.7.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.8.html
-     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
-beginexp_html.php3.9.html
-     <b>Starting experiment configuration!</b> You will be notified via email when the experiment has been fully
 beginexp_html.php3.html
      <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
 boot.php3.html
-     reboot (pc158): Attempting to reboot ...
-     reboot (pc158): Successful!
-delaycontrol.php3.3.html
-     Use this page to alter the traffic shaping parameters of your
+     reboot (pc120): Attempting to reboot ...
+     reboot (pc149): Attempting to reboot ...
+     reboot (pc120): Successful!
+     reboot (pc149): Successful!
 delaycontrol.php3.html
      Use this page to alter the traffic shaping parameters of your
 deletegroup.php3.html
@@ -57,122 +31,48 @@ deletegroup.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
 deleteimageid.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
       Image 'testproj3-testimg3' in project testproj3 has been deleted!
 deleteosid.php3.html
       OS Descriptor 'testosid3' in Project testproj3 has been deleted!
-deleteproject.php3.html
-      Are you <b>REALLY REALLY</b> sure you want to remove Project 'testproj3?'
 deleteuser.php3.1.html
      	 Okay, let's be sure.<br>
      Are you <b>REALLY REALLY</b> sure you want to delete user 
+deleteuser.php3.4.html
+     <b>User 'testusr3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+deleteuser.php3.5.html
+     <b>User 'testusr3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
 deleteuser.php3.html
      	 Okay, let's be sure.<br>
-     Are you <b>REALLY REALLY</b> sure you want to remove user
-editgroup.php3.1.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.10.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.12.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.13.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.14.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.15.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.16.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.17.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.18.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.19.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.2.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.20.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.21.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.22.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.23.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.24.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.25.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.26.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.27.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.28.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.29.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.3.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.30.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.31.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.32.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.4.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.5.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.6.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.7.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.8.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.9.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
-editgroup.php3.html
-     	 <title>MyEmulab.Net - Show Group Information</title>
-     Show Group Information</h2>
+     Are you <b>REALLY REALLY</b> sure you want to delete user 
+editimageid.php3.1.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
 editimageid.php3.2.html
-      <h3 class="submenuheader">More Options</h3>
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
+editimageid.php3.3.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
+editimageid.php3.4.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
+editimageid.php3.5.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
+editimageid.php3.6.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
+editimageid.php3.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2>
 editnodetype.php3.1.html
      	 <title>MyEmulab.Net - Edit Node Type</title>
      Edit Node Type</h2>
 editnodetype.php3.10.html
-     	 <title>MyEmulab.Net - Edit Node Type</title>
-     Edit Node Type</h2>
-editnodetype.php3.11.html
      	 <title>MyEmulab.Net - Edit Node Type</title>
      Edit Node Type</h2>
 editnodetype.php3.2.html
@@ -196,9 +96,6 @@ editnodetype.php3.7.html
 editnodetype.php3.8.html
      	 <title>MyEmulab.Net - Edit Node Type</title>
      Edit Node Type</h2>
-editnodetype.php3.9.html
-     	 <title>MyEmulab.Net - Edit Node Type</title>
-     Edit Node Type</h2>
 editnodetype.php3.html
      	 <title>MyEmulab.Net - Edit Node Type</title>
      Edit Node Type</h2>
@@ -211,59 +108,41 @@ endexp.php3.html
       You will be notified via email when the experiment has been torn
 feedback.php3.1.html
      <center><h3><br>Done!</h3></center>
-freenode.php3.html
-      <h3 class="submenuheader">Node Options</h3>
-freezeuser.php3.html
-     Are you <b>REALLY REALLY</b> sure you want to freeze user
+gensslcert.php3.1.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
 gensslcert.php3.3.html
-     Your new SSL certificate has been created. You can
-joinproject.php3.1.html
-      As a pending user of the Testbed you will receive a key via email.
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+index.php3.1.html
+      Thanks! A message has been sent to <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+index.php3.html
+      Thanks! A message has been sent to <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 kb-manage.php3.2.html
-     <center><b>Knowledge Base Entry: 266 test_tag2</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+     <center><b>Knowledge Base Entry: 275 test_tag2</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
 kb-manage.php3.3.html
-     <center><b>Knowledge Base Entry: 267 test_tag3</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
-kb-manage.php3.4.html
-     <center><b>Knowledge Base Entry: 268 test_tag4</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+     <center><b>Knowledge Base Entry: 276 test_tag3</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
 kb-search.php3.1.html
      <font size=+2>Knowledge Base search results</font>
-linktest.php3.html
-      Are you <b>sure</b> you want to run linktest?
-loadimage.php3.1.html
-     <h2><b>Warning!</b><br />Doing a snapshot of node 'pc158' into image 'testproj3-testimg3' will overwrite any previous snapshot for that image. Are you sure you want to continue?</h2><input type='hidden' name='node' value='pc158'></input><input type='hidden' name='imageid' value='testproj3-testimg3'></input><input type='submit' name='confirmed' value='Confirm'></input>&nbsp;<input type='submit' name='cancelled' value='Cancel'></input>
-modifyexp.php3.1.html
-     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-modifyexp.php3.2.html
-     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-modifyexp.php3.7.html
-     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-modifyexp.php3.html
-     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-modnodeattributes.php3.1.html
-      <h3>Node attributes successfully modified!</h3><p>
-modnodeattributes.php3.3.html
-      <h3>Node attributes successfully modified!</h3><p>
 moduserinfo.php3.1.html
      This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.12.html
+moduserinfo.php3.11.html
      This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.15.html
+moduserinfo.php3.14.html
+     This will take a few moments; please be <em>patient</em>.<br>
+moduserinfo.php3.16.html
      This will take a few moments; please be <em>patient</em>.<br>
 moduserinfo.php3.17.html
      This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.18.html
+moduserinfo.php3.19.html
      This will take a few moments; please be <em>patient</em>.<br>
 moduserinfo.php3.2.html
      This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.20.html
-     This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.3.html
-     This will take a few moments; please be <em>patient</em>.<br>
 moduserinfo.php3.4.html
      This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.8.html
+moduserinfo.php3.7.html
      This will take a few moments; please be <em>patient</em>.<br>
-moduserinfo.php3.9.html
+moduserinfo.php3.8.html
      This will take a few moments; please be <em>patient</em>.<br>
 moduserinfo.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
@@ -271,22 +150,16 @@ newimageid.php3.1.html
       <h3 class="submenuheader">More Options</h3>
 newimageid_ez.php3.1.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.1.html'
-newimageid_ez.php3.10.html
-      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.10.html'
 newimageid_ez.php3.11.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.11.html'
+newimageid_ez.php3.16.html
+      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.16.html'
 newimageid_ez.php3.17.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.17.html'
 newimageid_ez.php3.18.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.18.html'
 newimageid_ez.php3.19.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.19.html'
-newimageid_ez.php3.20.html
-      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.20.html'
-newimageid_ez.php3.21.html
-      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.21.html'
-newimageid_ez.php3.22.html
-      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.22.html'
 newimageid_ez.php3.3.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.3.html'
 newimageid_ez.php3.4.html
@@ -296,56 +169,68 @@ newimageid_ez.php3.9.html
 newimageid_ez.php3.html
       Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.html'
 newnodelog.php3.1.html
-      Log for node pc158.
+      Log for node pc165.
 newosid.php3.html
-      <h3 class="submenuheader">More Options</h3>
+     <center><h3>Done!</h3></center>
 newproject.php3.html
       Your project request has been successfully queued.
+nodecontrol.php3.1.html
+     This will take a few moments; please be <em>patient</em>.<br>
+nodecontrol.php3.2.html
+     This will take a few moments; please be <em>patient</em>.<br>
+nodecontrol.php3.3.html
+     This will take a few moments; please be <em>patient</em>.<br>
 nodecontrol.php3.4.html
-      <h3>Node parameters successfully modified!</h3><p>
+     This will take a few moments; please be <em>patient</em>.<br>
+nodecontrol.php3.5.html
+     This will take a few moments; please be <em>patient</em>.<br>
+nodecontrol.php3.6.html
+     This will take a few moments; please be <em>patient</em>.<br>
 nodecontrol.php3.7.html
-      <h3>Node parameters successfully modified!</h3><p>
+     This will take a few moments; please be <em>patient</em>.<br>
+nodecontrol.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
 nscheck.php3.html
-     <center><br><br><h2>Your NS file looks good!</h2></center>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+     <center><br><h2>Your NS file looks good!</h2></center>
 nsgen.php3.1.html
       This template is for creating a DevBox for building software
 nsgen.php3.2.html
       This template is for creating a DevBox for building software
 nsgen.php3.3.html
       This template is for creating a DevBox for building software
-plab_ez.php3.3.html
+pagenotworking.php.html
+      Thanks! A message has been sent to <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+plab_ez.php3.5.html
      <tr><th colspan=2>Basic Options</th></tr>
-plab_ez.php3.4.html
-      <p><b>To finish creating your slice, edit the 
 plab_ez.php3.6.html
       <p><b>To finish creating your slice, edit the 
+plab_ez.php3.8.html
+      <p><b>To finish creating your slice, edit the 
 powertime.php3.1.html
-     <center>Updated power time for:<br><br><b>pc158</b><br></center><!-- end content -->
+     <center>Updated power time for:<br><br><b>pc165</b><br></center><!-- end content -->
 powertime.php3.2.html
-     <center>Updated power time for:<br><br><b>pc158</b><br></center><!-- end content -->
+     <center>Updated power time for:<br><br><b>pc165</b><br></center><!-- end content -->
 prereserve_node.php3.html
       <h3 class="submenuheader">Node Options</h3>
 replayexp.php3.html
-     <center><h2>Starting event replay. Please wait a moment ...
-showpubkeys.php3.1.html
-      Current ssh public keys for user fish.
-      Enter ssh public keys for user
-showpubkeys.php3.2.html
-      Current ssh public keys for user fish.
-      Enter ssh public keys for user
+     <b>Starting event replay</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+resendapproval.php.2.html
+      <h2>Done!</h2>
+resendapproval.php.html
+      <h2>Done!</h2>
 showpubkeys.php3.html
-      Current ssh public keys for user fish.
+      Current ssh public keys for user testuser.
       Enter ssh public keys for user
-showsfskeys.php3.1.html
-      Enter sfs public keys for user fish[<b>1</b>].
-showsfskeys.php3.html
-      Enter sfs public keys for user fish[<b>1</b>].
 showsumstats.php3.1.html
-     <b>Range: <a class='static'
+     <b>Range: Epoch, <a class='static'
 showsumstats.php3.2.html
-     <b>Range: <a class='static'
+     <b>Range: Epoch, <a class='static'
 showsumstats.php3.html
-     <b>Range: <a class='static'
+     <b>Range: Epoch, <a class='static'
 showuser_list.php3.2.html
       There are 26 users.
 showuser_list.php3.html
@@ -360,144 +245,136 @@ template_create.php.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
 updateaccounts.php3.html
-     You will be notified via email when the update has completed on
+     This will take a few moments; please be <em>patient</em>.<br>
 ================ failure ================
+approveproject.php3.1.html
+      Probe label: **{approveproject.php3:head_uid}**
 approveproject.php3.2.html
-      Probe label: '**{approveproject.php3:head_uid}**
-approveproject.php3.3.html
-      </h1></center>Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-approveproject.php3.5.html
-      Probe label: '**{approveproject.php3:pid}**
-archive_missing.php3.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Invalid characters in '**{archive_missing.php3:exptidx}**!
+      </h2></center>Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+approveproject.php3.4.html
+      Invalid page arguments: /approveproject.php3?pid='**%7Bapproveproject.php3:pid%7D**<br><br>Invalid argument for 'pid': '**{approveproject.php3:pid}**
+approveuser.php3.1.html
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+approveuser.php3.2.html
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+approveuser.php3.html
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 archive_tag.php3.html
-      Invalid characters in '**{archive_tag.php3:exptidx}**!
+      Invalid page arguments: /archive_tag.php3?experiment='**%7Barchive_tag.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{archive_tag.php3:experiment}**
 archive_tags.php3.html
-      Invalid characters in '**{archive_tags.php3:exptidx}**!
+      Invalid page arguments: /archive_tags.php3?experiment='**%7Barchive_tags.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{archive_tags.php3:experiment}**
 beginexp_html.php3.1.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal characters</font></td>
-beginexp_html.php3.12.html
+beginexp_html.php3.10.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal characters</font></td>
-beginexp_html.php3.13.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Illegal characters</font></td>
-beginexp_html.php3.14.html
+beginexp_html.php3.11.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Invalid level selection</font></td>
-beginexp_html.php3.15.html
+beginexp_html.php3.12.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Pathname includes illegal characters</font></td>
 beginexp_html.php3.5.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Invalid time provided - must be non-zero and less than 4</font></td>
+beginexp_html.php3.9.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Illegal characters</font></td>
 boot.php3.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Probe label: '**{boot.php3:node_id}**
+      Invalid page arguments: /boot.php3?experiment='**%7Bboot.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{boot.php3:experiment}**
 changeuid.php.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      The user fish must be unapproved (but verified) to change!
+      Invalid page arguments: /changeuid.php<br><br>Invalid argument for 'user': 
 changeuid.php.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      The user fish must be unapproved (but verified) to change!
+      Invalid page arguments: /changeuid.php<br><br>Invalid argument for 'user': '**{changeuid.php:user}**
 delaycontrol.php3.1.html
-      Probe label: \'**{delaycontrol.php3:eid}**
-delaycontrol.php3.2.html
-      Probe label: \'**{delaycontrol.php3:pid}**
+      Invalid page arguments: /delaycontrol.php3?experiment='**%7Bdelaycontrol.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{delaycontrol.php3:experiment}**
 deletegroup.php3.1.html
-      Probe label: '**{deletegroup.php3:gid}**
+      Invalid page arguments: /deletegroup.php3?gid='**%7Bdeletegroup.php3:gid%7D**&pid=testproj3<br><br>Invalid argument for 'gid': '**{deletegroup.php3:gid}**
 deletegroup.php3.2.html
-      Probe label: '**{deletegroup.php3:pid}**
+      Invalid page arguments: /deletegroup.php3?gid=testgroup3&pid='**%7Bdeletegroup.php3:pid%7D**<br><br>Invalid argument for 'pid': '**{deletegroup.php3:pid}**
 deleteimageid.php3.1.html
-      Probe label: '**{deleteimageid.php3:imageid}**
+      Invalid page arguments: /deleteimageid.php3?imageid='**%7Bdeleteimageid.php3:imageid%7D**<br><br>Invalid argument for 'image': '**{deleteimageid.php3:imageid}**
 deleteosid.php3.1.html
-      Probe label: '**{deleteosid.php3:osid}**
+      Invalid page arguments: /deleteosid.php3?osid='**%7Bdeleteosid.php3:osid%7D**<br><br>Invalid argument for 'osinfo': '**{deleteosid.php3:osid}**
 deleteproject.php3.1.html
-      Probe label: '**{deleteproject.php3:pid}**
+      Invalid page arguments: /deleteproject.php3?pid='**%7Bdeleteproject.php3:pid%7D**<br><br>Invalid argument for 'pid': '**{deleteproject.php3:pid}**
+deleteproject.php3.html
+      Project 'testproj3' has active experiments.<br>You must terminate those experiments before you can remove the project!
 deletepubkey.php3.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /deletepubkey.php3?key=1&target_uid='**%7Bdeletepubkey.php3:target_uid%7D**
+      Invalid page arguments: /deletepubkey.php3?key=1&user='**%7Bdeletepubkey.php3:user%7D**<br><br>Invalid argument for 'user': '**{deletepubkey.php3:user}**
 deletepubkey.php3.2.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /deletepubkey.php3?key='**%7Bdeletepubkey.php3:key%7D**&target_uid=testusr3
+      Invalid page arguments: /deletepubkey.php3?key='**%7Bdeletepubkey.php3:key%7D**&user=504<br><br>Invalid argument for 'integer': '**{deletepubkey.php3:key}**
 deletepubkey.php3.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
       Public Key for user 'testusr3' does not exist!
 deleteuser.php3.2.html
-      Probe label: '**{deleteuser.php3:target_uid}**
+      Invalid page arguments: /deleteuser.php3?user='**%7Bdeleteuser.php3:user%7D**&target_project=testproj3<br><br>Invalid argument for 'user': '**{deleteuser.php3:user}**
 deleteuser.php3.3.html
-      Probe label: '**{deleteuser.php3:target_uid}**
+      Invalid page arguments: /deleteuser.php3?user='**%7Bdeleteuser.php3:user%7D**<br><br>Invalid argument for 'user': '**{deleteuser.php3:user}**
 deleteuser.php3.4.html
-      Probe label: '**{deleteuser.php3:target_pid}**
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 deleteuser.php3.5.html
-      Probe label: '**{deleteuser.php3:target_pid}**
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 editexp.php3.1.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
-editexp.php3.10.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
-editexp.php3.11.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
-editexp.php3.12.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
-editexp.php3.13.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
-editexp.php3.14.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Probe label: \'**{editexp.php3:pid}**
-editexp.php3.15.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
+editexp.php3.10.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.2.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.3.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.4.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment='**%7Beditexp.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{editexp.php3:experiment}**
 editexp.php3.5.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.6.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.7.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.8.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.9.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Probe label: \'**{editexp.php3:eid}**
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
 editexp.php3.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Experiment is running or in transition; try again later</font></td>
-editgroup.php3.11.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Probe label: '**{editgroup.php3:gid}**
-editgroup.php3.33.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Probe label: '**{editgroup.php3:pid}**
+      Invalid page arguments: /editexp.php3?experiment=<br><br>Invalid argument for 'experiment': 
+editgroup.php3.2.html
+      Invalid page arguments: /editgroup.php3?gid=testgroup3&pid='**%7Beditgroup.php3:pid%7D**<br><br>Invalid argument for 'pid': '**{editgroup.php3:pid}**
+editgroup.php3.html
+      Invalid page arguments: /editgroup.php3?gid='**%7Beditgroup.php3:gid%7D**&pid=testproj3<br><br>Invalid argument for 'gid': '**{editgroup.php3:gid}**
 editimageid.php3.1.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Must select at least one type</font></td>
@@ -505,7 +382,7 @@ editimageid.php3.3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Contains	illegal characters!</font></td>
 editimageid.php3.4.html
-      Invalid page arguments: /editimageid.php3?imageid='**%7Beditimageid.php3:imageid%7D**<br><br>Invalid characters in imageid!
+      Invalid page arguments: /editimageid.php3?imageid='**%7Beditimageid.php3:imageid%7D**<br><br>Invalid argument for 'image': '**{editimageid.php3:imageid}**
 editimageid.php3.5.html
       Probe label: \'**{editimageid.php3:formfields[description]}**
 editimageid.php3.6.html
@@ -531,164 +408,121 @@ editnodetype.php3.5.html
 editnodetype.php3.8.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal characters</font></td>
+editnodetype.php3.9.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      '**{editnodetype.php3:node_type}** contains illegal characters!
 editnodetype.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal characters</font></td>
 endexp.php3.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /endexp.php3?eid='**%7Bendexp.php3:eid%7D**&pid=testproj3<br><br>Invalid experiment ID.
-endexp.php3.2.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Invalid page arguments: /endexp.php3?eid=testexp3&pid='**%7Bendexp.php3:pid%7D**<br><br>Invalid project ID.
+      Invalid page arguments: /endexp.php3?experiment='**%7Bendexp.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{endexp.php3:experiment}**
 feedback.php3.2.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      You cannot modify an experiment in transition.
+      Invalid page arguments: /feedback.php3?mode=clear&experiment='**%7Bfeedback.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{feedback.php3:experiment}**
 feedback.php3.3.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /feedback.php3?mode=clear&confirmed=Confirm&clear_last=1&eid='**%7Bfeedback.php3:eid%7D**&clear_bootstrap=1&pid=testbed<br><br>'**{feedback.php3:eid}** contains invalid characters!
-feedback.php3.4.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
       You cannot modify an experiment in transition.
-feedback.php3.5.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Invalid page arguments: /feedback.php3?mode=clear&confirmed=Confirm&clear_last=1&eid=testexp1&clear_bootstrap=1&pid='**%7Bfeedback.php3:pid%7D**<br><br>'**{feedback.php3:pid}** contains invalid characters!
 feedback.php3.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /feedback.php3?mode='**%7Bfeedback.php3:mode%7D**&confirmed=Confirm&clear_last=1&eid=testexp1&clear_bootstrap=1&pid=testbed<br><br>Mode value, '**{feedback.php3:mode}**, is not 'record' or 'clear'!
+      Invalid page arguments: /feedback.php3?mode='**%7Bfeedback.php3:mode%7D**&experiment=8<br><br>Mode value, '**{feedback.php3:mode}**, is not 'record' or 'clear'!
 freenode.php3.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Probe label: '**{freenode.php3:node_id}**
-freezeuser.php3.1.html
-      Probe label: '**{freezeuser.php3:target_uid}**
-freezeuser.php3.2.html
-      You can freeze a user or you can thaw a user!
-gensslcert.php3.1.html
+      Invalid page arguments: /freenode.php3?node_id='**%7Bfreenode.php3:node_id%7D**<br><br>Invalid argument for 'nodeid': '**{freenode.php3:node_id}**
+freenode.php3.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /gensslcert.php3<br><br>Invalid uid: ''**{gensslcert.php3:formfields[target_uid]}**'
+      pc165 is not currently reserved!
+freezeuser.php3.1.html
+      Invalid page arguments: /freezeuser.php3?user='**%7Bfreezeuser.php3:user%7D**&action=freeze<br><br>Invalid argument for 'user': '**{freezeuser.php3:user}**
+freezeuser.php3.2.html
+      You can freeze a user or you can thaw a user!
+freezeuser.php3.html
+      You cannot freeze someone who is not active!
 gensslcert.php3.2.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 gensslcert.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+joinproject.php3.1.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Already in use. Pick another</font></td>
 joinproject.php3.10.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.11.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.12.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use. Pick another</font></td>
       <font color=red>Already in use. Pick another</font></td>
       <font color=red>Illegal characters</font></td>
 joinproject.php3.13.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.14.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.15.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
       <font color=red>Illegal characters</font></td>
 joinproject.php3.16.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
+      <font color=red>Illegal characters</font></td>
 joinproject.php3.17.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Illegal characters</font></td>
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.18.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.19.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.2.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
       <font color=red>Illegal characters</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
-joinproject.php3.20.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.4.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.5.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.6.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
       <font color=red>Invalid Project Name</font></td>
 joinproject.php3.7.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
       <font color=red>Invalid Group Name</font></td>
 joinproject.php3.8.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.9.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. Pick another</font></td>
-      <font color=red>Already in use. <b>Did you forget to login?</b></font></td>
 joinproject.php3.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Probe label: \'**{joinproject.php3:formfields[usr_country]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Already in use. Pick another</font></td>
 kb-manage.php3.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
       Probe label: \'**{kb-manage.php3:formfields[xref_tag]}**
-kb-manage.php3.5.html
+kb-manage.php3.4.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
       Probe label: \'**{kb-manage.php3:formfields[body]}**
-kb-manage.php3.6.html
+kb-manage.php3.5.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
       Probe label: \'**{kb-manage.php3:formfields[new_section]}**
@@ -705,39 +539,42 @@ kb-search.php3.3.html
 kb-search.php3.html
       Invalid page arguments: /kb-search.php3?query_type='**%7Bkb-search.php3:query_type%7D**&submit=Submit%20Query&query_which=both&query=what<br><br>Improper query type '**{kb-search.php3:query_type}**
 linktest.php3.1.html
-      Invalid page arguments: /linktest.php3<br><br>'**{linktest.php3:eid}** contains invalid characters!
+      Invalid page arguments: /linktest.php3<br><br>Invalid argument for 'eid': '**{linktest.php3:eid}**
 linktest.php3.2.html
-      Invalid page arguments: /linktest.php3<br><br>'**{linktest.php3:pid}** contains invalid characters!
+      Invalid page arguments: /linktest.php3<br><br>Invalid argument for 'pid': '**{linktest.php3:pid}**
+loadimage.php3.1.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /loadimage.php3?imageid='**%7Bloadimage.php3:imageid%7D**<br><br>Invalid argument for 'image': '**{loadimage.php3:imageid}**
 loadimage.php3.2.html
-      Invalid page arguments: /loadimage.php3<br><br>Invalid characters in '**{loadimage.php3:imageid}**!
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /loadimage.php3?imageid=testproj3-testimg3<br><br>Invalid argument for 'nodeid': '**{loadimage.php3:node_id}**
 loadimage.php3.html
-      Invalid page arguments: /loadimage.php3<br><br>Invalid characters in '**{loadimage.php3:node}**!
+      pc165 is not currently reserved to an experiment!
+modifyexp.php3.1.html
+      Invalid page arguments: /modifyexp.php3?go=1&experiment=<br><br>Invalid argument for 'experiment': 
+modifyexp.php3.2.html
+      Invalid page arguments: /modifyexp.php3?go=1&experiment=<br><br>Invalid argument for 'experiment': 
 modifyexp.php3.3.html
-      You cannot modify an experiment in transition.
+      Invalid page arguments: /modifyexp.php3?go=1&experiment='**%7Bmodifyexp.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{modifyexp.php3:experiment}**
 modifyexp.php3.4.html
-      Probe label: \'**{modifyexp.php3:eid}**
-modifyexp.php3.5.html
-      You cannot modify an experiment in transition.
-modifyexp.php3.6.html
-      Probe label: \'**{modifyexp.php3:pid}**
-modnodeattributes.php3.2.html
-      Probe label: '**{modnodeattributes.php3:node_id}**
-modnodeattributes.php3.html
-     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+      Invalid page arguments: /modifyexp.php3?go='**%7Bmodifyexp.php3:go%7D**&experiment=<br><br>Invalid argument for 'experiment': 
+modifyexp.php3.html
+      Invalid page arguments: /modifyexp.php3?go=1&experiment=<br><br>Invalid argument for 'experiment': 
 moduserinfo.php3.1.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.10.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Illegal characters</font></td>
 moduserinfo.php3.11.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.12.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.13.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Illegal characters</font></td>
 moduserinfo.php3.14.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Illegal characters</font></td>
 moduserinfo.php3.15.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.16.html
@@ -746,15 +583,15 @@ moduserinfo.php3.17.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.18.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid Shell</font></td>
 moduserinfo.php3.19.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Invalid Shell</font></td>
 moduserinfo.php3.2.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-moduserinfo.php3.20.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.3.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /moduserinfo.php3?user='**%7Bmoduserinfo.php3:user%7D**<br><br>Invalid argument for 'user': '**{moduserinfo.php3:user}**
 moduserinfo.php3.4.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.5.html
@@ -762,46 +599,40 @@ moduserinfo.php3.5.html
 moduserinfo.php3.6.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.7.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Invalid page arguments: /moduserinfo.php3<br><br>Invalid uid: ''**{moduserinfo.php3:formfields[target_uid]}**'
+      &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.8.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 moduserinfo.php3.9.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Illegal characters</font></td>
 moduserinfo.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 newgroup.php3.1.html
-      Probe label: \'**{newgroup.php3:group_description}**
+      fish does not have enough permission to lead a group in project testproj3!
 newgroup.php3.2.html
-      Probe label: '**{newgroup.php3:group_pid}**
-newgroup.php3.3.html
       Probe label: \'**{newgroup.php3:group_leader}**
+newgroup.php3.3.html
+      Invalid page arguments: /newgroup.php3<br><br>Invalid argument for 'project': '**{newgroup.php3:project}**
 newgroup.php3.html
-      The group name must be alphanumeric characters only!
+      Invalid group name: Illegal characters
 newimageid.php3.10.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use in selected project</font></td>
 newimageid.php3.11.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use in selected project</font></td>
+      <font color=red>Invalid; Must be one of the partitions</font></td>
 newimageid.php3.12.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Invalid; Must be one of the partitions</font></td>
 newimageid.php3.13.html
-      Probe label: '**{newimageid.php3:formfields[node]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Already in use in selected project</font></td>
 newimageid.php3.14.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-newimageid.php3.15.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use in selected project</font></td>
-newimageid.php3.16.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use in selected project</font></td>
-newimageid.php3.17.html
-      Probe label: '**{newimageid.php3:formfields[part1_osid]}**
+      <font color=red>Invalid characters in OSID</font></td>
+      <font color=red>Invalid; Must be one of the partitions</font></td>
 newimageid.php3.2.html
-      Probe label: '**{newimageid.php3:formfields[default_osid]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid characters in OSID</font></td>
 newimageid.php3.3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Contains invalid characters</font></td>
@@ -809,10 +640,11 @@ newimageid.php3.4.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use in selected project</font></td>
 newimageid.php3.5.html
-      Probe label: '**{newimageid.php3:formfields[pid]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid project name</font></td>
 newimageid.php3.6.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use in selected project</font></td>
+      <font color=red>Invalid group name</font></td>
 newimageid.php3.7.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Must select at least one type</font></td>
@@ -821,34 +653,37 @@ newimageid.php3.8.html
       <font color=red>Already in use in selected project</font></td>
 newimageid.php3.9.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use in selected project</font></td>
+      <font color=red>Invalid node name</font></td>
 newimageid.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+newimageid_ez.php3.10.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid node name</font></td>
 newimageid_ez.php3.12.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 newimageid_ez.php3.13.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal Characters</font></td>
 newimageid_ez.php3.14.html
-      Probe label: '**{newimageid_ez.php3:formfields[node]}**
-newimageid_ez.php3.15.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal characters</font></td>
-newimageid_ez.php3.16.html
+newimageid_ez.php3.15.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 newimageid_ez.php3.2.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Contains invalid characters</font></td>
-newimageid_ez.php3.23.html
+newimageid_ez.php3.20.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Illegal Characters</font></td>
-newimageid_ez.php3.24.html
+newimageid_ez.php3.21.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Invalid number</font></td>
 newimageid_ez.php3.5.html
-      Probe label: '**{newimageid_ez.php3:formfields[pid]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid project name</font></td>
 newimageid_ez.php3.6.html
-      Probe label: '**{newimageid_ez.php3:formfields[gid]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid group name</font></td>
 newimageid_ez.php3.7.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Contains invalid characters</font></td>
@@ -857,7 +692,7 @@ newimageid_ez.php3.8.html
       <font color=red>Must select at least one type</font></td>
 newmmlist.php3.1.html
       &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Invalid Characters</font></td>
+      <font color=red>Invalid project name</font></td>
 newmmlist.php3.2.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 newmmlist.php3.3.html
@@ -869,7 +704,7 @@ newmmlist.php3.5.html
 newmmlist.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 newnodelog.php3.2.html
-      Probe label: '**{newnodelog.php3:node_id}**
+      Invalid page arguments: /newnodelog.php3<br><br>Invalid argument for 'nodeid': '**{newnodelog.php3:node_id}**
 newnodelog.php3.html
       The log type you gave looks funky!
 newnodes_list.php3.1.html
@@ -899,29 +734,25 @@ newosid.php3.1.html
 newosid.php3.10.html
       The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
 newosid.php3.11.html
-      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
-newosid.php3.12.html
       Operational Mode (op_mode) - Illegal Characters
+newosid.php3.12.html
+      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
 newosid.php3.13.html
-      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
-newosid.php3.14.html
-      Probe label: '**{newosid.php3:pid}**
-newosid.php3.15.html
       The Descriptor name must consist of alphanumeric characters and dash, dot, or underscore!
+newosid.php3.14.html
+      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
+newosid.php3.15.html
+      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
 newosid.php3.16.html
-      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
+      Reboot Waittime: Illegal characters
 newosid.php3.17.html
-      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
-newosid.php3.18.html
-      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
-newosid.php3.19.html
-      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
+      Invalid page arguments: /newosid.php3<br><br>Invalid argument for 'project': '**{newosid.php3:project}**
 newosid.php3.2.html
       The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
 newosid.php3.3.html
       The version string contains invalid characters!
 newosid.php3.4.html
-      NextOsid: Illegal characters
+      The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
 newosid.php3.5.html
       The OS Descriptor 'testosid3' already exists in Project testproj3! Please select another.
 newosid.php3.6.html
@@ -1004,9 +835,6 @@ newproject.php3.29.html
 newproject.php3.3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Select another</font></td>
-newproject.php3.30.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
-      <font color=red>Already in use. Select another</font></td>
 newproject.php3.4.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Already in use. Select another</font></td>
@@ -1027,20 +855,20 @@ newproject.php3.9.html
       <font color=red>Already in use. Select another</font></td>
 nodecontrol.php3.1.html
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-nodecontrol.php3.10.html
-      Probe label: '**{nodecontrol.php3:node_id}**
 nodecontrol.php3.2.html
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 nodecontrol.php3.3.html
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+nodecontrol.php3.4.html
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 nodecontrol.php3.5.html
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 nodecontrol.php3.6.html
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+nodecontrol.php3.7.html
+     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 nodecontrol.php3.8.html
-     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-nodecontrol.php3.9.html
-     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+      Invalid page arguments: /nodecontrol.php3?node_id='**%7Bnodecontrol.php3:node_id%7D**<br><br>Invalid argument for 'nodeid': '**{nodecontrol.php3:node_id}**
 nodecontrol.php3.html
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 nscheck.php3.1.html
@@ -1050,12 +878,21 @@ nsgen.php3.html
      Page Error</h2>
 plab_ez.php3.1.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid characters in rpm</font></td>
 plab_ez.php3.2.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+plab_ez.php3.3.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid characters in tarball</font></td>
+plab_ez.php3.4.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
      Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-plab_ez.php3.5.html
+plab_ez.php3.7.html
       &nbsp;Oops, please fix the following errors!&nbsp;
+plab_ez.php3.9.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid characters in startup command</font></td>
 plab_ez.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 powertime.php3.html
@@ -1063,30 +900,36 @@ powertime.php3.html
      Page Error</h2>
       Invalid node ID: '**{powertime.php3:nodes[]}**
 prereserve_node.php3.1.html
-      <font size=+1 color=red>Illegal characters in project name</font>
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /prereserve_node.php3?node_id=pc165<br><br>Invalid argument for 'pid': '**{prereserve_node.php3:pid}**
 prereserve_node.php3.2.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-      Invalid page arguments: /prereserve_node.php3?node_id='**%7Bprereserve_node.php3:node_id%7D**<br><br>Illegal characters in node_id
+      Invalid page arguments: /prereserve_node.php3?node_id='**%7Bprereserve_node.php3:node_id%7D**<br><br>Invalid argument for 'nodeid': '**{prereserve_node.php3:node_id}**
 replayexp.php3.1.html
-      Probe label: '**{replayexp.php3:eid}**
-replayexp.php3.2.html
-      Probe label: '**{replayexp.php3:pid}**
-showsumstats.php3.1.html
-      Invalid range argument: '**{showsumstats.php3:range}**!
-showsumstats.php3.2.html
-      Invalid showby argument: '**{showsumstats.php3:showby}**!
-showsumstats.php3.html
-      Invalid sortby argument: '**{showsumstats.php3:sortby}**!
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /replayexp.php3?experiment='**%7Breplayexp.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{replayexp.php3:experiment}**
+resendapproval.php.1.html
+      Invalid page arguments: /resendapproval.php?pid='**%7Bresendapproval.php:pid%7D**<br><br>Invalid argument for 'pid': '**{resendapproval.php:pid}**
+showpubkeys.php3.1.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /showpubkeys.php3?user='**%7Bshowpubkeys.php3:user%7D**<br><br>Invalid argument for 'user': '**{showpubkeys.php3:user}**
 showuser_list.php3.1.html
       Probe label: '**{showuser_list.php3:searchfor}**
 swapexp.php3.1.html
-      Probe label: '**{swapexp.php3:eid}**
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /swapexp.php3?eid='**%7Bswapexp.php3:eid%7D**&inout=out&pid=testproj3<br><br>Invalid argument for 'eid': '**{swapexp.php3:eid}**
 swapexp.php3.2.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
 swapexp.php3.3.html
-      Probe label: '**{swapexp.php3:pid}**
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /swapexp.php3?eid=testexp3&inout=out&pid='**%7Bswapexp.php3:pid%7D**<br><br>Invalid argument for 'pid': '**{swapexp.php3:pid}**
 swapexp.php3.html
      <h3>swapout could not proceed</h3><blockquote><pre>*** swapexp: Experiment testproj3/testexp3 is not swapped in or activating!
 template_create.php.1.html
@@ -1101,10 +944,26 @@ template_create.php.3.html
 template_create.php.4.html
       &nbsp;Oops, please fix the following errors!&nbsp;
       <font color=red>Pathname includes illegal characters</font></td>
+template_create.php.5.html
+     Cause: unknown
+template_create.php.6.html
+     Cause: unknown
+template_create.php.html
+     Cause: unknown
 updateaccounts.php3.1.html
-      Probe label: '**{updateaccounts.php3:eid}**
-updateaccounts.php3.2.html
-      Probe label: \'**{updateaccounts.php3:nodeid}**
-updateaccounts.php3.3.html
-      Probe label: '**{updateaccounts.php3:pid}**
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2>
+      Invalid page arguments: /updateaccounts.php3?experiment='**%7Bupdateaccounts.php3:experiment%7D**<br><br>Invalid argument for 'experiment': '**{updateaccounts.php3:experiment}**
+updateaccounts.php3.html
+     <h3>Node update could not proceed</h3><blockquote><pre>Experiment testbed/testexp1 is not ACTIVE!
 ================ UNKNOWN ================
+beginexp_html.php3.13.html
+beginexp_html.php3.14.html
+beginexp_html.php3.2.html
+beginexp_html.php3.3.html
+beginexp_html.php3.4.html
+beginexp_html.php3.6.html
+beginexp_html.php3.7.html
+beginexp_html.php3.8.html
+editgroup.php3.1.html
+linktest.php3.html

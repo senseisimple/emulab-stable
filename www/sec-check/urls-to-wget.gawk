@@ -37,9 +37,8 @@
 #   i.e. no remaining "UNKNOWN" entries in the analyze_output.txt file.
 #
 #   -wget lines will have the rest of the URL and option arguments filled in.
-#   !sql or -sql lines are queries that are passed to the inner boss mysql tbdb.
-#   "--" or "!!" lines are assumed to 
-# 
+#   !sql or -sql lines are quoted queries that are passed to the inner boss tbdb.
+#   !varnm=sql is a variant for getting stuff from the DB into a shell variable.
 #   Other "-" or "!" action lines are put into the shell script verbatim.
 
 BEGIN{
@@ -67,6 +66,9 @@ BEGIN{
     }
     else if ( $0 ~ /^.sql / ) \
 	cmd = "echo " substr($0, 5) "| ssh $MYBOSS mysql tbdb";
+    else if ( match($0, /^.(\w+)=sql (.*)/, s ) ) \
+	cmd = "set " s[1] "=`echo " s[2] "| ssh $MYBOSS mysql tbdb | tail +2`" \
+	      "; echo \"    " s[1] " = $" s[1] "\""; # Show the value too.
     else cmd = substr($0, 2);
 
     # Unconditional action lines start with an exclamation point.

@@ -32,15 +32,15 @@ FNR == 1 {
 # Rarely, a mix of <input and <form elements on a single line within a form.
 form && /<input.*<form/ {
     while ( $0 ~ "<input.*<form" || $0 ~ "</form.*<form" ) {
-	##print "INPUT/FORM", $0;
-	if ( index($0, "<input") < index($0, "<form") )
+	if ( index($0, "<input") < index($0, "<form") ) {
+	##print "  INPUT/FORM '" $0 "'";
+	    if ( index($0, "</form") < index($0, "<input") ) end_form();
 	    do_input();
+	}
 	else {
-	    if ( index($0, "</form") < index($0, "<form") ) 
-		end_form();
-	    else {
-		do_form();
-	    }
+	##print "  FORM/INPUT '" $0 "'";
+	    if ( index($0, "</form") < index($0, "<form") ) end_form();
+	    do_form();
 	}
     }
 }
@@ -66,8 +66,8 @@ function do_form() {
 
     end = index($0, ">");
     rest = substr($0, end+1);	# Save rest of line.
-    ##print "'" rest "'";
     $0 = substr($0, 1, end);	# Leave only <form ... > on the line.
+    ##print "  FORM ONLY '" $0 "'\n  REST '" rest "'";
 
     # Canonicalize.
     # Convert single-quoted action and method values to double quotes.
@@ -79,14 +79,13 @@ function do_form() {
 
     # May have more elements on the same line.
     $0 = rest;
-    ##print "FORM", $0;
 }
 
 form && /<input/ { while ( $0 ~ "<input" ) do_input(); }
 # May be multiple <input elements on a line.
 function do_input() {
 
-    ##print "INPUT", $0;
+    ##print "  INPUT '" $0 "'";
     $0 = substr($0, index($0, "<input")); # Put <input at beginning of line.
     sub("[ \t]on[a-zA-Z]+=.*['\"]", "", $0 ); # Skip Javascript.
 
@@ -106,12 +105,12 @@ function do_input() {
     $0 = gensub("(<input type=select.*name=[^ >]+).*(value=[^ >]+).*>",
 		"\\1 \\2>", 1);
 
-    ##print "FULL INPUT", $0;
+    ##print "    FULL INPUT '" $0 "'" ;
     
     end = index($0, ">");
     rest = substr($0, end+1);	# Save rest of line.
-    ##print "'" rest "'";
     $0 = substr($0, 1, end);	# Leave only <input ... > on the line.
+    ##print "    INPUT ONLY '" $0 "'\n    REST '" rest "'";
 
     # Canonicalize.
     sub("type=readonly", "type=text"); # There is no readonly type, text is default.
@@ -138,11 +137,13 @@ function do_input() {
 }
 
 function end_form() {
-    # Blank-line terminator on each form section.
+    # Output a blank-line terminator after each form section.
     if ( form ) {
+	match($0, "</form>");
+	rest = substr($0, RSTART+RLENGTH); # Save rest of line.
+	##print "    FORM END '" $0 "'\n    REST '" rest "'";
+	$0 = rest; 
 	printf "\n";
-	end = index($0, ">");
-	$0 = substr($0, end+1);	# Save rest of line.
     }
     form = 0;
 }

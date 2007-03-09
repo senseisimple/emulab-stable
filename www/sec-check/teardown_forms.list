@@ -1,26 +1,54 @@
-# Blank lines are currently not allowed in this file, but comments are okay.
-#
 # Gotta do this stuff with admin privs.
-#
+! gmake admin
+
+!expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
+! if ( "$expidx" != "" ) then
 /swapexp.php3
 /endexp.php3
 - $SRCDIR/undo-probe.pl -t exp testproj3/testexp3
-#
+###! $SRCDIR/undo-probe.pl -s exp testproj3/testexp3
+! else
+!     echo "*** No experiment testproj3/testexp3! ***"
+! endif
+
 /freenode.php3
 /deleteimageid.php3
 /deleteosid.php3
-#
+
+!usridx=sql "select uid_idx from users where uid='testusr3'"
+! if ( "$usridx" != "" ) then
 /deletepubkey.php3
-/deletesfskey.php3
+###/deletesfskey.php3
 /freezeuser.php3
+# (Users actually get deleted twice, see sep_urls.gawk for details.)
 /deleteuser.php3
+! else
+!     echo "*** No user testusr3! ***"
+! endif
 # Allow creating testusr3 again in setup.
 !sql "delete from deleted_users where uid='testusr3'"
-#
+
+!grpidx=sql "select gid_idx from groups where gid='testgroup3'"
+! if ( "$grpidx" != "" ) then
 /deletegroup.php3
+! else
+!     echo "*** No group testgroup3! ***"
+! endif
+
 # Currently, once a template has been created, a project can never be deleted.
+!projidx=sql "select pid_idx from projects where pid='testproj3'"
+! if ( "$projidx" != "" ) then
 !sql "delete from experiments where pid = 'testproj3' and eid like'T%-%'"
 /deleteproject.php3
-#
+! else
+!     echo "*** No project testproj3! ***"
+! endif
+
 # No other way to delete xref_tags?
 !sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"
+
+# Users don't actually get deleted anymore, they get archived.  Clean up.
+!sql "delete from users where uid='testusr3'"
+!sql "delete from group_membership where uid='testusr3'"!
+# Remove the user w.r.t. getpwnam as well.
+!ssh $MYBOSS sudo pw userdel -n testusr3

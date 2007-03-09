@@ -45,4 +45,8 @@ does not exist
 must be alphanumeric
 must consist of
 funky
+unknown
 You can freeze a user or you can thaw a user
+is not currently reserved
+Experiment must be active
+does not have enough permission

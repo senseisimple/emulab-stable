@@ -132,9 +132,11 @@ for ($i=1; $i<=$retries; $i++) {
     print ".";
     sleep(6);
 }
+my $status = ($setup? ($i>$retries? "missing" : "present")
+	      : ($i>$retries? "still here" : "removed") );
 print "" . ($i>$retries? "*** " : "") . "$type $id is " . 
-    ($setup? ($i>$retries? "missing" : "present")
-     : ($i>$retries? "not gone yet" : "removed") ) . "\n";
+    $status . "\n";
+exit(0) if ( $status eq "missing" || $status eq "still here" ); # Done.
 
 # Do the cleanup.
 my $cmd;

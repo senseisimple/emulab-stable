@@ -4,18 +4,19 @@
 # All rights reserved.
 #
 
-# See README-howto.txt for usage details.
-#
-# Notice that the output lists are put into the source dir.
-# Spidered HTML pages go in (subdirs of) the obj dir.
-#
 # Top-level targets:
 all_tasks = src_forms activate spider forms_coverage input_coverage normal probe
 # Stats from the top-level tasks:
 msgs_tasks = src_msg site_msg forms_msg input_msg probes_msg
 .PHONY: all $(all_tasks) msgs $(msgs_tasks)
+
+# See README-howto.txt for usage details.
 all: $(all_tasks)
 msgs: $(msgs_tasks)
+
+# Notice that the output lists are put into the results subdir of the source dir.
+# Spidered HTML pages go in (subdirs of) the obj dir.
+#
 
 SRCDIR		= @srcdir@
 RESDIR		= $(SRCDIR)/results
@@ -28,6 +29,8 @@ SRCWWW		= $(TESTBED_SRCDIR)/www
 
 OURDOMAIN       = @OURDOMAIN@
 
+include $(TESTBED_SRCDIR)/GNUmakerules
+
 # Delete a target file if the command fails in the middle of changing it.
 .DELETE_ON_ERROR:
 
@@ -35,17 +38,19 @@ OURDOMAIN       = @OURDOMAIN@
 # src_forms: Grep the sources for <form and make up a list of php form files.
 src_forms: src_list src_msg
 
-# All of the forms lines.
 SRC_FORMS	= $(RESDIR)/src_forms.list
-# Just the files list.
 SRC_FILES	= $(RESDIR)/src_files.list
 src_list: $(SRC_FORMS) $(SRC_FILES)
+
+# All of the forms lines.
 $(SRC_FORMS):
 	# Ignore any Emacs backup files with tilde's in the filenames.
 	(cd $(SRCWWW); \
 	  find . -maxdepth 1 -name '*.php*' -print0 | \
 	    xargs -0 grep -n '<form' | fgrep -v /save/ | \
 	    sed '/^[^:]*~/d' ) | sort > $(SRC_FORMS)
+
+# Just the files list.
 $(SRC_FILES): $(SRC_FORMS)
 	# Just filenames; get rid of the "./" prefix and ":<lnum>: <form" suffix.
 	sed -e 's|^[^:]*/||' -e 's|:.*||' $(SRC_FORMS) | uniq > $(SRC_FILES)
@@ -72,6 +77,9 @@ pswd		= EinE_tmp
 # Real email address for confirmation messages.
 email_dest	= flux.utah.edu
 real_email	= $(uid)@$(email_dest)
+# Another one, because they have to be unique now.
+email_dest2	= cs.utah.edu
+real_email2	= $(uid)@$(email_dest2)
 
 dom		= $(EinE_proj).$(OURDOMAIN)
 boss		= $(EinE_boss).$(EinE_exp).$(dom)
@@ -87,7 +95,7 @@ cookie_args	= --keep-session-cookies --no-check-certificate
 wget_args	= -S -k $(cookie_args) $(ld_cookies)
 wget_args_subdir= -S -k $(cookie_args) $(ld_cookies_subdir)
 
-# Check results.
+# Categorize results.
 success_cmd = grep -f $(SRCDIR)/success.txt
 FAIL_FILE = failure.txt
 failure_cmd = grep -f $(SRCDIR)/$(FAIL_FILE)
@@ -95,7 +103,8 @@ failure_cmd = grep -f $(SRCDIR)/$(FAIL_FILE)
 # Log in and create a current cookies.txt file.
 # Args are uid and password.  The password must match your login (see above.)
 logindir = logins
-login_user = @ if [ ! -d $(logindir) ]; then mkdir $(logindir); fi; \
+login_user = @ echo ==== Logging in as $(1) ; \
+	if [ ! -d $(logindir) ]; then mkdir $(logindir); fi; \
 	wget -S -dv $(cookie_args) $(sv_cookies) \
 	-o $(logindir)/login.log -O $(logindir)/login_$(1).html \
 	--post-data "uid=$(1)&password=$(2)&login=Login" \
@@ -108,7 +117,8 @@ login: logout
 	$(login_sys)
 
 # Log in above, then use this to toggle the admin bit on.
-admin_cmd = @ if [ ! -d $(logindir) ]; then mkdir $(logindir); fi; \
+admin_cmd = @ echo ==== Turning on admin privs; \
+	if [ ! -d $(logindir) ]; then mkdir $(logindir); fi; \
 	wget -S -dv $(cookie_args) $(ld_cookies) \
 	-o $(logindir)/admin.log -O $(logindir)/admin.html \
 	"$(sroot)/toggle.php?target_uid=$(uid)&type=adminon&value=1"; \
@@ -119,7 +129,8 @@ admin: login
 	$(admin_cmd)
 
 # Must be logged out to see the public view.
-logout_cmd = @ if [ ! -d $(logindir) ]; then mkdir $(logindir); fi; \
+logout_cmd = @ echo ==== Logging out; \
+	if [ ! -d $(logindir) ]; then mkdir $(logindir); fi; \
 	wget -S -dv $(cookie_args) $(ld_cookies)\
 	-o $(logindir)/logout.log -O $(logindir)/logout.html \
 	"$(sroot)/logout.php3?target_uid=$(uid)"
@@ -139,14 +150,15 @@ empty :=
 fmt_html_args = $(subst $(empty) ,&,$(subst \ ,%20,$(subst \",%22,$(strip $(1)))))
 
 # Post a form via wget and check the returned page.
-# Args are [root],php_infile,[html_outfile],html_args .
+# Args are [root],php_infile,[html_outfile],html_args,[run_time_args] .
 # root defaults to $(sroot) .  html_outfile defaults to php_infile.html .
 outdir = activate.wget
 define wget_post
 	@ if [ ! -d $(outdir) ]; then mkdir $(outdir); fi
-	@ root_dir=$(strip $(1)) \
-	  php_infile=$(strip $(2)) \
+	@ root_dir=$(strip $(1)); \
+	  php_infile=$(strip $(2)); \
 	  html_outfile=$(strip $(3)); \
+	  $(if $(5),$(5);) \
 	  post_args="$(call fmt_html_args, $(4))"; \
 	  echo "==== $(outdir) $${root_dir} $${php_infile} $${html_outfile}.html ===="; \
 	  echo "cd $(outdir); wget $(wget_args_subdir) \
@@ -165,22 +177,25 @@ define wget_post
 endef
 
 # Send an SQL command to myboss.
-# Commas need to be entered with a variable $(comma).
+# Commas separate "$(call" args.  Embed them in an arg with a variable $(comma).
 comma := ,
-boss_sql = echo "$(strip $(1));" | ssh $(boss) mysql tbdb
+boss_sql = echo "$(strip $(1))" | ssh $(boss) mysql tbdb | tail -1
 
 #================================================================
 # activate: Set up the newly swapped-in EinE site to turn on as many forms as we can.
 activate_tasks = new_proj1 new_proj2 approve_proj new_group \
 	  new_user1 confirm_user1 approve_user1 \
 	  new_user2 confirm_user2 \
-	  new_exp1 new_exp2 mod_exp2 \
+	  new_exp2 new_exp1 mod_exp2 \
 	  new_nodetype new_osid new_imageid
 .PHONY:   $(activate_tasks)
-activate: $(activate_tasks)
+activate: activate.wget $(activate_tasks) analyze_activate
 
-# Start two test projects.
-# Leave testproj2 unapproved so approveproject_form.php3 remains active.
+activate.wget:
+	- rm -rf activate.wget.prev
+	- mv -f activate.wget activate.wget.prev
+	mkdir activate.wget
+
 proj_common = $(call fmt_html_args,\
 	    formfields[proj_URL]=$(root)\
 	    formfields[proj_funders]=none\
@@ -191,6 +206,9 @@ proj_common = $(call fmt_html_args,\
 	    formfields[proj_why]=Test\ for\ injection.\
 	    formfields[proj_whynotpublic]=\
 	    submit=Submit)
+
+# Start two test projects.
+# Leave testproj2 unapproved so approveproject_form.php3 remains active.
 proj1 = testproj
 new_proj1: admin
 	$(call wget_post,,newproject.php3,newproj1.html,\
@@ -198,7 +216,7 @@ new_proj1: admin
 	    formfields[proj_name]=$(proj1)\ description.\
 	    $(proj_common))
 # Assume we stay logged in and toggled to admin.
-# Otherwise, each time looks like a separate browser login in the DB.
+# Otherwise, each time looks like a separate browser login in the session DB.
 proj2 = testproj2
 new_proj2:
 	$(call wget_post,,newproject.php3,newproj2.html,\
@@ -213,14 +231,12 @@ approve_proj:
 	    head_uid= user_interface=emulab pcplab_okay=Yep ron_okay=Yep message=)
 
 # Create a subgroup of the test project.  (Takes a few seconds to run.)
+grp1 = testgroup
 new_group:
 	$(call wget_post,,newgroup.php3,,\
-	    group_pid=$(proj1) group_id=testgroup group_leader=$(uid) \
+	    project=$(proj1) group_id=$(grp1) group_leader=$(uid) \
 	    group_description=$(proj1)\ subgroup.)
 
-# Make new users.  (Use http, not https; not logged in, join a project.)
-# Do testuser and testusr2.
-# Leave testusr2 unapproved (but confirmed) so approveuser_form.php3 is active.
 user_common = $(call fmt_html_args,\
 	    formfields[usr_title]=Tester\
 	    formfields[usr_affil]=Emulab\ Scripts\
@@ -237,60 +253,62 @@ user_common = $(call fmt_html_args,\
 	    formfields[pid]=$(proj1)\
 	    formfields[gid]=\
 	    submit=Submit)
+
+# Make new users.  (Use http, not https; not logged in, join a project.)
+# Do testuser and testusr2.
+# Leave testusr2 unapproved (but confirmed) so approveuser_form.php3 is active.
 usr1 = testuser
 name1 = Test User 1
-new_user1: logout
+new_user1: ###logout
+	$(logout_cmd)
 	$(call wget_post,$(root),joinproject.php3,newuser1.html,\
 	    formfields[joining_uid]=$(usr1)\
 	    formfields[usr_name]=$(subst $(empty) ,\ ,$(name1))\
 	    formfields[wikiname]=$(subst $(empty) ,,$(name1))\
 	    formfields[usr_email]=$(subst $(empty) ,,$(name1))@$(email_dest)\
 	    $(user_common))
+	$(login_sys)
+	$(admin_cmd)
 # Pretend the user sent in his e-mail confirmation.
 confirm_user1:
 	$(call boss_sql,\
 	    update users set status='unapproved' where uid='$(usr1)')
 query_user1:
 	$(call boss_sql,\
-	    select uid$(comma) usr_name$(comma) status \
+	    select uid$(comma) uid_idx$(comma) usr_name$(comma) status \
 	      from users where uid='$(usr1)')
 usr2 = testusr2
 name2 = Test User 2
-new_user2: logout
+new_user2: ###logout
+	$(logout_cmd)
 	$(call wget_post,,joinproject.php3,newuser2.html,\
             formfields[joining_uid]=$(usr2)\
             formfields[usr_name]=$(subst $(empty) ,\ ,$(name2))\
             formfields[wikiname]=$(subst $(empty) ,,$(name2))\
-            formfields[usr_email]=never.confirm@nowhere.net\
+            formfields[usr_email]=never.approve@nowhere.net\
 	    $(user_common))
+	$(login_sys)
+	$(admin_cmd)
 # Pretend the user sent in his e-mail confirmation.
 confirm_user2:
 	$(call boss_sql,\
 	    update users set status='unapproved' where uid='$(usr2)')
 query_user2:
 	$(call boss_sql,\
-	    select uid$(comma) usr_name$(comma) status \
+	    select uid$(comma) uid_idx$(comma) usr_name$(comma) status \
 	      from users where uid='$(usr2)')
 
-# Approve a new user.  (Takes a couple of minutes to run.)  (%24 is "$" .)
+# Approve a new user, Takes a couple of minutes to run.  %24 is "$", %2F is "/".
+# Get the uid_idx for the user from the db on the inner boss at run time.
+usr1_sql = $(call boss_sql, select uid_idx from users where uid='$(usr1)')
 # Gotta log back in after being logged out above.
-approve_user1: ###admin
-	$(login_sys)
-	$(admin_cmd)
+approve_user1:
 	$(call wget_post,,approveuser.php3,appusr1.html,\
-	    $(usr1)%24%24approval-$(proj1)%2F$(proj1)=approve\
-	    $(usr1)%24%24trust-$(proj1)%2F$(proj1)=local_root\
-            OK=Submit)
+	    U$$usr1_idx%24%24approval-$(proj1)%2F$(proj1)=approve\
+	    U$$usr1_idx%24%24trust-$(proj1)%2F$(proj1)=local_root\
+            OK=Submit,\
+	    usr1_idx=`$(usr1_sql)`)
 
-# Make an experiment via ssh and leave it not swapped in.
-# (Do exp2 before exp1 so exp2 can finish creating before we do modifyexp on it.)
-exp2 = testexp2
-new_exp2:
-	ssh $(ops) 'startexp -w -f -E "$(exp2) experiment." \
-	    -p $(EinE_proj) -e $(exp2) shaped-2-nodes.ns'
-
-# Make another new experiment.  Takes a few minutes to swap in.
-# Must have at least one delay node for Traffic Shaping and Link Tracing pages.
 exp_common =  $(call fmt_html_args,\
 	    beginexp=Submit\
 	    formfields[exp_pid]=$(EinE_proj)\
@@ -304,7 +322,19 @@ exp_common =  $(call fmt_html_args,\
 	    formfields[exp_noidleswap_reason]=Because\
 	    formfields[exp_autoswap]=0\
 	    formfields[exp_autoswap_timeout]=16\
-	    formfields[exp_linktest]=3)
+	    formfields[exp_linktest]=0)
+
+# Make an experiment via ssh and leave it not swapped in.
+# (Do exp2 before exp1 so exp2 can finish creating before we do modifyexp on it.)
+exp2 = testexp2
+new_exp2:
+	@echo ==== Creating $(exp2) ====
+	scp -p $(SRCDIR)/shaped-2-nodes.ns $(ops):
+	ssh $(ops) 'startexp -w -f -E "$(exp2) experiment." \
+	    -p $(EinE_proj) -e $(exp2) shaped-2-nodes.ns'
+
+# Make another new experiment.  Takes a few minutes to swap in.
+# Must have at least one delay node for Traffic Shaping and Link Tracing pages.
 exp1 = testexp1
 new_exp1:
 	scp -p $(SRCDIR)/shaped-2-nodes.ns $(ops):
@@ -318,7 +348,7 @@ mod_exp2:
 	$(call wget_post,,modifyexp.php3,modexp2.html,\
 	    pid=$(EinE_proj) eid=$(exp2) go=1\
 	    MAX_FILE_SIZE=512000\
-	    formfields[exp_localnsfile]=/users/$(USER)/shaped-2-nodes.ns\
+	    exp_localnsfile=/users/$(USER)/shaped-2-nodes.ns\
 	    reboot=1\
 	    eventrestart=1)
 
@@ -392,6 +422,13 @@ new_imageid:
 	    formfields[shared]=\
 	    submit=Submit)
 
+# Re-use the analysis action in the activate.wget subdirectory.
+analyze_activate:
+	cd activate.wget; \
+	gmake analyze_output=../$(ACTIVATE_ANALYSIS) \
+	      SRCDIR=../$(SRCDIR) -f ../GNUmakefile analyze
+ACTIVATE_ANALYSIS = $(RESDIR)/analyze_activate.txt
+
 #================================================================
 # spider: Recursively a copy of the EinE site with wget and extract its forms list.
 #
@@ -410,7 +447,7 @@ spider: $(spider_tasks)
 #
 # Also reject other links to pages which don't have any input fields, and don't ask
 # for confirmation before taking actions.
-top_links	= login.php3,logout.php3,toggle.php
+top_links	= login.php3,logout.php3,toggle.php,pagenotworking.php
 user_links	= suuser.php,sendtestmsg.php3
 exp_links	= showlogfile.php3,request_idleinfo.php3,request_swapexp.php3
 node_links	= nodetipacl.php3,showconlog.php3,nodessh.php3
@@ -419,13 +456,10 @@ rej_links	= \
 	.txt,$(top_links),$(user_links),$(exp_links),$(node_links),$(linkmon_links)
 
 # Clear out the wget directories.
-wget_dirs	= activate.wget public.wget admin.wget probes.wget
+wget_dirs	= public.wget admin.wget probes.wget
 .PHONY: $(wget_dirs)
 clear_wget_dirs: $(wget_dirs)
-activate.wget:
-	- rm -rf activate.wget.prev
-	- mv -f activate.wget activate.wget.prev
-	mkdir activate.wget
+
 public.wget:
 	- rm -rf public.wget.prev
 	- mv -f public.wget public.wget.prev
@@ -443,7 +477,7 @@ probes.wget:
 .PHONY:    public_spider admin_spider
 do_spider: public_spider admin_spider
 
-public_spider: logout public.wget/public.log
+public_spider: public.wget/public.log
 public.wget/public.log: 
 	$(logout_cmd)
 	cd public.wget; \
@@ -468,33 +502,36 @@ site_list: $(SITE_FORMS) $(SITE_FILES)
 
 # Ignore flyspray and Twiki for now.
 # Ignore the search box form on every page, we'll treat it separately.
-FORMS_CMD = find . \( -name distributions -prune \) \
+forms_cmd = find . \( -name distributions -prune \) \
 		-o \( -name flyspray -prune \) \
 		-o \( -name twiki -prune \) \
 		-o -type f -print0 | xargs -0 grep -n '<form ' | \
 	    fgrep -v /search.php3 ) | sort -u
 # Filenames - Remove directory prefix and "Get" arg lists after the filename.
 # Kill suffix after filename first: .../archive_view.php3/9/trunk?exptidx=9
-FILES_CMD = sed -e 's|\(php3*\).*|\1|' -e 's|^[^:]*/||' 
+files_cmd = sed -e 's|\(php3*\).*|\1|' -e 's|^[^:]*/||' 
 
 PUBLIC_FORMS	= $(RESDIR)/public_forms.list
 PUBLIC_FILES	= $(RESDIR)/public_files.list
 public_list: $(PUBLIC_FORMS) $(PUBLIC_FILES)
+
 $(PUBLIC_FORMS): public.wget/public.log
-	(cd public.wget; $(FORMS_CMD) > $(PUBLIC_FORMS)
+	(cd public.wget; $(forms_cmd) > $(PUBLIC_FORMS)
 $(PUBLIC_FILES): $(PUBLIC_FORMS)
-	$(FILES_CMD) $(PUBLIC_FORMS) | uniq > $(PUBLIC_FILES)
+	$(files_cmd) $(PUBLIC_FORMS) | uniq > $(PUBLIC_FILES)
 
 ADMIN_FORMS	= $(RESDIR)/admin_forms.list
 ADMIN_FILES	= $(RESDIR)/admin_files.list
 admin_list: $(ADMIN_FORMS) $(ADMIN_FILES)
+
 $(ADMIN_FORMS): admin.wget/admin.log
-	(cd admin.wget; $(FORMS_CMD) > $(ADMIN_FORMS)
+	(cd admin.wget; $(forms_cmd) > $(ADMIN_FORMS)
 $(ADMIN_FILES): $(ADMIN_FORMS)
-	$(FILES_CMD) $(ADMIN_FORMS) | uniq > $(ADMIN_FILES)
+	$(files_cmd) $(ADMIN_FORMS) | uniq > $(ADMIN_FILES)
 
 $(SITE_FORMS): $(PUBLIC_FORMS) $(ADMIN_FORMS)
 	cat $(PUBLIC_FORMS) $(ADMIN_FORMS) | sort -u > $(SITE_FORMS)
+
 # The <forms under index.html are actually in menu.php3 via defs.php3.in .
 # Ditto beginexp_{html,form}.php3 .
 $(SITE_FILES): $(PUBLIC_FILES) $(ADMIN_FILES)
@@ -533,32 +570,33 @@ input_coverage: input_list input_msg
 SITE_INPUTS     = $(RESDIR)/site_inputs.list
 INPUT_NAMES	= $(RESDIR)/input_names.list
 input_list: $(SITE_INPUTS) $(INPUT_NAMES)
+
 PUBLIC_INPUTS   = $(RESDIR)/public_inputs.list
 ADMIN_INPUTS    = $(RESDIR)/admin_inputs.list
-# XXX sed special case kluge.
+# XXX kluge to make imageid mtype checked by default since at least one is required.
 $(SITE_INPUTS): $(PUBLIC_INPUTS) $(ADMIN_INPUTS)
 	cat $(PUBLIC_INPUTS) $(ADMIN_INPUTS) | \
-	   sed 's/mtype_pc600/mtype_pc850/' > $(SITE_INPUTS)
+	   sed -e 's/mtype_pc600/mtype_pc850/' | \
+	   awk '/formfields\[mtype/ && ! /checked/ { sub(">", "checked >")} \
+		{print}' > $(SITE_INPUTS)
 
 # Extract input fields and context from the html form files in the wget subdirs.
 # Output sections terminated by a blank line contain: filename, <form, <input* .
 # Canonicalize and reorder: <input type="..." name="..." value=... ...>
-# INPUTS_CMD is parameterized by dir:={public,admin}
-DIR_FORMS 	= $(RESDIR)/$(dir)_forms.list
-DIR_INPUTS	= $(RESDIR)/$(dir)_inputs.list
-# This awk command gets a long list of forms file names on the command line.
-# Expand it in the shell with backquote rather than in Make so -n doesn't swamp us.
-INPUTS_CMD = @echo "form-inputs from $(dir)_forms.list files to $(dir)_inputs.list"; \
-	(cd $(dir).wget && gawk -f ../$(SRCDIR)/form-input.gawk \
-	     `sed "s/:[0-9][0-9]*:.*//" ../$(DIR_FORMS)` > ../$(DIR_INPUTS) )
-dir := public
-PUBLIC_INPUTS_CMD := $(INPUTS_CMD)
+#
+# inputs_cmd is parameterized by type dir{public,admin}.
+# Input comes from $(dir)_forms.list ; output goes into $(dir)_inputs.list .
+#
+# Run the awk command on a long list of forms file names.
+# Expand it in the shell so gmake -n doesn't swamp us.
+inputs_cmd = @echo "form-inputs from files in $(1)_forms.list to $(1)_inputs.list"; \
+   (cd $(1).wget && \
+    sed -e 's/:[0-9][0-9]*:.*//' ../$(RESDIR)/$(1)_forms.list | \
+    xargs gawk -f ../$(SRCDIR)/form-input.gawk $$f ) > $(RESDIR)/$(1)_inputs.list
 $(PUBLIC_INPUTS): $(PUBLIC_FORMS) $(SRCDIR)/form-input.gawk
-	$(PUBLIC_INPUTS_CMD)
-dir := admin
-ADMIN_INPUTS_CMD := $(INPUTS_CMD)
+	$(call inputs_cmd,public)
 $(ADMIN_INPUTS): $(ADMIN_FORMS) $(SRCDIR)/form-input.gawk
-	$(ADMIN_INPUTS_CMD)
+	$(call inputs_cmd,admin)
 
 # Get unique input field names: text(area), hidden, checkbox, select, radio/checked.
 $(INPUT_NAMES): $(SITE_INPUTS)
@@ -571,77 +609,106 @@ input_msg: input_list
 
 # Copy relevant name= lines from results/input_names.list to input_values.list .
 # Add a space and default value onto the ends of the lines for auto-form-fill-in.
-INPUT_VALUES	= $(SRCDIR)/input_values.list
+INPUT_VALUES_SRC = $(SRCDIR)/input_values.list
+
+# Substitute in some parts of the values dictionary at run time.
+INPUT_VALUES = input_values.list
+.PHONY: $(INPUT_VALUES)
+$(INPUT_VALUES): $(INPUT_VALUES_SRC)
+	sed -e "s/@uid@/$(uid)/" \
+	    -e "s/@email@/$(real_email2)/" \
+	    -e "s/@pcnode@/`$(node_sql)`/" \
+	    -e "s/@usridx@/`$(usridx_sql)`/" \
+	    -e "s/@grpidx@/`$(grpidx_sql)`/" \
+	    -e "s/@exptidx@/`$(exptidx_sql)`/" \
+	    $(INPUT_VALUES_SRC) > $(INPUT_VALUES)
+node_sql = $(call boss_sql, select phys_nodeid from nodes where type like 'pc%')
+show_node:
+	echo `$(node_sql)`
+usridx_sql = $(call boss_sql, select uid_idx from users where uid='$(usr1)')
+show_usridx:
+	echo `$(usridx_sql)`
+grpidx_sql = $(call boss_sql, select gid_idx from groups where gid='$(grp1)')
+show_grpidx:
+	echo `$(grpidx_sql)`
+exptidx_sql = $(call boss_sql, select idx from experiments where eid='$(exp1)')
+show_exptidx:
+	echo `$(exptidx_sql)`
 
 #================================================================
 # normal: Create and run "normal operations" test cases.
 #
 # Convert the input list to normal test cases with input field values.
 # Test until "normal" input tests work properly on all forms.
+# Cases are divided into setup, show, and teardown subsets.
 # 
+gen_tasks = gen_setup gen_show gen_teardown
+run_tasks = run_setup run_show run_teardown analyze
+.PHONY: normal gen_all run_all $(gen_tasks) $(run_tasks)
+
 normal: gen_all run_all
-gen_tasks = gen_setup gen_normal gen_teardown
-run_tasks = run_setup run_normal run_teardown analyze
-.PHONY: gen_all run_all $(gen_tasks) $(run_tasks)
 gen_all: $(gen_tasks)
 run_all: $(run_tasks)
 
-URLS		= $(NORMAL_URLS) $(SETUP_URLS) $(TEARDOWN_URLS)
+URLS		= $(SHOW_URLS) $(SETUP_URLS) $(TEARDOWN_URLS)
 
-NORMAL_URLS	= $(RESDIR)/site_normal.urls
-NORMAL_WGET	= $(RESDIR)/normal_cases.wget
-NORMAL_CASES	= $(RESDIR)/normal_cases.xml
-gen_normal: $(NORMAL_URLS) $(NORMAL_WGET) ###$(NORMAL_CASES)
+# These don't change persistent state.
+SHOW_URLS	= $(RESDIR)/show_cases.urls
+SHOW_WGET	= $(RESDIR)/show_cases.wget
+SHOW_XML	= $(RESDIR)/show_cases.xml
+gen_show: $(SHOW_URLS) $(SHOW_WGET) ###$(SHOW_XML)
 
-# Separate out the setup and teardown URL's from the normal ones.
-SETUP_URLS	= $(RESDIR)/site_setup.urls
+# Separate out the setup and teardown URL's from the "show" ones.
+SETUP_URLS	= $(RESDIR)/setup_cases.urls
 SETUP_WGET	= $(RESDIR)/setup_cases.wget
-SETUP_CASES	= $(RESDIR)/setup_cases.xml
-gen_setup: $(SETUP_URLS) $(SETUP_WGET) ###$(SETUP_CASES)
+SETUP_XML	= $(RESDIR)/setup_cases.xml
+gen_setup: $(SETUP_URLS) $(SETUP_WGET) ###$(SETUP_XML)
 
-TEARDOWN_URLS	= $(RESDIR)/site_teardown.urls
+TEARDOWN_URLS	= $(RESDIR)/teardown_cases.urls
 TEARDOWN_WGET	= $(RESDIR)/teardown_cases.wget
-TEARDOWN_CASES	= $(RESDIR)/teardown_cases.xml
-gen_teardown: $(TEARDOWN_URLS) $(TEARDOWN_WGET) ###$(TEARDOWN_CASES)
+TEARDOWN_XML	= $(RESDIR)/teardown_cases.xml
+gen_teardown: $(TEARDOWN_URLS) $(TEARDOWN_WGET) ###$(TEARDOWN_XML)
 
 sep_src		= $(SRCDIR)/sep-urls.gawk
 sep_cmd		= gawk -f $(sep_src) -v SYSADMIN=$(uid)
 f2u_src		= $(SRCDIR)/forms-to-urls.gawk
 u2w_src		= $(SRCDIR)/urls-to-wget.gawk
 u2w_cmd		= gawk -f $(u2w_src) -v SRCDIR=$(SRCDIR)
-
+URL_PREREQS	= $(f2u_src) $(SITE_INPUTS) $(INPUT_NAMES) $(INPUT_VALUES) \
+		  $(sep_src) $(SETUP_FORMS) $(TEARDOWN_FORMS)
 SETUP_FORMS	= $(SRCDIR)/setup_forms.list
 TEARDOWN_FORMS	= $(SRCDIR)/teardown_forms.list
 
-URL_PREREQS	= $(f2u_src) $(SITE_INPUTS) $(INPUT_NAMES) $(INPUT_VALUES) \
-		  $(sep_src) $(SETUP_FORMS) $(TEARDOWN_FORMS)
-$(URLS): $(URL_PREREQS)
+tmp_urls: $(URL_PREREQS)
 	gawk -f $(f2u_src) -v VALUES=$(INPUT_VALUES) \
             $(SITE_INPUTS) > tmp_urls
-	fgrep -v -f $(SETUP_FORMS) tmp_urls | \
-	    fgrep -v -f $(TEARDOWN_FORMS) > $(NORMAL_URLS)
+$(SHOW_URLS): tmp_urls
+	grep -h "^/" $(SETUP_FORMS) $(TEARDOWN_FORMS) > tmp_form_files
+	fgrep -v -f tmp_form_files tmp_urls > $(SHOW_URLS)
+$(SETUP_URLS): tmp_urls
 	$(sep_cmd) $(SETUP_FORMS) tmp_urls > $(SETUP_URLS)
+$(TEARDOWN_URLS): tmp_urls
 	$(sep_cmd) $(TEARDOWN_FORMS) tmp_urls > $(TEARDOWN_URLS)
 
 # WebInject doesn't store the returned pages.  Use wget and browse the directory.
-$(NORMAL_WGET): $(NORMAL_URLS) $(u2w_src)
-	$(u2w_cmd) $(NORMAL_URLS) > $(NORMAL_WGET)
+$(SHOW_WGET): $(SHOW_URLS) $(u2w_src)
+	$(u2w_cmd) $(SHOW_URLS) > $(SHOW_WGET)
 $(SETUP_WGET): $(SETUP_URLS) $(u2w_src)
 	$(u2w_cmd) $(SETUP_URLS) > $(SETUP_WGET)
 $(TEARDOWN_WGET): $(TEARDOWN_URLS) $(u2w_src)
 	$(u2w_cmd) $(TEARDOWN_URLS) > $(TEARDOWN_WGET)
 
 # XML test cases for WebInject.
-$(NORMAL_CASES): $(NORMAL_URLS) $(SRCDIR)/urls-to-webinject.gawk
-	gawk -f $(SRCDIR)/urls-to-webinject.gawk $(NORMAL_URLS) > $(NORMAL_CASES)
+$(SHOW_XML): $(SHOW_URLS) $(SRCDIR)/urls-to-webinject.gawk
+	gawk -f $(SRCDIR)/urls-to-webinject.gawk $(SHOW_URLS) > $(SHOW_XML)
 
-# Test until "normal" input tests work properly in all forms.
+# Test until "normal" input test cases work properly in all forms.
 RUN_ENV = MYBOSS=$(boss) MYOPS=$(ops) SRCDIR=$(SRCDIR)
 run_setup: $(SETUP_WGET) gen_setup
 	$(RUN_ENV) csh -f $(SETUP_WGET)
-run_normal: $(NORMAL_WGET) ###run_setup
-	csh -f $(NORMAL_WGET)
-run_teardown: $(TEARDOWN_WGET) run_setup
+run_show: $(SHOW_WGET) ###run_setup
+	csh -f $(SHOW_WGET)
+run_teardown: $(TEARDOWN_WGET) ###run_setup
 	$(RUN_ENV) csh -f $(TEARDOWN_WGET)
 
 matches = match_success.txt match_failure.txt
@@ -665,75 +732,83 @@ analyze:
 	sed -n 's/:.*//p' $(matches) | sort -u > recognized_output.files
 	ls *.html | fgrep -v -f recognized_output.files $(tee)
 
-NORMAL_OUTPUT	= $(RESDIR)/normal_output.xml
-run_webinject: $(NORMAL_OUTPUT)
-$(NORMAL_OUTPUT): $(NORMAL_CASES)
+SHOW_OUTPUT	= $(RESDIR)/show_output.xml
+run_webinject: $(SHOW_OUTPUT)
+$(SHOW_OUTPUT): $(SHOW_XML)
 	(cd $(SRCDIR)/webinject;
-	    webinject.pl ../$(NORMAL_CASES);
-	    mv results.xml ../$(NORMAL_OUTPUT)
+	    webinject.pl ../$(SHOW_XML);
+	    mv results.xml ../$(SHOW_OUTPUT)
 
 #================================================================
 # probe: Create and run probes to test the checking code of all input fields.
-.PHONY: gen_probes probe_all run_probes
+.PHONY: probe gen_probes probe_all run_probes
 probe:  gen_probes probe_all ##run_probes
 
 # Generate labeled mock SQL injection probes in individual fields.
 # Probe strings are labeled with the form and field names that caused the hole.
 #
-# These also need to be separated into setup, teardown, and normal, because of
-# unrepeatable operations being caught by checking code, e.g. can't ask it to create a
-# project when it already exists...  So the setup probing has to be done in the
-# teardown state, and vice versa.
+# These also need to be separated into setup, teardown, and show subsets,
+# because of unrepeatable operations being caught by checking code, e.g. can't
+# ask it to create a project when it already exists...  So the setup probing
+# has to be done in the teardown state, and vice versa.
 #
-PROBE_URLS	= $(PROBE_SETUP_URLS) $(PROBE_TEARDOWN_URLS) $(PROBE_NORMAL_URLS)
+PROBE_URLS	= $(PROBE_SETUP_URLS) $(PROBE_TEARDOWN_URLS) $(PROBE_SHOW_URLS)
 PROBE_SETUP_URLS = $(RESDIR)/setup_probe.urls
 PROBE_TEARDOWN_URLS = $(RESDIR)/teardown_probe.urls
-PROBE_NORMAL_URLS = $(RESDIR)/normal_probe.urls
+PROBE_SHOW_URLS = $(RESDIR)/show_probe.urls
 #
-PROBE_WGET	= $(PROBE_SETUP_WGET) $(PROBE_TEARDOWN_WGET) $(PROBE_NORMAL_WGET)
+PROBE_WGET	= $(PROBE_SETUP_WGET) $(PROBE_TEARDOWN_WGET) $(PROBE_SHOW_WGET)
 PROBE_SETUP_WGET = $(RESDIR)/probe_setup.wget
 PROBE_TEARDOWN_WGET = $(RESDIR)/probe_teardown.wget
-PROBE_NORMAL_WGET = $(RESDIR)/probe_normal.wget
+PROBE_SHOW_WGET = $(RESDIR)/probe_show.wget
 
 gen_probes: $(PROBE_URLS) $(PROBE_WGET)
-$(PROBE_URLS): $(URL_PREREQS)
+
+tmp_probe_urls: $(URL_PREREQS)
 	gawk -f $(f2u_src) -v PROBE=1 -v VALUES=$(INPUT_VALUES) \
             $(SITE_INPUTS) > tmp_probe_urls
-	fgrep -v -f $(SETUP_FORMS) tmp_probe_urls | \
-	    fgrep -v -f $(TEARDOWN_FORMS) > $(PROBE_NORMAL_URLS)
+$(PROBE_SHOW_URLS): tmp_probe_urls
+	grep -h "^/" $(SETUP_FORMS) $(TEARDOWN_FORMS) > tmp_probe_files
+	fgrep -v -f tmp_probe_files tmp_probe_urls > $(PROBE_SHOW_URLS)
+$(PROBE_SETUP_URLS): tmp_probe_urls
 	$(sep_cmd) $(SETUP_FORMS) tmp_probe_urls > $(PROBE_SETUP_URLS)
+$(PROBE_TEARDOWN_URLS): tmp_probe_urls
 	$(sep_cmd) $(TEARDOWN_FORMS) tmp_probe_urls > $(PROBE_TEARDOWN_URLS)
 
 # Output pages go to a subdir, using the cookies.txt file in the current dir.
 U2W_ARG = -v FAILFILE=$(FAIL_FILE) -v OUTDIR=probes.wget
-$(PROBE_NORMAL_WGET): $(PROBE_NORMAL_URLS) $(u2w_src)
-	$(u2w_cmd) $(U2W_ARG) $(PROBE_NORMAL_URLS) > $(PROBE_NORMAL_WGET)
+$(PROBE_SHOW_WGET): $(PROBE_SHOW_URLS) $(u2w_src)
+	$(u2w_cmd) $(U2W_ARG) $(PROBE_SHOW_URLS) > $(PROBE_SHOW_WGET)
 $(PROBE_SETUP_WGET): $(PROBE_SETUP_URLS) $(u2w_src)
 	$(u2w_cmd) $(U2W_ARG) $(PROBE_SETUP_URLS) > $(PROBE_SETUP_WGET)
 $(PROBE_TEARDOWN_WGET): $(PROBE_TEARDOWN_URLS) $(u2w_src)
 	$(u2w_cmd) $(U2W_ARG) $(PROBE_TEARDOWN_URLS) > $(PROBE_TEARDOWN_WGET)
 
-probe_tasks = probe_setup probe_teardown probe_normal probes_analyze probes_msg
+probe_tasks = probe_setup probe_teardown probe_show analyze_probes probes_msg
 .PHONY: $(probe_tasks)
 probe_all: gen_probes $(probe_tasks)
+
 probe_setup: $(PROBE_SETUP_WGET)   ###probe_teardown
 	$(RUN_ENV) csh -f $(PROBE_SETUP_WGET)
-probe_normal: $(PROBE_NORMAL_WGET) ###probe_setup
-	csh -f $(PROBE_NORMAL_WGET)
+probe_show: $(PROBE_SHOW_WGET) # Depends on activation.
+	csh -f $(PROBE_SHOW_WGET)
 probe_teardown: $(PROBE_TEARDOWN_WGET) ###probe_setup
 	$(RUN_ENV) csh -f $(PROBE_TEARDOWN_WGET)
 
+# Re-use the analysis action in the probes.wget subdirectory.
+analyze_probes:
+	cd probes.wget; \
+	gmake analyze_output=../$(PROBE_ANALYSIS) \
+	      SRCDIR=../$(SRCDIR) TESTBED_SRCDIR=../$(TESTBED_SRCDIR) \
+	      -f ../GNUmakefile analyze
 PROBE_ANALYSIS = $(RESDIR)/analyze_probes.txt
+
+probe_outputs = $(PROBE_LABELS) $(UNCAUGHT_PROBES) $(UNCAUGHT_FILES)
 PROBE_LABELS = $(RESDIR)/probe-labels.list
 UNCAUGHT_PROBES = $(RESDIR)/uncaught-probes.list
 UNCAUGHT_FILES = $(RESDIR)/uncaught-files.list
-# Re-use the analysis action in the probes.wget subdirectory.
-probes_analyze:
-	cd probes.wget; \
-	gmake analyze_output=../$(PROBE_ANALYSIS) \
-	      SRCDIR=../$(SRCDIR) -f ../GNUmakefile analyze
 
-probes_msg: ##probes_analyze
+probes_msg $(probe_outputs): ##analyze_probes
 	@gawk '/^=/ { type = $$2; next; } # === success, failure, or UNKNOWN. \
 	       /^[a-z]/ { 		  # Probe output file lines. \
 		 # When both match, failure supercedes success; . \
@@ -748,18 +823,19 @@ probes_msg: ##probes_analyze
 	@cat probes.wget/*.html | fgrep 'Probe label:' > $(PROBE_LABELS)
 	@fgrep ": '" < $(PROBE_LABELS) | sort > $(UNCAUGHT_PROBES)
 	@sed 's/.*{\([^:]*\).*/\1/' $(UNCAUGHT_PROBES) | uniq > $(UNCAUGHT_FILES)
-	@echo "** Probes to "`cat $(URLS) | wc -l`" pages gave" \
-	      `wc -l < $(PROBE_LABELS)`" hits: " \
-              `fgrep -c ': \' < $(PROBE_LABELS)`" backslashed, " \
-	      `wc -l < $(UNCAUGHT_PROBES)`" uncaught in " \
-	      `wc -l < $(UNCAUGHT_FILES)`" pages." | tr -s " "
+	@echo "** Probes to" \
+	    ` grep '^http' $(URLS) | sed 's/?.*//' | sort -u | wc -l`" pages gave" \
+	    `wc -l < $(PROBE_LABELS)`" hits: " \
+            `fgrep -c ': \' < $(PROBE_LABELS)`" backslashed, " \
+	    `wc -l < $(UNCAUGHT_PROBES)`" uncaught in " \
+	    `wc -l < $(UNCAUGHT_FILES)`" pages." | tr -s " "
 
 # Run the probes through webinject.
 # Successfully caught cases should produce "invalid input" warnings.
 # Potential penetrations will log SQL errors with the form/field name.
-PROBE_OUTPUT	= $(RESDIR)/probe_output.xml
+PROBE_OUTPUT = $(RESDIR)/probe_output.xml
 ###run_probes: $(PROBE_OUTPUT)
-$(PROBE_OUTPUT): $(PROBE_CASES)
+$(PROBE_OUTPUT): $(PROBE_XML)
 	(cd $(SRCDIR)/webinject;
-	   webinject.pl ../$(PROBE_CASES);
+	   webinject.pl ../$(PROBE_XML);
 	   mv results.xml ../$(PROBE_OUTPUT)

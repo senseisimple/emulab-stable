@@ -1,38 +1,70 @@
-# Blank lines are currently not allowed in this file, but comments are okay.
-#
 # Gotta do this stuff with admin privs.
 ! gmake admin
+
+!projidx=sql "select pid_idx from projects where pid='testproj3'"
+! if ( "$projidx" == "" ) then
 /newproject.php3
 /approveproject.php3
-#
+! else
+!     echo "*** Project testproj3 already exists! ***"
+! endif
+
+!usridx=sql "select uid_idx from users where uid='testusr3'"
+! if ( "$usridx" == "" ) then
+
 # Log out to create a new user, then back in again.
 ! gmake logout
 /joinproject.php3
 ! gmake admin
+
 # Pretend the user sent in his e-mail confirmation, allowing approval.
 !sql "update users set status='unapproved' where uid='testusr3'"
+!usridx=sql "select uid_idx from users where uid='testusr3'"
 /changeuid.php
 /approveuser.php3
-#
+! else
+!     echo "*** User testusr3 already exists! ***"
+! endif
+
+!expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
+! if ( "$expidx" == "" ) then
 /beginexp_html.php3
 - $SRCDIR/undo-probe.pl -s exp testproj3/testexp3
-#
+!expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
+# Wait for the testexp3 to be created.
+! set i = 1
+! while ( $i < 20 )
+!expstate=sql "select state from experiments where pid='testproj3' and eid='testexp3'"
+!   if ( "$expstate" == "swapped" ) break
+!   sleep 6
+!   @ i++
+! end
 /modifyexp.php3
 /editexp.php3
-#
-/newgroup_form.php3
+! else
+!     echo "*** Experiment testexp3 already exists! ***"
+! endif
+
+
+!grpidx=sql "select gid_idx from groups where gid='testgroup3'"
+! if ( "$grpidx" == "" ) then
+###/newgroup_form.php3
 /newgroup.php3
+!grpidx=sql "select gid_idx from groups where gid='testgroup3'"
 /editgroup.php3
-#
+! else
+!     echo "*** Group testgroup3 already exists! ***"
+! endif
+
 /newosid.php3
 /newimageid_ez.php3
 /newimageid.php3
 /loadimage.php3
-#
+
 /newmmlist.php3
 /template_create.php
-/template_swapin.php
-#
+###/template_swapin.php
+
 # Avoid xref_tag conflicts.
-! echo "delete from knowledge_base_entries where xref_tag like'test_tag%'" | ssh $MYBOSS mysql tbdb
+!sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"
 /kb-manage.php3

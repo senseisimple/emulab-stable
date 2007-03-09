@@ -43,13 +43,15 @@ successfully modified
 Your experiment has been dequeued
 is being removed
 Updated power time for
-Range: 
+Range:
+A message has been sent
 #{ The following few lines are for pages that don't have any success text,
 #  to keep them from being UNKNOWN.
 # archive_missing.php3
 Add Missing Files
 # editnodetype.php3
 Edit Node Type
+Edit Image Descriptor
 # editsitevars.php3
 batch/retry_wait
 #}

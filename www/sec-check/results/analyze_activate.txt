@@ -1,0 +1,33 @@
+================ success ================
+approveproject.php3.html
+     <b>Project 'testproj' is being created</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+appusr1.html
+     	 <title>MyEmulab.Net - New Users Approved</title>
+     New Users Approved</h2>
+      User testuser was <b>granted</b> membership in
+modexp2.html
+     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+newexp1.html
+     <b>Starting experiment configuration!</b> You will be notified via email when the experiment has been fully
+newgroup.php3.html
+     <b>Creating project group testgroup.</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+newimageid.html
+      <h3 class="submenuheader">More Options</h3>
+newnodetype.html
+     	 <title>MyEmulab.Net - Edit Node Type</title>
+     Edit Node Type</h2>
+newosid.html
+     <center><h3>Done!</h3></center>
+newproj1.html
+      Your project request has been successfully queued.
+newproj2.html
+      Your project request has been successfully queued.
+newuser1.html
+      As a pending user of the Testbed you will receive a key via email.
+newuser2.html
+      As a pending user of the Testbed you will receive a key via email.
+================ failure ================
+================ UNKNOWN ================

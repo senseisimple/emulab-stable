@@ -15,8 +15,7 @@
 <input type="text" name="formfields[usr_country]" value="USA" size=15>
 <input type="text" name="formfields[usr_phone]" value="" size=15>
 <input type="hidden" name="MAX_FILE_SIZE" value="1024" >
-<input type="file" name="usr_keyfile" value="" size=50>
-<input type="text" name="formfields[usr_key]" value="" size=50 maxlength=1024>
+<input type="file" name="usr_keyfile" size=50 <tr>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
 <input type="text" name="formfields[pid]" value="" size=12 maxlength=12>
@@ -52,7 +51,6 @@
 <input type="text" name="formfields[usr_phone]" value="" size=15>
 <input type="hidden" name="MAX_FILE_SIZE" value="1024" >
 <input type="file" name="usr_keyfile" value="" size=50>
-<input type="text" name="formfields[usr_key]" value="" size=50 maxlength=1024>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
 <input type="text" name="formfields[pid]" value="" size=12 maxlength=12>
