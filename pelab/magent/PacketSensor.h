@@ -102,7 +102,7 @@ private:
 
   // Typically, 4% of a packet is header. It's more, though, if the packet is
   // less than 1500 bytes
-  static const float SUPERMAGIC_PACKET_MULTIPLIER = 1.04;
+  static const float SUPERMAGIC_PACKET_MULTIPLIER; // = 1.04;
 };
 
 #endif

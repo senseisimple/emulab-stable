@@ -12,6 +12,8 @@
 
 using namespace std;
 
+const float PacketSensor::SUPERMAGIC_PACKET_MULTIPLIER = 1.04;
+
 PacketSensor::PacketSensor(StateSensor const * newState)
   : globalSequence()
   , state(newState)
