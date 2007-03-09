@@ -300,7 +300,7 @@ if ($STAMPS) {
 my @arguments = ($endexp, "-x", "-q");
 push(@arguments, "-b")
     if ($batchmode);
-push(@arguments, ($pid, $eid));
+push(@arguments, ($exptidx));
 
 # Now invoke.
 system(@arguments);
