@@ -168,8 +168,9 @@ function SPITFORM($formfields, $errors)
         #
         # Country needs a default for older users.
         #
-	if (! strcmp($formfields["usr_country"], "")) {
-	    $formfields[usr_country] = "USA";
+	if (!isset($formfields["usr_country"]) ||
+	    $formfields["usr_country"] == "") {
+	    $formfields["usr_country"] = "USA";
 	}
 
 	#

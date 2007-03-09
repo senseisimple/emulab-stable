@@ -102,7 +102,7 @@ $linktest_running = 0;
 
 function SPEWCLEANUP()
 {
-    global $pid, $unix_gid, $eid, $linktest_running;
+    global $pid, $unix_gid, $uid, $eid, $linktest_running;
 
     if (connection_aborted() && $linktest_running) {
 	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
