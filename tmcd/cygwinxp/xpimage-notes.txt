@@ -97,11 +97,17 @@ alias v='ls -lsF'
           net start w32time
           # May take a minute to take effect.
              
-      - Disable the Messenger Service to keep annoying spam pop-ups away.
+      - Disable the Messenger Service to keep annoying spam pop-ups away,
+        and to foil the Mailslot Heap Overflow Vulnerability, CVE-2006-1314
+        Also the Alerter Service, which also uses Mailslots on TCP port 445.
+        See http://www.microsoft.com/technet/security/bulletin/ms06-035.mspx
             # Optional informational commands are indented...
             cygrunsrv -VQ  Messenger
           sc config Messenger start= disabled
           sc stop Messenger
+            cygrunsrv -VQ  Alerter
+          sc config Alerter start= disabled
+          sc stop Alerter
 
       - Disable the SSDP Discovery Service and Universal Plug and Play Device Host.
         This closes port 5000 to attacks.  Also disable the Remote Registry service.
@@ -153,7 +159,7 @@ alias v='ls -lsF'
           When you already have a Cygwin, you can update the setup.exe by:
 
            # [On Ops as you.]
-           set pc=297
+           set pc=253
            scp -p /share/windows/cygwin-setup.exe pc$pc":"/tmp/setup.exe
              # Update the cached copy if you downloaded a new one.
              scp -p pc$pc":"/cygdrive/c/Software/Cygwin/setup.exe /share/windows/cygwin-setup.exe
@@ -165,6 +171,7 @@ alias v='ls -lsF'
            cp -p /tmp/setup.exe $csc
            chmod 755 $csc/setup.exe
            ls -l $csc
+           $csc/setup.exe &
 
         . Run Cygwin setup.exe in an RDP window.  (GUI-only interface.)
             # When Cygwin is already installed, ensure that upgrading SSH won't hang.
@@ -698,59 +705,59 @@ q
                 cat /local/logs/prog0.out
 # SKIP ]
 
-      - Get the testbed client code via CVS, build, and install it.
-            rootpc $pc
-            # [As root, on the node.]
-            login_name=fish ws_name=kzin domain=flux.utah.edu
-            ws_login=$login_name@$ws_name.$domain
-            cvs_login=$login_name@cvs.$domain
+      - Get the testbed client code via CVS and rsync, build, and install it.
 
-            # Start an agent and go to your workstation to get your ssh keys for the cvs server.
-            eval `ssh-agent -s`
-              ssh-add -l
-            ssh -A $ws_login
-              ssh-add -l
-            kdsa
-            exit
+            #[On boss.]
+            set pc=254
+              sudo ssh pc$pc id
+            sudo ssh pc$pc ls -l flux
+              sudo ssh pc$pc mkdir flux
 
-            ssh $cvs_login id
-              ssh -v $cvs_login id
-            export CVSROOT=$cvs_login:/usr/flux/CVS CVS_RSH=ssh
-
-              mkdir ~/flux
-            cd ~/flux
+            # Check out a testbed source tree somewhere on boss.
+            cd /home/fish/testbed-current
               # First time only
               mkdir CVS; touch CVS/Entries; echo . > CVS/Repository
+                # Simulated top setup if there's already a tree underneath.
+                echo cvs.flux.utah.edu:/usr/flux/CVS > CVS/Root
+                echo D/testbed//// > CVS/Entries
             # Any time the testbed tree needs to be re-created.  (Takes a while.)
             cvs -Q co testbed
               # Updates After that.
               cat CVS/Entries
+              cat testbed/CVS/Entries
                 cvs -n -q update testbed
               cvs -q update -d testbed
 
-            # Install some dotfiles for Root.
-            cp -p testbed/tmcd/cygwinxp/cygwin.root.bashrc ~root/.bashrc
-            cp -p testbed/tmcd/cygwinxp/cygwin.root.bash_profile ~root/.bash_profile
-            cp -p testbed/tmcd/cygwinxp/cygwin.root.emacs ~root/.emacs
-            # No HOME envar is set for root's desktop, so Emacs defaults it to C:/ .
-            cp -p ~root/.emacs C:/.emacs
+            # rsync over to the node.  Be patient, it's 50 megs.
+            sudo rsync -rl testbed root@pc$pc":"flux
 
-            # Install site-lisp files for Emacs.
-              v -t testbed/tmcd/cygwinxp/site-lisp
-              v -t c:/emacs-21.3/site-lisp
-            cp -rp testbed/tmcd/cygwinxp/site-lisp/* c:/emacs-21.3/site-lisp
-            ls -l c:/emacs-21.3/site-lisp
+            # Push the downloaded binary programs into the source tree for install.
+            sudo scp -p /share/windows/{WSName,addusers,usrtogrp,setx,devcon}.exe \
+                        pc$pc":"flux/testbed/tmcd/cygwinxp
 
-            # Need a resolv.conf before tmcc will work.
-              cat /etc/resolv.conf
-            cp -p ~/flux/testbed/tmcd/cygwinxp/resolv.conf /etc/resolv.conf
+            #[On the node.]
 
-            # The Elvin and program-agent man pages get installed in man8.
-            mkdir /usr/local/man/man8
-              
-            # Get the downloaded binary programs into the source tree for install.
-              ls -l ~/flux/testbed/tmcd/cygwinxp/*.exe
-            cp -p //fs/share/windows/{WSName,addusers,usrtogrp,setx,devcon}.exe ~/flux/testbed/tmcd/cygwinxp
+              ## Initial setup stuff.
+
+              # Install some dotfiles for Root.
+              cp -p testbed/tmcd/cygwinxp/cygwin.root.bashrc ~root/.bashrc
+              cp -p testbed/tmcd/cygwinxp/cygwin.root.bash_profile ~root/.bash_profile
+              cp -p testbed/tmcd/cygwinxp/cygwin.root.emacs ~root/.emacs
+              # No HOME envar is set for root's desktop, so Emacs defaults it to C:/ .
+              cp -p ~root/.emacs C:/.emacs
+
+              # Install site-lisp files for Emacs.
+                v -t testbed/tmcd/cygwinxp/site-lisp
+                v -t c:/emacs-21.3/site-lisp
+              cp -rp testbed/tmcd/cygwinxp/site-lisp/* c:/emacs-21.3/site-lisp
+              ls -l c:/emacs-21.3/site-lisp
+
+              # Need a resolv.conf before tmcc will work.
+                cat /etc/resolv.conf
+              cp -p ~/flux/testbed/tmcd/cygwinxp/resolv.conf /etc/resolv.conf
+
+              # The Elvin and program-agent man pages get installed in man8.
+              mkdir /usr/local/man/man8
 
             # Finally ready to do the Emulab makes!
             mkdir ~/flux/obj-real
@@ -779,11 +786,13 @@ q
               ps -Welf | grep emulab
               kill `ps -Welf | grep idlemon | awk '{print $2}'`
 
+              ls -l ~/flux/testbed/tmcd/cygwinxp/*.exe
             make client-install >& make.log1
             tail make.log1
 
             # Install the iperf HTML doc, since the makefiles don't do it.
             idoc=/usr/share/doc/iperf
+              v $idoc
             mkdir $idoc; chmod 755 $idoc
             (cd ~root/flux/testbed/event/linktest/iperf/iperf-2.0.2/doc; \
              for f in [a-z]*; do /usr/bin/install -c -o root -m 0644 $f $idoc ; done)
@@ -804,12 +813,16 @@ q
               #[On the node as me.]
               cd ~root
                 v $ptf/xpimage/*.tgz
-                mv $ptf/xpimage/xpimage-elab{,.2}.tgz
+                mv $ptf/xpimage/xpimage-elab{,.3}.tgz
               tar cfz $ptf/xpimage/xpimage-elab.tgz flux
-              #[Later, on the node as me.]
-              cd ~root
+                #[Best done on Ops.]
+                tar tvfz $ptf/xpimage/xpimage-elab.tgz | tail
+
+              # Re-install later.  Copy in on the node as me.
+                v ~root/flux
                 v $ptf/xpimage/xpimage*.tgz
               cp $ptf/xpimage/xpimage-elab.tgz /tmp
+
               #[On the node as root.]
               cd ~root
                 v flux
@@ -1239,7 +1252,7 @@ Making single images
         echo $pc $image
         node_admin on pc$pc &
           # Variant: wait until it's in the MFS before returning.
-          node_admin -w on pc$pc &
+          node_admin -w on pc$pc
               # Should not be necessary if ssh from root@boss to the node is working.
               rootpc $pc /sbin/reboot
           ## You may see:
@@ -1372,7 +1385,7 @@ Updating a set of existing images.
     . Build changes one place, make tarballs to update the others.
         #[On the build node, as me, in a Bash shell.]
           bash -l
-        date=2006-07-28
+        date=2006-11-16
         updates=/proj/testbed/fish/winxp
           v $updates/*$date*
 
@@ -1408,7 +1421,8 @@ Updating a set of existing images.
 
     . Install the tarballs to update a set of nodes.
         #[On Boss.]
-        set date=2006-07-28
+        set date=2006-11-16
+        v $rdf$date*
           script $rdf$date-sysprep
           script $rdf$date-pc850
           script $rdf$date-pc3000
@@ -1429,10 +1443,13 @@ Updating a set of existing images.
 
         set pid=testbed eid=new-windows-$hw
           set pid=testbed eid=new-windows-$hw"b"
+          ## set pid=testbed eid=Windows-1a
           ## set pid=testbed eid=Windows-1b
+          ## set pid=testbed eid=Windows-1e
           ## set pid=testbed eid=test-windows-$hw
           ## set pid=testbed eid=test-win-$hw-nofw
           ## set pid=testbed eid=test-windows-pc600
+          ## set pid=testbed eid=test-windows-pc850b
           ## set pid=testbed eid=test-windows-pc3000
         set exp=$eid.$pid.emulab.net
 
@@ -1476,6 +1493,7 @@ Updating a set of existing images.
           set rootpwd='rootPwd'
           set rd=/proj/testbed/fish/rdesktop/rdesktop-1.3.1
           set rdarg="-K -g 1280x1024 -a 16"
+          echo $nodes $exp
           foreach node ( $nodes )
             echo $node.$exp
             (cd $rd; ./rdesktop $rdarg -u root -p "$rootpwd" $node.$exp &)
@@ -1536,15 +1554,18 @@ Updating a set of existing images.
               end
 
             # Unpack the patched and edited system files.
-            date=2006-07-28
+            date=2006-11-16
+
             # Includes agetty.exe, under the SysV /etc/inittab.
+            # (Don't stop init in a console window, it kills agetty, and hence your login.)
             net stop init
             chmod 777 /etc/inittab
             tar xvfz /tmp/sys_$date.tgz -C /
               ls -l /sbin/agetty*
             chmod 600 /etc/inittab
             net start init
-            # sshd.exe may be busy, move the busy executable aside.
+
+            # sshd.exe may be busy, move the busy executable aside to install it.
               ls -l /usr/sbin/sshd*
             cd /usr/sbin
             net stop sshd
@@ -1556,7 +1577,8 @@ Updating a set of existing images.
           # Now that Cygwin and sshd are updated, we can go back to scripting...
           #[On Boss.]
           # Shut down the Emulab services so we can install new programs.
-          nodes "ps -Welf | grep emulab; killall evproxy"
+          nodes "ps -Welf | grep emulab"
+          nodes "killall evproxy"
           su_nodes "/usr/local/etc/emulab/rc/rc.syncserver shutdown; \
                     /usr/local/etc/emulab/rc/rc.progagent shutdown; \
                     /usr/local/etc/emulab/rc/rc.slothd stop; \
@@ -1569,7 +1591,8 @@ Updating a set of existing images.
           nodes "ps -Welf | grep emulab"
 
           # Unpack the Emulab files.
-          eval 'su_nodes "'" echo tar xfoz /tmp/elab_$date.tgz -C /usr/local "'" '
+          eval 'su_nodes "'" tar xfoz /tmp/elab_$date.tgz -C /usr/local "'" '
+          nodes "ls -lt /usr/local/etc/emulab | head -5"
 
      . Do one-time updates
          #[On Boss.]
@@ -1676,9 +1699,14 @@ Updating a set of existing images.
          # (Insert root password for "rootPwd" below.)
          ##su_nodes "prepare -p rootPwd"
          ## Have to do "prepare -n -s" on the SERIAL CONSOLE.  It shuts down the network.
-         ## (On SP0, expect "Error (2): The system cannot find the file specified.")
+         ##
+         ## On SP0, expect "Error (2): The system cannot find the file specified."
+         ##
+         ## The following is also normal, although the directory winds up empty at the end:
+         ##   "rm: cannot remove directory `/var/emulab/boot/tmcc': Directory not empty"
+         ##
          prepare -n -s
-         su_nodes "cat /etc/motd"
+         cat /etc/motd
 
          ### Checking cycle before making images. ###
          # It won't have to do the double-reboot dance, because the node names stay the same.
@@ -1711,7 +1739,9 @@ Updating a set of existing images.
              ## set exp=windows-5.testbed.emulab.net
              ## set exp=windows-5a.testbed.emulab.net
              ## set exp=test-windows-pc600.testbed.emulab.net
+             ## set exp=test-windows-pc850b.testbed.emulab.net
              ## set exp=test-windows-pc3000.testbed.emulab.net
+             ## set pid=testbed eid=test-windows-pc3000
 
          # Simple connectivity test.
          foreach node1 ( $nodes )
@@ -1725,6 +1755,8 @@ Updating a set of existing images.
          end
          # Linktest.
          run_linktest.pl -v -l 4 -e $pid/$eid
+         run_linktest.pl -v -l 2 -e $pid/$eid
+         run_linktest.pl -v -l 3 -e $pid/$eid
 
              # Tiny script updates (transmit from current directory.)
              set fixfile=liblocsetup.pm fixdest=/usr/local/etc/emulab/
@@ -1737,11 +1769,28 @@ Updating a set of existing images.
              eval 'su_nodes "'" ls -l $fixdest/$fixfile "'" '
              eval 'su_nodes "'" chown root $fixdest/$fixfile; chmod 755 $fixdest/$fixfile "'" '
 
+         # Check the Windows version.  "Help/About Windows" is "winver", no cut-and-paste.
+         set cv="/HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion"
+         # There's no service pack level for SP0 - Don't worry about the error.
+         foreach node ( $nodes )
+           echo -n "$node - "
+           ssh $node.$exp 'echo "`regtool get '" '$cv/ProductName'" '`'\
+                          '(Build `regtool get '" '$cv/BuildLab'" '`'\
+                          ': `regtool get '" '$cv/CSDVersion'" '`)" '
+         end
+
      . Prepare again, go into admin mode, and pull the images.
          # (Insert root password for "rootPwd" below.)
          ##su_nodes "prepare -p rootPwd"
          ## Have to do "prepare -n -s" on the serial console.
          prepare -n -s
+           #[On a single Windows Update node, set the motd line to UPDATE.]
+           cat /etc/motd
+           ed /etc/motd
+           1
+           s/node/UPDATE/p
+           w
+           q
 
          ##node_admin -e $pid,$eid on
            ## node_admin -e is broken.
@@ -1767,10 +1816,13 @@ Updating a set of existing images.
            v -t /{usr,proj}/testbed/images/WINXP*.ndz | head
          df -m /{usr,proj}/testbed/images
 
+             # One at a time...
              set node=SP0
              set node=SP1
              set node=SP2
              set node=UPDATE
+             set imagefile=/proj/testbed/images/WINXP-$node-$img"_"$date.ndz
+         # All together.
            echo $hw $img $disk $date
          foreach node ( $nodes )
            echo ================================  $node.$exp
@@ -1834,24 +1886,27 @@ Updating a set of existing images.
          # First, -new symlinks for testing.
          cd /usr/testbed/images
          set pctype; if ( "$hw" != pc850 ) set pctype="-$hw"
-         ls -lt WINXP-{SP[012],UPDATE}$pctype-new.ndz
-         ls -lt WINXP-{SP[012],UPDATE}-$img"_"$date.ndz
+         set imgs="{SP[012],UPDATE}"
+           echo $node
+           # set imgs=$node
+         ls -lt WINXP-$imgs$pctype-new.ndz
+         ls -lt WINXP-$imgs-$img"_"$date.ndz
          foreach node ( $nodes )
            set link=WINXP-$node$pctype-new.ndz file=WINXP-$node-$img"_"$date.ndz
            echo "$link -> $file"
            if ( -l $link ) rm -f $link
            ln -s $file $link
          end
-         v WINXP-{SP[012],UPDATE}$pctype-new.ndz
-         v -L WINXP-{SP[012],UPDATE}$pctype-new.ndz
+         v WINXP-$imgs$pctype-new.ndz
+         v -L WINXP-$imgs$pctype-new.ndz
            # Upward compatability from -pc3000 images to -sysprep images.
            set hw=pc3000 img=sysprep pctype=-pc3000
            # Restore.
            set hw=pc850 img=sysprep disk=/dev/ad0 pctype=
 
          # Update the dates in the image ID's.
-         ls -lLT WINXP-{SP[012],UPDATE}$pctype-new.ndz
-         ls -lLT WINXP-{SP[012],UPDATE}$pctype-new.ndz | gawk '{ sq = "'"'"'"; \
+         ls -lLT WINXP-$imgs$pctype-new.ndz
+         ls -lLT WINXP-$imgs$pctype-new.ndz | gawk '{ sq = "'"'"'"; \
                 # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
                 "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
                 image = gensub("\.ndz", "", 1, $NF); \
@@ -1859,7 +1914,6 @@ Updating a set of existing images.
                 print "update images set created=" sq date sq " where imagename=" sq image sq ";"\
                 print "update os_info set created=" sq date sq " where osname=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
-           cat ~/imgdates.sql
 
          echo "select created, imagename, path, pid from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort
          echo "select created, osname, pid from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort
@@ -1874,24 +1928,24 @@ Updating a set of existing images.
          # Then the regular symlinks.
          cd /usr/testbed/images
          set pctype; if ( "$hw" != pc850 ) set pctype="-$hw"
-         v WINXP-{SP[012],UPDATE}$pctype.ndz
-         v WINXP-{SP[012],UPDATE}-$img"_"$date.ndz
+         v WINXP-$imgs$pctype.ndz
+         v WINXP-$imgs-$img"_"$date.ndz
          foreach node ( $nodes )
            set link=WINXP-$node$pctype.ndz file=WINXP-$node-$img"_"$date.ndz
            echo "$link -> $file"
            if ( -l $link ) rm -f $link
            ln -s $file $link
          end
-         v WINXP-{SP[012],UPDATE}$pctype.ndz
-         v -L WINXP-{SP[012],UPDATE}$pctype.ndz
+         v WINXP-$imgs$pctype.ndz
+         v -L WINXP-$imgs$pctype.ndz
            # Upward compatability from -pc3000 images to -sysprep images.
            set hw=pc3000 img=sysprep pctype=-pc3000
            # Restore.
            set hw=pc850 img=sysprep disk=/dev/ad0 pctype=
 
          # Update the dates in the image ID's.
-         ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz
-         ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz | gawk '{ sq = "'"'"'"; \
+         ls -lLT WINXP-$imgs$pctype.ndz
+         ls -lLT WINXP-$imgs$pctype.ndz | gawk '{ sq = "'"'"'"; \
                 # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
                 "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
                 image = gensub("\.ndz", "", 1, $NF); \
