@@ -97,7 +97,7 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 #
 # Rules to regen configure written files.
 #
-%: %.in $(TBDEFS)
+%: %.in
 	@echo "Regenerating $@"
 	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ ./config.status
 
