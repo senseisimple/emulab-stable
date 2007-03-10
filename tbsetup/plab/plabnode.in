@@ -62,6 +62,10 @@ def main(args):
     if command == "alloc":
         try:
             node = slice.createNode(nodeid, force=parser.values.force)
+            # With the v4 NM, we have to sleep a couple seconds to give
+            # the slice the a chance to get keys/acct stuff straightened out
+            # so we can actually slogin and copy fixsudo.sh to the node.
+            time.sleep(2)
             node.emulabify()
             # Note that vnode_setup boots the node
             pass

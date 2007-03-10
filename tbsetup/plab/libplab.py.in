@@ -144,6 +144,31 @@ PLABEXPIREWARN = 1*WEEK        # one week advance warning for slice expiration.
 NODEEXPIREWARN = 2*WEEK+2*DAY  # about two weeks advance warning for slivers.
 
 #
+# This is a trigger table for dist'ing out multiple rootballs depending on
+# which NM is running on the node.  Since we don't know which version is
+# running on a node until we call into (DEF|COMPAT)_AGENT and actually connect
+# to the node, it's based off classnames.
+#
+# The table specifies a prefix to the default rootball name; this rootball
+# should be placed in the normal location.
+#
+# If the plcagent class and nodeagent class are both not in the trigger table,
+# we simply push the default rootball.
+#
+# Note that we could store version info in the database, but that doesn't
+# really have long-term value.  Plus, we have to be checking sites.xml all the
+# time to catch version changes during rollout.  This way, plabmonitord and
+# the web interface know exactly what is the version whenever a node is
+# contacted for setup.
+#
+# For now, only NM4agent has a custom tarball, since v4 nodes are in the
+# distinct minority right now.
+#
+from mod_PLC4 import NM4agent
+
+rootball_triggers = { mod_PLC4 : { NM4agent : 'NM4-' } }
+
+#
 # var to track failed renewals
 #
 failedrenew = []
@@ -1393,7 +1418,6 @@ class Slice:
 wrap_around(Slice._create, timeAdvice)
 wrap_around(Slice.destroy, timeAdvice)
 
-
 #
 # Node abstraction
 #
@@ -1401,12 +1425,33 @@ class Node:
     def __init__(self, slice, nodeid, pollNode = False):
         self.slice = slice
         self.nodeid = nodeid
-        self.IP = self.__findIP()
+        #self.IP = self.__findIP()
+        #self.hostname = self.__findHostname()
+        #self.phys_nodeid = self.__findPhysNodeID()
+        (self.IP,self.hostname,self.phys_nodeid) = self.__findHostInfo()
         self.leaseend = 0
         self.nodemeta = None
         self.pollNode = pollNode
+        # must be set in mod_<PLCAGENT>.createNode if you want to use
+        # multiple rootball and triggering support
+        self.nmagent = None
         return
 
+    def __logNodeHist(self,component,operation,status,msg):
+        try:
+            DBQueryFatal("insert into plab_nodehist values "
+                         "(NULL,%s,%s,%s,%s,%s,%s,%s)",
+                         (self.nodeid,self.phys_nodeid,
+                          time.strftime("%Y-%m-%d %H:%M:%S",
+                                        time.localtime(time.time())),
+                          component,operation,status,str(msg)))
+        except:
+            # do nothing
+            print "WARNING: could not log (%s,%s,%s,%s) into plab_nodehist!" % \
+                  (component,operation,status,msg)
+            pass
+        pass
+    
     # XXX: may want to rethink signal handling here.
     def _create(self, force=False):
         """
@@ -1430,8 +1475,15 @@ class Node:
             pass
 
         print "Creating Plab node %s on %s." % (self.nodeid, self.IP)
-        res, self.nodemeta, self.leaseend = \
-             self.slice.plab.agent.createNode(self)
+        res = None
+        try:
+            res, self.nodemeta, self.leaseend = \
+                 self.slice.plab.agent.createNode(self)
+            self.__logNodeHist('node','create','success','')
+        except:
+            self.__logNodeHist('node','create','failure',
+                               traceback.format_exception(*sys.exc_info()))
+            raise
         
         DBQueryFatal("replace into plab_slice_nodes"
                      " (exptidx, pid, eid, slicename, node_id,"
@@ -1521,7 +1573,14 @@ class Node:
                      "\n\n%s" % (self.nodeid, tbstr), TBOPS)
             pass
 
-        deleted = self.slice.plab.agent.freeNode(self)
+        deleted = 0
+        try:
+            deleted = self.slice.plab.agent.freeNode(self)
+            self.__logNodeHist('node','free','success','')
+        except:
+            self.__logNodeHist('node','free','failure',
+                               traceback.format_exception(*sys.exc_info()))
+            raise
         
         TIMESTAMP("freenode %s finished." % self.nodeid)
         return not deleted
@@ -1537,8 +1596,16 @@ class Node:
         return res[0] | res[1]
 
     def _renew(self):
-        res, self.nodemeta, self.leaseend = \
-                       self.slice.plab.agent.renewNode(self)
+        res = None
+        try:
+            res, self.nodemeta, self.leaseend = \
+                 self.slice.plab.agent.renewNode(self)
+            self.__logNodeHist('node','renew','success','')
+        except:
+            self.__logNodeHist('node','renew','failure',
+                               traceback.format_exception(*sys.exc_info()))
+            raise
+        
         DBQueryFatal("update plab_slice_nodes"
                      " set nodemeta = %s, leaseend = %s"
                      " where node_id = %s",
@@ -1556,6 +1623,41 @@ class Node:
         Emulab/Plab node.  Primarily, this unpacks the magic files on to
         the node.
         """
+        # check to see if we should use a custom rootball
+        rrootballname = rootballname
+        try:
+            if (not self.nmagent == None) \
+                   and (not self.slice.plab.agent == None):
+                tpc = self.slice.plab.agent.__class__
+                tnc = self.nmagent.getAgentClass()
+                if rootball_triggers.has_key(tpc) \
+                       and rootball_triggers[tpc].has_key(tnc):
+                    # found a valid prefix for the rootball; update the name
+                    rrootballname = rootball_triggers[tpc][tnc] + rootballname
+                    if debug:
+                        print "Updated rootball name from %s to %s" % (rootballname,
+                                                                       rrootballname)
+                        pass
+                    pass
+                else:
+                    if debug:
+                        print "rbtriggers: %s; looking for %s/%s" % (str(rootball_triggers),
+                                                                     str(tpc),
+                                                                     str(tnc))
+                        pass
+                    pass
+                pass
+            else:
+                if debug:
+                    print "One of the agents was null!"
+                    pass
+                pass
+            pass
+        except:
+            print "WARNING: exception while trying to update rootball name"
+            traceback.print_exc()
+            pass
+        
         TIMESTAMP("emulabify started on %s." % self.nodeid)
         print "Overlaying Emulab files on %s ..." % self.nodeid
         try:
@@ -1573,7 +1675,13 @@ class Node:
             print "Adding slice user to 'root' group on %s failed; " \
                   "attempting to carry on anyway." % self.nodeid
             pass
-        self.unpackRootball(rootballpath, rootballname)
+        try:
+            self.unpackRootball(rootballpath, rrootballname)
+            self.__logNodeHist('node','emulabify','success','')
+        except:
+            self.__logNodeHist('node','emulabify','failure',
+                               traceback.format_exception(*sys.exc_info()))
+            raise
         TIMESTAMP("emulabify finished on %s." % self.nodeid)
 
     def addToGroup(self, user, group):
@@ -1711,6 +1819,59 @@ class Node:
         if debug:
             print "IP is %s for node %s" % (IP, self.nodeid)
         return IP
+
+    def __findHostname(self):
+        """
+        Grabs the publicly-routable hostname of the remote node.
+        """
+        
+        res = DBQueryFatal("select pm.hostname,i.IP from nodes as nv"
+                           " left join interfaces as i"
+                           "  on nv.phys_nodeid=i.node_id"
+                           " left join plab_mapping as pm"
+                           "  on i.IP=pm.IP"
+                           " where nv.node_id='%s'" % (self.nodeid))
+        if (not res or len(res) == 0):
+            print "Warning: no hostname found for nodeid %s" % self.nodeid
+            hostname = None
+            pass
+        else:
+            ((hostname,IP),) = res
+            pass
+        if debug:
+            print "hostname is %s for node %s" % (hostname,IP)
+            pass
+        
+        return hostname
+
+    #
+    # Returns (IP,hostname,phys_nodeid).
+    #
+    def __findHostInfo(self):
+        """
+        Grabs the publicly-routable IP and hostname of the remote node,
+        and also our phys_nodeid for it.
+        """
+        res = DBQueryFatal("select i.IP,pm.hostname,nv.phys_nodeid "
+                           " from nodes as nv"
+                           " left join interfaces as i"
+                           "  on nv.phys_nodeid=i.node_id"
+                           " left join plab_mapping as pm"
+                           "  on i.IP=pm.IP"
+                           " where nv.node_id='%s'" % (self.nodeid))
+        if (not res or len(res) == 0):
+            print "Warning: no hostinfo found for nodeid %s" % self.nodeid
+            (IP,hostname,phys_nodeid) = (None,None,None)
+            pass
+        else:
+            ((IP,hostname,phys_nodeid),) = res
+            pass
+        if debug:
+            print "hostname is %s for node %s" % (hostname,IP)
+            pass
+        
+        return (IP,hostname,phys_nodeid)
+    
     pass  # end of class Node
 # AOP wrappers for class Node
 wrap_around(Node._create, timeAdvice)

@@ -17,11 +17,16 @@ use POSIX ":sys_wait_h";
 # 
 sub usage()
 {
-    print STDERR "Usage: plabmonitor [-d]\n";
+    print STDERR "Usage: plabmonitor [-dS]\n";
+    print STDERR "  -d   Debug mode.\n";
+    print STDERR "  -S   Run WITHOUT reading monitor state from database;\n";
+    print STDERR "         new state will still be written (default is to" .
+	" load state).\n";
     exit(-1);
 }
-my $optlist = "d";
+my $optlist = "dS";
 my $debug   = 0;
+my $stateful = 1;
 
 #
 # Only real root can call this.
@@ -80,12 +85,16 @@ if (@ARGV) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{'S'})) {
+    $stateful = 0;
+}
 
 #
 # Function prototypes
 #
 sub updatenodepool($);
 sub fatal($);
+#sub loadstate($$);
 
 #
 # Global vars
@@ -100,6 +109,11 @@ my $CHILLTIME    = 5;    # How long to wait after processing expirations.
 my $NEVER        = 0;    # "Never" in seconds since the Epoch.
 
 my $MAXLA        = 20;   # Don't let the system load get out of hand.
+
+# Keep only this many (success,fail) sequences in memory at a 
+# time (they get saved in the db anyway... we just need to minimize cost
+# across fork()s)
+my $MAX_STATE_SEQUENCES = 10;
 
 #
 # daemonize
@@ -240,6 +254,94 @@ while (1) {
     # We may have just fired off a bunch of kills, so chill for a bit to
     # let things quiesce.
     sleep($CHILLTIME);
+}
+
+#
+# Load monitor state from the plab_nodehist table for the given pnode.
+#
+sub loadstate($$) {
+    my $pool = shift;
+    my $pnode = shift;
+    my $poolpid = $pool->{'PID'};
+    my $pooleid = $pool->{'EID'};
+    my $poolpnodes = $pool->{'PNODES'};
+
+    if (!defined($pool) || !defined($pnode)) 
+      return;
+
+    my $res = 
+      DBQueryFatal("select unix_timestamp(timestamp),component,operation," . 
+                   "status " . 
+                   " from plab_nodehist where phys_node_id='$pnode' " . 
+                   " order by timestamp asc" . 
+                   );
+
+    # calculate sequence lengths; store most recent 10
+    my @sequences = ();
+    my $lastseqstat = '', $lastts = 0;
+    if ($res && $res->num_rows()) {
+      while (my @row = $res->fetchrow_array()) {
+          my ($ts,$com,$op,$status) = @row;
+
+          # filter out entries older than two weeks
+          # NOTE: after we create the sequence for this node, we will
+          # check the last (most recent) timestamp; if it's older than
+          # three days, we reject all sequence state for this node
+          # and start clean.  The reason for this is pretty obvious;
+          # if a node was good for two weeks, then we don't check for two 
+          # weeks (i.e., cause plabmonitord didn't run), we might try to use
+          # old state to assume new check intervals, and this might be bad.
+
+          if ($lastts == 0) {
+              # first row
+              $lastseqstat = $status;
+              $lastts = $ts;
+              next;
+          }
+	  
+          # @entry = (up/down,seqtime,conseccount)
+	  
+          # add this one on to the last.
+          @sequences[0][1] += ($ts - $lastts);
+          if ($lastseqstat eq $status) {
+              ++(@sequences[0][2]);
+          }
+          else {
+              # new entry
+              my @entry = ();
+              if ($status eq 'success') {
+                  entry[0] = 'up';
+              }
+              else {
+                  entry[0] = 'down';
+              }
+              entry[1] = 0;
+              entry[2] = 1;
+              
+	      # save off this sequence
+              push @sequences, \@entry;
+          }
+	  
+          $lastseqstat = $status;
+          $lastts = $ts;
+	  
+      }
+  }
+    
+    # remove the oldest N sequences...
+    if (scalar(@sequences) $MAX_STATE_SEQUENCES) {
+      for (my $i = scalar(@sequences); $i >= $MAX_STATE_SEQUENCES; --$i) {
+          undef($sequences[$i]);
+      }
+    }
+
+    $poolpnodes->{$pnode}->{'history'} = \@sequences;
+
+    Log(STATUSLOG, "plabmonitord, $pnodename, loadstate, ".
+      (scalar(@{$poolpnodes->{$pnodename}->{'history'}})).
+       " sequences added.");
+    
+    return;
 }
 
 #

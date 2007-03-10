@@ -23,12 +23,14 @@ import time
 import calendar
 import cPickle
 import os
+import socket
 
 from libtestbed import *
 from aspects import wrap_around
 from timer_advisories import timeAdvice
 
-#import sshhttp
+#from sshhttp import *
+import popen2
 
 #
 # output control vars
@@ -46,8 +48,8 @@ DEF_PLC_USER = ""
 DEF_PLC_PASS = ""
 DEF_PLC_PASS_FILE = "@prefix@/etc/plab/plc.pw"
 
-#DEF_NM_PORT = "812"
-DEF_NM_PORT = "814"
+DEF_NM_PORT = "812"
+DEF_NM_LEGACY_PORT = "814"
 
 #
 # A bunch of time constants / intervals (in seconds)
@@ -67,12 +69,13 @@ INSTMETHOD_PLCINST = "plc-instantiated"
 DEF_EMULAB_INSTMETHOD = INSTMETHOD_DELEGATED
 
 # XXX: need to figure out what these are in the new NM's context
+# hm, doesn't seem to have a version() call
 MAJOR_VERS = 1
 MINOR_VERS = 0
 MIN_REV    = 10
 
-class NMagent:
-    def __init__(self, IP, nodeid, nmport = DEF_NM_PORT):
+class NM3agent:
+    def __init__(self, IP, nodeid, nmport = DEF_NM_LEGACY_PORT):
         self.__server = xmlrpclib.ServerProxy("http://" + IP + ":" +
                                               nmport + "/")
         self.__vers = [0,0,0]
@@ -81,10 +84,16 @@ class NMagent:
         pass
 
     def create_sliver(self, ticket):
-        return self.__server.create_sliver(xmlrpclib.Binary(ticket))
+        res = self.__server.create_sliver(xmlrpclib.Binary(ticket))
+        if debug:
+            print "NM3: create_sliver: res = %s" % str(res)
+        return res
 
     def delete_sliver(self, rcap):
-        return self.__server.delete_sliver(rcap)
+        res = self.__server.delete_sliver(rcap)
+        if debug:
+            print "NM3: delete_sliver: res = %s" % str(res)
+        return res
 
     def version(self):
         if self.__vers == [0,0,0]:
@@ -97,18 +106,235 @@ class NMagent:
                 pass
             pass
         return self.__vers
+    
+    def getAgentClass(self):
+        return self.__class__
 
     pass
-#wrap_around(NMagent.create_sliver, timeAdvice)
-#wrap_around(NMagent.delete_sliver, timeAdvice)
 
+DEF_NM_DELEGATE_ACCT = "utah_elab_delegate"
+DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
+DEF_NM_SSHCMD = "/usr/bin/ssh -oStrictHostKeyChecking=no -l %s -i %s %s"
+
+class NM4agent:
+    def __init__(self,IP,nodeid,nmport=DEF_NM_PORT,
+                 del_acct=DEF_NM_DELEGATE_ACCT,
+                 del_key=DEF_NM_DELEGATE_KEY):
+        #self._sPipeMethod = SshConnection(DEF_NM_SSHCMD % (del_acct,
+        #                                                   del_key,
+        #                                                   IP))
+
+        # Instead of ssh xmlrpc transport, we use xmlrpclib load/dumps.
+        self._isopen = False
+        self.delacct = del_acct
+        self.delkey = del_key
+        
+        self.__vers = [4,0,0]
+        self.IP = IP
+        self.nodeid = nodeid
+        pass
+
+    def _open(self):
+        if not self._isopen:
+            try:
+                self.__agentconn = popen2.Popen3(DEF_NM_SSHCMD % (self.delacct,
+                                                                  self.delkey,
+                                                                  self.IP))
+                self._isopen = True
+            except:
+                raise
+            pass
+        pass
+
+    def _close(self):
+        if self._isopen:
+            # Nothing else we can do except wait for the connection to die,
+            # and that's silly... or kill the pid ourself---but the connection
+            # will naturally die after the response.
+            self._isopen = False
+        pass
+
+    def _xcall(self,cmd,args=()):
+        self._open()
+        if debug:
+            print "NM4agent: sending xmlrpc request (%s,%s)" % (cmd,str(args))
+        print >>self.__agentconn.tochild, xmlrpclib.dumps(args,cmd)
+        self.__agentconn.tochild.close()
+        if debug:
+            print "NM4agent: waiting for response"
+        retval = xmlrpclib.loads(self.__agentconn.fromchild.read())
+        if debug:
+            print "NM4agent: response = '%s'" % str(retval)
+        self.__agentconn.wait()
+        if debug:
+            print "NM4agent: _xcall complete"
+        self._close()
+
+        # XXX: we whack the retval to be compat with NMv3
+        rret = retval[0][0]
+        if rret == 1:
+            rret = 0
+            pass
+        retval = [ rret, [''] ]
+        
+        return retval
+    
+    def deliver_ticket(self,ticket):
+        if debug:
+            print "NM4agent: delivering ticket '%s'" % str(ticket)
+        return self._xcall('Ticket',(ticket,))
+    
+    def create_sliver(self,slice_name):
+        if debug:
+            print "NM4agent: creating sliver for slice %s" % slice_name
+        return self._xcall('Create',(slice_name,))
+
+    def delete_sliver(self,slice_name):
+        if debug:
+            print "NM4agent: destroying sliver for slice %s" % slice_name
+        return self._xcall('Destroy',(slice_name,))
+
+    def start_sliver(self,slice_name):
+        return self._xcall('Start',(slice_name,))
+
+    def stop_sliver(self,slice_name):
+        return self._xcall('Stop',(slice_name,))
+
+    # NM v4 does not have a version method...
+    def version(self):
+        return self.__vers
+    
+    def getAgentClass(self):
+        return self.__class__
+    pass
+
+DEF_NM_LEGACY_AGENT = NM3agent
+DEF_NM_AGENT = NM4agent
+
+class NMagent_wrapper:
+    def __init__(self,IP,nodeid):
+        # first try a tcp connection to the legacy NM port; if timeout,
+        # try default agent right away.
+        self.__agent = None
+        
+        if DEF_NM_LEGACY_AGENT != None:
+            legacy_nm = False
+            
+            #sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            #sock.settimeout(10.0)
+            try:
+                #sock.connect((str(IP),int(DEF_NM_LEGACY_PORT)))
+
+                tmp_agent = DEF_NM_LEGACY_AGENT(IP,nodeid)
+                tmp_agent.version()
+                
+                legacy_nm = True
+                if debug:
+                    print "NM %s (%s) IS legacy" % (IP,nodeid)
+                    pass
+            except:
+                print "NM on %s (%s) does not appear to be legacy." % (IP,
+                                                                       nodeid)
+                traceback.print_exc()
+                pass
+            
+            if legacy_nm:
+                self.__agent = DEF_NM_LEGACY_AGENT(IP,nodeid)
+                pass
+            else:
+                self.__agent = DEF_NM_AGENT(IP,nodeid)
+                pass
+            pass
+        else:
+            self.__agent = DEF_NM_AGENT(IP,nodeid)
+            pass
+        pass
+    
+    def getAgent(self):
+        return self.__agent
+
+    def getAgentClass(self):
+        return self.__agent.__class__
+
+    def create_sliver(self,slicename,ticketdata):
+        arg = None
+        
+        if self.__agent.__class__ == NM4agent:
+            arg = slicename
+            pass
+        else:
+            arg = ticketdata
+            pass
+
+        # if NM4agent, try delivering the ticket first, to maximize our
+        # chances:
+        if self.__agent.__class__ == NM4agent:
+            try:
+                res = tryXmlrpcCmd(self.__agent.deliver_ticket,ticketdata)
+                if res[0] == 0:
+                    print "WARNING: while trying to deliver ticket for slice %s: %s" % (slicename,str(res[1]))
+                else:
+                    if debug:
+                        print "Ticket delivery succeeded for slice %s" % slicename
+                        pass
+                    pass
+                pass
+            except:
+                print "WARNING: exception while delivering ticket for slice %s" % slicename
+                traceback.print_exc()
+                pass
+            pass
+        else:
+            if debug:
+                print "DEBUG: type(agent) = %s %s" % (str(type(self.__agent)),
+                                                      str(type(NM4agent)))
+            pass
+        
+        res = tryXmlrpcCmd(self.__agent.create_sliver,arg)
+        if self.__agent.__class__ == NM4agent:
+            #
+            # XXX - fix later
+            #
+            # return the new way -- we don't want to store a ticket
+            # until rollout is mostly done.
+            return (res,'')
+        else:
+            if debug:
+                print "res is %s" % str(res)
+                pass
+            retval = (res,None)
+            try:
+                retval = (res,cPickle.dumps(res[1][0]))
+            except:
+                pass
+            return retval
+
+        return None
+    
+    def delete_sliver(self,slicename,ticketdata):
+        arg = None
+        if self.__agent.__class__ == NM4agent:
+            arg = slicename
+            pass
+        else:
+            arg = ticketdata
+            pass
+        return tryXmlrpcCmd(self.__agent.delete_sliver,arg)
+
+    def update_sliver(self,slicename,ticketdata):
+        arg = None
+        if self.__agent.__class__ == NM4agent:
+            return tryXmlrpcCmd(self.__agent.deliver_ticket,ticketdata)
+        else:
+            return tryXmlrpcCmd(self.__agent.create_sliver,ticketdata)
+        return None
+    
+    pass
 
 #
 # The real PLC agent.  Wraps up standard arguments to the
 # PLC XMLRPC interface.
 #
-
-
 class PLCagent:
     def __init__(self, slicename,
                  uri = DEF_PLC_URI,
@@ -340,6 +566,8 @@ class mod_PLC4:
             raise
 
         try:
+            # XXX - fix for new NM and rollout.
+            #PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
             PLCticket = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
             if debug:
                 print PLCticket
@@ -424,7 +652,7 @@ class mod_PLC4:
         
         return ret
 
-    def getSliceMeta(self, slice):
+    def getSliceMetaLegacy(self, slice):
         agent = self.__getAgent(slice.slicename)
         
         try:
@@ -434,50 +662,84 @@ class mod_PLC4:
                 pass
             pass
         except:
-            print "Failed to get PLC ticket for slice %s" % slice.slicename
+            print "Failed to get legacy PLC ticket for slice %s" % slice.slicename
             raise
 
         return cPickle.dumps(PLCticket)
 
-    # XXX: fix to use new NM
-    def createNode(self, node):
+    def getSliceMeta(self,slice):
+        agent = self.__getAgent(slice.slicename)
 
-        ticketdata = cPickle.loads(node.slice.slicemeta)
-        agent  = NMagent(node.IP, node.nodeid)
-                  
-        #res = tryXmlrpcCmd(agent.SliceNodesAdd, node.IP,
-        #                   OKstrs = ["already assigned"])
-        #if debug:
-        #    print res
-        #    pass
-
-        # Make sure node is running compatible interface
         try:
-            vers = agent.version()
+            retval = tryXmlrpcCmd(agent.SliceGetTicket)
+            if debug:
+                print str(retval)
+                pass
             pass
         except:
-            print "Unable to check version on remote NM agent!"
+            print "Failed to get PLC ticket for slice %s" % slice.slicename
             raise
-        if vers[0] != MAJOR_VERS or vers[1] != MINOR_VERS \
-               or vers[2] < MIN_REV:
-            raise RuntimeError, \
-                  "Remote node manager version incompatible on %s: %s" % \
-                  (node.nodeid, ".".join(map(lambda x: str(x), vers)))
-        pass
+        return cPickle.dumps(retval)
+
+    # XXX: fix to use new NM
+    def createNode(self, node):
+        plcagent = self.__getAgent(node.slice.slicename)
+
+        ticketdata = cPickle.loads(node.slice.slicemeta)
+        node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
+
+        # XXX: if node is NM4agent, grab new-style ticket from PLC
+        # (flip during rollout once a majority of nodes have NMv4).
+        #
+        if (node.nmagent.getAgent()).__class__ == NM4agent:
+            try:
+                ticketdata = tryXmlrpcCmd(plcagent.SliceGetTicket)
+                if debug:
+                    print "DEBUG: got new ticket data successfully"
+            except:
+                print "Error: could not get ticket for %s" % node.slice.slicename
+                traceback.print_exc()
+                pass
+            pass
+                  
+        res = tryXmlrpcCmd(plcagent.SliceNodesAdd, node.hostname,
+                           OKstrs = ["already assigned"])
+        if debug:
+            print "mod_PLC4: createNode: res = %s" % str(res)
+            pass
+
+        # Make sure node is running compatible interface
+#        try:
+#            vers = agent.version()
+#            pass
+#        except:
+#            print "Unable to check version on remote NM agent!"
+#            raise
+#        if vers[0] != MAJOR_VERS or vers[1] != MINOR_VERS \
+#               or vers[2] < MIN_REV:
+#            raise RuntimeError, \
+#                  "Remote node manager version incompatible on %s: %s" % \
+#                  (node.nodeid, ".".join(map(lambda x: str(x), vers)))
+#        pass
 
         try:
-            res = tryXmlrpcCmd(agent.create_sliver, ticketdata)
+            res = node.nmagent.create_sliver(node.slice.slicename,ticketdata)
             if debug:
                 print res
                 pass
 
-            if not res[0] == 0:
+            realres = res[0]
+
+            if not realres[0] == 0:
                 raise RuntimeError, "create_sliver failed: %d, %s" % \
-                      (res[0], res[1])
+                      (realres[0], realres[1])
             pass
         except:
             print "Failed to create sliver %s on slice %s" % \
                   (node.nodeid, node.slice.slicename)
+            if debug:
+                traceback.print_exc()
+                pass
             # XXX: Can we clean up on the plab side here?
             #      delete_sliver requires an rcap, but we don't have one
             #      in this case (since sliver creation failed).
@@ -485,15 +747,23 @@ class mod_PLC4:
             raise
 
         # send back the rcap
-        return (res, cPickle.dumps(res[1][0]), node.slice.leaseend)
-
+        #return (res, cPickle.dumps(res[1][0]), node.slice.leaseend)
+        # instead, we send back whatever the wrapped agent sends back... which
+        # is some form of rcap.
+        return (realres,res[1],node.slice.leaseend)
+    
     def freeNode(self, node):
-        rcap = cPickle.loads(node.nodemeta)
-        agent = NMagent(node.IP, node.nodeid)
+        rcap = None
+        try:
+            rcap = cPickle.loads(node.nodemeta)
+        except:
+            print "WARNING: couldn't load rcap"
+            pass
+        node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
         res = None
 
         try:
-            res = tryXmlrpcCmd(agent.delete_sliver, rcap)
+            res = node.nmagent.delete_sliver(node.slice.slicename,rcap)
             if debug:
                 print res
                 pass
@@ -507,10 +777,10 @@ class mod_PLC4:
         
         return res
 
-    # XXX: fix
+    # XXX: MIGHT need fixing...
     def renewNode(self, node, length = 0):
-        return  self.createNode(node)
-
+        return self.createNode(node)
+    
     # XXX: add, now that the NM can do this...
     def startNode(self,node):
         return None
@@ -541,7 +811,8 @@ class mod_PLC4:
             # GetSlices in PLC 4 doesn't give you everything if you ask for
             # nothing.
             #
-            print "calling getSliceExpTime with slicename %s" % slicename
+            if debug:
+                print "calling getSliceExpTime with slicename %s" % slicename
             sdict = tryXmlrpcCmd(agent.SliceInfo,[slicename])
             # bug in PLC return filter...
             #                     ([slicename],['name','expires']))
