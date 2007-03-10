@@ -56,7 +56,10 @@ mkmfs() {
 	fi
 }
 
+cd /
+
 mkmfs /tmp 4 0
+mkmfs /root 1 1
 mkmfs /etc 4 1
 mkmfs /var 4 1
 

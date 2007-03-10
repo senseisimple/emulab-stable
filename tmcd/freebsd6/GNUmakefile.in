@@ -93,7 +93,8 @@ script-install:	dir-install
 
 #
 # NOTES:
-#  * We still use rc.conf.d/dhclient right now (til we switch to 6.x rc.d files)
+#  * We still use rc.conf.d/dhclient right now
+#    (til we switch to 6.x rc.d files)
 #
 frisbee-mfs-install:
 	(cd ../freebsd5; $(MAKE) all frisbee-mfs-install)
@@ -103,6 +104,12 @@ frisbee-mfs-install:
 
 mfs-install:
 	(cd ../freebsd5; $(MAKE) all mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+cdboot-install:
+	(cd ../freebsd5; $(MAKE) all cdboot-install)
 	rm -f $(SYSETCDIR)/testbed/dhclient
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*
 	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
