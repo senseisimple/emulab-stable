@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -374,7 +374,7 @@ struct configval {
 	 (char *) &foohdr.sysconfig.hostname - (char *) &foohdr },
 	{"domain",      CONFIG_STRING, sizeof(foohdr.sysconfig.domain),
 	 (char *) &foohdr.sysconfig.domain - (char *) &foohdr },
-	{"bootdisk",    CONFIG_IGNORE, 0, NULL },
+	{"bootdisk",    CONFIG_IGNORE, 0, 0 },
 };
 int maxconfigs = sizeof(configvals)/sizeof(struct configval);
 
@@ -403,7 +403,7 @@ readconfigfromfile(int devfd, tbboot_t *tbhdr, char *path)
 			warnx("Misformed input line: '%s'\n", buf);
 			return -1;
 		}
-		*bp   = NULL;
+		*bp   = 0;
 		name  = buf;
 		value = bp + 1;
 		
