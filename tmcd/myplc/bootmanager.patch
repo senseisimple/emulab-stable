@@ -1,0 +1,24 @@
+diff -ur source/configuration source.new/configuration
+--- source/configuration	2007-03-12 00:18:05.000000000 -0700
++++ source.new/configuration	2007-03-12 00:19:30.000000000 -0700
+@@ -52,7 +52,7 @@
+ 
+ 
+ # whether or not to skip hardware requirement check
+-SKIP_HARDWARE_REQUIREMENT_CHECK=0
++SKIP_HARDWARE_REQUIREMENT_CHECK=1
+ 
+ 
+ # minimum amount of memory needed for installer, in kb
+diff -ur source/steps/ConfirmInstallWithUser.py source.new/steps/ConfirmInstallWithUser.py
+--- source/steps/ConfirmInstallWithUser.py	2007-03-12 00:18:05.000000000 -0700
++++ source.new/steps/ConfirmInstallWithUser.py	2007-03-12 00:21:41.000000000 -0700
+@@ -47,7 +47,7 @@
+     log.write( "\n\nStep: Confirming install with user.\n" )
+     
+     try:
+-        confirmation= ""
++        confirmation= "yes"
+         install= 0
+         print welcome_message
+         
