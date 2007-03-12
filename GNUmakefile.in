@@ -287,10 +287,19 @@ install-setbuildinfo:
 	@echo "Setting the Build and Version info"
 	$(SETBUILDINFO)
 
+# We use separate src and obj trees in Emulab, so the traditional distclean to
+# clean "made" files from a mingled source-and-obj tree is unnecessary.
+# However, this may be useful if you mistakenly configure and make a src tree.
 clean:		clean-subdirs
 distclean:	distclean-subdirs
 	rm -f Makeconf GNUmakefile config.h config.status config.cache config.log
 	rm -f $(DISTCLEAN_FILES)
+#
+# Here's a different approch to recover from just configure problems.  It cleans
+# all files from an obj tree that have a corresponding .in file in the src tree.
+undo-configure:
+	find $SRCDIR -name '*.in' | \
+	    sed -e "s;$SRCDIR;$OBJDIR;" -e 's;[.]in$;;' | xargs rm -f
 
 elabinelab:
 	-mkdir -p $(INSTALL_TOPDIR)/src
