@@ -274,7 +274,7 @@ if (!$silent && !$group->IsProjectGroup()) {
     my $group_leader_uid   = $leader->uid();
 
     SENDMAIL("$group_leader_name '$group_leader_uid' <$group_leader_email>",
-     "New Group '$pid/$pid ($gid_idx)' Created",
+     "New Group '$pid/$gid ($gid_idx)' Created",
      "This message is to notify you that group '$gid' in project '$pid'\n".
      "has been created. Please save this link so that you can send it to\n".
      "people you wish to have join this group:\n".
