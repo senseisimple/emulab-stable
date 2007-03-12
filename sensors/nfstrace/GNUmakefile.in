@@ -148,4 +148,4 @@ fs-install install:
 endif
 
 clean:	clean.nfsdump
-	rm -f *.o core nfstrace.proxy nfsdump nfstrace.init
+	rm -f *.o core nfsdump nfstrace.init
