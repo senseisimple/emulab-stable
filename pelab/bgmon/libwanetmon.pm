@@ -130,6 +130,9 @@ sub sendcmd($$)
     if( !defined $cmd{managerID} ){
 	$cmd{managerID} = "default";
     }
+    if( !defined $cmd{expid} ){
+        $cmd{expid} = $expid;
+    }
 
     my $sercmd = serialize_hash( \%cmd );
 #    print "sercmd=$sercmd\n";
@@ -238,7 +241,7 @@ sub sendcmd_evsys($$$;$)
 sub stopnode($$)
 {
     my ($node,$managerID) = @_;
-    my %cmd = ( expid    => $expid,
+    my %cmd = (
 		managerID => $managerID,
 		cmdtype  => "STOPALL" );
     sendcmd($node,\%cmd);
@@ -264,10 +267,11 @@ sub stopnode_evsys($$$)
 }
 
 
-sub killnode($)
+sub killnode($$)
 {
-    my ($node) = @_;
-    my %cmd = ( expid    => $expid,
+    my ($node,$managerID) = @_;
+    my %cmd = (
+                managerID=> $managerID,
 		cmdtype  => "DIE" );
     sendcmd($node,\%cmd);
 }

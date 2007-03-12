@@ -7,13 +7,13 @@
 
 use lib '/usr/testbed/lib';
 use libtbdb;
-use libwanetmon;
 use event;
 use Getopt::Std;
 use strict;
 use IO::Socket::INET;
 use IO::Select;
-
+#use lib '/q/proj/tbres/gebhardt/testbed/pelab/bgmon';
+use libwanetmon;
 
 #
 # Turn off line buffering on output
@@ -28,7 +28,8 @@ sub usage {
 my $debug    = 0;
 my $impotent = 0;
 my $evexpt   = "__none";
-my $bgmonexpt = "tbres/pelabbgmon";
+my $bgmonexpt;
+my $default_bgmonexpt = "tbres/pelabbgmon";
 my ($server,$port,$cmdport);
 my %opt = ();
 if (!getopts("s:p:c:dih", \%opt)) {
@@ -98,7 +99,7 @@ $sel->add($socket_cmd);
 
 print "setting cmdport $cmdport and cmdexpt $bgmonexpt\n";
 setcmdport($cmdport);
-setexpid($bgmonexpt);
+setexpid($default_bgmonexpt);
 
 
 #main()
@@ -148,6 +149,16 @@ sub callbackFunc($$$) {
 	my $objname   = event_notification_get_objname($handle, $notification);
 	my $eventtype = event_notification_get_eventtype($handle,
 							 $notification);
+        my $thisexpid = event_notification_get_string($handle,
+                                                     $notification,
+                                                     "expid");
+        if( defined $thisexpid && $thisexpid ne ""  ){
+            setexpid($thisexpid);
+            $bgmonexpt = $thisexpid;
+        }else{
+            $bgmonexpt = $default_bgmonexpt;
+        }
+
 #	print "Event: $time $site $expt $group $host $objtype $objname " .
 #		"$eventtype\n";
 
@@ -266,9 +277,16 @@ sub callbackFunc($$$) {
 	    stopnode($srcnode, $managerID);
 	}
         elsif( $eventtype eq "DIE" ){
-            #TODO!
-        }
+            my $node = event_notification_get_string($handle,
+							$notification,
+							"srcnode");
+            my $managerID = event_notification_get_string($handle,
+							  $notification,
+							  "managerID");
 
+	    print "got $eventtype:$node,$managerID,$bgmonexpt\n";
+            killnode($node,$managerID);
+        }
 }
 
 
