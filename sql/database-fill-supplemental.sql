@@ -17,4 +17,4 @@ INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.0','delay','/boot/kernel.del
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.0','linkdelay','/boot/kernel.linkdelay/kernel');
 
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('cur_log_seq', 1);
-INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('next_osid', 100);
+INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('next_osid', 10000);
