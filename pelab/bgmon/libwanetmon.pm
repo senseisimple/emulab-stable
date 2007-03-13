@@ -267,11 +267,10 @@ sub stopnode_evsys($$$)
 }
 
 
-sub killnode($$)
+sub killnode($)
 {
-    my ($node,$managerID) = @_;
+    my ($node) = @_;
     my %cmd = (
-                managerID=> $managerID,
 		cmdtype  => "DIE" );
     sendcmd($node,\%cmd);
 }
