@@ -2106,7 +2106,7 @@ CREATE TABLE `osid_map` (
   `osid` int(8) unsigned NOT NULL default '0',
   `btime` datetime NOT NULL default '1000-01-01 00:00:00',
   `etime` datetime NOT NULL default '9999-12-31 23:59:59',
-  `imageid` int(8) unsigned NOT NULL default '0',
+  `nextosid` int(8) unsigned NOT NULL default '0',
   PRIMARY KEY  (`osid`,`btime`,`etime`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
