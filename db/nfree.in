@@ -330,15 +330,21 @@ foreach my $n (@freed_nodes) {
 	$error++;
 	next;
     }
-    my $result = DBQueryFatal("select mustclean from os_info ".
-			      "where osid='$def_boot_osid'");
-    my ($clean) = $result->fetchrow_array();    
 
+    #
     # See if the OS it was running was marked as mustclean or not. Basically,
     # this is an OSKit hack to avoid reloading disks that have not been
     # touched by the kernel. If a def_boot_path was set, there is nothing
     # we can figure out, so just reload it. This needs to be more general
     # purpose.
+    #
+    my $clean;
+    if (defined($def_boot_osid)) {
+	my $result = DBQueryFatal("select mustclean from os_info ".
+				  "where osid='$def_boot_osid'");
+	($clean) = $result->fetchrow_array();    
+    }
+   
     if ($isvirt || !$imageable) {
 	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
 	$mustclean = 0;
