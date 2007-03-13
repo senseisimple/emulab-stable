@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1000,14 +1000,6 @@ Phase "database", "Setting up database", sub {
 	ExecQuietFatal("$MYSQLADMIN -u mysql ping");
     };
 
-    Phase "dbpatch", "Patching up mysql DB", sub {
-	if (!ExecQuiet("$MYSQLDUMP -u root -p$password mysql emulab_dbs")) {
-	    PhaseSkip("DB already patched");
-	}
-
-	ExecQuietFatal("$MYSQL -u root -p$password mysql < $TOP_SRCDIR/sql/opsdb.sql");
-    };
-
     # Once the password is inserted and privs flushed, will need a password
     # from this point forward!
     Phase "privs", "Initializing mysqld priv system", sub {
@@ -1022,6 +1014,15 @@ Phase "database", "Setting up database", sub {
 			   " Password=PASSWORD(\"$password\") ".
 			   "where user=\"root\"; flush privileges' | ".
 			   "$MYSQL -s -u root mysql");
+    };
+
+    Phase "dbpatch", "Patching up mysql DB", sub {
+	if (!ExecQuiet("$MYSQLDUMP -u root -p$password mysql emulab_dbs")) {
+	    PhaseSkip("DB already patched");
+	}
+
+	ExecQuietFatal("$MYSQL -u root -p$password mysql ".
+		       "  < $TOP_SRCDIR/sql/opsdb.sql");
     };
 };
 
