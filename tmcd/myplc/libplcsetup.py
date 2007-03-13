@@ -93,7 +93,7 @@ def getXMLRPCAuthInfo():
 def getXMLRPCServer(url=DEF_PLC_URL):
     return xmlrpclib.Server(url,allow_none=True)
 
-def plcAddUser(realname,email,passwd,keys=[],root=False):
+def plcAddUser(realname,email,passwd,keys=[],root=False,pi=False):
     auth = getXMLRPCAuthInfo()
     server = getXMLRPCServer()
 
@@ -126,9 +126,22 @@ def plcAddUser(realname,email,passwd,keys=[],root=False):
             pass
         pass
 
+    roles = []
     if root:
-        server.AddRoleToPerson(auth,'admin',pid)
+        roles.append('admin')
         pass
+    if pi:
+        roles.append('pi')
+        roles.append('tech')
+        pass
+    
+    roles.append('user')
+
+    for role in roles:
+        server.AddRoleToPerson(auth,role,pid)
+        pass
+
+    server.AddPersonToSite(auth,pid,DEF_SITE_ID)
     
     return pid
 
@@ -138,7 +151,7 @@ def plcDeleteUser(email):
 
     return server.DeletePerson(auth,email)
 
-def plcUpdateUser(realname,email,passwd,keys=[],root=False):
+def plcUpdateUser(realname,email,passwd,keys=[],root=False,pi=False):
     auth = getXMLRPCAuthInfo()
     server = getXMLRPCServer()
 
@@ -168,11 +181,43 @@ def plcUpdateUser(realname,email,passwd,keys=[],root=False):
                                          'last_name'  : ln })
         pass
 
-    # update roles
-    if 'admin' in ulist[0]['roles'] and not root:
-        server.UpdatePerson(auth,email,{ 'roles' : [ 'user' ] })
+    roles = []
+    if root:
+        roles.append('admin')
+        pass
+    if pi:
+        roles.append('pi')
+        roles.append('tech')
         pass
 
+    roles.append('user')
+
+    # update roles
+    # delete any:
+    for cr in ulist[0]['roles']:
+        found = False
+        for nr in roles:
+            if cr == nr:
+                found = True
+                break
+            pass
+        if not found:
+            server.DeleteRoleFromPerson(auth,cr,email)
+            pass
+        pass
+    # add any:
+    for nr in roles:
+        found = False
+        for cr in ulist[0]['roles']:
+            if nr == cr:
+                found = True
+                break
+            pass
+        if not found:
+            server.AddRoleToPerson(auth,nr,email)
+            pass
+        pass
+    
     # update keys
     retlist = server.GetKeys(auth,ulist[0]['key_ids'],[ 'key_id','key' ])
     keylist = map(lambda(x): x['key'],retlist)
@@ -189,11 +234,12 @@ def plcUpdateUser(realname,email,passwd,keys=[],root=False):
             pass
         pass
     # delete:
-    for ret in retlist:
-        if not ret['key'] in keylist:
-            server.DeletePersonKey(auth,ret['key_id'])
-            pass
-        pass
+    # Actually, don't delete keys; users might add them.
+    #for ret in retlist:
+    #    if not ret['key'] in keylist:
+    #        server.DeletePersonKey(auth,ret['key_id'])
+    #        pass
+    #    pass
 
     # always update the password, it's easier than doing AuthCheck and all...
     server.UpdatePerson(auth,email,{ 'password' : passwd })
@@ -202,8 +248,8 @@ def plcUpdateUser(realname,email,passwd,keys=[],root=False):
 
 def plcUpdateUsers(uplist=[]):
     """
-    Takes a list of (realname,email,passwd,keys=[],root=False) account tuples
-    and adds, deletes, and updates as needed.
+    Takes a list of (realname,email,passwd,keys=[],root=False,pi=False)
+    account tuples and adds, deletes, and updates as needed.
     """
     auth = getXMLRPCAuthInfo()
     server = getXMLRPCServer()
@@ -246,12 +292,12 @@ def plcUpdateUsers(uplist=[]):
     #print "alist = %s\n\nulist = %s\n\ndlist = %s\n" % (alist,ulist,dlist)
     
     for als in alist:
-        print "Adding user %s" % als[1]
+        print "Adding user %s (%s)" % (als[1],str((als[4],als[5])))
         plcAddUser(*als)
         pass
 
     for uls in ulist:
-        print "Updating user %s" % uls[1]
+        print "Updating user %s (%s)" % (uls[1],str((uls[4],uls[5])))
         plcUpdateUser(*uls)
         pass
 

@@ -15,6 +15,7 @@ def runCommand(cmd):
         output.append(line)
         line = cp.readline()
         pass
+    cp.close()
     return output
 
 def getHostname():
@@ -22,7 +23,31 @@ def getHostname():
 
 def doService(serviceName,serviceAction):
     #print "Sending %s to %s" % (serviceAction,serviceName)
-    return os.system("service %s %s" % (serviceName,serviceAction))
+    pid = os.fork()
+    if pid == 0:
+        #
+        # These hacks seem necessary to prevent /sbin/service from somehow
+        # giving us zombies that then hang the parent perl process in
+        # rc.bootsetup.  Not sure why...
+        # 
+        sys.stdin.close()
+        sys.stderr.close()
+        sys.stdout.close()
+        sys.stdout = open('/dev/null','w')
+        sys.stderr = open('/dev/null','w')
+        os.execvp("/sbin/service",('service',serviceName,serviceAction))
+        sys.exit(0)
+        pass
+    else:
+        os.wait()
+        pass
+    #retval = runCommand("/sbin/service %s %s" % (serviceName,serviceAction))
+    #if retval != None:
+    #    for line in retval:
+    #        print line
+    #        pass
+    #    pass
+    #return None
 
 def readUserKeys(uid):
     """
@@ -39,7 +64,11 @@ def readUserKeys(uid):
             pass
         pass
 
+    fd.close()
+
     return keylist
+
+TMCC = '/usr/local/etc/emulab/tmcc'
 
 def runTMCC(cmd):
     """
@@ -108,6 +137,15 @@ if not os.getuid() == 0:
     sys.exit(-1)
     pass
 
+# do this right away so we can exit without doing a single thing to the plc
+# config.
+tmccEPlabConfig = runTMCC('eplabconfig')
+
+if tmccEPlabConfig == None or len(tmccEPlabConfig) == 0:
+    print "plabinelab: nothing to do, exiting"
+    sys.exit(0)
+    pass
+
 # -3.
 print "plabinelab: stopping plc:"
 doService('plc','stop')
@@ -131,7 +169,6 @@ if not os.path.exists('/plc/emulab/bootmanager.patch.done'):
 # python modules.
 from libplcsetup import *
 
-TMCC = '/usr/local/etc/emulab/tmcc'
 # XXX: need to switch this stuff to be a little more intelligent so
 # we can configure private planetlab networks from the control net.
 DEF_PLC_HOST = getHostname()
@@ -151,7 +188,6 @@ except:
 print "plabinelab: gathering info from tmcd"
 tmccAccounts = runTMCC('accounts')
 tmccCreator = runTMCC('creator')
-tmccEPlabConfig = runTMCC('eplabconfig')
 
 (creatorUID,creatorEmail) = (None,None)
 for acct in tmccAccounts:
@@ -234,12 +270,16 @@ for lineDict in tmccAccounts:
         if lineDict['ROOT'] == '1':
             root = True
             pass
+        pi = False
+        if lineDict['LOGIN'] == creatorUID:
+            pi = True
+            pass
         # we use the @emulab.net address because it makes it easier for us
         # to later remove users during a swapmod (there are legit plc users
         # in the db that are needed for plc maint).
         userlist.append((lineDict['NAME'],
                          lineDict['LOGIN'] + '@emulab.net',lineDict['PSWD'],
-                         readUserKeys(lineDict['LOGIN']),root))
+                         readUserKeys(lineDict['LOGIN']),root,pi))
         pass
     pass
 
@@ -388,5 +428,9 @@ os.system('chkconfig plc off')
 
 # Finis.
 print "plabinelab: done!"
+
+sys.stdin.close()
+sys.stdout.close()
+sys.stderr.close()
 
 sys.exit(0)
