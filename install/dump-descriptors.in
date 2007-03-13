@@ -22,19 +22,25 @@ sub usage()
 #
 # These are the images/osids we dump out. We of course get the embedded osids.
 # We should probably add an export flag to the tables so we can avoid this
-# hardwired list.
+# hardwired list. Note that all of these are assumed to live in the emulab-ops
+# project.
 #
-my @images	  = ('emulab-ops-FBSD410+RHL90-STD',
-		     'emulab-ops-FBSD410-STD',
-		     'emulab-ops-RHL90-STD');
+my @imagenames	  = ('FBSD410+RHL90-STD',
+		     'FBSD410-STD',
+		     'RHL90-STD');
 
-my @osids	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
+my @osnames	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
 		     'OPSNODE-BSD', 'FW-IPFW',
-		     'RHL-STD', 'FBSD-STD',
-		     'emulab-ops-FBSD-JAIL', 'emulab-ops-POWER-CONTROLLER');
+		     'RHL-STD', 'FBSD-STD', 'FBSD-JAIL', 'POWER-CONTROLLER');
 
-my %osidtoimageid = ("RHL-STD"  => "emulab-ops-RHL90-STD",
-		     "FBSD-STD" => "emulab-ops-FBSD410-STD");
+my @osids	   = ();
+
+#
+# Need to map these dynamically since we do not want to hardwire the actual
+# nextosid IDs (numbers) into this table.
+#
+my %mappings       = ("RHL-STD"  => "RHL90-STD",
+		      "FBSD-STD" => "FBSD410-STD");
 
 #
 # Configure variables
@@ -90,8 +96,8 @@ open(OUTPUT, ">$filename") or
 #
 DBQueryFatal("create temporary table temp_images like images");
 DBQueryFatal("insert into temp_images ".
-	     "select * from images where ".
-	     join(" or ", map("imageid='$_'", @images)));
+	     "select * from images where pid='$protoproj' and (".
+	     join(" or ", map("imagename='$_'", @imagenames)) . ")");
 
 my $query_result  = DBQueryFatal("show create table temp_images");
 my $create_string = ($query_result->fetchrow_array())[1];
@@ -155,8 +161,9 @@ foreach my $key (keys(%tempkeys)) {
 #
 DBQueryFatal("create temporary table temp_os_info like os_info");
 DBQueryFatal("insert into temp_os_info ".
-	     "select * from os_info where ".
-	     join(" or ", map("osid='$_'", @osids)));
+	     "select * from os_info where pid='$protoproj' and ((".
+	     join(" or ", map("osname='$_'", @osnames)) . ") or (".
+	     join(" or ", map("osid='$_'", @osids)) . "))");
 
 $query_result  = DBQueryFatal("show create table temp_os_info");
 $create_string = ($query_result->fetchrow_array())[1];
@@ -179,11 +186,20 @@ DBQueryFatal("update temp_os_info set ".
 # We reset the nextosid slots in the -STD osids, rather then worrying
 # about the osid_map table. 
 #
-foreach my $osid (keys(%osidtoimageid)) {
-    my $nextosid = $osidtoimageid{$osid};
+foreach my $osname (keys(%mappings)) {
+    my $nextosname = $mappings{$osname};
+
+    $query_result =
+	DBQueryFatal("select osid from temp_os_info ".
+		     "where pid='$protoproj' and osname='$nextosname'");
+    if (! $query_result->numrows) {
+	print "Could not map $protoproj,$osname to its osid!\n";
+	exit(-1);
+    }
+    my ($nextosid) = $query_result->fetchrow_array();
 
     DBQueryFatal("update temp_os_info set nextosid='$nextosid' ".
-		 "where osid='$osid'");
+		 "where pid='$protoproj' and osname='$osname'");
 }
 
 $query_result =

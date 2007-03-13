@@ -22,7 +22,7 @@ sub usage()
 # These are the OSIDs that are used to populate the osidtoimageid table
 # using their nextosid entries.
 #
-my @standard_osids  = ('RHL-STD', 'FBSD-STD');
+my @standard_osnames  = ('RHL-STD', 'FBSD-STD');
 
 #
 # Configure variables
@@ -45,7 +45,9 @@ use Project;
 #$libdb::DBQUERY_DEBUG = 1;
 
 # Local
-my %osidtoimageid = ();
+my %osidtoimageid  = ();
+my %local_osids    = ();
+my %local_imageids = ();
 
 #
 # Turn off line buffering on output
@@ -86,8 +88,9 @@ my $gid     = $protoproj->gid();
 my $gid_idx = $protoproj->gid_idx();
 
 # Temp tables to hold new rows.
-DBQueryFatal("create temporary table temp_images like images");
-DBQueryFatal("create temporary table temp_os_info like os_info");
+DBQueryFatal("create table temp_images like images");
+DBQueryFatal("create table temp_os_info like os_info");
+DBQueryFatal("create table temp_o2i like osidtoimageid");
 
 #
 # Open tempfile.
@@ -136,20 +139,90 @@ while (my $rowref = $describe_result->fetchrow_hashref()) {
 }
 
 #
+# Go through the new set of os_info entries and assign local IDs to them.
+# Remember them since we need to change the new images table too.
+#
+my $query_result = DBQueryFatal("select osid from temp_os_info");
+
+while (my ($osid) = $query_result->fetchrow_array()) {
+    $local_osids{$osid} = TBGetUniqueIndex("next_osid", 1000);
+}
+
+#
+# Update temp_os_info with locally derived osids. nextosid as well.
+#
+$query_result->dataseek(0);
+
+while (my ($osid) = $query_result->fetchrow_array()) {
+    my $newosid = $local_osids{$osid};
+
+    DBQueryFatal("update temp_os_info set osid='$newosid' ".
+		 "where osid='$osid'");
+    DBQueryFatal("update temp_os_info set nextosid='$newosid' ".
+		 "where nextosid='$osid'");
+}
+
+#
+# Go through new set of images entries, but watch for ezid images since they
+# have the same ID as its corresponding os_info entry.
+#
+$query_result = DBQueryFatal("select imageid,ezid from temp_images");
+
+while (my ($imageid,$ezid) = $query_result->fetchrow_array()) {
+    if ($ezid) {
+	$local_imageids{$imageid} = $local_osids{$imageid};
+    }
+    else {
+	$local_imageids{$imageid} = TBGetUniqueIndex("next_osid", 1000);
+    }
+}
+
+#
+# Update temp_images with locally derived imageids.
+#
+$query_result->dataseek(0);
+
+while (my ($imageid) = $query_result->fetchrow_array()) {
+    my $newimageid = $local_imageids{$imageid};
+
+    DBQueryFatal("update temp_images set imageid='$newimageid' ".
+		 "where imageid='$imageid'");
+}
+
+#
+# And then update osids inside temp_images with locally derived imageids.
+#
+foreach my $osid (keys(%local_osids)) {
+    my $newosid = $local_osids{$osid};
+
+    DBQueryFatal("update temp_images set part1_osid='$newosid' ".
+		 "where part1_osid='$osid'");
+    DBQueryFatal("update temp_images set part2_osid='$newosid' ".
+		 "where part2_osid='$osid'");
+    DBQueryFatal("update temp_images set part3_osid='$newosid' ".
+		 "where part3_osid='$osid'");
+    DBQueryFatal("update temp_images set part4_osid='$newosid' ".
+		 "where part4_osid='$osid'");
+    DBQueryFatal("update temp_images set default_osid='$newosid' ".
+		 "where default_osid='$osid'");
+}
+
+#
 # Use the nextosid slot of the -STD osids to figure out what the default
 # images are.
 #
-my $query_result =
+$query_result =
     DBQueryFatal("select nextosid from temp_os_info ".
 		 "where nextosid is not null and (".
-		 join(" or ", map("osid='$_'", @standard_osids)) . ")");
+		 join(" or ", map("osname='$_'", @standard_osnames)) . ")");
 
 while (my ($nextosid) = $query_result->fetchrow_array()) {
     my $subquery_result =
-	DBQueryFatal("select imageid from temp_images where ".
+	DBQueryFatal("select imageid from temp_images ".
+		     "where loadlength=1 and (".
 		     join(" or ", map("$_='$nextosid'",
 				      ("part1_osid", "part2_osid",
-				       "part3_osid", "part4_osid"))));
+				       "part3_osid", "part4_osid"))) . ")");
 
     if (!$subquery_result->numrows) {
 	print "*** WARNING: No osidtoimageid mapping for $nextosid\n";
@@ -159,13 +232,6 @@ while (my ($nextosid) = $query_result->fetchrow_array()) {
     
     $osidtoimageid{$nextosid} = $imageid;
 }
-
-#
-# Ready to populate the tables. Move the entries from temp_images and
-# temp_os_info across to the real tables.
-#
-DBQueryFatal("replace into images select * from temp_images");
-DBQueryFatal("replace into os_info select * from temp_os_info");
 
 #
 # Make up osidtoimageid entries for all local PCs. This is a shotgun
@@ -178,10 +244,18 @@ while (my ($type) = $query_result->fetchrow_array()) {
     foreach my $osid (keys(%osidtoimageid)) {
 	my $imageid = $osidtoimageid{$osid};
 
-	DBQueryFatal("replace into osidtoimageid values ".
+	DBQueryFatal("replace into temp_o2i values ".
 		     "('$osid', '$type', '$imageid')");
     }
 }
+
+#
+# Ready to populate the tables. Move the entries from temp_images and
+# temp_os_info across to the real tables.
+#
+DBQueryFatal("replace into images select * from temp_images");
+DBQueryFatal("replace into os_info select * from temp_os_info");
+DBQueryFatal("replace into osidtoimageid select * from temp_o2i");
 
 exit(0);
 
