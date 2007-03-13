@@ -309,12 +309,12 @@ class OSinfo
               </tr>\n";
 
 	if ($nextosid) {
-	    if (strncmp($nextosid, "MAP:", 4) == 0)
+	    if ($nextosid == 0) {
 		echo "<tr>
 		        <td>Next Osid: </td>
 		        <td class=left>
-			    Mapped via DB table: " .
-		                substr($nextosid, 4) . " </td></tr>\n";
+			    Mapped via DB table: osid_map</td></tr>\n";
+	    }
 	    else
 		echo "<tr>
                         <td>Next Osid: </td>

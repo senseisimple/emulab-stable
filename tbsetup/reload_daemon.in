@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -50,9 +50,6 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use NodeType;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
 
 #
 # These come from the library.

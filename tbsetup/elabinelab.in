@@ -1006,7 +1006,8 @@ sub TearDownEmulab()
     # why that is.
     #
     DBQueryFatal("update nodes set ".
-		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
+		 "  def_boot_osid=NULL,next_boot_osid=NULL,".
+		 "  temp_boot_osid=NULL ".
 		 "where " .
 		    join(" or ", map("node_id='$_'",
 				     ($bossnode, $opsnode,
@@ -1216,7 +1217,8 @@ sub RemoveNodes()
     # why that is.
     #
     DBQueryFatal("update nodes set ".
-		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
+		 "  def_boot_osid=NULL,next_boot_osid=NULL,".
+		 "  temp_boot_osid=NULL ".
 		 "where " .
 		   join(" or ", map("node_id='$_'", @nodes)));
     

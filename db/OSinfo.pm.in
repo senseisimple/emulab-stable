@@ -1,0 +1,216 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package OSinfo;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use User;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		  = "@prefix@";
+my $BOSSNODE      = "@BOSSNODE@";
+my $CONTROL	  = "@USERNODE@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBAPPROVAL    = "@TBAPPROVALEMAIL@";
+my $TBAUDIT       = "@TBAUDITEMAIL@";
+my $TBBASE        = "@TBBASE@";
+my $TBWWW         = "@TBWWW@";
+
+# Cache of instances to avoid regenerating them.
+my %osids      = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx or pid,osname, depending on the args.
+#
+sub Lookup($$;$)
+{
+    my ($class, $arg1, $arg2) = @_;
+    my $osid;
+
+    #
+    # A single arg is either an index or a "pid,osname" or "pid/osname" string.
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $osid = $1;
+	}
+	elsif ($arg1 =~ /^([-\w]*),([-\w\.\+]*)$/ ||
+	       $arg1 =~ /^([-\w]*)\/([-\w\.\+]*)$/) {
+	    $arg1 = $1;
+	    $arg2 = $2;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (! (($arg1 =~ /^[-\w\.\+]*$/) && ($arg2 =~ /^[-\w\.\+]*$/))) {
+	return undef;
+    }
+
+    #
+    # Two args means pid/osname lookup instead of gid_idx.
+    #
+    if (defined($arg2)) {
+	my $osid_result =
+	    DBQueryWarn("select osid from os_info ".
+			"where pid='$arg1' and osname='$arg2'");
+
+	return undef
+	    if (! $osid_result || !$osid_result->numrows);
+
+	($osid) = $osid_result->fetchrow_array();
+    }
+
+    # Look in cache first
+    return $osids{"$osid"}
+        if (exists($osids{"$osid"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from os_info where osid='$osid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self           = {};
+    $self->{'OSINFO'}  = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $osids{"$osid"} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'OSINFO'}->{$_[1]}); }
+sub osname($)           { return field($_[0], "osname"); }
+sub osid($)             { return field($_[0], "osid"); }
+sub pid($)	        { return field($_[0], "pid"); }
+sub gid($)	        { return field($_[0], "gid"); }
+sub pid_idx($)          { return field($_[0], "pid_idx"); }
+sub gid_idx($)          { return field($_[0], "gid_idx"); }
+sub creator($)          { return field($_[0], "creator"); }
+sub creator_idx($)      { return field($_[0], "creator_idx"); }
+sub created($)          { return field($_[0], "created"); }
+sub description($)      { return field($_[0], "description"); }
+sub OS($)		{ return field($_[0], "OS"); }
+sub version($)		{ return field($_[0], "version"); }
+sub path($)             { return field($_[0], "path"); }
+sub magic($)            { return field($_[0], "magic"); }
+sub machinetype($)      { return field($_[0], "machinetype"); }
+sub osfeatures($)       { return field($_[0], "osfeatures"); }
+sub ezid($)		{ return field($_[0], "ezid"); }
+sub shared($)		{ return field($_[0], "shared"); }
+sub mustclean($)	{ return field($_[0], "mustclean"); }
+sub op_mode($)		{ return field($_[0], "op_mode"); }
+sub nextosid($)		{ return field($_[0], "nextosid"); }
+sub max_concurrent($)   { return field($_[0], "max_concurrent"); }
+sub mfs($)              { return field($_[0], "mfs"); }
+sub reboot_waittime($)  { return field($_[0], "reboot_waittime"); }
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $osid = $self->osid();
+    
+    my $query_result =
+	DBQueryWarn("select * from os_info where osid=$osid");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'OSINFO'} = $query_result->fetchrow_hashref();
+
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid    = $self->pid();
+    my $osid   = $self->osid();
+    my $osname = $self->osname();
+
+    return "[OS $osid: $pid,$osname]";
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $osid = $self->osid();
+
+    my $query = "update os_info set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where osid='$osid'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Check permissions.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid = (ref($user) ? $user->uid() : $user);
+
+    return TBOSIDAccessCheck($uid, $self->osid(), $access_type);
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

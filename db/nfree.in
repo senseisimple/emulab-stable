@@ -378,7 +378,7 @@ foreach my $n (@freed_nodes) {
     DBQueryWarn("update nodes set startupcmd='',rpms='',deltas='', ".
 		"tarballs='',failureaction='fatal', routertype='none', ".
 		"def_boot_cmd_line='',next_boot_cmd_line='', ".
-		"temp_boot_osid='',next_boot_osid='', ".
+		"temp_boot_osid=NULL,next_boot_osid=NULL, ".
 		"update_accounts=0,ipport_next=ipport_low, ".
 		"sfshostid=NULL,allocstate='$allocFreeState',boot_errno=0 ".
 		"where node_id='$n'") || $error++;

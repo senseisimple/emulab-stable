@@ -3930,5 +3930,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.111: Minor fix to schema file; skip to next entry.
 
+4.112: OSIDs and IMAGEIDs are now globally unique.
 
+       All of the sql changes are made in the following script:
 
+         ./step4_newids.pl

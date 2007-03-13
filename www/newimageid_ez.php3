@@ -1185,6 +1185,11 @@ $os_version  = $formfields["os_version"];
 $op_mode     = $formfields["op_mode"];
 
 #
+# Grab unique imageid (before locking tables).
+# 
+$imageid = TBGetUniqueIndex("next_osid");
+
+#
 # Special option. Whole disk image, but only one partition that actually
 # matters. 
 #
@@ -1210,16 +1215,6 @@ if (($image  = Image::LookupByName($project, $imagename)) ||
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
-}
-
-#
-# Just concat them to form a unique imageid and osid.
-# 
-$imageid = "$pid-$imagename";
-if (($image  = Image::Lookup($imageid)) ||
-    ($osinfo = OSInfo::Lookup($imageid))) {
-    DBQueryFatal("unlock tables");
-    TBERROR("Could not form a unique ID for $pid/$imagename!", 1);
 }
 
 DBQueryFatal("INSERT INTO images ".

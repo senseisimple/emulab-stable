@@ -2013,11 +2013,11 @@ sub TBBootWhat($;$)
     # The priority would seem pretty clear.
     #
     return ($next_boot_osid, $next_boot_opmode)
-	if (defined($next_boot_osid) && $next_boot_osid ne "");
+	if (defined($next_boot_osid) && $next_boot_osid ne 0);
     return ($temp_boot_osid, $temp_boot_opmode)
-	if (defined($temp_boot_osid) && $temp_boot_osid ne "");
+	if (defined($temp_boot_osid) && $temp_boot_osid ne 0);
     return ($def_boot_osid, $def_boot_opmode)
-	if (defined($def_boot_osid) && $def_boot_osid ne "");
+	if (defined($def_boot_osid) && $def_boot_osid ne 0);
 
     print("*** Warning: node '$node': All boot info was null!\n");
     return undef;
@@ -2341,8 +2341,11 @@ sub TBResolveNextOSID($;$$)
 	# images, at least short of creating a new experiment with the same
 	# ns file.
 	#
-	if ($next_osid && $next_osid =~ /^MAP:(\w+)/) {
-	    my $map = $1;
+	# next_osid used to be MAP:osid_map, but now its an integer field
+	# so just look for a 0 index, which is not a "valid" osid.
+	#
+	if (defined($next_osid) && $next_osid == 0) {
+	    my $map = "osid_map";
 
 	    my $timestr;
 	    if (defined($pid) && defined($eid)) {

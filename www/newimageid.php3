@@ -790,9 +790,13 @@ $default_osid= $formfields["default_osid"];
 $path        = $formfields["path"];
 
 #
+# Grab unique imageid (before locking tables). 
+# 
+$imageid = TBGetUniqueIndex("next_osid");
+
+#
 # And insert the record!
 #
-
 DBQueryFatal("lock tables images write, osidtoimageid write");
 
 #
@@ -805,15 +809,6 @@ if (($image = Image::LookupByName($project, $imagename))) {
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
-}
-
-#
-# Just concat them to form a unique imageid. 
-# 
-$imageid = "$pid-$imagename";
-if (($image = Image::Lookup($imageid))) {
-    DBQueryFatal("unlock tables");
-    TBERROR("Could not form a unique imageid for $pid/$imagename!", 1);
 }
 
 #

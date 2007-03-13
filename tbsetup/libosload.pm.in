@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -23,6 +23,8 @@ use libreboot;
 use libtblog;
 use Node;
 use NodeType;
+use Image;
+use OSinfo;
 use English;
 use File::stat;
 use IO::Handle;
@@ -65,6 +67,7 @@ sub osload ($$) {
     my $usedefault  = 1;
     my $mereuser    = 0;
     my $rowref;
+    my $image;
 
     if (!defined($args->{'nodelist'})) {
 	tberror "Must supply a node list!"; # INTERNAL
@@ -120,12 +123,20 @@ sub osload ($$) {
 	}
     }
 
+    if (defined($imageid)) {
+	$image = Image->Lookup($imageid);
+	if (!defined($image)) {
+	    tberror("Could not map $imageid to its object!");
+	    return -1;
+	}
+    }
+
     #
     # Check permission to use the imageid.
     # 
-    if (defined($imageid) && $mereuser &&
-	! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
-	tberror "You do not have permission to load '$imageid'!";
+    if (defined($image) && $mereuser &&
+	! $image->AccessCheck($UID, TB_IMAGEID_READINFO)) {
+	tberror "You do not have permission to load $image";
 	return -1;
     }
 
@@ -136,11 +147,11 @@ sub osload ($$) {
     # NOT intended to be strong enforcement of license restrictions, just a
     # way to catch mistakes.
     #
-    if (defined($imageid) &&
-	!TBImageLoadMaxOkay($imageid, scalar(@nodes), @nodes)) {
+    if (defined($image) &&
+	!TBImageLoadMaxOkay($image->imageid(), scalar(@nodes), @nodes)) {
 	tberror 
 	    "Would exceed maxiumum concurrent instances ".
-		"limitation for $imageid";
+		"limitation for $image";
 	return -1;
     }
 
@@ -197,9 +208,14 @@ sub osload ($$) {
 
 	if ($usedefault) {
 	    $imageid = $default_imageid;
+	    $image   = Image->Lookup($imageid);
+	    if (!defined($image)) {
+		tberror("Could not map $imageid to its object!");
+		return -1;
+	    }
 	}
 
-	print STDERR "osload: Using $imageid for $node\n"
+	print STDERR "osload: Using $image for $node\n"
 	    if $debug;
 
 	#
@@ -207,7 +223,7 @@ sub osload ($$) {
 	# by caching the image info on the first use.  GetImageInfo() will
 	# perform various one-time checks as well.
 	# 
-	if (!exists($imageinfo{$imageid}) && !GetImageInfo($imageid, $node)) {
+	if (!exists($imageinfo{$imageid}) && !GetImageInfo($image, $node)) {
 	    goto failednode;
 	}
 	$rowref = $imageinfo{$imageid};
@@ -222,7 +238,13 @@ sub osload ($$) {
 	my $maxwait	   = $rowref->{'maxloadwait'};
 	my $imagepid	   = $rowref->{'pid'};
 
-	print "osload ($node): Changing default OS to $defosid\n";
+	my $osinfo = OSinfo->Lookup($defosid);
+	if (!defined($osinfo)) {
+	    tberror("Could map map OSID $defosid to its object!");
+	    goto failednode;
+	}
+
+	print "osload ($node): Changing default OS to $osinfo\n";
 	if (!$TESTMODE) {
 	    system("$osselect $defosid $node");
 	    if ($?) {
@@ -488,18 +510,17 @@ sub osload ($$) {
 #
 sub GetImageInfo($;$)
 {
-    my ($imageid, $node) = @_;
+    my ($image, $node) = @_;
 
-    my $query_result =
-	DBQueryWarn("select * from images where imageid='$imageid'");
-    if (! $query_result || $query_result->numrows < 1) {
-	tberror "Imageid $imageid is not defined!";
+    my $imageid = $image->imageid();
+    my $rowref  = $image->DBData();
+    if (!defined($rowref)) {
+	tberror("No DBData for $image!");
 	$imageinfo{$imageid} = 'BADIMAGE';
 	return 0;
     }
-    $imageinfo{$imageid} = $query_result->fetchrow_hashref();
+    $imageinfo{$imageid} = $rowref;
 
-    my $rowref = $imageinfo{$imageid};
     my $imagepath = $rowref->{'path'};
 
     #
@@ -507,7 +528,7 @@ sub GetImageInfo($;$)
     # and that file should exist.
     #
     if (!defined($imagepath)) {
-	tberror "No filename associated with $imageid!";
+	tberror "No filename associated with $image!";
 	$imageinfo{$imageid} = 'BADIMAGE';
 	return 0;
     }
@@ -519,12 +540,12 @@ sub GetImageInfo($;$)
 	    #
 	    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
 	    if ($?) {
-		tberror "Frisbeelauncher ($imageid) failed!";
+		tberror "Frisbeelauncher ($image) failed!";
 		$imageinfo{$imageid} = 'BADIMAGE';
 		return 0;
 	    }
 	    if (! -R $imagepath) {
-		tberror	"Frisbeelauncher could not fetch $imagepath ($imageid)!";
+		tberror	"Frisbeelauncher could not fetch $imagepath ($image)!";
 		$imageinfo{$imageid} = 'BADIMAGE';
 		return 0;
 	    }
@@ -562,7 +583,7 @@ sub GetImageInfo($;$)
     }
 
     print STDERR
-	"$imageid: loadpart=", $rowref->{'loadpart'},
+	"$image: loadpart=", $rowref->{'loadpart'},
 	", loadlen=", $rowref->{'loadlength'},
 	", imagepath=", $rowref->{'path'},
 	", defosid=", $rowref->{'default_osid'},

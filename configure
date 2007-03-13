@@ -2348,7 +2348,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile \
 	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
-	db/NodeType.pm db/Project.pm db/User.pm \
+	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
 	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \

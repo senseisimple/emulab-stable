@@ -864,7 +864,7 @@ sub cleanup()
 	    $experiment->SetState(EXPTSTATE_SWAPPED);
 	}
 	
-	if ($experiment->End("-force") != 0) {
+	if ($experiment->End("-f") != 0) {
 	    print "tbend failed!\n";
 	}
     }

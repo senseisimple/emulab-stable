@@ -208,7 +208,7 @@ CREATE TABLE `comments` (
 DROP TABLE IF EXISTS `current_reloads`;
 CREATE TABLE `current_reloads` (
   `node_id` varchar(32) NOT NULL default '',
-  `image_id` varchar(45) NOT NULL default '',
+  `image_id` int(8) unsigned NOT NULL default '0',
   `mustwipe` tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -1196,7 +1196,7 @@ CREATE TABLE `iface_counters` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `images`
+-- Table structure for table `images	`
 --
 
 DROP TABLE IF EXISTS `images`;
@@ -1206,18 +1206,19 @@ CREATE TABLE `images` (
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `pid` varchar(12) NOT NULL default '',
   `gid` varchar(12) NOT NULL default '',
-  `imageid` varchar(45) NOT NULL default '',
+  `imageid` int(8) unsigned NOT NULL default '0',
+  `old_imageid` varchar(45) NOT NULL default '',
   `creator` varchar(8) default NULL,
   `creator_idx` mediumint(8) unsigned NOT NULL default '0',
   `created` datetime default NULL,
   `description` tinytext NOT NULL,
   `loadpart` tinyint(4) NOT NULL default '0',
   `loadlength` tinyint(4) NOT NULL default '0',
-  `part1_osid` varchar(35) default NULL,
-  `part2_osid` varchar(35) default NULL,
-  `part3_osid` varchar(35) default NULL,
-  `part4_osid` varchar(35) default NULL,
-  `default_osid` varchar(35) NOT NULL default '',
+  `part1_osid` int(8) unsigned default NULL,
+  `part2_osid` int(8) unsigned default NULL,
+  `part3_osid` int(8) unsigned default NULL,
+  `part4_osid` int(8) unsigned default NULL,
+  `default_osid` int(8) unsigned NOT NULL default '0',
   `path` tinytext,
   `magic` tinytext,
   `load_address` text,
@@ -1229,7 +1230,8 @@ CREATE TABLE `images` (
   `updated` datetime default NULL,
   PRIMARY KEY  (`imageid`),
   UNIQUE KEY `pid` (`pid`,`imagename`),
-  KEY `gid` (`gid`)
+  KEY `gid` (`gid`),
+  KEY `old_imageid` (`old_imageid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1889,11 +1891,11 @@ CREATE TABLE `nodes` (
   `type` varchar(30) NOT NULL default '',
   `phys_nodeid` varchar(32) default NULL,
   `role` enum('testnode','virtnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
-  `def_boot_osid` varchar(35) NOT NULL default '',
+  `def_boot_osid` int(8) unsigned default NULL,
   `def_boot_path` text,
   `def_boot_cmd_line` text,
-  `temp_boot_osid` varchar(35) NOT NULL default '',
-  `next_boot_osid` varchar(35) NOT NULL default '',
+  `temp_boot_osid` int(8) unsigned default NULL,
+  `next_boot_osid` int(8) unsigned default NULL,
   `next_boot_path` text,
   `next_boot_cmd_line` text,
   `pxe_boot_path` text,
@@ -1918,7 +1920,7 @@ CREATE TABLE `nodes` (
   `update_accounts` smallint(6) default '0',
   `next_op_mode` varchar(20) NOT NULL default '',
   `ipodhash` varchar(64) default NULL,
-  `osid` varchar(35) NOT NULL default '',
+  `osid` int(8) unsigned default NULL,
   `ntpdrift` float default NULL,
   `ipport_low` int(11) NOT NULL default '11000',
   `ipport_next` int(11) NOT NULL default '11000',
@@ -2067,7 +2069,8 @@ CREATE TABLE `os_info` (
   `osname` varchar(20) NOT NULL default '',
   `pid` varchar(12) NOT NULL default '',
   `pid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `osid` varchar(35) NOT NULL default '',
+  `osid` int(8) unsigned NOT NULL default '0',
+  `old_osid` varchar(35) NOT NULL default '',
   `creator` varchar(8) default NULL,
   `creator_idx` mediumint(8) unsigned NOT NULL default '0',
   `created` datetime default NULL,
@@ -2082,14 +2085,16 @@ CREATE TABLE `os_info` (
   `shared` tinyint(4) NOT NULL default '0',
   `mustclean` tinyint(4) NOT NULL default '1',
   `op_mode` varchar(20) NOT NULL default 'MINIMAL',
-  `nextosid` varchar(35) default NULL,
+  `nextosid` int(8) unsigned default NULL,
+  `old_nextosid` varchar(35) NOT NULL default '',
   `max_concurrent` int(11) default NULL,
   `mfs` tinyint(4) NOT NULL default '0',
   `reboot_waittime` int(10) unsigned default NULL,
   PRIMARY KEY  (`osid`),
   UNIQUE KEY `pid` (`pid`,`osname`),
   KEY `OS` (`OS`),
-  KEY `path` (`path`(255))
+  KEY `path` (`path`(255)),
+  KEY `old_osid` (`old_osid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -2098,10 +2103,10 @@ CREATE TABLE `os_info` (
 
 DROP TABLE IF EXISTS `osid_map`;
 CREATE TABLE `osid_map` (
-  `osid` varchar(35) NOT NULL default '',
+  `osid` int(8) unsigned NOT NULL default '0',
   `btime` datetime NOT NULL default '1000-01-01 00:00:00',
   `etime` datetime NOT NULL default '9999-12-31 23:59:59',
-  `nextosid` varchar(35) default NULL,
+  `imageid` int(8) unsigned NOT NULL default '0',
   PRIMARY KEY  (`osid`,`btime`,`etime`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2111,9 +2116,9 @@ CREATE TABLE `osid_map` (
 
 DROP TABLE IF EXISTS `osidtoimageid`;
 CREATE TABLE `osidtoimageid` (
-  `osid` varchar(35) NOT NULL default '',
+  `osid` int(8) unsigned NOT NULL default '0',
   `type` varchar(30) NOT NULL default '',
-  `imageid` varchar(45) NOT NULL default '',
+  `imageid` int(8) unsigned NOT NULL default '0',
   PRIMARY KEY  (`osid`,`type`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2152,8 +2157,8 @@ DROP TABLE IF EXISTS `partitions`;
 CREATE TABLE `partitions` (
   `node_id` varchar(32) NOT NULL default '',
   `partition` tinyint(4) NOT NULL default '0',
-  `osid` varchar(35) default NULL,
-  `imageid` varchar(45) default NULL,
+  `osid` int(8) unsigned default NULL,
+  `imageid` int(8) unsigned default NULL,
   `imagepid` varchar(12) NOT NULL default '',
   PRIMARY KEY  (`node_id`,`partition`),
   KEY `osid` (`osid`)
@@ -2476,7 +2481,7 @@ CREATE TABLE `reserved` (
 DROP TABLE IF EXISTS `scheduled_reloads`;
 CREATE TABLE `scheduled_reloads` (
   `node_id` varchar(32) NOT NULL default '',
-  `image_id` varchar(45) NOT NULL default '',
+  `image_id` int(8) unsigned NOT NULL default '0',
   `reload_type` enum('netdisk','frisbee') default NULL,
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;

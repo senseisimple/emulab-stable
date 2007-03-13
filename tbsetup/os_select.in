@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -200,6 +200,7 @@ sub set_nextmode($;$)
 sub set_boot_osid($) {
     my ($node) = @_;
     my $field  = "def_boot_osid";
+    my $value;
 
     $field = "next_boot_osid"
 	if ($oneshot);
@@ -208,12 +209,14 @@ sub set_boot_osid($) {
 
     if ($clear) {
 	debug("Clearing $field for $node.\n");
+	$value = "NULL";
     }
     else {
 	debug("Setting $field for $node to $osid.\n");
+	$value = "'$osid'";
     }
     
-    DBQueryFatal("update nodes set ${field}='$osid' where node_id='$node'");
+    DBQueryFatal("update nodes set ${field}=${value} where node_id='$node'");
 }
 
 # Return current opmode that a node is set to.

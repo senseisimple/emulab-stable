@@ -23,7 +23,8 @@ WEB_SBIN_SCRIPTS= webnodelog webnewwanode webidlemail webchangeuid
 WEB_BIN_SCRIPTS = webnfree
 LIBEXEC_SCRIPTS = $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS) xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
-		  NodeType.pm Interface.pm User.pm Group.pm Project.pm 
+		  NodeType.pm Interface.pm User.pm Group.pm Project.pm \
+		  Image.pm OSinfo.pm
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy dumperrorlog.proxy

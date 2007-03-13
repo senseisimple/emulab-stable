@@ -246,6 +246,14 @@ else {
     $os_path = "NULL";
 }
 
+#
+# Grab unique imageid (before locking tables).
+# 
+$osid = TBGetUniqueIndex("next_osid");
+
+#
+# Insert the new record with tables locked.
+#
 DBQueryFatal("lock tables os_info write");
 
 #
@@ -255,15 +263,6 @@ if (OSInfo::LookupByName($project, $osname)) {
     DBQueryFatal("unlock tables");
     USERERROR("The OS Descriptor '$osname' already exists in Project $pid! ".
               "Please select another.", 1);
-}
-
-#
-# Just concat them to form a unique imageid. 
-# 
-$osid = "$pid-$osname";
-if (OSInfo::Lookup($osid)) {
-    DBQueryFatal("unlock tables");
-    TBERROR("Could not form a unique osid for $pid/$osname!", 1);
 }
 
 $query_result =
