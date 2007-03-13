@@ -12,7 +12,7 @@ use Getopt::Std;
 use strict;
 use IO::Socket::INET;
 use IO::Select;
-use lib '/q/proj/tbres/gebhardt/testbed/pelab/bgmon';
+#use lib '/q/proj/tbres/gebhardt/testbed/pelab/bgmon';
 use libwanetmon;
 
 #
