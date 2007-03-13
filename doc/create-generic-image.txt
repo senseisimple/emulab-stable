@@ -10,6 +10,7 @@ How to make a generic image from a Utah one:
 2b. Turn off cvsup
 	sudo rm -rf /root/.cvsup
 	sudo cp /dev/null /etc/emulab/nosup
+	sudo rm /etc/emulab/supfile
 
 2c. Change the root password.
    Set it to something generic like the newnode MFS password via
@@ -18,11 +19,22 @@ How to make a generic image from a Utah one:
    the password hash to /etc/emulab/master.passwd.  Make sure you change
    both the root and toor password hashes (in the /etc/emulab file).
 
-2d. Install a generic kernel.
-   Build a kernel from the TESTBED-GENERIC config, and install it as
-   /kernel.
+2d. Remove root's known_hosts file.
+   sudo rm -f /root/.ssh/known_hosts
 
-2e. Shutdown to single user and run the prepare script.
+2e. Install generic kernels.
+   Build kernels from the various TESTBED-* configs and install them:
+	TESTBED-GENERIC		  -> /kernel.100HZ
+	TESTBED-LINKDELAY-GENERIC -> /kernel.1000HZ
+	TESTBED-DELAY-GENERIC	  -> /kernel.10000HZ
+	TESTBED-JAIL-GENERIC	  -> /kernel.jail
+
+   Make sure that there are hard links too:
+   	ln -f /kernel.1000HZ /kernel.linkdelay
+   	ln -f /kernel.10000HZ /kernel.delay
+	ln -f /kernel.100HZ /kernel
+
+2f. Shutdown to single user and run the prepare script.
    I always first umount NFS directories:
 	umount -h fs
    Then run prepare:
@@ -34,11 +46,11 @@ How to make a generic image from a Utah one:
    still NFS mounted, but it isn't since I use "rmdir" which will not
    remove a directory that isn't empty or a mount point.
 
-2f. Remove the Utah SSL certs and SSH host keys
+2g. Remove the Utah SSL certs and SSH host keys
 	rm /etc/ssh/ssh_host*
 	rm /etc/emulab/*.pem
 
-2g. Reboot into Linux
+2h. Reboot into Linux
 
 3. Linux:
 
@@ -47,6 +59,7 @@ How to make a generic image from a Utah one:
 3b. Turn off cvsup
 	sudo rm -rf /root/.cvsup
 	sudo cp /dev/null /etc/emulab/nosup
+	sudo rm /etc/emulab/supfile
 
 3c. Change the root password.
    Set it to something generic like the newnode MFS password via
@@ -55,11 +68,14 @@ How to make a generic image from a Utah one:
    the password hash to /etc/emulab/shadow.  Make sure you change
    both the root and toor password hashes (in the /etc/emulab file).
 
-3d. Install a generic kernel.
+3d. Remove root's known_hosts file.
+   sudo rm -f /root/.ssh/known_hosts
+
+3e. Install a generic kernel.
    We do not yet have such a thing for Linux.  So we hope the
    current kernel is "generic enough".
 
-3e. Shutdown to single user and run the prepare script.
+3f. Shutdown to single user and run the prepare script.
    I always first umount NFS directories:
 	umount -at nfs
    Then run prepare:
@@ -71,10 +87,19 @@ How to make a generic image from a Utah one:
    still NFS mounted, but it isn't since I use "rmdir" which will not
    remove a directory that isn't empty or a mount point.
 
-3f. Remove the Utah SSL certs and SSH host keys
+3g. Remove the Utah SSL certs and SSH host keys
 	rm /etc/ssh/ssh_host*
 	rm /etc/emulab/*.pem
 
-3g. Reboot into the admin MFS
+3h. Reboot into the admin MFS
 
-4. Create the image.
+4. Minor admin stuff.
+   Once in the admin MFS, I run fsck on the filesystesm just to be safe:
+
+	fsck /dev/ad0s1[aef]
+	e2fsck -f -y /dev/ad0s2
+
+   The latter in particular ensures that the last-fsck timestamp is updated
+   so the filesystem won't be forced into an fsck for another 180 days or so.
+
+5. Create the image.

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 Instructions for creating a site-customized image from a "generic" image
@@ -127,12 +127,16 @@ Now update the following files:
 
 * /mnt/root/.ssh/authorized_keys
 
-  Put in local boss root pub key.  Leave in Utah (Emulab) pub key if
-  acceptable (if you want/need our help debugging).  Otherwise, remove it.
+  NOTE: THE ROOT PUBKEY FOR UTAH'S EMULAB IS IN THIS FILE BY DEFAULT.
+  This means that we (Utah Emulab admins) can login, as root, to your nodes.
+  This is useful if you want our help debugging, but it might be in violation
+  of your local security policies.  So remove it if you don't want it there!
 
 * /mnt/etc/localtime
 
-  Copy the correct file over from /mnt/usr/share/zoneinfo
+  Copy the correct file over from /mnt/usr/share/zoneinfo.  Note that these
+  zoneinfo files have been updated to reflect the new (as of 2007) DST rules
+  in the US.
 
 * /mnt/etc/master.passwd
 
