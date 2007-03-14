@@ -28,6 +28,11 @@ boss-install: install
 
 clean:
 
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@
+
 $(INSTALL_DIR)/opsdir/sbin/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
