@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -20,6 +20,7 @@
 #include <mysql/mysql.h>
 
 /* XXX Should be configured in */
+#define NEWNODEPID      "emulab-ops"
 #define NEWNODEOSID	"NEWNODE-MFS"
 
 #ifdef USE_MYSQL_DB
@@ -291,13 +292,13 @@ boot_newnode_mfs(struct in_addr ipaddr, int version, boot_what_t *info)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	error("%s: nonexistent IP, booting '%s'\n",
-	      inet_ntoa(ipaddr), NEWNODEOSID);
+	error("%s: nonexistent IP, booting '%s,%s'\n",
+	      inet_ntoa(ipaddr), NEWNODEPID, NEWNODEOSID);
 
 #define MFS_PATH	0
 
-	res = mydb_query("select path from os_info "
-			 "where osid='%s' and mfs=1", 1, NEWNODEOSID);
+	res = mydb_query("select path from os_info where pid='%s' and "
+			 "osname='%s' and mfs=1", 1, NEWNODEPID, NEWNODEOSID);
 
 	if (!res) {
 		error("Query failed\n");
