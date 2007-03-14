@@ -10,6 +10,36 @@ AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
 AC_PREFIX_DEFAULT(/usr/testbed)
 AC_CONFIG_HEADER(config.h)
 
+# We use separate source and obj trees in Emulab.  Configuring in a source
+# tree messes it up, so throw an error.
+#
+# Check that $srcdir, (which defaults to the argv[0] path to the configure
+# script,) is different from the current directory.
+#
+if test `realpath $srcdir` = `pwd`; then
+    if test "$ac_srcdir_defaulted" = yes; then
+	AC_MSG_ERROR(
+	    [You are running the configure script in the current directory.
+Output from configure must go into an Emulab obj tree, not a source tree!
+cd to the top of an obj tree, and run the configure in your source tree.])
+    else
+	AC_MSG_ERROR(
+	    [You specified --srcdir= to be the current directory.
+Output from configure should go into an Emulab obj tree, not a source tree!
+cd to the top of an obj tree, and run the configure in your source tree.
+Then --srcdir= will be unnecessary.])
+    fi
+fi
+#
+# Double-check that there isn't a Makeconf.in (the UNIQUE-FILE-IN-SOURCE-DIR)
+# in the current directory.
+#
+if test -f $ac_unique_file; then
+    AC_MSG_ERROR([The current directory is a source tree containing $ac_unique_file .
+Output from configure should go into an Emulab obj tree, not a source tree!
+cd to the top of an obj tree, and run the configure in your source tree.])
+fi
+
 for tbarch in arm/3.4.1; do
     PATH="/usr/local/$tbarch/bin:${PATH}"
 done
@@ -259,13 +289,15 @@ AC_ARG_WITH(TBDEFS,
 [  --with-TBDEFS=name	Specify definitions file (defs-default default)],
 [
     if test "$withval" = "yes"; then
-	AC_MSG_ERROR(Invalid TBDEFS - Must specify the value)
+	AC_MSG_ERROR([Invalid TBDEFS - Must specify the value])
     fi
     TBDEFS="$withval"
     TBPATH=`dirname $withval`
 ],[
-    TBDEFS="$srcdir/defs-default"
-    TBPATH="$srcdir"
+    AC_MSG_ERROR(
+	[The required --with-TBDEFS= argument was not given.
+The value of --with-TBDEFS= must be the path to your Emulab defs file.
+Copy and modify the defs-example file.  defs-default has values for Utah.])
 ])
 
 if test -f $TBDEFS; then
