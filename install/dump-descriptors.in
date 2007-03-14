@@ -27,10 +27,11 @@ sub usage()
 #
 my @imagenames	  = ('FBSD410+RHL90-STD',
 		     'FBSD410-STD',
-		     'RHL90-STD');
+		     'RHL90-STD',
+		     'FBSD410-IPFW2');
 
 my @osnames	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
-		     'OPSNODE-BSD', 'FW-IPFW',
+		     'OPSNODE-BSD', 'FW-IPFW', 'FW-IPFW2',
 		     'RHL-STD', 'FBSD-STD', 'FBSD-JAIL', 'POWER-CONTROLLER');
 
 my @osids	   = ();
