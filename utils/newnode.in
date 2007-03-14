@@ -357,7 +357,7 @@ NODE: foreach my $node_id (@node_ids) {
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
 	"phys_nodeid='$node_id', role='$role', priority=$priority, " .
     	"eventstate='$state', op_mode='$opmode', " .
-	"def_boot_osid='$MFS_INITIAL', " .
+	"def_boot_osid='$osid', " .
 	"state_timestamp=unix_timestamp(NOW()), " .
 	"op_mode_timestamp=unix_timestamp(NOW())");
 
