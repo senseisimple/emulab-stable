@@ -290,11 +290,11 @@ NODE: foreach my $node_id (@node_ids) {
 	my $osinfo = OSinfo->Lookup(TBOPSPID(), $OS_OPSNODE);
 
 	$osid   = $osinfo->osid();
-	$opmode = $osinfo->opmode();
+	$opmode = $osinfo->op_mode();
     }
     else {
 	$osid   = $adminmfs->osid();
-	$opmode = $adminmfs->opmode();
+	$opmode = $adminmfs->op_mode();
     }
 
     #
