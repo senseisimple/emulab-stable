@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 Instructions for creating a site-customized image from a "generic" image
-provided by Utah.  The basic procedure is:
+(FBSD410+RHL90-GENERIC.ndz) provided by Utah.  The basic procedure is:
 
   - load the image on a testbed machine
   - customize both FreeBSD and Linux filesystems
@@ -303,27 +303,41 @@ G. Installing the images
 
        mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
 
-   and record these initial images in the Emulab database.
+   The boss installation process should have created image (and OS)
+   descriptors for these standard images.  You can verify via the web
+   page by clicking on "List ImageIDs" on the left menu and ensuring
+   that FBSD-STD, RHL-STD, FBSD410-STD, and RHL90-STD are all shown.
 
-   The image tarball includes sample SQL INSERT commands in the
-   setup-images.sql, setup-osids.sql and setup-o2i.sql files to make this
-   easier.  Note however, that the database schema occasionally changes,
-   so it is important to ensure that your DB matches the INSERT commands in
-   those files before doing them.  The table formats for the file commands
-   are listed at the beginning of the files.  Compare those formats to the
-   current schema in your database by doing:
+H. Before you free up the node you have been using to customize the
+   standard image, you might also want to customize the firewall image
+   (FBSD410-IPFW2-GENERIC.ndz) if you plan to use control net firewalls.
 
-       mysql tbdb
-       describe images;
-       describe osids;
-       describe osidtoimageid;
+   To do this, make sure you node is in the admin MFS and then do (from
+   your boss node):
 
-   setup-o2i.sql is just a template and will have to be modified to use.
-   Tweak the other .sql files as necessary for schema changes, and apply
-   the commands.
+      sudo ssh pc1 imageunzip -s 1 - /dev/$DSK \
+	< /usr/testbed/images/FBSD410-IPFW2-GENERIC.ndz
 
+   Note the "-s 1" argument to imageunzip.  This tells it that the image
+   should be loaded in the first DOS partition rather than at the beginning
+   of the disk.  This is why you should not attempt to customize the firewall
+   image before you have done the standard image; the latter contains a DOS
+   partition table necessary for this step.
 
-Dealing with SCSI disks (or RAID).
+   Now proceed to customize as in B. (Customize FreeBSD) above.  After
+   customization (don't forget the final step of remounting the FSes readonly!)
+   save the image from boss via:
+
+       cd /proj/emulab/ops/images
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-IPFW2.ndz
+
+   Finally, move it into place on boss:
+
+       mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
+
+   Again, an image descriptor (FW-IPFW2) should already exist in the database.
+     
+Dealing with SCSI disks (or RAID) and unrecognized hardware.
 
 * For completeness here are the files that need to be changed if you have
   other than IDE disks:
@@ -332,32 +346,23 @@ Dealing with SCSI disks (or RAID).
       Linux /etc/fstab: needs "hda" changed to appropriate type
       Linux /etc/lilo.conf: ditto, plus lilo must be rerun
 
-  Again, you should not need to mess with these files, the post-disk-loader
+  However, you should not need to mess with these files, the post-disk-loader
   script will do it for you.
 
-* For FreeBSD, we have four different kernels that are used for various
-  purposes.  Only one of them is generic.  So you will need to build
-  customized kernels in order to do "link delays", delay nodes and virtual
-  nodes.  The image does include our versions of all these kernels, so
-  try those first and maybe save yourself some work.  These kernels support:
-
-      disks: ad, ar, da (with ahc, ahd controllers)
-      network: xl, dc, fxp, em, nge
-
-  Copy /kernel.100HZ over to /kernel on a node and try booting it.  If
-  that works and all your network interfaces were found, just create a
-  new image after copying /kernel.100HZ to /kernel (copy, don't move,
-  /kernel.100HZ needs to exist).
-
-  Otherwise, you need to build your own kernels.  You can look at output from
-  the admin MFS (aka GENERIC) kernel if necessary.  Add the necessary driver
-  to the various TESTBED configs in the kernel source, and rebuild and install
-  the kernels in the image.  Mail testbed-ops@flux.utah.edu for more info.
+* For FreeBSD, we have five different FreeBSD 4.10 kernels that are used
+  for various purposes.  All of them are based on the GENERIC configuration.
+  If the default kernel ("/kernel" aka "/kernel.100HZ") does not boot on your
+  machine or your disk or ethernet interfaces are not recognized, you will
+  have to move to a FreeBSD 6.2 based solution.  You will need to contact
+  testbed-ops@emulab.net in this case.  In the future FreeBSD 6 world, there
+  should only be ONE kernel for everything.
 
 * For Linux, it is even more of a PITA.  We currently don't even have a
   generic Linux kernel in the image.  So if Linux doesn't boot in the image,
   you will have to configure/build a new kernel on some external machine.
-  If you don't have a Linux machine to do this with, contact us.
+  Since the default Linux image is RedHat 9 with a 2.4 kernel, it is also
+  possible that it just doesn't support newer hardware.  Again, contact us
+  if this happens.
 
 [ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
-[ Last updated 03/13/07 ]
+[ Last updated 03/14/07 ]
