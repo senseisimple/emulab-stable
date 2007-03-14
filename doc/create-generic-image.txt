@@ -19,20 +19,29 @@ How to make a generic image from a Utah one:
    the password hash to /etc/emulab/master.passwd.  Make sure you change
    both the root and toor password hashes (in the /etc/emulab file).
 
-2d. Remove root's known_hosts file.
-   sudo rm -f /root/.ssh/known_hosts
+2d. Remove root's known_hosts file and authorized_keys.
+	sudo sh -c 'rm /root/.ssh/*'
+    Note that we used to leave our boss' authorized_keys file in the image,
+    but now that file is automatically overwritten as part of node setup
+    so there is no point.
 
 2e. Install generic kernels.
-   Build kernels from the various TESTBED-* configs and install them:
+   Build kernels from the various TESTBED-* configs and install them.
+   For FBSD 4.x:
 	TESTBED-GENERIC		  -> /kernel.100HZ
 	TESTBED-LINKDELAY-GENERIC -> /kernel.1000HZ
 	TESTBED-DELAY-GENERIC	  -> /kernel.10000HZ
 	TESTBED-JAIL-GENERIC	  -> /kernel.jail
-
-   Make sure that there are hard links too:
+   Make sure that all the proper aliases exist too:
    	ln -f /kernel.1000HZ /kernel.linkdelay
    	ln -f /kernel.10000HZ /kernel.delay
-	ln -f /kernel.100HZ /kernel
+	cp -p /kernel.100HZ /kernel
+
+   For FBSD 5.x and higher:
+	TESTBED-GENERIC		  -> /boot/kernel
+	TESTBED-LINKDELAY-GENERIC -> /boot/kernel.linkdelay
+	TESTBED-DELAY-GENERIC	  -> /boot/kernel.delay
+   (there is no vnode/jail support on FBSD 5+).
 
 2f. Shutdown to single user and run the prepare script.
    I always first umount NFS directories:
@@ -68,8 +77,11 @@ How to make a generic image from a Utah one:
    the password hash to /etc/emulab/shadow.  Make sure you change
    both the root and toor password hashes (in the /etc/emulab file).
 
-3d. Remove root's known_hosts file.
-   sudo rm -f /root/.ssh/known_hosts
+3d. Remove root's known_hosts file and authorized_keys.
+	sudo sh -c 'rm -f /root/.ssh/*'
+    Note that we used to leave our boss' authorized_keys file in the image,
+    but now that file is automatically overwritten as part of node setup
+    so there is no point.
 
 3e. Install a generic kernel.
    We do not yet have such a thing for Linux.  So we hope the

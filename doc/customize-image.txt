@@ -125,13 +125,6 @@ full-featured system, you can run binaries from the disk image itself:
 
 Now update the following files:
 
-* /mnt/root/.ssh/authorized_keys
-
-  NOTE: THE ROOT PUBKEY FOR UTAH'S EMULAB IS IN THIS FILE BY DEFAULT.
-  This means that we (Utah Emulab admins) can login, as root, to your nodes.
-  This is useful if you want our help debugging, but it might be in violation
-  of your local security policies.  So remove it if you don't want it there!
-
 * /mnt/etc/localtime
 
   Copy the correct file over from /mnt/usr/share/zoneinfo.  Note that these
@@ -197,12 +190,6 @@ still mounted on /mnt, so we use another directory):
 
 Now you can update the necessary files as follows.
 	
-* /mnt2/root/.ssh/authorized_keys
-
-  Copy over from the FreeBSD partition:
-
-      cp -p /mnt/root/.ssh/authorized_keys /mnt2/root/.ssh/
-
 * /mnt2/etc/shadow
 
   Using your favorite editor, copy in the password hash for root from
@@ -238,7 +225,7 @@ Now unmount the Linux filesystem:
 and fsck it for good luck.  Actually, not only good luck but also to reset
 the time stamp that forces a periodic fsck:
 
-      e2fsck /dev/${DSK}s2
+      e2fsck -f -y /dev/${DSK}s2
 
 
 D. Saving the customized image
@@ -373,4 +360,4 @@ Dealing with SCSI disks (or RAID).
   If you don't have a Linux machine to do this with, contact us.
 
 [ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
-[ Last updated 05/10/05 ]
+[ Last updated 03/13/07 ]
