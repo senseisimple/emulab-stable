@@ -298,7 +298,7 @@ distclean:	distclean-subdirs
 # Here's a different approch to recover from just configure problems.  It cleans
 # all files from an obj tree that have a corresponding .in file in the src tree.
 undo-configure:
-	find $SRCDIR -name '*.in' | \
+	find $SRCDIR -name '*.in' -a -not -name configure.in | \
 	    sed -e "s;$SRCDIR;$OBJDIR;" -e 's;[.]in$;;' | xargs rm -f
 
 elabinelab:
