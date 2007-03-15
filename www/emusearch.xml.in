@@ -1,0 +1,34 @@
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/"
+                       xmlns:moz="http://www.mozilla.org/2006/browser/search/">
+
+    <!-- Should be customized per-site -->
+    <ShortName>@THISHOMEBASE@ Search</ShortName>
+    <LongName>@THISHOMEBASE@ Documentation Search</LongName>
+    <Description>
+        Search the @THISHOMEBASE@ documentation and knowledge base
+    </Description>
+    <Contact>@TBOPSEMAIL_NOSLASH@</Contact>
+    <!-- I'm using https because it shouldn't make all that big of a
+         difference, and if we ever have searches that can return different
+         things for different users (ie. search their wikis), having full
+         cookies will be important-->
+    <moz:SearchForm>@TBBASE@/search.php3</moz:SearchForm>
+    <Url type="text/html" 
+        template="@TBBASE@/search.php3?query={searchTerms}" />
+    <Image height="16" width="16" type="image/vnd.microsoft.icon">
+        @TBDOCBASE@/favicon.ico
+    </Image>
+    <Image height="64" width="64" type="image/png">
+        @TBDOCBASE@/favicon.png
+    </Image>
+
+    <!-- This stuff is the same for every site -->
+    <Developer>Flux Group, School of Computing, University of Utah</Developer>
+    <InputEncoding>inputEncoding</InputEncoding>
+    <OutputEncoding>UTF-8</OutputEncoding>
+    <InputEncoding>UTF-8</InputEncoding>
+    <Query role="example" searchTerms="node" />
+    <SyndicationRight>limited</SyndicationRight>
+    <Tags>emulab network research testbed</Tags>
+
+</OpenSearchDescription>

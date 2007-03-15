@@ -23,6 +23,7 @@ $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 #
 function SPITSEARCHFORM($query)
 {
+
     echo "<table align=center border=1>
           <form action=search.php3 method=get>\n";
 
@@ -110,6 +111,27 @@ if ($fp = popen("$TBSUEXEC_PATH nobody nobody websearch $safe_query", "r")) {
 else {
     TBERROR("Query failed: $query", 0);
 }
+
+#
+# Add search to the browser's toolbar
+#
+echo "
+<script type='text/javascript' language='javascript'>
+function addSearch() {
+    if (window.external &&
+        ('AddSearchProvider' in window.external)) {
+            window.external.AddSearchProvider('$TBBASE/emusearch.xml');
+    } else {
+        alert('Sorry, your web browser does not support Opensearch');
+    }
+}
+</script>
+
+<p>
+<a onclick='addSearch();'>Add the Emulab search engine to your browser's
+    toolbar</a>
+</p>
+";
 
 #
 # Standard Testbed Footer

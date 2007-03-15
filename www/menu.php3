@@ -273,7 +273,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave _NEW here about 2 weeks
-	WRITESIDEBARBUTTON_NEW("Papers and Talks (Mar 9)", $TBDOCBASE, "pubs.php3");
+        WRITESIDEBARBUTTON_NEW("Papers and Talks (Mar 9)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software (Jul 18)",
 			       $TBDOCBASE, "software.php3");
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
@@ -629,6 +629,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	  <head>
 	    <title>$THISHOMEBASE - $title</title>
             <link rel=\"shortcut icon\" href=\"favicon.ico\" TYPE=\"image/vnd.microsoft.icon\">
+            <link rel=\"search\" type=\"application/opensearchdescription+xml\" title=\"$THISHOMEBASE Search\" href=\"emusearch.xml\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
 	    <link rel='stylesheet' href='$BASEPATH/common-style.css' type='text/css' />
     	    <!-- do not import full style sheet into NS47, since it does bad job
