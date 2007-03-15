@@ -18,7 +18,7 @@ use Exporter;
 	 TBSCRIPTLOCK_OKAY TBSCRIPTLOCK_TIMEDOUT
 	 TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED
 	 PROJROOT GROUPROOT USERROOT SCRATCHROOT SHAREROOT
-	 TBValidUserDir TBValidUserDirList TBMakeTempFile);
+	 TBValidUserDir TBValidUserDirList TBMakeTempFile NewUUID);
 
 # After package decl.
 use English;
@@ -666,6 +666,22 @@ sub TBScriptUnlock()
 {
     close($lockhandle)
 	if defined($lockhandle);
+}
+
+#
+# Get me a UUID (universally unique identifier). Its really nice that there
+# is a program that does this! They look like this:
+#
+#	047edb7b-d346-11db-96cb-001143e453fe
+#
+sub NewUUID()
+{
+    my $uuid = `/usr/bin/uuidgen`;
+
+    if ($uuid =~ /^(\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12})$/) {
+	return $1;
+    }
+    return undef;
 }
 
 1;
