@@ -628,8 +628,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	<html>
 	  <head>
 	    <title>$THISHOMEBASE - $title</title>
-            <!--<link rel=\"SHORTCUT ICON\" HREF=\"netbed.ico\">-->
-            <link rel=\"SHORTCUT ICON\" HREF=\"netbed.png\" TYPE=\"image/png\">
+            <link rel=\"shortcut icon\" href=\"favicon.ico\" TYPE=\"image/vnd.microsoft.icon\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
 	    <link rel='stylesheet' href='$BASEPATH/common-style.css' type='text/css' />
     	    <!-- do not import full style sheet into NS47, since it does bad job
