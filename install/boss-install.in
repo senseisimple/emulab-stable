@@ -314,8 +314,6 @@ if ($UID != 0) {
     die "This script must be run as root.\n";
 }
 
-goto skipall;
-
 Phase "usersgroups", "Creating users and groups", sub {
     Phase "tbadmin", "Creating tbadmin group", sub {
 	if (getgrnam("tbadmin")) {
@@ -1201,8 +1199,6 @@ if ($BUGDBSUPPORT) {
     };
 }
 
-skipall:
-	
 Phase "firstuser", "Setting up initial user ($PROTOUSER)", sub {
     Phase "firstuser", "Calling 'firstuser' to create account", sub {
 	PhaseSkip("$PROTOUSER already created")
