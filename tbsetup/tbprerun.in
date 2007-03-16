@@ -389,7 +389,7 @@ if (! $TESTMODE) {
 	if (defined($experiment->elabinelab_exptidx()));
 
     if (keys(%sets)) {
-	$experiment->TableUpdate("experiment_stats", \%sets) or
+	$experiment->TableUpdate("experiment_stats", \%sets) == 0 or
 	    fatal("Could not update experiment_stats info for $experiment!");
     }
 }
