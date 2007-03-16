@@ -560,7 +560,8 @@ function SPITFORM($formfields, $errors)
 		  <td><input type='checkbox'
 			 name='formfields[exp_idleswap]'
 			 value='1'";
-	if ($formfields['exp_idleswap'] == "1") {
+	if (isset($formfields['exp_idleswap']) &&
+	    $formfields['exp_idleswap'] == "1") {
 	    echo " checked='1'";
 	}
 	echo "></td>

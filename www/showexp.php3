@@ -7,7 +7,7 @@
 include("defs.php3");
 require("Sajax.php");
 include("showstuff.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 sajax_init();
 sajax_export("GetExpState", "Show", "ModifyAnno");
 

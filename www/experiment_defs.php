@@ -5,6 +5,8 @@
 # All rights reserved.
 #
 #
+include_once("template_defs.php");
+
 # This class is really just a wrapper around the DB data ...
 #
 # A cache to avoid lookups. Indexed by node_id.
