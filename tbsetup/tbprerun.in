@@ -193,7 +193,8 @@ if ($events_result->num_rows) {
 #
 if ($experiment->elabinelab()) {
     # Inner experiment better exist.
-    if (defined($experiment->elabinelab_eid())) {
+    if (defined($experiment->elabinelab_eid()) &&
+	$experiment->elabinelab_eid() ne "") {
 	my $inner_experiment =
 	    Experiment->Lookup($pid, $experiment->elabinelab_eid());
 
@@ -329,7 +330,9 @@ if (!$zeemode) {
 # correspond to what the wrapped experiment really wants. It is a lot easier
 # to do this here then in the parser.
 #
-if ($experiment->elabinelab() && defined($experiment->elabinelab_eid())) {
+if ($experiment->elabinelab() &&
+    defined($experiment->elabinelab_eid()) &&
+    $experiment->elabinelab_eid() ne "") {
     my $outer_result;
     my $inner_result;
     my $inner_experiment =
