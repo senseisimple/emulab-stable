@@ -405,7 +405,7 @@ sub AddUser()
     # Do the ssh thing. Invoke as real user for auditing.
     #
     $EUID = $UID;
-    if (system("$ADDKEY -i $user")) {
+    if ($user ne $PROTOUSER && system("$ADDKEY -i $user")) {
 	fatal("Could not generate initial ssh key for $user");
     }
     # Add to elists.
