@@ -25,6 +25,10 @@ $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 $optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
 				 "formfields", PAGEARG_ARRAY);
 
+# Need below
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+
 #
 # Verify Permission.
 #
@@ -593,6 +597,14 @@ if ($doemail &&
 
     $target_creator = $experiment->GetCreator();
     $target_swapper = $experiment->GetSwapper();
+    # Needed below.
+    $swappable          = $experiment->swappable();
+    $idleswap           = $experiment->idleswap();
+    $noswap_reason      = $experiment->noswap_reason();
+    $idleswap_timeout   = $experiment->idleswap_timeout() / 60.0;
+    $noidleswap_reason  = $experiment->noidleswap_reason();
+    $autoswap           = $experiment->autoswap();
+    $autoswap_timeout   = $experiment->autoswap_timeout() / 60.0;
 
     $user_name  = $this_user->name();
     $user_email = $this_user->email();
