@@ -699,7 +699,7 @@ sub UpdateUser(;$)
     }
 
     # Shell is different on local vs control node.
-    if ((defined($freezeopt) && $freezeopt) || $user eq $PROTOUSER) {
+    if (defined($freezeopt) && $freezeopt) {
 	$locshellarg = "-s $NOLOGIN";
 	$remshellarg = "-s $NOLOGIN";
     }
@@ -707,6 +707,9 @@ sub UpdateUser(;$)
 	# Leave local shell alone if an admin.
 	$locshellarg = "-s $PBAG"
 	    if (!$usr_admin);
+	# Special treatment for PROTUSER
+	$locshellarg = "-s " . $shellpaths{"tcsh"} . " "
+	    if ($usr_admin && $user eq $PROTOUSER);
 
 	if (!defined($usr_shell) ||
 	    !exists($shellpaths{$usr_shell})) {

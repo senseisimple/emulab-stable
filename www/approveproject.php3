@@ -263,12 +263,6 @@ elseif (strcmp($approval, "approve") == 0) {
               using the account you just
               created so that you can continue setting up your new Emulab!
               </font><br>\n";
-        #
- 	# Freeze the initial user.
-        #
-        DBQueryFatal("update users set ".
-                     "  status='" . TBDB_USERSTATUS_FROZEN . "' ".
-	             "where uid='$FIRSTUSER'");
 
         #
         # Move to next phase. 

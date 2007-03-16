@@ -95,6 +95,8 @@ my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $INETD_CONF      = "/etc/inetd.conf";
 
+my $PROTOUSER       = "elabman";
+my $PROTOUSER_KEY   = "$TOP_SRCDIR/install/elabman_dsa.pub";
 my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
 my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
@@ -110,6 +112,8 @@ my $DHCPD_MAKECONF  = "$PREFIX/sbin/dhcpd_makeconf";
 my $BATCHEXP        = "$PREFIX/bin/batchexp";
 my $WAP             = "$PREFIX/sbin/withadminprivs";
 my $NAMED_SETUP     = "$PREFIX/sbin/named_setup";
+my $ADDPUBKEY       = "$PREFIX/sbin/addpubkey";
+my $TBACCT          = "$PREFIX/sbin/tbacct";
 
 my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
@@ -309,6 +313,8 @@ if (! $batchmode) {
 if ($UID != 0) {
     die "This script must be run as root.\n";
 }
+
+goto skipall;
 
 Phase "usersgroups", "Creating users and groups", sub {
     Phase "tbadmin", "Creating tbadmin group", sub {
@@ -1195,12 +1201,63 @@ if ($BUGDBSUPPORT) {
     };
 }
 
-Phase "firstuser", "Setting up initial user (elabman)", sub {
-    PhaseSkip("elabman already created")
-	if (-d "$USERROOT/elabman");
-    ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
-		   (defined($password) ? " -p $password" : ""));
+skipall:
+	
+Phase "firstuser", "Setting up initial user ($PROTOUSER)", sub {
+    Phase "firstuser", "Calling 'firstuser' to create account", sub {
+	PhaseSkip("$PROTOUSER already created")
+	    if (-d "$USERROOT/$PROTOUSER");
+	ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
+		       (defined($password) ? " -p $password" : ""));
+    };
+    Phase "Fixing", "Fixing up DB state for $PROTOUSER", sub {
+	my ($exitval, @rows) =
+	    ExecQuiet("echo 'select uid from users ".
+		      "  where uid=\"$PROTOUSER\" and webonly=0' ".
+		      "| $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("echo 'update users set webonly=0 ".
+		       "  where uid=\"$PROTOUSER\"' | $MYSQL -s $DBNAME");
+    };
+    Phase "Thawing", "Thawing $PROTOUSER", sub {
+	my ($exitval, @rows) =
+	    ExecQuiet("echo 'select uid from users ".
+		      "  where uid=\"$PROTOUSER\" and status=\"active\"' ".
+		      "| $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("echo 'update users set status=\"active\" ".
+		       "  where uid=\"$PROTOUSER\"' | $MYSQL -s $DBNAME");
+	ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $TBACCT -b thaw $PROTOUSER");
+    };
+    Phase "DSAKey", "Adding DSA key to $PROTOUSER account", sub {
+	my ($exitval, @rows) =
+	    ExecQuiet("echo 'select * from user_pubkeys ".
+		      " where uid=\"$PROTOUSER\"' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$SUDO -u $PROTOUSER $WAP ".
+		       "  $ADDPUBKEY -f -u $PROTOUSER $PROTOUSER_KEY");
+    };
+    Phase "authkeys", "Generating authorized_keys for $PROTOUSER", sub {
+	ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $ADDPUBKEY -w $PROTOUSER");
+    };
 };
+
+	exit(0);
 
 Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
     PhaseSkip("elabckup already created")
@@ -1219,7 +1276,7 @@ Phase "experiments", "Setting up system experiments", sub {
 	Phase "$pid/$eid", "$pid/$eid", sub {
 	    PhaseSkip("Experiment Created")
 		if (-d "$PROJROOT/$pid/exp/$eid");
-	    ExecQuietFatal("$SUDO -u elabman $WAP $BATCHEXP ".
+	    ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
 			   "  -q -i -w -f -n -S 'System Experiment' ".
 			   "  -L 'System Experiment' ".
 			   "  -E '$desc - DO NOT DELETE' ".

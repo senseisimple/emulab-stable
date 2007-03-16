@@ -31,14 +31,14 @@ my $protouser       = 'elabman';
 my $protouser_name  = 'Emulab Manager';
 my $protouser_email = '@TBOPSEMAIL@';
 my $protouser_shell = 'tcsh';
+my $protouser_notes = "DO NOT DELETE THIS ACCOUNT!";
 my $HOMEDIR         = USERROOT();
 my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
-my $webonly         = 1;
-my $uid_idx	    = 1; # Initial IDX for protouser.
 my $pid_idx         = 1; # Initial IDX for protoproj.
 my $trust           = "project_root";
+my $binshell        = "/bin/nologin";
 my $password;
 my $encpass;
 my %opts;
@@ -65,7 +65,6 @@ if (defined($opts{p})) {
 }
 if (defined($opts{u})) {
     $protouser = $opts{u};
-    $webonly = 0;
     $trust = "local_root";
 }
 if (defined($opts{n})) {
@@ -151,10 +150,20 @@ if (!$batchmode) {
     }
 }
 
+# Initial protouser gets a real shell until actively frozen later.
+# Also setup a notes entry.
+if (!defined($opts{u})) {
+    $binshell = "/bin/tcsh";
+    $protouser_notes = "This account can be frozen after your Emulab ".
+	"is fully setup and running. DO NOT DELETE THIS ACCOUNT!";
+}
+
 print "Creating user on boss...\n";
-if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G \"$Ggid\" -h - " .
-    "-m -d $HOMEDIR/$protouser -s /bin/nologin -c \"$protouser_name\"\n") {
-       die "Unable to add user to the password file!\n";
+if (system("/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
+	   "-G \"$Ggid\" -h - " .
+	   "-m -d $HOMEDIR/$protouser -s $binshell ".
+	   "-c \"$protouser_name\"")) {
+    die "Unable to add user to the password file!\n";
 }
 
 if ($CONTROL ne $BOSSNODE) {
@@ -162,7 +171,7 @@ if ($CONTROL ne $BOSSNODE) {
     
     if (system("ssh $CONTROL ".
 	       "'/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
-	       "-G \"$Ggid\" -h - -d $HOMEDIR/$protouser -s /bin/nologin ".
+	       "-G \"$Ggid\" -h - -d $HOMEDIR/$protouser -s $binshell ".
 	       "-c \"$protouser_name\"'")) {
 	die "Unable to add user to the ops password file!\n";
     }
@@ -173,10 +182,12 @@ DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid+1");
 
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
-	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
-	"usr_modified=now(), admin=1, webonly=$webonly, status='active', ".
-	"usr_shell='$protouser_shell', usr_email='$protouser_email', ".
-	"mailman_password='$mailman_password',uid_idx=$uid");
+	     "usr_name='$protouser_name', ".
+	     "usr_addr='DO NOT DELETE THIS ACCOUNT', ".
+	     "usr_pswd='$encpass', unix_uid=$uid, notes='$protouser_notes', ".
+	     "usr_modified=now(), admin=1, webonly=0, status='active',".
+	     "usr_shell='$protouser_shell', usr_email='$protouser_email', ".
+	     "mailman_password='$mailman_password',uid_idx=$uid");
 DBQueryFatal("insert into user_stats set uid='$protouser',uid_idx=$uid");
 
 if (!defined($opts{u})) {
