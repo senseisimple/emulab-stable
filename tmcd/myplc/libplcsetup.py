@@ -426,7 +426,7 @@ def plcUpdateNodes(uplist=[]):
                 break
             pass
         if not found:
-            dlist.append(ntuple[0])
+            dlist.append(pnode['hostname'])
             pass
         pass
 
