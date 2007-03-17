@@ -18,6 +18,33 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20070317: Before build.
+
+          Due to a change in gcc's handling of c++ bools in functions with
+          variable argument lists, you will need to reinstall ulsshxmlrpcpp and
+          rebuild/reinstall in your testbed source tree so that the event
+          system is recompiled against the new version.
+
+	  * Grab this file from our website and unpack it somewhere convenient
+            on your boss node:
+
+                http://www.emulab.net/downloads/ulsshxmlrpcpp-0.1.2.tar.gz
+
+          * Unpack, configure, build, install:
+
+	        cd someplace
+		tar xzf ulsshxmlrpcpp-0.1.2.tar.gz
+		mkdir ulbuild
+		cd ulbuild
+		../ulsshxmlrpcpp-0.1.2/configure
+		gmake && gmake install
+
+	  * Rebuild your testbed source tree:
+
+	        cd testbed-build-dir
+		gmake && gmake install
+
+
 20061201: Time to upgrade your mysql ... If you are still running
           FreeBSD 4.10 on your boss node, then you are almost certainly
           running an ancient version of mysql (3.23). In lieu of upgrading
