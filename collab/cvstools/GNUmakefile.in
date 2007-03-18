@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,6 +16,9 @@ LIBEXEC_SCRIPTS		= webcvsrepo_ctrl
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= cvsd.conf.head
 CTRL_SBIN_SCRIPTS	= cvsrepo_ctrl.proxy
+
+# These scripts installed setuid, with sudo. 
+SETUID_SBIN_SCRIPTS     = cvsrepo_ctrl
 
 #
 # Force dependencies on the scripts so that they will be rerun through
