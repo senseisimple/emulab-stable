@@ -51,17 +51,20 @@ $linktest_pid   = 0;
 #
 function CHECKPAGEARGS() {
     global $this_user, $TB_EXPTSTATE_ACTIVE, $TB_EXPT_MODIFY;
+    global $TB_EXPTSTATE_ACTIVATING, $TB_EXPTSTATE_MODIFY_RESWAP;
     global $pid, $eid, $experiment;
     global $unix_gid, $linktest_level, $linktest_pid;
 
     $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
     
     if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run linktest ".
+	USERERROR("You do not have permission to start/stop linktest ".
 		  "on $pid/$eid!", 1);
     }
-    if ($experiment->state() != $TB_EXPTSTATE_ACTIVE) {
-	USERERROR("Experiment $eid must be active to run linktest!", 1);
+    if ($experiment->state() != $TB_EXPTSTATE_ACTIVE &&
+	$experiment->state() != $TB_EXPTSTATE_ACTIVATING &&
+	$experiment->state() != $TB_EXPTSTATE_MODIFY_RESWAP) {
+	USERERROR("Experiment $eid must be active to start/stop linktest!", 1);
     }
     $pid            = $experiment->pid();
     $eid            = $experiment->eid();
