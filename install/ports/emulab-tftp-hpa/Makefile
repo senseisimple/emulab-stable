@@ -6,7 +6,7 @@
 #
 
 PORTNAME=	tftp-hpa
-PORTVERSION=	0.33
+PORTVERSION=	0.48
 #CATEGORIES=	net
 CATEGORIES=	misc
 MASTER_SITES=	ftp://www.kernel.org/pub/software/network/tftp/
@@ -29,7 +29,7 @@ INSTALL_WRKSRC=	${WRKSRC}/tftpd
 # make sure we don't run configure (with no args) out of the Makefile
 # due to our patching configure.in
 post-patch:
-	touch ${WRKSRC}/acconfig.h.in ${WRKSRC}/configure
+	touch ${WRKSRC}/aconfig.h.in ${WRKSRC}/configure
 
 post-install:
 	@${ECHO} ""

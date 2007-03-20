@@ -2,4 +2,6 @@ The tftpd-hpa TFTP distribution as configured for Emulab:
 
 	- install in a reasonable place for FreeBSD
 	- install only the daemon, not the user client
+	- rules file tailored for Emulab
+	- support a maxusers feature
 	- minor patches for the code
