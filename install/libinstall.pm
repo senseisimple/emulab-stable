@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -375,8 +375,6 @@ sub CreateFileFatal($@) {
 # context.
 #
 sub ExecQuiet(@) {
-    my @commnads = @_;
-
     #
     # Use a pipe read, so that we save away the output
     #

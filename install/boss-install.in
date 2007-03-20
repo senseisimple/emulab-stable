@@ -64,6 +64,7 @@ my $PATCH      = "/usr/bin/patch";
 my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
+my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $TOUCH      = "/usr/bin/touch";
 my $SSH_INIT   = "/usr/bin/ssh -1";
 my $SCP_INIT   = "/usr/bin/scp -1";
@@ -143,6 +144,11 @@ my $APACHE_CERTPEM_OPS  = "apache-ops_cert.pem";
 my $APACHE_KEYPEM_OPS   = "apache-ops_key.pem";
 my $APACHE_CERTFILE_OPS = "$APACHE_ETCDIR/ssl.crt/${USERNODE}.crt";
 my $APACHE_KEYFILE_OPS  = "$APACHE_ETCDIR/ssl.key/${USERNODE}.key";
+
+#
+# XXX temporary for tftp
+#
+my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 
 #
 # Some directories we care about
@@ -409,6 +415,20 @@ Phase "ports", "Installing ports", sub {
 		}
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
 			       "     $PKG_ADD $PHP4_PORT");
+	    };
+	    # XXX temporary: only needed til emulab-boss package updated
+	    Phase "tftpd", "Updating tftpd installation", sub {
+		my $pname = `$PKG_INFO -E 'emulab-tftp-hpa-*' 2>/dev/null`;
+		chomp($pname);
+		if ($pname eq $TFTPD_PKG) {
+		    PhaseSkip("tftpd already up to date");
+		}
+		if (!$packagedir) {
+		    PhaseSkip("No package directory provided");
+		}
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+		    if ($pname);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $TFTPD_PKG");
 	    };
 	}
     };

@@ -1,6 +1,6 @@
 Information necessary for keeping boss and ops node up-to-date. This
 file contains updates that must be made outside of the database and
-the intall tree (ie. /usr/testbed).
+the install tree (ie. /usr/testbed).
 
 This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
@@ -17,6 +17,47 @@ After install - after doing a 'gmake boss-install' on boss or
 Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
+
+20070320: Time to upgrade your tftpd.  This has only been tested on
+	  FreeBSD 6.x, so if you are still running FreeBSD 4.10, then
+	  you can skip this.  The only significant difference (other
+	  than going from version 0.33 to 0.48, which is ancillary) is
+	  a change to make tftpd work better under load when it hits its
+	  "maxchildren" limit.
+
+	  * See if you tftpd is already up to date on your boss:
+
+		pkg_info -E 'emulab-tftp-hpa-*'
+
+	    If it reports anything other than "emulab-tftp-hpa-0.48",
+	    you should continue.
+
+	  * Grab the new package:
+
+		cd /var/tmp
+		fetch http://www.emulab.net/downloads/emulab-tftp-hpa-0.48.tbz
+
+	  * Shutdown and deinstall the old server:
+
+		sudo /usr/local/etc/rc.d/tftpd-hpa.sh stop
+		sudo pkg_delete -f emulab-tftp-hpa-0.33
+
+	  * Install and start the new server:
+
+		sudo pkg_add /var/tmp/emulab-tftp-hpa-0.48.tbz
+		sudo /usr/local/etc/rc.d/tftpd-hpa.sh start
+
+	  If you do want to update in a FreeBSD 4.10 environment, you will
+	  have to build from it from the port.  Make sure you have the
+	  recommended port tree installed as /usr/ports and then:
+
+		cd <emulab-srcdir>/install/ports; sudo ./ports-install
+		cd /usr/ports/misc/emulab-tftp-hpa
+		sudo make
+		sudo /usr/local/etc/rc.d/tftpd-hpa.sh stop
+		sudo pkg_delete -f emulab-tftp-hpa-0.33
+		sudo make install
+		sudo /usr/local/etc/rc.d/tftpd-hpa.sh start
 
 20070317: Before build.
 
