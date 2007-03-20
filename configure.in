@@ -16,7 +16,7 @@ AC_CONFIG_HEADER(config.h)
 # Check that $srcdir, (which defaults to the argv[0] path to the configure
 # script,) is different from the current directory.
 #
-if test `realpath $srcdir` = `pwd`; then
+if test `(cd $srcdir; pwd)` = `pwd`; then
     if test "$ac_srcdir_defaulted" = yes; then
 	AC_MSG_ERROR(
 	    [You are running the configure script in the current directory.
@@ -297,7 +297,8 @@ AC_ARG_WITH(TBDEFS,
     AC_MSG_ERROR(
 	[The required --with-TBDEFS= argument was not given.
 The value of --with-TBDEFS= must be the path to your Emulab defs file.
-Copy and modify the defs-example file.  defs-default has values for Utah.])
+Copy and modify the defs-example file for your Emulab installation.
+defs-default has values for Utah, including client-side image compilations.])
 ])
 
 if test -f $TBDEFS; then

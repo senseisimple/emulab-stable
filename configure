@@ -587,7 +587,7 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 # Check that $srcdir, (which defaults to the argv[0] path to the configure
 # script,) is different from the current directory.
 #
-if test `realpath $srcdir` = `pwd`; then
+if test `(cd $srcdir; pwd)` = `pwd`; then
     if test "$ac_srcdir_defaulted" = yes; then
 	{ echo "configure: error: You are running the configure script in the current directory.
 Output from configure must go into an Emulab obj tree, not a source tree!
@@ -1546,7 +1546,8 @@ else
   
     { echo "configure: error: The required --with-TBDEFS= argument was not given.
 The value of --with-TBDEFS= must be the path to your Emulab defs file.
-Copy and modify the defs-example file.  defs-default has values for Utah." 1>&2; exit 1; }
+Copy and modify the defs-example file for your Emulab installation.
+defs-default has values for Utah, including client-side image compilations." 1>&2; exit 1; }
 
 fi
 
@@ -2096,17 +2097,17 @@ for ac_hdr in ulxmlrpcpp/ulxr_config.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2100: checking for $ac_hdr" >&5
+echo "configure:2101: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2105 "configure"
+#line 2106 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2110: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2111: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2145,17 +2146,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2149: checking for $ac_hdr" >&5
+echo "configure:2150: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2154 "configure"
+#line 2155 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2159: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2160: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2188,7 +2189,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2192: checking for $ac_word" >&5
+echo "configure:2193: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2267,7 +2268,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2271: checking for a BSD compatible install" >&5
+echo "configure:2272: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2328,7 +2329,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2332: checking for $ac_word" >&5
+echo "configure:2333: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
