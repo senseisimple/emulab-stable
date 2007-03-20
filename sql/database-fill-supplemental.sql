@@ -5,7 +5,7 @@
 -- these is not idempotent, since a site may have changed them for some reason.
 --
 
-INSERT INTO `node_types` VALUES ('pcvm','pcvm',NULL,NULL,1,0,1,1,0,0,0,0,0);
+INSERT IGNORE INTO `node_types` VALUES ('pcvm','pcvm',NULL,NULL,1,0,1,1,0,0,0,0,0);
 
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','delay','/kernel.delay');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','vnodehost','/kernel.jail');
