@@ -137,16 +137,28 @@ the Emulab database and directories into initial conditions.
 
      ls -l /users /proj /groups
      rm -r /proj/* /groups/*
+     mkdir /proj/cvsrepos
      pw groupdel -n emulab-ops
      ls -l /usr/testbed/{expwork,*/proj}
      rm -r /usr/testbed/expwork/* /usr/testbed/*/proj/*
      ls -l /usr/testbed/{expwork,*/proj}
 
-  * Remove user and group from the elabman "Create First Project" pages.
+ * Remove user and group from the elabman "Create First Project" pages.
      set me = *your-login*
+     set us = testbed
      pw userdel -n $me -r
-     pw groupdel -n testbed
+     pw groupdel -n $us
      ls -l /users /proj /groups
+
+ * Also remove any other users and groups you've created since then.
+   Otherwise you will get this message until you've cleared them:
+   'Error Creating Project: Transient error; please try again later.'
+     tail /etc/passwd
+     tail /etc/group
+     set him = *user*
+     set them = *group*
+     pw userdel -n $him -r
+     pw groupdel -n $them
 
  * Kill the database.
      mysql -e "drop database tbdb"
