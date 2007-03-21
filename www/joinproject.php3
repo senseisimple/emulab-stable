@@ -7,6 +7,16 @@
 include("defs.php3");
 
 #
+# This is a hack to support wikiregister.php3 - normally, this variable would
+# be cleared by OptionalPageArguments()
+#
+if (isset($forwikionly) && $forwikionly == True) {
+    $old_forwikionly = True;
+} else {
+    $old_forwikionly = False;
+}
+
+#
 # No PAGEHEADER since we spit out a Location header later. See below.
 #
 
@@ -44,8 +54,11 @@ else {
     $returning = 0;
 }
 
+if ($old_forwikionly == True) {
+    $forwikionly = True;
+}
 if (!isset($forwikionly)) {
-    $forwikionly = 0;
+    $forwikionly = False;
 }
 unset($addpubkeyargs);
 
