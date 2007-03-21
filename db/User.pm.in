@@ -377,7 +377,7 @@ sub Create($$$$)
 	    DBQueryWarn("select u.unix_uid + 1 as start from users as u ".
 			"left outer join users as r on ".
 			"  u.unix_uid + 1 = r.unix_uid ".
-			"where u.unix_uid>$min_uid and ".
+			"where u.unix_uid>=$min_uid and ".
 			"      u.unix_uid<60000 and ".
 			"      r.unix_uid is null limit 1");
 	return undef

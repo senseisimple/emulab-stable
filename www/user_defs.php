@@ -328,7 +328,7 @@ class User
 	    DBQueryFatal("select u.unix_uid + 1 as start from users as u ".
 			 "left outer join users as r on ".
 			 "  u.unix_uid + 1 = r.unix_uid ".
-			 "where u.unix_uid>$MIN_UNIX_UID and ".
+			 "where u.unix_uid>=$MIN_UNIX_UID and ".
 			 "      u.unix_uid<60000 and ".
 			 "      r.unix_uid is null limit 1");
 
