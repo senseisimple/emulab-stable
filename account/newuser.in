@@ -442,7 +442,7 @@ sub escapeshellarg($)
 {
     my ($str) = @_;
 
-    $str =~ s/(')/'\\''/g;
+    $str =~ s/[^[:alnum:]]/\\$&/g;
     return $str;
 }
 	   
