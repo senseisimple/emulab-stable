@@ -106,7 +106,7 @@ Download the packages tarball from:
 Now, untar this someplace (you need about 140MB of space, so don't use /tmp).
 Let's say you untarred it into /usr/tmp. You would then run:
 
-	env PKG_PATH=/usr/tmp/FreeBSD-6.1-20060921 pkg_add emulab-ops-2.0
+	env PKG_PATH=/usr/tmp/packages pkg_add emulab-ops-2.0
 
 Of course, if you untarred it somewhere else, put in the correct path.
 
