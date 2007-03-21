@@ -1095,7 +1095,7 @@ if ($MAILMANSUPPORT) {
 			      "fgrep -q -s mailman") == 0);
 
 	    ExecQuietFatal("sed -i .orig -e ".
-			   "  's,\\(AliasFile.*\\),\\1\\,$MAILMANALIAS,' ".
+			   "  's;\\(AliasFile.*\\);$MAILMANALIAS,\\1;' ".
 			   "$SENDMAIL_CF");
 	};
 	Phase "aliases", "Creating $MAILMANALIAS", sub {
