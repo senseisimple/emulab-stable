@@ -132,17 +132,10 @@ else {
 
 #
 # These are the fields that we allow to come in from the XMLfile.
+# This first set is required by all types of users
 #
 my %required = ("name"		=> "usr_name",
 		"email"		=> "usr_email",
-		"address"	=> "usr_addr",
-		"city"		=> "usr_city",
-		"state"		=> "usr_state",
-		"zip"		=> "usr_zip",
-		"country"	=> "usr_country",
-		"phone"		=> "usr_phone",
-		"title"		=> "usr_title",
-		"affiliation"	=> "usr_affil",
 		"password"	=> undef);
 
 my %optional = ("login"		=> "uid",
@@ -150,6 +143,23 @@ my %optional = ("login"		=> "uid",
 		"URL"		=> "usr_URL",
 		"shell"		=> "usr_shell",
 		"pubkey"        => undef);
+
+#
+# These are required for most users, but are optional for wiki-only users
+# 
+my %usually_required = ("address"	=> "usr_addr",
+ 		        "city"		=> "usr_city",
+ 		        "state"	        => "usr_state",
+		        "zip"		=> "usr_zip",
+		        "country"	=> "usr_country",
+		        "phone"	        => "usr_phone",
+		        "title"	        => "usr_title",
+		        "affiliation"	=> "usr_affil");
+if ($type eq "wikionly") {
+    %optional = (%optional, %usually_required);
+} else {
+    %required = (%required, %usually_required);
+}
 
 ($WIKISUPPORT ? \%required : \%optional)->{"wikiname"} = "wikiname";
 
