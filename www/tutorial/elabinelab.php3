@@ -94,10 +94,12 @@ discussion, the project is "testbed" and the experiment is called
 
 	tb-elab-in-elab 1
 
-	set ::TBCOMPAT::elabinelab_maxpcs 1
+	namespace eval TBCOMPAT {
+	    set elabinelab_maxpcs 1
+	}
 
 	$ns run
-	</code></pre>
+	</pre></code>
 which is instantiated as shown in the visualization in Figure 1.
 
   <br>
@@ -118,7 +120,12 @@ which is instantiated as shown in the visualization in Figure 1.
 <br>
 As you can see in Figure 1, most of the details are handled for you;
 the experiment includes a boss node, an ops node, and a single pc600,
-all of which are connected via a lan. Once the experiment swaps in,
+all of which are connected via a lan.  (You may specify 0 to
+<tt>elabinelab_maxpcs</tt> to get only an inner boss and ops, or a positive
+integer for multiple experimental pc nodes.)
+
+<br><br>
+Once the experiment swaps in,
 you can log into <tt>myops.myemulab.testbed.emulab.net</tt>, or you
 can log into the web server at <tt>myboss.myemulab.testbed.emulab.net</tt>.
 There is also a single experimental node that can be used to create an
@@ -135,7 +142,7 @@ Another example:
 	tb-elab-in-elab 1
         tb-set-inner-elab-eid myexp
 	$ns run
-	</code></pre>
+	</pre></code>
 In this example, we have included a <tt>tb-set-inner-elab-eid</tt>
 directive, which says to automatically launch an experiment within the
 inner Emulab once it is set up. The "myexp" experiment must already
@@ -148,6 +155,56 @@ experiment has been swapped in. You can interact with the inner
 experiment normally, albeit from the inner boss (myboss) web interface
 and the inner users node (myops), or you can log into the inner
 experimental node (mypc1) directly.
+
+<br><br>
+You may specify a different Emulab source tarfile to be used in setting up the
+inner Elab, for example:
+	<code><pre>
+	namespace eval TBCOMPAT {
+	    set elabinelab_source_tarfile "/proj/yourpid/emulab-src.tar.gz"
+	}
+	</pre></code>
+
+This source tarfile is created in your object tree (preferably one that is
+pure, without any other hacks.)  Run "make elabinelab" and it will create the
+tarfile for you.
+
+<br><br>
+Or if you want to check out a specific tag of the Emulab source code:
+
+	<code><pre>
+	tb-set-elabinelab-cvstag SomeTag
+	</pre></code>
+
+which will generate a checkout from the CVS repository.
+
+<br><br>
+You may specify tarfiles to modify your inner inner boss and ops, for example:
+	<code><pre>
+  	namespace eval TBCOMPAT {
+  	    set elabinelab_tarfiles("boss") "/usr/site /proj/yourpid/patch.tar.gz"
+  	}
+	</pre></code>
+  
+You can specify multiple tarfiles in the string, just as 
+<a href="docwrapper.php3?docname=nscommands.html#tb-set-node-tarfiles"
+<tt>tb-set-node-tarfiles</tt> </a> allows.
+
+<br><br>
+Using similar sytax, there are also <tt>set elabinelab_</tt> versions of some
+of the <tt>tb-set-</tt> commands that control how the inner boss, ops, and
+experimental nodes are set up:
+<ul>
+  <li> <tt>elabinelab_nodeos</tt> - Choose a node OS ID, similar to
+       <a href="docwrapper.php3?docname=nscommands.html#tb-set-node-os"
+       <tt>tb-set-node-os</tt> </a>. </li>
+  <li> <tt>elabinelab_hardware</tt> - Choose a node hardware type, similar to
+       <a href="docwrapper.php3?docname=nscommands.html#tb-set-hardware"
+       <tt>tb-set-hardware</tt> </a>. </li>
+  <li> <tt>elabinelab_fixnodes</tt> - Choose an exact node, similar to
+       <a href="docwrapper.php3?docname=nscommands.html#tb-fix-node"
+       <tt>tb-fix-node</tt> </a>. </li>
+</ul>
 
 <h3> Implementation Notes</h3>
 

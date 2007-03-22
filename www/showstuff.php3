@@ -195,7 +195,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	}
 
         echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
-                <th><a href=\"faq.php3#tiptunnel\">Console</a></th> .
+                <th><a href=\"kb-show.php3?xref_tag=tiptunnel\">Console</a></th> .
                 <th>Log</th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
