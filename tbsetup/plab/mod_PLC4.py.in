@@ -54,8 +54,9 @@ DEF_NM_LEGACY_PORT = "814"
 #
 # A bunch of time constants / intervals (in seconds)
 #
-MAX_PLC_LEASELEN = 2*MONTH-4*DAY   # defined by PLC as ~two months (56 days)
-MIN_LEASE_WINDOW = 2*MONTH-11*DAY  # minimum time until expiration
+MAX_PLC_LEASELEN = 2*MONTH-5*DAY   # defined by PLC as ~two months (56 days)
+                                   # but have to use 55 now cause PLC won't take 56.
+MIN_LEASE_WINDOW = 2*MONTH-12*DAY  # minimum time until expiration
 MAX_LEASE_SLOP = 600 # (ten minutes)
 MAX_CACHE_TIME = HOUR # (one hour)
 
@@ -595,6 +596,12 @@ class mod_PLC4:
         # Get current PLC timeout for this slice
         leaseend = self.getSliceExpTime(slice.slicename)
 
+        if debug:
+            print "PLC says %s/%s expires at %s" % \
+                  (slice.eid,slice.pid,
+                   time.strftime("%Y-%m-%d %H:%M:%S",
+                                 time.gmtime(leaseend)))
+
         # Warn that we weren't able to get the exp. time from PLC,
         # but don't fail - try to renew anyway.
         if not leaseend:
@@ -627,8 +634,13 @@ class mod_PLC4:
             return 1
 
         # Max out leaseend as far as (politically) possible
-        timeleft = leaseend - now
-        newleaseend = now + (MAX_PLC_LEASELEN - timeleft)
+        newleaseend = now + MAX_PLC_LEASELEN
+
+        if debug:
+            print "Renewing until %s (adding now +%d s)" % \
+                  (time.strftime("%Y-%m-%d %H:%M:%S",
+                                 time.gmtime(newleaseend)),
+                   newleaseend - now)
         
         try:
             # XXX: again fix NOKstrs as necessary
