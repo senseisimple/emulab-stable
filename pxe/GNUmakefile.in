@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -42,7 +42,7 @@ BI_DBSRC += event-support.c
 BI_DBOBJ += event-support.o
 
 CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib \
-		-I/usr/local/include -lm -L/usr/local/lib -lpubsub 
+		`elvin-config --cflags vin4c`
 LFLAGS  += $(OBJDIR)/event/lib/libevent.a `elvin-config --libs vin4c` -lcrypto
 endif
 
