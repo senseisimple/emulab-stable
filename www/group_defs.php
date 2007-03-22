@@ -968,7 +968,7 @@ class Group
 	    $trust   = $row["trust"];
 
 	    if (! ($target_user = User::Lookup($uid_idx))) {
-		TBERROR("Could not lookup object for user $target_uid", 1);
+		TBERROR("Could not lookup object for user $uid_idx", 1);
 	    }
 	    $usr_name     = $target_user->name();
 	    $usr_email    = $target_user->email();
