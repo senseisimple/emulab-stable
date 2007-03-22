@@ -627,7 +627,8 @@ class mod_PLC4:
             return 1
 
         # Max out leaseend as far as (politically) possible
-        newleaseend = now + MAX_PLC_LEASELEN
+        timeleft = leaseend - now
+        newleaseend = now + (MAX_PLC_LEASELEN - timeleft)
         
         try:
             # XXX: again fix NOKstrs as necessary
