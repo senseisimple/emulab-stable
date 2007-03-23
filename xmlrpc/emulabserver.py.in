@@ -4292,7 +4292,7 @@ class elabinelab:
         if (verifyerror):
             return verifyerror
         
-        argstr = escapeshellarg(argdict["imageid"])
+        argstr = escapeshellarg(str(argdict["imageid"]))
         
         (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
         if exitval:
