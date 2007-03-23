@@ -1273,8 +1273,6 @@ Phase "firstuser", "Setting up initial user ($PROTOUSER)", sub {
     };
 };
 
-	exit(0);
-
 Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
     PhaseSkip("elabckup already created")
 	if (-d "$USERROOT/elabckup");
