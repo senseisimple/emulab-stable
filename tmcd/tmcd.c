@@ -6180,6 +6180,43 @@ COMMAND_PROTOTYPE(doeplabconfig)
 	}
 	mysql_free_result(res);
 
+	/*
+	 * Grab lanlink on which the node should be/contact plc.
+	 */
+	/* 
+	 * For now, just assume that plab_plcnet is a valid lan name and 
+	 * join it with virtlans and ifaces.
+	 */
+	res = mydb_query("select vl.vnode,r.node_id,vn.plab_plcnet,"
+			 "       vn.plab_role,i.IP,i.mask,i.mac"
+			 "  from reserved as r left join virt_lans as vl"
+			 "    on r.pid=vl.pid and r.eid=vl.eid"
+			 "  left join interfaces as i"
+			 "    on vl.ip=i.IP and r.node_id=i.node_id"
+			 "  left join virt_nodes as vn"
+			 "    on vl.vname=vn.plab_plcnet and r.vname=vn.vname"
+			 "  where r.pid='%s' and r.eid='%s' and"
+                         "    r.plab_role != 'none' and i.IP != ''"
+			 "      and vn.plab_plcnet != 'none'"
+			 "      and vn.plab_plcnet != 'control'",
+			 7,reqp->pid,reqp->eid);
+	if (!res) {
+	    error("EPLABCONFIG: %s: DB Error getting plab_in_elab info\n",
+		  reqp->nodeid);
+	    return 1;
+	}
+	nrows = (int)mysql_num_rows(res);
+	while (nrows--) {
+	    row = mysql_fetch_row(res);
+	    bufp = buf;
+	    
+	    bufp += OUTPUT(bufp,ebufp-bufp,
+			   "VNAME=%s PNAME=%s PLCNETWORK=%s ROLE=%s IP=%s NETMASK=%s MAC=%s\n",
+			   row[0],row[1],row[2],row[3],row[4],row[5],row[6]);
+	    client_writeback(sock,buf,strlen(buf),tcp);
+	}
+	mysql_free_result(res);
+
 	return 0;
 }
 
