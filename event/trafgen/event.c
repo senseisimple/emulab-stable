@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
