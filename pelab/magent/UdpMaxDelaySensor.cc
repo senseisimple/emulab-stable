@@ -10,7 +10,7 @@
 using namespace std;
 
 UdpMaxDelaySensor::UdpMaxDelaySensor(UdpPacketSensor const *udpPacketSensorVal, UdpMinDelaySensor const *minDelaySensorVal, UdpLossSensor const *lossSensorVal)
-	: maxDelay(0),
+	: maxDelay(0),sentDelay(0),
 	packetHistory(udpPacketSensorVal),
 	minDelaySensor(minDelaySensorVal),
 	lossSensor(lossSensorVal)
@@ -40,7 +40,6 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 
         unsigned short int seqNum = *(unsigned short int *)(packet->payload + 1);
         unsigned long long oneWayQueueDelay;
-        bool eventFlag = false;
 
 	vector<UdpPacketInfo>::iterator vecIterator;
 	vector<UdpPacketInfo> ackedPackets = packetHistory->getAckedPackets();
@@ -86,19 +85,19 @@ void UdpMaxDelaySensor::localAck(PacketInfo *packet)
 
         // Set this as the new maximum one way queuing delay.
         if(oneWayQueueDelay > maxDelay)
-        {
-                eventFlag = true;
                 maxDelay = oneWayQueueDelay;
-        }
 
         // Send an event message to the monitor to change the value of maximum one way delay.
-        if(eventFlag == true)
+	if(lossSensor->getPacketLoss() > 0)
         {
 		// Report the maximum delay
 		ostringstream messageBuffer;
-		messageBuffer<<"MAXINQ="<<(maxDelay+minDelaySensor->getMinDelay())/1000;
-		if(lossSensor->getPacketLoss() > 0)
+		if(maxDelay > sentDelay)
+		{
+			messageBuffer<<"MAXINQ="<<(maxDelay+minDelaySensor->getMinDelay())/1000;
 			global::output->eventMessage(messageBuffer.str(), packet->elab);
+			sentDelay = maxDelay;
+		}
 
 		logWrite(SENSOR,"VALUE::New Max Delay = %llu",maxDelay);
         }

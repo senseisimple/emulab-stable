@@ -31,6 +31,7 @@ class UdpMaxDelaySensor:public Sensor{
 
 	private:
 		unsigned long long maxDelay;
+		unsigned long long sentDelay;
 		UdpPacketSensor const *packetHistory;
 		UdpMinDelaySensor const *minDelaySensor;
 		UdpLossSensor const *lossSensor;
