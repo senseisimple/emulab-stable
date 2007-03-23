@@ -6211,8 +6211,9 @@ COMMAND_PROTOTYPE(doeplabconfig)
 	    bufp = buf;
 	    
 	    bufp += OUTPUT(bufp,ebufp-bufp,
-			   "VNAME=%s PNAME=%s PLCNETWORK=%s ROLE=%s IP=%s NETMASK=%s MAC=%s\n",
-			   row[0],row[1],row[2],row[3],row[4],row[5],row[6]);
+			   "VNAME=%s PNAME=%s.%s PLCNETWORK=%s ROLE=%s IP=%s NETMASK=%s MAC=%s\n",
+			   row[0],row[1],OURDOMAIN,row[2],row[3],row[4],row[5],
+			   row[6]);
 	    client_writeback(sock,buf,strlen(buf),tcp);
 	}
 	mysql_free_result(res);
