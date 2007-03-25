@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -181,9 +181,9 @@ sub read_schema($) {
 	    # If we are in a table creation statement, we need to find out
 	    # what this line is trying to do...
 	    #
-
 	    if (/^\) TYPE\s*=\s*(\w+);/ ||
-		/^\) ENGINE\s*=\s*(\w+)\s*DEFAULT\s*CHARSET=(\w+);/) {
+		/^\) ENGINE\s*=\s*(\w+)\s*DEFAULT\s*CHARSET=(\w+);/ ||
+		/^\) ENGINE\s*=\s*(\w+)\s*AUTO_INCREMENT=\d*\s*DEFAULT\s*CHARSET=(\w+);/) {
 
 		# The end of the table definition
 		my $type = $1;
