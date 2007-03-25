@@ -10,6 +10,7 @@ import xmlrpclib
 # grab plc_config
 sys.path.append('/plc/root/usr/lib/python2.4/site-packages')
 from plc_config import PLCConfiguration
+import array
 
 
 debug = 1
@@ -316,7 +317,52 @@ def addMACDelim(mac,delim=':'):
         return mac
     pass
 
-def plcAddNode(hostname,ip,mac):
+def calcBroadcast(ip,netmask):
+    sip = ip.split('.')
+    nip = netmask.split('.')
+    
+    sip = array.array("B",map(lambda(x): int(x),sip))
+    nip = array.array("B",map(lambda(x): int(x),nip))
+    
+    if len(sip) != len(nip) or len(sip) != 4:
+        return None
+    
+    bip = array.array("B",[0,0,0,0])
+    retval = ''
+    for i in range(0,len(sip)):
+        bip[i] = sip[i] & nip[i]
+        bip[i] |= 0xff & ~nip[i]
+        if i > 0:
+            retval += '.'
+            pass
+        retval += str(bip[i])
+        pass
+    
+    return retval
+
+def calcNetwork(ip,netmask):
+    sip = ip.split('.')
+    nip = netmask.split('.')
+    
+    sip = array.array("B",map(lambda(x): int(x),sip))
+    nip = array.array("B",map(lambda(x): int(x),nip))
+    
+    if len(sip) != len(nip) or len(sip) != 4:
+        return None
+    
+    bip = array.array("B",[0,0,0,0])
+    retval = ''
+    for i in range(0,len(sip)):
+        bip[i] = sip[i] & nip[i]
+        if i > 0:
+            retval += '.'
+            pass
+        retval += str(bip[i])
+        pass
+    
+    return retval
+
+def plcAddNode(hostname,ip,mac,doDHCP,netmask,dnsServerIP):
     auth = getXMLRPCAuthInfo()
     server = getXMLRPCServer()
 
@@ -324,12 +370,27 @@ def plcAddNode(hostname,ip,mac):
     
     nid = server.AddNode(auth,DEF_SITE_ID,{ 'hostname' : hostname })
 
-    nnid = server.AddNodeNetwork(auth,nid,{ 'is_primary' : True,
-                                            'hostname'   : hostname,
-                                            'ip'         : ip,
-                                            'mac'        : fmac,
-                                            'method'     : 'dhcp',
-                                            'type'       : 'ipv4' })
+    methodstr = 'dhcp'
+    if not doDHCP:
+        methodstr = 'static'
+        pass
+
+    ad = { 'is_primary' : True,
+           'hostname'   : hostname,
+           'ip'         : ip,
+           'mac'        : fmac,
+           'method'     : methodstr,
+           'type'       : 'ipv4' }
+    if not doDHCP:
+        ad['ip'] = ip
+        ad['gateway'] = ip
+        ad['network'] = calcNetwork(ip,netmask)
+        ad['broadcast'] = calcBroadcast(ip,netmask)
+        ad['netmask'] = netmask
+        ad['dns1'] = '127.0.0.1'
+        pass
+    
+    nnid = server.AddNodeNetwork(auth,nid,ad)
 
     # ugh, have to set a node key manually
     astr = "abcdefghijklmnopqrstuvwxyz"
@@ -350,7 +411,7 @@ def plcDeleteNode(hostname):
 
     return server.DeleteNode(auth,hostname)
 
-def plcUpdateNode(hostname,ip,mac):
+def plcUpdateNode(hostname,ip,mac,doDHCP,netmask,dnsServerIP):
     auth = getXMLRPCAuthInfo()
     server = getXMLRPCServer()
 
@@ -371,16 +432,32 @@ def plcUpdateNode(hostname,ip,mac):
 
     nnid = nodelist[0]['nodenetwork_ids'][0]
 
-    nnlist = server.GetNodeNetworks(auth,[ nnid ],[ 'ip','mac' ])
+    nnlist = server.GetNodeNetworks(auth,[ nnid ],[ 'ip','mac','method' ])
 
     if len(nnlist) != 1:
         print "WARNING: more than one node network for %s; " + \
               "using first!" % hostname
         pass
     
-    if ip != nnlist[0]['ip'] or fmac != nnlist[0]['mac']:
-        return server.UpdateNodeNetwork(auth,nnid,{ 'ip' : ip,
-                                                    'mac' : fmac })
+    methodstr = 'dhcp'
+    if not doDHCP:
+        methodstr = 'static'
+        pass
+
+    if ip != nnlist[0]['ip'] or fmac != nnlist[0]['mac'] \
+           or nnlist[0]['method'] != methodstr:
+        ad = { 'ip' : ip,
+               'mac' : fmac,
+               'method' : methodstr }
+        if not doDHCP:
+            ad['ip'] = ip
+            ad['gateway'] = ip
+            ad['network'] = calcNetwork(ip,netmask)
+            ad['broadcast'] = calcBroadcast(ip,netmask)
+            ad['netmask'] = netmask
+            ad['dns1'] = '127.0.0.1'
+            pass
+        return server.UpdateNodeNetwork(auth,nnid,ad)
         pass
 
     # even if we don't do anything, return 1.
@@ -388,7 +465,7 @@ def plcUpdateNode(hostname,ip,mac):
 
 def plcUpdateNodes(uplist=[]):
     """
-    uplist should be a list of (hostname,ip,mac) tuples.
+    uplist should be a list of (hostname,ip,mac,doDHCP) tuples.
     """
     auth = getXMLRPCAuthInfo()
     server = getXMLRPCServer()
@@ -479,20 +556,38 @@ def plcGetNodeConfig(hostname):
 
     nnlist = server.GetNodeNetworks(auth,
                                     { 'hostname' : hostname },
-                                    [ 'mac','method' ])
+                                    [ 'broadcast','network','ip','dns1',
+                                      'netmask','gateway','mac','method' ])
 
     if len(nnlist) != 1:
         return []
 
-    (host,network) = hostname.split('.',1)
-
-    return [ 'NODE_ID="%d"' % nlist[0]['node_id'],
-             'NODE_KEY="%s"' % nlist[0]['key'],
-             'NET_DEVICE="%s"' % nnlist[0]['mac'],
-             'IP_METHOD="%s"' % nnlist[0]['method'],
-             'HOST_NAME="%s"' % host,
-             'DOMAIN_NAME="%s"' % network ]
-
+    hsp = hostname.split('.',1)
+    if len(hsp) == 2:
+        (host,network) = hsp
+        pass
+    else:
+        host = hostname
+        network = ''
+        pass
+    
+    retval = []
+    retval.append('IP_METHOD="%s"' % nnlist[0]['method'])
+    if nnlist[0]['method'] == 'static':
+        retval.append('IP_ADDRESS="%s"' % nnlist[0]['ip'])
+        retval.append('IP_GATEWAY="%s"' % nnlist[0]['gateway'])
+        retval.append('IP_NETMASK="%s"' % nnlist[0]['netmask'])
+        retval.append('IP_NETADDR="%s"' % nnlist[0]['network'])
+        retval.append('IP_BROADCASTADDR="%s"' % nnlist[0]['broadcast'])
+        retval.append('IP_DNS1="%s"' % nnlist[0]['dns1'])
+        pass
+    retval.append('NODE_ID="%d"' % nlist[0]['node_id'])
+    retval.append('NODE_KEY="%s"' % nlist[0]['key'])
+    retval.append('NET_DEVICE="%s"' % nnlist[0]['mac'])
+    retval.append('HOST_NAME="%s"' % host)
+    retval.append('DOMAIN_NAME="%s"' % network)
+    
+    return retval
 
 def readRootAcctInfo(refresh=False,pwfile=DEF_ROOT_ACCOUNT_INFO_FILE):
     global cachedRootUID,cachedRootPasswd

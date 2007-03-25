@@ -3,6 +3,8 @@
 import traceback
 import sys
 import os.path
+import socket
+import re
 
 #
 # Helper functions.
@@ -174,6 +176,11 @@ from libplcsetup import *
 DEF_PLC_HOST = getHostname()
 DEF_PLC_IP = socket.gethostbyname(DEF_PLC_HOST)
 
+
+#
+# Kick it all off.
+#
+
 # -2.
 #try:
 #    os.makedirs('/plc/emulab/setup')
@@ -236,29 +243,119 @@ if rootUID == None or rootPasswd == None:
 # grab the PLC's name while we're at it...
 PLC_NAME = plcReadConfigVar('plc','name')
 
+plab_ip = ''
+plab_host = ''
+
+# Now, we ALWAYS must put the plc_www variables on the control net so that
+# users can get to it without a proxy.  However, we want to move boot,api,db
+# servers to the experimental net if that's where the plc is supposed to be.
+for lineDict in tmccEPlabConfig:
+    # look for lines that have PLCNETWORK=X and ROLE=plc
+    if lineDict.has_key('ROLE') and lineDict['ROLE'] == 'plc' \
+       and lineDict.has_key('PLCNETWORK'):
+        plab_ip = lineDict['IP']
+        plab_host = socket.gethostbyaddr(plab_ip)[0]
+        break
+    pass
+
+if plab_ip == '':
+    plab_ip = DEF_PLC_IP
+    plab_host = DEF_PLC_HOST
+    pass
+
+plab_host = 'plc'
+
 print "plabinelab: updating config for PLC '%s'" % str(PLC_NAME)
-configVarsList = [ [ 'plc_www','ip',              DEF_PLC_IP ],
-                   [ 'plc_www','host',            DEF_PLC_HOST ],
+configVarsList = [ [ 'plc_www','ip',              plab_ip ],
+                   [ 'plc_www','host',            plab_ip ],
                    [ 'plc','root_user',           rootUID ],
                    [ 'plc','root_password',       rootPasswd ],
-                   [ 'plc_boot','ip',             DEF_PLC_IP ],
-                   [ 'plc_boot','host',           DEF_PLC_HOST ],
+                   [ 'plc_boot','ip',             plab_ip ],
+                   [ 'plc_boot','host',           plab_ip ],
                    [ 'plc_mail','support_address',creatorEmail ],
                    [ 'plc_mail','boot_address',   creatorEmail ],
                    [ 'plc_mail','slice_address',  creatorEmail ],
-                   [ 'plc_api','ip',              DEF_PLC_IP ],
-                   [ 'plc_api','host',            DEF_PLC_HOST ],
-                   [ 'plc_db','ip',               DEF_PLC_IP ],
-                   [ 'plc_db','host',             DEF_PLC_HOST ] ]
+                   [ 'plc_api','ip',              plab_ip ],
+                   [ 'plc_api','host',            plab_ip ],
+                   [ 'plc_db','ip',               plab_ip ],
+                   [ 'plc_db','host',             plab_ip ] ]
 plcUpdateConfig(configVarsList)
 
 # XXX: can't find a good way to grab this, but it's unlikely that it will
 # change during emulab exp runtime.
 PLC_BOOTCD_VERSION = '3.3'
 
+# Ensure that Emulab files are overlayed into the PlanetLab-Bootstrap tarball.
+PLC_BOOTSTRAP_TARBALL = '/plc/data/var/www/html/boot/PlanetLab-Bootstrap.tar.bz2'
+EMULAB_ROOTBALL = '/share/plabplc/files/tbroot.tar.bz2'
+
+
+
+print "Emulabifying PlanetLab-Bootstrap tarball..."
+cwd = os.getcwd()
+if not os.path.exists('/tmp/proot'):
+    os.makedirs('/tmp/proot')
+    pass
+os.chdir('/tmp')
+os.system("sudo tar -xjpf %s -C /tmp/proot" % PLC_BOOTSTRAP_TARBALL)
+os.system("sudo tar -xjpf %s -C /tmp/proot" % EMULAB_ROOTBALL)
+os.chdir('/tmp/proot')
+os.system("sudo tar -cjpf %s ." % PLC_BOOTSTRAP_TARBALL)
+os.chdir(cwd)
+os.system("sudo rm -rf /tmp/proot")
+print "Finished Emulabification."
+
+
+
 # 2.
 print "plabinelab: restarting plc"
 doService('plc','start')
+
+# update PLC's inner /etc/hosts with our canonical outer one, lest the
+# plab nodes not resolve when we try to add them.
+print "plabinelab: modifying Emulab hosts file"
+hfd = open('/etc/hosts','r')
+outlines = list()
+line = hfd.readline()
+lrm = re.compile('[\s\t]+')
+while line != None and line != '':
+    line = line.rstrip('\n')
+    if line == '' \
+           or line.startswith('#') or line.__contains__('127.0.0.1') \
+           or line.__contains__('localhost') or line.__contains__('.plab'):
+        outlines.append(line)
+        pass
+    else:
+        # probably a valid line.
+        # note that we postfix our domain to any entry without a domain.
+        lsp = lrm.split(line)
+        nlsp = list()
+        for elm in lsp:
+            if not elm.__contains__('.'):
+                nlsp.append("%s.plab" % elm)
+                pass
+            pass
+        outstr = ''
+        for bit in lsp:
+            outstr += bit + '\t'
+            pass
+        for bit in nlsp:
+            outstr += bit + '\t'
+            pass
+        outlines.append(outstr)
+        pass
+    line = hfd.readline()
+    pass
+hfd.close()
+# writeback
+hfd = open('/etc/hosts','w')
+for ol in outlines:
+    hfd.write(ol + "\n")
+    pass
+hfd.close()
+
+print "plabinelab: adding Emulab hosts to chroot"
+os.system("cat /etc/hosts >> /plc/root/etc/hosts")
 
 # 3.
 # first update users:
@@ -285,17 +382,42 @@ for lineDict in tmccAccounts:
 
 plcUpdateUsers(userlist)
 
+pnameTrans = dict()
+
 # now do nodes:
+# need to save off the control net interface info, then if there's an
+# experimental interface specified for a node to be/contact plc on, overwrite.
 print "plabinelab: updating nodes"
 nodelist = list()
 for lineDict in tmccEPlabConfig:
-    if lineDict.has_key('ROLE') and lineDict['ROLE'] == 'node':
+    if lineDict.has_key('PLCNETWORK') and \
+           lineDict.has_key('ROLE') and lineDict['ROLE'] == 'node':
+        for i in range(0,len(nodelist)):
+            print "checking nodelist entry with pname %s against %s" % \
+                  (nodelist[i][0],lineDict['PNAME'])
+            if nodelist[i][0] == lineDict['PNAME']:
+                print "changing ne IP %s to IP %s" % \
+                      (nodelist[i][1],lineDict['IP'])
+                nodelist[i] = (lineDict['VNAME'] + '.plab',lineDict['IP'],
+                               lineDict['MAC'],False,
+                               lineDict['NETMASK'],lineDict['IP'])
+                pnameTrans[lineDict['PNAME']] = lineDict['VNAME'] + '.plab'
+                break
+            pass
+        pass
+    elif lineDict.has_key('ROLE') and lineDict['ROLE'] == 'node':
         nodelist.append((lineDict['PNAME'],
-                         lineDict['CNETIP'],lineDict['CNETMAC']))
+                         lineDict['CNETIP'],lineDict['CNETMAC'],True,
+                         '',''))
+        pnameTrans[lineDict['PNAME']] = lineDict['PNAME']
         pass
     pass
 
+print "nodelist = %s" % str(nodelist)
+
 plcUpdateNodes(nodelist)
+
+noRemoteConfig = True
 
 # 4.
 # first create the local node config info:
@@ -304,46 +426,56 @@ nidToMAC = dict()
 # XXX: this does depend on tmcd returning the ROLE lines before the private
 # iface lines for each vname.
 for lineDict in tmccEPlabConfig:
-    if lineDict.has_key('ROLE') and lineDict['ROLE'] == 'node':
-        nid = plcGetNodeID(lineDict['PNAME'])
-
+    if lineDict.has_key('ROLE') and lineDict['ROLE'] == 'node' \
+           and not lineDict.has_key('PLCNETWORK'):
+        nid = plcGetNodeID(pnameTrans[lineDict['PNAME']])
+        
         print "plabinelab: generating config files for node id %d" % nid
-
+        
         vnameToNID[lineDict['VNAME']] = nid
         nidToMAC[nid] = lineDict['CNETMAC']
         
-        configLines = plcGetNodeConfig(lineDict['PNAME'])
+        configLines = plcGetNodeConfig(pnameTrans[lineDict['PNAME']])
         macLines = [ addMACDelim(lineDict['CNETMAC'],'-') ]
-
+        
         if not os.path.exists('/plc/emulab/nodes/%d' % nid):
             os.makedirs('/plc/emulab/nodes/%d' % nid)
             pass
-
+        
         cfd = open('/plc/emulab/nodes/%d/conf' % nid,'w')
         for cl in configLines:
+            print "configLine(%d) = '%s'" % (nid,cl)
             cfd.write('%s\n' % cl)
             pass
         cfd.close()
-
+        
         mfd = open('/plc/emulab/nodes/%d/mac' % nid,'w')
         for ml in macLines:
             mfd.write('%s\n' % ml)
             pass
         mfd.close()
-
+        
         pass
-    elif not lineDict.has_key('ROLE') and lineDict.has_key('VNAME'):
+    elif not lineDict.has_key('ROLE') and lineDict.has_key('VNAME') \
+             and vnameToNID.has_key(lineDict['VNAME']):
         nid = vnameToNID[lineDict['VNAME']]
 
-        pfd = open('/plc/emulab/nodes/%d/ifcfg-eth1' % nid,'w')
-        pfd.write("DEVICE=eth1\n")
-        pfd.write("BOOTPROTO=none\n")
-        pfd.write("IPADDR=%s\n" % lineDict['IP'])
-        pfd.write("NETMASK=%s\n" % lineDict['NETMASK'])
-        pfd.write("HWADDR=%s\n" % addMACDelim(lineDict['MAC'],':'))
-        pfd.write("ONBOOT=yes\n")
-        pfd.write("TYPE=Ethernet\n")
-        pfd.close()
+        # This step is "commented" out right now since the
+        # PlanetLab-Bootstrap.tar.bz2 is whacked with the emulab client side
+        # runscripts... thus, we no longer need it.  But we still leave it as
+        # an option so that images that don't whack the bootstrap tarball can
+        # use it.
+        if not noRemoteConfig:
+            pfd = open('/plc/emulab/nodes/%d/ifcfg-eth1' % nid,'w')
+            pfd.write("DEVICE=eth1\n")
+            pfd.write("BOOTPROTO=none\n")
+            pfd.write("IPADDR=%s\n" % lineDict['IP'])
+            pfd.write("NETMASK=%s\n" % lineDict['NETMASK'])
+            pfd.write("HWADDR=%s\n" % addMACDelim(lineDict['MAC'],':'))
+            pfd.write("ONBOOT=yes\n")
+            pfd.write("TYPE=Ethernet\n")
+            pfd.close()
+            pass
         pass
     pass
 
@@ -363,6 +495,8 @@ for nid in vnameToNID.values():
     os.chdir(cwd)
     os.system('rm -rf /tmp/ncfg-root')
     pass
+pass
+
 
 # setup tftp:
 # we have to extract the node kernel that chainboots into the real kernel,
@@ -388,20 +522,25 @@ ilfd.close()
 for nid in vnameToNID.values():
     print "plabinelab: configuring pxelinux for node id %d" % nid
     
-    os.system('rm -rf /tmp/real-ncfg')
-    os.makedirs('/tmp/real-ncfg/usr/boot')
+    os.system('rm -rf /tmp/real-ncfg-%d' % nid)
+    os.makedirs('/tmp/real-ncfg-%d/usr/boot' % nid)
     os.system('cp /plc/emulab/nodes/%d/conf ' \
-              '/tmp/real-ncfg/usr/boot/plnode.txt' % nid)
+              '/tmp/real-ncfg-%d/usr/boot/plnode.txt' % (nid,nid))
+    os.makedirs('/tmp/real-ncfg-%d/etc' % nid)
+    os.system('cp /etc/hosts /tmp/real-ncfg-%d/etc' % nid)
+    os.system('cp /etc/host.conf /tmp/real-ncfg-%d/etc' % nid)
     cwd = os.getcwd()
-    os.chdir('/tmp/real-ncfg')
+    os.chdir('/tmp/real-ncfg-%d' % nid)
     os.system('find . | cpio -o -c | gzip -9 > /tftpboot/config-%d.img' % nid)
-    os.system('rm -rf /tmp/real-ncfg')
+    #os.system('rm -rf /tmp/real-ncfg')
     os.chdir(cwd)
 
     if not os.path.exists('/tftpboot/pxelinux.cfg'):
         os.makedirs('/tftpboot/pxelinux.cfg')
         pass
 
+    # notice that we still use the control net mac, even if setting up PLC
+    # on the experimental LAN, since pxeboot is always from control.
     pfd = open('/tftpboot/pxelinux.cfg/01-%s' % addMACDelim(nidToMAC[nid],'-'),'w')
     for iline in ilconfigLines:
         rline = ''
