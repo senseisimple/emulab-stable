@@ -2382,6 +2382,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
 	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
+	db/dumperrorlog.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/unixgroups \
