@@ -48,7 +48,7 @@ post-install:
 	chown root $(INSTALL_SBINDIR)/mkusercert
 	chmod u+s $(INSTALL_SBINDIR)/mkusercert
 
-control-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF))
+control-install:
 
 # This rule says what web* script depends on which installed binary directory.
 $(LIBEXEC_STUFF): $(INSTALL_SBINDIR)

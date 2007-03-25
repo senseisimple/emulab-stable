@@ -91,7 +91,8 @@ LINKS=	cd $(INSTALL_BINDIR) && \
 			ln -s script_wrapper.py $$file; \
 		done;
 endif
-control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
+control-install:	$(CLIENTBINS) $(USERLIBS) \
+			$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
 			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBINS))
 	$(LINKS)
 

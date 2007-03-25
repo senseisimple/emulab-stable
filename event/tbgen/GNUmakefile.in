@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -60,7 +60,7 @@ tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o ../lib/libevent.a ../l
 install:	$(INSTALL_BINDIR)/tevc \
 		$(INSTALL_DIR)/opsdir/bin/tevc
 
-control-install:	$(INSTALL_BINDIR)/tevc
+control-install:	all $(INSTALL_BINDIR)/tevc
 
 client: tevc
 client-install: client
