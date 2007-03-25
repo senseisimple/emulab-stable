@@ -41,6 +41,7 @@ my $BOSSNODE_IP= '@BOSSNODE_IP@';
 my $USERNODE_IP= '@USERNODE_IP@';
 my $FSNODE_IP=   '@FSNODE_IP@';
 my $SCRATCHDIR = '@FSDIR_SCRATCH@';
+my $SHAREDIR   = '@FSDIR_SHARE@';
 
 #
 # Fixed paths for clients
@@ -177,7 +178,10 @@ my $CISCO_MIB_FTP = "ftp://ftp.cisco.com/pub/mibs/v2";
 my @TESTBED_DIRS = ($PREFIX);
 
 my @MOUNTPOINTS = ("$USERSVAR_DIR", "$OPSDIR_DIR",
-		   "$USERROOT", "$PROJROOT", "$GROUPROOT", "$SHAREROOT");
+		   "$USERROOT", "$PROJROOT", "$GROUPROOT");
+if ($SHAREDIR) {
+    push(@MOUNTPOINTS, "$SHAREROOT");
+}
 if ($SCRATCHDIR) {
     push(@MOUNTPOINTS, "$SCRATCHROOT");
 }
