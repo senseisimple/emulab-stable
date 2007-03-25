@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2006 University of Utah and the Flux Group.
+# Copyright (c) 2002-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -30,7 +30,8 @@ $(INSTALL_APACHE_CONFIG)/%: %
 	$(INSTALL_DATA) $< $@
 
 
-install: $(addprefix $(INSTALL_APACHE_CONFIG)/, $(CONFIG_FILES))
+install: httpd.conf
+	$(INSTALL_DATA) httpd.conf $(INSTALL_APACHE_CONFIG)/httpd.conf
 
 control-install: httpd.conf-ops
 	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
