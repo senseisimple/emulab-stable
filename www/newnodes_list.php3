@@ -56,6 +56,17 @@ if (isset($selected)) {
     $selected_nodes = array();
 }
 
+# Remove these to make the code below easier.
+if (isset($newtype) && $newtype == "") {
+    unset($newtype);
+}
+if (isset($newprefix) && $newprefix == "") {
+    unset($newprefix);
+}
+if (isset($addnumber) && $addnumber == "") {
+    unset($addnumber);
+}
+
 #
 # Build up a handy little clause for these nodes to be used in WHEREs
 #
@@ -282,7 +293,7 @@ if (isset($newprefix) || isset($addnumber)) {
 	    preg_match("/^(.*-)([a-zA-Z])$/",$name,$matches)) {
 	    $prefix = $matches[1];
 	    $number = $matches[2];
-	    if ($addnumber) {
+	    if (isset($addnumber)) {
 	        if (is_numeric($number)) {
 		    $number = $number + $addnumber;
 		} else {
