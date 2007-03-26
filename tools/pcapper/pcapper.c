@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -904,7 +904,7 @@ int main (int argc, char **argv) {
 				fd = 1;
 			} else {
 				fd = open(filenames[i],
-					  O_WRONLY | O_CREAT | O_TRUNC);
+					  O_WRONLY | O_CREAT | O_TRUNC, 0600);
 				if (fd < 0) {
 					perror("Opening savefile");
 					exit(1);
