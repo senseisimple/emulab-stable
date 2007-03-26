@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,7 +41,7 @@ my $privkey = "$TB/etc/identity.newnode";
 # We also try root's own private key in case the node has somehow ended up in a
 # state where it's booted from the special boot CD or a 'regular' image.
 #
-my $rootkey = "/root/.ssh/identity";
+my $rootkey = "/root/.ssh/id_rsa";
 
 if (!TBAdmin($UID)) {
     die "Sorry, only admins can run this script\n";
