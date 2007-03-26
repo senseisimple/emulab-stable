@@ -156,11 +156,18 @@ doService('plc','mount')
 
 # ick!  need to patch the bootmanager so that 1) it doesn't ask if we're sure
 # before installing, and 2) it doesn't fail the hardware check on slow nodes.
+#
+# Also have to patch the bootmanager/WriteNetworkConfig.py file so that it
+# writes the correct ifcfg-ethX file, and does not assume eth0.
 if not os.path.exists('/plc/emulab/bootmanager.patch.done'):
     print "plabinelab: patching bootmanager"
     cwd = os.getcwd()
     os.chdir('/plc/root/usr/share/bootmanager')
     os.system('patch -p0 < /plc/emulab/bootmanager.patch')
+    os.chdir(cwd)
+    # now do a specific one needed for plab-on-the-exp-net
+    os.chdir('/plc/root/usr/share/bootmanager/source/steps')
+    os.system('patch -p0 < /share/plabplc/files/WriteNetworkConfig.patch')
     os.chdir(cwd)
     bpd = open('/plc/emulab/bootmanager.patch.done','w')
     bpd.write('done\n')
@@ -289,8 +296,6 @@ PLC_BOOTCD_VERSION = '3.3'
 PLC_BOOTSTRAP_TARBALL = '/plc/data/var/www/html/boot/PlanetLab-Bootstrap.tar.bz2'
 EMULAB_ROOTBALL = '/share/plabplc/files/tbroot.tar.bz2'
 
-
-
 print "Emulabifying PlanetLab-Bootstrap tarball..."
 cwd = os.getcwd()
 if not os.path.exists('/tmp/proot'):
@@ -304,8 +309,6 @@ os.system("sudo tar -cjpf %s ." % PLC_BOOTSTRAP_TARBALL)
 os.chdir(cwd)
 os.system("sudo rm -rf /tmp/proot")
 print "Finished Emulabification."
-
-
 
 # 2.
 print "plabinelab: restarting plc"
