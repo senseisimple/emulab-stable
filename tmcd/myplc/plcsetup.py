@@ -314,9 +314,10 @@ if not os.path.exists('/tmp/proot'):
     pass
 os.chdir('/tmp')
 os.system("sudo tar -xjpf %s -C /tmp/proot" % PLC_BOOTSTRAP_TARBALL)
-os.system("sudo tar -xjpf %s -C /tmp/proot" % EMULAB_ROOTBALL)
+os.system("sudo tar -xjpf %s-%s -C /tmp/proot" % (EMULAB_ROOTBALL,
+                                                  EMULAB_ROOTBALL_ROLE))
 os.chdir('/tmp/proot')
-os.system("sudo tar -cjpf %s-%s ." % PLC_BOOTSTRAP_TARBALL)
+os.system("sudo tar -cjpf %s ." % PLC_BOOTSTRAP_TARBALL)
 os.chdir(cwd)
 os.system("sudo rm -rf /tmp/proot")
 print "Finished Emulabification."
