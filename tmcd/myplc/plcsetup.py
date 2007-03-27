@@ -261,7 +261,8 @@ for lineDict in tmccEPlabConfig:
     if lineDict.has_key('ROLE') and lineDict['ROLE'] == 'plc' \
        and lineDict.has_key('PLCNETWORK'):
         plab_ip = lineDict['IP']
-        plab_host = socket.gethostbyaddr(plab_ip)[0]
+        #plab_host = socket.gethostbyaddr(plab_ip)[0]
+        plab_host = lineDict['VNAME']
         break
     pass
 
@@ -270,7 +271,10 @@ if plab_ip == '':
     plab_host = DEF_PLC_HOST
     pass
 
-plab_host = 'plc'
+isControlNet = True
+if not plab_ip == DEF_PLC_IP:
+    isControlNet = False
+    pass
 
 print "plabinelab: updating config for PLC '%s'" % str(PLC_NAME)
 configVarsList = [ [ 'plc_www','ip',              plab_ip ],
@@ -295,6 +299,13 @@ PLC_BOOTCD_VERSION = '3.3'
 # Ensure that Emulab files are overlayed into the PlanetLab-Bootstrap tarball.
 PLC_BOOTSTRAP_TARBALL = '/plc/data/var/www/html/boot/PlanetLab-Bootstrap.tar.bz2'
 EMULAB_ROOTBALL = '/share/plabplc/files/tbroot.tar.bz2'
+# Make sure we use the right tarball.  Unfortunately, the plab nodes don't like
+# the normal emulab linux bootscripts if contacting plc on the experimental
+# net.
+EMULAB_ROOTBALL_ROLE = 'CONTROL'
+if not isControlNet:
+    EMULAB_ROOTBALL_ROLE = 'EXP'
+    pass
 
 print "Emulabifying PlanetLab-Bootstrap tarball..."
 cwd = os.getcwd()
@@ -305,7 +316,7 @@ os.chdir('/tmp')
 os.system("sudo tar -xjpf %s -C /tmp/proot" % PLC_BOOTSTRAP_TARBALL)
 os.system("sudo tar -xjpf %s -C /tmp/proot" % EMULAB_ROOTBALL)
 os.chdir('/tmp/proot')
-os.system("sudo tar -cjpf %s ." % PLC_BOOTSTRAP_TARBALL)
+os.system("sudo tar -cjpf %s-%s ." % PLC_BOOTSTRAP_TARBALL)
 os.chdir(cwd)
 os.system("sudo rm -rf /tmp/proot")
 print "Finished Emulabification."
