@@ -1094,8 +1094,9 @@ if ($MAILMANSUPPORT) {
 		if (ExecQuiet("fgrep AliasFile $SENDMAIL_CF | ".
 			      "fgrep -q -s mailman") == 0);
 
+	    # Insert the mailman aliases file first, to avoid a forwarding loop.
 	    ExecQuietFatal("sed -i .orig -e ".
-			   "  's;\\(AliasFile.*\\);$MAILMANALIAS,\\1;' ".
+			   "  '/AliasFile=/s;=;=$MAILMANALIAS,;' ".
 			   "$SENDMAIL_CF");
 	};
 	Phase "aliases", "Creating $MAILMANALIAS", sub {
