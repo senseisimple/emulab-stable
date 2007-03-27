@@ -25,7 +25,7 @@ static void croak(const char *format, ...) {
     vfprintf(stderr,format, ap);
     va_end(ap);
     fflush(stderr);
-    exit(1);
+    abort();
 }
 
 /*
