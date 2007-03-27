@@ -77,6 +77,7 @@ Node instproc init {s} {
     $self set failureaction "fatal"
     $self set inner_elab_role ""
     $self set plab_role "none"
+    $self set plab_plcnet "none"
     $self set fixed ""
     $self set nseconfig ""
 
@@ -145,6 +146,7 @@ Node instproc updatedb {DB} {
     $self instvar failureaction
     $self instvar inner_elab_role
     $self instvar plab_role
+    $self instvar plab_plcnet
     $self instvar routertype
     $self instvar fixed
     $self instvar agentlist
@@ -277,6 +279,11 @@ Node instproc updatedb {DB} {
     if { $plab_role != "none" } {
 	lappend fields "plab_role"
 	lappend values $plab_role
+    }
+
+    if { $plab_plcnet != "" } {
+	lappend fields "plab_plcnet"
+	lappend values $plab_plcnet
     }
 
     if { $numeric_id != {} } {

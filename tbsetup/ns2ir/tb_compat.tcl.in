@@ -1612,6 +1612,29 @@ proc tb-set-node-plab-role {node role} {
 }
 
 #
+# Set the default inner plab network.  Can be a linklan, "CONTROL", or
+# "EXPERIMENTAL".  If user sets CONTROL
+#
+
+#
+# Set the interface on which a node will be/access PLC.
+# Both a plc and a normal planetlab node can call this.
+#
+proc tb-set-node-plab-plcnet {node lanlink} {
+    if {[$node info class] != "Node"} {
+        perror "\[tb-set-node-plab-plcnet] $node is not a node."
+        return
+    }
+    if {$lanlink != "control" && $lanlink != "exp" &&
+        ([$lanlink info class] != "Link" && [$lanlink info class] != "Lan")} {
+	perror "\[tb-set-node-plab-plcnet] $lanlink must be a link, lan, \"control\", or \"exp\"."
+	return
+    }
+    # don't do checking here, wait til we have Total Information Awareness.
+    $node set plab_plcnet $lanlink
+}
+
+#
 # Set security level.
 #
 proc tb-set-security-level {level} {
