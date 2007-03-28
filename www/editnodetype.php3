@@ -32,6 +32,10 @@ $optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
 				 "newattribute_name",  PAGEARG_STRING,
 				 "newattribute_value", PAGEARG_STRING);
 
+if (!isset($attributes)) {
+    $attributes = array();
+}
+
 # This belongs elsewhere!
 $initial_attributes = array(
     array("attrkey" => "adminmfs_osid", "attrvalue" => "FREEBSD-MFS",
