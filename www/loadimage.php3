@@ -54,11 +54,11 @@ if (! isset($node) || isset($canceled)) {
     $url = CreateURL("loadimage", $image); 
 
     echo "<form action='$url' method='post'>\n".
-	 "<font size=+1>Node to snapshot into image '$imageid':</font> ".
+	 "<font size=+1>Node to snapshot into image '$image_name':</font> ".
 	 "<input type='text'   name='node_id' value='$node_id'></input>\n".
 	 "<input type='submit' name='submit'  value='Go!'></input>\n".
 	 "</form><br>";
-    echo "<font size=+1>Information for Image Descriptor '$imageid':</font>\n";
+    echo "<font size=+1>Information for Image Descriptor '$image_name':</font>\n";
     
     $image->Show();
 
@@ -87,7 +87,7 @@ if (! isset($confirmed)) {
     
     echo "<center><form action='$url' method='post'>\n".
          "<h2><b>Warning!</b></h2>".
-	 "<h3>Doing a snapshot of node '$node_id' into image '$imageid' ".
+	 "<h3>Doing a snapshot of node '$node_id' into image '$image_name' ".
 	 "will overwrite any previous snapshot for that image. ".
 	 "Are you sure you want to continue?</h3>".
          "<input type='hidden' name='node_id'   value='$node_id'></input>".
@@ -101,7 +101,7 @@ if (! isset($confirmed)) {
 }
 
 echo "<br>
-      Taking a snapshot of node '$node_id' into image '$imageid' ...
+      Taking a snapshot of node '$node_id' into image '$image_name' ...
       <br><br>\n";
 flush();
 
@@ -114,7 +114,7 @@ echo "This will take 10 minutes or more; you will receive email
       notification when the snapshot is complete. In the meantime,
       <b>PLEASE DO NOT</b> delete the imageid or the experiment
       $node_id is in. In fact, it is best if you do not mess with 
-      the node or the experiment at all until uou receive email.<br>\n";
+      the node or the experiment at all until you receive email.<br>\n";
 
 flush();
 
