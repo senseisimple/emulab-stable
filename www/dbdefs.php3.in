@@ -648,6 +648,19 @@ function DBQuery($query)
     global	$DBErrorString;
     global      $DBlinkid;
     
+    # Support for SQL-injection vulnerability checking.  Labeled probe strings
+    # should be caught in page input argument checking before they get here.
+    $lbl = strpos($query, "**{");
+    if ( $lbl !== FALSE ) {
+	$end = strpos($query, "}**") + 3;
+	# Look for a preceeding single quote, and see if it's backslashed.
+	if ( substr($query, $lbl-1, 1) == "'" ) {
+	    $lbl--;
+	    if ( substr($query, $lbl-1, 1) == '\\' ) $lbl--;
+	}
+	USERERROR("Probe label: " . substr($query, $lbl, $end-$lbl), 1);
+    }
+
     $result = mysql_query($query, $DBlinkid);
 
     if (! $result) {
