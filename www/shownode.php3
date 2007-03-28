@@ -124,7 +124,7 @@ if ($isadmin ||
 
 if ($node->AccessCheck($this_user, $TB_NODEACCESS_LOADIMAGE)) {
     WRITESUBMENUBUTTON("Create a Disk Image",
-		       "newimageid_ez.php3?formfields[node]=$node_id");
+		       "newimageid_ez.php3?formfields[node_id]=$node_id");
 }
 
 if (($isadmin ||
