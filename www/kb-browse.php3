@@ -65,6 +65,7 @@ while ($row = mysql_fetch_array($search_result)) {
     $section  = $row['section'];
     $title    = $row['title'];
     $idx      = $row['idx'];
+    $xref_tag = $row['xref_tag'];
 
     if ($lastsection != $section) {
 	if ($lastsection != "") {
@@ -76,7 +77,12 @@ while ($row = mysql_fetch_array($search_result)) {
 	echo "<ul>\n";
     }
     echo "<li>";
-    echo "<a href=#${idx}>$title</a>\n";
+    if (isset($xref_tag) && $xref_tag != "") {
+	echo "<a href=#${xref_tag}>$title</a>\n";
+    }
+    else {
+	echo "<a href=#${idx}>$title</a>\n";
+    }
 }
 mysql_data_seek($search_result, 0);
 
@@ -105,9 +111,12 @@ while ($row = mysql_fetch_array($search_result)) {
     echo "<li>";
     if (isset($xref_tag) && $xref_tag != "") {
 	echo "<a NAME='$xref_tag'></a>";
+	echo "<a href=kb-show.php3?xref_tag=$xref_tag>$title</a>\n";
     }
-    echo "<a NAME='$idx'></a>";
-    echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    else {
+	echo "<a NAME='$idx'></a>";
+	echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    }
 
     echo "<blockquote>\n";
     echo $body;

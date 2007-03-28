@@ -48,8 +48,11 @@ while ($row = mysql_fetch_array($search_result)) {
     echo "<li>";
     if (isset($xref_tag) && $xref_tag != "") {
 	echo "<a NAME='$xref_tag'></a>";
+	echo "<a href=kb-show.php3?xref_tag=$xref_tag>$title</a>\n";
     }
-    echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    else {
+	echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    }
 }
 
 echo "</ul>\n";
