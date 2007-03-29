@@ -484,7 +484,7 @@ Phase "portfixup", "Fixing up packages", sub {
 Phase "patches", "Applying patches", sub {
     Phase "m2cryptopatch", "Patching m2crypto", sub {
 	my $patchfile = $M2CRYPTO_PATCH;
-	
+
 	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
 	    $patchfile = "${patchfile}-0.13";
 	}
@@ -866,7 +866,9 @@ Phase "samba", "Setting up Samba", sub {
 Phase "ssh", "Allowing root ssh", sub {
     Phase "sshdconfig", "Permitting root login through ssh", sub {
 	DoneIfEdited($SSHD_CONFIG);
-	AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+	AppendToFileFatal($SSHD_CONFIG,
+			  "PermitRootLogin yes",
+			  "Protocol 2,1");
     };
     Phase "dotssh", "Making root's .ssh directory", sub {
 	DoneIfExists("/root/.ssh");
