@@ -244,6 +244,10 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	ptop_error("Bad link line, bad delay characteristics.");
       }
 
+      if (ibw <= 0) {
+          ptop_error("Bad link line - negative or zero bandwidth.");
+      }
+
 #define ISSWITCH(n) (n->types.find("switch") != n->types.end())
       // Check to make sure the nodes in the link actually exist
       if (pname2vertex.find(src) == pname2vertex.end()) {
