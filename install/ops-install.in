@@ -220,7 +220,7 @@ my $VARRUN        = "/var/run";
 #
 my @LOCAL_HOSTS        = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
 my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
-    "/var/log/mountd.log");
+    "/var/log/mountd.log", "LOGDIR/pubsubd.log", "LOGDIR/elvin_gateway.log");
 my @LOCAL_MAILING_LISTS = grep(/$OURDOMAIN$/,@MAILING_LISTS);
 my @MAILING_LIST_NAMES  = map { /^([\w-]+)\@/ } @LOCAL_MAILING_LISTS;
 
@@ -764,6 +764,10 @@ Phase "syslog", "Setting up syslog", sub {
 	print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
 	print SC "!mountd\n";
 	print SC "*.*\t\t\t\t\t\t/var/log/mountd.log\n";
+	print SC "!pubsubd\n";
+	print SC "*.*\t\t\t\t\t\t/var/log/pubsubd.log\n";
+	print SC "!elvin_gateway\n";
+	print SC "*.*\t\t\t\t\t\t/var/log/elvin_gateway.log\n";
 	print SC "# " . MAGIC_TESTBED_END . "\n";
 	close SC;
     };
@@ -804,6 +808,8 @@ Phase "syslog", "Setting up syslog", sub {
 	AppendToFileFatal($NEWSYSLOG_CONF,
 	    "/var/log/logins\t\t\t\t640  7     200 *      Z",
 	    "/var/log/mountd.log\t\t\t640  5     200 *      Z",
+	    "$LOGDIR/pubsubd.log\t\t\t640  5     1000 *     Z",
+	    "$LOGDIR/elvin_gateway.log\t\t\t640  5     1000 *     Z",
 	    "/var/log/tiplogs/capture.log\t\t644  7     *    168   Z");
     };
 };
