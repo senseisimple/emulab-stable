@@ -59,6 +59,7 @@ mfs-install:	destdircheck common-install etc-install \
 	$(INSTALL) -m 755 $(SRCDIR)/camwce $(BINDIR)/camwce
 	cp $(SRCDIR)/mfs-rc.conf $(SYSETCDIR)/rc.conf
 	rm -f $(BINDIR)/rc/rc.mkelab
+	rm -f $(RCDIR)/elvind.sh
 	@if [ ! -f $(ISMFS) ]; then \
 	    echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"; \
 	fi
@@ -96,6 +97,7 @@ frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 755 -s ../tmcc-nossl $(SYSETCDIR)/testbed/tmcc
 	$(INSTALL) -m 755 -s ../findif $(SYSETCDIR)/testbed
 	rm -f $(BINDIR)/rc/rc.mkelab
+	rm -f $(RCDIR)/elvind.sh
 
 cdboot-install:	destdircheck common-install etc-install \
 			script-install bin-install
