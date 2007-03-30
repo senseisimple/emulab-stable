@@ -380,9 +380,9 @@ class emulab:
         if starting and ending:
             comparison = "BETWEEN %s and %s"
             sub = (starting, ending)
-            pass
         elif starting:
             comparison = "> %s"
+            pass
             sub = (starting,)
             pass
         elif ending:
@@ -4212,9 +4212,11 @@ class elabinelab:
             return verifyerror
 
         if (argdict["op"] != "setup" and
+            argdict["op"] != "list" and
+            argdict["op"] != "trunk" and
             argdict["op"] != "destroy"):
             return EmulabResponse(RESPONSE_BADARGS,
-                                  output="op must be setup or destroy")
+			  output="op must be list, trunk, setup or destroy")
 
         argstr = "-p " + self.pid + " -e " + self.eid + " " + argdict["op"];
      
@@ -4222,10 +4224,10 @@ class elabinelab:
         # Figure out how to convert the stuff we got into something we can
         # pass on the command line to perl backend.
         # 
-        if argdict["op"] == "destroy":
+        if argdict["op"] == "destroy" or argdict["op"] == "list":
             #
-            # Destroy is easy; just pass a list of id numbers out. The backend
-            # script does all the verification.
+            # Destroy and list are easy; just pass a list of id numbers out.
+	    # The backend script does all the verification.
             #
             if (isinstance(argdict["arg"], types.IntType)):
                 argstr += " " + str(argdict["arg"])
@@ -4237,6 +4239,17 @@ class elabinelab:
                     pass
                 pass
             pass
+        elif argdict["op"] == "trunk":
+            #
+            # Trunk is syntactically like destroy or list with two extra args.
+            #
+	    info = argdict["arg"]
+	    argstr += " " + str(info["mode"]) + " " + str(info["port"])
+	    tokens = info["vlans"].split(",")
+	    for token in tokens:
+		argstr += " " + escapeshellarg(token)
+		pass
+	    pass
         else:
             #
             # Setup is harder. Pass a set of strings to the script,

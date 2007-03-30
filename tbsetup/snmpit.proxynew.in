@@ -13,7 +13,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT "Usage: snmpit.proxy [-d] -p <pid> -e <eid> ".
-	"setup|destroy arg [arg ...]\n";
+	"setup|destroy|trunk|list arg [arg ...]\n";
  
     exit(-1);
 }
@@ -22,6 +22,9 @@ my $debug    = 0;
 my $impotent = 0;
 my $pid;
 my $eid;
+my @inner_ids = ();
+my @outer_ids = ();
+my %mapping   = ();
 
 #
 # Configure variables
@@ -53,6 +56,9 @@ my $exptidx;
 # Protos
 sub SetupVlans();
 sub DestroyVlans();
+sub Trunk();
+sub List();
+sub Map();
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -123,6 +129,12 @@ if ($op eq "setup") {
 elsif ($op eq "destroy") {
     exit(DestroyVlans());
 }
+elsif ($op eq "trunk") {
+    exit(Trunk());
+}
+elsif ($op eq "list") {
+    exit(List());
+}
 
 #
 # Setup vlans for an inner emulab. ARGV holds a set of strings that look
@@ -136,6 +148,7 @@ elsif ($op eq "destroy") {
 sub SetupVlans()
 {
     my $vlantable = {};
+    my %vmaptable = ();
     my %vtagtable = ();
     my %nodes     = ();
     my @outer_ids = ();
@@ -185,24 +198,31 @@ sub SetupVlans()
 	    "    that will be affected by the operation you requested\n");
     }
 
-    #
+    # Stoller wrote:
     # Sanity check the inner id numbers. If they already exist in the
     # mapping table, then bail now. We could probably support this, but
     # I do not see a reason to yet.
-    #
-    my $query_result =
-	DBQueryFatal("select * from elabinelab_vlans ".
-		     "where pid='$pid' and eid='$eid' and ".
-		     # Join "id='foo'" with ORs
-		     "(" .
-		       join(' OR ', map("inner_id='$_'", keys(%$vlantable))) .
-		     ")");
-    if ($query_result->numrows) {
-	my @ids = keys(%$vlantable);
-	
-	die("*** $0:\n",
-	    "    One of the inner vlan ids (@ids) already exists!\n");
-    }
+
+    # Sklower explains:
+    # for the federation boss, in order to calculate which
+    # vlans go on which inter site trunks it's convenient to
+    # push the vlan handling for master site's parent into
+    # a pseudo-switch-module, but that will cause the parent
+    # to be asked to add groups of interfaces in chunks.
+
+#    my $query_result =
+#	DBQueryFatal("select * from elabinelab_vlans ".
+#		     "where pid='$pid' and eid='$eid' and ".
+#		     # Join "id='foo'" with ORs
+#		     "(" .
+#		       join(' OR ', map("inner_id='$_'", keys(%$vlantable))) .
+#		     ")");
+#    if ($query_result->numrows) {
+#	my @ids = keys(%$vlantable);
+#	
+#	die("*** $0:\n",
+#	    "    One of the inner vlan ids (@ids) already exists!\n");
+#    }
 
     #
     # Okay, sanity check the interfaces for each node. They have to be real
@@ -211,17 +231,31 @@ sub SetupVlans()
     # control network, and we do not let those interfaces change.
     #
     foreach my $node (keys(%nodes)) {
+
 	my @ifaces = @{ $nodes{$node} };
 
+	# Sklower chimes in again
+	# In Mike's canonical experiment about running two interfaces in
+	# multiplexed mode the query that was here returned more than
+	# one result, because the same interface was presented twice.
+        
+	# this check is going to become a lot more elaborate if we allow
+	# an elabinelab to have firewalls within it ... let's *table* that
+	# motion for now ...
+
 	my $query_result =
-	    DBQueryFatal("select node_id,iface from interfaces ".
-			 "where node_id='$node' and IP='' and ".
+	    DBQueryFatal("select iface,role,IP from interfaces ".
+			 "where node_id='$node' and ".
 			 # Join "iface='foo'" with ORs
 			 "(" . join(' OR ', map("iface='$_'", @ifaces)) . ")");
 
-	if ($query_result->numrows != scalar(@ifaces)) {
-	    die("*** $0:\n",
-		"    One of the ifaces (@ifaces) for $node cannot be changed\n");
+	if ($query_result) {
+	    while (my ($iface, $role, $IP) = $query_result->fetchrow()) {
+		if (($role ne "expt") || ($IP ne "")) {
+		    die("*** $0:\n",
+			"Iface $iface for $node cannot be changed\n");
+		}
+	    }
 	}
     }
 
@@ -258,6 +292,7 @@ sub SetupVlans()
 	my $vtag    = $vtagtable{$id};
 	my @members = keys(%{ $vlantable->{$id} });
 	my $mstring = "@members";
+	my $outer_id;
 
 	if ($debug) {
 	    print STDERR "$pid $eid $id $mstring\n";
@@ -265,39 +300,72 @@ sub SetupVlans()
 	next
 	    if ($impotent);
 
-	# Insert outer vlans entry.
+	# Insert (or modify) outer vlans entry.
 	my $query_result =
-	    DBQueryWarn("insert into vlans ".
-			"  (exptidx,id,pid,eid,virtual,members) ".
-			"values ($exptidx, 0, '$pid', '$eid', '$vtag', ".
-			"        '$mstring')");
-	if (!$query_result || !$query_result->numrows) {
-	    print STDERR "*** $0:\n".
-		         "    Could not insert vlan table entry for $id\n";
-	    $errors++;
-	    next;
-	}
-	my $outer_id = $query_result->insertid;
+	    DBQueryFatal("select outer_id from elabinelab_vlans ".
+			 "where pid='$pid' and eid='$eid' and inner_id='$id'");
+	if ($query_result->numrows == 1) {
+	    ($outer_id) = $query_result->fetchrow();
+	    $query_result =
+		DBQueryFatal("select members from vlans where id='$outer_id'");
+	    if ($query_result->numrows == 1) {
+		my ($oldstring) = $query_result->fetchrow();
+		my @mlist = split " ",$oldstring;
+		my %mhash = ();
+		foreach my $mem (@mlist) {
+		    $mhash{$mem} = 1;
+		}
+		foreach my $mem (@members) {
+		    $mhash{$mem} = 1;
+		}
+		@mlist = keys(%mhash);
+		$mstring = "@mlist";
+	    }
+	    my $query_result =
+		DBQueryWarn("update vlans set members='$mstring' where " .
+			     "id='$outer_id'");
+	    if (!$query_result) {
+		print STDERR "*** $0:\n".
+			     "    Could not update vlan table entry for $id\n";
+		$errors++;
+		next;
+	    }
+	} else {
+	    my $query_result =
+		DBQueryWarn("insert into vlans ".
+			    "  (exptidx,id,pid,eid,virtual,members) ".
+			    "values ($exptidx, 0, '$pid', '$eid', '$vtag', ".
+			    "        '$mstring')");
+	    if (!$query_result || !$query_result->numrows) {
+		print STDERR "*** $0:\n".
+			     "    Could not insert vlan table entry for $id\n";
+		$errors++;
+		next;
+	    }
+	    $outer_id = $query_result->insertid;
 
-	# Insert mapping between inner and outer vlan entries.
-	$query_result =
-	    DBQueryWarn("insert into elabinelab_vlans ".
+	    # Insert mapping between inner and outer vlan entries.
+	    $query_result = DBQueryWarn("insert into elabinelab_vlans ".
 			 "       (exptidx,pid,eid,inner_id,outer_id) ".
 			 "values ($exptidx, '$pid', '$eid', $id, $outer_id)");
-	if (!$query_result || !$query_result->numrows) {
-	    #
-	    # Failed, must remove vlans entry too. We keep going though
-	    # 
-	    print STDERR "*** $0:\n".
-		         "    Could not insert elabinelab_vlans table entry ".
-			 "for $id/$outer_id\n";
+	    if (!$query_result || !$query_result->numrows) {
+		#
+		# Failed, must remove vlans entry too. We keep going though
+		# 
+		print STDERR "*** $0:\n".
+			     "    Could not insert elabinelab_vlans table entry ".
+			     "for $id/$outer_id\n";
 
-	    DBQueryFatal("delete from vlans where id='$outer_id'");
-	    $errors++;
-	    next;
+		DBQueryFatal("delete from vlans where id='$outer_id'");
+		$errors++;
+		next;
+	    }
 	}
-	print STDERR "Mapping inner id $id to outer id $outer_id\n";
-	print STDERR "  $mstring\n";
+	if ($debug) {
+	    print STDERR "Mapping inner id $id to outer id $outer_id\n";
+	    print STDERR "  $mstring\n";
+	}
+	$vmaptable{$id} = $outer_id;
 	# Okay, save outer_id up for passing to snmpit below.
 	push(@outer_ids, $outer_id);
     }
@@ -308,7 +376,7 @@ sub SetupVlans()
     return $errors
 	if ($impotent);
     
-    system("$TB/bin/snmpit -t $pid $eid @outer_ids");
+    system("$TB/bin/snmpit -t $pid $eid @outer_ids > /dev/null");
     if ($?) {
 	#
 	# Yuck failed. We leave things as is, and wait for experiment
@@ -321,20 +389,26 @@ sub SetupVlans()
 	             "    snmpit -t failed!\n";
 	$errors = $? >> 8;
     }
+    my @results = ();
+    foreach $id (keys %vmaptable) {
+	my $mapid = $vmaptable{$id};
+	$query_result = DBQuery("select tag from vlans where id='$mapid'");
+	if (!$query_result || $query_result->numrows != 1) {
+	    print STDERR "couldn't retrive vlan 802.1Q number for $mapid \n";
+	     $errors++;
+	} else {
+	    my ($tagnum) = $query_result->fetchrow();
+	    push (@results, "$id#$tagnum");
+	}
+    }
+    print join(",", @results);
     return $errors;
 }
-
 #
-# Destroy a set of vlans. We get a list of inner vlan ID numbers for the
-# inner elab vlans table. We have to map those to outer vlan table id
-# numbers, and then remove those from the DB and from the switches.
-# 
-sub DestroyVlans()
+# This is common to list and destroy
+#
+sub Map()
 {
-    my @inner_ids = ();
-    my @outer_ids = ();
-    my %mapping   = ();
-
     my $query_result =
 	DBQueryFatal("select inner_id,outer_id from elabinelab_vlans ".
 		     "where pid='$pid' and eid='$eid'");
@@ -342,7 +416,6 @@ sub DestroyVlans()
     while (my ($inner_id,$outer_id) = $query_result->fetchrow()) {
 	$mapping{$inner_id} = $outer_id;
     }
-    
     #
     # Sanity check; make sure the set of vlans we got on the command line
     # (from the inner elab via the RPC server) are really vlans we have
@@ -352,6 +425,7 @@ sub DestroyVlans()
     while (@ARGV) {
 	my $id = shift(@ARGV);
 
+	if ($id eq "") { next ; }
 	if (! ($id =~ /^\d+$/)) {
 	    print STDERR "*** $0:\n".
 		         "    Illegal characters in id: $id\n";
@@ -366,6 +440,18 @@ sub DestroyVlans()
 	push(@inner_ids, $id);
 	push(@outer_ids, $mapping{$id});
     }
+    return 0;
+}
+
+#
+# Destroy a set of vlans. We get a list of inner vlan ID numbers for the
+# inner elab vlans table. We have to map those to outer vlan table id
+# numbers, and then remove those from the DB and from the switches.
+# 
+sub DestroyVlans()
+{
+
+    Map();
     # If no vlans, do nothing! snmpit will end up removing all the vlans!
     return 0
 	if (! @outer_ids);
@@ -414,4 +500,122 @@ sub DestroyVlans()
 		 "(" . join(' OR ', map("inner_id='$_'", @inner_ids)) . ")");
 
     return 0;
+}
+#
+# List a set of vlans. We get a list of inner vlan ID numbers for the
+# inner elab vlans table. We have to map those to outer vlan table id
+# numbers, and then list.
+# 
+sub List()
+{
+    my @pairs;
+
+    Map();
+    if (!@inner_ids) { @inner_ids = keys %mapping; }
+    if (!@inner_ids) { return 0; }
+
+    foreach my $in (@inner_ids) {
+	my $out = $mapping{$in};
+	push @pairs, "$out#$in";
+    }
+    my $command = "$TB/bin/snmpit -L " . join(",", @pairs);
+    system($command);
+    if ($?) {
+	# Yuck failed.
+	print STDERR "*** $0:\n".  "    snmpit -L failed!\n";
+	return $? >> 8;
+    }
+    return 0;
+}
+
+#
+# Either put a(n experimental) port into standard, or dual-mode trunking
+# or reset to its normal state (snmpit -E , -T or - U).
+#
+sub Trunk()
+{
+    my $mode = shift(@ARGV);
+    my $port = shift(@ARGV);
+
+    $port =~ /^(.+):(.+)/;
+    my ($node, $card) = ($1,$2);
+    my $query =
+	"select iface from interfaces where node_id='$node' and card='$card'";
+    my $query_result = DBQueryFatal($query);
+    if ($query_result->numrows != 1) {
+	print STDERR "can't determine iface from $port in $pid/$eid\n";
+	return 1;
+    }
+    my ($iface) = ($query_result->fetchrow())[0];
+
+    $query_result =
+	DBQueryFatal("select node_id from reserved where node_id='$node' ".
+		     "and pid='$pid' and eid='$eid'");
+    if ($query_result->numrows != 1) {
+	print STDERR "$node not allocated to $pid / $eid\n";
+	return 1;
+    }
+    Map();
+    if ($mode eq "-U") {
+	$query_result = DBQueryFatal("select iface from vinterfaces where " .
+			 "node_id='$node' and type='vlan' and iface='$iface'");
+	if ($query_result->numrows == 0) {
+	    print STDERR "$port not trunked in database\n";
+	    return 1;
+	}
+	#
+	# Okay, ask snmpit to Untrunk
+	#
+	if ($debug) {
+	    print STDERR "Running 'snmpit -U $port'\n";
+	}
+	system("$TB/bin/snmpit -U $port > /dev/null");
+	if ($?) {
+	    # Yuck failed.
+	    print STDERR "*** $0:\n".  "    snmpit -U failed!\n";
+	    return $? >> 8;
+	}
+	#
+	# and clean up the database
+	#
+	$query_result = DBQueryFatal("delete from vinterfaces where " .
+			 "node_id='$node' and type='vlan' and iface='$iface'");
+	return 0;
+    }
+    if (($mode eq "-E") || ($mode eq "-T")) {
+	# First, update the status of the port in the database
+	# The code here is wrong and needs futher work.
+	# apparently there is a vinterfaces entry for each vlan
+	# however in order to figure out which one you have to
+	# do a join through both the vlans and virt_lans tables.
+	# There's no convenient way, given the management
+	# interface, to come up with a unique IP address that's
+	# appropriate to stuff.  It seems likely that the structure
+	# of the database will be revised, in this area, but
+	# for now, we'll just play Joe Isuzu.
+	$query_result = DBQueryFatal("select iface from vinterfaces where " .
+			  "node_id='$node' and iface='$iface'");
+	if ($query_result->numrows != 0) {
+	    DBQueryFatal("update vinterfaces set type='vlan' where " .
+	      "node_id='$node' and iface='$iface'");
+	} else {
+	    DBQueryFatal(
+	    "replace into vinterfaces (node_id,iface,type) " .
+	    "values ('$node','$iface','vlan')");
+	}
+	#
+	# Okay, ask snmpit to trunk these vlans. 
+	#
+	my $command = "$TB/bin/snmpit $mode $port @outer_ids > /dev/null";
+	if ($debug) { print STDERR "Running $command\n"; }
+	system($command);
+	if ($?) {
+	    # Yuck failed.
+	    print STDERR "*** $0:\n".  "    snmpit $mode failed!\n";
+	    return $? >> 8;
+	}
+	return 0;
+    }
+    print STDERR "*** unknown mode for trunk request: $mode \n";
+    return 1;
 }

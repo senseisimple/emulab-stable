@@ -90,6 +90,7 @@ VLAN Control:
   -l                List all VLANs
   -w                Used with -l, includes device-specific VLAN number
   -M                Used with -l, print MAC addresses instead of port numbers
+  -L <out#in[,o2#i2,...]> stylized -l for snmpit.proxy of specific vlans
   -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
                         and put [ports] in it
   -y <type>         When used with -m, the new VLAN becomes a private VLAN
@@ -133,7 +134,7 @@ my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F');
+    'y=s','x=s','z=s','F','L=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -220,6 +221,7 @@ my @commands;
 # Simple commands
 #
 if ($opt{l}) { push @commands, ["listvlans"]; }
+if ($opt{L}) { push @commands, ["listvlans"]; }
 if ($opt{s}) { push @commands, ["listports"]; }
 if ($opt{g}) { push @commands, ["getstats"]; }
 if ($opt{t}) { push @commands, ["tables"]; }
@@ -764,22 +766,51 @@ sub parseStatusString($) {
 sub doListVlans ($) {
 
     my $stacks = shift;
-    
     my %vlans;
+    my @vlanList;
 
     #
     # We need to 'coallate' the results from each stack by putting together
     # the results from each stack, based on the VLAN identifier
     #
+if ($ELABINELAB) {
+    #
+    # Sklower deliberately uglified this.  The intent is that eventually
+    # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
+    # it will just work.  For now, we dup the code.
+    #
+    @vlanList = RemoteDoList();
+    foreach my $vlan (@vlanList) {
+	my ($id,$ddep,$memberref) = @$vlan;
+	${$vlans{$id}}[0] = $ddep;
+	push @{${$vlans{$id}}[1]}, @$memberref;
+    }
+} else {
     foreach my $stack (@$stacks) {
-	my @vlanList = $stack->listVlans();
+	@vlanList = $stack->listVlans();
 	foreach my $vlan (@vlanList) {
 	    my ($id,$ddep,$memberref) = @$vlan;
 	    ${$vlans{$id}}[0] = $ddep;
 	    push @{${$vlans{$id}}[1]}, @$memberref;
 	}
     }
+}
 
+    #
+    # less code to do this for snmpit.proxy than for it to popen snmpit
+    # parse the output, and glue it back together.
+    #
+    if ($opt{L}) {
+	my @results;
+	foreach my $pair (split ',', $opt{L}) {
+	    my ($out,$in) = split "#", $pair;
+	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#" .
+				    join(' ', @{${$vlans{$out}}[1]});
+	    push @results, $vlan;
+	}
+	print join(',', @results);
+	exit(0);
+    }
     #
     # These need to be declared here for the benefit of the format string
     # See perlform(1) for help with formats
@@ -1166,13 +1197,6 @@ sub doVlansFromTables($@) {
     my ($stack) = @$stacks;
 
     #
-    # Hand over to outer boss.
-    # 
-    if ($ELABINELAB) {
-	return RemoteDoVlansFromTables(@vlans);
-    }
-
-    #
     # Sanity check: make sure that this experiment does not use more VLANs than
     # we can put on the stack. Note that we don't try to check how many are
     # available (ie. total - used), because getting the 'used' value is not
@@ -1203,6 +1227,13 @@ sub doVlansFromTables($@) {
 	$errors += doTrunkEnable($stacks,$port);
     }
     $equaltrunking = $oEopt;
+
+    #
+    # Hand over to outer boss.
+    # 
+    if ($ELABINELAB) {
+	return RemoteDoVlansFromTables(@vlans);
+    }
 
     foreach my $vlan (@vlans) {
 	my @ports = getVlanPorts($vlan);
@@ -1529,6 +1560,11 @@ sub doTrunkEnable($$@) {
     my $port = shift;
     my @vlans = @_;
 
+
+    if ($ELABINELAB) {
+	my $mode = $equaltrunking ? "-E" : "-T";
+	return RemoteDoTrunking($mode,$port,@vlans);
+    }
     #
     # Sanity checking
     #
@@ -1553,6 +1589,10 @@ sub doTrunkDisable($$) {
     my $stacks = shift;
     my $port = shift;
 
+    if ($ELABINELAB) {
+	my @vlans=();
+	return RemoteDoTrunking("-U",$port,@vlans);
+    }
     #
     # Sanity checking
     #
