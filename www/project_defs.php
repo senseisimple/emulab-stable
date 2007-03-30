@@ -593,7 +593,8 @@ class Project
 	$proj_members		= $this->num_members();
 	$proj_pcs		= $this->num_pcs();
         # These are now booleans, not actual counts.
-	$proj_ronpcs		= YesNo($this->num_ron());
+	$proj_ronpcs		= YesNo(
+            strpos($this->pcremote_ok(), "pcron") !== false);
 	$proj_plabpcs		= YesNo($this->num_pcplab());
 	$proj_linked		= YesNo($this->linked_to_us());
 	$proj_why		= nl2br($this->why());
@@ -738,7 +739,31 @@ class Project
                   <td>RON Access: </td>
                   <td class=\"left\">$proj_ronpcs</td>
               </tr>\n";
-    
+
+	# Fine-grained Datapository access: show node_ids over all sub-groups.
+	# Should probably do likewise in individual sub-group pages.
+	# "dp_projects" node_attributes are lists of group gid_idx's.
+        $query_result =
+	    DBQueryFatal("select distinct g.gid_idx, a.node_id ".
+			 "  from groups as g, node_attributes as a ".
+			 "where g.pid_idx='$proj_idx' ".
+			 "  and a.attrkey='dp_projects' ".
+                         "  and FIND_IN_SET(g.gid_idx, a.attrvalue) ".
+			 "order by g.gid_idx, a.node_id");
+	$proj_dp_nodes = "";
+	while ($row = mysql_fetch_array($query_result)) {
+	    $node_id = $row["node_id"];
+
+	    if ($proj_dp_nodes) $proj_dp_nodes .= ", ";
+	    $proj_dp_nodes .= $node_id;
+	}
+	if ($proj_dp_nodes) {
+	    echo "<tr>
+		      <td>Datapository Access: </td>
+		      <td class=\"left\">$proj_dp_nodes</td>
+		  </tr>\n";
+	}
+
 	echo "<tr>
                   <td>Created: </td>
                   <td class=\"left\">$proj_created</td>
