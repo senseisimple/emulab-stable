@@ -258,7 +258,18 @@ public class DataCache {
             // the content source... a silly sun! they're so silly.
             if (contentObj != null && 
                 contentObj instanceof java.awt.image.ImageProducer) {
-                contentObj = java.awt.Toolkit.getDefaultToolkit().createImage(raw);
+                
+                contentObj = null;
+                try {
+                    contentObj = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(raw));
+                }
+                catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+                
+                if (contentObj == null) {
+                    contentObj = java.awt.Toolkit.getDefaultToolkit().createImage(raw);
+                }
 //                debug("getURL: second contentObj = " + 
 //                      ((contentObj != null)?contentObj.getClass().toString():""));
                   

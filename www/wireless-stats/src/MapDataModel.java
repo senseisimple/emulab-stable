@@ -439,8 +439,10 @@ public class MapDataModel {
     }
     
     public void setScale(int scale) {
-        this.currentScale = scale;
-        notifyChangeListeners();
+        if (scale <= this.getMaxScale() && scale >= this.getMinScale()) {
+            this.currentScale = scale;
+            notifyChangeListeners();
+        }
     }
     
     public int getFloor() {
@@ -449,32 +451,6 @@ public class MapDataModel {
     
     public int getScale() {
         return this.currentScale;
-    }
-    
-    public int getNextScale() {
-        if (this.currentScale != this.getMaxScale()) {
-            int i = 1;
-            while (!this.isValidScale(this.currentScale + i)) {
-                ++i;
-            }
-            return (this.currentScale + i);
-        }
-        else {
-            return this.currentScale;
-        }
-    }
-    
-    public int getPrevScale() {
-        if (this.currentScale != this.getMinScale()) {
-            int i = 1;
-            while (!this.isValidScale(this.currentScale - i)) {
-                ++i;
-            }
-            return (this.currentScale - 1);
-        }
-        else {
-            return this.currentScale;
-        }
     }
     
     public boolean isValidScale(int s) {
@@ -549,11 +525,22 @@ public class MapDataModel {
 //        notifyChangeListeners();
 //    }
     
-    public void addNodeToSelection(String node) {
-        if (!selectionList.contains(node)) {
-            selectionList.add(node);
+    public boolean isModeSelect() {
+        if (this.mode == MapDataModel.MODE_SELECT_DST 
+            || this.mode == MapDataModel.MODE_SELECT_SRC) {
+            return true;
         }
-        notifyChangeListeners();
+        
+        return false;
+    }
+    
+    public void addNodeToSelection(String node) {
+        if ((this.mode == MapDataModel.MODE_SELECT_DST 
+             || this.mode == MapDataModel.MODE_SELECT_SRC) 
+             && !selectionList.contains(node)) {
+            selectionList.add(node);
+            notifyChangeListeners();
+        }
     }
     
     public void setSelection(Vector selection) {

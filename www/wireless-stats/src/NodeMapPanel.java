@@ -12,13 +12,12 @@ import java.awt.image.*;
 import java.util.*;
 
 public class NodeMapPanel extends javax.swing.JPanel 
-    implements ChangeListener,ImageObserver {
+    implements ChangeListener,ImageObserver,DatasetModelListener {
     
     private Image bgImage;
     // the widgets vector is what actually gets drawn, but the elements
     // in the following hashtables are provided for ease of ref
     private Hashtable nodeWidgets;
-    private Vector selectedNodes;
     private boolean selectEnabled;
     private Hashtable linkWidgets;
     private Vector widgets;
@@ -33,19 +32,26 @@ public class NodeMapPanel extends javax.swing.JPanel
     private int lastShiftY;
     
     private Point coordToCenter;
-    
     private BufferedImage bufImage;
     
-
+    // our connection to sanity
+    private DatasetModel dmodel;
+    
+    // Bean-ify.
     public NodeMapPanel() {
         super();
+    }
+    
+    public NodeMapPanel(DatasetModel dm) {
+        super();
+        
+        this.dmodel = dm;
         
         this.widgets = new Vector();
         this.bgImage = null;
         this.nodeWidgets = new Hashtable();
         this.linkWidgets = new Hashtable();
         this.model = null;
-        this.selectedNodes = new Vector();
         this.selectEnabled = false;
         
         setPreferredSize(new Dimension(800,600));
@@ -102,6 +108,22 @@ public class NodeMapPanel extends javax.swing.JPanel
             }
         });
         
+        this.dmodel.addDatasetModelListener(this);
+        
+        // see if we have a current model...
+        if (this.dmodel.getCurrentModel() != null) {
+            setModel(this.dmodel.getCurrentModel());
+            this.model.addChangeListener(this);
+        }
+        
+    }
+    
+    public void newDataset(String dataset,DatasetModel model) { return; }
+    
+    public void datasetUnloaded(String dataset,DatasetModel model) { return; }
+    
+    public void currentDatasetChanged(String dataset,DatasetModel model) {
+        this.setModel(model.getCurrentModel());
     }
     
     public void setContainingScrollPane(JScrollPane jsp) {
@@ -162,7 +184,7 @@ public class NodeMapPanel extends javax.swing.JPanel
         this.lastShiftY = 0;
     }
     
-    public void setModel(MapDataModel model) {
+    private void setModel(MapDataModel model) {
         if (this.model != null) {
             // remove ourselves as a listener, just in case.
             this.model.removeChangeListener(this);
@@ -171,20 +193,6 @@ public class NodeMapPanel extends javax.swing.JPanel
         this.model = model;
         
         this.model.addChangeListener(this);
-    }
-    
-    public void setControlPanel(ControlPanel controlPanel) {
-        this.controlPanel = controlPanel;
-    }
-    
-    public void controlPanelSetSelectedNodes(Vector nodes) {
-        this.selectedNodes = nodes;
-        //System.out.println("CP sent sel nodes to map: "+nodes.toString());
-        this.repaint();
-    }
-    
-    public void controlPanelSetSelectEnabled(boolean val) {
-        this.selectEnabled = val;
     }
     
     public boolean updateImage(Image img,int infoflags,
@@ -205,6 +213,10 @@ public class NodeMapPanel extends javax.swing.JPanel
         // if e == this, assume that we only we need to redraw the bgImage.
         
         System.out.println("NMP: stateChanged event");
+        
+        // check the model selection mode and update ourself:
+        this.selectEnabled = this.model.isModeSelect();
+        Vector selectedNodes = this.model.getSelection();
         
         if (e.getSource() != this) {
             this.scaleFactor = this.model.getScaleFactor();
@@ -414,7 +426,6 @@ public class NodeMapPanel extends javax.swing.JPanel
             g.drawImage(bufImage,0,0,null);
         }
         
-        
     }
 
     // <editor-fold defaultstate="collapsed" desc=" Generated Code ">//GEN-BEGIN:initComponents
@@ -486,31 +497,30 @@ public class NodeMapPanel extends javax.swing.JPanel
                 }
             }
             
-            if (clickedNode == null && this.selectedNodes.size() > 0) {
-                this.selectedNodes.clear();
+            if (clickedNode == null) {
                 // tell controlPanel:
-                this.controlPanel.mapSetSelectedNodes(this.selectedNodes);
-                this.repaint();
-            }
-            else if (clickedNode == null) {
-                ;
+                this.model.setSelection(new Vector());
             }
             else {
                 // if it's a click with a shift mod, add or remove from the
                 //   current selection set.
                 if (evt.isShiftDown()) {
-                    if (this.selectedNodes.contains(clickedNode)) {
-                        this.selectedNodes.remove(clickedNode);
+                    if (this.model.getSelection().contains(clickedNode)) {
+                        //this.selectedNodes.remove(clickedNode);
+                        this.model.removeNodeFromSelection(clickedNode);
                     }
                     else {
-                        this.selectedNodes.add(clickedNode);
+                        this.model.addNodeToSelection(clickedNode);
+                        //this.selectedNodes.add(clickedNode);
                     }
+                    
                 }
                 // if it's a single click, clear the selection list
                 //   adding hte node that was clicked, if any, of course
                 else {
-                    this.selectedNodes.clear();
-                    this.selectedNodes.add(clickedNode);
+                    Vector v = new Vector();
+                    v.add(clickedNode);
+                    this.model.setSelection(v);
 //                    if (this.selectedNodes.contains(clickedNode)) {
 //                        this.selectedNodes.remove(clickedNode);
 //                        this.
@@ -520,8 +530,8 @@ public class NodeMapPanel extends javax.swing.JPanel
 //                    }
                 }
                 
-                this.controlPanel.mapSetSelectedNodes(this.selectedNodes);
-                this.repaint();
+                //this.model.setSelection(this.selectedNodes);
+                //this.repaint();
             }
             
         }
@@ -532,18 +542,17 @@ public class NodeMapPanel extends javax.swing.JPanel
         // transform it into scale 1.0 coords... thus we can center any image.
         this.coordToCenter = new Point((int)(evt.getX()/this.scaleFactor),(int)(evt.getY()/scaleFactor));
         
-        int scale = this.controlPanel.getScale();
+        int scale = this.model.getScale();
             
         if (evt.isControlDown()) {
             // zoom out if possible:
-            // the control panel knows if it's possible or not...
-            this.controlPanel.setScale(scale - 1);
-
+            // the model knows if it's possible or not...
+            this.model.setScale(scale - 1);
             //System.err.println("double click");
         }
         else {
             // zoom in if possible:
-            this.controlPanel.setScale(scale + 1);
+            this.model.setScale(scale + 1);
         }
         
         // reset our viewport:
@@ -582,32 +591,6 @@ public class NodeMapPanel extends javax.swing.JPanel
         }
         
     }
-
-//    public void setBackgroundImage(final Image bgImage) {
-//        this.bgImage = bgImage;
-//        
-//        java.awt.image.ImageObserver io = new java.awt.Component() {
-//            public boolean updateImage(Image img, int infoflags,
-//                                       int x, int y, 
-//                                       int width, int height) {
-//                //System.out.println("ImageObserver w = "+width+",h = "+height);
-//                
-//                return true;
-//            }
-//        };
-//        
-//        int width = bgImage.getWidth(null);
-//        int height = bgImage.getHeight(null);
-//        //System.out.println("sbi: width = "+width+", height = "+height);
-//        setPreferredSize(new Dimension(width, height));
-//        setMinimumSize(new Dimension(width, height));
-//        revalidate();
-//        
-//        // ah, good trickery :-)
-//        stateChanged(new ChangeEvent(this));
-//        
-//        repaint();
-//    }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables

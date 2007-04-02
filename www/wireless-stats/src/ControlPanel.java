@@ -12,12 +12,11 @@ import java.awt.*;
 import java.awt.event.*;
 import java.beans.*;
 
-public class ControlPanel extends javax.swing.JPanel {
+public class ControlPanel extends javax.swing.JPanel 
+    implements ChangeListener,DatasetModelListener {
     
     private String currentModelName;
     private MapDataModel currentModel;
-    private NodeMapPanel map;
-    private Hashtable datasets;
     private Vector modelNames;
     // a map of model name to a Vector (containing JComponents -- generally
     // (label,jcombobox) pairs... all of which get added to the indexPanel
@@ -25,21 +24,22 @@ public class ControlPanel extends javax.swing.JPanel {
     private Hashtable modelIndexComponents;
     // placements for components in above table
     private Hashtable modelIndexPlacements;
+    // make our own comboboxmodel so that we can add model names ex post facto
+    private DefaultComboBoxModel dDCM;
+    
+    private DatasetModel dmodel;
     
     // ummm, a gentler comment: this is needed to preserve the component's
     // identity as a bean... so I can add it to the appropriate DND panel
     // in netbeans.
     public ControlPanel() {
         super();
-        //this(null,null,null);
     }
     
-    public ControlPanel(Hashtable datasets,NodeMapPanel map) {
+    public ControlPanel(DatasetModel dm) {
         super();
         
-        // this only exists so we can tell the map about new datasets.
-        this.map = map;
-        this.datasets = datasets;
+        this.dmodel = dm;
         this.modelNames = new Vector();
         this.currentModelName = null;
         this.currentModel = null;
@@ -50,9 +50,9 @@ public class ControlPanel extends javax.swing.JPanel {
         String tmpModelName = null;
         MapDataModel tmpModel = null;
         
-        for (Enumeration e1 = datasets.keys(); e1.hasMoreElements(); ) {
+        for (Enumeration e1 = dmodel.getDatasetNames().elements(); e1.hasMoreElements(); ) {
             String modelName = (String)e1.nextElement();
-            Dataset ds = (Dataset)datasets.get(modelName);
+            Dataset ds = (Dataset)dmodel.getDataset(modelName);
             
             modelNames.add(modelName);
             if (tmpModelName == null) {
@@ -62,46 +62,131 @@ public class ControlPanel extends javax.swing.JPanel {
             System.err.println("considered model '"+modelName+"'");
         }
         
+        dDCM = new DefaultComboBoxModel(this.modelNames);
+        
         initComponents();
         
-        System.err.println("setting init model '"+tmpModelName+"' with model="+tmpModel);
-        setModel(tmpModelName,tmpModel);
-        // this is the ugliest hack in the book, but the images won't display
-        // right away unless we sleep and let them settle, then reset the model.
-//        try {
-//            Thread.currentThread().sleep(500);
-//        }
-//        catch (Exception ex) {
-//            ;
-//        }
-//        tmpModel.fireChangeListeners();
+        if (this.dmodel.getCurrentModel() != null) {
+            this.currentModelName = this.dmodel.getCurrentDatasetName();
+            this.currentModel = this.dmodel.getCurrentModel();
+            System.err.println("setting init model to '"+this.currentModelName+"' with model="+this.currentModel);
+            setModel(this.currentModelName,this.currentModel);
+        }
+        else {
+            System.err.println("defaulting init model to '"+tmpModelName+"' with model="+tmpModel);
+            setModel(tmpModelName,tmpModel);
+        }
+        
+        this.dmodel.addDatasetModelListener(this);
+        
     }
     
-    protected void mapSetSelectedNodes(Vector nodes) {
-        // the idea is that the nodemap call this to
-        // determine the selection based on map clicks:
-        
-        // first, tell the list about each item:
-        nodesList.clearSelection();
-        
-        if (nodes != null && nodes.size() > 0) {
-            String[] data = this.currentModel.getData().getNodes();
-            Arrays.sort(data);
-            int selected[] = new int[nodes.size()];
-
-            int count = 0;
-            for (int i = 0; i < data.length; ++i) {
-                if (nodes.contains(data[i])) {
-                    selected[count] = i;
-                    ++count;
-                }
-            }
-
-            this.nodesList.setSelectedIndices(selected);
+    public void newDataset(String dsn,DatasetModel model) {
+        if (!this.modelNames.contains(dsn)) {
+            this.modelNames.add(dsn);
+            this.dDCM.addElement(dsn);
         }
     }
     
+    public void datasetUnloaded(String dsn,DatasetModel model) {
+        if (this.modelNames.contains(dsn)) {
+            this.modelNames.remove(dsn);
+            this.dDCM.removeElement(dsn);
+        }
+    }
+    
+    public void currentDatasetChanged(String dsn,DatasetModel model) {
+        // XXX: this cannot happen to us at the moment... but if it does...
+        this.setModel(dsn,model.getCurrentModel());
+    }
+    
+    private void setSelectedNodes(Vector nodes) {
+        // check to see if the current selection is the same as what
+        // we have:
+        boolean isSame = true;
+        Object realNodes[] = this.nodesList.getSelectedValues();
+
+        if (realNodes == null || realNodes.length != nodes.size()) {
+            isSame = false;
+        }
+        else {
+            for (int i = 0; i < realNodes.length; ++i) {
+                if (!nodes.contains(realNodes[i])) {
+                    isSame = false;
+                    break;
+                }
+            }
+            // also must check the other way, doh:
+            for (Enumeration e1 = nodes.elements(); e1.hasMoreElements(); ) {
+                Object obj = e1.nextElement();
+                boolean found = false;
+                for (int i = 0; i < realNodes.length; ++i) {
+                    if (realNodes[i].equals(obj)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    isSame = false;
+                    break;
+                }
+            }
+        }
+            
+        if (!isSame) {
+            // update our selection...
+            nodesList.clearSelection();
+
+            if (nodes != null && nodes.size() > 0) {
+                String[] data = this.currentModel.getData().getNodes();
+                Arrays.sort(data);
+                int selected[] = new int[nodes.size()];
+
+                int count = 0;
+                for (int i = 0; i < data.length; ++i) {
+                    if (nodes.contains(data[i])) {
+                        selected[count] = i;
+                        ++count;
+                    }
+                }
+
+                this.nodesList.setSelectedIndices(selected);
+            }
+        }
+    }
+
+    private void setScale(int scale,boolean fromUs) {
+        if (scale != this.scaleSlider.getValue()) {
+            if (scale <= this.currentModel.getMaxScale()
+                && scale >= this.currentModel.getMinScale()) {
+                if (fromUs) {
+                    // don't want to generate a change event on the model
+                    // if we didn't do it!
+                    this.currentModel.setScale(scale);
+                }
+                this.scaleSlider.setValue(scale);
+
+                
+            }
+        }
+    }
+    
+    public void stateChanged(ChangeEvent e) {
+        // XXX: for now, we only check scale and node selection,
+        // since those are the only things that the interactive map
+        // can change.
+        
+        setSelectedNodes(this.currentModel.getSelection());
+        
+        setScale(this.currentModel.getScale(),false);
+    }
+    
     private void setModel(String modelName,MapDataModel m) {
+        // out-of-sight models should not generate events, but just in case:
+        if (this.currentModel != null) {
+            this.currentModel.removeChangeListener(this);
+        }
+        
         this.currentModel = m;
         this.currentModelName = modelName;
         
@@ -111,11 +196,9 @@ public class ControlPanel extends javax.swing.JPanel {
         // last: tell the map about the new model:
         // no, do this first!  then the new listener in the map updates 
         // right away and redraws
-        Dataset ds = (Dataset)datasets.get(this.currentModelName);
-        map.setModel(this.currentModel);
-        // we tell it about this so that we can pass back and forth selection
-        // info...
-        map.setControlPanel(this);
+        Dataset ds = (Dataset)dmodel.getDataset(this.currentModelName);
+        
+        this.datasetComboBox.setSelectedItem(this.currentModelName);
         
         // a bit of dynamic trickery: remove all components from indexPanel,
         // and add the necessary ones specified by this model.  If this model
@@ -268,7 +351,6 @@ public class ControlPanel extends javax.swing.JPanel {
         String[] nodes = this.currentModel.getData().getNodes();
         Arrays.sort(nodes);
         this.nodesList.setListData(nodes);
-        //this.nodesList.setS
         
         // set up the floor combobox:
         Integer[] td = new Integer[ds.floor.length];
@@ -284,13 +366,16 @@ public class ControlPanel extends javax.swing.JPanel {
         this.scaleSlider.setValue(m.getScale());
         if (m.getMinScale() == m.getMaxScale()) {
             this.scaleSlider.setEnabled(false);
+            this.zoomInButton.setEnabled(false);
+            this.zoomOutButton.setEnabled(false);
         }
         else {
             this.scaleSlider.setEnabled(true);
+            this.zoomInButton.setEnabled(true);
+            this.zoomOutButton.setEnabled(true);
         }
         
-        // finally, set the background
-        //map.setBackgroundImage(ds.getImage(m.getFloor(),m.getScale()));
+        this.currentModel.addChangeListener(this);
     }
     
     // <editor-fold defaultstate="collapsed" desc=" Generated Code ">//GEN-BEGIN:initComponents
@@ -302,7 +387,7 @@ public class ControlPanel extends javax.swing.JPanel {
         collapsablePanelContainer = new CollapsablePanelContainer();
         datasetOptionsCollapsablePanel = new CollapsablePanel("Dataset Options");
         datasetLabel = new javax.swing.JLabel();
-        datasetComboBox = new JComboBox(new DefaultComboBoxModel(modelNames));
+        datasetComboBox = new JComboBox(dDCM);
         datasetParametersLabel = new javax.swing.JLabel();
         primaryDisplayPropertyLabel = new javax.swing.JLabel();
         primaryDisplayPropertyComboBox = new javax.swing.JComboBox();
@@ -315,7 +400,9 @@ public class ControlPanel extends javax.swing.JPanel {
         floorLabel = new javax.swing.JLabel();
         floorComboBox = new javax.swing.JComboBox();
         scaleLabel = new javax.swing.JLabel();
+        zoomOutButton = new javax.swing.JButton();
         scaleSlider = new javax.swing.JSlider();
+        zoomInButton = new javax.swing.JButton();
         nodeFiltersCollapsablePanel = new CollapsablePanel("Node Filters");
         nodesLabel = new javax.swing.JLabel();
         modeAllRadioButton = new javax.swing.JRadioButton();
@@ -333,6 +420,7 @@ public class ControlPanel extends javax.swing.JPanel {
         thresholdContainerPanel = new javax.swing.JPanel();
         thresholdCheckBox = new javax.swing.JCheckBox();
         thresholdTextField = new javax.swing.JTextField();
+        nodesListScrollPane = new javax.swing.JScrollPane();
         nodesList = new javax.swing.JList();
 
         setLayout(new java.awt.GridBagLayout());
@@ -471,6 +559,7 @@ public class ControlPanel extends javax.swing.JPanel {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 1;
         gridBagConstraints.gridy = 0;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.weightx = 1.0;
@@ -486,8 +575,27 @@ public class ControlPanel extends javax.swing.JPanel {
         gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
         mapOptionsCollapsablePanel.add(scaleLabel, gridBagConstraints);
 
+        zoomOutButton.setFont(new java.awt.Font("Dialog", 0, 10));
+        zoomOutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/minus.gif")));
+        zoomOutButton.setMinimumSize(new java.awt.Dimension(16, 23));
+        zoomOutButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                zoomOutButtonActionPerformed(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+        mapOptionsCollapsablePanel.add(zoomOutButton, gridBagConstraints);
+
         scaleSlider.setMaximum(5);
-        scaleSlider.setValue(3);
+        scaleSlider.setMinimum(1);
+        scaleSlider.setMinorTickSpacing(1);
+        scaleSlider.setPaintTicks(true);
+        scaleSlider.setSnapToTicks(true);
+        scaleSlider.setValue(1);
         scaleSlider.addChangeListener(new javax.swing.event.ChangeListener() {
             public void stateChanged(javax.swing.event.ChangeEvent evt) {
                 scaleSliderStateChanged(evt);
@@ -495,12 +603,28 @@ public class ControlPanel extends javax.swing.JPanel {
         });
 
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridx = 2;
         gridBagConstraints.gridy = 1;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
+        gridBagConstraints.weightx = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(2, 2, 2, 2);
         mapOptionsCollapsablePanel.add(scaleSlider, gridBagConstraints);
+
+        zoomInButton.setFont(new java.awt.Font("Dialog", 0, 10));
+        zoomInButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/plus.gif")));
+        zoomInButton.setMinimumSize(new java.awt.Dimension(16, 23));
+        zoomInButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                zoomInButtonActionPerformed(evt);
+            }
+        });
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 3;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        mapOptionsCollapsablePanel.add(zoomInButton, gridBagConstraints);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
@@ -736,15 +860,14 @@ public class ControlPanel extends javax.swing.JPanel {
         gridBagConstraints.insets = new java.awt.Insets(0, 15, 0, 2);
         nodeFiltersCollapsablePanel.add(thresholdContainerPanel, gridBagConstraints);
 
-        nodesList.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(102, 102, 102)));
         nodesList.setFont(new java.awt.Font("Dialog", 0, 10));
-        nodesList.setMinimumSize(new java.awt.Dimension(160, 100));
-        nodesList.setPreferredSize(new java.awt.Dimension(90, 120));
         nodesList.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
             public void valueChanged(javax.swing.event.ListSelectionEvent evt) {
                 nodesListValueChanged(evt);
             }
         });
+
+        nodesListScrollPane.setViewportView(nodesList);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
@@ -754,7 +877,7 @@ public class ControlPanel extends javax.swing.JPanel {
         gridBagConstraints.weightx = 1.0;
         gridBagConstraints.weighty = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(2, 16, 2, 2);
-        nodeFiltersCollapsablePanel.add(nodesList, gridBagConstraints);
+        nodeFiltersCollapsablePanel.add(nodesListScrollPane, gridBagConstraints);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
@@ -770,57 +893,44 @@ public class ControlPanel extends javax.swing.JPanel {
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTHWEST;
         gridBagConstraints.weightx = 1.0;
         gridBagConstraints.weighty = 1.0;
         add(collapsablePanelContainer, gridBagConstraints);
 
     }// </editor-fold>//GEN-END:initComponents
 
+    private void zoomInButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zoomInButtonActionPerformed
+        this.currentModel.setScale(this.currentModel.getScale() + 1);
+    }//GEN-LAST:event_zoomInButtonActionPerformed
+
+    private void zoomOutButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zoomOutButtonActionPerformed
+        this.currentModel.setScale(this.currentModel.getScale() - 1);
+    }//GEN-LAST:event_zoomOutButtonActionPerformed
+
+    private void nodesListValueChanged(javax.swing.event.ListSelectionEvent evt) {//GEN-FIRST:event_nodesListValueChanged
+        // check if the selection changed;
+        if (!nodesList.getValueIsAdjusting()) {
+            // safe
+            Object objs[] = nodesList.getSelectedValues();
+            Vector tmp = new Vector();
+            for (int i = 0; i < objs.length; ++i) {
+                tmp.add(objs[i]);
+            }
+            this.currentModel.setSelection(tmp);
+        }
+    }//GEN-LAST:event_nodesListValueChanged
+
     private void floorComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_floorComboBoxItemStateChanged
         this.currentModel.setFloor(((Integer)floorComboBox.getSelectedItem()).intValue());
-        // have to cheat here...
-        
-        //map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
     }//GEN-LAST:event_floorComboBoxItemStateChanged
 
     private void scaleSliderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_scaleSliderStateChanged
-        int s = scaleSlider.getValue();
-        if (this.currentModel.getScale() < s) {
-            int tmps = this.currentModel.getPrevScale();
-            if (tmps != s) {
-                this.scaleSlider.setValue(tmps);
-            }
-            this.currentModel.setScale(tmps);
-            
-            //map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
-        }
-        else if (this.currentModel.getScale() > s) {
-            int tmps = this.currentModel.getNextScale();
-            if (tmps != s) {
-                this.scaleSlider.setValue(tmps);
-            }
-            this.currentModel.setScale(tmps);
-            //map.setBackgroundImage();
-        }
-        else {
-            // equal --- do nothing.
-            ;
+        if (!this.scaleSlider.getValueIsAdjusting()) {
+            int s = scaleSlider.getValue();
+            this.currentModel.setScale(s);
         }
     }//GEN-LAST:event_scaleSliderStateChanged
-    
-    public int getScale() {
-        return this.currentModel.getScale();
-    }
-    
-    public void setScale(int scale) {
-        if (scale <= this.currentModel.getMaxScale()
-            && scale >= this.currentModel.getMinScale()) {
-            this.currentModel.setScale(scale);
-            this.scaleSlider.setValue(scale);
-            
-            //map.setBackgroundImage(this.currentModel.getDataset().getImage(this.currentModel.getFloor(),this.currentModel.getScale()));
-        }
-    }
     
     private void primaryDisplayPropertyComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_primaryDisplayPropertyComboBoxActionPerformed
         this.currentModel.setCurrentProperty((String)this.primaryDisplayPropertyComboBox.getSelectedItem());
@@ -855,20 +965,6 @@ public class ControlPanel extends javax.swing.JPanel {
             //thresholdTextField.setEnabled(false);
         }
     }//GEN-LAST:event_MSTRadioButtonActionPerformed
-
-    private void nodesListValueChanged(javax.swing.event.ListSelectionEvent evt) {//GEN-FIRST:event_nodesListValueChanged
-        // check if the selection changed;
-        if (!nodesList.getValueIsAdjusting()) {
-            // safe
-            Object objs[] = nodesList.getSelectedValues();
-            Vector tmp = new Vector();
-            for (int i = 0; i < objs.length; ++i) {
-                tmp.add(objs[i]);
-            }
-            this.currentModel.setSelection(tmp);
-            this.map.controlPanelSetSelectedNodes(tmp);
-        }
-    }//GEN-LAST:event_nodesListValueChanged
 
     private void thresholdTextFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_thresholdTextFieldActionPerformed
         Float threshold = null;
@@ -954,8 +1050,6 @@ public class ControlPanel extends javax.swing.JPanel {
             kBestNeighborsCheckBox.setEnabled(true);
             noneCheckBox.setEnabled(true);
             thresholdCheckBox.setEnabled(true);
-            
-            map.controlPanelSetSelectEnabled(true);
         }
     }//GEN-LAST:event_selectByDstRadioButtonActionPerformed
 
@@ -968,8 +1062,6 @@ public class ControlPanel extends javax.swing.JPanel {
             kBestNeighborsCheckBox.setEnabled(true);
             noneCheckBox.setEnabled(true);
             thresholdCheckBox.setEnabled(true);
-            
-            map.controlPanelSetSelectEnabled(true);
         }
     }//GEN-LAST:event_selectBySrcRadioButtonActionPerformed
 
@@ -982,15 +1074,13 @@ public class ControlPanel extends javax.swing.JPanel {
             kBestNeighborsCheckBox.setEnabled(true);
             noneCheckBox.setEnabled(true);
             thresholdCheckBox.setEnabled(true);
-            
-            map.controlPanelSetSelectEnabled(false);
         }
     }//GEN-LAST:event_modeAllRadioButtonActionPerformed
 
     private void datasetComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_datasetComboBoxActionPerformed
         String modelName = (String)datasetComboBox.getSelectedItem();
-        Dataset ds = (Dataset)datasets.get(modelName);
-        setModel(modelName,ds.model);
+        Dataset ds = (Dataset)dmodel.getDataset(modelName);
+        this.dmodel.setCurrentModel(modelName);
     }//GEN-LAST:event_datasetComboBoxActionPerformed
     
     
@@ -1018,6 +1108,7 @@ public class ControlPanel extends javax.swing.JPanel {
     private CollapsablePanel nodeFiltersCollapsablePanel;
     private javax.swing.JLabel nodesLabel;
     private javax.swing.JList nodesList;
+    private javax.swing.JScrollPane nodesListScrollPane;
     private javax.swing.JCheckBox noneCheckBox;
     private javax.swing.JLabel otherOptionsLabel;
     private javax.swing.JComboBox powerLevelComboBox;
@@ -1032,6 +1123,8 @@ public class ControlPanel extends javax.swing.JPanel {
     private javax.swing.JCheckBox thresholdCheckBox;
     private javax.swing.JPanel thresholdContainerPanel;
     private javax.swing.JTextField thresholdTextField;
+    private javax.swing.JButton zoomInButton;
+    private javax.swing.JButton zoomOutButton;
     // End of variables declaration//GEN-END:variables
     
 }
