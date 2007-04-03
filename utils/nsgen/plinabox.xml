@@ -14,6 +14,7 @@
     <!-- This hard-codes the image name, but it seems like we have to do
          that somewhere... -->
     <variable name="ImageName" default="PLAB-PLC" descr = "Disk Image for PLC" />
+    <variable name="PLCOnExpLAN" default="0" descr="PLC should run on private Emulab experimental LAN if 1; else on public Emulab control network." />
     <nstext>
         <section><![CDATA[
 # plinabox.ns - NS script to make a private PlanetLab on Emulab
@@ -38,6 +39,7 @@ tb-set-node-os $plc <ImageName />
 tb-set-node-plab-role $plc plc
 tb-set-hardware $plc <PLCHWType />
 
+set privatePLC <PLCOnExpLAN />
 
 # 
 # Create the nodes
@@ -49,8 +51,16 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
   tb-set-hardware $node($i) <HWType />
   append lan_string "$node($i) "
 }
+append lan_string "$plc "
 
 set lan [$ns make-lan $lan_string 100Mb 0ms]
+
+if { $privatePLC == 1 } {
+  tb-set-node-plab-plcnet $plc $lan
+  for {set i 1} {$i <= $num_pcs} {incr i} {
+    tb-set-node-plab-plcnet $node($i) $lan
+  }
+}
 
 #
 # Boilerplate
