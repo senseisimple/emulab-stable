@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 #ifdef EVENTSYS
@@ -58,11 +58,8 @@ bievent_shutdown(void)
 			address_tuple_free(tuple);
 			tuple = NULL;
 		}
-		if (!event_unregister(event_handle)) {
-			error("Unable to unregister from event system!\n");
-			event_handle = NULL;
-			return 1;
-		}
+		event_unregister(event_handle);
+		event_handle = NULL;
 	}
 	return 0;
 }
