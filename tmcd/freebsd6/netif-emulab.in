@@ -24,13 +24,7 @@ _cmdifn=
 cnet_dhcp()
 {
 	#
-	# Argh! FreeBSD >= 6 has rewritten dhclient and it no longer takes
-	# the -i option.  So we remove that option here.
-	#
-	dhclient_flags=`echo $dhclient_flags | sed -e 's/-i [0-9][0-9]*//'`
-
-	#
-	# Argh V2! FreeBSD >= 6 dhclient also allows only a single interface
+	# Argh! FreeBSD >= 6 dhclient also allows only a single interface
 	# to be specified.  I tried to make this work by launching multiple,
 	# simultaneous dhclients, but that caused EEPROM read failures on
 	# em devices.  So we will use the "pure" port version if it is
@@ -42,6 +36,13 @@ cnet_dhcp()
 	    ${dhclient_program} ${dhclient_flags} $*
 	else
 	    echo "Using default dhclient..."
+
+	    #
+	    # Argh redux! FreeBSD >= 6 has rewritten dhclient and it no longer
+	    # takes the -i option.  So we remove that option here.
+	    #
+	    dhclient_flags=`echo $dhclient_flags | sed -e 's/-i [0-9][0-9]*//'`
+
 	    for _if in $*; do
 		${dhclient_program} ${dhclient_flags} -b $_if
 	    done
