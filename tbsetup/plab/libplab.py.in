@@ -1202,7 +1202,9 @@ class Slice:
 
             # see if we have two tickets to insert (support the legacy ticket
             # or not)
-            if type(tmpslicemeta) == list:
+            if type(tmpslicemeta) == tuple:
+                self.slicemeta = tmpslicemeta[0]
+                self.slicemeta_legacy = tmpslicemeta[1]
                 insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
                                   "slicemeta_legacy,leaseend,admin)"
                 insertValuesStr = "(%s,%s,%s,%s,%s,%s,%s,%s)"
@@ -1214,6 +1216,7 @@ class Slice:
                                      adminbit)
                 pass
             else:
+                self.slicemeta = tmpslicemeta
                 insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
                                   "leaseend,admin)"
                 insertValuesStr = "(%s, %s, %s, %s, %s, %s, %s)"
@@ -1223,10 +1226,11 @@ class Slice:
                                                    time.gmtime(self.leaseend)),
                                      adminbit)
                 pass
+
+            qstr = "insert into plab_slices " + insertFieldsStr + \
+                   " values " + insertValuesStr
             
-            DBQueryFatal("insert into plab_slices %s " \
-                         "values %s" % (insertFieldsStr,insertValuesStr),
-                         insertValuesTuple)
+            DBQueryFatal(qstr,insertValuesTuple)
             pass
         except:
             self.plab.agent.deleteSlice(self)

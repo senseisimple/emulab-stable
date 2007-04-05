@@ -566,13 +566,15 @@ class mod_PLC4:
             print "Failed to add nodes to slice %s" % slice.slicename
             raise
 
+        (PLCticket,PLCticket_legacy) = ('','')
         try:
             # XXX - fix for new NM and rollout.
             PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
             PLCticket_legacy = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
-            #if debug:
-            #    print PLCticket
-            #    pass
+            if debug:
+                print "ticket = %s" % str(PLCticket)
+                print "legacy ticket = %s" % str(PLCticket_legacy)
+                pass
             pass
         except:
             print "Failed to get PLC ticket for slice %s" % slice.slicename
