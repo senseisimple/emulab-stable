@@ -367,7 +367,7 @@ Phase "exports", "Setting up exports", sub {
 	    "$realdir\t$BOSSNODE $USERNODE -maproot=root");
 	push(@exports_lines,
 	     "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
-	     "-maproot=root -ro");
+	     "-maproot=root -ro -alldirs");
 
 	#
 	# Put them in exports.head, and copy that to /etc/exports
