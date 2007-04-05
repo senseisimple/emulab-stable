@@ -115,7 +115,7 @@ class NM3agent:
 
 DEF_NM_DELEGATE_ACCT = "utah_elab_delegate"
 DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
-DEF_NM_SSHCMD = "/usr/bin/ssh -oStrictHostKeyChecking=no -l %s -i %s %s"
+DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no -l %s -i %s %s"
 
 class NM4agent:
     def __init__(self,IP,nodeid,nmport=DEF_NM_PORT,
@@ -236,7 +236,7 @@ class NMagent_wrapper:
             except:
                 print "NM on %s (%s) does not appear to be legacy." % (IP,
                                                                        nodeid)
-                traceback.print_exc()
+                #traceback.print_exc()
                 pass
             
             if legacy_nm:
@@ -648,7 +648,11 @@ class mod_PLC4:
                                newleaseend,
                                NOKstrs = ["does not exist"])
             # Get the updated ticket.
-            slice.slicemeta = self.getSliceMeta(slice)
+            # XXX: update for NM4 when we switch.  For now we need to record
+            # the old ticketdata in the db.
+            #slice.slicemeta = self.getSliceMeta(slice)
+            slice.slicemeta = self.getSliceMetaLegacy(slice)
+
             ret = 1
             if debug:
                 print "SliceRenew returns: %s" % res
@@ -736,6 +740,7 @@ class mod_PLC4:
 #        pass
 
         try:
+            print "DEBUG: using ticketdata = '%s'" % str(ticketdata)
             res = node.nmagent.create_sliver(node.slice.slicename,ticketdata)
             if debug:
                 print res
