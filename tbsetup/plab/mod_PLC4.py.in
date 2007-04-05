@@ -568,11 +568,11 @@ class mod_PLC4:
 
         try:
             # XXX - fix for new NM and rollout.
-            #PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
-            PLCticket = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
-            if debug:
-                print PLCticket
-                pass
+            PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
+            PLCticket_legacy = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
+            #if debug:
+            #    print PLCticket
+            #    pass
             pass
         except:
             print "Failed to get PLC ticket for slice %s" % slice.slicename
@@ -580,7 +580,9 @@ class mod_PLC4:
         
         # XXX: fix for PLC 4
         leaseend = now + MAX_PLC_LEASELEN
-        return (res, cPickle.dumps(PLCticket), leaseend)
+        return (res, (cPickle.dumps(PLCticket),
+                      cPickle.dumps(PLCticket_legacy)),
+                leaseend)
     
     def deleteSlice(self, slice):
         agent = self.__getAgent(slice.slicename)
@@ -650,8 +652,8 @@ class mod_PLC4:
             # Get the updated ticket.
             # XXX: update for NM4 when we switch.  For now we need to record
             # the old ticketdata in the db.
-            #slice.slicemeta = self.getSliceMeta(slice)
-            slice.slicemeta = self.getSliceMetaLegacy(slice)
+            slice.slicemeta = self.getSliceMeta(slice)
+            slice.slicemeta_legacy = self.getSliceMetaLegacy(slice)
 
             ret = 1
             if debug:
@@ -708,17 +710,18 @@ class mod_PLC4:
         # XXX: if node is NM4agent, grab new-style ticket from PLC
         # (flip during rollout once a majority of nodes have NMv4).
         #
-        if (node.nmagent.getAgent()).__class__ == NM4agent:
-            try:
-                ticketdata = tryXmlrpcCmd(plcagent.SliceGetTicket)
-                if debug:
-                    print "DEBUG: got new ticket data successfully"
-            except:
-                print "Error: could not get ticket for %s" % node.slice.slicename
-                traceback.print_exc()
-                pass
+        if (node.nmagent.getAgent()).__class__ == NM3agent:
+            ticketdata = cPickle.loads(node.slice.slicemeta_legacy)
+            #try:
+            #    ticketdata = tryXmlrpcCmd(plcagent.SliceGetTicket)
+            #    if debug:
+            #        print "DEBUG: got new ticket data successfully"
+            #except:
+            #    print "Error: could not get ticket for %s" % node.slice.slicename
+            #    traceback.print_exc()
+            #    pass
             pass
-                  
+        
         res = tryXmlrpcCmd(plcagent.SliceNodesAdd, node.hostname,
                            OKstrs = ["already assigned"])
         if debug:

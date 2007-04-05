@@ -256,16 +256,22 @@ class siteParser:
             if not attrs.has_key('BWLIMIT'):
                 attrs['BWLIMIT'] = "-1"
                 pass
-            self.__hosts.append({
-                'HNAME'     : attrs['NAME'],
-                'IP'        : attrs['IP'],
-                'PLABID'    : attrs['NODE_ID'],
-                'MAC'       : attrs['MAC'],
-                'BWLIMIT'   : attrs['BWLIMIT'],
-                'SITE'      : self.__sitename,
-                'LATITUDE'  : self.__latitude,
-                'LONGITUDE' : self.__longitude
-                })
+            if not attrs.has_key('IP'):
+                print "node %s did not have IP!" % attrs['NAME']
+                pass
+            else:
+                self.__hosts.append({
+                    'HNAME'     : attrs['NAME'],
+                    'IP'        : attrs['IP'],
+                    'PLABID'    : attrs['NODE_ID'],
+                    'MAC'       : attrs['MAC'],
+                    'BWLIMIT'   : attrs['BWLIMIT'],
+                    'SITE'      : self.__sitename,
+                    'LATITUDE'  : self.__latitude,
+                    'LONGITUDE' : self.__longitude,
+                    'STATUS'    : attrs['STATUS']
+                    })
+                pass
             pass
         
         else:
@@ -342,7 +348,10 @@ class Plab:
             extype, exval, extrace = sys.exc_info()
             print "Error talking to agent: %s: %s" % (extype, exval)
             if debug:
-                print extrace
+                #print extrace
+                traceback.print_exc()
+                pass
+            
             print "Going back to sleep until next scheduled poll"
             return
 
@@ -476,6 +485,26 @@ class Plab:
                 pass
             pass
 
+        # Do node features updates separately since very few nodes are usually
+        # updated, whereas we must do status separately from other fields.
+        # XXX: munge this in with other fields later.
+        upfeatures = []
+        for nodeent in avail:
+            # Determine if we already know about this node.
+            try:
+                matchres = self.__matchPlabNode(nodeent, known)
+                if matchres:
+                    upfeatures.append((nodeent,matchres))
+                    pass
+                pass
+            except:
+                pass
+            pass
+        
+        for (nodeent,(nodeid,other)) in upfeatures:
+            self.__updateNodeFeatures(nodeid,nodeent)
+            pass
+        
         if chgerrstr:
             SENDMAIL(TBOPS,
                      "Two or more changes detected for some plab nodes",
@@ -525,7 +554,15 @@ class Plab:
                 elif (attr == "LATITUDE") or (attr == "LONGITUDE"):
                     # Special rules for latitude and longitude to avoid
                     # FP errors
-                    if (ent[attr] != None and plabent[attr] != None) \
+                    nasty = False
+                    try:
+                        x = float(ent[attr])
+                        x = float(plabent[attr])
+                        pass
+                    except:
+                        nasty = True
+                        pass
+                    if (not nasty and ent[attr] != None and plabent[attr] != None) \
                            and (ent[attr] != "" and plabent[attr] != "") \
                            and ((float(ent[attr]) > \
                                  (float(plabent[attr]) + LATLONG_DELTA)) \
@@ -827,7 +864,44 @@ class Plab:
             raise
         return
 
-
+    def __updateNodeFeatures(self,nodeid,nodeent):
+        """
+        Record the status of this node in the node_features
+        table.
+        """
+        # XXX Make this atomic
+        #
+        try:
+            # Note that we have to pass '%' as an arg to DBQuery, sigh
+            DBQueryFatal("delete from node_features where node_id=%s" \
+                         " and feature like %s",
+                         (nodeid,'plabstatus-%'))
+            
+            if nodeent.has_key('STATUS'):
+                # Kind of a hack - we assume most people will want Production
+                # nodes
+                if nodeent['STATUS'] == "Production" :
+                    weight = 0.0
+                    pass
+                else:
+                    weight = 1.0
+                    pass
+                DBQueryFatal("insert into node_features" \
+                             " (node_id, feature, weight)" \
+                             " values (%s,%s,%s)",
+                             (nodeid,
+                              'plabstatus-%s' % nodeent['STATUS'],
+                              weight))
+                pass
+            pass
+        except:
+            print "Error updating plab node STATUS feature " \
+                  "for node %s!" % nodeid
+            traceback.print_exc()
+            
+        
+        return None
+    
     def __updateNode(self, nodeid, nodeent):
         """
         updateNodeEntries() helper function.  Updates attributes for plab
@@ -856,6 +930,7 @@ class Plab:
                          " values (%s, %s, %s, %s, %s, %s, %s)",
                          (nodeid, 0, 1, nodeent['IP'], 'plab_fake',
                           controliface, 'ctrl'))
+
             pass
         except:
             print "Error updating PLAB node in DB: someone needs to clean up!"
@@ -907,6 +982,7 @@ class Plab:
                      (updstr, nodeid))
         updmsg = "Plab node %s attributes updated:\n\n%s" % (nodeid, chattrs)
         TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, updmsg)
+
         # updateNodeEtries() already sends mail.
         #SENDMAIL(TBOPS,
         #         "Plab node %s attributes updated." % nodeid, updmsg, TBOPS)
@@ -1072,6 +1148,7 @@ class Slice:
         self.plab = plab
         self.pid, self.eid = pid, eid
         self.slicemeta = None
+        self.slicemeta_legacy = None
         self.exptidx = None
         self.slicename = slicename
         self.description = DEF_SLICE_DESC
@@ -1110,7 +1187,7 @@ class Slice:
         print "Creating Plab slice %s." % self.slicename
 
         try:
-            res, self.slicemeta, self.leaseend = \
+            res, tmpslicemeta, self.leaseend = \
                  self.plab.agent.createSlice(self)
             
             # Do compat calls right after main agent calls.
@@ -1123,14 +1200,33 @@ class Slice:
                     pass
                 pass
 
-            DBQueryFatal("insert into plab_slices "
-                         "(exptidx,pid,eid,slicename,slicemeta,leaseend,admin)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (self.exptidx, self.pid, self.eid, self.slicename,
-                          self.slicemeta,
-                          time.strftime("%Y-%m-%d %H:%M:%S",
-                                        time.gmtime(self.leaseend)),
-                          adminbit))
+            # see if we have two tickets to insert (support the legacy ticket
+            # or not)
+            if type(tmpslicemeta) == list:
+                insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
+                                  "slicemeta_legacy,leaseend,admin)"
+                insertValuesStr = "(%s,%s,%s,%s,%s,%s,%s,%s)"
+                insertValuesTuple = (self.exptidx,self.pid,self.eid,
+                                     self.slicename,
+                                     self.slicemeta,self.slicemeta_legacy,
+                                     time.strftime("%Y-%m-%d %H:%M:%S",
+                                                   time.gmtime(self.leaseend)),
+                                     adminbit)
+                pass
+            else:
+                insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
+                                  "leaseend,admin)"
+                insertValuesStr = "(%s, %s, %s, %s, %s, %s, %s)"
+                insertValuesTuple = (self.exptidx,self.pid,self.eid,
+                                     self.slicename,self.slicemeta,
+                                     time.strftime("%Y-%m-%d %H:%M:%S",
+                                                   time.gmtime(self.leaseend)),
+                                     adminbit)
+                pass
+            
+            DBQueryFatal("insert into plab_slices %s " \
+                         "values %s" % (insertFieldsStr,insertValuesStr),
+                         insertValuesTuple)
             pass
         except:
             self.plab.agent.deleteSlice(self)
@@ -1203,7 +1299,8 @@ class Slice:
         self.description = descr
         self.exptidx = eindex
             
-        res = DBQueryFatal("select slicename, slicemeta, leaseend "
+        res = DBQueryFatal("select slicename, slicemeta, "
+                           "  slicemeta_legacy, leaseend "
                            " from plab_slices "
                            " where pid = %s and eid = %s",
                            (self.pid, self.eid))
@@ -1211,7 +1308,7 @@ class Slice:
                "No slice found for %s-%s" % (self.pid, self.eid)
         assert (len(res) == 1), \
                "Multiple slices found for %s-%s" % (self.pid, self.eid)
-        ((self.slicename, self.slicemeta, leaseend), ) = res
+        ((self.slicename,self.slicemeta,self.slicemeta_legacy,leaseend),) = res
         self.leaseend = calendar.timegm(time.strptime(str(leaseend),
                                                       "%Y-%m-%d %H:%M:%S"))
         return
@@ -1236,11 +1333,12 @@ class Slice:
                 pass
             
             DBQueryFatal("update plab_slices "
-                         " set slicemeta=%s, leaseend=%s "
+                         " set slicemeta=%s, leaseend=%s, slicemeta_legacy=%s "
                          " where slicename=%s",
                          (self.slicemeta,
                           time.strftime("%Y-%m-%d %H:%M:%S",
                                         time.gmtime(self.leaseend)),
+                          self.slicemeta_legacy,
                           self.slicename))
             pass
         except:
@@ -1380,13 +1478,12 @@ class Slice:
         Grab current slice metadata from Planetlab and store in db
         """
         try:
-            # XXX: no handling of compat agent here---this is about getting
-            # a ticket to the local NM---and there is only one NM per node,
-            # so having a compat call here doesn't make a difference.
+            # Handle legacy tickets for compat purposes.
             self.slicemeta = self.plab.agent.getSliceMeta(self)
+            self.slicemeta_legacy = self.plab.agent.getSliceMetaLegacy(self)
             DBQueryFatal("update plab_slices set "
-                         "slicemeta=%s where slicename=%s",
-                         (self.slicemeta, self.slicename))
+                         "slicemeta=%s,slicemeta_legacy=%s where slicename=%s",
+                         (self.slicemeta,self.slicemeta_legacy,self.slicename))
             pass
         except:
             print "Error updating slice metadata!"
