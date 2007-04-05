@@ -47,11 +47,28 @@ $plab_type_descr = array('pcplab' => 'Any PlanetLab node',
 			 'pcplabinet2' => 'Internet2');
 
 #
+# Grab node versions from the db (currently stored in node_features)
+#
+
+$nodeversions = array();
+$res = DBQueryFatal("select feature from node_features" . 
+		    "  where feature like 'plabstatus-%' group by feature");
+while ($row = mysql_fetch_row($res)) {
+    list($foo,$feature) = split("\-",$row[0]);
+    $nodeversions[] = $feature;
+}
+if (count($nodeversions) == 0) {
+    $nodeversions[] = "Production";
+}
+
+#
+#
 # Spit out the form
 #
 function SPITFORM($advanced,$formfields, $errors = array()) {
     global $TBBASE;
     global $plab_types, $plab_type_descr;
+    global $nodeversions;
 
     #
     # Default autoswap time - very long...
@@ -201,6 +218,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
          echo "<input type='hidden' name='formfields[tarball]' value=''>\n";
          echo "<input type='hidden' name='formfields[rpm]' value=''>\n";
          echo "<input type='hidden' name='formfields[startupcmd]' value=''>\n";
+	 echo "<input type='hidden' name='formfields[nodeversion]' value='Production'\n";
      }
 
     #
@@ -237,6 +255,25 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		    </select>
 		 </td>
 	      </tr>\n";
+	
+        #
+        # Node version
+        #
+	echo "<tr>
+                 <td><a href=\"$TBBASE/kb-show.php3?xref_tag=plab-node-versions\">Node version</a>:
+                 </td>
+                 <td>
+                    <select name='formfields[nodeversion]'>\n";
+	foreach ($nodeversions as $nv) {
+	    echo "         <option value='$nv'";
+	    if ($formfields["nodeversion"] == $nv) {
+		echo " selected";
+	    }
+	    echo ">$nv</option>\n";
+	}
+	echo "      </select>
+                 </td>
+              </tr>";
 
 	#
 	# Resource usage
@@ -569,7 +606,10 @@ function MAKENS($formfields) {
     }
     if ($formfields['startupcmd']) {
 	$nsgen_args .= "-v Startup='$formfields[startupcmd]' ";
-    }    
+    }
+    if ($formfields['nodeversion']) {
+	$nsgen_args .= "-v NodeVersion='$formfields[nodeversion]' ";
+    }
     
     #
     # Note: We run this as nobody on purpose - this is really dumb, but later
@@ -586,6 +626,8 @@ function MAKENS($formfields) {
 # Check values the user submitted to make sure that they are valid
 #
 function CHECKFORM($formfields) {
+    global $nodeversions;
+
     $errors = array();
     if (!preg_match("/^\d+$/",$formfields['count'],$matches)) {
 	$errors['count'] = "Number of nodes must be a positive integer";
@@ -610,6 +652,10 @@ function CHECKFORM($formfields) {
     if ($formfields['startupcmd'] &&
 	    preg_match("/'/",$formfields['startupcmd'],$matches)) {
 	$errors['startupcmd'] = "Invalid characters in startup command";
+    }
+    if ($formfields['nodeversion'] &&
+	!in_array($formfields['nodeversion'],$nodeversions)) {
+	$errors['nodeversion'] = "Invalid node version $formfields[nodeversion]";
     }
 
     return $errors;
