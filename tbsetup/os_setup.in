@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -1371,8 +1371,8 @@ if (defined $tally{reload}) {
 	my $total = $total{$osid}{any_type};
 	
 	my $line;
-	$line = sprintf("%d/%d nodes failed to load the the os \"%s\"",
-			$d{failed}, $total, $osid);
+	$line = sprintf("%d/%d nodes failed to load the os \"%s\"",
+			$d{failed}, $total, $osname);
 	$line = add_failed_nodes($line, 2, %d);
 	
 	$summary .= $line;
