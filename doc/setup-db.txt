@@ -275,7 +275,7 @@ step 2a above. For example:
 Next, add the switches to the nodes table. The only necessary fields here are
 node_id (choose one appropriate to the switch), type (use one of the ones you
 created earlier,) and role. Role, for switches, should be either 'testswitch'
-or 'controlswitch', depending on whether you're using it for the experimental
+or 'ctrlswitch', depending on whether you're using it for the experimental
 or control network. If it's used for both, call it a 'testswitch'. Example:
 
 	insert into nodes set
