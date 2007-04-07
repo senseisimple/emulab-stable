@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.8 2006-08-03 21:33:15 kwebb Exp $
+# $Id: cvsweb.cgi,v 1.9 2007-04-07 05:39:29 johnsond Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -360,7 +360,7 @@ if (defined($input{"content-type"})) {
 }
 
 # Emulab Hacks!
-if (@ARGV && $ARGV[0] eq "-repo") {
+if (@ARGV && $ARGV[0] eq "--repo") {
     $license = undef;
     @CVSrepositories = (
 	'top'   => [$ARGV[1], $ARGV[1]],

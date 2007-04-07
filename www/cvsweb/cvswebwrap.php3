@@ -25,7 +25,7 @@ $isadmin   = ISADMIN();
 # Form the real url.
 #
 $newurl  = preg_replace("/cvswebwrap/", "cvsweb", $_SERVER['REQUEST_URI']);
-$newurl .= "/";
+$newurl = preg_replace("/php3/","php3/",$newurl);
 
 #
 # Standard Testbed Header

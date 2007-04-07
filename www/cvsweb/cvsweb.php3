@@ -232,7 +232,7 @@ if (isset($repodir)) {
     
     # I know, I added an argument to a script that is not supposed to
     # take any. So be it; it was easy.
-    $shellcmd .= "$TBSUEXEC_PATH $uid $pid $prog $embed --repo=$repodir";
+    $shellcmd .= "$TBSUEXEC_PATH $uid $pid $prog $embed --repo $repodir";
 }
 else {
     $shellcmd .= "$script";
