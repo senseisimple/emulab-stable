@@ -108,7 +108,7 @@ if ($retval) {
 }
 
 # Zap back to template page.
-PAGEREPLACE("template_show.php?guid=$guid&version=$version");
+PAGEREPLACE("template_show.php?guid=$guid&version=$vers");
 
 #
 # In case the above fails.
