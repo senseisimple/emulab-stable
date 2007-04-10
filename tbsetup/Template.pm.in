@@ -127,6 +127,7 @@ sub guid($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'guid'}); }
 sub vers($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'vers'}); }
 sub pid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'pid'}); }
 sub gid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'gid'}); }
+sub gid_idx($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'gid_idx'}); }
 sub eid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'eid'}); }
 sub tid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'tid'}); }
 sub path($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'path'}); }
