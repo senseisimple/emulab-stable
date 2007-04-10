@@ -47,16 +47,18 @@ while ($#ARGV > 1) {
 }
 
 # open the file and grab slices
-open(SFILE,"$sfile") 
-    or die "could not open slice file '$sfile'!";
-while (my $line = <SFILE>) {
-    chomp($line);
-
-    if (!($line =~ /^\#/ || $line eq '')) {
-	push @slices, $line;
+if (!scalar(@slices)) {
+    open(SFILE,"$sfile") 
+	or die "could not open slice file '$sfile'!";
+    while (my $line = <SFILE>) {
+	chomp($line);
+	
+	if (!($line =~ /^\#/ || $line eq '')) {
+	    push @slices, $line;
+	}
     }
+    close(SFILE);
 }
-close(SFILE);
 
 # read in our plc credentials
 open(PFILE,"$PLAB_CREDS_FILE")
@@ -107,8 +109,6 @@ $req = POST $PLC_LOGIN, [ email => $uid, password => $passwd ];
 $res = $ua->request($req);
 #print $res->as_string();
 
-#@slices = ('utah_allnodes');
-
 # ugh, now we have to dig out the slice_name->slice_id mapping so we can get
 # to the details page for each slice.
 
@@ -121,7 +121,7 @@ my $page = $res->content();
 my @plines = split('\n',$page);
 
 foreach my $line (@plines) {
-    if ($line =~ /href=\'index\.php\?id\=(\d+)\'>([\_a-zA-Z0-9]+)/) {
+    if ($line =~ /href=\'\/db\/slices\/index\.php\?id\=(\d+)\'>([_a-zA-Z0-9]+)/) {
 	$slicemap{$2} = $1;
 	#print "DEBUG: slice id for $2 is $1\n";
     }
