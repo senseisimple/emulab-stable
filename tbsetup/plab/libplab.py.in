@@ -1762,8 +1762,10 @@ class Node:
         TIMESTAMP("emulabify started on %s." % self.nodeid)
         print "Overlaying Emulab files on %s ..." % self.nodeid
         try:
-            self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh")
-            self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True)
+            self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh",
+                        tries=3,interval=5)
+            self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True,
+                           tries=3,interval=5)
             pass
         except RuntimeError:
             print "fixsudo failed on %s; attempting to carry on anyway.." % \
@@ -1814,7 +1816,7 @@ class Node:
                        quiet = True)
         return
 
-    def __perform(self, command, quiet = False):
+    def __perform(self, command, quiet = False, tries=1, interval=5):
         """
         Executes the given command on the remote node via sshtb, run as
         the slice user.
@@ -1822,9 +1824,28 @@ class Node:
         if debug:
             print "Performing '%s' on %s" % (command, self.nodeid)
         command = "%s -host %s %s" % (SSH, self.nodeid, command)
-        return self.__execute(command, quiet)
-
-    def __copy(self, localfile, remotefile):
+        (success,rtries) = (False,tries)
+        while not success and rtries > 0:
+            rtries -= 1
+            try:
+                retval = self.__execute(command, quiet)
+                success = True
+            except:
+                if rtries == 0:
+                    raise
+                else:
+                    print "WARNING: perform %s on %s failed, try %d" \
+                          % (command,self.nodeid,tries-rtries)
+                    try:
+                        time.sleep(interval)
+                    except:
+                        pass
+                    pass
+                pass
+            pass
+        return retval
+    
+    def __copy(self, localfile, remotefile, tries=1, interval=5):
         """
         Copies a file from the local system to the remote node, doing so
         as the slice user.
@@ -1833,11 +1854,30 @@ class Node:
             print "Copying %s to %s on %s" % \
                   (localfile, remotefile, self.nodeid)
             pass
-        # We're using rsync now.
-        command = "rsync -e '%s -host' %s %s:%s" % \
-                  (SSH, localfile, self.nodeid, remotefile)
-        return self.__execute(command)
-
+        (success,rtries) = (False,tries)
+        while not success and rtries > 0:
+            rtries -= 1
+            try:
+                # We're using rsync now.
+                command = "rsync -e '%s -host' %s %s:%s" % \
+                          (SSH, localfile, self.nodeid, remotefile)
+                retval = self.__execute(command)
+                success = True
+            except:
+                if rtries == 0:
+                    raise
+                else:
+                    print "WARNING: copy %s to %s on %s failed, try %d" \
+                          % (localfile,remotefile,self.nodeid,tries-rtries)
+                    try:
+                        time.sleep(interval)
+                    except:
+                        pass
+                    pass
+                pass
+            pass
+        return retval
+    
     def __execute(self, command, quiet = False):
         """
         Executes the given command, optionally squelching the output.
