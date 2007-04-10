@@ -745,7 +745,10 @@ class mod_PLC4:
 #        pass
 
         try:
-            print "DEBUG: using ticketdata = '%s'" % str(ticketdata)
+            if debug:
+                print "DEBUG: using ticketdata = '%s'" % str(ticketdata)
+                pass
+            
             res = node.nmagent.create_sliver(node.slice.slicename,ticketdata)
             if debug:
                 print res
