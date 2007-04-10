@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -202,6 +202,14 @@ foreach my $name (keys(%runlist)) {
     libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx, $dir,
 						     $tag, $subdir) == 0 or
         fatal(-1, "Could not checkout $tag to $dir");
+
+    if (! -e "$dbdump") {
+	$subdir = "exp/dbdata";
+	
+	libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx, $dir,
+							 $tag, $subdir) == 0 or
+            fatal(-1, "Could not checkout $tag to $dir");
+    }
 
     #
     # Now we need to create a DB on ops to hold the DB dump.
