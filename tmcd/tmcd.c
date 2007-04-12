@@ -4019,7 +4019,7 @@ mydb_connect()
 	if (mysql_real_connect(&db, 0, "tmcd", 0,
 			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
 		error("%s: connect failed: %s\n", dbname, mysql_error(&db));
-		return 1;
+		return 0;
 	}
 	strcpy(db_dbname, dbname);
 	db_connected = 1;
@@ -4052,9 +4052,24 @@ mydb_query(char *query, int ncols, ...)
 		return (MYSQL_RES *) 0;
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
-		error("%s: query failed: %s\n", dbname, mysql_error(&db));
+		error("%s: query failed: %s, retrying\n",
+		      dbname, mysql_error(&db));
 		mydb_disconnect();
-		return (MYSQL_RES *) 0;
+		/*
+		 * Try once to reconnect.  In theory, the caller (client)
+		 * will retry the tmcc call and we will reconnect and
+		 * everything will be fine.  The problem is that the
+		 * client may get a different tmcd process each time,
+		 * and every one of those will fail once before
+		 * reconnecting.  Hence, the client could wind up failing
+		 * even if it retried.
+		 */
+		if (!mydb_connect() ||
+		    mysql_real_query(&db, querybuf, n) != 0) {
+			error("%s: query failed: %s\n",
+			      dbname, mysql_error(&db));
+			return (MYSQL_RES *) 0;
+		}
 	}
 
 	res = mysql_store_result(&db);
