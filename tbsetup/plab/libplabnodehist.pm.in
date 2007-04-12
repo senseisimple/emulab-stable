@@ -1,0 +1,177 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libplabnodehist;
+
+#
+# This library provides functions for interpreting the plab_nodehist table.
+#
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw (getNodeHistSequences sequenceToStr);
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use English;
+use POSIX qw(strftime);
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+my $debug = 0;
+
+#
+# Returns up/down sequences derived from the plab_nodehist table.
+# Args:
+#   $1 = plab physnode id
+#   $2 = N, where you want only the sequences derived from the last N seconds
+#        of history
+# Returns:
+#   A hash of phys_node_id->{'up'|'down'}->array of sequences.
+#
+# A 'sequence' is an array with the following elements:
+#  [ starttime, duration, members ]
+# where 
+#  starttime is seconds past Epoch; duration is seconds; 
+#  members is the number of consecutive 'success's or 'failure's in 
+#    the sequence.
+#
+sub getNodeHistSequences(;$$) {
+    
+    my $fpnode = shift;
+    my $fstime = shift;
+
+    my ($cpnode,$cstatus,$cstarttime,$cendtime,$cmembers) = ('','',0,0,0);
+    my ($totalseqs,$totalnodes) = (0,0);
+
+    my %r = ();
+
+    my $now = time();
+
+    # Note: the "parsing" requires that the statuses be ordered by 
+    # physnodeid, then time.  You know, push as much work to the db as 
+    # possible.
+    my $filter = "";
+    if (defined($fpnode) && $fpnode ne '') {
+	$filter .= " and phys_node_id='$fpnode'";
+    }
+    if (defined($fstime)) {
+	$filter .= " and timestamp > '" . \
+	    strftime("%Y-%m-%d %H:%M:%S",
+		     localtime(time() - $fstime)) . "'";
+    }
+
+    my $q = "select phys_node_id,unix_timestamp(timestamp)," . 
+	    "    status" . 
+	    "  from plab_nodehist" . 
+	    "  where component='node' and operation='create'" . 
+	    "  $filter" . 
+	    "  order by phys_node_id,timestamp";
+
+    if ($debug) {
+	print "query = \"$q\"\n";
+    }
+
+    my $res = DBQueryFatal($q);
+
+    print "getSequences: beginning construction at " . 
+	(strftime("%Y-%m-%d %H:%M:%S",localtime())) . ".\n";
+    
+    #my $i = 0;
+    my @row;
+    while (@row = $res->fetchrow_array()) {
+	#++$i;
+	# save off any current sequence in the previous pnode/status
+	if (($row[0] ne $cpnode && $cpnode ne '') 
+	    || ($row[2] ne $cstatus && $cstatus ne '')) {
+	    # if this is a new failure/success sequence within the same pnode,
+	    # set the endtime to the starttime of the new sequence.
+	    if ($cpnode eq $row[0] && $cstatus ne $row[2] && $cstatus ne '') {
+		#print "DEBUG: used endtime $row[1]\n";
+		$cendtime = $row[1];
+	    }
+	    # otherwise, just use the current time, cause this is a new set
+	    # of data for another pnode.
+	    else {
+		#print "DEBUG: using default endtime $now\n";
+		$cendtime = $now;
+	    }
+	    my $nseq = [ $cstarttime, ($cendtime - $cstarttime), $cmembers ];
+	    ++$totalseqs;
+	    push @{$r{$cpnode}{$cstatus}}, $nseq;
+	    $r{$cpnode}{'lastseq'} = [ $cstatus, $nseq ];
+	    ($cstatus,$cstarttime,$cendtime,$cmembers) = ('',-1,-1,0);
+	}
+	if ($row[0] ne $cpnode) {
+	    # new pnode
+	    ++$totalnodes;
+	    $cpnode = $row[0];
+	    $r{$cpnode}{'success'} = [];
+	    $r{$cpnode}{'failure'} = [];
+	    $r{$cpnode}{'lastseq'} = [];
+	    #print "DEBUG: new pnode $cpnode\n";
+	}
+	if ($row[2] ne $cstatus) {
+	    # start new sequence within this pnode.
+	    #print "DEBUG: new sequence at row $i\n";
+	    $cstatus = $row[2];
+	    $cstarttime = $row[1];
+	    ++$cmembers;
+	}
+	else {
+	    #print "DEBUG: ${cmembers}th member at row $i\n";
+	    ++$cmembers;
+	}
+    }
+    # add the final sequence not caught in the loop...
+    if ($cpnode ne '' && $cstatus ne '') {
+	if ($cpnode eq $row[0] && $cstatus ne $row[2] && $cstatus ne '') {
+	    #print "DEBUG: used endtime $row[1]\n";
+	    $cendtime = $row[1];
+	}
+	# otherwise, just use the current time, cause this is a new set
+	# of data for another pnode.
+	else {
+	    #print "DEBUG: using default endtime $now\n";
+	    $cendtime = $now;
+	}
+	my $nseq = [ $cstarttime, ($cendtime - $cstarttime), $cmembers ];
+	++$totalseqs;
+	push @{$r{$cpnode}{$cstatus}}, $nseq;
+	$r{$cpnode}{'lastseq'} = [ $cstatus, $nseq ];
+    }
+
+    print "getSequences: finished construction at " . 
+	(strftime("%Y-%m-%d %H:%M:%S",localtime())) . ".\n";
+
+    print "getSequences: added $totalseqs sequences for $totalnodes nodes.\n";
+
+    return \%r;
+}
+
+sub sequenceToStr($) {
+    my $seq = shift;
+
+    if (!defined($seq)) {
+	return undef;
+    }
+
+    return sprintf("%s -> %s (%s): %d",
+		   strftime("%Y-%m-%d %H:%M:%S",localtime($$seq[0])),
+		   strftime("%Y-%m-%d %H:%M:%S",localtime($$seq[0]+$$seq[1])),
+		   $$seq[1] . "s",
+		   $$seq[2]);
+}
+
+# Make perl happy
+1;

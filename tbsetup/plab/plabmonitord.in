@@ -58,6 +58,9 @@ use libdb;
 use libtestbed;
 use libplabmon;
 
+# Grab stuff to interpret the plab_nodehist table
+use libplabnodehist;
+
 # Load pool libraries
 use plabmon_badpool;
 use plabmon_goodpool;
@@ -94,7 +97,6 @@ if (defined($options{'S'})) {
 #
 sub updatenodepool($);
 sub fatal($);
-#sub loadstate($$);
 
 #
 # Global vars
@@ -178,10 +180,20 @@ $SIG{HUP}  = \&termsig;
 $SIG{INT}  = \&termsig;
 
 #
+# Load state from plab_nodehist.  Down in updatenodepool, we load each node's 
+# consecsuccess or consecfailure vars from this hash, and then we delete the 
+# node's history entry from this hashref.
+# If we ever need the history to hang around longer, have to use a better way
+# to only set consec* vars once (easy).
+#
+my $seqref = getNodeHistSequences();
+
+#
 # Main loop: grind around looking for nodes to check in the various
 # pools.  Sleep until next node is ready to be processed.
 #
 my $windowsize = 0;
+my $i = 0;
 while (1) {
     my $now = time();
     my $sleeptime = $MAXSLEEPTIME;
@@ -257,94 +269,6 @@ while (1) {
 }
 
 #
-# Load monitor state from the plab_nodehist table for the given pnode.
-#
-sub loadstate($$) {
-    my $pool = shift;
-    my $pnode = shift;
-    my $poolpid = $pool->{'PID'};
-    my $pooleid = $pool->{'EID'};
-    my $poolpnodes = $pool->{'PNODES'};
-
-    if (!defined($pool) || !defined($pnode)) 
-      return;
-
-    my $res = 
-      DBQueryFatal("select unix_timestamp(timestamp),component,operation," . 
-                   "status " . 
-                   " from plab_nodehist where phys_node_id='$pnode' " . 
-                   " order by timestamp asc" . 
-                   );
-
-    # calculate sequence lengths; store most recent 10
-    my @sequences = ();
-    my $lastseqstat = '', $lastts = 0;
-    if ($res && $res->num_rows()) {
-      while (my @row = $res->fetchrow_array()) {
-          my ($ts,$com,$op,$status) = @row;
-
-          # filter out entries older than two weeks
-          # NOTE: after we create the sequence for this node, we will
-          # check the last (most recent) timestamp; if it's older than
-          # three days, we reject all sequence state for this node
-          # and start clean.  The reason for this is pretty obvious;
-          # if a node was good for two weeks, then we don't check for two 
-          # weeks (i.e., cause plabmonitord didn't run), we might try to use
-          # old state to assume new check intervals, and this might be bad.
-
-          if ($lastts == 0) {
-              # first row
-              $lastseqstat = $status;
-              $lastts = $ts;
-              next;
-          }
-	  
-          # @entry = (up/down,seqtime,conseccount)
-	  
-          # add this one on to the last.
-          @sequences[0][1] += ($ts - $lastts);
-          if ($lastseqstat eq $status) {
-              ++(@sequences[0][2]);
-          }
-          else {
-              # new entry
-              my @entry = ();
-              if ($status eq 'success') {
-                  entry[0] = 'up';
-              }
-              else {
-                  entry[0] = 'down';
-              }
-              entry[1] = 0;
-              entry[2] = 1;
-              
-	      # save off this sequence
-              push @sequences, \@entry;
-          }
-	  
-          $lastseqstat = $status;
-          $lastts = $ts;
-	  
-      }
-  }
-    
-    # remove the oldest N sequences...
-    if (scalar(@sequences) $MAX_STATE_SEQUENCES) {
-      for (my $i = scalar(@sequences); $i >= $MAX_STATE_SEQUENCES; --$i) {
-          undef($sequences[$i]);
-      }
-    }
-
-    $poolpnodes->{$pnode}->{'history'} = \@sequences;
-
-    Log(STATUSLOG, "plabmonitord, $pnodename, loadstate, ".
-      (scalar(@{$poolpnodes->{$pnodename}->{'history'}})).
-       " sequences added.");
-    
-    return;
-}
-
-#
 # Go through the PID/EID associated with the pool and grab any new nodes
 # that have appeared.
 #
@@ -384,6 +308,26 @@ sub updatenodepool($) {
                                              'consecfails'    => 0,
                                              'consecsuccess'  => 0,
                                              'setupfails'     => 0};
+
+		if (exists($seqref->{$pnodename})) {
+		    my $lseqtype = $seqref->{$pnodename}{'lastseq'}->[0];
+		    my $lseqcount = $seqref->{$pnodename}{'lastseq'}->[1]->[2];
+
+		    if ($lseqtype eq 'success') {
+			$poolpnodes->{$pnodename}{'consecsuccess'} = $lseqcount;
+		    }
+		    elsif ($lseqtype eq 'failure') {
+			$poolpnodes->{$pnodename}{'consecfails'} = $lseqcount;
+		    }
+
+		    $pool->calcnextcheck($poolpnodes->{$pnodename});
+
+		    delete $seqref->{$pnodename};
+
+		    print "Loaded nodehist for $pnodename ($lseqtype/$lseqcount).\n";
+		    my $nct = $poolpnodes->{$pnodename}->{'nextchecktime'};
+		    print "calcnextcheck($pnodename) = ".($nct-time())."\n";
+		}
 
                 Log(STATUSLOG, "plabmonitord, $pnodename, addtopool, ".
                     "nostat, node added to pool $pool->{'NAME'}");

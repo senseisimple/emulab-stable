@@ -428,7 +428,7 @@ sub teardownnode($$;$) {
 
 
 # XXX: may be bogus, but it'll do for now.
-my $MININTERVAL = 300;
+my $MININTERVAL = 600;
 my $MAXINTERVAL = 3600;
 sub calcnextcheck($$;$) {
     my ($self, $pnode, $reason) = @_;
