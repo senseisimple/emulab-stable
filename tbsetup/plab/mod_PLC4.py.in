@@ -115,7 +115,8 @@ class NM3agent:
 
 DEF_NM_DELEGATE_ACCT = "utah_elab_delegate"
 DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
-DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no -l %s -i %s %s"
+DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no" \
+                " -oPasswordAuthentication=no -l %s -i %s %s"
 
 class NM4agent:
     def __init__(self,IP,nodeid,nmport=DEF_NM_PORT,
@@ -157,20 +158,30 @@ class NM4agent:
 
     def _xcall(self,cmd,args=()):
         self._open()
-        if debug:
-            print "NM4agent: sending xmlrpc request (%s,%s)" % (cmd,str(args))
-        print >>self.__agentconn.tochild, xmlrpclib.dumps(args,cmd)
-        self.__agentconn.tochild.close()
-        if debug:
-            print "NM4agent: waiting for response"
-        retval = xmlrpclib.loads(self.__agentconn.fromchild.read())
-        if debug:
-            print "NM4agent: response = '%s'" % str(retval)
-        self.__agentconn.wait()
-        if debug:
-            print "NM4agent: _xcall complete"
-        self._close()
-
+        try:
+            if debug:
+                print "NM4agent: sending xmlrpc request (%s,%s)" % (cmd,
+                                                                    str(args))
+                pass
+            print >>self.__agentconn.tochild, xmlrpclib.dumps(args,cmd)
+            self.__agentconn.tochild.close()
+            if debug:
+                print "NM4agent: waiting for response"
+                pass
+            retval = xmlrpclib.loads(self.__agentconn.fromchild.read())
+            if debug:
+                print "NM4agent: response = '%s'" % str(retval)
+                pass
+            self.__agentconn.wait()
+            if debug:
+                print "NM4agent: _xcall complete"
+                pass
+            self._close()
+        except:
+            # always close; we can only send one xmlrpc request at a time
+            self._close()
+            raise
+        
         # XXX: we whack the retval to be compat with NMv3
         rret = retval[0][0]
         if rret == 1:
@@ -185,11 +196,28 @@ class NM4agent:
             print "NM4agent: delivering ticket '%s'" % str(ticket)
         return self._xcall('Ticket',(ticket,))
     
-    def create_sliver(self,slice_name):
+    def create_sliver(self,slice_name,tries=2,interval=5):
         if debug:
             print "NM4agent: creating sliver for slice %s" % slice_name
-        return self._xcall('Create',(slice_name,))
-
+            pass
+        (success,rtries) = (False,tries)
+        while not success and rtries > 0:
+            rtries -= 1
+            try:
+                retval = self._xcall('Create',(slice_name,))
+                success = True
+            except:
+                if rtries == 0:
+                    raise
+                else:
+                    print "Warning: create_sliver for slice %s failed" \
+                          % slice_name
+                    time.sleep(interval)
+                    pass
+                pass
+            pass
+        return retval
+    
     def delete_sliver(self,slice_name):
         if debug:
             print "NM4agent: destroying sliver for slice %s" % slice_name
@@ -273,7 +301,7 @@ class NMagent_wrapper:
             try:
                 res = tryXmlrpcCmd(self.__agent.deliver_ticket,ticketdata)
                 if res[0] == 0:
-                    print "WARNING: while trying to deliver ticket for slice %s: %s" % (slicename,str(res[1]))
+                    print "Warning: while trying to deliver ticket for slice %s: %s" % (slicename,str(res[1]))
                 else:
                     if debug:
                         print "Ticket delivery succeeded for slice %s" % slicename
@@ -284,11 +312,6 @@ class NMagent_wrapper:
                 print "WARNING: exception while delivering ticket for slice %s" % slicename
                 traceback.print_exc()
                 pass
-            pass
-        else:
-            if debug:
-                print "DEBUG: type(agent) = %s %s" % (str(type(self.__agent)),
-                                                      str(type(NM4agent)))
             pass
         
         res = tryXmlrpcCmd(self.__agent.create_sliver,arg)
@@ -714,14 +737,6 @@ class mod_PLC4:
         #
         if (node.nmagent.getAgent()).__class__ == NM3agent:
             ticketdata = cPickle.loads(node.slice.slicemeta_legacy)
-            #try:
-            #    ticketdata = tryXmlrpcCmd(plcagent.SliceGetTicket)
-            #    if debug:
-            #        print "DEBUG: got new ticket data successfully"
-            #except:
-            #    print "Error: could not get ticket for %s" % node.slice.slicename
-            #    traceback.print_exc()
-            #    pass
             pass
         
         res = tryXmlrpcCmd(plcagent.SliceNodesAdd, node.hostname,

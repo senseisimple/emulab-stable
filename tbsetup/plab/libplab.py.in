@@ -1677,7 +1677,8 @@ class Node:
         deleted = 0
         try:
             deleted = self.slice.plab.agent.freeNode(self)
-            self.__logNodeHist('node','free','success','')
+            # Uncomment to increase logging
+            #self.__logNodeHist('node','free','success','')
         except:
             self.__logNodeHist('node','free','failure',
                                traceback.format_exception(*sys.exc_info()))
@@ -1780,7 +1781,8 @@ class Node:
             pass
         try:
             self.unpackRootball(rootballpath, rrootballname)
-            self.__logNodeHist('node','emulabify','success','')
+            # Uncomment to increase logging
+            #self.__logNodeHist('node','emulabify','success','')
         except:
             self.__logNodeHist('node','emulabify','failure',
                                traceback.format_exception(*sys.exc_info()))
