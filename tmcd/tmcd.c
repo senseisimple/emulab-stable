@@ -161,6 +161,7 @@ typedef struct {
 	int		elab_in_elab;
         int		singlenet;	  /* Modifier for elab_in_elab */
 	int		update_accounts;
+	int		exptidx;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
 	char		pnodeid[TBDB_FLEN_NODEID]; /* XXX */
@@ -4144,7 +4145,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,vt.isplabdslice, "
 				 " ps.admin, "
-				 " e.elab_in_elab,e.elabinelab_singlenet "
+				 " e.elab_in_elab,e.elabinelab_singlenet, "
+				 " e.idx "
 				 "from nodes as nv "
 				 "left join nodes as np on "
 				 " np.node_id=nv.phys_nodeid "
@@ -4164,7 +4166,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " nk.node_id=nv.node_id "
 				 "where nv.node_id='%s' and "
 				 " (i.IP='%s' and i.role='ctrl') ",
-				 25, reqp->vnodeid, inet_ntoa(ipaddr));
+				 26, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -4174,7 +4176,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,0, "
-				 " 0,e.elab_in_elab,e.elabinelab_singlenet "
+				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
+				 " e.idx "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -4186,7 +4189,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=n.node_id "
 				 "where i.IP='%s' and i.role='ctrl'", /*XXX*/
-				 25, inet_ntoa(ipaddr));
+				 26, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -4224,6 +4227,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	if (row[4] && row[5]) {
 		strncpy(reqp->pid, row[4], sizeof(reqp->pid));
 		strncpy(reqp->eid, row[5], sizeof(reqp->eid));
+		reqp->exptidx = atoi(row[25]);
 		reqp->allocated = 1;
 
 		if (row[6])
@@ -7102,10 +7106,10 @@ COMMAND_PROTOTYPE(doportregister)
 		 * Register port for the service.
 		 */
 		if (mydb_update("replace into port_registration set "
-				"     pid='%s', eid='%s', "
+				"     pid='%s', eid='%s', exptidx=%d, "
 				"     service='%s', node_id='%s', port='%d'",
-				reqp->pid, reqp->eid, service,
-				reqp->nodeid, port)) {
+				reqp->pid, reqp->eid, reqp->exptidx,
+				service, reqp->nodeid, port)) {
 			error("doportregister: %s: DB Error setting %s=%d!\n",
 			      reqp->nodeid, service, port);
 			return 1;
