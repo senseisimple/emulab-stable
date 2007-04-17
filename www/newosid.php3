@@ -250,6 +250,7 @@ else {
 # Grab unique imageid (before locking tables).
 # 
 $osid = TBGetUniqueIndex("next_osid");
+$uuid = NewUUID();
 
 #
 # Insert the new record with tables locked.
@@ -269,12 +270,12 @@ $query_result =
     DBQueryFatal("INSERT INTO os_info ".
 		 "(osname, osid, description,OS,version,path,magic,op_mode, ".
 		 " osfeatures, pid, shared, creator, creator_idx, mustclean, ".
-		 " created, reboot_waittime, pid_idx) ".
+		 " created, reboot_waittime, pid_idx, uuid) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
 		 "        '$os_version', $os_path, '$os_magic', '$op_mode', ".
 		 "        '$os_features', '$pid', $os_shared, ".
 	         "        '$uid', '$dbid', $os_mustclean, now(), ".
-		 "        $os_reboot_waittime, $pid_idx)");
+		 "        $os_reboot_waittime, $pid_idx, '$uuid')");
 
 DBQueryFatal("unlock tables");
 

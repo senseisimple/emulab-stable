@@ -793,6 +793,7 @@ $path        = $formfields["path"];
 # Grab unique imageid (before locking tables). 
 # 
 $imageid = TBGetUniqueIndex("next_osid");
+$uuid    = NewUUID();
 
 #
 # And insert the record!
@@ -885,13 +886,14 @@ $query_result =
 		 "(imagename, imageid, description, loadpart, loadlength, ".
 		 " part1_osid, part2_osid, part3_osid, part4_osid, ".
 		 " default_osid, path, pid, gid, shared, global, ".
-		 " creator, creator_idx, created, pid_idx, gid_idx) ".
+		 " creator, creator_idx, created, pid_idx, gid_idx, uuid) ".
 		 "VALUES ".
 		 "  ('$imagename', '$imageid', '$description', $loadpart, ".
 		 "   $loadlength, ".
 		 "   $part1_osid, $part2_osid, $part3_osid, $part4_osid, ".
 		 "   '$default_osid', '$path', '$pid', '$gid', $shared, ".
-	         "   $global, '$uid', '$dbid', now(), $pid_idx, $gid_idx)");
+	         "   $global, '$uid', '$dbid', now(), $pid_idx, $gid_idx, ".
+		 "   '$uuid')");
 
 if (!$isadmin || $makedefault) {
     for ($i = 0; $i < count($mtypes_array); $i++) {

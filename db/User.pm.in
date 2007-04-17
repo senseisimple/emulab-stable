@@ -406,6 +406,13 @@ sub Create($$$$)
     # And a verification key.
     my $verify_key = TBGenSecretKey();
 
+    # And a UUID (universally unique identifier).
+    my $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "*** WARNING: Could not generate a UUID!\n";
+	return undef;
+    }
+
     # Now tack on other stuff we need.
     push(@insert_data, "wikionly='1'")
 	if ($wikionly);
@@ -417,6 +424,7 @@ sub Create($$$$)
     push(@insert_data, "unix_uid=$unix_uid");
     push(@insert_data, "mailman_password='$mailman_password'");
     push(@insert_data, "verify_key='$verify_key'");
+    push(@insert_data, "uid_uuid='$uuid'");
     push(@insert_data, "uid_idx='$uid_idx'");
     push(@insert_data, "uid='$uid'");
 
@@ -440,8 +448,8 @@ sub Create($$$$)
     DBQueryWarn("insert into users set " . join(",", @insert_data))
 	or return undef;
 
-    if (! DBQueryWarn("insert into user_stats (uid, uid_idx) ".
-		      "VALUES ('$uid', $uid_idx)")) {
+    if (! DBQueryWarn("insert into user_stats (uid, uid_idx, uid_uuid) ".
+		      "VALUES ('$uid', $uid_idx, '$uuid')")) {
 	DBQueryFatal("delete from users where uid_idx='$uid_idx'");
 	return undef;
     }

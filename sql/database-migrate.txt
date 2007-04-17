@@ -3971,3 +3971,10 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table plab_slices add 
            `slicemeta_legacy` text 
 	   after slicemeta;
+
+4.119: Add UUIDs to lots of tables.
+
+       All of the sql changes are made in the following script:
+
+         ./step5_newids.pl
+

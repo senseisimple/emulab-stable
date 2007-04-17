@@ -91,6 +91,7 @@ class OSinfo
     function osname()		{ return $this->field("osname"); }
     function pid()		{ return $this->field("pid"); }
     function osid()		{ return $this->field("osid"); }
+    function uuid()		{ return $this->field("uuid"); }
     function creator()		{ return $this->field("creator"); }
     function creator_idx()	{ return $this->field("creator_idx"); }
     function created()		{ return $this->field("created"); }
@@ -201,6 +202,7 @@ class OSinfo
 	$nextosid       = $this->nextosid();
 	$max_concurrent = $this->max_concurrent();
 	$reboot_waittime= $this->reboot_waittime();
+	$uuid           = $this->uuid();
 
 	if (! ($creator_user = User::Lookup($creator))) {
 	    TBERROR("Error getting object for user $creator", 1);
@@ -327,6 +329,11 @@ class OSinfo
 	echo "<tr>
                 <td>Internal ID: </td>
                 <td class=\"left\">$osid</td>
+              </tr>\n";
+
+	echo "<tr>
+                <td>UUID: </td>
+                <td class=left>$uuid</td>
               </tr>\n";
 
 	echo "</table>\n";

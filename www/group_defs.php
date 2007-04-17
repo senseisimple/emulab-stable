@@ -300,6 +300,7 @@ class Group
     function gid()	        { return $this->field("gid"); }
     function pid_idx()          { return $this->field("pid_idx"); }
     function gid_idx()          { return $this->field("gid_idx"); }
+    function uuid()             { return $this->field("gid_uuid"); }
     function leader()           { return $this->field("leader"); }
     function leader_idx()       { return $this->field("leader_idx"); }
     function created()          { return $this->field("created"); }
@@ -345,6 +346,7 @@ class Group
 	    $pid = $project->pid();
 	    $pid_idx = $project->pid_idx();
 	}
+	$uuid = NewUUID();
 	
 	# Get me an unused unix id. Nice query, eh? Basically, find 
 	# unused numbers by looking at existing numbers plus one, and check
@@ -371,14 +373,17 @@ class Group
 			 " created=now(), ".
 			 " description='$description', ".
 			 " unix_name='$unix_name', ".
+			 " gid_uuid='$uuid', ".
 			 " gid_idx=$gid_idx, ".
 			 " pid_idx=$pid_idx, ".
 			 " unix_gid=$unix_gid")) {
 	    return null;
 	}
 
-	if (! DBQueryWarn("insert into group_stats (pid,gid,gid_idx,pid_idx) ".
-			  "values ('$pid', '$gid', $gid_idx, $pid_idx)")) {
+	if (! DBQueryWarn("insert into group_stats ".
+			  "  (pid,gid,gid_idx,pid_idx,gid_uuid) ".
+			  "values ('$pid', '$gid', $gid_idx, ".
+			  "        $pid_idx, '$uuid')")) {
 	    DBQueryFatal("delete from groups where gid_idx='$gid_idx'");
 	    return null;
 	}
@@ -835,6 +840,7 @@ class Group
 	$expt_last   = $this->expt_last();
 	$unix_gid    = $this->unix_gid();
 	$unix_name   = $this->unix_name();
+	$uuid        = $this->uuid();
 
 	if ($this->IsProjectGroup()) 
 	    $mail = "$pid" . "-users@" . $OURDOMAIN;
@@ -903,6 +909,13 @@ class Group
 	    echo "<tr>
                       <td>Email List: </td>
                       <td class=\"left\">$mail</td>
+                  </tr>\n";
+	}
+
+	if (ISADMIN()) {
+	    echo "<tr>
+                    <td>UUID: </td>
+                    <td class=left>$uuid</td>
                   </tr>\n";
 	}
 

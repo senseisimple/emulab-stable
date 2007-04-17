@@ -66,6 +66,7 @@ $TBLIBEXEC_DIR	= "$TBDIR"."libexec/";
 $TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
 $TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
 $TBCSLOGINS     = "$TBETC_DIR/cslogins";
+$UUIDGEN_PATH   = "/usr/bin/uuidgen";
 
 #
 # Hardcoded check against $WWWHOST, to prevent anyone from accidentally setting
@@ -413,6 +414,21 @@ function CHECKPASSWORD($uid, $password, $name, $email, &$error)
     }
     TBERROR("Checkpass Failure! Returned '$mypipe'.\n\n".
 	    "$TBCHKPASS_PATH $password $uid '$name:$email'", 1);
+}
+
+#
+# Grab a UUID (universally unique identifier).
+#
+function NewUUID()
+{
+    global $UUIDGEN_PATH;
+
+    $uuid = shell_exec($UUIDGEN_PATH);
+    
+    if (isset($uuid) && $uuid != "") {
+	return rtrim($uuid);
+    }
+    TBERROR("$UUIDGEN_PATH Failure", 1);
 }
 
 function LASTNODELOGIN($node)

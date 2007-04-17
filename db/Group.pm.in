@@ -284,6 +284,13 @@ sub Create($$$$$$)
 	}
     }
 
+    # And a UUID (universally unique identifier).
+    my $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "*** WARNING: Could not generate a UUID!\n";
+	return undef;
+    }
+
     if (!DBQueryWarn("insert into groups set ".
 		     " pid='$pid', gid='$gid', ".
 		     " leader='" . $leader->uid() . "'," .
@@ -291,14 +298,16 @@ sub Create($$$$$$)
 		     " created=now(), ".
 		     " description='$description', ".
 		     " unix_name='$unix_name', ".
+		     " gid_uuid='$uuid', ".
 		     " gid_idx=$gid_idx, ".
 		     " pid_idx=$pid_idx, ".
 		     " unix_gid=$unix_gid")) {
 	return undef;
     }
 
-    if (! DBQueryWarn("insert into group_stats (pid, gid, gid_idx, pid_idx) ".
-		      "values ('$pid', '$gid', $gid_idx, $pid_idx)")) {
+    if (! DBQueryWarn("insert into group_stats ".
+		      "  (pid, gid, gid_idx, pid_idx, gid_uuid) ".
+		      "values ('$pid','$gid',$gid_idx,$pid_idx,'$uuid')")) {
 	DBQueryFatal("delete from groups where gid_idx='$gid_idx'");
 	return undef;
     }

@@ -173,6 +173,7 @@ class User
     function uid()		{ return $this->field("uid"); }
     function webid()		{ return $this->field("uid_idx"); }
     function dbid()		{ return $this->field("uid_idx"); }
+    function uuid()		{ return $this->field("uid_uuid"); }
     function created()		{ return $this->field("usr_created"); }
     function expires()		{ return $this->field("usr_expires"); }
     function modified()		{ return $this->field("usr_modified"); }
@@ -576,6 +577,7 @@ class User
 	$cvsweb      = $user->cvsweb();
 	$wikionly    = $user->wikionly();
 	$stud        = $user->stud();
+	$uuid        = $user->uuid();
 
 	if (!strcmp($usr_addr2, ""))
 	    $usr_addr2 = "&nbsp;";
@@ -727,6 +729,11 @@ class User
               </tr>\n";
 
 	if (ISADMIN()) {
+	    echo "<tr>
+                    <td>UUID: </td>
+                    <td class=left>$uuid</td>
+                  </tr>\n";
+	    
 	    $cvswebflip = ($cvsweb ? 0 : 1);
 
 	    $toggle_url = CreateURL("toggle", $user,

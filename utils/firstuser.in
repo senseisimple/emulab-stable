@@ -39,6 +39,8 @@ my $batchmode       = 0;
 my $pid_idx         = 1; # Initial IDX for protoproj.
 my $trust           = "project_root";
 my $binshell        = "/bin/nologin";
+my $uid_uuid;
+my $gid_uuid;
 my $password;
 my $encpass;
 my %opts;
@@ -177,20 +179,25 @@ if ($CONTROL ne $BOSSNODE) {
     }
 }
 
+# These users do not really need a uuid, but give them one anyway.
+$uid_uuid = NewUUID();
+
 # Initialize the index value;
 DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid+1");
 
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
-	     "usr_name='$protouser_name', ".
+	     "usr_name='$protouser_name', uid_uuid='$uid_uuid', ".
 	     "usr_addr='DO NOT DELETE THIS ACCOUNT', ".
 	     "usr_pswd='$encpass', unix_uid=$uid, notes='$protouser_notes', ".
 	     "usr_modified=now(), admin=1, webonly=0, status='active',".
 	     "usr_shell='$protouser_shell', usr_email='$protouser_email', ".
 	     "mailman_password='$mailman_password',uid_idx=$uid");
-DBQueryFatal("insert into user_stats set uid='$protouser',uid_idx=$uid");
+DBQueryFatal("insert into user_stats set ".
+	     "  uid='$protouser', uid_idx=$uid, uid_uuid='$uid_uuid'");
 
 if (!defined($opts{u})) {
+    $gid_uuid = NewUUID();
     
     print "Creating project in database...\n";
     DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
@@ -204,9 +211,10 @@ if (!defined($opts{u})) {
 		 "leader='$protouser', leader_idx=$uid, created=now(), ".
 		 "description='Default Group', " .
 		 "unix_gid=$gid, gid_idx=$pid_idx, pid_idx=$pid_idx, ".
-		 "unix_name='$protoproj'");
+		 "unix_name='$protoproj', gid_uuid='$gid_uuid'");
     DBQueryFatal("insert into group_stats set ".
-		 "pid='$protoproj',gid='$protoproj',gid_idx=$pid_idx");
+		 "   pid='$protoproj',gid='$protoproj', ".
+		 "   gid_idx=$pid_idx, gid_uuid='$gid_uuid'");
 
     DBQueryFatal("replace into emulab_indicies set name='next_gid',idx=10000");
 }

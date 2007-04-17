@@ -1188,6 +1188,8 @@ $op_mode     = $formfields["op_mode"];
 # Grab unique imageid (before locking tables).
 # 
 $imageid = TBGetUniqueIndex("next_osid");
+$uuid1   = NewUUID();
+$uuid2   = NewUUID();
 
 #
 # Special option. Whole disk image, but only one partition that actually
@@ -1221,21 +1223,22 @@ DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$bootpart" . "_osid, ".
 	     " default_osid, path, pid, global, creator, creator_idx, ".
-	     " created, gid, shared, pid_idx, gid_idx) ".
+	     " created, gid, shared, pid_idx, gid_idx, uuid) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
 	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $global, ".
-             "   '$uid', '$dbid', now(), '$gid', $shared, $pid_idx,$gid_idx)");
+             "   '$uid', '$dbid', now(), '$gid', $shared, $pid_idx, ".
+	     "   $gid_idx, '$uuid1')");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
 	     " osfeatures, pid, creator, creator_idx, shared, created, ".
-	     " op_mode, max_concurrent, reboot_waittime, pid_idx) ".
+	     " op_mode, max_concurrent, reboot_waittime, pid_idx, uuid) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
              "   '$uid', '$dbid', $global, now(), '$op_mode', ".
-             "   $max_concurrent, $reboot_waittime, $pid_idx)");
+             "   $max_concurrent, $reboot_waittime, $pid_idx, '$uuid2')");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".

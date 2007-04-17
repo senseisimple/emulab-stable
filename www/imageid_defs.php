@@ -123,6 +123,7 @@ class Image
     function pid()		{ return $this->field("pid"); }
     function gid()		{ return $this->field("gid"); }
     function imageid()		{ return $this->field("imageid"); }
+    function uuid()		{ return $this->field("uuid"); }
     function creator()		{ return $this->field("creator"); }
     function creator_idx()	{ return $this->field("creator_idx"); }
     function created()		{ return $this->field("created"); }
@@ -230,6 +231,7 @@ class Image
 	$globalid	= $this->isglobal();
 	$creator	= $this->creator();
 	$created	= $this->created();
+	$uuid           = $this->uuid();
 
 	if (!$description)
 	    $description = "&nbsp;";
@@ -379,6 +381,11 @@ class Image
 	echo "<tr>
                 <td>Internal ID: </td>
                 <td class=left>$imageid</td>
+              </tr>\n";
+
+	echo "<tr>
+                <td>UUID: </td>
+                <td class=left>$uuid</td>
               </tr>\n";
 
 	echo "<tr>

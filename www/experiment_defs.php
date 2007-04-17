@@ -204,6 +204,7 @@ class Experiment
     function gid()	    { return $this->field('gid'); }
     function eid()	    { return $this->field('eid'); }
     function idx()	    { return $this->field('idx'); }
+    function uuid()	    { return $this->field('eid_uuid'); }
     function description()  { return $this->field('expt_name'); }
     function path()	    { return $this->field('path'); }
     function state()	    { return $this->field('state'); }
@@ -609,6 +610,7 @@ class Experiment
 	$dpdb        = $exprow["dpdb"];
 	$dpdbname    = $exprow["dpdbname"];
 	$dpdbpassword= $exprow["dpdbpassword"];
+	$uuid        = $exprow["eid_uuid"];
 
 	$autoswap_hrs= ($autoswap_timeout/60.0);
 	$idleswap_hrs= ($idleswap_timeout/60.0);
@@ -913,6 +915,12 @@ class Experiment
 	}
 
 	if (!$short) {
+	    if (ISADMIN()) {
+		echo "<tr>
+                        <td>UUID: </td>
+                        <td class=left>$uuid</td>
+                      </tr>\n";
+	    }
 	    if ($usemodelnet) {
 		echo "<tr>
                       <td>Use Modelnet: </td>

@@ -108,7 +108,7 @@ my $create_string = ($query_result->fetchrow_array())[1];
 # it simplifies backwards compatability.
 #
 DBQueryFatal("alter table temp_images ".
-	     "drop pid_idx, drop gid_idx, drop creator_idx");
+	     "drop pid_idx, drop gid_idx, drop creator_idx, drop uuid");
 
 #
 # Before we dump the table contents, reset a few things.
@@ -174,7 +174,7 @@ $create_string = ($query_result->fetchrow_array())[1];
 # it simplifies backwards compatability.
 #
 DBQueryFatal("alter table temp_os_info ".
-	     "drop pid_idx, drop creator_idx");
+	     "drop pid_idx, drop creator_idx, drop uuid");
 
 #
 # Before we dump the table contents, reset a few things.
