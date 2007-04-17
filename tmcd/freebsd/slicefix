@@ -295,6 +295,17 @@ dolinux() {
 	}
 
 	#
+	# If there's a GRUB config file, update all root=X kernel params.
+	#
+	gconf=/mnt/boot/grub/grub.conf
+	if [ -r $gconf ]; then
+	    echo "  updating /boot/grub/grub.conf"
+	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $gconf || {
+		echo "Failed to update /boot/boot/grub/grub.conf"
+	    }
+	fi
+
+	#
 	# If using lilo, update lilo.conf and set indicator to tell Emulab
 	# to rerun lilo.
 	#
