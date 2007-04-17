@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,7 +15,8 @@ $ns rtproto Static
 #
 # If set to 1, doesn't allocate any real Plab nodes (or fake ones either).
 # Attributes for the elab-* machines are taken from DB data for nodes in
-# the plabnodes list.
+# the plabnodes list. This can be used to implement the Simple-Static and
+# Simple-Dynamic modes
 #
 # This option requires that you have nodes listed in plabnodes and forces
 # use of the dbmonitor.
@@ -23,15 +24,10 @@ $ns rtproto Static
 set no_plab 0
 
 #
-# This control how many _pairs_ of PCs there are. ie. 2 gets you 2 monitors,
-# plus matching stubs
+# This control how many _pairs_ of PCs there are. ie. 2 gets you 2 monitors in
+# Emulab, plus matching agents in PlanetLab
 #
 set num_pcs 2
-
-#
-# If set to 1, we create a fake PlanetLab inside Emulab
-#
-set fake_plab 0
 
 #
 # If set to 1, we grab real PlanetLab nodes. Both this and fake_plab can be
@@ -40,24 +36,15 @@ set fake_plab 0
 set real_plab 1
 
 #
-# Run FreeBSD 6.1 on elab_ nodes.  Forces use of dbmonitor.
+# If set to 1, we create a fake PlanetLab inside Emulab, so that we can run
+# the agent in an environment we have full control over
 #
-set do_bsd 0
+set fake_plab 0
 
 #
-# If set to 1, we trace all links (real/fake plab, elab) at the delay nodes.
+# If set to 1, we do automatic tcpdumps on all nodes
 #
 set trace 1
-
-#
-# If set to 1, we trace on all end nodes instead of (or in addition to)
-# all delay nodes above.
-#
-# XXX this option won't do anything right now.  If there are delay nodes
-# involved for local LAN/clouds it is ignored, and as long as tracing is
-# enabled, plab nodes will get end_node tracing anyway.
-#
-set trace_end_nodes 0
 
 #
 # If you want to get specific real planetlab nodes, ask for them here by site
@@ -71,6 +58,9 @@ set trace_end_nodes 0
 #     may get you less-loaded nodes and is more robust to crashed nodes
 #   You can get a list of node IDs and sites at:
 #     https://www.emulab.net/nodecontrol_list.php3?showtype=widearea
+#   You can get a list of PlanetLab nodes that are known to be fairly reliable
+#     and to have data from flexmon by running the 'goodnodes.pl' script in the
+#     root directory of your Flexlab source
 #   Site names are case-sensitive!
 #
 
@@ -84,61 +74,30 @@ set plabnodes {}
 # Example node list
 #set plabnodes {plab518 plab541 plab628 plab736 plab360}
 
+#
+# This provides you with an easy way to skip certain hosts in the above lists
+# by index number
+#
 # Empty List
 set skiplist {}
 # Example list
 #set skiplist {2 7}
 
-for {set i 0} {$i < [llength $skiplist]} {incr i} {
-    set skip([lindex $skiplist $i]) 1
-}
-
 #
-# Where to grab your tarball of pelab software from. To make this tarball:
-#   Go to your testbed source tree
-#   Run 'cvs up'!!!
-#   Run 'gmake' in pelab/stub and pelab/libnetmon (on a DEVBOX node)
-#   From the root of your source tree, run:
-#       tar czvf /proj/tbres/my-pelab.tar.gz pelab
-#   Of course, don't name it 'my-plab.tar.gz'! You can put this file in
-#       a subdirectory if you want, but it must be somewhere in
-#       /proj/tbres/
-#   Put the path to your tarball in this variable
+# Where to grab your tarball of flexlab software from. See the README for
+# instructions. Then put the path to your tarball in this variable.
 #
 set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
-#set pelab_tar "/proj/tbres/mike/pelab-bin.tar.gz"
-
 
 #
-# When using a fake plab, these are the parameters for the fake Internet
-# 'cloud' connecting the plab nodes. For now, all nodes have the same
-# parameters - hopefully this will change in a later version
-#
-set cloud_delay "30ms"
-set cloud_bw "1.5Mbps"
-
-#
-# When using a fake plab, these are the parameters for the 'control'
-# delay (ie. the latency for the elab nodes to reach the plab nodes
-#
-set control_delay "0ms"
-set control_bw "100Mbps"
-
-#
-# These are the initial conditions for the 'elabc' cloud, the Emulab side of
-# a pelab experiment
-#
-set ecloud_delay "0ms"
-set ecloud_bw "100Mbps"
-
-#
-# Hardare type to use for PCs inside of emulab
+# Hardare type to use for PCs inside of emulab - you can set to some other
+# value, like "pc3000", to get specific types of PCs
 #
 set hwtype "pc"
 
 #
 # Server and client to use for automated testing. If set, will automatically
-# be started by the 'start-experiment' script
+# be started on all elab nodes by the 'start-experiment' script
 #
 if {$do_bsd} {
     set sstr "/usr/local/etc/emulab/emulab-iperf -s "
@@ -158,19 +117,29 @@ set clientprog $cstr
 set allnodesprog "/bin/true"
 
 #
-# If non-zero, uses the new stub (magent) instead of the old one
-# If set to 1, uses the new stub as a receiver
-# If set to 2, uses a separate iperfd to receive traffic
+# Run FreeBSD 6.1 on elab_ nodes.  Forces use of dbmonitor.
 #
-set use_magent 1
+set do_bsd 0
 
 #
-# If non-zero, uses the DB-based "monitor" to control the cloud shaping
+# If non-zero, uses the DB-based "monitor" to control the cloud shaping. This
+# implements the Simple-Static and Simple-Dynamic network models (If this is
+# not set, you get the regular monitor and agent, which implement ACIM)
 #
 set use_dbmonitor 0
 if {$do_bsd} {
     set use_dbmonitor 1
 }
+
+#
+# Use this to set a unique port so that you don't collide with others on the
+# same node. Only supported when use_magent is set
+#
+set stub_port 3149
+
+######
+# Options for the dbmonitor (simple models)
+######
 
 #
 # If dbmonitor is set, these are the intervals at which the latency and BW
@@ -185,19 +154,78 @@ set dbmonitor_bwinterval 0
 set opt(DBMONITOR_LATINTERVAL) $dbmonitor_latinterval
 set opt(DBMONITOR_BWINTERVAL) $dbmonitor_bwinterval
 
+######
+# Options for Fake PlanetLab
+######
+
+#
+# When using a fake plab, these are the parameters for the fake Internet
+# 'cloud' connecting the plab nodes. For now, all nodes have the same
+# parameters - hopefully this will change in a later version
+#
+set cloud_delay "30ms"
+set cloud_bw "1.5Mbps"
+
+#
+# When using a fake plab, these are the parameters for the 'control'
+# delay (ie. the latency for the elab nodes to reach the plab nodes
+#
+set control_delay "0ms"
+set control_bw "100Mbps"
+
+######
+# Deprecated / Unsupported / Internal Options
+######
+
+#
+# If set to 1, we trace on all end nodes instead of (or in addition to)
+# all delay nodes above.
+#
+# XXX this option won't do anything right now.  If there are delay nodes
+# involved for local LAN/clouds it is ignored, and as long as tracing is
+# enabled, plab nodes will get end_node tracing anyway.
+#
+set trace_end_nodes 0
+
+#
+# These are the initial conditions for the 'elabc' cloud, the Emulab side of
+# a pelab experiment
+#
+set ecloud_delay "0ms"
+set ecloud_bw "100Mbps"
+
 #
 # If non-zero, limits the number of slots in the queues for the fake PlanetLab
 #
 set limit_fake_queue_slots 0
 
-#
-# Use this to set a unique port so that you don't collide with others on the
-# same node. Only supported when use_magent is set
-#
-set stub_port 3149
-
 # XXX for internal use only
 set no_stub 0
+
+#
+# If non-zero, uses the new stub (magent) instead of the old one
+# If set to 1, uses the new stub as a receiver
+# If set to 2, uses a separate iperfd to receive traffic
+#
+set use_magent 2
+
+# End of user-settable options
+##########
+
+set pid ${GLOBALS::pid}
+set eid ${GLOBALS::eid}
+
+set delay_os FBSD54-DNODE
+
+if {$do_bsd} {
+    set node_os FBSD61-STD
+} else {
+    # XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
+    set node_os PLAB-DEVBOX-UPDATE
+    #set node_os PLAB-DEVBOX
+}
+
+tb-set-delay-os $delay_os
 
 #
 # Enforce no_plab requirements
@@ -219,23 +247,12 @@ if {$use_dbmonitor} {
     set no_stub 1
 }
 
-# End of user-settable options
-##########
-
-set pid ${GLOBALS::pid}
-set eid ${GLOBALS::eid}
-
-set delay_os FBSD54-DNODE
-
-if {$do_bsd} {
-    set node_os FBSD61-STD
-} else {
-    # XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
-    set node_os PLAB-DEVBOX-UPDATE
-    #set node_os PLAB-DEVBOX
+#
+# Set up skiplist
+#
+for {set i 0} {$i < [llength $skiplist]} {incr i} {
+    set skip([lindex $skiplist $i]) 1
 }
-
-tb-set-delay-os $delay_os
 
 set stub_peer_port $stub_port
 set stub_command_port [expr $stub_port + 1]
