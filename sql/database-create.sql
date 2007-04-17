@@ -2180,6 +2180,23 @@ CREATE TABLE `plab_mapping` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `plab_nodehist`
+--
+
+DROP TABLE IF EXISTS `plab_nodehist`;
+CREATE TABLE `plab_nodehist` (
+  `idx` mediumint(10) unsigned NOT NULL auto_increment,
+  `node_id` varchar(32) NOT NULL,
+  `phys_node_id` varchar(32) NOT NULL,
+  `timestamp` datetime NOT NULL,
+  `component` varchar(64) NOT NULL,
+  `operation` varchar(64) NOT NULL,
+  `status` enum('success','failure','unknown') NOT NULL default 'unknown',
+  `msg` text,
+  PRIMARY KEY  (`idx`,`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `plab_site_mapping`
 --
 

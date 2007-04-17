@@ -3943,3 +3943,20 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table project add 
            `allow_workbench` tinyint(1) NOT NULL default '0'
 	    after cvsrepo_public;
+
+4.116: Add custom history table for planetlab nodes.
+
+       DROP TABLE IF EXISTS `plab_nodehist`;
+       CREATE TABLE `plab_nodehist` (
+           `idx` mediumint(10) unsigned NOT NULL auto_increment,
+	   `node_id` varchar(32) NOT NULL,
+	   `phys_node_id` varchar(32) NOT NULL,
+	   `timestamp` datetime NOT NULL,
+	   `component` varchar(64) NOT NULL,
+	   `operation` varchar(64) NOT NULL,
+	   `status` enum('success','failure','unknown') NOT NULL default 'unknown',
+	   `msg` text,
+	   PRIMARY KEY  (`idx`,`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+
