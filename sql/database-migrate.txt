@@ -3940,6 +3940,6 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.115: Add a workbench flag to the project table.
 
-       alter table project_stats add 
+       alter table project add 
            `allow_workbench` tinyint(1) NOT NULL default '0'
 	    after cvsrepo_public;
