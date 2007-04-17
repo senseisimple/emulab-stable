@@ -38,7 +38,7 @@ my $windowHrsDef = 6;
 $| = 1;
 
 sub usage {
-        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type]".
+        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type] ".
             "[-0 starttime] [-1 endtime] <numNodes>\n";
         return 1;
 }
