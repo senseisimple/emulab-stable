@@ -6,7 +6,7 @@
 # Standalone makefile for building Flexlab binaries
 #
 
-SUBDIRS = libnetmon magent
+SUBDIRS = libnetmon magent iperfd
 
 all:   all-subdirs
 clean: clean-subdirs
