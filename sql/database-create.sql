@@ -3226,6 +3226,7 @@ CREATE TABLE `virt_nodes` (
   `fixed` text NOT NULL,
   `inner_elab_role` enum('boss','boss+router','router','ops','ops+fs','fs','node') default NULL,
   `plab_role` enum('plc','node','none') NOT NULL default 'none',
+  `plab_plcnet` varchar(32) NOT NULL default 'none',
   `numeric_id` int(11) default NULL,
   PRIMARY KEY  (`exptidx`,`vname`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`),
