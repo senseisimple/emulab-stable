@@ -2368,6 +2368,7 @@ CREATE TABLE `projects` (
   `default_user_interface` enum('emulab','plab') NOT NULL default 'emulab',
   `linked_to_us` tinyint(4) NOT NULL default '0',
   `cvsrepo_public` tinyint(1) NOT NULL default '0',
+  `allow_workbench` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`pid_idx`),
   UNIQUE KEY `pid` (`pid`),
   KEY `unix_gid` (`unix_gid`),

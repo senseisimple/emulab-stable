@@ -226,10 +226,12 @@ function LoginStatus() {
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,l.adminon,webonly, " .
 		     "       user_interface,n.type,u.stud,u.wikiname, ".
-		     "       u.wikionly,g.pid,u.foreign_admin,u.uid_idx " .
+		     "       u.wikionly,g.pid,u.foreign_admin,u.uid_idx, " .
+		     "       p.allow_workbench ".
 		     " from users as u ".
 		     "left join login as l on l.uid_idx=u.uid_idx ".
 		     "left join group_membership as g on g.uid_idx=u.uid_idx ".
+		     "left join projects as p on p.pid_idx=g.pid_idx ".
 		     "left join nodetypeXpid_permissions as n on g.pid=n.pid ".
 		     "where u.uid_idx='$safe_idx' and ".
 		     (isset($curhash) ?
@@ -246,8 +248,9 @@ function LoginStatus() {
     # Scan the rows. All the info is duplicate, except for the trust
     # values and the pid. pid is a hack.
     #
-    $trusted = 0;
-    $opsguy  = 0;
+    $trusted   = 0;
+    $opsguy    = 0;
+    $workbench = 0;
     
     while ($row = mysql_fetch_array($query_result)) {
 	$expired = $row[0];
@@ -279,6 +282,7 @@ function LoginStatus() {
 	# Set foreign_admin=1 for admins of another Emulab.
 	$foreign_admin   = $row[15];
 	$uid_idx         = $row[16];
+	$workbench      += $row[17];
 
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
@@ -430,7 +434,9 @@ function LoginStatus() {
     # XXX Temporary.
     if ($stud) {
 	$EXPOSEARCHIVE = 1;
-	$EXPOSETEMPLATES = 1;
+    }
+    if ($workbench) {
+	$EXPOSETEMPLATES = $EXPOSEARCHIVE = 1;
     }
     return $CHECKLOGIN_STATUS;
 }

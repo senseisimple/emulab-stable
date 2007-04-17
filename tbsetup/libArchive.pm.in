@@ -19,6 +19,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use Project;
 use English;
 use File::stat;
 use File::Basename;
@@ -30,8 +31,7 @@ my $TB		= "@prefix@";
 my $MAINSITE    = @TBMAINSITE@;
 my $ARCHSUPPORT = @ARCHIVESUPPORT@;
 my $USEARCHIVE  = ($MAINSITE || $ARCHSUPPORT);
-my %ALLOWEDPID  = ("testbed" => 1, "compadres" => 1, "tbres" => 1,
-		   "fightfire" => 1, NetX => 1);
+my %ALLOWEDPID  = ("testbed" => 1);
 # XXX
 my $ARCHIVEDIR  = "/usr/testbed/exparchive";
 my $TESTMODE    = @TESTMODE@;
@@ -79,8 +79,13 @@ sub doarchiving($)
 {
     my ($pid) = @_;
     
+    my $project = Project->Lookup($pid);
+    return 0
+	if (!defined($project));
+    
     return 1
-	if ($USEARCHIVE && exists($ALLOWEDPID{$pid}));
+	if ($USEARCHIVE &&
+	    (exists($ALLOWEDPID{$pid}) || $project->allow_workbench()));
     
     return 0;
 }
@@ -2199,7 +2204,7 @@ sub TBCheckoutExperimentArchivebyExptIDX($$;$$)
     my ($archive_idx,$pid) = $query_result->fetchrow_array();
 
     return 0
-	if (! exists($ALLOWEDPID{$pid}));
+	if (! doarchiving($pid));
 
     # Need to deal with no archive yet!
     return 1

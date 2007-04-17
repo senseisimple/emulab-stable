@@ -144,6 +144,7 @@ class Project
 	                     { return $this->field("default_user_interface"); }
     function linked_to_us()  { return $this->field("linked_to_us"); }
     function cvsrepo_public(){ return $this->field("cvsrepo_public"); }
+    function allow_workbench(){ return $this->field("allow_workbench"); }
 
     function unix_gid() {
 	$group = $this->DefaultGroup();
@@ -575,6 +576,15 @@ class Project
 
 	return 0;
     }
+    function SetAllowWorkbench($onoff) {
+	$idx    = $this->pid_idx();
+	$onofff = ($onoff ? 1 : 0);
+
+	DBQueryFatal("update projects set allow_workbench='$onoff' ".
+		     "where pid_idx='$idx'");
+
+	return 0;
+    }
 
     function Show() {
 	global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR, $TBCVSREPO_DIR;
@@ -603,6 +613,7 @@ class Project
 	$expt_last		= $this->expt_last();
 	$wikiname		= $group->wikiname();
 	$cvsrepo_public		= $this->cvsrepo_public();
+	$allow_workbench	= $this->allow_workbench();
 
 	if (! ($head_user = User::Lookup($proj_head_idx))) {
 	    TBERROR("Could not lookup object for user $proj_head_idx", 1);
@@ -742,7 +753,7 @@ class Project
 
 	# Fine-grained Datapository access: show node_ids over all sub-groups.
 	# Should probably do likewise in individual sub-group pages.
-	# "dp_projects" node_attributes are lists of group gid_idx's.
+	# "dp_projects" node_attributes are lists of group gid_idxs.
         $query_result =
 	    DBQueryFatal("select distinct g.gid_idx, a.node_id ".
 			 "  from groups as g, node_attributes as a ".
@@ -783,6 +794,17 @@ class Project
                   <td>Approved?: </td>
                   <td class=\"left\">$approved</td>
 	      </tr>\n";
+
+	if (ISADMIN()) {
+	    $YesNo = YesNo($allow_workbench);
+	    $flip  = ($allow_workbench ? 0 : 1);
+	    
+	    echo "<tr>
+                      <td>Allow Workbench:</td>
+                      <td><a href=toggle.php?pid=$pid&type=workbench".
+		          "&value=$flip>$YesNo</a> (Click to toggle)</td>
+                  </tr>\n";
+	}
 
 	echo "<tr>
                   <td colspan='2'>Why?:</td>

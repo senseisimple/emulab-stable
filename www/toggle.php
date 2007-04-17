@@ -23,22 +23,26 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 # List of valid toggles
-$toggles = array("adminon", "webfreeze", "cvsweb", "lockdown",
-		 "cvsrepo_public");
+$toggles = array("adminon", "webfreeze", "cvsweb", "lockdown", "stud",
+		 "cvsrepo_public", "workbench");
 
 # list of valid values for each toggle
 $values  = array("adminon"        => array(0,1),
 		 "webfreeze"      => array(0,1),
 		 "cvsweb"         => array(0,1),
+		 "stud"           => array(0,1),
 		 "lockdown"       => array(0,1),
-		 "cvsrepo_public" => array(0,1));
+		 "cvsrepo_public" => array(0,1),
+		 "workbench"      => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
 $optargs = array("adminon"        => array(),
 		 "webfreeze"      => array("user" => 1),
 		 "cvsweb"         => array("user" => 1),
+		 "stud"           => array("user" => 1),
 		 "lockdown"       => array("pid" => 1, "eid" => 1),
-		 "cvsrepo_public" => array("pid" => 1));
+		 "cvsrepo_public" => array("pid" => 1),
+		 "workbench"      => array("pid" => 1));
 
 # Mandatory page arguments.
 $reqargs = RequiredPageArguments("type",  PAGEARG_STRING,
@@ -101,6 +105,17 @@ elseif ($type == "cvsweb") {
     $zapurl = CreateURL("showuser", $target_user);
     $target_user->SetCVSWeb($value);
 }
+elseif ($type == "stud") {
+    # must be admin
+    if (! $isadmin) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    if (! ($target_user = User::Lookup($user))) {
+	PAGEARGERROR("Target user '$user' is not a valid user!");
+    }
+    $zapurl = CreateURL("showuser", $target_user);
+    $target_user->SetStudly($value);
+}
 elseif ($type == "lockdown") {
     # must be admin
     if (! $isadmin) {
@@ -128,6 +143,21 @@ elseif ($type == "cvsrepo_public") {
     $zapurl = CreateURL("showproject", $project);
     $project->SetCVSRepoPublic($value);
     SUEXEC($uid, $pid, "webcvsrepo_ctrl $pid", SUEXEC_ACTION_DIE);
+}
+elseif ($type == "workbench") {
+    # Must validate the pid since we allow non-admins to do this.
+    if (! TBvalid_pid($pid)) {
+	PAGEARGERROR("Invalid characters in $pid");
+    }
+    if (! ($project = Project::Lookup($pid))) {
+	PAGEARGERROR("Project $pid is not a valid project!");
+    }
+    # Must be admin
+    if (!$isadmin) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    $zapurl = CreateURL("showproject", $project);
+    $project->SetAllowWorkbench($value);
 }
 else {
     USERERROR("Nobody has permission to toggle $type!", 1);

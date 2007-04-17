@@ -120,6 +120,7 @@ sub expt_last($)        { return field($_[0], "expt_last"); }
 sub approved($)         { return field($_[0], "approved"); }
 sub wikiname($)         { return field($_[0], "wikiname"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
+sub allow_workbench($)  { return field($_[0], "allow_workbench"); }
 
 # These come from the group not the project.
 sub unix_gid($)         { return $_[0]->{'GROUP'}->unix_gid(); }
