@@ -273,7 +273,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave _NEW here about 2 weeks
-        WRITESIDEBARBUTTON_NEW("Papers and Talks (Mar 9)", $TBDOCBASE, "pubs.php3");
+        WRITESIDEBARBUTTON("Papers and Talks (Mar 9)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software (Jul 18)",
 			       $TBDOCBASE, "software.php3");
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
