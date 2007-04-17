@@ -2237,6 +2237,7 @@ CREATE TABLE `plab_slices` (
   `exptidx` int(11) NOT NULL default '0',
   `slicename` varchar(64) NOT NULL default '',
   `slicemeta` text,
+  `slicemeta_legacy` text,
   `leaseend` datetime default NULL,
   `admin` tinyint(1) default '0',
   PRIMARY KEY  (`exptidx`),
