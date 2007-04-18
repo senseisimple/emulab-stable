@@ -23,6 +23,13 @@ if (!$isadmin && !STUDLY()) {
     USERERROR("You are not allowed to view this page!", 1);
 }
 
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("showby", PAGEARG_STRING,
+				 "sortby", PAGEARG_STRING,
+				 "range",  PAGEARG_STRING);
+
 # Page args,
 if (! isset($showby)) {
     $showby = "users";
