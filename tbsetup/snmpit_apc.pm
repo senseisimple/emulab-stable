@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -121,15 +121,16 @@ sub status {
     # come first, we use them.  We grab the number of phases supported,
     # then use that as a limit on how many status load values we retrieve.
     #
-    # The OID to retrieve the phases is:  ".1.3.6.1.4.1.318.1.1.12.2.1.2";
-    # the load status table OID is:  ".1.3.6.1.4.1.318.1.1.12.2.3.1.1.2".
+    # The OID to retrieve the phases is: ".1.3.6.1.4.1.318.1.1.12.1.9";
+    # the load status table OID is:      ".1.3.6.1.4.1.318.1.1.12.2.3.1.1.2".
     #
     my $phases;
 
-    $phases = $self->{SESS}->get([["rPDULoadDevNumPhases",0]]);
+    $phases = $self->{SESS}->get([["rPDUIdentDeviceNumPhases",0]]);
     if (!$phases) {
 	# not all models support this MIB
-	print STDERR "Query phase: No answer from device\n" if $self->{DEBUG};
+	print STDERR "Query phase: IdentDeviceNumPhases failed\n"
+	    if $self->{DEBUG};
 	return 0;
     }
 
