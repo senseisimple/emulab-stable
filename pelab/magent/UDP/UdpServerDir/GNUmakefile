@@ -5,7 +5,7 @@
 #
 
 EXECUTABLE=UdpServer
-
+all: ${EXECUTABLE}
 
 ${EXECUTABLE}: UdpServer.cc UdpServer.h
 	g++ -o $@ UdpServer.cc -lpcap
