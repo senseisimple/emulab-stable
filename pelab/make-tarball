@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 
-files="pelab/auto-pelab.ns pelab/common-env.sh pelab/init-elabnodes.pl pelab/dbmonitor pelab/libnetmon pelab/magent pelab/monitor pelab/pelabdb.pwd pelab/stub pelab/iperfd pelab/bin"
+files="pelab/auto-pelab.ns pelab/common-env.sh pelab/init-elabnodes.pl pelab/dbmonitor pelab/libnetmon pelab/magent pelab/monitor pelab/pelabdb.pwd pelab/stub pelab/iperfd"
 
 if [ $# != 1 ]; then
     echo "usage: $0 tarball-path"
@@ -22,6 +22,11 @@ fi
 echo "##### cleaning up a little"
 rm -f magent/*.o stub/*.o UDP/UdpServerDir/*.o
 strip magent/magent stub/stubd libnetmon/netmonup magent/UDP/UdpServerDir/UdpServer
+
+# XXX: This is a terrible hack for images that don't have the tbevent python
+# module installed
+echo "##### grabbing tbevent library"
+cp ../event/lib/tbevent.py monitor/
 
 echo "##### creating tarball $path from .."
 tar czf $path -C .. $files
