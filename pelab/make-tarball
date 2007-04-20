@@ -23,10 +23,5 @@ echo "##### cleaning up a little"
 rm -f magent/*.o stub/*.o UDP/UdpServerDir/*.o
 strip magent/magent stub/stubd libnetmon/netmonup magent/UDP/UdpServerDir/UdpServer
 
-# XXX: This is a terrible hack for images that don't have the tbevent python
-# module installed
-echo "##### grabbing tbevent library"
-cp ../event/lib/tbevent.py monitor/
-
 echo "##### creating tarball $path from .."
 tar czf $path -C .. $files
