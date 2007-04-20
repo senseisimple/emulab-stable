@@ -29,7 +29,7 @@ use lib '/usr/testbed/lib';
 use libtbdb;
 use libwanetmondb;
 
-my $allnodeFile = "/proj/tbres/plab-reliable-list";
+my $allnodeFile = "/share/planetlab/reliable_nodes";
 my $NLIST = "/usr/testbed/bin/node_list";
 my $pprefix = "plab";
 my $windowHrsDef = 6;
@@ -38,19 +38,21 @@ my $windowHrsDef = 6;
 $| = 1;
 
 sub usage {
-        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type] ".
+        print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type] [-v] ".
             "[-0 starttime] [-1 endtime] <numNodes>\n";
         return 1;
 }
 my ($pid, $eid);
 my $blacklistfilename;
 my $type = "";
+my $verbose = 0;
 my ($t0, $t1);
 my %opt = ();
-getopts("0:1:e:f:t:", \%opt);
+getopts("0:1:e:f:t:v", \%opt);
 if ($opt{e}) { ($pid,$eid) = split('/', $opt{e}); }
 if ($opt{f}) { $blacklistfilename = $opt{f}; }
 if ($opt{t}) { $type = $opt{t}; }
+if ($opt{v}) { $verbose = 1; }
 if ($opt{0}) { $t0 = $opt{0}; } else { $t0 = time()-$windowHrsDef*60*60; }
 if ($opt{1}) { $t1 = $opt{1}; }
 elsif($opt{0}) { $t1 = $t0+$windowHrsDef*60*60; }
@@ -79,6 +81,9 @@ foreach my $nodeinfo (@allnodesinfo){
     #print "$fields[0]\n";
 }
 close FILE;
+if ($verbose) {
+    print "Read " . scalar(@allnodes) . " nodes from reliable nodes file\n";
+}
 
 #
 # get list of blacklisted nodes
@@ -167,6 +172,9 @@ for( $allnodesIndex=0; $allnodesIndex < scalar(@allnodes); $allnodesIndex++ ){
     }
 }
 
+if ($verbose) {
+    print "Starting main loop\n";
+}
 #
 #
 # MAIN LOOP
@@ -175,7 +183,9 @@ for( $allnodesIndex=0; $allnodesIndex < scalar(@allnodes); $allnodesIndex++ ){
 my ($lowestRatedSite, $lowestRating) = ();
 do{    
     ($lowestRatedSite, $lowestRating) = fullyConnTest();
-#    print "lowestRatedSite=$lowestRatedSite, lowestRating=$lowestRating\n";
+    if ($verbose) {
+        print "lowestRatedSite=$lowestRatedSite, lowestRating=$lowestRating\n";
+    }
     if( !isFullyConn($lowestRating) ){
         #modify set
         # delete worst node
@@ -384,7 +394,9 @@ sub checkConn($$){
                      "dstsite_idx=$srcsite)) ".
                      "limit 1";
     my @results = getRows($qstr);
-#    print "getRows (latency) finished for query\n$qstr\n";
+    if ($verbose) {
+        print "getRows (latency) finished for query\n$qstr\n";
+    }
     if( !scalar(@results) ){
     }else{
         $latConn = 1;
@@ -416,6 +428,9 @@ sub checkConn($$){
     if( !scalar(@results) ){
     }else{
         $bwConnB = 1;
+    }
+    if ($verbose) {
+        print "getRows (bandwidth) finished for query\n$qstr\n";
     }
 #    print "($latConn, $bwConnF, $bwConnB)\n";
     return ($latConn, $bwConnF, $bwConnB);
