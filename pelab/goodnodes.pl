@@ -243,7 +243,9 @@ sub fullyConnTest{
     %connRating = ();
  
     my @sites = keys %chosenBySite;
-#    print "nodes=@nodes\n";
+    if ($verbose) {
+        print "sites=@sites\n";
+    }
 
     for( my $i=0; $i<scalar(@sites)-1; $i++ ){
         my $srcsite = $sites[$i];
@@ -253,7 +255,9 @@ sub fullyConnTest{
 
             if( !defined($connMatrix{$srcsite}{$dstsite}) ){ 
                 my ($latConn,$bwConnF,$bwConnB)=checkConn($srcsite,$dstsite);
-#                print "$srcsite => $dstsite, ($latConn,$bwConnF,$bwConnB)\n";
+                if ($verbose) {
+                    print "$srcsite => $dstsite, ($latConn,$bwConnF,$bwConnB)\n";
+                }
 
                 $connMatrix{$srcsite}{$dstsite} = $latConn + $bwConnF;
                 $connMatrix{$dstsite}{$srcsite} = $latConn + $bwConnB;
@@ -315,7 +319,7 @@ sub addNew($){
     #** check if this node satisfies the constraints **
 
     my $qstr = "select latency from pair_data ".
-                     "force index (unixstamp) ".
+                     #"force index (unixstamp) ".
                      "where latency is not NULL and ".
                      "dstsite_idx=$siteidx and ".
                      "unixstamp > $t0 and ".
@@ -384,7 +388,7 @@ sub checkConn($$){
     my $bwTestStr = "> 0";
     
     my $qstr = "select * from pair_data ".
-                     "force index (unixstamp) ".
+                     #"force index (unixstamp) ".
                      "where (latency $latTestStr  and ".
                      "unixstamp > $t0 and ".
                      "unixstamp < $t1) and ".
@@ -403,7 +407,7 @@ sub checkConn($$){
     }
     
     $qstr = "select * from pair_data ".
-        "force index (unixstamp) ".
+        #"force index (unixstamp) ".
             "where bw $bwTestStr and ".
             "unixstamp > $t0 and ".
             "unixstamp < $t1 and ".
@@ -417,7 +421,7 @@ sub checkConn($$){
     }
 
     $qstr = "select * from pair_data ".
-        "force index (unixstamp) ".
+        #"force index (unixstamp) ".
             "where bw $bwTestStr and ".
             "unixstamp > $t0 and ".
             "unixstamp < $t1 and ".
