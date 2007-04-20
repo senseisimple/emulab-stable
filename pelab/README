@@ -51,7 +51,7 @@ What is not supported:
 Running an experiment with the auto-pelab scripts:
 
 Note: Depending in how you got the source, it will either be in a directory
-called 'flexlab' made by untarring the tarball, or in the 'pelab' subdirectory
+called 'pelab' made by untarring the tarball, or in the 'pelab' subdirectory
 of the testbed CVS repository.
 
 1) Build the flexlab software:
