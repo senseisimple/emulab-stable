@@ -3961,7 +3961,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.117: Add a field to specify to which network a private PLC is connected.
 
-       alter table nodes add 
+       alter table virt_nodes add 
            `plab_plcnet` varchar(32) NOT NULL default 'none'
 	   after plab_role;
 
