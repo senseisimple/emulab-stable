@@ -1196,6 +1196,20 @@ sub doVlansFromTables($@) {
     }
     my ($stack) = @$stacks;
 
+    my @trunkedPorts = getExperimentTrunks($pid,$eid);
+    $equaltrunking = 1;
+    foreach my $port (@trunkedPorts) {
+	$errors += doTrunkEnable($stacks,$port);
+    }
+    $equaltrunking = $oEopt;
+
+    #
+    # Hand over to outer boss.
+    # 
+    if ($ELABINELAB) {
+	return RemoteDoVlansFromTables(@vlans);
+    }
+
     #
     # Sanity check: make sure that this experiment does not use more VLANs than
     # we can put on the stack. Note that we don't try to check how many are
@@ -1219,20 +1233,6 @@ sub doVlansFromTables($@) {
         tberror "Too many VLANs in experiment: $expt_vlan_count requested, " .
                 "$vlan_count available";
         return 1;
-    }
-
-    my @trunkedPorts = getExperimentTrunks($pid,$eid);
-    $equaltrunking = 1;
-    foreach my $port (@trunkedPorts) {
-	$errors += doTrunkEnable($stacks,$port);
-    }
-    $equaltrunking = $oEopt;
-
-    #
-    # Hand over to outer boss.
-    # 
-    if ($ELABINELAB) {
-	return RemoteDoVlansFromTables(@vlans);
     }
 
     foreach my $vlan (@vlans) {
