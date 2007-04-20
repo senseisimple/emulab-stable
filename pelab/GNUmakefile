@@ -17,3 +17,17 @@ clean: clean-subdirs
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
+#
+# Rules for making a distribution
+#
+
+# Files and directories to exclude
+DISTFILE=flexlab-dist.tar.gz
+EXCLUDES=CVS stub *.tar.gz supafly $(DISTFILE) *.core .\#* bgmon *.bak \
+	 db doc schedmon iplane parastream .??*
+	 
+EXCLUDE_TARSTR=$(foreach pat,$(EXCLUDES),--exclude '$(pat)')
+
+dist:
+	$(MAKE) clean
+	gtar czvf $(DISTFILE) $^ $(EXCLUDE_TARSTR) -C ../ pelab/
