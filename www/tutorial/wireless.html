@@ -8,12 +8,23 @@
 </center>
 
 Some Emulab nodes contain 802.11 a/b/g wifi interfaces (Atheros 5212 chipset),
-and are scattered around at various locations. To find out where they
+and are scattered around at various locations in a large building.  To find out where they
 are located and what their node IDs are, see the <a
 href=https://www.emulab.net/floormap.php3>wireless floormaps</a> page.
 When you click on one of the colored dots, you will be taken to a page
 describing the node and what type of interfaces the node has installed
 in it.
+<br>
+<br>
+In addition to the nodes deployed throughout the building, we've also
+concentrated a subset of them in our machine room.  36 of the pc600s now have
+802.11 a/b/g interfaces, also with the Atheros 5212 chipset.  Each has an
+external antenna deployed on the backs of the racks containing the pc600s.  To
+find out which nodes are where, look at <a
+href="https://www.emulab.net/floormap.php3?building=MEB-MRC600">the floormaps
+for this sub-cluster</a>.  For connectivity, antenna positions, and related
+information, see the <a href="#envinfo">Environmental Information</a>
+subsection of this document.
 
 <br>
 <br>
@@ -95,11 +106,11 @@ following small example:
 	tb-set-lan-setting $lan0 "channel" 2
 	tb-set-node-lan-setting $lan0 $nodew1 "txpower" "auto"
 
-	# Currently you must use Redhat 9.0 on wireless nodes.
+	# Currently you must use Fedora Core 4 or Redhat 9.0 on wireless nodes.
 	# Let the other node default to RHL-STD (currently 7.3).
-	tb-set-node-os $nodew1 RHL90-WIRELESS
-	tb-set-node-os $nodew2 RHL90-WIRELESS
-	tb-set-node-os $nodew3 RHL90-WIRELESS
+	tb-set-node-os $nodew1 FC4-WIRELESS
+	tb-set-node-os $nodew2 FC4-WIRELESS
+	tb-set-node-os $nodew3 FC4-WIRELESS
 
 	# Turn on static routing.
 	$ns rtproto Static
@@ -123,11 +134,10 @@ A few points should be noted:
      as long as the nodes have enough wired interfaces. If you try to
      create an experiment that uses more links (wired or wireless) on a
      node than are available in Emulab, the experiment will fail to map.
-     Of the current 28 wifi nodes, the 18 pc3000w wifi nodes 
-     (pcwf1-18) contain two wifi cards and one wired experimental interface, 
-     the four pc600 nodes (pc2,9,31,40) contain one wifi card and four 
-     experimental interfaces, and the four pc2Uwifi (pc180,182,183,184) 
-     nodes have one wifi card and no wired experimental interfaces.
+     Of the current 54 wifi nodes, the 18 pc3000w wifi nodes 
+     (pcwf1-18) contain two wifi cards and one wired experimental interface 
+     and the 36 pc600 (all pc600s except pc8,pc11,pc30,pc38) nodes contain one wifi card and four 
+     experimental interfaces.
 
 <li> In the example above, we let Emulab decide what wireless nodes to
      use for the lan. This is not an ideal approach, as Emulab does
@@ -138,15 +148,15 @@ A few points should be noted:
      problem.
 
 <li> You must specify which node is to act as the <em>access point</em> for
-     the lan.  Rather then using dedicated access points, Emulab's
+     the lan.  Rather than using dedicated access points, Emulab's
      implementation of wireless lans uses the interface's capability to
      become an access point for a lan. The node that is chosen to be the
      access point should obviously be within range of all of the nodes in
      the lan. There is currently no automated mechanism to pick the access
      point for you, but one is planned for the future.
-     We also plan to support <em>ad-hoc</em> mode;
-     unfortunately the proprietary layer under the Linux driver for our
-     Atheros cards does not currently support it.
+     <em>ad-hoc</em> mode is available in recent madwifi driver versions,
+     including those installed on the <tt>FC4-WIRELESS</tt> image.  However, we
+     haven't yet integrated it as an option for NS files.
 
 <li> Wireless lans allow a number of configuration parameters to be
      specified, either for the lan as a whole, or for individual members of
@@ -158,12 +168,18 @@ A few points should be noted:
      transmit power for <tt>nodew1</tt> to auto; all other nodes will
      default to an interface specific setting.
 
-<li> You must use Redhat 9.0 to take advantage of wireless interfaces. Be
-     sure to set the OSID for all of your wireless nodes to
-     <tt>RHL90-WIRELESS</tt>.
+<li> You must use Fedora Core 4 or RedHat 9.0 to take advantage of wireless
+     interfaces. Be sure to set the OSID for all of your wireless nodes to
+     <tt>FC4-WIRELESS</tt> or <tt>RHL90-WIRELESS</tt>.  <tt>FC4-WIRELESS</tt>
+     contains a 2.6.x kernel and very recent madwifi drivers; 
+     <tt>RHL90-WIRELESS</tt> is contains a 2.4.x kernel and is outdated.
 
-<li> The wifi nodes contain Netgear WAG311 cards, which use the
-     Atheros 5212 802.11a/b/g chipset.  This chipset is quite flexible
+<li> The pc3000w wifi nodes contain <a
+     href="http://netgear.com/products/details/WAG311.php">Netgear WAG311
+     cards</a>, which use the Atheros 5212 802.11a/b/g chipset; 
+     the pc600 nodes contain <a
+     href="http://www.dlink.com/products/?sec=0&pid=306">D-Link DWL-AG530</a>,
+     which also use the Atheros 5212 chipset.  This chipset is quite flexible
      since most of the 802.11 MAC layer is handled in software. Emulab
      provides the standard madwifi Atheros driver by default, but
      there are alternatives such as the madwifi stripped driver from
@@ -172,6 +188,9 @@ A few points should be noted:
      <br>
      <a href="http://netgear.com/products/details/WAG311.php">
      Netgear WAG311 product info</a>
+     <br>
+     <a href="http://www.dlink.com/products/?sec=0&pid=306">
+     D-Link DWL-AG530</a>
      <br>
      <a href="http://madwifi.sourceforge.net">Madwifi Atheros driver</a>
      <br>
@@ -183,7 +202,7 @@ A few points should be noted:
 
 Numerous interface settings are possible using <tt>tb-set-lan-setting</tt>
 and <tt>tb-set-node-lan-setting</tt>. These mostly correspond to options
-that are available using the <tt>iwconfig</tt> command on Redhat 9.0. Not
+that are available using the <tt>iwconfig</tt> command on Fedora Core 4 or Redhat 9.0. Not
 all options are accepted by all cards, and the format of the value you
 provide for the option must be acceptable to iwconfig. At some point in the
 future we hope to make this more explicit so that know exactly what options
@@ -318,3 +337,120 @@ choose which nodes you want, and then in your NS file:
 
 Keep in mind that the physical nodes you choose must be free when you
 swap in your experiment!
+
+<br>
+<br>
+
+<a NAME="envinfo"></a>
+<font size=+1>
+Environment Information</font>
+<br>
+<br>
+
+Due to the dense nature of the pc600 mini-cluster, we describe some of its
+properties and deployment characteristics in detail in this section.  You can
+view a map of the deployment 
+<a href="https://www.emulab.net/floormap.php3?building=MEB-MRC600">here</a>.
+
+<br>
+<br>
+The external antennas for each wireless interface in the pc600s are deployed in
+a 6 x 6 grid on the back side of the racks housing the pc600s and pc850s.  Each
+antenna is currently pointed straight down towards the floor.  The
+grid is 300cm x 224cm.  All nodes in the grid are easily able to communicate
+with each another; the interesting nature of this grid becomes more evident
+when many nodes attempt to send packets at the same time.  Because the nodes
+are deployed in our machine room, the environment is hostile, with many other
+racks, machines, conduits, and other items, conspiring to provide various types
+of signal interference.
+
+<br>
+<br>
+To give you an idea of what you might expect when many nodes in proximity are
+sending packets at the same time, we ran some simple tests.  In this
+experiment, all nodes are placed in ad-hoc mode in a single LAN, and send
+packets all at once to the broadcast address in their subnet.  Each node sends
+1000 1024-byte packets at a rate of 10pps.  We then do this iteratively over
+all channels in each of a, b, and g modes.  The results are presented in terms
+of the percentage of broadcast packets received at each node.  The Aggregate
+Statistics table simply aggregates all statistics gathered from each 802.11
+mode across all receivers.
+
+<br>
+<br>
+<center>
+<table>
+  <tr>
+    <td colspan="6"><center>Aggregate Statistics</center></td>
+  </tr>
+  <tr>
+    <td>Mode</td>
+    <td>min</td>
+    <td>mean</td>
+    <td>max</td>
+    <td>stddev</td>
+    <td>var</td>
+  </tr>
+
+  <tr>
+    <td>802.11 a</td>
+    <td>0.10</td>
+    <td>65.21</td>
+    <td>99.40</td>
+    <td>15.69</td>
+    <td>246.27</td>
+  </tr>
+  <tr>
+    <td>802.11 b</td>
+    <td>2.10</td>
+    <td>25.19</td>
+    <td>91.10</td>
+    <td>15.01</td>
+    <td>225.25</td>
+  </tr>
+  <tr>
+    <td>802.11 g</td>
+    <td>0.30</td>
+    <td>26.04</td>
+    <td>83.10</td>
+    <td>15.84</td>
+    <td>250.99</td>
+  </tr>
+</table>
+</center>
+
+<!--
+  <tr>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+  </tr>
+-->
+
