@@ -699,7 +699,8 @@ sub DumpDBGoo()
 		    "select t.* from group_membership as gm ".
 		    "left join users as u on u.uid_idx=gm.uid_idx ".
 		    "left join $table as t on t.uid_idx=u.uid_idx ".
-		    "where gm.pid='$pid' and gm.gid=gm.pid ".
+		    "where (gm.pid='$pid' or ".
+		    "       gm.pid='" . TBOPSPID() . "') and gm.gid=gm.pid ".
 		    " and t.uid_idx is not NULL and ".
 		    " u.status='" . USERSTATUS_ACTIVE() . "'")
 	    or die("*** $0:\n".
@@ -713,6 +714,10 @@ sub DumpDBGoo()
 			 "where uid='$creator'");
 	}
 
+	# Clean up ... these are created in the inner elab.
+	DBQueryFatal("delete from temp_${table} ".
+		     "where uid='elabman' or uid='elabckup'");
+
 	DBQueryWarn("select * from temp_$table ".
 		    "into outfile '$statedir/$table'")
 	    or die("*** $0:\n".
@@ -724,7 +729,8 @@ sub DumpDBGoo()
 		"left join users as u on u.uid_idx=gm.uid_idx ".
 		"where (gm.pid='$pid' or ".
 		"       gm.pid='" . TBOPSPID() . "') and ".
-		" u.status='" . USERSTATUS_ACTIVE() . "' ".
+		" u.status='" . USERSTATUS_ACTIVE() . "' and ".
+		" gm.uid!='elabman' and gm.uid!='elabckup' ".
 		"into outfile '$statedir/group_membership'")
 	or die("*** $0:\n".
 	       "    Could not dump table group_membership\n");
