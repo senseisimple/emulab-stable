@@ -38,6 +38,7 @@ THISHOMEBASE=Emulab.Net
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 WINSUPPORT=1
+ELVIN_COMPAT=1
 
 #
 # This next group will not work outside of Utah (yet).
