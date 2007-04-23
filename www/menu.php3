@@ -870,7 +870,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 
     if ($login_user) {
 	echo "<div class=pagenotworking>Page not working properly? ";
-	echo "<a href=pagenotworking.php>Click here</a></div>";
+	echo "<a href=pagenotworking.php target=_blank>Click here</a></div>";
     }
 
     echo "<div class='cbody'>\n";
