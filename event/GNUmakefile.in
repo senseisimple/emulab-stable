@@ -36,7 +36,7 @@ etc-subdir:
 
 install: 
 	@$(MAKE) -C lib install
-	@$(MAKE) -C sched install
+#	@$(MAKE) -C sched install
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install

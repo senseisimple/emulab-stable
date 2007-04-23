@@ -128,7 +128,9 @@ _tbevent.so:	event.o event_wrap_py.o util.o
 
 LIB_STUFF       = event.pm event.so tbevent.py _tbevent.so
 
-install: $(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
+install: $(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+
+install-old: $(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
 	$(addprefix $(INSTALL_DIR)/opsdir/lib/, $(LIB_STUFF))
 
 control-install:	$(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
