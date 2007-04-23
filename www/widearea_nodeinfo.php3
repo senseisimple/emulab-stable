@@ -308,6 +308,7 @@ function makeURL($text,$formfields,$node_id,$sortby) {
     return "<a href=\"widearea_nodeinfo.php3?$args\">$text</a>";
 }
 
+$err = false;
 if (!isset($formfields)) {
     $formfields = array();
     
@@ -326,40 +327,50 @@ if (!isset($formfields)) {
 else {
     if ($formfields["node_id"] &&
 	!TBvalid_node_id($formfields["node_id"])) {
+	$err = true;
 	USERERROR("Invalid characters in node_id");
     }
     if ($formfields["dst_node_id"] &&
 	!TBvalid_node_id($formfields["dst_node_id"])) {
+	$err = true;
 	USERERROR("Invalid characters in dst_node_id");
     }
     if ($formfields["min_bw"] &&
 	!TBvalid_integer($formfields["min_bw"])) {
+	$err = true;
 	USERERROR("Invalid characters in min_bw");
     }
     if ($formfields["max_bw"] &&
 	!TBvalid_integer($formfields["max_bw"])) {
+	$err = true;
 	USERERROR("Invalid characters in max_bw");
     }
     if ($formfields["min_latency"] &&
 	!TBvalid_integer($formfields["min_latency"])) {
+	$err = true;
 	USERERROR("Invalid characters in min_latency");
     }
     if ($formfields["max_latency"] &&
 	!TBvalid_integer($formfields["max_latency"])) {
+	$err = true;
 	USERERROR("Invalid characters in max_latency");
     }
     if ($formfields["min_plr"] &&
 	!TBvalid_float($formfields["min_plr"])) {
+	$err = true;
 	USERERROR("Invalid characters in min_plr");
     }
     if ($formfields["max_plr"] &&
 	!TBvalid_float($formfields["max_plr"])) {
+	$err = true;
 	USERERROR("Invalid characters in max_plr");
     }
     
     SPITFORM($formfields);
-    SPITDATA("widearea_recent", "Most Recent Data", $formfields);
-    SPITDATA("widearea_delays", "Aged Data", $formfields);
+    if (! $err) {
+	SPITDATA("widearea_recent", "Most Recent Data", $formfields);
+	SPITDATA("widearea_delays", "Aged Data", $formfields);
+    }
 }
 
 #
