@@ -1,12 +1,11 @@
-#
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004,2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 ######################################################################
 ##### Some notes on the design and operation of snmpit 
-##### Robert Ricci <ricci@cs.utah.edu>
+##### Robert Ricci <ricci@cs.utah.edu>, Keith Sklower <sklower@cs.Berkeley.EDU>
 ######################################################################
 
 #####
@@ -27,22 +26,33 @@ The latter two wrap SNMP commands, retry in case of timeout, and send mail to
 the site's testbed-ops list if they fail. The first simply warns the user and
 continues execution, whereas the Fatal() version exit()s.
 
-snmpit_cisco_stack.pm - Contains the knowledge required to handle a collection
-of Cisco switches which share a common set of VLANs. Does not actually do any
+snmpit_stack.pm - Contains the knowledge required to handle a collection
+of switches which share a common set of VLANs. Does not actually do any
 SNMP itself, but has the knowledge of how to deal with multiple switches. For
-example, it knows that (in some configurations) one switch acts as a 'VLAN (or
-VTP) server', and in order to create a VLAN, you just have to talk to it. But,
+example, it knows that (in some configurations) one switch acts as a 'VLAN
+server', and in order to create a VLAN, you just have to talk to it. But,
 to get a list of ports in VLANs, you have to talk to all of the switches. Also
 has the job of aggregating information from switches - ie. doing a listVlans()
 on the stack does a listVlans() on all individual switches and then collates
 the results.  snmpit itself calls into the stack module, which creates a
-snmpit_cisco module for each switch, and calls into that to do the actual
+snmpit_<switchtype> module for each switch, and calls into that to do the actual
 work.
+
+snmpit_cisco_stack.pm - Contains the knowledge required to handle a collection
+of Cisco switches which share a common set of VLANs.  There are optimization
+that could be done for collections in which all the switches are cisco switches,
+but currently both emulab and DETER using snmpit_stack.pm instead.
 
 snmpit_cisco.pm - Contains the actual SNMP commands to deal with Cisco
 switches, and deals with error checking, retries, etc. Writing versions of
 this for other switches will be the hardest part of porting snmpit, because it
 has a lot of knowledge about the quirkiness of Cisco's SNMP implementation.
+
+snmpit_nortel.pm - Contains the specific SNMP for Nortel 55[123]0 class
+switches, and deals with error checking, retries, etc.
+
+snmpit_foundry.pm - Contains the specific SNMP for Foundry 9604 and 1500 class
+switches, and deals with error checking, retries, etc.
 
 snmpit_intel_stack.pm - Similar to snmpit_cisco_stack.pm . We haven't used it
 in quite some time, so it's quite possibly bitrotted.
@@ -88,29 +98,146 @@ choose to exploit this bit of API design is up to you.
 snmpit has a concept of stacks of switches. These are a set of switches on
 which we can create a VLAN that spans potentially all switches. Thus, they are
 connected by trunk links. Right now, snmpit does not support creating a VLAN
-across multiple stacks (that would go against the definition of a stack), and
-it does not support stacks that contain more than one type of switch. This
-latter is something we will probably have to address soon - probably by
-creating another level in the object hierarchy, above snmpit_cisco_stack which
-calls into the stack modules for the various devices and has the glue to
-create trunks between them.
+across multiple stacks (that would go against the definition of a stack), but
+it does not stacks that contain more than one type of switch.
 
 Probably, all of your experimental-net switches will be in a single stack.
 
-Stacks are, by convention, named after their leader. In a Cisco stack, the
-leader is the one you talk to in order to create VLANs, etc.
+Stacks are, by convention, sometimes named after their leader.  In a Cisco
+stack, the leader is the one you talk to in order to create VLANs, etc,
+via VTP; however in a generic stack, the two are usual named "Control"
+and "Experiment", where the "Control" stack is used for setting up
+firewall vlans and the "Experiment" stack is used for normal links
+and lans described in .ns files.
 
 #####
 ##### New switch backends
 #####
 
 Essentially, what you need to do to port snmpit to a new switch vendor is make
-a new module that exports the same API as snmpit_cisco_stack.pm . It's up to
-you whether you want to do this in two levels as I have with the Cisco support
-or not, but I strongly recommend doing it this way. You could start out with a
-stack module that's just wrappers into the backend module. Or you could start
-with snmpit_cisco_stack.pm, and tweak it only where needed to conform to the
-needs of your switches.
+a new module that exports the same API as snmpit_stack, which expects
+the following object methods:
+
+$device->new(($classname,$devicename,$debuglevel,$community)
+	returns a new object, blessed into the snmpit_<switch> class.
+
+$device->vlanNumberExists($self, $vlan_number)
+	returns 1 if the 802.1Q VLAN tag exists on the switch, 0 otherwise
+
+$device->findVlans($self, @vlan_ids)
+	returns a hash mapping VLAN ids to 802.1Q VLAN numbers
+	any VLANs not found have NULL VLAN numbers
+	If no VLAN id is given, returns mappings for the entire switch.
+
+$device->findVlan($self, $vlan_id, $no_retry)
+	returns the VLAN number for the given vlan_id if it exists
+	returns undef if the VLAN id is not found
+	Retries several times unless the $no_retry option is given.
+
+(could be written in terms of $device->findVlans, but in the interest
+of efficiency, some switches might do this in a single snmp request
+instead of walking a table).
+
+$device->listVlans($self)
+	returns a list of VLAN information
+	Each entry is an array reference. The array is in the form
+	[id, 802.1Q tag, members] where id is the human readable
+	VLAN identifier (as stored in the database), and members is
+	a reference to an array of ports that are VLAN members.
+
+$device->listPorts($self)
+	returns: A list of port information. Each entry is an array reference.
+	The array is in the form [id, enabled, link, speed, duplex] where:
+	    id is the port identifier (in node:port form)
+	    enabled is "yes" if the port is enabled, "no" otherwise
+	    link is "up" if the port has carrier, "down" otherwise
+	    speed is in the form "XMbps"
+	    duplex is "full" or "half"
+
+$device->getStats($self)
+         this function is largely device independent, but uses snmp
+	 to retrieve a list of standard SNMP quantities from the
+	 non-proprietary interface MIB, (octets in, out, unicast packets
+	 in, out, etc.)  It is put in the snmpit_device() file since
+	 there might be a device depending mapping between modport
+	 and ifIndex, and it does use snmp.
+
+	 The value is not really documented, but only is relevant
+	 if you change portstats.in or snmpit.in.
+
+$device->createVlan($self, $vlan_id, $vlan_number)
+	Create a VLAN on this switch, with the identifier and 802.1Q tag
+	returns the new VLAN number on success, 0 on failure.
+
+(in the case of the Foundry switch, you cannot create a vlan with no
+elements, so the module cashes the information, fibs about having does
+it, and looks it up when ports are to be added).
+
+$device->setPortVlan($self, $vlan_number, @ports)
+	 Put the given ports in the given VLAN, given 802.1Q tag number
+	 returns 0 on success, or the number of failed ports on failure.
+
+There is side-channel return that would have been better to have as
+ref argument but was not done in the name of backwards compatiblility;
+the act of putting a port in one VLAN may remove it from another
+and when this happens you want to invalidate the forwarding caches
+on the switches which are frequently triples of (mac, last seen port, vlan).
+
+A list of vlans which are thus affected is put in $device->{DISPLACED_VLANS}
+during the course of that call.
+
+$device->enablePortTrunking2($self, $port, $vlan_number, $equaltrunking)
+#        modport: module.port of the trunk to operate on
+#        nativevlan: VLAN number of the native VLAN for this trunk
+#        equaltrunk: don't do dual mode; tag PVID also.
+#        Returns 1 on success, 0 otherwise
+
+
+$device->removePortsFromVlan($self, @target_vlans_by_tag)
+	 remove all ports from the list of VLANs, given 802.1Q tag number
+	 returns 0 on success, or the number of failed ports on failure.
+
+$device->removeVlan($self, @target_vlans_by_tag)
+	 remove each of the list of VLANs, given 802.1Q tag number
+	 returns 0 on success, or the number of failed ports on failure.
+
+(some switches require a separate action to remove the vlan after the ports
+are emptied out of it).
+
+$device->clearAllVlansOnTrunk($self, $modport)
+#        modport: module.port of the trunk to operate on
+#        Returns 1 on success, 0 otherwise (must be done before taking a
+#	 port out of trunking mode.
+
+(usually internal).
+
+$device->disablePortTrunking($self, $modport)
+	returns 1 on success, 0 on failure.
+
+$device->getChannelIfIndex($self, @ports)
+	this is used in the function immediately below; an interswitch
+	trunk maybe connected by several physical wires constituting
+	a logical trunk.  It is necessary on cisco's (and possibly
+	others) to return a special cookie for trunk operations.
+	this function only deals with one trunk at a time.
+
+$device->setVlansOnTrunk($self, $trunkIndex, $value, @vlan_number)
+#        $trunkIndex: cookie returned above for the trunk on which to operate.
+#        $value: 0 to disallow the VLAN on the trunk, 1 to allow it
+#        #vlan_numbers: An array of 802.1Q VLAN numbers to operate on
+#        Returns 1 on success, 0 otherwise
+#
+
+$device->resetVlanIfOnTrunk($self, $modport, $vlan_number)
+#        modport: module.port of the trunk to operate on
+#        vlan_number: A 802.1Q VLAN tag number to check
+#        return value currently ignored.  Takes vlan out of the trunk and puts
+#	 it back in to flush the FDB.
+
+
+$device->convertPortFormat($self, $output format, @ports)
+	returns a list of ports in the specified output format
+	from $PORT_FORMAT_{IFINDEX,MODPORT,NODEPORT}
 
 Looking at snmpit_cisco.pm to figure out the basics of switch configuration
 with SNMP is not a bad idea, but keep in mind that there are several things
@@ -133,10 +260,6 @@ that _might_ be supported in your switch.
 
 You can also look at snmpit_intel.pm for examples if you wish, but keep in
 mind it's not actively maintained.
-
-We don't, at the time being, ever automatically manipulate the control net.
-So, you don't need to worry about having snmpit support for the switch(es) on
-your control net.
 
 #####
 ##### VLAN IDs and VLAN numbers
@@ -251,7 +374,7 @@ some of them may be supported on your switch.
 ##### switchmac
 #####
 
-wwitchmac is a script, used at installation time, to print out all the MAC
+switchmac is a script, used at installation time, to print out all the MAC
 adresses a switch has learned, and what ports they're on. The idea is to
 eliminate the need for the testbed administrators to manually enter which nodes
 are connected to which ports on which switches.
