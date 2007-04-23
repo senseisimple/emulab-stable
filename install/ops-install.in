@@ -46,7 +46,6 @@ my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
 my $LIBDIR      = "$PREFIX/lib";
 my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
-my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 #
 # Fixed paths for clients
@@ -947,15 +946,6 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server: $!");
 	}
     };
-    if ($ELVIN_COMPAT) {
-	Phase "elvin-gateway", "Installing elvin gateway startup file", sub {
-	    DoneIfExists("$RCDIR/3.elvin_gateway.sh");
-	    PhaseFail("Pubsub system or elvin_gateway is not installed")
-		if (! -e "$RCDIR/3.elvin_gateway");
-	    ExecQuietFatal("mv $RCDIR/3.elvin_gateway ".
-			   "  $RCDIR/3.elvin_gateway.sh");
-	};
-    }
     
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
         Phase "elvind.sh", "Removing port version of elvind.sh", sub {
