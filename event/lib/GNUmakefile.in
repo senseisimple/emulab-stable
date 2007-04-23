@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,11 +11,20 @@ SUBDIR		= event/lib
 
 include $(OBJDIR)/Makeconf
 
+PUBSUBFLAGS     = -I/usr/local/include
+PUBSUBMTFLAGS   = -I/usr/local/include
+PUBSUBLIB       = /usr/local/lib/libpubsub.so
+
+ifeq ($(ELVIN_COMPAT),1)
+PUBSUBFLAGS    += -DELVIN_COMPAT
+PUBSUBMTFLAGS  += -DELVIN_COMPAT
+endif
+
 SYSTEM	       := $(shell uname -s)
 LIBS		= libevent.a
 SWIGLIBS        =
 # Re-entrant, multi-threaded version on FreeBSD, not on Linux or Windows clients.
-ifeq ($(SYSTEM),FreeBSD)
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 LIBS           += libevent_r.a
 SWIGLIBS       += event.so _tbevent.so
 endif
@@ -30,11 +39,10 @@ PERLVERS	:= $(shell $(SRCDIR)/perlvers.pl)
 
 #CFLAGS += -DDEBUG
 CFLAGS += -O2 -g -static -I. -Wall
-SCFLAGS = $(CFLAGS) `$(ELVIN_CONFIG) --cflags vin4c`
-TCFLAGS = $(CFLAGS) `$(ELVIN_CONFIG) --cflags vin4mt`
+SCFLAGS = $(CFLAGS) $(PUBSUBFLAGS)
+TCFLAGS = $(CFLAGS) $(PUBSUBMTFLAGS)
 # Special CFLAGS w/o warnings, for SWIG-generated code
-CFLAGS_NOWARN += -O2 -g -static -I.
-CFLAGS_NOWARN += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS_NOWARN += -O2 -g -static -I. $(PUBSUBFLAGS)
 ifeq ($(SYSTEM),Linux)
 PCORE  = -I/usr/lib/perl5/5.6.1/i386-linux/CORE
 PCORE  += -I/usr/lib/perl5/5.8.3/i386-linux-thread-multi/CORE
@@ -113,10 +121,10 @@ event_wrap_py.o: $(SRCDIR)/event_wrap_py.c event.h
 	$(CC) -c $(CFLAGS_NOWARN) $(PYCORE) $<
 
 event.so:	event.o event_wrap.o util.o
-	ld -shared $^ `$(ELVIN_CONFIG) --libs vin4c` -lcrypto -o event.so
+	ld -shared $^ $(PUBSUBLIB) -lcrypto -o event.so
 
 _tbevent.so:	event.o event_wrap_py.o util.o
-	ld -shared $^ `$(ELVIN_CONFIG) --libs vin4c` -lcrypto -o $@
+	ld -shared $^ $(PUBSUBLIB) -lcrypto -o $@
 
 LIB_STUFF       = event.pm event.so tbevent.py _tbevent.so
 

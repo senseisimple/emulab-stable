@@ -10,9 +10,9 @@ OBJDIR		= ../..
 SUBDIR		= event/proxy
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest evproxyplab elvindtest
+PROGRAMS	= evproxy proxytest elvindtest
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += evproxyclient evproxyserver
+PROGRAMS       += 
 endif
 
 include $(OBJDIR)/Makeconf
@@ -42,17 +42,17 @@ $(LIBEVENTDIR)/%.a:
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O2 -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 
 PFLAGS    = -pthread
 PFLAGS   += -DDEBUG
 PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-PFLAGS   += `$(ELVIN_CONFIG) --cflags vin4mt`
+PFLAGS   += -L/usr/local/lib -lpubsub_r -lm
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
-LIBS     += -levent -ltb -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+LIBS     += -levent_r -ltb -lcrypto
+LIBS     += -L/usr/local/lib -lpubsub_r -lm
 CPPC     = g++
 
 ifeq ($(host_cpu),arm)
@@ -79,7 +79,7 @@ PLIBS     = -levent_r -ltb
 PLIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lcrypto -lm
 
 evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ evproxy.o $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ -pthread evproxy.o $(LIBS)
 
 evproxyclient-debug:	proxyclient.o $(LIBTBDIR)/log.o
 	$(CC) $(LDFLAGS) -o $@ proxyclient.o $(LIBS)
@@ -91,7 +91,7 @@ proxyserver.o:  proxyserver.c
 	$(CC) $(PFLAGS) -c $<
 
 proxytest-debug:	proxytest.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ proxytest.o $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ proxytest.o -pthread $(LIBS)
 
 evproxyplab.o: evproxyplab.cc
 	$(CPPC) $(CFLAGS)  -c $<
@@ -100,7 +100,7 @@ evproxyplab:    evproxyplab.o ../lib/libevent.a ../lib/event.h
 	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
 elvindtest-debug: elvindtest.o
-	$(CC) $(LDFLAGS) -o $@ elvindtest.o $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ elvindtest.o -pthread $(LIBS)
 
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h

@@ -192,7 +192,7 @@ my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
     "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log",
-    "$LOGDIR/plabrenew.log", "$LOGDIR/sslxmlrpc.log", "LOGDIR/pubsubd.log");
+    "$LOGDIR/plabrenew.log", "$LOGDIR/sslxmlrpc.log", "$LOGDIR/pubsubd.log");
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
     "CISCO-PRIVATE-VLAN-MIB", "CISCO-STACK-MIB", "CISCO-VLAN-MEMBERSHIP-MIB",
@@ -433,6 +433,14 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
 		    if ($pname);
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $TFTPD_PKG");
+	    };
+	    # XXX Also temporary
+	    Phase "pubsub", "Installing pubsub package", sub {
+		if (!ExecQuiet("$PKG_INFO -x pubsub")) {
+		    PhaseSkip("pubsub already installed");
+		}
+		my $pname = GetPackage("pubsub", $packagedir);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
 	}
     };
@@ -1112,20 +1120,25 @@ if ($MAILMANSUPPORT) {
     };
 }
 
-Phase "event", "Setting up event system", sub {
-    Phase "elvinconf", "Installing elvind config file", sub {
-	DoneIfIdentical($ELVIND_CONF,$BOSS_ELVIND_CONF);
-	ExecQuietFatal("$CP $BOSS_ELVIND_CONF $ELVIND_CONF");
-    };
+Phase "pubsub", "Setting up pubsub system", sub {
+    # Ug, kill off the sync server in elabinelab.
+    if ($ELABINELAB) {	
+	Phase "syncd", "Stopping syncd", sub {
+	    if (ExecQuiet("killall -s emulab-syncd")) {
+		PhaseSkip("syncd not running");
+	    }
+	    ExecQuietFatal("killall emulab-syncd");
+	};
+    }
     # For elabinelab, be sure to kill off running event system. Harmless.
-    Phase "stopping", "Stopping event system", sub {
-	if (ExecQuiet("killall -s elvind")) {
-	    PhaseSkip("elvind not running");
+    Phase "stopping", "Stopping pubsub system", sub {
+	if (ExecQuiet("killall -s pubsubd")) {
+	    PhaseSkip("pubsubd not running");
 	}
-	ExecQuietFatal("$RCDIR/2.elvind.sh stop");
+	ExecQuietFatal("$RCDIR/2.pubsubd.sh stop");
     };
-    Phase "starting", "Starting event system", sub {
-	ExecQuietFatal("$RCDIR/2.elvind.sh start");
+    Phase "starting", "Starting pubsub system", sub {
+	ExecQuietFatal("$RCDIR/2.pubsubd.sh start");
     };
 };
 

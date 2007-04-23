@@ -186,7 +186,6 @@ sysetc-install:	dir-install
 			$(SYSETCDIR)/dhclient-enter-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/periodic.conf $(SYSETCDIR)/periodic.conf
 	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh $(RCDIR)/testbed.sh
-	$(INSTALL) -m 755 $(SRCDIR)/elvind.sh $(RCDIR)/elvind.sh
 
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare

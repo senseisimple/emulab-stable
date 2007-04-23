@@ -55,6 +55,7 @@ my $GROUPROOT   = "@GROUPSROOT_DIR@";
 my $USERROOT    = "@USERSROOT_DIR@";
 my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
 my $SHAREROOT	= "@SHAREROOT_DIR@";
+my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
@@ -220,7 +221,8 @@ my $VARRUN        = "/var/run";
 #
 my @LOCAL_HOSTS        = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
 my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
-    "/var/log/mountd.log", "LOGDIR/pubsubd.log", "LOGDIR/elvin_gateway.log");
+    "/var/log/mountd.log", "$LOGDIR/pubsubd.log", "$LOGDIR/elvin_gateway.log");
+
 my @LOCAL_MAILING_LISTS = grep(/$OURDOMAIN$/,@MAILING_LISTS);
 my @MAILING_LIST_NAMES  = map { /^([\w-]+)\@/ } @LOCAL_MAILING_LISTS;
 
@@ -341,6 +343,14 @@ Phase "ports", "Installing ports", sub {
 			       "     $PKG_ADD $PHP4_PORT");
 	    };
 	}
+	# XXX Also temporary
+	Phase "pubsub", "Installing pubsub package", sub {
+	    if (!ExecQuiet("$PKG_INFO -x pubsub")) {
+		PhaseSkip("pubsub already installed");
+	    }
+	    my $pname = GetPackage("pubsub", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
     };
     Phase "fs-packages", "Installing FS packages", sub {
 	if (!$ISFS) {
@@ -765,9 +775,9 @@ Phase "syslog", "Setting up syslog", sub {
 	print SC "!mountd\n";
 	print SC "*.*\t\t\t\t\t\t/var/log/mountd.log\n";
 	print SC "!pubsubd\n";
-	print SC "*.*\t\t\t\t\t\t/var/log/pubsubd.log\n";
+	print SC "*.*\t\t\t\t\t\t${LOGDIR}/pubsubd.log\n";
 	print SC "!elvin_gateway\n";
-	print SC "*.*\t\t\t\t\t\t/var/log/elvin_gateway.log\n";
+	print SC "*.*\t\t\t\t\t\t${LOGDIR}/elvin_gateway.log\n";
 	print SC "# " . MAGIC_TESTBED_END . "\n";
 	close SC;
     };
@@ -946,6 +956,15 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server: $!");
 	}
     };
+    if ($ELVIN_COMPAT) {
+	Phase "elvin-gateway", "Installing elvin gateway startup file", sub {
+	    DoneIfExists("$RCDIR/3.elvin_gateway.sh");
+	    PhaseFail("Pubsub system or elvin_gateway is not installed")
+		if (! -e "$RCDIR/3.elvin_gateway");
+	    ExecQuietFatal("mv $RCDIR/3.elvin_gateway ".
+			   "  $RCDIR/3.elvin_gateway.sh");
+	};
+    }
     
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
         Phase "elvind.sh", "Removing port version of elvind.sh", sub {

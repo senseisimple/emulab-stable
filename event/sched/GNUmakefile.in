@@ -20,7 +20,7 @@ CFLAGS   += -DSBINDIR='"$(INSTALL_SBINDIR)"'
 #CFLAGS  += -DDEBUG
 CFLAGS	 += -O -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4mt`
+CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -pthread
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
@@ -38,7 +38,7 @@ ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
 #     gave up quickly. Deal with it later. 
 #
 #LIBS     += `elvin-config --libs vin4mt`
-LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
+LIBS	 += -L/usr/local/lib -lpubsub_r -lssl -lcrypto -lm
 
 OBJS	  = event-sched.o 
 

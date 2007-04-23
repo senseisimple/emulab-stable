@@ -32,11 +32,11 @@ $(LIBEVENTDIR)/%.a:
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+LIBS     += -lm -L/usr/local/lib -lpubsub 
 
 ifeq ($(host_cpu),arm)
 else

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -112,10 +112,6 @@ sysetc-install:	dir-install ifcfgs
 		mv -f $(SYSETCDIR)/cron.daily/makewhatis.cron \
 				$(SYSETCDIR)/cron.pend; \
 	fi
-	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
-	-ln -sf $(RRCDIR)/init.d/elvin $(DEFRUNLVLDIR)/S96elvin
-	-ln -sf $(RRCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
-	-ln -sf $(RRCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(RCDIR)/rc.local
 	-ln -sf $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local
 

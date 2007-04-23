@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -49,7 +49,7 @@ main(int argc, char **argv)
 	MYSQL_RES		*res;	
 	MYSQL_ROW		row;
 	int			tcpsock, ch;
-	int			length, i, err = 0;
+	int			length, i;
 	struct sockaddr_in	name;
 	struct timeval		timeout;
 	struct group		*group;
@@ -134,8 +134,7 @@ main(int argc, char **argv)
 		int		   clientsock, length = sizeof(client);
 		int		   cc, port;
 		whoami_t	   whoami;
-		unsigned char	   buf[BUFSIZ], node_id[64];
-		secretkey_t        secretkey;
+		unsigned char	   node_id[64];
 		tipowner_t	   tipown;
 		void		  *reply = &tipown;
 		size_t		   reply_size = sizeof(tipown);

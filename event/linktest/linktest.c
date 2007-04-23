@@ -11,6 +11,7 @@
 #include <string.h>
 #include <errno.h>
 #include <paths.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <netinet/in.h>

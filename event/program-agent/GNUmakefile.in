@@ -28,12 +28,15 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS	 += -I/usr/local/include
+#CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c` -DHAVE_ELVIN
+CFLAGS	 += -DHAVE_PUBSUB
 CFLAGS   += -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 
 LDFLAGS  += -g -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+#LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+LIBS	 += -L/usr/local/lib -lpubsub
 
 ifeq ($(host_cpu),arm)
 else

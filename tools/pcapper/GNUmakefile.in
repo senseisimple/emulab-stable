@@ -29,8 +29,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 PTHREADCFLAGS = -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS   = -L/usr/local/lib -llthread -llgcc_r
 
-ELVINFLAGS    = `$(ELVIN_CONFIG) --cflags vin4c`
-ELVINLIBS     = `$(ELVIN_CONFIG) --libs vin4c`
+ELVINFLAGS    = -I/usr/local/include
+ELVINLIBS     = -L/usr/local/lib -lpubsub -lm
 EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib $(ELVINFLAGS)
 EVENTOBJS     = $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o
 EVENTLIBS     = $(ELVINLIBS) -lcrypto

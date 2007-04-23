@@ -1735,6 +1735,15 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
+		/^ELVIN_COMPAT$/ && do {
+		    if (-e "/usr/local/libexec/elvind") {
+			print OUTDEFS "ELVIN_COMPAT=1\n";
+		    }
+		    else {
+			print OUTDEFS "ELVIN_COMPAT=0\n";
+		    }
+		    last SWITCH;
+		};
 		
 		print OUTDEFS $line;
 	    }

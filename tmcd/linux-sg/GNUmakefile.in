@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -62,7 +62,6 @@ etc-install:	dir-install sysetc-remove sysetc-install
 sysetc-install:	dir-install
 	-mkdir -p $(SYSETCDIR)/dhcpc
 	$(INSTALL) -m 755 $(SRCDIR)/dhcpcd.exe $(SYSETCDIR)/dhcpc/dhcpcd.exe
-	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
 	$(INSTALL) -m 755 $(SRCDIR)/mountallwrapper.sh \
 		$(RCDIR)/init.d/mountallwrapper.sh

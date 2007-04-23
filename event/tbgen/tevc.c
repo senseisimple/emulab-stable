@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <string.h>
 #include <time.h>
 #include <math.h>
 #include <signal.h>

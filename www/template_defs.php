@@ -1612,6 +1612,20 @@ class TemplateInstance
     }
 
     #
+    # Check if a unique runid.
+    #
+    function UniqueRunID($runid) {
+	$exptidx = $this->exptidx();
+	$runid  = addslashes($runid);
+	
+	$query_result =
+	    DBQueryFatal("select * from experiment_runs ".
+			 "where exptidx='$exptidx' and runid='$runid'");
+
+	return (mysql_num_rows($query_result) ? 0 : 1);
+    }
+
+    #
     # Show details for an experiment run
     #
     function ShowRun($runidx) {

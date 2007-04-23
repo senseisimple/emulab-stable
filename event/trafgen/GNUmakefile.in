@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,13 +40,13 @@ CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g #-Wall
 CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
 CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 CFLAGS	 += -DUSEEVENTS
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 # Expand the elvin-config list now so it can be filtered below.
-LIBS     += $(shell $(ELVIN_CONFIG) --libs vin4c)
+LIBS     += -L/usr/local/lib -lpubsub -lm
 
 SYSTEM   := $(shell uname -s)
 

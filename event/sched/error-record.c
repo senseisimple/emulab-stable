@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <sys/param.h>
 #include <string.h>
-
+#include <limits.h>
 #include "tbdefs.h"
 #include "popenf.h"
 

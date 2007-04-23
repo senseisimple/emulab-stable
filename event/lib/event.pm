@@ -7,7 +7,7 @@ require DynaLoader;
 package eventc;
 bootstrap event;
 package event;
-@EXPORT = qw( $MAXHOSTNAMELEN event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get event_handle_keydata_set event_handle_keydata_get event_handle_keylen_set event_handle_keylen_get event_handle_do_loop_set event_handle_do_loop_get event_handle_init_set event_handle_init_get event_handle_connect_set event_handle_connect_get event_handle_disconnect_set event_handle_disconnect_get event_handle_cleanup_set event_handle_cleanup_get event_handle_mainloop_set event_handle_mainloop_get event_handle_notify_set event_handle_notify_get event_handle_subscribe_set event_handle_subscribe_get event_handle_unsubscribe_set event_handle_unsubscribe_get new_event_handle delete_event_handle event_notification_elvin_notification_set event_notification_elvin_notification_get event_notification_has_hmac_set event_notification_has_hmac_get new_event_notification delete_event_notification address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get address_tuple_timeline_set address_tuple_timeline_get new_address_tuple delete_address_tuple $ADDRESSTUPLE_ALL $OBJECTTYPE_TESTBED $OBJECTTYPE_TRAFGEN address_tuple_alloc address_tuple_free $EVENT_HOST_ANY $EVENT_NULL $EVENT_TEST $EVENT_SCHEDULE $EVENT_TRAFGEN_START $EVENT_TRAFGEN_STOP event_register event_register_withkeyfile event_register_withkeydata event_register_withkeyfile_withretry event_register_withkeydata_withretry event_unregister c_event_poll c_event_poll_blocking dont_use_this_function_because_it_does_not_work event_stop_main event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe event_subscribe_auth event_async_subscribe event_unsubscribe event_async_unsubscribe event_notification_insert_hmac event_notification_pack event_notification_unpack event_set_idle_period event_set_failover event_arg_get event_arg_dup $EA_TAG_DONE $EA_Site $EA_Experiment $EA_Group $EA_Host $EA_Type $EA_Name $EA_Event $EA_Arguments $EA_ArgInteger $EA_ArgFloat $EA_ArgString $EA_When event_notification_create_v event_notification_create event_do_v event_do xmalloc xrealloc timeval_tv_sec_set timeval_tv_sec_get timeval_tv_usec_set timeval_tv_usec_get new_timeval delete_timeval callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get new_callback_data delete_callback_data $callback_data_list allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe $event_string_buffer event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender );
+@EXPORT = qw( $MAXHOSTNAMELEN event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get event_handle_keydata_set event_handle_keydata_get event_handle_keylen_set event_handle_keylen_get event_handle_do_loop_set event_handle_do_loop_get event_handle_connect_set event_handle_connect_get event_handle_disconnect_set event_handle_disconnect_get event_handle_mainloop_set event_handle_mainloop_get event_handle_notify_set event_handle_notify_get event_handle_subscribe_set event_handle_subscribe_get event_handle_unsubscribe_set event_handle_unsubscribe_get new_event_handle delete_event_handle event_notification_pubsub_notification_set event_notification_pubsub_notification_get event_notification_has_hmac_set event_notification_has_hmac_get new_event_notification delete_event_notification address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get address_tuple_timeline_set address_tuple_timeline_get new_address_tuple delete_address_tuple $ADDRESSTUPLE_ALL $OBJECTTYPE_TESTBED $OBJECTTYPE_TRAFGEN address_tuple_alloc address_tuple_free $EVENT_HOST_ANY $EVENT_NULL $EVENT_TEST $EVENT_SCHEDULE $EVENT_TRAFGEN_START $EVENT_TRAFGEN_STOP event_register event_register_withkeyfile event_register_withkeydata event_register_withkeyfile_withretry event_register_withkeydata_withretry event_unregister c_event_poll c_event_poll_blocking dont_use_this_function_because_it_does_not_work event_stop_main event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe event_subscribe_auth event_async_subscribe event_unsubscribe event_async_unsubscribe event_notification_insert_hmac event_set_idle_period event_set_failover event_arg_get event_arg_dup $EA_TAG_DONE $EA_Site $EA_Experiment $EA_Group $EA_Host $EA_Type $EA_Name $EA_Event $EA_Arguments $EA_ArgInteger $EA_ArgFloat $EA_ArgString $EA_When event_notification_create_v event_notification_create event_do_v event_do xmalloc xrealloc make_timestamp timeval_tv_sec_set timeval_tv_sec_get timeval_tv_usec_set timeval_tv_usec_get new_timeval delete_timeval callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get new_callback_data delete_callback_data $callback_data_list allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe $event_string_buffer event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender );
 
 # ---------- BASE METHODS -------------
 
@@ -80,8 +80,6 @@ package event;
 *event_unsubscribe = *eventc::event_unsubscribe;
 *event_async_unsubscribe = *eventc::event_async_unsubscribe;
 *event_notification_insert_hmac = *eventc::event_notification_insert_hmac;
-*event_notification_pack = *eventc::event_notification_pack;
-*event_notification_unpack = *eventc::event_notification_unpack;
 *event_set_idle_period = *eventc::event_set_idle_period;
 *event_set_failover = *eventc::event_set_failover;
 *event_arg_get = *eventc::event_arg_get;
@@ -92,6 +90,7 @@ package event;
 *event_do = *eventc::event_do;
 *xmalloc = *eventc::xmalloc;
 *xrealloc = *eventc::xrealloc;
+*make_timestamp = *eventc::make_timestamp;
 *allocate_callback_data = *eventc::allocate_callback_data;
 *free_callback_data = *eventc::free_callback_data;
 *dequeue_callback_data = *eventc::dequeue_callback_data;
@@ -128,14 +127,10 @@ use vars qw(@ISA %OWNER %ITERATORS %BLESSEDMEMBERS);
 *swig_keylen_set = *eventc::event_handle_keylen_set;
 *swig_do_loop_get = *eventc::event_handle_do_loop_get;
 *swig_do_loop_set = *eventc::event_handle_do_loop_set;
-*swig_init_get = *eventc::event_handle_init_get;
-*swig_init_set = *eventc::event_handle_init_set;
 *swig_connect_get = *eventc::event_handle_connect_get;
 *swig_connect_set = *eventc::event_handle_connect_set;
 *swig_disconnect_get = *eventc::event_handle_disconnect_get;
 *swig_disconnect_set = *eventc::event_handle_disconnect_set;
-*swig_cleanup_get = *eventc::event_handle_cleanup_get;
-*swig_cleanup_set = *eventc::event_handle_cleanup_set;
 *swig_mainloop_get = *eventc::event_handle_mainloop_get;
 *swig_mainloop_set = *eventc::event_handle_mainloop_set;
 *swig_notify_get = *eventc::event_handle_notify_get;
@@ -181,8 +176,8 @@ use vars qw(@ISA %OWNER %ITERATORS %BLESSEDMEMBERS);
 @ISA = qw( event );
 %OWNER = ();
 %ITERATORS = ();
-*swig_elvin_notification_get = *eventc::event_notification_elvin_notification_get;
-*swig_elvin_notification_set = *eventc::event_notification_elvin_notification_set;
+*swig_pubsub_notification_get = *eventc::event_notification_pubsub_notification_get;
+*swig_pubsub_notification_set = *eventc::event_notification_pubsub_notification_set;
 *swig_has_hmac_get = *eventc::event_notification_has_hmac_get;
 *swig_has_hmac_set = *eventc::event_notification_has_hmac_set;
 sub new {
@@ -388,6 +383,11 @@ bless $callback_data_list, event::callback_data;
 1;
 #
 # CODE PAST THIS POINT WAS NOT AUTOMATICALLY GENERATED BY SWIG
+#
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
 #
 # For now, this has to get cat'ed onto the end of event.pm, since it
 # doesn't seem possible to get SWIG to just pass it through into the

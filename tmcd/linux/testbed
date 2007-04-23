@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -36,16 +36,34 @@ case "$1" in
 	;;
   stop)
   	rm /var/lock/subsys/testbed
-	echo "Shutting down testbed daemons ..."
+	echo "Shutting down testbed daemons (some may fail)..."
+	echo -n "  trafgen: "
 	killproc trafgen
+	echo
+	echo -n "  program-agent: "
 	killproc program-agent
+	echo
+	echo -n "  slothd: "
 	killproc slothd
+	echo
+	echo -n "  healthd: "
 	killproc healthd
+	echo
+	echo -n "  watchdog: "
 	killproc watchdog
+	echo
+	echo -n "  evproxy: "
 	killproc evproxy
+	echo
+	echo -n "  linktest: "
 	killproc linktest
+	echo
+	echo -n "  emulab-syncd: "
 	killproc emulab-syncd
+	echo
+	echo -n "  tippty: "
 	killproc tippty
+	echo
         if [ ! -f /var/lock/subsys/tbprepare ]; then
 	    echo "Informing the testbed we're rebooting ..."
 	    $BINDIR/tmcc state SHUTDOWN

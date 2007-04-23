@@ -21,9 +21,9 @@ CFLAGS+= -Wall -g -I${OBJDIR} -I/usr/local/include \
 		-I$(TESTBED_SRCDIR)/event/lib \
 		-DCLIENT_BINDIR='"$(CLIENT_BINDIR)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED) \
-		`elvin-config --cflags vin4c`
+		-I/usr/local/include
 LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql -L${OBJDIR}/event/lib -static
-LIBS+= -ltb -levent -lcrypto `elvin-config --libs vin4c`
+LIBS+= -ltb -levent -lcrypto -L/usr/local/lib -lpubsub -lm
 CP= cp -pf
 
 SYSTEM  := $(shell uname -s)
