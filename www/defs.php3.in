@@ -201,7 +201,7 @@ function TBERROR ($message, $death, $xmp = 0) {
 #
 # General user errors should print something warm and fuzzy
 #
-function USERERROR($message, $death) {
+function USERERROR($message, $death = 1) {
     global $TBMAILADDR;
     global $session_interactive, $session_errorhandler;
 
