@@ -12,9 +12,9 @@ INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','vnodehost','/kernel.jai
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','linkdelay','/kernel.linkdelay');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','5.4','delay','/boot/kernel.delay/kernel');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','5.4','linkdelay','/boot/kernel.linkdelay/kernel');
+INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.2','delay','/boot/kernel.poll/kernel HZ=10000');
+INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.2','linkdelay','/boot/kernel/kernel HZ=1000');
 INSERT IGNORE INTO os_boot_cmd VALUES ('Linux','9.0','linkdelay','linkdelay');
-INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.0','delay','/boot/kernel.delay/kernel');
-INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.0','linkdelay','/boot/kernel.linkdelay/kernel');
 
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('cur_log_seq', 1);
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('next_osid', 10000);
