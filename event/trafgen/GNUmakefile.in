@@ -82,14 +82,17 @@ NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 ifeq ($(NEEDKERB),0)
  CFLAGS  += `/usr/kerberos/bin/krb5-config --cflags`
  LIBS    += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+ LIBS    += -lkrb5support
 endif
+endif
+LIBS	 += -ldl -lz
 endif
 endif
 
 ifeq ($(SYSTEM),Linux)
 CFLAGS	 += -DLINUX
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
-LIBS	 += -ldl
 endif
 
 LEX	 = flex -l
