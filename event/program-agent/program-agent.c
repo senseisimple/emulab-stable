@@ -1478,7 +1478,7 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 	if (pinfo->pid != 0) {
 		warning("start_program: %s is still running: %d\n",
 			pinfo->name, pinfo->pid);
-		return 0;
+		return -1;
 	}
 
 	set_program(pinfo, args);
