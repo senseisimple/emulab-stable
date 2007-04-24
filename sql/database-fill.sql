@@ -827,6 +827,7 @@ REPLACE INTO table_regex VALUES ('virt_node_motelog','vname','text','redirect','
 REPLACE INTO table_regex VALUES ('virt_node_motelog','logfileid','text','regex','^[-\\w\\.+]+$',2,45,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_motelog','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_motelog','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO `table_regex` VALUES ('virt_nodes','plab_plcnet','text','regex','^[\\w\\_\\d]+$',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
