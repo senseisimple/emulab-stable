@@ -606,7 +606,7 @@ sub Trunk()
 	#
 	# Okay, ask snmpit to trunk these vlans. 
 	#
-	my $command = "$TB/bin/snmpit $mode $port @outer_ids > /dev/null";
+	my $command = "$TB/bin/snmpit -S Experiment $mode $port @outer_ids > /dev/null";
 	if ($debug) { print STDERR "Running $command\n"; }
 	system($command);
 	if ($?) {
