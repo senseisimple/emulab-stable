@@ -33,7 +33,7 @@ class Image
 	$types = array();
 	
 	$query_result = 
-	    DBQueryFatal("select type from osidtoimageid ".
+	    DBQueryFatal("select distinct type from osidtoimageid ".
 			 "where imageid='$safe_id'");
 	
 	while ($row = mysql_fetch_array($query_result)) {
@@ -97,7 +97,7 @@ class Image
 	$types = array();
 	
 	$query_result = 
-	    DBQueryFatal("select type from osidtoimageid ".
+	    DBQueryFatal("select distinct type from osidtoimageid ".
 			 "where imageid='$imageid'");
 	
 	while ($row = mysql_fetch_array($query_result)) {
