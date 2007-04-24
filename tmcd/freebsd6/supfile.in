@@ -1,4 +1,4 @@
 #
 # Bump as needed.
 #
-FBSD61-STD base=@CLIENT_VARDIR@ prefix=/ preserve release=20060606
+FBSD62-STD base=@CLIENT_VARDIR@ prefix=/ preserve release=20070419
