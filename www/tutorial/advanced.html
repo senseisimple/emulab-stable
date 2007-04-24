@@ -519,6 +519,21 @@ tracing programs on the fly, pausing them, restarting them, and
 killing them.
 <br><br>
 
+Here is an example of the output from interactive 'Link Tracing/Monitoring':
+	<code><pre>
+	1177100936.506386 (icmp:0,0 tcp:0,0 udp:0,0 other:0,0) (icmp:0,0 tcp:0,0 udp:0,0 other:0,0) (dropped:0) </code></pre>
+
+The first thing on each line is a timestamp, in typically unix format
+(seconds since the epoch). Each set of measurements in parentheses contains
+counts for one of the interfaces on the node to which you're connected.
+When you first connect, it prints a single line containing the
+number of interfaces for the node, and then one line explaining which
+link each interface belongs to. The first set of measurements on the
+line corresponds to the first interface reported, and so on. 'icmp:A,B'
+means that, since the last message, there were A bytes of ICMP traffic
+sent in B packets.
+<br><br>
+
 In addition to capturing just the packet headers, you may also capture
 the entire packet:
 	<code><pre>
