@@ -716,7 +716,8 @@ sub DumpDBGoo()
 
 	# Clean up ... these are created in the inner elab.
 	DBQueryFatal("delete from temp_${table} ".
-		     "where uid='elabman' or uid='elabckup'");
+		     "where uid='elabman' or uid='elabckup' or ".
+		     "      uid='operator'");
 
 	DBQueryWarn("select * from temp_$table ".
 		    "into outfile '$statedir/$table'")
@@ -730,7 +731,8 @@ sub DumpDBGoo()
 		"where (gm.pid='$pid' or ".
 		"       gm.pid='" . TBOPSPID() . "') and ".
 		" u.status='" . USERSTATUS_ACTIVE() . "' and ".
-		" gm.uid!='elabman' and gm.uid!='elabckup' ".
+		" gm.uid!='elabman' and gm.uid!='elabckup' and ".
+		" gm.uid!='operator' ".
 		"into outfile '$statedir/group_membership'")
 	or die("*** $0:\n".
 	       "    Could not dump table group_membership\n");
