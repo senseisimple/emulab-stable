@@ -1615,7 +1615,7 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 	    ((strcmp(objtype, TBDB_OBJECTTYPE_SEQUENCE) == 0) ||
 	     (strcmp(objtype, TBDB_OBJECTTYPE_GROUP) == 0)) &&
 	    !handled) {
-		send_report(primary_simulator_agent, "");
+		send_error_report(primary_simulator_agent, "");
 	}
 	
 	return 1;

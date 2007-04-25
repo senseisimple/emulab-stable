@@ -212,14 +212,15 @@ static void dump_report_data(FILE *file,
 	}
 }
 
-int send_report(simulator_agent_t sa, char *args)
+static int real_send_report(simulator_agent_t sa, char *args, bool error_report)
 {
 	struct lnList error_records;
 	char loghole_name[BUFSIZ];
 	int rc, retval;
 	FILE *file;
-	bool archive = true;
+	bool archive;
 	char * tmp;
+	const char * report_file_name;
 
 	assert(sa != NULL);
 	assert(args != NULL);
@@ -241,10 +242,9 @@ int send_report(simulator_agent_t sa, char *args)
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		make_timestamp(time_buf, &now);
-		info("Sending Report at %s with args \"%s\"\n",
-		     time_buf, args);
+		info("Sending %sReport at %s with args \"%s\"\n",
+		     error_report ? "Error " : "", time_buf, args);
 	}
-	     
 
 	/*
 	 * Get the logs off the nodes so we can generate summaries from the
@@ -255,8 +255,12 @@ int send_report(simulator_agent_t sa, char *args)
 		errorc("failed to sync log holes %d\n", rc);
 	}
 
-	if ((file = fopen("logs/report.mail", "w")) == NULL) {
-		errorc("could not create report.mail\n");
+	report_file_name = error_report 
+		? "logs/error-report.mail" 
+		: "logs/report.mail";
+
+	if ((file = fopen(report_file_name, "w")) == NULL) {
+		errorc("could not create %s\n", report_file_name);
 		retval = -1;
 	}
 	else {
@@ -347,16 +351,21 @@ int send_report(simulator_agent_t sa, char *args)
 		file = NULL;
 	}
 	
-	if ((rc = event_arg_get(args, "ARCHIVE", &tmp)) > 0) {
+	if (error_report) {
+		archive = false;
+	} else if (!(rc = event_arg_get(args, "ARCHIVE", &tmp)) > 0) {
 		if (rc == 4 && strncmp(tmp, "true", 4) == 0) {
 			archive = true;
 		} else if (rc == 5 && strncmp(tmp, "false", 5) == 0) {
 			archive = false;
 		} else {
-			error("ARCHIVE must be \"true\" or \"false\"\n");
+			error("ARCHIVE must be \"true\" or \"false\", assuming \"false\"\n");
+			archive = false;
 		}
-	} 
-
+	} else {
+		archive = true;
+	}
+	
 	if (archive) {
 		if ((file = popenf("loghole --port=%d --quiet archive --delete", 
 				   "r", DEFAULT_RPC_PORT)) == NULL) {
@@ -379,12 +388,14 @@ int send_report(simulator_agent_t sa, char *args)
 		loghole_name[0] = '\0';
 	}
 
-	if (systemf("mail -s \"%s: %s/%s experiment report\" %s "
-		    "< logs/report.mail",
+	if (systemf("mail -s \"%s: %s/%s experiment %sreport\" %s "
+		    "< %s",
 		    OURDOMAIN,
 		    pid,
 		    loghole_name[0] ? loghole_name : eid,
-		    getenv("USER")) != 0) {
+		    error_report ? "error " : "",
+		    getenv("USER"),
+		    report_file_name) != 0) {
 		errorc("could not execute send report\n");
 		retval = -1;
 	}
@@ -394,6 +405,14 @@ int send_report(simulator_agent_t sa, char *args)
 	assert(lnEmptyList(&error_records));
 	
 	return retval;
+}
+
+int send_report(simulator_agent_t sa, char *args) {
+	return real_send_report(sa, args, false);
+}
+
+int send_error_report(simulator_agent_t sa, char *args) {
+	return real_send_report(sa, args, true);
 }
 
 static int do_reset(simulator_agent_t sa, char *args)
