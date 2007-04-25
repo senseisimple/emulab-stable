@@ -1,11 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 
 #
@@ -53,6 +52,9 @@ if ($TESTMODE) {
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
+
+sub failed($$);
 
 #
 # Turn off line buffering on output
@@ -63,50 +65,35 @@ $| = 1;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-sub failed($$$);
-
-my $uid;
-my $gid;
-my $pid;
-my $eid;
-
 #
-# Find all the active experiments.  For us active implies swapped-in.
+# Find all the active experiments.
 #
-$query_result = DBQueryFatal("select pid,eid,expt_head_uid,gid ".
-			     "from experiments where state='active'");
+my @experiments = Experiment->AllActive();
 
-while (($pid, $eid, $uid, $gid) = $query_result->fetchrow_array()) {
-    my $unix_uid;
-    my $group;
-    my $unix_egid;
-    my $unix_pgid;
+foreach my $experiment (@experiments) {
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+    my $swapper = $experiment->GetSwapper();
+    my $project = $experiment->GetProject();
+    my $group   = $experiment->GetGroup();
 
+    failed($experiment, "Could not load swapper object")
+	if (!defined($swapper));
+    failed($experiment, "Could not load project object")
+	if (!defined($project));
+    failed($experiment, "Could not load group object")
+	if (!defined($group));
+    
     #
     # Ignore "special" experiments
     #
-    if ($pid eq TB_OPSPID) {
-	next;
-    }
+    next
+	if ($pid eq TB_OPSPID);
 
-    #
-    # Figure out the unix uid/gid
-    #
-    $unix_uid = getpwnam($uid);
-    if (!defined($unix_uid)) {
-	failed("no unix uid for DB uid $uid", $pid, $eid);
-	next;
-    }
-    $unix_pgid = getgrnam($pid);
-    if (!defined($unix_pgid)) {
-	failed("no unix gid for project", $pid, $eid);
-	next;
-    }
-    if (!TBGroupUnixInfo($pid, $gid, \$unix_egid, \$group)) {
-	failed("no unix gid for DB gid $gid", $pid, $eid);
-	next;
-    }
-
+    my $unix_uid  = $swapper->unix_uid();
+    my $unix_pgid = $project->unix_gid();
+    my $unix_egid = $group->unix_gid();
+    
     #
     # Set uid/gid to that of the user.  We need to be in both the
     # project's unix group and the experiments's unix group in order
@@ -117,26 +104,25 @@ while (($pid, $eid, $uid, $gid) = $query_result->fetchrow_array()) {
     $GID = $unix_pgid;
     $EGID = "$unix_pgid $unix_pgid $unix_egid";
     $EUID = $UID = $unix_uid;
-    $ENV{'USER'} = $uid;
+    $ENV{'USER'} = $swapper->uid();
 
-    print "Starting event scheduler for $pid/$eid ...\n";
+    print "Starting event scheduler for $experiment ...\n";
     system("$evcontrol start $pid,$eid");
     if ($?) {
-	failed("$evcontrol failed, status=$?", $pid, $eid);
-    } else {
+	failed($experiment, "$evcontrol failed, status=$?");
+    }
+    else {
 	print "Started event scheduler for $pid/$eid\n";
     }
-
     # set uid back to root
     $EUID = $UID = 0;
 }
+exit(0);
 
-exit 0;
-
-sub failed($$$)
+sub failed($$)
 {
-    (my $msg, my $pid, my $eid) = @_;
+    my ($experiment, $msg) = @_;
 
     warn("$msg");
-    warn("WARNING: did not start event scheduler for $pid/$eid");
+    warn("WARNING: did not start event scheduler for $experiment");
 }

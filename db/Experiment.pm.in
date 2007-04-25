@@ -196,6 +196,28 @@ sub LookupByIndex($$)
 }
 
 #
+# All active experiments.
+#
+sub AllActive($)
+{
+    my ($class) = @_;
+    my @result  = ();
+    
+    my $query_result =
+	DBQueryFatal("select idx from experiments where state='active'");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $experiment = Experiment->Lookup($idx);
+
+	if (!defined($experiment)) {
+	    print STDERR "Experiment::AllActive: No object for $idx!\n";
+	}
+	push(@result, $experiment);
+    }
+    return @result;
+}
+
+#
 # LockTables simple locks the given tables, and then refreshes the
 # experiment instance (thereby getting the data from the DB after
 # the tables are locked).
