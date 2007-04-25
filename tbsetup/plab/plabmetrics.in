@@ -339,6 +339,11 @@ sub InsertMetrics($%)
     } else {
 	$scaled = $load / $MAXLOAD;
     }
+
+    # proper, valid feature weights have to be less than 1 
+    if ($scaled > 0.99) {
+	$scaled = 0.99;
+    }
 		
     #
     # Plab people request that we not start jobs on nodes
