@@ -32,3 +32,4 @@ vcsa:x:69:
 sshd:x:74:
 sfs:x:77:
 pcap:x:78:
+dbus:x:81:
