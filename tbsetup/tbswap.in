@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -463,7 +463,7 @@ sub doSwapout($) {
 	    if ($type >= RETRY ||
 		($update_Eventsys_restart && $type == UPDATE) ) {
 		print "Stopping the event system\n";
-		if (system("eventsys_control stop $pid $eid")) {
+		if (system("eventsys_control stop $pid,$eid")) {
 		    tberror({type => 'secondary', severity => SEV_SECONDARY,
 			     error => ['eventsys_stop_failed']},
 			    "Failed to stop the event system.");
@@ -1282,7 +1282,7 @@ sub doSwapin($) {
 	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
 	    print "Starting the event system.\n";
 	    TBDebugTimeStamp("eventsys_control started");
-	    if (system("eventsys_control start $pid $eid")) {
+	    if (system("eventsys_control start $pid,$eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['eventsys_start_failed']},
 			"Failed to start the event system.");

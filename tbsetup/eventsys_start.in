@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -120,7 +120,7 @@ while (($pid, $eid, $uid, $gid) = $query_result->fetchrow_array()) {
     $ENV{'USER'} = $uid;
 
     print "Starting event scheduler for $pid/$eid ...\n";
-    system("$evcontrol start $pid $eid");
+    system("$evcontrol start $pid,$eid");
     if ($?) {
 	failed("$evcontrol failed, status=$?", $pid, $eid);
     } else {

@@ -613,7 +613,7 @@ SignalProgAgents("RELOAD") == 0
 # Restart the event stream from the beginning.
 #
 print "Asking the event system to replay events ...\n";
-system("$eventcontrol replay $pid $eid") == 0
+system("$eventcontrol replay $pid,$eid") == 0
     or fatal(-1, "Could not restart the event system!");
 
 # We lose the log info for this commit if we do not copy it out to the

@@ -2600,6 +2600,7 @@ class experiment:
         argstr  = ""
         argstr += " " + escapeshellarg(argdict["action"])
         argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += ","
         argstr += " " + escapeshellarg(argdict["exp"])
         
         (exitval, output) = runcommand(TBDIR + "/bin/eventsys_control "

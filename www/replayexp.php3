@@ -79,7 +79,7 @@ set_time_limit(0);
 
 STARTBUSY("Starting event replay");
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webeventsys_control replay $pid $eid",
+		 "webeventsys_control replay $pid,$eid",
 		 SUEXEC_ACTION_DIE);
 STOPBUSY();
 

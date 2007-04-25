@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,7 +20,7 @@ use POSIX ":sys_wait_h";
 sub usage()
 {
     print STDOUT
-	"Usage: eventsys_control [-f] <start|stop|replay> <pid> <eid>\n";
+	"Usage: eventsys_control [-f] <start|stop|replay> <eid>\n";
     exit(-1);
 }
 my  $optlist = "dfa";
@@ -62,6 +62,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use Experiment;
+use User;
 use Template;
 
 #
@@ -77,9 +79,6 @@ my $proxy	= "$TB/sbin/eventsys.proxy";
 my $debug	= 1;
 my $force       = 0;
 my $agent       = 0;
-my $expstate;
-my $exptidx;
-my $dbuid;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -89,7 +88,7 @@ my $dbuid;
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 3) {
+if (@ARGV != 2) {
     usage();
 }
 if (defined($options{"d"})) {
@@ -102,8 +101,6 @@ if (defined($options{"a"})) {
     $agent = 1;
 }
 my $action = $ARGV[0];
-my $pid    = $ARGV[1];
-my $eid    = $ARGV[2];
 
 #
 # Untaint args.
@@ -114,32 +111,34 @@ if ($action =~ /^(start|stop|replay)$/) {
 else {
     usage();
 }
-if ($pid =~ /^([-\@\w]+)$/) {
-    $pid = $1;
-}
-else {
-    die("Bad data in pid: $pid.");
-}
-if ($eid =~ /^([-\@\w]+)$/) {
-    $eid = $1;
-}
-else {
-    die("Bad data in eid: $eid.");
-}
 
-if (! ($expstate = ExpState($pid, $eid))) {
-    tbdie("No such experiment $pid/$eid!");
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid = $this_user->uid();
+my $isadmin  = TBAdmin();
 
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+#
+# Grab the experiment.
+#
+my $experiment = Experiment->Lookup($ARGV[1]);
+if (! $experiment) {
+    die("*** $0:\n".
+	"    No such experiment in the Emulab Database.\n");
 }
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
+my $expstate = $experiment->state();
 
 #
 # Check permission. Only people with permission to destroy the experiment
 # can do this.
 #
-if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
+if (! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
     tbdie("You do not have permission to control the event system!");
 }
 
@@ -151,7 +150,7 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
     $expstate ne EXPTSTATE_ACTIVATING &&
     $expstate ne EXPTSTATE_MODIFY_RESWAP &&
     $expstate ne EXPTSTATE_SWAPPING) {
-    tbdie("Experiment $pid/$eid must be active (or swapping)!");
+    tbdie("$experiment must be active (or swapping)!");
 }
 
 #
@@ -159,8 +158,7 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
 # the experiment, balk unless force mode is on.
 #
 if ($action eq "start" && !$force && !ExpNodes($pid, $eid)) {
-    tbnotice("There are no nodes in $pid/$eid. ".
-	     "Not starting a scheduler.");
+    tbnotice("There are no nodes in $experiment. Not starting a scheduler.");
     exit(0);
 }
 
@@ -185,16 +183,9 @@ if ($action ne "stop" && ! $agent) {
 }
 
 # Need the unix_gid info to pass to boss.
-my $gid = ExpGroup($pid, $eid);
-my ($unix_gid, $unix_gidname);
-
-if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gidname)) {
-    tbdie("Could not get unix group info for $pid/$gid!");
-}
-
-# Need this to see if its a template experiment.
-if (! TBExptIDX($pid, $eid, \$exptidx)) {
-    tbdie("Could not get experiment index for $pid/$gid!");
+my $group = $experiment->GetGroup();
+if (!defined($group)) {
+    tbdie("Could not get unix group info for $experiment!");
 }
 
 #
@@ -207,13 +198,13 @@ $cmd .= " -d"
     if ($debug);
 $cmd .= " -a"
     if ($agent);
-$cmd .= " -t " . TBExptUserDir($pid, $eid) . "/logs/events"
-    if (Template::Instance->LookupByExptidx($exptidx));
-$cmd .= " -l " . TBExptUserDir($pid, $eid) . "/logs/event-sched.log";
-$cmd .= " -k " . TBDB_EVENTKEY($pid, $eid);
-$cmd .= " -g " . $unix_gidname;
+$cmd .= " -t " . $experiment->UserDir() . "/logs/events"
+    if ($experiment->IsInstance());
+$cmd .= " -l " . $experiment->UserDir() . "/logs/event-sched.log";
+$cmd .= " -k " . $experiment->EventKeyPath();
+$cmd .= " -g " . $group->unix_name();
 $cmd .= " -e $pid/$eid";
-$cmd .= " -u $dbuid";
+$cmd .= " -u $user_uid";
 $cmd .= " $action";
 
 $UID=0;

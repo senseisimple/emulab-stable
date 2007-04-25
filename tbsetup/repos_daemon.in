@@ -538,7 +538,7 @@ sub evsysctrl($)
 	if (system("$locpiper $lpflag $REPOSPID $REPOSEID")) {
 	    notify("Failed to $action locpiper\n");
 	}
-	elsif (system("$evsys $action $REPOSPID $REPOSEID")) {
+	elsif (system("$evsys $action $REPOSPID,$REPOSEID")) {
 	    notify("Failed to $action event system\n");
 	}
 	else {
