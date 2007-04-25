@@ -52,6 +52,7 @@ use libtblog;
 use libArchive;
 use Template;
 use NodeType;
+use OSinfo;
 
 TBDebugTimeStampsOn();
 
@@ -72,6 +73,7 @@ my %vnode2pnode = ();
 my %pnodevcount = ();
 my %plabvnodes  = ();
 my %osids       = ();
+my %osmap       = ();
 my %canfail     = ();
 my %bios_waittime   = ();	# Indexed by node_type.
 my %reboot_waittime = ();	# Indexed by osid.
@@ -193,7 +195,7 @@ TBDebugTimeStamp("os_setup started");
 #
 my $firewall;
 my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
-my $firewallimageid;
+my $firewallimage;
 
 #
 # Ditto ElabinElab.
@@ -209,7 +211,7 @@ if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
 #
 my $plabinelab = 0;
 my $plcnode;
-my $plcimageid;
+my $plcimage;
 if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
     $plabinelab = 1;
 }
@@ -243,6 +245,7 @@ while (my %row = $db_result->fetchhash()) {
     my $plabnode  = $typeinfo->isplabdslice();
     my $bios_wait = $typeinfo->bios_waittime();
     my $bootpath  = 0;
+    my $osinfo    = undef;
 
     #
     # VIRTNODE HACK: Virtual nodes are special. Jailed vnodes can do quite
@@ -273,7 +276,15 @@ while (my %row = $db_result->fetchhash()) {
 	    $reboots{$node} = 1;
 	}
     }
+
     $osids{$node}         = $osid;
+    if ($osid) {
+	$osinfo = OSinfo->Lookup($osid);
+
+	die_noretry("Could not map $osid to its object!")
+	    if (!defined($osinfo));
+    }
+    $osmap{$node}         = $osinfo;
     $bios_waittime{$type} = $bios_wait;
     $node_types{$node}    = $type;
     $vname{$node}         = $vname;
@@ -364,26 +375,14 @@ while (my %row = $db_result->fetchhash()) {
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
 	#
-	if (! $osid) {
+	if (! $osinfo) {
 	    die_noretry("$node has no bootpath and no def_boot_osid set!");
 	}
 
 	#
-	# Grab the info for this OSID. This is part of the image check.
-	#
-	my $osid_result =
-	    DBQueryFatal("select * from os_info where osid='$osid'");
-
-	if ($osid_result->numrows == 0) {
-	    die_noretry("No such OSID $osid is defined!");
-	}
-
-	my %osid_row   = $osid_result->fetchhash();
-
-	#
 	# If there is an actual path, its an OSKit kernel not an image.
 	#
-	if (! defined($osid_row{'path'}) || $osid_row{'path'} eq "") {
+	if (! defined($osinfo->path()) || $osinfo->path() eq "") {
 	    #
 	    # Not an OSKit kernel.
 	    # Make sure this OSID is actually loaded on the machine.
@@ -401,21 +400,23 @@ while (my %row = $db_result->fetchhash()) {
 		#
 		# Check to see if a non specific version specified.
 		#
-		if (! defined($osid_row{'version'}) ||
-		    $osid_row{'version'} eq "") {
-
+		if (!defined($osinfo->version()) || $osinfo->version() eq "") {
 		    #
 		    # A non-specific version. There needs to be a way to
 		    # map it to another osid.
 		    #
-		    if (!defined($osid_row{'nextosid'})) {
-			die_noretry("No mapping can be made for $osid ($node)!");
+		    if (! defined($osinfo->nextosid())) {
+			die_noretry("No mapping for $osinfo ($node)!");
 		    }
 
 		    my $nextosid = TBResolveNextOSID($osid, $pid, $eid);
 		    if (!defined($nextosid)) {
-			die_noretry("No mapping can be made for $osid ($node)!");
+			die_noretry("No mapping for $osinfo ($node)!");
 		    }
+		    $nextosinfo = OSinfo->Lookup($nextosid);
+
+		    die_noretry("Could not map $osid to its object!")
+			if (!defined($nextosinfo));
 		
 		    #
 		    # See if the nextosid is already on the disk. If not,
@@ -431,21 +432,22 @@ while (my %row = $db_result->fetchhash()) {
 			# User wants a specific version of an OS, but its not
 			# loaded on the machine.
 			#
-			print "Mapping $osid on $node to $nextosid ".
+			print "Mapping $osinfo on $node to $nextosinfo ".
 			    "and setting up a reload.\n";
 
-			SetupReload($node, $nextosid, $type);
+			SetupReload($node, $nextosinfo, $type);
 			$osids{$node} = $nextosid;
+			$osmap{$node} = $nextosinfo;
 		    }
 		    else {
 			#
 			# Already loaded.
 			#
-			print "Mapping $osid on $node to $nextosid.\n";
+			print "Mapping $osinfo on $node to $nextosinfo.\n";
 
 			if ($dolastload &&
 			    defined($row{'pid'}) && $row{'pid'} ne $pid) {
-			    SetupReload($node, $nextosid, $type);
+			    SetupReload($node, $nextosinfo, $type);
 			}
 			else {
 			    system("$osselect $nextosid $node") and
@@ -453,6 +455,7 @@ while (my %row = $db_result->fetchhash()) {
 					    "$nextosid for $node");
 			}
 			$osids{$node} = $nextosid;
+			$osmap{$node} = $nextosinfo;
 		    }
 		}
 		else {
@@ -460,7 +463,7 @@ while (my %row = $db_result->fetchhash()) {
 		    # User wants a specific version of an OS, but its not
 		    # loaded on the machine.
 		    #
-		    SetupReload($node, $osid, $type);
+		    SetupReload($node, $osinfo, $type);
 		}
 	    }
 	    else {
@@ -469,7 +472,7 @@ while (my %row = $db_result->fetchhash()) {
 		#
 		if ($dolastload &&
 		    defined($row{'pid'}) && $row{'pid'} ne $pid) {
-		    SetupReload($node, $osid, $type);
+		    SetupReload($node, $osinfo, $type);
 		}
 	    }
 	}
@@ -489,7 +492,7 @@ while (my %row = $db_result->fetchhash()) {
 	$reboot_waittime{$osid} = TBOSIDRebootWaittime($osid);
     }
 
-    print STDERR "$node - $osids{$node} - $canfail{$node}\n"
+    print STDERR "$node - $osmap{$node} - $canfail{$node}\n"
 	if $dbg;
 }
 
@@ -574,7 +577,7 @@ if ($firewalled) {
 	MarkNodeDown($node);
 	TBSetNodeLogEntry($node, $dbuid, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
-			  "failed to boot image for osid " . $osids{$node} .
+			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
 	SENDMAIL($TBOPS, "1 node is down",
 		 "Node:\n".
@@ -616,7 +619,7 @@ if ($plabinelab) {
     my $node = $plcnode;
 
     TBDebugTimeStamp("rebooting/reloading PLC node");
-    if (!os_setup_one($node, $plcimageid, "PLC")) {
+    if (!os_setup_one($node, $plcimage, "PLC")) {
 	tbwarn "PLC node $node failed to boot".
 	    "This has been reported to testbed-ops.";
 	SENDMAIL($TBOPS, "1 node is down",
@@ -935,7 +938,7 @@ while ( @nodelist ) {
 	MarkNodeDown($node);
 	TBSetNodeLogEntry($node, $dbuid, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
-			  "failed to boot image for osid " . $osids{$node} .
+			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
 	push(@informtbopsfatal, $node);
     } else {
@@ -1095,7 +1098,8 @@ elsif (@vnodelist) {
         # their respective OSIDs, with some slop time that scales up
         # as a function of the number of vnodes on the parent pnode.
         #
-        my $osid        = $osids{$node};
+        my $osinfo      = $osmap{$node};
+	my $osid        = $osinfo->osid();
         my $reboot_time = $reboot_waittime{$osid};
 	my $maxwait     = $reboot_time + (40 * $pnodevcount{$pnode});
 
@@ -1231,28 +1235,6 @@ tbinfo "OS Setup Done.";
 #
 # Various helper function for summary report
 #
-
-# returns an array (osname, user_image)
-sub get_osname ($) {
-    my ($osid) = @_;
-
-    my ($osname, $pidofosid);
-    my $user_image = 1;
-
-    my $query_result =
-        DBQueryFatal("select osname,pid from os_info where osid='$osid'");
-
-    if ($query_result->num_rows > 0) {
-        ($osname, $pidofosid) = $query_result->fetchrow_array();
-        $user_image = 0 if $pidofosid eq TBOPSPID();
-    } else {
-        $osname = $osid;
-        $user_image = 0;
-    }
- 
-    return ($osname, $user_image);
-}
-
 sub add_defaults($) {
     my ($d) = (@_);
     $d->{failed_fatal}    = 0 unless defined $d->{failed_fatal};
@@ -1314,9 +1296,10 @@ my $summary = '';
 # First gather stats
 #
 foreach (keys %failed_nodes) {
-    my $node = $_;
-    my $osid = $osids{$_};
-    my $type = $node_types{$_};
+    my $node   = $_;
+    my $osinfo = $osmap{$_};
+    my $osid   = $osinfo->osid();
+    my $type   = $node_types{$_};
     my ($what,$fatal)  = @{$failed_nodes{$_}};
 
     my ($error_type, $severity);
@@ -1334,7 +1317,7 @@ foreach (keys %failed_nodes) {
     }
 
     if (defined($error_type) && defined($severity)) {
-	tbreport($severity, $error_type, $node, $type, $osid);
+	tbreport($severity, $error_type, $node, $type, $osinfo);
     }
 
     $tally{$what}{$osid} = {} unless defined $tally{$what}{$osid};
@@ -1350,8 +1333,9 @@ foreach (keys %failed_nodes) {
     push @{$t->{by_type}{$type}{"failed_${fatal}_list"}}, $_;
 }
 foreach (@all_nodes) {
-    my $osid = $osids{$_};
-    my $type = $node_types{$_};
+    my $osinfo = $osmap{$_};
+    my $osid   = $osinfo->osid();
+    my $type   = $node_types{$_};
     $total{$osid}{any_type}++;
     $total{$osid}{by_type}{$type}++;
 }
@@ -1364,8 +1348,8 @@ if (defined $tally{reload}) {
     $users_fault = 0;
 
     foreach my $osid (sort keys %{$tally{reload}}) {
-	
-	my ($osname) = get_osname($osid);
+	my $osinfo  = OSinfo->Lookup($osid);
+	my $osname  = $osinfo->osname();
 	
 	my %d     = %{$tally{reload}{$osid}{any_type}};
 	my $total = $total{$osid}{any_type};
@@ -1383,8 +1367,9 @@ if (defined $tally{reload}) {
     $users_fault = 1;
 
     foreach my $osid (sort keys %{$tally{boot}}) {
-	
-	my ($osname, $user_image) = get_osname($osid);
+	my $osinfo     = OSinfo->Lookup($osid);
+	my $osname     = $osinfo->osname();
+	my $user_image = ($osinfo->pid() eq TBOPSPID() ? 0 : 1);
 	
 	add_defaults($tally{boot}{$osid}{any_type});
 	my %d   = %{$tally{boot}{$osid}{any_type}};
@@ -1478,7 +1463,7 @@ exit(1)
 exit 0;
 
 #
-# Map an OSID to an imageid for a node type.
+# Map an OSID to an image for a node type.
 #
 sub TBMapOSIDtoImageID($$)
 {
@@ -1491,9 +1476,7 @@ sub TBMapOSIDtoImageID($$)
     if ($query_result->numrows == 0) {
 	return 0;
     }
-    my ($imageid) = $query_result->fetchrow_array();
-
-    return $imageid;
+    return Image->Lookup($query_result->fetchrow_array());
 }
 
 #
@@ -1502,26 +1485,26 @@ sub TBMapOSIDtoImageID($$)
 #
 sub SetupReload($$$)
 {
-    my ($node, $osid, $type) = @_;
+    my ($node, $osinfo, $type) = @_;
 
-    if ((my $imageid = TBMapOSIDtoImageID($osid, $type))) {
+    if ((my $image = TBMapOSIDtoImageID($osinfo->osid(), $type))) {
 	# XXX firewall is treated special
 	if ($firewalled && ($node eq $firewall)) {
-	    $firewallimageid = $imageid;
+	    $firewallimage = $image;
 	}
 	# as is a plabinelab PLC node
 	elsif ($plabinelab && ($node eq $plcnode)) {
-	    $plcimageid = $imageid;
-	} elsif (!defined($reloads{$imageid})) {
-	    $reloads{$imageid} = [ $node ];
+	    $plcimage = $image;
+	} elsif (!defined($reloads{$image->imageid()})) {
+	    $reloads{$image->imageid()} = [ $node ];
 	} else {
-	    push(@{ $reloads{$imageid} }, $node);
+	    push(@{ $reloads{$image->imageid()} }, $node);
 	}
     }
     else {
 	die_noretry({type => 'primary', severity => SEV_ERROR,
-		     error => ['file_not_found', 'image', $osid, $node]},
-		    "No image can be found for $osid on $node!");
+		     error => ['file_not_found', 'image', $osinfo, $node]},
+		    "No image can be found for $osinfo on $node!");
     }
 }
 
@@ -1552,7 +1535,7 @@ sub FirewallSetup($)
 {
     my ($node) = @_;
 
-    if (os_setup_one($node, $firewallimageid, "Firewall")) {
+    if (os_setup_one($node, $firewallimage, "Firewall")) {
 	#
 	# Firewall has booted, perform any final actions.
 	#
@@ -1583,7 +1566,7 @@ sub FirewallSetup($)
 #
 sub os_setup_one($$$)
 {
-    my ($node,$imageid,$msgstr) = @_;
+    my ($node,$image,$msgstr) = @_;
 
     #
     # XXX this is probably not entirely right.
@@ -1595,7 +1578,7 @@ sub os_setup_one($$$)
     #
     # Reload the node if necessary
     #
-    if (defined($imageid)) {
+    if (defined($image)) {
 	delete $reboots{$node};
 	delete $reconfigs{$node};
 
@@ -1608,7 +1591,7 @@ sub os_setup_one($$$)
 
 	$reload_args{'debug'}    = $dbg;
 	$reload_args{'waitmode'} = 1;
-	$reload_args{'imageid'}  = $imageid;
+	$reload_args{'imageid'}  = $image->imageid();
 	$reload_args{'nodelist'} = [ @nodelist ];
 
 	if (osload(\%reload_args, $reload_failures) != 0) {
