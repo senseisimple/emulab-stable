@@ -95,12 +95,12 @@ install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
-#	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
-#			$(INSTALL_DIR)/opsdir/bin/$(SCRIPT_RUN)
-#	$(INSTALL_PROGRAM) $(SCRIPT_PROXY) \
-#			$(INSTALL_DIR)/opsdir/sbin/$(SCRIPT_PROXY)
-#	$(INSTALL_PROGRAM) $(LTEVENT) \
-#			$(INSTALL_DIR)/opsdir/libexec/$(LTEVENT)
+	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
+			$(INSTALL_DIR)/opsdir/bin/$(SCRIPT_RUN)
+	$(INSTALL_PROGRAM) $(SCRIPT_PROXY) \
+			$(INSTALL_DIR)/opsdir/sbin/$(SCRIPT_PROXY)
+	$(INSTALL_PROGRAM) $(LTEVENT) \
+			$(INSTALL_DIR)/opsdir/libexec/$(LTEVENT)
 	@echo "Don't forget to do a post-install as root"
 
 post-install: 
