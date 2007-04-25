@@ -49,7 +49,7 @@ IDLEMONEXE = $(DESTDIR)$(CLIENT_BINDIR)/idlemon$(EXE)
 
 endif
 
-all: $(SDPROGS) client
+all: $(SDPROGS) client $(SBIN_SCRIPTS) webfeedback
 
 include ${TESTBED_SRCDIR}/GNUmakerules
 
