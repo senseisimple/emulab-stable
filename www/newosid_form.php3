@@ -34,7 +34,7 @@ $osid_result =
     DBQueryFatal("select * from os_info ".
 		 "where (path='' or path is NULL) and ".
 		 "      version!='' and version is not NULL ".
-		 "order by osid");
+		 "order by pid,osname");
 
 ?>
 <blockquote><blockquote>

@@ -56,8 +56,13 @@ if (($resrow = $node->ReservedTableEntry())) {
 #
 # Get the OSID list. These are either OSIDs that are currently loaded on
 # the node as indicated by the partitions table, or OSIDs with non-null
-# paths (which means they are OSKit kernels). The list is pruned using the
-# pid of the user when not an admin type, of course.
+# paths (which means they are OSKit kernels or BSD MFSes). The list is pruned
+# using the pid of the user when not an admin type, of course.
+#
+# Note the funky "order by", we reverse sort by node_id first to get the
+# disk-based OSes up front (node_id is '' for OSKit/MFS kernels).  After
+# that we order by pid and then by osname (rather than osid since that is
+# now an integer).
 #
 if ($isadmin) {
     $osid_result =
@@ -66,7 +71,7 @@ if ($isadmin) {
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where p.node_id='$node_id' or ".
 		     "(o.path!='' and o.path is not NULL) ".
-		     "order by o.osid");
+		     "order by p.node_id desc,o.pid,o.osname");
 }
 else {
     $uid_idx = $this_user->uid_idx();
@@ -79,7 +84,7 @@ else {
 		     "where p.node_id='$node_id' or ".
 		     "  ((m.uid_idx='$uid_idx' or o.shared=1) and ".
 		     "   (o.path!='' and o.path is not NULL)) ".
-		     "order by o.pid,o.osid");
+		     "order by p.node_id desc,o.pid,o.osname");
 }
 
 echo "<table border=2 cellpadding=0 cellspacing=2
@@ -117,7 +122,8 @@ echo "    <td><select name=def_boot_osid>\n";
 if ($def_boot_osid &&
     ($osinfo = OSinfo::Lookup($def_boot_osid))) {
     $osname = $osinfo->osname();
-    echo "<option selected value='$def_boot_osid'>$osname </option>\n";
+    $pid = $osinfo->pid();
+    echo "<option selected value='$def_boot_osid'>$pid - $osname </option>\n";
 }
                while ($row = mysql_fetch_array($osid_result)) {
                   $osname = $row["osname"];
@@ -164,6 +170,7 @@ if ($isadmin) {
 	$osname = $row["osname"];
 	$oosid = $row["oosid"];
 	$posid = $row["posid"];
+	$pid   = $row["pid"];
 
         # Use the osid that came from the partitions table, if there
 	# was one - otherwise, go with the os_info table
@@ -202,6 +209,7 @@ if ($isadmin) {
 	$osname = $row["osname"];
 	$oosid = $row["oosid"];
 	$posid = $row["posid"];
+	$pid   = $row["pid"];
 
         # Use the osid that came from the partitions table, if there
 	# was one - otherwise, go with the os_info table

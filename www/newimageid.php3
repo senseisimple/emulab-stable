@@ -90,7 +90,7 @@ function SPITFORM($formfields, $errors)
 	    DBQueryFatal("select * from os_info ".
 			 "where (path='' or path is NULL) and ".
 			 "      version!='' and version is not NULL ".
-			 "order by osid");
+			 "order by pid,osname");
     }
     else {
 	$uid_idx = $this_user->uid_idx();
@@ -102,7 +102,7 @@ function SPITFORM($formfields, $errors)
 			 "where m.uid_idx='$uid_idx' and ".
 			 "      (path='' or path is NULL) and ".
 			 "      version!='' and version is not NULL ".
-			 "order by o.pid,o.osid");
+			 "order by o.pid,o.osname");
     }
     if (! mysql_num_rows($osid_result)) {
 	USERERROR("There are no OS Descriptors that you are able to use!", 1);

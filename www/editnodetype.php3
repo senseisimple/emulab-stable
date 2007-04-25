@@ -386,11 +386,11 @@ else {
 $osid_result =
     DBQueryFatal("select osid,osname,pid from os_info ".
 		 "where (path='' or path is NULL) ".
-		 "order by pid,osid");
+		 "order by pid,osname");
 
 $imageid_result =
     DBQueryFatal("select imageid,imagename,pid from images ".
-		 "order by pid,imageid");
+		 "order by pid,imagename");
 
 #
 # On first load, display initial values.
