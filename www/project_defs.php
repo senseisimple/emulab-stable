@@ -637,7 +637,7 @@ class Project
 	echo "<tr>
                   <td>Name: </td>
                   <td class=\"left\">
-                      <a href='showproj_url'>$pid ($proj_idx)</a></td>
+                      <a href='$showproj_url'>$pid ($proj_idx)</a></td>
               </tr>\n";
     
 	echo "<tr>
