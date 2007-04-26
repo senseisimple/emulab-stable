@@ -402,7 +402,7 @@ class OSinfo
 		if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
 		    continue;
 		}
-		if ($experiment->AccessCheck($user, $TB_EXPT_READINFO)) {
+		if (! $experiment->AccessCheck($user, $TB_EXPT_READINFO)) {
 		    $other_exps++;
 		    continue;
 		}
