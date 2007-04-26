@@ -256,31 +256,19 @@ function SPITFORM($formfields, $errors)
     else {
        if (! isset($formfields['copyid'])) {
 	if (!isset($formfields['nsref']) && !isset($view['quiet'])) {
-	  if (STUDLY()) {
-            echo "<p><ul>
-	    <li><b>If you have an NS file:</b><br> You may want to
-                <b><a href='nscheck_form.php3'>syntax check it first</a></b>
-            <li><b>If you do not have an NS file:</b><br>
-                <b><a href='clientui.php3'>New GUI editor</a></b> - An enhanced Java applet for editing topologies.<br>
-                <b><a href='buildui/bui.php3'>The NetBuild GUI</a></b>
-		can be used to graphically create topologies.<font size=-2>
-		(<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
-		information</a>)</font>.
-            </ul></p><br>";
-	  } else {
-	    echo "<p><ul>
-	    <li><b>If you have an NS file:</b><br> You may want to
-                <b><a href='nscheck_form.php3'>syntax check it first</a></b>
-	    <li><b>If you do not have an NS file:</b><br> You may want to
-		<b><a href='buildui/bui.php3'>go to the NetBuild GUI</a></b>
-		to graphically create one online<font size=-2>
-		(<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
-		information</a>)</font>.<br>
-                Or, you can download the Emulab
-                <a href='netlab/client.php3'><b>client</b></a> and graphically
-                create one from your desktop.
-	     </ul></p><br>";
-	  }
+          echo "<p><ul>
+          <li><b>If you have an NS file:</b><br> You may want to
+              <b><a href='nscheck_form.php3'>syntax check it first</a></b>
+          <li><b>If you do not have an NS file:</b><br>
+              <b><a href='clientui.php3'>New GUI editor</a></b> - An enhanced Java applet for editing topologies.<br>
+              The older <b><a href='buildui/bui.php3'>NetBuild GUI</a></b>
+              can be used to graphically create topologies.<font size=-2>
+              (<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
+              information</a>)</font>.<br>
+              Or, you can download the Emulab
+              <a href='netlab/client.php3'><b>client</b></a> and graphically
+              create one from your desktop.
+          </ul></p><br>";
 	} else {
 	    if (isset($view['plab_ns_message'])) {
 		echo "<center>

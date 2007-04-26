@@ -15,7 +15,7 @@ $view = array(
     'hide_copyright' => 1
 );
 
-PAGEHEADER("NetlabClient", $view);
+PAGEHEADER("Experiment Creation GUI", $view);
 
 #
 # Only known and logged in users can do this.
@@ -31,6 +31,8 @@ $optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
 				 "fallback",   PAGEARG_BOOLEAN);
 
 ?>
+
+<h3>Note: See the Help menu for quickstart and tips</h3>
 
 <div id="clientblock" name="clientblock"></div>
 
