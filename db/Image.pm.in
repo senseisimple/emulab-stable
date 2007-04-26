@@ -228,5 +228,58 @@ sub AccessCheck($$$)
     return TBImageIDAccessCheck($uid, $self->imageid(), $access_type);
 }
 
+#
+# LockTables simply locks the given tables, and then refreshes the
+# instance (thereby getting the data from the DB after the tables are locked).
+#
+sub LockTables($;$)
+{
+    my ($self, $spec) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $spec = "images write"
+	if (!defined($spec));
+    
+    DBQueryWarn("lock tables $spec")
+	or return -1;
+	
+    return $self->Refresh();
+}
+sub UnLockTables($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    DBQueryWarn("unlock tables")
+	or return -1;
+    return 0;
+}
+
+#
+# Bump the busy indicator to keep the frisbeed going.
+#
+sub KeepBusy($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $imageid = $self->imageid();
+
+    DBQueryFatal("update images set load_busy=GREATEST(load_busy,1) " .
+		 "where imageid='$imageid'");
+
+    return 0;
+}
+
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;

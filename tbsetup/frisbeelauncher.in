@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use Getopt::Std;
 use POSIX 'setsid';	 # For &daemonize
 use POSIX ":sys_wait_h"; # For &WNOHANG
@@ -49,11 +50,25 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use Image;
+
+# Protos.
+sub LockTables();
+sub UnlockTables();
+sub PickAddress();
+sub SetAddress($);
+sub SetPid($);
+sub TestBusy();
+sub ClearPid();
+sub ClearAddress();
+sub Fatal($);
+sub debug($);
 
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 my $FRISBEEIMAGE= "$TB/sbin/frisbeeimage";
+my $child_pid   = 0;
 
 my $STD_BW	= 72000000; 	# 71.6Mb/sec w/1000HZ kernel
 my $USR_BW	= 54000000;	# 53.7Mb/sec w/1000HZ kernel
@@ -62,7 +77,7 @@ my $USR_BW	= 54000000;	# 53.7Mb/sec w/1000HZ kernel
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -74,43 +89,49 @@ if (defined($options{"k"})) {
 }
 usage()
     if (! @ARGV);
-$imageid = shift @ARGV;
 
 #
-# Untaint the argument.
+# Verify user and get his DB uid and other info for later.
 #
-if ($imageid =~ /^([-\@\w\+.]+)$/) {
-    $imageid = $1;
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    Fatal("You ($UID) do not exist!");
 }
-else {
-    die("Invalid image '$imageid' contains illegal characters.\n");
-}
+my $user_uid = $this_user->uid();
 
-# Grab the filename to give to frisbee
-my $filename = &get_filename($imageid);
+#
+# Grab the Image.
+#
+my $image = Image->Lookup($ARGV[0]);
+if (! defined($image)) {
+    Fatal("No such image in the Emulab Database.\n");
+}
+my $imageid  = $image->imageid();
+my $filename = $image->path();
 
 #
 # Make sure that the user has sufficient permissions.
 #
-if (!TBImageIDAccessCheck($UID, $imageid,
-			  ($killmode ? TB_IMAGEID_DESTROY :
-			   TB_IMAGEID_READINFO))) {
-    tbdie("Not enough permission!");
+if (!$image->AccessCheck($this_user,
+			 ($killmode ? TB_IMAGEID_DESTROY :
+			  TB_IMAGEID_READINFO))) {
+    Fatal("Not enough permission!");
 }
 
 if (!$killmode && !$ELABINELAB && ! -R $filename) {
-    tbdie("You do not have permission to read the image file for".
-	"imageid $imageid: $filename\n");
+    Fatal("You do not have permission to read the image file for".
+	  "$image: $filename\n");
 }
 
 #
 # Need to lock the tables here, so we can lock out anyone else from
 # messing with the image (and so we can pick an address atomically). 
 #
-&lock_tables;
+LockTables();
 
 # Try to discover if some other process is handling this address
-($address, $pid) = get_address($imageid);
+my $address = $image->load_address();
+my $pid     = $image->frisbee_pid();
 
 if ($killmode) {
     #
@@ -119,7 +140,7 @@ if ($killmode) {
     #
     # No point in leaving table locked; not going to modify it.
     #
-    unlock_tables();
+    UnlockTables();
 
     # Nothing running.
     exit(0)
@@ -133,10 +154,10 @@ if ($killmode) {
 	
 	SENDMAIL($TBOPS,
 		 "Frisbee Killer Failed!",
-		 "Imageid: $imageid\n".
+		 "Image: $image\n".
 		 $mesg);
 	
-	tbdie($mesg);
+	Fatal($mesg);
     }
     if ($address && !$pid) {
 	#
@@ -145,7 +166,10 @@ if ($killmode) {
 	# try again. If still no pid, bail.
 	#
 	sleep(1);
-	($address, $pid) = get_address($imageid);
+	$image->Refresh();
+
+	$address = $image->load_address();
+	$pid     = $image->frisbee_pid();
 
 	# Okay, situation resolved itself; other frisbeelauncher bailed.
 	exit(0)
@@ -159,10 +183,10 @@ if ($killmode) {
 	
 	    SENDMAIL($TBOPS,
 		     "Frisbee Killer Failed!",
-		     "Imageid: $imageid\n".
+		     "Image: $image\n".
 		     $mesg);
 	
-	    tbdie($mesg);
+	    Fatal($mesg);
 	}
     }
 
@@ -172,22 +196,25 @@ if ($killmode) {
     # much point since it is not likely to happen. If it turns out to
     # be a problem we can change the way this works.
     #
-    unlock_tables();
     if (! kill('TERM', $pid)) {
 	SENDMAIL($TBOPS,
 		 "Frisbee Killer Failed!",
-		 "Failed to stop frisbee daemon for $imageid\n".
+		 "Failed to stop frisbee daemon for $image\n".
 		 "Could not kill(TERM) process $pid: $? $!");
 
-	tbdie("Failed to stop frisbee daemon for $imageid!");
+	Fatal("Failed to stop frisbee daemon for $image!");
     }
     exit(0);
 }
 
-if ($address && &keepbusy($imageid)) {
-        &unlock_tables;
-	&debug("A server ($address) is already running for image $imageid\n");
-	exit (0);
+#
+# Keep the current frisbeed running for another time period.
+#
+if ($address) {
+    $image->KeepBusy();
+    UnlockTables();
+    debug("A server ($address) is already running for image $image\n");
+    exit(0);
 }
 
 # This would be inconsistent.
@@ -196,23 +223,21 @@ if ($pid) {
 	
     SENDMAIL($TBOPS,
 	     "Frisbee Startup Failed!",
-	     "Imageid: $imageid\n".
+	     "Image: $image\n".
 	     $mesg);
 	
-    tbdie($mesg);
+    Fatal($mesg);
 }
 
 # Pick an address: Die if unsucessful, set address and unlock if sucessful
-$address = &pick_address;
-&debug("Picked address $address\n");
-
+$address = PickAddress();
 if (!$address) {
-	&unlock_tables;
-	die "Unable to find a free address to send on\n";
+    UnlockTables();
+    Fatal("Unable to find a free multicast address");
 }
-
-&set_address($imageid,$address);
-&unlock_tables;
+debug("Picked address $address\n");
+SetAddress($address);
+UnlockTables();
 
 #
 # When running inside an inner Emulab, try to get the image from the
@@ -223,7 +248,7 @@ if ($ELABINELAB && ! -e $filename) {
     $EUID = $UID;
     system("$FRISBEEIMAGE $imageid");
     if ($?) {
-	tbdie("No such image file: $filename!");
+	Fatal("No such image file: $filename!");
     }
     $EUID = 0;
 }
@@ -239,8 +264,8 @@ if (my $childpid = TBBackGround($LOGFILE)) {
     sleep(1);
     my $foo = waitpid($childpid, &WNOHANG);
     if ($foo) {
-	&clear_address;
-	tbdie("Error $? backgrounding frisbeelauncher!");
+	ClearAddress();
+	Fatal("Error $? backgrounding frisbeelauncher!");
     }
     exit(0);
 }
@@ -251,7 +276,7 @@ $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
 
 # Set our pid. This happens outside the lock which could lead to races,
 # but that is unlikely. Look for it above though.
-set_pid($imageid, $PID);
+SetPid($PID);
 
 #
 # Drop root permissions, if we have them
@@ -287,11 +312,10 @@ while (1) {
 	# it should keep going. This has to be done with tables locked
 	# since another caller is going to bump it.
 	#
-	&lock_tables();
-	if (! &testbusy($imageid)) {
-		last;
-	}
-	&unlock_tables();
+    	LockTables();
+	last
+	    if (! TestBusy());
+	UnlockTables();
 	
 	if ($child_pid = fork()) {
 		# Wait for child to exit
@@ -308,20 +332,20 @@ while (1) {
 		    #
 		    my $err = $?;
 		    if ($firsttry && ($err >> 8) == EADDRINUSE()) {
-			warn "Frisbeed bind failed for address $address, ".
-			     "picking another address\n";
-			&lock_tables();
-			$address = &pick_address;
+			warn("Frisbeed bind failed for address $address, ".
+			     "picking another address\n");
+			LockTables();
+			$address = PickAddress();
 			if ($address) {
-			    &set_address($imageid, $address);
-			    &unlock_tables;
+			    SetAddress($address);
+			    UnlockTables();
 			    next;
 			}
-			&unlock_tables;
-			warn "Unable to find a free address to send on\n";
+			UnlockTables();
+			warn("Unable to find a free address to send on\n");
 		    }
 		    SENDMAIL($TBOPS, "Frisbeed Failed!",
-			     "Imageid: $imageid\n".
+			     "Image: $image\n".
 			     "Address: $address\n\n".
 			     "Process $child_pid exited with value $err.\n".
 			     "Please look at the syslog for frisbeed!\n\n".
@@ -331,9 +355,10 @@ while (1) {
 		    # in the DB, so that another one will not start
 		    # until the matter is resolved by someone. 
 		    #
-		    set_pid($imageid, 0);
+		    ClearPid();
 		    exit(1);
-		} else {
+		}
+		else {
 		    $firsttry = 0;
 		}
 	}
@@ -342,19 +367,18 @@ while (1) {
 		# The database format for address is host:port - however,
 		# we need to give them as seperate arguments to frisbeed.
 		if ($address =~ /(.*):(.*)/) {
-			my $addr = $1;
-			my $port = $2;
+		    my $addr = $1;
+		    my $port = $2;
 
-			if (!exec("$FRISBEED $args -m $addr -p $port $filename")) {
-				die("$$: Unable to exec $FRISBEED\n");
-			}
+		    if (!exec("$FRISBEED $args -m $addr -p $port $filename")) {
+			Fatal("$$: Unable to exec $FRISBEED");
+		    }
 		}
-		die("$$: Bad address format: $address.\n");
+		Fatal("$$: Bad address format: $address!");
 	}
 }
-
-&clear_address;
-&unlock_tables();
+ClearAddress();
+UnlockTables();
 exit(0);
 
 ######################################################################
@@ -363,67 +387,33 @@ exit(0);
 
 # Only print if -d option was given. Also add $$ on the beginning of the
 # string, to ease debugging
-sub debug {
-	if ($debug) { print "$$: ", @_ };
+sub debug($)
+{
+    my ($msg) = @_;
+
+    print "$$: $msg"
+	if ($debug);
 }
 
-# Grab the address for the passed-in imageid
-sub get_address {
-	my ($imageid) = @_;
-
-	my $sth =
-	    DBQueryFatal("SELECT load_address,frisbee_pid ".
-			 "FROM images WHERE imageid='$imageid'");
-
-	my @row = $sth->fetchrow;
-	if (!@row) {
-		die "No such imageid: $imageid\n";
-	}
-
-	return ($row[0], $row[1]);
-}
-
-# Grab the filename for the passed-in imageid
-sub get_filename {
-	my ($imageid) = @_;
-	my $image_query = "SELECT path FROM images WHERE " .
-		"imageid='$imageid'";
-
-	my $sth = DBQueryFatal($image_query);
-
-	my @row = $sth->fetchrow;
-	if (!@row) {
-		die "No such imageid: $imageid\n";
-	}
-
-	return $row[0];
-}
-
-
-# Lock the tables used in this script - waits indefinitely until it
-# succeeds
-sub lock_tables {
-	while (1) {
-		&debug("Locking tables\n");
-		my $sth = DBQuery("LOCK TABLES images WRITE, ".
-				  "            emulab_indicies WRITE");
-		if (!$sth) {
-			print "DB Error locking tables. Waiting a bit ...\n";
-			sleep(10);
-		} else {
-			last;
-		}
-	}
+# Lock the tables used in this script
+sub LockTables()
+{
+    debug("locking tables\n");
+    if ($image->LockTables("images write, emulab_indicies write") != 0) {
+	Fatal("Error locking tables");
+    }
 }
 
 # Unlock the tables used in this script
-sub unlock_tables {
-	&debug("Unlocking tables\n");
-	DBQueryFatal("UNLOCK TABLES"); 
+sub UnlockTables()
+{
+    debug("Unlocking tables\n");
+    $image->UnLockTables();
 }
 
 # Pick out an address to use
-sub pick_address {
+sub PickAddress()
+{
     my $idx;
     my $baseaddr_query =
 	DBQueryFatal("select idx from emulab_indicies ".
@@ -448,10 +438,10 @@ sub pick_address {
 		
 		SENDMAIL($TBOPS,
 			 "FrisbeeLauncher Failed!",
-			 "Imageid: $imageid\n".
+			 "Image: $image\n".
 			 $mesg);
 	
-		tbdie($mesg);
+		Fatal($mesg);
 	    }
 	}
     }
@@ -467,58 +457,48 @@ sub pick_address {
     return "${address}:${port}";
 }
 
-# Pass in an imageid, and an address
-sub set_address {
-	my ($imageid,$address) = @_;
+# Set the load address and busy bit.
+sub SetAddress($)
+{
+    my ($address) = @_;
 
-	DBQueryFatal("UPDATE images SET load_address='$address',load_busy=1 " .
-		     "WHERE imageid='$imageid'");
+    $image->Update({"load_address" => $address, "load_busy" => 1}) == 0 or
+	fatal("Could not update load address for $image");
+}
+# Clear out the address (and pid) registered to this process
+sub ClearAddress()
+{
+    debug("Clearing out registered load_address and pid\n");
+
+    $image->Update({"load_address" => '',
+		    "load_busy"    => 0,
+		    "frisbee_pid"  => 0}) == 0 or
+	Fatal("Could not clear load address for $image");
 }
 
-# Pass in an imageid and a pid.
-sub set_pid {
-	my ($imageid,$pid) = @_;
+# Set the frisbee process ID.
+sub SetPid($)
+{
+    my ($pid) = @_;
 
-	DBQueryFatal("UPDATE images SET frisbee_pid=$pid " .
-		     "WHERE imageid='$imageid'");
+    $image->Update({"frisbee_pid" => $pid}) == 0 or
+	fatal("Could not update load address for $image");
 }
-
-# Pass in an imageid and a pid.
-sub clear_pid {
-	my ($imageid) = @_;
-
-	DBQueryFatal("UPDATE images SET frisbee_pid=0 " .
-		     "WHERE imageid='$imageid'");
-}
-
-# Bump the busy indicator to keep the frisbeed going.
-sub keepbusy($) {
-	my ($imageid) = @_;
-
-	DBQueryFatal("UPDATE images SET load_busy=GREATEST(load_busy,1) " .
-		     "WHERE imageid='$imageid'");
-
-	return 1;
+sub ClearPid()
+{
+    SetPid(0);
 }
 
 # Test the busy indicator, and set to zero.
-sub testbusy($) {
-	my ($imageid) = @_;
+sub TestBusy()
+{
+    my $busy = $image->load_busy();
 
-	my $query_result =
-	    DBQueryFatal("select load_busy from images ".
-			 "WHERE imageid='$imageid'");
-
-	my @row = $query_result->fetchrow;
-	if (!@row) {
-	        return 0;
-	}
-	
-	if ($row[0]) {
-	    DBQueryFatal("UPDATE images SET load_busy=0 ".
-			 "WHERE imageid='$imageid'");
-	}
-	return $row[0];
+    if ($busy) {
+	$image->Update({"load_busy" => 0}) == 0 or
+	    fatal("Could not clear busy for $image");
+    }	
+    return $busy;
 }
 
 # Kill off our child process, if started, and clear out registered address
@@ -528,15 +508,14 @@ sub cleanup {
 	if ($child_pid) {
 		kill 15, $child_pid;
 	}
-	&clear_address;
+	ClearAddress();
 	exit(1);
 }
 
-# Clear out the address (and pid) registered to this process
-sub clear_address {
-	&debug("Clearing out registered load_address and pid\n");
-	# Now, clear out the load_address we had set up
-	DBQueryFatal("update images set ".
-		     "load_address='',load_busy=0,frisbee_pid=0 ".
-		     "where imageid='$imageid'");
+sub Fatal($)
+{
+    my ($msg) = @_;
+    
+    tbdie("*** $0:\n".
+	  "    $msg\n");
 }
