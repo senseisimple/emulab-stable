@@ -105,16 +105,37 @@ if (!$noumount && -e "/share/freebsd") {
 #
 # Run anacron to bring everything up to date. It never runs again.
 #
-print "Running cron jobs.\n";
-system("anacron -d -f -s -n");
+# XXX anacron, at least later versions, insists on sending mail and there
+# is no way to disable it.  Since FC6 doesn't run sendmail, anacrons attempts
+# to send mail will hang and eventually timeout.  This makes things take a
+# lot longer, so we hack and temporarily move sendmail while we run anacron!
+#
+if (-x "/usr/sbin/sendmail") {
+    my $didrename = 0;
+    print "Running cron jobs (might see failed attempts to mail output).\n";
+    if (rename("/usr/sbin/sendmail", "/usr/sbin/_sendmail")) {
+	$didrename = 1;
+    }
+    system("anacron -d -f -s -n");
+    if ($didrename) {
+	rename("/usr/sbin/_sendmail", "/usr/sbin/sendmail");
+    }
+} else {
+    print "Running cron jobs.\n";
+    system("anacron -d -f -s -n");
+}
 
 #
 # Create locate and makewhatis DBs, which are no longer in weekly cron.
 #
-print "Building makewhatis DB. This could take a few minutes ...\n";
-system("/etc/cron.pend/makewhatis.cron");
-print "Building locate DB. This could take a few minutes ...\n";
-system("/etc/cron.pend/slocate.cron");
+if (-x "/etc/cron.pend/makewhatis.cron") {
+    print "Building makewhatis DB. This could take a few minutes ...\n";
+    system("/etc/cron.pend/makewhatis.cron");
+}
+if (-x "/etc/cron.pend/slocate.cron") {
+    print "Building locate DB. This could take a few minutes ...\n";
+    system("/etc/cron.pend/slocate.cron");
+}
 
 #
 # Generate a dumpdates file. Use fstab to find out what filesystems
