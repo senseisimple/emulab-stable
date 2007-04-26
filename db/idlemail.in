@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -223,7 +223,7 @@ EOT
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
-	system("$TB/sbin/idleswap -r -i $pid $eid > /dev/null") &&
+	system("$TB/sbin/idleswap -r -i $pid,$eid > /dev/null") &&
 	  warn("idlemail: Problem idleswapping $pid/$eid: $!\n");
     }
 
@@ -239,7 +239,7 @@ EOT
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
-	system("$TB/sbin/idleswap -r -a $pid $eid > /dev/null") &&
+	system("$TB/sbin/idleswap -r -a $pid,$eid > /dev/null") &&
 	  warn("idlemail: Problem autoswapping $pid/$eid: $!\n");
     }
 

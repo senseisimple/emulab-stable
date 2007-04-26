@@ -238,7 +238,7 @@ $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		  ($force ?
-		   "webidleswap $args $pid $eid" :
+		   "webidleswap $args $pid,$eid" :
 		   ($instance ?
 		    "webtemplate_swap$inout -e $eid $guid/$version" :
 		    "webswapexp -s $inout $pid $eid")),

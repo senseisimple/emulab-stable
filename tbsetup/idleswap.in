@@ -1,11 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 use Getopt::Std;
 
@@ -14,11 +13,14 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: idleswap [-i | -a] <pid> <eid>\n";
+    print STDOUT "Usage: idleswap [-i | -a] <eid>\n";
     exit(-1);
 }
 # Hidden switch: -r = root mode - used by idlemail
-my  $optlist = "iar";
+my $optlist    = "iar";
+my $idleswap   = 0;
+my $autoswap   = 0;
+my $rootokay   = 0;
 
 #
 # Configure variables
@@ -33,14 +35,12 @@ my $template_swapout = "$TB/bin/template_swapout";
 
 # Testbed Support libraries
 use lib "@prefix@/lib";
-use libaudit;
 use libdb;
 use libtestbed;
-use Template;
+use Experiment;
 
-# Locals.
-my $idleswap   = 0;
-my $autoswap   = 0;
+# Protos.
+sub fatal($);
 
 # Untaint the path
 $ENV{'PATH'} = '/bin:/usr/bin';
@@ -51,13 +51,12 @@ $| = 1;
 
 # We don't want to run this script unless its the real version.
 if ($EUID != 0) {
-    die("*** $0:\n".
-	"    Must be root! Maybe its a development version?\n");
+    fatal("Must be root! Maybe its a development version?");
 }
 
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"i"})) { $idleswap = 1; }
 if (defined($options{"a"})) { $autoswap = 1; }
@@ -66,107 +65,54 @@ if (defined($options{"r"})) { $rootokay = 1; }
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
 if ($UID == 0 && (!defined($rootokay) || !$rootokay) ) {
-    die("*** $0:\n".
-	"    Please do not run this as root! Its already setuid!\n");
+    fatal("Please do not run this as root! Its already setuid!");
 }
 
-if (@ARGV != 2) {
+if (@ARGV != 1) {
     usage();
 }
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
 
-# Untaint the arguments.
-if ($pid =~ /^([-\@\w.]+)$/) {
-    $pid = $1;
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
-else {
-    die("Tainted argument $pid!\n");
+
+#
+# Grab the Experiment
+#
+my $experiment = Experiment->Lookup($ARGV[0]);
+if (! defined($experiment)) {
+    fatal("No such experiment in the Emulab Database.");
 }
-if ($eid =~ /^([-\@\w.]+)$/) {
-    $eid = $1;
-}
-else {
-    die("Tainted argument $eid!\n");
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
+
+# Need the swapper for below.
+my $swapper = $experiment->GetSwapper();
+if (! defined($swapper)) {
+    fatal("Could not get object for swapper.");
 }
 
 # Only admins can forcibly swap an idle experiment out.
 if (! TBAdmin($UID) && ($UID!=0 || !$rootokay) ) {
-    die("*** $0:\n".
-	"    Only testbed administrators can issue a forcible swap!\n");
+    fatal("Only testbed administrators can issue a forcible swap!");
 }
 
-#
-# This script is always audited.
-#
-if (AuditStart(0)) {
-    #
-    # Parent exits normally
-    #
-    exit(0);
+# Flip to the user to do the swap.
+if ($swapper->FlipTo($experiment->unix_gid()) != 0) {
+    fatal("Could not flip to $swapper");
 }
 
-# Need to know the creator of the experiment.
-my $query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result->numrows) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid!\n");
-}
-my %hashrow = $query_result->fetchhash();
-my $creator = $hashrow{'expt_head_uid'};
-my $gid     = $hashrow{'gid'};
-my $exptidx = $hashrow{'idx'};
-
-# Fire off the swap and exit.
-#
-# Flip to the creator. The swap happens as the creator of the
-# experiment.
-my ($unix_uid, $unix_gid, $unix_gname);
-
-(undef,undef,$unix_uid) = getpwnam($creator) or
-  die("*** $0:\n".
-      "    No such user $creator\n");
-TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
-  die("*** $0:\n".
-      "    No such group $pid/$gid\n");
-
-#
-# Need the entire group list for the user, cause of subgroups, and cause
-# thats the correct thing to do. Too bad perl does not have a getgrouplist
-# function like the C library. Maybe its cleaner to just use sudo? Should
-# we get this info from the DB instead of using "id?" 
-#
-my $glist = `id -G $creator`;
-if ($glist =~ /^([\d ]*)$/) {
-    $glist = $1;
-}
-else {
-  die("*** $0:\n".
-      "    Unexpected results from 'id -G $creator': $glist\n");
-}
-
-# Send the email now, which terminates the audit.
-AuditEnd();
-
-# Remove current group from glist, then add gid twice at the front of the list
-# Order matters here, or we won't pick up all the groups we need.
-
-$glist =~ s/ ?\b$unix_gid\b ?//;
-$glist = $unix_gid . " " . $unix_gid . " " . $glist;
-
-$GID            = $unix_gid;
-$EGID           = $glist;
-$EUID = $UID    = $unix_uid;
-$ENV{'USER'}    = $creator;
-$ENV{'LOGNAME'} = $creator;
-
-if (my $instance = Template::Instance->LookupByExptidx($exptidx)) {
-    my $guid = $instance->guid();
-    my $vers = $instance->vers();
+if ($experiment->IsInstance()) {
+    my $instance = Template::Instance->LookupByExptidx($experiment->idx());
+    my $guid     = $instance->guid();
+    my $vers     = $instance->vers();
 
     exec "$template_swapout -e $eid $guid/$vers";
+    die("Failed to exec $template_swapout!");
 }
 else {
     my $arg = "";
@@ -176,8 +122,14 @@ else {
     else { $arg = "-f"; }
 
     exec "$swapexp $arg -s out $pid $eid";
+    die("Failed to exec $swapexp!");
 }
+exit(-1);
 
-die("*** $0:\n".
-    "    Failed to exec $swapexp!\n");
-
+sub fatal($)
+{
+    my ($msg) = @_;
+    
+    die("*** $0:\n".
+	"    $msg\n");
+}

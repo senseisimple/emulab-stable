@@ -217,6 +217,22 @@ sub AllActive($)
     return @result;
 }
 
+# This is needed a lot.
+sub unix_gid($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $group = $self->GetGroup();
+    return -1
+	if (!defined($group));
+
+    return $group->unix_gid();
+}
+
 #
 # LockTables simple locks the given tables, and then refreshes the
 # experiment instance (thereby getting the data from the DB after

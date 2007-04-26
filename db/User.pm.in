@@ -728,7 +728,67 @@ sub GroupMembershipList($$;$)
     }
     @$prval = @result;
     return 0;
-}    
+}
+
+#
+# Return a glist for setting user groups. The argument is the default
+# group, since the list has to be reordered for perl to do the right thing. 
+#
+sub GList($$)
+{
+    my ($self, $default) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $user_uid = $self->uid();
+
+    # Should we get this info from the DB instead of using "id?"
+    my $glist = `id -G $user_uid`;
+    if ($glist =~ /^([\d ]*)$/) {
+	$glist = $1;
+    }
+    else {
+	print STDERR "*** Unexpected results from 'id -G $user_uid': $glist\n";
+	return undef;
+    }
+
+    #
+    # Remove current group from glist, then add gid twice at the front
+    # of the list Order matters here, or we won't pick up all the groups
+    # we need.
+    #
+    $glist =~ s/ ?\b$default\b ?//;
+    $glist = $default . " " . $default . " " . $glist;
+
+    return $glist;
+}
+
+#
+# Flip to user, with the provided group as the default.
+#
+sub FlipTo($$)
+{
+    my ($self, $default_gid) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $glist = $self->GList($default_gid);
+    return -1
+	if (!defined($glist));
+
+    $GID            = $default_gid;
+    $EGID           = $glist;
+    $EUID = $UID    = $self->unix_uid();
+    $ENV{'USER'}    = $self->uid();
+    $ENV{'LOGNAME'} = $self->uid();
+
+    return 0;
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

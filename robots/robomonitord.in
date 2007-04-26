@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -340,5 +340,5 @@ sub SwapIt($$$)
     #
     my $optarg = ($force ? "-f" : "-a");
     
-    return(system("$idleswap $optarg -r $pid, $eid"));
+    return(system("$idleswap $optarg -r $pid,$eid"));
 }
