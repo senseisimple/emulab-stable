@@ -1747,7 +1747,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		  */
 		  res = mydb_query("select g.unix_name,g.unix_gid "
 				   "  from projects as p "
-				   "left join groups as g on p.pid=g.pid "
+				   "join groups as g on p.pid=g.pid "
 				   "where p.approved!=0 and "
 				   "      FIND_IN_SET('%s',pcremote_ok)>0",
 				   2, reqp->type);
@@ -1814,10 +1814,11 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "  UNIX_TIMESTAMP(u.usr_modified), "
 				 "  u.usr_email,u.usr_shell "
 				 "from group_membership as p "
-				 "left join users as u on p.uid_idx=u.uid_idx "
-				 "left join groups as g on p.pid=g.pid "
+				 "join users as u on p.uid_idx=u.uid_idx "
+				 "join groups as g on p.pid=g.pid "
 				 "where p.trust!='none' "
 				 "      and u.webonly=0 "
+                                 "      and g.unix_id is not NULL "
 				 "      and u.status='active' order by u.uid",
 				 14, reqp->pid, reqp->gid);
 	}
@@ -1839,12 +1840,13 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "  u.widearearoot,u.wideareajailroot, "
 				 "  u.usr_w_pswd "
 				 "from group_membership as p "
-				 "left join users as u on p.uid_idx=u.uid_idx "
-				 "left join groups as g on "
+				 "join users as u on p.uid_idx=u.uid_idx "
+				 "join groups as g on "
 				 "     p.pid=g.pid and p.gid=g.gid "
 				 "where ((p.pid='%s')) and p.trust!='none' "
 				 "      and u.status='active' "
 				 "      and u.webonly=0 "
+                                 "      and g.unix_gid is not NULL "
 				 "order by u.uid",
 				 17, reqp->pid);
 	}
@@ -1862,8 +1864,8 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  u.widearearoot,u.wideareajailroot, "
 			     "  u.usr_w_pswd "
 			     "from group_membership as p "
-			     "left join users as u on p.uid_idx=u.uid_idx "
-			     "left join groups as g on "
+			     "join users as u on p.uid_idx=u.uid_idx "
+			     "join groups as g on "
 			     "     p.pid=g.pid and p.gid=g.gid "
 			     "where (p.pid='%s') and p.trust!='none' "
 			     "      and u.status='active' and u.admin=1 "
@@ -1922,15 +1924,16 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "u.widearearoot,u.wideareajailroot, "
 				 "u.usr_w_pswd "
 				 "from projects as p "
-				 "left join group_membership as m "
+				 "join group_membership as m "
 				 "  on m.pid=p.pid "
-				 "left join groups as g on "
+				 "join groups as g on "
 				 "  g.pid=m.pid and g.gid=m.gid "
-				 "left join users as u on u.uid_idx=m.uid_idx "
+				 "join users as u on u.uid_idx=m.uid_idx "
 				 "where p.approved!=0 "
 				 "      and %s "
 				 "      and m.trust!='none' "
 				 "      and u.webonly=0 "
+                                 "      and g.unix_gid is not NULL "
 				 "      and u.status='active' "
 				 "order by u.uid",
 				 17, subclause);
@@ -2254,7 +2257,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "u.usr_email,u.usr_shell, "
 				 "u.widearearoot,u.wideareajailroot "
 				 "from widearea_accounts as w "
-				 "left join users as u on u.uid_idx=w.uid_idx "
+				 "join users as u on u.uid_idx=w.uid_idx "
 				 "where w.trust!='none' and "
 				 "      u.status='active' and "
 				 "      node_id='%s' "
