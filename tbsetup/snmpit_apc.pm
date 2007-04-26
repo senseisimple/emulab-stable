@@ -121,17 +121,23 @@ sub status {
     # come first, we use them.  We grab the number of phases supported,
     # then use that as a limit on how many status load values we retrieve.
     #
-    # The OID to retrieve the phases is: ".1.3.6.1.4.1.318.1.1.12.1.9";
+    # The OID to retrieve the phases is: ".1.3.6.1.4.1.318.1.1.12.1.9"
+    # for more recent units, or:         ".1.3.6.1.4.1.318.1.1.12.2.1.2"
+    # for older ones;
     # the load status table OID is:      ".1.3.6.1.4.1.318.1.1.12.2.3.1.1.2".
     #
     my $phases;
 
     $phases = $self->{SESS}->get([["rPDUIdentDeviceNumPhases",0]]);
     if (!$phases) {
-	# not all models support this MIB
-	print STDERR "Query phase: IdentDeviceNumPhases failed\n"
-	    if $self->{DEBUG};
-	return 0;
+	# not all models support this MIB, try another
+	$phases = $self->{SESS}->get([["rPDULoadDevNumPhases",0]]);
+	if (!$phases) {
+	    # some don't support either, bail.
+	    print STDERR "Query phase: IdentDeviceNumPhases/LoadDevNumPhases failed\n"
+		if $self->{DEBUG};
+	    return 0;
+	}
     }
 
     print "Okay.\nPhase report was '$phases'\n" if $self->{DEBUG};
