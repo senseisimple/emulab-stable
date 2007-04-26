@@ -91,13 +91,10 @@ usage()
     if (! @ARGV);
 
 #
-# Verify user and get his DB uid and other info for later.
+# Verify user and get his DB uid and other info for later. Note that
+# root can run this script, so we might not get an actual user.
 #
 my $this_user = User->ThisUser();
-if (! defined($this_user)) {
-    Fatal("You ($UID) do not exist!");
-}
-my $user_uid = $this_user->uid();
 
 #
 # Grab the Image.
@@ -112,7 +109,8 @@ my $filename = $image->path();
 #
 # Make sure that the user has sufficient permissions.
 #
-if (!$image->AccessCheck($this_user,
+if (defined($this_user) &&
+    !$image->AccessCheck($this_user,
 			 ($killmode ? TB_IMAGEID_DESTROY :
 			  TB_IMAGEID_READINFO))) {
     Fatal("Not enough permission!");
