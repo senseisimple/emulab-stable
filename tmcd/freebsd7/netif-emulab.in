@@ -7,7 +7,7 @@
 #
 
 # PROVIDE: netif-emulab
-# REQUIRE: atm1 ipfilter mountcritlocal pccard serial sppp sysctl
+# REQUIRE: atm1 ipfilter mountcritlocal serial sppp sysctl
 # REQUIRE: adjkerntz hostname ipfs ipnat kldxref random
 # BEFORE: netif
 # KEYWORD: nojail
