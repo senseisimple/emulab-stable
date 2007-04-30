@@ -76,7 +76,7 @@ if (@ARGV != 1) {
 # Verify user and get his DB uid and other info for later.
 #
 my $this_user = User->ThisUser();
-if (! defined($this_user)) {
+if (!defined($this_user) && !$rootokay) {
     fatal("You ($UID) do not exist!");
 }
 
@@ -96,8 +96,8 @@ if (! defined($swapper)) {
     fatal("Could not get object for swapper.");
 }
 
-# Only admins can forcibly swap an idle experiment out.
-if (! TBAdmin($UID) && ($UID!=0 || !$rootokay) ) {
+# Only admins or root can forcibly swap an idle experiment out.
+if (! TBAdmin() && ($UID!=0 || !$rootokay) ) {
     fatal("Only testbed administrators can issue a forcible swap!");
 }
 
