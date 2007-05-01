@@ -449,7 +449,7 @@ else {
 	adjustmap($areamap, 0, $running_y);
 	push(@areamaps, $areamap);
 	
-	$running_y += $floorimage->Get('height');
+	$running_y += $real_out_height;  ## $floorimage->Get('height');
     }
     dprint "images ".($img_n+1)."\n";
     ## Append and Coalesce get this error - 
@@ -564,6 +564,7 @@ sub dofloor($$)
     }
     $img_n++;
     my $baseimage = $images->[$img_n];
+    my $ppm = $baseimages{$building}->{"ppm"};
 
     # Figure out where the user clicked.  (Use the upper-left corner if no click yet.)
     # We won't have both scale and click coords, because they are separate controls.
@@ -702,12 +703,10 @@ sub dofloor($$)
 					 " and floor='$floor'");
 	
 	while (my %crow = $camera_result->fetchhash()) {
-	    my $xmin    = $crow{"loc_x"} * $baseimages{$building}->{"ppm"};
-	    my $ymin    = $crow{"loc_y"} * $baseimages{$building}->{"ppm"};
-	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * 
-		$baseimages{$building}->{"ppm"};
-	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) *
-		$baseimages{$building}->{"ppm"};
+	    my $xmin    = $crow{"loc_x"} * $ppm;
+	    my $ymin    = $crow{"loc_y"} * $ppm;
+	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * $ppm;
+	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) * $ppm;
 	    
 	    $err = $baseimage->Draw(stroke=>'orange',
 				    strokewidth=>'1',
@@ -935,13 +934,22 @@ sub dofloor($$)
 	#
 	# Stick in a very primitive scale bar.
 	#
-	# Scale_arg 0 means to use the 40% size thumbnail images.
-	my $fac = ($scale <= 2.0 ? ($scale_arg == 0 ? 3 : 2) : 1);
-	my $fac2 = ($scale_arg == 0 ? 2 : 5) * $fac;
-	my $lab = sprintf("%d Meters", 5 * $fac);
-	dprint "scale bar fac $fac fac2 $fac2 lab $lab\n";
+	# Zoom factor: scale_arg 0 means to use the 40% size thumbnail images.
+	$fac = ($scale <= 2.0 ? ($scale_arg == 0 ? 3 : 2) : 1);
+	my ($lab, $fac2);
+	if ( $ppm < 100.0 ) {
+	    # Show a 15 meter scale bar for thumbnails, 10 normal, zoomed 5.
+	    $lab = sprintf("%d Meters", 5 * $fac);
+	    $fac2 = ($scale_arg == 0 ? 2 : 5) * $fac;
+	}
+	else {
+            # Use a 50 cm scale for the pc600 wifi cluster map.
+            $lab = "50 cm";
+            $fac2 = ($scale_arg == 0 ? 0.2 : 0.5);
+	}
+        dprint "scale bar: ppm $ppm, fac $fac, fac2 $fac2, lab $lab\n";
 
-	my $dis = int($baseimages{$building}->{"ppm"} * $fac2);
+	my $dis = int($ppm * $fac2);
 	my $sx1 = $this_width - ($dis + 10);
 	my $sx2 = $this_width - 10;
 	my $lx  = $sx1 + (($dis / 2) - ((length($lab) * 8) / 2));
@@ -1067,6 +1075,7 @@ sub calc_offsets($$$$$) {
 sub adjustmap($$$)
 {
     my ($mapref, $x, $y) = @_;
+    dprint "adjustmap x $x y $y\n";
 
     foreach my $nodeid (keys(%{ $mapref })) {
 	$mapref->{$nodeid}->{"X1"} += $x;
@@ -1120,7 +1129,8 @@ sub writefiles($@)
 			   "floormap.php3?building=${pc600wifi_bldg}" :
 			   "shownode.php3?node_id=${nodeid}")));
 	    my $title = ($isobs ? $descr :
-			 ($ispc600wifi ? "pc600 Wifi Cluster" : $nodeid));
+			 ($ispc600wifi ? "pc600 WiFi Cluster ($nodeid)" :
+			  $nodeid));
 
 	    $title .= " (vname=" . $map{$nodeid}->{'VNAME'} . ")"
 		if (exists($map{$nodeid}->{'VNAME'}));
