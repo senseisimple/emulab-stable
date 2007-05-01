@@ -25,6 +25,58 @@ else
 fi
 
 #
+# Update the MBR of the given disk to the indicated "version."
+#
+# XXX this is somewhat of a hack right now.  We recognize two
+# versions of the MBR:
+#	v1 (partition 1 size 6281352)
+#	v2 (partition 1 size 12305790)
+# Currently we only install a new MBR if the existing one is the
+# wrong size, just in case the user has customized the boot program.
+#
+tweakmbr() {
+    _DSK=$1
+    _NEW=$2
+
+    dd if=/dev/$_DSK of=/dev/null bs=512 count=1 2>/dev/null || {
+	echo "WARNING: could not read from $_DSK, MBR not changed"
+	return
+    }
+
+    _size=`fdisk -s $_DSK 2>/dev/null | sed -n -e 's/^ *1: *[0-9][0-9]* *\([0-9][0-9]*\).*$/\1/p'`
+    case ${_size}s in
+    6281352s)
+	_CUR=1
+	;;
+    12305790s)
+	_CUR=2   
+	;;
+    s)
+        # special case: no part1 so probably no MBR at all, make sure we install
+	echo "Found no MBR on $_DSK, installing version $_NEW"   
+	_CUR=1000000
+	;;
+    *)
+	echo "WARNING: custom MBR on $_DSK, not changed"
+	return
+    	;;
+    esac
+
+    if [ $_CUR = $_NEW ]; then
+	return
+    fi
+
+    # now set it if we can
+    if [ ! -r "/etc/emulab/mbr${_NEW}.dd" ]; then
+	echo "WARNING: cannot find MBR version $_NEW, not installed"
+	return
+    fi
+
+    echo "Installing MBR version $_NEW ..."
+    dd if=/etc/emulab/mbr${_NEW}.dd of=/dev/$_DSK bs=512 count=1
+}
+
+#
 # Function to zero all potential superblocks in the DOS partitions that
 # could interfere with the OSes on the image being loaded.
 #
@@ -87,6 +139,8 @@ ZFILL=`echo $LOADINFO | awk -F= '{ printf $6 }' | awk -F' ' '{ print $1 }'`
 ZFILL=${ZFILL:-'0'}
 ACPI=`echo $LOADINFO | awk -F= '{ printf $7 }' | awk -F' ' '{ print $1 }'`
 ACPI=${ACPI:-'unknown'}
+MBR=`echo $LOADINFO | awk -F= '{ printf $8 }' | awk -F' ' '{ print $1 }'`
+MBR=${MBR:-'1'}
 
 if [ "$PARTITION" != "0" ]; then
 	SLICE="-s $PARTITION"
@@ -183,6 +237,14 @@ if [ x"$ADDRESS" != x ]; then
 	    fi
 	    ;;
 	esac
+
+	#
+	# For slice images, ensure that the MBR is the correct version
+	# and replace if not.
+	#
+	if [ "$PARTITION" != "0" ]; then
+	    tweakmbr $DISK $MBR
+	fi
 
 	#
 	# If not zeroing the disk and we are loading a full disk image
