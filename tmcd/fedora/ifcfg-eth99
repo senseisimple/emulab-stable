@@ -1,0 +1,66 @@
+#/bin/sh -
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# HACK: run dhclient on all interfaces, and do nothing else
+#
+# Note that this file's name (eth99) cannot overlap with an actual
+# existing interface or dhclient will loop.  dhclient-script invokes
+# the source-config function which sources the ifcfg-ethN file.  Thus
+# if this script were called "ifcfg-eth0" and eth0 was the DHCPable
+# interface, we would wind up recursively invoking dhclient (trust me,
+# I tried it :-)
+#
+
+. /etc/emulab/paths.sh
+
+DEVICE="eth99"
+IFACETYPES="3c59x e100 e1000 tulip"
+
+#
+# First, probe for all our supported ethernet types
+#
+modprobe -qa $IFACETYPES
+
+#
+# If dhclient returns success, then it has configured the first interface
+# and gone into background mode.  At that point we don't care about it any
+# more and just kill it.  We also shutdown all the other interfaces (which
+# dhclient will leave "up") and set ONBOOT=no to prevent ifup (our caller)
+# from doing any further configuration on this fake interface.
+#
+if [ -x /sbin/dhclient ] && /sbin/dhclient -q ; then
+    killall dhclient
+
+    if [ -e $BOOTDIR/controlif ]; then
+	interface=`cat $BOOTDIR/controlif`
+	for _if in `ifconfig -s | awk '{ print $1 }' | grep -v Iface`
+	do
+	    if [ $_if != "lo" -a x$_if != x$interface ]
+	    then
+		echo "taking $_if down"
+	        ifconfig $_if down
+	    fi >>$LOGDIR/dhclient.log 2>&1
+	done
+
+        #
+        # Now probe for wifi interfaces.  We don't want to
+        # do this before dhcp'ing on the wired interfaces since
+        # there is a possibility that the wifi interface will
+        # grab an address and become the control net!
+        #
+        # This expects to load the madwifi-ng driver; the param states
+        # that no "virtual AP" device is to be created on module load.
+        # This is deferred until Emulab interface configuration time.
+        #
+        modprobe -q ath_pci autocreate=none
+    fi
+    ONBOOT="no"
+else
+    # eat flaming death
+    exit 1
+fi

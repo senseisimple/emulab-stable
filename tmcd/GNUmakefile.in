@@ -41,6 +41,9 @@ SSLOBJ   = ssl.o
 
 ifeq ($(SYSTEM),Linux)
 RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\).*/Linux\1/')
+ifeq ($(RHLVERSION),)
+RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Fedora Core release \([0-9]\).*/Fedora\1/')
+endif
 ifeq ($(NOSTATIC),)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 else
@@ -51,10 +54,14 @@ ifeq ($(NEEDKERB),0)
  TMLIBS   += `/usr/kerberos/bin/krb5-config --libs krb5`
 endif
 TMLIBS  += -ldl
+ifeq ($(findstring Fedora,$(RHLVERSION)),Fedora)
+MDSUBDIR  = fedora
+else
 ifeq ($(RHLVERSION),Linux9)
 MDSUBDIR  = linux9
 else
 MDSUBDIR  = linux
+endif
 endif
 endif
 

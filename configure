@@ -2491,6 +2491,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/linux/supfile \
 	tmcd/linux/sethostname.dhclient \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
+	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
         tmcd/linux-sg/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
