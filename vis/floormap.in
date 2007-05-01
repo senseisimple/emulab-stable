@@ -797,9 +797,11 @@ sub dofloor($$)
 		}
 	    }
 
-	    # Link to a special page for the pc600 Wifi Cluster nodes.
+	    # Link to a special page for the pc600 Wifi Cluster nodes, 
+	    # except on their own map.
 	    my $ispc600wifi = defined($rowref->{"feature"}) &&
-		$rowref->{"feature"} eq "pc600wifi";
+		$rowref->{"feature"} eq "pc600wifi" && 
+		    $building ne $pc600wifi_bldg;
 	    $props->{'ISPC600WIFI'} = $ispc600wifi;
 
             my $x2 = $x + $DOT_RAD;
@@ -881,7 +883,7 @@ sub dofloor($$)
 				    ($o > 180.0 && $o < 360.0)));
 	    
 	    # No labels on the pc600 wifi cluster nodes, except on their own map.
-	    if (!$ispc600wifi || $building eq $pc600wifi_bldg) {
+	    if (!$ispc600wifi) {
 		$err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
 					    text=>"$label");
 		warn "$err" if "$err";
