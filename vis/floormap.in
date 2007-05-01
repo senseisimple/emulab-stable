@@ -51,6 +51,7 @@ my $show_exclusion = 0;
 my $show_nodes     = 1;
 
 my $building;
+my $pc600wifi_bldg = "MEB-MRC600";
 my $floor;
 my $image;
 
@@ -497,18 +498,19 @@ sub dofloor($$)
     # Grab the nodes on this floor in this building. We want to know
     # their allocation status so we know what colors to use.
     #
-    my $query = "select loc.*,r.pid,r.eid,r.vname, ".
+    my $query = "select loc.*,r.pid,r.eid,r.vname,f.feature, ".
                 "  n.battery_voltage,n.battery_percentage, ".
 		"  n.destination_x,n.destination_y,n.destination_orientation ".
 		"  from location_info as loc ".
 		"left join reserved as r on r.node_id=loc.node_id ".
 		"left join nodes as n on n.node_id=loc.node_id ".
-		(defined($feature_filter)?"left join node_features as f on f.node_id=loc.node_id ":"") .
+		"left join node_features as f on f.node_id=loc.node_id " .
 		"where loc.building='$building' " .
                 (defined($feature_filter)?" and f.feature='$feature_filter' ":"") . 
 		(defined($pid) ? " and r.pid='$pid' and r.eid='$eid'" : "");
-    my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
-
+    # Overlap dots left-to right, top-to-bottom where they are close-packed.
+    my $order = " order by loc.loc_x, loc.loc_y";
+    my $query_result = DBQueryFatal($query . " and loc.floor='$floor'" . $order );
     
     my $newnodes_query = "select * from new_nodes ".
 		         "where building='$building'";
@@ -517,7 +519,7 @@ sub dofloor($$)
     # When ghosting is turned on, get nodes from all floors to be overlaid.
     my ($ghost_result, $ghost_newnodes_result);
     if ($ghost) {
-	$ghost_result = DBQueryFatal($query);
+	$ghost_result = DBQueryFatal($query . $order);
 	$ghost_newnodes_result = DBQueryFatal($newnodes_query);
     }
 
@@ -794,6 +796,12 @@ sub dofloor($$)
 		    }
 		}
 	    }
+
+	    # Link to a special page for the pc600 Wifi Cluster nodes.
+	    my $ispc600wifi = defined($rowref->{"feature"}) &&
+		$rowref->{"feature"} eq "pc600wifi";
+	    $props->{'ISPC600WIFI'} = $ispc600wifi;
+
             my $x2 = $x + $DOT_RAD;
 	    if ($ghost && $rowref->{"floor"} != $floor) { 
 		$err = $baseimage->Draw(stroke=>$color, strokewidth=>'1.5',
@@ -872,9 +880,12 @@ sub dofloor($$)
 		if (defined($o) && (($o < 0.0 && $o > -180.0) || 
 				    ($o > 180.0 && $o < 360.0)));
 	    
-            $err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
-					text=>"$label");
-            warn "$err" if "$err";            
+	    # No labels on the pc600 wifi cluster nodes, except on their own map.
+	    if (!$ispc600wifi || $building eq $pc600wifi_bldg) {
+		$err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
+					    text=>"$label");
+		warn "$err" if "$err";
+	    }
 
 	    $props->{"X1"} = $x - $DOT_RAD;
 	    $props->{"Y1"} = $y - $DOT_RAD;
@@ -1098,12 +1109,16 @@ sub writefiles($@)
 	    my $isobs = $map{$nodeid}->{"ISOBS"};
 	    my $descr = $map{$nodeid}->{"DESCR"};
 	    my $isnew = $map{$nodeid}->{"ISNEW"};
+	    my $ispc600wifi = $map{$nodeid}->{"ISPC600WIFI"};
 	    my $link  = ($isobs ?
 			 "showobstacle.php3?id=${nodeid}" :
 			 ($isnew ?
 			  "newnode_edit.php3?id=${isnew}" :
-			  "shownode.php3?node_id=${nodeid}"));
-	    my $title = ($isobs ? $descr : $nodeid);
+			  ($ispc600wifi ?
+			   "floormap.php3?building=${pc600wifi_bldg}" :
+			   "shownode.php3?node_id=${nodeid}")));
+	    my $title = ($isobs ? $descr :
+			 ($ispc600wifi ? "pc600 Wifi Cluster" : $nodeid));
 
 	    $title .= " (vname=" . $map{$nodeid}->{'VNAME'} . ")"
 		if (exists($map{$nodeid}->{'VNAME'}));
