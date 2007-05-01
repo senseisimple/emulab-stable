@@ -3936,15 +3936,15 @@ last_net_act,last_cpu_act,last_ext_act);
 
          ./step4_newids.pl
 
-4.114: Minor fix to schema file; skip to next entry.
+4.113: Minor fix to schema file; skip to next entry.
 
-4.115: Add a workbench flag to the project table.
+4.114: Add a workbench flag to the project table.
 
        alter table projects add 
            `allow_workbench` tinyint(1) NOT NULL default '0'
 	    after cvsrepo_public;
 
-4.116: Add custom history table for planetlab nodes.
+4.115: Add custom history table for planetlab nodes.
 
        DROP TABLE IF EXISTS `plab_nodehist`;
        CREATE TABLE `plab_nodehist` (
@@ -3959,22 +3959,32 @@ last_net_act,last_cpu_act,last_ext_act);
 	   PRIMARY KEY  (`idx`,`node_id`)
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-4.117: Add a field to specify to which network a private PLC is connected.
+4.116: Add a field to specify to which network a private PLC is connected.
 
        alter table virt_nodes add 
            `plab_plcnet` varchar(32) NOT NULL default 'none'
 	   after plab_role;
 
-4.118: Add a field to hold a legacy PLC slice ticket (since the migration from
+4.117: Add a field to hold a legacy PLC slice ticket (since the migration from
        3.x to 4.x continues).
 
        alter table plab_slices add 
            `slicemeta_legacy` text 
 	   after slicemeta;
 
-4.119: Add UUIDs to lots of tables.
+4.118: Add UUIDs to lots of tables.
 
        All of the sql changes are made in the following script:
 
          ./step5_newids.pl
 
+4.119: Add MBR "version number" to images table.  This might be considered
+       a step backward since it is not a GUID, but this field is viewed as
+       a temporary step.  Ultimately, OSIDs will have to have max sizes
+       associated with them so that MBRs (or GPTs or ...) can be dynamically
+       created per-image based on the OSIDs in the image, where they reside,
+       and what machine type they are being loaded on.
+
+       alter table images add
+	  `mbr_version` tinyint(4) NOT NULL default '1'
+	  after global;

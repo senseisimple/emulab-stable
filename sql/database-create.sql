@@ -1236,6 +1236,7 @@ CREATE TABLE `images` (
   `ezid` tinyint(4) NOT NULL default '0',
   `shared` tinyint(4) NOT NULL default '0',
   `global` tinyint(4) NOT NULL default '0',
+  `mbr_version` tinyint(4) NOT NULL default '1',
   `updated` datetime default NULL,
   PRIMARY KEY  (`imageid`),
   UNIQUE KEY `pid` (`pid`,`imagename`),
