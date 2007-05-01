@@ -501,6 +501,9 @@ echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
 if (isset($feature)) {
     echo "  <input type=\"hidden\" name=\"feature\" value=\"$feature\">\n";
 }
+if (isset($building)) {
+    echo "  <input type=\"hidden\" name=\"building\" value=\"$building\">\n";
+}
 
 # The last_* items come from a .state file with the map, from the Perl script.
 if (! readfile("${prefix}.state")) {
