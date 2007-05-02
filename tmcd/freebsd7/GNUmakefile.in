@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -89,4 +89,4 @@ sysetc-install:	dir-install netif-emulab
 	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab
 
 script-install:	dir-install
-#	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/rc.freebsd $(BINDIR)/rc
