@@ -121,30 +121,6 @@ if len(RSYNC) == 0:
     sys.exit(2)
     pass
 
-IDENTITY = None
-
-try:
-    auth = open(os.path.join(HOME, ".ssh", "authorized_keys"), "r").read()
-
-    for (pub, full) in ((os.path.join(HOME, ".ssh", "identity.pub"),
-                         (1, os.path.join(HOME, ".ssh", "identity"))),
-                        (os.path.join(HOME, ".ssh", "id_rsa.pub"),
-                         (2, os.path.join(HOME, ".ssh", "id_rsa")))):
-        try:
-            idpub = open(pub, "r").read()
-            
-            if auth.find(idpub) != -1:
-                IDENTITY = full
-                break
-            pass
-        except IOError:
-            pass
-        pass
-    pass
-except IOError:
-    pass
-
-
 def loghole_include(path):
     retval = ""
 
@@ -946,9 +922,6 @@ def rsync(host, base, dlpath = None, paths = ["/"], port = None,
                     + "-o Compression=no "
                     + "-o UserKnownHostsFile="
                     + os.path.join(HOME, ".ssh", "emulab_known_hosts"))
-        if IDENTITY:
-            ssh_args += " -o Protocol=%d -i %s" % IDENTITY
-            pass
         if port:
             ssh_args += " -p " + str(port)
             pass
