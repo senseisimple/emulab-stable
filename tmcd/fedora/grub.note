@@ -1,0 +1,19 @@
+This note applies to images using GRUB as the bootloader (currently, FC6-STD).
+
+In /boot/grub/grub.conf, we have hardwired the serial port address for COM1 to 
+0x3f8.  This is valid for most machines (probably all modern ones!).  The 
+reason it's set this way, instead of GRUB's "--unit=0" way is because some 
+BIOSes whack the BIOS data area containing the COM port addresses if console 
+redirection is enabled.  For instance, the Emulab pc850 BIOS writes 0x2f8 into 
+the the BDA for the COM1 address, and 0x0 for COM2).  This is an issue since
+GRUB uses the "unit" number (i.e., /dev/ttySX) to index into the COM address
+section of the BDA, and thus obtain the correct port address.  Unfortunately, 
+there doesn't seem to be a way to help GRUB get the correct address out of the
+BIOS (reinitializing the COM unit specified in grub.conf|menu.lst via BIOS int
+does not work, and it seems unlikely that anything else would -- the only way
+out is to do something more along the lines of serial device drivers; i.e., 
+the Linux ones.
+
+If you don't get output on serial with the FC6 image on your hardware, try 
+removing the "--port=0x3f8" argument from the "serial" option line in 
+/boot/grub/grub.conf.
