@@ -343,7 +343,7 @@ sub addNew($){
                      "unixstamp > $t0 and ".
                      "unixstamp < $t1 ".
                      "limit 1";
-    print "Running query '$qstr'\n";
+    #print "Running query '$qstr'\n";
     my @results = getRows($qstr);
     if( !scalar(@results) ){
         #warn("No latency results from $nodeid\n");
