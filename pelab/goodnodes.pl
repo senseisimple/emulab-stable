@@ -49,7 +49,11 @@ my $verbose = 0;
 my ($t0, $t1);
 my %opt = ();
 getopts("0:1:e:f:t:v", \%opt);
-if ($opt{e}) { ($pid,$eid) = split('/', $opt{e}); }
+if ($opt{e}) {
+    ($pid,$eid) = split('/', $opt{e});
+} else {
+    $pid = "tbres"; $eid = "pelabbgmon";
+}
 if ($opt{f}) { $blacklistfilename = $opt{f}; }
 if ($opt{t}) { $type = $opt{t}; }
 if ($opt{v}) { $verbose = 1; }
