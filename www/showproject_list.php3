@@ -247,6 +247,9 @@ function GENPLIST ($query_result)
 
     while (list($pid, $foo) = each($showby)) {
 	$projectrow = $projectrows["$pid"];
+	if (!isset($projectrow)) {
+	    continue;
+	}
 	$headidx    = $projectrow["head_idx"];
 	$Pname      = $projectrow["name"];
 	$approved   = $projectrow["approved"];
