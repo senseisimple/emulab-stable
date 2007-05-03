@@ -2272,6 +2272,9 @@ class template_startrun:
         print "     -y   - Default params, one of template,instance,lastrun";
         print "     -r   - A token (id) for the run";
         print "     -e   - Instance ID (aka eid)";
+	print "     -w   - Wait until run has started";
+	print "     -m   - Reparse ns file (effectively a swap modify)";
+        print "     -c   - run loghole clean before starting run";
         print "    guid  - Template GUID";
         print ""
         print "Environment:"
