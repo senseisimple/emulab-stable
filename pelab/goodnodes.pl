@@ -58,6 +58,10 @@ if ($opt{1}) { $t1 = $opt{1}; }
 elsif($opt{0}) { $t1 = $t0+$windowHrsDef*60*60; }
 else { $t1 = time(); }
 if (@ARGV !=1) { exit &usage; }
+
+#
+# These are globals
+#
 my $numnodes = $ARGV[0];
 my @allnodes = ();      #nodes to consider, in order of desirablility (?)
 my %chosenBySite = ();  #indexed by siteidx, maps to plabxxx
@@ -75,7 +79,7 @@ open FILE, "< $allnodeFile"
     or die "Can't open file";
 my @allnodesinfo = <FILE>;
 foreach my $nodeinfo (@allnodesinfo){
-    my @fields = split " ",$nodeinfo;
+    my @fields = split /\s+/, $nodeinfo;
     #we only want the plabxxx value (for now)
     push @allnodes, $fields[0];
     #print "$fields[0]\n";
@@ -163,17 +167,22 @@ if( defined($pid) && defined($eid) ){
 #
 # build set of nodes to test for fully-connectedness.
 #
+my $foundEnoughNodes = 0;
 for( $allnodesIndex=0; $allnodesIndex < scalar(@allnodes); $allnodesIndex++ ){
     if( !addNew($allnodesIndex) ){
     }
     if( scalar( keys %chosenBySite ) == $numnodes ){
-#        print "got $numnodes nodes\n";
+        $foundEnoughNodes = 1;
         last;
     }
 }
 
+if (!$foundEnoughNodes) {
+    die "Initial pass unable to find $numnodes sutiable nodes\n";
+}
+
 if ($verbose) {
-    print "Starting main loop\n";
+    print "Starting main loop - " . scalar(@allnodes). " nodes in \@allnodes\n";
 }
 #
 #
@@ -184,7 +193,8 @@ my ($lowestRatedSite, $lowestRating) = ();
 do{    
     ($lowestRatedSite, $lowestRating) = fullyConnTest();
     if ($verbose) {
-        print "lowestRatedSite=$lowestRatedSite, lowestRating=$lowestRating\n";
+        print "mainloop: lowestRatedSite=$lowestRatedSite, " .
+              "lowestRating=$lowestRating\n";
     }
     if( !isFullyConn($lowestRating) ){
         #modify set
@@ -193,18 +203,26 @@ do{
 #            "with rating=$lowestRating\n";
         delete $chosenBySite{$lowestRatedSite};
         # add new node
+        if ($verbose) {
+            print "mainloop: chosenBySite=" . (scalar keys %chosenBySite) .
+                  "\n";
+        }
         while( scalar(keys %chosenBySite) < $numnodes )
         {
-            if( $allnodesIndex < scalar(@allnodes)-1 ){
+            if ($allnodesIndex < scalar(@allnodes)-1) {
                 $allnodesIndex++;
+                if ($verbose) {
+                    print "mainloop: Trying new index $allnodesIndex\n";
+                }
                 #addNew will add to chosenBySite if good N.
                 addNew($allnodesIndex); 
-            }else{
-                die "COULD NOT MAKE FULLY CONNECTED SET!\n";
+            } else {
+                die "COULD NOT MAKE FULLY CONNECTED SET: Reached " .
+                    "$allnodesIndex of " . (scalar(@allnodes)-1) . "\n";
             }
         }
     }
-}while( !isFullyConn($lowestRating) ); #test if fully-connected
+} while( !isFullyConn($lowestRating) ); #test if fully-connected
 
 print "FULLY CONNECTED (n=$numnodes)!\n";
 print "allnodeindex=$allnodesIndex of ".scalar(@allnodes)."\n";
@@ -244,7 +262,7 @@ sub fullyConnTest{
  
     my @sites = keys %chosenBySite;
     if ($verbose) {
-        print "sites=@sites\n";
+        print "fullyConnTest(): sites=@sites\n";
     }
 
     for( my $i=0; $i<scalar(@sites)-1; $i++ ){
@@ -325,9 +343,10 @@ sub addNew($){
                      "unixstamp > $t0 and ".
                      "unixstamp < $t1 ".
                      "limit 1";
+    print "Running query '$qstr'\n";
     my @results = getRows($qstr);
     if( !scalar(@results) ){
-#        warn("No latency results from $nodeid\n");
+        #warn("No latency results from $nodeid\n");
         return 0;
     }
 
