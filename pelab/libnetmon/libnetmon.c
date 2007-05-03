@@ -707,6 +707,7 @@ void printlog(logmsg_t type, int fd, ...) {
             if (output_version < 3) { print = false; }
             if (!monitor_udp) { print = false; }
             print_value = false;
+	    break;
         default:
             croak("Invalid type (%i) passed to printlog()\n",type);
     }
@@ -1438,7 +1439,9 @@ ssize_t sendto(int fd, const void *buf, size_t count, int flags,
  * Wrap the sendmsg() function 
  */
 ssize_t sendmsg(int s, const struct msghdr *msg, int flags) {
+
     ssize_t rv;
+    struct sockaddr_in *serv_addr = (struct sockaddr_in *)(msg->msg_name);
 
     lnm_init();
     lnm_control();
@@ -1451,10 +1454,47 @@ ssize_t sendmsg(int s, const struct msghdr *msg, int flags) {
     rv = real_sendmsg(s,msg,flags);
 
     if ((rv > 0) && monitorFD_p(s)) {
-        printlog(LOG_SENDMSG,s);
+            /*
+             * If this socket is UDP and not connected, we need to make sure that we
+             * have the local port number, so that we can include it in the sendto()
+             * reports
+             */
+            if (monitorFDs[s].socktype == SOCK_DGRAM && !connectedFD_p(s) &&
+                            monitorFDs[s].local_port == 0) {
+                    // TODO: This overlaps a bit with nameFD - there is probably some
+                    // refactoring that should be done.
+                    struct sockaddr_in *localaddr;
+                    union {
+                            struct sockaddr sa;
+                            char data[128];
+                    } sockname;
+                    socklen_t namelen;
+                    namelen = sizeof(sockname.data);
+                    int gsn_rv = getsockname(s,(struct sockaddr *)sockname.data,&namelen);
+                    if (gsn_rv != 0) {
+                            croak("Unable to get local socket name: %s\n", strerror(errno));
+                    }
+                    localaddr = (struct sockaddr_in *) &(sockname.sa);
+                    monitorFDs[s].local_port = ntohs(localaddr->sin_port);
+            }
+            /*
+             * Report on the actual packet
+             */
+
+            // UDP connection-less sockets.
+            if(msg->msg_namelen > 0)
+            {
+                    // We ignore all IPv6 connections for now.
+                    if(serv_addr->sin_family == AF_INET)
+                            log_packet(s,rv,(struct sockaddr *)serv_addr);
+            }
+            else // TCP and connection oriented UDP sockets.
+                    log_packet(s,rv,NULL);
     }
 
     return rv;
+
+
 
 }
 
