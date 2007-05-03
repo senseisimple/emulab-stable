@@ -669,7 +669,7 @@ class Plab:
                 pass
             except herror:
                 nodeent['HNAME'] = nodeent['IP']
-                print "WARNING: Failed to get hostname for %s" % nodeent['IP']
+                print "Warning: Failed to get hostname for %s" % nodeent['IP']
                 pass
             pass
         
@@ -698,7 +698,7 @@ class Plab:
                 nodeent['LINKTYPE'] = "pcplabinet"
                 return
         else:
-            print "WARNING: Unknown gateway for host %s" % nodeent['IP']
+            print "Warning: Unknown gateway for host %s" % nodeent['IP']
 
         # We don't know - must manually classify.
         nodeent['LINKTYPE'] = "*Unknown*"
@@ -1128,7 +1128,7 @@ class Plab:
                 failstr += "%s/%s: (expires: %s UTC)\n" % \
                            (n[:2] + (time.asctime(time.gmtime(n[2])),))
                 pass
-            SENDMAIL(TBOPS, "WARNING: PLAB leases have expired, or will soon",
+            SENDMAIL(TBOPS, "Warning: PLAB leases have expired, or will soon",
                      "The following plab leases have expired, or will soon:\n"
                      + failstr + "\n\nPlease look into it!", TBOPS)
             pass
@@ -1195,7 +1195,7 @@ class Slice:
                 try:
                     self.plab.compat_agent.createSlice(self)
                 except:
-                    print "WARNING: compat agent failed in createSlice; " \
+                    print "Warning: compat agent failed in createSlice; " \
                           "\n  watch for inconsistent DB state!"
                     pass
                 pass
@@ -1239,7 +1239,7 @@ class Slice:
                 try:
                     self.plab.compat_agent.deleteSlice(self)
                 except:
-                    print "WARNING: compat agent failed in deleteSlice; " \
+                    print "Warning: compat agent failed in deleteSlice; " \
                           "\n  watch for inconsistent DB state!"
                     pass
                 pass
@@ -1331,7 +1331,7 @@ class Slice:
                 try:
                     self.plab.compat_agent.renewSlice(self)
                 except:
-                    print "WARNING: compat agent failed in renewSlice; " \
+                    print "Warning: compat agent failed in renewSlice; " \
                           "\n  watch for inconsistent DB state!"
                     pass
                 pass
@@ -1423,7 +1423,7 @@ class Slice:
             try:
                 self.plab.compat_agent.deleteSlice(self)
             except:
-                print "WARNING: compat agent failed in deleteSlice; " \
+                print "Warning: compat agent failed in deleteSlice; " \
                       "\n  watch for inconsistent DB state!"
                 pass
             pass
@@ -1526,9 +1526,6 @@ class Node:
     def __init__(self, slice, nodeid, pollNode = False):
         self.slice = slice
         self.nodeid = nodeid
-        #self.IP = self.__findIP()
-        #self.hostname = self.__findHostname()
-        #self.phys_nodeid = self.__findPhysNodeID()
         (self.IP,self.hostname,self.phys_nodeid) = self.__findHostInfo()
         self.leaseend = 0
         self.nodemeta = None
@@ -1548,7 +1545,7 @@ class Node:
                           component,operation,status,str(msg)))
         except:
             # do nothing
-            print "WARNING: could not log (%s,%s,%s,%s) into plab_nodehist!" % \
+            print "Warning: could not log (%s,%s,%s,%s) into plab_nodehist!" % \
                   (component,operation,status,msg)
             pass
         pass
@@ -1737,15 +1734,14 @@ class Node:
                     # found a valid prefix for the rootball; update the name
                     rrootballname = rootball_triggers[tpc][tnc] + rootballname
                     if debug:
-                        print "Updated rootball name from %s to %s" % (rootballname,
-                                                                       rrootballname)
+                        print "Updated rootball name from %s to %s" \
+                              % (rootballname,rrootballname)
                         pass
                     pass
                 else:
                     if debug:
-                        print "rbtriggers: %s; looking for %s/%s" % (str(rootball_triggers),
-                                                                     str(tpc),
-                                                                     str(tnc))
+                        print "rbtriggers: %s; looking for %s/%s" \
+                              % (str(rootball_triggers),str(tpc),str(tnc))
                         pass
                     pass
                 pass
@@ -1756,7 +1752,7 @@ class Node:
                 pass
             pass
         except:
-            print "WARNING: exception while trying to update rootball name"
+            print "Warning: exception while trying to update rootball name"
             traceback.print_exc()
             pass
         
@@ -1836,8 +1832,8 @@ class Node:
                 if rtries == 0:
                     raise
                 else:
-                    print "WARNING: perform %s on %s failed, try %d" \
-                          % (command,self.nodeid,tries-rtries)
+                    print "Warning: perform %s on %s failed, try %d of %d" \
+                          % (command,self.nodeid,tries-rtries,tries)
                     try:
                         time.sleep(interval)
                     except:
@@ -1869,8 +1865,9 @@ class Node:
                 if rtries == 0:
                     raise
                 else:
-                    print "WARNING: copy %s to %s on %s failed, try %d" \
-                          % (localfile,remotefile,self.nodeid,tries-rtries)
+                    print "Warning: copy %s to %s on %s failed, try %d of %d" \
+                          % (localfile,remotefile,self.nodeid,
+                             tries-rtries,tries)
                     try:
                         time.sleep(interval)
                     except:
