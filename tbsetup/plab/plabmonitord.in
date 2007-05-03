@@ -110,7 +110,7 @@ my $MAXSLEEPTIME = 600;  # Don't ever sleep for longer than this - we need
 my $CHILLTIME    = 5;    # How long to wait after processing expirations.
 my $NEVER        = 0;    # "Never" in seconds since the Epoch.
 
-my $MAXLA        = 20;   # Don't let the system load get out of hand.
+my $MAXLA        = 8;    # Don't let the system load get out of hand.
 
 # Keep only this many (success,fail) sequences in memory at a 
 # time (they get saved in the db anyway... we just need to minimize cost
