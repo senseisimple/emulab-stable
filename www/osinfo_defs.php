@@ -410,7 +410,7 @@ class OSinfo
 
 		echo "<tr>\n";
 		echo "  <td>$pid</td>\n";
-		echo "  <td><a href='showexp._url'>$eid</td>\n";
+		echo "  <td><a href='$showexp_url'>$eid</td>\n";
 		echo "  <td>$state</td>\n";
 		echo "</tr>\n";
 	    }
