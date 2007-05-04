@@ -1,30 +1,141 @@
-diff -ruN 4.10-release/src/sys/boot/i386/Makefile 4.10/src/sys/boot/i386/Makefile
---- 4.10-release/src/sys/boot/i386/Makefile	Fri Dec 21 14:02:08 2001
-+++ 4.10/src/sys/boot/i386/Makefile	Thu May 27 14:00:18 2004
+diff -ruN 6.2-release/src/sys/boot/common/boot.c 6.2/src/sys/boot/common/boot.c
+--- 6.2-release/src/sys/boot/common/boot.c	Thu May 19 17:03:01 2005
++++ 6.2/src/sys/boot/common/boot.c	Thu Mar  1 10:09:05 2007
+@@ -152,7 +152,17 @@
+ 
+     cp = getenv("autoboot_delay");
+     if ((autoboot_tried == 0) && ((cp == NULL) || strcasecmp(cp, "NO")))
+-	autoboot(-1, NULL);		/* try to boot automatically */
++	/* try to boot automatically */
++	if (autoboot(-1, NULL) != CMD_OK && getenv("nodefaultboot") != NULL) {
++	    struct bootblk_command **cmdp;
++	    SET_FOREACH(cmdp, Xcommand_set) {
++		if (!strcmp("reboot", (*cmdp)->c_name)) {
++		    printf("No bootfile specified, rebooting ...\n");
++		    ((*cmdp)->c_fn)(1, NULL);
++		}
++	    }
++
++	}
+ }
+ 
+ int
+@@ -248,8 +258,10 @@
+     /*
+      * Try $bootfile, then try our builtin default
+      */
+-    if ((spec = getenv("bootfile")) == NULL)
+-	spec = default_bootfiles;
++    if ((spec = getenv("bootfile")) == NULL) {
++	if (getenv("nodefaultboot") == NULL)
++	    spec = default_bootfiles;
++    }
+ 
+     while ((try > 0) && (spec != NULL)) {
+ 	spec = strchr(spec, ';');
+diff -ruN 6.2-release/src/sys/boot/common/interp_forth.c 6.2/src/sys/boot/common/interp_forth.c
+--- 6.2-release/src/sys/boot/common/interp_forth.c	Mon Aug 25 17:30:41 2003
++++ 6.2/src/sys/boot/common/interp_forth.c	Thu Mar  1 10:09:05 2007
+@@ -258,10 +258,12 @@
+     ficlSetEnv(bf_sys, "loader_version", 
+ 	       (bootprog_rev[0] - '0') * 10 + (bootprog_rev[2] - '0'));
+ 
+-    /* try to load and run init file if present */
+-    if ((fd = open("/boot/boot.4th", O_RDONLY)) != -1) {
+-	(void)ficlExecFD(bf_vm, fd);
+-	close(fd);
++    if (getenv("noforthinit") == NULL) {
++	    /* try to load and run init file if present */
++	    if ((fd = open("/boot/boot.4th", O_RDONLY)) != -1) {
++		    (void)ficlExecFD(bf_vm, fd);
++		    close(fd);
++	    }
+     }
+ 
+     /* Do this last, so /boot/boot.4th can change it */
+diff -ruN 6.2-release/src/sys/boot/common/loader.8 6.2/src/sys/boot/common/loader.8
+--- 6.2-release/src/sys/boot/common/loader.8	Thu Dec 21 05:43:02 2006
++++ 6.2/src/sys/boot/common/loader.8	Tue Dec 12 15:54:55 2006
+@@ -22,7 +22,7 @@
+ .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ .\" SUCH DAMAGE.
+ .\"
+-.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.82.2.5.2.1 2006/12/21 12:43:02 yar Exp $
++.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.82.2.6 2006/12/01 08:06:42 yar Exp $
+ .\"
+ .Dd November 29, 2006
+ .Dt LOADER 8
+diff -ruN 6.2-release/src/sys/boot/common/module.c 6.2/src/sys/boot/common/module.c
+--- 6.2-release/src/sys/boot/common/module.c	Mon Jan 23 07:33:53 2006
++++ 6.2/src/sys/boot/common/module.c	Thu Mar  1 10:09:05 2007
+@@ -633,6 +633,9 @@
+     if (*name == 0)
+ 	return(strdup(name));
+ 
++    if (getenv("nomodsearch") != NULL)
++	    return(strdup(name));
++
+     if (file_havepath(name)) {
+ 	/* Qualified, so just see if it exists */
+ 	if (stat(name, &sb) == 0)
+diff -ruN 6.2-release/src/sys/boot/ficl/loader.c 6.2/src/sys/boot/ficl/loader.c
+--- 6.2-release/src/sys/boot/ficl/loader.c	Tue Nov 30 04:35:30 2004
++++ 6.2/src/sys/boot/ficl/loader.c	Thu Mar  1 17:12:53 2007
+@@ -419,7 +419,22 @@
+ 
+     mode = stackPopINT(pVM->pStack);    /* get mode */
+     count = stackPopINT(pVM->pStack);   /* get count */
+-    ptr = stackPopPtr(pVM->pStack);     /* get ptr */
++
++    /*
++     * XXX Gruesome Emulab hack to allow us to run older Forth scripts.
++     * If it appears that there is no mode argument on the stack, assume
++     * mode 0 (RO) and shift the other arguments accordingly.
++     */
++    if (getenv("forth_bc")) {
++	    if ((mode < 0 || mode > 3) &&
++		(count < 0 || count > (64*1024))) {
++		    ptr = (char *)count;
++		    count = mode;
++		    mode = 0;
++	    } else
++		    ptr = stackPopPtr(pVM->pStack);
++    } else
++	    ptr = stackPopPtr(pVM->pStack);     /* get ptr */
+ 
+     if ((count < 0) || (ptr == NULL)) {
+         stackPushINT(pVM->pStack, -1);
+diff -ruN 6.2-release/src/sys/boot/i386/Makefile 6.2/src/sys/boot/i386/Makefile
+--- 6.2-release/src/sys/boot/i386/Makefile	Mon Dec  8 12:02:06 2003
++++ 6.2/src/sys/boot/i386/Makefile	Thu Mar  1 10:09:05 2007
 @@ -5,4 +5,9 @@
  # special boot programs, 'self-extracting boot2+loader'
  SUBDIR+=	pxeldr
  
 +.include <${.CURDIR}/Makefile.inc>
 +.if defined(TESTBED)
-+SUBDIR+=	emuboot emuboot0
++SUBDIR+=	emuboot
 +.endif
 +
  .include <bsd.subdir.mk>
-diff -ruN 4.10-release/src/sys/boot/i386/Makefile.inc 4.10/src/sys/boot/i386/Makefile.inc
---- 4.10-release/src/sys/boot/i386/Makefile.inc	Thu Dec 28 05:04:04 2000
-+++ 4.10/src/sys/boot/i386/Makefile.inc	Thu May 27 14:49:34 2004
-@@ -4,3 +4,53 @@
+diff -ruN 6.2-release/src/sys/boot/i386/Makefile.inc 6.2/src/sys/boot/i386/Makefile.inc
+--- 6.2-release/src/sys/boot/i386/Makefile.inc	Wed Oct 25 09:03:29 2006
++++ 6.2/src/sys/boot/i386/Makefile.inc	Thu Mar  1 13:34:55 2007
+@@ -9,6 +9,52 @@
+ 		-mno-mmx -mno-3dnow -mno-sse -mno-sse2
+ LDFLAGS+=	-nostdlib
  
- LOADER_ADDRESS?=	0x200000
- CFLAGS+=		-mpreferred-stack-boundary=2
++#
++# Force everything to use the serial console
++#
++FORCE_SERIAL_CONSOLE=	   1
++BTX_SERIAL=		   1
++BOOT_PXELDR_ALWAYS_SERIAL= 1
 +
 +#
 +# Default console speed to 115200.
 +#
-+FORCE_SERIAL_CONSOLE=	1
 +BOOT_COMCONSOLE_SPEED= 	115200
-+BTX_SERIAL=		1
 +
 +#
 +# To use serial port 2 rather than 1 (for DETER)
@@ -36,7 +147,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/Makefile.inc 4.10/src/sys/boot/i386/Mak
 +#
 +LOADER_TFTP_SUPPORT :=  1
 +CFLAGS		    :=	${CFLAGS:S/LOADER_NFS_SUPPORT/LOADER_TFTP_SUPPORT/}
-+CFLAGS		    +=  -DPXENFSROOTPATH=\"/tftpboot\"
++CFLAGS		    +=  -DPXENFSROOTPATH=\"/tftpboot\" -DNO_NFS_SUPPORT
 +
 +#
 +# This just adds extra TFTP lookups for .split and .split.gz files
@@ -51,172 +162,155 @@ diff -ruN 4.10-release/src/sys/boot/i386/Makefile.inc 4.10/src/sys/boot/i386/Mak
 +CFLAGS+=		-DTESTBED
 +
 +#
-+# Do not prompt for input in Emulab pxeboot (for GaTech)
++# Do not prompt for input in Emulab pxeboot (sometimes serial lines can
++# produce random input that will cause pxeboot to go into interactive
++# mode when you don't really want it.
 +#
 +#CFLAGS+=		-DNONINTERACTIVE
 +
-+#
-+# Support etherboot PXE emulation (GaTech)
-+#
-+# ETHERBOOT_RELOC is need to make sure that the BTX code doesn't
-+# overlap with Etherboot.  The value here should be whatever RELOC
-+# is defined to be in the Etherboot Config.  0x94000 is the default.
-+#
-+# XXX fix me: as of 4.10, makes boot2 (actually btx) too large
-+#
-+#ETHERBOOT_PXEEMU=      1
-+#CFLAGS+=               -DETHERBOOT_PXEEMU
-+#ETHERBOOT_RELOC=       0x94000
-+#CFLAGS+=               -DETHERBOOT_RELOC=0x94000
-diff -ruN 4.10-release/src/sys/boot/i386/boot2/boot1.s 4.10/src/sys/boot/i386/boot2/boot1.s
---- 4.10-release/src/sys/boot/i386/boot2/boot1.s	Tue Aug 14 16:55:29 2001
-+++ 4.10/src/sys/boot/i386/boot2/boot1.s	Thu May 27 14:00:18 2004
-@@ -353,7 +353,7 @@
- 
- 		.fill 0x30,0x1,0x0
- part4:		.byte 0x80, 0x00, 0x01, 0x00
--		.byte 0xa5, 0xff, 0xff, 0xff
-+		.byte 0xa5, 0xfe, 0xff, 0xff
- 		.byte 0x00, 0x00, 0x00, 0x00
- 		.byte 0x50, 0xc3, 0x00, 0x00	# 50000 sectors long, bleh
- 
-diff -ruN 4.10-release/src/sys/boot/i386/btx/btx/Makefile 4.10/src/sys/boot/i386/btx/btx/Makefile
---- 4.10-release/src/sys/boot/i386/btx/btx/Makefile	Thu Dec 28 05:08:22 2000
-+++ 4.10/src/sys/boot/i386/btx/btx/Makefile	Thu May 27 14:00:18 2004
-@@ -1,4 +1,4 @@
--# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.7.2.2 2000/12/28 12:08:22 ps Exp $
-+# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.13 2002/09/17 01:48:54 peter Exp $
- 
- M4?=	m4
- 
-@@ -6,6 +6,18 @@
- M4FLAGS+=	-DPAGING
- .endif
- 
-+.include <${.CURDIR}/../../Makefile.inc>
-+.if defined(TESTBED)
-+M4FLAGS+=	-DTESTBED
-+.endif
++# XXX do we need this?
++.MAKEFLAGS:  LOADER_NO_NFS_SUPPORT=1 LOADER_NO_SPLIT_SUPPORT=1
 +
-+.if defined(ETHERBOOT_PXEEMU)
-+M4FLAGS+=	-DETHERBOOT_PXEEMU
-+.if defined(ETHERBOOT_RELOC)
-+M4FLAGS+=	-DETHERBOOT_RELOC=$(ETHERBOOT_RELOC)
-+.endif
-+.endif
-+
- .if defined(BOOT_BTX_NOHANG)
- BOOT_BTX_FLAGS=0x1
- .else
-@@ -13,6 +25,15 @@
- .endif
+ .if ${MACHINE_ARCH} == "amd64"
+ CFLAGS+=	-m32 -march=i386
+ LDFLAGS+=	-m elf_i386_fbsd
+diff -ruN 6.2-release/src/sys/boot/i386/boot2/boot2.c 6.2/src/sys/boot/i386/boot2/boot2.c
+--- 6.2-release/src/sys/boot/i386/boot2/boot2.c	Wed Feb 15 08:08:51 2006
++++ 6.2/src/sys/boot/i386/boot2/boot2.c	Thu Mar  1 10:09:05 2007
+@@ -14,7 +14,7 @@
+  */
  
- AFLAGS+=	--defsym BTX_FLAGS=${BOOT_BTX_FLAGS}
-+
-+.if defined(BTX_SERIAL)
-+BOOT_COMCONSOLE_PORT?= 0x3f8
-+BOOT_COMCONSOLE_SPEED?= 9600
-+B2SIOFMT?=	0x3
-+
-+M4FLAGS+=	-DBTX_SERIAL -DSIOPRT=${BOOT_COMCONSOLE_PORT} \
-+		-DSIOFMT=${B2SIOFMT} -DSIOSPD=${BOOT_COMCONSOLE_SPEED}
-+.endif
+ #include <sys/cdefs.h>
+-__FBSDID("$FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.72.2.4 2006/02/15 15:08:51 ru Exp $");
++__FBSDID("$FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.72.2.5 2006/11/27 14:49:38 ru Exp $");
  
- ORG=	0x9000
+ #include <sys/param.h>
+ #include <sys/disklabel.h>
+@@ -79,7 +79,7 @@
+ #define PATH_KERNEL	"/boot/kernel/kernel"
  
-diff -ruN 4.10-release/src/sys/boot/i386/btx/btx/btx.s 4.10/src/sys/boot/i386/btx/btx/btx.s
---- 4.10-release/src/sys/boot/i386/btx/btx/btx.s	Thu Dec 28 05:08:22 2000
-+++ 4.10/src/sys/boot/i386/btx/btx/btx.s	Thu May 27 14:00:18 2004
-@@ -56,6 +56,12 @@
- #
+ #define ARGS		0x900
+-#define NOPT		12
++#define NOPT		14
+ #define NDEV		3
+ #define MEM_BASE	0x12
+ #define MEM_EXT 	0x15
+@@ -99,12 +99,14 @@
+ 
+ extern uint32_t _end;
+ 
+-static const char optstr[NOPT] = "DhaCgmnpqrsv"; /* Also 'P', 'S' */
++static const char optstr[NOPT] = "DhaCcdgmnpqrsv"; /* Also 'P', 'S' */
+ static const unsigned char flags[NOPT] = {
+     RBX_DUAL,
+     RBX_SERIAL,
+     RBX_ASKNAME,
+     RBX_CDROM,
++    RBX_CONFIG,
++    RBX_KDB,
+     RBX_GDB,
+     RBX_MUTE,
+     RBX_NOINTR,
+@@ -132,7 +134,11 @@
+ static uint32_t opts;
+ static int comspeed = SIOSPD;
+ static struct bootinfo bootinfo;
++#ifdef FORCE_SERIAL_CONSOLE
++static uint8_t ioctrl = (IO_SERIAL|IO_KEYBOARD);
++#else
+ static uint8_t ioctrl = IO_KEYBOARD;
++#endif
+ 
+ void exit(int);
+ static void load(void);
+@@ -332,7 +338,7 @@
+ 	return;
+     }
+     if (fmt == 0) {
+-	addr = hdr.ex.a_entry;
++	addr = hdr.ex.a_entry & 0xffffff;
+ 	p = PTOV(addr);
+ 	fs_off = PAGE_SIZE;
+ 	if (xfsread(ino, p, hdr.ex.a_text))
+@@ -366,7 +372,7 @@
+ 		j++;
+ 	}
+ 	for (i = 0; i < 2; i++) {
+-	    p = PTOV(ep[i].p_paddr);
++	    p = PTOV(ep[i].p_paddr & 0xffffff);
+ 	    fs_off = ep[i].p_offset;
+ 	    if (xfsread(ino, p, ep[i].p_filesz))
+ 		return;
+@@ -387,7 +393,7 @@
+ 		p += es[i].sh_size;
+ 	    }
+ 	}
+-	addr = hdr.eh.e_entry;
++	addr = hdr.eh.e_entry & 0xffffff;
+     }
+     bootinfo.bi_esymtab = VTOP(p);
+     bootinfo.bi_kernelname = VTOP(kname);
+diff -ruN 6.2-release/src/sys/boot/i386/btx/btx/btx.S 6.2/src/sys/boot/i386/btx/btx/btx.S
+--- 6.2-release/src/sys/boot/i386/btx/btx/btx.S	Thu Dec  7 15:30:22 2006
++++ 6.2/src/sys/boot/i386/btx/btx/btx.S	Thu Mar  1 10:09:05 2007
+@@ -12,7 +12,7 @@
+  * warranties of merchantability and fitness for a particular
+  * purpose.
+  *
+- * $FreeBSD: src/sys/boot/i386/btx/btx/btx.S,v 1.38.2.1.2.1 2006/12/07 22:30:22 jhb Exp $
++ * $FreeBSD: src/sys/boot/i386/btx/btx/btx.S,v 1.38.2.2 2006/12/07 22:26:51 jhb Exp $
+  */
+ 
+ /*
+@@ -56,6 +56,9 @@
+  */
  		.set SYS_EXIT,0x0		# Exit
  		.set SYS_EXEC,0x1		# Exec
-+ifdef(`TESTBED',`
++#ifdef TESTBED
 +		.set SYS_RESTART,0x2		# Restart from real mode
-+')
-+ifdef(`ETHERBOOT_PXEEMU',`
-+		.set SYS_PXEEMU,0x4		# Etherboot PXE Emulator
-+')
- #
- # V86 constants.
- #
-@@ -224,6 +230,12 @@
- 		movl $MEM_USR,%edx		# User base address
- 		movzwl %ss:BDA_MEM,%eax 	# Get free memory
- 		shll $0xa,%eax			# To bytes
-+ifdef(`ETHERBOOT_RELOC',`
-+		cmpl $ETHERBOOT_RELOC,%eax
-+		jle  init.8a
-+		movl $ETHERBOOT_RELOC,%eax	# Stay below etherboot
-+init.8a:
-+')
- 		subl $0x1000,%eax		# Less arg space
- 		subl %edx,%eax			# Less base
- 		movb $SEL_UDATA,%cl		# User data selector
-@@ -240,6 +252,9 @@
- 		movb $0x7,%cl			# Set remaining
- init.9:		push $0x0			#  general
- 		loop init.9			#  registers
-+ifdef(`BTX_SERIAL',`
-+		call sio_init			# setup the serial console
-+')
- 		popa				#  and initialize
- 		popl %es			# Initialize
- 		popl %ds			#  user
-@@ -255,14 +270,10 @@
- # Turn off paging.
- #
- 		movl %cr0,%eax			# Get CR0
--ifdef(`PAGING',`
- 		andl $~0x80000000,%eax		# Disable
++#endif
+ /*
+  * V86 constants.
+  */
+@@ -262,10 +265,17 @@
  		movl %eax,%cr0			#  paging
--')
  		xorl %ecx,%ecx			# Zero
--ifdef(`PAGING',`
  		movl %ecx,%cr3			# Flush TLB
--')
- #
- # To 16 bits.
- #
-@@ -290,10 +301,17 @@
- # Reboot or await reset.
- #
++#ifndef TESTBED
++/*
++ * XXX this instruction causes a CPU reset.  That is fine if you
++ * XXX are doing an exit, but if you are doing our restart it is bad!
++ *
++ */
+ /*
+  * Restore the GDT in case we caught a kernel trap.
+  */
+ 		lgdt gdtdesc	 		# Set GDT
++#endif
+ /*
+  * To 16 bits.
+  */
+@@ -293,6 +303,13 @@
+  * Reboot or await reset.
+  */
  		sti				# Enable interrupts
-+ifdef(`TESTBED',`
++#ifdef TESTBED
 +		testb $0x2,btx_hdr+0x7		# Restart?
 +		jz exit.25			# No
 +		andb $~0x3,btx_hdr+0x7		# clear flags in case of trap
 +		call *%bp			# Jump to magic location
 +exit.25:
-+')
++#endif
  		testb $0x1,btx_hdr+0x7		# Reboot?
  exit.3:		jz exit.3			# No
  		movw $0x1234, BDA_BOOT		# Do a warm boot
--		ljmp $0xffff,$0x0		# reboot the machine
-+		ljmp $0xf000,$0xfff0		# reboot the machine
- #
- # Set IRQ offsets by reprogramming 8259A PICs.
- #
-@@ -408,7 +426,11 @@
- 		popl %ds			#  saved
- 		cmpb $0x3,(%esp,1)		# Breakpoint?
- 		je except.3			# Yes
--		jmp exit			# Exit
-+		cmpb $0x1,(%esp,1)		# Debug?
-+		jne except.2a			# No
-+		testl $0x100,0x10(%esp,1)	# Trap flag set?
-+		jnz except.3			# Yes
-+except.2a:	jmp exit			# Exit
- except.3:	leal 0x8(%esp,1),%esp		# Discard err, int no
- 		iret				# From interrupt
- #
-@@ -840,7 +862,51 @@
- #
- # System Call.
- #
+@@ -841,7 +858,19 @@
+ /*
+  * System Call.
+  */
 -intx30: 	cmpl $SYS_EXEC,%eax		# Exec system call?
 +intx30:
-+ifdef(`TESTBED',`
++#ifdef TESTBED
 +		cmpl $SYS_RESTART,%eax		# Restart system call?
 +		jne intx30.05			# No
 +		orb $0x2,%ss:btx_hdr+0x7	# Magic exit flag
@@ -226,311 +320,77 @@ diff -ruN 4.10-release/src/sys/boot/i386/btx/btx/btx.s 4.10/src/sys/boot/i386/bt
 +		popl %ebp			# Stash it in ebp
 +		jmp exit			# Exit
 +intx30.05:
-+')
-+ifdef(`ETHERBOOT_PXEEMU',`
-+		cmpl $SYS_PXEEMU,%eax		# PXE emulation call?
-+		jne intx30.06			# No
-+		pushw %ds
-+		pushw %es
-+		pushw %fs
-+		pushw %gs
-+		pusha
-+		movl 0x34(%esp,1),%esi		# User mode %esp is now in %esi
-+		addl $20,%esi			# Addr of last parameter
-+		movl $5,%ecx			# 4l parameters + PMOffset
-+		std
-+intx30.2_1:
-+		lodsl
-+		pushl %eax
-+		loop intx30.2_1
-+		popl %ebx			# %ebx contains pxenv->PMOffset
-+		movw $SEL_SDATA,%ax
-+		mov %ax,%ds
-+		mov %ax,%es
-+		mov %ax,%fs
-+		mov %ax,%gs
-+		call *%ebx
-+		addl $16,%esp			# Discard 4l parameters
-+		popa
-+		popw %gs
-+		popw %fs
-+		popw %es
-+		popw %ds
-+		iret
-+intx30.06:
-+')
-+		cmpl $SYS_EXEC,%eax		# Exec system call?
++#endif
++	 	cmpl $SYS_EXEC,%eax		# Exec system call?
  		jne intx30.1			# No
  		pushl %ss			# Set up
  		popl %es			#  all
-@@ -862,7 +928,7 @@
- ')
- 		popl %eax			# Call
- 		call *%eax			#  program
--intx30.1:	incb %ss:btx_hdr+0x7		# Flag reboot
-+intx30.1:	orb $0x1,%ss:btx_hdr+0x7	# Flag reboot
- 		jmp exit			# Exit
- #
- # Dump structure [EBX] to [EDI], using format string [ESI].
-@@ -903,17 +969,28 @@
- 		shll $0x4,%eax			#  * 0x10
- 		addl %edx,%eax			#  + offset
- 		xchgl %eax,%esi 		# Set pointer
--dump.4: 	movb $0x10,%cl			# Bytes to dump
-+dump.4: 	movb $4,%dl			# Num lines
-+dump.4a:	movb $0x10,%cl			# Bytes to dump
- dump.5: 	lodsb				# Get byte and
- 		call hex8			#  dump it
- 		decb %cl			# Keep count
--		jz dump.7			# If done
-+		jz dump.6a			# If done
- 		movb $'-',%al			# Separator
- 		cmpb $0x8,%cl			# Half way?
- 		je dump.6			# Yes
- 		movb $' ',%al			# Use space
- dump.6: 	stosb				# Save separator
- 		jmp dump.5			# Continue
-+dump.6a:	decb %dl			# Keep count
-+		jz dump.7			# If done
-+		movb $0xa,%al			# Line feed
-+		stosb				# Save one
-+		movb $7,%cl			# Leading
-+		movb $' ',%al			#  spaces
-+dump.6b:	stosb				# Dump
-+		decb %cl			#  spaces
-+		jnz dump.6b
-+		jmp dump.4a			# Next line
- dump.7: 	popl %ds			# Restore
- dump.8: 	popl %esi			# Restore
- 		movb $0xa,%al			# Line feed
-@@ -952,6 +1029,80 @@
- 		testb %al,%al			# End of string?
- 		jnz putstr.0			# No
- 		ret				# To caller
-+ifdef(`BTX_SERIAL',`
-+		.set SIO_PRT,SIOPRT		# Base port
-+		.set SIO_FMT,SIOFMT		# 8N1
-+		.set SIO_DIV,(115200/SIOSPD)	# 115200 / SPD
+diff -ruN 6.2-release/src/sys/boot/i386/btx/lib/Makefile 6.2/src/sys/boot/i386/btx/lib/Makefile
+--- 6.2-release/src/sys/boot/i386/btx/lib/Makefile	Tue Dec 21 01:47:14 2004
++++ 6.2/src/sys/boot/i386/btx/lib/Makefile	Thu Mar  1 10:24:44 2007
+@@ -3,7 +3,7 @@
+ PROG=	crt0.o
+ INTERNALPROG=
+ NO_MAN=
+-SRCS=	btxcsu.s btxsys.s btxv86.s
++SRCS=	btxcsu.s btxsys.S btxv86.s
+ LDFLAGS=-Wl,-r
+ 
+ .include <bsd.prog.mk>
+diff -ruN 6.2-release/src/sys/boot/i386/btx/lib/btxsys.S 6.2/src/sys/boot/i386/btx/lib/btxsys.S
+--- 6.2-release/src/sys/boot/i386/btx/lib/btxsys.S	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/btx/lib/btxsys.S	Thu Mar  1 10:09:05 2007
+@@ -0,0 +1,46 @@
++#
++# Copyright (c) 1998 Robert Nordier
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms are freely
++# permitted provided that the above copyright notice and this
++# paragraph and the following disclaimer are duplicated in all
++# such forms.
++#
++# This software is provided "AS IS" and without any express or
++# implied warranties, including, without limitation, the implied
++# warranties of merchantability and fitness for a particular
++# purpose.
++#
 +
-+# void sio_init(void)
-+
-+sio_init:	movw $SIO_PRT+0x3,%dx		# Data format reg
-+		movb $SIO_FMT|0x80,%al		# Set format
-+		outb %al,(%dx)			#  and DLAB
-+		pushl %edx			# Save
-+		subb $0x3,%dl			# Divisor latch reg
-+		movw $SIO_DIV,%ax		# Set
-+		outw %ax,(%dx)			#  BPS
-+		popl %edx			# Restore
-+		movb $SIO_FMT,%al		# Clear
-+		outb %al,(%dx)			#  DLAB
-+		incl %edx			# Modem control reg
-+		movb $0x3,%al			# Set RTS,
-+		outb %al,(%dx)			#  DTR
-+		incl %edx			# Line status reg
-+
-+# void sio_flush(void)
-+
-+sio_flush.0:	call sio_getc.1 		# Get character
-+sio_flush:	call sio_ischar 		# Check for character
-+		jnz sio_flush.0 		# Till none
-+		ret				# To caller
-+
-+# void sio_putc(int c)
-+
-+sio_putc:	movw $SIO_PRT+0x5,%dx		# Line status reg
-+		xor %ecx,%ecx			# Timeout
-+		movb $0x40,%ch			#  counter
-+sio_putc.1:	inb (%dx),%al			# Transmitter
-+		testb $0x20,%al 		#  buffer empty?
-+		loopz sio_putc.1		# No
-+		jz sio_putc.2			# If timeout
-+		movb 0x4(%esp,1),%al		# Get character
-+		subb $0x5,%dl			# Transmitter hold reg
-+		outb %al,(%dx)			# Write character
-+sio_putc.2:	ret $0x4			# To caller
-+
-+# int sio_getc(void)
-+
-+sio_getc:	call sio_ischar 		# Character available?
-+		jz sio_getc			# No
-+sio_getc.1:	subb $0x5,%dl			# Receiver buffer reg
-+		inb (%dx),%al			# Read character
-+		ret				# To caller
-+
-+# int sio_ischar(void)
-+
-+sio_ischar:	movw $SIO_PRT+0x5,%dx		# Line status register
-+		xorl %eax,%eax			# Zero
-+		inb (%dx),%al			# Received data
-+		andb $0x1,%al			#  ready?
-+		ret				# To caller
++# $FreeBSD: src/sys/boot/i386/btx/lib/btxsys.s,v 1.2 1999/08/28 00:40:07 peter Exp $
 +
 +#
-+# Output character AL to the serial console.
++# BTX system calls.
 +#
-+putchr: 	pusha				# Save
-+		cmpb $10, %al			# is it a newline?
-+		jne putchr.1			#  no?, then leave
-+		push $13			# output a carriage
-+		call sio_putc			#  return first
-+		movb $10, %al			# restore %al
-+putchr.1:	pushl %eax			# Push the character
-+						#  onto the stack
-+		call sio_putc			# Output the character
-+		popa				# Restore
-+		ret				# To caller
-+',`
- #
- # Output character AL to the console.
- #
-@@ -985,7 +1136,7 @@
- 		movw $(SCR_ROW-1)*SCR_COL/2,%cx # Words to move
- 		rep				# Scroll
- 		movsl				#  screen
--		movb $' ',%al			# Space
-+		movb $0x20,%al			# Space
- 		movb $SCR_COL,%cl		# Columns to clear
- 		rep				# Clear
- 		stosw				#  line
-@@ -993,6 +1144,7 @@
- putchr.4:	movw %dx,(%ebx) 		# Update position
- 		popa				# Restore
- 		ret				# To caller
-+')
- 
- 		.p2align 4
- #
-@@ -1072,7 +1224,7 @@
- 		.byte 0x80|DMP_MEM|DMP_EOL,0x48 # "00 00 ... 00 00\n"
- 		.ascii "ss:esp" 		# "ss:esp="
- 		.byte 0x80|DMP_MEM|DMP_EOL,0x0	# "00 00 ... 00 00\n"
--		.asciz "BTX halted"		# End
-+		.asciz "BTX halted\n"		# End
- #
- # End of BTX memory.
- #
-diff -ruN 4.10-release/src/sys/boot/i386/btx/btxldr/Makefile 4.10/src/sys/boot/i386/btx/btxldr/Makefile
---- 4.10-release/src/sys/boot/i386/btx/btxldr/Makefile	Fri Apr 14 21:09:41 2000
-+++ 4.10/src/sys/boot/i386/btx/btxldr/Makefile	Thu May 27 14:00:18 2004
-@@ -3,6 +3,14 @@
- M4?=	m4
- M4FLAGS+=	-DLOADER_ADDRESS=${LOADER_ADDRESS}
- 
-+.include <${.CURDIR}/../../Makefile.inc>
-+.if defined(ETHERBOOT_PXEEMU)
-+M4FLAGS+=	-DETHERBOOT_PXEEMU
-+.if defined(ETHERBOOT_RELOC)
-+M4FLAGS+=	-DETHERBOOT_RELOC=$(ETHERBOOT_RELOC)
-+.endif
-+.endif
 +
- .if defined(BTXLDR_VERBOSE)
- M4FLAGS+=	-DBTXLDR_VERBOSE
- .endif
-diff -ruN 4.10-release/src/sys/boot/i386/btx/btxldr/btxldr.s 4.10/src/sys/boot/i386/btx/btxldr/btxldr.s
---- 4.10-release/src/sys/boot/i386/btx/btxldr/btxldr.s	Thu Jul  6 17:04:29 2000
-+++ 4.10/src/sys/boot/i386/btx/btxldr/btxldr.s	Thu May 27 14:00:18 2004
-@@ -13,7 +13,7 @@
- # purpose.
- #
- 
--# $FreeBSD: src/sys/boot/i386/btx/btxldr/btxldr.s,v 1.8.2.2 2000/07/06 23:04:29 obrien Exp $
-+# $FreeBSD: src/sys/boot/i386/btx/btxldr/btxldr.s,v 1.13 2003/11/06 21:33:17 jhb Exp $
- 
- #
- # Prototype BTX loader program, written in a couple of hours.  The
-@@ -68,6 +68,12 @@
- 		call putstr			#  ourselves
- 		movzwl BDA_MEM,%eax		# Get base memory
- 		shll $0xa,%eax			#  in bytes
-+ifdef(`ETHERBOOT_RELOC',`
-+		cmpl $ETHERBOOT_RELOC,%eax
-+		jle  start.1
-+		movl $ETHERBOOT_RELOC,%eax	# Stay below etherboot
-+start.1:
-+')
- 		movl %eax,%ebp			# Base of user stack
- ifdef(`BTXLDR_VERBOSE',`
- 		movl $m_mem,%esi		# Display
-@@ -78,7 +84,7 @@
- #
- # Relocate caller's arguments.
- #
--ifdef('BTXLDR_VERBOSE',`
-+ifdef(`BTXLDR_VERBOSE',`
- 		movl $m_esp,%esi		# Display
- 		movl %esp,%eax			#  caller
- 		call hexout			#  stack
-diff -ruN 4.10-release/src/sys/boot/i386/btx/lib/Makefile 4.10/src/sys/boot/i386/btx/lib/Makefile
---- 4.10-release/src/sys/boot/i386/btx/lib/Makefile	Fri Nov 15 12:46:41 2002
-+++ 4.10/src/sys/boot/i386/btx/lib/Makefile	Thu May 27 14:00:18 2004
-@@ -3,10 +3,25 @@
- OBJS=		btxcsu.o btxsys.o btxv86.o
- CLEANFILES+=	crt0.o ${OBJS}
- 
-+M4?=	m4
++#
++# Globals.
++#
++		.global __exit
++		.global __exec
++#
++# Constants.
++#
++		.set INT_SYS,0x30		# Interrupt number
++#
++# System call: exit
++#
++__exit: 	xorl %eax,%eax			# BTX system
++		int $INT_SYS			#  call 0x0
++#
++# System call: exec
++#
++__exec: 	movl $0x1,%eax			# BTX system
++		int $INT_SYS			#  call 0x1
 +
-+.include <${.CURDIR}/../../Makefile.inc>
-+.if defined(TESTBED)
-+M4FLAGS+=	-DTESTBED
-+.endif
-+
-+.if defined(ETHERBOOT_PXEEMU)
-+M4FLAGS+=	-DETHERBOOT_PXEEMU
-+.endif
-+
- all: crt0.o
- 
- crt0.o: ${OBJS}
- 	${LD} ${LDFLAGS} -i -o ${.TARGET} ${OBJS}
-+
-+btxsys.o: btxsys.s
-+	(cd ${.CURDIR}; ${M4} ${M4FLAGS} btxsys.s) | \
-+	   ${AS} ${AFLAGS} -o ${.TARGET}
- 
- .include <bsd.lib.mk>
- 
-diff -ruN 4.10-release/src/sys/boot/i386/btx/lib/btxsys.s 4.10/src/sys/boot/i386/btx/lib/btxsys.s
---- 4.10-release/src/sys/boot/i386/btx/lib/btxsys.s	Fri Aug 27 18:40:07 1999
-+++ 4.10/src/sys/boot/i386/btx/lib/btxsys.s	Thu May 27 14:00:18 2004
-@@ -38,3 +38,18 @@
- #
- __exec: 	movl $0x1,%eax			# BTX system
- 		int $INT_SYS			#  call 0x1
-+
-+ifdef(`TESTBED',`
++#ifdef TESTBED
 +		.global __restart
 +__restart:	movl $0x2,%eax			# BTX system
 +		int $INT_SYS			#  call 0x2
-+')
-+ifdef(`ETHERBOOT_PXEEMU',`
-+#
-+# Etherboot PXEEMU
-+#
-+		.global __pxeemu
-+__pxeemu:
-+		movl $0x4,%eax			# BTX system
-+		int $INT_SYS			#  call 0x4
-+')
-diff -ruN 4.10-release/src/sys/boot/i386/btx/lib/btxv86.h 4.10/src/sys/boot/i386/btx/lib/btxv86.h
---- 4.10-release/src/sys/boot/i386/btx/lib/btxv86.h	Fri Aug 27 18:40:08 1999
-+++ 4.10/src/sys/boot/i386/btx/lib/btxv86.h	Thu May 27 14:00:18 2004
-@@ -60,4 +60,10 @@
- void __exit(int) __attribute__((__noreturn__));
- void __exec(caddr_t, ...);
- 
-+#ifdef ETHERBOOT_PXEEMU
-+void __pxeemu(vm_offset_t pxe_entrypoint,
-+	      vm_offset_t v86_p, vm_offset_t pxe_v86_flag, int pxe_func_nr,
-+	      vm_offset_t pxe_func_arg);
 +#endif
-+
- #endif /* !_BTXV86_H_ */
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/Makefile 4.10/src/sys/boot/i386/emuboot/Makefile
---- 4.10-release/src/sys/boot/i386/emuboot/Makefile	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/Makefile	Tue Sep 21 23:06:42 2004
-@@ -0,0 +1,154 @@
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/Makefile 6.2/src/sys/boot/i386/emuboot/Makefile
+--- 6.2-release/src/sys/boot/i386/emuboot/Makefile	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/Makefile	Thu Mar  1 13:38:01 2007
+@@ -0,0 +1,138 @@
 +# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.8 2002/07/17 12:34:16 ru Exp $
 +
 +LOADER=		pxeboot
@@ -545,7 +405,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/Makefile 4.10/src/sys/boot/i386
 +# architecture-specific loader code
 +SRCS=		main.c conf.c emumain.c bootinfo.c multiboot.c diskboot.c groklilo.c
 +CFLAGS+=	-DLOADER_TFTP_SUPPORT
-+CFLAGS+=	-DLOADER_NFS_SUPPORT
++#CFLAGS+=	-DLOADER_NFS_SUPPORT
 +
 +.include <${.CURDIR}/../Makefile.inc>
 +.if defined(FORCE_SERIAL_CONSOLE)
@@ -561,11 +421,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/Makefile 4.10/src/sys/boot/i386
 +# Enable BootForth
 +BOOT_FORTH=	yes
 +CFLAGS+=	-DBOOT_FORTH -I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/i386
-+.if exists(${.OBJDIR}/../../ficl/libficl.a)
 +LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
-+.else
-+LIBFICL=	${.CURDIR}/../../ficl/libficl.a
-+.endif
 +.endif
 +
 +.if defined(LOADER_BZIP2_SUPPORT)
@@ -580,54 +436,42 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/Makefile 4.10/src/sys/boot/i386
 +
 +# Always add MI sources 
 +.PATH:		${.CURDIR}/../../common ${.CURDIR}/../loader
-+.include	<${.CURDIR}/../../common/Makefile.inc>
++.include	"${.CURDIR}/../../common/Makefile.inc"
 +CFLAGS+=	-I${.CURDIR}/../../common
-+CFLAGS+=	-I${.CURDIR}/../../.. -I.
++CFLAGS+=	-I.
 +
-+CLEANFILES+=	vers.c vers.o ${BASE}.list ${BASE}.bin ${BASE}.sym ${BASE}.help
++# XXX loader is too big!
++SRCS  :=	${SRCS:S/load_aout.c//}
++SRCS  :=	${SRCS:S/load_elf64.c//}
++SRCS  :=	${SRCS:S/load_elf64_obj.c//}
++SRCS  :=	${SRCS:S/reloc_elf64.c//}
++
++CLEANFILES=	vers.c vers.o ${BASE}.list ${BASE}.bin ${BASE}.sym ${BASE}.help
 +
 +CFLAGS+=	-Wall
-+LDFLAGS=	-nostdlib -static -Ttext 0x0
++LDFLAGS=	-static -Ttext 0x0
 +
 +# i386 standalone support library
 +LIBI386=	${.OBJDIR}/../libi386/libi386.a
 +CFLAGS+=	-I${.CURDIR}/..
 +
-+# where to get libstand from
-+#XXX need a better way to do this
-+LIBSTAND=	${.CURDIR}/../../../../lib/libstand/libstand.a
-+.if !exists(${LIBSTAND})
-+LIBSTAND=	${.OBJDIR}/../../../../lib/libstand/libstand.a
-+.if !exists(${LIBSTAND})
-+LIBSTAND=	-lstand
-+.endif
-+.endif
++# the location of libstand
 +CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 +
 +# BTX components
-+.if exists(${.OBJDIR}/../btx)
-+BTXDIR=		${.OBJDIR}/../btx
-+.else
-+BTXDIR=		${.CURDIR}/../btx
-+.endif
-+BTXLDR=		${BTXDIR}/btxldr/btxldr
-+BTXKERN=	${BTXDIR}/btx/btx
-+BTXCRT=		${BTXDIR}/lib/crt0.o
 +CFLAGS+=	-I${.CURDIR}/../btx/lib
-+
-+# BTX is expecting ELF components
-+CFLAGS+=	-elf
-+
-+# New linker set code
-+CFLAGS+=	-DNEW_LINKER_SET
 +
 +# Debug me!
 +#CFLAGS+=	-g
 +#LDFLAGS+=	-g
 +
-+vers.o:	${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version
++# Pick up ../Makefile.inc early.
++#.include <bsd.init.mk>
++
++all: ${LOADER}
++
++vers.c:	${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version
 +	sh ${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
-+	${CC} -c vers.c
 +
 +${BASE}: ${BASE}.bin ${BTXLDR} ${BTXKERN} ${BTXCRT} ${BASE}.help
 +	btxld -v -f aout -e ${LOADER_ADDRESS} -o ${.TARGET} -l ${BTXLDR} \
@@ -658,15 +502,15 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/Makefile 4.10/src/sys/boot/i386
 +	objcopy -S -O binary ${LDR}.out ${.TARGET}
 +.endif
 +
-+${LDR}.o: ${LDR}.s
-+	(cd ${.CURDIR}; ${M4} ${M4FLAGS} ${LDR}.s) | \
++${LDR}.o: ${LDR}.S
++	(cd ${.CURDIR}; ${M4} ${M4FLAGS} ${LDR}.S) | \
 +	   ${AS} ${AFLAGS} -o ${.TARGET}
 +
 +install:
 +	mv ${DESTDIR}${BINDIR}/pxeboot ${DESTDIR}${BINDIR}/pxeboot.old
 +	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 444 emuboot ${DESTDIR}${BINDIR}/pxeboot
 +
-+.include <${.CURDIR}/../Makefile.inc>
++#.include <${.CURDIR}/../Makefile.inc>
 +
 +# Cannot use ${OBJS} above this line
 +.include <bsd.prog.mk>
@@ -685,12 +529,12 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/Makefile 4.10/src/sys/boot/i386
 +.endif
 +
 +CLEANFILES+=	machine
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/bootinfo.c 4.10/src/sys/boot/i386/emuboot/bootinfo.c
---- 4.10-release/src/sys/boot/i386/emuboot/bootinfo.c	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/bootinfo.c	Thu May 27 14:00:18 2004
-@@ -0,0 +1,237 @@
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/bootinfo.c 6.2/src/sys/boot/i386/emuboot/bootinfo.c
+--- 6.2-release/src/sys/boot/i386/emuboot/bootinfo.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/bootinfo.c	Thu Mar  1 17:37:11 2007
+@@ -0,0 +1,239 @@
 +/*
-+ * Copyright (c) 2000, 2001, 2003, 2004 University of Utah and the Flux Group.
++ * Copyright (c) 2000, 2001, 2003, 2004, 2007 University of Utah and the Flux Group.
 + * All rights reserved.
 + * @OSKIT-FLUX-GPLUS@
 + */
@@ -897,38 +741,40 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/bootinfo.c 4.10/src/sys/boot/i3
 +	switch (boot_whatp->type) {
 +
 +	case BIBOOTWHAT_TYPE_MB:
-+		printf("boot multiboot kernel `%s:%s' with cmdline `%s'\n",
++		printf("boot multiboot kernel `%s:%s'",
 +		       inet_ntoa(boot_whatp->what.mb.tftp_ip),
-+		       boot_whatp->what.mb.filename,
-+		       boot_whatp->cmdline);
++		       boot_whatp->what.mb.filename);
 +		break;
 +
 +	case BIBOOTWHAT_TYPE_PART:
-+		printf("boot from main disk, partition %d\n",
++		printf("boot from main disk, partition %d",
 +		       boot_whatp->what.partition);
 +		break;
 +
 +	case BIBOOTWHAT_TYPE_SYSID:
-+		printf("boot from main disk partition with sysid %d\n",
++		printf("boot from main disk partition with sysid %d",
 +		       boot_whatp->what.sysid);
 +		break;
 +
 +	case BIBOOTWHAT_TYPE_WAIT:
 +		printf("boot wait; waiting for bootinfo instructions\n");
-+		break;
++		return;
 +
 +	case BIBOOTWHAT_TYPE_MFS:
-+		printf("boot from MFS %s\n", boot_whatp->what.mfs);
++		printf("boot from MFS %s", boot_whatp->what.mfs);
 +		break;
 +
 +	default:
 +		printf("!? invalid action %d\n", boot_whatp->type);
-+		break;
++		return;
 +	}
++	if (boot_whatp->cmdline[0])
++		printf(" with cmdline `%s'", boot_whatp->cmdline);
++	printf("\n");
 +}
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/bootwhat.h 4.10/src/sys/boot/i386/emuboot/bootwhat.h
---- 4.10-release/src/sys/boot/i386/emuboot/bootwhat.h	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/bootwhat.h	Thu May 27 14:00:18 2004
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/bootwhat.h 6.2/src/sys/boot/i386/emuboot/bootwhat.h
+--- 6.2-release/src/sys/boot/i386/emuboot/bootwhat.h	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/bootwhat.h	Thu May 27 14:00:18 2004
 @@ -0,0 +1,104 @@
 +/*
 + * Copyright (c) 2000, 2001, 2003, 2004 University of Utah and the Flux Group.
@@ -1034,9 +880,9 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/bootwhat.h 4.10/src/sys/boot/i3
 +#define BIBOOTWHAT FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
 +
 +#endif /* _OSKIT_BOOT_BOOTWHAT_H_ */
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/diskboot.c 4.10/src/sys/boot/i386/emuboot/diskboot.c
---- 4.10-release/src/sys/boot/i386/emuboot/diskboot.c	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/diskboot.c	Tue Sep 21 23:50:19 2004
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/diskboot.c 6.2/src/sys/boot/i386/emuboot/diskboot.c
+--- 6.2-release/src/sys/boot/i386/emuboot/diskboot.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/diskboot.c	Tue Sep 21 23:50:19 2004
 @@ -0,0 +1,553 @@
 +#include <stand.h>
 +
@@ -1591,9 +1437,9 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/diskboot.c 4.10/src/sys/boot/i3
 +	}
 +	return 0;
 +}
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emuboot.h 4.10/src/sys/boot/i386/emuboot/emuboot.h
---- 4.10-release/src/sys/boot/i386/emuboot/emuboot.h	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/emuboot.h	Wed Sep 22 10:33:59 2004
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/emuboot.h 6.2/src/sys/boot/i386/emuboot/emuboot.h
+--- 6.2-release/src/sys/boot/i386/emuboot/emuboot.h	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/emuboot.h	Wed Sep 22 10:33:59 2004
 @@ -0,0 +1,26 @@
 +#define ROOTDIR	"/tftpboot"
 +#define NETDEV	"pxe0:"
@@ -1621,10 +1467,10 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emuboot.h 4.10/src/sys/boot/i38
 +
 +int set_lilo_cmdline(int partition, char *cmdline);
 +void *load_partition_bblock(int partition);
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i386/emuboot/emumain.c
---- 4.10-release/src/sys/boot/i386/emuboot/emumain.c	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/emumain.c	Wed Oct 13 12:31:36 2004
-@@ -0,0 +1,440 @@
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/emumain.c 6.2/src/sys/boot/i386/emuboot/emumain.c
+--- 6.2-release/src/sys/boot/i386/emuboot/emumain.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/emumain.c	Wed Apr 18 16:27:54 2007
+@@ -0,0 +1,637 @@
 +/*-
 + * Copyright (c) 1998, 2002, 2004 Michael Smith <msmith@freebsd.org>
 + * All rights reserved.
@@ -1681,11 +1527,12 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +void			exit(int code);
 +static int		boot_wait(boot_what_t **boot_whatp);
 +static int		loader_setenv(char *var, int setit);
++static void		loader_getenv(void);
 +static int		boot_loader(char *);
 +static int		boot_local_partition(boot_what_t *boot_whatp);
++static void		load_fromdisk(char *bootspec, char *path, char *args);
 +
-+
-+int
++void
 +emumain(void)
 +{
 +    int i;
@@ -1766,6 +1613,14 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +		    break;
 +		    
 +	    case BIBOOTWHAT_TYPE_MFS:
++		    /*
++		     * XXX Emulab hack: we don't use boot.4th, so do not
++		     * even try to look it up.  There are other magic options
++		     * in the code as well, but they are triggered from the
++		     * loader.conf file.
++		     */
++		    loader_setenv("noforthinit=1", 1);
++
 +		    printf("Attempting boot of: %s\n",
 +			   boot_whatp->what.mfs);
 +		    err = boot_loader(boot_whatp->what.mfs);
@@ -1784,10 +1639,13 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +     * Well, the only way to get here is if the specified boot failed.
 +     * Fall through to booting the default, and hope it works.
 +     */
-+    printf("Server specified boot failed (err=%d), "
-+	   "booting from default partition...\n", err);
-+
++    printf("Server specified boot failed (err=%d), ", err);
++#ifdef NODISKBOOT
++    printf("rebooting and trying again...\n");
++#else
++    printf("booting from default partition...\n");
 +    boot_mbr_default();
++#endif
 +    exit(0);
 +}
 +
@@ -1839,6 +1697,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +		else if (strncmp(buf, INFO, strlen(INFO)) == 0) {
 +			disk_showinfo();
 +			bootinfo_showinfo();
++			loader_getenv();
 +			continue;
 +		}
 +#define LOADER	"loader"
@@ -1848,6 +1707,9 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +			if ((bp = strchr(buf, ':')))
 +				bp++;
 +			
++			/* XXX magic, see comment above */
++			loader_setenv("noforthinit=1", 1);
++
 +			boot_loader(bp);
 +			
 +			/* if we get here, it is an error */
@@ -1895,6 +1757,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +		       "  active:<partition number>, or\n"
 +		       "  loader (boot DHCP default MFS), or\n"
 +		       "  loader:<bootdir> (ex: /tftpboot/freebsd), or\n"
++		       "  loader:<IP>:<bootdir> (boot from other server), or\n"
 +		       "  loader:<disk1s1a> (boot from disk), or\n"
 +		       "  loader:<disk1s1a>:/kernel (boot from disk), or\n"
 +		       "  setenv:<var>=<value>, or\n"
@@ -1939,6 +1802,22 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +	return 0;
 +}
 +
++static void
++loader_getenv(void)
++{
++	struct env_var *ev;
++	char *cp;
++
++	printf("Variables:\n");
++	for (ev = environ; ev != NULL; ev = ev->ev_next) {
++		printf("  %s", ev->ev_name);
++		cp = getenv(ev->ev_name);
++		if (cp != NULL)
++			printf("=%s", cp);
++		printf("\n");
++	}
++}
++
 +/*
 + * Set or unset a loader env variable
 + */
@@ -1959,6 +1838,62 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +}
 +
 +/*
++ * Convert emuboot command line arguments into loader environment vars
++ * where possible.  Returns anything unparsable.
++ *
++ * We don't recognize much right now.  A couple of old-school - args:
++ *	-v	=> boot_verbose=1
++ *	-s	=> boot_single=1
++ * and key=value style args, some special, some not:
++ *	HZ=N	=> kern.hz=N
++ *	X=Y	=> X=Y
++ * will someday likely also handle ACPI options and console options.
++ */
++char *
++parse_args(char *args)
++{
++	char *nargs = NULL;
++	char *var, *val;
++
++	while (args != NULL) {
++		char *curarg = strsep(&args, " \t");
++
++		if (*curarg == '\0')
++			continue;
++		if (strcmp(curarg, "-v") == 0) {
++			var = "boot_verbose";
++			val = "1";
++		} else if (strcmp(curarg, "-s") == 0) {
++			var = "boot_single";
++			val = "1";
++		} else if (strncmp(curarg, "HZ=", 3) == 0) {
++			var = "kern.hz";
++			val = curarg + 3;
++		} else if ((val = strchr(curarg, '=')) != NULL) {
++			/*
++			 * Got equal?  Assume it is a loader variable
++			 * and just set it.
++			 */
++			var = curarg;
++			*val++ = 0;
++		} else {
++			/*
++			 * For now we just toss extra args since we cannot
++			 * pass them through with autoboot anyway.
++			 */
++			printf("Unrecognized argument '%s' ignored\n", curarg);
++			continue;
++		}
++#if 0
++		printf("args: %s=%s\n", var, val);
++#endif
++		setenv(var, val, 1);
++	}
++
++	return nargs;
++}
++
++/*
 + * Zap into the loader, first checking to see if a bootdir was specified.
 + * This will overwrite the default we got from DHCP.
 + */
@@ -1967,31 +1902,31 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +{
 +	struct in_addr old_tftp, new_tftp;
 +
++	/*
++	 * XXX Gruesome Emulab hack to allow us to run older Forth scripts.
++	 * At some point after FBSD 4, the interpreter fopen command changed
++	 * to expect a mode argument on the stack.  So we need to enable a
++	 * heuristic that tells the interpreter to be on the lookout for
++	 * fopen calls that appear to have no mode argument.
++	 * See ficl/loader.c for details.
++	 */
++	loader_setenv("forth_bc=1", 1);
++
 +	new_tftp.s_addr = htonl(INADDR_NONE);
 +	if (bootspec) {
-+		char *path;
++		char *path, *args;
 +		
++		if ((args = strchr(bootspec, ' '))) {
++			*args = 0;
++			args++;
++		}
 +		if ((path = strchr(bootspec, ':'))) {
-+			*path = NULL;
++			*path = 0;
 +			path++;
 +		}
 +
 +		if (strncmp(bootspec, "disk", strlen("disk")) == 0) {
-+			/*
-+			 * Make sure the kernel does not think it
-+			 * is running diskless.
-+			 */
-+			unsetenv("vfs.root.mountfrom");
-+			unsetenv("boot.nfsroot.nfshandle");
-+			unsetenv("boot.nfsroot.path");
-+			unsetenv("boot.nfsroot.server");
-+			setenv("currdev", bootspec, 1);
-+
-+			/*
-+			 * If given a path to a kernel, then load up and go.
-+			 */
-+			setenv("bootfile", path, 1);
-+			autoboot(0, NULL);
++			load_fromdisk(bootspec, path, args);
 +			return -1;
 +		}
 +		else {
@@ -2039,6 +1974,11 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +{
 +	int	sysid;
 +	char    buf[MAX_BOOT_DATA];
++	int	diskunit;
++
++	/* XXX allow booting through MBR */
++	if (boot_whatp->what.partition == 0)
++		return boot_mbr_partition(0);
 +
 +	if (partition_sysid(boot_whatp->what.partition, &sysid))
 +		return 1;
@@ -2059,15 +1999,118 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/emumain.c 4.10/src/sys/boot/i38
 +	/*
 +	 * Treat command line as the name of the kernel. Later add support
 +	 * for kernel args, whatever. 
++	 *
++	 * XXX for now we assume the kernel should come from the primary
++	 * hard drive, this needs to be fixed.
 +	 */
-+	sprintf(buf, "disk1s1a:%s", boot_whatp->cmdline);
++	diskunit = bd_bios2unit(0x80);
++	sprintf(buf, "disk%ds1a:%s", diskunit, boot_whatp->cmdline);
 +
 +	printf("Booting direct to FreeBSD kernel: %s\n", buf);
 +	return boot_loader(buf);
 +}
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/groklilo.c 4.10/src/sys/boot/i386/emuboot/groklilo.c
---- 4.10-release/src/sys/boot/i386/emuboot/groklilo.c	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/groklilo.c	Wed Sep 22 11:13:04 2004
++
++#ifdef BOOT_FORTH
++#include "ficl.h"
++extern FICL_VM *bf_vm;
++#endif
++
++/*
++ * Read the boot loader config files as the disk-based loader would do.
++ */
++static void
++load_fromdisk(char *bootspec, char *path, char *args)
++{
++	char *kname = 0;
++
++	/*
++	 * Establish currdev so we read configs from disk
++	 */
++	setenv("currdev", bootspec, 1);
++
++#ifdef BOOT_FORTH
++	bf_init();
++
++	/*
++	 * Initialize loader environment as disk-based loader would:
++	 *	loader.4th	normally read in loader.rc
++	 *	initialize	first half of 'start' called from loader.rc
++	 */
++	if (include("/boot/loader.4th") != CMD_OK) {
++		printf("Could not read /boot/loader.4th\n");
++		return;
++	}
++
++	/*
++	 * XXX unset ACPI.  The on-disk loader.conf file will explicitly
++	 * set it if needed.
++	 */
++	unsetenv("acpi_load");
++
++	bf_vm->sourceID.i = 0;
++	if (bf_run("initialize") != VM_OUTOFTEXT) {
++		return;
++	}
++#endif
++
++	/*
++	 * Undo PXE-set environment variables.
++	 */
++	unsetenv("vfs.root.mountfrom");
++	unsetenv("boot.nfsroot.nfshandle");
++	unsetenv("boot.nfsroot.path");
++	unsetenv("boot.nfsroot.server");
++	unsetenv("boot.netif.ip");
++	unsetenv("boot.netif.gateway");
++	unsetenv("boot.netif.hwaddr");
++	unsetenv("boot.netif.netmask");
++
++#if 0
++	printf("Before: bootspec='%s', path='%s', args='%s'\n",
++	       bootspec, path, args ? args : "<NULL>");
++#endif
++
++	/*
++	 * For FBSD 5 and above, strip off leading "/boot/" as it will
++	 * be assumed and will also screw up the setting of module_path
++	 */
++	if (strncmp(path, "/boot/", 6) == 0)
++		path += 6;
++
++	/*
++	 * Now override the environment with our info:
++	 *	kernel		kernel directory from which to boot
++	 *	bootfile	kernel file to boot
++	 */
++	if (path[0] != '/' && (kname = strrchr(path, '/')) != 0) {
++		*kname++ = 0;
++		setenv("bootfile", kname, 1);
++		setenv("kernel", path, 1);
++	} else
++		setenv("bootfile", path, 1);
++
++	/*
++	 * and fill in custom arguments.
++	 */
++	args = parse_args(args);
++
++#if 0
++	printf("After: bootfile='%s', kernel='%s', args='%s'\n",
++	       path, kname ? kname : "<NULL>", args ? args : "<NULL>");
++#endif
++
++	/*
++	 * Now load kernel plus any modules and then boot
++	 */
++#ifdef BOOT_FORTH
++	bf_run("boot-conf");
++#else
++	autoboot(0, NULL);
++#endif
++}
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/groklilo.c 6.2/src/sys/boot/i386/emuboot/groklilo.c
+--- 6.2-release/src/sys/boot/i386/emuboot/groklilo.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/groklilo.c	Wed Sep 22 11:13:04 2004
 @@ -0,0 +1,362 @@
 +/*
 + * Code to grok a LILO bootblock and change the default command line string
@@ -2431,10 +2474,10 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/groklilo.c 4.10/src/sys/boot/i3
 +}
 +
 +#endif
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/emuboot/main.c
---- 4.10-release/src/sys/boot/i386/emuboot/main.c	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/main.c	Thu May 27 14:00:18 2004
-@@ -0,0 +1,286 @@
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/main.c 6.2/src/sys/boot/i386/emuboot/main.c
+--- 6.2-release/src/sys/boot/i386/emuboot/main.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/main.c	Thu Mar  1 13:24:30 2007
+@@ -0,0 +1,319 @@
 +/*-
 + * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
 + * All rights reserved.
@@ -2508,6 +2551,12 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +/* XXX debugging */
 +extern char end[];
 +
++/* from emumain.c */
++void emumain(void);
++
++static void *heap_top;
++static void *heap_bottom;
++
 +int
 +main(void)
 +{
@@ -2524,7 +2573,15 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +     */
 +    bios_getmem();
 +
-+    setheap((void *)end, (void *)bios_basemem);
++#if 1
++    heap_top = PTOV(memtop_copyin);
++    memtop_copyin -= 0x300000;
++    heap_bottom = PTOV(memtop_copyin);
++#else
++    heap_top = (void *)bios_basemem;
++    heap_bottom = (void *)end;
++#endif
++    setheap(heap_bottom, heap_top);
 +
 +    /* 
 +     * XXX Chicken-and-egg problem; we want to have console output early, but some
@@ -2534,9 +2591,15 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +     * We can use printf() etc. once this is done.
 +     * If the previous boot stage has requested a serial console, prefer that.
 +     */
-+    if (initial_howto & RB_SERIAL)
++    bi_setboothowto(initial_howto);
++    if (initial_howto & RB_MULTIPLE) {
++	if (initial_howto & RB_SERIAL)
++	    setenv("console", "comconsole vidconsole", 1);
++	else
++	    setenv("console", "vidconsole comconsole", 1);
++    } else if (initial_howto & RB_SERIAL)
 +	setenv("console", "comconsole", 1);
-+    if (initial_howto & RB_MUTE)
++    else if (initial_howto & RB_MUTE)
 +	setenv("console", "nullconsole", 1);
 +    cons_probe();
 +
@@ -2548,7 +2611,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +    /*
 +     * Special handling for PXE and CD booting.
 +     */
-+    if (kargs->bootinfo == NULL) {
++    if (kargs->bootinfo == 0) {
 +	/*
 +	 * We only want the PXE disk to try to init itself in the below
 +	 * walk through devsw if we actually booted off of PXE.
@@ -2566,6 +2629,16 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +	if (devsw[i]->dv_init != NULL)
 +	    (devsw[i]->dv_init)();
 +    printf("BIOS %dkB/%dkB available memory\n", bios_basemem / 1024, bios_extmem / 1024);
++    if (initial_bootinfo != NULL) {
++	initial_bootinfo->bi_basemem = bios_basemem / 1024;
++	initial_bootinfo->bi_extmem = bios_extmem / 1024;
++    }
++
++    /* detect ACPI for future reference */
++    biosacpi_detect();
++
++    /* detect SMBIOS for future reference */
++    smbios_detect();
 +
 +    printf("\n");
 +    printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
@@ -2574,6 +2647,8 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +    extract_currdev();				/* set $currdev and $loaddev */
 +    setenv("LINES", "24", 1);			/* optional */
 +    
++    bios_getsmap();
++
 +    archsw.arch_autoload = i386_autoload;
 +    archsw.arch_getdev = i386_getdev;
 +    archsw.arch_copyin = i386_copyin;
@@ -2604,7 +2679,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +    new_currdev.d_dev = &biosdisk;
 +
 +    /* new-style boot loaders such as pxeldr and cdldr */
-+    if (kargs->bootinfo == NULL) {
++    if (kargs->bootinfo == 0) {
 +        if ((kargs->bootflags & KARGS_FLAGS_CD) != 0) {
 +	    /* we are booting from a CD with cdboot */
 +	    new_currdev.d_dev = &bioscd;
@@ -2633,7 +2708,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +
 +	/*
 +	 * If we are booted by an old bootstrap, we have to guess at the BIOS
-+	 * unit number.  We will loose if there is more than one disk type
++	 * unit number.  We will lose if there is more than one disk type
 +	 * and we are not booting from the lowest-numbered disk type 
 +	 * (ie. SCSI when IDE also exists).
 +	 */
@@ -2687,7 +2762,8 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +command_heap(int argc, char *argv[])
 +{
 +    mallocstats();
-+    printf("heap base at %p, top at %p\n", end, sbrk(0));
++    printf("heap base at %p, top at %p, upper limit at %p\n", heap_bottom,
++      sbrk(0), heap_top);
 +    return(CMD_OK);
 +}
 +
@@ -2721,10 +2797,10 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/main.c 4.10/src/sys/boot/i386/e
 +    }
 +}
 +
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.c 4.10/src/sys/boot/i386/emuboot/multiboot.c
---- 4.10-release/src/sys/boot/i386/emuboot/multiboot.c	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/multiboot.c	Thu May 27 14:00:18 2004
-@@ -0,0 +1,287 @@
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/multiboot.c 6.2/src/sys/boot/i386/emuboot/multiboot.c
+--- 6.2-release/src/sys/boot/i386/emuboot/multiboot.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/multiboot.c	Thu Mar  1 13:15:48 2007
+@@ -0,0 +1,290 @@
 +#include <stand.h>
 +#include <string.h>
 +
@@ -2772,8 +2848,8 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.c 4.10/src/sys/boot/i
 +	 * XXX tweak some magic global variables while we do the TFTP load.
 +	 */
 +	{
-+		struct loaded_module *mp = 0;
-+		struct module_metadata *md;
++		struct preloaded_file *fp = 0;
++		struct file_metadata *md;
 +		struct in_addr Orootip;
 +		char Orootpath[FNAME_SIZE];
 +
@@ -2788,9 +2864,9 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.c 4.10/src/sys/boot/i
 +		printf("Loading ELF file `%s' from %s...\n",
 +		       filename, inet_ntoa(rootip));
 +#endif
-+		err = elf_loadmodule(filename, 0, &mp);
++		err = __elfN(loadfile)(filename, 0, &fp);
 +		if (err == 0) {
-+			md = mod_findmetadata(mp, MODINFOMD_ELFHDR);
++			md = file_findmetadata(fp, MODINFOMD_ELFHDR);
 +			if (md != 0)
 +				entry = ((Elf_Ehdr *)&(md->md_data))->e_entry
 +					& 0xffffff;
@@ -2804,13 +2880,12 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.c 4.10/src/sys/boot/i
 +#ifdef DEBUG
 +			printf("Load failed, err=%d\n", err);
 +#endif
-+			if (mp)
-+				mod_discard(mp);
++			if (fp)
++				file_discard(fp);
 +			return (err);
 +		}
 +#ifdef DEBUG
-+		printf("Loaded at [0x%x - 0x%x], entry=0x%x\n",
-+		       mp->m_addr, mp->m_addr + mp->m_size, entry);
++		printf("Loaded, entry=0x%x\n", entry);
 +#endif
 +	}
 +
@@ -3006,15 +3081,19 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.c 4.10/src/sys/boot/i
 +				printf("undefined (%ld)\n", rdesc->Type);
 +			}
 +
-+			(char *)rdesc += rdesc->size + 4;
++			{
++				char *cp = (char *)rdesc;
++				cp += rdesc->size + 4;
++				rdesc = (struct AddrRangeDesc *)cp;
++			}
 +		};
 +	}
 +	
 +	
 +}
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.h 4.10/src/sys/boot/i386/emuboot/multiboot.h
---- 4.10-release/src/sys/boot/i386/emuboot/multiboot.h	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/multiboot.h	Thu May 27 14:00:18 2004
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/multiboot.h 6.2/src/sys/boot/i386/emuboot/multiboot.h
+--- 6.2-release/src/sys/boot/i386/emuboot/multiboot.h	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/multiboot.h	Thu May 27 14:00:18 2004
 @@ -0,0 +1,174 @@
 +/*
 + * Copyright (c) 1994-1995, 1998, 2001 University of Utah and the Flux Group.
@@ -3190,9 +3269,9 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/multiboot.h 4.10/src/sys/boot/i
 +
 +
 +#endif /* _OSKIT_X86_MULTIBOOT_H_ */
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/newvers.sh 4.10/src/sys/boot/i386/emuboot/newvers.sh
---- 4.10-release/src/sys/boot/i386/emuboot/newvers.sh	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/newvers.sh	Thu May 27 14:00:18 2004
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/newvers.sh 6.2/src/sys/boot/i386/emuboot/newvers.sh
+--- 6.2-release/src/sys/boot/i386/emuboot/newvers.sh	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/newvers.sh	Thu May 27 14:00:18 2004
 @@ -0,0 +1,47 @@
 +#!/bin/sh -
 +#
@@ -3241,52 +3320,1143 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot/newvers.sh 4.10/src/sys/boot/i3
 +echo "char bootprog_rev[] = \"${r}\";" >> vers.c
 +echo "char bootprog_date[] = \"${t}\";" >> vers.c
 +echo "char bootprog_maker[] = \"${u}@${h}\";" >> vers.c
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot/version 4.10/src/sys/boot/i386/emuboot/version
---- 4.10-release/src/sys/boot/i386/emuboot/version	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot/version	Thu May 27 14:00:18 2004
-@@ -0,0 +1,9 @@
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot/version 6.2/src/sys/boot/i386/emuboot/version
+--- 6.2-release/src/sys/boot/i386/emuboot/version	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot/version	Wed Apr 18 15:08:36 2007
+@@ -0,0 +1,13 @@
 +$FreeBSD: src/sys/boot/i386/loader/version,v 1.5.2.1 2000/07/06 23:45:00 obrien Exp $
 +
 +NOTE ANY CHANGES YOU MAKE TO THE BOOTBLOCKS HERE.  The format of this
 +file is important.  Make sure the current version number is on line 6.
 +
++1.8:	Add argument parsing for FreeBSD kernel command lines
++1.7:	Convert to FreeBSD 6.2 base
++1.6:	Read disk-based loader files when booting alternate kernel
++1.5:	Optimizations to avoid excess TFTP stat calls
 +1.4:	Use DHCP info from PXE, do not bootp ourselves
 +1.3:	Add support booting MFS directly. Boot specific kernel directly.
 +1.2:	Add support for setting active partition
 +1.1:	EMULAB boot version 1.1
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/Makefile 4.10/src/sys/boot/i386/emuboot0/Makefile
---- 4.10-release/src/sys/boot/i386/emuboot0/Makefile	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot0/Makefile	Thu May 27 14:00:18 2004
-@@ -0,0 +1,44 @@
-+# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.8.2.5 2000/12/28 21:52:32 ps Exp $
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot-cd/Makefile 6.2/src/sys/boot/i386/emuboot-cd/Makefile
+--- 6.2-release/src/sys/boot/i386/emuboot-cd/Makefile	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot-cd/Makefile	Fri Mar  9 15:51:14 2007
+@@ -0,0 +1,107 @@
++# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.81.2.1 2005/10/30 14:37:02 scottl Exp $
 +
-+MAINTAINER=	testbed-ops@emulab.net
++PROG=		loader.sym
++INTERNALPROG=
++NEWVERSWHAT=	"BTX-based Emulab boot loader" i386
 +
-+PROG=		emuboot0
-+NOMAN=
-+STRIP=
-+BINDIR?=	/boot
-+BINMODE=	444
++# architecture-specific loader code
++SRCS=		main.c conf.c diskboot.c testbed.c vers.c
 +
-+M4?=	m4
-+
-+B0FLAGS=0xf
-+B0TICKS=0xb6
-+
-+ORG=	0x600
-+
-+emuboot0: emuboot0.o
-+.if ${OBJFORMAT} == aout
-+	${LD} -N -s -T ${ORG} -o emuboot0.out emuboot0.o
-+	dd if=emuboot0.out of=${.TARGET} ibs=32 skip=1
-+.else
-+	${LD} -N -e start -Ttext ${ORG} -o emuboot0.out emuboot0.o
-+	objcopy -S -O binary emuboot0.out ${.TARGET}
++.include <${.CURDIR}/../Makefile.inc>
++.if defined(FORCE_SERIAL_CONSOLE)
++M4FLAGS+=	-DFORCE_SERIAL_CONSOLE
++CFLAGS+=	-DFORCE_SERIAL_CONSOLE
 +.endif
 +
-+emuboot0.o: emuboot0.s
-+	${AS} ${AFLAGS} --defsym FLAGS=${B0FLAGS} --defsym TICKS=${B0TICKS} \
-+		${.IMPSRC} -o ${.TARGET}
++# Enable PXE TFTP or NFS support, not both.
++.if defined(LOADER_TFTP_SUPPORT)
++CFLAGS+=	-DLOADER_TFTP_SUPPORT
++.else
++CFLAGS+=	-DLOADER_NFS_SUPPORT
++.endif
++
++# Enable PnP and ISA-PnP code.
++HAVE_PNP=	yes
++HAVE_ISABUS=	yes
++
++.if !defined(NO_FORTH)
++# Enable BootForth
++BOOT_FORTH=	yes
++CFLAGS+=	-DBOOT_FORTH -I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/i386
++LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
++.endif
++
++.if defined(LOADER_BZIP2_SUPPORT)
++CFLAGS+=	-DLOADER_BZIP2_SUPPORT
++.endif
++.if !defined(LOADER_NO_GZIP_SUPPORT)
++CFLAGS+=	-DLOADER_GZIP_SUPPORT
++.endif
++.if !defined(LOADER_NO_SPLIT_SUPPORT)
++CFLAGS+=	-DLOADER_SPLIT_SUPPORT
++.endif
++
++# Always add MI sources 
++.PATH:		${.CURDIR}/../../common ${.CURDIR}/../loader
++.include	"${.CURDIR}/../../common/Makefile.inc"
++CFLAGS+=	-I${.CURDIR}/../../common
++CFLAGS+=	-I.
++
++CLEANFILES=	vers.c loader loader.bin loader.help
++
++CFLAGS+=	-Wall
++LDFLAGS=	-static -Ttext 0x0
++
++# i386 standalone support library
++LIBI386=	${.OBJDIR}/../libi386/libi386.a
++CFLAGS+=	-I${.CURDIR}/..
++
++# BTX components
++CFLAGS+=	-I${.CURDIR}/../btx/lib
++
++# Debug me!
++#CFLAGS+=	-g
++#LDFLAGS+=	-g
++
++# Pick up ../Makefile.inc early.
++.include <bsd.init.mk>
++
++vers.c:	${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version
++	sh ${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
++
++loader: loader.bin ${BTXLDR} ${BTXKERN}
++	btxld -v -f aout -e ${LOADER_ADDRESS} -o ${.TARGET} -l ${BTXLDR} \
++		-b ${BTXKERN} loader.bin
++
++loader.bin: loader.sym
++	cp ${.ALLSRC} ${.TARGET}
++	strip -R .comment -R .note ${.TARGET}
++
++loader.help: help.common help.i386
++	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}
++
++.PATH: ${.CURDIR}/../../forth 
++FILES=	loader loader.help loader.4th support.4th loader.conf
++FILES+= screen.4th frames.4th beastie.4th
++# XXX INSTALLFLAGS_loader= -b
++FILESMODE_loader= ${BINMODE} -b
++FILESDIR_loader.conf=	/boot/defaults
++
++.if !exists(${DESTDIR}/boot/loader.rc)
++FILES+=	loader.rc
++.endif
++
++# XXX crt0.o needs to be first for pxeboot(8) to work
++OBJS=	${BTXCRT} 
++
++DPADD=	${LIBFICL} ${LIBI386} ${LIBSTAND}
++LDADD=	${LIBFICL} ${LIBI386} -lstand
++
++.include <bsd.prog.mk>
++
++.if ${MACHINE_ARCH} == "amd64"
++beforedepend ${OBJS}: machine
++CLEANFILES+=	machine
++machine:
++	ln -sf ${.CURDIR}/../../../i386/include machine
++.endif
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot-cd/diskboot.c 6.2/src/sys/boot/i386/emuboot-cd/diskboot.c
+--- 6.2-release/src/sys/boot/i386/emuboot-cd/diskboot.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot-cd/diskboot.c	Fri Mar  9 16:57:45 2007
+@@ -0,0 +1,554 @@
++#include <stand.h>
++
++#include <netinet/in_systm.h>
++#include <netinet/in.h>
++#include <netinet/udp.h>
++
++#include "btxv86.h"
++#include "libi386/libi386.h"
++#include "bootstrap.h"
++
++int load_sector(int sectno, void *buf);
++int set_active(int apart);
++
++/*
++ * Support for disk booting
++ */
++
++#define DISKDEV	0x80	/* first BIOS hard drive */
++
++static void *magicaddr = (void *)0x7C00;
++
++struct bios_mbr {
++	char bootcode[446];
++	char partinfo[64];	/* 4 x bios_partition_info */
++	unsigned short magic;
++};
++
++/* magic */
++#define BIOS_MAGIC	0xaa55
++
++struct bios_partition_info {
++        unsigned char bootid;
++        unsigned char beghead;
++        unsigned char begsect;
++        unsigned char begcyl; 
++        unsigned char sysid;
++        unsigned char endhead;
++        unsigned char endsect;
++        unsigned char endcyl;
++        unsigned long offset;
++        unsigned long numsectors;
++};
++
++/* bootable (active) bootid */
++#define BIOS_BOOTABLE	0x80
++
++static struct bios_mbr diskmbr;
++static char partbr[512];
++static int find_bootdisk(void);
++static int load_mbr(int dieonerror);
++static int check_mbr(void);
++static void show_mbr(void);
++static int bootdisk = -1;
++static char bootdevice[] = "disk0:";
++static int diskdev = DISKDEV;
++
++void
++set_bootdisk(int ndiskdev)
++{
++	if (bootdisk == -1 && find_bootdisk()) {
++		printf("can't find boot harddisk\n");
++		return;
++	}
++
++	if (ndiskdev >= 0 && ndiskdev != diskdev) {
++		int odiskdev = diskdev;
++		diskdev = ndiskdev;
++		if (find_bootdisk()) {
++			diskdev = odiskdev;
++			printf("can't set bootdisk to 0x%x, left as 0x%x\n",
++			       ndiskdev, diskdev);
++			return;
++		}
++	}
++	if (ndiskdev != diskdev)
++		printf("Boot disk is %s (0x%x)\n", bootdevice, diskdev);
++}
++
++/*
++ * Locate the boot code biosdisk that corresponds to BIOS disk DISKDEV
++ */
++static int
++find_bootdisk(void)
++{
++	bootdisk = bd_bios2unit(diskdev);
++	if (bootdisk >= 0) {
++		bootdevice[4] = bootdisk + '0';
++		return 0;
++	}
++
++	return -1;
++}
++
++void
++disk_showinfo(void)
++{
++	set_bootdisk(-1);
++	if (load_mbr(0) == 0) {
++		printf("Partitions, %s\n", bootdevice);
++		show_mbr();
++	}
++}
++
++/*
++ * Load the Master Boot Record using the BIOS.
++ */
++static int
++load_mbr(int dieonerror)
++{
++	if (load_sector(0, &diskmbr) == 0 && check_mbr() == 0)
++		return 0;
++
++	if (dieonerror)
++		panic("Could not load/verify MBR");
++	return -1;
++}
++
++/*
++ * Check sanity of the MBR.
++ */
++static int
++check_mbr(void)
++{
++	struct bios_mbr *mbr;
++	struct bios_partition_info *entry;
++	int i;
++
++	mbr = &diskmbr;
++#ifdef DEBUG
++	printf("MBR@%p: magic=%x, partinfo@%p\n", mbr, mbr->magic,
++	       mbr->partinfo);
++#endif
++	if (mbr->magic != BIOS_MAGIC) {
++#ifdef DEBUG
++		printf("MBR has bad magic (%x != %x)\n",
++		       mbr->magic, BIOS_MAGIC);
++#endif
++		return -1;
++	}
++
++	entry = (struct bios_partition_info *) mbr->partinfo;
++	for (i = 0; i < 4; i++, entry++) {
++#ifdef DEBUG
++		printf("%c%d: sysid=%d, offset=%lu, nsect=%lu\n",
++		       entry->bootid==BIOS_BOOTABLE ? '*' : ' ', i+1,
++		       entry->sysid, entry->offset, entry->numsectors);
++#endif
++		if (entry->numsectors == 0)
++			continue;
++
++		/* XXX sanity check fields */
++	}
++
++	return 0;
++}
++
++static struct ptypes {
++	int sysid;
++	char *str;
++} sysids[] = {
++	{ 165,	"FreeBSD" },
++	{ 131,	"Linux" },
++	{ 130,	"Linux swap" },
++	{ 7,	"NTFS" },
++	{ 166,	"OpenBSD" },
++	{ 0,	"Unused" },
++	{ -1,	"Unknown" }
++};
++
++static char *
++ptypestr(int sysid)
++{
++	struct ptypes *pt = sysids;
++
++	for (pt = sysids; pt->sysid >= 0; pt++)
++		if (pt->sysid == sysid)
++			break;
++	return (pt->str);
++}
++
++static void
++show_mbr(void)
++{
++	struct bios_partition_info *entry;
++	int i;
++
++	entry = (struct bios_partition_info *) diskmbr.partinfo;
++	for (i = 0; i < 4; i++, entry++) {
++		if (entry->numsectors == 0)
++			continue;
++		printf("%c%d: sysid=%d (%s), offset=%lu, nsect=%lu\n",
++		       entry->bootid==BIOS_BOOTABLE ? '*' : ' ', i+1,
++		       entry->sysid, ptypestr(entry->sysid),
++		       entry->offset, entry->numsectors);
++	}
++}
++
++/*
++ * Copy the given sector contents into the magic load address,
++ * switch to 16bit/real mode, and then jump to the address.
++ *
++ * Note that we copy the sector into the memory previously occupied
++ * by the pxeldr, this way we should not be clobbering anything.
++ */
++static void
++boot_from(void *buf)
++{
++	void __restart(void *) __attribute__((__noreturn__));
++
++	/*
++	 * Shutdown PXE
++	 */
++	dev_cleanup();
++
++	i386_copyin(buf, (vm_offset_t)magicaddr, 512);
++
++	/*
++	 * FreeBSD's mbr, boot0 and boot1 all expect %dl to be set to
++	 * the boot device when they are invoked.
++	 * I don't know if this is a BIOS handoff feature or if it is
++	 * a bug and everyone assumes it is a bit of PC lore.
++	 *
++	 * Anyway, we set it here and it makes it through the BTX intact.
++	 */
++	__asm __volatile("movb %0,%%dl" : : "m" (diskdev));
++
++	__restart(magicaddr);
++}
++
++/*
++ * Boot from the MBR.  As long as there is a MBR, and its intact,
++ * something good should happen (say, Lilo will appear).
++ */
++static void
++boot_mbr(void)
++{
++	boot_from(&diskmbr);
++}
++
++/*
++ * Load and boot the first sector of the indicated partition.
++ */
++static void
++boot_partition(int pnum, struct bios_partition_info *ptab)
++{
++	if (load_sector((int)ptab->offset, partbr) != 0 ||
++	    ((struct bios_mbr *)partbr)->magic != BIOS_MAGIC)
++		panic("Could not load/verify partition %d boot record", pnum);
++
++	boot_from(partbr);
++}
++
++/*
++ * Simply load and boot the MBR right off the disk.
++ */
++void
++boot_mbr_default(void)
++{
++	printf("Loading MBR and booting active partition\n");
++
++	(void) load_mbr(1);
++	boot_mbr();
++}
++
++/*
++ * Boot from a partition with a particular sysid.
++ * Search the table for the first non-empty partition of the given type.
++ * If the type does not exist, return non-zero.
++ */
++int
++boot_mbr_sysid(int sysid)
++{
++	struct bios_partition_info *entry;
++	int partition;
++
++	printf("Loading MBR and booting system ID %d\n", sysid);
++
++	(void) load_mbr(1);
++
++	/*
++	 * Look for a non-empty partition that matches the one we want.
++	 */
++	entry = (struct bios_partition_info *)diskmbr.partinfo;
++	for (partition = 0; partition < 4; partition++, entry++) {
++		if (entry->numsectors == 0)
++			continue;
++		if (entry->sysid == sysid)
++			break;
++	}
++	if (partition == 4) {
++		printf("%d: sysid not found in any partition\n", sysid);
++		return 1;
++	}
++
++	if (set_active(partition+1) != 0)
++		printf("WARNING: could not set active partition in MBR\n");
++	boot_partition(partition+1, entry);
++	return 0;
++}
++
++/*
++ * Boot from a particular partition.
++ * If the partition does not exist, return non-zero.
++ */ 
++int
++boot_mbr_partition(int partition)
++{
++	struct bios_partition_info *entry;
++
++	/* XXX hack: part:0 means boot through MBR */
++	if (partition == 0)
++		boot_mbr_default();
++
++	printf("Loading MBR and booting system partition %d\n", partition);
++
++	if (partition < 1 || partition > 4) {
++		printf("%d: invalid partition number\n", partition);
++		return 1;
++	}
++
++	/* partition is 1-based, table is 0-based */
++	partition--;
++
++	(void) load_mbr(1);
++
++	entry = ((struct bios_partition_info *)diskmbr.partinfo) + partition;
++	if (entry->numsectors == 0) {
++		printf("%d: non-existent partition\n", partition+1);
++		return 1;
++	}
++
++	if (set_active(partition+1) != 0)
++		printf("WARNING: could not set active partition in MBR\n");
++	boot_partition(partition+1, entry);
++	return 0;
++}
++
++/*
++ * Return the sysid for a partition.
++ */
++int
++partition_sysid(int partition, int *sysid)
++{
++	struct bios_partition_info *entry;
++
++	if (partition < 1 || partition > 4) {
++		printf("%d: invalid partition number\n", partition);
++		return 1;
++	}
++
++	/* partition is 1-based, table is 0-based */
++	partition--;
++
++	(void) load_mbr(1);
++
++	entry = ((struct bios_partition_info *)diskmbr.partinfo) + partition;
++	if (entry->numsectors == 0) {
++		printf("%d: non-existent partition\n", partition+1);
++		return 1;
++	}
++	*sysid = entry->sysid;
++	return 0;
++}
++
++int
++load_sector(int sectno, void *buf)
++{
++	int fd, rv = 0;
++
++	set_bootdisk(diskdev);
++	fd = open(bootdevice, 0);
++	if (fd >= 0) {
++		if (lseek(fd, (off_t)sectno * 512, SEEK_SET) < 0 ||
++		    read(fd, buf, 512) < 512) {
++			rv = errno;
++#ifdef DEBUG
++			printf("short/failed read of sector %d, err=%x\n",
++			       sectno, rv);
++#endif
++		}
++		close(fd);
++	} else {
++		rv = errno;
++#ifdef DEBUG
++		printf("failed open of %s, err=%x\n", bootdevice, rv);
++#endif
++	}
++
++#ifdef DEBUG
++	printf("Got sector %d: magic=0x%x\n",
++	       sectno, ((unsigned short *)buf)[255]);
++#endif
++	return rv;
++}
++
++#include <btxv86.h>
++
++/*
++ * Set the active partition in the disk MBR
++ */
++int
++set_active(int apart)
++{
++	struct bios_partition_info *entry;
++	int i;
++
++	if (apart < 1 || apart > 4) {
++		printf("set_active: invalid partition number %d\n", apart);
++		return 1;
++	}
++
++	if (load_mbr(0) != 0) {
++		printf("set_active: could not load MBR\n");
++		return 1;
++	}
++
++	/*
++	 * Already active
++	 */
++	entry = &((struct bios_partition_info *)diskmbr.partinfo)[apart-1];
++	if (entry->bootid & BIOS_BOOTABLE)
++		return 0;
++
++	/*
++	 * Verify the desired partition and mark it as active
++	 */
++	if (entry->numsectors == 0) {
++		printf("set_active: emptry partition %d\n", apart);
++		return 1;
++	}
++	entry->bootid |= BIOS_BOOTABLE;
++
++	/*
++	 * Clear any other active indicator.
++	 */
++	apart--;
++	entry = (struct bios_partition_info *)diskmbr.partinfo;
++	for (i = 0; i < 4; i++, entry++)
++		if (i != apart && (entry->bootid & BIOS_BOOTABLE))
++			entry->bootid &= ~BIOS_BOOTABLE;
++
++	/*
++	 * Write MBR back out.
++	 *
++	 * XXX we do this totally behind the back of the boot loader
++	 * subsystem (biosdisk) since it doesn't support disk writes.
++	 * Thus, this is the last thing you should do before jumping
++	 * to the next level boot code.
++	 *
++	 * This code lifted from the biosdisk read code.
++	 */
++	v86.ctl = V86_FLAGS;
++	v86.addr = 0x13;
++	v86.eax = 0x300 | 1;
++	v86.ecx = 1;
++	v86.edx = diskdev;
++	v86.es = VTOPSEG(&diskmbr);
++	v86.ebx = VTOPOFF(&diskmbr);
++	v86int();
++	if (v86.efl & 0x1) {
++		printf("set_active: could not write back MBR, eax=0x%x\n",
++		       v86.eax);
++		return 1;
++	}
++	return 0;
++}
++
++/*
++ * XXX for LILO support
++ */
++
++/*
++ * Read the boot block for the indicated partition.
++ * Returns a pointer to our buffer on success, 0 on failure.
++ */
++void *
++load_partition_bblock(int pnum)
++{
++	struct bios_partition_info *entry;
++
++	if (load_mbr(0) != 0)
++		return 0;
++
++	pnum--;
++	entry = ((struct bios_partition_info *)diskmbr.partinfo) + pnum;
++	if (load_sector((int)entry->offset, partbr) != 0 ||
++	    ((struct bios_mbr *)partbr)->magic != BIOS_MAGIC) {
++		printf("Could not load/verify partition %d boot record", pnum);
++		return 0;
++	}
++
++	return partbr;
++}
++
++/*
++ * Update a disk sector.
++ * Return 0 on success, non-zero otherwise.
++ *
++ * XXX we do this totally behind the back of the boot loader
++ * subsystem (biosdisk) since it doesn't support disk writes.
++ */
++int
++save_sector(int sectno, void *buf)
++{
++	u_int cyl, hd, sec, bpc, dblk;
++
++	dblk = sectno;
++
++	/*
++	 * Get the disk geometry
++	 */
++	v86.ctl = V86_FLAGS;
++	v86.addr = 0x13;
++	v86.eax = 0x800;
++	v86.edx = diskdev;
++	v86int();
++
++	if (v86.efl & 0x1) {
++#ifdef DEBUG
++		printf("save_sector: cannot get disk geometry\n");
++#endif
++		return 1;
++	}
++
++	hd = ((v86.edx & 0xff00) >> 8) + 1;
++	sec = v86.ecx & 0x3f;
++	bpc = sec * hd;
++
++	cyl = dblk / bpc;
++	if (cyl > 1023) {
++		printf("save_sector: cannot do cyl > 1024\n");
++		return 1;
++	}
++
++	dblk %= bpc;
++	hd = dblk / sec;
++	sec = dblk % sec;
++	sec++;
++
++	v86.ctl = V86_FLAGS;
++	v86.addr = 0x13;
++	v86.eax = 0x300 | 1;
++	v86.ecx = ((cyl & 0xff) << 8) | ((cyl & 0x300) >> 2) | sec;
++	v86.edx = (hd << 8) | diskdev;
++	v86.es = VTOPSEG(buf);
++	v86.ebx = VTOPOFF(buf);
++	v86int();
++	if (v86.efl & 0x1) {
++		printf("save_sector: could not write back sector %d\n",
++		       sectno);
++		return 1;
++	}
++	return 0;
++}
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot-cd/testbed.c 6.2/src/sys/boot/i386/emuboot-cd/testbed.c
+--- 6.2-release/src/sys/boot/i386/emuboot-cd/testbed.c	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot-cd/testbed.c	Fri Mar  9 17:10:00 2007
+@@ -0,0 +1,259 @@
++/*
++ * EMULAB-COPYRIGHT
++ * Copyright (c) 2000-2002, 2004, 2007 University of Utah and the Flux Group.
++ * All rights reserved.
++ */
++
++/*
++ * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <stand.h>
++#include <string.h>
++#include <machine/bootinfo.h>
++#include <sys/reboot.h>
++#include <zlib.h>
++#include <btxv86.h>
++#include "../libi386/libi386.h"
++
++#include "bootstrap.h"
++#include "testbed_boot.h"
++
++COMMAND_SET(testbed_boot, "testbed_boot",
++	    "boot the testbed", command_tbboot);
++
++static char iobuf[SECSIZE];
++static int gettbboot(int unit, tbboot_t *tbhdr);
++extern int unload_modules(void);
++
++extern int boot_mbr_partition(int partition);
++extern int set_active(int apart);
++
++static int
++command_tbboot(int argc, char *argv[])
++{
++	char	       *defpart  = "a";
++	char		diskdev[32], ffs[32];
++	tbboot_t	tbboot_hdr, *tbhdr = &tbboot_hdr;
++	int		biosdev, unit, slice;
++	unsigned	newcrc;
++
++	if (argc < 2) {
++		for (unit = 0; ; unit++) {
++			biosdev = bd_unit2bios(unit);
++			if (biosdev == -1) {
++				sprintf(command_errbuf,
++					"no drive found for testbed boot");
++				return(CMD_ERROR);
++			}
++			if (biosdev >= 0x80 && gettbboot(unit, tbhdr) == 0)
++				break;
++		}
++		sprintf(diskdev, "disk%d", unit);
++	}
++	else {
++		unit = -1;
++		if (strncmp(argv[1], "disk", 4) == 0 &&
++		    argv[1][4] >= '0' && argv[1][4] <= '9')
++			unit = argv[1][4] - '0';
++
++		biosdev = bd_unit2bios(unit);
++		if (biosdev == -1) {
++			sprintf(command_errbuf,
++				"no such drive '%s' for testbed boot",
++				argv[1]);
++			return(CMD_ERROR);
++		}
++		if (biosdev < 0x80 || gettbboot(unit, tbhdr) != 0) {
++			sprintf(command_errbuf,
++				"invalid drive '%s' for testbed boot",
++				argv[1]);
++			return(CMD_ERROR);
++		}
++		strncpy(diskdev, argv[1], sizeof(diskdev));
++	}
++	slice = tbhdr->bootfromdisk;
++	if (slice == 255) {
++		slice = 0;
++		strncpy(ffs, diskdev, sizeof(ffs));
++	} else {
++		sprintf(ffs, "%ss%d%s", diskdev, slice, defpart);
++	}
++	set_bootdisk(biosdev);
++	strcat(diskdev, ":");
++		
++	/*
++	 * Check boot direction. Its an error for them to be equal,
++	 * so boot to the cdrom and leave things as they are. 
++	 */
++	if (tbhdr->bootfromcdrom ||
++	    tbhdr->bootfromcdrom == tbhdr->bootfromdisk) {
++		if (tbhdr->bootfromcdrom == tbhdr->bootfromdisk)
++			printf("Oops, bootfromdisk==bootfromcdrom==%d. "
++			       "Booting from CDROM ...\n",
++			       tbhdr->bootfromdisk);
++		else
++			printf("Booting from CDROM ...\n");
++			
++		autoboot(-1, NULL);
++		return 0;
++	}
++
++	/*
++	 * Only choice is bootfromdisk=$slice. Clear it and go.
++	 */
++	tbhdr->bootfromdisk = 0;
++	tbhdr->bootfromcdrom = 1;
++	newcrc = crc32(0L, Z_NULL, 0);
++	newcrc = crc32(newcrc, (const char *) tbhdr, sizeof(*tbhdr));
++	tbhdr->checksum = newcrc;
++	
++	/*
++	 * Write the sector out.
++	 */
++	printf("Writing out new boot header ...\n");
++	{
++		bzero(iobuf, sizeof(iobuf));
++		memcpy(iobuf, tbhdr, sizeof(*tbhdr));
++
++		v86.ctl  = V86_FLAGS;
++		v86.addr = 0x13;
++		v86.eax  = 0x301;		/* Write 1 sector */
++		v86.ecx  = TBBOOT_SECTOR + 1;   /* BIOS is 1-based */
++		v86.edx  = biosdev;
++		v86.es   = VTOPSEG(iobuf);
++		v86.ebx  = VTOPOFF(iobuf);
++		v86int();
++		if (v86.efl & 0x1) {
++			sprintf(command_errbuf, "Header write failed!");
++			return(CMD_ERROR);
++		}
++	}
++
++	/*
++	 * Set the active partition on the disk we want to boot, and then
++	 * load the appropriate boot sector.  Even if we aren't loading the
++	 * MBR boot sector, we still modify the active partition as some
++	 * boot loaders (BSD boot2) use the active bit from there.
++	 *
++	 * We could/should optimize this for when we are booting into
++	 * a BSD filesystem; i.e., just load the kernel from here.
++	 */
++	printf("Setting the active partition of %s to %d...\n",
++	       diskdev, slice);
++	set_active(slice);
++	
++	/*
++	 * Switch over and go
++	 */
++#if 0
++	/*
++	 * We do this on the RON CD cause we know we are going to boot a
++	 * FreeBSD slice, but in the testbed it could be anything, so we
++	 * must boot through the MBR. As an optimization, we could do this
++	 * if we first looked inside the slice to see what its type is.
++	 */
++	unload_modules();
++	unsetenv("vfs.root.mountfrom");
++	setenv("currdev", ffs, 1);
++#endif
++	printf("Booting from %s...\n", ffs);
++#if 0
++	/* debugging: give us time to read the message on VGA */
++	delay(2000000);
++#endif
++	boot_mbr_partition(slice);
++	return(0);
++}
++
++static int
++gettbboot(int unit, tbboot_t *tbhdr)
++{
++	char disk[16];
++	unsigned oldcrc, newcrc;
++	int fd;
++
++	sprintf(disk, "disk%d:", unit);
++
++	/*
++	 * Open the disk and look for the magic structure.
++	 */
++	fd = open(disk, O_RDONLY);
++	if (fd < 0) {
++		printf("gettbboot: open '%s' failed: %s", disk, strerror(errno));
++		goto out;
++	}
++	if (lseek(fd, (off_t) TBBOOT_OFFSET, SEEK_SET) < 0) {
++		printf("gettbboot: lseek '%s' failed: %s",disk, strerror(errno));
++		goto out;
++	}
++	if (read(fd, iobuf, sizeof(iobuf)) < 0) {
++		printf("gettbboot: read '%s' failed: %s", disk, strerror(errno));
++		goto out;
++	}
++#if 0	/* causes a panic from free */
++	close(fd);
++#endif
++	fd = -1;
++
++	memcpy(tbhdr, iobuf, sizeof(*tbhdr));
++	if (tbhdr->magic1 != TBBOOT_MAGIC1 ||
++	    tbhdr->magic2 != TBBOOT_MAGIC2) {
++#if 0	/* do not complain about this, as it might be RO dongle (aka CD) */
++		printf("gettbboot: bad magic number on '%s'", disk);
++#endif
++		goto out;
++	}
++
++	if (0) {
++		printf("%s\n", disk);
++		printf("  bootfromdisk:	 %d\n",  tbhdr->bootfromdisk);
++		printf("  bootfromcdrom: %d\n",  tbhdr->bootfromcdrom);
++		printf("  checksum:	 %lx\n", tbhdr->checksum);
++	}
++
++	/*
++	 * Check the checksum.
++	 */
++	oldcrc = tbhdr->checksum;
++	tbhdr->checksum = 0;
++	newcrc = crc32(0L, Z_NULL, 0);
++	newcrc = crc32(newcrc, (const char *) tbhdr, sizeof(*tbhdr));
++
++	if (newcrc != oldcrc) {
++		printf("gettbboot: bad checksum number on '%s'", disk);
++		goto out;
++	}
++
++	/*
++	 * Good header!
++	 */
++	return(0);
++
++ out:
++	if (fd >= 0)
++		close(fd);
++	return(CMD_ERROR);
++}
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot-cd/testbed_boot.h 6.2/src/sys/boot/i386/emuboot-cd/testbed_boot.h
+--- 6.2-release/src/sys/boot/i386/emuboot-cd/testbed_boot.h	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot-cd/testbed_boot.h	Thu May 27 14:00:18 2004
+@@ -0,0 +1,111 @@
++/*
++ * EMULAB-COPYRIGHT
++ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
++ * All rights reserved.
++ */
++
++#include <netinet/in.h>
++
++/*
++ * This structure is placed in the boot block. The loader reads the
++ * structure to determine whether it should boot from CDROM or switch
++ * to the disk.
++ *
++ * The basic idea is this:
++ *
++ * 1. The node always boots from the CD-ROM (first in boot chain).
++ * 2. The loader looks for this magic structure:
++ *     2a: If not present continues to load from the CD-ROM (step 4).
++ *     2b: If present check the contents of the structure. If directed to
++ *         boot from the disk goto step 3. If not, continues to load from
++ *         the CDROM (step 4).
++ * 3. Boot from the disk. Switch the boot device to the disk so that the
++ *    kernel is loaded from the disk. Also reset the flag (written to disk)
++ *    to indicate that next reboot should happen from the CDROM. Also set
++ *    another flag, cleared by the kernel, that indicates the kernel booted
++ *    okay. This avoids reboot loops in the case of a scrogged disk.
++ * 4. Boot from the CD-ROM. The user level code on the CD-ROM will take care
++ *    of the rest, writing the proper flags to the structure on the disk.
++ *    Normally, this means checking in with Emulab, and then setting the flag
++ *    to cause it to boot from the disk.
++ *
++ * This entire structure has to be less than a sector.
++ */
++#define SECSIZE			512
++#define TBBOOT_MAXIFACELEN	12
++#define TBBOOT_MAXHOSTLEN	32
++#define TBBOOT_MAXDOMAINLEN	64
++#define TBBOOT_MAXKEYLEN	64
++#define TBBOOT_MAXDISKDEVLEN	32
++
++typedef struct tbboot_header
++{
++	unsigned long		magic1;
++	short			version;
++
++	/*
++	 * Set bootfromdisk to 1 to force loader to boot from disk.
++	 */
++	char			bootfromdisk;
++
++	/*
++	 * Set bootfromcdrom to 0 when booting from the disk. The kernel
++	 * will set this to 1. If the cdrom boots with bootfromdisk 0
++	 * and bootfromcdrom 0, something went wrong and the kernel did not
++	 * boot properly. Avoids a loop.
++	 */
++	char			bootfromcdrom;
++
++	/*
++	 * Flag to indicate the image is valid. Clear this when writing
++	 * a new image, and set it when done.
++	 */
++	char			validimage;
++
++	/*
++	 * Flag to indicate the system config block is valid (has info).
++	 */
++	char			validconfig;
++
++	/*
++	 * crc32 from the zlib library.
++	 */ 
++	unsigned long		checksum;
++
++	/* Paranoia */
++	unsigned long		magic2;
++
++	/*
++	 * The emulab key. 
++	 */
++	char			emulabkey[TBBOOT_MAXKEYLEN];
++
++	/*
++	 * System configuration.
++	 */
++	struct {
++		char		interface[TBBOOT_MAXIFACELEN];
++		char		hostname[TBBOOT_MAXHOSTLEN];
++		char		domain[TBBOOT_MAXDOMAINLEN];
++		struct in_addr	IP;
++		struct in_addr	netmask;
++		struct in_addr	nameserver;
++		struct in_addr	gateway;
++	} sysconfig;
++} tbboot_t;
++
++/* Magic value identifying the header.  */
++#define TBBOOT_MAGIC1		0x9badbeef
++#define TBBOOT_MAGIC2		0x69ceafd8
++
++/* Current Version */
++#define TBBOOT_VERSION		100
++
++/*
++ * Offset from start of the disk. Hardwired to sector 60 which should be
++ * clear on our images.
++ */
++#define TBBOOT_SECTOR		60
++#define TBBOOT_OFFSET		(TBBOOT_SECTOR * SECSIZE)
++
++
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot-cd/version 6.2/src/sys/boot/i386/emuboot-cd/version
+--- 6.2-release/src/sys/boot/i386/emuboot-cd/version	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot-cd/version	Fri Mar  9 16:31:49 2007
+@@ -0,0 +1,7 @@
++$FreeBSD: src/sys/boot/i386/loader/version,v 1.5.2.1 2000/07/06 23:45:00 obrien Exp $
++
++NOTE ANY CHANGES YOU MAKE TO THE BOOTBLOCKS HERE.  The format of this
++file is important.  Make sure the current version number is on line 6.
++
++1.1:	FreeBSD 6.x version
++0.9:	Working version
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot0/Makefile 6.2/src/sys/boot/i386/emuboot0/Makefile
+--- 6.2-release/src/sys/boot/i386/emuboot0/Makefile	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot0/Makefile	Mon Mar 12 10:14:15 2007
+@@ -0,0 +1,71 @@
++# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.32 2005/04/25 17:41:35 ru Exp $
++
++PROG?=	emuboot0
++STRIP=
++BINMODE=${NOBINMODE}
++NO_MAN=
++SRCS=	${PROG}.S
++MAINTAINER= testbed-ops@emulab.net
++
++# The default set of flags compiled into boot0.  This enables update (writing
++# the modified boot0 back to disk after running so that the selection made is
++# saved), packet mode (detect and use the BIOS EDD extensions if we try to
++# boot past the 1024 cylinder liimt), and booting from all valid slices.
++BOOT_BOOT0_FLAGS?=	0x8f
++
++# The number of timer ticks to wait for a keypress before assuming the default
++# selection.  Since there are 18.2 ticks per second, the default value of
++# 0xb6 (182d) corresponds to 10 seconds.
++BOOT_BOOT0_TICKS?=	0xb6
++
++# The base address that we the boot0 code to to run it.  Don't change this
++# unless you are glutton for punishment.
++BOOT_BOOT0_ORG?=	0x600
++
++# Comm settings for boot0sio.
++# Bit(s) Description
++# 7-5    data rate (110,150,300,600,1200,2400,4800,9600 bps)
++# 4-3    parity (00 or 10 = none, 01 = odd, 11 = even)
++# 2      stop bits (set = 2, clear = 1)
++# 1-0    data bits (00 = 5, 01 = 6, 10 = 7, 11 = 8)
++.if !defined(BOOT_BOOT0_COMCONSOLE_SPEED)
++BOOT_COMCONSOLE_SPEED?=	9600
++.if ${BOOT_COMCONSOLE_SPEED} == 9600
++BOOT_BOOT0_COMCONSOLE_SPEED=	"7 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 4800
++BOOT_BOOT0_COMCONSOLE_SPEED=	"6 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 2400
++BOOT_BOOT0_COMCONSOLE_SPEED=	"5 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 1200
++BOOT_BOOT0_COMCONSOLE_SPEED=	"4 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 600
++BOOT_BOOT0_COMCONSOLE_SPEED=	"3 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 300
++BOOT_BOOT0_COMCONSOLE_SPEED=	"2 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 150
++BOOT_BOOT0_COMCONSOLE_SPEED=	"1 << 5 + 3"
++.elif ${BOOT_COMCONSOLE_SPEED} == 110
++BOOT_BOOT0_COMCONSOLE_SPEED=	"0 << 5 + 3"
++.else
++BOOT_BOOT0_COMCONSOLE_SPEED=	"7 << 5 + 3"
++.endif
++.endif
++
++CFLAGS+=-DFLAGS=${BOOT_BOOT0_FLAGS} \
++	-DTICKS=${BOOT_BOOT0_TICKS} \
++	-DCOMSPEED=${BOOT_BOOT0_COMCONSOLE_SPEED}
++
++LDFLAGS=-N -e start -Ttext ${BOOT_BOOT0_ORG} -Wl,-S,--oformat,binary
 +
 +install:
 +	@echo ""
@@ -3299,44 +4469,48 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/Makefile 4.10/src/sys/boot/i38
 +	@echo "========================================="
 +	@echo ""
 +
-+CLEANFILES+= emuboot0.out emuboot0.o
-+
 +.include <bsd.prog.mk>
-diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s 4.10/src/sys/boot/i386/emuboot0/emuboot0.s
---- 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s	Wed Dec 31 17:00:00 1969
-+++ 4.10/src/sys/boot/i386/emuboot0/emuboot0.s	Thu May 27 14:00:18 2004
-@@ -0,0 +1,427 @@
-+#
-+# Copyright (c) 1998 Robert Nordier
-+# All rights reserved.
-+#
-+# Redistribution and use in source and binary forms are freely
-+# permitted provided that the above copyright notice and this
-+# paragraph and the following disclaimer are duplicated in all
-+# such forms.
-+#
-+# This software is provided "AS IS" and without any express or
-+# implied warranties, including, without limitation, the implied
-+# warranties of merchantability and fitness for a particular
-+# purpose.
-+#
+diff -ruN 6.2-release/src/sys/boot/i386/emuboot0/emuboot0.S 6.2/src/sys/boot/i386/emuboot0/emuboot0.S
+--- 6.2-release/src/sys/boot/i386/emuboot0/emuboot0.S	Wed Dec 31 17:00:00 1969
++++ 6.2/src/sys/boot/i386/emuboot0/emuboot0.S	Mon Mar 12 10:29:07 2007
+@@ -0,0 +1,476 @@
++/*
++ * Copyright (c) 2002 Bruce M. Simpson
++ * Copyright (c) 1998 Robert Nordier
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms are freely
++ * permitted provided that the above copyright notice and this
++ * paragraph and the following disclaimer are duplicated in all
++ * such forms.
++ *
++ * This software is provided "AS IS" and without any express or
++ * implied warranties, including, without limitation, the implied
++ * warranties of merchantability and fitness for a particular
++ * purpose.
++ *
++ * $FreeBSD: src/sys/boot/i386/boot0/boot0.S,v 1.14.2.1 2006/05/31 21:32:24 jhb Exp $
++ */
 +
-+# $FreeBSD: src/sys/boot/i386/boot0/boot0.s,v 1.14.2.6 2000/12/19 00:32:19 rnordier Exp $
-+
-+# A modified version of the standard BSD boot0 program intended for use
-+# in Emulab.  The only difference is that if there is no explicit input
-+# from the user we reboot.  This is intended to be use in conjunction
-+# with the Emulab PXE boot loader (emuboot) where we should never reach
-+# the MBR boot code.  Booting via the MBR implies that either the PXE BIOS
-+# didn't succeed (e.g., lost UDP packets during DHCP) or the bootinfo
-+# protocol broke down (e.g., lost UDP packets).  In either case, we really
-+# want to keep trying.  The easiest way to implement a retry at this level
-+# is to just reboot.
-+#
-+# We leave a provision for explicitly specifying a partition to boot from
-+# via console input so that a machine can be rebooted when detached from
-+# the Emulab environment.
-+#
++/* A modified version of the standard BSD boot0 program intended for use
++ * in Emulab.  The only difference is that if there is no explicit input
++ * from the user we reboot.  This is intended to be use in conjunction
++ * with the Emulab PXE boot loader (emuboot) where we should never reach
++ * the MBR boot code.  Booting via the MBR implies that either the PXE BIOS
++ * didn't succeed (e.g., lost UDP packets during DHCP) or the bootinfo
++ * protocol broke down (e.g., lost UDP packets).  In either case, we really
++ * want to keep trying.  The easiest way to implement a retry at this level
++ * is to just reboot.
++ *
++ * We leave a provision for explicitly specifying a partition to boot from
++ * via console input so that a machine can be rebooted when detached from
++ * the Emulab environment.
++ */
++	
++/* A 512-byte boot manager. */
++#ifdef SIO
++/* ... using a serial console on COM1. */
++#endif
 +
 +		.set NHRDRV,0x475		# Number of hard drives
 +		.set ORIGIN,0x600		# Execution address
@@ -3346,18 +4520,22 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s 4.10/src/sys/boot/i
 +		.set PRT_OFF,0x1be		# Partition table
 +
 +		.set TBL0SZ,0x3 		# Table 0 size
-+		.set TBL1SZ,0xc 		# Table 1 size
++		.set TBL1SZ,0xa 		# Table 1 size
 +
 +		.set MAGIC,0xaa55		# Magic: bootable
 +		.set B0MAGIC,0xbb66		# Identification
 +
 +		.set KEY_ENTER,0x1c		# Enter key scan code
 +		.set KEY_F1,0x3b		# F1 key scan code
++		.set KEY_1,0x02			# #1 key scan code
 +
-+#
-+# Addresses in the sector of embedded data values.
-+# Accessed with negative offsets from the end of the relocated sector (%ebp).
-+#
++		.set ASCII_BEL,0x07		# ASCII code for <BEL>
++		.set ASCII_CR,0x0D		# ASCII code for <CR>
++
++/*
++ * Addresses in the sector of embedded data values.
++ * Accessed with negative offsets from the end of the relocated sector (%ebp).
++ */
 +		.set _NXTDRV,-0x48		# Next drive
 +		.set _OPT,-0x47 		# Default option
 +		.set _SETDRV,-0x46		# Drive to force
@@ -3369,211 +4547,241 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s 4.10/src/sys/boot/i
 +		.globl start			# Entry point
 +		.code16				# This runs in real mode
 +
-+#
-+# Initialise segments and registers to known values.
-+# segments start at 0.
-+# The stack is immediately below the address we were loaded to.
-+#
++/*
++ * Initialise segments and registers to known values.
++ * segments start at 0.
++ * The stack is immediately below the address we were loaded to.
++ */
 +start:		cld				# String ops inc
 +		xorw %ax,%ax			# Zero
 +		movw %ax,%es			# Address
 +		movw %ax,%ds			#  data
 +		movw %ax,%ss			# Set up
 +		movw $LOAD,%sp			#  stack
-+	
-+#
-+# Copy this code to the address it was linked for
-+#
++
++/*
++ * Copy this code to the address it was linked for
++ */
 +		movw %sp,%si			# Source
 +		movw $start,%di			# Destination
 +		movw $0x100,%cx			# Word count
 +		rep				# Relocate
 +		movsw				#  code
-+#
-+# Set address for variable space beyond code, and clear it.
-+# Notice that this is also used to point to the values embedded in the block,
-+# by using negative offsets.
-+#
++/*
++ * Set address for variable space beyond code, and clear it.
++ * Notice that this is also used to point to the values embedded in the block,
++ * by using negative offsets.
++ */
 +		movw %di,%bp			# Address variables
 +		movb $0x8,%cl			# Words to clear
 +		rep				# Zero
 +		stosw				#  them
-+#
-+# Relocate to the new copy of the code.
-+#
++/*
++ * Relocate to the new copy of the code.
++ */
 +		incb -0xe(%di)			# Sector number
 +		jmp main-LOAD+ORIGIN		# To relocated code
-+#
-+# Check what flags were loaded with us, specifically, Use a predefined Drive.
-+# If what the bios gives us is bad, use the '0' in the block instead, as well.
-+#
-+main:		testb $0x20,_FLAGS(%bp)		# Set number drive?
++
++main:
++#if defined(SIO) && COMSPEED != 0
++/*
++ * Initialize the serial port.  bioscom preserves the driver number in DX.
++ */
++		movw COMSPEED,%ax		# defined by Makefile
++		callw bioscom
++#endif
++/*
++ * Check what flags were loaded with us, specifically if a predefined drive
++ * number should be used.  If what the bios gives us is bad, use the '0' in
++ * the block instead.
++ */
++		testb $0x20,_FLAGS(%bp)		# Set drive number?
 +		jnz main.1			# Yes
 +		testb %dl,%dl			# Drive number valid?
 +		js main.2			# Possibly (0x80 set)
-+main.1: 	movb _SETDRV(%bp),%dl		# Drive number to use
-+#
-+# Whatever we decided to use, now store it into the fake
-+# partition entry that lives in the data space above us.
-+#
-+main.2: 	movb %dl,_FAKE(%bp)		# Save drive number
++/*
++ * Only update the boot-sector when there is a valid drive number or
++ * the drive number is set manually.
++ */
++		orb $0x40,_FLAGS(%bp)		# Disable updates
++main.1:		movb _SETDRV(%bp),%dl		# Drive number to use
++/*
++ * Whatever we decided to use, now store it into the fake
++ * partition entry that lives in the data space above us.
++ */
++main.2:		movb %dl,_FAKE(%bp)		# Save drive number
 +		callw putn			# To new line
 +		pushw %dx			# Save drive number
-+#
-+# Start out with a pointer to the 4th byte of the first table entry
-+# so that after 4 iterations it's beyond the end of the sector.
-+# and beyond a 256 byte boundary and has overflowed 8 bits (see next comment).
-+# (remember that the table starts 2 bytes earlier than you would expect
-+# as the bootable flag is after it in the block)
-+#
++/*
++ * Start out with a pointer to the 4th byte of the first table entry
++ * so that after 4 iterations it's beyond the end of the sector
++ * and beyond a 256 byte boundary and has overflowed 8 bits (see next comment).
++ * Remember that the table starts 2 bytes earlier than you would expect
++ * as the bootable flag is after it in the block.
++ */
 +		movw $(partbl+0x4),%bx		# Partition table (+4)
 +		xorw %dx,%dx			# Item number
-+#
-+# Loop around on the partition table, printing values until we
-+# pass a 256 byte boundary. The end of loop test is at main.5.
-+#
-+main.3: 	movb %ch,-0x4(%bx)		# Zero active flag (ch == 0)
++/*
++ * Loop around on the partition table, printing values until we
++ * pass a 256 byte boundary. The end of loop test is at main.5.
++ */
++main.3:		movb %ch,-0x4(%bx)		# Zero active flag (ch == 0)
 +		btw %dx,_FLAGS(%bp)		# Entry enabled?
 +		jnc main.5			# No
-+#
-+# If any of the entries in the table are
-+# the same as the 'type' in the slice table entry,
-+# then this is an empty or non bootable partition. Skip it.
-+#
++/*
++ * If any of the entries in the table are the same as the 'type' in the slice
++ * table entry, then this is an empty or non bootable partition. Skip it.
++ */
 +		movb (%bx),%al			# Load type
 +		movw $tables,%di		# Lookup tables
 +		movb $TBL0SZ,%cl		# Number of entries
 +		repne				# Exclude
 +		scasb				#  partition?
 +		je main.5			# Yes
-+#
-+# Now scan the table of known types
-+#
-+		movb $TBL1SZ,%cl		# Number of entries
-+		repne				# Known
-+		scasb				#  type?
-+		jne main.4			# No
-+#
-+# If it matches get the matching element in the
-+# next array. if it doesn't, we are already
-+# pointing at its first element which points to a "?".
-+#
-+		addw $TBL1SZ,%di		# Adjust
-+main.4: 	movb (%di),%cl			# Partition
++/*
++ * Now scan the table of known types
++ */
++		movb $TBL1SZ+1,%cl		# Number of entries
++		repne				# Locate
++		scasb				#  type
++/*
++ * Get the matching element in the next array.
++ */
++		addw $TBL1SZ-1, %di		# Adjust
++		movb (%di),%cl			# Partition
 +		addw %cx,%di			#  description
 +		callw putx			# Display it
-+main.5: 	incw %dx			# Next item 
++main.5:		incw %dx			# Next item
 +		addb $0x10,%bl			# Next entry
 +		jnc main.3			# Till done
-+#
-+# Passed a 256 byte boundary..
-+# table is finished.
-+# Add one to the drive number and check it is valid, 
-+#
++/*
++ * Passed a 256 byte boundary; the table is finished.
++ * Add one to the drive number and check it is valid.
++ */
 +		popw %ax			# Drive number
 +		subb $0x80-0x1,%al		# Does next
 +		cmpb NHRDRV,%al			#  drive exist? (from BIOS?)
 +		jb main.6			# Yes
-+# If not then if there is only one drive,
-+# Don't display drive as an option.
-+#
++/*
++ * If this is the only drive, don't display it as an option.
++ */
 +		decw %ax			# Already drive 0?
 +		jz main.7			# Yes
-+# If it was illegal or we cycled through them,
-+# then go back to drive 0.
-+#
++/*
++ * If it was illegal or we cycled through them, go back to drive 0.
++ */
 +		xorb %al,%al			# Drive 0
-+#
-+# Whatever drive we selected, make it an ascii digit and save it back
-+# to the "next drive" location in the loaded block in case we
-+# want to save it for next time.
-+# This also is part of the printed drive string so add 0x80 to indicate
-+# end of string.
-+#
-+main.6: 	addb $'0'|0x80,%al		# Save next
++/*
++ * Whatever drive we selected, make it an ascii digit and save it back to the
++ * "next drive" location in the loaded block in case we want to save it later
++ * for next time.  This also is part of the printed drive string so add 0x80
++ * to indicate end of string.
++ */
++main.6:		addb $'0'|0x80,%al		# Save next
 +		movb %al,_NXTDRV(%bp)		#  drive number
 +		movw $drive,%di			# Display
 +		callw putx			#  item
-+#
-+# Now that we've printed the drive (if we needed to),
-+# Get ready for the input by noting the time.
-+#
-+main.7: 	movw $prompt,%si		# Display
++/*
++ * Now that we've printed the drive (if we needed to), display a prompt.
++ */
++main.7:		movw $prompt,%si		# Display
 +		callw putstr			#  prompt
-+		xorb %ah,%ah			# BIOS: Get
++		jmp main.7_1			# Skip beep
++/*
++ * Users's last try was bad, beep in displeasure.
++ */
++main.10:	movb $ASCII_BEL,%al		# Signal
++		callw putchr			#  beep!
++/*
++ * Start of input loop.  Take note of time
++ */
++main.7_1:	xorb %ah,%ah			# BIOS: Get
 +		int $0x1a			#  system time
 +		movw %dx,%di			# Ticks when
-+		addw _TICKS(%bp),%di	 	#  timeout
-+# 
-+# Busy loop, looking for keystrokes but
-+# keeping one eye on the time.
-+#
-+main.8: 	movb $0x1,%ah			# BIOS: Check
++		addw _TICKS(%bp),%di		#  timeout
++/*
++ * Busy loop, looking for keystrokes but keeping one eye on the time.
++ */
++main.8:
++#ifndef SIO
++		movb $0x1,%ah			# BIOS: Check
 +		int $0x16			#  for keypress
 +		jnz main.11			# Have one
++#else /* SIO */
++		movb $0x03,%ah			# BIOS: Read COM
++		call bioscom
++		testb $0x01,%ah			# Check line status
++		jnz main.11 			# (bit 1 indicates input)
++#endif /* SIO */
 +		xorb %ah,%ah			# BIOS: Get
 +		int $0x1a			#  system time
 +		cmpw %di,%dx			# Timeout?
 +		jb main.8			# No
-+#
-+# If timed out or defaulting, come here.
-+#
++/*
++ * If timed out or defaulting, come here.
++ */
 +main.9: 	movw $0x1234,0x472		# Set warm boot and
 +		ljmp $0xffff,$0x0		#  reboot the machine
-+#
-+# User's last try was bad, beep in displeasure.
-+# Since nothing was printed, just continue on as if the user
-+# hadn't done anything. This gives the effect of the user getting a beep 
-+# for all bad keystrokes but no action until either the timeout
-+# occurs or the user hits a good key.
-+#
-+main.10:	movb $0x7,%al			# Signal
-+		callw putchr			#  error
-+#
-+# Get the keystroke.
-+#
-+main.11:	xorb %ah,%ah			# BIOS: Get
++/*
++ * Get the keystroke.
++ */
++main.11:
++#ifndef SIO
++		xorb %ah,%ah			# BIOS: Get
 +		int $0x16			#  keypress
 +		movb %ah,%al			# Scan code
-+#
-+# If it's CR act as if timed out.
-+#
++#else
++		movb $0x02,%ah			# BIOS: Receive
++		call bioscom
++#endif
++/*
++ * If it's CR act as if timed out.
++ */
++#ifndef SIO
 +		cmpb $KEY_ENTER,%al		# Enter pressed?
++#else
++		cmpb $ASCII_CR,%al		# Enter pressed?
++#endif
 +		je main.9			# Yes
-+#
-+# Otherwise check if legal
-+# If not ask again.
-+#
++/*
++ * Otherwise check if legal. If not ask again.
++ */
++#ifndef SIO
 +		subb $KEY_F1,%al		# Less F1 scan code
 +		cmpb $0x4,%al			# F1..F5?
++		jna main.12			# Yes
++		subb $(KEY_1 - KEY_F1),%al	# Less #1 scan code
++#else
++		subb $'1',%al			# Less '1' ascii character
++#endif
++		cmpb $0x4,%al			# #1..#5?
 +		ja main.10			# No
-+#
-+# We have a selection.
-+# but if it's a bad selection go back to complain.
-+# The bits in MNUOPT were set when the options were printed.
-+# Anything not printed is not an option.
-+#
-+		cbtw				# Option
++/*
++ * We have a selection.  If it's a bad selection go back to complain.
++ * The bits in MNUOPT were set when the options were printed.
++ * Anything not printed is not an option.
++ */
++main.12:	cbtw				# Option
 +		btw %ax,_MNUOPT(%bp)	 	#  enabled?
 +		jnc main.10			# No
-+#
-+# Save the info in the original tables
-+# for rewriting to the disk.
-+#
++/*
++ * Save the info in the original tables
++ * for rewriting to the disk.
++ */
 +		movb %al,_OPT(%bp)		# Save option
 +		movw $FAKE,%si			# Partition for write
 +		movb (%si),%dl			# Drive number
 +		movw %si,%bx			# Partition for read
-+		cmpb $0x4,%al			# F5 pressed?
++		cmpb $0x4,%al			# F5/#5 pressed?
 +		pushf				# Save
 +		je main.13			# Yes
 +		shlb $0x4,%al			# Point to
 +		addw $partbl,%ax		#  selected
 +		xchgw %bx,%ax	 		#  partition
 +		movb $0x80,(%bx)		# Flag active
-+#
-+# If not asked to do a write-back (flags 0x40) don't do one.
-+#
++/*
++ * If not asked to do a write-back (flags 0x40) don't do one.
++ */
 +main.13:	pushw %bx			# Save
 +		testb $0x40,_FLAGS(%bp)		# No updates?
 +		jnz main.14			# Yes
@@ -3582,44 +4790,43 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s 4.10/src/sys/boot/i
 +		callw intx13			#  to disk
 +main.14:	popw %si			# Restore
 +		popf				# Restore
-+#
-+# If going to next drive, replace drive with selected one.
-+# Remember to un-ascii it. Hey 0x80 is already set, cool!
-+#
-+		jne main.15			# If not F5
++/*
++ * If going to next drive, replace drive with selected one.
++ * Remember to un-ascii it. Hey 0x80 is already set, cool!
++ */
++		jne main.15			# If not F5/#5
 +		movb _NXTDRV(%bp),%dl		# Next drive
 +		subb $'0',%dl			#  number
-+# 
-+# load  selected bootsector to the LOAD location in RAM.
-+# If it fails to read or isn't marked bootable, treat it
-+# as a bad selection.
-+# XXX what does %si carry?
-+#
++/*
++ * Load selected bootsector to the LOAD location in RAM.
++ * If it fails to read or isn't marked bootable, treat it as a bad selection.
++ */
 +main.15:	movw $LOAD,%bx			# Address for read
 +		movb $0x2,%ah			# Read sector
 +		callw intx13			#  from disk
 +		jc main.10			# If error
 +		cmpw $MAGIC,0x1fe(%bx)		# Bootable?
 +		jne main.10			# No
-+		pushw %si			# Save
 +		movw $crlf,%si			# Leave some
 +		callw puts			#  space
-+		popw %si			# Restore
 +		jmp *%bx			# Invoke bootstrap
-+#
-+# Display routines
-+#
 +
-+putkey: 	movb $'F',%al			# Display
++/*
++ * Display routines
++ */
++putkey:
++#ifndef SIO
++		movb $'F',%al			# Display
 +		callw putchr			#  'F'
++#endif
 +		movb $'1',%al			# Prepare
 +		addb %dl,%al			#  digit
 +		jmp putstr.1			# Display the rest
 +
-+#
-+# Display the option and note that it is a valid option.
-+# That last point is a bit tricky..
-+#
++/*
++ * Display the option and note that it is a valid option.
++ * That last point is a bit tricky..
++ */
 +putx:		btsw %dx,_MNUOPT(%bp)		# Enable menu option
 +		movw $item,%si			# Display
 +		callw putkey			#  key
@@ -3629,23 +4836,35 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s 4.10/src/sys/boot/i
 +
 +putn:		movw $crlf,%si			# To next line
 +
-+putstr: 	lodsb				# Get byte
++putstr:		lodsb				# Get byte
 +		testb $0x80,%al 		# End of string?
 +		jnz putstr.2			# Yes
 +putstr.1:	callw putchr			# Display char
 +		jmp putstr			# Continue
 +putstr.2:	andb $~0x80,%al 		# Clear MSB
 +
-+putchr: 	pushw %bx			# Save
++#ifndef SIO
++putchr:
++		pushw %bx			# Save
 +		movw $0x7,%bx	 		# Page:attribute
 +		movb $0xe,%ah			# BIOS: Display
 +		int $0x10			#  character
 +		popw %bx			# Restore
 +		retw				# To caller
++#else /* SIO */
++putchr:
++		movb $0x01,%ah			# BIOS: Send
++bioscom:
++		pushw %dx			# Save
++		xorw %dx,%dx 			# Use COM1
++		int $0x14			#  Character
++		popw %dx			# Restore
++		retw				# To caller
++#endif /* SIO */
 +
-+# One-sector disk I/O routine
++/* One-sector disk I/O routine */
 +
-+intx13: 	movb 0x1(%si),%dh		# Load head
++intx13:		movb 0x1(%si),%dh		# Load head
 +		movw 0x2(%si),%cx		# Load cylinder:sector
 +		movb $0x1,%al			# Sector count
 +		pushw %si			# Save
@@ -3666,108 +4885,132 @@ diff -ruN 4.10-release/src/sys/boot/i386/emuboot0/emuboot0.s 4.10/src/sys/boot/i
 +		popw %si			# Restore
 +		retw				# To caller
 +
-+# Menu strings
++/* Menu strings */
 +
 +item:		.ascii "  ";	     .byte ' '|0x80
-+prompt: 	.ascii "\nPXE failed:"; .byte ' '|0x80
++prompt:		.ascii "\nPXE bad:"; .byte ' '|0x80
 +crlf:		.ascii "\r";	     .byte '\n'|0x80
 +
-+# Partition type tables
++/* Partition type tables */
 +
 +tables:
-+#
-+# These entries identify invalid or NON BOOT types and partitions.
-+#
++/*
++ * These entries identify invalid or NON BOOT types and partitions.
++ */
 +		.byte 0x0, 0x5, 0xf
-+#
-+# These values indicate bootable types we know the names of
-+#
-+		.byte 0x1, 0x4, 0x6, 0xb, 0xc, 0xe, 0x63, 0x83
-+		.byte 0x9f, 0xa5, 0xa6, 0xa9
-+#
-+# These are offsets that match the known names above and point to the strings
-+# that will be printed.
-+#
-+		.byte os_misc-. 		# Unknown
-+		.byte os_dos-.			# DOS
++/*
++ * These values indicate bootable types we know the names of.
++ */
++		.byte 0x1, 0x6, 0x7, 0xb, 0xc, 0xe, 0x83
++		.byte 0xa5, 0xa6, 0xa9
++/*
++ * These are offsets that match the known names above and point to the strings
++ * that will be printed. os_misc will be used if the search of the above table
++ * runs over.
++ */
 +		.byte os_dos-.			# DOS
 +		.byte os_dos-.			# DOS
 +		.byte os_dos-.			# Windows
 +		.byte os_dos-.			# Windows
 +		.byte os_dos-.			# Windows
-+		.byte os_unix-. 		# UNIX
++		.byte os_dos-.			# Windows
 +		.byte os_linux-.		# Linux
-+		.byte os_bsd-.			# BSD/OS
 +		.byte os_freebsd-.		# FreeBSD
 +		.byte os_bsd-.			# OpenBSD
 +		.byte os_bsd-.			# NetBSD
-+#
-+# And here are the strings themselves. 0x80 or'd into a byte indicates 
-+# the end of the string. (not so great for Russians but...)
-+#
++		.byte os_misc-. 		# Unknown
++/*
++ * And here are the strings themselves. 0x80 or'd into a byte indicates
++ * the end of the string. (not so great for Russians but...)
++ */
 +os_misc:	.ascii "?";    .byte '?'|0x80
-+os_dos: 	.ascii "DO";   .byte 'S'|0x80
-+os_unix:	.ascii "UNI";  .byte 'X'|0x80
++os_dos:		.ascii "DO";   .byte 'S'|0x80
 +os_linux:	.ascii "Linu"; .byte 'x'|0x80
 +os_freebsd:	.ascii "Free"
-+os_bsd: 	.ascii "BS";   .byte 'D'|0x80
++os_bsd:		.ascii "BS";   .byte 'D'|0x80
 +
 +		.org PRT_OFF-0xe,0x90
 +
 +		.word B0MAGIC			# Magic number
 +
-+#
-+# These values are sometimes changed before writing back to the drive
-+# Be especially careful that nxtdrv: must come after drive:, as it 
-+# is part of the same string.
-+#
++/*
++ * These values are sometimes changed before writing back to the drive
++ * Be especially careful that nxtdrv: must come after drive:, as it
++ * is part of the same string.
++ */
 +drive:		.ascii "Drive "
-+nxtdrv: 	.byte 0x0			# Next drive number
++nxtdrv:		.byte 0x0			# Next drive number
 +opt:		.byte 0x0			# Option
-+setdrv: 	.byte 0x80			# Drive to force
++setdrv:		.byte 0x80			# Drive to force
 +flags:		.byte FLAGS			# Flags
 +ticks:		.word TICKS			# Delay
 +
-+#
-+# here is the 64 byte partition table that fdisk would fiddle with.
-+#
-+partbl: 	.fill 0x40,0x1,0x0		# Partition table
++/*
++ * Here is the 64 byte partition table that fdisk would fiddle with.
++ */
++partbl:		.fill 0x40,0x1,0x0		# Partition table
 +		.word MAGIC			# Magic number
-diff -ruN 4.10-release/src/sys/boot/i386/libi386/Makefile 4.10/src/sys/boot/i386/libi386/Makefile
---- 4.10-release/src/sys/boot/i386/libi386/Makefile	Fri Jul 19 12:46:28 2002
-+++ 4.10/src/sys/boot/i386/libi386/Makefile	Thu May 27 14:00:18 2004
-@@ -25,6 +25,13 @@
- CFLAGS+= -DDISK_DEBUG
- .endif
+diff -ruN 6.2-release/src/sys/boot/i386/libi386/Makefile 6.2/src/sys/boot/i386/libi386/Makefile
+--- 6.2-release/src/sys/boot/i386/libi386/Makefile	Sun Oct  1 06:07:07 2006
++++ 6.2/src/sys/boot/i386/libi386/Makefile	Thu Mar  1 10:27:26 2007
+@@ -6,9 +6,9 @@
+ SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
+ 	biospci.c biossmap.c bootinfo.c bootinfo32.c bootinfo64.c \
+ 	comconsole.c devicename.c elf32_freebsd.c \
+-	elf64_freebsd.c \
+ 	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
+-	smbios.c time.c vidconsole.c amd64_tramp.S
++	smbios.c time.c vidconsole.c
++#SRCS+=	elf64_freebsd.c amd64_tramp.S
  
-+.ifdef(ETHERBOOT_PXEEMU)
-+CFLAGS+= -DETHERBOOT_PXEEMU
-+.endif
-+.ifdef(ETHERBOOT_RELOC)
-+CFLAGS+= -DETHERBOOT_RELOC=$(ETHERBOOT_RELOC)
-+.endif
-+
- # Include simple terminal emulation (cons25-compatible)
- CFLAGS+= -DTERM_EMU
+ BOOT_COMCONSOLE_PORT?= 0x3f8
+ CFLAGS+=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}
+diff -ruN 6.2-release/src/sys/boot/i386/libi386/elf32_freebsd.c 6.2/src/sys/boot/i386/libi386/elf32_freebsd.c
+--- 6.2-release/src/sys/boot/i386/libi386/elf32_freebsd.c	Sat Aug 28 18:48:41 2004
++++ 6.2/src/sys/boot/i386/libi386/elf32_freebsd.c	Tue Dec 12 15:55:04 2006
+@@ -25,7 +25,7 @@
+  */
  
-diff -ruN 4.10-release/src/sys/boot/i386/libi386/biosmem.c 4.10/src/sys/boot/i386/libi386/biosmem.c
---- 4.10-release/src/sys/boot/i386/libi386/biosmem.c	Thu Dec 28 06:12:39 2000
-+++ 4.10/src/sys/boot/i386/libi386/biosmem.c	Thu May 27 14:00:18 2004
-@@ -71,6 +71,10 @@
- 	    bios_extmem = smap.length;
- 	}
-     } while (v86.ebx != 0);
-+#ifdef ETHERBOOT_RELOC
-+    if (bios_basemem > ETHERBOOT_RELOC)
-+	    bios_basemem = ETHERBOOT_RELOC;
-+#endif
+ #include <sys/cdefs.h>
+-__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf32_freebsd.c,v 1.14 2004/08/29 00:48:41 iedowse Exp $");
++__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf32_freebsd.c,v 1.14.2.1 2006/11/27 14:53:53 ru Exp $");
  
-     /* Fall back to the old compatibility function for base memory */
-     if (bios_basemem == 0) {
-diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/libi386/pxe.c
---- 4.10-release/src/sys/boot/i386/libi386/pxe.c	Wed Oct 29 02:47:40 2003
-+++ 4.10/src/sys/boot/i386/libi386/pxe.c	Thu May 27 14:03:23 2004
-@@ -36,6 +36,7 @@
+ #include <sys/param.h>
+ #include <sys/exec.h>
+@@ -46,7 +46,7 @@
+ struct file_format i386_elf_obj = { elf32_obj_loadfile, elf32_obj_exec };
+ 
+ /*
+- * There is an a.out kernel and one or more a.out modules loaded.  
++ * There is an ELF kernel and one or more ELF modules loaded.  
+  * We wish to start executing the kernel image, so make such 
+  * preparations as are required, and do so.
+  */
+diff -ruN 6.2-release/src/sys/boot/i386/libi386/elf64_freebsd.c 6.2/src/sys/boot/i386/libi386/elf64_freebsd.c
+--- 6.2-release/src/sys/boot/i386/libi386/elf64_freebsd.c	Sat Aug 28 18:48:41 2004
++++ 6.2/src/sys/boot/i386/libi386/elf64_freebsd.c	Tue Dec 12 15:55:04 2006
+@@ -25,7 +25,7 @@
+  */
+ 
+ #include <sys/cdefs.h>
+-__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf64_freebsd.c,v 1.15 2004/08/29 00:48:41 iedowse Exp $");
++__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf64_freebsd.c,v 1.15.2.1 2006/11/27 14:53:53 ru Exp $");
+ 
+ #define __ELF_WORD_SIZE 64
+ #include <sys/param.h>
+@@ -64,7 +64,7 @@
+ extern amd64_tramp();
+ 
+ /*
+- * There is an a.out kernel and one or more a.out modules loaded.  
++ * There is an ELF kernel and one or more ELF modules loaded.  
+  * We wish to start executing the kernel image, so make such 
+  * preparations as are required, and do so.
+  */
+diff -ruN 6.2-release/src/sys/boot/i386/libi386/pxe.c 6.2/src/sys/boot/i386/libi386/pxe.c
+--- 6.2-release/src/sys/boot/i386/libi386/pxe.c	Sun Apr 17 15:38:22 2005
++++ 6.2/src/sys/boot/i386/libi386/pxe.c	Thu Mar  1 13:34:10 2007
+@@ -35,6 +35,7 @@
  
  #include <netinet/in_systm.h>
  #include <netinet/in.h>
@@ -3775,7 +5018,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  #include <netinet/udp.h>
  
  #include <net.h>
-@@ -49,6 +50,12 @@
+@@ -48,6 +49,12 @@
  #include "pxe.h"
  
  /*
@@ -3788,7 +5031,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
   * Allocate the PXE buffers statically instead of sticking grimy fingers into
   * BTX's private data area.  The scratch buffer is used to send information to
   * the PXE BIOS, and the data buffer is used to receive data from the PXE BIOS.
-@@ -62,6 +69,7 @@
+@@ -61,6 +68,7 @@
  static pxe_t	*pxe_p   = NULL;	/* !PXE */
  static BOOTPLAYER	bootplayer;	/* PXE Cached information. */
  
@@ -3796,7 +5039,17 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  static int 	pxe_debug = 0;
  static int	pxe_sock = -1;
  static int	pxe_opens = 0;
-@@ -219,11 +227,18 @@
+@@ -77,7 +85,9 @@
+ static int	pxe_close(struct open_file *f);
+ static void	pxe_print(int verbose);
+ static void	pxe_cleanup(void);
++#ifndef NO_NFS_SUPPORT
+ static void	pxe_setnfshandle(char *rootpath);
++#endif
+ 
+ static void	pxe_perror(int error);
+ static int	pxe_netif_match(struct netif *nif, void *machdep_hint);
+@@ -218,11 +228,11 @@
  	       (uint8_t) (pxenv_p->Version >> 8),
  	       (uint8_t) (pxenv_p->Version & 0xFF));
  	if (pxe_call == bangpxe_call)
@@ -3806,18 +5059,11 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  		       pxe_p->EntryPointSP.offset);
  	else
 -		printf("@%04x:%04x\n",
-+#ifdef ETHERBOOT_PXEEMU
-+	if (pxenv_p->RMEntry.segment == 0 && pxenv_p->RMEntry.offset == 0 &&
-+	    pxenv_p->PMOffset != 0)
-+		printf("@%08x (Etherboot emulation)\n",
-+		       pxenv_p->PMOffset);
-+	else
-+#endif
 +		printf("@%04x:%04x (PXENV+)\n",
  		       pxenv_p->RMEntry.segment, pxenv_p->RMEntry.offset);
  
  	gci_p = (t_PXENV_GET_CACHED_INFO *) scratch_buffer;
-@@ -235,6 +250,8 @@
+@@ -234,6 +244,8 @@
  		pxe_p = NULL;
  		return (0);
  	}
@@ -3826,7 +5072,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  	bcopy(PTOV((gci_p->Buffer.segment << 4) + gci_p->Buffer.offset),
  	      &bootplayer, gci_p->BufferSize);
  	return (1);
-@@ -275,27 +292,87 @@
+@@ -274,14 +286,72 @@
  	}
  	if (rootip.s_addr == 0) {
  		/*
@@ -3902,15 +5148,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  		if (!rootpath[1])
  			strcpy(rootpath, PXENFSROOTPATH);
  
--		for (i = 0; rootpath[i] != '\0' && i < FNAME_SIZE; i++)
-+		for (i = 0; rootpath[i] != '\0'; i++)
- 			if (rootpath[i] == ':')
- 				break;
--		if (i && i != FNAME_SIZE && rootpath[i] == ':') {
-+		if (i && rootpath[i] == ':') {
- 			rootpath[i++] = '\0';
- 			if (inet_addr(&rootpath[0]) != INADDR_NONE)
- 				rootip.s_addr = inet_addr(&rootpath[0]);
+@@ -295,6 +365,8 @@
  			bcopy(&rootpath[i], &temp[0], strlen(&rootpath[i])+1);
  			bcopy(&temp[0], &rootpath[0], strlen(&rootpath[i])+1);
  		}
@@ -3919,7 +5157,29 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  		printf("pxe_open: server addr: %s\n", inet_ntoa(rootip));
  		printf("pxe_open: server path: %s\n", rootpath);
  		printf("pxe_open: gateway ip:  %s\n", inet_ntoa(gateip));
-@@ -375,11 +452,16 @@
+@@ -306,8 +378,10 @@
+ 		    sprintf(temp, "%6D", bootplayer.CAddr, ":");
+ 		    setenv("boot.netif.hwaddr", temp, 1);
+ 		}
++#ifndef NO_NFS_SUPPORT
+ 		setenv("boot.nfsroot.server", inet_ntoa(rootip), 1);
+ 		setenv("boot.nfsroot.path", rootpath, 1);
++#endif
+ 		setenv("dhcp.host-name", hostname, 1);
+ 	}
+     }
+@@ -335,8 +409,10 @@
+     if (pxe_opens > 0)
+ 	return(0);
+ 
++#ifndef NO_NFS_SUPPORT
+     /* get an NFS filehandle for our root filesystem */
+     pxe_setnfshandle(rootpath);
++#endif
+ 
+     if (pxe_sock >= 0) {
+ 
+@@ -375,11 +451,16 @@
  	    (t_PXENV_UNLOAD_STACK *)scratch_buffer;
  	t_PXENV_UNDI_SHUTDOWN *undi_shutdown_p =
  	    (t_PXENV_UNDI_SHUTDOWN *)scratch_buffer;
@@ -3936,7 +5196,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  	pxe_call(PXENV_UNDI_SHUTDOWN);
  
  #ifdef PXE_DEBUG
-@@ -395,6 +477,17 @@
+@@ -395,6 +476,17 @@
  		printf("pxe_cleanup: UNLOAD_STACK failed %x\n",
  		    unload_stack_p->Status);
  #endif
@@ -3954,29 +5214,23 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  }
  
  void
-@@ -445,6 +538,21 @@
- 	__pxenvseg = pxenv_p->RMEntry.segment;
- 	__pxenvoff = pxenv_p->RMEntry.offset;
- 	
-+#ifdef ETHERBOOT_PXEEMU
-+	if (__pxenvseg == 0 && __pxenvoff == 0 && pxenv_p->PMOffset != 0) {
-+		int pxe_v86_flag = 0;
-+		int retval = 0;
-+		do {
-+			__pxeemu(pxenv_p->PMOffset,
-+				 VTOP(&v86), VTOP(&pxe_v86_flag),
-+				 func, VTOP(scratch_buffer));
-+			if (pxe_v86_flag)
-+				v86int();
-+		} while (pxe_v86_flag != 0);
-+
-+		return;
-+	}
+@@ -403,6 +495,7 @@
+ 	return;
+ }
+ 
++#ifndef NO_NFS_SUPPORT
+ /*
+  * Reach inside the libstand NFS code and dig out an NFS handle
+  * for the root filesystem.
+@@ -454,6 +547,7 @@
+ 	sprintf(cp, "X");
+ 	setenv("boot.nfsroot.nfshandle", buf, 1);
+ }
 +#endif
- 	v86.ctl  = V86_ADDR | V86_CALLF | V86_FLAGS;
- 	v86.es   = VTOPSEG(scratch_buffer);
- 	v86.edi  = VTOPOFF(scratch_buffer);
-@@ -581,9 +689,11 @@
+ 
+ void
+ pxenv_call(int func)
+@@ -605,9 +699,11 @@
  readudp(struct iodesc *h, void *pkt, size_t len, time_t timeout)
  {
  	t_PXENV_UDP_READ *udpread_p = (t_PXENV_UDP_READ *)scratch_buffer;
@@ -3989,7 +5243,7 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  	bzero(udpread_p, sizeof(*udpread_p));
  	
  	udpread_p->dest_ip        = h->myip.s_addr;
-@@ -605,6 +715,97 @@
+@@ -629,6 +725,7 @@
  		return -1;
  	}
  	bcopy(data_buffer, pkt, udpread_p->buffer_size);
@@ -3997,99 +5251,9 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.c 4.10/src/sys/boot/i386/li
  	uh->uh_sport = udpread_p->s_port;
  	return udpread_p->buffer_size;
  }
-+
-+pxe_tftp_readfile(struct in_addr servip, 
-+		  char *filename, vm_offset_t addr, vm_size_t *size)
-+{
-+	t_PXENV_TFTP_READ_FILE	*readfilep =
-+		(t_PXENV_TFTP_READ_FILE *) scratch_buffer;
-+
-+	pxe_netif_end(0);
-+
-+	memset(readfilep, 0, sizeof(*readfilep));
-+	readfilep->ServerIPAddress = servip.s_addr;
-+	readfilep->BufferSize      = (uint32_t) *size;
-+	readfilep->Buffer          = VTOP(addr);
-+	strcpy(readfilep->FileName, filename);
-+
-+	if (netmask == 0 || SAMENET(myip, servip, netmask))
-+		readfilep->GatewayIPAdress = 0;
-+	else
-+		readfilep->GatewayIPAdress = gateip.s_addr;
-+
-+	pxe_call(PXENV_TFTP_READ_FILE);
-+
-+	if (readfilep->Status != 0) {
-+		int	status = readfilep->Status;
-+		if (status != 1)
-+			printf("readfile failed %x\n", status);
-+		pxe_netif_probe(0, 0);
-+		return status;
-+	}
-+	*size = readfilep->BufferSize;
-+
-+	pxe_netif_probe(0, 0);
-+	
-+	return 0;
-+}
-+
-+#if 0
-+/*
-+ * Debug functions
-+ */
-+
-+void
-+pxe_printifinfo(void)
-+{
-+	t_PXENV_UNDI_GET_INFORMATION *info =
-+		(t_PXENV_UNDI_GET_INFORMATION *)scratch_buffer;
-+	t_PXENV_UNDI_GET_NDIS_INFO *ifinfo =
-+		(t_PXENV_UNDI_GET_INFORMATION *)scratch_buffer;
-+
-+	pxe_call(PXENV_UNDI_GET_INFORMATION);
-+	if (info->Status == 0)
-+		printf("%d RX bufs, %d TX bufs\n",
-+		       info->RxBufCt, info->TxBufCt);
-+	pxe_call(PXENV_UNDI_GET_IFACE_INFO);
-+	if (ifinfo->Status == 0)
-+		printf("linkspeed=%x, servflags=%x\n",
-+		       ifinfo->LinkSpeed, ifinfo->ServiceFlags);
-+}
-+
-+void
-+pxe_clearstats(void)
-+{
-+	t_PXENV_UNDI_CLEAR_STATISTICS *stats =
-+		(t_PXENV_UNDI_CLEAR_STATISTICS *)scratch_buffer;
-+
-+	if (pxe_call == NULL)
-+		return;
-+
-+	pxe_call(PXENV_UNDI_CLEAR_STATISTICS);
-+	if (stats->Status != 0)
-+		printf("pxe_clearstats: failed %d\n", stats->Status);
-+}
-+
-+void
-+pxe_printstats(void)
-+{
-+	t_PXENV_UNDI_GET_STATISTICS *stats =
-+		(t_PXENV_UNDI_GET_STATISTICS *)scratch_buffer;
-+
-+	if (pxe_call == NULL)
-+		return;
-+
-+	pxe_call(PXENV_UNDI_GET_STATISTICS);
-+	if (stats->Status == 0)
-+		printf("pxe_stats: %d xmt, %d rcv, %d CRCerr, %d dropped\n",
-+		       stats->XmitGoodFrames, stats->RcvGoodFrames, 
-+		       stats->RcvCRCErrors, stats->RcvResourceErrors);
-+}
-+#endif
-+
-diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.h 4.10/src/sys/boot/i386/libi386/pxe.h
---- 4.10-release/src/sys/boot/i386/libi386/pxe.h	Sat Sep  9 20:52:18 2000
-+++ 4.10/src/sys/boot/i386/libi386/pxe.h	Wed Oct 13 12:32:22 2004
+diff -ruN 6.2-release/src/sys/boot/i386/libi386/pxe.h 6.2/src/sys/boot/i386/libi386/pxe.h
+--- 6.2-release/src/sys/boot/i386/libi386/pxe.h	Mon Sep 23 12:54:26 2002
++++ 6.2/src/sys/boot/i386/libi386/pxe.h	Thu Mar  1 10:09:05 2007
 @@ -61,7 +61,9 @@
  #define	MAC_ARGS(mac)					\
  	mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] 
@@ -4109,10 +5273,10 @@ diff -ruN 4.10-release/src/sys/boot/i386/libi386/pxe.h 4.10/src/sys/boot/i386/li
  
  typedef	uint16_t		SEGSEL_t;
  typedef	uint16_t		PXENV_STATUS_t;
-diff -ruN 4.10-release/src/sys/boot/i386/loader/Makefile 4.10/src/sys/boot/i386/loader/Makefile
---- 4.10-release/src/sys/boot/i386/loader/Makefile	Tue Jun 24 02:06:57 2003
-+++ 4.10/src/sys/boot/i386/loader/Makefile	Thu May 27 14:00:18 2004
-@@ -38,6 +38,9 @@
+diff -ruN 6.2-release/src/sys/boot/i386/loader/Makefile 6.2/src/sys/boot/i386/loader/Makefile
+--- 6.2-release/src/sys/boot/i386/loader/Makefile	Sun Oct 30 07:37:02 2005
++++ 6.2/src/sys/boot/i386/loader/Makefile	Thu Mar  1 10:09:05 2007
+@@ -31,6 +31,9 @@
  .if !defined(LOADER_NO_GZIP_SUPPORT)
  CFLAGS+=	-DLOADER_GZIP_SUPPORT
  .endif
@@ -4122,10 +5286,10 @@ diff -ruN 4.10-release/src/sys/boot/i386/loader/Makefile 4.10/src/sys/boot/i386/
  
  # Always add MI sources 
  .PATH:		${.CURDIR}/../../common
-diff -ruN 4.10-release/src/sys/boot/i386/loader/conf.c 4.10/src/sys/boot/i386/loader/conf.c
---- 4.10-release/src/sys/boot/i386/loader/conf.c	Mon Apr  8 07:50:09 2002
-+++ 4.10/src/sys/boot/i386/loader/conf.c	Thu May 27 14:00:18 2004
-@@ -60,7 +60,9 @@
+diff -ruN 6.2-release/src/sys/boot/i386/loader/conf.c 6.2/src/sys/boot/i386/loader/conf.c
+--- 6.2-release/src/sys/boot/i386/loader/conf.c	Sat Aug 28 18:48:42 2004
++++ 6.2/src/sys/boot/i386/loader/conf.c	Thu Mar  1 12:03:09 2007
+@@ -61,7 +61,9 @@
      &ext2fs_fsops,
      &dosfs_fsops,
      &cd9660_fsops,
@@ -4133,54 +5297,45 @@ diff -ruN 4.10-release/src/sys/boot/i386/loader/conf.c 4.10/src/sys/boot/i386/lo
      &splitfs_fsops,
 +#endif
  #ifdef LOADER_GZIP_SUPPORT
-     &zipfs_fsops,
+     &gzipfs_fsops,
  #endif
-diff -ruN 4.10-release/src/sys/boot/i386/pxeldr/Makefile 4.10/src/sys/boot/i386/pxeldr/Makefile
---- 4.10-release/src/sys/boot/i386/pxeldr/Makefile	Wed Apr 25 05:24:01 2001
-+++ 4.10/src/sys/boot/i386/pxeldr/Makefile	Thu May 27 14:00:18 2004
-@@ -16,6 +16,15 @@
- M4FLAGS+=	-DPROBE_KEYBOARD
- .endif
+@@ -84,14 +86,18 @@
+  */
+ extern struct file_format	i386_elf;
+ extern struct file_format	i386_elf_obj;
++#if 0
+ extern struct file_format	amd64_elf;
+ extern struct file_format	amd64_elf_obj;
++#endif
  
-+.include <${.CURDIR}/../Makefile.inc>
-+.if defined(FORCE_SERIAL_CONSOLE)
-+M4FLAGS+=	-DFORCE_SERIAL_CONSOLE
-+.endif
-+
-+.if defined(ETHERBOOT_PXEEMU)
-+M4FLAGS+=	-DETHERBOOT_PXEEMU
-+.endif
-+
- .if exists(${.OBJDIR}/../loader)
- LOADER=	${.OBJDIR}/../loader/loader
- .else
-diff -ruN 4.10-release/src/sys/boot/i386/pxeldr/pxeldr.s 4.10/src/sys/boot/i386/pxeldr/pxeldr.s
---- 4.10-release/src/sys/boot/i386/pxeldr/pxeldr.s	Fri Aug 10 16:06:18 2001
-+++ 4.10/src/sys/boot/i386/pxeldr/pxeldr.s	Thu May 27 14:00:18 2004
-@@ -81,7 +81,14 @@
- #
- # BTX program loader for PXE network booting
- #
--start:		cld				# string ops inc
-+start:
-+ifdef(`ETHERBOOT_PXEEMU', `
-+		jmp start2
-+signature:
-+		.ascii "PXEB"
-+start2:	
-+')
-+		cld				# string ops inc
- 		xorw %ax, %ax			# zero %ax
- 		movw %ax, %ss			# setup the
- 		movw $start, %sp		#  stack
-@@ -119,6 +126,10 @@
- 		orl $RB_SERIAL, (%bx)		# enable serial console
- keyb:
- ')
-+ifdef(`FORCE_SERIAL_CONSOLE',`
-+		orl $RB_SERIAL, (%bx)		# enable serial console
-+')
-+
- #
- # Turn on the A20 address line
- #
+ struct file_format *file_formats[] = {
+     &i386_elf,
+     &i386_elf_obj,
++#ifndef TESTBED
+     &amd64_elf,
+     &amd64_elf_obj,
++#endif
+     NULL
+ };
+ 
+diff -ruN 6.2-release/src/sys/boot/i386/pxeldr/pxeboot.8 6.2/src/sys/boot/i386/pxeldr/pxeboot.8
+--- 6.2-release/src/sys/boot/i386/pxeldr/pxeboot.8	Thu Dec 12 10:25:59 2002
++++ 6.2/src/sys/boot/i386/pxeldr/pxeboot.8	Tue Dec 12 15:55:05 2006
+@@ -22,7 +22,7 @@
+ .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ .\" SUCH DAMAGE.
+ .\"
+-.\" $FreeBSD: src/sys/boot/i386/pxeldr/pxeboot.8,v 1.7 2002/12/12 17:25:59 ru Exp $
++.\" $FreeBSD: src/sys/boot/i386/pxeldr/pxeboot.8,v 1.7.14.1 2006/11/22 16:39:21 pav Exp $
+ .\"
+ .\" Note: The date here should be updated whenever a non-trivial
+ .\" change is made to the manual page.
+@@ -103,7 +103,7 @@
+ .Pp
+ For further information on Intel's PXE specifications and Wired for
+ Management (WfM) systems, see
+-.Li http://developer.intel.com/ial/wfm/ .
++.Li http://www.intel.com/design/archives/wfm/ .
+ .Sh SEE ALSO
+ .Xr loader 8
+ .Sh HISTORY
