@@ -246,10 +246,10 @@ function GENPLIST ($query_result)
     echo "</tr>\n";
 
     while (list($pid, $foo) = each($showby)) {
+        if (!isset($projectrows["$pid"])) {
+            continue;
+        }
 	$projectrow = $projectrows["$pid"];
-	if (!isset($projectrow)) {
-	    continue;
-	}
 	$headidx    = $projectrow["head_idx"];
 	$Pname      = $projectrow["name"];
 	$approved   = $projectrow["approved"];

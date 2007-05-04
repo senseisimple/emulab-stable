@@ -31,10 +31,8 @@ $optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
 				 "newattribute_type",  PAGEARG_STRING,
 				 "newattribute_name",  PAGEARG_STRING,
 				 "newattribute_value", PAGEARG_STRING);
-
-if (!isset($attributes)) {
-    $attributes = array();
-}
+if (!isset($node_type)) { $node_type = ""; }
+if (!isset($attributes)) { $attributes = array(); }
 
 # This belongs elsewhere!
 $initial_attributes = array(

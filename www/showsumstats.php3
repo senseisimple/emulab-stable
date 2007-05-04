@@ -122,6 +122,7 @@ echo "<br><br>\n";
 # No ranges, just ordered. 
 #
 function showsummary ($showby, $sortby) {
+    global $TBOPSPID;
     switch ($showby) {
         case "projects":
 	    $which = "pid";
