@@ -165,13 +165,13 @@ dofreebsd() {
 	}
 
 	if [ $changedisk -eq 1 ]; then
-	    echo "  updating /etc/dumpdates"
+	    echo "  updating /etc/fstab"
 	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	    }
-	    echo "  updated /etc/fstab"
+	    echo "  updating /etc/dumpdates"
 	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
