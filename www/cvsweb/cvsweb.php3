@@ -180,7 +180,10 @@ $script = "cvsweb.cgi";
 $query = escapeshellcmd($_SERVER["QUERY_STRING"]);
 $name = escapeshellcmd($_SERVER["SCRIPT_NAME"]);
 $agent = escapeshellcmd($_SERVER["HTTP_USER_AGENT"]);
-$encoding = escapeshellcmd($_SERVER["HTTP_ACCEPT_ENCODING"]);
+if (isset($_SERVER["HTTP_ACCEPT_ENCODING"])
+    && $_SERVER["HTTP_ACCEPT_ENCODING"] != "") {
+    $encoding = escapeshellcmd($_SERVER["HTTP_ACCEPT_ENCODING"]);
+}
 
 # This is special ...
 if (isset($_SERVER["PATH_INFO"]) && $_SERVER["PATH_INFO"] != "") {
@@ -197,7 +200,9 @@ $script = preg_replace("/ /","\\ ",$script);
 $query = preg_replace("/ /","\\ ",$query);
 $name = preg_replace("/ /","\\ ",$name);
 $agent = preg_replace("/ /","\\ ",$agent);
-$encoding = preg_replace("/ /","\\ ",$encoding);
+if (isset($encoding)) {
+    $encoding = preg_replace("/ /","\\ ",$encoding);
+}
 
 #
 # A cleanup function to keep the child from becoming a zombie, since
@@ -223,8 +228,10 @@ set_time_limit(0);
 register_shutdown_function("SPEWCLEANUP");
 
 $shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
-            "SCRIPT_NAME=$name HTTP_USER_AGENT=$agent " .
-            "HTTP_ACCEPT_ENCODING=$encoding ";
+	    "SCRIPT_NAME=$name HTTP_USER_AGENT=$agent ";
+if (isset($encoding)) {
+    $shellcmd .= "HTTP_ACCEPT_ENCODING=$encoding ";
+}
 
 if (isset($repodir)) {
     $prog  = ($use_viewvc ? "webviewvc" : "webcvsweb");

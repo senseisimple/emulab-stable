@@ -55,7 +55,9 @@ if (isset($copyid) && $copyid != "") {
 		       $copyid, $matches)) {
 	$copypid = $matches[1];
 	$copyeid = $matches[2];
-	$copytag = $matches[3];
+	if (isset($matches[3])) {
+	    $copytag = $matches[3];
+	}
     }
     else {
 	PAGEARGERROR("Invalid ID");
@@ -145,6 +147,8 @@ if (isset($experiment)) {
 	echo "$nsfile\n";
     }
     else {
+	$pid = $experiment->pid();
+	$eid = $experiment->eid();
 	USERERROR("There is no NS file recorded for ".
 		  "experiment $eid in project $pid!", 1);
     }
