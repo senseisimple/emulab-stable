@@ -1,0 +1,112 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Command line interface to experiment archive module.
+#
+sub usage()
+{
+    print STDERR
+	"Usage: archive_list [-t tag] <idx> <view>\n";
+    exit(-1);
+}
+my $optlist = "dt:";
+my $debug   = 0;
+my $tag     = undef;
+
+#
+# Configure variables
+#
+my $TB		    = "@prefix@";
+my $TBOPS           = "@TBOPSEMAIL@";
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libaudit;
+use Archive;
+use User;
+use Experiment;
+
+#
+# Map invoking user to object.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+    Archive->setdebug(1);
+}
+if (defined($options{"t"})) {
+    $tag = $options{"t"};
+
+    if ($tag =~ /^([-\w]*)$/) {
+	$tag = $1;
+    }
+    else {
+	fatal("Bad data in tag: $tag");
+    }
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $archive_idx  = $ARGV[0];
+my $archive_view = $ARGV[1];
+
+if ($archive_view =~ /^([-\w]*)$/) {
+    $archive_view = $1;
+}
+else {
+    fatal("Bad data in view: $archive_view");
+}
+
+#
+# Find the archive and issue the list command. We just dump the whole
+# thing to stdout.
+#
+my $archive = Archive->Lookup($archive_idx);
+if (!defined($archive)) {
+    fatal("Could not map archive $archive_idx to its object");
+}
+exit($archive->List(undef, $archive_view, 1, $tag));
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+

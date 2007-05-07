@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -26,7 +27,8 @@ sub usage()
 	  "Use -e to change parameters of all nodes in an experiment.\n");
     exit(-1);
 }
-my  $optlist = "de:l";
+my $optlist   = "de:l";
+my $debug     = 0;
 
 #
 # Array of allowed names. All of these values are text, so no need to
@@ -68,12 +70,8 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 my $osselect    = "$TB/bin/os_select";
 my @nodes       = ();
 my %controls    = ();
-my $eidmode	= 0;
-my $debug       = 0;
 my $errors	= 0;
-my $pid;
-my $eid;
-my $dbuid;
+my $experiment;
 
 #
 # Load the Testbed support stuff. 
@@ -81,8 +79,12 @@ my $dbuid;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
+use Experiment;
+use Node;
 
-my $IsAdmin    = TBAdmin($UID);
+# Protos
+sub fatal($);
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -95,7 +97,7 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -120,21 +122,25 @@ if (defined($options{"l"})) {
     }
     exit(0);
 }
-
+# Experiment mode.
 if (defined($options{"e"})) {
-    $eidmode = $options{"e"};
-    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
-	$pid = $1;
-	$eid = $2;
-    }
-    else {
-	usage();
+    $experiment = Experiment->Lookup($options{"e"});
+    if (!defined($experiment)) {
+	fatal("No such experiment in the Emulab DB!");
     }
 }
-
 if (! @ARGV) {
     usage();
 }
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+my $isadmin = TBAdmin();
 
 #
 # Shift off the set strings (name=value). Verify that each one is in the
@@ -149,14 +155,12 @@ while (@ARGV) {
     shift;
 
     if (! defined($controlset{$1})) {
-	die("*** $0:\n".
-	    "    Illegal control setting: $1='$2'. Try the -l option!\n");
+	fatal("Illegal control setting: $1='$2'. Try the -l option!");
     }
     my ($admin,$multi) = @{ $controlset{$1} };
 
-    if ($admin && ! $IsAdmin) {
-	die("*** $0:\n".
-	    "    You do not have permission to set $1. Try the -l option!\n");
+    if ($admin && ! $isadmin) {
+	fatal("You do not have permission to set $1. Try the -l option!");
     }
 
     if ($multi && defined($controls{$1})) {
@@ -178,17 +182,15 @@ if ($debug) {
 # get the nodes. Otherwise, check access for each node given on the
 # command line.
 #
-if ($eidmode) {
+if (defined($experiment)) {
     # Permission check.
-    if ($UID && !TBAdmin($UID) &&
-	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-	die("*** $0:\n".
-	    "    You do not have permission to control nodes in $pid/$eid!\n");
+    if (!$isadmin &&
+	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+	fatal("You do not have permission to control nodes in $experiment!");
     }
 
-    if (! (@nodes = ExpNodes($pid, $eid))) {
-	die("*** $0:\n".
-	    "    There are no nodes in $pid/$eid!\n");
+    if (! (@nodes = $experiment->NodeList())) {
+	fatal("There are no nodes in $experiment!");
     }
 }
 else {
@@ -196,29 +198,25 @@ else {
 	usage();
     }
     
-    # Untaint the nodes.
-    foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
+    foreach my $nodeid (@ARGV) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    fatal("Bad node name: $node");
 	}
-	else {
-	    die("Bad node name: $node.");
-	}
-    
 	push(@nodes, $node);
     }
 }
 
 #
-# Create an update clause for all of the specified values.
+# Create update key/value pairs
 #
-my $physnodes_updatestr;
-my $virtnodes_updatestr;
-my @osselect_params=();
+my %physnode_updates = ();
+my %virtnode_updates = ();
+my @osselect_params  = ();
 
 foreach my $option (keys(%controls)) {
     my ($admin, $multi, $physdbkey, $virtdbkey,
-	$needs_osselect, $osselect_arg, $checkslot) = @{ $controlset{$option} };
+	$needs_osselect, $osselect_arg, $checkslot) = @{$controlset{$option}};
     my $value = $controls{$option};
 
     #
@@ -229,8 +227,7 @@ foreach my $option (keys(%controls)) {
     if ($value ne "" &&
 	!TBcheck_dbslot($value, $table, $slot,
 			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	die("*** $0:\n".
-	    "    Illegal value specified for $option: '$value'\n");
+	fatal("Illegal value specified for $option: '$value'");
     }
 
     if ($needs_osselect) {
@@ -250,38 +247,34 @@ foreach my $option (keys(%controls)) {
 	push(@osselect_params, $str);
     }
     else {
-	if (defined($physnodes_updatestr)) {
-	    $physnodes_updatestr = "$physnodes_updatestr, $physdbkey='$value'";
-	}
-	else {
-	    $physnodes_updatestr = "$physdbkey='$value'";
-	}
+	$physnode_updates{$physdbkey} = $value;
     }
 
     if (defined($virtdbkey)) {
-	if (defined($virtnodes_updatestr)) {
-	    $virtnodes_updatestr = "$virtnodes_updatestr, $virtdbkey='$value'";
-	}
-	else {
-	    $virtnodes_updatestr = "$virtdbkey='$value'";
-	}
+	$virtnode_updates{$virtdbkey} = $value;
     }
 }
-if (! defined($physnodes_updatestr) && 
-    @osselect_params==0 && 
-    ! defined($virtnodes_updatestr)) {
+if (! keys(%physnode_updates) && 
+    @osselect_params == 0 && 
+    ! keys(%virtnode_updates)) {
     exit(0);
 }
 
 if ($debug) {
-    if (defined($physnodes_updatestr)) {
-	print "Phys update will be '$physnodes_updatestr'\n";
+    if (keys(%physnode_updates)) {
+	print "Phys update will be '".
+	    join(",", map("$_='" .
+			  $physnode_updates{$_} . "'",
+			  keys(%physnode_updates))) . "'\n";
     }
     if (@osselect_params>0) {
 	print "osselect calls:\n  ".join("\n  ",@osselect_params)."\n";
     }
-    if (defined($virtnodes_updatestr)) {
-	print "Virt update will be '$virtnodes_updatestr'\n";
+    if (keys(%virtnode_updates)) {
+	print "Virt update will be '".
+	    join(",", map("$_='" .
+			  $virtnode_updates{$_} . "'",
+			  keys(%virtnode_updates))) . "'\n";
     }
 }
 
@@ -290,44 +283,34 @@ if ($debug) {
 # race condition window. Should probably lock instead, but thats a pain.
 #
 foreach my $node (@nodes) {
-    my $node_pid;
-    my $node_eid;
-    my $node_vname;
-
     if ($debug) { print "Processing $node...\n"; }
 
-    if (defined($physnodes_updatestr)) {
-	if ($UID && !$IsAdmin &&
-	    ! TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, $node)) {
+    if (keys(%physnode_updates) || @osselect_params) {
+	if (! $node->AccessCheck($this_user, TB_NODEACCESS_MODIFYINFO)) {
 	    print("*** $0:\n".
-		  "    You do not have permission to modify physical ".
+		  "*** You do not have permission to modify physical ".
 		  "parameters for $node!\n");
-	    
 	    $errors++;
 	    next;
 	}
-	DBQueryFatal("update nodes set $physnodes_updatestr ".
-		     "where node_id='$node'");
-    }
-
-    if (@osselect_params>0) {
-	if ($UID && !$IsAdmin &&
-	    ! TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, $node)) {
-	    print("*** $0:\n".
-		  "    You do not have permission to modify physical ".
-		  "parameters for $node!\n");
-	    
+	if (keys(%physnode_updates) &&
+	    $node->Update(\%physnode_updates) != 0) {
+	    print STDERR "*** Failed to update $node!\n";
 	    $errors++;
-	    next;
 	}
-	foreach $str (@osselect_params) {
-	    if ($debug) { print "Running '$osselect $str $node'\n"; }
-	    if (system("$osselect $str $node")) {
-		print "*** $0:\n    os_select failed!\n";
-		$errors++;
+	if (@osselect_params) {
+	    foreach my $str (@osselect_params) {
+		if ($debug) { print "Running '$osselect $str $node'\n"; }
+		
+		if (system("$osselect $str $node")) {
+		    print STDERR "*** 'os_select $str $node' failed!\n";
+		    $errors++;
+		}
 	    }
 	}
     }
+    next
+	if (! keys(%virtnode_updates));
 
     #
     # We need the vname for the node so that we can update the virt_nodes
@@ -337,27 +320,34 @@ foreach my $node (@nodes) {
     # the params of a swapped out experiment by having the user specify
     # the vname?
     #
-    if (! NodeidToExp($node, \$node_pid, \$node_eid, \$node_vname)) {
-	print("*** $0:\n".
-	      "    Node $node is not a member of a swapped in experiment!\n".
-	      "    Cannot set its virtual node parameters. Skipping ...\n");
-	next;
-    }
+    my $this_experiment = $node->Reservation();
+    next
+	if (!defined($this_experiment));
 
-    if (defined($node_vname) && defined($virtnodes_updatestr)) {
-	if ($UID && !$IsAdmin &&
-	    ! TBExptAccessCheck($UID, $node_pid, $node_eid, TB_EXPT_MODIFY)) {
+    my $node_vname = $node->vname();
+
+    if (defined($node_vname)) {
+	if (! $this_experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	    print("*** $0:\n".
 		  "    You do not have permission to modify virtual ".
 		  "parameters for $node!\n");
-	    
 	    $errors++;
 	    next;
 	}
-	DBQueryFatal("update virt_nodes set $virtnodes_updatestr ".
-		     "where pid='$node_pid' and eid='$node_eid' ".
-		     " and vname='$node_vname'");
+	if ($this_experiment->TableUpdate("virt_nodes", \%virtnode_updates,
+					  "vname='$node_vname'") != 0) {
+	    print STDERR "*** Failed to update $node in $experiment!\n";
+	    $errors++;
+	}
     }
 }
 
 exit($errors);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+    
+    die("*** $0:\n".
+	"    $msg\n");
+}

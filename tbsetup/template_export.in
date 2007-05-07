@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2006, 2007 University of Utah and the Flux Group.
@@ -14,7 +14,9 @@ use XML::Simple;
 use Data::Dumper;
 
 #
-# Export a template.
+# Export a template. The first form exports from an instance of a template,
+# optionally at a specific run/tag. The second form exports from the
+# template itself, optionally at a specific tag.
 #
 # Exit codes are important; they tell the web page what has happened so
 # it can say something useful to the user. Fatal errors are mostly done
@@ -28,22 +30,30 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_export [-q] [-s] [-r <runidx>] -i <idx>\n".
+	  "Usage: template_export [-q] [-s] [-r runidx | -t tag] -i <idx>\n".
+	  "       template_export [-q] [-s] [-t tag] guid/vers\n".
 	  "switches and arguments:\n".
 	  "-q           - be less chatty\n".
+	  "-o           - overwrite existing export directory\n".
 	  "-s           - spew to stdout (as for web page).\n".
+	  "-t           - specific archive tag to export.\n".
 	  "-i <idx>     - Instance index to export\n".
-	  "-r <runidx>  - Run index to export\n");
+	  "-r <runidx>  - Run index to export\n".
+	  "guid/vers    - The template to export.\n");
     exit(-1);
 }
-my $optlist	 = "qi:dsr:";
+my $optlist	 = "qi:dsr:ot:";
 my %options      = ();
 my $spew         = 0;
 my $quiet        = 0;
 my $debug        = 0;
+my $overwrite    = 0;
+my $template_mode= 0;
+my $guid;
+my $version;
 my $exptidx;
 my $runidx;
-my %bindings;
+my $tag;
 
 #
 # Configure variables
@@ -62,13 +72,17 @@ my $TAR         = "/usr/bin/tar";
 my $template;
 my $instance;
 my $pid;
-my $guid;
-my $version;
+my $project;
+my $archive;
+my %bindings;
+my $checkout;
 
 # Protos
 sub ParseArgs();
 sub fatal($$);
 sub cleanup();
+sub ExportTemplate();
+sub ExportInstance();
 
 #
 # Testbed Support libraries
@@ -79,9 +93,9 @@ use libtestbed;
 use libtblog;
 use Template;
 use User;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 0;
+use Project;
+use Archive;
+use Experiment;
 
 # In libdb
 my $projroot = PROJROOT();
@@ -116,25 +130,38 @@ if (! defined($this_user)) {
 # Now parse arguments.
 ParseArgs();
 
-# Temporary
-libArchive::setdebug($debug);
+#
+# Depending on call method, we find the template, or the instance and
+# then the template.
+#
+if ($template_mode) {
+    $template = Template->Lookup($guid, $version);
 
-#
-# Grab instance info and do access check via the template.
-#
-$instance = Template::Instance->LookupByExptidx($exptidx);
-if (!defined($instance)) {
-    fatal(-1, "Could not get instance record for experiment $exptidx!");
+    if (!defined($template)) {
+	fatal(-1, "Could not get template record for $guid/$version!");
+    }
+    $project = $template->GetProject();
+    $pid     = $project->pid();
+    $archive = $template->GetArchive();
 }
-$template = $instance->template();
-$pid      = $template->pid();
-$guid     = $template->guid();
-$version  = $template->vers();
+else {
+    #
+    # Grab instance info and do access check via the template.
+    #
+    $instance = Template::Instance->LookupByExptidx($exptidx);
+    if (!defined($instance)) {
+	fatal(-1, "Could not get instance record for experiment $exptidx!");
+    }
+    $template = $instance->template();
+    $project  = $template->GetProject();
+    $pid      = $project->pid();
+    $archive  = $template->GetArchive();
+    $guid     = $template->guid();
+    $version  = $template->vers();
+}
 
-if (! TBProjAccessCheck($this_user->uid(),
-			$template->pid(), $template->gid(),
-			TB_PROJECT_READINFO)) {
-    tberror("You do not have permission to export template $guid/$version");
+if (! $project->AccessCheck($this_user, TB_PROJECT_READINFO)) {
+    tberror("You do not have permission to export from $template");
     exit(1);
 }
 
@@ -147,10 +174,28 @@ if (system("$checkquota " . $this_user->uid()) != 0) {
 #
 # Checkout to the project tree.
 #
-my $checkout = "$projroot/$pid/export/$guid/$version/$exptidx";
+if ($spew) {
+    $checkout = "/var/tmp/export.$$";
+}
+elsif ($template_mode) {
+    $checkout  = "$projroot/$pid/export/$guid/$version/";
+    $checkout .= "/$tag"
+	if (defined($tag));
+}
+else {
+    $checkout = "$projroot/$pid/export/$guid/$version/$exptidx";
+    $checkout .= "/$tag"
+	if (defined($tag));
+}
 
 # Cleanup existing goo.
 if (-e $checkout) {
+    if (!$overwrite) {
+	# Exit status tells web interface what has happened.
+	print STDERR "Export directory already exists; ".
+	    "use overwite option (-o).\n";
+	exit(2);
+    }
     my $dirtoremove = $checkout;
 
     $dirtoremove .= "/run${runidx}"
@@ -163,59 +208,14 @@ if (! -e $checkout) {
 	or fatal(-1, "Could not mkdir $checkout");
 }
 
-#
-# Since that worked, lets create the XML representation of it and stash
-# to a file.
-#
+# XML stuff.
 my $root = {};
 
-$root->{"guid"} = $instance->guid() . "/" . $instance->vers();
-$root->{"pid"}  = $instance->pid();
-$root->{"eid"}  = $instance->eid();
-$root->{"uid"}  = $instance->uid();
-$root->{"start_time"} = $instance->start_time();
-$root->{"stop_time"}  = $instance->stop_time();
-
-# Fill in the bindings
-$instance->BindingList(\%bindings) == 0
-    or fatal(-1, "Could not get bindings for $instance");
-if (keys(%bindings)) {
-    $root->{"bindings"} = {};
-    foreach my $name (keys(%bindings)) {
-	my $value = $bindings{$name};
-	my $description;
-
-	$template->FormalParameterDescription($name, \$description);
-	
-	$root->{"bindings"}->{$name} = {'value' => $value,
-					'description' => $description};
-    }
+if ($template_mode) {
+    $root = ExportTemplate();
 }
-
-# Fill in the runs.
-my %runlist;
-$instance->RunList(\%runlist) == 0
-    or fatal(-1, "Could not get runlist for $instance");
-if (keys(%runlist)) {
-    $root->{"runs"} = {};
-    foreach my $name (keys(%runlist)) {
-	my $value = $runlist{$name};
-	
-	$root->{"runs"}->{$name} = $value;
-    }
-}
-
-# Fill in the metadata
-my %mlist;
-$template->MetadataList(\%mlist) == 0
-    or fatal(-1, "Could not get Metadata list for $instance");
-if (keys(%mlist)) {
-    $root->{"metadata"} = {};
-    foreach my $name (keys(%mlist)) {
-	my $value = $mlist{$name};
-	
-	$root->{"metadata"}->{$name} = $value;
-    }
+else {
+    $root = ExportInstance();
 }
 
 if ($debug) {
@@ -249,56 +249,6 @@ open(DUMP, ">$checkout/export.xml")
 print DUMP "$xml\n";
 close(DUMP);
 
-
-#
-# Now dump a checkout of each run, in its own directory. Eventually we
-# need to allow for sending out the actual repo instead of checkouts.
-#
-if (keys(%runlist)) {
-    $root->{"runs"} = {};
-    foreach my $name (keys(%runlist)) {
-	my $rowref = $runlist{$name};
-
-	# Export only requested run.
-	next
-	    if (defined($runidx) && $runidx != $rowref->{"idx"});
-
-	my $dir    = "$checkout/run" . $rowref->{"idx"};
-	my $tag    = $rowref->{"ending_archive_tag"};
-
-	# This could happen if template still instantiated (last run).
-	next
-	    if (!defined($tag) || $tag eq "");
-	
-	system("mkdir -p $dir") == 0
-	    or fatal(-1, "Could not mkdir $dir");
-
-	if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-							     $dir, $tag) < 0) {
-	    fatal(-1, "Could not checkout $tag to $dir");
-	}
-    }
-}
-else {
-    my $archive_tag;
-
-    # This would be silly; exporting an instance with no runs.
-    if ($instance->ArchiveTag(\$archive_tag) < 0) {
-	fatal(-1, "Could not get current archive tag for instance $exptidx!");
-    }
-    
-    if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-							 $checkout,
-							 $archive_tag) < 0) {
-	fatal(-1, "Could not checkout $archive_tag to $checkout");
-    }
-}
-
-#
-# Note the time this export was done.
-#
-$instance->UpdateExportTime();
-
 if ($spew) {
     system("$TAR zcf - -C $checkout .");
     cleanup();
@@ -318,10 +268,10 @@ sub ParseArgs()
 	usage();
     }
 
-    usage()
-	if (@ARGV);
-    
     if (defined($options{"i"})) {
+	usage()
+	    if (@ARGV);
+	
 	$exptidx = $options{"i"};
     
 	if (! TBcheck_dbslot($exptidx, "default", "int",
@@ -337,7 +287,22 @@ sub ParseArgs()
 	}
     }
     else {
-	tbdie("You must supply the -i option!");
+	usage()
+	    if (@ARGV != 1);
+
+	#
+	# Pick up guid/version first and untaint.
+	#
+	my $tmp = shift(@ARGV);
+
+	if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	    $guid = $1;
+	    $version = $2;
+	}
+	else {
+	    tbdie("Bad data in argument: $tmp");
+	}
+	$template_mode = 1;
     }
 
     if (defined($options{"r"})) {
@@ -356,6 +321,15 @@ sub ParseArgs()
 	}
     }
 
+    if (defined($options{"t"})) {
+	$tag = $options{"t"};
+    
+	if (! TBcheck_dbslot($tag, "archive_tags", "tag",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper tag!");
+	}
+    }
+
     if (defined($options{"q"})) {
 	$quiet = 1;
     }
@@ -365,6 +339,173 @@ sub ParseArgs()
     if (defined($options{"d"})) {
 	$debug = 2;
     }
+    if (defined($options{"o"})) {
+	$overwrite = 1;
+    }
+
+    usage()
+	if (defined($runidx) && defined($tag));
+}
+
+#
+# Export a template at an optional tag.
+#
+sub ExportTemplate()
+{
+    my $root     = {};
+
+    $root->{"guid"} = $template->guid() . "/" . $template->vers();
+    $root->{"pid"}  = $template->pid();
+
+    #
+    # Need the underlying experiment for this template, since that is
+    # where the archive hangs off of.
+    #
+    my $experiment = Experiment->Lookup($template->exptidx());
+    fatal(-1, "Could not lookup experiment for $template")
+	if (!defined($experiment));
+
+    # Dump formal parameters.
+    my %formals = ();
+    if ($template->FormalParameterList(\%formals) < 0) {
+	fatal(-1, "Could not get formal parameters for $template");
+    }
+    if (keys(%formals)) {
+	$root->{"bindings"} = {};
+	foreach my $name (keys(%formals)) {
+	    my $value = $formals{$name};
+	    my $description;
+
+	    if ($template->FormalParameterDescription($name,
+						      \$description) < 0) {
+		fatal(-1, "Could not get description for parameter $name");
+	    }
+	    $root->{"bindings"}->{$name} = {'value' => $value,
+					    'description' => $description};
+	}
+    }
+
+    # Fill in the metadata
+    my %mlist;
+    $template->MetadataList(\%mlist) == 0
+	or fatal(-1, "Could not get Metadata list for $instance");
+    if (keys(%mlist)) {
+	$root->{"metadata"} = {};
+	foreach my $name (keys(%mlist)) {
+	    my $value = $mlist{$name};
+	
+	    $root->{"metadata"}->{$name} = $value;
+	}
+    }
+    if (defined($tag)) {
+	if ($archive->Checkout($checkout, $experiment->idx(), $tag) < 0) {
+	    fatal(-1, "Could not checkout $tag to $checkout");
+	}
+    }
+    elsif (defined($experiment->archive_tag())) {
+	my $curtag = $experiment->archive_tag();
+
+	if ($archive->Checkout($checkout, $experiment->idx(), $curtag) < 0) {
+	    fatal(-1, "Could not checkout $curtag to $checkout");
+	}
+    }
+    return $root;
+}
+
+sub ExportInstance()
+{
+    my $root = {};
+
+    $root->{"guid"}       = $instance->guid() . "/" . $instance->vers();
+    $root->{"pid"}        = $instance->pid();
+    $root->{"eid"}        = $instance->eid();
+    $root->{"uid"}        = $instance->uid();
+    $root->{"start_time"} = $instance->start_time();
+    $root->{"stop_time"}  = $instance->stop_time();
+
+    # Fill in the bindings
+    $instance->BindingList(\%bindings) == 0
+	or fatal(-1, "Could not get bindings for $instance");
+    if (keys(%bindings)) {
+	$root->{"bindings"} = {};
+	foreach my $name (keys(%bindings)) {
+	    my $value = $bindings{$name};
+	    my $description;
+
+	    $template->FormalParameterDescription($name, \$description);
+	
+	    $root->{"bindings"}->{$name} = {'value' => $value,
+					    'description' => $description};
+	}
+    }
+
+    # Fill in the runs.
+    my %runlist;
+    $instance->RunList(\%runlist) == 0
+	or fatal(-1, "Could not get runlist for $instance");
+    if (keys(%runlist)) {
+	$root->{"runs"} = {};
+	foreach my $name (keys(%runlist)) {
+	    my $value = $runlist{$name};
+
+	    # Export only requested run.
+	    next
+		if (defined($runidx) && $runidx != $value->{"idx"});
+
+	    $root->{"runs"}->{$name} = $value;
+	}
+    }
+
+    # Fill in the metadata
+    my %mlist;
+    $template->MetadataList(\%mlist) == 0
+	or fatal(-1, "Could not get Metadata list for $instance");
+    if (keys(%mlist)) {
+	$root->{"metadata"} = {};
+	foreach my $name (keys(%mlist)) {
+	    my $value = $mlist{$name};
+	
+	    $root->{"metadata"}->{$name} = $value;
+	}
+    }
+
+    #
+    # Dump specific tag, or the runlist, each in its own directory.
+    # 
+    if (defined($tag)) {
+	if ($archive->Checkout($checkout, $instance->exptidx(), $tag) < 0) {
+	    fatal(-1, "Could not checkout $tag to $checkout");
+	}
+    }
+    elsif (keys(%runlist)) {
+	foreach my $name (keys(%runlist)) {
+	    my $rowref = $runlist{$name};
+
+	    # Export only requested run.
+	    next
+		if (defined($runidx) && $runidx != $rowref->{"idx"});
+
+	    my $dir    = "$checkout/run" . $rowref->{"idx"};
+	    my $curtag = $rowref->{"ending_archive_tag"};
+
+	    # This could happen if template still instantiated (last run).
+	    next
+		if (!defined($curtag) || $curtag eq "");
+	
+	    system("mkdir -p $dir") == 0
+		or fatal(-1, "Could not mkdir $dir");
+
+	    if ($archive->Checkout($dir, $instance->exptidx(), $curtag) < 0) {
+		fatal(-1, "Could not checkout $curtag to $dir");
+	    }
+	}
+    }
+    #
+    # Note the time this export was done.
+    #
+    $instance->UpdateExportTime();
+    
+    return $root;
 }
 
 #
@@ -383,6 +524,7 @@ sub fatal($$)
     
     tberror $msg;
     tbinfo "Cleaning up and exiting with status $errorstat ...";
+    cleanup();
 
     exit($errorstat);
 }

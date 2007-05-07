@@ -9,7 +9,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Experiment Tags");
+PAGEHEADER("Archive Tags");
 
 #
 # Only known and logged in users can end experiments.
@@ -21,29 +21,46 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
-				 "exptidx",    PAGEARG_INTEGER,
-				 "records",    PAGEARG_INTEGER);
+$optargs = OptionalPageArguments("index",      PAGEARG_INTEGER,
+				 "experiment", PAGEARG_EXPERIMENT,
+				 "template",   PAGEARG_TEMPLATE,
+				 "instance",   PAGEARG_INSTANCE,
+				 "records",    PAGEARG_INTEGER,
+				 "tag",        PAGEARG_STRING);
 
-if (isset($exptidx)) {
-    #
-    # Just in case we get here via a current experiment link.
-    #
-    if (($foo = Experiment::Lookup($exptidx))) {
+#
+# An instance might be a current or historical. If its a template, use
+# the underlying experiment of the template.
+#
+if (isset($instance)) {
+    if (($foo = $instance->GetExperiment()))
 	$experiment = $foo;
-    }
+    else
+	$index = $instance->exptidx();
+    $template = $instance->GetTemplate();
+}
+elseif (isset($template)) {
+    $experiment = $template->GetExperiment();
+}
+elseif (isset($index)) {
+    $experiment = Experiment::Lookup($index);
 }
 
 #
 # If we got a current experiment, great. Otherwise we have to lookup
 # data for a historical experiment.
 #
-if (isset($experiment)) {
+if (isset($experiment) && $experiment) {
     # Need these below.
     $pid = $experiment->pid();
     $eid = $experiment->eid();
-    $gid = $experiment->gid();
     $exptidx = $experiment->idx();
+
+    $stats = $experiment->GetStats();
+    if (!$stats) {
+	TBERROR("Could not load stats object for experiment $pid/$eid", 1);
+    }
+    $archive_idx = $stats->archive_idx();
 
     # Permission
     if (!$isadmin &&
@@ -52,16 +69,17 @@ if (isset($experiment)) {
 		  "archive in $pid/$eid!", 1);
     }
 }
-elseif (isset($exptidx)) {
-    $stats = ExperimentStats::Lookup($exptidx);
+elseif (isset($index)) {
+    $stats = ExperimentStats::Lookup($index);
     if (!$stats) {
-	PAGEARGERROR("Invalid experiment index: $exptidx");
+	PAGEARGERROR("Invalid experiment index: $index");
     }
 
     # Need these below.
     $pid = $stats->pid();
     $eid = $stats->eid();
-    $gid = $stats->gid();
+    $exptidx = $index;
+    $archive_idx = $stats->archive_idx();
 
     # Permission
     if (!$isadmin &&
@@ -80,35 +98,28 @@ if (!isset($records)) {
 }
 
 echo "<center>\n";
-if ($experiment) {
-    echo $experiment->PageHeader();
+if ($instance) {
+    echo $instance->PageHeader();
+    $url = CreateURL("archive_view", $instance);
+}
+elseif ($template) {
+    echo $template->PageHeader();
+    $url = CreateURL("archive_view", $template);
 }
 else {
     echo $stats->PageHeader();
+    $url = CreateURL("archive_view", "index", $exptidx);
 }
 echo "</center>\n";
 echo "<br>\n";
 
 #
-# We need the archive index so we can find its view.
-#
-$query_result =
-    DBQueryFatal("select s.archive_idx from experiment_stats as s ".
-		 "where s.exptidx='$exptidx'");
-if (mysql_num_rows($query_result) == 0) {
-    TBERROR("Could not get archive index for experiment $exptidx", 1);
-}
-$row   = mysql_fetch_array($query_result);
-$archive_idx = $row["archive_idx"];
-		    
-#
 # Grab all the (commit/user) tags.
 #
 $query_result =
     DBQueryFatal("select *,FROM_UNIXTIME(date_created) as date_created ".
-		 "  from archive_tags ".
-		 "where archive_idx='$archive_idx' and view='$exptidx' and ".
-		 "      (tagtype='user' or tagtype='commit') ".
+		 "  from archive_revisions ".
+		 "where archive_idx='$archive_idx' and view='$exptidx' " .
 		 "order by date_created desc");
 
 if (mysql_num_rows($query_result) == 0) {
@@ -124,17 +135,17 @@ echo "  <th>Description</th>";
 echo "</tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $archive_tag = $row["tag"];
-    $date_tagged = $row["date_created"];
-    $description = $row["description"];
+    $archive_tag  = $row["tag"];
+    $date_tagged  = $row["date_created"];
+    $description  = $row["description"];
+    $archive_view = $url . "&tag=$archive_tag";
 
     echo "<tr>";
     echo "  <td align=center>
                 <a href=beginexp_html.php3?copyid=$exptidx:$archive_tag>
                     <img border=0 alt=Run src=greenball.gif></a></td>";
     echo "  <td>".
-	     "<a href='archive_view.php3/$exptidx/history/".
-		    "$archive_tag/?exptidx=$exptidx'>$archive_tag</a>".
+	     "<a href='$archive_view'>$archive_tag</a>".
 	 "  </td>";
     
     echo "  <td>$date_tagged</td>";

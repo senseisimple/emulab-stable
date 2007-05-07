@@ -19,7 +19,7 @@ sub usage()
 	"       archive_control checktag <pid> <eid> <tag>\n";
     exit(-1);
 }
-my $optlist = "dfat:m:us:";
+my $optlist = "dfat:m:us:l";
 my $debug   = 0;
 my $force   = 0;
 my $dbuid;
@@ -120,9 +120,6 @@ $expstate = $experiment->state();
 if (! $experiment->AccessCheck($this_user, TB_EXPT_UPDATE)) {
     fatal("You do not have permission to control the archive for $pid/$eid!");
 }
-
-# Temporary
-libArchive::setdebug($debug);
 
 # Do not audit this operation.
 if ($action eq "checktag") {
@@ -325,6 +322,7 @@ elsif ($action eq "list" ||
     my @files    = ();
     my $tag      = undef;
     my $subdir   = undef;
+    my $long     = (defined($options{"l"}) ? 1 : 0);
     
     if (defined($options{"t"})) {
 	$tag = $options{"t"};
@@ -367,7 +365,8 @@ elsif ($action eq "list" ||
     }
 
     my $rval = 
-      libArchive::TBListExperimentArchive($pid, $eid, \@files, $tag, $subdir);
+      libArchive::TBListExperimentArchive($pid, $eid, \@files,
+					  $long, $tag, $subdir);
     exit($rval)
 	if ($rval);
 

@@ -565,11 +565,11 @@ class Template
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
 	echo "<tr>
-               <th align=center>Expand</th>
-               <th>EID</th>
-               <th>UID</th>
+               <th align=center>&nbsp</th>
+               <th>ID</th>
                <th>Start Time</th>
                <th>Stop Time</th>
+	       <th>Description</th>
                <th align=center>Show</th>
                <th align=center>Archive</th>
                <th align=center>Export</th>
@@ -581,21 +581,32 @@ class Template
 	$stalemark = "<b>?</b>";
 	
 	while ($row = mysql_fetch_array($query_result)) {
-	    $pid       = $row['pid'];
-	    $eid       = $row['eid'];
-	    $uid       = $row['uid'];
-	    $start     = $row['start_time'];
-	    $stop      = $row['stop_time'];
-	    $exptidx   = $row['exptidx'];
-	    $idx       = $row['idx'];
-	    $tag       = $row['archive_tag'];
+	    $pid        = $row['pid'];
+	    $eid        = $row['eid'];
+	    $start      = $row['start_time'];
+	    $stop       = $row['stop_time'];
+	    $exptidx    = $row['exptidx'];
+	    $idx        = $row['idx'];
+	    $tag        = $row['archive_tag'];
+	    $description= $row['description'];
+	    $onmouseover= "";
 
 	    if (! isset($stop)) {
 		$stop = "&nbsp";
 	    }
 
 	    $expandit = ((isset($expand) && $expand == $idx) ? 1 : 0);
-	    
+
+	    if (isset($description) && $description != "") {
+		$onmouseover = MakeMouseOver($description);
+		if (strlen($description) > 30) {
+		    $description = substr($description, 0, 30) . " <b>...</b>";
+		}
+	    }
+	    else {
+		$description = "&nbsp ";
+	    }
+
 	    echo "<tr>\n";
 	    echo " <td align=center>";
 	    if ($expandit) {
@@ -611,9 +622,9 @@ class Template
 	    echo " </td>
                    <td>$eid</td>\n";
 	    
-	    echo " <td>$uid</td>
-                   <td>$start</td>
-                   <td>$stop</td>\n";
+	    echo " <td>$start</td>
+                   <td>$stop</td>
+                   <td $onmouseover>$description</td>\n";
 
 	    echo " <td align=center>".
 		    MakeLink("instance", "instance=$exptidx",
@@ -621,8 +632,8 @@ class Template
 	    echo " </td>\n";
 
  	    echo " <td align=center>
-                     <a href=archive_view.php3/$exptidx/history/$tag/".
-		        "?instance=$exptidx>
+                     <a href='archive_view.php3".
+		        "?instance=$exptidx&tag=$tag'>
                      <img border=0 alt='i' src='greenball.gif'></a></td>";
 	    
 	    echo " <td align=center>".
@@ -1053,6 +1064,12 @@ class TemplateInstance
     function pid() {
 	return (is_null($this->instance) ? -1 : $this->instance['pid']);
     }
+    function gid() {
+	if (is_null($this->instance))
+	    return -1;
+	$template = $this->GetTemplate();
+	return $template->gid();
+    }
     function eid() {
 	return (is_null($this->instance) ? -1 : $this->instance['eid']);
     }
@@ -1108,6 +1125,12 @@ class TemplateInstance
     # Is instance actually running (current experiment).
     function Instantiated() {
 	return ($this->experiment ? 1 : 0);
+    }
+
+    function AccessCheck($user, $access_type) {
+	$template = $this->template;
+
+	return $template->AccessCheck($user, $access_type);
     }
 
     #
@@ -1446,8 +1469,8 @@ class TemplateInstance
 
 	    if (isset($end_tag) && $end_tag != "") {
 		$archive_link =
-		    "<a href=archive_view.php3".
-		    "/$exptidx/history/$end_tag/?instance=$exptidx>".
+		    "<a href='archive_view.php3".
+		    "?instance=$exptidx&tag=$end_tag'>".
 		    "<img border=0 alt='i' src='greenball.gif'></a>";
 	    }
 	    else {
@@ -1752,15 +1775,6 @@ class TemplateInstance
 	echo "</table>\n";
 
 	$this->ShowRunAnnotation($runidx);
-
-	$archive_url =
-	    "cvsweb/cvsweb.php3/$exptidx/tags/runs/$runid/?instance=$exptidx".
-	    "&embedded=1";
-
-	echo "<br>
-              <center><h3>File Archive</h3></center>
-	      <iframe width=100% height=300
-                      scrolling=yes src='$archive_url' border=2></iframe>\n";
 	    
 	echo "</center>\n";
     }

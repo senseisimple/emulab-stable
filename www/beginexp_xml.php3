@@ -334,11 +334,6 @@ if ($nsfilelocale == "copyid") {
     }
     
     $thensfile = "-c " . $formfields['copyid'];
-
-    # A branch needs the -b option.
-    if (isset($formfields["exp_branch"]) && $formfields["exp_branch"] == "1") {
-	$thensfile = $thensfile . " -b ";
-    }
 }
 elseif ($nsfilelocale == "local") {
     #

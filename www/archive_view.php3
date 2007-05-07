@@ -17,11 +17,12 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
+$optargs = OptionalPageArguments("index",      PAGEARG_INTEGER,
+				 "experiment", PAGEARG_EXPERIMENT,
 				 "template",   PAGEARG_TEMPLATE,
 				 "instance",   PAGEARG_INSTANCE,
-				 "exptidx",    PAGEARG_INTEGER,
-				 "records",    PAGEARG_INTEGER);
+				 "records",    PAGEARG_INTEGER,
+				 "tag",        PAGEARG_STRING);
 
 #
 # Standard Testbed Header now that we know what to say.
@@ -37,26 +38,37 @@ if (isset($instance)) {
     if (($foo = $instance->GetExperiment()))
 	$experiment = $foo;
     else
-	$exptidx = $instance->exptidx();
-    $template = $instance->GetTemplate();
-}
-elseif (isset($exptidx)) {
-    #
-    # Just in case we get here via a current experiment link.
-    #
-    if (($foo = Experiment::Lookup($exptidx))) {
-	$experiment = $foo;
-    }
+	$index = $instance->exptidx();
+    $template   = $instance->GetTemplate();
+    $urlarg     = "instance";
+    $urlval     = $instance->exptidx();
+    echo $instance->PageHeader();    
 }
 elseif (isset($template)) {
     $experiment = $template->GetExperiment();
+    $export_url = CreateURL("template_export", $template);
+    $urlarg     = "template";
+    $urlval     = $template->guid() . "/" . $template->vers();
+    echo $template->PageHeader();
+}
+elseif (isset($index)) {
+    $experiment = Experiment::Lookup($index);
+    $urlarg     = "index";
+    $urlval     = $index;
+    echo $experiment->PageHeader();
+}
+else {
+    $export_url = CreateURL("template_export", $experiment);
+    $urlarg     = "experiment";
+    $urlval     = $experiment->idx();
+    echo $experiment->PageHeader();
 }
 
 #
 # If we got a current experiment, great. Otherwise we have to lookup
 # data for a historical experiment.
 #
-if (isset($experiment)) {
+if (isset($experiment) && $experiment) {
     # Need these below.
     $pid = $experiment->pid();
     $eid = $experiment->eid();
@@ -69,15 +81,16 @@ if (isset($experiment)) {
 		  "archive in $pid/$eid!", 1);
     }
 }
-elseif (isset($exptidx)) {
-    $stats = ExperimentStats::Lookup($exptidx);
+elseif (isset($index)) {
+    $stats = ExperimentStats::Lookup($index);
     if (!$stats) {
-	PAGEARGERROR("Invalid experiment index: $exptidx");
+	PAGEARGERROR("Invalid experiment index: $index");
     }
 
     # Need these below.
     $pid = $stats->pid();
     $eid = $stats->eid();
+    $exptidx = $index;
 
     # Permission
     if (!$isadmin &&
@@ -90,62 +103,28 @@ else {
     PAGEARGERROR("Must provide a current or former experiment index");
 }
 
-$url = preg_replace("/archive_view/", "cvsweb/cvsweb",
+$url = preg_replace("/archive_view\.php3/", "archive_list.php",
 		    $_SERVER['REQUEST_URI']);
 
 # This is how you get forms to align side by side across the page.
-if (isset($experiment)) 
-    $style = 'style="float:left; width:50%;"';
-else
-    $style = "";
+$style = 'style="float:left; width:50%;"';
 
 echo "<center>\n";
-echo "<font size=+1>";
-
-if (isset($template)) {
-    $path = null;
-    
-    if (isset($instance)) {
-	$id = $instance->exptidx();
-	if (isset($experiment))
-	    $path = $experiment->path();
-
-	echo "Subversion datastore for Instance $id";
-    }
-    else {
-	$guid = $template->guid();
-	$vers = $template->vers();
-	$path = $template->path();
-
-	echo "Subversion datastore for Template $guid/$vers";
-    }
-
-    if ($path) {
-	echo "<br>(located at $USERNODE:$path)\n";
-    }
-}
-elseif ($experiment) {
-    echo "Subversion archive for experiment $pid/$eid";
-}
-else {
-    echo "Subversion archive for experiment $exptidx.";
-}
-
-echo "<br><br></font>";
 
 #
-# Only current experiments can be tagged.
+# Buttons to export and to view the tags.
 #
-if (isset($experiment)) {
-    echo "<form action='${TBBASE}/archive_tag.php3' $style method=get>\n";
-    echo "<b><input type=hidden name=experiment value='$exptidx'></b>";
-    echo "<b><input type=submit name=tag value='Tag Archive'></b>";
-    echo "</form>";
+echo "<form action='template_export.php' $style method=get>\n";
+echo "<b><input type=hidden name=$urlarg value='$urlval'></b>";
+if (isset($tag)) {
+    echo "<b><input type=hidden name=tag value='$tag'></b>";
 }
+echo "<b><input type=submit name=submit value='Export'></b>";
+echo "</form>";
 
-echo "<form action='${TBBASE}/archive_tags.php3' $style method=get>";
-echo "<b><input type=hidden name=experiment value='$exptidx'></b>";
-echo "<b><input type=submit name=tag value='Show Tags'></b>";
+echo "<form action='archive_tags.php3' $style method=get>";
+echo "<b><input type=hidden name=$urlarg value='$urlval'></b>";
+echo "<b><input type=submit name=submit value='Show Tags'></b>";
 echo "</form>";
 
 echo "<iframe width=100% height=800 scrolling=yes src='$url' border=2>".

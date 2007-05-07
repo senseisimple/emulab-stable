@@ -17,10 +17,10 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use libtblog;
 use User;
 use Project;
 use Group;
+use Node;
 use English;
 use Data::Dumper;
 use File::Basename;
@@ -133,8 +133,16 @@ sub Lookup($$;$)
     
     $self->{'STATS'} = $query_result->fetchrow_hashref();
     
-    # We get this lazily.
-    $self->{'RSRC'}  = undef;
+    my $rsrcidx = $self->{'STATS'}->{'rsrcidx'};
+
+    $query_result =
+	DBQueryWarn("select * from experiment_resources ".
+		    "where idx='$rsrcidx'");
+	
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    
+    $self->{'RSRC'} = $query_result->fetchrow_hashref();
 
     bless($self, $class);
     
@@ -144,8 +152,9 @@ sub Lookup($$;$)
     return $self;
 }
 # accessors
-sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{$_[1]}); }
-sub stats($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{$_[1]}); }
+sub field($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{$_[1]}); }
+sub stats($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{$_[1]});}
+sub resources($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'RSRC'}->{$_[1]}); }
 
 sub pid($)		{ return field($_[0], 'pid'); }
 sub gid($)		{ return field($_[0], 'gid'); }
@@ -184,6 +193,8 @@ sub swapper_idx($)      { return field($_[0], 'swapper_idx');}
 sub use_ipassign($)     { return field($_[0], 'use_ipassign');}
 sub ipassign_args($)    { return field($_[0], 'ipassign_args');}
 sub security_level($)   { return field($_[0], 'security_level');}
+sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
+sub archive_tag($)	{ return resources($_[0], 'archive_tag'); }
 
 #
 # Lookup an experiment given an experiment index.
@@ -249,6 +260,7 @@ sub LockTables($;$)
     $spec  = "experiments write"
 	if (!defined($spec));
     $spec .= ", experiment_stats read";
+    $spec .= ", experiment_resources read";
     
     DBQueryWarn("lock tables $spec")
 	or return -1;
@@ -520,7 +532,7 @@ sub Refresh($)
 	if (! ref($self));
 
     my $idx = $self->idx();
-    
+
     my $query_result =
 	DBQueryWarn("select * from experiments where idx=$idx");
 
@@ -528,6 +540,7 @@ sub Refresh($)
 	if (!$query_result || !$query_result->numrows);
 
     $self->{'EXPT'}  = $query_result->fetchrow_hashref();
+    $self->{'ISINSTANCE'} = undef;
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
@@ -537,8 +550,16 @@ sub Refresh($)
     
     $self->{'STATS'} = $query_result->fetchrow_hashref();
 
-    # And this is lazy again.
-    $self->{'RSRC'}  = undef;
+    my $rsrcidx = $self->rsrcidx();
+
+    $query_result =
+	DBQueryWarn("select * from experiment_resources ".
+		    "where idx='$rsrcidx'");
+	
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    
+    $self->{'RSRC'} = $query_result->fetchrow_hashref();
     return 0;
 }
 
@@ -1188,7 +1209,7 @@ sub Report($;$$)
 #
 # Return list of local nodes.
 # 
-sub LocalNodeList($$)
+sub LocalNodeListNames($$)
 {
     my ($self, $lref) = @_;
 
@@ -1201,6 +1222,39 @@ sub LocalNodeList($$)
 
     @$lref = ExpNodes($pid, $eid, 1, 0);
     return 0;
+}
+
+#
+# Return list of experiment nodes (objects or just names)
+# 
+sub NodeList($;$)
+{
+    my ($self, $namesonly) = @_;
+    my @nodenames = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    @nodenames = ExpNodes($pid, $eid);
+
+    return @nodenames
+	if (defined($namesonly) && $namesonly);
+
+    my @nodes = ();
+
+    foreach my $node (@nodenames) {
+	my $node = Node->Lookup($node);
+	if (!defined($node)) {
+	    print STDERR "*** Could not map $node to its object\n";
+	    return undef;
+	}
+	push(@nodes, $node);
+    }
+    return @nodes;
 }
 
 #
@@ -1819,6 +1873,19 @@ sub IsInstance($)
     return 0
 	if (! ref($self));
 
+    if (defined($self->{'ISINSTANCE'})) {
+	return $self->{'ISINSTANCE'};
+    }
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select parent_guid from experiment_template_instances ".
+		    "where exptidx='$idx'");
+
+    return 0
+	if (!$query_result);
+
+    $self->{'ISINSTANCE'} = $query_result->numrows;
     return $self->{'ISINSTANCE'};
 }
 

@@ -17,6 +17,11 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $reqargs  = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs  = OptionalPageArguments("action", PAGEARG_STRING);
+
+if (!isset($action) || $action == "tag" || $action == "commit") {
+    $action    = "commit";
+}
 
 #
 # Verify Permission.
@@ -29,17 +34,16 @@ if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 $pid = $experiment->pid();
 $gid = $experiment->gid();
 
-#
-# Not many actions to consider.
-#
-if (isset($commit) && $commit != "") {
-	SUEXEC($uid, $pid,$gid",
-	       "webarchive_control commit $pid $eid",
-	       SUEXEC_ACTION_DIE);
+if ($action == "commit") {
+    SUEXEC($uid, "$pid,$gid",
+	   "webarchive_control commit $pid $eid",
+	   SUEXEC_ACTION_DIE);
+
+    $newurl = preg_replace("/archive_control/",
+			   "archive_view", $_SERVER['REQUEST_URI']);
+
+    header("Location: $newurl");
+    exit(0);
 }
 
-$newurl = preg_replace("/archive_control/",
-		       "archive_view", $_SERVER['REQUEST_URI']);
-
-header("Location: $newurl");
 ?>

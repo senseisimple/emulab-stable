@@ -21,6 +21,8 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libArchive;
+use Archive;
+use Project;
 use User;
 use Experiment;
 use Group;
@@ -126,9 +128,11 @@ sub Lookup($$$)
 sub guid($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'guid'}); }
 sub vers($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'vers'}); }
 sub pid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'pid'}); }
+sub pid_idx($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'pid_idx'}); }
 sub gid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'gid'}); }
 sub gid_idx($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'gid_idx'}); }
 sub eid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'eid'}); }
+sub exptidx($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'exptidx'}); }
 sub tid($)  { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'tid'}); }
 sub path($) { return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'path'}); }
 sub archive_idx($) {
@@ -1775,6 +1779,34 @@ sub Stamp($$;$$$)
     return 0;
 }
 
+#
+# Return archive object for the template.
+#
+sub GetArchive($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return Archive->Lookup($self->archive_idx());
+}
+
+#
+# Return project object for the template.
+#
+sub GetProject($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return Project->Lookup($self->pid_idx());
+}
+
 ############################################################################
 
 package Template::Instance;
@@ -2951,8 +2983,6 @@ sub CopyDataStore($$$;$)
 	    or return -1;
     }
 
-    libArchive::setdebug(2);
-
     libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
 						     $to_path,
 						     $archive_tag,
@@ -3407,6 +3437,24 @@ sub Stamp($$;$$$)
     return 0;
 }
 
+#
+# Return archive object for template instance. 
+#
+sub GetArchive($$)
+{
+    my ($self, $viewp) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    # The view is always the experiment index.
+    $$viewp = $self->exptidx()
+	if (defined($viewp));
+
+    $self->template()->GetArchive();
+}
+
 ############################################################################
 
 package Template::Instance::Run;
@@ -3414,7 +3462,6 @@ use libdb;
 use libtestbed;
 use libtblog;
 use English;
-use libArchive;
 use overload ('""' => 'Stringify');
 
 # Flags for functions below.

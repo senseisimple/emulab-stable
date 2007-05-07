@@ -72,7 +72,6 @@ my $branch_template;    # New stuff; experiment templates.
 my $instance;		# New stuff; experiment templates.
 # All of these are for experiment dup and branch. Really mucks things up.
 # These globals are set when we parse the -c argument, but used later
-my $copybranch = 0;	# A branch instead of a duplicate
 my $copyfrom;		# Copy from where, archive or current experiment.
 my $copyarg;            # The -c argument.
 my $copyidx;            # The index of the experiment copied.
@@ -339,6 +338,16 @@ if (!defined($template) || defined($instance)) {
 	       error => ['create_experiment_directory_failed']},
 	      "Failed to created experiment directory");
     }
+
+    if (defined($instance)) {
+	# Need to cross-mark the instance right away so that it is flagged.
+	# Would be better to do this with a plain flag.
+	my %args = ();
+	$args{'exptidx'} = $experiment->idx();
+    
+	$instance->Update(0, \%args) == 0
+	    or fatal("Could not update experiment instance record!");
+    }
 }
 else {
     #
@@ -381,15 +390,6 @@ if (defined($branch_template)) {
 	if (libArchive::TBForkExperimentArchive($pid, $eid,
 						$pid, $archive_eid, undef)
 	    < 0);
-}
-elsif ($copybranch) {
-    # Currently, support branching from existing experiment only.
-    fatal({type => 'secondary', severity => SEV_SECONDARY,
-	   error => ['archive_op_failed', 'create', undef, undef]},
-	  "Could not create experiment archive!")
-	if (libArchive::TBForkExperimentArchive($pid, $eid,
-						$copypid,
-						$copyeid, $copytag) < 0);
 }
 elsif (libArchive::TBCreateExperimentArchive($pid, $eid) < 0) {
     fatal({type => 'secondary', severity => SEV_SECONDARY,
@@ -641,7 +641,7 @@ if (! ($frontend || $batchmode)) {
     #
     my @localnodes = ();
     fatal("Could not get local node list for $pid/$eid")
-	if ($experiment->LocalNodeList(\@localnodes));
+	if ($experiment->LocalNodeListNames(\@localnodes));
 
     if (@localnodes && scalar(@localnodes) > 2) {
 	my $vlans_result =
@@ -698,18 +698,6 @@ if (! defined($template)) {
 	       error => ['archive_op_failed', 'savepoint', undef, undef]},
 	      "Failed to do a savepoint on the experiment archive!");
     }
-}
-
-#
-# If this is a branch, then do a commit. Otherwise, the archive looks
-# wrong cause its a branch from the original and shows all those files.
-#
-if ($copybranch && !defined($template)) {
-    print "Doing a commit on the experiment archive ...\n";
-    libArchive::TBCommitExperimentArchive($pid, $eid, "branch_merge") == 0 or
-	fatal({type => 'secondary', severity => SEV_SECONDARY,
-	       error => ['archive_op_failed', 'commit', undef, undef]},
-	      "Failed to commit experiment archive!");
 }
 
 #
@@ -1005,10 +993,6 @@ sub ParseArgs()
 	    tbdie({type => 'primary', severity => SEV_ERROR,
 		   error => ['bad_data', 'argument', $copyarg]},
 		  "Bad data in argument: $copyarg");
-	}
-	# This option only makes sense with -c option.
-	if (defined($options{"b"})) {
-	    $copybranch = 1;
 	}
     }
 

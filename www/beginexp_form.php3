@@ -440,16 +440,6 @@ function SPITFORM($formfields, $errors)
                    <a target=nsfile href=spitnsdata.php3?copyid=$copyid>
                       $copyid</a>\n";
 
-	if ($EXPOSEARCHIVE) {
-	    $checked = "";
-
-	    if ($formfields['exp_branch'] == "1") {
-		$checked = "checked=1";
-	    }
-	    echo "&nbsp; <input type='checkbox' $checked
-			 name='formfields[exp_branch]' value='1'> ";
-	    echo "&nbsp; Branch?";
-	}
         echo "  </td>
                 <input type=hidden name=\"formfields[copyid]\" value='$copyid'>
               </tr>\n";

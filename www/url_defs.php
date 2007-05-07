@@ -361,6 +361,19 @@ function VerifyPageArguments($argspec, $required)
 		    $object = Template::Lookup($guid, $vers);
 		}
 	    }
+	    elseif (isset($_REQUEST[URL_TEMPLATE])) {
+		$guidvers = $_REQUEST[URL_TEMPLATE];
+		$yep = 1;
+		
+		if (preg_match("/^([\d]+)\/([\d]+)$/", $guidvers, $matches)) {
+		    $guid = $matches[1];
+		    $vers = $matches[2];
+		    $object = Template::Lookup($guid, $vers);
+		}
+		else {
+		    PAGEARGERROR("Invalid argument for '$type': $guidvers");
+		}
+	    }
 	    break;
 
 	case PAGEARG_INSTANCE:

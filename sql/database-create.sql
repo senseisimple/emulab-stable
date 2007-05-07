@@ -42,6 +42,24 @@ CREATE TABLE `active_checkups` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+
+-- Table structure for table `archive_revisions`
+--
+
+DROP TABLE IF EXISTS `archive_revisions`;
+CREATE TABLE `archive_revisions` (
+  `archive_idx` int(10) unsigned NOT NULL default '0',
+  `revision` int(10) unsigned NOT NULL auto_increment,
+  `parent_revision` int(10) unsigned default NULL,
+  `tag` varchar(64) NOT NULL default '',
+  `view` varchar(64) NOT NULL default '',
+  `date_created` int(10) unsigned NOT NULL default '0',
+  `converted` tinyint(1) default '0',
+  `description` text,
+  PRIMARY KEY  (`archive_idx`,`revision`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `archive_tags`
 --
 
@@ -53,6 +71,7 @@ CREATE TABLE `archive_tags` (
   `view` varchar(64) NOT NULL default '',
   `date_created` int(10) unsigned NOT NULL default '0',
   `tagtype` enum('user','commit','savepoint','internal') NOT NULL default 'internal',
+  `version` tinyint(1) default '0',
   `description` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `tag` (`tag`,`archive_idx`,`view`)
@@ -66,11 +85,13 @@ DROP TABLE IF EXISTS `archive_views`;
 CREATE TABLE `archive_views` (
   `view` varchar(64) NOT NULL default '',
   `archive_idx` int(10) unsigned NOT NULL default '0',
-  `current_tag` varchar(64) NOT NULL default '',
+  `revision` int(10) unsigned default NULL,
+  `current_tag` varchar(64) default NULL,
   `previous_tag` varchar(64) default NULL,
   `date_created` int(10) unsigned NOT NULL default '0',
   `branch_tag` varchar(64) default NULL,
   `parent_view` varchar(64) default NULL,
+  `parent_revision` int(10) unsigned default NULL,
   PRIMARY KEY  (`view`,`archive_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

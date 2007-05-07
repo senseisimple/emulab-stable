@@ -1070,6 +1070,13 @@ class ExperimentStats
     function idx()	    { return $this->field('exptidx'); }
     function exptidx()	    { return $this->field('exptidx'); }
     function rsrcidx()      { return $this->field('rsrcidx'); }
+    function pid_idx()      { return $this->field('pid_idx'); }
+    function gid_idx()      { return $this->field('gid_idx'); }
+    function archive_idx()  { return $this->field('archive_idx'); }
+
+    function Project() {
+	return Project::Lookup($this->pid_idx());
+    }
 
     #
     # Page header; spit back some html for the typical page header.

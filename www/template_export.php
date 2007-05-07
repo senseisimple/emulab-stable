@@ -17,56 +17,103 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-$reqargs = RequiredPageArguments("instance",  PAGEARG_INSTANCE);
-$optargs = OptionalPageArguments("canceled",  PAGEARG_BOOLEAN,
+$optargs = OptionalPageArguments("instance",  PAGEARG_INSTANCE,
+				 "template",  PAGEARG_TEMPLATE,
+				 "canceled",  PAGEARG_BOOLEAN,
 				 "confirmed", PAGEARG_BOOLEAN,
 				 "runidx",    PAGEARG_INTEGER,
+				 "tag",       PAGEARG_STRING,
+				 "overwrite", PAGEARG_BOOLEAN,
 				 "spew",      PAGEARG_BOOLEAN);
-$template = $instance->GetTemplate();
+
+#
+# An instance might be a current or historical. If its a template, use
+# the underlying experiment of the template.
+#
+if (isset($instance)) {
+    $template = $instance->GetTemplate();
+}
+elseif (! isset($template)) {
+    PAGEARGERROR("Must provide a template or an instance to export");
+}
 
 if (isset($canceled) && $canceled) {
-    header("Location: ". CreateURL("template_show", $template));
+    if (isset($instance))
+	header("Location: ". CreateURL("template_show", $template));
+    else
+	header("Location: ". CreateURL("template_show", $instance));	
     return;
 }
 
 # Need these below.
-$guid = $template->guid();
-$vers = $template->vers();
-$pid  = $template->pid();
-$eid  = $instance->eid();
+$guid     = $template->guid();
+$vers     = $template->vers();
+$pid      = $template->pid();
 $unix_gid = $template->UnixGID();
-$exptidx  = $instance->exptidx();
 
-if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to export in template ".
+if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to export from template ".
 	      "$guid/$vers!", 1);
 }
-if (isset($runidx) && !$instance->ValidRun($runidx)) {
-    USERERROR("Run '$runidx' is not a valid run in instance '$exptidx'", 1);
+if (isset($instance)) {
+    $exptidx  = $instance->exptidx();
+    
+    if (isset($runidx) && !$instance->ValidRun($runidx)) {
+	USERERROR("Run '$runidx' is not a valid run in instance '$exptidx'",
+		  1);
+    }
 }
 
-if (!isset($confirmed)) {
-    PAGEHEADER("Template Export");
+function SPITFORM($error)
+{
+    global $template, $instance, $runidx, $TBPROJ_DIR;
+    global $tag, $pid, $guid, $vers;
+
+    if ($error) {
+	echo "<center>\n";
+	echo "<font size=+1 color=red>";
+	echo $error;
+	echo "</font><br>\n";
+    }
+    else {
+	echo $template->PageHeader();
+	echo "<br><br>\n";
     
-    echo $template->PageHeader();
-    echo "<br><br>\n";
-    
-    echo "<center><br><font size=+1>
-          Export instance $exptidx " .
-	        (isset($runidx) ? "(Run $runidx)" : "") . "?";
-    echo "</font>";
+	echo "<center>\n";
+	echo "<font size=+1>";
+
+	if (isset($instance)) {
+	    echo "Export instance " . $instance->exptidx() .
+	           (isset($runidx) ? " (Run $runidx)" : "") . "?";
+	}
+	else {
+	    echo "Export Template Datastore";
+	}
+	echo "</font>";
+    }
     
     $template->Show();
 
-    $url = CreateURL("template_export", $instance);
-    if (isset($runidx)) {
-	$url .= "&runidx=$runidx";
+    if (isset($instance)) {
+	$url = CreateURL("template_export", $instance);
+	if (isset($runidx)) {
+	    $url .= "&runidx=$runidx";
+	}
+    }
+    else {
+	$url = CreateURL("template_export", $template);
+    }
+    if (isset($tag)) {
+	$url .= "&tag=$tag";
     }
     
     echo "<form action='$url' method=post>\n";
     echo "<br>\n";
     echo "<input type=checkbox name=spew value=1>
                 Save to local disk? [<b>1</b>]\n";
+    echo "<br>\n";
+    echo "<input type=checkbox name=overwrite value=1>
+                Overwrite existing export on server? [<b>2</b>]\n";
     echo "<br>\n";
     echo "<br>\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
@@ -75,15 +122,22 @@ if (!isset($confirmed)) {
     echo "</center>\n";
     echo "<blockquote><blockquote>
           <ol>
-            <li> By default, your instance will be exported to
-                 <tt>$TBPROJ_DIR/$pid/export/$guid/$vers/$exptidx</tt>,
+            <li> By default, your export will be saved to
+                 <tt>$TBPROJ_DIR/$pid/export/$guid/$vers</tt>,
                  available to
                  other experiments in your project. If you want to export
                  to a local file, click the <em>local disk</em> option
                  and a .tgz file will be generated and sent to your browser.
+
+            <li> When exporting to the above mentioned directory, overwrite
+                 any existing export. Otherwise an error will be reported.
           </ol>
           </blockquote></blockquote>\n";
-    
+    return;
+}
+if (!isset($confirmed)) {
+    PAGEHEADER("Template Export");
+    SPITFORM(null);
     PAGEFOOTER();
     return;
 }
@@ -94,6 +148,12 @@ if (isset($spew) && $spew) {
 }
 else {
     $spew = 0;
+}
+if (isset($overwrite) && $overwrite) {
+    $overwrite = 1;
+}
+else {
+    $overwrite = 0;
 }
 
 #
@@ -135,14 +195,26 @@ function SPEWCLEANUP()
 #
 # Run the backend script.
 #
-$optarg = (isset($runidx) ? "-r " . escapeshellarg($runidx) : "");
+$export_args = (isset($tag) ? "-t " . escapeshellarg($tag) . " " : "");
+
+if (isset($instance)) {
+    $export_args .= "-i $exptidx";
+    if (isset($runidx))
+	$exptidx .=  " -r " . escapeshellarg($runidx);
+}
+else {
+    $export_args .= "$guid/$vers";
+}
+if ($overwrite) {
+     $export_args = "-o " . $export_args;
+}
 
 if ($spew) {
     ignore_user_abort(1);
     register_shutdown_function("SPEWCLEANUP");
 
     if (($fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
-		     "  webtemplate_export -s -i $exptidx",
+		     "  webtemplate_export -s $export_args",
 		     "r"))) {
 	header("Content-Type: application/x-tar");
 	header("Content-Encoding: x-gzip");
@@ -170,7 +242,7 @@ if ($spew) {
 # Standard mode ...
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_export $optarg -i $exptidx",
+		 "webtemplate_export $export_args",
 		 SUEXEC_ACTION_IGNORE);
 
 /* Clear the 'loading' indicators above */
@@ -191,18 +263,17 @@ if ($retval < 0) {
 
 # User error. Tell user and exit.
 if ($retval) {
+    if ($retval == 2) {
+	SPITFORM("Export directory already exists! Use the overwrite option.");
+	PAGEFOOTER();
+	return;
+    }
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
     return;
 }
 
 # Zap back to template page.
 PAGEREPLACE(CreateURL("template_show", $template));
-
-#
-# In case the above fails.
-#
-echo "<center><b>Done!</b></center>";
-echo "<br><br>\n";
 
 #
 # Standard Testbed Footer

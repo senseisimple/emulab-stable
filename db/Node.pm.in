@@ -17,8 +17,9 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use NodeType;
-use Interface;
+require NodeType;
+require Interface;
+require Experiment;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -54,6 +55,9 @@ sub Lookup($$)
     # Look in cache first
     return $nodes{$nodeid}
         if (exists($nodes{$nodeid}));
+
+    return undef
+	if (! ($nodeid =~ /^\w+$/));
 
     my $query_result =
 	DBQueryWarn("select * from nodes as n ".
@@ -120,6 +124,24 @@ sub Stringify($)
 }
 
 #
+# Check permissions. Allow for either uid or a user ref until all code
+# updated.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid     = (ref($user) ? $user->uid() : $user);
+    my $node_id = $self->node_id();
+
+    return TBNodeAccessCheck($uid, $access_type, $node_id);
+}
+
+#
 # Lazily load the reservation info.
 #
 sub IsReserved($)
@@ -144,6 +166,53 @@ sub IsReserved($)
 	return 1;
     }
     return 1;
+}
+
+#
+# Get the experiment this node is reserved too, or null.
+#
+sub Reservation($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0
+	if (! $self->IsReserved());
+
+    return Experiment->Lookup($self->{"RSRV"}->{'pid'},
+			      $self->{"RSRV"}->{'eid'});
+}
+
+#
+# Get the raw reserved table info and return it, or null if no reservation
+#
+sub ReservedTableEntry($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return undef
+	if (! $self->IsReserved());
+
+    return $self->{"RSRV"};
+}
+
+# Need to create a set of access methods for the reservation.
+sub vname($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return undef
+	if (! $self->IsReserved());
+
+    return $self->{"RSRV"}->{'vname'};
 }
 
 #
@@ -225,6 +294,30 @@ sub control_iface($;$) {
 }
 sub rebootable($;$) {
     return NodeTypeInfo($_[0])->rebootable($_[1]);
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $nodeid = $self->node_id();
+
+    my $query = "update nodes set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where node_id='$nodeid'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
 }
 
 #

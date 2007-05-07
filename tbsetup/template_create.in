@@ -346,8 +346,12 @@ fatal(-1, "Could not add NS file to template store")
 # Grab archive index for new templates. 
 #
 if (!$modify) {
-    libArchive::TBExperimentArchiveInfo($pid, $eid, \$archive_idx, undef)
-	>= 0 or fatal(-1, "Could not get archive index for new template!");
+    my $archive;
+
+    libArchive::TBExperimentArchive($pid, $eid, \$archive, undef)
+	>= 0 or fatal(-1, "Could not get archive for new template!");
+
+    $archive_idx = $archive->idx();
 }
 else {
     #

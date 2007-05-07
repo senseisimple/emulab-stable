@@ -3988,3 +3988,26 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table images add
 	  `mbr_version` tinyint(4) NOT NULL default '1'
 	  after global;
+
+4.120: Convert to zip archives.
+
+	CREATE TABLE `archive_revisions` (
+	  `archive_idx` int(10) unsigned NOT NULL default '0',
+	  `revision` int(10) unsigned NOT NULL auto_increment,
+	  `parent_revision` int(10) unsigned default NULL,
+	  `tag` varchar(64) NOT NULL default '',
+	  `view` varchar(64) NOT NULL default '',
+	  `date_created` int(10) unsigned NOT NULL default '0',
+	  `description` text,
+	  `converted` tinyint(1) default '0',
+	  PRIMARY KEY  (`archive_idx`,`revision`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table archive_views add `revision` int(10) unsigned
+                default NULL after archive_idx;
+	alter table archive_views add `parent_revision` int(10) unsigned
+                default NULL after parent_view;
+	alter table archive_views change current_tag
+	        `current_tag` varchar(64) default NULL;
+	alter table archive_tags add `version` tinyint(1)
+	            default '0' after tagtype;

@@ -559,7 +559,7 @@ if (defined($replay_instance)) {
 
 print "Checking out a copy of the template datastore ($datastore_tag)\n";
 $instance->CopyDataStore($datastore_tag,
-			 "$instance_path/datastore", $replay_instance) == 0
+			 "$instance_path", $replay_instance) == 0
     or fatal(-1, "Could not copy datastore to instance");
 
 # Ditto for dynamic events. 

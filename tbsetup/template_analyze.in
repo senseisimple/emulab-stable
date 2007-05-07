@@ -184,7 +184,7 @@ foreach my $name (keys(%runlist)) {
     my $dir    = "$checkout/run${idx}";
     my $subdir = "dbdata";
     my $tag    = $rowref->{"ending_archive_tag"};
-    my $dbdump = "$dir/dbdump.gz";
+    my $dbdump = "$dir/$subdir/dbdump.gz";
 
     # This could happen if template is still instantiated (last run).
     next
@@ -205,10 +205,14 @@ foreach my $name (keys(%runlist)) {
 
     if (! -e "$dbdump") {
 	$subdir = "exp/dbdata";
+	$dbdump = "$dir/$subdir/dbdump.gz";
 	
 	libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx, $dir,
 							 $tag, $subdir) == 0 or
             fatal(-1, "Could not checkout $tag to $dir");
+    }
+    if (! -e "$dbdump") {
+	fatal(-1, "Could not find the dbdump file in the archive!");
     }
 
     #
