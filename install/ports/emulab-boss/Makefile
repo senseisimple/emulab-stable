@@ -53,7 +53,7 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
-	vin4.2:${PORTSDIR}/misc/libelvin \
+	pubsub.1:${PORTSDIR}/misc/emulab-pubsub \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
 RUN_DEPENDS=	\
@@ -76,7 +76,6 @@ RUN_DEPENDS=	\
 	rpm:${PORTSDIR}/archivers/rpm \
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
-	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind \
 	sudo:${PORTSDIR}/security/sudo \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	wget:${PORTSDIR}/ftp/wget \

@@ -54,7 +54,7 @@ MAINTAINER=	ricci@cs.utah.edu
 .MAKEFLAGS+=	-DBATCH
 
 LIB_DEPENDS= lthread.[23]:${PORTSDIR}/devel/linuxthreads \
-	vin4.2:${PORTSDIR}/misc/libelvin \
+	pubsub.1:${PORTSDIR}/misc/emulab-pubsub \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
 .if ${OSMAJOR} >= 6
@@ -69,7 +69,6 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	wget:${PORTSDIR}/ftp/wget \
-	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind \
 	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
 
 .if ${OSMAJOR} >= 6

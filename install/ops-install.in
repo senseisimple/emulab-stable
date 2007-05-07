@@ -240,8 +240,6 @@ if ($SCRATCHDIR) {
 #
 # A few files we have to deal with
 #
-my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
-my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
 my $MAILMAN_PATCH   = "$TOP_SRCDIR/patches/mailman.patch";
 my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
@@ -930,13 +928,6 @@ Phase "capture", "Setting up capture", sub {
     };
 };
 
-Phase "event", "Setting up event system", sub {
-    Phase "elvinconf", "Installing elvind config file", sub {
-	DoneIfIdentical($ELVIND_CONF,$OPS_ELVIND_CONF);
-	ExecQuietFatal("$CP $OPS_ELVIND_CONF $ELVIND_CONF");
-    };
-};
-
 Phase "rc.d", "Setting up rc.d scripts", sub {
     Phase "rsyncd", "Removing rsyncd startup script",  sub {
 	DoneIfDoesntExist("$RCDIR/rsyncd.sh");
@@ -971,8 +962,6 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");
             ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh");
         };
-	DoneIfExists("$RCDIR/2.elvind.sh");
-	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d control-install");
     };
 };
 

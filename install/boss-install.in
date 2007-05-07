@@ -189,7 +189,7 @@ if ($SCRATCHDIR) {
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
     "$LOGDIR/frisbeed.log", "$LOGDIR/proxydhcpd.log",
-    "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
+    "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
     "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log",
     "$LOGDIR/plabrenew.log", "$LOGDIR/sslxmlrpc.log", "$LOGDIR/pubsubd.log");
@@ -247,9 +247,6 @@ my $PHP4_PORT = "php4-extensions-1.0";
 my $OBJDIR = `/usr/bin/dirname $0`;
 chomp $OBJDIR;
 my $TOP_OBJDIR = "$OBJDIR/..";
-
-my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
-my $BOSS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-boss.conf";
 
 #
 # Allow this to work if the library is left in the source directory
@@ -610,8 +607,6 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");
             ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh");
         };
-	DoneIfExists("$RCDIR/3.testbed.sh");
-	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
     };
 };
 
@@ -653,7 +648,6 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!tftpd",     "*.*\t\t\t\t\t\t$LOGDIR/tftpd.log",
 	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
 	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
-	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
 	    "!pubsubd",    "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log",
 	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
@@ -704,7 +698,6 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/dhcpd.log              640  7     200  *     Z",
 	    "$LOGDIR/bootinfo.log           640  7     200  *     Z",
 	    "$LOGDIR/capserver.log          640  5     200  *     Z",
-	    "$LOGDIR/elvind.log             640  5     1000 *     Z",
 	    "$LOGDIR/pubsubd.log            640  5     1000 *     Z",
 	    "$LOGDIR/suexec.log             640  3     200  *     Z",
 	    "$LOGDIR/genlastlog.log         640  3     200  *     Z",
