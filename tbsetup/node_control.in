@@ -283,6 +283,7 @@ if ($debug) {
 # race condition window. Should probably lock instead, but thats a pain.
 #
 foreach my $node (@nodes) {
+    my $node_id = $node->node_id();
     if ($debug) { print "Processing $node...\n"; }
 
     if (keys(%physnode_updates) || @osselect_params) {
@@ -302,7 +303,7 @@ foreach my $node (@nodes) {
 	    foreach my $str (@osselect_params) {
 		if ($debug) { print "Running '$osselect $str $node'\n"; }
 		
-		if (system("$osselect $str $node")) {
+		if (system("$osselect $str $node_id")) {
 		    print STDERR "*** 'os_select $str $node' failed!\n";
 		    $errors++;
 		}
