@@ -2,11 +2,12 @@
 #
 # Wrapper for DHCPD which has a habit of dying. 
 #
+elabinelab="@ELABINELAB@"
 case "$1" in
 	start)
 		# limit to control network
 		cnetif=
-		if [ -x @prefix@/sbin/findif ]; then
+		if [ $elabinelab != "1" -a -x @prefix@/sbin/findif ]; then
 		    cnetif=`@prefix@/sbin/findif -i @BOSSNODE_IP@`
 		fi
 		if [ -x @prefix@/sbin/daemon_wrapper ]; then
