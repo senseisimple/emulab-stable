@@ -1469,8 +1469,8 @@ diff -ruN 6.2-release/src/sys/boot/i386/emuboot/emuboot.h 6.2/src/sys/boot/i386/
 +void *load_partition_bblock(int partition);
 diff -ruN 6.2-release/src/sys/boot/i386/emuboot/emumain.c 6.2/src/sys/boot/i386/emuboot/emumain.c
 --- 6.2-release/src/sys/boot/i386/emuboot/emumain.c	Wed Dec 31 17:00:00 1969
-+++ 6.2/src/sys/boot/i386/emuboot/emumain.c	Wed Apr 18 16:27:54 2007
-@@ -0,0 +1,637 @@
++++ 6.2/src/sys/boot/i386/emuboot/emumain.c	Mon May  7 18:10:56 2007
+@@ -0,0 +1,648 @@
 +/*-
 + * Copyright (c) 1998, 2002, 2004 Michael Smith <msmith@freebsd.org>
 + * All rights reserved.
@@ -2086,8 +2086,19 @@ diff -ruN 6.2-release/src/sys/boot/i386/emuboot/emumain.c 6.2/src/sys/boot/i386/
 +		*kname++ = 0;
 +		setenv("bootfile", kname, 1);
 +		setenv("kernel", path, 1);
-+	} else
++	}
++	else {
 +		setenv("bootfile", path, 1);
++		/*
++		 * Such a hack: if the path started with slash (i.e., did not
++		 * start with "/boot/"), then it is probably a 4.x boot where
++		 * we need to set 'kernel' to the file to boot.
++		 */
++		if (path[0] == '/') {
++			setenv("kernel", path, 1);
++			kname = path;
++		}
++	}
 +
 +	/*
 +	 * and fill in custom arguments.
@@ -3322,13 +3333,14 @@ diff -ruN 6.2-release/src/sys/boot/i386/emuboot/newvers.sh 6.2/src/sys/boot/i386
 +echo "char bootprog_maker[] = \"${u}@${h}\";" >> vers.c
 diff -ruN 6.2-release/src/sys/boot/i386/emuboot/version 6.2/src/sys/boot/i386/emuboot/version
 --- 6.2-release/src/sys/boot/i386/emuboot/version	Wed Dec 31 17:00:00 1969
-+++ 6.2/src/sys/boot/i386/emuboot/version	Wed Apr 18 15:08:36 2007
-@@ -0,0 +1,13 @@
++++ 6.2/src/sys/boot/i386/emuboot/version	Mon May  7 18:10:48 2007
+@@ -0,0 +1,14 @@
 +$FreeBSD: src/sys/boot/i386/loader/version,v 1.5.2.1 2000/07/06 23:45:00 obrien Exp $
 +
 +NOTE ANY CHANGES YOU MAKE TO THE BOOTBLOCKS HERE.  The format of this
 +file is important.  Make sure the current version number is on line 6.
 +
++1.9:	Fix direct booting of 4.x kernels
 +1.8:	Add argument parsing for FreeBSD kernel command lines
 +1.7:	Convert to FreeBSD 6.2 base
 +1.6:	Read disk-based loader files when booting alternate kernel
