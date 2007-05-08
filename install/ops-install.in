@@ -962,6 +962,7 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");
             ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh");
         };
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d control-install");
     };
 };
 
