@@ -11,6 +11,10 @@ include("defs.php3");
 #
 PAGEHEADER("OS Descriptor List");
 
+# Sorttable.js
+echo "<script type='text/javascript' language='javascript'
+              src='sorttable.js'></script>\n";
+
 #
 #
 # Only known and logged in users allowed.
@@ -23,21 +27,7 @@ $isadmin   = ISADMIN();
 # Admin users can see all OSIDs, while normal users can only see
 # ones in their projects or ones that are globally available.
 #
-$optargs = OptionalPageArguments("sortby",   PAGEARG_STRING,
-				 "creator",  PAGEARG_USER);
-
-if (! isset($sortby))
-    $sortby = "normal";
-
-if (! strcmp($sortby, "normal") ||
-    ! strcmp($sortby, "name"))
-    $order = "o.osname";
-elseif (! strcmp($sortby, "pid"))
-    $order = "o.pid";
-elseif (! strcmp($sortby, "desc"))
-    $order = "o.description";
-else 
-    $order = "o.osname";
+$optargs = OptionalPageArguments("creator",  PAGEARG_USER);
 
 #
 # Allow for creator restriction
@@ -59,7 +49,7 @@ if ($isadmin) {
     $query_result =
 	DBQueryFatal("SELECT * FROM os_info as o ".
 		     "$extraclause ".
-		     "order by $order");
+		     "order by o.osname");
 }
 else {
     $uid_idx = $this_user->uid_idx();
@@ -69,7 +59,7 @@ else {
 		     "left join group_membership as g on g.pid=o.pid ".
 		     "where (g.uid_idx='$uid_idx' or o.shared=1) ".
 		     "$extraclause ".
-		     "order by $order");
+		     "order by o.osname");
 }
 
 SUBPAGESTART();
@@ -102,16 +92,16 @@ SUBPAGEEND();
 
 if (mysql_num_rows($query_result)) {
     echo "<br>
-          <table border=2 cellpadding=0 cellspacing=2 align='center'>\n";
+          <table border=2 cellpadding=0 cellspacing=2
+                 align='center' id='showosidlist'>\n";
     
-    echo "<tr>
-              <th><a href='showosid_list.php3?&sortby=name'>
-                  Name</th>
-              <th><a href='showosid_list.php3?&sortby=pid'>
-                  PID</th>
-              <th><a href='showosid_list.php3?&sortby=desc'>
-                  Description</th>
-          </tr>\n";
+    echo "<thead class='sort'>
+           <tr>
+              <th>Name</th>
+              <th>PID</th>
+              <th>Description</th>
+           </tr>
+          </thead>\n";
     
     while ($row = mysql_fetch_array($query_result)) {
         $osname  = $row["osname"];
@@ -128,6 +118,9 @@ if (mysql_num_rows($query_result)) {
     }
     echo "</table>\n";
 }
+echo "<script type='text/javascript' language='javascript'>
+	sorttable.makeSortable(getObjbyName('showosidlist'));
+      </script>\n";
 
 #
 # Standard Testbed Footer

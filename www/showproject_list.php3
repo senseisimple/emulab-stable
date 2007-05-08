@@ -154,7 +154,7 @@ function GENPLIST ($query_result)
 
     echo "<table width='100%' border=2 id='$tablename'
                  cellpadding=2 cellspacing=2 align=center>
-          <thead>
+          <thead class='sort'>
           <tr>\n";
 
     echo "<th>PID</th>\n";

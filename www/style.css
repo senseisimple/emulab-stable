@@ -34,6 +34,13 @@ img.stealth { background-color:#FFF; }
 table.topbar { border-bottom: solid 2px #000; }
 table.bottombar { border-top: solid 2px #000; }
 
+/* Sortable tables */
+thead.sort {
+    color:#2222BB;
+    font-weight: bold;
+    cursor: default;
+}
+
 td.pad4 { padding: 4px; }
 td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
 td.paddedcell2 { padding: 0.5em; }

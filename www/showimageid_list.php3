@@ -11,6 +11,10 @@ include("defs.php3");
 #
 PAGEHEADER("Image List");
 
+# Sorttable.js
+echo "<script type='text/javascript' language='javascript'
+              src='sorttable.js'></script>\n";
+
 #
 #
 # Only known and logged in users allowed.
@@ -23,21 +27,7 @@ $isadmin   = ISADMIN();
 # Admin users can see all ImageIDs, while normal users can only see
 # ones in their projects or ones that are globally available.
 #
-$optargs = OptionalPageArguments("sortby",   PAGEARG_STRING,
-				 "creator",  PAGEARG_USER);
-
-if (! isset($sortby))
-    $sortby = "normal";
-
-if (! strcmp($sortby, "normal") ||
-    ! strcmp($sortby, "name"))
-    $order = "i.imagename";
-elseif (! strcmp($sortby, "pid"))
-    $order = "i.pid";
-elseif (! strcmp($sortby, "desc"))
-    $order = "i.description";
-else 
-    $order = "i.imagename";
+$optargs = OptionalPageArguments("creator",  PAGEARG_USER);
 $extraclause = "";
 
 #
@@ -60,7 +50,7 @@ if (isset($creator)) {
 if ($isadmin) {
     $query_result = DBQueryFatal("SELECT * FROM images as i ".
 				 "$extraclause ".
-				 "order by $order");
+				 "order by i.imagename");
 }
 else {
     #
@@ -78,7 +68,7 @@ else {
 		     "left join group_membership as g on g.pid=i.pid ".
 		     "where (g.uid_idx='$uid_idx' or i.global) ".
 		     "$extraclause ".
-		     "order by $order");
+		     "order by i.imagename");
 }
 
 SUBPAGESTART();
@@ -110,17 +100,16 @@ echo "Listed below are the Images that you can load on your nodes with the
 SUBPAGEEND();
 
 if (mysql_num_rows($query_result)) {
-    echo "<table border=2 cellpadding=0 cellspacing=2
+    echo "<table border=2 cellpadding=0 cellspacing=2 id='showimagelist'
            align='center'>\n";
 
-    echo "<tr>
-              <th><a href='showimageid_list.php3?&sortby=name'>
-                  Image</th>
-              <th><a href='showimageid_list.php3?&sortby=pid'>
-                  PID</th>
-              <th><a href='showimageid_list.php3?&sortby=desc'>
-                  Description</th>
-          </tr>\n";
+    echo "<thead class='sort'>
+           <tr>
+              <th>Image</th>
+              <th>PID</th>
+              <th>Description</th>
+           </tr>
+          </thead>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
 	$imageid    = $row["imageid"];
@@ -137,6 +126,9 @@ if (mysql_num_rows($query_result)) {
     }
     echo "</table>\n";
 }
+echo "<script type='text/javascript' language='javascript'>
+	sorttable.makeSortable(getObjbyName('showimagelist'));
+      </script>\n";
 
 #
 # Standard Testbed Footer
