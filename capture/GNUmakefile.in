@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,13 @@ SUBDIR		= capture
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
+
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
 
 all:		boss-all tipserv-all
 boss-all:	capserver
@@ -38,7 +45,7 @@ ifeq ($(NEEDKERB),0)
 endif
 endif
 else
-LDFLAGS += -static
+LDFLAGS  += $(LDSTATIC)
 endif
 
 capture: capture.c capdecls.h

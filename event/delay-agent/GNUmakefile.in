@@ -11,6 +11,13 @@ SUBDIR		= event/delay-agent
 
 include $(OBJDIR)/Makeconf
 
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
+
 all:	delay-agent
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -20,7 +27,7 @@ CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -static
+LDFLAGS  += $(LDSTATIC)
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS     += -L/usr/local/lib -lpubsub -lm

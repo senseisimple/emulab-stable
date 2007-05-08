@@ -30,6 +30,13 @@ SYSTEM	       := $(patsubst CYGWIN%,CYGWIN,$(shell uname -s))
 
 include $(OBJDIR)/Makeconf
 
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
+
 all:	binaries $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_PROXY) \
 		weblinktest linktest_control
 
@@ -46,9 +53,13 @@ LIBS     += -L/usr/local/lib -lpubsub -lm
 
 ifeq ($(host_cpu),arm)
 else
-LDFLAGS  += -static
+LDFLAGS  += $(LDSTATIC)
 ifeq ($(SYSTEM),Linux)
+ifeq ($(NOSTATIC),)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NEEDKERB := 1
+endif
 ifeq ($(NEEDKERB),0)
  CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
  LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`

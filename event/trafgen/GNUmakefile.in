@@ -32,6 +32,13 @@ OBJS = \
 
 include $(OBJDIR)/Makeconf
 
+ifeq ($(NOSTATIC),)
+# for now we link everything static
+LDSTATIC	= -static
+else
+LDSTATIC	= 
+endif
+
 all:	tg2.0 $(PROGRAMS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -51,7 +58,7 @@ LIBS     += -L/usr/local/lib -lpubsub -lm
 SYSTEM   := $(shell uname -s)
 
 ifneq ($(host_cpu),arm)
-LDFLAGS  += -static
+LDFLAGS  += $(LDSTATIC)
 endif
 
 ifeq ($(SYSTEM),FreeBSD)
