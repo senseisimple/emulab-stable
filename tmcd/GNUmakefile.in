@@ -121,7 +121,8 @@ version.c: tmcd.c
 install:	all
 
 install:	$(INSTALL_SBINDIR)/tmcd \
-		$(INSTALL_SBINDIR)/tmcd.restart
+		$(INSTALL_SBINDIR)/tmcd.restart \
+		$(INSTALL_SBINDIR)/findif
 	$(INSTALL_PROGRAM) $(SRCDIR)/common/config/rc.mkelab \
 			   $(INSTALL_ETCDIR)/rc.mkelab
 
