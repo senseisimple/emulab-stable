@@ -62,7 +62,7 @@ my $quiet = 0;
 sub usage {
     print << "END";
 Usage: $0 [-h] [-v] [-q] [-n] [-i device] [-S stack]
-	  [-l] [-s] [-g]
+	  [-l] [-s] [-g] [-O]
 	  [-m name [ports]]
 	  [-T port name]
 	  [-U port]
@@ -90,6 +90,7 @@ VLAN Control:
   -l                List all VLANs
   -w                Used with -l, includes device-specific VLAN number
   -M                Used with -l, print MAC addresses instead of port numbers
+  -O                Used with -l, list only orphaned VLANs
   -L <out#in[,o2#i2,...]> stylized -l for snmpit.proxy of specific vlans
   -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
                         and put [ports] in it
@@ -134,7 +135,7 @@ my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F','L=s');
+    'y=s','x=s','z=s','F','L=s','O');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -863,14 +864,26 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	# Permissions check - people only get to see their own VLANs
 	#
 	if ((!$eid) || (!$pid)) {
+            # If only printing orphaned VLANs, consider only ones that have IDs
+            # that look like the ones we assign in the database
+            if ($opt{O} && $vid !~ /^\d+$/) {
+                next;
+            }
 	    if (!TBAdmin()) {
 		&debug("Failed TBAdmin check\n");
 		next;
 	    }
-	} elsif ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
-	    &debug("Failed TBExptAccessCheck($UID,$pid,$eid)\n");
-	    next;
-	}
+	} else {
+            # If only printing orphaned VLANs, skip ones for which we know the
+            # pid and ied
+            if ($opt{O}) {
+                next;
+            }
+            if ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+                &debug("Failed TBExptAccessCheck($UID,$pid,$eid)\n");
+                next;
+            }
+        }
 
 
 	if (!$vname) { $vname = ""; }
