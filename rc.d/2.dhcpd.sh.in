@@ -4,10 +4,15 @@
 #
 case "$1" in
 	start)
+		# limit to control network
+		cnetif=
+		if [ -x @prefix@/sbin/findif ]; then
+		    cnetif=`@prefix@/sbin/findif -i @BOSSNODE_IP@`
+		fi
 		if [ -x @prefix@/sbin/daemon_wrapper ]; then
 			echo -n " dhcpd wrapper"
 			@prefix@/sbin/daemon_wrapper \
-			  /usr/local/sbin/dhcpd -f
+			  /usr/local/sbin/dhcpd -f $cnetif
 		fi
 		;;
 	stop)
