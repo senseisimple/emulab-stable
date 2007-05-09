@@ -301,10 +301,10 @@ foreach my $node (@nodes) {
 	}
 	if (@osselect_params) {
 	    foreach my $str (@osselect_params) {
-		if ($debug) { print "Running '$osselect $str $node'\n"; }
+		if ($debug) { print "Running '$osselect $str $node_id'\n"; }
 		
 		if (system("$osselect $str $node_id")) {
-		    print STDERR "*** 'os_select $str $node' failed!\n";
+		    print STDERR "*** 'os_select $str $node_id' failed!\n";
 		    $errors++;
 		}
 	    }
