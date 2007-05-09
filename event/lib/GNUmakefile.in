@@ -134,25 +134,26 @@ install: $(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
 control-install:	$(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 #
-# Right now we don't bother with the dynamic libs since all of the existing
-# clients are statically linked.  Also, the dynamic libs include the SWIG stubs
-# and that stuff needs work to build on Linux and FBSD5.
+# Right now we don't bother with the dynamic libs for a couple of reasons:
+# * clients are either statically linked or, even if dynamically linked,
+#   they are statically linked with the event code
+# * SWIG stubs don't build everywhere.  For instance the perl stubs (event.so)
+#   won't build on Fedora.
 #
 client: $(LIBS)
 client-install: client # client-libinstall
-
-client-pylibinstall: _tbevent.so
-	$(INSTALL_PROGRAM) $(SRCDIR)/tbevent.py $(DESTDIR)$(CLIENT_BINDIR)/tbevent.py
-	$(INSTALL_PROGRAM) _tbevent.so $(DESTDIR)$(CLIENT_BINDIR)/_tbevent.so
+client-libinstall: client-pylibinstall client-pllibinstall
 
 #
 # XXX Fix the python install location.
 #
-client-libinstall:
-	$(INSTALL_PROGRAM) $(SRCDIR)/event.pm $(DESTDIR)$(CLIENT_BINDIR)/event.pm
-	$(INSTALL_PROGRAM) event.so $(DESTDIR)$(CLIENT_BINDIR)/event.so
+client-pylibinstall: _tbevent.so
 	$(INSTALL_PROGRAM) $(SRCDIR)/tbevent.py $(DESTDIR)$(CLIENT_BINDIR)/tbevent.py
 	$(INSTALL_PROGRAM) _tbevent.so $(DESTDIR)$(CLIENT_BINDIR)/_tbevent.so
+
+client-pllibinstall: event.so
+	$(INSTALL_PROGRAM) $(SRCDIR)/event.pm $(DESTDIR)$(CLIENT_BINDIR)/event.pm
+	$(INSTALL_PROGRAM) event.so $(DESTDIR)$(CLIENT_BINDIR)/event.so
 
 clean:
 	/bin/rm -f *.o libevent.a libevent_r.a *.so *.py
