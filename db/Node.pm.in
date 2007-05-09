@@ -57,7 +57,7 @@ sub Lookup($$)
         if (exists($nodes{$nodeid}));
 
     return undef
-	if (! ($nodeid =~ /^\w+$/));
+	if (! ($nodeid =~ /^[-\w]+$/));
 
     my $query_result =
 	DBQueryWarn("select * from nodes as n ".
