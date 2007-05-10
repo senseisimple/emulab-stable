@@ -53,8 +53,20 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
-	pubsub.1:${PORTSDIR}/misc/emulab-pubsub \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
+
+#
+# Until/unless the pubsub Makefile is changed, we must include libelvin.
+# This is because the pubsub libraries have to be built with ELVIN_COMPAT
+# to talk to pubsub on ops, and building with compat means that the gateway
+# will be built.  Building that requires elvin libraries...
+#
+.if defined(ELVIN_COMPAT)
+LIB_DEPENDS+= vin4.2:${PORTSDIR}/misc/libelvin \
+	pubsub.1:${PORTSDIR}/misc/emulab-pubsub-elvincompat
+.else
+LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
+.endif
 
 RUN_DEPENDS=	\
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \

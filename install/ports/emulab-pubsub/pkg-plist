@@ -2,6 +2,7 @@ libexec/pubsubd
 include/pubsub/pubsub.h
 include/pubsub/elvin_hash.h
 lib/libpubsub.a
+lib/libpubsub.so.1
 lib/libpubsub.so
 lib/libpubsub_r.a
 etc/rc.d/2.pubsubd.sh

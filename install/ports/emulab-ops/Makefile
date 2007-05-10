@@ -54,8 +54,14 @@ MAINTAINER=	ricci@cs.utah.edu
 .MAKEFLAGS+=	-DBATCH
 
 LIB_DEPENDS= lthread.[23]:${PORTSDIR}/devel/linuxthreads \
-	pubsub.1:${PORTSDIR}/misc/emulab-pubsub \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
+
+.if defined(ELVIN_COMPAT)
+LIB_DEPENDS+= vin4.2:${PORTSDIR}/misc/libelvin \
+	pubsub.1:${PORTSDIR}/misc/emulab-pubsub-elvincompat
+.else
+LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
+.endif
 
 .if ${OSMAJOR} >= 6
 LIB_DEPENDS+= mhash.2:${PORTSDIR}/security/mhash \
@@ -69,7 +75,11 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	wget:${PORTSDIR}/ftp/wget \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
+	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto
+
+.if defined(ELVIN_COMPAT)
+RUN_DEPENDS+= ${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
+.endif
 
 .if ${OSMAJOR} >= 6
 RUN_DEPENDS+= \
