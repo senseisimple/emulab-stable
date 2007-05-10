@@ -1,0 +1,10 @@
+libexec/pubsubd
+libexec/elvin_gateway
+include/pubsub/pubsub.h
+include/pubsub/elvin_hash.h
+lib/libpubsub.a
+lib/libpubsub.so
+lib/libpubsub_r.a
+etc/rc.d/2.pubsubd.sh
+etc/rc.d/3.elvin_gateway.sh
+@dirrm include/pubsub
