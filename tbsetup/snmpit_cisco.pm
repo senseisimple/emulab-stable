@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -111,7 +111,11 @@ sub new($$$;$) {
     #
     # We have to change our behavior depending on what OS the switch runs
     #
-    $options->{'type'} =~ /^(\w+)(-modhack(-?))?(-ios)?$/;
+    if (!($options->{'type'} =~ /^(\w+)(-modhack(-?))?(-ios)?$/)) {
+	warn "ERROR: Incorrectly formatted switch type name: ",
+	     $options->{'type'}, "\n";
+	return undef;
+    }
     $self->{SWITCHTYPE} = $1;
 
     if ($2) {
