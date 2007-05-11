@@ -418,8 +418,6 @@ sub SetDBs(@)
 	    DBQueryFatal("delete from db where User='$uid' and Db='$db'")
 		or return -1;
 	}
-	DBQueryFatal("flush privileges")
-	    or return -1;
 
 	# Then do additions.
 	foreach my $db (keys(%newglist)) {
@@ -440,9 +438,9 @@ sub SetDBs(@)
 	    DBQueryFatal("grant all on `${db}`.* to '$uid'\@'%.${OURDOMAIN}'")
 		or return -1;
 	}
-	DBQueryFatal("flush privileges")
-	    or return -1;
     }
+    DBQueryFatal("flush privileges")
+	or return -1;
 
     return 0;
 }
