@@ -29,6 +29,16 @@ sub TableChanged($$)
     return $describe_result->numrows;
 }
 
+sub NNewUUID()
+{
+    my $uuid = `/usr/bin/uuidgen`;
+
+    if ($uuid =~ /^(\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12})$/) {
+	return $1;
+    }
+    return undef;
+}
+
 # users
 DBQueryFatal("lock tables users write, user_stats write");
 if (! TableChanged("users", "uid_uuid")) {
@@ -44,7 +54,7 @@ if (! TableChanged("user_stats", "uid_uuid")) {
 my $query_result = DBQueryFatal("select uid_idx from users ".
 				"where uid_uuid=''");
 while (my ($uid_idx) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -58,7 +68,7 @@ while (my ($uid_idx) = $query_result->fetchrow_array()) {
 $query_result = DBQueryFatal("select uid_idx from user_stats ".
 			     "where uid_uuid=''");
 while (my ($uid_idx) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -85,7 +95,7 @@ if (! TableChanged("group_stats", "gid_uuid")) {
 $query_result = DBQueryFatal("select gid_idx from groups ".
 			     "where gid_uuid=''");
 while (my ($gid_idx) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -100,7 +110,7 @@ while (my ($gid_idx) = $query_result->fetchrow_array()) {
 $query_result = DBQueryFatal("select gid_idx from group_stats ".
 			     "where gid_uuid=''");
 while (my ($gid_idx) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -127,7 +137,7 @@ if (! TableChanged("experiment_stats", "eid_uuid")) {
 $query_result = DBQueryFatal("select idx from experiments ".
 			     "where eid_uuid=''");
 while (my ($exptidx) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -142,7 +152,7 @@ while (my ($exptidx) = $query_result->fetchrow_array()) {
 $query_result = DBQueryFatal("select exptidx from experiment_stats ".
 			     "where eid_uuid=''");
 while (my ($exptidx) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -163,7 +173,7 @@ if (! TableChanged("images", "uuid")) {
 }
 $query_result = DBQueryFatal("select imageid from images where uuid=''");
 while (my ($imageid) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
@@ -184,7 +194,7 @@ if (! TableChanged("os_info", "uuid")) {
 }
 $query_result = DBQueryFatal("select osid from os_info where uuid=''");
 while (my ($osid) = $query_result->fetchrow_array()) {
-    my $uuid = NewUUID();
+    my $uuid = NNewUUID();
 
     if (!defined($uuid)) {
 	die("*** $0:\n".
