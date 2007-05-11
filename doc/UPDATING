@@ -18,6 +18,40 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20070511: Before build.
+
+	  Install the new publish/subscribe system which is replacing Elvin.
+	  DO THIS ONLY IF YOU ARE AN EXISTING SITE WITH ELVIN INSTALLED!
+	  On both boss and ops, do the following:
+
+	  * Grab and install the package:
+
+		cd /var/tmp
+		fetch http://www.emulab.net/downloads/pubsub-elvincompat-0.8.tbz
+		sudo pkg_add /var/tmp/pubsub-elvincompat-0.8.tbz
+
+	  * Add these lines to /etc/syslog.conf:
+
+		!pubsubd
+		*.*	/usr/testbed/log/pubsubd.log
+
+	  * Create logfile and restart syslog:
+
+		sudo cp /dev/null /usr/testbed/log/pubsubd.log
+		sudo kill -HUP `cat /var/run/syslog.pid`
+
+	  * Start pubsubd:
+
+		sudo /usr/local/etc/rc.d/2.pubsubd.sh start
+
+	  * ON OPS ONLY: start the elvin gateway:
+
+		sudo /usr/local/etc/rc.d/3.elvin_gateway.sh start
+
+	  * ON BOSS ONLY: disable elvind:
+
+		sudo rm -f /usr/local/etc/rc.d/2.elvind.sh
+
 20070320: Time to upgrade your tftpd.  This has only been tested on
 	  FreeBSD 6.x, so if you are still running FreeBSD 4.10, then
 	  you can skip this.  The only significant difference (other
