@@ -949,11 +949,10 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
     };
     if ($ELVIN_COMPAT) {
 	Phase "elvin-gateway", "Installing elvin gateway startup file", sub {
+	    PhaseSkip("elvind not installed, elvin_gateway not enabled")
+		if (! -x "/usr/local/libexec/elvind");
 	    DoneIfExists("$RCDIR/3.elvin_gateway.sh");
 	    PhaseFail("Pubsub system or elvin_gateway is not installed")
-		if (! -e "$RCDIR/3.elvin_gateway");
-	    ExecQuietFatal("mv $RCDIR/3.elvin_gateway ".
-			   "  $RCDIR/3.elvin_gateway.sh");
 	};
     }
     

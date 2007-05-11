@@ -603,11 +603,16 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	}
     };
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
-        Phase "elvind.sh", "Removing port version of elvind.sh", sub {
-	    DoneIfDoesntExist("$RCDIR/elvind.sh");
-            ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh");
-        };
 	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
+    };
+    Phase "unelvin", "Removing Elvin related startup scripts", sub {
+        Phase "elvind.sh", "Removing elvind startup", sub {
+            ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh $RCDIR/2.elvind.sh");
+        };
+        Phase "elvin_gateway.sh", "Removing elvin gateway startup", sub {
+	    DoneIfDoesntExist("$RCDIR/3.elvin_gateway.sh");
+            ExecQuietFatal("/bin/rm -f $RCDIR/3.elvin_gateway.sh");
+        };
     };
 };
 
