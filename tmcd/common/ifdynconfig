@@ -1,0 +1,158 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Dynamically change the configuration of an interface.  Since this is both
+# OS- and interface type-dependent, it basically just calls into liblocsetup
+# to get the appropriate commands to execute to perform the reconfig.
+#
+sub usage(;$) {
+    my $prog = shift;
+    if (!defined($prog)) {
+	$prog = '';
+    }
+    print "Usage: $prog iface up|down|modify [key1=val1 key2=val2 ... ]\n";
+    exit(1);
+}
+
+my $optlist = "d";
+my $iface;
+my $action;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $IFCONFIG      = "$BINDIR/rc/rc.ifconfig";
+my $ROUTECONFIG   = "$BINDIR/rc/rc.route";
+my $TUNCONFIG     = "$BINDIR/rc/rc.tunnels";
+my $DELAYCONFIG   = "$BINDIR/rc/rc.delays";
+my $KEYCONFIG     = "$BINDIR/rc/rc.keys";
+my $TRACECONFIG   = "$BINDIR/rc/rc.trace";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+my %options;
+my $progname = $ARGV[0];
+my $debug = 0;
+
+my %modopts = ();
+
+# Parse command line.
+if (!getopts($optlist,\%options)) {
+    usage($progname);
+}
+if (defined($options{'d'})) {
+    $debug = 1;
+}
+# Allow default above.
+if (@ARGV) {
+    $iface = shift @ARGV;
+}
+else {
+    usage();
+}
+if (@ARGV) {
+    $action = shift @ARGV;
+
+    $action = lc($action);
+
+    if ($action ne 'up' && $action ne 'down' && $action ne 'modify') {
+	print STDERR "ERROR: unknown action '$action'!\n";
+	exit(3);
+    }
+}
+else {
+    usage();
+}
+if ($action eq 'modify') {
+    if (!scalar(@ARGV)) {
+	print STDERR "ERROR: action modify, but no params!\n";
+	exit(4);
+    }
+}
+if (scalar(@ARGV)) {
+    # dump key=val params into a hash
+    foreach my $arg (@ARGV) {
+	my @ts = split(/=/,$arg);
+	if (scalar(@ts) != 2) {
+	    # don't want the user to be fooled into thinking all configs 
+	    # happened, instead of only some...
+	    print STDERR "ERROR: improper key=val pair '$arg'!\n";
+	    exit(25);
+	}
+	else {
+	    # NOTE: the event system changes these to uppercase; we want 
+	    # lowercase...
+	    $modopts{lc($ts[0])} = $ts[1];
+	}
+    }
+}
+
+# grab the interface config data
+my @ifacecfg;
+libsetup::getifconfig(\@ifacecfg);
+
+# find settings for our interface
+my $iface_hashref;
+foreach my $ifs (@ifacecfg) {
+    if ($ifs->{'IFACE'} eq $iface) {
+	$iface_hashref = $ifs;
+	last;
+    }
+}
+if (!defined($iface_hashref)) {
+    print STDERR "ERROR: could not find Emulab config data for " . 
+	"interface '$iface'!\n";
+    exit(10);
+}
+
+# workaround until support is added to all osdep libs...
+if (defined(&liblocsetup::os_ifdynconfig_cmds)) {
+    my @cmds = ();
+    my $retval = liblocsetup::os_ifdynconfig_cmds(\@cmds,$iface,$action,
+						  \%modopts,$iface_hashref);
+    # execute...
+    foreach my $cmd (@cmds) {
+	print "cmd = '$cmd'\n";
+	system($cmd);
+    }
+    # we assume that these commands return 0 -- there's not a lot else we can
+    # do.
+    exit(0);
+}
+elsif ($action eq 'modify') {
+    print STDERR "ERROR: OS does not support parameterized " . 
+	"link modification!\n";
+    exit(6);
+}
+else {
+    # best effort at up/down: ifconfig -- and assume it's in PATH
+    exit(system("ifconfig $iface $action"));
+}
+
+# should not get here
+exit(0);

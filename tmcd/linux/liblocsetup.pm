@@ -79,6 +79,11 @@ my $GATED	= "/usr/sbin/gated";
 my $ROUTE	= "/sbin/route";
 my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
+my $IWCONFIG = '/usr/local/sbin/iwconfig';
+my $WLANCONFIG = '/usr/local/bin/wlanconfig';
+my $RMMOD = '/sbin/rmmod';
+my $MODPROBE = '/sbin/modprobe';
+my $IWPRIV = '/usr/local/sbin/iwpriv';
 
 #
 # OS dependent part of cleanup node state.
@@ -183,43 +188,85 @@ sub os_ifconfig_line($$$$$$$;$$$)
 	    $iwcmd .= " txpower auto";
 	}
 	# Allow this too. 
-	if (exists($settings->{"sensitivity"})) {
-	    $iwcmd .= " sens " . $settings->{"sensitivity"};
+	if (exists($settings->{"sens"})) {
+	    $iwcmd .= " sens " . $settings->{"sens"};
+	}
+
+	# allow rts threshold and frag size
+	if (exists($settings->{'rts'})) {
+	    $iwcmd .= ' rts ' . $settings->{'rts'};
+	}
+	if (exists($settings->{'frag'})) {
+	    $iwcmd .= ' frag ' . $settings->{'frag'};
 	}
 
 	#
 	# We demand to be told if we are the master or a peon.
+	# We might also be in another mode.  Thus, if accesspoint is specified,
+	# we assume we are in either ap/sta (Master/Managed) mode.  If not,
+	# we look for a 'mode' argument and assume adhoc if we don't get one.
+	# The reason to assume adhoc is because we need accesspoint set to
+	# know how to configure the device for ap/sta modes, and setting a
+	# device to monitor mode by default sucks.
+	# 
 	# This needs to be last for some reason.
 	#
-	if (!exists($settings->{"accesspoint"})) {
-	    warn("*** WARNING: No accesspoint provided for $iface!\n");
-	    return undef;
-	}
-	my $accesspoint = $settings->{"accesspoint"};
-	my $accesspointwdots;
-
-	# Allow either dotted or undotted notation!
-	if ($accesspoint =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
-	    $accesspointwdots = "$1:$2:$3:$4:$5:$6";
-	}
-	elsif ($accesspoint =~
-	       /^(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2})$/) {
-	    $accesspointwdots = $accesspoint;
-	    $accesspoint      = "${1}${2}${3}${4}${5}${6}";
-	}
-	else {
-	    warn("*** WARNING: Improper format for MAC ($accesspoint) ".
-		 "provided for $iface!\n");
-	    return undef;
-	}
+	if (exists($settings->{'accesspoint'})) {
+	    my $accesspoint = $settings->{"accesspoint"};
+	    my $accesspointwdots;
 	    
-	if (libsetup::findiface($accesspoint) eq $iface) {
-            $wlccmd .= " wlanmode ap";
-	    $iwcmd .= " mode Master";
+	    # Allow either dotted or undotted notation!
+	    if ($accesspoint =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+		$accesspointwdots = "$1:$2:$3:$4:$5:$6";
+	    }
+	    elsif ($accesspoint =~
+		   /^(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2})$/) {
+		$accesspointwdots = $accesspoint;
+		$accesspoint      = "${1}${2}${3}${4}${5}${6}";
+	    }
+	    else {
+		warn("*** WARNING: Improper format for MAC ($accesspoint) ".
+		     "provided for $iface!\n");
+		return undef;
+	    }
+	    
+	    if (libsetup::findiface($accesspoint) eq $iface) {
+		$wlccmd .= " wlanmode ap";
+		$iwcmd .= " mode Master";
+	    }
+	    else {
+		$wlccmd .= " wlanmode sta";
+		$iwcmd .= " mode Managed ap $accesspointwdots";
+	    }
+	}
+	elsif (exists($settings->{'mode'})) {
+	    if ($settings->{'mode'} =~ /ad[\s\-]*hoc/i) {
+		$wlccmd .= " wlanmode adhoc";
+		$iwcmd .= " mode Ad-Hoc";
+	    }
+	    elsif ($settings->{'mode'} =~ /monitor/i) {
+		$wlccmd .= " wlanmode monitor";
+		$iwcmd .= " mode Monitor";
+	    }
+	    elsif ($settings->{'mode'} =~ /ap/i 
+		   || $settings->{'mode'} =~ /access[\s\-]*point/i 
+		   || $settings->{'mode'} =~ /master/i) {
+		$wlccmd .= " wlanmode ap";
+		$iwcmd .= " mode Master";
+	    }
+	    elsif ($settings->{'mode'} =~ /sta/i 
+		   || $settings->{'mode'} =~ /managed/i) {
+		$wlccmd .= " wlanmode sta";
+		$iwcmd .= " mode Managed ap any";
+	    }
+	    else {
+		warn("*** WARNING: Invalid mode provided for $iface!\n");
+		return undef;
+	    }
 	}
 	else {
-            $wlccmd .= " wlanmode sta";
-	    $iwcmd .= " mode Managed ap $accesspointwdots";
+	    warn("*** WARNING: No mode implied for $iface!\n");
+	    return undef;
 	}
 
         $uplines   = $wlccmd . "\n";
@@ -227,7 +274,7 @@ sub os_ifconfig_line($$$$$$$;$$$)
 	$uplines  .= $iwcmd . "\n";
 	$uplines  .= sprintf($IFCONFIG, $athiface, $inet, $mask) . "\n";
 	$downlines  = "$IFCONFIGBIN $athiface down\n";
-	$downlines .= "/usr/local/bin/wlanconfig $athiface destroy\n";
+	$downlines .= "$WLANCONFIG $athiface destroy\n";
 	$downlines .= "$IFCONFIGBIN $iface down\n";
 	return ($uplines, $downlines);
     }
@@ -271,6 +318,13 @@ sub os_ifconfig_line($$$$$$$;$$$)
 
         my $rate = $settings->{"rate"};
         $tuncmd .= " -r $rate";
+
+	if (exists($settings->{'carrierthresh'})) {
+	    $tuncmd .= " -c " . $settings->{'carrierthresh'};
+	}
+	if (exists($settings->{'rxgain'})) {
+	    $tuncmd .= " --rx-gain=" . $settings->{'rxgain'};
+	}
 
         $uplines = $tuncmd . " > /dev/null 2>&1 &\n";
         $uplines .= "sleep 5\n";
@@ -740,6 +794,558 @@ sub os_fwrouteconfig_line($$$)
     $downline .= "    done";
 
     return ($upline, $downline);
+}
+
+# proto for a function used in os_ifdynconfig_cmds
+sub getCurrentIwconfig($;$);
+
+#
+# Returns a list of commands needed to change the current device state to 
+# something matching the given configuration options.
+#
+sub os_ifdynconfig_cmds($$$$$) 
+{
+    my ($ret_aref,$iface,$action,$optref,$ifcfg) = @_;
+    my %opts = %$optref;
+    my %flags = ();
+    # this is the hash returned from getifconfig, but only for this interface
+    my %emifc = %$ifcfg;
+
+    my @cmds = ();
+
+    # only handle the atheros case for now, since it's the only one
+    # that can be significantly parameterized
+    if (exists($emifc{'TYPE'}) && $emifc{'TYPE'} eq 'ath') {
+	my ($ifnum) = $iface =~ /wifi(\d+)/;
+        my $ath = "ath${ifnum}";
+	my $wifi = $iface;
+
+	# check flags
+	my ($reset_wlan,$reset_kmod,$remember) = (0,0,0);
+	if (exists($opts{'resetkmod'}) && $opts{'resetkmod'} == 1) {
+	    $reset_kmod = 1;
+	    # note that this forces a wlan reset too!
+	    $reset_wlan = 1;
+	    delete $opts{'resetkmod'};
+	}
+	if (exists($flags{'resetwlan'}) && $opts{'resetwlan'} == 1) {
+	    $reset_wlan = 1;
+	    delete $opts{'resetwlan'};
+	}
+	# we only want to try to keep similar config options
+	# if the user tells us to...
+	if (exists($flags{'usecurrent'}) && $opts{'usecurrent'} == 1) {
+	    $remember = 1;
+	    delete $opts{'usecurrent'};
+	}
+
+	# handle the up/down case right away.
+	if (($action eq 'up' || $action eq 'down') 
+	    && scalar(keys(%opts)) == 0) {
+	    push @cmds,"$IFCONFIGBIN $ath $action";
+	    @$ret_aref = @cmds;
+	    return 0;
+	}
+
+	# first grab as much current state as we can, so we don't destroy
+	# previous state if we have to destroy the VAP (i.e., athX) interface
+	# 
+	# NOTE that we don't bother grabbing current ifconfig state --
+	# we assume that the current state is just what Emulab configured!
+	my $iwc_ref = getCurrentIwconfig($ath);
+	my %iwc = %$iwc_ref;
+
+	# hash containing new config:
+	my %niwc;
+
+	# first, whack the emulab and user-supplied configs
+	# so that the iwconfig params match what we need to give iwconfig
+	# i.e., emulab specifies ssid and we need essid.
+	if (exists($emifc{'ssid'})) {
+	    $emifc{'essid'} = $emifc{'ssid'};
+	    delete $emifc{'ssid'};
+	}
+	if (exists($opts{'ssid'})) {
+	    $opts{'essid'} = $opts{'ssid'};
+	    delete $opts{'ssid'};
+	}
+	if (exists($opts{'ap'})) {
+	    $opts{'accesspoint'} = $opts{'ap'};
+	    delete $opts{'ap'};
+	}
+	# we want this to be determined by the keyword 'freq' to iwconfig, 
+	# not channel
+	if (exists($opts{'channel'}) && !exists($opts{'freq'})) {
+	    $opts{'freq'} = $opts{'channel'};
+	}
+
+	for my $ok (keys(%opts)) {
+	    print STDERR "opts kv $ok=".$opts{$ok}."\n";
+	}
+	for my $tk (keys(%iwc)) {
+	    print STDERR "iwc kv $tk=".$iwc{$tk}."\n";
+	}
+
+	# here's how we set things up: we set niwc to emulab wireless data
+	# (i.e., INTERFACE_SETTINGs), then add in any current state, then
+	# add in any of the reconfig options.
+	my $key;
+	if ($remember) {
+	    for $key (keys(%{$emifc{'SETTINGS'}})) {
+		$niwc{$key} = $emifc{'SETTINGS'}->{$key};
+	    }
+	    for $key (keys(%iwc)) {
+		$niwc{$key} = $iwc{$key};
+	    }
+	}
+	for $key (keys(%opts)) {
+	    $niwc{$key} = $opts{$key};
+	}
+
+	for my $nk (keys(%niwc)) {
+	    print STDERR "niwc kv $nk=".$niwc{$nk}."\n";
+	}
+
+	# see what has changed and what we're going to have to do
+	my ($mode_ch,$proto_ch) = (0,0);
+
+	# first, change mode to a string matching those returned by iwconfig:
+	if (exists($niwc{'mode'})) {
+	    if ($niwc{'mode'} =~ /ad[\s\-]{0,1}hoc/i) {
+		$niwc{'mode'} = 'Ad-Hoc';
+	    }
+	    elsif ($niwc{'mode'} =~ /monitor/i) {
+		$niwc{'mode'} = "Monitor";
+	    }
+	    elsif ($niwc{'mode'} =~ /ap/i
+		   || $niwc{'mode'} =~ /master/i) {
+		$niwc{'mode'} = "Master";
+	    }
+	    elsif ($niwc{'mode'} =~ /sta/i 
+		   || $niwc{'mode'} =~ /managed/i) {
+		$niwc{'mode'} = 'Managed';
+	    }
+	    else {
+		print STDERR "ERROR: invalid mode '" . $niwc{'mode'} . "'\n";
+		return 10;
+	    }
+	}
+
+	# also change protocol, sigh
+	if (exists($niwc{'protocol'})) {
+	    if ($niwc{'protocol'} =~ /(802){0,1}11a/) {
+		$niwc{'protocol'} = '80211a';
+	    }
+	    elsif ($niwc{'protocol'} =~ /(802){0,1}11b/) {
+		$niwc{'protocol'} = '80211b';
+	    }
+	    elsif ($niwc{'protocol'} =~ /(802){0,1}11g/) {
+		$niwc{'protocol'} = '80211g';
+	    }
+	    else {
+		print STDERR "ERROR: invalid protocol '" . $niwc{'protocol'} . 
+		    "'\n";
+		return 11;
+	    }
+	}
+
+	# to be backwards compat:
+	# If the user sets a mode, we will put the device in that mode.
+	# If the user does not set a mode, but does set an accesspoint, 
+	#   we force the mode to either Managed or Master.
+	# If the user sets neither a mode nor accesspoint, but we are told to
+	#   "remember" the current state, we use that mode and ap.
+	if (exists($opts{'mode'})) {
+	    if ($niwc{'mode'} eq 'Managed' && exists($niwc{'accesspoint'})) {
+		# strip colons and lowercase to check if we are the accesspoint
+		# or a station:
+		my $tap = $niwc{'accesspoint'};
+		$tap =~ s/://g;
+		$tap = lc($tap);
+		
+		my $tmac = lc($ifc->{'MAC'});
+		
+		if ($tap eq $tmac) {
+		    # we are going to be the accesspoint; switch our mode to
+		    # master
+		    $niwc{'mode'} = 'Master';
+		}
+		else {
+		    $niwc{'mode'} = 'Managed';
+		    $niwc{'ap'} = $tap;
+		}
+	    }
+	}
+	elsif (exists($opts{'accesspoint'})) {
+	    # strip colons and lowercase to check if we are the accesspoint
+	    # or a station:
+	    my $tap = $niwc{'accesspoint'};
+	    $tap =~ s/://g;
+	    $tap = lc($tap);
+	    
+	    my $tmac = lc($ifc->{'MAC'});
+	    
+	    if ($tap eq $tmac) {
+		# we are going to be the accesspoint; switch our mode to
+		# master
+		$niwc{'mode'} = 'Master';
+	    }
+	    else {
+		$niwc{'mode'} = 'Managed';
+		$niwc{'ap'} = $tap;
+	    }
+	}
+	elsif ($remember) {
+	    # swipe first the old emulab config state, then the current
+	    # iwconfig state:
+	    
+	    # actually, this was already done above.
+	}
+
+	# get rid of ap option if we're the master:
+	if (exists($niwc{'mode'}) && $niwc{'mode'} eq 'Master') {
+	    delete $niwc{'ap'};
+	}
+
+	print STDERR "after whacking niwc into compliance:\n";
+	for my $nk (keys(%niwc)) {
+	    print STDERR "niwc kv $nk=".$niwc{$nk}."\n";
+	}
+
+	# assemble params to commands:
+	my ($iwc_mode,$wlc_mode);
+	my $iwp_mode;
+
+	if (exists($niwc{'mode'}) && $niwc{'mode'} ne $iwc{'mode'}) {
+	    $mode_ch = 1;
+	}
+	
+	if (exists($niwc{'mode'})) {
+	    $iwc_mode = $niwc{'mode'};
+	    if ($niwc{'mode'} eq 'Ad-Hoc') {
+		$wlc_mode = 'adhoc';
+	    }
+	    elsif ($niwc{'mode'} eq 'Managed') {
+		$wlc_mode = 'sta';
+	    }
+	    elsif ($niwc{'mode'} eq 'Monitor') {
+		$wlc_mode = 'monitor';
+	    }
+	    elsif ($niwc{'mode'} eq 'Master') {
+		$wlc_mode = 'ap';
+	    }
+	}
+
+	if (exists($niwc{'protocol'})) {
+	    if ($niwc{'protocol'} ne $iwc{'protocol'}) {
+		$proto_ch = 1;
+	    }
+	    
+	    if ($niwc{'protocol'} eq '80211a') {
+		$iwp_mode = 1;
+	    }
+	    elsif ($niwc{'protocol'} eq '80211b') {
+		$iwp_mode = 2;
+	    }
+	    elsif ($niwc{'protocol'} eq '80211g') {
+		$iwp_mode = 3;
+	    }
+	}
+
+	# for atheros cards, if we have to change the mode, we have to 
+	# first tear down the VAP and rerun wlanconfig, then reconstruct
+	# and reconfig the VAP.
+	if ($mode_ch == 1) {
+	    $reset_wlan = 1;
+	}
+
+        # Log what we're going to do:
+	if ($reset_wlan && defined($wlc_mode)) {
+	    print STDERR "WLANCONFIG: iface=$wifi; mode=$wlc_mode\n";
+	}
+	if (($proto_ch || $reset_wlan) && defined($iwp_mode)) {
+	    print STDERR "IWPRIV: proto=".$niwc{'protocol'}." ($iwp_mode)\n";
+	}
+	if ($reset_wlan) {
+	    print STDERR "IFCONFIG: iface=$ath; ip=" . $emifc{'IPADDR'} . 
+		"; netmask=" . $emifc{'IPMASK'} . "\n";
+	}
+
+	# assemble iwconfig params:
+	my $iwcstr = '';
+	if (exists($niwc{'essid'})) {
+	    $iwcstr .= ' essid ' . $niwc{'essid'};
+	}
+	if (exists($niwc{'freq'})) {
+	    $iwcstr .= ' freq ' . $niwc{'freq'};
+	}
+	if (exists($niwc{'rate'})) {
+	    $iwcstr .= ' rate ' . $niwc{'rate'};
+	}
+	if (exists($niwc{'txpower'})) {
+	    $iwcstr .= ' txpower ' . $niwc{'txpower'};
+	}
+	if (exists($niwc{'sens'})) {
+	    $iwcstr .= ' sens ' . $niwc{'sens'};
+	}
+	if (exists($niwc{'rts'})) {
+	    $iwcstr .= ' rts ' . $niwc{'rts'};
+	}
+	if (exists($niwc{'frag'})) {
+	    $iwcstr .= ' frag ' . $niwc{'frag'};
+	}
+	if (defined($iwc_mode) && $iwc_mode ne '') {
+	    $iwcstr .= " mode $iwc_mode";
+	    
+	    if ($iwc_mode eq 'Managed') {
+		if (exists($niwc{'ap'})) {
+		    $iwcstr .= ' ap ' . $niwc{'ap'};
+		}
+		else {
+		    $iwcstr .= ' ap any';
+		}
+	    }
+	}
+
+	print STDERR "IWCONFIG: $iwcstr\n";
+
+        #
+        # Generate commands to reconfigure the device.
+        #
+	if ($action eq 'up') {
+	    push @cmds,"$IFCONFIGBIN $ath $action";
+	}
+
+	if ($reset_wlan) {
+	    push @cmds,"$IFCONFIGBIN $ath down";
+	    push @cmds,"$IFCONFIGBIN $wifi down";
+	    push @cmds,"$WLANCONFIG $ath destroy";
+	    
+	    if ($reset_kmod) {
+		## also "reset" the kernel modules:
+		push @cmds,"$RMMOD ath_pci ath_rate_sample ath_hal";
+		push @cmds,"$RMMOD wlan_scan_ap wlan_scan_sta wlan";
+		push @cmds,"$MODPROBE ath_pci autocreate=none";
+	    }
+	    
+	    push @cmds,"$WLANCONFIG $ath create wlandev $wifi " . 
+		"wlanmode $wlc_mode";
+	}
+	if (($proto_ch || $mode_ch || $reset_wlan) && defined($iwp_mode)) {
+	    push @cmds,"$IWPRIV $ath mode $iwp_mode";
+	}
+	push @cmds,"$IWCONFIG $ath $iwcstr";
+	if ($reset_wlan) {
+	    push @cmds,"$IFCONFIGBIN $ath inet " . $emifc{'IPADDR'} . 
+		" netmask " . $emifc{'IPMASK'} . " up";
+	    # also make sure routing is up for this interface
+	    push @cmds,"/var/emulab/boot/rc.route " . $emifc{'IPADDR'} . " up";
+	}
+
+	# We don't do this right now because when we have to reset
+	# wlan state to force a new mode, we panic the kernel if we 
+	# do a wlanconfig without first destroying any monitor mode VAPs.
+	# What's more, I haven't found a way to see which VAP is attached to
+	# which real atheros device.
+	
+	#if ($do_mon_vdev) {
+	#    $athmon = "ath" . ($iface_num + 10);
+	#    push @cmds,"$WLANCONFIG $athmon create wlandev $wifi wlanmode monitor";
+	#    push @cmds,"$IFCONFIGBIN $athmon up";
+	#}
+
+	if ($action eq 'down') {
+	    push @cmds,"$IFCONFIGBIN $ath $action";
+	}
+    }
+    elsif (exists($emifc{'TYPE'}) && $emifc{'TYPE'} eq 'flex900') {
+	# see if we have any flags...
+	$resetkmod = 0;
+	if (exists($opts{'resetkmod'}) && $opts{'resetkmod'} == 1) {
+	    $resetkmod = 1;
+	}
+
+	# check args -- we MUST have freq and rate.
+	my ($freq,$rate,$carrierthresh,$rxgain);
+
+	if (!exists($opts{'protocol'})
+	    || $opts{'protocol'} ne 'flex900') {
+	    warn("*** WARNING: Unknown gnuradio protocol specified, " . 
+		 "assuming flex900!\n");
+        }
+
+	if (exists($opts{'frequency'})) {
+	    $freq = $opts{'frequency'};
+	}
+	elsif (exists($opts{'freq'})) {
+            $freq = $opts{'freq'};
+        }
+	else {
+	    warn("*** WARNING: No frequency specified for gnuradio ".
+                 "interface!\n");
+            return undef;
+	}
+
+	if (exists($opts{'rate'})) {
+	    $rate = $opts{'rate'};
+	}
+	else {
+	    warn("*** WARNING: No rate specified for gnuradio interface!\n");
+            return undef;
+        }
+
+	if (exists($opts{'carrierthresh'})) {
+	    $carrierthresh = $opts{'carrierthresh'};
+	}
+	if (exists($opts{'rxgain'})) {
+	    $rxgain = $opts{'rxgain'};
+	}
+
+	#
+	# Generate commands
+	#
+	push @cmds,"$IFCONFIGBIN $iface down";
+
+	# find out if we have to kill the current tunnel process...
+	my $tpid;
+	if (!open(PSP, "ps axwww 2>&1 |")) {
+	    print STDERR "ERROR: open: $!"; 
+	    return 19;
+	}
+	while (my $psl = <PSP>) {
+	    if ($psl =~ /\s*(\d+)\s*.*emulab\/tunnel\.py.*/) {
+		$tpid = $1;
+		last;
+	    }
+	}
+	close(PSP);
+	if (defined($tpid)) {
+	    push @cmds,"kill $tpid";
+	}
+
+	if ($resetkmod) {
+	    push @cmds,"/sbin/rmmod tun";
+	    push @cmds,"/sbin/modprobe tun";
+	}
+
+	my $tuncmd = 
+	    "/bin/env PYTHONPATH=/usr/local/lib/python2.4/site-packages " .
+	    "$BINDIR/tunnel.py -f $freq -r $rate";
+	if (defined($carrierthresh)) {
+	    $tuncmd .= " -c $carrierthresh";
+	}
+	if (defined($rxgain)) {
+	    $tuncmd .= " -rx-gain=$rxgain";
+	}
+	$tuncmd .= " > /dev/null 2>&1 &";
+	push @cmds,$tuncmd;
+
+	# Give the tun device time to come up
+	push @cmds,"sleep 2";
+
+	my $mac = $emifc{'MAC'};
+	push @cmds,"$IFCONFIGBIN $iface hw ether $mac";
+	push @cmds,"$IFCONFIGBIN $iface inet " . $emifc{'IPADDR'} .
+	    " netmask " . $emifc{'IPMASK'} . " up";
+	# also make sure routing is up for this interface
+	push @cmds,"/var/emulab/boot/rc.route " . $emifc{'IPADDR'} . " up";
+    }
+    
+    @$ret_aref = @cmds;
+    
+    return 0;
+}
+
+my %def_iwconfig_regex = ( 'protocol' => '.+(802.*11[abg]{1}).*',
+			   'essid'    => '.+SSID:\s*"*([\w\d_\-]+)"*.*',
+			   'mode'     => '.+Mode:([\w\-]+)\s+',
+			   'freq'     => '.+Frequency:(\d+\.\d+\s*\w+).*',
+			   'ap'       => '.+Access Point:\s*([0-9A-Za-z\:]+).*',
+			   'rate'     => '.+Rate[:|=]\s*(\d+\s*[\w\/]*)\s*',
+			   'txpower'  => '.+ower[:|=](\d+\s*\w+).*',
+			   'sens'     => '.+Sensitivity[:|=](\d+).*',
+                           # can't set this on our atheros cards
+                           #'retry'    => '.+Retry[:|=](\d+|off).*',
+			   'rts'      => '.+RTS thr[:|=](\d+|off).*',
+			   'frag'     => '.+Fragment thr[:|=](\d+|off).*',
+                           # don't care about this on our cards
+                           #'power'    => '.+Power Management[:|=](\d+|off).*',
+			 );
+
+#
+# Grab current iwconfig data for a specific interface, based on the 
+# specified regexps (which default to def_iwconfig_regex if unspecified).
+# Postprocess the property values so that they can be stuck back into iwconfig.
+#
+sub getCurrentIwconfig($;$) {
+    my ($dev,$regex_ref) = @_;
+    my %regexps;
+
+    if (!defined($dev) || $dev eq '') {
+        return;
+    }
+    if (!defined($regex_ref)) {
+	%regexps = %def_iwconfig_regex;
+    }
+    else {
+	%regexps = %$regex_ref;
+    }
+
+    my %r = ();
+    my @output = `$IWCONFIG`;
+
+    my $foundit = 0;
+    foreach my $line (@output) {
+        if ($line =~ /^$dev/) {
+            $foundit = 1;
+        }
+        elsif ($foundit && !($line =~ /^\s+/)) {
+            last;
+        }
+
+        if ($foundit) {
+            foreach my $iwprop (keys(%regexps)) {
+                my $regexp = $regexps{$iwprop};
+                if ($line =~ /$regexp/) {
+                    $r{$iwprop} = $1;
+                }
+            }    
+        }
+    }
+     
+    # postprocessing.
+    # We change the values back to valid args to the iwconfig command
+    if (defined($r{'protocol'})) {
+        $r{'protocol'} =~ s/\.//g;
+    }
+     
+    if (defined($r{'rate'})) {
+        if ($r{'rate'} =~ /^(\d+) Mb\/s/) {
+            $r{'rate'} = "${1}M";
+        }
+        else {
+            $r{'rate'} = $1;
+        }
+    }
+
+    if (defined($r{'txpower'})) {
+        if ($r{'txpower'} =~ /^(\d+)/) {
+            $r{'txpower'} = $1;
+        }
+        else {
+            $r{'txpower'} = 'auto';
+        }
+    }
+
+    if (defined($r{'freq'})) {
+        $r{'freq'} =~ s/\s//g;
+    }
+
+    foreach my $rk (keys(%r)) {
+	print STDERR "gci $rk=".$r{$rk}."\n";
+    }
+     
+    return \%r;
 }
 
 1;

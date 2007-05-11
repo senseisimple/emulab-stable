@@ -77,6 +77,7 @@ common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
 	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
+	$(INSTALL) -m 755 $(SRCDIR)/ifdynconfig $(BINDIR)/ifdynconfig
 	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/bootsubnodes $(BINDIR)/bootsubnodes
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
