@@ -117,6 +117,11 @@ sub new($$$;$) {
 	return undef;
     }
     $self->{SWITCHTYPE} = $1;
+    if (!$self->{SWITCHTYPE}) {
+	warn "ERROR: Unable to determine type of switch $self->{NAME} from " .
+             "string '$options->{type}'\n";
+	return undef;
+    }
 
     if ($2) {
         $self->{NON_MODULAR_HACK} = 1;
