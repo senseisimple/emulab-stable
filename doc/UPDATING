@@ -119,7 +119,6 @@ earliest time one of the steps needs to occur.
 	        cd testbed-build-dir
 		gmake && gmake install
 
-
 20061201: Time to upgrade your mysql ... If you are still running
           FreeBSD 4.10 on your boss node, then you are almost certainly
           running an ancient version of mysql (3.23). In lieu of upgrading
@@ -724,6 +723,13 @@ earliest time one of the steps needs to occur.
 	you'll need to switch to using the '<OURDOMAIN>.internal.db' zone
 	file - see Step 6 of doc/setup.txt for instructions on setting up
 	this file.
+
+20040202: Before install:
+
+	batchexp -q -i -w -f -n -S 'System Experiment' \
+             -L 'System Experiment' \
+             -E 'Nodes in limbo during nfree - DO NOT DELETE' \
+             -p emulab-ops -e nfree-locked
 
 20040121: After install
 	Changed the 3.testbed.sh rc.d script to handle 'start' and 'stop'
