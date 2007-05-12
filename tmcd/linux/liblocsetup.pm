@@ -963,7 +963,7 @@ sub os_ifdynconfig_cmds($$$$$)
 		$tap =~ s/://g;
 		$tap = lc($tap);
 		
-		my $tmac = lc($ifc->{'MAC'});
+		my $tmac = lc($emifc{'MAC'});
 		
 		if ($tap eq $tmac) {
 		    # we are going to be the accesspoint; switch our mode to
@@ -983,7 +983,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	    $tap =~ s/://g;
 	    $tap = lc($tap);
 	    
-	    my $tmac = lc($ifc->{'MAC'});
+	    my $tmac = lc($emifc{'MAC'});
 	    
 	    if ($tap eq $tmac) {
 		# we are going to be the accesspoint; switch our mode to
@@ -1099,7 +1099,19 @@ sub os_ifdynconfig_cmds($$$$$)
 	    
 	    if ($iwc_mode eq 'Managed') {
 		if (exists($niwc{'ap'})) {
-		    $iwcstr .= ' ap ' . $niwc{'ap'};
+		    if (!($niwc{'ap'} =~ /:/)) {
+                        # I really dislike perl sometimes.
+                        $iwcstr .= ' ap ' .
+                            substr($niwc{'ap'},0,2) . ":" .
+                            substr($niwc{'ap'},2,2) . ":" .
+                            substr($niwc{'ap'},4,2) . ":" .
+                            substr($niwc{'ap'},6,2) . ":" .
+                            substr($niwc{'ap'},8,2) . ":" .
+                            substr($niwc{'ap'},10,2);
+                    }
+                    else {
+			$iwcstr .= ' ap ' . $niwc{'ap'};
+		    }
 		}
 		else {
 		    $iwcstr .= ' ap any';
@@ -1257,12 +1269,12 @@ sub os_ifdynconfig_cmds($$$$$)
 }
 
 my %def_iwconfig_regex = ( 'protocol' => '.+(802.*11[abg]{1}).*',
-			   'essid'    => '.+SSID:\s*"*([\w\d_\-]+)"*.*',
+			   'essid'    => '.+SSID:\s*"*([\w\d_\-\.]+)"*.*',
 			   'mode'     => '.+Mode:([\w\-]+)\s+',
 			   'freq'     => '.+Frequency:(\d+\.\d+\s*\w+).*',
 			   'ap'       => '.+Access Point:\s*([0-9A-Za-z\:]+).*',
 			   'rate'     => '.+Rate[:|=]\s*(\d+\s*[\w\/]*)\s*',
-			   'txpower'  => '.+ower[:|=](\d+\s*\w+).*',
+			   'txpower'  => '.+ower[:|=](\d+\s*[a-zA-Z]+).*',
 			   'sens'     => '.+Sensitivity[:|=](\d+).*',
                            # can't set this on our atheros cards
                            #'retry'    => '.+Retry[:|=](\d+|off).*',
