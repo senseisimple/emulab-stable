@@ -1,12 +1,13 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2004, 2006 University of Utah and the Flux Group.
+   Copyright (c) 2004-2007 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
 <h2>Emulab Tutorial - Using Wireless Networking</h2>
 </center>
 
+<p>
 Some Emulab nodes contain 802.11 a/b/g wifi interfaces (Atheros 5212 chipset),
 and are scattered around at various locations in a large building.  To find out where they
 are located and what their node IDs are, see the <a
@@ -14,8 +15,9 @@ href=https://www.emulab.net/floormap.php3>wireless floormaps</a> page.
 When you click on one of the colored dots, you will be taken to a page
 describing the node and what type of interfaces the node has installed
 in it.
-<br>
-<br>
+</p>
+
+<p>
 In addition to the nodes deployed throughout the building, we've also
 concentrated a subset of them in our machine room.  36 of the pc600s now have
 802.11 a/b/g interfaces, also with the Atheros 5212 chipset.  Each has an
@@ -25,32 +27,50 @@ href="https://www.emulab.net/floormap.php3?building=MEB-MRC600">the floormaps
 for this sub-cluster</a>.  For connectivity, antenna positions, and related
 information, see the <a href="#envinfo">Environmental Information</a>
 subsection of this document.
+</p>
 
-<br>
-<br>
+<p>
 Before using a wireless network interface in an experiment,
-please read the following
-<b>Acceptable Use Policy</b> (AUP) regarding wireless interfaces.
+please read the <a href="#WirelessAUP"><b>Wireless Acceptable Use
+Policy</b></a> regarding wireless interfaces.
+</p>
+
+<p>
+This document is broken up into the following sections:
+<ol>
+<li><a href="#WirelessAUP">Wireless Acceptable Use Policy</a>
+<li><a href="#CreateExp">Creating an Experiment with Wireless Nodes</a>
+<li><a href="#LinkConfig">Wireless Link Configuration Settings</a>
+<li><a href="#DynamicLinkConfig">Dynamically Configuring Wireless Links</a>
+<li><a href="#AdvDynLinkConfig">Advanced Dynamic Link Configuration</a>
+<li><a href="#ChoosingNodes">Choosing Physical Nodes</a>
+<li><a href="#EnvInfo">Environment and Deployment Information</a>
+</ol>
+</p>
+
+<h3><a name="WirelessAUP">Wireless Acceptable Use Policy</a></h3>
+<p>
 By using our wireless nodes, you agree to be bound by this AUP.
+</p>
 
 <ul>
-<li> <b>Receiving: </b>
+<p><li> <b>Receiving: </b>
      You may listen to and monitor anything you like.  If you happen
      to observe "private" information such as plaintext Web passwords,
      you will not exploit that information, and you will take
      care not to let it leak out publicly, e.g., in log files.
-     </li><p>
+     </li></p>
      
-<li> <b>Transmitting (1): </b>
+<p><li> <b>Transmitting (1): </b>
      Do not transmit on channels that another experiment on the
      testbed is using, unless it's your own.  You can find out which
      channels are currently in use by looking at the top of the <a
      href=https://www.emulab.net/floormap.php3>wireless floormap</a>.
      <br>Where possible, choose channels that have the least frequency overlap
      with other experiments.  (channel/freq table coming.)
-     </li><p>
+     </li></p>
 
-<li> <b>Transmitting (2): </b>
+<p><li> <b>Transmitting (2): </b>
      Do not flood a wireless network with non-responsive traffic for
      any significant period of time.  The following channels are
      "production networks" used by others at this location, so are
@@ -62,19 +82,18 @@ By using our wireless nodes, you agree to be bound by this AUP.
      <tr><td>A</td><td>36, 38, 45, 52, 56, 60, 64</td></tr>
      <tr><td>B/G</td><td>1, 3, 5, 6, 7, 9, 11</td></tr>
      </table>
-     <p>
+     </li></p>
 
-<li> <b>Question and Exceptions:</b> send to
+<p><li> <b>Question and Exceptions:</b> send to
      <a href="mailto:testbed-ops@flux.utah.edu">Testbed Ops</a>
      if you're not sure, or want an exception.
+     </li></p>
 
 </ul>
 
-<font size=+1>
-Creating an Experiment with Wireless-Capable Nodes:</font>
-<br>
-<br>
+<h3><a name="CreateExp">Creating an Experiment with Wireless-Capable Nodes</a></h3>
 
+<p>
 To use a wireless network in an experiment, you must provide a few Emulab
 specific NS directives in your NS file, which are illustrated in the
 following small example:
@@ -99,15 +118,17 @@ following small example:
 	# Choose the wireless lan protocol.
 	tb-set-lan-protocol $lan0 "80211g"
 
-	# You must choose which node acts as the access point.
+	# Set an access point.  This node becomes the access point;
+	# others in the LAN become stations of it.  You can also set other
+	# modes for your LAN, such as Adhoc mode.
 	tb-set-lan-accesspoint $lan0 $nodew1
 
 	# Choose some other settings.
 	tb-set-lan-setting $lan0 "channel" 2
 	tb-set-node-lan-setting $lan0 $nodew1 "txpower" "auto"
 
-	# Currently you must use Fedora Core 4 or Redhat 9.0 on wireless nodes.
-	# Let the other node default to RHL-STD (currently 7.3).
+	# Select a wireless-capable image (i.e., FC4-WIRELESS)
+	# Let the other node default to RHL-STD (currently 9.0).
 	tb-set-node-os $nodew1 FC4-WIRELESS
 	tb-set-node-os $nodew2 FC4-WIRELESS
 	tb-set-node-os $nodew3 FC4-WIRELESS
@@ -115,19 +136,64 @@ following small example:
 	# Turn on static routing.
 	$ns rtproto Static
 	$ns run			</code></pre>
+</p>
 
-A few points should be noted:
+<p>
+As mentioned above, there are two different node types with wireless
+interfaces.  The <a href="shownodetype.php3?type=pc3000w"><tt>pc3000w</tt></a> 
+nodes are deployed in a wide range around our building.  We have also added a
+single wireless interface to 36 of the <a href="shownodetype.php3?type=pc600">
+<tt>pc600</tt></a>s.  If you wish to include <b>only <tt>pc3000w</tt></b> nodes
+in your experiment, for each node, set its hardware type:
+
+       <code><pre>
+       set nodew1 [$ns node]
+       tb-set-hardware $nodew1 pc3000w
+       set nodew2 [$ns node]
+       tb-set-hardware $nodew2 pc3000w
+       set nodew3 [$ns node]
+       tb-set-hardware $nodew3 pc3000w           </code></pre>
+
+If you wish to include <b>only <tt>pc600</tt></b> nodes in your experiment, for
+each node, add a "desire" to the node:
+
+       <code><pre>
+       set nodew1 [$ns node]
+       $nodew1 add-desire pc600wifi 1.0
+       set nodew2 [$ns node]
+       $nodew2 add-desire pc600wifi 1.0
+       set nodew3 [$ns node]
+       $nodew3 add-desire pc600wifi 1.0           </code></pre>
+
+These are simply alternative ways of instructing Emulab's resource allocator,
+<tt>assign</tt>, to select nodes of specific type or feature when you wish.
+</p>
+
+<p>
+In this example, we created a simple infrastructure mode LAN with a single
+access point.  You can also place LANs in Adhoc mode, for instance.  If you
+wish to do this, do not specify an access point with the
+<tt>tb-set-lan-accesspoint</tt> command.  Instead, set the mode for the LAN
+explicitly:
+
+        <code><pre>
+	tb-set-lan-setting $lan0 "mode" "adhoc"
+	</code></pre>
+</p>
+
+<p>
+A few additional points should be noted:
 <ul>
 <li> <tt>lan0</tt> is created with standard <tt>make-lan</tt>
      directive, but with a bandwidth that reflects the typical speed of a
      wireless link (54Mb for 80211a and 80211g, 11Mb for 80211b). Note that
-     you may not use duplex links of wireless interfaces; just lans.
-     We assign each lan a unique ssid.
+     you may not use duplex links of wireless interfaces; just LANs.
+     We assign each LAN a unique ssid.
 
-<li> After you create the lan, choose the <em>protocol</em> for the lan
+<li> After you create the LAN, choose the <em>protocol</em> for the LAN
      with the <tt>tb-set-lan-protocol</tt> directive. Currently, you can
-     set the protocol to one of <tt>80211a, 80211b, or 80211g.</tt>. If you
-     fail to set the protocol, the lan will consist of wired links, most
+     set the protocol to one of <tt>80211a, 80211b, or 80211g.</tt>. <b>If you
+     fail to set the protocol, the LAN will consist of wired links</b>, most
      likely with delay nodes inserted!
 
 <li> <tt>link0</tt> is a plain duplex link. You may create plain links
@@ -140,30 +206,37 @@ A few points should be noted:
      experimental interfaces.
 
 <li> In the example above, we let Emulab decide what wireless nodes to
-     use for the lan. This is not an ideal approach, as Emulab does
+     use for the LAN. This is not an ideal approach, as Emulab does
      not currently track the connectivity of nodes, and so might pick
      a set of nodes (randomly) that cannot communicate with each
      other.  See the section below on <a href="#ChoosingNodes">choosing
      your nodes</a> for more information on how to overcome this
      problem.
 
-<li> You must specify which node is to act as the <em>access point</em> for
-     the lan.  Rather than using dedicated access points, Emulab's
-     implementation of wireless lans uses the interface's capability to
-     become an access point for a lan. The node that is chosen to be the
-     access point should obviously be within range of all of the nodes in
-     the lan. There is currently no automated mechanism to pick the access
-     point for you, but one is planned for the future.
-     <em>ad-hoc</em> mode is available in recent madwifi driver versions,
-     including those installed on the <tt>FC4-WIRELESS</tt> image.  However, we
-     haven't yet integrated it as an option for NS files.
+<li> You will want to put your LAN or individual nodes in a specific operating
+     mode.  In the example above, we used the <tt>tb-set-lan-accesspoint</tt>
+     command to specify that <tt>nodew1</tt> be the access point, and all other
+     nodes become stations connected to that node.  Rather than using dedicated
+     access points, Emulab's implementation of wireless LANs uses the
+     interface's capability to become an access point for a LAN. The node that
+     is chosen to be the access point should obviously be within range of all
+     of the nodes in the LAN. There is currently no automated mechanism to pick
+     the access point for you, but one is planned for the future.  If you wish
+     to put your LAN into another operating mode (i.e., Adhoc), you must
+     specify this via the <tt>tb-set-lan-setting</tt> command.  In the above
+     example, you could add:
+     <code><pre>
+             tb-set-lan-setting $lan0 "mode" "adhoc"
+     </code</pre>
+     For more information on wireless modes, see the section of this document
+     entitled <a href="#LinkConfig">Wireless Link Configuration Settings</a>.
 
-<li> Wireless lans allow a number of configuration parameters to be
-     specified, either for the lan as a whole, or for individual members of
-     a lan. There are two Emulab specific directives that you can use;
+<li> Wireless LANs allow a number of configuration parameters to be
+     specified, either for the LAN as a whole, or for individual members of
+     a LAN. There are two Emulab specific directives that you can use;
      <tt>tb-set-lan-setting</tt> sets a configuration parameter for the
-     entire lan. In the example above, we set the channel to be used for
-     the lan to channel five. Per-node settings can be specified with the
+     entire LAN. In the example above, we set the channel to be used for
+     the LAN to channel five. Per-node settings can be specified with the
      <tt>tb-set-node-lan-setting</tt> directive. In the example, we set the
      transmit power for <tt>nodew1</tt> to auto; all other nodes will
      default to an interface specific setting.
@@ -172,76 +245,99 @@ A few points should be noted:
      interfaces. Be sure to set the OSID for all of your wireless nodes to
      <tt>FC4-WIRELESS</tt> or <tt>RHL90-WIRELESS</tt>.  <tt>FC4-WIRELESS</tt>
      contains a 2.6.x kernel and very recent madwifi drivers; 
-     <tt>RHL90-WIRELESS</tt> is contains a 2.4.x kernel and is outdated.
-
-<li> The pc3000w wifi nodes contain <a
-     href="http://netgear.com/products/details/WAG311.php">Netgear WAG311
-     cards</a>, which use the Atheros 5212 802.11a/b/g chipset; 
-     the pc600 nodes contain <a
-     href="http://www.dlink.com/products/?sec=0&pid=306">D-Link DWL-AG530</a>,
-     which also use the Atheros 5212 chipset.  This chipset is quite flexible
-     since most of the 802.11 MAC layer is handled in software. Emulab
-     provides the standard madwifi Atheros driver by default, but
-     there are alternatives such as the madwifi stripped driver from
-     the MIT roofnet project and SoftMAC from the Universtiy of
-     Colorado at Boulder. Here are some useful links:
-     <br>
-     <a href="http://netgear.com/products/details/WAG311.php">
-     Netgear WAG311 product info</a>
-     <br>
-     <a href="http://www.dlink.com/products/?sec=0&pid=306">
-     D-Link DWL-AG530</a>
-     <br>
-     <a href="http://madwifi.sourceforge.net">Madwifi Atheros driver</a>
-     <br>
-     <a href="http://pdos.csail.mit.edu/~jbicket/madwifi.stripped/">
-     Stripped madwifi driver</a> - <i>Primarily for use with
-     <a href="http://pdos.csail.mit.edu/click/">click</a></i>
+     <tt>RHL90-WIRELESS</tt> contains a 2.4.x kernel.  <b>We strongly
+     suggest</b> you use <tt>FC4-WIRELESS</tt> unless you specifically require
+     a 2.4.x Linux kernel.
 
 </ul>
+</p>
 
+<h3><a name="LinkConfig">Wireless Link Configuration Settings</a></h3>
+
+<p>
 Numerous interface settings are possible using <tt>tb-set-lan-setting</tt>
-and <tt>tb-set-node-lan-setting</tt>. These mostly correspond to options
-that are available using the <tt>iwconfig</tt> command on Fedora Core 4 or Redhat 9.0. Not
-all options are accepted by all cards, and the format of the value you
-provide for the option must be acceptable to iwconfig. At some point in the
-future we hope to make this more explicit so that know exactly what options
-are available each type of card, and what their legal values are. For now
-you have to be something of an expert. Here is a rough guide to what you
-can currently specify:
+and <tt>tb-set-node-lan-setting</tt>.  These mostly correspond to options
+that are available using the <tt>iwconfig</tt>, <tt>iwpriv</tt>, and
+<tt>wlanconfig</tt> commands on Fedora Core 4 or Redhat 9.0.  
+For <tt>iwconfig</tt>-specific options, the format of the value you provide for
+the option must be acceptable to iwconfig.  
+At some point in the future we hope to make this more
+explicit so that know exactly what options are available each type of card, and
+what their legal values are.  For now you will want to be familiar with
+<tt>iwconfig</tt> and the <a href="http://www.madwifi.org">madwifi drivers</a>
+for Atheros chipsets.  Here is a guide to what you can currently specify:
+</p>
 
 <ul>
-<li> <tt>channel</tt> - Set the channel for the lan to either a
-     channel number or a frequency. If you do not set the channel one
-     will be choosen for you, and thats probably just as bad as
-     setting it yourself without knowing what other people are using!
+<li> <tt>mode</tt>: Set the mode for the LAN or interface.  The mode argument
+     may be one of <tt>Master</tt>, <tt>Managed</tt>, <tt>Adhoc</tt>, or
+     <tt>Monitor</tt>.  <tt>Master</tt> makes the interface become an access
+     point (note that you probably do not want to set an entire LAN in
+     <tt>Master</tt> mode).  <tt>Managed</tt> makes the LAN or interface become
+     a station which connects to an access point, if one exists.
+     <tt>Adhoc</tt> puts the interface or LAN into ad-hoc mode.
+     <tt>Monitor</tt> puts the interface or LAN into monitor mode, which may be
+     useful for network sniffing.  Note that the <tt>Adhoc</tt> and
+     <tt>Monitor</tt> values can be given when calling
+     <tt>tb-set-lan-setting</tt>, but you probably only want to pass
+     <tt>Master</tt> or <tt>Managed</tt> values to
+     <tt>tb-set-node-lan-setting</tt>.  In fact, you can more easily set
+     nodes to be access points by calling <tt>tb-set-lan-accesspoint</tt>
+     for a wireless LAN; in this way, the node you specify will be the access
+     point and all others in the LAN will become stations of it.
 
-<li> <tt>rate</tt> - Some interfaces support setting a bit rate
+<li> <tt>freq</tt>: Set the channel for the LAN to either a
+     channel number or a frequency.  If you set the value to an integer
+     less than 1000, you are setting a channel number; if you set the value to
+     an integer greater than 1000, or to a floating point number with a unit
+     (i.e., 2.437GHz), you are setting a frequency directly.  
+     If you do not set the channel one will be choosen for you, and that's
+     probably just as bad as setting it yourself without knowing what other
+     people are using!
+
+<li> <tt>rate</tt>: Some interfaces support setting a bit rate
      different then the default. The default is to tell the interface
      to use "auto" mode (varies the rate according to RF conditions),
-     but you can specify a specific rate for either the entire lan or
+     but you can specify a specific rate for either the entire LAN or
      for just one node. The value should be in bits per second with no
-     units (11000, 54000, etc). See the iwconfig man page for more
-     details on the format of this option. 
+     units, or a floating point value with a unit (i.e., 11M, 54M). See the 
+     <tt>iwconfig</tt> man page for more details on the format of this option. 
 
-<li> <tt>txpower</tt> - Some interfaces support setting the transmit
+<li> <tt>txpower</tt>: Some interfaces support setting the transmit
      power to something different then the default. The default is to
      tell the interface to use "auto" mode. See the iwconfig man page
      for more details on the format of this option. Not all interfaces
      support this option. 
      
-<li> <tt>sensitivity</tt> - Some interfaces support setting the sensitivity
+<li> <tt>sens</tt>: Some interfaces support setting the <tt>sens</tt> 
+     parameter (i.e., sensitivity)
      to something different then the default. The default is to
      tell the interface to use "auto" mode. See the iwconfig man page
      for more details on the format of this option. Not all interfaces
-     support this option. 
+     support this option.
+
+<li> <tt>rts</tt>: This parameter can be set to enable RTS/CTS.  From the
+     <tt>iwconfig</tt> man page: "This parameter sets the size of the smallest
+     packet for which the node sends RTS; a value equal to the maximum packet
+     size disables the mechanism."  You can also set the value to "auto" or
+     "off"; note that the default is "off" on our hardware.  Setting this
+     parameter may not have the intended result on all hardware.
+
+<li> <tt>frag</tt>: Any IP packets larger than the value of this parameter 
+     will be split into multiple packets.  The value should be specified in
+     bytes.  You can also set it to "auto" or "off".
+
 </ul>
 
+
+<h3><a name="DynamicLinkConfig">Dynamically Configuring Wireless Links</a></h3>
+
+<p>
 After your experiment is swapped in, the above settings (including the
 accesspoint) can be changed on the fly, using either the
 <tt>link_config</tt> script on <tt>users.emulab.net</tt>, or with the
 XMLRPC interface. For example, if you want to change the accesspoint
-of a lan, first determine the MAC address (dotted or undotted notation
+of a LAN, first determine the MAC address (dotted or undotted notation
 is fine) of the interface you want to be the accesspoint, and then use
 link_config:
 
@@ -256,9 +352,27 @@ your desktop or from <tt>users</tt>.
 	sshxmlrpc_client.py link_config proj=myproj exp=myexp
 		link=lan0 "params={'accesspoint': '00:09:5B:94:26:AF'}"
 </code></pre>
+</p>
 
+<p>
+If you want to change your LAN to adhoc mode, you can simply run
+<tt>link_config</tt> from <tt>users.emulab.net</tt>:
+
+<code><pre>
+        link_config myproj myexp lan0 mode=adhoc
+</code></pre>
+
+Or you can use the XMLRPC client on <tt>users.emulab.net</tt>:
+
+<code><pre>
+        sshxmlrpc_client.py link_config proj=myproj exp=myexp
+                link=lan0 "params={'mode': 'adhoc'}"
+</code></pre>
+</p>
+
+<p>
 You may also change the settings for an individual node in a wireless
-lan (although in some cases this could make the lan unusable if you
+LAN (although in some cases this could make the LAN unusable if you
 were to change a setting on just a single node). To do this, use the
 <tt>-s</tt> option to link_config or the <tt>src</tt> argument to the
 XMLRPC interface:
@@ -269,9 +383,11 @@ XMLRPC interface:
 	sshxmlrpc_client.py link_config proj=myproj exp=myexp
 		src=nodew1 link=lan0 "params={'txpower': 50}"
 </code></pre>
+</p>
 
+<p>
 To <em>enable</em> and <em>disable</em> the interface for individual
-nodes on the lan:
+nodes on the LAN:
 
 <code><pre>
 	link_config -s nodew1 myproj myexp lan0 enable=no
@@ -283,16 +399,64 @@ nodes on the lan:
 Note this currently operates by bringing the interface up/down with
 the <tt>ifconfig</tt> command. 
 </code></pre>
+</p>
 
-<br>
-<br>
 
-<a NAME="ChoosingNodes"></a>
-<font size=+1>
-Choosing Physical Nodes:</font>
-<br>
-<br>
+<h3><a name="AdvDynLinkConfig">Advanced Dynamic Link Configuration</a></h3>
 
+<p>
+The goal of this section is to provide extra functionality via
+<tt>link_config</tt> so that you can work around issues encountered with the
+combination of Linux wireless support and the madwifi drivers.
+</p>
+
+<p>
+One "problem" that arises for wireless interfaces with
+Atheros chipsets due to the combination of the generic Linux wireless tools and
+the madwifi drivers, is that to
+change modes (i.e., from <tt>Managed</tt> to <tt>Adhoc</tt>), you must actually
+remove the <tt>athX</tt> device, change the mode with <tt>wlanconfig</tt>, and
+finally re-create the <tt>athX</tt> device.  This effectively removes all
+current <tt>iwconfig</tt> settings of the device and resets them to defaults.
+Consequently, if you want to keep your settings without having to respecify
+them as parameters to the command line, you can pass a flag (set the "remember"
+parameter to "1") to <tt>link_config</tt> that will do this for you.  When the
+"remember" flag is set, the current state of the device to be reconfigured is
+captured via <tt>iwconfig</tt>.  Any parameters you specify along with
+"remember" override the current settings.  If the device is currently down and
+we cannot obtain current settings via <tt>iwconfig</tt>, the original Emulab
+configuration from your NS file is used.
+<b>Important Note</b>: Using the "remember" flag can be dangerous.  For
+instance, if your device is currently operating in 80211b on channel 4, and you
+try to switch it to 80211a <emph>without specifying a new channel in the 5GHz
+spectrum</emph>, your kernel may panic (this has been observed on our
+<tt>RHL90-WIRELESS</tt> image with the latest 2.4.x kernel and madwifi
+drivers).  So, be careful!  
+</p>
+
+<p>
+In other situations, the Atheros/wireless tools combination will simply not
+execute your commands.  For instance, sometimes you cannot switch from one
+protocol to another (i.e., <tt>80211g</tt> to <tt>80211b</tt>); <tt>iwpriv</tt>
+will fail.  One solution to this problem is to remove the Atheros and wireless
+kernel modules, re-insert them, and then run the configuration commands.  If
+you find that some of your dynamic configuration commands fail, try setting the
+"resetkmod" parameter to "1" when calling <tt>link_config</tt>.  A less drastic
+approach that sometimes works is simply using <tt>wlanconfig</tt> to destroy
+the <tt>athX</tt> device and re-create it with the new settings.  You can try
+this by setting the "resetwlan" parameter to "1" when calling
+<tt>link_config</tt>.  <b>Important Note</b>: Removing and re-inserting kernel
+modules can have unintended side effects.  For instance, if you have multiple
+Atheros interfaces enabled on your node, removing the modules will remove any
+other <tt>athX</tt> devices you may have configured (and it might even panic
+your kernel).  Unfortunately, at this time, <tt>link_config</tt> cannot work
+around this possibility.
+</p>
+
+
+<h3><a name="ChoosingNodes">Choosing Physical Nodes</a></h3>
+
+<p>
 As mentioned above, Emulab's default mapping of nodes in your virtual
 topology, to physical nodes with wireless interfaces, does not
 currently take into account physical connectivity (walls, floors,
@@ -303,10 +467,10 @@ capability in the future, but in the meantime it is mostly up to you
 to choose nodes that make sense for your topology. You might end up
 having to make some trial and error runs, trying to find the right
 set of nodes (including setting the accesspoint to different nodes in
-a lan) before you get a working set.
+a LAN) before you get a working set.
+</p>
 
-<br>
-<br>
+<p>
 To assist in this chore there are two Emulab specific NS extensions
 you can use in your NS file. The first approach is to use the
 <tt>tb-use-physnaming</tt> extension.
@@ -322,7 +486,7 @@ which says that whenever a node is named by an existing physical node
 in the testbed, do an implicit fix-node. This saves a little bit of
 typing, and in some cases might be easier to manage then the second
 approach, which is to use <tt>tb-fix-node</tt> for all (or some) of
-the nodes in your lan. Using the
+the nodes in your LAN. Using the
 <a href=https://www.emulab.net/floormap.php3>wireless floormaps</a>
 choose which nodes you want, and then in your NS file:
 
@@ -337,23 +501,45 @@ choose which nodes you want, and then in your NS file:
 
 Keep in mind that the physical nodes you choose must be free when you
 swap in your experiment!
+</p>
 
-<br>
-<br>
+<h3<a name="Hardware">Hardware Details</a></h3>
 
-<a NAME="envinfo"></a>
-<font size=+1>
-Environment Information</font>
+<p>
+The <a href="shownodetype.php3?node_type=pc3000w"><tt>pc3000w</tt></a wifi 
+nodes each contain two 
+<a href="http://netgear.com/products/details/WAG311.php"> Netgear WAG311 
+cards</a>, which use the Atheros 5212 802.11a/b/g chipset.  Each <a href="shownodetype.php3?node_type=pc600"><tt>pc600</tt></a> node
+contains a single <a href="http://www.dlink.com/products/?sec=0&pid=306">
+D-Link DWL-AG530</a>, which also use the Atheros 5212 chipset.  This chipset is
+quite flexible since most of the 802.11 MAC layer is handled in software.  
+Emulab provides the standard madwifi Atheros driver by default, but there are 
+alternatives such as the madwifi stripped driver from the MIT roofnet project
+and SoftMAC from the Universtiy of Colorado at Boulder.  Here are some useful
+links: 
 <br>
-<br>
+<ul>
+<li><a href="http://netgear.com/products/details/WAG311.php">
+Netgear WAG311 product info</a>
+<li><a href="http://www.dlink.com/products/?sec=0&pid=306">
+D-Link DWL-AG530</a>
+<li><a href="http://madwifi.org">Madwifi Atheros driver</a>
+<li><a href="http://pdos.csail.mit.edu/~jbicket/madwifi.stripped/">
+Stripped madwifi driver</a> - <i>Primarily for use with
+<a href="http://pdos.csail.mit.edu/click/">click</a></i>
+</ul>
+</p>
 
+<h3><a name="EnvInfo">Environment and Deployment Information</a></h3>
+
+<p>
 Due to the dense nature of the pc600 mini-cluster, we describe some of its
 properties and deployment characteristics in detail in this section.  You can
 view a map of the deployment 
 <a href="https://www.emulab.net/floormap.php3?building=MEB-MRC600">here</a>.
+</p>
 
-<br>
-<br>
+<p>
 The external antennas for each wireless interface in the pc600s are deployed in
 a 6 x 6 grid on the back side of the racks housing the pc600s and pc850s.  Each
 antenna is currently pointed straight down towards the floor.  The
@@ -363,9 +549,9 @@ when many nodes attempt to send packets at the same time.  Because the nodes
 are deployed in our machine room, the environment is hostile, with many other
 racks, machines, conduits, and other items, conspiring to provide various types
 of signal interference.
+</p>
 
-<br>
-<br>
+<p>
 To give you an idea of what you might expect when many nodes in proximity are
 sending packets at the same time, we ran some simple tests.  In this
 experiment, all nodes are placed in ad-hoc mode in a single LAN, and send
@@ -375,9 +561,9 @@ all channels in each of a, b, and g modes.  The results are presented in terms
 of the percentage of broadcast packets received at each node.  The Aggregate
 Statistics table simply aggregates all statistics gathered from each 802.11
 mode across all receivers.
+</p>
 
-<br>
-<br>
+<p>
 <center>
 <table>
   <tr>
@@ -418,26 +604,26 @@ mode across all receivers.
   </tr>
 </table>
 </center>
+</p>
 
-<br>
-<br>
+<p>
 Finally, here are some pictures of the pc600 mini-cluster.  On the back of the
 racks, you can see the antennas in the 6 x 6, 36-node grid.  Some antennas are
 outlined to make them easier to see; however, once you find the corners of the
 grid, it becomes easier to spot them all.
+</p>
 
-<br>
-<br>
+<p>
 <center>
 <a href="pc600wifi_back.jpg"><img src="pc600wifi_back_thumb.jpg"></a>
 &nbsp;
 <a href="pc600wifi_back_marked.jpg"><img src="pc600wifi_back_marked_thumb.jpg"></a>
 &nbsp;
 <a href="pc600wifi_back_detail.jpg"><img src="pc600wifi_back_detail_thumb.jpg"></a>
-
 <br>
 <br>
 <a href="pc600wifi_front_left.jpg"><img src="pc600wifi_front_left_thumb.jpg"></a>
 &nbsp;
 <a href="pc600wifi_front_right.jpg"><img src="pc600wifi_front_right_thumb.jpg"></a>
 <center>
+</p>
