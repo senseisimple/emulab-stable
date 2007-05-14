@@ -78,7 +78,8 @@ ops-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/log/mysql
 	-chmod 770 $(INSTALL_TOPDIR)/log/mysql
-	-chown mysql.mysql $(INSTALL_TOPDIR)/log/mysql
+	-chown mysql $(INSTALL_TOPDIR)/log/mysql
+	-chgrp mysql $(INSTALL_TOPDIR)/log/mysql
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C security control-install
 	@$(MAKE) -C tip control-install
