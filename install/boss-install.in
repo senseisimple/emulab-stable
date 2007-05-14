@@ -345,7 +345,7 @@ Phase "usersgroups", "Creating users and groups", sub {
 	if (getpwnam("mysql")) {
 	    PhaseSkip("User already exists");
 	}
-	ExecQuietFatal("$PW useradd mysql -g 88 -g 88 -h - ".
+	ExecQuietFatal("$PW useradd mysql -u 88 -g 88 -h - ".
 		       "-d $MYSQLDBDIR -s /sbin/nologin -c 'MySQL Daemon'");
     };
     ExecQuietFatal("$CHOWN mysql:mysql $MYSQLDBDIR")
