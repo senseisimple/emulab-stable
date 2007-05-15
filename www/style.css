@@ -87,6 +87,13 @@ iframe.transparentusageframe {
      standard */
   -moz-opacity: 0.85;
 }
+iframe.outputframe {
+  width: 100%;
+  min-width: 100%;
+  border: 4px;
+  overflow: auto;
+  scrolling: auto;
+}
 
 div#usage table {
     border-width: 0px;
@@ -545,3 +552,4 @@ dl.envlist {
     border: #ffff00 solid 2px;
     background: #ffffcc;
 }
+

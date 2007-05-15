@@ -116,8 +116,9 @@ function SetupOutputArea(id) {
     IframeDoc.close();
 
     Iframe.style.border = "2px solid";
+    Iframe.style.width  = "100%";
     Iframe.height       = winheight;
-    Iframe.width        = "100%";
+    Iframe.width        = "100%"; 
     Iframe.scrolling    = "auto";
     Iframe.frameBorder  = "1";
 }

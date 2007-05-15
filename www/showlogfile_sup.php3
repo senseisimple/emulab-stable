@@ -117,9 +117,8 @@ function STARTLOG($experiment)
     echo "</center>\n";
     echo "<br>\n";
     
-    echo "<div><iframe id='outputframe' name='outputframe' ".
-	"width='100%' height='600px' overflow='auto' border='4'>".
-	"</iframe></div>\n";
+    echo "<div><iframe class='outputframe' ".
+	"id='outputframe' name='outputframe'></iframe></div>\n";
 
     echo "<script type='text/javascript' language='javascript' src='json.js'>
           </script>".
