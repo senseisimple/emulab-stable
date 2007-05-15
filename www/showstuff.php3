@@ -165,7 +165,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                 <font size=+1><b>Reserved Nodes</b></font></a>
               </center>
               <a NAME=reserved_nodes>
-              <table class='sortable' id='nodetable' align=center border=1>
+              <table id='nodetable' align=center border=1>
+              <thead class='sort'>
               <tr>
                 <th>Node ID</th>
                 <th>Name</th>\n";
@@ -177,7 +178,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
         }
 
 	if ($pid == $TBOPSPID) {
-	    echo "<th>Reserved<br>
+	    echo "<th class='sorttable_nosort'>Reserved<br>
                       <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
 		         "&sortby=rsrvtime-up&showclass=$showclass\">Up</a> or 
                       <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
@@ -191,20 +192,20 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                 <th>Startup<br>Status[<b>2</b>]</th>\n";
 	if ($showlastlog) {
 	    echo "  <th>Last Log<br>Time</th>
-		    <th>Last Log Message</th>\n";
+		    <th class='sorttable_nosort'>Last Log Message</th>\n";
 	}
 
-        echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
-                <th><a href=\"kb-show.php3?xref_tag=tiptunnel\">Console</a></th> .
-                <th>Log</th>";
+        echo "  <th class='sorttable_nosort'><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
+                <th class='sorttable_nosort'><a href=\"kb-show.php3?xref_tag=tiptunnel\">Console</a></th> .
+                <th class='sorttable_nosort'>Log</th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
 	if ($anywindows) {
-            echo "  <th>
+            echo "  <th class='sorttable_nosort'>
                         <a href=\"docwrapper.php3?docname=rdp-mime.html\">RDP</a>
                     </th>\n";
 	}
-	echo "  </tr>\n";
+	echo "  </tr></thead>\n";
 
 	$stalemark = "<b>?</b>";
 	$count = 0;
@@ -331,6 +332,10 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                         666 indicates a testbed internal error.</li>
               </ol>
               </blockquote></blockquote></blockquote></h4>\n";
+	
+	echo "<script type='text/javascript' language='javascript'>
+	        sorttable.makeSortable(getObjbyName('nodetable'));
+             </script>\n";
     }
 }
 

@@ -570,11 +570,6 @@ class Template
                <th>Start Time</th>
                <th>Stop Time</th>
 	       <th>Description</th>
-               <th align=center>Show</th>
-               <th align=center>Archive</th>
-               <th align=center>Export</th>
-               <th align=center>Replay</th>
-               <th align=center>Load DBs</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -619,40 +614,17 @@ class Template
                          "?guid=$guid&version=$vers&expand=$idx#$idx>".
 		         "<img border=0 alt='e' src='/icons/right.png'></a>\n";
 	    }
-	    echo " </td>
-                   <td>$eid</td>\n";
-	    
+	    echo " </td>";
+
+	    echo " <td align=center>".
+		      MakeLink("instance", "instance=$exptidx", $eid);
+	    echo " </td>\n";
+
 	    echo " <td>$start</td>
                    <td>$stop</td>
                    <td $onmouseover>$description</td>\n";
 
-	    echo " <td align=center>".
-		    MakeLink("instance", "instance=$exptidx",
-			     "<img border=0 alt='Show' src='greenball.gif'>");
-	    echo " </td>\n";
-
- 	    echo " <td align=center>
-                     <a href='archive_view.php3".
-		        "?instance=$exptidx&tag=$tag'>
-                     <img border=0 alt='i' src='greenball.gif'></a></td>";
-	    
-	    echo " <td align=center>".
- 		    MakeLink("export",
-			     "instance=$exptidx",
-			     "<img border=0 alt='Show' src='greenball.gif'>");
-
-	    echo " <td align=center>".
- 		    MakeLink("swapin",
-			     "guid=$guid&version=$vers".
-			     "&replay_instance_idx=$exptidx",
-			     "<img border=0 alt='Show' src='greenball.gif'>");
-
-	    echo " <td align=center>".
- 		    MakeLink("analyze",
-			     "instance=$exptidx",
-			     "<img border=0 alt='Show' src='greenball.gif'>");
-	    echo " </td>
-                 </tr>\n";
+	    echo "</tr>\n";
 
 	    if ($expandit) {
 		$instance = new TemplateInstance($exptidx);
@@ -660,7 +632,7 @@ class Template
 		echo "<tr>\n";
 		echo " <a NAME=$idx></a>\n";
 		echo "<td>&nbsp</td>\n";
-		echo " <td colspan=7>\n";
+		echo " <td colspan=4>\n";
 		$instance->ShowRunList(0);
 		echo " </td>\n";
 		echo "</tr>\n";
@@ -1073,6 +1045,10 @@ class TemplateInstance
     function eid() {
 	return (is_null($this->instance) ? -1 : $this->instance['eid']);
     }
+    # This is what I should have called this:
+    function id() {
+	return $this->eid();
+    }
     function uid() {
 	return (is_null($this->instance) ? -1 : $this->instance['uid']);
     }
@@ -1164,6 +1140,24 @@ class TemplateInstance
 	if ($this->experiment) {
 	    $showexp_url  = CreateURL("showexp", $this->experiment);
 	}
+
+	if ($detailed) {
+	    SUBPAGESTART();
+	    SUBMENUSTART("Options");
+	    WRITESUBMENUBUTTON("Export Instance",
+			       CreateURL("template_export", $this));
+
+	    WRITESUBMENUBUTTON("Load Database",
+			       CreateURL("template_analyze", $this));
+	
+	    WRITESUBMENUBUTTON("View Archive",
+			       CreateURL("archive_view", $this));
+	    
+	    WRITESUBMENUBUTTON("Replay",
+			       CreateURL("swapin", $template, 
+					 "replay_instance_idx", $exptidx));
+	    SUBMENUEND();
+	}
 	
 	echo "<center>\n";
 	if ($detailed && $pcount) {
@@ -1230,6 +1224,9 @@ class TemplateInstance
 	    $this->ShowBindings();
 	    echo "</tr>";
 	    echo "</table>\n";
+	}
+	if ($detailed) {
+	    SUBPAGEEND();
 	}
 
 	if ($withanno) {
@@ -1583,7 +1580,7 @@ class TemplateInstance
 	echo "<textarea id='annotation' rows=$cols cols=80>$annotation".
 	     "</textarea></form>";
 	echo "<button name=submit type=button value=submit ".
-	     "onclick=\"ModifyAnno();\">Submit Changes</button>\n";
+	     "onclick=\"ModifyAnno();\">Submit Annotation</button>\n";
 	echo "<center>";
 	if (! $longform) {
 	    echo "<script type='text/javascript' language='javascript'>
@@ -1608,7 +1605,7 @@ class TemplateInstance
 	echo "<textarea id='annotation' rows=5 cols=80>$annotation".
 	     "</textarea></form>";
 	echo "<button name=submit type=button value=submit ".
-	     "onclick=\"ModifyAnno();\">Submit Changes</button>\n";
+	     "onclick=\"ModifyAnno();\">Submit Annotation</button>\n";
 	echo "<center>";
 	echo "<script type='text/javascript' language='javascript'>
               function ModifyAnno() {
@@ -1683,6 +1680,22 @@ class TemplateInstance
 	if (!isset($stop))
 	    $stop = "&nbsp";
 
+	SUBPAGESTART();
+	SUBMENUSTART("Options");
+	WRITESUBMENUBUTTON("Export Record",
+			   CreateURL("template_export",
+				     $this, "runidx", $runidx));
+	WRITESUBMENUBUTTON("Revise Record",
+			   CreateURL("record_revise",
+				     $this, "runidx", $runidx));
+	
+	if (isset($end_tag) && $end_tag != "") {
+	    WRITESUBMENUBUTTON("View Archive",
+			       CreateURL("archive_view",
+					 $this, "tag", $end_tag));
+	}
+	SUBMENUEND();
+	
 	echo "<center>\n";
 	echo "<table border=0 bgcolor=#000 color=#000 class=stealth ".
 	     " cellpadding=0 cellspacing=0>\n";
@@ -1777,6 +1790,7 @@ class TemplateInstance
 	$this->ShowRunAnnotation($runidx);
 	    
 	echo "</center>\n";
+	SUBPAGEEND();
     }
 
     #

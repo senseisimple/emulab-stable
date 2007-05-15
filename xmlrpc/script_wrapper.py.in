@@ -139,6 +139,8 @@ API = {
                             "help" : "Terminate template instance" },
     "template_startrun" : { "func" : "template_startrun",
                             "help" : "Start new experiment run" },
+    "template_modrun"   : { "func" : "template_modrun",
+                            "help" : "Modify resources for run" },
     "template_stoprun"  : { "func" : "template_stoprun",
                             "help" : "Stop current experiment run" },
 };
@@ -2176,7 +2178,7 @@ class template_swapout:
     pass
 
 #
-# template_startrun
+# template_startrun and template_modrun
 #
 class template_startrun:
     def __init__(self, argv=None):
@@ -2266,6 +2268,113 @@ class template_startrun:
 
     def usage(self):
 	print "template_startrun [-r <id>] [-E <descr>] -e id [-p <pid> | <guid/vers>]";
+	print "where:";
+        print "     -E   - A pithy sentence describing your run";
+        print "     -x   - XML file of parameter bindings";
+        print "     -y   - Default params, one of template,instance,lastrun";
+        print "     -r   - A token (id) for the run";
+        print "     -e   - Instance ID (aka eid)";
+	print "     -w   - Wait until run has started";
+	print "     -m   - Reparse ns file (effectively a swap modify)";
+        print "     -c   - run loghole clean before starting run";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+class template_modrun:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:my:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        pid         = None
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-m":
+                params["modify"] = "yes"
+                pass
+            elif opt == "-c":
+                params["clear"] = "yes"
+                pass
+            elif opt == "-r":
+                params["runid"] = val
+                pass
+            elif opt == "-y":
+                params["params"] = val
+                pass
+            elif opt == "-p":
+                pid = val
+                pass
+            elif opt == "-x":
+                xmlfilename = val;
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if pid == None:
+            if len(req_args) == 0:
+                guid = infer_guid(os.getcwd())
+                if guid == None:
+                    self.usage();
+                    return -1
+                pass
+            elif len(req_args) == 1:
+                guid = req_args[0]
+                pass
+            else:
+                self.usage();
+                return -1
+            
+            params["guid"] = guid
+            pass
+        else:
+            params["pid"] = pid
+            pass
+        
+        if xmlfilename:
+            try:
+                params["xmlfilestr"] = open(xmlfilename).read();
+                pass
+            except:
+                print "Could not open file: " + req_args[0];
+                return -1;
+            pass
+        
+        rval,response = do_method("template", "modrun", params);
+        return rval;
+
+    def usage(self):
+	print "template_modrun [-r <id>] [-E <descr>] -e id [-p <pid> | <guid/vers>]";
 	print "where:";
         print "     -E   - A pithy sentence describing your run";
         print "     -x   - XML file of parameter bindings";

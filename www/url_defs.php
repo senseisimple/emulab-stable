@@ -95,6 +95,7 @@ $url_mapping["template_metadata"]   = "template_metadata.php";
 $url_mapping["template_modify"]     = "template_modify.php";
 $url_mapping["template_show"]       = "template_show.php";
 $url_mapping["template_swapin"]     = "template_swapin.php";
+$url_mapping["record_revise"]       = "record_revise.php";
 $url_mapping["linkgraph_image"]     = "linkgraph_image.php";
 $url_mapping["resendapproval"]      = "resendapproval.php";
 $url_mapping["showevents"]          = "showevents.php";

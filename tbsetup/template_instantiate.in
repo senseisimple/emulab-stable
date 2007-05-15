@@ -213,15 +213,13 @@ if (defined($replay_exptidx)) {
 	# Default to first run.
 	#
 	# XXX Need to convert these other routines to return Run objects
-	my $row = $replay_instance->FirstRun();
-	if (!defined($row)) {
-	    tbdie("Could not find first run for $replay_instance!");
-	}
-	$replay_runidx = $row->{'idx'};
+	$replay_run = $replay_instance->FirstRun();
     }
-
-    $replay_run =
-      Template::Instance::Run->LookupByID($replay_exptidx, $replay_runidx);
+    else {
+	$replay_run =
+	    Template::Instance::Run->LookupByID($replay_exptidx,
+						$replay_runidx);
+    }
 
     if (!defined($replay_run)) {
 	tbdie("Replay Run $replay_runidx does not exist!");

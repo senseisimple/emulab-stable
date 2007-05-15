@@ -1995,6 +1995,25 @@ sub Update($$;$)
 }
 
 #
+# AccessCheck, which just hands off to the experiment access check if
+# its a current instance, or to the template access check otherwise.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type);
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    my $experiment = $self->Experiment();
+    return $experiment->AccessCheck($user, $access_type)
+	if (defined($experiment));
+    
+    return $self->template()->AccessCheck($user, $access_type);
+}
+
+#
 # Locking to prevent concurrent access
 #
 sub TryLock($$)
@@ -2173,7 +2192,7 @@ sub Experiment($)
     my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     return Experiment->LookupByIndex($self->exptidx());
@@ -2363,6 +2382,18 @@ sub LookupRun($$)
     my $exptidx = $self->exptidx();
 
     return Template::Instance::Run->LookupByRunID($exptidx, $runid);
+}
+sub LookupRunByID($$)
+{
+    my ($self, $runidx) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+
+    return Template::Instance::Run->LookupByID($exptidx, $runidx);
 }
 
 #
@@ -2661,13 +2692,15 @@ sub FirstRun($)
     my $exptidx = $self->exptidx();
 
     my $query_result =
-	DBQueryWarn("select * from experiment_runs ".
+	DBQueryWarn("select idx from experiment_runs ".
 		    "where exptidx='$exptidx' order by idx asc limit 1");
 
     return undef
 	if (!$query_result);
 
-    return $query_result->fetchrow_hashref();
+    my ($runidx) = $query_result->fetchrow_array();
+
+    return Template::Instance::Run->LookupByID($exptidx, $runidx);
 }
 
 #
@@ -2714,7 +2747,8 @@ sub NewRunBinding($$$)
 	$value = "''";
     }
 
-    DBQueryWarn("insert into experiment_run_bindings set ".
+    # Use replace cause of "modify" in template_exprun ... 
+    DBQueryWarn("replace into experiment_run_bindings set ".
 		"  exptidx='$exptidx', runidx='$runidx', ".
 		"  name='$name', value=$value")
 	or return -1;
@@ -3455,6 +3489,78 @@ sub GetArchive($$)
     $self->template()->GetArchive();
 }
 
+#
+# Archive Stuff.
+#
+sub ArchiveCommit($$$)
+{
+    my ($self, $ptag, $comment) = @_;
+    my $rval;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $view;
+    my $archive = $self->GetArchive(\$view);
+    return -1
+	if (!defined($archive));
+
+    my $experiment    = $self->Experiment();
+    return -1
+	if (!defined($experiment));
+
+    my $rsrcidx = $experiment->rsrcidx();
+    my $userdir = $self->path();
+
+    if (-e $userdir) {
+	$rval = $archive->Add("$userdir/.", $view, 1, 1);
+
+	return $rval
+	    if ($rval != 0);
+    }
+    $$ptag = $archive->GenerateTag($$ptag);
+    $rval  = $archive->Commit($$ptag, $comment, undef, $view, undef);
+    return $rval
+	if ($rval != 0);
+
+    # XXX
+    $experiment->TableUpdate("experiment_resources",
+			     "archive_tag='$$ptag'", "idx='$rsrcidx'") == 0
+	or return -1;
+    
+    return 0;
+}
+
+sub ArchiveReplace($$$)
+{
+    my ($self, $tag) = @_;
+    my $rval;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $view;
+    my $archive = $self->GetArchive(\$view);
+    return -1
+	if (!defined($archive));
+
+    my $userdir = $self->path();
+
+    if (-e $userdir) {
+	$rval = $archive->Add("$userdir/.", $view, 1, 1);
+
+	return $rval
+	    if ($rval != 0);
+    }
+    $rval  = $archive->Replace($tag, $view);
+    return $rval
+	if ($rval != 0);
+	
+    return 0;
+}
+
 ############################################################################
 
 package Template::Instance::Run;
@@ -3628,6 +3734,31 @@ sub Refresh($)
 }
 
 #
+# Update record.
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $exptidx = $self->exptidx();
+    my $idx     = $self->idx();
+
+    my $query = "update experiment_runs set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where exptidx='$exptidx' and idx='$idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
 # Get list of bindings for the run.
 #
 sub BindingList($$)
@@ -3654,6 +3785,70 @@ sub BindingList($$)
 	$results{$name} = $value;
     }
     %$prval = %results;
+    return 0;
+}
+
+#
+# Commit the archive for a run and remember the tag.
+#
+# I wonder if a better way to do this is a table of revisions associated with
+# each run ...
+#
+sub ArchiveCommit($$)
+{
+    my ($self, $which) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    # Cons up a tag and commit.
+    my $runid     = $self->runid();
+    my $thistag   = "${which}_${runid}";
+    my $instance  = $self->instance();
+    my $comment   = "Run $runid";
+    my $slot;
+    if ($which eq "startrun") {
+	$comment = "Starting $comment";
+	$slot    = "starting_archive_tag";
+    }
+    elsif ($which eq "stoprun") {
+	$comment = "Stopping $comment";
+	$slot    = "ending_archive_tag";
+    }
+    elsif ($which eq "stoprun_revised") {
+	$comment = "Revising $comment";
+	$slot    = "ending_archive_tag";
+    }
+    else {
+	print STDERR "Unknown which $which in $self archive commit\n";
+	return -1;
+    }
+
+    $instance->ArchiveCommit(\$thistag, $comment) == 0 or
+	return -1;
+
+    # Update the run record since we want to remember this as the tag.
+    $self->Update({$slot => $thistag}) == 0 or
+	return -1;
+
+    return 0;
+}
+
+#
+# Replace an archive, as for resource modification of a run.
+#
+sub ArchiveReplace($$)
+{
+    my ($self, $tag) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $self->instance()->ArchiveReplace($tag) == 0 or
+	return -1;
+
     return 0;
 }
 

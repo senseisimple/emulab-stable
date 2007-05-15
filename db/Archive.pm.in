@@ -542,9 +542,10 @@ sub Add($$;$$$)
 # Do a diff of the checkin directory against provided directory to
 # determine if anything has changed.
 #
-sub Diff($$;$)
+sub Diff($$;$$)
 {
-    my ($self, $pathname, $view) = @_;
+    my ($self, $pathname, $view, @exceptions) = @_;
+    my $exclude_arg = "";
 
     return -1
 	if (! ref($self));
@@ -557,6 +558,12 @@ sub Diff($$;$)
 	print STDERR "ArchiveDiff: Could not validate pathname $pathname\n";
 	return -1;
     }
+
+    if (@exceptions) {
+	foreach my $exception (@exceptions) {
+	    $exclude_arg .= " '--exclude=$exception'";
+	}
+    }
     
     #
     # See if the archive exists and if it does, get the pathname to it.
@@ -566,7 +573,8 @@ sub Diff($$;$)
 	print STDERR "ArchiveAdd: $directory cannot be written!\n";
 	return -1;
     }
-    my $checkin   = "$directory/checkins/$view";
+    # See Add() above for why we add "exp"
+    my $checkin   = "$directory/checkins/$view/exp";
 
     #
     # If the target rootdir exists and is not writable by the current
@@ -577,7 +585,7 @@ sub Diff($$;$)
 	mysystem("$SUCHOWN $checkin") == 0 or return -1
     }
 
-    my $retval = mysystem("$DIFF -q -r $checkin $pathname");
+    my $retval = mysystem("$DIFF -q -r $exclude_arg $checkin $pathname");
     return 0
 	if ($retval == 0);
     return 1
@@ -591,9 +599,9 @@ sub Diff($$;$)
 # Commit the current contents of the temporary store to the archive.
 # Returns -1 if any error. Otherwise return 0.
 #
-sub Commit($;$$$$)
+sub Commit($;$$$$$)
 {
-    my ($self, $newtag, $mfile, $view, $altdir) = @_;
+    my ($self, $newtag, $comment, $mfile, $view, $altdir) = @_;
     my $noactivity = 0;
     my $cwd;
 
@@ -659,6 +667,9 @@ sub Commit($;$$$$)
 	    goto bad;
 	}
 	$description = DBQuoteSpecial(`cat $mfile`);
+    }
+    elsif (defined($comment)) {
+	$description = DBQuoteSpecial($comment);
     }
 
     #
@@ -729,6 +740,223 @@ sub Commit($;$$$$)
 	DBQueryWarn("delete from archive_revisions ".
 		    "where revision='$newrevision' and ".
 		    "      archive_idx='$archive_idx'");
+    }
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return -1;
+}
+
+#
+# Revise is a lot like commit, except that we are changing an arbitrary
+# revision, not the head of the view. 
+#
+sub Revise($$$$$$$)
+{
+    my ($self, $oldtag, $newtag, $comment, $mfile, $view, $dir) = @_;
+    my $noactivity = 0;
+    my $cwd;
+
+    return -1
+	if (! ref($self));
+    my $archive_idx  = $self->idx();
+
+    $view = $defaultview
+	if (!defined($view));
+
+    my $View = $self->View($view);
+    return -1
+	if (!defined($View));
+
+    return -1
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
+	    TBSCRIPTLOCK_OKAY());
+
+    #
+    # See if the archive exists and if it does, get the pathname to it.
+    #
+    my $directory = $self->directory();
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ArchiveRevise: $directory cannot be written!\n";
+	goto bad;
+    }
+    my $repodir   = "$directory/$REPO/$view";
+    my $checkin   = $dir;
+
+    # Need to remember where we came from!
+    chomp($cwd = `pwd`);
+    # Must do the taint check too.
+    if ($cwd =~ /^([-\w\.\/]+)$/) {
+	$cwd = $1;
+    }
+    else {
+	print STDERR "ArchiveRevise: Bad data in $cwd!\n";
+	goto bad;
+    }
+
+    if (! chdir("$checkin")) {
+	print STDERR "ArchiveRevise: Cannot chdir to $checkin!\n";
+	goto bad;
+    }
+
+    my $revision_row = $self->Revision($view, $oldtag);
+    if (!defined($revision_row)) {
+	print STDERR "ArchiveRevise: Could not find revision for $oldtag!\n";
+	goto bad;
+    }
+    my $parent_revision = $revision_row->{'revision'};
+
+    #
+    # Message can come from a file.
+    #
+    my $description = "'Revise Archive'";
+	
+    if (defined($mfile)) {
+	if (! -r $mfile) {
+	    print STDERR "*** ArchiveRevise: $mfile cannot be read!\n";
+	    goto bad;
+	}
+	$description = DBQuoteSpecial(`cat $mfile`);
+    }
+    elsif (defined($comment)) {
+	$description = DBQuoteSpecial($comment);
+    }
+
+    #
+    # Create a new revision record so I can get the revision number.
+    # Need to update the tag later.
+    #
+    my $query_result =
+	DBQueryWarn("insert into archive_revisions set revision=NULL, ".
+		    "  archive_idx='$archive_idx', view='$view', ".
+		    "  parent_revision=$parent_revision, ".
+		    "  description=$description, ".
+		    "  date_created=UNIX_TIMESTAMP(now())") or goto bad;
+
+    my $newrevision = $query_result->insertid;
+    my $zipfile     = "$repodir/$newrevision";
+    $newtag         = (defined($newtag) ? $newtag : "R${newrevision}");
+    
+    #
+    # Okay, zip up the checkin directory. This becomes a new "revision"
+    #
+    mysystem("$ZIP $zipopt -y -r $zipfile .") == 0 or goto bad;
+
+    DBQueryWarn("update archive_revisions set ".
+		"  tag='$newtag' ".
+		"where archive_idx='$archive_idx' and revision='$newrevision'")
+	or goto bad;
+
+    # Backwards compat
+    DBQueryWarn("insert into archive_tags set idx=NULL, version=$TAGVERSION, ".
+		"  tag='$newtag', view='$view', ".
+		"  archive_idx='$archive_idx', ".
+		"  tagtype='$TAGTYPE_COMMIT', ".
+		"  date_created=UNIX_TIMESTAMP(now())")
+	or goto bad;
+
+  okay:
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return 0;
+
+  bad:
+    if (defined($newrevision)) {
+	DBQueryWarn("delete from archive_revisions ".
+		    "where revision='$newrevision' and ".
+		    "      archive_idx='$archive_idx'");
+    }
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return -1;
+}
+
+#
+# Also like commit, but just replaces the zip archive file.
+#
+sub Replace($$$)
+{
+    my ($self, $oldtag, $view) = @_;
+    my $cwd;
+
+    return -1
+	if (! ref($self));
+    my $archive_idx  = $self->idx();
+
+    $view = $defaultview
+	if (!defined($view));
+
+    my $View = $self->View($view);
+    return -1
+	if (!defined($View));
+
+    return -1
+	if (TBScriptLock("archive_${archive_idx}_${view}", 0, 600) !=
+	    TBSCRIPTLOCK_OKAY());
+
+    #
+    # See if the archive exists and if it does, get the pathname to it.
+    #
+    my $directory = $self->directory();
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ArchiveReplace: $directory cannot be written!\n";
+	goto bad;
+    }
+    my $repodir   = "$directory/$REPO/$view";
+    my $checkin   = "$directory/checkins/$view"; 
+
+    # Need to remember where we came from!
+    chomp($cwd = `pwd`);
+    # Must do the taint check too.
+    if ($cwd =~ /^([-\w\.\/]+)$/) {
+	$cwd = $1;
+    }
+    else {
+	print STDERR "ArchiveReplace: Bad data in $cwd!\n";
+	goto bad;
+    }
+
+    if (! chdir("$checkin")) {
+	print STDERR "ArchiveReplace: Cannot chdir to $checkin!\n";
+	goto bad;
+    }
+
+    my $revision_row = $self->Revision($view, $oldtag);
+    if (!defined($revision_row)) {
+	print STDERR "ArchiveReplace: Could not find revision for $oldtag!\n";
+	goto bad;
+    }
+    my $revision = $revision_row->{'revision'};
+    my $zipfile  = "$repodir/${revision}.zip";
+    my $savefile = "$repodir/${revision}.save";
+
+    if (-e $zipfile) {
+	# print STDERR "ArchiveReplace: renaming $zipfile to $savefile\n";
+	if (!rename($zipfile, $savefile)) {
+	    print STDERR "ArchiveReplace: Could not backup $zipfile!\n";
+	    goto bad;
+	}
+    }
+    
+    #
+    # Okay, zip up the checkin directory. This becomes a new "revision"
+    #
+    mysystem("$ZIP $zipopt -y -r $zipfile .") == 0 or goto bad;
+
+  okay:
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return 0;
+
+  bad:
+    if (defined($zipfile) && -e $savefile) {
+	if (!rename($savefile, $zipfile)) {
+	    print STDERR "ArchiveReplace: Could not restore $zipfile!\n";
+	    goto bad;
+	}
     }
     TBScriptUnlock();
     chdir($cwd)
@@ -1251,12 +1479,14 @@ sub Archive($$)
 # Destroy an archive. The DB state is retained unless optional flag says
 # to clean it.
 #
-sub Destroy($$;$)
+sub Destroy($$;$$)
 {
-    my ($self, $clean, $view) = @_;
+    my ($self, $clean, $view, $force) = @_;
 
     $view = $defaultview
 	if (!defined($view));
+    $force = 0
+	if (!defined($force));
 
     return -1
 	if (! ref($self));
@@ -1272,7 +1502,7 @@ sub Destroy($$;$)
     # Need additional check to make sure that it has not already been
     # archived. Do not want to do anything, unless clean is specified.
     #
-    if ($self->archived()) {
+    if ($self->archived() && !$force) {
 	print STDERR "ArchiveArchive: ".
 	    "Archive $self archived on ". $self->date_archived() ."\n";
 	goto okay;
@@ -1286,7 +1516,7 @@ sub Destroy($$;$)
     if (! defined($shared)) {
 	goto bad;
     }
-    if (! $shared) {
+    if (!$shared || $force) {
 	mysystem("/bin/rm -rf $directory");
 	if ($?) {
 	    print STDERR "ArchiveDestroy: ".
@@ -1372,6 +1602,22 @@ sub IsTagUnique($$;$)
 	if (!$query_result);
 
     return ($query_result->numrows == 0);
+}
+
+#
+# Generate a tag. Nothing special, just a convenience function.
+#
+sub GenerateTag($$)
+{
+    my ($self, $tagext) = @_;
+    my $newtag;
+    
+    my ($seconds, $microseconds) = gettimeofday();
+    $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
+    $newtag .= int($microseconds / 1000);
+    $newtag .= "_${tagext}";
+
+    return $newtag;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

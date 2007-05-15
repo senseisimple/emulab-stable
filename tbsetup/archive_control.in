@@ -19,7 +19,7 @@ sub usage()
 	"       archive_control checktag <pid> <eid> <tag>\n";
     exit(-1);
 }
-my $optlist = "dfat:m:us:l";
+my $optlist = "dfat:m:us:lc:";
 my $debug   = 0;
 my $force   = 0;
 my $dbuid;
@@ -158,6 +158,7 @@ if ($action eq "commit") {
     my $tag     = "commit";
     my $usertag = 0;
     my $mfile   = undef;
+    my $comment = undef;
 
     if (defined($options{"t"})) {
 	$tag = $options{"t"};
@@ -186,6 +187,15 @@ if ($action eq "commit") {
 	}
 	else {
 	    fatal("Illegal characters in $mfile");
+	}
+    }
+    elsif (defined($options{"c"})) {
+	# A plain comment.
+	$comment = $options{"c"};
+
+	if (! TBcheck_dbslot($comment, "default", "tinytext",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    fatal("Illegal characters in comment");
 	}
     }
     
@@ -223,7 +233,7 @@ if ($action eq "commit") {
     # And commit the archive.
     print "Doing a commit on the experiment archive ...\n";
     if (libArchive::TBCommitExperimentArchive($pid, $eid, $tag,
-					      $usertag, $mfile) < 0) {
+					      $usertag, $mfile, $comment) < 0){
 	  fatal("Failed to commit experiment archive!");
     }
 }

@@ -280,10 +280,12 @@ elsif ($swapop eq "update") {
 
     $errors = doSwapout(UPDATE);
 
-    print STDERR "Doing a swapmodswapout on the experiment archive ...\n";    
-    if (libArchive::TBExperimentArchiveSwapModSwapOut($pid, $eid) < 0) {
-	tberror("Failed to do a swapmodswapout on the experiment archive!");
-	$errors = 1;
+    if (0) {
+	print STDERR "Doing a swapmodswapout on the experiment archive ...\n";
+	if (libArchive::TBExperimentArchiveSwapModSwapOut($pid, $eid) < 0) {
+	    tberror("Failed swapmodswapout on the experiment archive!");
+	    $errors = 1;
+	}
     }
 
     if ($errors) {

@@ -21,6 +21,7 @@ $optargs = OptionalPageArguments("instance",  PAGEARG_INSTANCE,
 				 "template",  PAGEARG_TEMPLATE,
 				 "canceled",  PAGEARG_BOOLEAN,
 				 "confirmed", PAGEARG_BOOLEAN,
+				 "referrer",  PAGEARG_STRING,
 				 "runidx",    PAGEARG_INTEGER,
 				 "tag",       PAGEARG_STRING,
 				 "overwrite", PAGEARG_BOOLEAN,
@@ -66,8 +67,10 @@ if (isset($instance)) {
 
 function SPITFORM($error)
 {
-    global $template, $instance, $runidx, $TBPROJ_DIR;
+    global $template, $instance, $runidx, $TBPROJ_DIR, $referrer;
     global $tag, $pid, $guid, $vers;
+
+    $iid   = $instance->id();
 
     if ($error) {
 	echo "<center>\n";
@@ -83,8 +86,11 @@ function SPITFORM($error)
 	echo "<font size=+1>";
 
 	if (isset($instance)) {
-	    echo "Export instance " . $instance->exptidx() .
-	           (isset($runidx) ? " (Run $runidx)" : "") . "?";
+	    echo "Export Instance $iid ";
+	    if (isset ($runidx)) {
+		$runid = $instance->GetRunID($runidx);
+		echo "(Run $runid)";
+	    }
 	}
 	else {
 	    echo "Export Template Datastore";
@@ -118,6 +124,9 @@ function SPITFORM($error)
     echo "<br>\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+    if (isset($referrer)) {
+	echo "<input type=hidden name=referrer value=$referrer>\n";
+    }
     echo "</form>\n";
     echo "</center>\n";
     echo "<blockquote><blockquote>
@@ -136,6 +145,9 @@ function SPITFORM($error)
     return;
 }
 if (!isset($confirmed)) {
+    if (!isset($referrer))
+	$referrer = $_SERVER['HTTP_REFERER'];
+    
     PAGEHEADER("Template Export");
     SPITFORM(null);
     PAGEFOOTER();
@@ -200,7 +212,7 @@ $export_args = (isset($tag) ? "-t " . escapeshellarg($tag) . " " : "");
 if (isset($instance)) {
     $export_args .= "-i $exptidx";
     if (isset($runidx))
-	$exptidx .=  " -r " . escapeshellarg($runidx);
+	$export_args .=  " -r " . escapeshellarg($runidx);
 }
 else {
     $export_args .= "$guid/$vers";
@@ -272,8 +284,12 @@ if ($retval) {
     return;
 }
 
+if (!isset($referrer)) {
+    $referrer = CreateURL("template_show", $template);
+}
+
 # Zap back to template page.
-PAGEREPLACE(CreateURL("template_show", $template));
+PAGEREPLACE($referrer);
 
 #
 # Standard Testbed Footer

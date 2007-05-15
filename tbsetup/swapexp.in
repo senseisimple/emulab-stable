@@ -909,19 +909,23 @@ if ($inout eq "out") {
     #
     # Add the files that have been detected by tracing to the archive.
     #
-    if (libArchive::TBExperimentArchiveAddTracedFiles($pid, $eid) < 0) {
-	fatal({type => 'secondary', severity => SEV_SECONDARY,
-	       error => ['archive_op_failed', 'add_traced_files', undef, undef]},
-	      "Failed to add traced files to the experiment archive!");
-    }
+    if (!$template_mode) {
+	if (libArchive::TBExperimentArchiveAddTracedFiles($pid, $eid) < 0) {
+	    fatal({type => 'secondary', severity => SEV_SECONDARY,
+		   error => ['archive_op_failed', 'add_traced_files',
+			     undef, undef]},
+		  "Failed to add traced files to the experiment archive!");
+	}
 
-    #
-    # Add the experiment directory.
-    #
-    if (libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) < 0) {
-	fatal({type => 'secondary', severity => SEV_SECONDARY,
-	       error => ['archive_op_failed', 'add_user_files', undef, undef]},
-	      "Failed to add user specified files to the experiment archive!");
+	#
+	# Add the experiment directory.
+	#
+	if (libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) < 0) {
+	    fatal({type => 'secondary', severity => SEV_SECONDARY,
+		   error => ['archive_op_failed', 'add_user_files',
+			     undef, undef]},
+		  "Failed to add user files to the experiment archive!");
+	}
     }
 
     $experiment->SetState(EXPTSTATE_SWAPPED) == 0
@@ -958,9 +962,11 @@ elsif ($inout eq "modify") {
     #
     # Prepare the Archive for the swapmod, in case we have to "roll back".
     #
-    print "Doing a preswapmod on the experiment archive ...\n";
-    if (libArchive::TBExperimentArchivePreSwapMod($pid, $eid) < 0) {
-	fatal("Failed to do a preswapmod on the experiment archive!");
+    if (!$template_mode) {
+	print "Doing a preswapmod on the experiment archive ...\n";
+	if (libArchive::TBExperimentArchivePreSwapMod($pid, $eid) < 0) {
+	    fatal("Failed to do a preswapmod on the experiment archive!");
+	}
     }
 
     GatherSwapStats($pid, $eid, $user_uid,
@@ -1151,43 +1157,44 @@ $experiment->SaveLogFiles();
 #
 $experiment->CopyLogFiles();
 
-# And tell the archive library to add the experiment directory.
-libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
-    or fatal("Failed to add user archive files to the archive!");
+if (!$template_mode) {
+    # And tell the archive library to add the experiment directory.
+    libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
+	or fatal("Failed to add user archive files to the archive!");
 
-#
-# The archive gets different treatment when doing a swapmod.
-#
-if ($inout eq "modify") {
-    print "Doing a commit on the previous experiment archive ...\n";
-    libArchive::TBExperimentArchiveSwapModCommit($pid, $eid,
-						 $estate eq EXPTSTATE_SWAPPED)
-	== 0 or	fatal({type => 'secondary', severity => SEV_SECONDARY,
-		       error => ['archive_op_failed', 'commit', undef, undef]},
-		      "Failed to commit experiment archive!");
-}
+    #
+    # The archive gets different treatment when doing a swapmod.
+    #
+    if ($inout eq "modify") {
+	print "Doing a commit on the previous experiment archive ...\n";
+	libArchive::TBExperimentArchiveSwapModCommit($pid, $eid,
+						$estate eq EXPTSTATE_SWAPPED)
+	    == 0 or fatal({type => 'secondary', severity => SEV_SECONDARY,
+			   error => ['archive_op_failed', 'commit',
+				     undef, undef]},
+			  "Failed to commit experiment archive!");
+    }
 
-#
-# Do a SavePoint on the experiment files. For both of these archive
-# operations, skip if in template mode; we have too many tags building
-# up from too many operations. Leave it to the wrapper script.
-#
-if (! $template_mode) {
+    #
+    # Do a SavePoint on the experiment files. For both of these archive
+    # operations, skip if in template mode; we have too many tags building
+    # up from too many operations. Leave it to the wrapper script.
+    #
     print "Doing a savepoint on the experiment archive ...\n";
     if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, $tag) < 0) {
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
 	       error => ['archive_op_failed', 'savepoint', undef, undef]},
 	      "Failed to do a savepoint on the experiment archive!");
     }
-}
 
-# Commit the archive after swapout
-if ($inout eq "out" && !$template_mode) {
-    print "Doing a commit on the experiment archive ...\n";
-    libArchive::TBCommitExperimentArchive($pid, $eid, $tag) == 0 or
-	fatal({type => 'secondary', severity => SEV_SECONDARY,
-	       error => ['archive_op_failed', 'commit', undef, undef]},
-	      "Failed to commit experiment archive!");
+    # Commit the archive after swapout
+    if ($inout eq "out") {
+        print "Doing a commit on the experiment archive ...\n";
+	libArchive::TBCommitExperimentArchive($pid, $eid, $tag) == 0 or
+	    fatal({type => 'secondary', severity => SEV_SECONDARY,
+		   error => ['archive_op_failed', 'commit', undef, undef]},
+		  "Failed to commit experiment archive!");
+    }
 }
 
 #
@@ -1328,7 +1335,8 @@ sub cleanup()
 	#
 	# Rollback the archive.
 	#
-        libArchive::TBExperimentArchiveRollBack($pid, $eid);
+        libArchive::TBExperimentArchiveRollBack($pid, $eid)
+	    if (!$template_mode);
     }
 
     #

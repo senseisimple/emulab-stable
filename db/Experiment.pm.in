@@ -1630,6 +1630,30 @@ sub ClearPortRegistration($)
 }
 
 #
+# Does experiment have any program agents.
+#
+sub HaveProgramAgents($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select distinct vnode from virt_programs ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return -1
+	if (!defined($query_result));
+
+    return $query_result->numrows;
+}
+
+#
 # Setup up phony program agent event agents and groups. This is so we
 # can talk to the program agent itself, not to the programs the agent
 # is responsible for. 

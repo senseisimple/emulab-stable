@@ -4823,7 +4823,7 @@ class template:
     #
     # Start a new run
     #
-    def startrun(self, version, argdict):
+    def newrun(self, action, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
@@ -4902,7 +4902,7 @@ class template:
             pass
 
         argstr += " -e " + escapeshellarg(argdict["exp"])
-        argstr += " -a start"
+        argstr += " -a " + action + " "
 
         if pid == None:
             argstr += " " + escapeshellarg(argdict["guid"])
@@ -4918,6 +4918,12 @@ class template:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    def startrun(self, version, argdict):
+        return self.newrun("start", version, argdict):
+            
+    def modrun(self, version, argdict):
+        return self.newrun("modify", version, argdict):
+    
     #
     # Stop current run.
     #

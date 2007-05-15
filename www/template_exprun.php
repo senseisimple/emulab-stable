@@ -40,8 +40,9 @@ $guid = $template->guid();
 $vers = $template->vers();
 $pid  = $template->pid();
 $eid  = $instance->eid();
-$unix_gid = $template->UnixGID();
-$exptidx  = $instance->exptidx();
+$unix_gid   = $template->UnixGID();
+$exptidx    = $instance->exptidx();
+$experiment = $instance->GetExperiment();
 
 if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to export in template ".
@@ -62,18 +63,23 @@ function DOIT($instance, $action, $command_options)
     $command_options = "-e $eid " . $command_options;
     
     if ($action == "start") {
-	PAGEHEADER("Start new Experiment Run");
+	PAGEHEADER("Start new Run");
 	$message = "Starting new experiment run";
 	$command_options = "-a start " . $command_options;
     }
     elseif ($action == "abort") {
-	PAGEHEADER("Abort Experiment Run");
+	PAGEHEADER("Abort Run");
 	$message = "Aborting experiment run";
 	$command_options = "-a abort " . $command_options;
     }
+    elseif ($action == "modify") {
+	PAGEHEADER("Modify Run Resources");
+	$message = "Modifying resources for run";
+	$command_options = "-a modify " . $command_options;
+    }
     else {
-	PAGEHEADER("Stop current Experiment Run");
-	$message = "Stopping current experiment run";
+	PAGEHEADER("Stop current Run");
+	$message = "Stopping current run";
 	$command_options = "-a stop " . $command_options;
     }	
 
@@ -185,14 +191,18 @@ function DOTIME($instance, $action)
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($instance, $formfields, $parameters, $errors)
+function SPITFORM($action, $instance, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
     global $TBVALIDDIRS_HTML;
     $template   = $instance->GetTemplate();
-    $experiment = $instance->GetExperiment();
 
-    PAGEHEADER("Start new Experiment Run");
+    if ($action == "modify") {
+	PAGEHEADER("Modify Resources");
+    }
+    else {
+	PAGEHEADER("Start New Run");
+    }
 
     echo $instance->ExpPageHeader();
     echo "<br><br>\n";
@@ -266,24 +276,27 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
 
     $url = CreateURL("template_exprun", $instance);
 
-    echo "<form action='${url}&action=start' method=post>\n";
+    echo "<form action='${url}&action=$action' method=post>\n";
     echo "<table align=center border=1>\n";
     
     #
     # RunID:
     #
-    echo "<tr>
-              <td class='pad4'>ID:
-              <br><font size='-1'>(alphanumeric, no blanks)</font></td>
-              <td class='pad4' class=left>
-                  <input type=text
+    if ($action == "start" ||
+	($action == "modify" && !$instance->runidx())) {
+	
+	echo "<tr>
+                  <td class='pad4'>ID:
+                  <br><font size='-1'>(alphanumeric, no blanks)</font></td>
+                  <td class='pad4' class=left>";
+	echo "    <input type=text
                          name=\"formfields[runid]\"
                          value=\"" . $formfields["runid"] . "\"
 	                 size=$TBDB_EIDLEN
-                         maxlength=$TBDB_EIDLEN>
-              &nbsp (optional; we will make up one for you)
-              </td>
-          </tr>\n";
+                         maxlength=$TBDB_EIDLEN>\n";
+	echo "    </td>
+              </tr>\n";
+    }
 
     #
     # Clean logs before starting run?
@@ -299,23 +312,6 @@ function SPITFORM($instance, $formfields, $parameters, $errors)
     }
     echo ">";
     echo "&nbsp (run '<tt>loghole clean</tt>' before starting run)
-	    </td>
-	  </tr>\n";
-
-    #
-    # Swapmod?
-    #
-    echo "<tr>
-	      <td class='pad4'>Reparse NS file?:</td>
-              <td class='pad4' class=left>
-  	          <input type=checkbox name='formfields[swapmod]' value='Yep'";
-
-    if (isset($formfields["swapmod"]) &&
-	strcmp($formfields["swapmod"], "Yep") == 0) {
-	echo " checked='1'";
-    }
-    echo ">";
-    echo "&nbsp (effectively a '<tt>swap modify</tt>')
 	    </td>
 	  </tr>\n";
 
@@ -410,7 +406,7 @@ elseif (isset($action) && ($action == "pause" || $action == "continue")) {
     PAGEFOOTER();
     return;
 }
-elseif (!isset($exprun)) {
+elseif (! isset($formfields)) {
     $defaults = array();
     
     #
@@ -418,7 +414,6 @@ elseif (!isset($exprun)) {
     #
     $defaults['runid']   = $instance->NextRunID();
     $defaults['clean']   = "";
-    $defaults['swapmod'] = "";
     $defaults['description'] = "";
     $defaults['parameter_xmlfile'] = "";
 
@@ -436,12 +431,9 @@ elseif (!isset($exprun)) {
 	}
     }
 
-    SPITFORM($instance, $defaults, $bindings, 0);
+    SPITFORM($action, $instance, $defaults, $bindings, 0);
     PAGEFOOTER();
     return;
-}
-elseif (! isset($formfields)) {
-    PAGEARGERROR();
 }
 
 #
@@ -455,17 +447,20 @@ $command_options = " ";
 #
 # RunID:
 #
-if (!isset($formfields["runid"]) || $formfields["runid"] == "") {
-    $errors["ID"] = "Missing Field";
-}
-elseif (!TBvalid_eid($formfields["runid"])) {
-    $errors["ID"] = TBFieldErrorString();
-}
-elseif (! $instance->UniqueRunID($formfields["runid"])) {
-    $errors["ID"] = "Already in use";
-}
-else {
-    $command_options .= " -r " . escapeshellarg($formfields["runid"]);
+if ($action == "start" ||
+    ($action == "modify" && !$instance->runidx())) {
+    if (!isset($formfields["runid"]) || $formfields["runid"] == "") {
+	$errors["ID"] = "Missing Field";
+    }
+    elseif (!TBvalid_eid($formfields["runid"])) {
+	$errors["ID"] = TBFieldErrorString();
+    }
+    elseif (! $instance->UniqueRunID($formfields["runid"])) {
+	$errors["ID"] = "Already in use";
+    }
+    else {
+	$command_options .= " -r " . escapeshellarg($formfields["runid"]);
+    }
 }
 
 #
@@ -473,13 +468,6 @@ else {
 #
 if (isset($formfields["clean"]) && $formfields["clean"] == "Yep") {
     $command_options .= " -c";
-}
-
-#
-# Swapmod?
-#
-if (isset($formfields["swapmod"]) && $formfields["swapmod"] == "Yep") {
-    $command_options .= " -m";
 }
 
 #
@@ -565,7 +553,7 @@ if (count($parameter_masterlist)) {
 }
 
 if (count($errors)) {
-    SPITFORM($instance, $formfields, $parameters, $errors);
+    SPITFORM($action, $instance, $formfields, $parameters, $errors);
     PAGEFOOTER();
     exit(1);
 }

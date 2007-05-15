@@ -19,6 +19,7 @@ $isadmin   = ISADMIN();
 #
 $reqargs = RequiredPageArguments("instance",  PAGEARG_INSTANCE);
 $optargs = OptionalPageArguments("canceled",  PAGEARG_BOOLEAN,
+				 "referrer",  PAGEARG_STRING,
 				 "confirmed", PAGEARG_BOOLEAN);
 $template = $instance->GetTemplate();
 
@@ -32,6 +33,7 @@ $guid = $template->guid();
 $vers = $template->vers();
 $pid  = $template->pid();
 $eid  = $instance->eid();
+$iid  = $instance->id();
 $unix_gid = $template->UnixGID();
 $exptidx  = $instance->exptidx();
 
@@ -41,20 +43,25 @@ if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 }
 
 if (!isset($confirmed)) {
-    PAGEHEADER("Template Analyze");
+    PAGEHEADER("Reconstitute");
+
+    echo $instance->PageHeader();
     
-    echo "<center><br><font size=+1>
-          Reconstitute database(s) for instance $exptidx in Template
-             in Template $guid/$vers?</font>\n";
+    echo "<br><br><center><br><font size=+1>
+          Reconstitute database(s) for instance $iid?</font>\n";
     
     $template->Show();
 
     $url = CreateURL("template_analyze", $instance);
 
+    if (!isset($referrer))
+	$referrer = $_SERVER['HTTP_REFERER'];
+
     echo "<form action='$url' method=post>\n";
     echo "<br>\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+    echo "<input type=hidden name=referrer value=$referrer>\n";
     echo "</form>\n";
     echo "</center>\n";
     
@@ -67,7 +74,7 @@ if (!isset($confirmed)) {
 #
 set_time_limit(0);
 
-PAGEHEADER("Template Analyze");
+PAGEHEADER("Reconstitute");
 
 echo $template->PageHeader();
 echo "<br><br>\n";
@@ -107,8 +114,11 @@ if ($retval) {
     return;
 }
 
+if (!isset($referrer)) {
+    $referrer = CreateURL("template_show", $template);
+}
 # Zap back to template page.
-PAGEREPLACE("template_show.php?guid=$guid&version=$vers");
+PAGEREPLACE($referrer);
 
 #
 # In case the above fails.

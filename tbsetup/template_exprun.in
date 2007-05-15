@@ -14,7 +14,7 @@ use XML::Simple;
 use Data::Dumper;
 
 #
-# Create a new experiment template. 
+# Start/Stop/Pause experiment runs ...
 #
 # Exit codes are important; they tell the web page what has happened so
 # it can say something useful to the user. Fatal errors are mostly done
@@ -43,7 +43,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwx:p:E:a:r:e:dscft:imy:";
+my $optlist	 = "qwx:p:E:a:r:e:dscft:iy:";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -51,7 +51,6 @@ my $debug        = 0;
 my $foreground   = 0;
 my $ignoreerrors = 0;
 my $clean        = 0;
-my $doswapmod    = 0;
 my $paramwhich;
 my $paramfile;
 my %parameters   = ();
@@ -85,6 +84,7 @@ my $logname;
 my $exptidx;
 my $template;
 my $newrun;
+my $oldrun;
 my $instance;
 my $locktoken;
 # For the END block below.
@@ -114,13 +114,10 @@ use libdb;
 use libtestbed;
 use libtblog;
 use User;
-use libArchive;
 use Template;
 use Experiment;
+use Archive;
 use event;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 0;
 
 #
 # Turn off line buffering on output
@@ -214,6 +211,10 @@ if (!defined($template)) {
     $guid    = $template->guid();
     $version = $template->vers();
 }
+my $archive = $template->GetArchive();
+if (!defined($archive)) {
+    fatal(-1, "Could net archive object for $template");
+}
    
 #
 # Check project permission.
@@ -262,6 +263,13 @@ elsif ($action eq "start" && !defined($runid)) {
     }
     else {
 	print "Using new run ID '$runid' ...\n";
+    }
+}
+elsif ($action eq "modify") {
+    # Better get a new runid if currently between runs since we want to
+    # "speculatively start a new run.
+    if (!defined($instance->runidx()) && !defined($runid)) {
+	tbdie("Must provide a runid; please use the -r option!");
     }
 }
 
@@ -421,34 +429,44 @@ if ($waitmode) {
 # Might not be a current run, which is okay.
 #
 if (defined($instance->runidx())) {
-    my $thisrun = $instance->CurrentRun();
+    $oldrun = $instance->CurrentRun();
 
-    if (!defined($thisrun)) {
+    if (!defined($oldrun)) {
 	tbdie("Cannot get current run object for $instance!");
     }
-	
-    if ($STAMPS) {
-	$instance->Stamp("template_exprun", "stopping agents");
-    }
-    print "Asking program agents to stop ... this will take a moment.\n";
-    SignalProgAgents("HALT") == 0
-	or $ignoreerrors
-	or CheckForDeadNodes($thisrun);
 
-    if ($STAMPS) {
-	$instance->Stamp("template_exprun", "agents stopped");
+    if ($experiment->HaveProgramAgents()) {
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "stopping agents");
+	}
+	print "Asking program agents to stop ... this will take a moment.\n";
+	SignalProgAgents("HALT") == 0
+	    or $ignoreerrors
+	    or CheckForDeadNodes($oldrun);
+
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "agents stopped");
+	}
+    }
+
+    #
+    # Modify is going to reuse the current run, so do not do anything else
+    # at this point. 
+    #
+    if ($action eq "modify") {
+	goto domodify;
     }
 
     # This sets the stop time.
     $instance->StopCurrentRun() == 0
-	or fatal(-1, "Could not stop experiment run for $instance!");
+	or fatal(-1, "Could not stop run for $instance!");
 
     if ($action eq "abort") {
 	# XXX What about the tag?
 	$instance->FinalizeCurrentRun() == 0
-	    or fatal(-1, "Could not finalize experiment run for $instance!");
+	    or fatal(-1, "Could not finalize run for $instance!");
 
-	print "Experiment run has been aborted!\n";    
+	print "Run has been aborted!\n";    
 	
 	# Send completion event only on "stop/abort"; otherwise it gets lost.
 	SendCompletionEvent();
@@ -462,7 +480,7 @@ if (defined($instance->runidx())) {
     print "Asking loghole to sync the logfiles ... this will take a minute.\n";
     $instance->LogHole() == 0
 	or $ignoreerrors
-        or CheckForDeadNodes($thisrun);
+        or CheckForDeadNodes($oldrun);
 
     if ($STAMPS) {
 	my $du = 0;
@@ -483,24 +501,16 @@ if (defined($instance->runidx())) {
     #
     # Commit the archive. 
     #
-    my $this_runid = $thisrun->runid();
+    my $this_runid = $oldrun->runid();
     
-    system("$archcontrol -d -t stoprun_${this_runid} commit $pid $eid");
+    system("$archcontrol -d -t stoprun_${this_runid} ".
+	   "-c 'Stopping Run $this_runid' commit $pid $eid");
 
     # This has to be done after the archive commit, so we can find the tag.
     $instance->FinalizeCurrentRun() == 0
-	or fatal(-1, "Could not finalize experiment run for $instance!");
+	or fatal(-1, "Could not finalize run for $instance!");
 
-    #
-    # And create a tag (and subdir) for this. This is primarily a
-    # convenience function for the web interface. The tag is simply an
-    # alias to the current trunk and does not cause a savepoint or a
-    # commit.
-    #
-    system("$archcontrol -d -u -s runs/$this_runid tag $pid $eid stoprun")
-	== 0 or fatal(-1, "Could not tag archive!");
-    
-    print "Experiment run '$this_runid' has been stopped.\n";
+    print "Run '$this_runid' has been stopped.\n";
 
     if ($STAMPS) {
 	$instance->Stamp("template_exprun", "run stopped");
@@ -513,6 +523,32 @@ if ($action eq "stop") {
     goto done;
 }
 
+#
+# If this is a startrun, lets see if the record changed. If it did,
+# commit a new version of the previous stoprun so that these changes
+# are recorded as being part of the previous run, not the current run.
+#
+if (!defined($oldrun)) {
+    my $diff = $archive->Diff($instance->path(), $instance->exptidx(),
+			      ("run.log"));
+
+    fatal(-1, "Failed to diff archive!")
+	if ($diff < 0);
+
+    if ($diff) {
+	my $lastrun = $instance->LastRun();
+	fatal(-1, "Could not lookup previous run for $instance")
+	    if (!defined($lastrun));
+
+	print "Files for previous run $lastrun changed; revising archive.\n";
+	
+        # Commit the archive for the run.
+	$lastrun->ArchiveCommit("stoprun_revised") == 0 or
+	    fatal(-1, "Could not commit revised archive for previous run!");
+    }
+}
+
+domodify:
 #
 # Clean/Clear if requested before generating the new run, in case there
 # is a problem.
@@ -533,33 +569,42 @@ if ($clean) {
 }
 
 #
-# Generate a new run.
+# Generate a new run. (modify uses existing run if there is one).
 #
-$newrun = $instance->NewRun($runid, $this_user, $description);
-if (!defined($newrun)) {
-    fatal(-1, "Could not create new experiment run for $instance!");
+if ($action eq "modify" && defined($oldrun)) {
+    $newrun = $oldrun;
+    $runid  = $oldrun->runid();
+}
+else {
+    $newrun = $instance->NewRun($runid, $this_user, $description);
+
+    if (!defined($newrun)) {
+	fatal(-1, "Could not create new run for $instance!");
+    }
 }
 
 # Mark the start time of the run.
-$instance->StartRun(($doswapmod ? Template::STARTRUN_FLAGS_SWAPMOD() : 0)) == 0
-    or fatal(-1, "Could not mark start of new run for $instance!");
+$instance->StartRun(($action eq "modify" ?
+		     Template::STARTRUN_FLAGS_SWAPMOD() : 0)) == 0
+    or fatal(-1, "Could not mark start of run for $instance!");
 
 #
-# And the bindings for the run ...
+# And the bindings for the run ... This actually uses a "replace" so its okay
+# to do this for a modify operation.
 #
 foreach my $name (keys(%parameters)) {
     my $value = $parameters{$name};
 
     $instance->NewRunBinding($name, $value) == 0
-	or fatal(-1, "Could not create new experiment run binding ".
-		 "for $instance!");
+	or fatal(-1, "Could not create run binding for $instance!");
 }
 
-if ($doswapmod) {
+if ($action eq "modify") {
     #
     # Now do the swapmod, using the original NS file for now. The environ
     # variables will be passed to the NS reparse by parse-ns wrapper script.
     #
+    my $oldtag     = $experiment->archive_tag();
     my $userdir    = $instance->path();
     my $nsfile     = "$userdir/tbdata/nsfile.ns";
     my @arguments  = ($swapexp, "-q", "-x", "-s", "modify",
@@ -571,6 +616,13 @@ if ($doswapmod) {
 	if ($?);
 
     $instance->Refresh();
+    $experiment->Refresh();
+
+    # XXX - Need to move the tag out of the resources table. Dumb idea.
+    my $rsrcidx = $experiment->rsrcidx();
+    $experiment->TableUpdate("experiment_resources",
+			     "archive_tag='$oldtag'", "idx='$rsrcidx'") == 0
+	or return -1;
 
     # This has to be redone since the batchexp will have written
     # incomplete data.
@@ -603,11 +655,31 @@ $instance->InitializeEnvVariables(\%parameters) == 0
 print "Writing environment strings ...\n";
 $instance->WriteEnvVariables() == 0
     or fatal(-1, "Could not write environment strings for program agents");
-    
-print "Asking program agents to reload ... this will take a moment.\n";
-SignalProgAgents("RELOAD") == 0
-    or $ignoreerrors
-    or CheckForDeadNodes($newrun);
+
+if ($experiment->HaveProgramAgents()) {
+    print "Asking program agents to reload ... this will take a moment.\n";
+    SignalProgAgents("RELOAD") == 0
+	or $ignoreerrors
+	or CheckForDeadNodes($newrun);
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting commit");
+}
+
+# Commit the archive for the run.
+if ($action eq "modify" && defined($oldrun)) {
+    $newrun->ArchiveReplace($newrun->start_tag()) == 0 or
+	fatal(-1, "Could not replace archive for run!");
+}
+else {
+    $newrun->ArchiveCommit("startrun") == 0 or
+	fatal(-1, "Could not commit archive for run!");
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting event system");
+}
 
 #
 # Restart the event stream from the beginning.
@@ -622,22 +694,10 @@ $experiment->CopyLogFiles()
     if (defined($logname));
 
 if ($STAMPS) {
-    $instance->Stamp("template_exprun", "starting commit");
-}
-system("$archcontrol -d -t startrun_${runid} commit $pid $eid");
-
-#
-# And create a tag (and subdir) for this. This is primarily a
-# convenience function for the web interface. The tag is simply an
-# alias to the current trunk and does not cause a savepoint or a
-# commit.
-#
-system("$archcontrol -d -u -s runs/$runid tag $pid $eid startrun");
-
-if ($STAMPS) {
     $instance->Stamp("template_exprun", "run started");
 }
-print "Experiment run '$runid' has been started.\n";
+print "Run '$runid' has been " .
+    ($action eq "modify" && defined($oldrun) ? "modified" : "started") . "\n";
 done:
 
 if (keys(%deadnodes)) {
@@ -752,7 +812,7 @@ sub ParseArgs()
 
 	if ($action ne "start" && $action ne "stop" &&
 	    $action ne "pause" && $action ne "continue" &&
-	    $action ne "abort") {
+	    $action ne "abort" && $action ne "modify") {
 	    tbdie("Improper -a argument: $action.");
 	}
 	# Need the equiv of a taint check.
@@ -781,9 +841,6 @@ sub ParseArgs()
     }
     if (defined($options{"i"})) {
 	$ignoreerrors = 1;
-    }
-    if (defined($options{"m"})) {
-	$doswapmod = 1;
     }
     if (defined($options{"t"})) {
 	$ctoken = $options{"t"};
@@ -866,8 +923,9 @@ sub ParseArgs()
 sub cleanup()
 {
     # only for start new run; stop run failures do not do this!
+    # Do not kill the oldrun on a modify either.
     $instance->DeleteCurrentRun()
-	if (defined($instance) && defined($newrun));
+	if (defined($instance) && defined($newrun) && !defined($oldrun));
 
     $instance->UnLock($locktoken)
 	if (defined($instance) && defined($locktoken));

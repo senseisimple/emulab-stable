@@ -501,7 +501,7 @@ sub TBExperimentArchiveSwapModCommit($$$)
 
     print "Doing a commit on the experiment archive ...\n";
     return -1
-	if ($archive->Commit($newtag, undef, $view, $location) != 0);
+	if ($archive->Commit($newtag, undef, undef, $view, $location) != 0);
 
     if (!DBQueryWarn("update experiment_resources set ".
 		     "      archive_tag='$newtag' ".
@@ -530,9 +530,9 @@ sub TBExperimentArchiveSwapModCommit($$$)
 #
 # Commit an experiment archive. 
 #
-sub TBCommitExperimentArchive($$$;$$)
+sub TBCommitExperimentArchive($$$;$$$)
 {
-    my ($pid, $eid, $tagext, $usertagged, $mfile) = @_;
+    my ($pid, $eid, $tagext, $usertagged, $mfile, $comment) = @_;
     my ($archive, $view);
 
     return 0
@@ -576,7 +576,7 @@ sub TBCommitExperimentArchive($$$;$$)
     }
 
     return -1
-	if ($archive->Commit($newtag, $mfile, $view) != 0);
+	if ($archive->Commit($newtag, $comment, $mfile, $view) != 0);
 
     $experiment->TableUpdate("experiment_resources",
 			     "archive_tag='$newtag'", "idx='$rsrcidx'") == 0
