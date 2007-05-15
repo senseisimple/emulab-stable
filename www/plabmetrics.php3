@@ -6,10 +6,20 @@
 #
 include("defs.php3");
 
+# a few constants
+$DEF_LIMIT = 20;
+$DEF_NUMPAGENO = 10;
+
 #
 # Standard Testbed Header
 #
-PAGEHEADER("PlanetLab Metrics");
+# cheat and use the page args to influence the view.
+$view = array();
+if (isset($_REQUEST['pagelayout']) && $_REQUEST['pagelayout'] == "minimal") {
+    $view = array ('hide_banner' => 1, 'hide_sidebar' => 1 );
+}
+
+PAGEHEADER("PlanetLab Metrics",$view);
 
 #
 # Only known and logged in users can get plab data.
@@ -18,202 +28,415 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-$optargs = OptionalPageArguments("sortby", PAGEARG_STRING);
+# make sure to add any new args here to pm_buildurl() as well
+$optargs = OptionalPageArguments( "cols",   PAGEARG_ALPHALIST,
+				  "offset", PAGEARG_INTEGER,
+				  "limit",  PAGEARG_INTEGER,
+				  "upnodefilter", PAGEARG_STRING,
+				  "pagelayout", PAGEARG_BOOLEAN,
+				  "experiment", PAGEARG_EXPERIMENT,
+				  "sortcols", PAGEARG_ALPHALIST,
+				  "sortdir", PAGEARG_STRING );
+
+# link to show/hide sidebar
+
+# basic options
+#   which cols (including ordering somehow, probably javascript)
+#   upnodefilter (emulab|comon|none) (also show brief totals here ---
+#     emulab=330, comon=400, none=880)
+#   hostname filter (basically, text to a like "%<text>%" sql expr)
+#   enable/disable selection; show current selection and be able to remove 
+#     nodes from it!
+#   drop-down proj/exp list; only show nodes in that pid/eid (and only include
+#     exps with planetlab nodes; admins see all exps with planetlab nodes)
+
+# advanced options -- hideable div
+#   constrain columns
+#     some sort of query language, sigh -- maybe can find a php lib for it
+#   build-your-own rank (based off column weights, normalization to max or 
+#     user-chosen ceil; each col should be able to be minimized/maximized in 
+#     its contribution to the rank)
+
+# should provide cotop links (one node-centric, one slice-centric)
+# paint comon columns red, emulab green, or something like that.
+
+
+# A map of colnames the user can refer to, to their name in queries we issue.
+$colmap = array( 'node_id' => 'pm.node_id',
+		 'hostname' => 'pm.hostname',
+		 'plab_id' => 'pm.hostname',
+                 # comon columns
+		 'resptime' => 'pcd.resptime','uptime' => 'pcd.uptime',
+		 'lastcotop' => 'pcd.lastcotop','date' => 'pcd.date',
+		 'drift' => 'pcd.drift','cpuspeed' => 'pcd.cpuspeed',
+		 'busycpu' => 'pcd.busycpu','syscpu' => 'pcd.syscpu',
+		 'freecpu' => 'pcd.freecpu','1minload' => 'pcd.1minload',
+		 '5minload' => 'pcd.5minload','numslices' => 'pcd.numslices',
+		 'liveslices' => 'pcd.liveslices','connmax' => 'pcd.connmax',
+		 'connavg' => 'pcd.connavg','timermax' => 'pcd.timermax',
+		 'timeravg' => 'pcd.timeravg','memsize' => 'pcd.memsize',
+		 'memact' => 'pcd.memact','freemem' => 'pcd.freemem',
+		 'swapin' => 'pcd.swapin','swapout' => 'pcd.swapout',
+		 'diskin' => 'pcd.diskin','diskout' => 'pcd.diskout',
+		 'gbfree' => 'pcd.gbfree','swapused' => 'pcd.swapused',
+		 'bwlimit' => 'pcd.bwlimit','txrate' => 'pcd.txrate',
+		 'rxrate' => 'pcd.rxrate',
+                 # emulab columns
+		 'unavail' => 'pnhs.unavail',
+		 'jitdeduction' => 'pnhs.jitdeduct',
+		 'successes' => 'pnhs.succnum',
+		 'failures' => 'pnhs.failnum',
+		 'nodestatus' => 'ns.status',
+		 'nodestatustime' => 'ns.status_timestamp',
+                 # what about what kind of link the node contains 
+		 # (i.e., inet,inet2,dsl,...) ?
+	       );
 
 #
-# This is very simple; just invoke the script and spit the results back
-# out in a nice format.
+# First, deal with args:
 #
-if (! isset($sortby)) {
-    $sortby = "nodeid";
-}
 
-#
-# A cleanup function to keep the child from becoming a zombie, since
-# the script is terminated, but the children are left to roam.
-#
-$fp = 0;
+# access control -- everybody can see stats for all nodes, but only members
+# of a pid can see which nodes an eid in that pid has.
+if (isset($experiment)) {
+    # need these later
+    $eid = $experiment->eid();
+    $pid = $experiment->pid();
 
-function CLEANUP()
-{
-    global $fp;
-
-    if (!$fp || !connection_aborted()) {
-	exit();
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view experiment $eid!",1);
     }
-    pclose($fp);
-    exit();
-}
-ignore_user_abort(1);
-register_shutdown_function("CLEANUP");
-
-#
-# Comparison functions for uasort below. We are sorting an array indexed
-# indexed by plain int, where each element in the array is another array of
-# metrics. These comparison functions are metric specific since they have
-# to look at a different array entry, including the nodeid.
-#
-function intcmp ($a, $b) {
-    if ($a == $b) return 0;
-    return ($a < $b) ? -1 : 1;
-}
-function nodeid_cmp ($a, $b) {
-    preg_match("/^[a-zA-Z]*(\d*)$/", $a["nodeid"], $a_matches);
-    preg_match("/^[a-zA-Z]*(\d*)$/", $b["nodeid"], $b_matches);
-
-    return intcmp($a_matches[1], $b_matches[1]);
-}
-function load_cmp ($a, $b) {
-    return intcmp($a["load"], $b["load"]);
-}
-function cpu_cmp ($a, $b) {
-    return intcmp($a["cpu"], $b["cpu"]);
-}
-function mem_cmp ($a, $b) {
-    return intcmp($a["mem"], $b["mem"]);
-}
-function disk_cmp ($a, $b) {
-    return intcmp($a["disk"], $b["disk"]);
-}
-function netbw_cmp ($a, $b) {
-    return intcmp($a["netbw"], $b["netbw"]);
-}
-function name_cmp ($a, $b) {
-    return strcmp($a["name"], $b["name"]);
 }
 
-#
-# Grab the node list from the DB in one query, which we use later to
-# map from the IP to the node_id. 
-#
-$query_result =
-    DBQueryFatal("select i.node_id,i.IP,w.hostname from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "left join interfaces as i on i.node_id=n.node_id ".
-		 "left join widearea_nodeinfo as w on n.node_id=w.node_id ".
-		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
-    		 "and nt.class='pcplabphys'");
-
-$nodemap = array();
-while ($row = mysql_fetch_array($query_result)) {
-    $nodeid   = $row["node_id"];
-    $IP       = $row["IP"];
-    $hostname = $row["hostname"];
-
-    $nodemap["$IP"] = $nodeid;
-    $hostnames["$nodeid"] = $hostname;
+# we have to fix which node id we select based on if we're querying the 
+# reserved table (we need phys node id, but have to join reserved to nodes
+# to get it)
+if (isset($experiment)) {
+    $colmap['node_id'] = 'n.phys_nodeid';
 }
 
-#
-# Grab the data from the external program and stick into an array indexed
-# by node_id.
-#
-$nodemetrics = array();
-
-if ($fp = popen("$TBSUEXEC_PATH nobody nobody webplabstats -i", "r")) {
-    # Parse the header line to get the load metric
-    $string = fgets($fp, 1024);
-    $results = preg_split("/[\s]+/", $string, -1, PREG_SPLIT_NO_EMPTY);
-    $loadmetric = $results[0];
-
-    while (!feof($fp)) {
-	$string = fgets($fp, 1024);
-	$results = preg_split("/[\s]+/", $string, -1, PREG_SPLIT_NO_EMPTY);
-
-	# This appears to happen ...
-	if (count($results) < 7)
-	    continue;
-
-	$ip     = $results[6];
-	$nodeid = $nodemap["$ip"];
-	
-	if (!$nodeid || strlen($nodeid) == 0) {
-	    continue;
-	}
-
-	$hostname = $hostnames[$nodeid];
-
-	$metrics = array();
-	$metrics["load"]  = $results[0];
-	$metrics["cpu"]   = $results[1];
-	$metrics["mem"]   = $results[2];
-	$metrics["disk"]  = $results[3];
-	$metrics["netbw"] = $results[4];
-	$metrics["name"]  = $hostname;
-	$metrics["ip"]    = $results[6];
-	$metrics["nodeid"]= $nodeid;
-	$nodemetrics[]    = $metrics;
+# strip off the table prefixes; mysql driver doesn't seem to include them
+$colmap_mysqlnames = array();
+foreach ($colmap as $k => $v) {
+    $sa = explode('.',$v);
+    $nv = $sa[0];
+    if (count($sa) == 2) {
+	$nv = $sa[1];
     }
-    pclose($fp);
-    $fp = 0;
-}
-else {
-    USERERROR("Error getting Planetlab Metrics!", 1);
+    elseif (count($sa) > 2) {
+        $nv = implode('.',array_slice($sa,1));
+    }
+
+    $colmap_mysqlnames[$k] = $nv;
 }
 
-#
-# Sort the array.
-#
-switch ($sortby) {
- case "nodeid":
-     uasort($nodemetrics, "nodeid_cmp");
-     break;
- case "load":
-     uasort($nodemetrics, "load_cmp");
-     break;
- case "cpu":
-     uasort($nodemetrics, "cpu_cmp");
-     break;
- case "mem":
-     uasort($nodemetrics, "mem_cmp");
-     break;
- case "disk":
-     uasort($nodemetrics, "disk_cmp");
-     break;
- case "netbw":
-     uasort($nodemetrics, "netbw_cmp");
-     break;
- case "name":
-     uasort($nodemetrics, "name_cmp");
-     break;
- default:
-     USERERROR("Invalid sortby argument: $sortby!", 1);
+# default columns displayed, in this order.
+# note that they can't get rid of node_id.
+$defcols = array( 'hostname','lastcotop','5minload','freemem',
+	          'txrate','rxrate','unavail','nodestatus','nodestatustime' );
+
+if (!isset($cols) || count($cols) == 0) {
+    $cols = $defcols;
 }
 
 #
-# Spit the table.
+# Display search options and selection:
 #
-echo "<table border=2 
-             cellpadding=1 cellspacing=2 align=center>\n";
-echo "<tr>
-          <th><a href='plabmetrics.php3?&sortby=nodeid'>Node ID</a></th>
-          <th><a href='plabmetrics.php3?&sortby=load'>$loadmetric</a></th>
-          <th><a href='plabmetrics.php3?&sortby=disk'>%Disk Used</a></th>
-          <th><a href='plabmetrics.php3?&sortby=name'>Name</a></th>
-      </tr>\n";
 
-foreach ($nodemetrics as $index => $metrics) {
-    $load  = $metrics["load"];
-    $cpu   = $metrics["cpu"];
-    $mem   = $metrics["mem"];
-    $disk  = $metrics["disk"];
-    $netbw = $metrics["netbw"];
-    $name  = $metrics["name"];
-    $ip    = $metrics["ip"];
-    $nodeid= $metrics["nodeid"];
 
-    echo "<tr>
-              <td>$nodeid</td>
-              <td>$load</td>
-              <td>$disk</td>
-              <td>$name</td>
-          </tr>\n";
+#
+# Next, build query:
+#
+
+# Grab query parts
+$qbits = pm_buildqueryinfo();
+$select_s = $qbits[0]; $src_s = $qbits[1]; $filter_s = $qbits[2]; 
+$sort_s = $qbits[3]; $pag_s = $qbits[4];
+
+# query that counts num data rows
+$qcount = "select count(" . $colmap['node_id'] . ") as num" . 
+    " from $src_s $filter_s";
+
+# query that gets data
+$q = "select $select_s from $src_s $filter_s $sort_s $pag_s";
+
+$qres = DBQueryFatal($qcount);
+if (mysql_num_rows($qres) != 1) {
+    TBERROR("Unexpected number of rows in count query!");
 }
-echo "</table>\n";
+$row = mysql_fetch_array($qres);
+$totalrows = $row['num'];
+
+#
+# Finally, display data:
+#
+
+pm_showtable($totalrows,$q);
 
 #
 # Standard Testbed Footer
 #
 PAGEFOOTER();
+
+#
+# Any page arguments that you want preserved (i.e., 
+# (Optional|Required)PageArguments ones) should be put in here.
+# This is where we build urls that the various clickable links have.
+# If you need to override any of the defaults, or add more, pass an array 
+# with key/value params.
+#
+function pm_buildurl() {
+    global $offset,$limit,$upnodefilter,$pagelayout,$pid,$eid;
+    global $sortcols,$sortdir;
+
+    $pageargs = array( 'pid','eid','cols','sortcols','sortdir',
+                       'upnodefilter','pagelayout','limit','offset' );
+
+    $params = array();
+    foreach ($pageargs as $pa) {
+        if (isset($GLOBALS[$pa])) {
+            $params[$pa] = $GLOBALS[$pa];
+        }
+    }
+
+    if (func_num_args() > 0) {
+        $aa = func_get_args();
+        foreach ($aa[0] as $ok => $ov) {
+            $params[$ok] = $ov;
+        }
+    }
+
+    $retval = "plabmetrics.php3?";
+    foreach ($params as $k => $v) {
+        if (is_array($v)) {
+            $v = implode($v,',');
+        }
+        $retval .= "$k=" . urlencode($v) . "&";
+    }
+    $retval = rtrim($retval,'&');
+
+    return $retval;
+}
+
+function pm_getpaginationlinks($totalrows) {
+    global $offset,$limit,$DEF_NUMPAGENO;
+
+    $retval = '';
+
+    $pagecount = ceil($totalrows / $limit);
+    $pageno = floor($offset / $limit) + 1;
+
+    $retval .= "Page $pageno of $pagecount &mdash; ";
+    if ($pageno > 1) {
+        $url = pm_buildurl(array('offset' => 0));
+        $retval .= "<a href='$url'>&lt;&lt;</a> ";
+        $url = pm_buildurl(array('offset' => ($offset - $limit)));
+        $retval .= "<a href='$url'>&lt;</a> ";
+    }
+    else {
+        $retval .= "<< < ";
+    }
+    # print DEF_NUMPAGENO max, centered around the current page if possible
+    if ($DEF_NUMPAGENO > $pagecount) {
+        $startpn = 1;
+        $stoppn = $pagecount;
+    }
+    else {
+        $startpn = $pageno - floor(($DEF_NUMPAGENO - 1) / 2);
+        $stoppn = $startpn + ($DEF_NUMPAGENO - 1);
+        if ($startpn < 1) {
+            $startpn = 1;
+            $stoppn = $startpn + ($DEF_NUMPAGENO - 1);
+            $stoppn = ($stoppn > $pagecount)?$pagecount:$stoppn;
+        }
+        elseif ($stoppn > $pagecount) {
+            $stoppn = $pagecount;
+            $startpn = $stoppn - ($DEF_NUMPAGENO - 1);
+        }
+    }
+    for ($i = $startpn; $i <= $stoppn; ++$i) {
+        $url = pm_buildurl(array('offset' => ($i - 1) * $limit));
+        $retval .= "<a href='$url'>$i</a> ";
+    }
+
+    if ($pageno < $pagecount) {
+        $url = pm_buildurl(array('offset' => ($offset + $limit)));
+        $retval .= "<a href='$url'>&gt;</a> ";
+        $url = pm_buildurl(array('offset' => ($pagecount-1)*$limit));
+        $retval .= "<a href='$url'>&gt;&gt;</a> ";
+    }
+    else {
+        $retval .= "> >> ";
+    }
+
+    return $retval;
+}
+
+#
+# Assemble query chunks.  Returns an array of query subparts.  Each element is
+# intended to go into the query like this:
+#   select [0] from [1] [2] [3] [4] 
+# where [1] is a table source with joins; [2] is a where filter; 
+# [3] is a sort; and [4] is a limit/offset thing for pagination.
+#
+function pm_buildqueryinfo() {
+    global $cols,$colmap,$experiment,$upnodefilter,$sortcols,$sortdir;
+    global $limit,$offset;
+    global $DEF_LIMIT;
+
+    $q_colstr = $colmap['node_id'];
+    foreach ($cols as $c) {
+        $q_colstr .= "," . $colmap[$c];
+    }
+
+    # setup the main select/join string
+    if (isset($experiment)) {
+        $q_joinstr = " reserved as r" . 
+            " left join nodes as n on r.node_id=n.node_id" .
+            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id";
+    }
+    else {
+        $q_joinstr = " plab_mapping as pm";
+    }
+    # for now, just join all potential tables, even if we're not selecting data
+    $q_joinstr .= " left join node_status as ns on pm.node_id=ns.node_id";
+    $q_joinstr .= " left join plab_comondata as pcd on pm.node_id=pcd.node_id";
+    $q_joinstr .= " left join plab_nodehiststats as pnhs" . 
+	" on pm.node_id=pnhs.node_id";
+
+    # setup the quick filter string (note that all of these get and'd)
+    $q_quickfs = '';
+    if (isset($experiment)) {
+        if (strlen($q_quickfs) > 0) {
+	    $q_quickfs .= " and ";
+        }
+        $q_quickfs .= " r.pid='$pid' and r.eid='$eid'";
+    }
+    if (isset($upnodefilter)) {
+        if ($upnodefilter == "emulab") {
+            if (strlen($q_quickfs) > 0) {
+                $q_quickfs .= " and ";
+            }
+            $q_quickfs .= " ns.status='up'";
+        }
+        elseif ($upnodefilter == "comon") {
+            if (strlen($q_quickfs) > 0) {
+                $q_quickfs .= " and ";
+            }
+            $q_quickfs .= " (pcd.lastcotop - now()) < 600";
+        }
+    }
+
+    # setup the user filter string (can be very complex; is and'd to the quick
+    # filter string if it exists)
+    $q_userfs = '';
+
+    # finalize the filter string
+    $q_finalfs = '';
+    if (strlen($q_quickfs) > 0) {
+        if (strlen($q_finalfs) > 0) {
+	    $q_finalfs .= " and ";
+        }
+        $q_finalfs .= " $q_quickfs ";
+    }
+    if (strlen($q_userfs) > 0) {
+        if (strlen($q_finalfs) > 0) {
+            $q_finalfs .= " and ";
+        }
+        $q_finalfs .= " $q_userfs ";
+    }
+    if (strlen($q_finalfs) > 0) {
+        $q_finalfs = "where $q_finalfs";
+    }
+
+    # setup sorting
+    if (!isset($sortcols) || count($sortcols) == 0) {
+        $sortcols = array('node_id');
+    }
+    $q_sortstr = 'order by ';
+    foreach ($sortcols as $sc) {
+        $q_sortstr .= $colmap[$sc] . ",";
+    }
+    $q_sortstr = rtrim($q_sortstr,',');
+    if (isset($sortdir)) {
+        if ($sortdir != "asc" && $sortdir != "desc") {
+            # XXX - bad sort param!
+	    $sortdir = "asc";
+        }
+    }
+    else {
+        # we set one by default so that users don't have a hard time in the
+        # default case
+        $sortdir = "asc";
+    }
+    $q_sortstr .= " $sortdir";
+
+    # setup pagination
+    $q_pagstr = '';
+    if (!isset($limit)) {
+        $limit = $DEF_LIMIT;
+    }
+    if (isset($limit) && !isset($offset)) {
+        $offset = 0;
+    }
+    $q_pagstr .= " limit $limit offset $offset";
+
+    return array($q_colstr,$q_joinstr,$q_finalfs,$q_sortstr,$q_pagstr);
+}
+
+function pm_showtable($totalrows,$query) {
+    global $sortcols,$sortdir,$colmap,$colmap_mysqlnames,$cols;
+
+    echo "<center><div style=''>\n";
+    echo pm_getpaginationlinks($totalrows);
+    echo "<br>\n";
+
+    # dump table header
+    echo "<table>\n";
+    echo "  <tr>\n";
+
+    # reverse the sort direction if necessary
+    if (isset($sortcols) && count($sortcols) == 1 
+        && $sortcols[0] == 'node_id') {
+        $nsortdir = ($sortdir == "asc")?"desc":"asc";
+    }
+    else {
+        $nsortdir = $sortdir;
+    }
+    $url = pm_buildurl(array('sortcols' => 'node_id','sortdir' => $nsortdir));
+    echo "    <th><a href='$url'>node_id</a></th>\n";
+    foreach ($cols as $c) {
+        # reverse the sort direction if necessary
+        if (isset($sortcols) && count($sortcols) == 1 
+            && $sortcols[0] == $c) {
+            $nsortdir = ($sortdir == "asc")?"desc":"asc";
+        }
+        else {
+            $nsortdir = $sortdir;
+        }
+        $url = pm_buildurl(array('sortcols' => $c,'sortdir' => $nsortdir));
+        echo "    <th><a href='$url'>$c</a></th>\n";
+    }
+
+    # now run the real query
+    $qres = DBQueryFatal($query);
+
+    while ($row = mysql_fetch_array($qres)) {
+        echo "  <tr>\n";
+        echo "    <td>" . $row[$colmap_mysqlnames['node_id']] . "</td>\n";
+        foreach ($cols as $c) {
+            $dbval = $row[$colmap_mysqlnames[$c]];
+            # stupid mysql driver
+            if (is_numeric($dbval) && is_float($dbval+0)) {
+                $dbval = sprintf("%.4f",$dbval);
+            }
+            echo "      <td>$dbval</td>\n";
+        }
+    }
+
+    echo "</table>\n";
+    echo pm_getpaginationlinks($totalrows);
+    echo "</div></center>\n";
+}
 
 ?>

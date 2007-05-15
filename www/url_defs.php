@@ -47,6 +47,7 @@ define("PAGEARG_INTEGER",	"integer");
 define("PAGEARG_NUMERIC",	"numeric");
 define("PAGEARG_ARRAY",		"array");
 define("PAGEARG_ANYTHING",	"anything");
+define("PAGEARG_ALPHALIST",     "alphalist");
 
 define("URL_USER",		"user");
 define("URL_PROJECT",		"project");
@@ -552,6 +553,18 @@ function VerifyPageArguments($argspec, $required)
 		$yep = 1;
 
                 # Anything allowed, caller BETTER check it.
+	    }
+	    break;
+
+	case PAGEARG_ALPHALIST:
+	    if (isset($_REQUEST[$name])) {
+		$object = $_REQUEST[$name];
+		if (!preg_match("/^[\d\w\-\ \,]+$/",$object)) {
+		    unset($object);
+		}
+		else {
+		    $object = preg_split("/[\,\;]+\s*/",$_REQUEST[$name]);
+		}
 	    }
 	    break;
 	    
