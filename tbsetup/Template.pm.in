@@ -3023,12 +3023,23 @@ sub CopyDataStore($$$;$)
 						     "datastore")
 	== 0 or return -1;
 
-    libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-						     $to_path,
-						     $archive_tag,
-						     "exp/datastore")
-	== 0 or return -1;
-    
+    #
+    # Path confusion. We want this to really be at top level, so
+    # use a symlink to fake things. 
+    #
+    if (! -e "$to_path/exp") {
+	Template::mysystem("cd $to_path; ln -s . exp") == 0
+	    or return -1;
+    }
+
+    if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
+							 $to_path,
+							 $archive_tag,
+							 "exp/datastore")) {
+	unlink("$to_path/exp");
+	return -1;
+    }
+    unlink("$to_path/exp");
     return 0;
 }
 
