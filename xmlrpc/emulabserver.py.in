@@ -4919,10 +4919,10 @@ class template:
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     def startrun(self, version, argdict):
-        return self.newrun("start", version, argdict):
-            
+        return self.newrun("start", version, argdict)
+                
     def modrun(self, version, argdict):
-        return self.newrun("modify", version, argdict):
+        return self.newrun("modify", version, argdict)
     
     #
     # Stop current run.
