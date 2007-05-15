@@ -385,15 +385,18 @@ if ($expstate) {
 
     if ($instance && $expstate == $TB_EXPTSTATE_ACTIVE) {
 	if ($instance->runidx()) {
-	    WRITESUBMENUBUTTON("Stop Current Experiment Run",
+	    WRITESUBMENUBUTTON("Stop Current Run",
 			       CreateURL("template_exprun", $instance,
 					 "action", "stop"));
-	    WRITESUBMENUBUTTON("Abort Current Experiment Run",
+	    WRITESUBMENUBUTTON("Abort Current Run",
 			       CreateURL("template_exprun", $instance,
 					 "action", "abort"));
 	}
+	WRITESUBMENUBUTTON("Modify Resources",
+			   CreateURL("template_exprun", $instance,
+				     "action", "modify"));
 
-	WRITESUBMENUBUTTON("Start New Experiment Run",
+	WRITESUBMENUBUTTON("Start New Run",
 			   CreateURL("template_exprun", $instance,
 				     "action", "start"));
 
@@ -403,7 +406,7 @@ if ($expstate) {
 					 "action", "continue"));
 	}
 	else {
-	    WRITESUBMENUBUTTON("Pause Experiment Runtime",
+	    WRITESUBMENUBUTTON("Pause Runtime",
 			       CreateURL("template_exprun", $instance,
 					 "action", "pause"));
 	}
