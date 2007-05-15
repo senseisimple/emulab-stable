@@ -94,6 +94,21 @@ for ($i = 0; $i < scalar(@ranklist); ++$i) {
 	"\t" . $ranklist[$i]{'totseqnum_failure'} .
 	"\t" . $ranklist[$i]{'jitseqnum_failure'} .
 	"\n";
+
+    # insert into stats table for use in web display, or other computation
+    my $kstr = "node_id,unavail,jitdeduct,succtime,succnum,succjitnum," . 
+	"failtime,failnum,failjitnum";
+    my $vstr = "'" . $ranklist[$i]{'nodeid'} . "'," . 
+	$ranklist[$i]{'rank'} . "," . 
+	$ranklist[$i]{'jitter_deduction'} . "," . 
+	$ranklist[$i]{'totseqlen_success'} . "," . 
+	$ranklist[$i]{'totseqnum_success'} . "," . 
+	$ranklist[$i]{'jitseqnum_success'} . "," . 
+	$ranklist[$i]{'totseqlen_failure'} . "," . 
+	$ranklist[$i]{'totseqnum_failure'} . "," . 
+	$ranklist[$i]{'jitseqnum_failure'};
+
+    DBQueryWarn("insert into plab_nodehiststats ($kstr) values ($vstr)");
 }
 
 close($OF);

@@ -86,6 +86,25 @@ my $COMONURL = "http://summer.cs.princeton.edu/status/tabulator.cgi".
     "?table=table_nodeview&format=formatspaces&select='resptime%20%3E%200'";
 my %host2nodeid = ();
 
+# translates emulab keys to comon keys for inserts into the 
+# plab_comondata table (the real point is to keep track of which comon fields
+# our table stores, of course)
+my %comon_trans_table = (resptime => 'resptime',uptime => 'uptime',
+			 lastcotop => 'lastcotop',date => 'date',
+			 drift => 'drift',cpuspeed => 'cpuspeed',
+			 busycpu => 'busycpu',syscpu => 'syscpu',
+			 freecpu => 'freecpu','1minload' => '1minload',
+			 '5minload' => '5minload',numslices => 'numslices',
+			 liveslices => 'liveslices',connmax => 'connmax',
+			 connavg => 'connavg',timermax => 'timermax',
+			 timeravg => 'timeravg',memsize => 'memsize',
+			 memact => 'memact',freemem => 'freemem',
+			 swapin => 'swapin',swapout => 'swapout',
+			 diskin => 'diskin',diskout => 'diskout',
+			 gbfree => 'gbfree',swapused => 'swapused',
+			 bwlimit => 'bwlimit',txrate => 'txrate',
+			 rxrate => 'rxrate');
+
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 5;
 
@@ -258,6 +277,11 @@ sub ProcessCoMonData($) {
             next;
         }
         my %metrics = ();
+	# save off all the column data
+	for (my $lpc = 0; $lpc < scalar(@coldata); ++$lpc) {
+	    $metrics{$columns[$lpc]} = $coldata[$lpc];
+	}
+	# save off custom data
         $metrics{'metricsage'} = null2inf($coldata[$colpos{'lastcotop'}]);
         $metrics{'load_1min'}  = null2inf($coldata[$colpos{'1minload'}]);
         $metrics{'load_5min'}  = null2inf($coldata[$colpos{'5minload'}]);
@@ -273,7 +297,6 @@ sub ProcessCoMonData($) {
         InsertMetrics($node_id, %metrics);
     }
 }
-
 
 #
 # Insert the metrics we care about. Called for each node.
@@ -367,6 +390,42 @@ sub InsertMetrics($%)
 		    " (node_id, feature, weight) ".
 		    " values ('$nodeid', '+disk', $disk)");
     }
+
+    # finally, insert int/float values into the main comon data table
+    if (!$impotent) {
+	my $qstr = "replace into plab_comondata ";
+	my $kstr = "node_id,";
+	my $vstr = "'$nodeid',";
+	my @errors = ();
+	foreach my $ekn (keys(%comon_trans_table)) {
+	    $kstr .= "$ekn,";
+	    my $val = $metrics{$comon_trans_table{$ekn}};
+	    if ($val eq '' || $val =~ /null/i) {
+		$val = -1;
+	    }
+	    # make sure we have an int or float; we accept nothing else.
+	    if (!($val =~ /^\-?\d+(\.\d+)?$/)) {
+		push @errors,"bad data in field ".$comon_trans_table{$ekn}.
+		    ": '$val'";
+	    }
+	    $vstr .= $metrics{$comon_trans_table{$ekn}} . ",";
+	}
+	if (scalar(@errors) > 0) {
+	    print STDERR "Errors during $nodeid:\n";
+	    foreach my $er (@errors) {
+		print STDERR "  $er\n";
+	    }
+	}
+	else {
+	    # close off the query and do it
+	    chop($kstr);
+	    chop($vstr);
+	    $qstr .= "($kstr) values ($vstr)";
+
+	    DBQueryWarn($qstr);
+	}
+    }
+    
 }
 
 
