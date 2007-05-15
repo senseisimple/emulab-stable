@@ -108,7 +108,7 @@ for ($i = 0; $i < scalar(@ranklist); ++$i) {
 	$ranklist[$i]{'totseqnum_failure'} . "," . 
 	$ranklist[$i]{'jitseqnum_failure'};
 
-    DBQueryWarn("insert into plab_nodehiststats ($kstr) values ($vstr)");
+    DBQueryWarn("replace into plab_nodehiststats ($kstr) values ($vstr)");
 }
 
 close($OF);
