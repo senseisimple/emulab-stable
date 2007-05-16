@@ -934,7 +934,7 @@ sub Replace($$$)
 
     if (-e $zipfile) {
 	# print STDERR "ArchiveReplace: renaming $zipfile to $savefile\n";
-	if (!rename($zipfile, $savefile)) {
+if (!rename($zipfile, $savefile)) {
 	    print STDERR "ArchiveReplace: Could not backup $zipfile!\n";
 	    goto bad;
 	}
@@ -1619,6 +1619,52 @@ sub GenerateTag($$)
 
     return $newtag;
 }
+
+#
+# Return pointer to zip archive file.
+#
+sub ZipFile($;$$)
+{
+    my ($self, $view, $tag) = @_;
+
+    return undef
+	if (! ref($self));
+    my $archive_idx  = $self->idx();
+
+    $view = $defaultview
+	if (!defined($view));
+
+    my $View = $self->View($view);
+    return undef
+	if (!defined($View));
+
+    # Cannot list if there are no revisions.
+    return undef
+	if (!defined($View->{'revision'}));
+
+    my $directory = $self->directory();
+    my $repodir   = "$directory/$REPO/$view";
+
+    # Where to find what we want.
+    my $revision;
+    
+    if (defined($tag)) {
+	my $revision_row = $self->Revision($view, $tag);
+
+	if (!defined($revision_row)) {
+	    print STDERR "ArchiveList: ".
+		"Could not locate a revision for $view/$tag in $self\n";
+	    return undef;
+	}
+	$revision = $revision_row->{'revision'};
+    }
+    else {
+	# Trunk, sorta.
+	$revision = $View->{'revision'};
+    }
+    return "$repodir/${revision}.zip";
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

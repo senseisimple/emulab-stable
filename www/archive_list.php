@@ -20,6 +20,7 @@ $optargs = OptionalPageArguments("index",      PAGEARG_INTEGER,
 				 "experiment", PAGEARG_EXPERIMENT,
 				 "instance",   PAGEARG_INSTANCE,
 				 "template",   PAGEARG_TEMPLATE,
+				 "file",       PAGEARG_INTEGER,
 				 "tag",        PAGEARG_STRING);
 
 if (! (isset($experiment) || isset($instance) ||
@@ -87,6 +88,9 @@ elseif (isset($index)) {
 		  "archive in $pid/$eid!", 1);
     }
 }
+
+# This gets scrubbed ...
+$query = escapeshellcmd($_SERVER["QUERY_STRING"]);
     
 #
 # A cleanup function to keep the child from becoming a zombie.
@@ -106,19 +110,27 @@ register_shutdown_function("SPEWCLEANUP");
 ignore_user_abort(1);
 
 # Pass the tag through.
-$tagopt = (isset($tag) ? "-t " . escapeshellarg($tag) : "");
+$options  = (isset($tag) ? "-t " . escapeshellarg($tag) : "");
+$options .= " -q $query ";
+$options .= (isset($file) ? " -i " . escapeshellarg($file) : "");
 
 $fp = popen("$TBSUEXEC_PATH $uid ".
-	    "   $pid,$gid webarchive_list $tagopt $archive_idx $idx", "r");
+	    "   $pid,$gid webarchive_list $options $archive_idx $idx",
+	    "r");
 
 if (! $fp) {
     USERERROR("Archive listing failed!", 1);
 }
 
-header("Content-Type: text/plain");
-header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
-header("Cache-Control: no-cache, must-revalidate");
-header("Pragma: no-cache");
+#
+# Yuck. Since we cannot tell php to shut up and not print headers, we have to
+# 'merge' headers from the backend with PHPs.
+#
+while ($line = fgets($fp)) {
+    # This indicates the end of headers
+    if ($line == "\n") { break; }
+    header(rtrim($line));
+}
 flush();
 fpassthru($fp);
 $fp = 0;
