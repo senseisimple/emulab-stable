@@ -127,7 +127,7 @@ function STARTLOG($experiment)
           </script>\n";
     echo "<script type='text/javascript' language='javascript'>\n";
 
-    echo "SetupOutputArea('outputframe');\n"; 
+    echo "SetupOutputArea('outputframe', true);\n"; 
 
     echo "exp_pid = \"$pid\";\n";
     echo "exp_eid = \"$eid\";\n";

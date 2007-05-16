@@ -45,7 +45,7 @@ echo "<div><iframe id='outputframe' ".
       "width=100% height=600 scrolling=auto border=4></iframe></div>\n";
     
 echo "<script type='text/javascript' language='javascript'>\n";
-echo "SetupOutputArea('outputframe');\n"; 
+echo "SetupOutputArea('outputframe', true);\n"; 
 echo "</script>\n";
 
 echo "<iframe id='inputframe' name='inputframe' width=0 height=0

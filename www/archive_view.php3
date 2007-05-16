@@ -127,9 +127,13 @@ echo "<b><input type=hidden name=$urlarg value='$urlval'></b>";
 echo "<b><input type=submit name=submit value='Show Tags'></b>";
 echo "</form>";
 
-echo "<iframe width=100% height=800 scrolling=yes src='$url' border=2>".
-     "</iframe>\n";
+echo "<div><iframe src='$url' class='outputframe' ".
+	"id='outputframe' name='outputframe'></iframe></div>\n";
 echo "</center><br>\n";
+
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "SetupOutputArea('outputframe', false);\n"; 
+echo "</script>\n";
 
 #
 # Standard Testbed Footer

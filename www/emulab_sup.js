@@ -106,14 +106,17 @@ function GetMaxHeight(id) {
     return winheight;
 }
 
-function SetupOutputArea(id) {
+function SetupOutputArea(id, clean) {
     var Iframe    = getObjbyName(id);
     var IframeDoc = IframeDocument(id);
     var winheight = GetMaxHeight(id);
 
-    IframeDoc.open();
-    IframeDoc.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
-    IframeDoc.close();
+    if (clean == true) {
+        IframeDoc.open();
+        IframeDoc.write('<html><head><base href=$BASEPATH/></head><body>' +
+                        '<pre id=outputarea></pre></body></html>');
+        IframeDoc.close();
+    }
 
     Iframe.style.border = "2px solid";
     Iframe.style.width  = "100%";
