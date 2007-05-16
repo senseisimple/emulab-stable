@@ -895,7 +895,7 @@ sub osload_setupswapinfo($$;@)
     # set to an MFS at other times.
     #
     my $query_result = DBQueryWarn(
-	"select r.node_id,r.vname,r.pid,r.eid,r.erole,n.osid,p.partition,p.imageid,p.imagepid,i.loadpart,e.savedisk ".
+	"select r.node_id,r.vname,r.pid,r.eid,r.erole,n.osid,p.partition,p.imageid,p.imagepid,i.imagename,i.loadpart,e.savedisk ".
 	"from reserved as r ".
 	"left join nodes as n on n.node_id=r.node_id ".
 	"left join node_types as nt on nt.type=n.type ".
@@ -908,7 +908,7 @@ sub osload_setupswapinfo($$;@)
     }
 
     while (my ($node, $vname, $rpid, $reid, $erole, $osid, $part, $imageid,
-	       $imagepid, $lpart, $savedisk) =
+	       $imagepid, $imagename, $lpart, $savedisk) =
 	   $query_result->fetchrow_array()) {
 
 	my $nodeobject = Node->Lookup($node);
@@ -924,7 +924,7 @@ sub osload_setupswapinfo($$;@)
 	# XXX not a disk-based OSID.  This can happen during frisbee loads
 	#
 	if (!defined($imageid)) {
-	    print "*** swapinfo: $osid is not disk-based!?\n";
+	    print "*** swapinfo: OS $osid is not disk-based!?\n";
 	    next
 		if (!$allnodes);
 	    return 1;
@@ -957,7 +957,7 @@ sub osload_setupswapinfo($$;@)
 
 	my $disk = "$dtype$dunit";
 	$nodeinfo{$node} =
-	    [$vname, $rpid, $reid, $osid, $disk, $part, $imageid, $imagepid, $lpart];
+	    [$vname, $rpid, $reid, $disk, $part, $imagepid, $imagename, $lpart];
     }
 
     #
@@ -965,9 +965,14 @@ sub osload_setupswapinfo($$;@)
     # the name <vname>.sig.  Likewise, we record the partition that the
     # image resides in under <vname>.part.
     #
-    # Note that we actually copy the signature over as <imageid>.sig and
+    # Note that we actually copy the signature over as <imagename>.sig and
     # then symlink the <vname>.sig's to it.  This not only saves space,
     # but makes it easier to determine what is loaded on each node.
+    #
+    # Finally note that we are using imagename rather than imageid (which
+    # is a numeric UUID).  The latter is really closer to what we want, but
+    # was added later and needs to be reconciled with our idea of 'unique'
+    # (the signature).
     #
     my %gotsig = ();
     for my $node (keys(%nodeinfo)) {
@@ -976,15 +981,15 @@ sub osload_setupswapinfo($$;@)
 	    print "*** swapinfo: WARNING: got no partition info for $node!\n";
 	    next;
 	}
-	my ($vname, $rpid, $reid, $osid, $disk, $part, $imageid, $imagepid, $lpart) = @{$infop};
+	my ($vname, $rpid, $reid, $disk, $part, $imagepid, $imagename, $lpart) = @{$infop};
 
 	#
 	# If imageid is not "fully qualified" with the project name,
 	# generate a name that is.
 	#
-	my $rimageid = $imageid;
-	if ($rimageid !~ /^$imagepid-/) {
-	    $rimageid = "$imagepid-$imageid";
+	my $rimagename = $imagename;
+	if ($rimagename !~ /^$imagepid-/) {
+	    $rimagename = "$imagepid-$imagename";
 	}
 
 	# XXX backward compat
@@ -1013,15 +1018,15 @@ sub osload_setupswapinfo($$;@)
 	} else {
 	    $sigdir = "/$PROJROOT/$imagepid/images/sigs";
 	}
-	$signame = "$imageid.ndz.sig";
+	$signame = "$imagename.ndz.sig";
 	$signame =~ s/^$imagepid-//;
 	if (! -d $sigdir || ! -f "$sigdir/$signame") {
 	    print "*** swapinfo: WARNING: ".
-		"no image signature for $rimageid, ".
+		"no image signature for $rimagename, ".
 		"cannot save swapout state!\n";
 	    next;
 	}
-	my $basesig = "$infodir/$rimageid.sig";
+	my $basesig = "$infodir/$rimagename.sig";
 	if (! -r $basesig) {
 	    $mustcopy = 1;
 	} elsif (!defined($gotsig{$basesig})) {
@@ -1029,11 +1034,11 @@ sub osload_setupswapinfo($$;@)
 	    my $totime = stat($basesig)->mtime;
 	    if ($fromtime > $totime) {
 		print "*** swapinfo: WARNING: ".
-		    "$rimageid.sig out of date, updating...\n";
+		    "$rimagename.sig out of date, updating...\n";
 		$mustcopy = 1;
 	    } elsif ($fromtime < $totime) {
 		print "*** swapinfo: WARNING: ".
-		    "$rimageid.sig newer than source $sigdir/$signame!\n";
+		    "$rimagename.sig newer than source $sigdir/$signame!\n";
 	    }
 	}
 	if ($mustcopy) {
@@ -1047,7 +1052,7 @@ sub osload_setupswapinfo($$;@)
 	}
 	$gotsig{$basesig} = 1;
 
-	if (system("/bin/ln -s $rimageid.sig $infodir/$vname.sig")) {
+	if (system("/bin/ln -s $rimagename.sig $infodir/$vname.sig")) {
 	    print "*** swapinfo: WARNING: ".
 		"could not create signature $infodir/$vname.sig, ".
 		    "cannot save swapout state!\n";
