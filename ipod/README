@@ -88,14 +88,14 @@ ICMP type is 6, ICMP code is 6.  Length of the ICMP must be at least
 32 bytes if key checking is enabled.
 
 
-Use in Netbed:
+Use in Emulab:
 
-At boot, a node checks in with Netbed Central ("boss" node) over a
+At boot, a node checks in with Emulab Central ("boss" node) over a
 secure SSL connection using the TMCD protocol ("tmcc ipodinfo").  During
 this checkin, the boss generates a random key for the IPOD, stores the key
 in its database, and replies to the node sending the key and its own IP
 information.  The node parses the addr/mask/key information and configures
-the kernel using sysctls.  If the node cannot contact Netbed Central,
+the kernel using sysctls.  If the node cannot contact Emulab Central,
 it does not configure an IPOD key and IPOD processing is disabled.
 (Perhaps a better way to do this would be a challenge-response protocol,
 but that might add complexity, and the goal of IPOD is to be completely
