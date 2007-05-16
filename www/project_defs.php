@@ -821,12 +821,13 @@ class Project
 	$groups    = $this->SubGroups();
 
 	echo "<h3>Project Groups</h3>\n";
-	echo "<table align=center border=1>\n";
+	echo "<table id='grouplist' align=center border=1>\n";
+	echo "<thead class='sort'>";
 	echo "<tr>
                <th>GID</th>
                <th>Description</th>
                <th>Leader</th>
-              </tr>\n";
+              </tr></thead>\n";
 
 	foreach ($groups as $group) {
 	    $gid         = $group->gid();
@@ -844,6 +845,10 @@ class Project
                  </tr>\n";
 	}
 	echo "</table>\n";
+
+        echo "<script type='text/javascript' language='javascript'>
+	       sorttable.makeSortable(getObjbyName('grouplist'));
+             </script>\n";
     }
 
     function ShowStats() {

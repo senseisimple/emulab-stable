@@ -962,8 +962,10 @@ class Group
 	    echo "<h3>Group Members</h3>\n";
 
 	echo "</center>
-              <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+              <table align=center border=1 cellpadding=1
+                     id='userlist' cellspacing=2>\n";
 
+	echo "<thead class='sort'>";
 	echo "<tr>
                   <th>Name</th>\n";
 	if (! $projgrp) {
@@ -974,7 +976,7 @@ class Group
 	if ($showdel) {
 	    echo "<th>Remove</th>\n";
 	}
-	echo "</tr>\n";
+	echo "</tr></thead>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $uid_idx = $row["uid_idx"];
@@ -1012,6 +1014,9 @@ class Group
 	    echo "</tr>\n";
 	}
 	echo "</table>\n";
+        echo "<script type='text/javascript' language='javascript'>
+	       sorttable.makeSortable(getObjbyName('userlist'));
+             </script>\n";
     }
 
     function ShowStats() {

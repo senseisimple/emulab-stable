@@ -435,8 +435,9 @@ foreach($freetypes as $key => $value) {
 echo "</table>\n";
 SUBMENUEND_2B();
 
-echo "<table border=2 cellpadding=2 cellspacing=2>\n";
+echo "<table border=2 cellpadding=2 cellspacing=2 id='nodelist'>\n";
 
+echo "<thead class='sort'>";
 echo "<tr>
           <th align=center>ID</th>\n";
 
@@ -445,7 +446,7 @@ if ($showvnames) {
 }
 
 echo "    <th align=center>Type (Class)</th>
-          <th align=center>Up?</th>\n";
+          <th align=center class='sorttable_nosort'>Up?</th>\n";
 
 if ($isadmin) {
     echo "<th align=center>PID</th>
@@ -464,7 +465,7 @@ if (!strcmp($showtype, "widearea")) {
 	  <th align=center>Location</th>";
 }
     
-echo "</tr>\n";
+echo "</tr></thead>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
     $node_id            = $row["node_id"]; 
@@ -562,6 +563,9 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 echo "</table>\n";
+echo "<script type='text/javascript' language='javascript'>
+         sorttable.makeSortable(getObjbyName('nodelist'));
+      </script>\n";
 SUBPAGEEND();
 
 #

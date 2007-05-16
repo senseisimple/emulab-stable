@@ -1234,7 +1234,8 @@ function ShowExperimentList_internal($templates_only,
           <h3>$title ".
 	    ($templates_only ? "Template Instances" : "Experiments") . "</h3>
           </center>
-          <table align=center border=1 cellpadding=2 cellspacing=2>\n";
+          <table align=center border=1 cellpadding=2
+                 id='explist' cellspacing=2>\n";
 
 	if ($nopid) {
 	    $pidrow="";
@@ -1242,13 +1243,14 @@ function ShowExperimentList_internal($templates_only,
 	    $pidrow="\n<th>PID</th>";
 	}
 	
+	echo "<thead class='sort'>";
 	echo "<tr>$pidrow
               <th>EID</th>
               <th>State</th>
               <th align=center>Nodes [1]</th>
               <th align=center>Hours Idle [2]</th>
               <th>Description</th>
-          </tr>\n";
+          </tr></thead>\n";
 
 	$idlemark = "<b>*</b>";
 	$stalemark = "<b>?</b>";
@@ -1312,6 +1314,9 @@ function ShowExperimentList_internal($templates_only,
 	}
 	echo "</ol></font></td></tr></table>\n";
 
+        echo "<script type='text/javascript' language='javascript'>
+	       sorttable.makeSortable(getObjbyName('explist'));
+             </script>\n";
     }
 }
 

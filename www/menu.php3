@@ -664,6 +664,8 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     }
     echo "<script type='text/javascript' language='javascript'
                   src='${BASEPATH}/emulab_sup.js'></script>\n";
+    echo "<script type='text/javascript' language='javascript'
+                  src='${BASEPATH}/sorttable.js'></script>\n";
 
     if (! $nobanner ) {
         #

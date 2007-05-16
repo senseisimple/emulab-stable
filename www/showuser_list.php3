@@ -30,14 +30,10 @@ if (! $isadmin) {
 # Verify Page Arguments.
 #
 $optargs = OptionalPageArguments("showtype",   PAGEARG_STRING,
-				 "sortby",     PAGEARG_STRING,
 				 "searchfor",  PAGEARG_STRING);
 
 if (!isset($showtype)) {
     $showtype='loggedin';
-}
-if (!isset($sortby)) {
-    $sortby = "uid";
 }
 if (!isset($searchfor)) {
     $searchfor = "";
@@ -62,7 +58,6 @@ echo "<form action=showuser_list.php3 method=post>
              size=20
    	     maxlength=50>
       <input type=hidden name=showtype value=\"$showtype\">
-      <input type=hidden name=sortby   value=\"$sortby\">
       <b><input type=submit name=search value=Search></b>\n";
 echo "<br><br>\n";
 
@@ -121,18 +116,6 @@ else {
     $showtag = "";
 }
 
-if (! strcmp($sortby, "name"))
-    $order = "u.usr_name";
-elseif (! strcmp($sortby, "uid"))
-    $order = "u.uid";
-elseif (! strcmp($sortby, "widle"))
-    $order = "webidle DESC";
-elseif (! strcmp($sortby, "uidle"))
-    $order = "usersidle DESC";
-else {
-    $order = "u.uid";
-}
-
 $query_result =
     DBQueryFatal("SELECT " . ($dorecent ? "distinct" : "") . " u.*, ".
 		 " IF(ll.weblogin_last, ".
@@ -145,7 +128,7 @@ $query_result =
 		 "left join userslastlogin as ull on u.uid=ull.uid ".
 		 "left join user_stats as ll on u.unix_uid=ll.uid_idx ".
 		 "$where ".
-		 "order by $order");
+		 "order by u.uid");
 
 if (($count = mysql_num_rows($query_result)) == 0) {
     USERERROR("There are no users!", 1);
@@ -176,31 +159,25 @@ while ($row = mysql_fetch_array($projmemb_result)) {
     $projmemb_array[$uid][] = $foo;
 }
 
-echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2
-       align='center'>\n";
+echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2 
+       id='userlist' align='center'>\n";
 
+echo "<thead class='sort'>";
 echo "<tr>
           <th>&nbsp</th>
-          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uid".
-                 "&searchfor=$searchfor'> 
-                 UID</a></th>
-          <th><a href='showuser_list.php3?showtype=$showtype&sortby=name".
-                 "&searchfor=$searchfor'>
-                 Name</a></th>
+          <th>UID</th>
+          <th>Name</th>
           <th>Projects</th>\n";
 
 if (! strcmp($showtype, "inactive")) {
     echo "<th>Status</th>\n";
 }
 
-echo "    <th><a href='showuser_list.php3?showtype=$showtype&sortby=widle".
-                 "&searchfor=$searchfor'>
-                 Web<br>Idle</a></th>
-          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uidle".
-                 "&searchfor=$searchfor'>
-                 Users<br>Idle</a></th>\n";
+echo "    <th>Web<br>Idle</th>
+          <th>Users<br>Idle</th>\n";
 
 echo "</tr>\n";
+echo "</thead>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
     $thisuid  = $row["uid"];
@@ -268,6 +245,10 @@ while ($row = mysql_fetch_array($query_result)) {
     echo "</tr>\n";
 }
 echo "</table>\n";
+
+echo "<script type='text/javascript' language='javascript'>
+	  sorttable.makeSortable(getObjbyName('userlist'));
+       </script>\n";
 
 #
 # Standard Testbed Footer

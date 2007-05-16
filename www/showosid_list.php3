@@ -11,10 +11,6 @@ include("defs.php3");
 #
 PAGEHEADER("OS Descriptor List");
 
-# Sorttable.js
-echo "<script type='text/javascript' language='javascript'
-              src='sorttable.js'></script>\n";
-
 #
 #
 # Only known and logged in users allowed.

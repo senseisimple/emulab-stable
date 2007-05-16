@@ -158,7 +158,6 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
     
     if (mysql_num_rows($query_result)) {
 	echo "
-              <script type='text/javascript' language='javascript' src='sorttable.js'></script>
               <center>
               <br>
               <a href=" . $_SERVER["REQUEST_URI"] . "#reserved_nodes>
