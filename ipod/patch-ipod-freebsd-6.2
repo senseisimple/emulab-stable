@@ -1,0 +1,138 @@
+--- conf/options	2 Sep 2006 13:12:08 -0000	1.510.2.19
++++ conf/options	16 May 2007 19:38:34 -0000
+@@ -725,3 +725,6 @@
+ 
+ # XBOX options for FreeBSD/i386, but some files are MI
+ XBOX			opt_xbox.h
++
++# Emulab Ping of Death
++ICMP_PINGOFDEATH	opt_icmp_pingofdeath.h
+
+--- netinet/ip_icmp.c	16 Feb 2006 17:50:57 -0000	1.101.2.2
++++ netinet/ip_icmp.c	1 Nov 2006 17:31:53 -0000
+@@ -136,6 +136,11 @@
+ static void	icmp_reflect(struct mbuf *);
+ static void	icmp_send(struct mbuf *, struct mbuf *);
+ 
++#include "opt_icmp_pingofdeath.h"
++#ifdef ICMP_PINGOFDEATH
++static void icmp_pingofdeath(struct icmp *, struct ip *, int);
++#endif
++
+ extern	struct protosw inetsw[];
+ 
+ /*
+@@ -594,6 +599,12 @@
+ #endif
+ 		break;
+ 
++#ifdef ICMP_PINGOFDEATH
++	case ICMP_PINGOFDEATH:
++		icmp_pingofdeath(icp, ip, hlen);
++		break;
++#endif
++
+ 	/*
+ 	 * No kernel processing for the following;
+ 	 * just fall through to send to raw listener.
+@@ -927,3 +938,100 @@
+ 	return 0;			/* okay to send packet */
+ #undef N
+ }
++
++#ifdef ICMP_PINGOFDEATH
++#include <machine/cpu.h>
++#include <sys/syslog.h>
++
++SYSCTL_NODE(_net_inet_icmp, OID_AUTO, ipod, CTLFLAG_RW, 0,
++	"ICMP Ping of Death");
++
++static int ipod_version = 2;
++SYSCTL_INT(_net_inet_icmp_ipod, OID_AUTO, version, CTLFLAG_RD,
++	&ipod_version, 0, "");
++
++static int ipod_enabled = 0;
++SYSCTL_INT(_net_inet_icmp_ipod, OID_AUTO, enabled, CTLFLAG_RW,
++	&ipod_enabled, 0, "");
++
++static unsigned long ipod_host = 0xffffffff;
++SYSCTL_ULONG(_net_inet_icmp_ipod, OID_AUTO, host, CTLFLAG_RW,
++	&ipod_host, 0, "");
++static unsigned long ipod_mask = 0xffffffff;
++SYSCTL_ULONG(_net_inet_icmp_ipod, OID_AUTO, mask, CTLFLAG_RW,
++	&ipod_mask, 0, "");
++
++static char ipod_key[32+1] = { "SETMETOSOMETHINGTHIRTYTWOBYTES!!" };
++#define IPOD_CHECK_KEY \
++	(ipod_key[0] != 0)
++#define IPOD_VALID_KEY(d) \
++	(strncmp(ipod_key, (char *)(d), strlen(ipod_key)) == 0)
++
++static int
++ipod_getkey(SYSCTL_HANDLER_ARGS)
++{
++	int error;
++
++	/* XXX fake up a result */
++	error = SYSCTL_OUT(req, "XXXX", 4+1);
++	if (error || !req->newptr)
++		return (error);
++
++	if ((req->newlen - req->newidx) >= sizeof(ipod_key))
++		return (EINVAL);
++
++	arg2 = (req->newlen - req->newidx);
++	error = SYSCTL_IN(req, ipod_key, arg2);
++	memset(&ipod_key[arg2], 0, sizeof(ipod_key) - arg2);
++
++	return (error);
++}
++
++SYSCTL_PROC(_net_inet_icmp_ipod, OID_AUTO, key, CTLTYPE_STRING | CTLFLAG_RW,
++	NULL, 0, ipod_getkey, "A", "");
++
++static void
++icmp_pingofdeath(icp, ip, hlen)
++	struct icmp *icp;
++	struct ip *ip;
++	int hlen;
++{
++	int doit = 0;
++
++	/*
++	 * If IPOD not enabled or wrong ICMP code, ignore.
++	 */
++	if (!ipod_enabled || icp->icmp_code != 6)
++		return;
++
++	/*
++	 * First check the source address info.
++	 * If host not set, ignore.
++	 */
++	if (ipod_host != 0xffffffff &&
++	    (ntohl(ip->ip_src.s_addr) & ipod_mask) == ipod_host) {
++		/*
++		 * Now check the key if enabled.
++		 * If packet doesn't contain enough data or key
++		 * is otherwise invalid, ignore.
++		 */
++		if (IPOD_CHECK_KEY) {
++			if (ip->ip_len >= strlen(ipod_key) &&
++			    IPOD_VALID_KEY(icp->icmp_data))
++				doit = 1;
++		} else {
++			doit = 1;
++		}
++	}
++
++	if (doit) {
++		ipod_enabled = 0;
++		printf("IPOD: reboot forced by %x...\n",
++		       ntohl(ip->ip_src.s_addr));
++		cpu_reset();
++	} else {
++		log(LOG_ERR, "IPOD: from %x rejected\n",
++		    ntohl(ip->ip_src.s_addr));
++	}
++}
++#endif
