@@ -120,6 +120,9 @@ my $NOCOLLAB   = 0;
 # Single or dual control network.
 my $SINGLE_CONTROLNET = 0;
 
+# Enable elvin compatibility
+my $ELVIN_COMPAT = 0;
+
 # This will not change ...
 my $PHP4_PKG = "php4-extensions-1.0";
 
@@ -232,6 +235,11 @@ sub doboot()
     $emulabconfig{"NOSETUP"}    = 0;
     $emulabconfig{"SCRATCHFS"}  = 0;
     $emulabconfig{"SINGLE_CONTROLNET"} = 0;
+    if (-x "/usr/local/libexec/elvind") {
+	$emulabconfig{"ELVIN_COMPAT"} = 1;
+    } else {
+	$emulabconfig{"ELVIN_COMPAT"} = 0;
+    }
 
     #
     # Need outer control router IP in lots of places.
@@ -288,6 +296,10 @@ sub doboot()
     if ($emulabconfig{"SINGLE_CONTROLNET"}) {
 	$SINGLE_CONTROLNET = 1;
     }
+    # and elvin compatibility
+    if ($emulabconfig{"ELVIN_COMPAT"}) {
+	$ELVIN_COMPAT = 1;
+    }
 
     # XXX Temporary
     if ($FBSD_VERSION == 5.4) {    
@@ -307,9 +319,13 @@ sub doboot()
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
     }
     elsif ($FBSD_VERSION == 6.1 || $FBSD_VERSION == 6.2) {
-	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/6.1/packages";
-	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/6.1/packages";
-	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/6.1/packages";
+	if ($ELVIN_COMPAT) {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/6.1/packages.elvincompat";
+	} else {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/6.1/packages";
+	}
+	$emulabconfig{OPS_PKG_DIR}  = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{BOSS_PKG_DIR} = $emulabconfig{FS_PKG_DIR};
 	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
@@ -1736,12 +1752,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^ELVIN_COMPAT$/ && do {
-		    if (-e "/usr/local/libexec/elvind") {
-			print OUTDEFS "ELVIN_COMPAT=1\n";
-		    }
-		    else {
-			print OUTDEFS "ELVIN_COMPAT=0\n";
-		    }
+		    print OUTDEFS "ELVIN_COMPAT=$ELVIN_COMPAT\n";
 		    last SWITCH;
 		};
 		
