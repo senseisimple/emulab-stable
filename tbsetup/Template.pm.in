@@ -2753,11 +2753,6 @@ sub NewRunBinding($$$)
 		"  name='$name', value=$value")
 	or return -1;
 
-    DBQueryWarn("replace into virt_user_environment set ".
-		"   name='$name', value=$value, ".
-		"   exptidx='$exptidx', pid='$pid', eid='$eid'")
-	or return -1;
-    
     return 0;
 }
 
@@ -3373,9 +3368,9 @@ sub WriteProgramAgents($)
 #
 # Setup the environment variables for a template swapin.
 #
-sub InitializeEnvVariables($;$)
+sub InitializeEnvVariables($)
 {
-    my ($self, $parameters) = @_;
+    my ($self) = @_;
 
     # Must be a real reference. 
     return -1
@@ -3429,10 +3424,23 @@ sub InitializeEnvVariables($;$)
     # table so that they are available to the program agent when it starts up
     # on the nodes.
     #
-    if (defined($parameters)) {
-	foreach my $name (keys(%{ $parameters })) {
-	    my $value = $parameters->{$name};
+    # Have to watch for the initial swapin since there will not be a current
+    # run yet. In this case, grab the environment variables from the instance.
+    #
+    my %parameters;
 
+    if (defined($self->runidx())) {
+	$self->RunBindingList(\%parameters) == 0 or return -1;
+    }
+    else {
+	$self->BindingList(\%parameters) == 0 or return -1;
+    }
+    
+    if (%parameters) {
+	foreach my $name (keys(%parameters)) {
+	    my $value = $parameters{$name};
+
+	    # This actually replaces.
 	    $experiment->AddEnvVariable($name, $value) == 0
 		or return -1;
 	}

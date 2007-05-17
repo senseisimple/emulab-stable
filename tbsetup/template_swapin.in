@@ -293,6 +293,24 @@ if (! ($foreground || $experiment->batchmode())) {
     }
 }
 
+#
+# All instances currently start with a default run.
+#
+$run = $instance->NewRun($eid, $this_user, $instance->description());
+if (!defined($run)) {
+    fatal(-1, "Could not create new experiment run for $instance!");
+}
+
+#
+# And the bindings for the default run ...
+#
+foreach my $name (keys(%parameters)) {
+    my $value = $parameters{$name};
+
+    $instance->NewRunBinding($name, $value) == 0
+	or fatal(-1, "Error inserting run binding into DB!");
+}
+
 # Event connect before starting swapin so we catch all the states.
 SetupEventHandler()
     if ($experiment->batchmode());
@@ -371,34 +389,6 @@ if ($experiment->batchmode()) {
 system("$archcontrol -t swapin commit $pid $eid");
 if ($?) {
     fatal(-1, "Could not commit archive!");
-}
-
-#
-# All instances currently start with a default run.
-#
-$run = $instance->NewRun($eid, $this_user, $instance->description());
-if (!defined($run)) {
-    fatal(-1, "Could not create new experiment run for $instance!");
-}
-
-#
-# And create a tag (and subdir) for this run. This is primarily a convenience
-# function for the web interface. The tag is simply an alias to the current
-# trunk and does not cause a savepoint or a commit.
-#
-system("$archcontrol -u -s runs/$eid tag $pid $eid startrun");
-if ($?) {
-    fatal(-1, "Could not commit archive!");
-}
-
-#
-# And the bindings for the default run ...
-#
-foreach my $name (keys(%parameters)) {
-    my $value = $parameters{$name};
-
-    $instance->NewRunBinding($name, $value) == 0
-	or fatal(-1, "Error inserting run binding into DB!");
 }
 
 $instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0

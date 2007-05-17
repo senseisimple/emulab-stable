@@ -564,19 +564,6 @@ $instance->CopyDataStore($datastore_tag,
 $instance->CopyTemplateEvents() == 0
     or fatal(-1, "Could not copy template events to instance");
 
-# We munge the environment variables.
-$instance->InitializeEnvVariables(\%parameters) == 0
-    or fatal(-1, "Could not add new environment variables to instance");
-    
-print "Writing environment strings ...\n";
-$instance->WriteEnvVariables() == 0
-    or fatal(-1, "Could not write environment strings for program agents");
-
-# This has to be redone since the batchexp will have written incomplete data.
-print "Writing program agent info ...\n";
-$instance->WriteProgramAgents() == 0
-    or fatal(-1, "Could not write program agent info");
-
 if (! $preload) {
     if ($STAMPS) {
 	$instance->Stamp("template_instantiate", "swapin starting");

@@ -630,6 +630,18 @@ if ($action eq "modify") {
     $instance->WriteProgramAgents() == 0
 	or fatal(-1, "Could not write program agent info");
 }
+else {
+    #
+    # The swapmod would have rewritten the environment strings, but otherwise
+    # it has to be done by hand.
+    #
+    $instance->InitializeEnvVariables() == 0
+	or fatal(-1, "Could not update environment variables for $instance");
+    
+    print "Writing new environment strings ...\n";
+    $instance->WriteEnvVariables() == 0
+	or fatal(-1, "Could not rewrite environment strings for $instance");
+}
 
 #
 # Now we stash the parameter file for the next version of the archive.
@@ -644,17 +656,6 @@ if (defined($paramfile)) {
     system("/bin/cp", $source, $target) == 0
 	or fatal(-1, "Could not copy $source to $target");
 }
-
-#
-# We munge the environment variables *AFTER* the potential swapmod since
-# it will have scrogged the user env.
-#
-$instance->InitializeEnvVariables(\%parameters) == 0
-    or fatal(-1, "Could not add new environment variables to instance");
-    
-print "Writing environment strings ...\n";
-$instance->WriteEnvVariables() == 0
-    or fatal(-1, "Could not write environment strings for program agents");
 
 if ($experiment->HaveProgramAgents()) {
     print "Asking program agents to reload ... this will take a moment.\n";
