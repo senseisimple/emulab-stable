@@ -10,6 +10,7 @@ OBJDIR		= ..
 SUBDIR		= tbsetup
 UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 PLABSUPPORT     = @PLABSUPPORT@
+ISMAINSITE	= @TBMAINSITE@
 SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
@@ -35,9 +36,12 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
-		  elabinelab snmpit.proxy panic repos_daemon node_attributes \
+		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
 		  rmproj
+ifeq ($(ISMAINSITE),1)
+SBIN_STUFF     += repos_daemon
+endif
 
 CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
