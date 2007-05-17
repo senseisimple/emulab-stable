@@ -11,9 +11,11 @@ COMMENT=	"Simple publish subscribe system for Emulab, Elvind compatible"
 MAKEFILE=	GNUmakefile
 USE_GMAKE=	yes
 INSTALLS_SHLIB=	yes
-NO_CHECKSUM=    yes
 
 CONFLICTS=	pubsub-[0-9]*
 MAKE_FLAGS=	ELVIN_COMPAT=yes
+
+LIB_DEPENDS=	vin4.2:${PORTSDIR}/misc/libelvin
+RUN_DEPENDS=	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
 
 .include <bsd.port.mk>
