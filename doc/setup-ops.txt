@@ -97,6 +97,10 @@ collection that are known to work with our software, and to save you hours
 of compile time, we provide pre-built binary packages of the ports required
 by Emulab. 
 
+[ NOTE: if you are an existing Emulab site doing a reinstall, and want to
+  maintain backward compatibility with your existing images, you will have
+  to get a special packages tarball from Utah. ]
+
 Download the packages tarball from:
 
 	http://www.emulab.net/downloads/FreeBSD-6.1-20060921.tar.gz

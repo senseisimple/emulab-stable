@@ -143,7 +143,7 @@ and make sure the home directories for them are removed as well!
 
 ##### Step 3 - Installing packages
 
-Again, almost the same as on ops. Download the same tarball, and follow
+Again, almost the same as on ops. Use the same tarball, and follow
 the same pkg_add procedure, except this time, you're going to install
 the emulab-boss package instead of emulab-ops:
 
