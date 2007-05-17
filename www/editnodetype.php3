@@ -89,7 +89,7 @@ $initial_attributes = array(
 #
 function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 {
-    global $osid_result, $imageid_result, $new_type;
+    global $osid_result, $imageid_result, $mfsosid_result, $new_type;
     global $newattribute_name, $newattribute_value, $newattribute_type;
 
     #
@@ -254,6 +254,11 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 	    WRITEOSIDMENU($key, "attributes[$key]", $osid_result, $val,
 			  "deletes[$key]", $deletes[$key]);
 	}
+	elseif ($key == "adminmfs_osid" ||
+		$key == "diskloadmfs_osid") {
+	    WRITEOSIDMENU($key, "attributes[$key]", $mfsosid_result, $val,
+			  "deletes[$key]", $deletes[$key]);
+	}
 	elseif ($key == "default_imageid") {
 	    WRITEIMAGEIDMENU($key, "attributes[$key]", $imageid_result, $val,
 			     "deletes[$key]", $deletes[$key]);
@@ -384,6 +389,11 @@ else {
 $osid_result =
     DBQueryFatal("select osid,osname,pid from os_info ".
 		 "where (path='' or path is NULL) ".
+		 "order by pid,osname");
+
+$mfsosid_result =
+    DBQueryFatal("select osid,osname,pid from os_info ".
+		 "where (path is not NULL and path!='') ".
 		 "order by pid,osname");
 
 $imageid_result =
