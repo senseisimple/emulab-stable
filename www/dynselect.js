@@ -159,6 +159,12 @@ dynselect.swapOptions = function(sobj,i,j) {
 		    sobj.options[i].defaultSelected,sobj.options[i].selected);
     e2 = new Option(sobj.options[j].text,sobj.options[j].value,
 		    sobj.options[j].defaultSelected,sobj.options[j].selected);
+
+    // Hacks to fix background color of <option> elms when they get swapped.
+    // Other style properties require similar hacks, I bet.
+    e1.style.backgroundColor = sobj.options[i].style.backgroundColor;
+    e2.style.backgroundColor = sobj.options[j].style.backgroundColor;
+
     e1s = sobj.options[i].selected;
     e2s = sobj.options[j].selected;
     sobj.options[j] = e1;
