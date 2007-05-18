@@ -392,9 +392,9 @@ if ($expstate) {
 			       CreateURL("template_exprun", $instance,
 					 "action", "abort"));
 	}
-	WRITESUBMENUBUTTON("Modify Resources",
-			   CreateURL("template_exprun", $instance,
-				     "action", "modify"));
+	#WRITESUBMENUBUTTON("Modify Resources",
+	#		   CreateURL("template_exprun", $instance,
+	#			     "action", "modify"));
 
 	WRITESUBMENUBUTTON("Start New Run",
 			   CreateURL("template_exprun", $instance,

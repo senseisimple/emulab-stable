@@ -43,7 +43,7 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwx:p:E:a:r:e:dscft:iy:";
+my $optlist	 = "qwx:p:E:a:r:e:dscft:iy:m";
 my %options      = ();
 my $quiet        = 0;
 my $waitmode     = 0;
@@ -51,6 +51,7 @@ my $debug        = 0;
 my $foreground   = 0;
 my $ignoreerrors = 0;
 my $clean        = 0;
+my $doswapmod    = 0;
 my $paramwhich;
 my $paramfile;
 my %parameters   = ();
@@ -584,7 +585,7 @@ else {
 }
 
 # Mark the start time of the run.
-$instance->StartRun(($action eq "modify" ?
+$instance->StartRun(($action eq "modify" || $doswapmod ?
 		     Template::STARTRUN_FLAGS_SWAPMOD() : 0)) == 0
     or fatal(-1, "Could not mark start of run for $instance!");
 
@@ -599,7 +600,7 @@ foreach my $name (keys(%parameters)) {
 	or fatal(-1, "Could not create run binding for $instance!");
 }
 
-if ($action eq "modify") {
+if ($action eq "modify" || $doswapmod) {
     #
     # Now do the swapmod, using the original NS file for now. The environ
     # variables will be passed to the NS reparse by parse-ns wrapper script.
@@ -842,6 +843,9 @@ sub ParseArgs()
     }
     if (defined($options{"i"})) {
 	$ignoreerrors = 1;
+    }
+    if (defined($options{"m"})) {
+	$doswapmod = 1;
     }
     if (defined($options{"t"})) {
 	$ctoken = $options{"t"};

@@ -315,6 +315,23 @@ function SPITFORM($action, $instance, $formfields, $parameters, $errors)
 	    </td>
 	  </tr>\n";
 
+    #
+    # Swapmod?
+    #
+    echo "<tr>
+	      <td class='pad4'>Reparse NS file?:</td>
+              <td class='pad4' class=left>
+  	          <input type=checkbox name='formfields[swapmod]' value='Yep'";
+
+    if (isset($formfields["swapmod"]) &&
+	strcmp($formfields["swapmod"], "Yep") == 0) {
+	echo " checked='1'";
+    }
+    echo ">";
+    echo "&nbsp (effectively a '<tt>swap modify</tt>')
+	    </td>
+	  </tr>\n";
+
     echo "<tr>
               <td colspan=2>
                Use this text area for an (optional) description:
@@ -414,6 +431,7 @@ elseif (! isset($formfields)) {
     #
     $defaults['runid']   = $instance->NextRunID();
     $defaults['clean']   = "";
+    $defaults['swapmod'] = "";
     $defaults['description'] = "";
     $defaults['parameter_xmlfile'] = "";
 
@@ -468,6 +486,13 @@ if ($action == "start" ||
 #
 if (isset($formfields["clean"]) && $formfields["clean"] == "Yep") {
     $command_options .= " -c";
+}
+
+#
+# Swapmod?
+#
+if (isset($formfields["swapmod"]) && $formfields["swapmod"] == "Yep") {
+    $command_options .= " -m";
 }
 
 #
