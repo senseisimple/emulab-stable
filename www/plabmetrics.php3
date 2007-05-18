@@ -14,7 +14,7 @@ $DEF_NUMPAGENO = 10;
 #
 # Standard Testbed Header
 #
-# cheat and use the page args to influence the view.
+# Cheat and use the page args to influence the view.
 $view = array();
 if (isset($_REQUEST['pagelayout']) && $_REQUEST['pagelayout'] == "minimal") {
     $view = array ('hide_banner' => 1, 'hide_sidebar' => 1 );
@@ -22,7 +22,9 @@ if (isset($_REQUEST['pagelayout']) && $_REQUEST['pagelayout'] == "minimal") {
 
 PAGEHEADER("PlanetLab Metrics",$view);
 
-
+#
+# Some javascript to help us out.
+#
 ?>
 <script type='text/javascript' src='<?php echo $TBBASE; ?>/dynselect.js'></script>
 <script type="text/javascript" language="javascript">
@@ -61,6 +63,7 @@ function divflipvis(id) {
     }
     else {
 	obj.style.height = divstate[id].origheight+"px";
+	//obj.style.height = obj.offsetHeight+"px";
 	obj.style.position = "static";
 	divstate[id].vis = obj.style.visibility = "visible";
     }
@@ -68,12 +71,11 @@ function divflipvis(id) {
 
 function init() {
     divinit('searchdiv');
-    divinit('legenddiv');
-    divinit('selectiondiv');
+    //    divinit('selectiondiv');
 
-    divflipvis('searchdiv');
-    divflipvis('legenddiv');
-    divflipvis('selectiondiv');
+    //divflipvis('searchdiv');
+    //divflipvis('legenddiv');
+    //divflipvis('selectiondiv');
 }
 
 window.onload = init;
@@ -108,8 +110,8 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# hack -- unset $pid and $eid vars if they are '' before we check args!
-# (needed so we can let users drop a previous pid/eid filter)
+# Hacks -- unset $pid and $eid vars if they are '' before we check args!
+# (needed so we can let users drop a previous pid/eid filter).
 #
 if (isset($_REQUEST['pid']) && $_REQUEST['pid'] == '') {
     unset($_REQUEST['pid']);
@@ -118,12 +120,15 @@ if (isset($_REQUEST['eid']) && $_REQUEST['eid'] == '') {
     unset($_REQUEST['eid']);
 }
 
-# same for upnodefilter arg
+# Do similar for other arguments.
 if (isset($_REQUEST['upnodefilter']) && $_REQUEST['upnodefilter'] == '') {
     unset($_REQUEST['upnodefilter']);
 }
+if (isset($_REQUEST['userquery']) && $_REQUEST['userquery'] == '') {
+    unset($_REQUEST['userquery']);
+}
 
-# make sure to add any new args here to pm_buildurl() as well
+# Make sure to add any new args here to pm_buildurl() as well.
 $optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
 				  "cols",   PAGEARG_ALPHALIST,
 				  "offset", PAGEARG_INTEGER,
@@ -132,73 +137,42 @@ $optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
 				  "pagelayout", PAGEARG_BOOLEAN,
 				  "sortcols", PAGEARG_ALPHALIST,
 				  "sortdir", PAGEARG_STRING,
-                                  # never fear -- we check this ourself since
+
+                                  # Never fear.  We check this ourself since
                                   # it could contain either an alphanumeric
-                                  # string, or a perl5 regex!
-				  # (only alphanum strings go in db queries!)
+                                  # string, or a perl5 regex. NOTE:
+                                  # only alphanum strings go in db queries;
+                                  # regexes are handled within this page.
 				  "hostfilter", PAGEARG_ANYTHING,
-				  "selectmode", PAGEARG_BOOLEAN,
+
+				  "selectable", PAGEARG_BOOLEAN,
 				  "selectionlist", PAGEARG_ALPHALIST,
-                                  # we check this *extremely* copiously.
-                                  # it actually gets tokenized and we verify
-                                  # every last token against known or 
-                                  # numeric values
-				  "userquery", PAGEARG_ANYTHING,
-                                  # verified, but never leaves php
-				  "colrank", PAGEARG_ANYTHING);
 
-# link to show/hide sidebar
+                                  # We check this *extremely* copiously.
+                                  # It actually gets tokenized and parsed and
+                                  # we verify every last token against known 
+                                  # or numeric values.
+				  "userquery", PAGEARG_ANYTHING );
 
-# basic options
-#   hostname filter (basically, text to a like "%<text>%" sql expr)
-#   enable/disable selection; show current selection and be able to remove 
-#     nodes from it!
+                                  # Unimplemented.
+                                  # Verified, but never leaves php
+                                  #"colrank", PAGEARG_ANYTHING);
 
-# advanced options
-#   constrain columns
-#     some sort of query language, sigh -- maybe can find a php lib for it
-#   build-your-own rank (based off column weights, normalization to max or 
-#     user-chosen ceil; each col should be able to be minimized/maximized in 
-#     its contribution to the rank)
-
-# should provide cotop links (one node-centric, one slice-centric)
-# paint comon columns red, emulab green, or something like that.
+# Yet to be implemented:
+# * basic options
+#     enable/disable selection; show current selection and be able to remove 
+#       nodes from it!
+#     color emulab/comon/other data sources (only header cells, prob)
+#     add cotop (both node-centric and slice-centric?) and pcvm links; other?
+# * advanced options
+#     build-your-own rank (based off column weights, normalization to max or 
+#       user-chosen ceil; each col should be able to be minimized/maximized in 
+#       its contribution to the rank)
 
 
-# A map of colnames the user can refer to, to their name in queries we issue.
-$colmap = array( 'node_id' => 'pm.node_id',
-		 'hostname' => 'pm.hostname',
-		 'plab_id' => 'pm.plab_id',
-                 # comon columns
-		 'resptime' => 'pcd.resptime','uptime' => 'pcd.uptime',
-		 'lastcotop' => 'pcd.lastcotop',
-		 'date' => 'from_unixtime(pcd.date) as codate',
-		 'drift' => 'pcd.drift','cpuspeed' => 'pcd.cpuspeed',
-		 'busycpu' => 'pcd.busycpu','syscpu' => 'pcd.syscpu',
-		 'freecpu' => 'pcd.freecpu','1minload' => 'pcd.1minload',
-		 '5minload' => 'pcd.5minload','numslices' => 'pcd.numslices',
-		 'liveslices' => 'pcd.liveslices','connmax' => 'pcd.connmax',
-		 'connavg' => 'pcd.connavg','timermax' => 'pcd.timermax',
-		 'timeravg' => 'pcd.timeravg','memsize' => 'pcd.memsize',
-		 'memact' => 'pcd.memact','freemem' => 'pcd.freemem',
-		 'swapin' => 'pcd.swapin','swapout' => 'pcd.swapout',
-		 'diskin' => 'pcd.diskin','diskout' => 'pcd.diskout',
-		 'gbfree' => 'pcd.gbfree','swapused' => 'pcd.swapused',
-		 'bwlimit' => 'pcd.bwlimit','txrate' => 'pcd.txrate',
-		 'rxrate' => 'pcd.rxrate',
-                 # emulab columns
-		 'unavail' => 'pnhs.unavail',
-		 'jitdeduction' => 'pnhs.jitdeduct',
-		 'successes' => 'pnhs.succnum',
-		 'failures' => 'pnhs.failnum',
-		 'nodestatus' => 'ns.status',
-		 'nodestatustime' => 'ns.status_timestamp',
-                 # what about what kind of link the node contains 
-		 # (i.e., inet,inet2,dsl,...) ?
-	       );
 
 #
-# First, deal with args:
+# Argument checks.
 #
 
 # access control -- everybody can see stats for all nodes, but only members
@@ -256,7 +230,8 @@ expValues['No Experiment'] = '';
 
 # This is a sick query, but there does not appear to be anything in the 
 # user, project, or experiment objects that will do the job.
-# We want to find all pid/eids that have mapped plab nodes that we can read.
+# We want to find all pid/eids that have mapped plab nodes that the user 
+# can read.
 if ($isadmin) {
     $pequery = "
 select e.pid,e.eid from experiments as e 
@@ -307,26 +282,98 @@ else {
     }
 }
 
+# Close off the script we started above.
 ?>
 
 </script>
 
 <?php
 
-# we have to fix which node id we select based on if we are querying the 
+#
+# Setup data source information (i.e., fields in our database that 
+# can be displayed).
+#
+
+# A map of colnames the user can refer to, to their name in queries we issue.
+# This mapping handles rvalues with table prefixes or ' as ' aliases.
+$colmap = array( 'node_id' => 'pm.node_id',
+		 'hostname' => 'pm.hostname',
+		 'plab_id' => 'pm.plab_id',
+                 # comon columns
+		 'resptime' => 'pcd.resptime','uptime' => 'pcd.uptime',
+		 'lastcotop' => 'pcd.lastcotop',
+		 'date' => 'from_unixtime(pcd.date) as codate',
+		 'drift' => 'pcd.drift','cpuspeed' => 'pcd.cpuspeed',
+		 'busycpu' => 'pcd.busycpu','syscpu' => 'pcd.syscpu',
+		 'freecpu' => 'pcd.freecpu','1minload' => 'pcd.1minload',
+		 '5minload' => 'pcd.5minload','numslices' => 'pcd.numslices',
+		 'liveslices' => 'pcd.liveslices','connmax' => 'pcd.connmax',
+		 'connavg' => 'pcd.connavg','timermax' => 'pcd.timermax',
+		 'timeravg' => 'pcd.timeravg','memsize' => 'pcd.memsize',
+		 'memact' => 'pcd.memact','freemem' => 'pcd.freemem',
+		 'swapin' => 'pcd.swapin','swapout' => 'pcd.swapout',
+		 'diskin' => 'pcd.diskin','diskout' => 'pcd.diskout',
+		 'gbfree' => 'pcd.gbfree','swapused' => 'pcd.swapused',
+		 'bwlimit' => 'pcd.bwlimit','txrate' => 'pcd.txrate',
+		 'rxrate' => 'pcd.rxrate',
+                 # emulab columns
+		 'unavail' => 'pnhs.unavail',
+		 'jitdeduction' => 'pnhs.jitdeduct',
+		 'successes' => 'pnhs.succnum',
+		 'failures' => 'pnhs.failnum',
+		 'nodestatus' => 'ns.status',
+		 'nodestatustime' => 'ns.status_timestamp',
+                 # what about what kind of link the node contains 
+		 # (i.e., inet,inet2,dsl,...) ?
+	       );
+
+# An array to help color data sources so users can more easily figure out
+# what is what.
+$colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
+                 'lastcotop' => 'CoMon','date' => 'CoMon','drift' => 'CoMon',
+		 'cpuspeed' => 'CoMon','busycpu' => 'CoMon',
+		 'syscpu' => 'CoMon','freecpu' => 'CoMon','1minload' =>'CoMon',
+		 '5minload' => 'CoMon','numslices' => 'CoMon',
+                 'liveslices' => 'CoMon','connmax' => 'CoMon',
+                 'connavg' => 'CoMon','timermax' => 'CoMon',
+		 'timeravg' => 'CoMon','memsize' => 'CoMon',
+                 'memact' => 'CoMon','freemem' => 'CoMon',
+                 'swapin' => 'CoMon','swapout' => 'CoMon',
+                 'diskin' => 'CoMon','diskout' => 'CoMon',
+                 'gbfree' => 'CoMon','swapused' => 'CoMon',
+                 'bwlimit' => 'CoMon','txrate' => 'CoMon','rxrate' => 'CoMon',
+		 
+		 'node_id' => 'Emulab','hostname' => 'Emulab',
+		 'plab_id' => 'Emulab','unavail' => 'Emulab',
+		 'jitdeduction' => 'Emulab','successes' => 'Emulab',
+                 'failures' => 'Emulab','nodestatus' => 'Emulab',
+                 'nodestatustime' => 'Emulab' );
+
+# An array containing colors for data sources.
+$colcol = array( 'Emulab' => '#cde4f3', 'CoMon' => '#ffedd7' );
+
+# We have to fix which node id we select based on if we are querying the 
 # reserved table (we need phys node id, but have to join reserved to nodes
-# to get it)
+# to get it).
 if (isset($experiment)) {
     $colmap['node_id'] = 'n.phys_nodeid';
 }
 
-# strip off the table prefixes or use 'as' aliases; mysql driver does not 
-# seem to include them
+# Strip off the table prefixes or use 'as' aliases; mysql driver does not 
+# seem to include them as column names in mysql_fetch_array (needed for 
+# converting user-visible col names to db select-able col names).
+#
+# Also form a second array that DOES have table prefixes, but only has aliases
+# (need this for the where clause).
 $colmap_mysqlnames = array();
+$colmap_mysqlnames_where = array();
+
 foreach ($colmap as $k => $v) {
+    $had_as = false;
     if (strstr($v,' as ')) {
 	$sa = explode(' as ',$v);
 	$nv = $sa[1];
+	$had_as = true;
     }
     else {
 	$sa = explode('.',$v);
@@ -340,26 +387,33 @@ foreach ($colmap as $k => $v) {
     }
 
     $colmap_mysqlnames[$k] = $nv;
+    if ($had_as) {
+	$colmap_mysqlnames_where[$k] = $nv;
+    }
+    else {
+	$colmap_mysqlnames_where[$k] = $v;
+    }
 }
 
-# default columns displayed, in this order.
-# note that they cannot get rid of node_id.
-$defcols = array( 'hostname','nodestatus','nodestatustime','unavail',
+# Default columns displayed, in this order.
+$defcols = array( 'node_id','hostname','nodestatus','nodestatustime','unavail',
 		  '5minload','freemem','txrate','rxrate','date', );
 
-# default sort and included columns
+# Default sort and included columns
 $defsortcols = array( 'unavail','5minload' );
 
+# Assign a default set of columns if unset.
 if (!isset($cols) || count($cols) == 0) {
     $cols = $defcols;
 }
 
+# Assign a default set of sort columns and sort order if unset.
 if (!isset($sortcols)) {
     $sortcols = $defsortcols;
     $sortdir = 'asc';
 }
 
-# make sure all cols are valid!  remove them if they are not!
+# Ensure all cols (vis/order and sort) are valid.  Remove them if not.
 $tmpcols = array();
 foreach ($cols as $sc) {
     if (array_key_exists($sc,$colmap)) {
@@ -382,11 +436,12 @@ foreach ($sortcols as $sc) {
 }
 $sortcols = $tmpcols;
 
-# make sure sortdir is valid (asc/desc):
+# Ensure sortdir is valid (asc/desc).
 if (isset($sortdir) && $sortdir != 'asc' && $sortdir != 'desc') {
     array_push($opterrs,"Invalid sort dir '$sortdir'; changing to 'asc'!");
     $sortdir = 'asc';
 }
+
 
 #
 # Next, build query:
@@ -414,6 +469,7 @@ if (mysql_num_rows($qres) != 1) {
 $row = mysql_fetch_array($qres);
 $totalrows = $row['num'];
 
+
 #
 # Draw nondata part of page
 #
@@ -422,7 +478,7 @@ pm_shownondata();
 echo "<br><br>";
 
 #
-# Finally, display data:
+# Finally, execute main data query and display resulting data.
 #
 pm_showtable($totalrows,$q);
 
@@ -430,6 +486,11 @@ pm_showtable($totalrows,$q);
 # Standard Testbed Footer
 #
 PAGEFOOTER();
+
+
+#
+# Utility functions.
+#
 
 #
 # Show the non-data part of the page:
@@ -440,20 +501,28 @@ function pm_shownondata() {
 
     echo "<table class='stealth'>\n";
     echo "<tr>\n";
-    echo "<td class='stealth' valign='top' width='1px'>\n";
+    echo "<td class='stealth' valign='top' width='1%'>\n";
     SUBMENUSTART("Page Options");
     WRITESUBMENUBUTTON("Search Options",
 		       "javascript:divflipvis(\"searchdiv\")");
-    WRITESUBMENUBUTTON("Selected Nodes",
-		       "javascript:divflipvis(\"selectiondiv\")");
-    WRITESUBMENUBUTTON("Data Legend",
-		       "javascript:divflipvis(\"legenddiv\")");
+#WRITESUBMENUBUTTON("Choose Nodes",
+#"javascript:divflipvis(\"selectiondiv\")");
+    WRITESUBMENUBUTTON("Data Legend","#legend");
     WRITESUBMENUDIVIDER();
-    $url = pm_buildurl(array('pagelayout' => 'minimal'));
-    WRITESUBMENUBUTTON("Hide Sidebar",$url);
-    SUBMENUEND();
+    if (isset($pagelayout) && $pagelayout == 'minimal') {
+	$url = pm_buildurl(array('pagelayout' => ''));
+	WRITESUBMENUBUTTON("Show Sidebar",$url);
+    }
+    else {
+	$url = pm_buildurl(array('pagelayout' => 'minimal'));
+	WRITESUBMENUBUTTON("Hide Sidebar",$url);
+    }
+    # Ugh -- cannot use SUBMENUEND cause it inserts a weird <td></td> combo
+    # SUBMENUEND();
+    echo "    </ul>\n";
+    echo "    <!-- end submenu -->\n";
     echo "</td>\n";
-    echo "<td class='stealth'>\n";
+    echo "<td class='stealth' halign='left' valign='top' width='99%'>\n";
     if (count($opterrs) > 0) {
 	echo "<span style='color: red'>Errors:<br>\n";
 	foreach ($opterrs as $e) {
@@ -462,10 +531,8 @@ function pm_shownondata() {
 	echo "</span><br>\n";
     }
     pm_showsearch();
-    echo "<br>\n";
-    pm_showlegend();
-    echo "<br>\n";
-    pm_showselection();
+#echo "<br>\n";
+#pm_showselection();
     echo "</td>\n";
     echo "</tr>\n";
     echo "</table>\n";
@@ -475,19 +542,10 @@ function pm_shownondata() {
 # Show the selection box
 #
 function pm_showselection() {
-    echo "<div style='padding: 8px; border: 2px dashed gray; visibility: visible; width: 100%' id='selectiondiv'>\n";
-    echo "Selection not yet enabled!\n";
-    echo "</div>\n";
-}
-
-#
-# Show the legend box
-#
-function pm_showlegend() {
-    echo "<div style='padding: 8px; border: 2px dashed gray; visibility: visible' id='legenddiv'>\n";
-    echo "Coming soon.  For now, look at the " . 
-	"<a href='http://summer.cs.princeton.edu/status/legend.html'>CoMon " .
-	"legend</a>.\n";
+    echo "<div style='padding: 8px; padding-left: 12px; padding-right: 12px;";
+    echo " border: 2px solid silver; visibility: visible; margin-left: 4px'";
+    echo " id='selectiondiv'>\n";
+    echo "<b>Selected nodes</b>:<br>\n";
     echo "</div>\n";
 }
 
@@ -497,10 +555,14 @@ function pm_showlegend() {
 function pm_showsearch() {
     global $limit,$DEF_LIMIT,$offset;
     global $upnodefilter,$pid,$eid,$sortcols,$cols,$sortdir;
-    global $pidmap,$colmap;
+    global $pidmap,$colmap,$colcol,$colsrc;
     global $hostfilter;
+    global $pagelayout;
+    global $userquery;
 
-    echo "<div style='margin-right: auto; padding: 8px; border: 2px dashed gray; visibility: visible' id='searchdiv'>\n";
+    echo "<div style='padding: 8px; padding-left: 12px; padding-right: 12px;";
+    echo " border: 2px solid silver; visibility: visible; margin-left: 4px'";
+    echo " id='searchdiv'>\n";
     echo "<form name='plsearchform' id='plsearchform'" . 
 	" action='plabmetrics.php3' method='post' " . 
         # We manually set a comma-delineated string comprised of the col names
@@ -513,9 +575,13 @@ function pm_showsearch() {
 	"setFormElementValue(\"sortcols\",".
 	"dynselect.getOptsAsDelimString(document.getElementById(\"selsortcols\"),".
 	"\",\",false));" . "'" . ">\n";
-
     
-    # only draw pid/exp boxes if the user can access experiments with pl nodes
+    if (isset($pagelayout)) {
+	echo "<input type='hidden' name='pagelayout' value='$pagelayout'>\n";
+    }
+    
+    # Only draw pid/exp boxes if the user can access swapped-in experiments 
+    # with pl nodes.
     if (count($pidmap)) {
 	echo "Show <b>only nodes in project/experiment</b>:\n";
 	echo "<select name='pid' id='pid'";
@@ -571,7 +637,7 @@ function pm_showsearch() {
 
     # hostname filtering (not included in normal user query because
     # we support perl5 regexps for filtering on the data as post-db)
-    echo "Show only hostnames that match ";
+    echo "Show only <b>hostnames that match</b> ";
     $thf = '';
     if (isset($hostfilter)) {
 	$thf = $hostfilter;
@@ -579,33 +645,20 @@ function pm_showsearch() {
     echo "<input type='text' value='$thf' name='hostfilter' size='25'>\n";
     echo "<br>\n";
 
-    # handle limit/offset
-    $defLimits = array( '10' => 10,'20' => 20,'50' => 50,
-		        '100' => 100,'All' => 0 );
-    echo "Show ";
-    echo "<select name='limit' id='limit'";
-    # XXX
-    # if the user changes the limit we change the offset to 0 so they
-    # do not get funky page offset stuff
-    echo "  onChange='setFormElementValue(\"offset\",0)'>\n";
-    foreach ($defLimits as $limk => $limv) {
-	echo "  <option value='$limv' ";
-	if ($limv == $limit) {
-	    echo " selected";
-	}
-	echo ">$limk</option>\n";
+    # custom user query
+    echo "Filter with <b>custom query</b>: \n";
+    $tuq = '';
+    if (isset($userquery)) {
+	$tuq = $userquery;
     }
-    echo "</select>\n";
-    echo " PlanetLab <b>nodes per page</b>\n";
-    echo "<input type='hidden' name='offset' id='offset' value='$offset'>\n";
-    echo "<br><br>\n";
+    echo "<input type='text' value='$tuq' name='userquery' size='64'>\n";
+    echo "<br>\n";
 
 
     # hidden vals for col selection and sorting
     echo "<input type='hidden' name='cols' id='cols' value='$cols'>\n";
     echo "<input type='hidden' name='sortcols' id='sortcols' " . 
 	"value='$sortcols'>\n";
-
 
     # choose which columns are shown and what the column order should be
     # first do the headers -- col order and col sort get munged here!
@@ -630,7 +683,9 @@ function pm_showsearch() {
     # avail cols go in the left box, current shown cols in the right.
     $da = array_diff(array_keys($colmap),$cols);
     foreach ($da as $foo) {
-	echo "  <option value='$foo'>$foo</option>\n";
+	$colstr = $colcol[$colsrc[$foo]];
+	echo "  <option style='background-color: $colstr' value='$foo'>";
+	echo "$foo</option>\n";
     }
     echo "</select>\n";
     echo "</td>\n";
@@ -649,7 +704,9 @@ function pm_showsearch() {
     echo "<td class='stealth'>\n";
     echo "<select name='selcols' id='selcols' multiple size='6'>\n";
     foreach ($cols as $foo) {
-	echo "  <option value='$foo'>$foo</option>\n";
+	$colstr = $colcol[$colsrc[$foo]];
+	echo "  <option style='background-color: $colstr' value='$foo'>";
+	echo "$foo</option>\n";
     }
     echo "</select>\n";
     echo "</td>\n";
@@ -674,7 +731,9 @@ function pm_showsearch() {
     # avail cols go in the left box, current shown cols in the right.
     $da2 = array_diff(array_keys($colmap),$sortcols);
     foreach ($da2 as $foo) {
-	echo "  <option value='$foo'>$foo</option>\n";
+	$colstr = $colcol[$colsrc[$foo]];
+	echo "  <option style='background-color: $colstr' value='$foo'>";
+	echo "$foo</option>\n";
     }
     echo "</select>\n";
     echo "</td>\n";
@@ -693,7 +752,9 @@ function pm_showsearch() {
     echo "<td class='stealth'>\n";
     echo "<select name='selsortcols' id='selsortcols' multiple size='6'>\n";
     foreach ($sortcols as $foo) {
-	echo "  <option value='$foo'>$foo</option>\n";
+	$colstr = $colcol[$colsrc[$foo]];
+	echo "  <option style='background-color: $colstr' value='$foo'>";
+	echo "$foo</option>\n";
     }
     echo "</select>\n";
     echo "</td>\n";
@@ -723,7 +784,27 @@ function pm_showsearch() {
     echo "</tr>\n";
 
     echo "</table>\n";
-    echo "<br>\n";
+
+    # handle limit/offset
+    $defLimits = array( '10' => 10,'20' => 20,'50' => 50,
+		        '100' => 100,'All' => 0 );
+    echo "Show ";
+    echo "<select name='limit' id='limit'";
+    # XXX
+    # if the user changes the limit we change the offset to 0 so they
+    # do not get funky page offset stuff
+    echo "  onChange='setFormElementValue(\"offset\",0)'>\n";
+    foreach ($defLimits as $limk => $limv) {
+	echo "  <option value='$limv' ";
+	if ($limv == $limit) {
+	    echo " selected";
+	}
+	echo ">$limk</option>\n";
+    }
+    echo "</select>\n";
+    echo " PlanetLab <b>nodes per page</b>\n";
+    echo "<input type='hidden' name='offset' id='offset' value='$offset'>\n";
+    echo "<br><br>\n";
 
     # form buttons
     echo "<input type='submit' value='Search'>\n";
@@ -847,11 +928,16 @@ function pm_buildqueryinfo() {
     global $pid,$eid;
     global $DEF_LIMIT;
     global $hostfilter,$hf_regexp;
+    global $userquery;
+    global $opterrs;
 
-    $q_colstr = $colmap['node_id'];
+    $q_colstr = '';
     foreach ($cols as $c) {
 	if (array_key_exists($c,$colmap)) {
-	    $q_colstr .= "," . $colmap[$c];
+	    if (strlen($q_colstr) > 0) {
+		$q_colstr .= ",";
+	    }
+	    $q_colstr .= $colmap[$c];
 	}
     }
 
@@ -900,9 +986,18 @@ function pm_buildqueryinfo() {
         $q_quickfs .= $colmap['hostname'] . " like '%$hostfilter%'";
     }
 
-    # setup the user filter string (can be very complex; is anded to the quick
+    # Setup the user filter string (can be very complex; is anded to the quick
     # filter string if it exists)
     $q_userfs = '';
+    if (isset($userquery)) {
+	$res = pm_parseuserquery($userquery,false);
+	if (!$res[0]) {
+	    array_push($opterrs,$res[1]);
+	}
+	else {
+	    $q_userfs = $res[1];
+	}
+    }
 
     # finalize the filter string
     $q_finalfs = '';
@@ -916,7 +1011,7 @@ function pm_buildqueryinfo() {
         if (strlen($q_finalfs) > 0) {
             $q_finalfs .= " and ";
         }
-        $q_finalfs .= " $q_userfs ";
+        $q_finalfs .= " ($q_userfs) ";
     }
     if (strlen($q_finalfs) > 0) {
         $q_finalfs = "where $q_finalfs";
@@ -964,25 +1059,27 @@ function pm_buildqueryinfo() {
 
 function pm_showtable($totalrows,$query) {
     global $sortcols,$sortdir,$colmap,$colmap_mysqlnames,$cols;
+    global $colsrc,$colcol;
 
     echo "<center><div style=''>\n";
+    echo "<p>\n";
+    echo "<b>$totalrows nodes</b> matched your query.";
+    echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+    foreach ($colcol as $k => $v) {
+	echo "<span style='background-color: $v; border: 1px solid black;";
+	echo "width: 16px; height: 16px;'>";
+	echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+	echo "</span>\n";
+	echo " $k ";
+    }
+    echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
     echo pm_getpaginationlinks($totalrows);
-    echo "<br>\n";
+    echo "</p>\n";
 
     # dump table header
     echo "<table>\n";
     echo "  <tr>\n";
 
-    # reverse the sort direction if necessary
-    if (isset($sortcols) && count($sortcols) == 1 
-        && $sortcols[0] == 'node_id') {
-        $nsortdir = ($sortdir == "asc")?"desc":"asc";
-    }
-    else {
-        $nsortdir = $sortdir;
-    }
-    $url = pm_buildurl(array('sortcols' => 'node_id','sortdir' => $nsortdir));
-    echo "    <th><a href='$url'>node_id</a></th>\n";
     foreach ($cols as $c) {
         # reverse the sort direction if necessary
         if (isset($sortcols) && count($sortcols) == 1 
@@ -992,8 +1089,9 @@ function pm_showtable($totalrows,$query) {
         else {
             $nsortdir = $sortdir;
         }
+	$sstr = "background-color: " . $colcol[$colsrc[$c]];
         $url = pm_buildurl(array('sortcols' => $c,'sortdir' => $nsortdir));
-        echo "    <th><a href='$url'>$c</a></th>\n";
+        echo "    <th style='$sstr'><a href='$url'>$c</a></th>\n";
     }
 
     # now run the real query
@@ -1001,20 +1099,325 @@ function pm_showtable($totalrows,$query) {
 
     while ($row = mysql_fetch_array($qres)) {
         echo "  <tr>\n";
-        echo "    <td>" . $row[$colmap_mysqlnames['node_id']] . "</td>\n";
         foreach ($cols as $c) {
             $dbval = $row[$colmap_mysqlnames[$c]];
             # stupid mysql driver
             if (is_numeric($dbval) && is_float($dbval+0)) {
                 $dbval = sprintf("%.4f",$dbval);
             }
-            echo "      <td>$dbval</td>\n";
-        }
+
+	    if ($c == 'hostname') {
+		echo "     <td><a href='http://$dbval:3120/cotop'>";
+		echo "$dbval</a></td>";
+	    }
+            else {
+		echo "     <td>$dbval</td>\n";
+	    }
+	}
     }
 
     echo "</table>\n";
+    echo "<p>\n";
     echo pm_getpaginationlinks($totalrows);
+    echo "</p>\n";
     echo "</div></center>\n";
+}
+
+#
+# Parses a simple query expression.  Very dumb parser, but I do not want to 
+# parse anything complex, so dumb works.  Basically, we look for 
+# comparison operators (<,>,<=,>=,==,!=), boolean operators (and,or),
+# names, constants, and containers (i.e., '(' or ')').  The rules are simple:
+# open containers must always have a syntactically correct close container;
+# each name must be followed by a comparison operator;
+# each comparison must be followed by a constant;
+# each boolean operator must be followed by a new container;
+# containers may be implicit (that is, <name> <comp> <const> is a container).
+#
+function pm_parseuserquery($q,$debug = false) {
+    global $colmap,$colmap_mysqlnames;
+
+    # first tokenize
+    $toka = array();
+    # valid states are str,qstr,qqstr,cop,bop,''
+    $tst = '';
+    $tval = '';
+    $i = 0;
+    $errstr = '';
+    foreach (range(0,strlen($q)-1) as $i) {
+	$c = $q[$i];
+
+	if ($tst == 'qqstr') {
+	    if ($c == '\'') {
+		$errstr = 'Quoted string cannot contain quotes.';
+		break;
+	    }
+	    if ($c == '"') {
+		array_push($toka,$tval);
+		$tst = '';
+		$tval = '';
+	    }
+	    else {
+		$tval .= "$c";
+	    }
+	}
+	elseif ($tst == 'qstr') {
+	    if ($c == '"') {
+		$errstr = 'Quoted string cannot contain quotes.';
+		break;
+	    }
+	    if ($c == '\'') {
+		array_push($toka,$tval);
+		$tst = '';
+		$tval = '';
+	    }
+	    else {
+		$tval .= "$c";
+	    }
+	}
+	elseif ($c == ' ') {
+	    if ($tst == 'qstr' || $tst == 'qqstr') {
+		$tval .= "$c";
+	    }
+	    elseif ($tst != '') {
+		array_push($toka,$tval);
+		$tval = '';
+		$tst = '';
+	    }
+	}
+	elseif ($c == '(' || $c == ')') {
+	    if ($tst != '') {
+		array_push($toka,$tval);
+		$tst = '';
+		$tval = '';
+	    }
+	    array_push($toka,$c);
+	    $tval = '';
+	    $tst = '';
+	}
+	elseif ($c == '\'') {
+	    if ($tst != '') {
+		array_push($toka,$tval);
+	    }
+	    $tst = 'qstr';
+	    $tval = '';
+	}
+	elseif ($c == '"') {
+	    if ($tst != '') {
+		array_push($toka,$tval);
+	    }
+	    $tst = 'qqstr';
+	    $tval = '';
+	}
+	elseif (ctype_alnum($c) || $c == '.' || $c == '-' || $c == '_') {
+	    if ($tst == 'str' || $tst == '') {
+		$tval .= "$c";
+		$tst = 'str';
+	    }
+	    elseif ($tst != '') {
+		array_push($toka,$tval);
+		$tval = $c;
+		$tst = 'str';
+	    }
+	    else {
+		$errstr = "Invalid character '$c' in bareword at char $i!";
+		break;
+	    }
+	}
+	elseif ($c == '>' || $c == '<' || $c == '=' || $c == '!') {
+	    if ($tst == 'cop') {
+		$tval .= "$c";
+	    }
+	    elseif ($tst != '') {
+		array_push($toka,$tval);
+	    }
+	    else {
+		$tval = "$c";
+		$tst = 'cop';
+	    }
+	}
+	else {
+	    $errstr = "Invalid character '$c' at char $i!";
+	    break;
+	}
+    }
+    # clean up last token
+    if ($tval != '') {
+	array_push($toka,$tval);
+    }
+
+    if (strlen($errstr) > 0) {
+	return array(false,$errstr);
+    }
+
+    if ($debug) {
+	echo "<br>tokens = '" . implode(',',$toka) . "'<br><br>\n";
+    }
+    
+
+    # now apply the rules and generate some real sql:
+    
+    function isbop($tok) {
+	$bops = array('and','or');
+	foreach ($bops as $bop) {
+	    if ($bop == $tok)
+		return true;
+	}
+	return false;
+    }
+    function iscop($tok) {
+	$cops = array('<','>','<=','>=','==','!=');
+	foreach ($cops as $cop) {
+	    if ($cop == $tok)
+		return true;
+	}
+	return false;
+    }
+    function isname($tok) {
+	global $colmap;
+	foreach (array_keys($colmap) as $col) {
+	    if ($col == $tok)
+		return true;
+	}
+	return false;
+    }
+    function isnum($tok) {
+	if (preg_match("/^-{0,1}\d+(\.\d+){0,1}$/",$tok) == 1) {
+	    return true;
+	}
+	return false;
+    }
+    function isstr($tok) {
+	if (preg_match("/^[\w\d\s\.\-_:]+$/",$tok) == 1) {
+	    return true;
+	}
+	return false;
+    }
+    function sat($tok,$need) {
+	if ($need == 'name' && isname($tok)) {
+	    return true;
+	}
+	elseif ($need == 'cop' && iscop($tok)) {
+	    return true;
+	}
+	elseif ($need == 'bop' && isbop($tok)) {
+	    return true;
+	}
+	elseif ($need == 'const' && (isnum($tok) || isstr($tok))) {
+	    return true;
+	}
+	elseif ($need == 'ocont' && $tok == '(') {
+	    return true;
+	}
+	elseif ($need == 'ccont' && $tok == ')') {
+	    return true;
+	}
+    }
+    function whichsat($tok,$lneeds) {
+	foreach ($lneeds as $n) {
+	    if (sat($tok,$n)) {
+		return $n;
+	    }
+	}
+	return '';
+    }
+	
+
+    $retq = '';
+    $oc = $cc = 0;
+    
+    # We have to adjust the parser state transitions if we are ahead or 
+    # following a comparison operator, so that we can properly look for
+    # either a boolean op or close paren.
+    $pre_cop_name_const_trans = array('cop');
+    $post_cop_name_const_trans = array('ccont','bop');
+    
+    $trans = array( 'name' => $pre_cop_name_const_trans,
+		    'ocont' => array('ocont','name','const'),
+		    'ccont' => array('ccont','bop'),
+		    'const' => $pre_cop_name_const_trans,
+		    'cop' => array('name','const'),
+		    'bop' => array('ocont','name','const') );
+    
+    # Initial transition.
+    $needs = array('name','const','ocont');
+
+    # We have to keep track of if we have seen the cop, or have not, 
+    # in an <name|const> <cop> <name|const> expr, so that we know which
+    # needs are valid.
+    $sawcop = false;
+
+    foreach ($toka as $i) {
+        # echo "needs = " . implode(',',$needs) . "; ";
+	$sneed = whichsat($i,$needs);
+	$needs = $trans[$sneed];
+	if (!isset($needs)) {
+	    $needs = array();
+	}
+
+        # echo "sneed = $sneed; newneeds = " . implode(',',$needs) . "<br>\n";
+
+	if ($sneed == '') {
+	    $errstr = "Malformed expression at token '$i'!";
+	    break;
+	}
+	
+	if ($sneed == 'ocont') {
+	    ++$oc;
+	    $retq .= '(';
+	}
+	elseif ($sneed == 'ccont') {
+	    ++$cc;
+	    $retq .= ')';
+	}
+        # XXX: handle the problem caused by use of ' as ' in colmap
+	elseif ($sneed == 'name') {
+	    $retq .= " " . $colmap[$i] . " ";
+	    if ($sawcop) {
+		$sawcop = false;
+		$trans['name'] = $pre_cop_name_const_trans;
+		$trans['const'] = $pre_cop_name_const_trans;
+	    }
+	}
+	elseif ($sneed == 'const') {
+	    $cstr = '';
+	    if (isnum($i)) {
+		$cstr = $i;
+	    }
+	    else {
+		$cstr = "'" . $i . "'";
+	    }
+	    $retq .= " $cstr ";
+	    if ($sawcop) {
+		$sawcop = false;
+		$trans['name'] = $pre_cop_name_const_trans;
+		$trans['const'] = $pre_cop_name_const_trans;
+	    }
+	}
+	elseif ($sneed == 'cop') {
+	    if ($i == '==') {
+		$retq .= ' = ';
+	    }
+	    else {
+		$retq .= " $i ";
+	    }
+	    $sawcop = true;
+	    $trans['name'] = $post_cop_name_const_trans;
+	    $trans['const'] = $post_cop_name_const_trans;
+	}
+	elseif ($sneed == 'bop') {
+	    $retq .= " $i ";
+	}
+    }
+    if (strlen($errstr) > 0) {
+	return array(false,$errstr);
+    }
+
+    if ($debug) {
+	echo "user query as SQL = '$retq' !<br>\n";
+    }
+
+    return array(true,$retq);
 }
 
 ?>
