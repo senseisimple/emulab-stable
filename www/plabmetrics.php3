@@ -48,7 +48,7 @@ function divinit(id) {
     divstate[id].vis = obj.style.visibility;
 }
 
-function divflipvis(id) {
+function divflipvis(id,linktxtid) {
     var obj = document.getElementById(id);
     if (!isdef(obj)) {
 	return false;
@@ -66,6 +66,17 @@ function divflipvis(id) {
 	//obj.style.height = obj.offsetHeight+"px";
 	obj.style.position = "static";
 	divstate[id].vis = obj.style.visibility = "visible";
+    }
+
+    linktxt = "Show";
+    if (divstate[id].vis == "visible") {
+	linktxt = "Hide";
+    }
+    if (linktxtid != null) {
+	var lobj = document.getElementById(linktxtid);
+	if (lobj != null) {
+	    lobj.innerHTML = linktxt;
+	}
     }
 }
 
@@ -121,6 +132,19 @@ function setSelectionAllCheckboxes(form,selstate) {
 
     return true;
 }
+
+function getFormElementValue(form,id) {
+    if (form == null || id == null) {
+	return '';
+    }
+    var fobj = document.forms[form].elements[id];
+    if (!isdef(fobj)) {
+	return '';
+    }
+
+    return fobj.value;
+}
+    
 
 </script>
 <?php
@@ -608,12 +632,16 @@ function pm_shownondata() {
     echo "<tr>\n";
     echo "<td class='stealth' valign='top' width='1%'>\n";
     SUBMENUSTART("Page Options");
-    WRITESUBMENUBUTTON("Search Options",
-		       "javascript:divflipvis(\"searchdiv\")");
-#WRITESUBMENUBUTTON("Choose Nodes",
-#"javascript:divflipvis(\"selectiondiv\")");
-    WRITESUBMENUBUTTON("Data Legend","#legend");
-    WRITESUBMENUDIVIDER();
+    if (!isset($selectable) || !$selectable) {
+	$url = pm_buildurl(array( 'selectable' => 'yes' ));
+	WRITESUBMENUBUTTON("Select Nodes",$url);
+    }
+    else {
+	$url = pm_buildurl(array( 'selectable' => 'no' ));
+	WRITESUBMENUBUTTON("Hide Selection",$url);
+    }
+    WRITESUBMENUBUTTON("<span id='searchdivtw'>Hide</span> Search",
+		       "javascript:divflipvis(\"searchdiv\",\"searchdivtw\")");
     if (isset($pagelayout) && $pagelayout == 'minimal') {
 	$url = pm_buildurl(array('pagelayout' => ''));
 	WRITESUBMENUBUTTON("Show Sidebar",$url);
@@ -622,6 +650,8 @@ function pm_shownondata() {
 	$url = pm_buildurl(array('pagelayout' => 'minimal'));
 	WRITESUBMENUBUTTON("Hide Sidebar",$url);
     }
+    WRITESUBMENUDIVIDER();
+    WRITESUBMENUBUTTON("Data Legend","#legend");
     # Ugh -- cannot use SUBMENUEND cause it inserts a weird <td></td> combo
     # SUBMENUEND();
     echo "    </ul>\n";
@@ -665,14 +695,30 @@ function pm_showselection() {
     }
     else {
 	echo "<textarea name='selectionlist' rows='4' cols='64'>\n";
-	echo implode(',',$selectionlist);
+	echo implode(', ',$selectionlist);
 	echo "</textarea>\n";
 	echo "<br>\n";
 	echo "<input type='submit' value='Save Selection Edits'>\n";
 	echo "<input type='button' value='Clear Selection'>\n";
-	echo "&nbsp;<input type='button' value='Create PlanetLab Slice from Selection'>\n";
     }
+    echo "</form>\n";
 
+    # We need a separate mini-form that submits to plab_ez so that we can
+    # open a new window without using javascript (only the <form> element
+    # can accept a target attribute).
+    echo "<form name='toplabez' id='toplabez' action='plab_ez.php3'" . 
+	" method='post' target='_blank'" . 
+	" onSubmit='setFormElementValue(" . 
+	"   \"toplabez\",\"formfields[nodelist]\"," . 
+	"   (getFormElementValue(\"nodeeditsel\",\"selectionlist\")).replace(/\\,\s*/g,\" \"))'>\n";
+    # plab_ez in advanced mode expects to see all these vars.
+    echo "<input type='hidden' name='formfields[nodelist]' value=''>\n";
+    echo "<input type='hidden' name='advanced' value='yes'>\n";
+    # This is a hack.  We allow the submit button value to be submitted
+    # to plab_ez so that plab_ez will figure out that it is supposed to
+    # be in advanced mode.  Before changing the value (name) of this button, 
+    # make sure you understand how plab_ez decides if it is in advanced more.
+    echo "<input type='submit' name='submit' value='Create PlanetLab Slice'>\n";
     echo "</form>\n";
 
     echo "</div>\n";
@@ -1229,6 +1275,9 @@ function pm_showtable($totalrows,$data) {
     global $colsrc,$colcol;
     global $selectable,$selectionlist,$newpgsel;
 
+    $unicode_up = '&#x25b4;';
+    $unicode_dn = '&#x25be;';
+
     echo "<center><div style=''>\n";
     echo "<p>\n";
     echo "<b>$totalrows nodes</b> matched your query.";
@@ -1273,20 +1322,28 @@ function pm_showtable($totalrows,$data) {
     echo "  <tr>\n";
 
     if (isset($selectable) && $selectable) {
-	echo "<th>Select</th>\n";
+	echo "<th valign='center'>Select</th>\n";
     }
     foreach ($cols as $c) {
         # reverse the sort direction if necessary
+	$arr = "";
         if (isset($sortcols) && count($sortcols) == 1 
             && $sortcols[0] == $c) {
             $nsortdir = ($sortdir == "asc")?"desc":"asc";
+	    if ($nsortdir == 'desc') {
+		$arr = " " . $unicode_up;
+	    }
+	    else {
+		$arr = " " . $unicode_dn;
+	    }
         }
         else {
             $nsortdir = $sortdir;
         }
 	$sstr = "background-color: " . $colcol[$colsrc[$c]];
         $url = pm_buildurl(array('sortcols' => $c,'sortdir' => $nsortdir));
-        echo "    <th style='$sstr'><a href='$url'>$c</a></th>\n";
+        echo "    <th valign='center' style='$sstr'>" . 
+	    "<a href='$url'>${c}${arr}</a></th>\n";
     }
 
     $tmppgsel = array();

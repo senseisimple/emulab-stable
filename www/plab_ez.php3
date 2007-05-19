@@ -157,6 +157,16 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     }
 
     #
+    # Phys node list
+    #
+    if (isset($formfields["nodelist"])) {
+	$nodelist = $formfields["nodelist"];
+    }
+    else {
+	$nodelist = "";
+    }
+
+    #
     # Grab a list of how many are available
     #
     $plab_counts = TBPlabAvail();
@@ -218,7 +228,8 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
          echo "<input type='hidden' name='formfields[tarball]' value=''>\n";
          echo "<input type='hidden' name='formfields[rpm]' value=''>\n";
          echo "<input type='hidden' name='formfields[startupcmd]' value=''>\n";
-	 echo "<input type='hidden' name='formfields[nodeversion]' value='Production'\n";
+	 echo "<input type='hidden' name='formfields[nodeversion]' value='Production'>\n";
+	 echo "<input type='hidden' name='formfields[nodelist]' value=''>\n";
      }
 
     #
@@ -255,7 +266,16 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		    </select>
 		 </td>
 	      </tr>\n";
-	
+
+        #
+	# Node list
+        #
+	echo "<tr>
+                 <td>Physical Node List:</td>
+                 <td><input type='text' name='formfields[nodelist]'
+                         value='$nodelist' size=36></td>
+              </tr>\n";
+
         #
         # Node version
         #
@@ -266,7 +286,8 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
                     <select name='formfields[nodeversion]'>\n";
 	foreach ($nodeversions as $nv) {
 	    echo "         <option value='$nv'";
-	    if ($formfields["nodeversion"] == $nv) {
+	    if (array_key_exists("nodeversion",$formfields) 
+		&& $formfields["nodeversion"] == $nv) {
 		echo " selected";
 	    }
 	    echo ">$nv</option>\n";
@@ -286,21 +307,26 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 		 <td>
 		    <select name='formfields[resusage]'>
 		    <option value='5'";
-	if ($formfields["resusage"] == 5) { echo " selected"; }
+	if (array_key_exists("resusage",$formfields) 
+	    && $formfields["resusage"] == 5) { echo " selected"; }
 	echo ">Very High</option>
 		    <option value='4'";
-	if ($formfields["resusage"] == 4) { echo " selected"; }
+	if (array_key_exists("resusage",$formfields) 
+	    && $formfields["resusage"] == 4) { echo " selected"; }
 	echo ">High</option>
 		    <option value='3'";
-	if (!$formfields["resusage"] || $formfields["resusage"] == 3) {
+	if (array_key_exists("resusage",$formfields) 
+	    && (!$formfields["resusage"] || $formfields["resusage"] == 3)) {
 	    echo " selected";
 	}
 	echo ">Medium</option>
 		    <option value='2'";
-	if ($formfields["resusage"] == 2) { echo " selected"; }
+	if (array_key_exists("resusage",$formfields) 
+	    && $formfields["resusage"] == 2) { echo " selected"; }
 	echo ">Low</option>
 		    <option value='1'";
-	if ($formfields["resusage"] == 1) { echo " selected"; }
+	if (array_key_exists("resusage",$formfields) 
+	    && $formfields["resusage"] == 1) { echo " selected"; }
 	echo ">Very Low</option>
 		    </select>
 		 </td>
@@ -376,37 +402,49 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	#
 	# Tarballs
 	#
+	$tval = '';
+	if (array_key_exists("tarball",$formfields)) {
+	    $tval = $formfields["tarball"];
+	}
 	echo "<tr>
 	         <td><a href='plab_ez_footnote2.html'
 		        target='emulabfootnote'>Tarball(s)</a> to install:</td>
 		 <td>
 		    <input type='text' size=50 name=formfields[tarball]
-		           value='" . $formfields["tarball"] . "'>
+		           value='" . $tval . "'>
 		 </td>
 	      </tr>\n";
 
 	#
 	# RPMs
 	#
+	$tval = '';
+	if (array_key_exists("rpm",$formfields)) {
+	    $tval = $formfields["rpm"];
+	}
 	echo "<tr>
 	         <td><a href='plab_ez_footnote3.html'
 		        target='emulabfootnote'>RPM(s)</a> to install:</td>
 	         <td>
 		    <input type='text' name='formfields[rpm]'
-		           value='" . $formfields["rpm"] . "' size=50>
+		           value='" . $tval . "' size=50>
 	         </td>
               </tr>\n";
 
 	#
 	# Startup commands
 	#
+	$tval = '';
+	if (array_key_exists("startupcmd",$formfields)) {
+	    $tval = $formfields["startupcmd"];
+	}
 	echo "<tr>
                  <td><a href='plab_ez_footnote4.html'
 		        target='emulabfootnote'>Command</a> to run on startup:
 		</td>
 	         <td>
 		    <input type='text' name='formfields[startupcmd]'
-		           value='" . $formfields["startupcmd"] . "' size=50>
+		           value='" . $tval . "' size=50>
 		 </td>
                </tr>\n";
     } # if ($advanced)
@@ -589,6 +627,9 @@ function MAKENS($formfields) {
     if ($formfields['count']) {
 	$nsgen_args .= "-v Count='$formfields[count]' ";
     }
+    if ($formfields['nodelist']) {
+	$nsgen_args .= "-v NodeList='$formfields[nodelist]' ";
+    }
     if ($formfields['type']) {
 	$nsgen_args .= "-v HWType='$formfields[type]' ";
     }
@@ -631,6 +672,9 @@ function CHECKFORM($formfields) {
     $errors = array();
     if (!preg_match("/^\d+$/",$formfields['count'],$matches)) {
 	$errors['count'] = "Number of nodes must be a positive integer";
+    }
+    if (!preg_match("/(\w+\d+\s*)*/",$formfields['nodelist'],$matches)) {
+	$errors['nodelist'] = "Node list must be a space-separated list";
     }
     if ($formfields['when'] && (strcmp($formfields['when'],"never") != 0) &&
         (!preg_match("/^\d*(\.\d+)?$/",$formfields['when'],$matches))) {

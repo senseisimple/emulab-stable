@@ -15,6 +15,7 @@
     <variable name="RPMs" default="/proj/yourproj/rpms/yourrpm.rpm" />
     <variable name="Startup" default="/somepath/yourstartupcmd" />
     <variable name="NodeVersion" default="Production" />
+    <variable name="NodeList" default="" />
     <nstext>
 	<section><![CDATA[
 # planetlab.ns - NS script to allocate PlanetLab nodes on Emulab/Netbed
@@ -46,6 +47,14 @@ tb-set-mem-usage <ResUsage>
 set num_nodes <Count>
 
 #
+# Possibly use a fixed set of nodes (if set, overrides num_nodes setting!)
+#
+set nodelist {<NodeList>}
+if { [llength $nodelist] > 0 } {
+    set num_nodes [llength $nodelist]
+}
+
+#
 # Type of PlanetLab nodes to request.  Current choices, with counts:
 #    pcplab      Any PlanetLab node (127)
 # The following are mutually exclusive sets:
@@ -70,6 +79,10 @@ set node_version "<NodeVersion>"
 for {set i 1} {$i <= $num_nodes} {incr i} {
     set node($i) [$ns node]
     tb-set-hardware $node($i) $hwtype
+
+    if { [llength $nodelist] > 0 } {
+        tb-fix-node $node($i) [lindex $nodelist [expr $i - 1]]
+    }
 
 	]]></section>
     <section depends_on="FailOK" action="comment"><![CDATA[
