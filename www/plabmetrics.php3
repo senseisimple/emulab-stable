@@ -80,7 +80,7 @@ function init() {
 
 window.onload = init;
 
-function setFormElementValue(id,value) {
+function setElementValue(id,value) {
     if (id == null) {
 	return false;
     }
@@ -90,6 +90,34 @@ function setFormElementValue(id,value) {
     }
 
     obj.value = value;
+
+    return true;
+}
+
+function setFormElementValue(form,id,value) {
+    if (form == null || id == null) {
+	return false;
+    }
+    var fobj = document.forms[form].elements[id];
+    if (!isdef(fobj) ) {
+    	return false;
+    }
+    
+    fobj.value = value;
+
+}
+
+function setSelectionAllCheckboxes(form,selstate) {
+    if (form == null) {
+	return false;
+    }
+
+    var fobj = document.forms[form];
+    for (var i = 0; i < fobj.elements.length; ++i) {
+	if (fobj.elements[i].type == 'checkbox') {
+	    fobj.elements[i].checked = selstate;
+	}
+    }
 
     return true;
 }
@@ -147,6 +175,8 @@ $optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
 
 				  "selectable", PAGEARG_BOOLEAN,
 				  "selectionlist", PAGEARG_ALPHALIST,
+				  "newpgsel", PAGEARG_ARRAY,
+				  "pgsel", PAGEARG_ARRAY,
 
                                   # We check this *extremely* copiously.
                                   # It actually gets tokenized and parsed and
@@ -160,15 +190,11 @@ $optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
 
 # Yet to be implemented:
 # * basic options
-#     enable/disable selection; show current selection and be able to remove 
-#       nodes from it!
-#     color emulab/comon/other data sources (only header cells, prob)
-#     add cotop (both node-centric and slice-centric?) and pcvm links; other?
+#     add and pcvm links; other?
 # * advanced options
 #     build-your-own rank (based off column weights, normalization to max or 
 #       user-chosen ceil; each col should be able to be minimized/maximized in 
 #       its contribution to the rank)
-
 
 
 #
@@ -407,6 +433,23 @@ if (!isset($cols) || count($cols) == 0) {
     $cols = $defcols;
 }
 
+# If selecting nodes, make sure that node_id is included in our queries.
+if (isset($selectable) && $selectable) {
+    $foundit = false;
+    foreach ($cols as $c) {
+	if ($c == 'node_id') {
+	    $foundit = true;
+	}
+    }
+    if (!$foundit) {
+	$ta = array('node_id');
+	foreach ($cols as $c) {
+	    array_push($ta,$c);
+	}
+	$cols = $ta;
+    }
+}
+
 # Assign a default set of sort columns and sort order if unset.
 if (!isset($sortcols)) {
     $sortcols = $defsortcols;
@@ -442,6 +485,47 @@ if (isset($sortdir) && $sortdir != 'asc' && $sortdir != 'desc') {
     $sortdir = 'asc';
 }
 
+#
+# Figure out if the user selected any new plab nodes, and update the
+# selectionlist if so.
+#
+if (isset($selectionlist) && $selectionlist[0] == 'ALLINSEARCH') {
+    ;
+}
+elseif ((isset($newpgsel) && count($newpgsel) > 0) 
+	|| (isset($pgsel) && count($pgsel) > 0)) {
+    if (!isset($pgsel)) {
+	$pgsel = array();
+    }
+    if (!isset($newpgsel)) {
+	$newpgsel = array();
+    }
+    if (!isset($selectionlist) || $selectionlist == '') {
+	$selectionlist = array();
+    }
+
+    # compare newpgsel and pgsel; see which are new, and add new ones
+    # to selectionlist
+    $ra = array();
+    $aa = array();
+    foreach ($newpgsel as $i) {
+	if (!in_array($i,$pgsel)) {
+	    array_push($aa,$i);
+	}
+    }
+    foreach ($pgsel as $os) {
+	if ($os != '' && !in_array($os,$newpgsel)) {
+	    array_push($ra,$os);
+	}
+    }
+    foreach ($aa as $elm) {
+	if (!in_array($elm,$selectionlist)) {
+	    array_push($selectionlist,$elm);
+	}
+    }
+    $da = array_diff($selectionlist,$ra);
+    $selectionlist = $da;
+}
 
 #
 # Next, build query:
@@ -456,6 +540,9 @@ $sort_s = $qbits[3]; $pag_s = $qbits[4];
 $qcount = "select count(" . $colmap['node_id'] . ") as num" . 
     " from $src_s $filter_s";
 
+# query that gets all node_id values in the search
+$qnid = "select " . $colmap['node_id'] . " from $src_s $filter_s";
+
 # query that gets data
 $q = "select $select_s from $src_s $filter_s $sort_s $pag_s";
 
@@ -469,6 +556,24 @@ if (mysql_num_rows($qres) != 1) {
 $row = mysql_fetch_array($qres);
 $totalrows = $row['num'];
 
+if (isset($selectionlist) && count($selectionlist) == 1 
+    && $selectionlist[0] == 'ALLINSEARCH') {
+    $qres = DBQueryFatal($qnid);
+    $selectionlist = array();    
+    while ($row = mysql_fetch_array($qres)) {
+	array_push($selectionlist,$row[$colmap_mysqlnames['node_id']]);
+    }
+}
+
+#
+# Grab the query data!  Hate to store it in memory, but because of the page
+# layout we must.
+#
+$qres = DBQueryFatal($q);
+$data = array();
+while ($row = mysql_fetch_array($qres)) {
+    array_push($data,$row);
+}
 
 #
 # Draw nondata part of page
@@ -480,7 +585,7 @@ echo "<br><br>";
 #
 # Finally, execute main data query and display resulting data.
 #
-pm_showtable($totalrows,$q);
+pm_showtable($totalrows,$data);
 
 #
 # Standard Testbed Footer
@@ -496,7 +601,7 @@ PAGEFOOTER();
 # Show the non-data part of the page:
 #
 function pm_shownondata() {
-    global $pagelayout;
+    global $pagelayout,$selectable;
     global $opterrs;
 
     echo "<table class='stealth'>\n";
@@ -531,8 +636,10 @@ function pm_shownondata() {
 	echo "</span><br>\n";
     }
     pm_showsearch();
-#echo "<br>\n";
-#pm_showselection();
+    if (isset($selectable) && $selectable) {
+	echo "<br>\n";
+	pm_showselection();
+    }
     echo "</td>\n";
     echo "</tr>\n";
     echo "</table>\n";
@@ -542,10 +649,32 @@ function pm_shownondata() {
 # Show the selection box
 #
 function pm_showselection() {
+    global $selectionlist;
+
     echo "<div style='padding: 8px; padding-left: 12px; padding-right: 12px;";
     echo " border: 2px solid silver; visibility: visible; margin-left: 4px'";
     echo " id='selectiondiv'>\n";
+
+    echo "<form name='nodeeditsel' id='nodeeditsel' action='plabmetrics.php3' method='post'>\n";
+    echo pm_gethiddenfields('nodeeditsel');
+
     echo "<b>Selected nodes</b>:<br>\n";
+
+    if (!isset($selectionlist)) {
+	echo "None.\n";
+    }
+    else {
+	echo "<textarea name='selectionlist' rows='4' cols='64'>\n";
+	echo implode(',',$selectionlist);
+	echo "</textarea>\n";
+	echo "<br>\n";
+	echo "<input type='submit' value='Save Selection Edits'>\n";
+	echo "<input type='button' value='Clear Selection'>\n";
+	echo "&nbsp;<input type='button' value='Create PlanetLab Slice from Selection'>\n";
+    }
+
+    echo "</form>\n";
+
     echo "</div>\n";
 }
 
@@ -563,22 +692,21 @@ function pm_showsearch() {
     echo "<div style='padding: 8px; padding-left: 12px; padding-right: 12px;";
     echo " border: 2px solid silver; visibility: visible; margin-left: 4px'";
     echo " id='searchdiv'>\n";
-    echo "<form name='plsearchform' id='plsearchform'" . 
-	" action='plabmetrics.php3' method='post' " . 
+    echo "<form name='plsearchform' id='plsearchform'" .
+        " action='plabmetrics.php3' method='post' " .
         # We manually set a comma-delineated string comprised of the col names
         # in the display cols select box.  This way, we still only must handle
         # the cols var, instead of both the cols and selcols[] vars on 
         # search box post vs url get.
-        " onSubmit='setFormElementValue(\"cols\",".
+        " onSubmit='setFormElementValue(\"plsearchform\",\"cols\",".
 	"dynselect.getOptsAsDelimString(document.getElementById(\"selcols\"),".
 	"\",\",false)); " . 
-	"setFormElementValue(\"sortcols\",".
+	"setFormElementValue(\"plsearchform\",\"sortcols\",".
 	"dynselect.getOptsAsDelimString(document.getElementById(\"selsortcols\"),".
 	"\",\",false));" . "'" . ">\n";
     
-    if (isset($pagelayout)) {
-	echo "<input type='hidden' name='pagelayout' value='$pagelayout'>\n";
-    }
+    # Also includes hidden vals for col selection and sorting.
+    echo pm_gethiddenfields('plsearchform');
     
     # Only draw pid/exp boxes if the user can access swapped-in experiments 
     # with pl nodes.
@@ -654,11 +782,6 @@ function pm_showsearch() {
     echo "<input type='text' value='$tuq' name='userquery' size='64'>\n";
     echo "<br>\n";
 
-
-    # hidden vals for col selection and sorting
-    echo "<input type='hidden' name='cols' id='cols' value='$cols'>\n";
-    echo "<input type='hidden' name='sortcols' id='sortcols' " . 
-	"value='$sortcols'>\n";
 
     # choose which columns are shown and what the column order should be
     # first do the headers -- col order and col sort get munged here!
@@ -793,7 +916,7 @@ function pm_showsearch() {
     # XXX
     # if the user changes the limit we change the offset to 0 so they
     # do not get funky page offset stuff
-    echo "  onChange='setFormElementValue(\"offset\",0)'>\n";
+    echo "  onChange='setFormElementValue(\"plsearchform\",\"offset\",0)'>\n";
     foreach ($defLimits as $limk => $limv) {
 	echo "  <option value='$limv' ";
 	if ($limv == $limit) {
@@ -803,7 +926,6 @@ function pm_showsearch() {
     }
     echo "</select>\n";
     echo " PlanetLab <b>nodes per page</b>\n";
-    echo "<input type='hidden' name='offset' id='offset' value='$offset'>\n";
     echo "<br><br>\n";
 
     # form buttons
@@ -822,12 +944,10 @@ function pm_showsearch() {
 # with key/value params.
 #
 function pm_buildurl() {
-    global $offset,$limit,$upnodefilter,$pagelayout,$pid,$eid;
-    global $sortcols,$sortdir;
-
     $pageargs = array( 'pid','eid','cols','sortcols','sortdir',
                        'upnodefilter','pagelayout','limit','offset',
-		       'hostfilter','userquery' );
+		       'hostfilter','userquery',
+		       'selectable','selectionlist' );
 
     $params = array();
     foreach ($pageargs as $pa) {
@@ -854,6 +974,53 @@ function pm_buildurl() {
 
     return $retval;
 }
+
+#
+# Parameterized by form name because the forms each have some of the values
+# as non-hidden controls.
+#
+function pm_gethiddenfields($whichform,$override=array()) {
+    $pageargs = array();
+    if ($whichform == 'plsearchform') {
+	$pageargs = array('pagelayout','offset',
+			  'cols','sortcols',
+			  'selectable','selectionlist');
+    }
+    elseif ($whichform == 'nodesel') {
+	$pageargs = array('pid','eid','cols','sortcols','sortdir',
+			  'upnodefilter','pagelayout','hostfilter',
+			  'selectable','selectionlist','userquery',
+			  'offset','limit');
+    }
+    elseif ($whichform == 'nodeeditsel') {
+	$pageargs = array('pid','eid','cols','sortcols','sortdir',
+			  'upnodefilter','pagelayout','hostfilter',
+			  'selectable','userquery',
+			  'offset','limit');
+    }
+
+    $params = array();
+    foreach ($pageargs as $pa) {
+        if (isset($GLOBALS[$pa])) {
+            $params[$pa] = $GLOBALS[$pa];
+        }
+    }
+
+    foreach ($override as $ok => $ov) {
+	$params[$ok] = $ov;
+    }
+
+    $retval = "";
+    foreach ($params as $k => $v) {
+        if (is_array($v)) {
+            $v = implode($v,',');
+        }
+        # Include the id field just in case javascripts touch these.
+        $retval .= "<input type='hidden' name='$k' id='$k' value='$v'>\n";
+    }
+
+    return $retval;
+}    
 
 function pm_getpaginationlinks($totalrows) {
     global $offset,$limit,$DEF_NUMPAGENO;
@@ -1057,9 +1224,10 @@ function pm_buildqueryinfo() {
     return array($q_colstr,$q_joinstr,$q_finalfs,$q_sortstr,$q_pagstr);
 }
 
-function pm_showtable($totalrows,$query) {
+function pm_showtable($totalrows,$data) {
     global $sortcols,$sortdir,$colmap,$colmap_mysqlnames,$cols;
     global $colsrc,$colcol;
+    global $selectable,$selectionlist,$newpgsel;
 
     echo "<center><div style=''>\n";
     echo "<p>\n";
@@ -1076,10 +1244,37 @@ function pm_showtable($totalrows,$query) {
     echo pm_getpaginationlinks($totalrows);
     echo "</p>\n";
 
+    if (isset($selectable) && $selectable) {
+	echo "<form name='nodesel' id='nodesel' action='plabmetrics.php3' method='get'" . 
+	    " >\n";
+        # Must ensure that the form field selectionlist is sent, so we can
+        # whack it with javascript if necessary.
+	$ova = array();
+	if (!isset($selectionlist)) {
+	    $ova = array('selectionlist' => '');
+	}
+	echo pm_gethiddenfields('nodesel',$ova);
+	echo "<p>\n";
+	echo "<input type='button' id='saveb' value='Save Selection'" . 
+	    " onClick='this.form.submit()'>\n";
+	echo "<input type='button' value='Select All on Page' " . 
+	    " onClick='setSelectionAllCheckboxes(\"nodesel\",true)'>\n";
+	echo "<input type='button' value='Unselect All on Page' " . 
+	    " onClick='setSelectionAllCheckboxes(\"nodesel\",false)'>\n";
+	echo "<input type='button' id='aisb' value='Select All in Search' " .
+	    " onClick='setFormElementValue(\"nodesel\"," . 
+	    "\"selectionlist\",\"ALLINSEARCH\");" . 
+	    "this.form.submit()'>\n";
+	echo "</p>\n";
+    }
+
     # dump table header
     echo "<table>\n";
     echo "  <tr>\n";
 
+    if (isset($selectable) && $selectable) {
+	echo "<th>Select</th>\n";
+    }
     foreach ($cols as $c) {
         # reverse the sort direction if necessary
         if (isset($sortcols) && count($sortcols) == 1 
@@ -1094,11 +1289,24 @@ function pm_showtable($totalrows,$query) {
         echo "    <th style='$sstr'><a href='$url'>$c</a></th>\n";
     }
 
-    # now run the real query
-    $qres = DBQueryFatal($query);
+    $tmppgsel = array();
 
-    while ($row = mysql_fetch_array($qres)) {
+    foreach ($data as $row) {
         echo "  <tr>\n";
+	if (array_key_exists($colmap_mysqlnames['node_id'],$row) 
+	    && isset($selectable) && $selectable) {
+	    echo "<td>\n";
+	    $checkedstr = '';
+	    if (isset($selectionlist) 
+		&& in_array($row[$colmap_mysqlnames['node_id']],
+			    $selectionlist)) {
+		array_push($tmppgsel,$row[$colmap_mysqlnames['node_id']]);
+		$checkedstr = ' checked';
+	    }
+	    echo "<input type='checkbox' name='newpgsel[]' value='" . 
+		$row[$colmap_mysqlnames['node_id']] . "'$checkedstr>\n";
+	    echo "</td>\n";
+	}
         foreach ($cols as $c) {
             $dbval = $row[$colmap_mysqlnames[$c]];
             # stupid mysql driver
@@ -1115,11 +1323,19 @@ function pm_showtable($totalrows,$query) {
 	    }
 	}
     }
+    foreach ($tmppgsel as $tval) {
+	echo "<input type='hidden' name='pgsel[]' value='$tval'>\n";
+    }
 
     echo "</table>\n";
     echo "<p>\n";
     echo pm_getpaginationlinks($totalrows);
     echo "</p>\n";
+
+    if (isset($selectable) && $selectable) {
+	echo "</form>";
+    }
+
     echo "</div></center>\n";
 }
 
