@@ -349,6 +349,15 @@ else {
 $colmap = array( 'node_id' => 'pm.node_id',
 		 'hostname' => 'pm.hostname',
 		 'plab_id' => 'pm.plab_id',
+                 # emulab columns
+		 'nodestatus' => 'ns.status',
+		 'nodestatustime' => 'ns.status_timestamp',
+		 'unavail' => 'pnhs.unavail',
+		 'jitdeduction' => 'pnhs.jitdeduct',
+		 'successes' => 'pnhs.succnum',
+		 'failures' => 'pnhs.failnum',
+                 # what about what kind of link the node contains 
+		 # (i.e., inet,inet2,dsl,...) ?
                  # comon columns
 		 'resptime' => 'pcd.resptime','uptime' => 'pcd.uptime',
 		 'lastcotop' => 'pcd.lastcotop',
@@ -365,17 +374,7 @@ $colmap = array( 'node_id' => 'pm.node_id',
 		 'diskin' => 'pcd.diskin','diskout' => 'pcd.diskout',
 		 'gbfree' => 'pcd.gbfree','swapused' => 'pcd.swapused',
 		 'bwlimit' => 'pcd.bwlimit','txrate' => 'pcd.txrate',
-		 'rxrate' => 'pcd.rxrate',
-                 # emulab columns
-		 'unavail' => 'pnhs.unavail',
-		 'jitdeduction' => 'pnhs.jitdeduct',
-		 'successes' => 'pnhs.succnum',
-		 'failures' => 'pnhs.failnum',
-		 'nodestatus' => 'ns.status',
-		 'nodestatustime' => 'ns.status_timestamp',
-                 # what about what kind of link the node contains 
-		 # (i.e., inet,inet2,dsl,...) ?
-	       );
+		 'rxrate' => 'pcd.rxrate' );
 
 # An array to help color data sources so users can more easily figure out
 # what is what.
@@ -398,6 +397,75 @@ $colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
 		 'jitdeduction' => 'Emulab','successes' => 'Emulab',
                  'failures' => 'Emulab','nodestatus' => 'Emulab',
                  'nodestatustime' => 'Emulab' );
+
+# The legend for fields.  The comon data is quoted from
+# http://summer.cs.princeton.edu/status/legend.html .
+$coldoc = array( 'node_id' => 'Emulab physical node id.',
+		 'hostname' => 'Node hostname.',
+		 'plab_id' => 'PLC node id number.',
+		 'nodestatus' => 'Emulab node status; up or down.',
+		 'nodestatustime' => 'Most recent heartbeat from the node ' . 
+		   'to Emulab heartbeat from the node.',
+		 'unavail' => 'Unavailability percentage as calculated by ' . 
+		   'Emulab.  Is increased if the node is often up and down.',
+		 'jitdeduction' => 'Amount added to total unavailability ' . 
+		   'percent; depends on if the node is often up and down.',
+		 'successes' => 'Number of recent Emulab sliver creation ' . 
+		   'successes on the node.',
+		 'failures' => 'Number of recent Emulab sliver creation ' . 
+		   'failures on the node.',
+		 'resptime' => '"How long it took for the node to respond ' . 
+		   'with the CoMon data."',
+		 'uptime' => '"How long the node has been up since last reboot."',
+		 'lastcotop' => '"How long it\'s been since we were able ' . 
+		   'to query the CoTop sensor on the node."',
+		 'date' => '"Reflects what time the node thinks it is, ' . 
+		   'slightly adjusted for skew."',
+		 'drift' => '"How far off from the median node time is ' . 
+		   'this node\'s time."',
+		 'cpuspeed' => '"The speed of the processor in gigahertz."',
+		 'busycpu' => '"Gives the % of time the CPU is utilized."',
+		 'syscpu' => '"Percentage of time the CPU is spending in ' . 
+		   'the OS"',
+		 'freecpu' => '"Indicates how much of the CPU a spin-loop ' . 
+		   'was able to obtain"',
+		 '1minload,5minload' => '"Load averages (# of runnable ' . 
+		   'processes) for the past 1 and and 5 minutes. The ' . 
+		   '1-minute value is actually the maximum 1-minute value ' . 
+		   'over the past 5 minutes."',
+		 'numslices' => '"Indicates the maximum number of slices ' . 
+		   'reported by slicestat over the past 5 minutes, measured ' .
+		   'once every 30 seconds."',
+		 'liveslices' => '"The count of how many slices used at ' . 
+		   'least one-tenth of one percent of the CPU in the last 5 ' .
+		   'minutes, measured at 30-second intervals."',
+		 'connmax,connavg' => '"We [CoMon] have a small client and ' . 
+		   'server demon that performs a TCP accept every second. ' . 
+		   'The Conn Max and Conn Avg fields show the maximum and ' . 
+		   'average times of the connect, over the past 5 minutes. ' . 
+		   'These values are in milliseconds."',
+		 'timermax,timeravg' => '"On each node, we [CoMon] run a ' . 
+		   'timer that tries to sleep for about 1ms at a time. The ' . 
+		   'Timer Max field shows the maximum interval between ' . 
+		   'timers and the Timer Avg field gives the average ' . 
+		   'interval, over the past 5 minutes. The hope is that ' . 
+		   'this gives some insight into the scheduler behavior. ' . 
+		   'These values are in milliseconds."',
+		 'memsize' => '"The node\'s memory size in GB."',
+		 'memact' => '"Percentage of the memory is in the operating ' .
+		   'system\'s "active" pool."',
+		 'freemem' => '"The output of a test program that tries to ' . 
+		   'grab 100MB of memory on the node."',
+		 'swapin,swapout' => '"The amount of memory swapped in/out ' . 
+		   'of disk per second, as obtained from vmstat."',
+		 'diskin,diskout' => '"The blocks in/out per second, as ' . 
+		   'obtained from vmstat."',
+		 'gbfree' => '"The amount of free space left on the disk, ' . 
+		   'in GB."',
+		 'swapused' => '"The percentage of the swap space consumed."',
+		 'bwlimit' => 'Node bandwidth limit.',
+		 'txrate,rxrate' => '"Transmit and receive rates (in Kbps), ' .
+		   'taken as a sum of per-slice activity."' );
 
 # An array containing colors for data sources.
 $colcol = array( 'Emulab' => '#cde4f3', 'CoMon' => '#ffedd7' );
@@ -612,6 +680,11 @@ echo "<br><br>";
 pm_showtable($totalrows,$data);
 
 #
+# Say what it all means.
+#
+pm_showlegend();
+
+#
 # Standard Testbed Footer
 #
 PAGEFOOTER();
@@ -620,6 +693,40 @@ PAGEFOOTER();
 #
 # Utility functions.
 #
+
+function pm_showlegend() {
+    global $colsrc,$coldoc;
+
+    echo "<h3><a name='legend'>Data Legend</a></h3>\n";
+    echo "<p>Emulab data:</p>\n";
+    echo "<p><ul>\n";
+    foreach ($coldoc as $col => $doc) {
+	$rcol = $col;
+	if (strstr($col,',')) {
+	    $ta = explode(',',$col);
+	    $rcol = $ta[0];
+	}
+	if ($colsrc[$rcol] == 'Emulab') {
+	    echo "<li><b>$col</b> " . $coldoc[$col];
+	}
+    }
+    echo "</p></ul>\n";
+    echo "<p>CoMon data (quotes are from <a href='" . 
+	"http://summer.cs.princeton.edu/status/legend.html'>the CoMon " . 
+	"legend</a>):</p>\n";
+    echo "<p><ul>\n";
+    foreach ($coldoc as $col => $doc) {
+	$rcol = $col;
+	if (strstr($col,',')) {
+	    $ta = explode(',',$col);
+	    $rcol = $ta[0];
+	}
+	if ($colsrc[$rcol] == 'CoMon') {
+	    echo "<li><b>$col</b> " . $coldoc[$col];
+	}
+    }
+    echo "</p></ul>\n";
+}
 
 #
 # Show the non-data part of the page:
@@ -706,20 +813,23 @@ function pm_showselection() {
     # We need a separate mini-form that submits to plab_ez so that we can
     # open a new window without using javascript (only the <form> element
     # can accept a target attribute).
-    echo "<form name='toplabez' id='toplabez' action='plab_ez.php3'" . 
-	" method='post' target='_blank'" . 
-	" onSubmit='setFormElementValue(" . 
-	"   \"toplabez\",\"formfields[nodelist]\"," . 
-	"   (getFormElementValue(\"nodeeditsel\",\"selectionlist\")).replace(/\\,\s*/g,\" \"))'>\n";
-    # plab_ez in advanced mode expects to see all these vars.
-    echo "<input type='hidden' name='formfields[nodelist]' value=''>\n";
-    echo "<input type='hidden' name='advanced' value='yes'>\n";
-    # This is a hack.  We allow the submit button value to be submitted
-    # to plab_ez so that plab_ez will figure out that it is supposed to
-    # be in advanced mode.  Before changing the value (name) of this button, 
-    # make sure you understand how plab_ez decides if it is in advanced more.
-    echo "<input type='submit' name='submit' value='Create PlanetLab Slice'>\n";
-    echo "</form>\n";
+    if (isset($selectionlist)) {
+	echo "<form name='toplabez' id='toplabez' action='plab_ez.php3'" . 
+	    " method='post' target='_blank'" . 
+	    " onSubmit='setFormElementValue(" . 
+	    "   \"toplabez\",\"formfields[nodelist]\"," . 
+	    "   (getFormElementValue(\"nodeeditsel\",\"selectionlist\")).replace(/\\,\s*/g,\" \"))'>\n";
+        # plab_ez in advanced mode expects to see all these vars.
+	echo "<input type='hidden' name='formfields[nodelist]' value=''>\n";
+	echo "<input type='hidden' name='advanced' value='yes'>\n";
+        # This is a hack.  We allow the submit button value to be submitted
+        # to plab_ez so that plab_ez will figure out that it is supposed to
+        # be in advanced mode.  Before changing the value (name) of this 
+        # button, make sure you understand how plab_ez decides if it is in 
+        # advanced mode.
+	echo "<input type='submit' name='submit' value='Create PlanetLab Slice'>\n";
+	echo "</form>\n";
+    }
 
     echo "</div>\n";
 }
@@ -1326,7 +1436,7 @@ function pm_showtable($totalrows,$data) {
     }
     foreach ($cols as $c) {
         # reverse the sort direction if necessary
-	$arr = "";
+	$arr = '';
         if (isset($sortcols) && count($sortcols) == 1 
             && $sortcols[0] == $c) {
             $nsortdir = ($sortdir == "asc")?"desc":"asc";
@@ -1339,7 +1449,15 @@ function pm_showtable($totalrows,$data) {
         }
         else {
             $nsortdir = $sortdir;
-        }
+	    if (in_array($c,$sortcols)) {
+		if ($sortdir == 'desc') {
+		    $arr = " " . $unicode_up;
+		}
+		else {
+		    $arr = " " . $unicode_dn;
+		}
+	    }
+	}
 	$sstr = "background-color: " . $colcol[$colsrc[$c]];
         $url = pm_buildurl(array('sortcols' => $c,'sortdir' => $nsortdir));
         echo "    <th valign='center' style='$sstr'>" . 
