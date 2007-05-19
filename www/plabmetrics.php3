@@ -806,7 +806,9 @@ function pm_showselection() {
 	echo "</textarea>\n";
 	echo "<br>\n";
 	echo "<input type='submit' value='Save Selection Edits'>\n";
-	echo "<input type='button' value='Clear Selection'>\n";
+	echo "<input type='button' value='Clear Selection'" . 
+	    " onClick='setFormElementValue(\"nodeeditsel\"," .
+	    " \"selectionlist\",\"\")'>\n";
     }
     echo "</form>\n";
 
