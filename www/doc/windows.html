@@ -172,12 +172,28 @@ in your experiment .ns file, like this:
 </pre>
 
 The Emulab Windows XP images are no longer specific to a particular hardware type.
-(See the <a href="#Changes"> Change Log </a> for more information.)  You can
+(See the <a href="#Changes"> Change Log </a> for more information.)  You may
 explicitly <a href="../kb-show.php3?xref_tag=tb-set-hardware">specify the
-hardware type</a> to run on, for example:
+hardware type</a> to run on if you wish, for example:
 <pre>
     <a href="../kb-show.php3?xref_tag=tb-set-hardware">tb-set-hardware</a> $node pc3000
 </pre>
+
+See the <a href="#tb-set-node-failure-action"> note below</a> on using the <a
+href="../tutorial/docwrapper.php3?docname=nscommands.html#tb-set-node-failure-action">
+tb-set-node-failure-action</a> command for experiments with a large number of
+Windows nodes.  This can save a <a href="../kb-show.php3?xref_tag=swapping">
+swap-in</a> with a large number of Windows nodes, or prevent a single node
+boot failure on a <a href="../kb-show.php3?xref_tag=swapmod"> swapmod</a> from
+swapping-out the whole experiment.  <p>
+
+If you use these commands:
+<a href="../kb-show.php3?xref_tag=tb-set-node-startcmd">tb-set-node-startcmd</a>,
+<a href="../kb-show.php3?xref_tag=load-software">tb-set-node-tarfiles</a>, or
+<a href="../kb-show.php3?xref_tag=load-software">tb-set-node-rpms</a> you
+should read the sections on <a href="#Cygwin_permissions"> Permissions </a>
+and <a href="#Cygwin_GUI"> Windows GUI programs </a> below.  <p>
+
 
 Currently available Windows XP images are:
 
@@ -222,13 +238,6 @@ Currently available Windows XP images are:
   </li>
 
 </ul>
-
-If you use these commands:
-<a href="../kb-show.php3?xref_tag=tb-set-node-startcmd">tb-set-node-startcmd</a>,
-<a href="../kb-show.php3?xref_tag=load-software">tb-set-node-tarfiles</a>, or
-<a href="../kb-show.php3?xref_tag=load-software">tb-set-node-rpms</a> you
-should read the sections on <a href="#Cygwin_permissions"> Permissions </a>
-and <a href="#Cygwin_GUI"> Windows GUI programs </a> below.  <p>
 
 <h4><a name="Network_config"> </a> Network config </h4>
 
@@ -372,25 +381,27 @@ that the swap-in process is finished by any of these methods:
   <li> Watching the realtime swap-in log to monitor its progress.
 </ul>
 
-<div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen Windows
-XP fail to do the second reboot.  We're working on it.  If you try to login
-after swap-in and your Windows password isn't honored, use this command on Ops
-to remotely reboot the node:<pre>    node_reboot pcxxx</pre>
+<a name="tb-set-node-failure-action"> </a>
+<div style="margin-left: 40px;"> <b>NOTE:</b>
 
-If you are able to log in but your remote home directory isn't mounted, you
-have the additional option of executing this command on
-the node itself: <pre>    /sbin/reboot</pre>
+Sometimes Windows XP fails to do the second reboot.  One reason is transient
+race conditions in the Windows startup, for example in the network stack when
+there are multiple network interface devices being initialized at the same
+time.  We make a strong effort to recover from this, but if the recovery code
+fails, by default it results in a <a href="../kb-show.php3?xref_tag=swapping">
+swap-in</a> or <a href="../kb-show.php3?xref_tag=swapmod"> swapmod</a>
+failure.  <p>
 
-The EmulabStartup service runs <code>/usr/local/etc/emulab/rc/rc.bootsetup</code>,
-logging output to <code>/var/log/bootsetup.log</code>.  If you're having swap-in
-problems and rc.bootsetup doesn't finish sending <code>ISUP</code> to Emulab within
-10 minutes, the node will be rebooted.  After a couple of reboot cycles without a
+At boot time, the EmulabStartup service on Windows XP runs the
+<code>/usr/local/etc/emulab/rc/rc.bootsetup</code> script, logging output to
+<code>/var/log/bootsetup.log</code>.  If you're having swap-in problems and
+rc.bootsetup doesn't finish sending <code>ISUP</code> to Emulab within 10
+minutes, the node will be rebooted.  After a couple of reboot cycles without a
 <code>ISUP</code>, Emulab gives up on the node.  <p>
 
-If you want to prevent swap-in failure, whether to diagnose the problem or to continue
-manually, you may add this line to your
-<a href="../tutorial/docwrapper.php3?docname=nscommands.html"> ns file </a>
-for each Windows node: <br>
+You can cause these boot-time problems to be nonfatal by adding this line to
+your <a href="../tutorial/docwrapper.php3?docname=nscommands.html"> ns file
+</a> <i>for each Windows node</i>: <br>
 &nbsp; &nbsp; &nbsp; &nbsp; <code>
     <a href="../tutorial/docwrapper.php3?docname=nscommands.html#tb-set-node-failure-action"> 
     tb-set-node-failure-action</a> <i>$node</i> "nonfatal"
@@ -398,8 +409,20 @@ for each Windows node: <br>
 (where <code><i>$node</i></code> is replaced with the node variable, of course.)
 <p>
 
-It will still complain if it doesn't get the ISUP signal at the end of rc.bootsetup,
-but the swap-in will proceed and allow you to figure out what's happening.  </div>
+Emulab will still complain if it doesn't get the ISUP signal at the end of
+rc.bootsetup, but the swap-in or swapmod will proceed and allow you to figure
+out what's happening.  Then you will probably have to manually reboot the failed
+Windows node to make it available to your experiment.  <p>
+
+If you try to login to a node after swap-in to diagnose the problem and your
+Windows password isn't honored, use this command on Ops to remotely reboot the
+node:<pre> node_reboot pcxxx</pre>
+
+If you are able to log in but your remote home directory isn't mounted, this
+is another symptom of a partial set-up.  You have the additional option of
+executing this command on the node itself:<pre> /sbin/reboot</pre>
+
+This gives Windows another chance to get it right.  </div>
 
 <h4><a name="Login_connections"> </a> Login connections to Windows </h4>
 
