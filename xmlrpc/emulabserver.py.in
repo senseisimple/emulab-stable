@@ -4374,7 +4374,8 @@ class elabinelab:
             #
             # The current control network becomes the outer control network.
             # The experimental network with an IP assigned becomes the
-            # inner control network.
+            # inner control network.  Interfaces other than experimental
+            # or control (e.g., fake IXP interfaces) are ignored.
             #
             role = res[3]
             IP   = res[7]
@@ -4385,6 +4386,8 @@ class elabinelab:
             elif role == "expt" and IP != "":
                 role = "ctrl"
                 pass
+            elif role != "expt":
+                continue
             
             tmp["mac"]         = res[1]
             tmp["iface"]       = res[2]
