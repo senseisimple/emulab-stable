@@ -24,7 +24,7 @@ $isadmin   = ISADMIN();
 
 # List of valid toggles
 $toggles = array("adminon", "webfreeze", "cvsweb", "lockdown", "stud",
-		 "cvsrepo_public", "workbench");
+		 "cvsrepo_public", "workbench", "hiderun");
 
 # list of valid values for each toggle
 $values  = array("adminon"        => array(0,1),
@@ -33,7 +33,8 @@ $values  = array("adminon"        => array(0,1),
 		 "stud"           => array(0,1),
 		 "lockdown"       => array(0,1),
 		 "cvsrepo_public" => array(0,1),
-		 "workbench"      => array(0,1));
+		 "workbench"      => array(0,1),
+		 "hiderun"        => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
 $optargs = array("adminon"        => array(),
@@ -42,7 +43,8 @@ $optargs = array("adminon"        => array(),
 		 "stud"           => array("user" => 1),
 		 "lockdown"       => array("pid" => 1, "eid" => 1),
 		 "cvsrepo_public" => array("pid" => 1),
-		 "workbench"      => array("pid" => 1));
+		 "workbench"      => array("pid" => 1),
+		 "hiderun"        => array("instance" => 1, "runidx" => 1));
 
 # Mandatory page arguments.
 $reqargs = RequiredPageArguments("type",  PAGEARG_STRING,
@@ -158,6 +160,15 @@ elseif ($type == "workbench") {
     }
     $zapurl = CreateURL("showproject", $project);
     $project->SetAllowWorkbench($value);
+}
+elseif ($type == "hiderun") {
+    RequiredPageArguments("instance",  PAGEARG_INSTANCE,
+			  "runidx",    PAGEARG_INTEGER);
+
+    if (! $instance->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+	USERERROR("You do not have permission to modify this instance", 1);
+    }
+    $instance->SetRunHidden($runidx, $value);
 }
 else {
     USERERROR("Nobody has permission to toggle $type!", 1);

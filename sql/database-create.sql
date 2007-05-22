@@ -571,6 +571,7 @@ CREATE TABLE `experiment_runs` (
   `start_time` datetime default NULL,
   `stop_time` datetime default NULL,
   `swapmod` tinyint(1) NOT NULL default '0',
+  `hidden` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`exptidx`,`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

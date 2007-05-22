@@ -4011,3 +4011,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	        `current_tag` varchar(64) default NULL;
 	alter table archive_tags add `version` tinyint(1)
 	            default '0' after tagtype;
+
+4.121: Add a hidden bit to the runs table.
+
+	alter table experiment_runs add hidden tinyint(1) NOT NULL default '0';
+

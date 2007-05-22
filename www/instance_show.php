@@ -20,13 +20,19 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-$reqargs  = RequiredPageArguments("instance",  PAGEARG_INSTANCE);
+$reqargs  = RequiredPageArguments("instance",   PAGEARG_INSTANCE);
+$optargs  = OptionalPageArguments("showhidden", PAGEARG_BOOLEAN);
 $template = $instance->GetTemplate();
 # Need these below.
 $guid = $template->guid();
 $vers = $template->vers();
 $pid  = $template->pid();
 $eid  = $instance->eid();
+
+# Default to not showing hidden
+if (!isset($showhidden)) {
+     $showhidden = 0;
+}
 
 if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
@@ -61,7 +67,7 @@ echo "</script>\n";
 
 echo $instance->PageHeader();
 echo "<br><br>\n";
-$instance->Show(1, 1);
+$instance->Show(1, 1, $showhidden);
 
 #
 # Standard Testbed Footer

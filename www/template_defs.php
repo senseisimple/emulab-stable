@@ -633,7 +633,7 @@ class Template
 		echo " <a NAME=$idx></a>\n";
 		echo "<td>&nbsp</td>\n";
 		echo " <td colspan=4>\n";
-		$instance->ShowRunList(0);
+		$instance->ShowRunList(0, 0);
 		echo " </td>\n";
 		echo "</tr>\n";
 	    }
@@ -1112,7 +1112,7 @@ class TemplateInstance
     #
     # Show an instance.
     #
-    function Show($detailed, $withanno = 0) {
+    function Show($detailed, $withanno = 0, $showhidden = 0) {
 	$exptidx = $this->exptidx();
 	$runidx  = $this->runidx();
 	$guid    = $this->guid();
@@ -1141,6 +1141,13 @@ class TemplateInstance
 	    $showexp_url  = CreateURL("showexp", $this->experiment);
 	}
 
+	# If there are hidden runs, then add an option to show them
+	$query_result =
+	    DBQueryFatal("select count(*) from experiment_runs ".
+			 "where exptidx='$exptidx' and hidden!=0");
+	$row = mysql_fetch_array($query_result);
+	$numhidden = $row[0];
+	
 	if ($detailed) {
 	    SUBPAGESTART();
 	    SUBMENUSTART("Options");
@@ -1156,6 +1163,15 @@ class TemplateInstance
 	    WRITESUBMENUBUTTON("Replay",
 			       CreateURL("swapin", $template, 
 					 "replay_instance_idx", $exptidx));
+
+	    if ($numhidden) {
+		$tag = ($showhidden ? "Hide" : "Show");
+		$val = ($showhidden ? 0 : 1);
+		
+		WRITESUBMENUBUTTON("$tag Hidden Runs",
+				   CreateURL("instance_show", $this,
+					     "showhidden", $val));
+	    }
 	    SUBMENUEND();
 	}
 	
@@ -1234,7 +1250,7 @@ class TemplateInstance
 	}
 
 	if ($detailed) {
-	    $this->ShowRunList(1);
+	    $this->ShowRunList(1, $showhidden);
 	}
 
 	echo "</center>\n";
@@ -1412,7 +1428,7 @@ class TemplateInstance
     #
     # Show the run list for an instance.
     #
-    function ShowRunList($withheader) {
+    function ShowRunList($withheader, $showhidden) {
 	$exptidx = $this->exptidx();
 	$guid    = $this->guid();
 	$vers    = $this->vers();
@@ -1447,12 +1463,16 @@ class TemplateInstance
 	    $exptidx   = $rrow['exptidx'];
 	    $start_tag = $rrow['starting_archive_tag'];
 	    $end_tag   = $rrow['ending_archive_tag'];
+	    $hidden    = $rrow['hidden'];
 	    $description = $rrow['description'];
 	    $onmouseover = "";
 
 	    if (! isset($stop)) {
 		$stop = "&nbsp";
 	    }
+
+	    if ($hidden && !$showhidden)
+		continue;
 
 	    if (isset($description) && $description != "") {
 		$onmouseover = MakeMouseOver($description);
@@ -1646,6 +1666,21 @@ class TemplateInstance
     }
 
     #
+    # Set/Clear the hidden bit.
+    #
+    function SetRunHidden($runidx, $hidden) {
+	$exptidx = $this->exptidx();
+	$runidx  = addslashes($runidx);
+	$hidden  = ($hidden ? 1 : 0);
+	
+	$query_result =
+	    DBQueryFatal("update experiment_runs set hidden=$hidden ".
+			 "where exptidx='$exptidx' and idx='$runidx'");
+
+	return 0;
+    }
+
+    #
     # Show details for an experiment run
     #
     function ShowRun($runidx) {
@@ -1671,6 +1706,7 @@ class TemplateInstance
 	$start_tag   = $row['starting_archive_tag'];
 	$end_tag     = $row['ending_archive_tag'];
 	$description = $row['description'];
+	$hidden      = $row['hidden'];
 
 	# Run descriptions are metatdata that can be changed.
 	# But use a naming convention. 
@@ -1688,6 +1724,17 @@ class TemplateInstance
 	WRITESUBMENUBUTTON("Revise Record",
 			   CreateURL("record_revise",
 				     $this, "runidx", $runidx));
+
+	if ($hidden) {
+	    WRITESUBMENUBUTTON("UnHide Record",
+			       CreateURL("toggle", $this, "runidx", $runidx,
+					 "type", "hiderun", "value", 0));
+	}
+	else {
+	    WRITESUBMENUBUTTON("Hide Record",
+			       CreateURL("toggle", $this, "runidx", $runidx,
+					 "type", "hiderun", "value", 1));
+	}
 	
 	if (isset($end_tag) && $end_tag != "") {
 	    WRITESUBMENUBUTTON("View Archive",
@@ -1714,6 +1761,9 @@ class TemplateInstance
 	ShowItem("Instance",
 		 MakeLink("instance", "instance=$exptidx", "$exptidx"));
 	ShowItem("ID",          $runidx);
+	if ($hidden) {
+	    ShowItem("Hidden", "<font color=red>Yes</font>");
+	}
 
 	if ($description && $description != "") {
 	    $onmouseover = MakeMouseOver($description);
