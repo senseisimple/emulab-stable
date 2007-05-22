@@ -35,7 +35,7 @@ function find_switch_macs(&$mac_list) {
 	$iface = $exploded[3];
 	$class = $exploded[4];
 	if (!preg_match("/^([\w-]+)\/(\d+)\.(\d+)$/",$switchport,$matches)) {
-	    echo "<h3>Bad line from switchmac: $line\n";
+	    echo "<h3>Bad line from switchmac: $line</h3>\n";
 	}
 	$switch = $matches[1];
 	$card = $matches[2];
