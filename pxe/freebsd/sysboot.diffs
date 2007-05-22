@@ -531,12 +531,13 @@ diff -ruN 6.2-release/src/sys/boot/i386/emuboot/Makefile 6.2/src/sys/boot/i386/e
 +CLEANFILES+=	machine
 diff -ruN 6.2-release/src/sys/boot/i386/emuboot/bootinfo.c 6.2/src/sys/boot/i386/emuboot/bootinfo.c
 --- 6.2-release/src/sys/boot/i386/emuboot/bootinfo.c	Wed Dec 31 17:00:00 1969
-+++ 6.2/src/sys/boot/i386/emuboot/bootinfo.c	Thu Mar  1 17:37:11 2007
-@@ -0,0 +1,239 @@
++++ 6.2/src/sys/boot/i386/emuboot/bootinfo.c	Tue May 22 11:21:28 2007
+@@ -0,0 +1,240 @@
 +/*
-+ * Copyright (c) 2000, 2001, 2003, 2004, 2007 University of Utah and the Flux Group.
++ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
 + * All rights reserved.
-+ * @OSKIT-FLUX-GPLUS@
++ *
++ * boot/bootinfo.c from the OSKit.
 + */
 +#include <stand.h>
 +#include <netinet/in_systm.h>
