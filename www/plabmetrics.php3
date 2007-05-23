@@ -225,6 +225,9 @@ $optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
 # Argument checks.
 #
 
+# first of all, only post-filter the data if absolutely necessary.
+$mustpostfilter = 0;
+
 # access control -- everybody can see stats for all nodes, but only members
 # of a pid can see which nodes an eid in that pid has.
 if (isset($experiment)) {
@@ -251,10 +254,10 @@ elseif (preg_match("/^([0-9a-zA-Z\-_\.]+)$/",$hostfilter) == 1) {
     $hf_regexp = 0;
 }
 else {
-    array_push($opterrs,"Only hostname characters are supported for" . 
-	                " hostname filtering.");
-    unset($hostfilter);
     $hf_regexp = 1;
+    # setup post-filtering so that we can match using regexps.
+    $mustpostfilter = 1;
+    echo "needed regexp and postfilter<br>\n";
 }
 
 #
@@ -635,8 +638,14 @@ $qcount = "select count(" . $colmap['node_id'] . ") as num" .
 # query that gets all node_id values in the search
 $qnid = "select " . $colmap['node_id'] . " from $src_s $filter_s";
 
-# query that gets data
-$q = "select $select_s from $src_s $filter_s $sort_s $pag_s";
+# query that gets data (note that if we need to do postfiltering, we
+# manually paginate the data!)
+if ($mustpostfilter) {
+    $q = "select $select_s from $src_s $filter_s $sort_s";
+}
+else {
+    $q = "select $select_s from $src_s $filter_s $sort_s $pag_s";
+}
 
 #echo "qcount = $qcount<br><br>\n";
 #echo "q = $q<br><br>\n";
@@ -668,6 +677,26 @@ while ($row = mysql_fetch_array($qres)) {
 }
 
 #
+# Post-db filtering
+#
+if ($mustpostfilter) {
+    $data = pm_filterdata($data);
+    $totalrows = count($data);
+
+    # Now we must manually paginate (i.e., we just do offset/limit ourself).
+    $i = 0;
+    $finaldata = array();
+    foreach ($data as $row) {
+	if ($i >= $offset && $i < ($offset+$limit)) {
+	    array_push($finaldata,$row);
+	}
+	++$i;
+    }
+
+    $data = $finaldata;
+}
+
+#
 # Draw nondata part of page
 #
 pm_shownondata();
@@ -693,6 +722,32 @@ PAGEFOOTER();
 #
 # Utility functions.
 #
+
+#
+# Filters the rows returned by a sql query and returns a new set of
+# rows that the filter allows though.
+#
+function pm_filterdata($data) {
+    global $hostfilter,$hf_regexp;
+    global $colmap_mysqlnames;
+
+    if (!$hf_regexp) {
+	return;
+    }
+
+    #
+    # Filter all rows based on regexp (expensive but no good way).
+    #
+    $retval = array();
+    foreach ($data as $idx => $row) {
+	if (preg_match("/$hostfilter/",
+		       $row[$colmap_mysqlnames['hostname']]) > 0) {
+	    array_push($retval,$row);
+	}
+    }
+
+    return $retval;
+}
 
 function pm_showlegend() {
     global $colsrc,$coldoc;
