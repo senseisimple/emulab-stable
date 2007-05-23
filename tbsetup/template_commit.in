@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -28,7 +28,8 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_commit [-q] [-e eid] <guid/vers>\n".
+	  "Usage: template_commit [-q] -f <path>\n".
+	  "       template_commit [-q] [-e eid] <guid/vers>\n".
 	  "       template_commit [-q] -p pid -e eid\n".
 	  "switches and arguments:\n".
 	  "-q          - be less chatty\n".
@@ -37,10 +38,11 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qe:dp:";
+my $optlist	 = "qe:dp:f:";
 my %options      = ();
 my $quiet        = 0;
 my $debug        = 0;
+my $frompath;
 my $eid;
 my $pid;
 my $guid;
@@ -60,11 +62,12 @@ my $checkquota  = "$TB/sbin/checkquota";
 my $modify      = "$TB/bin/template_create";
 my $archcontrol = "$TB/bin/archive_control";
 my $TAR         = "/usr/bin/tar";
+my $RSYNC	= "/usr/local/bin/rsync";
 
 # Locals
-my $dbuid;
 my $template;
 my $child_template;
+my $cookie;
 
 # Protos
 sub ParseArgs();
@@ -73,6 +76,7 @@ sub sighandler($);
 sub cleanup();
 sub CommitFromInstance();
 sub CommitFromTemplate();
+sub CommitFromCheckout();
 
 #
 # Testbed Support libraries
@@ -106,8 +110,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
 
 # Now parse arguments.
@@ -133,6 +138,28 @@ if (defined($pid)) {
     $version = $template->vers();
 }
 else {
+    if (defined($frompath)) {
+	#
+	# Figure out what template from cookie file.
+	#
+	$cookie  = "$frompath/.template";
+
+	if (open(COOKIE, $cookie)) {
+	    while (<COOKIE>) {
+		if ($_ =~ /^GUID:\s*([\w]*)\/([\d]*)$/) {
+		    $guid    = $1;
+		    $version = $2;
+		}
+	    }
+	    close(COOKIE);
+	}
+	else {
+	    tbdie("Could not open $cookie!");
+	}
+	if (!(defined($guid) && defined($version))) {
+	    tbdie("Could not parse $cookie!");
+	}
+    }
     $template = Template->Lookup($guid, $version);
 
     if (!defined($template)) {
@@ -140,7 +167,7 @@ else {
     }
 }
 
-if (! $template->AccessCheck($dbuid, TB_EXPT_MODIFY)) {
+if (! $template->AccessCheck($this_user, TB_EXPT_MODIFY)) {
     tberror("You do not have permission to commit template $guid/$version");
     exit(1);
 }
@@ -150,13 +177,78 @@ if (! $template->AccessCheck($dbuid, TB_EXPT_MODIFY)) {
 #
 $SIG{TERM} = \&sighandler;
 
-if (defined($eid)) {
+if (defined($frompath)) {
+    CommitFromCheckout();
+}
+elsif (defined($eid)) {
     CommitFromInstance();
 }
 else {
     CommitFromTemplate();
 } 
 exit(0);
+
+#
+# Commit from a checkout. 
+#
+sub CommitFromCheckout()
+{
+    my $pid     = $template->pid();
+    my $tid     = $template->tid();
+    my $gid     = $template->gid();
+    my $nsfile  = "$frompath/tbdata/nsfile.ns";
+    my $optarg  = ($quiet ? "-q" : "");
+
+    #
+    # The NS file is taken from the checkout.
+    #
+    fatal(1, "There is no NS file in $frompath/tbdata!")
+	if (! -e $nsfile);
+  
+    #
+    # Template modify to give us a new version. Giving it $frompath causes
+    # the datastore to be imported from the directory instead of the parent
+    # template.
+    #
+    system("$modify -m $guid/$version -w $optarg -g $gid -f $frompath ".
+	   "$pid $tid $nsfile");
+    if ($?) {
+	fatal($? >> 8, "Failed to modify $template!");
+    }
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+
+    $child_template = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child_template)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+
+    #
+    # Now we want to copy back to the $frompath to sync it up.
+    #
+    my $newpath = $child_template->path();
+
+    if (system("$RSYNC -rtgoDlz ${newpath}/ $frompath") != 0) {
+	fatal(-1, "Could not copy template back to checkout");
+    }
+
+    # Update the cookie so that the checkout refers to the new template
+    # not the original template.
+    unlink($cookie)
+	if (-e $cookie);
+
+    open(COOKIE, "> $cookie") or
+	fatal(-1, "Could not create $cookie\n");
+    print COOKIE "# Do not remove this file!\n";
+    print COOKIE "GUID: $child_guid/$child_vers\n";
+    print COOKIE "TIME: " . time() . "\n";
+    close(COOKIE);
+
+    return 0;
+}
 
 #
 # Commit a template. This is basically a template modify operation.
@@ -291,6 +383,14 @@ sub ParseArgs()
 	if (! TBcheck_dbslot($pid, "projects", "pid",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 	    tbdie("Improper project name (pid)!");
+	}
+    }
+    elsif (defined($options{"f"})) {
+	$frompath = $options{"f"};
+
+	# The Archive library has a nice routine to validate this path.
+	if (Archive::ValidatePath(\$frompath) != 0) {
+	    tbdie("Invalid path $frompath");
 	}
     }
     else {

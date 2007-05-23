@@ -4615,9 +4615,78 @@ class template:
             argstr += " "
             argstr += str(argdict["guid"])
             pass
+        elif argdict.has_key("path"):
+            try:
+                path = nfspath(argdict["path"]) # Scrub the path
+
+                # Make sure the path is accessible,
+                if not os.access(path, os.X_OK):
+                    raise OSError(errno.EPERM, "Path is not accessible", path)
+
+                pass
+            except OSError, e:
+                retval = EmulabResponse(RESPONSE_ERROR,
+                                        value=e,
+                                        output=(e.strerror +
+                                                ": " + e.filename))
+                return
+            
+            argstr  = "-q -f "
+            argstr += escapeshellarg(argdict["path"]);
+            pass
         
         (exitval, output) = runcommand(TBDIR +
                                        "/bin/template_commit " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Checkout a template.
+    #
+    def checkout(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "path"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w\/]*$", argdict["guid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        try:
+            path = nfspath(argdict["path"]) # Scrub the path
+
+            # Make sure the path is accessible,
+            if not os.access(path, os.X_OK):
+                raise OSError(errno.EPERM, "Path is not accessible", path)
+
+            pass
+        except OSError, e:
+            retval = EmulabResponse(RESPONSE_ERROR,
+                                    value=e,
+                                    output=(e.strerror + ": " + e.filename))
+            pass
+                                  
+        argstr  = "-q -f " + escapeshellarg(argdict["path"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_checkout " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         

@@ -185,6 +185,20 @@ sub LookupByPidEid($$$)
 }
 
 #
+# Return the underlying experiment object for the template itself.
+#
+sub GetExperiment($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return Experiment->LookupByIndex($self->exptidx());
+}
+
+#
 # Refresh a template instance by reloading from the DB.
 #
 sub Refresh($)
@@ -1794,6 +1808,20 @@ sub GetArchive($)
 }
 
 #
+# Get the current archive tag for the template from the underlying experiment.
+#
+sub ArchiveTag($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return $self->GetExperiment()->archive_tag();
+}
+
+#
 # Return project object for the template.
 #
 sub GetProject($)
@@ -2197,6 +2225,7 @@ sub Experiment($)
 
     return Experiment->LookupByIndex($self->exptidx());
 }
+sub GetExperiment($) { return $_[0]->Experiment(); }
 
 #
 # Delete a template instance record.

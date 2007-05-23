@@ -39,10 +39,11 @@ sub usage()
 	  "<input>   - Input file for experiment.\n");
     exit(-1);
 }
-my $optlist	 = "qwE:g:m:";
+my $optlist	 = "qwE:g:m:f:";
 my $quiet        = 0;
 my $waitmode     = 0;
 my $modify       = 0;
+my $frompath;
 my $description;
 my $pid;
 my $tid;
@@ -245,7 +246,7 @@ if (my $childpid =
 	    if (! $quiet);
 	exit(0);
     }
-    print("Waiting for template $pid/$tid to be created\n")
+    print("Waiting for template $pid/$tid to be created. Please be patient!\n")
 	if (! $quiet);
 
     # Give child a chance to run.
@@ -379,9 +380,15 @@ if ($modify) {
     print "Committing archive before copying data store\n";
     libArchive::TBCommitExperimentArchive($pid, $eid, "template_modify")
 	>= 0 or fatal(-1, "Failed to commit experiment archive!");
-    
-    $template->CopyDataStore($parent_template, $user_uid) == 0
-	or fatal(-1, "Failed to copy data store");
+
+    if (defined($frompath)) {
+	$template->ImportDataStore("$frompath/datastore") == 0
+	    or fatal(-1, "Failed to import data store");
+    }
+    else {
+	$template->CopyDataStore($parent_template, $user_uid) == 0
+	    or fatal(-1, "Failed to copy data store");
+    }
 
     # and tell the archive library about the above files.
     libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
@@ -547,6 +554,15 @@ sub ParseArgs()
     }
     else {
 	$gid = $pid;
+    }
+
+    if (defined($options{"f"})) {
+	$frompath = $options{"f"};
+
+	# The Archive library has a nice routine to validate this path.
+	if (Archive::ValidatePath(\$frompath) != 0) {
+	    tbdie("Invalid path $frompath");
+	}
     }
 
     #

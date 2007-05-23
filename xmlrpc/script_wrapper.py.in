@@ -131,6 +131,8 @@ API = {
                             "help" : "Commit changes to template (modify)" },
     "template_export"   : { "func" : "template_export",
                             "help" : "Export template record" },
+    "template_checkout" : { "func" : "template_checkout",
+                            "help" : "Checkout a template" },
     "template_instantiate": { "func" : "template_instantiate",
                             "help" : "Instantiate a template" },
     "template_swapin":    { "func" : "template_swapin",
@@ -1825,7 +1827,10 @@ class template_commit:
             pass
         
         # Try to infer the template guid/vers from the current path.
-        if (len(req_args) == 0 and pid == None and eid == None):
+        if os.access(".template", os.R_OK):
+            params["path"] = os.getcwd()
+            pass
+        elif (len(req_args) == 0 and pid == None and eid == None):
             guid = infer_guid(os.getcwd())
             if guid != None:
                 params["guid"] = guid
@@ -1848,13 +1853,15 @@ class template_commit:
         else:
             self.usage();
             return -1
+
+        print "Committing new template; please be (very) patient!"
         
         rval,response = do_method("template", "template_commit", params);
         return rval;
     
     def usage(self):
-	print "template_commit [-e eid] [<guid/vers>]"
-        print "template_commit -p pid -e eid"
+	print "template_commit [-w] [-e eid] [<guid/vers>]"
+        print "template_commit [-w] -p pid -e eid"
 	print "where:";
 	print "     -w     - Wait for template to finish commit";
         print "     -e     - Commit from specific template instance (eid)"
@@ -1921,6 +1928,40 @@ class template_export:
         print "  cwd   The template GUID will be inferred from the current"
         print "        working directory, if it is inside the templates's"
         print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+class template_checkout:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "d", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        if (len(req_args) == 0):
+            self.usage()
+            return -1
+
+        params         = {}
+        params["guid"] = req_args[0]
+        params["path"] = os.getcwd()
+        
+        rval,response = do_method("template", "checkout", params);
+        return rval;
+    
+    def usage(self):
+	print "template_checkout guid/vers";
+        print ""
+        print "Environment:"
+        print "  cwd   The template checkout is placed in the current dir"
         wrapperoptions();
         return
     pass

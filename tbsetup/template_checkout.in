@@ -1,0 +1,243 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Checkout a copy of a template. Do not be confused by the name; this will
+# make a copy of a template in the specified directory and drop a little
+# cookie so that we can tell later what template it refers to. It only works
+# when called from ops (the directory specified resides on ops, there is
+# no remote checkout at this time). Later, you can commit the template, which
+# creates a new template (template_modify) and changes the cookie so that the
+# current directory refers to the new template.
+#
+# Eventually support remote checkout via the web interface.
+#
+# There is no "update" operation, as with "cvs update" so you can easily
+# muck up things by having two directories that refer to the same template!
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_checkout [-q] -f <path> <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-q          - be less chatty\n".
+	  "-f          - path to checkout directory on ops (via NFS).\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qdf:";
+my %options      = ();
+my $quiet        = 0;
+my $debug        = 0;
+my $directory;
+my $guid;
+my $version;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL     = "@USERNODE@";
+my $checkquota  = "$TB/sbin/checkquota";
+my $TAR         = "/usr/bin/tar";
+
+# Protos
+sub ParseArgs();
+sub fatal($);
+sub cleanup();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use Experiment;
+use Archive;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $user_uid   = $this_user->uid();
+
+#
+# Before doing anything else, check for overquota ... lets not waste
+# our time. Make sure user sees the error by exiting with 1.
+#
+if (system("$checkquota $user_uid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
+    exit(1);
+}
+
+# Now parse arguments.
+ParseArgs();
+
+# A little cookie file in that indicates what template it refers to. 
+my $cookie = "$directory/.template";
+
+if (-e $cookie) {
+    print STDERR "$directory already contains a checkout!\n";
+    print STDERR "There is no 'update' operation yet; delete or move it.\n";
+    exit(1);
+}
+
+my $template = Template->Lookup($guid, $version);
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+
+# Grab the archive tag from the template itself, for an archive checkout.
+my $archive_tag = $template->ArchiveTag();
+if (!defined($archive_tag) || $archive_tag eq "") {
+    tbdie("Could not determine archive_tag for $template!");
+}
+
+# And do the checkout to the directory specified.
+my $archive = $template->GetArchive();
+if (!defined($archive)) {
+    tbdie("Could not get archive object for $template!");
+}
+
+# This toplevel "exp" directory has turned out to be a pain in the ass.
+# What was I thinking?
+if (-e "$directory/exp" && ! -l "$directory/exp") {
+    print STDERR "Please remove '$directory/exp' first!\n";
+    exit(1);
+}
+if (! -e "$directory/exp") {
+    system("cd $directory; ln -s . exp") == 0 or
+	tbdie("Could not create exp symlink in $directory!");
+}
+
+if ($archive->Checkout($directory, $template->exptidx(), $archive_tag) != 0) {
+    fatal("Could not checkout $archive_tag from $archive to $directory!");
+}
+unlink("$directory/exp");
+
+#
+# If the checkout succeeds then drop a little cookie file in that indicates
+# what template it refers to. 
+#
+unlink($cookie)
+    if (-e $cookie);
+
+open(COOKIE, "> $cookie") or
+    fatal("Could not create $cookie\n");
+print COOKIE "# Do not remove this file!\n";
+print COOKIE "GUID: $guid/$version\n";
+print COOKIE "TIME: " . time() . "\n";
+close(COOKIE);
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    #
+    # Parse out guid/vers argument.
+    #
+    usage()
+	if (@ARGV != 1);
+    
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"f"})) {
+	$directory = $options{"f"};
+
+        # The Archive library has a nice routine to validate this path.
+	if (Archive::ValidatePath(\$directory) != 0) {
+	    tberror("Invalid path for checkout $directory");
+	    exit(1);
+	}
+    }
+    else {
+	tbdie("Must supply a path argument with the -f option!");
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 2;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+    
+    tberror $msg;
+    cleanup();
+    exit(-1);
+}
+
