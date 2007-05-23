@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package NodeType;
@@ -135,7 +135,7 @@ sub AuxTypes($)
 		     "  from node_types_auxtypes as at ".
 		     "left join node_types as nt on nt.type=at.type ");
     
-    return undef
+    return ()
 	if (!$query_result || !$query_result->numrows);
 
     while (my ($auxtype, $type) = $query_result->fetchrow_array()) {
