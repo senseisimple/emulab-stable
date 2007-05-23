@@ -122,7 +122,7 @@ while (my $rowref = $describe_result->fetchrow_hashref()) {
 	DBQueryFatal("update temp_images set creator_idx='$user_idx'");
     }
     elsif ($slot eq "uuid") {
-	douuids++;
+	$douuids++;
     }
 }
 
@@ -155,16 +155,14 @@ while (my ($osid) = $query_result->fetchrow_array()) {
 #
 # Update temp_os_info with locally derived osids. nextosid as well.
 #
-$query_result->dataseek(0);
-
-while (my ($osid) = $query_result->fetchrow_array()) {
+foreach my $osid (keys(%local_osids)) {
     my $newosid = $local_osids{$osid};
 
     DBQueryFatal("update temp_os_info set osid='$newosid' ".
 		 "where osid='$osid'");
     DBQueryFatal("update temp_os_info set nextosid='$newosid' ".
 		 "where nextosid='$osid'");
-    if ($uuids) {
+    if ($douuids) {
 	my $uuid = NewUUID();
 	
 	DBQueryFatal("update temp_os_info set uuid='$uuid' ".
@@ -198,7 +196,7 @@ while (my ($imageid) = $query_result->fetchrow_array()) {
     DBQueryFatal("update temp_images set imageid='$newimageid' ".
 		 "where imageid='$imageid'");
 
-    if ($uuids) {
+    if ($douuids) {
 	my $uuid = NewUUID();
 	
 	DBQueryFatal("update temp_images set uuid='$uuid' ".
