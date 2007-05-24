@@ -1031,12 +1031,22 @@ sub RunAssign ()
     # Assign success; parse results.
     # 
     # read nodes section
-    while ((my $line = <ASSIGNFP>) !~ /^Nodes:/) {
+    my $found_nodes_section = 0;
+    while (<ASSIGNFP>) {
 	# find the 'BEST SCORE' line and print that out for informational
 	# purposes
-	if ($line =~ /BEST SCORE/) {
-	    print $line;
+	if (/BEST SCORE/) {
+	    print;
 	}
+        if (/^Nodes:/) {
+            $found_nodes_section = 1;
+            last;
+        }
+    }
+    if (!$found_nodes_section) {
+        tbwarn("Internal error - unable to find Nodes section in " .
+               "assign output");
+        return 1;
     }
     printdb "Nodes:\n";
     while (<ASSIGNFP>) {
@@ -1177,7 +1187,18 @@ sub RunAssign ()
     # read Edges
     # By convention, in plinks, the delay node is always the second
     # entry.
-    while (<ASSIGNFP> !~ /^Edges:/) { }
+    my $found_edges_section = 1;
+    while (<ASSIGNFP>) {
+        if (/^Edges:/) {
+            $found_edges_section = 1;
+            last;
+        }
+    }
+    if (!$found_edges_section) {
+        tbwarn("Internal error - unable to find Edges section in " .
+               "assign output");
+        return 1;
+    }
     printdb "Edges:\n";
     EDGEWHILE: while (<ASSIGNFP>) {
 	/^End Edges$/ && last EDGEWHILE;
