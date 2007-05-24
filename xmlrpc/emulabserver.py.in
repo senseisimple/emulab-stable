@@ -4616,21 +4616,6 @@ class template:
             argstr += str(argdict["guid"])
             pass
         elif argdict.has_key("path"):
-            try:
-                path = nfspath(argdict["path"]) # Scrub the path
-
-                # Make sure the path is accessible,
-                if not os.access(path, os.X_OK):
-                    raise OSError(errno.EPERM, "Path is not accessible", path)
-
-                pass
-            except OSError, e:
-                retval = EmulabResponse(RESPONSE_ERROR,
-                                        value=e,
-                                        output=(e.strerror +
-                                                ": " + e.filename))
-                return
-            
             argstr  = "-q -f "
             argstr += escapeshellarg(argdict["path"]);
             pass
@@ -4668,20 +4653,6 @@ class template:
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed arguments")
 
-        try:
-            path = nfspath(argdict["path"]) # Scrub the path
-
-            # Make sure the path is accessible,
-            if not os.access(path, os.X_OK):
-                raise OSError(errno.EPERM, "Path is not accessible", path)
-
-            pass
-        except OSError, e:
-            retval = EmulabResponse(RESPONSE_ERROR,
-                                    value=e,
-                                    output=(e.strerror + ": " + e.filename))
-            pass
-                                  
         argstr  = "-q -f " + escapeshellarg(argdict["path"])
         argstr += " " + escapeshellarg(argdict["guid"])
 
