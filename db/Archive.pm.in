@@ -383,6 +383,9 @@ sub ValidatePath($)
 	return 1;
     }
 
+    # XXX For template checkout/commit via xmlrpc interface
+    $pathname =~ s/^\/q//;
+
     if (! -e $pathname || ! -r $pathname) {
 	print STDERR "*** ValidatePath: $pathname cannot be read!\n";
 	return 1;
