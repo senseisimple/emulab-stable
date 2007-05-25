@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -543,6 +543,7 @@ main(int argc, char **argv)
 		key.keylen = strlen(key.key);
 		if (write(ptyfd, &key, sizeof(key)) != sizeof(key))
 			die("write(): %s", geterr(errno));
+#ifdef  WITHSSL
 		initializessl();
 		sslRelay = SSL_new(ctx);
 		if (!sslRelay)
@@ -553,6 +554,7 @@ main(int argc, char **argv)
 			die("SSL_connect()");
 		if (sslverify(sslRelay, "Capture Server"))
 			die("SSL connection did not verify");
+#endif
 		if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
 			die("fcntl(O_NONBLOCK): %s", geterr(errno));
 		tipactive = 1;
@@ -978,12 +980,14 @@ dropped:
 			for (lcc = 0; lcc < cc; lcc += i) {
 				if (relay_rcv) {
 #ifdef USESOCKETS
+#ifdef  WITHSSL
 					if (sslRelay != NULL) {
 						i = SSL_write(sslRelay,
 							      &buf[lcc],
 							      cc - lcc);
-					}
-					else {
+					} else
+#endif
+					{
 						i = cc - lcc;
 					}
 #endif
@@ -1475,12 +1479,14 @@ clientconnect(void)
 {
 	struct sockaddr_in sin;
 	int		cc, length = sizeof(sin);
-	int             dorelay = 0, doupload = 0;
-	int             ret;
 	int		newfd;
 	secretkey_t     key;
 	capret_t	capret;
+#ifdef WITHSSL
+	int             dorelay = 0, doupload = 0;
+	int             ret;
 	SSL	       *newssl;
+#endif
 
 	newfd = accept(sockfd, (struct sockaddr *)&sin, &length);
 	if (newfd < 0) {
@@ -1740,7 +1746,13 @@ handleupload(void)
 	int		drop = 0, rc, retval = 0;
 	char		buffer[BUFSIZE];
 
-	if ((rc = SSL_read(sslUpload, buffer, sizeof(buffer))) < 0) {
+#ifdef WITHSSL
+	rc = SSL_read(sslUpload, buffer, sizeof(buffer));
+#else
+	/* XXX no clue if this is correct */
+	rc = read(upfd, buffer, sizeof(buffer));
+#endif
+	if (rc < 0) {
 		if ((errno != EINTR) && (errno != EAGAIN)) {
 			drop = 1;
 		}
@@ -1764,8 +1776,10 @@ handleupload(void)
 	}
 
 	if (drop) {
+#ifdef WITHSSL
 		SSL_free(sslUpload);
 		sslUpload = NULL;
+#endif
 		FD_CLR(upfd, &sfds);
 		close(upfd);
 		upfd = -1;

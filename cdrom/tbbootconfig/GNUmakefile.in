@@ -19,7 +19,7 @@ CFLAGS	+= -O -g -Wall -I${OBJDIR}
 LFLAGS  += -lz
 
 tbbootconfig: tbbootconfig.c
-	$(CC) $(CFLAGS) -static -g -o tbbootconfig $< $(LFLAGS)
+	$(CC) $(CFLAGS) $(LDSTATIC) -g -o tbbootconfig $< $(LFLAGS)
 
 client: tbbootconfig
 

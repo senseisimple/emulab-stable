@@ -60,13 +60,6 @@ WITH_HASH	= 1
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 SUBDIRCFLAGS	= -Wall -O2 -g # -ansi -pedantic
 ifeq ($(SYSTEM),Linux)
 SUBDIRCFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -D_THREAD_SAFE -pthread

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -21,8 +21,7 @@ PTYLIBS  =
 SYSTEM := $(shell uname -s)
 PTYLIBS += -lutil
 ifeq ($(SYSTEM),Linux)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
+ifneq ($(wildcard /usr/kerberos/bin/krb5-config),)
  SSLFLAGS += `/usr/kerberos/bin/krb5-config --cflags`
  SSLLIBS  += `/usr/kerberos/bin/krb5-config --libs krb5`
 endif
@@ -41,7 +40,7 @@ TUNNELOBJS = tiptunnel.o
 LIBS=
 
 #tip:	$(OBJS)
-#	$(CC) -static -o tip $(OBJS) $(LIBS)
+#	$(CC) $(LDSTATIC) -o tip $(OBJS) $(LIBS)
 
 tip:	$(TESTBED_SRCDIR)/tip/tip.deprecation
 	cp $(TESTBED_SRCDIR)/tip/tip.deprecation tip
@@ -50,7 +49,7 @@ tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 	$(CC) $(SSLFLAGS) -o tiptunnel.o -c $<
 
 tiptunnel: tiptunnel.o
-	$(CC) -static -o tiptunnel tiptunnel.o $(SSLLIBS)
+	$(CC) $(LDSTATIC) -o tiptunnel tiptunnel.o $(SSLLIBS)
 
 # 'console' is tiptunnel, without SSL, and with localmode on by default.
 

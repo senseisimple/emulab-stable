@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 PUBSUBFLAGS     = -I/usr/local/include
 PUBSUBMTFLAGS   = -I/usr/local/include
-PUBSUBLIB       = /usr/local/lib/libpubsub.so
+PUBSUBLIB       = -L/usr/local/lib -lpubsub
 
 ifeq ($(ELVIN_COMPAT),1)
 PUBSUBFLAGS    += -DELVIN_COMPAT
@@ -38,11 +38,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 PERLVERS	:= $(shell $(SRCDIR)/perlvers.pl)
 
 #CFLAGS += -DDEBUG
-CFLAGS += -O2 -g -static -I. -Wall
+CFLAGS += -O2 -g -I. -Wall
 SCFLAGS = $(CFLAGS) $(PUBSUBFLAGS)
 TCFLAGS = $(CFLAGS) $(PUBSUBMTFLAGS)
 # Special CFLAGS w/o warnings, for SWIG-generated code
-CFLAGS_NOWARN += -O2 -g -static -I. $(PUBSUBFLAGS)
+CFLAGS_NOWARN += -O2 -g -I. $(PUBSUBFLAGS)
 ifeq ($(SYSTEM),Linux)
 PCORE  = -I/usr/lib/perl5/5.6.1/i386-linux/CORE
 PCORE  += -I/usr/lib/perl5/5.8.3/i386-linux-thread-multi/CORE

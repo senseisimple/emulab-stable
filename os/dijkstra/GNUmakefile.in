@@ -11,13 +11,6 @@ SUBDIR		= os/dijkstra
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 CXXFLAGS	= -Wall -O2 -I/usr/local/include -ftemplate-depth-40 -g
 CXXFLAGS	+= $(LDSTATIC)
 

@@ -12,13 +12,6 @@ SUBDIR		= cdrom/groklilo
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 all:	groklilo
 
 include $(TESTBED_SRCDIR)/GNUmakerules

@@ -14,13 +14,6 @@ LBINDIR		= $(DESTDIR)/usr/local/bin
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules

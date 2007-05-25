@@ -11,13 +11,6 @@ SUBDIR		= event/delay-agent
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 all:	delay-agent
 
 include $(TESTBED_SRCDIR)/GNUmakerules

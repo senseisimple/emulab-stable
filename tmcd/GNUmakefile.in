@@ -13,13 +13,6 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 all:	server fullclient client
 fullclient: tmcc
 client: tmcc-nossl findif dostype
@@ -30,6 +23,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS	+= -O -g -Wall -DUDP \
 		-I${OBJDIR} -I/usr/local/include -I${TESTBED_SRCDIR}/lib/libtb
 TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
+LDFLAGS += $(LDSTATIC)
 
 #
 # For SSL enabled tmcd/tmcc
@@ -44,14 +38,17 @@ RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux relea
 ifeq ($(RHLVERSION),)
 RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Fedora Core release \([0-9]\).*/Fedora\1/')
 endif
-ifeq ($(NOSTATIC),)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 else
-NEEDKERB := 1
+NOKERB := 1
 endif
-ifeq ($(NEEDKERB),0)
- CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
- TMLIBS   += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+TMLIBS   += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+TMLIBS     += -lkrb5support
+endif
 endif
 TMLIBS  += -ldl
 ifeq ($(findstring Fedora,$(RHLVERSION)),Fedora)

@@ -19,11 +19,11 @@ all:	$(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static -Wall
+CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC) -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS     +=  -L/usr/local/lib -lpubsub -lm
 ifeq ($(SYSTEM),Linux)

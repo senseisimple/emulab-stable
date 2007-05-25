@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,13 +16,6 @@ PROGRAMS       +=
 endif
 
 include $(OBJDIR)/Makeconf
-
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
 
 all:	$(PROGRAMS)
 
@@ -54,26 +47,26 @@ LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent_r -ltb -lcrypto
 LIBS     += -L/usr/local/lib -lpubsub_r -lm
 CPPC     = g++
-
-ifeq ($(host_cpu),arm)
-else
 LDFLAGS  += $(LDSTATIC)
-PLDFLAGS  += $(LDSTATIC)
+
+# Deal with the presence/absence of kerberos in the linux ssl library
 ifeq ($(SYSTEM),Linux)
-ifeq ($(NOSTATIC),)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 else
-NEEDKERB := 1
+NOKERB := 1
 endif
-ifeq ($(NEEDKERB),0)
- CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
- LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
 ifneq ($(wildcard /usr/lib/libkrb5support.a),)
- LIBS     += -lkrb5support
+LIBS     += -lkrb5support
 endif
 endif
+endif
+
+ifeq ($(SYSTEM),Linux)
 LIBS     += -ldl -lz
-endif
 endif
 
 PLDFLAGS  = -pthread

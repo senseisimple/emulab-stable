@@ -15,17 +15,7 @@ CFLAGS	= -Wall -O2 -g \
 		  -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
 LIBS	= ${OBJDIR}/lib/libtb/libtb.a
 LDFLAGS =
-
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
-ifneq ($(host_cpu),arm)
 LDFLAGS  += $(LDSTATIC)
-endif
 
 TESTS = $(SRCDIR)/syncd_test.sh
 

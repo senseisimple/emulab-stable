@@ -11,13 +11,6 @@ SUBDIR		= os/growdisk
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 all:	growdisk
 
 include $(TESTBED_SRCDIR)/GNUmakerules

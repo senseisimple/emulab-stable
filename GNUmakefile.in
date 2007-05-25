@@ -35,6 +35,13 @@ SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 
 all:		all-subdirs 
 
+#
+# We used to statically link our event agents.  We no longer do this, but
+# if you want "old style" agents, use this target.
+#
+all-static:
+	@LDSTATIC=-static $(MAKE) all
+
 install:	
 	@echo "Choose either boss-install, ops-install or fs-install"
 	@echo "Choose opsfs-install instead of ops-install for a combined ops/fs machine"

@@ -11,13 +11,6 @@ SUBDIR		= os/genhostsfile
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-LDSTATIC	= -static
-else
-LDSTATIC	= 
-endif
-
 CFLAGS	= -Wall -O2 -g $(LDSTATIC) -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
 LIBS    = ${OBJDIR}/lib/libtb/libtb.a
 

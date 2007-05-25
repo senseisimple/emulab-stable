@@ -24,6 +24,7 @@ CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -pthread
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC)
 DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
 LIBS     += -levent_r -ltb -lz
 
@@ -60,7 +61,7 @@ OBJS = \
 	version.o
 
 event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
-	$(CXX) $(CFLAGS) -static $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
 
 DEPS = \
 	console-agent.h error-record.h event-sched.h group-agent.h listNode.h \

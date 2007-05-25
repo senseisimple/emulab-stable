@@ -13,15 +13,6 @@ RHLVERSION     := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux rele
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(NOSTATIC),)
-# for now we link everything static
-CCSTATIC	= -static
-LDSTATIC	= -static
-else
-CCSTATIC	=
-LDSTATIC	= 
-endif
-
 all: pcapper
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -40,7 +31,7 @@ TBLIBS        = $(EVENTOBJS) $(OBJDIR)/lib/libtb/libtb.a $(EVENTLIBS)
 
 PCAPLIBS=-lpcap
 
-CFLAGS  = -Wall $(CCSTATIC) $(PTHREADCFLAGS) \
+CFLAGS  = -Wall $(PTHREADCFLAGS) \
 	  -DEMULAB -g -DDROPROOT -DBOSSNODE=\"@BOSSNODE@\" \
 	  -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 LDFLAGS = $(LDSTATIC)
