@@ -978,6 +978,7 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
 	    PhaseSkip("Key already copied");
 	} else {
+	    ExecQuietFatal("chmod 400 $INIT_PRIVKEY");
 	    ExecQuietFatal("$SCP_INIT -i $INIT_PRIVKEY ".
 			   "$ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
 
