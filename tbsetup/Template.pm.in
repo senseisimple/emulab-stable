@@ -3044,7 +3044,7 @@ sub CopyDataStore($$$;$)
     libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
 						     $to_path,
 						     $archive_tag,
-						     "datastore")
+						     "datastore/")
 	== 0 or return -1;
 
     #
@@ -3059,7 +3059,7 @@ sub CopyDataStore($$$;$)
     if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
 							 $to_path,
 							 $archive_tag,
-							 "exp/datastore")) {
+							 "exp/datastore/")) {
 	unlink("$to_path/exp");
 	return -1;
     }

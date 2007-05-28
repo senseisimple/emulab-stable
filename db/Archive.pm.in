@@ -1104,9 +1104,9 @@ sub Fork($$;$$)
 #
 # Checkout a copy of the archive, optionally at a particular view/branch.
 #
-sub Checkout($$;$$$)
+sub Checkout($$;$$@)
 {
-    my ($self, $target, $view, $tag, $subdir) = @_;
+    my ($self, $target, $view, $tag, @subdirs) = @_;
     my $cwd;
 
     return -1
@@ -1183,15 +1183,16 @@ sub Checkout($$;$$$)
     }
     my $zipfile = "$repodir/$revision";
     
-    # Allowed to check out a particular subdir (but not a file).
-    $subdir = (defined($subdir) ? "'$subdir/*'" : "");
+    # Allowed to check out a set of files/dirs
+    my $subdir_arg = (! @subdirs ? "" :
+		      join(" ", map("'" . $_ . "'", @subdirs)));
 
     # unzip has a different verbose option.
     my $unzipopt = ($debug ? "" : "-q");
 
     # Now check it out
     if (my $rval = mysystem("cd $target; ".
-			    "$UNZIP $unzipopt -o -u $zipfile $subdir")) {
+			    "$UNZIP $unzipopt -o -u $zipfile $subdir_arg")) {
 	# Allow for exit(11) from unzip, which says the requested files
 	# where not in the archive. Not really an error.
 	goto bad

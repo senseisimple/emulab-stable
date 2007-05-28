@@ -1248,7 +1248,7 @@ sub CopyInArchive()
 	# Ask for a checkout of the archive. 
 	#
 	my $dstdir = "$userdir/nsdata";
-	my $subdir = "/exp/tbdata";
+	my $subdir = "/exp/tbdata/";
 	my $oldns  = "$dstdir/${copyeid}.ns";
 
 	print "Checking out experiment archive to $dstdir\n";
@@ -1262,7 +1262,7 @@ sub CopyInArchive()
 	# An old template will have the nsfile in a different place.
 	#
 	if (! -e $oldns) {
-	    $subdir = "/archive/nsdata";
+	    $subdir = "/archive/nsdata/";
 	    $oldns  = "$dstdir/archive/nsdata/nsfile.ns";
 
 	    print "Checking out experiment archive to $dstdir\n";

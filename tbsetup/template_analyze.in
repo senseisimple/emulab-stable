@@ -182,7 +182,7 @@ foreach my $name (keys(%runlist)) {
     my $rowref = $runlist{$name};
     my $idx    = $rowref->{"idx"};
     my $dir    = "$checkout/run${idx}";
-    my $subdir = "dbdata";
+    my $subdir = "dbdata/";
     my $tag    = $rowref->{"ending_archive_tag"};
     my $dbdump = "$dir/$subdir/dbdump.gz";
 
@@ -204,7 +204,7 @@ foreach my $name (keys(%runlist)) {
         fatal(-1, "Could not checkout $tag to $dir");
 
     if (! -e "$dbdump") {
-	$subdir = "exp/dbdata";
+	$subdir = "exp/dbdata/";
 	$dbdump = "$dir/$subdir/dbdump.gz";
 	
 	libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx, $dir,

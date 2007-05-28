@@ -217,23 +217,8 @@ sub CommitFromCheckout()
     }
     # Pick up changes to child guid/vers.
     $template->Refresh();
-
     my $child_guid = $template->child_guid();
     my $child_vers = $template->child_vers();
-
-    $child_template = Template->Lookup($child_guid, $child_vers);
-    if (!defined($child_template)) {
-	fatal(-1, "Lookup of child template failed!");
-    }
-
-    #
-    # Now we want to copy back to the $frompath to sync it up.
-    #
-    my $newpath = $child_template->path();
-
-    if (system("$RSYNC -rtgoDlz ${newpath}/ $frompath") != 0) {
-	fatal(-1, "Could not copy template back to checkout");
-    }
 
     # Update the cookie so that the checkout refers to the new template
     # not the original template.

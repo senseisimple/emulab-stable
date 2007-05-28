@@ -158,8 +158,21 @@ if (! -e "$directory/exp") {
 	tbdie("Could not create exp symlink in $directory!");
 }
 
-if ($archive->Checkout($directory, $template->exptidx(), $archive_tag) != 0) {
-    fatal("Could not checkout $archive_tag from $archive to $directory!");
+#
+# There is a plain experiment underlying the template, which has a lot
+# of stuff we do not want to show the user in the checkout cause its
+# pointless stuff. So rather then a toplevel checkout, grab the two
+# things we really care about (datastore and the nsfile).
+#
+if ($archive->Checkout($directory, $template->exptidx(),
+		       $archive_tag, "exp/datastore/") != 0) {
+    fatal("Could not checkout datastore from $archive_tag in ".
+	  "$archive to $directory!");
+}
+if ($archive->Checkout($directory, $template->exptidx(),
+		       $archive_tag, "exp/tbdata/nsfile.ns") != 0) {
+    fatal("Could not checkout tbdata/nsfile.ns from $archive_tag in ".
+	  "$archive to $directory!");
 }
 unlink("$directory/exp");
 

@@ -1830,37 +1830,34 @@ class template_commit:
         if os.access(".template", os.R_OK):
             params["path"] = os.getcwd()
             pass
-        elif (len(req_args) == 0 and pid == None and eid == None):
-            guid = infer_guid(os.getcwd())
-            if guid != None:
-                params["guid"] = guid
-                pass
-            else:
-                (pid, eid) = infer_pideid(os.getcwd())
-                
-                if (pid != None and eid != None):
-                    params["proj"] = pid
-                    params["exp"] = eid
-                    pass
-                else:
-                    self.usage();
-                    return -1
-                pass
-            pass
         elif len(req_args) == 1:
             guid = req_args[0]
             pass
         else:
-            self.usage();
-            return -1
+            #
+            # Crawl up the tree looking for a .template file.
+            #
+            rootino = os.stat("/").st_ino
 
-        print "Committing new template; please be (very) patient!"
+            while True:
+                if os.access(".template", os.R_OK):
+                    params["path"] = os.getcwd()
+                    break
+                if os.stat(".").st_ino == rootino:
+                    self.usage();
+                    return -1
+                os.chdir("..")
+                pass
+            pass
+
+        print "Committing template; please be (very) patient!"
         
         rval,response = do_method("template", "template_commit", params);
         return rval;
     
     def usage(self):
-	print "template_commit [-w] [-e eid] [<guid/vers>]"
+	print "template_commit [-w]"
+	print "template_commit [-w] [-e eid] <guid/vers>"
         print "template_commit [-w] -p pid -e eid"
 	print "where:";
 	print "     -w     - Wait for template to finish commit";
@@ -1873,9 +1870,8 @@ class template_commit:
         print "in the foreground, returning exit status. Email is still sent.";
         print ""
         print "Environment:"
-        print "  cwd   The template GUID will be inferred from the current"
-        print "        working directory, if it is inside the templates's"
-        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        print "  cwd   The template will be inferred from the current"
+        print "        working directory, if it is inside a template checkout."
         wrapperoptions();
         return
     pass
