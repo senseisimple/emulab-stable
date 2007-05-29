@@ -283,3 +283,18 @@ ID  Name                            Members of VLAN
     (aka "trunk") links:
 
     http://www.cisco.com/warp/public/473/4.html
+
+18. snmpit 'unable to find channel information' errors
+
+    Sometimes, for no reason we can discern, a switch stops returning
+    information about what EtherChannel a port belongs to. When this happens,
+    snmpit is unable to deal with trunks that cross the channel, and will return
+    an error. Note that this failure *only* occurs through SNMP. If you do a
+    'show port channel' (or IOS equivalent) on the command line, everything
+    looks fine. The simple way to clear these up is to delete and re-create the
+    channel. Luckily, you don't have to touch the configuration of the trunk
+    that runs on it (though this will temporarily disrupt traffic):
+        set port channel 2/9-12 mode off
+        set port channel 2/9-12 mode on
+    ... of course, use the actual ports that your channel runs on.
+
