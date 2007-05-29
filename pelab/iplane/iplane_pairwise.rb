@@ -27,7 +27,7 @@ iplane = IPlane.new
 #
 nodes.each_index{ |n1|
     (n1 + 1 .. nodes.length() - 1).each{ |n2| 
-        puts "Adding path #{nodes[n1]} to #{nodes[n2]}"
+#        puts "Adding path #{nodes[n1]} to #{nodes[n2]}"
         iplane.addPath(nodes[n1],nodes[n2])
     }
 }
@@ -35,13 +35,14 @@ nodes.each_index{ |n1|
 #
 # Run the query on iplane
 #
-puts "Getting responses..."
+#puts "Getting responses..."
 responses = iplane.queryPendingPaths
-puts "Got Respnses!"
+#puts "Got Respnses!"
 
 #
 # And, simply print the data we care about from the responses
 #
 responses.each{ |r|
-    puts "src=#{r.src} dst=#{r.dst} lat=#{r.lat} predicted?=#{r.predicted_flag}"
+    puts "source=#{r.src} dest=#{r.dst} latency=#{r.lat}"
+#"predicted?=#{r.predicted_flag}"
 }
