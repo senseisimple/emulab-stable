@@ -171,6 +171,7 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
 	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.pm) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.py) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/bin/, $(CTRLBIN_STUFF)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_STUFF))\
 	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(FSBIN_STUFF))
