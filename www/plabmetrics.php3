@@ -274,16 +274,35 @@ else {
 # Flexlab filter options:
 #
 if (isset($flexlabfilter) && $flexlabfilter) {
+    echo "flexlabfilter=$flexlabfilter<br>\n";
     if (isset($flexlabsave) && $flexlabsave 
 	&& isset($flexlabrecompute) && $flexlabrecompute) {
         # unset recompute; save is the winner...
 	unset($flexlabrecompute);
     }
+
+    if (isset($flexlabsave) && $flexlabsave) {
+	echo "flexlabsave set<br>\n";
+    }
+
+    if (isset($flexlabrecompute) && $flexlabrecompute) {
+	echo "flexlabrecompute set<br>\n";
+    }
+
+    if (isset($flexlabfcsize)) {
+	echo "flexlabfcsize=$flexlabfcsize set<br>\n";
+    }
+
+    if (isset($flexlabfcnodes)) {
+	echo "flexlabfcnodes=" . implode(',',$flexlabfcnodes) . "<br>\n";
+    }
+
     $mustpostfilter = 1;
 }
 else {
     if (isset($flexlabfcnodes)) {
 	unset($flexlabfcnodes);
+	echo "unsetting flexlabfcnodes<br>\n";
     }
 }
 
@@ -668,9 +687,6 @@ $sort_s = $qbits[3]; $pag_s = $qbits[4];
 $qcount = "select count(" . $colmap['node_id'] . ") as num" . 
     " from $src_s $filter_s";
 
-# query that gets all node_id values in the search
-$qnid = "select " . $colmap['node_id'] . " from $src_s $filter_s";
-
 # query that gets data (note that if we need to do postfiltering, we
 # manually paginate the data!)
 if ($mustpostfilter) {
@@ -689,15 +705,6 @@ if (mysql_num_rows($qres) != 1) {
 }
 $row = mysql_fetch_array($qres);
 $totalrows = $row['num'];
-
-if (isset($selectionlist) && count($selectionlist) == 1 
-    && $selectionlist[0] == 'ALLINSEARCH') {
-    $qres = DBQueryFatal($qnid);
-    $selectionlist = array();    
-    while ($row = mysql_fetch_array($qres)) {
-	array_push($selectionlist,$row[$colmap_mysqlnames['node_id']]);
-    }
-}
 
 #
 # Grab the query data!  Hate to store it in memory, but because of the page
@@ -727,6 +734,17 @@ if ($mustpostfilter) {
     }
 
     $data = $finaldata;
+}
+
+#
+# Select all if desired.
+#
+if (isset($selectionlist) && count($selectionlist) == 1 
+    && $selectionlist[0] == 'ALLINSEARCH') {
+    $selectionlist = array();    
+    foreach ($data as $row) {
+	array_push($selectionlist,$row[$colmap_mysqlnames['node_id']]);
+    }
 }
 
 #
@@ -834,6 +852,12 @@ function pm_filterdata($data) {
 		    }
 		}
 	    }
+	    elseif (!$response[0]) {
+		$rnatmp = $remaining_nodes;
+		array_push($opterrs,
+			   "Error in XMLRPC transport: " . $response[1]);
+		$flexlabfcnodes = array();
+	    }
 	    elseif (xmlrpc_is_fault($response[1])) {
 		$rnatmp = $remaining_nodes;
 		array_push($opterrs,
@@ -842,10 +866,19 @@ function pm_filterdata($data) {
 		$flexlabfcnodes = array();
 	    }
 	    else {
-		$rnatmp = $remaining_nodes;
-		array_push($opterrs,
-			   "Error in XMLRPC transport: " . $response[1]);
-		$flexlabfcnodes = array();
+		
+	    }
+
+            # Now make sure that the save checkbox gets marked, and that 
+            # recompute is off (try to save computation and keep result set
+            # stable).
+	    if (isset($flexlabrecompute)) {
+		$flexlabrecompute = False;
+	    }
+
+            # Auto-save if any nodes were returned.
+	    if (count($flexlabfcnodes) > 0) {
+		$flexlabsave = True;
 	    }
 	}
 	$remaining_nodes = $rnatmp;
@@ -862,7 +895,7 @@ function do_xmlrpc($host,$port,$method,$argdict) {
     $c = curl_init();
     curl_setopt($c,CURLOPT_URL,"http://$host:$port/");
     curl_setopt($c,CURLOPT_RETURNTRANSFER,1);
-    curl_setopt($c,CURLOPT_TIMEOUT,3);
+    curl_setopt($c,CURLOPT_TIMEOUT,120);
     curl_setopt($c,CURLOPT_HTTPHEADER,$xheaders);
     curl_setopt($c,CURLOPT_POSTFIELDS,$xreq);
 
