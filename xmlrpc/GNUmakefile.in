@@ -27,7 +27,8 @@ EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 # These are the ones installed on plastic (users, control, etc). 
 # 
 CLIENTBINS      = sshxmlrpc_client.py script_wrapper.py sslxmlrpc_client.py
-USERLIBS	= sshxmlrpc.py emulabclient.py libxmlrpc.pm
+USERLIBS	= sshxmlrpc.py emulabclient.py libxmlrpc.pm \
+		  BasicXMLRPCServers.py
 SYMLINKS        = node_admin node_reboot os_load create_image node_list \
 		  delay_config wilink_config savelogs portstats eventsys_control \
 		  readycount nscheck startexp batchexp startexp swapexp endexp \
