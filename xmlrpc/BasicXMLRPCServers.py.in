@@ -1,9 +1,7 @@
 #!/usr/local/bin/python
 
 #
-# A simple little xmlrpc server that provides an interface to flexlab data.
-# At present, basically just exports goodnodes.pl functionality, but could
-# do more if desired.
+# A couple simple XMLRPC server extensions.
 #
 
 import os
@@ -18,11 +16,48 @@ import traceback
 
 debug = True
 
-class NetworkAuthError(exceptions.Exception):
+# XXX: hack.
+# Have to override the
+# SimpleXMLRPCServer.SimpleXMLRPCDispatcher._marshaled_dispatch method
+# so that we can marshal None values.  If SimpleXMLRPCDispatcher changes,
+# this will need to be hacked so it complies again...
+class AllowNoneOptXMLRPCDispatcher(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
+    #
+    # Taken straight from SimpleXMLRPCServer.py in the python stdlib.
+    #
+    def _marshaled_dispatch(self, data, dispatch_method = None):
+        params, method = xmlrpclib.loads(data,)
+
+        # generate response
+        try:
+            if dispatch_method is not None:
+                response = dispatch_method(method, params)
+            else:
+                response = self._dispatch(method, params)
+            # wrap response in a singleton tuple
+            response = (response,)
+            response = xmlrpclib.dumps(response, methodresponse=1,
+                                       allow_none=self._allow_none)
+        except Fault, fault:
+            response = xmlrpclib.dumps(fault,allow_none=self._allow_none)
+        except:
+            # report exception back to server
+            response = xmlrpclib.dumps(
+                xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value)),
+                allow_none=self._allow_none
+                )
+
+        return response
+    
+    pass
+
+class NetworkAuthFault(xmlrpclib.Fault):
     pass
 
 class SimpleObjectXMLRPCServer(SocketServer.ThreadingMixIn,
-                               SimpleXMLRPCServer.SimpleXMLRPCServer,object):
+                               SimpleXMLRPCServer.SimpleXMLRPCServer,
+                               AllowNoneOptXMLRPCDispatcher,
+                               object):
     """
     Extension to the simple xmlrpc server that registers member functions
     of a class as xmlrpc functions, so they can be called as
@@ -33,6 +68,8 @@ class SimpleObjectXMLRPCServer(SocketServer.ThreadingMixIn,
         super(SimpleObjectXMLRPCServer,self).__init__(addr,**kwargs)
         self.classfuncs = dict({})
         self.classinitargs = dict({})
+
+        self._allow_none = True
 
         return
 
