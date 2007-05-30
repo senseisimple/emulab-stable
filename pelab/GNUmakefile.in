@@ -10,14 +10,16 @@ OBJDIR		= ..
 SUBDIR		= pelab
 
 BIN_STUFF	= cloudinfo
+SBIN_STUFF	= flexdatasrv
 
 include $(OBJDIR)/Makeconf
 
-all: $(BIN_STUFF)
+all: $(BIN_STUFF) $(SBIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: subdir-install $(addprefix $(INSTALL_DIR)/opsdir/bin/, $(BIN_STUFF))
+install: subdir-install $(addprefix $(INSTALL_DIR)/opsdir/bin/, $(BIN_STUFF)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(SBIN_STUFF))
 
 boss-install: install
 
@@ -30,4 +32,9 @@ clean:
 $(INSTALL_DIR)/opsdir/bin/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@

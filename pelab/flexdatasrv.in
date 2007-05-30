@@ -1,0 +1,468 @@
+#!/usr/local/bin/python
+
+#
+# A simple little xmlrpc server that provides an interface to flexlab data.
+# At present, basically just exports goodnodes.pl functionality, but could
+# do more if desired.
+#
+
+import os, os.path
+import pwd
+import SimpleXMLRPCServer
+import sys
+import types
+import exceptions
+import traceback
+import threading
+
+debug = True
+
+TBPATH = os.path.join("@prefix@", "lib")
+#TBPATH = os.path.join("/usr/testbed/devel/johnsond", "lib")
+if not TBPATH in sys.path:
+    sys.path.append(TBPATH)
+    pass
+
+#sys.path.append("/usr/testbed/devel/johnsond/lib")
+
+import libdb
+import BasicXMLRPCServers
+
+
+class FlexlabError(exceptions.Exception):
+    pass
+
+class FlexlabInvalidArgumentError(FlexlabError):
+    pass
+
+
+class FlexlabDataServer:
+    """
+    FlexlabDataServer keeps a cache of the last 24 hours of flexmon data.
+    """
+    def __init__(self,autorefresh=60):
+        """
+        Set autorefresh to -1 to disable; else, set interval between refreshes
+        in seconds.
+        """
+        # the "cache" is a big map:
+        #   'lat' => srcsiteidx => dstsiteidx => (value,unixtime)
+        #   'bw'  => srcsiteidx => dstsiteidx => (value,unixtime)
+        self.cache = dict({})
+        self._cacheinit = False
+        self._lastdataidx = 0
+
+        self.nodeidToSiteIdx = dict({})
+        self.siteIdxToSiteName = dict({})
+
+        self.dbs = dict({})
+        self.dbs['opsdb'] = libdb.TBDBConnect(dbnum=1,db='pelab',
+                                              user='flexlabdata')
+        self.dbs['dpdb'] = None
+
+        if autorefresh > 0:
+            # fire off a refresh/age thread:
+            at = threading.Thread(target=self.refreshAndAge,args=())
+            # it really IS a "daemon thread" but we want it to die when the
+            # main thread is killed.
+            at.setDaemon(0)
+            at.start()
+            pass
+        
+        return
+
+    def populatePairDataCache(self):
+        if len(self.cache.keys()) > 0:
+            self.cache = dict({})
+            pass
+
+        # We find the least greatest index of the two queries so that we can
+        # easily update later.
+        mingidx = 0
+
+        # Grab a summary of the last 24 hours worth of pair_data from the
+        # ops pelab db.  Note that we only remember the most recent measurement
+        # that satisfies our criteria, for each site pair.
+        q = "select idx,srcsite_idx,dstsite_idx,latency,max(unixstamp) as ts"+\
+            " from pair_data where (unix_timestamp()-unixstamp) < 86400" + \
+            "  and latency is not NULL and latency > 0" + \
+            " group by srcsite_idx,dstsite_idx " + \
+            " order by srcsite_idx,dstsite_idx;"
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+
+        for (idx,sidx,didx,latency,ts) in qres:
+            if idx > mingidx:
+                idx = mingidx
+            self._cacheMeasurement('lat',sidx,didx,latency,ts)
+            pass
+        
+        q = "select idx,srcsite_idx,dstsite_idx,bw,max(unixstamp) as ts" + \
+            " from pair_data where (unix_timestamp()-unixstamp) < 86400" + \
+            "  and bw > 0 " + \
+            " group by srcsite_idx,dstsite_idx " + \
+            " order by srcsite_idx,dstsite_idx;"
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+
+        tidx = 0
+        for (idx,sidx,didx,bw,ts) in qres:
+            if idx > tidx:
+                idx = tidx
+            self._cacheMeasurement('bw',sidx,didx,bw,ts)
+            pass
+
+        if tidx < mingidx:
+            mingidx = tidx
+
+        self._lastdataidx = mingidx
+
+        q = "select site_name,site_idx,node_id,node_idx" + \
+            " from site_mapping order by site_idx"
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+
+        for (sname,sidx,node_id,nidx) in qres:
+            self.nodeidToSiteIdx[node_id] = sidx
+            self.siteIdxToSiteName[sidx] = sname
+            pass
+
+        self._cacheinit = True
+        pass
+
+    def _cacheMeasurement(self,type,sidx,didx,mval,ts):
+        if not self.cache.has_key(type):
+            self.cache[type] = dict({})
+        if not self.cache[type].has_key(sidx):
+            self.cache[type][sidx] = dict({})
+
+        self.cache[type][sidx][didx] = (mval,ts)
+        pass
+
+    def _refreshPairDataCache(self):
+        if not self._cacheinit:
+            return
+
+        q = "select idx,srcsite_idx,dstsite_idx,latency,bw,unixstamp as ts" + \
+            " from pair_data where idx > %d" + \
+            "  and ((latency is not NULL and latency > 0) or bw > 0)" + \
+            " group by srcsite_idx,dstsite_idx " + \
+            " order by unixstamp" % (self._lastdataidx)
+
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+        for (idx,sidx,didx,lat,bw,ts) in qres:
+            # figure out which it is, bw or lat:
+            if lat == None or lat == '':
+                self._cacheMeasurement('bw',sidx,didx,bw,ts)
+            else:
+                self._cacheMeasurement('lat',sidx,didx,lat,ts)
+            if idx > self._lastdataidx:
+                self._lastdataidx = idx
+            
+        pass
+
+    def _ageCache(self):
+        if not self._cacheinit:
+            return
+
+        now = time.time()
+
+        for mtype in self.cache.keys():
+            sdict = self.cache[mtype]
+            for srcsite in sdict.keys():
+                ddict = sdict[srcsite]
+                for (dstsite,(val,ts)) in ddict.iteritems():
+                    if (now - ts) > CACHE_LIMIT:
+                        ddict.remove(dstsite)
+
+        pass
+
+    def refreshAndAge(self):
+        self._refreshPairDataCache()
+        self._ageCache()
+        pass
+
+    def _foreverRefreshAndAge(self):
+        while True:
+            try:
+                self.refreshAndAge()
+            except:
+                traceback.print_exc()
+                pass
+            try:
+                time.sleep(self.autorefresh*1000)
+            except:
+                traceback.print_exc()
+                pass
+            pass
+        pass
+        
+    def getMeasurement(self,type,srcsiteidx,dstsiteidx,t0=0,t1=0):
+        """
+        Retrieves a measurement from flexlab data.
+        """
+        if self.cache.has_key(type) \
+           and self.cache[type].has_key(srcsiteidx) \
+           and self.cache[type][srcsiteidx].has_key(dstsiteidx):
+            (val,ts) = self.cache[type][srcsiteidx][dstsiteidx]
+        else:
+            val = None
+        
+        return val
+
+    def getSiteIdx(self,nodeid):
+        if self.nodeidToSiteIdx.has_key(nodeid):
+            return self.nodeidToSiteIdx[nodeid]
+        return None
+
+    def getAvailNodes(self):
+        return self.nodeidToSiteIdx.keys()
+
+    def getAvailSiteIdxs(self):
+        return self.siteIdxToSiteName.keys()
+
+    pass
+
+
+class flexlab:
+    def __init__(self,fds):
+        self.fds = fds
+        self.debug = True
+        return
+    
+    def getFullyConnectedSet(self,argdict={}):
+        """
+        Returns a set of PlanetLab nodes that are fully connected based
+        on flexmon data.
+
+        Arguments:
+          size (int)        Size of the fully connected set to find.
+          nodefilter (list) A list of Emulab node_ids or PlanetLab hostnames
+                            with which to restrict subset selection.
+          filtertype (bool) If true, a fully connected set is chosen based on
+                            only the nodes in the nodefilter list.  If false,
+                            a subset is chosen from all nodes except the nodes
+                            in the nodefilter list.
+        Returns:
+          A list of Emulab node_ids.
+        """
+        retval = ''
+
+        # check args
+        if argdict == None or type(argdict) != types.DictType:
+            raise FlexlabInvalidArgumentError("No arguments!")
+        if argdict.has_key("size"):
+            try:
+                size = int(argdict["size"])
+            except:
+                raise FlexlabInvalidArgumentError("Must supply a positive set size!")
+            if size <= 0:
+                raise FlexlabInvalidArgumentError("Must supply a positive set size!")
+            pass
+        else:
+            raise FlexlabInvalidArgumentError("Must supply a positive set size!")
+        
+        nodefilterlist = []
+        filtertype = True
+        
+        if argdict.has_key("nodefilter"):
+            nodefilterlist = argdict["nodefilter"]
+            if type(nodefilterlist) != types.ListType:
+                raise FlexlabInvalidArgumentError("nodefilterlist must be a list!")
+            pass
+        else:
+            filtertype = False
+            pass
+
+        if argdict.has_key("filtertype"):
+            filtertype = argdict["filtertype"]
+            if type(filtertype) != types.BooleanType:
+                raise FlexlabInvalidArgumentError("filtertype must be a bool!")
+            pass
+
+        # grab our final node list:
+        availnodes = self.fds.getAvailNodes()
+        finalnodes = []
+        if filtertype:
+            finalnodes = nodefilterlist
+            pass
+        else:
+            for n in availnodes:
+                if not n in nodefilterlist:
+                    finalnodes.append(n)
+                    pass
+                pass
+            pass
+
+        try:
+            retval = self._simpleGoodnodes(size,finalnodes)
+        except:
+            raise
+
+        return retval
+
+    def _simpleGoodnodes(self,size,nlist):
+        retval = []
+
+        if self.debug:
+            print "size=%d,nlist=%s" % (size,str(nlist))
+
+        tpool = list(nlist)
+        cpool = []
+        usedsites = dict({})
+
+        foundit = False
+        sitematrix = dict({})
+
+        while not foundit:
+            siterank = dict({})
+            
+            while len(cpool) != size and len(tpool) > 0:
+                elm = tpool.pop(0)
+                elmsite = self.fds.nodeidToSiteIdx[elm]
+                if not usedsites.has_key(elmsite):
+                    usedsites[elmsite] = elm
+                    cpool.append(elm)
+                pass
+
+            if self.debug:
+                print "cpool=%s" % str(cpool)
+            
+            # can't find a set
+            if len(cpool) != size and len(tpool) == 0:
+                break
+
+            # test current site pool connectivity:
+            sites = usedsites.keys()
+            for i in range(0,len(sites) - 1):
+                ss = sites[i]
+                for j in range(i+1,len(sites)):
+                    ds = sites[j]
+
+                    if not sitematrix.has_key(ss):
+                        sitematrix[ss] = dict({})
+                    if not sitematrix.has_key(ds):
+                        sitematrix[ds] = dict({})
+
+                    if not sitematrix[ss].has_key(ds) \
+                        or not sitematrix[ds].has_key(ss):
+                        lat = self.fds.getMeasurement('lat',ss,ds)
+                        if lat == None:
+                            lat = self.fds.getMeasurement('lat',ds,ss)
+                        fbw = self.fds.getMeasurement('bw',ss,ds)
+                        bbw = self.fds.getMeasurement('bw',ds,ss)
+
+                        if not lat == None:
+                            lat = 1
+                        else:
+                            lat = 0
+                        if not fbw == None:
+                            fbw = 1
+                        else:
+                            fbw = 0
+                        if not bbw == None:
+                            bbw = 1
+                        else:
+                            bbw = 0
+                        
+                        sitematrix[ss][ds] = lat + fbw
+                        sitematrix[ds][ss] = lat + bbw
+
+                        pass
+                    if not siterank.has_key(ss):
+                        siterank[ss] = 0
+                    if not siterank.has_key(ds):
+                        siterank[ds] = 0
+                    
+                    siterank[ds] += sitematrix[ss][ds]
+                    siterank[ss] += sitematrix[ds][ss]
+                    pass
+                pass
+
+            # see if the pool is fully connected; if not, evict the worst node:
+            lowv = (size - 1) * 2
+            lows = -1
+            for i in range(0,len(sites)):
+                if siterank.has_key(sites[i]) and siterank[sites[i]] < lowv:
+                    lowv = siterank[sites[i]]
+                    lows = sites[i]
+                pass
+
+            if not lowv == (size - 1) * 2:
+                # must evict a node
+                nid = usedsites[lows]
+                del usedsites[lows]
+                cpool.remove(nid)
+                if self.debug:
+                    print "removing nid %s" % nid
+            else:
+                foundit = True
+            pass
+
+        # return the nodelist
+        if foundit:
+            retval = usedsites.values()
+        else:
+            raise FlexlabError("Could not find %d fully-connected sites!" \
+                               % size)
+        return retval
+    
+    pass
+
+
+import getopt
+
+DEF_HOST = '0.0.0.0'
+DEF_PORT = 3993
+DEF_ACLLIST = ['155.98.32.0/20','155.98.60.0/24']
+
+def usage(progname):
+    print "Usage: %s [-hpa <arg>]" % str(progname)
+    print "  -h <addr>    Binds to this IP address (default: %s)" % DEF_HOST
+    print "  -p <port>    Listens on this port (default: %d)" % DEF_PORT
+    print "  -a <acllist> Comma-separated list of networks that we accept"
+    print "               requests from (default: '%s')" % str(DEF_ACLLIST)
+    pass
+
+def main():
+    try:
+        opts,args = getopt.getopt(sys.argv[1:],"h:p:a:")
+    except getopt.GetoptError:
+        usage(sys.argv[0])
+        sys.exit(2)
+
+    (host,port,acllist) = (DEF_HOST,DEF_PORT,DEF_ACLLIST)
+
+    for (o,v) in opts:
+        if o == 'h':
+            host = v
+            pass
+        elif o == 'p':
+            port = int(v)
+            pass
+        elif o == 'a':
+            acllist = v.split(',')
+            pass
+        pass
+
+    # setup the db lib so as NOT to send mail to TBOPS
+    libdb.debug = True
+    libdb.__dbMailOnFail = True
+    libdb.__dbFailMailAddr = "johnsond@emulab.net"
+
+    print "Initializing XMLRPC server..."
+    server = BasicXMLRPCServers.InetAclXMLRPCServer((host,port),acllist)
+
+    fds = FlexlabDataServer(autorefresh=60)
+    print "Populating flexmon cache..."
+    fds.populatePairDataCache()
+
+    print "Registering XMLRPC functions..."
+    server.register_introspection_functions()
+    server.register_class_functions(flexlab,initargs=(fds,))
+    
+    print "Accepting requests now."
+    server.serve_forever()
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()
+    pass
