@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -15,6 +15,7 @@ extern "C" {
 
 int	loginit(int usesyslog, char *name);
 void	logsyslog(void);
+void	logflush(void);
 void	info(const char *fmt, ...);
 void	warning(const char *fmt, ...);
 void	error(const char *fmt, ...);
