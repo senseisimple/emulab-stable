@@ -11,6 +11,10 @@ include("showstuff.php3");
 $DEF_LIMIT = 20;
 $DEF_NUMPAGENO = 10;
 
+#$FLEXLAB_XMLRPC_SRV = '@USERSNODE@';
+$FLEXLAB_XMLRPC_SRV = 'ops.emulab.net';
+$FLEXLAB_XMLRPC_SRV_PORT = 3993;
+
 #
 # Standard Testbed Header
 #
@@ -206,7 +210,13 @@ $optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
                                   # It actually gets tokenized and parsed and
                                   # we verify every last token against known 
                                   # or numeric values.
-				  "userquery", PAGEARG_ANYTHING );
+				  "userquery", PAGEARG_ANYTHING,
+
+				  "flexlabfilter", PAGEARG_BOOLEAN,
+				  "flexlabfcsize", PAGEARG_INTEGER,
+				  "flexlabsave", PAGEARG_BOOLEAN,
+				  "flexlabrecompute", PAGEARG_BOOLEAN,
+				  "flexlabfcnodes", PAGEARG_ALPHALIST );
 
                                   # Unimplemented.
                                   # Verified, but never leaves php
@@ -257,8 +267,26 @@ else {
     $hf_regexp = 1;
     # setup post-filtering so that we can match using regexps.
     $mustpostfilter = 1;
-    echo "needed regexp and postfilter<br>\n";
+    #echo "needed regexp and postfilter<br>\n";
 }
+
+#
+# Flexlab filter options:
+#
+if (isset($flexlabfilter) && $flexlabfilter) {
+    if (isset($flexlabsave) && $flexlabsave 
+	&& isset($flexlabrecompute) && $flexlabrecompute) {
+        # unset recompute; save is the winner...
+	unset($flexlabrecompute);
+    }
+    $mustpostfilter = 1;
+}
+else {
+    if (isset($flexlabfcnodes)) {
+	unset($flexlabfcnodes);
+    }
+}
+
 
 #
 # Setup the viewable exp/pid mappings:
@@ -352,9 +380,11 @@ else {
 $colmap = array( 'node_id' => 'pm.node_id',
 		 'hostname' => 'pm.hostname',
 		 'plab_id' => 'pm.plab_id',
+		 'site' => 'psm.site_name',
                  # emulab columns
 		 'nodestatus' => 'ns.status',
 		 'nodestatustime' => 'ns.status_timestamp',
+		 'nettype' => 'nat.type',
 		 'unavail' => 'pnhs.unavail',
 		 'jitdeduction' => 'pnhs.jitdeduct',
 		 'successes' => 'pnhs.succnum',
@@ -397,6 +427,7 @@ $colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
 		 
 		 'node_id' => 'Emulab','hostname' => 'Emulab',
 		 'plab_id' => 'Emulab','unavail' => 'Emulab',
+		 'site' => 'Emulab','nettype' => 'Emulab',
 		 'jitdeduction' => 'Emulab','successes' => 'Emulab',
                  'failures' => 'Emulab','nodestatus' => 'Emulab',
                  'nodestatustime' => 'Emulab' );
@@ -406,9 +437,11 @@ $colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
 $coldoc = array( 'node_id' => 'Emulab physical node id.',
 		 'hostname' => 'Node hostname.',
 		 'plab_id' => 'PLC node id number.',
+		 'site' => 'Site with which the node is affiliated.',
 		 'nodestatus' => 'Emulab node status; up or down.',
-		 'nodestatustime' => 'Most recent heartbeat from the node ' . 
-		   'to Emulab heartbeat from the node.',
+		 'nodestatustime' => 'Most recent heartbeat time from the ' . 
+		   'node to Emulab.',
+		 'nettype' => 'Type of network node lives on.',
 		 'unavail' => 'Unavailability percentage as calculated by ' . 
 		   'Emulab.  Is increased if the node is often up and down.',
 		 'jitdeduction' => 'Amount added to total unavailability ' . 
@@ -730,23 +763,119 @@ PAGEFOOTER();
 function pm_filterdata($data) {
     global $hostfilter,$hf_regexp;
     global $colmap_mysqlnames;
+    global $flexlabfilter,$flexlabfcsize,$flexlabsave,$flexlabrecompute;
+    global $flexlabfcnodes;
+    global $FLEXLAB_XMLRPC_SRV,$FLEXLAB_XMLRPC_SRV_PORT;
 
-    if (!$hf_regexp) {
-	return;
-    }
+    global $opterrs;
+
+    # Array of node_ids; must be reduced after each filter.
+    $remaining_nodes = array();
 
     #
     # Filter all rows based on regexp (expensive but no good way).
     #
-    $retval = array();
-    foreach ($data as $idx => $row) {
-	if (preg_match("/$hostfilter/",
-		       $row[$colmap_mysqlnames['hostname']]) > 0) {
-	    array_push($retval,$row);
+    if ($hf_regexp) {
+	$rnatmp = array();
+	$rnodes = array();
+	foreach ($data as $row) {
+	    if (preg_match("/$hostfilter/",
+			   $row[$colmap_mysqlnames['hostname']]) > 0) {
+		array_push($rnatmp,$row);
+		$rnodes[$row[$colmap_mysqlnames['node_id']]] = 1;
+	    }
 	}
+	$remaining_nodes = $rnatmp;
+    }
+    else {
+	$remaining_nodes = $data;
     }
 
-    return $retval;
+    #
+    # Flexlab "goodnodes" filter.  Contacts xmlrpc server on ops and gets a 
+    # list of fully-connected nodes.
+    #
+    $rnatmp = array();
+    if (isset($flexlabfilter) && $flexlabfilter) {
+	if (isset($flexlabsave) && $flexlabsave 
+	    && isset($flexlabfcnodes)) {
+            # Do not make another expensive xmlrpc call -- just filter 
+            # against the current flexlab set.
+	    foreach ($remaining_nodes as $row) {
+		if (in_array($row[$colmap_mysqlnames['node_id']],
+			     $flexlabfcnodes)) {
+		    array_push($rnatmp,$row);
+		}
+	    }
+	}
+	else {
+            # Make the call.
+	    $xargs = array( 'size' => $flexlabfcsize );
+	    $ta = array();
+	    foreach ($remaining_nodes as $row) {
+		array_push($ta,$row[$colmap_mysqlnames['node_id']]);
+	    }
+	    if (count($ta) > 0) {
+		$xargs['nodefilter'] = $ta;
+		$xargs['filtertype'] = True;
+	    }
+	    $response = do_xmlrpc($FLEXLAB_XMLRPC_SRV,$FLEXLAB_XMLRPC_SRV_PORT,
+				  'flexlab.getFullyConnectedSet',$xargs);
+	    if ($response[0] && !xmlrpc_is_fault($response[1])) {
+                #echo "xresp = '" . implode(',',$response[1]) . "'<br>\n";
+		$rnatmp = array();
+		$flexlabfcnodes = array();
+		foreach ($remaining_nodes as $row) {
+		    if (in_array($row[$colmap_mysqlnames['node_id']],
+				 $response[1])) {
+			array_push($rnatmp,$row);
+			array_push($flexlabfcnodes,
+				   $row[$colmap_mysqlnames['node_id']]);
+		    }
+		}
+	    }
+	    elseif (xmlrpc_is_fault($response[1])) {
+		$rnatmp = $remaining_nodes;
+		array_push($opterrs,
+			   "XMLRPC fault: code=" . $response[1]['faultCode'] . 
+			   "; msg=" . $response[1]['faultString']);
+		$flexlabfcnodes = array();
+	    }
+	    else {
+		$rnatmp = $remaining_nodes;
+		array_push($opterrs,
+			   "Error in XMLRPC transport: " . $response[1]);
+		$flexlabfcnodes = array();
+	    }
+	}
+	$remaining_nodes = $rnatmp;
+    }
+    
+    return $remaining_nodes;
+}
+
+function do_xmlrpc($host,$port,$method,$argdict) {
+    $xreq = xmlrpc_encode_request($method,$argdict);
+    #echo "xreq = '<!-- " . $xreq . " -->'<br>\n";
+    $xheaders = array( 'Content-type: text/xml',
+		       "Content-length: " . strlen($xreq) );
+    $c = curl_init();
+    curl_setopt($c,CURLOPT_URL,"http://$host:$port/");
+    curl_setopt($c,CURLOPT_RETURNTRANSFER,1);
+    curl_setopt($c,CURLOPT_TIMEOUT,3);
+    curl_setopt($c,CURLOPT_HTTPHEADER,$xheaders);
+    curl_setopt($c,CURLOPT_POSTFIELDS,$xreq);
+
+    $xresp = curl_exec($c);
+    if (curl_errno($c)) {
+	$errstr = curl_error($c);
+	curl_close($c);
+	return array(False,$errstr);
+    }
+    else {
+	curl_close($c);
+	return array(True,xmlrpc_decode($xresp));
+    }
 }
 
 function pm_showlegend() {
@@ -886,7 +1015,7 @@ function pm_showselection() {
         # advanced mode.
 	echo "<input type='submit' name='submit' value='Create PlanetLab Slice'>\n";
 	echo "</form>\n";
-    }
+    }    
 
     echo "</div>\n";
 }
@@ -901,6 +1030,8 @@ function pm_showsearch() {
     global $hostfilter;
     global $pagelayout;
     global $userquery;
+    global $flexlabfilter,$flexlabfcsize,$flexlabsave,$flexlabrecompute;
+    global $flexlabfcnodes;
 
     echo "<div style='padding: 8px; padding-left: 12px; padding-right: 12px;";
     echo " border: 2px solid silver; visibility: visible; margin-left: 4px'";
@@ -1139,6 +1270,39 @@ function pm_showsearch() {
     }
     echo "</select>\n";
     echo " PlanetLab <b>nodes per page</b>\n";
+    echo "<br>\n";
+
+    # flexlab filter options
+    $ffstate = "";
+    if (isset($flexlabfilter) && $flexlabfilter) {
+	$ffstate = ' checked';
+    }
+    echo "<input type='checkbox' name='flexlabfilter' value='yes'$ffstate>\n";
+    echo " Filter against <b>Flexlab</b> data: ";
+    echo "<br>\n";
+    echo "&nbsp;&nbsp;&nbsp;&nbsp;";
+    echo " Select ";
+    $ffsize = 3;
+    if (isset($flexlabfcsize)) {
+	$ffsize = $flexlabfcsize;
+    }
+    echo "<input type='text' name='flexlabfcsize' size='4' value='$ffsize'>\n";
+    echo " fully-connected nodes (one per site) <br>";
+    echo "&nbsp;&nbsp;&nbsp;&nbsp;";
+    $ffstate = '';
+    if (isset($flexlabsave) && $flexlabsave) {
+	$ffstate = ' checked';
+    }
+    echo "<input type='checkbox' name='flexlabsave' value='yes'$ffstate>\n";
+    echo " Save set <b>without recomputing</b><br>\n";
+    echo "&nbsp;&nbsp;&nbsp;&nbsp;";
+    $ffstate = '';
+    if (isset($flexlabrecompute) && $flexlabrecompute) {
+	$ffstate = ' checked';
+    }
+    echo "<input type='checkbox' name='flexlabrecompute' value='yes'$ffstate>\n";
+    echo " Force set <b>recomputation</b>";
+
     echo "<br><br>\n";
 
     # form buttons
@@ -1160,7 +1324,9 @@ function pm_buildurl() {
     $pageargs = array( 'pid','eid','cols','sortcols','sortdir',
                        'upnodefilter','pagelayout','limit','offset',
 		       'hostfilter','userquery',
-		       'selectable','selectionlist' );
+		       'selectable','selectionlist',
+		       'flexlabfilter','flexlabsave','flexlabfcsize',
+		       'flexlabfcnodes' );
 
     $params = array();
     foreach ($pageargs as $pa) {
@@ -1179,7 +1345,7 @@ function pm_buildurl() {
     $retval = "plabmetrics.php3?";
     foreach ($params as $k => $v) {
         if (is_array($v)) {
-            $v = implode($v,',');
+            $v = '' . implode(',',$v);
         }
         $retval .= "$k=" . urlencode($v) . "&";
     }
@@ -1197,19 +1363,24 @@ function pm_gethiddenfields($whichform,$override=array()) {
     if ($whichform == 'plsearchform') {
 	$pageargs = array('pagelayout','offset',
 			  'cols','sortcols',
-			  'selectable','selectionlist');
+			  'selectable','selectionlist',
+			  'flexlabfcnodes');
     }
     elseif ($whichform == 'nodesel') {
 	$pageargs = array('pid','eid','cols','sortcols','sortdir',
 			  'upnodefilter','pagelayout','hostfilter',
 			  'selectable','selectionlist','userquery',
-			  'offset','limit');
+			  'offset','limit',
+			  'flexlabfilter','flexlabsave','flexlabfcsize',
+			  'flexlabfcnodes');
     }
     elseif ($whichform == 'nodeeditsel') {
 	$pageargs = array('pid','eid','cols','sortcols','sortdir',
 			  'upnodefilter','pagelayout','hostfilter',
 			  'selectable','userquery',
-			  'offset','limit');
+			  'offset','limit',
+			  'flexlabfilter','flexlabsave','flexlabfcsize',
+			  'flexlabfcnodes');
     }
 
     $params = array();
@@ -1226,7 +1397,7 @@ function pm_gethiddenfields($whichform,$override=array()) {
     $retval = "";
     foreach ($params as $k => $v) {
         if (is_array($v)) {
-            $v = implode($v,',');
+            $v = implode(',',$v);
         }
         # Include the id field just in case javascripts touch these.
         $retval .= "<input type='hidden' name='$k' id='$k' value='$v'>\n";
@@ -1331,13 +1502,17 @@ function pm_buildqueryinfo() {
         $q_joinstr = " plab_mapping as pm";
     }
     # for now, just join all possible tables, even if we are not selecting data
+    $q_joinstr .= " left join plab_site_mapping as psm on pm.node_id=psm.node_id";
+    $q_joinstr .= " left join node_auxtypes as nat on pm.node_id=nat.node_id";
     $q_joinstr .= " left join node_status as ns on pm.node_id=ns.node_id";
     $q_joinstr .= " left join plab_comondata as pcd on pm.node_id=pcd.node_id";
     $q_joinstr .= " left join plab_nodehiststats as pnhs" . 
 	" on pm.node_id=pnhs.node_id";
 
     # setup the quick filter string (note that all of these get anded)
-    $q_quickfs = '';
+    
+    # note that all plab nodes get a non-"pcplab" node auxtype.
+    $q_quickfs = "nat.type != 'pcplab'";
     if (isset($experiment)) {
         if (strlen($q_quickfs) > 0) {
 	    $q_quickfs .= " and ";
