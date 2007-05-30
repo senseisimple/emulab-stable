@@ -15,25 +15,23 @@ import exceptions
 import traceback
 import threading
 import time
+import xmlrpclib
 
 debug = True
 
 TBPATH = os.path.join("@prefix@", "lib")
-#TBPATH = os.path.join("/usr/testbed/devel/johnsond", "lib")
 if not TBPATH in sys.path:
     sys.path.append(TBPATH)
     pass
-
-#sys.path.append("/usr/testbed/devel/johnsond/lib")
 
 import libdb
 import BasicXMLRPCServers
 
 
-class FlexlabError(exceptions.Exception):
+class FlexlabFault(xmlrpclib.Fault):
     pass
 
-class FlexlabInvalidArgumentError(FlexlabError):
+class FlexlabInvalidArgumentFault(FlexlabFault):
     pass
 
 
@@ -268,18 +266,18 @@ class flexlab:
 
         # check args
         if argdict == None or type(argdict) != types.DictType:
-            raise FlexlabInvalidArgumentError("No arguments!")
+            return FlexlabInvalidArgumentFault(10,"No arguments!")
         
         if argdict.has_key("size"):
             try:
                 size = int(argdict["size"])
             except:
-                raise FlexlabInvalidArgumentError("Must supply a positive set size!")
+                return FlexlabInvalidArgumentFault(11,"Must supply a positive set size!")
             if size <= 0:
-                raise FlexlabInvalidArgumentError("Must supply a positive set size!")
+                return FlexlabInvalidArgumentFault(11,"Must supply a positive set size!")
             pass
         else:
-            raise FlexlabInvalidArgumentError("Must supply a positive set size!")
+            return FlexlabInvalidArgumentFault(11,"Must supply a positive set size!")
         
         nodefilterlist = []
         filtertype = True
@@ -287,7 +285,7 @@ class flexlab:
         if argdict.has_key("nodefilter"):
             nodefilterlist = argdict["nodefilter"]
             if type(nodefilterlist) != types.ListType:
-                raise FlexlabInvalidArgumentError("nodefilterlist must be a list!")
+                return FlexlabInvalidArgumentFault(12,"nodefilterlist must be a list!")
             pass
         else:
             filtertype = False
@@ -296,7 +294,7 @@ class flexlab:
         if argdict.has_key("filtertype"):
             filtertype = argdict["filtertype"]
             if type(filtertype) != types.BooleanType:
-                raise FlexlabInvalidArgumentError("filtertype must be a bool!")
+                return FlexlabInvalidArgumentFault(13,"filtertype must be a bool!")
             pass
 
         # grab our final node list:
@@ -422,8 +420,9 @@ class flexlab:
         if foundit:
             retval = usedsites.values()
         else:
-            raise FlexlabError("Could not find %d fully-connected sites!" \
-                               % size)
+            retval = FlexlabFault(20,
+                                  "Could not find %d fully-connected sites!" \
+                                  % size)
         return retval
     
     pass
