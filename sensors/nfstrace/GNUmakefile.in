@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This is the Emulab specific makefile.
@@ -42,6 +42,7 @@ make.nfsdump:
 clean.nfsdump: $(SRCDIR)/nfsdump2/config.status
 	cd $(SRCDIR)/nfsdump2/ && ./config.status
 	cd $(SRCDIR)/nfsdump2 && $(MAKE) clean
+	cd $(SRCDIR)/nfsdump2 && rm -f config.status config.cache
 
 $(SRCDIR)/nfsdump2/nfsdump: $(SRCDIR)/nfsdump2/config.status make.nfsdump
 
