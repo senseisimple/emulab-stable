@@ -25,9 +25,8 @@
 use strict;
 use English;
 use Getopt::Std;
-use lib '/usr/testbed/lib';
-use libtbdb;
-use libwanetmondb;
+use lib '/usr/testbed/devel/johnsond/lib';
+use libxmlrpc;
 
 my $allnodeFile = "/share/planetlab/reliable_nodes";
 my $NLIST = "/usr/testbed/bin/node_list";
@@ -68,13 +67,8 @@ if (@ARGV !=1) { exit &usage; }
 #
 my $numnodes = $ARGV[0];
 my @allnodes = ();      #nodes to consider, in order of desirablility (?)
-my %chosenBySite = ();  #indexed by siteidx, maps to plabxxx
-my %nodeIds = ();       #indexed by plabxxx => (siteid, nodeid)
 my %expnodes = ();  #nodes making up eid/pid
 my %blacknodes = ();#nodes not allowed to be chosen (deleted from allnodes)
-my %connMatrix = (); # {srcsite}{dstsite} => 1/0 mapping 
-my %connRating = (); # site => rating value
-my $allnodesIndex = 0;
 
 #
 # Get list of possible nodes
@@ -107,14 +101,6 @@ if( defined $blacklistfilename ){
     }
     close FILE;
 }
-
-#
-# prototypes
-sub addNew($);
-sub checkConn($$);
-sub isFullyConn($);
-#
-#
 
 
 ###############################################################################
@@ -168,318 +154,47 @@ if( defined($pid) && defined($eid) ){
 
 #print "%%%%%%\n@allnodes\n%%%%%%%%%%";
 
+
 #
-# build set of nodes to test for fully-connectedness.
+# Send candidate node list to flexlab xmlrpc server.
 #
-my $foundEnoughNodes = 0;
-for( $allnodesIndex=0; $allnodesIndex < scalar(@allnodes); $allnodesIndex++ ){
-    if( !addNew($allnodesIndex) ){
-    }
-    if( scalar( keys %chosenBySite ) == $numnodes ){
-        $foundEnoughNodes = 1;
-        last;
-    }
+
+my ($DEF_HOST,$DEF_PORT,$DEF_URL) = ('ops.emulab.net','3993','/');
+
+my $xurl = "http://${DEF_HOST}:${DEF_PORT}${DEF_URL}";
+my $xargs = { 'size' => $numnodes,
+              'nodefilter' => \@allnodes,
+              'filtertype' => 1 };
+my $respref = libxmlrpc::CallMethodHTTP($xurl,'flexlab.getFullyConnectedSet',
+    $xargs);
+
+print "rr = $respref\n";
+
+if (!defined($respref)) {
+    print STDERR "ERROR: did not get response from server!\n";
+    exit(3);
 }
 
-if (!$foundEnoughNodes) {
-    die "Initial pass unable to find $numnodes sutiable nodes\n";
+my %resp = %$respref;
+
+foreach my $k (keys(%resp)) {
+    print "rk = $k, rv = $resp{$k}\n";
 }
 
-if ($verbose) {
-    print "Starting main loop - " . scalar(@allnodes). " nodes in \@allnodes\n";
-}
-#
-#
-# MAIN LOOP
-#
-#
-my ($lowestRatedSite, $lowestRating) = ();
-do{    
-    ($lowestRatedSite, $lowestRating) = fullyConnTest();
-    if ($verbose) {
-        print "mainloop: lowestRatedSite=$lowestRatedSite, " .
-              "lowestRating=$lowestRating\n";
-    }
-    if( !isFullyConn($lowestRating) ){
-        #modify set
-        # delete worst node
-#        print "deleting $chosenBySite{$lowestRatedSite} ".
-#            "with rating=$lowestRating\n";
-        delete $chosenBySite{$lowestRatedSite};
-        # add new node
-        if ($verbose) {
-            print "mainloop: chosenBySite=" . (scalar keys %chosenBySite) .
-                  "\n";
-        }
-        while( scalar(keys %chosenBySite) < $numnodes )
-        {
-            if ($allnodesIndex < scalar(@allnodes)-1) {
-                $allnodesIndex++;
-                if ($verbose) {
-                    print "mainloop: Trying new index $allnodesIndex\n";
-                }
-                #addNew will add to chosenBySite if good N.
-                addNew($allnodesIndex); 
-            } else {
-                die "COULD NOT MAKE FULLY CONNECTED SET: Reached " .
-                    "$allnodesIndex of " . (scalar(@allnodes)-1) . "\n";
-            }
-        }
-    }
-} while( !isFullyConn($lowestRating) ); #test if fully-connected
-
-print "FULLY CONNECTED (n=$numnodes)!\n";
-print "allnodeindex=$allnodesIndex of ".scalar(@allnodes)."\n";
-
-#printChosenNodes();
-
-print "FINAL SET:\n";
-foreach my $siteidx (keys %chosenBySite){
-    print "$chosenBySite{$siteidx}\n";
+if (exists($resp{'httpcode'}) && $resp{'httpcode'} != 400) {
+    print STDERR "ERROR: http code " . $resp{'httpcode'} . "; http msg '" . 
+        $resp{'httpmsg'} . "'\n";
+    exit(4);
 }
 
-
-
-#print "before FCT\n";
-#fullyConnTest();
-
-
-###############################################################################
-
-sub isFullyConn($){
-    my ($lowestRating) = @_;
-    if( $lowestRating == ($numnodes-1)*2 ){
-        return 1;
-    }else{
-        return 0;
-    }
-}
-
-
-#
-# Tests the nodes listed in %chosenBySite for fully-connectedness
-# Returns the siteid of the lowest rated (connectedness) node, and its rating
-#
-sub fullyConnTest{
-
-    %connRating = ();
- 
-    my @sites = keys %chosenBySite;
-    if ($verbose) {
-        print "fullyConnTest(): sites=@sites\n";
-    }
-
-    for( my $i=0; $i<scalar(@sites)-1; $i++ ){
-        my $srcsite = $sites[$i];
-
-        for( my $j=$i+1; $j<scalar(@sites); $j++ ){
-            my $dstsite = $sites[$j];
-
-            if( !defined($connMatrix{$srcsite}{$dstsite}) ){ 
-                my ($latConn,$bwConnF,$bwConnB)=checkConn($srcsite,$dstsite);
-                if ($verbose) {
-                    print "$srcsite => $dstsite, ($latConn,$bwConnF,$bwConnB)\n";
-                }
-
-                $connMatrix{$srcsite}{$dstsite} = $latConn + $bwConnF;
-                $connMatrix{$dstsite}{$srcsite} = $latConn + $bwConnB;
-            }
-
-            #a node's rating is defined as the number of successful
-            # bw tests it is the dst for, plus the number of latency
-            # tests it is involved in.
-            #
-            $connRating{$dstsite} += $connMatrix{$srcsite}{$dstsite};
-            $connRating{$srcsite} += $connMatrix{$dstsite}{$srcsite};
-        }        
-    }
-
-
-    my $lowestRatedSite;
-    my $lowestRating;
-    #
-    # find lowest rating
-    #
-    foreach my $site (keys %chosenBySite){
-        if( !defined $lowestRating ){
-            $lowestRating = $connRating{$site};
-            $lowestRatedSite = $site;
-            next;
-        }
-        
-        if( $connRating{$site} < $lowestRating ){
-            $lowestRating = $connRating{$site};
-            $lowestRatedSite = $site;
-#            print "new lowest rating $lowestRating from $node\n";
-        }
-    }
-
-#    print "lowestRatedSite=$lowestRatedSite, $lowestRating\n";
-    return ($lowestRatedSite, $lowestRating);
-}
-
-
-
-#
-# add the site of given node at given index to result set of "%chosenBySite"
-# if data exists for that node
-#  returns 1 if successful, 0 if fail.
-#  fail: 
-#    - no results
-#    - already a node under its siteix in %chosenBySite
-#
-sub addNew($){
-    my ($index) = @_;
-    my $nodeid = $allnodes[$index];
-    my $f_valid = 1;
-
-#    print "adding index $index=$nodeid of ".scalar(@allnodes)-1."\n";;
-
-    #get node and site IDxs
-    my ($siteidx,$nodeidx) = getNodeIDs($nodeid);
-
-    #** check if this node satisfies the constraints **
-
-    my $qstr = "select latency from pair_data ".
-                     #"force index (unixstamp) ".
-                     "where latency is not NULL and ".
-                     "dstsite_idx=$siteidx and ".
-                     "unixstamp > $t0 and ".
-                     "unixstamp < $t1 ".
-                     "limit 1";
-    #print "Running query '$qstr'\n";
-    my @results = getRows($qstr);
-    if( !scalar(@results) ){
-        #warn("No latency results from $nodeid\n");
-        return 0;
-    }
-
-    if( $f_valid == 1 ){
-        #add node to set if one doesn't already exist from its site
-        if( !defined $chosenBySite{$siteidx} ){
-            $chosenBySite{$siteidx} = $nodeid;
-        }else{
-            #already exists
-            $f_valid = 0;
-        }
-#        print "added $nodeid / $siteidx,$nodeidx\n";
-    }
-
-    return $f_valid;    
-}
-
-
-#
-# param: plabxx, output: [siteidx, nodeidx]
-#
-sub getNodeIDs($){
-    my ($nodeid) = @_;
-
-    #if it's already added to hash, don't look it up again
-    if( defined $nodeIds{$nodeid} ){
-        return @{$nodeIds{$nodeid}};
-    }
-
-    # Grab the site and node index.
-    my $qstr = "select * from site_mapping ".
-               "where node_id='$nodeid'";
-    my @results = getRows($qstr);
-
-    if( !scalar(@results) ){
-        die("Could not map $nodeid to its site or node index!\n");
-    }
-
-    my $site_idx = $results[0]->{site_idx};
-    my $node_idx = $results[0]->{node_idx};
-
-    $nodeIds{$nodeid} = [$site_idx,$node_idx];
-#    print "added to nodeIds: $nodeid => @{$nodeIds{$nodeid}}\n";
-    return ($site_idx,$node_idx);
+if ($resp{'code'} ne 0) {
+    print STDERR "ERROR: xmlrpc code " . $resp{'code'} . ", fault msg '" . 
+	$resp{'output'} . "'\n";
+    exit(5);
 }
 
 #
-# returns an array of values indicating the connectedness of the passed path
-# - latConn is 0 or 1 (1 if either forward or backward rtt exists)
-# - bwConnF is 0, 1 / for bw from src to dst
-# - bwConnB is 0, 1 / for bw from dst to src
+# Must be a success.
 #
-sub checkConn($$){
-    my ($srcsite, $dstsite) = @_;
-    my ($latConn, $bwConnF, $bwConnB) = (0,0,0);
-    my $latTestStr= "> 0";
-#    my $latTestStr= "is not null";
-    my $bwTestStr = "> 0";
-    
-    my $qstr = "select * from pair_data ".
-                     #"force index (unixstamp) ".
-                     "where (latency $latTestStr  and ".
-                     "unixstamp > $t0 and ".
-                     "unixstamp < $t1) and ".
-                     "((srcsite_idx=$srcsite and ".
-                     "dstsite_idx=$dstsite) or ".
-                     "(srcsite_idx=$dstsite and ".
-                     "dstsite_idx=$srcsite)) ".
-                     "limit 1";
-    my @results = getRows($qstr);
-    if ($verbose) {
-        print "getRows (latency) finished for query\n$qstr\n";
-    }
-    if( !scalar(@results) ){
-    }else{
-        $latConn = 1;
-    }
-    
-    $qstr = "select * from pair_data ".
-        #"force index (unixstamp) ".
-            "where bw $bwTestStr and ".
-            "unixstamp > $t0 and ".
-            "unixstamp < $t1 and ".
-            "srcsite_idx=$srcsite and ".
-            "dstsite_idx=$dstsite ".
-            "limit 1";
-    @results = getRows($qstr);
-    if( !scalar(@results) ){
-    }else{
-        $bwConnF = 1;
-    }
-
-    $qstr = "select * from pair_data ".
-        #"force index (unixstamp) ".
-            "where bw $bwTestStr and ".
-            "unixstamp > $t0 and ".
-            "unixstamp < $t1 and ".
-            "srcsite_idx=$dstsite and ".
-            "dstsite_idx=$srcsite ".
-            "limit 1";
-    @results = getRows($qstr);
-    if( !scalar(@results) ){
-    }else{
-        $bwConnB = 1;
-    }
-    if ($verbose) {
-        print "getRows (bandwidth) finished for query\n$qstr\n";
-    }
-#    print "($latConn, $bwConnF, $bwConnB)\n";
-    return ($latConn, $bwConnF, $bwConnB);
-}
-
-
-
-sub printChosenNodes{
-
-    my @nodes = values %chosenBySite;
-
-    for( my $i=0; $i<scalar(@nodes)-1; $i++ ){
-        my $src = $nodes[$i];
-        for( my $j=$i+1; $j<scalar(@nodes); $j++ ){
-            my $dst = $nodes[$j];
-            print "$src=>$dst :: $connMatrix{$src}{$dst} ".
-                "and $connMatrix{$dst}{$src}\n";
-        }
-    }
-
-    foreach my $node (@nodes){
-        print "$node: $connRating{$node}\n";
-    }
-}
-
+print "" . join(',',@{$resp{'value'}}). "\n";
+exit(0);
