@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use libtblog;
 use User;
 use Project;
 use Group;
