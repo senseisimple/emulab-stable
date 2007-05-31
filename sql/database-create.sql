@@ -42,7 +42,6 @@ CREATE TABLE `active_checkups` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
-
 -- Table structure for table `archive_revisions`
 --
 
@@ -2200,6 +2199,45 @@ CREATE TABLE `partitions` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `plab_comondata`
+--
+
+DROP TABLE IF EXISTS `plab_comondata`;
+CREATE TABLE `plab_comondata` (
+  `node_id` varchar(32) NOT NULL,
+  `resptime` float default NULL,
+  `uptime` float default NULL,
+  `lastcotop` float default NULL,
+  `date` double default NULL,
+  `drift` float default NULL,
+  `cpuspeed` float default NULL,
+  `busycpu` float default NULL,
+  `syscpu` float default NULL,
+  `freecpu` float default NULL,
+  `1minload` float default NULL,
+  `5minload` float default NULL,
+  `numslices` int(11) default NULL,
+  `liveslices` int(11) default NULL,
+  `connmax` float default NULL,
+  `connavg` float default NULL,
+  `timermax` float default NULL,
+  `timeravg` float default NULL,
+  `memsize` float default NULL,
+  `memact` float default NULL,
+  `freemem` float default NULL,
+  `swapin` int(11) default NULL,
+  `swapout` int(11) default NULL,
+  `diskin` int(11) default NULL,
+  `diskout` int(11) default NULL,
+  `gbfree` float default NULL,
+  `swapused` float default NULL,
+  `bwlimit` float default NULL,
+  `txrate` float default NULL,
+  `rxrate` float default NULL,
+  PRIMARY KEY  (`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `plab_mapping`
 --
 
@@ -2229,6 +2267,24 @@ CREATE TABLE `plab_nodehist` (
   `status` enum('success','failure','unknown') NOT NULL default 'unknown',
   `msg` text,
   PRIMARY KEY  (`idx`,`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `plab_nodehiststats`
+--
+
+DROP TABLE IF EXISTS `plab_nodehiststats`;
+CREATE TABLE `plab_nodehiststats` (
+  `node_id` varchar(32) NOT NULL,
+  `unavail` float default NULL,
+  `jitdeduct` float default NULL,
+  `succtime` int(11) default NULL,
+  `succnum` int(11) default NULL,
+  `succjitnum` int(11) default NULL,
+  `failtime` int(11) default NULL,
+  `failnum` int(11) default NULL,
+  `failjitnum` int(11) default NULL,
+  PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

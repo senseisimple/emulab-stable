@@ -4016,3 +4016,54 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table experiment_runs add hidden tinyint(1) NOT NULL default '0';
 
+4.122: Add a table to store PlanetLab CoMon data, and another to store
+       cache latest statistics about planetlab nodes (a reduction of the data
+       in plab_nodehist).
+
+       CREATE TABLE `plab_comondata` (
+         `node_id` varchar(32) NOT NULL,
+	 `resptime` float default NULL,
+	 `uptime` float default NULL,
+	 `lastcotop` float default NULL,
+	 `date` double default NULL,
+	 `drift` float default NULL,
+	 `cpuspeed` float default NULL,
+	 `busycpu` float default NULL,
+	 `syscpu` float default NULL,
+	 `freecpu` float default NULL,
+	 `1minload` float default NULL,
+	 `5minload` float default NULL,
+	 `numslices` int(11) default NULL,
+	 `liveslices` int(11) default NULL,
+	 `connmax` float default NULL,
+	 `connavg` float default NULL,
+	 `timermax` float default NULL,
+	 `timeravg` float default NULL,
+	 `memsize` float default NULL,
+	 `memact` float default NULL,
+	 `freemem` float default NULL,
+	 `swapin` int(11) default NULL,
+	 `swapout` int(11) default NULL,
+	 `diskin` int(11) default NULL,
+	 `diskout` int(11) default NULL,
+	 `gbfree` float default NULL,
+	 `swapused` float default NULL,
+	 `bwlimit` float default NULL,
+	 `txrate` float default NULL,
+	 `rxrate` float default NULL,
+	 PRIMARY KEY  (`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       CREATE TABLE `plab_nodehiststats` (
+         `node_id` varchar(32) NOT NULL,
+	 `unavail` float default NULL,
+	 `jitdeduct` float default NULL,
+	 `succtime` int(11) default NULL,
+	 `succnum` int(11) default NULL,
+	 `succjitnum` int(11) default NULL,
+	 `failtime` int(11) default NULL,
+	 `failnum` int(11) default NULL,
+	 `failjitnum` int(11) default NULL,
+	 PRIMARY KEY  (`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
