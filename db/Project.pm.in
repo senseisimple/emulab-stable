@@ -333,6 +333,8 @@ sub SendNewProjectEmail($;$)
 	if (!defined($usr_addr2));
     $usr_URL = ""
 	if (!defined($usr_URL));
+    $proj_whynotpublic = ""
+	if (!defined($proj_whynotpublic));
 
     if ($returning || $firstproject) {
 	SENDMAIL($TBAPPROVAL,
