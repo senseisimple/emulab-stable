@@ -59,7 +59,7 @@ my %config =
       "version"		=> undef,
       "cert"		=> undef,
     );
-my $debug = 1;
+my $debug = 0;
 
 #
 # Emulab XMLRPC defs.
