@@ -168,18 +168,12 @@ my $xargs = { 'size' => $numnodes,
 my $respref = libxmlrpc::CallMethodHTTP($xurl,'flexlab.getFullyConnectedSet',
     $xargs);
 
-print "rr = $respref\n";
-
 if (!defined($respref)) {
     print STDERR "ERROR: did not get response from server!\n";
     exit(3);
 }
 
 my %resp = %$respref;
-
-foreach my $k (keys(%resp)) {
-    print "rk = $k, rv = $resp{$k}\n";
-}
 
 if (exists($resp{'httpcode'}) && $resp{'httpcode'} != 400) {
     print STDERR "ERROR: http code " . $resp{'httpcode'} . "; http msg '" . 
