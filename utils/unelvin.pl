@@ -10,6 +10,11 @@ use English;
 #
 # Remove all traces of elvin from a client
 #
+my @BSDPKGS = (
+    'elvind-4.0.3',
+    'libelvin-4.0.3_2'
+);
+
 my @BSDFILES = (
     '/usr/local/etc/rc.d/elvind.sh',
     '/usr/local/bin/elvin-config',
@@ -51,6 +56,12 @@ if ($isbsd) {
     system("sed -i '' -e '/elvind/d' /etc/syslog.conf");
 
     # remove any packages?
+    foreach my $pkg (@BSDPKGS) {
+	if (!system("pkg_info -e $pkg")) {
+	    print "removing $pkg package...\n";
+	    system("pkg_delete -f $pkg");
+	}
+    }
 
     # remove known files
     my @list = `ls -d @BSDFILES 2>/dev/null`;
