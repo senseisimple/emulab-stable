@@ -452,13 +452,13 @@ def main():
     (host,port,acllist) = (DEF_HOST,DEF_PORT,DEF_ACLLIST)
 
     for (o,v) in opts:
-        if o == 'h':
+        if o == '-h':
             host = v
             pass
-        elif o == 'p':
+        elif o == '-p':
             port = int(v)
             pass
-        elif o == 'a':
+        elif o == '-a':
             acllist = v.split(',')
             pass
         pass
