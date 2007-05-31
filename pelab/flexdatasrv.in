@@ -293,6 +293,12 @@ class flexlab:
 
         if argdict.has_key("filtertype"):
             filtertype = argdict["filtertype"]
+            if type(filtertype) == types.IntType:
+                if filtertype == 0:
+                    filtertype = False
+                else:
+                    filtertype = True
+                pass
             if type(filtertype) != types.BooleanType:
                 return FlexlabInvalidArgumentFault(13,"filtertype must be a bool!")
             pass
