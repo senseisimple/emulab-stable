@@ -15,7 +15,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT =
     qw ( DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
-	 DBQuoteSpecial TBDBConnect TBDBDisconnect
+	 DBQuoteSpecial TBDBConnect TBDBDisconnect DBBinaryQuery
 	 );
 
 # Must come after package declaration!
@@ -55,7 +55,10 @@ my $tbdbuser;
 my $tbdbhost   = "localhost";
 my $tbdbpasswd = "none";
 
-sub TBDBConnect($;$$$)
+#
+# Database handle passed by reference as 5th argument ($_[4])
+#
+sub TBDBConnect($;$$$$)
 {
     my ($dbname, $dbuser, $dbpasswd, $dbhost) = @_;
     my $maxtries = $DBCONN_MAXTRIES;
@@ -93,19 +96,37 @@ sub TBDBConnect($;$$$)
     }
     $DB->{'dbh'}->{'PrintError'} = 0;
     $Mysql::QUIET = 1;
+    if (@_ == 5)  {
+	$_[4]->{'tbdbname'} = $tbdbname;
+	$_[4]->{'tbdbuser'} = $tbdbuser;
+	$_[4]->{'tbdbpasswd'} = $tbdbpasswd;
+	$_[4]->{'tbdbhost'} = $tbdbhost;
+	$_[4]->{'DB'} = $DB;
+    }
     return 0;
 }
 
-sub TBDBDisconnect()
+sub TBDBDisconnect(;$)
 {
-    undef($DB);
+    if (defined($_[0])) {
+	undef($_[0]->{'DB'});
+    } else {
+	undef $DB;
+    }    
 }
-
-sub TBdbfork()
+    
+sub TBdbfork(;$)
 {
     select(undef, undef, undef, 0.3);
-    undef($DB);
-    TBDBReConnect($tbdbname, $tbdbuser, $tbdbpasswd);
+    if (defined($_[0])) {
+	undef($_[0]->{'DB'});
+        TBDBReConnect($_[0]->{'tbdbname'}, $_[0]->{'tbdbuser'}, 
+		      $_[0]->{'tbdbpasswd'}, $_[0]->{'tbdbhost'}, 
+		      $_[0]->{'DB'});
+    } else {
+	undef($DB);
+	TBDBReConnect($tbdbname, $tbdbuser, $tbdbpasswd);
+    }
 }
 
 #
@@ -126,9 +147,15 @@ my $DBErrorString = "";
 # the error string from the DB module. Use DBFatal (below) to print/email
 # that string, and then exit.
 #
-sub DBQuery($)
+sub DBQuery($;$)
 {
-    my($query)   = $_[0];
+    my($query, $handle)   = @_;
+    my $dbhandle;
+    if (!defined($handle)) {
+	$dbhandle = $DB;
+    } else {
+	$dbhandle = $handle->{'DB'};
+    }
     my $maxtries = $DBQUERY_MAXTRIES;
     my $result;
 
@@ -138,17 +165,18 @@ sub DBQuery($)
     }
 
     while ($maxtries) {
-	$result = $DB->query($query);
+	$result = $dbhandle->query($query);
 	if (! defined($result)) {
-	    my $err = $DB->err;
+	    my $err = $dbhandle->err;
 
 	    $DBErrorString =
 		"  Query: $query\n".
-		"  Error: " . $DB->errstr . " ($err)";
+		"  Error: " . $dbhandle->errstr . " ($err)";
 	}
 	if (defined($result) ||
-	    ($DB->err != 2006) && ($DB->err != 1053) && ($DB->err != 2013) &&
-	    ($DB->err != 1046)) {
+	    ($dbhandle->err != 2006) && ($dbhandle->err != 1053) && 
+            ($dbhandle->err != 2013) &&
+	    ($dbhandle->err != 1046)) {
 	    last;
 	}
 
@@ -162,12 +190,12 @@ sub DBQuery($)
 #
 # Same as above, but die on error.
 #
-sub DBQueryFatal($)
+sub DBQueryFatal($;$)
 {
-    my($query) = $_[0];
+    my ($query, $handle) = @_;
     my($result);
 
-    $result = DBQuery($query);
+    $result = DBQuery($query, $handle);
 
     if (! $result) {
 	DBFatal("DB Query failed");
@@ -179,12 +207,12 @@ sub DBQueryFatal($)
 # Same as above, but just send email on error. This info is useful
 # to the TB system, but the caller has to retain control.
 #
-sub DBQueryWarn($)
+sub DBQueryWarn($;$)
 {
-    my($query) = $_[0];
+    my ($query, $handle) = @_;
     my($result);
 
-    $result = DBQuery($query);
+    $result = DBQuery($query, $handle);
 
     if (! $result) {
 	DBWarn("DB Query failed");
@@ -232,11 +260,16 @@ sub DBFatal($)
 #
 # usage: char *DBQuoteSpecial(char *string);
 #
-sub DBQuoteSpecial($)
+sub DBQuoteSpecial($;$)
 {
-    my($string) = $_[0];
-
-    $string = $DB->quote($string);
+    my($string, $handle) = @_;
+    my $dbhandle;
+    if (!defined($handle)) {
+	$dbhandle = $DB;
+    } else {
+	$dbhandle = $dbhandle->{'DB'};
+    }
+    $string = $dbhandle->quote($string);
 
     return $string;
 }
@@ -256,6 +289,40 @@ sub DBDateTime(;$)
     }
 
     return strftime("20%y-%m-%d %H:%M:%S", localtime(time() + $seconds));
+}
+
+# Binary mode for database query
+#
+# usage: DBBinaryQuery(dbhandle, statement, @data);
+#        returns the query object result.
+#
+# Sets $DBErrorString is case of error; saving the original query string and
+# the error string from the DB module. Use DBFatal to print/email
+# that string, and then exit.
+#
+
+sub DBBinaryQuery {
+   my ($handle, $statement, @data) = @_; 
+   
+   my $dbh = $handle->{'DB'}->{'dbh'};
+   my $sth = $dbh->prepare($statement);
+   if (!$sth) {
+       $DBErrorString =
+	   "  Query: $statement\n".
+	   "  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
+       return undef;
+   }
+   $sth->{'PrintError'} = !$Mysql::QUIET;
+   
+   my $query_result = $sth->execute(@data);
+   if (!$query_result) {
+       $DBErrorString =
+	   "  Query: $statement\n".
+	   "  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
+       return undef;
+   }
+   $sth->{'CompatMode'} = 1;
+   $sth;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
