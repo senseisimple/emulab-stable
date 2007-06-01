@@ -11,7 +11,7 @@ SUBDIR		= pelab/db
 
 include $(OBJDIR)/Makeconf
 
-USERSBIN_SCRIPTS = pelab_dbpush pelab_opspush.proxy
+USERSBIN_SCRIPTS = pelab_dbpush pelab_opspush.proxy pelab_sql_dbpush
 BOSSSBIN_SCRIPTS = pelab_opspush 
 
 all:	$(BOSSSBIN_SCRIPTS) $(USERSBIN_SCRIPTS)
