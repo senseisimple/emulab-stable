@@ -132,9 +132,9 @@ function STARTLOG($experiment)
     echo "exp_pid = \"$pid\";\n";
     echo "exp_eid = \"$eid\";\n";
     echo "</script><div>
-         <iframe id='downloader' name='downloader' width=0 height=0 src='$url'
-                 onload='ml_handleReadyState(LOG_STATE_LOADED);'
-                 border=0 frameborder=0>
+         <iframe id='downloader' name='downloader'
+                 class='downloader' src='$url'
+                 onload='ml_handleReadyState(LOG_STATE_LOADED);'>
          </iframe></div>\n";
 }
 

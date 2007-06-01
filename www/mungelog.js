@@ -47,28 +47,35 @@ function GetPNodes_cb(data) {
     ml_handleReadyState(nextState);
 }
 
+/*
+ * Handle init state for Safari, which does not appear to support an onload
+ * event for iframes. 
+ */
+if (is_safari) {
+    window.onload = (function() {
+        var nextfn = window.onload || function(){};
+        return function() {
+	    ml_handleReadyState(LOG_STATE_LOADED);
+            nextfn();
+        }
+    })();
+}
+
 /* Clear the various 'loading' indicators. */
-function ml_loadFinished(done) {
-    clearInterval(upInterval);
-
-    if (done) {
-        ClearLoadingIndicators("<center><b>Done!</b></center>");
-    }
-    else {
-        ClearLoadingIndicators(" ");
-    }
-
+function ml_loadFinished() {
+    ClearLoadingIndicators("<center><b>Done!</b></center>");
     nextState = LOG_STATE_LOADED;
 }
 
 function ml_getInnerText(el) {
-	if (typeof el == "string") return el;
-	if (typeof el == "undefined") { return ""; };
-	if (el.innerText) return el.innerText;	//Not needed but it is faster
-	var str = "";
+	if (typeof el == "string")    { return el; }
+	if (typeof el == "undefined") { return ""; }
+	if (el.innerText)             { return el.innerText; }
 	
+	var str = "";
 	var cs = el.childNodes;
 	var l = cs.length;
+
 	for (var i = 0; i < l; i++) {
 		switch (cs[i].nodeType) {
 			case 1: //ELEMENT_NODE
@@ -87,31 +94,21 @@ function ml_getInnerText(el) {
  * @return The text in the given iframe.  If the text is surrounded by '<pre>'
  * tags (mozilla, IE), they will be stripped.
  */
-function ml_getBodyText(ifr) {
+function ml_getBodyText(oDoc) {
     var retval = null;
 
     try {
-	var oDoc;
-	
-	if (ifr.document && is_safari) {
-	    // Safari
-	    oDoc = ifr.document;
-        }
-	else {
-	    oDoc = (ifr.contentWindow || ifr.contentDocument);
-	    if (oDoc.document) {
-		oDoc = oDoc.document;
-	    }
-	}
 	for (lpc = 0; lpc < oDoc.childNodes.length; lpc++) {
 	    text = ml_getInnerText(oDoc.childNodes[lpc]);
 	    if (text != "") {
-		if (retval == null)
-		  retval = "";
+		if (retval == null) {
+		    retval = "";
+                }
 		retval += text;
 	    }
 	}
-	if (retval.indexOf("<pre>") != -1 || retval.indexOf("<PRE>") != -1) {
+        if (retval != null &&
+	    (retval.indexOf("<pre>") != -1 || retval.indexOf("<PRE>") != -1)) {
 	    retval = retval.substring(5, retval.length - 6);
 	}
     }
@@ -182,13 +179,19 @@ function ml_handleReadyState(state) {
     var idoc   = IframeDocument('outputframe');
     var oa     = idoc.getElementById('outputarea');
     var dl     = getObjbyName('downloader');
+    var ddoc   = IframeDocument('downloader');
+
+    //warn("state = " + state + ", docTriesLeft = " + docTriesLeft);
 
     if (docTriesLeft < 0) {
-        /* Already decided we were broken; just ignore */
+        /* Already decided we were broken; just waiting for loader to finish */
+	if (state == LOG_STATE_LOADED) {
+	    ml_loadFinished();
+	}
         return;
     }
 
-    if ((rt = ml_getBodyText(dl)) == null) {
+    if (ddoc == null ||	((rt = ml_getBodyText(ddoc)) == null)) {
 	/* 
 	 * Browsers that do not support DOMs for text/plain files or are a
 	 * little slow in getting it setup will end up here.  If we fail to
@@ -196,10 +199,16 @@ function ml_handleReadyState(state) {
 	 * make the iframe visible.
 	 */
 	docTriesLeft -= 1;
-	if (docTriesLeft < 0) {
-	    /* Give up, turn off the spinner */
-	    ml_loadFinished(0);
+	if (docTriesLeft < 0 || state == LOG_STATE_LOADED) {
+	    /* Give up, wait for downloader window to signal loaded. */
+	    clearInterval(upInterval);
 
+	    // We get this if the page finished loading before docTriesLeft
+	    // get to zero.
+	    if (state == LOG_STATE_LOADED) {
+		ml_loadFinished();
+	    }
+	    
             /* Hide the outputarea */
             HideFrame("outputframe");
 
@@ -207,18 +216,24 @@ function ml_handleReadyState(state) {
 	    var winheight = GetMaxHeight('downloader');
 
 	    dl.style.border = "2px solid";
-	    dl.height       = winheight;
+	    dl.style.height = winheight + "px";
+	    dl.style.width  = "100%";
+	    dl.style.scrolling = "auto";
+	    dl.style.overflow  = "auto";
+	    dl.height       = winheight + "px";
 	    dl.width        = "100%";
 	    dl.scrolling    = "auto";
+	    dl.overflow     = "auto";
 	    dl.frameBorder  = "1";
 	}
 	return;
     }
 
     if (state == LOG_STATE_LOADED) {
-	ml_loadFinished(1);
+	clearInterval(upInterval);
+	ml_loadFinished();
     }
-    
+
     if (state == LOG_STATE_LOADING || state == LOG_STATE_LOADED) {
 	/*
 	 * Get any new data and append it to the last line from the previous

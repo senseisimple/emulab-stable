@@ -41,9 +41,10 @@ function IframeDocument(id)
     var oIframe = getObjbyName(id);
     var oDoc    = (oIframe.contentWindow || oIframe.contentDocument);
 
-    if (oIframe.document && is_safari) {
-        // Safari
-	return oIframe.document;
+    if (is_safari) {
+	if (oIframe.document)
+	    return oIframe.document;
+	return null;
     }
     
     if (oDoc.document) {
