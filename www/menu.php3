@@ -10,6 +10,7 @@ $login_status     = CHECKLOGIN_NOTLOGGEDIN;
 $drewheader       = 0;
 $noheaders	  = 0;
 $autorefresh      = 0;
+$javascript_debug = 0;
 $currentusage     = 1;
 $currently_busy   = 0;
 $bodyclosestring  = "";
@@ -619,7 +620,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     global $TBDIR, $WWW;
     global $MAINPAGE;
     global $TBDOCBASE;
-    global $autorefresh, $currentusage;
+    global $autorefresh, $currentusage, $javascript_debug;
 
     $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/");
 
@@ -654,6 +655,10 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     }
     if ($extra_headers) {
         echo $extra_headers;
+    }
+    if ($javascript_debug) {
+	echo "<script type='text/javascript'
+                      src='${BASEPATH}/js/inline-console.js'></script>\n";
     }
     echo "</head>
             <body bgcolor='#FFFFFF' 
@@ -895,7 +900,7 @@ function ENDPAGE() {
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
     global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring, $currently_busy;
-    global $login_user;
+    global $login_user, $javascript_debug;
 
     if ($currently_busy) {
 	CLEARBUSY();
@@ -952,6 +957,10 @@ function PAGEFOOTER($view = NULL) {
     echo "      <!-- end copyright -->\n";
     echo "</div>";
     echo "</div>";
+
+    if ($javascript_debug) {
+	echo "<div id='inline-console'></div>\n";
+    }
 
     ENDPAGE();
 
