@@ -181,7 +181,6 @@ while (@results = $query_result->fetchrow()) {
     my $result = DBBinaryQuery($dphandle, "replace into site_mapping ".
 			       "values (?,?,?,?)",
 			       @results);
-    print "transfering @results\n";
     if (! defined($result)) {
 	# send email to tbops
 	DBFatal("DB push failed to transfer site_mappings");
@@ -302,8 +301,10 @@ if ($maxidx > $lastidx) {
         #
         # Delete all rows that we just archived
         #
-        print("delete from pair_data ".
-	      "where idx > $lastidx and idx <= $endidx\n");
+        if ($debug) {
+	    print("delete from pair_data ".
+		  "where idx > $lastidx and idx <= $endidx\n");
+	}
         DBQueryFatal("delete from pair_data ".
                      "where idx > $lastidx and idx <= $endidx $except", $opshandle);
     } else {
