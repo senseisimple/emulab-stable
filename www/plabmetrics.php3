@@ -274,27 +274,10 @@ else {
 # Flexlab filter options:
 #
 if (isset($flexlabfilter) && $flexlabfilter) {
-    echo "flexlabfilter=$flexlabfilter<br>\n";
     if (isset($flexlabsave) && $flexlabsave 
 	&& isset($flexlabrecompute) && $flexlabrecompute) {
         # unset recompute; save is the winner...
 	unset($flexlabrecompute);
-    }
-
-    if (isset($flexlabsave) && $flexlabsave) {
-	echo "flexlabsave set<br>\n";
-    }
-
-    if (isset($flexlabrecompute) && $flexlabrecompute) {
-	echo "flexlabrecompute set<br>\n";
-    }
-
-    if (isset($flexlabfcsize)) {
-	echo "flexlabfcsize=$flexlabfcsize set<br>\n";
-    }
-
-    if (isset($flexlabfcnodes)) {
-	echo "flexlabfcnodes=" . implode(',',$flexlabfcnodes) . "<br>\n";
     }
 
     $mustpostfilter = 1;
@@ -302,7 +285,6 @@ if (isset($flexlabfilter) && $flexlabfilter) {
 else {
     if (isset($flexlabfcnodes)) {
 	unset($flexlabfcnodes);
-	echo "unsetting flexlabfcnodes<br>\n";
     }
 }
 
