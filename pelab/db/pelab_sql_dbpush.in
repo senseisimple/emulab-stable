@@ -31,7 +31,7 @@ use Fcntl;
 #            fix the data, and then call this script with -e option
 
 sub usage() {
-    print STDOUT "Usage: pelab_dbpush1 [-d] [-l limit] [-r] [-e]\n";
+    print STDOUT "Usage: pelab_sql_dbpush [-d] [-l limit] [-r] [-e]\n";
     exit(-1);
 }
 
@@ -90,7 +90,7 @@ use libtestbed;
 sub fatal($);
 sub DeleteExceptions;
 sub PushErrorEntries;
-		       
+sub pelabWarn($);
 
 #
 # Form a temp name.
@@ -236,6 +236,21 @@ if ($debug) {
 }
 
 
+# To speed up insertion, we will prepare a stmt in advance
+# and use that again and again
+
+my $dbh = $dphandle->{'DB'}->{'dbh'};
+my $statement = "insert into pair_data values (?,?,?,?,?,?,?,?,?,?,?)";
+my $sth = $dbh->prepare($statement);
+if (!$sth) {
+    my $ErrorString = 
+	"Unable to prepare: $statement \n".
+	    "  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
+    fatal($ErrorString);
+}
+
+$sth->{'PrintError'} = !$Mysql::QUIET;
+
 if ($maxidx > $lastidx) {
     # Transfer data to DP in chunks of 30 records
     my $start = $lastidx, $end = $lastidx + $CHUNK_SIZE;
@@ -250,21 +265,19 @@ if ($maxidx > $lastidx) {
 	my @results;
 	while (@results = $query_result->fetchrow()) {
 	    # dump it to dp
-	    my $result = DBBinaryQuery($dphandle, "insert into pair_data ".
-				       "values (?,?,?,?,?,?,?,?,?,?,?)", 
-				       @results);
 	    my $idx = $results[0];
-
-	    # check error status
-	    if (! defined($result)) {
+	    my $query_result = $sth->execute(@results);
+	    if (!$query_result) {
+		my $ErrorString =
+		    "  Inserting pair data in DP\n".
+			"  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
 		
 		# send email to tbops
-		DBWarn("DB push failed for idx number $idx");
 		if ($debug) {  print " DP push failed for idx $idx\n"; }
+		pelabWarn("DB push failed for idx number $idx\n $ErrorString");
 		
-
 		# insert idx into sync error table
-		DBQueryFatal("replace into sync_erros values ($idx)",
+		DBQueryFatal("replace into sync_errors values ($idx)",
 			     $opshandle);
 		
 		$numOfErrors++;
@@ -301,7 +314,7 @@ if ($maxidx > $lastidx) {
         #
         # Delete all rows that we just archived
         #
-        if ($debug) {
+	if ($debug) {
 	    print("delete from pair_data ".
 		  "where idx > $lastidx and idx <= $endidx\n");
 	}
@@ -381,4 +394,15 @@ sub fatal($)
 
     die("*** $0:\n".
 	"    $msg\n");
+}
+
+sub pelabWarn($) {
+    my($message) = @_;
+    my($text);
+    
+    print STDERR "*** $message";
+
+    if (exists($INC{'libtestbed.pm'})) {
+      libtestbed::SENDMAIL($TBOPS, "DBError in pelab_sql_dbpush", $message);
+    }
 }
