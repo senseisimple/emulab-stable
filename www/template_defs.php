@@ -278,9 +278,6 @@ class Template
 	ShowItem("Creator", MakeAnchor($showuser_url, $uid));
 	ShowItem("Created", $created);
 
-	echo "<tr><td align=center colspan=2>Datastore Directory</td></tr>\n";
-	echo "<tr><td align=center colspan=2>$path</td></tr>\n";
-
 	$onmouseover = MakeMouseOver($description);
 	if (strlen($description) > 40) {
 	    $description = substr($description, 0, 40) . " <b>... </b>";
