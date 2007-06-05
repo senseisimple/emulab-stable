@@ -1,0 +1,26 @@
+flexdatasrv.in is designed to provide a simple remote interface to some of the
+flexlab data both in the db on ops, and in the datapository.  At the current
+time of writing, it is built atop some extensions to Python's XMLRPC serving
+functionality.  Currently it provides only the functionality of the goodnodes
+script, but this could change if we want to make more data and queries
+available to other interested parties.
+
+There are two primary components.  The FlexlabDataServer class is essentially a
+wrapper around the ops database, and stores the most recent latency/bw
+measurements for all nodes.  This cache is updated every minute, and is useful
+in a number of queries.  It was intended to also wrap the datapository, but
+this wasn't important in the initial implementation.
+
+The flexlab class exposes the RPC functions.  Any "public" method (in python,
+anything not starting with an underscore) is exported into an XMLRPC server by
+some extensions to the simple xmlrpc python libs that I wrote, and can be
+accessed by an XMLRPC call to "flexlab.<method>" (i.e.,
+"flexlab.getFullyConnectedSet").  Documentation for each method is intended to
+be online, and can be accessed by an XMLRPC call to
+"system.methodHelp('<method>')" (i.e.,
+"system.methodHelp('flexlab.getFullyConnectedSet')").  Available methods can be
+listed by a call to "system.listMethods".
+
+If you want to add more functionality to the xmlrpc server, just add a public
+method and some documentation to the flexlab class, or create your own class
+and register it in the server wrapper at the bottom of flexdatasrv.in .
