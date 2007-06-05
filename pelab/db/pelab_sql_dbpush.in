@@ -56,6 +56,7 @@ my $DBUSER    = "pelab";
 my $DPHOST    = "nfs.emulab.net";
 my $DPDBUSER    = "flexlabpush";
 my $DPDBNAME   = "nodesamples";
+my $LOCKFILE   = "/var/run/pelab_sql_dump.lock";
 
 # Transfer data to DP in chunks of 30 records
 my $CHUNK_SIZE = 30;
@@ -91,6 +92,7 @@ sub fatal($);
 sub DeleteExceptions;
 sub PushErrorEntries;
 sub pelabWarn($);
+sub PelabDBQueryFatal;
 
 #
 # Form a temp name.
@@ -129,6 +131,18 @@ if (! $debug) {
     open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 }
+
+#
+# check for the lock, and create one if it does not exist
+#
+if (-e $LOCKFILE) {
+    fatal("Could not run due to existence of a lock file\n");
+}
+
+open(FH, ">$LOCKFILE")  ||   
+    fatal("couldn't create lock file $LOCKFILE\n");
+print FH time . "\n";
+close(FH);
 
 
 #
@@ -174,7 +188,7 @@ if ($errors_only) {
 
 # Transfer site_mappings to DP
 
-my $query_result = DBQueryFatal("select * from site_mapping",
+my $query_result = PelabDBQueryFatal("select * from site_mapping",
 				$opshandle);
 my @results;
 while (@results = $query_result->fetchrow()) {
@@ -191,13 +205,13 @@ while (@results = $query_result->fetchrow()) {
 # Get the last index we archived out.
 #
 $query_result =
-    DBQueryFatal("select idx from emulab_indicies ".
+    PelabDBQueryFatal("select idx from emulab_indicies ".
 		 "where name='pair_data_idx'", $opshandle);
 
 
 my ($lastidx) = $query_result->fetchrow_array();
 if (!defined($lastidx)) {
-    DBQueryFatal("insert into emulab_indicies (name, idx) ".
+    PelabDBQueryFatal("insert into emulab_indicies (name, idx) ".
 		 "values ('pair_data_idx', 0)", $opshandle);
     $lastidx = 0;
 }
@@ -215,13 +229,13 @@ my $cutoffage = (time() - $CUTAGE) * 1.0;
 #
 if (defined($limit)) {
     $query_result =
-	DBQueryFatal("select idx from pair_data ".
+	PelabDBQueryFatal("select idx from pair_data ".
 		     "where idx > $lastidx ".
 		     "order by idx asc limit $limit,1", $opshandle);
 }
 else {
     $query_result =
-	DBQueryFatal("select MAX(idx) from pair_data", $opshandle);
+	PelabDBQueryFatal("select MAX(idx) from pair_data", $opshandle);
 }
 my ($maxidx) = $query_result->fetchrow_array();
 
@@ -259,7 +273,7 @@ if ($maxidx > $lastidx) {
     my $endidx = $lastidx; # last idx sent to dp        
     
     while ($start < $maxidx) {
-	my $query_result = DBQueryFatal("select * from pair_data ".
+	my $query_result = PelabDBQueryFatal("select * from pair_data ".
 					"where idx > $start and idx <= $end ", 
 					$opshandle);
 	my @results;
@@ -277,7 +291,7 @@ if ($maxidx > $lastidx) {
 		pelabWarn("DB push failed for idx number $idx\n $ErrorString");
 		
 		# insert idx into sync error table
-		DBQueryFatal("replace into sync_errors values ($idx)",
+		PelabDBQueryFatal("replace into sync_errors values ($idx)",
 			     $opshandle);
 		
 		$numOfErrors++;
@@ -292,7 +306,7 @@ if ($maxidx > $lastidx) {
 	}
 	
 	# update of idx
-	DBQueryFatal("update emulab_indicies set idx='$endidx' ".
+	PelabDBQueryFatal("update emulab_indicies set idx='$endidx' ".
 		     "where name='pair_data_idx'", $opshandle);
 
 	if ($errorStatus) { 
@@ -318,14 +332,14 @@ if ($maxidx > $lastidx) {
 	    print("delete from pair_data ".
 		  "where idx > $lastidx and idx <= $endidx\n");
 	}
-        DBQueryFatal("delete from pair_data ".
+        PelabDBQueryFatal("delete from pair_data ".
                      "where idx > $lastidx and idx <= $endidx $except", $opshandle);
     } else {
         #
         # Delete anything older then MAXAGE that has been archived. This leaves
         # a cache of data on ops.
         #
-        DBQueryFatal("delete from pair_data ".
+        PelabDBQueryFatal("delete from pair_data ".
                      "where idx <= $lastidx and unixstamp < $cutoffage $except", $opshandle);
     }
 }
@@ -333,6 +347,7 @@ if ($maxidx > $lastidx) {
 
 unlink("$logname")
     if (-e $logname);
+unlink("$LOCKFILE");
 exit(0);
 
 
@@ -343,7 +358,7 @@ exit(0);
 sub DeleteExceptions
 {
     my $tmp = "";
-    my $query_result = DBQueryFatal("select * from sync_errors", $opshandle);
+    my $query_result = PelabDBQueryFatal("select * from sync_errors", $opshandle);
     my @results;
     while (@results = $query_result->fetchrow()) {
 	# dump it to dp
@@ -360,7 +375,7 @@ sub DeleteExceptions
 
 sub PushErrorEntries
 {
-    my $query_result = DBQueryFatal("select pair_data.* from pair_data, sync_errors ".
+    my $query_result = PelabDBQueryFatal("select pair_data.* from pair_data, sync_errors ".
 				    "where pair_data.idx = sync_errors.idx",
 				    $opshandle);
     my @results;
@@ -376,7 +391,7 @@ sub PushErrorEntries
 	    DBWarn("DB push failed for idx number $idx");
 	} else {
 	    # remove idx into sync error table
-	    DBQueryFatal("delete from sync_errors where idx = $idx",
+	    PelabDBQueryFatal("delete from sync_errors where idx = $idx",
 			 $opshandle);
 	}
     }
@@ -391,7 +406,9 @@ sub fatal($)
    
     unlink("$logname")
 	if (-e $logname);
-
+    
+    unlink("$LOCKFILE");
+    
     die("*** $0:\n".
 	"    $msg\n");
 }
@@ -405,4 +422,17 @@ sub pelabWarn($) {
     if (exists($INC{'libtestbed.pm'})) {
       libtestbed::SENDMAIL($TBOPS, "DBError in pelab_sql_dbpush", $message);
     }
+}
+
+sub PelabDBQueryFatal($;$) {
+    my ($query, $handle) = @_;
+    my($result);
+
+    $result = DBQueryWarn($query, $handle);
+
+    if (! $result) {
+	fatal("DB Query Failed");
+    }
+
+    return $result;
 }
