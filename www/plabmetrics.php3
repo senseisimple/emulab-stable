@@ -507,6 +507,41 @@ $coldoc = array( 'node_id' => 'Emulab physical node id.',
 # An array containing colors for data sources.
 $colcol = array( 'Emulab' => '#cde4f3', 'CoMon' => '#ffedd7' );
 
+
+# Some help info.
+$help = array();
+$help['project/experiment'] = 
+    "Show only nodes in one of your swapped-in experiments.";
+$help['alive nodes'] = 
+    "Show only nodes that are considered alive by Emulab (had" . 
+    " heartbeat in last 20min) or by CoMon (CoTop in last 10 mins).";
+$help['hostname'] = "Show only nodes matching this alphanumeric string" . 
+    " or Perl5 regular expression.";
+$help['custom query'] = "Show only nodes whose data fields match this" . 
+    " expression.  Expressions are simple boolean queries such as" . 
+    " (nodestatus == up and unavail < 0.25).  You can use the operators" . 
+    " '<','>','<=','>=','==','!='.  Barewords are considered strings; if" . 
+    " you must encode whitespace, surround the text with quotes.";
+$help['show/order fields'] = "Move fields from the left-side box to the" . 
+    " right-side box; fields in the right-side box are displayed.  In the" . 
+    " right-side box, move fields up and down to change left-to-right " . 
+    " display order.";
+$help['sort fields'] = "Sort returned data in either ascending or descending" .
+    " order, in the order of the fields.  Move the fields up and down to" . 
+    " change the ordering.";
+$help['nodes per page'] = "Show only N nodes per page.";
+$help['fully connected nodes from Flexlab data'] = 
+    "Show N fully-connected nodes based on latest Flexlab NxN tests." . 
+    " Possible nodes are chosen from the pool of nodes selected by any" . 
+    " filters you have enabled.";
+$help['save fully connected set without recomputing'] = 
+    "Save the computed fully-connected set for additional filtering" . 
+    "(saves slight computation delay, depending on size of set).";
+$help['recompute fully-connected set'] = 
+    "Force a recomputation of the fully-connected set based on the current" . 
+    " filter set.";
+
+
 # We have to fix which node id we select based on if we are querying the 
 # reserved table (we need phys node id, but have to join reserved to nodes
 # to get it).
@@ -747,6 +782,11 @@ pm_showtable($totalrows,$data);
 pm_showlegend();
 
 #
+# Provide some help.
+#
+pm_showhelp();
+
+#
 # Standard Testbed Footer
 #
 PAGEFOOTER();
@@ -893,6 +933,19 @@ function do_xmlrpc($host,$port,$method,$argdict) {
     }
 }
 
+function pm_showhelp() {
+    global $help;
+
+    echo "<h3><a name='help'>Search Help</a></h3>\n";
+    echo "<p>Filters:</p>\n";
+    echo "<p><ul>\n";
+    foreach ($help as $hi => $hv) {
+	$link_hi = str_replace(" ","_",$hi);
+	echo "<li><b><a name='$link_hi'>$hi</a></b> $hv</li>\n";
+    }
+    echo "</ul></p>\n";
+}
+
 function pm_showlegend() {
     global $colsrc,$coldoc;
 
@@ -958,6 +1011,7 @@ function pm_shownondata() {
     }
     WRITESUBMENUDIVIDER();
     WRITESUBMENUBUTTON("Data Legend","#legend");
+    WRITESUBMENUBUTTON("Search Help","#help");
     # Ugh -- cannot use SUBMENUEND cause it inserts a weird <td></td> combo
     # SUBMENUEND();
     echo "    </ul>\n";
@@ -1070,7 +1124,9 @@ function pm_showsearch() {
     # Only draw pid/exp boxes if the user can access swapped-in experiments 
     # with pl nodes.
     if (count($pidmap)) {
-	echo "Show <b>only nodes in project/experiment</b>:\n";
+	echo "Show <b>only nodes in project/experiment</b>";
+	echo " <a href='#project/experiment'>[?]</a>";
+	echo ":\n";
 	echo "<select name='pid' id='pid'";
 	echo " onChange='dynselect.setOptions(";
 	echo "   document.getElementById(\"eid\"),";
@@ -1109,7 +1165,9 @@ function pm_showsearch() {
     }
 
     # handle basic upnodefiltering
-    echo "Show <b>only nodes considered alive</b> by ";
+    echo "Show <b>only nodes considered alive</b> ";
+    echo " <a href='#alive_nodes'>[?]</a>";
+    echo " by ";
     echo "<input type='checkbox' name='upnodefilter' value='emulab'";
     if (isset($upnodefilter) && $upnodefilter == 'emulab') {
 	echo " checked";
@@ -1125,6 +1183,7 @@ function pm_showsearch() {
     # hostname filtering (not included in normal user query because
     # we support perl5 regexps for filtering on the data as post-db)
     echo "Show only <b>hostnames that match</b> ";
+    echo " <a href='#hostname'>[?]</a> ";
     $thf = '';
     if (isset($hostfilter)) {
 	$thf = $hostfilter;
@@ -1133,7 +1192,9 @@ function pm_showsearch() {
     echo "<br>\n";
 
     # custom user query
-    echo "Filter with <b>custom query</b>: \n";
+    echo "Filter with <b>custom query</b> ";
+    echo " <a href='#custom_query'>[?]</a>";
+    echo ": \n";
     $tuq = '';
     if (isset($userquery)) {
 	$tuq = $userquery;
@@ -1147,14 +1208,18 @@ function pm_showsearch() {
     echo "<table class='stealth'>\n";
     echo "<tr>\n";
     echo "<td class='stealth' colspan='4'>\n";
-    echo "<b>Show and reorder</b> columns:<br>\n";
+    echo "<b>Show and reorder</b> ";
+    echo " <a href='#show/order_fields'>[?]</a>";
+    echo " fields:<br>\n";
     echo "</td>\n";
     # space
     echo "<td class='stealth' colspan='4'>\n";
-    echo "&nbsp;&nbsp;&nbsp;&nbsp;";
+    echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
     echo "</td>\n";
     echo "<td class='stealth' colspan='4'>\n";
-    echo "<b>Sort selected</b> columns:\n";
+    echo "<b>Sort selected</b> ";
+    echo " <a href='#sort_fields'>[?]</a>";
+    echo " fields:\n";
     echo "</td>\n";
     echo "</tr>\n";
     
@@ -1284,7 +1349,9 @@ function pm_showsearch() {
 	echo ">$limk</option>\n";
     }
     echo "</select>\n";
-    echo " PlanetLab <b>nodes per page</b>\n";
+    echo " PlanetLab <b>nodes per page</b> ";
+    echo " <a href='#nodes_per_page'>[?]</a>";
+    echo "\n";
     echo "<br>\n";
 
     # flexlab filter options
@@ -1302,21 +1369,26 @@ function pm_showsearch() {
 	$ffsize = $flexlabfcsize;
     }
     echo "<input type='text' name='flexlabfcsize' size='4' value='$ffsize'>\n";
-    echo " fully-connected nodes (one per site) <br>";
+    echo " fully-connected nodes (one per site) ";
+    echo " <a href='#fully_connected_nodes_from_Flexlab_data'>[?]</a>";
+    echo "<br>";
     echo "&nbsp;&nbsp;&nbsp;&nbsp;";
     $ffstate = '';
     if (isset($flexlabsave) && $flexlabsave) {
 	$ffstate = ' checked';
     }
     echo "<input type='checkbox' name='flexlabsave' value='yes'$ffstate>\n";
-    echo " Save set <b>without recomputing</b><br>\n";
+    echo " Save set <b>without recomputing</b> ";
+    echo " <a href='#save_fully_connected_set_without_recomputing'>[?]</a>";
+    echo " <br>\n";
     echo "&nbsp;&nbsp;&nbsp;&nbsp;";
     $ffstate = '';
     if (isset($flexlabrecompute) && $flexlabrecompute) {
 	$ffstate = ' checked';
     }
     echo "<input type='checkbox' name='flexlabrecompute' value='yes'$ffstate>\n";
-    echo " Force set <b>recomputation</b>";
+    echo " Force set <b>recomputation</b> ";
+    echo " <a href='#recompute_fully-connected_set'>[?]</a>";
 
     echo "<br><br>\n";
 
