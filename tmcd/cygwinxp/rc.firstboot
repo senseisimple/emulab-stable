@@ -193,4 +193,11 @@ else
     fi
 fi
 
+# Spawn a script to kill the logonui.exe task periodically.  It is instantly
+# restarted by Windows, but is "cleaned out" in the process.  This works
+# around the 15-second "sawtooth" pattern that shows up in the load average
+# after reboot and can eat most of the CPU.
+logit "Starting clean_logonui in the background."
+/bin/sh clean_logonui >& /dev/null &
+
 logit "rc.firstboot finished."
