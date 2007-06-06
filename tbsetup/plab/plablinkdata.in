@@ -82,7 +82,8 @@ use libtestbed;
 # Locals
 my $logfile	= "$TB/log/plablinkdata.log";
 my $tempfile	= "/tmp/plablink.$$";
-my $LATURL	= "http://www.pdos.lcs.mit.edu/~strib/pl_app/current.app";
+#my $LATURL	= "http://www.pdos.lcs.mit.edu/~strib/pl_app/current.app";
+my $LATURL      = "http://ping.ececs.uc.edu/ping/current.app";
 my $BWURL	= "http://www.planet-lab.org/logs/iperf/files";
 my %linkdata    = (); # Map IP to link data.
 my %hostmap	= (); # Map hostname to IP.
@@ -176,6 +177,18 @@ while (my ($nodeid,$IP,$iface,$hostname) = $query_result->fetchrow_array()) {
 }
 
 #
+# Grab the last known good hostname<->IP map from the db in case we have to 
+# resolve hostnames while processing latency data, and the host doesn't resolve
+# via gethostbyname.
+#
+%dbhostipmap = ();
+$query_result = DBQueryFatal("select hostname,IP from plab_mapping");
+
+while (my ($hostname,$IP) = $query_result->fetchrow_array()) {
+    $dbhostipmap{$hostname} = $IP;
+}
+
+#
 # If given a datafile, then parse it as the type of file that was specified
 # on the command line.
 # 
@@ -194,7 +207,9 @@ else {
     if (DownLoadURL($LATURL, $tempfile) == 0) {
 	$exitval = ParseLatency($tempfile);
     }
-    if (!$exitval) {
+    # don't do bw right now; the plab iperf logs seem to have disappeared.
+    # this should be done with flexlab anyway.
+    if (0 && !$exitval) {
 	#
 	# What a pain. Need to figure the current BW data set from the date.
 	# We go back one week.
@@ -271,8 +286,12 @@ sub InsertLinkData()
 	    $update .= "start_time=$now,end_time=start_time ";
 	    $update .= ",time=$latency "
 		if (defined($latency));
-	    $update .= ",bandwidth=$bandwidth "
-		if (defined($bandwidth));
+	    if (defined($bandwidth)) {
+		$update .= ",bandwidth=$bandwidth ";
+	    }
+	    else {
+		$update .= ",bandwidth=0 ";
+	    }
 
 	    my $query_result =
 		DBQueryFatal("update widearea_recent set ".
@@ -386,12 +405,36 @@ sub ParseLatency($)
     for (my $i = 0; $i < scalar(@iplist); $i++) {
 	my $ip = $iplist[$i];
 	
+	# all nodes are now listed by hostname, so do lookup if they aren't
+	# IPs.
 	if ($ip =~ /^(\d*\.\d*\.\d*\.\d*)$/) {
 	    if (exists($linkdata{$1})) {
 		$linkdata{$1}->{INDEX} = $i;
 	    }
 	    # Map index to the ip for later (its position in the lists).
 	    $nodemap[$i] = $1;
+	}
+	elsif ($ip =~ /^([\w\d\-_\.]+)$/) {
+	    if (exists($dbhostipmap{$ip})) {
+		my $rip = $dbhostipmap{$ip};
+		if (exists($linkdata{$rip})) {
+		    $linkdata{$rip}->{INDEX} = $i;
+		}
+		$nodemap[$i] = $rip;
+	    }
+	    else {
+		my $rip = gethostbyname($1);
+		if (defined($rip)) {
+		    if (exists($linkdata{$rip})) {
+			$linkdata{$rip}->{INDEX} = $i;
+		    }
+		    $nodemap[$i] = $rip;
+		}
+		else {
+		    print STDERR "Could not resolve host '$ip'!\n";
+		    goto nosync;
+		}
+	    }
 	}
 	else {
 	    goto nosync;
@@ -432,7 +475,8 @@ sub ParseLatency($)
 	# sending its data back; this line can be replaced with actual
 	# data at any point in the future, if node x ever sends it in.
 	#
-	if ($_ =~ /^\*\*\* no data received for ([\d\.]*) \*\*\*$/) {
+	if ($_ =~ /^\*\*\* no data received for ([\d\.]*) \*\*\*$/ 
+	    || $_ =~ /^\*\*\* no data received for ([\w\d\-_\.]+) \*\*\*$/) {
 	    print STDERR "No data for $1 ($from_nodeid)\n"
 		if ($debug);
 	    goto skip;
