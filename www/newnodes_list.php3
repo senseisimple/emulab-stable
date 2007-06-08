@@ -35,6 +35,7 @@ $optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
 				 "delete",       PAGEARG_STRING,
 				 "calc",         PAGEARG_STRING,
 				 "create",       PAGEARG_STRING,
+				 "ignoreifaces", PAGEARG_BOOLEAN,
 				 "research",     PAGEARG_STRING,
 				 "swap",         PAGEARG_STRING,
 				 "newtype",      PAGEARG_STRING,
@@ -131,10 +132,11 @@ if (isset($create)) {
         $nodenames[] = $row["node_id"];
     }
     $nodelist = implode(" ",$nodenames);
+    $option   = ((isset($ignoreifaces) && $ignoreifaces) ? "-f" : "");
     echo "<h3>Creating nodes - this could take a while, please wait</h3>\n";
     echo "<hr>\n";
     echo "<pre>\n";
-    passthru("$TBSUEXEC_PATH $uid $gid webnewnode $nodelist 2>&1");
+    passthru("$TBSUEXEC_PATH $uid $gid webnewnode $option $nodelist 2>&1");
     echo "</pre>\n";
     echo "<hr>\n";
 }
@@ -557,6 +559,8 @@ while ($row = mysql_fetch_array($nodes_result)) {
 <input type="submit" value="Search switch ports for selected nodes" name="research">
 <br><br>
 <input type="submit" value="Create selected nodes" name="create">
+  &nbsp <input type="checkbox" value=1 name=ignoreifaces>
+    Ignore unconnected interfaces (not attached to a switch)
 <br><br>
 <input type="submit" value="Delete selected nodes" name="delete">
 
