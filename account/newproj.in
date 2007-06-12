@@ -279,7 +279,7 @@ TBGetSiteVar("general/firstinit/state", \$firstinitstate);
 $newproj->SendNewProjectEmail($firstinitstate eq "createproject");
 
 # The web interface requires this line to be printed!
-print "User $new_pid/$new_idx has been created\n";
+print "Project $new_pid/$new_idx has been created\n";
 exit(0);
 
 sub fatal($) {

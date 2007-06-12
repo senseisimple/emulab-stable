@@ -285,7 +285,7 @@ class Project
         #
 	unset($matches);
 	
-	if (!preg_match("/^User\s+(\w+)\/(\d+)\s+/",
+	if (!preg_match("/^Project\s+([-\w]+)\/(\d+)\s+/",
 			$suexec_output_array[count($suexec_output_array)-1],
 			$matches)) {
 	    $error = "Transient error; please try again later.";
