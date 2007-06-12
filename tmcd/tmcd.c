@@ -4814,6 +4814,26 @@ COMMAND_PROTOTYPE(dojailconfig)
 	mysql_free_result(res);
 
 	/*
+	 * See if a per-node-type vnode disk size is specified
+	 */
+	res = mydb_query("select na.attrvalue from nodes as n "
+			 "left join node_type_attributes as na on "
+			 "  n.type=na.type "
+			 "where n.node_id='%s' and "
+			 "na.attrkey='virtnode_disksize'", 1, reqp->pnodeid);
+	if (res) {
+		if ((int)mysql_num_rows(res) != 0) {
+			row = mysql_fetch_row(res);
+			if (row[0]) {
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       "VDSIZE=%d\n", atoi(row[0]));
+			}
+			client_writeback(sock, buf, strlen(buf), tcp);
+		}
+		mysql_free_result(res);
+	}
+
+	/*
 	 * Now return the IP interface list that this jail has access to.
 	 * These are tunnels or ip aliases on the real interfaces, but
 	 * its easier just to consult the virt_lans table for all the
