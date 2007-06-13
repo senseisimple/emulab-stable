@@ -41,6 +41,36 @@ if( @ARGV < 1 ){
 
 my $path = $ARGV[0];
 
+# Find out what version of Fedora Core this node is running
+open(FR, "</etc/fedora-release")
+        or die "Unable to open fedora-release file: $!\n";
+my $release_string = <FR>;
+my $fc_version;
+my $os_string;
+if ($release_string =~ /Fedora Core release (\d+)/) {
+    $fc_version = "$1";
+    $os_string = "FC$1";
+} else {
+    die "Unable to determine Fedora release version from '$release_string'\n";
+}
+
+print "Running on OS $os_string\n";
+
+# Symlink each binary to the appropriate version
+foreach my $bin ("iperf", "iperfd", "fping") {
+    my $destbin = "$path/$bin";
+    my $sourcebin = "$path/$bin-$os_string";
+    if (-e $destbin) {
+        unlink $destbin or die "Unable to remove old $destbin: $!\n";
+    }
+    if (!-e $sourcebin) {
+        die "Missing required binary: $sourcebin\n";
+    }
+    if (!link($sourcebin, $destbin)) {
+        die "Unable to link $sourcebin to $destbin\n";
+    }
+}
+
 #system "sudo perl $path/bgmon.pl -e $expt -i $iperfport -d $path/ >/tmp/bgmon.log&";
 system "sudo perl -I$path $path/bgmon.pl -e $expt -i $iperfport -d $path/&";
 system "sudo rm $path/iperfd.out $path/iperfd.err";
