@@ -40,6 +40,13 @@ my $IPERFDURATION = 5;      #duration in seconds of iperf test
 my %allnodes;
 my %deadsites;
 
+# nodestatus hash to keep track of getstatus failures for each node.
+# $nodestatus{$node} is set to 0 for a successful status probe, and 
+# a +1 for a failed status probe. A node is removed from the measurement
+# set only if nodestatus goes >= the $NODESTATUSTHRESHOLD
+my %nodestatus;         
+my $NODESTATUSTHRESHOLD = 2;
+
 # RPC STUFF ##############################################
 my $TB         = "/usr/testbed";
 my $ELABINELAB = 0;
@@ -101,6 +108,7 @@ setexpid("tbres/pelabbgmon");
 #FORWARD DECL'S
 sub main::outputErrors();
 sub main::stopnode($);
+sub main::getstatuswrapper($);
 
 #############################################################################
 #
@@ -237,20 +245,22 @@ sub choosenodes
 	}
 	elsif( ("NONE" eq $bestnode) && defined $intersitenodes{$site} )
 	{
-	    print time()." SECTION 2: removing tests to $site / ".
-		"$intersitenodes{$site} \n";
-	    # ** This section handles when a site has no nodes available
-
-	    #no available node at this site, so remove site from hash
-	    foreach my $srcsite (keys %intersitenodes){
-		stoppairtest( $intersitenodes{$srcsite},
-			      $intersitenodes{$site} );
+	    if ($nodestatus{$intersitenodes{$site}} >= $NODESTATUSTHRESHOLD ) {
+		print time()." SECTION 2: removing tests to $site / ".
+		    "$intersitenodes{$site} \n";
+		# ** This section handles when a site has no nodes available
+		
+		#no available node at this site, so remove site from hash
+		foreach my $srcsite (keys %intersitenodes){
+		    stoppairtest( $intersitenodes{$srcsite},
+				  $intersitenodes{$site} );
+		}
+		delete $intersitenodes{$site};
 	    }
-	    delete $intersitenodes{$site};
 	}
 	elsif( defined $intersitenodes{$site} &&
 	       ( $intersitenodes{$site} ne $bestnode ||
-		 getstatus($bestnode) eq "anyscheduled_no"
+		 getstatuswrapper($bestnode) eq "anyscheduled_no"
 	       )
 	     )
 	{
@@ -381,13 +391,13 @@ sub choosebestnode($)
 	    if( $bestnode eq "NONE" ){
 		#set this to be best node if it responds to a command
 
-		if( getstatus($node) ne "error" ){
+		if( getstatuswrapper($node) ne "error" ){
 		    $bestnode = $node;
 		}
 	    }else{
 		if( ($allnodes{$node}{cpu} < $allnodes{$bestnode}{cpu}
 		    - $CPUUSAGETHRESHOLD) &&
-		    getstatus($node) ne "error" )
+		    getstatuswrapper($node) ne "error" )
 		{
 		    print '$allnodes{$node}{cpu}'.
 			"  $allnodes{$node}{cpu}\n";
@@ -627,3 +637,22 @@ sub edittest_amc( $$$$$$ ){
 		duration => "$duration" );
     sendcmd_amc(\%cmd);
 }
+
+
+sub getstatuswrapper($) {
+    my ($node) = @_;
+    my $status = getstatus($node);
+    
+    if (!defined $nodestatus{$node}) {
+        $nodestatus{$node} = 0;
+    }
+
+    if ($status eq "error") {
+	$nodestatus{$node} = $nodestatus{$node} + 1;
+    } else {
+	$nodestatus{$node} = 0;
+    }     
+    return $status;
+}
+    
+

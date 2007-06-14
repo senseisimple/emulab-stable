@@ -143,7 +143,7 @@ sub sendcmd($$)
 	$socket = IO::Socket::INET->new( PeerPort => $port,
 					 Proto    => 'tcp',
 					 PeerAddr => $node,
-					 Timeout  => 1 );
+					 Timeout  => 3 );
 	if( defined $socket ){
 #	    $sel->add($socket);
 	    print $socket "$sercmd\n";
