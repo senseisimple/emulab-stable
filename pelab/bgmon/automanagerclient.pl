@@ -47,6 +47,9 @@ my %deadsites;
 my %nodestatus;         
 my $NODESTATUSTHRESHOLD = 2;
 
+# Lower limit for bandwidth frequency
+my $MINBWPER = 3600;       # 1 hr
+
 # RPC STUFF ##############################################
 my $TB         = "/usr/testbed";
 my $ELABINELAB = 0;
@@ -337,6 +340,9 @@ sub modifytests
 
     my $numsites = scalar(keys %intersitenodes);
     my $bwper = ($numsites - 1) * $IPERFDURATION * 1/$bwdutycycle;
+    if ($bwper < $MINBWPER) {
+	$bwper = $MINBWPER;
+    }
     #TODO: ?? dynamically change latency period, too?
 
     #update connections to use  newly calculated periods
