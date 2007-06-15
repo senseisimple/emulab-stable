@@ -8,7 +8,7 @@
 CC=g++
 
 OBJECTS=CircularTraffic.o \
-       	Command.o \
+	Command.o \
 	Connection.o \
 	Decayer.o \
 	DelaySensor.o \
