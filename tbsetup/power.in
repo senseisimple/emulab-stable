@@ -208,8 +208,12 @@ foreach my $node (@machines) {
     }
 
     my ($power_id, $outlet, $last_power, $nodetype) = $result->fetchrow();
-    my $typeinfo    = NodeType->Lookup($nodetype);
-    my $power_delay = $typeinfo->power_delay();
+    my $power_delay = 60;
+    # XXX hack for using power before nodes have been added
+    if (defined($nodetype)) {
+	my $typeinfo = NodeType->Lookup($nodetype);
+	$power_delay = $typeinfo->power_delay();
+    }
     my $time_ok     = (time() - $power_delay > $last_power ? 1 : 0);
 
     #
