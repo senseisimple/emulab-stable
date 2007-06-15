@@ -111,7 +111,7 @@ if (! $swapper->SameUser($creator)) {
 
 # And send email
 TBMAIL("$swapper_name <$swapper_email>",
-       "Please tell us about your experiment",
+       "Experiment $pid/$eid - Please tell us about it",
        "Hi. We noticed that your experiment '$pid/$eid' has been\n".
        "swapped in for $hours hours and is using $pcs nodes.\n".
        "\n".
