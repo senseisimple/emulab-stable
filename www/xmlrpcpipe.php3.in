@@ -13,7 +13,7 @@ include("defs.php3");
 
 $RPCSERVER  = "@BOSSNODE@";
 $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
-$FSDIR_USERS = "@FSDIR_USERS@";
+$FSDIR_USERS = "@USERSROOT_DIR@";
 
 #
 # Emulab XMLRPC defs.
