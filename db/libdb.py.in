@@ -86,8 +86,8 @@ def TBDBConnect(dbnum=0,db=None,user=None,host=None,passwd=None):
     if dbnum == None:
         dbnum = TBDBUnusedHandle()
 
-    if __DB.has_key(dbnum):
-        return
+    if __DB.has_key(dbnum) and __DB[dbnum] != None:
+        return dbnum
 
     cargs = {}
     dbname = db
@@ -208,7 +208,7 @@ def TBDBReconnect(retry = False,dbnum = 0,passwd=None):
 #
 def TBDBPreFork():
     unclosed = []
-    for dbno in __DB:
+    for dbno in __DB.keys():
         if not TBDBDisconnect(dbnum=dbno):
             unclosed.append(dbno)
             pass
