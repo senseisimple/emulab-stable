@@ -788,6 +788,60 @@ sub MemberList($$;$$)
     return 0;
 }
 
+#
+# Update the aggregate stats.
+#
+sub UpdateStats($$$$$)
+{
+    my ($self, $mode, $duration, $pnodes, $vnodes) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $gid_idx = $self->gid_idx();
+
+    DBQueryWarn("update group_stats ".
+		"set expt${mode}_count=expt${mode}_count+1, ".
+		"    expt${mode}_last=now(), ".
+		"    allexpt_duration=allexpt_duration+${duration}, ".
+		"    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		"    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		"    allexpt_vnode_duration=".
+		"        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		"    allexpt_pnode_duration=".
+		"        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		"where gid_idx='$gid_idx'");
+
+    if ($mode eq TBDB_STATS_SWAPIN || $mode eq TBDB_STATS_START) {
+	DBQueryWarn("update groups set ".
+		    " expt_last=now(),expt_count=expt_count+1 ".
+		    "where gid_idx='$gid_idx'");
+    }
+    $self->Refresh();
+
+    return 0;
+}
+
+#
+# Bump last activity
+#
+sub BumpActivity($)
+{
+    my ($self) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $gid_idx = $self->gid_idx();
+    
+    DBQueryWarn("update group_stats set last_activity=now() ".
+		"where gid_idx='$gid_idx'");
+
+    return 0;
+}
+
 ############################################################################
 
 package Group::MemberShip;
@@ -1046,3 +1100,4 @@ sub ModifyTrust($$)
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
+

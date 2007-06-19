@@ -485,12 +485,12 @@ if (system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
 # Gather statistics; start the clock ticking.
 #
 if ($frontend || $batchmode) {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_PRELOAD, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_PRELOAD) == 0 or
+	fatal("Preswap failed!");
 }
 else {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_START, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_START) == 0 or
+	fatal("Preswap failed!");
 }
 
 goto skiplog
@@ -625,7 +625,7 @@ if (! ($frontend || $batchmode)) {
     $experiment->SetState(EXPTSTATE_ACTIVATING) == 0
 	or fatal("Failed to set experiment state to ". EXPTSTATE_ACTIVATING());
 
-    if ($experiment->Swap("in") != 0) {
+    if ($experiment->Swap($Experiment::EXPT_SWAPIN) != 0) {
 	$errorstat = $? >> 8;
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
 	       error => ['tbswap_in_failed']},
@@ -701,13 +701,16 @@ if (! defined($template)) {
 }
 
 #
-# Gather statistics.
+# Gather statistics. This is not likely to fail, but if it does I want to
+# bail cause the inconsistent records are a pain in the ass to deal with!
 #
 if ($frontend || $batchmode) {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_PRELOAD, 0);
+    $experiment->PostSwap($this_user, TBDB_STATS_PRELOAD) == 0 or
+	fatal("Postswap failed!");
 }
 else {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_START, 0);
+    $experiment->PostSwap($this_user, TBDB_STATS_START) == 0 or
+	fatal("Postswap failed!");
 }
 
 #
@@ -827,12 +830,11 @@ sub cleanup()
     # Gather statistics.
     #
     if ($frontend) {
-	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_PRELOAD, $errorstat);
+	$experiment->SwapFail($this_user, TBDB_STATS_PRELOAD, $errorstat);
     }
     else {
-	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_START, $errorstat);
+	$experiment->SwapFail($this_user, TBDB_STATS_START, $errorstat);
     }
-    $experiment->Refresh();
 
     #
     # Must clean up the experiment if it made it our of NEW state.
@@ -858,10 +860,8 @@ sub cleanup()
     }
     $experiment->SetState(EXPTSTATE_TERMINATED);
 
-    #
-    # Okay, we *are* going to terminate the experiment.
-    # 
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_TERMINATE, 0);
+    # Old swap gathering stuff.
+    $experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE, 0);
 
     # Clear the logfile so the webpage stops.
     $experiment->CloseLogFile();

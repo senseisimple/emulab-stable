@@ -42,7 +42,7 @@ if (isset($record)) {
 		     "left join experiment_resources as r on ".
 		     " r.exptidx=s.exptidx ".
 		     "where s.exptidx=$record $wclause ".
-		     "order by r.idx desc");
+		     "order by r.tstamp desc");
 
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("No such experiment record $record in the system!", 1);

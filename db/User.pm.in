@@ -24,6 +24,7 @@ use overload ('""' => 'Stringify');
 use Project;
 use vars qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
 	    $NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
+	    $NEWUSER_FLAGS_NOUUID
 	    $USERSTATUS_ACTIVE $USERSTATUS_FROZEN
 	    $USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
 	    $USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED
@@ -48,6 +49,7 @@ $NEWUSER_FLAGS_PROJLEADER	= 0x01;
 $NEWUSER_FLAGS_WIKIONLY		= 0x02;
 $NEWUSER_FLAGS_WEBONLY		= 0x04;
 $NEWUSER_FLAGS_ARCHIVED		= 0x08;
+$NEWUSER_FLAGS_NOUUID		= 0x80;
 
 # Status values.
 $USERSTATUS_ACTIVE		= "active";
@@ -60,6 +62,7 @@ $USERSTATUS_ARCHIVED	        = "archived";
 # Why, why, why?
 @EXPORT_OK = qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
 		$NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
+		$NEWUSER_FLAGS_NOUUID
 		$USERSTATUS_ACTIVE $USERSTATUS_FROZEN
 		$USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
 		$USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED);
@@ -263,11 +266,13 @@ sub LookupByEmail($$)
 sub Create($$$$)
 {
     my ($class, $uid, $flags, $argref) = @_;
+    my $uuid;
 
     my $isleader = ($flags & $NEWUSER_FLAGS_PROJLEADER ? 1 : 0);
     my $wikionly = ($flags & $NEWUSER_FLAGS_WIKIONLY   ? 1 : 0);
     my $webonly  = ($flags & $NEWUSER_FLAGS_WEBONLY    ? 1 : 0);
     my $archived = ($flags & $NEWUSER_FLAGS_ARCHIVED   ? 1 : 0);
+    my $nouuid   = ($flags & $NEWUSER_FLAGS_NOUUID     ? 1 : 0);
 
     #
     # If no uid, we need to generate a unique one for the user.
@@ -406,11 +411,14 @@ sub Create($$$$)
     # And a verification key.
     my $verify_key = TBGenSecretKey();
 
-    # And a UUID (universally unique identifier).
-    my $uuid = NewUUID();
-    if (!defined($uuid)) {
-	print "*** WARNING: Could not generate a UUID!\n";
-	return undef;
+    if (! $nouuid) {
+	# And a UUID (universally unique identifier).
+	$uuid = NewUUID();
+	if (!defined($uuid)) {
+	    print "*** WARNING: Could not generate a UUID!\n";
+	    return undef;
+	}
+	push(@insert_data, "uid_uuid='$uuid'");
     }
 
     # Now tack on other stuff we need.
@@ -424,7 +432,6 @@ sub Create($$$$)
     push(@insert_data, "unix_uid=$unix_uid");
     push(@insert_data, "mailman_password='$mailman_password'");
     push(@insert_data, "verify_key='$verify_key'");
-    push(@insert_data, "uid_uuid='$uuid'");
     push(@insert_data, "uid_idx='$uid_idx'");
     push(@insert_data, "uid='$uid'");
 
@@ -448,8 +455,14 @@ sub Create($$$$)
     DBQueryWarn("insert into users set " . join(",", @insert_data))
 	or return undef;
 
-    if (! DBQueryWarn("insert into user_stats (uid, uid_idx, uid_uuid) ".
-		      "VALUES ('$uid', $uid_idx, '$uuid')")) {
+    # And the stats record.
+    @insert_data = ();
+    push(@insert_data, "uid_idx='$uid_idx'");
+    push(@insert_data, "uid='$uid'");
+    push(@insert_data, "uid_uuid='$uuid'")
+	if (!$nouuid);
+
+    if (! DBQueryWarn("insert into user_stats set ".join(",", @insert_data))) {
 	DBQueryFatal("delete from users where uid_idx='$uid_idx'");
 	return undef;
     }
@@ -789,6 +802,54 @@ sub FlipTo($$)
     return 0;
 }
 
+#
+# Update aggregate stats.
+#
+sub UpdateStats($$$$$)
+{
+    my ($self, $mode, $duration, $pnodes, $vnodes) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    DBQueryWarn("update user_stats ".
+		"set expt${mode}_count=expt${mode}_count+1, ".
+		"    expt${mode}_last=now(), ".
+		"    allexpt_duration=allexpt_duration+${duration}, ".
+		"    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		"    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		"    allexpt_vnode_duration=".
+		"        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		"    allexpt_pnode_duration=".
+		"        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		"where uid_idx='$uid_idx'");
+
+    $self->Refresh();
+
+    return 0;
+}
+
+#
+# Bump last activity
+#
+sub BumpActivity($)
+{
+    my ($self) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+    
+    DBQueryWarn("update user_stats set last_activity=now() ".
+		"where uid_idx='$uid_idx'");
+
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

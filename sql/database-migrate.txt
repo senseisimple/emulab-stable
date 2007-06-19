@@ -4067,3 +4067,23 @@ last_net_act,last_cpu_act,last_ext_act);
 	 PRIMARY KEY  (`node_id`)
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+4.123: Improvements to stats gathering code for experiments.
+
+	alter table experiment_resources 
+          add `uid_idx` mediumint(8) unsigned NOT NULL default '0'
+             after tstamp,
+	  add `swapin_time` int(10) unsigned NOT NULL default '0'
+	     after uid_idx,
+	  add `swapout_time` int(10) unsigned NOT NULL default '0'
+	     after swapin_time,
+	  add `swapmod_time` int(10) unsigned NOT NULL default '0'
+	     after swapout_time,
+	  add  `byswapmod` tinyint(1) unsigned default '0'
+	     after swapmod_time;
+	  add `byswapin` tinyint(1) unsigned default '0'
+	     after byswapmod;
+
+	The run the following script. It is better if the testbed is
+	not in use at the time!
+
+	./resources.pl

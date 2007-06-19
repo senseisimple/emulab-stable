@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -295,6 +295,37 @@ if ($query_result->numrows) {
 	printf("%-16s %-16s %-16s %-20s\n", $object, $type, $state, $start);
     }
     print "\n";
+}
+
+#
+# Look for inconsistent resource records.
+#
+if (! ($query_result =
+       DBQueryWarn("select e.idx,r.idx,e.pid,e.eid,".
+		   "    e.expt_head_uid,UNIX_TIMESTAMP(r.swapin_time) ".
+		   " from experiment_resources as r ".
+		   "left join experiments as e on e.idx=r.exptidx ".
+		   "  where e.state='swapped' and swapin_time!=0 and ".
+		   "        swapout_time=0 and swapmod_time=0 and pnodes>0"))){
+    fatal("Error accessing the database.");
+}
+
+if ($query_result->numrows) {
+    print "\n";
+    print "----------------------------------------------------------------\n";
+    print "\n";
+    print "Experiments with inconsistent experiment_resource records:\n";
+    printf("%-12s %-12s %-8s %-12s %-22s %s\n",
+           "PID", "EID", "IDX", "Creator", "Started", "RIDX");
+    print "------------ ------------ -------- ------------ ------------ ".
+	  "---------------------- -------\n";
+    
+    while (my ($exptidx,$idx,$pid,$eid,$creator,$swapin_time) =
+	   $query_result->fetchrow()) {
+
+	printf("%-12s %-12s %-8s %-12s %-22s %s\n",
+	       $pid, $eid, $exptidx, $creator, $swapin_time, $idx);
+    }
 }
 
 #

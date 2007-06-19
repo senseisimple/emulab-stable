@@ -426,24 +426,22 @@ if ($waitmode) {
 # Sanity check states in case someone changes something.
 #
 if ($estate eq EXPTSTATE_ACTIVE) { 
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPOUT) == 0 or
+	fatal("Preswap failed!");
 
-    if ($experiment->Swap("out") != 0) {
+    if ($experiment->Swap($Experiment::EXPT_SWAPOUT) != 0) {
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
 	       error => ['tbswap_out_failed']},
 	      "tbswap out failed!");
     }
+    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT) == 0 or
+	fatal("PostSwap failed!");
+
     $experiment->SetState(EXPTSTATE_TERMINATING) == 0
 	or fatal("Failed to set experiment state to " .
 		 EXPTSTATE_TERMINATING());
 
     $estate = EXPTSTATE_SWAPPED;
-
-    #
-    # Gather statistics for the swapout.
-    #
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0);
 
     # Commit the archive after swapout. Easier to use the script. 
     system("$archcontrol -t endexp commit $pid $eid");
@@ -451,8 +449,9 @@ if ($estate eq EXPTSTATE_ACTIVE) {
 
 if ($estate eq EXPTSTATE_SWAPPED ||
     $estate eq EXPTSTATE_QUEUED) {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_TERMINATE, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE, 0,
+				 TBDB_STATS_FLAGS_START)
+	== 0 or fatal("GatherSwapStats failed");
 
     if ($experiment->End() != 0) {  
 	fatal("tbend failed!\n");
@@ -465,7 +464,8 @@ if ($estate eq EXPTSTATE_SWAPPED ||
     #
     # Gather statistics for the swapout.
     #
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_TERMINATE, 0);
+    $experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE)
+	== 0 or fatal("GatherSwapStats failed");
 }
 
 # We better be here ...

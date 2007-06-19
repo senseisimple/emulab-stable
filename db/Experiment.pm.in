@@ -17,7 +17,6 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-#use libtblog;
 use User;
 use Project;
 use Group;
@@ -26,6 +25,10 @@ use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
+
+use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN
+	    $EXPT_SWAPOUT $EXPT_SWAPMOD
+	    @EXPORT_OK);
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -42,6 +45,20 @@ my $TBSWAP      = "$TB/bin/tbswap";
 my $TBREPORT    = "$TB/bin/tbreport";
 my $TBEND       = "$TB/bin/tbend";
 my $DU          = "/usr/bin/du";
+
+# Swap Actions
+$EXPT_PRELOAD		= TBDB_STATS_PRELOAD();
+$EXPT_START		= TBDB_STATS_START();
+$EXPT_SWAPIN		= TBDB_STATS_SWAPIN();
+$EXPT_SWAPOUT		= TBDB_STATS_SWAPOUT();
+$EXPT_SWAPMOD		= TBDB_STATS_SWAPMODIFY();
+
+# For stats gathering code.
+my $EXPT_STARTCLOCK;
+
+# Why, why, why?
+@EXPORT_OK = qw($EXPT_PRELOAD $EXPT_START
+		$EXPT_SWAPIN $EXPT_SWAPOUT $EXPT_SWAPMOD);
 
 # Hmm, this is silly. 
 if ($EVENTSYS) {
@@ -168,6 +185,7 @@ sub state($)		{ return field($_[0], 'state'); }
 sub batchstate($)	{ return field($_[0], 'batchstate'); }
 sub batchmode($)	{ return field($_[0], 'batchmode'); }
 sub rsrcidx($)		{ return stats($_[0], 'rsrcidx'); }
+sub lastrsrc($)		{ return stats($_[0], 'lastrsrc'); }
 sub creator($)		{ return field($_[0], 'expt_head_uid');}
 sub canceled($)		{ return field($_[0], 'canceled'); }
 sub locked($)		{ return field($_[0], 'expt_locked'); }
@@ -195,7 +213,13 @@ sub use_ipassign($)     { return field($_[0], 'use_ipassign');}
 sub ipassign_args($)    { return field($_[0], 'ipassign_args');}
 sub security_level($)   { return field($_[0], 'security_level');}
 sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
+sub swapin_count($)	{ return stats($_[0], 'swapin_count'); }
+sub destroyed($)	{ return stats($_[0], 'destroyed'); }
 sub archive_tag($)	{ return resources($_[0], 'archive_tag'); }
+sub thumbnail($)	{ return resources($_[0], 'thumbnail'); }
+sub swapin_time($)	{ return resources($_[0], 'swapin_time'); }
+sub swapout_time($)	{ return resources($_[0], 'swapout_time'); }
+sub lastidx($)	        { return resources($_[0], 'lastidx'); }
 
 #
 # Lookup an experiment given an experiment index.
@@ -431,12 +455,17 @@ sub Create($$$$)
 	return undef;
     }
 
+    my $creator_uid = $argref->{'expt_head_uid'};
+    my $creator_idx = $argref->{'creator_idx'};
+    my $batchmode   = $argref->{'batchmode'};
+
     #
     # Create an experiment_resources record for the above record.
     #
     $query_result =
-	DBQueryWarn("insert into experiment_resources (tstamp, exptidx) ".
-		    "values (FROM_UNIXTIME('$now'), $exptidx)");
+	DBQueryWarn("insert into experiment_resources ".
+		    "(tstamp, exptidx, uid_idx) ".
+		    "values (FROM_UNIXTIME('$now'), $exptidx, $creator_idx)");
 
     if (!$query_result) {
 	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
@@ -445,10 +474,7 @@ sub Create($$$$)
 	return undef;
     }
     my $rsrcidx     = $query_result->insertid;
-    my $creator_uid = $argref->{'expt_head_uid'};
-    my $creator_idx = $argref->{'creator_idx'};
-    my $batchmode   = $argref->{'batchmode'};
-
+    
     #
     # Now create an experiment_stats record to match.
     #
@@ -491,21 +517,30 @@ sub Delete($;$)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $pid     = $self->pid();
+    my $eid     = $self->eid();
+    my $exptidx = $self->idx();
 
     $purge = 0
 	if (!defined($purge));
 
     TBExptDestroy($pid, $eid);
 
+    #
+    # Mark experiment destroyed. This is a backup to End() below.
+    #
+    if (! defined($self->destroyed())) {
+	DBQueryWarn("update experiment_stats set ".
+		    "   destroyed=now() ".
+		    "where exptidx=$exptidx");
+	$self->Refresh();
+    }
     return 0
 	if (! $purge);
     
     #
     # Now we can clean up the stats records. 
     #
-    my $exptidx = $self->idx();
     my $rsrcidx = $self->rsrcidx();
     
     DBQueryWarn("DELETE from experiment_resources ".
@@ -1143,9 +1178,458 @@ sub PreRun($;$$)
     return 0;
 }
 
-sub Swap($;$$)
+#
+# Initialiaize bookkeeping for a swap operation.
+#
+sub PreSwap($$$)
 {
-    my ($self, $direction, $options) = @_;
+    my ($self, $swapper, $which) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($swapper)));
+
+    my $exptidx  = $self->idx();
+    my $rsrcidx  = $self->rsrcidx();
+    my $lastrsrc = $rsrcidx;
+    my $uid_idx  = $swapper->uid_idx();
+    # XXX state is no longer "active" for swapmod of active experiment.
+    my $isactive = $self->swapin_time(); 
+
+    #
+    # We should never get here with a lastrsrc in the stats record; it
+    # indicates something went wrong, and we need to clean up the DB
+    # state by hand.
+    #
+    if ($self->lastrsrc()) {
+	print STDERR "Inconsistent lastrsrc in stats record for $self!\n";
+	return -1;
+    }
+
+    #
+    # Generate a new resource record, but watch for the unused one that
+    # we got when the experiment was first created.
+    #
+    if ($which eq $EXPT_SWAPMOD || $which eq $EXPT_SWAPIN) {
+	#
+	# In SWAPIN, copy over the thumbnail. This is temporary; I think
+	# the thumbnail is going to end up going someplace else. 
+	#
+	my $thumbdata = (defined($self->thumbnail()) ?
+			 DBQuoteSpecial($self->thumbnail()) : "NULL");
+	my $byswapmod = ($which eq $EXPT_SWAPMOD ? 1 : 0);
+	my $byswapin  = ($which eq $EXPT_SWAPIN  ? 1 : 0);
+
+	my $query_result =
+	    DBQueryWarn("insert into experiment_resources ".
+			" (idx, uid_idx, tstamp, exptidx, lastidx, ".
+			"  byswapmod, byswapin, thumbnail) ".
+			"values (0, '$uid_idx', now(), $exptidx, $rsrcidx,".
+			"        $byswapmod, $byswapin, $thumbdata)");
+	return -1
+	    if (! $query_result ||
+		! $query_result->insertid);
+	
+	my $newrsrc = $query_result->insertid;
+	
+	DBQueryWarn("update experiment_stats set ".
+		    "  rsrcidx=$newrsrc,lastrsrc=$rsrcidx ".
+		    "where exptidx=$exptidx")
+	    or goto failed;
+
+	$self->Refresh() == 0
+	    or goto failed;
+
+	$rsrcidx = $newrsrc;
+    }
+
+    #
+    # Update the timestamps in the current resource record to reflect
+    # the official start of the operation.
+    #
+    if ($which eq $EXPT_SWAPIN) {
+	DBQueryWarn("update experiment_resources set ".
+		    "  swapin_time=UNIX_TIMESTAMP(now()) ".
+		    "where idx='$rsrcidx'")
+	    or goto failed;
+    }
+    elsif ($which eq $EXPT_SWAPOUT && ! $self->swapout_time()) {
+	# Do not overwrite it; means a previously failed swapout, but for
+	# accounting purposes, we want the original time.
+	DBQueryWarn("update experiment_resources set ".
+		    "  swapout_time=UNIX_TIMESTAMP(now()) ".
+		    "where idx='$rsrcidx'")
+	    or goto failed;
+    }
+    elsif ($which eq $EXPT_SWAPMOD && $isactive) {
+	DBQueryWarn("update experiment_resources set ".
+		    "  swapin_time=UNIX_TIMESTAMP(now()) ".
+		    "where idx='$rsrcidx'")
+	    or goto failed;
+	#
+	# If this swapmod fails, the record is deleted of course.
+	# But if it succeeds, we will also change the previous record
+	# to reflect the swapmod time. See PostSwap() below.
+	#
+    }
+
+    # Old swap gathering stuff.
+    $self->GatherSwapStats($swapper, $which, 0,
+			   libdb::TBDB_STATS_FLAGS_START()) == 0
+	or goto failed;
+
+    # We do these here since even failed operations implies activity.
+    # No worries if they fail; just informational.
+    $swapper->BumpActivity();
+    $self->GetProject()->BumpActivity();
+    $self->GetGroup()->BumpActivity();
+    return 0;
+
+  failed:
+    $self->SwapFail($which, 55);
+    return -1;
+}
+
+#
+# Rollback after a failed swap operation; cleans up the stats and resources.
+#
+sub SwapFail($$$$)
+{
+    my ($self, $swapper, $which, $ecode) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    # Old swap gathering stuff.
+    $self->GatherSwapStats($swapper, $which, $ecode);
+
+    my $exptidx = $self->idx();
+    my $session = libtblog::tblog_session();
+    $session = 'NULL' unless defined $session;
+
+    # This is pointless.
+    DBQueryWarn("update experiment_stats set ".
+		"  swap_errors=swap_errors+1, ".
+		"  swap_exitcode=$ecode, ".
+		"  last_error=$session ".
+		"where exptidx=$exptidx");
+
+    #
+    # Get current and last rsrc record direct from DB to avoid local cache.
+    #
+    my $query_result =
+	DBQueryWarn("select rsrcidx,lastrsrc from experiment_stats ".
+		    "where exptidx=$exptidx");
+
+    return -1
+	if (! $query_result ||
+	    ! $query_result->numrows);
+
+    my ($rsrcidx, $lastrsrc) = $query_result->fetchrow_array();
+
+    #
+    # Special case; The first swapin does not get a new resource record,
+    # and so there will be nothing to delete. So, clear the swapin time.
+    # I think we can get rid of this special case, and also the case of
+    # creating a new resource record when doing a swapmod to an inactive
+    # experiment, but do not want to tackle that at this time
+    #
+    if (! $lastrsrc && $which eq $EXPT_SWAPIN) {
+	DBQueryWarn("update experiment_resources set swapin_time=0 ".
+		    "where idx='$rsrcidx'")
+	or return -1;
+    }
+    
+    return 0
+	if (! $lastrsrc);
+
+    #
+    # If there is a lastrsrc record, it means the current one is bogus and
+    # needs to be deleted, and the stats record repointed to the last one.
+    # If this reset operation fails, lets be sure to set the timestamps in
+    # the bogus resource record to 0 so that we have an indication that
+    # something went wrong when we later traverse the chain of records. 
+    #
+    DBQueryWarn("update experiment_resources set ".
+		"  swapin_time=0,swapmod_time=0,swapout_time=0 ".
+		"where idx='$rsrcidx'")
+	or return -1;
+
+    if ($which eq $EXPT_SWAPMOD &&
+	$self->state() eq libdb::EXPTSTATE_ACTIVE()) {
+	DBQueryWarn("update experiment_resources set swapmod_time=0 ".
+		    "where idx='$lastrsrc'")
+	    or return -1;
+    }
+
+    DBQueryWarn("delete from experiment_resources ".
+		"where idx=$rsrcidx")
+	or return -1;
+
+    #
+    # This last step clears lastrsrc, which is how we know that the record
+    # is consistent and that we can do another swap operation on it.
+    #
+    DBQueryWarn("update experiment_stats set ".
+		"  rsrcidx=$lastrsrc,lastrsrc=NULL ".
+		"where exptidx=$exptidx")
+	or return -1;
+
+    $self->Refresh();
+
+    #
+    # If we fail to clear the lastrsrc record, the next swap operation will
+    # fail until the DB is cleaned up.
+    #
+    return 0;
+}
+
+#
+# Finalize bookkeeping for a swap operation.
+#
+sub PostSwap($$$$)
+{
+    my ($self, $swapper, $which, $flags) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $exptidx  = $self->idx();
+    my $rsrcidx  = $self->rsrcidx();
+    my $lastrsrc = $self->lastrsrc();
+
+    # Old swap gathering stuff.
+    $self->GatherSwapStats($swapper, $which, 0) == 0
+	or return -1;
+
+    #
+    # On a swapout/modify complete, update the duration counters. We
+    # want to update the aggregates too below, so get the numbers we
+    # need for that first. Modify is a bit of a complication since we
+    # want to charge for the experiment as it *was* until this point,
+    # since the number of nodes has changed.
+    #
+    my $pnodes       = 0;
+    my $vnodes       = 0;
+    my $duration     = 0;
+    my $prev_uid_idx = 0;
+    my $prev_swapper = $swapper;
+
+    if ($which eq $EXPT_SWAPOUT ||
+	($which eq $EXPT_SWAPMOD &&
+	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
+	my $query_result;
+	
+	#
+	# If this is a swapout, we use the current resource record. If this
+	# is a swapmod, we have to back to the previous resource record,
+	# since the current one reflects usage for the new swap.
+	#
+	if ($which eq $EXPT_SWAPOUT) {
+	    $query_result =
+		DBQueryWarn("select r.pnodes,r.vnodes,r.uid_idx, ".
+			    "  r.swapout_time - r.swapin_time ".
+			    " from experiment_resources as r ".
+			    "where r.idx='$rsrcidx'");
+	}
+	else {
+	    $query_result =
+		DBQueryWarn("select r.pnodes,r.vnodes,r.uid_idx, ".
+			    "  r.swapmod_time - r.swapin_time ".
+			    " from experiment_resources as r ".
+			    "where r.idx='$rsrcidx'");
+	}
+	return -1
+	    if (!$query_result);
+	
+	if ($query_result->numrows) {
+	    ($pnodes,$vnodes,$prev_uid_idx,$duration) =
+		$query_result->fetchrow_array;
+	    # Might happen if swapin stats got losts.
+	    $duration = 0
+		if (! defined($duration));
+
+	    $prev_swapper = User->Lookup($prev_uid_idx);
+	    $prev_swapper = $swapper
+		if (!defined($prev_swapper));
+	}
+    }
+
+    if ($which eq $EXPT_SWAPMOD) {
+	my $when = "UNIX_TIMESTAMP(now())";
+	# unless its active, in which case pick up swapin time.
+	$when = $self->swapin_time()
+	    if ($self->state() eq libdb::EXPTSTATE_ACTIVE());
+	
+	DBQueryWarn("update experiment_resources set ".
+		    "  swapmod_time=$when ".
+		    "where idx='$lastrsrc'")
+	    or return -1;
+    }
+
+    # Special case for initial record. Needs to be fixed.
+    if ($which eq $EXPT_SWAPIN && !$self->lastidx()) {
+	DBQueryWarn("update experiment_resources set byswapin=1 ".
+		    "where idx='$rsrcidx'")
+	    or return -1;
+    }
+
+    #
+    # Increment idleswap indicator, but only valid on swapout. Harmless
+    # if this fails, so do not worry about it.
+    #
+    if ($which eq $EXPT_SWAPOUT &&
+	$flags & libdb::TBDB_STATS_FLAGS_IDLESWAP()) {
+	DBQueryWarn("update experiment_stats ".
+		    "set idle_swaps=idle_swaps+1 ".
+		    "where exptidx=$exptidx");
+    }
+
+    #
+    # On successful swapin, get the number of pnodes. assign_wrapper
+    # has filled in everything else, but until the experiment actually
+    # succeeds in swapping, do not set the pnode count. The intent
+    # is to avoid counting experiments that ultimately fail as taking
+    # up physical resources.
+    #
+    if ($which eq $EXPT_START ||
+	$which eq $EXPT_SWAPIN ||
+	$which eq $EXPT_SWAPMOD) {
+	my $query_result =
+	    DBQueryWarn("select r.node_id from reserved as r ".
+			"left join nodes as n on r.node_id=n.node_id ".
+			"where r.exptidx='$exptidx' and n.role='testnode'");
+
+	return -1
+	    if (! $query_result);
+
+	$pnodes = $query_result->numrows;
+
+	DBQueryWarn("update experiment_resources set pnodes=$pnodes ".
+		    "where idx=$rsrcidx")
+	    or return -1;
+    }
+    
+    #
+    # Per project/group/user aggregates. These can now be recalculated,
+    # so if this fails, do not worry about it.
+    #
+    if ($which eq $EXPT_PRELOAD ||
+	$which eq $EXPT_START ||
+	$which eq $EXPT_SWAPOUT ||
+	$which eq $EXPT_SWAPIN ||
+	$which eq $EXPT_SWAPMOD) {
+	$self->GetProject()->UpdateStats($which, $duration, $pnodes, $vnodes);
+	$self->GetGroup()->UpdateStats($which, $duration, $pnodes, $vnodes);
+	if ($which eq $EXPT_SWAPOUT ||
+	    $which eq $EXPT_SWAPMOD) {
+	    $prev_swapper->UpdateStats($which, $duration, $pnodes, $vnodes);
+	}
+	else {
+	    $swapper->UpdateStats($which, 0, 0, 0);
+	}
+
+	#
+	# Update the per-experiment record.
+	# Note that we map start into swapin.
+	#
+	if ($which eq $EXPT_SWAPOUT ||
+	    $which eq $EXPT_SWAPIN ||
+	    $which eq $EXPT_START ||
+	    $which eq $EXPT_SWAPMOD) {
+	    my $tmp = $which;
+	    if ($which eq $EXPT_START) {
+		$tmp = $EXPT_SWAPIN;
+	    }
+	    DBQueryWarn("update experiment_stats ".
+			"set ${tmp}_count=${tmp}_count+1, ".
+			"    ${tmp}_last=now(), ".
+			"    swapin_duration=swapin_duration+${duration}, ".
+			"    swap_exitcode=0, ".
+			"    last_error=NULL ".
+			"where exptidx=$exptidx");
+	}
+
+	# Batch mode info.
+	if ($which eq $EXPT_SWAPIN || $which eq $EXPT_START) {
+	    my $batchmode = $self->batchmode();
+	    
+	    DBQueryWarn("update experiment_resources set ".
+			"    batchmode=$batchmode ".
+			"where idx=$rsrcidx");
+	}
+    }
+
+    #
+    # This last step clears lastrsrc, which is how we know that the record
+    # is consistent and that we can do another swap operation on it.
+    #
+    DBQueryWarn("update experiment_stats set lastrsrc=NULL ".
+		"where exptidx=$exptidx");
+    
+    $self->Refresh();
+    
+    return 0;
+}
+
+#
+# Gather Stats. This is the original stats code, which has been partly
+# replaced by the code above.
+#
+sub GatherSwapStats($$$;$$)
+{
+    my ($self, $user, $mode, $ecode, $flags) = @_;
+
+    # Optional argument to modify the stats gathering.
+    $flags = 0
+	if (!defined($flags));
+    $ecode = 0
+	if (!defined($ecode));
+
+    #
+    # If this is a start time marker, then just record the time in a global
+    # variable and return. This is cheezy, but the interface I'm providing
+    # allows for fancier stuff later if desired.
+    #
+    if ($flags & libdb::TBDB_STATS_FLAGS_START()) {
+	$EXPT_STARTCLOCK = time();
+	return 0;
+    }
+    my $session = libtblog::tblog_session();
+    $session = 'NULL' unless defined $session;
+
+    my $exptidx   = $self->idx();
+    my $rsrcidx   = $self->rsrcidx();
+    my $uid       = $user->uid();
+    my $uid_idx   = $user->uid_idx();
+    my $starttime = (!defined($EXPT_STARTCLOCK) ? "NULL" :
+		     "FROM_UNIXTIME($EXPT_STARTCLOCK)");
+
+    #
+    # Okay, Jay wants a log file but I am not crazy about that. Instead we
+    # have a tiny table of testbed wide stats, which cross indexes with the
+    # experiment_stats table via the idx field (which comes from the
+    # experiments table of course). For each operation insert a record. We
+    # can then construct a complete record of what happened from this
+    # table, when correlated with experiment_stats. We could probably not
+    # have an errorcode in experiment_stats, but since its a tinyint, not
+    # worth worrying about.
+    #
+    DBQueryWarn("insert into testbed_stats ".
+		"(idx, uid, uid_idx, start_time, end_time, exptidx, rsrcidx, ".
+		" action, exitcode, log_session) ".
+		"values (0, '$uid', '$uid_idx',  $starttime, now(), ".
+		"        $exptidx, $rsrcidx, '$mode', $ecode, $session)")
+	or return -1;
+
+    return 0;
+}
+
+sub Swap($$;$$)
+{
+    my ($self, $which, $options, $flags) = @_;
 
     # Must be a real reference. 
     return -1
@@ -1153,12 +1637,24 @@ sub Swap($;$$)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $idx = $self->idx();
+    my $op;
 
     $options = ""
 	if (!defined($options));
 
-    print "Running 'tbswap $direction $options $pid $eid'\n";
-    mysystem("$TBSWAP $direction $options $pid $eid");
+    if ($which eq $EXPT_SWAPIN) {
+	$op = "in";
+    }
+    elsif ($which eq $EXPT_SWAPOUT) {
+	$op = "out";
+    }
+    elsif ($which eq $EXPT_SWAPMOD) {
+	$op = "update";
+    }
+
+    print "Running 'tbswap $op $options $pid $eid'\n";
+    mysystem("$TBSWAP $op $options $pid $eid");
     return -1
 	if ($?);
     return 0;
@@ -1172,17 +1668,29 @@ sub End($;$)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
-    my $idx = $self->idx();
+    my $exptidx = $self->idx();
 
     $options = ""
 	if (!defined($options));
 
-    print "Running 'tbend $options -e $idx'\n";
-    mysystem("$TBEND $options -e $idx");
+    #
+    # If the destroyed field is already set, leave it alone since it means
+    # the operation failed the first time.
+    #
+    if (! defined($self->destroyed())) {
+	DBQueryWarn("update experiment_stats set ".
+		    "   destroyed=now() ".
+		    "where exptidx=$exptidx")
+	    or return -1;
+	$self->Refresh() == 0
+	    or return -1;
+    }
+    
+    print "Running 'tbend $options -e $exptidx'\n";
+    mysystem("$TBEND $options -e $exptidx");
     return -1
 	if ($?);
+
     return 0;
 }
 
@@ -1247,10 +1755,10 @@ sub NodeList($;$)
 
     my @nodes = ();
 
-    foreach my $node (@nodenames) {
-	my $node = Node->Lookup($node);
+    foreach my $nodeid (@nodenames) {
+	my $node = Node->Lookup($nodeid);
 	if (!defined($node)) {
-	    print STDERR "*** Could not map $node to its object\n";
+	    print STDERR "*** Could not map $nodeid to its object\n";
 	    return undef;
 	}
 	push(@nodes, $node);
@@ -1912,6 +2420,27 @@ sub IsInstance($)
 
     $self->{'ISINSTANCE'} = $query_result->numrows;
     return $self->{'ISINSTANCE'};
+}
+
+#
+# Set the thumbnail for an experiment. Comes in as a binary string, which
+# must be quoted before DB insertion. 
+#
+sub SetThumbNail($$)
+{
+    my ($self, $bindata) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $rsrcidx = $self->rsrcidx();
+    $bindata = DBQuoteSpecial($bindata);
+
+    DBQueryWarn("update experiment_resources set thumbnail=$bindata ".
+		"where idx=$rsrcidx") or return -1;
+		
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

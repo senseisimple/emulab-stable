@@ -874,16 +874,16 @@ $SIG{QUIT} = 'DEFAULT';
 # Gather stats; start clock ticking
 #
 if ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPIN, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPIN) == 0 or
+	fatal("Preswap failed!");
 }
 elsif ($inout eq "out") {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPOUT) == 0 or
+	fatal("Preswap failed!");
 }
 elsif ($inout eq "modify") {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPMODIFY, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPMODIFY) == 0 or
+	fatal("Preswap failed!");
 }
 
 #
@@ -899,7 +899,7 @@ if ($inout ne "restart" && -e $repfile) {
 if ($inout eq "out") {
     my $optarg = (($force || $idleswap) ? "-force" : "");
 
-    if ($experiment->Swap("out", $optarg) != 0) {
+    if ($experiment->Swap($Experiment::EXPT_SWAPOUT, $optarg) != 0) {
 	$errorstat = $? >> 8;
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
 	       error => ['tbswap_out_failed']},
@@ -937,14 +937,11 @@ if ($inout eq "out") {
 	or fatal("Failed to clear the panic bit!");
 }
 elsif ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $user_uid,
-		    TBDB_STATS_SWAPIN, 0, TBDB_STATS_FLAGS_PRESWAPIN);
-
     # Set the swapper now so that nodes use the proper uid. If the swapin
     # fails, we leave the swapper as is, since its harmless and informative.
     $experiment->SetSwapper($this_user);
 
-    if ($experiment->Swap("in") != 0) {
+    if ($experiment->Swap($Experiment::EXPT_SWAPIN) != 0) {
 	$errorstat = $? >> 8;
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
 	       error => ['tbswap_in_failed']},
@@ -968,9 +965,6 @@ elsif ($inout eq "modify") {
 	    fatal("Failed to do a preswapmod on the experiment archive!");
 	}
     }
-
-    GatherSwapStats($pid, $eid, $user_uid,
-		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
 
     # Gather up some firewall state for later comparison.
     if (GatherFWinfo() < 0) {
@@ -1053,7 +1047,7 @@ elsif ($inout eq "modify") {
 	    $optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
 	}
 
-	if ($experiment->Swap("update", $optarg) == 0) {
+	if ($experiment->Swap($Experiment::EXPT_SWAPMOD, $optarg) == 0) {
 	    #
 	    # Success. Set the state back to active cause thats where it
 	    # started.
@@ -1201,14 +1195,17 @@ if (!$template_mode) {
 # Gather stats. 
 #
 if ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPIN, 0);
+    $experiment->PostSwap($this_user, TBDB_STATS_SWAPIN) == 0 or
+	fatal("PostSwap failed!");
 }
 elsif ($inout eq "out") {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0,
-		    ($idleswap ? TBDB_STATS_FLAGS_IDLESWAP() : 0));
+    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT,
+			  ($idleswap ? TBDB_STATS_FLAGS_IDLESWAP() :0)) == 0 or
+	fatal("PostSwap failed!");
 }
 elsif ($inout eq "modify") {
-    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPMODIFY, 0);
+    $experiment->PostSwap($this_user, TBDB_STATS_SWAPMODIFY) == 0 or
+	fatal("PostSwap failed!");
 }
 
 # Accounting info. For swapout, must be after its done with.
@@ -1296,7 +1293,7 @@ sub cleanup()
     # Gather stats. 
     #
     if ($inout eq "in") {
-	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPIN, $errorstat);
+	$experiment->SwapFail($this_user, TBDB_STATS_SWAPIN, $errorstat);
 
 	#
 	# Must clean up the experiment if it managed to swap in.
@@ -1304,13 +1301,13 @@ sub cleanup()
 	$estate = $experiment->state();
 	
 	if ($estate eq EXPTSTATE_ACTIVE) {
-	    if ($experiment->Swap("out", "-force") != 0) {
+	    if ($experiment->Swap($Experiment::EXPT_SWAPOUT, "-force") != 0) {
 		print "tbswap out failed!\n";
 	    }
 	}
     }
     elsif ($inout eq "out") {
-	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, $errorstat);
+	$experiment->SwapFail($this_user, TBDB_STATS_SWAPOUT, $errorstat);
     }
     elsif ($inout eq "modify") {
 	#
@@ -1319,10 +1316,9 @@ sub cleanup()
 	# that fails, but results in the experiment being restored the
 	# way it was. 
 	#
-	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPMODIFY, $errorstat);
-	
+	$experiment->SwapFail($this_user, TBDB_STATS_SWAPMODIFY, $errorstat);
 	if ($modifySwapped) {
-	    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, 0);
+	    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT);
 	}
     }
 
@@ -1349,12 +1345,14 @@ sub cleanup()
 	# Note: $estate is indeed still set appropriately!
 	#
 	if ($estate eq EXPTSTATE_ACTIVE) {
-	    if ($experiment->Swap("out", "-force") != 0) {
+	    $experiment->PreSwap($this_user, TBDB_STATS_SWAPOUT);
+	
+	    if ($experiment->Swap($Experiment::EXPT_SWAPOUT, "-force") != 0) {
 		print "tbswap out failed!\n";
 		$stat = $? >> 8;
 	    }
 	    $experiment->SetState(EXPTSTATE_SWAPPED);
-	    GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_SWAPOUT, $stat);
+	    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT, $stat);
 	}
 
 	$stat = 0;
@@ -1366,7 +1364,7 @@ sub cleanup()
 	#
 	# Okay, we are going to destroy the experiment below.
 	# 
-	GatherSwapStats($pid, $eid, $user_uid, TBDB_STATS_TERMINATE, 0);
+	$experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE);
 	
 	# Must override since we are so badly hosed. 
 	$termswapstate = EXPTSTATE_TERMINATED;
