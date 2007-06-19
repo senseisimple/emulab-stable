@@ -361,18 +361,14 @@ with 'wap snmpit -o <name>'.
 
 1) Power controllers
 
-The only two supported power controllers at this time are the APC AP9210 and
-the BayTech RPC27. Theoretically, other SNMP and serial-controlled power
-controllers should not be hard to support.
+Follow the instructions in setup-power.txt.
 
-If your power controllers are controlled via IP and SNMP, add a node type andor
-interface type for them. Then, give them an entries in the nodes, interfaces,
-and wires tables. Make sure to get the IP address correct in the interfaces
-table. The role listed in the nodes table should be 'powerctrl'.
+Setting up the power controllers before you add your nodes makes adding
+the nodes remotely much easier.  The process being: power off all nodes,
+then power on what you want to be the first node.  It should show up in
+the "new node" page on the Emulab web portal.  You can then add it as "pc1".
+Then power on the second node, add it, etc.
 
-If you have serial power controllers, just create entries node_types and nodes
-- no interfaces or wires. Again, the role in the nodes table should be
-'powerctrl'.
 
 ##### Step 5 - Images and OSids
 
