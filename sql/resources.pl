@@ -733,8 +733,8 @@ while (my ($exptidx,$rsrcidx) = $query_result->fetchrow_array()) {
 		 "where idx=$rsrcidx");
 }
 
-if (0) {
-    DBQueryFatal("unlock tables");
+if (1) {
+#   DBQueryFatal("unlock tables");
     DBQueryFatal("rename table ".
 		 "testbed_stats to testbed_stats_backup, ".
 		 "experiment_stats to experiment_stats_backup, ".
