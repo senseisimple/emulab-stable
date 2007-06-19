@@ -55,6 +55,11 @@ $isplab   = $row["isplabdslice"];
 $issubnode= $row["issubnode"];
 $class    = $row["class"];
 
+#
+# XXX hack to determine if target node is on a routable network
+#
+$unroutable = ($ELABINELAB || !strncmp($CONTROL_NETWORK, "192.168.", 8));
+
 if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);
 }
@@ -86,7 +91,10 @@ if ($isvirt) {
 	echo "gateway: $USERNODE\n";
     }
 }
-elseif ($ELABINELAB) {
+elseif ($unroutable) {
+    #
+    # If nodes are unroutable, gateway via the user node
+    #
     echo "gateway: $USERNODE\n";
 }
 elseif ($issubnode && $class == 'ixp') {
