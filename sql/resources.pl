@@ -708,16 +708,10 @@ while (my ($exptidx,$expstate) = $query_result->fetchrow_array()) {
 			 "where exptidx=$exptidx");
 	}
     }
-    if (defined($expt_lastidx) && exists($mapping{$expt_lastidx})) {
-	my $rsrcidx = $mapping{$expt_lastidx};
-	
-	print "Update experiment_stats:$expt_lastidx to $rsrcidx\n";
-	
-	if (! $impotent) {
-	    DBQueryFatal("update experiment_stats_new set lastrsrc=$rsrcidx ".
-			 "where exptidx=$exptidx");
-	}
-    }
+    if (! $impotent) {
+	DBQueryFatal("update experiment_stats_new set lastrsrc=NULL ".
+		     "where exptidx=$exptidx");
+    }    
 }
 
 # Last bit of cleanup for records that are too hosed to worry about.
