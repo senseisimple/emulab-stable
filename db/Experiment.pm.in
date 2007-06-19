@@ -55,6 +55,7 @@ $EXPT_SWAPMOD		= TBDB_STATS_SWAPMODIFY();
 
 # For stats gathering code.
 my $EXPT_STARTCLOCK;
+my $EXPT_RESOURCESHOSED = 0;
 
 # Why, why, why?
 @EXPORT_OK = qw($EXPT_PRELOAD $EXPT_START
@@ -1203,6 +1204,8 @@ sub PreSwap($$$)
     #
     if ($self->lastrsrc()) {
 	print STDERR "Inconsistent lastrsrc in stats record for $self!\n";
+	# XXX
+	$EXPT_RESOURCESHOSED = 1;
 	return -1;
     }
 
@@ -1300,6 +1303,10 @@ sub SwapFail($$$$)
     # Must be a real reference. 
     return -1
 	if (! ref($self));
+
+    # Do not proceed if we got here via a hosed resources record.
+    return 0
+	if ($EXPT_RESOURCESHOSED);
 
     # Old swap gathering stuff.
     $self->GatherSwapStats($swapper, $which, $ecode);
