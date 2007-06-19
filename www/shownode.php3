@@ -69,11 +69,11 @@ if (($experiment = $node->Reservation())) {
 }
 if ($experiment && $vname != "") {
     echo " (<b>".
-	 "   $vname.".
-	 "   <a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
-	 "   <a href='showproject.php3?pid=$pid'>$pid</a>.".
-	 "       $OURDOMAIN".
-	 "  </b>)";
+	 "$vname.".
+	 "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
+	 "<a href='showproject.php3?pid=$pid'>$pid</a>.".
+	 "$OURDOMAIN".
+	 "</b>)";
 }	
 
 echo "</font><br><br>\n";
