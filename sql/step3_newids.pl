@@ -257,6 +257,21 @@ if (! TableChanged("firewall_rules", "exptidx")) {
 UpdateTablePidEid("firewall_rules", "exptidx", "pid", "eid");
 DBQueryFatal("unlock tables");
 
+# firewalls
+DBQueryFatal("lock tables firewalls write");
+if (! TableChanged("firewalls", "exptidx")) {
+    DBQueryFatal("alter table firewalls ".
+		 "add `exptidx` int(11) NOT NULL default '0' after eid");
+    UpdateTablePidEid("firewalls", "exptidx", "pid", "eid");
+    DBQueryFatal("alter table firewalls add KEY ".
+		 "pideid (`pid`,`eid`,`fwname`)");
+    DBQueryFatal("alter table firewalls drop PRIMARY KEY");
+    DBQueryFatal("alter table firewalls add PRIMARY KEY ".
+		 "(`exptidx`,`fwname`)");
+}
+UpdateTablePidEid("firewalls", "exptidx", "pid", "eid");
+DBQueryFatal("unlock tables");
+
 # ipport_ranges
 DBQueryFatal("lock tables ipport_ranges write");
 if (! TableChanged("ipport_ranges", "exptidx")) {
