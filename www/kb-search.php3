@@ -247,13 +247,22 @@ else {
 	$clause = "where ". implode(" and ", $wordarray);
     }
     $search_result =
-	DBQueryFatal("select * from knowledge_base_entries ".
-		     "$clause ".
-		     ($admin_access ? "" : 
-		      "and section != 'Testbed Operations' ").
-		     "order by section,date_created");
+	DBQuery("select * from knowledge_base_entries ".
+		"$clause ".
+		($admin_access ? "" : 
+		 "and section != 'Testbed Operations' ").
+		"order by section,date_created");
 }
 
+if ( ! $search_result ) {
+    if (!$embedded) {
+	DBWarn("DB Query failed");
+	SPITFORM($query, $query_type, $query_which,
+                 "Bad query.  Please try again.  " . mysql_error());
+	PAGEFOOTER();
+    }
+    return;
+}
 if (! mysql_num_rows($search_result)) {
     if (!$embedded) {
 	SPITFORM($query, $query_type, $query_which,
