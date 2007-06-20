@@ -12,13 +12,17 @@ SUBDIR		= rc.d
 
 WINSUPPORT      = @WINSUPPORT@
 PELABSUPPORT    = @PELABSUPPORT@
+ELVINCOMPAT	= @ELVIN_COMPAT@
 SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
 RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh \
 		  2.dhcpd.sh 1.mysql-client.sh
-OPS_SCRIPTS     = 2.elvind.sh 3.and.sh 1.mysql-client.sh 1.mysql-server.sh
+OPS_SCRIPTS     = 3.and.sh 1.mysql-client.sh 1.mysql-server.sh
+ifeq ($(ELVINCOMPAT),1)
+OPS_SCRIPTS    += 2.elvind.sh 3.elvin_gateway.sh
+endif
 
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
