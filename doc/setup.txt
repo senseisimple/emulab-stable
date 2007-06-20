@@ -192,6 +192,9 @@ script as root (note the same package directory argument as above).
 Like the ops-install script, boss-install sets up passwordless sudo for
 anyone in the wheel group.
 
+Also note that boss-install (really, the installing from source step below)
+requires internet access so it can grab some files 
+
 ##### Step 7 - Installing from source.
 
 This step is now done as part of boss-install.  You can check it or fix up
@@ -320,6 +323,23 @@ find files as you're learning the system. This normally happens nightly, but
 you can force it to happen now by running '/usr/libexec/locate.updatedb' as
 root. This will take several minutes. You can then find foo.conf by running
 'locate foo.conf'.
+
+dhclient - If you don't control the public network to which boss and ops (and
+perhaps tipserv) are attached, your network admins may want you to run dhclient
+on those interfaces (and you may want to as well so that your boss
+/etc/resolv.conf contains the correct nameserver returned by dhclient, to avoid
+configuring it statically).  However, boss runs its own nameserver that
+ops and the experimental nodes must contact to resolve internal names, so you
+must get dhclient to correctly write /etc/resolv.conf (i.e., boss must be the
+first nameserver).  The easiest way to solve this problem is to add the
+following line to boss's /etc/dhclient.conf:
+   prepend domain-name-servers 127.0.0.1
+and add the following line to ops's (and any other non-experimental nodes, such
+as tipservs) /etc/dhclient.conf:
+   prepend domain-name-server <bossip>
+where <bossip> is replaced by a valid IP address for your boss.  Make sure to
+restart dhclient on these machines since dhclient will continue to overwrite
+/etc/resolv.conf incorrectly.
 
 ##### Step 11 - Reboot boss
 
