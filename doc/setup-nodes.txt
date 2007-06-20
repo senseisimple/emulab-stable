@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2005 University of Utah and the Flux Group.
+# Copyright (c) 2002-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -85,15 +85,24 @@ the rest)
 	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
 
 You'll also need to add entries to the interface_types table (using the web
-SQL editor, or SQL directly) for each type of network card you are using. Notes
-on the columns:
+SQL editor, or SQL directly) for each type of network card you are using.
+Notes on the columns:
 
 * type - Name of the FreeBSD driver for the card (common ones are 'fxp' for
-	Intel EtherExpress Pro 100 and 'xl' for Tulip-based cards)
+	Intel EtherExpress Pro 100, 'em' for Intel Pro 1000, and 'bge' for
+	Broadcom gigabit).
 	
-* max_speed - The maximum speed of the interface, in Kbps.
+* max_speed - The maximum speed of the interface, in Kbps.  Likely to be
+	either 100000 for 100Mb or 1000000 for Gb.
 
 * full_duplex - 1 if the card can operate in full duplex, 0 otherwise.
+
+Note that you should only specify 1000000 (Gb) for the max_speed if the
+card is Gb capable *and* connected to a Gigabit switch.  If a Gb capable
+card is going to run at 100000 (100Mb) instead, then it is best to add
+a seperate type such as 'em100' (for the 'em' type) to describe that
+configuration.  This way, if you use a Gb switch in the future, you can
+change the type fields in the interfaces table to be 'em' instead of 'em100'.
 
 As an example, to insert an entry for an "fxp" interface:
 
@@ -103,13 +112,34 @@ As an example, to insert an entry for an "fxp" interface:
 	    connector='RJ45';
 
 Once you have all of the interfaces specified, you need to insert the
-following interface_capabilities table entries, *foreach* new interface
+following interface_capabilities table entries, *for each* new interface
 type you entered above:
 
 	insert into interface_capabilities set
 	    type='fxp',capkey='protocols',capval='ethernet';
 	insert into interface_capabilities set
 	    type='fxp',capkey='ethernet_defspeed',capval='100000';
+
+Again, if the interface is Gigabit capable and connected to a Gb switch,
+capval above should be 1000000.  For example:
+
+	insert into interface_capabilities set
+	    type='em',capkey='protocols',capval='ethernet';
+	insert into interface_capabilities set
+	    type='em',capkey='ethernet_defspeed',capval='1000000';
+
+In such a configuration, you will also want to add:
+
+	insert into interface_capabilities set
+	    type='em',capkey='ethernet_auxspeeds',capval='100000';
+
+This allows a Gb 'em' interface to be configured in an experiment as 100Mb
+without the use of a delay node; i.e., by setting the switch and interface
+characteristics to 100Mb directly.  In theory you could use this to
+configure 10Mb links without a delay node as well, but in our experience,
+we have had too many problems getting switch and node to communicate when
+hardwiring at 10Mb.  So we just use delay nodes to handle 10Mb.
+
 
 ##### Bringing up the first node
 
