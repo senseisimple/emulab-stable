@@ -1893,6 +1893,18 @@ CREATE TABLE `node_types_auxtypes` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `node_utilization`
+--
+
+DROP TABLE IF EXISTS `node_utilization`;
+CREATE TABLE `node_utilization` (
+  `node_id` varchar(32) NOT NULL default '',
+  `allocated` int(10) unsigned NOT NULL default '0',
+  `down` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`node_id`),
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `nodeipportnum`
 --
 
@@ -1929,6 +1941,7 @@ CREATE TABLE `nodes` (
   `type` varchar(30) NOT NULL default '',
   `phys_nodeid` varchar(32) default NULL,
   `role` enum('testnode','virtnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
+  `inception` datetime default NULL,
   `def_boot_osid` int(8) unsigned default NULL,
   `def_boot_path` text,
   `def_boot_cmd_line` text,

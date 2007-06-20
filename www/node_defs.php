@@ -401,8 +401,9 @@ class Node
 	    DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
 			 "greatest(last_tty_act,last_net_act,last_cpu_act,".
 			 "last_ext_act) as last_act, ".
-			 " t.isvirtnode,t.isremotenode,t.isplabdslice, ".
-			 " r.erole as rsrvrole, pi.IP as phys_IP, loc.* ".
+			 "  t.isvirtnode,t.isremotenode,t.isplabdslice, ".
+			 "  r.erole as rsrvrole, pi.IP as phys_IP, loc.*, ".
+			 "  util.* ".
 			 " from nodes as n ".
 			 "left join reserved as r on n.node_id=r.node_id ".
 			 "left join node_activity as na on ".
@@ -416,6 +417,8 @@ class Node
 			 "     pi.role='" . TBDB_IFACEROLE_CONTROL . "' ".
 			 "left join location_info as loc on ".
 			 "     loc.node_id=n.node_id ".
+			 "left join node_utilization as util on ".
+			 "     util.node_id=n.node_id ".
 			 "where n.node_id='$node_id'");
 	
 	if (mysql_num_rows($query_result) == 0) {
@@ -465,6 +468,9 @@ class Node
 	$battery_timestamp  = $row["battery_timestamp"];
 	$boot_errno         = $row["boot_errno"];
 	$reserved_pid       = $row["reserved_pid"];
+	$inception          = $row["inception"];
+	$alloctime          = $row["allocated"];
+	$downtime           = $row["down"];
 
 	if (!$def_boot_cmd_line)
 	    $def_boot_cmd_line = "&nbsp;";

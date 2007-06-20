@@ -733,9 +733,9 @@ class Plab:
                          " (node_id, type, phys_nodeid, role, priority,"
                          "  op_mode, def_boot_osid,"
                          "  allocstate, allocstate_timestamp,"
-                         "  eventstate, state_timestamp)"
+                         "  eventstate, state_timestamp, inception)"
                          " values (%s, %s, %s, %s, %s,"
-                         "  %s, %s, %s, now(), %s, now())",
+                         "  %s, %s, %s, now(), %s, now(), now())",
                          (nodeid, 'pcplabphys', nodeid,
                           'testnode', priority*100,
                           'ALWAYSUP', defosid,
@@ -743,6 +743,11 @@ class Plab:
                           'ISUP'))
 
             DBQueryFatal("replace into node_hostkeys"
+                         " (node_id)"
+                         " values (%s)",
+                         (nodeid))
+
+            DBQueryFatal("replace into node_utilization"
                          " (node_id)"
                          " values (%s)",
                          (nodeid))

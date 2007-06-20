@@ -624,6 +624,67 @@ sub DeleteVnodes(@)
     return 0;
 }
 
+sub SetNodeHistory($$$$)
+{
+    my ($self, $op, $user, $experiment) = @_;
+
+    my $exptidx = $experiment->idx();
+    my $nodeid  = $self->node_id();
+    my $now     = time();
+    my $uid;
+    my $uid_idx;
+
+    if (!defined($user)) {
+	# Should this be elabman instead?
+	$uid = "root";
+	$uid_idx = 0;
+    }
+    else {
+	$uid = $user->uid();
+	$uid_idx = $user->uid_idx();
+    }
+    if ($op eq TB_NODEHISTORY_OP_MOVE() || $op eq TB_NODEHISTORY_OP_FREE()) {
+	# Summary info. We need the last entry made.
+	my $query_result =
+	    DBQueryWarn("select exptidx,stamp from node_history ".
+			"where node_id='$nodeid' ".
+			"order by stamp desc limit 1");
+
+	if ($query_result && $query_result->numrows) {
+	    my ($lastexptidx,$stamp) = $query_result->fetchrow_array();
+	    my $checkexp;
+
+	    if ($op eq TB_NODEHISTORY_OP_FREE()) {
+		$checkexp = $experiment;
+	    }
+	    else {
+		$checkexp = Experiment->Lookup($lastexptidx);
+	    }
+	    if (defined($checkexp)) {
+		if ($checkexp->pid() eq NODEDEAD_PID() &&
+		    $checkexp->eid() eq NODEDEAD_EID()) {
+		    my $diff = $now - $stamp;
+
+		    DBQueryWarn("update node_utilization set ".
+				" down=down+$diff ".
+				"where node_id='$nodeid'")
+		    }
+		else {
+		    my $diff = $now - $stamp;
+
+		    DBQueryWarn("update node_utilization set ".
+				" allocated=allocated+$diff ".
+				"where node_id='$nodeid'");
+		}
+	    }
+	}
+    }
+    return DBQueryWarn("insert into node_history set ".
+		       "  history_id=0, node_id='$nodeid', op='$op', ".
+		       "  uid='$uid', uid_idx='$uid_idx', ".
+		       "  stamp=$now, exptidx=$exptidx");
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 
 1;

@@ -56,7 +56,8 @@ echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
 if ($isadmin) {
-    echo    ", <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
+    echo    ", <a href='nodeutilization.php'>utilization</a>,
+               <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
                <a href='nodecontrol_list.php3?showtype=physical'>physical</a>,
                <a href='nodecontrol_list.php3?showtype=all'>all</a>";
 }

@@ -358,6 +358,7 @@ NODE: foreach my $node_id (@node_ids) {
 	"phys_nodeid='$node_id', role='$role', priority=$priority, " .
     	"eventstate='$state', op_mode='$opmode', " .
 	"def_boot_osid='$osid', " .
+	"inception=now(), ".
 	"state_timestamp=unix_timestamp(NOW()), " .
 	"op_mode_timestamp=unix_timestamp(NOW())");
 
@@ -367,6 +368,8 @@ NODE: foreach my $node_id (@node_ids) {
 		 "(node_id, status, status_timestamp) ".
 		 "values ('$node_id', 'down', now()) ");
     DBQueryFatal("insert into node_activity ".
+		 "(node_id) values ('$node_id')");
+    DBQueryFatal("insert into node_utilization ".
 		 "(node_id) values ('$node_id')");
 
     #

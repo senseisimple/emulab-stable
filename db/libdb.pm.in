@@ -5266,29 +5266,34 @@ sub TBSetNodeHistory($$$$$)
     # XXX Eventually this should change, but the use of $UID is funky.
     #
     my $dbid;
+    my $node = Node->Lookup($nodeid);
+    my $experiment = Experiment->Lookup($pid, $eid);
+    my $this_user;
 
-    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    if (!defined($node)) {
+	print "*** WARNING: No such node $nodeid!\n";
+	return 0;
+    }
+    if (!defined($experiment)) {
 	print "*** WARNING: No such experiment $pid/$eid!\n";
 	return 0;
     }
-    if ($uid =~ /^[0-9]+$/) {
-	# Should this be elabman instead?
-	$uid  = ($uid == 0 ? "root" : MapNumericUID($uid));
-	$dbid = 0;
-    }
-    else {
-	my $this_user = User->Lookup($uid);
+
+    if ($uid =~ /^[0-9]+$/ && $uid != 0) {
+	$this_user = User->LookupByUnixId($uid);
 	if (! defined($this_user)) {
 	    print "*** WARNING: $UID does not exist in the DB!";
 	    return 0;
 	}
-	$dbid = $this_user->dbid();
     }
-    
-    return DBQueryWarn("insert into node_history set ".
-		       "  history_id=0, node_id='$nodeid', op='$op', ".
-		       "  uid='$uid', uid_idx='$dbid', ".
-		       "  stamp=UNIX_TIMESTAMP(now()), exptidx=$exptidx");
+    else {
+	$this_user = User->Lookup($uid);
+	if (! defined($this_user)) {
+	    print "*** WARNING: $UID does not exist in the DB!";
+	    return 0;
+	}
+    }
+    return $node->SetNodeHistory($op, $this_user, $experiment);
 }
 
 sub TBGetOSBootCmd($$$)
