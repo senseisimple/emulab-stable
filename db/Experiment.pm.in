@@ -158,7 +158,7 @@ sub Lookup($$;$)
 	DBQueryWarn("select * from experiment_resources ".
 		    "where idx='$rsrcidx'");
 	
-    return -1
+    return undef
 	if (!$query_result || !$query_result->numrows);
     
     $self->{'RSRC'} = $query_result->fetchrow_hashref();
