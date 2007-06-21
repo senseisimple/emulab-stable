@@ -19,6 +19,7 @@ my $INITCOND = "init-elabnodes.pl";
 
 my $realplab = 0;
 my $initelab = 0;
+my $sanityChecks = 0;
 
 my $UNKNOWN = "<unknown>";
 my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
@@ -39,10 +40,11 @@ sub usage()
 	  "  -s command-args append args to stub command line\n".
 	  "  -M command-line replace the current monitor command arguments\n".
 	  "  -m command-args append args to monitor command line\n".
+      "  -t              start tcpdumps for cross-correlation checks\n".
 	  "  -C              show current command line(s)\n";
     exit(1);
 }
-my $optlist = "CS:s:M:m:piN:O:";
+my $optlist = "CS:s:M:m:piN:O:t";
 
 my $pelabdir;
 if ($0 =~ /(.*)\/[^\/]+$/) {
@@ -151,6 +153,9 @@ if (defined($options{"i"})) {
 #	die "Unknown -O type '", $options{"O"}, "'\n";
 #    }
 #}
+if (defined($options{"t"})) {
+    $sanityChecks = 1;
+}
 
 my $use_magent = ($stub_cmd =~ /magent/) ? 1 : 0;
 my $use_simplemodel = ($mon_cmd =~ /dbmonitor/) ? 1 : 0;
@@ -332,6 +337,11 @@ if (system "$TEVC -e $pid/$eid now monitorgroup start") {
 #if (system "$TEVC -e $pid/$eid now plabtcpdump start") {
 #    die "Error running tevc\n";
 #}
+
+print "##### Starting tcpdumps for cross-correlation sanity checks\n";
+if (system "$TEVC -e $pid/$eid now sanityCheckDumps start") {
+    die "Error running tevc\n";
+}
 
 print "##### Done\n";
 

@@ -73,6 +73,7 @@ set plabsites {}
 set plabnodes {}
 # Example node list
 #set plabnodes {plab518 plab541 plab628 plab736 plab360}
+set plabnodes {plab540 plab18}
 
 #
 # This provides you with an easy way to skip certain hosts in the above lists
@@ -94,6 +95,7 @@ set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
 # value, like "pc3000", to get specific types of PCs
 #
 set hwtype "pc"
+set do_bsd 0
 
 #
 # Server and client to use for automated testing. If set, will automatically
@@ -119,7 +121,6 @@ set allnodesprog "/bin/true"
 #
 # Run FreeBSD 6.1 on elab_ nodes.  Forces use of dbmonitor.
 #
-set do_bsd 0
 
 #
 # If non-zero, uses the DB-based "monitor" to control the cloud shaping. This
@@ -136,7 +137,9 @@ if {$do_bsd} {
 # same node. Only supported when use_magent is set
 #
 set stub_port 3149
+set udp_stub_peer_port 3492
 
+        
 ######
 # Options for the dbmonitor (simple models)
 ######
@@ -207,7 +210,7 @@ set no_stub 0
 # If set to 1, uses the new stub as a receiver
 # If set to 2, uses a separate iperfd to receive traffic
 #
-set use_magent 2
+set use_magent 1
 
 # End of user-settable options
 ##########
@@ -221,8 +224,8 @@ if {$do_bsd} {
     set node_os FBSD61-STD
 } else {
     # XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
-    set node_os PLAB-DEVBOX-UPDATE
-    #set node_os PLAB-DEVBOX
+    #set node_os PLAB-DEVBOX-UPDATE
+    set node_os PLAB-DEVBOX
 }
 
 tb-set-delay-os $delay_os
@@ -255,7 +258,7 @@ for {set i 0} {$i < [llength $skiplist]} {incr i} {
 }
 
 set stub_peer_port $stub_port
-set stub_command_port [expr $stub_port + 1]
+set stub_command_port 3150
 
 #
 # Tarballs and RPMs we install on all nodes
@@ -311,6 +314,8 @@ set clientlist {}
 set tflist {}
 set anlist {}
 
+set sanitychecklist {}
+
 #
 # Create all of the nodes
 #
@@ -325,6 +330,10 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
         set planetstub($i) [$planet($i) program-agent -expected-exit-code $ecode -command $stubcommand]
         lappend stublist $planetstub($i)
         lappend planetstublist $planetstub($i)
+
+        set plabsanitycheck($i) [$planet($i) program-agent -expected-exit-code $ecode -command "sudo /usr/sbin/tcpdump -w /local/logs/SanityCheck.log -i vnet \\( \\(tcp and dst host $planet($i) and dst port $stub_peer_port \\) or \\(udp and dst host $planet($i) and dst port $udp_stub_peer_port \\) \\) "]
+
+        lappend sanitychecklist $plabsanitycheck($i)
 
         tb-set-node-tarfiles $planet($i) $tarfiles
         tb-set-node-rpms $planet($i) $plab_rpms
@@ -375,6 +384,10 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     set client($i) [$elab($i) program-agent -expected-exit-code $ecode -command $clientprog]
     lappend serverlist $server($i)
     lappend clientlist $client($i)
+
+    set elabsanitycheck($i) [$elab($i) program-agent -expected-exit-code $ecode -command "sudo tcpdump -w /local/logs/SanityCheck.log -i any \\( \\(tcp and dst host $elab($i) \\) or \\(udp and dst host $elab($i) \\) \\) "]
+
+    lappend sanitychecklist $elabsanitycheck($i)
 
     tb-set-node-tarfiles $elab($i) $tarfiles
     if {$elab_rpms != ""} {
@@ -428,6 +441,8 @@ set allclients [$ns event-group $clientlist]
 
 set tfhosts [$ns event-group $tflist]
 set anhosts [$ns event-group $anlist]
+
+set sanityCheckDumps [$ns event-group $sanitychecklist]
 
 set tracelist {}
 
@@ -550,6 +565,8 @@ if {$no_plab || $real_plab} {
         $start append "$link trace stop"
     }
 
+    $start append "$sanityCheckDumps stop"
+
     # clean out log files
     # XXX original script passed --root, cleanlogs does not--may be a problem.
     $start append "$ns log \"##### Cleaning logs...\""
@@ -619,6 +636,8 @@ if {$no_plab || $real_plab} {
 	$stop append "$ns log \"##### Stopping servers...\""
 	$stop append "$allservers stop"
     }
+
+    $stop append "$sanityCheckDumps stop"
 
     # stop link logging and save logs
     $stop append "$ns log \"##### Stop link tracing...\""
