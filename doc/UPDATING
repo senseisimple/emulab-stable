@@ -59,7 +59,7 @@ earliest time one of the steps needs to occur.
 	  a change to make tftpd work better under load when it hits its
 	  "maxchildren" limit.
 
-	  * See if you tftpd is already up to date on your boss:
+	  * See if your tftpd is already up to date on your boss:
 
 		pkg_info -E 'emulab-tftp-hpa-*'
 

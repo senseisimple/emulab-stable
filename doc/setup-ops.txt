@@ -6,13 +6,13 @@
 
 #####
 ##### Setting up the Utah Network Testbed software
-##### Most recently tested on FreeBSD 6.1 .
+##### Most recently tested on FreeBSD 6.2 .
 #####
 
 ##### Step 1 - OS installation and setup
 
 Install FreeBSD on the machine you'll be using for your ops node, using the
-standard FreeBSD installation process. When asked by the installer, it's best
+standard FreeBSD installation process.  When asked by the installer, it's best
 to choose the 'Developer' distribution set - this gets you full sources. When
 it asks if you want to install the ports collection, answer *no*.  Do not
 install any packages at this time - you'll get a chance to later.  You'll
@@ -33,8 +33,10 @@ space to hold them:
 
 Do *not* create any user accounts yet, and just log in as root for the time
 being.  Our software will create user accounts later, once you get boss set
-up. If you already created any users, then delete them with the "pw" command
-and make sure the home directories for them are removed as well. 
+up.
+
+If you already created any users, then delete them with the "pw" command
+and make sure the home directories for them are removed as well! 
 
 
 ##### Step 1a - Shared filesystem setup for combined ops/fs machine.
@@ -98,7 +100,7 @@ of compile time, we provide pre-built binary packages of the ports required
 by Emulab. 
 
 [ NOTE: if you are an existing Emulab site doing a reinstall, and want to
-  maintain backward compatibility with your existing images, you will have
+  maintain backward compatibility with your existing OS images, you will have
   to get a special packages tarball from Utah. ]
 
 Download the packages tarball from:

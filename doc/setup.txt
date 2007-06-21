@@ -6,7 +6,7 @@
 
 #####
 ##### Setting up the Utah Network Testbed software.
-##### Most recently tested on FreeBSD 6.1 .
+##### Most recently tested on FreeBSD 6.2 .
 #####
 
 ##### Important notes
@@ -133,12 +133,12 @@ As with setting up ops, you need to create partitions large enough:
 /var          - Holds the database, so at least a few hundred MB. 
 
 
-Do *not* create any users yet, and just log in a root for the time being.
+Do *not* create any users yet, and just log in as root for the time being.
 Our software will create users later, once you get boss set up. BE SURE to
 give root a password and REMEMBER it! You are going to need it later.  To
 set the root password use "passwd root".
 
-If you already created users, then delete them with the "pw" command
+If you already created any users, then delete them with the "pw" command
 and make sure the home directories for them are removed as well!
 
 ##### Step 3 - Installing packages
