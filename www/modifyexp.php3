@@ -171,6 +171,9 @@ if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
 if (isset($_FILES['exp_nsfile']) &&
     $_FILES['exp_nsfile']['name'] != "" &&
     $_FILES['exp_nsfile']['tmp_name'] != "") {
+    if ($_FILES['exp_nsfile']['size'] == 0) {
+        USERERROR("Uploaded NS file does not exist, or is empty");
+    }
     $specupload = 1;
 }
 if (!$speclocal && !$specupload && isset($nsdata))  {
