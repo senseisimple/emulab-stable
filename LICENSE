@@ -2,7 +2,7 @@ EMULAB SOFTWARE SNAPSHOT LICENSE TERMS
 
 Except for any files marked with the GNU General Public License, or that
 bear non-Utah copyrights and are unchanged from the original (e.g., cracklib
-and healthd), this Emulab code snapshot comes with RESTRICTED RIGHTS.
+and healthd), this Emulab software snapshot comes with RESTRICTED RIGHTS.
 
 Permission to use, copy, and modify this software is hereby
 granted provided that the following conditions are met.
@@ -10,7 +10,9 @@ granted provided that the following conditions are met.
 By accepting this software, you agree:
 -not to redistribute it, even within your organization;
 -that within a month of the official Utah Emulab release you will upgrade
- to that release and its license and destroy all copies of this snapshot;[*]
+ to that release and its license[*] and destroy all reasonably accessible
+ copies of this software snapshot; after that month all rights you have to
+ use, copy, or modify this software snapshot will terminate;
 -to retain this notice and all included copyright and credit notices;
 -to prominently give appropriate credit to "Emulab" and the University of
  Utah in the primary user interface(s) to systems that use this
@@ -41,9 +43,9 @@ June 12, 2007
     Salt Lake City, UT  84112
 
 
-[*] Within a month after the Affero General Public License version 3
-(AGPLv3) is finalized, Utah expects to release the Emulab software
-under that open source license.
+[*] Within a month after the GNU Affero General Public License
+version 3 (AGPLv3) is finalized, Utah expects to release the
+Emulab software under that open source license.
 
 A draft of AGPLv3 is available at http://gplv3.fsf.org/agplv3-dd1.txt.
 It consists of the GNU General Public License version 3 (GPLv3) with a
