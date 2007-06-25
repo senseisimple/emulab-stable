@@ -314,7 +314,7 @@ if [ x"$ADDRESS" != x ]; then
 	        exit 0
 		;;
 	*)
-		echo "Frisbee run failed, status $?"
+		echo "Frisbee run failed, status $fstat"
 		;;
 	esac
 else
