@@ -25,7 +25,7 @@ ptop file: <line>*
 <feature_type> ::= | "?+" | "*&" | "*!"
 <flag> ::= trivial_bw:<int> | subnode_of:<node_name> | unique
 
-<link_line> ::= link <link_name> <interface> <interface> <int> <float> <float> [ <link_type> ]
+<link_line> ::= link <link_name> <interface> <interface> <int> <float> <float> [ <int> ] <link_type>*
 <interface> := <node_name>:<mac>/<iface>
 
 <type_limit_line> ::= set-type-limit <node_type> <int>
@@ -65,9 +65,13 @@ Interpretation:
     from all other physical nodes - it prevents assign from putting it in a
     physical equivalence class, as described in the paper.
 <link_line> - The two interfaces are the source and destination of this link,
-    respectively. The three numbers are, respectively, bandwidth, delay, and
-    packet loss. Units are not specified, but must match the units in the top
-    file. See notes at the end of this file for more information. 
+    respectively. The next three numbers are, respectively, bandwidth, delay,
+    and packet loss. Units are not specified, but must match the units in the
+    top file. See notes at the end of this file for more information. The final
+    (optional) integer records the number of virtual links that can be mapped
+    to this physical link. In practice, we do not use this field, using the
+    bandwidth number for multiplexing instead, and it has been removed from
+    the latest version of the file format.
 <link_type> - In practice, usually 'ethernet', '80211a', '80211b', or '80211g'.
     Older ptop files do not have this field.
 <interface> - the first part of this field is the only really important one:
