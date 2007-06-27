@@ -46,6 +46,40 @@ put this in /etc/newsyslog.conf do:
    # testbed stuff
    /usr/testbed/log/tiplogs/capture.log    664  7     1000 *     Z
 
+*** export log filesystem to ops node.  So log dir should really be a
+    distinct filesystem, else you export more than you intend!
+
+# rc.conf: added by Emulab setup: allow export of log filesystem
+rpcbind_enable="YES"
+nfs_server_enable="YES"
+nfs_reserved_port_only="YES"
+mountd_enable="YES"
+mountd_flags="-r -p 900"
+
+# exports: added by Emulab setup: allow export of log filesystem
+/var/log/tiplogs ops -ro -alldirs
+
+*** install boss rootkey in tipserv authorized_keys
+
+*** install script(s) to keep groups file in sync
+
+*** add NFS mount to ops fstab
+
+    tipserv:/var/log/tiplogs /var/log/tiplogs nfs ro,-b,-i,nodev,nosuid 0 0
+
+    note that ops-install script assumes that ops is a tipserv machine
+    if mounting remote tipserv directory on ops:/var/log/tiplogs, be sure
+    to disable newsyslog.conf entry.
+
+    # exports: added by Emulab setup: allow export of log filesystem
+/var/log/tiplogs ops -ro -alldirs
+
+*** install script(s) to keep groups file in sync
+
+*** note that ops-install script assumes that ops is a tipserv machine
+    if mounting remote tipserv directory on ops:/var/log/tiplogs, be sure
+    to disable newsyslog.conf entry.
+
 1) Enter all the power controller's serial line info into the emulab DB
    and add a line to the "capture" startup script.
 
