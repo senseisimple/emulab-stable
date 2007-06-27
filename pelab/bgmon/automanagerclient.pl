@@ -47,6 +47,12 @@ my %deadsites;
 my %nodestatus;         
 my $NODESTATUSTHRESHOLD = 2;
 
+# nodecpustatus hash to keep track of CPU threshold failures of a
+# a current bestnode. Basically a node has to beat previous best node
+# by CPUUSAGETHRESHOLD 2 times before being replaced by another node.
+my %nodecpustatus;
+my $NODECPUSTATUSTHRESHOLD = 2;
+
 # Lower limit for bandwidth frequency
 my $MINBWPER = 3600;       # 1 hr
 
@@ -401,6 +407,10 @@ sub choosebestnode($)
 		    $bestnode = $node;
 		}
 	    }else{
+		if (!defined $nodecpustatus{$node}) {
+		    $nodecpustatus{$node} = 0;
+		}
+		
 		if( ($allnodes{$node}{cpu} < $allnodes{$bestnode}{cpu}
 		    - $CPUUSAGETHRESHOLD) &&
 		    getstatuswrapper($node) ne "error" )
@@ -409,7 +419,15 @@ sub choosebestnode($)
 			"  $allnodes{$node}{cpu}\n";
 		    print '$allnodes{best$node}{cpu}'.
 			"  $allnodes{$bestnode}{cpu}\n";
-		    $bestnode = $node;
+		    
+		    $nodecpustatus{$node} = $nodecpustatus{$node} + 1;
+		    
+		    if ($nodecpustatus{$node} >= $NODECPUSTATUSTHRESHOLD) {
+			$bestnode = $node;
+		    }
+		    
+		} else {
+		    $nodecpustatus{$node} = 0;
 		}
 	    }
 	}
