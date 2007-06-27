@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -405,12 +405,12 @@ ClientStatsDump(unsigned int id, ClientStats_t *stats)
 		seconds = stats->u.v1.runsec;
 		if (seconds == 0)
 			seconds = 1;
-		log("  real data written:      %qu (%ld Bps)",
+		log("  real data written:      %qu (%qu Bps)",
 		    stats->u.v1.rbyteswritten,
-		    (long)(stats->u.v1.rbyteswritten/seconds));
-		log("  effective data written: %qu (%ld Bps)",
+		    stats->u.v1.rbyteswritten/seconds);
+		log("  effective data written: %qu (%qu Bps)",
 		    stats->u.v1.ebyteswritten,
-		    (long)(stats->u.v1.ebyteswritten/seconds));
+		    stats->u.v1.ebyteswritten/seconds);
 		log("Client %u Params:", id);
 		log("  chunk/block size:     %d/%d",
 		    CHUNKSIZE, BLOCKSIZE);
