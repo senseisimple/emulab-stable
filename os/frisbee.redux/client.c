@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -600,13 +600,44 @@ ClientRecvThread(void *arg)
 	}
 }
 
+static pthread_t child_pid;
+
+#ifndef linux
+/*
+ * XXX mighty hack!
+ *
+ * Don't know if this is a BSD linuxthread thing or just a pthread semantic,
+ * but if the child thread calls exit(-1) from fatal, the frisbee process
+ * exits, but with a code of zero; i.e., the child exit code is lost.
+ * Granted, a multi-threaded program should not be calling exit willy-nilly,
+ * but it does so we deal with it as follows.
+ *
+ * Since the child should never exit during normal operation (we always
+ * kill it), if it does exit we know there is a problem.  So, we catch
+ * all exits and if it is the child, we set a flag.  The parent thread
+ * will see this and exit with an error.
+ *
+ * Since I don't understand this fully, I am making it a FreeBSD-only
+ * thing for now.
+ */
+static int	 child_error;
+
+void
+myexit(void)
+{
+	if (pthread_self() == child_pid) {
+		child_error = -2;
+		pthread_exit((void *)child_error);
+	}
+}
+#endif
+
 /*
  * The heart of the game.
  */
 static void
 ChunkerStartup(void)
 {
-	pthread_t	child_pid;
 	void		*ignored;
 	int		chunkcount = TotalChunkCount;
 	int		i, wasidle = 0;
@@ -656,6 +687,9 @@ ChunkerStartup(void)
 		}
 	}
 
+#ifndef linux
+	atexit(myexit);
+#endif
 	if (pthread_create(&child_pid, NULL,
 			   ClientRecvThread, (void *)0)) {
 		fatal("Failed to create pthread!");
@@ -677,6 +711,23 @@ ChunkerStartup(void)
 		 * XXX should be a condition variable.
 		 */
 		if (i == maxchunkbufs) {
+#ifndef linux
+			/*
+			 * XXX mighty hack (see above).
+			 *
+			 * Might be nothing to do because network receiver
+			 * thread died.  That indicates a problem.
+			 *
+			 * XXX why _exit and not exit?  Because exit loses
+			 * the error code again.  This is clearly bogus and
+			 * needs to be rewritten!
+			 */
+			if (child_error) {
+				pthread_join(child_pid, &ignored);
+				_exit(child_error);
+			}
+#endif
+
 #ifdef DOEVENTS
 			Event_t event;
 			if (eventserver != NULL &&
