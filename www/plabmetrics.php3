@@ -288,6 +288,16 @@ else {
     }
 }
 
+#
+# If filtering on pid/eid AND upnodefilter == emulab, we must postfilter the
+# data (initial query will get the list of pid/eid nodes, then we filter out
+# upnodes).  This is because a plab node isup according to Emulab if its 
+# node status is up and if it is in the emulab-ops/plabnodes experiment.
+#
+if (isset($experiment) 
+    && (isset($upnodefilter) && $upnodefilter == 'emulab')) {
+    $mustpostfilter = 1;
+}
 
 #
 # Setup the viewable exp/pid mappings:
@@ -803,6 +813,7 @@ PAGEFOOTER();
 function pm_filterdata($data) {
     global $hostfilter,$hf_regexp;
     global $colmap_mysqlnames;
+    global $upnodefilter,$experiment;
     global $flexlabfilter,$flexlabfcsize,$flexlabsave,$flexlabrecompute;
     global $flexlabfcnodes;
     global $FLEXLAB_XMLRPC_SRV,$FLEXLAB_XMLRPC_SRV_PORT;
@@ -829,6 +840,34 @@ function pm_filterdata($data) {
     }
     else {
 	$remaining_nodes = $data;
+    }
+
+    #
+    # If filtering on $experiment AND $upnodefilter == 'emulab', we must 
+    # postfilter to see if the nodes really were in emulab-ops/plabnodes.
+    #
+    if (isset($experiment) 
+	&& (isset($upnodefilter) && $upnodefilter == 'emulab')) {
+	echo "FOO: rns = " . count($remaining_nodes) . "<br>\n";
+	$upnodes = array();
+	$pnq = "select n.node_id from nodes as n" . 
+	    " left join reserved as r on n.node_id=r.node_id" . 
+	    " where n.type='pcplabphys'" . 
+	    "  and !(r.pid='emulab-ops' and r.eid='hwdown')";
+
+	$pnqres = DBQueryFatal($pnq);
+	while ($row = mysql_fetch_array($pnqres)) {
+	    array_push($upnodes,$row['node_id']);
+	}
+
+	$rnatmp = array();
+	foreach ($remaining_nodes as $row) {
+	    if (in_array($row[$colmap_mysqlnames['node_id']],$upnodes)) {
+		array_push($rnatmp,$row);
+	    }
+	}
+	$remaining_nodes = $rnatmp;
+	echo "FOO: rns = " . count($remaining_nodes) . "<br>\n";
     }
 
     #
@@ -1585,6 +1624,13 @@ function pm_buildqueryinfo() {
             " left join nodes as n on r.node_id=n.node_id" .
             " left join plab_mapping as pm on n.phys_nodeid=pm.node_id";
     }
+    elseif (isset($upnodefilter) && $upnodefilter == 'emulab') {
+        # Note, the other half of this case (if $experiment isset AND this 
+        # case) is covered later because it has to be postfiltered!
+	$q_joinstr = " reserved as r" . 
+            " left join nodes as n on r.node_id=n.node_id" .
+            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id";
+    }
     else {
         $q_joinstr = " plab_mapping as pm";
     }
@@ -1612,6 +1658,9 @@ function pm_buildqueryinfo() {
                 $q_quickfs .= " and ";
             }
             $q_quickfs .= " ns.status='up'";
+	    if (!isset($experiment)) {
+		$q_quickfs .= " and n.type='pcplabphys' and !(r.pid='emulab-ops' and r.eid='hwdown')";
+	    }
         }
         elseif ($upnodefilter == "comon") {
             if (strlen($q_quickfs) > 0) {
