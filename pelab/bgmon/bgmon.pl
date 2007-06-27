@@ -176,6 +176,9 @@ print "command-port = $cmdport\n";
 print "result send port = $sendport\n";
 print "ackport = $ackport\n";
 
+# initialize seed for random number generation
+srand (time ^ unpack "%L*", `uname -a`);
+
 # Create a TCP socket to receive commands on
 my $socket_cmd = IO::Socket::INET->new( LocalPort => $cmdport,
 #TODO: added this as comment, in case it breaks: LocalHost => $thismonaddr,
@@ -504,9 +507,18 @@ while (1) {
                     #if time of next run is in the future, set it to that
                     $testev->{"timeOfNextRun"} += $testev->{"testper"};
                 }else{
-                    #if time of next run is in the past, set to current time
-                    $testev->{"timeOfNextRun"} 
-                      = time_all();
+		    if ( ($testev->{"timeOfNextRun"}  == 0) &&
+			 ( $testev->{"managerID"} eq "automanagerclient" ) &&
+			 ($testtype eq "bw" ) ) {
+			# init the test based on random initial time
+			my $range = $testev->{"testper"} - 2 * $iperfduration;
+			my $random_init = int(rand($range));
+			$testev->{"timeOfNextRun"} =  time_all() + $random_init;
+		    } else {
+			#if time of next run is in the past, set to current time
+			$testev->{"timeOfNextRun"}
+			= time_all();
+		    }
                 }
 
                 $testev->{"flag_scheduled"} = 1;
