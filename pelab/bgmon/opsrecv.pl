@@ -92,6 +92,10 @@ if( $DBPWD =~ /^([\w]*)\s([\w]*)$/ ) {
 my ($DB_data, $DB_sitemap);
 TBDBConnect($DBNAME,$DBUSER,$DBPWD);
 
+# set sql_mode to STRICT_ALL_TABLES to match it with
+# dp database mode
+DBQueryWarn("set SESSION sql_mode='STRICT_ALL_TABLES'");
+
 my $socket_rcv = IO::Socket::INET->new( LocalPort => $port,
 					Proto     => 'udp' );
 #my $socket_snd = IO::Socket::INET->new( PeerPort => $sendport,
