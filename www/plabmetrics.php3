@@ -1667,8 +1667,9 @@ function pm_buildqueryinfo() {
             if (strlen($q_quickfs) > 0) {
                 $q_quickfs .= " and ";
             }
-            $q_quickfs .= " (pcd.lastcotop - now()) < 600" . 
-		" and pcd.lastcotop is not null";
+            $q_quickfs .= " pcd.lastcotop < 305 and pcd.resptime > 0 " . 
+		" and pcd.lastcotop is not null " . 
+		" and (now() - from_unixtime(pcd.date)) < " . (12*60*60);
         }
     }
     if (isset($hostfilter) && $hf_regexp == 0) {
