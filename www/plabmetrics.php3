@@ -1601,6 +1601,7 @@ function pm_getpaginationlinks($totalrows) {
 #
 function pm_buildqueryinfo() {
     global $cols,$colmap,$experiment,$upnodefilter,$sortcols,$sortdir;
+    global $colmap_mysqlnames;
     global $limit,$offset;
     global $pid,$eid;
     global $DEF_LIMIT;
@@ -1714,7 +1715,7 @@ function pm_buildqueryinfo() {
     }
     $q_sortstr = 'order by ';
     foreach ($sortcols as $sc) {
-        $q_sortstr .= $colmap[$sc] . ",";
+        $q_sortstr .= $colmap_mysqlnames[$sc] . ",";
     }
     $q_sortstr = rtrim($q_sortstr,',');
     if (isset($sortdir)) {
