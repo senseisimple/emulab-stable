@@ -427,7 +427,7 @@ def MarkPhysNodeDown(pnode):
 
     DBQueryFatal("lock tables reserved write")
     DBQueryFatal("update reserved set "
-		 "  exptidx=%d,pid=%s,eid=%s,rsrv_time=now() "
+		 "  exptidx=%s,pid=%s,eid=%s,rsrv_time=now() "
 		 "where node_id=%s",
                  (exptidx,pid, eid, pnode))
     DBQueryFatal("unlock tables")
