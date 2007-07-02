@@ -29,20 +29,22 @@
 #
 # Calculates the correlation of the traffic
 # on Planetlab nodes versus the traffic on the
-# corresponding Emulab nodes.
+# corresponding Flexlab (Emulab) nodes.
 #
 # Requires that Tcpdump files be saved on elab-*
 # and planet-* nodes during the Flexlab run.
 # This can be done by passing "-t" option
 # to start-experiment and stop-experiment scripts
 #
-# This script can also be done in stand-alone mode 
+# This script can also be executed in stand-alone mode 
 # after collecting the logs
-# with stop-experiment and point to the 
-# directory having the collected logs.
+# with stop-experiment  - Just point it to the 
+# directory containing the logs.
 # 
-# Cross Correlation reference: Paul Bourke
-# http://local.wasp.uwa.edu.au/~pbourke/other/correlate
+# Cross Correlation references: 
+# -----------------------------
+# FFT method  - http://en.wikipedia.org/wiki/Cross-correlation
+# Paul Bourke - http://local.wasp.uwa.edu.au/~pbourke/other/correlate
 #
 #########################################################
 
@@ -177,7 +179,6 @@ def CalcBucketAvgThroughput(fileName, outputFile, bucketSize, transportFlag):
     return (8000000*packetAvgBytes/(packetAvgTime*1024.0))
 
 #}
-
 ###############################################################
 ###############################################################
 
@@ -188,7 +189,6 @@ def CalcMovingAvgThroughput(fileName, outputFile, minSamples, avgTimeScale, maxS
     arrayIndex = 0
     packetAvgBytes = 0
     packetAvgTime = 0
-    numPackets = 0
     numLines = 0
     packetSizeArray = [0] * maxAvgSamples
     packetTimeArray = [0] * maxAvgSamples
@@ -204,10 +204,15 @@ def CalcMovingAvgThroughput(fileName, outputFile, minSamples, avgTimeScale, maxS
     elif transportFlag == 1: # UDP
         regExp = re.compile('^(\d\d):(\d\d):(\d\d)\.(\d{6})\sIP\s([\w\d\.\-]*?)\.([\d\w\-]*)\s>\s([\w\d\.\-]*?)\.([\d\w\-]*):\sUDP,\slength\s(\d*)')
 
+
+    runningByteTotal = 0
+    runningTimeTotal = 0
+    runningPacketTotal = 0
+    lastIndex = 0
+
     for lineRead in inputFile:
     #{
         match = regExp.match(lineRead)
-
 
         if match:
         #{
@@ -221,53 +226,63 @@ def CalcMovingAvgThroughput(fileName, outputFile, minSamples, avgTimeScale, maxS
             #}
             else:
             #{
-                packetSizeArray[arrayIndex] = int(match.group(9))
-                packetTimeArray[arrayIndex] = time - lastPacketTime
+                currentPacketSize = int(match.group(9))
+                currentPacketTime = time - lastPacketTime
+
+                runningByteTotal += currentPacketSize
+                runningTimeTotal += currentPacketTime
+                runningPacketTotal += 1
 
                 packetAvgBytes = packetAvgBytes + int(match.group(9))
                 packetAvgTime = packetAvgTime + packetTimeArray[arrayIndex]
 
-                arrayIndex = (arrayIndex + 1) % maxSamples
-
-                if numPackets < maxSamples:
+                if runningPacketTotal >= minSamples:
                 #{
-                    numPackets += 1
-                #}
-
-                if numPackets >= minSamples:
-                #{
-
-                    if numPackets < maxSamples:
+                    if (runningPacketTotal < maxSamples) and (runningTimeTotal < avgTimeScale):
                     #{
-                        sampleCount = numPackets
+                        throughput = 8000000*runningByteTotal/(runningTimeTotal*1024.0)
+                    #}
+                    elif runningPacketTotal < maxSamples:
+                    #{
+                        while (runningPacketTotal >= minSamples) and (runningTimeTotal > avgTimeScale):
+                        #{
+                            runningTimeTotal -= packetTimeArray[lastIndex]
+                            runningByteTotal -= packetSizeArray[lastIndex]
+                            lastIndex = (lastIndex + 1)%maxSamples
+                            runningPacketTotal -= 1
+                        #}
+                        throughput = 8000000*runningByteTotal/(runningTimeTotal*1024.0)
+                    #}
+                    elif runningTimeTotal < avgTimeScale:
+                    #{
+                        runningByteTotal -= packetSizeArray[lastIndex]
+                        runningTimeTotal -= packetTimeArray[lastIndex]
+                        runningPacketTotal -= 1
+                        lastIndex = (lastIndex + 1)%maxSamples
+                        throughput = 8000000*runningByteTotal/(runningTimeTotal*1024.0)
                     #}
                     else:
                     #{
-                        sampleCount = maxSamples
+                        while (runningPacketTotal >= minSamples) and (runningPacketTotal > maxSamples) and (runningTimeTotal > avgTimeScale):
+                        #{
+                            runningTimeTotal -= packetTimeArray[lastIndex]
+                            runningByteTotal -= packetSizeArray[lastIndex]
+                            lastIndex = (lastIndex + 1)%maxSamples
+                            runningPacketTotal -= 1
+                        #}
+                        throughput = 8000000*runningByteTotal/(runningTimeTotal*1024.0)
                     #}
 
-                    timePeriod = 0
-                    packetSizeSum = 0
-                    index = 0
-                    iter = 0
-                    throughput = 0
-
-                    while iter < maxSamples and timePeriod < avgTimeScale :
+                    if runningTimeTotal != 0 :
                     #{
-                        index = (arrayIndex - 1 - iter + maxSamples)%maxSamples
-                        timePeriod += packetTimeArray[index]
-                        packetSizeSum += packetSizeArray[index]
-                        iter += 1
-                    #}
-
-                    if timePeriod != 0 :
-                    #{
-                        throughput = 8000000*packetSizeSum/(timePeriod*1024.0)
                         tmpFileHandle.write(str(time-initTime)+" "+str(throughput)+"\n")
                         numLines += 1
                     #}
-
                 #}
+
+                packetSizeArray[arrayIndex] = currentPacketSize
+                packetTimeArray[arrayIndex] = currentPacketTime
+                arrayIndex = (arrayIndex + 1) % maxSamples
             #}
 
             lastPacketTime = time
@@ -288,11 +303,15 @@ def CalcMovingAvgThroughput(fileName, outputFile, minSamples, avgTimeScale, maxS
     del packetTimeArray
 
     # Return the avg. transfer rate - in kbps
+    if packetAvgTime == 0:
+        return 0
+
     return (8000000*packetAvgBytes/(packetAvgTime*1024.0))
 #}
 
 ###############################################################
 ###############################################################
+
 def PreProcess(inputFile, outputFile):
 #{
 
@@ -440,72 +459,72 @@ def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
         n = rows2
     #}
 
-    arraySize = FindPowerOf2(n)
-
-    x = [0.0] * arraySize
-    y = [0.0] * arraySize
-
-    xFFT = empty(arraySize, complex)
-    yFFT = empty(arraySize, complex)
-
-    count1 = 0
-    for lineRead in InFileHandle1:
-    #{
-        if count1 >= n:
-            break
-        x[count1] = float( lineRead.split()[1] )
-        count1 += 1
-    #}
-
-    InFileHandle1.close()
-
-    count2 = 0
-
-    for lineRead in InFileHandle2:
-    #{
-        if count2 >= n:
-            break
-        y[count2] = float( lineRead.split()[1] )
-        count2 += 1
-    #}
-
-    InFileHandle2.close()
-
-    # Calculate the delay interval with maximum
-    # correlation using FFT
-    xFFT = fft(x)
-    yFFT = fft(y)
-
-    inverseCorrArray = empty(arraySize,complex)
-    corrArray = empty(arraySize,complex)
-
-    for i in range(0, n):
-    #{
-        inverseCorrArray[i] = xFFT[i].conjugate() * yFFT[i]
-    #}
-
-    corrArray = ifft(inverseCorrArray)
-
-    maxCorr = -99999999
-    maxIndex = 0
-
-    # Find out the optimal shift in -10 sec: 10 sec range
-    for i in range(-1000, 1000):
-    #{
-        if corrArray[i].real > maxCorr:
-            maxCorr = corrArray[i].real
-            maxIndex = i
-    #}
-
-    delay = maxIndex
-
-    # Calculate the mean of the two series x[], y[] 
-    mx = 0
-    my = 0   
-
-    # Both the files are empty - just return.
+    # If both the files are empty - just return.
     if n != 0:
     #{
+        arraySize = FindPowerOf2(n)
+
+        x = [0.0] * arraySize
+        y = [0.0] * arraySize
+
+        xFFT = empty(arraySize, complex)
+        yFFT = empty(arraySize, complex)
+
+        count1 = 0
+        for lineRead in InFileHandle1:
+        #{
+            if count1 >= n:
+                break
+            x[count1] = float( lineRead.split()[1] )
+            count1 += 1
+        #}
+
+        InFileHandle1.close()
+
+        count2 = 0
+
+        for lineRead in InFileHandle2:
+        #{
+            if count2 >= n:
+                break
+            y[count2] = float( lineRead.split()[1] )
+            count2 += 1
+        #}
+
+        InFileHandle2.close()
+
+        # Calculate the delay interval with maximum
+        # correlation using FFT
+        xFFT = fft(x)
+        yFFT = fft(y)
+
+        inverseCorrArray = empty(arraySize,complex)
+        corrArray = empty(arraySize,complex)
+
+        for i in range(0, n):
+        #{
+            inverseCorrArray[i] = xFFT[i].conjugate() * yFFT[i]
+        #}
+
+        corrArray = ifft(inverseCorrArray)
+
+        maxCorr = -99999999
+        maxIndex = 0
+
+        # Find out the optimal shift in -10 sec: 10 sec range
+        for i in range(-1000, 1000):
+        #{
+            if corrArray[i].real > maxCorr:
+                maxCorr = corrArray[i].real
+                maxIndex = i
+        #}
+
+        delay = maxIndex
+
+        # Calculate the mean of the two series x[], y[] 
+        mx = 0
+        my = 0   
+
 
         for i in range(0, n):
         #{
@@ -558,16 +577,20 @@ def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
 
     diffTransferRate = elabAvg - plabAvg
 
-    diffPercentage = 100.0*(float(diffTransferRate))/(float(elabAvg))
+    if elabAvg != 0:
+        diffPercentage = 100.0*(float(diffTransferRate))/(float(elabAvg))
+    else:
+        diffPercentage = 0.0
 
     OutputFileHandle.write("Max_Correlation=" + str(maxCorr) + ":Delay=" + str(delay*10) + "ms:Transport=" + transport + ":N=" + str(n) + ":KbpsPercentDiff=" + str(diffPercentage) + "\n")
 
-    del x
-    del y
-    del xFFT
-    del yFFT
-    del corrArray
-    del inverseCorrArray
+    if n!= 0:
+        del x
+        del y
+        del xFFT
+        del yFFT
+        del corrArray
+        del inverseCorrArray
 #}
 ##############################################################
 ##############################################################
