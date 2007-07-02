@@ -389,7 +389,29 @@ def PreProcess(inputFile, outputFile):
     del timeArray
     del valueArray
 #}
+##############################################################
+##############################################################
+def FindPowerOf2(n):
+#{
+    mask = 1
+    bitPosition = 0
+    multipleOf2 = 0
 
+    for i in range(1, 32):
+    #{
+        if n & mask == mask:
+            bitPosition = i
+            multipleOf2 += 1
+
+        mask = mask*2
+    #}
+
+    if multipleOf2 == 1:
+        return n
+    else:
+        return int(math.pow(2,bitPosition)) 
+
+#}
 ##############################################################
 ##############################################################
 def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
@@ -418,9 +440,13 @@ def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
         n = rows2
     #}
 
-    x = [0.0] * n
-    y = [0.0] * n
+    arraySize = FindPowerOf2(n)
 
+    x = [0.0] * arraySize
+    y = [0.0] * arraySize
+
+    xFFT = empty(arraySize, complex)
+    yFFT = empty(arraySize, complex)
 
     count1 = 0
     for lineRead in InFileHandle1:
@@ -450,8 +476,8 @@ def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
     xFFT = fft(x)
     yFFT = fft(y)
 
-    inverseCorrArray = [0.0 + 0.0j] * (n)
-    corrArray = [0.0 + 0.0j] * (n)
+    inverseCorrArray = empty(arraySize,complex)
+    corrArray = empty(arraySize,complex)
 
     for i in range(0, n):
     #{
@@ -818,7 +844,7 @@ def Main():
 #{
     global minAvgSamples 
     global avgTime 
-    global maxAvgSamples 
+    global maxAvgSamples
     global logDir 
     global OutputFileHandle 
 
@@ -836,13 +862,13 @@ def Main():
             default=False, help="Use Bucket average instead of Moving average")
 
     cmdParser.add_option("-a", "--avgTime", action="store", dest="avgTime", \
-            default=2000000, help="Time period for Moving/Bucket Average")
+            type="int",default=2000000, help="Time period for Moving/Bucket Average")
 
     cmdParser.add_option("-m", "--minSamples", action="store", dest="minAvgSamples", \
-            default=100, help="Min Samples for Moving Average")
+            type="int",default=100, help="Min Samples for Moving Average")
 
     cmdParser.add_option("-x", "--maxSamples", action="store", dest="maxAvgSamples", \
-            default=500, help="Max Samples for Moving Average")
+            type="int",default=500, help="Max Samples for Moving Average")
 
     (cmdOptions, args) = cmdParser.parse_args()
 
@@ -853,6 +879,12 @@ def Main():
     logDir = args[0]
     OutputFileName = logDir + "/logs/SanityCheckDetails.txt"
     reportFileName = logDir + "/logs/SanityCheckReport.txt"
+
+    if not(os.path.exists(OutputFileName) and os.path.exists(reportFileName)) :
+    #{
+        print "##### Error: Path given as input is invalid. Provide the path upto(not including) logs/ directory"
+        sys.exit()
+    #}
 
     OutputFileHandle = file(OutputFileName, "w")
 
@@ -870,6 +902,9 @@ def Main():
     elif cmdOptions.udp:
         transportFlag = 2
         iterator = 1
+    else:
+        transportFlag = 2
+        iterator = 0
 
 
     minAvgSamples = cmdOptions.minAvgSamples
