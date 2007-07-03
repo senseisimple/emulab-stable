@@ -189,6 +189,44 @@ int main(int argc,char **argv) {
 	    exit(-4);
 	}
 
+	if (hex_mode) {
+            char *rkey_tmp = malloc(sizeof(char)*20);
+            char *gkey_tmp = malloc(sizeof(char)*20);
+            int lpc;
+            int outer_lpc = 0;
+            for (lpc = 0; lpc < rkey_len; lpc += 2) {
+                char cbite[3];
+                cbite[2] = '\0';
+                if ((lpc + 2) == rkey_len) {
+		    strncpy(cbite,&rkey[lpc],1);
+		    cbite[1] = '\0';
+                }
+                else {
+		    strncpy(cbite,&rkey[lpc],2);
+                }
+                int bite = (int)strtol(cbite,NULL,16);
+                rkey_tmp[outer_lpc++] = (char)bite;
+            }
+            rkey_len = outer_lpc;
+            outer_lpc = 0;
+            for (lpc = 0; lpc < gkey_len; lpc += 2) {
+		char cbite[3];
+		cbite[2] = '\0';
+		if ((lpc + 2) == gkey_len) {
+		    strncpy(cbite,&gkey[lpc],1);
+		    cbite[1] = '\0';
+		}
+		else {
+		    strncpy(cbite,&gkey[lpc],2);
+		}
+		int bite = (int)strtol(cbite,NULL,16);
+		gkey_tmp[outer_lpc++] = (char)bite;
+            }
+            gkey_len = outer_lpc;
+            gkey = gkey_tmp;
+            rkey = rkey_tmp;
+        }
+	
 	rmcp_ctx_setsecure(ctx,
 			   roleno,
 			   rkey,rkey_len,
