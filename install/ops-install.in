@@ -46,6 +46,9 @@ my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
 my $LIBDIR      = "$PREFIX/lib";
 my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
+my $OUTER_BOSS = '@OUTERBOSS_NODENAME@';
+if ($OUTER_BOSS eq '')
+    { $OUTER_BOSS = "www.emulab.net"; }
 
 #
 # Fixed paths for clients
@@ -1183,7 +1186,7 @@ if ($CVSSUPPORT) {
 if ($BUGDBSUPPORT) {
     my $FLYSPRAYPWD   = "$ETCDIR/flyspray.pwd";
     my $FLYSPRAYDIR   = "/usr/local/www/data/flyspray";
-    my $FLYSPRAYURL   = "http://www.emulab.net/downloads/flyspray-0.9.9.tgz";
+    my $FLYSPRAYURL   = "http://$OUTER_BOSS/downloads/flyspray-0.9.9.tgz";
     my $FLYSPRAYCONF  = "$ETCDIR/flyspray.conf.php";
     my $PHPCONFIG     = "/usr/local/etc/php.ini";
     my $localtarfile  = "/tmp/flyspray.tgz";
@@ -1314,7 +1317,7 @@ if ($BUGDBSUPPORT) {
 if ($WIKISUPPORT) {
     my $WIKIDIR       = "/usr/local/www/data/twiki";
     my $WIKICONF      = "LocalSite.cfg";
-    my $WIKIURL       = "http://www.emulab.net/downloads/twiki-4.1.tgz";
+    my $WIKIURL       = "http://$OUTER_BOSS/downloads/twiki-4.1.tgz";
     my $localtarfile  = "/tmp/twiki.tgz";
     my $CGISESSDIR    = "/var/db/cgisess";
     my $WIKI_LOGDIR   = "$LOGDIR/twiki";
