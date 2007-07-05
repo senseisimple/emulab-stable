@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Script for renaming files within expinfo diretoriesl. To be run after
+# anonymize-expinfo, and does a similar operation to the files within the
+# directory. 
+#
+# Intentionally supports only top and ptop files for now, but can be extended
+# to handle others
+#
+# If it finds any potential errors, does nothing. 
+#
+
+use strict;
+
+my @dirs = `ls -1 .`;
+chomp @dirs;
+
+my $errors = 0;
+my @commands;
+foreach my $dir (@dirs) {
+    next unless -d $dir;
+
+    my @files = `ls -1 $dir`; 
+    chomp @files;
+
+    my $newname;
+    my %newnames;
+    foreach my $file (@files) {
+        if ($file =~ /^([\w-]+)-(\d+\.p?top)$/) {
+            #print "top/ptopfile with ID: $file\n";
+            $newname = "$dir-$2";
+        } elsif ($file =~ /^([\w-]+)-(\d+-empty\.ptop)/) {
+            #print "Empty ptop file: $file\n";
+            $newname = "$dir-$2";
+        } elsif ($file =~ /^([\w-]+)-(\d+-coarsened\.top)/) {
+            #print "Empty ptop file: $file\n";
+            $newname = "$dir-$2";
+        } elsif ($file =~ /^([\w-]+)(\.p?top)$/) {
+            #print "Plain top/ptopfile: $file\n";
+            $newname = "${dir}$2";
+        } else {
+            warn "***: Filneame I don't recognize: $file\n";
+            $errors++;
+        }
+
+        if ($newnames{$newname}) {
+            warn "***: I want to rename two files $dir/${newname}: " .
+                "$newnames{$newname} and $file\n";
+            $errors++;
+        } else {
+            $newnames{$newname} = $file;
+            push @commands, "mv $dir/$file $dir/$newname\n";
+        }
+    }
+}
+
+if ($errors) {
+    exit(1);
+} else {
+    foreach my $cmd (@commands) {
+        if (system $cmd) {
+            print "*** Error running '$cmd'!\n";
+        }
+    }
+    exit(0);
+}

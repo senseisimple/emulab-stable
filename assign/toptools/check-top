@@ -1,0 +1,852 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# checktop - a script for checking, manipulating, and normalizing top/ptop
+# files from various versions of assign. Really, it's a full top/ptop file
+# parser.
+#
+
+#
+# TODO list:
+# Normailzation:
+#       Remove LAN nodes from old ptop files? (put LAN node on switches
+#           instead)
+#       Rename nodes in virtual topologies
+
+use strict;
+
+use Getopt::Std;
+
+my %opt;
+my $optlist = "ltL:evDnrs";
+if (!getopts($optlist,\%opt)){ 
+    warn "Usage: $0 [-r] [-l] [-e] [-t] [-L limit] [-v] [-D] [-n] [-s]\n";
+    warn " -r   Remove any files that fail the check\n";
+    warn " -l   List files that pass the check to stdout\n";
+    warn " -e   Print parse errors from failed files to stderr\n";
+    warn " -t   When finished, dump information about all types and\n";
+    warn "        features seen to stdout\n";
+    warn " -L   Stop after about <limit> files have been processed\n";
+    warn " -v   Print some progress information to stderr\n";
+    warn " -D   Include debugging output\n";
+    warn " -n   Normalize all files by re-writing them. Strips out some\n";
+    warn "        private information\n";
+    warn " -s   Strict checking - only pass files that would be parsed by\n";
+    warn "        latest version of assign\n";
+    exit 1;
+}
+
+#
+# Lists of legal flags 
+#
+my %ptop_nodeflags =  (
+    'trivial_bw' => 'int',
+    'subnode_of' => 'string',
+    'unique' => 'none'
+);
+
+my %top_nodeflags = (
+    'disallow_trivial_mix' => 'none',
+    'subnode_of' => 'string'
+);
+
+my %top_linkflags = (
+    'nodelay' => 'none',
+    'emulated' => 'none',
+    'trivial_ok' => 'none',
+    'fixsrciface' => 'string',
+    'fixdstface' => 'string'
+);
+
+#
+# Check to see if a given feature is allowed or if it should be filtered
+#
+sub is_feature_okay($) {
+    my ($feature) = @_;
+    if ($feature =~ /^OS-/) {
+        # OSes in the emulab-ops project are okay, as are ones that are just
+        # specified with a numeric ID
+        if ($feature =~ /^OS-\d+$/ || $feature =~ /^OS-emulab-ops/) {
+            #print "Allowing OS feature $feature\n"; 
+            return 1;
+        } else {
+            #print "Denying OS feature $feature\n";
+            return 0;
+        }
+    } else {
+        # Right now, everything that isn't an OS is considered 'safe'
+        return 1;
+    }
+}
+
+#
+# Make a list of types, features, and desires that we see, so that we can be
+# reasonably sure we're only seeing real ones
+#
+my %seen_node_types;
+my %seen_link_types;
+my %seen_fds;
+
+sub merge_sets($$) {
+    my ($global, $local) = @_;
+    foreach my $key (keys %$local) {
+        $global->{$key} = 1;
+    }
+}
+
+sub check_type($$) {
+    my ($type, $string) = @_;
+    my $passed;
+    if ($type eq "none") {
+        $passed = !defined($string);
+    } elsif ($type eq "int") {
+        $passed = defined($string) && ($string =~ /^-?\d+/);
+    } elsif ($type eq "float") {
+        $passed = defined($string) && (($string =~ /^-?\d+(\.\d+)?/) ||
+                                       ($string =~ /^-?\.\d+?/));
+    } elsif ($type eq "string") {
+        $passed = defined($string);
+    } else {
+        die "Bad type check for type '$type'\n";
+    }
+    if (!$passed) {
+        if (!defined($string)) {
+            $string = "(undefined)";
+        }
+        die "Type error: Looking for $type, got '$string'";
+    }
+}
+
+sub check_flag($$) {
+    my ($flagset, $flag) = @_;
+    my ($flagname,$flagval) = split(/:/, $flag, 2);
+    my $valtype = $flagset->{$flagname};
+    if (!defined($valtype)) {
+        die "Illegal flag: '$flagname'";
+    } else {
+        check_type($valtype, $flagval);
+    }
+}
+
+sub check_flag_nonfatal($$) {
+    my ($flagset,$flag) = @_;
+    #print "checking flag $flag\n";
+    eval {check_flag($flagset,$flag)};
+    #if (eval {check_flag($flagset,$flag)}) {
+    if ($@) {
+        #print "returning 0: $@\n";
+        return 0;
+    } else {
+        #print "returning 1\n";
+        return 1;
+    }
+}
+
+sub check_node_type($) {
+    my ($type) = @_;
+    my ($typename,$typeval) = split(/:/, $type, 2);
+    check_type('string', $type);
+    # TODO Check number of slots
+}
+
+#
+# Normalize our internal represetnation of a ptop file by filling in any
+# missing fields with reasonable defaults
+#
+sub normalize_ptop($) {
+    my ($ptop) = @_;
+    my ($nodes, $links, $limits) = @$ptop;
+    foreach my $node (@$nodes) {
+        #print "Normalizing $node->{name}\n";
+        if (!$node->{types}) {
+            # Assume that the node is a PC
+            $node->{types} = [["pc", 1]];
+        } else {
+            # All types should be a pair, including the number of slots - we
+            # fill in '1' as the slot count if not given
+            @{$node->{types}} = map {
+                if (ref($_) eq "ARRAY") {
+                    $_;
+                } else {
+                     [$_,1];
+                }
+            } @{$node->{types}};
+        }
+
+        # Just make sure the features and flags entries are not null
+        if (!$node->{features}) {
+            $node->{features} = [];
+        }
+        if (!$node->{flags}) {
+            $node->{flags} = [];
+        }
+
+        # Filter out some OS features
+        @{$node->{features}} = grep { is_feature_okay($$_[0]) } @{$node->{features}};
+    }
+
+    foreach my $link (@$links) {
+        # In the future, we would have to do something fancy here, if we're
+        # renaming nodes
+        if (!exists $link->{delay}) {
+            $link->{delay} = 0;
+        }
+        if (!exists $link->{loss}) {
+            $link->{loss} = 0;
+        }
+        if (!exists $link->{slots}) {
+            $link->{slots} = 1;
+        }
+
+        # Give the link a type of 'ethernet' if it isn't typed
+        if (!exists $link->{types} || $link->{types} == []) {
+            $link->{types} = ["ethernet"];
+        }
+    }
+
+    # Nothing to do for limits, for now
+}
+
+sub write_normalized_ptop($$) {
+    my ($outfile, $ptop) = @_;
+    my ($nodes, $links, $limits) = @$ptop;
+
+    open (OF,">$outfile") or die "Unable to open $outfile for writing";
+    foreach my $node (@$nodes) {
+        my $name = $node->{name};
+        my $types = join(" ", map { join ":", @$_; } @{$node->{types}});
+        my $features = join(" ", map { join ":", @$_; } @{$node->{features}});
+        my $flags = join(" ", map {
+                if (ref($_) eq "ARRAY") {
+                    join ":", @$_;
+                } else {
+                    $_;
+                }
+            } @{$node->{flags}});
+
+        # Avoid extraneous spaces if some options fields are empty, by building
+        # spaces into the strings
+        if ($features ne "") {
+            $features = " $features";
+        }
+        if ($flags ne "") {
+            $flags = " $flags";
+        }
+        print OF "node $name $types -$features -$flags\n";
+    }
+
+    foreach my $link (@$links) {
+        my $name = $link->{name};
+        my $srciface = $link->{srciface};
+        my $dstiface = $link->{dstiface};
+        my $bw = $link->{bw};
+        my $delay = $link->{delay};
+        my $loss = $link->{loss};
+        my $slots = $link->{slots};
+        my $types = join " ", @{$link->{types}};
+
+        print OF "link $name $srciface $dstiface $bw $delay $loss $slots $types\n";
+    }
+
+    foreach my $limit (@$limits) {
+        my $type = $limit->{type};
+        my $count = $limit->{limit};
+
+        print OF "set-type-limit $type $count\n";
+    }
+
+    close(OF);
+}
+
+sub normalize_top($) {
+    my ($top) = @_;
+    my ($nodes, $links, $vclasses, $fixes, $hints) = @$top;
+
+    foreach my $node (@$nodes) {
+        #print "Normalizing $node->{name}\n";
+        if (!$node->{type}) {
+            # Assume that the node is a PC
+            $node->{type} = ["pc", 1];
+        } else {
+            # All types should be a pair, including the number of slots - we
+            # fill in '1' as the slot count if not given
+            if (ref($node->{type}) ne "ARRAY") {
+                $node->{type} = [$node->{type},1];
+            }
+        }
+
+        # Just make sure the features and flags entries are not null
+        if (!$node->{desires}) {
+            $node->{desires} = [];
+        }
+        if (!$node->{flags}) {
+            $node->{flags} = [];
+        }
+
+        # Filter out some OS desires
+        @{$node->{desires}} = grep { is_feature_okay($$_[0]) } @{$node->{desires}};
+    }
+
+    foreach my $link (@$links) {
+        # In the future, we would have to do something fancy here, if we're
+        # renaming nodes
+        if (!exists $link->{delay}) {
+            $link->{delay} = 0;
+        }
+        if (!exists $link->{loss}) {
+            $link->{loss} = 0;
+        }
+        if (!exists $link->{slots}) {
+            $link->{slots} = 1;
+        }
+
+        # Give the link a type of 'ethernet' if it isn't typed
+        if (!exists $link->{type}) {
+            $link->{type} = "ethernet";
+        }
+    }
+
+    # Nothing to do, for now, for vclasses, fixes, or hints
+}
+
+sub write_normalized_top($$) {
+    my ($outfile, $top) = @_;
+    my ($nodes, $links, $vclasses, $fixes, $hints) = @$top;
+
+    open (OF,">$outfile") or die "Unable to open $outfile for writing";
+
+    # We put vclasses first so that we're guaranteed that to be defined before
+    # the vnodes that use them
+    foreach my $vclass (@$vclasses) {
+        my $name = $vclass->{name};
+        my $weight = $vclass->{weight};
+        my $types = join(" ",@{$vclass->{types}});
+
+        print OF "make-vclass $name $weight $types\n";
+    }
+
+
+    foreach my $node (@$nodes) {
+        my $name = $node->{name};
+        my $type = join(":",@{$node->{type}});
+        my $flags = join(" ", map {
+                if (ref($_) eq "ARRAY") {
+                    join ":", @$_;
+                } else {
+                    $_;
+                }
+            } @{$node->{flags}});
+        my $desires = join(" ", map { join ":", @$_; } @{$node->{desires}});
+
+        print OF "node $name $type";
+        
+        # Avoid empty spaces if $flags and/or $desires are empty
+        if ($flags ne "") {
+            print OF " $flags";
+        }
+
+        if ($desires ne "") {
+            print OF " $desires";
+        }
+        
+        print OF "\n";
+    }
+
+    foreach my $link (@$links) {
+        my $name = $link->{name};
+        my $srciface = $link->{srciface};
+        my $dstiface = $link->{dstiface};
+        my $bw = $link->{bw};
+        my $delay = $link->{delay};
+        my $loss = $link->{loss};
+        my $type = $link->{type};
+        my $flags = join(" ", map {
+                if (ref($_) eq "ARRAY") {
+                    join ":", @$_;
+                } else {
+                    $_;
+                }
+            } @{$link->{flags}});
+
+        # Avoid spaces if $flags is empty
+        print OF "link $name $srciface $dstiface $bw $delay $loss $type";
+        if ($flags ne "") {
+            print OF " $flags";
+        }
+        print OF "\n";
+
+    }
+
+    foreach my $fix (@$fixes) {
+        my $vnode = $fix->{vnode};
+        my $pnode = $fix->{pnode};
+
+        print OF "fix-node $vnode $pnode\n";
+    }
+
+    foreach my $hint (@$hints) {
+        my $vnode = $hint->{vnode};
+        my $pnode = $hint->{pnode};
+
+        print OF "node-hint $vnode $pnode\n";
+    }
+
+    close(OF);
+}
+
+sub parse_ptop($) {
+    my ($ptop) = @_;
+
+    open PT, "<$ptop" or die "Unable to open $ptop: $!\n";
+
+    # We will only merge these into the global set if we succesfully parse the
+    # whole file
+    my %local_seen_node_types;
+    my %local_seen_link_types;
+    my %local_seen_fds;
+
+    my (@nodes, @links, @limits);
+
+    my $line_no = 0;
+    while (my $line = <PT>) {
+        $line_no++;
+        chomp $line;
+
+        my @tokens = split /\s+/,$line;
+        my $line_type = shift @tokens;
+
+        if (!@tokens) {
+            # Skip blank lines
+            next;
+        }
+
+        if ($line_type eq "node") {
+            my %node;
+
+            my $name = shift @tokens;
+            check_type("string",$name);
+
+            # Grab all types for this node, list terminated with a '-'
+            my @types;
+            while (my $token = shift @tokens) {
+                if ($token eq "-") {
+                    last;
+                } else {
+                    my ($type, $slots) = split(/:/,$token,2);
+                    if (!defined $slots) {
+                        $slots = 1;
+                    }
+                    $local_seen_node_types{$type} = 1;
+                    push @types, [$type, $slots];
+                }
+            }
+            if (!@types) {
+                die "No types for node $name on $ptop line $line_no\n";
+            }
+
+            # Grab features, list terminated with a '-'. Can be empty
+            my @features;
+            while (my $token = shift @tokens) {
+                if ($token eq "-") {
+                    last;
+                } else {
+                    my ($feature, $weight) = split(/:/,$token,2);
+                    if (!defined $weight) {
+                        die "Malformed feature '$token'";
+                    }
+                    $local_seen_fds{$feature} = 1;
+                    push @features, [$feature,$weight];
+                }
+            }
+
+            # Grab flags and make sure they are legal flags
+            my @flags = @tokens;
+            @tokens = ();
+            foreach my $flag (@flags) {
+                check_flag(\%ptop_nodeflags,$flag);
+            }
+
+            $node{name} = $name;
+            $node{types} = \@types;
+            $node{features} = \@features;
+            $node{flags} = \@flags;
+
+            push @nodes, \%node;
+
+        } elsif ($line_type eq "link") {
+            my %link;
+
+            $link{name} = shift @tokens;
+            check_type("string",$link{name});
+
+            # TODO - probably add a special type check for interfaces
+            $link{srciface} = shift @tokens;
+            check_type("string",$link{srciface});
+            $link{dstiface} = shift @tokens;
+            check_type("string",$link{dstiface});
+
+            $link{bw} = shift @tokens;
+            check_type("int",$link{bw});
+
+            # This is a bit tricky - figure out if there are delay and
+            # loss present on the line
+            if (scalar(@tokens) < 2) {
+                if ($opt{s}) {
+                    die "No latency/loss on $ptop line $line_no\n";
+                }
+                if (scalar(@tokens) == 1) {
+                    $link{slots} = shift @tokens;
+                    check_type("int",$link{slots});
+                }
+                # Note: There were no types on link lines old enough to
+                # not have delay/loss
+            } else {
+                $link{delay} = shift @tokens;
+                check_type("float",$link{delay});
+                $link{loss} = shift @tokens;
+                check_type("float",$link{loss});
+                $link{slots} = shift @tokens;
+                check_type("int",$link{slots});
+                my @types = ();
+                if (@tokens) {
+                    @types = @tokens;
+                    @tokens = ();
+                    foreach my $type (@types) {
+                        check_type("string",$type);
+                        $seen_link_types{$type} = 1;
+                    }
+                    $link{types} = \@types;
+                } else {
+                    if ($opt{s}) {
+                        # Only die if doing strict checking - otherwise, it's
+                        # okay to have no types
+                        die "No link type on $ptop line $line_no\n";
+                    }
+                }
+            }
+
+            push @links, \%link;
+
+        } elsif ($line_type eq "set-type-limit") {
+            my $type = shift @tokens;
+            check_type("string", $type);
+            $local_seen_node_types{$type} = 1;
+            my $limit = shift @tokens;
+            check_type("int", $limit);
+
+            my %limit = (type => $type, limit => $limit);
+            push @limits, \%limit;
+        } else {
+            die "Unknown line type '$line_type' on $ptop line $line_no\n";
+        }
+
+        # Make sure that we've parsed all tokens
+        if (@tokens) {
+            die "Tokens left after parsing finished on $ptop line $line_no\n
+            @tokens\n";
+        }
+    }
+
+    merge_sets(\%seen_node_types,\%local_seen_node_types);
+    merge_sets(\%seen_link_types,\%local_seen_link_types);
+    merge_sets(\%seen_fds,\%local_seen_fds);
+
+    close PT;
+
+    return [\@nodes, \@links, \@limits];
+}
+
+sub parse_top($) {
+    my ($top) = @_;
+
+    # We will only merge these into the global set if we succesfully parse the
+    # whole file
+    my %local_seen_node_types;
+    my %local_seen_link_types;
+    my %local_seen_fds;
+
+    open TF, "<$top" or die "Unable to open $top: $!\n";
+
+    my (@nodes, @links, @vclasses, @fixes, @hints);
+    my $line_no = 0;
+    while (my $line = <TF>) {
+        $line_no++;
+        chomp $line;
+
+        my @tokens = split /\s+/,$line;
+        my $line_type = shift @tokens;
+
+        if (!@tokens) {
+            # Skip blank lines
+            next;
+        }
+
+        if ($line_type eq "node") {
+            my %node;
+
+            $node{name} = shift @tokens;
+            check_type("string",$node{name});
+
+            my $token = shift @tokens;
+
+            my ($type, $slots) = split(/:/,$token,2);
+            check_node_type($type);
+            if ($slots) {
+                check_type("int",$slots);
+                $node{type} = [$type, $slots];
+            } else {
+                $node{type} = $type;
+            }
+            $local_seen_node_types{$type} = 1;
+
+            # Grab desires, which can be intermixed with flags. Ick.
+            my @desires;
+            my @flags;
+            while (my $token = shift @tokens) {
+                if (check_flag_nonfatal(\%top_nodeflags,$token)) {
+                    push @flags, $token;
+                } else {
+                    my ($desire, $weight) = split(/:/,$token,2);
+                    check_type('string',$desire);
+                    check_type('float', $weight);
+                    $local_seen_fds{$desire} = 1;
+                    push @desires, [$desire,$weight];
+                }
+            }
+
+            $node{desires} = \@desires;
+            $node{flags} = \@flags;
+
+            push @nodes, \%node;
+
+        } elsif ($line_type eq "link") {
+            my %link;
+
+            $link{name} = shift @tokens;
+            check_type("string",$link{name});
+            $link{srciface} = shift @tokens;
+            check_type("string",$link{srciface});
+            $link{dstiface} = shift @tokens;
+            check_type("string",$link{dstiface});
+
+            $link{bw} = shift @tokens;
+            check_type("int",$link{bw});
+            
+            # This is a bit tricky - figure out if there are delay and
+            # loss present on the line
+            # XXX - I'm not sure if there were flags on lines that didn't
+            # have latency/loss
+            if (!scalar(@tokens)) {
+                if ($opt{s}) {
+                    die "No latency/loss on $top line $line_no\n";
+                }
+            } elsif (scalar(@tokens) == 1) {
+                die "Link line in a format I don't recognize on $top line " .
+                    "$line_no\n";
+            } else {
+                $link{delay} = shift @tokens;
+                check_type("float",$link{delay});
+                $link{loss} = shift @tokens;
+                check_type("float",$link{loss});
+            }
+
+            # Distintuish between the two different formats of link lines
+            if (@tokens) {
+                my @flags;
+
+                my $maybe_flag = shift @tokens;
+                if (check_flag_nonfatal(\%top_linkflags,$maybe_flag)) {
+                    push @flags, $maybe_flag;
+                    if ($opt{s}) {
+                        die "No link type on $top line $line_no\n";
+                    }
+                } else {
+                    $link{type} = $maybe_flag;
+                    $local_seen_link_types{$link{type}} = 1;
+                }
+
+                push @flags, @tokens;
+                @tokens = ();
+                foreach my $flag (@flags) {
+                    check_flag(\%top_linkflags,$flag);
+                }
+
+                $link{flags} = \@flags;
+            }
+
+            push @links, \%link;
+            
+        } elsif ($line_type eq "make-vclass") {
+            my $name = shift @tokens;
+            check_type("string", $name);
+            my $penalty = shift @tokens;
+            check_type("float", $penalty);
+
+            my @types = @tokens;
+            if (!@types) {
+                die "No types given for vclass on $top line $line_no\n";
+            } else {
+                foreach my $type (@types) {
+                    $local_seen_node_types{$type} = 1;
+                }
+            }
+            @tokens = ();
+
+            my %vclass = (name => $name, weight => $penalty, types => \@types);
+            push @vclasses, \%vclass;
+        } elsif ($line_type eq "fix-node") {
+
+            my $vnode = shift @tokens;
+            check_type("string",$vnode);
+            my $pnode = shift @tokens;
+            check_type("string",$pnode);
+
+            my %fix = (vnode => $vnode, pnode => $pnode);
+            push @fixes, \%fix;
+
+        } elsif ($line_type eq "node-hint") {
+            my $vnode = shift @tokens;
+            check_type("string",$vnode);
+            my $pnode = shift @tokens;
+            check_type("string",$pnode);
+
+            my %hint = (vnode => $vnode, pnode => $pnode);
+            push @hints, \%hint;
+        } else {
+            die "Unknown line type '$line_type' on $top line $line_no\n";
+        }
+
+        # Make sure that we've parsed all tokens
+        if (@tokens) {
+            die "Tokens left after parsing finished on $top line $line_no\n
+            @tokens\n";
+        }
+    }
+
+    merge_sets(\%seen_node_types,\%local_seen_node_types);
+    merge_sets(\%seen_link_types,\%local_seen_link_types);
+    merge_sets(\%seen_fds,\%local_seen_fds);
+
+    close TF;
+
+    return [\@nodes, \@links, \@vclasses, \@fixes, \@hints];
+}
+
+#
+# Find top files
+#
+my @dirs = `ls -1`;
+chomp @dirs;
+my $processed_files = 0;
+my $passed_files = 0;
+foreach my $dir (@dirs) {
+    #my @ptopfiles = `ls -1 $dir/\*.ptop`;
+    #my @ptopfiles = ();
+    #my @topfiles = `ls -1 $dir/\*.top`;
+
+    my @topfiles;
+    my @ptopfiles;
+
+    opendir DIR, "$dir" or die "Unable to open $dir: $!\n";
+    while (my $file = readdir DIR) {
+        if ($file =~ /\.ptop$/) {
+            push @ptopfiles, "$dir/$file";
+        }
+        if ($file =~ /\.top$/) {
+            push @topfiles, "$dir/$file";
+        }
+    }
+
+    chomp @ptopfiles;
+    chomp @topfiles;
+    foreach my $ptop (@ptopfiles) {
+        if ($opt{D}) {
+            print "Checking ptop file $ptop\n";
+        }
+        $processed_files++;
+        my $ptop_data = eval { parse_ptop($ptop); };
+        #if (eval { parse_ptop($ptop); }) {
+        if (!$@) {
+            $passed_files++;
+            if ($opt{l}) {
+                print "$ptop\n";
+            }
+            if ($opt{n}) {
+                normalize_ptop($ptop_data);
+                write_normalized_ptop($ptop,$ptop_data);
+            }
+        } else {
+            if ($opt{r}) {
+                system "rm $ptop";
+            }
+            if ($opt{e}) {
+                print "*** FAILED: $ptop: $@\n";
+            }
+        }
+
+        if ($processed_files % 100 == 0) {
+            if ($opt{v}) {
+                print STDERR "*** Processed $processed_files files ($passed_files passed)\n";
+            }
+        }
+    }
+    foreach my $top (@topfiles) {
+        if ($opt{D}) {
+            print "Checking top file $top\n";
+        }
+        #parse_top($top);
+        $processed_files++;
+        my $top_data = eval { parse_top($top); };
+        #if (eval { parse_top($top); }) {
+        if (!$@) {
+            $passed_files++;
+            if ($opt{l}) {
+                print "$top\n";
+            }
+            if ($opt{n}) {
+                normalize_top($top_data);
+                write_normalized_top($top,$top_data);
+            }
+        } else {
+            if ($opt{r}) {
+                system "rm $top";
+            }
+            if ($opt{e}) {
+                print "*** FAILED: $top: $@\n";
+            }
+        }
+
+        if ($processed_files % 100 == 0) {
+            if ($opt{v}) {
+                print STDERR "*** Processed $processed_files files ($passed_files passed)\n";
+            }
+        }
+    }
+
+    if ($opt{L} && $processed_files > $opt{L}) {
+        last;
+    }
+}
+
+if ($opt{t}) {
+    # Dump the types we've seen
+    print "Seen node types:\n";
+    foreach my $node_type (sort keys %seen_node_types) {
+        print "$node_type\n";
+    }
+
+    print "Seen link types:\n";
+    foreach my $link_type (sort keys %seen_link_types) {
+        print "$link_type\n";
+    }
+
+    print "Seen features/desires:\n";
+    foreach my $fd (sort keys %seen_fds) {
+        print "$fd\n";
+    }
+}
