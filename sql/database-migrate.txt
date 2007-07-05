@@ -4079,7 +4079,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  add `swapmod_time` int(10) unsigned NOT NULL default '0'
 	     after swapout_time,
 	  add  `byswapmod` tinyint(1) unsigned default '0'
-	     after swapmod_time;
+	     after swapmod_time,
 	  add `byswapin` tinyint(1) unsigned default '0'
 	     after byswapmod;
 
