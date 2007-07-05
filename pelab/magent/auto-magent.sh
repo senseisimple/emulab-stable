@@ -22,7 +22,7 @@ TARGETS=$MAGENT
 #
 if [ ${MAGENT_NORECV:-0} -ne 0 ]; then
     port=`echo $ARGS | sed -e 's/.*--peerserverport=\([0-9][0-9]*\).*/\1/'`
-    ARGS=$ARGS --nopeerserver
+    ARGS="$ARGS --nopeerserver"
     echo "${IPERFD_DIR}/$IPERFD -p $port"
     ${IPERFD_DIR}/$IPERFD -p $port &
     TARGETS="$TARGETS $IPERFD"
