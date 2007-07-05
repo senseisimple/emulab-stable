@@ -140,6 +140,18 @@ Interpretation:
 
 ##### Other notes
 
+The 'normalized' files we have released have the following properties:
+    Nodes are all listed before links
+    In top files, vclasses are listed before nodes, to avoid forward references
+    All link lines in top and ptop files have associated types - this means
+        that for the top file format, link lines are all in the <link_line2>
+        format.
+    All link lines in the physical topology files have the optional 'slots'
+        field
+    All node lines in the ptop files have the optional dashes to separate the
+        'feature' and 'flags' portions of the line, though the actual feature
+        and flag lists may be empty
+
 There is, unfortunately, a change I made in the top file format that you must
 take special care to detect. Later versions of the top file add a mandatory
 type field to link lines, before the flags. Thus, when looking at a file, you
