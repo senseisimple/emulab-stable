@@ -23,6 +23,7 @@ namespace global
   int connectionModelArg = 0;
   unsigned short peerUdpServerPort = 0;
   unsigned short peerServerPort = 0;
+  bool isPeerServer = true;
   unsigned short monitorServerPort = 0;
   bool doDaemonize = false;
   int replayArg = NO_REPLAY;

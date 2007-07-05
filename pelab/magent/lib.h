@@ -350,6 +350,7 @@ namespace global
   extern int connectionModelArg;
   extern unsigned short peerUdpServerPort;
   extern unsigned short peerServerPort;
+  extern bool isPeerServer;
   extern unsigned short monitorServerPort;
   extern bool doDaemonize;
   extern int replayArg;

@@ -94,15 +94,15 @@ void KernelTcp::connect(PlanetOrder & planet)
             logWrite(ERROR, "Could not create a datagram socket in KernelTcp::connect");
         }
 
-	int flags = fcntl(peersock, F_GETFL, 0);
+        int flags = fcntl(peersock, F_GETFL, 0);
 
-	flags = flags | O_NONBLOCK;
+        flags = flags | O_NONBLOCK;
 
-	if( fcntl(peersock, F_SETFL, flags) < 0 )
-	{
-		logWrite(ERROR,"Could not set UDP socket to non-blocking");
+        if( fcntl(peersock, F_SETFL, flags) < 0 )
+        {
+                logWrite(ERROR,"Could not set UDP socket to non-blocking");
 
-	}
+        }
 
         udpLocalAddr.sin_family = AF_INET;
         udpLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -398,14 +398,14 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
                   return -1;
           }
 
-	  int flags = fcntl(peersock, F_GETFL, 0);
+          int flags = fcntl(peersock, F_GETFL, 0);
 
-	  flags = flags | O_NONBLOCK;
+          flags = flags | O_NONBLOCK;
 
-	  if( fcntl(peersock, F_SETFL, flags) < 0 )
-	  {
-		  logWrite(ERROR,"Could not set UDP socket to non-blocking");
-	  }
+          if( fcntl(peersock, F_SETFL, flags) < 0 )
+          {
+                  logWrite(ERROR,"Could not set UDP socket to non-blocking");
+          }
     }
   // result.planet.ip and result.planet.remotePort denote the destination.
   // result.planet.ip is in host order
@@ -437,15 +437,15 @@ int KernelTcp::writeUdpMessage(int size, WriteResult & result)
 
   if(bytesWritten < 0)
   {
-	  if(errno == EWOULDBLOCK)
-	  {
-		  logWrite(EXCEPTION,"UDP sendto returned EWOULDBLOCK");
-	  }
-	  else
-	  {
-	      logWrite(EXCEPTION, "Error writing to UDP socket in KernelTcp, errno = %d",errno);
-	      return -1;
-	  }
+          if(errno == EWOULDBLOCK)
+          {
+                  logWrite(EXCEPTION,"UDP sendto returned EWOULDBLOCK");
+          }
+          else
+          {
+              logWrite(EXCEPTION, "Error writing to UDP socket in KernelTcp, errno = %d",errno);
+              return -1;
+          }
   }
 
   udpCurSeqNum++;
@@ -481,7 +481,7 @@ namespace
 void KernelTcp::init(void)
 {
   // Set up the peerAccept socket
-  if (global::peerServerPort != 0) {
+  if (global::isPeerServer) {
     global::peerAccept = createServer(global::peerServerPort,
                                       "Peer accept socket (No incoming peer "
                                       "connections will be accepted)");
@@ -931,14 +931,14 @@ namespace
     static int counter = 0;
         pcap_stats(KernelTcp::pcapDescriptor, &pcapStats);
 
-	if(counter%2000 == 0)
-	{
+        if(counter%2000 == 0)
+        {
         if(pcapStats.ps_drop > currentPcapLoss)
         {
                  currentPcapLoss = pcapStats.ps_drop;
                  logWrite(SENSOR,"\nSTAT::Number of packets lost in libpcap = %d\n",currentPcapLoss);
         }
-	}
+        }
     counter++;
 
     // We want to distinguish between packets that are outgoing and

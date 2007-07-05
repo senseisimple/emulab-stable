@@ -66,6 +66,7 @@ void usageMessage(char *progname)
   cerr << "Usage: " << progname << " [options]" << endl;
   cerr << "  --connectionmodel=<null|kerneltcp> " << endl;
   cerr << "  --peerserverport=<int> " << endl;
+  cerr << "  --nopeerserver " << endl;
   cerr << "  --peerudpserverport=<int> " << endl;
   cerr << "  --monitorserverport=<int> " << endl;
   cerr << "  --interface=<iface> " << endl;
@@ -82,6 +83,7 @@ void processArgs(int argc, char * argv[])
   // Defaults, in case the user does not pass us explicit values
   global::connectionModelArg = CONNECTION_MODEL_KERNEL;
   global::peerServerPort = 3491;
+  global::isPeerServer = true;
   global::peerUdpServerPort = 3492;
   global::monitorServerPort = 4200;
   global::interface = "vnet";
@@ -94,6 +96,7 @@ void processArgs(int argc, char * argv[])
     // too.
     {"connectionmodel",   required_argument, NULL, 'c'},
     {"peerserverport",    required_argument, NULL, 'p'},
+    {"nopeerserver",      no_argument,       NULL, 'x'},
     {"peerudpserverport", required_argument, NULL, 'u'},
     {"monitorserverport", required_argument, NULL, 'm'},
     {"interface",         required_argument, NULL, 'i'},
@@ -159,6 +162,9 @@ void processArgs(int argc, char * argv[])
       {
         global::peerServerPort = argIntVal;
       }
+      break;
+    case 'x':
+      global::isPeerServer = false;
       break;
     case 'u':
       if (sscanf(optarg,"%i",&argIntVal) != 1)
