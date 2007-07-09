@@ -25,6 +25,7 @@ import pwd
 sys.path.append("@prefix@/lib")
 import getopt
 import os
+import re
 
 import xmlrpclib
 from emulabclient import *
@@ -1797,7 +1798,8 @@ class template_commit:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:p:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv,
+                                           "we:p:E:t:r:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1824,32 +1826,34 @@ class template_commit:
                 params["proj"] = val
                 pid = val;
                 pass
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-t":
+                params["tid"] = val;
+                pass
+            elif opt == "-r":
+                params["tag"] = val;
+                pass
             pass
         
         # Try to infer the template guid/vers from the current path.
-        if os.access(".template", os.R_OK):
-            params["path"] = os.getcwd()
+        if len(req_args) == 1:
+            params["guid"] = req_args[0]
             pass
-        elif len(req_args) == 1:
-            guid = req_args[0]
+        elif pid == None and eid == None:
+            (guid, subdir) = infer_template()
+            if subdir:
+                params["path"] = os.getcwd()
+                pass
+            else:
+                self.usage();
+                return -1
             pass
         else:
-            #
-            # Crawl up the tree looking for a .template file.
-            #
-            rootino = os.stat("/").st_ino
-
-            while True:
-                if os.access(".template", os.R_OK):
-                    params["path"] = os.getcwd()
-                    break
-                if os.stat(".").st_ino == rootino:
-                    self.usage();
-                    return -1
-                os.chdir("..")
-                pass
-            pass
-
+            self.usage();
+            return -1
+        
         print "Committing template; please be (very) patient!"
         
         rval,response = do_method("template", "template_commit", params);
@@ -1857,11 +1861,13 @@ class template_commit:
     
     def usage(self):
 	print "template_commit [-w]"
-	print "template_commit [-w] [-e eid] <guid/vers>"
+	print "template_commit [-w] [-e eid | -r tag] <guid/vers>"
         print "template_commit [-w] -p pid -e eid"
 	print "where:";
 	print "     -w     - Wait for template to finish commit";
         print "     -e     - Commit from specific template instance (eid)"
+        print "     -E     - A pithy sentence describing your experiment"
+        print "     -t     - The template name (alphanumeric, no blanks)"
         print "     -p     - Project for -e option (pid)"
         print "    guid    - Template GUID"
         print ""
@@ -1871,7 +1877,7 @@ class template_commit:
         print ""
         print "Environment:"
         print "  cwd   The template will be inferred from the current"
-        print "        working directory, if it is inside a template checkout."
+        print "        working directory if it is inside a template checkout."
         wrapperoptions();
         return
     pass
@@ -2030,8 +2036,11 @@ class template_instantiate:
         if len(req_args) == 0:
             guid = infer_guid(os.getcwd())
             if guid == None:
-                self.usage();
-                return -1
+                (guid, subdir) = infer_template()
+                if guid == None:
+                    self.usage()
+                    return -1
+                pass
             pass
         elif len(req_args) == 1:
             guid = req_args[0]
@@ -2055,9 +2064,9 @@ class template_instantiate:
         return rval;
 
     def usage(self):
-        print "template_instantiate [-q] [-b] [-E description] [-p xmlfilename] ";
-        print "         [-p] [-S reason] [-L reason] [-a <time>] [-l <time>]";
-        print "         -e <eid> <guid>";
+        print "template_instantiate [-q] [-E description] [-p xmlfilename] ";
+        print "     [-b] [-p] [-S reason] [-L reason] [-a <time>] [-l <time>]";
+        print "     -e <eid> <guid>";
 	print "where:";
         print "   -b   - queue for the batch system";
         print "   -p   - preload only; do not swapin";
@@ -2074,8 +2083,7 @@ class template_instantiate:
         print ""
         print "Environment:"
         print "  cwd   The template GUID will be inferred from the current"
-        print "        working directory, if it is inside the templates's"
-        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        print "        working directory if it is inside a template checkout."
         wrapperoptions();
         return
     pass
@@ -2531,6 +2539,46 @@ def infer_guid(path):
         vers = dirs[dirs.index("templates") + 2]
         pass
     return guid + "/" + vers
+
+#
+# Different version, that crawls up tree looking for .template file.
+# Open up file and get the guid/vers, but also return path of final directory.
+#
+def infer_template():
+    rootino = os.stat("/").st_ino
+    cwd     = os.getcwd()
+    guid    = None
+    vers    = None
+    subdir  = None
+
+    try:
+        while True:
+            if os.access(".template", os.R_OK):
+                fp = open(".template")
+                line = fp.readline()
+                while line:
+                    m = re.search('^GUID:\s*([\w]*)\/([\d]*)$', line)
+                    if m:
+                        guid    = m.group(1)
+                        vers    = m.group(2)
+                        subdir  = os.getcwd()
+                        fp.close();
+                        return (guid + "/" + vers, subdir)
+                    line = fp.readline()
+                    pass
+                fp.close();
+                break
+            if os.stat(".").st_ino == rootino:
+                break
+            os.chdir("..")
+            pass
+        pass
+    except:
+        pass
+        
+    os.chdir(cwd)
+    return (guid, subdir)    
+    pass
 
 #
 # Infer pid and eid

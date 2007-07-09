@@ -15,7 +15,7 @@ SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nsverify nseparse checkup
+SUBDIRS		= checkpass ns2ir nsverify nseparse checkup template_cvsroot
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
@@ -158,6 +158,7 @@ endif
 subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ns2ir install
+	@$(MAKE) -C template_cvsroot install
 	@$(MAKE) -C nsverify install
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)

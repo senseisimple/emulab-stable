@@ -34,16 +34,18 @@ use Data::Dumper;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_checkout [-q] -f <path> <guid/vers>\n".
+	  "Usage: template_checkout [-q] [-u] -f <path> <guid/vers>\n".
 	  "switches and arguments:\n".
 	  "-q          - be less chatty\n".
+	  "-u          - update existing checkout\n".
 	  "-f          - path to checkout directory on ops (via NFS).\n".
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qdf:";
+my $optlist	 = "qdf:u";
 my %options      = ();
 my $quiet        = 0;
+my $update       = 0;
 my $debug        = 0;
 my $directory;
 my $guid;
@@ -124,7 +126,7 @@ ParseArgs();
 # A little cookie file in that indicates what template it refers to. 
 my $cookie = "$directory/.template";
 
-if (-e $cookie) {
+if (-e $cookie && !$update) {
     print STDERR "$directory already contains a checkout!\n";
     print STDERR "There is no 'update' operation yet; delete or move it.\n";
     exit(1);
@@ -156,6 +158,14 @@ if (-e "$directory/exp" && ! -l "$directory/exp") {
 if (! -e "$directory/exp") {
     system("cd $directory; ln -s . exp") == 0 or
 	tbdie("Could not create exp symlink in $directory!");
+}
+
+#
+# No update in place (yet) since we use simple zip files. Move the current
+# datastore directory out of the way. 
+#
+if ($update && -d "$directory/datastore") {
+    
 }
 
 #
@@ -235,6 +245,9 @@ sub ParseArgs()
     }
     if (defined($options{"d"})) {
 	$debug = 2;
+    }
+    if (defined($options{"u"})) {
+	$update = 1;
     }
 }
 

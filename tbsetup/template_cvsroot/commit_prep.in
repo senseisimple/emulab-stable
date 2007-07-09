@@ -1,0 +1,71 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#print "Prep: @ARGV\n";
+
+#
+# Simply record the directory (first argument). The last one we get indicates
+# the last file of the commit. 
+#
+my $id = getpgrp();
+my $directory = shift(@ARGV);
+my $filename = "/tmp/#cvs.files.lastdir.${id}";
+my $docommit = "/tmp/#cvs.docommit.${id}";
+my $entries  = "CVS/Entries";
+
+open(FILE, ">$filename") or die("Cannot open $filename, stopped");
+print FILE "$directory\n";
+close(FILE);
+
+#
+# Scan the file list. If we are committing the magic file, setup for a
+# commit later in the loginfo handler.
+#
+if (! grep(/^TemplateInfo$/, @ARGV)) {
+    exit(0);
+}
+
+#
+# Read the CVS version out of the CVS/Entries file so we can match it
+# up against a tag. 
+#
+my ($name,$revision,$date,undef,$tag) =
+    split('/', substr(`grep TemplateInfo $entries`, 1));
+
+if (!defined($name) || !defined($revision)) {
+    die("Could not find TemplateInfo in $entries!\n");
+}
+
+#
+# If not operating on the trunk (revision is x.y), then it has to be a
+# tagged sandbox.
+#
+if ($revision =~ /^\d+\.\d+$/) {
+    $tag = "HEAD";
+}
+elsif (!defined($tag)) {
+    die("You must tag your repository to create a new template!\n");
+}
+else {
+    chomp($tag);
+    $tag = substr($tag, 1);
+}
+#print "TemplateInfo: $revision,$tag\n";
+
+# Cookie file that says we need to do a commit, and what the tag is.
+open(COM, ">$docommit")
+    or die("Could not write $docommit");
+print COM "$tag\n";
+close(COM);
+exit(0);

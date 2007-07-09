@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#print "Log: @ARGV\n";
+
+#
+# Simply record the log message for later.
+#
+my $id = getpgrp();
+my $logfile  = shift(@ARGV);
+my $filename = "/tmp/#cvs.logmsg.${id}";
+my $docommit = "/tmp/#cvs.docommit.${id}";
+
+if (-e $docommit) {
+    system("cp -p $logfile $filename") == 0
+	or die("Could not copy $logfile $filename!\n");
+}
+exit(0);

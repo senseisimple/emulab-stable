@@ -325,41 +325,27 @@ tblog_set_info($pid,$eid,$UID);
 
 #
 # Create a directory structure for the experiment.
-# There is no need to do this for the template wrapper experiment; it was
-# already done when the template was created.
 #
-if (!defined($template) || defined($instance)) {
-    if ($experiment->CreateDirectory() != 0) {
-	if (($? >> 8) == EDQUOT()) {
-	    # Obey exit status protocol for web page; User should see this.
-	    $errorstat = 1;
-	}
-	fatal({type => 'secondary', severity => SEV_SECONDARY,
-	       error => ['create_experiment_directory_failed']},
-	      "Failed to created experiment directory");
+if ($experiment->CreateDirectory() != 0) {
+    if (($? >> 8) == EDQUOT()) {
+	# Obey exit status protocol for web page; User should see this.
+	$errorstat = 1;
     }
-
-    if (defined($instance)) {
-	# Need to cross-mark the instance right away so that it is flagged.
-	# Would be better to do this with a plain flag.
-	my %args = ();
-	$args{'exptidx'} = $experiment->idx();
-    
-	$instance->Update(0, \%args) == 0
-	    or fatal("Could not update experiment instance record!");
-    }
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['create_experiment_directory_failed']},
+	  "Failed to created experiment directory");
 }
-else {
-    #
-    # But we do need to update the experiment record with the template path.
-    #
+if (defined($instance)) {
+    # Need to cross-mark the instance right away so that it is flagged.
+    # Would be better to do this with a plain flag.
     my %args = ();
-    $args{'path'} = $template->path();
+    $args{'exptidx'} = $experiment->idx();
     
-    $experiment->Update(\%args) == 0
-	or fatal("Could not update experiment record!");
-
-    # And the template with the new experiment index.
+    $instance->Update(0, \%args) == 0
+	or fatal("Could not update experiment instance record!");
+}
+elsif (defined($template)) {
+    # Tell the template with the new experiment index.
     %args = ();
     $args{'exptidx'} = $experiment->idx();
 

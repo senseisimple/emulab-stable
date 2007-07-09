@@ -29,20 +29,25 @@ sub usage()
 {
     print(STDERR
 	  "Usage: template_commit [-q] -f <path>\n".
-	  "       template_commit [-q] [-e eid] <guid/vers>\n".
+	  "       template_commit [-q] [-e eid | -r tag] <guid/vers>\n".
 	  "       template_commit [-q] -p pid -e eid\n".
 	  "switches and arguments:\n".
 	  "-q          - be less chatty\n".
 	  "-e <eid>    - Experiment instance to commit from\n".
+	  "-E <str>    - A pithy sentence describing the new template\n".
+	  "-t <tid>    - The template name (alphanumeric, no blanks)\n".
 	  "-p <pid>    - Project for -e option\n".
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qe:dp:f:";
+my $optlist	 = "qe:dp:f:t:E:r:";
 my %options      = ();
 my $quiet        = 0;
 my $debug        = 0;
 my $frompath;
+my $repotag;
+my $tid;
+my $description;
 my $eid;
 my $pid;
 my $guid;
@@ -74,6 +79,7 @@ sub ParseArgs();
 sub fatal($$);
 sub sighandler($);
 sub cleanup();
+sub CommitFromRepo();
 sub CommitFromInstance();
 sub CommitFromTemplate();
 sub CommitFromCheckout();
@@ -177,16 +183,60 @@ if (! $template->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 #
 $SIG{TERM} = \&sighandler;
 
-if (defined($frompath)) {
-    CommitFromCheckout();
-}
-elsif (defined($eid)) {
-    CommitFromInstance();
+if (defined($repotag)) {
+    CommitFromRepo();
 }
 else {
-    CommitFromTemplate();
-} 
+    tbdie("Unsupported template commit operation!");
+    
+    if (defined($frompath)) {
+	CommitFromCheckout();
+    }
+    elsif (defined($eid)) {
+	CommitFromInstance();
+    }
+    else {
+	CommitFromTemplate();
+    }
+}
 exit(0);
+
+#
+# Commit from a Repo.
+#
+sub CommitFromRepo()
+{
+    my $pid     = $template->pid();
+    my $gid     = $template->gid();
+    my $optarg  = ($quiet ? "-q" : "");
+
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+    
+    #
+    # Template modify to give us a new version. Giving it $frompath causes
+    # the datastore to be imported from the directory instead of the parent
+    # template.
+    #
+    system("$modify -w -m $guid/$version $optarg -g $gid -r $repotag ".
+	   "$pid $tid");
+    if ($?) {
+	fatal($? >> 8, "Failed to modify $template!");
+    }
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
+
+    return 0;
+}
 
 #
 # Commit from a checkout. 
@@ -194,11 +244,14 @@ exit(0);
 sub CommitFromCheckout()
 {
     my $pid     = $template->pid();
-    my $tid     = $template->tid();
     my $gid     = $template->gid();
     my $nsfile  = "$frompath/tbdata/nsfile.ns";
     my $optarg  = ($quiet ? "-q" : "");
 
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+    
     #
     # The NS file is taken from the checkout.
     #
@@ -219,6 +272,12 @@ sub CommitFromCheckout()
     $template->Refresh();
     my $child_guid = $template->child_guid();
     my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
 
     # Update the cookie so that the checkout refers to the new template
     # not the original template.
@@ -241,12 +300,15 @@ sub CommitFromCheckout()
 sub CommitFromTemplate()
 {
     my $pid     = $template->pid();
-    my $tid     = $template->tid();
     my $gid     = $template->gid();
     my $userdir = $template->path();
     my $nsfile  = "$userdir/tbdata/nsfile.ns";
     my $optarg  = ($quiet ? "-q" : "");
     
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+
     #
     # The NS file is taken from the template.
     #
@@ -260,6 +322,19 @@ sub CommitFromTemplate()
     if ($?) {
 	fatal($? >> 8, "Failed to modify template!");
     }
+
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
+
+    return 0;
 }
 
 #
@@ -268,6 +343,7 @@ sub CommitFromTemplate()
 sub CommitFromInstance()
 {
     my $pid = $template->pid();
+    my $gid = $template->gid();
     
     my $experiment = Experiment->Lookup($pid, $eid);
     if (!defined($experiment)) {
@@ -289,12 +365,13 @@ sub CommitFromInstance()
     fatal(1, "There is no NS file in $userdir/tbdata!")
 	if (! -e $nsfile);
 
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+
     #
     # Start with a plain template modify of the current template.
     #
-    my $tid = $template->tid();
-    my $gid = $template->gid();
-    
     system("$modify -m $guid/$version -w -g $gid $pid $tid $nsfile");
     if ($?) {
 	fatal($? >> 8, "Failed to commit instance to template!");
@@ -395,6 +472,40 @@ sub ParseArgs()
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 	    tbdie("Improper experiment name (id)!");
 	}
+    }
+    elsif (defined($options{"r"})) {
+	$repotag = $options{"r"};
+
+	if ($repotag =~ /^([-\w:]+)$/) {
+	    $repotag = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $repotag");
+	}
+    }
+
+    if (defined($options{"t"})) {
+	$tid = $options{"t"};
+
+	if ($tid =~ /^([-\w]+)$/) {
+	    $tid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $tid.");
+	}
+	if (! TBcheck_dbslot($tid, "experiments", "eid",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template name (id)!");
+	}
+    }
+
+    if (defined($options{"E"})) {
+	if (! TBcheck_dbslot($options{"E"},
+			     "experiment_templates", "description",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template description!");
+	}
+	$description = $options{"E"};
     }
 
     if (defined($options{"q"})) {

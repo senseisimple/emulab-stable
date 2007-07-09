@@ -39,10 +39,12 @@ sub usage()
 	  "<input>   - Input file for experiment.\n");
     exit(-1);
 }
-my $optlist	 = "qwE:g:m:f:";
+my $optlist	 = "qwE:g:m:f:r:";
 my $quiet        = 0;
 my $waitmode     = 0;
 my $modify       = 0;
+my $repotag;
+my $repobase;
 my $frompath;
 my $description;
 my $pid;
@@ -71,7 +73,9 @@ my $template;
 my $guid;
 my $vers;
 my $eid;
-my $archive_idx = 0;
+my $cvsdir;
+my $tmpdir;
+my $archive;
 # For the END block below.
 my $cleaning    = 0;
 my $exptcreated = 0;
@@ -82,6 +86,8 @@ my $checkquota  = "$TB/sbin/checkquota";
 my $batchexp    = "$TB/bin/batchexp";
 my $endexp      = "$TB/bin/endexp";
 my $makegraph   = "$TB/bin/template_graph";
+my $CVSBIN      = "/usr/bin/cvs";
+my $RLOG        = "/usr/bin/rlog";
 
 # Protos
 sub ParseArgs();
@@ -99,8 +105,11 @@ use Template;
 use libaudit;
 use User;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 120;
+# In libdb
+my $projroot = PROJROOT();
+
+# Temporary
+$libtestbed::SYSTEM_DEBUG = 1;
 
 #
 # Turn off line buffering on output
@@ -225,9 +234,11 @@ if ($STAMPS) {
 $justexit = 0;
 
 # Grab stuff we need out of the template.
-$guid = $template->guid();
-$vers = $template->vers();
-$eid  = $template->eid();
+$guid   = $template->guid();
+$vers   = $template->vers();
+$eid    = $template->eid();
+$cvsdir = "$projroot/$pid/templates/$guid/cvsrepo";
+$tmpdir = "$projroot/$pid/templates/$guid/cvstmp.$$";
 
 #
 # Use the logonly option to audit so that we get a record mailed.
@@ -310,6 +321,137 @@ $SIG{QUIT} = 'DEFAULT';
 if (my $rval = $template->CreateDirectory()) {
     fatal($rval, "Failed to create directories for template");
 }
+my $template_dir = $template->path();
+
+#
+# Set up CVS repo on ops to use as alternate interface.
+#
+if (!$modify) {
+    if (! mkdir("$cvsdir", 0777)) {
+	fatal(-1, "Could not mkdir $cvsdir: $!");
+    }
+    if (! chmod(0777, "$cvsdir")) {
+	fatal(-1, "Could not chmod $cvsdir: $!");
+    }
+    # Init the CVS control files.
+    System("$CVSBIN -d $cvsdir init") == 0
+	or fatal(-1, "Could not initialize $cvsdir");
+
+    open(GUID, ">$cvsdir/CVSROOT/GUID") or
+	fatal(-1, "Could not create cookie file in CVSROOT directory");
+    print GUID "$guid\n";
+    close(GUID);
+
+    System("cd $cvsdir/CVSROOT; co -l modules taginfo") == 0
+	or fatal(-1, "Could not lock $cvsdir/CVSROOT/modules");
+
+    System("cp -fp $TB/lib/cvsroot/* $cvsdir/CVSROOT") == 0
+	or fatal(-1, "Could not copy cvsroot files to $cvsdir/CVSROOT!");
+
+    open(MODULES, ">> $cvsdir/CVSROOT/modules") 
+	or fatal(-1, "Could not open $cvsdir/CVSROOT/modules for writing");
+    print MODULES "\n";
+    print MODULES "$guid -t $TB/sbin/rtag_commit $guid\n";
+    close(MODULES);
+}
+#
+# We stick in a little cookie file so we know what template this is,
+# from within the CVS repo (well, sandbox).
+#
+open(COOKIE, "> $template_dir/.template") or
+    fatal(-1, "Could not create cookie file in stub import directory");
+print COOKIE "# DO NOT REMOVE THIS FILE OR MODIFY THIS FILE, EVER!\n";
+print COOKIE "GUID: $guid/$vers\n";
+print COOKIE "TIME: " . time() . "\n";
+close(COOKIE);
+
+if ($repotag) {
+    #
+    # We need to get a checkout from the repo for both the nsfile and
+    # the datastore directory.
+    #
+    mkdir("$tmpdir", 0777) or
+	fatal(-1, "Could not mkdir $tmpdir: $!");
+
+    # Checkout ...
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r $repotag $guid")
+	== 0 or fatal(-1, "Could not checkout tag '$repotag' from $cvsdir");
+
+    $inputfile = "$tmpdir/$guid/tbdata/nsfile.ns";
+    fatal(-1, "NS file missing from repo checkout!")
+	if (!-e $inputfile);
+
+    #
+    # Need the numeric revision corresponding to the tag. From that we can
+    # determine the branch tag.
+    #
+    my $revision;
+    
+    open(TAGLOG, "$cvsdir/CVSROOT/tags") or
+	fatal(-1, "Could not open $cvsdir/CVSROOT/tags for reading");
+    while (<TAGLOG>) {
+	if ($_ =~ /^$repotag,\s*([\w]+),\s*([\d\.]+)$/) {
+	    print "$repotag $1 at revision $2\n";
+	    if ($1 eq "add" || $1 eq "mov") {
+		$revision = $2;
+	    }
+	    else {
+		$revision = undef;
+	    }
+	}
+    }
+    close(TAGLOG);
+    if (!defined($revision)) {
+	fatal(-1, "Could not find base revision for $repotag");
+    }
+    #
+    # And now the branch tag that this tag is on. Split the revision
+    # up so we can find the second to last token. Basically, if
+    # 1.2.2.1 is the revision, then the branch tag has a revision
+    # number that looks like 1.2.0.2 (magic). The HEAD is special of
+    # course.
+    #
+    my @tokens = split(/\./, $revision);
+    if (scalar(@tokens) > 2) {
+	my $branchtag;
+	
+	$tokens[scalar(@tokens)-1] = $tokens[scalar(@tokens)-2];
+	$tokens[scalar(@tokens)-2] = 0;
+	my $branchrev = join(".", @tokens);
+    
+	open(RLOG, "$RLOG -h $cvsdir/$guid/.template,v |")
+	    or fatal(-1, "Could not run rlog on $cvsdir/$guid/.template,v!");
+	my $intags = 0;
+	while (<RLOG>) {
+	    if ($intags) {
+		# Look for end of tag section. Consume rest of input file.
+		if ($_ =~ /^[\w]+/) {
+		    while (<RLOG>) {
+			;
+		    }
+		    last;
+		}
+		# Otherwise process tags ...
+		if ($_ =~ /^\s+([-\w]+):\s+([\d\.]+)$/) {
+		    #print "tag $1 at revision $2\n";
+		    if ($branchrev eq $2) {
+			$branchtag = $1;
+		    }
+		}
+		next;
+	    }
+	    # Look for the start of the tag section.
+	    if ($_ =~ /^symbolic names:/) {
+		$intags = 1;
+	    }
+	}
+	close(RLOG);
+	if (!defined($branchtag)) {
+	    fatal(-1, "Could not find branch tag for revision $revision!");
+	}
+	$repobase = $branchtag;
+    }
+}
 
 #
 # The description is versioned metadata the user can modify.
@@ -346,24 +488,12 @@ fatal(-1, "Could not add NS file to template store")
 #
 # Grab archive index for new templates. 
 #
-if (!$modify) {
-    my $archive;
-
-    libArchive::TBExperimentArchive($pid, $eid, \$archive, undef)
-	>= 0 or fatal(-1, "Could not get archive for new template!");
-
-    $archive_idx = $archive->idx();
-}
-else {
-    #
-    # Grab the archive index for the parent; the archive is shared.
-    #
-    $archive_idx = $parent_template->archive_idx();
-}
+libArchive::TBExperimentArchive($pid, $eid, \$archive, undef)
+    >= 0 or fatal(-1, "Could not get archive for $template!");
 
 # And update the record.
 %args = ();
-$args{'archive_idx'} = $archive_idx;
+$args{'archive_idx'} = $archive->idx();
 
 $template->Update(\%args) == 0
     or fatal(-1, "Could not update template record!");
@@ -381,7 +511,11 @@ if ($modify) {
     libArchive::TBCommitExperimentArchive($pid, $eid, "template_modify")
 	>= 0 or fatal(-1, "Failed to commit experiment archive!");
 
-    if (defined($frompath)) {
+    if ($repotag) {
+	$template->ImportDataStore("$tmpdir/$guid/datastore") == 0
+	    or fatal(-1, "Failed to import data store");
+    }
+    elsif (defined($frompath)) {
 	$template->ImportDataStore("$frompath/datastore") == 0
 	    or fatal(-1, "Failed to import data store");
     }
@@ -394,11 +528,146 @@ if ($modify) {
     libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
 	or fatal(-1, "Failed to add datastore files to the archive!");
 }
+
+# Make a copy of the inputfile in the template_dir so that it finds its
+# way into the user accessible CVS repo. This is also where the datastore
+# gets copied to for import.
+system("cp -p $inputfile $template_dir/tbdata/nsfile.ns") == 0
+    or fatal(-1, "Could not copy $inputfile to $template_dir/tbdata");
+
+# Need this so the datastore directory looks populated in the CVS repo.
+if (! -e "$template_dir/datastore/.ignore") {
+    System("cd $template_dir/datastore; touch .ignore")
+	== 0 or fatal(-1,
+		      "Could not touch .ignore in $template_dir/datastore");
+}
+
+#
+# When the template is first created, import an initial vendor branch
+# into the CVS repo so that there is something there. 
+#
+if (!$modify) {
+    System("cd $template_dir; ".
+	   "$CVSBIN -d $cvsdir import ".
+	   "  -m 'Initialize new cvs repo for template $guid' ".
+	   "  $guid T${guid}-1_import_branch T${guid}-1_import")
+	== 0 or fatal(-1, "Could not import new template into $cvsdir");
+
+    #
+    # Must advance the head past 1.1 since that is where the imports are done
+    # and it will confuse everything later.
+    #
+    mkdir("$tmpdir", 0777) or
+	fatal(-1, "Could not mkdir $tmpdir: $!");
+
+    # Checkout ...
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout $guid")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    # Commit ...
+    System("cd $tmpdir; $CVSBIN -d $cvsdir commit -f -R ".
+	     "  -m 'Commit initial import back to head'")
+	== 0 or fatal(-1, "Could not commit to $cvsdir");
+
+    #
+    # Now tag the CVS repo with the current guid/vers so we can find it easily.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n T${guid}-${vers} $guid")
+	== 0 or fatal(-1, "Could not rtag initial version in $cvsdir");
+}
+elsif ($frompath) {
+    #
+    # When modifying a template from an instance we need to import the
+    # new files into the CVS repo and then merge/commit back to the
+    # current head (of the branch).
+    #
+    # Not going to deal with this now.
+}
+elsif ($repotag) {
+    #
+    # Need to commit the new version of .template on the new branch so
+    # that when the user does a checkout of the branch, it says what
+    # template it is (and what to template to modify on the next branch).
+    #
+    System("cp -p $template_dir/.template $tmpdir/$guid") == 0
+	or fatal(-1, "Could not cp $template_dir/.template to $tmpdir/$guid");
+
+    # Check the file in.
+    System("cd $tmpdir/$guid; ".
+	   "$CVSBIN commit " . (defined($repobase) ? "-r $repobase " : " ") .
+	   "  -m 'Update guid after modify' .template")
+	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+    
+    #
+    # Tag the CVS repo with the current guid/vers so we can find it easily.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n -r $repotag T${guid}-${vers} $guid")
+	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+
+    #
+    # Clear the default branch so that "update -A" takes user to trunk.
+    #
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
+}
+else {
+    mkdir("$tmpdir", 0777) or
+	fatal(-1, "Could not mkdir $tmpdir: $!");
+	
+    #
+    # Create a branch off the parent template.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n -r T${parent_guid}-${parent_vers} ".
+	   " -b T${parent_guid}-${vers}_branch $guid ") 
+	== 0 or fatal(-1, "Could not rtag parent version in $cvsdir");
+    
+    #
+    # Modify from the web. Import onto new branch in the vendor branch.
+    # Then commit to a new branch head.
+    #
+    System("cd $template_dir; ".
+	   "$CVSBIN -d $cvsdir import -b 1.1.${vers} ".
+	   "  -m 'Modify cvs repo for template $guid/$vers' ".
+	   "  $guid T${guid}-${vers}_import_branch T${guid}-${vers}_import")
+	== 0 or fatal(-1, "Could not import modified template into $cvsdir");
+
+    # Checkout and merge
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	   "  -r T${parent_guid}-${vers}_branch ".
+	   "  -j T${parent_guid}-${vers}_branch ".
+	   "  -j T${guid}-${vers}_import_branch $guid")
+	== 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
+
+    # Need to clear the -b (default branch) or else the merge
+    # commit fails for some reason that makes no sense to me.
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b $guid")
+	== 0 or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
+
+    # Commit ...
+    System("cd $tmpdir; $CVSBIN -d $cvsdir commit -f -R ".
+	     "  -r T${parent_guid}-${vers}_branch ".
+	     "  -m 'Commit merge with head'")
+	== 0 or fatal(-1, "Could not commit on $cvsdir");
+
+    #
+    # Clear the default branch so that "update -A" takes user to trunk.
+    #
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
+
+    #
+    # Now tag the CVS repo with the current guid/vers so we can find it easily.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n ".
+	   " -r T${parent_guid}-${vers}_branch T${guid}-${vers} $guid")
+	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+}
+
 # Do a savepoint prior to the commit below. As noted above, this is
 # not done in batchexp.
-print "Doing a savepoint\n";
-libArchive::TBExperimentArchiveSavePoint($pid, $eid, "CopyDataStore") >= 0
-    or fatal(-1, "Failed to do a savepoint on the experiment archive!");
+#print "Doing a savepoint\n";
+#libArchive::TBExperimentArchiveSavePoint($pid, $eid, "CopyDataStore") >= 0
+#    or fatal(-1, "Failed to do a savepoint on the experiment archive!");
 
 print "Doing final commit\n";
 libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
@@ -580,6 +849,17 @@ sub ParseArgs()
 	}
     }
 
+    if (defined($options{"r"})) {
+	$repotag = $options{"r"};
+
+	if ($repotag =~ /^([-\w]+)$/) {
+	    $repotag  = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $repotag");
+	}
+    }
+
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"},
 			     "experiment_templates", "description",
@@ -614,6 +894,9 @@ sub cleanup()
 
 	# And delete all the other stuff?
     }
+    # Delete repo but only if this is the initial template creation.
+    system("/bin/rm -rf $cvsdir")
+	if (!$modify && defined($cvsdir) && -e $cvsdir);
     $template->Delete()
 	if (defined($template));
 }

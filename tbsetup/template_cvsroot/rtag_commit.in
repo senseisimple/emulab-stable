@@ -1,0 +1,158 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use File::Basename;
+use POSIX ":sys_wait_h";
+
+#
+# Configure variables
+#
+my $TBROOT          = "@prefix@";
+my $template_commit = "$TBROOT/bin/template_commit";
+my $RLOG	    = "/usr/bin/rlog";
+my $CO		    = "/usr/bin/co";
+my $CI		    = "/usr/bin/ci";
+my $RCS		    = "/usr/bin/rcs";
+my $logfile         = "/tmp/rtag_commit.$$";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# CVS sets this.
+my $CVSROOT = $ENV{'CVSROOT'};
+
+# locals
+my $baserev;
+my $guid;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+# Two arguments; the module name and the new tag.
+if (@ARGV != 2) {
+    die("Improper usage!\n");
+}
+my $module = $ARGV[0];
+my $tag    = $ARGV[1];
+
+# See if the new tag is a branch tag. To do that, run rlog over the RCS
+# file and look at the revision number. We count the dots. There is also
+# a special case of x.y.0.z to look for.
+my $revision = `$RLOG -h $CVSROOT/$module/.template,v |grep '$tag:'`;
+if ($?) {
+    die("rlog on $CVSROOT/$module/.template,v failed!\n");
+}
+if ($revision =~ /^\s*$tag:\s*([\d.]+)$/) {
+    $revision = $1;
+}
+else {
+    die("Could not parse output of rlog: '$revision'\n");
+}
+
+#
+# Need to figure out what template is being revised to create the new one.
+# We use the .template file for that, reading the tag log to figure what
+# revision number was branched when the branch was created.
+#
+open(TAGLOG, "$CVSROOT/CVSROOT/tags") or
+    die("Could not open $CVSROOT/CVSROOT/tags for reading\n");
+while (<TAGLOG>) {
+    if ($_ =~ /^$tag,\s*([\w]+),\s*([\d\.]+)$/) {
+	print "$tag $1 at revision $2\n";
+	if ($1 eq "add" || $1 eq "mov") {
+	    $baserev = $2;
+	}
+	else {
+	    $baserev = undef;
+	}
+    }
+}
+close(TAGLOG);
+if (!defined($baserev)) {
+    die("Could not find base revision for $tag\n");
+}
+
+#
+# Count dots, and then look for magic branch. If its a branch then we need
+# to do a commit on the cookie file so that we get an actual revision on
+# the branch. Need to do this for the server side.
+#
+my @tokens = split(/\./, $revision);
+if ((scalar(@tokens) & 1) || ($revision =~ /\d*\.0\.\d*$/)) {
+    # Form a revision number on the new branch.
+    $tokens[scalar(@tokens)-2] = $tokens[scalar(@tokens)-1];
+    $tokens[scalar(@tokens)-1] = 1;
+    my $branch = join(".", @tokens[0 .. scalar(@tokens)-2]);
+
+    system("$CO -r${baserev} $CVSROOT/$module/.template,v") == 0
+	or die("Could not co -r${baserev} $CVSROOT/$module/.template,v!\n");
+
+    system("$RCS -b${branch} $CVSROOT/$module/.template,v") == 0
+	or die("Could not rcs -b${branch} $CVSROOT/$module/.template,v");
+    
+    system("$CI -f -r${branch} -m'Force checkin on new branch' ".
+	   " $CVSROOT/$module/.template,v .template") == 0
+	or die("Could not ci -r${branch} $CVSROOT/$module/.template,v!\n");
+
+    system("$RCS -b $CVSROOT/$module/.template,v") == 0
+	or die("Could not rcs -b $CVSROOT/$module/.template,v");
+
+    print "$tag/$revision is a branch revision.\n";
+    print "Next tag operation on this branch invokes template modify\n";
+    exit(0);
+}
+
+#
+# Checkout the .template file at the base revision, and get the guid from it.
+# This is the template we are going to modify.
+#
+open(CO, "$CO -q -p${baserev} $CVSROOT/$module/.template,v |")
+    or die("Could not run '$CO -p${baserev} $CVSROOT/$module/.template,v\n");
+while (<CO>) {
+    if ($_ =~ /^GUID:\s*(\d+\/\d+)$/) {
+	$guid = $1;
+    }
+}
+close(CO);
+if (!defined($guid)) {
+    die("Could not find guid!\n");
+}
+print "Running: template_commit -r $tag $guid\n";
+
+if (0) {
+    exit(0);
+}
+
+#
+# Fork a child to start the modify operation. Because of CVS locking,
+# we cannot actually wait till completion, but we can wait for a
+# little while just in case it fails early on.
+#
+if (my $childpid = TBBackGround($logfile)) {
+    #
+    # Delay a moment, and they look for an exit status. This is intended
+    # to catch startup problems.
+    #
+    print "Starting template modify operation ... Be patient!\n";
+    select(undef, undef, undef, 5.0);
+    my $foo = waitpid($childpid, &WNOHANG);
+    if ($foo) {
+	system("cat $logfile")
+	    if (-s $logfile);
+	exit(-1);
+    }
+    print "Please wait for email about the status before continuing.\n";
+    exit(0);
+}
+exec("$template_commit -r $tag $guid");
+die("Failed to exec $template_commit!\n");

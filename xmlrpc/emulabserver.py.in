@@ -4605,6 +4605,17 @@ class template:
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
+            elif opt == "description":
+                argstr += " -E "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "tid":
+                tid = escapeshellarg(val)
+                pass
+            elif opt == "tag":
+                argstr += " -r "
+                argstr += escapeshellarg(val);
+                pass
             pass
 
         if argdict.has_key("guid"):
@@ -4616,7 +4627,7 @@ class template:
             argstr += str(argdict["guid"])
             pass
         elif argdict.has_key("path"):
-            argstr  = "-q -f "
+            argstr += " -q -f "
             argstr += escapeshellarg(argdict["path"]);
             pass
         
