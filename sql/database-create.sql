@@ -1901,7 +1901,7 @@ CREATE TABLE `node_utilization` (
   `node_id` varchar(32) NOT NULL default '',
   `allocated` int(10) unsigned NOT NULL default '0',
   `down` int(10) unsigned NOT NULL default '0',
-  PRIMARY KEY  (`node_id`),
+  PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
