@@ -29,6 +29,8 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $CVSROOT = $ENV{'CVSROOT'};
 
 # locals
+my $module;
+my $tag;
 my $baserev;
 my $guid;
 
@@ -38,12 +40,31 @@ my $guid;
 use lib "@prefix@/lib";
 use libtestbed;
 
-# Two arguments; the module name and the new tag.
-if (@ARGV != 2) {
-    die("Improper usage!\n");
+if (@ARGV == 2) {
+    $module = $ARGV[0];
+    $tag    = $ARGV[1];
 }
-my $module = $ARGV[0];
-my $tag    = $ARGV[1];
+elsif (!@ARGV) {
+    # See logtag ...
+    my $id = getpgrp();
+    my $docommit = "/tmp/#cvs.docommit.${id}";
+
+    die("Improper usage!\n")
+	if (! -e $docommit);
+
+    my $foo = `cat $docommit`;
+    if ($foo =~ /^(.+),\s*(.+)$/) {
+	$module = $1;
+	$tag    = $2;
+	unlink($docommit);
+    }
+    else {
+	die("Improper usage!\n")
+    }
+}
+else {
+    die("Improper usage!\n")
+}
 
 # See if the new tag is a branch tag. To do that, run rlog over the RCS
 # file and look at the revision number. We count the dots. There is also

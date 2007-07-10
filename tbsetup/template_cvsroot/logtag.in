@@ -6,6 +6,7 @@
 #
 use English;
 use strict;
+use File::Basename;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -30,6 +31,17 @@ while (@ARGV) {
 	    or die("Could not open $CVSROOT/CVSROOT/tags!\n");
 	print TAGLOG "$tagname, $op, $rev\n";
 	close(TAGLOG);
+
+	if ($op eq "add") {
+	    # Generate a marker to tell the post tag function
+	    my $module = basename($repo);
+	    my $id = getpgrp();
+	    my $docommit = "/tmp/#cvs.docommit.${id}";
+	    open(COM, ">$docommit")
+		or die("Could not write $docommit");
+	    print COM "$module, $tagname\n";
+	    close(COM);
+	}
 	last;
     }
 }

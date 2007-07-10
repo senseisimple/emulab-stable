@@ -342,17 +342,18 @@ if (!$modify) {
     print GUID "$guid\n";
     close(GUID);
 
-    System("cd $cvsdir/CVSROOT; co -l modules taginfo") == 0
-	or fatal(-1, "Could not lock $cvsdir/CVSROOT/modules");
+    System("cd $cvsdir/CVSROOT; co -l config taginfo") == 0
+	or fatal(-1, "Could not lock $cvsdir/CVSROOT/config");
 
     System("cp -fp $TB/lib/cvsroot/* $cvsdir/CVSROOT") == 0
 	or fatal(-1, "Could not copy cvsroot files to $cvsdir/CVSROOT!");
 
-    open(MODULES, ">> $cvsdir/CVSROOT/modules") 
-	or fatal(-1, "Could not open $cvsdir/CVSROOT/modules for writing");
-    print MODULES "\n";
-    print MODULES "$guid -t $TB/sbin/rtag_commit $guid\n";
-    close(MODULES);
+    open(CONFIG, ">> $cvsdir/CVSROOT/config") 
+	or fatal(-1, "Could not open $cvsdir/CVSROOT/config for writing");
+    print CONFIG "\n";
+    print CONFIG "# Added for Emulab Testbed; DO NOT DELETE!\n";
+    print CONFIG "TemplateCommit=$TB/sbin/rtag_commit\n";
+    close(CONFIG);
 }
 #
 # We stick in a little cookie file so we know what template this is,
@@ -372,14 +373,6 @@ if ($repotag) {
     #
     mkdir("$tmpdir", 0777) or
 	fatal(-1, "Could not mkdir $tmpdir: $!");
-
-    # Checkout ...
-    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r $repotag $guid")
-	== 0 or fatal(-1, "Could not checkout tag '$repotag' from $cvsdir");
-
-    $inputfile = "$tmpdir/$guid/tbdata/nsfile.ns";
-    fatal(-1, "NS file missing from repo checkout!")
-	if (!-e $inputfile);
 
     #
     # Need the numeric revision corresponding to the tag. From that we can
@@ -450,7 +443,30 @@ if ($repotag) {
 	    fatal(-1, "Could not find branch tag for revision $revision!");
 	}
 	$repobase = $branchtag;
+
+	# Checkout ...
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r $repotag $guid")
+	    == 0 or fatal(-1, "Could not checkout '$repotag' from $cvsdir");
     }
+    else {
+	# Checkout along trunk, no -r option cause then commit fails
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r HEAD $guid")
+	    == 0 or fatal(-1, "Could not checkout trunk from $cvsdir");
+
+	#
+	# Clear the default branch so that checkout gives us the trunk.
+	#
+	System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+	    == 0 or fatal(-1, "Could not clear default branch in $cvsdir");
+
+	# And clear the sticky tag so later commit works.
+	System("cd $tmpdir/$guid; $CVSBIN -d $cvsdir update -A")
+	    == 0 or fatal(-1, "Could not update to head trunk from $cvsdir");
+    }
+
+    $inputfile = "$tmpdir/$guid/tbdata/nsfile.ns";
+    fatal(-1, "NS file missing from repo checkout!")
+	if (!-e $inputfile);
 }
 
 #
@@ -596,12 +612,14 @@ elsif ($repotag) {
     System("cd $tmpdir/$guid; ".
 	   "$CVSBIN commit " . (defined($repobase) ? "-r $repobase " : " ") .
 	   "  -m 'Update guid after modify' .template")
-	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+	== 0 or fatal(-1, "Could not commit final version in $cvsdir");
     
     #
     # Tag the CVS repo with the current guid/vers so we can find it easily.
     #
-    System("$CVSBIN -d $cvsdir rtag -n -r $repotag T${guid}-${vers} $guid")
+    System("$CVSBIN -d $cvsdir rtag -n " .
+	   (defined($repobase) ? "-r $repobase " : " ") .
+	   "   T${guid}-${vers} $guid")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
 
     #

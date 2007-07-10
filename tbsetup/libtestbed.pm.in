@@ -694,7 +694,7 @@ sub System($)
     my ($command) = @_;
 
     print STDERR "Running '$command'\n"
-	if ($system_debug);
+	if ($SYSTEM_DEBUG);
 
     TBDebugTimeStamp($command);
     my $retval = system($command);

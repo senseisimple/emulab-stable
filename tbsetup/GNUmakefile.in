@@ -114,7 +114,7 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir nsverify plab ipassign checkup
+.PHONY:	checkpass ns2ir nsverify plab ipassign checkup template_cvsroot
 checkpass:
 	@$(MAKE) -C checkpass all
 
@@ -135,6 +135,9 @@ ipassign:
 
 checkup:
 	@$(MAKE) -C checkup all
+
+template_cvsroot:
+	@$(MAKE) -C template_cvsroot all
 
 install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
