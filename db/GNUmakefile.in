@@ -17,9 +17,10 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
 		  idletimes idlemail setsitevar audit changeuid changepid \
 		  elabinelab_bossinit update_permissions mysqld_watchdog \
-		  dumperrorlog
+		  dumperrorlog changeleader
 
-WEB_SBIN_SCRIPTS= webnodelog webnewwanode webidlemail webchangeuid
+WEB_SBIN_SCRIPTS= webnodelog webnewwanode webidlemail webchangeuid \
+		  webchangeleader
 WEB_BIN_SCRIPTS = webnfree
 LIBEXEC_SCRIPTS = $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS) xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \

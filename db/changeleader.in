@@ -1,0 +1,164 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Change the project leader of a project, such as when a PI moves on.
+# The old leader is switched to local root, so that we do not have to
+# worry about existing experiments and subgroups. 
+#
+sub usage()
+{
+    print(STDERR "Usage: changeleader <pid> <newuid>\n");
+    exit(-1);
+}
+my $optlist = "df";
+my $debug   = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+use Project;
+use User;
+
+# Protos.
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+# Only admin types!
+if (!TBAdmin()) {
+    die("*** $0:\n".
+	"    Only TB administrators can run this script!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid    = shift(@ARGV);
+my $newuid = shift(@ARGV);
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+# Map project to object.
+my $project = Project->Lookup($pid);
+if (! defined($pid)) {
+    fatal("$pid does not exist!");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($newuid);
+if (! defined($target_user)) {
+    fatal("$newuid does not exist!");
+}
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# Only operate on approved users.
+# 
+if ($target_user->status() ne USERSTATUS_ACTIVE()) {
+    fatal("User '$newuid' must be an active user!");
+}
+
+my $projleader = $project->GetLeader();
+if (! defined($projleader)) {
+    fatal("Could not map project leader for $project to its object!");
+}
+if ($projleader->SameUser($target_user)) {
+    fatal("$target_user is already the leader of $project!");
+}
+
+#
+# First change the membership setting for old/new users. We set the old
+# leader to local_root so that we do not have to worry about existing
+# experiments and subgroups.
+#
+my $olduser_membership = $project->LookupUser($projleader);
+if (!defined($olduser_membership)) {
+    fatal("Could not get membership object for $projleader in $project!");
+}
+my $target_membership = $project->LookupUser($target_user);
+if (!defined($target_membership)) {
+    fatal("Could not get membership object for $target_user in $project!");
+}
+
+if ($olduser_membership->ModifyTrust($Group::MemberShip::TRUSTSTRING_LOCALROOT)
+    != 0) {
+    fatal("Could not change $olduser_membership to local root!");
+}
+if ($target_membership->ModifyTrust($Group::MemberShip::TRUSTSTRING_PROJROOT)
+    != 0) {
+    fatal("Could not change $target_membership to project root!");
+}
+# Now change the leader ...
+if ($project->ChangeLeader($target_user) != 0) {
+    fatal("Could not change leader for $project to $target_user!");
+}
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

@@ -437,7 +437,7 @@ sub LookupUser($$)
 }
 
 #
-# Change the leader for a project. Done *only* before project is approved.
+# Change the leader for a project.
 #
 sub ChangeLeader($$)
 {
