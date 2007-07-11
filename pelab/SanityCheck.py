@@ -538,13 +538,28 @@ def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
         # Calculate the denominator
         sx = 0
         sy = 0
+        x_meandiff = 0
+        y_meandiff = 0
+        x_variance = 0.0
+        y_variance = 0.0
 
         for i in range(0,n): 
         #{
-            sx += (x[i] - mx) * (x[i] - mx)
-            sy += (y[i] - my) * (y[i] - my)
+            x_meandiff = x[i] - mx
+            y_meandiff = y[i] - my
+
+            x_meandiff *= x_meandiff
+            y_meandiff *= y_meandiff
+
+            sx += x_meandiff
+            sy += y_meandiff
+
+            x_variance += x_meandiff
+            y_variance += y_meandiff
         #}
 
+        x_variance /= float(n) 
+        y_variance /= float(n) 
 
         denom = math.sqrt(sx*sy)
 
@@ -692,8 +707,6 @@ def CalcCorrelation(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
         for delay in range(-maxdelay,maxdelay):
         #{
             sxy = 0
-            sys.stdout.write("$")
-            sys.stdout.flush()
 
             for i in range(0,n): 
             #{
@@ -836,6 +849,16 @@ def PrintReport(correlationDataFile, numNodes, numNodesProcessed, reportFileName
                 reportFileHandle.write( "***** ERROR: This Flexlab run is possibly tainted. \nDetected " + matchObj.group(3) + " cross-correlation mismatch for files '" + flexLabFile + "' and '" + pLabFile + "'\n")
                 errorFlag = 1
 
+            #}
+# Check the delay offset by comparing it against the sum
+# of Emulab-to-Planetlab RTT + Planetlab internode RTT.
+# Not implemented yet.
+            if  ( ( int(matchObj.group(4)) ) and ( float (matchObj.group(1)) > 0.0 ) and ( int(matchObj.group(2)) == 0 ) ) :
+                
+            #{
+                print "\n***** ERROR: This Flexlab run is possibly tainted. \nDetected " + matchObj.group(3) + " cross-correlation mismatch for files '" + flexLabFile + "' and '" + pLabFile + "'"
+                reportFileHandle.write( "***** ERROR: This Flexlab run is possibly tainted. \nDetected " + matchObj.group(3) + " cross-correlation mismatch for files '" + flexLabFile + "' and '" + pLabFile + "'\n")
+                errorFlag = 1
             #}
 
         #}
