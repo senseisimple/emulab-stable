@@ -1034,10 +1034,12 @@ DROP TABLE IF EXISTS `firewalls`;
 CREATE TABLE `firewalls` (
   `pid` varchar(12) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
   `fwname` varchar(32) NOT NULL default '',
   `vlan` int(11) default NULL,
   `vlanid` int(11) default NULL,
-  PRIMARY KEY  (`pid`,`eid`,`fwname`),
+  PRIMARY KEY (`exptidx`,`fwname`),
+  KEY `pideid` (`pid`,`eid`,`fwname`),
   KEY `vlan` (`vlan`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
