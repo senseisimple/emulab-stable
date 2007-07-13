@@ -33,6 +33,7 @@ sub debug(@);
 my $debug = 0;
 my $sql = 1;
 my $quiet = 0;
+my $ignore_tables = 0;
 
 #
 # Return value - number of differences between the two files
@@ -43,7 +44,7 @@ my $diff = 0;
 # Process command-line args
 #
 my %opt;
-getopts('hdsq', \%opt); 
+getopts('hdsqt', \%opt); 
 if ($opt{h}) {
     exit &usage;
 }
@@ -58,7 +59,9 @@ if ($opt{q}) {
     $sql = 0;
     $debug = 0;
 }
-
+if ($opt{t}) {
+    $ignore_tables = 1;
+}
 
 if (@ARGV != 2) {
     exit &usage
@@ -289,7 +292,8 @@ sub compare_tables($$) {
     # Removed tables are easy to handle 
     #
     foreach my $table (@$removed) {
-	$diff++;
+	$diff++
+	    if (!$ignore_tables);
 	if (!$quiet) { print "# Table $table was removed\n"; }
 	if ($sql) { print "DROP TABLE $table;\n\n"; }
     }
@@ -298,7 +302,8 @@ sub compare_tables($$) {
     #
     #
     foreach my $table (@$added) {
-	$diff++;
+	$diff++
+	    if (!$ignore_tables);
 	if (!$quiet) { print "# Table $table was added\n"; }
 	if ($sql) {
 	    print "CREATE TABLE $table (\n";
@@ -592,6 +597,7 @@ sub usage() {
     print "-h    This message\n";
     print "-s    Summary: Don't print SQL statments to apply changes\n";
     print "-q    Quiet: Don't print anything, just return a value\n";
+    print "-t    Ignore table creates and drops\n";
     print "-d    Turn on debugging output\n";
     return 1;
 }

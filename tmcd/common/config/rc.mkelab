@@ -1108,12 +1108,23 @@ sub SetupBossNode()
     GetEmulabSource("${TBDIR}/testbed/src");
 
     print "Copying over initial dbstate from /proj\n";
-    mysystem("mkdir ${TBDIR}/testbed/stuff");
-    mysystem("cp -fp /proj/$pid/exp/$eid/dbstate.tar.gz ".
-	     "       ${TBDIR}/testbed/stuff");
+    my $expdir = "/proj/$pid/exp/$eid";
+    my $stuffdir = "${TBDIR}/testbed/stuff";
+    mysystem("mkdir $stuffdir");
+    mysystem("cp -fp $expdir/dbstate.tar.gz  $stuffdir");
+    mysystem("cp -fp $expdir/outer_db_schema $stuffdir");
+
+    if (!$NOSETUP) {
+	print "Check for db schema mismatch before we go any further\n";
+	my $testbed_srcdir = "${TBDIR}/testbed/src";
+	my $schemadiff     = "$testbed_srcdir/utils/schemadiff";
+	my $master_schema  = "$testbed_srcdir/sql/database-create.sql";
+	my $outer_schema   = "$stuffdir/outer_db_schema";
+	mysystem("$schemadiff -st $master_schema $outer_schema");
+    }
 
     # Copy over creators ssl certificate for XMLRPC. See below.
-    mysystem("cp -fp ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff");
+    mysystem("cp -fp ~${creator}/.ssl/emulab.pem $stuffdir");
 
     #
     # Stash the IP of the outer emulab for tmcc (and script above).
@@ -1364,12 +1375,11 @@ sub SetupBossNode()
     # of boss install too. 
     #
     print "Copying over tftpboot tar file from web server and unpacking\n";
-    mysystem("wget -q -O ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
+    mysystem("wget -q -O $stuffdir/tftpboot.tar.gz ".
 	     "http://${bossname}/downloads/".
 	     $emulabconfig{"MFSTARBALL"});
 
-    mysystem("tar xzf ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
-	     "    -C /tftpboot");
+    mysystem("tar xzf $stuffdir/tftpboot.tar.gz -C /tftpboot");
 
     #
     # Its the generic stuff; must localize.
@@ -1418,7 +1428,7 @@ sub SetupBossNode()
     # inner boss to invoke the XMLRPC server on the outer boss for
     # doing things like power control, vlan setup, etc.
     #
-    mysystem("cp -p ${TBDIR}/testbed/stuff/emulab.pem $RPCCERT");
+    mysystem("cp -p $stuffdir/emulab.pem $RPCCERT");
 
     #
     # Copy the inner ssl cert and root's public ssh keys to the mfs's
@@ -1439,8 +1449,7 @@ sub SetupBossNode()
     # Unpack the initial DB contents and load it into the DB.
     #
     mysystem("mkdir /tmp/dbstate.$$");
-    mysystem("tar xzf ${TBDIR}/testbed/stuff/dbstate.tar.gz ".
-	     "    -C /tmp/dbstate.$$");
+    mysystem("tar xzf $stuffdir/dbstate.tar.gz -C /tmp/dbstate.$$");
     
     opendir(DIR, "/tmp/dbstate.$$") or
 	SetupFatal("Cannot opendir /tmp/dbstate.$$: $!");
