@@ -1116,7 +1116,7 @@ sub SetupBossNode()
 
     if (!$NOSETUP) {
 	print "Check for db schema mismatch before we go any further\n";
-	my $testbed_srcdir = "${TBDIR}/testbed/src";
+	my $testbed_srcdir = "${TBDIR}/testbed/src/testbed";
 	my $schemadiff     = "$testbed_srcdir/utils/schemadiff";
 	my $master_schema  = "$testbed_srcdir/sql/database-create.sql";
 	my $outer_schema   = "$stuffdir/outer_db_schema";

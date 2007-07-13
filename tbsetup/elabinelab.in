@@ -43,19 +43,13 @@ sub DumpDBGoo();
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CONTROL	= "@USERNODE@";
+my $DBNAME      = "@TBDBNAME@";
 my $TBOPSPID    = TBOPSPID();
 my $SSH		= "$TB/bin/sshtb";
 my $nodereboot  = "$TB/bin/node_reboot";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $nodewait    = "$TB/sbin/node_statewait";
 my $snmpit      = "$TB/bin/snmpit";
-my $isvers5     = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
-my $extraopts   = ($isvers5 ? "--skip-quote-names" : "");
-#
-# XXX: Requires that mysqldump be in caller's $PATH - probably an OK
-# assumption, but maybe not always
-#
-my $mysqldump   = "mysqldump -d $extraopts $DBNAME";
 
 # Locals
 my $elabinelab;
@@ -940,7 +934,17 @@ sub DumpDBGoo()
     # is compatible with the sql/database-create.sql schema file there, *before*
     # loading it into the db.  Added/removed columns would misalign row data.
     #
-    system("$mysqldump 2> /dev/null > $expdir/outer_db_schema");
+    my $schemafile = "$expdir/outer_db_schema";
+    system("rm -f $schemafile")
+	if (-f $schemafile);
+    my $isvers5     = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
+    my $extraopts   = ($isvers5 ? "--skip-quote-names" : "");
+    #
+    # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
+    # assumption, but maybe not always
+    #
+    my $mysqldump   = "mysqldump -d $extraopts $DBNAME";
+    system("$mysqldump 2> /dev/null > $schemafile");
 
     #
     # Tar up the directory and send it over to (real) ops.
