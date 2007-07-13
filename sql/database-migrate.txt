@@ -4104,3 +4104,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	./nodeutil.pl
 
+4.125: Minor fix to schema file; skip to next entry.
+
+4.126: The recent changes made to the firewalls table in step3_newids.pl were
+       omitted.  Nothing to do unless you had already passed version 4.109 .
+       Otherwise, re-run ./step3_newids.pl .
