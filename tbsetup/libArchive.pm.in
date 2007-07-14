@@ -23,6 +23,7 @@ use Project;
 use English;
 use Experiment;
 use Archive;
+use Template;
 use File::stat;
 use File::Basename;
 use POSIX qw(strftime);
@@ -183,6 +184,10 @@ sub TBExperimentArchiveAddUserFiles($$)
 
     return 0
 	if (!Archive::doarchiving($pid, $eid));
+
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return -1
+	if (!defined($experiment));
     
     my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
@@ -190,7 +195,17 @@ sub TBExperimentArchiveAddUserFiles($$)
     return -1
 	if ($rval < 0);
 
-    my $userdir = TBExptUserDir($pid, $eid);
+    my $userdir;
+
+    if ($experiment->IsTemplate()) {
+	# XXX Fix this
+	my $template = Template->LookupByPidEid($pid, $eid);
+
+	$userdir = $template->path();
+    }
+    else {
+	$userdir = $experiment->UserDir();
+    }
 
     if (-e $userdir) {
 	$rval = $archive->Add("$userdir/.", $view, 1, 1);
@@ -212,13 +227,27 @@ sub TBExperimentArchiveDiffUserFiles($$)
     return 0
 	if (!Archive::doarchiving($pid, $eid));
     
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return -1
+	if (!defined($experiment));
+    
     my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $userdir = TBExptUserDir($pid, $eid);
+    my $userdir;
+
+    if ($experiment->IsTemplate()) {
+	# XXX Fix this
+	my $template = Template->LookupByPidEid($pid, $eid);
+
+	$userdir = $template->path();
+    }
+    else {
+	$userdir = $experiment->UserDir();
+    }
 
     if (-e $userdir) {
 	$rval = $archive->Diff("$userdir/.", $view);

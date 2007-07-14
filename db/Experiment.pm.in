@@ -131,7 +131,9 @@ sub Lookup($$;$)
         if (exists($experiments{"$idx"}));
     
     my $query_result =
-	DBQueryWarn("select e.*,i.parent_guid from experiments as e ".
+	DBQueryWarn("select e.*,i.parent_guid,t.guid from experiments as e ".
+		    "left join experiment_templates as t on ".
+		    "     t.exptidx=e.idx ".
 		    "left join experiment_template_instances as i on ".
 		    "     i.exptidx=e.idx ".
 		    "where e.idx='$idx'");
@@ -143,6 +145,8 @@ sub Lookup($$;$)
     $self->{'EXPT'}  = $query_result->fetchrow_hashref();
     # An Instance?
     $self->{'ISINSTANCE'} = defined($self->{'EXPT'}->{'parent_guid'});
+    # The experiment underlying a template.
+    $self->{'ISTEMPLATE'} = defined($self->{'EXPT'}->{'guid'});
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
@@ -577,7 +581,6 @@ sub Refresh($)
 	if (!$query_result || !$query_result->numrows);
 
     $self->{'EXPT'}  = $query_result->fetchrow_hashref();
-    $self->{'ISINSTANCE'} = undef;
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
@@ -2413,20 +2416,21 @@ sub IsInstance($)
     return 0
 	if (! ref($self));
 
-    if (defined($self->{'ISINSTANCE'})) {
-	return $self->{'ISINSTANCE'};
-    }
-    my $idx = $self->idx();
-
-    my $query_result =
-	DBQueryWarn("select parent_guid from experiment_template_instances ".
-		    "where exptidx='$idx'");
-
-    return 0
-	if (!$query_result);
-
-    $self->{'ISINSTANCE'} = $query_result->numrows;
     return $self->{'ISINSTANCE'};
+}
+
+#
+# Is this experiment the one underlying a template.
+#
+sub IsTemplate($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    return $self->{'ISTEMPLATE'};
 }
 
 #
