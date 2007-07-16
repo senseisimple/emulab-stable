@@ -1182,6 +1182,15 @@ sub Checkout($$;$$@)
 	$revision = $View->{'revision'};
     }
     my $zipfile = "$repodir/$revision";
+
+    # Append * to directories.
+    for (my $i = 0; $i < scalar(@subdirs); $i++) {
+	my $subdir = $subdirs[$i];
+
+	if ($subdir =~ /\/$/) {
+	    $subdirs[$i] .= "*";
+	}
+    }
     
     # Allowed to check out a set of files/dirs
     my $subdir_arg = (! @subdirs ? "" :
