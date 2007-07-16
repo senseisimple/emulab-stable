@@ -22,7 +22,7 @@ view "internal" {
     match-clients {
         127.0.0.0/8;
 	%internal_network_withmask%;
-        172.16.0.0/12;
+	%virtnode_network_withmask%;
     };
 
     zone "@OURDOMAIN@" in {

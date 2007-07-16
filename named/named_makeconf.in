@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -41,6 +41,8 @@ my $PUBLIC_NETWORK     = "@PUBLIC_NETWORK@";
 my $PUBLIC_ROUTER      = "@PUBLIC_ROUTER@";
 my $PUBLIC_NETMASK     = "@PUBLIC_NETMASK@";
 my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
+my $VIRTNODE_NETWORK   = "@VIRTNODE_NETWORK@";
+my $VIRTNODE_NETMASK   = "@VIRTNODE_NETMASK@";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
@@ -77,6 +79,15 @@ for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
 	last;
     }
 }
+my $VIRTNODE_SLASH_NETMASK = "24";
+for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
+    my $foo = pack("N", $NETMASKS[$i]);
+
+    if ($VIRTNODE_NETMASK eq inet_ntoa($foo)) {
+	$VIRTNODE_SLASH_NETMASK = "$i";
+	last;
+    }
+}
 
 # This is for the dotted and reverse dotted notation needed for the
 # reverse maps. This is probably all wrong ... 
@@ -99,6 +110,9 @@ while (<IF>) {
 	if (/^(.*)\%([-\w]*)\%(.*)$/) {
 	    if ($2 eq "internal_network_withmask") {
 		print $1 . "${TESTBED_NETWORK}/${TESTBED_SLASH_NETMASK}" ."$3\n";
+	    }
+	    elsif ($2 eq "virtnode_network_withmask") {
+		print $1 . "${VIRTNODE_NETWORK}/${VIRTNODE_SLASH_NETMASK}" ."$3\n";
 	    }
 	    elsif ($2 eq "internal_network_dotted") {
 		print $1 . "${ia}.${ib}.${ic}" . "$3\n";

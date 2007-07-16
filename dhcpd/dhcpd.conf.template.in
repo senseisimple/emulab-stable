@@ -91,6 +91,6 @@ shared-network emulab {
  #
  # Private network; for virtual (jailed) nodes.
  #
- subnet 172.16.0.0 netmask 255.240.0.0 {
+ subnet @VIRTNODE_NETWORK@ netmask @VIRTNODE_NETMASK@ {
  }
 }
