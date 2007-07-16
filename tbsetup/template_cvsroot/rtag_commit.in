@@ -151,7 +151,7 @@ if (!defined($guid)) {
 }
 print "Running: template_commit -r $tag $guid\n";
 
-if (1) {
+if (0) {
     exit(0);
 }
 
