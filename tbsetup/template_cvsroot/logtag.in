@@ -15,6 +15,8 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # CVS sets this.
 my $CVSROOT = $ENV{'CVSROOT'};
 
+#print "logtag: @ARGV\n";
+
 #
 # Record any tags made to the .template file. 
 #
@@ -34,7 +36,7 @@ while (@ARGV) {
 
 	if ($op eq "add") {
 	    # Generate a marker to tell the post tag function
-	    my $module = basename($repo);
+	    my $module = basename(dirname($repo));
 	    my $id = getpgrp();
 	    my $docommit = "/tmp/#cvs.docommit.${id}";
 	    open(COM, ">$docommit")

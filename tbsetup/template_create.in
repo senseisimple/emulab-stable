@@ -366,7 +366,7 @@ print COOKIE "GUID: $guid/$vers\n";
 print COOKIE "TIME: " . time() . "\n";
 close(COOKIE);
 
-if ($repotag) {
+if (defined($repotag)) {
     #
     # We need to get a checkout from the repo for both the nsfile and
     # the datastore directory.
@@ -412,8 +412,9 @@ if ($repotag) {
 	$tokens[scalar(@tokens)-2] = 0;
 	my $branchrev = join(".", @tokens);
     
-	open(RLOG, "$RLOG -h $cvsdir/$guid/.template,v |")
-	    or fatal(-1, "Could not run rlog on $cvsdir/$guid/.template,v!");
+	open(RLOG, "$RLOG -h $cvsdir/$guid/setup/.template,v |")
+	    or fatal(-1,
+		     "Could not run rlog on $cvsdir/$guid/setup/.template,v!");
 	my $intags = 0;
 	while (<RLOG>) {
 	    if ($intags) {
@@ -445,26 +446,27 @@ if ($repotag) {
 	$repobase = $branchtag;
 
 	# Checkout ...
-	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r $repotag $guid")
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	       "  -r $repotag $guid/setup")
 	    == 0 or fatal(-1, "Could not checkout '$repotag' from $cvsdir");
     }
     else {
 	# Checkout along trunk, no -r option cause then commit fails
-	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r HEAD $guid")
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r HEAD $guid/setup")
 	    == 0 or fatal(-1, "Could not checkout trunk from $cvsdir");
 
 	#
 	# Clear the default branch so that checkout gives us the trunk.
 	#
-	System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+	System("cd $tmpdir/$guid; $CVSBIN -d $cvsdir admin -b")
 	    == 0 or fatal(-1, "Could not clear default branch in $cvsdir");
 
 	# And clear the sticky tag so later commit works.
-	System("cd $tmpdir/$guid; $CVSBIN -d $cvsdir update -A")
+	System("cd $tmpdir/$guid/setup; $CVSBIN -d $cvsdir update -A")
 	    == 0 or fatal(-1, "Could not update to head trunk from $cvsdir");
     }
 
-    $inputfile = "$tmpdir/$guid/tbdata/nsfile.ns";
+    $inputfile = "$tmpdir/$guid/setup/tbdata/nsfile.ns";
     fatal(-1, "NS file missing from repo checkout!")
 	if (!-e $inputfile);
 }
@@ -527,8 +529,8 @@ if ($modify) {
     libArchive::TBCommitExperimentArchive($pid, $eid, "template_modify")
 	>= 0 or fatal(-1, "Failed to commit experiment archive!");
 
-    if ($repotag) {
-	$template->ImportDataStore("$tmpdir/$guid/datastore") == 0
+    if (defined($repotag)) {
+	$template->ImportDataStore("$tmpdir/$guid/setup/datastore") == 0
 	    or fatal(-1, "Failed to import data store");
     }
     elsif (defined($frompath)) {
@@ -566,7 +568,7 @@ if (!$modify) {
     System("cd $template_dir; ".
 	   "$CVSBIN -d $cvsdir import ".
 	   "  -m 'Initialize new cvs repo for template $guid' ".
-	   "  $guid T${guid}-1_import_branch T${guid}-1_import")
+	   "  $guid/setup T${guid}-1_import_branch T${guid}-1_import")
 	== 0 or fatal(-1, "Could not import new template into $cvsdir");
 
     #
@@ -579,6 +581,14 @@ if (!$modify) {
     # Checkout ...
     System("cd $tmpdir; $CVSBIN -d $cvsdir checkout $guid")
 	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    # Create the records directory.
+    System("cd $tmpdir/$guid; mkdir records; touch records/.ignore") == 0 or
+	fatal(-1, "Could not mkdir records directory in $tmpdir/$guid");
+ 
+    System("cd $tmpdir/$guid; $CVSBIN -d $cvsdir add records; ".
+	   "                  $CVSBIN -d $cvsdir add records/.ignore")
+	== 0 or fatal(-1, "Could not cvs add $tmpdir/$guid/records!");
 
     # Commit ...
     System("cd $tmpdir; $CVSBIN -d $cvsdir commit -f -R ".
@@ -599,17 +609,17 @@ elsif ($frompath) {
     #
     # Not going to deal with this now.
 }
-elsif ($repotag) {
+elsif (defined($repotag)) {
     #
     # Need to commit the new version of .template on the new branch so
     # that when the user does a checkout of the branch, it says what
     # template it is (and what to template to modify on the next branch).
     #
-    System("cp -p $template_dir/.template $tmpdir/$guid") == 0
+    System("cp -p $template_dir/.template $tmpdir/$guid/setup") == 0
 	or fatal(-1, "Could not cp $template_dir/.template to $tmpdir/$guid");
 
     # Check the file in.
-    System("cd $tmpdir/$guid; ".
+    System("cd $tmpdir/$guid/setup; ".
 	   "$CVSBIN commit " . (defined($repobase) ? "-r $repobase " : " ") .
 	   "  -m 'Update guid after modify' .template")
 	== 0 or fatal(-1, "Could not commit final version in $cvsdir");
@@ -619,7 +629,7 @@ elsif ($repotag) {
     #
     System("$CVSBIN -d $cvsdir rtag -n " .
 	   (defined($repobase) ? "-r $repobase " : " ") .
-	   "   T${guid}-${vers} $guid")
+	   "   T${guid}-${vers} $guid/setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
 
     #
@@ -636,7 +646,7 @@ else {
     # Create a branch off the parent template.
     #
     System("$CVSBIN -d $cvsdir rtag -n -r T${parent_guid}-${parent_vers} ".
-	   " -b T${parent_guid}-${vers}_branch $guid ") 
+	   " -b T${parent_guid}-${vers}_branch $guid/setup ") 
 	== 0 or fatal(-1, "Could not rtag parent version in $cvsdir");
     
     #
@@ -645,24 +655,24 @@ else {
     #
     System("cd $template_dir; ".
 	   "$CVSBIN -d $cvsdir import -b 1.1.${vers} ".
-	   "  -m 'Modify cvs repo for template $guid/$vers' ".
-	   "  $guid T${guid}-${vers}_import_branch T${guid}-${vers}_import")
+	   "  -m 'Modify cvs repo for template $guid/$vers' $guid/setup ".
+	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
 	== 0 or fatal(-1, "Could not import modified template into $cvsdir");
 
     # Checkout and merge
     System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
 	   "  -r T${parent_guid}-${vers}_branch ".
 	   "  -j T${parent_guid}-${vers}_branch ".
-	   "  -j T${guid}-${vers}_import_branch $guid")
+	   "  -j T${guid}-${vers}_import_branch $guid/setup")
 	== 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
 
     # Need to clear the -b (default branch) or else the merge
     # commit fails for some reason that makes no sense to me.
-    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b $guid")
+    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir admin -b $guid")
 	== 0 or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
 
     # Commit ...
-    System("cd $tmpdir; $CVSBIN -d $cvsdir commit -f -R ".
+    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
 	     "  -r T${parent_guid}-${vers}_branch ".
 	     "  -m 'Commit merge with head'")
 	== 0 or fatal(-1, "Could not commit on $cvsdir");
@@ -677,9 +687,11 @@ else {
     # Now tag the CVS repo with the current guid/vers so we can find it easily.
     #
     System("$CVSBIN -d $cvsdir rtag -n ".
-	   " -r T${parent_guid}-${vers}_branch T${guid}-${vers} $guid")
+	   " -r T${parent_guid}-${vers}_branch T${guid}-${vers} $guid/setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
 }
+System("/bin/rm -rf $tmpdir")
+    if (-e $tmpdir);
 
 # Do a savepoint prior to the commit below. As noted above, this is
 # not done in batchexp.
@@ -915,6 +927,8 @@ sub cleanup()
     # Delete repo but only if this is the initial template creation.
     system("/bin/rm -rf $cvsdir")
 	if (!$modify && defined($cvsdir) && -e $cvsdir);
+    System("/bin/rm -rf $tmpdir")
+	if (defined($tmpdir) && -e $tmpdir);
     $template->Delete()
 	if (defined($template));
 }

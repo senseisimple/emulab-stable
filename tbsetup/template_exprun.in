@@ -98,6 +98,7 @@ my $checkquota  = "$TB/sbin/checkquota";
 my $archcontrol = "$TB/bin/archive_control";
 my $eventcontrol= "$TB/bin/eventsys_control";
 my $tevc        = "$TB/bin/tevc";
+my $CVSBIN      = "/usr/bin/cvs";
 
 # Protos
 sub ParseArgs();
@@ -119,6 +120,9 @@ use Template;
 use Experiment;
 use Archive;
 use event;
+
+# In libdb
+my $projroot = PROJROOT();
 
 #
 # Turn off line buffering on output
@@ -506,6 +510,31 @@ if (defined($instance->runidx())) {
     
     system("$archcontrol -d -t stoprun_${this_runid} ".
 	   "-c 'Stopping Run $this_runid' commit $pid $eid");
+
+    #
+    # Do the CVS stuff.
+    #
+    my $runidx       = $oldrun->idx();
+    my $exptidx      = $instance->exptidx();
+    my $instance_dir = $instance->path();
+    my $cvsdir       = "$projroot/$pid/templates/$guid/cvsrepo";
+    my $tmpdir       = "$projroot/$pid/templates/$guid/cvstmp.$$";
+    my $tag          = "R${exptidx}-${runidx}_import";
+    my $instance_tag = "I${exptidx}";
+
+    # This imports the experiment directory into the records subdir.
+    System("cd $instance_dir; ".
+	   "$CVSBIN -d $cvsdir import -I 'datastore/*' ".
+	   "  -m 'Import record for run $this_runid' ".
+	   "  $guid/records/$exptidx,$runidx ${tag}_branch $tag")
+	== 0 or fatal(-1, "Could not import new record into $cvsdir");
+
+    # Now tag it with the same tag that was applied for the instance.
+    # Apply to the branch tag directly instead of symbolically since that
+    # does not work properly for some reason. 
+    System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 ".
+	   "  $instance_tag $guid/records/$exptidx,$runidx")
+	== 0 or fatal(-1, "Could not rtag new record in $cvsdir");
 
     # This has to be done after the archive commit, so we can find the tag.
     $instance->FinalizeCurrentRun() == 0

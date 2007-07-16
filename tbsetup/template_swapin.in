@@ -67,7 +67,6 @@ my %parameters;
 my $pid;
 my $run;
 my $logname;
-my $template_tag;
 my @ExptStates  = ();
 # For the END block below.
 my $cleaning    = 0;
@@ -81,6 +80,7 @@ my $swapexp     = "$TB/bin/swapexp";
 my $endexp      = "$TB/bin/endexp";
 my $dbcontrol   = "$TB/sbin/opsdb_control";
 my $archcontrol = "$TB/bin/archive_control";
+my $CVSBIN      = "/usr/bin/cvs";
 
 # Protos
 sub ParseArgs();
@@ -100,6 +100,9 @@ use Template;
 use Experiment;
 use event;
 use libaudit;
+
+# In libdb
+my $projroot = PROJROOT();
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -390,6 +393,20 @@ system("$archcontrol -t swapin commit $pid $eid");
 if ($?) {
     fatal(-1, "Could not commit archive!");
 }
+
+#
+# Do the CVS stuff.
+#
+my $exptidx      = $instance->exptidx();
+my $cvsdir       = "$projroot/$pid/templates/$guid/cvsrepo";
+my $instance_tag = "I${exptidx}";
+my $template_tag = "T${guid}-$version";
+
+# Tag the template with an instance tag. This tag is used to associate
+# records with this instance with the actual template.
+System("$CVSBIN -d $cvsdir rtag -n -r ".
+       "  $template_tag $instance_tag $guid/setup") == 0
+    or fatal(-1, "Could not rtag with instance tag in $cvsdir");
 
 $instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0
     or fatal(-1, "Could not update start time in instance record!");

@@ -70,9 +70,9 @@ else {
 # See if the new tag is a branch tag. To do that, run rlog over the RCS
 # file and look at the revision number. We count the dots. There is also
 # a special case of x.y.0.z to look for.
-my $revision = `$RLOG -h $CVSROOT/$module/.template,v |grep '$tag:'`;
+my $revision = `$RLOG -h $CVSROOT/$module/setup/.template,v |grep '$tag:'`;
 if ($?) {
-    die("rlog on $CVSROOT/$module/.template,v failed!\n");
+    die("rlog on $CVSROOT/$module/setup/.template,v failed!\n");
 }
 if ($revision =~ /^\s*$tag:\s*([\d.]+)$/) {
     $revision = $1;
@@ -116,17 +116,17 @@ if ((scalar(@tokens) & 1) || ($revision =~ /\d*\.0\.\d*$/)) {
     $tokens[scalar(@tokens)-1] = 1;
     my $branch = join(".", @tokens[0 .. scalar(@tokens)-2]);
 
-    system("$CO -r${baserev} $CVSROOT/$module/.template,v") == 0
+    system("$CO -r${baserev} $CVSROOT/$module/setup/.template,v") == 0
 	or die("Could not co -r${baserev} $CVSROOT/$module/.template,v!\n");
 
-    system("$RCS -b${branch} $CVSROOT/$module/.template,v") == 0
+    system("$RCS -b${branch} $CVSROOT/$module/setup/.template,v") == 0
 	or die("Could not rcs -b${branch} $CVSROOT/$module/.template,v");
     
     system("$CI -f -r${branch} -m'Force checkin on new branch' ".
-	   " $CVSROOT/$module/.template,v .template") == 0
+	   " $CVSROOT/$module/setup/.template,v .template") == 0
 	or die("Could not ci -r${branch} $CVSROOT/$module/.template,v!\n");
 
-    system("$RCS -b $CVSROOT/$module/.template,v") == 0
+    system("$RCS -b $CVSROOT/$module/setup/.template,v") == 0
 	or die("Could not rcs -b $CVSROOT/$module/.template,v");
 
     print "$tag/$revision is a branch revision.\n";
@@ -138,7 +138,7 @@ if ((scalar(@tokens) & 1) || ($revision =~ /\d*\.0\.\d*$/)) {
 # Checkout the .template file at the base revision, and get the guid from it.
 # This is the template we are going to modify.
 #
-open(CO, "$CO -q -p${baserev} $CVSROOT/$module/.template,v |")
+open(CO, "$CO -q -p${baserev} $CVSROOT/$module/setup/.template,v |")
     or die("Could not run '$CO -p${baserev} $CVSROOT/$module/.template,v\n");
 while (<CO>) {
     if ($_ =~ /^GUID:\s*(\d+\/\d+)$/) {
@@ -151,7 +151,7 @@ if (!defined($guid)) {
 }
 print "Running: template_commit -r $tag $guid\n";
 
-if (0) {
+if (1) {
     exit(0);
 }
 
