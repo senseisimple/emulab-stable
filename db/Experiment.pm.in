@@ -575,12 +575,19 @@ sub Refresh($)
     my $idx = $self->idx();
 
     my $query_result =
-	DBQueryWarn("select * from experiments where idx=$idx");
+	DBQueryWarn("select e.*,i.parent_guid,t.guid from experiments as e ".
+		    "left join experiment_templates as t on ".
+		    "     t.exptidx=e.idx ".
+		    "left join experiment_template_instances as i on ".
+		    "     i.exptidx=e.idx ".
+		    "where e.idx='$idx'");
 
     return -1
 	if (!$query_result || !$query_result->numrows);
 
-    $self->{'EXPT'}  = $query_result->fetchrow_hashref();
+    $self->{'EXPT'}       = $query_result->fetchrow_hashref();
+    $self->{'ISINSTANCE'} = defined($self->{'EXPT'}->{'parent_guid'});
+    $self->{'ISTEMPLATE'} = defined($self->{'EXPT'}->{'guid'});
 
     $query_result =
 	DBQueryWarn("select * from experiment_stats where exptidx='$idx'");
