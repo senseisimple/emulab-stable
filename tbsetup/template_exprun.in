@@ -107,6 +107,7 @@ sub sighandler($);
 sub SignalProgAgents($);
 sub SendCompletionEvent();
 sub CheckForDeadNodes($);
+sub GenXML($$);
 
 #
 # Testbed Support libraries
@@ -521,13 +522,19 @@ if (defined($instance->runidx())) {
     my $tmpdir       = "$projroot/$pid/templates/$guid/cvstmp.$$";
     my $tag          = "R${exptidx}-${runidx}_import";
     my $instance_tag = "I${exptidx}";
+    my $xmlfile      = "$instance_dir/info.xml";
+
+    fatal(-1, "Could not generate XML description for $oldrun")
+	if (GenXML($instance, $xmlfile) != 0);
 
     # This imports the experiment directory into the records subdir.
     System("cd $instance_dir; ".
-	   "$CVSBIN -d $cvsdir import -I 'datastore/*' ".
+	   "$CVSBIN -d $cvsdir import -I 'datastore' ".
 	   "  -m 'Import record for run $this_runid' ".
 	   "  $guid/records/$exptidx,$runidx ${tag}_branch $tag")
 	== 0 or fatal(-1, "Could not import new record into $cvsdir");
+
+    unlink($xmlfile);
 
     # Now tag it with the same tag that was applied for the instance.
     # Apply to the branch tag directly instead of symbolically since that
@@ -1073,6 +1080,92 @@ sub CheckForDeadNodes($)
 	#
 	$deadnodes{$node_id} = $node_id;
     }
+}
+
+#
+# Generate an XML file describing the just finished run.
+#
+sub GenXML($$)
+{
+    my ($instance, $outputfile) = @_;
+    my $root     = {};
+    my $template = $instance->GetTemplate();
+    my $run      = $instance->CurrentRun();
+    my %bindings;
+    my %mlist;
+
+    $root->{"infoversion"}= "1.0";
+    $root->{"guid"}       = $instance->guid() . "/" . $instance->vers();
+    $root->{"pid"}        = $template->pid();
+    $root->{"pid_idx"}    = $template->pid_idx();
+    $root->{"eid"}        = $instance->eid();
+    $root->{"exptidx"}    = $instance->exptidx();
+    $root->{"uid"}        = $instance->uid();
+    $root->{"uid_idx"}    = $instance->uid_idx();
+    $root->{"runid"}      = $run->runid();
+    $root->{"run_idx"}    = $run->idx();
+    $root->{"start_time"} = $run->start_time();
+    $root->{"stop_time"}  = $run->stop_time();
+
+    # Fill in the bindings
+    $run->BindingList(\%bindings) == 0
+	or fatal(-1, "Could not get bindings for $run");
+    if (keys(%bindings)) {
+	$root->{"bindings"} = {};
+	foreach my $name (keys(%bindings)) {
+	    my $value = $bindings{$name};
+	    my $description;
+
+	    $template->FormalParameterDescription($name, \$description);
+	
+	    $root->{"bindings"}->{$name} = {'value' => $value,
+					    'description' => $description};
+	}
+    }
+
+    # Fill in the metadata
+    $template->MetadataList(\%mlist) == 0
+	or fatal(-1, "Could not get Metadata list for $instance");
+    if (keys(%mlist)) {
+	$root->{"metadata"} = {};
+	foreach my $name (keys(%mlist)) {
+	    my $value = $mlist{$name};
+	
+	    $root->{"metadata"}->{$name} = $value;
+	}
+    }
+
+    if ($debug) {
+	print Dumper($root);
+	print "\n";
+    }
+    my %xmloptions = ('RootName' => 'run',
+		      'XMLDecl' => 1,
+		      'SuppressEmpty' => undef,
+		      'NoAttr' => 1);
+
+    my $xml = XMLout($root, %xmloptions);
+
+    if ($debug) {
+	print "$xml\n";
+
+	$root = XMLin($xml, KeyAttr => "name",
+		      "ForceArray" => ["metadata", "runs", "bindings"]);
+	print Dumper($root);
+	print "\n";
+    }
+
+    unlink($outputfile)
+	if (-e $outputfile);
+    if (open(DUMP, ">$outputfile")) {
+	print DUMP "$xml\n";
+	close(DUMP);
+    }
+    else {
+	print STDERR "*** Could not open $outputfile for writing";
+	return -1;
+    }
+    return 0;
 }
 
 END {

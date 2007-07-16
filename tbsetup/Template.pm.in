@@ -1953,6 +1953,7 @@ sub vers($)          { return field($_[0], 'parent_vers');}
 sub pid($)           { return field($_[0], 'pid'); }
 sub eid($)           { return field($_[0], 'eid'); }
 sub uid($)           { return field($_[0], 'uid'); }
+sub uid_idx($)       { return field($_[0], 'uid_idx'); }
 sub runidx($)        { return field($_[0], 'runidx'); }
 sub start_time($)    { return field($_[0], 'start_time'); }
 sub stop_time($)     { return field($_[0], 'stop_time'); }
@@ -2242,6 +2243,7 @@ sub Experiment($)
     return Experiment->LookupByIndex($self->exptidx());
 }
 sub GetExperiment($) { return $_[0]->Experiment(); }
+sub GetTemplate($)   { return $_[0]->template(); }
 
 #
 # Delete a template instance record.
