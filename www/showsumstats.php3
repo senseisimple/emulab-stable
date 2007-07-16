@@ -289,6 +289,7 @@ function showsummary ($showby) {
 function showrange ($showby, $range) {
     global $TBOPSPID, $TB_EXPTSTATE_ACTIVE, $debug, $debug2, $debug3;
     $now   = time();
+    $inactive_swapmods = 0;
     unset($rangematches);
     
     switch ($range) {
@@ -358,6 +359,9 @@ function showrange ($showby, $range) {
 	$vnodes      = $row["vnodes"];
 	$rsrcidx     = $row["idx"];
 
+	if ($swapin_time > $spanend) {
+	    continue;
+	}
 	if ($swapin_time < $spanstart) 
 	    $swapseconds = $spanend - $spanstart;
 	else
@@ -479,6 +483,8 @@ function showrange ($showby, $range) {
 	if ($byswapmod) {
 	    $pid_summary[$pid]["swapmods"]++;
 	    $uid_summary[$uid]["swapmods"]++;
+	    if (!($pnodes || $vnodes))
+		$inactive_swapmods++;
 	}
 
 	# Current experiment and this resource record is the one we
@@ -616,7 +622,7 @@ function showrange ($showby, $range) {
                <td align=left>$swapin_total</td>
            </tr>
            <tr><td nowrap align=right><b>Swapmods</b></td>
-               <td align=left>$swapmod_total</td>
+               <td align=left>$swapmod_total ($inactive_swapmods)</td>
            </tr>
            <tr><td nowrap align=right><b>New</b></td>
                <td align=left>$new_total</td>
