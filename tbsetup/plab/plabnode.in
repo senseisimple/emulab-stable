@@ -20,7 +20,10 @@ import libplab
 
 
 def usage(me):
-    print "Usage: %s [ -vdf ] { alloc | renew | free } pid eid nodeid" % me
+    print "Usage: %s [-vdfE] {alloc|renew|free|stop|start|restart} pid eid nodeid\n" \
+          "  Without Emulab DB:\n" \
+          "       %s [-vdfE] {alloc|renew|free|stop|start|restart} slicename nodeid" \
+          % (me,me)
     sys.exit(1)
 
 def processException(command, nodeid, e):
@@ -46,18 +49,32 @@ def main(args):
     parser.add_option("--noIS", dest="noIS", action="store_true",
                       default=False,
                       help="Don't run InstantiateSliver() in mod_PLC")
+    parser.add_option("-E","--no-emulabify",dest="no_emulabify",default=False,
+                      action="store_true",help="Do not install/config Emulab" \
+                      " software on the node")
 
     # parse command line options
     opts, args = parser.parse_args(args[1:])
 
+    slicename = None
     # make sure we were told what to do on the command line.
-    if not len(args) == 4:
+    if len(args) == 3:
+        command, slicename, nodeid = args
+        pass
+    elif len(args) == 4:
+        command, pid, eid, nodeid = args
+        pass
+    else:
         usage(me)
         pass
-
-    command, pid, eid, nodeid = args
+    
     plab = libplab.Plab()
-    slice = plab.loadSlice(pid, eid)
+    if slicename != None:
+        slice = plab.loadSliceNoDB(slicename)
+        pass
+    else:
+        slice = plab.loadSlice(pid, eid)
+        pass
 
     if command == "alloc":
         try:
@@ -65,8 +82,10 @@ def main(args):
             # With the v4 NM, we have to sleep a couple seconds to give
             # the slice the a chance to get keys/acct stuff straightened out
             # so we can actually slogin and copy fixsudo.sh to the node.
-            time.sleep(2)
-            node.emulabify()
+            if not opts.no_emulabify:
+                time.sleep(2)
+                node.emulabify()
+                pass
             # Note that vnode_setup boots the node
             pass
         except Exception, e:
@@ -92,6 +111,50 @@ def main(args):
         try:
             node = slice.loadNode(nodeid)
             node.free()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "stop":
+        try:
+            node = slice.loadNode(nodeid)
+            node.stop()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "start":
+        try:
+            node = slice.loadNode(nodeid)
+            node.start()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "stop":
+        try:
+            node = slice.loadNode(nodeid)
+            node.stop()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "restart":
+        try:
+            node = slice.loadNode(nodeid)
+            node.restart()
             pass
         except Exception, e:
             processException(command, nodeid, e)

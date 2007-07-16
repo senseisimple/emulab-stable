@@ -12,26 +12,73 @@ import getopt
 from libtestbed import *
 import libplab
 
-usage = "%prog [ -vd ] { create | destroy } pid eid"
+usage = "%prog [-vd] {create|destroy} pid eid\n" \
+        "  Without Emulab DB:\n" \
+        "%prog [-vd] [-u <user1,...>] [-n <node1,...>] -c <slicedesc> \\\n" \
+        "            {create|destroy} slicename"
+        #            [-w <url>]
 
 def main(args):
     me = args[0]
     parser = TBParser(usage)
+    parser.add_option("-u","--users",dest="users",action="store",
+                      help="Comma-separated list of users to add to the slice",
+                      default=None)
+    parser.add_option("-n","--nodes",dest="nodes",action="store",
+                      help="Comma-separated list of hostnames to add to " \
+                      "the slice",default=None)
+    parser.add_option("-c","--slicedesc",dest="slicedesc",action="store",
+                      help="Slice description",default=None)
+#    parser.add_option("-w","--sliceurl",dest="sliceurl",action="store_true",
+#                      help="Slice URL",default=None)
+    userlist,nodelist = None,None
+    
     (opts, args) = parser.parse_args()
-
-    if len(args) < 3:
+    
+    usedb = True
+    if len(args) == 2:
+        usedb = False
+        command,slicename = args
+        if args[0] == 'create' and (opts.slicedesc == None \
+                                    or opts.slicedesc == ''):
+            parser.error("Must supply a slice description if creating by slicename!")
+            pass
+        if opts.nodes != None:
+            nodelist = opts.nodes.split(',')
+            pass
+        if opts.users != None:
+            userlist = opts.nodes.split(',')
+            pass
+        pass
+    elif len(args) == 3:
+        command,pid,eid = args
+        pass
+    else:
         parser.error("Incorrect number of arguments")
-
-    command,pid,eid = args
+        pass
 
     plab = libplab.Plab()
     if command == "create":
-        slice = plab.createSlice(pid, eid)
+        if usedb:
+            slice = plab.createSlice(pid, eid)
+            pass
+        else:
+            slice = plab.createSliceNoDB(slicename,opts.slicedesc,
+                                         userlist=userlist,nodelist=nodelist)
+            pass
+        pass
     elif command == "destroy":
-        slice = plab.loadSlice(pid, eid)
+        if usedb:
+            slice = plab.loadSlice(pid, eid)
+            pass
+        else:
+            slice = plab.loadSliceNoDB(slicename)
+            pass
         slice.destroy()
+        pass
     else:
         usage(me)
+        pass
 
 if __name__ == "__main__":
     main(sys.argv)

@@ -312,11 +312,28 @@ class Plab:
         slice._create()
         return slice
 
+    def createSliceNoDB(self,name,description,userlist=[],nodelist=[]):
+        """
+        Slice factory function that doesn't use the Emulab db.
+        """
+        slice = Slice(self,usedb=False,slicename=name,slicedescr=description,
+                      userlist=userlist,nodelist=nodelist)
+        slice._create()
+        return slice
+
     def loadSlice(self, pid, eid):
         """
         Slice factory function
         """
         slice = Slice(self, pid, eid)
+        slice._load()
+        return slice
+
+    def loadSliceNoDB(self,name):
+        """
+        Slice factory function that doesn't use the Emulab db.
+        """
+        slice = Slice(self,usedb=False,slicename=name)
         slice._load()
         return slice
 
@@ -1149,14 +1166,39 @@ wrap_around(Plab.createSlice, timeAdvice)
 #
 class Slice:
 
-    def __init__(self, plab, pid, eid, slicename = None):
+    def __init__(self, plab, pid = None, eid = None, exptidx = None,
+                 usedb = True, slicename = None, slicedescr = DEF_SLICE_DESC,
+                 sliceurl = None, userlist = [], nodelist = []):
         self.plab = plab
         self.pid, self.eid = pid, eid
         self.slicemeta = None
         self.slicemeta_legacy = None
-        self.exptidx = None
+        self.exptidx = exptidx
         self.slicename = slicename
-        self.description = DEF_SLICE_DESC
+        self.description = slicedescr
+        self.sliceurl = sliceurl
+        self.usedb = usedb
+        self.userlist = userlist
+        self.nodelist = nodelist
+
+        # Rules for arguments.
+        if usedb and (pid == None or eid == None):
+            raise RuntimeError, "Must provide pid/eid if using DB!"
+
+        if not usedb and slicename == None:
+            raise RuntimeError, "Must provide slicename if not using DB!"
+
+        # For the case where usedb is false, we have to set eid/pid to
+        # empty strings instead of None, since various other classes assume
+        # they are set.  Same with leaseend -- for that, we just pick the
+        # current time (it's a safe, if impractical, base for "renewing" the
+        # slice).  We do attempt to retrieve leaseend from PLC in _load.
+        if self.pid == None:
+            self.pid = ""
+        if self.eid == None:
+            self.eid = ""
+        self.leaseend = time.gmtime(time.time())
+        
         return
     
     def _create(self):
@@ -1172,23 +1214,25 @@ class Slice:
             adminbit = 1
             pass
 
-        res = DBQueryFatal("select idx, expt_name from experiments "
-                           "where pid=%s "
-                           "and eid=%s",
-                           (self.pid, self.eid))
-        if not len(res):
-            raise RuntimeError, \
-                  "Didn't get any results while looking up info on " \
-                  "experiment %s/%s" % (self.pid, self.eid)
-        (eindex, descr) = res[0]
-        
-        if not self.slicename:
-            self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+        if self.usedb:
+            res = DBQueryFatal("select idx, expt_name from experiments "
+                               "where pid=%s "
+                               "and eid=%s",
+                               (self.pid, self.eid))
+            if not len(res):
+                raise RuntimeError, \
+                      "Didn't get any results while looking up info on " \
+                      "experiment %s/%s" % (self.pid, self.eid)
+            (eindex, descr) = res[0]
+            
+            if not self.slicename:
+                self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+                pass
+            
+            self.description = descr
+            self.exptidx = eindex
             pass
-
-        self.description = descr
-        self.exptidx = eindex
-
+        
         print "Creating Plab slice %s." % self.slicename
 
         try:
@@ -1205,8 +1249,8 @@ class Slice:
                     pass
                 pass
 
-            # see if we have two tickets to insert (support the legacy ticket
-            # or not)
+            # see if we have two tickets to insert (support the legacy
+            # ticket or not)
             if type(tmpslicemeta) == tuple:
                 self.slicemeta = tmpslicemeta[0]
                 self.slicemeta_legacy = tmpslicemeta[1]
@@ -1232,10 +1276,12 @@ class Slice:
                                      adminbit)
                 pass
 
-            qstr = "insert into plab_slices " + insertFieldsStr + \
-                   " values " + insertValuesStr
-            
-            DBQueryFatal(qstr,insertValuesTuple)
+            if self.usedb:
+                qstr = "insert into plab_slices " + insertFieldsStr + \
+                       " values " + insertValuesStr
+                
+                DBQueryFatal(qstr,insertValuesTuple)
+                pass
             pass
         except:
             self.plab.agent.deleteSlice(self)
@@ -1249,31 +1295,36 @@ class Slice:
                     pass
                 pass
 
-            DBQueryFatal("delete from plab_slices where slicename=%s",
-                         (self.slicename,))
+            if self.usedb:
+                DBQueryFatal("delete from plab_slices where slicename=%s",
+                             (self.slicename,))
+                pass
             raise
 
-        # Setup mailing alias for the slice.  All mail currently filters
-        # in via the 'emulabman' alias.  A procmail filter there will
-        # redirect it to the appropriate user.
-        try:
-            qres = DBQueryFatal("select u.uid, u.usr_email from users as u "
-                                "left join experiments as e "
-                                "on u.uid_idx = e.swapper_idx "
-                                "where e.pid=%s and e.eid=%s",
-                                (self.pid, self.eid))
-            if not len(qres):
-                raise RuntimeError, \
-                      "Didn't get any results while looking up user info " \
-                      "for experiment %s/%s" % (self.pid, self.eid)
-            (username, usremail) = qres[0]
-            command = "%s -host %s /bin/echo %s \> %s/%s" % \
-                      (SSH, USERNODE, usremail,
-                       SLICE_ALIAS_DIR, self.slicename)
-            os.system(command)
-        except:
-            print "Could not setup email alias for slice: %s!" % self.slicename
-            traceback.print_exc()
+        if self.usedb:
+            # Setup mailing alias for the slice.  All mail currently filters
+            # in via the 'emulabman' alias.  A procmail filter there will
+            # redirect it to the appropriate user.
+            try:
+                qres = DBQueryFatal("select u.uid, u.usr_email from users as u "
+                                    "left join experiments as e "
+                                    "on u.uid_idx = e.swapper_idx "
+                                    "where e.pid=%s and e.eid=%s",
+                                    (self.pid, self.eid))
+                if not len(qres):
+                    raise RuntimeError, \
+                          "Didn't get any results while looking up user info" \
+                          " for experiment %s/%s" % (self.pid, self.eid)
+                (username, usremail) = qres[0]
+                command = "%s -host %s /bin/echo %s \> %s/%s" % \
+                          (SSH, USERNODE, usremail,
+                           SLICE_ALIAS_DIR, self.slicename)
+                os.system(command)
+            except:
+                print "Could not setup email alias for slice: %s!" \
+                      % self.slicename
+                traceback.print_exc()
+                pass
             pass
 
         return res
@@ -1286,6 +1337,25 @@ class Slice:
         XXX This should probably be made lazy, since not all operations
         really need it
         """
+        if not self.usedb:
+            # Just grab NM tickets from PLC for now
+            try:
+                self.slicemeta = self.plab.agent.getSliceMeta(self)
+                self.slicemeta_legacy = self.plab.agent.getSliceMetaLegacy(self)
+                pass
+            except:
+                raise
+
+            # Grab leaseend time
+            try:
+                self.leaseend = self.plab.agent.getSliceExpTime(self)
+                pass
+            except:
+                # do nothing -- we can survive without the leaseend time.
+                pass
+            
+            return
+        
         if verbose:
             print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
             pass
@@ -1340,15 +1410,17 @@ class Slice:
                           "\n  watch for inconsistent DB state!"
                     pass
                 pass
-            
-            DBQueryFatal("update plab_slices "
-                         " set slicemeta=%s, leaseend=%s, slicemeta_legacy=%s "
-                         " where slicename=%s",
-                         (self.slicemeta,
-                          time.strftime("%Y-%m-%d %H:%M:%S",
-                                        time.gmtime(self.leaseend)),
-                          self.slicemeta_legacy,
-                          self.slicename))
+
+            if self.usedb:
+                DBQueryFatal("update plab_slices "
+                             "set slicemeta=%s,leaseend=%s,slicemeta_legacy=%s"
+                             " where slicename=%s",
+                             (self.slicemeta,
+                              time.strftime("%Y-%m-%d %H:%M:%S",
+                                            time.gmtime(self.leaseend)),
+                              self.slicemeta_legacy,
+                              self.slicename))
+                pass
             pass
         except:
             print "slice.renew: Slice renewal failed:"
@@ -1382,7 +1454,7 @@ class Slice:
             pass
 
         # Report any nodes that are near to expiration
-        if len(reportfailed) > 0:
+        if self.usedb and len(reportfailed) > 0:
             tbstr = ""
             for nodeid, leaseend in reportfailed:
                 tbstr += "Node: %s, Leaseend: %s UTC\n" % \
@@ -1405,14 +1477,25 @@ class Slice:
         slice is destroyed.
         """
         print "Destroying Plab slice %s." % self.slicename
-        res = DBQueryFatal("select node_id from plab_slice_nodes"
-                           " where slicename = %s",
-                           (self.slicename))
+        nodeidlist = []
+        if self.usedb:
+            res = DBQueryFatal("select node_id from plab_slice_nodes"
+                               " where slicename = %s",
+                               (self.slicename))
+            for (nodeid,) in res:
+                nodeidlist.append(nodeid)
+                pass
+            pass
+        else:
+            nodeidlist = self.nodelist
+            pass
+        
         print "\tRemoving any remaining nodes in slice.."
-        for (nodeid,) in res:
-            node = self.loadNode(nodeid)
+        for nid in nodeidlist:
+            node = self.loadNode(nid)
             node.free()
             del node  # Encourage the GC'er
+            pass
 
         osigs = disable_sigs(TERMSIGS)
 
@@ -1432,29 +1515,30 @@ class Slice:
                       "\n  watch for inconsistent DB state!"
                 pass
             pass
-        
-        try:
-            print "\tRemoving slice DB entry."
-            DBQueryFatal("delete from plab_slices where slicename = %s",
-                         (self.slicename,))
-        except:
-            print "Error deleting slice from DB!"
-            tbstr = "".join(traceback.format_exception(*sys.exc_info()))
-            SENDMAIL(TBOPS, "Error deleting slice from DB",
-                     "Slice deletion error:\n\n%s" % tbstr, TBOPS)
-            enable_sigs(osigs)
-            raise
 
-        try:
-            command = "%s -host %s /bin/rm -f %s/%s" % \
-                      (SSH, USERNODE, SLICE_ALIAS_DIR, self.slicename)
-            os.system(command)
-        except:
-            print "Could not remove email alias for slice: %s!" % \
-                  self.slicename
-            traceback.print_exc()
-            pass
+        if self.usedb:
+            try:
+                print "\tRemoving slice DB entry."
+                DBQueryFatal("delete from plab_slices where slicename = %s",
+                             (self.slicename,))
+            except:
+                print "Error deleting slice from DB!"
+                tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+                SENDMAIL(TBOPS, "Error deleting slice from DB",
+                         "Slice deletion error:\n\n%s" % tbstr, TBOPS)
+                enable_sigs(osigs)
+                raise
             
+            try:
+                command = "%s -host %s /bin/rm -f %s/%s" % \
+                          (SSH, USERNODE, SLICE_ALIAS_DIR, self.slicename)
+                os.system(command)
+            except:
+                print "Could not remove email alias for slice: %s!" % \
+                      self.slicename
+                traceback.print_exc()
+                pass
+            pass
         
         enable_sigs(osigs)
 
@@ -1463,14 +1547,14 @@ class Slice:
         Node factory function
         """
         # XXX: KRW - The following is a hack to help me with testing.
-        if not nodeid.startswith("plab"):
-            IP = socket.gethostbyname(nodeid)
-            qres = DBQueryFatal("select n.node_id from nodes as n left join "
-                                "interfaces as i on n.node_id = i.node_id "
-                                "where i.IP = %s", (IP,))
-            assert (len(qres) > 0), "Node does not exist in DB: %s" % nodeid
-            nodeid = qres[0][0] + "-20"
-        node = Node(self, nodeid)
+        #if not nodeid.startswith("plab"):
+        #    IP = socket.gethostbyname(nodeid)
+        #    qres = DBQueryFatal("select n.node_id from nodes as n left join "
+        #                        "interfaces as i on n.node_id = i.node_id "
+        #                        "where i.IP = %s", (IP,))
+        #    assert (len(qres) > 0), "Node does not exist in DB: %s" % nodeid
+        #    nodeid = qres[0][0] + "-20"
+        node = Node(self, nodeid, usedb = self.usedb)
         node._create(force)
         return node
 
@@ -1478,7 +1562,7 @@ class Slice:
         """
         Node factory function
         """
-        node = Node(self, nodeid)
+        node = Node(self, nodeid, usedb = self.usedb)
         node._load()
         return node
 
@@ -1490,9 +1574,13 @@ class Slice:
             # Handle legacy tickets for compat purposes.
             self.slicemeta = self.plab.agent.getSliceMeta(self)
             self.slicemeta_legacy = self.plab.agent.getSliceMetaLegacy(self)
-            DBQueryFatal("update plab_slices set "
-                         "slicemeta=%s,slicemeta_legacy=%s where slicename=%s",
-                         (self.slicemeta,self.slicemeta_legacy,self.slicename))
+            if self.usedb:
+                DBQueryFatal("update plab_slices set"
+                             " slicemeta=%s,slicemeta_legacy=%s"
+                             " where slicename=%s",
+                             (self.slicemeta,self.slicemeta_legacy,
+                              self.slicename))
+                pass
             pass
         except:
             print "Error updating slice metadata!"
@@ -1505,33 +1593,83 @@ class Slice:
         """
         Return a tuple containing the nodes that belong to this slice
         """
-        # Grab set of plab nodes belonging to expt and their IPs:
-        return DBQueryFatal("select r.node_id, i.IP, w.hostname "
-                            " from reserved as r "
-                            " left join nodes as n1 "
-                            "  on r.node_id = n1.node_id "
-                            " left join nodes as n2 "
-                            "  on n1.phys_nodeid = n2.node_id "
-                            " left join widearea_nodeinfo as w "
-                            "  on n2.node_id = w.node_id "
-                            " left join interfaces as i "
-                            "  on w.node_id = i.node_id "
-                            " where r.pid=%s and r.eid=%s "
-                            " and n1.type=%s and i.role=%s",
-                            (self.pid, self.eid, "pcplab", "ctrl"))
+        if self.usedb:
+            # Grab set of plab nodes belonging to expt and their IPs:
+            return DBQueryFatal("select r.node_id, i.IP, w.hostname "
+                                " from reserved as r "
+                                " left join nodes as n1 "
+                                "  on r.node_id = n1.node_id "
+                                " left join nodes as n2 "
+                                "  on n1.phys_nodeid = n2.node_id "
+                                " left join widearea_nodeinfo as w "
+                                "  on n2.node_id = w.node_id "
+                                " left join interfaces as i "
+                                "  on w.node_id = i.node_id "
+                                " where r.pid=%s and r.eid=%s "
+                                " and n1.type=%s and i.role=%s",
+                                (self.pid, self.eid, "pcplab", "ctrl"))
+        else:
+            retval = []
+            for n in self.nodelist:
+                nn = Node(self,n)
+                # Grab the IP and hostname
+                retval.append([n,nn.IP,nn.hostname])
+                pass
+            return retval
+        pass
+
+    def getSliceUsers(self):
+        return self.userlist
+    
     pass  # end of class Slice
 # AOP wrappers for class Slice
 wrap_around(Slice._create, timeAdvice)
 wrap_around(Slice.destroy, timeAdvice)
 
+# Helper regexps used in the Node class
+VNODE_REG = re.compile("^plabvm(\d+)\-(\d+)$")
+PNODE_REG = re.compile("^plab(\d+)$")
+IP_REG = re.compile("^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
+HOSTNAME_REG = re.compile("^([\d\w\-\.]+)$")
+
 #
 # Node abstraction
 #
 class Node:
-    def __init__(self, slice, nodeid, pollNode = False):
+    #
+    # Note: you can now pass in an Emulab vnode or pnode, or a hostname or
+    # IP address.
+    # Also, note that passing in a pnode or hostname/IP forces usedb = False,
+    # since most Emulab db entries depend on the vnodeid at this level.
+    #
+    def __init__(self, slice, nodeid, pollNode = False, usedb = True):
+        self.usedb = usedb
         self.slice = slice
         self.nodeid = nodeid
+
+        # Figure out what kind of nodeid we were given (how we do lookups
+        # depends on it):
+        if VNODE_REG.match(nodeid) != None:
+            self.nidtype = 'v'
+            pass
+        elif PNODE_REG.match(nodeid) != None:
+            self.nidtype = 'p'
+            self.usedb = False
+            pass
+        elif IP_REG.match(nodeid) != None:
+            self.nidtype = 'i'
+            self.usedb = False
+            pass
+        elif HOSTNAME_REG.match(nodeid) != None:
+            self.nidtype = 'h'
+            self.usedb = False
+            pass
+        else:
+            raise RuntimeError, "nodeid must be an Emulab vnode or pnode, or" \
+                  " a hostname or IP address!"
+        
         (self.IP,self.hostname,self.phys_nodeid) = self.__findHostInfo()
+        
         self.leaseend = 0
         self.nodemeta = None
         self.pollNode = pollNode
@@ -1554,6 +1692,27 @@ class Node:
                   (component,operation,status,msg)
             pass
         pass
+
+    def __gcNode(self,add_remove):
+        if add_remove:
+            # add
+            now = time.strftime("%Y-%m-%d %H:%M:%S",
+                                time.localtime(time.time()))
+            q = "replace into plab_sliver_garbage (pid,eid,exptidx," \
+                "  slicename,node_id,phys_node_id,ctime,mtime)"\
+                " values (%s,%s,%s,%s,%s,%s,%s,%s)"
+            DBQueryWarn(q,(self.slice.pid,self.slice.eid,self.slice.exptidx,
+                           self.slice.slicename,self.nodeid,self.phys_nodeid,
+                           now,now))
+        else:
+            # remove, and don't worry about failed queries, since the garbage
+            # collector will check for this case anyway.
+            q = "delete from plab_sliver_garbage" \
+                " where pid=%s and eid=%s and slicename=%s and node_id=%s"
+            DBQuery(q,(self.slice.pid,self.slice.eid,self.slice.slicename,
+                       self.phys_nodeid))
+        
+        pass
     
     # XXX: may want to rethink signal handling here.
     def _create(self, force=False):
@@ -1563,18 +1722,29 @@ class Node:
         node setup is performed.  Don't call this directly, use
         Slice.createNode instead.
         """
-        
-        # First, make sure there isn't already an entry in the DB
-        try:
-            self._load()
-        except:
-            pass
-        else:
-            if force:
-                print "Node entry exists in DB, but creation forced anyway."
+
+        if self.usedb:
+            # First, make sure there isn't already an entry in the DB
+            try:
+                self._load()
+            except:
+                pass
             else:
-                raise RuntimeError, "Entry for plab node %s already exists " \
-                      "in the DB" % self.nodeid
+                if force:
+                    print "Node entry exists in DB, but creation forced anyway."
+                else:
+                    raise RuntimeError, "Entry for plab node %s already " \
+                          "exists in the DB" % self.nodeid
+                pass
+            pass
+
+        if self.usedb:
+            # Note: whenever we create a plab sliver, we remove the node from
+            # the plab_sliver_garbage table before even trying the create.
+            # The reason for this is that even if the create never succeeds
+            # in a swapin, there will be a corresponding free call for all
+            # slivers that matter.
+            self.__gcNode(False)
             pass
 
         print "Creating Plab node %s on %s." % (self.nodeid, self.IP)
@@ -1582,21 +1752,28 @@ class Node:
         try:
             res, self.nodemeta, self.leaseend = \
                  self.slice.plab.agent.createNode(self)
-            self.__logNodeHist('node','create','success','')
+            if self.usedb:
+                self.__logNodeHist('node','create','success','')
+                pass
         except:
-            self.__logNodeHist('node','create','failure',
-                               traceback.format_exception(*sys.exc_info()))
+            if self.usedb:
+                self.__logNodeHist('node','create','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
             raise
+
+        if self.usedb:
+            DBQueryFatal("replace into plab_slice_nodes"
+                         " (exptidx, pid, eid, slicename, node_id,"
+                         " nodemeta, leaseend)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (self.slice.exptidx, self.slice.pid, self.slice.eid,
+                          self.slice.slicename, self.nodeid,
+                          self.nodemeta,
+                          time.strftime("%Y-%m-%d %H:%M:%S",
+                                        time.gmtime(self.leaseend))))
+            pass
         
-        DBQueryFatal("replace into plab_slice_nodes"
-                     " (exptidx, pid, eid, slicename, node_id,"
-                     " nodemeta, leaseend)"
-                     " values (%s, %s, %s, %s, %s, %s, %s)",
-                     (self.slice.exptidx, self.slice.pid, self.slice.eid,
-                      self.slice.slicename, self.nodeid,
-                      self.nodemeta,
-                      time.strftime("%Y-%m-%d %H:%M:%S",
-                                    time.gmtime(self.leaseend))))
         if self.pollNode:
             TIMESTAMP("Waiting for %s to respond" % self.nodeid)
             while True:
@@ -1613,12 +1790,15 @@ class Node:
 
         TIMESTAMP("createnode finished on %s." % self.nodeid)
         return
-
+    
     def _load(self):
         """
         Loads an already allocated node from the DB.  Don't call this
         directly, use Slice.loadNode instead.
         """
+        if not self.usedb:
+            return
+        
         if verbose:
             print "Loading node %s" % self.nodeid
         res = DBQueryFatal("select slicename, nodemeta, leaseend "
@@ -1663,27 +1843,36 @@ class Node:
         deleted = 0
         TIMESTAMP("freenode %s started." % self.nodeid)
         print "Freeing Plab node %s." % self.nodeid
-        
-        # Remove the DB entry first.
-        try:
-            DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
-                         (self.nodeid,))
-        except:
-            print "Uh oh, couldn't remove plab sliver record from the DB!"
-            tbstr = "".join(traceback.format_exception(*sys.exc_info()))
-            SENDMAIL(TBOPS, "Error: Couldn't remove plab vnode from DB",
-                     "Unable to delete entry for sliver %s from the DB:"
-                     "\n\n%s" % (self.nodeid, tbstr), TBOPS)
+
+        if self.usedb:
+            # Remove the DB entry first.
+            try:
+                DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
+                             (self.nodeid,))
+            except:
+                print "Uh oh, couldn't remove plab sliver record from the DB!"
+                tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+                SENDMAIL(TBOPS, "Error: Couldn't remove plab vnode from DB",
+                         "Unable to delete entry for sliver %s from the DB:"
+                         "\n\n%s" % (self.nodeid, tbstr), TBOPS)
+                pass
             pass
 
         deleted = 0
         try:
             deleted = self.slice.plab.agent.freeNode(self)
-            # Uncomment to increase logging
-            #self.__logNodeHist('node','free','success','')
+            if self.usedb:
+                # Uncomment to increase logging
+                #self.__logNodeHist('node','free','success','')
+                pass
         except:
-            self.__logNodeHist('node','free','failure',
-                               traceback.format_exception(*sys.exc_info()))
+            # since the free failed, we need to add this
+            # node to plab_sliver_garbage
+            if self.usedb:
+                self.__gcNode(True)
+                self.__logNodeHist('node','free','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
             raise
         
         TIMESTAMP("freenode %s finished." % self.nodeid)
@@ -1704,20 +1893,108 @@ class Node:
         try:
             res, self.nodemeta, self.leaseend = \
                  self.slice.plab.agent.renewNode(self)
-            self.__logNodeHist('node','renew','success','')
+            if self.usedb:
+                self.__logNodeHist('node','renew','success','')
+                pass
         except:
-            self.__logNodeHist('node','renew','failure',
-                               traceback.format_exception(*sys.exc_info()))
+            if self.usedb:
+                self.__logNodeHist('node','renew','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
+            raise
+
+        if self.usedb:
+            DBQueryFatal("update plab_slice_nodes"
+                         " set nodemeta = %s, leaseend = %s"
+                         " where node_id = %s",
+                         (self.nodemeta,
+                          time.strftime("%Y-%m-%d %H:%M:%S",
+                                        time.gmtime(self.leaseend)),
+                          self.nodeid))
+            pass
+        
+        TIMESTAMP("renewnode %s finished." % self.nodeid)
+        return 0
+
+    def start(self):
+        """
+        Start up this node via the NM Start call (start means run the main
+        vserver init script).  Note that this method forks and runs another
+        private method to actually do the work!
+        """
+        res = ForkCmd(self._start, timeout = RENEW_TIMEOUT,
+                      disable_sigs_parent = TERMSIGS)
+        return res[0] | res[1]
+
+    def _start(self):
+        res = None
+        try:
+            res = self.slice.plab.agent.startNode(self)
+            if self.usedb:
+                self.__logNodeHist('node','start','success','')
+                pass
+        except:
+            if self.usedb:
+                self.__logNodeHist('node','start','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
             raise
         
-        DBQueryFatal("update plab_slice_nodes"
-                     " set nodemeta = %s, leaseend = %s"
-                     " where node_id = %s",
-                     (self.nodemeta,
-                      time.strftime("%Y-%m-%d %H:%M:%S",
-                                    time.gmtime(self.leaseend)),
-                      self.nodeid))
-        TIMESTAMP("renewnode %s finished." % self.nodeid)
+        TIMESTAMP("startnode %s finished." % self.nodeid)
+        return 0
+
+    def stop(self):
+        """
+        Stop this node via the NM Start call (start means kill all processes
+        in the vserver).  Note that this method forks and runs another
+        private method to actually do the work!
+        """
+        res = ForkCmd(self._stop, timeout = RENEW_TIMEOUT,
+                      disable_sigs_parent = TERMSIGS)
+        return res[0] | res[1]
+
+    def _stop(self):
+        res = None
+        try:
+            res = self.slice.plab.agent.stopNode(self)
+            if self.usedb:
+                self.__logNodeHist('node','stop','success','')
+                pass
+        except:
+            if self.usedb:
+                self.__logNodeHist('node','stop','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
+            raise
+        
+        TIMESTAMP("stopnode %s finished." % self.nodeid)
+        return 0
+
+    def restart(self):
+        """
+        Restarts this node via the NM Start call (restart means kill all
+        processes in the vserver and run /etc/rc.vinit).  Note that this
+        method forks and runs another private method to actually do the work!
+        """
+        res = ForkCmd(self._restart, timeout = RENEW_TIMEOUT,
+                      disable_sigs_parent = TERMSIGS)
+        return res[0] | res[1]
+
+    def _restart(self):
+        res = None
+        try:
+            res = self.slice.plab.agent.restartNode(self)
+            if self.usedb:
+                self.__logNodeHist('node','restart','success','')
+                pass
+        except:
+            if self.usedb:
+                self.__logNodeHist('node','restart','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
+            raise
+        
+        TIMESTAMP("restartnode %s finished." % self.nodeid)
         return 0
 
     def emulabify(self, rootballpath = DEFAULT_DATA_PATH,
@@ -1782,11 +2059,15 @@ class Node:
             pass
         try:
             self.unpackRootball(rootballpath, rrootballname)
-            # Uncomment to increase logging
-            #self.__logNodeHist('node','emulabify','success','')
+            if self.usedb:
+                # Uncomment to increase logging
+                #self.__logNodeHist('node','emulabify','success','')
+                pass
         except:
-            self.__logNodeHist('node','emulabify','failure',
-                               traceback.format_exception(*sys.exc_info()))
+            if self.usedb:
+                self.__logNodeHist('node','emulabify','failure',
+                                   traceback.format_exception(*sys.exc_info()))
+                pass
             raise
         TIMESTAMP("emulabify finished on %s." % self.nodeid)
 
@@ -1947,42 +2228,57 @@ class Node:
         """
         Figures out and returns the IP of the remote node.
         """
-        res = DBQueryFatal("select i.IP from nodes as nv"
-                           " left join interfaces as i on"
-                           "  nv.phys_nodeid=i.node_id"
-                           " where nv.node_id=%s"
-                           " limit 1",
-                           (self.nodeid))
-        if (not res or len(res) == 0):
-            # XXX: send email
-            print "Warning: no IP found for nodeid %s" % self.nodeid
-            IP = "0.0.0.0"
+        if self.nidtype == 'v' or self.nidtype == 'p':
+            res = DBQueryFatal("select i.IP from nodes as nv"
+                               " left join interfaces as i on"
+                               "  nv.phys_nodeid=i.node_id"
+                               " where nv.node_id=%s"
+                               " limit 1",
+                               (self.nodeid))
+            if (not res or len(res) == 0):
+                # XXX: send email
+                print "Warning: no IP found for nodeid %s" % self.nodeid
+                IP = "0.0.0.0"
+                pass
+            else:
+                ((IP, ), ) = res
+                pass
             pass
         else:
-            ((IP, ), ) = res
+            IP = socket.gethostbyname(self.nodeid)
             pass
+        
         if debug:
             print "IP is %s for node %s" % (IP, self.nodeid)
+
         return IP
 
     def __findHostname(self):
         """
         Grabs the publicly-routable hostname of the remote node.
         """
-        
-        res = DBQueryFatal("select pm.hostname,i.IP from nodes as nv"
-                           " left join interfaces as i"
-                           "  on nv.phys_nodeid=i.node_id"
-                           " left join plab_mapping as pm"
-                           "  on i.IP=pm.IP"
-                           " where nv.node_id='%s'" % (self.nodeid))
-        if (not res or len(res) == 0):
-            print "Warning: no hostname found for nodeid %s" % self.nodeid
-            hostname = None
+        if self.nidtype == 'v' or self.nidtype == 'p':
+            res = DBQueryFatal("select pm.hostname,i.IP from nodes as nv"
+                               " left join interfaces as i"
+                               "  on nv.phys_nodeid=i.node_id"
+                               " left join plab_mapping as pm"
+                               "  on i.IP=pm.IP"
+                               " where nv.node_id='%s'" % (self.nodeid))
+            if (not res or len(res) == 0):
+                print "Warning: no hostname found for nodeid %s" % self.nodeid
+                hostname = None
+                pass
+            else:
+                ((hostname,IP),) = res
+                pass
+            pass
+        elif self.nidtype == 'i':
+            hostname = socket.gethostbyaddr(self.nodeid)
             pass
         else:
-            ((hostname,IP),) = res
+            hostname = self.nodeid
             pass
+        
         if debug:
             print "hostname is %s for node %s" % (hostname,IP)
             pass
@@ -1997,20 +2293,33 @@ class Node:
         Grabs the publicly-routable IP and hostname of the remote node,
         and also our phys_nodeid for it.
         """
-        res = DBQueryFatal("select i.IP,pm.hostname,nv.phys_nodeid "
-                           " from nodes as nv"
-                           " left join interfaces as i"
-                           "  on nv.phys_nodeid=i.node_id"
-                           " left join plab_mapping as pm"
-                           "  on i.IP=pm.IP"
-                           " where nv.node_id='%s'" % (self.nodeid))
-        if (not res or len(res) == 0):
-            print "Warning: no hostinfo found for nodeid %s" % self.nodeid
-            (IP,hostname,phys_nodeid) = (None,None,None)
+        if self.nidtype == 'v' or self.nidtype == 'p':
+            res = DBQueryFatal("select i.IP,pm.hostname,nv.phys_nodeid "
+                               " from nodes as nv"
+                               " left join interfaces as i"
+                               "  on nv.phys_nodeid=i.node_id"
+                               " left join plab_mapping as pm"
+                               "  on i.IP=pm.IP"
+                               " where nv.node_id='%s'" % (self.nodeid))
+            if (not res or len(res) == 0):
+                print "Warning: no hostinfo found for nodeid %s" % self.nodeid
+                (IP,hostname,phys_nodeid) = (None,None,None)
+                pass
+            else:
+                ((IP,hostname,phys_nodeid),) = res
+                pass
+            pass
+        elif self.nidtype == 'i':
+            IP = self.nodeid
+            hostname = socket.gethostbyaddr(IP)
+            phys_nodeid = None
             pass
         else:
-            ((IP,hostname,phys_nodeid),) = res
+            hostname = self.nodeid
+            IP = socket.gethostbyname(self.nodeid)
+            phys_nodeid = None
             pass
+        
         if debug:
             print "hostname is %s for node %s" % (hostname,IP)
             pass

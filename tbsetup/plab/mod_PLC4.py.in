@@ -306,9 +306,9 @@ class NMagent_wrapper:
             arg = ticketdata
             pass
 
-        # if NM4agent, try delivering the ticket first, to maximize our
-        # chances:
-        if self.__agent.__class__ == NM4agent:
+        # If the agent wants to deliver a ticket explicitly before the create
+        # call, we do that.
+        if self.__agent.__class__.__dict__.has_key('deliver_ticket'):
             try:
                 res = tryXmlrpcCmd(self.__agent.deliver_ticket,ticketdata)
                 if res[0] == 0:
@@ -355,6 +355,21 @@ class NMagent_wrapper:
         else:
             return tryXmlrpcCmd(self.__agent.create_sliver,ticketdata)
         return None
+
+    def stop_sliver(self,slicename):
+        if self.__agent.__class__.__dict__.has_key('stop_sliver'):
+            return tryXmlrpcCmd(self.__agent.stop_sliver,slicename)
+        return 0
+
+    def start_sliver(self,slicename):
+        if self.__agent.__class__.__dict__.has_key('start_sliver'):
+            return tryXmlrpcCmd(self.__agent.start_sliver,slicename)
+        return 0
+
+    def restart_sliver(self,slicename):
+        if self.__agent.__class__.__dict__.has_key('restart_sliver'):
+            return tryXmlrpcCmd(self.__agent.restart_sliver,slicename)
+        return 0
     
     pass
 
@@ -421,7 +436,6 @@ class PLCagent:
         return self.__server.UpdateSlice(self.__auth, self.__slicename,
                                          { 'expires' : expdate })
 
-    # XXX: this should work ok if xmlrpc converts lists to arrays...
     def SliceNodesAdd(self,nodelist):
         if not type(nodelist) == list:
             nodelist = [nodelist]
@@ -562,6 +576,7 @@ class mod_PLC4:
         now = calendar.timegm(time.gmtime())
 
         try:
+            # XXX: fix to take desc and url args! (i.e., SliceUpdate)
             res = tryXmlrpcCmd(agent.SliceCreate)
             if debug:
                 print "SliceCreate result: %s" % res
@@ -572,8 +587,16 @@ class mod_PLC4:
             raise
         
         try:
+            userlist = slice.getSliceUsers()
+            # XXX: we might not always want to add emulabman
+            if userlist == None:
+                userlist = []
+                pass
+            if not EMULABMAN_EMAIL in userlist:
+                userlist.append(EMULABMAN_EMAIL)
+                pass
             res = tryXmlrpcCmd(agent.SliceUsersAdd,
-                               EMULABMAN_EMAIL)
+                               userlist)
             if debug:
                 print "SliceUsersAdd result: %s" % res
                 pass
@@ -587,9 +610,11 @@ class mod_PLC4:
         # that the slice doesn't include the local NM's node... or something
         # like that... so we must add the nodes to the slice.
         try:
-            # XXX: test hack
-            #nodelist = ['pcwf3.emulab.net']
-            nodelist = map(lambda x: x[2], slice.getSliceNodes())
+            tnodelist = slice.getSliceNodes()
+            if tnodelist == None:
+                tnodelist = []
+                pass
+            nodelist = map(lambda x: x[2], tnodelist)
             res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
             if debug:
                 print "SliceNodesAdd result: %s" % res
@@ -756,7 +781,6 @@ class mod_PLC4:
             raise
         return cPickle.dumps(retval)
 
-    # XXX: fix to use new NM
     def createNode(self, node):
         plcagent = self.__getAgent(node.slice.slicename)
 
@@ -820,7 +844,7 @@ class mod_PLC4:
         try:
             rcap = cPickle.loads(node.nodemeta)
         except:
-            print "WARNING: couldn't load rcap"
+            #print "WARNING: couldn't load rcap"
             pass
         node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
         res = None
@@ -840,18 +864,39 @@ class mod_PLC4:
         
         return res
 
-    # XXX: MIGHT need fixing...
     def renewNode(self, node, length = 0):
         return self.createNode(node)
     
-    # XXX: add, now that the NM can do this...
     def startNode(self,node):
-        return None
+        node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
+        try:
+            res = node.nmagent.start_sliver(node.slice.slicename)
+        except:
+            print "Failed to start node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        return res
 
-    # XXX: add, now that the NM can do this...
     def stopNode(self,node):
-        return None
+        node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
+        try:
+            res = node.nmagent.stop_sliver(node.slice.slicename)
+        except:
+            print "Failed to stop node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        return res
 
+    def restartNode(self,node):
+        node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
+        try:
+            res = node.nmagent.restart_sliver(node.slice.slicename)
+        except:
+            print "Failed to stop node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        return res
+    
     # XXX: this is broken, appears to be bug in GetSlices xmlrpc call in PLC4
     def getSliceExpTime(self, slicename):
         """
