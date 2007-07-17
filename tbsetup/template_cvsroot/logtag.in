@@ -34,7 +34,7 @@ while (@ARGV) {
 	print TAGLOG "$tagname, $op, $rev\n";
 	close(TAGLOG);
 
-	if ($op eq "add") {
+	if ($op eq "add" || $op eq "mov") {
 	    # Generate a marker to tell the post tag function
 	    my $module = basename(dirname($repo));
 	    my $id = getpgrp();

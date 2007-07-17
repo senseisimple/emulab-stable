@@ -33,6 +33,12 @@ my $module;
 my $tag;
 my $baserev;
 my $guid;
+my %revisions;
+my $cookiefile;
+
+# Protos
+sub compare_revisions($$);
+sub ParseRevisions($);
 
 #
 # Testbed Support libraries
@@ -66,13 +72,14 @@ elsif (!@ARGV) {
 else {
     die("Improper usage!\n")
 }
+$cookiefile = "$CVSROOT/$module/setup/.template,v";
 
 # See if the new tag is a branch tag. To do that, run rlog over the RCS
 # file and look at the revision number. We count the dots. There is also
 # a special case of x.y.0.z to look for.
-my $revision = `$RLOG -h $CVSROOT/$module/setup/.template,v |grep '$tag:'`;
+my $revision = `$RLOG -h $cookiefile |grep '$tag:'`;
 if ($?) {
-    die("rlog on $CVSROOT/$module/setup/.template,v failed!\n");
+    die("rlog on $cookiefile failed!\n");
 }
 if ($revision =~ /^\s*$tag:\s*([\d.]+)$/) {
     $revision = $1;
@@ -90,7 +97,7 @@ open(TAGLOG, "$CVSROOT/CVSROOT/tags") or
     die("Could not open $CVSROOT/CVSROOT/tags for reading\n");
 while (<TAGLOG>) {
     if ($_ =~ /^$tag,\s*([\w]+),\s*([\d\.]+)$/) {
-	print "$tag $1 at revision $2\n";
+	#print "$tag $1 at revision $2\n";
 	if ($1 eq "add" || $1 eq "mov") {
 	    $baserev = $2;
 	}
@@ -116,18 +123,18 @@ if ((scalar(@tokens) & 1) || ($revision =~ /\d*\.0\.\d*$/)) {
     $tokens[scalar(@tokens)-1] = 1;
     my $branch = join(".", @tokens[0 .. scalar(@tokens)-2]);
 
-    system("$CO -r${baserev} $CVSROOT/$module/setup/.template,v") == 0
-	or die("Could not co -r${baserev} $CVSROOT/$module/.template,v!\n");
+    system("$CO -r${baserev} $cookiefile") == 0
+	or die("Could not co -r${baserev} $cookiefile!\n");
 
-    system("$RCS -b${branch} $CVSROOT/$module/setup/.template,v") == 0
-	or die("Could not rcs -b${branch} $CVSROOT/$module/.template,v");
+    system("$RCS -b${branch} $cookiefile") == 0
+	or die("Could not rcs -b${branch} $cookiefile!\n");
     
     system("$CI -f -r${branch} -m'Force checkin on new branch' ".
-	   " $CVSROOT/$module/setup/.template,v .template") == 0
-	or die("Could not ci -r${branch} $CVSROOT/$module/.template,v!\n");
+	   " $cookiefile .template") == 0
+	or die("Could not ci -r${branch} $cookiefile!\n");
 
-    system("$RCS -b $CVSROOT/$module/setup/.template,v") == 0
-	or die("Could not rcs -b $CVSROOT/$module/.template,v");
+    system("$RCS -b $cookiefile") == 0
+	or die("Could not rcs -b $cookiefile");
 
     print "$tag/$revision is a branch revision.\n";
     print "Next tag operation on this branch invokes template modify\n";
@@ -135,11 +142,32 @@ if ((scalar(@tokens) & 1) || ($revision =~ /\d*\.0\.\d*$/)) {
 }
 
 #
+# Make sure that the tag is applied to last revision on the branch (or trunk). 
+#
+ParseRevisions("$cookiefile");
+my $branch;
+		
+if (scalar(@tokens) == 2) {
+    $branch = "TRUNK";
+}
+else {
+    pop(@tokens);
+    $branch = join(".", @tokens);
+}
+if (!exists($revisions{$branch}) ||
+    compare_revisions($revision, $revisions{$branch}) != 0) {
+    print "*** You must cvs update setup/.template to get the latest ".
+	"version!\n";
+    print "*** Then reissue the tag operation using the -F option.\n";
+    exit(1);
+}
+
+#
 # Checkout the .template file at the base revision, and get the guid from it.
 # This is the template we are going to modify.
 #
-open(CO, "$CO -q -p${baserev} $CVSROOT/$module/setup/.template,v |")
-    or die("Could not run '$CO -p${baserev} $CVSROOT/$module/.template,v\n");
+open(CO, "$CO -q -p${baserev} $cookiefile |")
+    or die("Could not run '$CO -p${baserev} $cookiefile\n");
 while (<CO>) {
     if ($_ =~ /^GUID:\s*(\d+\/\d+)$/) {
 	$guid = $1;
@@ -149,9 +177,9 @@ close(CO);
 if (!defined($guid)) {
     die("Could not find guid!\n");
 }
-print "Running: template_commit -r $tag $guid\n";
 
 if (0) {
+    print "Would run: template_commit -r $tag $guid\n";
     exit(0);
 }
 
@@ -178,3 +206,64 @@ if (my $childpid = TBBackGround($logfile)) {
 }
 exec("$template_commit -r $tag $guid");
 die("Failed to exec $template_commit!\n");
+
+#
+# Compare two revision numbers, returning negative, zero, or positive
+# in the manner of strcmp. 
+#
+sub compare_revisions($$)
+{
+    my ($rev1, $rev2) = @_;
+
+    my @rev1_tokens = split(/\./, $rev1);
+    my @rev2_tokens = split(/\./, $rev2);
+
+    while (@rev1_tokens) {
+	my $tok1 = shift(@rev1_tokens);
+	my $tok2 = shift(@rev2_tokens);
+
+	next
+	    if ($tok1 == $tok2);
+
+	return ($tok1 > $tok2 ? 1 : -1);
+    }
+    return 0;
+}
+
+#
+# Parse the tags for a file.
+#
+sub ParseRevisions($)
+{
+    my ($filename) = @_;
+
+    open(RLOG, "$RLOG $filename |")
+	or die("Could not run rlog on $filename\n");
+
+    while (<RLOG>) {
+	if ($_ =~ /^----/) {
+	    # Next line is supposed to be a revision line.
+	    my $revline = <RLOG>;
+	    if ($revline =~ /^revision ([\d.]+)$/) {
+		my $revision = $1;
+
+		my @tokens = split(/\./, $revision);
+		my $branch;
+		
+		if (scalar(@tokens) == 2) {
+		    $branch = "TRUNK";
+		}
+		else {
+		    pop(@tokens);
+		    $branch = join(".", @tokens);
+		}
+		if (!exists($revisions{$branch}) ||
+		    compare_revisions($revision, $revisions{$branch}) > 0){
+		    $revisions{$branch} = $revision;
+		}
+	    }
+	}
+    }
+    close(RLOG);
+}
+
