@@ -331,7 +331,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
         lappend stublist $planetstub($i)
         lappend planetstublist $planetstub($i)
 
-        set plabsanitycheck($i) [$planet($i) program-agent -expected-exit-code $ecode -command "sudo /usr/sbin/tcpdump -w /local/logs/SanityCheck.log -i vnet \\( \\(tcp and dst host $planet($i) and dst port $stub_peer_port \\) or \\(udp and dst host $planet($i) and dst port $udp_stub_peer_port \\) \\) "]
+        set plabsanitycheck($i) [$planet($i) program-agent -command "/local/pelab/run-sanity.sh vnet $planet($i) $stub_peer_port $udp_stub_peer_port"]
 
         lappend sanitychecklist $plabsanitycheck($i)
 
@@ -385,7 +385,7 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     lappend serverlist $server($i)
     lappend clientlist $client($i)
 
-    set elabsanitycheck($i) [$elab($i) program-agent -expected-exit-code $ecode -command "sudo tcpdump -w /local/logs/SanityCheck.log -i any \\( \\(tcp and dst host $elab($i) \\) or \\(udp and dst host $elab($i) \\) \\) "]
+    set elabsanitycheck($i) [$elab($i) program-agent -command "/local/pelab/run-sanity.sh any $elab($i) "]
 
     lappend sanitychecklist $elabsanitycheck($i)
 

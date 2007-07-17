@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ use Getopt::Std;
 my $TEVC = "/usr/testbed/bin/tevc";
 my $LOGHOLE = "/usr/testbed/bin/loghole";
 
-my $optlist = "n:t";
+my $optlist = "nt";
 my $nologs = 0;
 my $sanityChecks = 0;
 

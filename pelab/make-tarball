@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 
-files="pelab/auto-pelab.ns pelab/common-env.sh pelab/init-elabnodes.pl pelab/dbmonitor pelab/libnetmon pelab/magent pelab/monitor pelab/pelabdb.pwd pelab/stub pelab/iperfd"
+files="pelab/auto-pelab.ns pelab/common-env.sh pelab/init-elabnodes.pl pelab/run-sanity.sh pelab/dbmonitor pelab/libnetmon pelab/magent pelab/monitor pelab/pelabdb.pwd pelab/stub pelab/iperfd"
 
 if [ $# != 1 ]; then
     echo "usage: $0 tarball-path"
