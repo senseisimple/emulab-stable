@@ -155,14 +155,14 @@ if ($reinstall || $uninstall) {
 DelaySetup();
 if (-e TMDELAY) {
     system(TMDELAY . " enable")
-	if ($install);
+	if ($install || $reinstall);
     exit(0);
 }
 
 LinkDelaySetup();
 if (-e TMLINKDELAY) {
     system(TMLINKDELAY . " enable")
-	if ($install);
+	if ($install || $reinstall);
     exit(0);
 }
 exit(0);
