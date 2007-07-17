@@ -139,6 +139,7 @@ PLAB_SVC_SLICEDESC = "Emulab management service slice. Performs periodic " \
 PLABMON_PID = "emulab-ops"
 PLABMON_EID = "plab-monitor"
 DEF_SLICE_DESC = "Slice created by Emulab"
+DEF_EMULAB_URL = "http://www.emulab.net"
 
 PLABEXPIREWARN = 1*WEEK        # one week advance warning for slice expiration.
 NODEEXPIREWARN = 2*WEEK+2*DAY  # about two weeks advance warning for slivers.
@@ -312,12 +313,14 @@ class Plab:
         slice._create()
         return slice
 
-    def createSliceNoDB(self,name,description,userlist=[],nodelist=[]):
+    def createSliceNoDB(self,name,description,userlist=[],nodelist=[],
+                        instmethod=None):
         """
         Slice factory function that doesn't use the Emulab db.
         """
         slice = Slice(self,usedb=False,slicename=name,slicedescr=description,
-                      userlist=userlist,nodelist=nodelist)
+                      userlist=userlist,nodelist=nodelist,
+                      instmethod=instmethod)
         slice._create()
         return slice
 
@@ -329,11 +332,15 @@ class Plab:
         slice._load()
         return slice
 
-    def loadSliceNoDB(self,name):
+    def loadSliceNoDB(self,slicename,slicedescr=None,sliceurl=None,
+                      userlist=[],nodelist=[],instmethod=None):
         """
         Slice factory function that doesn't use the Emulab db.
         """
-        slice = Slice(self,usedb=False,slicename=name)
+        slice = Slice(self,usedb=False,slicename=slicename,
+                      slicedescr=slicedescr,sliceurl=sliceurl,
+                      userlist=userlist,nodelist=nodelist,
+                      instmethod=instmethod)
         slice._load()
         return slice
 
@@ -1168,7 +1175,8 @@ class Slice:
 
     def __init__(self, plab, pid = None, eid = None, exptidx = None,
                  usedb = True, slicename = None, slicedescr = DEF_SLICE_DESC,
-                 sliceurl = None, userlist = [], nodelist = []):
+                 sliceurl = DEF_EMULAB_URL, userlist = [], nodelist = [],
+                 instmethod = None):
         self.plab = plab
         self.pid, self.eid = pid, eid
         self.slicemeta = None
@@ -1180,6 +1188,7 @@ class Slice:
         self.usedb = usedb
         self.userlist = userlist
         self.nodelist = nodelist
+        self.instmethod = instmethod
 
         # Rules for arguments.
         if usedb and (pid == None or eid == None):
@@ -1284,6 +1293,9 @@ class Slice:
                 pass
             pass
         except:
+            print "slice create(slice %s): exception\n%s" \
+                  % (self.slicename,traceback.format_exc())
+            
             self.plab.agent.deleteSlice(self)
             
             if compat_mode:

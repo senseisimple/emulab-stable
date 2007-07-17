@@ -65,6 +65,7 @@ EMULABMAN_EMAIL = "emulabman@emulab.net"
 DEF_SLICE_DESC = "Slice created by Emulab"
 DEF_EMULAB_URL = "http://www.emulab.net"
 
+INSTMETHOD_NMCONTROLLER = "nm-controller"
 INSTMETHOD_DELEGATED = "delegated"
 INSTMETHOD_PLCINST = "plc-instantiated"
 DEF_EMULAB_INSTMETHOD = INSTMETHOD_DELEGATED
@@ -115,8 +116,8 @@ class NM3agent:
 
     pass
 
-DEF_NM_DELEGATE_ACCT = "utah_elab_delegate"
-DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
+DEF_NM_DELEGATE_ACCT = "utah_nmcontrol"
+DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
 DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no" \
                 " -oPasswordAuthentication=no -l %s -i %s %s"
 
@@ -575,9 +576,22 @@ class mod_PLC4:
         res = None
         now = calendar.timegm(time.gmtime())
 
+        # fix up some slice info just in case
+        if slice.sliceurl == None:
+            slice.sliceurl = DEF_EMULAB_URL
+            pass
+        if slice.description == None:
+            slice.description = DEF_SLICE_DESC
+            pass
+        if slice.instmethod == None:
+            slice.instmethod = DEF_EMULAB_INSTMETHOD
+            pass
+        
         try:
             # XXX: fix to take desc and url args! (i.e., SliceUpdate)
-            res = tryXmlrpcCmd(agent.SliceCreate)
+            res = tryXmlrpcCmd(agent.SliceCreate,(slice.sliceurl,
+                                                  slice.description,
+                                                  slice.instmethod))
             if debug:
                 print "SliceCreate result: %s" % res
                 pass
@@ -585,6 +599,22 @@ class mod_PLC4:
         except:
             print "Failed to create slice %s" % slice.slicename
             raise
+
+        # If the slice is delegated, make sure to set the `delegations` attr
+        # to our nm-controller slice
+        if slice.instmethod == INSTMETHOD_DELEGATED:
+            try:
+                res = tryXmlrpcCmd(agent.SliceAddAttribute,
+                                   ('delegations',DEF_NM_DELEGATE_ACCT))
+                if debug:
+                    print "SliceAddAttribute(delegations) result: %s" % res
+                    pass
+                pass
+            except:
+                print "Failed to set 'delegations' attribute on slice %s" \
+                      % slice.slicename
+                raise
+            pass
         
         try:
             userlist = slice.getSliceUsers()
@@ -611,13 +641,14 @@ class mod_PLC4:
         # like that... so we must add the nodes to the slice.
         try:
             tnodelist = slice.getSliceNodes()
-            if tnodelist == None:
-                tnodelist = []
+            if tnodelist == None or tnodelist == []:
                 pass
-            nodelist = map(lambda x: x[2], tnodelist)
-            res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
-            if debug:
-                print "SliceNodesAdd result: %s" % res
+            else:
+                nodelist = map(lambda x: x[2], tnodelist)
+                res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
+                if debug:
+                    print "SliceNodesAdd result: %s" % res
+                    pass
                 pass
             pass
         except:
@@ -646,18 +677,21 @@ class mod_PLC4:
         #    raise
 
         (PLCticket,PLCticket_legacy) = ('','')
-        try:
-            # XXX - fix for new NM and rollout.
-            PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
-            PLCticket_legacy = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
-            if debug:
-                print "ticket = %s" % str(PLCticket)
-                print "legacy ticket = %s" % str(PLCticket_legacy)
+        # We can only get the tickets if the slice is in delegated mode.
+        if slice.instmethod == INSTMETHOD_DELEGATED:
+            try:
+                # XXX - fix for new NM and rollout.
+                PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
+                PLCticket_legacy = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
+                if debug:
+                    print "ticket = %s" % str(PLCticket)
+                    print "legacy ticket = %s" % str(PLCticket_legacy)
+                    pass
                 pass
+            except:
+                print "Failed to get PLC ticket for slice %s" % slice.slicename
+                raise
             pass
-        except:
-            print "Failed to get PLC ticket for slice %s" % slice.slicename
-            raise
         
         # XXX: fix for PLC 4
         leaseend = now + MAX_PLC_LEASELEN
@@ -754,6 +788,10 @@ class mod_PLC4:
 
     def getSliceMetaLegacy(self, slice):
         agent = self.__getAgent(slice.slicename)
+
+        # We can only get the tickets if the slice is in delegated mode.
+        if slice.instmethod != INSTMETHOD_DELEGATED:
+            return cPickle.dumps('')
         
         try:
             PLCticket = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
@@ -769,7 +807,7 @@ class mod_PLC4:
 
     def getSliceMeta(self,slice):
         agent = self.__getAgent(slice.slicename)
-
+        
         try:
             retval = tryXmlrpcCmd(agent.SliceGetTicket)
             if debug:

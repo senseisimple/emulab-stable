@@ -14,8 +14,8 @@ import libplab
 
 usage = "%prog [-vd] {create|destroy} pid eid\n" \
         "  Without Emulab DB:\n" \
-        "%prog [-vd] [-u <user1,...>] [-n <node1,...>] -c <slicedesc> \\\n" \
-        "            {create|destroy} slicename"
+        "%prog [-vd] [-u <user1,...>] [-n <node1,...>] [-m <instmethod>] \n" \
+        "      -c <slicedesc> {create|destroy} slicename"
         #            [-w <url>]
 
 def main(args):
@@ -29,6 +29,8 @@ def main(args):
                       "the slice",default=None)
     parser.add_option("-c","--slicedesc",dest="slicedesc",action="store",
                       help="Slice description",default=None)
+    parser.add_option("-m","--instmethod",dest="instmethod",action="store",
+                      help="Slice instantiation method",default=None)
 #    parser.add_option("-w","--sliceurl",dest="sliceurl",action="store_true",
 #                      help="Slice URL",default=None)
     userlist,nodelist = None,None
@@ -46,8 +48,14 @@ def main(args):
         if opts.nodes != None:
             nodelist = opts.nodes.split(',')
             pass
+        else:
+            nodelist = []
+            pass
         if opts.users != None:
             userlist = opts.nodes.split(',')
+            pass
+        else:
+            userlist = []
             pass
         pass
     elif len(args) == 3:
@@ -64,7 +72,8 @@ def main(args):
             pass
         else:
             slice = plab.createSliceNoDB(slicename,opts.slicedesc,
-                                         userlist=userlist,nodelist=nodelist)
+                                         userlist=userlist,nodelist=nodelist,
+                                         instmethod=opts.instmethod)
             pass
         pass
     elif command == "destroy":
@@ -72,7 +81,9 @@ def main(args):
             slice = plab.loadSlice(pid, eid)
             pass
         else:
-            slice = plab.loadSliceNoDB(slicename)
+            slice = plab.loadSliceNoDB(slicename,slicedescr=opts.slicedesc,
+                                       userlist=userlist,nodelist=nodelist,
+                                       instmethod=opts.instmethod)
             pass
         slice.destroy()
         pass
