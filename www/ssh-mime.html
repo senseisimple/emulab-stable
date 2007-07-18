@@ -20,8 +20,8 @@ a "text/x-testbed-ssh" ".tbssh" file.
      .tbssh file with a script, or associate it with the script in the browser
      so you can just click.  See the installation directions <a
      href="#windows_install">below</a>.</li>
-<li> For <b>Mac OSX</b> you will need to configure a folder action for your
-     browser downloads directory. See the installation directions <a
+<li> For <b>Mac OSX</b> you will need to a use a wrapper around
+     <code>ssh-mime.pl</code>.  See the installation directions <a
      href="#osx_install">below</a>. Both xterm and Terminal windows
      are supported under OSX (if you are not running X11, an OSX Terminal
      window is created).</li>
@@ -198,31 +198,16 @@ a "text/x-testbed-ssh" ".tbssh" file.
      <li> Re-login to make the global variables work.
      </ul>
 
-<li> Move the <a href="ssh-mime.pl"><code>ssh-mime.pl</code> script</a>
-     into your <code>~/bin</code> directory. 
-
-<li> <code> mkdir -p ~/Library/Scripts/Folder\ Action\ Scripts</code>
-
-<li> Move the <a href="ssh-mime.scpt"><code>ssh-mime.scpt</code>
-     AppleScript</a> to the above directory.
-
-<li> Start up Firefox or Safari and go into the Downloads menu to figure
-     out where files are being saved (typically <code>~/Desktop</code> or
-     <code>~/Documents/My Downloads</code>).
-
-<li> Go into the <code>Finder</code> and find that folder. Right Click on
-     the folder. (If you do not have a 3 button external mouse, then you
-     select the folder, and do Control-Click).
-
-<li> You will see an option to <code>Enable Folder Actions</code> in the
-     menu. Select that option.
-
-<li> Right click again on the folder, and select the <code>Attach Folder
-     Action</code> option. A <code>Finder</code> file chooser pops up.
-     Select <code>~/Library/Scripts/Folder\ Action\ Scripts/ssh-mime.scpt
-     </code>.
+<li> Move the <a href="ssh-mime.pl"><code>ssh-mime.pl</code></a> script
+     into your <code>~/bin</code> directory.
+     Also move the <a href="emulab.app"><code>emulab.app</code></a> applescript
+     into your <code>~/bin</code> directory (right click and Save). 
 
 <li> The first time you click on an <code>SSH To Node</code> button, your
-     browser ask you what to do. Choose the <code>Download</code> option
-     and select the <code>Do this automatically</code> button.
+     browser will ask you what to do. Choose the <code>Open them with this
+     application</code> option, and then Browse for
+     <code>~/bin/emulab.app</code>.
+     Click <code>OK</code>, and then close the preference panels.
+</ul>
+
 </p>
