@@ -52,8 +52,6 @@ import sys
 import re
 import os
 import array
-from numpy import *
-from numpy.fft import *
 import math
 from posix import *
 from optparse import OptionParser
@@ -328,9 +326,12 @@ def PreProcess(inputFile, outputFile):
     numRows = 0
     numLines = 0
 
+# Skip the bandwidth comparison for 5 seconds, while Flexlab converges
+# to the correct available bandwidth and delay estimates.
+    initialThreshold = 500
+
     inputFileHandle = file(inputFile,"r")
     outputFileHandle = file(outputFile,"w")
-    tmpFileHandle = file(tmpFile,"w")
 
     numRows = int( (inputFileHandle.readline()).split()[0] )
     timeArray = [0] * (numRows + 1)
@@ -370,15 +371,17 @@ def PreProcess(inputFile, outputFile):
 
         if currentTimeVal == timeArray[index]:
         #{
-            tmpFileHandle.write(str(currentTimeVal) + " " + \
-                    str(valueArray[index]) + "\n")
+            if numLines > initialThreshold:
+                outputFileHandle.write(str(currentTimeVal) + " " + \
+                        str(valueArray[index]) + "\n")
             currentTimeVal += 10000
             numLines += 1
         #}
         elif currentTimeVal == timeArray[index+1]:
         #{
-            tmpFileHandle.write(str(currentTimeVal) + " " + \
-                    str(valueArray[index+1]) + "\n")
+            if numLines > initialThreshold:
+                outputFileHandle.write(str(currentTimeVal) + " " + \
+                        str(valueArray[index+1]) + "\n")
             currentTimeVal += 10000
             index += 1
             indexChanged = 1
@@ -387,8 +390,9 @@ def PreProcess(inputFile, outputFile):
         elif currentTimeVal < timeArray[index+1]:
         #{
             intermValue = slope*timeArray[index] + intercept
-            tmpFileHandle.write(str(currentTimeVal) + " " + \
-                    str(intermValue) + "\n")
+            if numLines > initialThreshold:
+                outputFileHandle.write(str(currentTimeVal) + " " + \
+                        str(intermValue) + "\n")
             currentTimeVal += 10000
             numLines += 1
         #}
@@ -399,190 +403,57 @@ def PreProcess(inputFile, outputFile):
         #}
     #}
 
-    outputFileHandle.write(str(numLines) + "\n")
     outputFileHandle.close()
-    tmpFileHandle.close()
-    os.system("cat " + tmpFile + " >> " + outputFile)
-    os.remove(tmpFile)
 
     del timeArray
     del valueArray
 #}
 ##############################################################
 ##############################################################
-def FindPowerOf2(n):
-#{
-    mask = 1
-    bitPosition = 0
-    multipleOf2 = 0
-
-    for i in range(1, 32):
-    #{
-        if n & mask == mask:
-            bitPosition = i
-            multipleOf2 += 1
-
-        mask = mask*2
-    #}
-
-    if multipleOf2 == 1:
-        return n
-    else:
-        return int(math.pow(2,bitPosition)) 
-
-#}
-##############################################################
-##############################################################
-def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
+def CalcCorrelation(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
 #{
 
-    i = 0; j = 0
-    mx = 0.0;my = 0.0; sx = 0.0; sy = 0.0; sxy = 0.0; denom = 0.0
-    n = 0
-    delay = 0
-    count1 = 0 ; count2 = 0
-    rows1 = 0; rows2 = 0
-    maxCorr = 0
+    delayVal = 0
+    maxCorr = -2.0
+    lineCount1 = 0
+    lineCount2 = 0
+    numLines = 0
 
-    InFileHandle1 = file(InFile1, "r")
-    InFileHandle2 = file(InFile2, "r")
+    pipeObj = popen("wc -l " + InFile1, "r")
+    lineCount1 = int(pipeObj.readline().split()[0])
+    pipeObj.close()
 
-    rows1 = int( (InFileHandle1.readline()).split()[0] )
-    rows2 = int( (InFileHandle2.readline()).split()[0] )
+    pipeObj = popen("wc -l " + InFile2, "r")
+    lineCount2 = int(pipeObj.readline().split()[0])
+    pipeObj.close()
 
-    if rows1 < rows2:
-    #{
-        n = rows1
-    #}
+    if lineCount1 < lineCount2:
+        numLines = lineCount1
     else:
+        numLines = lineCount2
+
+    if numLines != 0:
     #{
-        n = rows2
-    #}
+        os.system("sh CorrelationR.sh " + InFile1 + " " + InFile2 + " " + "/tmp/Correlation.log" )
 
-    # If both the files are empty - just return.
-    if n != 0:
-    #{
-        arraySize = FindPowerOf2(n)
+        InFileHandle1 = file("/tmp/Correlation.log", "r")
 
-        x = [0.0] * arraySize
-        y = [0.0] * arraySize
-
-        xFFT = empty(arraySize, complex)
-        yFFT = empty(arraySize, complex)
-
-        count1 = 0
         for lineRead in InFileHandle1:
         #{
-            if count1 >= n:
-                break
-            x[count1] = float( lineRead.split()[1] )
-            count1 += 1
+            shiftVal = int( lineRead.split()[0] )
+            corrVal = float( lineRead.split()[1] )
+
+            if corrVal > maxCorr:
+                maxCorr = corrVal
+                delayVal = shiftVal
         #}
 
         InFileHandle1.close()
-
-        count2 = 0
-
-        for lineRead in InFileHandle2:
-        #{
-            if count2 >= n:
-                break
-            y[count2] = float( lineRead.split()[1] )
-            count2 += 1
-        #}
-
-        InFileHandle2.close()
-
-        # Calculate the delay interval with maximum
-        # correlation using FFT
-        xFFT = fft(x)
-        yFFT = fft(y)
-
-        inverseCorrArray = empty(arraySize,complex)
-        corrArray = empty(arraySize,complex)
-
-        for i in range(0, n):
-        #{
-            inverseCorrArray[i] = xFFT[i].conjugate() * yFFT[i]
-        #}
-
-        corrArray = ifft(inverseCorrArray)
-
-        maxCorr = -99999999
-        maxIndex = 0
-
-        # Find out the optimal shift in -10 sec: 10 sec range
-        for i in range(-1000, 1000):
-        #{
-            if corrArray[i].real > maxCorr:
-                maxCorr = corrArray[i].real
-                maxIndex = i
-        #}
-
-        delay = maxIndex
-
-        # Calculate the mean of the two series x[], y[] 
-        mx = 0
-        my = 0   
-
-
-        for i in range(0, n):
-        #{
-            mx += x[i]
-            my += y[i]
-        #}
-
-        mx /= n
-        my /= n
-
-        # Calculate the denominator
-        sx = 0
-        sy = 0
-        x_meandiff = 0
-        y_meandiff = 0
-        x_variance = 0.0
-        y_variance = 0.0
-
-        for i in range(0,n): 
-        #{
-            x_meandiff = x[i] - mx
-            y_meandiff = y[i] - my
-
-            x_meandiff *= x_meandiff
-            y_meandiff *= y_meandiff
-
-            sx += x_meandiff
-            sy += y_meandiff
-
-            x_variance += x_meandiff
-            y_variance += y_meandiff
-        #}
-
-        x_variance /= float(n) 
-        y_variance /= float(n) 
-
-        denom = math.sqrt(sx*sy)
-
-        # Calculate the correlation coefficient for the 
-        # above determinted shift
-        sxy = 0
-
-        for i in range(0,n): 
-        #{
-            j = i + delay
-
-            if  j < 0 or j >= n:
-                continue
-            else:
-                sxy += (x[i] - mx) * (y[j] - my)
-        #}
-        maxCorr = sxy / denom
-
     #}
     else:
     #{
-        delay = 0
-        maxCorr = 0
+        delayVal = 0
+        maxCorr = 0.0
     #}
 
     if transportFlag == 0:
@@ -597,162 +468,7 @@ def CalcCorrelationFFT(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
     else:
         diffPercentage = 0.0
 
-    OutputFileHandle.write("Max_Correlation=" + str(maxCorr) + ":Delay=" + str(delay*10) + "ms:Transport=" + transport + ":N=" + str(n) + ":KbpsPercentDiff=" + str(diffPercentage) + "\n")
-
-    if n!= 0:
-        del x
-        del y
-        del xFFT
-        del yFFT
-        del corrArray
-        del inverseCorrArray
-#}
-##############################################################
-##############################################################
-def CalcCorrelation(InFile1, InFile2, transportFlag, plabAvg, elabAvg):
-#{
-
-    i = 0; j = 0
-    mx = 0.0;my = 0.0; sx = 0.0; sy = 0.0; sxy = 0.0; denom = 0.0; r = 0.0
-    n = 0
-    maxdelay = 1000; delay = 0
-    count1 = 0 ; count2 = 0
-    rows1 = 0; rows2 = 0
-    maxCorr = 0
-
-    InFileHandle1 = file(InFile1, "r")
-    InFileHandle2 = file(InFile2, "r")
-
-    rows1 = int( (InFileHandle1.readline()).split()[0] )
-    rows2 = int( (InFileHandle2.readline()).split()[0] )
-
-    if rows1 < rows2:
-    #{
-        n = rows1
-    #}
-    else:
-    #{
-        n = rows2
-    #}
-
-    x = [0.0] * n
-    y = [0.0] * n
-
-    count1 = 0
-    for lineRead in InFileHandle1:
-    #{
-        if count1 >= n:
-            break
-        x[count1] = float( lineRead.split()[1] )
-        count1 += 1
-    #}
-
-    InFileHandle1.close()
-
-    count2 = 0
-
-    for lineRead in InFileHandle2:
-    #{
-        if count2 >= n:
-            break
-        y[count2] = float( lineRead.split()[1] )
-        count2 += 1
-    #}
-
-    InFileHandle2.close()
-
-    # Calculate the mean of the two series x[], y[] 
-    mx = 0
-    my = 0   
-
-    # Both the files are empty - just return.
-    if n != 0:
-    #{
-
-        for i in range(0, n):
-        #{
-            mx += x[i]
-            my += y[i]
-        #}
-
-        mx /= n
-        my /= n
-
-        # Calculate the denominator
-        sx = 0
-        sy = 0
-
-        for i in range(0,n): 
-        #{
-            sx += (x[i] - mx) * (x[i] - mx)
-            sy += (y[i] - my) * (y[i] - my)
-        #}
-
-    # Subtract the mean of each series from individual values
-    # This saves us a lot of time in the nested for loop below.
-        for i in range(0,n):
-        #{
-            x[i] = x[i] - mx
-            y[i] = y[i] - my
-        #}
-
-        denom = math.sqrt(sx*sy)
-
-        maxCorr = -1.0
-        minCorr = 1.0
-        maxDelay = 0
-        minDelay = 0
-
-        # Calculate the correlation series 
-        for delay in range(-maxdelay,maxdelay):
-        #{
-            sxy = 0
-
-            for i in range(0,n): 
-            #{
-                j = i + delay
-
-                if  j < 0 or j >= n:
-                    continue
-                else:
-                    #sxy += (x[i] - mx) * (y[j] - my)
-                    sxy += (x[i]) * (y[j])
-            #}
-            r = sxy / denom
-#        OutputFileHandle.write(str(delay) + " " +str(r) + "\n")
-
-            if r > maxCorr:
-            #{
-                maxCorr = r
-                maxDelay = delay
-            #}
-            if r < minCorr:
-            #{
-                minCorr = r
-                minDelay = delay
-            #}
-        #}
-    #}
-    else:
-    #{
-        maxDelay = 0
-        maxCorr = 0
-    #}
-
-    if transportFlag == 0:
-        transport = "TCP"
-    elif transportFlag == 1:
-        transport = "UDP"
-
-    diffTransferRate = elabAvg - plabAvg
-
-    diffPercentage = 100.0*(float(diffTransferRate))/(float(elabAvg))
-
-    OutputFileHandle.write("Max_Correlation=" + str(maxCorr) + ":Delay=" + str(maxDelay*10) + "ms:Transport=" + transport + ":N=" + str(n) + ":KbpsPercentDiff=" + str(diffPercentage) + "\n")
-
-    del x
-    del y
-
+    OutputFileHandle.write("Max_Correlation=" + str(maxCorr) + ":Delay=" + str(delayVal*10) + "ms:Transport=" + transport + ":N=" + str(numLines) + ":KbpsPercentDiff=" + str(diffPercentage) + "\n")
 
 #}
 
@@ -781,7 +497,7 @@ def processFiles(fileNameElab, fileNamePlab, averagingMethod, transportFlag):
         PreProcess(tmpFilePlab1, tmpFilePlab2)
         sys.stdout.write("#")
         sys.stdout.flush()
-        CalcCorrelationFFT(tmpFilePlab2, tmpFileElab2, transportFlag, plabAvg, elabAvg)
+        CalcCorrelation(tmpFilePlab2, tmpFileElab2, transportFlag, plabAvg, elabAvg)
         sys.stdout.write("#")
         sys.stdout.flush()
 
@@ -814,8 +530,8 @@ def processFiles(fileNameElab, fileNamePlab, averagingMethod, transportFlag):
 #
 # For all pairs of nodes in the Flexlab experiment:
 # a) Cross-correlation > 0.5
-# b) Offset used for this value of cross-correlation >= 0
-# c) Offset < 8 seconds
+# b) Offset used for this value of cross-correlation <= 0
+# c) Offset > -8 seconds
 # d) Difference between Flexlab & Planetlab transfer rates
 #    is less than 40%
 # e) SanityCheck Tcpdump files exist for all pairs of nodes.
@@ -843,7 +559,7 @@ def PrintReport(correlationDataFile, numNodes, numNodesProcessed, reportFileName
             matchObj = correlationRegex.match(correlationLine)
 
             if  ( ( int(matchObj.group(4)) ) and  \
-                    ( ( float(matchObj.group(1)) < 0.5 ) or ( int(matchObj.group(2)) < 0 ) or ( int(matchObj.group(2)) > 8000 )  or ( float(matchObj.group(5)) > 40.0 or float(matchObj.group(5)) < -40.0 ) ) ) :
+                    ( ( float(matchObj.group(1)) < 0.5 ) or ( int(matchObj.group(2)) > 0 ) or ( int(matchObj.group(2)) < -8000 )  or ( float(matchObj.group(5)) > 40.0 or float(matchObj.group(5)) < -40.0 ) ) ) :
             #{
                 print "\n***** ERROR: This Flexlab run is possibly tainted. \nDetected " + matchObj.group(3) + " cross-correlation mismatch for files '" + flexLabFile + "' and '" + pLabFile + "'"
                 reportFileHandle.write( "***** ERROR: This Flexlab run is possibly tainted. \nDetected " + matchObj.group(3) + " cross-correlation mismatch for files '" + flexLabFile + "' and '" + pLabFile + "'\n")
@@ -926,7 +642,7 @@ def Main():
     OutputFileName = logDir + "/logs/SanityCheckDetails.txt"
     reportFileName = logDir + "/logs/SanityCheckReport.txt"
 
-    if not(os.path.exists(OutputFileName) and os.path.exists(reportFileName)) :
+    if not(os.path.exists(logDir + "/logs")) :
     #{
         print "##### Error: Path given as input is invalid. Provide the path upto(not including) logs/ directory"
         sys.exit()
