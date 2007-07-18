@@ -25,7 +25,7 @@
 use strict;
 use English;
 use Getopt::Std;
-use lib '/usr/testbed/devel/johnsond/lib';
+use lib '/usr/testbed/lib';
 use libxmlrpc;
 
 my $allnodeFile = "/share/planetlab/reliable_nodes";
