@@ -30,10 +30,21 @@ earliest time one of the steps needs to occur.
 		fetch http://www.emulab.net/downloads/pubsub-elvincompat-0.8.tbz
 		sudo pkg_add /var/tmp/pubsub-elvincompat-0.8.tbz
 
-	  * Add these lines to /etc/syslog.conf:
+          * Add this line to your defs file:
+
+		ELVIN_COMPAT=1
+
+            and reconfig/rebuild/reinstall on bother boss and ops.
+
+	  * Add these lines to /etc/syslog.conf on boss and ops:
 
 		!pubsubd
 		*.*	/usr/testbed/log/pubsubd.log
+
+            and also this line to /etc/syslog.conf on ops:
+
+		!elvin_gateway
+		*.*	/usr/testbed/log/elvin_gateway.log
 
 	  * Create logfile and restart syslog:
 
