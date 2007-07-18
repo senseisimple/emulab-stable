@@ -11,6 +11,8 @@ use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
 use Errno qw(EDQUOT ETIMEDOUT);
 use XML::Simple;
+use File::Find;
+use File::stat;
 use Data::Dumper;
 
 #
@@ -1083,6 +1085,30 @@ sub CheckForDeadNodes($)
 }
 
 #
+# Callback to generate the file listing.
+#
+my @allfiles = ();
+
+sub FindCallBack
+{
+    my $name = $_;
+
+    return
+	if ($name eq "." || $name eq "..");
+
+    my $st = stat($name) or
+	fatal(-1, "Failed to stat $name!");
+
+    push(@allfiles, {'pathname' => "$File::Find::dir/$name",
+		     'mode'     => $st->mode,
+		     'uid'      => $st->uid,
+		     'gid'      => $st->gid,
+		     'atime'    => $st->atime,
+		     'mtime'    => $st->mtime,
+		     'ctime'    => $st->ctime});
+}
+
+#
 # Generate an XML file describing the just finished run.
 #
 sub GenXML($$)
@@ -1134,6 +1160,20 @@ sub GenXML($$)
 	    $root->{"metadata"}->{$name} = $value;
 	}
     }
+
+    # File listing to preserve attributes, just in case.
+    my $cwd = `/bin/pwd`;
+    # Must do the taint check too.
+    if ($cwd =~ /^(.*)$/) {
+	$cwd = $1;
+    }
+    if (! chdir($instance->path())) {
+	print STDERR "*** Could not chdir to instance path\n";
+	return -1;
+    }
+    find({'wanted' => \&FindCallBack, 'untaint' => 1}, ".");
+    chdir($cwd);
+    $root->{"files"} = {"file" => [@allfiles]};
 
     if ($debug) {
 	print Dumper($root);
