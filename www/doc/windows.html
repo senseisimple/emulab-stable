@@ -851,7 +851,16 @@ depends on <code>prepare</code> being run.
        <div style="margin-left: 40px;"> <b>NOTE:</b> Windows XP is too big to
        fit in the partitioning scheme used by FreeBSD and Linux, so it's
        necessary when making a Windows custom image to specify <b>Partition
-       1</b>, and click <b>Whole Disk Image.</b> </div>
+       1</b>, and click <b>Whole Disk Image.</b> </div> <br>
+  </li>
+
+  <li>
+     When you're testing your custom image, it's a good idea to set the <a
+     href="../tutorial/docwrapper.php3?docname=nscommands.html#tb-set-node-failure-action">
+     tb-set-node-failure-action</a> to "nonfatal" in the ns file so you get a
+     chance to examine an image that hasn't completed the set-up process.  See
+     the <a href="#tb-set-node-failure-action"> note below</a> for other
+     useful ideas.
   </li>
 </ul>
 
