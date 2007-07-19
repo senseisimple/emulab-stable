@@ -116,8 +116,10 @@ class NM3agent:
 
     pass
 
-DEF_NM_DELEGATE_ACCT = "utah_nmcontrol"
-DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
+#DEF_NM_DELEGATE_ACCT = "utah_nmcontrol"
+DEF_NM_DELEGATE_ACCT = "utah_elab_delegate"
+#DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
+DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
 DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no" \
                 " -oPasswordAuthentication=no -l %s -i %s %s"
 
