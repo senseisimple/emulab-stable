@@ -26,6 +26,8 @@ if not TBPATH in sys.path:
 
 import libdb
 import BasicXMLRPCServers
+import networkx as NX
+from networkx import *
 
 
 class FlexlabFault(xmlrpclib.Fault):
@@ -246,6 +248,7 @@ class flexlab:
 
         Arguments:
           size (int)        Size of the fully connected set to find.
+                            A size of 0 means give maximal clique size.
           nodefilter (list) A list of Emulab node_ids or PlanetLab hostnames
                             with which to restrict subset selection.
           filtertype (bool) If true, a fully connected set is chosen based on
@@ -259,6 +262,7 @@ class flexlab:
                             run a max clique heuristic over the set of nodes
                             that are supplied (or all known nodes, if none are
                             supplied), and will select the k-best nodes.
+          meastype (str)    Measurements to be considered - 'lat' or 'bw'
         Returns:
           A list of Emulab node_ids.
         """
@@ -281,6 +285,7 @@ class flexlab:
         
         nodefilterlist = []
         filtertype = True
+	meastype = ''
         
         if argdict.has_key("nodefilter"):
             nodefilterlist = argdict["nodefilter"]
@@ -289,6 +294,15 @@ class flexlab:
             pass
         else:
             filtertype = False
+            pass
+
+        if argdict.has_key("meastype"):
+            meastype = argdict["meastype"]
+            if meastype != 'lat' and meastype != 'bw':
+                return FlexlabInvalidArgumentFault(12,"meastype can be only lat or bw!")
+            pass
+        else:
+            meastype = 'lat'
             pass
 
         if argdict.has_key("filtertype"):
@@ -318,7 +332,7 @@ class flexlab:
             pass
 
         try:
-            retval = self._simpleGoodnodes(size,finalnodes)
+            retval = self._GraphGoodnodes(meastype,size,finalnodes)
         except:
             raise
 
@@ -433,6 +447,99 @@ class flexlab:
     
     pass
 
+    def _GraphGoodnodes(self,meastype,size,nlist):
+        retval = []
+
+        if self.debug:
+            print "size=%d,nlist=%s" % (size,str(nlist))
+	
+	G=Graph()
+
+        tpool = list(nlist)
+        cpool = []
+        usedsites = dict({})
+
+        foundit = False
+        sitematrix = dict({})
+
+	while len(tpool) > 0:
+		elm	 = tpool.pop(0)
+		elmsite = self.fds.nodeidToSiteIdx[elm]
+                if not usedsites.has_key(elmsite):
+                    usedsites[elmsite] = elm
+                    cpool.append(elm)
+                pass
+
+	if self.debug:
+                print "cpool=%s" % str(cpool)
+            
+	# test current site pool connectivity:
+       	sites = usedsites.keys()
+       	for i in range(0,len(sites) - 1):
+                ss = sites[i]
+                for j in range(i+1,len(sites)):
+                    ds = sites[j]
+
+                    lat = self.fds.getMeasurement('lat',ss,ds)
+                    if lat == None:
+                            lat = self.fds.getMeasurement('lat',ds,ss)
+                    fbw = self.fds.getMeasurement('bw',ss,ds)
+                    bbw = self.fds.getMeasurement('bw',ds,ss)
+
+                    if not lat == None:
+                            lat = 1
+                    else:
+                            lat = 0
+                    if not fbw == None:
+                            fbw = 1
+                    else:
+                            fbw = 0
+                    if not bbw == None:
+                            bbw = 1
+                    else:
+                            bbw = 0
+                        
+		    if (meastype == "lat"):
+		    	if lat > 0:
+				G.add_edge((ss, ds))
+				pass
+                    	pass
+		    if (meastype == "bw"):
+			bw = fbw + bbw
+		    	if bw > 1:
+				G.add_edge((ss, ds))
+				pass
+                    	pass
+                    
+                pass
+
+	cliques = find_cliques(G)
+	cliquesize = graph_clique_number(G,cliques)
+
+        csites = dict({})
+	for c in cliques:
+		if len(c) == cliquesize:
+			for s in c:
+				csites[s] = usedsites[s]
+			break
+		pass
+	
+	# if size is 0, return the maximal clique
+	if size == 0:
+		size = cliquesize	
+
+        # return the nodelist
+        if cliquesize >= size:			
+		tmp = csites.values()
+	        retval = tmp[0:size]
+        else:
+            	retval = FlexlabFault(20,
+                                      "Could not find %d fully-connected sites!" \
+                                      % size)
+        return retval
+
+    
+    pass
 
 import getopt
 
