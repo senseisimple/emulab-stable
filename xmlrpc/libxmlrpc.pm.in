@@ -291,7 +291,11 @@ sub CallMethodHTTP($$$) {
     
     # Python servers seem to return faults in structs, not as <fault> elements.
     # Sigh.
-    if ($goo->value()->is_fault() 
+    if (!ref($goo)) {
+        print STDERR "Error in XMLRPC parse: $goo\n";
+        return undef;
+    }
+    elsif ($goo->value()->is_fault() 
 	|| (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
 	    && exists($goo->value()->{'faultCode'}))) {
 	$code   = $goo->value()->{"faultCode"}->value;
