@@ -454,6 +454,11 @@ DocumentRoot "@prefix@/www"
     AllowOverride All
 </Directory>
 
+<Directory @prefix@/www/webdb>
+    AllowOverride None
+    Order deny,allow
+    deny from all
+</Directory>
 
 #
 # This should be changed to whatever you set DocumentRoot to.
