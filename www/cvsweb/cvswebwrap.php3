@@ -11,15 +11,20 @@
 chdir("../");
 require("defs.php3");
 
-#
-# Make sure that URL args are cleaned.
-#
-RequiredPageArguments();
-
 # Must be logged in.
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Verify form arguments.
+#
+$optargs = OptionalPageArguments("template",   PAGEARG_TEMPLATE,
+				 "project",    PAGEARG_PROJECT,
+				 "embedded",   PAGEARG_BOOLEAN);
+if (!isset($embedded)) {
+    $embedded = 0;
+}
 
 #
 # Form the real url.
@@ -32,24 +37,20 @@ $newurl = preg_replace("/php3/","php3/",$newurl);
 #
 PAGEHEADER("Emulab CVS Repository");
 
-?>
-
-<head>
-<style type="text/css">
-
-#cvsfr {
-  width: 100%;
-  height: 800px;
+if (isset($project)) {
+    ;
+}
+elseif (isset($template)) {
+    echo $template->PageHeader();
 }
 
-</style>
-</head>
+echo "<div><iframe src='$newurl' class='outputframe' ".
+	"id='outputframe' name='outputframe'></iframe></div>\n";
+echo "</center><br>\n";
 
-<div id="cvscon">
-<iframe id="cvsfr" scrolling=yes src="<?php echo $newurl ?>" border=0></iframe>
-</div>
-
-<?php
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "SetupOutputArea('outputframe', false);\n"; 
+echo "</script>\n";
 
 #
 # Standard Testbed Footer

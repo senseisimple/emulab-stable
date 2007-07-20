@@ -105,6 +105,7 @@ $url_mapping["spitreport"]          = "spitreport.php";
 $url_mapping["statechange"]         = "statechange.php";
 $url_mapping["experimentrun_show"]  = "experimentrun_show.php";
 $url_mapping["instance_show"]       = "instance_show.php";
+$url_mapping["cvswebwrap"]          = "cvsweb/cvswebwrap.php3";
 	     
 #
 # The caller will pass in a page id, and a list of things. If the thing

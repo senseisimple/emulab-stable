@@ -323,6 +323,9 @@ if ($template->EventCount() > 0) {
 WRITESUBMENUBUTTON("Browse Datastore",
 		   CreateURL("archive_view", $template));
 
+WRITESUBMENUBUTTON("Browse CVS Repository",
+		   CreateURL("cvswebwrap", $template));
+
 WRITESUBMENUBUTTON("View Records",
 		   CreateURL("template_history", $template));
 

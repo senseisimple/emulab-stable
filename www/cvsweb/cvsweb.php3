@@ -32,9 +32,7 @@ $use_viewvc = 0;
 #
 # Verify form arguments.
 #
-$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
-				 "instance",   PAGEARG_INSTANCE,
-				 "template",   PAGEARG_TEMPLATE,
+$optargs = OptionalPageArguments("template",   PAGEARG_TEMPLATE,
 				 "project",    PAGEARG_PROJECT,
 				 "embedded",   PAGEARG_BOOLEAN);
 if (!isset($embedded)) {
@@ -57,111 +55,44 @@ if (isset($project)) {
 	header("Location: $url");
 	return;
     }
-    if (isset($experiment)) {
-	#
-	# Wants access to the experiment archive, which is really a repo.
-	#
-	$pid = $experiment->pid();
-	$eid = $experiment->eid();
-	
-	if (! ISADMIN() &&
-	    ! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
-	    USERERROR("Not enough permission to view '$pid/$eid'", 1);
-	}
-	# Get the repo index for the experiment.
+    #
+    # Authenticated access to the project repo.
+    #
+    if (! ISADMIN() &&
+	! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+        # Then check to see if the project cvs repo is public.
 	$query_result =
-	    DBQueryFatal("select s.archive_idx from experiments as e ".
-			 "left join experiment_stats as s on s.exptidx=e.idx ".
-			 "where e.pid='$pid' and e.eid='$eid'");
-	
+	    DBQueryFatal("select cvsrepo_public from projects ".
+			 "where pid='$pid'");
 	if (!mysql_num_rows($query_result)) {
-	    TBERROR("Error getting repo index for '$pid/$eid'", 1);
+	    TBERROR("Error getting cvsrepo_public bit", 1);
 	}
 	$row = mysql_fetch_array($query_result);
-	if (!isset($row[0])) {
-	    TBERROR("Error getting repo index for '$pid/$eid'", 1);
+	if ($row[0] == 0) {
+	    USERERROR("You are not a member of Project $pid.", 1);
 	}
-	$repoidx = $row[0];
-	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";
-	$use_viewvc = 1;
     }
-    else {
-	#
-	# Wants access to the project repo.
-	#
-	if (! ISADMIN() &&
-	    ! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
-            # Then check to see if the project cvs repo is public.
-	    $query_result =
-		DBQueryFatal("select cvsrepo_public from projects ".
-			     "where pid='$pid'");
-	    if (!mysql_num_rows($query_result)) {
-		TBERROR("Error getting cvsrepo_public bit", 1);
-	    }
-	    $row = mysql_fetch_array($query_result);
-	    if ($row[0] == 0) {
-		USERERROR("You are not a member of Project $pid.", 1);
-	    }
-	}
-	$repodir = "$TBCVSREPO_DIR/$pid";
-    }
+    $repodir = "$TBCVSREPO_DIR/$pid";
 }
-elseif (isset($experiment) || isset($instance) || isset($template)) {
+elseif (isset($template)) {
     if (!$CVSSUPPORT) {
 	USERERROR("Project CVS support is not enabled!", 1);
     }
 
     # Must be logged in for this!
-    if ($this_user) {
-	CheckLoginOrDie();
-    }
+    $this_user = CheckLoginOrDie();
 
-    if (isset($template)) {
-	$experiment = $template->GetExperiment();
-    }
-    
-    if (isset($instance)) {
-	$pid = $instance->pid();
-	$eid = $instance->eid();
-	$idx = $instance->exptidx();
-	$project = $instance->Project();
-    }
-    else {
-	$pid = $experiment->pid();
-	$eid = $experiment->eid();
-	$idx = $experiment->idx();
-	$project = $experiment->Project();
-    }
-    
-    # Need the pid/eid/gid. Access the stats table since we want to provide
-    # cvs access to terminated experiments via the archive.
-    $query_result =
-	DBQueryFatal("select s.archive_idx,a.archived ".
-		     "   from experiment_stats as s ".
-		     "left join archives as a on a.idx=s.archive_idx ".
-		     "where s.exptidx='$idx'");
-    if (!mysql_num_rows($query_result)) {
-	USERERROR("Experiment '$idx' is not a valid experiment", 1);
-    }
-    $row = mysql_fetch_array($query_result);
-    $repoidx  = $row[0];
-    $archived = $row[1];
+    $guid = $template->guid();
+    $vers = $template->vers();
+    $pid  = $template->pid();
+    $project = $template->GetProject();
 
-    # Lets do group level check since it might not be a current experiment.
-    if (!$archived) {
-	if (! ISADMIN() &&
-	    ! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
-	    USERERROR("Not enough permission to view archive", 1);
-	}
-	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";
+    if (! ISADMIN() &&
+	! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+	USERERROR("Not enough permission to view cvs repo for template", 1);
     }
-    else {
-	if (! ISADMIN()) {
-	    USERERROR("Must be administrator to view historical archives!", 1);
-	}
-	$repodir = "/usr/testbed/exparchive/Archive/$repoidx/repo/";
-    }
-    $use_viewvc = 1;
+    # Repo for the entire template stored here per-template.
+    $repodir = "$TBPROJ_DIR/$pid/templates/$guid/cvsrepo/$guid";
 }
 else {
     $this_user = CheckLoginOrDie();

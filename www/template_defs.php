@@ -167,6 +167,15 @@ class Template
 	return $this->experiment;
     }
 
+    function GetProject() {
+	$pid = $this->pid();
+
+	if (! ($project = Project::Lookup($pid))) {
+	    TBERROR("Could not lookup project $pid!", 1);
+	}
+	return $project;
+    }
+
     # Return the unixgid for operating on this template.
     function UnixGID() {
 	$experiment = $this->experiment;
@@ -2282,7 +2291,7 @@ function MakeLink($which, $args, $text)
 	$page = "showuser.php3";
     }
     elseif ($which == "template") {
-	$page = "template_show.php";
+	$page = "/template_show.php";
     }
     elseif ($which == "metadata") {
 	$page = "template_metadata.php";
