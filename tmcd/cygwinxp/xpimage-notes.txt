@@ -1244,6 +1244,8 @@ Making single images
         set pc=221 img=UPDATE image=UPDATE-pc3000-sysprep_2006-07-28
         set pc=106 img=UPDATE image=UPDATE-pc850-sysprep_2006-03-03
 
+        set pc=247 img=UPDATE image=UPDATE-sysprep_2007-07-20
+
         df -m /proj/testbed/images /usr/testbed/images
           # Verify SSH working.
           rootpc $pc id
@@ -1307,10 +1309,17 @@ Making single images
           ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img-new.ndz
           ls -l /usr/testbed/images/WINXP-$img-new*
         # Production images.
-        ls -l /usr/testbed/images/WINXP-$img*
-        rm /usr/testbed/images/WINXP-$img.ndz
-        ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img.ndz
-        ls -l /usr/testbed/images/WINXP-$img*
+          ls -l /usr/testbed/images/WINXP-$img*
+        set files = `ls -F /usr/testbed/images/WINXP-$img* | grep @ | tr -d @`
+        echo $files
+        v $files
+        foreach f ( $files )
+            echo $f
+            rm $f
+            ln -s WINXP-$image.ndz $f
+        end
+          v $files
+          ls -l /usr/testbed/images/WINXP-$img*
 
 ================================================================
 
