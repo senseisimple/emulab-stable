@@ -118,9 +118,9 @@ if (!$nologs) {
     # Create an archive containing these logfiles
     #
     print "##### Creating archive\n";
-##    if (system "$LOGHOLE -e $pid/$eid archive") {
-##	die "Error running loghole\n";
-##    }
+    if (system "$LOGHOLE -e $pid/$eid archive") {
+	die "Error running loghole\n";
+    }
 } else {
     print "##### Ignoring logfiles\n";
 }
