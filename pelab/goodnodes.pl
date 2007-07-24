@@ -38,16 +38,18 @@ $| = 1;
 
 sub usage {
         print "Usage: $0 [-e pid/eid] [-f blacklistfilename] [-t type] [-v] ".
-            "[-0 starttime] [-1 endtime] <numNodes>\n";
+            "[-m meastype] [-s searchtype] <numNodes>\n";
         return 1;
 }
 my ($pid, $eid);
 my $blacklistfilename;
 my $type = "";
+my $meastype = "both";
+my $searchtype = "maxclique";
 my $verbose = 0;
 my ($t0, $t1);
 my %opt = ();
-getopts("0:1:e:f:t:v", \%opt);
+getopts("0:1:e:f:t:vm:s:", \%opt);
 if ($opt{e}) {
     ($pid,$eid) = split('/', $opt{e});
 } else {
@@ -55,12 +57,26 @@ if ($opt{e}) {
 }
 if ($opt{f}) { $blacklistfilename = $opt{f}; }
 if ($opt{t}) { $type = $opt{t}; }
+if ($opt{m}) { $meastype = $opt{m}; }
+if ($opt{s}) { $searchtype = $opt{s}; }
 if ($opt{v}) { $verbose = 1; }
 if ($opt{0}) { $t0 = $opt{0}; } else { $t0 = time()-$windowHrsDef*60*60; }
 if ($opt{1}) { $t1 = $opt{1}; }
 elsif($opt{0}) { $t1 = $t0+$windowHrsDef*60*60; }
 else { $t1 = time(); }
 if (@ARGV !=1) { exit &usage; }
+if (($meastype ne 'lat') && ($meastype ne 'bw') && ($meastype ne 'both')) {
+    print "Wrong value of meastype (-m option). It can be only".
+	  "'lat', 'bw', or 'both' \n";
+    exit 1;
+}
+
+if (($searchtype ne 'fastfallible') && ($searchtype ne 'maxclique')) {
+    print "Wrong value of searchtype (-s option). It can be only".
+	  "'fastfallible' or 'maxclique'\n";
+    exit 1;
+}
+
 
 #
 # These are globals
@@ -164,6 +180,8 @@ my ($DEF_HOST,$DEF_PORT,$DEF_URL) = ('ops.emulab.net','3993','/');
 my $xurl = "http://${DEF_HOST}:${DEF_PORT}${DEF_URL}";
 my $xargs = { 'size' => $numnodes,
               'nodefilter' => \@allnodes,
+              'meastype' => $meastype,
+              'searchtype' => $searchtype,
               'filtertype' => 1 };
 my $respref = libxmlrpc::CallMethodHTTP($xurl,'flexlab.getFullyConnectedSet',
     $xargs);

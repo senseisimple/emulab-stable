@@ -262,7 +262,7 @@ class flexlab:
                             run a max clique heuristic over the set of nodes
                             that are supplied (or all known nodes, if none are
                             supplied), and will select the k-best nodes.
-          meastype (str)    Measurements to be considered - 'lat' or 'bw'
+          meastype (str)    Measurements to be considered - 'lat','bw','both'
         Returns:
           A list of Emulab node_ids.
         """
@@ -277,7 +277,7 @@ class flexlab:
                 size = int(argdict["size"])
             except:
                 return FlexlabInvalidArgumentFault(11,"Must supply a positive set size!")
-            if size <= 0:
+            if size < 0:
                 return FlexlabInvalidArgumentFault(11,"Must supply a positive set size!")
             pass
         else:
@@ -286,6 +286,7 @@ class flexlab:
         nodefilterlist = []
         filtertype = True
 	meastype = ''
+	searchtype = ''
         
         if argdict.has_key("nodefilter"):
             nodefilterlist = argdict["nodefilter"]
@@ -298,11 +299,20 @@ class flexlab:
 
         if argdict.has_key("meastype"):
             meastype = argdict["meastype"]
-            if meastype != 'lat' and meastype != 'bw':
-                return FlexlabInvalidArgumentFault(12,"meastype can be only lat or bw!")
+            if meastype != 'lat' and meastype != 'bw' and meastype != 'both':
+                return FlexlabInvalidArgumentFault(12,"meastype can be only lat, bw or both!")
             pass
         else:
             meastype = 'lat'
+            pass
+
+        if argdict.has_key("searchtype"):
+            searchtype = argdict["searchtype"]
+            if searchtype != 'fastfallible' and searchtype != 'maxclique':
+                return FlexlabInvalidArgumentFault(12,"searchtype can be only fastfallible or maxclique!")
+            pass
+        else:
+            searchtype = 'maxclique'
             pass
 
         if argdict.has_key("filtertype"):
@@ -332,7 +342,10 @@ class flexlab:
             pass
 
         try:
-            retval = self._GraphGoodnodes(meastype,size,finalnodes)
+	    if searchtype == 'maxclique':
+            	retval = self._GraphGoodnodes(meastype,size,finalnodes)
+	    else:
+            	retval = self._simpleGoodnodes(size,finalnodes)		
         except:
             raise
 
@@ -507,6 +520,12 @@ class flexlab:
 		    if (meastype == "bw"):
 			bw = fbw + bbw
 		    	if bw > 1:
+				G.add_edge((ss, ds))
+				pass
+                    	pass
+		    if (meastype == "both"):
+			both = lat + fbw + bbw
+		    	if both > 2:
 				G.add_edge((ss, ds))
 				pass
                     	pass
