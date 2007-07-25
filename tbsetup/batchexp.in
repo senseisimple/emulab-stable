@@ -935,7 +935,7 @@ sub ParseArgs()
 	#
 	if (! ($tempnsfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
 	    ! ($tempnsfile =~ /^\/tmp\/\d+\.ns/) &&
-	    ! ($tempnsfile =~ /^\/var\/tmp\/php\w+/) &&
+	    ! ($tempnsfile =~ /^\/var\/tmp\/php[-\w]+/) &&
 	    ! TBValidUserDir($tempnsfile, 0)) {
 	    tberror({type => 'primary', severity => SEV_ERROR,
 		     error => ['disallowed_directory', $tempnsfile]},
