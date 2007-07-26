@@ -4109,3 +4109,8 @@ last_net_act,last_cpu_act,last_ext_act);
 4.126: The recent changes made to the firewalls table in step3_newids.pl were
        omitted.  Nothing to do unless you had already passed version 4.109 .
        Otherwise, re-run ./step3_newids.pl .
+
+4.127: Increase vtype name from 12 to 32 chars.
+
+	alter table virt_vtypes change name
+                  `name` varchar(32) NOT NULL default '';
