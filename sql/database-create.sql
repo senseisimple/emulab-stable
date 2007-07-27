@@ -541,7 +541,7 @@ CREATE TABLE `experiment_inputs` (
 DROP TABLE IF EXISTS `experiment_pmapping`;
 CREATE TABLE `experiment_pmapping` (
   `rsrcidx` int(10) unsigned NOT NULL default '0',
-  `vname` varchar(32) default NULL,
+  `vname` varchar(32) NOT NULL default '',
   `node_id` varchar(32) NOT NULL default '',
   `node_type` varchar(30) NOT NULL default '',
   `node_erole` varchar(30) NOT NULL default '',
