@@ -14,6 +14,7 @@ use Getopt::Std;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
 
 #
 # Do things necessary for setting up inner elab experiment. 
@@ -94,7 +95,8 @@ my $dbuid;
 my $user_name;
 my $user_email;
 my $query_result;
-my $exptinfo;
+my $inner_experiment;
+my $inner_nsfile;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -215,30 +217,18 @@ if ($fwboot) {
 # from the DB and save it. 
 #
 if (defined($elabinelab_eid)) {
-    $query_result =
-	DBQueryFatal("select nsfile from nsfiles ".
-		     "where pid='$pid' and eid='$elabinelab_eid'");
-
+    $inner_experiment = Experiment->Lookup($pid, $elabinelab_eid);
     die("*** $0:\n".
 	"    No such experiment in DB for $pid/$elabinelab_eid\n")
-	if (!$query_result->numrows);
+	if (!defined($inner_experiment));
 
-    my ($nsfile) = $query_result->fetchrow_array();
+    $inner_experiment->GetNSFile(\$inner_nsfile) == 0 or
+	die("*** $0:\n".
+	    "    Could not get NS file for $inner_experiment\n");
     
     die("*** $0:\n".
-	"    No nsfile in DB for $pid/$elabinelab_eid\n")
-	if (!defined($nsfile) || $nsfile eq "");
-
-    $query_result =
-	DBQueryFatal("select * from experiments ".
-		     "where pid='$pid' and eid='$elabinelab_eid'");
-
-    die("*** $0:\n".
-	"    No such experiment in DB for $pid/$elabinelab_eid\n")
-	if (!$query_result->numrows);
-
-    $exptinfo = $query_result->fetchrow_hashref();
-    $exptinfo->{"nsfile"} = $nsfile;
+	"    No nsfile in DB for $inner_experiment")
+	if (!defined($inner_nsfile) || $inner_nsfile eq "");
 }
 
 #
@@ -486,7 +476,7 @@ if (defined($elabinelab_eid)) {
     open(NS, "> /tmp/$$.ns")
 	or die("*** $0:\n".
 	       "    Could not write ns code to tmp file!\n");
-    print NS $exptinfo->{"nsfile"};
+    print NS $inner_nsfile;
     print NS "\n";
     close(NS);
 

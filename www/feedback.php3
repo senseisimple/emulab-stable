@@ -205,16 +205,8 @@ else if (strcmp($mode, "clear") == 0) {
 	# Avoid	SIGPROF in child.
 	# 
 	set_time_limit(0);
-	
-	$query_result = DBQueryFatal("SELECT nsfile from nsfiles ".
-				     "where pid='$pid' and eid='$eid'");
-	if (mysql_num_rows($query_result)) {
-	    $row    = mysql_fetch_array($query_result);
-	    $nsdata = $row["nsfile"];
-	}
-	else {
-	    $nsdata = ""; # XXX what to do...
-	}
+
+	$nsdata = $experiment->NSFile();
 	
 	list($usec, $sec) = explode(' ', microtime());
 	srand((float) $sec + ((float) $usec * 100000));

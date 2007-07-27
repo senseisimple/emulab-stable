@@ -45,6 +45,7 @@ my $TBSWAP      = "$TB/bin/tbswap";
 my $TBREPORT    = "$TB/bin/tbreport";
 my $TBEND       = "$TB/bin/tbend";
 my $DU          = "/usr/bin/du";
+my $MD5         = "/sbin/md5";
 
 # Swap Actions
 $EXPT_PRELOAD		= TBDB_STATS_PRELOAD();
@@ -225,6 +226,7 @@ sub thumbnail($)	{ return resources($_[0], 'thumbnail'); }
 sub swapin_time($)	{ return resources($_[0], 'swapin_time'); }
 sub swapout_time($)	{ return resources($_[0], 'swapout_time'); }
 sub lastidx($)	        { return resources($_[0], 'lastidx'); }
+sub input_data_idx($)   { return resources($_[0], 'input_data_idx'); }
 
 #
 # Lookup an experiment given an experiment index.
@@ -544,14 +546,20 @@ sub Delete($;$)
 	if (! $purge);
     
     #
-    # Now we can clean up the stats records. 
+    # Now we can clean up the stats and resource records. 
     #
     my $rsrcidx = $self->rsrcidx();
-    
+
+    $self->DeleteInputFiles();
+
+    DBQueryWarn("DELETE from experiment_pmapping ".
+		"WHERE rsrcidx=$rsrcidx")
+	if (defined($rsrcidx) && $rsrcidx);
+
     DBQueryWarn("DELETE from experiment_resources ".
 		"WHERE idx=$rsrcidx")
 	if (defined($rsrcidx) && $rsrcidx);
-	
+
     DBQueryWarn("DELETE from testbed_stats ".
 		"WHERE exptidx=$exptidx");
 
@@ -559,6 +567,188 @@ sub Delete($;$)
     DBQueryWarn("DELETE from experiment_stats ".
 		"WHERE eid='$eid' and pid='$pid' and exptidx=$exptidx");
 
+    return 0;
+}
+
+#
+# Add an input file to the template. The point of this is to reduce
+# duplication by taking an md5 of the input file, and sharing that
+# record/file.
+# 
+sub AddInputFile($$;$)
+{
+    my ($self, $inputfile, $isnsfile) = @_;
+    my $input_data_idx;
+    my $isnew = 0;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $isnsfile = 0
+	if (! defined($isnsfile));
+
+    return -1
+	if (! -r $inputfile);
+
+    my $data_string = `cat $inputfile`;
+    return -1
+	if ($?);
+
+    my $exptidx  = $self->idx();
+    my $rsrcidx  = $self->rsrcidx();
+
+    if ($data_string) {
+	# As you can see, we md5 the raw data.
+	$data_string = DBQuoteSpecial($data_string);
+	if (length($data_string) >= DBLIMIT_NSFILESIZE()) {
+	    tberror("Input file is too big (> " . DBLIMIT_NSFILESIZE() . ")!");
+	    return -1;
+	}
+
+	#
+	# Grab an MD5 of the file to see if we already have a copy of it.
+	# Avoids needless duplication.
+	#
+	my $md5 = `$MD5 -q $inputfile`;
+	chomp($md5);
+
+	DBQueryWarn("lock tables experiment_input_data write, ".
+		    "            experiment_inputs write, ".
+		    "            experiment_resources write")
+	    or return -1;
+
+	my $query_result =
+	    DBQueryWarn("select idx from experiment_input_data ".
+			"where md5='$md5'");
+
+	if (!$query_result) {
+	    DBQueryWarn("unlock tables");
+	    return -1;
+	}
+
+	if ($query_result->numrows) {
+	    ($input_data_idx) = $query_result->fetchrow_array();
+	    $isnew = 0;
+	}
+	else {
+	    $query_result =
+		DBQueryWarn("insert into experiment_input_data ".
+			    "(idx, md5, input) ".
+			    "values (NULL, '$md5', $data_string)");
+	    
+	    if (!$query_result) {
+		DBQueryWarn("unlock tables");
+		return -1;
+	    }
+	    $input_data_idx = $query_result->insertid;
+	    $isnew = 1;
+	}
+	if (! DBQueryWarn("insert into experiment_inputs ".
+			  " (rsrcidx, exptidx, input_data_idx) values ".
+			  " ($rsrcidx, $exptidx, '$input_data_idx')")) {
+	    DBQueryWarn("delete from experiment_input_data ".
+			"where idx='$input_data_idx'")
+		if ($isnew);
+	    DBQueryWarn("unlock tables");
+	    return -1;
+	}
+	if ($isnsfile &&
+	    $self->TableUpdate("experiment_resources",
+			       "input_data_idx='$input_data_idx'") != 0) {
+	    DBQueryWarn("unlock tables");
+	    return -1;
+	}
+	DBQueryWarn("unlock tables");
+    }
+    return 0;
+}
+
+#
+# Delete the input files, but only if not in use.
+#
+sub DeleteInputFiles($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $rsrcidx = $self->rsrcidx();
+    my $nsidx   = $self->input_data_idx();
+
+    DBQueryWarn("lock tables experiment_input_data write, ".
+		"            experiment_resources write, ".
+		"            experiment_inputs write")
+	or return -1;
+
+    #
+    # Get all input files for this rsrc record.
+    #
+    my $query_result =
+	DBQueryWarn("select input_data_idx from experiment_inputs ".
+		    "where rsrcidx='$rsrcidx'");
+    goto bad
+	if (! $query_result);
+    goto done
+	if (! $query_result->numrows);
+
+    while (my ($input_data_idx) = $query_result->fetchrow_array()) {
+	#
+	# Delete but only if not in use.
+	#
+	my $query_result =
+	    DBQueryWarn("select count(rsrcidx) from experiment_inputs ".
+			"where input_data_idx='$input_data_idx' and ".
+			"      rsrcidx!='$rsrcidx'");
+	goto bad
+	    if (! $query_result);
+	next
+	    if ($query_result->numrows);
+
+	DBQueryWarn("delete from experiment_input_data ".
+		    "where idx='$input_data_idx'")
+	    or goto bad;
+
+	DBQueryWarn("delete from experiment_inputs ".
+		    "where input_data_idx='$input_data_idx'")
+	    or goto bad;
+
+	if (defined($nsidx) && $nsidx == $input_data_idx) {
+	    DBQueryWarn("update experiment_resources set input_data_idx=NULL ".
+			"where rsrcidx='$rsrcidx'")
+		or goto bad;
+	}
+    }
+  done:
+    DBQueryWarn("unlock tables");
+    return 0;
+
+  bad:
+    DBQueryWarn("unlock tables");
+    return 1;
+}
+
+#
+# Grab an input file.
+#
+sub GetInputFile($$$)
+{
+    my ($self, $idx, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $query_result =
+	DBQueryWarn("select input from experiment_input_data ".
+		    "where idx='$idx'");
+    return -1
+	if (! $query_result || !$query_result->numrows);
+
+    my ($nsfile) = $query_result->fetchrow_array();
+    $$pref = $nsfile;
     return 0;
 }
 
@@ -1053,7 +1243,7 @@ sub CreateLogFile($$$)
 }
 
 #
-# Set the experiments nsfiles table entry.
+# Set the experiments NS file using AddInputFile() above
 #
 sub SetNSFile($$)
 {
@@ -1063,26 +1253,25 @@ sub SetNSFile($$)
     return -1
 	if (! ref($self));
 
-    my $nsfile_string = `cat $nsfile`;
+    return $self->AddInputFile($nsfile, 1);
+}
+
+sub GetNSFile($$)
+{
+    my ($self, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    # In case there is no NS file stored.
+    $$pref = undef;
+
+    my $input_data_idx = $self->input_data_idx();
     return 0
-	if (!$nsfile_string);
+	if (!defined($input_data_idx));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
-    my $idx = $self->idx();
-    $nsfile_string = DBQuoteSpecial($nsfile_string);
-    
-    if (length($nsfile_string) >= DBLIMIT_NSFILESIZE()) {
-	print "NS file is way too big!\n";
-	return -1;
-    }
-
-    return -1    
-	if (!DBQueryWarn("delete from nsfiles where exptidx='$idx'") ||
-	    !DBQueryWarn("insert into nsfiles (exptidx, pid, eid, nsfile) ".
-			 "values ($idx, '$pid', '$eid', $nsfile_string)"));
-
-    return 0;
+    return $self->GetInputFile($input_data_idx, $pref);
 }
 
 #
@@ -1221,19 +1410,24 @@ sub PreSwap($$$)
     if ($which eq $EXPT_SWAPMOD || $which eq $EXPT_SWAPIN) {
 	#
 	# In SWAPIN, copy over the thumbnail. This is temporary; I think
-	# the thumbnail is going to end up going someplace else. 
+	# the thumbnail is going to end up going someplace else.
+	# For swapmod, its gonna get overwritten in tbprerun.
+	# Ditto above for input_data_idx.
 	#
 	my $thumbdata = (defined($self->thumbnail()) ?
 			 DBQuoteSpecial($self->thumbnail()) : "NULL");
+        my $input_data_idx = (defined($self->input_data_idx()) ?
+			      $self->input_data_idx() : "NULL");
 	my $byswapmod = ($which eq $EXPT_SWAPMOD ? 1 : 0);
 	my $byswapin  = ($which eq $EXPT_SWAPIN  ? 1 : 0);
 
 	my $query_result =
 	    DBQueryWarn("insert into experiment_resources ".
 			" (idx, uid_idx, tstamp, exptidx, lastidx, ".
-			"  byswapmod, byswapin, thumbnail) ".
+			"  byswapmod, byswapin, input_data_idx, thumbnail) ".
 			"values (0, '$uid_idx', now(), $exptidx, $rsrcidx,".
-			"        $byswapmod, $byswapin, $thumbdata)");
+			"        $byswapmod, $byswapin, ".
+			"        $input_data_idx, $thumbdata)");
 	return -1
 	    if (! $query_result ||
 		! $query_result->insertid);
@@ -1508,11 +1702,15 @@ sub PostSwap($$$$)
     #
     if ($which eq $EXPT_START ||
 	$which eq $EXPT_SWAPIN ||
-	$which eq $EXPT_SWAPMOD) {
+	($which eq $EXPT_SWAPMOD &&
+	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
 	my $query_result =
-	    DBQueryWarn("select r.node_id from reserved as r ".
+	    DBQueryWarn("select r.node_id,n.type,r.erole, ".
+			"     r.vname,n.phys_nodeid ".
+			"  from reserved as r ".
 			"left join nodes as n on r.node_id=n.node_id ".
-			"where r.exptidx='$exptidx' and n.role='testnode'");
+			"where r.exptidx='$exptidx' and ".
+			"      (n.role='testnode' or n.role='virtnode')");
 
 	return -1
 	    if (! $query_result);
@@ -1522,6 +1720,20 @@ sub PostSwap($$$$)
 	DBQueryWarn("update experiment_resources set pnodes=$pnodes ".
 		    "where idx=$rsrcidx")
 	    or return -1;
+
+	# Generate the pmapping insert.
+	my @mappings = ();
+
+	while (my ($node_id,$type,$erole,$vname,$physnode) =
+	       $query_result->fetchrow_array()) {
+	    push(@mappings,
+		 "($rsrcidx, '$vname', '$physnode', '$type', '$erole')");
+	}
+	if (@mappings) {
+	    DBQueryWarn("insert into experiment_pmapping values ".
+			join(",", @mappings))
+		or return -1;
+	}
     }
     
     #

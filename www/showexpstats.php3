@@ -105,6 +105,11 @@ while ($row = mysql_fetch_assoc($query_result)) {
                      <a href='showthumb.php3?idx=$rsrcidx'>Thumbnail</a>
                   </td>\n";
 	}
+	elseif ($key == "input_data_idx") {
+	    echo "<td nowrap>
+                     <a href='spitnsdata.php3?record=$rsrcidx'>$value</a>
+                  </td>\n";
+	}
 	else {
 	    if (!$print_header && $skipping) {
 		if ($key == "foo") {

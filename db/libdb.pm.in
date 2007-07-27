@@ -3480,8 +3480,7 @@ sub TBExptContainsNodeCT($$$)
 		   "virt_firewalls",
 		   "firewall_rules",
 		   "virt_tiptunnels",
-		   "ipsubnets",
-		   "nsfiles");
+		   "ipsubnets");
 
 @physicalTables = ("delays",
 		   "vlans",

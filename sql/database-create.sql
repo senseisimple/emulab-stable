@@ -507,6 +507,48 @@ CREATE TABLE `eventlist` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `experiment_input_data`
+--
+
+DROP TABLE IF EXISTS `experiment_input_data`;
+CREATE TABLE `experiment_input_data` (
+  `idx` int(10) unsigned NOT NULL auto_increment,
+  `md5` varchar(32) NOT NULL default '',
+  `compressed` tinyint(1) unsigned default '0',
+  `input` mediumblob,
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `md5` (`md5`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `experiment_template_inputs`
+--
+
+DROP TABLE IF EXISTS `experiment_inputs`;
+CREATE TABLE `experiment_inputs` (
+  `rsrcidx` int(10) unsigned NOT NULL default '0',
+  `exptidx` int(10) unsigned NOT NULL default '0',
+  `input_data_idx` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`rsrcidx`,`input_data_idx`),
+  KEY `rsrcidx` (`rsrcidx`),
+  KEY `exptidx` (`exptidx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `experiment_pmapping`
+--
+
+DROP TABLE IF EXISTS `experiment_pmapping`;
+CREATE TABLE `experiment_pmapping` (
+  `rsrcidx` int(10) unsigned NOT NULL default '0',
+  `vname` varchar(32) default NULL,
+  `node_id` varchar(32) NOT NULL default '',
+  `node_type` varchar(30) NOT NULL default '',
+  `node_erole` varchar(30) NOT NULL default '',
+  PRIMARY KEY  (`rsrcidx`,`vname`,`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `experiment_resources`
 --
 
@@ -541,10 +583,12 @@ CREATE TABLE `experiment_resources` (
   `delay_capacity` tinyint(3) unsigned default NULL,
   `batchmode` tinyint(1) unsigned default '0',
   `archive_tag` varchar(64) default NULL,
+  `input_data_idx` int(10) unsigned default NULL,
   `thumbnail` mediumblob,
   PRIMARY KEY  (`idx`),
   KEY `exptidx` (`exptidx`),
   KEY `lastidx` (`lastidx`)
+  KEY `inputdata` (`input_data_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

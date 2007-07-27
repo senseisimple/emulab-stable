@@ -20,6 +20,7 @@ $isadmin   = ISADMIN();
 $optargs = OptionalPageArguments("experiment",   PAGEARG_EXPERIMENT,
 				 "template",     PAGEARG_TEMPLATE,
 				 "copyid",       PAGEARG_STRING,
+				 "record",       PAGEARG_INTEGER,
 				 "nsref",        PAGEARG_INTEGER,
 				 "guid",         PAGEARG_INTEGER,
 				 "nsdata",       PAGEARG_ANYTHING);
@@ -105,6 +106,29 @@ if (isset($copyid) && $copyid != "") {
 #
 # Spit back an NS file to the user. 
 #
+if (isset($record) && $record != "" && TBvalid_integer($record)) {
+    $experiment_resources = ExperimentResources::Lookup($record);
+    if (! $experiment_resources) {
+	USERERROR("No such experiment resources record $record!", 1);
+    }
+    if (!$experiment_resources->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view the NS file for ".
+		  "experiment resource record $record!", 1);
+    }
+    
+    #
+    # Grab the NS file.
+    #
+    if (($nsfile = $experiment_resources->NSFile())) {
+	header("Content-Type: text/plain");
+	echo "$nsfile\n";
+    }
+    else {
+	USERERROR("There is no NS file recorded for ".
+		  "experiment resource record $record!", 1);
+    }
+    return;
+}
 
 #
 # A template.

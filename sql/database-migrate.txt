@@ -4114,3 +4114,42 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table virt_vtypes change name
                   `name` varchar(32) NOT NULL default '';
+
+4.128: More historical data for experiments.
+
+	CREATE TABLE `experiment_input_data` (
+	  `idx` int(10) unsigned NOT NULL auto_increment,
+	  `md5` varchar(32) NOT NULL default '',
+	  `compressed` tinyint(1) unsigned default '0',
+	  `input` mediumblob,
+	  PRIMARY KEY  (`idx`),
+	  UNIQUE KEY `md5` (`md5`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	DROP TABLE IF EXISTS `experiment_pmapping`;
+	CREATE TABLE `experiment_pmapping` (
+	  `rsrcidx` int(10) unsigned NOT NULL default '0',
+	  `vname` varchar(32) default NULL,
+	  `node_id` varchar(32) NOT NULL default '',
+	  `node_type` varchar(30) NOT NULL default '',
+	  `node_erole` varchar(30) NOT NULL default '',
+	  PRIMARY KEY  (`rsrcidx`,`vname`,`node_id`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	CREATE TABLE `experiment_inputs` (
+	  `rsrcidx` int(10) unsigned NOT NULL default '0',
+	  `exptidx` int(10) unsigned NOT NULL default '0',
+	  `input_data_idx` int(10) unsigned NOT NULL default '0',
+	  PRIMARY KEY  (`rsrcidx`,`input_data_idx`),
+	  KEY `rsrcidx` (`rsrcidx`),
+	  KEY `exptidx` (`exptidx`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table experiment_resources add 
+           `input_data_idx` int(10) unsigned default NULL after archive_tag;
+
+
+	And then run this script:
+
+	./nsfiles.pl
+

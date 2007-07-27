@@ -70,9 +70,10 @@ while ($row = mysql_fetch_array($query_result)) {
     $allocpercent       = sprintf("%.3f", ($alloctime / $age) * 100);
     $freepercent        = sprintf("%.3f", ($freetime / $age) * 100);
     $downpercent        = sprintf("%.3f", ($downtime / $age) * 100);
+    $url                = CreateURL("shownode", URLARG_NODEID, $node_id);
 
     echo "<tr>
-           <td>$node_id</td>
+           <td><a href='$url'>$node_id</a></td>
            <td>$inception</td>
            <td>$age</td>
            <td>$freetime</td>

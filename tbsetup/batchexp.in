@@ -1212,13 +1212,10 @@ sub CopyInArchive()
 	#
 	# Grab a copy from the DB since we save all current NS files there.
 	#
-	my $query_result =
-	    DBQueryFatal("select nsfile from nsfiles ".
-			 "where pid='$copypid' and eid='$copyeid'");
-	tbdie("No such experiment in DB for $copypid/$copyeid\n")
-	    if (!$query_result->numrows);
-	my ($nsfile) = $query_result->fetchrow_array();
-	tbdie("No nsfile in DB for $copypid/$copyeid\n")
+	my $nsfile;
+	$copy_experiment->GetNSFile(\$nsfile) == 0
+	    or tbdie("Could not get NS file for $copy_experiment");
+	tbdie("No nsfile in DB for $copy_experiment")
 	    if (!defined($nsfile) || $nsfile eq "");
 
 	open(NS, "> $tempnsfile")

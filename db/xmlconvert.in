@@ -464,13 +464,8 @@ sub readXML($$$$$) {
 		    defined($rowhash{'pathname'})) {
 		    my $pathname = $rowhash{'pathname'};
 
-		    # libArchive checks the paths to make sure they are
-		    # from the allowed places.
-		    if (libArchive::TBExperimentArchiveAddFile($pid, $eid,
-							       $pathname)
-			< 0) {
-			fatal("Failed to add $pathname to the archive!");
-		    }
+		    $experiment->AddInputFile($pathname) == 0
+			or fatal("Failed to add input file $pathname!");
 		}
 	    }
 	    next;

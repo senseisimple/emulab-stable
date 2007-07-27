@@ -193,7 +193,8 @@ class Experiment
 	return ExperimentStats::Lookup($this->idx());
     }
     function GetResources() {
-	return ExperimentResources::Lookup($this->idx());
+	$stats = $this->GetStats();
+	return ExperimentResources::Lookup($stats->rsrcidx());
     }
 
     # accessors
@@ -357,18 +358,18 @@ class Experiment
 
     # Return the stored NS file for an experiment.
     function NSFile() {
-	$pid = $this->pid();
-	$eid = $this->eid();
-	
+	$resources      = $this->GetResources();
+	$input_data_idx = $resources->input_data_idx();
+
 	$query_result =
-	    DBQueryFatal("select nsfile from nsfiles ".
-			 "where pid='$pid' and eid='$eid'");
+	    DBQueryFatal("select input from experiment_input_data ".
+			 "where idx='$input_data_idx'");
 
 	if (! mysql_num_rows($query_result)) {
 	    return null;
 	}
 	$row    = mysql_fetch_array($query_result);
-	return $row["nsfile"];
+	return $row["input"];
     }
 
     #
@@ -1096,10 +1097,11 @@ class ExperimentStats
     #
     function AccessCheck ($user, $access_type) {
 	global $TBDB_TRUST_USER;
+	$pid_idx = $this->pid_idx();
 	
-	if (! ($project = Project::Lookup($this->pid()))) {
+	if (! ($project = Project::Lookup($pid_idx))) {
 	    TBERROR("ExperimentStats::AccessCheck: ".
-		    "Cannot map $pid to its object", 1);
+		    "Cannot map project $pid_idx to its object", 1);
 	}
 	return $project->AccessCheck($user, $TBDB_TRUST_USER);
     }
@@ -1112,14 +1114,12 @@ class ExperimentResources
     #
     # Constructor by lookup on unique index for current resources
     #
-    function ExperimentResources($exptidx) {
-	$safe_exptidx = addslashes($exptidx);
+    function ExperimentResources($rsrcidx) {
+	$safe_rsrcidx = addslashes($rsrcidx);
 
 	$query_result =
-	    DBQueryWarn("select r.* from experiment_stats as s ".
-			"left join experiment_resources as r on ".
-			"    s.rsrcidx=r.idx ".
-			"where s.exptidx='$safe_exptidx'");
+	    DBQueryWarn("select r.* from experiment_resources as r ".
+			"where r.idx='$safe_rsrcidx'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    $this->resources = null;
@@ -1133,9 +1133,9 @@ class ExperimentResources
 	return !is_null($this->resources);
     }
 
-    # Lookup by exptidx.
-    function Lookup($exptidx) {
-	$foo = new ExperimentResources($exptidx);
+    # Lookup by resource record number
+    function Lookup($rsrcidx) {
+	$foo = new ExperimentResources($rsrcidx);
 
 	if ($foo->IsValid())
 	    return $foo;
@@ -1147,10 +1147,43 @@ class ExperimentResources
     function field($name) {
 	return (is_null($this->resources) ? -1 : $this->resources[$name]);
     }
-    function idx()	    { return $this->field('idx'); }
-    function exptidx()	    { return $this->field('exptidx'); }
-    function lastidx()      { return $this->field('lastidx'); }
-    function wirelesslans() { return $this->field('wirelesslans'); }
+    function idx()	      { return $this->field('idx'); }
+    function exptidx()	      { return $this->field('exptidx'); }
+    function lastidx()        { return $this->field('lastidx'); }
+    function wirelesslans()   { return $this->field('wirelesslans'); }
+    function input_data_idx() { return $this->field('input_data_idx'); }
+
+    function GetStats() {
+	return ExperimentStats::Lookup($this->exptidx());
+    }
+
+    #
+    # Project level check via the stats record.
+    #
+    function AccessCheck ($user, $access_type) {
+	$experiment_stats = $this->GetStats();
+
+	return $experiment_stats->AccessCheck($user, $access_type);
+    }
+    
+    # Return the stored NS file this resource record
+    function NSFile() {
+	$input_data_idx = $this->input_data_idx();
+
+	if (! $input_data_idx) {
+	    return null;
+	}
+
+	$query_result =
+	    DBQueryFatal("select input from experiment_input_data ".
+			 "where idx='$input_data_idx'");
+
+	if (! mysql_num_rows($query_result)) {
+	    return null;
+	}
+	$row    = mysql_fetch_array($query_result);
+	return $row["input"];
+    }
 }
 
 #
