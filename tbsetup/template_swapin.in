@@ -70,7 +70,7 @@ my $logname;
 my @ExptStates  = ();
 # For the END block below.
 my $cleaning    = 0;
-my $exptcreated = 0;
+my $exptactive  = 0;
 my $justexit    = 1;
 
 # Programs we need
@@ -81,6 +81,7 @@ my $endexp      = "$TB/bin/endexp";
 my $dbcontrol   = "$TB/sbin/opsdb_control";
 my $archcontrol = "$TB/bin/archive_control";
 my $CVSBIN      = "/usr/bin/cvs";
+my $RLOG        = "/usr/bin/rlog";
 
 # Protos
 sub ParseArgs();
@@ -333,6 +334,9 @@ fatal($? >> 8, "Could not instantiate the experiment")
 #
 $justexit = 0;
 
+# And we need to terminate the experiment!
+$exptactive = 1;
+
 #
 # We will spew forth info to the user each time the batch daemon tries to
 # swap it in. 
@@ -402,11 +406,19 @@ my $cvsdir       = "$projroot/$pid/templates/$guid/cvsrepo";
 my $instance_tag = "I${exptidx}";
 my $template_tag = "T${guid}-$version";
 
-# Tag the template with an instance tag. This tag is used to associate
-# records with this instance with the actual template.
-System("$CVSBIN -d $cvsdir rtag -n -r ".
-       "  $template_tag $instance_tag $guid/setup") == 0
-    or fatal(-1, "Could not rtag with instance tag in $cvsdir");
+if (-e $cvsdir) {
+    # Tag the template with an instance tag. This tag is used to associate
+    # records with this instance with the actual template.
+    # The rlog check is so we can deal with old templates that have an
+    # incomplete CVS repo.
+    System("$RLOG -h $cvsdir/$guid/setup/.template,v | ".
+	   "  grep -q '${template_tag}:'");
+    if (! $?) {
+	System("$CVSBIN -d $cvsdir rtag -n -r ".
+	       "  $template_tag $instance_tag $guid/setup") == 0
+	       or fatal(-1, "Could not rtag with instance tag in $cvsdir");
+    }
+}
 
 $instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0
     or fatal(-1, "Could not update start time in instance record!");
@@ -533,6 +545,11 @@ sub cleanup()
     # For debugging.
     $experiment->BackupUserData()
 	if (defined($experiment));
+
+    if ($exptactive) {
+	$experiment->Swap($Experiment::EXPT_SWAPOUT, "-x -q -w") == 0
+	    or exit(-1);
+    }
 
     $instance->DeleteCurrentRun()
 	if (defined($run));

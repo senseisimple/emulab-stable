@@ -762,16 +762,12 @@ sub ParseArgs()
 #
 sub cleanup()
 {
-    if ($exptcreated) {
-	exit(-1)
-	    if (!TBExptIDX($pid, $eid, \$exptidx));
-
+    if (defined($experiment)) {
 	# Before killing it, save off the user directory for debugging.
 	$experiment->BackupUserData();
-		
-	system("$endexp -x -q -w $exptidx");
-	exit(-1)
-	    if ($?);
+
+	$experiment->End("-x -q -w") == 0
+	    or exit(-1);
     }
     $instance->Delete()
 	if (defined($instance));

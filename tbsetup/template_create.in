@@ -45,6 +45,7 @@ my $waitmode     = 0;
 my $modify       = 0;
 my $repotag;
 my $repobase;
+my $needrepoinit = 0;
 my $frompath;
 my $description;
 my $pid;
@@ -326,7 +327,10 @@ my $template_dir = $template->path();
 #
 # Set up CVS repo on ops to use as alternate interface.
 #
-if (!$modify) {
+if (!$modify || ! -e $cvsdir) {
+    $needrepoinit = 1
+	if (! -e $cvsdir);
+	
     if (! mkdir("$cvsdir", 0777)) {
 	fatal(-1, "Could not mkdir $cvsdir: $!");
     }
@@ -564,11 +568,11 @@ if (! -e "$template_dir/datastore/.ignore") {
 # When the template is first created, import an initial vendor branch
 # into the CVS repo so that there is something there. 
 #
-if (!$modify) {
+if (!$modify || $needrepoinit) {
     System("cd $template_dir; ".
 	   "$CVSBIN -d $cvsdir import ".
-	   "  -m 'Initialize new cvs repo for template $guid' ".
-	   "  $guid/setup T${guid}-1_import_branch T${guid}-1_import")
+	   "  -m 'Initialize new cvs repo for template $guid' $guid/setup ".
+	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
 	== 0 or fatal(-1, "Could not import new template into $cvsdir");
 
     #
@@ -641,6 +645,15 @@ elsif (defined($repotag)) {
 else {
     mkdir("$tmpdir", 0777) or
 	fatal(-1, "Could not mkdir $tmpdir: $!");
+
+    #
+    # To support older templates, see if the parent is in the CVS repo.
+    # If not, skip all this. 
+    #
+    System("$RLOG -h $cvsdir/$guid/setup/.template,v | ".
+	   "  grep -q 'T${parent_guid}-${parent_vers}:'");
+    goto noparent
+	if ($?);
 	
     #
     # Create a branch off the parent template.
@@ -668,15 +681,15 @@ else {
 
     # Need to clear the -b (default branch) or else the merge
     # commit fails for some reason that makes no sense to me.
-    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir admin -b $guid")
-	== 0 or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
-
+    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir admin -b $guid") == 0
+	or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
+    
     # Commit ...
     System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
-	     "  -r T${parent_guid}-${vers}_branch ".
-	     "  -m 'Commit merge with head'")
+	   "  -r T${parent_guid}-${vers}_branch ".
+	   "  -m 'Commit merge with head'")
 	== 0 or fatal(-1, "Could not commit on $cvsdir");
-
+    
     #
     # Clear the default branch so that "update -A" takes user to trunk.
     #
@@ -684,11 +697,14 @@ else {
 	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
 
     #
-    # Now tag the CVS repo with the current guid/vers so we can find it easily.
+    # Now tag the CVS repo with the current guid/vers so we can
+    # find it easily.
     #
     System("$CVSBIN -d $cvsdir rtag -n ".
-	   " -r T${parent_guid}-${vers}_branch T${guid}-${vers} $guid/setup")
+	   "  -r T${parent_guid}-${vers}_branch T${guid}-${vers} ".
+	   "  $guid/setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+noparent:
 }
 System("/bin/rm -rf $tmpdir")
     if (-e $tmpdir);
@@ -856,6 +872,7 @@ sub ParseArgs()
     }
 
     if (defined($options{"f"})) {
+	tbdie("Commit from instance/template not supported right now!");
 	$frompath = $options{"f"};
 
 	# The Archive library has a nice routine to validate this path.
