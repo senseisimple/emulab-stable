@@ -704,12 +704,6 @@ sub DeleteInputFiles($)
 			"      rsrcidx!='$rsrcidx'");
 	goto bad
 	    if (! $query_result);
-	next
-	    if ($query_result->numrows);
-
-	DBQueryWarn("delete from experiment_input_data ".
-		    "where idx='$input_data_idx'")
-	    or goto bad;
 
 	DBQueryWarn("delete from experiment_inputs ".
 		    "where input_data_idx='$input_data_idx'")
@@ -720,6 +714,12 @@ sub DeleteInputFiles($)
 			"where rsrcidx='$rsrcidx'")
 		or goto bad;
 	}
+	next
+	    if ($query_result->numrows);
+
+	DBQueryWarn("delete from experiment_input_data ".
+		    "where idx='$input_data_idx'")
+	    or goto bad;
     }
   done:
     DBQueryWarn("unlock tables");
