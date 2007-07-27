@@ -109,7 +109,7 @@ sub sighandler($);
 sub SignalProgAgents($);
 sub SendCompletionEvent();
 sub CheckForDeadNodes($);
-sub GenXML($$);
+sub GenXML($$$);
 
 #
 # Testbed Support libraries
@@ -525,25 +525,40 @@ if (defined($instance->runidx())) {
     my $tag          = "R${exptidx}-${runidx}_import";
     my $instance_tag = "I${exptidx}";
     my $xmlfile      = "$instance_dir/info.xml";
+    my @symlinklist  = ();
 
-    fatal(-1, "Could not generate XML description for $oldrun")
-	if (GenXML($instance, $xmlfile) != 0);
+    if (-e $cvsdir) {
+	fatal(-1, "Could not generate XML description for $oldrun")
+	    if (GenXML($instance, $xmlfile, \@symlinklist) != 0);
 
-    # This imports the experiment directory into the records subdir.
-    System("cd $instance_dir; ".
-	   "$CVSBIN -d $cvsdir import -I 'datastore' ".
-	   "  -m 'Import record for run $this_runid' ".
-	   "  $guid/records/$exptidx,$runidx ${tag}_branch $tag")
-	== 0 or fatal(-1, "Could not import new record into $cvsdir");
+	# Remove all the symlinks before the import. Bogus!
+	foreach my $ref (@symlinklist) {
+	    unlink($instance_dir . "/" . $ref->{'pathname'});
+	}
 
-    unlink($xmlfile);
+	# This imports the experiment directory into the records subdir.
+	System("cd $instance_dir; ".
+	       "$CVSBIN -d $cvsdir import -I 'datastore' ".
+	       "  -m 'Import record for run $this_runid' ".
+	       "  $guid/records/$exptidx,$runidx ${tag}_branch $tag")
+	    == 0 or fatal(-1, "Could not import new record into $cvsdir");
 
-    # Now tag it with the same tag that was applied for the instance.
-    # Apply to the branch tag directly instead of symbolically since that
-    # does not work properly for some reason. 
-    System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 ".
-	   "  $instance_tag $guid/records/$exptidx,$runidx")
-	== 0 or fatal(-1, "Could not rtag new record in $cvsdir");
+	unlink($xmlfile);
+
+	# Restore all the symlinks after the import. Bogus!
+	foreach my $ref (@symlinklist) {
+	    my $pathname  = $ref->{'pathname'};
+	    my $linkvalue = $ref->{'linkvalue'};
+	    symlink($linkvalue, "$instance_dir/$pathname");
+	}
+
+	# Now tag it with the same tag that was applied for the instance.
+	# Apply to the branch tag directly instead of symbolically since that
+	# does not work properly for some reason. 
+	System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 ".
+	       "  $instance_tag $guid/records/$exptidx,$runidx")
+	    == 0 or fatal(-1, "Could not rtag new record in $cvsdir");
+    }
 
     # This has to be done after the archive commit, so we can find the tag.
     $instance->FinalizeCurrentRun() == 0
@@ -1088,10 +1103,12 @@ sub CheckForDeadNodes($)
 # Callback to generate the file listing.
 #
 my @allfiles = ();
+my @symlinks = ();
 
 sub FindCallBack
 {
-    my $name = $_;
+    my $name    = $_;
+    my $linkval = "";
 
     return
 	if ($name eq "." || $name eq "..");
@@ -1099,8 +1116,23 @@ sub FindCallBack
     my $st = stat($name) or
 	fatal(-1, "Failed to stat $name!");
 
-    push(@allfiles, {'pathname' => "$File::Find::dir/$name",
+    # Force taint check
+    my $fullpath = "$File::Find::dir/$name";
+    if ($fullpath =~ /^(.*)$/) {
+	$fullpath = $1;
+    }
+    if (-l $name) {
+	$linkval = readlink($name);
+	if ($linkval =~ /^(.*)$/) {
+	    $linkval = $1;
+	}
+	push(@symlinks, {'pathname'  => $fullpath,
+			 'linkvalue' => $linkval});
+    }
+
+    push(@allfiles, {'pathname' => $fullpath,
 		     'mode'     => $st->mode,
+		     'linkval'  => $linkval,
 		     'uid'      => $st->uid,
 		     'gid'      => $st->gid,
 		     'atime'    => $st->atime,
@@ -1111,9 +1143,9 @@ sub FindCallBack
 #
 # Generate an XML file describing the just finished run.
 #
-sub GenXML($$)
+sub GenXML($$$)
 {
-    my ($instance, $outputfile) = @_;
+    my ($instance, $outputfile, $psymlinks) = @_;
     my $root     = {};
     my $template = $instance->GetTemplate();
     my $run      = $instance->CurrentRun();
@@ -1205,6 +1237,7 @@ sub GenXML($$)
 	print STDERR "*** Could not open $outputfile for writing";
 	return -1;
     }
+    @$psymlinks = @symlinks;
     return 0;
 }
 
