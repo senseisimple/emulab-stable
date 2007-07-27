@@ -711,7 +711,7 @@ sub DeleteInputFiles($)
 
 	if (defined($nsidx) && $nsidx == $input_data_idx) {
 	    DBQueryWarn("update experiment_resources set input_data_idx=NULL ".
-			"where rsrcidx='$rsrcidx'")
+			"where idx='$rsrcidx'")
 		or goto bad;
 	}
 	next
