@@ -25,7 +25,8 @@ my $query_result =
 while (my ($pid, $eid, $exptidx, $nsfile) = $query_result->fetchrow_array()) {
     my $experiment = Experiment->Lookup($exptidx);
     if (!defined($experiment)) {
-	die("Could not lookup experiment object for $exptidx\n");
+	print "Could not lookup experiment object for $exptidx\n";
+	next;
     }
     open(NSFILE, ">$tmpfile")
 	or die("Could not open $tmpfile for writing!\n");
