@@ -30,6 +30,29 @@ $| = 1;
 
 my %portinfo = ();
 
+#
+# Quick conversion from hex to char.  Note that if there's an odd number of
+# chars, we just process the last char c as "0x0c".
+#
+sub hextostr($) {
+    my $hstr = shift;
+    if (!defined($hstr)) {
+	return '';
+    }
+    my $retval = "";
+    my $len = length($hstr);
+    for (my $i = 0; $i < $len; $i += 2) {
+	my $ch = substr($hstr,$i,(($i + 2) == $len)?1:2);
+	$retval .= chr(hex($ch));
+	print "" . hex($ch) . ",";
+    }
+    print "\n";
+
+    print "converted $hstr to $retval\n";
+
+    return $retval;
+}
+
 # usage: rmcpctrl(type, cmd, nodes)
 # type = { "asf" } # can probably be extended to ipmi
 # cmd = { "cycle" | "on" | "off" }
@@ -111,6 +134,14 @@ sub rmcpctrl($$@) {
 		}
 	    }
 
+	    # if keys are in hex, convert them to char strings:
+	    if ($rkey =~ /^0x/) {
+		$rkey = hextostr(substr($rkey,2));
+	    }
+	    if ($gkey =~ /^0x/) {
+		$gkey = hextostr(substr($gkey,2));
+	    }
+	    
 	    if ($parallelize) {
 		if (my $pid = fork()) {
 		    push @kids, $pid;
