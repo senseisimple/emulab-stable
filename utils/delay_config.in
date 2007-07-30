@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -496,8 +496,10 @@ sub ChangeLinkDelayConfig() {
 	my $OS    = $row->{'OS'};
 
 	if ($OS eq "Linux") {
-	    die("*** $0:\n".
-		"    Oops, dynamic events do not yet work on Linux!\n");
+	    print STDERR
+		"*** $0:\n".
+		"    Oops, dynamic events do not yet work on Linux!\n";
+	    exit(2);
 	}
     }
 
