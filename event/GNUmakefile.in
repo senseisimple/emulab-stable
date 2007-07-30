@@ -40,6 +40,7 @@ install:
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
+	@$(MAKE) -C program-agent install
 
 client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
