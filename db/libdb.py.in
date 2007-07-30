@@ -456,7 +456,7 @@ def TBSetNodeHistory(nodeid, op, uid, pid, eid):
     
     return DBQueryWarn("insert into node_history set "
 		       "  history_id=0, node_id=%s, op=%s, "
-		       "  uid=%s, uid_idx=%s stamp=UNIX_TIMESTAMP(now()), "
+		       "  uid=%s, uid_idx=%s, stamp=UNIX_TIMESTAMP(now()), "
 		       "  exptidx=%s",
                        (nodeid,op,uid,idx,exptidx))
 
