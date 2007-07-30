@@ -599,6 +599,10 @@ if (!$modify || $needrepoinit) {
 	     "  -m 'Commit initial import back to head'")
 	== 0 or fatal(-1, "Could not commit to $cvsdir");
 
+    # No keyword subst.
+    System("cd $tmpdir; $CVSBIN -Q -d $cvsdir admin -kb")
+	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
+    
     #
     # Now tag the CVS repo with the current guid/vers so we can find it easily.
     #
@@ -696,6 +700,10 @@ else {
     System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
 	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
 
+    # No keyword subst.
+    System("cd $tmpdir; $CVSBIN -Q -d $cvsdir admin -kb")
+	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
+    
     #
     # Now tag the CVS repo with the current guid/vers so we can
     # find it easily.

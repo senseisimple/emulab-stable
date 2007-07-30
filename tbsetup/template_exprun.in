@@ -101,6 +101,8 @@ my $archcontrol = "$TB/bin/archive_control";
 my $eventcontrol= "$TB/bin/eventsys_control";
 my $tevc        = "$TB/bin/tevc";
 my $CVSBIN      = "/usr/bin/cvs";
+my $FIND        = "/usr/bin/find";
+my $RCS         = "/usr/bin/rcs";
 
 # Protos
 sub ParseArgs();
@@ -551,6 +553,14 @@ if (defined($instance->runidx())) {
 	    my $linkvalue = $ref->{'linkvalue'};
 	    symlink($linkvalue, "$instance_dir/$pathname");
 	}
+
+	# No keyword subst.
+	System("$FIND $cvsdir/$guid/records/$exptidx,$runidx ".
+	       "  -name '*,v' -print -exec $RCS -q -kb '{}' \\;")
+	    == 0 or fatal(-1, "Could not set -kb in $cvsdir");
+
+	# And kill the temp dir.
+	System("/bin/rm -rf $tmpdir");
 
 	# Now tag it with the same tag that was applied for the instance.
 	# Apply to the branch tag directly instead of symbolically since that
