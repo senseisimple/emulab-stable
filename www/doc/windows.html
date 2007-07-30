@@ -248,7 +248,8 @@ NetbiosOptions=2 </a>) and <i>DNS auto-registration</i> (<a
 href="http://support.microsoft.com/default.aspx?scid=kb;EN-US;q246804">
 DisableDynamicUpdate=1 </a>) are disabled to allow network <a
 href="../docwrapper.php3?docname=swapping.html#idleness"> idle detection </a>
-by the <code>slothd</code> service.  <i>TCP/IP address autoconfiguration</i>
+by the <a href="../kb-show.php3?xref_tag=slothd_details">
+<code>slothd</code></a> service.  <i>TCP/IP address autoconfiguration</i>
 is disabled (<a
 href="http://www.microsoft.com/resources/documentation/Windows/2000/server/reskit/en-us/Default.asp?url=/resources/documentation/Windows/2000/server/reskit/en-us/regentry/58861.asp">
 IPAutoconfigurationEnabled=0 </a>) so that unswitched interfaces like the
@@ -392,12 +393,13 @@ fails, by default it results in a <a href="../kb-show.php3?xref_tag=swapping">
 swap-in</a> or <a href="../kb-show.php3?xref_tag=swapmod"> swapmod</a>
 failure.  <p>
 
+<a href="../kb-show.php3?xref_tag=XP_boot">
 At boot time, the EmulabStartup service on Windows XP runs the
 <code>/usr/local/etc/emulab/rc/rc.bootsetup</code> script, logging output to
-<code>/var/log/bootsetup.log</code>.  If you're having swap-in problems and
+<code>/var/log/bootsetup.log</code>.</a>  If you're having swap-in problems and
 rc.bootsetup doesn't finish sending <code>ISUP</code> to Emulab within 10
 minutes, the node will be rebooted.  After a couple of reboot cycles without a
-<code>ISUP</code>, Emulab gives up on the node.  <p>
+<code>ISUP</code>, Emulab gives up on the node.<p>
 
 You can cause these boot-time problems to be nonfatal by adding this line to
 your <a href="../tutorial/docwrapper.php3?docname=nscommands.html"> ns file
@@ -641,7 +643,8 @@ files. (See <a href="http://en.wikipedia.org/wiki/Server_Message_Block">
 http://en.wikipedia.org/wiki/Server_Message_Block</a>.) <p>
 
 In Emulab, we normally disable NetBT on experiment nodes, because it chatters
-and messes up slothd network idle detection, and is not needed for the usual
+and messes up <a href="../kb-show.php3?xref_tag=slothd_details">
+<code>slothd</code></a> network idle detection, and is not needed for the usual
 SMB mounts of <code>/users</code>, <code>/proj</code>, and <code>/share</code>
 dirs, which are served from a Samba service on <b>fs</b>. <p>
 
