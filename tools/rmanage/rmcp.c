@@ -84,7 +84,7 @@ u_int8_t *swr_fill_str(char *str,int len) {
     u_int8_t *retval = NULL;
     retval = (u_int8_t *)malloc(sizeof(u_int8_t)*len);
     if (retval != NULL) {
-        strncpy((char *)retval,str,len);
+        memcpy((char *)retval,str,len);
     }
     return retval;
 }
@@ -911,7 +911,7 @@ rmcp_error_t rmcp_ctx_setsecure(rmcp_ctx_t *ctx,
 	    ctx->gen_key_len = gen_key_len;
 	}
     }
-
+    
     return retval;
 }
 
