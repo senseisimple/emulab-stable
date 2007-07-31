@@ -685,11 +685,11 @@ else {
 
     # Need to clear the -b (default branch) or else the merge
     # commit fails for some reason that makes no sense to me.
-    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir admin -b $guid") == 0
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b $guid") == 0
 	or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
     
     # Commit ...
-    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
+    System("cd $tmpdir/$guid/setup; $CVSBIN -d $cvsdir commit -f -R ".
 	   "  -r T${parent_guid}-${vers}_branch ".
 	   "  -m 'Commit merge with head'")
 	== 0 or fatal(-1, "Could not commit on $cvsdir");
@@ -697,18 +697,18 @@ else {
     #
     # Clear the default branch so that "update -A" takes user to trunk.
     #
-    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+    System("cd $tmpdir/$guid/setup; $CVSBIN -d $cvsdir admin -b")
 	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
 
     # No keyword subst.
-    System("cd $tmpdir; $CVSBIN -Q -d $cvsdir admin -kb")
+    System("cd $tmpdir/$guid/setup; $CVSBIN -Q -d $cvsdir admin -kb")
 	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
     
     #
     # Now tag the CVS repo with the current guid/vers so we can
     # find it easily.
     #
-    System("$CVSBIN -d $cvsdir rtag -n ".
+    System("$CVSBIN -d $cvsdir rtag -n ".	
 	   "  -r T${parent_guid}-${vers}_branch T${guid}-${vers} ".
 	   "  $guid/setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
