@@ -933,7 +933,8 @@ sub DumpDBGoo()
     # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
     # assumption, but maybe not always
     #
-    my $mysqldump   = "mysqldump -d $extraopts $DBNAME";
+    my $mysqldump   = "mysqldump -d $extraopts $DBNAME " .
+	"@FULLTABLES @NODETABLES @PROJTABLES @USERTABLES";
     system("$mysqldump 2> /dev/null > $schemafile");
 
     #
