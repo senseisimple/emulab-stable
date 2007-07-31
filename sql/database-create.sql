@@ -587,7 +587,7 @@ CREATE TABLE `experiment_resources` (
   `thumbnail` mediumblob,
   PRIMARY KEY  (`idx`),
   KEY `exptidx` (`exptidx`),
-  KEY `lastidx` (`lastidx`)
+  KEY `lastidx` (`lastidx`),
   KEY `inputdata` (`input_data_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
