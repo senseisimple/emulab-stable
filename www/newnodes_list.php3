@@ -32,6 +32,7 @@ if (! $isadmin) {
 # Verify page arguments.
 #
 $optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
+				 "remap",        PAGEARG_ARRAY,
 				 "delete",       PAGEARG_STRING,
 				 "calc",         PAGEARG_STRING,
 				 "create",       PAGEARG_STRING,
@@ -219,7 +220,7 @@ if (isset($research)) {
 	}
     }
     foreach ($mac_list as $mac => $switchport) {
-        if ($switchport["switch"]) {
+        if (isset($switchport["switch"])) {
 	    $extra_set = "";
 	    
             if ($ELABINELAB) {
