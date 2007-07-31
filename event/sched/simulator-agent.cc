@@ -353,7 +353,7 @@ static int real_send_report(simulator_agent_t sa, char *args, bool error_report)
 	
 	if (error_report) {
 		archive = false;
-	} else if (!(rc = event_arg_get(args, "ARCHIVE", &tmp)) > 0) {
+	} else if ((rc = event_arg_get(args, "ARCHIVE", &tmp)) > 0) {
 		if (rc == 4 && strncmp(tmp, "true", 4) == 0) {
 			archive = true;
 		} else if (rc == 5 && strncmp(tmp, "false", 5) == 0) {
