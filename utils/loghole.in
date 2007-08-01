@@ -2046,7 +2046,7 @@ def do_clean(args):
 
     # Parse action-specific options and arguments.
     try:
-        opts, args = getopt.getopt(args, "fner", [
+        opts, args = getopt.getopt(args, "fneR", [
             "force", "nodes", "experiment", "root", ])
         for opt, val in opts:
             if opt in ("-f", "--force"):
@@ -2064,7 +2064,7 @@ def do_clean(args):
                 confirm_msg = ("Are you sure you want to remove log files "
                                "from the experiment log directory? [y/N] ")
                 pass
-            elif opt in ("-r", "--root"):
+            elif opt in ("-R", "--root"):
                 as_root = True
             pass
         pass
