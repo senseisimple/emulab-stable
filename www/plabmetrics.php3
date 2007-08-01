@@ -2111,6 +2111,11 @@ function pm_parseuserquery($q,$debug = false) {
     foreach ($toka as $i) {
         # echo "needs = " . implode(',',$needs) . "; ";
 	$sneed = whichsat($i,$needs);
+	if ($sneed == '') {
+	    $errstr = "Parser error at token '$i'!";
+	    break;
+	}
+	
 	$needs = $trans[$sneed];
 	if (!isset($needs)) {
 	    $needs = array();
@@ -2118,11 +2123,6 @@ function pm_parseuserquery($q,$debug = false) {
 
         # echo "sneed = $sneed; newneeds = " . implode(',',$needs) . "<br>\n";
 
-	if ($sneed == '') {
-	    $errstr = "Malformed expression at token '$i'!";
-	    break;
-	}
-	
 	if ($sneed == 'ocont') {
 	    ++$oc;
 	    $retq .= '(';
