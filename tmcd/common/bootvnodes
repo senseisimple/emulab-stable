@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -259,6 +259,8 @@ system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
 # activity in another, the latter may be randomly killed off.
 #
 # Elegant solution: rename the mountd.pid file so mount cannot find it!
+# XXX hmm...mountd_sux hack above should take care of this, and we need
+# to hup mountd when we modify the exports file.
 #
 rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
     if (-e "/var/run/mountd.pid");
