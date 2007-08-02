@@ -8,6 +8,7 @@ use English;
 use Getopt::Std;
 
 my $FSTAB = "/etc/fstab";
+my $script = $0;
 
 #
 # Figure out if there is a swap device and add it to fstab.
@@ -125,6 +126,7 @@ sub addswap($$)
 	print STDERR "*** WARNING: could not add /dev/$dev to $FSTAB, ".
 	    "swap enabled this boot only\n";
     }
+    print FD "# the following added by $script\n";
     print FD "/dev/$dev\t\tnone\tswap\tsw\t0\t0\n";
     close(FD);
     print "Swap enabled\n";
