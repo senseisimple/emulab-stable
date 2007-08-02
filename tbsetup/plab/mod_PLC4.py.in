@@ -116,10 +116,11 @@ class NM3agent:
 
     pass
 
-#DEF_NM_DELEGATE_ACCT = "utah_nmcontrol"
-DEF_NM_DELEGATE_ACCT = "utah_elab_delegate"
-#DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
-DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
+DEF_NM_DELEGATE_ACCT = "utah_nmcontrol"
+DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
+TRY_SECONDARY_DEL_ACCT = True
+SECONDARY_NM_DELEGATE_ACCT = "utah_elab_delegate"
+SECONDARY_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
 DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no" \
                 " -oPasswordAuthentication=no -l %s -i %s %s"
 
@@ -162,6 +163,8 @@ class NM4agent:
         pass
 
     def _xcall(self,cmd,args=()):
+        int_try_secondary = False
+        
         self._open()
         try:
             if debug:
@@ -169,7 +172,10 @@ class NM4agent:
                 pass
             print >>self.__agentconn.tochild, xmlrpclib.dumps(args,cmd)
             self.__agentconn.tochild.close()
-            retval = xmlrpclib.loads(self.__agentconn.fromchild.read())
+            retval = self.__agentconn.fromchild.read()
+            #if retval == None or retval == '':
+            #    raise RuntimeError("no response from NM")
+            retval = xmlrpclib.loads(retval)
             if debug:
                 print "NM4: xmlrpc response(%s/%s): '%s'" % (self.nodeid,
                                                              self.IP,
@@ -181,9 +187,70 @@ class NM4agent:
                 pass
             self._close()
         except:
-            # always close; we can only send one xmlrpc request at a time
-            self._close()
-            raise
+            if self.__agentconn.poll() == -1:
+                # Try waiting for it...
+                self.__agentconn.wait()
+                pass
+
+            # If there's an exception, and if the child process returned 255
+            # (ssh failure), try forcing legacy (but only try that once, then
+            # raise)
+            # NOTE: ssh returns 255 to the shell, but python, or something,
+            # screws things up so that the low 8 bits get shifted 8 left.
+            if self.__agentconn.poll() == 65280:
+                print "Error: SSH failure to %s/%s" % (self.nodeid,self.IP)
+                self._close()
+                if not TRY_SECONDARY_DEL_ACCT:
+                    raise
+                else:
+                    int_try_secondary = True
+                pass
+            else:
+                # always close; we can only send one xmlrpc request at a time
+                self._close()
+                raise
+            pass
+
+        # If we're still alive now and we saw an ssh error, that means
+        # we decided to try via the secondary delegate account.
+        if int_try_secondary:
+            print "Trying secondary credentials:"
+            self.__agentconn = None
+            self.delacct = SECONDARY_NM_DELEGATE_ACCT
+            self.delkey = SECONDARY_NM_DELEGATE_KEY
+            self._open()
+            try:
+                if debug:
+                    print "NM4: xmlrpc send(%s/%s): %s" \
+                          % (self.nodeid,self.IP,cmd)
+                    pass
+                print >>self.__agentconn.tochild, xmlrpclib.dumps(args,cmd)
+                self.__agentconn.tochild.close()
+                retval = self.__agentconn.fromchild.read()
+                if retval == None or retval == '':
+                    raise RuntimeError("no response from NM")
+                retval = xmlrpclib.loads(retval)
+                if debug:
+                    print "NM4: xmlrpc response(%s/%s): '%s'" \
+                          % (self.nodeid,self.IP,str(retval))
+                    pass
+                self.__agentconn.wait()
+                if debug:
+                    print "NM4: xmlrpc done(%s/%s)" % (self.nodeid,self.IP)
+                    pass
+                self._close()
+            except:
+                if self.__agentconn.poll() == -1:
+                    # Try waiting for it...
+                    self.__agentconn.wait()
+                    pass
+                if self.__agentconn.poll() == 65280:
+                    print "Error: SSH failure to %s/%s" \
+                          % (self.nodeid,self.IP)
+                    pass
+                self._close()
+                raise
+            pass
         
         # XXX: we whack the retval to be compat with NMv3
         rret = retval[0][0]
