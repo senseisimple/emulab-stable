@@ -110,6 +110,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
 use Node;
 use NodeType;
 use libadminctrl;
@@ -719,6 +720,13 @@ my %vnode2rtabid = ();
 #
 ########################################################################
 
+
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal("Could not lookup experiment object!")
+}
+
 printdb "Generating TOP file.\n";
 TBDebugTimeStamp("TOP started");
 
@@ -727,7 +735,7 @@ TBDebugTimeStamp("TOP started");
 #
 if (!$toponly) {
     fatal("Failed admission control checks!")
-	if (!TBAdmissionControlCheck($UID, $pid, $eid, \%admission_control));
+	if (!TBAdmissionControlCheck(undef, $experiment, \%admission_control));
 }
 
 #

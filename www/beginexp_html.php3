@@ -40,7 +40,7 @@ $optargs = OptionalPageArguments("view_style", PAGEARG_STRING,
 				 "formfields", PAGEARG_ARRAY,
 				 "nsref", PAGEARG_INTEGER,
 				 "guid", PAGEARG_INTEGER,
-				 "copyid", PAGEARG_STRING);
+				 "copyid", PAGEARG_INTEGER);
 
 #
 # Handle pre-defined view styles

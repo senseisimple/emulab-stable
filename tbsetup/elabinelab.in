@@ -15,6 +15,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use Experiment;
+use User;
 
 #
 # Do things necessary for setting up inner elab experiment. 
@@ -78,9 +79,6 @@ if ($EUID != 0) {
 	"    Must be root! Maybe its a development version?\n");
 }
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
-
 # Locals
 my $SAVEUID     = $UID;
 my $workdir;
@@ -91,9 +89,6 @@ my $bossnode;
 my $fsnode;
 my $routernode;
 my @expnodes    = ();
-my $dbuid;
-my $user_name;
-my $user_email;
 my $query_result;
 my $inner_experiment;
 my $inner_nsfile;
@@ -144,6 +139,11 @@ if ($eid =~ /^([-\w]+)$/) {
 else {
     die("Tainted argument $eid!\n");
 }
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    die("*** $0:\n".
+	"    Could not map $pid/$eid to its object!\n");
+}
 $workdir = TBExptWorkDir($pid, $eid);
 $expdir = PROJROOT() . "/$pid/exp/$eid";
 
@@ -155,18 +155,14 @@ my $bosslogfile = "$workdir/bossnode.log";
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
-}
 TBDebugTimeStampsOn();
 
 #
@@ -499,7 +495,8 @@ if (defined($elabinelab_eid)) {
 	
     print "Starting experiment $pid/$elabinelab_eid on inner emulab.\n";
     TBDebugTimeStamp("Starting inner experiment");
-    system("$SSH -host $bossnode 'sudo -u $dbuid /usr/testbed/bin/batchexp ".
+    system("$SSH -host $bossnode ".
+	   " 'sudo -u $user_uid /usr/testbed/bin/batchexp ".
 	   "  -q -i $optarg -S \"ElabInElab Experiment\" ".
 	   "  -L \"ElabInElab ElabInElab\" -E \"ElabInElab Experiment\" ".
 	   "  -p $pid -e $elabinelab_eid $nsfilename'");
@@ -698,11 +695,11 @@ sub DumpDBGoo()
 		   "    Could not create table temp_$table\n");
 
 	if ($table eq "users") {
-	    $creator = ExpLeader($pid, $eid);
+	    my $creator_uid = $experiment->creator();
 	    
 	    DBQueryFatal("update temp_${table} set ".
 			 " admin=1 ".
-			 "where uid='$creator'");
+			 "where uid='$creator_uid'");
 	}
 
 	# Clean up ... these are created in the inner elab.

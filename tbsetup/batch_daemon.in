@@ -343,12 +343,18 @@ sub dosomething($$)
     $template= undef;
     
     # Locals
-    my $creator = $exphash->{'expt_head_uid'};
     my $experiment = Experiment->Lookup($pid, $eid);
     if (! defined($experiment)) {
 	print "Could not find experiment object! Skipping ...\n";
 	return -1;
     }
+    my $creator = $experiment->GetCreator();
+    if (! defined($creator)) {
+	print "Could not find creator object! Skipping ...\n";
+	return -1;
+    }
+    my $creator_uid = $creator->uid();
+    
     print "Doing a '$dowhat' to batch experiment $pid/$eid\n";
 
     # Clean before starting.
@@ -405,9 +411,8 @@ sub dosomething($$)
     #
     # Get some user information. 
     #
-    if (!UserDBInfo($creator, \$user_name, \$user_email)) {
-	fatal("DB Error getting user information for uid $creator");
-    }
+    $user_name  = $creator->name();
+    $user_email = $creator->email();
     
     chdir("$workdir") or
 	fatal("Could not cd into $workdir!");
@@ -416,8 +421,8 @@ sub dosomething($$)
     # Figure out the unix uid/gid that the experiment configuration is
     # going to run as. 
     #
-    (undef,undef,$unix_uid) = getpwnam($creator) or
-	fatal("No such user $creator");
+    (undef,undef,$unix_uid) = getpwnam($creator_uid) or
+	fatal("No such user $creator_uid");
     TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
 	fatal("No such group $pid/$gid");
 
@@ -426,12 +431,12 @@ sub dosomething($$)
     # thats the correct thing to do. Too bad perl does not have a getgrouplist
     # function like the C library.
     #
-    my $glist = `id -G $creator`;
+    my $glist = `id -G $creator_uid`;
     if ($glist =~ /^([\d ]*)$/) {
 	$glist = $1;
     }
     else {
-	fatal("Unexpected results from 'id -G $creator': $glist");
+	fatal("Unexpected results from 'id -G $creator_uid': $glist");
     }
     #
     # Remove current group from glist, then add gid twice at the front
@@ -451,8 +456,8 @@ sub dosomething($$)
     $GID            = $unix_gid;
     $EGID           = $glist;
     $EUID = $UID    = $unix_uid;
-    $ENV{'USER'}    = $creator;
-    $ENV{'LOGNAME'} = $creator;
+    $ENV{'USER'}    = $creator_uid;
+    $ENV{'LOGNAME'} = $creator_uid;
     
     if ($dowhat eq "start") {
 	startexp($exphash);

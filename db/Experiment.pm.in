@@ -34,6 +34,8 @@ use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $CONTROL	= "@USERNODE@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $PROJROOT    = "@PROJROOT_DIR@";
 my $EVENTSYS    = @EVENTSYS@;
 my $STAMPS      = @STAMPS@;
 my $TEVC	= "$TB/bin/tevc";
@@ -218,6 +220,8 @@ sub swapper_idx($)      { return field($_[0], 'swapper_idx');}
 sub use_ipassign($)     { return field($_[0], 'use_ipassign');}
 sub ipassign_args($)    { return field($_[0], 'ipassign_args');}
 sub security_level($)   { return field($_[0], 'security_level');}
+sub linktest_pid($)     { return field($_[0], 'linktest_pid');}
+sub linktest_level($)   { return field($_[0], 'linktest_level');}
 sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
 sub swapin_count($)	{ return stats($_[0], 'swapin_count'); }
 sub destroyed($)	{ return stats($_[0], 'destroyed'); }
@@ -258,6 +262,35 @@ sub AllActive($)
 	push(@result, $experiment);
     }
     return @result;
+}
+
+#
+# All experiments for a particular user. Class method.
+#
+sub UserExperimentList($$$)
+{
+    my ($class, $user, $plist) = @_;
+    my @result  = ();
+    my $uid_idx = $user->uid_idx();
+    
+    my $query_result =
+	DBQueryWarn("select idx from experiments ".
+		    "where creator_idx='$uid_idx' or swapper_idx='$uid_idx'");
+    return -1
+	if (! $query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $experiment = Experiment->Lookup($idx);
+
+	if (!defined($experiment)) {
+	    print STDERR "Experiment::UserExperimentList: ".
+		"No object for $idx!\n";
+	    return -1;
+	}
+	push(@result, $experiment);
+    }
+    @$plist = @result;
+    return 0;
 }
 
 # This is needed a lot.
@@ -527,11 +560,44 @@ sub Delete($;$)
     my $pid     = $self->pid();
     my $eid     = $self->eid();
     my $exptidx = $self->idx();
+    my $workdir = $self->WorkDir();
+    my $userdir = $self->UserDir();
 
     $purge = 0
 	if (!defined($purge));
 
-    TBExptDestroy($pid, $eid);
+    #
+    # Try to remove experiment directory. We allow for it not being there
+    # cause we often run the tb programs directly. We also allow for not
+    # having permission, in the case that an admin type is running this,
+    # in which case it won't be allowed cause of directory permissions. Thats
+    # okay since admin types should rarely end experiments in other projects.
+    #
+    print "Removing experiment directories ... \n";
+    if (defined($userdir) && system("/bin/rm -rf $userdir")) {
+	print "*** WARNING: Not able to remove $userdir\n";
+	print "             Someone will need to do this by hand.\n";
+	# NFS errors usually the result. Sometimes its cause there is
+	# someone in the directory, so its being held open.
+        libtestbed::SENDMAIL($TBOPS,
+			     "Experiment::Delete: Could not remove directory",
+			     "Could not remove $userdir.\n".
+			     "Someone will need to do this by hand.\n");
+    }
+    if (system("/bin/rm -rf $workdir")) {
+	print "*** WARNING: Not able to remove $workdir\n";
+	print "             Someone will need to do this by hand.\n";
+    }
+    # Yuck.
+    if ($pid ne $self->gid()) {
+	my $eidlink = "$PROJROOT/$pid/exp/$eid";
+	unlink($eidlink)
+	    if (-l $eidlink);
+    }
+    libArchive::TBDeleteExperimentArchive($pid, $eid);
+
+    DBQueryWarn("DELETE from experiments ".
+		"WHERE eid='$eid' and pid='$pid'");
 
     #
     # Mark experiment destroyed. This is a backup to End() below.
@@ -900,11 +966,42 @@ sub AccessCheck($$$)
     return -1
 	if (! ref($self));
 
-    my $uid = (ref($user) ? $user->uid() : $user);
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    if ($access_type < TB_EXPT_MIN ||
+	$access_type > TB_EXPT_MAX) {
+	die("*** Invalid access type: $access_type!");
+    }
 
-    return TBExptAccessCheck($uid, $pid, $eid, $access_type);
+    # Admins do whatever they want.
+    return 1
+	if ($user->IsAdmin());
+
+    my $group = $self->GetGroup();
+    return 0
+	if (!defined($group));
+    my $project = $self->GetProject();
+    return 0
+	if (!defined($project));
+
+    #
+    # An experiment may be destroyed by the experiment creator or the
+    # project/group leader.
+    #
+    my $mintrust;
+    
+    if ($access_type == TB_EXPT_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other people's experiments, including
+    # those in groups they do not belong to.
+    #
+    return TBMinTrust($group->Trust($user), $mintrust) ||
+	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT);
 }
 
 #
@@ -938,7 +1035,7 @@ sub GetProject($)
     my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     my $project = Project->Lookup($self->pid_idx());
@@ -958,7 +1055,7 @@ sub GetGroup($)
     my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     my $group = Group->Lookup($self->gid_idx());
@@ -1293,6 +1390,27 @@ sub SetLogFile($$)
 }
 
 #
+# Get the experiment logfile.
+#
+sub GetLogFile($$$)
+{
+    my ($self, $lognamep, $isopenp) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    $$lognamep = undef;
+
+    TBExptGetLogFile($pid, $eid, $lognamep, $isopenp)
+	or return -1;
+    return 0;
+}
+
+#
 # Mark the log as open so that the spew keeps looking for more output.
 # 
 sub OpenLogFile($)
@@ -1602,6 +1720,9 @@ sub PostSwap($$$$)
     return -1
 	if (! ref($self));
 
+    $flags = 0
+	if (!defined($flags));
+
     my $exptidx  = $self->idx();
     my $rsrcidx  = $self->rsrcidx();
     my $lastrsrc = $self->lastrsrc();
@@ -1622,11 +1743,11 @@ sub PostSwap($$$$)
     my $duration     = 0;
     my $prev_uid_idx = 0;
     my $prev_swapper = $swapper;
+    my $query_result;
 
     if ($which eq $EXPT_SWAPOUT ||
 	($which eq $EXPT_SWAPMOD &&
 	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
-	my $query_result;
 	
 	#
 	# If this is a swapout, we use the current resource record. If this
@@ -1704,7 +1825,7 @@ sub PostSwap($$$$)
 	$which eq $EXPT_SWAPIN ||
 	($which eq $EXPT_SWAPMOD &&
 	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
-	my $query_result =
+	$query_result =
 	    DBQueryWarn("select r.node_id,n.type,r.erole, ".
 			"     r.vname,n.phys_nodeid ".
 			"  from reserved as r ".
@@ -2124,7 +2245,7 @@ sub SetSwapInfo($$)
     my $pid = $self->pid();
     my $eid = $self->eid();
     
-    TBSetExpSwapTime($pid, $eid);
+    $self->SetSwapTime();
     $self->SetSwapper($user);
     return $self->Refresh();
 }
@@ -2162,8 +2283,24 @@ sub GetSwapper($)
     # Must be a real reference. 
     return undef
 	if (! ref($self));
+    return undef
+	if (! defined($self->swapper_idx()));
 
     return User->Lookup($self->swapper_idx());
+}
+
+#
+# Get creator (user) object.
+#
+sub GetCreator($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return User->Lookup($self->creator_idx());
 }
 
 #
@@ -2177,10 +2314,11 @@ sub SetSwapTime($)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
-    
-    TBSetExpSwapTime($pid, $eid);
+    my $idx = $self->idx();
+
+    return -1
+	if (!DBQueryWarn("update experiments set expt_swapped=now() ".
+			 "where idx='$idx'"));
     return 0;
 }
 
@@ -2205,18 +2343,23 @@ sub SetCancelFlag($$)
 #
 # Clear the panic bit.
 #
-sub ClearPanicBit($)
+sub SetPanicBit($$)
 {
-    my ($self) = @_;
+    my ($self, $onoff) = @_;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $idx = $self->idx();
+
+    $onoff = ($onoff ? 1 : 0);
+    my $when  = ($onoff ? "now()" : "NULL");
     
-    TBExptClearPanicBit($pid, $eid);
+    return -1
+	if (!DBQueryWarn("update experiments set ".
+			 "  paniced=$onoff,panic_date=$when ".
+			 "where idx='$idx'"));
     return 0;
 }
 
@@ -2235,6 +2378,24 @@ sub IsFirewalled($)
     my $eid = $self->eid();
 
     return TBExptFirewall($pid, $eid);
+}
+
+#
+# Get the firewall node name and port number for an experiment;
+# e.g., for use in an snmpit call.
+# Return 1 if successful, 0 on error.
+#
+sub FirewallAndPort($$$)
+{
+    my ($self, $fwnodep, $fwportp) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    TBExptFirewallAndPort($self->pid(), $self->eid(), $fwnodep, $fwportp)
+	or return -1;
+    return 0;
 }
 
 #
@@ -2693,6 +2854,92 @@ sub SetThumbNail($$)
 		
     return 0;
 }
+
+#
+# Check experiment to see if all nodes are linktest capable, returning
+# a list of nodes that are not.
+#
+sub LinkTestCapable($$)
+{
+    my ($self, $pref) = @_;
+    my @result = ();
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select v.vname, FIND_IN_SET('linktest',osfeatures) ".
+		    "  from virt_nodes as v ".
+		    "left join reserved as r on r.pid=v.pid and ".
+		    "     r.eid=v.eid and r.vname=v.vname ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join os_info as o on o.osid=n.def_boot_osid ".
+		    "where v.exptidx='$idx'");
+    return -1
+	if (!defined($query_result));
+
+    while (my ($vname,$gotlinktest) = $query_result->fetchrow_array()) {
+	if (! defined($gotlinktest) || !$gotlinktest) {
+	    push(@result, $vname);
+	}
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
+# Map vname to reserved node.
+#
+sub VnameToNode($$)
+{
+    my ($self, $vname) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select node_id from reserved ".
+		    "where exptidx='$idx' and vname='$vname'");
+
+    return undef
+	if (! $query_result ||
+	    ! $query_result->num_rows);
+
+    my ($node_id) = $query_result->fetchrow_array();    
+    return Node->Lookup($node_id);
+}
+
+#
+# Map vname to reserved node using the v2pmap table.
+#
+sub VnameToPmap($$)
+{
+    my ($self, $vname) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select node_id from v2pmap ".
+		    "where exptidx='$idx' and vname='$vname'");
+
+    return undef
+	if (! $query_result ||
+	    ! $query_result->num_rows);
+
+    my ($node_id) = $query_result->fetchrow_array();    
+    return Node->Lookup($node_id);
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

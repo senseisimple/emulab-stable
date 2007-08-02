@@ -53,6 +53,7 @@ use libArchive;
 use Template;
 use NodeType;
 use OSinfo;
+use User;
 
 TBDebugTimeStampsOn();
 
@@ -171,21 +172,15 @@ if ($UID && !TBAdmin($UID) &&
 }
 
 #
-# Verify user and get his DB uid.
-# XXX - copied from elsewhere: is this translation needed anymore?
+# Verify user and get his DB uid and other info for later.
 #
-my $dbuid;
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database.");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die_noretry("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user, in case we have to alert them about failures
-#
-my ($user_name,$user_email);
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_uid      = $this_user->uid();
+my $user_name     = $this_user->name();
+my $user_email    = $this_user->email();
 my $user_email_to = "$user_name <$user_email>";
 
 TBDebugTimeStamp("os_setup started");
@@ -575,7 +570,7 @@ if ($firewalled) {
 	# and whine to tbops.
 	#
 	MarkNodeDown($node);
-	TBSetNodeLogEntry($node, $dbuid, TB_DEFAULT_NODELOGTYPE(),
+	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
 			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
@@ -936,7 +931,7 @@ while ( @nodelist ) {
     if (! TBOsidToPid($osids{$node}, \$pidofosid) ||
 	$pidofosid eq TBOPSPID()) {
 	MarkNodeDown($node);
-	TBSetNodeLogEntry($node, $dbuid, TB_DEFAULT_NODELOGTYPE(),
+	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
 			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
@@ -1159,7 +1154,7 @@ elsif (@vnodelist) {
 	    # XXX Need to deal with the same pnode being used twice.
 	    #
 	    MarkPhysNodeDown($pnode);
-	    TBSetNodeLogEntry($pnode, $dbuid, TB_DEFAULT_NODELOGTYPE(),
+	    TBSetNodeLogEntry($pnode, $user_uid, TB_DEFAULT_NODELOGTYPE(),
 			      "'Moved to hwdown; ".
 			      "$node ($pid/$eid) failed to setup'");
 	}

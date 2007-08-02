@@ -26,6 +26,7 @@ my $TB     = "@prefix@";
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libdb;
+use Experiment;
 
 my $nalloc      = "$TB/bin/nalloc";
 my $debug       = 0;
@@ -71,14 +72,12 @@ if ($UID && !TBAdmin($UID)) {
   die("Only root or TB administrators can schedule reservations.\n");
 }
 
-if (! ExpLeader($pid,$eid)) {
-    die("You experiment $pid/$eid does not exist.\n");
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid in the Emulab Database.\n");
 }
-
-my $exptidx;
-if (!TBExptIDX($pid, $eid, \$exptidx)) {
-    die("No such experiment $pid/$eid!\n");
-}
+my $exptidx = $experiment->idx();
 
 foreach my $node (@nodes) {
   my $pc = $node;

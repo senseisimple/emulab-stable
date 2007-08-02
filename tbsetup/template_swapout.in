@@ -56,10 +56,7 @@ my $TBBASE	= "@TBBASE@";
 my $STAMPS      = @STAMPS@;
 
 # Locals
-my $user_name;
-my $user_email;
 my $pid;
-my $dbuid;
 my $logname;
 my $exptidx;
 my $template;
@@ -112,18 +109,13 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_uid   = $this_user->uid();
 
 # Now parse arguments.
 ParseArgs();
@@ -145,7 +137,7 @@ $template = Template->Lookup($guid, $version);
 if (!defined($template)) {
     tbdie("Experiment template $guid/$version does not exist!");
 }
-if (! TBProjAccessCheck($dbuid,
+if (! TBProjAccessCheck($user_uid,
 			$template->pid(), $template->gid(),
 			TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to terminate template instance ".

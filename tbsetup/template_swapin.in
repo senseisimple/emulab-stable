@@ -287,13 +287,15 @@ if (! ($foreground || $experiment->batchmode())) {
     AddAuditInfo("failure_frag", "T. Swapin Failure");
     AddAuditInfo("success_frag", "T. Swapped In");
 
-    my $expt_head_login = $experiment->creator();
-    my $expt_head_name;
-    my $expt_head_email;
-    if (UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
+    my $creator = $experiment->GetCreator();
+    if (defined($creator)) {
+	my $expt_head_name  = $creator->name();
+	my $expt_head_email = $creator->email();
+	
 	AddAuditInfo("cc", "$expt_head_name <$expt_head_email>");
-    } else {
-	tbwarn("Could not determine name/email for $expt_head_login.");
+    }
+    else {
+	tbwarn("Could not determine name/email for experiment creator");
     }
 }
 

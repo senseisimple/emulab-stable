@@ -27,7 +27,6 @@ my $CONTROL  = "@USERNODE@";
 
 # Locals
 my $SAVEUID  = $UID;
-my $dbuid;
 my $outfile = "nsltmap";
 
 #
@@ -59,6 +58,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
 
 if (@ARGV != 4) {
     usage();
@@ -101,15 +101,17 @@ else {
 # Get DB uid for sending over to ops. In testmode, it runs locally
 # as the user running the testsuite, obviously.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
     tbdie("You do not exist in the Emulab Database!");
 }
+my $user_uid = $this_user->uid();
 
 # Run as the user for most of this script.
 $EUID = $UID;
 
 my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
-$cmdargs .= " -u $dbuid -v -- $pid $gid $eid";
+$cmdargs .= " -u $user_uid -v -- $pid $gid $eid";
 
 # create the output file as the user for quota purposes
 unlink $outfile;

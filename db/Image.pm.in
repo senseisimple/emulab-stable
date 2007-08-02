@@ -17,6 +17,8 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use Project;
+use Group;
 use User;
 use English;
 use Data::Dumper;
@@ -213,19 +215,108 @@ sub Update($$)
 }
 
 #
-# Check permissions.
+# Load the project object for an image
+#
+sub GetProject($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $project = Project->Lookup($self->pid_idx());
+    
+    if (! defined($project)) {
+	print("*** WARNING: Could not lookup project object for $self!", 1);
+	return undef;
+    }
+    return $project;
+}
+
+#
+# Load the group object for an image
+#
+sub GetGroup($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $group = Group->Lookup($self->gid_idx());
+    
+    if (! defined($group)) {
+	print("*** WARNING: Could not lookup group object for $self!", 1);
+	return undef;
+    }
+    return $group;
+}
+
+#
+# Check permissions. Note that root may ask permission, which comes in
+# as an undef user.
 #
 sub AccessCheck($$$)
 {
     my ($self, $user, $access_type) = @_;
 
     # Must be a real reference. 
-    return -1
+    return 0
 	if (! ref($self));
 
-    my $uid = (ref($user) ? $user->uid() : $user);
+    if ($access_type < TB_IMAGEID_MIN || $access_type > TB_IMAGEID_MAX) {
+	print "*** Invalid access type $access_type!\n";
+	return 0;
+    }
+    # Admins and root do whatever they want.
+    return 1
+	if ((defined($user) && $user->IsAdmin()) ||
+	    ($UID == 0 || $UID eq "root"));
 
-    return TBImageIDAccessCheck($uid, $self->imageid(), $access_type);
+    my $mintrust;
+    
+    #
+    # Global ImageIDs can be read by anyone.
+    #
+    if ($self->global()) {
+	if ($access_type == TB_IMAGEID_READINFO) {
+	    return 1;
+	}
+	return 0;
+    }
+
+    my $project = $self->GetProject();
+    return 0
+	if (!defined($project));
+    my $group = $self->GetGroup();
+    return 0
+	if (!defined($group));
+
+    #
+    # Otherwise must have proper trust in the group
+    #
+    if ($access_type == TB_IMAGEID_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+        #
+        # Shared imageids are readable by anyone in the project.
+        #
+	if ($self->shared()) {
+	    $group = $project->GetProjectGroup();
+	}
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other people's experiments, including
+    # those in groups they do not belong to.
+    #
+    return TBMinTrust($group->Trust($user), $mintrust) ||
+	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT);
 }
 
 #
@@ -276,6 +367,26 @@ sub KeepBusy($)
 
     DBQueryFatal("update images set load_busy=GREATEST(load_busy,1) " .
 		 "where imageid='$imageid'");
+
+    return 0;
+}
+
+#
+# Mark the update time in the record,
+#
+sub MarkUpdateTime($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $imageid = $self->imageid();
+
+    return -1
+	if (! DBQueryWarn("update images set updated=now() " .
+			  "where imageid='$imageid'"));
 
     return 0;
 }

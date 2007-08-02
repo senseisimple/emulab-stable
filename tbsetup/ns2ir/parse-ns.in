@@ -45,7 +45,7 @@ my $TESTMODE = @TESTMODE@;
 my $infile   = "parse.input";
 my $outfile  = "parse.output";
 my $SAVEUID  = $UID;
-my $dbuid;
+my $this_user;
 my $pid;
 my $gid;
 my $eid;
@@ -90,6 +90,7 @@ use libtblog qw(dblog *SERR);
 use NodeType;
 use Template;
 use Experiment;
+use User;
 
 use constant false => 0;
 use constant true  => 1;
@@ -174,8 +175,9 @@ if (!$TESTMODE) {
     # Get DB uid for sending over to ops. In testmode, it runs locally
     # as the user running the testsuite, obviously.
     #
-    if (! UNIX2DBUID($UID, \$dbuid)) {
-	tbdie("You do not exist in the Emulab Database!");
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	tbdie("You ($UID) do not exist!");
     }
 
     # Run as the user for most of this script.
@@ -206,8 +208,8 @@ system("touch $outfile") == 0 or
 # user ID to flip to, when not in testmode.
 #
 my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
-$cmdargs .= " -u $dbuid"
-    if (defined($dbuid));
+$cmdargs .= " -u " . $this_user->uid() . " "
+    if (defined($this_user));
 $cmdargs .= " -- ";
 $cmdargs .= " -a"
     if ($anonmode);

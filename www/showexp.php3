@@ -493,10 +493,8 @@ if (! $instance) {
 		       "showstats.php3?showby=expt&exptidx=$expindex");
 }
 
-if (!$instance && STUDLY()) {
-    WRITESUBMENUBUTTON("Duplicate Experiment",
-		       "beginexp_html.php3?copyid=${exp_pid},${exp_eid}");
-}
+WRITESUBMENUBUTTON("Duplicate Experiment",
+		   "beginexp_html.php3?copyid=$expindex");
 
 if ($EXPOSEARCHIVE && !$instance) {
     WRITESUBMENUBUTTON("Experiment File Archive",

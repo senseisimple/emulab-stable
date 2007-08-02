@@ -307,6 +307,17 @@ my $user_email = $this_user->email();
 my $isadmin    = TBAdmin();
 
 #
+# Get email address of the swapper/creator, which may be different than
+# the person who is actually terminating the experiment, since its polite
+# to let the original creator know whats going on. 
+#
+my $swapper = $experiment->GetSwapper();
+$swapper = $experiment->GetCreator()
+    if (!defined($swapper));
+my $expt_head_name  = $swapper->name();
+my $expt_head_email = $swapper->email();
+
+#
 # Set error reporting info
 #
 tblog_set_info($pid,$eid,$UID);
@@ -316,7 +327,7 @@ tblog_set_info($pid,$eid,$UID);
 # Note that any script down the line has to do an admin check also. 
 #
 if ($UID && !$isadmin &&
-    ! $experiment->AccessCheck($user_uid, TB_EXPT_DESTROY)) {
+    ! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
     tbdie("You do not have permission to swap or modify this experiment!");
 }
 
@@ -372,7 +383,6 @@ $experiment->LockTables("experiments write") == 0
     or die("*** $0:\n".
 	   "    Could not lock experiment tables for $pid/$eid!\n");
 
-my $expt_head_login = $experiment->creator();
 my $estate          = $experiment->state();
 my $batchstate      = $experiment->batchstate();
 my $expt_path       = $experiment->path();
@@ -750,20 +760,6 @@ if ($inout eq "modify") {
 }
 
 #
-# Get email address of the experiment head, which may be different than
-# the person who is actually terminating the experiment, since its polite
-# to let the original creator know whats going on. 
-#
-my $expt_head_name;
-my $expt_head_email;
-
-if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
-    tbwarn("Could not determine name/email for $expt_head_login.");
-    $expt_head_name  = "TBOPS";
-    $expt_head_email = $TBOPS;
-}
-
-#
 # Before going to background, we have to copy out the NS file!
 #
 if ($inout eq "modify" && defined($modnsfile)) {
@@ -933,7 +929,7 @@ if ($inout eq "out") {
 		  error => ['set_experiment_state_failed', EXPTSTATE_SWAPPED()]},
 	         "Failed to set experiment state to " . EXPTSTATE_SWAPPED());
     
-    $experiment->ClearPanicBit() == 0
+    $experiment->SetPanicBit(0) == 0
 	or fatal("Failed to clear the panic bit!");
 }
 elsif ($inout eq "in") {

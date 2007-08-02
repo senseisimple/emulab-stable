@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,7 +42,6 @@ my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 
 # Locals
-my $dbuid;
 my $template;
 my $instance;
 # For the END block below.
@@ -67,6 +66,7 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Template;
+use User;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -84,11 +84,13 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
 
 # Now parse arguments.
 ParseArgs();
@@ -101,7 +103,7 @@ $template = Template->Lookup($template_guid, $template_vers);
 if (!defined($template)) {
     tbdie("Experiment template $template_guid/$template_vers does not exist!");
 }
-if (! TBProjAccessCheck($dbuid,
+if (! TBProjAccessCheck($user_uid,
 			$template->pid(), $template->gid(),
 			TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to add metadata to template ".

@@ -56,6 +56,7 @@ use libadminmfs;
 use libtblog;
 use libArchive;
 use Experiment;
+use User;
 
 #require exitonwarn; # exitonwarn isn't really a module, so just require it
 
@@ -176,11 +177,16 @@ tblog_set_info($pid,$eid,$UID);
 #
 TBDebugTimeStampsOn();
 
-# Need this below.
-my ($dbuid, $uname, $umail);
-if (UNIX2DBUID($UID, \$dbuid)) {
-    UserDBInfo($dbuid, \$uname, \$umail);
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 # Slowly convert to using Experiment module.
 my $experiment = Experiment->Lookup($pid, $eid);
@@ -257,7 +263,7 @@ elsif ($swapop eq "update") {
     # more stringent check using assign.
     #
     print STDERR "Checking with Admission Control ...\n";
-    if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
+    if (! TBAdmissionControlCheck(undef, $experiment, undef)) {
 	tberror({type => 'secondary', severity => SEV_SECONDARY,
 		 error => ['admission_control_failure']},
 		"Admission control failure!\n");
@@ -359,7 +365,7 @@ elsif ($swapop eq "in") {
     # a more stringent check using assign.
     #
     print STDERR "Checking with Admission Control ...\n";
-    if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
+    if (! TBAdmissionControlCheck(undef, $experiment, undef)) {
 	tberror({type => 'secondary', severity => SEV_SECONDARY,
 		 error => ['admission_control_failure']},
 		"Admission control failure!\n");
@@ -1773,16 +1779,16 @@ done:
 	}
 
 	tberror "$fwerr" . "\nINFORMING $TBOPS!";
-	if (defined($umail)) {
-	    SENDMAIL("$uname <$umail>",
+	if (defined($user_email)) {
+	    SENDMAIL("$user_name <$user_email>",
 		     "Firewalled experiment $op failed".
 		     " for $pid/$eid",
 		     "$op of firewalled experiment $pid/$eid".
-		     " by $dbuid failed!\n".
+		     " by $user_uid failed!\n".
 		     "Admin intervention required:\n\n$fwerr\n\n".
 		     "Current state of @nodes:\n\n".
 		     join("\n", @fwstate) . "\n",
-		     "$uname <$umail>",
+		     "$user_name <$user_email>",
 		     "Cc: $TBOPS");
 	}
 	return 1;

@@ -4,6 +4,7 @@
 # Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -59,8 +60,13 @@ if ($UID == 0) {
 	"    Please do not run this as root! Its already setuid!\n");
 }
 
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
 # Only admin types!
-if (!TBAdmin()) {
+if (! $this_user->IsAdmin()) {
     die("*** $0:\n".
 	"    Only TB administrators can run this script!\n");
 }
@@ -69,7 +75,7 @@ if (!TBAdmin()) {
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -105,12 +111,6 @@ if (! defined($pid)) {
 my $target_user = User->Lookup($newuid);
 if (! defined($target_user)) {
     fatal("$newuid does not exist!");
-}
-
-# Map invoking user to object.
-my $this_user = User->LookupByUnixId($UID);
-if (! defined($this_user)) {
-    fatal("You ($UID) do not exist!");
 }
 
 #

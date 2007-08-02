@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -26,10 +26,11 @@ my $sshtb	= "$TB/bin/sshtb";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
+use User;
 
 # Locals
 my $SAVEUID = $UID;
-my $dbuid;
 
 #
 # Turn off line buffering on output
@@ -79,20 +80,29 @@ if ($eid =~ /^([-\w]+)$/) {
 else {
     die("*** Bad data in eid: $eid.\n");
 }
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    die("*** $0:\n".
+	"    Could not lookup experiment object!\n");
+}
 
-# Must exist in the DB.
-if (! UNIX2DBUID($UID, \$dbuid)) {
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
     die("*** $0:\n".
 	"    You do not exist in the Emulab Database!\n");
 }
+my $user_uid   = $this_user->uid();
 
 #
 # Verify permission to muck with this experiment. This is to head off
 # permission problems early; the nodes are indvidually checked later
 # in the library.
 #
-if (!TBAdmin($UID) &&
-    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+if (!$this_user->IsAdmin() &&
+    !$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
     die("*** $0:\n".
 	"    You do not have permission to save log files in $pid/$eid!\n");
 }
@@ -115,7 +125,7 @@ if ($query_result->numrows == 0) {
 }
 
 my $savedir = PROJROOT() . "/$pid/tiplogs/$eid";
-my $cmdargs = "$TB/sbin/savelogs.proxy -u $dbuid -s $savedir ";
+my $cmdargs = "$TB/sbin/savelogs.proxy -u $user_uid -s $savedir ";
 
 while (my ($nodeid, $vname) = $query_result->fetchrow_array()) {
     $cmdargs .= " $nodeid $vname";

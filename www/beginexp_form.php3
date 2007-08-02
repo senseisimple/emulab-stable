@@ -24,54 +24,7 @@ function INITFORM($formfields, $projlist)
     # This is for experiment copying ...
     #
     if (isset($copyid) && $copyid != "") {
-	unset($copypid);
-	unset($copyeid);
-	
-	#
-	# See what kind of copy.
-	#
-	if (preg_match("/^(\d+)(?::([-\w]*))?$/", $copyid, $matches)) {
-	    $exptidx = $matches[1];
-	    
-            #
-	    # See if its a current experiment.
-	    #
-	    if (($experiment = Experiment::Lookup($exptidx))) {
-		$copypid = $experiment->pid();
-		$copyeid = $experiment->eid();
-	    }
-	}
-	elseif (preg_match("/^([-\w]+),([-\w]+)(?::([-\w]*))?$/",
-		       $copyid, $matches)) {
-	    $copypid = $matches[1];
-	    $copyeid = $matches[2];
-	}
-
-	#
-	# Current experiment; we can get some additional stuff.
-	#
-	if (isset($copypid) && isset($copyeid)) {
-            #
-	    # See if its a current experiment.
-	    #
-	    if (($experiment =
-		 Experiment::LookupByPidEid($copypid, $copyeid))) {
-		$defaults["exp_description"] = $experiment->description();
-	    }
-	    
-	    # See if already a copy.
-	    if (preg_match("/^([-\w]*)-Copy(\d*)$/", $copyeid, $matches2)) {
-		$copyeid   = $matches2[1];
-		$copycount = "Copy" . (((int) $matches2[2]) + 1);
-	    }
-	    else
-		$copycount = "Copy0";
-
-	    $defaults["exp_pid"] = $copypid;
-	    $defaults["exp_id"]  = "${copyeid}-${copycount}";
-	}
 	$defaults["copyid"] = $copyid;
-	$defaults["exp_branch"] = 0;
     }
     else {
 	unset($copyid);
@@ -435,10 +388,10 @@ function SPITFORM($formfields, $errors)
 	$copyid = $formfields['copyid'];
 
 	echo "<tr>
-               <td class='pad4'>Copy of experiment: &nbsp</td>
+               <td class='pad4'>Copy of experiment $copyid: &nbsp</td>
                <td class='pad4'>
                    <a target=nsfile href=spitnsdata.php3?copyid=$copyid>
-                      $copyid</a>\n";
+                      Click for NS File</a>\n";
 
         echo "  </td>
                 <input type=hidden name=\"formfields[copyid]\" value='$copyid'>

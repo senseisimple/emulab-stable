@@ -37,6 +37,7 @@ my $template_swapout = "$TB/bin/template_swapout";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Template;
 use Experiment;
 
 # Protos.

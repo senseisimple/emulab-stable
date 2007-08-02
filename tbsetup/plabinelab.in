@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -12,6 +12,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
 
 #
 # Do things necessary for setting up inner elab experiment. 
@@ -58,13 +59,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 $| = 1;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
-
 # Locals
-my $dbuid;
-my $user_name;
-my $user_email;
 my $query_result;
 
 #
@@ -109,19 +104,11 @@ else {
 }
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
-}
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
 
 TBDebugTimeStampsOn();

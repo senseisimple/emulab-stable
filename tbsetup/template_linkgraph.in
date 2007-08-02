@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -65,7 +65,6 @@ my $dbcontrol   = "$TB/sbin/opsdb_control";
 my $tempanalyze = "$TB/bin/template_analyze";
 
 # Locals
-my $dbuid;
 my $template;
 my $instance;
 my $archive_tag;
@@ -84,6 +83,7 @@ use libtestbed;
 use libtblog;
 use Template;
 use Experiment;
+use User;
 
 # In libdb
 my $projroot = PROJROOT();
@@ -108,11 +108,13 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
 
 # Now parse arguments.
 ParseArgs();
@@ -128,7 +130,7 @@ $template = Template->Lookup($guid, $version);
 if (!defined($template)) {
     tbdie("Experiment template $guid/$version does not exist!");
 }
-if (! TBProjAccessCheck($dbuid,
+if (! TBProjAccessCheck($user_uid,
 			$template->pid(), $template->gid(),
 			TB_PROJECT_READINFO)) {
     tberror("You do not have permission to export template $guid/$version");
@@ -146,7 +148,7 @@ if ($instance->ArchiveTag(\$archive_tag) < 0) {
     fatal(-1, "Could not get current archive tag for instance $exptidx!");
 }
 
-if (system("$checkquota $dbuid") != 0) {
+if (system("$checkquota $user_uid") != 0) {
     tberror("You are over your disk quota on $CONTROL; ".
 	    "please login there and cleanup!");
     exit(1);

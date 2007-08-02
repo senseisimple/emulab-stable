@@ -333,7 +333,7 @@ if ($nsfilelocale == "copyid") {
 	    $extragroups = ",$copypid";
     }
     
-    $thensfile = "-c " . $formfields['copyid'];
+    $thensfile = "-c " . escapeshellarg($formfields['copyid']);
 }
 elseif ($nsfilelocale == "local") {
     #

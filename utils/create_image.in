@@ -1,11 +1,9 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 use POSIX qw(setsid);
@@ -66,7 +64,10 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libadminmfs;
+use Experiment;
 use Node;
+use User;
+use Image;
 
 #
 # Turn off line buffering on output
@@ -93,20 +94,16 @@ my $def_devnum	= 0;
 my $devtype;
 my $devnum;
 my $mereuser    = 0;
-my %imageid_row = ();
 my $debug       = 0;
-my $imageid;
 my $imagepid    = TB_OPSPID;
 my $logname;
-my @row;
-my $dbuid;
 my $needcleanup = 0;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -118,17 +115,17 @@ if (@ARGV != 2) {
 }
 
 my $imagename  = $ARGV[0];
-my $node       = $ARGV[1];
+my $node_id    = $ARGV[1];
 
 #
 # Untaint the arguments.
 #
-if ($node =~ /^([-\w]+)$/) {
-    $node = $1;
+if ($node_id =~ /^([-\w]+)$/) {
+    $node_id = $1;
 }
 else {
     die("*** $0:\n".
-	"    Bad data in $node\n");
+	"    Bad data in $node_id\n");
 }
 
 if ($imagename =~ /^([-\w\.\+]+)$/) {
@@ -152,28 +149,26 @@ if (defined($options{"p"})) {
 }
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
-#
-# Valid Node ID?
-#
-if (! TBValidNodeName($node)) {
+# Check node and permission
+my $node = Node->Lookup($node_id);
+if (!defined($node)) {
     die("*** $0:\n".
-	"    Invalid node name $node!\n");
+	"    Invalid node name $node_id!\n");
 }
-
-#
-# Verify Permission.
-#
-if ($UID && !TBAdmin($UID)) {
+if ($UID && ! $this_user->IsAdmin()) {
     $mereuser = 1;
 
-    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, $node)) {
+    if (! $node->AccessCheck($this_user, TB_NODEACCESS_LOADIMAGE)) {
 	die("*** $0:\n".
 	    "    You do not have permission to create an image from $node\n");
     }
@@ -183,20 +178,10 @@ if ($UID && !TBAdmin($UID)) {
 # Before doing anything else, check for overquota ... lets not waste
 # our time. Make sure user sees the error by exiting with 1.
 #
-if (system("$checkquota $dbuid") != 0) {
+if (system("$checkquota $user_uid") != 0) {
     die("*** $0:\n".
 	"    You are over your disk quota on $CONTROL; ".
 	"please login there and cleanup!\n");
-}
-
-#
-# Get email info for user.
-#
-my $user_name;
-my $user_email;
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine user name and email address!\n");
 }
 
 #
@@ -204,31 +189,28 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 # output file has to be the node project directory, since that is the
 # directory that is going to be NFS mounted by default.
 #
-my $pid;
-my $eid;
-if (! NodeidToExp($node, \$pid, \$eid)) {
+my $experiment = $node->Reservation();
+if (!defined($experiment)) {
     die("*** $0:\n".
-	"    Could not map $node to its project and experiment ID!\n");
+	"    Could not map $node to its experiment object!\n");
 }
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
 
 #
 # Grab the imageid description from the DB. We do a permission check, but
 # mostly to avoid hard to track errors that would result if the user picked
 # the wrong one (which is likely to happen no matter what I do).
 #
-$db_result =
-    DBQueryFatal("select * from images where ".
-		 "pid='$imagepid' and imagename='$imagename'");
-    
-if ($db_result->numrows < 1) {
+my $image = Image->Lookup($imagepid, $imagename);
+if (!defined($image)) {
     die("*** $0:\n".
 	"    No such image descriptor $imagename in project $imagepid!\n");
 }
-%imageid_row = $db_result->fetchhash();
-$imageid = $imageid_row{'imageid'};
+my $imageid = $image->imageid();
 
 if ($mereuser &&
-    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
+    ! $image->AccessCheck($this_user, TB_IMAGEID_ACCESS)) {
     die("*** $0:\n".
 	"    You do not have permission to use imageid $imageid!\n");
 }
@@ -237,8 +219,8 @@ if ($mereuser &&
 # Make sure that the directory exists and is writeable for the user.
 # We test this by creating the file. Its going to get wiped anyway.
 #
-my $filename = $imageid_row{'path'};
-my $isglobal = $imageid_row{'global'};
+my $filename = $image->path();
+my $isglobal = $image->global();
 
 #
 # Redirect pathname for global images.
@@ -309,36 +291,31 @@ close(FILE) or
 #
 # Get the disktype for this node
 #
-my $nodeobject = Node->Lookup($node);
-if (!defined($nodeobject)) {
-    die("*** $0:\n".
-	"    Could not Lookup $node\n");
-}
-$nodeobject->disktype(\$devtype);
-$nodeobject->bootdisk_unit(\$devnum);
+$node->disktype(\$devtype);
+$node->bootdisk_unit(\$devnum);
 
 $devtype = $def_devtype
     if (!defined($devtype));
 $devnum = $def_devnum
     if (!defined($devnum));
-
 my $device = "/dev/${devtype}${devnum}";
 
 #
 # Record when this image was updated, so that we can figure out which
 # revision of the testbed image it was based off.
 #
-DBQueryFatal("update images set updated=now() where ".
-	     "pid='$imagepid' and imagename='$imagename'");
-
+$node->MarkUpdateTime() == 0 or
+    die("*** $0:\n".
+	"    Could not mark the update time in $image\n");
+    
 #
 # Okay, we want to build up a command line that will run the script on
 # on the client node. We use the imageid description to determine what
 # slice (or perhaps the entire disk) is going to be zipped up. We do not
 # allow arbitrary combos of course. 
 #
-my $startslice = $imageid_row{'loadpart'};
-my $loadlength = $imageid_row{'loadlength'};
+my $startslice = $image->loadpart();
+my $loadlength = $image->loadlength();
 my $command    = "$createimage ";
 
 if ($startslice || $loadlength == 1) {
@@ -354,15 +331,15 @@ else {
 if (!$debug) {
     $logname = TBMakeLogname("create-image-$pid-$eid");
 
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    $experiment->SetLogFile($logname);
+    $experiment->OpenLogFile();
 
     if (my $childpid = TBBackGround($logname)) {
 	#
 	# Parent exits normally, except if in waitmode. 
 	#
 	if (!$waitmode) {
-	    print("Your image from $node is being created\n".
+	    print("Your image from $node_id is being created\n".
 		  "You will be notified via email when the image has been\n".
 		  "completed, and you can load the image on another node.\n");
 	    exit(0);
@@ -407,7 +384,7 @@ if ($waitmode) {
 $needcleanup = 1;
 
 # Clear the bootlog; see below.
-DBQueryFatal("delete from node_bootlogs where node_id='$node'");
+$node->ClearBootLog();
 
 #
 # Reboot into admin mode and run the command.
@@ -434,7 +411,7 @@ my $result;
 my $retry = 1;
 while ($retry) {
     $retry = 0;
-    if (TBAdminMfsRunCmd(\%args, undef, $node)) {
+    if (TBAdminMfsRunCmd(\%args, undef, $node_id)) {
 	$result = "setupfailed"
 	    if (!defined($result));
     }
@@ -472,7 +449,8 @@ mkdir($sigdir, 0770)
 my $sigfilename;
 ($sigfilename = $filename) =~ s/^(.*)(\/[^\/]+$)/$1\/sigs$2.sig/;
 my $swmsg = "";
-if (! -x $imagehash || system("$imagehash -c -o $sigfilename $filename") != 0) {
+if (! -x $imagehash ||
+    system("$imagehash -c -o $sigfilename $filename") != 0) {
     warn("Could not create swapout signature file\n");
     $swmsg = "WARNING: could not create swapout signature file $sigfilename\n".
 	     "       You will not be able to save disk state for this image\n";
@@ -485,20 +463,16 @@ print "Image written to $filename.\n";
 #      "Final size: " . (stat($filename))[7] . " bytes.\n";
 
 # Append bootlog (which has prepare output)
-my $bootlog_result =
-    DBQueryFatal("select bootlog from node_bootlogs ".
-		 "where node_id='$node'");
-
-if ($bootlog_result->numrows) {
-    my ($stuff) = $bootlog_result->fetchrow_array();
+my $bootlog;
+if ($node->GetBootLog(\$bootlog) == 0) {
     print "\n\n";
     print "------------------ Prepare Output ----------------\n";
-    print "$stuff\n";
+    print "$bootlog\n";
 }
 
 SENDMAIL("$user_name <$user_email>",
-	 "Image Creation on $node Completed: $pid/$imagename",
-	 "Image creation on $node has completed. As you requested, the\n".
+	 "Image Creation on $node_id Completed: $pid/$imagename",
+	 "Image creation on $node_id has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
 	 "You may now os_load this image on other nodes in your experiment.\n".
 	 "$swmsg",
@@ -508,7 +482,7 @@ SENDMAIL("$user_name <$user_email>",
 
 if (defined($logname)) {
     # Close up the log file so the webpage stops.
-    TBExptCloseLogFile($pid, $eid);
+    $experiment->CloseLogFile();
     unlink("$logname");
 }
 exit 0;
@@ -524,9 +498,9 @@ sub cleanup ()
     $args{'name'}     = $me;
     $args{'on'}       = 0;
     $args{'clearall'} = 0;
-    if (TBAdminMfsSelect(\%args, undef, $node)) {
+    if (TBAdminMfsSelect(\%args, undef, $node_id)) {
 	print("*** $me:\n".
-	      "    Could not turn admin mode off for $node!\n");
+	      "    Could not turn admin mode off for $node_id!\n");
 	return 0;
     }
 
@@ -535,9 +509,9 @@ sub cleanup ()
     $args{'on'}     = 0;
     $args{'reboot'} = 1;
     $args{'wait'}   = 0;
-    if (TBAdminMfsBoot(\%args, undef, $node)) {
+    if (TBAdminMfsBoot(\%args, undef, $node_id)) {
 	print("*** $me:\n".
-	      "    Failed to reboot $node on cleanup!\n");
+	      "    Failed to reboot $node_id on cleanup!\n");
 	return 0;
     }
 
@@ -558,7 +532,7 @@ sub fatal($)
     # Send a message to the testbed list. 
     #
     SENDMAIL("$user_name <$user_email>",
-	     "Image Creation Failure on $node: $pid/$imagename",
+	     "Image Creation Failure on $node_id: $pid/$imagename",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",
@@ -566,7 +540,7 @@ sub fatal($)
     
     if (defined($logname)) {
         # Close up the log file so the webpage stops.
-	TBExptCloseLogFile($pid, $eid);
+	$experiment->CloseLogFile();
 	unlink("$logname");
     }
     exit(-1);
@@ -586,8 +560,8 @@ sub check_progress($$)
     #
     # Command has finished for better or worse, record status and finish.
     #
-    if ($statusp->{$node} ne "none") {
-	$result = $statusp->{$node};
+    if ($statusp->{$node_id} ne "none") {
+	$result = $statusp->{$node_id};
 	return 0;
     }
 

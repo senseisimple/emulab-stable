@@ -81,33 +81,38 @@ use libdb;
 use libtblog;
 use Template;
 use libArchive;
+use Experiment;
+use User;
 
 if (@ARGV != 2) {
     usage();
 }
 my ($pid, $eid) = @ARGV;
 
-my $dbuid;
 my %tofetch   = ();
 my %toarchive = ();
 
 #
-# Verify user and get his DB uid.
-#   
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("Go Away! You do not exist in the Emulab Database.");
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
+
 #
 # First, make sure the experiment exists
 #
-if (!ExpState($pid,$eid)) {
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
     tbdie("There is no experiment $eid in project $pid");
 }
 
 #
 # User must have at least MODIFY permissions to use this script
 #
-if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY())) {
     tbdie("You are not allowed to modify experiment $eid in project $pid");
 }
 
@@ -115,39 +120,25 @@ if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
 # Get the experiment's directory - that's where we'll stash any files we
 # fetch
 #
-my $expdir = TBExptUserDir($pid,$eid);
-if (!$expdir) {
-    tbdie("Unable to get experiment directory");
-}
-
-# Need this below for template specific code.
-my $exptidx;
-TBExptIDX($pid, $eid, \$exptidx) or
-    tbdie("unable to get experiment index!");
+my $expdir  = $experiment->UserDir();
+my $exptidx = $experiment->idx();
 
 #
 # Get a list of all RPMs and tarballs to fetch
 #
-my $result = DBQueryFatal("SELECT vname, rpms, tarfiles FROM virt_nodes WHERE " .
-    "pid='$pid' and eid='$eid'");
+my $result = $experiment->TableLookUp("virt_nodes", "vname,rpms,tarfiles");
 
 while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     #
     # Find out the pnode where the this vnode is mapped, if any
     #
-    my $physnode;
-    VnameToNodeid($pid,$eid,$vname,\$physnode); 
+    my $physnode = $experiment->VnameToNode($vname);
     
     # The if block below is needed for simulated nodes which do not
     # have a reserved table entry. A tarfile specified for a simulated
     # node ends up on its host PC
-    if ( ! $physnode ) {
-	my $query_result = 
-	DBQueryFatal("select node_id from v2pmap where pid='$pid' and eid='$eid'".  
-	     	     " and vname='$vname'");
-	if ( $query_result->numrows ) {
-	    ($physnode) = $query_result->fetchrow_array();
-	}
+    if (! defined($physnode)) {
+	$physnode = $experiment->VnameToPmap($vname);
     }
 
     #
@@ -274,9 +265,9 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     #
     # If this virtual node is allocated, update the nodes table
     #
-    if ($physnode) {
-	DBQueryFatal("UPDATE nodes SET tarballs='$tarfiles', rpms='$rpms' " .
-	    "WHERE node_id='$physnode'");
+    if (defined($physnode)) {
+	$physnode->Update({'tarballs' => $tarfiles, 'rpms' => $rpms}) == 0
+	    or tbdie("Could not update tarballs,rpms for $physnode");
     }
 }
 
@@ -297,7 +288,7 @@ while (my ($URL, $localfile) = each %tofetch) {
     # Build up a new command line to do the fetch on ops
     #
     my $cmdargs = "$TB/bin/fetchtar.proxy ";
-    $cmdargs .= " -u $dbuid $URL $localfile ";
+    $cmdargs .= " -u $user_uid $URL $localfile ";
 
     #
     # Must flip to real root for the ssh, and then flip back afterwards.

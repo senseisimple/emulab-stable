@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 use POSIX qw(mktime);
@@ -19,10 +20,6 @@ sub usage()
 	"Spew a tar/rpm for an experiment.\n";
     exit(-1);
 }
-
-sub SpewFile();
-sub VerifyFile();
-
 my $optlist   = "vt:";
 my $debug     = 1;
 my $doverify  = 0;
@@ -40,7 +37,6 @@ my $timestamp;			# GM Time.
 #               1. File could not be verified.
 #               2. File has not changed since timestamp.
 #               3. File could not be opened for reading.
-#
   
 #
 # Configure variables
@@ -55,6 +51,12 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
+
+# Protos
+sub SpewFile();
+sub VerifyFile();
+sub fatal($);
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -67,7 +69,7 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -89,8 +91,6 @@ if (@ARGV != 2) {
 }
 my $nodeid  = $ARGV[0];
 my $file    = $ARGV[1];
-my $pid;
-my $eid;
 
 #
 # Untaint the arguments.
@@ -109,15 +109,20 @@ else {
     die("*** Bad data in argument: $file");
 }
 
-#
-# We need the pid,eid,gid,creator.
-#
-if (!NodeidToExp($nodeid, \$pid, \$eid)) {
+my $node = Node->Lookup($nodeid);
+if (!defined($node)) {
+    die("*** $0:\n".
+	"    $nodeid does not exist!\n");
+}
+my $experiment = $node->Reservation();
+if (!defined($experiment)) {
     die("*** $0:\n".
 	"    $nodeid is not allocated to an experiment!\n");
 }
-my $gid     = ExpGroup($pid, $eid);
-my $creator = ExpLeader($pid, $eid);
+my $pid     = $experiment->pid();
+my $eid     = $experiment->eid();
+my $gid     = $experiment->gid();
+my $creator = $experiment->GetCreator()->name();
 my $bytelen = 0;
 
 if (my $retval = VerifyFile()) {
@@ -142,6 +147,7 @@ sub SpewFile()
     #
     my $foffset = 0;
     my $retries = 5;
+    my $buf;
 
     while ($bytelen) {
 	my $rlen = sysread(FD, $buf, 8192);
@@ -223,8 +229,8 @@ sub VerifyFile()
     # Stat the file to confirm that its either owned by the experiment
     # creator, or in the gid of the experiment.
     #
-    (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$bytelen,
-     undef,$mtime) = stat($translated);
+    my (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$bytelen,
+	undef,$mtime) = stat($translated);
 
     my ($unix_uid, $unix_gid, $unix_gname);
 
@@ -307,8 +313,9 @@ sub VerifyRPM()
     return 0;
 }
 
-sub fatal {
-    my $msg = $_[0];
+sub fatal($)
+{
+    my ($msg) = @_;
 
     SENDMAIL($TBOPS, "spewrpmtar:$file", $msg);
     die("*** $0:\n".

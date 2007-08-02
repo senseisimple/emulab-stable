@@ -55,10 +55,7 @@ my $makegraph   = "$TB/bin/template_graph";
 # Locals
 my $guid;
 my $version;
-my $dbuid;
 my $logname;
-my $user_name;
-my $user_email;
 my $template;
 my @templates   = ();
 my %instances   = ();	# Indexed by vers.
@@ -77,9 +74,7 @@ use libtestbed;
 use libtblog;
 use Template;
 use libaudit;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 0;
+use User;
 
 #
 # Turn off line buffering on output
@@ -101,19 +96,14 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
-
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 # Now parse arguments.
 ParseArgs();
@@ -126,9 +116,7 @@ $template = Template->Lookup($guid, $version);
 if (!defined($template)) {
     tbdie("Experiment template $guid/$version does not exist!");
 }
-if (! TBProjAccessCheck($dbuid,
-			$template->pid(), $template->gid(),
-			TB_PROJECT_CREATEEXPT)) {
+if (! $template->AccessCheck($this_user, TB_EXPT_DESTROY())) {
     tberror("You do not have permission to delete template $guid/$version");
     exit(1);
 }

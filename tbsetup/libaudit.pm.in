@@ -14,7 +14,8 @@ use Exporter;
     qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV AuditGetARGV
 	 AddAuditInfo
 	 LogStart LogEnd
-	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY LIBAUDIT_NODELETE LIBAUDIT_FANCY
+	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY
+	 LIBAUDIT_NODELETE LIBAUDIT_FANCY
        );
 
 # After package decl.
@@ -29,6 +30,7 @@ use Carp;
 #
 use lib "@prefix@/lib";
 use libtestbed;
+use User;
 
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBAUDIT	= "@TBAUDITEMAIL@";
@@ -368,13 +370,17 @@ sub SendFancyMail($)
 {
     import libdb;
     import libtblog;
+    import User;
 
     my ($exitstatus) = @_;
     
     my ($TO, $FROM);
     my ($name, $email);
-    if (UserDBInfo($USERNAME, \$name, \$email)) {
-	$TO = "$name <$email>";
+    my $this_user = User->ThisUser();
+    if (defined($this_user)) {
+	$name  = $this_user->name();
+	$email = $this_user->email();
+	$TO    = "$name <$email>";
     } else {
 	$TO = "$GCOS <${USERNAME}\@${OURDOMAIN}>";
     }

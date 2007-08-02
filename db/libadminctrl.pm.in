@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -193,6 +193,8 @@ use English;
 use libdb;
 use libtestbed;
 use libtblog;
+use Experiment;
+use User;
 use Group;
 
 # Configure variables
@@ -1078,15 +1080,19 @@ sub UpdateNodeTypeXpidPermissions()
 # current node count plus the minimum number of nodes needed by the
 # experiment.
 # 
-sub TBAdmissionControlCheck($$$$)
+sub TBAdmissionControlCheck($$$)
 {
-    my ($uid, $pid, $eid, $ptypearray) = @_;
-    my $gid = ExpGroup($pid, $eid);
+    my ($user, $experiment, $ptypearray) = @_;
+    my $gid = $experiment->gid();
 
     $assignflag = 1
 	if (defined($ptypearray));
 
-    $uid = MapNumericUID($uid);
+    $user = User->ThisUser()
+	if (!defined($user));
+    my $uid  = $user->uid();
+    my $pid  = $experiment->pid();
+    my $eid  = $experiment->eid();
 
     #
     # Check to see if admin control is even on.

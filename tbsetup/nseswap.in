@@ -70,6 +70,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -105,6 +106,14 @@ if ($eid =~ /^([-\@\w.]+)$/) {
 }
 else {
     die("Tainted argument $eid!\n");
+}
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
 
 my $exptidx;
@@ -229,28 +238,12 @@ sub swapout_on_max_retries() {
     my ($sim_reswap_count) = $query_result->fetchrow_array();
 
     if ($sim_reswap_count >= $max_retries) {
-	my $dbuid;
-	my $user_name;
-	my $user_email;
+	my $user_name  = $this_user->name();
+	my $user_email = $this_user->email();
 
-    
-	# 
-	# Verify user and get his DB uid.
-	#
-    	if (! UNIX2DBUID($UID, \$dbuid)) {
-	    die("*** $0:\n".
-	    	"    You do not exist in the Emulab Database.\n");
-    	}
-
-    	#
-    	# Get email info for user.
-    	#
-    	if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-		die("*** $0:\n".
-	    	    "    Cannot determine your name and email address.\n");
-        }
-        $message =
-            "Experiment $pid/$eid reached max retries:$max_retries trying to re-map \n".
+        my $message =
+            "Experiment $pid/$eid reached max retries:$max_retries ".
+	    "trying to re-map\n".
             "simulated nodes. Forcibly swapping out the experiment\n";
 
     	SENDMAIL("$user_name <$user_email>",

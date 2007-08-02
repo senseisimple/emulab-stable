@@ -102,6 +102,7 @@ use libArchive;
 use Experiment;
 use Template;
 use User;
+use Project;
 use Group;
 
 my $parser      = "$TB/libexec/parse-ns";
@@ -1148,7 +1149,12 @@ sub CheckCopyArgs()
 
 	tbdie("Could not get experiment index for $copypid/$copyeid")
 	    if (!defined($copy_experiment));
-		
+
+	if (! $copy_experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
+	    tberror("You do not have permission to copy $copy_experiment");
+	    exit(1);
+	}
+	
 	#
 	# If given a tag, must use the archive. To do that, we need the
 	# experiment index of the experiment we are copying from.
@@ -1159,38 +1165,42 @@ sub CheckCopyArgs()
 	}
     }
     elsif ($copyarg =~ /^(\d+)(?::([-\w]*))?$/) {
-	#
-	# By convention, using an idx means we want to go to the experiment
-	# archive instead of what is currently in the filesystem. 
-	#
 	$copyidx  = $1;
 	$copytag  = (defined($2) ? (($2 eq "") ? undef : $2) : undef);
-	$copyfrom = "archive";
 
 	$copy_experiment = Experiment->LookupByIndex($copyidx);
 
 	#
-	# Not a cuurent experiment?
+	# Not a current experiment?
 	#
 	if (!defined($copy_experiment)) {
 	    my $query_result =
-		DBQueryFatal("select pid,eid from experiment_stats ".
+		DBQueryFatal("select pid_idx from experiment_stats ".
 			     "where exptidx='$copyidx'");
 
 	    if (! $query_result->numrows) {
 		tbdie("No such experiment index: $copyidx");
 	    }
-	    ($copypid, $copyeid) = $query_result->fetchrow_array();
+	    my ($copy_pid_idx) = $query_result->fetchrow_array();
+	    my $copy_project = Project->Lookup($copy_pid_idx);
+	    
+	    if (! $copy_project->AccessCheck($this_user,
+					     TB_PROJECT_READINFO)) {
+		tberror("You do not have permission to copy $copy_experiment");
+		exit(1);
+	    }
+	    $copyfrom = "archive";
 	}
 	else {
-	    $copypid = $copy_experiment->pid();
-	    $copyeid = $copy_experiment->eid();
-	}
-	
-	if (!TBProjAccessCheck($UID, $copypid, $copypid, TB_PROJECT_READINFO)){
-	    tberror("You do not have permission to copy experiment  ".
-		    "$copypid/$copyeid ($copyidx)");
-	    exit(1);
+	    $copypid  = $copy_experiment->pid();
+	    $copyeid  = $copy_experiment->eid();
+	    $copyfrom = "exp";
+
+	    if (! $copy_experiment->AccessCheck($this_user,
+						TB_EXPT_READINFO)) {
+		tberror("You do not have permission to copy $copy_experiment");
+		exit(1);
+	    }
 	}
     }
     else {
@@ -1228,43 +1238,28 @@ sub CopyInArchive()
     }
     else {
 	#
-	# Ask for a checkout of the archive. 
+	# Look in the resources table.
 	#
-	my $dstdir = "$userdir/nsdata";
-	my $subdir = "/exp/tbdata/";
-	my $oldns  = "$dstdir/${copyeid}.ns";
+	my $query_result =
+	    DBQueryFatal("select d.input from experiment_stats as s ".
+			 "left join experiment_inputs as i on ".
+			 "     i.exptidx=s.exptidx and i.rsrcidx=s.rsrcidx ".
+			 "left join experiment_input_data as d on ".
+			 "     d.idx=i.input_data_idx ".
+			 "where s.exptidx='$copyidx'");
 
-	print "Checking out experiment archive to $dstdir\n";
-        libArchive::TBCheckoutExperimentArchivebyExptIDX($copyidx,
-							 $dstdir,
- 							 $copytag,
-							 $subdir)
-	    == 0 or fatal("CopyInArchive: Checking out archive");
-
-	#
-	# An old template will have the nsfile in a different place.
-	#
-	if (! -e $oldns) {
-	    $subdir = "/archive/nsdata/";
-	    $oldns  = "$dstdir/archive/nsdata/nsfile.ns";
-
-	    print "Checking out experiment archive to $dstdir\n";
-	    libArchive::TBCheckoutExperimentArchivebyExptIDX($copyidx,
-							     $dstdir,
-							     $copytag,
-							     $subdir)
-		== 0 or fatal("CopyInArchive: Checking out archive");
+	if (! $query_result->numrows) {
+	    tbdie("No such experiment index: $copyidx");
 	}
+	my ($nsfile) = $query_result->fetchrow_array();
 	
-	fatal("Missing NS file: $oldns")
-	    if (! -e $oldns);
-
-	#
-	# Now copy the old NS file out and delete the rest of it.
-	#
-	system("/bin/cp", "$oldns", "$tempnsfile") == 0
-	    or fatal("Failed to copy $oldns to $tempnsfile");
-	system("/bin/rm -rf $dstdir");
+	open(NS, "> $tempnsfile")
+	    or tbdie("Could not write ns code to $tempnsfile!\n");
+	$nsfile =~ s/\r//g;
+	print NS $nsfile;
+	print NS "\n";
+	close(NS);
+	chmod(0664, "$tempnsfile");
     }
 }
 

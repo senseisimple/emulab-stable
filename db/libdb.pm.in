@@ -154,28 +154,28 @@ use vars qw(@ISA @EXPORT);
 
 	 TBDB_PHYSICAL_NODE_TABLES
 
-	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
-	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
-	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
+	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
+	 TBExptAccessCheck MarkNodeDown
+	 SetNodeBootStatus OSFeatureSupported NodeidToExp NodeidToExpOldReserved
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
-	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
+	 DBQuoteSpecial ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
-	 DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
-	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
-	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
+	 DBDateTime DefaultImageID TBGroupUnixInfo
+	 TBValidNodeName TBSetNodeLogEntry
+	 TBSetSchedReload MapNodeOSID 
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
 	 TBResolveNextOSID TBOsidToPid TBOSIDRebootWaittime
-	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
-	 TBdbfork TBDBDisconnect VnameToNodeid TBExpLocked
+	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
+	 TBdbfork TBDBDisconnect VnameToNodeid 
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
-	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
-	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
+	 TBIPtoNodeID TBNodeBootReset TBNodeStateWait
+	 TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
 	 TBExptIsElabInElab TBExptIsPlabInElab
 	 TBExptPlabInElabPLC TBExptPlabInElabNodes
@@ -826,6 +826,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'node_history'		=> [ 'node_id' ],
 	'node_bootlogs'		=> [ 'node_id' ],
         'plab_mapping'          => [ 'node_id' ],
+        'node_utilization'      => [ 'node_id' ],
     );
 }
 
@@ -909,42 +910,22 @@ sub TBGrpTrust($$$)
     #
     # No group, then use the default group.
     #
-    if (! $gid) {
-	$gid = $pid;
-    }
+    $gid = $pid
+	if (! $gid);
 
     #
-    # Must map to an existing user to be trusted, obviously
+    # Must map to an existing user to be trusted, obviously.
     #
     my $target_user = User->Lookup($uid);
     return PROJMEMBERTRUST_NONE
 	if (! defined($target_user));
-    my $uid_idx = $target_user->uid_idx();
 
-    #
-    # User must be active to be trusted.
-    #
+    # Ditto the group.
+    my $target_group = Group->Lookup($pid, $gid);
     return PROJMEMBERTRUST_NONE
-	if ($target_user->status() ne USERSTATUS_ACTIVE());
+	if (! defined($target_group));
 
-    #
-    # Must be a member of the group.
-    #
-    my $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where uid_idx='$uid_idx' and pid='$pid' and gid='$gid'");
-
-    #
-    # No membership is the same as no trust. True? Maybe an error instead?
-    #
-    if ($query_result->numrows == 0) {
-	return PROJMEMBERTRUST_NONE;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    my $trust_string = $row[0];
-
-    return TBTrustConvert($trust_string);
+    return $target_group->Trust($target_user)
 }
 
 #
@@ -972,38 +953,11 @@ sub TBProjTrust($$)
 #
 sub TBAdmin(;$)
 {
-    #
-    # No one is considered an admin unless they have the magic environment
-    # variable set (so that you have to be a bit more explict about wanting
-    # admin privs.) Use the withadminprivs script to get this variable set.
-    # Also check with HTTP_ at the front of the name, since this is required
-    # to get it through suexec from the web scripts.
-    #
-    if (!($ENV{WITH_TB_ADMIN_PRIVS} || $ENV{HTTP_WITH_TB_ADMIN_PRIVS})) {
-	return 0;
-    }
-
-    # Map current user to object and confirm admin status from db.
     my $this_user = User->ThisUser();
     return 0
 	if (! defined($this_user));
 
-    return $this_user->admin();
-}
-
-#
-# Test whether current user is a member of the emulab-ops project.
-# We ignore the argument; always test the current user. 
-# 
-sub TBOpsGuy(;$)
-{
-    # Map current user to object and confirm admin status from db.
-    my $this_user = User->ThisUser();
-    return 0
-	if (! defined($this_user));
-
-    return TBMinTrust(TBProjTrust($this_user->uid_idx(), $TBOPSPID),
-		      PROJMEMBERTRUST_USER());
+    return $this_user->IsAdmin();
 }
 
 #
@@ -1017,46 +971,20 @@ sub TBOpsGuy(;$)
 sub TBProjAccessCheck($$$$)
 {
     my ($uid, $pid, $gid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_PROJECT_MIN ||
-	$access_type > TB_PROJECT_MAX) {
-	die("*** Invalid access type: $access_type!");
-    }
 
     #
-    # Admins do whatever they want!
+    # Must map to an existing user to be trusted, obviously.
     #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
+    my $target_user = User->Lookup($uid);
+    return 0
+	if (! defined($target_user));
 
-    #
-    # No group, then use the default group.
-    #
-    if (! defined($gid)) {
-	$gid = $pid;
-    }
+    # Ditto the group
+    my $target_group = Group->Lookup($pid, $gid);
+    return 0
+	if (! defined($target_group));
 
-    if ($access_type == TB_PROJECT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    elsif ($access_type == TB_PROJECT_CREATEEXPT) {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-    elsif ($access_type == TB_PROJECT_DELUSER) {
-	$mintrust = PROJMEMBERTRUST_PROJROOT;
-    }
-    elsif ($access_type == TB_PROJECT_MAKEGROUP ||
-	   $access_type == TB_PROJECT_DELGROUP) {
-	$mintrust = PROJMEMBERTRUST_GROUPROOT;
-    }
-    else {
-	die("*** Unexpected access type: $access_type!");
-    }
-
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+    return $target_group->AccessCheck($target_user, $access_type);
 }
 
 #
@@ -1069,50 +997,20 @@ sub TBProjAccessCheck($$$$)
 sub TBExptAccessCheck($$$$)
 {
     my ($uid, $pid, $eid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_EXPT_MIN ||
-	$access_type > TB_EXPT_MAX) {
-	die("*** Invalid access type: $access_type!");
-    }
 
     #
-    # Admins do whatever they want!
+    # Must map to an existing user to be trusted, obviously.
     #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
+    my $target_user = User->Lookup($uid);
+    return 0
+	if (! defined($target_user));
 
-    my $query_result =
-	DBQueryFatal("SELECT gid,expt_head_uid FROM experiments WHERE ".
-		     "eid='$eid' and pid='$pid'");
+    # Ditto the group
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return 0
+	if (! defined($experiment));
 
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    my $gid     = $row[0];
-    my $creator = $row[1];
-
-    #
-    # An experiment may be destroyed by the experiment creator or the
-    # project/group leader.
-    #
-    if ($access_type == TB_EXPT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-
-    #
-    # Either proper permission in the group, or group_root in the project.
-    # This lets group_roots muck with other people's experiments, including
-    # those in groups they do not belong to.
-    #
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
+    return $experiment->AccessCheck($target_user, $access_type);
 }
 
 #
@@ -1126,189 +1024,25 @@ sub TBNodeAccessCheck($$@)
 {
     my ($uid, $access_type) = (shift, shift);
     my @nodelist = @_;
-    my $mintrust;
-
-    if ($access_type < TB_NODEACCESS_MIN ||
-	$access_type > TB_NODEACCESS_MAX) {
-	die("*** Invalid access type: $access_type!");
-    }
 
     #
-    # Admins do whatever they want!
+    # Must map to an existing user to be trusted, obviously.
     #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
+    my $target_user = User->Lookup($uid);
+    return 0
+	if (! defined($target_user));
+    return 1
+	if ($target_user->IsAdmin());
 
-    if ($access_type == TB_NODEACCESS_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
+    foreach my $nodeid (@nodelist) {
+	my $node = Node->Lookup($nodeid);
+	return 0
+	    if (!defined($node));
 
-    foreach my $node (@nodelist) {
-	my $query_result =
-	    DBQueryFatal("select e.pid,e.gid from reserved as r ".
-			 "left join experiments as e on ".
-			 "     e.pid=r.pid and e.eid=r.eid ".
-			 "where r.node_id='$node'");
-
-	if ($query_result->numrows == 0) {
-	    return 0;
-	}
-	my @row = $query_result->fetchrow_array();
-	my $pid = $row[0];
-	my $gid = $row[1];
-
-	#
-	# Either proper permission in the group, or group_root in the
-	# project. This lets group_roots muck with other people's
-	# nodes, including those in groups they do not belong to.
-	#
-	if (! TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) &&
-	    ! TBMinTrust(TBGrpTrust($uid, $pid, $pid),
-			 PROJMEMBERTRUST_GROUPROOT)) {
-	    return 0;
-	}
+	return 0
+	    if (!$node->AccessCheck($target_user, $access_type));
     }
     return 1;
-}
-
-#
-# Access checks for an OSID. Tests for tbadmin.
-#
-# Usage: TBOSIDAccessCheck($uid, $osid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-#
-sub TBOSIDAccessCheck($$$)
-{
-    my ($uid, $osid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_OSID_MIN || $access_type > TB_OSID_MAX) {
-	die("*** Invalid access type $access_type!");
-    }
-
-    #
-    # Admins do whatever they want!
-    #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
-
-    #
-    # No GIDs yet.
-    #
-    my $query_result =
-	DBQueryFatal("SELECT pid,shared FROM os_info WHERE osid='$osid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    my $pid = $row[0];
-    my $shared = $row[1];
-
-    #
-    # Global OSIDs can be read by anyone, but must be admin to read.
-    #
-    if ($shared) {
-	if ($access_type == TB_OSID_READINFO) {
-	    return 1;
-	}
-	return 0;
-    }
-
-    #
-    # Otherwise must have proper trust in the project.
-    #
-    if ($access_type == TB_OSID_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-
-    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
-}
-
-#
-# Access checks for an ImageID
-#
-# Usage: TBImageIDAccessCheck($uid, $imageid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-#
-sub TBImageIDAccessCheck($$$)
-{
-    my ($uid, $imageid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_IMAGEID_MIN || $access_type > TB_IMAGEID_MAX) {
-	die("*** Invalid access type $access_type!");
-    }
-
-    #
-    # Admins and root do whatever they want!
-    #
-    if (TBAdmin($uid) || !$UID || $UID eq "root" || $uid eq "root") {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
-
-    #
-    # No GIDs yet.
-    #
-    my $query_result =
-	DBQueryFatal("SELECT pid,gid,shared,global FROM images ".
-		     "WHERE imageid='$imageid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    my $pid = $row[0];
-    my $gid = $row[1];
-    my $shared = $row[2];
-    my $global = $row[3];
-
-    #
-    # Global ImageIDs can be read by anyone.
-    #
-    if ($global) {
-	if ($access_type == TB_IMAGEID_READINFO) {
-	    return 1;
-	}
-	return 0;
-    }
-
-    #
-    # Otherwise must have proper trust in the pid/gid
-    #
-    if ($access_type == TB_IMAGEID_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-        #
-        # Shared imageids are readable by anyone in the project.
-        #
-	if ($shared) {
-	    $gid = $pid;
-	}
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-
-    #
-    # Either proper permission in the group, or group_root in the project.
-    # This lets group_roots muck with other people's experiments, including
-    # those in groups they do not belong to.
-    #
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
 }
 
 #
@@ -1365,154 +1099,6 @@ sub TBNodeAllocCheck($$)
 }
 
 #
-# Return Project leader. First argument pid.
-#
-# usage: ProjLeader(char *pid)
-#        returns char *leader if a valid pid.
-#        returns 0 if an invalid pid.
-#
-sub ProjLeader($)
-{
-    my($pid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select head_uid from projects where pid='$pid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return Group leader.
-#
-# usage: GroupLeader(char *pid, char *gid)
-#        returns char *leader if a valid pid.
-#        returns 0 if an invalid pid.
-#
-sub GroupLeader($$)
-{
-    my($pid, $gid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select leader from groups where ".
-		     "pid='$pid' and gid='$gid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return Experiment leader. First argument pid. Second argument is eid.
-#
-# usage: ExpLeader(char *pid, char *eid)
-#        returns char *leader if a valid pid/eid.
-#        returns 0 if an invalid pid/eid.
-#
-sub ExpLeader($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select expt_head_uid from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return Experiment swapper. First argument pid. Second argument is eid.
-#
-# usage: ExpSwapper(char *pid, char *eid)
-#        returns char *swapper if a valid pid/eid.
-#        returns 0 if an invalid pid/eid.
-#
-sub ExpSwapper($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select expt_swap_uid from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return a list of leaders (proj/group roots) for a given pid/gid,
-# in the format of an email address list. If no gid, assumes gid=pid.
-#
-# usage: TBLeaderMailList($pid,[$gid])
-#	 returns string like "name <email>[, name2 <email2>[, ...]]"
-#
-sub TBLeaderMailList($;$) {
-    # Based on the php version in dbdefs.php
-
-    my $pid = shift;
-    my $gid = shift || $pid;
-
-    # XXX: hardcode project_root and group_root here because we don't
-    # have the strings in variables...
-    my $query_result =
-    DBQueryFatal("select distinct usr_name,u.uid,usr_email from users as u ".
-                 "left join group_membership as gm on gm.uid_idx=u.uid_idx ".
-                 "where (trust='project_root' and pid='$pid') or ".
-		 "(trust='group_root' and pid='$pid' and gid='$gid') ".
-                 "order by trust DESC, usr_name");
-
-    if ($query_result->numrows() == 0) {
-	return 0;
-    }
-    my $mailstr="";
-    while (my @row = $query_result->fetchrow_array()) {
-	if ($mailstr ne "") { $mailstr .=", "; }
-	$mailstr .= '"'.$row[0]." (".$row[1].")\" <".$row[2].">";
-    }
-    return $mailstr;
-}
-
-#
-# Return Experiment group.
-#
-# usage: ExpGroup(char *pid, char *eid)
-#        returns gid if a valid pid/eid.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub ExpGroup($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryWarn("select gid from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
 # Return Experiment state.
 #
 # usage: ExpState(char *pid, char *eid)
@@ -1521,158 +1107,12 @@ sub ExpGroup($$)
 #
 sub ExpState($$)
 {
-    my($pid, $eid) = @_;
+    my ($pid, $eid) = @_;
 
-    my $query_result =
-	DBQueryWarn("select state from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Set Experiment state.
-#
-# usage: SetExpState(char *pid, char *eid, char *state)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub SetExpState($$$)
-{
-    my($pid, $eid, $state) = @_;
-
-    if ($EVENTSYS) {
-	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		      objname   => "$pid/$eid",
-		      eventtype => $state,
-		      expt      => "$pid/$eid",
-		      host      => $BOSSNODE);
-    }
-
-    my $query_result =
-	DBQueryWarn("update experiments set state='$state' ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Set the swap in/out time for an experiment.
-#
-# usage: TBSetExpSwapTime(char *pid, char *eid)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBSetExpSwapTime($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryWarn("update experiments set expt_swapped=now() ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Lock Experiment. Can also provide an optional new state.
-#
-# usage: TBLockExp(char *pid, char *eid, char *newstate)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBLockExp($$;$)
-{
-    my($pid, $eid, $newstate) = @_;
-
-    my $query_result =
-	DBQueryWarn("update experiments set expt_locked=now() ".
-		    (defined($newstate) ? ",state='$newstate' " : "") .
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    if ($EVENTSYS && defined($newstate)) {
-	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		      objname   => "$pid/$eid",
-		      eventtype => $newstate,
-		      expt      => "$pid/$eid",
-		      host      => $BOSSNODE);
-    }
-    return 1;
-}
-
-#
-# Test if Experiment is locked. Can provide optional pointer to return state.
-#
-# usage: TBExpLocked(char *pid, char *eid, char **state)
-#        returns 1 if locked.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBExpLocked($$;$)
-{
-    my($pid, $eid, $curstate) = @_;
-
-    my $query_result =
-	DBQueryWarn("select expt_locked,state from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-
-    $$curstate = $row[1]
-	if (defined($curstate));
+    my $experiment = Experiment->Lookup($pid, $eid);
     return 0
-	if (! defined($row[0]));
-    return 1;
-}
-
-#
-# UnLock Experiment. Can also provide an optional new state.
-#
-# usage: TBUnLockExp(char *pid, char *eid, char *newstate)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBUnLockExp($$;$)
-{
-    my($pid, $eid, $newstate) = @_;
-
-    my $query_result =
-	DBQueryWarn("update experiments set expt_locked=NULL ".
-		    (defined($newstate) ? ",state='$newstate' " : "") .
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    if ($EVENTSYS && defined($newstate)) {
-	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		      objname   => "$pid/$eid",
-		      eventtype => $newstate,
-		      expt      => "$pid/$eid",
-		      host      => $BOSSNODE);
-    }
-    return 1;
+	if (!defined($experiment));
+    return $experiment->state();
 }
 
 #
@@ -2021,31 +1461,6 @@ sub TBBootWhat($;$)
 
     print("*** Warning: node '$node': All boot info was null!\n");
     return undef;
-}
-
-#
-# Ah, what a hack! I'm tired of seeing regexs for sharks scattered around
-# the code. Anyway, this checks to see if a node is a shelf, and fills
-# in the shelf/node, return 1 if it is. The shelf/node arguments are
-# optional, if all you want to do is see if its a shelf type thing.
-#
-# usage: IsShelved(char *nodeid, [\$shelf], [\$node])
-#        returns 1 if the node is a shelf type thing. Optionally fills in info.
-#        returns 0 if the node is just a normal kind of node.
-#
-sub IsShelved ($;$$) {
-    my($nodeid, $shelf, $node) = @_;
-
-    if ($nodeid =~ /sh(\d+)-(\d+)/) {
-	if (defined($shelf)) {
-	    $$shelf = $1;
-	}
-	if (defined($node)) {
-	    $$node = $2;
-	}
-	return 1;
-    }
-    return 0;
 }
 
 #
@@ -2526,44 +1941,6 @@ sub TBUnixGroupList ($) {
 }
 
 #
-# Map UID to DB UID (login). This function will eventually be tossed.
-#
-# usage: UNIX2DBUID(int uid, \$login)
-#        returns 1 if the UID is okay.
-#        returns 0 if the UID is bogus.
-#
-sub UNIX2DBUID ($$) {
-    my($unix_uid, $userlogin) = @_;
-
-    my $target_user = User->LookupByUnixId($unix_uid);
-    return 0
-	if (! defined($target_user));
-
-    $$userlogin = $target_user->uid();
-    return 1;
-}
-
-#
-# Validate a node log type.
-#
-# usage: TBValidNodeLogType(char *type)
-#        Returns 1 if the type string is valid.
-#        Returns 0 if not.
-#
-sub TBValidNodeLogType($)
-{
-    my($type) = @_;
-
-    foreach my $actype ( TB_NODELOGTYPES ) {
-	if ($actype eq $type) {
-	    return 1;
-	}
-    }
-
-    return 0;
-}
-
-#
 # Insert a Log entry for a node.
 #
 # usage: TBSetNodeLogEntry(char *node, char *uid, char *type, char *message)
@@ -2572,24 +1949,14 @@ sub TBValidNodeLogType($)
 #
 sub TBSetNodeLogEntry($$$$)
 {
-    my($node, $dbuid, $type, $message) = @_;
+    my ($node_id, $dbuid, $type, $message) = @_;
 
-    if (! TBValidNodeName($node) || !TBValidNodeLogType($type)) {
-	return 0;
-    }
+    my $node = Node->Lookup($node_id);
+    return 0
+	if (! defined($node));
 
-    #
-    # XXX Eventually this should change, but it uses non-existent uids!
-    #
-    my $dbid = 0;
-    my $this_user = User->Lookup($dbuid);
-    if (defined($this_user)) {
-	$dbid = $this_user->dbid();
-    }
-    return DBQueryWarn("insert into nodelog ".
-		       "values ".
-                       "('$node', NULL, '$type', '$dbuid', '$dbid', ".
-		       " $message, now())");
+    return ($node->InsertNodeLogEntry(User->Lookup($dbuid),
+				      $type, $message) == 0 ? 1 : 0);
 }
 
 #
@@ -3251,61 +2618,6 @@ sub TBExptSecurityLevel($$$)
 	if (defined($levelp));
     return 1;
 }
-
-#
-# Destroy an experiment and cleanup all traces. Used from several
-# different scripts, so localized here.
-#
-sub TBExptDestroy($$)
-{
-    my($pid, $eid) = @_;
-
-    my $workdir = TBExptWorkDir($pid, $eid);
-    my $userdir = TBExptUserDir($pid, $eid);
-    my $gid     = ExpGroup($pid, $eid);
-
-    #
-    # Try to remove experiment directory. We allow for it not being there
-    # cause we often run the tb programs directly. We also allow for not
-    # having permission, in the case that an admin type is running this,
-    # in which case it won't be allowed cause of directory permissions. Thats
-    # okay since admin types should rarely end experiments in other projects.
-    #
-    print "Removing experiment directories ... \n";
-    if (defined($userdir) && system("/bin/rm -rf $userdir")) {
-	print "*** WARNING: Not able to remove $userdir\n";
-	print "             Someone will need to do this by hand.\n";
-	# NFS errors usually the result. Sometimes its cause there is
-	# someone in the directory, so its being held open.
-        libtestbed::SENDMAIL($TBOPS, "TBExptDestroy: Could not remove directory",
-			     "Could not remove $userdir.\n".
-			     "Someone will need to do this by hand.\n");
-    }
-    if (system("/bin/rm -rf $workdir")) {
-	print "*** WARNING: Not able to remove $workdir\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-    # Yuck.
-    if ($pid ne $gid) {
-	# XXX note that this is not the same as TBExptUserDir
-	my $eidlink = "$PROJROOT/$pid/exp/$eid";
-	unlink($eidlink)
-	    if (-l $eidlink);
-    }
-    libArchive::TBDeleteExperimentArchive($pid, $eid);
-
-    #
-    # Remove all trace from the DB.
-    #
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    return 0;
-}
-
 
 #
 # Check if a site-specific variable exists.
@@ -4804,8 +4116,11 @@ sub MapNumericUID($)
     my $name;
 
     if ($uid =~ /^[0-9]+$/) {
-	UNIX2DBUID($uid, \$name)
-	    or die("*** $uid not a valid Emulab user!\n");
+	my $user = User->LookupByUnixId($uid);
+	if (!defined($user)) {
+	    die("*** $uid not a valid Emulab user!\n");
+	}
+	$name = $user->uid();
     }
     else {
 	$name = $uid;
@@ -5278,11 +4593,17 @@ sub TBSetNodeHistory($$$$$)
 	return 0;
     }
 
-    if ($uid =~ /^[0-9]+$/ && $uid != 0) {
-	$this_user = User->LookupByUnixId($uid);
-	if (! defined($this_user)) {
-	    print "*** WARNING: $UID does not exist in the DB!";
-	    return 0;
+    if ($uid =~ /^[0-9]+$/) {
+	if ($uid == 0) {
+	    # Node->SetNodeHistory() is okay with this.
+	    $this_user = undef;
+	}
+	else {
+	    $this_user = User->LookupByUnixId($uid);
+	    if (! defined($this_user)) {
+		print "*** WARNING: $UID does not exist in the DB!";
+		return 0;
+	    }
 	}
     }
     else {

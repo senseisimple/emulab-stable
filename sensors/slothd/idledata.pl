@@ -1,13 +1,14 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use lib '/usr/testbed/lib';
 
 use libdb;
+use Project;
 use English;
 use Getopt::Long;
 use strict;
@@ -71,8 +72,10 @@ if (($opts{"p"} && (@ARGV > 0 || $opts{"a"}))
 
 if ($opts{"p"}) {
     ($pid,$eid) = split(/,/, $opts{"p"});
-    die "Error:  Unknown project specified: '$pid'"
-        unless ProjLeader($pid);
+    my $project = Project->Lookup($pid);
+    if (!defined($project)) {
+	die "Error:  Unknown project specified: '$pid'";
+    }
     if (defined($eid)) {
         die "Error:  no such experiment '$eid' in project '$pid'.\n"
             unless ExpState($pid, $eid);

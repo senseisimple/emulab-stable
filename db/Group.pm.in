@@ -398,21 +398,71 @@ sub TableUpdate($$$;$)
 }
 
 #
+# The basis of access permissions; what is the users trust level in the group.
+#
+sub Trust($$)
+{
+    my ($self, $user) = @_;
+    
+    #
+    # User must be active to be trusted.
+    #
+    return PROJMEMBERTRUST_NONE
+	if ($user->status() ne USERSTATUS_ACTIVE());
+
+    #
+    # Must be a member of the group.
+    #
+    my $membership = $self->LookupUser($user);
+
+    #
+    # No membership is the same as no trust. True? Maybe an error instead?
+    #
+    return PROJMEMBERTRUST_NONE
+	if (!defined($membership));
+    
+    return TBTrustConvert($membership->trust());
+}
+
+#
 # Check permissions.
 #
 sub AccessCheck($$$)
 {
     my ($self, $user, $access_type) = @_;
-
+    my $mintrust;
+    
     # Must be a real reference. 
-    return -1
+    return 0
 	if (! ref($self));
 
-    my $uid = (ref($user) ? $user->uid() : $user);
-    my $pid = $self->pid();
-    my $gid = $self->gid();
+    if ($access_type < TB_PROJECT_MIN ||
+	$access_type > TB_PROJECT_MAX) {
+	print "*** Invalid access type: $access_type!\n";
+	return 0;
+    }
+    # Admins do whatever they want.
+    return 1
+	if ($user->IsAdmin());
 
-    return TBProjAccessCheck($uid, $pid, $gid, $access_type);
+    if ($access_type == TB_PROJECT_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    elsif ($access_type == TB_PROJECT_CREATEEXPT) {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+    elsif ($access_type == TB_PROJECT_DELUSER) {
+	$mintrust = PROJMEMBERTRUST_PROJROOT;
+    }
+    elsif ($access_type == TB_PROJECT_MAKEGROUP ||
+	   $access_type == TB_PROJECT_DELGROUP) {
+	$mintrust = PROJMEMBERTRUST_GROUPROOT;
+    }
+    else {
+	print "*** Invalid access type: $access_type!\n";
+	return 0;
+    }
+    return TBMinTrust($self->Trust($user), $mintrust);
 }
 
 #

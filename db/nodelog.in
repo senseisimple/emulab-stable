@@ -1,10 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -31,45 +31,43 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
+use Node;
 
 if (!$UID) {
     die("*** $0:\n".
 	"    Please do not run this script as root!\n");
 }
-if (! (TBAdmin($UID) || TBOpsGuy($UID))) {
-    die("*** $0:\n".
-	"    You must be a TB administrator to enter a log entry\n");
-}
 
 my $errors = 0;
 my $message;
-my @nodes;
 my $type = "misc";
 
 #
-# Verify user and get his DB uid.
+# Verify user.
 #
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
     die("You ($UID) do not exist!\n");
+}
+if (! ($this_user->IsAdmin() || $this_user->IsOpsGuy())) {
+    die("*** $0:\n".
+	"    You must be a TB administrator to enter a log entry\n");
 }
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (@ARGV < 1) {
     usage();
 }
-@nodes = @ARGV;
-
 if (defined($options{"m"})) {
     $message = $options{"m"};
-    $message = DBQuoteSpecial($message);
 }
 else {
     usage();
@@ -79,31 +77,17 @@ if (defined($options{"t"})) {
 }
 
 #
-# Validate type tag.
-# 
-if (!TBValidNodeLogType($type)) {
-    die("*** $0:\n".
-	"    Invalid log type $type!\n");
-}
-
+# Grab nodes and insert.
 #
-# Validate the nodes names. 
-#
-foreach my $node ( @nodes ) {
-    if (! TBValidNodeName($node)) {
+foreach my $node_id ( @ARGV ) {
+    my $node = Node->Lookup($node_id);
+    if (!defined($node)) {
 	die("*** $0:\n".
-	    "    Invalid node name $node!\n");
+	    "    No such node: $node_id!\n");
     }
-}
-
-#
-# And then insert the log entry.
-#
-foreach my $node ( @nodes ) {
-    if (! TBSetNodeLogEntry($node, $this_user->uid(), $type, $message)) {
-	print STDERR "Failed to insert entry for node $node\n";
+    if ($node->InsertNodeLogEntry($this_user, $type, $message) != 0) {
+	print STDERR "*** Failed to insert entry for node $node\n";
 	$errors++;
     }
 }
-
 exit($errors);
