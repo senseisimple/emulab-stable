@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -174,7 +174,7 @@ void handle_link_modify(char * linkname, int l_index,
   info("recd. MODIFY event for link = %s\n", linkname);
 
   /*
-   * As a convience to the user, we create virt_agents entries
+   * As a convenience to the user, we create virt_agents entries
    * for each "link-vnode" so that users can talk to a specific
    * side of a duplex link, or a specific node in a lan (in which
    * case it refers to both pipes, not just one). Look at the
@@ -416,7 +416,9 @@ void set_link_params(int l_index, int blackhole, int p_which)
 	    structpipe_params *p_params
 	      = &(link_map[l_index].params[p_index]);
 
-	    info("entered the loop, pindex = %d\n", p_index);
+	    if (debug)
+	      info("entered the loop, pindex=%d, pipe=%d\n",
+		   p_index, link_map[l_index].pipes[p_index]);
 	
 	    memset(&pipe, 0, sizeof pipe);
 
