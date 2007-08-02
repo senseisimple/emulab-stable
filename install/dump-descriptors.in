@@ -15,9 +15,15 @@ use strict;
 #
 sub usage()
 {
-    print STDOUT "Usage: dump-descriptors filename\n";
+    print STDERR "Usage: dump-descriptors [-v vers] filename\n";
+    print STDERR "  -v 1    first generation STD images (FBSD410, RHL90)\n";
+    print STDERR "  -v 2    second generation STD images (FBSD62, FC6)\n";
+    print STDERR "Default version is 1.\n";
     exit(-1);
 }
+
+my $optlist = "v:";
+my $version = 1;
 
 #
 # These are the images/osids we dump out. We of course get the embedded osids.
@@ -25,10 +31,11 @@ sub usage()
 # hardwired list. Note that all of these are assumed to live in the emulab-ops
 # project.
 #
-my @imagenames	  = ('FBSD410+RHL90-STD',
-		     'FBSD410-STD',
-		     'RHL90-STD',
-		     'FBSD410-IPFW2');
+my %imagenames    = (
+    "1" => ['FBSD410+RHL90-STD', 'FBSD410-STD', 'RHL90-STD', 'FBSD410-IPFW2'],
+    # XXX need IPFW and JAIL images
+    "2" => ['FBSD62+FC6-STD', 'FBSD62-STD', 'FC6-STD'],
+);
 
 my @osnames	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
 		     'OPSNODE-BSD', 'FW-IPFW', 'FW-IPFW2',
@@ -40,8 +47,16 @@ my @osids	   = ();
 # Need to map these dynamically since we do not want to hardwire the actual
 # nextosid IDs (numbers) into this table.
 #
-my %mappings       = ("RHL-STD"  => "RHL90-STD",
-		      "FBSD-STD" => "FBSD410-STD");
+my %mappings       = (
+    "1" => {
+	"RHL-STD"  => "RHL90-STD",
+	"FBSD-STD" => "FBSD410-STD",
+    },
+    "2" => {
+	"RHL-STD"  => "FC6-STD",
+	"FBSD-STD" => "FBSD62-STD",
+    }
+);
 
 #
 # Configure variables
@@ -75,6 +90,22 @@ $| = 1;
 $ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"v"})) {
+    my $vers = $options{"v"};
+    if (!exists($imagenames{$vers})) {
+	usage();
+    }
+    $version = $vers;
+}
+
 usage()
     if (@ARGV != 1);
 my $filename = $ARGV[0];
@@ -98,7 +129,7 @@ open(OUTPUT, ">$filename") or
 DBQueryFatal("create temporary table temp_images like images");
 DBQueryFatal("insert into temp_images ".
 	     "select * from images where pid='$protoproj' and (".
-	     join(" or ", map("imagename='$_'", @imagenames)) . ")");
+	     join(" or ", map("imagename='$_'", @{$imagenames{$version}})) . ")");
 
 my $query_result  = DBQueryFatal("show create table temp_images");
 my $create_string = ($query_result->fetchrow_array())[1];
@@ -164,7 +195,8 @@ DBQueryFatal("create temporary table temp_os_info like os_info");
 DBQueryFatal("insert into temp_os_info ".
 	     "select * from os_info where pid='$protoproj' and ((".
 	     join(" or ", map("osname='$_'", @osnames)) . ") or (".
-	     join(" or ", map("osid='$_'", @osids)) . "))");
+	     join(" or ", map("osid='$_'", @osids)) . "))".
+	     " order by osname");
 
 $query_result  = DBQueryFatal("show create table temp_os_info");
 $create_string = ($query_result->fetchrow_array())[1];
@@ -187,8 +219,8 @@ DBQueryFatal("update temp_os_info set ".
 # We reset the nextosid slots in the -STD osids, rather then worrying
 # about the osid_map table. 
 #
-foreach my $osname (keys(%mappings)) {
-    my $nextosname = $mappings{$osname};
+foreach my $osname (keys(%{$mappings{$version}})) {
+    my $nextosname = $mappings{$version}{$osname};
 
     $query_result =
 	DBQueryFatal("select osid from temp_os_info ".
