@@ -342,10 +342,10 @@ class flexlab:
             pass
 
         try:
-	    if searchtype == 'maxclique':
+	    if searchtype == 'oldbad':
+            	retval = self._simpleGoodnodes(size,finalnodes)
+            else:
             	retval = self._GraphGoodnodes(meastype,size,finalnodes)
-	    else:
-            	retval = self._simpleGoodnodes(size,finalnodes)		
         except:
             raise
 
