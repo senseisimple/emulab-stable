@@ -16,23 +16,22 @@ my $newProjName;
 %bottleNecks = {};
 my %nodeClasses;
 
-die "Usage: perl sharedBottle.pl proj_name exp_name logsDirectory newProj_name newExp_name"
-if(@ARGV < 5);
+die "Usage: perl sharedBottle.pl proj_name exp_name newProj_name newExp_name"
+if(@ARGV < 4);
 
-$expName = $ARGV[0];
-$projName = $ARGV[1];
-
-$logsDir = $ARGV[2];
-
+$projName = $ARGV[0];
+$expName = $ARGV[1];
+$newProjName = $ARGV[2];
 $newExpName = $ARGV[3];
-$newProjName = $ARGV[4];
+
+$logsDir = "/proj/$projName/exp/$expName/logs/dump";
+
 
 # Get the initial conditions.
-$elabInitScript = "/path/to/init-elabnodes.pl";
-$initConditionsCommand = $elabInitScript . " -o /tmp/initial-conditions.txt " . $projName . " " . $expName; 
+$elabInitScript = "/proj/tbres/duerig/testbed/pelab/init-elabnodes.pl";
+$initConditionsCommand = $elabInitScript . " -o /tmp/initial-conditions.txt " . $newProjName . " " . $newExpName; 
 
-#FIXME
-#system($initConditionsCommand);
+system($initConditionsCommand);
 
 open(CONDITIONS, "/tmp/initial-conditions.txt");
 
@@ -128,17 +127,17 @@ foreach $sourceName (readdir(logsDirHandle))
 
 			# Run Rubenstein's code on the ".filter" files
 			# inside the second destination directory.
-			#FIXME
-			$DansScript = "/script/somewhere/xyz.sh";
-			$filterFile1 = $destTwo . "/" . "file1.filter";
-			$filterFile2 = $destTwo . "/" . "file2.filter";
-			$filterFile3 = $destTwo . "/" . "file3.filter";
+			`perl /proj/tbres/duerig/testbed/pelab/bw-bottleneck/dump2filter.pl $destTwo`;
+			$DansScript = "/proj/tbres/duerig/filter/genjitco.FreeBSD";
+			$filterFile1 = $destTwo . "/" . "source.filter";
+			$filterFile2 = $destTwo . "/" . "dest1.filter";
+			$filterFile3 = $destTwo . "/" . "dest2.filter";
 
-			$sharedBottleneckCheck = $DansScript . $filterFile1 . $filterFile2 . $filterFile3 . " | ";
+			$sharedBottleneckCheck = $DansScript ." ". $filterFile1
+			    ." ". $filterFile2 ." ". $filterFile3;
 
 			my @scriptOutput = ();
-			#FIXME
-			#$scriptOutput = `$sharedBottleneckCheck`;
+			@scriptOutput = `$sharedBottleneckCheck | tail -n 2`;
 
 			$scriptOutput[0] = "last CHANGE was CORRELATED, corr case: 30203 pkts, test case: 30203 pkts";
 			$scriptOutput[1] = "testingabcdef";
@@ -146,16 +145,16 @@ foreach $sourceName (readdir(logsDirHandle))
 			# "CORRELATED" means that these two nodes have
 			# a shared bottleneck.
 
-			if($scriptOutput[$#scriptOutput - 1] =~ /(\w*)\sCHANGE\s(\w*)\s(\w*)\,[\w\d\W\:\,]*/)
+			if($scriptOutput[$#scriptOutput - 1] =~ /last CHANGE\s(\w*)\s(\w*)\,[\w\d\W\:\,]*/)
 			{
-			    if($3 eq "CORRELATED")
+			    if($2 eq "CORRELATED")
 			    {
 				push(@{ $bottleNecks{$sourceName} },$destOne . ":" . $destTwo);
 				push(@destLists,$destOne);
 				push(@destLists,$destTwo);
 
 			    }
-			    elsif($3 eq "UNCORRELATED")
+			    elsif($2 eq "UNCORRELATED")
 			    {
 				push(@destLists,$destOne);
 				push(@destLists,$destTwo);
