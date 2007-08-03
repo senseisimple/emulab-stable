@@ -7,7 +7,8 @@
 # Opens <path>/source.dump <path>/dest1.dump <path>/dest2.dump
 
 $basePath = $ARGV[0];
-$dumpPattern = '^([0-9.]*) IP [0-9.]+ > ([0-9.]+): [A-Za-z. ]+([0-9]+)';
+#$dumpPattern = '^([0-9.]*) IP [0-9.]+ > ([0-9.]+): [A-Za-z. ]+([0-9]+)';
+$dumpPattern = '^([0-9.]*) ([0-9.]+) ([0-9]+)$';
 
 sub setupDest
 {

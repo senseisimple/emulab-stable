@@ -21,7 +21,7 @@ sub copyFiles
     system("cp $prefix/node-$dest1/local/logs/dump-$source-$dest1-$dest2.dump $prefix/dump/$source/$dest1/$dest2/dest1.dump");
     system("cp $prefix/node-$dest2/local/logs/dump-$source-$dest1-$dest2.dump $prefix/dump/$source/$dest1/$dest2/dest2.dump");
 
-    system("perl dump2filter.pl $prefix/dump/$source/$dest1/$dest2");
+#    system("perl dump2filter.pl $prefix/dump/$source/$dest1/$dest2");
 }
 
 print("/usr/testbed/bin/loghole -e $pid/$eid sync -P\n");
@@ -43,4 +43,4 @@ for ($source = 1; $source <= $nodeCount; ++$source)
     }
 }
 
-system("/usr/testbed/bin/loghole -e $pid/$eid archive")
+system("/usr/testbed/bin/loghole -e $pid/$eid archive");
