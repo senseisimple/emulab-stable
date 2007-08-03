@@ -74,14 +74,32 @@ sub runTest
 
 #-----------------------------------------------------------------------
 
+@randList = ();
 for ($i = 1; $i <= $nodeCount; ++$i)
 {
-    for ($j = $i + 1; $j <= $nodeCount; ++$j)
+    push(@randList, $i);
+}
+
+srand($source);
+for ($i = 1; $i <= $nodeCount; ++$i)
+{
+    $first = int(rand($nodeCount));
+    $second = int(rand($nodeCount));
+    $temp = $randList[$first];
+    $randList[$first] = $randList[$second];
+    $randList[$second] = $temp;
+}
+
+for ($i = 0; $i < $nodeCount; ++$i)
+{
+    for ($j = $i + 1; $j < $nodeCount; ++$j)
     {
-	if ($i != $source
-	    && $j != $source)
+	$dest1 = $randList[$i];
+	$dest2 = $randList[$j];
+	if ($dest1 != $source
+	    && $dest2 != $source)
 	{
-	    runTest($i, $j);
+	    runTest($dest1, $dest2);
 	}
     }
 }
