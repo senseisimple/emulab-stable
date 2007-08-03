@@ -28,7 +28,13 @@ sub startProgram
 {
     my $dest = $_[0];
     my $command = $_[1];
-    my $string = "/usr/testbed/bin/tevc -e $project/$exp now node-$source-to-node-$dest start";
+    my $wait = $_[2];
+    my $string = "/usr/testbed/bin/tevc ";
+    if ($wait != 0)
+    {
+	String = $string . '-w ';
+    }
+    my $string = $string."-e $project/$exp now node-$source-to-node-$dest start";
     if ($command ne "")
     {
 	$string = $string." COMMAND='".$command."'";
@@ -48,14 +54,12 @@ sub runTest
     my $dest1 = $_[0];
     my $dest2 = $_[1];
     my $i = 0;
-    startProgram($dest1, "sh /bw-bottleneck/run-server.sh $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump");
-    startProgram($dest2, "sh /bw-bottleneck/run-server.sh $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump");
+    startProgram($dest1, "sh /bw-bottleneck/run-server.sh $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump", 0);
+    startProgram($dest2, "sh /bw-bottleneck/run-server.sh $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump", 0);
 
     sleep(2);
 
-    startProgram("client", "sh /bw-bottleneck/run-client.sh node-$dest1.$exp.$project.emulab.net node-$dest2.$exp.$project.emulab.net $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump $duration");
-
-    sleep($duration);
+    startProgram("client", "sh /bw-bottleneck/run-client.sh node-$dest1.$exp.$project.emulab.net node-$dest2.$exp.$project.emulab.net $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump $duration", 1);
 
     stopProgram($dest1);
     stopProgram($dest2);
