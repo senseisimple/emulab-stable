@@ -53,7 +53,6 @@ my %bwMap = {};
 my %delayMap = {};
 my %elabMap = {};
 
-my $nodeNameCounter = 0;
 # Create a list of the IP addresses.
 foreach $conditionLine (@initialConditions)
 {
@@ -316,8 +315,7 @@ foreach $sourceName (readdir(logsDirHandle))
 
 	if($retVal != 0)
 	{
-	    print "ERROR:($sourceName) Transitive property has been violated. Skipping this source node.\n";
-	    next;
+	    print "WARNING:($sourceName) Transitive property has been violated.\n";
 	}
 
 	$nodeClasses{$sourceName} = [ @equivClasses ];
@@ -423,8 +421,13 @@ foreach $sourceName (readdir(logsDirHandle))
 
 closedir(logsDirHandle);
 
+# Check whether the transitive property has been
+# violated in any equivalence classes - If it has been
+# correct it (for now) by assuming that all the nodes
+# have the transitive property wrt shared bottlenecks.
 sub checkSanity()
 {
+    $retVal = 0;
     foreach $equivSet (@equivClasses)
     {
 	foreach $classElement ( @$equivSet ) 
@@ -435,13 +438,14 @@ sub checkSanity()
 		{
 		    if($adjMatrix[$classElement][$secondIter] != 1)
 		    {
-			return -1;
+			$adjMatrix[$classElement][$secondIter] = 1;
+			$retVal = -1;
 		    }
 		}
 	    }
 	}
     }
 
-    return 0;
+    return $retVal;
 }
 
