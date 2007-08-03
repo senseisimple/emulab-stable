@@ -64,7 +64,9 @@ sub runTest
 
     sleep(2);
 
-    startProgram("client", "sh /bw-bottleneck/run-client.sh node-$dest1.$exp.$project.emulab.net node-$dest2.$exp.$project.emulab.net $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump $duration", 1);
+    startProgram("client", "sh /bw-bottleneck/run-client.sh node-$dest1.$exp.$project.emulab.net node-$dest2.$exp.$project.emulab.net $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump $duration", 0);
+
+    sleep($duration + 5);
 
     stopProgram($dest1);
     stopProgram($dest2);
