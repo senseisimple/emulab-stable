@@ -61,10 +61,12 @@ function CHECKPAGEARGS() {
 	USERERROR("You do not have permission to start/stop linktest ".
 		  "on $pid/$eid!", 1);
     }
-    if ($experiment->state() != $TB_EXPTSTATE_ACTIVE &&
-	$experiment->state() != $TB_EXPTSTATE_ACTIVATING &&
-	$experiment->state() != $TB_EXPTSTATE_MODIFY_RESWAP) {
-	USERERROR("Experiment $eid must be active to start/stop linktest!", 1);
+    $expstate = $experiment->state();
+    if ($expstate != $TB_EXPTSTATE_ACTIVE &&
+	$expstate != $TB_EXPTSTATE_ACTIVATING &&
+	$expstate != $TB_EXPTSTATE_MODIFY_RESWAP) {
+	USERERROR("Experiment $eid must be active to start/stop linktest," . 
+		  " not $expstate!", 1);
     }
     $pid            = $experiment->pid();
     $eid            = $experiment->eid();

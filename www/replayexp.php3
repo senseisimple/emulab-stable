@@ -80,8 +80,20 @@ set_time_limit(0);
 STARTBUSY("Starting event replay");
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webeventsys_control replay $pid,$eid",
-		 SUEXEC_ACTION_DIE);
-STOPBUSY();
+		 SUEXEC_ACTION_IGNORE);
+CLEARBUSY();
+
+#
+# Fatal Error. Report to the user, even though there is not much he can
+# do with the error. Also reports to tbops.
+# 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+    #
+    # Never returns ...
+    #
+    die("");
+}
 
 echo "Events for your experiment are now being replayed.\n";
 

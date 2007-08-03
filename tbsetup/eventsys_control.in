@@ -150,7 +150,7 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
     $expstate ne EXPTSTATE_ACTIVATING &&
     $expstate ne EXPTSTATE_MODIFY_RESWAP &&
     $expstate ne EXPTSTATE_SWAPPING) {
-    tbdie("$experiment must be active (or swapping)!");
+    tbdie("$experiment must be active (or swapping), not $expstate!");
 }
 
 #
