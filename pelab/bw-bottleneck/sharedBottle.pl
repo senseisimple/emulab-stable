@@ -370,12 +370,13 @@ foreach $sourceName (readdir(logsDirHandle))
 		}
 
 
-		my $delayEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=" . $addrNodeMapping{$destSeen[$tmpName2]};
+# 		my $delayEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=" . $addrNodeMapping{$destSeen[$tmpName2]};
+		my $delayEventCommand = "$tevc ".$elabMap{$addrNodeMapping{$destSeen[$tmpName2]}}." modify DEST=" . $addrNodeMapping{$destSeen[$tmpName2]}." SRC=".$addrNodeMapping{$sourceName};
 
 		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . $delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$tmpName2]}};
 		# Execute the delay event command.
-		#print "EXECUTE $delayEventCommand\n";
-		#`$delayEventCommand`;
+		print "EXECUTE $delayEventCommand\n";
+		`$delayEventCommand`;
 	    }
 	    $bwEventCommand = $bwEventCommand . " " . "BANDWIDTH=" . $maxBw;
 	    # Execute the event to set the bandwidth for this equivalence class.
@@ -406,13 +407,13 @@ foreach $sourceName (readdir(logsDirHandle))
 		print "EXECUTE: $bwEventCommand\n";
 		`$bwEventCommand`;
 
-		my $delayEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=" . $addrNodeMapping{$destSeen[$i]};
+		my $delayEventCommand = "$tevc ".$elabMap{$addrNodeMapping{$destSeen[$i]}}." modify DEST=" . $addrNodeMapping{$destSeen[$i]}." SRC=".$addrNodeMapping{$sourceName};
 
 		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . $delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$i]}};
 
 		# Execute the delay event command.
-		#print "EXECUTE: $delayEventCommand\n";
-		#`$delayEventCommand`;
+		print "EXECUTE: $delayEventCommand\n";
+		`$delayEventCommand`;
 	    }
 	}
 
