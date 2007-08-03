@@ -2312,6 +2312,12 @@ try:
             pass
         elif opt in ("-a", "--all"):
             all_experiments = True
+            if 'get' or 'sync' in ACTIONS:
+                raise getopt.error(
+                    "\nError: You cannot use -a/--all and sync together.  When using the 'sync' action\n"
+                    "       you must specify an experiment with the -e flag or the --experiment flag\n"
+                    "       or be in an experiment directory. \n")
+                pass
             pass
         elif opt in ("-P", "--port"):
             XMLRPC_PORT = int(val)
