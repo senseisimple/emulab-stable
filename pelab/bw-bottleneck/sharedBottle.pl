@@ -52,6 +52,14 @@ my %bwMap = {};
 my %delayMap = {};
 my %elabMap = {};
 
+# Create & send events.
+# Get initial conditions for the paths of interest
+# from the database, using init-elabnodes.pl
+my $tevc = "/usr/testbed/bin/tevc -e $newProjName/$newExpName now";
+
+`/usr/testbed/bin/tevc -w -e $newProjName/$newExpName now elabc reset`;
+`$tevc elabc create start`;
+
 # Create a list of the IP addresses.
 foreach $conditionLine (@initialConditions)
 {
@@ -331,14 +339,6 @@ foreach $sourceName (readdir(logsDirHandle))
 #	    print "\n";
 
 #	}
-
-	# Create & send events.
-	# Get initial conditions for the paths of interest
-	# from the database, using init-elabnodes.pl
-	my $tevc = "/usr/testbed/bin/tevc -e $newProjName/$newExpName now";
-
-	`$tevc elabc reset`;
-	`$tevc elabc create start`;
 
 	# Send the events to all the nodes which form an equivalent class.
 	foreach $tmpName (@equivClasses)
