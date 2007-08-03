@@ -94,8 +94,10 @@ for ($i = 0; $i < $nodeCount; ++$i)
 {
     for ($j = $i + 1; $j < $nodeCount; ++$j)
     {
-	$dest1 = $randList[$i];
-	$dest2 = $randList[$j];
+#	$dest1 = $randList[$i];
+#	$dest2 = $randList[$j];
+	$dest1 = $i + 1;
+	$dest2 = $j + 1;
 	if ($dest1 != $source
 	    && $dest2 != $source)
 	{
