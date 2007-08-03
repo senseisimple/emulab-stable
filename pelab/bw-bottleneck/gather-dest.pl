@@ -54,6 +54,11 @@ sub runTest
     my $dest1 = $_[0];
     my $dest2 = $_[1];
     my $i = 0;
+
+    stopProgram($dest1);
+    stopProgram($dest2);
+    stopProgram("client");
+
     startProgram($dest1, "sh /bw-bottleneck/run-server.sh $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump", 0);
     startProgram($dest2, "sh /bw-bottleneck/run-server.sh $serverPort /bw-bottleneck dump-$source-$dest1-$dest2.dump", 0);
 
