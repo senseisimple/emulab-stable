@@ -124,23 +124,24 @@ foreach $sourceName (readdir(logsDirHandle))
 		{
 		    if( (-d $logsDir . "/" . $sourceName . "/" . $destOne . "/" . $destTwo) && $destTwo ne "." && $destTwo ne ".." )
 		    {
-
+			$fullPath = "$logsDir/$sourceName/$destOne/$destTwo";
 			# Run Rubenstein's code on the ".filter" files
 			# inside the second destination directory.
-			`perl /proj/tbres/duerig/testbed/pelab/bw-bottleneck/dump2filter.pl $destTwo`;
+			`perl /proj/tbres/duerig/testbed/pelab/bw-bottleneck/dump2filter.pl $fullPath`;
 			$DansScript = "/proj/tbres/duerig/filter/genjitco.FreeBSD";
-			$filterFile1 = $destTwo . "/" . "source.filter";
-			$filterFile2 = $destTwo . "/" . "dest1.filter";
-			$filterFile3 = $destTwo . "/" . "dest2.filter";
+			$filterFile1 = $fullPath . "/" . "source.filter";
+			$filterFile2 = $fullPath . "/" . "dest1.filter";
+			$filterFile3 = $fullPath . "/" . "dest2.filter";
 
 			$sharedBottleneckCheck = $DansScript ." ". $filterFile1
 			    ." ". $filterFile2 ." ". $filterFile3;
 
+			print "EXECUTE: $sharedBottleneckCheck\n";
 			my @scriptOutput = ();
 			@scriptOutput = `$sharedBottleneckCheck | tail -n 2`;
 
-			$scriptOutput[0] = "last CHANGE was CORRELATED, corr case: 30203 pkts, test case: 30203 pkts";
-			$scriptOutput[1] = "testingabcdef";
+#			$scriptOutput[0] = "last CHANGE was CORRELATED, corr case: 30203 pkts, test case: 30203 pkts";
+#			$scriptOutput[1] = "testingabcdef";
 
 			# "CORRELATED" means that these two nodes have
 			# a shared bottleneck.
@@ -334,7 +335,7 @@ foreach $sourceName (readdir(logsDirHandle))
 	# Create & send events.
 	# Get initial conditions for the paths of interest
 	# from the database, using init-elabnodes.pl
-	my $tevc = "tevc -e $newProjName/$newExpName now";
+	my $tevc = "/usr/testbed/bin/tevc -e $newProjName/$newExpName now";
 
 	`$tevc elabc reset`;
 	`$tevc elabc create start`;
@@ -373,13 +374,13 @@ foreach $sourceName (readdir(logsDirHandle))
 
 		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . $delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$tmpName2]}};
 		# Execute the delay event command.
-		print "EXECUTE $delayEventCommand\n";
+		#print "EXECUTE $delayEventCommand\n";
 		#`$delayEventCommand`;
 	    }
 	    $bwEventCommand = $bwEventCommand . " " . "BANDWIDTH=" . $maxBw;
 	    # Execute the event to set the bandwidth for this equivalence class.
 	    print "EXECUTE $bwEventCommand\n";
-	    #`$bwEventCommand`;
+	    `$bwEventCommand`;
 	}
 
 	# Create and send events for all the loner dest nodes reachable from this source node.
@@ -399,18 +400,18 @@ foreach $sourceName (readdir(logsDirHandle))
 	    {
 		my $bwEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=";
 		$bwEventCommand = $bwEventCommand . $addrNodeMapping{$destSeen[$i]};
-		$bwEventCommand = $bwEventCommand . $bwMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$i]}};
+		$bwEventCommand = $bwEventCommand . " BANDWIDTH=".$bwMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$i]}};
 
 		# Execute the event to set the bandwidth for this path.
 		print "EXECUTE: $bwEventCommand\n";
-		#`$bwEventCommand`;
+		`$bwEventCommand`;
 
 		my $delayEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=" . $addrNodeMapping{$destSeen[$i]};
 
 		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . $delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$i]}};
 
 		# Execute the delay event command.
-		print "EXECUTE: $delayEventCommand\n";
+		#print "EXECUTE: $delayEventCommand\n";
 		#`$delayEventCommand`;
 	    }
 	}
