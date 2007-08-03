@@ -32,7 +32,7 @@ sub startProgram
     my $string = "/usr/testbed/bin/tevc ";
     if ($wait != 0)
     {
-	String = $string . '-w ';
+	$string = $string . '-w ';
     }
     my $string = $string."-e $project/$exp now node-$source-to-node-$dest start";
     if ($command ne "")
