@@ -156,17 +156,20 @@ foreach $sourceName (readdir(logsDirHandle))
 
 			if($scriptOutput[$#scriptOutput - 1] =~ /last CHANGE\s(\w*)\s(\w*)\,[\w\d\W\:\,]*/)
 			{
+                print "For source $sourceName: Comparing $destOne $destTwo: $scriptOutput[$#scriptOutput] \n";
 			    if($2 eq "CORRELATED")
 			    {
 				push(@{ $bottleNecks{$sourceName} },$destOne . ":" . $destTwo);
 				push(@destLists,$destOne);
 				push(@destLists,$destTwo);
+                print "CORRELATED\n\n";
 
 			    }
 			    elsif($2 eq "UNCORRELATED")
 			    {
 				push(@destLists,$destOne);
 				push(@destLists,$destTwo);
+                print "UNCORRELATED\n\n";
 			    }
 			    else
 			    {
