@@ -373,7 +373,7 @@ foreach $sourceName (readdir(logsDirHandle))
 # 		my $delayEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=" . $addrNodeMapping{$destSeen[$tmpName2]};
 		my $delayEventCommand = "$tevc ".$elabMap{$addrNodeMapping{$destSeen[$tmpName2]}}." modify DEST=" . $addrNodeMapping{$destSeen[$tmpName2]}." SRC=".$addrNodeMapping{$sourceName};
 
-		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . $delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$tmpName2]}};
+		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . (($delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$tmpName2]}})/2);
 		# Execute the delay event command.
 		print "EXECUTE $delayEventCommand\n";
 		`$delayEventCommand`;
@@ -409,7 +409,7 @@ foreach $sourceName (readdir(logsDirHandle))
 
 		my $delayEventCommand = "$tevc ".$elabMap{$addrNodeMapping{$destSeen[$i]}}." modify DEST=" . $addrNodeMapping{$destSeen[$i]}." SRC=".$addrNodeMapping{$sourceName};
 
-		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . $delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$i]}};
+		$delayEventCommand = $delayEventCommand . " " . "DELAY=" . (($delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$i]}})/2);
 
 		# Execute the delay event command.
 		print "EXECUTE: $delayEventCommand\n";
