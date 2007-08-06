@@ -95,7 +95,8 @@ TBDebugTimeStamp("nalloc checked exp state");
 #
 if ($UID) {
     if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-        warn("*** You not have permission to allocate nodes in $pid/$eid!\n");
+        warn("*** You do not have permission to allocate nodes in ".
+	     "$pid/$eid!\n");
         exit -1;
     }
 }
