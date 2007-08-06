@@ -304,7 +304,7 @@ my $device = "/dev/${devtype}${devnum}";
 # Record when this image was updated, so that we can figure out which
 # revision of the testbed image it was based off.
 #
-$node->MarkUpdateTime() == 0 or
+$image->MarkUpdateTime() == 0 or
     die("*** $0:\n".
 	"    Could not mark the update time in $image\n");
     
