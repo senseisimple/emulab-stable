@@ -185,9 +185,11 @@ $template = Template->Lookup($guid, $version);
 if (!defined($template)) {
     tbdie("Experiment template $guid/$version does not exist!");
 }
-if (! TBProjAccessCheck($user_uid,
-			$template->pid(), $template->gid(),
-			TB_PROJECT_CREATEEXPT)) {
+my $project = $template->GetProject();
+if (!defined($project)) {
+    tbdie("Could not get project for $template");
+}
+if (! $project->AccessCheck($this_user, TB_PROJECT_CREATEEXPT)) {
     tberror("You do not have permission to instantiate template ".
 	    "$guid/$version");
     exit(1);

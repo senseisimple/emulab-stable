@@ -227,13 +227,10 @@ if (!defined($archive)) {
 }
    
 #
-# Check project permission.
+# Check permission.
 #
-if (! TBProjAccessCheck($user_uid,
-			$template->pid(), $template->gid(),
-			TB_PROJECT_CREATEEXPT)) {
-    tberror("You do not have permission to instantiate template ".
-	    "$guid/$version");
+if (! $template->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    tberror("You do not have permission to start/stop runs in $instance!");
     exit(1);
 }
 

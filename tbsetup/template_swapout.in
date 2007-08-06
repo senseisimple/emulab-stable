@@ -137,9 +137,7 @@ $template = Template->Lookup($guid, $version);
 if (!defined($template)) {
     tbdie("Experiment template $guid/$version does not exist!");
 }
-if (! TBProjAccessCheck($user_uid,
-			$template->pid(), $template->gid(),
-			TB_PROJECT_CREATEEXPT)) {
+if (! $template->AccessCheck($this_user, TB_EXPT_DESTROY)) {
     tberror("You do not have permission to terminate template instance ".
 	    "$eid in template $guid/$version");
     exit(1);

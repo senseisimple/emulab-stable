@@ -104,6 +104,7 @@ use libtblog;
 use libArchive;
 use Template;
 use libaudit;
+use Project;
 use User;
 
 # In libdb
@@ -159,8 +160,12 @@ ParseArgs();
 #
 # Make sure UID is allowed to create experiments in this project.
 #
-if (! TBProjAccessCheck($user_uid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    tbdie("You do not have permission to create experiments in $pid/$gid");
+my $project = Project->Lookup($pid, $eid);
+if (!defined($project)) {
+    tbdie("Could not map project $pid/$eid to its object!");
+}
+if (! $project->AccessCheck($this_user, TB_PROJECT_CREATEEXPT)) {
+    tbdie("You do not have permission to create templates in $pid/$gid");
 }
 
 #
