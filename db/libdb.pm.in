@@ -975,7 +975,7 @@ sub TBProjAccessCheck($$$$)
     #
     # Must map to an existing user to be trusted, obviously.
     #
-    my $target_user = User->Lookup($uid);
+    my $target_user = User->LookupByUnixId($uid);
     return 0
 	if (! defined($target_user));
 
@@ -1001,7 +1001,7 @@ sub TBExptAccessCheck($$$$)
     #
     # Must map to an existing user to be trusted, obviously.
     #
-    my $target_user = User->Lookup($uid);
+    my $target_user = User->LookupByUnixId($uid);
     return 0
 	if (! defined($target_user));
 
@@ -1028,7 +1028,7 @@ sub TBNodeAccessCheck($$@)
     #
     # Must map to an existing user to be trusted, obviously.
     #
-    my $target_user = User->Lookup($uid);
+    my $target_user = User->LookupByUnixId($uid);
     return 0
 	if (! defined($target_user));
     return 1
