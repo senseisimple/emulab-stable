@@ -162,11 +162,10 @@ else {
 }
 
 #
-# Change experiment state and lock it.
+# Change experiment state and lock it. Unlock tables at same time.
 #
-$experiment->Lock(($reset ? EXPTSTATE_ACTIVE : EXPTSTATE_PANICED)) == 0
+$experiment->Lock(($reset ? EXPTSTATE_ACTIVE : EXPTSTATE_PANICED), 1) == 0
     or fatal("Could not lock $experiment");
-$experiment->UnLockTables();
 
 #
 # XXX - At this point a failure is going to leave things in an

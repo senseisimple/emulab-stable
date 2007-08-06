@@ -2373,13 +2373,9 @@ sub MarkPhysNodeDown($)
 	return -1;
     }
 
-    DBQueryFatal("lock tables reserved write");
-
     DBQueryFatal("update reserved set " .
 		 "  exptidx=$exptidx, pid='$pid',eid='$eid',rsrv_time=now() ".
 		 "where node_id='$pnode'");
-
-    DBQueryFatal("unlock tables");
 
     TBSetNodeHistory($pnode, TB_NODEHISTORY_OP_MOVE, $UID, $pid, $eid);
 }

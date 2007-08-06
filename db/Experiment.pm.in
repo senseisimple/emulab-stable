@@ -1248,9 +1248,9 @@ sub Unlock($;$)
     return 0;
 }
 
-sub Lock(;$)
+sub Lock(;$$)
 {
-    my ($self, $newstate) = @_;
+    my ($self, $newstate, $unlocktables) = @_;
 
     # Must be a real reference. 
     return -1
@@ -1260,14 +1260,27 @@ sub Lock(;$)
     my $eid = $self->eid();
     my $sclause = (defined($newstate) ? ",state='$newstate' " : "");
 
+    # flag to indicate tables should be unlocked. 
+    $unlocktables = 0
+	if (!defined($unlocktables));
+
     my $query_result =
 	DBQueryWarn("update experiments set expt_locked=now() $sclause ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
 	$query_result->numrows == 0) {
+	$self->UnLockTables()
+	    if ($unlocktables);
 	return -1;
     }
+
+    #
+    # We do this before calling out to the event system to avoid livelock
+    # in case the event system goes down.
+    #
+    $self->UnLockTables()
+	if ($unlocktables);
     
     if (defined($newstate)) {
 	$self->{'EXPT'}->{'state'} = $newstate;

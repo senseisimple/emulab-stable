@@ -182,7 +182,7 @@ if ($waitmode) {
 # terminating consists of a couple of different experiment states down inside
 # the tb scripts. 
 #
-$experiment->LockTables("experiments write") == 0
+$experiment->LockTables() == 0
     or die("*** $0:\n".
 	   "    Could not lock experiment tables for $pid/$eid!\n");
 
@@ -335,8 +335,8 @@ else {
     die("*** $0:\n".
 	"    Experiment $pid/$eid appears to be in the wrong state: $estate\n");
 }
-$experiment->Lock($nextstate);
-$experiment->UnLockTables();
+# Unlock tables at same time.
+$experiment->Lock($nextstate, 1);
 
 #
 # XXX - At this point a failure is going to leave things in an

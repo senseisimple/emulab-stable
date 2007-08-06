@@ -379,7 +379,7 @@ $robotexp =
 # terminating consists of a couple of different experiment states down inside
 # the tb scripts.
 #
-$experiment->LockTables("experiments write") == 0
+$experiment->LockTables() == 0
     or die("*** $0:\n".
 	   "    Could not lock experiment tables for $pid/$eid!\n");
 
@@ -715,8 +715,9 @@ if ($inout ne "out") {
 # 
 $termswapstate = $estate;
 
-# Lock the record, set the nextstate, and unlock the table.
-$experiment->Lock($nextswapstate) == 0
+# Lock the record, set the nextstate, and unlock the table. Unlock
+# tables at same time.
+$experiment->Lock($nextswapstate, 1) == 0
     or tbdie({type => 'secondary', severity => SEV_SECONDARY,
 	      error => ['set_experiment_state_failed', $nextswapstate]},
 	     "Failed to set experiment state to $nextswapstate");
@@ -726,8 +727,6 @@ $experiment->Lock($nextswapstate) == 0
 # See the END block below.
 #
 $justexit = 0;
-
-$experiment->UnLockTables();
 
 # Need the previous swapper for rollback below. Safe now that tables unlocked.
 my $last_swapper = User->Lookup($experiment->swapper_idx());
