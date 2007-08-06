@@ -24,6 +24,7 @@ use libtblog;
 use Node;
 use NodeType;
 use Image;
+use User;
 use OSinfo;
 use English;
 use File::stat;
@@ -68,6 +69,7 @@ sub osload ($$) {
     my $mereuser    = 0;
     my $rowref;
     my $image;
+    my $this_user;
 
     if (!defined($args->{'nodelist'})) {
 	tberror "Must supply a node list!"; # INTERNAL
@@ -112,14 +114,19 @@ sub osload ($$) {
     # want. Normal users can only change nodes in experiments in their
     # own projects.
     #
-    if ($UID && !TBAdmin($UID)) {
-	$mereuser = 1;
+    if ($UID) {
+	$this_user = User->ThisUser();
+	return -1
+	    if (!defined($this_user));
 
-	if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
-	    tberror
-		"Not enough permission to load images on one or ".
-		    "more nodes!";
-	    return -1;
+	if (!$this_user->IsAdmin()) {
+	    $mereuser = 1;
+
+	    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
+		tberror("Not enough permission to load images on one or ".
+			"more nodes!");
+		return -1;
+	    }
 	}
     }
 
@@ -135,7 +142,7 @@ sub osload ($$) {
     # Check permission to use the imageid.
     # 
     if (defined($image) && $mereuser &&
-	! $image->AccessCheck($UID, TB_IMAGEID_READINFO)) {
+	! $image->AccessCheck($this_user, TB_IMAGEID_READINFO)) {
 	tberror "You do not have permission to load $image";
 	return -1;
     }
