@@ -5,7 +5,11 @@ autoconf/install.sh
 os/shd 
 www/cvsweb 
 robots/vmcd/camera_data/output_camera*
-event/lib/event_wrap*
+robots/mezzanine
+robots/mtp/*.java
+robots/mtp/xdr_sizeof.c
+robots/vmcd/etc
+lib/event_wrap*
 doc/ChangeLog 
 tmcd/cygwinxp/site-lisp 
 tmcd/plab 
