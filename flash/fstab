@@ -1,0 +1,5 @@
+# Flash drive:
+/dev/da0s1a             /               ufs     ro              0       0
+# or CD:
+#/dev/acd0a              /               cd9660  ro              0       0
+proc			/proc		procfs	rw		0	0

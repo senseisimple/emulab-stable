@@ -255,6 +255,14 @@ cdboot-install: destdircheck cdboot
 	@$(MAKE) -C cdrom client-install
 	@$(MAKE) -C tmcd/freebsd6 cdboot-install
 
+flashboot: mfsoscheck client
+	@echo "Flash dongle files built"
+
+flashboot-install: destdircheck flashboot
+	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+	@$(MAKE) -C os frisbee-mfs-install
+	@$(MAKE) -C flash client-install
+
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
 # tell, you can't put ifeq()'s inside of targets
