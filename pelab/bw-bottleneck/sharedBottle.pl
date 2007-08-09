@@ -16,13 +16,14 @@ my $newProjName;
 %bottleNecks = {};
 my %nodeClasses;
 
-die "Usage: perl sharedBottle.pl proj_name exp_name newProj_name newExp_name"
-if(@ARGV < 4);
+die "Usage: perl sharedBottle.pl proj_name exp_name newProj_name newExp_name initial_conditions.txt(Optional)"
+if($#ARGV < 3);
 
 $projName = $ARGV[0];
 $expName = $ARGV[1];
 $newProjName = $ARGV[2];
 $newExpName = $ARGV[3];
+$initialConditionsFilename = $ARGV[4];
 
 $logsDir = "/proj/$projName/exp/$expName/logs/dump";
 
@@ -31,9 +32,13 @@ $logsDir = "/proj/$projName/exp/$expName/logs/dump";
 $elabInitScript = "/proj/tbres/duerig/testbed/pelab/init-elabnodes.pl";
 $initConditionsCommand = $elabInitScript . " -o /tmp/initial-conditions.txt " . $newProjName . " " . $newExpName; 
 
-system($initConditionsCommand);
+if($#ARGV == 3) 
+{
+    system($initConditionsCommand);
+    $initialConditionsFilename = "/tmp/initial-conditions.txt";
+}
 
-open(CONDITIONS, "/tmp/initial-conditions.txt");
+open(CONDITIONS, $initialConditionsFilename);
 
 my @initialConditions = ();
 
