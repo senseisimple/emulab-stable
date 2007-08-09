@@ -9,32 +9,35 @@
 #
 #   Input is a set of page URL's including appended ?args, from sep-urls.gawk .
 #   Interspersed action lines for setup and teardown may be prefixed by a
-#   "!" or "-".  See below for further description of "-" lines.
+#   "!" or "-".  Further description of action lines is below.
 #
 #   The GET arg method is default, including action= args for a POSTed form.
 #   A POST argument string follows a "?post:" separator after the other ?args.
 #
 #   A -v COOKIES= awk arg gives the path to an alternate cookies.txt file.
 #   A -v OUTDIR= awk arg gives the path to an alternate output directory.
-#   (Otherwise, .html output files go into the current directory.)
+#        (Otherwise, .html output files go into the current directory.)
 #   A -v SRCDIR= awk arg gives the path to the script source directory.
-#   A -v FAILFILE=/failure.txt awk arg enables generation of conditional
+#   A -v FAILFILE=failure.txt awk arg enables generation of conditional
 #        probe inverse "-" action lines.  See below.
 #
-#   Interspersed action lines may be prefixed by a "!" or a "-".  "!" lines
-#   are just put into the output script among the wget lines.
+#   Action lines in the input stream may be prefixed by a "!" or a "-".
+#   . "!" lines are just put into the output script among the wget lines.
+#   .  "-" lines are *conditional undo* actions for probing.
 #
-#   When probing, an action line prefixed by a "-" that follows a /filename
-#   line in the file list gives a corresponding "inverse action" to undo it if
-#   the probe execution *DOESN'T FAIL*, due to ignoring the probe value given
-#   for the input field.  E.g, the first beginexp that succeeds, uses up the
+#   A conditional undo action line immediately follows a /filename line in the
+#   file list.  It gives a corresponding "inverse action" to conditionally
+#   undo the action of the probed page when its execution *DOESN'T FAIL*.
+#   This is useful when the probe value given for a specific input field is
+#   ignored.  For example, the first beginexp probe that succeeds uses up the
 #   experiment name and blocks all other probes, so the experiment has to be
-#   deleted again before the next probe is done.
+#   deleted again by the inverse action before the next probe is done.
 #
-#   "-" lines are wrapped in an "if" test so they only run if the preceding
-#   probe wget output file DOES NOT match any grep pattern in failure.txt .
-#   NOTE: This will only work reliably with a completed failure.txt pattern file,
-#   i.e. no remaining "UNKNOWN" entries in the analyze_output.txt file.
+#   Undo action "-" lines are wrapped in an "if" test in the generated script
+#   so they only run if the preceding probe wget output file DOES NOT match
+#   any grep pattern in failure.txt .  NOTE: This will only work reliably with
+#   a completed failure.txt pattern file, i.e. there are no remaining
+#   "UNKNOWN" entries in the analyze_output.txt file.
 #
 #   -wget lines will have the rest of the URL and option arguments filled in.
 #   !sql or -sql lines are quoted queries that are passed to the inner boss tbdb.

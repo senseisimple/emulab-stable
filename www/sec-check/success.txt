@@ -28,14 +28,12 @@ To finish creating your slice
 public keys for user
 Click to visit archive
 Done!
-Continue only if this is what you want
-Are you sure you want to continue
 mailing list administration
 Basic Options
 More Options
 Node Options
 Use this page to alter the
-Starting event replay
+now being replayed
 There are [0-9 a-z]* users
 you want to run linktest
 New Users Approved
@@ -45,6 +43,7 @@ is being removed
 Updated power time for
 Range:
 A message has been sent
+Taking a snapshot
 #{ The following few lines are for pages that don't have any success text,
 #  to keep them from being UNKNOWN.
 # archive_missing.php3

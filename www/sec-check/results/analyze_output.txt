@@ -6,17 +6,13 @@ approveuser.php3.html
      	 <title>MyEmulab.Net - New Users Approved</title>
      New Users Approved</h2>
       User testusr3 was <b>granted</b> membership in
-archive_tag.php3.html
-      Commit/Tag Archive
-archive_tags.php3.html
-      <tr> <th>Run</th> <th>Tag (Click to visit archive)</th> <th>Date</th> <th>Description</th></tr>
 beginexp_html.php3.html
      <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
 boot.php3.html
-     reboot (pc120): Attempting to reboot ...
-     reboot (pc149): Attempting to reboot ...
-     reboot (pc120): Successful!
-     reboot (pc149): Successful!
+     reboot (pc168): Attempting to reboot ...
+     reboot (pc91): Attempting to reboot ...
+     reboot (pc168): Successful!
+     reboot (pc91): Successful!
 delaycontrol.php3.html
      Use this page to alter the traffic shaping parameters of your
 deletegroup.php3.html
@@ -26,9 +22,7 @@ deletegroup.php3.html
 deleteimageid.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
-      Image 'testproj3-testimg3' in project testproj3 has been deleted!
-deletenodelog.php3.html
-      Log for node pc165.
+      Image '10007' in project testproj3 has been deleted!
 deleteosid.php3.html
       OS Descriptor 'testosid3' in Project testproj3 has been deleted!
 deleteproject.php3.html
@@ -37,14 +31,8 @@ deleteproject.php3.html
 deletepubkey.php3.html
       Current ssh public keys for user testusr3.
       Enter ssh public keys for user
-deleteuser.php3.1.html
-     <b>User 'testusr3' is being removed!</b> ...<br>
-     This will take a few moments; please be <em>patient</em>.<br>
 deleteuser.php3.html
      <b>User 'testusr3' is being removed!</b> ...<br>
-     This will take a few moments; please be <em>patient</em>.<br>
-     ClearBusyIndicators('<center><b>Done!</b></center>');
-delmmlist.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
 editexp.php3.html
@@ -65,6 +53,9 @@ endexp.php3.html
       You will be notified via email when the experiment has been torn
 feedback.php3.html
      <center><h3><br>Done!</h3></center>
+freenode.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
 freezeuser.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
@@ -74,13 +65,18 @@ gensslcert.php3.html
 joinproject.php3.html
       As a pending user of the Testbed you will receive a key via email.
 kb-manage.php3.html
-     <center><b>Knowledge Base Entry: 280 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+     <center><b>Knowledge Base Entry: 275 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
 kb-search.php3.html
      <font size=+2>Knowledge Base search results</font>
+linktest.php3.html
+      Are you <b>sure</b> you want to run linktest?
+loadimage.php3.html
+      Taking a snapshot of node 'pc119' into image 'testimg3' ...
 modifyexp.php3.html
      <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 moduserinfo.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
 newgroup.php3.html
      <b>Creating project group testgroup3.</b> ...<br>
      This will take a few moments; please be <em>patient</em>.<br>
@@ -88,9 +84,9 @@ newgroup.php3.html
 newimageid.php3.html
       <h3 class="submenuheader">More Options</h3>
 newimageid_ez.php3.html
-      Continue only if this is what you want.</h2><br /><form enctype="multipart/form-data" action='newimageid_ez.php3.html'
+      <h3 class="submenuheader">More Options</h3>
 newnodelog.php3.html
-      Log for node pc165.
+      Log for node pc119.
 newosid.php3.html
      <center><h3>Done!</h3></center>
 newproject.php3.html
@@ -107,52 +103,39 @@ nsgen.php3.html
 plab_ez.php3.html
       <p><b>To finish creating your slice, edit the 
 powertime.php3.html
-     <center>Updated power time for:<br><br><b>pc165</b><br></center><!-- end content -->
+     <center>Updated power time for:<br><br><b>pc119</b><br></center><!-- end content -->
 prereserve_node.php3.html
       <h3 class="submenuheader">Node Options</h3>
 replayexp.php3.html
-     <b>Starting event replay</b> ...<br>
      This will take a few moments; please be <em>patient</em>.<br>
-     ClearBusyIndicators('<center><b>Done!</b></center>');
+     Events for your experiment are now being replayed.
 resendapproval.php.html
       <h2>Done!</h2>
 showpubkeys.php3.html
       Current ssh public keys for user testuser.
       Enter ssh public keys for user
 showsumstats.php3.html
-     <b>Range: Epoch, <a class='static'
+     <b>Range: <a class='static'
 showuser_list.php3.html
-      There are 2 logged in users.
+      There are 3 logged in users.
 template_create.php.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
 updateaccounts.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
+     You will be notified via email when the update has completed on
 ================ failure ================
-deleteuser.php3.1.html
-     Could not continue. Please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
-freenode.php3.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      pc165 is not currently reserved!
-kb-search.php3.html
-     <li><a href="https://myboss.vulnelab.testbed.emulab.net/kb-show.php3?idx=174">What does "invalid migration assumptions" mean from "assign"?</a>
-loadimage.php3.html
-      pc165 is not currently reserved to an experiment!
-moduserinfo.php3.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
+archive_tags.php3.html
+      No tags for experiment testbed/testexp1
 newmmlist.php3.html
       &nbsp;Oops, please fix the following errors!&nbsp;
 newnodes_list.php3.html
       At least one node must be selected!
 swapexp.php3.html
      <h3>swapout could not proceed</h3><blockquote><pre>*** swapexp: Experiment testproj3/testexp3 is not swapped in or activating!
-template_swapin.php.html
+template_export.php.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
-updateaccounts.php3.html
-     <h3>Node update could not proceed</h3><blockquote><pre>Experiment testbed/testexp1 is not ACTIVE!
+      Invalid page arguments: /template_export.php?experiment=9<br><br>Must provide a template or an instance to export
 ================ UNKNOWN ================
 changeuid.php.html
-linktest.php3.html
-template_modify.php.html

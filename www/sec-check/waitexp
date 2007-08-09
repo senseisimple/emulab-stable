@@ -1,0 +1,63 @@
+#! /bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# waitexp - Wait for an experiment to be in the "active" state.
+
+pid=$1
+eid=$2
+if [ -z "$pid" -o -z "$eid" ]; then
+    echo "usage: $0 <pid> <eid>"
+    exit 1
+fi
+
+max=600  # Max number of seconds to wait (10 minutes).
+msg=60   # Give a message every so often (seconds)
+sec=10   # Check every few seconds.
+hdr=true
+
+i=0; while [ $i -lt $(($max/$msg)) ]
+do
+    i=$(($i + 1))
+    j=0; while [ $j -lt $(($msg/$sec)) ]
+    do
+	j=$(($j + 1))
+
+	sql="select state from experiments where pid='$pid' and eid='$eid'"
+	state=`echo "$sql" | mysql tbdb | tail +2`
+
+	# Done if active state now.
+	if [ "$state" = "active" ]; then
+	    echo ""
+	    echo "$pid/$eid is $state."
+	    echo ""
+	    exit 0
+
+	# Starting to wait.
+	elif [ $hdr ]; then
+	    echo ""
+	    echo "*** Waiting for $pid/$eid to become active."
+	    hdr=
+
+	# Extra message if inactive but the state changes.
+	elif [ "$ostate" != "$state" ]; then
+	    echo "$pid/$eid $state"
+	fi
+	ostate=$state
+
+	# Dots for progress between messages.
+	echo -n .
+	sleep $sec
+    done
+
+    # Show the inactive state.
+    echo "$pid/$eid $state"
+done
+
+# Failed!
+echo "*** Giving up waiting for $pid/$eid."
+echo ""
+exit 1

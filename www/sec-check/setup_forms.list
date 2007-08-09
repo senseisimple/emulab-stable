@@ -3,10 +3,11 @@
 
 !projidx=sql "select pid_idx from projects where pid='testproj3'"
 ! if ( "$projidx" == "" ) then
+!projidx=sql "select pid_idx from projects where pid='testproj3'"
 /newproject.php3
 /approveproject.php3
 ! else
-!     echo "*** Project testproj3 already exists! ***"
+!     echo "*** Project testproj3 ($projidx) already exists! ***"
 ! endif
 
 !usridx=sql "select uid_idx from users where uid='testusr3'"
@@ -22,8 +23,9 @@
 !usridx=sql "select uid_idx from users where uid='testusr3'"
 /changeuid.php
 /approveuser.php3
+/moduserinfo.php3
 ! else
-!     echo "*** User testusr3 already exists! ***"
+!     echo "*** User testusr3 ($usridx) already exists! ***"
 ! endif
 
 !expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
@@ -42,7 +44,7 @@
 /modifyexp.php3
 /editexp.php3
 ! else
-!     echo "*** Experiment testexp3 already exists! ***"
+!     echo "*** Experiment testexp3 ($expidx) already exists! ***"
 ! endif
 
 
@@ -53,12 +55,26 @@
 !grpidx=sql "select gid_idx from groups where gid='testgroup3'"
 /editgroup.php3
 ! else
-!     echo "*** Group testgroup3 already exists! ***"
+!     echo "*** Group testgroup3 ($grpidx) already exists! ***"
 ! endif
 
+!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+! if ( "$osidx" == "" ) then
 /newosid.php3
+!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+! else
+!     echo "*** OS testproj3-testosid3 $(osidx) already exists! ***"
+! endif
+
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+! if ( "$imgidx" == "" ) then
 /newimageid_ez.php3
 /newimageid.php3
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+! else
+!     echo "*** Image testproj3-testimg3 $(imgdx) already exists! ***"
+! endif
+/editimageid.php3
 /loadimage.php3
 
 /newmmlist.php3

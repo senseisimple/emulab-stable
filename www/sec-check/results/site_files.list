@@ -7,12 +7,10 @@ changeuid.php
 delaycontrol.php3
 deletegroup.php3
 deleteimageid.php3
-deletenodelog.php3
 deleteosid.php3
 deleteproject.php3
 deletepubkey.php3
 deleteuser.php3
-delmmlist.php3
 editexp.php3
 editgroup_form.php3
 editimageid.php3
@@ -49,11 +47,9 @@ prereserve_node.php3
 replayexp.php3
 resendapproval.php
 showpubkeys.php3
+showsfskeys.php3
 showsumstats.php3
 showuser_list.php3
 swapexp.php3
 template_create.php
-template_metadata.php
-template_modify.php
-template_swapin.php
 updateaccounts.php3

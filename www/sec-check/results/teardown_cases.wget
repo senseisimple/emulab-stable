@@ -6,15 +6,29 @@ wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.
      else
          echo "*** No experiment testproj3/testexp3! ***"
      endif
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O freenode.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc165"
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deleteimageid.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testproj3-testimg3"
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deleteosid.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?osid=testproj3-testosid3"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O freenode.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc119"
+    set imgidx=`echo "select imageid from images where pid='testproj3' and imagename='testimg3'"| ssh $MYBOSS mysql tbdb | tail +2`; echo "    imgidx = $imgidx"
+     if ( "$imgidx" != "" ) then
+     else
+         echo "*** No image testimg3! ***"
+     endif
+    set imgidx=`echo "select imageid from images where pid='testproj3' and imagename='testimg3a'"| ssh $MYBOSS mysql tbdb | tail +2`; echo "    imgidx = $imgidx"
+     if ( "$imgidx" != "" ) then
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deleteimageid.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=$imgidx"
+     else
+         echo "*** No image testimg3a! ***"
+     endif
+    set osidx=`echo "select osid from os_info where pid='testproj3' and osname='testosid3'"| ssh $MYBOSS mysql tbdb | tail +2`; echo "    osidx = $osidx"
+     if ( "$osidx" != "" ) then
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deleteosid.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?osid=$osidx"
+     else
+         echo "*** No os id testosid3! ***"
+     endif
     set usridx=`echo "select uid_idx from users where uid='testusr3'"| ssh $MYBOSS mysql tbdb | tail +2`; echo "    usridx = $usridx"
      if ( "$usridx" != "" ) then
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deletepubkey.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key=1&user=$usridx"
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O freezeuser.php3.html --post-data "confirmed=Confirm&confirmed_twice=Confirm" "https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?user=$usridx&action=freeze"
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deleteuser.php3.html --post-data "confirmed=Confirm&confirmed_twice=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user=$usridx&target_project=testproj3"
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O deleteuser.php3.1.html --post-data "confirmed=Confirm&confirmed_twice=Confirm" "https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user=$usridx"
      else
          echo "*** No user testusr3! ***"
      endif
@@ -34,5 +48,6 @@ wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.
      endif
     echo  "delete from knowledge_base_entries where xref_tag like'test_tag%'"| ssh $MYBOSS mysql tbdb
     echo  "delete from users where uid='testusr3'"| ssh $MYBOSS mysql tbdb
-    echo  "delete from group_membership where uid='testusr3'"!| ssh $MYBOSS mysql tbdb
+    echo  "delete from group_membership where uid='testusr3'"| ssh $MYBOSS mysql tbdb
     ssh $MYBOSS sudo pw userdel -n testusr3
+    echo Done.

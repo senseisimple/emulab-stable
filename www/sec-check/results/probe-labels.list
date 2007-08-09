@@ -1,51 +1,17 @@
-            Probe label: '**{approveproject.php3:head_uid}**
-            Probe label: '**{approveproject.php3:pid}**
-            Probe label: '**{boot.php3:node_id}**
-            Probe label: \'**{delaycontrol.php3:eid}**
-            Probe label: \'**{delaycontrol.php3:pid}**
-            Probe label: '**{deletegroup.php3:gid}**
-            Probe label: '**{deletegroup.php3:pid}**
-            Probe label: '**{deleteimageid.php3:imageid}**
-            Probe label: '**{deleteosid.php3:osid}**
-            Probe label: '**{deleteproject.php3:pid}**
-            Probe label: '**{deleteuser.php3:target_uid}**
-            Probe label: '**{deleteuser.php3:target_uid}**
-            Probe label: '**{deleteuser.php3:target_pid}**
-            Probe label: '**{deleteuser.php3:target_pid}**
-            Probe label: \'**{editexp.php3:pid}**
-            Probe label: \'**{editexp.php3:eid}**
-            Probe label: '**{editgroup.php3:gid}**
-            Probe label: '**{editgroup.php3:pid}**
+            Probe label: \'**{approveproject.php3:head_uid}**
+            Probe label: \'**{editexp.php3:formfields[noswap_reason]}**
+            Probe label: '**{editexp.php3:formfields[linktest_level]}**
+            Probe label: \'**{editexp.php3:formfields[noidleswap_reason]}**
+            Probe label: '**{editexp.php3:formfields[cpu_usage]}**
+            Probe label: \'**{editexp.php3:formfields[description]}**
+            Probe label: '**{editexp.php3:formfields[mem_usage]}**
             Probe label: \'**{editimageid.php3:formfields[description]}**
-            Probe label: '**{freenode.php3:node_id}**
-            Probe label: '**{freezeuser.php3:target_uid}**
-            Probe label: \'**{joinproject.php3:formfields[usr_country]}**
             Probe label: \'**{kb-manage.php3:formfields[xref_tag]}**
             Probe label: \'**{kb-manage.php3:formfields[body]}**
             Probe label: \'**{kb-manage.php3:formfields[new_section]}**
             Probe label: \'**{kb-manage.php3:formfields[title]}**
             Probe label: \'**{kb-search.php3:query}**
-            Probe label: \'**{modifyexp.php3:eid}**
-            Probe label: \'**{modifyexp.php3:pid}**
-            Probe label: '**{modnodeattributes.php3:node_id}**
+            Probe label: \'**{moduserinfo.php3:formfields[usr_country]}**
             Probe label: \'**{newgroup.php3:group_description}**
-            Probe label: '**{newgroup.php3:group_pid}**
             Probe label: \'**{newgroup.php3:group_leader}**
-            Probe label: '**{newimageid.php3:formfields[node]}**
-            Probe label: '**{newimageid.php3:formfields[part1_osid]}**
-            Probe label: '**{newimageid.php3:formfields[default_osid]}**
-            Probe label: '**{newimageid.php3:formfields[pid]}**
-            Probe label: '**{newimageid_ez.php3:formfields[node]}**
-            Probe label: '**{newimageid_ez.php3:formfields[pid]}**
-            Probe label: '**{newimageid_ez.php3:formfields[gid]}**
-            Probe label: '**{newnodelog.php3:node_id}**
-            Probe label: '**{newosid.php3:pid}**
-            Probe label: '**{nodecontrol.php3:node_id}**
-            Probe label: '**{replayexp.php3:eid}**
-            Probe label: '**{replayexp.php3:pid}**
             Probe label: '**{showuser_list.php3:searchfor}**
-            Probe label: '**{swapexp.php3:eid}**
-            Probe label: '**{swapexp.php3:pid}**
-            Probe label: '**{updateaccounts.php3:eid}**
-            Probe label: \'**{updateaccounts.php3:nodeid}**
-            Probe label: '**{updateaccounts.php3:pid}**

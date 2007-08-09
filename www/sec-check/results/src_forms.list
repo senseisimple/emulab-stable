@@ -1,26 +1,16 @@
-./.#deleteuser.php3.1.19:189:    echo "<form action='$url' method=post>";
-./.#deleteuser.php3.1.19:217:    echo "<form action='$url' method=post>";
-./.#editnodetype.php3.1.12:137:          <form action=editnodetype.php3?$formargs method=post " .
-./.#showstuff.php3.1.188:1781:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
-./.#showstuff.php3.1.190:1800:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
-./.#showstuff.php3.1.191:1804:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
-./.#showstuff.php3.1.192:1810:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
-./.#showstuff.php3.1.193:1820:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
-./.#showstuff.php3.1.196:1647:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
-./.#showstuff.php3.1.197:1647:	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
 ./approveproject_form.php3:107:      <form action='" . CreateURL("approveproject", $project) .
 ./approveuser_form.php3:131:echo "<form action='approveuser.php3' method='post'>\n";
 ./approvewauser_form.php3:111:echo "<form action='approvewauser.php3' method='post'>\n";
 ./archive_missing.php3:113:    echo "<form action='" .
 ./archive_tag.php3:71:          <form action='" . CreateURL("archive_tag", $experiment) . "' ".
-./archive_view.php3:140:    echo "<form action='${TBBASE}/archive_tag.php3' $style method=get>\n";
-./archive_view.php3:146:echo "<form action='${TBBASE}/archive_tags.php3' $style method=get>";
-./beginexp_form.php3:308:    echo "<form name=form1 enctype=multipart/form-data
+./archive_view.php3:117:echo "<form action='template_export.php' $style method=get>\n";
+./archive_view.php3:125:echo "<form action='archive_tags.php3' $style method=get>";
+./beginexp_form.php3:296:    echo "<form name=form1 enctype=multipart/form-data
 ./boot.php3:88:    echo "<form action='$url' target=_blank method=post>";
 ./changeuid.php:61:          <form action=changeuid.php method=post>
 ./chpasswd.php3:102:          <form action='${TBBASE}/$chpass_url' method=post>\n";
 ./delaycontrol.php3:208:print "<form action='$url' method=post>\n" .
-./deletegroup.php3:81:    echo "<form action='$url' method=post>";
+./deletegroup.php3:82:    echo "<form action='$url' method=post>";
 ./deleteimageid.php3:72:    echo "<form action='$url' method=post>";
 ./deletenodelog.php3:64:    echo "<form action='$url' method=post>";
 ./deleteosid.php3:144:    echo "<form action='$url' method=\"post\">";
@@ -31,10 +21,10 @@
 ./deleteuser.php3:189:    echo "<form action='$url' method=post>";
 ./deleteuser.php3:217:    echo "<form action='$url' method=post>";
 ./delmmlist.php3:74:    echo "<form action='delmmlist.php3?listname=$listname' method=post>";
-./editexp.php3:74:          <form action='$url' method=post>\n";
+./editexp.php3:78:          <form action='$url' method=post>\n";
 ./editgroup_form.php3:91:          <form action='$url' method=post>
 ./editimageid.php3:87:          <form action='$url' method=post name=idform>\n";
-./editnodetype.php3:143:          <form action=editnodetype.php3?$formargs method=post " .
+./editnodetype.php3:141:          <form action=editnodetype.php3?$formargs method=post " .
 ./editsitevars.php3:103:    echo "<form action='editsitevars.php3' method='get'>";
 ./editsitevars.php3:112:    echo "<form action='editsitevars.php3' method='get'>";
 ./editsitevars.php3:48:	echo "<form action='editsitevars.php3' method='post'>";
@@ -42,19 +32,19 @@
 ./endexp.php3:83:    echo "<form action='$url' method=post>";
 ./feedback.php3:105:    echo "<form action='$url' method=post>";
 ./floormap.php3:428:echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
-./freenode.php3:78:    echo "<form action='$url' method=post>";
+./freenode.php3:72:    echo "<form action='$url' method=post>";
 ./freezeuser.php3:119:    echo "<form action='$url' method=post>";
 ./freezeuser.php3:138:    echo "<form action='$url' method=post>";
 ./gensslcert.php3:101:          <form enctype=multipart/form-data
-./joinproject.php3:154:          <form name=myform enctype=multipart/form-data
+./joinproject.php3:167:          <form name=myform enctype=multipart/form-data
 ./kb-manage.php3:94:          <form action='kb-manage.php3' method=post>\n";
 ./kb-search.php3:40:          <form action=kb-search.php3 method=get>\n";
-./linktest.php3:327:echo "<form action=linktest.php3 method=post name=myform id=myform>";
+./linktest.php3:330:echo "<form action=linktest.php3 method=post name=myform id=myform>";
 ./loadimage.php3:56:    echo "<form action='$url' method='post'>\n".
 ./loadimage.php3:88:    echo "<center><form action='$url' method='post'>\n".
 ./login.php3:121:          <form action='${TBBASE}/login.php3${pagearg}' method=post>
-./menu.php3:182:	   <form method=get action=$TBDOCBASE/search.php3>
-./menu.php3:308:        <form method='get' action='$newsBase/search.php3'>
+./menu.php3:183:	   <form method=get action=$TBDOCBASE/search.php3>
+./menu.php3:309:        <form method='get' action='$newsBase/search.php3'>
 ./modifyexp.php3:101:    echo "<form name='form1' action='$url' method='post'
 ./modnodeattributes_form.php3:78:echo "<form action='$url' method=\"post\">\n";
 ./moduserinfo.php3:87:          <form action='$url' method=post>\n";
@@ -65,43 +55,49 @@
 ./newmmlist.php3:112:          <form action='newmmlist.php3' method=post name=myform>\n";
 ./newnode_edit.php3:83:<form action="newnode_edit.php3" method="get">
 ./newnodelog_form.php3:41:     <form action='newnodelog.php3' method=post>\n";
-./newnodes_list.php3:343:<form action="newnodes_list.php3" method="get" name="nodeform">
+./newnodes_list.php3:357:<form action="newnodes_list.php3" method="get" name="nodeform">
 ./newosid_form.php3:52:<form action="newosid.php3" method="post" name=idform>
 ./newproject.php3:157:          <form enctype=multipart/form-data name=myform
 ./news.php3:173:	echo "<form action='news.php3' ".
 ./news.php3:221:	echo "<form action='news.php3' method='post'>\n";
 ./news.php3:288:	echo "<form action='news.php3' method='post'>";
 ./news.php3:80:	echo "<form action='news.php3' method='post'>\n";
-./nodecontrol_form.php3:93:echo "<form action='$url' method=\"post\">\n";
+./nodecontrol_form.php3:98:echo "<form action='$url' method=\"post\">\n";
 ./nscheck_form.php3:33:echo "<form enctype=\"multipart/form-data\"
 ./nsgen.php3:129:    echo "<form name='form1' action='nsgen.php3' method='get'>\n";
-./pagenotworking.php:26: 	echo "<form action='pagenotworking.php' method=get>";
+./pagenotworking.php:27: 	echo "<form action='pagenotworking.php' method=get>";
 ./panicbutton.php3:66:    echo "<form action='$url' method=post>";
 ./password.php3:78:          <form action=${TBBASE}/password.php3 method=post>
-./plab_ez.php3:120:    echo "<form name='form1' action='plab_ez.php3' method='get'>\n";
+./plab_ez.php3:137:    echo "<form name='form1' action='plab_ez.php3' method='get'>\n";
+./plabmetrics.php3:1087:    echo "<form name='nodeeditsel' id='nodeeditsel' action='plabmetrics.php3' method='post'>\n";
+./plabmetrics.php3:1108:    # open a new window without using javascript (only the <form> element
+./plabmetrics.php3:1111:	echo "<form name='toplabez' id='toplabez' action='plab_ez.php3'" . 
+./plabmetrics.php3:1147:    echo "<form name='plsearchform' id='plsearchform'" .
+./plabmetrics.php3:1777:	echo "<form name='nodesel' id='nodesel' action='plabmetrics.php3' method='get'" . 
 ./powertime.php3:62:    $body_str .= "<form action='powertime.php3' method=get><br><table>";
 ./prereserve_node.php3:75:          <form action='$url' method=post>\n";
+./record_revise.php:80:          <form action='$url' method=post>\n";
 ./remapexp.php3:74:    echo "<form action='$url' method=post>";
 ./replayexp.php3:66:    echo "<form action='$url' method=post>";
 ./request_idleinfo.php3:78:    echo "<form action='$url' method=post>";
 ./request_swapexp.php3:94:    echo "<form action='$url' method=post>";
 ./resendapproval.php:68:    echo "<form action='$url' method='post'>\n";
 ./robotmap.php3:233:echo "<form method=post action='robotmap.php3" .
-./search.php3:27:          <form action=search.php3 method=get>\n";
+./search.php3:28:          <form action=search.php3 method=get>\n";
 ./setnodeloc.php3:136:          <form action=setnodeloc.php3 method=get>
 ./showpubkeys.php3:137:          <form enctype=multipart/form-data
 ./showsfskeys.php3:135:          <form enctype=multipart/form-data
-./showsumstats.php3:104:echo "<form action=showsumstats.php3 method=get>
-./showuser_list.php3:58:echo "<form action=showuser_list.php3 method=post>
+./showsumstats.php3:119:echo "<form action=showsumstats.php3 method=get>
+./showuser_list.php3:54:echo "<form action=showuser_list.php3 method=post>
 ./swapexp.php3:171:    echo "<form action='swapexp.php3?inout=$inout&pid=$pid&eid=$eid'
-./template_analyze.php:54:    echo "<form action='$url' method=post>\n";
+./template_analyze.php:60:    echo "<form action='$url' method=post>\n";
 ./template_commit.php:62:    echo "<form action='$url' method=post>\n";
 ./template_create.php:60:    echo "<form enctype=multipart/form-data
-./template_defs.php:1559:	echo "<form action='fee' method=post>\n";
-./template_defs.php:1584:	echo "<form action='fee' method=post>\n";
+./template_defs.php:1605:	echo "<form action='fee' method=post>\n";
+./template_defs.php:1630:	echo "<form action='fee' method=post>\n";
 ./template_editevents.php:84:    echo "<form action='$url'  method=post>\n";
-./template_export.php:66:    echo "<form action='$url' method=post>\n";
-./template_exprun.php:269:    echo "<form action='${url}&action=start' method=post>\n";
+./template_export.php:116:    echo "<form action='$url' method=post>\n";
+./template_exprun.php:279:    echo "<form action='${url}&action=$action' method=post>\n";
 ./template_metadata.php:95:    echo "<form action='${url}&action=$action' method=post>\n";
 ./template_modify.php:74:    echo "<form action='$url' method='post'>";
 ./template_swapin.php:99:    echo "<form action='$url' method=post>\n";

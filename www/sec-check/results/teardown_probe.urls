@@ -1,36 +1,71 @@
+! gmake admin
+!expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
+! if ( "$expidx" != "" ) then
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&pid=testproj3?post:confirmed='**{swapexp.php3:confirmed}**
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid='**{swapexp.php3:eid}**&inout=out&pid=testproj3?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout='**{swapexp.php3:inout}**&pid=testproj3?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&pid='**{swapexp.php3:pid}**?post:confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/endexp.php3?eid=testexp3&pid=testproj3?post:confirmed='**{endexp.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment=$expidx?post:confirmed='**{endexp.php3:confirmed}**
 - $SRCDIR/undo-probe.pl -t exp testproj3/testexp3
-https://myboss.vulnelab.testbed.emulab.net/endexp.php3?eid='**{endexp.php3:eid}**&pid=testproj3?post:confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment='**{endexp.php3:experiment}**?post:confirmed=Confirm
 - $SRCDIR/undo-probe.pl -t exp testproj3/testexp3
-https://myboss.vulnelab.testbed.emulab.net/endexp.php3?eid=testexp3&pid='**{endexp.php3:pid}**?post:confirmed=Confirm
-- $SRCDIR/undo-probe.pl -t exp testproj3/testexp3
-https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc158?post:confirmed='**{freenode.php3:confirmed}**
+! else
+!     echo "*** No experiment testproj3/testexp3! ***"
+! endif
+https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc119?post:confirmed='**{freenode.php3:confirmed}**
 https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id='**{freenode.php3:node_id}**?post:confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?post:confirmed='**{deleteimageid.php3:confirmed}**&imageid=testproj3-testimg3
-https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?post:confirmed=Confirm&imageid='**{deleteimageid.php3:imageid}**
-https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?post:confirmed='**{deleteosid.php3:confirmed}**&osid=testproj3-testosid3
-https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?post:confirmed=Confirm&osid='**{deleteosid.php3:osid}**
-https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key=1&target_uid=testusr3?post:confirmed='**{deletepubkey.php3:confirmed}**
-https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key=1&target_uid='**{deletepubkey.php3:target_uid}**?post:confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key='**{deletepubkey.php3:key}**&target_uid=testusr3?post:confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?post:confirmed='**{freezeuser.php3:confirmed}**&target_uid=testusr3&action=freeze
-https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?post:confirmed=Confirm&confirmed_twice=Confirm&target_uid='**{freezeuser.php3:target_uid}**&action=freeze
-https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?post:confirmed=Confirm&confirmed_twice=Confirm&target_uid=testusr3&action='**{freezeuser.php3:action}**
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?post:confirmed='**{deleteuser.php3:confirmed}**&target_uid=testusr3&target_pid=testproj3
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?post:confirmed='**{deleteuser.php3:confirmed}**&target_uid=testusr3
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?post:confirmed=Confirm&confirmed_twice=Confirm&target_uid='**{deleteuser.php3:target_uid}**&target_pid=testproj3
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?post:confirmed=Confirm&confirmed_twice=Confirm&target_uid='**{deleteuser.php3:target_uid}**
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?post:confirmed=Confirm&confirmed_twice=Confirm&target_uid=testusr3&target_pid='**{deleteuser.php3:target_pid}**
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?post:confirmed=Confirm&confirmed_twice=Confirm&target_uid=testusr3&target_pid='**{deleteuser.php3:target_pid}**
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+! if ( "$imgidx" != "" ) then
+! else
+!     echo "*** No image testimg3! ***"
+! endif
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3a'"
+! if ( "$imgidx" != "" ) then
+https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=$imgidx?post:confirmed='**{deleteimageid.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid='**{deleteimageid.php3:imageid}**?post:confirmed=Confirm
+! else
+!     echo "*** No image testimg3a! ***"
+! endif
+!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+! if ( "$osidx" != "" ) then
+https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?osid=$osidx?post:confirmed='**{deleteosid.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?osid='**{deleteosid.php3:osid}**?post:confirmed=Confirm
+! else
+!     echo "*** No os id testosid3! ***"
+! endif
+!usridx=sql "select uid_idx from users where uid='testusr3'"
+! if ( "$usridx" != "" ) then
+https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key=1&user=$usridx?post:confirmed='**{deletepubkey.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key=1&user='**{deletepubkey.php3:user}**?post:confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key='**{deletepubkey.php3:key}**&user=$usridx?post:confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?user=$usridx&action=freeze?post:confirmed='**{freezeuser.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?user='**{freezeuser.php3:user}**&action=freeze?post:confirmed=Confirm&confirmed_twice=Confirm
+https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?user=$usridx&action='**{freezeuser.php3:action}**?post:confirmed=Confirm&confirmed_twice=Confirm
+https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user=$usridx&target_project=testproj3?post:confirmed='**{deleteuser.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user='**{deleteuser.php3:user}**&target_project=testproj3?post:confirmed=Confirm&confirmed_twice=Confirm
+https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user=$usridx&target_project='**{deleteuser.php3:pid}**?post:confirmed=Confirm&confirmed_twice=Confirm
+! else
+!     echo "*** No user testusr3! ***"
+! endif
 !sql "delete from deleted_users where uid='testusr3'"
+!grpidx=sql "select gid_idx from groups where gid='testgroup3'"
+! if ( "$grpidx" != "" ) then
 https://myboss.vulnelab.testbed.emulab.net/deletegroup.php3?gid=testgroup3&pid=testproj3?post:confirmed='**{deletegroup.php3:confirmed}**
 https://myboss.vulnelab.testbed.emulab.net/deletegroup.php3?gid='**{deletegroup.php3:gid}**&pid=testproj3?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/deletegroup.php3?gid=testgroup3&pid='**{deletegroup.php3:pid}**?post:confirmed=Confirm
+! else
+!     echo "*** No group testgroup3! ***"
+! endif
+!projidx=sql "select pid_idx from projects where pid='testproj3'"
+! if ( "$projidx" != "" ) then
 !sql "delete from experiments where pid = 'testproj3' and eid like'T%-%'"
-https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3?post:confirmed='**{deleteproject.php3:confirmed}**&pid=testproj3
-https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3?post:confirmed=Confirm&confirmed_twice=Confirm&pid='**{deleteproject.php3:pid}**
+https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3?pid=testproj3?post:confirmed='**{deleteproject.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3?pid='**{deleteproject.php3:pid}**?post:confirmed=Confirm&confirmed_twice=Confirm
+! else
+!     echo "*** No project testproj3! ***"
+! endif
 !sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"
+!sql "delete from users where uid='testusr3'"
+!sql "delete from group_membership where uid='testusr3'"
+!ssh $MYBOSS sudo pw userdel -n testusr3
+!echo Done.

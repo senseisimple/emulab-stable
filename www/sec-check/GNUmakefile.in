@@ -57,7 +57,9 @@ $(SRC_FILES): $(SRC_FORMS)
 
 src_msg: src_list
 	@echo "** `wc -l < $(SRC_FORMS)` separate forms" \
-	     "are on `wc -l < $(SRC_FILES)` code pages.  **" | tr -s " "
+	     "are on `wc -l < $(SRC_FILES)` code pages. **" | tr -s " "
+	@echo "** (See $(notdir $(SRC_FORMS)) and $(notdir $(SRC_FILES)) in $(RESDIR) .) **"
+	@echo "**"
 
 #================================================================
 # Lots of common stuff for wget.
@@ -152,6 +154,7 @@ fmt_html_args = $(subst $(empty) ,&,$(subst \ ,%20,$(subst \",%22,$(strip $(1)))
 # Post a form via wget and check the returned page.
 # Args are [root],php_infile,[html_outfile],html_args,[run_time_args] .
 # root defaults to $(sroot) .  html_outfile defaults to php_infile.html .
+# The run_time_args are good for e.g. a repeatedly referenced db item.
 outdir = activate.wget
 define wget_post
 	@ if [ ! -d $(outdir) ]; then mkdir $(outdir); fi
@@ -160,9 +163,10 @@ define wget_post
 	  html_outfile=$(strip $(3)); \
 	  $(if $(5),$(5);) \
 	  post_args="$(call fmt_html_args, $(4))"; \
-	  echo "==== $(outdir) $${root_dir} $${php_infile} $${html_outfile}.html ===="; \
+	  echo "==== $(outdir) $${root_dir} $${php_infile}" \
+		    "$${html_outfile:=$(2).html} ===="; \
 	  echo "cd $(outdir); wget $(wget_args_subdir) \
-	    -O $${html_outfile:=$(2).html} \
+	    -O $${html_outfile} \
 	    -o $${html_outfile}.log \
 	    --post-data '$${post_args}' \
 	    $${root_dir:-$(sroot)}/$${php_infile}" \
@@ -176,8 +180,8 @@ define wget_post
 	  fi
 endef
 
-# Send an SQL command to myboss.
-# Commas separate "$(call" args.  Embed them in an arg with a variable $(comma).
+# Send an SQL command to myboss.  The value is the last line if more than one.
+# Commas separate "$(call" args.  Embed them into an arg with a variable $(comma).
 comma := ,
 boss_sql = echo "$(strip $(1))" | ssh $(boss) mysql tbdb | tail -1
 
@@ -400,6 +404,10 @@ new_osid:
 	    os_shared=Yep\
 	    os_feature_linkdelays=checked\
 	    os_feature_ssh=checked)
+os1_osid_sql = $(call boss_sql, \
+	select osid from os_info where pid='$(proj1)' and osname='$(os1)')
+show_os1_osid:
+	echo `$(os1_osid_sql)`
 img1 = testimg
 new_imageid:
 	$(call wget_post,,newimageid.php3,newimageid.html,\
@@ -408,11 +416,12 @@ new_imageid:
 	    formfields[gid]=\
 	    formfields[path]=/proj/testbed/images/$(img1).ndz\
 	    formfields[loadlength]=1\
-	    formfields[default_osid]=$(proj1)-$(os1)\
-	    formfields[part1_osid]=$(proj1)-$(os1)\
+	    formfields[default_osid]=$$os1_osid\
+	    formfields[part1_osid]=$$os1_osid\
 	    formfields[part2_osid]=X\
 	    formfields[part3_osid]=X\
 	    formfields[part4_osid]=X\
+	    formfields[mtype_pc600]=Yep\
 	    formfields[mtype_pc850]=Yep\
 	    formfields[makedefault]=Yep\
 	    formfields[loadpart]=1\
@@ -420,13 +429,15 @@ new_imageid:
 	    formfields[description]=Descriptive text.\
 	    formfields[global]=\
 	    formfields[shared]=\
-	    submit=Submit)
+	    submit=Submit,\
+	    os1_osid=`$(os1_osid_sql)`)
 
 # Re-use the analysis action in the activate.wget subdirectory.
 analyze_activate:
 	cd activate.wget; \
 	gmake analyze_output=../$(ACTIVATE_ANALYSIS) \
-	      SRCDIR=../$(SRCDIR) -f ../GNUmakefile analyze
+	      SRCDIR=../$(SRCDIR) TESTBED_SRCDIR=../$(TESTBED_SRCDIR) \
+	      -f ../GNUmakefile analyze
 ACTIVATE_ANALYSIS = $(RESDIR)/analyze_activate.txt
 
 #================================================================
@@ -480,6 +491,7 @@ do_spider: public_spider admin_spider
 public_spider: public.wget/public.log
 public.wget/public.log: 
 	$(logout_cmd)
+	@ echo ==== Spidering the public interface.
 	cd public.wget; \
 	wget -r -S $(cookie_args) $(ld_cookies_subdir) -o public.log \
 	     -k -D $(dom) -R $(rej_links) -X /downloads,/gallery $(sroot)
@@ -489,7 +501,8 @@ admin_spider: admin.wget/admin.log
 admin.wget/admin.log:
 	$(login_sys)
 	$(admin_cmd)
-	@echo "** Be patient, spidering will take about 10 minutes. **"
+	@ echo ==== Spidering the private "(logged in, admin)" interface.
+	@echo "** Be patient, spidering will take at least 10 minutes. **"
 	cd admin.wget; \
 	wget -r -S $(cookie_args) $(ld_cookies_subdir) -o admin.log \
 	     -k -D $(dom) -R $(rej_links) -X /downloads,/gallery $(sroot)
@@ -543,7 +556,9 @@ site_msg: site_list public_list admin_list
 	@echo "** `wc -l < $(SITE_FORMS)` (`wc -l < $(PUBLIC_FORMS)` +" \
 	      "`wc -l < $(ADMIN_FORMS)` ) forms instances" \
 	      "are in `wc -l < $(SITE_FILES)` (` wc -l < $(PUBLIC_FILES)` +" \
-	      "`wc -l < $(ADMIN_FILES)` ) web pages.  **" | tr -s " "
+	      "`wc -l < $(ADMIN_FILES)` ) web pages. **" | tr -s " "
+	@echo "** (See *_{forms,files}.list in $(RESDIR) .) **"
+	@echo "**"
 
 #================================================================
 # forms_coverage: Compare the two lists to find uncovered (unlinked) forms.
@@ -553,11 +568,12 @@ forms_coverage: files_missing forms_msg
 FILES_MISSING = $(RESDIR)/files_missing.list
 files_missing: $(FILES_MISSING)
 $(FILES_MISSING): $(SRC_FILES) $(SITE_FILES)
-	diff $(SRC_FILES) $(SITE_FILES) | grep '^[<>]' > $(FILES_MISSING)
+	diff $(SRC_FILES) $(SITE_FILES) | grep '^[<>] [^.]' > $(FILES_MISSING)
 
 forms_msg: files_missing src_msg site_msg
-	@echo "** `wc -l < $(FILES_MISSING)` forms files are not covered.  **" \
-		| tr -s " "
+	@echo "** `wc -l < $(FILES_MISSING)` forms files are not covered. **" | tr -s " "
+	@echo "** (See $(FILES_MISSING) .) **"
+	@echo "**"
 
 # Look at files_missing.list and see README-howto.txt for the
 # procedure to activate coverage of more forms.
@@ -576,7 +592,6 @@ ADMIN_INPUTS    = $(RESDIR)/admin_inputs.list
 # XXX kluge to make imageid mtype checked by default since at least one is required.
 $(SITE_INPUTS): $(PUBLIC_INPUTS) $(ADMIN_INPUTS)
 	cat $(PUBLIC_INPUTS) $(ADMIN_INPUTS) | \
-	   sed -e 's/mtype_pc600/mtype_pc850/' | \
 	   awk '/formfields\[mtype/ && ! /checked/ { sub(">", "checked >")} \
 		{print}' > $(SITE_INPUTS)
 
@@ -605,13 +620,16 @@ $(INPUT_NAMES): $(SITE_INPUTS)
 
 input_msg: input_list
 	@echo "** `grep -c '<input' $(SITE_INPUTS)` input fields," \
-	      "`wc -l < $(INPUT_NAMES)` unique.  **" | tr -s " "
+	      "`wc -l < $(INPUT_NAMES)` unique. **" | tr -s " "
+	@echo "** (See $(notdir $(SITE_INPUTS))" \
+	      "and $(notdir $(INPUT_NAMES)) in $(RESDIR) .) **"
+	@echo "**"
 
 # Copy relevant name= lines from results/input_names.list to input_values.list .
 # Add a space and default value onto the ends of the lines for auto-form-fill-in.
 INPUT_VALUES_SRC = $(SRCDIR)/input_values.list
 
-# Substitute in some parts of the values dictionary at run time.
+# Subst configure names of activate objs for @keyword@ in the values dictionary.
 INPUT_VALUES = input_values.list
 .PHONY: $(INPUT_VALUES)
 $(INPUT_VALUES): $(INPUT_VALUES_SRC)
@@ -621,6 +639,7 @@ $(INPUT_VALUES): $(INPUT_VALUES_SRC)
 	    -e "s/@usridx@/`$(usridx_sql)`/" \
 	    -e "s/@grpidx@/`$(grpidx_sql)`/" \
 	    -e "s/@exptidx@/`$(exptidx_sql)`/" \
+	    -e "s/@os1_osid@/`$(os1_osid_sql)`/" \
 	    $(INPUT_VALUES_SRC) > $(INPUT_VALUES)
 node_sql = $(call boss_sql, select phys_nodeid from nodes where type like 'pc%')
 show_node:
@@ -679,20 +698,25 @@ URL_PREREQS	= $(f2u_src) $(SITE_INPUTS) $(INPUT_NAMES) $(INPUT_VALUES) \
 SETUP_FORMS	= $(SRCDIR)/setup_forms.list
 TEARDOWN_FORMS	= $(SRCDIR)/teardown_forms.list
 
+# All of the URL's (setup, show, teardown) mixed together.
 tmp_urls: $(URL_PREREQS)
 	gawk -f $(f2u_src) -v VALUES=$(INPUT_VALUES) \
             $(SITE_INPUTS) > tmp_urls
+# Show action is the default for those that are neither setup nor teardown.
 $(SHOW_URLS): tmp_urls
 	grep -h "^/" $(SETUP_FORMS) $(TEARDOWN_FORMS) > tmp_form_files
 	fgrep -v -f tmp_form_files tmp_urls > $(SHOW_URLS)
+# The setup and teardown actions are ordered: separated out and hacked by a script.
 $(SETUP_URLS): tmp_urls
 	$(sep_cmd) $(SETUP_FORMS) tmp_urls > $(SETUP_URLS)
 $(TEARDOWN_URLS): tmp_urls
 	$(sep_cmd) $(TEARDOWN_FORMS) tmp_urls > $(TEARDOWN_URLS)
 
 # WebInject doesn't store the returned pages.  Use wget and browse the directory.
+# (Show commands are unordered, but make sure the experiment is active.)
 $(SHOW_WGET): $(SHOW_URLS) $(u2w_src)
-	$(u2w_cmd) $(SHOW_URLS) > $(SHOW_WGET)
+	$(u2w_cmd) $(SHOW_URLS) | \
+	sed 's|^|ssh $(boss) ./waitexp $(EinE_proj) $(exp1); |' > $(SHOW_WGET)
 $(SETUP_WGET): $(SETUP_URLS) $(u2w_src)
 	$(u2w_cmd) $(SETUP_URLS) > $(SETUP_WGET)
 $(TEARDOWN_WGET): $(TEARDOWN_URLS) $(u2w_src)
@@ -707,7 +731,8 @@ RUN_ENV = MYBOSS=$(boss) MYOPS=$(ops) SRCDIR=$(SRCDIR)
 run_setup: $(SETUP_WGET) gen_setup
 	$(RUN_ENV) csh -f $(SETUP_WGET)
 run_show: $(SHOW_WGET) ###run_setup
-	csh -f $(SHOW_WGET)
+	scp $(SRCDIR)/waitexp $(boss):
+	$(RUN_ENV) csh -f $(SHOW_WGET)
 run_teardown: $(TEARDOWN_WGET) ###run_setup
 	$(RUN_ENV) csh -f $(TEARDOWN_WGET)
 
@@ -731,6 +756,12 @@ analyze:
 	$(call analyze_hdr,UNKNOWN)
 	sed -n 's/:.*//p' $(matches) | sort -u > recognized_output.files
 	ls *.html | fgrep -v -f recognized_output.files $(tee)
+	@echo "**"
+	@echo -n "** Analysis: "
+	@gawk '/^==/{if (type!="") printf "%s %s, ", type, count; type=$$2; count=0; next}\
+	     /^[^ ]/{count++} END{printf "%s %s **\n", type, count;}' $(analyze_output)
+	@echo "** (See $(notdir $(analyze_output)) in $(RESDIR) .) **"
+	@echo "**"
 
 SHOW_OUTPUT	= $(RESDIR)/show_output.xml
 run_webinject: $(SHOW_OUTPUT)
@@ -829,6 +860,9 @@ probes_msg $(probe_outputs): ##analyze_probes
             `fgrep -c ': \' < $(PROBE_LABELS)`" backslashed, " \
 	    `wc -l < $(UNCAUGHT_PROBES)`" uncaught in " \
 	    `wc -l < $(UNCAUGHT_FILES)`" pages." | tr -s " "
+	@echo "** (See $(notdir $(PROBE_LABELS))" \
+	      "and $(notdir $(UNCAUGHT_FILES)) in $(RESDIR) .) **"
+	@echo "**"
 
 # Run the probes through webinject.
 # Successfully caught cases should produce "invalid input" warnings.

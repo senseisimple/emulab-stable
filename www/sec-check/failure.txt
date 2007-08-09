@@ -36,7 +36,7 @@ Please log in again
 You cannot modify an experiment in transition
 has active experiments
 Must supply a project name
-No such image
+No such
 already exists
 must be unapproved
 could not proceed
@@ -48,5 +48,6 @@ funky
 unknown
 You can freeze a user or you can thaw a user
 is not currently reserved
-Experiment must be active
+must be active
 does not have enough permission
+Could not map page arguments

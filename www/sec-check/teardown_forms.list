@@ -12,15 +12,33 @@
 ! endif
 
 /freenode.php3
+
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+! if ( "$imgidx" != "" ) then
 /deleteimageid.php3
+! else
+!     echo "*** No image testimg3! ***"
+! endif
+
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3a'"
+! if ( "$imgidx" != "" ) then
+/deleteimageid.php3
+! else
+!     echo "*** No image testimg3a! ***"
+! endif
+
+!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+! if ( "$osidx" != "" ) then
 /deleteosid.php3
+! else
+!     echo "*** No os id testosid3! ***"
+! endif
 
 !usridx=sql "select uid_idx from users where uid='testusr3'"
 ! if ( "$usridx" != "" ) then
 /deletepubkey.php3
 ###/deletesfskey.php3
 /freezeuser.php3
-# (Users actually get deleted twice, see sep_urls.gawk for details.)
 /deleteuser.php3
 ! else
 !     echo "*** No user testusr3! ***"
@@ -34,6 +52,9 @@
 ! else
 !     echo "*** No group testgroup3! ***"
 ! endif
+
+# Place-holder...
+/delmmlist.php3
 
 # Currently, once a template has been created, a project can never be deleted.
 !projidx=sql "select pid_idx from projects where pid='testproj3'"
@@ -49,6 +70,9 @@
 
 # Users don't actually get deleted anymore, they get archived.  Clean up.
 !sql "delete from users where uid='testusr3'"
-!sql "delete from group_membership where uid='testusr3'"!
+!sql "delete from group_membership where uid='testusr3'"
 # Remove the user w.r.t. getpwnam as well.
 !ssh $MYBOSS sudo pw userdel -n testusr3
+
+# Clear the error return.
+!echo Done.

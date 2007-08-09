@@ -1,12 +1,3 @@
-.#deleteuser.php3.1.19
-.#editnodetype.php3.1.12
-.#showstuff.php3.1.188
-.#showstuff.php3.1.190
-.#showstuff.php3.1.191
-.#showstuff.php3.1.192
-.#showstuff.php3.1.193
-.#showstuff.php3.1.196
-.#showstuff.php3.1.197
 approveproject_form.php3
 approveuser_form.php3
 approvewauser_form.php3
@@ -65,8 +56,10 @@ pagenotworking.php
 panicbutton.php3
 password.php3
 plab_ez.php3
+plabmetrics.php3
 powertime.php3
 prereserve_node.php3
+record_revise.php
 remapexp.php3
 replayexp.php3
 request_idleinfo.php3

@@ -7,15 +7,29 @@ https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment=$expidx?post:c
 ! else
 !     echo "*** No experiment testproj3/testexp3! ***"
 ! endif
-https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc165?post:confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=testproj3-testimg3?post:confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?osid=testproj3-testosid3?post:confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc119?post:confirmed=Confirm
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+! if ( "$imgidx" != "" ) then
+! else
+!     echo "*** No image testimg3! ***"
+! endif
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3a'"
+! if ( "$imgidx" != "" ) then
+https://myboss.vulnelab.testbed.emulab.net/deleteimageid.php3?imageid=$imgidx?post:confirmed=Confirm
+! else
+!     echo "*** No image testimg3a! ***"
+! endif
+!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+! if ( "$osidx" != "" ) then
+https://myboss.vulnelab.testbed.emulab.net/deleteosid.php3?osid=$osidx?post:confirmed=Confirm
+! else
+!     echo "*** No os id testosid3! ***"
+! endif
 !usridx=sql "select uid_idx from users where uid='testusr3'"
 ! if ( "$usridx" != "" ) then
 https://myboss.vulnelab.testbed.emulab.net/deletepubkey.php3?key=1&user=$usridx?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/freezeuser.php3?user=$usridx&action=freeze?post:confirmed=Confirm&confirmed_twice=Confirm
 https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user=$usridx&target_project=testproj3?post:confirmed=Confirm&confirmed_twice=Confirm
-https://myboss.vulnelab.testbed.emulab.net/deleteuser.php3?user=$usridx?post:confirmed=Confirm&confirmed_twice=Confirm
 ! else
 !     echo "*** No user testusr3! ***"
 ! endif
@@ -35,5 +49,6 @@ https://myboss.vulnelab.testbed.emulab.net/deleteproject.php3?pid=testproj3?post
 ! endif
 !sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"
 !sql "delete from users where uid='testusr3'"
-!sql "delete from group_membership where uid='testusr3'"!
-!sudo pw userdel -n testusr3
+!sql "delete from group_membership where uid='testusr3'"
+!ssh $MYBOSS sudo pw userdel -n testusr3
+!echo Done.
