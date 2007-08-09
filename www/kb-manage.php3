@@ -469,7 +469,13 @@ if (isset($idx) && (!isset($action) || $action != "delete")) {
     #
     # Okay, redirect the user over to the show page so they can see it.
     #
-    header("Location: kb-show.php3?idx=$idx");
+    if (isset($xref_tag) && $xref_tag != "") {
+	header("Location: kb-show.php3?xref_tag=".
+	       str_replace("'", "", $xref_tag));
+    }
+    else {
+	header("Location: kb-show.php3?idx=$idx");
+    }
 }
 else {
     # Redirect to the search page.
