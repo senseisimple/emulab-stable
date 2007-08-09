@@ -591,20 +591,19 @@ function SPITFORM($formfields, $errors)
 	echo "                       > Yes
                   </td>
               </tr>\n";
-
-	#
-	# Reboot waittime. 
-	# 
-	echo "<tr>
-		  <td>Reboot Waittime (seconds):</td>
-		  <td class=left>
-		      <input type=text
-			     name=\"formfields[reboot_waittime]\"
-			     value=\"" . $formfields["reboot_waittime"] . "\"
-			     size=4 maxlength=4>
-		  </td>
-	      </tr>\n";
     }
+    #
+    # Reboot waittime. 
+    # 
+    echo "<tr>
+	      <td>Reboot Waittime (seconds)[<b>8</b>]:</td>
+	      <td class=left>
+		  <input type=text
+		         name=\"formfields[reboot_waittime]\"
+			 value=\"" . $formfields["reboot_waittime"] . "\"
+			 size=4 maxlength=4>
+   	      </td>
+	  </tr>\n";
 
     echo "<tr>
               <td align=center colspan=2>
@@ -616,7 +615,7 @@ function SPITFORM($formfields, $errors)
           </table>\n";
 
     if (!isset($view["hide_footnotes"])) {
-	echo "<h4><blockquote>
+	echo "<blockquote>
 	      <ol type=1 start=1>
 		 <li> If you don't know what partition you have customized,
 		      here are some guidelines:
@@ -689,9 +688,13 @@ function SPITFORM($formfields, $errors)
 		 <li> If your image contains software that is only licensed to run
 		      on a limited number of nodes at a time, you can put this
 		      number here. Most users will want to leave this option blank.
-		 </li>
+                 </li>
+		 <li> Leave this field <b>blank</b> unless you know what you
+                      are doing, or you have an explicit problem with images
+                      taking too long to boot. <b>Please talk to us first!</b>
+                 </li>
 	      </ol>
-	      </blockquote></h4>\n";
+	      </blockquote>\n";
     }
 }
 
@@ -1067,10 +1070,7 @@ if (isset($formfields["max_concurrent"]) &&
 #
 if (isset($formfields["reboot_waittime"]) &&
     strcmp($formfields["reboot_waittime"],"")) {
-    if (!$isadmin) {
-	$errors["Reboot Waittime"] = "Not enough permission";
-    }
-    elseif (!TBvalid_integer($formfields["reboot_waittime"])) {
+    if (!TBvalid_integer($formfields["reboot_waittime"])) {
 	$errors["Reboot Waittime"] = TBFieldErrorString();
     }
     $reboot_waittime = $formfields["reboot_waittime"];
