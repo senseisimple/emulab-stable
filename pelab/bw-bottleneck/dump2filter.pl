@@ -15,7 +15,8 @@ sub setupDest
     my $fileName = $basePath.'/dest'.$_[0].'.dump';
     my %hash;
     my $file;
-    open($file, "<".$fileName);
+    open($file, "<".$fileName)
+	or die("Couldn't open file $fileName for reading");
     my @array = <$file>;
     for ($i = 0; $i < @array; ++$i)
     {
@@ -34,7 +35,8 @@ sub setupDest
     return %hash;
 }
 
-open(SOURCE_IN, "<$basePath/source.dump");
+open(SOURCE_IN, "<$basePath/source.dump")
+    or die("Couldn't open file $basePath/source.dump for reading");
 @source = <SOURCE_IN>;
 close(SOURCE_IN);
 
