@@ -5,10 +5,11 @@
 #
 
 # Top-level targets:
-all_tasks = src_forms activate spider forms_coverage input_coverage normal probe
+# "activate" isn't in "all" because it's a setup task that shouldn't be repeated.
+all_tasks = src_forms spider forms_coverage input_coverage normal probe
 # Stats from the top-level tasks:
-msgs_tasks = src_msg site_msg forms_msg input_msg probes_msg
-.PHONY: all $(all_tasks) msgs $(msgs_tasks)
+msgs_tasks = src_msg site_msg forms_msg input_msg analyze analyze_probes probes_msg
+.PHONY: activate all $(all_tasks) msgs $(msgs_tasks)
 
 # See README-howto.txt for usage details.
 all: $(all_tasks)
@@ -187,7 +188,7 @@ boss_sql = echo "$(strip $(1))" | ssh $(boss) mysql tbdb | tail -1
 
 #================================================================
 # activate: Set up the newly swapped-in EinE site to turn on as many forms as we can.
-activate_tasks = new_proj1 new_proj2 approve_proj new_group \
+activate_tasks = fix_emails new_proj1 new_proj2 approve_proj new_group \
 	  new_user1 confirm_user1 approve_user1 \
 	  new_user2 confirm_user2 \
 	  new_exp2 new_exp1 mod_exp2 \
@@ -210,6 +211,17 @@ proj_common = $(call fmt_html_args,\
 	    formfields[proj_why]=Test\ for\ injection.\
 	    formfields[proj_whynotpublic]=\
 	    submit=Submit)
+
+# Also change all user e-mail addresses to me so I get the editgroup, etc. e-mail
+# instead of bothering everybody else on testbed-ops.  This is *not* the primary
+# e-mail address used as my login to Emulab, which *has to be unique*!
+fix_emails:
+	@echo ==== Fixing email addresses ====
+	echo "select uid, usr_email from users where usr_email not like '%@myops%'; \
+	      update users set usr_email='$(real_email2)' \
+	        where uid != '$(uid)' and usr_email not like '%@myops%'; \
+	      select uid, usr_email from users where usr_email not like '%@myops%';" | \
+	    ssh $(boss) mysql --table tbdb
 
 # Start two test projects.
 # Leave testproj2 unapproved so approveproject_form.php3 remains active.
@@ -747,7 +759,8 @@ analyze_cmd = grep -H -f $(SRCDIR)/$(1) *.html | tr -s " " >> match_$(1); \
 	      gawk '{ cl = index($$0, ":"); fn = substr($$0, 1, cl-1); \
 		      if ( file != fn ) { file = fn; print file; }; \
 		      print "    ", substr($$0, cl+1); }' match_$(1) $(cut) $(tee)
-analyze:
+
+$(analyze_output): *.html
 	truncate -s 0 $(matches) $(analyze_output)
 	$(call analyze_hdr,success)
 	-$(call analyze_cmd,success.txt)
@@ -756,8 +769,10 @@ analyze:
 	$(call analyze_hdr,UNKNOWN)
 	sed -n 's/:.*//p' $(matches) | sort -u > recognized_output.files
 	ls *.html | fgrep -v -f recognized_output.files $(tee)
+
+analyze: $(analyze_output)
 	@echo "**"
-	@echo -n "** Analysis: "
+	@echo -n "** $(analysis_kind)Analysis: "
 	@gawk '/^==/{if (type!="") printf "%s %s, ", type, count; type=$$2; count=0; next}\
 	     /^[^ ]/{count++} END{printf "%s %s **\n", type, count;}' $(analyze_output)
 	@echo "** (See $(notdir $(analyze_output)) in $(RESDIR) .) **"
@@ -826,10 +841,10 @@ probe_show: $(PROBE_SHOW_WGET) # Depends on activation.
 probe_teardown: $(PROBE_TEARDOWN_WGET) ###probe_setup
 	$(RUN_ENV) csh -f $(PROBE_TEARDOWN_WGET)
 
-# Re-use the analysis action in the probes.wget subdirectory.
+# Re-use the "analyze" action, but in the probes.wget subdirectory.
 analyze_probes:
-	cd probes.wget; \
-	gmake analyze_output=../$(PROBE_ANALYSIS) \
+	@cd probes.wget; \
+	gmake analyze_output=../$(PROBE_ANALYSIS) analysis_kind="Probe " \
 	      SRCDIR=../$(SRCDIR) TESTBED_SRCDIR=../$(TESTBED_SRCDIR) \
 	      -f ../GNUmakefile analyze
 PROBE_ANALYSIS = $(RESDIR)/analyze_probes.txt
@@ -839,21 +854,22 @@ PROBE_LABELS = $(RESDIR)/probe-labels.list
 UNCAUGHT_PROBES = $(RESDIR)/uncaught-probes.list
 UNCAUGHT_FILES = $(RESDIR)/uncaught-files.list
 
-probes_msg $(probe_outputs): ##analyze_probes
+probes_msg $(probe_outputs): analyze_probes
 	@gawk '/^=/ { type = $$2; next; } # === success, failure, or UNKNOWN. \
 	       /^[a-z]/ { 		  # Probe output file lines. \
 		 # When both match, failure supercedes success; . \
 		 if ( types[$$1] == "" ) { types[$$1]=type; n[type]++; nprobes++; } \
 		 else if ( types[$$1] == "success" && type == "failure" ) { \
-		     types[$$1]=type; n[type]++; n["success"]--; } \
+		     dups++; types[$$1]=type; n[type]++; n["success"]--; } \
 		 next; } \
 	       END{ print "**", nprobes, "probes", \
 		    "out of '"`cat $(PROBE_WGET) | grep -c '^wget'`"' executed:", \
 		    n["success"]+0, "showed success,", n["failure"]+0, "failure,", \
-		    n["UNKNOWN"]+0, "UNKNOWN."; }' $(PROBE_ANALYSIS)
+		    dups+0, "dups,", n["UNKNOWN"]+0, "UNKNOWN."; }' $(PROBE_ANALYSIS)
 	@cat probes.wget/*.html | fgrep 'Probe label:' > $(PROBE_LABELS)
 	@fgrep ": '" < $(PROBE_LABELS) | sort > $(UNCAUGHT_PROBES)
 	@sed 's/.*{\([^:]*\).*/\1/' $(UNCAUGHT_PROBES) | uniq > $(UNCAUGHT_FILES)
+	@echo "**"
 	@echo "** Probes to" \
 	    ` grep '^http' $(URLS) | sed 's/?.*//' | sort -u | wc -l`" pages gave" \
 	    `wc -l < $(PROBE_LABELS)`" hits: " \

@@ -61,7 +61,7 @@ https://myboss.vulnelab.testbed.emulab.net/newimageid.php3?post:formfields[loadl
 !     echo "*** Image testproj3-testimg3 $(imgdx) already exists! ***"
 ! endif
 https://myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=$imgidx?post:formfields[path]=/proj/testbed/images/testimg3.ndz&formfields[mtype_pc850]=Yep&submit=Submit&formfields[load_address]=&formfields[description]=Descriptive text.&formfields[frisbee_pid]=0
-https://myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=$imgidx?post:submit=Go!&node_id=pc119&confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/loadimage.php3?imageid=$imgidx?post:submit=Go!&node_id=pc123&confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/newmmlist.php3?post:formfields[listname]=testlist&formfields[pid]=testproj3&submit=Submit&formfields[password1]=EinE_tmp&formfields[password2]=EinE_tmp&formfields[fullname]=testproj3-testlist@vulnelab.testbed.emulab.net
 https://myboss.vulnelab.testbed.emulab.net/template_create.php?post:MAX_FILE_SIZE=1024&formfields[tid]=testtid&formfields[localnsfile]=/users/fish/shaped-2-nodes.ns&formfields[gid]=&formfields[pid]=testproj3&create=Create Template&formfields[description]=Descriptive text.
 !sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"

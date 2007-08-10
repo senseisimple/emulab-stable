@@ -33,8 +33,8 @@ https://myboss.vulnelab.testbed.emulab.net/gensslcert.php3?post:formfields[passp
 https://myboss.vulnelab.testbed.emulab.net/linktest.php3?post:level='**{linktest.php3:level}**&eid=testexp1&pid=testbed
 https://myboss.vulnelab.testbed.emulab.net/linktest.php3?post:level=1&eid='**{linktest.php3:eid}**&pid=testbed
 https://myboss.vulnelab.testbed.emulab.net/linktest.php3?post:level=1&eid=testexp1&pid='**{linktest.php3:pid}**
-https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type='**{newnodelog.php3:log_type}**&log_entry=Test log entry.&node_id=pc119
-https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry='**{newnodelog.php3:log_entry}**&node_id=pc119
+https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type='**{newnodelog.php3:log_type}**&log_entry=Test log entry.&node_id=pc123
+https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry='**{newnodelog.php3:log_entry}**&node_id=pc123
 https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry=Test log entry.&node_id='**{newnodelog.php3:node_id}**
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]='**{newnodes_list.php3:remap[4]}**&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber=
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix='**{newnodes_list.php3:newprefix}**&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber=
@@ -47,14 +47,14 @@ https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]='**{newnodes_list.php3:remap[2]}**&remap[3]=&addnumber=
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber='**{newnodes_list.php3:addnumber}**
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]='**{newnodes_list.php3:remap[3]}**&addnumber=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms='**{nodecontrol.php3:rpms}**&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid='**{nodecontrol.php3:next_boot_osid}**&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid='**{nodecontrol.php3:def_boot_osid}**&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid='**{nodecontrol.php3:temp_boot_osid}**&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd='**{nodecontrol.php3:startupcmd}**&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs='**{nodecontrol.php3:tarballs}**&next_boot_cmd_line=&def_boot_cmd_line=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line='**{nodecontrol.php3:def_boot_cmd_line}**
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line='**{nodecontrol.php3:next_boot_cmd_line}**&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms='**{nodecontrol.php3:rpms}**&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid='**{nodecontrol.php3:next_boot_osid}**&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid='**{nodecontrol.php3:def_boot_osid}**&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid='**{nodecontrol.php3:temp_boot_osid}**&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd='**{nodecontrol.php3:startupcmd}**&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs='**{nodecontrol.php3:tarballs}**&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line='**{nodecontrol.php3:def_boot_cmd_line}**
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line='**{nodecontrol.php3:next_boot_cmd_line}**&def_boot_cmd_line=
 https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id='**{nodecontrol.php3:node_id}**?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
 https://myboss.vulnelab.testbed.emulab.net/nscheck.php3?post:MAX_FILE_SIZE='**{nscheck.php3:MAX_FILE_SIZE}**&formfields[exp_localnsfile]=/users/fish/shaped-2-nodes.ns
 https://myboss.vulnelab.testbed.emulab.net/nscheck.php3?post:MAX_FILE_SIZE=1024&formfields[exp_localnsfile]='**{nscheck.php3:formfields[exp_localnsfile]}**
@@ -75,10 +75,10 @@ https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[rpm]=&formfie
 https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[rpm]=&formfields[count]=1&formfields[when]=1&formfields[tarball]=&submit=Create it&formfields[nodelist]=&formfields[type]=pcplab&formfields[nodeversion]=Production&formfields[canfail]=Yep&formfields[startupcmd]=&formfields[units]='**{plab_ez.php3:formfields[units]}**&formfields[resusage]=1
 https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[rpm]=&formfields[count]=1&formfields[when]=1&formfields[tarball]=&submit=Create it&formfields[nodelist]=&formfields[type]=pcplab&formfields[nodeversion]=Production&formfields[canfail]=Yep&formfields[startupcmd]='**{plab_ez.php3:formfields[startupcmd]}**&formfields[units]=168&formfields[resusage]=1
 https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]='**{powertime.php3:nodes[]}**&poweron=Yep&confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc119&poweron='**{powertime.php3:poweron}**&confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc119&poweron=Yep&confirmed='**{powertime.php3:confirmed}**
-https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc119?post:submit='**{prereserve_node.php3:submit}**&pid=testbed
-https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc119?post:submit=Submit&pid='**{prereserve_node.php3:pid}**
+https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc123&poweron='**{powertime.php3:poweron}**&confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc123&poweron=Yep&confirmed='**{powertime.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc123?post:submit='**{prereserve_node.php3:submit}**&pid=testbed
+https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc123?post:submit=Submit&pid='**{prereserve_node.php3:pid}**
 https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id='**{prereserve_node.php3:node_id}**?post:submit=Submit&pid=testbed
 https://myboss.vulnelab.testbed.emulab.net/replayexp.php3?experiment=9?post:confirmed='**{replayexp.php3:confirmed}**
 https://myboss.vulnelab.testbed.emulab.net/replayexp.php3?experiment='**{replayexp.php3:experiment}**?post:confirmed=Confirm

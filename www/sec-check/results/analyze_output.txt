@@ -9,10 +9,11 @@ approveuser.php3.html
 beginexp_html.php3.html
      <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
 boot.php3.html
-     reboot (pc168): Attempting to reboot ...
-     reboot (pc91): Attempting to reboot ...
-     reboot (pc168): Successful!
-     reboot (pc91): Successful!
+     reboot (pc123): Attempting to reboot ...
+     reboot (pc153): Attempting to reboot ...
+     reboot (pc167): Attempting to reboot ...
+     reboot (pc153): Successful!
+     reboot (pc167): Successful!
 delaycontrol.php3.html
      Use this page to alter the traffic shaping parameters of your
 deletegroup.php3.html
@@ -22,7 +23,7 @@ deletegroup.php3.html
 deleteimageid.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
-      Image '10007' in project testproj3 has been deleted!
+      Image '10004' in project testproj3 has been deleted!
 deleteosid.php3.html
       OS Descriptor 'testosid3' in Project testproj3 has been deleted!
 deleteproject.php3.html
@@ -65,13 +66,13 @@ gensslcert.php3.html
 joinproject.php3.html
       As a pending user of the Testbed you will receive a key via email.
 kb-manage.php3.html
-     <center><b>Knowledge Base Entry: 275 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+     <center><b>Knowledge Base Entry: 274 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
 kb-search.php3.html
      <font size=+2>Knowledge Base search results</font>
 linktest.php3.html
       Are you <b>sure</b> you want to run linktest?
 loadimage.php3.html
-      Taking a snapshot of node 'pc119' into image 'testimg3' ...
+      Taking a snapshot of node 'pc123' into image 'testimg3' ...
 modifyexp.php3.html
      <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 moduserinfo.php3.html
@@ -85,8 +86,10 @@ newimageid.php3.html
       <h3 class="submenuheader">More Options</h3>
 newimageid_ez.php3.html
       <h3 class="submenuheader">More Options</h3>
+newmmlist.php3.html
+     <center><h2>testproj3-testlist mailing list administration<br>General Options Section</h2></center><hr>
 newnodelog.php3.html
-      Log for node pc119.
+      Log for node pc123.
 newosid.php3.html
      <center><h3>Done!</h3></center>
 newproject.php3.html
@@ -103,7 +106,7 @@ nsgen.php3.html
 plab_ez.php3.html
       <p><b>To finish creating your slice, edit the 
 powertime.php3.html
-     <center>Updated power time for:<br><br><b>pc119</b><br></center><!-- end content -->
+     <center>Updated power time for:<br><br><b>pc123</b><br></center><!-- end content -->
 prereserve_node.php3.html
       <h3 class="submenuheader">Node Options</h3>
 replayexp.php3.html
@@ -117,7 +120,7 @@ showpubkeys.php3.html
 showsumstats.php3.html
      <b>Range: <a class='static'
 showuser_list.php3.html
-      There are 3 logged in users.
+      There are 2 logged in users.
 template_create.php.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
@@ -127,8 +130,6 @@ updateaccounts.php3.html
 ================ failure ================
 archive_tags.php3.html
       No tags for experiment testbed/testexp1
-newmmlist.php3.html
-      &nbsp;Oops, please fix the following errors!&nbsp;
 newnodes_list.php3.html
       At least one node must be selected!
 swapexp.php3.html

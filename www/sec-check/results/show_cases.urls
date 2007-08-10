@@ -8,14 +8,14 @@ https://myboss.vulnelab.testbed.emulab.net/editsitevars.php3?post:name=batch/ret
 https://myboss.vulnelab.testbed.emulab.net/feedback.php3?mode=clear&experiment=9?post:confirmed=Confirm&clear_last=1
 https://myboss.vulnelab.testbed.emulab.net/gensslcert.php3?post:formfields[passphrase1]=EinE_tmp&submit=Create SSL Cert&formfields[passphrase2]=EinE_tmp&formfields[user]=10071
 https://myboss.vulnelab.testbed.emulab.net/linktest.php3?post:level=1&eid=testexp1&pid=testbed
-https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry=Test log entry.&node_id=pc119
+https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry=Test log entry.&node_id=pc123
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
 https://myboss.vulnelab.testbed.emulab.net/nscheck.php3?post:MAX_FILE_SIZE=1024&formfields[exp_localnsfile]=/users/fish/shaped-2-nodes.ns
 https://myboss.vulnelab.testbed.emulab.net/nsgen.php3?template=plabdevbox&templatevalues[ImageName]=PLAB-DEVBOX&templatevalues[NodeName]=devbox&templatevalues[HWType]=pc
 https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[rpm]=&formfields[count]=1&formfields[when]=1&formfields[tarball]=&submit=Create it&formfields[nodelist]=&formfields[type]=pcplab&formfields[nodeversion]=Production&formfields[canfail]=Yep&formfields[startupcmd]=&formfields[units]=168&formfields[resusage]=1
-https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc119&poweron=Yep&confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc119?post:submit=Submit&pid=testbed
+https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc123&poweron=Yep&confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc123?post:submit=Submit&pid=testbed
 https://myboss.vulnelab.testbed.emulab.net/replayexp.php3?experiment=9?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/resendapproval.php?pid=testbed?post:submit=Submit&message=
 https://myboss.vulnelab.testbed.emulab.net/showpubkeys.php3?user=502?post:MAX_FILE_SIZE=1024

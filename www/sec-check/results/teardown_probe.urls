@@ -12,7 +12,7 @@ https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment='**{endexp.php
 ! else
 !     echo "*** No experiment testproj3/testexp3! ***"
 ! endif
-https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc119?post:confirmed='**{freenode.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc123?post:confirmed='**{freenode.php3:confirmed}**
 https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id='**{freenode.php3:node_id}**?post:confirmed=Confirm
 !imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
 ! if ( "$imgidx" != "" ) then

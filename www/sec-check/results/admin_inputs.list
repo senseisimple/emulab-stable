@@ -199,14 +199,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,hwdown
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=1
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="hwdown-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Node reported as down - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,hwdown' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='1' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -220,14 +220,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,nfree-leases
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=2
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="nfree-leases-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Nodes in limbo during nfree - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,nfree-leases' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='2' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -241,14 +241,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,nfree-locked
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=3
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="nfree-locked-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Nodes in limbo during nfree - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,nfree-locked' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='3' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -262,14 +262,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,oldreserved
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=4
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="oldreserved-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Nodes in limbo during swap modify - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,oldreserved' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='4' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -283,14 +283,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,opsnodes
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=5
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="opsnodes-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Nodes designated as Ops Nodes - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,opsnodes' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='5' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -304,14 +304,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,reloading
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=6
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="reloading-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Nodes reloading images - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,reloading' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='6' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -325,14 +325,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=emulab-ops,reloadpending
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=7
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="reloadpending-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="Nodes waiting for reload - DO NOT DELETE" size=60>
-<input type="hidden" name="formfields[copyid]" value='emulab-ops,reloadpending' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='7' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -346,14 +346,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=testbed,testexp1
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=8
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="testexp1-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="testexp1 experiment." size=60>
-<input type="hidden" name="formfields[copyid]" value='testbed,testexp1' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='8' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -367,14 +367,14 @@
 <input type="checkbox" name="formfields[exp_preload]" value='Yep' >
 <input type="button" name="beginexp" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=testbed,testexp2
+./myboss.vulnelab.testbed.emulab.net/beginexp_html.php3?copyid=9
 <form name=form1 enctype=multipart/form-data action="beginexp_html.php3" method="post">
 <input type="hidden" name="beginexp" value="Submit" >
 <input type="select" name="formfields[exp_pid]" value=''>
 <input type="select" name="formfields[exp_gid]" value=''>
-<input type="text" name="formfields[exp_id]" value="testexp2-Copy0" size=19 maxlength=19>
-<input type="text" name="formfields[exp_description]" value="testexp2 experiment." size=60>
-<input type="hidden" name="formfields[copyid]" value='testbed,testexp2' >
+<input type="text" name="formfields[exp_id]" value="" size=19 maxlength=19>
+<input type="text" name="formfields[exp_description]" value="" size=60>
+<input type="hidden" name="formfields[copyid]" value='9' >
 <input type="hidden" name="formfields[exp_swappable]" value='1' >
 <input type="hidden" name="formfields[exp_noswap_reason]" value=''>
 <input type="checkbox" name="formfields[exp_idleswap]" value='1' checked='1'>
@@ -423,18 +423,18 @@
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc119
-<form action="boot.php3?node_id=pc119" target=_blank method="post">
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc123
+<form action="boot.php3?node_id=pc123" target=_blank method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc168
-<form action="boot.php3?node_id=pc168" target=_blank method="post">
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc153
+<form action="boot.php3?node_id=pc153" target=_blank method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc91
-<form action="boot.php3?node_id=pc91" target=_blank method="post">
+./myboss.vulnelab.testbed.emulab.net/boot.php3?node_id=pc167
+<form action="boot.php3?node_id=pc167" target=_blank method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
@@ -3152,7 +3152,7 @@
 <input type="text" name="formfields[path]" value="/usr/testbed/images/FBSD410-STD.ndz" size=50>
 <input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="235.252.1.3:6259" size=20 maxlength=256>
-<input type="text" name="formfields[frisbee_pid]" value="5240" size=6 maxlength=10>
+<input type="text" name="formfields[frisbee_pid]" value="2988" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=286
@@ -4646,7 +4646,7 @@
 <input type="text" name="formfields[path]" value="/usr/testbed/images/RHL90-STD.ndz" size=50>
 <input type="checkbox" name="formfields[mtype_pc850]" value="Yep" checked >
 <input type="text" name="formfields[load_address]" value="235.252.1.2:6258" size=20 maxlength=256>
-<input type="text" name="formfields[frisbee_pid]" value="5217" size=6 maxlength=10>
+<input type="text" name="formfields[frisbee_pid]" value="3005" size=6 maxlength=10>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/editimageid.php3?imageid=866
@@ -5087,7 +5087,7 @@
 <form action="editsitevars.php3" method="post">
 <input type="hidden" name="name" value='general/mailman/password' >
 <input type="submit" name="defaulted" value='Reset to Default Value' >
-<input type="text" name="value" value='4381aac432' size='60' >
+<input type="text" name="value" value='c33cb888a7' size='60' >
 <input type="submit" name="edited" value='Change to New Value' >
 <input type="submit" name="canceled" value='Cancel' >
 
@@ -5119,7 +5119,7 @@
 <form action="editsitevars.php3" method="post">
 <input type="hidden" name="name" value='general/version/build' >
 <input type="submit" name="defaulted" value='Reset to Default Value' >
-<input type="text" name="value" value='07/31/2007' size='60' >
+<input type="text" name="value" value='08/10/2007' size='60' >
 <input type="submit" name="edited" value='Change to New Value' >
 <input type="submit" name="canceled" value='Cancel' >
 
@@ -5183,7 +5183,7 @@
 <form action="editsitevars.php3" method="post">
 <input type="hidden" name="name" value='node/ssh_pubkey' >
 <input type="submit" name="defaulted" value='Reset to Default Value' >
-<input type="text" name="value" value='ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA5RG2k07VoXjTWXJ+LBOfgzMh8uvEPKhAr5j2/zX4jqKGPn4dr7Otio0ap3Zhnhgj7MPdPstbL1nxPitqQ2ctIXUC8AQc0RzUEbRFudFwuFziTj5kL1F49zvm6XPkmjvmPJtDH6xCbcBppF4ToaISPIQ6BnOMa73yT71MIBzDo15CJxL+rVjITDUpIVVS/+FXonf6j/FmQdiu0kEle48QqUDMMplnonwCJiUG8BtgFXdScE4svtcZGlxW93WHVZ6WXetiohbwQF4Kb75vT0Pq8YRFO/r4ZzfrwFHhfZMtR5aqAj6eT8M0PUYGj7Jvrd3bV4Ec1Ab3mPzyzK/fVws0Xw== root@myboss.vulnelab.testbed.emulab.net' size='60' >
+<input type="text" name="value" value='ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA4v0YTsgOLElZlDq5sJuphn/OvW58UIGx7+R80Ug2V/u8qEXmK8hc9COZNu+IbOSg8GP8McoTHFk7Duek5EHHZVEXrsXxXOJ+xbnRNmirOlYQjnhn9tcUQsCp3YMmaPb2dZzI+jEXvnfPmA17TFXpJIdVunUkzk9WCQYSrNoH+wV8V7J3ZpRdr4b+MGPPD4ZTtB4N1Q5lIXrZwZed8gI5XpQToSt6KRE65gN4yuRPR0gg1h7h21hUIdYX1fRS+Sa03zsDeAHgXRA96CezPTRrmA/LEu8Mdov6z8s0O9DVExbpI4faGiwdn/n1i0UbME6JExtta2mJVlyXQtsAx6eKUw== root@myboss.vulnelab.testbed.emulab.net' size='60' >
 <input type="submit" name="edited" value='Change to New Value' >
 <input type="submit" name="canceled" value='Cancel' >
 
@@ -5523,18 +5523,18 @@
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc119
-<form action="freenode.php3?node_id=pc119" method="post">
+./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc123
+<form action="freenode.php3?node_id=pc123" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc168
-<form action="freenode.php3?node_id=pc168" method="post">
+./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc153
+<form action="freenode.php3?node_id=pc153" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc91
-<form action="freenode.php3?node_id=pc91" method="post">
+./myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc167
+<form action="freenode.php3?node_id=pc167" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
@@ -13343,20 +13343,20 @@
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc119
-<form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?node_id=pc119" method="post">
+./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc123
+<form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?node_id=pc123" method="post">
 <input type="text" name="_newattrs[0]" size="32">
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc168
-<form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?node_id=pc168" method="post">
+./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc153
+<form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?node_id=pc153" method="post">
 <input type="text" name="_newattrs[0]" size="32">
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc91
-<form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?node_id=pc91" method="post">
+./myboss.vulnelab.testbed.emulab.net/modnodeattributes_form.php3?node_id=pc167
+<form action="https://myboss.vulnelab.testbed.emulab.net/modnodeattributes.php3?node_id=pc167" method="post">
 <input type="text" name="_newattrs[0]" size="32">
 <input type="text" name="_newvals[0]" size="60">
 <input type="submit" value="Submit" >
@@ -13562,7 +13562,7 @@
 <input type="text" name="formfields[usr_phone]" value="412-268-3064" size=15>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
-<input type="text" name="formfields[w_password1]" value="bkdtMNtT" size=8>
+<input type="text" name="formfields[w_password1]" value="P9ugEkne" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13907,7 +13907,7 @@
 <input type="text" name="formfields[usr_phone]" value="" size=15>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
-<input type="text" name="formfields[w_password1]" value="Pm" size=8>
+<input type="text" name="formfields[w_password1]" value="BF" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13930,7 +13930,7 @@
 <input type="text" name="formfields[usr_phone]" value="" size=15>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
-<input type="text" name="formfields[w_password1]" value="Ou" size=8>
+<input type="text" name="formfields[w_password1]" value="Yj" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13953,7 +13953,7 @@
 <input type="text" name="formfields[usr_phone]" value="(801) 123-4567" size=15>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
-<input type="text" name="formfields[w_password1]" value="11859256" size=8>
+<input type="text" name="formfields[w_password1]" value="11867724" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -13976,7 +13976,7 @@
 <input type="text" name="formfields[usr_phone]" value="(801) 123-4567" size=15>
 <input type="password" name="formfields[password1]" value="" size=8>
 <input type="password" name="formfields[password2]" value="" size=8>
-<input type="text" name="formfields[w_password1]" value="11859256" size=8>
+<input type="text" name="formfields[w_password1]" value="11867724" size=8>
 <input type="text" name="formfields[w_password2]" size=8>
 <input type="checkbox" name="formfields[user_interface]" value="plab" >
 <input type="textarea" name="formfields[notes]" rows=2 cols=40>
@@ -14231,7 +14231,7 @@
 <input type="text" name="formfields[reboot_waittime]" value="" size=4 maxlength=4>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node_id]=pc119
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node_id]=pc123
 <form action="newimageid_ez.php3" enctype="multipart/form-data" method="post" name=idform>
 <input type="select" name="formfields[pid]" value=''>
 <input type="select" name="formfields[gid]" value=''>
@@ -14241,7 +14241,7 @@
 <input type="select" name="formfields[os_name]" value="none" >
 <input type="text" name="formfields[os_version]" value="" size=12 maxlength=12>
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="text" name="formfields[node_id]" value="pc119" size=10 maxlength=10>
+<input type="text" name="formfields[node_id]" value="pc123" size=10 maxlength=10>
 <input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
@@ -14259,7 +14259,7 @@
 <input type="text" name="formfields[reboot_waittime]" value="" size=4 maxlength=4>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node_id]=pc168
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node_id]=pc153
 <form action="newimageid_ez.php3" enctype="multipart/form-data" method="post" name=idform>
 <input type="select" name="formfields[pid]" value=''>
 <input type="select" name="formfields[gid]" value=''>
@@ -14269,7 +14269,7 @@
 <input type="select" name="formfields[os_name]" value="none" >
 <input type="text" name="formfields[os_version]" value="" size=12 maxlength=12>
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="text" name="formfields[node_id]" value="pc168" size=10 maxlength=10>
+<input type="text" name="formfields[node_id]" value="pc153" size=10 maxlength=10>
 <input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
@@ -14287,7 +14287,7 @@
 <input type="text" name="formfields[reboot_waittime]" value="" size=4 maxlength=4>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node_id]=pc91
+./myboss.vulnelab.testbed.emulab.net/newimageid_ez.php3?formfields[node_id]=pc167
 <form action="newimageid_ez.php3" enctype="multipart/form-data" method="post" name=idform>
 <input type="select" name="formfields[pid]" value=''>
 <input type="select" name="formfields[gid]" value=''>
@@ -14297,7 +14297,7 @@
 <input type="select" name="formfields[os_name]" value="none" >
 <input type="text" name="formfields[os_version]" value="" size=12 maxlength=12>
 <input type="text" name="formfields[path]" value="/proj/" size=50>
-<input type="text" name="formfields[node_id]" value="pc91" size=10 maxlength=10>
+<input type="text" name="formfields[node_id]" value="pc167" size=10 maxlength=10>
 <input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
 <input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
@@ -14386,23 +14386,23 @@
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc119
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc123
 <form action="https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3" method="post">
-<input type="text" name="node_id" value="pc119" size=10 maxlength=10>
+<input type="text" name="node_id" value="pc123" size=10 maxlength=10>
 <input type="select" name="log_type" value='misc' >
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc168
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc153
 <form action="https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3" method="post">
-<input type="text" name="node_id" value="pc168" size=10 maxlength=10>
+<input type="text" name="node_id" value="pc153" size=10 maxlength=10>
 <input type="select" name="log_type" value='misc' >
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc91
+./myboss.vulnelab.testbed.emulab.net/newnodelog_form.php3?node_id=pc167
 <form action="https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3" method="post">
-<input type="text" name="node_id" value="pc91" size=10 maxlength=10>
+<input type="text" name="node_id" value="pc167" size=10 maxlength=10>
 <input type="select" name="log_type" value='misc' >
 <input type="text" name="log_entry" size=50 maxlength=128>
 <input type="submit" value="Submit" >
@@ -14549,8 +14549,8 @@
 <input type="text" name="tarballs" value="/usr/src /proj/testbed/fish/emulab-src.tar.gz" size="60" maxlength="1024" >
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc119
-<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc119" method="post">
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc123
+<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123" method="post">
 <input type="select" name="def_boot_osid" value='336' >
 <input type="text" name="def_boot_cmd_line" size="40" value="">
 <input type="select" name="next_boot_osid" value="">
@@ -14561,22 +14561,22 @@
 <input type="text" name="tarballs" size="60" maxlength="1024" value="">
 <input type="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc168
-<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc168" method="post">
-<input type="select" name="def_boot_osid" value='336' >
-<input type="text" name="def_boot_cmd_line" size="40" value="">
-<input type="select" name="next_boot_osid" value="">
-<input type="text" name="next_boot_cmd_line" size="40" value="">
-<input type="select" name="temp_boot_osid" value="">
-<input type="text" name="startupcmd" size="60" maxlength="256" value=''>
-<input type="text" name="rpms" size="60" maxlength="1024" value="">
-<input type="text" name="tarballs" size="60" maxlength="1024" value="">
-<input type="submit" value="Submit" >
-
-./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc91
-<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc91" method="post">
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc153
+<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc153" method="post">
 <input type="select" name="def_boot_osid" value='285' >
 <input type="text" name="def_boot_cmd_line" value="/kernel.delay" size="40" >
+<input type="select" name="next_boot_osid" value="">
+<input type="text" name="next_boot_cmd_line" size="40" value="">
+<input type="select" name="temp_boot_osid" value="">
+<input type="text" name="startupcmd" size="60" maxlength="256" value=''>
+<input type="text" name="rpms" size="60" maxlength="1024" value="">
+<input type="text" name="tarballs" size="60" maxlength="1024" value="">
+<input type="submit" value="Submit" >
+
+./myboss.vulnelab.testbed.emulab.net/nodecontrol_form.php3?node_id=pc167
+<form action="https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc167" method="post">
+<input type="select" name="def_boot_osid" value='336' >
+<input type="text" name="def_boot_cmd_line" size="40" value="">
 <input type="select" name="next_boot_osid" value="">
 <input type="text" name="next_boot_cmd_line" size="40" value="">
 <input type="select" name="temp_boot_osid" value="">
@@ -14664,21 +14664,21 @@
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc119
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc123
 <form action="https://myboss.vulnelab.testbed.emulab.net/powertime.php3" method="get">
-<input type="checkbox" name="nodes[]" value="pc119" checked>
+<input type="checkbox" name="nodes[]" value="pc123" checked>
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc168
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc153
 <form action="https://myboss.vulnelab.testbed.emulab.net/powertime.php3" method="get">
-<input type="checkbox" name="nodes[]" value="pc168" checked>
+<input type="checkbox" name="nodes[]" value="pc153" checked>
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
-./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc91
+./myboss.vulnelab.testbed.emulab.net/powertime.php3?node_id=pc167
 <form action="https://myboss.vulnelab.testbed.emulab.net/powertime.php3" method="get">
-<input type="checkbox" name="nodes[]" value="pc91" checked>
+<input type="checkbox" name="nodes[]" value="pc167" checked>
 <input type="checkbox" name="poweron" value="Yep" checked>
 <input type="submit" name="confirmed" value="Confirm" >
 
@@ -14712,18 +14712,18 @@
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc119
-<form action="prereserve_node.php3?node_id=pc119" method="post">
+./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc123
+<form action="prereserve_node.php3?node_id=pc123" method="post">
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc168
-<form action="prereserve_node.php3?node_id=pc168" method="post">
+./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc153
+<form action="prereserve_node.php3?node_id=pc153" method="post">
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
-./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc91
-<form action="prereserve_node.php3?node_id=pc91" method="post">
+./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc167
+<form action="prereserve_node.php3?node_id=pc167" method="post">
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
@@ -15225,18 +15225,18 @@
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc119
-<form action="https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?experiment=9&amp;node_id=pc119" method="post">
+./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc123
+<form action="https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?experiment=9&amp;node_id=pc123" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc168
-<form action="https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?experiment=9&amp;node_id=pc168" method="post">
+./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc153
+<form action="https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?experiment=9&amp;node_id=pc153" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 
-./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc91
-<form action="https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?experiment=9&amp;node_id=pc91" method="post">
+./myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?pid=testbed&eid=testexp1&nodeid=pc167
+<form action="https://myboss.vulnelab.testbed.emulab.net/updateaccounts.php3?experiment=9&amp;node_id=pc167" method="post">
 <input type="submit" name="confirmed" value="Confirm" >
 <input type="submit" name="canceled" value="Cancel" >
 

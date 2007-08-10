@@ -1,4 +1,3 @@
-            Probe label: \'**{approveproject.php3:head_uid}**
             Probe label: \'**{editexp.php3:formfields[noswap_reason]}**
             Probe label: \'**{editexp.php3:formfields[noidleswap_reason]}**
             Probe label: \'**{editexp.php3:formfields[description]}**
@@ -7,7 +6,5 @@
             Probe label: \'**{kb-manage.php3:formfields[body]}**
             Probe label: \'**{kb-manage.php3:formfields[new_section]}**
             Probe label: \'**{kb-manage.php3:formfields[title]}**
-            Probe label: \'**{kb-search.php3:query}**
             Probe label: \'**{moduserinfo.php3:formfields[usr_country]}**
             Probe label: \'**{newgroup.php3:group_description}**
-            Probe label: \'**{newgroup.php3:group_leader}**
