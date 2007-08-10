@@ -146,6 +146,11 @@ foreach $sourceName (readdir(logsDirHandle))
 			$filterFile2 = $fullPath . "/" . "dest1.filter";
 			$filterFile3 = $fullPath . "/" . "dest2.filter";
 
+			if (!(-r $filterFile1) || !(-r $filterFile2) || !($filterFile3))
+			{
+			    print "Missing file. Cannot process $fullPath\n";
+			    continue;
+			}
 			$sharedBottleneckCheck = $DansScript ." ". $filterFile1
 			    ." ". $filterFile2 ." ". $filterFile3;
 
