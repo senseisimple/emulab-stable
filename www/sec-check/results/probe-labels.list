@@ -1,10 +1,7 @@
             Probe label: \'**{approveproject.php3:head_uid}**
             Probe label: \'**{editexp.php3:formfields[noswap_reason]}**
-            Probe label: '**{editexp.php3:formfields[linktest_level]}**
             Probe label: \'**{editexp.php3:formfields[noidleswap_reason]}**
-            Probe label: '**{editexp.php3:formfields[cpu_usage]}**
             Probe label: \'**{editexp.php3:formfields[description]}**
-            Probe label: '**{editexp.php3:formfields[mem_usage]}**
             Probe label: \'**{editimageid.php3:formfields[description]}**
             Probe label: \'**{kb-manage.php3:formfields[xref_tag]}**
             Probe label: \'**{kb-manage.php3:formfields[body]}**
@@ -14,4 +11,3 @@
             Probe label: \'**{moduserinfo.php3:formfields[usr_country]}**
             Probe label: \'**{newgroup.php3:group_description}**
             Probe label: \'**{newgroup.php3:group_leader}**
-            Probe label: '**{showuser_list.php3:searchfor}**

@@ -1,4 +1,0 @@
-            Probe label: '**{editexp.php3:formfields[cpu_usage]}**
-            Probe label: '**{editexp.php3:formfields[linktest_level]}**
-            Probe label: '**{editexp.php3:formfields[mem_usage]}**
-            Probe label: '**{showuser_list.php3:searchfor}**

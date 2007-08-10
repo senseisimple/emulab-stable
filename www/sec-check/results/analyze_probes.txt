@@ -328,9 +328,8 @@ editexp.php3.1.html
      Page Error</h2>
       Probe label: \'**{editexp.php3:formfields[noswap_reason]}**
 editexp.php3.10.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Probe label: '**{editexp.php3:formfields[linktest_level]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid character</font></td>
 editexp.php3.4.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
@@ -340,17 +339,15 @@ editexp.php3.6.html
      Page Error</h2>
       Probe label: \'**{editexp.php3:formfields[noidleswap_reason]}**
 editexp.php3.8.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Probe label: '**{editexp.php3:formfields[cpu_usage]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid character</font></td>
 editexp.php3.9.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
       Probe label: \'**{editexp.php3:formfields[description]}**
 editexp.php3.html
-     	 <title>MyEmulab.Net - Page Error</title>
-     Page Error</h2>
-      Probe label: '**{editexp.php3:formfields[mem_usage]}**
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Invalid character</font></td>
 editgroup.php3.1.html
       Could not map page arguments to 'group'
 editgroup.php3.10.html
@@ -1018,7 +1015,7 @@ showsumstats.php3.1.html
 showsumstats.php3.html
       Invalid range argument: '**{showsumstats.php3:range}**!
 showuser_list.php3.html
-      Probe label: '**{showuser_list.php3:searchfor}**
+      Invalid page arguments: /showuser_list.php3<br><br>Invalid characters in 'searchfor': '**{showuser_list.php3:searchfor}**
 swapexp.php3.1.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>

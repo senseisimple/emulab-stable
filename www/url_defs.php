@@ -576,7 +576,7 @@ function VerifyPageArguments($argspec, $required)
 		$yep = 1;
 
                 # Pages never get arguments with special chars. Check.
-		if (preg_match("/^[\'\"]+$/", $object)) {
+		if (preg_match("/[\'\"]/", $object)) {
 		    PAGEARGERROR("Invalid characters in '$name': $object");
 		}
 	    }

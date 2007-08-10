@@ -441,6 +441,7 @@ if (!isset($formfields["idleswap"]) ||
 	         addslashes($formfields["noidleswap_reason"]) . "'";
 }
 elseif (!isset($formfields["idleswap_timeout"]) ||
+	!preg_match("/^[\d]+$/", $formfields["idleswap_timeout"]) ||
 	($formfields["idleswap_timeout"] + 0) <= 0 ||
 	( (($formfields["idleswap_timeout"] + 0) > $idleswaptimeout) &&
 	  !ISADMIN()) ) {
@@ -463,6 +464,7 @@ if (!isset($formfields["autoswap"]) ||
     $inserts[] = "autoswap_timeout=0";
 }
 elseif (!isset($formfields["autoswap_timeout"]) ||
+	!preg_match("/^[\d]+$/", $formfields["autoswap_timeout"]) ||
 	($formfields["autoswap_timeout"] + 0) == 0) {
     $errors["Max Duration"] = "Invalid time provided";
 }
@@ -490,7 +492,10 @@ else {
 if (isset($formfields["cpu_usage"]) &&
     strcmp($formfields["cpu_usage"], "")) {
 
-    if (($formfields["cpu_usage"] + 0) < 0 ||
+    if (!preg_match("/^[\d]+$/", $formfields["cpu_usage"])) {
+	$errors["CPU Usage"] = "Invalid character";
+    }
+    elseif (($formfields["cpu_usage"] + 0) < 0 ||
 	($formfields["cpu_usage"] + 0) > 5) {
 	$errors["CPU Usage"] = "Invalid (0 <= X <= 5)";
     }
@@ -508,7 +513,10 @@ else {
 if (isset($formfields["mem_usage"]) &&
     strcmp($formfields["mem_usage"], "")) {
 
-    if (($formfields["mem_usage"] + 0) < 0 ||
+    if (!preg_match("/^[\d]+$/", $formfields["mem_usage"])) {
+	$errors["Mem Usage"] = "Invalid character";
+    }
+    elseif (($formfields["mem_usage"] + 0) < 0 ||
 	($formfields["mem_usage"] + 0) > 5) {
 	$errors["Mem Usage"] = "Invalid (0 <= X <= 5)";
     }
@@ -526,9 +534,12 @@ else {
 if (isset($formfields["linktest_level"]) &&
     strcmp($formfields["linktest_level"], "")) {
 
-    if (($formfields["linktest_level"] + 0) < 0 ||
+    if (!preg_match("/^[\d]+$/", $formfields["linktest_level"])) {
+	$errors["Linktest Level"] = "Invalid character";
+    }
+    elseif (($formfields["linktest_level"] + 0) < 0 ||
 	($formfields["linktest_level"] + 0) > 4) {
-	$errors["Linktest Level"] = "Invalid linktest level";
+	$errors["Linktest Level"] = "Invalid (0 <= X <= 4)";
     }
     else {
 	$inserts[] = "linktest_level=" . $formfields["linktest_level"];
