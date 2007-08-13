@@ -26,6 +26,10 @@ How to make a generic image from a Utah one:
     so there is no point.
 
 2e. Install generic kernels.
+
+   [ As of 8/13/07 there are prebuilt versions of these in
+     http://www.emulab.net/downloads/generic-kernels-4.10.tar.gz. ]
+
    Build kernels from the various TESTBED-* configs and install them.
    For FBSD 4.x:
 	TESTBED-GENERIC		  -> /kernel.100HZ

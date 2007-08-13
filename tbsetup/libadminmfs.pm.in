@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Admin MFS library.  Routines related to getting into and out of the
@@ -537,7 +537,7 @@ sub TBAdminMfsRunCmd($$@)
     if (scalar(@nodes) != scalar(@succeeded)) {
 	if (scalar(@failed) > 0) {
 	    print STDERR "*** $me:\n".
-		"    Failed to run command on @failed\n";
+		"    Command run failed on @failed\n";
 	    push(@{$failedref}, @failed)
 		if (defined($failedref));
 	}
