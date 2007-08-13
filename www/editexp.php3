@@ -46,7 +46,7 @@ function SPITFORM($experiment, $formfields, $errors)
     #
     # Standard Testbed Header
     #
-    PAGEHEADER("Edit Experiment Metadata");
+    PAGEHEADER("Edit Experiment Settings");
 
     echo $experiment->PageHeader();
     echo "<br><br>\n";

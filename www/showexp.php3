@@ -421,7 +421,7 @@ if ($expstate) {
     }
 }
 
-WRITESUBMENUBUTTON("Modify Metadata",
+WRITESUBMENUBUTTON("Modify Settings",
 		   CreateURL("editexp", $experiment));
 
 WRITESUBMENUDIVIDER();
