@@ -75,8 +75,8 @@ my $KERNELJAIL  = "jail";
 my $KERNELLDELAY= "linkdelay";
 
 my $TMDELMAP	= TMDELMAP;	# Really comes from libloc.
-my $TC          = "/sbin/tc";		# This is the working version!
-my $IPTABLES    = "/sbin/iptables";	# This is the working version!
+my $TC          = "/usr/local/sbin/tc";               # This is the working version!
+my $IPTABLES    = "/usr/local/sbin/iptables"; # This is the working version!
 
 # This should never happen!
 if (REMOTE() || MFS()) {
@@ -222,8 +222,8 @@ sub LinkDelaySetup()
 	    #
             # NB: Linux doesn't support floats either, and wants usecs.
             #
-	    #$delay  = int($delay + 0.5) * 1000;
-	    #$rdelay = int($rdelay + 0.5) * 1000;
+	    $delay  = int($delay + 0.5) * 1000;
+	    $rdelay = int($rdelay + 0.5) * 1000;
 
 	    #
 	    # Sweet! 'k' as in "kbit" means 1024, not 1000, to tc.
@@ -278,10 +278,13 @@ sub LinkDelaySetup()
             print DEL "ifconfig $iface txqueuelen $queue\n";
 
             print DEL "$TC qdisc add dev $iface handle $pipeno root ";
-            print DEL "netem loss ${plr}% delay ${delay}ms\n";
+            print DEL "plr $plr\n";
 
             print DEL "$TC qdisc add dev $iface handle ". ($pipeno+10) ." ";
-            print DEL "parent ". ($pipeno) .":1 htb default 1\n";
+            print DEL "parent ${pipeno}:1 delay usecs $delay\n";
+
+            print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
+            print DEL "parent ". ($pipeno+10) .":1 htb default 1\n";
 
 	    if ($bandw != 0) {
 		print DEL "$TC class add dev $iface classid ". ($pipeno+20) .":1 ";
