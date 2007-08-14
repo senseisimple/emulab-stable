@@ -11,7 +11,6 @@ include("showstuff.php3");
 $DEF_LIMIT = 20;
 $DEF_NUMPAGENO = 10;
 
-#$FLEXLAB_XMLRPC_SRV = '@USERSNODE@';
 $FLEXLAB_XMLRPC_SRV = 'ops.emulab.net';
 $FLEXLAB_XMLRPC_SRV_PORT = 3993;
 
@@ -900,7 +899,8 @@ function pm_filterdata($data) {
 	    }
 	    $response = do_xmlrpc($FLEXLAB_XMLRPC_SRV,$FLEXLAB_XMLRPC_SRV_PORT,
 				  'flexlab.getFullyConnectedSet',$xargs);
-	    if ($response[0] && !xmlrpc_is_fault($response[1])) {
+	    if (is_array($response) && is_array($response[1]) && $response[0] 
+		&& !xmlrpc_is_fault($response[1])) {
                 #echo "xresp = '" . implode(',',$response[1]) . "'<br>\n";
 		$rnatmp = array();
 		$flexlabfcnodes = array();
@@ -913,21 +913,25 @@ function pm_filterdata($data) {
 		    }
 		}
 	    }
-	    elseif (!$response[0]) {
-		$rnatmp = $remaining_nodes;
-		array_push($opterrs,
-			   "Error in XMLRPC transport: " . $response[1]);
-		$flexlabfcnodes = array();
-	    }
-	    elseif (xmlrpc_is_fault($response[1])) {
-		$rnatmp = $remaining_nodes;
-		array_push($opterrs,
-			   "XMLRPC fault: code=" . $response[1]['faultCode'] . 
-			   "; msg=" . $response[1]['faultString']);
-		$flexlabfcnodes = array();
-	    }
 	    else {
-		
+		if (is_array($response) || !is_array($response[1])) {
+		    array_push($opterrs,"XMLRPC Server Error: " . 
+			       $response[1] . "!\n");
+		}
+		elseif (!$response[0]) {
+		    array_push($opterrs,
+			       "Error in XMLRPC transport: " . $response[1]);
+		}
+		elseif (xmlrpc_is_fault($response[1])) {
+		    array_push($opterrs,
+			       "XMLRPC fault: code=".$response[1]['faultCode'].
+			       "; msg=".$response[1]['faultString']);
+		}
+		else {
+		    array_push($opterrs,"Completely unknown XMLRPC error!");
+		}
+		$rnatmp = $remaining_nodes;
+		$flexlabfcnodes = array();
 	    }
 
             # Now make sure that the save checkbox gets marked, and that 
