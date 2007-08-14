@@ -43,6 +43,15 @@ case $ACPI in
     ;;
 esac
 
+#
+# ...or the filesystem
+#
+if [ -r /etc/emulab/isflash ]; then
+    FLASHBOOT=1
+else
+    FLASHBOOT=0
+fi
+
 dofreebsd() {
 	#
 	# ARGH!  FreeBSD 5, which primarily uses UFS2, internally converts
@@ -301,8 +310,19 @@ dolinux() {
 	if [ -r $gconf ]; then
 	    echo "  updating /boot/grub/grub.conf"
 	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $gconf || {
-		echo "Failed to update /boot/boot/grub/grub.conf"
+		echo "Failed to update /boot/grub/grub.conf"
 	    }
+	    #
+	    # If we booted from a flash device we also have to tweak grub's
+	    # notion of root since the flash device will be "hd0".  It
+	    # appears that we do NOT have to update Linux's drive mapping.
+  	    # XXX this pattern is too hard wired.
+	    #
+	    if [ $FLASHBOOT -eq 1 ]; then
+	        sed -i '' -e "s;root (hd0,1);root (hd1,1);" $gconf || {
+		    echo "Failed to update root in /boot/grub/grub.conf"
+		}
+	    fi
 	fi
 
 	#
