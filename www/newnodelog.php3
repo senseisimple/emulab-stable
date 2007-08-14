@@ -24,7 +24,7 @@ $isadmin   = ISADMIN();
 #
 $reqargs = RequiredPageArguments("node",      PAGEARG_NODE,
 				 "log_type",  PAGEARG_STRING,
-				 "log_entry", PAGEARG_STRING);
+				 "log_entry", PAGEARG_ANYTHING);
 
 #
 # Only Admins can enter log entries.

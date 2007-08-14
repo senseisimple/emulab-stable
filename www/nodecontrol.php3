@@ -25,7 +25,7 @@ $isadmin   = ISADMIN();
 $reqargs = RequiredPageArguments("node",	      PAGEARG_NODE,
 				 "def_boot_osid",     PAGEARG_STRING,
 				 "def_boot_cmd_line", PAGEARG_STRING,
-				 "startupcmd",        PAGEARG_STRING,
+				 "startupcmd",        PAGEARG_ANYTHING,
 				 "tarballs",          PAGEARG_STRING,
 				 "rpms",              PAGEARG_STRING);
 $optargs = OptionalPageArguments("next_boot_osid",     PAGEARG_STRING,
@@ -57,7 +57,7 @@ if ($def_boot_cmd_line != $node->def_boot_cmd_line()) {
     $command_string .= "default_boot_cmdline='$def_boot_cmd_line' ";
 }
 if ($startupcmd != $node->startupcmd()) {
-    $command_string .= "startup_command='$startupcmd' ";
+    $command_string .= "startup_command=" . escapeshellarg($startupcmd) . " ";
 }
 if ($tarballs != $node->tarballs()) {
     $command_string .= "tarfiles='$tarballs' ";

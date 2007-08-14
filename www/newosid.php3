@@ -26,7 +26,7 @@ $isadmin   = ISADMIN();
 #
 $optargs = OptionalPageArguments("osname",      PAGEARG_STRING,
 				 "project",     PAGEARG_PROJECT,
-				 "description", PAGEARG_STRING,
+				 "description", PAGEARG_ANYTHING,
 				 "os_path",     PAGEARG_STRING,
 				 "os_version",  PAGEARG_STRING,
 				 "OS",          PAGEARG_STRING,

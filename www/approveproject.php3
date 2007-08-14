@@ -22,7 +22,7 @@ $reqargs = RequiredPageArguments("project",  PAGEARG_PROJECT,
 				 "approval", PAGEARG_STRING);
 $optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
 				 "user_interface", PAGEARG_STRING,
-				 "message", PAGEARG_STRING,
+				 "message", PAGEARG_ANYTHING,
 				 "silent", PAGEARG_BOOLEAN);
 
 #
