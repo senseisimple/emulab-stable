@@ -790,17 +790,23 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
        $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
 	(defined($nodes{$node2}) || defined($switches{$node2}))) {
+        
+        # Types for this link - for the time being, we assume that all
+        # links are Ethernet, though this will certaily change later.
+        my $basetype = "ethernet";
+
 	$iface1 = get_iface($node1,$card1,$port1);
 	$iface2 = get_iface($node2,$card2,$port2);
-	$iface1bw = get_ifacebw($node1,$card1,$port1,"ethernet");
-	$iface2bw = get_ifacebw($node2,$card2,$port2,"ethernet");
+	$iface1bw = get_ifacebw($node1,$card1,$port1,$basetype);
+	$iface2bw = get_ifacebw($node2,$card2,$port2,$basetype);
+
+        my @types = ($basetype);
 
 	next
 	    if (! exists($interfacecardports{"$node1:$iface1"}));
 	
 	# XXX - This is a bad, bad hack - we  use our knowledge that in the
-	# wires table links to the switch always come as node2. We also assume
-	# that node interfaces are plugged into switch ports of the same speed.
+	# wires table links to the switch always come as node2.
 	# Chris has something better on the way (storing the speed on the
 	# switch side), so this is just a temp. hack.
 	if (!defined($switches{$node1}) && defined($switches{$node2})) {
@@ -826,10 +832,25 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$interconnects{"$node1:$node2"} = new Math::BigInt $bw;
 	    }
 	} else {
+            # Node-to-switch link
 	    # !!! - Here we use our knowledge that in the wires table links
 	    # to the switch always come as node2.
+
+            # Come up with some other types for this link. The idea is that
+            # it allows people to ask for links to specific switches, specific
+            # interface types, etc.
+            my $switch = get_ifaceswitch($node1,$iface1);
+            if ($switch) {
+                push @types, "$basetype-$switch";
+            }
+            if ($interfacetypes{"$node1:$card1:$port1"}) {
+                push @types, "$basetype-" .
+                    $interfacetypes{"$node1:$card1:$port1"};
+            }
+            push @types, "$basetype-$bw";
+
 	    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-		" $node2:$iface2 $bw 0 0 1 ethernet\n";
+		" $node2:$iface2 $bw 0 0 1 " . join(" ",@types) . "\n";
 	}
     } 
 }
