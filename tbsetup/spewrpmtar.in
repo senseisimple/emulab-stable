@@ -122,7 +122,7 @@ if (!defined($experiment)) {
 my $pid     = $experiment->pid();
 my $eid     = $experiment->eid();
 my $gid     = $experiment->gid();
-my $creator = $experiment->GetCreator()->name();
+my $creator = $experiment->GetCreator()->uid();
 my $bytelen = 0;
 
 if (my $retval = VerifyFile()) {
