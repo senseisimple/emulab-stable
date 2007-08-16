@@ -236,6 +236,7 @@ while (my %row = $db_result->fetchhash()) {
     my $class     = $typeinfo->class();
     my $subnode   = $typeinfo->issubnode();
     my $virtnode  = $typeinfo->isvirtnode();
+    my $isremote  = $typeinfo->isremotenode();
     my $imageable = $typeinfo->imageable();
     my $plabnode  = $typeinfo->isplabdslice();
     my $bios_wait = $typeinfo->bios_waittime();
@@ -247,9 +248,9 @@ while (my %row = $db_result->fetchhash()) {
     # a bit, and so run them through the checks below.
     #
     if ($virtnode) {
-	$vnodes{$node} = ($jailnode || $plabnode);
+	$vnodes{$node} = ($jailnode || $plabnode || $isremote);
 	$plabvnodes{$node} = $plabnode;
-	if (! $jailnode && ! $plabnode) {
+	if (! $jailnode && ! $plabnode && !$isremote) {
 	    next;
 	}
     }
@@ -272,7 +273,7 @@ while (my %row = $db_result->fetchhash()) {
 	}
     }
 
-    $osids{$node}         = $osid;
+    $osids{$node} = $osid;
     if ($osid) {
 	$osinfo = OSinfo->Lookup($osid);
 
@@ -280,7 +281,7 @@ while (my %row = $db_result->fetchhash()) {
 	    if (!defined($osinfo));
     }
     $osmap{$node}         = $osinfo;
-    $bios_waittime{$type} = $bios_wait;
+    $bios_waittime{$type} = (defined($bios_wait) ? $bios_wait : 0);
     $node_types{$node}    = $type;
     $vname{$node}         = $vname;
 
@@ -365,7 +366,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it.
     #
-    if (!$bootpath && !$jailnode && !$plabnode && $imageable) {
+    if (!$bootpath && !$virtnode && $imageable) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
@@ -1087,16 +1088,27 @@ elsif (@vnodelist) {
 	my $wstart = $waitstart{$node};
 	my $curallocstate;
 	my $actual_state;
+	my $maxwait;
 
         #
         # Base the maxwait for vnodes on the reboot_waittime field for
         # their respective OSIDs, with some slop time that scales up
         # as a function of the number of vnodes on the parent pnode.
         #
-        my $osinfo      = $osmap{$node};
-	my $osid        = $osinfo->osid();
-        my $reboot_time = $reboot_waittime{$osid};
-	my $maxwait     = $reboot_time + (40 * $pnodevcount{$pnode});
+	if ($islocal) {
+	    my $osinfo      = $osmap{$node};
+	    my $osid        = $osinfo->osid();
+	    my $reboot_time = $reboot_waittime{$osid};
+	    
+	    $maxwait = $reboot_time + (40 * $pnodevcount{$pnode});
+	}
+	else {
+	    #
+	    # A remote node is supposed to be up and running, but no idea
+	    # how long is reasonable.
+	    #
+	    $maxwait = 60 * $pnodevcount{$pnode};
+	}
 
 	TBGetNodeAllocState($node, \$curallocstate);
 
