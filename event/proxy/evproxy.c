@@ -21,19 +21,22 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <signal.h>
 #include "config.h"
 #include "event.h"
 #include "tbdefs.h"
 #include "log.h"
 
 static int debug = 0;
+static int stop  = 0;
 static event_handle_t localhandle;
 static event_handle_t bosshandle;
 
 void
 usage(char *progname)
 {
-    fprintf(stderr, "Usage: %s [-s server] -e pid/eid\n", progname);
+    fprintf(stderr,
+	    "Usage: %s [-s server] [-i pidfile] -e pid/eid\n", progname);
     exit(-1);
 }
 
@@ -45,6 +48,12 @@ static void
 sched_callback(event_handle_t handle,
 	       event_notification_t notification, void *data);
 
+static void
+sigterm(int sig)
+{
+	stop = 1;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -53,6 +62,8 @@ main(int argc, char **argv)
 	char			*server = NULL;
 	char			*port = NULL;
 	char			*myeid = NULL;
+	char			*pidfile = NULL;
+	char			*vnodeid = NULL;
 	char			buf[BUFSIZ], ipaddr[32];
 	char			hostname[MAXHOSTNAMELEN];
 	struct hostent		*he;
@@ -62,7 +73,7 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "ds:p:e:")) != -1) {
+	while ((c = getopt(argc, argv, "ds:p:e:i:v:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
@@ -73,8 +84,14 @@ main(int argc, char **argv)
 		case 'p':
 			port = optarg;
 			break;
+		case 'i':
+			pidfile = optarg;
+			break;
 		case 'e':
 			myeid = optarg;
+			break;
+		case 'v':
+			vnodeid = optarg;
 			break;
 		default:
 			usage(progname);
@@ -176,10 +193,15 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on remote server");
 	}
 
+	signal(SIGTERM, sigterm);
+
 	/*
 	 * Stash the pid away.
 	 */
-	sprintf(buf, "%s/evproxy.pid", _PATH_VARRUN);
+	if (pidfile)
+		strcpy(buf, pidfile);
+	else
+		sprintf(buf, "%s/evproxy.pid", _PATH_VARRUN);
 	fp = fopen(buf, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", getpid());
@@ -187,8 +209,11 @@ main(int argc, char **argv)
 	}
 
 	/* Begin the event loop, waiting to receive event notifications */
-	while (1)
-		sleep(10);
+	while (! stop) {
+		struct timeval  tv = { 5, 0 };
+
+		select(0, NULL, NULL, NULL, &tv);
+	}
 
 	/* Unregister with the remote event system: */
 	if (event_unregister(bosshandle) == 0) {
