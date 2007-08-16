@@ -610,14 +610,16 @@ foreach ($inserts as $name => $value) {
 if (isset($new_type)) {
     DBQueryFatal("insert into node_types set type='$node_type', ".
 		 implode(",", $insert_data));
-    if ($formfields["class"] == "pc") {
+    if ($formfields["class"] == "pc" || $formfields["isremotenode"] == 1) {
 	$vnode_type = $node_type;
 	$vnode_type = preg_replace("/pc/","pcvm",$vnode_type);
 	if ($vnode_type == $node_type) {
 	    $vnode_type = "$vnode_type-vm";
 	}
+	$pcvmtype = ($formfields["isremotenode"] == 1 ? "pcvwa" : "pcvm");
+	
 	DBQueryFatal("insert into node_types_auxtypes set " .
-	    "auxtype='$vnode_type', type='pcvm'");
+		     "  auxtype='$vnode_type', type='$pcvmtype'");
     }
     foreach ($attributes as $key => $value) {
         # Skip if scheduled for deletion
