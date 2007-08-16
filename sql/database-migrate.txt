@@ -4155,3 +4155,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.129: Minor fix to previous revision; skip to next entry.
 4.130: Minor fix to previous revision; skip to next entry.
+
+4.131: Add some new WA support.
+
+	alter table widearea_nodeinfo
+          add `privkey` varchar(128) default NULL,
+	  add `IP` varchar(15) default NULL,
+	  add KEY `IP` (`IP`),
+	  add KEY `privkey` (`privkey`);
+

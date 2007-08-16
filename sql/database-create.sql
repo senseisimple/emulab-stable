@@ -3689,7 +3689,11 @@ CREATE TABLE `widearea_nodeinfo` (
   `latitude` float default NULL,
   `longitude` float default NULL,
   `bwlimit` varchar(32) default NULL,
-  PRIMARY KEY  (`node_id`)
+  `privkey` varchar(128) default NULL,
+  `IP` varchar(15) default NULL,
+  PRIMARY KEY  (`node_id`),
+  KEY `IP` (`IP`),
+  KEY `privkey` (`privkey`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
