@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -134,13 +134,15 @@ main(int argc, char **argv)
 	if (reboot) {
 		boot_whatp->type = BIBOOTWHAT_TYPE_REBOOT;
 #ifdef	EVENTSYS
-		bievent_send(target.sin_addr, TBDB_NODESTATE_SHUTDOWN);
+		bievent_send(target.sin_addr, (void *) NULL,
+			     TBDB_NODESTATE_SHUTDOWN);
 #endif
 	}
 	else if (query) {
 		boot_whatp->type = BIBOOTWHAT_TYPE_AUTO;
 #ifdef	EVENTSYS
-		bievent_send(target.sin_addr, TBDB_NODESTATE_PXEWAKEUP);
+		bievent_send(target.sin_addr, (void *) NULL,
+			     TBDB_NODESTATE_PXEWAKEUP);
 #endif
 	}
 	else {
@@ -151,17 +153,20 @@ main(int argc, char **argv)
 			fatal("Could not send bootinfo packet!");
 		}
 #ifdef	EVENTSYS
-		bievent_send(target.sin_addr, TBDB_NODESTATE_PXEBOOTING);
+		bievent_send(target.sin_addr, (void *) NULL,
+			     TBDB_NODESTATE_PXEBOOTING);
 		switch (boot_whatp->type) {
 		case BIBOOTWHAT_TYPE_PART:
 		case BIBOOTWHAT_TYPE_SYSID:
 		case BIBOOTWHAT_TYPE_MB:
 		case BIBOOTWHAT_TYPE_MFS:
-			bievent_send(target.sin_addr, TBDB_NODESTATE_BOOTING);
+			bievent_send(target.sin_addr, (void *) NULL,
+				     TBDB_NODESTATE_BOOTING);
 			break;
 				
 		case BIBOOTWHAT_TYPE_WAIT:
-			bievent_send(target.sin_addr, TBDB_NODESTATE_PXEWAIT);
+			bievent_send(target.sin_addr, (void *) NULL,
+				     TBDB_NODESTATE_PXEWAIT);
 			break;
 		default:
 			error("%s: invalid boot directive: %d\n",

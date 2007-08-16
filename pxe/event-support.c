@@ -69,7 +69,7 @@ bievent_shutdown(void)
  * if not already done. Returns 0 on sucess, 1 on failure.
  */
 int
-bievent_send(struct in_addr ipaddr, char *event)
+bievent_send(struct in_addr ipaddr, void *opaque, char *event)
 {
 	event_notification_t	notification;
 	char			nodeid[TBDB_FLEN_NODEID];

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * boot/bootwhat.h from the OSKit.
@@ -26,7 +26,7 @@
 #define  MAX_BOOT_PATH		256
 #define  MAX_BOOT_CMDLINE	((MAX_BOOT_DATA - MAX_BOOT_PATH) - 32)
 
-typedef struct {
+typedef struct boot_info {
 	short   version;
 	short	opcode;
 	int	status;
