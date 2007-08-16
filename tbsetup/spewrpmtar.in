@@ -229,7 +229,7 @@ sub VerifyFile()
     # Stat the file to confirm that its either owned by the experiment
     # creator, or in the gid of the experiment.
     #
-    my (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$bytelen,
+    my (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$length,
 	undef,$mtime) = stat($translated);
 
     my ($unix_uid, $unix_gid, $unix_gname);
@@ -257,6 +257,7 @@ sub VerifyFile()
 	if (defined($timestamp) && $timestamp >= $mtime);
     
     $file = $translated;
+    $bytelen = $length;
     return 0;
 }
 
