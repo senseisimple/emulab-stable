@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -186,12 +186,13 @@ foreach my $node (@nodes) {
     my $plab;
     my $allocstate;
     my $mode = ($killmode ? "teardown" : "setup");
+    my $remote = TBIsNodeRemote($node); 
 
     if (! TBIsNodeVirtual($node, \$jailed, \$plab)) {
 	next;
     }
     if (($plabonly || $jailonly) and 
-        !($plabonly && $plab or $jailonly && $jailed)) {
+        !(($plabonly && $plab) || ($jailonly && ($jailed || $remote)))) {
         next;
     }
     if (! TBPhysNodeID($node, \$pnode)) {
@@ -210,7 +211,7 @@ foreach my $node (@nodes) {
 	    #
 	    # When swapping, local vnodes go down with the physnode.
 	    #
-	    if (! TBIsNodeRemote($node)) {
+	    if (! $remote) {
 		print "$node will $mode with local node $pnode.\n";
 		next;
 	    }
@@ -239,7 +240,7 @@ foreach my $node (@nodes) {
 	    # assumed that these booted okay, and need to be torndown,
 	    # even though they are not RES_READY.
 	    #
-	    if (! TBIsNodeRemote($node)) {
+	    if (! $remote) {
 		if ($killmode) {
 		    if ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
 			print "$node failed to boot; skipping $mode.\n";
@@ -391,35 +392,41 @@ while (1) {
 	    # Must change our real UID to root so that ssh will work.
 	    $UID = 0;
 
-	    if ($plab && $mode eq "setup") {
+	    if ($mode eq "setup" && ($plab || !$jailed)) {
                 # Make sure vnode is in the proper state before trying to
                 # bring it up.
                 # XXX: do this for all vnodes (see above)?
                 TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN);
-		if (TBForkCmd("$TB/sbin/plabnode ". 
-                              ($force ? "-f" : "").
-                              " alloc $pid $eid $vnode", 1)) {
-		    print STDERR "*** $0:\n" .
-                        "    Plab node allocation failed\n";
-		    # Should check DB state instead.
-		    exit(99);
+		if ($plab) {
+		    if (TBForkCmd("$TB/sbin/plabnode ". 
+				  ($force ? "-f" : "").
+				  " alloc $pid $eid $vnode", 1)) {
+			print STDERR "*** $0:\n" .
+			    "    Plab node allocation failed\n";
+			# Should check DB state instead.
+			exit(99);
+		    }
+		}
+		else {
+		    if (TBForkCmd("$ssh -host $pnode $CLIENT_BIN/vnodesetup ".
+				  " -i $vnode", 1)) {
+			exit(99);
+		    }
 		}
                 # Make sure the system knows we now have state on the node!
                 TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 	    }
-
-	    # Cleanup is used only on plab nodes.
-            # Don't try to teardown plab vnodes; it's just asking for
-            # trouble as the shutdown may hang or take too long.  It's
-            # best to simply try and free the vserver below.
-	    if (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))) {
+	    elsif (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))) {
+		# Cleanup is used only on plab nodes.
+		# Don't try to teardown plab vnodes; it's just asking for
+		# trouble as the shutdown may hang or take too long.  It's
+		# best to simply try and free the vserver below.
 		my $args = (($mode eq "teardown") ? "-k " :
 			    ($mode eq "reboot" ? "-r " : " "));
-		$args   .= ($jailed   ? "-j " : " ");
-		$args   .= ($plab     ? "-p " : " ");
+		$args   .= ($jailed   ? "-j " : ($plab ? "-p " : "-i "));
 		$args   .= "$vnode ";
 		
-		$exval = TBForkCmd("$ssh -host $vnode ".
+		$exval = TBForkCmd("$ssh -host $pnode ".
                                  "$CLIENT_BIN/vnodesetup $args",1);
             }
 
