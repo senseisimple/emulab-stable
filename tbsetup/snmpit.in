@@ -458,7 +458,7 @@ if ($TESTMODE) {
 snmpit_lib::init($debug);
 
 my $exitval = 0;
-foreach my $command (@commands) {
+COMMAND: foreach my $command (@commands) {
 
     #
     # Pull the operation and the arugments to it.
@@ -470,7 +470,9 @@ foreach my $command (@commands) {
     #
     # Discover the set of devices we need to talk to. This differs depending
     # on the operation which we're performing. We also get a list of all ports
-    # and vlan IDs involved in this operation, if appropriate
+    # and vlan IDs involved in this operation, if appropriate. We use this
+    # opportunity to bail out of the command if it appears we have no work
+    # to do
     #
     my @devicenames;
     my @vlans;
@@ -487,6 +489,10 @@ foreach my $command (@commands) {
 	};
 	(/tables/) && do {
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
+            if (!@vlans) {
+                print "snmpit: $pid/$eid has no VLANs to create, skipping\n";
+                next COMMAND;
+            }
 	    @ports = getVlanPorts(@vlans);
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
@@ -497,6 +503,10 @@ foreach my $command (@commands) {
 	    # When we reset, we operate on all test switches, just to be safe
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
+            if (!@vlans) {
+                print "snmpit: $pid/$eid has no VLANs to remove, skipping\n";
+                next COMMAND;
+            }
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
