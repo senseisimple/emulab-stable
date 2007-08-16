@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw ( );
+@EXPORT = qw();
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
@@ -20,9 +20,11 @@ use libtestbed;
 require NodeType;
 require Interface;
 require Experiment;
+require OSinfo;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
+use vars qw($NODEROLE_TESTNODE @EXPORT_OK);
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -30,6 +32,19 @@ my $BOSSNODE    = "@BOSSNODE@";
 my $EVENTSYS    = @EVENTSYS@;
 # XXX stinky hack detection
 my $ISUTAH	= @TBMAINSITE@;
+
+# Exported defs
+$NODEROLE_TESTNODE	= 'testnode';
+
+# Why, why, why?
+@EXPORT_OK = qw($NODEROLE_TESTNODE);
+
+# Defaults
+#
+# MFS to boot the nodes into initially
+my $MFS_INITIAL = TB_OSID_FREEBSD_MFS();
+# Initial event system state to put the nodes into
+my $STATE_INITIAL = TBDB_NODESTATE_SHUTDOWN;
 
 # Cache of instances to avoid regenerating them.
 my %nodes	= ();
@@ -84,6 +99,132 @@ sub eventstate($)    { return field($_[0], 'eventstate'); }
 sub jailflag($)      { return field($_[0], 'jailflag'); }
 sub phys_nodeid($)   { return field($_[0], 'phys_nodeid'); }
 sub def_boot_osid($) { return field($_[0], 'def_boot_osid'); }
+
+#
+# Create a new node.
+#
+sub Create($$$$)
+{
+    my ($class, $node_id, $experiment, $argref) = @_;
+    my ($control_iface,$virtnode_capacity,$adminmfs,$adminmfs_osid);
+    my ($priority, $osid, $opmode, $state);
+
+    my $type = $argref->{'type'};
+    my $role = $argref->{'role'};
+
+    my $typeinfo = NodeType->Lookup($type);
+    return undef
+	if (!defined($typeinfo));
+
+    my $isremote = $typeinfo->isremotenode();
+
+    if ($typeinfo->virtnode_capacity(\$virtnode_capacity)) {
+	print STDERR "*** No virtnode_capacity for $type! Using zero.\n";
+	$virtnode_capacity = 0;
+    }
+    if ($typeinfo->adminmfs_osid(\$adminmfs_osid)) {
+	print STDERR "*** No adminmfs osid for $type!\n";
+	return undef;
+    }
+    # Find object for the adminfs.
+    if (defined($adminmfs_osid)) {
+	$adminmfs = OSinfo->Lookup($adminmfs_osid);
+    }
+    else {
+	$adminmfs = OSinfo->Lookup(TBOPSPID(), $MFS_INITIAL);
+    }
+    if (!defined($adminmfs)) {
+	print STDERR "*** Could not find OSinfo object for adminmfs!\n";
+	return undef;
+    }
+    $osid   = $adminmfs->osid();
+    $opmode = $adminmfs->op_mode();
+    $state  = $STATE_INITIAL;
+    
+    #
+    # Make up a priority (just used for sorting)
+    #
+    if ($node_id =~ /^(.*\D)(\d+)$/) {
+	$priority = $2;
+    }
+    else {
+	$priority = 1;
+    }
+    # The list of table we have to clear if anything goes wrong.
+    my @cleantables = ("nodes", "node_hostkeys", "node_status",
+		       "node_activity", "node_utilization",
+		       "node_auxtypes", "reserved");
+
+    DBQueryWarn("insert into nodes set ".
+		"  node_id='$node_id', type='$type', " .
+		"  phys_nodeid='$node_id', role='$role', ".
+		"  priority=$priority, " .
+		"  eventstate='$state', op_mode='$opmode', " .
+		"  def_boot_osid='$osid', " .
+		"  inception=now(), ".
+		"  state_timestamp=unix_timestamp(NOW()), " .
+		"  op_mode_timestamp=unix_timestamp(NOW())")
+	or goto bad;
+
+    DBQueryWarn("insert into node_hostkeys (node_id) ".
+		"values ('$node_id')")
+	or goto bad;
+	
+    DBQueryWarn("insert into node_status ".
+		"(node_id, status, status_timestamp) ".
+		"values ('$node_id', 'down', now()) ")
+	or goto bad;
+    
+    DBQueryWarn("insert into node_activity ".
+		"(node_id) values ('$node_id')")
+	or goto bad;
+	
+    DBQueryWarn("insert into node_utilization ".
+		"(node_id) values ('$node_id')")
+	or goto bad;
+
+    if (defined($experiment)) {
+	my $exptidx = $experiment->idx();
+	my $pid     = $experiment->pid();
+	my $eid     = $experiment->eid();
+
+	# Reserve node to hold it from being messed with.
+	print STDERR
+	    "*** Reserving new node $node_id to $pid/$eid\n";
+
+	DBQueryWarn("insert into reserved ".
+		    "(node_id, exptidx, pid, eid, rsrv_time, vname) ".
+		    "values ('$node_id', $exptidx, ".
+		    "        '$pid', '$eid', now(), '$node_id')")
+	    or goto bad;
+    }
+
+    #
+    # Add vnode counts.
+    #
+    if ($role eq $Node::NODEROLE_TESTNODE && $virtnode_capacity) {
+	my $vtype = $type;
+	if (!($vtype =~ s/pc/pcvm/)) {
+	    $vtype = "$vtype-vm";
+	}
+	my $pcvmtype = ($isremote ? "pcvwa" : "pcvm");
+
+	DBQueryWarn("insert into node_auxtypes set node_id='$node_id', " .
+		    "type='$pcvmtype', count=$virtnode_capacity")
+	    or goto bad;
+	    
+	DBQueryWarn("insert into node_auxtypes set node_id='$node_id', " .
+		    "type='$vtype', count=$virtnode_capacity")
+	    or goto bad;
+    }
+    return Node->Lookup($node_id);
+    
+  bad:
+    foreach my $table (@cleantables) {
+	DBQueryWarn("delete from $table where node_id='$node_id'");
+    }
+    return undef;
+}
 
 #
 # Refresh a class instance by reloading from the DB.
@@ -685,7 +826,7 @@ sub CreateVnodes($$)
 		 "       def_boot_osid='$osid', " .
 		 "       update_accounts=1, ".
 		 "       jailflag=$isjailed ".
-		 ($isjailed ? ",jailip='$jailip'" : "");
+		 (($isjailed && !$isremote) ? ",jailip='$jailip'" : "");
 
 	print STDERR "$statement\n"
 	    if ($debug);
