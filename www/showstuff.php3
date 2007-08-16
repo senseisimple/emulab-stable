@@ -122,7 +122,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                          " oi.OS,tip.tipname,wa.site,wa.hostname, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime, ".
-		         "nl.reported,nl.entry ".
+		         "nl.reported,nl.entry,nt.isjailed,nt.isremotenode ".
 		         "from reserved as r ".
 		         "left join nodes as n on n.node_id=r.node_id ".
                          "left join widearea_nodeinfo as wa on wa.node_id=n.phys_nodeid ".
@@ -143,7 +143,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,nt.isplabdslice, ".
                          " oi.OS,tip.tipname,wa.site,wa.hostname, ".
 		         " ns.status as nodestatus, ".
-		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
+		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") ".
+			 "   as rsrvtime,nt.isjailed,nt.isremotenode ".
 		         "from reserved as r ".
 		         "left join nodes as n on n.node_id=r.node_id ".
                          "left join widearea_nodeinfo as wa on wa.node_id=n.phys_nodeid ".
@@ -222,6 +223,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    $bootstate     = $row["eventstate"];
 	    $isvirtnode    = $row["isvirtnode"];
             $isplabdslice  = $row["isplabdslice"];
+	    $isjailed      = $row["isjailed"];
+	    $isremote      = $row["isremotenode"];
 	    $tipname       = $row["tipname"];
 	    $iswindowsnode = $row["OS"]=='Windows';
 
@@ -273,9 +276,13 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    else
 		echo "<td>&nbsp;</td>\n";
 
-	    if ($bootstate != "ISUP") {
+	    if ($isvirtnode && !($isjailed || $isplabdslice)) {
+		echo "  <td>$bootstate</td>\n";
+	    }
+	    elseif ($bootstate != "ISUP") {
 		echo "  <td>$status ($bootstate)</td>\n";
-	    } else {
+	    }
+	    else {
 		echo "  <td>$status</td>\n";
 	    }
 	    
@@ -295,7 +302,17 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                     </td>\n";
 
 	    if ($isvirtnode || !isset($tipname) || $tipname = '') {
-		echo "<td>&nbsp;</td>\n";
+		echo "  <td>&nbsp;</td>\n";
+
+		if ($isvirtnode) {
+		    echo "  <td align=center>
+                                <a href='bootlog.php3?node_id=$node_id'>
+                                <img src=\"/icons/f.gif\" alt='boot log'></a>
+                            </td>\n";
+		}
+		else {
+		    echo "  <td>&nbsp;</td>\n";
+		}
 	    }
 	    else {
 		echo "  <td align=center>
