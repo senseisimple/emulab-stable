@@ -264,6 +264,9 @@ sub adminmfs_osid($;$) {return GetAttribute($_[0], "adminmfs_osid",$_[1]);}
 sub rebootable($;$)    {return GetAttribute($_[0], "rebootable",$_[1]);}
 sub power_delay($;$)   {return GetAttribute($_[0], "power_delay",$_[1]);}
 
+sub initial_experiment($;$) {
+    return GetAttribute($_[0], "initial_experiment",$_[1]);
+}
 sub virtnode_capacity($;$) {
     return GetAttribute($_[0], "virtnode_capacity", $_[1]);
 }
