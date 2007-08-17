@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -41,6 +41,7 @@ if ($EUID != 0) {
 # Script specific goo.
 my $RCDIR   = "$BINDIR/rc";
 my $LOGFILE = "$LOGDIR/cdbootsetup.debug";
+my $WGET    = "/usr/local/bin/wget";
 
 #
 # Disk related parameters
@@ -63,6 +64,13 @@ my $MINDISKSIZE = 8000;
 my $defrawdisk	= "/dev/ad0";
 my $rawbootdisk;
 
+# Set below.
+my $bossname;
+my $bossip;
+
+# For widearea.
+my $privkey;
+
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
@@ -77,6 +85,7 @@ sub doshutdown();
 sub doreconfig();
 sub docleanup();
 sub BootNotify($$);
+sub BootWhat();
 
 # Allow default above.
 if (@ARGV) {
@@ -176,12 +185,34 @@ sub doboot()
     #
     # The CD does some different stuff.
     #
-    print("Doing Testbed Setup on a CD\n");
+    print("Doing Testbed Setup on a CD/Dongle\n");
 
     # Get the boss info for below.
-    my ($bossname, $bossip) = tmccbossinfo();
+    ($bossname, $bossip) = tmccbossinfo();
     if (!defined($bossname)) {
 	fatal("Could not determine the name of the boss server!");
+    }
+
+    #
+    # Widearea nodes need to checkin and tell Emulab in case we are a new
+    # node, or more likely, our IP address has changed. 
+    #
+    if (REMOTE()) {
+	my $hostname = `hostname`;
+	chomp($hostname);
+
+	$privkey = `cat $ETCDIR/emulab-privkey`;
+	chomp($privkey);
+
+	my $IP = `cat $BOOTDIR/myip`;
+	chomp($IP);
+
+	my $URL = "https://$bossname/wanodecheckin.php".
+	    "?IP=$IP&privkey=$privkey" .
+	    (defined($hostname) && $hostname ne ""
+	     ? "&hostname=$hostname" : "");
+
+	system("$WGET -O - '$URL'");
     }
 
     # Enable IPoD
@@ -214,7 +245,8 @@ sub doboot()
     system("tbbootconfig -v $bootdev");
     if ($?) {
 	print("No valid boot config on $bootdev; initializing ...\n");
-	system("tbbootconfig -d -f -c 1 -k 0 -m 1 $bootdev");
+	system("tbbootconfig -d -f -c 1 -k 0 ".
+	       (defined($privkey) ? "-e '$privkey' " : "") . "-m 1 $bootdev");
 	if ($?) {
 	    print("Error running tbbootconfig; falling back to MFS boot\n");
 	    goto mfs;
@@ -228,11 +260,7 @@ sub doboot()
     # should boot (has been allocated or needs to be reloaded).
     #
     print("Asking bootinfo what to do; warning, this might block ...\n");
-    my $bootwhat = `bootinfoclient -s $bossname`;
-    if ($?) {
-	print("Error running bootinfoclient; falling back to MFS boot\n");
-	goto mfs;
-    }
+    my $bootwhat = BootWhat();
     chomp($bootwhat);
 
     if ($debug) {
@@ -567,4 +595,54 @@ sub VerifyMBR($$)
   bad:
     close(FDISK);
     return -1;
+}
+
+#
+# Ask bootwhat what to do. 
+#
+sub BootWhat()
+{
+    if (!REMOTE()) {
+	my $bootwhat = `bootinfoclient -s $bossname`;
+	if ($?) {
+	    print("Error running bootinfoclient; falling back to MFS boot\n");
+	    return "";
+	}
+	return $bootwhat;
+    }
+    my @results;
+
+    if (tmcc(TMCCCMD_BOOTWHAT, "", \@results) < 0 || !@results) {
+	print "Error getting BOOTWHAT from Emulab Control!\n";
+	return "";
+    }
+    my ($status, $type, $rest) =
+	($results[0] =~ /^STATUS=(\w*) TYPE=(\d*)(.*)$/);
+    if (!defined($status) || $status ne "success") {
+	print "BOOTWHAT did not return success from Emulab Control!\n";
+	return "";
+    }
+    return "reboot"
+	if ($type == 5);
+
+    # MFS
+    if ($type == 7) {
+	my ($what) = ($rest =~ /^\s*WHAT=(.*)/);
+	return "mfs:$what";
+    }
+    # Partition.
+    if ($type == 1) {
+	my ($what, $cmdline);
+	
+	if ($rest =~ /^\s*WHAT=(\d*)$/) {
+	    $what = $1;
+	    $cmdline = "";
+	}
+	elsif ($rest =~ /^\s*WHAT=(\d*)\s+CMDLINE='(.*)'$/) {
+	    $what = $1;
+	    $cmdline = $2;
+	}
+	return "partition:$what $cmdline";
+    }
+    return "";
 }
