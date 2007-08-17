@@ -673,11 +673,6 @@ Link instproc updatedb {DB} {
     $self instvar protocol
     $self instvar mustdelay
 
-    if {$protocol != "ethernet"} {
-	perror "Link must be an ethernet only, not a $protocol"
-	return
-    }
-
     $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
     foreach nodeport $nodelist {
@@ -733,7 +728,7 @@ Link instproc updatedb {DB} {
 
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "vnode" "vport" "ip" "mustdelay"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -756,7 +751,7 @@ Link instproc updatedb {DB} {
  	    lappend fields "trace_db"
 	}
 
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip $mustdelay]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)

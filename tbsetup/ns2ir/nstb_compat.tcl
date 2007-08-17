@@ -66,6 +66,7 @@ proc tb-set-delay-capacity {cap} {}
 proc tb-use-ipassign {onoff} {}
 proc tb-set-ipassign-args {args} {}
 proc tb-set-lan-protocol {lanlink protocol} {}
+proc tb-set-link-protocol {lanlink protocol} {}
 proc tb-set-lan-accesspoint {lanlink node} {}
 proc tb-set-lan-setting {lanlink capkey capval} {}
 proc tb-set-node-lan-setting {lanlink node capkey capval} {}

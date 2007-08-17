@@ -1186,6 +1186,17 @@ proc tb-set-lan-protocol {lanlink protocol} {
 }
 
 #
+# Allow type of links (but not LANs) to be changed.
+#
+proc tb-set-link-protocol {lanlink protocol} {
+    if {[$lanlink info class] != "Link"} {
+	perror "\[tb-set-lan-protocol] $lanlink is not a link."
+	return
+    }
+    $lanlink set protocol $protocol
+}
+
+#
 # XXX - We need to set the accesspoint for a wireless lan. I have no
 # idea how this will eventually be done, but for now just do it manually.
 # 
