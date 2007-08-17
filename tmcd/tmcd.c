@@ -34,6 +34,8 @@
 #include "ssl.h"
 #include "log.h"
 #include "tbdefs.h"
+#include "bootwhat.h"
+#include "bootinfo.h"
 
 #ifdef EVENTSYS
 #include "event.h"
@@ -150,6 +152,7 @@ static volatile int killme;
  * reduce the number of DB queries per request to a minimum.
  */
 typedef struct {
+	struct in_addr  client;
 	int		allocated;
 	int		jailflag;
 	int		isvnode;
@@ -263,6 +266,7 @@ COMMAND_PROTOTYPE(doplabeventkeys);
 COMMAND_PROTOTYPE(dointfcmap);
 COMMAND_PROTOTYPE(domotelog);
 COMMAND_PROTOTYPE(doportregister);
+COMMAND_PROTOTYPE(dobootwhat);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -356,6 +360,7 @@ struct command {
 	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
 	{ "motelog",      FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
 	{ "portregister", FULLCONFIG_NONE, F_REMNOSSL, doportregister},
+	{ "bootwhat",	  FULLCONFIG_NONE, 0, dobootwhat },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1678,7 +1683,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		nrows, gidint;
-	int		tbadmin, didwidearea = 0;
+	int		tbadmin, didwidearea = 0, nodetypeprojects = 0;
 
 	if (! tcp) {
 		error("ACCOUNTS: %s: Cannot give account info out over UDP!\n",
@@ -1695,6 +1700,21 @@ COMMAND_PROTOTYPE(doaccounts)
 		return 1;
 	}
 
+	/*
+	 * See if a per-node-type set of projects is specified for accounts.
+	 */
+	res = mydb_query("select na.attrvalue from nodes as n "
+			 "left join node_type_attributes as na on "
+			 "  n.type=na.type "
+			 "where n.node_id='%s' and "
+			 "na.attrkey='project_accounts'", 1, reqp->nodeid);
+	if (res) {
+		if ((int)mysql_num_rows(res) != 0) {
+			nodetypeprojects = 1;
+		}
+		mysql_free_result(res);
+	}
+
         /*
 	 * We need the unix GID and unix name for each group in the project.
 	 */
@@ -1703,6 +1723,27 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * All groups! 
 		 */
 		res = mydb_query("select unix_name,unix_gid from groups", 2);
+	}
+	else if (nodetypeprojects) {
+		/*
+		 * The projects/groups are specified as a comma separated
+		 * list in the node_type_attributes table. Return this
+		 * set of groups, plus those in emulab-ops since we want
+		 * to include admin people too.
+		 */
+		res = mydb_query("select g.unix_name,g.unix_gid "
+				 " from projects as p "
+				 "left join groups as g on "
+				 "     p.pid_idx=g.pid_idx "
+				 "where p.approved!=0 and "
+				 "  (FIND_IN_SET(g.gid_idx, "
+				 "   (select na.attrvalue from nodes as n "
+				 "    left join node_type_attributes as na on "
+				 "         n.type=na.type "
+				 "    where n.node_id='%s' and "
+				 "    na.attrkey='project_accounts')) > 0 or "
+				 "   p.pid='%s')",
+				 2, reqp->nodeid, RELOADPID);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
 		res = mydb_query("select unix_name,unix_gid from groups "
@@ -1821,6 +1862,42 @@ COMMAND_PROTOTYPE(doaccounts)
                                  "      and g.unix_id is not NULL "
 				 "      and u.status='active' order by u.uid",
 				 14, reqp->pid, reqp->gid);
+	}
+	else if (nodetypeprojects) {
+		/*
+		 * The projects/groups are specified as a comma separated
+		 * list in the node_type_attributes table. Return this
+		 * set of users, plus those in emulab-ops since we want
+		 * to include emulab-ops people too.
+		 */
+		res = mydb_query("select distinct  "
+				 "u.uid,'*',u.unix_uid,u.usr_name, "
+				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+				 "u.emulab_pubkey,u.home_pubkey, "
+				 "UNIX_TIMESTAMP(u.usr_modified), "
+				 "u.usr_email,u.usr_shell, "
+				 "u.widearearoot,u.wideareajailroot, "
+				 "u.usr_w_pswd "
+				 "from projects as p "
+				 "join group_membership as m on "
+				 "     m.pid_idx=p.pid_idx "
+				 "join groups as g on "
+				 "     g.gid_idx=m.gid_idx "
+				 "join users as u on u.uid_idx=m.uid_idx "
+				 "where p.approved!=0 "
+				 "      and m.trust!='none' "
+				 "      and u.webonly=0 "
+                                 "      and g.unix_gid is not NULL "
+				 "      and u.status='active' and "
+				 "  (FIND_IN_SET(g.gid_idx, "
+				 "   (select na.attrvalue from nodes as n "
+				 "    left join node_type_attributes as na on "
+				 "         n.type=na.type "
+				 "    where n.node_id='%s' and "
+				 "    na.attrkey='project_accounts')) > 0 or "
+				 "   p.pid='%s') "
+				 "order by u.uid",
+				 17, reqp->nodeid, RELOADPID);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
 		/*
@@ -4040,6 +4117,12 @@ mydb_disconnect()
 	db_connected = 0;
 }
 
+/*
+ * Just so we can include bootinfo from the pxe directory.
+ */
+int	dbinit(void) { return 0;}
+void	dbclose(void) {}
+
 MYSQL_RES *
 mydb_query(char *query, int ncols, ...)
 {
@@ -4215,6 +4298,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		mysql_free_result(res);
 		return 1;
 	}
+	reqp->client = ipaddr;
 	strncpy(reqp->class,  row[0],  sizeof(reqp->class));
 	strncpy(reqp->type,   row[1],  sizeof(reqp->type));
 	strncpy(reqp->pclass, row[14], sizeof(reqp->pclass));
@@ -4446,6 +4530,36 @@ int myevent_send(address_tuple_t tuple) {
 		event_notification_free(event_handle,notification);
 		return 0;
 	}
+}
+
+/*
+ * This is for bootinfo inclusion.
+ */
+int	bievent_init(void) { return 0; }
+
+int
+bievent_send(struct in_addr ipaddr, void *opaque, char *event)
+{
+	tmcdreq_t		*reqp = (tmcdreq_t *) opaque;
+	static address_tuple_t	tuple;
+
+	if (!tuple) {
+		tuple = address_tuple_alloc();
+		if (tuple == NULL) {
+			error("bievent_send: Unable to allocate tuple!\n");
+			return -1;
+		}
+	}
+	tuple->host      = BOSSNODE;
+	tuple->objtype   = "TBNODESTATE";
+	tuple->objname	 = reqp->nodeid;
+	tuple->eventtype = event;
+
+	if (myevent_send(tuple)) {
+		error("bievent_send: Error sending event\n");
+		return -1;
+	}
+	return 0;
 }
 #endif /* EVENTSYS */
  
@@ -7144,5 +7258,49 @@ COMMAND_PROTOTYPE(doportregister)
 	if (verbose)
 		info("PORTREG: %s: %s=%d\n", reqp->nodeid, service, port);
 	
+	return 0;
+}
+
+/*
+ * Return bootwhat info using the bootinfo routine from the pxe directory.
+ * This is used by the dongle boot on widearea nodes. Better to use tmcd
+ * then open up another daemon to the widearea.
+ */
+COMMAND_PROTOTYPE(dobootwhat)
+{
+	boot_info_t	boot_info;
+	boot_what_t	*boot_whatp = (boot_what_t *) &boot_info.data;
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
+
+	if (query_bootinfo_db(reqp->client,
+			      BIVERSION_CURRENT, boot_whatp)) {
+		OUTPUT(buf, sizeof(buf), "STATUS=failed\n");
+	}
+	else {
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			      "STATUS=success TYPE=%d",
+			      boot_whatp->type);
+		if (boot_whatp->type == BIBOOTWHAT_TYPE_PART) {
+			bufp += OUTPUT(bufp, ebufp - bufp, " WHAT=%d",
+				      boot_whatp->what.partition);
+		}
+		else if (boot_whatp->type == BIBOOTWHAT_TYPE_SYSID) {
+			bufp += OUTPUT(bufp, ebufp - bufp, " WHAT=%d",
+				      boot_whatp->what.sysid);
+		}
+		else if (boot_whatp->type == BIBOOTWHAT_TYPE_MFS) {
+			bufp += OUTPUT(bufp, ebufp - bufp, " WHAT=%s",
+				      boot_whatp->what.mfs);
+		}
+		if (strlen(boot_whatp->cmdline)) {
+			bufp += OUTPUT(bufp, ebufp - bufp, " CMDLINE='%s'\n",
+				      boot_whatp->cmdline);
+		}
+		bufp += OUTPUT(bufp, ebufp - bufp, "\n");
+	}
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	info("BOOTWHAT: %s: %s\n", reqp->nodeid, buf);
 	return 0;
 }

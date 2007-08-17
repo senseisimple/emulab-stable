@@ -21,8 +21,10 @@ server: tmcd tmcd.restart
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -Wall -DUDP \
-		-I${OBJDIR} -I/usr/local/include -I${TESTBED_SRCDIR}/lib/libtb
+		-I${OBJDIR} -I/usr/local/include \
+		-I${TESTBED_SRCDIR}/lib/libtb -I${TESTBED_SRCDIR}/pxe
 TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
+BOOTINFO = ${OBJDIR}/pxe/bootinfo.o ${OBJDIR}/pxe/bootinfo_mysql.o
 LDFLAGS += $(LDSTATIC)
 
 #
@@ -87,9 +89,9 @@ ifeq ($(EVENTSYS),1)
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
-tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ)
+tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		version.o $(SSLOBJ) \
+		version.o $(SSLOBJ) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
