@@ -354,7 +354,20 @@ sub virtlanusevirtiface($) {
     my $encap = virtlanencapstyle($_[0]);
     return ($encap eq "veth" || $encap eq "veth-ne" || $encap eq "vlan");
 }
-
+# We hardcode (for now) the set of LAN/link "protocols" that are wireless.
+# Eventually, this should probably come from the database.
+sub virtlanwireless($) {
+    return (virtlanprotocol($_[0]) =~ /^(80211|flex900)/);
+}
+# We don't actually store information about the protocol heirarchy in the
+# database, so we use a simple conventions for now - <basetype>[-subtype]
+sub protocolbasetype($) {
+    if ($_[0] =~ /^([^-]+)-/) {
+        return $1;
+    } else {
+        return $_[0];
+    }
+}
 
 #
 # virt_vtypes: The virt_vtypes table in the DB, indexed by the vtype
@@ -2597,13 +2610,12 @@ if ($query_result->numrows) {
 }
 
 #
-# Deal with interface settings.
+# Deal with interface settings for wireless LANs
 #
 foreach $lan (keys(%virt_lans)) {
     my $protocol = virtlanprotocol($lan);
     
-    next
-	if (virtlanwidearea($lan) || $protocol eq "ethernet");
+    next unless virtlanwireless($lan);
 	
     my @members = virtlanmembers($lan);
     my $ssid    = "${lan}_${experiment_idx}";
@@ -2751,7 +2763,10 @@ sub getbandwidth($$$) {
     my $best = 10000000000;
 
     my $node_type  = virtnodetype($node);
-    my $protocol   = virtlanprotocol($lan);
+
+    # We do not have much information about link types in the database, as we
+    # do about node types, and hence this hack.
+    my $protocol = protocolbasetype(virtlanprotocol($lan));
 
     fatal("getbandwidth(): $node - invalid type/class $node_type/$node_class!")
 	if (!exists($node_type_linkbw{$node_type}{$protocol}) &&
@@ -3750,7 +3765,11 @@ sub requires_delay($$$)
 {
     my ($node, $lan, $targetbw) = @_;
     my $node_type  = virtnodetype($node);
-    my $protocol   = virtlanprotocol($lan);
+
+    # We do not have much information about link types in the database, as we
+    # do about node types, and hence this hack.
+    my $protocol = protocolbasetype(virtlanprotocol($lan));
+
     my $node_class;
 
     fatal("requires_delay(): $node - invalid type $node_type!")
@@ -4738,7 +4757,7 @@ sub CreateTopFile()
 	    $virt_lans{$lan}->{"ALLSIM"} = 1;
 	}
 
-	if ($protocol ne "ethernet") {
+	if ($protocol !~ /^ethernet/) {
 	    #
 	    # This arrangement is temporary. For now, if its not a regular
 	    # ethernet, then create a lan attached to a fake switch. See ptopgen.
@@ -4884,7 +4903,7 @@ sub CreateTopFile()
 		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 
 		    print(TOPFILE "link $plink $node0 $node1 ".
-			  max($top_bw,$top_rbw) . " 0 0 ethernet " .
+			  max($top_bw,$top_rbw) . " 0 0 $protocol " .
 			  ($emulated ? " emulated" : "") .
 			  ($trivial_ok ? " trivial_ok\n" : "\n"));
 		    
@@ -4916,10 +4935,10 @@ sub CreateTopFile()
 		    print TOPFILE "node $delayname delay $delay_osid_desire\n";
 		    print TOPFILE
 			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
-			"$node0 $delayname $top_bw 0 0 ethernet\n";
+			"$node0 $delayname $top_bw 0 0 $protocol\n";
 		    print TOPFILE
 			"link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
-			"$node1 $delayname $top_bw 0 0 ethernet\n";
+			"$node1 $delayname $top_bw 0 0 $protocol\n";
 
 		    $delaynodes{$delayname} = $delayname;
 		    
@@ -4942,10 +4961,10 @@ sub CreateTopFile()
 
 		if ($emulated) {
 		    print TOPFILE " " . max($top_bw,$top_rbw) .
-				  " 0 0 ethernet emulated";
+				  " 0 0 $protocol emulated";
 		}
 		else {
-		    print TOPFILE " $top_bw 0 0 ethernet";
+		    print TOPFILE " $top_bw 0 0 $protocol";
 		}
 		if ($trivial_ok) {
 		    print TOPFILE " trivial_ok";
@@ -5070,7 +5089,7 @@ sub CreateTopFile()
 			     $member,$rdelay,$rbw,$rloss,0];
 
 			print(TOPFILE "link $plink $node lan/$lan " .
-			      max($top_bw,$top_rbw) . " 0 0 ethernet" .
+			      max($top_bw,$top_rbw) . " 0 0 $protocol" .
 			      ($emulated ? " emulated" : "") .
 			      ($trivial_ok ? " trivial_ok\n" : "\n"));
 
@@ -5088,9 +5107,9 @@ sub CreateTopFile()
 			print TOPFILE "node $delayname delay " .
                             "$delay_osid_desire\n";
 			print TOPFILE "link linkdelaysrc/$lan/$member" .
-			    " $node $delayname $top_bw 0 0 ethernet\n";
+			    " $node $delayname $top_bw 0 0 $protocol\n";
 			print TOPFILE "link linkdelaydst/$lan/$member" .
-			    " lan/$lan $delayname $top_bw 0 0 ethernet\n";
+			    " lan/$lan $delayname $top_bw 0 0 $protocol\n";
 			
 			$delaynodes{$delayname} = $delayname;
 
@@ -5109,7 +5128,7 @@ sub CreateTopFile()
 		    my $plink = "linklan/$lan/$member";
 
 		    print TOPFILE "link $plink $node lan/$lan $top_bw " .
-			"0 0 ethernet";
+			"0 0 $protocol";
 		    if ($emulated) {
 			print TOPFILE " emulated";
 		    }
