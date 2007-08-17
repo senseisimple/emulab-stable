@@ -1,0 +1,242 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Notes on the dongle boot:
+#
+#  * Need SSL version of tmcc, emulab.pem and pcwa.pem file.
+#  * Root public ssh key from boss.
+#  * New version of libtmcc with bootwhat def.
+#  * Create /etc/emulab/emulab-privkey to match what is in widearea_nodeinfo 
+#    for each node (per node dongles).
+#  * Created /etc/emulab/bossnode pointing to boss.
+#  * touch /etc/emulab/isrem
+#
+
+#
+# Widearea Node checkin. 
+#
+# Note that the exit code from this script is propogated via the web
+# interface to the remote node.
+# 
+sub usage()
+{
+    print(STDERR "Usage: wanodecheckin [-h <hostname>] <privkey> <IP>\n");
+    exit(-1);
+}
+my $optlist = "dh:";
+my $debug   = 0;
+my $hostname;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
+my $TBBASE   = "@TBBASE@";
+my $NAMED    = "$TB/sbin/named_setup";
+my $NALLOC   = "$TB/bin/nalloc";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Experiment;
+use Node;
+
+# Protos
+sub notify($);
+sub fatal($$);
+
+# These error codes must match whats in the client, but of course.
+my $WASTATUS_OKAY		= 0;
+my $WASTATUS_MISSINGARGS	= 100;
+my $WASTATUS_INVALIDARGS	= 101;
+my $WASTATUS_BADPRIVKEY		= 102;
+my $WASTATUS_BADIPADDR		= 103;
+my $WASTATUS_BADREMOTEIP	= 104;
+my $WASTATUS_IPADDRINUSE	= 105;
+my $WASTATUS_MUSTUSESSL		= 106;
+my $WASTATUS_OTHER		= 199;
+
+# Default initial experiment unless overridden.
+my $PID_HWDOWN = NODEDEAD_PID();
+my $EID_HWDOWN = NODEDEAD_EID();
+
+# Parse options.
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"h"})) {
+    $hostname = $options{"h"};
+
+    if ($hostname =~ /^([-\w]+)$/) {
+	$hostname = $1;
+    }
+    else {
+	fatal($WASTATUS_INVALIDARGS, "Bad data in hostname");
+    }
+}
+usage
+    if (@ARGV != 2);
+
+my $privkey = $ARGV[0];
+my $IP      = $ARGV[1];
+
+# untaint args.
+if ($IP =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) {
+    $IP = $1;
+}
+else {
+    fatal($WASTATUS_INVALIDARGS, "Bad data in IP address");
+}
+if ($privkey =~ /^([\w]+)$/) {
+    $privkey = $1;
+}
+else {
+    fatal($WASTATUS_INVALIDARGS, "Bad data in private key");
+}
+
+#
+# Lookup and see if privkey is valid and matches the IP. If so, all is
+# good.
+#
+my $query_result = DBQueryWarn("select node_id,IP,machine_type ".
+			       "  from widearea_nodeinfo ".
+			       "where privkey='$privkey'");
+if (!$query_result) {
+    fatal($WASTATUS_OTHER, "DB Error getting widearea_nodeinfo table");
+}
+if (!$query_result->numrows) {
+    #
+    # We are not going to do dynamic widearea nodes yet. If the privkey
+    # is not in the table, it is not a node we know/care about.
+    #
+    fatal($WASTATUS_BADPRIVKEY, "Unknown private key");
+}
+my ($node_id, $known_IP, $machine_type) = $query_result->fetchrow_array();
+
+if (!defined($known_IP)) {
+    my $experiment = Experiment->Lookup($PID_HWDOWN, $EID_HWDOWN);
+
+    #
+    # If the known_IP is not defined, this is the first time we have
+    # heard from the node. Create it.
+    #
+    my $node = Node->Create($node_id, $experiment,
+			    {'type' => $machine_type,
+			     'role' => $Node::NODEROLE_TESTNODE});
+    if (!defined($node)) {
+	fatal($WASTATUS_OTHER, "Could not create new node: $node_id");
+    }
+
+    # Initialize the control interface.
+    my $control_iface = $node->control_iface();
+    if (!defined($control_iface)) {
+	$control_iface = "eth0";
+    }
+    if (! DBQueryWarn("replace into interfaces set ".
+		      "    node_id='$node_id', ".
+		      "    card=0, port=1, ".
+		      "    interface_type='fxp', ".
+		      "    iface='$control_iface', ".
+		      "    role='" . TBDB_IFACEROLE_CONTROL() . "', ".
+		      "    IP='$IP'")) {
+	fatal($WASTATUS_OTHER,
+	      "Failed to insert new WA node into interfaces table");
+    }
+
+    if (! DBQueryWarn("update widearea_nodeinfo set IP='$IP' ".
+		      (defined($hostname) ? ",hostname='$hostname' " : "") .
+		      "where node_id='$node_id'")) {
+	fatal($WASTATUS_OTHER, "Failed to update IP in widearea_nodeinfo");
+    }
+    notify("Widearea node $node_id has checked in for the firstime ".
+	   "with IP $IP");
+}
+elsif ($known_IP eq $IP) {
+    #
+    # If the IP has not changed, nothing to do unless the hostname changed.
+    #
+    if (defined($hostname)) {
+	DBQueryWarn("update widearea_nodeinfo set hostname='$hostname' ".
+		    "where node_id='$node_id'");
+    }
+    exit($WASTATUS_OKAY);
+}
+else {
+    #
+    # IP has changed, probably cause of dynamic DHCP. We have to
+    # change various tables and then regen the nameserver config.
+    #
+    if (! (DBQueryWarn("update interfaces set IP='$IP' ".
+		       "where node_id='$node_id' and card=0 and port=1") &&
+	   DBQueryWarn("update widearea_nodeinfo set IP='$IP' ".
+		       (defined($hostname) ? ",hostname='$hostname' " : "") .
+		       "where node_id='$node_id'"))) {
+	fatal($WASTATUS_OTHER, "Failed to update IP in DB");
+    }
+    notify("Widearea node $node_id has changed its IP address from $known_IP ".
+	   "to $IP");
+}
+
+# Now regen nameserver.
+if (system($NAMED) != 0) {
+    fatal($WASTATUS_OTHER, "Failed to regenerate named files and restart");
+}
+exit($WASTATUS_OKAY);
+
+# Notify TBOPS
+sub notify($)
+{
+    my ($message) = @_;
+    
+    print "$message\n";
+    
+    SENDMAIL($TBOPS,
+	     "Widearea Node Checkin",
+	     "\n".
+	     "Widearea Node Checkin.\n".
+	     "IP: $IP, Privkey: $privkey\n\n".
+	     "$message",
+	     "$TBOPS");
+}
+
+# Return Error code and send email;
+sub fatal($$)
+{
+    my ($status, $message) = @_;
+    print STDERR "*** $0:\n".
+	         "    $message\n";
+    
+    SENDMAIL($TBOPS,
+	     "Failure in Widearea Node Checkin",
+	     "\n".
+	     "Failure in Widearea Node Checkin. Exited with $status.\n".
+	     "IP: $IP, Privkey: $privkey\n\n".
+	     "$message",
+	     "$TBOPS");
+
+    exit($status);
+}

@@ -1,0 +1,170 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Simple script to create new widearea nodes. The XML file should look
+# like this:
+#
+#	<opt>
+#	 <site value='NYC' />
+#	 <city value='FEE' />
+#	 <machine_type value='pc850' />
+#	 <state />
+#	</opt>
+#
+sub usage()
+{
+    print(STDERR "Usage: wanodecreate <node_id> <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+# Default values for the table entry. Gotta have the undef entries.
+my %defaults = ('node_id'	=> undef,
+		'machine_type'  => undef,
+		'contact_uid'   => 'elabman',
+		'contact_idx'   => undef,
+		'connect_type'  => 'unknown',
+		'city'		=> "",
+		'state'		=> "",
+		'zip'		=> "",
+		'country'	=> "USA",
+		'external_node_id' => "",
+                'hostname'      => "NULL",
+		'site'		=> "NULL",
+		'latitude'	=> "NULL",
+		'longitude'     => "NULL",
+		'bwlimit'       => "NULL",
+		'privkey'	=> undef);
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Node;
+use NodeType;
+
+# Protos
+sub fatal($);
+
+# Parse options.
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+usage
+    if (@ARGV != 2);
+
+my $node_id = $ARGV[0];
+my $xmlfile = $ARGV[1];
+
+#
+# Verify user is an admin.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+if (! $this_user->IsAdmin()) {
+    fatal("You do not have permission to create new widearea nodes");
+}
+if (!-e $xmlfile) {
+    fatal("$xmlfile does not exist");
+}
+my $node = Node->Lookup($node_id);
+if (defined($node)) {
+    fatal("$node_id already exists in the nodes table!");
+}
+my $query_result =
+    DBQueryFatal("select node_id from widearea_nodeinfo ".
+		 "where node_id='$node_id'");
+if ($query_result->numrows) {
+    fatal("$node_id already exists in the widearea_nodeinfo table!");
+}
+
+my $parse = XMLin($xmlfile, ValueAttr => [ 'value' ],
+		  SuppressEmpty => undef);
+
+# Pick up values from XML file.
+foreach my $key (keys(%defaults)) {
+    my $default = $defaults{$key};
+
+    if (exists($parse->{$key}) && defined($parse->{$key})) {
+	$defaults{$key} = $parse->{$key};
+    }
+}
+# Node_id from command line
+$defaults{'node_id'} = $node_id;
+
+# Make sure we got a privkey, or generate one if not.
+if (!defined($defaults{'privkey'})) {
+    $defaults{'privkey'} = TBGenSecretKey();
+}
+# Map the contact_uid to a real user.
+if (!defined($defaults{'contact_uid'})) {
+    $defaults{'contact_uid'} = $this_user->uid();
+}
+my $contact_user = User->Lookup($defaults{'contact_uid'});
+if (!defined($contact_user)) {
+    fatal("Contact uid does not exist in the Emulab DB!");
+}
+$defaults{'contact_idx'} = $contact_user->uid_idx();
+# Make sure the machine_type is real.
+if (!defined($defaults{'machine_type'}) || $defaults{'machine_type'} eq "") {
+    fatal("Invalid node type given!");
+}
+my $nodetype = NodeType->Lookup($defaults{'machine_type'});
+if (!defined($nodetype)) {
+    fatal("Invalid node type given!");
+}
+
+# Make everything is defined.
+foreach my $key (keys(%defaults)) {
+    my $default = $defaults{$key};
+    if (!defined($default)) {
+	fatal("Must provided a defintion for $key!");
+    }
+}
+DBQueryFatal("insert into widearea_nodeinfo set ".
+	     join(",", map("$_='" . $defaults{$_} . "'", keys(%defaults))));
+print "Inserted new node $node_id with key: ".
+    $defaults{'privkey'} . "\n";
+exit(0);
+
+
+sub fatal($)
+{
+    my ($message) = @_;
+    die("*** $0:\n".
+	"    $message\n");
+}

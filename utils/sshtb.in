@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,6 +32,7 @@ my $UNIFIED     = "@UNIFIED_BOSS_AND_OPS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $USERNODE    = "@USERNODE@";
 my $FSNODE      = "@FSNODE@";
+my $MAINSITE    = @TBMAINSITE@;
 
 # Locals
 my $debug	= 0;
@@ -97,7 +98,7 @@ else {
 	    TBPhysNodeID($hostname, \$physhost);
 	    $hostname = $physhost;
 	}
-	elsif (TBIsNodeRemote($hostname)) {
+	elsif (TBIsNodeRemote($hostname) && $MAINSITE) {
 	    $user = "emulabman";
 	}
     }
