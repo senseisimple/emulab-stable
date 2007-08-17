@@ -42,6 +42,18 @@ if [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
 fi
 
 #
+# Remember our server IP, real hostname, router IP, etc.
+#
+echo $new_dhcp_server_identifier > $BOOTDIR/bossip
+echo $new_host_name > $BOOTDIR/realname
+echo $new_routers > $BOOTDIR/routerip
+echo $new_ip_address > $BOOTDIR/myip
+echo $new_subnet_mask > $BOOTDIR/mynetmask
+if [ -n "$interface" ]; then
+    echo $interface > $BOOTDIR/controlif
+fi
+
+#
 # If this is a newnode boot, boss (inner or outer) will have returned with
 # no hostname.  We don't need to record anything in this case, so skip it.
 #
@@ -56,18 +68,6 @@ curhname=`hostname`
 if [ $reason = BOUND -a -z "$curhname" -a -n "$new_host_name" ]; then
     echo "`date`: hostname is $new_host_name" >>$LOGDIR/dhclient-exit.log 2>&1
     hostname $new_host_name
-fi
-
-#
-# Remember our server IP, real hostname, router IP, etc.
-#
-echo $new_dhcp_server_identifier > $BOOTDIR/bossip
-echo $new_host_name > $BOOTDIR/realname
-echo $new_routers > $BOOTDIR/routerip
-echo $new_ip_address > $BOOTDIR/myip
-echo $new_subnet_mask > $BOOTDIR/mynetmask
-if [ -n "$interface" ]; then
-    echo $interface > $BOOTDIR/controlif
 fi
 
 #
