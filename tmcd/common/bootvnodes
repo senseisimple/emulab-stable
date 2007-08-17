@@ -133,8 +133,7 @@ sub bootvnode($$$)
 	$opt = "-b";
 	$act = "Booting";
     }
-    $opt .= " -jVt"
-	if ($jailed);
+    $opt .= ($jailed ? " -jVt" : " -i");
     
     print "$act vnode $vnode ...\n";
     system("vnodesetup $opt $vnode");
@@ -152,8 +151,7 @@ if (defined($action) && !$reconfig) {
 
     foreach my $file (@files) {
 	if ($file =~ /^(pcvm[-\w]*)$/) {
-	    # Assume jailed for now.
-	    bootvnode($1, $action, 1);
+	    bootvnode($1, $action, (-e "$vndir/$file/fakejail" ? 0 : 1));
 	}
     }
     exit(0);
@@ -192,7 +190,7 @@ if ($reconfig) {
 
     foreach my $file (@files) {
 	if ($file =~ /^(pcvm[-\w]*)$/) {
-	    $curvnodelist{$1} = 1;	# XXX Assume jailed.
+	    $curvnodelist{$1} = (-e "$vndir/$file/fakejail" ? 0 : 1);
 	}
     }
 

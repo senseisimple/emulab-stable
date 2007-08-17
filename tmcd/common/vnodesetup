@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,16 +24,18 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 sub usage()
 {
     print "Usage: vnodesetup -j [-sV] [-b | -k | -r | -h] [-d] <vnodeid>\n".
-	"         vnodesetup -p [-b | -k | -r | -h] [-d] <vnodeid>\n".
+	  "       vnodesetup -p [-b | -k | -r | -h] [-d] <vnodeid>\n".
+	  "       vnodesetup -i [-b | -k | -r | -h] [-d] <vnodeid>\n".
 	" -j creates a BSD jail-based virtual node.\n".
 	" -p creates a Planetlab virtual node.\n".
+	" -i creates a fake virtual node.\n".
 	"\n".
 	"Use -b when starting the virtual node at boot time.\n".
 	"Use -h when halting the virtual node.\n".
 	"Use -k when killing the virtual node (removes filesystems).\n";
     exit(1);
 }
-my $optlist	= "kbdjsVrhpt";
+my $optlist	= "kbdjsVrhpti";
 
 # Locals
 my $killit	= 0;
@@ -42,6 +44,7 @@ my $haltit	= 0;
 my $debug	= 0;
 my $fromboot	= 0;
 my $dojail	= 0;
+my $fakevnode   = 0;
 my $interactive = 0;
 my $usevcnetroutes = 0;
 my $doplab	= 0;
@@ -136,6 +139,9 @@ if (defined($options{"j"})) {
 if (defined($options{"p"})) {
     $doplab = 1;
 }
+if (defined($options{"i"})) {
+    $fakevnode = 1;
+}
 if (@ARGV != 1) {
     usage();
 }
@@ -148,12 +154,8 @@ else {
     die("Bad data in vnodeid: $vnodeid.");
 }
 
-if ($dojail && $doplab) {
-    die("Can't do both jail and Plab");
-}
-
-if (!$dojail && !$doplab) {
-    die("Must be a real jail or a real Plab vserver.");
+if (! ($dojail || $doplab || $fakevnode)) {
+    die("Must specify one of -i, -j, -p options.");
 }
 
 # Tell the library what vnode we are messing with.
@@ -227,6 +229,10 @@ if (-e $pidfile) {
 	    "    Not able to kill running vnode manager!\n");
     }
 }
+
+# Skip saving history from previous boot when its a fake jail.
+unlink($logname)
+    if (-e $logname && $fakevnode);
 
 #
 # Okay, lets continue on so that ssh from Emulab exits right away.
@@ -432,6 +438,35 @@ elsif ($doplab) {
 	    "    Could not start vserver setup!\n");
     }
 }
+elsif ($fakevnode) {
+    #
+    # A fake vnode is not in a jail/vserver, but just another process.
+    #
+    $jailpid = fork();
+    if ($jailpid) {
+	#
+	# Parent waits for jail to fold on its own. If the current process is
+	# killed off though, it will never return.
+	#
+	if (waitpid($jailpid, 0) < 0) {
+	    #
+	    # Means that already waited. Must be forcing a reboot.
+	    # 
+	    if (!defined($jailpid) && $rebooting) {
+		$rebooting = 0;
+		goto REBOOT;
+	    }
+	}
+	undef($jailpid);
+	$cleanupstate = "TBFAILED";
+	fatal("Jail exited unexpectedly!");
+    }
+    else {
+	exec("$BINDIR/rc/rc.fakejail -j $vnodeid");
+	die("*** $0:\n".
+	    "    Could not start fake jail setup!\n");
+    }
+}
 else {
     #
     # Inform the TMCD we are ready.
@@ -550,12 +585,11 @@ sub cleanup()
 	print "Waiting 1 second for process group to die off ...\n";
 	sleep(1);
     }
-
-    #
-    # Don't do anything to kill off vserver, because the signalling
-    # process will take care of it
-    #
-    if (defined($vserverpid)) {
+    elsif (defined($vserverpid)) {
+        #
+        # Don't do anything to kill off vserver, because the signalling
+        # process will take care of it
+        #
 	print "Letting signalling process take down vserver.\n";
     }
 

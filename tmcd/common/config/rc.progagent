@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -24,14 +24,6 @@ $| = 1;
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-# Script specific goo
-my $LOGFILE = "$LOGDIR/progagent.debug";
-my $WRAPLOG = "$LOGDIR/progwrap.debug";
-my $PIDFILE = "/var/run/progagent.pid";
-my $CONFIG  = "$BOOTDIR/progagents";
-my $PAGENT  = "$BINDIR/program-agent";
-my $TOKEN   = "/var/tmp/progagent-token";
-
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
@@ -53,7 +45,16 @@ if ($EUID != 0) {
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || REMOTE() && !PLAB());
+    if (MFS() || (REMOTE() && !(PLAB() || FAKEJAILED() || JAILED())));
+
+# Script specific goo. 
+my $LOGFILE = LOGDIR() . "/progagent.debug";
+my $WRAPLOG = LOGDIR() . "/progwrap.debug";
+my $PIDFILE = (FAKEJAILED() ?
+	       CONFDIR() . "/progagent.pid" : "/var/run/progagent.pid");
+my $CONFIG  = CONFDIR() . "/progagents";
+my $PAGENT  = "$BINDIR/program-agent";
+my $TOKEN   = "/var/tmp/progagent-token";
 
 # Protos.
 sub doboot();

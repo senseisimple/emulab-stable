@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -20,15 +20,15 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
-	 gettraceconfig genhostsfile getmotelogconfig calcroutes
+	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP USESFS 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
-	 ISFW
+	 ISFW FAKEJAILED
 
-	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
+	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
@@ -87,6 +87,11 @@ sub libsetup_getvnodeid()
 my $injail;
 
 #
+# True if running as a fake jail (no jail, just processes).
+# 
+my $nojail;
+
+#
 # True if running in a Plab vserver.
 #
 my $inplab;
@@ -131,9 +136,13 @@ BEGIN
 	libsetup_setvnodeid($vid);
 	$injail = 1;
     }
-
-    # Determine if running inside a Plab vserver.
-    if (-e "$BOOTDIR/plabname") {
+    elsif (exists($ENV{'FAKEJAIL'})) {
+	# Fake jail.
+	libsetup_setvnodeid($ENV{'FAKEJAIL'});
+	$nojail = 1;
+    }
+    elsif (-e "$BOOTDIR/plabname") {
+	# Running inside a Plab vserver.
 	open(VN, "$BOOTDIR/plabname");
 	my $vid = <VN>;
 	close(VN);
@@ -186,17 +195,23 @@ sub LOCALROOTFS()	{ (REMOTE() ? "/users/local" : "$VARDIR/jails/local");}
 # 2. A virtual node inside a jail or a Plab vserver ($VARDIR/boot).
 # 3. A virtual (or sub) node, from the outside. 
 #
-# As for #3, whether setting up a old-style virtual node or a new style
+# As for #3, whether setting up a old-style (fake) virtual node or a new style
 # jailed node, the code that sets it up needs a different per-vnode path.
 #
 sub CONFDIR() {
-    if ($injail || $inplab) {
-	return $BOOTDIR;
-    }
-    if ($vnodeid) {
-	return JAILDIR();
-    }
+    return $BOOTDIR
+	if ($injail || $inplab);
+    return JAILDIR()
+	if ($vnodeid);
     return $BOOTDIR;
+}
+# Cause of fakejails, we want log files in the right place.
+sub LOGDIR() {
+    return $LOGDIR
+	if ($injail || $inplab);
+    return JAILDIR() 
+	if ($vnodeid);
+    return $LOGDIR;
 }
 
 #
@@ -204,6 +219,7 @@ sub CONFDIR() {
 # 
 sub TMNICKNAME()	{ CONFDIR() . "/nickname";}
 sub TMJAILNAME()	{ CONFDIR() . "/jailname";}
+sub TMFAKEJAILNAME()	{ CONFDIR() . "/fakejail";}
 sub TMJAILCONFIG()	{ CONFDIR() . "/jailconfig";}
 sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
 sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
@@ -275,6 +291,7 @@ sub STARGATE()  { if (-e "$ETCDIR/isstargate") { return 1; } else { return 0; } 
 # Are we jailed? See above.
 #
 sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }
+sub FAKEJAILED(){ if ($nojail) { return $vnodeid; } else { return 0; } }
 
 #
 # Are we on plab?
@@ -1570,6 +1587,41 @@ sub jailsetup()
 
     print STDOUT "Checking Testbed jail configuration ...\n";
     dojailconfig();
+
+    return ($pid, $eid, $vname);
+}
+
+#
+# Bogus emulation of jails without a jail,
+#
+sub fakejailsetup()
+{
+    $nojail = 1;
+
+    # Stick this into the environment so that sub processes know.
+    $ENV{'FAKEJAIL'} = $vnodeid;
+    
+    #
+    # Create a file inside so that libsetup inside the jail knows its
+    # inside a jail and what its ID is. 
+    #
+    system("echo '$vnodeid' > " . TMFAKEJAILNAME());
+    # Need to unify this with jailname.
+    system("echo '$vnodeid' > " . TMNODEID());
+
+    #
+    # Always remove the old nickname file.  No need to worry about a project
+    # change at this level (see bootsetup) but we do need to make sure we
+    # pick up on a vnode/jail being reassigned to a different virtual node.
+    #
+    unlink TMNICKNAME;
+
+    print STDOUT "Checking Testbed reservation status ... \n";
+    if (! check_status()) {
+	print STDOUT "  Free!\n";
+	return 0;
+    }
+    print STDOUT "  Allocated! $pid/$eid/$vname\n";
 
     return ($pid, $eid, $vname);
 }
