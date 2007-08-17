@@ -42,7 +42,7 @@ if (!isset($_SERVER["SSL_PROTOCOL"])) {
 if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $IP) ||
     !preg_match('/^[\w]+$/', $privkey) ||
     (isset($hostname) &&
-     !preg_match('/^[-\w]+$/', $hostname))) {
+     !preg_match('/^[-\w\.]+$/', $hostname))) {
     SPITSTATUS(WASTATUS_INVALIDARGS);
     return;
 }
