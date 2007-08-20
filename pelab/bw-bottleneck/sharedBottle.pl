@@ -337,6 +337,52 @@ foreach $sourceName (readdir(logsDirHandle))
 # the sources, try to find equivalence classes
 # from each source. Check to ensure that the
 # transitive property is not being violated.
+#############
+        $counter1 = 0;
+        $counter2 = 0;
+        my @deletionFlagArray = ();
+        foreach $classVar1 (@equivClasses)
+        {
+            push(@deletionFlagArray,0);
+        }
+
+        foreach $classVar1 (@equivClasses)
+        {
+            $counter2 = 0;
+            $intersectionFlag = 0;
+            foreach $classVar2 (@equivClasses)
+            {
+                if( ($deletionFlagArray[$counter1] != 1) and ($deletionFlagArray[$counter2] != 1) and ($counter1 != $counter2) )
+                {
+                    $intersectionFlag = &checkIntersection($counter1, $counter2);
+                    if($intersectionFlag)
+                    {
+                        &mergeClasses( $counter1, $counter2);
+
+                        #Mark the equivalence class $counter2 for deletion.
+                        $deletionFlagArray[$counter2] = 1;
+                    }
+                }
+                $counter2 += 1;
+            }
+            $counter1 += 1;
+        }
+
+        my @tmpEquivClasses = @equivClasses;
+
+        @equivClasses = ();
+        $counter1 = 0;
+        foreach $classIter (@tmpEquivClasses)
+        {
+            if($deletionFlagArray[$counter1] == 0)
+            {
+                push(@equivClasses, [@$classIter]);
+            }
+            $counter1++;
+        }
+
+############
+
 # For debugging.
 
         $retVal = &checkSanity(@equivClasses, @adjMatrix);
@@ -468,5 +514,48 @@ sub checkSanity()
     }
 
     return $retVal;
+}
+
+sub checkIntersection()
+{
+    ($index1, $index2) = @_;
+    @array1 = @{ $equivClasses[$index1]};
+    @array2 = @{ $equivClasses[$index2]};
+    foreach $arrayMember (@array1)
+    {
+        foreach $checkVal (@array2)
+        {
+            if($arrayMember == $checkVal)
+            {
+                return 1;
+            } 
+    
+        }
+    }
+    return 0;
+}
+
+sub mergeClasses()
+{
+    ($index1, $index2) = @_;
+    @secondArray = @{ $equivClasses[$index2] };
+    $intersectionFlag = 0;
+
+    foreach $tmpVal (@secondArray)
+    {
+        foreach $arrayMember (@{ $equivClasses[$index1] })
+        {
+            if($arrayMember == $tmpVal)
+            {
+                $intersectionFlag = 1;
+                last;
+            }
+        }
+
+        if($intersectionFlag == 0)
+        {
+            push(@{ $equivClasses[$index1]}, $tmpVal);
+        }
+    }
 }
 
