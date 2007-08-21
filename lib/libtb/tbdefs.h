@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -22,6 +22,7 @@
 #define TBDB_FLEN_PRIVKEY	64
 #define TBDB_FLEN_SFSHOSTID	128
 #define TBDB_FLEN_RPMS		4096
+#define TBDB_FLEN_TINYTEXT	(256 + 1)
 
 /*
  * Event system stuff.

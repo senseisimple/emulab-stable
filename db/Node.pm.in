@@ -451,6 +451,9 @@ sub issimnode($)      { return NodeTypeInfo($_[0])->issimnode(); }
 sub default_osid($;$) {
     return NodeTypeInfo($_[0])->default_osid($_[1]);
 }
+sub default_imageid($;$) {
+    return NodeTypeInfo($_[0])->default_imageid($_[1]);
+}
 sub imageable($;$) {
     return NodeTypeInfo($_[0])->imageable($_[1]);
 }

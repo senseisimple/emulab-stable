@@ -23,10 +23,10 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches cvsinit checkquota \
 		  spewconlog opsdb_control newnode suchown archive_list \
-                  wanodecheckin wanodecreate
+                  wanodecheckin wanodecreate spewimage
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
-                  webwanodecheckin
+                  webwanodecheckin webspewimage
 WEB_BIN_SCRIPTS = webcreate_image websetdest weblinkmon_ctl webspewevents \
 		  webdelay_config 
 LIBEXEC_SCRIPTS	= spewleds webcopy spewsource webcvsweb xlogin webviewvc \

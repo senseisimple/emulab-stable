@@ -500,6 +500,8 @@ fi
 if test -z "$TBWWW"; then
     TBWWW="<$TBBASE/>"
 fi
+AC_DEFINE_UNQUOTED(TBBASE, "$TBBASE")
+
 if test -z "$THISHOMEBASE"; then
     THISHOMEBASE="Emulab.Net"
 fi

@@ -204,11 +204,16 @@ sub osload ($$) {
     foreach my $node (@nodes) {
 	# All nodes start out as being successful; altered later as needed.
 	$result->{$node} = 0;
+
+	my $nodeobject = Node->Lookup($node);
+	if (!defined($nodeobject)) {
+	    tberror "$node: Could not map to object!";
+	    goto failednode;
+	}
 	
 	# Get default imageid for this node.
-	my $default_imageid;
-	if (! DefaultImageID($node, \$default_imageid) ||
-	    ! defined($default_imageid)) {
+	my $default_imageid = $nodeobject->default_imageid();
+	if (! defined($default_imageid)) {
 	    tberror "$node: No default imageid defined!";
 	    goto failednode;
 	}
@@ -244,6 +249,7 @@ sub osload ($$) {
 	my $defosid        = $rowref->{'default_osid'};
 	my $maxwait	   = $rowref->{'maxloadwait'};
 	my $imagepid	   = $rowref->{'pid'};
+	my $access_key	   = $rowref->{'access_key'};
 
 	my $osinfo = OSinfo->Lookup($defosid);
 	if (!defined($osinfo)) {
@@ -320,7 +326,8 @@ sub osload ($$) {
 	# become an entry in node_capabilities or something like that in the
 	# future - that would be cleaner)
 	#
-	my ($type, $class) = TBNodeType($node);
+	my $type  = $nodeobject->type();
+	my $class = $nodeobject->class();
 	my $reload_mode;
 	my $reload_func;
 	my $reboot_required;
@@ -333,6 +340,18 @@ sub osload ($$) {
 	    $reload_mode = "Frisbee";
 	    $reload_func = \&SetupReloadFrisbee;
 	    $reboot_required = !$noreboot; # Reboot unless $noreboot flag set
+
+	    # This is passed along so that remote node can request the file.
+	    # Make sure the image object has an access key defined.
+	    if ($nodeobject->isremotenode() !defined($access_key)) {
+		$access_key = TBGenSecretKey();
+
+		$rowref->{'access_key'} = $access_key;
+		if ($image->Update({'access_key' => $access_key}) != 0) {
+		    tberror "$node: Could not initialize image access key";
+		    goto failednode;
+		}
+	    }
 	}
 
 	#
@@ -340,19 +359,20 @@ sub osload ($$) {
 	# later, we'll know how to handle it
 	#
 	$reload_info{$node} = {
+	    'node'    => $node,
 	    'mode'    => $reload_mode,
 	    'func'    => $reload_func,
 	    'imageid' => $imageid,
 	    'osid'    => $defosid,
 	    'reboot'  => $reboot_required,
 	    'zerofree'=> $zerofree,
-	    'maxwait' => $maxwait
+	    'maxwait' => $maxwait,
 	};
 
 	print "Setting up reload for $node (mode: $reload_mode)\n";
 
 	if (!$TESTMODE) {
-	    if (&$reload_func($node, $imageid, $defosid, $zerofree) < 0) {
+	    if (&$reload_func($reload_info{$node}) < 0) {
 		tberror("$node: Could not set up reload. Skipping.");
 		goto failednode;
 	    }
@@ -470,8 +490,7 @@ sub osload ($$) {
 		my $reload_info = $reload_info{$node};
 
 		# Possible race with reboot?
-		if (&{$reload_info->{'func'}}($node, $reload_info->{'imageid'},
-		    $reload_info->{'osid'}, $reload_info->{'zerofree'}) < 0) {
+		if (&{$reload_info->{'func'}}($reload_info) < 0) {
 		    tberror("$node: Could not set up reload. Skipping.");
 		    $result->{$node} = -1;
 		    $failures++;
@@ -722,10 +741,13 @@ sub WaitTillReloadDone($$$@)
 }
 
 # Setup a reload. 
-sub SetupReloadFrisbee($$$$)
+sub SetupReloadFrisbee($)
 {
-    my ($node, $imageid, $osid_notused, $zerofree) = @_;
-    my $osid = TBNodeDiskloadOSID($node);
+    my $reload_info   = $_[0];
+    my $node          = $reload_info->{'node'};
+    my $imageid       = $reload_info->{'imageid'};
+    my $zerofree      = $reload_info->{'zerofree'};
+    my $osid          = TBNodeDiskloadOSID($node);
 
     #
     # Put it in the current_reloads table so that nodes can find out which
@@ -756,9 +778,12 @@ sub SetupReloadFrisbee($$$$)
 # this differs from a Frisbee reload in one key way - it does the reload
 # right here in this code, rather than setting up a reload for later.
 #
-sub SetupReloadUISP($$$$)
+sub SetupReloadUISP($)
 {
-    my ($node, $imageid, $osid, $zerofree_unused) = @_;
+    my $reload_info   = $_[0];
+    my $node          = $reload_info->{'node'};
+    my $imageid       = $reload_info->{'imageid'};
+    my $osid          = $reload_info->{'osid'};
 
     #
     # Get the path to the image

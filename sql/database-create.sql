@@ -1311,6 +1311,7 @@ CREATE TABLE `images` (
   `global` tinyint(4) NOT NULL default '0',
   `mbr_version` tinyint(4) NOT NULL default '1',
   `updated` datetime default NULL,
+  `access_key` varchar(64) default NULL,
   PRIMARY KEY  (`imageid`),
   UNIQUE KEY `pid` (`pid`,`imagename`),
   KEY `gid` (`gid`),

@@ -5,6 +5,7 @@
 #undef VERSION
 
 #undef TBROOT
+#undef TBBASE
 #undef TBDBNAME
 #undef TBADMINGROUP
 #undef IPBASE

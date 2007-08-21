@@ -97,7 +97,7 @@ if ($action eq "boot" || $action eq "reconfig") {
     # We want to save all of the output off, but also dup it to the console.
     #
     open(LOG, "> $LOGFILE") or
-	BootFatal(-1, "Could not open $LOGFILE!");
+	BootNotify(-1, "Could not open $LOGFILE!");
     LOG->autoflush(1);
 
     #
@@ -319,9 +319,9 @@ sub doboot()
 	system("reboot");
 	sleep(10000);
     }
-    elsif ($bootwhat =~ /^mfs:[-\w\.]*:(.*)$/) {
-	print("Bootinfo says to boot MFS $1!\n");
-	my $mfs = basename($1);
+    elsif ($bootwhat =~ /^mfs:([-\w\.]*:)?(.*)$/) {
+	print("Bootinfo says to boot MFS $2!\n");
+	my $mfs = basename($2);
 
 	#
 	# We know about a couple of different MFSs, but thats it!
@@ -346,8 +346,9 @@ sub doboot()
 		sleep(10);
 		goto bootinfo;
 	    }
-	    # Failed, drop into MFS for easy debug and reboot later.
-	    goto mfs;
+	    fatal("Failed to reload the disk. Sending data to Emulab.");
+	    # Drop into the shell to debug.
+	    return 1;
 	}
 	elsif ($mfs =~ /^freebsd.*$/) {
 	    goto mfs;

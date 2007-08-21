@@ -1,0 +1,234 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(mktime strftime);
+
+#
+# Spew a tar/rpm file to stdout. 
+#
+# The script is setuid and run from the webserver. 
+#
+sub usage()
+{
+    print STDERR
+	"Usage: spewimage [-h] [-t timestamp] -k access_key <imageid>\n".
+	"Spew an image file to a (widearea) node.\n";
+    exit(-1);
+}
+my $optlist   = "t:k:h";
+my $debug     = 0;
+my $headonly  = 0;
+my $access_key;
+my $timestamp;			# GM Time.
+
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Proceeding.
+# $status > 0 - Expected error. No such file, not modified, etc.
+#               1. File could not be verified.
+#               2. File has not changed since timestamp.
+#               3. File could not be opened for reading.
+  
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Image;
+
+# Locals
+my $bytelen = 0;
+
+# Protos
+sub SpewImage();
+sub VerifyImage();
+sub fatal($);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"h"})) {
+    $headonly = 1;
+}
+if (defined($options{"k"})) {
+    $access_key = $options{"k"};
+
+    if ($access_key =~ /^([\w]+)$/) {
+	$access_key = $1;
+    }
+    else {
+	die("*** Bad data in access_key: $access_key\n");
+    }
+}
+if (defined($options{"t"})) {
+    $timestamp = $options{"t"};
+
+    if ($timestamp =~ /^([\d]+)$/) {
+	$timestamp = $1;
+    }
+    else {
+	die("*** Bad data in timestamp: $timestamp\n");
+    }
+}
+if (@ARGV != 1 || !defined($access_key)) {
+    usage();
+}
+my $imageid = $ARGV[0];
+my $image   = Image->Lookup($ARGV[0]);
+if (!defined($image)) {
+    die("*** $0:\n".
+	"    $imageid does not exist!\n");
+}
+
+if (my $retval = VerifyImage()) {
+    exit($retval);
+}
+exit(3)
+    if (SpewImage() != 0);
+exit(0);
+
+#
+# Spew out a file. 
+#
+sub SpewImage()
+{
+    my $file = $image->path();
+    
+    open(FD, "< $file")
+	or fatal("Could not open $file!\n");
+
+    #
+    # Deal with NFS read failures
+    #
+    my $foffset = 0;
+    my $retries = 5;
+    my $buf;
+
+    while ($bytelen) {
+	my $rlen = sysread(FD, $buf, 8192);
+
+	if (! defined($rlen)) {
+	    #
+	    # Retry a few times on error to avoid the
+	    # changing-exports-file server problem.
+	    #
+	    if ($retries > 0 && sysseek(FD, $foffset, 0)) {
+		$retries--;
+		sleep(1);
+		next;
+	    }
+	    fatal("Error reading $file: $!");
+	}
+        if ($rlen == 0) {
+	    last;
+	}
+	if (! syswrite(STDOUT, $buf, $rlen)) {
+	    fatal("Error writing file to stdout: $!");
+	}
+	$foffset += $rlen;
+	$bytelen -= $rlen;
+	$retries = 5;
+    }
+    if ($bytelen) {
+	fatal("Did not get the entire file! $bytelen bytes left.");
+    }
+    close(FD);
+    return 0;
+}
+
+#
+# Verify that we can return this file, return error if not allowed.
+# Otherwise return 0 for okay.
+#
+sub VerifyImage()
+{
+    #
+    # The current user needs to be able to read the image file and must
+    # have provided proper access key. 
+    #
+    my $file = $image->path();
+    if (! -r $file) {
+	if ($debug) {
+	    print STDERR "Cannot read $file\n";
+	}
+	return 1;
+    }
+
+    if (!defined($image->access_key())) {
+	if ($debug) {
+	    print STDERR "$image does not have an access key set!\n";
+	}
+	return 1;
+    }
+    if ($access_key ne $image->access_key()) {
+	if ($debug) {
+	    print STDERR "Invalid access key!\n";
+	}
+	return 1;
+    }
+
+    #
+    # Stat the file to get the bytelen for spewing.
+    #
+    my (undef,undef,undef,undef,undef,undef,undef,$length,
+	undef,$mtime) = stat($file);
+
+    if ($headonly) {
+	print "Content-Length: $length\n";
+	print "Last-Modified: " .
+	    strftime("%a, %d %b %Y %H:%M:%S GMT", gmtime($mtime)) . "\n";
+	exit(0);
+    }
+
+    #
+    # Check timestamp if supplied. Remember, we get GM timestamps, so
+    # must convert the local stamp.
+    #
+    if (defined($timestamp)) {
+	$mtime = mktime(gmtime($mtime));
+	return 2
+	    if ($timestamp >= $mtime);
+    }
+    $bytelen = $length;
+    return 0;
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "spewimage:$imageid", $msg);
+    die("*** $0:\n".
+	"    $msg\n");
+}

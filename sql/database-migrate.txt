@@ -4164,3 +4164,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	  add KEY `IP` (`IP`),
 	  add KEY `privkey` (`privkey`);
 
+4.132: Add an access key to images table for distribution to
+       widearea nodes.
+
+       alter table images add `access_key` varchar(64) default NULL;
+

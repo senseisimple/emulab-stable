@@ -1854,6 +1854,9 @@ fi
 if test -z "$TBWWW"; then
     TBWWW="<$TBBASE/>"
 fi
+cat >> confdefs.h <<EOF
+#define TBBASE "$TBBASE"
+EOF
 if test -z "$THISHOMEBASE"; then
     THISHOMEBASE="Emulab.Net"
 fi

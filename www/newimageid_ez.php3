@@ -29,6 +29,7 @@ $isadmin   = ISADMIN();
 #
 $optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
 				 "nodetype",     PAGEARG_STRING,
+				 "nodeclass",    PAGEARG_STRING,
 				 "canceled",     PAGEARG_BOOLEAN,
 				 "confirmed",    PAGEARG_BOOLEAN,
 				 "formfields",   PAGEARG_ARRAY);
@@ -36,7 +37,6 @@ $optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
 #
 # Options for using this page with different types of nodes
 #
-$nodetypes = array( "mote" );
 if (isset($nodetype) && $nodetype == "mote") {
     $view = array('hide_partition' => 1, 'hide_os' => 1, 'hide_version' => 1,
 		  'hide_snapshot' => 1, 'hide_features' => 1,
@@ -51,7 +51,10 @@ if (isset($nodetype) && $nodetype == "mote") {
 } else {
     # Defaults to PC view
     $view = array('hide_upload' => 1);
-    $nodeclass = "pc";
+    if (!isset($nodeclass)) 
+	$nodeclass = "pc";
+    else
+	$nodeclass = addslashes($nodeclass);
     $title = "EZ Form";
     $help_message = 
           "See the
@@ -97,6 +100,7 @@ function SPITFORM($formfields, $errors)
 {
     global $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
 	$osid_featurelist, $nodetype, $filename_extension, $help_message;
+    global $nodeclass;
     global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
     global $TBDB_OSID_VERSLEN, $TBBASE, $TBPROJ_DIR, $TBGROUP_DIR;
     global $view;
@@ -212,7 +216,9 @@ function SPITFORM($formfields, $errors)
     if (isset($nodetype)) {
 	echo "<input type=hidden name=nodetype value='$nodetype'>";
     }
-
+    elseif (isset($nodeclass)) {
+	echo "<input type=hidden name=nodeclass value='$nodetype'>";
+    }
 
     #
     # Select Project
@@ -1158,6 +1164,9 @@ if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
     }
     if (isset($nodetype)) {
 	echo "<input type=hidden name=nodetype value='$nodetype'>";
+    }
+    elseif (isset($nodeclass)) {
+	echo "<input type=hidden name=nodeclass value='$nodeclass'>";
     }
     echo "<input type=hidden name='submit' value='Submit'>\n";
     echo "<input type=submit name=confirmed value=Confirm>&nbsp;";

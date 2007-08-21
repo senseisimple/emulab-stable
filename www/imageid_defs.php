@@ -10,6 +10,8 @@ class Image
 {
     var	$image;
     var $types;
+    var $group;
+    var $project;
 
     #
     # Constructor by lookup on unique ID
@@ -40,6 +42,10 @@ class Image
 	    $types[] = $row['type'];
 	}
 	$this->types = $types;
+
+	# Load lazily;
+	$this->group      = null;
+	$this->project    = null;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -122,6 +128,8 @@ class Image
     function imagename()	{ return $this->field("imagename"); }
     function pid()		{ return $this->field("pid"); }
     function gid()		{ return $this->field("gid"); }
+    function pid_idx()		{ return $this->field("pid_idx"); }
+    function gid_idx()		{ return $this->field("gid_idx"); }
     function imageid()		{ return $this->field("imageid"); }
     function uuid()		{ return $this->field("uuid"); }
     function creator()		{ return $this->field("creator"); }
@@ -209,6 +217,37 @@ class Image
 
 	return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
 	    TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
+    }
+
+    #
+    # Load the project object for an experiment.
+    #
+    function Project() {
+	$pid_idx = $this->pid_idx();
+
+	if ($this->project)
+	    return $this->project;
+
+	$this->project = Project::Lookup($pid_idx);
+	if (! $this->project) {
+	    TBERROR("Could not lookup project $pid_idx!", 1);
+	}
+	return $this->project;
+    }
+    #
+    # Load the group object for an experiment.
+    #
+    function Group() {
+	$gid_idx = $this->gid_idx();
+
+	if ($this->group)
+	    return $this->group;
+
+	$this->group = Group::Lookup($gid_idx);
+	if (! $this->group) {
+	    TBERROR("Could not lookup group $gid_idx!", 1);
+	}
+	return $this->group;
     }
 
     function Show() {

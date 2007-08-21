@@ -182,7 +182,7 @@ typedef struct {
 	char		keyhash[TBDB_FLEN_PRIVKEY];
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
-	char		testdb[256];
+	char		testdb[TBDB_FLEN_TINYTEXT];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
 static int	checkdbredirect(tmcdreq_t *);
@@ -3619,18 +3619,19 @@ COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
-	char		*disktype, *useacpi;
+	char		*disktype, *useacpi, address[MYBUFSIZE];
 	int		disknum, zfill, mbrvers;
 
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,mustwipe,mbr_version"
+	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
+			 "   mustwipe,mbr_version,access_key,imageid"
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
 			 "where node_id='%s'",
-			 6, reqp->nodeid);
+			 8, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -3642,30 +3643,50 @@ COMMAND_PROTOTYPE(doloadinfo)
 		mysql_free_result(res);
 		return 0;
 	}
-
-	/*
-	 * Simple text string.
-	 */
 	row = mysql_fetch_row(res);
-	if (! row[0] || !row[0][0]) {
-		mysql_free_result(res);
-		return 0;
-	}
 
 	/*
-	 * Sanity check
+	 * Remote nodes get a URL for the address. 
 	 */
-	if (!row[3] || !row[3][0]) {
-		error("doloadinfo: %s: No pid associated with address %s\n",
-		      reqp->nodeid, row[0]);
-		return 1;
+	if (!reqp->islocal) {
+		if (!row[6] || !row[6][0]) {
+			error("doloadinfo: %s: "
+			      "No access key associated with imageid %s\n",
+			      reqp->nodeid, row[7]);
+			mysql_free_result(res);
+			return 1;
+		}
+		OUTPUT(address, sizeof(address),
+		       "%s/spewimage.php?imageid=%s&access_key=%s",
+		       TBBASE, row[7], row[6]);
+	}
+	else {
+		/*
+		 * Simple text string.
+		 */
+		if (! row[0] || !row[0][0]) {
+			mysql_free_result(res);
+			return 0;
+		}
+		strcpy(address, row[0]);
+
+		/*
+		 * Sanity check
+		 */
+		if (!row[3] || !row[3][0]) {
+			error("doloadinfo: %s: "
+			      "No pid associated with address %s\n",
+			      reqp->nodeid, row[0]);
+			mysql_free_result(res);
+			return 1;
+		}
 	}
 
 	bufp += OUTPUT(bufp, ebufp - bufp,
-		       "ADDR=%s PART=%s PARTOS=%s", row[0], row[1], row[2]);
+		       "ADDR=%s PART=%s PARTOS=%s", address, row[1], row[2]);
 
 	/*
-	 * Remember zero-fill free space, mbr version fields
+	 * Remember zero-fill free space, mbr version fields, and access_key
 	 */
 	zfill = 0;
 	if (row[4] && row[4][0])
@@ -3673,8 +3694,6 @@ COMMAND_PROTOTYPE(doloadinfo)
 	mbrvers = 1;
 	if (row[5] && row[5][0])
 		mbrvers = atoi(row[5]);
-
-	mysql_free_result(res);
 
 	/*
 	 * Get disk type and number
@@ -3717,8 +3736,9 @@ COMMAND_PROTOTYPE(doloadinfo)
 			nrows--;
 		}
 	}
-	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%d\n",
-	       disktype, disknum, zfill, useacpi, mbrvers);
+	bufp += OUTPUT(bufp, ebufp - bufp,
+		       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%d\n",
+		       disktype, disknum, zfill, useacpi, mbrvers);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
@@ -7273,8 +7293,10 @@ COMMAND_PROTOTYPE(dobootwhat)
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 
-	if (query_bootinfo_db(reqp->client,
-			      BIVERSION_CURRENT, boot_whatp)) {
+	boot_info.opcode  = BIOPCODE_BOOTWHAT_REQUEST;
+	boot_info.version = BIVERSION_CURRENT;
+
+	if (bootinfo(reqp->client, &boot_info, (void *) reqp)) {
 		OUTPUT(buf, sizeof(buf), "STATUS=failed\n");
 	}
 	else {

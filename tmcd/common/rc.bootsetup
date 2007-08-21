@@ -202,6 +202,33 @@ sub doboot()
     }
 
     #
+    # We need a hostname that resolves to something. If we get here and
+    # there is no hostname, set it.
+    #
+    if (REMOTE()) {
+	my $curname = `hostname -s`;
+	if (! ($curname =~ /.+/)) {
+	    my ($domain) = ($bossname =~ /^[^\.]+\.(.*)$/);
+	    my @tmccresults;
+	    
+	    if (tmcc(TMCCCMD_NODEID, undef, \@tmccresults) < 0) {
+		fatal("Could not get nodeid from tmccd!");
+	    }
+	    my $nodeid = $tmccresults[0];
+	    chomp($nodeid);
+	
+	    print STDERR
+		"Hostname not set. Setting it to ${nodeid}.${domain}\n";
+	    
+	    if (system("hostname", "${nodeid}.${domain}")) {
+		fatal("sethostname failed!");
+	    }
+	    # Delay a moment to let things settle down.
+	    sleep(5);
+	}
+    }
+
+    #
     # Check for an os dependent initialization script.
     #
     my $os_script = "rc." . lc($OSNAME);

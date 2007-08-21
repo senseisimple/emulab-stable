@@ -22,6 +22,13 @@ if [ -r /etc/emulab/paths.sh ]; then
 else
 	BINDIR=/etc/testbed
 	BOOTDIR=/etc/testbed
+	ETCDIR=/etc/testbed
+fi
+
+# Behave a little different on widearea nodes.
+isrem=0
+if [ -e $ETCDIR/isrem ]; then
+    isrem=1
 fi
 
 #
@@ -129,17 +136,17 @@ if [ -x /usr/sbin/ntpdate ]; then
 	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
 fi
 
-ADDRESS=`echo $LOADINFO | awk -F= '{ printf $2 }' | awk -F' ' '{ print $1 }'`
-PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }' | awk -F' ' '{ print $1 }'`
+ADDRESS=`echo \"$LOADINFO\" | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
+PARTITION=`echo \"$LOADINFO\" | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
 PARTITION=${PARTITION:-'0'}
-PARTOS=`echo $LOADINFO | awk -F= '{ printf $4 }' | awk -F' ' '{ print $1 }'`
-DISK=`echo $LOADINFO | awk -F= '{ printf $5 }' | awk -F' ' '{ print $1 }'`
+PARTOS=`echo \"$LOADINFO\" | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
+DISK=`echo \"$LOADINFO\" | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
 DISK=${DISK:-'ad0'}
-ZFILL=`echo $LOADINFO | awk -F= '{ printf $6 }' | awk -F' ' '{ print $1 }'`
+ZFILL=`echo \"$LOADINFO\" | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
 ZFILL=${ZFILL:-'0'}
-ACPI=`echo $LOADINFO | awk -F= '{ printf $7 }' | awk -F' ' '{ print $1 }'`
+ACPI=`echo \"$LOADINFO\" | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
 ACPI=${ACPI:-'unknown'}
-MBR=`echo $LOADINFO | awk -F= '{ printf $8 }' | awk -F' ' '{ print $1 }'`
+MBR=`echo \"$LOADINFO\" | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
 MBR=${MBR:-'1'}
 
 if [ "$PARTITION" != "0" ]; then
@@ -205,14 +212,56 @@ if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
 fi 
 
 if [ x"$ADDRESS" != x ]; then
-        PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
-	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
-	if [ -e $BOOTDIR/myip ]; then
-		MCASTIF="-i `cat $BOOTDIR/myip`"
+	isurl=`echo \"$ADDRESS\" | grep http -`
+	ispath=`echo \"$ADDRESS\" | egrep \"^/\" -`
+
+	if [ x"$isurl" != x ]; then
+	    echo "Need to download $ADDRESS"
+
+	    isurl=1
+	    if [ ! -d /images ]; then
+		echo "Need to create or mount /images directory!"
+		exit 1
+	    fi
+	    
+	    #
+	    # This needs a lot more work ...
+	    #
+	    imagefile=`echo ${ADDRESS} | sed -e 's,^http[s]*://[^/]*/,,'`
+	    imagefile="/images/$imagefile"
+
+	    wget -nv -N -P /images "${ADDRESS}"
+	    wstat=$?
+	    case $wstat in
+	    0)
+		echo "wget succeeded getting the image"
+		;;
+	    *)
+		echo "wget failed, status $wstat"
+		exit 1
+		;;
+	    esac
+	elif [ x"$ispath" != x ]; then
+	    ispath=1
+	    
+	    if [ ! -e $ADDRESS ]; then
+		echo "$ADDRESS does not exist!"
+		exit 1
+	    fi
+	    imagefile="$ADDRESS"
 	else
+	    PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
+	    MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
+	    if [ -e $BOOTDIR/myip ]; then
+		MCASTIF="-i `cat $BOOTDIR/myip`"
+	    else
 		MCASTIF=""
+	    fi
+	    MCASTADDR="-m $MCAST -p $PORT"
+	    isurl=0
+	    ispath=0
 	fi
-	MCASTADDR="-m $MCAST -p $PORT"
+	    
 	#
 	# ZFILL==1: use frisbee
 	# ZFILL==2: separate disk-wipe pass (not yet implemented)
@@ -258,15 +307,20 @@ if [ x"$ADDRESS" != x ]; then
 	# a reasonable assumption in general, it mostly works in our
 	# environment and at least won't hurt anything if not true.
 	#
-	if [ x"$ZFILL" = x -a "$PARTITION" = "0" ]; then
+	if [ $isrem -eq 0 -a x"$ZFILL" = x -a "$PARTITION" = "0" ]; then
 	    zapsuperblocks $DISK
 	fi
 
-	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
-	$BINDIR/tmcc state RELOADING
+        $BINDIR/tmcc state RELOADING
 
-	$BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
-	fstat=$?
+	if [ x"$imagefile" != x ]; then
+	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $SLICE $ZFILL $imagefile /dev/$DISK"
+	    /usr/local/bin/imageunzip -o -O -W 32 $SLICE $ZFILL $imagefile /dev/$DISK
+	else
+	    echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
+	    $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
+	fi
+        fstat=$?
 
 	#
 	# Turn the cache back off if we turned it on.
@@ -304,7 +358,11 @@ if [ x"$ADDRESS" != x ]; then
 		if [ $reboot -eq 1 ]; then
 		    $BINDIR/tmcc state RELOADDONEV2
 		    echo "Waiting for server to reboot us ..."
-		    sleep 240
+		    if [ $isrem -eq 1 ]; then
+			sleep 30
+		    else
+			sleep 240
+		    fi
 		    echo "No response from server, rebooting myself ..."
 		    /sbin/reboot
 		    sleep 100

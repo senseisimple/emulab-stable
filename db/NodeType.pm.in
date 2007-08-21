@@ -248,6 +248,7 @@ sub GetAttribute($$;$$)
 }
 # Shortcuts for typical attributes.
 sub default_osid($;$)  {return GetAttribute($_[0], "default_osid", $_[1]); }
+sub default_imageid($;$){return GetAttribute($_[0], "default_imageid",$_[1]); }
 sub delay_osid($;$)    {return GetAttribute($_[0], "delay_osid", $_[1]); }
 sub jail_osid($;$)     {return GetAttribute($_[0], "jail_osid", $_[1]); }
 sub imageable($;$)     {return GetAttribute($_[0], "imageable", $_[1]); }
