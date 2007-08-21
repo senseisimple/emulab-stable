@@ -388,11 +388,6 @@ sub checkkernel($)
 
     if (!($kernvers =~ /$kernel/i)) {
 
-	# XXX only works for linkdelay right now
-	return if ($kernel ne $KERNELLDELAY);
-
-    if (!($kernvers =~ /$kernel/i)) {
-
         # XXX only works for linkdelay right now
         return if ($kernel ne $KERNELLDELAY);
 
