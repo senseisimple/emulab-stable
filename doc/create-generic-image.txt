@@ -28,7 +28,10 @@ How to make a generic image from a Utah one:
 2e. Install generic kernels.
 
    [ As of 8/13/07 there are prebuilt versions of these in
-     http://www.emulab.net/downloads/generic-kernels-4.10.tar.gz. ]
+     http://www.emulab.net/downloads/generic-kernels-4.10.tar.gz.
+     For Utah, there are prebuilt kernels (and master.passwd files
+     with the usual newnode root password) in
+     ~mike/distimages/generic-image/fbsd* ]
 
    Build kernels from the various TESTBED-* configs and install them.
    For FBSD 4.x:
@@ -50,14 +53,14 @@ How to make a generic image from a Utah one:
 2f. Shutdown to single user and run the prepare script.
    I always first umount NFS directories:
 	umount -h fs
+   Then I remove /users and /proj mount points:
+	rmdir /users/* /proj/*
+   (Note that this looks really dangerous, in the case where something is
+    still NFS mounted, but it isn't since I use "rmdir" which will not
+    remove a directory that isn't empty or a mount point.)
    Then run prepare:
 	cd /usr/local/etc/emulab
 	./prepare
-   Then I remove /users and /proj mount points:
-	rmdir /users/* /proj/*
-   Note that this looks really dangerous, in the case where something is
-   still NFS mounted, but it isn't since I use "rmdir" which will not
-   remove a directory that isn't empty or a mount point.
 
 2g. Remove the Utah SSL certs and SSH host keys
 	rm /etc/ssh/ssh_host*
@@ -94,14 +97,14 @@ How to make a generic image from a Utah one:
 3f. Shutdown to single user and run the prepare script.
    I always first umount NFS directories:
 	umount -at nfs
+   Then I remove /users and /proj mount points:
+	rmdir /users/* /proj/*
+   (Note that this looks really dangerous, in the case where something is
+    still NFS mounted, but it isn't since I use "rmdir" which will not
+    remove a directory that isn't empty or a mount point.)
    Then run prepare:
 	cd /usr/local/etc/emulab
 	./prepare
-   Then I remove /users and /proj mount points:
-	rmdir /users/* /proj/*
-   Note that this looks really dangerous, in the case where something is
-   still NFS mounted, but it isn't since I use "rmdir" which will not
-   remove a directory that isn't empty or a mount point.
 
 3g. Remove the Utah SSL certs and SSH host keys
 	rm /etc/ssh/ssh_host*
@@ -119,3 +122,6 @@ How to make a generic image from a Utah one:
    so the filesystem won't be forced into an fsck for another 180 days or so.
 
 5. Create the image.
+
+	cd /proj/<pid>/images
+	imagezip -o /dev/ad0 <somename>-GENERIC.ndz
