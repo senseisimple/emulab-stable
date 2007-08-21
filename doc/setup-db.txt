@@ -296,7 +296,8 @@ switches that do not have expansion modules, the card number is assumed to be
 0. Make sure to get the current_speed (this time, in Mbps, and note, this is
 an enumerated type, not an integer, so you need to put quotes around the
 speed) and duplex correct. You'll also need to set 'iface' to some string
-representing the port - I tend to use 'module/port' (ie. '1/1').
+representing the port - I tend to use 'module/port' (ie. '1/1'). Set the 'role'
+of the interfaces to 'other'.
 
 Now, go into the wires table and add wires connecting the switch interfaces you
 just created. Make sure to set the type to 'Trunk'. In this case, it doesn't
