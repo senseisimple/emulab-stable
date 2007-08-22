@@ -44,11 +44,7 @@ sub hextostr($) {
     for (my $i = 0; $i < $len; $i += 2) {
 	my $ch = substr($hstr,$i,(($i + 2) == $len)?1:2);
 	$retval .= chr(hex($ch));
-	print "" . hex($ch) . ",";
     }
-    print "\n";
-
-    print "converted $hstr to $retval\n";
 
     return $retval;
 }
