@@ -3619,7 +3619,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
-	char		*disktype, *useacpi, address[MYBUFSIZE];
+	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
 	int		disknum, zfill, mbrvers;
 
 	/*
@@ -3701,13 +3701,15 @@ COMMAND_PROTOTYPE(doloadinfo)
 	disktype = DISKTYPE;
 	disknum = DISKNUM;
 	useacpi = "unknown";
+	useasf = "unknown";
 
 	res = mydb_query("select attrkey,attrvalue from nodes as n "
 			 "left join node_type_attributes as a on "
 			 "     n.type=a.type "
 			 "where (a.attrkey='bootdisk_unit' or "
 			 "       a.attrkey='disktype' or "
-			 "       a.attrkey='use_acpi') and "
+			 "       a.attrkey='use_acpi' or "
+			 "       a.attrkey='use_asf') and "
 			 "      n.node_id='%s'", 2, reqp->nodeid);
 	
 	if (!res) {
@@ -3732,13 +3734,16 @@ COMMAND_PROTOTYPE(doloadinfo)
 				else if (strcmp(row[0], "use_acpi") == 0) {
 					useacpi = row[1];
 				}
+				else if (strcmp(row[0], "use_asf") == 0) {
+					useasf = row[1];
+				}
 			}
 			nrows--;
 		}
 	}
 	bufp += OUTPUT(bufp, ebufp - bufp,
-		       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%d\n",
-		       disktype, disknum, zfill, useacpi, mbrvers);
+		       " DISK=%s%d ZFILL=%d ACPI=%s ASF=%s MBRVERS=%d\n",
+		       disktype, disknum, zfill, useacpi, useasf, mbrvers);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);

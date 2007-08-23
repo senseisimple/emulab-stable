@@ -136,17 +136,19 @@ if [ -x /usr/sbin/ntpdate ]; then
 	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
 fi
 
-ADDRESS=`echo \"$LOADINFO\" | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
-PARTITION=`echo \"$LOADINFO\" | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
+ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
+PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
 PARTITION=${PARTITION:-'0'}
-PARTOS=`echo \"$LOADINFO\" | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
-DISK=`echo \"$LOADINFO\" | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
+PARTOS=`echo $LOADINFO | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
+DISK=`echo $LOADINFO | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
 DISK=${DISK:-'ad0'}
-ZFILL=`echo \"$LOADINFO\" | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
+ZFILL=`echo $LOADINFO | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
 ZFILL=${ZFILL:-'0'}
-ACPI=`echo \"$LOADINFO\" | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
+ACPI=`echo $LOADINFO | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
 ACPI=${ACPI:-'unknown'}
-MBR=`echo \"$LOADINFO\" | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
+ASF=`echo $LOADINFO | sed -e 's/.*ASF=\([^[:space:]]*\).*/\1/'`
+ASF=${ASF:-'unknown'}
+MBR=`echo $LOADINFO | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
 MBR=${MBR:-'1'}
 
 if [ "$PARTITION" != "0" ]; then
@@ -212,8 +214,8 @@ if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
 fi 
 
 if [ x"$ADDRESS" != x ]; then
-	isurl=`echo \"$ADDRESS\" | grep http -`
-	ispath=`echo \"$ADDRESS\" | egrep \"^/\" -`
+	isurl=`echo $ADDRESS | grep http -`
+	ispath=`echo $ADDRESS | grep '^/' -`
 
 	if [ x"$isurl" != x ]; then
 	    echo "Need to download $ADDRESS"
@@ -227,10 +229,10 @@ if [ x"$ADDRESS" != x ]; then
 	    #
 	    # This needs a lot more work ...
 	    #
-	    imagefile=`echo ${ADDRESS} | sed -e 's,^http[s]*://[^/]*/,,'`
+	    imagefile=`echo $ADDRESS | sed -e 's,^http[s]*://[^/]*/,,'`
 	    imagefile="/images/$imagefile"
 
-	    wget -nv -N -P /images "${ADDRESS}"
+	    wget -nv -N -P /images "$ADDRESS"
 	    wstat=$?
 	    case $wstat in
 	    0)
@@ -337,6 +339,7 @@ if [ x"$ADDRESS" != x ]; then
 		$BINDIR/growdisk -vW /dev/$DISK
 		echo "Adjusting slice-related files"
 		export SLICEFIX_ACPI=$ACPI
+		export SLICEFIX_ASF=$ASF
 		$BINDIR/slicefix $PARTITION $DISK
 		echo "Image load complete at `date`"
 

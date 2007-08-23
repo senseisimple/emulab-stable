@@ -43,6 +43,19 @@ case $ACPI in
     ;;
 esac
 
+ASF=${SLICEFIX_ASF:-'unknown'}
+case $ASF in
+0|no|NO)
+    ASF=no
+    ;;
+1|yes|YES)
+    ASF=yes
+    ;;
+*)
+    ASF=unknown
+    ;;
+esac
+
 #
 # ...or the filesystem
 #
@@ -112,6 +125,7 @@ dofreebsd() {
 	changedisk=0
 	changeentropy=0
 	changeacpi=0
+	changeasf=0
 
 	# If our disk does not appear anywhere in fstab, we need to fix it
 	grep "^/dev/${disk}s" /mnt/etc/fstab >/dev/null 2>&1
@@ -160,7 +174,37 @@ dofreebsd() {
 	    esac
 	fi
 
-	if [ $changedisk -eq 0 -a $changeentropy -eq 0 -a $changeacpi -eq 0 ]; then
+	#
+	# See if we need to change the ASF setting.
+	#
+	# Note that, unlike ACPI, we change it even if there was no
+	# previous setting in /boot/loader.conf.
+	#
+	if [ $ASF != "unknown" ]; then
+	    grep "hw.bge.allow_asf=" /mnt/boot/loader.conf >/dev/null 2>&1
+	    case $? in
+	    0)
+		grep "^hw.bge.allow_asf=1" /mnt/boot/loader.conf >/dev/null 2>&1
+		case $? in
+		0)
+		    if [ $ASF = "no" ]; then
+			changeasf=1
+		    fi
+		    ;;
+		*)
+		    if [ $ASF = "yes" ]; then
+			changeasf=1
+		    fi
+		    ;;
+		esac
+		;;
+	    *)
+	        changeasf=1
+		;;
+	    esac
+	fi
+
+	if [ $changedisk -eq 0 -a $changeentropy -eq 0 -a $changeacpi -eq 0 -a $changeasf -eq 0 ]; then
 		echo "  no changes necessary"
 		umount $rootdev
 		return 0
@@ -217,6 +261,31 @@ EOF1
 # enable ACPI
 acpi_load="YES"
 hint.acpi.0.disabled=0
+EOF2
+	    fi
+	fi
+
+	if [ $changeasf -eq 1 ]; then
+	    if [ $ASF = "no" ]; then
+		on="dis"
+	    else
+		on="en"
+	    fi
+	    echo "  ${on}abling ASF"
+	    sed -E -i .orig -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
+		echo "Failed to update /boot/loader.conf"
+		umount $rootdev
+		return 1
+	    }
+	    if [ $ASF = "no" ]; then
+		cat <<EOF1 >>/mnt/boot/loader.conf
+# disable ASF
+hw.bge.allow_asf=0
+EOF1
+	    else
+		cat <<EOF2 >>/mnt/boot/loader.conf
+# enable ASF
+hw.bge.allow_asf=1
 EOF2
 	    fi
 	fi
