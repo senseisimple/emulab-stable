@@ -3742,8 +3742,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 		}
 	}
 	bufp += OUTPUT(bufp, ebufp - bufp,
-		       " DISK=%s%d ZFILL=%d ACPI=%s ASF=%s MBRVERS=%d\n",
-		       disktype, disknum, zfill, useacpi, useasf, mbrvers);
+		       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%d ASF=%s\n",
+		       disktype, disknum, zfill, useacpi, mbrvers, useasf);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
