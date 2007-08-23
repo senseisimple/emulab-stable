@@ -56,7 +56,6 @@ my $batchmode   = 0;
 my @nodes       = ();
 my $logname;
 my $failed	= 0;
-my $estate;
 
 #
 # Load the Testbed support stuff. 
@@ -116,7 +115,8 @@ if (! defined($experiment)) {
 #
 # Check state. Only ACTIVE experiments. 
 #
-if ($experiment->state() ne EXPTSTATE_ACTIVE) {
+my $estate = $experiment->state;
+if ($estate() ne EXPTSTATE_ACTIVE) {
     print STDERR "Experiment $pid/$eid is in state $estate, not ACTIVE!\n";
     # For web page.
     exit(1);
