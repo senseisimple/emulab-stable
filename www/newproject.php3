@@ -414,6 +414,9 @@ function SPITFORM($formfields, $returning, $errors)
     #
     # Publicly visible.
     #
+    if (!isset($formfields["proj_public"])) {
+	$formfields["proj_public"] = "";
+    }
     echo "<tr>
               <td colspan=2>*Can we list your project publicly as
                              an \"Emulab User?\":
@@ -437,6 +440,9 @@ function SPITFORM($formfields, $returning, $errors)
     #
     # Will you add a link?
     #
+    if (!isset($formfields["proj_linked"])) {
+	$formfields["proj_linked"] = "";
+    }
     echo "<tr>
               <td colspan=2>*Will you add a link on your project page
                         to <a href=\"$TBDOCBASE\" target='_blank'>$WWWHOST</a>?
