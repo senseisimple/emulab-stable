@@ -48,7 +48,7 @@ $types_result =
     DBQueryFatal("select distinct n.type from nodes as n ".
 		 "left join node_type_attributes as a on a.type=n.type ".
 		 "where a.attrkey='imageable' and ".
-		 "      a.attrvalue!='0'");
+		 "      a.attrvalue!='0' and n.role='testnode'");
 
 #
 # Spit the form out using the array of data. 
@@ -481,7 +481,7 @@ if (!isset($submit)) {
     #
     # For users that are in one project and one subgroup, it is usually
     # the case that they should use the subgroup, and since they also tend
-    # to be in the clueless portion of our users, give them some help.
+    # to be in the naive portion of our users, give them some help.
     # 
     if (count($projlist) == 1) {
 	list($project, $grouplist) = each($projlist);
@@ -596,7 +596,7 @@ elseif ($formfields["loadpart"] != 0 && $formfields["loadlength"] != 1) {
 # Store the ones we care about and silently forget about the extraneous
 # OSIDs by setting the locals to NULL.
 #
-# XXX This loops creates locals part1_osid, part2_osid, part3_osid, and
+# XXX This loop creates locals part1_osid, part2_osid, part3_osid, and
 #     part4_osid on the fly. Look at $$foo. We use them below.
 #
 $osid_array = array();
@@ -649,7 +649,7 @@ elseif (! TBvalid_osid($formfields["default_osid"])) {
     $errors["Boot OS"] = "Invalid characters in OSID";
 }
 elseif (!OSinfo::Lookup($formfields["default_osid"])) {
-    $errors["Boot  OS"] = "No such OS defined";
+    $errors["Boot OS"] = "No such OS defined";
 }
 else {
     for ($i = 0; $i < count($osid_array); $i++) {
