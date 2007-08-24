@@ -343,7 +343,7 @@ sub osload ($$) {
 
 	    # This is passed along so that remote node can request the file.
 	    # Make sure the image object has an access key defined.
-	    if ($nodeobject->isremotenode() !defined($access_key)) {
+	    if ($nodeobject->isremotenode() && !defined($access_key)) {
 		$access_key = TBGenSecretKey();
 
 		$rowref->{'access_key'} = $access_key;
@@ -366,7 +366,7 @@ sub osload ($$) {
 	    'osid'    => $defosid,
 	    'reboot'  => $reboot_required,
 	    'zerofree'=> $zerofree,
-	    'maxwait' => $maxwait,
+	    'maxwait' => $maxwait
 	};
 
 	print "Setting up reload for $node (mode: $reload_mode)\n";
@@ -383,7 +383,7 @@ sub osload ($$) {
 	$result->{$node} = -1;
 	$failures++;
     }
-
+    
     #
     # Remove any failed nodes from the list we are going to operate on.
     #
@@ -525,7 +525,6 @@ sub osload ($$) {
 	close(CHILD_WRITER);
 	exit($failures);
     }
-    
     return $failures;
 }
 
