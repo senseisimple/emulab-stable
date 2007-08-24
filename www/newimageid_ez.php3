@@ -48,6 +48,8 @@ if (isset($nodetype) && $nodetype == "mote") {
           <a href=doc/docwrapper.php3?docname=emotes.html#PROGRAMMING>
           mote documentation</a> for more info on creating/using custom
           mote images.";
+    # Default to 'srec' files for use with uisp
+    $filename_extension = "srec";
 } else {
     # Defaults to PC view
     $view = array('hide_upload' => 1);
@@ -60,7 +62,10 @@ if (isset($nodetype) && $nodetype == "mote") {
           "See the
           <a href=tutorial/docwrapper.php3?docname=tutorial.html#CustomOS>
           tutorial</a> for more info on creating/using custom Images.";
+    # Default to imagezip ndz files
+    $filename_extension = "ndz";
 }
+
 #
 # Standard Testbed Header
 #
@@ -85,7 +90,7 @@ $types_querystring = "select distinct n.type from nodes as n ".
     "left join node_types as nt on n.type=nt.type ".
     "left join node_type_attributes as a on a.type=n.type ".
     "where a.attrkey='imageable' and ".
-    "      a.attrvalue!='0'";
+    "      a.attrvalue!='0' and n.role='testnode'";
 
 if ($nodeclass) {
     $types_querystring .= " and nt.class='$nodeclass' ";
@@ -217,7 +222,7 @@ function SPITFORM($formfields, $errors)
 	echo "<input type=hidden name=nodetype value='$nodetype'>";
     }
     elseif (isset($nodeclass)) {
-	echo "<input type=hidden name=nodeclass value='$nodetype'>";
+	echo "<input type=hidden name=nodeclass value='$nodeclass'>";
     }
 
     #
@@ -681,11 +686,18 @@ function SPITFORM($formfields, $errors)
 		 </li>
 		 <li> Specify the node types that this image will be able
 		      to work on (can be loaded on and expected to work).
-		      Typically, images will work on all of the \"pc\" types when
-		      you are customizing one of the standard images. However,
-		      if you are installing your own OS from scratch, or you are
-		      using DOS partition four, then this might not be true.
-		      Feel free to ask us!
+		      Typically, images of newer OS versions will work on all
+		      of the \"pc\" types.  However, older versions of OSes
+		      may only work on the older hardware types (pc600, pc850,
+		      pc2000).  To make this type selection process easier,
+		      when you take a snapshot of an existing node that you
+		      have customized (see 2. above), the system will restrict
+		      the types to those allowed for the \"base\" image (the
+		      one originally loaded, that you have customized).  If
+		      you need to override this restriction and add a type
+		      that is not allowed in the current image, you will have
+		      to contact us.  If you have any questions, free to ask
+		      us!
 		 </li>
 		 <li> If you need to snapshot the entire disk (including the MBR),
 		      check this option. <b>Most users will not need to check this
@@ -744,9 +756,6 @@ if (!isset($submit)) {
 	$defaults["op_mode"]     = TBDB_ALWAYSUP_OPMODE;
 	$defaults["os_name"]     = "TinyOS";
 	$defaults["os_version"]  = "1.1.0";
-
-	# Default to 'srec' files for use with uisp
-	$filename_extension    = "srec";
     } else {
 	# Defaulys for PC-type nodes
 	$defaults["loadpart"] = "X";
@@ -761,15 +770,12 @@ if (!isset($submit)) {
 	# mtype_all is a "fake" variable which makes all
 	# mtypes checked in the virgin form.
 	$defaults["mtype_all"] = "Yep";
-
-	# Default to imagezip ndz files
-	$filename_extension    = "ndz";
     }
 
     #
     # For users that are in one project and one subgroup, it is usually
     # the case that they should use the subgroup, and since they also tend
-    # to be in the clueless portion of our users, give them some help.
+    # to be in the naive portion of our users, give them some help.
     # 
     if (count($projlist) == 1) {
 	list($project, $grouplist) = each($projlist);
@@ -905,7 +911,7 @@ elseif (! array_key_exists($formfields["os_name"], $osid_oslist)) {
     $errors["OS"] = "Invalid OS";
 }
 elseif (! $osid_oslist[$formfields["os_name"]] && !$isadmin) {
-    $errors["OS"] = "No enough permission";
+    $errors["OS"] = "Not enough permission";
 }
 
 #
@@ -1013,28 +1019,6 @@ elseif (! $osid_opmodes[$formfields["op_mode"]] && !$isadmin) {
 }
 
 #
-# Node Types:
-# See what node types this image will work on. Must be at least one!
-# Store the valid types in a new array for simplicity.
-#
-$mtypes_array = array();
-
-while ($row = mysql_fetch_array($types_result)) {
-    $type = $row["type"];
-
-    #
-    # Look for a post variable with name.
-    # 
-    if (isset($formfields["mtype_$type"]) &&
-	$formfields["mtype_$type"] == "Yep") {
-	$mtypes_array[] = $type;
-    }
-}
-if (! count($mtypes_array)) {
-    $errors["Node Types"] = "Must select at least one type";
-}
-
-#
 # Node.
 #
 unset($node);
@@ -1056,6 +1040,57 @@ if (isset($formfields["node_id"]) &&
 }
 
 #
+# Node Types:
+# See what node types this image will work on. Must be at least one!
+# Store the valid types in a new array for simplicity.
+#
+# We perform a further check for non-admins.  When a node to snapshot
+# has been specified, we check the OSID of the appropriate partition
+# and see which node types it is appropriate for, and further restrict
+# the list as necessary.  This prevents creation of custom images based on
+# old OSes from being checked as runnable on newer HW where they do not
+# stand a chance.
+#
+$mtypes_array = array();
+
+while ($row = mysql_fetch_array($types_result)) {
+    $type = $row["type"];
+
+    #
+    # Look for a post variable with name.
+    # 
+    if (isset($formfields["mtype_$type"]) &&
+	$formfields["mtype_$type"] == "Yep") {
+	$mtypes_array[] = $type;
+    }
+}
+if (! count($mtypes_array)) {
+    $errors["Node Types"] = "Must select at least one type";
+} elseif (!$isadmin && isset($node_id) && !isset($errors["DOS Partition"])) {
+    $part = $formfields["loadpart"];
+    $query_result =
+	DBQueryFatal("select oi.type from osidtoimageid as oi ".
+		     "left join partitions as p on oi.osid=p.osid ".
+		     "where p.node_id='$node_id' and p.partition=$part");
+    $otypes_array = array();
+    while ($row = mysql_fetch_array($query_result)) {
+	$ntype = $row["type"];
+	$otypes_array[$ntype] = 1;
+    }
+    # Flag invalid node types
+    for ($i = 0; $i < count($mtypes_array); $i++) {
+	$ntype = $mtypes_array[$i];
+	if (!isset($otypes_array[$ntype])) {
+	    if (!isset($errors["Node Types"])) {
+		$errors["Node Types"] =
+		    "Current image on $node_id cannot run on types: ";
+	    }
+	    $errors["Node Types"] .= " $ntype";
+	}
+    }
+}
+
+#
 # Max concurrent
 # 
 if (isset($formfields["max_concurrent"]) &&
@@ -1072,7 +1107,8 @@ if (isset($formfields["max_concurrent"]) &&
 
 #
 # Reboot waittime. Only admin users can set this. Grab default
-# if not set.
+# if not set.  If no default, complain (unless they failed to specify an OS
+# in which case we will complain about that instead).
 #
 if (isset($formfields["reboot_waittime"]) &&
     strcmp($formfields["reboot_waittime"],"")) {
@@ -1081,7 +1117,7 @@ if (isset($formfields["reboot_waittime"]) &&
     }
     $reboot_waittime = $formfields["reboot_waittime"];
 }
-else {
+else if (!isset($errors["OS"])) {
     if (! array_key_exists($formfields["os_name"], $osid_reboot_waitlist)) {
 	$errors["Reboot Waittime"] = "No default reboot waittime for OS";
     }
