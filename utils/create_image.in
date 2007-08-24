@@ -231,15 +231,6 @@ if ($isglobal && ($filename =~ /^\/usr\/testbed/)) {
     print "*** WARNING: Writing global descriptor to $filename instead!\n";
 }
 
-# Untaint. Very silly.
-if ($filename =~ /^([-\w\.\/\+]+)$/) {
-    $filename = $1;
-}
-else {
-    die("*** $0:\n".
-	"    Bad filename: $filename!\n");
-}
-
 #
 # Make sure real path is someplace that makes sense; remember that the
 # image is created on the nodes, and it NFS mounts directories on ops.
@@ -254,6 +245,11 @@ if ($translated =~ /^([-\w\.\/]+)$/) {
 else {
     die("*** $0:\n".
 	"    Bad data returned by realpath: $translated\n");
+}
+# Make sure not a directory.
+if (-d $filename) {
+    die("*** $0:\n".
+	"    $filename is a directory! Must be a plain file.\n");
 }
 
 #
