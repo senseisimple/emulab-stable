@@ -1,0 +1,7 @@
+could not map
+could not continue
+already in use
+you cannot modify
+experiment in transition
+undefined variable
+uninitialized value

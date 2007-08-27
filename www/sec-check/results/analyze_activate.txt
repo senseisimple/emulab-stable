@@ -27,7 +27,10 @@ newproj2.html
       Your project request has been successfully queued.
 newuser1.html
       As a pending user of the Testbed you will receive a key via email.
+      application, and you will be notified via email as soon as
 newuser2.html
       As a pending user of the Testbed you will receive a key via email.
+      application, and you will be notified via email as soon as
 ================ failure ================
+================ problem ================
 ================ UNKNOWN ================

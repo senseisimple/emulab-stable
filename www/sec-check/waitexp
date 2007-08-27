@@ -6,13 +6,17 @@
 #
 
 # waitexp - Wait for an experiment to be in the "active" state.
+#    Required first two args are the project and experiment names.
+#    Optional third arg is another state to wait for.
 
 pid=$1
 eid=$2
 if [ -z "$pid" -o -z "$eid" ]; then
-    echo "usage: $0 <pid> <eid>"
+    echo "usage: $0 <pid> <eid> [<state>]"
     exit 1
 fi
+goal_state=$3
+if [ -z $goal_state ]; then goal_state="active"; fi
 
 max=600  # Max number of seconds to wait (10 minutes).
 msg=60   # Give a message every so often (seconds)
@@ -29,8 +33,8 @@ do
 	sql="select state from experiments where pid='$pid' and eid='$eid'"
 	state=`echo "$sql" | mysql tbdb | tail +2`
 
-	# Done if active state now.
-	if [ "$state" = "active" ]; then
+	# Done if in the desired state now.
+	if [ "$state" = "$goal_state" ]; then
 	    echo ""
 	    echo "$pid/$eid is $state."
 	    echo ""
@@ -39,7 +43,7 @@ do
 	# Starting to wait.
 	elif [ $hdr ]; then
 	    echo ""
-	    echo "*** Waiting for $pid/$eid to become active."
+	    echo "*** $pid/$eid is $state.  Waiting for it to become $goal_state."
 	    hdr=
 
 	# Extra message if inactive but the state changes.
@@ -58,6 +62,6 @@ do
 done
 
 # Failed!
-echo "*** Giving up waiting for $pid/$eid."
+echo "*** Giving up waiting for $pid/$eid to become $goal_state. ***"
 echo ""
 exit 1

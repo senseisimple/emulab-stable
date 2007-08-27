@@ -4,7 +4,7 @@
 # Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# forms-to-urls - Generate URL's for accessing the site.
+# forms-to-urls.gawk - Generate URL's for accessing the site.
 #
 #   form-input.gawk's output format is the input format for this script.
 #
@@ -181,14 +181,9 @@ form && /^$/ {			# Blank line terminates each form section.
 
     if (arg_vals) {		# Ignore if no argument values to supply.
 
-	if ( ! PROBE ) {
-	    # Not probing.
-	    gsub("%d", "", arg_str);
-	    print url arg_str;
-	}
-	else {
-	    # Substitute a labeled mock SQL injection attack probe string for
-	    # EACH ?argument value.  Generates N urls.
+	if ( PROBE ) {
+	    # When probing, generate N probe urls.  Substitute a labeled mock SQL
+	    # injection attack probe string for one ?argument value in each URL.
 	    delete all_args;
 	    for (arg in action_args) all_args[arg] = action_args[arg];
 	    for (arg in args) all_args[arg] = args[arg];
@@ -208,5 +203,12 @@ form && /^$/ {			# Blank line terminates each form section.
 		print url probe_str;
 	    }
 	}
+
+	# Not probing, or finished with probe URLs.  Put out the unmodified URL
+	# *after* the probe URLs, since dependent actions later on will need the
+	# results of a setup/teardown action.
+	gsub("%d", "", arg_str);
+	print url arg_str;
+
     }
 }

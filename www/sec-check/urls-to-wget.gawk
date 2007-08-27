@@ -9,7 +9,12 @@
 #
 #   Input is a set of page URL's including appended ?args, from sep-urls.gawk .
 #   Interspersed action lines for setup and teardown may be prefixed by a
-#   "!" or "-".  Further description of action lines is below.
+#   "!" or "-".  Further description of these action lines is below.
+#
+#   Output is a csh script containing "wget" statements to simulate submitting
+#   HTML forms responses to drive the web site, interspersed with other state
+#   query and control structure lines.  You may run the whole thing en masse,
+#   or copy-paste individual commands into an interactive c-shell.
 #
 #   The GET arg method is default, including action= args for a POSTed form.
 #   A POST argument string follows a "?post:" separator after the other ?args.
@@ -23,7 +28,7 @@
 #
 #   Action lines in the input stream may be prefixed by a "!" or a "-".
 #   . "!" lines are just put into the output script among the wget lines.
-#   .  "-" lines are *conditional undo* actions for probing.
+#   .  "-" lines are *conditional undo* (inverse) actions for probing.
 #
 #   A conditional undo action line immediately follows a /filename line in the
 #   file list.  It gives a corresponding "inverse action" to conditionally
@@ -62,7 +67,7 @@ BEGIN{
     type = substr($0, 1, 1);
     if ( $0 ~ /^.wget / ) {
 	process_url(last_prefix "/" $2); # Sets url, url_args, post_args.
-        # Put the undo output in a separate subdir to avoid confusion.
+        # Put the undo output into a separate subdir to avoid confusion.
 	file_args = "-O " outpath "undo/" last_file;
 	cmd = sprintf("wget %s %s %s%s %s", 
 		      wget_args, ld_cookies, file_args, post_args, url_args);
@@ -76,9 +81,12 @@ BEGIN{
 
     # Unconditional action lines start with an exclamation point.
     if ( type == "!" ) { print "    " cmd; }
+
     # Conditional "inverse action" lines start with a dash.
-    else if ( length(FAILFILE) ){ # Only need to undo when probing.
-	# Wrap in an if-block.
+    # Only need to undo when probing, and only after lines containing a probe.
+    # (The others are the real setup/teardown actions that allow continuing.)
+    if ( type == "-" && length(FAILFILE) && last_url_was_probe ) {
+	# Do the undo only when the thing being undone didn't fail.
 	printf "if ( ! { grep -q -f %s/%s %s%s } ) then\n    %s\nendif\n",
 	    SRCDIR, FAILFILE, outpath, last_file, cmd;
     }
@@ -125,4 +133,7 @@ function process_url(u) {	# Sets url, url_args, post_args.
     file_args = "-O " outpath file;
 
     print "wget", wget_args, ld_cookies, file_args post_args, url_args;
+
+    # Remember whether this was a probing URL or an setup/teardown action URL.
+    last_url_was_probe = index(post_args url_args, "**{")
 }

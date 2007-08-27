@@ -3,19 +3,19 @@ https://myboss.vulnelab.testbed.emulab.net/template_export.php?experiment=9
 https://myboss.vulnelab.testbed.emulab.net/archive_tags.php3?experiment=9
 https://myboss.vulnelab.testbed.emulab.net/boot.php3?experiment=9?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/delaycontrol.php3?experiment=9?post:dochange=1
-https://myboss.vulnelab.testbed.emulab.net/editnodetype.php3?node_type=pctest?post:formfields[isdynamic]=0&formfields[issubnode]=0&formfields[isplabdslice]=0&formfields[isjailed]=0&newattribute_name=&formfields[isremotenode]=0&formfields[isvirtnode]=0&submit=Submit&formfields[issimnode]=0&node_type=pctest&newattribute_value=&formfields[class]=pc
+https://myboss.vulnelab.testbed.emulab.net/editnodetype.php3?node_type=pctest?post:formfields[isdynamic]=0&newattribute_type=integer&formfields[issubnode]=0&formfields[isplabdslice]=0&formfields[isjailed]=0&newattribute_name=testattr&formfields[isremotenode]=0&formfields[isvirtnode]=0&submit=Submit&formfields[issimnode]=0&node_type=pctest&newattribute_value=42&formfields[class]=pc
 https://myboss.vulnelab.testbed.emulab.net/editsitevars.php3?post:name=batch/retry_wait&value=
 https://myboss.vulnelab.testbed.emulab.net/feedback.php3?mode=clear&experiment=9?post:confirmed=Confirm&clear_last=1
 https://myboss.vulnelab.testbed.emulab.net/gensslcert.php3?post:formfields[passphrase1]=EinE_tmp&submit=Create SSL Cert&formfields[passphrase2]=EinE_tmp&formfields[user]=10071
 https://myboss.vulnelab.testbed.emulab.net/linktest.php3?post:level=1&eid=testexp1&pid=testbed
-https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry=Test log entry.&node_id=pc123
+https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3?post:log_type=misc&log_entry=Test log entry.&node_id=pc120
 https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber=
-https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc123?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
+https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc120?post:rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=
 https://myboss.vulnelab.testbed.emulab.net/nscheck.php3?post:MAX_FILE_SIZE=1024&formfields[exp_localnsfile]=/users/fish/shaped-2-nodes.ns
 https://myboss.vulnelab.testbed.emulab.net/nsgen.php3?template=plabdevbox&templatevalues[ImageName]=PLAB-DEVBOX&templatevalues[NodeName]=devbox&templatevalues[HWType]=pc
 https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[rpm]=&formfields[count]=1&formfields[when]=1&formfields[tarball]=&submit=Create it&formfields[nodelist]=&formfields[type]=pcplab&formfields[nodeversion]=Production&formfields[canfail]=Yep&formfields[startupcmd]=&formfields[units]=168&formfields[resusage]=1
-https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc123&poweron=Yep&confirmed=Confirm
-https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc123?post:submit=Submit&pid=testbed
+https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc120&poweron=Yep&confirmed=Confirm
+https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc120?post:submit=Submit&clear=1&pid=testbed
 https://myboss.vulnelab.testbed.emulab.net/replayexp.php3?experiment=9?post:confirmed=Confirm
 https://myboss.vulnelab.testbed.emulab.net/resendapproval.php?pid=testbed?post:submit=Submit&message=
 https://myboss.vulnelab.testbed.emulab.net/showpubkeys.php3?user=502?post:MAX_FILE_SIZE=1024

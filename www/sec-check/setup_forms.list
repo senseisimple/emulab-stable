@@ -1,11 +1,19 @@
 # Gotta do this stuff with admin privs.
 ! gmake admin
 
+# Project testproj3, with me as head.
 !projidx=sql "select pid_idx from projects where pid='testproj3'"
 ! if ( "$projidx" == "" ) then
-!projidx=sql "select pid_idx from projects where pid='testproj3'"
-/newproject.php3
-/approveproject.php3
+
+    /newproject.php3
+    # Undo project_defs.php::NewNewProject -> newproj.in -> Project.pm::Create.
+    - $SRCDIR/undo-probe.pl -s proj testproj3
+    !projidx=sql "select pid_idx from projects where pid='testproj3'"
+
+    /approveproject.php3
+    # Turn the project approved bit back off to undo.
+    -sql "update projects set approved=0 where where pid='testproj3'"
+
 ! else
 !     echo "*** Project testproj3 ($projidx) already exists! ***"
 ! endif
@@ -13,36 +21,46 @@
 !usridx=sql "select uid_idx from users where uid='testusr3'"
 ! if ( "$usridx" == "" ) then
 
-# Log out to create a new user, then back in again.
-! gmake logout
-/joinproject.php3
-! gmake admin
+    # Log out to create a new user, then back in again.
+    ! gmake logout
+    /joinproject.php3
+    - $SRCDIR/undo-probe.pl -s -n user testusr3
+    ! gmake admin
 
-# Pretend the user sent in his e-mail confirmation, allowing approval.
-!sql "update users set status='unapproved' where uid='testusr3'"
-!usridx=sql "select uid_idx from users where uid='testusr3'"
-/changeuid.php
-/approveuser.php3
-/moduserinfo.php3
+    # Pretend the user sent in his e-mail confirmation, allowing approval.
+    !sql "update users set status='unapproved' where uid='testusr3'"
+    !usridx=sql "select uid_idx from users where uid='testusr3'"
+
+    # Change the uid before approval.
+    /changeuid.php
+
+    # Approve the user.
+    /approveuser.php3
+    # To undo, remove the user from the default group, then set the status back.
+    - ssh $MYBOSS /usr/testbed/sbin/modgroups -r testproj3:testproj3 testusr3
+    -sql "update users set status='unapproved' where uid='testusr3'"
+
+    /moduserinfo.php3
+
 ! else
 !     echo "*** User testusr3 ($usridx) already exists! ***"
 ! endif
 
 !expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
 ! if ( "$expidx" == "" ) then
-/beginexp_html.php3
-- $SRCDIR/undo-probe.pl -s exp testproj3/testexp3
-!expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
-# Wait for the testexp3 to be created.
-! set i = 1
-! while ( $i < 20 )
-!expstate=sql "select state from experiments where pid='testproj3' and eid='testexp3'"
-!   if ( "$expstate" == "swapped" ) break
-!   sleep 6
-!   @ i++
-! end
-/modifyexp.php3
-/editexp.php3
+
+    /beginexp_html.php3
+    - $SRCDIR/undo-probe.pl -s -p testproj3 exp testexp3
+    !expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
+    # Wait for testexp3 to be created, but not swapped in (state "swapped").
+    ! ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
+
+    /modifyexp.php3
+    # Wait again for "in transition" between probes to modifyexp.
+    -ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
+
+    /editexp.php3
+
 ! else
 !     echo "*** Experiment testexp3 ($expidx) already exists! ***"
 ! endif
@@ -50,30 +68,42 @@
 
 !grpidx=sql "select gid_idx from groups where gid='testgroup3'"
 ! if ( "$grpidx" == "" ) then
-###/newgroup_form.php3
-/newgroup.php3
-!grpidx=sql "select gid_idx from groups where gid='testgroup3'"
-/editgroup.php3
+
+    ###/newgroup_form.php3
+    /newgroup.php3
+    !grpidx=sql "select gid_idx from groups where gid='testgroup3'"
+
+    /editgroup.php3
+
 ! else
 !     echo "*** Group testgroup3 ($grpidx) already exists! ***"
 ! endif
 
 !osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
 ! if ( "$osidx" == "" ) then
-/newosid.php3
-!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+
+    /newosid.php3
+    - $SRCDIR/undo-probe.pl -s -p testproj3 osid testosid3
+    !osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+
 ! else
-!     echo "*** OS testproj3-testosid3 $(osidx) already exists! ***"
+!     echo "*** OS testproj3-testosid3 ($osidx) already exists! ***"
 ! endif
 
 !imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
 ! if ( "$imgidx" == "" ) then
-/newimageid_ez.php3
-/newimageid.php3
-!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+
+    # No node_id's are given here, so no need to wait for the image to be made.
+    /newimageid_ez.php3
+    - $SRCDIR/undo-probe.pl -s -p testproj3 imageid testimg3
+    /newimageid.php3
+    - $SRCDIR/undo-probe.pl -s -p testproj3 imageid testimg3a
+    !imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+
 ! else
-!     echo "*** Image testproj3-testimg3 $(imgdx) already exists! ***"
+!     echo "*** Image testproj3-testimg3 ($imgidx) already exists! ***"
 ! endif
+
 /editimageid.php3
 /loadimage.php3
 

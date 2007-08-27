@@ -4994,7 +4994,7 @@
 <input type="text" name="newattribute_name" value="">
 <input type="text" name="newattribute_value" value="">
 <input type="radio" name="newattribute_type" value="boolean" >
-<input type="radio" name="newattribute_type" value="integer" >
+<input type="radio" name="newattribute_type" value="integer" checked >
 <input type="radio" name="newattribute_type" value="float" >
 <input type="radio" name="newattribute_type" value="string" >
 <input type="submit" name="submit" value="Submit" >
@@ -5059,7 +5059,7 @@
 <input type="text" name="newattribute_name" value="">
 <input type="text" name="newattribute_value" value="">
 <input type="radio" name="newattribute_type" value="boolean" >
-<input type="radio" name="newattribute_type" value="integer" >
+<input type="radio" name="newattribute_type" value="integer" checked >
 <input type="radio" name="newattribute_type" value="float" >
 <input type="radio" name="newattribute_type" value="string" >
 <input type="submit" name="submit" value="Submit" >
@@ -14753,46 +14753,55 @@
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=cisco1
 <form action="prereserve_node.php3?node_id=cisco1" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=cisco3
 <form action="prereserve_node.php3?node_id=cisco3" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=cisco4
 <form action="prereserve_node.php3?node_id=cisco4" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=cisco5
 <form action="prereserve_node.php3?node_id=cisco5" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=cisco8
 <form action="prereserve_node.php3?node_id=cisco8" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=ops
 <form action="prereserve_node.php3?node_id=ops" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc123
 <form action="prereserve_node.php3?node_id=pc123" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc153
 <form action="prereserve_node.php3?node_id=pc153" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc167
 <form action="prereserve_node.php3?node_id=pc167" method="post">
+<input type="hidden" name="clear" value="1" >
 <input type="select" name="pid" value=''>
 <input type="submit" name="submit" value="Submit" >
 

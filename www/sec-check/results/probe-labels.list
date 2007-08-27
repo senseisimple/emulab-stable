@@ -8,3 +8,6 @@
             Probe label: \'**{kb-manage.php3:formfields[title]}**
             Probe label: \'**{moduserinfo.php3:formfields[usr_country]}**
             Probe label: \'**{newgroup.php3:group_description}**
+            Probe label: \'**{newimageid.php3:formfields[description]}**
+            Probe label: \'**{newimageid_ez.php3:formfields[description]}**
+            Probe label: \'**{newosid.php3:description}**

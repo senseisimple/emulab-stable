@@ -9,13 +9,14 @@ approveuser.php3.html
 beginexp_html.php3.html
      <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
 boot.php3.html
-     reboot (pc123): Attempting to reboot ...
-     reboot (pc153): Attempting to reboot ...
-     reboot (pc167): Attempting to reboot ...
-     reboot (pc153): Successful!
-     reboot (pc167): Successful!
-delaycontrol.php3.html
-     Use this page to alter the traffic shaping parameters of your
+     reboot (pc120): Attempting to reboot ...
+     reboot (pc155): Attempting to reboot ...
+     reboot (pc165): Attempting to reboot ...
+     reboot (pc120): Successful!
+     reboot (pc155): Successful!
+     reboot (pc165): Successful!
+changeuid.php.html
+      Please enter the new UID for user 'testusr3'<br><br>
 deletegroup.php3.html
      <b>Group 'testgroup3' in project 'testproj3' is being removed!</b> ...<br>
      This will take a few moments; please be <em>patient</em>.<br>
@@ -23,13 +24,15 @@ deletegroup.php3.html
 deleteimageid.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
-      Image '10004' in project testproj3 has been deleted!
+      Image '10038' in project testproj3 has been deleted!
 deleteosid.php3.html
       OS Descriptor 'testosid3' in Project testproj3 has been deleted!
 deleteproject.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
 deletepubkey.php3.html
+     	 <title>MyEmulab.Net - SSH Public Keys for user: testusr3</title>
+     SSH Public Keys for user: testusr3</h2>
       Current ssh public keys for user testusr3.
       Enter ssh public keys for user
 deleteuser.php3.html
@@ -55,8 +58,7 @@ endexp.php3.html
 feedback.php3.html
      <center><h3><br>Done!</h3></center>
 freenode.php3.html
-     This will take a few moments; please be <em>patient</em>.<br>
-     ClearBusyIndicators('<center><b>Done!</b></center>');
+      Operation canceled!
 freezeuser.php3.html
      This will take a few moments; please be <em>patient</em>.<br>
      ClearBusyIndicators('<center><b>Done!</b></center>');
@@ -65,14 +67,15 @@ gensslcert.php3.html
      ClearBusyIndicators('<center><b>Done!</b></center>');
 joinproject.php3.html
       As a pending user of the Testbed you will receive a key via email.
+      application, and you will be notified via email as soon as
 kb-manage.php3.html
-     <center><b>Knowledge Base Entry: 274 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+     <center><b>Knowledge Base Entry: 282 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
 kb-search.php3.html
      <font size=+2>Knowledge Base search results</font>
 linktest.php3.html
       Are you <b>sure</b> you want to run linktest?
 loadimage.php3.html
-      Taking a snapshot of node 'pc123' into image 'testimg3' ...
+      Taking a snapshot of node 'pc120' into image 'testimg3' ...
 modifyexp.php3.html
      <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
 moduserinfo.php3.html
@@ -86,10 +89,8 @@ newimageid.php3.html
       <h3 class="submenuheader">More Options</h3>
 newimageid_ez.php3.html
       <h3 class="submenuheader">More Options</h3>
-newmmlist.php3.html
-     <center><h2>testproj3-testlist mailing list administration<br>General Options Section</h2></center><hr>
 newnodelog.php3.html
-      Log for node pc123.
+      Log for node pc120.
 newosid.php3.html
      <center><h3>Done!</h3></center>
 newproject.php3.html
@@ -106,7 +107,7 @@ nsgen.php3.html
 plab_ez.php3.html
       <p><b>To finish creating your slice, edit the 
 powertime.php3.html
-     <center>Updated power time for:<br><br><b>pc123</b><br></center><!-- end content -->
+     <center>Updated power time for:<br><br><b>pc120</b><br></center><!-- end content -->
 prereserve_node.php3.html
       <h3 class="submenuheader">Node Options</h3>
 replayexp.php3.html
@@ -115,6 +116,8 @@ replayexp.php3.html
 resendapproval.php.html
       <h2>Done!</h2>
 showpubkeys.php3.html
+     	 <title>MyEmulab.Net - SSH Public Keys for user: testuser</title>
+     SSH Public Keys for user: testuser</h2>
       Current ssh public keys for user testuser.
       Enter ssh public keys for user
 showsumstats.php3.html
@@ -129,7 +132,14 @@ updateaccounts.php3.html
      You will be notified via email when the update has completed on
 ================ failure ================
 archive_tags.php3.html
+     <b>Notice</b>: Undefined variable: instance in <b>/usr/testbed/www/archive_tags.php3</b> on line <b>101</b><br />
+     <b>Notice</b>: Undefined variable: template in <b>/usr/testbed/www/archive_tags.php3</b> on line <b>105</b><br />
       No tags for experiment testbed/testexp1
+delaycontrol.php3.html
+      No running delay nodes with eid='testexp1' and pid='testbed'!
+newmmlist.php3.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Name already in use; pick another</font></td>
 newnodes_list.php3.html
       At least one node must be selected!
 swapexp.php3.html
@@ -138,5 +148,10 @@ template_export.php.html
      	 <title>MyEmulab.Net - Page Error</title>
      Page Error</h2>
       Invalid page arguments: /template_export.php?experiment=9<br><br>Must provide a template or an instance to export
+================ problem ================
+archive_tags.php3.html
+     <b>Notice</b>: Undefined variable: instance in <b>/usr/testbed/www/archive_tags.php3</b> on line <b>101</b><br />
+     <b>Notice</b>: Undefined variable: template in <b>/usr/testbed/www/archive_tags.php3</b> on line <b>105</b><br />
+newmmlist.php3.html
+      <font color=red>Name already in use; pick another</font></td>
 ================ UNKNOWN ================
-changeuid.php.html

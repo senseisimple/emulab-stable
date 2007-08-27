@@ -13,6 +13,7 @@
 #       - Comment lines are prefixed by a "#".
 #       - Action lines are prefixed by a "!" or "-".  See urls-to-wget.gawk
 #         for further descriptions.
+#       - Leading whitespace on lines is removed, so actions can be indented.
 #
 #     . Then the URL's to be separated out and ordered according to the list.
 #
@@ -22,13 +23,17 @@
 #   A -v SYSADMIN= awk arg specifies the administrator login name to use.
 #
  
+# Remove leading whitespace on lines.
+{$1 = $1;}
+
 # Just a slash and filename, so not a URL.
 # Remember its name and output order.
 /^[/]/ { names[++nfiles] = name = substr($0,2); order[name] = nfiles; next; }
 
 # Action lines start with an exclamation point or dash.  Just pass through.
 /^!/ { urls[++nfiles ",1"] = $0; next; }
-/^-/ { inverse[name] = $0; next; }
+# Concatenate (possibly multiple) inverse actions.
+/^-/ { inverse[name] = (inv=inverse[name]) (length(inv)?"\n":"") $0; next; }
 
 # Ignore comments and blank lines.
 /^#/ || /^[ \t]*$/ { next; }
@@ -98,6 +103,10 @@ function fn_url(fn, url) {
     # This looks like a bug: link url's should use target_project, not pid.
     else if ( fn == "deleteuser.php3") {  
 	sub("&pid=", "\\&target_project=");
+    }
+    # It's a pain to reallocate nodes; just cancel freenode instead of confirming.
+    else if ( fn == "freenode.php3") {  
+	sub("confirmed=Confirm", "canceled=Cancel");
     }
 
     # REALLY REALLY confirm freezeuser, deleteuser, and deleteproject.
