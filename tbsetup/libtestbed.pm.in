@@ -138,7 +138,7 @@ sub SENDMAIL($$$;$$@)
 
     if (@Files) {
 	foreach my $file ( @Files ) {
-	    if (open(IN, "$file")) {
+	    if (defined($file) && open(IN, "$file")) {
 		print MAIL "\n--------- $file --------\n";
 
 		while (<IN>) {
