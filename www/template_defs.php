@@ -2291,7 +2291,7 @@ function MakeLink($which, $args, $text)
 	$page = "showuser.php3";
     }
     elseif ($which == "template") {
-	$page = "/template_show.php";
+	$page = "template_show.php";
     }
     elseif ($which == "metadata") {
 	$page = "template_metadata.php";
