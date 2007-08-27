@@ -476,6 +476,8 @@ function SPITFORM($formfields, $errors)
     #
     if (!isset($view["hide_footnotes"])) {
 	$footnote = "[<b>5</b>]";
+    } else {
+	$footnote = "";
     }
     echo "<tr>
               <td>Node Types${footnote}:</td>
@@ -606,8 +608,13 @@ function SPITFORM($formfields, $errors)
     #
     # Reboot waittime. 
     # 
+    if (!isset($view["hide_footnotes"])) {
+	$footnote = "[<b>8</b>]";
+    } else {
+	$footnote = "";
+    }
     echo "<tr>
-	      <td>Reboot Waittime (seconds)[<b>8</b>]:</td>
+	      <td>Reboot Waittime (seconds)${footnote}:</td>
 	      <td class=left>
 		  <input type=text
 		         name=\"formfields[reboot_waittime]\"
@@ -1022,6 +1029,7 @@ elseif (! $osid_opmodes[$formfields["op_mode"]] && !$isadmin) {
 # Node.
 #
 unset($node);
+unset($node_id);
 if (isset($formfields["node_id"]) &&
     strcmp($formfields["node_id"], "")) {
 
