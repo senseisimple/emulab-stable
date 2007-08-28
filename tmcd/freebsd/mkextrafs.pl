@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -20,10 +20,14 @@ my $DOSTYPE = "$BINDIR/dostype";
 #
 sub usage()
 {
-    print("Usage: mkextrafs.pl [-f] [-s slice] <mountpoint>\n");
+    print("Usage: mkextrafs.pl [-f] [-s slice] [-r disk] <mountpoint>\n");
     exit(-1);
 }
-my  $optlist = "fs:";
+my $optlist    = "fs:r:cn";
+my $diskopt;
+my $checkit    = 0;
+my $forceit    = 0;
+my $noinit     = 0;
 
 #
 # Yep, hardwired for now.  Should be options or queried via TMCC.
@@ -31,7 +35,6 @@ my  $optlist = "fs:";
 my $disk       = "ad0";
 my $slice      = "4";
 my $partition  = "e";
-my $forceit    = 0;
 
 sub mysystem($);
 
@@ -62,6 +65,18 @@ if (defined($options{"f"})) {
 if (defined($options{"s"})) {
     $slice = $options{"s"};
 }
+if (defined($options{"c"})) {
+    $checkit = 1;
+}
+if (defined($options{"c"})) {
+    $checkit = 1;
+}
+if (defined($options{"r"})) {
+    $diskopt = $options{"r"};
+}
+if (defined($options{"n"})) {
+    $noinit = $options{"n"};
+}
 if (@ARGV != 1) {
     usage();
 }
@@ -73,11 +88,16 @@ if (! -d $mountpoint) {
 }
 
 #
-# XXX determine the disk based on the root fs
+# XXX determine the disk based on the root fs if not provided.
 #
-my $rootdev = `df | egrep '/\$'`;
-if ($rootdev =~ /^\/dev\/([a-z]+\d+)s[1-4][a-h]/) {
-    $disk = $1;
+if (defined($diskopt)) {
+    $disk = $diskopt;
+}
+else {
+    my $rootdev = `df | egrep '/\$'`;
+    if ($rootdev =~ /^\/dev\/([a-z]+\d+)s[1-4][a-h]/) {
+	$disk = $1;
+    }
 }
 
 my $slicedev   = "${disk}s${slice}";
@@ -89,13 +109,13 @@ my $fsdevice   = "/dev/${slicedev}${partition}";
 #
 if (!system("egrep -q -s '^${fsdevice}' /etc/fstab")) {
     if ($checkit) {
-	exit(-1);
+	exit(0);
     }
     die("*** $0:\n".
 	"    There is already an entry in /etc/fstab for $fsdevice\n");
 }
 elsif ($checkit) {
-    exit(0);
+    exit(1);
 }
 
 #
@@ -137,6 +157,11 @@ if ($stype != 165) {
 	"    No $DOSTYPE program, cannot set type of DOS partition\n")
 	if (! -e "$DOSTYPE");
     mysystem("$DOSTYPE -f /dev/$disk $slice 165");
+}
+elsif ($noinit) {
+    mysystem("mount $fsdevice $mountpoint");
+    mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
+    exit(0);
 }
 
 #
@@ -191,6 +216,7 @@ mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
 mysystem("mount $mountpoint");
 mysystem("mkdir $mountpoint/local");
+exit(0);
 
 sub mysystem($)
 {

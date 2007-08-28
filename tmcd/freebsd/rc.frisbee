@@ -231,18 +231,6 @@ if [ x"$ADDRESS" != x ]; then
 	    #
 	    imagefile=`echo $ADDRESS | sed -e 's,^http[s]*://[^/]*/,,'`
 	    imagefile="/images/$imagefile"
-
-	    wget -nv -N -P /images "$ADDRESS"
-	    wstat=$?
-	    case $wstat in
-	    0)
-		echo "wget succeeded getting the image"
-		;;
-	    *)
-		echo "wget failed, status $wstat"
-		exit 1
-		;;
-	    esac
 	elif [ x"$ispath" != x ]; then
 	    ispath=1
 	    
@@ -298,6 +286,31 @@ if [ x"$ADDRESS" != x ]; then
 	fi
 
 	#
+	# If a remote node and we have a URL, make sure that we have a place
+	# to put it. Done after the MBR tweak of course. Then download the
+	$ URL.
+	#
+	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	    $BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
+		$BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
+		    echo "Could not create /images partition"
+		    exit 1
+		}
+	    }
+	    wget -nv -N -P /images "$ADDRESS"
+	    wstat=$?
+	    case $wstat in
+	    0)
+		echo "wget succeeded getting the image"
+		;;
+	    *)
+		echo "wget failed, status $wstat"
+		exit 1
+		;;
+	    esac
+	fi
+
+	#
 	# If not zeroing the disk and we are loading a full disk image
 	# we need to ensure that we at least invalidate any old superblocks
 	# that might leak through (most likely in partition 4 which isn't
@@ -316,8 +329,8 @@ if [ x"$ADDRESS" != x ]; then
         $BINDIR/tmcc state RELOADING
 
 	if [ x"$imagefile" != x ]; then
-	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $SLICE $ZFILL $imagefile /dev/$DISK"
-	    /usr/local/bin/imageunzip -o -O -W 32 $SLICE $ZFILL $imagefile /dev/$DISK
+	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}"
+	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}
 	else
 	    echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
 	    $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
