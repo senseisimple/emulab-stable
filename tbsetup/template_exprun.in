@@ -510,8 +510,14 @@ if (defined($instance->runidx())) {
     #
     my $this_runid = $oldrun->runid();
     
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "commit starting");
+    }
     system("$archcontrol -d -t stoprun_${this_runid} ".
 	   "-c 'Stopping Run $this_runid' commit $pid $eid");
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "commit done");
+    }
 
     #
     # Do the CVS stuff.
@@ -527,6 +533,10 @@ if (defined($instance->runidx())) {
     my @symlinklist  = ();
 
     if (-e $cvsdir) {
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "cvs stuff starting");
+	}
+
 	fatal(-1, "Could not generate XML description for $oldrun")
 	    if (GenXML($instance, $xmlfile, \@symlinklist) != 0);
 
@@ -565,6 +575,10 @@ if (defined($instance->runidx())) {
 	System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 ".
 	       "  $instance_tag $guid/records/$exptidx,$runidx")
 	    == 0 or fatal(-1, "Could not rtag new record in $cvsdir");
+
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "cvs stuff done");
+	}
     }
 
     # This has to be done after the archive commit, so we can find the tag.
