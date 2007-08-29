@@ -369,6 +369,7 @@ while (1) {
 	# XXX - do this!
 	
 	my ($vnode, $pnode, $mode, $jailed, $plab) = @{pop @vnodes};
+	my $remote = TBIsNodeRemote($vnode); 
     
 	print STDOUT "Doing $mode of vnode $vnode on $pnode ...\n";
 
