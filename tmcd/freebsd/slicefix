@@ -127,8 +127,8 @@ dofreebsd() {
 	changeacpi=0
 	changeasf=0
 
-	# If our disk does not appear anywhere in fstab, we need to fix it
-	grep "^/dev/${disk}s" /mnt/etc/fstab >/dev/null 2>&1
+	# If our disk/part does not appear anywhere in fstab, we need to fix it
+	grep "^/dev/${disk}s${part}" /mnt/etc/fstab >/dev/null 2>&1
 	case $? in
 	0)
 	    ;;
@@ -378,20 +378,27 @@ dolinux() {
 	gconf=/mnt/boot/grub/grub.conf
 	if [ -r $gconf ]; then
 	    echo "  updating /boot/grub/grub.conf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $gconf || {
+	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $gconf || {
 		echo "Failed to update /boot/grub/grub.conf"
 	    }
+
 	    #
-	    # If we booted from a flash device we also have to tweak grub's
-	    # notion of root since the flash device will be "hd0".  It
-	    # appears that we do NOT have to update Linux's drive mapping.
-  	    # XXX this pattern is too hard wired.
+	    # Tweak grub's notion of root.
+	    # Note that grub's partition numbering is zero-based.
+	    #
+	    gdisk=`echo $dunit | sed -e 'y/abcdefgh/01234567/'`
+	    gpart=`expr $part - 1`
+	    #
+	    # If we booted from a flash device we also have to further tweak
+	    # grub's notion of root disk since the flash device will be "hd0".
+	    # It appears that we do NOT have to update Linux's drive mapping.
 	    #
 	    if [ $FLASHBOOT -eq 1 ]; then
-	        sed -i '' -e "s;root (hd0,1);root (hd1,1);" $gconf || {
-		    echo "Failed to update root in /boot/grub/grub.conf"
-		}
+	        gdisk=`expr $gdisk + 1`
 	    fi
+	    sed -i '' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
+		echo "Failed to update root in /boot/grub/grub.conf"
+	    }
 	fi
 
 	#
@@ -402,7 +409,7 @@ dolinux() {
 	lconf=/mnt/etc/lilo.conf
 	if [ -r $lconf ]; then
 	    echo "  updating /etc/lilo.conf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $lconf || {
+	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $lconf || {
 		    echo "Failed to update /etc/lilo.conf"
 		    umount $rootdev
 		    return 1

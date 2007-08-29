@@ -162,7 +162,7 @@ if [ "$PARTITION" != "0" ]; then
 		SLICE="$SLICE -D 166"
 		PTYPE=166
 		;;
-	Linux)
+	Fedora|Linux)
 		SLICE="$SLICE -D 131"
 		PTYPE=131
 		;;
