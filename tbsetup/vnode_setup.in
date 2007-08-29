@@ -192,7 +192,8 @@ foreach my $node (@nodes) {
 	next;
     }
     if (($plabonly || $jailonly) and 
-        !(($plabonly && $plab) || ($jailonly && ($jailed || $remote)))) {
+        !(($plabonly && $plab) || ($jailonly && (($jailed || $remote) 
+						 && !$plab)))) {
         next;
     }
     if (! TBPhysNodeID($node, \$pnode)) {
@@ -416,7 +417,9 @@ while (1) {
                 # Make sure the system knows we now have state on the node!
                 TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 	    }
-	    elsif (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))) {
+	    
+	    if (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))
+		&& !($mode eq "setup" && $remote && !$plab)) {
 		# Cleanup is used only on plab nodes.
 		# Don't try to teardown plab vnodes; it's just asking for
 		# trouble as the shutdown may hang or take too long.  It's
@@ -426,7 +429,12 @@ while (1) {
 		$args   .= ($jailed   ? "-j " : ($plab ? "-p " : "-i "));
 		$args   .= "$vnode ";
 		
-		$exval = TBForkCmd("$ssh -host $pnode ".
+		# If it's a plab node, we must ssh to the vnode, not pnode.
+		my $pnodeOrVnode = $pnode;
+		if ($plab) {
+		    $pnodeOrVnode = $vnode;
+		}
+		$exval = TBForkCmd("$ssh -host $pnodeOrVnode ".
                                  "$CLIENT_BIN/vnodesetup $args",1);
             }
 
