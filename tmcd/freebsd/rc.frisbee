@@ -287,8 +287,7 @@ if [ x"$ADDRESS" != x ]; then
 
 	#
 	# If a remote node and we have a URL, make sure that we have a place
-	# to put it. Done after the MBR tweak of course. Then download the
-	$ URL.
+	# to put it. Done after the MBR tweak of course. Then download the URL.
 	#
 	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
 	    $BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
