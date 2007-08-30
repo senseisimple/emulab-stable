@@ -115,8 +115,8 @@ if (! defined($experiment)) {
 #
 # Check state. Only ACTIVE experiments. 
 #
-my $estate = $experiment->state;
-if ($estate() ne EXPTSTATE_ACTIVE) {
+my $estate = $experiment->state();
+if ($estate ne EXPTSTATE_ACTIVE) {
     print STDERR "Experiment $pid/$eid is in state $estate, not ACTIVE!\n";
     # For web page.
     exit(1);
