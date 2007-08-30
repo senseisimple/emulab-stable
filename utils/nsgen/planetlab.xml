@@ -72,6 +72,8 @@ if { [llength $nodelist] > 0 } {
 set hwtype "<HWType>"
 set node_version "<NodeVersion>"
 
+set inet_string ""
+
 #
 # Select the N approximately least-loaded nodes of the given type.  Fails if
 # insufficient nodes are found due to excessive loads or inadequate disk space.
@@ -79,6 +81,8 @@ set node_version "<NodeVersion>"
 for {set i 1} {$i <= $num_nodes} {incr i} {
     set node($i) [$ns node]
     tb-set-hardware $node($i) $hwtype
+
+    append $inet_string "$node(${i}) "
 
     if { [llength $nodelist] > 0 } {
         tb-fix-node $node($i) [lindex $nodelist [expr $i - 1]]
@@ -125,6 +129,13 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
 # 3) The "startup" command will be executed every time the vnode boots:
 #    at experiment startup, swapin, and vnode reboot.  Of course, it needs
 #    to exist on the vnode, probably from a tarball or RPM you installed.
+
+#
+# This makes "the Internet" an addressable object in your topology - it will,
+# for example, enable you to set up automatic tcpdump on it.
+#
+set internet [$ns make-lan "$inet_string" 100Mbps 0ms]
+tb-set-lan-protocol $internet "ipv4"
 
 #
 # Boilerplate
