@@ -82,7 +82,7 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
     set node($i) [$ns node]
     tb-set-hardware $node($i) $hwtype
 
-    append $inet_string "$node(${i}) "
+    append inet_string "$node(${i}) "
 
     if { [llength $nodelist] > 0 } {
         tb-fix-node $node($i) [lindex $nodelist [expr $i - 1]]
