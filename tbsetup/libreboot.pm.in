@@ -752,6 +752,11 @@ sub RebootVNode($$) {
 
     print STDOUT "reboot ($vnode): Rebooting (on $pnode).\n";
 
+    # See if we're a plab node (must send the '-p' switch to vnodesetup
+    # so that plab slivers reboot properly if vnodesetup has died.
+    my ($jailed,$plab) = (0,0);
+    TBIsNodeVirtual($vnode, \$jailed, \$plab);
+
     #
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
@@ -787,12 +792,21 @@ sub RebootVNode($$) {
 	}
 	return($exitstatus);
     }
+
+    my $addargs = "";
+    if ($plab) {
+	$addargs .= "-p ";
+    }
+    elsif ($jailed) {
+	$addargs .= "-j ";
+    }
+
     #
     # Must change our real UID to root so that ssh will work.
     #
     $UID = 0;
 
-    exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup -r -j $vnode");
+    exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup -r $addargs $vnode");
     exit(0);
 }
 

@@ -198,7 +198,7 @@ if ($killit || $haltit) {
     exit(killvnode());
 }
 if ($rebootit) {
-    if (! -e $pidfile) {
+    if (!$doplab && ! -e $pidfile) {
 	die("*** $0:\n".
 	    "    No pid for $vnodeid manager!\n");
     }
@@ -493,14 +493,20 @@ sub killvnode() {
     if ($mpid =~ /^([-\@\w.]+)$/) {
 	$mpid = $1;
     }
-    else {
+    elsif (!($doplab && $mpid eq '')) {
 	die("*** $0:\n".
 	    "    Bad data in pid: $mpid!\n");
     }
 
     my $sigtosend = ($haltit ? 'TERM' : 'USR1');
 	
-    if (kill($sigtosend, $mpid) == 0) {
+    if ($doplab && $mpid eq '') {
+	# sometimes plab vservers die and don't rerun initscripts, so
+	# we're left with a dangling pidfile... so just remove the file 
+	# and continue.
+	unlink($pidfile);
+    }
+    elsif (kill($sigtosend, $mpid) == 0) {
 	print"*** Could not kill($sigtosend) process $mpid: $!\n";
 	return -1;
     }
@@ -539,14 +545,45 @@ sub rebootvnode() {
     if ($mpid =~ /^([-\@\w.]+)$/) {
 	$mpid = $1;
     }
-    else {
+    elsif (!($doplab && $mpid eq '')) {
 	die("*** $0:\n".
 	    "    Bad data in pid: $mpid!\n");
     }
-    if (kill('USR2', $mpid) == 0) {
-	print"*** Could not kill(USR2) process $mpid: $!\n";
+
+    if ($doplab && $mpid eq '') {
+	print "Killing all vserver processes and restarting sliver.\n";
+	# sometimes plab vservers die and don't rerun initscripts, so
+	# we're left with a dangling pidfile... so just remove the file 
+	# and continue.
+	unlink($pidfile);
+	# manually kill all processes besides us, just in case the pid file
+	# wasn't written correctly
+	killvserver();
+	# restart things ourselves!
+	my $spid = fork();
+	if ($spid == 0) {
+	    # become real root so perl doesn't complain about suid
+	    $UID = 0;
+	    close(STDIN);
+	    close(STDOUT);
+	    close(STDERR);
+	    open(STDIN, "< /dev/null") or
+		die("opening /dev/null for STDIN: $!");
+	    open(STDERR, "> /dev/null") 
+		or die("opening /dev/null for STDERR: $!");
+	    open(STDOUT, "> /dev/null") 
+		or die("opening /dev/null for STDOUT: $!");
+	    exec("$BINDIR/vnodesetup -p $vnodeid");
+	    die("exec reboot vnodesetup failed!");
+	}
+    }
+    elsif (kill('USR2', $mpid) == 0) {
+	if ($debug) {
+	    print"*** Could not kill(USR2) process $mpid: $!\n";
+	}
 	return -1;
     }
+
     hackwaitandexit();
 }
 
@@ -769,5 +806,6 @@ sub hackwaitandexit()
 		if ($mtime >= $now || $ctime >= $now);
 	}
     }
+
     exit(1);
 }
