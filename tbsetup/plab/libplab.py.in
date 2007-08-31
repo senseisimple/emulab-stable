@@ -617,13 +617,12 @@ class Plab:
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
         """
-        res = DBQueryFatal("select plab_mapping.node_id,plab_id,"
-                           "plab_mapping.hostname,IP,mac,site,latitude,"
-                           "longitude,bwlimit"
-                           " from plab_mapping"
-                           " left join widearea_nodeinfo on"
-                           "    plab_mapping.node_id = "
-                           "    widearea_nodeinfo.node_id")
+        res = DBQueryFatal("select pm.node_id,pm.plab_id,pm.hostname,"
+                           "pm.IP,pm.mac,wni.site,wni.latitude,"
+                           "wni.longitude,wni.bwlimit"
+                           " from plab_mapping as pm"
+                           " left join widearea_nodeinfo as wni on"
+                           "    pm.node_id = wni.node_id")
         
         ret = {}
         for (nodeid, plabid, hostname, ip, mac, site,
