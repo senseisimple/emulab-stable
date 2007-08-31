@@ -290,6 +290,7 @@ if [ x"$ADDRESS" != x ]; then
 	# to put it. Done after the MBR tweak of course. Then download the URL.
 	#
 	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	    echo "Downloading image \'$ADDRESS\' to /images directory ..."
 	    $BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
 		$BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
 		    echo "Could not create /images partition"
@@ -335,6 +336,17 @@ if [ x"$ADDRESS" != x ]; then
 	    $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
 	fi
         fstat=$?
+
+	#
+	# If we mounted a partition from the disk to store the image,
+	# we must unmount it now so that slicefix and others don't fail
+	# due to an in-use partition.
+	#
+	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	    umount /images || {
+	        echo "WARNING: could not unmount /images"
+	    }
+	fi
 
 	#
 	# Turn the cache back off if we turned it on.
