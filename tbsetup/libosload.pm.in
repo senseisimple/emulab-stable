@@ -18,6 +18,7 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
+use libtestbed; # for TBGenSecretKey();
 use libdb;
 use libreboot;
 use libtblog;
