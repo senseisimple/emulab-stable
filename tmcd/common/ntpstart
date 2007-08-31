@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -55,6 +55,12 @@ my @tmccresults;
 # Since this is a wrapper, we have to try to start ntp no matter what.
 #
 sub ntpstart () {
+    #
+    # No arguments means don't run ntpd, we just wanted to run ntpdate
+    #
+    return 0
+	if (!@ARGV);
+
     #
     # XXX FreeBSD 7 prepends "-c <configfile>" to the arguments
     # which in our case means before the command name!
