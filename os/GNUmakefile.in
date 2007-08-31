@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -77,6 +77,10 @@ frisbee-mfs:
 frisbee-mfs-install: frisbee-mfs
 	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux client-install
 	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C growdisk client-install
+
+cdboot-install: mfs-install frisbee-mfs
+	$(MAKE) -e -C frisbee.redux client-install
+	$(MAKE) -e -C growdisk client-install
 
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)

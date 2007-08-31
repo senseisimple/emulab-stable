@@ -108,8 +108,17 @@ mfs-install:
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*
 	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
 
+#
+# CD/Flash install DOES have the FreeBSD 6 stuff
+#
 cdboot-install:
 	(cd ../freebsd5; $(MAKE) all cdboot-install)
-	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*
 	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
+	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(ETCDIR)/master.passwd
+	$(INSTALL) -m 444 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab

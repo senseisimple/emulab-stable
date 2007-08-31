@@ -43,6 +43,13 @@ client-install: destdircheck client
 	$(INSTALL) -m 644 $(SRCDIR)/loader.rc $(DESTDIR)/boot/loader.rc
 	$(INSTALL) -m 440 $(SRCDIR)/sudoers $(DESTDIR)/usr/local/etc/sudoers
 	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/emulab/dhclient
+	rm -f $(DESTDIR)/etc/emulab/frisbee $(DESTDIR)/etc/emulab/growdisk
+	rm -rf $(DESTDIR)/etc/emulab/supfile $(DESTDIR)/root/.cvsup
+	cp /dev/null $(DESTDIR)/etc/emulab/nosup
+	rm -rf $(DESTDIR)/etc/jail
+	date '+FLASHBOOT-%y%m%d' > $(DESTDIR)/etc/emulab/emuboot-volid
+	@echo "NOTE: you will need to install $(DESTDIR)/etc/emulab/mbr*.dd"
 
 clean:
 	$(MAKE) -C ../cdrom/groklilo clean

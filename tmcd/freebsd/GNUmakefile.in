@@ -116,9 +116,7 @@ cdboot-install:	destdircheck common-install etc-install \
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
 	(cd ../../sensors/slothd; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 	(cd ../../pxe; $(MAKE) DESTDIR=$(DESTDIR) client-install)
-	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) client-install)
-	(cd ../../os/imagezip; $(MAKE) DESTDIR=$(DESTDIR) client-install)
-	(cd ../../os/frisbee.redux; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) cdboot-install)
 	(cd ../../cdrom;$(MAKE) DESTDIR=$(DESTDIR) client-install)
 	(cd ../../tools/teachswitch; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 	$(INSTALL) -m 755 $(SRCDIR)/../../install/newclient $(BINDIR)/newclient
