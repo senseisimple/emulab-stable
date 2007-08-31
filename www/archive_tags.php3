@@ -98,11 +98,11 @@ if (!isset($records)) {
 }
 
 echo "<center>\n";
-if ($instance) {
+if (isset($instance)) {
     echo $instance->PageHeader();
     $url = CreateURL("archive_view", $instance);
 }
-elseif ($template) {
+elseif (isset($template)) {
     echo $template->PageHeader();
     $url = CreateURL("archive_view", $template);
 }
