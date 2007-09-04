@@ -4,6 +4,8 @@ PORTNAME=	pubsub-elvincompat
 PORTVERSION=	0.8
 CATEGORIES=	misc
 MASTER_SITES=	http://www.emulab.net/distributions/
+DISTFILES=      pubsub-elvincompat-0.8.tar.gz
+WRKSRC=         ${WRKDIR}/pubsub-0.8
 
 MAINTAINER=	stoller@flux.utah.edu
 COMMENT=	"Simple publish subscribe system for Emulab, Elvind compatible"
