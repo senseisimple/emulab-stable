@@ -1,0 +1,53 @@
+Problems with the current delay agent:
+
+ * Interface to backend, i.e., dummynet, is hardwired.  We only handle
+   dummynet and we make IPFW ioctls to handle the setup.  For this reason,
+   we have not even attempted to interface to Linux tc (for Linux end node
+   shaping).
+
+ * In part because of the above, the delay-agent has to run on the node
+   doing the shaping.  This is fine for FreeBSD and probably Linux, but
+   more more exotic shaping solutions like a Click router, the node may
+   not have the cojones to run the event system code, present a POSIX API,
+   handle sysloging, etc.
+
+ * Code has just accumulated too many warts by too many authors.
+   Between changes to handle advanced features like delay distribution
+   functions and tables and mods to support per-flow shaping, shared
+   bottleneck pipes, etc. it has just become a mess.
+
+ * The dynamic characteristics of a link are not saved across reboots.
+   If tevc has been used to modify link characteristics, then those chars
+   are lost when the node reboots, the link is reset with the DB values.
+
+Goals:
+
+ * Cleanly separate the backend.  In the simplest form we just have the
+   agent invoke a script with appropriate arguments, e.g.:
+
+	delayclient link0 getparams
+	delayclient link0 setparams delay=20 bandwidth=10000 plr=0.1
+
+   and let the OS specific script deal with invoking ipfw or tc or whatever.
+   This puts the bulk of the work into the OS clients as they have to map
+   the link/lan to an interface or pipe.
+
+   Delay-agent can then run on a proxy node if necessary, invoking the
+   client directly or across the network.  Likewise, the client can
+   either run on the shaping node or on the proxy using whatever
+   mechanism necessary to communicate with the shaping implementation.
+
+   At the very least we need to support dummynet (FreeBSD) and tc (Linux).
+   There are numerous other link emulation mechanisms out there like
+   WAILnet (UWisc), NETshaper (Stuttgart) and Click-based solutions,
+   that could fit into the framework.
+
+ * Ability to support Flexlab needs.  These include:
+    * per-flow shaping pipes: pipes tied to addr/proto/port pairs.
+    * "bottleneck" bandwidth pipes: multiple sources sharing a bottleneck
+      bandwidth to a common destination, multiple destinations sharing a
+      bottleneck bandwidth from a common source.
+
+ * Save current state so that it can be reestablished following a crash.
+   This may be more complicated in the proxy case (who saves state, where
+   is it saved, etc).
