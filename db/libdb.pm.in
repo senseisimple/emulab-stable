@@ -213,7 +213,7 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_ROUTERTYPE_STATIC TBDB_ROUTERTYPE_MANUAL
 	 TBDB_EVENTKEY TBDB_WEBKEY
 	 TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN TBDB_CHECKDBSLOT_ERROR
-         max min TBcheck_dbslot
+         max min TBcheck_dbslot TBFieldErrorString
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
 	 TBGetUniqueIndex
 
@@ -4454,6 +4454,8 @@ sub TBFieldData($$;$)
     }
     # Resort to a default entry.
     if (!defined($fielddata)) {
+	$DBFieldErrstr = "No slot data";
+	
 	if (defined($flag)) {
 	    if ($flag & TBDB_CHECKDBSLOT_WARN()) {
 		print STDERR "*** $0:\n" .
@@ -4478,6 +4480,8 @@ sub TBFieldData($$;$)
 sub TBcheck_dbslot($$$;$)
 {
     my ($token, $table, $column, $flag) = @_;
+    
+    $DBFieldErrstr = "Unknown Error";
 
     my ($fielddata,$toplevel) = TBFieldData($table, $column, $flag);
 
@@ -4511,21 +4515,33 @@ sub TBcheck_dbslot($$$;$)
 	if (! ($check =~ /\Q$/));
 
     # Check regex.
-    return 0
-	if (! ("$token" =~ /$check/));
+    if (! ("$token" =~ /$check/)) {
+	$DBFieldErrstr = "Illegal Characters";
+	return 0;
+    }
 
     # Check min/max.
     if ($column_type eq "text") {
+	my $len = length($token);
+
+	# Any length is okay if no min or max. 
 	return 1
-	    if ((!$min && !$max) ||
-		(length($token) >= $min &&
-		 length($token) <= $max));
+	    if ((!($min || $max)) ||
+		($len >= $min && $len <= $max));
+	$DBFieldErrstr = "Too Short"
+	    if ($min && $len < $min);
+	$DBFieldErrstr = "Too Long"
+	    if ($max && $len > $max);
     }
     elsif ($column_type eq "int" ||
 	   $column_type eq "float") {
 	# If both min/max are zero, then skip check; allow anything.
 	return 1
-	    if ((!$min && !$max) || ($token >= $min && $token <= $max));
+	    if ((!($min || $max)) || ($token >= $min && $token <= $max));
+	$DBFieldErrstr = "Too Small"
+	    if ($min && $token < $min);
+	$DBFieldErrstr = "Too Big"
+	    if ($max && $token > $max);
     }
     else {
 	die("*** $0:\n" .
@@ -4541,14 +4557,18 @@ sub TBcheck_dbslot($$$;$)
 #
 # WARNING: this will unlock all locked tables, be careful where you call it!
 #
-sub TBGetUniqueIndex($;$)
+sub TBGetUniqueIndex($;$$)
 {
-    my ($name, $initval) = @_;
+    my ($name, $initval, $nolock) = @_;
 
     #
-    # Lock the table to avoid conflicts
+    # Lock the table to avoid conflict, but not if the caller already did it.
     #
-    DBQueryFatal("lock tables emulab_indicies write");
+    $nolock = 0
+	if (!defined($nolock));
+    
+    DBQueryFatal("lock tables emulab_indicies write")
+	if (!$nolock);
 
     my $query_result =
 	DBQueryFatal("select idx from emulab_indicies ".
@@ -4561,7 +4581,8 @@ sub TBGetUniqueIndex($;$)
 
     DBQueryFatal("replace into emulab_indicies (name, idx) ".
 		 "values ('$name', $nextidx)");
-    DBQueryFatal("unlock tables");
+    DBQueryFatal("unlock tables")
+	if (!$nolock);
 
     return $curidx;
 }
