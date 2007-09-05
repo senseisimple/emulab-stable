@@ -17,7 +17,7 @@ use POSIX ":sys_wait_h";
 # 
 sub usage()
 {
-    print STDERR "Usage: plabmonitor [-dS]\n";
+    print STDERR "Usage: plabmonitord [-dS]\n";
     print STDERR "  -d   Debug mode.\n";
     print STDERR "  -S   Run WITHOUT reading monitor state from database;\n";
     print STDERR "         new state will still be written (default is to" .
@@ -186,7 +186,10 @@ $SIG{INT}  = \&termsig;
 # If we ever need the history to hang around longer, have to use a better way
 # to only set consec* vars once (easy).
 #
-my $seqref = getNodeHistSequences();
+my $seqref = {};
+if ($stateful) {
+    $seqref = getNodeHistSequences();
+}
 
 #
 # Main loop: grind around looking for nodes to check in the various
