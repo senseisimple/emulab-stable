@@ -20,10 +20,12 @@ import libplab
 
 
 def usage(me):
-    print "Usage: %s [-vdfE] {alloc|renew|free|stop|start|restart} pid eid nodeid\n" \
-          "  Without Emulab DB:\n" \
-          "       %s [-vdfE] {alloc|renew|free|stop|start|restart} slicename nodeid" \
-          % (me,me)
+    print "Usage: %s \\\n" \
+          "  [-vdfE] {alloc|renew|free|stop|start|restart|nmping} \\\n" \
+          "          pid eid nodeid\n" \
+          "  (or without Emulab DB):\n" \
+          "          slicename nodeid" \
+          % (me)
     sys.exit(1)
 
 def processException(command, nodeid, e):
@@ -161,6 +163,22 @@ def main(args):
             sys.exit(1)
             pass
         pass
+
+    elif command == "nmping":
+        exitval = 1
+        try:
+            node = slice.loadNode(nodeid)
+            res = node.pingNM()
+            if res:
+                exitval = 0
+                pass
+            pass
+        except:
+            if parser.values.debug:
+                traceback.print_exc()
+                pass
+            pass
+        sys.exit(exitval)
 
     else:
         usage(me)

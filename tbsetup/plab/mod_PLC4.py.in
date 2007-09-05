@@ -110,6 +110,19 @@ class NM3agent:
                 pass
             pass
         return self.__vers
+
+    def ping(self):
+        try:
+            res = self.__server.version()
+            if type(res) == list and len(res) == 2 and res[0] == 0:
+                return True
+            pass
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
     
     def getAgentClass(self):
         return self.__class__
@@ -121,8 +134,9 @@ DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
 TRY_SECONDARY_DEL_ACCT = True
 SECONDARY_NM_DELEGATE_ACCT = "utah_elab_delegate"
 SECONDARY_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
-DEF_NM_SSHCMD = "/usr/bin/ssh -q -oStrictHostKeyChecking=no" \
-                " -oPasswordAuthentication=no -l %s -i %s %s"
+DEF_NM_SSHCMD = "/usr/bin/ssh -q -o StrictHostKeyChecking=no" \
+                " -o PasswordAuthentication=no -o NumberOfPasswordPrompts=0" \
+                " -l %s -i %s %s"
 
 class NM4agent:
     def __init__(self,IP,nodeid,nmport=DEF_NM_PORT,
@@ -254,8 +268,11 @@ class NM4agent:
         
         # XXX: we whack the retval to be compat with NMv3
         rret = retval[0][0]
-        if rret == 1:
+        if not rret == 0:
             rret = 0
+            pass
+        else:
+            rret = 1
             pass
         retval = [ rret, [''] ]
         
@@ -310,6 +327,20 @@ class NM4agent:
     # NM v4 does not have a version method...
     def version(self):
         return self.__vers
+
+    def ping(self):
+        try:
+            # No better way to ping v4 than to call Help.
+            res = self._xcall('Help')
+            if res[0] == 0:
+                return True
+            pass
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
     
     def getAgentClass(self):
         return self.__class__
@@ -440,7 +471,10 @@ class NMagent_wrapper:
         if self.__agent.__class__.__dict__.has_key('restart_sliver'):
             return tryXmlrpcCmd(self.__agent.restart_sliver,slicename)
         return 0
-    
+
+    def ping(self):
+        return tryXmlrpcCmd(self.__agent.ping)
+
     pass
 
 #
@@ -887,6 +921,20 @@ class mod_PLC4:
             print "Failed to get PLC ticket for slice %s" % slice.slicename
             raise
         return cPickle.dumps(retval)
+
+    def pingNM(self,node):
+        plcagent = self.__getAgent(node.slice.slicename)
+        node.nmagent = NMagent_wrapper(node.IP,node.nodeid)
+
+        try:
+            res = node.nmagent.ping()
+            return res
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
 
     def createNode(self, node):
         plcagent = self.__getAgent(node.slice.slicename)

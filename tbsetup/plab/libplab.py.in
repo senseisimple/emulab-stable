@@ -1724,7 +1724,32 @@ class Node:
                        self.phys_nodeid))
         
         pass
-    
+
+    def pingNM(self):
+        isup = False
+        try:
+            isup = self.slice.plab.agent.pingNM(self)
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        if not isup:
+            # Don't flood hist table with successful pings.
+            self.__logNodeHist('node','nmping','failure','')
+            pass
+        return isup
+
+    def pingNode(self,timeout=10):
+        try:
+            self.__execute("/bin/ping -o -t %d %s" % (timeout,self.IP))
+            # Don't flood hist table with successful pings.
+            return True
+        except:
+            pass
+        self.__logNodeHist('node','ping','failure','')
+        return False
+
     # XXX: may want to rethink signal handling here.
     def _create(self, force=False):
         """
