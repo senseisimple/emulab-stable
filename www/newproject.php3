@@ -648,6 +648,8 @@ if (!isset($formfields)) {
     PAGEARGERROR("Invalid form arguments.");
 }
 
+TBERROR("A\n\n" . print_r($formfields, TRUE), 0);
+
 #
 # Otherwise, must validate and redisplay if errors
 #
@@ -932,6 +934,7 @@ if (!$returning) {
 				      $args,
 				      $error)) != 0) {
 	$errors["Error Creating User"] = $error;
+	TBERROR("B\n${error}\n\n" . print_r($args, TRUE), 0);
 	SPITFORM($formfields, $returning, $errors);
 	PAGEFOOTER();
 	return;
@@ -981,6 +984,7 @@ if (isset($formfields["proj_ronpcs"]) &&
 
 if (! ($project = Project::NewNewProject($leader, $args, $error))) {
     $errors["Error Creating Project"] = $error;
+    TBERROR("C\n${error}\n\n" . print_r($args, TRUE), 0);
     SPITFORM($formfields, $returning, $errors);
     PAGEFOOTER();
     return;
