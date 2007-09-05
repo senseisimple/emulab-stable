@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -45,7 +45,7 @@ my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
-use libdb;
+#use libdb;
 
 #
 # This is for the dotted and reverse dotted notation needed for the

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -51,7 +51,7 @@ my $MXSTR = "\t\tIN\tMX 10\tops\n";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
-use libdb;
+#use libdb;
 
 sub isroutable($);
 

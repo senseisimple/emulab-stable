@@ -46,7 +46,7 @@ my $VIRTNODE_NETMASK   = "@VIRTNODE_NETMASK@";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
-use libdb;
+#use libdb;
 
 # Simple is good. I stole this out of a google search.
 my @NETMASKS =
