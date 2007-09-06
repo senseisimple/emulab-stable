@@ -6,7 +6,8 @@ set either symmetrically (duplex) or asymmetrically (simplex).  LANs can
 have characteristics set either uniformly for the entire LAN or individually
 per node on the LAN.  Note that shaped LANs are mostly used to emulate
 "clouds" where you are modeling the last hop of nodes connected to some
-opaque network.  We can shape bandwidth, delay and packet loss rate.
+opaque network.  We can shape bandwidth, delay and packet loss rate, and
+to a limited extent, queuing behavior.
 
 Shaping is usually done using a dedicated "delay node" which is interposed
 between nodes on a link or LAN.  A single shaping node can shape one link
@@ -34,54 +35,390 @@ Shaping can be specified statically in the NS file using (largely) standard
 NS commands and syntax.  Some commands were added by us, in particular to
 handle LANs.  Commands:
 
-* create a link between nodes with specified parameters:
-	$ns duplex-link <node1> <node2> <bw> <delay> <q-behavior>
+* Create a link between nodes with specified parameters:
 
-* set loss rate on a link:
-	tb-set-link-loss <src-node> <dst-node> <plr>
-	tb-set-link-loss <linkname> <plr>
+	set <link> [$ns duplex-link <node1> <node2> <bw> <del> <q-behavior>]
 
-* set simplex (individual direction) parameters on a link:
-	tb-set-link-simplex-params <linkname> <src-node> <delay> <bw> <plr>
+  and to set loss rate on the link:
 
-And for LANs:
+	tb-set-link-loss <link> <plr>
 
-* create a LAN with N nodes:
-	$ns make-lan "<node0> <node1> ... <nodeN>" <bw> <delay>
+  Here the characteristics specified are one-way; i.e., traffic from
+  <node1> to <node2> are shaped with the values, as is the traffic from
+  <node2> to <node1>.  The result is that a round-trip measurement such
+  as ping will see <bw> bandwidth, 2 * <del> delay, and 1-((1-<plr>)**2)
+  packet loss rate.
 
-* to set loss rate for an entire LAN or per-node:
+* To set simplex (individual direction) parameters on a link:
+
+	tb-set-link-simplex-params <linkname> <src-node> <del> <bw> <plr>
+
+  As measured from a single node doing a round-trip test, you will observe
+  the lesser of the two directional <bw> values, the sum of the directional
+  <del> values and 1 - ((1-<plr1>) * (1-<plr2>)) packet loss.  In effect,
+  a duplex link is a degenerate case of the simplex link (duh!)
+
+For LANs:
+
+* Create a LAN with N nodes:
+
+	set <lan> [$ns make-lan "<node0> <node1> ... <nodeN>" <bw> <del>]
+
+  and to set loss rate for a LAN:
+
 	tb-set-lan-loss <lan> <loss>
-	tb-set-node-lan-loss <node> <lan> <loss>
 
-* to set per-node delay and bandwidth:
-	tb-set-node-lan-delay <node> <lan> <delay>
-	tb-set-node-lan-bandwidth <node> <lan> <bw>
+  Here a LAN appears as a set of pairwise links for the purposes of shaping
+  characteristics.  Traffic from any node to any other will see the indicated
+  values.  Thus, round-trip traffic between any pair of nodes will be the
+  same as for an identically shaped link between those nodes.
+
+* You can also construct LANs with per-node characteristics:
+
+	set <lan> [$ns make-lan "<n1> <n2> ... <nN>" 100Mbs 0ms]
+	tb-set-node-lan-params <n1> <lan> <del1> <bw1> <loss1>
+	tb-set-node-lan-params <n2> <lan> <del2> <bw2> <loss2>
+	...
+
+  However, here the interpretation of the shaping values is slightly different.
+  In this case, the characteristics reflect one-way values to and from "the
+  LAN."  In other words, it is a duplex-link to the LAN.  In still other words,
+  round-trip traffic from <n1> to any other unshaped node on an unshaped LAN
+  will see <bw1> bandwidth, 2 * <del1>, and 1-((1-<loss1>)**2) packet loss.
+  If the other node involved in the round trip is also shaped, then round-trip
+  traffic will see:
+
+	bw: lesser of <bw1> and <bw2>
+	delay: 2 * <del1> + 2 * <del2>
+	plr: 1 - ((1 - <loss1>)**2 * (1 - <loss2>)**2)
+
+  and if the base LAN is also shaped (characteristics on the make-lan method)
+  then...don't EVEN go there.
 
 Shaping can also be modified dynamically using the web page or tevc.
 
 End node shaping can be set globally or per-link/LAN:
+
 	tb-use-endnodeshaping <enable?>
 	tb-set-endnodeshaping <link-or-lan> <enable?>
-
-Semantic differences between links and LANs...
-LANs of two nodes...
 
 
 2. Shaping info in the database.
 
-Shaping information is stored in the DB in a variety of tables...
+Shaping information is stored in the DB in three tables.  One stores
+the virtual ("logical") information, which is essentially as specified in
+the NS topology.  The other two store the physical information needed by
+either the dedicated shaping node or the experiment nodes themselves (when
+endnode shaping is in effect).  This info includes the physical nodes used
+for shaping (if any), the interfaces involved, the dummynet pipe numbers
+to use, etc.
+
+2a. virt_lans
+
+The logical information is stored in the virt_lans table.  Here, for a
+given experiment, there is a row for every endpoint of a link or lan for
+every node involved.  For example, a link between two nodes:
+
+    set link [$ns duplex-link n1 n2 1Mbps 10ms DropTail]
+    tb-set-link-loss $link 0.01
+
+would have two rows, one for n1 and one for n2:
+
+    +-------+-------+------+------+---------+------+------+---------+
+    | vname | vnode | del  | bw   | loss    | rdel | rbw  | rloss   |
+    +-------+-------+------+------+---------+------+------+---------+
+    | link  | n1    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    | link  | n2    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    +-------+-------+------+------+---------+------+------+---------+
+
+Each row contains the characteristics for "outgoing" or forward traffic on
+the endpoint (del/bw/loss) and the characteristics of "incoming" or reverse
+traffic on the endpoint (rdel/rbw/rloss).
+
+Since the characteristics specified by the user for a link are for
+one-way between the nodes, this DB arrangement requires that the shaping
+characteristics be divided up between the nodes (across DB rows) such that
+the resulting combination reflects the user-specified values.  For bandwidth,
+the value stored in the DB is just what the user gave, since limiting the
+BW on both sides is the same as limiting on one side.  For delay, half the
+value is associated with each endpoint since delay values are additive.
+For loss rate, there is a multiplicative effect so "half" the value means
+1 - sqrt(1-<loss>).  Returning to the example above, this means that the
+outgoing characteristics for n1, and incoming for n2, will be bw=1000,
+delay=5, loss=0.00501.  Since it is a duplex-link, the return path (outgoing
+for n2, incoming for n1) will be set the same.
+
+For simplex links in which each direction has different characteristics:
+
+    set link [$ns duplex-link $n1 $n2 100Mb 0ms DropTail]
+    tb-set-link-simplex-params $link $n1 10ms 1Mb 0.01
+    tb-set-link-simplex-params $link $n2 20ms 2Mb 0.02
+
+the characteristics are again split, with the node listed as the source
+node uses the "outgoing" fields to store the characteristics for that
+direction:
+
+    +-------+-------+------+---------+-------+------+---------+
+    | vnode | del   | bw   | loss    | rdel  | rbw  | rloss   |
+    +-------+-------+------+---------+-------+------+---------+
+    | n1    | 5.00  | 1000 | 0.00501 | 10.00 | 2000 | 0.01005 |
+    | n2    | 10.00 | 2000 | 0.01005 | 5.00  | 1000 | 0.00501 |
+    +-------+-------+------+---------+-------+------+---------+
+
+
+For a symmetric delayed LAN (i.e., one in which all node pairs have virtual
+duplex links with the indicated characteristics); e.g.:
+
+    set lan [$ns make-lan "n1 n2 n3" 1Mbps 10ms]
+    tb-set-lan-loss $lan 0.01
+
+the DB state for the endpoints for each set of nodes is setup as for a
+duplex link above:
+
+    +-------+------+------+---------+------+------+---------+
+    | vnode | del  | bw   | loss    | rdel | rbw  | rloss   |
+    +-------+------+------+---------+------+------+---------+
+    | n1    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    | n2    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    | n3    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    +-------+------+------+---------+------+------+---------+
+
+
+For asymmetric delayed LANs (those with per-node characteristics); e.g.:
+
+    set lan [$ns make-lan "n1 n2 n3" 100Mbs 0ms]
+    tb-set-node-lan-params $n1 $lan 10us 1Mbps 0.01
+    tb-set-node-lan-params $n2 $lan 20us 2Mbps 0.02
+    tb-set-node-lan-params $n3 $lan 30us 3Mbps 0.03
+
+the user specified values are for the "link" between a node and the LAN.
+Thus for LANs, the information is not split.  Recalling that the user-
+specified values are for traffic both to and from the node, the single row
+associated with the connection of the node and the LAN contains those
+user-specified values for both the forward and reverse directions:
+
+    +-------+-------+------+---------+-------+------+---------+
+    | vnode | del   | bw   | loss    | rdel  | rbw  | rloss   |
+    +-------+-------+------+---------+-------+------+---------+
+    | n1    | 10.00 | 1000 | 0.01000 | 10.00 | 1000 | 0.01000 |
+    | n2    | 20.00 | 2000 | 0.02000 | 20.00 | 2000 | 0.02000 |
+    | n3    | 30.00 | 3000 | 0.03000 | 30.00 | 3000 | 0.03000 |
+    +-------+-------+------+---------+-------+------+---------+
+
+2b. delays
+
+The delays table stores the "physical" information related to delays when
+dedicated shaping nodes are used.  This is information about the physical
+instantiation of the virt_lans information and thus only exists when an
+experiment is swapped in.  The delays table information is structured for
+the benefit of the shaping node for which it is intended.  For each
+experiment, there is a single row representing a delayed link or lan
+connection.  Each row has two sets of shaping characteristics, called "pipes".
+Each pipe represents traffic flowing in one direction through the shaping
+node.  Exactly what that means, depends on whether we are shaping a link,
+a symmetrically delayed LAN, or an asymmetrically delayed LAN.  Let's look
+at some examples.
+
+In the interest of full-disclosure, it should be noted that the following
+DB tables were hand-edited for clarity.  In particular, many columns are
+omitted and we currently support only two delayed links per physical
+shaping node.  For the latter, pipe numbers have been renumbered to be
+unique--as though all three LAN nodes were delayed by the same shaping node.
+In reality the delays table also contains the physical node_id of the shaping
+node, and it is the combo of node_id/pipe that is truly unique.
+
+For our example duplex link:
+
+    set link [$ns duplex-link n1 n2 1Mbps 10ms DropTail]
+    tb-set-link-loss $link 0.01
+
+we get:
+
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | vn1  | p0  | del0  | bw0  | loss0 | vn2  | p1  | del1  | bw1  | loss1 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | n1   | 130 | 10.00 | 1000 | 0.010 | n2   | 140 | 10.00 | 1000 | 0.010 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+
+where pipe0 (p0) represents the shaping (del0/bw0/loss0) on the path from
+n1 to n2, and pipe1 (p1) represents the shaping (del1/bw1/loss1) on the
+path from n2 to n1.  As we see, for the duplex link, both directions are
+identical.  For the simplex link:
+
+    set link [$ns duplex-link $n1 $n2 100Mb 0ms DropTail]
+    tb-set-link-simplex-params $link $n1 10ms 1Mb 0.01
+    tb-set-link-simplex-params $link $n2 20ms 2Mb 0.02
+
+we get:
+
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | vn1  | p0  | del0  | bw0  | loss0 | vn2  | p1  | del1  | bw1  | loss1 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | n1   | 130 | 10.00 | 1000 | 0.010 | n2   | 140 | 20.00 | 2000 | 0.020 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+
+Here we see the two pipes reflecting the different characteristics.
+
+For our symmetric delayed LAN:
+
+    set lan [$ns make-lan "n1 n2 n3" 1Mbps 10ms]
+    tb-set-lan-loss $lan 0.01
+
+we have:
+
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | vn1  | p0  | del0  | bw0  | loss0 | vn2  | p1  | del1  | bw1  | loss1 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | n1   | 130 | 5.00  | 1000 | 0.005 | n1   | 140 | 5.00  | 1000 | 0.005 |
+    | n2   | 150 | 5.00  | 1000 | 0.005 | n2   | 160 | 5.00  | 1000 | 0.005 |
+    | n3   | 110 | 5.00  | 1000 | 0.005 | n3   | 120 | 5.00  | 1000 | 0.005 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+
+Note that this is NOT like the entries in the delays table would be for
+duplex links between the sets of nodes.  Instead, the values are "halved".
+Even though the definition of a symmetric shaped LAN leads one to believe
+that the connection between any pair of LAN nodes would look like a duplex
+link, that isn't the case here.  This is due to the fact that the
+implementation of LANs is different than that of links and the delays table
+reflects the implementation.  The difference is that, for links, shaping is
+between two nodes while, for LANs, the shaping is between a node and the LAN.
+Hence one-way traffic on a link is shaped by a single pipe (e.g., n1 -> n2
+via pipe 130 in the duplex link table) while in a LAN, it is shaped by two
+(e.g., n1 -> LAN via pipe 130, LAN -> n2 via pipe 160).  So the values must
+be different in the two implementations to achieve the same observed result.
+
+For an asymmetric delayed LAN where nodes have individual shaping parameters,
+such as:
+
+    set lan [$ns make-lan "n1 n2 n3" 100Mbs 0ms]
+    tb-set-node-lan-params $n1 $lan 10us 1Mbps 0.01
+    tb-set-node-lan-params $n2 $lan 20us 2Mbps 0.02
+    tb-set-node-lan-params $n3 $lan 30us 3Mbps 0.03
+
+we get:
+
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | vn1  | p0  | del0  | bw0  | loss0 | vn2  | p1  | del1  | bw1  | loss1 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | n1   | 130 | 10.00 | 1000 | 0.010 | n1   | 140 | 10.00 | 1000 | 0.010 |
+    | n2   | 110 | 20.00 | 2000 | 0.020 | n2   | 120 | 20.00 | 2000 | 0.020 |
+    | n3   | 110 | 30.00 | 3000 | 0.030 | n3   | 120 | 30.00 | 3000 | 0.030 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+
+Here the entries are very much like the duplex-link case.  That is because
+asymmetric delayed LANs are essentially duplex-links from a node to the LAN.
+Thus pipe0 is the path from node to LAN, and pipe1 the path from LAN to node.
+Note that since this is a LAN configuration, traffic from one node to another
+does traverse two pipes.
+
+2c. linkdelays
+
+The linkdelays table is the analog of the delays table for cases where
+endnode shaping is used.  In other words, linkdelays entries exist for
+links and LANs that have endnode shaping specified, delays table entries
+exist for all others.
+
+The structure of linkdelays is very similar to that of delays.
+As with delays, the entries only exist when an experiment is swapped in.
+Again, for each experiment, there is a single row representing a delayed
+link or lan connection and each row has two pipes and the associated
+characteristics.  However, here the pipes represent traffic out of the
+node ("pipe", analogous to delays "pipe0") and traffic into the node
+("rpipe" analogous to delays "pipe1").
+
+One interesting difference is in how links are represented.  Instead of
+being two pipes on the shaping node (and thus one delays table entry),
+it is now one pipe each on each endnode (and thus two linkdelays table
+entries).  The entries for our example duplex link look like:
+
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+    | pnode | vn | pipe | del   | bw   | loss  | rpipe | rdel | rbw  | rloss |
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+    | pc1   | n1 | 130  | 10.00 | 1000 | 0.010 | 0     | 0.00 | 100  | 0.000 |
+    | pc2   | n2 | 130  | 10.00 | 1000 | 0.010 | 0     | 0.00 | 100  | 0.000 |
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+
+Note the odd information for the reverse pipe.  This is because a reverse
+pipe is not setup as there is no shaping to do in that direction.  Traffic
+from n1 to n2 is shaped on n1 and traffic from n2 to n1 is shaped on n2.
+
+The simplex link example is similar:
+
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+    | pnode | vn | pipe | del   | bw   | loss  | rpipe | rdel | rbw  | rloss |
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+    | pc1   | n1 | 130  | 10.00 | 1000 | 0.010 | 0     | 0.00 | 100  | 0.000 |
+    | pc2   | n2 | 130  | 20.00 | 2000 | 0.020 | 0     | 0.00 | 100  | 0.000 |
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+
+
+Information for LANs is the same as in the delays table.  For the symmetric
+example all pipes are used the characteristics are "halved":
+
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+    | pnode | vn | pipe | del   | bw   | loss  | rpipe | rdel | rbw  | rloss |
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+    | pc1   | n1 | 110  | 5.00  | 1000 | 0.005 | 120   | 5.00 | 1000 | 0.005 |
+    | pc2   | n2 | 110  | 5.00  | 1000 | 0.005 | 120   | 5.00 | 1000 | 0.005 |
+    | pc3   | n3 | 110  | 5.00  | 1000 | 0.005 | 120   | 5.00 | 1000 | 0.005 |
+    +-------+----+------+-------+------+-------+-------+------+------+-------+
+
+and for the asymmetric LAN:
+
+    +-------+----+------+-------+------+-------+-------+-------+------+-------+
+    | pnode | vn | pipe | del   | bw   | loss  | rpipe | rdel  | rbw  | rloss |
+    +-------+----+------+-------+------+-------+-------+-------+------+-------+
+    | pc1   | n1 | 110  | 10.00 | 1000 | 0.010 | 120   | 10.00 | 1000 | 0.010 |
+    | pc2   | n2 | 110  | 20.00 | 2000 | 0.020 | 120   | 20.00 | 2000 | 0.020 |
+    | pc3   | n3 | 110  | 30.00 | 3000 | 0.030 | 120   | 30.00 | 3000 | 0.030 |
+    +-------+----+------+-------+------+-------+-------+-------+------+-------+
+
+
+2d. A few words about queues.
+
+Conspicuously absent from the discussion thus far, is the topic of queues
+and queue lengths.  The NS specification allows queue types and lengths to
+be set on links and LANs, and both the virt_lans and delays tables contain
+information about queues--I have just ignored it.  This needs to be
+addressed, I have just never taken the time to understood the issues.
+
+However, briefly, the default queue size is 50 packets.  That value can be
+adjusted or changed to reflect bytes rather than packets.  There are also
+some parameters for describing RED queuing as implemented by dummynet.
+
+The one anomalous case is for the so-called incoming (reverse) path for LANs
+in the delays table.  Here the queue size is hardwired to two, (I believe)
+because bottleneck queuing for the connection between two nodes on the LAN
+should take place only once, and that would be at the outgoing pipe.
+This is an area that needs to be better understood and described.
 
 
 3. Shaping info on the client.
 
-The DB state is returned in the tmcd "delay" command and looks like:
+To reiterate, shaping clients are most often dedicated "delay nodes,"
+but may also be experiment nodes themselves when endnode shaping is used.
+Each shaping client runs some delay configuration scripts at boot time to
+handle the initial, static configuration of delays.  The client also runs
+an instance of the delay-agent to handle dynamic changes to shaping.
+
+The boot time scripts use database information returned via the "tmcc"
+database proxy to perform the initial configuration and also to provide
+interface configuration to the delay-agent.
+
+3a. Dedicated shaping node
+
+The DB state is returned in the tmcd "delay" command and is a series of
+lines, each line looking like:
 
 DELAY INT0=<mac0> INT1=<mac1> \
- PIPE0=<pipe0> DELAY0=<delay0> BW0=<bw0> PLR0=<plr0>
- PIPE1=<pipe1> DELAY1=<delay1> BW1=<bw1> PLR1=<plr1>
- LINKNAME=<link>
- <queue0 params> <queue1 params>
+ PIPE0=<pipe0> DELAY0=<delay0> BW0=<bw0> PLR0=<plr0> \
+ PIPE1=<pipe1> DELAY1=<delay1> BW1=<bw1> PLR1=<plr1> \
+ LINKNAME=<link> \
+ <queue0 params> <queue1 params> \
  VNODE0=<node0> VNODE1=<node1> NOSHAPING=<0|1>
+
+pretty much a direct reflection of the information in the delays table,
+one line per row in the table.
 
 <mac0> and <mac1> are used to identify the physical interfaces which are
 the endpoints of the link.  The client runs a program called findif to map
@@ -91,11 +428,15 @@ this manner since different OSes have different names for interfaces
 interfaces in different orders.
 
 <pipe0> and <pipe1> identify the two directions of a link, with <delayN>,
-<bwN>, <plrN> and <queueN params> being the associated characteristics.
-How these are used is explained below.
+<bwN> and <plrN> being the associated characteristics.  How these are used
+is explained below.
 
-<linkname> is the name of the link as given in the NS file and is used to
+<link> is the name of the link as given in the NS file and is used to
 identify the link in the delay-agent.
+
+<queueN params> are the parameters associated with queuing which I will
+continue to gloss over for now.  Suffice it to say, the parameters pretty
+much directly translate into dummynet configuration parameters.
 
 <vnode0> and <vnode1> are the names of the nodes at the end points of the
 link as given in the NS file.
@@ -103,17 +444,100 @@ link as given in the NS file.
 The NOSHAPING parameter is not used by the delay agent.  It is used for
 link monitoring to indicate that a bridge with no pipes should be setup.
 
-For LANs of three or more nodes it looks like...
-
 This information is used at boottime to create two files.
 
-/var/emulab/boot/rc.delay is a file containing shell commands that is
-run to configure the bridge and pipes.  This script sets up the static,
-boot time shaping parameters.
+/var/emulab/boot/rc.delay is constructed on dedicated shaping nodes.
+This file contains shell commands and is run to configure the bridge
+and pipes.  For each delayed link/LAN (i.e., each line of the tmcc delays
+information) the two interfaces are bridged together using the FreeBSD
+bridge code and IPFW is enabled for the bridge.  Then the assorted IPFW
+pipes are configured, again using the information from tmcc.  The result
+looks something like:
+
+    sysctl -w net.link.ether.bridge=0
+    sysctl -w net.link.ether.bridge_ipfw=0
+    sysctl -w net.link.ether.bridge_cfg=fxp2:69,fxp3:69,fxp1:70,fxp4:70,
+    sysctl -w net.link.ether.bridge=1
+    sysctl -w net.link.ether.bridge_ipfw=1
+    ...
+    ipfw add 60110 pipe 60110 ip from any to any in recv fxp2
+    ipfw add 60120 pipe 60120 ip from any to any in recv fxp3
+    ipfw pipe 60110 config delay 5ms bw 1000Kbit/s plr 0.005 queue 50 
+    ipfw pipe 60120 config delay 5ms bw 1000Kbit/s plr 0.005 queue 2 
+    ipfw add 60130 pipe 60130 ip from any to any in recv fxp1
+    ipfw add 60140 pipe 60140 ip from any to any in recv fxp4
+    ipfw pipe 60130 config delay 5ms bw 1000Kbit/s plr 0.005 queue 50 
+    ipfw pipe 60140 config delay 5ms bw 1000Kbit/s plr 0.005 queue 2 
+    ...   
 
 /var/emulab/boot/delay_mapping contains information about which interfaces
 are associated with which pipes.  It is used by the delay-agent which
-handles dynamic changes to shaping.
+handles dynamic changes to shaping, and its format is described below.
+
+3b. Endnode shaping
+
+The DB state is returned in the tmcd "linkdelay" command and is a series of
+lines, each line looking like:
+
+LINKDELAY IFACE=<mac> TYPE=<type> LINKNAME=<link> VNODE=<node> \
+ INET=<IP> MASK=<netmask> \
+ PIPE=<pipe> DELAY=<delay> BW=<bw> PLR=<plr> \
+ RPIPE=<rpipe> RDELAY=<rdelay> RBW=<rbw> RPLR=<rplr> \
+ <queue params>
+
+pretty much a direct reflection of the information in the linkdelays table,
+one line per row in the table.
+
+<mac> is used to identify the physical interface which corresponds to
+the endpoint of the link on this node.  As with shaping nodes, the client
+uses findif to map the MAC address into an interface to configure.
+
+<type> is the type of the link or LAN, either "simplex" or "duplex".
+This is used as an indication as to whether the reverse pipe needs to
+be setup (duplex) or not (simplex).  This is an unfortunate overloading
+of the terms, as a duplex link will be labeled with TYPE=simplex.
+
+<link> is the name of the link as given in the NS file and is used to
+identify the link in the delay-agent.
+
+<node> is the node receiving the info (us).  It is not really needed.
+
+<IP> and <netmask> are no longer important.  They were used to enable
+endnode shaping on physical links that were multiplexed using IP aliasing.
+These were used along with a local modification to IPFW to apply multiple
+rules to an interface based on the network of the "next hop".  We no longer
+allow this (though the rules are still setup, see below) as it did not
+completely work.
+
+<pipe> and <rpipe> identify the two directions of a link, with <(r)delay>,
+<(r)bw>, and <(r)plr> being the associated characteristics.
+
+<queue params> are the parameters associated with queuing which I will
+continue to gloss over for now.  Suffice it to say, the parameters pretty
+much directly translate into dummynet configuration parameters.
+
+This information is used at boottime to create three files.  The first
+two are concerned with the setup of static, boot time shaping parameters.
+One file is for dedicated shaping nodes, the other for endnode shaping
+on experiment nodes.
+
+/var/emulab/boot/rc.linkdelay is analogous to rc.delay for dedicated shaping
+nodes.  It contains shell commands and is run to configure IPFW on the shaped
+interfaces.  The result looks something like:
+
+    ifconfig em1 media 100baseTX mediaopt full-duplex
+    ipfw add 110 pipe 110 ip from any to any out xmit em1 nexthop 10.1.2.2:255.255.255.0
+    ipfw pipe 110 config delay 10ms bw 1000Kbit/s plr 0.010 queue 50 
+    ipfw add 120 pipe 120 ip from any to any in recv em1
+    ipfw pipe 120 config delay 10ms bw 1000Kbit/s plr 0 queue 5
+    ifconfig em0 media 100baseTX mediaopt full-duplex
+    ipfw add 130 pipe 130 ip from any to any out xmit em0 nexthop 10.1.1.2:255.255.255.0
+    ipfw pipe 130 config delay 10ms bw 1000Kbit/s plr 0.010 queue 50 
+
+Note the nexthop rules which, as mentioned, are no longer relevant but are
+still produced.
+
+/var/emulab/boot/delay_mapping is the same as for shaping nodes.
 
 
 4. Dynamic shaping with the delay-agent.
@@ -158,12 +582,6 @@ The IPFW rules on delay (setup via /var/emulab/boot/rc.delay) are:
   pipe <pipe0> ip from any to any in recv <if0>
   pipe <pipe1> ip from any to any in recv <if1>
 
-For a duplex link, the specified shaping values (e.g., 4ms delay) are applied
-in both directions (e.g., 8ms round trip).  For simplex links, each pipe
-is set to the appropriate characteristics for the direction implied.
-
-For a lan of two nodes, with each node having independent characteristics ...
-
 A LAN of 3 or more nodes is considerably different.  Each node will have
 two pipes again, one between the node and the delay node and one between
 the delay node and "the lan".  The delay_mapping file now looks like:
@@ -189,7 +607,7 @@ This translates into:
   |       |             +-----+       +-----+             |       |
   | node1 |--- pipe2 -->| if2 | delay | if3 |<-- pipe3 ---| "lan" |
   |       |             +-----+       +-----+             |       |
-  +-------+                   |       |                   +       +
+  +-------+                   |       |                   |       |
                               |       |                   |       |
   +-------+                   |       |                   |       |
   |       |             +-----+       +-----+             |       |
@@ -238,7 +656,7 @@ EVENTTYPE: RESET, UP, DOWN, MODIFY
 5a. Hybrid mode setup:
 
 The current so-called "hybrid mode" setup for the current so-called "simple
-model" allows for per-node pairs in an internet "cloud" (i.e., a LAN) to have
+model" allows for per-node pairs in an Internet "cloud" (i.e., a LAN) to have
 individual (per pair) delay and plr, but potentially a shared bandwidth.
 To setup unique characteristics per pair, the event should specify a DEST
 parameter:
@@ -271,20 +689,20 @@ So it looks like:
 
   +-------+                   +-------+                   +-------+
   |       |             +-----+       +-----+             |       |
-  | node0 | -- pipe0 -->| if0 |       | if1 |<-- pipe1 -- |       |
-  |       |             +-----+       +-----+             |       |
+  | node0 |--- pipe0 -->| if0 |       | if1 |<-- pipe1 ---|       |
+  |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
   +-------+                   |       |                   |       |
                               |       |                   |       |
   +-------+                   |       |                   |       |
   |       |             +-----+       +-----+             |       |
-  | node1 | -- pipe2 -->| if2 | delay | if3 |<-- pipe3 -- | "lan" |
-  |       |             +-----+       +-----+             |       |
-  +-------+                   |       |                   +       +
+  | node1 |--- pipe2 -->| if2 | delay | if3 |<-- pipe3 ---| "lan" |
+  |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
+  +-------+                   |       |                   |       |
                               |       |                   |       |
   +-------+                   |       |                   |       |
   |       |             +-----+       +-----+             |       |
-  | node2 | -- pipe4 -->| if4 |       | if5 |<-- pipe5 -- |       |
-  |       |             +-----+       +-----+             |       |
+  | node2 |--- pipe4 -->| if4 |       | if5 |<-- pipe5 ---|       |
+  |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
   +-------+                   +-------+                   +-------+
 
 There are additional event parameters for hybrid pipes.
