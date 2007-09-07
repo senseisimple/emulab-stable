@@ -2465,9 +2465,8 @@ foreach my $vnode (keys(%v2pmap)) {
 
 	printdb("sshdport: $vnode $pnode $vvnode $sshdport\n");
 
-	DBQueryFatal("replace into port_registration set pid='$pid', " .
-                     "eid='$eid', exptidx='$experiment_idx', service='sshd', ".
-                     "node_id='$vvnode', port=$sshdport");
+	DBQueryFatal("update nodes set sshdport=$sshdport ".
+		     "where node_id='$vvnode'");
     }
 }
 

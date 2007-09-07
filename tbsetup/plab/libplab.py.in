@@ -856,19 +856,13 @@ class Plab:
                          " (node_id, type, phys_nodeid, role, priority,"
                          "  op_mode, def_boot_osid, update_accounts,"
                          "  allocstate, allocstate_timestamp,"
-                         "  eventstate, state_timestamp)"
+                         "  eventstate, state_timestamp, sshdport)"
                          " values (%s, %s, %s, %s, %s,"
                          "  %s, %s, %s, %s, now(), %s, now(), %s)",
                          (vnodeid, vnodetype, nodeid, 'virtnode', vprio,
                           'PCVM', defosid, 1,
                           'FREE_CLEAN',
-                          'SHUTDOWN'))
-
-            DBQueryFatal("insert into port_registration"
-                         " (pid, eid, exptidx, service, node_id, port)"
-                         " values (%s, %s, %s, %s, %s, %s)",
-                         (MONITOR_PID, MONITOR_EID, mon_exptidx,
-                          'sshd', vnodeid, sshdport ))
+                          'SHUTDOWN', sshdport))
 
             DBQueryFatal("insert into node_hostkeys"
                          " (node_id)"
