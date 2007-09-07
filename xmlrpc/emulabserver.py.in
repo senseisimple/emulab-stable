@@ -3555,7 +3555,7 @@ class node:
                 output=("You do not have permission to access: "
                         + argdict["node"]))
 
-        res = DBQueryFatal("select n.node_id,n.jailflag,n.port, "
+        res = DBQueryFatal("select n.node_id,n.jailflag,p.port, "
                            "       r.vname,r.pid,r.eid, "
                            "       t.isvirtnode,t.isremotenode,t.isplabdslice "
                            " from nodes as n "
