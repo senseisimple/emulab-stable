@@ -167,6 +167,29 @@ class FlexlabDataServer:
         print "Updated lastdataidx to %d" % self._lastdataidx
         pass
 
+    def _refreshNodeSiteMap(self):
+        if not self._cacheinit:
+            return
+
+        q = "select site_name,site_idx,node_id,node_idx" \
+            " from site_mapping order by site_idx"
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+
+        # for now, we only update new nodes, not flush "old" ones.
+        newnodes = []
+        for (sname,sidx,node_id,nidx) in qres:
+            if not self.nodeidToSiteIdx.has_key(node_id):
+                newnodes.append(node_id)
+                self.nodeidToSiteIdx[node_id] = sidx
+                self.siteIdxToSiteName[sidx] = sname
+                pass
+            pass
+
+        print "Added %d new nodes (%s)." % (len(newnodes),
+                                            str.join(',',newnodes))
+        
+        pass
+
     def _ageCache(self):
         if not self._cacheinit:
             return
@@ -190,6 +213,7 @@ class FlexlabDataServer:
 
     def refreshAndAge(self):
         self._refreshPairDataCache()
+        self._refreshNodeSiteMap()
         self._ageCache()
         pass
 
