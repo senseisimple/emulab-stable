@@ -403,7 +403,7 @@ class Node
 			 "last_ext_act) as last_act, ".
 			 "  t.isvirtnode,t.isremotenode,t.isplabdslice, ".
 			 "  r.erole as rsrvrole, pi.IP as phys_IP, loc.*, ".
-			 "  util.* ".
+			 "  util.*, p.port ".
 			 " from nodes as n ".
 			 "left join reserved as r on n.node_id=r.node_id ".
 			 "left join node_activity as na on ".
@@ -419,6 +419,8 @@ class Node
 			 "     loc.node_id=n.node_id ".
 			 "left join node_utilization as util on ".
 			 "     util.node_id=n.node_id ".
+                         "left join port_registration as p on ".
+                         "  (n.node_id = p.node_id and p.service='sshd') ".
 			 "where n.node_id='$node_id'");
 	
 	if (mysql_num_rows($query_result) == 0) {
@@ -454,7 +456,7 @@ class Node
 	$ipport_low	    = $row["ipport_low"];
 	$ipport_next	    = $row["ipport_next"];
 	$ipport_high	    = $row["ipport_high"];
-	$sshdport	    = $row["sshdport"];
+	$sshdport	    = $row["port"];
 	$last_act           = $row["last_act"];
 	$last_tty_act       = $row["last_tty_act"];
 	$last_net_act       = $row["last_net_act"];

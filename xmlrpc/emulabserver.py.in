@@ -3555,12 +3555,14 @@ class node:
                 output=("You do not have permission to access: "
                         + argdict["node"]))
 
-        res = DBQueryFatal("select n.node_id,n.jailflag,n.sshdport, "
+        res = DBQueryFatal("select n.node_id,n.jailflag,n.port, "
                            "       r.vname,r.pid,r.eid, "
                            "       t.isvirtnode,t.isremotenode,t.isplabdslice "
                            " from nodes as n "
                            "left join reserved as r on n.node_id=r.node_id "
                            "left join node_types as t on t.type=n.type "
+                           "left join port_registration as p on "
+                           "  (n.node_id = p.node_id and p.service='sshd')"
                            "where " + clause,
                            clause_args)
 

@@ -162,12 +162,14 @@ print "\n";
 if ($state eq EXPTSTATE_ACTIVE) {
     my $query_result =
 	DBQueryFatal("select r.vname,r.node_id,n.type,n.phys_nodeid,o.osname,".
-		     "       n.sshdport,n.jailflag,nt.isremotenode,".
+		     "       p.port,n.jailflag,nt.isremotenode,".
 		     "       nt.isplabdslice ".
 		     "  from reserved as r ".
 		     "left join nodes as n on r.node_id=n.node_id ".
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     "left join node_types as nt on nt.type=n.type ".
+                     "left join port_registration as p on ".
+                     "  (n.node_id = p.node_id and p.service='sshd')".
 		     "where r.pid='$pid' and r.eid='$eid' order by vname");
 
     while (($v,$p,$t,$m,$o,$s,$j,$r,$d) = $query_result->fetchrow_array()) {

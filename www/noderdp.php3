@@ -43,12 +43,14 @@ else {
 }
 
 $query_result =
-    DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
+    DBQueryFatal("select n.jailflag,n.jailip,p.port, ".
 		 "       r.vname,r.pid,r.eid, ".
 		 "       t.isvirtnode,t.isremotenode,t.isplabdslice ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
+                 "left join port_registration as p on ".
+                 "  (n.node_id = p.node_id and p.service='sshd') ".
 		 "where n.node_id='$node_id'");
 
 if (mysql_num_rows($query_result) == 0) {
@@ -58,7 +60,7 @@ if (mysql_num_rows($query_result) == 0) {
 $row = mysql_fetch_array($query_result);
 $jailflag = $row["jailflag"];
 $jailip   = $row["jailip"];
-$sshdport = $row["sshdport"];
+$sshdport = $row["port"];
 $vname    = $row["vname"];
 $pid      = $row["pid"];
 $eid      = $row["eid"];

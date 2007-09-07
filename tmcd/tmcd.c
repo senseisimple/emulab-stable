@@ -4915,8 +4915,10 @@ COMMAND_PROTOTYPE(dojailconfig)
 	/*
 	 * Now need the sshdport and jailip for this node.
 	 */
-	res = mydb_query("select sshdport,jailip from nodes "
-			 "where node_id='%s'",
+	res = mydb_query("select port, jailip from nodes as n "
+                         "left join port_registration as p on "
+                         "  (n.node_id = p.node_id and p.service='sshd') "
+                         "where node_id='%s'",
 			 2, reqp->nodeid);
 	
 	if (!res) {
@@ -5031,7 +5033,7 @@ COMMAND_PROTOTYPE(doplabconfig)
 	/*
 	 * Now need the sshdport for this node.
 	 */
-	res = mydb_query("select n.sshdport, ps.admin, i.IP "
+	res = mydb_query("select p.port, ps.admin, i.IP "
                          " from reserved as r "
                          " left join nodes as n " 
                          "  on n.node_id=r.node_id "
@@ -5039,6 +5041,8 @@ COMMAND_PROTOTYPE(doplabconfig)
                          "  on n.phys_nodeid=i.node_id "
                          " left join plab_slices as ps "
                          "  on r.pid=ps.pid and r.eid=ps.eid "
+                         " left join port_registration as p on "
+                         "  (n.node_id = p.node_id and p.service='sshd') "
                          " where i.role='ctrl' and r.node_id='%s'",
 			 3, reqp->nodeid);
 
@@ -7196,7 +7200,7 @@ COMMAND_PROTOTYPE(domotelog)
 }
 
 /*
- * Return motelog info for this node.
+ * Lookup or record the port number that is being used for a particular service
  */
 COMMAND_PROTOTYPE(doportregister)
 {
