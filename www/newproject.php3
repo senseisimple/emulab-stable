@@ -648,7 +648,7 @@ if (!isset($formfields)) {
     PAGEARGERROR("Invalid form arguments.");
 }
 
-TBERROR("A\n\n" . print_r($formfields, TRUE), 0);
+#TBERROR("A\n\n" . print_r($formfields, TRUE), 0);
 
 #
 # Otherwise, must validate and redisplay if errors
@@ -879,14 +879,7 @@ if (isset($formfields["proj_linked"]) &&
     $errors["Link to Us"] = "Bad Value";
 }
 
-# Present these errors before we call out to do pubkey stuff; saves work.
-if (count($errors)) {
-    SPITFORM($formfields, $returning, $errors);
-    PAGEFOOTER();
-    return;
-}
-
-# Done with sanity checks!
+# Present these errors before we call out to do anything else.
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
     PAGEFOOTER();
