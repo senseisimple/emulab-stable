@@ -345,10 +345,7 @@ $qres = DBQueryFatal($pequery);
 
 $pidmap = array();
 
-if (mysql_num_rows($qres) == 0) {
-    TBERROR("Unexpected number of rows in count query!");
-}
-else {
+if (mysql_num_rows($qres) > 0) {
     while ($row = mysql_fetch_array($qres)) {
 	$tpid = $row['pid'];
 	$teid = $row['eid'];
