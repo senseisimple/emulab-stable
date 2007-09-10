@@ -42,7 +42,7 @@ SYMLINKS        = node_admin node_reboot os_load create_image node_list \
 # configure if the .in file is changed.
 # 
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF) $(LIBEXEC_STUFF) \
-	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBINS)
+	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBINS) BasicXMLRPCServers.py
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
