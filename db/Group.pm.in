@@ -448,7 +448,8 @@ sub AccessCheck($$$)
     if ($access_type == TB_PROJECT_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER;
     }
-    elsif ($access_type == TB_PROJECT_CREATEEXPT) {
+    elsif ($access_type == TB_PROJECT_CREATEEXPT ||
+	   $access_type == TB_PROJECT_MAKEOSID) {
 	$mintrust = PROJMEMBERTRUST_LOCALROOT;
     }
     elsif ($access_type == TB_PROJECT_DELUSER) {

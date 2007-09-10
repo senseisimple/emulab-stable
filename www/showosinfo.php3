@@ -38,7 +38,7 @@ WRITESUBMENUBUTTON("Delete this OS Descriptor",
 		   CreateURL("deleteosid", $osinfo));
 if ($isadmin) {
      WRITESUBMENUBUTTON("Create a new OS Descriptor",
-			"newosid_form.php3");
+			"newosid.php3");
 }
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
 		   "newimageid_ez.php3");

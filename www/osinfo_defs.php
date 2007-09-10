@@ -78,6 +78,93 @@ class OSinfo
     }
 
     #
+    # Class function to create new osid and return object.
+    #
+    function NewOSID($user, $project, $osname, $args, &$errors) {
+	global $suexec_output, $suexec_output_array;
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "newosid");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+
+	# Add these. Maybe caller should do this?
+	$args["osname"]  = $osname;
+	$args["project"] = $project->pid_idx();
+
+	fwrite($fp, "<osid>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</osid>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	$retval = SUEXEC("nobody", "nobody", "webnewosid $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$errors[] = "Transient error; please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		# unlink($xmlname);
+		if (count($suexec_output_array)) {
+		    for ($i = 0; $i < count($suexec_output_array); $i++) {
+			$line = $suexec_output_array[$i];
+			if (preg_match("/^([-\w]+):\s*(.*)$/",
+				       $line, $matches)) {
+			    $errors[$matches[1]] = $matches[2];
+			}
+			else
+			    $errors[] = $line;
+		    }
+		}
+		else
+		    $errors[] = "Transient error; please try again later.";
+	    }
+	    return null;
+	}
+
+        #
+        # Parse the last line of output. Ick.
+        #
+	unset($matches);
+	
+	if (!preg_match("/^OSID\s+([^\/]+)\/(\d+)\s+/",
+			$suexec_output_array[count($suexec_output_array)-1],
+			$matches)) {
+	    $errors[] = "Transient error; please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    return null;
+	}
+	$osid = $matches[2];
+	$newosid = OSinfo::Lookup($osid);
+	if (! $newosid) {
+	    $errors[] = "Transient error; please try again later.";
+	    TBERROR("Could not lookup new osid $osid", 0);
+	    return null;
+	}
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then create the osid by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return $newosid; 
+    }
+
+    #
     # Equality test.
     #
     function SameOS($osinfo) {

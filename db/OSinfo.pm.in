@@ -34,8 +34,45 @@ my $TBBASE        = "@TBBASE@";
 my $TBWWW         = "@TBWWW@";
 
 # Cache of instances to avoid regenerating them.
-my %osids      = ();
-my $debug      = 0;
+my %osids	= ();
+my $debug	= 0;
+
+# Valid features. Mirrored in the web interface. The value is a user-okay flag.
+my %FEATURES	= ( "ping"	 => 1,
+		    "ssh",	 => 1,
+		    "ipod"	 => 1,
+		    "isup"	 => 1,
+		    "veths"	 => 0,
+		    "mlinks"	 => 0,
+		    "linktest"	 => 1,
+		    "linkdelays" => 0 );
+
+# Valid OS names. Mirrored in the web interface. The value is a user-okay flag.
+my %OSLIST	= ( "Linux"	 => 1,
+		    "Fedora"	 => 1,
+		    "FreeBSD"	 => 1,
+		    "NetBSD"	 => 1,
+		    "Windows"	 => 1,
+		    "TinyOS"	 => 1,
+		    "Oskit"	 => 0,
+		    "Other"	 => 1 );
+
+# Default OSID boot wait timeouts in seconds. Mirrored in the web interface. 
+my %WAITTIMES    = ("Linux"	 => 120,
+		    "Fedora"	 => 120,
+		    "FreeBSD"	 => 120,
+		    "NetBSD"	 => 120,
+		    "Windows"	 => 240,
+		    "TinyOS"	 => 60,
+		    "Oskit"	 => 60,
+		    "Other"	 => 60 );
+
+# OP modes. Mirrored in the web interface. The value is a user-okay flag.
+my %OPMODES	 = ("NORMALv2"	 => 1,
+		    "NORMALv1"	 => 0,
+		    "MINIMAL"	 => 1,
+		    "NORMAL"	 => 1,
+		    "ALWAYSUP"	 => 1 );
 
 # Little helper and debug function.
 sub mysystem($)
@@ -135,6 +172,82 @@ sub nextosid($)		{ return field($_[0], "nextosid"); }
 sub max_concurrent($)   { return field($_[0], "max_concurrent"); }
 sub mfs($)              { return field($_[0], "mfs"); }
 sub reboot_waittime($)  { return field($_[0], "reboot_waittime"); }
+
+#
+# Create a new experiment. This installs the new record in the DB,
+# and returns an instance. There is some bookkeeping along the way.
+#
+sub Create($$$$)
+{
+    my ($class, $project, $creator, $osname, $argref) = @_;
+    my $idx;
+    my $now = time();
+
+    return undef
+	if (ref($class) || !ref($project));
+
+    my $pid     = $project->pid();
+    my $pid_idx = $project->pid_idx();
+    my $uid     = $creator->uid();
+    my $uid_idx = $creator->uid_idx();
+
+    #
+    # The pid/osid has to be unique, so lock the table for the check/insert.
+    #
+    DBQueryWarn("lock tables os_info write, emulab_indicies write")
+	or return undef;
+
+    my $query_result =
+	DBQueryWarn("select osname from os_info ".
+		    "where pid_idx='$pid_idx' and osname='$osname'");
+
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	tberror("OS $osname in project $pid already exists!");
+	return undef;
+    }
+
+    #
+    # Grab unique ID. Table already locked.
+    # 
+    my $osid  = TBGetUniqueIndex("next_osid", undef, 1);
+    my $uuid  = NewUUID();
+    my $desc  = "''";
+    my $magic = "''"; 
+
+    # Some fields special cause of quoting.
+    #
+    if (exists($argref->{'description'})) {
+	$desc = DBQuoteSpecial($argref->{'description'});
+	delete($argref->{'description'});
+    }
+    if (exists($argref->{'magic'})) {
+	$magic = DBQuoteSpecial($argref->{'magic'});
+	delete($argref->{'magic'});
+    }
+    
+    my $query = "insert into os_info set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    # Append the rest
+    $query .= ",osname='$osname'";
+    $query .= ",osid='$osid'";
+    $query .= ",uuid='$uuid'";
+    $query .= ",pid='$pid',pid_idx='$pid_idx'";
+    $query .= ",creator='$uid',creator_idx='$uid_idx'";
+    $query .= ",created=now()";
+    $query .= ",description=$desc";    
+    $query .= ",magic=$magic";    
+    
+    if (! DBQueryWarn($query)) {
+	DBQueryWarn("unlock tables");
+	tberror("Error inserting new os_info record for $pid/$osname!");
+	return undef;
+    }
+    DBQueryWarn("unlock tables");
+
+    return OSinfo->Lookup($osid);
+}
 
 #
 # Refresh a class instance by reloading from the DB.
@@ -263,6 +376,39 @@ sub AccessCheck($$$)
     }
 
     return TBMinTrust($project->Trust($user), $mintrust);
+}
+
+#
+# Class method to get the default reboot time for an os type.
+#
+sub RebootWaitTime($$)
+{
+    my ($self, $os) = @_;
+
+    return $WAITTIMES{"other"}
+	if (!exists($WAITTIMES{$os}));
+
+    return $WAITTIMES{$os};
+}
+
+#
+# Class method to check the OS is legal.
+#
+sub ValidOS($$)
+{
+    my ($self, $os) = @_;
+
+    return (exists($OSLIST{$os}) ? 1 : 0);
+}
+
+#
+# Class method to check the OPmode is legal.
+#
+sub ValidOpMode($$)
+{
+    my ($self, $opmode) = @_;
+
+    return (exists($OPMODES{$opmode}) ? 1 : 0);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

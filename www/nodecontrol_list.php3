@@ -48,12 +48,14 @@ else {
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
                <a href='floormap.php3'>wireless maps</a>,
-               <a href='floormap.php3?feature=usrp'>
-                  GNU USRP (software defined radio) maps</a>,
                <a href='nodecontrol_list.php3?showtype=wireless'>
-                                                        wireless list</a>,
-               <a href='robotmap.php3'>robot maps</a>,
-               <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
+                                                        wireless list</a>,";
+if ($TBMAINSITE) {
+    echo "     <a href='floormap.php3?feature=usrp'>
+                  GNU USRP (software defined radio) maps</a>,
+               <a href='robotmap.php3'>robot maps</a>, ";
+}
+echo "         <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
 if ($isadmin) {
     echo    ", <a href='nodeutilization.php'>utilization</a>,

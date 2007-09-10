@@ -73,7 +73,7 @@ WRITESUBMENUBUTTON("Create an Image Descriptor",
 		   "newimageid_ez.php3");
 if ($isadmin) {
     WRITESUBMENUBUTTON("Create an OS Descriptor",
-		       "newosid_form.php3");
+		       "newosid.php3");
 }
 WRITESUBMENUBUTTON("OS Descriptor list",
 		   "showosid_list.php3");

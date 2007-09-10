@@ -438,7 +438,7 @@ function SPITFORM($formfields, $errors)
 	         boot sector, while '1' means to start at the beginning of the
 	         first partition (typically starting at sector 63).
              <li>If you are using a custom OS, you must
-                  <a href='newosid_form.php3'>create the OS Descriptor
+                  <a href='newosid.php3'>create the OS Descriptor
                   first!</a>
              <li>The OS (partition) that is active when the node boots up.
              <li>The image file must reside in the project directory.
@@ -927,7 +927,7 @@ if (! isset($node)) {
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
 		   "newimageid_ez.php3");
 WRITESUBMENUBUTTON("Create a new OS Descriptor",
-		   "newosid_form.php3");
+		   "newosid.php3");
 WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
 WRITESUBMENUBUTTON("OS Descriptor list",
