@@ -16,7 +16,7 @@ SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
                   setdest loghole webcopy linkmon_ctl snmp-if-deref.sh \
-		  template_record spewevents \
+		  template_record spewevents newosid \
 		  wbts_dump
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog daemon_wrapper \
@@ -28,7 +28,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage
 WEB_BIN_SCRIPTS = webcreate_image websetdest weblinkmon_ctl webspewevents \
-		  webdelay_config 
+		  webdelay_config webnewosid
 LIBEXEC_SCRIPTS	= spewleds webcopy spewsource webcvsweb xlogin webviewvc \
                   $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS)
 
