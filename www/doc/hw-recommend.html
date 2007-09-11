@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
+   Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -39,10 +39,14 @@ recommendations, and outlines the consequences of each choice.
 		interface should have PXE capability and need only be 100Mb.
 		All experimental
 		interfaces should be the same, unless you are purposely going
-		for a heterogenous environment. The control net interface can
+		for a heterogenous environment. We use Intel cards (Pro100,
+		Pro1000) almost exclusively, but others have also used
+		Broadcom, 3Com and D-link interfaces.
+		The control net interface can
 		be different.  For the control net we have used
 		Intel Pro100 (fxp) and Pro1000 (em) cards,
-		as well as builtin Broadcom (bge) and 3Com (xl) devices.
+		as well as builtin Broadcom (bge), 3Com (xl) and RealTek (re)
+		devices.
 		Note that the older the card/motherboard, the more likely
 		it is that either it will not have PXE or that the PXE
 		implementation will have bugs, so it's
@@ -64,6 +68,10 @@ recommendations, and outlines the consequences of each choice.
 		and/or "low profile" PCI cards.
 		Heat is an issue in smaller cases, as they may not have room
 		for CPU fans. This limits the processor speed that can be used.
+		Smaller cases also make for denser wiring.  See
+		<a href="/gallery/clusterI/full/firstrack.jpg">the back of one of our pc850 racks</a>
+		for example.
+		Denser cabling can affect air flow exacerbating heat issues.
 		For our first round of machines ("pc600"), we bought standard
 		motherboards and 4U cases, and assembled the machines ourselves.
 		For our second round of PCs ("pc850"), we opted for the (now
@@ -122,6 +130,11 @@ recommendations, and outlines the consequences of each choice.
 		For reliable scaling we may someday migrate away
 		from PXE-booting to CD-based booting,
 		as we already do with our widearea and wireless nodes.</dd>
+
+	<dt><b>USB</b></dt>
+		<dd>We currently do not use any USB devices, though booting
+		from a write-protected USB flash drive is another alternative
+		to booting via PXE.</dd>
 
 	<dt><b>VGA</b></dt>
 		<dd>Only needed if motherboard does not have serial console
@@ -233,16 +246,18 @@ recommendations, and outlines the consequences of each choice.
 <hr>
 
 <a NAME="SERVERS"></a><h2>Servers</h2>
-	Two is preferable, though 1 could be made to work if you are willing
+	Two is preferable, though one could be made to work if you are willing
 	to invest some time and effort. The NFS server
 	needs enough space for /users and /proj , as well as a few extra gigs
 	for build trees, logs, and images.  If you have more than 128 nodes,
 	and plan to use Cyclades or RocketPort serial ports, you need one
 	"tip server" machine per 128 serial lines (other serial muxes may
 	have similar limitations.)  Tip servers do not need to be very
-	powerful. A 1000Mb network connection is suggested for disk image
+	powerful, we use old desktop machines that have full-height PCI slots.
+        A 1000Mb network connection is suggested for the disk image
 	distribution machine (usually boss.) though you can get by with 100Mb.
-	Database machine should have reasonably fast CPU and plenty of RAM.
+	The database machine (boss) should have reasonably fast CPU and
+	plenty of RAM.
 
 <hr>
 
@@ -258,7 +273,7 @@ recommendations, and outlines the consequences of each choice.
 		'molded strain relief' are better than cables with boots, but
 		are often much more extensive. We buy cables in two-foot
 		increments, which keeps slack low without making the order too
-		complicated. Our standard so far has been to make control net
+		complicated. Our "standard" so far has been to make control net
 		cables red, experimental net cables yellow, serial cables
 		white, and cables for control hardware (such as power
 		controllers) green.  We've bought all of our cables from <a
@@ -304,7 +319,7 @@ recommendations, and outlines the consequences of each choice.
 		href="http://www.comtrol.com/products/rocketport.asp">
 		Comtrol RocketPort</a> series of serial muxes.
 		In particular, we use the 32-port RocketPort Universal PCI
-		interfaces (pn 99126-7) and 1U rackmount panels (pn 98700-0).
+		interfaces (pn 99356-8) and 1U rackmount panels (pn 99380-3).
 		As mentioned, you can only have 4 cards (or 128 ports) per
 		machine, so if you have more than 128 nodes, you will need
 		multiple machines to host the interfaces.
@@ -312,18 +327,23 @@ recommendations, and outlines the consequences of each choice.
 		card, so make sure you have a machine with full-height
 		(not low-profile) slots!</dd>
 
-	<dt><b>Serial port reset controllers</b><dt>
-		<dd>It may be possible to build (or buy) serial-port
-		passthroughs that are wired to reset pins on MB.  Some
-		motherboard chipsets (eg. Intel LX+) have this feature built
-		on. NOT TESTED by Utah, and may not be 100% reliable (MB may be
-		able to get into a state where reset pins are not functional.)
-		Theoretically nicer to the hardware than power controllers.<dd>
+	<dt><b>IPMI and ASF support</b></dt>
+		<dd>Most server motherboards, and some desktops, support
+		some form of remote management including remote reset and
+		even "Serial Over LAN."  To date, we have only experimented
+		with ASF for power cycling on a particular Dell Optiplex box
+		with a Broadcom controller.  Getting this working in a non-
+		Windows environment required a Dell-mediated agreement with
+		Broadcom to obtain a Linux configuration client and, in at
+		least this instantiation, the ASF controller can be disabled
+		(confused?) by the host OS driver.  So this has not been a
+		cost-effective solution thus far.
+		</dd>
 
-	<dt><b>"Whack on LAN" power controllers</b><dt>
-		One of our students developed a hardware modification to
+	<dt><b>"Whack on LAN" power controllers</b></dt>
+		<dd>One of our students developed a hardware modification to
 		the Wake-on-LAN mechanism to allow us to reset machines
 		via the network.  See<a
 		href="http://www.cs.utah.edu/gradsac/rd2005/ayers.html">
-		this abstract</a> for a little info.<dd>
-		</dl>
+		this abstract</a> for a little info.</dd>
+</dl>
