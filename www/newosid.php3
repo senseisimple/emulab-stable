@@ -45,7 +45,7 @@ function SPITFORM($formfields, $errors)
     global $this_user, $projlist, $isadmin;
     global $osid_opmodes, $osid_oslist, $osid_featurelist;
     global $TBDB_OSID_OSNAMELEN, $TBDB_OSID_OSNAMELEN;
-    global $TBDB_OSID_VERSLEN, $TBDB_OSID_VERSLEN;
+    global $TBDB_OSID_VERSLEN, $TBDB_OSID_VERSLEN, $TBBASE;
 
     if ($errors) {
 	echo "<table class=nogrid
