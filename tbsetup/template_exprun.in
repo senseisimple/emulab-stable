@@ -547,7 +547,7 @@ if (defined($instance->runidx())) {
 
 	# This imports the experiment directory into the records subdir.
 	System("cd $instance_dir; ".
-	       "$CVSBIN -d $cvsdir import -I 'datastore' ".
+	       "$CVSBIN -t -d $cvsdir import -I 'datastore' ".
 	       "  -m 'Import record for run $this_runid' ".
 	       "  $guid/records/$exptidx,$runidx ${tag}_branch $tag")
 	    == 0 or fatal(-1, "Could not import new record into $cvsdir");
