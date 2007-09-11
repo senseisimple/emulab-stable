@@ -526,7 +526,7 @@ if (defined($instance->runidx())) {
     my $exptidx      = $instance->exptidx();
     my $instance_dir = $instance->path();
     my $cvsdir       = "$projroot/$pid/templates/$guid/cvsrepo";
-    my $tmpdir       = "$projroot/$pid/templates/$guid/cvstmp.$$";
+    my $cvssubdir    = "$guid/records/$exptidx,$runidx";
     my $tag          = "R${exptidx}-${runidx}_import";
     my $instance_tag = "I${exptidx}";
     my $xmlfile      = "$instance_dir/info.xml";
@@ -535,6 +535,12 @@ if (defined($instance->runidx())) {
     if (-e $cvsdir) {
 	if ($STAMPS) {
 	    $instance->Stamp("template_exprun", "cvs stuff starting");
+	}
+	# If the repo subdir exists, it is likely left over from a previous
+	# attempt to stop the run, that failed for some reason. Kill it.
+	if (-e "$cvsdir/$cvssubdir") {
+	    fatal(-1, "Could not remove old $cvsdir/$cvssubdir")
+		if (System("/bin/rm -rf $cvsdir/$cvssubdir"));
 	}
 
 	fatal(-1, "Could not generate XML description for $oldrun")
@@ -547,9 +553,9 @@ if (defined($instance->runidx())) {
 
 	# This imports the experiment directory into the records subdir.
 	System("cd $instance_dir; ".
-	       "$CVSBIN -t -d $cvsdir import -I 'datastore' ".
+	       "$CVSBIN -d $cvsdir import -I 'datastore' ".
 	       "  -m 'Import record for run $this_runid' ".
-	       "  $guid/records/$exptidx,$runidx ${tag}_branch $tag")
+	       "  $cvssubdir ${tag}_branch $tag")
 	    == 0 or fatal(-1, "Could not import new record into $cvsdir");
 
 	unlink($xmlfile);
@@ -562,18 +568,14 @@ if (defined($instance->runidx())) {
 	}
 
 	# No keyword subst.
-	System("$FIND $cvsdir/$guid/records/$exptidx,$runidx ".
+	System("$FIND $cvsdir/$cvssubdir ".
 	       "  -name '*,v' -print -exec $RCS -q -kb '{}' \\;")
 	    == 0 or fatal(-1, "Could not set -kb in $cvsdir");
-
-	# And kill the temp dir.
-	System("/bin/rm -rf $tmpdir");
 
 	# Now tag it with the same tag that was applied for the instance.
 	# Apply to the branch tag directly instead of symbolically since that
 	# does not work properly for some reason. 
-	System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 ".
-	       "  $instance_tag $guid/records/$exptidx,$runidx")
+	System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 $instance_tag $cvssubdir")
 	    == 0 or fatal(-1, "Could not rtag new record in $cvsdir");
 
 	if ($STAMPS) {
