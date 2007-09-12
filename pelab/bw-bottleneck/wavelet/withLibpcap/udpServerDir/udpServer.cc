@@ -19,12 +19,12 @@
 #include <netinet/ether.h>
 
 
-#define LOCAL_SERVER_PORT 5671
+#define LOCAL_SERVER_PORT 9831
 #define MAX_MSG 1024
 
 pcap_t *pcapDescriptor = NULL;
 
-char appAck[37];
+char appAck[60];
 unsigned long long milliSec = 0;
 
 int sd, rc, n, flags;
@@ -61,20 +61,21 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         // TODO:The packet can also be leaving from this host - our libpcap filter
         //  ignores those for now - as such, nothing needs to be done for such packets.
     {
-        cout << "TV_sec = " << pcap_info->ts.tv_sec << ", usec = "<<pcap_info->ts.tv_usec<<"\n";
         unsigned long long secVal = pcap_info->ts.tv_sec;
         unsigned long long usecVal = pcap_info->ts.tv_usec;
         unsigned long long recvTimestamp = secVal*1000 + usecVal/1000;
-        unsigned long long sendTimestamp = *(unsigned long long *)(dataPtr + sizeof(short int) + 1);
+        unsigned long long sendTimestamp = *(unsigned long long *)(dataPtr + 3*sizeof(short int) + 1);
         long long oneWayDelay = recvTimestamp - sendTimestamp;
 
 		appAck[0] = '1';
         memcpy(&appAck[1] ,(dataPtr + 1), sizeof(short int));
-		memcpy(&appAck[1 + sizeof(short int)], &sendTimestamp, sizeof(unsigned long long));
-		memcpy(&appAck[1 + + sizeof(short int) + sizeof(unsigned long long)], &oneWayDelay, sizeof(long long));
+        memcpy(&appAck[1 + sizeof(short int)] ,(dataPtr + 1 + sizeof(short int)), sizeof(short int));
+        memcpy(&appAck[1 + 2*sizeof(short int)] ,(dataPtr + 1 + 2*sizeof(short int)), sizeof(short int));
+		memcpy(&appAck[1 + 3*sizeof(short int)], &sendTimestamp, sizeof(unsigned long long));
+		memcpy(&appAck[1 + + 3*sizeof(short int) + sizeof(unsigned long long)], &oneWayDelay, sizeof(long long));
         cout << "Sending app level ack to "<< inet_ntoa(cliAddr.sin_addr) << ",at " << sendTimestamp << " , recvtimestamp = "<<recvTimestamp<< ", delay = "<< oneWayDelay << endl;
 
-		sendto(sd,appAck,1 + + sizeof(short int) + 2*sizeof(long long),flags,(struct sockaddr *)&cliAddr,cliLen);
+		sendto(sd,appAck,1 + + 3*sizeof(short int) + 2*sizeof(long long),flags,(struct sockaddr *)&cliAddr,cliLen);
 	}
 	else if(packetType == '1') // TODO:This is an udp ACK packet. If it is being sent
 	    // out from this host, do nothing.
@@ -183,7 +184,7 @@ void init_pcap( char *ipAddress)
         pcapDescriptor = pcap_open_live(interface, BUFSIZ, 0, 0, errBuf);
         localAddress.s_addr = netp;
         printf("IP addr = %s\n", ipAddress);
-        sprintf(filter," udp and dst host %s and dst port 5671 ", ipAddress);
+        sprintf(filter," udp and dst host %s and dst port 9831 ", ipAddress);
 
         if(pcapDescriptor == NULL)
         {

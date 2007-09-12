@@ -1,16 +1,3 @@
-/*
-   Detecting Shared Congestion by wavelets
-
-   Header file for shcon.cpp 
-   By Taek H. Kim (thkim@ece.utexas.edu)
-
-Wavelet : Daubechies 12 (db6)
-Thresholding : MINIMAXI soft-thresholding
-Noise Scaling : Multi-level scaling
-Maximum decomposition level : 4
-
- */
-
 #include <math.h>
 #include <algorithm> // reverse_copy()
 #include <numeric>   // accumulate()
@@ -272,7 +259,7 @@ bool delay_correlation(const vector<double> &delay1,
     sum2b += wd2[i] * wd2[i];
     xsum += wd1[i] * wd2[i];
     //printf("Wd1[%d] = %f, Wd2[%d] = %f\n", i, wd1[i], i, wd2[i]);
-    printf("%f %f\n",wd1[i], wd2[i]);
+    //printf("%f %f\n",wd1[i], wd2[i]);
   }
   double meana = suma / nSamples, meanb = sumb / nSamples;
   double sum = xsum - meana * sumb - meanb * suma + meana * meanb * nSamples;
@@ -292,16 +279,17 @@ bool delay_correlation(const vector<double> &delay1,
   }
   double xcor_value;
   if (sum == 0.0) {
-    if (varNa < _SMALL && varNb < _SMALL) xcor_value = 1;
-    if (varNa < _SMALL || varNb < _SMALL) xcor_value = 0;
+    if (varNa < _SMALL && varNb < _SMALL) xcor_value = 0.998;
+    if (varNa < _SMALL || varNb < _SMALL) xcor_value = 0.002;
   } else {
-  std::cout<<"sum2a = "<<sum2a<<", nSamples = "<<nSamples<<", meana = "<<meana<<", suma = "<<suma<<"\n";
-  std::cout<<"sum2b = "<<sum2b<<", nSamples = "<<nSamples<<", meanb = "<<meanb<<", sumb = "<<sumb<<"\n";
+  //std::cout<<"sum2a = "<<sum2a<<", nSamples = "<<nSamples<<", meana = "<<meana<<", suma = "<<suma<<"\n";
+  //std::cout<<"sum2b = "<<sum2b<<", nSamples = "<<nSamples<<", meanb = "<<meanb<<", sumb = "<<sumb<<"\n";
   std::cout<<"varNa = " <<varNa<<", varNb = "<<varNb << ", denom = "<<varNa*varNb<<"\n";
     xcor_value = sum / sqrt(varNa * varNb);
   }
-  if(varNa < 400 && varNb < 400)
-    xcor_value = 0.0001;
-  std::cout<<"CORRELATION="<<xcor_value<<std::endl;
+//  if(varNa < 50.0 || varNb < 50.0)
+ //   xcor_value = 0.0001;
+  //std::cout<<"CORRELATION="<<xcor_value<<std::endl;
+  printf("CORRELATION=%.3f\n", xcor_value);
   return (xcor_value >= threshold)? 1:0;
 }
