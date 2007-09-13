@@ -239,7 +239,7 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 #
 if (exists($newuser_args{'uid'})) {
     UserError("User already exists; pick another login name!")
-	if (User->Lookup($newuser_args{'uid'}));
+	if (User->LookupByUidAll($newuser_args{'uid'}));
     
     UserError("Reserved user name; pick another login name!")
 	if (getpwnam($newuser_args{'uid'}));

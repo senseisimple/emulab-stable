@@ -188,6 +188,22 @@ sub LookupByUid($$)
     return User->Lookup($uid);
 }
 
+# Include archived users, as for checking a newuser account.
+sub LookupByUidAll($$)
+{
+    my ($class, $uid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users where uid='$uid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
 #
 # Lookup user given the unix uid ($UID typically).
 #
