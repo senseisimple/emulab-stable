@@ -758,8 +758,6 @@ This translates into:
   |       |             +-----+       +-----+             |       |
   +-------+                   +-------+                   +-------+
 
-
-
 4b. delay-agent on end nodes.
 
 Fill me in...
@@ -880,17 +878,26 @@ soon.
 
 The CREATE event is sent to all nodes in the cloud (rather, to the shaping
 node responsible for each node's connection to the underlying LAN) and
-creates "node pair" pipes for each node to all other nodes on the LAN.
-Each node-to-LAN connection has two pipes associated with each possible
-destination on the LAN (destinations determined from /etc/hosts file).
-The first pipe is used for most situations and contains BW/delay values
-for the pair.  The second pipe is used when operating in Flexlab hybrid
-mode as described below.  Characteristics of these per-pair pipes cannot
-be set/modified unless a CREATE command has first been executed.
+creates, internal to the delay-agent, "node pair" pipes for each node to
+all other nodes on the LAN.  Actual IPFW rules and dummynet pipes are only
+created the first time a per-pair pipe's characteristics are set via the
+MODIFY event.  This behavior is in part an optimization, but is also
+essential for the hybrid model described later.
+
 There is a corresponding CLEAR event which will destroy all the per-pair
 pipes, leaving only the standard delayed LAN setup (node to LAN pipes).
 
-The cloud snippet above would translate into a setup of:
+Each node-to-LAN connection has two pipes associated with each possible
+destination on the LAN (destinations determined from /etc/hosts file).
+The first pipe is used for shaping bandwidth for the pair.  The second
+pipe is used for shaping delay (and eventually packet loss).  While it
+might seem that the single pipe from a node to the LAN might be sufficient
+for shaping both, the split is needed when operating in the hybrid mode
+as described below.  Characteristics of these per-pair pipes cannot be
+modified unless a CREATE command has first been executed.
+
+Assuming all IPFW/dummynet pipes have been modified, the cloud snippet
+above would translate into a physical setup of:
 
   +----+                        +-------+                        +-------+
   |    |--- to n2 pipe -->+-----+       +-----+<- from n2 pipe --|       |
@@ -914,7 +921,16 @@ The cloud snippet above would translate into a setup of:
 where the top two pipes in each set of three are the new, per-pair pipes
 and the final pipe is the standard shaping pipe which can be thought of
 as the "default" pipe through which any traffic flows for which there is
-not a specific per-pair setup.
+not a specific per-pair setup.  In IPFW, the rules associated with the
+per-pair pipes are numbered starting at 60000 and decreasing.  This gives
+them higher priority than the default pipes which are numbered above 60000.
+
+One important thing to note is that while bandwidth is shaped on the
+outgoing pipe, when a delay value is set on n1 for destination n2, it is
+imposed on the link *into* n1.  This is different than for regular LAN
+shaping (and for the ACIM model below), where bandwidth, delay and loss
+are all applied in one direction.  The reason for the split is explained
+in the hybrid-model discussion below.
 
 5a. Simple mode setup:
 
@@ -929,10 +945,15 @@ command).  If the DEST parameter is not given, then the modification is
 applied to the "default" pipe (i.e., the normal shaping behavior).  For
 example:
 
-    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2 BW=1000 DELAY=10 PLR=0
+    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2 BANDWIDTH=1000 DELAY=10
 
-Assuming 10.0.0.2 is "n2", this would change the "n1 to n2 pipe" and
-possibly the "n1 from n2 pipe."
+Assuming 10.0.0.2 is "n2" in the diagram above, this would change n1's
+"to n2 pipe" to shape the bandwidth, and change n1's "from n2 pipe" to
+handle the delay.  If a more "balanced" shaping is desired, half of each
+characteristic could be applied to both sides via:
+
+    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2 BANDWIDTH=1000 DELAY=5
+    tevc -e pid/eid now cloud-n2 MODIFY DEST=10.0.0.1 BANDWIDTH=1000 DELAY=5
 
 5b. ACIM mode setup:
 
@@ -941,16 +962,22 @@ were not enough, here we further add per-flow pipes!  For example, in the
 diagram above, the six pipes for n1 might also have a seventh pipe for
 "n1 TCP port 10345 to n2 TCP port 80" if a monitored web application running
 on n1 were to connect to the web server on n2.  That pipe could then have
-specific BW, delay and loss characteristics.  It should be noted that only
-one pipe is created here to serve BW/delay/loss, unlike the split of BW
-from the others on per-pair pipes.  The one pipe is in the node-to-lan
-outgoing direction (i.e., on the left hand side in the diagram above).
+specific BW, delay and loss characteristics.
 
-For an application being monitored with ACIM, these more specific pipes
-are created for each flow on the fly as connections are formed.  Flows
-from unmonitored applications will use the node pair pipes.  Note that
-this would include return traffic to the monitored application unless the
-other end were also monitored.
+Note that only one pipe is created here to serve bandwidth, delay and loss,
+unlike the split of BW from the others on per-pair pipes.  The one pipe is
+in the node-to-lan outgoing direction (i.e., on the left hand side in the
+diagram above).
+
+Higher priority is given to per-flow pipes by numbering the IPFW rules
+starting from 100 and working up.  Thus the priority is: per-flow pipe,
+per-pair pipe, default pipe.
+
+For an application being monitored with ACIM, the flow pipes are created
+for each flow on the fly as connections are formed.  Flows from unmonitored
+applications will use the node pair pipes.  Note that this would include
+return traffic to the monitored application unless the other end were also
+monitored.
 
 The tevc commands sports even more parameters to support per-flow pipes.
 In addition to the DEST parameter, there are three others needed:
@@ -964,11 +991,24 @@ SRCPORT:
 DSTPORT:
     The destination UDP or TCP port number.
 
-An example:
+An example follows.  First, a flow pipe must be explicitly created:
+
+    tevc -e pid/eid now cloud-n1 CREATE \
+	DEST=10.0.0.2 PROTOCOL=TCP SRCPORT=10345 DSTPORT=80
+
+Note that unlike per-pair pipes, the CREATE call here immediately creates
+the associated IPFW rule and dummynet pipe.  A flow pipe will inherit its
+initial characteristics from the "parent" per-pair pipe.  Those
+characteristics can be changed with:
 
     tevc -e pid/eid now cloud-n1 MODIFY \
 	DEST=10.0.0.2 PROTOCOL=TCP SRCPORT=10345 DSTPORT=80 \
-	BW=1000 DELAY=10 PLR=0
+	BANDWIDTH=1000 DELAY=10
+
+When finished, the flow pipe is destroyed with:
+
+    tevc -e pid/eid now cloud-n1 CLEAR \
+	DEST=10.0.0.2 PROTOCOL=TCP SRCPORT=10345 DSTPORT=80
 
 5c. Hybrid mode setup:
 
@@ -978,135 +1018,203 @@ form.  For a given node, it allows full per-destination delay settings and
 partial per-destination bandwidth settings.  All destinations that do not
 have individual bandwidth pipes, will share a single, default bandwidth pipe.
 
-This is where the seperate pipes for BW and delay/plr described above
-come into play.  In the current implementation, every node pair has
-individual delay and loss characteristics.  These are implemented on the
-"from node" pipes (i.e., the right-hand side of the diagram above).  Thus
-for a LAN of N nodes, each node will have N-1 "from node" pipes 
-Nodes
-may then also have per-node pair BW pipes to some, but possibly not all,
-of the other nodes.
+This is where the separate pipes for bandwidth and delay/plr described above
+come into play.  Recall that the CREATE call only creates a full NxN set of
+pipes internally, and that actual dummynet pipes are only created when the
+first MODIFY event for the pipe is received.  This allows for having only
+a subset of per-pair pipes active.  Hence, for a given node, by explicitly
+setting the characteristics for only some destination nodes, all other
+destinations will use the default pipe and its characteristics.  This is
+how hybrid mode achieves a shared destination bandwidth.
 
+Specifically, in the current Flexlab hybrid-model implementation, every
+node pair is set with individual delay and loss characteristics via MODIFY
+events.  These are the "from node" pipes (i.e., the right-hand side of
+the diagram above).  Thus for a LAN of N nodes, each node will have N-1
+such "from node" pipes active.  Nodes may then also have per-node pair
+bandwidth pipes to some, but possibly not all, of the other nodes.  These
+are the "to node" (left-hand side) pipes.  Where specific bandwidth per-pair
+pipes are not setup with MODIFY, the default pipe will then be used and
+thus its bandwidth shared by traffic to all unnamed destinations.
 
-To setup unique characteristics per pair, the event should specify a DEST
-parameter:
+This mechanism allows only a single set of shared destination bandwidth
+nodes.  The implementation will have to be modified to allow multiple
+shared destination bandwidth sets or shared source bandwidth sets.
 
-  tevc -e pid/eid now link-node DEST=10.0.0.2 DELAY=10 PLR=0
+The tevc commands to setup unique delay characteristics per pair use the
+DEST parameter:
 
-would say that the link "link-node" from us to 10.0.0.2 should have the
-indicated characteristics.  To setup a shared bandwidth, omit the DEST:
+    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2 DELAY=10
 
-  tevc -e pid/eid now link-node BANDWIDTH=1000
+would say that traffic from us to 10.0.0.2 should have a 10ms round-trip
+delay.  Likewise for setting up unique per-pair bandwidth:
 
-which says that all traffic to all hosts reachable on link-node should share
-a 1000Kb *outgoing* bandwidth.  To allow some hosts to have per-pair
-bandwidth while all others share, then use a command with DEST and BANDWIDTH:
-
-  tevc -e pid/eid now link-node DEST=10.0.0.2 BANDWIDTH=5000
-  tevc -e pid/eid now link-node BANDWIDTH=1000
+    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2 BANDWIDTH=5000
 
 which says that traffic between us and 10.0.0.2 has an outgoing "private"
-BW of 5000Kb while traffic from us to all other nodes in the cloud shares
-a 1000Kb outgoing bandwidth.
+BW of 5000Kb.  To establish the "default" shared bandwidth, we simply
+omit the DEST:
 
-5d. Flexlab shaping implementation.
+    tevc -e pid/eid now cloud-n1 MODIFY BANDWIDTH=1000
 
-At the current time, a Flexlab experiment must have all nodes in a "cloud"
-created via the "make-cloud" method instead of "make-lan."  Make-cloud is
-just syntactic sugar for creating an unshaped LAN with mustdelay set, e.g.:
+to say that traffic from us to all other nodes in the cloud shares a 1000Kb
+outgoing bandwidth.
 
-    set link [$ns duplex-link n1 n2 100Mbps 0ms DropTail]
-    $link mustdelay
+5d. Late additions to Flexlab shaping.
 
-This cloud must have at least three nodes as LANs of two nodes are optimized
-into a link and links do not give us all the pipes we need, as we will see
-soon.
+A later, quick hack added the ability to specify multiple sets of shared
+outgoing bandwidth nodes.  A specification like:
 
-This whole thing is implemented using the two shaping pipes that connect
-every node to a LAN.  Since delay and packet loss are per-node pair but
-bandwidth may be applied to sets of nodes
-The delay and PLR are set on the incoming (lan-to-node)
-pipe, while the BW is applied to the outgoing (node-to-lan) pipe.  Note that
-this is completely different than the normal shaping done on a LAN node.
-Normally, the delay/plr are divided up between the incoming and outgoing pipes.
+    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2,10.0.0.3 BANDWIDTH=5000
 
-So it looks like:
+creates a "per node pair" style pipe for which the destination is a list
+of nodes rather than a single node.  This directly translates into an IPFW
+command:
 
-  +-------+                   +-------+                   +-------+
-  |       |             +-----+       +-----+             |       |
-  | node0 |--- pipe0 -->| if0 |       | if1 |<-- pipe1 ---|       |
-  |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
-  +-------+                   |       |                   |       |
-                              |       |                   |       |
-  +-------+                   |       |                   |       |
-  |       |             +-----+       +-----+             |       |
-  | node1 |--- pipe2 -->| if2 | delay | if3 |<-- pipe3 ---| "lan" |
-  |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
-  +-------+                   |       |                   |       |
-                              |       |                   |       |
-  +-------+                   |       |                   |       |
-  |       |             +-----+       +-----+             |       |
-  | node2 |--- pipe4 -->| if4 |       | if5 |<-- pipe5 ---|       |
-  |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
-  +-------+                   +-------+                   +-------+
+    ipfw add <pipe> pipe <pipe> ip from any to 10.0.0.2,10.0.0.3 in recv <if>
 
-This means that, for any pair of nodes n1 and n2, packets from n1 to n2
-have the BW shaped leaving n1 but the delay applied when arriving at n2
+so it was straightforward, though hacky in the current delay-agent, to
+implement.  This is clearly more general than the one "default rule"
+bandwidth, but would be less efficient in the case where they is only
+one set.
 
-    NOTE: In both the link and LAN case, we have only a single pipe
-    on each side of the shaping node.  While this is sufficient for
-    implementing basic delays, it causes some grief for the Flexlab
-    modifications (described later), where we want to potentially run
-    packets through multiple rules in each direction (e.g., once for
-    BW shaping, once for delay shaping).  With IPFW, you can only
-    apply a single rule to a packet passing through.  In order to
-    apply multiple rules, you would have to run through IPFW multiple
-    times.  However, when using IPFW in combination with bridging,
-    packets are only passed through once (as opposed to with IP
-    forwarding, where packets pass through once on input and once on
-    output. 
+A final variation is a mechanism for allowing the specification for an
+"incoming" delay from a particular node:
 
-There are additional event parameters for hybrid pipes.
+    tevc -e pid/eid now cloud-n1 MODIFY SRC=10.0.0.2 DELAY=10
 
-EVENTTYPE: CREATE, CLEAR
+This would appear to be equivalent to:
 
-# "flow" pipe events
-CREATE: create "flow" pipes.  Each link has two pipes associated with each
-        possible destination (destinations determined from /etc/hosts file).
-	The first pipe is used for most situations and contains BW/delay
-	values.  The second pipe is used when operating in Flexlab hybrid mode.
-	In that case the first pipe is used for delay, the second for BW.
+    tevc -e pid/eid now cloud-n2 MODIFY DEST=10.0.0.1 DELAY=10
 
-CLEAR: destroy all "flow" pipes
+and for round-trip traffic they will produce the same result.  However,
+they will perform differently for one way traffic.  For the SRC= rule,
+traffic from n2 to n1 will see 10ms of delay, but for the DEST= rule
+traffic from n2 to n1 will see no delay since the shaping is on the
+return path.  This is really an implementation artifact though.
 
+So why are there both forms?  I do not recall if there was supposed to
+be a functional difference, or whether it was just a convenience issue
+depending on which object handle you had readily available.
+
+5e. Future additions to Flexlab shaping.
+
+Thus far, the only additional feature that has been requested is the
+ability to specify a "shared source" bandwidth.  For example, with:
+
+    set cloud [$ns make-cloud "n1 n2 n3 n4" 100Mbps 0ms]
+
+we might want to say: "on n1 I want 1Mbs from {n2,n3}" which would
+presumably translate into tevc commands:
+
+    tevc -e pid/eid now cloud-n1 MODIFY SRC=10.0.0.2,10.0.0.3 BW=1000
+
+So why is this a problem?  Going back to the base diagram for a cloud
+(for simplicity assuming a shaping node that could handle shaping four links):
+
+  +-------+                   +-------+                     +-------+
+  |       |             +-----+       +-----+               |       |
+  |  n1   |- to pipes ->| if0 |       | if1 |<- from pipes -|       |
+  |       |    (BW)     +-----+       +-----+    (del)      |       |
+  +-------+                   |       |                     |       |
+                              |       |                     |       |
+  +-------+                   |       |                     |       |
+  |       |             +-----+       +-----+               |       |
+  |  n2   |- to pipes ->| if2 |       | if3 |<- from pipes -|       |
+  |       |    (BW)     +-----+       +-----+    (del)      |       |
+  +-------+                   |       |                     |       |
+                              | delay |                     | "lan" |
+  +-------+                   |       |                     |       |
+  |       |             +-----+       +-----+               |       |
+  |  n3   |- to pipes ->| if4 |       | if5 |<- from pipes -|       |
+  |       |    (BW)     +-----+       +-----+    (del)      |       |
+  +-------+                   |       |                     |       |
+                              |       |                     |       |
+  +-------+                   |       |                     |       |
+  |       |             +-----+       +-----+               |       |
+  |  n4   |- to pipes ->| if6 |       | if7 |<- from pipes -|       |
+  |       |    (BW)     +-----+       +-----+    (del)      |       |
+  +-------+                   +-------+                     +-------+
+
+So the shaping would need to be applied in the "from pipes" for "cloud-n1"
+(i.e., the upper right).  However, the from pipes already include one pipe
+for adding per-pair delay from all other nodes to n1:
+
+    <n2-del> pipe <pipe1a> ip from 10.0.0.2 to any in recv <if1>
+             pipe <pipe1a> config delay 10ms
+    <n3-del> pipe <pipe1b> ip from 10.0.0.3 to any in recv <if1>
+             pipe <pipe1b> config delay 20ms
+    <n4-del> pipe <pipe1c> ip from 10.0.0.4 to any in recv <if1>
+             pipe <pipe1c> config delay 30ms
+
+to which we would need to add a rule for shared bandwidth:
+
+    <n1-bw> pipe <pipe1d> ip from 10.0.0.2,10.0.0.3 to any in recv <if1>
+            pipe <pipe1d> config bw 1000Kbit/sec
+
+but only one of these rules can trigger for each packet coming in on <if1>.
+In this case, packets from 10.0.0.2 and .3 will go through the delay pipes
+(pipe1a or pipe1b) and not the bandwidth pipe (pipe1d).  Putting the
+bandwidth pipe first won't help, now packets will pass through it and
+not the delay pipes!
+
+We could apply the appropriate bandwidth and delay to each of the from
+pipes from .2 and .3 so that there is only one pipe from each node:
+
+    <n2-del> pipe <pipe1a> ip from 10.0.0.2 to any in recv <if1>
+             pipe <pipe1a> config delay 10ms bw 1000Kbit/sec
+    <n3-del> pipe <pipe1b> ip from 10.0.0.3 to any in recv <if1>
+             pipe <pipe1b> config delay 20ms bw 1000Kbit/sec
+
+but now the bandwidth of 1000Kbit/sec is no longer shared.
+
+We could instead augment the left-hand "to pipes" adding an "incoming"
+rule so that we had:
+
+    # to pipes    
+    <n2-bw> pipe <pipe0a> ip from any to 10.0.0.2 in recv <if0>
+    <n2-bw> pipe <pipe0b> ip from any to 10.0.0.3 in recv <if0>
+    <n2-bw> pipe <pipe0c> ip from any to 10.0.0.4 in recv <if0>
+    # new rule
+    <n1-bw> pipe <pipe0d> ip from 10.0.0.2,10.0.0.3 to any out xmit <if0>
+
+However, when combining bridging (recall, <if0> and <if1> are bridged)
+with IPFW, packets traveling in either direction will only pass through
+IPFW once in each direction.  This means that a packet coming from the
+lan to n1, will trigger the appropriate "in recv <if1>" rule (pipe1?)
+and then be immediately placed on the outgoing interface <if0> with no
+further filtering.  Hence, the "out xmit <if0>" rule (aka pipe0d) will
+never be triggered.
+
+So we cannot hang a "shared source bandwidth" pipe in either place nor
+modify any of the existing pipes.
+
+In the big picture, what we might want to be able to support in a shaping
+node are, for each of BW, delay and loss and for each node in an N node cloud:
+
+ * shaping from node to {node set}
+ * shaping to node from {node set}
+
+Here a {node set} might be "all N other nodes in the LAN" in which case
+we have two shaping pipes for a node to and from the LAN (aka, the current
+asymmetric shaped LAN), or a set might contain a single node in which case
+we have N-1 shaping pipes for other nodes (aka, the current Flexlab per
+node pair pipes), or it might be multiple pipes with subsets of 2 to N-1
+nodes (aka, shared-source and shared-destination bandwidth pipes, as well
+as possibly useless shared-source and shared-destination delay and PLR
+pipes).  The only requirement for a set would be that it be disjoint with
+any other set.
+
+
+6. Assorted dummynet mods
 
 Additional MODIFY arguments:
 BWQUANTUM, BWQUANTABLE, BWMEAN, BWSTDDEV, BWDIST, BWTABLE,
 DELAYQUANTUM, DELAYQUANTABLE, DELAYMEAN, DELAYSTDDEV, DELAYDIST, DELAYTABLE,
 PLRQUANTUM, PLRQUANTABLE, PLRMEAN, PLRSTDDEV, PLRDIST, PLRTABLE,
+
 MAXINQ
+    Define a maximum time for packets to be in a queue before they
+    are dropped.  This is the way in which ACIM models the queue
+    length of the bottleneck router.
 
-5b. Hybrid model mods
-
-We want to be able to specify, at a destination, a source delay from a
-specific node.  For example with nodes H1-H5 we might issue commands:
-
-to H1: "10ms from H2 to me, 20ms from H3 to me"
-	tevc ... elabc-h1 SRC=10.0.0.2 DELAY=10ms
-	tevc ... elabc-h1 SRC=10.0.0.3 DELAY=20ms
-delay from H4 to H1 and H5 to H1 will be the "default" (zero?)
-
-We want to be able to specify, at a source, that some set of destinations
-will share outgoing BW.  Currently we support a single, implied set of
-destinations in the sense that you can specify individual host-host links
-with specific outgoing bandwidth, and then all remaining destinations can
-share the "default" BW.  We want to be able to support multiple, explicit
-sets.  For example, with hosts H1-H5 we might issue:
-
-to H3: "1Mbs to {H1,H2}, 2Mbs to H4"
-	tevc ... elabc-h3 DEST=10.0.0.1,10.0.0.2 BANDWIDTH=1000
-	tevc ... elabc-h3 DEST=10.0.0.4 BANDWIDTH=2000
-
-The "default" in this case will be whatever was setup with an earlier
-	tevc ... elabc-h3 BANDWIDTH=2000
-or unlimited if there was no such command.
