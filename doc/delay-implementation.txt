@@ -1,6 +1,9 @@
 [ This file explains how traffic shaping is implemented with the emphasis
 on how the delay-agent works. ]
 
+
+0. Overview
+
 We can shape network links or LANs.  Links can have their characteristics
 set either symmetrically (duplex) or asymmetrically (simplex).  LANs can
 have characteristics set either uniformly for the entire LAN or individually
@@ -8,6 +11,11 @@ per node on the LAN.  Note that shaped LANs are mostly used to emulate
 "clouds" where you are modeling the last hop of nodes connected to some
 opaque network.  We can shape bandwidth, delay and packet loss rate, and
 to a limited extent, queuing behavior.
+
+From the user perspective, links and LANs can be shaped "statically" by
+specifying their characteristics once in the NS file, or dynamically by
+sending "shaping events" via a web page, client GUI, of the command line
+tool "tevc."
 
 Shaping is usually done using a dedicated "delay node" which is interposed
 between nodes on a link or LAN.  A single shaping node can shape one link
@@ -17,7 +25,13 @@ Emulab, one shaping node can handle two nodes connected to the LAN.
 More details are given below.
 
 A lower-fidelity method is to shape the links at the end points ("end node
-shaping").  Larger networks can be emulated in this way.
+shaping").  Larger networks can be emulated in this way since it doesn't
+require a dedicated shaping node for every 1-2 links.
+
+As part of the Flexlab project, Emulab supports shaping LANs in more
+specialized ways.  These include the ability to shape traffic between
+individual node-pairs and even to shape between individual TCP or UDP
+flows among nodes.
 
 Our shaping nodes currently use dummynet, configured via IPFW, running on
 FreeBSD.  Much of the terminology below (e.g., "pipe") comes from this
@@ -27,7 +41,6 @@ between the two interfaces composing a link.  An IPFW rule is setup for
 each interface, and a dummynet pipe associated with each rule.  Shaping
 characteristics are then applied to those pipes.
 
-Complicating factors: LANs, PELAB, endnode shaping...
 
 1. Specifying shaping.
 
@@ -51,7 +64,7 @@ handle LANs.  Commands:
 
 * To set simplex (individual direction) parameters on a link:
 
-	tb-set-link-simplex-params <linkname> <src-node> <del> <bw> <plr>
+	tb-set-link-simplex-params <link> <src-node> <del> <bw> <plr>
 
   As measured from a single node doing a round-trip test, you will observe
   the lesser of the two directional <bw> values, the sum of the directional
@@ -71,7 +84,9 @@ For LANs:
   Here a LAN appears as a set of pairwise links for the purposes of shaping
   characteristics.  Traffic from any node to any other will see the indicated
   values.  Thus, round-trip traffic between any pair of nodes will be the
-  same as for an identically shaped link between those nodes.
+  same as for an identically shaped link between those nodes.  For the
+  remainder of this text, we will generally refer to this as a "symmetrically
+  shaped" or simply "symmetric" LAN.
 
 * You can also construct LANs with per-node characteristics:
 
@@ -92,15 +107,44 @@ For LANs:
 	delay: 2 * <del1> + 2 * <del2>
 	plr: 1 - ((1 - <loss1>)**2 * (1 - <loss2>)**2)
 
-  and if the base LAN is also shaped (characteristics on the make-lan method)
-  then...don't EVEN go there.
+  We refer to this case as an "asymmetrically shaped" or "asymmetric" LAN.
+
+      NOTE: This is a bit of a misnomer however, as it is possible
+      to use tb-set-node-lan-params to set identical (symmetric)
+      characteristics on the node connections, but the observed
+      behavior will be different than for a so-called symmetric LAN
+      setup with the same characteristics.
+
+  It is also possible for the base LAN to be shaped (characteristics on the
+  make-lan method) and for the individual node connections to be shaped (an
+  asymmetric symmetric LAN?).  For sanity reasons we won't EVEN go there.
 
 Shaping can also be modified dynamically using the web page or tevc.
+No matter the UI, the actual work is done by sending link shaping events
+to the shaping client, as described later.
+
+It is possible to force allocation of shaping nodes even for unshaped
+links (i.e., links that might be later dynamically shaped) by using the
+mustdelay method:
+
+	<link-or-lan> mustdelay
 
 End node shaping can be set globally or per-link/LAN:
 
 	tb-use-endnodeshaping <enable?>
 	tb-set-endnodeshaping <link-or-lan> <enable?>
+
+1a. Is a LAN of two nodes a link?
+
+One interesting issue that arises here, and has implications further down
+the line, is whether a LAN of two nodes is equivalent to a link.  The answer,
+as you might expect, is "yes and no."  A duplex-link will behave the same
+as a symmetric LAN of two nodes.  The two are in fact represented in the DB
+and implemented identically.  The same is NOT (quite) true of an asymmetric
+LAN of two nodes, because of the different semantics.  The LAN will be
+"collapsed" into a link in the DB and the implementation will be the same,
+but the characteristics stored in the DB and the resulting observed behavior
+will be different, reflecting the differing semantics.
 
 
 2. Shaping info in the database.
@@ -124,12 +168,12 @@ every node involved.  For example, a link between two nodes:
 
 would have two rows, one for n1 and one for n2:
 
-    +-------+-------+------+------+---------+------+------+---------+
-    | vname | vnode | del  | bw   | loss    | rdel | rbw  | rloss   |
-    +-------+-------+------+------+---------+------+------+---------+
-    | link  | n1    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
-    | link  | n2    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
-    +-------+-------+------+------+---------+------+------+---------+
+    +-------+------+------+---------+------+------+---------+
+    | vnode | del  | bw   | loss    | rdel | rbw  | rloss   |
+    +-------+------+------+---------+------+------+---------+
+    | n1    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    | n2    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
+    +-------+------+------+---------+------+------+---------+
 
 Each row contains the characteristics for "outgoing" or forward traffic on
 the endpoint (del/bw/loss) and the characteristics of "incoming" or reverse
@@ -183,6 +227,8 @@ duplex link above:
     | n3    | 5.00 | 1000 | 0.00501 | 5.00 | 1000 | 0.00501 |
     +-------+------+------+---------+------+------+---------+
 
+As mentioned in earlier text, a symmetric LAN of two nodes is represented
+identically to a duplex link with the same characteristics.
 
 For asymmetric delayed LANs (those with per-node characteristics); e.g.:
 
@@ -211,21 +257,28 @@ The delays table stores the "physical" information related to delays when
 dedicated shaping nodes are used.  This is information about the physical
 instantiation of the virt_lans information and thus only exists when an
 experiment is swapped in.  The delays table information is structured for
-the benefit of the shaping node for which it is intended.  For each
-experiment, there is a single row representing a delayed link or lan
+the benefit of the shaping node for which it is intended.
+
+    NOTE: Shaping nodes do not even exist in the virtual (persistent)
+    state of an experiment.  They are assigned when an experiment
+    is swapped in, and only physical state tables like delays know
+    about them.
+
+For each experiment, there is a single row representing a delayed link or lan
 connection.  Each row has two sets of shaping characteristics, called "pipes".
 Each pipe represents traffic flowing in one direction through the shaping
 node.  Exactly what that means, depends on whether we are shaping a link,
 a symmetrically delayed LAN, or an asymmetrically delayed LAN.  Let's look
 at some examples.
 
-In the interest of full-disclosure, it should be noted that the following
-DB tables were hand-edited for clarity.  In particular, many columns are
-omitted and we currently support only two delayed links per physical
-shaping node.  For the latter, pipe numbers have been renumbered to be
-unique--as though all three LAN nodes were delayed by the same shaping node.
-In reality the delays table also contains the physical node_id of the shaping
-node, and it is the combo of node_id/pipe that is truly unique.
+    NOTE: In the interest of full-disclosure, it should be noted that
+    the following DB tables were hand-edited for clarity.  In particular,
+    many columns are omitted and we currently support only two delayed
+    links per physical shaping node.  For the latter, pipe numbers have
+    been renumbered to be unique--as though all three LAN nodes were
+    delayed by the same shaping node.  In reality the delays table also
+    contains the physical node_id of the shaping node, and it is the
+    combo of node_id/pipe that is truly unique.
 
 For our example duplex link:
 
@@ -274,18 +327,24 @@ we have:
     | n3   | 110 | 5.00  | 1000 | 0.005 | n3   | 120 | 5.00  | 1000 | 0.005 |
     +------+-----+-------+------+-------+------+-----+-------+------+-------+
 
-Note that this is NOT like the entries in the delays table would be for
-duplex links between the sets of nodes.  Instead, the values are "halved".
-Even though the definition of a symmetric shaped LAN leads one to believe
-that the connection between any pair of LAN nodes would look like a duplex
-link, that isn't the case here.  This is due to the fact that the
-implementation of LANs is different than that of links and the delays table
-reflects the implementation.  The difference is that, for links, shaping is
-between two nodes while, for LANs, the shaping is between a node and the LAN.
-Hence one-way traffic on a link is shaped by a single pipe (e.g., n1 -> n2
-via pipe 130 in the duplex link table) while in a LAN, it is shaped by two
-(e.g., n1 -> LAN via pipe 130, LAN -> n2 via pipe 160).  So the values must
-be different in the two implementations to achieve the same observed result.
+Notice that this is NOT like the entries in the delays table would be for
+duplex links between any two nodes in the LAN.  Instead, the values are
+"halved".  Even though the definition of a symmetric shaped LAN leads one
+to believe that the connection between any pair of LAN nodes would look
+like a duplex link, that isn't the case here.  This is due to the fact that
+the implementation of LANs is different than that of links and the delays
+table reflects the implementation.  The difference is that, for links,
+shaping is between two nodes while, for LANs, the shaping is between a node
+and the LAN.  Hence one-way traffic on a link is shaped by a single pipe
+(e.g., n1 -> n2 via pipe 130 in the duplex link table) while in a LAN, it
+is shaped by two (e.g., n1 -> LAN via pipe 130, LAN -> n2 via pipe 160).
+So the values must be different in the two implementations to achieve the
+same observed result.
+
+But what if we had a LAN of two nodes; e.g., removing "n3" above?  Then
+it is represented exactly like a duplex link.  The two lines you would
+get in the delays table by removing "n3" above, are in fact collapsed
+into a single entry that looks like the duplex-link example.
 
 For an asymmetric delayed LAN where nodes have individual shaping parameters,
 such as:
@@ -311,6 +370,21 @@ Thus pipe0 is the path from node to LAN, and pipe1 the path from LAN to node.
 Note that since this is a LAN configuration, traffic from one node to another
 does traverse two pipes.
 
+If we again remove "n3" to get a LAN of two nodes, the remaining two lines
+are again collapsed into one, but the result is NOT the same as for the
+simplex-link example.  Instead we get:
+
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | vn1  | p0  | del0  | bw0  | loss0 | vn2  | p1  | del1  | bw1  | loss1 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+    | n1   | 130 | 30.00 | 1000 | 0.030 | n2   | 140 | 30.00 | 1000 | 0.030 |
+    +------+-----+-------+------+-------+------+-----+-------+------+-------+
+
+This reflects the behavior that traffic from n1 to n2 will see, for example,
+10ms delay from n1 to the LAN and then another 20ms (30ms total) from the
+LAN to n2.
+
+
 2c. linkdelays
 
 The linkdelays table is the analog of the delays table for cases where
@@ -321,7 +395,7 @@ exist for all others.
 The structure of linkdelays is very similar to that of delays.
 As with delays, the entries only exist when an experiment is swapped in.
 Again, for each experiment, there is a single row representing a delayed
-link or lan connection and each row has two pipes and the associated
+link or LAN connection and each row has two pipes and the associated
 characteristics.  However, here the pipes represent traffic out of the
 node ("pipe", analogous to delays "pipe0") and traffic into the node
 ("rpipe" analogous to delays "pipe1").
@@ -444,35 +518,119 @@ link as given in the NS file.
 The NOSHAPING parameter is not used by the delay agent.  It is used for
 link monitoring to indicate that a bridge with no pipes should be setup.
 
-This information is used at boottime to create two files.
-
+This information is used at boot time to create two files.  One is for
+the benefit of the delay-agent and is discussed later.  The other,
 /var/emulab/boot/rc.delay is constructed on dedicated shaping nodes.
 This file contains shell commands and is run to configure the bridge
 and pipes.  For each delayed link/LAN (i.e., each line of the tmcc delays
 information) the two interfaces are bridged together using the FreeBSD
 bridge code and IPFW is enabled for the bridge.  Then the assorted IPFW
 pipes are configured, again using the information from tmcc.  The result
-looks something like:
+looks something like this for a link:
 
-    sysctl -w net.link.ether.bridge=0
-    sysctl -w net.link.ether.bridge_ipfw=0
-    sysctl -w net.link.ether.bridge_cfg=fxp2:69,fxp3:69,fxp1:70,fxp4:70,
+    sysctl -w net.link.ether.bridge_cfg=<if0>:69,<if1>:69,
     sysctl -w net.link.ether.bridge=1
     sysctl -w net.link.ether.bridge_ipfw=1
     ...
-    ipfw add 60110 pipe 60110 ip from any to any in recv fxp2
-    ipfw add 60120 pipe 60120 ip from any to any in recv fxp3
-    ipfw pipe 60110 config delay 5ms bw 1000Kbit/s plr 0.005 queue 50 
-    ipfw pipe 60120 config delay 5ms bw 1000Kbit/s plr 0.005 queue 2 
-    ipfw add 60130 pipe 60130 ip from any to any in recv fxp1
-    ipfw add 60140 pipe 60140 ip from any to any in recv fxp4
-    ipfw pipe 60130 config delay 5ms bw 1000Kbit/s plr 0.005 queue 50 
-    ipfw pipe 60140 config delay 5ms bw 1000Kbit/s plr 0.005 queue 2 
+    ipfw add <pipe0> pipe <pipe0> ip from any to any in recv <if0>
+    ipfw add <pipe1> pipe <pipe1> ip from any to any in recv <if1>
+    ipfw pipe <pipe0> config delay <del0>ms bw <bw0>Kbit/s plr <plr0> <q0-params>
+    ipfw pipe <pipe1> config delay <del1>ms bw <bw1>Kbit/s plr <plr1> <q1-params>
     ...   
 
-/var/emulab/boot/delay_mapping contains information about which interfaces
-are associated with which pipes.  It is used by the delay-agent which
-handles dynamic changes to shaping, and its format is described below.
+Or pictorially:
+
+  +-------+                      +-------+                      +-------+
+  |       |                +-----+       +-----+                |       |
+  | node0 |---- pipe0 ---->| if0 | delay | if1 |<---- pipe1 ----| node1 |
+  |       | del0/bw0/plr0  +-----+       +-----+  del1/bw1/plr1 |       |
+  +-------+                      +-------+                      +-------+
+
+In terms of physical connectivity, node0's interface and delay's
+interface <if0> are in a switch VLAN together while node1's interface and
+delay's <if1> are in another VLAN.
+
+For a LAN, consider a shaping node which is handling two nodes from a
+potentially larger LAN.  There would be two lines from tmcd:
+
+DELAY INT0=<mac0> INT1=<mac1> \
+ PIPE0=<pipe0> DELAY0=<delay0> BW0=<bw0> PLR0=<plr0> \
+ PIPE1=<pipe1> DELAY1=<delay1> BW1=<bw1> PLR1=<plr1> \
+ LINKNAME=<lan> \
+ <queue0 params> <queue1 params> \
+ VNODE0=<node0> VNODE1=<node0> NOSHAPING=<0|1>
+
+DELAY INT0=<mac2> INT1=<mac3> \
+ PIPE0=<pipe2> DELAY0=<delay2> BW0=<bw2> PLR0=<plr2> \
+ PIPE1=<pipe3> DELAY1=<delay3> BW1=<bw3> PLR1=<plr3> \
+ LINKNAME=<lan> \
+ <queue2 params> <queue3 params> \
+ VNODE0=<node1> VNODE1=<node1> NOSHAPING=<0|1>
+
+Note that LINKNAME is the same in both lines since the shaping node is
+handling two nodes in the same LAN.  Also, in each line, VNODE0 and VNODE1
+are the same since the two pipes describe connections for the same node
+to and from the LAN as indicated in the picture below.
+
+    sysctl -w net.link.ether.bridge_cfg=<if0>:69,<if1>:69,<if2>:70,<if3>:70,
+    sysctl -w net.link.ether.bridge=1
+    sysctl -w net.link.ether.bridge_ipfw=1
+    ...
+    ipfw add <pipe0> pipe <pipe0> ip from any to any in recv <if0>
+    ipfw add <pipe1> pipe <pipe1> ip from any to any in recv <if1>
+    ipfw pipe <pipe0> config delay <del0>ms bw <bw0>Kbit/s plr <plr0> <q0-params>
+    ipfw pipe <pipe1> config delay <del1>ms bw <bw1>Kbit/s plr <plr1> queue 5
+    ipfw add <pipe2> pipe <pipe2> ip from any to any in recv <if2>
+    ipfw add <pipe3> pipe <pipe3> ip from any to any in recv <if3>
+    ipfw pipe <pipe2> config delay <del2>ms bw <bw2>Kbit/s plr <plr2> <q2-params>
+    ipfw pipe <pipe3> config delay <del3>ms bw <bw3>Kbit/s plr <plr3> queue 5
+
+which looks like:
+
+  +-------+                      +-------+                      +-------+
+  |       |                +-----+       +-----+                |       |
+  | node0 |---- pipe0 ---->| if0 |       | if1 |<---- pipe1 ----|       |
+  |       | del0/bw0/plr0  +-----+       +-----+  del1/bw1/plr1 |       |
+  +-------+                      |       |                      |       |
+                                 | delay |                      | "lan" |
+  +-------+                      |       |                      |       |
+  |       |                +-----+       +-----+                |       |
+  | node1 |---- pipe2 ---->| if2 |       | if3 |<---- pipe3 ----|       |
+  |       | del2/bw2/plr2  +-----+       +-----+  del3/bw3/plr3 |       |
+  +-------+                      +-------+                      +-------+
+                                                                  |   |
+                                                    (to other     |   |
+                                                  shaping nodes)  V   V
+
+
+In terms of physical connectivity, node0's interface and delay's
+interface <if0> are in a switch VLAN together as are node1's interface
+and delay's <if2>.  On the other side, delay's <if1> and <if3> (along with
+interfaces for shaping nodes for any other nodes in the LAN) are in a VLAN
+together.  Note that traffic between node0 and node1 will not take a
+loopback "shortcut" on delay as the bridges between <if0>/<if1> and
+<if2>/<if3> ensure that traffic is pushed out onto the LAN.
+
+    NOTE: Looking at the previous two diagrams, you can see the main
+    reason that LANs of two nodes are converted into links.  If the
+    LAN example just above had only the two nodes shown and was
+    implemented as a true LAN, it would require twice as many shaping
+    resources as for a link.  That is, a link has one set of shaping
+    pipes between nodes while a LAN of two nodes would have two sets.
+
+    NOTE: These diagrams also show a subtle implementation issue
+    with respect to switches.  Consider the shaped link between
+    node0 and node1 in the first diagram.  Because the shaping node
+    is bridging traffic between its if0 and if1, a side effect is
+    that traffic with node0's MAC address will arrive at the switch
+    not only at the port to which node0 is attached, but also at the
+    port to which delay's if1 is attached.  Ditto for node1's MAC
+    on its switch port and delay's if0 port.  Some switches cannot
+    handle the same MAC address appearing on multiple ports in
+    different VLANs.  These switches have a global (as opposed to
+    per-VLAN) MAC table used for "learning" which MACs are behind
+    which ports and are confused by the same MAC appearing on
+    different ports.
 
 3b. Endnode shaping
 
@@ -516,33 +674,23 @@ completely work.
 continue to gloss over for now.  Suffice it to say, the parameters pretty
 much directly translate into dummynet configuration parameters.
 
-This information is used at boottime to create three files.  The first
-two are concerned with the setup of static, boot time shaping parameters.
-One file is for dedicated shaping nodes, the other for endnode shaping
-on experiment nodes.
-
+As with the shaping node case, the information is used at boot time to
+create two files.  One for the delay-agent discussed in the next section,
+and the other for boot time configuration of the shaping pipes.
 /var/emulab/boot/rc.linkdelay is analogous to rc.delay for dedicated shaping
 nodes.  It contains shell commands and is run to configure IPFW on the shaped
 interfaces.  The result looks something like:
 
-    ifconfig em1 media 100baseTX mediaopt full-duplex
-    ipfw add 110 pipe 110 ip from any to any out xmit em1 nexthop 10.1.2.2:255.255.255.0
-    ipfw pipe 110 config delay 10ms bw 1000Kbit/s plr 0.010 queue 50 
-    ipfw add 120 pipe 120 ip from any to any in recv em1
-    ipfw pipe 120 config delay 10ms bw 1000Kbit/s plr 0 queue 5
-    ifconfig em0 media 100baseTX mediaopt full-duplex
-    ipfw add 130 pipe 130 ip from any to any out xmit em0 nexthop 10.1.1.2:255.255.255.0
-    ipfw pipe 130 config delay 10ms bw 1000Kbit/s plr 0.010 queue 50 
-
-Note the nexthop rules which, as mentioned, are no longer relevant but are
-still produced.
-
-/var/emulab/boot/delay_mapping is the same as for shaping nodes.
+    ifconfig <if> media 100baseTX mediaopt full-duplex
+    ipfw add <pipe> pipe <pipe> ip from any to any out xmit <if>
+    ipfw pipe <if> config delay <del>ms bw <bw>Kbit/s plr <plr> <q-params>
+    ipfw add <rpipe> pipe <rpipe> ip from any to any in recv <if>
+    ipfw pipe <rpipe> config delay <del>ms bw <bw>Kbit/s plr 0 queue 5
 
 
 4. Dynamic shaping with the delay-agent.
 
-4a. Physical configuration of delay nodes.
+4a. delay-agent running on dedicated shaping nodes.
 
 The delay-agent uses a mapping file created at boot time to determine
 what names are associated with what interfaces and delay pipes.
@@ -564,7 +712,8 @@ of the link.  <if0> is associated with <node0> and <if1> with <node1>.
 For a lan, <if0> is associated with <node0> and <if1> with "the lan"
 (see below for more info).
 
-For a link (or a LAN of 2 nodes) this translates into:
+Reviewing the diagrams from the previous section, the shaping setup for
+a link (or LAN of two nodes) looks like:
 
   +-------+                   +-------+                   +-------+
   |       |             +-----+       +-----+             |       |
@@ -572,15 +721,8 @@ For a link (or a LAN of 2 nodes) this translates into:
   |       |             +-----+       +-----+             |       |
   +-------+                   +-------+                   +-------+
 
-In terms of physical connectivity, node0's interface and delay's
-interface <if0> are in a switch VLAN together while node1's interface and
-delay's <if1> are in another VLAN.  The delay node bridges the two
-interfaces together, applying dummynet shaping via IPFW at each interface.
-
-The IPFW rules on delay (setup via /var/emulab/boot/rc.delay) are:
-
-  pipe <pipe0> ip from any to any in recv <if0>
-  pipe <pipe1> ip from any to any in recv <if1>
+So the delay_mapping file provides the necessary context to map events
+for the link <linkname> to IPFW operations on dummynet pipes.
 
 A LAN of 3 or more nodes is considerably different.  Each node will have
 two pipes again, one between the node and the delay node and one between
@@ -590,10 +732,11 @@ the delay node and "the lan".  The delay_mapping file now looks like:
   <linkname> <linktype> <node1> <node1> <if2> <if3> <pipe2> <pipe3>
   <linkname> <linktype> <node2> <node2> <if4> <if5> <pipe4> <pipe5>
 
-[ Of course, our delay nodes can only delay two links since they have only
-4 interfaces, so there will actually be two delay nodes in an experiment
-of three nodes.  But for this explanation, we pretend that one delay node
-has six interfaces and would have the above lines... ]
+    NOTE: Of course, our shaping nodes can only handle two links
+    each since they have only four interfaces, so there will
+    actually be two shaping nodes for a LAN of three nodes.
+    But for this explanation, we pretend that one shaping node
+    has six interfaces and would have the above lines.
 
 This translates into:
 
@@ -615,49 +758,236 @@ This translates into:
   |       |             +-----+       +-----+             |       |
   +-------+                   +-------+                   +-------+
 
-and the IPFW rules:
 
-  pipe <pipe0> ip from any to any in recv <if0>
-  pipe <pipe1> ip from any to any in recv <if1>
-  pipe <pipe2> ip from any to any in recv <if2>
-  pipe <pipe3> ip from any to any in recv <if3>
-  pipe <pipe4> ip from any to any in recv <if4>
-  pipe <pipe5> ip from any to any in recv <if5>
 
-4b. Dynamic configuration via events.
+4b. delay-agent on end nodes.
+
+Fill me in...
+
+4c. Dynamic configuration via events.
 
 Emulab events are used to communicate and effect changes on links.
 delay-agent specific events have the following arguments.
 
 OBJNAME: the link being controlled.
-  The name is of the form <linkname>-<nodename>.
-  Duplex links have two such names, one each for src/dst nodename.
-  Duplex lans also have two, one each toward/from the LAN "node".
+  The name is of the form <linkname> or <linkname>-<nodename>.
+  The former is used duplex links and symmetrically shaped LANs to
+  change the global characteristics.  The latter is used to identify
+  specific endpoints of a link or LAN to effect simplex-style changes.
 
-OBJTYPE: LINK
+OBJTYPE: the event agent type.
+  Always "LINK".
 
-EVENTTYPE: RESET, UP, DOWN, MODIFY
+EVENTTYPE: operations on links and LANs.
+  One of: RESET, UP, DOWN, MODIFY.
+
   RESET forces a complete re-running of "delaysetup" which tears down
   all existing dummynet and bridging, and sets it up again.  Currently
-  only used as part of the Flexlab infrastructure below.
+  only used as part of the Flexlab infrastructure below, but not specific
+  to it.
 
   UP, DOWN will take the indicated link up or down.  Taking a link down
   is done by setting the packet loss rate to 1.  Up returns the plr to
   its previous value.
 
-  MODIFY is used for all other changes.
-  BANDWIDTH (in kilobits/sec), DELAY (in millis), PLR (0 to 1),
-  LIMIT (q-limit in packets, unless...), QUEUE-IN-BYTES (q limit is in bytes),
-  MAXTHRESH, THRESH, LINTERM, Q_WEIGHT (dummynet RED params),
-  PIPE (to apply changes to)
+  MODIFY is used for all other changes:
+    PIPE=N: shaping pipe to apply changes to,
+    BANDWIDTH=N: bandwidth, measured in kilobits per second,
+    DELAY=N: one-way delay measured in milliseconds,
+    PLR=N.N: a packet loss probability between 0 and 1,
+    LIMIT=N: the maximum length of the bandwidth shaping queue in packets,
+    QUEUE-IN-BYTES: indicates that limit is bytes rather than packets,
+    MAXTHRESH, THRESH, LINTERM, Q_WEIGHT: assorted dummynet RED params.
+
+The tevc syntax for sending these events is:
+
+    tevc -e pid/eid now <objname> <eventtype> <args...>
+
+Links and lans are identified by the names given to them in the NS file
+(e.g., "link1", "biglan").  Appending the node name with a dash (e.g.,
+"link1-n2", "biglan-client5") identifies a particular node's connection
+to the indicated link/lan and is used for modifying one-way params.
+The object type (LINK) is implied by the object and does not need to be
+passed via tevc.
+
 
 5. Flexlab configuration.
 
-5a. Hybrid mode setup:
+Flexlab has a variety of interesting requirements.  In the "application-
+centric" Internet Model (ACIM), it wants to be able to perform traffic
+shaping on a per-flow basis.  Here a flow is a combination of protocol,
+src and dst IP address and port numbers.  These flow pipes are setup and
+torn down on demand as the application being monitored opens and closes
+network connections.  Different pipes are used for traffic in each direction.
+In addition to bandwidth and delay (no loss rate yet), it also indirectly
+tracks the maximum queuing delay of the bottleneck router and wants to be
+able to emulate that in dummynet.
 
-The current so-called "hybrid mode" setup for the current so-called "simple
-model" allows for per-node pairs in an Internet "cloud" (i.e., a LAN) to have
-individual (per pair) delay and plr, but potentially a shared bandwidth.
+There are also two "simple," measurement-driven models.  The simple-static
+model uses historic data to do a one-time configuration of the shaping of
+links between host pairs.  The simple-dynamic model continuously updates
+the link shaping parameters based on current values collected from a
+background measurement service.  Both of the simple models require two
+simplex pipes per host pair in the experiment, one in each direction. 
+
+Finally, there are some improvements on the simple model which attempt
+to recognize bottleneck links in the topology of communicating nodes.
+In this so-called "hybrid" model, there is not a complete set of node-pair
+shaping pipes for all characteristics.  Instead a nodes may share a
+bandwidth pipe to a set of destination nodes.  The node may also have a
+different shared bandwidth pipe to another set of nodes, or may have
+per-node destination bandwidth pipes as well:
+
+
+N5 <----+                     +----> N2
+         \  5Mbps    10Mbps  /
+N6 <------+<----- N1 ------>+------> N3
+                  /          \
+N7 <-------------+            +----> N4
+       50Mbps
+
+This is the "shared destination" variant of the hybrid model.  There is also
+an analogous (and as of yet unimplemented) shared-source model in which
+incoming traffic for a node from a set of nodes shares a bandwidth pipe.
+In both of the shared models, bandwidth and delay are still per node-pair
+attributes.
+
+It is assumed that the ACIM and simple models will not exist within the
+same experiment; i.e., a delay node only has to implement one or the
+other at any given time.
+
+While all of these models are configured and managed dynamically using
+events and the delay-agents, there are some changes to the NS file
+necessary to accommodate Flexlab usage.
+
+A Flexlab experiment must have all nodes in a "cloud" created via the
+"make-cloud" method instead of "make-lan":
+
+    set cloud [$ns make-cloud "n1 n2 n3" 100Mbps 0ms]
+
+Make-cloud is roughly equivalent to creating a symmetrically shaped LAN
+with no initial shaping (i.e., with mustdelay set to force allocation of
+shaping nodes), and with special triggering of a CREATE event (described
+below) at boot time, e.g.:
+
+    set cloud [$ns make-lan "n1 n2 n3" 100Mbps 0ms]
+    $cloud mustdelay
+    $ns at 0 "$cloud CREATE"
+
+A cloud must have at least three nodes as LANs of two nodes are optimized
+into a link and links do not give us all the pipes we need, as we will see
+soon.
+
+The CREATE event is sent to all nodes in the cloud (rather, to the shaping
+node responsible for each node's connection to the underlying LAN) and
+creates "node pair" pipes for each node to all other nodes on the LAN.
+Each node-to-LAN connection has two pipes associated with each possible
+destination on the LAN (destinations determined from /etc/hosts file).
+The first pipe is used for most situations and contains BW/delay values
+for the pair.  The second pipe is used when operating in Flexlab hybrid
+mode as described below.  Characteristics of these per-pair pipes cannot
+be set/modified unless a CREATE command has first been executed.
+There is a corresponding CLEAR event which will destroy all the per-pair
+pipes, leaving only the standard delayed LAN setup (node to LAN pipes).
+
+The cloud snippet above would translate into a setup of:
+
+  +----+                        +-------+                        +-------+
+  |    |--- to n2 pipe -->+-----+       +-----+<- from n2 pipe --|       |
+  | n1 |--- to n3 pipe -->| if0 |       | if1 |<- from n3 pipe --|       |
+  |    |-- from n1 pipe ->+-----+       +-----+<-- to n1 pipe ---|       |
+  +----+       (BW)             |       |         (del/plr)      |       |
+                                |       |                        |       |
+  +----+                        |       |                        |       |
+  |    |--- to n1 pipe -->+-----+       +-----+<- from n1 pipe --|       |
+  | n2 |--- to n3 pipe -->| if2 | delay | if3 |<- from n3 pipe --| "lan" |
+  |    |-- from n2 pipe ->+-----+       +-----+<-- to n2 pipe ---|       |
+  +----+       (BW)             |       |         (del/plr)      |       |
+                                |       |                        |       |
+  +----+                        |       |                        |       |
+  |    |--- to n1 pipe -->+-----+       +-----+<- from n1 pipe --|       |
+  | n3 |--- to n2 pipe -->| if0 |       | if1 |<- from n2 pipe --|       |
+  |    |-- from n3 pipe ->+-----+       +-----+<-- to n3 pipe ---|       |
+  +----+       (BW)             +-------+         (del/plr)      +-------+
+
+
+where the top two pipes in each set of three are the new, per-pair pipes
+and the final pipe is the standard shaping pipe which can be thought of
+as the "default" pipe through which any traffic flows for which there is
+not a specific per-pair setup.
+
+5a. Simple mode setup:
+
+In both the simple-static and simple-dynamic models, tevc commands are
+used to assign characteristics to the various per-pair pipes created above.
+In the static case, this is done only at boot time.  In the dynamic case,
+it is done periodically throughout the lifetime of the experiment.  To
+accomplish this, the tevc MODIFY event is augmented with an additional
+DEST parameter.  The DEST parameter is used to identify a specific node
+pair pipe (the source is implied by the link object targeted by the tevc
+command).  If the DEST parameter is not given, then the modification is
+applied to the "default" pipe (i.e., the normal shaping behavior).  For
+example:
+
+    tevc -e pid/eid now cloud-n1 MODIFY DEST=10.0.0.2 BW=1000 DELAY=10 PLR=0
+
+Assuming 10.0.0.2 is "n2", this would change the "n1 to n2 pipe" and
+possibly the "n1 from n2 pipe."
+
+5b. ACIM mode setup:
+
+ACIM mode is again a dynamic shaping feature.  As if per-node pair pipes
+were not enough, here we further add per-flow pipes!  For example, in the
+diagram above, the six pipes for n1 might also have a seventh pipe for
+"n1 TCP port 10345 to n2 TCP port 80" if a monitored web application running
+on n1 were to connect to the web server on n2.  That pipe could then have
+specific BW, delay and loss characteristics.  It should be noted that only
+one pipe is created here to serve BW/delay/loss, unlike the split of BW
+from the others on per-pair pipes.  The one pipe is in the node-to-lan
+outgoing direction (i.e., on the left hand side in the diagram above).
+
+For an application being monitored with ACIM, these more specific pipes
+are created for each flow on the fly as connections are formed.  Flows
+from unmonitored applications will use the node pair pipes.  Note that
+this would include return traffic to the monitored application unless the
+other end were also monitored.
+
+The tevc commands sports even more parameters to support per-flow pipes.
+In addition to the DEST parameter, there are three others needed:
+
+PROTOCOL:
+    Either "UDP" or "TCP".
+
+SRCPORT:
+    The source UDP or TCP port number.
+
+DSTPORT:
+    The destination UDP or TCP port number.
+
+An example:
+
+    tevc -e pid/eid now cloud-n1 MODIFY \
+	DEST=10.0.0.2 PROTOCOL=TCP SRCPORT=10345 DSTPORT=80 \
+	BW=1000 DELAY=10 PLR=0
+
+5c. Hybrid mode setup:
+
+Hybrid mode adds the possibility groups of nodes sharing bandwidth to or
+from a specific node.  The current implementation allows only a limited
+form.  For a given node, it allows full per-destination delay settings and
+partial per-destination bandwidth settings.  All destinations that do not
+have individual bandwidth pipes, will share a single, default bandwidth pipe.
+
+This is where the seperate pipes for BW and delay/plr described above
+come into play.  In the current implementation, every node pair has
+individual delay and loss characteristics.  These are implemented on the
+"from node" pipes (i.e., the right-hand side of the diagram above).  Thus
+for a LAN of N nodes, each node will have N-1 "from node" pipes 
+Nodes
+may then also have per-node pair BW pipes to some, but possibly not all,
+of the other nodes.
+
+
 To setup unique characteristics per pair, the event should specify a DEST
 parameter:
 
@@ -679,8 +1009,23 @@ which says that traffic between us and 10.0.0.2 has an outgoing "private"
 BW of 5000Kb while traffic from us to all other nodes in the cloud shares
 a 1000Kb outgoing bandwidth.
 
+5d. Flexlab shaping implementation.
+
+At the current time, a Flexlab experiment must have all nodes in a "cloud"
+created via the "make-cloud" method instead of "make-lan."  Make-cloud is
+just syntactic sugar for creating an unshaped LAN with mustdelay set, e.g.:
+
+    set link [$ns duplex-link n1 n2 100Mbps 0ms DropTail]
+    $link mustdelay
+
+This cloud must have at least three nodes as LANs of two nodes are optimized
+into a link and links do not give us all the pipes we need, as we will see
+soon.
+
 This whole thing is implemented using the two shaping pipes that connect
-every node to a LAN.  The delay and PLR are set on the incoming (lan-to-node)
+every node to a LAN.  Since delay and packet loss are per-node pair but
+bandwidth may be applied to sets of nodes
+The delay and PLR are set on the incoming (lan-to-node)
 pipe, while the BW is applied to the outgoing (node-to-lan) pipe.  Note that
 this is completely different than the normal shaping done on a LAN node.
 Normally, the delay/plr are divided up between the incoming and outgoing pipes.
@@ -705,6 +1050,22 @@ So it looks like:
   |       |    (BW)     +-----+       +-----+  (del/plr)  |       |
   +-------+                   +-------+                   +-------+
 
+This means that, for any pair of nodes n1 and n2, packets from n1 to n2
+have the BW shaped leaving n1 but the delay applied when arriving at n2
+
+    NOTE: In both the link and LAN case, we have only a single pipe
+    on each side of the shaping node.  While this is sufficient for
+    implementing basic delays, it causes some grief for the Flexlab
+    modifications (described later), where we want to potentially run
+    packets through multiple rules in each direction (e.g., once for
+    BW shaping, once for delay shaping).  With IPFW, you can only
+    apply a single rule to a packet passing through.  In order to
+    apply multiple rules, you would have to run through IPFW multiple
+    times.  However, when using IPFW in combination with bridging,
+    packets are only passed through once (as opposed to with IP
+    forwarding, where packets pass through once on input and once on
+    output. 
+
 There are additional event parameters for hybrid pipes.
 
 EVENTTYPE: CREATE, CLEAR
@@ -713,16 +1074,11 @@ EVENTTYPE: CREATE, CLEAR
 CREATE: create "flow" pipes.  Each link has two pipes associated with each
         possible destination (destinations determined from /etc/hosts file).
 	The first pipe is used for most situations and contains BW/delay
-	values.  The second pipe is used when operating in PELAB hybrid mode.
+	values.  The second pipe is used when operating in Flexlab hybrid mode.
 	In that case the first pipe is used for delay, the second for BW.
 
 CLEAR: destroy all "flow" pipes
 
-# "flow" pipe specification params
-DEST: destination IP address
-PROTOCOL: UDP or TCP
-SRCPORT: source port number
-DSTPORT: destination port number
 
 Additional MODIFY arguments:
 BWQUANTUM, BWQUANTABLE, BWMEAN, BWSTDDEV, BWDIST, BWTABLE,
