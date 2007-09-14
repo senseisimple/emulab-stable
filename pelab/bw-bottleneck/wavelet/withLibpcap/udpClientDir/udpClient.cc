@@ -1,4 +1,4 @@
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h> 
-#include <sys/time.h> 
+#include <string.h>
+#include <sys/time.h>
 #include <pcap.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -34,6 +34,7 @@ pcap_t *pcapDescriptor = NULL;
 
 using namespace std;
 
+vector< vector< vector< vector<double> > > > sendTimesArray;
 vector< vector< vector< vector<int> > > > delaySequenceArray;
 vector< vector< vector< map<unsigned long long, int> > > > packetTimeMaps;
 vector< vector< vector< map<string, unsigned long long> > > > actualTimeMaps;
@@ -92,6 +93,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         cout <<" Orig timestamp was "<< tmpStrStream.str() << " , actual time = "<< actualTimeMaps[xIndex][yIndex][hostIndex][tmpStrStream.str()]<<"\n";
         cout <<"Packet time map Index = "<< packetTimeMaps[xIndex][yIndex][hostIndex][origTimestamp] << ", host index = " << hostIndex << " \n";
         delaySequenceArray[xIndex][yIndex][hostIndex][packetTimeMaps[xIndex][yIndex][hostIndex][origTimestamp]] = oneWayDelay - ( actualTimeMaps[xIndex][yIndex][hostIndex][tmpStrStream.str()] - origTimestamp);
+        sendTimesArray[xIndex][yIndex][hostIndex][packetTimeMaps[xIndex][yIndex][hostIndex][origTimestamp]] = actualTimeMaps[xIndex][yIndex][hostIndex][tmpStrStream.str()];
 
         if(oneWayDelay < 50000 && oneWayDelay > -50000 && (delaySequenceArray[xIndex][yIndex][hostIndex][packetTimeMaps[xIndex][yIndex][hostIndex][origTimestamp]] > 100000 || delaySequenceArray[xIndex][yIndex][hostIndex][packetTimeMaps[xIndex][yIndex][hostIndex][origTimestamp]] < -100000 ) )
         {
@@ -172,7 +174,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
     // Ignore the IP options for now - but count their length.
     /////////////////////////////////////////////////////////
-    u_char *udpPacketStart = (u_char *)(pkt_data + sizeof(struct ether_header) + ipHeaderLength*4); 
+    u_char *udpPacketStart = (u_char *)(pkt_data + sizeof(struct ether_header) + ipHeaderLength*4);
 
     struct udphdr const *udpPacket;
 
@@ -212,7 +214,7 @@ void init_pcap( char *ipAddress)
         exit(1);
     }
 
-    pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp); 
+    pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp);
     pcap_setfilter(pcapDescriptor, &bpfProg);
     pcap_setnonblock(pcapDescriptor, 1, errBuf);
 
@@ -238,7 +240,7 @@ int main(int argc, char **argv)
     ifstream inputFileHandle;
 
     localhostEnt = gethostbyname(argv[3]);
-    memcpy((char *) &localHostAddr.sin_addr.s_addr, 
+    memcpy((char *) &localHostAddr.sin_addr.s_addr,
             localhostEnt->h_addr_list[0], localhostEnt->h_length);
     init_pcap(inet_ntoa(localHostAddr.sin_addr));
     int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
@@ -257,7 +259,7 @@ int main(int argc, char **argv)
 
     while(!inputFileHandle.eof())
     {
-        inputFileHandle.getline(tmpStr, 80); 
+        inputFileHandle.getline(tmpStr, 80);
         tmpString = tmpStr;
 
         if(tmpString.size() < 3)
@@ -272,7 +274,7 @@ int main(int argc, char **argv)
     for(int test = 0;test < hostList.size(); test++)
         printf("%s\n", hostList[test].c_str());
 
-    
+
     // We don't need to run the probe client on this node - just exit.
     if(enableClientFlag == false)
         exit(0);
@@ -293,6 +295,7 @@ int main(int argc, char **argv)
     fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK);
 
     delaySequenceArray.resize(numHosts-1);
+    sendTimesArray.resize(numHosts - 1);
     packetTimeMaps.resize(numHosts-1);
     actualTimeMaps.resize(numHosts-1);
 
@@ -300,31 +303,31 @@ int main(int argc, char **argv)
     {
         host1 = NULL;
         host1 = gethostbyname(hostList[i].c_str());
-        if(host1 == NULL) 
+        if(host1 == NULL)
         {
             printf("ERROR: Unknown host %s\n", hostList[i].c_str());
             exit(1);
         }
 
         remoteServAddr1.sin_family = host1->h_addrtype;
-        memcpy((char *) &remoteServAddr1.sin_addr.s_addr, 
+        memcpy((char *) &remoteServAddr1.sin_addr.s_addr,
                 host1->h_addr_list[0], host1->h_length);
         remoteServAddr1.sin_port = htons(REMOTE_SERVER_PORT);
         cout << "First host IP = "<<inet_ntoa(remoteServAddr1.sin_addr)<<"\n";
 
 
         delaySequenceArray[i].resize(numHosts - i - 1);
+        sendTimesArray[i].resize(numHosts - i - 1);
         packetTimeMaps[i].resize(numHosts - i - 1);
         actualTimeMaps[i].resize(numHosts -i - 1);
 
 
         for( int j = i+1; j < numHosts; j++)
         {
-            printf("PROGRESS: i = %d/%d, j = %d/%d\n",i, numHosts - 2, j, numHosts - 1); 
-
+            printf("PROGRESS: i = %d/%d, j = %d/%d\n",i, numHosts - 2, j, numHosts - 1);
             host2 = NULL;
             host2 = gethostbyname(hostList[j].c_str());
-            if(host2 == NULL) 
+            if(host2 == NULL)
             {
                 printf("ERROR: Unknown host %s\n", hostList[j].c_str());
                 exit(1);
@@ -339,18 +342,21 @@ int main(int argc, char **argv)
             //system(iperfCmd2.c_str());
             //////////////////////////////
 
-
             remoteServAddr2.sin_family = host2->h_addrtype;
-            memcpy((char *) &remoteServAddr2.sin_addr.s_addr, 
+            memcpy((char *) &remoteServAddr2.sin_addr.s_addr,
                     host2->h_addr_list[0], host2->h_length);
             remoteServAddr2.sin_port = htons(REMOTE_SERVER_PORT);
 
             delaySequenceArray[i][j-i-1].resize(2);
+            sendTimesArray[i][j - i - 1].resize(2);
             packetTimeMaps[i][j-i-1].resize(2);
             actualTimeMaps[i][j-i-1].resize(2);
 
             delaySequenceArray[i][j-i-1][0].resize(0);
             delaySequenceArray[i][j-i-1][1].resize(0);
+
+            sendTimesArray[i][j - i - 1][0].resize(0);
+            sendTimesArray[i][j - i - 1][1].resize(0);
 
             packetTimeMaps[i][j-i-1][0].clear();
             packetTimeMaps[i][j-i-1][1].clear();
@@ -447,13 +453,14 @@ int main(int argc, char **argv)
                         memcpy(&messageString[1 + sizeof(short int)], &xIndex, sizeof(short int));
                         memcpy(&messageString[1 + 2*sizeof(short int)], &yIndex, sizeof(short int));
                         memcpy(&messageString[1 + 3*sizeof(short int)], &sendTime, sizeof(unsigned long long));
-                        rc = sendto(clientSocket, messageString, 1 + 3*sizeof(short int) + sizeof(unsigned long long), flags, 
-                                (struct sockaddr *) &remoteServAddr1, 
+                        rc = sendto(clientSocket, messageString, 1 + 3*sizeof(short int) + sizeof(unsigned long long), flags,
+                                (struct sockaddr *) &remoteServAddr1,
                                 sizeof(remoteServAddr1));
                         if(rc < 0)
                             printf("ERROR sending first udp message\n");
                         packetTimeMaps[i][j-i-1][0][sendTime] = packetCounter;
                         delaySequenceArray[i][j-i-1][0].push_back(-9999);
+                        sendTimesArray[i][j-i-1][0].push_back(-9999);
                         cout<< "TO " << hostList[i] << " :Counter=" << packetCounter << " :SendTime= " << sendTime << endl;
 
                         sendTime = getTimeMilli();
@@ -463,14 +470,15 @@ int main(int argc, char **argv)
                         memcpy(&messageString[1 + sizeof(short int)], &xIndex, sizeof(short int));
                         memcpy(&messageString[1 + 2*sizeof(short int)], &yIndex, sizeof(short int));
                         memcpy(&messageString[1 + 3*sizeof(short int)], &sendTime, sizeof(unsigned long long));
-                        rc = sendto(clientSocket, messageString, 1 + 3*sizeof(short int) + sizeof(unsigned long long), flags, 
-                                (struct sockaddr *) &remoteServAddr2, 
+                        rc = sendto(clientSocket, messageString, 1 + 3*sizeof(short int) + sizeof(unsigned long long), flags,
+                                (struct sockaddr *) &remoteServAddr2,
                                 sizeof(remoteServAddr2));
 
                         if(rc < 0)
                             printf("ERROR sending second udp message\n");
                         packetTimeMaps[i][j-i-1][1][sendTime] = packetCounter;
                         delaySequenceArray[i][j-i-1][1].push_back(-9999);
+                        sendTimesArray[i][j-i-1][0].push_back(-9999);
                         cout<< "TO " << hostList[j] << " :Counter=" << packetCounter << " :SendTime= " << sendTime << endl;
 
                         lastSentTime = getTimeMilli();
@@ -563,7 +571,10 @@ int main(int argc, char **argv)
                         // Interpolate delays for the missing packets in this range.
                         int y = 0;
                         for (int x = k, y = 1; x < lastInRange; x++, y++)
+                        {
                             delaySequenceArray[xIndex][yIndex][0][x] = delaySequenceArray[xIndex][yIndex][0][k-1] + y*step ;
+                            sendTimesArray[xIndex][yIndex][0][x] -9999;
+                        }
                     }
                     if (delaySequenceArray[xIndex][yIndex][1][k] == -9999)
                     {
@@ -588,7 +599,10 @@ int main(int argc, char **argv)
                         // Interpolate delays for the missing packets in this range.
                         int y = 0;
                         for (int x = k, y = 1; x < lastInRange; x++, y++)
+                        {
                             delaySequenceArray[xIndex][yIndex][1][x] = delaySequenceArray[xIndex][yIndex][1][k-1] + y*step ;
+                            sendTimesArray[xIndex][yIndex][1][x] = -9999;
+                        }
                     }
                 }
             }
@@ -602,7 +616,19 @@ int main(int argc, char **argv)
             {
                 for (int k = firstSeenIndex; k < lastSeenIndex + 1; k++)
                 {
-                    outputFileHandle << delaySequenceArray[xIndex][yIndex][0][k] <<  " " << delaySequenceArray[xIndex][yIndex][1][k]  << "\n";
+                  // Output the delay of the first packet, the delay
+                  // of the second packet, the send time of the first
+                  // packet, the send time of the second packet.
+                  //
+                  // The sequence numbers are implicit in the order.
+                  outputFileHandle << delaySequenceArray[xIndex][yIndex][0][k]
+                                   <<  " "
+                                   << delaySequenceArray[xIndex][yIndex][1][k]
+                                   << " "
+                                   << sendTimesArray[xIndex][yIndex][0][k]
+                                   << " "
+                                   << sendTimesArray[xIndex][yIndex][1][k]
+                                   << "\n";
                 }
             }
             outputFileHandle.close();

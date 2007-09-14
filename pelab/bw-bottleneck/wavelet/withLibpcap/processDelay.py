@@ -9,7 +9,7 @@ pathTwoDelayList = []
 
 for delayLine in delayFileHandle.readlines():
 #{
-    pathOneDelay, pathTwoDelay = delayLine.split()
+    pathOneDelay, pathTwoDelay, ignore1, ignore2 = delayLine.split()
 
     pathOneDelay = int(pathOneDelay)
     pathTwoDelay = int(pathTwoDelay)
