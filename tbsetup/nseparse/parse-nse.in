@@ -272,7 +272,8 @@ sub GenDefsFile($)
 		     "left join virt_nodes as vn on vn.pid=v.pid " .
 		     "and vn.eid=v.eid and vn.vname=v.vname " .
 		     "left join reserved as r on r.node_id=v.node_id " .
-		     "where v.pid='$pid' and v.eid='$eid'");
+		     "where r.erole!='delaynode' and " .
+		     "v.pid='$pid' and v.eid='$eid'");
     while (my ($vnode,$vtype,$ipports,$pnode) = $query_result->fetchrow_array()) {
 	print TCL "set v2pmapinfo($vnode) [list $vtype [list $ipports] $pnode]\n";
     }
