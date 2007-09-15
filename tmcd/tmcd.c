@@ -7321,7 +7321,7 @@ COMMAND_PROTOTYPE(dobootwhat)
 				      boot_whatp->what.mfs);
 		}
 		if (strlen(boot_whatp->cmdline)) {
-			bufp += OUTPUT(bufp, ebufp - bufp, " CMDLINE='%s'\n",
+			bufp += OUTPUT(bufp, ebufp - bufp, " CMDLINE='%s'",
 				      boot_whatp->cmdline);
 		}
 		bufp += OUTPUT(bufp, ebufp - bufp, "\n");

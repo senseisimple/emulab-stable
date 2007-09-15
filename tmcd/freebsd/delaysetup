@@ -859,7 +859,17 @@ sub checkkernel($$)
 	if ($hz =~ /hz = (\d+),/) {
 	    $hz = int($1);
 	    if ($hz != $kernelhz) {
-		print STDOUT "Updating kernel HZ ...\n";
+		print STDOUT "Updating kernel HZ ($hz -> $kernelhz) ...\n";
+		#
+		# See if there is a custom Emulab command line setting.
+		# If so, warn and do not change.
+		#
+		my $binfo = `$BINDIR/tmcc bootwhat`;
+		if ($binfo =~ /HZ=(\d+)/ && int($1) == $hz) {
+		    print "*** WARNING: custom HZ value on command line, ".
+			  "not changing to $kernelhz.\n";
+		    return 0;
+		}
 		if (-e "/boot/loader.conf") {
 		    #
 		    # If already running a custom HZ rate, don't change it.
