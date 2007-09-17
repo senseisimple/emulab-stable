@@ -1659,6 +1659,10 @@ sub os_setup_one($$$)
 	if (nodereboot(\%reboot_args, $reboot_failures) != 0) {
 	    return 0;
 	}
+	print "$node is alive and well\n";
+	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
+	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
     }
 
     #
