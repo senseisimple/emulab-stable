@@ -17,12 +17,15 @@
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
 #include <netinet/ether.h>
+#include <fcntl.h>
 
 
 #define LOCAL_SERVER_PORT 19835
 #define MAX_MSG 1024
 
 pcap_t *pcapDescriptor = NULL;
+long receivedPackets = 0;
+long processedPackets = 0;
 
 char appAck[60];
 unsigned long long milliSec = 0;
@@ -49,6 +52,10 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 
     u_char *dataPtr = udpPacketStart + 8;
     unsigned char packetType = *(unsigned char *)(dataPtr);
+    struct sockaddr_in returnAddr;
+
+    processedPackets++;
+    printf("Received packets = %d, processed = %d\n", receivedPackets, processedPackets);
 
     if(packetType == '0')// This is a udp data packet arriving here. Send an
         // application level acknowledgement packet for it.
@@ -59,13 +66,17 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         unsigned long long sendTimestamp = *(unsigned long long *)(dataPtr + sizeof(short int) + 1);
         long long oneWayDelay = recvTimestamp - sendTimestamp;
 
+        returnAddr.sin_family = AF_INET;
+        memcpy((char *) &returnAddr.sin_addr, (char *)&(ipPacket->ip_src), sizeof(struct in_addr));
+        returnAddr.sin_port = udpHdr->source;
+
 		appAck[0] = '1';
         memcpy(&appAck[1] ,(dataPtr + 1), sizeof(short int));
 		memcpy(&appAck[1 + sizeof(short int)], &sendTimestamp, sizeof(unsigned long long));
 		memcpy(&appAck[1 + + sizeof(short int) + sizeof(unsigned long long)], &oneWayDelay, sizeof(long long));
-        cout << "Sending app level ack to "<< inet_ntoa(cliAddr.sin_addr) << ",at " << sendTimestamp << " , recvtimestamp = "<<recvTimestamp<< ", delay = "<< oneWayDelay << endl;
+        cout << "Sending app level ack to "<< inet_ntoa(returnAddr.sin_addr) << ",at " << sendTimestamp << " , recvtimestamp = "<<recvTimestamp<< ", delay = "<< oneWayDelay << endl;
 
-		sendto(sd,appAck,1 + + sizeof(short int) + 2*sizeof(long long),flags,(struct sockaddr *)&cliAddr,cliLen);
+		sendto(sd,appAck,1 + + sizeof(short int) + 2*sizeof(long long),flags,(struct sockaddr *)&returnAddr,cliLen);
 	}
 	else if(packetType == '1') // TODO:This is an udp ACK packet. If it is being sent
 	    // out from this host, do nothing.
@@ -161,7 +172,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 void init_pcap( char *ipAddress)
 {
-        char interface[] = "eth0";
+        char interface[] = "eth1";
         struct bpf_program bpfProg;
         char errBuf[PCAP_ERRBUF_SIZE];
         char filter[128] = " udp ";
@@ -184,6 +195,7 @@ void init_pcap( char *ipAddress)
 
         pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp);
         pcap_setfilter(pcapDescriptor, &bpfProg);
+        pcap_setnonblock(pcapDescriptor, 1, errBuf);
 }
 
 
@@ -222,32 +234,57 @@ int main(int argc, char *argv[]) {
   }
 
   printf("%s: waiting for data on port UDP %u\n", 
-	   argv[0],LOCAL_SERVER_PORT);
+          argv[0],LOCAL_SERVER_PORT);
+
+
+  init_pcap(inet_ntoa(servAddr.sin_addr));
+  int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
 
   flags = 0;
+  fcntl(sd, F_SETFL, flags | O_NONBLOCK);
 
-
-    init_pcap(inet_ntoa(servAddr.sin_addr));
-
+  fd_set socketReadSet;
   /* server infinite loop */
   while(1) {
-    
-    memset(msg,0x0,MAX_MSG);
 
-    /* receive message */
-    cliLen = sizeof(cliAddr);
-    n = recvfrom(sd, msg, MAX_MSG, flags,
-		 (struct sockaddr *) &cliAddr, &cliLen);
+      FD_ZERO(&socketReadSet);
+      FD_SET(sd,&socketReadSet);
+      FD_SET(pcapfd,&socketReadSet);
 
-    pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL);
+      struct timeval timeoutStruct;
 
-    if(n<0) {
-      printf("%s: cannot receive data \n",argv[0]);
-      continue;
-    }
+      timeoutStruct.tv_sec = 2;
+      timeoutStruct.tv_usec = 0;
+
+      select(sd+pcapfd+1,&socketReadSet,0,0,&timeoutStruct);
+
+      if (FD_ISSET(sd,&socketReadSet) != 0)
+      {
+          while(true)
+          {
+              memset(msg,0x0,MAX_MSG);
+              /* receive message */
+              cliLen = sizeof(cliAddr);
+              if( recvfrom(sd, msg, MAX_MSG, flags,(struct sockaddr *) &cliAddr, &cliLen) == -1)
+                  break;
+              else
+              {
+                receivedPackets++;
+              }
+
+          }
+      }
+
+      if (FD_ISSET(pcapfd,&socketReadSet) )
+          pcap_dispatch(pcapDescriptor, 1000, pcapCallback, NULL);
+
+      if(n<0) {
+          printf("%s: cannot receive data \n",argv[0]);
+          continue;
+      }
   }
 
-return 0;
+  return 0;
 
 }
 

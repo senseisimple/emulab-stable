@@ -82,10 +82,16 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         memcpy(&oneWayDelay, ( long long *)(dataPtr + 1 + sizeof(short int) + sizeof(unsigned long long)), sizeof(long long));
         ostringstream tmpStrStream;
         tmpStrStream << origTimestamp;
-        cout << " Onewaydelay for the ACK = " << oneWayDelay << ", host Index = "<< hostIndex << "\n";
+        if(actualTimeMaps[hostIndex].count(tmpStrStream.str()) == 0)
+        {
+            printf("ERROR: Original timestamp = %llu, and hostIndex = %d was not found in the packet Hash\n", origTimestamp, hostIndex);
+            delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = oneWayDelay;
+        }
+        else
+            delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = oneWayDelay - ( actualTimeMaps[hostIndex][tmpStrStream.str()] - origTimestamp);
+
+        cout << " Onewaydelay for the ACK = " << oneWayDelay << " recorded = "<< delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] <<", host Index = "<< hostIndex << "\n";
         cout <<" Orig timestamp was "<< tmpStrStream.str() << " , actual time = "<< actualTimeMaps[hostIndex][tmpStrStream.str()]<<"\n";
-        cout <<"Packet time map Index = "<< packetTimeMaps[hostIndex][origTimestamp] << ", host index = " << hostIndex << " \n";
-        delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = oneWayDelay - ( actualTimeMaps[hostIndex][tmpStrStream.str()] - origTimestamp);
 
         if(oneWayDelay < 50000 && oneWayDelay > -50000 && (delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] > 100000 || delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] < -100000 ) )
         {
@@ -93,10 +99,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 
 
         }
-        if(actualTimeMaps[hostIndex].count(tmpStrStream.str()) == 0)
-        {
-            printf("ERROR: Original timestamp was not found in the packet Hash\n\n");
-        }
+        cout <<"Packet time map Index = "<< packetTimeMaps[hostIndex][origTimestamp] << ", host index = " << hostIndex << " \n\n\n";
     }
     else
     {
@@ -185,7 +188,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 void init_pcap( char *ipAddress)
 {
-    char interface[] = "eth0";
+    char interface[] = "eth1";
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
@@ -226,7 +229,7 @@ int main(int argc, char **argv)
     string localHostName = argv[3];
 
     int timeout = 2000; // 1 second
-    int probeRate = 10; // Hz
+    int probeRate = 20; // Hz
     int probeDuration = 15000; // 15 seconds
     vector<string> hostList;
 
@@ -307,6 +310,9 @@ int main(int argc, char **argv)
     unsigned long long lastSentTime = startTime;
     bool endProbesFlag = false;
     bool readTimeoutFlag = false;
+    bool disableWritesFlag = false;
+    bool firstWriteFlag = true;
+    unsigned long timeoutValue = 0;
 
     while ((( lastSentTime - startTime) < probeDuration) || !(readTimeoutFlag))
     {
@@ -314,27 +320,53 @@ int main(int argc, char **argv)
         // Stop waiting for probe replies after a timeout - calculated from the
         // time the last probe was sent out.
         if (endProbesFlag && ( (getTimeMilli() - lastSentTime) > timeout))
+        {
             readTimeoutFlag = 1;
+        }
         // Stop sending probes after the given probe duration.
         if (!(endProbesFlag) && (lastSentTime - startTime) > probeDuration)
+        {
             endProbesFlag = 1;
+            disableWritesFlag = true;
+        }
 
         if (endProbesFlag)
-            usleep(timeout*100);
+        {
+            timeoutValue = timeout*100;
+        }
+        else
+        {
+                if (!(getTimeMilli() - lastSentTime > targetSleepTime))
+                {
+                     timeoutValue = ( targetSleepTime - (getTimeMilli() - lastSentTime) )*1000 ;
+                     if(!firstWriteFlag)
+                         disableWritesFlag = true;
+                }
+                else
+                {
+                    timeoutValue = 0;
+                    disableWritesFlag = false;
+                }
+        }
 
         fd_set socketReadSet, socketWriteSet;
         FD_ZERO(&socketReadSet);
         FD_SET(clientSocket,&socketReadSet);
         FD_SET(pcapfd,&socketReadSet);
         FD_ZERO(&socketWriteSet);
-        FD_SET(clientSocket,&socketWriteSet);
+
+        if(!disableWritesFlag)
+            FD_SET(clientSocket,&socketWriteSet);
 
         struct timeval timeoutStruct;
 
         timeoutStruct.tv_sec = 0;
         timeoutStruct.tv_usec = 0;
 
-        if (!endProbesFlag)
+        timeoutStruct.tv_usec = timeoutValue % 1000000;
+        timeoutStruct.tv_sec = timeoutValue / 1000000;
+
+        if(!disableWritesFlag)
         {
             select(clientSocket+pcapfd+1,&socketReadSet,&socketWriteSet,0,&timeoutStruct);
         }
@@ -347,29 +379,7 @@ int main(int argc, char **argv)
         {
             pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL);
         }
-        if (!readTimeoutFlag)
-        {
-            if (FD_ISSET(clientSocket,&socketReadSet) != 0)
-            {
-                while (true)
-                {
-                    int flags = 0;
-                    if( recvfrom(clientSocket, msg, MAX_MSG, flags,
-                                (struct sockaddr *) &servAddr, &echoLen) != -1)
-                    {
-                        while(pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL) != 0);
-                    }
-                    else
-                    {
-                        if(endProbesFlag)
-                            usleep(timeout*100);
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!endProbesFlag)
+        if (!endProbesFlag && !disableWritesFlag)
         {
             if (FD_ISSET(clientSocket,&socketWriteSet) != 0)
             {
@@ -399,27 +409,48 @@ int main(int argc, char **argv)
 
 
                 }
-                while(pcap_dispatch(pcapDescriptor, -1, pcapCallback, NULL) != 0);
                 packetCounter++;
                 lastSentTime = getTimeMilli();
-                // Sleep for 99 msec for a 10Hz target probing rate.
-                usleep(targetSleepTime*1000);
+                firstWriteFlag = false;
             }
-            else
+        }
+        if (!readTimeoutFlag)
+        {
+            if (FD_ISSET(clientSocket,&socketReadSet) != 0)
             {
-                if (!(getTimeMilli() - lastSentTime > targetSleepTime))
+                while (true)
                 {
-                    cout << " About to sleep for " << ( targetSleepTime - (getTimeMilli() - lastSentTime) )*1000 <<"\n";
-                    usleep(  ( targetSleepTime - (getTimeMilli() - lastSentTime) )*1000) ;
+                    int flags = 0;
+                    if( recvfrom(clientSocket, msg, MAX_MSG, flags,(struct sockaddr *) &servAddr, &echoLen) == -1)
+                    {
+                        break;
+                    }
                 }
             }
         }
+
     }
     //////////////////////////////
 
-    usleep(20000000);
+    fd_set socketReadSet;
+    FD_ZERO(&socketReadSet);
+    FD_SET(pcapfd,&socketReadSet);
 
-    while(pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL) != 0);
+    unsigned long long waitStartTime = getTimeMilli();
+
+    while( (getTimeMilli() - waitStartTime) < 20000)
+    {
+        struct timeval timeoutStruct;
+
+        timeoutStruct.tv_sec = 5;
+        timeoutStruct.tv_usec = 0;
+
+        select(pcapfd+1,&socketReadSet,0,0,&timeoutStruct);
+        if (FD_ISSET(pcapfd,&socketReadSet) )
+        {
+            pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL);
+        }
+    }
 
     for (int i = 0; i < numHosts; i++)
     {

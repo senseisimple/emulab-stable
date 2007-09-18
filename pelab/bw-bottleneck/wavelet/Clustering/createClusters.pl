@@ -26,7 +26,7 @@ $newProjName = $ARGV[2];
 $newExpName = $ARGV[3];
 $initialConditionsFilename = $ARGV[4];
 
-$logsDir = "/tmp/clusterLogs2";
+$logsDir = "/tmp/testLogs";
 
 
 # Get the initial conditions.
@@ -149,14 +149,8 @@ foreach $sourceName (readdir(logsDirHandle))
                 my @scriptOutput;
 
                 @scriptOutput = `$waveletScript`;
-                #print "@scriptOutput\n";
-          #      print "Index = $nodeNameMapping{$destOne}\n";
                 $denoisedDelays[$nodeNameMapping{$destOne}] = [ @scriptOutput ];
 
-                #foreach $testIter (@{$denoisedDelays[$nodeNameMapping{$destOne}]})
-                #{
-                #    print "$testIter";
-                #}
             }
         }
         closedir(sourceDirHandle);
@@ -186,6 +180,7 @@ foreach $sourceName (readdir(logsDirHandle))
                     push(@newEquivClass, $i);
 
                     push(@equivClasses, [@newEquivClass]);
+                    print "$sourceName: WARNING: Creating a new equiv class/cluster for $nodeNumberMapping{$i} due to lack of samples($#scriptOutput)\n";
                 }
                 else
                 {
@@ -216,26 +211,22 @@ foreach $sourceName (readdir(logsDirHandle))
                     }
                     $denominator = sqrt($denominator);
 
+                    # Exclude paths with low-variance.
+                    if($denominator < 25)
+                    {
+                        my @newEquivClass = ();
+                        push(@newEquivClass, $i);
+
+                        push(@equivClasses, [@newEquivClass]);
+                        print "$sourceName: WARNING: Creating a new equiv class/cluster for $nodeNumberMapping{$i} due to low variance of samples($denominator)\n";
+                        next;
+                    }
+
                     foreach $delayValue (@delayValueArray)
                     {
                         $delayValue = ($delayValue - $avgValue)/$denominator;
                         print RECORDFILE "$delayValue:";
                     }
-
-                    #foreach $delayValue (@scriptOutput)
-                    #{
-                    #    chomp($delayValue);
-#
-#                        if($counter < 128)
-#                        {
-#                            print RECORDFILE "$delayValue:";
-#                            $counter++;
-#                        }
-#                        else
-#                        {
-#                            last;
-#                        }
-#                    }
 
                     print RECORDFILE "$i\n";
                 }
