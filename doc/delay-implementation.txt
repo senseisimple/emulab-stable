@@ -1010,6 +1010,19 @@ When finished, the flow pipe is destroyed with:
     tevc -e pid/eid now cloud-n1 CLEAR \
 	DEST=10.0.0.2 PROTOCOL=TCP SRCPORT=10345 DSTPORT=80
 
+A new dummynet feature was added to model bottleneck queuing for ACIM.
+The "maxinq" (maximum time in queue) parameter, and associated MAXINQ
+MODIFY event parameter defines a maximum time for packets to be in a
+queue before they are dropped.  This is an alternative method to a
+probability-based drop or RED.  When a packet arrives at the bandwidth
+shaper, its expected time to traverse the shaping pipe is calculated,
+namely: time on the bandwidth queue plus the explicit delay time.  If
+that value exceeds the maxinq setting, the packet is dropped.
+
+    NOTE: since the BW and delay are applied via separate pipes in
+    the current Flexlab dummynet, the maxinq setting doesn't do
+    exactly what you might expect.
+
 5c. Hybrid mode setup:
 
 Hybrid mode adds the possibility groups of nodes sharing bandwidth to or
@@ -1205,16 +1218,88 @@ as possibly useless shared-source and shared-destination delay and PLR
 pipes).  The only requirement for a set would be that it be disjoint with
 any other set.
 
+5f. A way to implement multiple pipes for Flexlab shaping
+
+If you set net.inet.ip.fw.one_pass to zero with sysctl, it changes the
+behavior of IPFW so that ALL rules that match are applied to a packet.
+This means that something like:
+
+    # delay pipes
+    <n2-del> pipe <pipe1a> ip from 10.0.0.2 to any in recv <if1>
+             pipe <pipe1a> config delay 10ms
+    <n3-del> pipe <pipe1b> ip from 10.0.0.3 to any in recv <if1>
+             pipe <pipe1b> config delay 20ms
+    # BW pipes
+    <n1-bw> pipe <pipe1d> ip from 10.0.0.2,10.0.0.3 to any in recv <if1>
+            pipe <pipe1d> config bw 1000Kbit/sec
+    ...    
+
+from above, would work.  For a packet coming in on <if1> from 10.0.0.2,
+both <n2-del> and <n1-bw> would be applied.  The tricky part here is to
+try to limit the number of rules that are checked/applied to every packet.
+Considering that we might have two (BW, delay) node-to-shapingnode pipes
+and two (BW, delay) LAN-to-shapingnode pipes for every node being shaped,
+and each shaping node can handle two links, there are eight possible rules
+that every packet may have to match against.  That includes control net
+packets!
+
+We can limit it some by doing something like:
+
+    skipto 60110 ip from any to any in recv <if1>
+    skipto 60210 ip from any to any in recv <if2>
+    skipto 60310 ip from any to any in recv <if3>
+    skipto 60410 ip from any to any in recv <if4>
+    skipto 65534 ip from any to any
+
+    # 60110: <if1> set
+    pipe 60110 ip from any to any	# BW
+    pipe 60120 ip from any to any	# delay
+    skipto 65534 ip from any to any
+
+    # 60210: <if2> set
+    ...
+
+    # 65534: final rule
+    allow ip from any to any
+
+Note that the "skipto 65534" rules at the end of each block are needed to
+prevent fall-through, since processing will not stop until the final rule
+(65534) is hit.  This is clearly a convoluted mess and might get worse since
+we can no longer use the "more specific rule overrides a more general rule"
+feature which we have relied on in Flexlab for shared BW shaping.
+
+5g. A more drastic solution
+
+A couple of times I have thought about writing a new kernel bridge model
+for just our use.  Since we are always just bridging two nodes, all the
+MAC lookup logic and loop prevention of a regular bridge is not needed.
+We could also arrange to invoke dummynet directly at both ends of the
+bridge, without having to involve IPFW and lots of rules.
+
+However, the performance gain and simplification may not be all that
+great at the end of the day.  If we are tempted to go the NIH route,
+I would want to first look more closely at other existing alternatives
+like a Click shaping configuration.
+
+Note that neither a rewrite or an alternative like Click addresses the
+endnode shaping needs.
+
 
 6. Assorted dummynet mods
 
-Additional MODIFY arguments:
-BWQUANTUM, BWQUANTABLE, BWMEAN, BWSTDDEV, BWDIST, BWTABLE,
-DELAYQUANTUM, DELAYQUANTABLE, DELAYMEAN, DELAYSTDDEV, DELAYDIST, DELAYTABLE,
-PLRQUANTUM, PLRQUANTABLE, PLRMEAN, PLRSTDDEV, PLRDIST, PLRTABLE,
+Some additional MODIFY arguments were added once upon a time to allow more
+flexibility when specifying shaping characteristics.  In addition to the
+standard constant BW/delay/plr values, mechanisms were added to dummynet
+to support distribution- and table-driven methods for adjusting the three.
 
-MAXINQ
-    Define a maximum time for packets to be in a queue before they
-    are dropped.  This is the way in which ACIM models the queue
-    length of the bottleneck router.
+Those arguments are:
+
+BWQUANTUM, BWQUANTABLE, BWMEAN, BWSTDDEV, BWDIST, BWTABLE:
+    Bandwidth tweakage.
+
+DELAYQUANTUM, DELAYQUANTABLE, DELAYMEAN, DELAYSTDDEV, DELAYDIST, DELAYTABLE:
+    Delay tweakage.
+
+PLRQUANTUM, PLRQUANTABLE, PLRMEAN, PLRSTDDEV, PLRDIST, PLRTABLE,
+    Packet loss tweakage.
 
