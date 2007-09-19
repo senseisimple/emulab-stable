@@ -86,7 +86,7 @@ nodes = info_method(PACKAGE_VERSION, { "proj" : pid, "exp" : eid, "aspect" : "ma
 nodelist = nodes["value"]
 
 delaynodes = list()
-delayre = re.compile('tbsdelay\d+')
+delayre = re.compile('tbs?delay\d+')
 for node in nodelist:
     if delayre.match(node):
         delaynodes.append(node)
