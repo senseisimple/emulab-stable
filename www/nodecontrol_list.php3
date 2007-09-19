@@ -130,6 +130,11 @@ elseif (! strcmp($showtype, "wireless")) {
 
     $view   = "Wireless";
 }
+elseif (preg_match("/^[-\w]+$/", $showtype)) {
+    $role   = "(role='testnode')";
+    $clause = "and (nt.type='$showtype')";
+    $view   = "only <a href=shownodetype.php3?node_type=$showtype>$showtype</a>";
+}
 else {
     $role   = "(role='testnode')";
     $clause = "and (nt.class='pc')";

@@ -116,6 +116,8 @@ $query_result =
 if (mysql_num_rows($query_result)) {
     echo "<br>
           <center>
+	  Nodes (<a href=nodecontrol_list.php3?showtype=$node_type>Show details</a>)
+	  <br>
           <table class=nogrid cellspacing=0 border=0 cellpadding=5>\n";
 
     $maxcolumns = 4;
