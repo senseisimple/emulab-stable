@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -96,5 +96,4 @@ for node in nodelist:
 #
 for node in delaynodes:
     print "##### Cleaning %s" % node
-    os.system("ssh -o 'BatchMode=yes' -o 'StrictHostKeyChecking=no' %s.%s.%s sudo /usr/local/etc/emulab/delaysetup -ui" % (node,eid,pid))
-
+    os.system("ssh -o 'BatchMode=yes' -o 'StrictHostKeyChecking=no' %s.%s.%s sudo /usr/local/etc/emulab/delaysetup -r" % (node,eid,pid))
