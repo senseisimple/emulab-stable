@@ -146,7 +146,7 @@ foreach $sourceName (readdir(logsDirHandle))
                         $filterFile2 = $fullPath . "/" . "dest1.filter";
                         $filterFile3 = $fullPath . "/" . "dest2.filter";
 
-                        if (!(-r $filterFile1) || !(-r $filterFile2) || !($filterFile3))
+                        if (!(-r $filterFile1) || !(-r $filterFile2) || !(-r $filterFile3))
                         {
                             print "Missing file. Cannot process $fullPath\n";
                             continue;
@@ -167,7 +167,9 @@ foreach $sourceName (readdir(logsDirHandle))
                         if($scriptOutput[$#scriptOutput - 1] =~ /last CHANGE\s(\w*)\s(\w*)\,[\w\d\W\:\,]*/)
                         {
                             print "For source $sourceName: Comparing $destOne $destTwo: $scriptOutput[$#scriptOutput]";
-                            if($2 eq "CORRELATED")
+			    $corrResult = $2;
+                            if($corrResult eq "CORRELATED"
+			       && !($scriptOutput[$#scriptOutput] =~ /nan/))
                             {
                                 push(@{ $bottleNecks{$sourceName} },$destOne . ":" . $destTwo);
                                 push(@destLists,$destOne);
@@ -175,7 +177,8 @@ foreach $sourceName (readdir(logsDirHandle))
                                 print "CORRELATED\n\n";
 
                             }
-                            elsif($2 eq "UNCORRELATED")
+                            elsif($corrResult eq "UNCORRELATED"
+				  && !($scriptOutput[$#scriptOutput] =~ /nan/))
                             {
                                 push(@destLists,$destOne);
                                 push(@destLists,$destTwo);
