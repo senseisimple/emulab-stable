@@ -101,8 +101,10 @@ my $archcontrol = "$TB/bin/archive_control";
 my $eventcontrol= "$TB/bin/eventsys_control";
 my $tevc        = "$TB/bin/tevc";
 my $CVSBIN      = "/usr/bin/cvs";
+my $CVSCTRL     = "/usr/testbed/sbin/cvs_ctrl";
 my $FIND        = "/usr/bin/find";
 my $RCS         = "/usr/bin/rcs";
+my $SSH		= "$TB/bin/sshtb";
 
 # Protos
 sub ParseArgs();
@@ -158,6 +160,8 @@ if (! defined($this_user)) {
 my $user_name  = $this_user->name();
 my $user_email = $this_user->email();
 my $user_uid   = $this_user->uid();
+
+$libtestbed::SYSTEM_DEBUG = 1;
 
 #
 # Before doing anything else, check for overquota ... lets not waste
@@ -554,9 +558,9 @@ if (defined($instance->runidx())) {
 	}
 
 	# This imports the experiment directory into the records subdir.
-	System("cd $instance_dir; ".
-	       "$CVSBIN -d $cvsdir import -I 'datastore' ".
-	       "  -m 'Import record for run $this_runid' ".
+	System("$CVSCTRL -w $instance_dir -- ".
+	       "  -d $cvsdir import -kb -I \"datastore\" ".
+	       "  -m \"Import record for run $this_runid\" ".
 	       "  $cvssubdir ${tag}_branch $tag")
 	    == 0 or fatal(-1, "Could not import new record into $cvsdir");
 
@@ -569,15 +573,11 @@ if (defined($instance->runidx())) {
 	    symlink($linkvalue, "$instance_dir/$pathname");
 	}
 
-	# No keyword subst.
-	System("$FIND $cvsdir/$cvssubdir ".
-	       "  -name '*,v' -print -exec $RCS -q -kb '{}' \\;")
-	    == 0 or fatal(-1, "Could not set -kb in $cvsdir");
-
 	# Now tag it with the same tag that was applied for the instance.
 	# Apply to the branch tag directly instead of symbolically since that
-	# does not work properly for some reason. 
-	System("$CVSBIN -d $cvsdir rtag -n -r 1.1.1 $instance_tag $cvssubdir")
+	# does not work properly for some reason.
+	System("$CVSCTRL -- ".
+	       " -d $cvsdir rtag -n -r 1.1.1 $instance_tag $cvssubdir")
 	    == 0 or fatal(-1, "Could not rtag new record in $cvsdir");
 
 	if ($STAMPS) {
@@ -816,7 +816,7 @@ sub ParseArgs()
     if (! getopts($optlist, \%options)) {
 	usage();
     }
-
+    
     #
     # Allow pid to be used instead of GUID.
     #

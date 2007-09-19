@@ -1,0 +1,120 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno qw(EEXIST);
+
+#
+# Add a mailman list, say for a project or other reason. If for a project
+# the admin password comes from the groups table. Otherwise it comes from
+# the sitevars table cause its assumed to be an admins list of some kind.
+#
+sub usage()
+{
+    print STDOUT "Usage: cvs_ctrl ...\n";
+    exit(-1);
+}
+my $optlist   = "dw:";
+my $debug     = 0;
+my $workdir;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $SSH         = "$TB/bin/sshtb";
+my $CVSPROXY    = "$TB/sbin/cvs.proxy";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_uid   = $this_user->uid();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"w"})) {
+    $workdir = $options{"w"};
+
+    # Note different taint check (allow /).
+    if ($workdir =~ /^([-\w\.\/]+)$/) {
+	$workdir = $1;
+    }
+    else {
+	tbdie("Bad data in workdir: $workdir");
+    }
+}
+
+my @args = ("-host", $CONTROL, $CVSPROXY, "-u", $user_uid);
+if (defined($workdir)) {
+    push(@args, "-w");
+    push(@args, $workdir);
+}
+push(@args, "--");
+foreach my $arg (@ARGV) {
+    push(@args, "\\\"$1\\\"")
+	if ($arg =~ /^(.*)$/);
+}
+
+#
+# For ssh.
+#
+$UID = $EUID;
+
+#print "$SSH @args\n";
+
+exec($SSH, @args);

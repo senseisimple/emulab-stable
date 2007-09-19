@@ -1,0 +1,154 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use BSD::Resource;
+use POSIX qw(:signal_h);
+    
+#
+# Simply a wrapper for the cvs.
+#
+# The first argument option is the user to run this script as, since we
+# gets invoked by a root ssh from boss. 
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: cvs.proxy -u user [args ...]\n".
+        "Where options and arguments are those required by cvs\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CVSBIN   = "/usr/bin/cvs";
+
+# Locals
+my $optlist  = "u:w:";
+my $user;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my $options;
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"w"})) {
+    my $workdir = $options{"w"};
+    
+    if (! chdir("$workdir")) {
+	die("*** $0:\n".
+	    "    Could not chdir to $workdir\n");
+    }
+}
+usage()
+    if (!exists($options{"u"}));
+$user = $options{"u"};
+
+#
+# First option has to be the -u option, the user to run this script as.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!");
+}
+(undef,undef,$unix_uid) = getpwnam($user) or
+    die("*** $0:\n".
+	"    No such user $user\n");
+
+#
+# Need the entire group list for the user, cause of subgroups, and
+# cause thats the correct thing to do. Too bad perl does not have a
+# getgrouplist function like the C library.
+#
+my $glist = `id -G $user`;
+if ($glist =~ /^([\d ]*)$/) {
+    $glist = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Unexpected results from 'id -G $user': $glist\n");
+}
+
+# Need to split off the first group and create a proper list for $GUID.
+my @gglist   = split(" ", $glist);
+my $unix_gid = $gglist[0];
+$glist       = "$unix_gid $glist";
+
+# Flip to user and never go back!
+$GID            = $unix_gid;
+$EGID           = $glist;
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+#
+# Fork a child process to run cvs in.
+#
+my $pid = fork();
+
+if (!defined($pid)) {
+    die("*** $0:\n".
+	"    Could not fork a new process!");
+}
+
+#
+# Child runs the cvs program niced down, and then exits.
+#
+if (! $pid) {
+    # Set the CPU limit for us.
+    setrlimit(RLIMIT_CPU, 1200, 1200);
+    
+    # Give parent a chance to react.
+    sleep(1);
+
+    exec("nice -2 $CVSBIN @ARGV");
+    die("Could not exec $CVSBIN!\n");
+}
+
+#
+# Parent waits.
+#
+waitpid($pid, 0);
+my $exit_status = $?;
+
+#
+# If the child was KILLed, then it overran its time limit.
+# Send email. Otherwise, exit with result of child.
+#
+if (($exit_status & 0xff) == SIGKILL) {
+    my $msg = "$CVSBIN Exceeded CPU Limit";
+
+    SENDMAIL($TBOPS, "CVS Exceeded CPU Limit", $msg);
+    
+    print STDERR "$msg\n";
+    exit(15);
+}
+exit($exit_status >> 8);
+

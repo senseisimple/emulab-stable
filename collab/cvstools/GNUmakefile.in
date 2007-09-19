@@ -11,14 +11,14 @@ SUBDIR		= collab/cvstools
 
 include $(OBJDIR)/Makeconf
 
-SBIN_SCRIPTS		= cvsrepo_ctrl
+SBIN_SCRIPTS		= cvsrepo_ctrl cvs_ctrl
 LIBEXEC_SCRIPTS		= webcvsrepo_ctrl
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= cvsd.conf.head
-CTRL_SBIN_SCRIPTS	= cvsrepo_ctrl.proxy
+CTRL_SBIN_SCRIPTS	= cvsrepo_ctrl.proxy cvs.proxy
 
 # These scripts installed setuid, with sudo. 
-SETUID_SBIN_SCRIPTS     = cvsrepo_ctrl
+SETUID_SBIN_SCRIPTS     = cvsrepo_ctrl cvs_ctrl
 
 #
 # Force dependencies on the scripts so that they will be rerun through
