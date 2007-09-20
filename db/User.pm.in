@@ -43,6 +43,7 @@ my $CONTROL	   = "@USERNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $MIN_UNIX_UID   = @MIN_UNIX_UID@;
 my $MIN_UNIX_GID   = @MIN_UNIX_GID@;
+my $tbacct	   = "$TB/sbin/tbacct";
 
 # Create() flags.
 $NEWUSER_FLAGS_PROJLEADER	= 0x01;
@@ -66,6 +67,10 @@ $USERSTATUS_ARCHIVED	        = "archived";
 		$USERSTATUS_ACTIVE $USERSTATUS_FROZEN
 		$USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
 		$USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED);
+
+# Protos
+sub SetUserInterface($$);
+sub escapeshellarg($);
 
 # Cache of instances to avoid regenerating them.
 my %users      = ();
@@ -255,8 +260,8 @@ sub LookupByWikiName($$)
 }
 
 #
-# Lookup user given a wikiname. This is just to make sure the wikiname
-# the user picked is unique.
+# Lookup user given an e-mail address.  This is just to make sure the
+# e-mail address the user picked is unique.
 #
 sub LookupByEmail($$)
 {
@@ -354,7 +359,7 @@ sub Create($$$$)
 		}
 		# Must be exact root
 		next
-		    if ($name != $token);
+		    if ($name ne $token);
 
 		# Backwards compatability; might not have appended number.
 		if (isset($number) && intval($number) > $max) {
@@ -622,6 +627,212 @@ sub IsAdmin($)
 }
 
 #
+# Worker class method to change the user profile.
+# Assumes most argument checking was done elsewhere.
+#
+sub ModUserInfo($$$$)
+{
+    my ($class, $this_user, $target_user, $argref, $usrerr_ref) = @_;
+
+    my $this_uid = $this_user->uid();
+    my $isadmin = $this_user->IsAdmin();
+
+    my $target_uid = $target_user->uid();
+    my $target_uid_idx = $target_user->uid_idx();
+    my $target_name = $target_user->name();
+    my $target_email = $target_user->email();
+    my $wikionly = $target_user->wikionly();
+
+    my %mods;
+    my $noreport;
+
+    #
+    # Only admin types can change the email address. If its different, the
+    # user circumvented the form, and so its okay to blast it.
+    #
+    my $usr_email = $argref->{"usr_email"};
+    if ($usr_email && $target_email ne $usr_email) {
+	if (!$isadmin) {
+	    $$usrerr_ref = "Email: ".
+		"You are not allowed to change your email address";
+	    return undef;
+	}
+
+	#
+	# Invoke the backend to deal with this.
+	#
+	my $cmd = "$tbacct email $target_uid " .
+		   escapeshellarg($usr_email);
+	##print $cmd;
+	my $cmd_out = `$cmd`;
+	if ($?) {
+	    chomp($cmd_out);
+	    $$usrerr_ref = "Error: " . $cmd_out;
+	    return undef;
+	}
+	$mods{"usr_email"} = $usr_email;
+    }
+
+    #
+    # Now see if the user is requesting to change the password.
+    #
+    if (($argref->{"password1"} && $argref->{"password1"} ne "") &&
+	($argref->{"password2"} && $argref->{"password2"} ne "")) {
+
+	my $old_encoding = $target_user->pswd();
+	my $new_encoding = crypt($argref->{"password1"}, $old_encoding);
+
+	#
+	# Compare. Must change it!
+	# 
+	if ($old_encoding eq $new_encoding) {
+	    $$usrerr_ref = "Error: " .
+		"New password same as old password";
+	    return undef;
+	}
+
+	#
+	# Do it again. This ensures we use the current algorithm, not whatever
+	# it was encoded with last time.
+	# XXX Perl crypt doesn't have this option!
+	# XXX $new_encoding  = crypt($argref->{"password1"});
+
+	my $safe_encoding = escapeshellarg($new_encoding);
+
+	#
+	# Invoke the backend to deal with this.
+	#
+	my $cmd = "tbacct passwd $target_uid $safe_encoding";
+	##print $cmd;
+	my $cmd_out = `$cmd`;
+	if ($?) {
+	    chomp($cmd_out);
+	    $$usrerr_ref = "Error: " . $cmd_out;
+	    return undef;
+	}
+	$noreport = 1;
+    }
+
+    #
+    # See if the user is requesting to change the Windows password.
+    #
+    if (($argref->{"w_password1"} && $argref->{"w_password1"} ne "") &&
+	($argref->{"w_password2"} && $argref->{"w_password2"} ne "")) {
+
+	my $old_wpswd = $target_user->w_pswd();
+	my $new_wpswd = $argref->{"w_password1"};
+
+	#
+	# Compare. Must change it!
+	# 
+	if ($old_wpswd eq $new_wpswd) {
+	    $$usrerr_ref = "Error: " .
+		"New Windows password same as old Windows password";
+	    return undef;
+	}
+
+	#
+	# Invoke the backend to deal with this.
+	#
+	my $cmd = "tbacct wpasswd $target_uid " . escapeshellarg($new_wpswd);
+	##print $cmd;
+	my $cmd_out = `$cmd`;
+	if ($?) {
+	    chomp($cmd_out);
+	    $$usrerr_ref = "Error: " . $cmd_out;
+	    return undef;
+	}
+	$noreport = 1;
+    }
+
+    #
+    # Only admins can change the notes field. We do not bother to generate
+    # any email or external updates for this.
+    #
+    my $notes = $argref->{"notes"};
+    if ($notes && $isadmin && $target_user->notes() ne $notes) {
+	$target_user->SetNotes($notes);
+	$noreport = 1;
+    }
+
+    #
+    # Set the plab bit separately since no need to call out to the backend.
+    #
+    my $ui = $argref->{"user_interface"};
+    if ($ui && $target_user->user_interface() ne $ui) {
+	$target_user->SetUserInterface($ui);
+	$noreport = 1;
+    }
+
+    #
+    # Now update the rest of the information in the DB.
+    # (Others above already did their own updates.)
+    #
+    my %updates;
+    foreach my $col ("usr_name", "usr_title", "usr_affil", "usr_URL",
+		     "usr_addr", "usr_addr2", "usr_city", "usr_state",
+		     "usr_zip", "usr_country", "usr_phone", "usr_shell") {
+	my $arg = $argref->{$col};
+	if ($arg) {
+	    # Copy args so that others can't get through.
+	    $updates{$col} = $mods{$col} = $arg;
+	}
+    }
+    if (keys %updates) {
+	if ($target_user->Update(\%updates)) {
+	    return undef;
+	}
+    }
+
+    if (!keys %mods) {
+	if (!$noreport) {
+	    # Warn the user that the submit button was pressed with no effect.
+	    $$usrerr_ref = "Submit: Nothing changed";
+	    return undef;
+	}
+    }
+    else {
+	# Send an audit e-mail reporting what is being changed.
+	my @report = ("Name:usr_name", "Email:usr_email",
+		      "Job Title:usr_title", "Affiliation:usr_affil", 
+		      "URL:usr_URL", "Address1:usr_addr",
+		      "Address2:usr_addr2", "City:usr_city",
+		      "State:usr_state", "ZIP/Postal Code:usr_zip",
+		      "Country:usr_country", "Phone:usr_phone",
+		      "Shell:usr_shell");
+	my $msg = "\n".
+	    "User information for '$target_uid' changed by '$this_uid'.\n".
+	     "(IDX: $target_uid_idx, $target_name, $target_email".
+		 ($wikionly ? ", *WikiOnly*" : "") . ")\n\n";
+	foreach my $line (@report) {
+	    my ($label, $field) = split /:/, $line;
+	    if (my $value = $mods{$field}) {
+		$msg .= sprintf "%-20s%s\n", $label .":", $value;
+	    }
+	}
+	SENDMAIL("$target_name <$target_email>",
+		 "User Information for '$target_uid' Modified",
+		 $msg, TBMAIL_OPS(), sprintf("Bcc: %s\nErrors-To:%s", 
+					     TBMAIL_AUDIT(), TBMAIL_WWW()));
+
+	#
+	# "tbacct mod" updates the user gecos field (usr_name) and shell.
+	#
+	if ($mods{"usr_name"} || $mods{"usr_shell"}) {
+	    my $cmd = "$tbacct mod $target_uid";
+	    ##print $cmd;
+	    my $cmd_out = `$cmd`;
+	    if ($?) {
+		chomp($cmd_out);
+		$$usrerr_ref = "Error: " . $cmd_out;
+		return undef;
+	    }
+	}
+    }
+    return 1;
+}
+
+#
 # Refresh a class instance by reloading from the DB.
 #
 sub Refresh($)
@@ -670,7 +881,7 @@ sub Update($$)
 
     my $uid_idx = $self->uid_idx();
 
-    my $query = "update users set ".
+    my $query = "update users set usr_modified=now(), ".
 	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
 
     $query .= " where uid_idx='$uid_idx'";
@@ -765,6 +976,70 @@ sub SetPassword($$$)
 	if (! DBQueryWarn("update users set ".
 			  "  usr_pswd='$encoding', pswd_expires=$expires, ".
 			  "  chpasswd_key=NULL,chpasswd_expires=0 ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# Set Windows password for user.
+#
+sub SetWindowsPassword($$)
+{
+    my ($self, $wpswd) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  usr_w_pswd='$wpswd' ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# Set notes field for user.
+#
+sub SetNotes($$)
+{
+    my ($self, $notes) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $notes = escapeshellarg($notes);
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  notes='$notes' ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# Set user interface mode for user.
+#
+sub SetUserInterface($$)
+{
+    my ($self, $interface) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  user_interface='$interface' ".
 			  "where uid_idx='$uid_idx'"));
 
     return Refresh($self);
@@ -1066,6 +1341,39 @@ sub BumpActivity($)
 		"where uid_idx='$uid_idx'");
 
     return 0;
+}
+
+#
+# Check permissions.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $mintrust;
+
+    if ($access_type < TB_USERINFO_MIN || $access_type > TB_USERINFO_MAX) {
+	print "*** Invalid access type $access_type!\n";
+	return 0;
+    }
+    # Admins do whatever they want!
+    return 1
+	if ($user->IsAdmin());
+
+    # Otherwise, better be the same user.
+    return SameUser($self, $user);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    return $str;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

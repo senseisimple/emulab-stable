@@ -646,28 +646,55 @@ sub UpdatePassword()
 #
 sub UpdateWindowsPassword()
 {
-    # shell escape.
-    $wpswd     =~ s/\$/\\\$/g;
+    #
+    # New password (encrypted) comes in on the command line. 
+    #
+    usage()
+	if (! @ARGV);
+    my $new_wpswd  = shift(@ARGV);
 
-    #
-    # Check status. Ignore if user is not active.
-    #
-    if ($status ne USERSTATUS_ACTIVE) {
-	print("$user is not active! Not updating the password!\n");
+    # Lets not do this if no changes.
+    if ($new_wpswd eq $target_user->w_pswd()) {
+	print "Password has not changed ...\n";
 	return 0;
     }
 
-    $UID = 0;
-    print "Updating user $user Samba password on $SAMBANODE.\n";
-    # -s = silent, -a = add user if necessary.
-    open( SPCMD, "| $SSH -host $SAMBANODE $SMBPASSWD -s -a $user")
-        || fatal("Opening $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
-    local $SIG{PIPE} = sub { die "smbpasswd spooler pipe broke" };
-    print SPCMD "$wpswd\n$wpswd\n";
-    close SPCMD 
-	|| fatal("Closing $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+    #
+    # Insert into database.
+    #
+    if ($target_user->SetWindowsPassword($new_wpswd)) {
+	fatal("Could not update Windows password string for $target_user");
+    }
 
-    $UID = $SAVEUID;
+    # Go no further if a webonly user.
+    return 0
+	if ($webonly);
+
+    #
+    # Go no further if user is not active or frozen.
+    #
+    return 0
+	if (! ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN));
+
+    #
+    # Change on ops for Samba only if there is a real account there.
+    #
+    if (! $wikionly) {
+	# shell escape.
+	$new_wpswd     =~ s/\$/\\\$/g;
+
+	$UID = 0;
+	print "Updating user $user Samba password on $SAMBANODE.\n";
+	# -s = silent, -a = add user if necessary.
+	open( SPCMD, "| $SSH -host $SAMBANODE $SMBPASSWD -s -a $user")
+	    || fatal("Opening $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+	local $SIG{PIPE} = sub { die "smbpasswd spooler pipe broke" };
+	print SPCMD "$new_wpswd\n$new_wpswd\n";
+	close SPCMD 
+	    || fatal("Closing $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+
+	$UID = $SAVEUID;
+    }
     return 0;
 }
 

@@ -12,7 +12,8 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
-	 TBMakeLogname TB_BOSSNODE TB_OPSEMAIL TBGenSecretKey TBDebugTimeStamp
+	 TBMakeLogname TB_BOSSNODE TB_OPSEMAIL TB_WWWEMAIL TB_AUDITEMAIL
+	 TBMAIL_OPS TBMAIL_WWW TBMAIL_AUDIT TBGenSecretKey TBDebugTimeStamp
 	 TBDebugTimeStampsOn TBForkCmd TB_BOSSEVENTPORT TB_EVENTSERVER
 	 TBScriptLock TBScriptUnlock TBTimeStampWithDate
 	 TBSCRIPTLOCK_OKAY TBSCRIPTLOCK_TIMEDOUT
@@ -31,12 +32,14 @@ use File::Basename;
 use Time::HiRes qw(gettimeofday);
 use vars qw(@EXPORT_OK);
 
-#my $MAILTAG  = "@OURDOMAIN@";
-my $MAILTAG  = "@THISHOMEBASE@";
-my $BOSSNODE = "@BOSSNODE@";
-my $TIMESTAMPS = "@TIMESTAMPS@";
-my $TBOPSEMAIL = "@TBOPSEMAIL@";
-my $SCRIPTNAME = "Unknown";
+#my $MAILTAG	 = "@OURDOMAIN@";
+my $MAILTAG	 = "@THISHOMEBASE@";
+my $BOSSNODE	 = "@BOSSNODE@";
+my $TIMESTAMPS	 = "@TIMESTAMPS@";
+my $TBOPSEMAIL	 = "@TBOPSEMAIL@";
+my $TBWWWEMAIL	 = "@TBWWWEMAIL@";
+my $TBAUDITEMAIL = "@TBAUDITEMAIL@";
+my $SCRIPTNAME	 = "Unknown";
 
 # Exported.
 $SYSTEM_DEBUG = 0;
@@ -70,8 +73,13 @@ sub SCRATCHROOT() { $FSDIR_SCRATCH ? $SCRATCHROOT : ""; }
 # Hostname of our boss node
 sub TB_BOSSNODE()	{ $BOSSNODE; }
 
-# Testbed ops email address
-sub TB_OPSEMAIL()	{ $TBOPSEMAIL; }
+# Testbed email addresses.
+sub TB_OPSEMAIL()   { $TBOPSEMAIL; }
+sub TB_WWWEMAIL()   { $TBWWWEMAIL; }
+sub TB_AUDITEMAIL() { $TBAUDITEMAIL; }
+sub TBMAIL_OPS()    { "Testbed Ops <$TBOPSEMAIL>"; }
+sub TBMAIL_WWW()    { "Testbed WWW <$TBWWWEMAIL>"; }
+sub TBMAIL_AUDIT()  { "Testbed Audit <$TBAUDITEMAIL>" }
 
 # This is for the swigged event library which includes this file.
 sub TB_BOSSEVENTPORT()  { "@BOSSEVENTPORT@"; }

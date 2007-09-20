@@ -25,11 +25,11 @@ include Makeconf
 #   @optional_subdirs@ (has event)
 #   ipod os security sensors 
 # Then things that only depend on stuff we've done:
-#   pxe tbsetup tmcd utils www tip capture vis
+#   pxe tbsetup tmcd utils backend www tip capture vis
 # Then things that depend on stuff we just did:
 #
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
-		pxe tbsetup account tmcd utils tip capture ipod vis \
+		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
 		tools/svn wiki bugdb collab tools/rmanage
 

@@ -2427,6 +2427,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	account/GNUmakefile account/tbacct \
 	account/addpubkey account/addsfskey account/genpubkeys \
 	account/quotamail account/mkusercert account/newproj account/newuser \
+	backend/GNUmakefile backend/moduserinfo \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \

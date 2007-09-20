@@ -582,12 +582,12 @@ REPLACE INTO table_regex VALUES ('projects','default_user_interface','text','reg
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[-\\w]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('projects','URL','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
+
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_name','text','regex','^[-\\w\\. ]+$',4,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\\.]+)\\@([-\\w\\.]+)$',3,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_shell','text','regex','^(csh|sh|bash|tcsh)$',0,0,NULL);
-
 REPLACE INTO table_regex VALUES ('users','usr_title','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_affil','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_addr','text','redirect','default:tinytext',0,0,NULL);
@@ -598,6 +598,12 @@ REPLACE INTO table_regex VALUES ('users','usr_zip','text','redirect','default:ti
 REPLACE INTO table_regex VALUES ('users','usr_country','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_URL','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_pswd','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','password1','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','password2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','w_password1','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','w_password2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','user_interface','text','regex','^(emulab|plab)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','notes','text','redirect','default:text',0,65535,NULL);
 
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);

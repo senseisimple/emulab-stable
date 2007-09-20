@@ -151,6 +151,75 @@ class User
     }
 
     #
+    # Class function to change the user profile.
+    #
+    function ModUserInfo($target_user, $args, &$errors) {
+	global $suexec_output, $suexec_output_array;
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "moduserinfo");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+
+	# Add these. Maybe caller should do this?
+	$args["uid"]  = $target_user->uid();
+
+	fwrite($fp, "<userinfo>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</userinfo>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	$retval = SUEXEC("nobody", "nobody", "webmoduserinfo $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$errors[] = "Transient error; please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		# unlink($xmlname);
+		if (count($suexec_output_array)) {
+		    for ($i = 0; $i < count($suexec_output_array); $i++) {
+			$line = $suexec_output_array[$i];
+			if (preg_match("/^([-\w]+):\s*(.*)$/",
+				       $line, $matches)) {
+			    $errors[$matches[1]] = $matches[2];
+			}
+			else
+			    $errors[] = $line;
+		    }
+		}
+		else
+		    $errors[] = "Transient error; please try again later.";
+	    }
+	    return null;
+	}
+
+	# There are no return value(s) to parse at the end of the output.
+
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then do the operation by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return true;
+    }
+
+    #
     # Equality test.
     #
     function SameUser($user) {
@@ -941,50 +1010,6 @@ class User
 		     "where uid_idx='$idx'");
 
 	return $this->Refresh();
-    }
-    function ChangeProfile($usr_name,  $usr_title,
-			   $usr_affil, $usr_addr,
-			   $usr_addr2, $usr_city,
-			   $usr_state, $usr_zip, $usr_country,
-			   $usr_phone, $usr_shell, $usr_URL) {
-
-	$idx          = $this->uid_idx();
-	$usr_name     = addslashes($usr_name);
-	$usr_title    = addslashes($usr_title);
-	$usr_affil    = addslashes($usr_affil);
-	$usr_addr     = addslashes($usr_addr);
-	$usr_addr2    = addslashes($usr_addr2);
-	$usr_city     = addslashes($usr_city);
-	$usr_state    = addslashes($usr_state);
-	$usr_zip      = addslashes($usr_zip);
-	$usr_country  = addslashes($usr_country);
-	$usr_phone    = addslashes($usr_phone);
-	$usr_shell    = addslashes($usr_shell);
-	$usr_URL      = addslashes($usr_URL);
-
-	$query_result =
-	    DBQueryFatal("UPDATE users SET ".
-			 "usr_name=\"$usr_name\",       ".
-			 "usr_URL=\"$usr_URL\",         ".
-			 "usr_addr=\"$usr_addr\",       ".
-			 "usr_addr2=\"$usr_addr2\",     ".
-			 "usr_city=\"$usr_city\",       ".
-			 "usr_state=\"$usr_state\",     ".
-			 "usr_zip=\"$usr_zip\",         ".
-			 "usr_country=\"$usr_country\", ".
-			 "usr_phone=\"$usr_phone\",     ".
-			 "usr_title=\"$usr_title\",     ".
-			 "usr_affil=\"$usr_affil\",     ".
-			 "usr_shell=\"$usr_shell\"      ".
-			 "WHERE uid_idx=\"$idx\"");
-
-	if (mysql_affected_rows()) {
-	    DBQueryFatal("update users set usr_modified=now() ".
-			 "where uid_idx='$idx'");
-	    
-	    return 1;
-	}
-	return 0;
     }
 
     #

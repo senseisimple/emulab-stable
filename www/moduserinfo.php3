@@ -19,7 +19,7 @@ $isadmin   = ISADMIN();
 # Shell options we support. Maybe stick in DB someday.
 $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
 
-# used if db slot for user is NULL (should not happen.)
+# Used if db slot for user is NULL (should not happen.)
 $defaultshell = 'tcsh';
 
 # See below.
@@ -79,11 +79,10 @@ function SPITFORM($formfields, $errors)
 
     echo "<table align=center border=1> 
           <tr>
-            <td align=center colspan=3>
-                <b>Fields marked with * are required.</b>
-            </td>
-          </tr>\n
-
+             <td align=center colspan=3>
+                 <em>(Fields marked with * are required)</em>
+             </td>
+          </tr>
           <form action='$url' method=post>\n";
 
         #
@@ -215,14 +214,14 @@ function SPITFORM($formfields, $errors)
                   <td class=left>";
 	echo "<select name=\"formfields[usr_shell]\">";
 	foreach ($shelllist as $s) {
+	    $selected = "";
+
 	    if ((!isset($formfields["usr_shell"]) &&
-		 0 == strcmp($defaultshell, $s)) ||
-		0 == strcmp($formfields["usr_shell"],$s)) {
-		$sel = "selected='1'";
-	    } else {
-		$sel = "";
+		 strcmp($defaultshell, $s) == 0) ||
+		strcmp($formfields["usr_shell"],$s) == 0) {
+		$selected = "selected";
 	    }
-	    echo "<option value='$s' $sel>$s</option>";
+	    echo "<option $selected value='$s'>$s</option>";
 	}	
 	echo "</select></td></tr>";
 
@@ -269,7 +268,7 @@ function SPITFORM($formfields, $errors)
 	    #   
 	    # A separate password is kept for experiment nodes running Windows.
 	    # It is presented behind-the-scenes to rdesktop and Samba by our
-	    # Web# interface, but you may still need to type it.
+	    # Web interface, but you may still need to type it.
 	    # The default password is randomly generated.
 	    # You may change it to something easier to remember.
 	    #
@@ -329,8 +328,8 @@ function SPITFORM($formfields, $errors)
 	}
 
     echo "<tr>
-              <td colspan=3 align=center>
-                 <b><input type=submit name=submit value=Submit></b>
+              <td align=center colspan=3>
+                  <b><input type=submit name=submit value=Submit></b>
               </td>
           </tr>\n";
 
@@ -364,19 +363,22 @@ function SPITFORM($formfields, $errors)
           </h4>\n";
 }
 
+# Early error checking on $target_user.
+$errors  = array();
+
 #
 # The target uid and the current uid will be the same, unless its a priv user
 # (admin,PI) modifying someone elses data. Must verify this case. Note that
 # the target uid comes initially as a page arg, but later as a form argument
 #
-if (! isset($submit)) {
+if (!isset($submit)) {
     if (!isset($target_user)) {
 	$target_user = $this_user;
     }
 }
 else {
     if (!isset($target_user) || !isset($formfields)) {
-	PAGEARGERROR("Invalid form arguments!");
+	$errors["Args"] = "Invalid form arguments!";
     }
 }
 
@@ -388,397 +390,165 @@ $target_uid = $target_user->uid();
 #
 if (!$isadmin && 
     !$target_user->AccessCheck($this_user, $TB_USERINFO_MODIFYINFO)) {
-    USERERROR("You do not have permission to modify information for ".
-	      "user: $target_uid!", 1);
-}
-
-#
-# Construct a defaults array based on current DB info. Used for the initial
-# form, and to determine if any changes were made. This is to avoid churning
-# the passwd file for no reason, given that most people use this page
-# simply to change their password. 
-#
-$defaults	         = array();
-$defaults["user"]        = $target_user->webid();
-$defaults["usr_email"]   = $target_user->email();
-$defaults["usr_URL"]     = $target_user->URL();
-$defaults["usr_addr"]    = $target_user->addr();
-$defaults["usr_addr2"]   = $target_user->addr2();
-$defaults["usr_city"]    = $target_user->city();
-$defaults["usr_state"]   = $target_user->state();
-$defaults["usr_zip"]     = $target_user->zip();
-$defaults["usr_country"] = $target_user->country();
-$defaults["usr_name"]    = $target_user->name();
-$defaults["usr_phone"]   = $target_user->phone();
-$defaults["usr_title"]   = $target_user->title();
-$defaults["usr_affil"]   = $target_user->affil();
-$defaults["usr_shell"]   = $target_user->shell();
-$defaults["notes"]       = $target_user->notes();
-$defaults["password1"]   = "";
-$defaults["password2"]   = "";
-$defaults["user_interface"] = $target_user->user_interface();
-$wikionly                = $target_user->wikionly();
-
-# Show and keep the Windows password if user-set, otherwise fill in the
-# random one. 
-if ($target_user->w_pswd() != "") {
-    $defaults["w_password1"] =
-	$defaults["w_password2"] = $target_user->w_pswd();
-}
-else {
-    #
-    # The initial random default for the Windows Password is based on the Unix
-    # encrypted password, in particular the random salt if it's an MD5 crypt,
-    # consisting of the 8 chars after an initial "$1$" and followed by "$".
-    #
-    $unixpwd = explode('$', $target_user->pswd());
-    if (strlen($unixpwd[0]) > 0)
-	# When there's no $ at the beginning, its not an MD5 hash.
-	$randpwd = substr($unixpwd[0],0,8);
-    else
-	$randpwd = substr($unixpwd[2],0,8); # The MD5 salt string.
-    $defaults["w_password1"] = $defaults["w_password2"] = $randpwd;
+    $errors["Project"] = 
+	"You do not have permission to modify information for ".
+	    "user: $target_uid!";
 }
 
 #
 # On first load, display a form consisting of current user values, and exit.
 #
-if (! isset($submit)) {
-    SPITFORM($defaults, 0);
+if (!isset($submit)) {
+    $defaults = array();
+    $defaults["user"]        = $target_user->webid();
+    $defaults["usr_email"]   = $target_user->email();
+    $defaults["usr_URL"]     = $target_user->URL();
+    $defaults["usr_addr"]    = $target_user->addr();
+    $defaults["usr_addr2"]   = $target_user->addr2();
+    $defaults["usr_city"]    = $target_user->city();
+    $defaults["usr_state"]   = $target_user->state();
+    $defaults["usr_zip"]     = $target_user->zip();
+    $defaults["usr_country"] = $target_user->country();
+    $defaults["usr_name"]    = $target_user->name();
+    $defaults["usr_phone"]   = $target_user->phone();
+    $defaults["usr_title"]   = $target_user->title();
+    $defaults["usr_affil"]   = $target_user->affil();
+    $defaults["usr_shell"]   = $target_user->shell();
+    $defaults["notes"]       = $target_user->notes();
+    $defaults["password1"]   = "";
+    $defaults["password2"]   = "";
+    $defaults["user_interface"] = $target_user->user_interface();
+
+    $wikionly                = $target_user->wikionly();
+
+    # Show and keep the Windows password if user-set, otherwise fill in the
+    # random one.
+    if ($target_user->w_pswd() != "") {
+	$defaults["w_password1"] =
+	    $defaults["w_password2"] = $target_user->w_pswd();
+    }
+    else {
+	#
+	# The initial random default for the Windows Password is based on the
+	# Unix encrypted password, in particular the random salt if it's an
+	# MD5 crypt, consisting of the 8 chars after an initial "$1$" and
+	# followed by "$".
+	#
+	$unixpwd = explode('$', $target_user->pswd());
+	if (strlen($unixpwd[0]) > 0)
+	    # When there's no $ at the beginning, its not an MD5 hash.
+	    $randpwd = substr($unixpwd[0],0,8);
+	else
+	    $randpwd = substr($unixpwd[2],0,8); # The MD5 salt string.
+	$defaults["w_password1"] = $defaults["w_password2"] = $randpwd;
+    }
+
+    SPITFORM($defaults, $errors);
     PAGEFOOTER();
     return;
 }
 
 #
-# Otherwise, must validate and redisplay if errors
-#
-$errors = array();
-
-#
-# These fields are required!
-#
-if (!isset($formfields["usr_name"]) ||
-    strcmp($formfields["usr_name"], "") == 0) {
-    $errors["Full Name"] = "Missing Field";
-}
-elseif (! TBvalid_usrname($formfields["usr_name"])) {
-    $errors["Full Name"] = TBFieldErrorString();
-}
-# Make sure user name has at least two tokens!
-$tokens = preg_split("/[\s]+/", $formfields["usr_name"],
-		     -1, PREG_SPLIT_NO_EMPTY);
-if (count($tokens) < 2) {
-    $errors["Full Name"] = "Please provide a first and last name";
-}
-if (!$wikionly) {
-    # WikiOnly can leave these fields blank, but must error check them anyway.
-    if (!isset($formfields["usr_title"]) ||
-	strcmp($formfields["usr_title"], "") == 0) {
-	$errors["Job Title/Position"] = "Missing Field";
-    }
-    if (!isset($formfields["usr_affil"]) ||
-	strcmp($formfields["usr_affil"], "") == 0) {
-	$errors["Affiliation"] = "Missing Field";
-    }
-}
-if (isset($formfields["usr_title"]) &&
-    ! TBvalid_title($formfields["usr_title"])) {
-    $errors["Job Title/Position"] = TBFieldErrorString();
-}
-if (isset($formfields["usr_affil"]) &&
-    ! TBvalid_affiliation($formfields["usr_affil"])) {
-    $errors["Affiliation"] = TBFieldErrorString();
-}
-if (!isset($formfields["usr_shell"]) ||
-    !in_array($formfields["usr_shell"], $shelllist)) {
-    $errors["Shell"] = "Invalid Shell";
-}
-if (isset($formfields["usr_URL"]) &&
-    strcmp($formfields["usr_URL"], "") &&
-    strcmp($formfields["usr_URL"], $HTTPTAG) &&
-    ! CHECKURL($formfields["usr_URL"], $urlerror)) {
-    $errors["Home Page URL"] = $urlerror;
-}
-if (!isset($formfields["usr_email"]) ||
-    strcmp($formfields["usr_email"], "") == 0) {
-    $errors["Email Address"] = "Missing Field";
-}
-elseif (! TBvalid_email($formfields["usr_email"])) {
-    $errors["Email Address"] = TBFieldErrorString();
-}
-elseif (($temp_user = User::LookupByEmail($formfields["usr_email"])) &&
-	!$target_user->SameUser($temp_user)) {
-    $errors["Email Address"] = "Already in use by another user!";
-}
-if (!$isadmin && !$wikionly) {
-    # Admins can leave these fields blank, but must error check them anyway.
-    if (!isset($formfields["usr_addr"]) ||
-	strcmp($formfields["usr_addr"], "") == 0) {
-	$errors["Postal Address 1"] = "Missing Field";
-    }
-    if (!isset($formfields["usr_city"]) ||
-	strcmp($formfields["usr_city"], "") == 0) {
-	$errors["City"] = "Missing Field";
-    }
-    if (!isset($formfields["usr_state"]) ||
-	strcmp($formfields["usr_state"], "") == 0) {
-	$errors["State"] = "Missing Field";
-    }
-    if (!isset($formfields["usr_zip"]) ||
-	strcmp($formfields["usr_zip"], "") == 0) {
-	$errors["ZIP/Postal Code"] = "Missing Field";
-    }
-    if (!isset($formfields["usr_country"]) ||
-	strcmp($formfields["usr_country"], "") == 0) {
-	$errors["Country"] = "Missing Field";
-    }
-    if (!isset($formfields["usr_phone"]) ||
-	strcmp($formfields["usr_phone"], "") == 0) {
-	$errors["Phone #"] = "Missing Field";
-    } 
-}
-if (isset($formfields["usr_addr"]) &&
-    !TBvalid_addr($formfields["usr_addr"])) {
-    $errors["Postal Address 1"] = TBFieldErrorString();
-}
-# Optional
-if (isset($formfields["usr_addr2"]) &&
-    !TBvalid_addr($formfields["usr_addr2"])) {
-    $errors["Postal Address 2"] = TBFieldErrorString();
-}
-if (isset($formfields["usr_city"]) &&
-    !TBvalid_city($formfields["usr_city"])) {
-    $errors["City"] = TBFieldErrorString();
-}
-if (isset($formfields["usr_state"]) &&
-    !TBvalid_state($formfields["usr_state"])) {
-    $errors["State"] = TBFieldErrorString();
-}
-if (isset($formfields["usr_zip"]) &&
-    !TBvalid_zip($formfields["usr_zip"])) {
-    $errors["Zip/Postal Code"] = TBFieldErrorString();
-}
-if (isset($formfields["usr_country"]) &&
-    !TBvalid_country($formfields["usr_zip"])) {
-    $errors["Zip/Postal Code"] = TBFieldErrorString();
-}
-if (isset($formfields["usr_phone"]) && $formfields["usr_phone"] != "" &&
-    !TBvalid_phone($formfields["usr_phone"])) {
-    $errors["Phone #"] = TBFieldErrorString();
-}
-if (isset($formfields["password1"]) &&
-    strcmp($formfields["password1"], "")) {
-    if (!isset($formfields["password2"]) ||
-	strcmp($formfields["password2"], "") == 0) {
-	$errors["Retype Password"] = "Missing Field";
-    }
-    elseif (strcmp($formfields["password1"], $formfields["password2"])) {
-	$errors["Retype Password"] = "Two Passwords Do Not Match";
-    }
-    elseif (! CHECKPASSWORD($target_uid,
-			    $formfields["password1"],
-			    $formfields["usr_name"],
-			    $formfields["usr_email"], $checkerror)) {
-	$errors["Password"] = "$checkerror";
-    }
-}
-if (isset($formfields["w_password1"]) &&
-    strcmp($formfields["w_password1"], "") &&
-    $formfields["w_password1"] != $defaults["w_password1"]) {
-    if (!isset($formfields["w_password2"]) ||
-	strcmp($formfields["w_password2"], "") == 0) {
-	$errors["Retype Windows Password"] = "Missing Field";
-    }
-    elseif (strcmp($formfields["w_password1"], $formfields["w_password2"])) {
-	$errors["Retype Windows Password"] =
-	    "Two Windows Passwords Do Not Match";
-    }
-    elseif (! CHECKPASSWORD($target_uid,
-			    $formfields["w_password1"],
-			    $formfields["usr_name"],
-			    $formfields["usr_email"], $checkerror)) {
-	$errors["Windows Password"] = "$checkerror";
-    }
-}
+# If any errors, respit the form with the current values and the
+# error messages displayed. Iterate until happy.
+# 
 if (count($errors)) {
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
 }
 
+#
+# Build up argument array to pass along.
+#
+$args = array();
+
+# Always pass the password fields if specified.
+if (isset($formfields["password1"]) && $formfields["password1"] != "") {
+    $args["password1"] = $formfields["password1"];
+}
+if (isset($formfields["password2"]) && $formfields["password2"] != "") {
+    $args["password2"] = $formfields["password2"];
+}
+if (isset($formfields["w_password1"]) && $formfields["w_password1"] != "") {
+    $args["w_password1"] = $formfields["w_password1"];
+}
+if (isset($formfields["w_password2"]) && $formfields["w_password2"] != "") {
+    $args["w_password2"] = $formfields["w_password2"];
+}
+
+# Skip passing ones that are not changing from the default (DB state.)
+if (isset($formfields["usr_name"]) && $formfields["usr_name"] != "" &&
+    ($formfields["usr_name"] != $target_user->name())) {
+    $args["usr_name"]	= $formfields["usr_name"];
+}
+if (isset($formfields["usr_email"]) && $formfields["usr_email"] != "" &&
+    ($formfields["usr_email"] != $target_user->email())) {
+    $args["usr_email"]	= $formfields["usr_email"];
+}
+if (isset($formfields["usr_title"]) && $formfields["usr_title"] != "" &&
+    $formfields["usr_title"] != $target_user->title()) {
+    $args["usr_title"]	= $formfields["usr_title"];
+}
+if (isset($formfields["usr_affil"]) && $formfields["usr_affil"] != "" &&
+    $formfields["usr_affil"] != $target_user->affil()) {
+    $args["usr_affil"]	= $formfields["usr_affil"];
+}
+if (isset($formfields["usr_shell"]) && $formfields["usr_shell"] != "" &&
+    $formfields["usr_shell"] != $target_user->shell()) {
+    $args["usr_shell"]	= $formfields["usr_shell"];
+}
+if (isset($formfields["usr_URL"]) && $formfields["usr_URL"] != "" &&
+    $formfields["usr_URL"] != $target_user->URL()) {
+    $args["usr_URL"]	= $formfields["usr_URL"];
+}
+if (isset($formfields["usr_addr"]) && $formfields["usr_addr"] != "" &&
+    $formfields["usr_addr"] != $target_user->addr()) {
+    $args["usr_addr"]	= $formfields["usr_addr"];
+}
+if (isset($formfields["usr_addr2"]) && $formfields["usr_addr2"] != "") {
+    $args["usr_addr2"]	= $formfields["usr_addr2"];
+}
+if (isset($formfields["usr_city"]) && $formfields["usr_city"] != "" &&
+    $formfields["usr_city"] != $target_user->city()) {
+    $args["usr_city"]	= $formfields["usr_city"];
+}
+if (isset($formfields["usr_state"]) && $formfields["usr_state"] != "" &&
+    $formfields["usr_state"] != $target_user->state()) {
+    $args["usr_state"]	= $formfields["usr_state"];
+}
+if (isset($formfields["usr_zip"]) && $formfields["usr_zip"] != "" &&
+    $formfields["usr_zip"] != $target_user->zip()) {
+    $args["usr_zip"]	= $formfields["usr_zip"];
+}
+if (isset($formfields["usr_country"]) && $formfields["usr_country"] != "" &&
+    $formfields["usr_country"] != $target_user->country()) {
+    $args["usr_country"]	= $formfields["usr_country"];
+}
+if (isset($formfields["usr_phone"]) && $formfields["usr_phone"] != "" &&
+    $formfields["usr_phone"] != $target_user->phone()) {
+    $args["usr_phone"]	= $formfields["usr_phone"];
+}
+if (isset($formfields["user_interface"]) && $formfields["user_interface"] != "" &&
+    $formfields["user_interface"] != $target_user->user_interface()) {
+    $args["user_interface"]	= $formfields["user_interface"];
+}
+if (isset($formfields["notes"]) && $formfields["notes"] != "" &&
+    $formfields["notes"] != $target_user->notes()) {
+    $args["notes"]	= $formfields["notes"];
+}
+
+if (! ($result = User::ModUserInfo($target_user, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
+
 PAGEHEADER("Modify User Information");
-STARTBUSY("Making user profile changes");
 
-#
-# Only admin types can change the email address. If its different, the
-# user circumvented the form, and so its okay to blast it.
-#
-if ($target_user->email() != $formfields["usr_email"]) {
-    if (!$isadmin) {
-	USERERROR("You are not allowed to change your email address. <br> ".
-		  "Please contact Testbed Operations.", 1);
-    }
-    
-    # Invoke the backend to deal with this.
-    SUEXEC($uid, "nobody",
-	   "webtbacct email $target_uid " .
-	       escapeshellarg($formfields["usr_email"]),
-	   SUEXEC_ACTION_DIE);
-}
-
-#
-# Now see if the user is requesting to change the password. We checked
-# them above when the form was submitted.
-#
-if ((isset($formfields["password1"]) && $formfields["password1"] != "") &&
-    (isset($formfields["password2"]) && $formfields["password2"] != "")) {
-
-    $old_encoding = $target_user->pswd();
-    $new_encoding = crypt($formfields["password1"], $old_encoding);
-
-    #
-    # Compare. Must change it!
-    # 
-    if (! strcmp($old_encoding, $new_encoding)) {
-	$errors["New Password"] = "New password is the same as old password";
-	SPITFORM($formfields, $errors);
-	PAGEFOOTER();
-	return;
-    }
-
-    #
-    # Do it again. This ensures we use the current algorithm, not whatever
-    # it was encoded with last time.
-    #
-    $new_encoding  = crypt($formfields["password1"]);
-    $safe_encoding = escapeshellarg($new_encoding);
-
-    #
-    # Invoke backend to deal with this.
-    #
-    if (!HASREALACCOUNT($uid)) {
-	SUEXEC("nobody", "nobody",
-	       "webtbacct passwd $target_uid $safe_encoding",
-	       SUEXEC_ACTION_DIE);
-    }
-    else {
-	SUEXEC($uid, "nobody",
-	       "webtbacct passwd $target_uid $safe_encoding",
-	       SUEXEC_ACTION_DIE);
-    }
-}
-
-#
-# See if the user is requesting to change the Windows password. We checked
-# them above when the form was submitted.
-#
-if (!$wikionly &&
-    ((isset($formfields["w_password1"]) && $formfields["w_password1"] != "") &&
-     (isset($formfields["w_password2"]) && $formfields["w_password2"] != ""))){
-
-    $target_user->SetWindowsPassword($formfields["w_password1"]);
-    
-    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
-	SUEXEC($uid, "nobody", "webtbacct wpasswd $target_uid", 1);
-    }
-}
-
-#
-# Only admins can change the notes field. We do not bother to generate
-# any email or external updates for this.
-#
-if ($isadmin && $target_user->notes() != $formfields["notes"]) {
-    $target_user->SetNotes($formfields["notes"]);
-}
-
-#
-# Set the plab bit seperately since no need to call out to the backend.
-#
-if (isset($formfields["user_interface"]) &&
-    $formfields["user_interface"] == TBDB_USER_INTERFACE_PLAB) {
-    $user_interface = TBDB_USER_INTERFACE_PLAB;
-}
-else {
-    $user_interface = TBDB_USER_INTERFACE_EMULAB;
-}
-if ($target_user->user_interface() != $user_interface) {
-    $target_user->SetUserInterface($user_interface);
-}
-
-#
-# Now change the rest of the information.
-$usr_name     = $formfields["usr_name"];
-$usr_email    = $formfields["usr_email"];
-$usr_title    = $formfields["usr_title"];
-$usr_affil    = $formfields["usr_affil"];
-$usr_addr     = $formfields["usr_addr"];
-$usr_city     = $formfields["usr_city"];
-$usr_state    = $formfields["usr_state"];
-$usr_zip      = $formfields["usr_zip"];
-$usr_country  = $formfields["usr_country"];
-$usr_phone    = $formfields["usr_phone"];
-$usr_shell    = $formfields["usr_shell"];
-
-if (! isset($formfields["usr_URL"]) ||
-    strcmp($formfields["usr_URL"], "") == 0 ||
-    strcmp($formfields["usr_URL"], $HTTPTAG) == 0) {
-    $usr_URL = "";
-}
-else {
-    $usr_URL = $formfields["usr_URL"];
-}
-
-if (! isset($formfields["usr_addr2"])) {
-    $usr_addr2 = "";
-}
-else {
-    $usr_addr2 = $formfields["usr_addr2"];
-}
-
-$modified = $target_user->ChangeProfile($usr_name,  $usr_title,
-					$usr_affil, $usr_addr,
-					$usr_addr2, $usr_city,
-					$usr_state, $usr_zip, $usr_country,
-					$usr_phone, $usr_shell, $usr_URL);
-if ($modified) {
-    TBMAIL("$usr_name <$usr_email>",
-	   "User Information for '$target_uid' Modified",
-	   "\n".
-	   "User information for '$target_uid' changed by '$uid'.\n".
-	   "\n".
-	   "Name:              $usr_name\n".
-	   "IDX:               " . $target_user->uid_idx()  . "\n".
-	   "Email:             $usr_email\n".
-	   "URL:               $usr_URL\n".
-	   "Affiliation:       $usr_affil\n".
-	   "Address1:          $usr_addr\n".
-	   "Address2:          $usr_addr2\n".
-	   "City:              $usr_city\n".
-	   "State:             $usr_state\n".
-	   "ZIP/Postal Code:   $usr_zip\n".
-	   "Country:           $usr_country\n".
-	   "Phone:             $usr_phone\n".
-	   "Job Title:         $usr_title\n".
-	   "Shell:             $usr_shell\n",
-	   "WikiOnly:	       $wikionly\n",
-	   "From: $TBMAIL_OPS\n".
-	   "Bcc: $TBMAIL_AUDIT\n" .
-	   "Errors-To: $TBMAIL_WWW");
-
-    #
-    # mkacct updates the user gecos
-    #
-    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
-	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
-    }
-}
-
-STOPBUSY();
-
-#
-# Spit out a redirect so that the history does not include a post
-# in it. The back button skips over the post and to the form.
-# 
+echo "<center><h3>Done!</h3></center>\n";
 PAGEREPLACE(CreateURL("showuser", $target_user) . "#PROFILE");
 
 #
