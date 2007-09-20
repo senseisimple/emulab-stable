@@ -14502,26 +14502,26 @@
 
 ./myboss.vulnelab.testbed.emulab.net/newosid_form.php3
 <form action="https://myboss.vulnelab.testbed.emulab.net/newosid.php3" method="post" name=idform>
-<input type="select" name="project" value=''>
-<input type="text" name="osname" size=20 maxlength=20>
-<input type="text" name="description" size="40">
-<input type="select" name="OS" value="Linux" >
-<input type="text" name="os_version" size=12 maxlength=12>
-<input type="text" name="os_path" size=40>
-<input type="text" name="os_magic" size=30>
-<input type="checkbox" name="os_feature_ping" value="checked" checked >
-<input type="checkbox" name="os_feature_ssh" value="checked" checked >
-<input type="checkbox" name="os_feature_ipod" value="checked" checked >
-<input type="checkbox" name="os_feature_isup" value="checked" checked >
-<input type="checkbox" name="os_feature_veths" value="checked" checked >
-<input type="checkbox" name="os_feature_mlinks" value="checked" checked >
-<input type="checkbox" name="os_feature_linktest" value="checked" checked >
-<input type="checkbox" name="os_feature_linkdelays" value="checked" checked >
-<input type="select" name="op_mode" value="NORMALv2" >
-<input type="checkbox" name="os_shared" value="Yep" >
-<input type="checkbox" name="os_clean" value="Yep" >
-<input type="text" name="os_reboot_waittime" size=5>
-<input type="select" name="nextosid" value="X" >
+<input type="select" name="formfields[pid]" value=''>
+<input type="text" name="formfields[osname]" size=20 maxlength=20>
+<input type="text" name="formfields[description]" size="40">
+<input type="select" name="formfields[OS]" value="Linux" >
+<input type="text" name="formfields[version]" size=12 maxlength=12>
+<input type="text" name="formfields[path]" size=40>
+<input type="text" name="formfields[magic]" size=30>
+<input type="checkbox" name="formfields[os_feature_ping]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_ssh]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_ipod]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_isup]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_veths]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_mlinks]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_linktest]" value="checked" checked >
+<input type="checkbox" name="formfields[os_feature_linkdelays]" value="checked" checked >
+<input type="select" name="formfields[op_mode]" value="NORMALv2" >
+<input type="checkbox" name="formfields[shared]" value="Yep" >
+<input type="checkbox" name="formfields[mustclean]" value="Yep" >
+<input type="text" name="formfields[reboot_waittime]" size=5>
+<input type="select" name="formfields[nextosid]" value="X" >
 <input type="submit" value="Submit" >
 
 ./myboss.vulnelab.testbed.emulab.net/newproject.php3

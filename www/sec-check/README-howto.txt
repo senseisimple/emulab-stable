@@ -118,7 +118,7 @@ See README-FIRST.txt for a top-level outline.
        failure occurs, the make stops.  This is a Good Thing, because there
        are a lot of dependencies in the activation sequence.  Most early
        objects must exist for later ones to be created.  When UNKNOWN results
-       occur, browse to the file and update the patterns.
+       occur, browse to the file to see what was returned and update the patterns.
 
      - You can browse to the .html files using File/Open, or pop up pages in
        your browser directly from Emacs using this handy keyboard macro:
@@ -138,6 +138,9 @@ See README-FIRST.txt for a top-level outline.
        The file path to your current obj-devel directory containing html files
        is in buffer "d".  Put the cursor on a filename line in an analyze*.txt
        file and type ^C-^F to pop up the page in the current Opera tab.
+
+       Notice that if the resulting .html file contains a javascript PageReplace,
+       you will need to comment that out to see what was returned by PHP.
 
      - Debugging: You can gmake individual activation tasks when things are
        broken, working through the sequence by hand.  The actions should
@@ -198,12 +201,17 @@ See README-FIRST.txt for a top-level outline.
 
      - This is automatic, but there are a few little special cases in the
        makefile.  It leads into iterating on the input_values.list dictionary.
-       See the comments in README-concepts.txt .
+       See the comments about this in README-concepts.txt .
 
      - Input is the spidered public.wget and admin.wget subtrees.
 
-     - Output is $twsr/site_inputs.list and $twsr/input_names.list, which
-       isn't used directly, but is used for adding to $tws/input_values.list .
+     - Output is $twsr/site_inputs.list and $twsr/input_names.list .
+
+       . When the inputs to a form change (fields, names, or defaults) you can
+         edit site_inputs.list rather than having to do another whole spider run.
+
+       . input_names.list isn't used directly, but is a source for copying strings
+         to add to the $tws/input_values.list control file.
 
        See the comments in $twsr/forms-to-urls.gawk about features controlled
        by special annotations on the input_values.list entries.

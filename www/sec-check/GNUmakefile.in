@@ -409,26 +409,27 @@ new_nodetype:
 os1 = testosid
 new_osid:
 	$(call wget_post,,newosid.php3,newosid.html,\
-	    pid=$(proj1)\
-	    osname=$(os1)\
-	    os_feature_isup=checked\
-	    os_magic=\
-	    os_path=\
-	    os_version=666\
-	    nextosid=\
-	    os_feature_veths=checked\
-	    os_feature_ping=checked\
-	    os_feature_ipod=checked\
-	    OS=FreeBSD\
-	    os_feature_linktest=checked\
-	    os_feature_mlinks=checked\
-	    os_clean=Yep\
-	    op_mode=NORMALv2\
-	    description=Test OS description.\
-	    os_reboot_waittime=150\
-	    os_shared=Yep\
-	    os_feature_linkdelays=checked\
-	    os_feature_ssh=checked)
+	    formfields[pid]=$(proj1)\
+	    formfields[osname]=$(os1)\
+	    formfields[os_feature_isup]=checked\
+	    formfields[magic]=\
+	    formfields[path]=\
+	    formfields[version]=666\
+	    formfields[nextosid]=\
+	    formfields[os_feature_veths]=checked\
+	    formfields[os_feature_ping]=checked\
+	    formfields[os_feature_ipod]=checked\
+	    formfields[OS]=FreeBSD\
+	    formfields[os_feature_linktest]=checked\
+	    formfields[os_feature_mlinks]=checked\
+	    formfields[mustclean]=Yep\
+	    formfields[op_mode]=NORMALv2\
+	    formfields[description]=Test OS description.\
+	    formfields[reboot_waittime]=150\
+	    formfields[shared]=Yep\
+	    formfields[os_feature_linkdelays]=checked\
+	    formfields[os_feature_ssh]=checked\
+	    submit=Submit)
 os1_osid_sql = $(call boss_sql, \
 	select osid from os_info where pid='$(proj1)' and osname='$(os1)')
 show_os1_osid:
