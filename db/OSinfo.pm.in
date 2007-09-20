@@ -174,12 +174,12 @@ sub mfs($)              { return field($_[0], "mfs"); }
 sub reboot_waittime($)  { return field($_[0], "reboot_waittime"); }
 
 #
-# Create a new experiment. This installs the new record in the DB,
+# Create a new os_info. This installs the new record in the DB,
 # and returns an instance. There is some bookkeeping along the way.
 #
 sub Create($$$$)
 {
-    my ($class, $project, $creator, $osname, $argref) = @_;
+    my ($class, $project, $creator, $osname, $argref, $usrerr_ref) = @_;
     my $idx;
     my $now = time();
 
@@ -203,7 +203,7 @@ sub Create($$$$)
 
     if ($query_result->numrows) {
 	DBQueryWarn("unlock tables");
-	tberror("OS $osname in project $pid already exists!");
+	$$usrerr_ref = "Error: OS $osname in project $pid already exists!";
 	return undef;
     }
 

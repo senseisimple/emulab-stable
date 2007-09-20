@@ -83,8 +83,7 @@ function SPITFORM($formfields, $errors)
     #
     echo "<tr>
               <td>*Select Project:</td>
-              <td><select name=\"formfields[pid]\"
-                          onChange='SetPrefix(idform);'>
+              <td><select name=\"formfields[pid]\">
                       <option value=''>Please Select &nbsp</option>\n";
     
     while (list($project) = each($projlist)) {

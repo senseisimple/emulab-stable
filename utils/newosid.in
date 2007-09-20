@@ -110,12 +110,11 @@ else {
 	fatal("Bad data in translated pathname: $xmlfile");
     }
 
-    # The web interface (and in the future the xmlrpc interface) will
-    # sets this.
+    # The web interface (and in the future the xmlrpc interface) sets this.
     $this_user = User->ImpliedUser();
 
     if (! defined($this_user)) {
-	fatal("Cannot determind implied user!");
+	fatal("Cannot determine implied user!");
     }
 }
 
@@ -280,10 +279,14 @@ delete($newosid_args{"osname"});
 # Ditto the pid.
 delete($newosid_args{"pid"});
 
-my $new_osinfo = OSinfo->Create($project, $this_user, $osname, \%newosid_args);
-if (!defined($new_osinfo)) {
-    fatal("Could not create new OSID!");
-}
+my $usrerr;
+my $new_osinfo = OSinfo->Create($project, $this_user, $osname,
+				\%newosid_args, \$usrerr);
+UserError($usrerr)
+    if (defined($usrerr));
+fatal("Could not create new OSID!")
+    if (!defined($new_osinfo));
+
 my $osid = $new_osinfo->osid();
 	    
 # The web interface requires this line to be printed.
