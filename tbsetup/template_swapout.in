@@ -164,13 +164,18 @@ if (!defined($experiment)) {
     fatal(-1, "Experiment $pid/$eid object could not be found!");
 }
 
-# Check for cancel.
+# Check for cancel and dequeue.
 if (! $batchmode) {
     if ($experiment->state() eq EXPTSTATE_ACTIVATING) {
 	system("$swapexp -x -s out $pid $eid");
 	exit($? >> 8);
     }
-    # Check for a pre-loaded instance (never active).
+    elsif ($experiment->batchmode() &&
+	   $experiment->state() eq EXPTSTATE_QUEUED) {
+	# User wants to dequeue a batch experiment that is waiting to go.
+	system("$swapexp -x -s pause $pid $eid");
+	exit($? >> 8);
+    }
 }
 
 #

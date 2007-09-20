@@ -209,14 +209,18 @@ $SIG{TERM} = \&sighandler;
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
-if (! ($foreground || $experiment->batchmode())) {
+if (! $foreground) {
     # Cleanup
     $experiment->CleanLogFiles() == 0
 	or fatal(-1, "Could not clean up logfiles!");
     
     $logname = TBExptCreateLogFile($pid, $eid, "swapin");
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+
+    # The batch daemon is going to set the current log file, so do not do it.
+    if (! $experiment->batchmode()) {
+	TBExptSetLogFile($pid, $eid, $logname);
+	TBExptOpenLogFile($pid, $eid);
+    }
 
     if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
 				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
@@ -360,8 +364,6 @@ if ($experiment->batchmode()) {
 	    if (! @ExptStates);
 
 	foreach my $state (@ExptStates) {
-	    print "$state\n";
-	    
 	    if ($state eq EXPTSTATE_ACTIVATING()) {
 		print "Experiment is starting a swapin attempt ...\n";
 	    }
@@ -383,10 +385,13 @@ if ($experiment->batchmode()) {
 		# Dumped out of the batch system for some reason.
 		print "Experiment has been removed from the batch queue.\n";
 
+		$instance->DeleteCurrentRun() == 0
+		    or exit(-1);
+
 		#
-		# We are done; remove record of this attempt and exit.
+		# We are done. User has to requeue batched instance.
 		#
-		fatal(1, "Experiment has been removed from the batch queue");
+		exit(0);
 	    }
 	}
     }

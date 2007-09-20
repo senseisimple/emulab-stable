@@ -90,9 +90,6 @@ $lockdown      = $experiment->lockdown();
 
 # Template Instance Experiments get special treatment in this page.
 $instance = TemplateInstance::LookupByExptidx($exptidx);
-if ($instance && ($inout != "out" && $inout != "in")) {
-    PAGEARGERROR("Invalid action for template instance");
-}
 
 # Convert inout to informative text.
 if (!strcmp($inout, "in")) {
@@ -119,6 +116,8 @@ elseif (!strcmp($inout, "pause")) {
     $action = "dequeue";
 }
 elseif (!strcmp($inout, "restart")) {
+    if ($instance)
+        PAGEARGERROR("Invalid action for template instance");
     $action = "restart";
 }
 
@@ -219,8 +218,9 @@ if ($instance) {
     $guid = $instance->guid();
     $version = $instance->vers();
 
-    STARTBUSY(($inout == "out" ? "Terminating" : "Starting") . 
-	      " template instance!");    
+    STARTBUSY("Template Instance is");
+    if ($inout == "pause")
+	$inout = "out";
 }
 
 #
@@ -269,10 +269,7 @@ if ($retval) {
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    if ($instance) {
-	STARTLOG($experiment);
-    }
-    elseif ($isbatch) {
+    if ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
 	    echo "Batch Mode experiments will be run when enough resources
                   become available. This might happen immediately, or it
@@ -293,10 +290,13 @@ else {
                   please contact $TBMAILADDR.\n";
 	}
 	elseif (strcmp($inout, "pause") == 0) {
-	    echo "Your experiment has been dequeued. You may requeue your
+	    echo "Your experiment has been dequeued.
 		  experiment at any time.\n";
 	}
 	STARTWATCHER($experiment);
+    }
+    elseif ($instance) {
+	STARTLOG($experiment);
     }
     else {
 	echo "<div>";
