@@ -420,8 +420,8 @@ foreach $node (keys(%nodes)) {
     # will have a feature def-osid-fbsd-nse 0.0
     # This is used by assign to prefer these pnodes
     # first before using others.
-    if( $node_def_boot_osid{$node} eq 
-	TBOSID(TB_OPSPID, "FBSD-NSE") ) { 
+    if($node_def_boot_osid{$node} && ($node_def_boot_osid{$node} eq 
+	TBOSID(TB_OPSPID, "FBSD-NSE"))) { 
 	push(@features, "FBSD-NSE:0.0");
     }
 
