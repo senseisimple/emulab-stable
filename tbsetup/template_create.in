@@ -783,7 +783,8 @@ if ($modify) {
 #
 # Generate the graph for the template.
 #
-system("$makegraph $guid");
+print "Generating graph\n";
+system("$makegraph -s $guid");
 fatal(-1, "Error generating template graph.")
     if ($?);
 

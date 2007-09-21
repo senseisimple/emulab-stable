@@ -22,9 +22,10 @@ sub usage()
 	  "<guid>      - GUID to graph\n");
     exit(-1);
 }
-my $optlist	 = "p:z:d";
+my $optlist	 = "p:z:ds";
 my %options      = ();
 my $debug	 = 0;
+my $silent	 = 0;
 my $prefix       = "/tmp/dot$$";
 my $scale        = 1.0;
 my $zoom;
@@ -293,8 +294,10 @@ close(DOT);
 #
 # Now run dot and generate both a gif and an image map file.
 #
-system("$DOT -Tgif -o $giffile  $dotfile");
-system("$DOT -Tcmapx -o $imapfile $dotfile");
+my $redirect = ($silent ? "> /dev/null 2>&1" : "");
+
+system("$DOT -Tgif -o $giffile $dotfile $redirect");
+system("$DOT -Tcmapx -o $imapfile $dotfile $redirect");
 
 #
 # Grab the input data. 
@@ -360,6 +363,9 @@ sub ParseArgs()
     }
     if (defined($options{"d"})) {
 	$debug = 1;
+    }
+    if (defined($options{"s"})) {
+	$silent = 1;
     }
     if (defined($options{"z"})) {
 	$zoom = $options{"z"};
