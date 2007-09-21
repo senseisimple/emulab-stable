@@ -204,7 +204,7 @@ if (my $childpid = TBBackGround($logfile)) {
     print "Please wait for email about the status before continuing.\n";
     exit(0);
 }
-exec("$template_commit -r $tag $guid");
+exec("$template_commit -r $tag -t $tag $guid");
 die("Failed to exec $template_commit!\n");
 
 #

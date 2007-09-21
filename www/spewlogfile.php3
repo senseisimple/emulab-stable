@@ -16,25 +16,32 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments.
 #
-$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "template",   PAGEARG_TEMPLATE);
 
-# Need these below.
-$pid = $experiment->pid();
-$eid = $experiment->eid();
-
-#
-# Verify permission.
-#
-if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view the log for $pid/$eid!", 1);
+if (! (isset($experiment) || isset($template))) {
+    PAGEARGERROR("Must provide either an experiment or a template");
 }
 
 #
-# Check for a logfile. This file is transient, so it could be gone by
-# the time we get to reading it.
+# Verify permission and sure there is a logfile.
 #
-if (! $experiment->logfile()) {
-    USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
+if (isset($experiment)) {
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view logs for $pid/$eid!", 1);
+    }
+    if (! $experiment->logfile()) {
+	USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
+    }
+}
+else {
+    if (!$template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view logs for ".
+		  "$guid/$vers!", 1);
+    }
+    if (! $template->logfile()) {
+	USERERROR("Template $guid/$vers is no longer in transition!", 1);
+    }
 }
 
 #
@@ -56,7 +63,16 @@ function SPEWCLEANUP()
 ignore_user_abort(1);
 register_shutdown_function("SPEWCLEANUP");
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $pid $eid", "r")) {
+if (isset($experiment)) {
+    $args = "-e " . $experiment->pid() . "/" . $experiment->eid();
+    $pid  = $experiment->pid();
+}
+else {
+    $args = "-t " . $template->guid() . "/" . $template->vers();
+    $pid  = $template->pid();
+}
+
+if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $args", "r")) {
     header("Content-Type: text/plain");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     header("Cache-Control: no-cache, must-revalidate");
@@ -72,7 +88,10 @@ if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $pid $eid", "r")) {
     $fp = 0;
 }
 else {
-    USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
+    if (isset($experiment))
+	USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
+    else
+	USERERROR("Template $guid/$vers is no longer in transition!", 1);
 }
 
 ?>

@@ -19,15 +19,25 @@ function ClearLoadingIndicators(done_msg)
 {
     var busyimg = getObjbyName('busy');
     var loadingspan = getObjbyName('loading');
+    var loadingdiv  = getObjbyName('inner_loaddiv');
 
-    loadingspan.innerHTML = done_msg;
+    loadingdiv.style.display = "none";
     busyimg.style.display = "none";
     busyimg.src = "1px.gif";
+    loadingspan.innerHTML = done_msg;
 }
 
 function ClearBusyIndicators(done_msg)
 {
 	ClearLoadingIndicators(done_msg);
+}
+
+function HideBusyIndicators()
+{
+    var loadingdiv  = getObjbyName('outer_loaddiv');
+
+    ClearBusyIndicators('');
+    loadingdiv.style.display = "none";
 }
 
 /* Replace the current page */

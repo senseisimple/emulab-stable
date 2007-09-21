@@ -33,11 +33,9 @@ class Template
 	$pid = $this->pid();
 	$eid = $this->eid();
 
-	if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
-	    $this->template = NULL;
-	    return;
+	if (($experiment = Experiment::LookupByPidEid($pid, $eid))) {
+	    $this->experiment = $experiment;
 	}
-	$this->experiment = $experiment;
     }
 
     # Hmm, how does one cause an error in a php constructor?
@@ -128,7 +126,7 @@ class Template
     function path() {
 	if (!$this->experiment)
 	    return -1;
-	$experiment = $this->experiment;
+	$experiment = $this->GetExperiment();
 	return $experiment->path();
     }
     function IsHidden() {
@@ -153,6 +151,9 @@ class Template
     function child_vers() {
 	return (is_null($this->template) ? -1 :$this->template['child_vers']);
     }
+    function logfile() {
+	return (is_null($this->template) ? -1 :$this->template['logfile']);
+    }
 
     # The root template has no parent guid.
     function IsRoot() {
@@ -164,6 +165,14 @@ class Template
 
     # Return the underlying experiment for this template.
     function GetExperiment() {
+	if (! $this->experiment) {
+	    $pid = $self->pid();
+	    $eid = $self->eid();
+	    
+	    if (($experiment = Experiment::LookupByPidEid($pid, $eid))) {
+		$this->experiment = $experiment;
+	    }
+	}
 	return $this->experiment;
     }
 
@@ -178,7 +187,7 @@ class Template
 
     # Return the unixgid for operating on this template.
     function UnixGID() {
-	$experiment = $this->experiment;
+	$experiment = $this->GetExperiment();
 
 	return $experiment->UnixGID();
     }

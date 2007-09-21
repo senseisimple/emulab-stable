@@ -186,14 +186,14 @@ $SIG{TERM} = \&sighandler;
 if (defined($repotag)) {
     CommitFromRepo();
 }
+elsif (defined($eid)) {
+    CommitFromInstance();
+}
 else {
     tbdie("Unsupported template commit operation!");
     
     if (defined($frompath)) {
 	CommitFromCheckout();
-    }
-    elsif (defined($eid)) {
-	CommitFromInstance();
     }
     else {
 	CommitFromTemplate();
@@ -372,35 +372,22 @@ sub CommitFromInstance()
     #
     # Start with a plain template modify of the current template.
     #
-    system("$modify -m $guid/$version -w -g $gid $pid $tid $nsfile");
+    system("$modify -f $frompath ".
+	   "  -m $guid/$version -w -g $gid $pid $tid $nsfile");
     if ($?) {
 	fatal($? >> 8, "Failed to commit instance to template!");
     }
     # Pick up changes to child guid/vers.
+    # Pick up changes to child guid/vers.
     $template->Refresh();
-
-    $child_template = Template->Lookup($template->child_guid(),
-				       $template->child_vers());
-    
-    if (!defined($child_template)) {
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
 	fatal(-1, "Lookup of child template failed!");
     }
-
-    #
-    # Now "import" the datastore directory from the instance to the new
-    # template and commit the changes. 
-    #
-    if ($child_template->ImportDataStore("$userdir/datastore") != 0) {
-	fatal(-1, "Could not import datastore from instance to template!");
-    }
-
-    #
-    # Commit the archive. 
-    #
-    system("$archcontrol -t import commit $pid " . $child_template->eid());
-    if ($?) {
-	fatal(-1, "Could not commit archive!");
-    }
+    $child->SetDescription($description)
+	if (defined($description));
 }
 
 #

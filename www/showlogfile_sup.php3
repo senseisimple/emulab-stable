@@ -102,14 +102,13 @@ function STARTWATCHER($experiment)
     echo "</script>\n";
 }
 
-function STARTLOG($experiment)
+function STARTLOG($object)
 {
-    global $BASEPATH;
-    $pid = $experiment->pid();
-    $eid = $experiment->eid();
-    $url = CreateURL("spewlogfile", $experiment);
-
-    STARTWATCHER($experiment);
+    $url = CreateURL("spewlogfile", $object);
+    
+    if (is_a($object, 'Experiment')) {
+	STARTWATCHER($object);
+    }
 
     echo "<center>\n";
     echo "<img id='busy' src='busy.gif'>
@@ -129,8 +128,6 @@ function STARTLOG($experiment)
 
     echo "SetupOutputArea('outputframe', true);\n"; 
 
-    echo "exp_pid = \"$pid\";\n";
-    echo "exp_eid = \"$eid\";\n";
     echo "</script><div>
          <iframe id='downloader' name='downloader'
                  class='downloader' src='$url'

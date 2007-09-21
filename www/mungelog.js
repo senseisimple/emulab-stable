@@ -6,10 +6,6 @@
 var LOG_STATE_LOADING = 1;
 var LOG_STATE_LOADED = 2;
 
-/* The experiment pid/eid used when getting the pnode list. */
-var exp_pid = "";
-var exp_eid = "";
-
 var pnodes = new Array(); // List of pnode names in longest to shortest order.
 var lastLength = 0; // The length of the download text at the last check.
 var lastLine = ""; // The last line of the download text.
@@ -240,22 +236,6 @@ function ml_handleReadyState(state) {
 	 * iteration (in case the line was only partially downloaded).
 	 */
 	var newData = lastLine + rt.substring(lastLength);
-
-	/* Look for assigns "signal" that the pnode list is available. */
-	/* XXX Turned off since it is slow. */
-	if (0 && newData.indexOf('Mapped to physical reality!') != -1) {
-	    if (getPNodeProgress == 1) {
-		/* Still waiting for the reply. */
-		return;
-	    }
-	    else if (getPNodeProgress == 0) {
-		/* Send the request. */
-		getPNodeProgress = 1;
-		x_GetPNodes(exp_pid, exp_eid, GetPNodes_cb);
-		
-		return;
-	    }
-	}
 
 	lastLength = rt.length;
 	lastLine = "";

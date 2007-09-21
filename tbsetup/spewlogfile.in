@@ -1,31 +1,30 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 use Getopt::Std;
 
 #
-# Spew the current log file for an experiment to stdout. This is for
-# use by the web interface, so it can send the lofgile to the user in
-# a web page.
+# Spew the current log file for an experiment or template to stdout.
+# This is for use by the web interface, so it can send the logfile to
+# the user in a web page.
 #
 # The wrinkle is that the logfile only exists while the experiment is
 # in transition, and we have to quit when the experiment is no longer in
 # transition so that the web page can finish.
 #
-
 sub usage()
 {
-    print STDOUT "Usage: spewlogfile <pid> <eid>\n".
-	"Spew the logfile for an experiment.\n";
+    print("Usage: spewlogfile -e pid,eid\n".
+	  "       spewlogfile -t guid,vers\n".
+	  "Spew the logfile for an experiment or template.\n");
     exit(-1);
 }
-my $optlist = "w";
+my $optlist = "we:t:";
 my $fromweb = 0;
   
 #
@@ -37,6 +36,8 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $logname;
 my $isopen;
+my $experiment;
+my $template;
 
 #
 # Load the Testbed support stuff. 
@@ -44,6 +45,9 @@ my $isopen;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
+use Template;
+use User;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -56,34 +60,29 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"w"})) {
     $fromweb = 1;
 }
-if (@ARGV != 2) {
-    usage();
+if (defined($options{"e"})) {
+    $experiment = Experiment->Lookup($options{"e"});
+    if (! $experiment) {
+	die("*** $0:\n".
+	    "    No such experiment in the Emulab Database.\n");
+    }
 }
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
-
-#
-# Untaint the arguments.
-#
-if ($pid =~ /^([-\@\w]+)$/) {
-    $pid = $1;
+elsif (defined($options{"t"})) {
+    $template = Template->Lookup($options{"t"});
+    if (! $template) {
+	die("*** $0:\n".
+	    "    No such template in the Emulab Database.\n");
+    }
 }
-else {
-    die("*** Bad data in pid: $pid\n");
-}	
-if ($eid =~ /^([-\@\w]+)$/) {
-    $eid = $1;
-}
-else {
-    die("*** Bad data in eid: $eid\n");
-}
+usage()
+    if (@ARGV || !($experiment || $template));
 
 #
 # This script is setuid, so please do not run it as root. Hard to track
@@ -95,19 +94,42 @@ if ($UID == 0) {
 }
 
 #
-# Verify that this person is allowed to do this. 
+# Verify user and get his DB uid and other info for later.
 #
-if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
     die("*** $0:\n".
-	"    You do not have permission to view log files for $pid/$eid!\n");
+	"    You ($UID) do not exist!");
 }
 
 #
-# Get the logfile name.
+# Verify that this person is allowed to do this. 
 #
-if (! TBExptGetLogFile($pid, $eid, \$logname, \$isopen)) {
-    die("*** $0:\n".
-	"    There is no logfile to view for $pid/$eid!\n");
+if ($experiment) {
+    if (!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
+	die("*** $0:\n".
+	    "    You do not have permission to view log for $experiment!\n");
+    }
+    #
+    # Get the logfile name.
+    #
+    if ($experiment->GetLogFile(\$logname, \$isopen)) {
+	die("*** $0:\n".
+	    "    There is no logfile to view for $experiment!\n");
+    }
+}
+else {
+    if (!$template->AccessCheck($this_user, TB_EXPT_READINFO)) {
+	die("*** $0:\n".
+	    "    You do not have permission to view log for $template!\n");
+    }
+    #
+    # Get the logfile name.
+    #
+    if ($template->GetLogFile(\$logname, \$isopen)) {
+	die("*** $0:\n".
+	    "    There is no logfile to view for $template!\n");
+    }
 }
 
 use Fcntl;
@@ -118,7 +140,7 @@ STDOUT->autoflush(1);
 # If not an admin type, flip back to the UID now to enforce normal
 # permissions. 
 #
-if (! TBAdmin($UID)) {
+if (!$this_user->IsAdmin()) {
     $EUID = $UID;
 }
 
@@ -129,7 +151,7 @@ sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
 #
 # If an admin type, flip back to the UID now that the file is open.
 #
-if (TBAdmin($UID)) {
+if ($this_user->IsAdmin()) {
     $EUID = $UID;
 }
 
@@ -142,7 +164,7 @@ my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
 # but not sure what else to do.
 #
 if ($fromweb && $isopen && $size < 1024) {
-    for ($i = $size; $i <= 1024; $i++) {
+    for (my $i = $size; $i <= 1024; $i++) {
 	print " ";
     }
     print "\n";
@@ -154,13 +176,20 @@ if ($fromweb && $isopen && $size < 1024) {
 #
 while (1) {
     my $tmp;
+    my $buf;
     
     while (sysread(LOG, $buf, 2048)) {
 	print STDOUT "$buf";
     }
-    if (! TBExptGetLogFile($pid, $eid, \$tmp, \$isopen) || !$isopen ||
-	$tmp ne $logname) {
-	last;
+    if ($experiment) {
+	last
+	    if ($experiment->GetLogFile(\$tmp, \$isopen) ||
+		!$isopen || $tmp ne $logname);
+    }
+    else {
+	last
+	    if ($template->GetLogFile(\$tmp, \$isopen) ||
+		!$isopen || $tmp ne $logname);
     }
     sleep(2);
 }

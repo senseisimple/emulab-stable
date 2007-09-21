@@ -1123,14 +1123,17 @@ function STARTBUSY($msg) {
     # Allow for a repeated call; Do nothing.
     if ($currently_busy)
 	return;
-    
-    echo "<center>\n";
+
+    echo "<div id='outer_loaddiv'>\n";
+    echo "<center><div id='inner_loaddiv'>\n";
     echo "<b>$msg</b> ...<br>\n";
     echo "This will take a few moments; please be <em>patient</em>.<br>\n";
+    echo "</div>\n";
     echo "<img id='busy' src='busy.gif'>".
 	   "<span id='loading'> Working ...</span>";
     echo "<br><br>\n";
     echo "</center>\n";
+    echo "</div>\n";
     flush();
     $currently_busy = 1;
 }
@@ -1157,6 +1160,19 @@ function CLEARBUSY() {
 
     echo "<script type='text/javascript' language='javascript'>\n";
     echo "ClearBusyIndicators('');\n";
+    echo "</script>\n";
+    flush();
+    $currently_busy = 0;
+}
+
+function HIDEBUSY() {
+    global $currently_busy;
+    
+    if (!$currently_busy)
+	return;
+
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "HideBusyIndicators();\n";
     echo "</script>\n";
     flush();
     $currently_busy = 0;

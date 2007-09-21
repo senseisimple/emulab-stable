@@ -532,7 +532,7 @@ if (defined($instance->runidx())) {
     my $exptidx      = $instance->exptidx();
     my $instance_dir = $instance->path();
     my $cvsdir       = "$projroot/$pid/templates/$guid/cvsrepo";
-    my $cvssubdir    = "$guid/records/$exptidx,$runidx";
+    my $cvssubdir    = "records/$exptidx,$runidx";
     my $tag          = "R${exptidx}-${runidx}_import";
     my $instance_tag = "I${exptidx}";
     my $xmlfile      = "$instance_dir/info.xml";

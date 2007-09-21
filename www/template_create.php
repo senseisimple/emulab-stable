@@ -18,6 +18,9 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
 #
 # Verify page arguments.
 #
@@ -497,27 +500,25 @@ STARTBUSY("Starting template creation!");
 
 # And run that script!
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_create -w -q -E $description ".
+		 "webtemplate_create -E $description ".
 		 "-g $gid $pid $tid $thensfile",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($deletensfile) {
     unlink($thensfile);
 }
-
 /* Clear the various 'loading' indicators. */
-STOPBUSY();
+HIDEBUSY();
 
-#
-# Fatal Error. Report to the user, even though there is not much he can
-# do with the error. Also reports to tbops.
-# 
-if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
-}
-
-# User error. Tell user and exit.
 if ($retval) {
+    #
+    # Fatal Error. Report to the user, even though there is not much he can
+    # do with the error. Also reports to tbops.
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    }
+    # User error. Tell user and exit.
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
     return;
 }
@@ -525,16 +526,24 @@ if ($retval) {
 #
 # Parse the last line of output. Ick.
 #
-if (preg_match("/^Template\s+(\w+)\/(\w+)\s+/",
+if (preg_match("/^Template\s+(\w+)\/(\w+)\s+is being/",
 	       $suexec_output_array[count($suexec_output_array)-1],
 	       $matches)) {
     $guid = $matches[1];
     $vers = $matches[2];
 
-    if (($template = Template::Lookup($guid, $vers))) {
-	PAGEREPLACE(CreateURL("template_show", $template));
+    $template = Template::Lookup($guid, $vers);
+    if (! $template) {
+	TBERROR("Could not lookup template object for $guid/$vers", 1);
+	return;
     }
+    echo $template->PageHeader();
+    echo "<br><br>\n";
+    STARTLOG($template);
 }
+else {
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+}    
 
 #
 # Standard Testbed Footer

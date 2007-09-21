@@ -98,9 +98,31 @@ sub mysystem($)
 #
 # Lookup a template and create a class instance to return.
 #
-sub Lookup($$$)
+sub Lookup($$;$)
 {
-    my ($class, $guid, $vers) = @_;
+    my ($class, $arg1, $arg2) = @_;
+    my ($guid, $vers);
+
+    #
+    # A single arg is either an index or a "guid,vers" or "guid/vers" string.
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^([-\w]*),([-\w]*)$/ ||
+	    $arg1 =~ /^([-\w]*)\/([-\w]*)$/) {
+	    $guid = $1;
+	    $vers = $2;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (! (($arg1 =~ /^[-\w]*$/) && ($arg2 =~ /^[-\w]*$/))) {
+	return undef;
+    }
+    else {
+	$guid = $arg1;
+	$vers = $arg2;
+    }
 
     # Look in cache first
     return $templates{"$guid/$vers"}
@@ -147,6 +169,10 @@ sub child_vers($) {
     return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'child_vers'}); }
 sub description($) {
     return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'description'}); }
+sub logfile($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'logfile'}); }
+sub logfile_open($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'logfile_open'}); }
 
 #
 # Lookup a template given an experiment index.
@@ -415,6 +441,126 @@ sub Delete($)
     }
     $self->{'TEMPLATE'} = undef;
     return 0;
+}
+
+#
+# Logfiles. This all needs to change.
+#
+# Open a new logfile and return its name.
+#
+sub CreateLogFile($$$)
+{
+    my ($self, $prefix, $ppath) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $vers     = $self->vers();
+    my $guid     = $self->guid();
+    my $pid      = $self->pid();
+    my $projroot = PROJROOT();
+    my $logdir   = "$projroot/$pid/templates/logs";
+    my $logname  = "$logdir/$prefix.${guid}-${vers}.log";
+
+    return -1
+	if (-e $logname);
+
+    return -1
+	if (! -d $logdir && !mkdir($logdir, 0775));
+
+    Template::mysystem("touch $logname") == 0
+	    or return -1;
+
+    $$ppath = $logname;
+    return 0;
+}
+
+#
+# Set the experiment to use the logfile. It becomes the "current" spew.
+#
+sub SetLogFile($$)
+{
+    my ($self, $logname) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return $self->Update({'logfile' => $logname});
+}
+
+#
+# Get the experiment logfile.
+#
+sub GetLogFile($$$)
+{
+    my ($self, $lognamep, $isopenp) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    # Must do this to catch updates to the logfile variables.
+    return -1
+	if ($self->Refresh());
+
+    return -1
+	if (! $self->logfile());
+
+    $$lognamep = $self->logfile();
+    $$isopenp  = $self->logfile_open();
+    return 0;
+}
+
+#
+# Mark the log as open so that the spew keeps looking for more output.
+# 
+sub OpenLogFile($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return $self->Update({'logfile_open' => 1});
+}
+
+#
+# And close it ...
+#
+sub CloseLogFile($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return $self->Update({'logfile_open' => 0});
+}
+
+#
+# And clear it ...
+#
+sub ClearLogFile($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $guid = $self->guid();
+    my $vers = $self->vers();
+
+    if (!DBQueryWarn("update experiment_templates set ".
+		     "logfile=NULL,logfile_open=0 ".
+		     "where guid='$guid' and vers='$vers'")) {
+	return -1;
+    }
+    return $self->Refresh();
 }
 
 #

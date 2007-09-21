@@ -52,6 +52,7 @@ my $pid;
 my $tid;
 my $gid;
 my $inputfile;
+my $logname;
 # For modify.
 my $parent_guid;
 my $parent_vers;
@@ -234,6 +235,15 @@ if ($STAMPS) {
 }
 
 #
+# The template gets its own directory structure. 
+#
+if (my $rval = $template->CreateDirectory()) {
+    $template->Delete();
+    tbdie("Failed to create directories for template");
+}
+my $template_dir = $template->path();
+
+#
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
 #
@@ -249,8 +259,15 @@ $tmpdir = "$projroot/$pid/templates/$guid/cvstmp.$$";
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
+$template->CreateLogFile("template_create", \$logname) == 0 or
+    fatal(-1, "Could not create a logfile");
+$template->SetLogFile($logname) == 0 or
+    fatal(-1, "Could not set the logfile to $logname");
+$template->OpenLogFile() == 0 or
+    fatal(-1, "Could not open the logfile");
+
 if (my $childpid =
-    AuditStart(LIBAUDIT_DAEMON, undef, LIBAUDIT_LOGONLY|LIBAUDIT_FANCY)) {
+    AuditStart(LIBAUDIT_DAEMON, $logname, LIBAUDIT_LOGONLY|LIBAUDIT_FANCY)) {
     #
     # Parent exits normally, unless in waitmode. We have to set
     # justexit to make sure the END block below does not run.
@@ -258,12 +275,12 @@ if (my $childpid =
     $justexit = 1;
     
     if (!$waitmode) {
-	print("Template $pid/$tid is being created.\n".
- 	      "You will be notified via email it is ready to use\n")
+	print("Template $guid/$vers is being created. Watch your email.\n")
 	    if (! $quiet);
 	exit(0);
     }
-    print("Waiting for template $pid/$tid to be created. Please be patient!\n")
+    print("Waiting for template $guid/$vers to be created. ".
+	  "Please be patient!\n")
 	if (! $quiet);
 
     # Give child a chance to run.
@@ -322,14 +339,6 @@ $SIG{TERM} = \&handler;
 $SIG{QUIT} = 'DEFAULT';
 
 #
-# The template gets its own directory structure. 
-#
-if (my $rval = $template->CreateDirectory()) {
-    fatal($rval, "Failed to create directories for template");
-}
-my $template_dir = $template->path();
-
-#
 # Set up CVS repo on ops to use as alternate interface.
 #
 if (!$modify || ! -e $cvsdir) {
@@ -364,6 +373,7 @@ if (!$modify || ! -e $cvsdir) {
     print CONFIG "TemplateCommit=$TB/sbin/rtag_commit\n";
     close(CONFIG);
 }
+
 #
 # We stick in a little cookie file so we know what template this is,
 # from within the CVS repo (well, sandbox).
@@ -421,9 +431,9 @@ if (defined($repotag)) {
 	$tokens[scalar(@tokens)-2] = 0;
 	my $branchrev = join(".", @tokens);
     
-	open(RLOG, "$RLOG -h $cvsdir/$guid/setup/.template,v |")
+	open(RLOG, "$RLOG -h $cvsdir/setup/.template,v |")
 	    or fatal(-1,
-		     "Could not run rlog on $cvsdir/$guid/setup/.template,v!");
+		     "Could not run rlog on $cvsdir/setup/.template,v!");
 	my $intags = 0;
 	while (<RLOG>) {
 	    if ($intags) {
@@ -456,26 +466,26 @@ if (defined($repotag)) {
 
 	# Checkout ...
 	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
-	       "  -r $repotag $guid/setup")
+	       "  -r $repotag setup")
 	    == 0 or fatal(-1, "Could not checkout '$repotag' from $cvsdir");
     }
     else {
 	# Checkout along trunk, no -r option cause then commit fails
-	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r HEAD $guid/setup")
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r HEAD setup")
 	    == 0 or fatal(-1, "Could not checkout trunk from $cvsdir");
 
 	#
 	# Clear the default branch so that checkout gives us the trunk.
 	#
-	System("cd $tmpdir/$guid; $CVSBIN -d $cvsdir admin -b")
+	System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
 	    == 0 or fatal(-1, "Could not clear default branch in $cvsdir");
 
 	# And clear the sticky tag so later commit works.
-	System("cd $tmpdir/$guid/setup; $CVSBIN -d $cvsdir update -A")
+	System("cd $tmpdir/setup; $CVSBIN -d $cvsdir update -A")
 	    == 0 or fatal(-1, "Could not update to head trunk from $cvsdir");
     }
 
-    $inputfile = "$tmpdir/$guid/setup/tbdata/nsfile.ns";
+    $inputfile = "$tmpdir/setup/tbdata/nsfile.ns";
     fatal(-1, "NS file missing from repo checkout!")
 	if (!-e $inputfile);
 }
@@ -539,7 +549,7 @@ if ($modify) {
 	>= 0 or fatal(-1, "Failed to commit experiment archive!");
 
     if (defined($repotag)) {
-	$template->ImportDataStore("$tmpdir/$guid/setup/datastore") == 0
+	$template->ImportDataStore("$tmpdir/setup/datastore") == 0
 	    or fatal(-1, "Failed to import data store");
     }
     elsif (defined($frompath)) {
@@ -576,9 +586,13 @@ if (! -e "$template_dir/datastore/.ignore") {
 if (!$modify || $needrepoinit) {
     System("cd $template_dir; ".
 	   "$CVSBIN -d $cvsdir import ".
-	   "  -m 'Initialize new cvs repo for template $guid' $guid/setup ".
+	   "  -m 'Initialize new cvs repo for template $guid' setup ".
 	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
 	== 0 or fatal(-1, "Could not import new template into $cvsdir");
+
+    # Create the records module with a simple mkdir. Harmless.
+    mkdir("$cvsdir/records", 0777) or
+	fatal(-1, "Could not mkdir $cvsdir/records: $!");
 
     #
     # Must advance the head past 1.1 since that is where the imports are done
@@ -588,31 +602,37 @@ if (!$modify || $needrepoinit) {
 	fatal(-1, "Could not mkdir $tmpdir: $!");
 
     # Checkout ...
-    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout $guid")
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout setup")
 	== 0 or fatal(-1, "Could not checkout from $cvsdir");
 
-    # Create the records directory.
-    System("cd $tmpdir/$guid; mkdir records; touch records/.ignore") == 0 or
-	fatal(-1, "Could not mkdir records directory in $tmpdir/$guid");
- 
-    System("cd $tmpdir/$guid; $CVSBIN -d $cvsdir add records; ".
-	   "                  $CVSBIN -d $cvsdir add records/.ignore")
-	== 0 or fatal(-1, "Could not cvs add $tmpdir/$guid/records!");
-
     # Commit ...
-    System("cd $tmpdir; $CVSBIN -d $cvsdir commit -f -R ".
+    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
 	     "  -m 'Commit initial import back to head'")
 	== 0 or fatal(-1, "Could not commit to $cvsdir");
 
     # No keyword subst.
-    System("cd $tmpdir; $CVSBIN -Q -d $cvsdir admin -kb")
+    System("cd $tmpdir/setup; $CVSBIN -Q -d $cvsdir admin -kb")
 	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
-    
+
     #
     # Now tag the CVS repo with the current guid/vers so we can find it easily.
     #
-    System("$CVSBIN -d $cvsdir rtag -n T${guid}-${vers} $guid")
+    System("$CVSBIN -d $cvsdir rtag -n T${guid}-${vers} setup")
 	== 0 or fatal(-1, "Could not rtag initial version in $cvsdir");
+
+    # Setup the records directory.
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout records")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    System("cd $tmpdir/records; touch .ignore") == 0 or
+	fatal(-1, "Could not create $tmpdir/records/.ignore");
+ 
+    System("cd $tmpdir/records; $CVSBIN -d $cvsdir add .ignore")
+	== 0 or fatal(-1, "Could not cvs add $tmpdir/records/.ignore!");
+    
+    System("cd $tmpdir/records; $CVSBIN -d $cvsdir commit -f -R ".
+	     "  -m 'Commit initial records directory'")
+	== 0 or fatal(-1, "Could not commit records to $cvsdir");
 }
 elsif ($frompath) {
     #
@@ -628,11 +648,11 @@ elsif (defined($repotag)) {
     # that when the user does a checkout of the branch, it says what
     # template it is (and what to template to modify on the next branch).
     #
-    System("cp -p $template_dir/.template $tmpdir/$guid/setup") == 0
-	or fatal(-1, "Could not cp $template_dir/.template to $tmpdir/$guid");
+    System("cp -p $template_dir/.template $tmpdir/setup") == 0
+	or fatal(-1, "Could not cp $template_dir/.template to $tmpdir");
 
     # Check the file in.
-    System("cd $tmpdir/$guid/setup; ".
+    System("cd $tmpdir/setup; ".
 	   "$CVSBIN commit " . (defined($repobase) ? "-r $repobase " : " ") .
 	   "  -m 'Update guid after modify' .template")
 	== 0 or fatal(-1, "Could not commit final version in $cvsdir");
@@ -642,7 +662,7 @@ elsif (defined($repotag)) {
     #
     System("$CVSBIN -d $cvsdir rtag -n " .
 	   (defined($repobase) ? "-r $repobase " : " ") .
-	   "   T${guid}-${vers} $guid/setup")
+	   "   T${guid}-${vers} setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
 
     #
@@ -659,16 +679,16 @@ else {
     # To support older templates, see if the parent is in the CVS repo.
     # If not, skip all this. 
     #
-    System("$RLOG -h $cvsdir/$guid/setup/.template,v | ".
+    System("$RLOG -h $cvsdir/setup/.template,v | ".
 	   "  grep -q 'T${parent_guid}-${parent_vers}:'");
     goto noparent
 	if ($?);
-	
+
     #
-    # Create a branch off the parent template.
+    # Create a branch off the parent template for this new template
     #
     System("$CVSBIN -d $cvsdir rtag -n -r T${parent_guid}-${parent_vers} ".
-	   " -b T${parent_guid}-${vers}_branch $guid/setup ") 
+	   " -b T${parent_guid}-${vers}_branch setup ") 
 	== 0 or fatal(-1, "Could not rtag parent version in $cvsdir");
     
     #
@@ -677,7 +697,7 @@ else {
     #
     System("cd $template_dir; ".
 	   "$CVSBIN -d $cvsdir import -b 1.1.${vers} ".
-	   "  -m 'Modify cvs repo for template $guid/$vers' $guid/setup ".
+	   "  -m 'Modify cvs repo for template $guid/$vers' setup ".
 	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
 	== 0 or fatal(-1, "Could not import modified template into $cvsdir");
 
@@ -685,16 +705,16 @@ else {
     System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
 	   "  -r T${parent_guid}-${vers}_branch ".
 	   "  -j T${parent_guid}-${vers}_branch ".
-	   "  -j T${guid}-${vers}_import_branch $guid/setup")
+	   "  -j T${guid}-${vers}_import_branch setup")
 	== 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
 
     # Need to clear the -b (default branch) or else the merge
     # commit fails for some reason that makes no sense to me.
-    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b $guid") == 0
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b setup") == 0
 	or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
     
     # Commit ...
-    System("cd $tmpdir/$guid/setup; $CVSBIN -d $cvsdir commit -f -R ".
+    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
 	   "  -r T${parent_guid}-${vers}_branch ".
 	   "  -m 'Commit merge with head'")
 	== 0 or fatal(-1, "Could not commit on $cvsdir");
@@ -702,11 +722,11 @@ else {
     #
     # Clear the default branch so that "update -A" takes user to trunk.
     #
-    System("cd $tmpdir/$guid/setup; $CVSBIN -d $cvsdir admin -b")
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b setup")
 	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
 
     # No keyword subst.
-    System("cd $tmpdir/$guid/setup; $CVSBIN -Q -d $cvsdir admin -kb")
+    System("cd $tmpdir; $CVSBIN -Q -d $cvsdir admin -kb setup")
 	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
     
     #
@@ -715,7 +735,7 @@ else {
     #
     System("$CVSBIN -d $cvsdir rtag -n ".	
 	   "  -r T${parent_guid}-${vers}_branch T${guid}-${vers} ".
-	   "  $guid/setup")
+	   "  setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
 noparent:
 }
@@ -781,6 +801,13 @@ if ($modify) {
 if ($STAMPS) {
     $template->Stamp("template_create", "created");
 }
+
+#
+# Clear the log file so the web page stops spewing. 
+#
+$template->CloseLogFile()
+    if (defined($logname));
+
 exit(0);
 
 #
@@ -866,6 +893,12 @@ sub ParseArgs()
 	    # Note positive status; so error goes to user not tbops.
 	    exit(1);
 	}
+	# Copy to a temporary file.
+	my $tempnsfile = $inputfile;
+	$inputfile = "/tmp/$$.ns";
+	if (system("/bin/cp", "$tempnsfile", "$inputfile")) {
+	    tberror("Could not copy $tempnsfile to $inputfile");
+	}
     }
     #
     # Optional gid. Defaults to pid.
@@ -885,7 +918,6 @@ sub ParseArgs()
     }
 
     if (defined($options{"f"})) {
-	tbdie("Commit from instance/template not supported right now!");
 	$frompath = $options{"f"};
 
 	# The Archive library has a nice routine to validate this path.
@@ -955,6 +987,8 @@ sub cleanup()
 	# And delete all the other stuff?
     }
     # Delete repo but only if this is the initial template creation.
+    system("/bin/rm -f $inputfile")
+	if (defined($inputfile) && -e $inputfile);
     system("/bin/rm -rf $cvsdir")
 	if (!$modify && defined($cvsdir) && -e $cvsdir);
     System("/bin/rm -rf $tmpdir")
