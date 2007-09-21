@@ -787,6 +787,15 @@ fatal(-1, "Error generating template graph.")
     if ($?);
 
 #
+# Make the new template active (and the parent template inactive) if the
+# parent was already active.
+#
+if ($parent_template->IsActive()) {
+    $parent_template->InActivate();
+    $template->Activate();
+}
+
+#
 # Update parent to point to most recent child.
 #
 if ($modify) {

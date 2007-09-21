@@ -173,6 +173,8 @@ sub logfile($) {
     return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'logfile'}); }
 sub logfile_open($) {
     return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'logfile_open'}); }
+sub active($) {
+    return ((! ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}->{'active'}); }
 
 #
 # Lookup a template given an experiment index.
@@ -1775,6 +1777,16 @@ sub InActivate($)
 	or return -1;
 
     return 0;
+}
+sub IsActive($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    return $self->active();
 }
 
 # Improve this at some point.
