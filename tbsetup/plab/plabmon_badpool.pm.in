@@ -84,7 +84,7 @@ sub checknextnode($) {
 
     # Nothinig to check!
     if (!$pnode) {
-        return;
+        return 1;
     }
 
     # Grab the vnode for this pnode (service sliver vnode)
@@ -92,7 +92,7 @@ sub checknextnode($) {
 
     if (!defined($vnode)) {
         print "Could not find vnode associated with $pnode!\n";
-        return;
+        return 1;
     }
 
     print "Pool: $self->{'NAME'}: Testing node $pnode->{'name'} at ".
@@ -110,7 +110,7 @@ sub checknextnode($) {
         $self->{'PENDING'}->{$pnode->{'name'}} = $pnode;
         $self->{'CHPID2POOL'}->{$chpid} = $self;
 
-        return
+        return 0;
     }
 
     # Worker process.
@@ -214,7 +214,7 @@ sub processchild($$$) {
 
     if (!defined($pnode)) {
         print "Pool: $self->{'NAME'}: $chpid not found in pending list!\n";
-        return 1;
+        return 0;
     }
 
     # Setup log entry prefix

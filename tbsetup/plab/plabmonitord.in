@@ -219,8 +219,11 @@ while (1) {
         foreach my $pool (@allpools) {
             # if pool still has nodes to test, get them going.
             if ($pool->getnextchecktime() <= $now) {
-                $pool->checknextnode();
-                $windowsize++;
+		# Only increment the window if we successfully launched a 
+		# process.
+		if (!$pool->checknextnode()) {
+		    $windowsize++;
+		}
             }
         }
     }
@@ -256,6 +259,14 @@ while (1) {
         }
     }
 
+    # This is the best place to get an idea of running plabnode procs.
+    my @procs = `ps axwww | grep 'emulab-ops plab-' | wc -l`;
+    my $pcount = 0;
+    if (scalar(@procs) > 0) {
+	$procs[0] =~ /(\d+)/;
+	$pcount = $procs[0];
+    }
+
     # Look for expired processes.  Calling checkexpiration on a pool
     # has the side effect of checking for ISUP (or ISUP expiration) for
     # any nodes pending thusly in the pool.  The return value is the
@@ -265,6 +276,9 @@ while (1) {
         my $numfinished = $pool->checkexpiration();
         $windowsize -= $numfinished;
     }
+
+    # Log diff between believed window size, and "actual"
+    print "winsize = $windowsize / runprocs = $pcount\n";
 
     # We may have just fired off a bunch of kills, so chill for a bit to
     # let things quiesce.
