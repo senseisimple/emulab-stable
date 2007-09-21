@@ -267,7 +267,8 @@ $template->OpenLogFile() == 0 or
     fatal(-1, "Could not open the logfile");
 
 if (my $childpid =
-    AuditStart(LIBAUDIT_DAEMON, $logname, LIBAUDIT_LOGONLY|LIBAUDIT_FANCY)) {
+    AuditStart(LIBAUDIT_DAEMON, $logname,
+	       LIBAUDIT_LOGONLY|LIBAUDIT_FANCY|LIBAUDIT_NODELETE)) {
     #
     # Parent exits normally, unless in waitmode. We have to set
     # justexit to make sure the END block below does not run.
