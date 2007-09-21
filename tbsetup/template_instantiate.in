@@ -768,7 +768,7 @@ sub cleanup()
 	# Before killing it, save off the user directory for debugging.
 	$experiment->BackupUserData();
 
-	$experiment->End("-x -q -w") == 0
+	$experiment->End("-f") == 0
 	    or exit(-1);
     }
     $instance->Delete()
