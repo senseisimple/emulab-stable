@@ -1,12 +1,13 @@
 #!/usr/local/bin/python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 200-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
 import getopt
 import os, os.path
+import pwd
 import traceback
 import syslog
 import string
@@ -327,7 +328,9 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             os.setgid(self.glist[0])
             os.setgroups(self.glist)
             os.setuid(self.uid)
+            pwddb = pwd.getpwuid(self.uid);
 
+            os.environ["HOME"]    = pwddb[5];
             os.environ["USER"]    = self.user;
             os.environ["LOGNAME"] = self.user;
             pass
