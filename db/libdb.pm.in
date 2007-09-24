@@ -4459,7 +4459,7 @@ sub TBFieldData($$;$)
     }
     # Resort to a default entry.
     if (!defined($fielddata)) {
-	$DBFieldErrstr = "No slot data";
+	$DBFieldErrstr = "Error-checking pattern missing from the database";
 	
 	if (defined($flag)) {
 	    if ($flag & TBDB_CHECKDBSLOT_WARN()) {
