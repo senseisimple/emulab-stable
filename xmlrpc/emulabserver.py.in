@@ -4455,6 +4455,7 @@ class elabinelab:
                              "left join wires as s on s.node_id1=i.node_id "
                              "   and s.card1=i.card "
                              "where r.node_id=%s "
+			     "   and s.node_id2!='' "
                              "order by r.node_id,iface",
                              (nodeid,))
         
