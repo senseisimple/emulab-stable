@@ -4,51 +4,104 @@
 # Copyright (c) 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use Getopt::Long;
+
+local $RubensteinScriptPath = "/proj/tbres/pramod/bottleneck-emulab/filter/genjitco.i386";
+local $MinSikKimScriptPath = "/proj/tbres/pramod/bottleneck-emulab/devel/MinSikKim/MinSikKimProgram";
+local $ClusterProgramPath = "/proj/tbres/pramod/bottleneck-emulab/devel/Clustering/c++-samples/wvcluster";
+local $elabInitScript = "/proj/tbres/duerig/testbed/pelab/init-elabnodes.pl";
+
+local $newExpName = "";
+local $newProjName = "";
+local $logsDir = "";
+local $nodeListFilename = "";
+local $Algorithm = "";
+local $initialConditionsFilename = "";
+
+local $scratchSpaceDir = "/tmp/bw-bottleneck/rubenstein";
+
+# Print usage and die.
+
+sub PrintUsage()
+{
+        print "Usage: perl createClusters.pl -NewProj=newProjName -NewExp=newExpName -LogDir=/path/to/logs -nodeFile=/path/to/nodeListFile -Algorithm=rubestein/wavelet (rest optional) -RubensteinPath=/path/to/genjitco.arch -MinSikKimPath=/path/to/MinSikKimProgram -ClusterProgPath=/path/to/wvcluster -InitConditions=/path/to/initial_conditions.txt\n";
+        exit(1);
+
+}
+
+# Check for the validity of command line arguments.
+
+sub processOptions()
+{
+    &GetOptions("LogDir=s"=>\$logsDir,
+            "NewProj=s"=>\$newProjName,
+            "NewExp=s"=>\$newExpName,
+            "InitConditions=s"=>\$initialConditionsFilename,
+            "NodeFile=s"=>\$nodeListFilename,
+            "Algorithm=s"=>\$Algorithm,
+            "RubensteinPath=s"=>\$RubensteinScriptPath,
+            "MinSikKimPath=s"=>\$MinSikKimScriptPath,
+            "ClusterProgPath=s"=>\$ClusterProgramPath);
+
+    if($newExpName eq "" or $newProjName eq "" or $logsDir eq "" or $nodeListFilename eq "" or $Algorithm eq "")
+    {
+        print "ERROR: One of the mandatory arguments is empty.\n";
+        &PrintUsage();
+    }
+
+    if(not(-e $logsDir))
+    {
+        print "ERROR: Path provided to the logs directory is invalid.\n";
+        &PrintUsage();
+    }
+
+    if(not(-e $nodeListFilename))
+    {
+        print "ERROR: Path provided to the file with node names is invalid.\n";
+        &PrintUsage();
+
+    }
+
+    if( not(  ($Algorithm =~ /rubenstein/i) || ($Algorithm =~ /wavelet/i) ) )
+    {
+        print "ERROR: Please choose either 'rubenstein' or 'wavelet' ( without quotes, case insensitive ) as the algorithm\n";
+        &PrintUsage();
+    }
+
+    if($initialConditionsFilename ne "")
+    {
+        if(not(-e $initialConditionsFilename))
+        {
+            print "WARNING: The initial conditions file path provided at command line is invalid.\n";
+            print "Reverting back to using init-elabnodes.pl\n";
+                
+        }
+    }
+}
 
 
-my $expName;
-my $projName;
-my $logsDir;
+#############################################################################
+############################    MAIN    #####################################
+#############################################################################
 
-my $newExpName;
-my $newProjName;
-
-%bottleNecks = {};
-my %nodeClasses;
-my %nodeNameMap = {};
-
-die "Usage: perl sharedBottle.pl proj_name exp_name newProj_name newExp_name initial_conditions.txt(Optional)"
-if($#ARGV < 3);
-
-$projName = $ARGV[0];
-$expName = $ARGV[1];
-$newProjName = $ARGV[2];
-$newExpName = $ARGV[3];
-$initialConditionsFilename = $ARGV[4];
-
-$logsDir = "/tmp/testLogs";
-
+# Process the command line options.
+&processOptions();
 
 # Get the initial conditions.
-$elabInitScript = "/proj/tbres/duerig/testbed/pelab/init-elabnodes.pl";
+# Get initial conditions for the paths of interest
+# from the database, using init-elabnodes.pl
+
 $initConditionsCommand = $elabInitScript . " -o /tmp/initial-conditions.txt " . $newProjName . " " . $newExpName; 
 
-if($#ARGV == 3) 
+if( ($initialConditionsFilename eq "") or (not(-e $initialConditionsFilename)) ) 
 {
     system($initConditionsCommand);
     $initialConditionsFilename = "/tmp/initial-conditions.txt";
 }
 
 open(CONDITIONS, $initialConditionsFilename);
-
-my @initialConditions = ();
-
-while(<CONDITIONS>)
-{
-    chomp( $_ );
-    push(@initialConditions, $_);
-}
-
+my @initialConditions = <CONDITIONS>;
+chomp(@initialConditions);
 close(CONDITIONS);
 
 my @addressList = ();
@@ -57,16 +110,8 @@ my $addrFlag = 0;
 my %bwMap = {};
 my %delayMap = {};
 my %elabMap = {};
-
-# Create & send events.
-# Get initial conditions for the paths of interest
-# from the database, using init-elabnodes.pl
-my $tevc = "/usr/testbed/bin/tevc -e $newProjName/$newExpName now";
-
-#@@@`/usr/testbed/bin/tevc -w -e $newProjName/$newExpName now elabc reset`;
-#@@@`$tevc elabc create start`;
-
-# Create a list of the IP addresses.
+my $numNodes = 0;
+# Create a list of the IP addresses listed in the initial-conditions file.
 foreach $conditionLine (@initialConditions)
 {
     if($conditionLine =~ /(\d*?\.\d*?\.\d*?\.(\d*?))\s(\d*?\.\d*?\.\d*?\.\d*?)\s(\d*?)\s(\d*?)\s[\d\w\-\.]*/)
@@ -85,9 +130,9 @@ foreach $conditionLine (@initialConditions)
         if($addrFlag == 0)
         {
             push(@addressList, $srcAddress);
+            $numNodes += 1;
 
             $elabMap{$srcAddress} = "elabc-elab-" . $2;
-            print "Mapping $2 TO $elabMap{$srcAddress}\n";
         }
 
 # Create a mapping of the initial conditions.
@@ -95,6 +140,109 @@ foreach $conditionLine (@initialConditions)
         $delayMap{$1}{$3} = $5;
     }
 }
+
+# Read the file listing the hostnames of the nodes involved in this
+# particular measurement.
+
+open(INFILE, "<$nodeListFilename");
+my @nodeNameList = <INFILE>;
+chomp(@nodeNameList);
+close(INFILE);
+
+# A little checking to ensure that the number of nodes in the NodeList file
+# matches the values in the initial conditions file.
+if($numNodes != ($#nodeNameList+1) )
+{
+    print "ERROR: Mismatch between the number of nodes in InitialConditions.txt and in the NodeList file.\n";
+    print "Both the files should have the same number of nodes for a 1-to-1 mapping to be possible.\n";
+    exit(1);
+}
+
+# Convert the delay data produced by the wavelet code
+# into something palatable to the Rubenstein program.
+if($Algorithm =~ /rubenstein/i)
+{
+    if(-e $scratchSpaceDir)
+    {
+        `rm -rf $scratchSpaceDir`;
+    }
+
+    `mkdir $scratchSpaceDir`;
+
+    opendir(logsDirHandle, $logsDir);
+    foreach $sourceName (readdir(logsDirHandle))
+    {
+        if( (-d $logsDir . "/" . $sourceName ) and $sourceName ne "." and $sourceName ne ".." )
+        {
+            if( grep(/^$sourceName$/, @nodeNameList) )
+            {
+                @dirNameList = ();
+
+                opendir(sourceDirHandle, $logsDir . "/" . $sourceName);
+                foreach $destOne (readdir(sourceDirHandle))
+                {
+                    if( (-d $logsDir . "/" . $sourceName . "/" . $destOne) && $destOne ne "." && $destOne ne ".." )
+                    {
+                        if( grep(/^$destOne$/, @nodeNameList) )
+                        {
+                            if(-e "$logsDir/$sourceName/$destOne/delay.log")
+                            {
+                                push(@dirNameList, $destOne);
+                            }
+                            else
+                            {
+                                print "WARNING: Missing log file $logsDir/$sourceName/$destOne/delay.log\n";
+                            }
+                        }
+                    }
+                }
+                closedir(sourceDirHandle);
+
+                my $firstLevelIndex = 0, $secondLevelIndex = 0;
+
+                foreach $destOne (@dirNameList)
+                {
+                    $secondLevelIndex = 0;
+                    foreach $destTwo (@dirNameList)
+                    {
+                        if($secondLevelIndex > $firstLevelIndex)
+                        {
+                            `mkdir -p $scratchSpaceDir/$sourceName/$destOne/$destTwo`;
+                            `paste -d ' ' $logsDir/$sourceName/$destOne/delay.log $logsDir/$sourceName/$destTwo/delay.log > $scratchSpaceDir/$sourceName/$destOne/$destTwo/delay.log `;
+                        }
+
+                        $secondLevelIndex++;
+                    }
+                    $firstLevelIndex++;
+                }
+            }
+        }
+    }
+
+    closedir(sourceDirHandle);
+# Call our sharedBottle.pl to feed these .filter files we created to
+# sharedBottle.pl - It will then create equivalence classes for the
+# paths.
+
+    system("perl sharedBottle.pl $scratchSpaceDir $newProjName $newExpName $initialConditionsFilename $RubensteinScriptPath");
+
+# Our work here is done, sign off.
+    exit(0);
+}
+
+#############################################################################
+######################### Wavelet processing ################################
+#############################################################################
+
+%bottleNecks = {};
+my %nodeClasses;
+my %nodeNameMap = {};
+
+# Create & send events.
+my $tevc = "/usr/testbed/bin/tevc -e $newProjName/$newExpName now";
+
+`/usr/testbed/bin/tevc -w -e $newProjName/$newExpName now elabc reset`;
+`$tevc elabc create start`;
 
 opendir(logsDirHandle, $logsDir);
 
@@ -133,8 +281,6 @@ foreach $sourceName (readdir(logsDirHandle))
 
         my @denoisedDelays = ();
 
-#        print "Into directory $sourceName\n";
-
         foreach $destOne (readdir(sourceDirHandle))
         {
             if( (-d $logsDir . "/" . $sourceName . "/" . $destOne) && $destOne ne "." && $destOne ne ".." )
@@ -142,10 +288,8 @@ foreach $sourceName (readdir(logsDirHandle))
                 # Inside each destination directory, look for 
                 # delay.log file with delay values.
 
-#                print "Into directory $sourceName/$destOne\n";
-
                 $fullPath = "$logsDir/$sourceName/$destOne/delay.log";
-                $waveletScript = "./MinSikKim/MinSikKimProgram $fullPath";
+                $waveletScript = "$MinSikKimScriptPath $fullPath";
                 my @scriptOutput;
 
                 @scriptOutput = `$waveletScript`;
@@ -174,7 +318,7 @@ foreach $sourceName (readdir(logsDirHandle))
 
                 # Put this destination in a seperate cluster - we
                 # have zero samples/delay values.
-                if( ($#scriptOutput == 0) or ($#scriptOutput < 120) )
+                if( ($#scriptOutput == 0) or ($#scriptOutput < 128) )
                 {
                     my @newEquivClass = ();
                     push(@newEquivClass, $i);
@@ -234,7 +378,7 @@ foreach $sourceName (readdir(logsDirHandle))
         }
         close(RECORDFILE);
 
-        $clusteringProgram = "/tmp/clustering/c++-samples/wvcluster $tmpTreeRecordFile /tmp/tmp.idx";
+        $clusteringProgram = "$ClusterProgramPath $tmpTreeRecordFile /tmp/tmp.idx";
 
         my @clusteringOutput ; 
 
@@ -298,18 +442,17 @@ foreach $sourceName (readdir(logsDirHandle))
                 }
 
 
-# 		my $delayEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=" . $addrNodeMapping{$destSeen[$tmpName2]};
                 my $delayEventCommand = "$tevc ".$elabMap{$addrNodeMapping{$nodeNumberMapping{$tmpName2}}}." modify DEST=" . $addrNodeMapping{$nodeNumberMapping{$tmpName2}}." SRC=".$addrNodeMapping{$sourceName};
 
                 $delayEventCommand = $delayEventCommand . " " . "DELAY=" . ($delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$nodeNumberMapping{$tmpName2}}});
 # Execute the delay event command.
                 print "EXECUTE $delayEventCommand\n";
-   #@@@             `$delayEventCommand`;
+                `$delayEventCommand`;
             }
             $bwEventCommand = $bwEventCommand . " " . "BANDWIDTH=" . $maxBw;
 # Execute the event to set the bandwidth for this equivalence class.
             print "EXECUTE $bwEventCommand\n";
-      #@@@      `$bwEventCommand`;
+            `$bwEventCommand`;
         }
 
             print "\n\n";

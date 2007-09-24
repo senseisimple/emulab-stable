@@ -16,27 +16,27 @@ sub setupDest
     my %hash;
     my $file;
     open($file, "<".$fileName)
-	or die("Couldn't open file $fileName for reading");
+        or die("Couldn't open file $fileName for reading");
     my @array = <$file>;
     for ($i = 0; $i < @array; ++$i)
     {
-	$array[$i] =~ /$dumpPattern/;
-	$hash{$3} = $1;
+        $array[$i] =~ /$dumpPattern/;
+        $hash{$3} = $1;
     }
     $array[0] =~ /$dumpPattern/;
     if ($_[0] == 1)
     {
-	$dest1Address = $2;
+        $dest1Address = $2;
     }
     else
     {
-	$dest2Address = $2;
+        $dest2Address = $2;
     }
     return %hash;
 }
 
 open(SOURCE_IN, "<$basePath/source.dump")
-    or die("Couldn't open file $basePath/source.dump for reading");
+or die("Couldn't open file $basePath/source.dump for reading");
 @source = <SOURCE_IN>;
 close(SOURCE_IN);
 
@@ -60,32 +60,33 @@ for ($i = 0; $i < @source; ++$i)
     $flowAddress = $2;
     $flowSequence = $3;
 
-    if ($flowAddress == $dest1Address)
+    if ($flowAddress eq $dest1Address)
     {
-	$destNum = 1;
-	$destSequence = $sequence1;
-	++$sequence1;
-	$destTime = $dest1{$3};
+        $destNum = 1;
+        $destSequence = $sequence1;
+        ++$sequence1;
+        $destTime = $dest1{$3};
     }
     else
     {
-	$destNum = 2;
-	$destSequence = $sequence2;
-	++$sequence2;
-	$destTime = $dest2{$3};
+        $destNum = 2;
+        $destSequence = $sequence2;
+        ++$sequence2;
+        $destTime = $dest2{$3};
     }
     if (defined($destTime))
     {
-	if ($flowAddress == $dest1Address)
-	{
-	    print DEST1_OUT 'Rcvr: (f'.$destNum.':'.$destSequence.':M'.$merged.')@'.$sourceTime.' arr '.$destTime."\n";
-	}
-	else
-	{
-	    print DEST2_OUT 'Rcvr: (f'.$destNum.':'.$destSequence.':M'.$merged.')@'.$sourceTime.' arr '.$destTime."\n";
-	}
 
-	print SOURCE_OUT 'Src1: send (f'.$destNum.':'.$destSequence.':M'.$merged.')@'.$sourceTime."\n";
-	++$merged;
+        if ($flowAddress eq $dest1Address)
+        {
+            print DEST1_OUT 'Rcvr: (f'.$destNum.':'.$destSequence.':M'.$merged.')@'.$sourceTime.' arr '.$destTime."\n";
+        }
+        else
+        {
+            print DEST2_OUT 'Rcvr: (f'.$destNum.':'.$destSequence.':M'.$merged.')@'.$sourceTime.' arr '.$destTime."\n";
+        }
+
+        print SOURCE_OUT 'Src1: send (f'.$destNum.':'.$destSequence.':M'.$merged.')@'.$sourceTime." \n";
+        ++$merged;
     }
 }

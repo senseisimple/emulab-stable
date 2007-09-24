@@ -25,7 +25,7 @@
 #include <map>
 #include <sstream>
 
-#define REMOTE_SERVER_PORT 19835
+#define REMOTE_SERVER_PORT 19655
 #define MAX_MSG 100
 
 
@@ -34,6 +34,7 @@ pcap_t *pcapDescriptor = NULL;
 
 using namespace std;
 
+vector< vector<unsigned long long> > sendTimesArray;
 vector< vector<int> > delaySequenceArray;
 vector< map<unsigned long long, int> > packetTimeMaps;
 vector< map<string, unsigned long long> > actualTimeMaps;
@@ -70,6 +71,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         ostringstream tmpStrStream;
         tmpStrStream << origTimestamp;
         actualTimeMaps[hostIndex][tmpStrStream.str()] = (unsigned long long)(secVal*1000 + usecVal/1000);
+        sendTimesArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = (unsigned long long)(secVal*1000 + usecVal/1000);
         printf("Recording Timestamp = %s for Host = %d, value = %llu\n", tmpStrStream.str().c_str(), hostIndex, actualTimeMaps[hostIndex][tmpStrStream.str()]);
     }
     else if(packetType == '1')
@@ -88,7 +90,9 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
             delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = oneWayDelay;
         }
         else
+        {
             delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = oneWayDelay - ( actualTimeMaps[hostIndex][tmpStrStream.str()] - origTimestamp);
+        }
 
         cout << " Onewaydelay for the ACK = " << oneWayDelay << " recorded = "<< delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] <<", host Index = "<< hostIndex << "\n";
         cout <<" Orig timestamp was "<< tmpStrStream.str() << " , actual time = "<< actualTimeMaps[hostIndex][tmpStrStream.str()]<<"\n";
@@ -188,10 +192,15 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 void init_pcap( char *ipAddress)
 {
-    char interface[] = "eth1";
+    char interface[20] = "vnet";
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
+    ifstream ifmapHandle;
+
+    ifmapHandle.open("/var/emulab/boot/ifmap", ios::in);
+    ifmapHandle >> interface;
+    ifmapHandle.close();
 
     // IP Address and sub net mask.
     bpf_u_int32 maskp, netp;
@@ -200,8 +209,8 @@ void init_pcap( char *ipAddress)
     pcap_lookupnet(interface, &netp, &maskp, errBuf);
     pcapDescriptor = pcap_open_live(interface, BUFSIZ, 0, 0, errBuf);
     localAddress.s_addr = netp;
-    printf("IP addr = %s\n", ipAddress);
-    sprintf(filter," udp and ( (src host %s and dst port 19835 ) or (dst host %s and src port 19835 )) ", ipAddress, ipAddress);
+    printf("IP addr = %s, Interface = %s\n", ipAddress, interface);
+    sprintf(filter," udp and ( (src host %s and dst port 19655 ) or (dst host %s and src port 19655 )) ", ipAddress, ipAddress);
 
     if(pcapDescriptor == NULL)
     {
@@ -229,8 +238,8 @@ int main(int argc, char **argv)
     string localHostName = argv[3];
 
     int timeout = 2000; // 1 second
-    int probeRate = 20; // Hz
-    int probeDuration = 15000; // 15 seconds
+    int probeRate = 12; // Hz
+    int probeDuration = 150000; // 150 seconds
     vector<string> hostList;
 
     ifstream inputFileHandle;
@@ -299,6 +308,7 @@ int main(int argc, char **argv)
 
     fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK);
 
+    sendTimesArray.resize(numHosts);
     delaySequenceArray.resize(numHosts);
     packetTimeMaps.resize(numHosts);
     actualTimeMaps.resize(numHosts);
@@ -404,9 +414,9 @@ int main(int argc, char **argv)
 
                     packetTimeMaps[i][sendTime] = packetCounter;
                     delaySequenceArray[i].push_back(-9999);
+                    sendTimesArray[i].push_back(sendTime);
 
                     cout<< "TO " << hostList[i] << " :Counter=" << packetCounter << " :SendTime= " << sendTime << endl;
-
 
                 }
                 packetCounter++;
@@ -452,6 +462,82 @@ int main(int argc, char **argv)
         }
     }
 
+    // Find the common sequence of delay indices present for 
+    // all the probed destinations.
+    int minSequenceLength = 128;
+    int maxFirstSeenIndex = -999999, minLastSeenIndex = 9999999;
+    vector<int> delaySequenceSize;
+
+    delaySequenceSize.resize(numHosts);
+
+    for (int i = 0; i < numHosts; i++)
+    {
+        int delaySeqLen = delaySequenceArray[i].size();
+        int firstSeenIndex = -1;
+        int lastSeenIndex = -1;
+
+        for (int k = 0; k < delaySeqLen; k++)
+        {
+            if (delaySequenceArray[i][k] != -9999) 
+            {
+                lastSeenIndex = k;
+                if (firstSeenIndex == -1)
+                    firstSeenIndex = k;
+            }
+        }
+
+        if(lastSeenIndex == -1)
+        {
+            delaySequenceSize[i] = 0;
+        }
+        else
+        {
+            delaySequenceSize[i] = lastSeenIndex - firstSeenIndex + 1;
+
+            if(delaySequenceSize[i] >= minSequenceLength)
+            {
+                if(lastSeenIndex < minLastSeenIndex)
+                    minLastSeenIndex = lastSeenIndex;
+
+                if(firstSeenIndex > maxFirstSeenIndex)
+                    maxFirstSeenIndex = firstSeenIndex;
+            }
+        }
+
+    }
+
+    int delaySeqLen = delaySequenceArray[0].size();
+    maxFirstSeenIndex = -1;
+    minLastSeenIndex = -1;
+    bool missingSampleFlag = false;
+
+    for (int k = 0; k < delaySeqLen; k++)
+    {
+        missingSampleFlag = false;
+        for (int l = 0; l < numHosts; l++)
+        {
+            // Ignore paths which do not have the minimum
+            // number of delay samples.
+            if(delaySequenceSize[l] < minSequenceLength)
+                continue;
+
+            if (delaySequenceArray[l][k] == -9999) 
+            {
+                missingSampleFlag = true;
+            }
+        }
+
+        if(!missingSampleFlag)
+        {
+                minLastSeenIndex = k;
+                if (maxFirstSeenIndex == -1)
+                    maxFirstSeenIndex = k;
+        }
+    }
+
+    printf("Maxfirstseenindex = %d, minlastseenIndex = %d\n", maxFirstSeenIndex, minLastSeenIndex);
+    fflush(stdout);
+
     for (int i = 0; i < numHosts; i++)
     {
         string dirPath = outputDirectory + "/" + hostList[i];
@@ -473,6 +559,21 @@ int main(int argc, char **argv)
         int firstSeenIndex = -1;
         int lastSeenIndex = -1;
 
+        if(delaySequenceSize[i] < minSequenceLength)
+        {
+            // Create an empty log file.
+            ofstream outputFileHandle;
+            string delayFilePath = dirPath + "/" + "delay.log";
+            outputFileHandle.close();
+            continue;
+        }
+        else
+        {
+            firstSeenIndex = maxFirstSeenIndex;
+            lastSeenIndex = minLastSeenIndex;
+        }
+
+        /*
         for (int k = 0; k < delaySeqLen; k++)
         {
             if (delaySequenceArray[i][k] != -9999) 
@@ -482,6 +583,7 @@ int main(int argc, char **argv)
                     firstSeenIndex = k;
             }
         }
+        */
 
         if (lastSeenIndex != -1)
         {
@@ -522,7 +624,7 @@ int main(int argc, char **argv)
         {
             for (int k = firstSeenIndex; k < lastSeenIndex + 1; k++)
             {
-                outputFileHandle << delaySequenceArray[i][k] <<  "\n"; 
+                outputFileHandle << delaySequenceArray[i][k] << " "<< sendTimesArray[i][k] <<  "\n"; 
             }
         }
         outputFileHandle.close();

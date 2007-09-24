@@ -16,27 +16,27 @@ my $newProjName;
 %bottleNecks = {};
 my %nodeClasses;
 
-die "Usage: perl sharedBottle.pl proj_name exp_name newProj_name newExp_name initial_conditions.txt(Optional)"
-if($#ARGV < 3);
+die "Usage: perl sharedBottle.pl logsDir newProj_name newExp_name initial_conditions.txt DansScript"
+if($#ARGV < 4);
 
-$projName = $ARGV[0];
-$expName = $ARGV[1];
-$newProjName = $ARGV[2];
-$newExpName = $ARGV[3];
-$initialConditionsFilename = $ARGV[4];
+$logsDir = $ARGV[0];
+$newProjName = $ARGV[1];
+$newExpName = $ARGV[2];
+$initialConditionsFilename = $ARGV[3];
+$DansScriptPath = $ARGV[4];
 
-$logsDir = "/proj/$projName/exp/$expName/logs/dump";
+#$logsDir = "/proj/$projName/exp/$expName/logs/dump";
 
 
 # Get the initial conditions.
-$elabInitScript = "/proj/tbres/duerig/testbed/pelab/init-elabnodes.pl";
-$initConditionsCommand = $elabInitScript . " -o /tmp/initial-conditions.txt " . $newProjName . " " . $newExpName; 
+#$elabInitScript = "/proj/tbres/duerig/testbed/pelab/init-elabnodes.pl";
+#$initConditionsCommand = $elabInitScript . " -o /tmp/initial-conditions.txt " . $newProjName . " " . $newExpName; 
 
-if($#ARGV == 3) 
-{
-    system($initConditionsCommand);
-    $initialConditionsFilename = "/tmp/initial-conditions.txt";
-}
+#if($#ARGV == 2) 
+#{
+#    system($initConditionsCommand);
+#    $initialConditionsFilename = "/tmp/initial-conditions.txt";
+#}
 
 open(CONDITIONS, $initialConditionsFilename);
 
@@ -111,37 +111,60 @@ foreach $sourceName (readdir(logsDirHandle))
     }
 }
 
+
 rewinddir(logsDirHandle);
 
 # Descend into all the source directories
 foreach $sourceName (readdir(logsDirHandle))
 {
-    if( (-d $logsDir . "/" . $sourceName ) && $sourceName ne "." && $sourceName ne ".." )
+    if( (-d "$logsDir/$sourceName" ) && $sourceName ne "." && $sourceName ne ".." )
     {
 
         my @destLists;
 # Then search for all possible destinations for 
 # a particular source.
-        opendir(sourceDirHandle, $logsDir . "/" . $sourceName);
+        opendir(sourceDirHandle, "$logsDir/$sourceName");
 
         foreach $destOne (readdir(sourceDirHandle))
         {
-            if( (-d $logsDir . "/" . $sourceName . "/" . $destOne) && $destOne ne "." && $destOne ne ".." )
+            if( (-d "$logsDir/$sourceName/$destOne") && $destOne ne "." && $destOne ne ".." )
             {
 
 # Inside each destination directory, look for 
 # all possible second destinations.
-                opendir(destDirHandle, $logsDir . "/" . $sourceName . "/" . $destOne);
+                opendir(destDirHandle, "$logsDir/$sourceName/$destOne");
 
                 foreach $destTwo (readdir(destDirHandle))
                 {
-                    if( (-d $logsDir . "/" . $sourceName . "/" . $destOne . "/" . $destTwo) && $destTwo ne "." && $destTwo ne ".." )
+                    if( (-d "$logsDir/$sourceName/$destOne/$destTwo") && $destTwo ne "." && $destTwo ne ".." )
                     {
                         $fullPath = "$logsDir/$sourceName/$destOne/$destTwo";
 # Run Rubenstein's code on the ".filter" files
 # inside the second destination directory.
-                        `perl /proj/tbres/duerig/testbed/pelab/bw-bottleneck/dump2filter.pl $fullPath`;
-                        $DansScript = "/proj/tbres/duerig/filter/genjitco.FreeBSD";
+                
+                        if(-r "$fullPath/delay.log")
+                        {
+                            ($path1Variance, $path2Variance) = &CheckVariance("$fullPath/delay.log");
+
+                        # One of the two paths had low variance - declare this pair of paths as being
+                        # uncorrelated.
+                            if(not( $path1Variance >= 25 and $path2Variance >= 25) )
+                            {
+                                push(@destLists,$destOne);
+                                push(@destLists,$destTwo);
+
+                                printf("WARNING: One or more of paths($sourceName -> $destOne, $sourceName -> $destTwo) have low variance(%.3f,%.3f)\n.Considering these paths as uncorrelated\n", $path1Variance, $path2Variance);
+                                next;
+                            }
+                        }
+                        else
+                        {
+                            print "Missing file(delay.log). Cannot process $fullPath\n";
+                            next;
+                        }
+                        system("perl delay2dump.pl $fullPath/delay.log $fullPath");
+                        system("perl dump2filter.pl $fullPath");
+
                         $filterFile1 = $fullPath . "/" . "source.filter";
                         $filterFile2 = $fullPath . "/" . "dest1.filter";
                         $filterFile3 = $fullPath . "/" . "dest2.filter";
@@ -149,14 +172,14 @@ foreach $sourceName (readdir(logsDirHandle))
                         if (!(-r $filterFile1) || !(-r $filterFile2) || !(-r $filterFile3))
                         {
                             print "Missing file. Cannot process $fullPath\n";
-                            continue;
+                            next;
                         }
-                        $sharedBottleneckCheck = $DansScript ." ". $filterFile1
-                            ." ". $filterFile2 ." ". $filterFile3;
-
+                        $sharedBottleneckCheck = $DansScriptPath ." ". $filterFile1." ". $filterFile2 ." ". $filterFile3;
+                            
                         print "EXECUTE: $sharedBottleneckCheck\n";
                         my @scriptOutput = ();
                         @scriptOutput = `$sharedBottleneckCheck | tail -n 2`;
+#system("$sharedBottleneckCheck");
 
 #			$scriptOutput[0] = "last CHANGE was CORRELATED, corr case: 30203 pkts, test case: 30203 pkts";
 #			$scriptOutput[1] = "testingabcdef";
@@ -167,9 +190,9 @@ foreach $sourceName (readdir(logsDirHandle))
                         if($scriptOutput[$#scriptOutput - 1] =~ /last CHANGE\s(\w*)\s(\w*)\,[\w\d\W\:\,]*/)
                         {
                             print "For source $sourceName: Comparing $destOne $destTwo: $scriptOutput[$#scriptOutput]";
-			    $corrResult = $2;
+                            $corrResult = $2;
                             if($corrResult eq "CORRELATED"
-			       && !($scriptOutput[$#scriptOutput] =~ /nan/))
+                                    && !($scriptOutput[$#scriptOutput] =~ /nan/))
                             {
                                 push(@{ $bottleNecks{$sourceName} },$destOne . ":" . $destTwo);
                                 push(@destLists,$destOne);
@@ -178,7 +201,7 @@ foreach $sourceName (readdir(logsDirHandle))
 
                             }
                             elsif($corrResult eq "UNCORRELATED"
-				  && !($scriptOutput[$#scriptOutput] =~ /nan/))
+                                    && !($scriptOutput[$#scriptOutput] =~ /nan/))
                             {
                                 push(@destLists,$destOne);
                                 push(@destLists,$destTwo);
@@ -357,10 +380,10 @@ foreach $sourceName (readdir(logsDirHandle))
             {
                 if( ($deletionFlagArray[$counter1] != 1) and ($deletionFlagArray[$counter2] != 1) and ($counter1 != $counter2) )
                 {
-                    $intersectionFlag = &checkIntersection($counter1, $counter2);
+                    $intersectionFlag = &CheckIntersection($counter1, $counter2);
                     if($intersectionFlag)
                     {
-                        &mergeClasses( $counter1, $counter2);
+                        &MergeClasses( $counter1, $counter2);
 
                         #Mark the equivalence class $counter2 for deletion.
                         $deletionFlagArray[$counter2] = 1;
@@ -388,30 +411,48 @@ foreach $sourceName (readdir(logsDirHandle))
 
 # For debugging.
 
-        $retVal = &checkSanity(@equivClasses, @adjMatrix);
+        $retVal = &CheckSanity(@equivClasses, @adjMatrix);
 
         if($retVal != 0)
         {
             print "WARNING:($sourceName) Transitive property has been violated.\n";
         }
-#	print "(Debugging) Equivalence classes - $sourceName\n";
-#foreach $tmpName (@equivClasses)
-#	{
-#	    foreach $tmpName2 (@$tmpName)
-#	    {
-#		print $destSeen[$tmpName2] . " ";
-#	    }
-#	    print "\n";
-#
-#	}
+	print "(Debugging) Equivalence classes - $sourceName\n";
+foreach $tmpName (@equivClasses)
+	{
+    foreach $tmpName2 (@$tmpName)
+	    {
+		print $destSeen[$tmpName2] . " ";
+	    }
+	    print "\n";
 
-        $nodeClasses{$sourceName} = [ @equivClasses ];
+	}
+
+for($i = 0; $i < $numDests; $i++)
+{
+    my $lonerFlag = 0;
+    for($j = 0; $j < $numDests; $j++)
+    {
+        if($adjMatrix[$i][$j] == 1)
+        {
+            $lonerFlag = 1;
+            last;
+        }
+    }
+
+    if($lonerFlag == 0)
+    {
+		print $destSeen[$i] . "\n";
+    }
+}
+
+$nodeClasses{$sourceName} = [ @equivClasses ];
 
 
 # Send the events to all the nodes which form an equivalent class.
-        foreach $tmpName (@equivClasses)
-        {
-            my $bwEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=";
+foreach $tmpName (@equivClasses)
+{
+    my $bwEventCommand = "$tevc $elabMap{$addrNodeMapping{$sourceName}} modify DEST=";
             my $firstDestFlag = 0;
 
             my $maxBw = 0;
@@ -486,6 +527,7 @@ foreach $sourceName (readdir(logsDirHandle))
         }
 
     }
+    print "\n\n";
 }
 
 closedir(logsDirHandle);
@@ -494,7 +536,7 @@ closedir(logsDirHandle);
 # violated in any equivalence classes - If it has been
 # correct it (for now) by assuming that all the nodes
 # have the transitive property wrt shared bottlenecks.
-sub checkSanity()
+sub CheckSanity()
 {
     $retVal = 0;
     foreach $equivSet (@equivClasses)
@@ -519,7 +561,7 @@ sub checkSanity()
     return $retVal;
 }
 
-sub checkIntersection()
+sub CheckIntersection()
 {
     ($index1, $index2) = @_;
     @array1 = @{ $equivClasses[$index1]};
@@ -538,7 +580,7 @@ sub checkIntersection()
     return 0;
 }
 
-sub mergeClasses()
+sub MergeClasses()
 {
     ($index1, $index2) = @_;
     @secondArray = @{ $equivClasses[$index2] };
@@ -562,3 +604,54 @@ sub mergeClasses()
     }
 }
 
+sub CheckVariance()
+{
+    open(HANDLE, $_[0]);
+
+    my @delayArray1 = (), @delayArray2 = ();
+
+    while($line = <HANDLE>)
+    {
+        if($line =~ /^(\d*)\s(\d*)\s(\d*)\s(\d*)/)
+        {
+            push(@delayArray1, $1);
+            push(@delayArray2, $3);
+        }
+    }
+    close(HANDLE);
+
+    my $delay1Avg = 0, $delay2Avg = 0;
+    my $delay1Variance = 0, $delay2Variance = 0;
+
+# Calculate the avg delay for both the paths.
+    for($i = 0; $i <= $#delayArray1; $i++)
+    {
+        $delay1Avg = $delay1Avg + $delayArray1[$i];
+    }
+    $delay1Avg = $delay1Avg/($#delayArray1 + 1);
+
+    for($i = 0; $i <= $#delayArray2; $i++)
+    {
+        $delay2Avg = $delay2Avg + $delayArray2[$i];
+    }
+    $delay2Avg = $delay2Avg/($#delayArray2 + 1);
+
+    # Get the variance for each path.
+    for($i = 0; $i <= $#delayArray1; $i++)
+    {
+        $delay1Variance = $delay1Variance + ($delayArray1[$i] - $delay1Avg)*($delayArray1[$i] - $delay1Avg);
+    }
+    $delay1Variance = sqrt($delay1Variance);
+
+    for($i = 0; $i <= $#delayArray2; $i++)
+    {
+        $delay2Variance = $delay2Variance + ($delayArray2[$i] - $delay2Avg)*($delayArray2[$i] - $delay2Avg);
+    }
+    $delay2Variance = sqrt($delay2Variance);
+
+    my @retArray = ();
+    push(@retArray, $delay1Variance);
+    push(@retArray, $delay2Variance);
+
+    return @retArray;
+}

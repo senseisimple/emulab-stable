@@ -1,7 +1,7 @@
 # delay2dump.pl
 
 
-if ($ARGV != 2)
+if ($#ARGV != 1)
 {
     die ("Usage: delay2dump.pl <in-file> <out-path>");
 }
@@ -16,17 +16,35 @@ $sequence = 0;
 while ($line = <IN>)
 {
     $line =~ /^([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)$/;
-    $send1 = $1;
-    $send2 = $2;
-    $delay1 = $3;
-    $delay2 = $4;
+    $send1 = $2;
+    $send2 = $4;
+    $delay1 = $1;
+    $delay2 = $3;
+
+    $send1_delay = ($send1 + $delay1)*1000;
+    $send2_delay = ($send2 + $delay2)*1000;
+
+    $send1 = $send1*1000;
+    $send2 = $send2*1000;
+
+    $send1_sec = $send1/1000000;
+    $send1_usec = $send1 % 1000000;
+
+    $send2_sec = $send2/1000000;
+    $send2_usec = $send2 % 1000000;
+
+    $send1_delay_sec = $send1_delay/1000000;
+    $send1_delay_usec = $send1_delay % 1000000;
+
+    $send2_delay_sec = $send2_delay/1000000;
+    $send2_delay_usec = $send2_delay % 1000000;
 
     if ($send1 ne -9999 && $send2 ne -9999)
     {
-	print (OUT_SOURCE, $send1." 10.0.0.2 ".$sequence);
-	print (OUT_SOURCE, $send2." 10.0.0.3 ".$sequence);
-	print (OUT_DEST1, ($send1 + $delay1)." 10.0.0.1 ".$sequence);
-	print (OUT_DEST2, ($send2 + $delay2)." 10.0.0.1 ".$sequence);
+        printf (OUT_SOURCE "%d.%d 10.0.0.2 %d\n", $send1_sec,$send1_usec,$sequence);
+        printf (OUT_SOURCE "%d.%d 10.0.0.3 %d\n", $send2_sec,$send2_usec,$sequence);
+        printf (OUT_DEST1 "%d.%d 10.0.0.2 %d\n",$send1_delay_sec,$send1_delay_usec,$sequence);
+        printf (OUT_DEST2 "%d.%d 10.0.0.3 %d\n",$send2_delay_sec,$send2_delay_usec,$sequence);
     }
 
     $sequence++;
