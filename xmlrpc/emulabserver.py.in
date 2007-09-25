@@ -4612,7 +4612,8 @@ class template:
                 argstr += escapeshellarg(val)
                 pass
             elif opt == "tid":
-                tid = escapeshellarg(val)
+                argstr += " -t "
+                argstr += escapeshellarg(val)
                 pass
             elif opt == "tag":
                 argstr += " -r "
