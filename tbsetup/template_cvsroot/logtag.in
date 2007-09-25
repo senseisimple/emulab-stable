@@ -36,7 +36,7 @@ while (@ARGV) {
 
 	if ($op eq "add" || $op eq "mov") {
 	    # Generate a marker to tell the post tag function
-	    my $module = basename(dirname($repo));
+	    my $module = basename($repo);
 	    my $id = getpgrp();
 	    my $docommit = "/tmp/#cvs.docommit.${id}";
 	    open(COM, ">$docommit")
