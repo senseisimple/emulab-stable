@@ -320,8 +320,16 @@ NODE: foreach my $node_id (@node_ids) {
 			   "cert"    => $RPCCERT,
 			   "portnum" => $RPCPORT});
 
+	#
+	# XXX force MAC to a string since simple XML parser may otherwise
+	# think it is an int (i.e., all digits) or even a double (i.e.,
+	# all digits with an 'e' in the middle).  Don't laugh, I spent a
+	# lot of time figuring this out when it really happened!
+	#
+	my $macstr = RPC::XML::string->new($interfaces{0}[0]);
+
 	my $rval = libxmlrpc::CallMethod("elabinelab", "newnode_info",
-					 {"mac" => $interfaces{0}[0]});
+					 {"mac" => $macstr});
 
 	if (!defined($rval)) {
 	    print "XMPRPC server did not return control iface info!\n";
