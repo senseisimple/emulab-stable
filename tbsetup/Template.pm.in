@@ -463,18 +463,32 @@ sub CreateLogFile($$$)
     my $pid      = $self->pid();
     my $projroot = PROJROOT();
     my $logdir   = "$projroot/$pid/templates/logs";
-    my $logname  = "$logdir/$prefix.${guid}-${vers}.log";
-
-    return -1
-	if (-e $logname);
+    my $linkname = "$logdir/$prefix.${guid}-${vers}.log";
 
     return -1
 	if (! -d $logdir && !mkdir($logdir, 0775));
 
+    my $logname  = `mktemp $logdir/$prefix.${guid}-${vers}.XXXXXX`;
+
+    if ($logname =~ /^([-\@\w\.\/]+)$/) {
+	$logname = $1;
+    }
+    else {
+	return -1;
+    }
+	
+    if (-e $linkname) {
+	return -1
+	    if (! unlink($linkname));
+    }
     Template::mysystem("touch $logname") == 0
 	    or return -1;
-
-    $$ppath = $logname;
+    
+    if (! link($logname, $linkname)) {
+	print STDERR "*** Cannot link $logname,$linkname: $!\n";
+	return -1;
+    }
+    $$ppath = $linkname;
     return 0;
 }
 
