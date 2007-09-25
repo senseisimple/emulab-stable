@@ -72,7 +72,7 @@ elsif (!@ARGV) {
 else {
     die("Improper usage!\n")
 }
-$cookiefile = "$CVSROOT/$module/setup/.template,v";
+$cookiefile = "$CVSROOT/$module/.template,v";
 
 # See if the new tag is a branch tag. To do that, run rlog over the RCS
 # file and look at the revision number. We count the dots. There is also
