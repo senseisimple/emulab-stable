@@ -4362,8 +4362,9 @@ class elabinelab:
                              "   i.node_id=r.node_id "
                              "left join wires as s on s.node_id1=i.node_id "
                              "   and s.card1=i.card "
-                             "where r.pid=%s and r.eid=%s and "
-                             "   r.inner_elab_role='node' "
+                             "where r.pid=%s and r.eid=%s "
+                             "   and r.inner_elab_role='node' "
+			     "   and s.node_id2!='' "
                              "order by r.node_id,iface",
                              (self.pid,self.eid,))
         
@@ -4491,7 +4492,7 @@ class elabinelab:
             tmp["card"]        = res[5]
             tmp["type"]        = res[6]
             tmp["switch_id"]   = res[7]
-            tmp["switch_card"] = res[9]
+            tmp["switch_card"] = res[8]
             tmp["switch_port"] = res[9]
             interfaces[res[1]] = tmp
             pass
