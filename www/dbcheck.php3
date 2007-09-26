@@ -46,6 +46,7 @@ function TBGrabFieldData()
 function TBFieldData($table, $column, $flag = 0)
 {
     global $DBFieldData;
+    global $DBFieldErrstr;
     
     if (! $DBFieldData) {
 	TBGrabFieldData();
@@ -75,8 +76,10 @@ function TBFieldData($table, $column, $flag = 0)
                 # Warn TBOPS
 		TBERROR("TBFieldData: No slot data for $table/$column!", 0);
 	    }
-	    if ($flag & TBDB_CHECKDBSLOT_ERROR)
-		return 0;
+	    if ($flag & TBDB_CHECKDBSLOT_ERROR) {
+		$DBFieldErrstr = "Internal Error";
+		return array(null, null);
+	    }
 	}
 	$fielddata = $DBFieldData["default:default"];
     }
