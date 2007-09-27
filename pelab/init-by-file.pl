@@ -7,13 +7,26 @@ $proj = $ARGV[0];
 $exp = $ARGV[1];
 $filename = $ARGV[2];
 
+sub psystem(@) {
+  print join(' ', @_);
+  print "\n";
+  system(@_);
+  die unless $? == 0;
+}
+
 open(FILE, "<".$filename) or die("Cannot open $filename\n");
+
+# reset the links
+# wait only on the reset event
+psystem("/usr/testbed/bin/tevc -e $proj/$exp now elabc clear");
+psystem("/usr/testbed/bin/tevc -w -e $proj/$exp now elabc reset");
+psystem("/usr/testbed/bin/tevc -e $proj/$exp now elabc create");
 
 while ($line = <FILE>)
 {
     $line =~ /^10.0.0.([0-9]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) [0-9.]+$/;
-    print("/usr/testbed/bin/tevc -e $proj/$exp now elabc-elab-$1 modify dest=$2 bandwidth=$3\n");
-    print("/usr/testbed/bin/tevc -e $proj/$exp now elabc-elab-$1 modify dest=$2 delay=$4\n");
-    system("/usr/testbed/bin/tevc -e $proj/$exp now elabc-elab-$1 modify dest=$2 bandwidth=$3");
-    system("/usr/testbed/bin/tevc -e $proj/$exp now elabc-elab-$1 modify dest=$2 delay=$4");
+    psystem("/usr/testbed/bin/tevc -e $proj/$exp now elabc-elab-$1 modify dest=$2 bandwidth=$3");
+    psystem("/usr/testbed/bin/tevc -e $proj/$exp now elabc-elab-$1 modify dest=$2 delay=$4");
 }
+
+
