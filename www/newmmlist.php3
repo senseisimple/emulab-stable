@@ -324,48 +324,106 @@ if (count($errors)) {
     return;
 }
 
-$listname = $project->pid() . "-" . $formfields["listname"];
-$safename = addslashes($listname);
-$password = $formfields["password1"];
-
 #
-# Need to lock the table for this. 
-# 
-DBQueryFatal("lock tables mailman_listnames write");
+# Build up argument array to pass along.
+#
+$args = array();
 
-$query_result =
-    DBQueryFatal("select * from mailman_listnames ".
-		 "where listname='$safename'");
-if (mysql_num_rows($query_result)) {
-    DBQueryFatal("unlock tables");
-    $errors["List Name"] = "Name already in use; pick another";
+if (isset($formfields["pid"]) &&
+    $formfields["pid"] != "none" && $formfields["pid"] != "") {
+    $args["pid"]		= $formfields["pid"];
+}
+if (isset($formfields["password1"]) && $formfields["password1"] != "") {
+    $args["password1"]	= $formfields["password1"];
+}
+if (isset($formfields["password2"]) && $formfields["password2"] != "") {
+    $args["password2"]	= $formfields["password2"];
+}
+if (isset($formfields["listname"]) && $formfields["listname"] != "") {
+    $args["listname"]	= $formfields["listname"];
+}
+if (isset($formfields["fullname"]) && $formfields["fullname"] != "") {
+    $args["fullname"]	= $formfields["fullname"];
+}
+
+if (! ($result = NewMmList($uid, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
 }
 
-DBQueryFatal("insert into mailman_listnames ".
-	     " (listname, owner_uid, owner_idx, created) ".
-	     "values ('$safename', '$uid', '$dbid', now())");
-DBQueryFatal("unlock tables");
-
-#
-# Okay, call out to the backend to create the actual list. 
-#
-$retval = SUEXEC($uid, $TBADMINGROUP,
-		 "webaddmmlist -u " . escapeshellarg($listname) . " $uid " .
-		           escapeshellarg($password),
-		 SUEXEC_ACTION_IGNORE);
-
-# Failed? Remove the DB entry.
-if ($retval != 0) {
-    DBQueryFatal("delete from mailman_listnames ".
-		 "where listname='$safename'");
-    SUEXECERROR(SUEXEC_ACTION_DIE);
-}
-
 #
 # Okay, redirect the user over to the listadmin page to finish configuring.
 #
-header("Location: ${MAILMANURL}/admin/${listname}/?adminpw=${password}");
+header("Location: ${MAILMANURL}/admin/${listname}/?adminpw=${formfields["password1"]}");
+
+#
+# When there's an MmList class, this will be a Class function to make a new one...
+#
+function NewMmList($uid, $args, &$errors) {
+    global $suexec_output, $suexec_output_array, $TBADMINGROUP;
+
+    #
+    # Generate a temporary file and write in the XML goo.
+    #
+    $xmlname = tempnam("/tmp", "newmmlist");
+    if (! $xmlname) {
+	TBERROR("Could not create temporary filename", 0);
+	$errors[] = "Transient error; please try again later.";
+	return null;
+    }
+    if (! ($fp = fopen($xmlname, "w"))) {
+	TBERROR("Could not open temp file $xmlname", 0);
+	$errors[] = "Transient error; please try again later.";
+	return null;
+    }
+
+    fwrite($fp, "<MmList>\n");
+    foreach ($args as $name => $value) {
+	fwrite($fp, "<attribute name=\"$name\">");
+	fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	fwrite($fp, "</attribute>\n");
+    }
+    fwrite($fp, "</MmList>\n");
+    fclose($fp);
+    chmod($xmlname, 0666);
+
+    $retval = SUEXEC($uid, $TBADMINGROUP, "webnewmmlist $xmlname",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	if ($retval < 0) {
+	    $errors[] = "Transient error; please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	}
+	else {
+	    # unlink($xmlname);
+	    if (count($suexec_output_array)) {
+		for ($i = 0; $i < count($suexec_output_array); $i++) {
+		    $line = $suexec_output_array[$i];
+		    if (preg_match("/^([-\w]+):\s*(.*)$/",
+				   $line, $matches)) {
+			$errors[$matches[1]] = $matches[2];
+		    }
+		    else
+			$errors[] = $line;
+		}
+	    }
+	    else
+		$errors[] = "Transient error; please try again later.";
+	}
+	return null;
+    }
+
+    # There are no return value(s) to parse at the end of the output.
+
+    # Unlink this here, so that the file is left behind in case of error.
+    # We can then create the MmList by hand from the xmlfile, if desired.
+    unlink($xmlname);
+
+    return true; 
+}
+
 ?>

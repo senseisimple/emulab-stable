@@ -810,7 +810,15 @@ REPLACE INTO table_regex VALUES ('virt_firewalls','eid','text','redirect','exper
 REPLACE INTO table_regex VALUES ('virt_firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|ipfw2|ipchains|ipfw2-vlan)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('mailman_lists','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','password1','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','password2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','fullname','text','redirect','users:usr_email',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','listname','text','redirect','mailman_listnames:listname',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('mailman_listnames','listname','text','regex','^[-\\w\\.\\+]+$',3,64,NULL);
+
 REPLACE INTO table_regex VALUES ('default','fulltext','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,20000,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrkey','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrvalue','text','regex','^[-\\w\\.+,\\s]+$',0,255,NULL);
