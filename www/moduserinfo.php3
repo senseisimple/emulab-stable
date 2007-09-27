@@ -7,7 +7,7 @@
 include("defs.php3");
 
 #
-# No PAGEHEADER since we spit out a Location header later. See below.
+# No PAGEHEADER here since we spit out a Location header later. See below.
 # 
 # We want to allow logged in users with expired passwords to change them.
 #
@@ -50,6 +50,7 @@ function SPITFORM($formfields, $errors)
     # expiration interaction. See below.
     #
     PAGEHEADER("Modify User Information");
+    ###STARTBUSY("Making user profile changes");
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -506,7 +507,8 @@ if (isset($formfields["usr_addr"]) && $formfields["usr_addr"] != "" &&
     $formfields["usr_addr"] != $target_user->addr()) {
     $args["usr_addr"]	= $formfields["usr_addr"];
 }
-if (isset($formfields["usr_addr2"]) && $formfields["usr_addr2"] != "") {
+if (isset($formfields["usr_addr2"]) && $formfields["usr_addr2"] != "" &&
+    $formfields["usr_addr2"] != $target_user->addr2()) {
     $args["usr_addr2"]	= $formfields["usr_addr2"];
 }
 if (isset($formfields["usr_city"]) && $formfields["usr_city"] != "" &&
@@ -547,6 +549,8 @@ if (! ($result = User::ModUserInfo($target_user, $args, $errors))) {
 }
 
 PAGEHEADER("Modify User Information");
+
+###STOPBUSY();
 
 echo "<center><h3>Done!</h3></center>\n";
 PAGEREPLACE(CreateURL("showuser", $target_user) . "#PROFILE");
