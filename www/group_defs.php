@@ -94,6 +94,94 @@ class Group
     }
 
     #
+    # Class function to create a new Project Group.
+    #
+    function Create($project, $uid, $args, &$errors) {
+	global $suexec_output, $suexec_output_array;
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "newgroup");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+
+	# Add these. Maybe caller should do this?
+	$args["project"]  = $project->pid();
+
+	fwrite($fp, "<group>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</group>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	# Note: running as the user for mkgroup and modgroups underneath.
+	$unix_gid  = $project->unix_gid();
+	$retval = SUEXEC($uid, $unix_gid, "webnewgroup $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$errors[] = "Transient error; please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		# unlink($xmlname);
+		if (count($suexec_output_array)) {
+		    for ($i = 0; $i < count($suexec_output_array); $i++) {
+			$line = $suexec_output_array[$i];
+			if (preg_match("/^([-\w]+):\s*(.*)$/",
+				       $line, $matches)) {
+			    $errors[$matches[1]] = $matches[2];
+			}
+			else
+			    $errors[] = $line;
+		    }
+		}
+		else
+		    $errors[] = "Transient error; please try again later.";
+	    }
+	    return null;
+	}
+
+        #
+        # Parse the last line of output. Ick.
+        #
+	unset($matches);
+	
+	if (!preg_match("/^GROUP\s+([^\/]+)\/(\d+)\s+/",
+			$suexec_output_array[count($suexec_output_array)-1],
+			$matches)) {
+	    $errors[] = "Transient error; please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    return null;
+	}
+	$group = $matches[2];
+	$newgroup = Group::Lookup($group);
+	if (! $newgroup) {
+	    $errors[] = "Transient error; please try again later.";
+	    TBERROR("Could not lookup new group $group", 0);
+	    return null;
+	}
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then create the group by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return $newgroup; 
+    }
+
+    #
     # Load the project for a group lazily.
     #
     function LoadProject() {

@@ -19,125 +19,209 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 #
-# Verify page arguments
+# Verify page arguments.
 #
-$reqargs = RequiredPageArguments("project",           PAGEARG_PROJECT,
-				 "group_id",          PAGEARG_STRING,
-				 "group_description", PAGEARG_ANYTHING,
-				 "group_leader",      PAGEARG_STRING);
+$optargs = OptionalPageArguments("project",    PAGEARG_PROJECT,
+				 "submit",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
+if (!isset($project)) {
+    #
+    # See what projects the uid can do this in.
+    #
+    $projlist = $this_user->ProjectAccessList($TB_PROJECT_MAKEGROUP);
 
-# Need these below
-$group_pid = $project->pid();
-$unix_gid  = $project->unix_gid();
-$safe_id   = escapeshellarg($group_id);
-
-#
-# Check ID for sillyness.
-#
-if ($group_id == "") {
-    USERERROR("Must provide a group name!", 1);
-}
-elseif (! TBvalid_gid($group_id)) {
-    USERERROR("Invalid group name: " . TBFieldErrorString(), 1);
-}
-if ($group_leader == "") {
-    USERERROR("Must provide a group leader!", 1);
-}
-
-#
-# Certain of these values must be escaped or otherwise sanitized.
-# 
-$group_description = addslashes($group_description);
-
-#
-# Verify permission.
-#
-if (!$project->AccessCheck($this_user, $TB_PROJECT_MAKEGROUP)) {
-    USERERROR("You do not have permission to create groups in project ".
-	      "$group_pid!", 1);
-}
-
-# Need the user object for creating the group.
-if (! ($leader = User::Lookup($group_leader))) {
-    USERERROR("User '$group_leader' is an unknown user!", 1);
-}
-
-#
-# Verify leader. Any user can lead a group, but they must be a member of
-# the project, and we have to avoid an ISADMIN() check in AccessCheck().
-#
-if (!$project->IsMember($leader, $isapproved) ||
-    !$project->AccessCheck($leader, $TB_PROJECT_LEADGROUP)) {
-    USERERROR("$group_leader does not have enough permission to lead a group ".
-	      "in project $group_pid!", 1);
-}
-
-#
-# Make sure the GID is not already there.
-#
-if (($oldgroup = Group::LookupByPidGid($group_pid, $group_id))) {
-    USERERROR("The group $group_id already exists! Please select another.", 1);
-}
-
-#
-# The unix group name must be globally unique. Form a name and check it.
-#
-$unix_gname = substr($group_pid, 0, 3) . "-" . $group_id;
-$maxtries   = 99;
-$count      = 0;
-
-while ($count < $maxtries) {
-    if (strlen($unix_gname) > $TBDB_UNIXGLEN) {
-	TBERROR("Unix group name $unix_gname is too long!", 1);
+    if (! count($projlist)) {
+	USERERROR("You do not appear to be a member of any Projects in which ".
+		  "you have permission to create new groups.", 1);
     }
+}
+else {
+    #
+    # Verify permission for specific project.
+    #
+    $pid = $project->pid();
     
-    $query_result =
-	DBQueryFatal("select gid from groups where unix_name='$unix_gname'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	break;
+    if (!$project->AccessCheck($this_user, $TB_PROJECT_MAKEGROUP)) {
+	USERERROR("You do not have permission to create groups in ".
+		  "project $pid!", 1);
     }
-    $count++;
-
-    $unix_gname = substr($group_pid, 0, 3) . "-" .
-	substr($group_id,  0, strlen($group_id) - 2) . "$count";
-}
-if ($count == $maxtries) {
-    TBERROR("Could not form a unique Unix group name!", 1);
 }
 
 #
-# Create the new group and set up the initial membership for the leader.
-#
-# Note, if the project leader wants to be in the subgroup, he/she has to
-# add themself via the edit page. 
-#
-if (! ($newgroup = Group::NewGroup($project, $group_id, $leader,
-				   $group_description, $unix_gname))) {
-    TBERROR("Could not create new group $group_pid/$group_id!", 1);
-}
-$gid_idx = $newgroup->gid_idx();
-
-STARTBUSY("Creating project group $group_id.");
-
-#
-# Run the script. This will make the group directory, set the perms, etc.
-#
-SUEXEC($uid, $unix_gid,
-       "webmkgroup $gid_idx", SUEXEC_ACTION_DIE);
-
-#
-# Now add the group leader to the group.
+# Spit the form out using the array of data. 
 # 
-SUEXEC($uid, $unix_gid,
-       "webmodgroups -a $group_pid:$safe_id:group_root $group_leader",
-       SUEXEC_ACTION_DIE);
+function SPITFORM($formfields, $errors)
+{
+    global $project, $pid, $projlist;
+    global $TBDB_GIDLEN, $TBDB_UIDLEN;
 
-STOPBUSY();
+    if ($errors) {
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
+              <tr>
+                 <th align=center colspan=2>
+                   <font size=+1 color=red>
+                      &nbsp;Oops, please fix the following errors!&nbsp;
+                   </font>
+                 </td>
+              </tr>\n";
+
+	while (list ($name, $message) = each ($errors)) {
+	    echo "<tr>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
+                  </tr>\n";
+	}
+	echo "</table><br>\n";
+    }
+
+    echo "<br>
+          <table align=center border=1> 
+          <tr>
+             <td align=center colspan=2>
+                 <em>(Fields marked with * are required)</em>
+             </td>
+          </tr>\n";
+
+    if (isset($project)) {
+	$url = CreateURL("newgroup", $project);
+	echo "<form action='$url' method=post>
+	      <tr>
+		  <td>* Project:</td>
+		  <td class=left>
+		      <input name=project type=readonly value='$pid'>
+		  </td>
+	      </tr>\n";
+    }
+    else {
+	$url = CreateURL("newgroup");
+	echo "<form action='$url' method=post>
+	      <tr>
+		  <td>*Select Project:</td>";
+	echo "    <td><select name=project>";
+
+	while (list($proj) = each($projlist)) {
+	    echo "<option value='$proj'>$proj </option>\n";
+	}
+
+	echo "       </select>";
+	echo "    </td>
+	      </tr>\n";
+    }
+
+    echo "<tr>
+	      <td>*Group Name (no blanks, lowercase):</td>
+	      <td class=left>
+		  <input type=text 
+			 name=\"formfields[group_id]\" 
+			 value=\"" . $formfields["group_id"] . "\"
+			 size=$TBDB_GIDLEN
+			 maxlength=$TBDB_GIDLEN>
+	      </td>
+	  </tr>\n";
+
+    echo "<tr>
+	      <td>*Group Description:</td>
+	      <td class=left>
+		  <input type=text size=50
+			 name=\"formfields[group_description]\"
+			 value=\"" . $formfields["group_description"] . "\">
+	      </td>
+	  </tr>\n";
+
+    echo "<tr>
+	      <td>*Group Leader (Emulab userid):</td>
+	      <td class=left>
+		  <input type=text
+			 name=\"formfields[group_leader]\"
+			 value=\"" . $formfields["group_leader"] . "\"
+			 size=$TBDB_UIDLEN maxlength=$TBDB_UIDLEN>
+	      </td>
+	  </tr>\n";
+
+    echo "<tr>
+              <td align=center colspan=2>
+                  <b><input type=submit name=submit value=Submit></b>
+              </td>
+          </tr>\n";
+
+    echo "</form>
+          </table>\n";
+
+    echo "<br><center>
+	     Important <a href=docwrapper.php3?docname=groups.html#SECURITY'>
+	     security issues</a> are discussed in the
+	     <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+          </center>\n";
+}
 
 #
-# Redirect back to project page.
+# Accumulate error reports for the user, e.g.
+#    $errors["Key"] = "Msg";
+# Required page args may need to be checked early.
+$errors  = array();
+
 #
+# On first load, display a virgin form and exit.
+#
+if (!isset($submit)) {
+    $defaults = array();
+    $defaults["group_id"]	   = "";
+    $defaults["group_description"] = "";
+    $defaults["group_leader"]	   = $uid;
+
+    SPITFORM($defaults, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# If any errors, respit the form with the current values and the
+# error messages displayed. Iterate until happy.
+# 
+if (count($errors)) {
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Build up argument array to pass along.
+#
+$args = array();
+
+if (isset($formfields["project"]) &&
+    $formfields["project"] != "none" && $formfields["project"] != "") {
+    $args["project"]		= $formfields["project"];
+}
+if (isset($formfields["group_id"]) && $formfields["group_id"] != "") {
+    $args["group_id"]	= $formfields["group_id"];
+}
+if (isset($formfields["group_description"]) && 
+    $formfields["group_description"] != "") {
+    $args["group_description"]	= $formfields["group_description"];
+}
+if (isset($formfields["group_leader"]) && $formfields["group_leader"] != "") {
+    $args["group_leader"]	= $formfields["group_leader"];
+}
+
+$group_id = $formfields["group_id"];
+###STARTBUSY("Creating project group $group_id.");
+echo "<br>Creating project group $group_id.<br>\n";
+
+if (! ($newgroup = Group::Create($project, $uid, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+###STOPBUSY();
+
+echo "<center><h3>Done!</h3></center>\n";
 PAGEREPLACE(CreateURL("showgroup", $newgroup));
 
 #

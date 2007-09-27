@@ -45,7 +45,7 @@ if (! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
 SUBPAGESTART();
 SUBMENUSTART("Project Options");
 WRITESUBMENUBUTTON("Create Subgroup",
-		   "newgroup_form.php3?pid=$pid");
+		   "newgroup.php3?pid=$pid");
 WRITESUBMENUBUTTON("Edit User Privs",
 		   "editgroup_form.php3?pid=$pid&gid=$pid");
 WRITESUBMENUBUTTON("Remove Users",
