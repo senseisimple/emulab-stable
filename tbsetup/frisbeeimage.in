@@ -144,8 +144,17 @@ if ($debug) {
     print "$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename\n";
 }
 
+$SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
 system("$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename");
 if ($?) {
     tbdie("Error downloading image data from outer Emulab!");
 }
 exit(0);
+
+sub cleanup {
+    tbwarn("Download interrupted, $filename removed");
+    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = 'IGNORE';
+    kill('TERM', 0); 
+    unlink($filename);
+    exit(-1);
+}
