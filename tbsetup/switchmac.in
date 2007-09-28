@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -195,6 +195,9 @@ SWITCH:
 	@vlanList = ([0,0,[]]);
 	if ($switchtype eq "foundry") {
 	    $device = new snmpit_foundry($switch,$debug,$community);
+	}
+	if ($switchtype eq "nortel") {
+	    $device = new snmpit_nortel($switch,$debug,$community);
 	}
     }
 
