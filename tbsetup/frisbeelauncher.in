@@ -69,6 +69,7 @@ my $FRISBEED	= "$TB/sbin/frisbeed";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 my $FRISBEEIMAGE= "$TB/sbin/frisbeeimage";
 my $child_pid   = 0;
+my $dlfilename  = 0;
 
 my $STD_BW	= 72000000; 	# 71.6Mb/sec w/1000HZ kernel
 my $USR_BW	= 54000000;	# 53.7Mb/sec w/1000HZ kernel
@@ -122,8 +123,17 @@ if (!$killmode && !$ELABINELAB && ! -R $filename) {
 }
 
 #
+# Pick an address to use before locking the DB.  Die if unsucessful,
+# set address if sucessful.  If something goes wrong later or there is
+# already a laucher active, we will wind up wasting this address,
+# but hey, we can make more!
+#
+my $naddress = PickAddress()
+    if (!$killmode);
+
+#
 # Need to lock the tables here, so we can lock out anyone else from
-# messing with the image (and so we can pick an address atomically). 
+# messing with the image.
 #
 LockTables();
 
@@ -219,6 +229,8 @@ if ($address) {
 if ($pid) {
     my $mesg = "Inconsistent DB state. No load address but PID ($pid) set!";
 	
+    UnlockTables();
+
     SENDMAIL($TBOPS,
 	     "Frisbee Startup Failed!",
 	     "Image: $image\n".
@@ -227,28 +239,37 @@ if ($pid) {
     Fatal($mesg);
 }
 
-# Pick an address: Die if unsucessful, set address and unlock if sucessful
-$address = PickAddress();
-if (!$address) {
-    UnlockTables();
-    Fatal("Unable to find a free multicast address");
-}
-debug("Picked address $address\n");
+#
+# Ok, no process is already running for this image, we will use the new
+# address chosen earlier.
+#
+$address = $naddress;
 SetAddress($address);
 UnlockTables();
+debug("Picked address $address\n");
 
 #
 # When running inside an inner Emulab, try to get the image from the
 # outer emulab when it does not exist locally. Of course, it could still
 # be a bogus image.
 #
+# We do this before going into the background as that is what os_setup
+# expects.  Note that we set a signal handler so we can remove any partially
+# downloaded image if interrupted.  We also record our pid so that -k will
+# work in another frisbeelauncher instance.
+#
 if ($ELABINELAB && ! -e $filename) {
+    debug("Fetching image $filename ($imageid) from real boss\n");
+    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
+    SetPid($PID);
     $EUID = $UID;
+    $dlfilename = $filename;
     system("$FRISBEEIMAGE $imageid");
+    $dlfilename = 0;
+    $EUID = 0;
     if ($?) {
 	Fatal("No such image file: $filename!");
     }
-    $EUID = 0;
 }
 
 # Run in the background
@@ -262,7 +283,9 @@ if (my $childpid = TBBackGround($LOGFILE)) {
     sleep(1);
     my $foo = waitpid($childpid, &WNOHANG);
     if ($foo) {
+	LockTables();
 	ClearAddress();
+	UnlockTables();
 	Fatal("Error $? backgrounding frisbeelauncher!");
     }
     exit(0);
@@ -332,15 +355,11 @@ while (1) {
 		    if ($firsttry && ($err >> 8) == EADDRINUSE()) {
 			warn("Frisbeed bind failed for address $address, ".
 			     "picking another address\n");
-			LockTables();
 			$address = PickAddress();
-			if ($address) {
-			    SetAddress($address);
-			    UnlockTables();
-			    next;
-			}
+			LockTables();
+			SetAddress($address);
 			UnlockTables();
-			warn("Unable to find a free address to send on\n");
+			next;
 		    }
 		    SENDMAIL($TBOPS, "Frisbeed Failed!",
 			     "Image: $image\n".
@@ -396,8 +415,8 @@ sub debug($)
 # Lock the tables used in this script
 sub LockTables()
 {
-    debug("locking tables\n");
-    if ($image->LockTables("images write, emulab_indicies write") != 0) {
+    debug("Locking tables\n");
+    if ($image->LockTables("images write") != 0) {
 	Fatal("Error locking tables");
     }
 }
@@ -405,65 +424,113 @@ sub LockTables()
 # Unlock the tables used in this script
 sub UnlockTables()
 {
-    debug("Unlocking tables\n");
     $image->UnLockTables();
+    debug("Unlocked tables\n");
 }
 
-# Pick out an address to use
-sub PickAddress()
+#
+# One-time conversion function.
+# Convert overly complex frisbee_mcastaddr index into simple incremented one.
+#
+sub CreateIndex()
 {
-    my $idx;
+    my $idx = 0;
+
+    DBQueryFatal("lock tables emulab_indicies write");
+
     my $baseaddr_query =
 	DBQueryFatal("select idx from emulab_indicies ".
 		     "where name='frisbee_mcastaddr'");
-    if (! $baseaddr_query->num_rows) {
-	$idx = unpack("N", inet_aton("${BASEADDR}.1"));
-	
-	DBQueryFatal("insert into emulab_indicies (name, idx) ".
-		     "values ('frisbee_mcastaddr', $idx)");
-    }
-    else {
+    if ($baseaddr_query->num_rows) {
 	($idx) = $baseaddr_query->fetchrow_array();
-    }
-    my ($a,$b,$c,$d) = unpack('C4', pack('N', $idx));
-    # Bump to next address.
-    if (++$d >= 255) {
-	$d = 1;
-	if (++$c >= 255) {
-	    $c = 1;
-	    if (++$b >= 255) {
-		my $mesg = "No more multicast addresses!";
-		
-		SENDMAIL($TBOPS,
-			 "FrisbeeLauncher Failed!",
-			 "Image: $image\n".
-			 $mesg);
-	
-		Fatal($mesg);
-	    }
+	my $orig = unpack("N", inet_aton("${BASEADDR}.1"));
+	$idx -= $orig;
+	# absolutely anal: we didn't use 2 of every 256 addresses
+	my $tweak = int($idx / 256) * 2;
+	$idx -= $tweak;
+	if ($idx < 0 || $idx > 1000000) {
+	    $idx = 0;
 	}
     }
+    $idx++;
+
+    DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		 " values ('frisbee_index', $idx)");
+
+    DBQueryFatal("unlock tables");
+    return $idx;
+}
+
+#
+# Pick out an address to use.
+# DB tables must be *unlocked* for this to work!
+#
+sub PickAddress()
+{
+    my $idx;
+    my $index_query =
+	DBQueryFatal("update emulab_indicies set idx=LAST_INSERT_ID(idx+1) ".
+		     "where name='frisbee_index'");
+
+    if ($index_query->affectedrows <= 0) {
+	my $msg = "Doing one-time creation of frisbee_index in emulab_indicies table";
+	SENDMAIL($TBOPS,
+		 "FrisbeeLauncher Notice!",
+		 "Image: $image\n".
+		 $msg);
+
+	$idx = CreateIndex();
+    } else {
+	$idx = $index_query->insertid();
+    }
+
+    my ($a,$b,$c,$d) = split /\./, $BASEADDR;
+    $b = 1 if (!defined($b));
+    $c = 1 if (!defined($c));
+    $d = 1 if (!defined($d));
+
+    $d += $idx;
+    if ($d > 254) {
+	$c += int($d / 254);
+	$d = $d % 254 + 1;
+    }
+    if ($c > 254) {
+	$b += int($c / 254);
+	$c = $c % 254 + 1;
+    }
+    if ($b > 254) {
+	my $mesg = "No more multicast addresses!";
+
+	SENDMAIL($TBOPS,
+		 "FrisbeeLauncher Failed!",
+		 "Image: $image\n".
+		 $mesg);
+
+	Fatal($mesg);
+    }
+
     my $address = "${a}.${b}.${c}.${d}";
     my $port    = $BASEPORT + ((($c << 8) | $d) & 0x7FFF);
     
-    # Insert back into emulab_indicies for next time.
-    $idx = unpack("N", inet_aton($address));
-
-    DBQueryFatal("update emulab_indicies set idx=$idx ".
-		 "where name='frisbee_mcastaddr'");
-
     return "${address}:${port}";
 }
 
+#
 # Set the load address and busy bit.
+# Always called with tables locked.
+#
 sub SetAddress($)
 {
     my ($address) = @_;
 
     $image->Update({"load_address" => $address, "load_busy" => 1}) == 0 or
-	fatal("Could not update load address for $image");
+	Fatal("Could not update load address for $image");
 }
+
+#
 # Clear out the address (and pid) registered to this process
+# Might be called with tables locked.
+#
 sub ClearAddress()
 {
     debug("Clearing out registered load_address and pid\n");
@@ -474,37 +541,53 @@ sub ClearAddress()
 	Fatal("Could not clear load address for $image");
 }
 
-# Set the frisbee process ID.
+#
+# Set and clear the frisbee process ID.
+# Always called with tables unlocked.
+#
 sub SetPid($)
 {
     my ($pid) = @_;
 
     $image->Update({"frisbee_pid" => $pid}) == 0 or
-	fatal("Could not update load address for $image");
+	Fatal("Could not update load address for $image");
 }
 sub ClearPid()
 {
     SetPid(0);
 }
 
+#
 # Test the busy indicator, and set to zero.
+# Always called with tables locked.
+#
 sub TestBusy()
 {
     my $busy = $image->load_busy();
 
     if ($busy) {
-	$image->Update({"load_busy" => 0}) == 0 or
-	    fatal("Could not clear busy for $image");
+	if ($image->Update({"load_busy" => 0}) != 0) {
+	    UnlockTables();
+	    Fatal("Could not clear busy for $image");
+	}
     }	
     return $busy;
 }
 
+#
 # Kill off our child process, if started, and clear out registered address
 # Also, die off
-sub cleanup {
+#
+sub cleanup
+{
 	print STDERR "$$: Killed, cleaning up\n";
+	if ($dlfilename) {
+	    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = 'IGNORE';
+	    kill('TERM', 0);
+	    $dlfilename = 0;
+	}
 	if ($child_pid) {
-		kill 15, $child_pid;
+	    kill(15, $child_pid);
 	}
 	ClearAddress();
 	exit(1);
