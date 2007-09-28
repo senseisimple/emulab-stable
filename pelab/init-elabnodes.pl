@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -59,6 +59,7 @@ my $outfile;
 my $doelabaddrs = 1;
 my $remote = 0;
 my $cloudonly = 0;
+my $lanonly = 0;
 
 # Default values.  Note: delay and PLR are round trip values.
 my $DEF_BW = 10001;	# Kbits/sec
@@ -92,7 +93,7 @@ my $now     = time();
 # left are the required arguments.
 #
 my %options = ();
-if (! getopts("S:no:rCd", \%options)) {
+if (! getopts("S:no:rCLd", \%options)) {
     usage();
 }
 if (defined($options{"n"})) {
@@ -114,6 +115,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"C"})) {
     $cloudonly = 1;
+}
+if (defined($options{"L"})) {
+    $lanonly = 1;
 }
 if (defined($options{"S"})) {
     my $high = time();
@@ -310,8 +314,10 @@ if (!$showonly) {
 	write_info($outfile);
     } elsif ($cloudonly) {
 	send_cloud_events();
+    } elsif ($lanonly) {
+	send_hybrid_events(1);
     } else {
-	send_hybrid_events();
+	send_hybrid_events(0);
     }
 }
 
@@ -418,8 +424,9 @@ sub send_cloud_events()
 #    destinations.  For I1 destinations, the computation is as in #2,
 #    the max per-path value for any of them.
 #
-sub send_hybrid_events()
+sub send_hybrid_events($)
 {
+    my ($I1only) = @_;
     my %dstmap;
 
     foreach my $src (keys %shapeinfo) {
@@ -429,7 +436,8 @@ sub send_hybrid_events()
 
 	#
 	# Loop over all destinations forming I2 pipes and keeping track
-	# of the max BW to all I1 nodes.
+	# of the max BW to all I1 nodes.  If I1only is non-zero, we treat
+	# everything as I1 (i.e., shared BW to all destinations).
 	#
 	my @cmds;
 	foreach my $rec (@{$shapeinfo{$src}}) {
@@ -441,7 +449,7 @@ sub send_hybrid_events()
 	    my $dtype = $dstmap{$dst};
 
 	    my $cmd = "DEST=$dst DELAY=$del PLR=$plr";
-	    if ($stype eq "inet" || $dtype eq "inet") {
+	    if ($I1only || $stype eq "inet" || $dtype eq "inet") {
 		$gotinet = 1;
 		if ($bw != $DEF_BW && $bw > $maxbw) {
 		    $maxbw = $bw;
