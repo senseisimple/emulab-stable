@@ -248,60 +248,70 @@ my $target_name = $target_user->name();
 my $target_email = $target_user->email();
 
 # Make sure the user name has at least two tokens!
-if ($moduserinfo_args{"usr_name"} &&
+if (exists($moduserinfo_args{"usr_name"}) &&
     $moduserinfo_args{"usr_name"} !~ /\S\s+\S/) {
     UserError("FullName: Please provide a first and last name");
 }
 
-if ($moduserinfo_args{"URL"} ) {
+if (exists($moduserinfo_args{"URL"})) {
     if ($moduserinfo_args{"URL"} !~ /^http:\/\//) {
 	UserError("URL: malformed - Must begin with http://");
     }
-    if ($moduserinfo_args{"URL"} !~ /\s/) {
+    if ($moduserinfo_args{"URL"} =~ /\s/) {
 	UserError("URL: malformed - Spaces are not allowed.");
     }
 }
 
-if ($moduserinfo_args{"usr_email"}) {
+if (exists($moduserinfo_args{"usr_email"})) {
     my $temp_user = User->LookupByEmail($moduserinfo_args{"usr_email"});
     if ($temp_user && !$target_user->SameUser($temp_user)) {
 	UserError("EmailAddress: Already in use by another user!");
     }
 }
 
-my $pwd1 = $moduserinfo_args{"password1"};
-my $pwd2 = $moduserinfo_args{"password2"};
-if (($pwd1 && $pwd1 ne "") xor ($pwd2 && $pwd2 ne "")) {
-    UserError("Password: must confirm");
-}
-if ($pwd1 && $pwd2) {
-    if ($pwd1 ne $pwd2) {
-	UserError("Password: Two passwords do not match");
+my $is_pwd1 = exists($moduserinfo_args{"password1"});
+my $is_pwd2 = exists($moduserinfo_args{"password2"});
+if ($is_pwd1 || $is_pwd2) {
+    my $pwd1 = $moduserinfo_args{"password1"};
+    my $pwd2 = $moduserinfo_args{"password2"};
+    if (($is_pwd1 && $pwd1 ne "") xor ($is_pwd2 && $pwd2 ne "")) {
+	UserError("Password: must confirm");
     }
-    if ($pwd2) {
-	CheckPassword("", $target_uid, $pwd2, 
-		      $target_name, $target_email);
+    if ($is_pwd1 && $is_pwd2) {
+	if ($pwd1 ne $pwd2) {
+	    UserError("Password: Two passwords do not match");
+	}
+	if ($pwd2) {
+	    CheckPassword("", $target_uid, $pwd2, 
+			  $target_name, $target_email);
+	}
     }
 }
 
 # We often get the previous Windows password without a confirmation,
 # because it is shown in the form input field.
-my $wpwd1 = $moduserinfo_args{"w_password1"};
-my $wpwd2 = $moduserinfo_args{"w_password2"};
-if ($wpwd1 && $wpwd2) {
-    if ($wpwd2 ne "" && $wpwd1 ne $wpwd2) {
-	UserError("WindowsPassword: Two passwords do not match");
-    }
-    if ($wpwd2) {
-	CheckPassword("Windows", $target_uid, $wpwd2, 
-		      $target_name, $target_email);
+my $is_w_pwd1 = exists($moduserinfo_args{"w_password1"});
+my $is_w_pwd2 = exists($moduserinfo_args{"w_password2"});
+if ($is_pwd1 || $is_pwd2) {
+    my $w_pwd1 = $moduserinfo_args{"w_password1"};
+    my $w_pwd2 = $moduserinfo_args{"w_password2"};
+    if ($is_w_pwd1 && $is_w_pwd2) {
+	if ($w_pwd2 ne "" && $w_pwd1 ne $w_pwd2) {
+	    UserError("WindowsPassword: Two passwords do not match");
+	}
+	if ($w_pwd2) {
+	    CheckPassword("Windows", $target_uid, $w_pwd2, 
+			  $target_name, $target_email);
+	}
     }
 }
 
-my $ui = $moduserinfo_args{"user_interface"};
-if ($ui && $ui ne TBDB_USER_INTERFACE_EMULAB &&
-    $ui ne TBDB_USER_INTERFACE_PLAB) {
-    UserError("UserInterface: Invalid");
+if (exists($moduserinfo_args{"user_interface"})) {
+    my $ui = $moduserinfo_args{"user_interface"};
+    if ($ui && $ui ne TBDB_USER_INTERFACE_EMULAB &&
+	$ui ne TBDB_USER_INTERFACE_PLAB) {
+	UserError("UserInterface: Invalid");
+    }
 }
 
 exit(0)

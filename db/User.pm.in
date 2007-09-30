@@ -772,10 +772,9 @@ sub ModUserInfo($$$$)
     foreach my $col ("usr_name", "usr_title", "usr_affil", "usr_URL",
 		     "usr_addr", "usr_addr2", "usr_city", "usr_state",
 		     "usr_zip", "usr_country", "usr_phone", "usr_shell") {
-	my $arg = $argref->{$col};
-	if ($arg) {
-	    # Copy args so that others can't get through.
-	    $updates{$col} = $mods{$col} = $arg;
+	# Copy args we want so that others can't get through.
+	if (exists($argref->{$col})) {
+	    $updates{$col} = $mods{$col} = $argref->{$col};
 	}
     }
     if (keys %updates) {
@@ -806,8 +805,8 @@ sub ModUserInfo($$$$)
 		 ($wikionly ? ", *WikiOnly*" : "") . ")\n\n";
 	foreach my $line (@report) {
 	    my ($label, $field) = split /:/, $line;
-	    if (my $value = $mods{$field}) {
-		$msg .= sprintf "%-20s%s\n", $label .":", $value;
+	    if (exists($mods{$field})) {
+		$msg .= sprintf "%-20s%s\n", $label .":", $mods{$field};
 	    }
 	}
 	SENDMAIL("$target_name <$target_email>",

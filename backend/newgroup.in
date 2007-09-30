@@ -320,7 +320,7 @@ my $group_idx = $new_group->gid_idx();
 # Run the script to make the group directory, set the perms, etc.
 #
 my $cmd = "mkgroup $group_idx";
-##print $cmd;
+##print $cmd . "\n";
 my $cmd_out = `$cmd`;
 UserError("Error: " . $cmd_out)
     if ($?);
@@ -330,7 +330,7 @@ UserError("Error: " . $cmd_out)
 # 
 my $safe_id = escapeshellarg($group_id);
 my $cmd = "webmodgroups -a $group_pid:$safe_id:group_root $group_leader",
-##print $cmd;
+##print $cmd . "\n";
 $cmd_out = `$cmd`;
 UserError("Error: " . $cmd_out)
     if ($?);
