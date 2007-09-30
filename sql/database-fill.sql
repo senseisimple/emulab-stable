@@ -562,8 +562,6 @@ REPLACE INTO table_regex VALUES ('experiments','uselatestwadata','int','redirect
 REPLACE INTO table_regex VALUES ('experiments','wa_delay_solverweight','float','redirect','default:float',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_bw_solverweight','float','redirect','default:float',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_plr_solverweight','float','redirect','default:float',0,1024,NULL);
-REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
-REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
 
 REPLACE INTO table_regex VALUES ('groups','project','text','redirect','projects:pid',0,0,NULL);
@@ -718,6 +716,7 @@ REPLACE INTO table_regex VALUES ('projects','num_members','int','redirect','defa
 REPLACE INTO table_regex VALUES ('projects','num_pcs','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_pcplab','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_ron','int','redirect','default:int',0,1024,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','encap_style','text','regex','^(alias|veth|veth-ne|vlan|default)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','veth_encapsulate','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','allowfixnode','int','redirect','default:boolean',0,0,NULL);
@@ -726,14 +725,25 @@ REPLACE INTO table_regex VALUES ('experiments','delay_osname','text','redirect',
 REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','dpdb','int','redirect','default:tinyint',0,1,NULL);
+
+REPLACE INTO table_regex VALUES ('experiments','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('experiments','idle_ignore','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','swappable','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',1,255,NULL);
-REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','idleswap','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','idleswap_timeout','int','redirect','default:int',1,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','autoswap','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','autoswap_timeout','int','redirect','default:int',1,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('experiments','savedisk','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
+REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
+REPLACE INTO table_regex VALUES ('experiments','batchmode','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','linktest_level','int','redirect','default:tinyint',0,4,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_lans','protocol','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','is_accesspoint','int','redirect','default:boolean',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','linktest_level','int','redirect','default:tinyint',0,4,NULL);
-REPLACE INTO table_regex VALUES ('experiments','dpdb','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_settings','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_settings','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_settings','vname','text','redirect','virt_lans:vname',0,0,NULL);

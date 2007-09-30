@@ -1,0 +1,447 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Back-end script to change experiment info from an XML description.
+#
+sub usage()
+{
+    print("Usage: editexp [-v] <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "dv";
+my $debug   = 0;
+my $verify  = 0;	# Check data and return status only. 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+use Experiment;
+
+# Protos
+sub fatal($);
+sub UserError(;$);
+sub escapeshellarg($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and the
+# current user context is "implied" (see tbauth.php3).
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    # You don't need admin privileges to change experiment info.
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+
+    # The web interface (and in the future the xmlrpc interface) sets this.
+    $this_user = User->ImpliedUser();
+
+    if (! defined($this_user)) {
+	fatal("Cannot determine implied user!");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+#
+# XXX We should encode all of this in the DB so that we can generate the
+# forms on the fly, as well as this checking code.
+#
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("experiment"	=> ["eid",		$SLOT_REQUIRED],
+
+     # The rest are optional, so we can skip passing ones that are not changing.
+     "description"	=> ["description",	$SLOT_OPTIONAL],
+     "idle_ignore"	=> ["idle_ignore",	$SLOT_OPTIONAL],
+     "swappable"	=> ["swappable",	$SLOT_OPTIONAL],
+     "noswap_reason"	=> ["noswap_reason",	$SLOT_OPTIONAL],
+     "idleswap"		=> ["idleswap",		$SLOT_OPTIONAL],
+     "idleswap_timeout"	=> ["idleswap_timeout",	$SLOT_OPTIONAL],
+     "noidleswap_reason"=> ["noidleswap_reason",$SLOT_OPTIONAL],
+     "autoswap"		=> ["autoswap",		$SLOT_OPTIONAL],
+     "autoswap_timeout"	=> ["autoswap_timeout",	$SLOT_OPTIONAL],
+     "savedisk"		=> ["savedisk",		$SLOT_OPTIONAL],
+     "cpu_usage"	=> ["cpu_usage",	$SLOT_OPTIONAL],
+     "mem_usage"	=> ["mem_usage",	$SLOT_OPTIONAL],
+     "batchmode"	=> ["batchmode",	$SLOT_OPTIONAL],
+     "linktest_level"	=> ["linktest_level",	$SLOT_OPTIONAL]);
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+#
+# Process and dump the errors (formatted for the web interface).
+# We should probably XML format the errors instead but not sure I want
+# to go there yet.
+#
+my %errors = ();
+
+#
+# Make sure all the required arguments were provided.
+#
+foreach my $key (keys(%xmlfields)) {
+    my (undef, $required, undef) = @{$xmlfields{$key}};
+
+    $errors{$key} = "Required value not provided"
+	if ($required & $SLOT_REQUIRED  &&
+	    ! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+UserError()
+    if (keys(%errors));
+
+#
+# We build up an array of arguments to pass to Experiment->Editexp() as we check
+# the attributes.
+#
+my %editexp_args = ();
+
+foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+
+    if ($debug) {
+	print STDERR "User attribute: '$key' -> '$value'\n";
+    }
+
+    $errors{$key} = "Unknown attribute"
+	if (!exists($xmlfields{$key}));
+
+    my ($dbslot, $required, $default) = @{$xmlfields{$key}};
+
+    if ($required & $SLOT_REQUIRED) {
+	# A slot that must be provided, so do not allow a null value.
+	if (!defined($value)) {
+	    $errors{$key} = "Must provide a non-null value";
+	    next;
+	}
+    }
+    if ($required & $SLOT_OPTIONAL) {
+	# Optional slot. If value is null skip it. Might not be the correct
+	# thing to do all the time?
+	if (!defined($value)) {
+	    next
+		if (!defined($default));
+	    $value = $default;
+	}
+    }
+    if ($required & $SLOT_ADMINONLY) {
+	# Admin implies optional, but thats probably not correct approach.
+	$errors{$key} = "Administrators only"
+	    if (! $this_user->IsAdmin());
+    }
+	
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "experiments", 
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	$errors{$key} = TBFieldErrorString();
+	next;
+    }
+
+    $editexp_args{$dbslot} = $value;
+}
+UserError()
+    if (keys(%errors));
+
+#
+# Now do special checks.
+#
+my $doemail = 0;
+
+my $experiment = Experiment->Lookup($editexp_args{"eid"});
+if (!defined($experiment)) {
+    UserError("Experiment: No such experiment");
+}
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY())) {
+    UserError("Experiment: Not enough permission");
+}
+
+#
+# Description must not be blank.
+#
+if ((exists($editexp_args{"description"}) ?
+     $editexp_args{"description"} eq "" :
+     $experiment->description() eq "")) {
+    UserError("Description: Missing Field");
+}
+
+#
+# Swappable/Idle Ignore
+# Any of these which are not "1" become "0".
+#
+# Idle Ignore
+#
+if (exists($editexp_args{"idle_ignore"})) {
+    if ($editexp_args{"idle_ignore"} ne "1") {
+	$editexp_args{"idle_ignore"} = 0;
+    }
+}
+
+#
+# Swappable
+#
+if (exists($editexp_args{"swappable"})) {
+    if ($editexp_args{"swappable"} ne "1") {
+	$editexp_args{"swappable"} = 0;
+
+	# Turning off swappable, must provide justification.
+	if ((exists($editexp_args{"noswap_reason"}) ?
+	     $editexp_args{"noswap_reason"} eq "" :
+	     $experiment->noswap_reason() eq "")) {
+	    if (!$this_user->IsAdmin()) {
+		UserError("Swappable: No justification provided");
+	    }
+	    else {
+		$editexp_args{"noswap_reason"} = "ADMIN";
+	    }
+	}
+	if ($experiment->swappable()) {
+	    $doemail = 1;
+	}
+    }
+}
+if (exists($editexp_args{"noswap_reason"})) {
+    $editexp_args{"noswap_reason"} = 
+	escapeshellarg($editexp_args{"noswap_reason"});
+}
+
+#
+# IdleSwap
+#
+my $idleswaptimeout = TBGetSiteVar("idle/threshold");
+if (exists($editexp_args{"idleswap_timeout"})) {
+    if ($editexp_args{"idleswap_timeout"} <= 0 ||
+	($editexp_args{"idleswap_timeout"} > $idleswaptimeout &&
+	 !$this_user->IsAdmin())) {
+	UserError("Idleswap: Invalid time provided" .
+		  " (0 < X <= $idleswaptimeout)");
+    }
+}
+if (exists($editexp_args{"idleswap"})) {
+    if ($editexp_args{"idleswap"} ne "1") {
+	$editexp_args{"idleswap"} = 0;
+
+	# Turning off idleswap, must provide justification.
+	if ((exists($editexp_args{"noidleswap_reason"}) ?
+	     $editexp_args{"noidleswap_reason"} eq "" :
+	     $experiment->noidleswap_reason() eq "")) {
+	    if (! $this_user->IsAdmin()) {
+		UserError("IdleSwap: No justification provided");
+	    }
+	    else {
+		$editexp_args{"noidleswap_reason"} = "ADMIN";
+	    }
+	}
+	if ($experiment->idleswap()) {
+	    $doemail = 1;
+	}
+	#XXX $editexp_args{"idleswap_timeout"} = 0;
+    }
+}
+if (exists($editexp_args{"noidleswap_reason"})) {
+    $editexp_args{"noidleswap_reason"} =
+	escapeshellarg($editexp_args{"noidleswap_reason"});
+}
+
+#
+# AutoSwap
+#
+if (exists($editexp_args{"autoswap_timeout"})) {
+    if ($editexp_args{"autoswap_timeout"} <= 0) {
+	UserError("Max Duration: Invalid time provided");
+    }
+}
+if (exists($editexp_args{"autoswap"})) {
+    if ($editexp_args{"autoswap"} ne "1") {
+	$editexp_args{"autoswap"} = 0;
+	#XXX $editexp_args{"autoswap_timeout"} = 0;
+    }
+}
+
+#
+# Swapout disk state saving
+#
+if (exists($editexp_args{"savedisk"})) {
+    if ($editexp_args{"savedisk"} ne "1") {
+	$editexp_args{"savedisk"} = 0;
+    }
+}
+
+#
+# CPU Usage
+#
+if (exists($editexp_args{"cpu_usage"}) &&
+    $editexp_args{"cpu_usage"} ne "") {
+
+    if ($editexp_args{"cpu_usage"} < 0 ||
+	$editexp_args{"cpu_usage"} > 5) {
+	UserError("CPU Usage: Invalid (0 <= X <= 5)");
+    }
+}
+
+#
+# Mem Usage
+#
+if (exists($editexp_args{"mem_usage"}) &&
+    $editexp_args{"mem_usage"} ne "") {
+
+    if ($editexp_args{"mem_usage"} < 0 ||
+	$editexp_args{"mem_usage"} > 5) {
+	UserError("Mem Usage: Invalid (0 <= X <= 5)");
+    }
+}
+
+#
+# Linktest level
+#
+if (exists($editexp_args{"linktest_level"}) &&
+    $editexp_args{"linktest_level"} ne "") {
+
+    if ($editexp_args{"linktest_level"} < 0 ||
+	$editexp_args{"linktest_level"} > 4) {
+	UserError("Linktest Level: Invalid (0 <= X <= 4)");
+    }
+}
+
+exit(0)
+    if ($verify);
+
+#
+# Now safe to change experiment info.
+#
+# We pass the Experiment along as an argument to EditExp(), so remove it from
+# the argument array.
+#
+delete($editexp_args{"experiment"});
+
+my $usrerr;
+my $editexp_val = Experiment->EditExp($experiment, $this_user, $doemail,
+				      \%editexp_args, \$usrerr);
+UserError($usrerr)
+    if (defined($usrerr));
+fatal("Could not modify Experiment!")
+    if (!defined($editexp_val));
+
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    # Exit with negative status so web interface treats it as system error.
+    exit(-1);
+}
+
+sub UserError(;$)
+{
+    my ($mesg) = @_;
+
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+    }
+    print "$mesg\n"
+	if (defined($mesg));
+
+    # Exit with positive status so web interface treats it as user error.
+    exit(1);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    return $str;
+}

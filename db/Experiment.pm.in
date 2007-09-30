@@ -39,6 +39,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $PROJROOT    = "@PROJROOT_DIR@";
 my $EVENTSYS    = @EVENTSYS@;
 my $STAMPS      = @STAMPS@;
+my $TBBASE      = "@TBBASE@";
 my $TEVC	= "$TB/bin/tevc";
 my $DBCONTROL   = "$TB/sbin/opsdb_control";
 my $RSYNC	= "/usr/local/bin/rsync";
@@ -189,6 +190,7 @@ sub pid_idx($)		{ return field($_[0], 'pid_idx'); }
 sub gid_idx($)		{ return field($_[0], 'gid_idx'); }
 sub eid($)		{ return field($_[0], 'eid'); }
 sub idx($)		{ return field($_[0], 'idx'); }
+sub description($)	{ return field($_[0], 'expt_name'); }
 sub path($)		{ return field($_[0], 'path'); }
 sub state($)		{ return field($_[0], 'state'); }
 sub batchstate($)	{ return field($_[0], 'batchstate'); }
@@ -885,6 +887,194 @@ sub Update($$)
 	if (! DBQueryWarn($query));
 
     return Refresh($self);
+}
+
+#
+# Worker class method to change experiment info.
+# Assumes most argument checking was done elsewhere.
+#
+sub EditExp($$$$$$)
+{
+    my ($class, $experiment, $user, $doemail, $argref, $usrerr_ref) = @_;
+
+    my %mods;
+    my $noreport;
+    my %updates;
+
+    #
+    # Converting the batchmode is tricky, but we can let the DB take care
+    # of it by requiring that the experiment not be locked, and it be in
+    # the swapped state. If the query fails, we know that the experiment
+    # was in transition.
+    #
+	
+    if (!exists($argref->{"batchmode"})) {
+	$argref->{"batchmode"} = 0;
+    }
+    if ($experiment->batchmode() != $argref->{"batchmode"}) {
+	my $success  = 0;
+
+	my $batchmode;
+	if ($argref->{"batchmode"} ne "1") {
+	    $batchmode = 0;
+	    $argref->{"batchmode"} = 0;
+	}
+	else {
+	    $batchmode = 1;
+	    $argref->{"batchmode"} = 1;
+	}
+
+	if ($experiment->SetBatchMode($batchmode) != 0) {
+	    $$usrerr_ref = "Batch Mode: Experiment is running or in transition; ".
+		"try again later";
+	    return undef;
+	}
+	$mods{"batchmode"} = $batchmode;
+    }
+
+    #
+    # Now update the rest of the information in the DB.
+    #
+
+    # Name change for experiment description.
+    if (exists($argref->{"description"})) {
+	$updates{"expt_name"} = ($mods{"description"} = $argref->{"description"});
+    }
+
+    # Note that timeouts are in hours in the UI, but in minutes in the DB. 
+    if (exists($argref->{"idleswap_timeout"})) {
+	$updates{"idleswap_timeout"} = 60 * 
+	    ($mods{"idleswap_timeout"} = $argref->{"idleswap_timeout"});
+    }
+    if (exists($argref->{"autoswap_timeout"})) {
+	$updates{"autoswap_timeout"} = 60 * 
+	    ($mods{"autoswap_timeout"} = $argref->{"autoswap_timeout"});
+    }
+
+    foreach my $col ("idle_ignore", "swappable", "noswap_reason",
+		     "idleswap", "noidleswap_reason", "autoswap", "savedisk",
+		     "cpu_usage", "mem_usage", "linktest_level") {
+	# Copy args we want so that others can't get through.
+	if (exists($argref->{$col})) {
+	    $updates{$col} = $mods{$col} = $argref->{$col};
+	}
+    }
+
+    # Save state before change for the email message below.
+    my $olds = ($experiment->swappable() ? "Yes" : "No");
+    my $oldsr= $experiment->noswap_reason();
+    my $oldi = ($experiment->idleswap() ? "Yes" : "No");
+    my $oldit= $experiment->idleswap_timeout() / 60.0;
+    my $oldir= $experiment->noidleswap_reason();
+    my $olda = ($experiment->autoswap() ? "Yes" : "No");
+    my $oldat= $experiment->autoswap_timeout() / 60.0;
+
+    if (keys %updates) {
+	if ($experiment->Update(\%updates)) {
+	    return undef;
+	}
+    }
+
+    my $creator = $experiment->creator();
+    my $swapper = $experiment->swapper();
+    my $uid = $user->uid();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    if (!keys %mods) {
+	if (!$noreport) {
+	    # Warn the user that the submit button was pressed with no effect.
+	    $$usrerr_ref = "Submit: Nothing changed";
+	    return undef;
+	}
+    }
+    # Do not send this email if the user is an administrator
+    # (adminmode does not matter), and is changing an expt he created
+    # or swapped in. Pointless email.
+    elsif ( $doemail &&
+	     ! ($user->admin() &&
+		($uid eq $creator || $uid eq $swapper)) ) {
+
+	# Send an audit e-mail reporting what is being changed.
+	my $target_creator = $experiment->GetCreator();
+	my $target_swapper = $experiment->GetSwapper();
+
+	my $user_name  = $user->name();
+	my $user_email = $user->email();
+	my $cname      = $target_creator->name();
+	my $cemail     = $target_creator->email();
+	my $sname      = $target_swapper->name();
+	my $semail     = $target_swapper->email();
+
+	my $s    = ($experiment->swappable() ? "Yes" : "No");
+	my $sr   = $experiment->noswap_reason();
+	my $i    = ($experiment->idleswap() ? "Yes" : "No");
+	my $it   = $experiment->idleswap_timeout() / 60.0;
+	my $ir   = $experiment->noidleswap_reason();
+	my $a    = ($experiment->autoswap() ? "Yes" : "No");
+	my $at   = $experiment->autoswap_timeout() / 60.0;
+
+	my $msg = "\n".
+	    "The swap settings for $pid/$eid have changed\n".
+	    "\nThe old settings were:\n".
+	    "Swappable:\t$olds\t($oldsr)\n".
+	    "Idleswap:\t$oldi\t(after $oldit hrs)\t($oldir)\n".
+	    "MaxDuration:\t$olda\t(after $oldat hrs)\n".
+	    "\nThe new settings are:\n".
+	    "Swappable:\t$s\t($sr)\n".
+	    "Idleswap:\t$i\t(after $it hrs)\t($ir)\n".
+	    "MaxDuration:\t$a\t(after $at hrs)\n".
+	    "\nCreator:\t$creator ($cname <$cemail>)\n".
+	    "Swapper:\t$swapper ($sname <$semail>)\n".
+            "\nDifferences were:\n";
+	my @report = 
+	    ("Description:description", "Idle Ignore:idle_ignore",
+	     "Swappable:swappable", "Noswap Reason:noswap_reason",
+	     "Idleswap:idleswap", "Idleswap Timeout:idleswap_timeout",
+	     "Noidleswap Reason:noidleswap_reason", "Autoswap:autoswap",
+	     "Autoswap timeout:autoswap_timeout", "Savedisk:savedisk",
+	     "Cpu Usage:cpu_usage", "Mem Usage:mem_usage",
+	     "Batch Mode:batchmode", "Linktest Level:linktest_level");
+	foreach my $line (@report) {
+	    my ($label, $field) = split /:/, $line;
+	    if (exists($mods{$field})) {
+		$msg .= sprintf "%-20s%s\n", $label .":", $mods{$field};
+	    }
+	}
+	$msg .= "\n".
+	   "\nIf it is necessary to change these settings, ".
+	   "please reply to this message \nto notify the user, ".
+	   "then change the settings here:\n\n".
+	   "$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n".
+	   "Thanks,\nTestbed WWW\n";
+
+	SENDMAIL("$user_name <$user_email>",
+		 "$pid/$eid swap settings changed",
+		 $msg, TBMAIL_OPS(), sprintf("Bcc: %s\nErrors-To:%s", 
+					     TBMAIL_AUDIT(), TBMAIL_WWW()));
+    }
+    return 1;
+}
+
+sub SetBatchMode($$) {
+    my ($self, $mode) = @_;
+
+    my $reqstate = EXPTSTATE_SWAPPED();
+    my $idx      = $self->idx();
+    $mode        = ($mode ? 1 : 0);
+
+    DBQueryFatal("lock tables experiments write");
+
+    my $query_result =
+	DBQueryFatal("update experiments set ".
+		     "   batchmode=$mode ".
+		     "where idx='$idx' and ".
+		     "     expt_locked is NULL and state='$reqstate'");
+
+    my $success = $query_result->numrows;    # XXX Was DBAffectedRows().
+    dbqueryfatal("unlock tables");
+
+    return ($success ? 0 : -1);
 }
 
 #
