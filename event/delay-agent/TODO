@@ -51,3 +51,84 @@ Goals:
  * Save current state so that it can be reestablished following a crash.
    This may be more complicated in the proxy case (who saves state, where
    is it saved, etc).
+
+API:
+
+At this point I am leaning toward having the API object be an abstract
+"pipe" rather than just the link; i.e., a lower-level interface than
+mentioned above.  Here the delay agent will be responsible for mapping
+link objects and sets of parameters into pipe objects.  This frees the
+client from needing to know what sets of parameters imply per-flow pipes
+vs. per-hostpair pipes vs. just plain pipes.  It does complicate the API
+with the need for a pipe creation call with src/dst interfaces, src/dst
+IPs, direction, etc.
+
+The abstract pipe will probably look a lot like a dummynet pipe, but in
+theory it is just a one-way path with the attributes: bandwidth, delay,
+packet loss, and queuing.
+
+It is thus up to the delay-agent to decide how many pipes are setup to
+implement the various per-foo pipes.
+
+Commands are of the form "delayclient <pipename> <command>" where command
+is one of:
+
+1. create <iface> <dir> <proto> <src-list> <dst-list> [<src-port> <dst-port>]
+
+   Create a path moving traffic from a set or sources to a set of
+   destinations in the direction indicated via the specified interface.
+   <iface>:	MAC address of the interface to use for traffic,
+   <dir>:	whether traffic will be coming in ("in"), going out ("out")
+		or both ("*") on the indicated interface,
+   <proto>:	protocol of traffic and address lists: "tcp", "udp", "ip",
+		"eth" or "*".
+   <src-list>:	one or more comma-separated IP (proto={tcp,udp,ip}) or
+		MAC (proto=eth) addresses, or "*" (proto=*) from which
+		traffic will be sourced.
+   <dst-list>:	one or more comma-separated IP (proto={tcp,udp,ip}) or
+		MAC (proto=eth) addresses, or "*" (proto=*) for which
+		traffic is destined.
+   <src-port>:	optional source port for per-flow pipes (proto={tcp,udp})
+   <dst-port>:	optional destination port for per-flow pipes (proto={tcp,udp})
+   "Returns" (prints?) an identifier for the pipe created.
+
+   Examples:
+
+   Standard duplex-link from n1 to n2:
+     create <if0-MAC> in * * *	# ipfw: all from any to any in recv if0
+     create <if1-MAC> in * * *	# ipfw: all from any to any in recv if1
+
+   Flexlab per-pair pipe from n1 to n2 (one pipe BW, one pipe delay/plr):
+     create <if0-MAC> in * * n2	# ipfw: all from any to 10.0.0.2 in recv if0
+     create <if0-MAC> in * * n2	# ipfw: all from any to 10.0.0.2 in recv if0
+
+   Flexlab per-flow pipe:
+     create <if0-MAC> in tcp n1 n2 1111 80 # ipfw: tcp from \
+					   #   10.0.0.1 src-port 1111 to \
+					   #   10.0.0.2 dst-port 80 in recv if0
+
+   Flexlab shared-destination BW pipe:
+     create <if0-MAC> in * * n2,n3,n4 # ipfw: all from any to \
+				      #   10.0.0.2,10.0.0.3,10.0.0.4 \
+				      #   in recv if0
+
+   Flexlab shared-source BW pipe:
+     create <if1-MAC> in * n2,n3,n4 * # ipfw: all from \
+				      #   10.0.0.2,10.0.0.3,10.0.0.4 \
+				      #   to any in recv if1
+
+2. setparams <pipe> <shaping-params>
+
+   Set the shaping characteristics on the indicated pipe.
+   <shaping-params> can be either "saved" meaning to restore them from
+   the last point at which they were changed (i.e., at the time of a crash)
+   or one or more of:
+   bw=<bw>:	set the bandwidth to the indicated value
+   del=<del>:	set the delay to the indicated value
+   plr=<plr>:	set the packet loss rate to the indicated value
+   queue=<stuff>: set the queuing parameters to the indicated stuff (TBD).
+
+3. getparams <pipe>
+   "Returns" the current settings for the indicated pipe in a key=value
+   format that can be later fed back to setparams.
+
