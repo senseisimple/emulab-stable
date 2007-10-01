@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -51,62 +51,17 @@ A. Things to understand up front:
    - GNU make.  On Linux it is the standard make.  On FreeBSD, you must
      install the port: /usr/ports/devel/gmake.
 
-   - Python.  Needs to be Python 2.3 right now.  For FreeBSD, go to
-     /usr/ports/lang/python23 and do a "make install".
+   - Python.  Python 2.4 is what we use right now.  For FreeBSD, go to
+     /usr/ports/lang/python24 and do a "make install".
 
-   - Elvin headers and libraries.  Check for the existence of "libvin4.a"
-     in your library path (probably in /usr/local/lib).  If it doesn't
-     exist, you will need to download (wget or fetch):
+   - Utah's pubsub headers and libraries.  Grab the source tarball from:
 
-       http://www.emulab.net/downloads/libelvin-4.0.3.tar.gz
-       http://www.emulab.net/downloads/libelvin-4.0.3.patch
+       http://www.emulab.net/downloads/pubsub-0.8.tar.gz
 
-     unpack the tarball and patch it:
+     unpack it and do:
 
-       tar xzf libelvin-4.0.3.tar.gz
-       patch -p0 < libelvin-4.0.3.patch
-
-     then build, and install it.  For FreeBSD:
-       cd libelvin-4.0.3
-       ./configure --enable-threads
-       make
-       sudo make install
-     for Linux, at least RedHat 9:
-       export CFLAGS="-g -O2 -fno-strict-aliasing"
-       export CPPFLAGS="`/usr/kerberos/bin/krb5-config --cflags`"
-       export LIBS="`/usr/kerberos/bin/krb5-config --libs`"
-       ./configure
-       gmake
-       gmake install
-       unset CFLAGS CPPFLAGS LIBS
-
-     Note that this is an older version of elvin, so you cannot just install
-     a package or RPM.
-
-   - Elvin daemon.  Due to changes in the event system, we now use a node
-     local elvind.  If you didn't have libelvin above installed, you won't
-     have elvind, so download:
-
-       http://www.emulab.net/downloads/elvind-4.0.3.tar.gz
-       http://www.emulab.net/downloads/elvind-4.0.3.patch
-
-     unpack the tarball and patch it:
-
-       tar xzf elvind-4.0.3.tar.gz
-       patch -p0 < elvind-4.0.3.patch
-
-     then build, and install it.  For FreeBSD:
-       cd elvind-4.0.3
-       ./configure
-       make
-       sudo make install
-     for Linux:
-       ./configure
-       gmake
-       gmake install
-
-     Note that no special environment variables are needed for Linux and
-     elvind as were needed for libelvin.
+       gmake ELVIN_COMPAT= client
+       sudo gmake ELVIN_COMPAT= install-client
 
    - Boost headers.  Check for the boost directory in the include directory
      path (probably in /usr/local/include or even /usr/include).
