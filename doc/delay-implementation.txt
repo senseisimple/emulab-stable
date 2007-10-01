@@ -687,6 +687,11 @@ interfaces.  The result looks something like:
     ipfw add <rpipe> pipe <rpipe> ip from any to any in recv <if>
     ipfw pipe <rpipe> config delay <del>ms bw <bw>Kbit/s plr 0 queue 5
 
+3c. Endnode shaping on Linux.
+
+Endnode shaping is currently only implemented in Redhat Linux 9 (aka, the
+2.4 kernel) since it involves a local modification to tc ("traffic control").
+
 
 4. Dynamic shaping with the delay-agent.
 
