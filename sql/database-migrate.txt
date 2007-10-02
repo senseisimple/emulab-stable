@@ -4147,7 +4147,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table experiment_resources add 
            `input_data_idx` int(10) unsigned default NULL after archive_tag;
-
+	alter table experiment_resources add
+	    KEY `inputdata` (`input_data_idx`);
 
 	And then run this script:
 
