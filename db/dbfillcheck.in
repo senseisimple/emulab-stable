@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -75,6 +75,6 @@ if (!$?) {
 print "*** Your installed database is out of date with $dbfill\n";
 print "    To bring it up to date, run: \n";
 print "    mysqldump tbdb > tbdb.backup\n";
-print "    mysql tbdb < $dbfill\n";
+print "    (cd db; mysql tbdb < $master_fill)\n";
 unlink($tempdifffile);
 exit(1);
