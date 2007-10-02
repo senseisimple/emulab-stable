@@ -632,6 +632,15 @@ loopback "shortcut" on delay as the bridges between <if0>/<if1> and
     which ports and are confused by the same MAC appearing on
     different ports.
 
+3a0. Linux dedicated delay nodes.
+
+There exists a beta implementation of dedicated delays for linux.  It supports
+the same queue param set as FreeBSD's dummynet pipes (including RED/GRED queue
+params).  Essentially, it is our linkdelay support for linux (see Section 3c)
+with the addition of bridges.  The main difference once bridges are added is
+that you hook the queueing disciplines directly to the bridge and (at least
+as of 2.6) you no longer need IMQ support to handle ingress queueing.
+
 3b. Endnode shaping
 
 The DB state is returned in the tmcd "linkdelay" command and is a series of
@@ -690,8 +699,51 @@ interfaces.  The result looks something like:
 3c. Endnode shaping on Linux.
 
 Endnode shaping is currently only implemented in Redhat Linux 9 (aka, the
-2.4 kernel) since it involves a local modification to tc ("traffic control").
+2.4 kernel) since it involves a local modification to tc ("traffic control")
+and two packet schedulers (that implement delay and plr) in the kernel (NOTE:
+these have since been ported to 2.6 kernels).
 
+As described in Section 3b, we use the same information from the LINKDELAY tmcd
+command to setup traffic shaping on links.  On linux, we use tc (one of the
+iproute2 utils) to do the traffic shaping and iptables (with IMQ patches) to
+do some funky forwarding.  tc is the userspace interface to the packet
+schedulers in the kernel, which implement things like token bucket filters for
+rate limiting, or plr and delay (tc calls these things "queueing
+disciplines").  Instead of sending the packet directly to an interface, the
+kernel pushes it to any queueing disciplines setup for the interface (by
+default, each interface gets a pfifo buffer).  qdiscs can be chained, and some
+can be classful (meaning you can tag packets in iptables as belonging to a
+class, and the per-class rules in the qdisc get applied).  We only make use of
+the chaining aspect.  We add qdiscs to an interface in the following order:
+PLR, delay, and rate limit.  Note that linux endnode shaping does not presently
+support RED/GRED queue params, although it easily could as of 2.6 kernels.
+
+However, since the linux kernel network stack did not support ingress queueing
+disciplines, we used the IMQ (intermediate queue) patches for the kernel and
+iptables so that we could handle ingress queueing for the duplex case.  The IMQ
+patches create imqX devices.  With iptables, you siphon off all incoming
+traffic on an interface to an imq device, then set the imq device's "target" to
+a real interface.  Then, of course, we can attach qdiscs to the imq device to
+handle ingress packet scheduling.
+
+The commands to setup endnode shaping are written by
+/usr/local/etc/emulab/delaysetup to /var/emulab/boot/rc.linkdelay.  The key
+commands look something like the following:
+
+    ifconfig <if> txqueuelen <slots>
+    tc qdisc add dev <if> handle <pipeno> root plr <plr>
+    tc qdisc add dev <if> handle <pipeno+q_i*10> parent <pipeno+(q_i-1)*10>:1 \
+        delay usecs <delay>
+    tc qdisc add dev <if> handle <pipeno+q_i*10> parent <pipeno+(q_i-1)*10>:1 \
+        htb default 1
+    tc class add dev <if> classid <pipeno+q_i*10> \ 
+        parent <pipeno+(q_i-1)*10>:1 htb rate <bw> ceil <bw>
+
+    (if the link is duplex, there are similar rules for the imq device that is
+     interposed for ingress queueing; the iptables command to do this shuffle
+     looks like:
+
+    iptables -t mangle -A PREROUTING -i <if> -j IMQ --todev <imqno>   ).
 
 4. Dynamic shaping with the delay-agent.
 
