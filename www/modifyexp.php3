@@ -109,7 +109,7 @@ if (! isset($go)) {
     echo "<tr><th><em>or</em> NS file on server: </th> ";
     echo "<td><input type=text name=\"exp_localnsfile\" size=40
                      onchange=\"this.form.syntax.disabled=(this.value=='')\" />
-          </td</tr>\n";
+          </td></tr>\n";
     
     echo "<tr><td colspan=2><b><em>or</em> Edit:</b><br>\n";
     echo "<textarea cols='100' rows='40' name='nsdata'
