@@ -788,8 +788,16 @@ REPLACE INTO table_regex VALUES ('virt_nodes','plab_role','text','regex','^(plc|
 REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_singlenet','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',0,45,NULL);
+
+REPLACE INTO table_regex VALUES ('images','imageid','text','redirect','default:int',0,100000000,NULL);
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
+REPLACE INTO table_regex VALUES ('images','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('images','path','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('images','mtype','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','load_address','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','frisbee_pid','text','redirect','default:int',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','pid','text','redirect','projects:pid',0,0,NULL);

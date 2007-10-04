@@ -115,6 +115,75 @@ class Image
     }
 
     #
+    # Class function to edit image descriptor.
+    #
+    function EditImageid($image, $args, &$errors) {
+	global $suexec_output, $suexec_output_array;
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "editimageid");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+
+	# Add these. Maybe caller should do this?
+	$args["imageid"] = $image->imageid();
+
+	fwrite($fp, "<image>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</image>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	$retval = SUEXEC("nobody", "nobody", "webeditimageid $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$errors[] = "Transient error; please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		# unlink($xmlname);
+		if (count($suexec_output_array)) {
+		    for ($i = 0; $i < count($suexec_output_array); $i++) {
+			$line = $suexec_output_array[$i];
+			if (preg_match("/^([-\w]+):\s*(.*)$/",
+				       $line, $matches)) {
+			    $errors[$matches[1]] = $matches[2];
+			}
+			else
+			    $errors[] = $line;
+		    }
+		}
+		else
+		    $errors[] = "Transient error; please try again later.";
+	    }
+	    return null;
+	}
+
+	# There are no return value(s) to parse at the end of the output.
+
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then create the image by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return true;
+    }
+
+    #
     # Equality test.
     #
     function SameImage($image) {

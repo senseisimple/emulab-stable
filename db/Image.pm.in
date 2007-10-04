@@ -165,6 +165,116 @@ sub Refresh($)
 }
 
 #
+# Worker class method to edit image descriptor.
+# Assumes most argument checking was done elsewhere.
+#
+sub EditImageid($$$$)
+{
+    my ($class, $image, $argref, $usrerr_ref) = @_;
+
+    my %mods;
+    my $noreport;
+
+    my $imageid = $image->imageid();
+
+    #
+    # Now update the rest of the information in the DB.
+    # (Others above already did their own updates.)
+    #
+    my %updates;
+    foreach my $col ("description", "path", "load_address", "frisbee_pid" ) {
+	# Copy args we want so that others can't get through.
+	if (exists($argref->{$col})) {
+	    $updates{$col} = $mods{$col} = $argref->{$col};
+	}
+    }
+    # See mtype_$type args below.
+
+    #
+    # Need a list of node types. We join this over the nodes table so that
+    # we get a list of just the nodes that are currently in the testbed, not
+    # just in the node_types table.
+    #
+    my $types_result =
+	DBQueryFatal("select distinct n.type from nodes as n ".
+		     "left join node_type_attributes as a on a.type=n.type ".
+		     "where a.attrkey='imageable' and ".
+		     "      a.attrvalue!='0'");
+    my @mtypes_array;
+    my @map_updates;
+    my $redo_map = 0;
+    while (my ($type) = $types_result->fetchrow_array()) {
+	push(@mtypes_array, $type);
+
+	# Remember when we get one of the mtype_$type args.  These aren't DB
+	# columns to update, but instead control re-creating the rows in the
+	# osidtoimageid table for this imageid, below.
+	my $mtype = "mtype_$type";
+	if (exists($argref->{$mtype})) {
+	    my $value = $argref->{$mtype};
+	    ##printf "argref->{$mtype} %s\n", $value;
+	    $mods{$mtype} = $value;
+	    if ($value eq "1") {
+		push(@map_updates, $type);
+		$redo_map = 1;
+	    }
+	}
+    }
+
+    if (!keys %mods) {
+	if (!$noreport) {
+	    # Warn the user that the submit button was pressed with no effect.
+	    $$usrerr_ref = "Submit: Nothing changed";
+	    return undef;
+	}
+    }
+
+    if (keys %updates || $redo_map) {
+	DBQueryFatal("lock tables images write, os_info write, ".
+		     "osidtoimageid write");
+    }
+    if (keys %updates) {
+	if ($image->Update(\%updates)) {
+	    $$usrerr_ref = "DB: Error updating the images table";
+	    DBQueryFatal("unlock tables");
+	    return undef;
+	}
+    }
+    if ($redo_map) {
+	#
+	# Update the osidtoimageid table too.
+	# 
+	# Must delete old entries first.
+	DBQueryFatal("delete from osidtoimageid ".
+		     "where imageid='$imageid'");
+
+	my @osid_array;
+	for (my $i = 1; $i <= 4; $i++) {
+	    my $foo = $image->field("part${i}_osid");
+	    if (defined($foo)) {
+		push(@osid_array, $foo);
+	    }
+	}
+	for (my $i = 0; $i <= $#map_updates; $i++) {
+	    for (my $j = 0; $j <= $#osid_array; $j++) {
+		 my $query = "REPLACE INTO osidtoimageid ".
+			     "       (osid, type, imageid) ".
+			     "VALUES ('$osid_array[$j]', ".
+			     "        '$map_updates[$i]', ".
+			     "        '$imageid')";
+		 ##print "$query\n";
+		 DBQueryFatal($query);
+	    }
+	}
+    }
+    if (keys %updates || $redo_map) {
+	DBQueryFatal("unlock tables");
+    }
+
+    return 1;
+}
+
+#
 # Stringify for output.
 #
 sub Stringify($)

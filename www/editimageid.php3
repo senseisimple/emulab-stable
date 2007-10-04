@@ -15,7 +15,7 @@ include_once("osinfo_defs.php");
 PAGEHEADER("Edit Image Descriptor");
 
 #
-# Only known and logged in users!
+# Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
@@ -50,11 +50,11 @@ $types_result =
 		 "      a.attrvalue!='0'");
 
 #
-# Spit the form out using the array of data. 
-# 
+# Spit the form out using the array of data.
+#
 function SPITFORM($image, $formfields, $errors)
 {
-    global $uid, $isadmin, $types_result;
+    global $uid, $isadmin, $types_result, $defaults;
     global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
     
     if ($errors) {
@@ -84,14 +84,14 @@ function SPITFORM($image, $formfields, $errors)
     $url = CreateURL("editimageid", $image);
     echo "<br>
           <table align=center border=1> 
-          <form action='$url' method=post name=idform>\n";
+          <form action='$url' method=post>\n";
 
     #
     # Imagename
     #
     echo "<tr>
               <td>ImageID:</td>
-              <td class=left>" . $formfields["imagename"] . "</td>
+              <td class=left>" . $defaults["imagename"] . "</td>
           </tr>\n";
 
     #
@@ -99,7 +99,7 @@ function SPITFORM($image, $formfields, $errors)
     #
     echo "<tr>
               <td>Project:</td>
-              <td class=left>" . $formfields["pid"] . "</td>
+              <td class=left>" . $defaults["pid"] . "</td>
           </tr>\n";
 
     #
@@ -107,7 +107,7 @@ function SPITFORM($image, $formfields, $errors)
     # 
     echo "<tr>
               <td>Group:</td>
-              <td class=left>" . $formfields["gid"] . "</td>
+              <td class=left>" . $defaults["gid"] . "</td>
           </tr>\n";
 
     #
@@ -115,7 +115,7 @@ function SPITFORM($image, $formfields, $errors)
     #
     echo "<tr>
               <td>Descriptor Name:</td>
-              <td class=left>" . $formfields["imagename"] . "</td>
+              <td class=left>" . $defaults["imagename"] . "</td>
           </tr>\n";
 
     #
@@ -136,7 +136,7 @@ function SPITFORM($image, $formfields, $errors)
     #
     echo "<tr>
               <td>Load Partition:</td>
-              <td class=left>" . $formfields["loadpart"] . "</td>
+              <td class=left>" . $defaults["loadpart"] . "</td>
           </tr>\n";
 
     #
@@ -144,14 +144,14 @@ function SPITFORM($image, $formfields, $errors)
     #
     echo "<tr>
               <td>Load Partition:</td>
-              <td class=left>" . $formfields["loadlength"] . "</td>
+              <td class=left>" . $defaults["loadlength"] . "</td>
           </tr>\n";
 
     echo "<tr>
              <td>Partition 1 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields["part1_osid"]))
-	SpitOSIDLink($formfields["part1_osid"]);
+    if (isset($defaults["part1_osid"]))
+	SpitOSIDLink($defaults["part1_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -160,8 +160,8 @@ function SPITFORM($image, $formfields, $errors)
     echo "<tr>
              <td>Partition 2 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields["part2_osid"]))
-	SpitOSIDLink($formfields["part2_osid"]);
+    if (isset($defaults["part2_osid"]))
+	SpitOSIDLink($defaults["part2_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -170,8 +170,8 @@ function SPITFORM($image, $formfields, $errors)
     echo "<tr>
              <td>Partition 3 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields["part3_osid"]))
-	SpitOSIDLink($formfields["part3_osid"]);
+    if (isset($defaults["part3_osid"]))
+	SpitOSIDLink($defaults["part3_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -180,8 +180,8 @@ function SPITFORM($image, $formfields, $errors)
     echo "<tr>
              <td>Partition 4 OS: </td>
              <td class=\"left\">";
-    if (isset($formfields["part4_osid"]))
-	SpitOSIDLink($formfields["part4_osid"]);
+    if (isset($defaults["part4_osid"]))
+	SpitOSIDLink($defaults["part4_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -190,8 +190,8 @@ function SPITFORM($image, $formfields, $errors)
     echo "<tr>
              <td>Boot OS: </td>
              <td class=\"left\">";
-    if (isset($formfields["default_osid"]))
-	SpitOSIDLink($formfields["default_osid"]);
+    if (isset($defaults["default_osid"]))
+	SpitOSIDLink($defaults["default_osid"]);
     else
 	echo "No OS";
     echo "   </td>
@@ -240,7 +240,7 @@ function SPITFORM($image, $formfields, $errors)
     #
     echo "<tr>
   	      <td>Shared?:</td>
-              <td class=left>". ($formfields["shared"] ? "Yes" : "No") . "</td>
+              <td class=left>". ($defaults["shared"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
     #
@@ -248,7 +248,7 @@ function SPITFORM($image, $formfields, $errors)
     #
     echo "<tr>
   	      <td>Global?:</td>
-              <td class=left>". ($formfields["global"] ? "Yes" : "No") . "</td>
+              <td class=left>". ($defaults["global"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
     echo "<tr>
@@ -262,7 +262,7 @@ function SPITFORM($image, $formfields, $errors)
 	               size=20 maxlength=256>";
     }
     else {
-	echo $formfields["load_address"];
+	echo $defaults["load_address"];
     }
     echo "  </td>
           </tr>\n";
@@ -278,7 +278,7 @@ function SPITFORM($image, $formfields, $errors)
 	               size=6 maxlength=10>";
     }
     else {
-	echo $formfields["frisbee_pid"];
+	echo $defaults["frisbee_pid"];
     }
     echo "  </td>
           </tr>\n";
@@ -315,46 +315,15 @@ if (! isset($submit)) {
 #
 $errors     = array();
 $updates    = array();
-$osid_array = array();
 
-if (!isset($formfields["description"]) ||
-    strcmp($formfields["description"], "") == 0) {
-    $errors["Description"] = "Missing Field";
-}
-elseif (! TBvalid_description($formfields["description"])) {
-    $errors["Description"] = TBFieldErrorString();
-}
-else {
-    $updates[] = "description='" . addslashes($formfields["description"]) . "'";
-}
-
-if (!isset($formfields["path"]) ||
-    strcmp($formfields["path"], "") == 0) {
-    $errors["Path"] = "Missing Field";
-}
-elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields["path"])) {
-    $errors["Path"] = "Contains invalid characters";
-}
-elseif ($isadmin) {
-    $updates[] = "path='" . $formfields["path"] . "'";
-}    
-else {
-    $pdef    = "";
-    $shared = $defaults["shared"];
-    $pid    = $defaults["pid"];
-    $gid    = $defaults["gid"];
-	
-    if (!$shared && strcmp($gid, $pid)) {
-	$pdef = "$TBGROUP_DIR/" . $pid . "/" . $gid . "/";
-    }
-    else {
-	$pdef = "$TBPROJ_DIR/" . $pid . "/";
-    }
-
-    if (strpos($formfields["path"], $pdef) === false) {
-	$errors["Path"] = "Must reside in $pdef";
-    }
-    $updates[] = "path='" . $formfields["path"] . "'";
+#
+# If any errors, respit the form with the current values and the
+# error messages displayed. Iterate until happy.
+# 
+if (count($errors)) {
+    SPITFORM($image, $formfields, $errors);
+    PAGEFOOTER();
+    return;
 }
 
 #
@@ -362,7 +331,7 @@ else {
 # Store the valid types in a new array for simplicity.
 #
 $mtypes_array = array();
-
+mysql_data_seek($types_result, 0);
 while ($row = mysql_fetch_array($types_result)) {
     $type = $row["type"];
 
@@ -378,43 +347,44 @@ if (! count($mtypes_array)) {
     $errors["Node Types"] = "Must select at least one type";
 }
 
+
 #
-# Only admins can edit the load_address or the frisbee pid.
-# 
-if ($isadmin) {
-    if (isset($formfields["load_address"]) &&
-	$formfields["load_address"] != "") {
-	$foo = addslashes($formfields["load_address"]);
+# Build up argument array to pass along.
+#
+$args = array();
 
-	if (strcmp($formfields["load_address"], $foo)) {
-	    $errors["Load Address"] = "Contains	illegal characters!";
-	}
-	$updates[] = "load_address='$foo'";
-    }
-    else {
-	$updates[] = "load_address=NULL";
-    }
+# Notice that {part*,default}_osid are not editable inputs on this form.
 
-    if (isset($formfields["frisbee_pid"]) &&
-	$formfields["frisbee_pid"] != "") {
-	if (! TBvalid_integer($formfields["frisbee_pid"])) {
-	    $errors["Frisbee PID"] = "Must must be a valid integer!";
-	}
-	$updates[] = "frisbee_pid='" . $formfields["frisbee_pid"] . "'";
-    }
-    else {
-	$updates[] = "frisbee_pid=NULL";
+# Skip passing ones that are not changing from the default (DB state.)
+if (isset($formfields["description"]) && $formfields["description"] != "" &&
+    ($formfields["description"] != $image->description())) {
+    $args["description"] = $formfields["description"];
+}
+
+if (isset($formfields["path"]) && $formfields["path"] != "" &&
+    ($formfields["path"] != $image->path())) {
+    $args["path"] = $formfields["path"];
+}
+
+# The mtype_* checkboxes are dynamically generated.
+foreach ($mtypes_array as $type) {
+
+    # Filter booleans from checkbox values, send if different.
+    $checked = isset($formfields["mtype_$type"]) &&
+	strcmp($formfields["mtype_$type"], "Yep") == 0;
+    if ($checked != array_search("mtype_$type", $mtypes_array)) {
+	$args["mtype_$type"] = $checked ? "1" : "0";
     }
 }
 
-#
-# If any errors, respit the form with the current values and the
-# error messages displayed. Iterate until happy.
-# 
-if (count($errors)) {
-    SPITFORM($image, $formfields, $errors);
-    PAGEFOOTER();
-    return;
+if (isset($formfields["load_address"]) && $formfields["load_address"] != "" &&
+    ($formfields["load_address"] != $image->load_address())) {
+    $args["load_address"] = $formfields["load_address"];
+}
+
+if (isset($formfields["frisbee_pid"]) && $formfields["frisbee_pid"] != "" &&
+    ($formfields["frisbee_pid"] != $image->frisbee_pid())) {
+    $args["frisbee_pid"] = $formfields["frisbee_pid"];
 }
 
 #
@@ -422,10 +392,16 @@ if (count($errors)) {
 # for each machinetype. They cannot actually do that through the EZ form
 # since the osid/imageid has to be unique, but it can happen by mixed
 # use of the long form and the short form, or with multiple uses of the
-# long form. 
-#
-$typeclause = "type=" . "'$mtypes_array[0]'";
+# long form.
 
+# Can't check this unless we have at least one mtype!
+if (!count($mtypes_array)) {
+    SPITFORM($image, $formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
+    
+$typeclause = "type=" . "'$mtypes_array[0]'";
 for ($i = 1; $i < count($mtypes_array); $i++) {
     $typeclause = "$typeclause or type=" . "'$mtypes_array[$i]'";
 }
@@ -455,9 +431,9 @@ $query_result =
 		 " images.imageid=osidtoimageid.imageid ".
 		 "where ($osidclause) and ($typeclause) and ".
 		 "      images.imageid!='$imageid'");
+DBQueryFatal("unlock tables");
 
 if (mysql_num_rows($query_result)) {
-	DBQueryFatal("unlock tables");
 
 	echo "<center>
               There are other image descriptors that specify the 
@@ -496,29 +472,15 @@ if (mysql_num_rows($query_result)) {
 		  "necessary changes!", 1);
 }
 
-#
-# Update the images table.
-# 
-DBQueryFatal("update images set ".
-	     implode(",", $updates) . " ".
-	     "where imageid='$imageid'");
-
-#
-# And the osidtoimageid table.
-# 
-# Must delete old entries first.
-DBQueryFatal("delete from osidtoimageid ".
-	     "where imageid='$imageid'");
-    
-for ($i = 0; $i < count($mtypes_array); $i++) {
-    for ($j = 0; $j < count($osid_array); $j++) {
-	DBQueryFatal("REPLACE INTO osidtoimageid ".
-		     "(osid, type, imageid) ".
-		     "VALUES ('$osid_array[$j]', '$mtypes_array[$i]', ".
-		     "        '$imageid')");
-    }
+# Send to the backend for more checking, and eventually, to update the DB.
+if (! ($result = Image::EditImageid($image,
+				 $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($image, $formfields, $errors);
+    PAGEFOOTER();
+    return;
 }
-DBQueryFatal("unlock tables");
 
 PAGEREPLACE(CreateURL("showimageid", $image));
 
