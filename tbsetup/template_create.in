@@ -676,25 +676,67 @@ else {
     mkdir("$tmpdir", 0777) or
 	fatal(-1, "Could not mkdir $tmpdir: $!");
 
+    my $athead = 0;
+
     #
     # To support older templates, see if the parent is in the CVS repo.
     # If not, skip all this. 
     #
-    System("$RLOG -h $cvsdir/setup/.template,v | ".
-	   "  grep -q 'T${parent_guid}-${parent_vers}:'");
+    my $ptag = "T${parent_guid}-${parent_vers}";
+    my $revision = `$RLOG -h $cvsdir/setup/.template,v | grep '${ptag}:'`;
     goto noparent
 	if ($?);
 
+    # Split out the revision number.
+    if ($revision =~ /^.*:\s+([\d.]+)$/) {
+	$revision = $1;
+    }
+    else {
+	fatal(-1, "Could not parse '$revision'");
+    }
+
     #
-    # Create a branch off the parent template for this new template
+    # We want to know if the parent is on the trunk and at the head.  If it
+    # is, then continue along the trunk, otherwise need to create a branch
+    # off the parent. This makes it nice for the common case that most
+    # people work along the the trunk.
     #
-    System("$CVSBIN -d $cvsdir rtag -n -r T${parent_guid}-${parent_vers} ".
-	   " -b T${parent_guid}-${vers}_branch setup ") 
-	== 0 or fatal(-1, "Could not rtag parent version in $cvsdir");
+    # XXX Potential problem here; even though the .template file is at the
+    # head revision on the trunk, there is no way to know where all the
+    # other files are. If the user has been good to his CVS tree, then
+    # things will probably work most of the time, but ...
+    #
+    chomp($revision);
+    my @tokens = split(/\./, $revision);
+    if (scalar(@tokens) == 2) {
+	my $header = `$RLOG -h $cvsdir/setup/.template,v | egrep '^head:'`;
+	if ($?) {
+	    fatal(-1, "Could not determine head revision for ".
+		  "$cvsdir/setup/.template,v");
+	}
+	if ($header =~ /^head:\s+([\d.]+)$/) {
+	    if ("$1" eq "$revision") {
+		$athead = 1;
+	    }
+	}
+	else {
+	    fatal(-1, "Could not parse ($header) head revision for ".
+		  "$cvsdir/setup/.template,v");
+	}
+    }
+
+    if (!$athead) {
+        #
+        # Create a branch off the parent template for this new template
+        #
+	System("$CVSBIN -d $cvsdir rtag -n -r T${parent_guid}-${parent_vers} ".
+	       " -b T${parent_guid}-${vers}_branch setup ") 
+	    == 0 or fatal(-1, "Could not rtag parent version in $cvsdir");
+    }
     
     #
-    # Modify from the web. Import onto new branch in the vendor branch.
-    # Then commit to a new branch head.
+    # Import onto new branch in the vendor branch.
+    # Then commit to a new (branch) head.
     #
     System("cd $template_dir; ".
 	   "$CVSBIN -d $cvsdir import -b 1.1.${vers} ".
@@ -702,23 +744,36 @@ else {
 	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
 	== 0 or fatal(-1, "Could not import modified template into $cvsdir");
 
-    # Checkout and merge
-    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
-	   "  -r T${parent_guid}-${vers}_branch ".
-	   "  -j T${parent_guid}-${vers}_branch ".
-	   "  -j T${guid}-${vers}_import_branch setup")
-	== 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
+    if ($athead) {
+	# Checkout and merge
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	       "  -j HEAD -j T${guid}-${vers}_import_branch setup")
+	    == 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
 
-    # Need to clear the -b (default branch) or else the merge
-    # commit fails for some reason that makes no sense to me.
-    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b setup") == 0
-	or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
+        # Commit ...
+	System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
+	       "  -m 'Commit merge with head'")
+	    == 0 or fatal(-1, "Could not commit on $cvsdir");
+    }
+    else {
+	# Checkout and merge
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	       "  -r T${parent_guid}-${vers}_branch ".
+	       "  -j T${parent_guid}-${vers}_branch ".
+	       "  -j T${guid}-${vers}_import_branch setup")
+	    == 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
+
+	# Need to clear the -b (default branch) or else the merge
+	# commit fails for some reason that makes no sense to me.
+	System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b setup") == 0
+	    or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
     
-    # Commit ...
-    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
-	   "  -r T${parent_guid}-${vers}_branch ".
-	   "  -m 'Commit merge with head'")
-	== 0 or fatal(-1, "Could not commit on $cvsdir");
+        # Commit ...
+	System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
+	       "  -r T${parent_guid}-${vers}_branch  ".
+	       "  -m 'Commit merge with head'")
+	    == 0 or fatal(-1, "Could not commit on $cvsdir");
+    }
     
     #
     # Clear the default branch so that "update -A" takes user to trunk.
@@ -735,8 +790,8 @@ else {
     # find it easily.
     #
     System("$CVSBIN -d $cvsdir rtag -n ".	
-	   "  -r T${parent_guid}-${vers}_branch T${guid}-${vers} ".
-	   "  setup")
+	   "  -r " . ($athead ? "HEAD" : "T${parent_guid}-${vers}_branch") .
+	   "  T${guid}-${vers} setup")
 	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
 noparent:
 }
