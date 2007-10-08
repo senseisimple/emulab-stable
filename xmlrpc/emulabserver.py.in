@@ -809,7 +809,9 @@ class fs:
         for proj in projs:
             if proj[0] == proj[1]:
                 res.append(PROJROOT + "/" + proj[0])
-		res.append(SCRATCHROOT + "/" + proj[0])
+                if not SCRATCHROOT == "":
+                    res.append(SCRATCHROOT + "/" + proj[0])
+                    pass
                 pass
             else:
                 res.append(GROUPROOT + "/" + proj[0] + "/" + proj[1])
