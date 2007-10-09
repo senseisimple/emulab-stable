@@ -12,8 +12,10 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= moduserinfo newgroup newmmlist editexp editimageid
-WEB_BIN_SCRIPTS = webmoduserinfo webnewgroup webnewmmlist webeditimageid
+BIN_SCRIPTS	= moduserinfo newgroup newmmlist editexp editimageid \
+		  editnodetype
+WEB_BIN_SCRIPTS = webmoduserinfo webnewgroup webnewmmlist webeditimageid \
+		  webeditnodetype
 WEB_SBIN_SCRIPTS= 
 LIBEXEC_SCRIPTS	= $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS)
 

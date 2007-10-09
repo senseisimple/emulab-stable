@@ -23,9 +23,14 @@ if (! $isadmin) {
 }
 
 $optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
-				 "node_type",  PAGEARG_STRING,
-				 "new_type",   PAGEARG_STRING,
 				 "formfields", PAGEARG_ARRAY,
+
+				 # Send new_type=1 to create new nodetype.
+				 "new_type",   PAGEARG_STRING,
+				 # Optional if new_type, required if not.
+				 "node_type",  PAGEARG_STRING,
+
+				 # Attribute creation and deletion.
 				 "deletes",    PAGEARG_ARRAY,
 				 "attributes", PAGEARG_ARRAY,
 				 "newattribute_type",  PAGEARG_STRING,
@@ -249,6 +254,10 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
            <td align=center colspan=2><b>Node Attributes</b></td></tr>\n";
 
     while (list ($key, $val) = each ($attributes)) {
+	if (!isset($deletes[$key])) {
+	    # Somehow this doesn't get initialized in the Create Node case.
+	    $deletes[$key] = "";
+	}
 	if ($key == "default_osid" ||
 	    $key == "jail_osid" ||
 	    $key == "delay_osid") {
@@ -385,7 +394,7 @@ else {
 }
 
 #
-# We need a list of osids and imageids.
+# We need lists of osids and imageids for selection.
 #
 $osid_result =
     DBQueryFatal("select osid,osname,pid from os_info ".
@@ -419,94 +428,11 @@ if (!isset($new_type)) {
 }
 
 #
-# Otherwise, must validate and redisplay if errors. Build up a DB insert
-# string as we go. 
+# Otherwise, must validate and redisplay if errors.
 #
 $errors  = array();
-$inserts = array();
 
-# Class (only for new types)
-if (isset($new_type) &&
-    isset($formfields['class']) && $formfields['class'] != "") {
-    if (! TBvalid_description($formfields['class'])) {
-	$errors["Class"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["class"] = addslashes($formfields["class"]);
-    }
-}
-
-# isvirtnode
-if (isset($formfields["isvirtnode"]) && $formfields["isvirtnode"] != "") {
-    if (! TBvalid_boolean($formfields["isvirtnode"])) {
-	$errors["isvirtnode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isvirtnode"] = $formfields["isvirtnode"];
-    }
-}
-
-# isjailed
-if (isset($formfields["isjailed"]) && $formfields["isjailed"] != "") {
-    if (! TBvalid_boolean($formfields["isjailed"])) {
-	$errors["isjailed"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isjailed"] = $formfields["isjailed"];
-    }
-}
-
-# isdynamic
-if (isset($formfields["isdynamic"]) && $formfields["isdynamic"] != "") {
-    if (! TBvalid_boolean($formfields["isdynamic"])) {
-	$errors["isdynamic"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isdynamic"] = $formfields["isdynamic"];
-    }
-}
-
-# isremotenode
-if (isset($formfields["isremotenode"]) && $formfields["isremotenode"] != "") {
-    if (! TBvalid_boolean($formfields["isremotenode"])) {
-	$errors["isremotenode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isremotenode"] = $formfields["isremotenode"];
-    }
-}
-
-# issubnode
-if (isset($formfields["issubnode"]) && $formfields["issubnode"] != "") {
-    if (! TBvalid_boolean($formfields["issubnode"])) {
-	$errors["issubnode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["issubnode"] = $formfields["issubnode"];
-    }
-}
-
-# isplabdslice
-if (isset($formfields["isplabdslice"]) && $formfields["isplabdslice"] != "") {
-    if (! TBvalid_boolean($formfields["isplabdslice"])) {
-	$errors["isplabdslice"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isplabdslice"] = $formfields["isplabdslice"];
-    }
-}
-
-# issimnode
-if (isset($formfields["issimnode"]) && $formfields["issimnode"] != "") {
-    if (! TBvalid_boolean($formfields["issimnode"])) {
-	$errors["issimnode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["issimnode"] = $formfields["issimnode"];
-    }
-}
-
-# Check the attributes
+# Check the attributes.
 while (list ($key, $val) = each ($attributes)) {
     # Skip checks if scheduled for deletion
     if (isset($deletes[$key]) && $deletes[$key] == "checked") 
@@ -517,37 +443,36 @@ while (list ($key, $val) = each ($attributes)) {
 	continue;
     }
     
-    $attrtype = $attribute_types[$key];
-    $valid    = 1;
-
     if ($val == "") {
 	$errors[$key] = "No value provided for $key";
 	continue;
     }
-    elseif ($attrtype == "boolean") {
-	$valid = TBvalid_boolean($val);
+
+    # Probably redundant with the XML keyfields checking...
+    $attrtype = $attribute_types[$key];
+    if ($attrtype == "") {	# Shouldn't happen...
+	$attrtype = $attribute_types[$key] = "integer";
     }
-    elseif ($attrtype == "float") {
-	$valid = TBvalid_float($val);
-    }
-    elseif ($attrtype == "integer") {
-	$valid = TBvalid_integer($val);
-    }
-    elseif ($attrtype == "string") {
-	$valid = TBvalid_description($val);
-    }
-    else {
+    if (strpos(":boolean:float:integer:string:", ":$attrtype:")===FALSE) {
 	$errors[$key] = "Invalid type information: $attrtype";
 	continue;
     }
-    if (!$valid) {
-	$errors[$key] = TBFieldErrorString();
+
+    # New attributes require type and value.
+    if (isset($newattribute_name) && $newattribute_name != "" &&
+	!(isset($newattribute_type) && $newattribute_type != "")) {
+	$errors[$newattribute_name] = "Missing type";
+    }
+    if (isset($newattribute_name) && $newattribute_name != "" &&
+	!(isset($newattribute_value) && $newattribute_value != "")) {
+	$errors[$newattribute_name] = "Missing value";
     }
 }
 
 #
-# Spit any errors now.
-#
+# If any errors, respit the form with the current values and the
+# error messages displayed. Iterate until happy.
+# 
 if (count($errors)) {
     SPITFORM($node_type, $formfields, $attributes, $deletes, $errors);
     PAGEFOOTER();
@@ -555,115 +480,160 @@ if (count($errors)) {
 }
 
 #
-# Form allows for a single new attribute, but someday be more fancy.
+# Build up argument array to pass along.
+#
+$args = array();
+
+# Class (only for new types.)
+if (isset($new_type) &&
+    isset($formfields['class']) && $formfields['class'] != "") {
+    $args["new_type"] = "1";
+    $args["class"] = $formfields["class"];
+}
+
+# isvirtnode
+if (isset($formfields["isvirtnode"]) && $formfields["isvirtnode"] != "") {
+    $args["isvirtnode"] = $formfields["isvirtnode"];
+}
+
+# isjailed
+if (isset($formfields["isjailed"]) && $formfields["isjailed"] != "") {
+    $args["isjailed"] = $formfields["isjailed"];
+}
+
+# isdynamic
+if (isset($formfields["isdynamic"]) && $formfields["isdynamic"] != "") {
+    $args["isdynamic"] = $formfields["isdynamic"];
+}
+
+# isremotenode
+if (isset($formfields["isremotenode"]) && $formfields["isremotenode"] != "") {
+    $args["isremotenode"] = $formfields["isremotenode"];
+}
+
+# issubnode
+if (isset($formfields["issubnode"]) && $formfields["issubnode"] != "") {
+    $args["issubnode"] = $formfields["issubnode"];
+}
+
+# isplabdslice
+if (isset($formfields["isplabdslice"]) && $formfields["isplabdslice"] != "") {
+    $args["isplabdslice"] = $formfields["isplabdslice"];
+}
+
+# issimnode
+if (isset($formfields["issimnode"]) && $formfields["issimnode"] != "") {
+    $args["issimnode"] = $formfields["issimnode"];
+}
+
+# Existing attributes.
+foreach ($attributes as $attr_key => $attr_val) {
+    if (isset($deletes[$attr_key]) && $deletes[$attr_key] == "checked") 
+	$args["delete_${attr_key}"] = "1";
+    $attr_type = $attribute_types[$attr_key];
+    $args["attr_${attr_type}_${attr_key}"] = $attr_val;
+}
+
+#
+# Form allows for adding a single new attribute, but someday be more fancy.
 #
 if (isset($newattribute_name) && $newattribute_name != "" &&
     isset($newattribute_value) && $newattribute_value != "" &&
     isset($newattribute_type) && $newattribute_type != "") {
 
-    if (!preg_match("/^[-\w]+$/", $newattribute_name)) {
-	$errors["New Attribute Name"] = "Invalid characters in attribute name";
-    }
-    else {
-	$valid    = 1;
-
-	if ($newattribute_type == "boolean") {
-	    $valid = TBvalid_boolean($newattribute_value);
-	}
-	elseif ($newattribute_type == "float") {
-	    $valid = TBvalid_float($newattribute_value);
-	}
-	elseif ($newattribute_type == "integer") {
-	    $valid = TBvalid_integer($newattribute_value);
-	}
-	elseif ($newattribute_type == "string") {
-	    $valid = TBvalid_description($newattribute_value);
-	}
-	else {
-	    $errors["New Attribute Type"] = "Invalid type: $newattribute_type";
-	}
-	if (!$valid) {
-	    $errors["New Attribute Type"] = TBFieldErrorString();
-	}
-    }
-
-    #
-    # Spit any errors now.
-    #
-    if (count($errors)) {
-	SPITFORM($node_type, $formfields, $attributes, $deletes, $errors);
-	PAGEFOOTER();
-	return;
-    }
-    # Set up for loops below.
-    $attributes[$newattribute_name] = $newattribute_value;
-    $attribute_types[$newattribute_name] = $newattribute_type;
+    $args["new_attr"] = $newattribute_name;
+    # The following is matched by wildcards on the other side of XML,
+    # including checking its type and value, just like existing attributes.
+    $args["attr_${newattribute_type}_$newattribute_name"] = $newattribute_value;
 }
 
-#
-# Otherwise, do the inserts.
-#
-$insert_data = array();
-foreach ($inserts as $name => $value) {
-    $insert_data[] = "$name='$value'";
+if (! ($result = SetNodeType($node_type, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($node_type, $formfields, $attributes, $deletes, $errors);
+    PAGEFOOTER();
+    return;
 }
 
-if (isset($new_type)) {
-    DBQueryFatal("insert into node_types set type='$node_type', ".
-		 implode(",", $insert_data));
-    if ($formfields["class"] == "pc" || $formfields["isremotenode"] == 1) {
-	$vnode_type = $node_type;
-	$vnode_type = preg_replace("/pc/","pcvm",$vnode_type);
-	if ($vnode_type == $node_type) {
-	    $vnode_type = "$vnode_type-vm";
-	}
-	$pcvmtype = ($formfields["isremotenode"] == 1 ? "pcvwa" : "pcvm");
-	
-	DBQueryFatal("insert into node_types_auxtypes set " .
-		     "  auxtype='$vnode_type', type='$pcvmtype'");
-    }
-    foreach ($attributes as $key => $value) {
-        # Skip if scheduled for deletion
-	if (isset($deletes[$key]) && $deletes[$key] == "checked") 
-	    continue;
-	
-	$key   = addslashes($key);
-	$type  = addslashes($attribute_types[$key]);
-	$value = addslashes($value);
-	
-	DBQueryFatal("insert into node_type_attributes set ".
-		     "   type='$node_type', ".
-		     "   attrkey='$key', attrtype='$type', ".
-		     "   attrvalue='$value' ");
-    }
-} else {
-    DBQueryFatal("update node_types set ".
-		 implode(",", $insert_data) . " ".
-		 "where type='$node_type'");
-
-    foreach ($attributes as $key => $value) {
-	$key   = addslashes($key);
-	$type  = addslashes($attribute_types[$key]);
-	$value = addslashes($value);
-
-        # Remove if scheduled for deletion
-	if (isset($deletes[$key]) && $deletes[$key] == "checked") {
-	    DBQueryFatal("delete from node_type_attributes ".
-			 "where type='$node_type' and attrkey='$key'");
-	}
-	else {
-	    DBQueryFatal("replace into node_type_attributes set ".
-			 "   type='$node_type', ".
-			 "   attrkey='$key', attrtype='$type', ".
-			 "   attrvalue='$value' ");
-	}
-    }
-}
+PAGEHEADER(isset($new_type) ? "Create" : "Edit" . "Node Type");
 
 #
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 #
-header("Location: editnodetype.php3?node_type=$node_type");
+PAGEREPLACE("editnodetype.php3?node_type=$node_type");
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+
+#
+# Create or edit a nodetype.  (No class for that at present.)
+#
+function SetNodeType($node_type, $args, &$errors) {
+    global $suexec_output, $suexec_output_array;
+
+    #
+    # Generate a temporary file and write in the XML goo.
+    #
+    $xmlname = tempnam("/tmp", "editnodetype");
+    if (! $xmlname) {
+	TBERROR("Could not create temporary filename", 0);
+	$errors[] = "Transient error(1); please try again later.";
+	return null;
+    }
+    if (! ($fp = fopen($xmlname, "w"))) {
+	TBERROR("Could not open temp file $xmlname", 0);
+	$errors[] = "Transient error(2); please try again later.";
+	return null;
+    }
+
+    # Add these. Maybe caller should do this?
+    $args["node_type"] = $node_type;
+    
+    fwrite($fp, "<nodetype>\n");
+    foreach ($args as $name => $value) {
+	fwrite($fp, "<attribute name=\"$name\">");
+	fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	fwrite($fp, "</attribute>\n");
+    }
+    fwrite($fp, "</nodetype>\n");
+    fclose($fp);
+    chmod($xmlname, 0666);
+
+    $retval = SUEXEC("nobody", "nobody", "webeditnodetype $xmlname",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	if ($retval < 0) {
+	    $errors[] = "Transient error(3); please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	}
+	else {
+	    # unlink($xmlname);
+	    if (count($suexec_output_array)) {
+		for ($i = 0; $i < count($suexec_output_array); $i++) {
+		    $line = $suexec_output_array[$i];
+		    if (preg_match("/^([-\w]+):\s*(.*)$/",
+				   $line, $matches)) {
+			$errors[$matches[1]] = $matches[2];
+		    }
+		    else
+			$errors[] = $line;
+		}
+	    }
+	    else
+		$errors[] = "Transient error(4); please try again later.";
+	}
+	return null;
+    }
+    # There are no return value(s) to parse at the end of the output.
+
+    # Unlink this here, so that the file is left behind in case of error.
+    # We can then create the nodetype by hand from the xmlfile, if desired.
+    unlink($xmlname);
+    return true;
+}
 
 ?>

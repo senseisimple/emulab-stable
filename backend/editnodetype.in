@@ -1,0 +1,552 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Back-end script to create or edit a nodetype.
+#
+sub usage()
+{
+    print("Usage: editnodetype [-v] <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "dv";
+my $debug   = 0;
+my $verify  = 0;	# Check data and return status only. 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+use OSinfo;
+
+# Protos
+sub fatal($);
+sub UserError(;$);
+sub escapeshellarg($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and the
+# current user context is "implied" (see tbauth.php3).
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    fatal("You must have admin privledges to ...")
+	if (!$this_user->IsAdmin());
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+
+    # The web interface (and in the future the xmlrpc interface) sets this.
+    $this_user = User->ImpliedUser();
+
+    if (! defined($this_user)) {
+	fatal("Cannot determine implied user!");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+#
+# XXX We should encode all of this in the DB so that we can generate the
+# forms on the fly, as well as this checking code.
+#
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("node_type"	=> ["node_type",	$SLOT_REQUIRED],
+
+     # Presence of new_type commands creation of a new nodetype.
+     "new_type"		=> ["attr_boolean",	$SLOT_OPTIONAL],
+
+     # Class may only be changed while making a new class. 
+     "class"		=> ["class",		$SLOT_OPTIONAL],
+
+     # Fixed attributes.
+     "isvirtnode"	=> ["boolean",		$SLOT_OPTIONAL],
+     "isjailed"		=> ["boolean",		$SLOT_OPTIONAL],
+     "isdynamic"	=> ["boolean",		$SLOT_OPTIONAL],
+     "isremotenode"	=> ["boolean",		$SLOT_OPTIONAL],
+     "issubnode"	=> ["boolean",		$SLOT_OPTIONAL],
+     "isplabdslice"	=> ["boolean",		$SLOT_OPTIONAL],
+     "issimnode"	=> ["boolean",		$SLOT_OPTIONAL],
+
+     # Dynamic attributes with wildcards.
+     "attr_boolean_*"	=> ["attr_boolean",	$SLOT_OPTIONAL],
+     "attr_integer_*"	=> ["attr_int",		$SLOT_OPTIONAL],
+     "attr_float_*"	=> ["attr_float",	$SLOT_OPTIONAL],
+     "attr_string_*"	=> ["attr_string",	$SLOT_OPTIONAL],
+
+     # Old-style osid and image names.
+     "attr_string_*_osid"    => ["attr_osid",	$SLOT_OPTIONAL],
+     "attr_string_*_imageid" => ["attr_imageid",$SLOT_OPTIONAL],
+     # New-style indices.
+     "attr_integer_*_osid"   => ["attr_int",	$SLOT_OPTIONAL],
+     "attr_integer_*_imageid"=> ["attr_int",	$SLOT_OPTIONAL],
+
+     # The name of a single attribute to add to the list.
+     "new_attr"		=> ["attr_name",	$SLOT_OPTIONAL],
+     # Multiple attributes can be deleted from the list.
+     "delete_*"		=> ["attr_boolean",	$SLOT_OPTIONAL]);
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+#
+# Process and dump the errors (formatted for the web interface).
+# We should probably XML format the errors instead but not sure I want
+# to go there yet.
+#
+my %errors = ();
+
+#
+# Make sure all the required arguments were provided.
+#
+my $key;
+foreach $key (keys(%xmlfields)) {
+    my (undef, $required, undef) = @{$xmlfields{$key}};
+
+    $errors{$key} = "Required value not provided"
+	if ($required & $SLOT_REQUIRED  &&
+	    ! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+UserError()
+    if (keys(%errors));
+
+#
+# We build up an array of arguments to pass to () as we check
+# the attributes.
+#
+my %editnodetype_args = ();
+
+#
+# Wildcard keys have one or more *'s in them like simple glob patterns.
+# This allows multiple key instances for categories of attributes, and
+# putting a "type signature" in the key for arg checking, as well.
+#
+# Wildcards are made into regex's by anchoring the ends and changing each * to
+# a "word" (group of alphahumeric.)  A tail * means "the rest", allowing
+# multiple words separated by underscores or dashes.
+#
+my $wordpat = '[a-zA-Z0-9]+';
+my $tailpat = '[-\w]+';
+my %wildcards;
+foreach $key (keys(%xmlfields)) {
+    if (index($key, "*") >= 0) {
+	my $regex = '^' . $key . '$';
+	$regex =~ s/\*\$$/$tailpat/;
+	$regex =~ s/\*/$wordpat/g;
+	$wildcards{$key} = $regex;
+    }
+}
+# Key ordering is lost in a hash.
+# Put longer matching wildcard keys before their prefix.
+my @wildkeys = reverse(sort(keys(%wildcards)));
+
+foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $field = $key;
+    my $wild;
+    if (!exists($xmlfields{$key})) {
+
+	# Not a regular key; look for a wildcard regex match.
+        foreach my $wildkey (@wildkeys) {
+	    my $regex = $wildcards{$wildkey};
+	    if ($wild = $key =~ /$regex/) {
+		$field = $wildkey;
+		print STDERR "Wildcard: '$key' matches '$wildkey'\n"
+		    if ($debug);
+		last; # foreach $wildkey
+	    }
+	}
+	if (!$wild) {
+	    $errors{$key} = "Unknown attribute";
+	    next; # foreach $key
+	}
+    }
+
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
+
+    if ($required & $SLOT_REQUIRED) {
+	# A slot that must be provided, so do not allow a null value.
+	if (!defined($value)) {
+	    $errors{$key} = "Must provide a non-null value";
+	    next;
+	}
+    }
+    if ($required & $SLOT_OPTIONAL) {
+	# Optional slot. If value is null skip it. Might not be the correct
+	# thing to do all the time?
+	if (!defined($value)) {
+	    next
+		if (!defined($default));
+	    $value = $default;
+	}
+    }
+    if ($required & $SLOT_ADMINONLY) {
+	# Admin implies optional, but thats probably not correct approach.
+	$errors{$key} = "Administrators only"
+	    if (! $this_user->IsAdmin());
+    }
+	
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "node_types", $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	$errors{$key} = TBFieldErrorString();
+	next;
+    }
+
+    $editnodetype_args{$key} = $value;
+}
+UserError()
+    if (keys(%errors));
+
+#
+# Now do special checks.
+#
+my $query_result;
+my $node_type = $editnodetype_args{'node_type'};
+my $new_type = exists($editnodetype_args{"new_type"});
+
+#
+# Check whether the node type already exists.
+#
+$query_result =
+    DBQueryFatal("select * from node_types where type='$node_type'");
+my $node_type_exists = $query_result->numrows;
+my $prev_nodetype_data;
+if ($new_type) {
+
+    # Found.  But it's supposed to be new.
+    UserError("New NodeType: $node_type is already used!")
+	if ($node_type_exists);
+}
+else {
+    # Not found, but it was supposed to be old.
+    UserError("NodeType: $node_type is not a valid nodetype!")
+	if (!$node_type_exists);
+
+    # Found an existing one, grab its data.
+    $prev_nodetype_data = $query_result->fetchrow_hashref();
+}
+
+#
+# Check attributes of the node type, building an insert list as we go.
+#
+my @nodetype_data;
+
+# First check fixed (non-attr*) attributes that are in the node_types table.
+# Class may only be set while making a new nodetype.
+my $class;
+if (exists($editnodetype_args{"class"})) {
+    my $newclass = $editnodetype_args{"class"};
+    if ($new_type) {
+	$class = $newclass;
+	if ($class eq "") {
+	    $class = "pc";	# Default to pc class.
+	}
+	push(@nodetype_data, "class='$class'");
+    }
+    else {
+	$class = $prev_nodetype_data->{"class"};
+
+	# It's okay to specify it to be the same as it was before.
+	UserError("NodeType: Can't change class ($class) of existing node.")
+	    if ($class ne $newclass);
+    }
+}
+
+# The rest of them all have names starting with "is" at present.
+my @fixed_args   = grep(/^is/, keys(%editnodetype_args));
+foreach my $name (@fixed_args) {
+    if (exists($editnodetype_args{$name})) {
+	my $value = $editnodetype_args{$name};
+	push(@nodetype_data, "$name='$value'");
+    }
+}
+# Needed below.
+my $isremotenode = exists($editnodetype_args{"isremotenode"}) ?
+    $editnodetype_args{"isremotenode"} : 
+    $prev_nodetype_data->{"isremotenode"};
+
+# Get previous dynamic attrs from the node_type_attributes table.
+$query_result =
+    DBQueryFatal("select * from node_type_attributes ".
+		 "where type='$node_type'");
+my $prev_attrs = $query_result->fetchall_hashref("attrkey");
+
+# Dynamic attributes to be changed or deleted.  Possibly one new one added.
+my $new_attr_name = "";
+if (my $new_attr = exists($editnodetype_args{'new_attr'})) {
+    $new_attr_name = $editnodetype_args{'new_attr'};
+
+    # The new attr must not already exist.
+    UserError("New NodeType Attr: $new_attr_name is already used!")
+	if (exists($prev_attrs->{$new_attr_name}));
+}
+
+# Get lists of ids for checking the special "attr_*_*id" attributes.
+$query_result =
+    DBQueryFatal("select osid,osname,pid from os_info ".
+		 "where (path='' or path is NULL) ".
+		 "order by pid,osname");
+my $osids = $query_result->fetchall_hashref("osid");
+$query_result =
+    DBQueryFatal("select osid,osname,pid from os_info ".
+		 "where (path is not NULL and path!='') ".
+		 "order by pid,osname");
+my $mfsosids = $query_result->fetchall_hashref("osid");
+$query_result =
+    DBQueryFatal("select imageid,imagename,pid from images ".
+		 "order by pid,imagename");
+my $imageids = $query_result->fetchall_hashref("imageid");
+
+# Separate out the attr types and names from the other argument keys.
+my ($attr_name, $attr_type, $attr_value);
+my (@attr_names, %attr_types, %attr_values, %attr_dels);
+foreach my $argkey (keys(%editnodetype_args)) {
+    next
+	if (!($argkey =~ /^attr_/));
+
+    $attr_name = $attr_type = $argkey;
+    $attr_name =~ s/^attr_${wordpat}_(.*)$/$1/;
+    if ($argkey =~ /_(os|image)id$/) {
+	# Special case: the type is the LAST part of the name for ID attrs.
+	$attr_type = $1;
+    }
+    else {
+	# Normal ones are like "attr_type_name".
+	$attr_type =~ s/^attr_($wordpat)_.*$/$1/;
+    }
+    $attr_value = $editnodetype_args{$argkey};
+
+    if ($debug) {
+	print STDERR "Dynamic attr: $attr_name($attr_type) = '$attr_value'\n";
+    }
+
+    push(@attr_names, $attr_name);
+    $attr_types{$attr_name} = $attr_type;
+    $attr_values{$attr_name} = $attr_value;
+}
+
+# Check all of the dynamic attrs that are to be set.
+foreach $attr_name (@attr_names) {
+    
+    # Skip checks on attrs that are scheduled for deletion anyway.
+    my $del = $attr_dels{$attr_name} = 
+	exists($editnodetype_args{"delete_${attr_name}"}) &&
+	    $editnodetype_args{"delete_${attr_name}"} eq "1";
+    next
+	if $del;
+
+    # An attr to be set must pre-exist, unless it's the new attr.
+    UserError("NodeType Attr: $attr_name is not set in nodetype $node_type!")
+	if (!exists($prev_attrs->{$attr_name}) && 
+	    $attr_name ne $new_attr_name);
+
+    $attr_type = $attr_types{$attr_name};
+    $attr_value = $attr_values{$attr_name};
+
+    # Check the osid and imageid attribute values against the id lists.
+    # Under the web page interface, these come to us from selectors.
+    if ($attr_type eq "osid") {
+	if ($attr_name =~ /mfs$/) {
+	    UserError("NodeType MFS OSID Attr: $attr_name is not an mfs_osid.")
+		if (!exists($mfsosids->{$attr_value}));
+	}
+	else {
+	    UserError("NodeType OSID Attr: $attr_name is not an osid.")
+		if (!exists($osids->{$attr_value}));
+	}
+    }
+    elsif ($attr_type eq "imageid") {
+	UserError("NodeType Image ID Attr: $attr_name is not an imageid.")
+	    if (!exists($imageids->{$attr_value}));
+    }
+}
+
+exit(0)
+    if ($verify);
+
+#
+# Now safe to put the nodetype info into the DB.
+#
+my ($type, $value);
+if ($new_type) {
+    DBQueryFatal("insert into node_types set type='$node_type', ".
+		 join(",", @nodetype_data));
+
+    if ($class eq "pc" || $isremotenode eq "1") {
+	my $vnode_type = $node_type;
+	$vnode_type =~ s/pc/pcvm/;
+	if ($vnode_type eq $node_type) {
+	    $vnode_type = "$vnode_type-vm";
+	}
+	my $pcvmtype = ($isremotenode eq "1" ? "pcvwa" : "pcvm");
+
+	DBQueryFatal("insert into node_types_auxtypes set " .
+		     "  auxtype='$vnode_type', type='$pcvmtype'");
+    }
+
+    foreach $attr_name (@attr_names) {
+	# Skip adding an attr if it is also scheduled for deletion.
+	next
+	    if ($attr_dels{$attr_name});
+
+	$key   = escapeshellarg($attr_name);
+	$type  = escapeshellarg($attr_types{$attr_name});
+	$value = escapeshellarg($attr_values{$attr_name});
+
+	DBQueryFatal("insert into node_type_attributes set ".
+		     "   type='$node_type', ".
+		     "   attrkey='$key', attrtype='$type', ".
+		     "   attrvalue='$value' ");
+    }
+}
+else {
+    DBQueryFatal("update node_types set ".
+		 join(",", @nodetype_data) . " ".
+		 "where type='$node_type'");
+
+    foreach $attr_name (@attr_names) {
+	$key   = escapeshellarg($attr_name);
+	$type  = escapeshellarg($attr_types{$attr_name});
+	$value = escapeshellarg($attr_values{$attr_name});
+
+	# Remove an attr from the DB if scheduled for deletion.
+	if ($attr_dels{$attr_name}) {
+	    DBQueryFatal("delete from node_type_attributes ".
+			 "where type='$node_type' and attrkey='$key'");
+	}
+	else {
+	    DBQueryFatal("replace into node_type_attributes set ".
+			 "   type='$node_type', ".
+			 "   attrkey='$key', attrtype='$type', ".
+			 "   attrvalue='$value' ");
+	}
+    }
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    # Exit with negative status so web interface treats it as system error.
+    exit(-1);
+}
+
+sub UserError(;$)
+{
+    my ($mesg) = @_;
+
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+    }
+    print "$mesg\n"
+	if (defined($mesg));
+
+    # Exit with positive status so web interface treats it as user error.
+    exit(1);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^-_[:alnum:]]/\\$&/g;
+    return $str;
+}

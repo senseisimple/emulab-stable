@@ -798,6 +798,18 @@ REPLACE INTO table_regex VALUES ('images','osid','text','redirect','os_info:osid
 REPLACE INTO table_regex VALUES ('images','load_address','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','frisbee_pid','text','redirect','default:int',0,0,NULL);
 
+REPLACE INTO table_regex VALUES ('node_types','new_type','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','node_type','text','regex','^[-\\w]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('node_types','class','text','regex','^[\\w]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('node_types','boolean','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_name','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_imageid','text','redirect','images:imageid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_boolean','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_integer','text','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_float','text','redirect','default:float',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_string','text','redirect','default:tinytext',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','pid','text','redirect','projects:pid',0,0,NULL);
