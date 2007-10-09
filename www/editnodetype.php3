@@ -5,6 +5,8 @@
 # All rights reserved.
 #
 include("defs.php3");
+include_once("imageid_defs.php");
+include_once("osinfo_defs.php");
 include("osiddefs.php3");
 
 #
@@ -40,10 +42,17 @@ if (!isset($node_type)) { $node_type = ""; }
 if (!isset($attributes)) { $attributes = array(); }
 if (!isset($deletes)) { $deletes = array(); }
 
+$emulab_ops = Project::LookupByPid("emulab-ops");
+$freebsd_mfs = OSinfo::LookupByName($emulab_ops,"FREEBSD-MFS");
+$fbsd410_rhl90_std = Image::LookupByName($emulab_ops,"FBSD410+RHL90-STD");
+$rhl_std = OSinfo::LookupByName($emulab_ops, "RHL-STD");
+$fbsd_std = OSinfo::LookupByName($emulab_ops,"FBSD-STD");
+$frisbee_mfs = OSinfo::LookupByName($emulab_ops,"FRISBEE-MFS");
+
 # This belongs elsewhere!
 $initial_attributes = array(
-    array("attrkey" => "adminmfs_osid", "attrvalue" => "FREEBSD-MFS",
-	  "attrtype" => "string"),
+    array("attrkey" => "adminmfs_osid", "attrvalue" => $freebsd_mfs->osid(),
+	  "attrtype" => "integer"),
     array("attrkey" => "bios_waittime", "attrvalue" => "60",
 	  "attrtype" => "integer"),
     array("attrkey" => "bootdisk_unit", "attrvalue" => "0",
@@ -52,16 +61,17 @@ $initial_attributes = array(
 	  "attrtype" => "string"),
     array("attrkey" => "control_network", "attrvalue" => "X",
 	  "attrtype" => "integer"),
-    array("attrkey" => "default_imageid", "attrvalue" => "",
-	  "attrtype" => "string"),
-    array("attrkey" => "default_osid", "attrvalue" => "RHL-STD",
-	  "attrtype" => "string"),
+    array("attrkey" => "default_imageid",
+	  "attrvalue" => $fbsd410_rhl90_std->imageid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "default_osid", "attrvalue" => $rhl_std->osid(),
+	  "attrtype" => "integer"),
     array("attrkey" => "delay_capacity", "attrvalue" => "2",
 	  "attrtype" => "integer"),
-    array("attrkey" => "delay_osid", "attrvalue" => "FBSD-STD",
-	  "attrtype" => "string"),
-    array("attrkey" => "diskloadmfs_osid", "attrvalue" => "FRISBEE-MFS",
-	  "attrtype" => "string"),
+    array("attrkey" => "delay_osid", "attrvalue" => $fbsd_std->osid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "diskloadmfs_osid", "attrvalue" => $frisbee_mfs->osid(),
+	  "attrtype" => "integer"),
     array("attrkey" => "disksize", "attrvalue" => "0.00",
 	  "attrtype" => "float"),
     array("attrkey" => "disktype", "attrvalue" => "ad",
@@ -70,8 +80,8 @@ $initial_attributes = array(
 	  "attrtype" => "integer"),
     array("attrkey" => "imageable", "attrvalue" => "1",
 	  "attrtype" => "boolean"),
-    array("attrkey" => "jail_osid", "attrvalue" => "FBSD-STD",
-	  "attrtype" => "string"),
+    array("attrkey" => "jail_osid", "attrvalue" =>  $fbsd_std->osid(),
+	  "attrtype" => "integer"),
     array("attrkey" => "max_interfaces", "attrvalue" => "X",
 	  "attrtype" => "integer"),
     array("attrkey" => "memory", "attrvalue" => "XXX",
