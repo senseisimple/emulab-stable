@@ -140,26 +140,23 @@ my %xmlfields =
      "class"		=> ["class",		$SLOT_OPTIONAL],
 
      # Fixed attributes.
-     "isvirtnode"	=> ["boolean",		$SLOT_OPTIONAL],
-     "isjailed"		=> ["boolean",		$SLOT_OPTIONAL],
-     "isdynamic"	=> ["boolean",		$SLOT_OPTIONAL],
-     "isremotenode"	=> ["boolean",		$SLOT_OPTIONAL],
-     "issubnode"	=> ["boolean",		$SLOT_OPTIONAL],
-     "isplabdslice"	=> ["boolean",		$SLOT_OPTIONAL],
-     "issimnode"	=> ["boolean",		$SLOT_OPTIONAL],
+     "isvirtnode"	=> ["isvirtnode",	$SLOT_OPTIONAL],
+     "isjailed"		=> ["isjailed",		$SLOT_OPTIONAL],
+     "isdynamic"	=> ["isdynamic",	$SLOT_OPTIONAL],
+     "isremotenode"	=> ["isremotenode",	$SLOT_OPTIONAL],
+     "issubnode"	=> ["issubnode",	$SLOT_OPTIONAL],
+     "isplabdslice"	=> ["isplabdslice",	$SLOT_OPTIONAL],
+     "issimnode"	=> ["issimnode",	$SLOT_OPTIONAL],
 
      # Dynamic attributes with wildcards.
      "attr_boolean_*"	=> ["attr_boolean",	$SLOT_OPTIONAL],
-     "attr_integer_*"	=> ["attr_int",		$SLOT_OPTIONAL],
+     "attr_integer_*"	=> ["attr_integer",	$SLOT_OPTIONAL],
      "attr_float_*"	=> ["attr_float",	$SLOT_OPTIONAL],
      "attr_string_*"	=> ["attr_string",	$SLOT_OPTIONAL],
 
-     # Old-style osid and image names.
-     "attr_string_*_osid"    => ["attr_osid",	$SLOT_OPTIONAL],
-     "attr_string_*_imageid" => ["attr_imageid",$SLOT_OPTIONAL],
-     # New-style indices.
-     "attr_integer_*_osid"   => ["attr_int",	$SLOT_OPTIONAL],
-     "attr_integer_*_imageid"=> ["attr_int",	$SLOT_OPTIONAL],
+     # OS and Image ID's, referenced by their integer index.
+     "attr_integer_*_osid"   => ["attr_osid",	$SLOT_OPTIONAL],
+     "attr_integer_*_imageid"=> ["attr_imageid",$SLOT_OPTIONAL],
 
      # The name of a single attribute to add to the list.
      "new_attr"		=> ["attr_name",	$SLOT_OPTIONAL],
@@ -426,9 +423,11 @@ foreach $attr_name (@attr_names) {
     next
 	if $del;
 
-    # An attr to be set must pre-exist, unless it's the new attr.
+    # An attr to be set must pre-exist, unless it's the one new attr.
+    # (And of course, the attrs of a new_type are *all* new attrs.)
     UserError("NodeType Attr: $attr_name is not set in nodetype $node_type!")
-	if (!exists($prev_attrs->{$attr_name}) && 
+	if (!$new_type && 
+	    !exists($prev_attrs->{$attr_name}) && 
 	    $attr_name ne $new_attr_name);
 
     $attr_type = $attr_types{$attr_name};

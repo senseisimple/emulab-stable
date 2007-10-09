@@ -801,7 +801,13 @@ REPLACE INTO table_regex VALUES ('images','frisbee_pid','text','redirect','defau
 REPLACE INTO table_regex VALUES ('node_types','new_type','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','node_type','text','regex','^[-\\w]+$',1,30,NULL);
 REPLACE INTO table_regex VALUES ('node_types','class','text','regex','^[\\w]+$',1,30,NULL);
-REPLACE INTO table_regex VALUES ('node_types','boolean','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isvirtnode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isjailed','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isdynamic','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isremotenode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','issubnode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isplabdslice','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','issimnode','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_name','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_osid','text','redirect','os_info:osid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_imageid','text','redirect','images:imageid',0,0,NULL);
