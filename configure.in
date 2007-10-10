@@ -809,6 +809,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	account/quotamail account/mkusercert account/newproj account/newuser \
 	backend/GNUmakefile backend/moduserinfo backend/newgroup \
 	backend/newmmlist backend/editexp backend/editimageid backend/editnodetype \
+	backend/editsitevars \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
