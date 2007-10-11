@@ -195,7 +195,7 @@ UserError()
     if (keys(%errors));
 
 #
-# We build up an array of arguments to pass to () as we check
+# We build up an array of arguments to reference as we check
 # the attributes.
 #
 my %editnodetype_args = ();

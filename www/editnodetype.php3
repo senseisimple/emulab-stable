@@ -565,7 +565,7 @@ if (! ($result = SetNodeType($node_type, $args, $errors))) {
     return;
 }
 
-PAGEHEADER(isset($new_type) ? "Create" : "Edit" . "Node Type");
+PAGEHEADER(isset($new_type) ? "Create" : "Edit" . " Node Type");
 
 #
 # Spit out a redirect so that the history does not include a post
