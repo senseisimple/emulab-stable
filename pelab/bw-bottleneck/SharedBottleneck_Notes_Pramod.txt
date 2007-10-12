@@ -169,9 +169,67 @@ closer to reality - probably none of the 3 would be a slam-dunk. But, a
 step forward until we figure out a way to get the multiplexing number.
 
 
+8) Possible remedy to reverse path Ack problems observed in Emulab:
+-------------------------------------------------------------------
 
+When we set the available bandwidth to paths ( either in a cloud or in a
+shared-lan) in Emulab - we deviate in one significant way from what goes on
+in the real world routers. Most of the routers have a high throughput ( even
+the bottleneck router ) on Inet2 - typically 20 Mbps or more - but the
+available bandwidth to a TCP flow might be less than 500 kbps ( on the Harvard
+-> Princeton path for example ) - this happens due to a large degree of
+multiplexing. However, the Acks and the packets are still processed at the
+line rate of (say) 20 Mbps - so there isn't much of a delay variation even on
+congested bottleneck links. The Harvard->Princeton path exhibits virtually 
+insignificant changes in the RTT of full sized (1400 bytes) PING packets sent
+once every 50-100 milli seconds(+/- 2 msec variation over the base rtt of 10 msec). 
+More to the point, the Acks of a forward path TCP
+connection do not experience large queuing delays on the reverse path.
 
+With an Emulab reverse path setting of 500 Kbits/sec, we are artificially
+introducing very large queuing delays(on the order of 300-400 msec). By the time the Acks of the forward
+path get to the head of the queue on the reverse path, the reverse path
+IPerf's packets have made the round trip back and congest the queue again.
+This effectively increases the RTT of the forward path IPerf to 300-400 msec.
+We know that TCP's throughput drops for large bandwidth delay product paths. I
+did not observe any significant Ack packet loss for the forward path TCP
+connection - so this seems to be the explanation for the throughput drop.
 
+One way we could make this better is to set the delay agent bandwidth to the
+capacity of the bottleneck path - but introduce a large number of flows so
+that any new flow on the path effectively gets a throughput approx. equal to
+our available bandwidth estimate. As and when we change the value of the
+available bandwidth, the delay agent has to change the number of background
+flows on that path - assuming that the bottleneck capacity remains the same.
+I tested this with background UDP traffic and a large number of TCP flows(40)
+in the background - the PING times are now stable like the ones seen on Inet2.
+
+9) Estimating statistical multiplexing ?
+
+We *might* be able to side-step the whole TCP RTT fairness debate.
+
+a) Find out the capacity of the bottleneck link.
+b) We already know the throughput of a single IPerf flow on that path(from
+flexmon).
+c) Setup the delay agent bandwidth to the bottleneck capacity and introduce
+background TCP flows to make sure that a new TCP flow gets the available
+bandwidth. The number of background flows may not be equal to the number of
+flows in the real world ( there will not be any RTT variation, as well as no
+mix of short/long-lived flows... ). But I hypothesize that the results will be
+closer to the results seen on Inet2 paths.
+
+10) How reliable are the shared congestion detection methods ?
+
+In congested paths, the bottleneck link router's queue remains almost always
+full - hence producing insignificant delay variations. The shared congestion
+detection methods ( both rubenstein and wavelets ) depend on there being
+delay variations. If there is no variation - we currently assume that there is 
+no shared bottleneck. While this is true for paths where the router queues are
+on average empty, we will also observe no variance for paths which are
+congested most of the time.
+
+This seems to be a condition, which at least for now, we are not in a position
+to properly detect as being a shared bottleneck.
 
 References:
 -----------------------
@@ -190,5 +248,50 @@ Volume 5, Issue 3, Jun 1997 Page(s):336 - 350
     with R. Prasad and C. Dovrolis, Technical Report GIT-CERCS-03-2, Feb 2003, Georgia Tech.
 
 4) "Zhang, L., Shenker, S. and Clark, D.D., Observations on the dynamics of a congestion control algorithm: the effects of two-way traffic. ACM SIGCOMM Comput. Commun. Rev. v21. 133-147."
+
+5) L. Kalampoukas, A. Varma, and K. K. Ramakrishnan.
+Performance of Two-Way TCP Traffic over Asymmetric
+Access Links. In Proc. Interop ’97 Engineers’ Conference,
+       May 1997.
+
+6) T. V. Lakshman, U. Madhow, and B. Suter. Windowbased
+Error Recovery and Flow Control with a Slow
+Acknowledgement Channel: A study of TCP/IP Performance.
+In Proc. Infocom 97, April 1997.
+
+7) The effects of asymmetry on TCP performance.
+
+Hari Balakrishnan, Venkata N. Padmanabhan and Randy H. Katz
+Mobicom 1997
+
+8) Provisioning for bursty Internet traffic: Implications for Industry and
+Internet Infrastructure.
+
+David Clark(MIT), William Lehr, Ian Liu
+@ MIT ITC Workshop on Internet QoS, 1999
+
+9) Update on buffer sizing in internet routers
+    
+    Yashar Ganjali(Stanford University)
+    Nick McKeown(Stanford)
+
+    ACM CCR 2006
+
+
+10) Issues and trends in router design
+Keshav, S.   Sharma, R.  
+Cornell Univ., Ithaca, NY;
+
+Communications Magazine, IEEE
+Publication Date: May 1998
+
+11) Sizing router buffers
+Guido Appenzeller    Stanford University
+Isaac Keslassy   Stanford University
+Nick McKeown     Stanford University
+
+SIGCOMM 2004
+
+
 
 
