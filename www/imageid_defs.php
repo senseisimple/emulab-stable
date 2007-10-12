@@ -115,7 +115,94 @@ class Image
     }
 
     #
-    # Class function to edit image descriptor.
+    # Class function to create a new image descriptor.
+    #
+    function NewImageId($imagename, $args, &$errors) {
+	global $suexec_output, $suexec_output_array;
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "newimageid");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $errors[] = "Transient error(1); please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $errors[] = "Transient error(2); please try again later.";
+	    return null;
+	}
+
+	# Add these. Maybe caller should do this?
+	$args["imagename"] = $imagename;
+
+	fwrite($fp, "<image>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</image>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	$retval = SUEXEC("nobody", "nobody", "webnewimageid $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$errors[] = "Transient error(3); please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		# unlink($xmlname);
+		if (count($suexec_output_array)) {
+		    for ($i = 0; $i < count($suexec_output_array); $i++) {
+			$line = $suexec_output_array[$i];
+			if (preg_match("/^([-\w]+):\s*(.*)$/",
+				       $line, $matches)) {
+			    $errors[$matches[1]] = $matches[2];
+			}
+			else
+			    $errors[] = $line;
+		    }
+		}
+		else
+		    $errors[] = "Transient error(4); please try again later.";
+	    }
+	    return null;
+	}
+
+        #
+        # Parse the last line of output. Ick.
+        #
+	unset($matches);
+	
+	if (!preg_match("/^IMAGE\s+([^\/]+)\/(\d+)\s+/",
+			$suexec_output_array[count($suexec_output_array)-1],
+			$matches)) {
+	    $errors[] = "Transient error; please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    return null;
+	}
+	$image = $matches[2];
+	$newimage = image::Lookup($image);
+	if (! $newimage) {
+	    $errors[] = "Transient error; please try again later.";
+	    TBERROR("Could not lookup new image $image", 0);
+	    return null;
+	}
+
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then create the image by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return $newimage; 
+    }
+
+    #
+    # Class function to edit an image descriptor.
     #
     function EditImageid($image, $args, &$errors) {
 	global $suexec_output, $suexec_output_array;

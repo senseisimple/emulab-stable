@@ -789,12 +789,24 @@ REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_singlenet','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
 
-REPLACE INTO table_regex VALUES ('images','imageid','text','redirect','default:int',0,100000000,NULL);
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
+REPLACE INTO table_regex VALUES ('images','imageid','text','redirect','default:int',0,100000000,NULL);
+REPLACE INTO table_regex VALUES ('images','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','gid','text','redirect','groups:gid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('images','loadpart','text','redirect','default:tinyint',0,4,NULL);
+REPLACE INTO table_regex VALUES ('images','loadlength','text','redirect','default:tinyint',1,4,NULL);
+REPLACE INTO table_regex VALUES ('images','part1_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','part2_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','part3_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','part4_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','default_osid','text','redirect','os_info:osid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','path','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('images','shared','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','global','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','makedefault','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','mtype','text','redirect','default:boolean',0,0,NULL);
-REPLACE INTO table_regex VALUES ('images','osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','node_id','text','redirect','nodes:node_id',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','load_address','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','frisbee_pid','text','redirect','default:int',0,0,NULL);
 

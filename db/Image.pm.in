@@ -165,6 +165,163 @@ sub Refresh($)
 }
 
 #
+# Create a new os_info. This installs the new record in the DB,
+# and returns an instance. There is some bookkeeping along the way.
+#
+sub Create($$$$)
+{
+    my ($class, $project, $group, $creator, $imagename, $argref, $usrerr_ref) = @_;
+    my $idx;
+    my $now = time();
+
+    return undef
+	if (ref($class) || !ref($project));
+
+    my $isadmin = $creator->IsAdmin();
+
+    # We may ignore particular partN_osid's by deleting them.
+    my @arg_slots = grep(/^part[1-4]_osid$/, keys(%{$argref}));
+
+    # Pass-through a bunch of required slots, ignoring any extras
+    # and stuff we handle explicitly.
+    foreach my $key ("loadpart", "loadlength", "default_osid") {
+	if (!exists($argref->{$key})) {
+	    $$usrerr_ref = "Error: $key missing in Image->Create!";
+	    return undef;
+	}
+	push(@arg_slots, $key);
+    }
+    # Pass-through optional slots, otherwise the DB default is used.
+    foreach my $key ("path", "shared", "global") {
+	if (exists($argref->{$key})) {
+	    push(@arg_slots, $key);
+	}
+    }
+
+    my $pid     = $project->pid();
+    my $pid_idx = $project->pid_idx();
+    my $gid     = $group->gid();
+    my $gid_idx = $group->gid_idx();
+    my $uid     = $creator->uid();
+    my $uid_idx = $creator->uid_idx();
+
+    #
+    # The pid/imageid has to be unique, so lock the table for the check/insert.
+    #
+    DBQueryWarn("lock tables images write, emulab_indicies write")
+	or return undef;
+
+    my $query_result =
+	DBQueryWarn("select imagename from images ".
+		    "where pid_idx='$pid_idx' and imagename='$imagename'");
+
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	$$usrerr_ref = "Error: IMAGE $imagename in project $pid already exists!";
+	return undef;
+    }
+
+    #
+    # Grab unique ID. Table already locked.
+    # 
+    my $imageid  = TBGetUniqueIndex("next_imageid", undef, 1);
+    my $uuid  = NewUUID();
+    my $desc  = "''";
+
+    # Some fields special cause of quoting.
+    #
+    if (exists($argref->{'description'})) {
+	$desc = DBQuoteSpecial($argref->{'description'});
+    }
+    
+    my $query = "insert into images set ".
+	join(",", map("$_='" . $argref->{$_} . "'", @arg_slots));
+
+    # Append the rest
+    $query .= ",imagename='$imagename'";
+    $query .= ",imageid='$imageid'";
+    $query .= ",uuid='$uuid'";
+    $query .= ",pid='$pid',pid_idx='$pid_idx'";
+    $query .= ",gid='$gid',gid_idx='$gid_idx'";
+    $query .= ",creator='$uid',creator_idx='$uid_idx'";
+    $query .= ",created=now()";
+    $query .= ",description=$desc";    
+    
+    if (! DBQueryWarn($query)) {
+	DBQueryWarn("unlock tables");
+	tberror("Error inserting new images record for $pid/$imagename!");
+	return undef;
+    }
+
+    my $image = Image->Lookup($imageid);
+    # Create the osidtoimageid mapping.  Admins have an option to do it or not.
+    my $makedefault = exists($argref->{"makedefault"}) && 
+	$argref->{"makedefault"} eq "1";
+    if (!$isadmin || $makedefault) {
+
+	# Lock tables unlocks previous locks as a side-effect.
+	DBQueryWarn("lock tables osidtoimageid write, images write, ".
+		    "nodes as n write, node_type_attributes as a write");
+	#
+	# Need a list of node types. We join this over the nodes table so that
+	# we get a list of just the nodes that are currently in the testbed, not
+	# just in the node_types table.
+	#
+	my $types_result =
+	    DBQueryWarn("select distinct n.type from nodes as n ".
+			 "left join node_type_attributes as a on a.type=n.type ".
+			 "where a.attrkey='imageable' and ".
+			 "      a.attrvalue!='0'");
+	my @mtypes_array;
+	my @map_updates;
+	while (my ($type) = $types_result->fetchrow_array()) {
+	    push(@mtypes_array, $type);
+
+	    # Remember when we get one of the mtype_$type args.  These aren't DB
+	    # columns to update, but instead control re-creating the rows in the
+	    # osidtoimageid table for this imageid, below.
+	    my $mtype = "mtype_$type";
+	    if (exists($argref->{$mtype})) {
+		my $value = $argref->{$mtype};
+		##printf "argref->{$mtype} %s\n", $value;
+		if ($value eq "1") {
+		    push(@map_updates, $type);
+		}
+	    }
+	}
+
+	my @osid_array;
+	for (my $i = 1; $i <= 4; $i++) {
+	    my $foo = $image->field("part${i}_osid");
+	    if (defined($foo)) {
+		push(@osid_array, $foo);
+	    }
+	}
+
+	for (my $i = 0; $i <= $#map_updates; $i++) {
+	    for (my $j = 0; $j <= $#osid_array; $j++) {
+		 my $query = "INSERT INTO osidtoimageid ".
+			     "       (osid, type, imageid) ".
+			     "VALUES ('$osid_array[$j]', ".
+			     "        '$map_updates[$i]', ".
+			     "        '$imageid')";
+		 ##print "$query\n";
+		 if (! DBQueryWarn($query)) {
+		     DBQueryWarn("unlock tables");
+		     tberror("Error inserting new ostoimageid mapping for ".
+			     "$pid/$imagename!");
+		     return undef;
+		 }
+	    }
+	}
+    }
+
+    DBQueryWarn("unlock tables");
+
+    return $image;
+}
+
+#
 # Worker class method to edit image descriptor.
 # Assumes most argument checking was done elsewhere.
 #
@@ -196,7 +353,7 @@ sub EditImageid($$$$)
     # just in the node_types table.
     #
     my $types_result =
-	DBQueryFatal("select distinct n.type from nodes as n ".
+	DBQueryWarn("select distinct n.type from nodes as n ".
 		     "left join node_type_attributes as a on a.type=n.type ".
 		     "where a.attrkey='imageable' and ".
 		     "      a.attrvalue!='0'");
@@ -230,13 +387,13 @@ sub EditImageid($$$$)
     }
 
     if (keys %updates || $redo_map) {
-	DBQueryFatal("lock tables images write, os_info write, ".
+	DBQueryWarn("lock tables images write, os_info write, ".
 		     "osidtoimageid write");
     }
     if (keys %updates) {
 	if ($image->Update(\%updates)) {
 	    $$usrerr_ref = "DB: Error updating the images table";
-	    DBQueryFatal("unlock tables");
+	    DBQueryWarn("unlock tables");
 	    return undef;
 	}
     }
@@ -245,7 +402,7 @@ sub EditImageid($$$$)
 	# Update the osidtoimageid table too.
 	# 
 	# Must delete old entries first.
-	DBQueryFatal("delete from osidtoimageid ".
+	DBQueryWarn("delete from osidtoimageid ".
 		     "where imageid='$imageid'");
 
 	my @osid_array;
@@ -263,12 +420,12 @@ sub EditImageid($$$$)
 			     "        '$map_updates[$i]', ".
 			     "        '$imageid')";
 		 ##print "$query\n";
-		 DBQueryFatal($query);
+		 DBQueryWarn($query);
 	    }
 	}
     }
     if (keys %updates || $redo_map) {
-	DBQueryFatal("unlock tables");
+	DBQueryWarn("unlock tables");
     }
 
     return 1;
