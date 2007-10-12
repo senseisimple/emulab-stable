@@ -280,17 +280,18 @@ $project = null;
 #
 # Project:
 #
-if (!isset($formfields["pid"]) || $formfields["pid"] == "") {
+if (!isset($formfields["pid"]) ||
+    strcmp($formfields["pid"], "") == 0) {
     $errors["Project"] = "Not Selected";
 }
 elseif (!TBvalid_pid($formfields["pid"])) {
     $errors["Project"] = "Invalid project name";
 }
-elseif (! ($project = Project::Lookup($formfields["pid"]))) {
+elseif (!($project = Project::Lookup($formfields["pid"]))) {
     $errors["Project"] = "Invalid project name";
 }
 elseif (!$project->AccessCheck($this_user, $TB_PROJECT_MAKEOSID)) {
-    $errors["Project"] = "Not enough permission";    
+    $errors["Project"] = "Not enough permission";
 }
 
 FormValidate($form, $errors, $fields, $formfields);

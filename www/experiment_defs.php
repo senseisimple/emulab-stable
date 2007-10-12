@@ -204,7 +204,7 @@ class Experiment
 	# There are no return value(s) to parse at the end of the output.
 
 	# Unlink this here, so that the file is left behind in case of error.
-	# We can then create the experiment by hand from the xmlfile, if desired.
+	# We can then edit the experiment by hand from the xmlfile, if desired.
 	unlink($xmlname);
 	return true;
     }
