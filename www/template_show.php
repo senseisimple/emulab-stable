@@ -310,6 +310,8 @@ WRITESUBMENUBUTTON("Modify Template",
 WRITESUBMENUBUTTON("Instantiate Template",
 		   CreateURL("template_swapin", $template));
 
+WRITESUBMENUBUTTON("Create New Template", CreateURL("template_create"));
+
 WRITESUBMENUBUTTON("Add Metadata",
 		   CreateURL("template_metadata", $template) . "&action=add");
 
@@ -317,6 +319,9 @@ if ($template->EventCount() > 0) {
     WRITESUBMENUBUTTON("Edit Template Events",
 		       CreateURL("template_editevents", $template));
 }
+
+WRITESUBMENUBUTTON("Search Template",
+		   CreateURL("template_search", $template));
 
 # We show the user the datastore for the template;
 # the rest of it is not important.

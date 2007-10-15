@@ -126,6 +126,7 @@ function FormRenderRadio($name, $attrs)
     return $html;
 }
 
+
 function FormRenderSelect($name, $attrs)
 {
     $html = "<select name=\"formfields[$name]\" ";
@@ -139,7 +140,12 @@ function FormRenderSelect($name, $attrs)
 	$html .= $attrs['#javascript'] . " ";
     }
     $html .= ">\n";
-    $html .= "<option value=''>Please Select &nbsp</option>\n";
+
+    if (isset($attrs['#default']))
+	$default = $attrs['#default'];
+    else
+	$default = "Please Select";
+    $html .= "<option value=''>$default &nbsp</option>\n";
 
     if (isset($attrs['#options'])) {
 	while (list ($selectvalue, $selectlabel) = each ($attrs['#options'])) {
@@ -182,7 +188,6 @@ function FormRenderSubmit($name, $attrs)
 {
     $html = "";
 
-    $html .= "<td align=center colspan=2>";
     $html .= "<input type=submit name=\"$name\" ";
     if (isset($attrs['#value'])) {
 	$html .= "value=\"" . $attrs['#value'] . "\" ";
@@ -199,7 +204,34 @@ function FormRenderSubmit($name, $attrs)
     if (isset($attrs['#javascript'])) {
 	$html .= $attrs['#javascript'] . " ";
     }
-    $html .= "></td>";
+    $html .= ">";
+    
+    return $html;
+}
+
+function FormRenderImage($name, $attrs)
+{
+    $html = "";
+    $img  = $attrs['#image'];
+
+    $html .= "<input type=image name=\"formfields[$name]\" ";
+    if (isset($attrs['#value'])) {
+	$html .= "value=\"" . $attrs['#value'] . "\" ";
+    }
+    else {
+	$html .= "value=Submit ";
+    }
+    if (isset($attrs['#class'])) {
+	$html .= "class=\"" . $attrs['#class'] . "\" ";
+    }
+    else {
+	$html .= "class=\"form-image\" ";
+    }
+    if (isset($attrs['#javascript'])) {
+	$html .= $attrs['#javascript'] . " ";
+    }
+    $html .= "src=$img ";
+    $html .= ">";
     
     return $html;
 }
@@ -210,6 +242,23 @@ function FormRenderTable($name, $attributes, $submitted)
     $html = "<table align=center border=1>\n";
     $html .= FormRenderElements($attributes['#fields'], $submitted);
     $html .= "</table>\n";
+    return $html;
+}
+
+# Render a list of elements together.
+function FormRenderList($name, $attributes, $submitted)
+{
+    $html = "";
+    
+    while (list ($subname, $subattrs) = each ($attributes['#elements'])) {
+	if ($submitted && array_key_exists($subname, $submitted)) {
+	    $subattrs['#value'] = $submitted[$subname];
+	}
+	$html .= FormRenderElement($subname, $subattrs, $submitted);
+	if (isset($subattrs['#label']))
+	    $html .= $subattrs['#label'] . " &nbsp; ";
+	$html .= " &nbsp; ";
+    }
     return $html;
 }
 
@@ -232,10 +281,15 @@ function FormRenderElement($name, $attributes, $submitted)
 	break;
     case "hidden":
 	$value = $attributes['#value'];
-	$field_html .= "<input type=hidden name=$name value=\"$value\">\n";
+	$field_html .=
+	    "<input type=hidden name=\"formfields[$name]\" ".
+	    "value=\"$value\">\n";
 	break;
     case "submit":
 	$field_html = FormRenderSubmit($name, $attributes);
+	break;
+    case "image":
+	$field_html = FormRenderImage($name, $attributes);
 	break;
     case "checkbox":
 	$field_html = FormRenderCheckBox($name, $attributes);
@@ -261,6 +315,9 @@ function FormRenderElement($name, $attributes, $submitted)
 	break;
     case "table":
 	$field_html = FormRenderTable($name, $attributes, $submitted);
+	break;
+    case "list":
+	$field_html = FormRenderList($name, $attributes, $submitted);
 	break;
     }
     return $field_html;
@@ -311,7 +368,8 @@ function FormRenderElements($fields, $submitted)
 	    }
 		
 	    $html .= "<tr>";
-	    if ($attributes['#type'] != "submit") {
+	    if ($attributes['#type'] != "submit" &&
+		!isset($attributes['#colspan'])) {
 		$html .= "<td $mouseover $cols>";
 
 		# Required fields mark with *
@@ -335,8 +393,11 @@ function FormRenderElements($fields, $submitted)
 		    $html .= "<td>$field_html</td>";
 		}
 	    }
-	    else 
+	    else {
+		$html .= "<td align=center colspan=2>";
 		$html .= "$field_html";
+		$html .= "</td>\n";
+	    }
 	    $html .= "</tr>\n";
 	}
     }
@@ -416,30 +477,76 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
     echo "$html\n";
 }
 
-function FormValidate($form, &$errors, $fields, $submitted)
+function FormValidateElement($name, &$errors, $attributes, &$submitted)
+{
+    # Check for required fields not filled out
+    if (isset($attributes['#required']) && $attributes['#required'] &&
+	!(isset($submitted[$name]) && $submitted[$name] != "")) {
+	$errors[$attributes['#label']] = "Missing required value";
+    }
+    elseif (isset($attributes['#checkslot'])) {
+	$check = $attributes['#checkslot'];
+	
+	if (function_exists($check)) {
+	    $check($name, $errors, $attributes, $submitted[$name]);
+	}
+	elseif (preg_match("/^([-\w]+):([-\w]+)$/", $check, $matches)) {
+	    #
+	    # What if not required and not set?
+	    #
+	    if (!isset($submitted[$name]) || $submitted[$name] == "") {
+		$submitted[$name] = "";
+	    }
+	    if (!TBcheck_dbslot($submitted[$name],
+				$matches[1], $matches[2],
+				TBDB_CHECKDBSLOT_WARN|
+				TBDB_CHECKDBSLOT_ERROR)) {
+		$errors[$attributes['#label']] = TBFieldErrorString();
+	    }
+	}
+	elseif (substr($check, 0, 1) == "/") {
+	    # Regular expression.
+	    if (!preg_match($check, $submitted[$name])) {
+		$errors[$attributes['#label']] = "Illegal characters";
+	    }
+	}
+	else {
+	    TBERROR("Could not parse checkslot: $check", 1);
+	}
+    }
+}
+
+function FormValidate($form, &$errors, $fields, &$submitted)
 {
     while (list ($name, $attributes) = each ($fields)) {
-        # Check for required fields not filled out
-	if (isset($attributes['#required']) && $attributes['#required'] &&
-	    !(isset($submitted[$name]) && $submitted[$name] != "")) {
-	    $errors[$attributes['#label']] = "Missing required value";
-	}
-	else if (isset($attributes['#checkslot']) &&
-		 isset($submitted[$name]) && $submitted[$name] != "") {
-	    # Check slot
-	    if (preg_match("/^([-\w]+):([-\w]+)$/",
-			   $attributes['#checkslot'], $matches)) {
-
-		if (!TBcheck_dbslot($submitted[$name],
-				    $matches[1], $matches[2],
-				    TBDB_CHECKDBSLOT_WARN|
-				    TBDB_CHECKDBSLOT_ERROR)) {
-		    $errors[$attributes['#label']] = TBFieldErrorString();
-		}
+	switch ($attributes['#type']) {
+	case "textfield":
+	case "password":
+	case "hidden":
+	case "submit":
+	case "checkbox":
+	case "radio":
+	case "file":
+	case "select":
+	    FormValidateElement($name, $errors, $attributes, $submitted);
+	    break;
+	case "checkboxes":
+	    while (list ($subname, $subattrs) = each ($attributes['#boxes'])) {
+		FormValidateElement($subname, $errors, $subattrs, $submitted);
 	    }
-	    else {
-		TBERROR("Could not parse " . $attributes['#checkslot'], 1);
+	    break;
+	case "table":
+	    FormValidate($form, $errors, $attributes['#fields'], $submitted);
+	    break;
+	case "list":
+	    while (list ($subname, $subattrs) =
+		   each ($attributes['#elements'])) {
+		FormValidateElement($subname, $errors, $subattrs, $submitted);
 	    }
+	    break;
+	default:
+	    $errors[$name] = "Invalid slot type: " . $attributes['#type'];
+	    break;
 	}
     }
 }

@@ -96,6 +96,7 @@ $url_mapping["template_metadata"]   = "template_metadata.php";
 $url_mapping["template_modify"]     = "template_modify.php";
 $url_mapping["template_show"]       = "template_show.php";
 $url_mapping["template_swapin"]     = "template_swapin.php";
+$url_mapping["template_search"]     = "template_search.php";
 $url_mapping["record_revise"]       = "record_revise.php";
 $url_mapping["linkgraph_image"]     = "linkgraph_image.php";
 $url_mapping["resendapproval"]      = "resendapproval.php";
@@ -106,6 +107,7 @@ $url_mapping["statechange"]         = "statechange.php";
 $url_mapping["experimentrun_show"]  = "experimentrun_show.php";
 $url_mapping["instance_show"]       = "instance_show.php";
 $url_mapping["cvswebwrap"]          = "cvsweb/cvswebwrap.php3";
+$url_mapping["profile"]             = "profile.php";
 	     
 #
 # The caller will pass in a page id, and a list of things. If the thing
