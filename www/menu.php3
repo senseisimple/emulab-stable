@@ -13,6 +13,7 @@ $autorefresh      = 0;
 $javascript_debug = 0;
 $currentusage     = 1;
 $currently_busy   = 0;
+$sortedtables     = array();
 $bodyclosestring  = "";
 
 #
@@ -41,6 +42,13 @@ else {
 # item that starts a new group.
 $nextsidebarcl    = "";
 $nextsubmenucl    = "";
+
+# Add a table id to the list of sorted tables to initialize on current page.
+function AddSortedTable($id) {
+    global $sortedtables;
+
+    $sortedtables[] = $id;
+}
 
 #
 # TOPBARCELL - Make a cell for the topbar. Actually, the name lies, it can be
@@ -966,6 +974,15 @@ function PAGEFOOTER($view = NULL) {
 
     # Plug the home site from all others.
     echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
+
+    # Prime all the sortable tables.
+    if (count($sortedtables)) {
+	echo "<script type='text/javascript' language='javascript'>\n";
+	foreach ($sortedtables as $i => $id) {
+	    echo "sorttable.makeSortable(getObjbyName('$id'));\n";
+	}
+	echo "</script>\n";
+    }
 
     # This has to be after all the tooltip definitions.
     echo "<script type='text/javascript' src='${TBBASE}/js/wz_tooltip.js'>".
