@@ -59,7 +59,7 @@ $clauseselection = array('equal'     => "==",
 $form = array('#id'	  => 'myform',
 	      '#action'   => CreateURL("template_search", $root),
 	      '#caption'  => "Search your template (records) ".
-	                        "by parameter values');
+	                        "by parameter values");
 
 $fields = array();
 
