@@ -22,7 +22,8 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("group", PAGEARG_GROUP);
-$optargs = OptionalPageArguments("submit", PAGEARG_STRING);
+$optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
 
 #
 # The default group membership cannot be changed, but the trust levels can.
@@ -34,7 +35,7 @@ $pid = $group->pid();
 $gid = $group->gid();
 
 #
-# Verify permission. 
+# Verify permission.
 #
 if (! $group->AccessCheck($this_user, $TB_PROJECT_EDITGROUP)) {
     USERERROR("You do not have permission to edit group $gid in ".
@@ -58,9 +59,11 @@ if ($group->AccessCheck($this_user, $TB_PROJECT_BESTOWGROUPROOT)) {
 }
 
 #
-# Grab the current user list for the group. The group leader cannot be
-# removed! Do not include members that have not been approved to main
-# group either! This will force them to go through the approval page first.
+# Grab the current user list for the group. Provide a button selection
+# of people that can be removed. The group leader cannot be removed!
+# Do not include members that have not been approved
+# to main group either! This will force them to go through the approval
+# page first.
 #
 $curmembers = $group->MemberList();
 
@@ -69,180 +72,271 @@ $curmembers = $group->MemberList();
 # added. Do not include people in the above list, obviously! Do not
 # include members that have not been approved to main group either! This
 # will force them to go through the approval page first.
-# 
+#
 $nonmembers = $group->NonMemberList();
 
 #
-# First pass does checks. Second pass does the real thing. 
+# Spit the form out using the array of data.
 #
+function SPITFORM($formfields, $errors)
+{
+    global $group, $defaultgroup;
+    global $grabusers, $bestowgrouproot, $curmembers, $nonmembers;
+
+    if ($errors) {
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
+              <tr>
+                 <th align=center colspan=2>
+                   <font size=+1 color=red>
+                      &nbsp;Oops, please fix the following errors!&nbsp;
+                   </font>
+                 </td>
+              </tr>\n";
+
+	while (list ($name, $message) = each ($errors)) {
+	    echo "<tr>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
+                  </tr>\n";
+	}
+	echo "</table><br>\n";
+    }
+
+    #
+    # We do not allow the actual group info to be edited. Just the membership.
+    #
+    $group->Show();
+
+    echo "<br><center>
+	   Important <a href='docwrapper.php3?docname=groups.html#SECURITY'>
+	   security issues</a> are discussed in the
+	   <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+	  </center>\n";
+
+    if (count($curmembers) ||
+	($grabusers && count($nonmembers))) {
+	$url = CreateURL("editgroup", $group);
+	echo "<br>
+	      <table align=center border=1>
+	      <form action='$url' method=post>\n";
+    }
+
+    if (count($curmembers)) {
+	if ($defaultgroup) {
+	    echo "<tr><td align=center colspan=2 nowrap=1>
+		  <br>
+		  <font size=+1><b>Edit Trust Level</b></font>
+		  <br>
+		  You may edit trust level in the default group,<br>
+		    but you are not allowed to remove members.
+		  </td></tr>\n";
+	}
+	else {
+	    echo "<tr><td align=center colspan=2 nowrap=1>
+		  <br>
+		  <font size=+1><b>Remove/Edit Group Members.</b></font>
+		  <br>
+		  Deselect the ones you would like to remove,<br>
+		       or edit their trust value.
+		  </td></tr>\n";
+	}
+
+	foreach ($curmembers as $target_user) {
+	    $target_uid = $target_user->uid();
+	    $target_idx = $target_user->uid_idx();
+	    $trust      = $target_user->GetTempData();
+	    $showurl    = CreateURL("showuser", $target_user);
+
+	    if ($defaultgroup) {
+		echo "<tr>
+			 <td>
+			   <input type=hidden 
+				  name=\"formfields[change_$target_idx]\"
+				  value=permit>
+			      <A href='$showurl'>$target_uid &nbsp</A>
+			 </td>\n";
+	    }
+	    else {
+		echo "<tr>
+			 <td>   
+			   <input checked type=checkbox value=permit
+				  name=\"formfields[change_$target_idx]\">
+			      <A href='$showurl'>$target_uid &nbsp</A>
+			 </td>\n";
+	    }
+
+	    echo "   <td align=center>
+			<select name=\"formfields[U${target_idx}\$\$trust]\">\n";
+
+	    #
+	    # We want to have the current trust value selected in the menu.
+	    #
+	    if ($group->CheckTrustConsistency($target_user,
+					      TBDB_TRUSTSTRING_USER, 0)) {
+		echo "<option value='user' " .
+		    ((strcmp($trust, "user") == 0) ? "selected" : "") .
+			">User </option>\n";
+	    }
+	    if ($group->CheckTrustConsistency($target_user,
+					      TBDB_TRUSTSTRING_LOCALROOT, 0)) {
+		echo "<option value='local_root' " .
+		    ((strcmp($trust, "local_root") == 0) ? "selected" : "") .
+			">Local Root </option>\n";
+
+		#
+		# If group_root is already selected, or we have permission to set
+		# it, show it. Otherwise do not.
+		#
+		if (strcmp($trust, "group_root") == 0 || $bestowgrouproot) {
+		    echo "<option value='group_root' " .
+			((strcmp($trust, "group_root") == 0) ? "selected" : "") .
+			    ">Group Root </option>\n";
+		}
+	    }
+	    echo "        </select>
+		       </td>\n";
+	}
+	echo "</tr>\n";
+	reset($curmembers);
+    }
+
+    if ($grabusers && count($nonmembers)) {
+	echo "<tr><td align=center colspan=2 nowrap=1>
+	      <br>
+	      <font size=+1><b>Add Group Members</b></font>[<b>1</b>].
+		 <br>
+		 Select the ones you would like to add.<br>
+		 Be sure to select the appropriate trust level.
+	      </td></tr>\n";
+
+	foreach ($nonmembers as $target_user) {
+	    $target_uid = $target_user->uid();
+	    $target_idx = $target_user->uid_idx();
+	    $trust      = $target_user->GetTempData();
+	    $showurl    = CreateURL("showuser", $target_user);
+
+	    echo "<tr>
+		     <td>
+		       <input type=checkbox value=permit 
+			      name=\"formfields[add_$target_idx]\">
+			  <A href='$showurl'>$target_uid &nbsp</A>
+		     </td>\n";
+
+	    echo "   <td align=center>
+		       <select name=\"formfields[U${target_idx}\$\$trust]\">\n";
+
+	    if ($group->CheckTrustConsistency($target_user,
+					      TBDB_TRUSTSTRING_USER, 0)) {
+		echo "<option value='user' " .
+		    ((strcmp($trust, "user") == 0) ? "selected" : "") .
+			">User</option>\n";
+	    }
+	    if ($group->CheckTrustConsistency($target_user,
+					      TBDB_TRUSTSTRING_LOCALROOT, 0)) {
+		echo "<option value='local_root' " .
+		    ((strcmp($trust, "local_root") == 0) ? "selected" : "") .
+			">Local Root</option>\n";
+
+		if ($bestowgrouproot) {
+		    echo "<option value='group_root' " .
+			((strcmp($trust, "group_root") == 0) ? "selected" : "") .
+			    ">Group Root</option>\n";
+		}
+	    }
+	    echo "        </select>
+		</td>\n";
+	}
+	echo "</tr>\n";
+	reset($nonmembers);
+    }
+
+    if (count($curmembers) ||
+	($grabusers && count($nonmembers))) {
+	echo "<tr>
+		 <td align=center colspan=2>
+		     <b><input type=submit name=submit value=Submit></b>
+		 </td>
+	      </tr>\n";
+
+	echo "</form>
+	      </table>\n";
+    }
+    else {
+	echo "<br><center>
+	       <em>There are no project members who are eligible to be added
+		   or removed from this group[<b>1</b>].</em>
+		 </center>\n";
+    }
+
+    echo "<h4><blockquote><blockquote><blockquote>
+	  <ol>
+	   <li> Only members who have already been approved to the main
+		project will be listed. If a project member is missing, please
+		go to <a href=approveuser_form.php3>New User Approval</a>
+		and approve the user to the main project group. Then you can
+		reload this page and add those members to other groups in your
+		project.\n";
+    echo "</ol>
+	  </blockquote></blockquote></blockquote>
+	  </h4>\n";
+}
 
 #
-# Go through the list of current members. For each one, check to see if
-# the checkbox for that person was checked. If not, delete the person
-# from the group membership. Otherwise, look to see if the trust level
-# has been changed.
+# Accumulate error reports for the user, e.g.
+#    $errors["Key"] = "Msg";
+# Required page args may need to be checked early.
+$errors  = array();
+
+#
+# On first load, display a virgin form and exit.
+#
+if (!isset($submit) || !isset($formfields)) {
+    $defaults = array();
+
+    SPITFORM($defaults, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+# Check that the formfields members are at least formatted correctly.
+if (isset($formfields)) {
+    foreach ($formfields as $key => $value) {
+	if ( !((preg_match("/^change_[0-9]+$/", $key) ||
+		preg_match("/^add_[0-9]+$/", $key)) &&
+	       $value=="permit") &&
+             !(preg_match("/^U[0-9]+\\$\\\$trust$/", $key) &&
+	       ($value=="user" || $value=="local_root" || 
+		$value=="group_root")) ) {
+	    $errors["Args"] = "Invalid form arguments! $key=$value";
+	}
+    }
+}
+
+#
+# If any errors, respit the form with the current values and the
+# error messages displayed. Iterate until happy.
 # 
-if (count($curmembers)) {
-    foreach ($curmembers as $target_user) {
-	$target_uid = $target_user->uid();
-	$target_idx = $target_user->uid_idx();
-	$oldtrust   = $target_user->GetTempData();
-	$foo        = "change_$target_idx";
-
-	#
-	# Is member to be deleted?
-	# 
-	if (!$defaultgroup && !isset($HTTP_POST_VARS[$foo])) {
-            # Yes.
-	    continue;
-	}
-
-        #
-        # There should be a corresponding trust variable in the POST vars.
-        # Note that we construct the variable name and indirect to it.
-        #
-        $foo      = "U${target_idx}\$\$trust";
-	$newtrust = $HTTP_POST_VARS[$foo];
-	
-	if (!$newtrust || strcmp($newtrust, "") == 0) {
-	    TBERROR("Error finding trust for $target_uid in editgroup", 1);
-	}
-
-	if (strcmp($newtrust, TBDB_TRUSTSTRING_USER) &&
-	    strcmp($newtrust, TBDB_TRUSTSTRING_LOCALROOT) &&
-	    strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT)) {
-	    TBERROR("Invalid trust $newtrust for $target_uid in editgroup", 1);
-	}
-
-	#
-	# If the user is attempting to bestow group_root on a user who 
-	# did not previously have group_root, check to see if the operation is
-	# permitted.
-	#
-	if (strcmp($newtrust, $oldtrust) &&
-	    !strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT) && 
-	    !$bestowgrouproot) {
-	    USERERROR("You do not have permission to bestow group root".
-		      "trust to users in $pid/$gid!", 1 );
-	}
-
-	$group->CheckTrustConsistency($target_user, $newtrust, 1);
-    }
-    reset($curmembers);
+if (count($errors)) {
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
 }
 
 #
-# Go through the list of non members. For each one, check to see if
-# the checkbox for that person was checked. If so, add the person
-# to the group membership, with the trust level specified.
-# Only do this if user has permission to grab users. 
+# The trust args are in the formfields array by keyword/value.
 #
-
-if ($grabusers && !$defaultgroup && count($nonmembers)) {
-    foreach ($nonmembers as $target_user) {
-	$target_uid = $target_user->uid();
-	$target_idx = $target_user->uid_idx();
-	$foo        = "add_$target_idx";    
-	
-	if (isset($HTTP_POST_VARS[$foo]) && $HTTP_POST_VARS[$foo] == "permit"){
-	    #
-	    # There should be a corresponding trust variable in the POST vars.
-	    # Note that we construct the variable name and indirect to it.
-	    #
-	    $bar      = "U${target_idx}\$\$trust";
-	    $newtrust = $HTTP_POST_VARS[$bar];
-	    
-	    if (!$newtrust || strcmp($newtrust, "") == 0) {
-		TBERROR("Error finding trust for $target_uid", 1);
-	    }
-	    
-	    if (strcmp($newtrust, TBDB_TRUSTSTRING_USER) &&
-		strcmp($newtrust, TBDB_TRUSTSTRING_LOCALROOT) &&
-		strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT)) {
-		TBERROR("Invalid trust $newtrust for $target_uid", 1);
-	    }
-
-	    if (!strcmp($newtrust, TBDB_TRUSTSTRING_GROUPROOT)
-		&& !$bestowgrouproot) {
-		USERERROR("You do not have permission to bestow group root".
-			  "trust to users in $pid/$gid!", 1 );
-	    }
-	    $group->CheckTrustConsistency($target_user, $newtrust, 1);
-	}
-    }
-    reset($nonmembers);
+if (! ($result = Group::EditGroup($group, $uid, $formfields, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
 }
 
-#
-# Now do the second pass, which makes the changes. 
-#
-# Grab the unix GID for running scripts.
-#
-$unix_gid = $group->unix_gid();
-
-STARTBUSY("Applying group membership changes");
-
-#
-# Go through the list of current members. For each one, check to see if
-# the checkbox for that person was checked. If not, delete the person
-# from the group membership. Otherwise, look to see if the trust level
-# has been changed.
-#
-if (count($curmembers)) {
-    foreach ($curmembers as $target_user) {
-	$target_uid = $target_user->uid();
-	$target_idx = $target_user->uid_idx();
-	$oldtrust   = $target_user->GetTempData();
-	$foo        = "change_$target_idx";    
-
-	if (!$defaultgroup && !isset($HTTP_POST_VARS[$foo])) {
-	    SUEXEC($uid, $unix_gid, "webmodgroups -r $pid:$gid $target_uid",
-		   SUEXEC_ACTION_DIE);
-	    continue;
-	}
-        #
-        # There should be a corresponding trust variable in the POST vars.
-        # Note that we construct the variable name and indirect to it.
-        #
-        $foo      = "U${target_idx}\$\$trust";
-	$newtrust = $HTTP_POST_VARS[$foo];
-	
-	if (strcmp($oldtrust,$newtrust)) {
-	    SUEXEC($uid, $unix_gid,
-		   "webmodgroups -m $pid:$gid:$newtrust $target_uid",
-		   SUEXEC_ACTION_DIE);
-	}
-    }
-}
-
-#
-# Go through the list of non members. For each one, check to see if
-# the checkbox for that person was checked. If so, add the person
-# to the group membership, with the trust level specified.
-# 
-
-if ($grabusers && !$defaultgroup && count($nonmembers)) {
-    foreach ($nonmembers as $target_user) {
-	$target_uid = $target_user->uid();
-	$target_idx = $target_user->uid_idx();
-	$foo        = "add_$target_idx";    
-	
-	if (isset($HTTP_POST_VARS[$foo]) && $HTTP_POST_VARS[$foo] == "permit"){
-	    #
-	    # There should be a corresponding trust variable in the POST vars.
-	    # Note that we construct the variable name and indirect to it.
-	    #
-	    $bar      = "U${target_idx}\$\$trust";
-	    $newtrust = $HTTP_POST_VARS[$bar];
-
-	    SUEXEC($uid, $unix_gid,
-		   "webmodgroups -a $pid:$gid:$newtrust $target_uid",
-		   SUEXEC_ACTION_DIE);
-	}
-    }
-}
-
-STOPBUSY();
+###STOPBUSY();
 
 #
 # Spit out a redirect so that the history does not include a post

@@ -566,6 +566,7 @@ REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','
 
 REPLACE INTO table_regex VALUES ('groups','project','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('groups','gid_idx','text','regex','^[\\d]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('groups','group_id','text','redirect','groups:gid',2,12,NULL);
 REPLACE INTO table_regex VALUES ('groups','group_leader','text','redirect','users:uid',2,8,NULL);
 REPLACE INTO table_regex VALUES ('groups','group_description','text','redirect','default:tinytext',0,256,NULL);

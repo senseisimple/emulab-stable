@@ -22,7 +22,8 @@ use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
-use vars qw($MEMBERLIST_FLAGS_UIDSONLY $MEMBERLIST_FLAGS_ALLUSERS);
+use vars qw($MEMBERLIST_FLAGS_UIDSONLY $MEMBERLIST_FLAGS_ALLUSERS
+	    $MEMBERLIST_FLAGS_GETTRUST);
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -42,6 +43,7 @@ my $debug      = 0;
 # MemberList flags.
 $MEMBERLIST_FLAGS_UIDSONLY	= 0x01;
 $MEMBERLIST_FLAGS_ALLUSERS	= 0x02;
+$MEMBERLIST_FLAGS_GETTRUST	= 0x04;
 
 # Little helper and debug function.
 sub mysystem($)
@@ -343,6 +345,262 @@ sub Delete($)
 }
 
 #
+# Worker class method to edit group membership.
+# Makes two passes, first checking consistency, then updating the DB.
+#
+sub EditGroup($$$$)
+{
+    my ($class, $group, $this_user, $argref, $usrerr_ref) = @_;
+
+    my %mods;
+    my $noreport;
+
+    #
+    # The default group membership cannot be changed, but the trust levels can.
+    #
+    my $defaultgroup = $group->IsProjectGroup();
+
+    #
+    # See if user is allowed to add non-members to group.
+    # 
+    my $grabusers = 0;
+    if ($group->AccessCheck($this_user, TB_PROJECT_GROUPGRABUSERS())) {
+	$grabusers = 1;
+    }
+
+    #
+    # See if user is allowed to bestow group_root upon members of group.
+    # 
+    my $bestowgrouproot = 0;
+    if ($group->AccessCheck($this_user, TB_PROJECT_BESTOWGROUPROOT())) {
+	$bestowgrouproot = 1;
+    }
+
+    #
+    # Grab the user list for the group. Provide a button selection of people
+    # that can be removed. The group leader cannot be removed!
+    # Do not include members that have not been approved
+    # to main group either! This will force them to go through the approval
+    # page first.
+    #
+    my @curmembers;
+    if ($group->MemberList(\@curmembers, $MEMBERLIST_FLAGS_GETTRUST)) {
+	$$usrerr_ref = "Error: Could not get member list for $group";
+	return undef;
+    }
+
+    #
+    # Grab the user list from the project. These are the people who can be
+    # added. Do not include people in the above list, obviously! Do not
+    # include members that have not been approved to main group either! This
+    # will force them to go through the approval page first.
+    #
+    my @nonmembers;
+    if ($group->NonMemberList(\@nonmembers)) {
+	$$usrerr_ref = "Error: Could not get nonmember list for $group";
+	return undef;
+    }
+
+    #
+    # First pass does checks. Second pass does the real thing. 
+    #
+
+    my $g_pid = $group->pid();
+    my $g_gid = $group->gid();
+    my $target_user;
+    my $target_idx;
+    my $target_uid;
+    my $oldtrust;
+    my $newtrust;
+    my $foo;
+    my $bar;
+    my $cmd;
+    my $cmd_out;
+
+    #
+    # Go through the list of current members. For each one, check to see if
+    # the checkbox for that person was checked. If not, delete the person
+    # from the group membership. Otherwise, look to see if the trust level
+    # has been changed.
+    #
+    if ($#curmembers>=0) {
+	foreach $target_user (@curmembers) {
+	    $target_uid = $target_user->uid();
+	    $target_idx = $target_user->uid_idx();
+	    $oldtrust   = $target_user->GetTempData();
+	    $foo        = "change_$target_idx";
+
+	    #
+	    # Is member to be deleted?
+	    # 
+	    if (!$defaultgroup && !exists($argref->{$foo})) {
+		# Yes.
+		next;
+	    }
+
+	    #
+	    # There should be a corresponding trust variable in the POST vars.
+	    # Note that we construct the variable name and indirect to it.
+	    #
+	    $foo      = "U${target_idx}\$\$trust";
+	    if (!exists($argref->{$foo}) || $argref->{$foo} eq "") {
+		$$usrerr_ref = "Error: finding trust(1) for $target_uid";
+		return undef;
+	    }
+	    $newtrust = $argref->{$foo};
+
+	    if ($newtrust ne $Group::MemberShip::TRUSTSTRING_USER &&
+		$newtrust ne $Group::MemberShip::TRUSTSTRING_LOCALROOT &&
+		$newtrust ne $Group::MemberShip::TRUSTSTRING_GROUPROOT) {
+		$$usrerr_ref = "Error: Invalid trust $newtrust for $target_uid";
+		return undef;
+	    }
+
+	    #
+	    # If the user is attempting to bestow group_root on a user who 
+	    # did not previously have group_root, check to see if the operation is
+	    # permitted.
+	    #
+	    if ($newtrust ne $oldtrust &&
+		$newtrust eq $Group::MemberShip::TRUSTSTRING_GROUPROOT && 
+		!$bestowgrouproot) {
+		$$usrerr_ref = "Group: You do not have permission to bestow".
+		    " group root trust to users in $g_pid/$g_gid!";
+	    }
+
+	    $group->Group::MemberShip::CheckTrustConsistency($target_user, 
+							     $newtrust, 1);
+	}
+    }
+
+    #
+    # Go through the list of non members. For each one, check to see if
+    # the checkbox for that person was checked. If so, add the person
+    # to the group membership, with the trust level specified.
+    # Only do this if user has permission to grab users. 
+    #
+
+    if ($grabusers && !$defaultgroup && $#nonmembers>=0) {
+	foreach $target_user (@nonmembers) {
+	    $target_uid = $target_user->uid();
+	    $target_idx = $target_user->uid_idx();
+	    $foo        = "add_$target_idx";    
+
+	    if (exists($argref->{$foo}) && $argref->{$foo} eq "permit"){
+		#
+		# There should be a corresponding trust variable in the POST vars.
+		# Note that we construct the variable name and indirect to it.
+		#
+		$bar = "U${target_idx}\$\$trust";
+		if (!exists($argref->{$bar}) || $argref->{$bar} eq "") {
+		    $$usrerr_ref = "Error: finding trust(2) for $target_uid";
+		    return undef;
+		}
+		$newtrust = $argref->{$bar};
+
+		if ($newtrust ne $Group::MemberShip::TRUSTSTRING_USER &&
+		    $newtrust ne $Group::MemberShip::TRUSTSTRING_LOCALROOT &&
+		    $newtrust ne $Group::MemberShip::TRUSTSTRING_GROUPROOT) {
+		    $$usrerr_ref = "Error: " .
+			"Invalid trust $newtrust for $target_uid";
+		    return undef;
+		}
+
+		if ($newtrust eq $Group::MemberShip::TRUSTSTRING_GROUPROOT
+		    && !$bestowgrouproot) {
+		    $$usrerr_ref = "Error: You do not have permission to".
+			" bestow group root trust to users in $g_pid/$g_gid!";
+		    return undef;
+		}
+		$group->Group::MemberShip::CheckTrustConsistency($target_user,
+								 $newtrust, 1);
+	    }
+	}
+    }
+
+    #
+    # Now do the second pass, which makes the changes. 
+    #
+
+    ### STARTBUSY("Applying group membership changes");
+
+    #
+    # Go through the list of current members. For each one, check to see if
+    # the checkbox for that person was checked. If not, delete the person
+    # from the group membership. Otherwise, look to see if the trust level
+    # has been changed.
+    #
+    if ($#curmembers>=0) {
+	foreach $target_user (@curmembers) {
+	    $target_uid = $target_user->uid();
+	    $target_idx = $target_user->uid_idx();
+	    $oldtrust   = $target_user->GetTempData();
+	    $foo        = "change_$target_idx";
+
+	    if (!$defaultgroup && !exists($argref->{$foo})) {
+		$cmd = "modgroups -r $g_pid:$g_gid $target_uid";
+		##print $cmd . "\n";
+		$cmd_out = `$cmd`;
+		if ($?) {
+		    $$usrerr_ref = "Error: " . $cmd_out;
+		    return undef;
+		}
+	    }
+	    #
+	    # There should be a corresponding trust variable in the POST vars.
+	    # Note that we construct the variable name and indirect to it.
+	    #
+	    $foo      = "U${target_idx}\$\$trust";
+	    $newtrust = $argref->{$foo};
+
+	    if ($oldtrust ne $newtrust) {
+		$cmd = "modgroups -m $g_pid:$g_gid:$newtrust $target_uid";
+		##print $cmd . "\n";
+		$cmd_out = `$cmd`;
+		if ($?) {		
+		    $$usrerr_ref = "Error: " . $cmd_out;
+		    return undef;
+		}
+	    }
+	}
+    }
+
+    #
+    # Go through the list of non members. For each one, check to see if
+    # the checkbox for that person was checked. If so, add the person
+    # to the group membership, with the trust level specified.
+    #
+
+    if ($grabusers && !$defaultgroup && $#nonmembers>=0) {
+	foreach $target_user (@nonmembers) {
+	    $target_uid = $target_user->uid();
+	    $target_idx = $target_user->uid_idx();
+	    $foo        = "add_$target_idx";    
+
+	    if (exists($argref->{$foo}) && $argref->{$foo} eq "permit"){
+		#
+		# There should be a corresponding trust variable in the POST vars.
+		# Note that we construct the variable name and indirect to it.
+		#
+		$bar      = "U${target_idx}\$\$trust";
+		$newtrust = $argref->{$bar};
+
+		$cmd = "modgroups -a $g_pid:$g_gid:$newtrust $target_uid";
+		##print $cmd . "\n";
+		$cmd_out = `$cmd`;
+		if ($?) {
+		    $$usrerr_ref = "Error: " . $cmd_out;
+		    return undef;
+		}
+
+	    }
+	}
+    }
+
+    return 1;
+}
+
+#
 # Generic function to look up some table values given a set of desired
 # fields and some conditions. Pretty simple, not widely useful, but it
 # helps to avoid spreading queries around then we need to. 
@@ -493,7 +751,7 @@ sub AccessCheck($$$)
 	    return 1;
 	}
 
-	if ($gid == $pid)  {
+	if ($gid eq $pid)  {
 	    #
 	    # Only project_root can bestow group_root in default group, 
 	    # and we already established that they are not project_root,
@@ -858,6 +1116,9 @@ sub LeaderMailList($)
 sub MemberList($$;$$)
 {
     my ($self, $prval, $flags, $desired_trust) = @_;
+    my $exclude_leader = 1;	# Could be controlled by a flag.
+    my $leader	       = $self->GetLeader();
+    my $leader_idx     = $leader->uid_idx();
 
     # Must be a real reference. 
     return -1
@@ -870,6 +1131,7 @@ sub MemberList($$;$$)
     my $pid_idx    = $self->pid_idx();
     my @result     = ();
     my $uids_only  = ($flags & $MEMBERLIST_FLAGS_UIDSONLY ? 1 : 0);
+    my $gettrust   = ($flags & $MEMBERLIST_FLAGS_GETTRUST ? 1 : 0);
     my $trust_clause;
 
     if (defined($desired_trust)) {
@@ -883,7 +1145,7 @@ sub MemberList($$;$$)
     }
 
     my $query_result =
-	DBQueryWarn("select distinct m.uid_idx,m.uid ".
+	DBQueryWarn("select distinct m.uid_idx,m.uid,m.trust ".
 		    "   from group_membership as m ".
 		    "where m.pid_idx='$pid_idx' and ".
 		    "      m.gid_idx='$gid_idx' $trust_clause");
@@ -891,7 +1153,67 @@ sub MemberList($$;$$)
     return -1
 	if (!$query_result);
 
-    while (my ($uid_idx, $uid) = $query_result->fetchrow_array()) {
+    while (my ($uid_idx, $uid, $trust) = $query_result->fetchrow_array()) {
+
+	if ($exclude_leader && $leader_idx == $uid_idx) {
+	    next;
+	}
+	
+	if ($uids_only) {
+	    push(@result, $uid);
+	    next;
+	}
+	
+	my $user = User->Lookup($uid_idx);
+	if (!defined($user)) {
+	    print "Group::Memberlist: Could not map $uid_idx to object\n";
+	    return undef;
+	}
+	if ($gettrust) {
+	    # So caller can get this with GetTempData.
+	    $user->SetTempData($trust);
+	}
+	push(@result, $user);
+    }
+    @$prval = @result;
+    return 0;
+}
+
+#
+# Grab the user list from the project. These are the people who can be
+# added. Do not include people in the above list, obviously! Do not
+# include members that have not been approved to main group either! This
+# will force them to go through the approval page first.
+#
+sub NonMemberList($$;$)
+{
+    my ($self, $prval, $flags) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $flags = 0
+	if (!defined($flags));
+
+    my $gid_idx    = $self->gid_idx();
+    my $pid_idx    = $self->pid_idx();
+    my @result     = ();
+    my $uids_only  = ($flags & $MEMBERLIST_FLAGS_UIDSONLY ? 1 : 0);
+
+    my $query_result =
+	DBQueryFatal("select m.uid_idx from group_membership as m ".
+		     "left join group_membership as a on ".
+		     "     a.uid_idx=m.uid_idx and ".
+		     "     a.pid_idx=m.pid_idx and a.gid_idx='$gid_idx' ".
+		     "where m.pid_idx='$pid_idx' and ".
+		     "      m.gid_idx=m.pid_idx and a.uid_idx is NULL ".
+		     "      and m.trust!='none'");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($uid_idx, $uid, $trust) = $query_result->fetchrow_array()) {
 	if ($uids_only) {
 	    push(@result, $uid);
 	    next;
@@ -1216,6 +1538,108 @@ sub ModifyTrust($$)
 	or return -1;
 
     return Refresh($self);
+}
+
+#
+# Trust consistency.
+#
+sub CheckTrustConsistency($$$$)
+{
+    my ($self, $user, $newtrust, $fail) = @_;
+    my $uid	   = $user->uid();
+    my $pid	   = $self->pid();
+    my $gid	   = $self->gid();
+    my $uid_idx	   = $user->uid_idx();
+    my $pid_idx	   = $self->pid_idx();
+    my $gid_idx	   = $self->gid_idx();
+    my $trust_none = $TRUSTSTRING_NONE;
+    my $project	   = $self->Group::GetProject();
+
+    # 
+    # set $newtrustisroot to 1 if attempting to set a rootful trust,
+    # 0 otherwise.
+    #
+    my $newtrustisroot = TBTrustConvert($newtrust) > PROJMEMBERTRUST_USER() ? 1 : 0;
+
+    #
+    # If changing subgroup trust level, then compare levels.
+    # A user may not have root privs in the project and user privs
+    # in the subgroup; it makes no sense to do that and can violate trust.
+    #
+    my $projtrustisroot;
+    if ($pid_idx != $gid_idx) {
+	#
+	# Setting non-default "sub"group.
+	# Verify that if user has root in project,
+	# we are setting a rootful trust for him in 
+	# the subgroup as well.
+	#
+	$projtrustisroot =
+	    ($project->Trust($user) > PROJMEMBERTRUST_USER() ? 1 : 0);
+
+	if ($projtrustisroot > $newtrustisroot) {
+	    print("*** User $uid may not have a root trust level in ".
+		    "the default group of $pid, ".
+		    "yet be non-root in subgroup $gid!\n");
+	    return 0;
+	}
+    }
+    else {
+	#
+	# Setting default group.
+	# Do not verify anything (yet.)
+	#
+	my $projtrustisroot = $newtrustisroot;
+    }
+
+    #
+    # Get all the subgroups not equal to the subgroup being changed.
+    # 
+    my $query_result =
+	DBQueryFatal("select trust,gid from group_membership ".
+		     "where uid_idx='$uid_idx' and ".
+		     "      pid_idx='$pid_idx' and ".
+		     "      gid_idx!=pid_idx and ".
+		     "      gid_idx!='$gid_idx' and ".
+		     "      trust!='$trust_none'");
+
+    while (my ($grptrust, $ogid) = $query_result->fetchrow_array()) {
+
+	# 
+	# Get what the users trust level is in the 
+	# current subgroup we are looking at.
+	#
+	my $grptrustisroot = 
+	    TBTrustConvert($grptrust) > PROJMEMBERTRUST_USER() ? 1 : 0;
+
+	#
+	# If users trust level is higher in the default group than in the
+	# subgroup we are looking at, this is wrong.
+	#
+	if ($projtrustisroot > $grptrustisroot) {
+	    print("*** User $uid may not have a root trust level in ".
+		    "the default group of $pid, ".
+		    "yet be non-root in subgroup $ogid!/n");
+	    return 0;
+
+	}
+
+	if ($pid_idx != $gid_idx) {
+	    #
+	    # Iff we are modifying a subgroup, 
+	    # Make sure that the trust we are setting is as
+	    # rootful as the trust we already have set in
+	    # every other subgroup.
+	    # 
+	    if ($newtrustisroot != $grptrustisroot) { 
+		print("*** User $uid may not mix root and ".
+			"non-root trust levels in ".
+			"different subgroups of $pid!/n");
+		return 0;
+	    }
+	}
+    }
+    return 1;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -183,6 +183,21 @@ sub wikiname($)		{ return field($_[0], "wikiname"); }
 sub wikionly($)		{ return field($_[0], "wikionly"); }
 sub mailman_password($) { return field($_[0], "mailman_password"); }
 
+# Temporary data storage ... useful.
+sub GetTempData($$) { return field($_[0], "tempdata"); } 
+sub SetTempData($$) {
+
+    my ($self, $value) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $self->{'USER'}->{"tempdata"} = $value;
+
+    return 0;
+}
+
 #
 # Lookup user given a plain uid. For backwards compat.
 #

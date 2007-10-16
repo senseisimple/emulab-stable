@@ -182,6 +182,77 @@ class Group
     }
 
     #
+    # Class function to edit group membership.
+    #
+    function EditGroup($group, $uid, $args, &$errors) {
+	global $suexec_output, $suexec_output_array;
+
+        #
+        # Generate a temporary file and write in the XML goo.
+        #
+	$xmlname = tempnam("/tmp", "editgroup");
+	if (! $xmlname) {
+	    TBERROR("Could not create temporary filename", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+	if (! ($fp = fopen($xmlname, "w"))) {
+	    TBERROR("Could not open temp file $xmlname", 0);
+	    $errors[] = "Transient error; please try again later.";
+	    return null;
+	}
+
+	# Add these. Maybe caller should do this?
+	$args["group"]  = $group->gid_idx();
+
+	fwrite($fp, "<group>\n");
+	foreach ($args as $name => $value) {
+	    fwrite($fp, "<attribute name=\"$name\">");
+	    fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	    fwrite($fp, "</attribute>\n");
+	}
+	fwrite($fp, "</group>\n");
+	fclose($fp);
+	chmod($xmlname, 0666);
+
+	# Grab the unix GID for running scripts.
+	$unix_gid = $group->unix_gid();
+
+	$retval = SUEXEC($uid, $unix_gid, "webeditgroup $xmlname",
+			 SUEXEC_ACTION_IGNORE);
+
+	if ($retval) {
+	    if ($retval < 0) {
+		$errors[] = "Transient error; please try again later.";
+		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	    }
+	    else {
+		# unlink($xmlname);
+		if (count($suexec_output_array)) {
+		    for ($i = 0; $i < count($suexec_output_array); $i++) {
+			$line = $suexec_output_array[$i];
+			if (preg_match("/^([-\w]+):\s*(.*)$/",
+				       $line, $matches)) {
+			    $errors[$matches[1]] = $matches[2];
+			}
+			else
+			    $errors[] = $line;
+		    }
+		}
+		else
+		    $errors[] = "Transient error; please try again later.";
+	    }
+	    return null;
+	}
+	# There are no return value(s) to parse at the end of the output.
+
+	# Unlink this here, so that the file is left behind in case of error.
+	# We can then edit the group by hand from the xmlfile, if desired.
+	unlink($xmlname);
+	return true;
+    }
+
+    #
     # Load the project for a group lazily.
     #
     function LoadProject() {

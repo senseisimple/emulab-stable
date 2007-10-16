@@ -67,7 +67,7 @@ if ($showmenu) {
 
     if ($group->AccessCheck($this_user, $TB_PROJECT_EDITGROUP)) {
 	WRITESUBMENUBUTTON("Edit this Group",
-			   "editgroup_form.php3?pid=$pid&gid=$gid");
+			   "editgroup.php3?pid=$pid&gid=$gid");
     }
 
     #
