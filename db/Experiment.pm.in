@@ -1072,7 +1072,7 @@ sub SetBatchMode($$) {
 		     "     expt_locked is NULL and state='$reqstate'");
 
     my $success = $query_result->numrows;    # XXX Was DBAffectedRows().
-    dbqueryfatal("unlock tables");
+    DBQueryFatal("unlock tables");
 
     return ($success ? 0 : -1);
 }
