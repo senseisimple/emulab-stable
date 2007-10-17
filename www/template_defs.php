@@ -991,6 +991,58 @@ class Template
 
 	return 0;
     }
+
+    function SavedSearches($user) {
+	$guid    = $this->guid();
+	$vers    = $this->vers();
+	$uid_idx = $user->uid_idx();
+	
+	$query_result =
+	    DBQueryFatal("select name from experiment_template_searches ".
+			 "where parent_guid='$guid' and ".
+			 "      parent_vers='$vers' and uid_idx='$uid_idx'");
+
+	if (!mysql_num_rows($query_result))
+	    return null;
+
+	$result = array();
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $name = $row['name'];
+	    $result[$name] = $name;
+	}
+	return $result;
+    }
+    function SavedSearch($name, $user) {
+	$guid    = $this->guid();
+	$vers    = $this->vers();
+	$uid_idx = $user->uid_idx();
+	
+	$query_result =
+	    DBQueryFatal("select expr from experiment_template_searches ".
+			 "where parent_guid='$guid' and ".
+			 "      parent_vers='$vers' and ".
+			 "      uid_idx='$uid_idx'  and ".
+			 "      name='$name'");
+
+	if (!mysql_num_rows($query_result))
+	    return array();
+
+	$row = mysql_fetch_array($query_result);
+	return unserialize($row['expr']);
+    }
+    function DeleteSearch($name, $user) {
+	$guid    = $this->guid();
+	$vers    = $this->vers();
+	$uid_idx = $user->uid_idx();
+	
+	$query_result =
+	    DBQueryFatal("delete from experiment_template_searches ".
+			 "where parent_guid='$guid' and ".
+			 "      parent_vers='$vers' and ".
+			 "      uid_idx='$uid_idx'  and ".
+			 "      name='$name'");
+    }
 }
 
 #
