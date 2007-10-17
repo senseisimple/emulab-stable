@@ -13,15 +13,17 @@ include_once("form_defs.php");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$uid_idx   = $this_user->uid_idx();
 $isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
 #
-$reqargs = RequiredPageArguments("template",   PAGEARG_TEMPLATE);
-$optargs = OptionalPageArguments("search",     PAGEARG_STRING,
-				 "addclause",  PAGEARG_STRING,
-				 "formfields", PAGEARG_ARRAY); 
+$reqargs = RequiredPageArguments("template",     PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("search",       PAGEARG_STRING,
+				 "prevsearch",   PAGEARG_STRING,
+				 "addclause",    PAGEARG_STRING,
+				 "formfields",   PAGEARG_ARRAY); 
 
 #
 # Standard Testbed Header after argument checking.
@@ -95,6 +97,21 @@ $fields['matchif'] =
 	  '#checkslot'  => "/^(any|all)$/");
 
 #
+# User is given the option to save this search for later.
+#
+$fields['save'] = array('#type'    => 'list',
+			'#label'   => 'Save this search',
+			'#elements'=> array('savesearch' =>
+					    array('#type'       => 'checkbox',
+						  '#label'      => 'Yes',
+						  '#return_value'=> 1),
+					    'savename'   =>
+					    array('#type'       => 'textfield',
+						  '#label'      => 'Save Name',
+						  '#size'       => 20,
+						  '#maxlength'  => 64)));
+
+#
 # Grab a list of all parameters across all the templates and create
 # a list of input boxes.
 #
@@ -140,8 +157,43 @@ $fields['clausecount'] = array('#type'     => 'hidden',
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $form, $fields;
+    global $form, $fields, $root, $prevsearch, $this_user;
 
+    if (($savedsearches = $root->SavedSearches($this_user))) {
+	$action = CreateURL("template_search", $root);
+    
+	echo "<script language=JavaScript>
+              function PreviousSearch() {
+                  var index = document.prevsearch.prevselect.selectedIndex;
+                  document.prevsearch.target='_self';
+                  document.prevsearch.action='$action' + '&prevsearch=' +
+                     document.prevsearch.prevselect.options[index].value;
+                  document.prevsearch.submit();
+              }
+              </script>\n";
+	echo "<form name=prevsearch onsubmit=\"return false;\"
+                    action=foo method=post>\n";
+	echo FormRenderSelect("savedsearches",
+			      array('#type'      => 'select',
+				    '#default'   => 'Choose a Previous Search',
+				    '#options'   => $savedsearches,
+				    '#name'      => 'prevselect',
+				    '#javascript'=>
+				      "onchange=\"PreviousSearch();\""));
+	echo "</form>\n";
+    }
+
+    if (isset($prevsearch)) {
+	#
+	# Lets add a primitive mechanism to allow saved search deletion.
+	# Add a delete button to the saved search row.
+	#
+	$fields['save']['#elements']['deletesearch'] =
+	    array('#type'  => 'image',
+		  '#value' => "$prevsearch",
+		  '#image' => "trash.jpg");
+    }
+    
     $fields['submits'] =
 	array('#type'     => 'list',
 	      '#colspan'  => TRUE,
@@ -161,9 +213,14 @@ function SPITFORM($formfields, $errors)
 # On first load, display a virgin form and exit.
 #
 if (!isset($formfields)) {
-    $defaults = array();
-    $defaults["searchwhich"] = "template";
-    $defaults["matchif"]     = "any";
+    if (isset($prevsearch)) {
+	$defaults = $root->SavedSearch(addslashes($prevsearch), $this_user);
+    }
+    else {
+	$defaults = array();
+	$defaults["searchwhich"] = "template";
+	$defaults["matchif"]     = "any";
+    }
 
     SPITFORM($defaults, null);
     PAGEFOOTER();
@@ -173,6 +230,21 @@ if (!isset($formfields)) {
 if (!isset($formfields['clausecount']) ||
     $formfields['clausecount'] <= 0 || $formfields['clausecount'] > 20) {
     PAGEARGERROR("Invalid form arguments.");
+}
+
+#
+# Old searches. Process a deletion request before generating new list.
+#
+if (isset($formfields['deletesearch']) && $formfields['deletesearch'] != "" &&
+    TBcheck_dbslot($formfields['deletesearch'],
+		   "experiment_template_searches", "name",
+		   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+    $root->DeleteSearch(addslashes($formfields['deletesearch']), $this_user);
+    #
+    # Lets clear the saved search stuff.
+    #
+    unset($formfields['savesearch']);
+    unset($formfields['savename']);
 }
 
 #
@@ -295,6 +367,19 @@ function CheckValue($name, &$errors, $attributes, $value)
 }
 FormValidate($form, $errors, $fields, $formfields);
 
+# Check the save search stuff; easier then trying to automate it since 
+# I need to figure out how to automate correlated checks.
+if (isset($formfields['savesearch']) && $formfields['savesearch']) {
+    if (!isset($formfields['savename']) || $formfields['savename'] == "") {
+	$errors['Save Name'] = "Must provide a search save name";
+    }
+    elseif (!TBcheck_dbslot($formfields['savename'],
+			    "experiment_template_searches", "name",
+			    TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	$errors['Save Name'] = TBFieldErrorString();
+    }
+}
+
 #
 # If any errors, respit the form with the current values and the
 # error messages displayed. Iterate until happy.
@@ -364,9 +449,10 @@ elseif ($formfields["searchwhich"] == "instance") {
 	"select i.* from experiment_template_instance_bindings as b ".
 	"left join experiment_template_instances as i on ".
 	"     i.parent_guid=b.parent_guid and ".
-	"     i.parent_vers=b.parent_vers ".
+	"     i.parent_vers=b.parent_vers and ".
+	"     i.idx=b.instance_idx ".
 	"where b.parent_guid='$guid' and ($clausestring) ".
-	"group by i.parent_vers having count(i.parent_vers) $matchif";
+	"group by i.idx having count(i.idx) $matchif";
 }
 else {
     # This is complicated by the fact tha neither experiment_runs nor
@@ -378,7 +464,7 @@ else {
 	"left join experiment_runs as r on ".
 	"     r.exptidx=b.exptidx and r.idx=b.runidx ".
 	"where i.parent_guid='$guid' and ($clausestring) ".
-	"group by b.runidx having count(b.runidx) $matchif";
+	"group by i.idx,b.runidx having count(b.runidx) $matchif";
 }
 
 #TBERROR($query_string, 0);
@@ -388,6 +474,18 @@ if (!$query_result || !mysql_num_rows($query_result)) {
     $errors["Match Failure"] = "There were no matches";
     SPITFORM($formfields, $errors);
     return;
+}
+
+# Save this search to the DB if requested.
+if (isset($formfields['savesearch']) && $formfields['savesearch']) {
+    DBQueryWarn("replace into experiment_template_searches set ".
+		" uid_idx='$uid_idx', created=now(), ".
+		" parent_guid='$guid', ".
+		" parent_vers='" . $template->vers() . "'," .
+		" name='" . addslashes($formfields['savename']) . "'," .
+		" expr='" . addslashes(serialize($formfields)) . "'");
+    # Indicate that we are using a saved search, so that we get delete button.
+    $prevsearch = $formfields['savename'];
 }
 
 # Spit the form again so the user can change the search criteria.
