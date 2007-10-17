@@ -129,7 +129,14 @@ function FormRenderRadio($name, $attrs)
 
 function FormRenderSelect($name, $attrs)
 {
-    $html = "<select name=\"formfields[$name]\" ";
+    $html = "<select ";
+
+    if (array_key_exists('#name', $attrs)) {
+	$html .= " name='" . $attrs['#name'] . "' ";
+    }
+    else {
+	$html .= " name=\"formfields[$name]\" ";
+    }
     if (isset($attrs['#class'])) {
 	$html .= "class=\"" . $attrs['#class'] . "\" ";
     }
@@ -138,6 +145,9 @@ function FormRenderSelect($name, $attrs)
     }
     if (isset($attrs['#javascript'])) {
 	$html .= $attrs['#javascript'] . " ";
+    }
+    if (array_key_exists('#id', $attrs)) {
+	$html .= " id='" . $attrs['#id'] . "' ";
     }
     $html .= ">\n";
 
@@ -370,7 +380,7 @@ function FormRenderElements($fields, $submitted)
 	    $html .= "<tr>";
 	    if ($attributes['#type'] != "submit" &&
 		!isset($attributes['#colspan'])) {
-		$html .= "<td $mouseover $cols>";
+		$html .= "<td align=left $mouseover $cols>";
 
 		# Required fields mark with *
 		if (isset($attributes['#required']) &&
@@ -390,7 +400,7 @@ function FormRenderElements($fields, $submitted)
 		}
 		else {
 		    $html .= "</td>";
-		    $html .= "<td>$field_html</td>";
+		    $html .= "<td align=left>$field_html</td>";
 		}
 	    }
 	    else {
