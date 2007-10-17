@@ -908,7 +908,7 @@ function ENDPAGE() {
 function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
     global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring, $currently_busy;
-    global $login_user, $javascript_debug;
+    global $login_user, $javascript_debug, $sortedtables;
 
     if ($currently_busy) {
 	CLEARBUSY();
