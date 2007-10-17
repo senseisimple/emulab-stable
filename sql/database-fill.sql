@@ -909,13 +909,12 @@ REPLACE INTO table_regex VALUES ('os_info','osfeatures','text','regex','^[-\\w,]
 REPLACE INTO table_regex VALUES ('os_info','op_mode','text','regex','^[-\\w]*$',1,20,NULL);
 REPLACE INTO table_regex VALUES ('os_info','nextosid','text','redirect','os_info:osid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','reboot_waittime','int','redirect','default:int',0,2000,NULL);
-
 REPLACE INTO table_regex VALUES ('sitevariables','name','text','regex','^[\\w\\/]+$',1,255,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','value','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','reset','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','defaultvalue','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','description','text','redirect','default:text',0,0,NULL);
-
+REPLACE INTO table_regex VALUES ('experiment_template_searches','name','text','regex','^[-\\w]*$',2,64,NULL);
 --
 -- Dumping data for table `testsuite_preentables`
 --

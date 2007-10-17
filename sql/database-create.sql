@@ -845,6 +845,21 @@ CREATE TABLE `experiment_template_parameters` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `experiment_template_searches`
+--
+
+DROP TABLE IF EXISTS `experiment_template_searches`;
+CREATE TABLE `experiment_template_searches` (
+  `parent_guid` varchar(16) NOT NULL default '',
+  `parent_vers` smallint(5) unsigned NOT NULL default '0',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `name` varchar(64) NOT NULL default '',
+  `expr` mediumtext,
+  `created` datetime default NULL,
+  PRIMARY KEY  (`parent_guid`,`parent_vers`,`uid_idx`,`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `experiment_template_settings`
 --
 

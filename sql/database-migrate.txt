@@ -4170,3 +4170,14 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table images add `access_key` varchar(64) default NULL;
 
+4.133: Add a table to save template searches.
+
+	CREATE TABLE `experiment_template_searches` (
+	  `parent_guid` varchar(16) NOT NULL default '',
+	  `parent_vers` smallint(5) unsigned NOT NULL default '0',
+	  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+	  `name` varchar(64) NOT NULL default '',
+	  `expr` mediumtext,
+	  `created` datetime default NULL,
+	  PRIMARY KEY  (`parent_guid`,`parent_vers`,`uid_idx`,`name`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
