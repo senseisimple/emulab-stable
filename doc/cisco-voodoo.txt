@@ -199,6 +199,8 @@ ID  Name                            Members of VLAN
    To stop cloning:
       Console> (enable) set span disable <monitor>
 
+   NOTE: as of 10/11/07 bge0 on oboss has been taken over.  You could use
+         2/1, which is 100Mb fxp0 on oboss.
    NOTE: as of 12/14/06 we have bge0 on oboss attached to the control net
    switch (cisco2) so that it can be used for spanning.  Its cisco2 port
    is 9/13, use that for <monitor>.  Also note that you will have to have
