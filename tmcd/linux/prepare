@@ -14,7 +14,7 @@ require 'ctime.pl';
 #
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ();
-my @SYSVARDIRS  = ("lib/dhcp", "spool/clientmqueue", "log/audit");
+my @SYSVARDIRS  = ("lib/dhcp", "lib/dhcp3", "spool/clientmqueue", "log/audit");
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my @SOCKETS	= ("/dev/log", "/var/run/acpid.socket");
 my $FSTAB       = "/etc/fstab";
@@ -89,7 +89,7 @@ foreach my $dbfile (@DBFILES) {
 #
 if (!$noumount && -e "/share/freebsd") {
     print "Unmounting NFS filesystems ...\n";
-    if (!system("umount -t nfs")) {
+    if (!system("umount -at nfs")) {
 	#
 	# Note that this command will not remove anything if the NFS unmounts
 	# failed (and we didn't catch it) because the directories in question

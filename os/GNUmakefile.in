@@ -45,7 +45,7 @@ endif
 	$(MAKE) -C genhostsfile client
 
 client-install: client
-	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
+	-mkdir -p $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
@@ -83,7 +83,7 @@ cdboot-install: mfs-install frisbee-mfs
 	$(MAKE) -e -C growdisk client-install
 
 remote-install: 
-	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
+	-mkdir -p $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 

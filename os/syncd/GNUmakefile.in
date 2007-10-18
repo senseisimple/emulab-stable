@@ -43,7 +43,7 @@ client: all
 client-install: client
 	$(INSTALL_PROGRAM) emulab-syncd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd$(EXE)
 	$(INSTALL_PROGRAM) emulab-sync$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-sync$(EXE)
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)$(CLIENT_MANDIR)/man1
+	$(INSTALL) -m 755 -o root -d $(DESTDIR)$(CLIENT_MANDIR)/man1
 	$(INSTALL_DATA) $(SRCDIR)/emulab-syncd.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
 	$(INSTALL_DATA) $(SRCDIR)/emulab-sync.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
 

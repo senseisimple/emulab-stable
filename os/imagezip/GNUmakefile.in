@@ -185,7 +185,7 @@ install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip $(INSTALL_BINDI
 
 client: all
 client-install: client
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin
+	$(INSTALL) -m 755 -o root -d $(DESTDIR)/usr/local/bin
 	$(INSTALL_PROGRAM) -s imagezip$(EXE) $(DESTDIR)/usr/local/bin/imagezip$(EXE)
 	$(INSTALL_PROGRAM) -s imageunzip$(EXE) $(DESTDIR)/usr/local/bin/imageunzip$(EXE)
 	$(INSTALL_PROGRAM) -s imagedump$(EXE) $(DESTDIR)/usr/local/bin/imagedump$(EXE)

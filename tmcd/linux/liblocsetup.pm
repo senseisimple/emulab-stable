@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -590,7 +590,16 @@ sub os_useradd($$$$$$$$$)
     # Map the shell into a full path.
     $shell = MapShell($shell);
 
-    if (system("$USERADD -M -u $uid -g $gid $glist -p '$pswd' ".
+    #
+    # -M is Redhat only option?  Overrides default CREATE_HOME.
+    # So we see if CREATE_HOME is set and if so, use -M.
+    #
+    my $marg = "";
+    if (!system("grep -q CREATE_HOME /etc/login.defs")) {
+	$marg = "-M";
+    }
+
+    if (system("$USERADD $marg -u $uid -g $gid $glist -p '$pswd' ".
 	       "-d $homedir -s $shell -c \"$gcos\" $login") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;

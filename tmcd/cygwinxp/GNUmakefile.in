@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -77,8 +77,8 @@ sysetc-install:	dir-install ###ifcfgs
 	# Watchdog assumes the ssh keys are in /etc/ssh.
 	ln -f -s /etc /etc/ssh
 	# Boot log files have to be writable by root under rc.cygwin .
-	$(INSTALL) -c -m 775 -o root -g wheel -d /var/log
-	$(INSTALL) -c -m 775 -o root -g wheel -d /var/db
+	$(INSTALL) -c -m 775 -o root -d /var/log
+	$(INSTALL) -c -m 775 -o root -d /var/db
 	# Need an /etc/shells file for rc.acounts.
 	$(INSTALL) -m 755 $(SRCDIR)/shells /etc/shells
 
@@ -89,7 +89,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
-	$(INSTALL) -c -m 755 -o root -g wheel -d /sbin
+	$(INSTALL) -c -m 755 -o root -d /sbin
 	$(INSTALL) -m 755 $(SRCDIR)/reboot /sbin/reboot
 	# Put the tcsh desktop startup script in the CygWin root directory.
 	$(INSTALL) -m 755 $(SRCDIR)/cygwin-tcsh.bat /

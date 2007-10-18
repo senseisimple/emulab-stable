@@ -13,17 +13,20 @@
 #		and terminates any lingering daemons.
 
 # Source function library.
-. /etc/rc.d/init.d/functions
-
-# Source networking configuration.
-if [ ! -f /etc/sysconfig/network ]; then
-    exit 0
+if [ -f /etc/rc.d/init.d/functions ]; then
+    . /etc/rc.d/init.d/functions
 fi
 
-. /etc/sysconfig/network
+# Source networking configuration.
+if [ -f /etc/sysconfig/network ]; then
+    . /etc/sysconfig/network
+elif [ -f /lib/lsb/init-functions ]; then
+    . /lib/lsb/init-functions
+    NETWORKING=yes
+fi
 
 # Check that networking is up.
-[ ${NETWORKING} = "no" ] && exit 0
+[ "${NETWORKING}" = "no" ] && exit 0
 
 RETVAL=0
 
@@ -35,7 +38,7 @@ case "$1" in
 	# Note, /var/lock/subsys/testbed will be created at that time.
 	;;
   stop)
-  	rm /var/lock/subsys/testbed
+  	rm -f /var/lock/subsys/testbed /var/emulab/boot/controlif
 	echo "Shutting down testbed daemons (some may fail)..."
 	echo -n "  trafgen: "
 	killproc trafgen

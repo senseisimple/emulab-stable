@@ -9,7 +9,7 @@ EVENTSYS	= @EVENTSYS@
 OBJDIR		= ..
 SUBDIR		= tmcd
 
-SYSTEM	       := $(shell uname -s)
+SYSTEM	       := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -o)
 
 include $(OBJDIR)/Makeconf
 
@@ -36,10 +36,6 @@ TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
 
 ifeq ($(SYSTEM),Linux)
-RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\).*/Linux\1/')
-ifeq ($(RHLVERSION),)
-RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Fedora Core release \([0-9]\).*/Fedora\1/')
-endif
 ifneq ($(LDSTATIC),)
 NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 else
@@ -53,34 +49,46 @@ TMLIBS     += -lkrb5support
 endif
 endif
 TMLIBS  += -ldl
-ifeq ($(findstring Fedora,$(RHLVERSION)),Fedora)
-MDSUBDIR  = fedora
-else
-ifeq ($(RHLVERSION),Linux9)
-MDSUBDIR  = linux9
-else
+endif
+
+#
+# Take care of historic naming fubars:
+#	Redhat 7.x ->  linux
+#	Redhat 9.0 ->  linux9
+#	Fedora 4/6 ->  fedora
+#	Stargate 1  -> linux-sg
+#	FreeBSD 4.x -> freebsd
+#	Windows XP  -> cygwinxp
+#
+MDSUBDIR  := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -t)
+
+ifeq ($(SYSTEM),Linux)
+ifeq ($(MDSUBDIR),redhat7)
 MDSUBDIR  = linux
 endif
+ifeq ($(MDSUBDIR),redhat9)
+MDSUBDIR  = linux9
+endif
+ifeq ($(findstring fedora,$(MDSUBDIR)),fedora)
+MDSUBDIR  = fedora
+endif
+ifeq ($(MDSUBDIR),stargate1)
+MDSUBDIR  = linux-sg
 endif
 endif
 
 ifeq ($(SYSTEM),FreeBSD)
-FBSDVERSION    := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/freebsd\1/')
-ifeq ($(FBSDVERSION),freebsd4)
+ifeq ($(MDSUBDIR),freebsd4)
 MDSUBDIR  = freebsd
-else
-MDSUBDIR  = $(FBSDVERSION)
 endif
 endif
 
-ifeq ($(SYSTEM),CYGWIN_NT-5.1)
+ifeq ($(SYSTEM),Cygwin)
 # Cygwin on  Windows XP (a.k.a. NT 5.1) - resembles the Linux case.
+ifeq ($(MDSUBDIR),CYGWIN_NT-5.1)
 MDSUBDIR  = cygwinxp
 TMSLIBS   += -lminires
 endif
-
-ifeq ($(host_cpu),arm)
-MDSUBDIR  = linux-sg
 endif
 
 ifeq ($(EVENTSYS),1)

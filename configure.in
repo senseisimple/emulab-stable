@@ -882,7 +882,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux/sethostname.dhclient \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
-        tmcd/linux-sg/GNUmakefile \
+        tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
 	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \

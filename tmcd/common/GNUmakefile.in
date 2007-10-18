@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -50,16 +50,16 @@ other-install:
 	(cd ../../tools; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 
 dir-install:
-	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/lock
-	$(INSTALL) -m 755 -o root -g wheel -d $(TBBINDIR)
+	$(INSTALL) -m 755 -o root -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -d $(VARDIR)/lock
+	$(INSTALL) -m 755 -o root -d $(TBBINDIR)
 
 path-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/paths.pm $(ETCDIR)/paths.pm

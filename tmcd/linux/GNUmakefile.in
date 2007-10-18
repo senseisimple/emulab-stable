@@ -47,23 +47,23 @@ install client-install:	common-install etc-install \
 simple-install:	common-install script-install bin-install
 
 dir-install:
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/sysconfig
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/sysconfig/network-scripts
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/init.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc1.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(DEFRUNLVLDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc6.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/sup
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/sysconfig
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)/init.d
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)/rc1.d
+	$(INSTALL) -m 755 -o root -g root -d $(DEFRUNLVLDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)/rc6.d
+	$(INSTALL) -m 755 -o root -g root -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/sup
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/boot
 	-rm -rf $(DESTDIR)/etc/testbed
 	ln -s emulab $(DESTDIR)/etc/testbed
 	-rm -rf $(DESTDIR)/usr/local/etc/testbed
@@ -74,7 +74,7 @@ common-install:	dir-install
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
-	$(INSTALL) -m 750 -o root -g wheel -d $(DESTDIR)/root/.cvsup
+	$(INSTALL) -m 750 -o root -g root -d $(DESTDIR)/root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
@@ -103,7 +103,7 @@ sysetc-install:	dir-install ifcfgs
 	$(INSTALL) -m 755 $(SRCDIR)/tbprepare $(RCDIR)/init.d/tbprepare
 	-ln -sf $(RRCDIR)/init.d/tbprepare $(RCDIR)/rc1.d/K89tbprepare
 	-ln -sf $(RRCDIR)/init.d/tbprepare $(RCDIR)/rc6.d/K89tbprepare
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/cron.pend
 	if [ -e $(SYSETCDIR)/cron.daily/slocate.cron ]; then \
 		mv -f $(SYSETCDIR)/cron.daily/slocate.cron \
 				$(SYSETCDIR)/cron.pend; \
@@ -113,7 +113,9 @@ sysetc-install:	dir-install ifcfgs
 				$(SYSETCDIR)/cron.pend; \
 	fi
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(RCDIR)/rc.local
-	-ln -sf $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local
+	if [ "$(RCDIR)" != "$(SYSETCDIR)" ]; then \
+	    ln -sf $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local; \
+        fi
 
 sysetc-remove:
 	-rm -f $(RCDIR)/*/S95anacron $(RCDIR)/*/K05anacron 
@@ -137,7 +139,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 
 sfs-install:
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
+	$(INSTALL) -m 755 -o root -g root -d $(DESTDIR)/etc/sfs
 	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/init.d/sfs
 	-ln -sf $(RRCDIR)/init.d/nfs $(DEFRUNLVLDIR)/S20nfs
 	-ln -sf $(RRCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
