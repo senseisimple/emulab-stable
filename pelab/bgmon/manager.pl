@@ -29,13 +29,27 @@ my $debug    = 0;
 my $impotent = 0;
 my $evexpt   = "__none";
 my $bgmonexpt;
-my $default_bgmonexpt = "tbres/pelabbgmon";
 my ($server,$port,$cmdport);
 my %opt = ();
 if (!getopts("s:p:c:dih", \%opt)) {
     exit &usage;
 }
 
+#
+# Caps enforced on users and globally. Totally made-up.
+# Rates are in kilobytes / second, data transfer sizes are in kilobytes
+#
+my $USER_AVGRATE_CAP = 10 * 1024 / 8.0; # 10Mbps
+my $USER_DAILY_CAP = 1000 * 1024 * 1024 / 8.0; # 100Gbit
+my $USER_TOTAL_CAP = 2 * $USER_DAILY_CAP; # 200Gbit
+my $GLOBAL_AVGRATE_CAP = $USER_AVGRATE_CAP * 5;
+my $GLOBAL_DAILY_CAP = $USER_DAILY_CAP * 5;
+my $GLOBAL_TOTAL_CAP = $USER_TOTAL_CAP * 5;
+
+#
+# Keeps track of outstanding requests
+#
+my @requests;
 
 if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
@@ -108,7 +122,6 @@ while (1) {
 
     #check for pending received events from MANAGERCLIENTS
     event_poll_blocking($handle_mc, 100);
-
 
     #check for commands sent by the AUTOMANAGERCLIENT
     my @ready = $sel->can_read(1); #TODO: make non-blocking time longer?
@@ -211,7 +224,7 @@ sub callbackFunc($$$) {
 	    # only automanager can send "forever" edits (duration=0)
 	    if( isCmdValid(\%cmd) ){
 		print "sending cmd to $srcnode on behalf of $managerID\n";
-		sendcmd( $srcnode, \%cmd );
+                sendcmd( $srcnode, \%cmd );
 	    }
 
 	}
@@ -245,6 +258,7 @@ sub callbackFunc($$$) {
 	    my %cmd = ( expid     => $newexpid,
 			cmdtype   => $eventtype,
 			destnodes  => $destnodes,
+                        srcnode   => $srcnode,
 			testtype  => $testtype,
 			testper   => "$testper",
 			duration  => "$duration"
@@ -261,7 +275,7 @@ sub callbackFunc($$$) {
 #	    }
 	    if( isCmdValid(\%cmd) ){
 		print "sending cmd from $srcnode\n";
-		sendcmd( $srcnode, \%cmd );
+                sendcmd( $srcnode, \%cmd );
 	    }
 	}
 	elsif( $eventtype eq "STOPALL" ){
@@ -328,11 +342,174 @@ sub isCmdValid($)
                 #TODO: Commented out to prevent problems in our own tests.
 		#$cmdref->{duration} = "120";
 	    }
+
+            #
+            # Check to see if the request would exceed our caps on bandwidth
+            # rates and total bandwidth
+            # TODO: Only really works for INIT events now
+            #
+            if ($cmdref->{cmdtype} eq "INIT") {
+
+                # Start by clearing out any old requests that have expired
+                clear_expired_requests(\@requests);
+
+                my $totalbw = 0.0;
+                foreach my $dst (@destnodes) {
+                    my $pairbw = getBandwidth($cmdref->{srcnode},$dst);
+                    $totalbw += $pairbw;
+                }
+                # Duty cycle is the % of the time we'll be running a test
+                # XXX: This hardcodes the length of bandwidth tests!
+                my $dutycycle =  ($numDest * 5.0) / $cmdref->{testper};
+                # This is the average sending rate of the test at any point in
+                # time
+                my $avgrate = $totalbw * $dutycycle;
+                # This is how much traffic we can expect to send in a day
+                my $dailytransfer = $avgrate * 60 * 60 * 24;
+                # This is how much traffic we can expect to send over the
+                # duration of the requested test
+                my $totaltransfer = $avgrate * $cmdref->{duration};
+
+                # Add these stats up for all clients, and for all requests from
+                # this client
+                # XXX: Does not take into account the fact that higher-rate
+                # requests 'override', not add-to lower-rate ones
+                my ($globalAvgrate, $globalDailytransfer, $globalTotaltransfer);
+                my ($userAvgrate, $userDailytransfer, $userTotaltransfer);
+                $globalAvgrate = $userAvgrate = $avgrate;
+                $globalDailytransfer = $userDailytransfer = $dailytransfer;
+                $globalTotaltransfer = $userTotaltransfer = $totaltransfer;
+                foreach my $request (@requests) {
+                    my $samerequestor = ($request->{cmd}{managerID} eq
+                        $cmdref->{managerID});
+                    $globalAvgrate += $request->{avgrate};
+                    $globalDailytransfer += $request->{dailytransfer};
+                    $globalTotaltransfer += $request->{totaltransfer};
+                    if ($samerequestor) {
+                        $userAvgrate += $request->{avgrate};
+                        $userDailytransfer += $request->{dailytransfer};
+                        $userTotaltransfer += $request->{totaltransfer};
+                    }
+                }
+
+                #
+                # Check against limits - we don't actually reject any commands
+                # for now, just report that we would have
+                #
+                print "Command from $cmdref->{managerID} for ".
+                        "$cmdref->{testtype}\n";
+                print "  $numDest destination nodes, " .
+                        "period $cmdref->{testper}, " .
+                        "duration $cmdref->{duration}\n";
+                print "  total bandwidth $totalbw, duty cycle $dutycycle\n";
+                print "  avgrate = $avgrate dailytransfer = $dailytransfer " .
+                         "totalbw = $totalbw\n";
+                print "  userAvgrate = $userAvgrate " .
+                         "userDailytransfer = $userDailytransfer " .
+                         "userTotaltransfer = $userTotaltransfer\n";
+                print "  globalAvgrate = $globalAvgrate " .
+                         "globalDailytransfer = $globalDailytransfer " .
+                         "globalTotaltransfer = $globalTotaltransfer\n";
+
+                if ($userAvgrate > $USER_AVGRATE_CAP) {
+                    print "  REJECTED: user average rate cap exceeded\n";
+                }
+                if ($userDailytransfer > $USER_DAILY_CAP) {
+                    print "  REJECTED: user daily rate cap exceeded\n";
+                }
+                if ($userTotaltransfer > $USER_TOTAL_CAP) {
+                    print "  REJECTED: user total rate cap exceeded\n";
+                }
+                if ($globalAvgrate > $GLOBAL_AVGRATE_CAP) {
+                    print "  REJECTED: global average rate cap exceeded\n";
+                }
+                if ($globalDailytransfer > $GLOBAL_DAILY_CAP) {
+                    print "  REJECTED: global daily rate cap exceeded\n";
+                }
+                if ($globalTotaltransfer > $GLOBAL_TOTAL_CAP) {
+                    print "  REJECTED: global total rate cap exceeded\n";
+                }
+
+                if ($valid) {
+                    # Remember this request, so that we can track state between
+                    # requests
+                    my %request = ( cmd => $cmdref,
+                                    avgrate => $avgrate,
+                                    dailytransfer => $dailytransfer,
+                                    totaltransfer => $totaltransfer,
+                                    received => time() );
+                    push @requests, \%request;
+                }
+            }
 	}
     }
     return $valid;
 }
 
+#
+# Clear out all requests whose durations have expired
+#
+sub clear_expired_requests($) {
+    #my ($requests) = (@_);
+
+    my $now = time();
+
+    my @keep;
+    #foreach my $request (@$requests) {
+    foreach my $request (@requests) {
+        # A duration of '0' means to continue forever
+        my $expiration = $request->{received} + $request->{cmd}->{duration};
+        if ($request->{cmd}{duration} != 0 && $expiration < $now) {
+            print "Removing command (recv = $request->{received}, dur = $request->{cmd}->{duration}, expiration = $expiration, now = $now)\n";
+        } else {
+            push @keep, $request;
+        }
+    }
+
+    #$requests = \@keep;
+    @requests = @keep;
+}
+
+#
+# Get an estimate of the bandwidth between two nodes
+#
+sub getBandwidth() {
+    my ($src, $dst) = @_;
+
+    #
+    # Find the site indexes
+    #
+    my $result = DBQueryWarn("select site_idx from site_mapping where " .
+                             "node_id='$src'");
+
+    if ($result->numrows() != 1) {
+        warn "Error getting site_idx for node $src";
+        return 0;
+    }
+    my $srcidx = ($result->fetchrow_array())[0];
+    $result = DBQueryWarn("select site_idx from site_mapping where " .
+                             "node_id='$dst'");
+
+    if ($result->numrows() != 1) {
+        warn "Error getting site_idx for node $dst";
+        return 0;
+    }
+    my $dstidx = ($result->fetchrow_array())[0];
+
+    # Get the average bandwidth in the ops database for the pair
+    $result = DBQueryWarn("select AVG(bw) from pair_data " .
+                          "where srcsite_idx='$srcidx' ".
+                          "and dstsite_idx='$dstidx' ".
+                          "and bw is not null and bw > 0");
+    my $avgbw = ($result->fetchrow_array())[0];
+    if (!defined($avgbw) || $avgbw <= 0) {
+        warn "Unable to get measurements for pair $src,$dst " .
+               "($srcidx,$dstidx)\n";
+        return 0;
+    } else {
+        return $avgbw;
+    }
+}
 
 =pod
 sub event_poll_amc($){
