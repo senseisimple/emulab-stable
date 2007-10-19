@@ -924,6 +924,11 @@ REPLACE INTO table_regex VALUES ('sitevariables','reset','text','redirect','defa
 REPLACE INTO table_regex VALUES ('sitevariables','defaultvalue','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','description','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_searches','name','text','regex','^[-\\w]*$',2,64,NULL);
+
+REPLACE INTO table_regex VALUES ('user_pubkeys','verify','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('user_pubkeys','user','text','redirect','users:uid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('user_pubkeys','keyfile','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
+
 --
 -- Dumping data for table `testsuite_preentables`
 --

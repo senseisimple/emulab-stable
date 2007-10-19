@@ -6,6 +6,7 @@
 #
 use English;
 use Getopt::Std;
+use XML::Simple;
 
 #
 # Parse ssh public keys and enter into the DB. The default format is
@@ -17,17 +18,19 @@ use Getopt::Std;
 sub usage()
 {
     print "Usage: addpubkeys [-k | -f] [-n | -u <user>] [<keyfile> | <key>]\n";
+    print "       addpubkeys -x <xmlfile>\n";
     print "       addpubkeys [-i [-r] | -w] <user>\n";
     print "Options:\n";
     print " -k      Indicates that key was passed in on the command line\n";
     print " -f      Indicates that key was passed in as a filename\n";
     print " -n      Verify key format only; do not enter into into DB\n";
+    print " -X      Get args from an XML file: verify, user, keyfile.\n";
     print " -w      Generate new authkeys (protocol 1 and 2) file for user\n";
     print " -i      Initialize mode; generate initial key for user\n";
     print " -r      Force a regenerate of initial key for user\n";
     exit(-1);
 }
-my $optlist   = "kniwfu:r";
+my $optlist   = "kniwfu:rX:";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
@@ -35,6 +38,7 @@ my $force     = 0;
 my $genmode   = 0;
 my $nobody    = 0;
 my $noemail   = 0;
+my $xmlfile;
 
 #
 # Configure variables
@@ -73,9 +77,22 @@ use libtestbed;
 sub ParseKey($);
 sub InitUser();
 sub GenerateKeyFile();
+sub ParseXmlArgs($$$$$);
 sub fatal($);
 
 my $HOMEDIR = USERROOT();
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("verify"		=> ["verify",		$SLOT_OPTIONAL,	   0],
+     "user"		=> ["user",		$SLOT_OPTIONAL],
+     "keyfile"		=> ["keyfile",		$SLOT_REQUIRED]);
 
 #
 # Turn off line buffering on output
@@ -133,6 +150,26 @@ if (defined($options{"w"})) {
 if (defined($options{"u"})) {
     $user = $options{"u"};
 }
+if (defined($options{"X"})) {
+    $xmlfile = $options{"X"};
+
+    my %xmlargs = (); 
+    my %errors = ();
+    ParseXmlArgs($xmlfile, "user_pubkeys", \%xmlfields, \%xmlargs, \%errors);
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+	fatal("XML arg error");
+    }
+
+    $verify = $xmlargs{"verify"};
+    $user = $xmlargs{"user"}
+	if (exists($xmlargs{"user"}));
+    $ARGV[0] = $xmlargs{"keyfile"};
+}
+
 if ($verify && $genmode) {
     usage();
 }
@@ -542,6 +579,91 @@ sub GenerateKeyFile()
 	unlink("$sshdir/authorized_keys2");
     }
     return 0;
+}
+
+sub ParseXmlArgs($$$$$) {
+    my ($xmlfile, $table_name, $fields_ref, $args_ref, $errs_ref) = @_;
+    #
+    # Input args:
+    #  $xmlfile	   - XML file path.
+    #  $table_name - table_regex table_name for low-level checking patterns.
+    #  $fields_ref - xmlfields specification (hash reference.)
+    #
+    # Output args:
+    #  $args_ref   - Parsed argument values (hash reference.)
+    #  $errs_ref   - Error messages on failure (hash reference.)
+
+    my $debug = 0;
+
+    #
+    # Must wrap the parser in eval since it exits on error.
+    #
+    my $xmlparse = eval { XMLin($xmlfile,
+				VarAttr => 'name',
+				ContentKey => '-content',
+				SuppressEmpty => undef); };
+    if ($@) {
+	$errs_ref->{"XML Parse Error"} = "Return code $@";
+	return;
+    }
+
+    #
+    # Make sure all the required arguments were provided.
+    #
+    my $key;
+    foreach $key (keys(%{ $fields_ref })) {
+	my (undef, $required, undef) = @{$fields_ref->{$key}};
+
+	$errs_ref->{$key} = "Required value not provided"
+	    if ($required & $SLOT_REQUIRED  &&
+		! exists($xmlparse->{'attribute'}->{"$key"}));
+    }
+    return
+	if (keys(%{ $errs_ref }));
+
+    foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+	my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+
+	if ($debug) {
+	    print STDERR "User attribute: '$key' -> '$value'\n";
+	}
+
+	$errs_ref->{$key} = "Unknown attribute"
+	    if (!exists($fields_ref->{$key}));
+
+	my ($dbslot, $required, $default) = @{$fields_ref->{$key}};
+
+	if ($required & $SLOT_REQUIRED) {
+	    # A slot that must be provided, so do not allow a null value.
+	    if (!defined($value)) {
+		$errs_ref->{$key} = "Must provide a non-null value";
+		next;
+	    }
+	}
+	if ($required & $SLOT_OPTIONAL) {
+	    # Optional slot. If value is null skip it. Might not be the correct
+	    # thing to do all the time?
+	    if (!defined($value)) {
+		next
+		    if (!defined($default));
+		$value = $default;
+	    }
+	}
+	if ($required & $SLOT_ADMINONLY) {
+	    # Admin implies optional, but thats probably not correct approach.
+	    $errs_ref->{$key} = "Administrators only"
+		if (! $this_user->IsAdmin());
+	}
+
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($value, $table_name, $dbslot, 
+			     TBDB_CHECKDBSLOT_ERROR)) {
+	    $errs_ref->{$key} = TBFieldErrorString();
+	    next;
+	}
+
+	$args_ref->{$dbslot} = $value;
+    }
 }
 
 sub fatal($) {

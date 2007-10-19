@@ -35,6 +35,9 @@ if (!$isadmin &&
     USERERROR("You do not have permission to view ${target_uid}'s keys!", 1);
 }
 
+#
+# Spit the form out using the array of data.
+#
 function SPITFORM($formfields, $errors)
 {
     global $isadmin, $target_user, $BOSSNODE;
@@ -211,7 +214,7 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a form of current values.
 #
-if (! isset($submit)) {
+if (!isset($submit)) {
     $defaults = array();
     $defaults["password"] = "";
     SPITFORM($defaults, 0);
@@ -246,7 +249,7 @@ if (isset($_FILES['usr_keyfile']) &&
 	$errors["PubKey File"] = "Invalid characters";
     }
     else {
-	$addpubkeyargs = escapeshellarg($localfile);
+	$keyfile = $localfile;
 	chmod($localfile, 0644);	
     }
 }
@@ -254,7 +257,7 @@ if (isset($_FILES['usr_keyfile']) &&
 #
 # Must verify passwd to add keys.
 #
-if (isset($addpubkeyargs)) {
+if (isset($keyfile)) {
     if (! $isadmin) {
 	if (!isset($formfields["password"]) ||
 	    strcmp($formfields["password"], "") == 0) {
@@ -277,22 +280,113 @@ if (count($errors)) {
 }
 
 #
+# Build up argument array to pass along.
+#
+$args = array();
+
+$args["user"] = $target_uid;
+
+if (isset($keyfile) && $keyfile != "") {
+    $args["keyfile"] = $keyfile;
+}
+
+#
 # Okay, first run the script in verify mode to see if the key is
 # parsable. If it is, then do it for real.
 #
-if (ADDPUBKEY("-n -u $target_uid $addpubkeyargs")) {
+$args["verify"] = 1;
+if (! ($result = NewPubKey($args, $errors))) {
     $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
+
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
 }
+
 #
 # Insert key, update authkeys files and nodes if appropriate.
 #
-ADDPUBKEY("-u $target_uid $addpubkeyargs");
+$args["verify"] = 0;
+if (! ($result = NewPubKey($args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
 
 #
 # Redirect back, avoiding a POST in the history.
 # 
 header("Location: ". CreateURL("showpubkeys", $target_user));
+
+#
+# When there's a PubKeys class, this will be a Class function to edit them...
+#
+function NewPubKey($args, &$errors) {
+    global $suexec_output, $suexec_output_array, $TBADMINGROUP;
+
+    #
+    # Generate a temporary file and write in the XML goo.
+    #
+    $xmlname = tempnam("/tmp", "addpubkey");
+    if (! $xmlname) {
+	TBERROR("Could not create temporary filename", 0);
+	$errors[] = "Transient error; please try again later.";
+	return null;
+    }
+    if (! ($fp = fopen($xmlname, "w"))) {
+	TBERROR("Could not open temp file $xmlname", 0);
+	$errors[] = "Transient error; please try again later.";
+	return null;
+    }
+
+    fwrite($fp, "<PubKey>\n");
+    foreach ($args as $name => $value) {
+	fwrite($fp, "<attribute name=\"$name\">");
+	fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	fwrite($fp, "</attribute>\n");
+    }
+    fwrite($fp, "</PubKey>\n");
+    fclose($fp);
+    chmod($xmlname, 0666);
+
+    $retval = SUEXEC("nobody", "nobody", "webaddpubkey -X $xmlname",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	if ($retval < 0) {
+	    $errors[] = "Transient error; please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	}
+	else {
+	    # unlink($xmlname);
+	    if (count($suexec_output_array)) {
+		for ($i = 0; $i < count($suexec_output_array); $i++) {
+		    $line = $suexec_output_array[$i];
+		    if (preg_match("/^([-\w]+):\s*(.*)$/",
+				   $line, $matches)) {
+			$errors[$matches[1]] = $matches[2];
+		    }
+		    else
+			$errors[] = $line;
+		}
+	    }
+	    else
+		$errors[] = "Transient error; please try again later.";
+	}
+	return null;
+    }
+
+    # There are no return value(s) to parse at the end of the output.
+
+    # Unlink this here, so that the file is left behind in case of error.
+    # We can then edit the pubkeys by hand from the xmlfile, if desired.
+    unlink($xmlname);
+
+    return true; 
+}
+
 ?>
