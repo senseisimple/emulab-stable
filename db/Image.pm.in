@@ -20,6 +20,7 @@ use libtestbed;
 use Project;
 use Group;
 use User;
+use OSinfo;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -168,11 +169,10 @@ sub Refresh($)
 # Create a new os_info. This installs the new record in the DB,
 # and returns an instance. There is some bookkeeping along the way.
 #
-sub Create($$$$)
+sub Create($$$$$$$$)
 {
-    my ($class, $project, $group, $creator, $imagename, $argref, $usrerr_ref) = @_;
-    my $idx;
-    my $now = time();
+    my ($class, $project, $group, $creator,
+	$imagename, $imageid, $argref, $usrerr_ref) = @_;
 
     return undef
 	if (ref($class) || !ref($project));
@@ -221,15 +221,26 @@ sub Create($$$$)
 	return undef;
     }
 
-    #
-    # Grab unique ID. Table already locked.
-    # 
-    my $imageid  = TBGetUniqueIndex("next_imageid", undef, 1);
+    # We allow providing an image descriptor index, so newimageid_ez can use
+    # the same name, description, and index for both the OS and Image it makes.
+    if ($imageid > 0 ) {
+	# Make sure the OS descriptor for it already exists.
+	if (!OSinfo->Lookup($imageid)) {
+	    DBQueryWarn("unlock tables");
+	    $$usrerr_ref = "Error: Missing OSinfo $imagename/$imageid in $pid!";
+	    return undef;
+	}
+    } else {
+	#
+	# Grab unique ID. Table already locked.
+	# 
+	$imageid  = TBGetUniqueIndex("next_imageid", undef, 1);
+    }
     my $uuid  = NewUUID();
-    my $desc  = "''";
 
     # Some fields special cause of quoting.
     #
+    my $desc  = "''";
     if (exists($argref->{'description'})) {
 	$desc = DBQuoteSpecial($argref->{'description'});
     }

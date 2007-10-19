@@ -503,7 +503,7 @@ if (!isset($submit)) {
 	}
 	reset($projlist);
     }
- 
+
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -514,7 +514,7 @@ if (!isset($submit)) {
 #
 $errors  = array();
 
-# Be friendly about the form field names.
+# Be friendly about the required form field names.
 if (!isset($formfields["pid"]) ||
     strcmp($formfields["pid"], "") == 0) {
     $errors["Project"] = "Missing Field";
@@ -747,7 +747,7 @@ if (mysql_num_rows($query_result)) {
 
 # Send to the backend for more checking, and eventually, to update the DB.
 $imagename = $args["imagename"];
-if (! ($image = Image::NewImageId($imagename, $args, $errors))) {
+if (! ($image = Image::NewImageId(0, $imagename, $args, $errors))) {
     # Always respit the form so that the form fields are not lost.
     # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);

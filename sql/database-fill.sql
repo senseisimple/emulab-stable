@@ -811,6 +811,15 @@ REPLACE INTO table_regex VALUES ('images','node_id','text','redirect','nodes:nod
 REPLACE INTO table_regex VALUES ('images','load_address','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','frisbee_pid','text','redirect','default:int',0,0,NULL);
 
+REPLACE INTO table_regex VALUES ('images','nodetype','text','redirect','node_types:node_type',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','OS','text','redirect','os_info:OS',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','version','text','redirect','os_info:version',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','osfeatures','text','redirect','os_info:osfeatures',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','op_mode','text','redirect','os_info:op_mode',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','wholedisk','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','max_concurrent','text','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','reboot_waittime','text','redirect','default:int',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('node_types','new_type','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','node_type','text','regex','^[-\\w]+$',1,30,NULL);
 REPLACE INTO table_regex VALUES ('node_types','class','text','regex','^[\\w]+$',1,30,NULL);

@@ -117,7 +117,7 @@ class Image
     #
     # Class function to create a new image descriptor.
     #
-    function NewImageId($imagename, $args, &$errors) {
+    function NewImageId($ez, $imagename, $args, &$errors) {
 	global $suexec_output, $suexec_output_array;
 
         #
@@ -148,7 +148,8 @@ class Image
 	fclose($fp);
 	chmod($xmlname, 0666);
 
-	$retval = SUEXEC("nobody", "nobody", "webnewimageid $xmlname",
+	$script = "webnewimageid" . ($ez ? "_ez" : "");
+	$retval = SUEXEC("nobody", "nobody", "$script $xmlname",
 			 SUEXEC_ACTION_IGNORE);
 
 	if ($retval) {

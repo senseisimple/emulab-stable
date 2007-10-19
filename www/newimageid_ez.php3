@@ -12,9 +12,10 @@ include("osiddefs.php3");
 
 #
 # XXX
-# Currently, TBDB_OSID_OSNAMELEN is shorter then TBDB_IMAGEID_IMAGENAMELEN
+# In this form, we make the images:imagename and the os_info:osname the same!
+# Currently, TBDB_OSID_OSNAMELEN is shorter than TBDB_IMAGEID_IMAGENAMELEN
 # and that causes problems since we use the same id for both tables. For
-# now, test for the shorted of the two.
+# now, test for the shorter of the two.
 # 
 #
 # Only known and logged in users.
@@ -35,7 +36,9 @@ $optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
 				 "formfields",   PAGEARG_ARRAY);
 
 #
-# Options for using this page with different types of nodes
+# Options for using this page with different types of nodes.
+# nodetype controls the view and trumps nodeclass.
+# nodeclass determines what node types are visible from the DB.
 #
 if (isset($nodetype) && $nodetype == "mote") {
     $view = array('hide_partition' => 1, 'hide_os' => 1, 'hide_version' => 1,
@@ -51,7 +54,7 @@ if (isset($nodetype) && $nodetype == "mote") {
     # Default to 'srec' files for use with uisp
     $filename_extension = "srec";
 } else {
-    # Defaults to PC view
+    # Defaults to PC view.
     $view = array('hide_upload' => 1);
     if (!isset($nodeclass)) 
 	$nodeclass = "pc";
@@ -99,8 +102,8 @@ if ($nodeclass) {
 $types_result = DBQueryFatal($types_querystring);
 
 #
-# Spit the form out using the array of data. 
-# 
+# Spit the form out using the array of data.
+#
 function SPITFORM($formfields, $errors)
 {
     global $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
@@ -157,7 +160,7 @@ function SPITFORM($formfields, $errors)
                   var pid    = theform['formfields[pid]'].options[pidx].value;
                   var gidx   = theform['formfields[gid]'].selectedIndex;
                   var gid    = theform['formfields[gid]'].options[gidx].value;
-                  var shared = theform['formfields[shared]'].checked; 
+                  var shared = theform['formfields[shared]'].checked;
           \n";
     if ($isadmin)
 	echo     "var global = theform['formfields[global]'].checked;";
@@ -279,7 +282,7 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
-    # Image Name:
+    # Image Name
     #
     echo "<tr>
               <td>*Descriptor Name (no blanks):</td>
@@ -336,12 +339,12 @@ function SPITFORM($formfields, $errors)
     # Select an OS
     # 
     if (isset($view["hide_os"])) {
-	spithidden($formfields, 'os_name');
+	spithidden($formfields, 'OS');
     } else {
 	echo "<tr>
 		 <td>*Operating System:<br>
 		    (OS that is on the partition)</td>
-		 <td><select name=\"formfields[os_name]\">
+		 <td><select name=\"formfields[OS]\">
 		       <option value=none>Please Select </option>\n";
 
 	while (list ($os, $userokay) = each($osid_oslist)) {
@@ -350,8 +353,8 @@ function SPITFORM($formfields, $errors)
 	    if (!$userokay && !$isadmin)
 		continue;
 
-	    if (isset($formfields["os_name"]) &&
-		strcmp($formfields["os_name"], $os) == 0)
+	    if (isset($formfields["OS"]) &&
+		strcmp($formfields["OS"], $os) == 0)
 		$selected = "selected";
 
 	    echo "<option $selected value=$os>$os &nbsp; </option>\n";
@@ -365,15 +368,15 @@ function SPITFORM($formfields, $errors)
     # Version String
     #
     if (isset($view["hide_version"])) {
-	spithidden($formfields, 'os_version');
+	spithidden($formfields, 'version');
     } else {
 	echo "<tr>
 		  <td>*OS Version:<br>
 		      (eg: 4.3, 7.2, etc.)</td>
 		  <td class=left>
 		      <input type=text
-			     name=\"formfields[os_version]\"
-			     value=\"" . $formfields["os_version"] . "\"
+			     name=\"formfields[version]\"
+			     value=\"" . $formfields["version"] . "\"
 			     size=$TBDB_OSID_VERSLEN
 			     maxlength=$TBDB_OSID_VERSLEN>
 		  </td>
@@ -739,39 +742,37 @@ function spithidden($formfields, $field) {
 #
 if (!isset($submit)) {
     $defaults = array();
-    $defaults["pid"]           = "";
-    $defaults["gid"]           = "";
-    $defaults["imagename"]     = "";
-    $defaults["description"]   = "";
-    $defaults["loadpart"]      = "X";
-    $defaults["os_name"]       = "";
-    $defaults["os_version"]    = "";
-    $defaults["node_id"]       = "";
-    $defaults["op_mode"]       = "";
-    $defaults["max_concurrent"]= "";
-    $defaults["wholedisk"]     = "No";
-    $defaults["shared"]        = "No";
-    $defaults["global"]        = "No";
-    $defaults["makedefault"]   = "No";
+    $defaults["pid"]		 = "";
+    $defaults["gid"]		 = "";
+    $defaults["imagename"]	 = "";
+    $defaults["description"]	 = "";
+    $defaults["loadpart"]	 = "X";
+    $defaults["OS"]	 	 = "";
+    $defaults["version"]	 = "";
+    $defaults["path"]		 = "$TBPROJ_DIR/";
+    $defaults["node_id"]	 = "";
+    $defaults["op_mode"]	 = "";
+    $defaults["wholedisk"]	 = "No";
+    $defaults["max_concurrent"]	 = "";
+    $defaults["shared"]		 = "No";
+    $defaults["global"]		 = "No";
     $defaults["reboot_waittime"] = "";
-    $defaults["path"]          = "$TBPROJ_DIR/";
-    
 
     if (isset($nodetype) && $nodetype == "mote") {
 	# Defaults for mote-type nodes
 	$defaults["loadpart"]    = "1";
 	$defaults["op_mode"]     = TBDB_ALWAYSUP_OPMODE;
-	$defaults["os_name"]     = "TinyOS";
-	$defaults["os_version"]  = "1.1.0";
+	$defaults["OS"]          = "TinyOS";
+	$defaults["version"]     = "1.1.0";
     } else {
 	# Defaulys for PC-type nodes
 	$defaults["loadpart"] = "X";
 	$defaults["path"]     = "$TBPROJ_DIR/";
 	$defaults["op_mode"]  = TBDB_DEFAULT_OSID_OPMODE;
-	$defaults["os_feature_ping"] = "checked";
-	$defaults["os_feature_ssh"]  = "checked";
-	$defaults["os_feature_ipod"] = "checked";
-	$defaults["os_feature_isup"] = "checked";
+	$defaults["os_feature_ping"]	 = "checked";
+	$defaults["os_feature_ssh"]	 = "checked";
+	$defaults["os_feature_ipod"]	 = "checked";
+	$defaults["os_feature_isup"]	 = "checked";
 	$defaults["os_feature_linktest"] = "checked";
 
 	# mtype_all is a "fake" variable which makes all
@@ -786,7 +787,7 @@ if (!isset($submit)) {
     # 
     if (count($projlist) == 1) {
 	list($project, $grouplist) = each($projlist);
-	
+
 	if (count($grouplist) <= 2) {
 	    $defaults["pid"] = $project;
 	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0]))
@@ -805,7 +806,7 @@ if (!isset($submit)) {
     }
 
     #
-    # Allow formfields that are already set to override defaults
+    # Allow formfields that are already set to override defaults.
     #
     if (isset($formfields)) {
 	while (list ($field, $value) = each ($formfields)) {
@@ -813,7 +814,6 @@ if (!isset($submit)) {
 	}
     }
 
-    
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -823,6 +823,38 @@ if (!isset($submit)) {
 # Otherwise, must validate and redisplay if errors
 #
 $errors  = array();
+
+# Be friendly about the required form field names.
+if (!isset($formfields["imagename"]) ||
+    strcmp($formfields["imagename"], "") == 0) {
+    $errors["Descriptor Name"] = "Missing Field";
+}
+
+if (!isset($formfields["description"]) ||
+    strcmp($formfields["description"], "") == 0) {
+    $errors["Descriptor Name"] = "Missing Field";
+}
+
+if (!isset($formfields["loadpart"]) ||
+    strcmp($formfields["loadpart"], "X") == 0) {
+    $errors["Starting DOS Partion"] = "Missing Field";
+}
+
+if (!isset($formfields["OS"]) ||
+    strcmp($formfields["OS"], "X") == 0) {
+    $errors["Operating System"] = "Missing Field";
+}
+
+if (!isset($formfields["version"]) ||
+    strcmp($formfields["version"], "X") == 0) {
+    $errors["Operating System"] = "Missing Field";
+}
+
+if (!isset($formfields["op_mode"]) ||
+    strcmp($formfields["op_mode"], "none") == 0) {
+    $errors["Operational Mode"] = "Missing Field";
+}
+
 $project = null;
 $group   = null;
 
@@ -863,167 +895,85 @@ if ($group &&
 }
  
 #
-# Image Name:
-# 
-if (!isset($formfields["imagename"]) ||
-    strcmp($formfields["imagename"], "") == 0) {
-    $errors["Descriptor Name"] = "Missing Field";
+# Build up argument array to pass along.
+#
+$args = array();
+
+if (isset($formfields["pid"]) && $formfields["pid"] != "") {
+    $args["pid"] = $pid = $formfields["pid"];
 }
-else {
-    if (! ereg("^[a-zA-Z0-9][-_a-zA-Z0-9\.\+]+$", $formfields["imagename"])) {
-	$errors["Descriptor Name"] =
-	    "Must be alphanumeric (includes _, -, +, and .)<br>" .
-	    "and must begin with an alphanumeric";
-    }
-    elseif (strlen($formfields["imagename"]) > $TBDB_OSID_OSNAMELEN) {
-	$errors["Descriptor Name"] =
-	    "Too long! ".
-	    "Must be less than or equal to $TBDB_OSID_OSNAMELEN";
-    }
+
+if (isset($formfields["gid"]) && $formfields["gid"] != "") {
+    $args["gid"] = $gid = $formfields["gid"];
+}
+
+if (isset($formfields["imagename"]) && $formfields["imagename"] != "") {
+    $args["imagename"] = $imaganame = $formfields["imagename"];
+}
+
+if (isset($formfields["description"]) && $formfields["description"] != "") {
+    $args["description"] = $formfields["description"];
+}
+
+if (isset($formfields["loadpart"]) &&
+    $formfields["loadpart"] != "none" && $formfields["loadpart"] != "") {
+    $args["loadpart"] = $formfields["loadpart"];
+}
+
+if (isset($formfields["OS"]) &&
+    $formfields["OS"] != "none" && $formfields["OS"] != "") {
+    $args["OS"] = $formfields["OS"];
+}
+
+if (isset($formfields["version"]) && $formfields["version"] != "") {
+    $args["version"]	= $formfields["version"];
+}
+
+if (isset($formfields["path"]) && $formfields["path"] != "") {
+    $args["path"] = $formfields["path"];
+}
+
+if (isset($formfields["node_id"]) && $formfields["node_id"] != "") {
+    $args["node_id"] = $formfields["node_id"];
+}
+
+if (isset($formfields["op_mode"]) && $formfields["op_mode"] != "") {
+    $args["op_mode"] = $formfields["op_mode"];
+}
+
+# Filter booleans from checkboxes to 0 or 1.
+if (isset($formfields["wholedisk"])) {
+   $args["wholedisk"] = strcmp($formfields["wholedisk"], "Yep") ? 0 : 1;
+}
+if (isset($formfields["shared"])) {
+   $args["shared"] = strcmp($formfields["shared"], "Yep") ? 0 : 1;
+}
+if (isset($formfields["global"])) {
+   $args["global"] = strcmp($formfields["global"], "Yep") ? 0 : 1;
+}
+
+if (isset($formfields["max_concurrent"]) &&
+    $formfields["max_concurrent"] != "") {
+    $args["max_concurrent"] = $formfields["max_concurrent"];
+}
+
+if (isset($formfields["reboot_waittime"]) &&
+    $formfields["reboot_waittime"] != "") {
+    $args["reboot_waittime"] = $formfields["reboot_waittime"];
 }
 
 #
-# Description
-#
-if (!isset($formfields["description"]) ||
-    strcmp($formfields["description"], "") == 0) {
-    $errors["Description"] = "Missing Field";
-}
-
-#
-# Load Partition
-#
-if (!isset($formfields["loadpart"]) ||
-    strcmp($formfields["loadpart"], "") == 0 ||
-    strcmp($formfields["loadpart"], "X") == 0) {
-    $errors["DOS Partition"] = "Not Selected";
-}
-elseif (! ereg("^[0-9]+$", $formfields["loadpart"]) ||
-	$formfields["loadpart"] <= 0 || $formfields["loadpart"] > 4) {
-    $errors["DOS Partition"] = "Must be 1,2,3, or 4!";
-}
-
-#
-# Select an OS
-# 
-if (!isset($formfields["os_name"]) ||
-    strcmp($formfields["os_name"], "") == 0 ||
-    strcmp($formfields["os_name"], "none") == 0) {
-    $errors["OS"] = "Not Selected";
-}
-elseif (! preg_match("/^[-\w]+$/", $formfields["os_name"])) {
-    $errors["OS"] = "Illegal Characters";
-}
-elseif (! array_key_exists($formfields["os_name"], $osid_oslist)) {
-    $errors["OS"] = "Invalid OS";
-}
-elseif (! $osid_oslist[$formfields["os_name"]] && !$isadmin) {
-    $errors["OS"] = "Not enough permission";
-}
-
-#
-# Version String
-#
-if (!isset($formfields["os_version"]) ||
-    strcmp($formfields["os_version"], "") == 0) {
-    $errors["OS Version"] = "Missing Field";
-}
-elseif (! ereg("^[-_a-zA-Z0-9\.]+$", $formfields["os_version"])) {
-    $errors["OS Version"] = "Contains invalid characters";
-}
-
-#
-# Only admin types can set the global bit for an image. Ignore silently.
-#
-$global = 0;
-if ($isadmin &&
-    isset($formfields["global"]) &&
-    strcmp($formfields["global"], "Yep") == 0) {
-    $global = 1;
-}
-
-#
-# Image shared amongst subgroups
-#
-$shared = 0;
-if (isset($formfields["shared"]) &&
-    strcmp($formfields["shared"], "Yep") == 0) {
-    $shared = 1;
-}
-# Does not make sense to do this. 
-if ($global && $shared) {
-    $errors["Global"] = "Image declared both shared and global";
-}
-
-#
-# The path must not contain illegal chars and it must start with
-# /proj/$pid/images or /groups/$pid/$gid. Admins can do whatever
-# they like of course.
-# 
-if (!isset($formfields["path"]) ||
-    strcmp($formfields["path"], "") == 0) {
-    $errors["Path"] = "Missing Field";
-}
-elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields["path"])) {
-    $errors["Path"] = "Contains invalid characters";
-}
-elseif (! $isadmin) {
-    $pdef = "";
-    
-    if (!$shared &&
-	isset($formfields["gid"]) &&
-	strcmp($formfields["gid"], "") &&
-	strcmp($formfields["gid"], $formfields["pid"])) {
-	$pdef = "$TBGROUP_DIR/" .
-	    $formfields["pid"] . "/" . $formfields["gid"] . "/";
-    }
-    else {
-	$pdef = "$TBPROJ_DIR/" . $formfields["pid"] . "/images/";
-    }
-
-    if (strpos($formfields["path"], $pdef) === false) {
-	$errors["Path"] = "Invalid Path";
-    }
-}
-
-#
-# OS Features.
-# 
-# As a side effect of validating, form the os features set as a string
-# for the insertion below. 
+# Form comma separated list of osfeatures.
 #
 $os_features_array = array();
 
 while (list ($feature, $userokay) = each($osid_featurelist)) {
     if (isset($formfields["os_feature_$feature"]) &&
-	strcmp($formfields["os_feature_$feature"], "checked") == 0) {
-	if (!$userokay && !$isadmin) {
-	    $errors["Feature - $feature"] = "Not enough permission";
-	}
-	else {
-	    $os_features_array[] = $feature;
-	}
+	$formfields["os_feature_$feature"] == "checked") {
+	$os_features_array[] = $feature;
     }
 }
-$os_features = join(",", $os_features_array);
-
-#
-# Operational Mode
-# 
-if (!isset($formfields["op_mode"]) ||
-    strcmp($formfields["op_mode"], "") == 0 ||
-    strcmp($formfields["op_mode"], "none") == 0) {
-    $errors["Op. Mode"] = "Not Selected";
-}
-elseif (! preg_match("/^[-\w]+$/", $formfields["op_mode"])) {
-    $errors["Op. Mode"] = "Illegal Characters";
-}
-elseif (! array_key_exists($formfields["op_mode"], $osid_opmodes)) {
-    $errors["Op. Mode"] = "Invalid Operation Mode";
-}
-elseif (! $osid_opmodes[$formfields["op_mode"]] && !$isadmin) {
-    $errors["Op. Mode"] = "No enough permission";
-}
+$args["osfeatures"] = join(",", $os_features_array);
 
 #
 # Node.
@@ -1048,19 +998,11 @@ if (isset($formfields["node_id"]) &&
 }
 
 #
-# Node Types:
 # See what node types this image will work on. Must be at least one!
 # Store the valid types in a new array for simplicity.
 #
-# We perform a further check for non-admins.  When a node to snapshot
-# has been specified, we check the OSID of the appropriate partition
-# and see which node types it is appropriate for, and further restrict
-# the list as necessary.  This prevents creation of custom images based on
-# old OSes from being checked as runnable on newer HW where they do not
-# stand a chance.
-#
 $mtypes_array = array();
-
+mysql_data_seek($types_result, 0);
 while ($row = mysql_fetch_array($types_result)) {
     $type = $row["type"];
 
@@ -1074,64 +1016,15 @@ while ($row = mysql_fetch_array($types_result)) {
 }
 if (! count($mtypes_array)) {
     $errors["Node Types"] = "Must select at least one type";
-} elseif (!$isadmin && isset($node_id) && !isset($errors["DOS Partition"])) {
-    $part = $formfields["loadpart"];
-    $query_result =
-	DBQueryFatal("select oi.type from osidtoimageid as oi ".
-		     "left join partitions as p on oi.osid=p.osid ".
-		     "where p.node_id='$node_id' and p.partition=$part");
-    $otypes_array = array();
-    while ($row = mysql_fetch_array($query_result)) {
-	$ntype = $row["type"];
-	$otypes_array[$ntype] = 1;
-    }
-    # Flag invalid node types
-    for ($i = 0; $i < count($mtypes_array); $i++) {
-	$ntype = $mtypes_array[$i];
-	if (!isset($otypes_array[$ntype])) {
-	    if (!isset($errors["Node Types"])) {
-		$errors["Node Types"] =
-		    "Current image on $node_id cannot run on types: ";
-	    }
-	    $errors["Node Types"] .= " $ntype";
-	}
-    }
 }
 
-#
-# Max concurrent
-# 
-if (isset($formfields["max_concurrent"]) &&
-    strcmp($formfields["max_concurrent"],"")) {
-    
-    if (!preg_match ("/^\d+$/",$formfields["max_concurrent"])) {
-    	$errors["Maximum Concurrent Loads"] = "Invalid number";
-    }
+# The mtype_* checkboxes are dynamically generated.
+foreach ($mtypes_array as $type) {
 
-    $max_concurrent = "'" . $formfields["max_concurrent"] . "'";
-} else {
-    $max_concurrent = "NULL";
-}
-
-#
-# Reboot waittime. Only admin users can set this. Grab default
-# if not set.  If no default, complain (unless they failed to specify an OS
-# in which case we will complain about that instead).
-#
-if (isset($formfields["reboot_waittime"]) &&
-    strcmp($formfields["reboot_waittime"],"")) {
-    if (!TBvalid_integer($formfields["reboot_waittime"])) {
-	$errors["Reboot Waittime"] = TBFieldErrorString();
-    }
-    $reboot_waittime = $formfields["reboot_waittime"];
-}
-else if (!isset($errors["OS"])) {
-    if (! array_key_exists($formfields["os_name"], $osid_reboot_waitlist)) {
-	$errors["Reboot Waittime"] = "No default reboot waittime for OS";
-    }
-    else {
-	$reboot_waittime = $osid_reboot_waitlist[$formfields["os_name"]];
-    }
+    # Filter booleans from checkbox values.
+    $checked = isset($formfields["mtype_$type"]) &&
+	strcmp($formfields["mtype_$type"], "Yep") == 0;
+    $args["mtype_$type"] = $checked ? "1" : "0";
 }
 
 #
@@ -1221,91 +1114,15 @@ if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
     return;
 }
 
-
-#
-# For the rest, sanitize and convert to locals to make life easier.
-# 
-$description = addslashes($formfields["description"]);
-$pid         = $project->pid();
-$gid         = $group->gid();
-$pid_idx     = $project->pid_idx();
-$gid_idx     = $group->gid_idx();
-$imagename   = $formfields["imagename"];
-$bootpart    = $formfields["loadpart"];
-$path        = $formfields["path"];
-$os_name     = $formfields["os_name"];
-$os_version  = $formfields["os_version"];
-$op_mode     = $formfields["op_mode"];
-
-#
-# Grab unique imageid (before locking tables).
-# 
-$imageid = TBGetUniqueIndex("next_osid");
-$uuid1   = NewUUID();
-$uuid2   = NewUUID();
-
-#
-# Special option. Whole disk image, but only one partition that actually
-# matters. 
-#
-$loadlen   = 1;
-$loadpart  = $bootpart;
-
-if (isset($formfields["wholedisk"]) &&
-    strcmp($formfields["wholedisk"], "Yep") == 0) {
-    $loadlen   = 4;
-    $loadpart  = 0;
-}
-
-DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
-
-#
-# Of course, the Image/OS records may not already exist in the DB.
-#
-if (($image  = Image::LookupByName($project, $imagename)) ||
-    ($osinfo = OSInfo::LookupByName($project, $imagename))) {
-    DBQueryFatal("unlock tables");
-
-    $errors["Descriptor Name"] = "Already in use in selected project";
+$imagename = $args["imagename"];
+if (! ($image = Image::NewImageId(1, $imagename, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
 }
-
-DBQueryFatal("INSERT INTO images ".
-	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
-	     " part" . "$bootpart" . "_osid, ".
-	     " default_osid, path, pid, global, creator, creator_idx, ".
-	     " created, gid, shared, pid_idx, gid_idx, uuid) ".
-	     "VALUES ".
-	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
-	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $global, ".
-             "   '$uid', '$dbid', now(), '$gid', $shared, $pid_idx, ".
-	     "   $gid_idx, '$uuid1')");
-
-DBQueryFatal("INSERT INTO os_info ".
-	     "(osname, osid, ezid, description, OS, version, path, magic, ".
-	     " osfeatures, pid, creator, creator_idx, shared, created, ".
-	     " op_mode, max_concurrent, reboot_waittime, pid_idx, uuid) ".
-	     "VALUES ".
-	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
-	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', '$dbid', $global, now(), '$op_mode', ".
-             "   $max_concurrent, $reboot_waittime, $pid_idx, '$uuid2')");
-
-for ($i = 0; $i < count($mtypes_array); $i++) {
-    DBQueryFatal("REPLACE INTO osidtoimageid ".
-		 "(osid, type, imageid) ".
-		 "VALUES ('$imageid', '$mtypes_array[$i]', '$imageid')");
-}
-DBQueryFatal("unlock tables");
-
-#
-# Get the object for rest of the script.
-#
-if (! ($image = Image::Lookup($imageid))) {
-    TBERROR("Could not look up object for image $imageid", 1);
-}
+$imageid = $image->imageid();
 
 SUBPAGESTART();
 SUBMENUSTART("More Options");
@@ -1360,7 +1177,7 @@ if (isset($node)) {
     echo "This will take 10 minutes or more; you will receive email
           notification when the image is complete. In the meantime,
           <b>PLEASE DO NOT</b> delete the imageid or the experiment
-          $node is in. In fact, it is best if you do not mess with 
+          $nodeid is in. In fact, it is best if you do not mess with 
           the node at all!<br>\n";
 }
 
