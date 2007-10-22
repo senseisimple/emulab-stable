@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,6 +28,7 @@ our @EXPORT = qw (
 	       time_all
 	       setcmdport
 	       setexpid
+	       setevexpid
 	       stopnode
 	       stopnode_evsys
 	       edittest
@@ -55,9 +56,7 @@ my $socket;
 my $sel = IO::Select->new();
 my $port;
 my $expid;
-
-
-
+my $evexpid = "__none";
 
 sub setcmdport($)
 {
@@ -69,6 +68,12 @@ sub setexpid($)
 {
     $expid = $_[0];
 #    print "libwanetmon: expid=$expid\n";
+}
+
+sub setevexpid($)
+{
+    $evexpid = $_[0];
+#    print "libwanetmon: evexpid=$evexpid\n";
 }
 
 
@@ -213,7 +218,7 @@ sub sendcmd_evsys($$$;$)
     %$tuple = ( objtype   => "WANETMON",
 		objname   => $manType,
 		eventtype => $cmdname,
-		expt      => "__none",
+		expt      => $evexpid,
 		);
 
     my $notification = event::event_notification_alloc($handle,$tuple);
