@@ -29,6 +29,7 @@ my $debug    = 0;
 my $impotent = 0;
 my $evexpt   = "__none";
 my $bgmonexpt;
+my $default_bgmonexpt = "tbres/pelabbgmon";
 my ($server,$port,$cmdport);
 my %opt = ();
 if (!getopts("s:p:c:dih", \%opt)) {
@@ -38,6 +39,8 @@ if (!getopts("s:p:c:dih", \%opt)) {
 #
 # Caps enforced on users and globally. Totally made-up.
 # Rates are in kilobytes / second, data transfer sizes are in kilobytes
+# XXX: I think I have a constant wrong here somewhere, these limts should
+# not have to be this high
 #
 my $USER_AVGRATE_CAP = 10 * 1024 / 8.0; # 10Mbps
 my $USER_DAILY_CAP = 1000 * 1024 * 1024 / 8.0; # 100Gbit
