@@ -2680,7 +2680,7 @@ foreach $lan (keys(%virt_lans)) {
 			 "      member='$member'");
 
 	while (my ($capkey,$capval) = $query_result->fetchrow_array()) {
-	    DBQueryFatal("insert into interface_settings ".
+	    DBQueryFatal("replace into interface_settings ".
 			 "       (node_id, iface, capkey, capval) ".
 			 "values ('$pnode', '$pport', '$capkey', '$capval')");
 
