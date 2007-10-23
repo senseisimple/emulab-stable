@@ -135,7 +135,7 @@ sub sendcmd($$)
     if( !defined $cmd{managerID} ){
 	$cmd{managerID} = "default";
     }
-    if( !defined $cmd{expid} ){
+    if( defined($expid) && !defined $cmd{expid} ){
         $cmd{expid} = $expid;
     }
 
@@ -206,8 +206,11 @@ sub sendcmd_evsys($$$;$)
     if( !defined $manType ){
 	$manType = "managerclient";
     }
-
     print "manType = $manType\n";
+
+    if( defined($expid) && !defined $cmd{expid} ){
+        $cmd{expid} = $expid;
+    }
 
     #
     # This is the evsys command to send
