@@ -615,6 +615,7 @@ REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experime
 REPLACE INTO table_regex VALUES ('virt_agents','vname','text','redirect','eventlist:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','vnode','text','regex','^([-\\w]+)|(\\*{1})$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','objecttype','int','redirect','default:tinyint',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -653,6 +654,9 @@ REPLACE INTO table_regex VALUES ('virt_lans','trace_expr','text','redirect','def
 REPLACE INTO table_regex VALUES ('virt_lans','trace_snaplen','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_endnode','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_db','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','modify','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','compat','int','redirect','default:boolean',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','vname','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -833,9 +837,9 @@ REPLACE INTO table_regex VALUES ('node_types','issimnode','text','redirect','def
 REPLACE INTO table_regex VALUES ('node_types','attr_name','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_osid','text','redirect','os_info:osid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_imageid','text','redirect','images:imageid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('node_types','attr_boolean','text','redirect','default:boolean',0,0,NULL);
-REPLACE INTO table_regex VALUES ('node_types','attr_integer','text','redirect','default:int',0,0,NULL);
-REPLACE INTO table_regex VALUES ('node_types','attr_float','text','redirect','default:float',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_boolean','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_integer','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_float','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_string','text','redirect','default:tinytext',0,0,NULL);
 
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
@@ -918,6 +922,7 @@ REPLACE INTO table_regex VALUES ('os_info','osfeatures','text','regex','^[-\\w,]
 REPLACE INTO table_regex VALUES ('os_info','op_mode','text','regex','^[-\\w]*$',1,20,NULL);
 REPLACE INTO table_regex VALUES ('os_info','nextosid','text','redirect','os_info:osid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','reboot_waittime','int','redirect','default:int',0,2000,NULL);
+
 REPLACE INTO table_regex VALUES ('sitevariables','name','text','regex','^[\\w\\/]+$',1,255,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','value','text','redirect','default:text',0,0,NULL);
 REPLACE INTO table_regex VALUES ('sitevariables','reset','text','redirect','default:boolean',0,0,NULL);
