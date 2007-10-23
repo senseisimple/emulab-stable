@@ -23,6 +23,7 @@ use Getopt::Std;
 use strict;
 use IO::Socket::INET;
 use IO::Select;
+use Time::HiRes qw(gettimeofday);
 
 # node and site id caches
 my %nodeids;
@@ -33,6 +34,7 @@ my %ipaddrs;
 
 # Batch up insertions. Simple string.
 my $insertions = "";
+my @queued_data;
 my $batchsize  = 0;
 my $maxbatch   = 30;
 my $maxidletime= 5;	# Seconds before forced insert.
@@ -326,6 +328,7 @@ sub saveTestToDB()
     $insertions .=
 	"($srcsite, $srcnode, $dstsite, $dstnode, $tstamp, ".
 	" $latency, $loss, $bw)";
+    push @queued_data, sprintf("RECORD ADDED $results{linksrc} $results{linkdest} : %.6f", $results{tstamp});
 
     $batchsize++;
     SendBatchedInserts()
@@ -341,8 +344,14 @@ sub SendBatchedInserts()
 	    if ($debug > 2);
 	$lastinsert = time();
     }
+    my ($seconds, $microseconds) = gettimeofday;
+    my $time = $seconds + $microseconds/1000000;
+    foreach my $d (@queued_data) {
+      printf "$d %.6f\n", $time;
+    }
     $batchsize  = 0;
     $insertions = "";
+    @queued_data = ();
 }
 
 
