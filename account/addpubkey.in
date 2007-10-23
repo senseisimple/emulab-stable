@@ -17,10 +17,11 @@ use XML::Simple;
 #
 sub usage()
 {
-    print "Usage: addpubkeys [-k | -f] [-n | -u <user>] [<keyfile> | <key>]\n";
-    print "       addpubkeys -x <xmlfile>\n";
-    print "       addpubkeys [-i [-r] | -w] <user>\n";
+    print "Usage: addpubkeys [-d] [-k | -f] [-n | -u <user>] [<keyfile> | <key>]\n";
+    print "       addpubkeys [-d] -X <xmlfile>\n";
+    print "       addpubkeys [-d] [-i [-r] | -w] <user>\n";
     print "Options:\n";
+    print " -d      Turn on debugging\n";
     print " -k      Indicates that key was passed in on the command line\n";
     print " -f      Indicates that key was passed in as a filename\n";
     print " -n      Verify key format only; do not enter into into DB\n";
@@ -30,7 +31,7 @@ sub usage()
     print " -r      Force a regenerate of initial key for user\n";
     exit(-1);
 }
-my $optlist   = "kniwfu:rX:";
+my $optlist   = "dkniwfu:rX:";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
@@ -62,6 +63,7 @@ my $user_name;
 my $user_email;
 my $user_dbid;
 my $user_uid;
+my $debug = 0;
 
 #
 # Testbed Support libraries
@@ -77,7 +79,7 @@ use libtestbed;
 sub ParseKey($);
 sub InitUser();
 sub GenerateKeyFile();
-sub ParseXmlArgs($$$$$);
+sub ParseXmlArgs($$$$$$);
 sub fatal($);
 
 my $HOMEDIR = USERROOT();
@@ -129,6 +131,9 @@ if ($UID == 0) {
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"d"})) {
+    $debug = 1;
+}
 if (defined($options{"k"})) {
     $iskey = 1;
 }
@@ -155,7 +160,8 @@ if (defined($options{"X"})) {
 
     my %xmlargs = (); 
     my %errors = ();
-    ParseXmlArgs($xmlfile, "user_pubkeys", \%xmlfields, \%xmlargs, \%errors);
+    ParseXmlArgs($xmlfile, "user_pubkeys", \%xmlfields, $debug,
+		 \%xmlargs, \%errors);
     if (keys(%errors)) {
 	foreach my $key (keys(%errors)) {
 	    my $val = $errors{$key};
@@ -581,13 +587,15 @@ sub GenerateKeyFile()
     return 0;
 }
 
-sub ParseXmlArgs($$$$$) {
-    my ($xmlfile, $table_name, $fields_ref, $args_ref, $errs_ref) = @_;
+sub ParseXmlArgs($$$$$$) {
+    my ($xmlfile, $table_name, $fields_ref, $debug,
+	$args_ref, $errs_ref) = @_;
     #
     # Input args:
     #  $xmlfile	   - XML file path.
     #  $table_name - table_regex table_name for low-level checking patterns.
     #  $fields_ref - xmlfields specification (hash reference.)
+    #  $debug
     #
     # Output args:
     #  $args_ref   - Parsed argument values (hash reference.)
@@ -662,7 +670,7 @@ sub ParseXmlArgs($$$$$) {
 	    next;
 	}
 
-	$args_ref->{$dbslot} = $value;
+	$args_ref->{$key} = $value;
     }
 }
 

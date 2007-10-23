@@ -251,6 +251,10 @@ if ((exists($editexp_args{"description"}) ?
      $experiment->description() eq "")) {
     UserError("Description: Missing Field");
 }
+if (exists($editexp_args{"description"})) {
+    $editexp_args{"description"} = 
+	escapeshellarg($editexp_args{"description"});
+}
 
 #
 # Swappable/Idle Ignore

@@ -318,7 +318,7 @@ if (!$isadmin && exists($editimageid_args{"path"})) {
 #
 # See what node types this image will work on. Must be at least one!
 if ($#mtypes_array < 0) {
-    UserError("Node Types: Must select at least one type");
+    UserError("Node Types: Must have at least one node type");
 }
 my $typeclause = join(" or ", map("type='$_'", @mtypes_array));
 
@@ -395,7 +395,6 @@ if ($query_result->numrows) {
     UserError("Conflict: Please check the other Image descriptors".
 	      " and make the necessary changes!\n $msg");
 }
-
 
 exit(0)
     if ($verify);

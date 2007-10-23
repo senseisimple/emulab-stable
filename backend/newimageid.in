@@ -11,7 +11,7 @@ use XML::Simple;
 use Data::Dumper;
 
 #
-# Back-end script to create new Image descriptors.
+# Back-end script to create new Image descriptors (Long Form.)
 #
 sub usage()
 {
@@ -132,7 +132,7 @@ my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
 #
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
-    ("imagename"	=> ["imagename"	,	$SLOT_REQUIRED],
+    ("imagename"	=> ["imagename",	$SLOT_REQUIRED],
      "pid"		=> ["pid",		$SLOT_REQUIRED],
      "gid"		=> ["gid",		$SLOT_OPTIONAL],
      "description"	=> ["description",	$SLOT_REQUIRED],
@@ -143,12 +143,12 @@ my %xmlfields =
      "part3_osid"	=> ["part3_osid",	$SLOT_OPTIONAL],
      "part4_osid"	=> ["part4_osid",	$SLOT_OPTIONAL],
      "default_osid"	=> ["default_osid",	$SLOT_REQUIRED],
-     "path"		=> ["path",		$SLOT_OPTIONAL,  ""],
-     "mtype_*"		=> ["mtype",		$SLOT_OPTIONAL],
-     "node_id"		=> ["node_id",		$SLOT_OPTIONAL,  ""],
-     "shared",		=> ["shared",		$SLOT_OPTIONAL,   0],
-     "global",		=> ["global",		$SLOT_ADMINONLY,  0],
-     "makedefault",	=> ["makedefault",	$SLOT_ADMINONLY,  0],
+     "path"		=> ["path",		$SLOT_OPTIONAL,    ""],
+     "mtype_*"		=> ["mtype",		$SLOT_OPTIONAL],  
+     "node_id"		=> ["node_id",		$SLOT_OPTIONAL,    ""],
+     "shared",		=> ["shared",		$SLOT_OPTIONAL,    0],
+     "global",		=> ["global",		$SLOT_ADMINONLY,   0],
+     "makedefault",	=> ["makedefault",	$SLOT_ADMINONLY,   0],
 );
 
 #
@@ -530,8 +530,8 @@ exit(0)
 delete($newimageid_args{"imagename"});
 
 my $usrerr;
-my $new_image = Image->Create($project, $group, $this_user, $imagename,
-				\%newimageid_args, \$usrerr);
+my $new_image = Image->Create($project, $group, $this_user, $imagename, 0,
+			      \%newimageid_args, \$usrerr);
 UserError($usrerr)
     if (defined($usrerr));
 fatal("Could not create new Image!")

@@ -56,7 +56,7 @@ function SPITFORM($image, $formfields, $errors)
 {
     global $uid, $isadmin, $types_result, $defaults;
     global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
-    
+
     if ($errors) {
 	echo "<table class=nogrid
                      align=center border=0 cellpadding=6 cellspacing=0>
@@ -87,7 +87,7 @@ function SPITFORM($image, $formfields, $errors)
           <form action='$url' method=post>\n";
 
     #
-    # Imagename
+    # Image Name
     #
     echo "<tr>
               <td>ImageID:</td>
@@ -122,7 +122,8 @@ function SPITFORM($image, $formfields, $errors)
     # Description
     #
     echo "<tr>
-              <td>Description:</td>
+              <td>Description:<br>
+                  (a short pithy sentence)</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[description]\"
@@ -201,7 +202,7 @@ function SPITFORM($image, $formfields, $errors)
     # Path to image.
     #
     echo "<tr>
-              <td>Filename</td>
+              <td>Filename (full path) of Image:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[path]\"
@@ -239,7 +240,8 @@ function SPITFORM($image, $formfields, $errors)
     # Shared?
     #
     echo "<tr>
-  	      <td>Shared?:</td>
+  	      <td>Shared?:<br>
+                  (available to all subgroups)</td>
               <td class=left>". ($defaults["shared"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
@@ -247,7 +249,8 @@ function SPITFORM($image, $formfields, $errors)
     # Global?
     #
     echo "<tr>
-  	      <td>Global?:</td>
+  	      <td>Global?:<br>
+                      (available to all projects)</td>
               <td class=left>". ($defaults["global"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
@@ -299,7 +302,7 @@ $defaults = $image->DBData();
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($submit)) {
+if (!isset($submit)) {
     # Generate the current types array for the form.
     foreach ($image->Types() as $type) {
 	$defaults["mtype_${type}"] = "Yep";
@@ -346,7 +349,6 @@ while ($row = mysql_fetch_array($types_result)) {
 if (! count($mtypes_array)) {
     $errors["Node Types"] = "Must select at least one type";
 }
-
 
 #
 # Build up argument array to pass along.
@@ -407,7 +409,7 @@ for ($i = 1; $i < count($mtypes_array); $i++) {
 }
 
 unset($osidclause);
-
+$osid_array = array();
 for ($i = 1; $i <= 4; $i++) {
     # Local variable dynamically created.    
     $foo      = "part${i}_osid";
@@ -423,7 +425,6 @@ for ($i = 1; $i <= 4; $i++) {
 }
     
 DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
-
 $query_result =
     DBQueryFatal("select osidtoimageid.*,images.pid,images.imagename ".
 		 " from osidtoimageid ".
@@ -434,7 +435,6 @@ $query_result =
 DBQueryFatal("unlock tables");
 
 if (mysql_num_rows($query_result)) {
-
 	echo "<center>
               There are other image descriptors that specify the 
 	      same OS descriptors for the same node types.<br>

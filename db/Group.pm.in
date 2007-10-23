@@ -23,7 +23,7 @@ use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
 use vars qw($MEMBERLIST_FLAGS_UIDSONLY $MEMBERLIST_FLAGS_ALLUSERS
-	    $MEMBERLIST_FLAGS_GETTRUST);
+	    $MEMBERLIST_FLAGS_GETTRUST $MEMBERLIST_FLAGS_EXCLUDE_LEADER);
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -41,9 +41,10 @@ my %groups    = ();
 my $debug      = 0;
 
 # MemberList flags.
-$MEMBERLIST_FLAGS_UIDSONLY	= 0x01;
-$MEMBERLIST_FLAGS_ALLUSERS	= 0x02;
-$MEMBERLIST_FLAGS_GETTRUST	= 0x04;
+$MEMBERLIST_FLAGS_UIDSONLY	 = 0x01;
+$MEMBERLIST_FLAGS_ALLUSERS	 = 0x02;
+$MEMBERLIST_FLAGS_GETTRUST	 = 0x04;
+$MEMBERLIST_FLAGS_EXCLUDE_LEADER = 0x08;
 
 # Little helper and debug function.
 sub mysystem($)
@@ -1116,7 +1117,6 @@ sub LeaderMailList($)
 sub MemberList($$;$$)
 {
     my ($self, $prval, $flags, $desired_trust) = @_;
-    my $exclude_leader = 1;	# Could be controlled by a flag.
     my $leader	       = $self->GetLeader();
     my $leader_idx     = $leader->uid_idx();
 
@@ -1132,6 +1132,7 @@ sub MemberList($$;$$)
     my @result     = ();
     my $uids_only  = ($flags & $MEMBERLIST_FLAGS_UIDSONLY ? 1 : 0);
     my $gettrust   = ($flags & $MEMBERLIST_FLAGS_GETTRUST ? 1 : 0);
+    my $exclude_leader = ($flags & $MEMBERLIST_FLAGS_EXCLUDE_LEADER ? 1 : 0);
     my $trust_clause;
 
     if (defined($desired_trust)) {
