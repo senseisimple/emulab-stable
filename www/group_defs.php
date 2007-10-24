@@ -105,12 +105,12 @@ class Group
 	$xmlname = tempnam("/tmp", "newgroup");
 	if (! $xmlname) {
 	    TBERROR("Could not create temporary filename", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(1); please try again later.";
 	    return null;
 	}
 	if (! ($fp = fopen($xmlname, "w"))) {
 	    TBERROR("Could not open temp file $xmlname", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(2); please try again later.";
 	    return null;
 	}
 
@@ -134,7 +134,7 @@ class Group
 
 	if ($retval) {
 	    if ($retval < 0) {
-		$errors[] = "Transient error; please try again later.";
+		$errors[] = "Transient error(3, $retval); please try again later.";
 		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    }
 	    else {
@@ -151,7 +151,7 @@ class Group
 		    }
 		}
 		else
-		    $errors[] = "Transient error; please try again later.";
+		    $errors[] = "Transient error(4, $retval); please try again later.";
 	    }
 	    return null;
 	}
@@ -164,14 +164,14 @@ class Group
 	if (!preg_match("/^GROUP\s+([^\/]+)\/(\d+)\s+/",
 			$suexec_output_array[count($suexec_output_array)-1],
 			$matches)) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(5); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    return null;
 	}
 	$group = $matches[2];
 	$newgroup = Group::Lookup($group);
 	if (! $newgroup) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(6); please try again later.";
 	    TBERROR("Could not lookup new group $group", 0);
 	    return null;
 	}
@@ -193,12 +193,12 @@ class Group
 	$xmlname = tempnam("/tmp", "editgroup");
 	if (! $xmlname) {
 	    TBERROR("Could not create temporary filename", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(1); please try again later.";
 	    return null;
 	}
 	if (! ($fp = fopen($xmlname, "w"))) {
 	    TBERROR("Could not open temp file $xmlname", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(2); please try again later.";
 	    return null;
 	}
 
@@ -223,7 +223,7 @@ class Group
 
 	if ($retval) {
 	    if ($retval < 0) {
-		$errors[] = "Transient error; please try again later.";
+		$errors[] = "Transient error(3, $retval); please try again later.";
 		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    }
 	    else {
@@ -240,7 +240,7 @@ class Group
 		    }
 		}
 		else
-		    $errors[] = "Transient error; please try again later.";
+		    $errors[] = "Transient error(4, $retval); please try again later.";
 	    }
 	    return null;
 	}

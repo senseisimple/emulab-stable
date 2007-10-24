@@ -154,7 +154,7 @@ class Image
 
 	if ($retval) {
 	    if ($retval < 0) {
-		$errors[] = "Transient error(3); please try again later.";
+		$errors[] = "Transient error(3, $retval); please try again later.";
 		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    }
 	    else {
@@ -171,7 +171,7 @@ class Image
 		    }
 		}
 		else
-		    $errors[] = "Transient error(4); please try again later.";
+		    $errors[] = "Transient error(4, $retval); please try again later.";
 	    }
 	    return null;
 	}
@@ -184,14 +184,14 @@ class Image
 	if (!preg_match("/^IMAGE\s+([^\/]+)\/(\d+)\s+/",
 			$suexec_output_array[count($suexec_output_array)-1],
 			$matches)) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(5); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    return null;
 	}
 	$image = $matches[2];
 	$newimage = image::Lookup($image);
 	if (! $newimage) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(6); please try again later.";
 	    TBERROR("Could not lookup new image $image", 0);
 	    return null;
 	}
@@ -214,12 +214,12 @@ class Image
 	$xmlname = tempnam("/tmp", "editimageid");
 	if (! $xmlname) {
 	    TBERROR("Could not create temporary filename", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(1); please try again later.";
 	    return null;
 	}
 	if (! ($fp = fopen($xmlname, "w"))) {
 	    TBERROR("Could not open temp file $xmlname", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(2); please try again later.";
 	    return null;
 	}
 
@@ -241,7 +241,7 @@ class Image
 
 	if ($retval) {
 	    if ($retval < 0) {
-		$errors[] = "Transient error; please try again later.";
+		$errors[] = "Transient error(3, $retval); please try again later.";
 		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    }
 	    else {
@@ -258,7 +258,7 @@ class Image
 		    }
 		}
 		else
-		    $errors[] = "Transient error; please try again later.";
+		    $errors[] = "Transient error(4, $retval); please try again later.";
 	    }
 	    return null;
 	}

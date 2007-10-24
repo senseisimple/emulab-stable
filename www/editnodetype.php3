@@ -617,7 +617,7 @@ function SetNodeType($node_type, $args, &$errors) {
 
     if ($retval) {
 	if ($retval < 0) {
-	    $errors[] = "Transient error(3); please try again later.";
+	    $errors[] = "Transient error(3, $retval); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	}
 	else {
@@ -634,7 +634,7 @@ function SetNodeType($node_type, $args, &$errors) {
 		}
 	    }
 	    else
-		$errors[] = "Transient error(4); please try again later.";
+		$errors[] = "Transient error(4, $retval); please try again later.";
 	}
 	return null;
     }

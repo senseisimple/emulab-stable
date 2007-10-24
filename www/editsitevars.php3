@@ -284,7 +284,7 @@ function SetSiteVar($name, $args, &$errors) {
 
     if ($retval) {
 	if ($retval < 0) {
-	    $errors[] = "Transient error(3); please try again later.";
+	    $errors[] = "Transient error(3, $retval); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	}
 	else {
@@ -301,7 +301,7 @@ function SetSiteVar($name, $args, &$errors) {
 		}
 	    }
 	    else
-		$errors[] = "Transient error(4); please try again later.";
+		$errors[] = "Transient error(4, $retval); please try again later.";
 	}
 	return null;
     }

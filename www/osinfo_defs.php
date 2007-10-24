@@ -89,12 +89,12 @@ class OSinfo
 	$xmlname = tempnam("/tmp", "newosid");
 	if (! $xmlname) {
 	    TBERROR("Could not create temporary filename", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(1); please try again later.";
 	    return null;
 	}
 	if (! ($fp = fopen($xmlname, "w"))) {
 	    TBERROR("Could not open temp file $xmlname", 0);
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(2); please try again later.";
 	    return null;
 	}
 
@@ -117,7 +117,7 @@ class OSinfo
 
 	if ($retval) {
 	    if ($retval < 0) {
-		$errors[] = "Transient error; please try again later.";
+		$errors[] = "Transient error(3, $retval); please try again later.";
 		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    }
 	    else {
@@ -134,7 +134,7 @@ class OSinfo
 		    }
 		}
 		else
-		    $errors[] = "Transient error; please try again later.";
+		    $errors[] = "Transient error(4, $retval); please try again later.";
 	    }
 	    return null;
 	}
@@ -147,14 +147,14 @@ class OSinfo
 	if (!preg_match("/^OSID\s+([^\/]+)\/(\d+)\s+/",
 			$suexec_output_array[count($suexec_output_array)-1],
 			$matches)) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(5); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    return null;
 	}
 	$osid = $matches[2];
 	$newosid = OSinfo::Lookup($osid);
 	if (! $newosid) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(6); please try again later.";
 	    TBERROR("Could not lookup new osid $osid", 0);
 	    return null;
 	}

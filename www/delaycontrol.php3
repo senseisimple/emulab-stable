@@ -669,12 +669,12 @@ function ChangeDelayConfig($uid, $pid, $unix_gid, $args, &$errors) {
     $xmlname = tempnam("/tmp", "delay_config");
     if (! $xmlname) {
 	TBERROR("Could not create temporary filename", 0);
-	$errors[] = "Transient error; please try again later.";
+	$errors[] = "Transient error(1); please try again later.";
 	return null;
     }
     if (! ($fp = fopen($xmlname, "w"))) {
 	TBERROR("Could not open temp file $xmlname", 0);
-	$errors[] = "Transient error; please try again later.";
+	$errors[] = "Transient error(2); please try again later.";
 	return null;
     }
 
@@ -712,11 +712,11 @@ function ChangeDelayConfig($uid, $pid, $unix_gid, $args, &$errors) {
 		}
 	    }
 	    else
-		$errors[] = "Transient error; please try again later.";
+		$errors[] = "Transient error(3, $retval); please try again later.";
 	}
 	else {
 	    # All other errors reported to tbops since they are bad!
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(4, $retval); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	}
 	return null;

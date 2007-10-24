@@ -371,12 +371,12 @@ function NewMmList($uid, $args, &$errors) {
     $xmlname = tempnam("/tmp", "newmmlist");
     if (! $xmlname) {
 	TBERROR("Could not create temporary filename", 0);
-	$errors[] = "Transient error; please try again later.";
+	$errors[] = "Transient error(1); please try again later.";
 	return null;
     }
     if (! ($fp = fopen($xmlname, "w"))) {
 	TBERROR("Could not open temp file $xmlname", 0);
-	$errors[] = "Transient error; please try again later.";
+	$errors[] = "Transient error(2); please try again later.";
 	return null;
     }
 
@@ -395,7 +395,7 @@ function NewMmList($uid, $args, &$errors) {
 
     if ($retval) {
 	if ($retval < 0) {
-	    $errors[] = "Transient error; please try again later.";
+	    $errors[] = "Transient error(3, $retval); please try again later.";
 	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	}
 	else {
@@ -412,7 +412,7 @@ function NewMmList($uid, $args, &$errors) {
 		}
 	    }
 	    else
-		$errors[] = "Transient error; please try again later.";
+		$errors[] = "Transient error(4, $retval); please try again later.";
 	}
 	return null;
     }
