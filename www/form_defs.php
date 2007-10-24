@@ -526,6 +526,25 @@ function FormValidateElement($name, &$errors, $attributes, &$submitted)
     }
 }
 
+function FormValidateFileUpload($name, &$errors, $attributes)
+{
+    # Check for required fields not filled out
+    if (isset($attributes['#required']) && $attributes['#required'] &&
+	!(isset($_FILES[$name]['name']) && $_FILES[$name]['size'] != 0)) {
+	$errors[$attributes['#label']] = "Missing required value";
+    }
+    elseif (isset($attributes['#checkslot'])) {
+	$check = $attributes['#checkslot'];
+	
+	if (function_exists($check)) {
+	    $check($name, $errors, $attributes, null);
+	}
+	else {
+	    TBERROR("Could not parse checkslot: $check", 1);
+	}
+    }
+}
+
 function FormValidate($form, &$errors, $fields, &$submitted)
 {
     while (list ($name, $attributes) = each ($fields)) {
@@ -536,7 +555,6 @@ function FormValidate($form, &$errors, $fields, &$submitted)
 	case "submit":
 	case "checkbox":
 	case "radio":
-	case "file":
 	case "select":
 	    FormValidateElement($name, $errors, $attributes, $submitted);
 	    break;
@@ -553,6 +571,9 @@ function FormValidate($form, &$errors, $fields, &$submitted)
 		   each ($attributes['#elements'])) {
 		FormValidateElement($subname, $errors, $subattrs, $submitted);
 	    }
+	    break;
+	case "file":
+	    FormValidateFileUpload($name, $errors, $attributes);
 	    break;
 	default:
 	    $errors[$name] = "Invalid slot type: " . $attributes['#type'];

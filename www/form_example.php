@@ -17,13 +17,12 @@ $uid       = $this_user->uid();
 
 $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 				 "formfields",  PAGEARG_ARRAY);
-if (!isset($formfields)) {
-     $formfields = null;
-}
 
 # The form attributes:
 $form = array('#id'	  => 'form1',
 	      '#caption'  => 'My Form',
+	      # XXX Only use enctype when doing a file upload. See below.
+	      '#enctype'  => 'multipart/form-data',
 	      '#action'   => 'form_example.php');
 
 # A set of form fields.
@@ -45,12 +44,29 @@ $fields['slot2'] = array('#type'	 => 'password',
 			 '#footnote'     => 'This is a footnote',
 			 '#size'         => 8);
 
-# File Upload. You must set '#entype' in the form array.
+#
+# File Upload. You must set '#enctype' in the form array above.
+#
+# Files are special cause PHP puts all the stuff into the $_FILES
+# superglobal. So, there is nothing in $formfields for them. For
+# doing the validation, easiest to define a local function.
+#
+function CheckFileUpload($name, &$errors, $attributes, $value)
+{
+    # Note that $value will not be defined in this function.
+    
+    if (! isset($_FILES[$name]['name']) || $_FILES[$name]['size'] == 0) {
+	$errors[$name] = "Missing required value";
+	return;
+    }
+}
 $fields['myfile'] = array('#type'        => 'file',
 			  '#label'       => 'Your File',
 			  '#size'        => 30,
-			  '#description' => 'An NS File'
+			  '#checkslot'   => 'CheckFileUpload',
+			  '#description' => 'A File'
 			  );
+$fields['MAX_FILE_SIZE'] = array('#type' => 'hidden', '#value' => "1024");
 
 # A plain checkbox
 $fields['slot3']  = array('#type'        => 'checkbox',
@@ -125,8 +141,17 @@ $fields['submit']  = array('#type'  => 'submit',
 			   '#value' => "Submit This Form",
 			   );
 
+$errors  = array();
+
+if (isset($formfields)) {
+    FormValidate($form, $errors, $fields, $formfields);
+}
+else {
+    $formfields = null;
+}
+
 echo "<center>";
-FormRender($form, null, $fields, $formfields);
+FormRender($form, $errors, $fields, $formfields);
 echo "</center>";
 
 #
