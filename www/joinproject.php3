@@ -342,8 +342,7 @@ function SPITFORM($formfields, $returning, $errors)
 		echo "        value=\"" .
 		    $_FILES['usr_keyfile']['name'] . "\"";
 	    }
-	    echo "    ">";                     
-                      </td>
+	    echo         "> </td>
                   </tr>\n";
 	}
 
