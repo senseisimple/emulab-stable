@@ -63,6 +63,10 @@ else {
     PAGEHEADER("My Emulab", null, null, $notice);
 }
 
+$html_groups    = null;
+$html_stats     = null;
+$html_templates = null;
+
 #
 # See if any mailman lists owned by the user. If so we add a menu item.
 #
@@ -114,8 +118,6 @@ if ($html_instances) {
 	TableWrapUp($html_instances, FALSE, FALSE,
 		    "instances_table", "instances_button");
 }
-$html_groups = null;
-$html_stats  = null;
 
 #
 # Lets show project and group membership.
