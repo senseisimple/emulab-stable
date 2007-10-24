@@ -385,7 +385,9 @@ sub EditGroup($$$$)
     # page first.
     #
     my @curmembers;
-    if ($group->MemberList(\@curmembers, $MEMBERLIST_FLAGS_GETTRUST)) {
+    if ($group->MemberList(\@curmembers, 
+			   $MEMBERLIST_FLAGS_GETTRUST |
+			   $MEMBERLIST_FLAGS_EXCLUDE_LEADER)) {
 	$$usrerr_ref = "Error: Could not get member list for $group";
 	return undef;
     }
@@ -1117,8 +1119,6 @@ sub LeaderMailList($)
 sub MemberList($$;$$)
 {
     my ($self, $prval, $flags, $desired_trust) = @_;
-    my $leader	       = $self->GetLeader();
-    my $leader_idx     = $leader->uid_idx();
 
     # Must be a real reference. 
     return -1
@@ -1134,6 +1134,13 @@ sub MemberList($$;$$)
     my $gettrust   = ($flags & $MEMBERLIST_FLAGS_GETTRUST ? 1 : 0);
     my $exclude_leader = ($flags & $MEMBERLIST_FLAGS_EXCLUDE_LEADER ? 1 : 0);
     my $trust_clause;
+
+    my $leader	    = $self->GetLeader();
+    my $leader_idx;
+    # There will be no leader during approveproject/Destroy.
+    if (defined($leader)) {
+	$leader_idx = $leader->uid_idx();
+    }
 
     if (defined($desired_trust)) {
 	$trust_clause = "and trust='$desired_trust'"
@@ -1156,7 +1163,7 @@ sub MemberList($$;$$)
 
     while (my ($uid_idx, $uid, $trust) = $query_result->fetchrow_array()) {
 
-	if ($exclude_leader && $leader_idx == $uid_idx) {
+	if ($exclude_leader && defined($leader) && $leader_idx == $uid_idx) {
 	    next;
 	}
 	
@@ -1222,7 +1229,7 @@ sub NonMemberList($$;$)
 	
 	my $user = User->Lookup($uid_idx);
 	if (!defined($user)) {
-	    print "Group::Memberlist: Could not map $uid_idx to object\n";
+	    print "Group::NonMemberList: Could not map $uid_idx to object\n";
 	    return undef;
 	}
 	push(@result, $user);

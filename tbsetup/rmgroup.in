@@ -192,59 +192,62 @@ foreach my $uid (@userlist) {
     $EUID = 0;
 }
 
-#
-# Now remove the group from the group file on both plastic and paper.
-#
-print "Removing group $unix_name ($unix_gid) on local node.\n";
+# If the group isn't in /etc/group yet, it wasn't approved and created.
+if (system("grep -q '^${unix_gid}:' /etc/group")) {
+    #
+    # Now remove the group from the group file on both plastic and paper.
+    #
+    print "Removing group $unix_name ($unix_gid) on local node.\n";
 
-if (system("$GROUPDEL $unix_name")) {
-    if (($? >> 8) != 65) {
-	fatal("Could not remove group $unix_name from local node!");
-    }
-}
-
-if ($MAILMANSUPPORT && !$ELABINELAB) {
-    my $listname = ($pid eq $gid ? "${pid}-users" : "${pid}-${gid}-users");
-    
-    # For perl
-    $EUID = $UID;
-    system("$DELMMLIST -a $listname") == 0 or
-	fatal("$DELMMLIST -a $listname failed!");
-    $EUID = 0;
-}
-
-if ($OPSDBSUPPORT && !$ELABINELAB) {
-    # For perl
-    $EUID = $UID;
-    system("$OPSDBCONTROL delgroup $pid $gid") == 0 or
-	fatal("$OPSDBCONTROL delgroup $pid $gid failed!");
-    $EUID = 0;
-}
-
-#
-# Be real root for ssh.
-# 
-$UID = 0;
-
-if ($CONTROL ne $BOSSNODE) {
-    print "Removing group $unix_name ($unix_gid) on $CONTROL.\n";
-
-    if (system("$SSH -host $CONTROL $GROUPDEL $unix_name")) {
+    if (system("$GROUPDEL $unix_name")) {
 	if (($? >> 8) != 65) {
-	    fatal("Could not remove group $unix_name from $CONTROL!");
+	    fatal("Could not remove group $unix_name from local node!");
 	}
     }
-}
 
-#
-# Remove group on the tip servers. 
-#
-foreach my $tipserver ( TBTipServers() ) {
-    print "Removing group $unix_name ($unix_gid) on $tipserver.\n";
+    if ($MAILMANSUPPORT && !$ELABINELAB) {
+	my $listname = ($pid eq $gid ? "${pid}-users" : "${pid}-${gid}-users");
 
-    if (system("$SSH -host $tipserver $GROUPDEL $unix_name")) {
-	if (($? >> 8) != 65) {
-	    fatal("Could not remove group $unix_name from $tipserver!");
+	# For perl
+	$EUID = $UID;
+	system("$DELMMLIST -a $listname") == 0 or
+	    fatal("$DELMMLIST -a $listname failed!");
+	$EUID = 0;
+    }
+
+    if ($OPSDBSUPPORT && !$ELABINELAB) {
+	# For perl
+	$EUID = $UID;
+	system("$OPSDBCONTROL delgroup $pid $gid") == 0 or
+	    fatal("$OPSDBCONTROL delgroup $pid $gid failed!");
+	$EUID = 0;
+    }
+
+    #
+    # Be real root for ssh.
+    # 
+    $UID = 0;
+
+    if ($CONTROL ne $BOSSNODE) {
+	print "Removing group $unix_name ($unix_gid) on $CONTROL.\n";
+
+	if (system("$SSH -host $CONTROL $GROUPDEL $unix_name")) {
+	    if (($? >> 8) != 65) {
+		fatal("Could not remove group $unix_name from $CONTROL!");
+	    }
+	}
+    }
+
+    #
+    # Remove group on the tip servers. 
+    #
+    foreach my $tipserver ( TBTipServers() ) {
+	print "Removing group $unix_name ($unix_gid) on $tipserver.\n";
+
+	if (system("$SSH -host $tipserver $GROUPDEL $unix_name")) {
+	    if (($? >> 8) != 65) {
+		fatal("Could not remove group $unix_name from $tipserver!");
+	    }
 	}
     }
 }

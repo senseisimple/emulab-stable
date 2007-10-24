@@ -161,22 +161,23 @@ if (@explist) {
 # Must not be the head of the project being removed from, or any projects
 # if being completely removed.
 #
-if (defined($project)) {
-    if ($target_user->SameUser($project->GetLeader())) {
-	fatal("$target_user is the leader of project $project!");
+if (!$nuke) {
+    if (defined($project)) {
+	if ($target_user->SameUser($project->GetLeader())) {
+	    fatal("$target_user is the leader of project $project!");
+	}
     }
-}
-else {
-    my @leaderlist;
-    
-    if ($target_user->ProjectLeaderList(\@leaderlist) != 0) {
-	fatal("Could not get project leader list for $target_user");
-    }
-    if (@leaderlist) {
-	fatal("$target_user is still heading up projects!");
-    }
-}
+    else {
+	my @leaderlist;
 
+	if ($target_user->ProjectLeaderList(\@leaderlist) != 0) {
+	    fatal("Could not get project leader list for $target_user");
+	}
+	if (@leaderlist) {
+	    fatal("$target_user is still heading up projects!");
+	}
+    }
+}
 #
 # If nuke mode is also specified, then the account is being nuked from
 # web page because of a project join denial. Check to make sure user

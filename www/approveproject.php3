@@ -24,6 +24,10 @@ $optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
 				 "user_interface", PAGEARG_STRING,
 				 "message", PAGEARG_ANYTHING,
 				 "silent", PAGEARG_BOOLEAN);
+$sendemail = 1;
+if (isset($silent) && $silent) {
+    $sendemail = 0;
+}
 
 #
 # Of course verify that this uid has admin privs!
@@ -139,13 +143,80 @@ elseif (strcmp($approval, "moreinfo") == 0) {
 }
 elseif ((strcmp($approval, "deny") == 0) ||
 	(strcmp($approval, "destroy") == 0)) {
+    
+    #
+    # If the "destroy" option was given, kill the users account.
+    #
+    if (strcmp($approval, "destroy") == 0) {
+	#
+	# Take the user out of the project group first.
+	#
+	SUEXEC($uid, $TBADMINGROUP, "webmodgroups -r $pid:$pid $headuid", 1);
+
+	#
+	# See if user is in any other projects (even unapproved).
+	#
+	$project_list = $leader->ProjectMembershipList();
+
+	#
+	# If yes, then we cannot safely delete the user account.
+	#
+	if (count($project_list)) {
+	    echo "<p>
+                  User $headuid was <b>denied</b> starting project $pid.
+                  <br>
+                  Since the user is a member (or requesting membership)
+		  in other projects, the account cannot be safely removed.
+		  <br>\n";
+	}
+	else {
+	    #
+	    # No other project membership. If the user is unapproved/newuser,
+	    # it means he was never approved in any project, and so will
+	    # likely not be missed. He will be unapproved if he did his
+	    # verification.
+	    #
+	    if (strcmp($curstatus, "newuser") &&
+		strcmp($curstatus, "unapproved")) {
+		echo "<p>
+		      User $headuid was <b>denied</b> starting project $pid.
+		      <br>
+		      Since the user has been approved by, or was active in other
+		      projects in the past, the account cannot be safely removed.
+		      \n";
+	    }
+	    else {
+		SUEXEC($uid, $TBADMINGROUP, "webrmuser -n -p $pid $headuid", 1); 
+
+		if ($sendemail) {
+		    TBMAIL("$headname '$headuid' <$headuid_email>",
+			   "Account '$headuid' Terminated",
+			   "\n".
+			   "This message is to notify you that your account has \n".
+			   "been terminated because your project $pid was denied.\n".
+			   "\n\n".
+			   "Thanks,\n".
+			   "Testbed Operations\n",
+			   "From: $TBMAIL_APPROVAL\n".
+			   "Bcc: $TBMAIL_APPROVAL\n".
+			   "Errors-To: $TBMAIL_WWW");
+		}
+		echo "<h3><p>
+			User $headuid was <b>denied</b> starting project $pid.
+			<br>
+			The account has also been <b>terminated</b>!
+		      </h3>\n";
+	    }
+	}
+    }
+    else {
+	echo "<h3><p>
+		  Project $pid (User: $headuid) has been denied.
+	      </h3>\n";
+    }
+
     SUEXEC($uid, $TBADMINGROUP, "webrmproj $pid", 1);
 
-    $sendemail = 1;
-    if (isset($silent) && $silent) {
-	$sendemail = 0;
-    }
-    
     if ($sendemail) {
 	TBMAIL("$headname '$headuid' <$headuid_email>",
 	       "Project '$pid' Denied",
@@ -161,30 +232,6 @@ elseif ((strcmp($approval, "deny") == 0) ||
 	       "Errors-To: $TBMAIL_WWW");
     }
 
-    #
-    # Well, if the "destroy" option was given, kill the users account.
-    #
-    if ($approval == "destroy") {
-	SUEXEC($uid, $TBADMINGROUP, "webrmuser $headuid", 1); 
-	
-	if ($sendemail) {
-	    TBMAIL("$headname '$headuid' <$headuid_email>",
-		   "Account '$headuid' Terminated",
-		   "\n".
-		   "This message is to notify you that your account has \n".
-		   "been terminated because your project $pid was denied.\n".
-		   "\n\n".
-		   "Thanks,\n".
-		   "Testbed Operations\n",
-		   "From: $TBMAIL_APPROVAL\n".
-		   "Bcc: $TBMAIL_APPROVAL\n".
-		   "Errors-To: $TBMAIL_WWW");
-	}
-    }
-
-    echo "<h3><p>
-              Project $pid (User: $headuid) has been denied.
-          </h3>\n";
 }
 elseif (strcmp($approval, "approve") == 0) {
     $optargs = "";
