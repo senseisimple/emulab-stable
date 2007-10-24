@@ -775,10 +775,10 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import url($BASEPATH/style.css); -->
+            <!-- @import url($BASEPATH/style-new.css); -->
             <!-- @import url($BASEPATH/cssmenu.css); -->";
     
-    if (0 && !$MAINPAGE) {
+    if (1 && !$MAINPAGE) {
 	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
     }
     echo "</style>\n";
