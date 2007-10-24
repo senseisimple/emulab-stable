@@ -30,21 +30,24 @@ $optargs = OptionalPageArguments("search",       PAGEARG_STRING,
 #
 PAGEHEADER("Template Search");
 
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+
 #
 # Check permission.
 #
 if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment template ".
-	      "$guid/$version!", 1);
+	      "$guid/$vers!", 1);
 }
 
 #
 # We display the info for all versions of the template. 
 #
 $root = $template->LookupRoot($template->guid());
-$guid = $root->guid();
 
-echo $root->PageHeader();
+echo $template->PageHeader();
 echo "<br><br>\n";
 
 # A list of match conditions we know about.
@@ -59,7 +62,7 @@ $clauseselection = array('equal'     => "==",
 # Define the form.
 #
 $form = array('#id'	  => 'myform',
-	      '#action'   => CreateURL("template_search", $root),
+	      '#action'   => CreateURL("template_search", $template),
 	      '#caption'  => "Search your template (records) ".
 	                        "by parameter values");
 
@@ -68,6 +71,18 @@ $fields = array();
 #
 # Search either templates, instances, or runs.
 #
+$fields['searchwhat'] =
+    array('#type'       => 'radio',
+	  '#label'      => 'Search which template versions',
+	  '#required'   => TRUE,
+	  '#radios'     => array('Template' =>
+				 array('#label'        => 'This Version',
+				       '#return_value' => "this"),
+				 'Instance' =>
+				 array('#label'        => 'All Versions',
+				       '#return_value' => "all")),
+	  '#checkslot'  => "/^(this|all)$/");
+
 $fields['searchwhich'] =
     array('#type'       => 'radio',
 	  '#label'      => 'What do you want to search',
@@ -157,10 +172,10 @@ $fields['clausecount'] = array('#type'     => 'hidden',
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $form, $fields, $root, $prevsearch, $this_user;
+    global $form, $fields, $root, $template, $prevsearch, $this_user;
 
     if (($savedsearches = $root->SavedSearches($this_user))) {
-	$action = CreateURL("template_search", $root);
+	$action = CreateURL("template_search", $template);
     
 	echo "<script language=JavaScript>
               function PreviousSearch() {
@@ -218,6 +233,7 @@ if (!isset($formfields)) {
     }
     else {
 	$defaults = array();
+	$defaults["searchwhat"]  = "this";
 	$defaults["searchwhich"] = "template";
 	$defaults["matchif"]     = "any";
     }
@@ -435,35 +451,50 @@ if ($formfields["matchif"] == "any") {
 else {
     $matchif = "=" . count($clauses);
 }
+#
+# This will be set to a specific version if not searching all template versions
+#
+$versionclause = "";
 
 if ($formfields["searchwhich"] == "template") {
+    if ($formfields["searchwhat"] == "this") {
+	$versionclause = "and p.parent_vers='$vers'";
+    }
     $query_string =
 	"select t.* from experiment_template_parameters as p ".
 	"left join experiment_templates as t on t.guid=p.parent_guid and ".
 	"     t.vers=p.parent_vers ".
-	"where p.parent_guid='$guid' and ($clausestring) ".
+	"where (p.parent_guid='$guid' $versionclause) and ($clausestring) ".
 	"group by t.vers having count(t.vers) $matchif";
 }
 elseif ($formfields["searchwhich"] == "instance") {
+    if ($formfields["searchwhat"] == "this") {
+	$versionclause = "and b.parent_vers='$vers'";
+    }
     $query_string =
 	"select i.* from experiment_template_instance_bindings as b ".
 	"left join experiment_template_instances as i on ".
 	"     i.parent_guid=b.parent_guid and ".
 	"     i.parent_vers=b.parent_vers and ".
 	"     i.idx=b.instance_idx ".
-	"where b.parent_guid='$guid' and ($clausestring) ".
+	"where (b.parent_guid='$guid' $versionclause) and ($clausestring) ".
 	"group by i.idx having count(i.idx) $matchif";
 }
 else {
+    #
     # This is complicated by the fact tha neither experiment_runs nor
-    # experiment_run_bindings has a backlink to the template. 
+    # experiment_run_bindings has a backlink to the template.
+    #
+    if ($formfields["searchwhat"] == "this") {
+	$versionclause = "and i.parent_vers='$vers'";
+    }    
     $query_string =
 	"select r.*,b.runidx,i.parent_vers ".
 	"     from experiment_template_instances as i ".
 	"left join experiment_run_bindings as b on b.exptidx=i.exptidx ".
 	"left join experiment_runs as r on ".
 	"     r.exptidx=b.exptidx and r.idx=b.runidx ".
-	"where i.parent_guid='$guid' and ($clausestring) ".
+	"where (i.parent_guid='$guid' $versionclause) and ($clausestring) ".
 	"group by i.idx,b.runidx having count(b.runidx) $matchif";
 }
 
