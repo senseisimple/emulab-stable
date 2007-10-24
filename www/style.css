@@ -7,6 +7,10 @@
 body {
   /* behavior:url("csshover.htc"); IE hack to make :hover work. */
 }
+#maincontent {
+  /*min-width: 950px; */
+  overflow: scroll;
+}
 
 td, th {
   border: solid 0px #669;
@@ -20,6 +24,9 @@ th {
   text-align: left;
   vertical-align: bottom;
 }
+caption {
+  padding-bottom: 4px;
+}
 
 table {
   border: 0px;
@@ -28,6 +35,10 @@ table {
 
 table.nogrid { border: solid 1px #669; background-color:#99A; }
 table.stealth { border: 0px; background-color:#FFF; }
+table.invisible { margin-top: 0px; margin-bottom: 0px; display: none; }
+div.invisible { margin-top: 0px; margin-bottom: 0px; display: none; }
+span.invisible { margin-top: 0px; margin-bottom: 0px; display: none; }
+
 td.stealth { background-color:#FFF; }
 img.stealth { background-color:#FFF; }
 
@@ -57,7 +68,6 @@ td.paddedcell2 { padding: 0.5em; }
   width: 100%;
   height: 100px;
 }
-
 #fancybannercell {
   background-color: #000000;
   background-image: url("fancy-header-background.jpg");
@@ -71,15 +81,15 @@ td.paddedcell2 { padding: 0.5em; }
 
 /* Styling for the usage box title and cells. */
 iframe.usageframe, iframe.transparentusageframe {
-  width: 275px;
-  height: 100px;
   border: 0px;
   margin: 0px;
-  float: right;
   padding: 0px;
   background-color: #444444;
+  float: right;
+  overflow: hide;
 }
-iframe.transparentusageframe {
+iframe.transparentusageframe, iframe.navbarusageframe {
+  background-color: #444444;
   opacity: 0.85;
   /* Why, IE, why?! */
   filter: alpha(opacity=85);
@@ -87,10 +97,23 @@ iframe.transparentusageframe {
      standard */
   -moz-opacity: 0.85;
 }
+iframe.usageframe, iframe.transparentusageframe {
+  width: 198px;
+  height: 100px;
+}
+iframe.navbarusageframe {
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  background-color: #444444;
+  width: 90px;
+  height: 54px;
+  z-index: 1;
+}
 iframe.outputframe {
-  width: 100%;
-  min-width: 100%;
-  border: 4px;
+  width: 98%;
+  min-width: 98%;
+  border: 1px;
   overflow: auto;
   scrolling: auto;
 }
@@ -109,6 +132,25 @@ div#usage table {
     /* Force the same height as the banner */
     height: 100px;
 }
+div#usagefreenodes table {
+  background-color: #666666;
+  /* Force the same height as the banner */
+  height: 54px;  /* must match usageframe size */
+}
+div#showexpusagefreenodes {
+  border: solid 2px black;
+}
+div#showexpusagefreenodes table {
+  border: 0px;
+}
+div#showexpusagefreenodes table td {
+  border: 1px;
+  background-color: #FFF;
+  color: #000;
+}
+div#showexpusagefreenodes table td a {
+  color: #2222BB;
+}
 
 .usagetitle {
   color: #fff;
@@ -117,22 +159,24 @@ div#usage table {
   font-size: 10pt;
 }
 
-td.menuoptusage {
-  font-weight: bold;
+td.menuoptusage, td.usagefreenodes {
+  font:bold 8pt arial,Helvetica,sans-serif;
+  border: solid 0px #666;
+  background-color: #000;
   color: #ffffff;
-  background-color: #444444;
-  padding-left: 6px;
-  padding-top: 1px; 
+  padding-left: 1px;
+  padding-right: 1px;
+  padding-top: 0px; 
   padding-bottom: 0px;
   margin: 0px; 
   border: 0px;
-  font-size: 9pt;
+  line-height: 12px;
 }
-
-td.menuoptusage a {
+td.menuoptusage, td.usagefreenodes a {
     /* Change link color to be more visible on a dark background */
     color: #ccccff;
 }
+
 /* END Banner */
 
 
@@ -141,8 +185,6 @@ td.menuoptusage a {
  * menus, and the "content" which is a container used to positon the
  * "contentbody" to the right of the leftcell.
  */
-
-
 /* BEGIN Left cell */
 .leftcell {
   /* Border for the entire group of menus. */
@@ -159,7 +201,81 @@ td.menuoptusage a {
   margin-top: 8px;
   width: 198px;
 }
+/* region across the top. */
+div.topcell {
+  /* Border for the entire group of menus. Put the border only on the top and
+    bottom so that setting the width to 100% doesn't force a scrollbar. */
+  border-top: solid 2px black;
+  border-bottom: solid 2px black;
 
+  background-image: url("fancy-header-background-short.jpg");
+  background-position: 0px 0px;
+  background-repeat: repeat;
+  background-color: #000; 
+  padding: 0px;
+  margin-bottom: 4px;
+
+  top: 0px;
+  left: 0px;
+  display: block;
+  width: 100%;
+  /* So we goto a scroll bar before the top nav menus go to hell */
+  min-width: 800px;
+  clear: both;
+  height: 54px;
+  z-index: 1;
+}
+table#topcelltable, table#topcelltable tr, table#topcelltable tr td {
+  background-color: #111;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+table#topcelltable tr td {
+  border-right: solid 3px #555;
+}
+#topcellimage {
+/*  float: left; */
+  border: 0px;
+}
+#topcellimage img {
+  border: 0px;
+}
+div.midtopcell {
+  padding: 0px;
+  margin: 0px;
+  /* IE: so menus appear on top */
+  z-index: 1;
+}
+div.midtopcell table#navmenus, div.midtopcell table#navmenus td {
+  background-color: #111;
+  /* The height allows for extra separation between upper/lower row */
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+div.midtopcell table#navmenus {
+  padding-left: 4px;
+  padding-right: 4px;
+  height: 54px;
+}
+div.midtopcell table#navmenus tr {
+  /* The height allows for extra separation between upper/lower row */
+  vertical-align: middle;
+  height: 16px;
+}
+div.midtopcell table#navmenus td {
+  height: 16px;
+}
+a.midtopcell:link, a.midtopcell:visited { color: #FFF; text-decoration: none;}
+
+div.cbody {
+  clear: left;
+  overflow: visible;
+  padding: 6px;
+}
 
 /*
  * The menus are made up of a heading (e.g. h2) and an unordered list that
@@ -169,34 +285,79 @@ td.menuoptusage a {
 .menuheader {
   background-color: #000;
   color: #FFF;
-  padding: 3px 4px;
+  padding: 0px 0px;
   font-size: medium;
   margin: 0px;
   text-align: left;
 }
-ul.menu {
+ul.navmenu {
   background-color: #cde;
   text-align: left;
   margin: 0px;
   padding: 3px 6px 6px 6px; /* Padding for menu items and at the bottom. */
 }
-ul.menu li {
+ul.navmenu-collapsed {
+  background-color: #cde;
+  text-align: left;
+  margin: 0px;
+  padding: 3px 6px 6px 6px; /* Padding for menu items and at the bottom. */
+  display: none;
+}
+ul.navmenu li {
   list-style: none; /* Get rid of the bullets. */
+  margin-left: 2px;
   margin-bottom: 2px;
 }
-ul.menu li.newgroup {
+ul.navmenu li.newgroup {
   /* Start of a new group of menu items, add some extra space to visually */
   /* separate them. */
   list-style: none;
   margin-top: 8px;
   margin-bottom: 2px;
 }
-
+#topcellsearchrow {
+  display: inline;
+  border: 0px;
+}
+#topcellsearchrow form {
+  display: inline;
+}
+/* Firefox does not understand inline-table. */
+#topcellsearchrow table {
+  display: inline;
+  height: 16px;
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+}
+#topcellsearchrow table {
+  display: inline-table;
+}
+/* Make the search box wide enough to be useful. */
+#topcellsearchrow #searchbox {
+  background-color: #666;
+  border: 1px solid #aaa;
+}
+#topcellsearchrow #searchbox.textInput {
+  color: #000;
+  background-color: #eee;
+  font-size: small;
+}
+#topcellsearchrow #searchbox.textInputEmpty {
+  color: #bbb;
+  font-size: small;
+}
 #searchrow {
-  padding: 3px;
   /* Add some horizontal separators. */
+  padding: 1px;
   border-top: solid 2px black;
   border-bottom: solid 2px black;
+}
+#searchrow {
+  /*position: relative; */
+  top: 5px;
+  padding: 0px;
+  margin: 0px;
 }
 #searchrow form, #searchrow table, #searchrow table td {
   /* Make sure the background is the same for the table that makes up the
@@ -204,25 +365,35 @@ ul.menu li.newgroup {
   background-color: #def;
   margin: 0px;
 }
+#topcellsearchrow table, #topcellsearchrow table tr,
+#topcellsearchrow table tr td {
+  /* Make sure the background is the same for the table that makes up the
+   * search box. */
+  background-color: #000;
+  height: 16px;
+  vertical-align: middle;
+}
+
 /* The text box. */
 #searchbox {
   padding: 0px;
-  margin: 0px;
+  margin-right: 0px;
   width: 100%; /* Force a width, the default value is actually too wide. */
 }
 .textInput {
-  color: #000000;
+  color: #000;
   font-size: small;
 }
 .textInputEmpty {
-  color: #888888;
+  color: #888;
   font-size: small;
 }
 /* The submit button. */
 #searchsub {
   padding: 0px;
-  margin: 0px;
-  font-size: x-small;
+  margin-left: 3px;
+  font-size: small;
+  border: solid 1px black;
 }
 
 /* The web/message text. */
@@ -231,13 +402,25 @@ ul.menu li.newgroup {
   font-weight: bold;
   padding-bottom: 2px;
 }
-
-#loginbox a {
-  display: block; /* Break the line for the login/request buttons. */
+.webmessage {
+  display: block; /* Break the line. */
+  position: static;
+  font-weight: bold;
+  padding: 0px;
+  margin: 0px;
+  text-align: center;
+  font-size: 10pt;
+  clear: left;
 }
 
+#loginbox {
+  display: block; /* Break the line for the login/request buttons. */
+  margin-top: 4px;
+  text-align: center;
+}
 /* The login message. */
 #loginbox strong {
+  text-align: center;
   font-weight: bold;
   display: block;
   padding-top: 3px;
@@ -256,6 +439,10 @@ ul.menu li.newgroup {
 
 /* Definition for regular pages that have a menu. */
 .content {
+  padding-top: 0px;
+  margin-top: 1px;
+}
+.rightcontent {
   position: absolute;
   left: 214px; /* Push it to the right of the menu. */
   margin-top: 8px;
@@ -263,12 +450,12 @@ ul.menu li.newgroup {
 }
 /* Definition for pages with no menu, like nscheck. */
 .fullcontent {
-  margin: 8px;
+  margin: 0px;
 }
 
 
 /*   BEGIN Content */
-.contentbody {
+.contentbody, .fullcontentbody {
   background-color: #FFF;
   border: solid 2px black;
 
@@ -278,36 +465,57 @@ ul.menu li.newgroup {
    * wide table is the direct descendent of this div, otherwise, no joy.
    */
   float: left;
-  margin-left: 0px;
-  margin-right: 0px;
-  padding-left: 16px;
-  padding-right: 16px;
   margin-bottom: 8px;
   min-width: 95%; /* XXX Safari doesn't expand the div to fill the viewport. */
-  padding-bottom: 20px;
-  background-image: url(gradient-black-flipped.png);
-  background-repeat: repeat-x;
-  background-position: bottom left;
+  padding-bottom: 10px;
+}
+.contentbody {
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-left: 0px;
+  margin-right: 0px;
+}
+.fullcontentbody {
+  padding-left: 0px;
+  padding-right: 0px;
+  margin-left: 8px;
+  margin-right: 8px;
+  margin-top: 4px;
 }
 
 /* The black bar containing the page title. */
-.contenttitle {
+.contenttitle, .rightcontenttitle {
   background-color: #000;
   color: #FFF;
   margin: 0px;
-
+  padding: 0px;
+  line-height: 30px;
+  clear: none; /* Let the version/login floats share the line.  XXX IE6 */
+}
+.contenttitle {
   /* Counteract the padding of the contentbody. */
+  margin-left: 0px;
+  margin-right: 0px;
+  margin-bottom: 4px; /* Simulate padding for the actual content. */
+  padding-left: 0px;
+  padding-bottom: 0px;
+}
+.rightcontenttitle {
   margin-left: -16px;
   margin-right: -16px;
   margin-bottom: 16px; /* Simulate padding for the actual content. */
-  padding: 0px;
   padding-left: 3px;
-  clear: none; /* Let the version/login floats share the line.  XXX IE6 */
-  line-height: 38px;
   padding-bottom: 12px;
-  background-image: url(gradient-black.png);
-  background-repeat: repeat-x;
-  background-position: bottom left;
+}
+.headernotice {
+  color: red;
+  font-size: 14pt;
+  width: 40%; /* This is how it gets centered */
+  float: right;
+  display: inline;
+  margin-right: 10px;
+  line-height: 30px; /* Match the height of the header so the text is */
+		     /* vertically centered. */
 }
 
 #versioninfo {
@@ -317,7 +525,7 @@ ul.menu li.newgroup {
   float: right;
   display: inline;
   margin-right: 10px;
-  line-height: 38px; /* Match the height of the header so the text is */
+  line-height: 30px; /* Match the height of the header so the text is */
 		     /* vertically centered. */
 }
 #logintime {
@@ -326,12 +534,9 @@ ul.menu li.newgroup {
   float: right;
   display: inline;
   text-align: right;
-  font-size: 13px;
-  line-height: 16px; /* Smaller line-height to fit the login and timestamp. */
+  font-size: 10pt;
+  line-height: 14px; /* Smaller line-height to fit the login and timestamp. */
   padding: 0px;
-  margin-top: 2px;
-  margin-right: -10px; /* The float obeys the contentbody padding so we need */
-		       /* to push it right a little. */
 }
 #logintime .uid {
   font-weight: bold;
@@ -340,11 +545,12 @@ ul.menu li.newgroup {
   font-weight: normal;
   content: "'"; /* XXX Doesn't work in IE6. */
 }
-#loggedin {
+.loggedin {
   color: #FFF;
   display: block; /* Break the line between login and timestamp. */
   margin: 0px;
   padding: 0px;
+  text-align: right;
 }
 
 
@@ -356,13 +562,16 @@ ul.menu li.newgroup {
   border-right: solid 4px black;
   border-left: solid 4px black;
   font-size: medium;
+  text-align: left;
   margin: 0px;
+  white-space: nowrap;
 }
 ul.submenu {
-  background-color: #f1fafa;
+  background-color: #FFF;
   margin: 0px;
   padding: 3px 6px 6px 6px;
   border: solid 2px black;
+  text-align: left;
 }
 ul.submenu li {
   font-size: 10pt;
@@ -403,6 +612,16 @@ ul.submenu li.newgroup {
   width: 100%; /* Same size as parent so it centers. */
   display: inline;
 }
+.rightsidebuiltwith {
+  display: inline;
+  float: right;
+  padding: 0;
+  margin: 0;
+  border: solid 5px black;
+}
+.rightsidebuiltwith img {
+  border: 0px;
+}
 .gripe {
   position: absolute; /* Take it out of the normal flow. */
   margin-top: 8px; /* Add some space between the leftcell and the link. */
@@ -421,10 +640,12 @@ ul.submenu li.newgroup {
 .pagenotworking {
   background-color:#FFF;
   font-size: x-small;
-  text-align: left;
+  position: relative;
+  display: inline;
+  float: right;
   padding: 0px;
-  margin-bottom: 6px;
-  margin-top: -16px;
+  margin-bottom: 2px;
+  margin-top: 2px;
   font-weight: bold;
 }
 .reportbug {
@@ -465,6 +686,12 @@ a2  { padding: 4px; }
 a2:hover   { background-color: #E7E7F0; border: solid 1px #007; text-decoration: none; padding: 3px;}
 
 span.topbaroption { background-color:#E1E1EA; }
+span.printable {
+  font-size: small;
+  font-weight: bold;
+  float: right;
+  display: inline;
+}
 
 .walayer {
   font-size: small;
@@ -500,9 +727,18 @@ span.topbaroption { background-color:#E1E1EA; }
 #topnavbar
 {
   padding: 3px 0;
-  margin-left: 0;
-  border-bottom: 1px solid #778;
+  margin: 0;
   font: bold 12px Verdana, sans-serif;
+}
+#topnavbarbottom
+{
+  height: 4px;
+  min-width: 100%;
+  border-top: 1px solid #778;
+  margin-top: 0;
+  margin-bottom: 8px;
+  padding-top: 0;
+  background: #FFF;
 }
 		
 #topnavbar li
@@ -512,23 +748,28 @@ span.topbaroption { background-color:#E1E1EA; }
   display: inline;
 }
 	
-#topnavbar li a
+#topnavbar li a.topnavbar
 {
   padding: 3px 0.5em;
   margin-left: 3px;
   border: 1px solid #778;
-  border-bottom: none;
   background: #DDE;
   text-decoration: none;
+  color: #667;
 }
+
+# outline property gets rid of the dashed outline after clicking.
+#topnavbar li a.topnavbar:link    { color: #667; background: #DDE}
+#topnavbar li a.topnavbar:active  { color: #667; background: #DDE;
+                                   outline: none;}
+#topnavbar li a.topnavbar:visited { color: #667; background: #DDE}
+#topnavbar li a.topnavbar:focus   { -moz-outline-style: none;}
+#topnavbar li a.topnavbar:focus   { outline: none;}
 		
-#topnavbar li a:link { color: #448; }
-#topnavbar li a:visited { color: #667; }
-		
-#topnavbar li a:hover
+#topnavbar li a.topnavbar:hover
 {
   color: #000;
-  background: #AAE;
+  background: #DDE;
   border-color: #227;
 }
 

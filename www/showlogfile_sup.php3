@@ -116,7 +116,7 @@ function STARTLOG($object)
     echo "</center>\n";
     echo "<br>\n";
     
-    echo "<div><iframe class='outputframe' ".
+    echo "<div align=center><iframe class='outputframe' ".
 	"id='outputframe' name='outputframe'></iframe></div>\n";
 
     echo "<script type='text/javascript' language='javascript' src='json.js'>

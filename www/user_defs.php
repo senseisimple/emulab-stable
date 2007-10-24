@@ -615,7 +615,7 @@ class User
 	return $html;
     }
 
-    function Show() {
+    function Show($html = FALSE) {
 	global $WIKISUPPORT;
 
 	$user = $this;
@@ -681,6 +681,8 @@ class User
 		"(" . $lastnodelogininfo["node_id"] . ")";
 	}
     
+	if ($html)
+	    ob_start();
 	echo "<table align=center border=1>\n";
     
 	echo "<tr>
@@ -849,6 +851,11 @@ class User
                   </tr>\n";
 	}
 	echo "</table>\n";
+	if ($html) {
+	    $table_html = ob_get_contents();
+	    ob_end_clean();
+	    return $table_html;
+	}
     }
 
     #

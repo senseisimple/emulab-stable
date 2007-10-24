@@ -8,12 +8,6 @@ include("defs.php3");
 include_once("template_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Show Project Information");
-
-
-#
 # Note the difference with which this page gets it arguments!
 # I invoke it using GET arguments, so uid and pid are are defined
 # without having to find them in URI (like most of the other pages
@@ -34,6 +28,11 @@ $reqargs  = RequiredPageArguments("project", PAGEARG_PROJECT);
 $project  = $reqargs["project"];
 $group    = $project->Group();
 $pid      = $project->pid();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Project $pid");
 
 #
 # Verify that this uid is a member of the project being displayed.

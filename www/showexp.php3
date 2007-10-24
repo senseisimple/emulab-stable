@@ -7,9 +7,10 @@
 include("defs.php3");
 require("Sajax.php");
 include("showstuff.php3");
+include_once("node_defs.php");
 include_once("template_defs.php");
 sajax_init();
-sajax_export("GetExpState", "Show", "ModifyAnno");
+sajax_export("GetExpState", "Show", "ModifyAnno", "FreeNodeHtml");
 
 #
 # Only known and logged in users can look at experiments.
@@ -61,6 +62,11 @@ if ($EXPOSETEMPLATES) {
 #
 # For the Sajax Interface
 #
+function FreeNodeHtml()
+{
+    return ShowFreeNodes();
+}
+
 function GetExpState($a, $b)
 {
     global $experiment;
@@ -308,8 +314,6 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 }
 
-echo $experiment->PageHeader();
-echo "<br /><br />\n";
 SUBPAGESTART();
 
 SUBMENUSTART("$tag Options");
@@ -557,6 +561,22 @@ if ($isadmin) {
     
 SUBMENUEND_2A();
 
+echo "<br>\n";
+echo "<script>\n";
+echo "function FreeNodeHtml_CB(stuff) {
+         getObjbyName('showexpusagefreenodes').innerHTML = stuff;
+         setTimeout('GetFreeNodeHtml()', 60000);
+      }
+      function GetFreeNodeHtml() {
+         x_FreeNodeHtml(FreeNodeHtml_CB);
+      }
+      setTimeout('GetFreeNodeHtml()', 60000);
+      </script>\n";
+	  
+echo "<div id=showexpusagefreenodes>\n";
+echo   ShowFreeNodes();
+echo "</div>\n";
+
 echo "<br>
       <a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>
          <img border=1 alt='experiment vis'
@@ -575,7 +595,7 @@ echo "<script type='text/javascript' language='javascript'>
         function Show(which) {
 	    li = getObjbyName(li_current);
             li.style.backgroundColor = '#DDE';
-            li.style.borderBottom = 'none';
+            li.style.borderBottom = '1px solid #778';
 
             li_current = 'li_' + which;
 	    li = getObjbyName(li_current);
@@ -627,6 +647,11 @@ echo "<script type='text/javascript' language='javascript'>
         }
         function ModifyAnno_cb(val) {
         }
+        function Setup() {
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = 'white';
+            li.style.borderBottom = '1px solid white';
+        }
       </script>\n";
 
 #
@@ -635,32 +660,37 @@ echo "<script type='text/javascript' language='javascript'>
 echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
-          <a href=\"#A\" style=\"background-color:white\" ".
+          <a href=\"#A\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_settings\" onclick=\"Show('settings');\">".
                "Settings</a></li>\n";
 echo "<li>
-          <a href=\"#B\" id=\"li_vis\" onclick=\"Show('vis');\">".
+          <a href=\"#B\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+               "id=\"li_vis\" onclick=\"Show('vis');\">".
                "Visualization</a></li>\n";
 echo "<li>
-          <a href=\"#C\" id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
+          <a href=\"#C\" class=topnavbar onfocus=\"this.hideFocus=true;\"  ".
+              "id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
               "NS File</a></li>\n";
 echo "<li>
-          <a href=\"#D\" id=\"li_details\" onclick=\"Show('details');\">".
+          <a href=\"#D\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+              "id=\"li_details\" onclick=\"Show('details');\">".
               "Details</a></li>\n";
 
 if ($instance) {
     echo "<li>
-              <a href=\"#E\" id=\"li_anno\" onclick=\"Show('anno');\">".
+              <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	          "id=\"li_anno\" onclick=\"Show('anno');\">".
                   "Annotation</a></li>\n";
 }
 echo "</ul>\n";
+echo "</div>\n";
+echo "<div align=center id=topnavbarbottom>&nbsp</div>\n";
 
 #
 # Start out with details ...
 #
 echo "<div align=center width=\"100%\" id=\"showexp_visarea\">\n";
 $experiment->Show();
-echo "</div>\n";
 echo "</div>\n";
 
 if ($experiment->Firewalled() &&
@@ -720,6 +750,13 @@ if ($isadmin) {
 
     $experiment->ShowStats();
 }
+
+#
+# Get the active tab to look right.
+#
+echo "<script type='text/javascript' language='javascript'>
+      Setup();
+      </script>\n";
 
 #
 # Standard Testbed Footer

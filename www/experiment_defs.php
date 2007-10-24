@@ -746,12 +746,13 @@ class Experiment
         #
         # Generate the table.
         #
-	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
+	echo "<table align=center border=1>\n";
 
 	if (!$short) {
+	    $thisurl = CreateURL("showexp", $this);
 	    echo "<tr>
                 <td>Name: </td>
-                <td class=left>$eid</td>
+                <td class=left><a href='$thisurl'>$eid</a></td>
               </tr>\n";
 
 	    echo "<tr>
@@ -1274,12 +1275,25 @@ function ShowExperimentList($type, $this_user, $object) {
 }
 
 function ShowExperimentList_internal($templates_only,
-				     $type, $this_user, $object) {
+				     $type, $this_user, $object,
+				     $tabledefs = null) {
     global $TB_EXPTSTATE_SWAPPED, $TB_EXPTSTATE_SWAPPING;
-
+    
     $from_idx = $this_user->uid_idx();
     $nopid    = 0;
     $parens   = 0;
+    $id       = "explist";
+    $class    = "explist";
+    $wanthtml = 0;
+    $notitle  = FALSE;
+    
+    if ($tabledefs) {
+	$id    = (isset($tabledefs['#id']) ? $tabledefs['#id'] : $id);
+	$class = (isset($tabledefs['#class']) ? $tabledefs['#class'] : $class);
+	$html  = (isset($tabledefs['#html']) ? $tabledefs['#html'] : $html);
+	$notitle = (isset($tabledefs['#notitle']) ?
+		    $tabledefs['#notitle'] : $notitle);
+    }
 
     if ($type == "USER") {
 	$uid   = $object->uid();
@@ -1338,12 +1352,15 @@ function ShowExperimentList_internal($templates_only,
     }
     
     if (mysql_num_rows($query_result)) {
+	if ($html)
+	    ob_start();
+
 	echo "<center>
-          <h3>$title ".
-	    ($templates_only ? "Template Instances" : "Experiments") . "</h3>
-          </center>
-          <table align=center border=1 cellpadding=2
-                 id='explist' cellspacing=2>\n";
+               <h3>$title ".
+	        ($templates_only ?
+		 "Template Instances" : "Experiments") . "</h3>
+              </center>
+              <table align=center border=1 class=class id=$id>\n";
 
 	if ($nopid) {
 	    $pidrow="";
@@ -1422,9 +1439,14 @@ function ShowExperimentList_internal($templates_only,
 	}
 	echo "</ol></font></td></tr></table>\n";
 
-        echo "<script type='text/javascript' language='javascript'>
-	       sorttable.makeSortable(getObjbyName('explist'));
-             </script>\n";
+	# Sort initialized later when page fully loaded.
+	AddSortedTable($id);
+
+	if ($html) {
+	    $html = ob_get_contents();
+	    ob_end_clean();
+	    return $html;
+	}
     }
 }
 

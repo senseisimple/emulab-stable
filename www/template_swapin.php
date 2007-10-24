@@ -714,18 +714,18 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		    "$command_options -e $eid $guid/$vers",
 		 SUEXEC_ACTION_IGNORE);
 
-CLEARBUSY();
+HIDEBUSY();
 
-#
-# Fatal Error. Report to the user, even though there is not much he can
-# do with the error. Also reports to tbops.
-# 
-if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
-}
+if (retval) {
+    #
+    # Fatal Error. Report to the user, even though there is not much he can
+    # do with the error. Also reports to tbops.
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    }
 
-# User error. Tell user and exit.
-if ($retval) {
+    # User error. Tell user and exit.
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
     return;
 }

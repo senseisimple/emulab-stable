@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node Information");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -27,8 +22,10 @@ $reqargs = RequiredPageArguments("node", PAGEARG_NODE);
 # Need these below
 $node_id = $node->node_id();
 
-echo "<font size=+2>".
-     "Node <b>$node_id</b></font>";
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node $node_id");
 
 #
 # Admin users can look at any node, but normal users can only control
@@ -46,7 +43,6 @@ if (! $isadmin &&
     }
     if (STUDLY() && ($power_id == "mail")) {
 	    SUBPAGESTART();
-	    
 	    SUBMENUSTART("Node Options");
 	    WRITESUBMENUBUTTON("Update Power State",
 			       "powertime.php3?node_id=$node_id");
@@ -67,16 +63,6 @@ if (($experiment = $node->Reservation())) {
     $eid   = $experiment->eid();
     $vname = $node->VirtName();
 }
-if ($experiment && $vname != "") {
-    echo " (<b>".
-	 "$vname.".
-	 "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
-	 "<a href='showproject.php3?pid=$pid'>$pid</a>.".
-	 "$OURDOMAIN".
-	 "</b>)";
-}	
-
-echo "</font><br><br>\n";
 
 SUBPAGESTART();
 SUBMENUSTART("Node Options");
@@ -168,7 +154,6 @@ if ($isadmin) {
 			   "prereserve_node.php3?node_id=$node_id&clear=1");
     }
 }
-
 SUBMENUEND();
 
 #

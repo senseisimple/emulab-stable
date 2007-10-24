@@ -318,6 +318,63 @@ class Template
 	echo "</table>\n";
     }
 
+    # 
+    # Summary data for the entire tree of templates.
+    #
+    function ShowSummary() {
+	$guid = $this->guid();
+	$vers = $this->vers();
+	$id   = "${guid}_${vers}_summary";
+
+	$query_result =
+	    DBQueryFatal("select * from experiment_templates ".
+			 "where guid='$guid' order by vers");
+
+	if (! mysql_num_rows($query_result))
+	    return;
+
+	AddSortedTable($id);
+	echo "<table align=center id='$id'
+		     border=1 cellpadding=5 cellspacing=2>\n";
+
+	echo "<thead class='sort'>\n";
+ 	echo "<tr>
+                <th>Vers</th>
+                <th>Parent</th>
+                <th>TID</th>
+                <th>Created</th>
+                <th>Description</th>
+              </tr>\n";
+ 	echo "</thead>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $vers    = $row['vers'];
+	    $tid     = $row['tid'];
+	    $pvers   = $row['parent_vers'];
+	    $tid     = $row['tid'];
+	    $desc    = $row['description'];
+	    $created = $row['created'];
+
+	    $onmouseover = MakeMouseOver($desc);
+	    if (strlen($desc) > 30) {
+		$desc = substr($desc, 0, 30) . " <b>... </b>";
+	    }
+	    $parent_link = MakeLink("template",
+				    "guid=$guid&version=$pvers", "$pvers");
+
+	    $current_link = MakeLink("template",
+				     "guid=$guid&version=$vers", "$vers");
+
+	    echo "<tr>".
+		"<td>$current_link</td>".
+		"<td>$parent_link</td>".
+		"<td>$tid</td>".
+		"<td>$created</td>".
+		"<td $onmouseover>$desc</td>";
+	}
+	echo "</table>\n";
+    }
+
     #
     # Page header; spit back some html for the typical page header.
     #
@@ -338,6 +395,7 @@ class Template
     function ShowParameters() {
 	$guid = $this->guid();
 	$vers = $this->vers();
+	$id   = "${guid}_${vers}_parameters";
 	
 	$query_result =
 	    DBQueryFatal("select p.name,p.value, ".
@@ -354,16 +412,20 @@ class Template
 	    !mysql_num_rows($query_result))
 	    return 0;
 
+	AddSortedTable($id);
 	echo "<center>
                <h3>Parameters</h3>
              </center> 
-             <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+             <table align=center id='$id'
+		    border=1 cellpadding=5 cellspacing=2>\n";
 
+	echo "<thead class='sort'>\n";
  	echo "<tr>
                 <th>Name</th>
                 <th>Default Value</th>
                 <th>Description</th>
               </tr>\n";
+	echo "</thead>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	   = $row['name'];
@@ -412,6 +474,7 @@ class Template
     function ShowMetadata() {
 	$guid = $this->guid();
 	$vers = $this->vers();
+	$id   = "${guid}_${vers}_metadata";
 	
 	$query_result =
 	    DBQueryFatal("select i.* from experiment_template_metadata as m ".
@@ -424,17 +487,21 @@ class Template
 	if (! mysql_num_rows($query_result))
 	    return 0;
 
+	AddSortedTable($id);
 	echo "<center>
                <h3>Metadata</h3>
              </center> 
-             <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+             <table id='$id'
+                    align=center border=1 cellpadding=5 cellspacing=2>\n";
 
+	echo "<thead class='sort'>\n";
  	echo "<tr>
                 <th>Edit</th>
                 <th>Delete</th>
                 <th>Name</th>
                 <th>Value</th>
               </tr>\n";
+	echo "</thead>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	   = $row['name'];
@@ -1217,7 +1284,7 @@ class TemplateInstance
 	
 	if ($detailed) {
 	    SUBPAGESTART();
-	    SUBMENUSTART("Options");
+	    SUBMENUSTART("Instance Options");
 	    WRITESUBMENUBUTTON("Export Instance",
 			       CreateURL("template_export", $this));
 
@@ -1311,7 +1378,6 @@ class TemplateInstance
 	if ($detailed) {
 	    SUBPAGEEND();
 	}
-
 	if ($withanno) {
 	    $this->ShowAnnotation();
 	}
@@ -1407,6 +1473,7 @@ class TemplateInstance
     #
     function ShowBindings() {
 	$instance_idx = $this->idx();
+	$id = "${instance_idx}_bindings";
 
 	$query_result =
 	    DBQueryWarn("select * from experiment_template_instance_bindings ".
@@ -1415,15 +1482,19 @@ class TemplateInstance
 	if (!mysql_num_rows($query_result))
 	    return 0;
 
+	AddSortedTable($id);
 	echo "<center>
                <h3>Instance Bindings</h3>
              </center> 
-             <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+             <table id='$id'
+                    align=center border=1 cellpadding=5 cellspacing=2>\n";
 
+	echo "<thead class='sort'>\n";
  	echo "<tr>
                 <th>Name</th>
                 <th>Value</th>
               </tr>\n";
+	echo "</thead>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	= $row['name'];
@@ -1446,6 +1517,7 @@ class TemplateInstance
     #
     function ShowRunBindings($runidx = null) {
 	$exptidx      = $this->exptidx();
+	$id           = "${exptidx}_runbindings";
 
 	if (! $runidx) {
 	    $runidx = $this->runidx();
@@ -1459,15 +1531,19 @@ class TemplateInstance
 	if (!mysql_num_rows($query_result))
 	    return 0;
 
+	AddSortedTable($id);
 	echo "<center>
                <h3>Run Bindings</h3>
              </center> 
-             <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+             <table id='$id'
+                    align=center border=1 cellpadding=5 cellspacing=2>\n";
 
+	echo "<thead class='sort'>\n";
  	echo "<tr>
                 <th>Name</th>
                 <th>Value</th>
               </tr>\n";
+	echo "</thead>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $name	= $row['name'];
@@ -1784,7 +1860,7 @@ class TemplateInstance
 	    $stop = "&nbsp";
 
 	SUBPAGESTART();
-	SUBMENUSTART("Options");
+	SUBMENUSTART("Run Options");
 	WRITESUBMENUBUTTON("Export Record",
 			   CreateURL("template_export",
 				     $this, "runidx", $runidx));
@@ -1874,17 +1950,22 @@ class TemplateInstance
 			 "where exptidx='$exptidx' and runidx='$runidx'");
 
 	if (mysql_num_rows($query_result)) {
+	    $id = "${exptidx}_${runidx}_bindings";
 	    echo "<td align=center class=stealth> &nbsp &nbsp &nbsp </td>\n";
 	    echo "<td align=center class=stealth>\n";
+	    AddSortedTable($id);
 	    echo "<center>
                    <h3>Run Bindings</h3>
                   </center> 
-                  <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+                  <table id='$id'
+                         align=center border=1 cellpadding=5 cellspacing=2>\n";
 
+	    echo "<thead class='sort'>\n";
 	    echo "<tr>
                     <th>Name</th>
                     <th>Value</th>
                   </tr>\n";
+	    echo "</thead>\n";
 
 	    while ($row = mysql_fetch_array($query_result)) {
 		$name	= $row['name'];
@@ -2389,8 +2470,11 @@ function MakeAnchor($url, $text, $anchor_args = "")
 #
 # Display a list of templates in its own table. Optional 
 #
-function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
+function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "", $html = FALSE)
 {
+    $table_html = null;
+    $table_id   = "showtemplatelist";
+    
     if ($which == "USER") {
 	$where = "t.uid='$id'";
 	$title = "Current";
@@ -2429,16 +2513,23 @@ function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
     }
 
     if (mysql_num_rows($query_result)) {
+	if ($html)
+	    ob_start();
+	
+	AddSortedTable($table_id);
 	echo "<center>
                <h3>$title Templates</h3>
              </center> 
-             <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+             <table id='$table_id'
+                    align=center border=1 cellpadding=5 cellspacing=2>\n";
 
+	echo "<thead class='sort'>\n";
  	echo "<tr>
                 <th>GUID</th>
                 <th>TID</th>
                 <th>PID/GID</th>
               </tr>\n";
+	echo "</thead>\n";
 
 	# Do not show root template if other templates are active for guid.
 	$lastguid = 0;
@@ -2463,7 +2554,12 @@ function SHOWTEMPLATELIST($which, $all, $myuid, $id, $gid = "")
                   </tr>\n";
   	}
 	echo "</table>\n";
+	if ($html) {
+	    $table_html = ob_get_contents();
+	    ob_end_clean();
+	}
     }
+    return $table_html;
 }
 
 #

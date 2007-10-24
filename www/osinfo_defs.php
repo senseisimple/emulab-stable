@@ -469,7 +469,8 @@ class OSinfo
 	}
 	else {
 	    $other_exps = 0;
-	    
+
+	    echo "<h3 align='center'>Experiments using this OS</h3>\n";
 	    echo "<table align=center border=1>\n";
 	    echo "  <tr> 
 		        <th>PID</th>

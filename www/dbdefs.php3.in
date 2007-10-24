@@ -369,6 +369,39 @@ function TBFreePCs()
 }
 
 #
+# Number of logged in users
+#
+function TBLoggedIn()
+{
+    $query_result =
+	DBQueryFatal("select count(distinct uid) from login ".
+		     "where timeout > UNIX_TIMESTAMP(now())");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
+}
+
+#
+# Number of active experiments.
+#
+function TBActiveExperiments()
+{
+    $query_result =
+	DBQueryFatal("select count(*) from experiments where ".
+		     "state='active' and pid!='emulab-ops' and ".
+		     "pid!='testbed'");
+    
+    if (mysql_num_rows($query_result) != 1) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    return $row[0];
+}
+
+#
 # Number of PCs reloading.
 #
 function TBReloadingPCs()

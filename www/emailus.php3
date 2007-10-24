@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,10 +12,9 @@ include("defs.php3");
 PAGEHEADER("Send us an email message!");
 
 echo "<p>
-      What, you expected a fancy form? Maybe someday ...
-
+      What, you expected a fancy form? 
       <p>
-      For now, here is a plain old hyperlink: $TBMAILADDR
+      Sorry, here is a plain old hyperlink: $TBMAILADDR
       \n";
 
 #

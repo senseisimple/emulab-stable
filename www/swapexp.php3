@@ -245,7 +245,7 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($instance) {
-    CLEARBUSY();
+    HIDEBUSY();
 }
 
 #

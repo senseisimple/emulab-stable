@@ -9,9 +9,13 @@
 
 var user_agent = navigator.userAgent.toLowerCase();
 var is_safari   = false;
+var is_firefox  = false;
 
 if (user_agent.indexOf("safari") != -1) {
     is_safari = true;
+}
+if (user_agent.indexOf("firefox") != -1) {
+    is_firefox = true;
 }
 
 /* Clear the various 'loading' indicators. */
@@ -130,9 +134,9 @@ function SetupOutputArea(id, clean) {
     }
 
     Iframe.style.border = "2px solid";
-    Iframe.style.width  = "100%";
+    Iframe.style.width  = "98%";
     Iframe.height       = winheight;
-    Iframe.width        = "100%"; 
+    Iframe.width        = "98%"; 
     Iframe.scrolling    = "auto";
     Iframe.frameBorder  = "1";
 }
@@ -180,7 +184,7 @@ function ShowDownLoader(id) {
 
     Iframe.style.border = "2px solid";
     Iframe.height       = winheight;
-    Iframe.width        = "100%";
+    Iframe.width        = "98%";
     Iframe.scrolling    = "auto";
     Iframe.frameBorder  = "1";
 }
@@ -412,4 +416,87 @@ function getObjNN4(obj,name) {
 	if (tmp) foundLayer = tmp;
     }
     return foundLayer;
+}
+
+function toggle_tableold(e_table, e_checkbox, e_title, e_footer) {
+    var id_table  = getObjbyName(e_table);
+    var id_footer = getObjbyName(e_footer);
+    var id_title  = getObjbyName(e_title);
+    var id_check  = getObjbyName(e_checkbox);
+    var checked   = id_check.checked;
+    
+    //Set the object to table-cell if the browser is
+    //Firefox and block if it's anything else.
+    if (is_firefox || is_safari) {
+	if (! checked) {
+            id_table.style.display = "none";
+	    if (id_footer) {
+		id_footer.style.display = "none";
+	    }
+	    if (id_title) {
+		id_title.style.display = "none";
+	    }
+         }
+         else {
+            id_table.style.display = "table";
+	    if (id_footer) {
+		id_footer.style.display = "block";
+	    }
+	    if (id_title) {
+		id_title.style.display = "block";
+	    }
+         }
+    }
+    else {
+	if (! checked) {
+            id_table.style.display = "none";
+	    if (id_footer) {
+		id_footer.style.display = "none";
+	    }
+	    if (id_title) {
+		id_title.style.display = "none";
+	    }
+	}
+	else {
+            id_table.style.display = "block";
+	    if (id_footer) {
+		id_footer.style.display = "block";
+	    }
+	    if (id_title) {
+		id_title.style.display = "block";
+	    }
+	}
+    }
+    return true;
+}
+
+function toggle_table(e_table, e_checkbox) {
+    var id_table  = getObjbyName(e_table);
+    var id_check  = getObjbyName(e_checkbox);
+    var checked   = id_check.checked;
+    
+    if (! checked) {
+	id_table.style.display = "none";
+    }
+    else {
+	id_table.style.display = "block";
+    }
+    return true;
+}
+
+function toggle_menu(e_list, e_arrow) {
+    var id_list  = getObjbyName(e_list);
+    var id_arrow = getObjbyName(e_arrow);
+
+    if (id_list.style.display == "none") {    
+	id_list.style.display = "block";
+	id_arrow.src = "menu-expanded.png";
+	id_arrow.alt = "Collapse";
+    }
+    else {
+	id_list.style.display = "none";
+	id_arrow.src = "menu-collapsed.png";
+	id_arrow.alt = "Expand";
+    }
+    return true;
 }

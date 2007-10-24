@@ -8,22 +8,22 @@ span.devpagename {
   font-weight: bold;
   font-size: large;
 }
-.menuheader, .submenuheader, .contenttitle  {
-  background-color: #060; 
-}
+#.menuheader, .submenuheader, .contenttitle  {
+#  background-color: #060; 
+#}
 .leftcell {
   border: solid 2px black;
 }
 .leftcell, #searchrow form, #searchrow table, #searchrow table td {
   background-color: #dfe;
 }
-ul.submenu, .submenuheader, #searchrow {
-  border-color: #060;
-}
+#ul.submenu, .submenuheader, #searchrow {
+#  border-color: #060;
+#}
 
-ul.menu, ul.submenu {
-  background-color: #CED;
-}
+#ul.menu, ul.submenu {
+#  background-color: #CED;
+#}
 
 body { background-image: url("wallpaper0.jpg"); }
 

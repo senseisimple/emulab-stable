@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("template_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Show Group Information");
-
-#
 # Note the difference with which this page gets it arguments!
 # I invoke it using GET arguments, so uid and pid are are defined
 # without having to find them in URI (like most of the other pages
@@ -33,6 +28,11 @@ $reqargs = RequiredPageArguments("group", PAGEARG_GROUP);
 $project = $group->Project();
 $pid     = $group->pid();
 $gid     = $group->gid();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Group $pid/$gid");
 
 #
 # Verify permission to look at the group. This is a little different,

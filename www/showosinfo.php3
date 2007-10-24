@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("osinfo_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("OS Descriptor Information");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -31,9 +26,15 @@ if (!$osinfo->AccessCheck($this_user, $TB_OSID_READINFO)) {
     USERERROR("You do not have permission to access this OS Descriptor!", 1);
 }
 $osid = $osinfo->osid();
+$osname = $osinfo->osname();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("OSID $osname");
 
 SUBPAGESTART();
-SUBMENUSTART("More Options");
+SUBMENUSTART("OSID Options");
 WRITESUBMENUBUTTON("Delete this OS Descriptor",
 		   CreateURL("deleteosid", $osinfo));
 if ($isadmin) {
@@ -47,13 +48,12 @@ WRITESUBMENUBUTTON("OS Descriptor list",
 WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
 SUBMENUEND();
+echo "<br><br>\n";
 
 #
 # Dump os_info record.
 # 
 $osinfo->Show();
-
-echo "<h3 align='center'>Experiments using this OS</h3>\n";
 $osinfo->ShowExperiments($this_user);
 SUBPAGEEND();
 

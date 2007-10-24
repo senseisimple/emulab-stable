@@ -58,8 +58,8 @@ else {
     $target_dbuid = $uid;
 }
 
-SUBPAGESTART();
-SUBMENUSTART("More Options");
+SUBPAGESTART()
+SUBMENUSTART("Mail List Options");
 WRITESUBMENUBUTTON("Create a Mailman List", "newmmlist.php3");
 
 if ($isadmin) {

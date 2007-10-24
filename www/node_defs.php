@@ -1344,4 +1344,103 @@ function ShowNodeHistory($node = null,
     }
 }
 
+#
+# Logged in users, show free node counts.
+#
+function ShowFreeNodes()
+{
+    $freecounts = array();
+    
+    # Get typelist and set freecounts to zero.
+    $query_result =
+	DBQueryFatal("select n.type from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "where (role='testnode') and class='pc' ");
+    while ($row = mysql_fetch_array($query_result)) {
+	$type              = $row[0];
+	$freecounts[$type] = 0;
+    }
+
+    if (!count($freecounts)) {
+	return "";
+    }
+	
+    # Get free totals by type.
+    $query_result =
+	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "left join reserved as r on r.node_id=n.node_id ".
+		     "where (role='testnode') and class='pc' ".
+		     "      and r.pid is null and n.reserved_pid is null ".
+		     "group BY n.eventstate,n.type");
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$type  = $row[1];
+	$count = $row[2];
+        # XXX Yeah, I'm a doofus and can't figure out how to do this in SQL.
+	if (($row[0] == TBDB_NODESTATE_ISUP) ||
+	    ($row[0] == TBDB_NODESTATE_PXEWAIT) ||
+	    ($row[0] == TBDB_NODESTATE_ALWAYSUP) ||
+	    ($row[0] == TBDB_NODESTATE_POWEROFF)) {
+	    $freecounts[$type] = $count;
+	}
+    }
+    $output = "";
+
+    $freepcs   = TBFreePCs();
+    $reloading = TBReloadingPCs();
+
+    $output .= "<table valign=top align=center width=100% height=100% border=1
+		 cellspacing=1 cellpadding=0>
+                 <tr><td nowrap colspan=6 class=usagefreenodes align=center>
+ 	           <b>$freepcs Free PCs, $reloading reloading</b></td></tr>\n";
+
+    $pccount = count($freecounts);
+    $newrow  = 1;
+    $maxcols = (int) ($pccount / 3);
+    if ($pccount % 3)
+	$maxcols++;
+    $cols    = 0;
+    foreach($freecounts as $key => $value) {
+	$freecount = $freecounts[$key];
+
+	if ($newrow) {
+	    $output .= "<tr>\n";
+	}
+	
+	$output .= "<td class=usagefreenodes align=right>
+                     <a target=_parent href=shownodetype.php3?node_type=$key>
+                        $key</a></td>
+                    <td class=usagefreenodes align=left>${freecount}</td>\n";
+
+	$cols++;
+	$newrow = 0;
+	if ($cols == $maxcols || $pccount <= 3) {
+	    $cols   = 0;
+	    $newrow = 1;
+	}
+
+	if ($newrow) {
+	    $output .= "</tr>\n";
+	}
+    }
+    if (! $newrow) {
+        # Fill out to $maxcols
+	for ($i = $cols + 1; $i <= $maxcols; $i++) {
+	    $output .= "<td class=usagefreenodes>&nbsp</td>";
+	    $output .= "<td class=usagefreenodes>&nbsp</td>";
+	}
+	$output .= "</tr>\n";
+    }
+    # Fill in up to 3 rows.
+    if ($pccount < 3) {
+	for ($i = $pccount + 1; $i <= 3; $i++) {
+	    $output .= "<tr><td class=usagefreenodes>&nbsp</td>
+                            <td class=usagefreenodes>&nbsp</td></tr>\n";
+	}
+    }
+
+    $output .= "</table>";
+    return $output;
+}
 
