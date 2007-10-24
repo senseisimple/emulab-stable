@@ -79,6 +79,7 @@ if (mysql_num_rows($result_delays) == 0 &&
 function SPITFORM($formfields, $errors)
 {
     global $experiment, $pid, $eid, $result_delays, $result_linkdelays;
+    global $EXPOSELINKTEST;
 
     if ($errors) {
 	echo "<table class=nogrid
