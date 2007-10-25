@@ -1095,11 +1095,13 @@ elsif (@vnodelist) {
         # their respective OSIDs, with some slop time that scales up
         # as a function of the number of vnodes on the parent pnode.
         #
+	my $reboot_time = 0;
+	my $osinfo = $osmap{$node};
+	if (defined($osinfo)) {
+	    my $osid = $osinfo->osid();
+	    $reboot_time = $reboot_waittime{$osid};
+	}
 	if ($islocal) {
-	    my $osinfo      = $osmap{$node};
-	    my $osid        = $osinfo->osid();
-	    my $reboot_time = $reboot_waittime{$osid};
-	    
 	    $maxwait = $reboot_time + (40 * $pnodevcount{$pnode});
 	}
 	else {
@@ -1107,7 +1109,7 @@ elsif (@vnodelist) {
 	    # A remote node is supposed to be up and running, but no idea
 	    # how long is reasonable.
 	    #
-	    $maxwait = 60 * $pnodevcount{$pnode};
+	    $maxwait = $reboot_time + 60 * $pnodevcount{$pnode};
 	}
 
 	TBGetNodeAllocState($node, \$curallocstate);
