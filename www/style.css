@@ -269,6 +269,10 @@ div.midtopcell table#navmenus tr {
 div.midtopcell table#navmenus td {
   height: 16px;
 }
+div.midtopcell table#navmenus tr#spacer,
+div.midtopcell table#navmenus td#spacer {
+  height: 14px;
+}
 a.midtopcell:link, a.midtopcell:visited { color: #FFF; text-decoration: none;}
 
 div.cbody {

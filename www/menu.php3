@@ -403,7 +403,7 @@ function WRITESIDEBAR() {
 	echo "</td></tr>";
 	# Extra row to force two rows to top and bottom of midtopcell.
 	# See height value for tr/td in the style file.
-	echo "<tr><td></td></tr>";
+	echo "<tr id=spacer><td id=spacer></td></tr>";
 	echo "<tr><td>";
     }
    
