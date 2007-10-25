@@ -64,7 +64,9 @@ if ($EXPOSETEMPLATES) {
 #
 function FreeNodeHtml()
 {
-    return ShowFreeNodes();
+    global $this_user, $experiment;
+    
+    return ShowFreeNodes($this_user, $experiment->Group());
 }
 
 function GetExpState($a, $b)
@@ -574,7 +576,7 @@ echo "function FreeNodeHtml_CB(stuff) {
       </script>\n";
 	  
 echo "<div id=showexpusagefreenodes>\n";
-echo   ShowFreeNodes();
+echo   ShowFreeNodes($this_user, $experiment->Group());
 echo "</div>\n";
 
 echo "<br>

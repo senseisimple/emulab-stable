@@ -1347,10 +1347,14 @@ function ShowNodeHistory($node = null,
 #
 # Logged in users, show free node counts.
 #
-function ShowFreeNodes()
+function ShowFreeNodes($user, $group)
 {
     $freecounts = array();
-    
+    $perms      = array();
+    $pid_idx    = $group->pid_idx();
+    $pid        = $group->pid();
+    $uid_idx    = $user->uid_idx();
+
     # Get typelist and set freecounts to zero.
     $query_result =
 	DBQueryFatal("select n.type from nodes as n ".
@@ -1359,21 +1363,58 @@ function ShowFreeNodes()
     while ($row = mysql_fetch_array($query_result)) {
 	$type              = $row[0];
 	$freecounts[$type] = 0;
+	$perms[$type]      = 1;
     }
 
     if (!count($freecounts)) {
 	return "";
     }
-	
+
+    #
+    # Anything listed in the perm tables is restricted. 
+    #
+    $query_result =
+	DBQueryFatal("select distinct type from nodetypeXpid_permissions");
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$perms[$row[0]] = 0;
+    }
+
+    #
+    # Want to restrict the actual free counts to what the current user
+    # is allowed to use, within the project the experiment belongs too.
+    # The wrinkle is if the person looking at the experiment is not a
+    # member of the project, in which case its probably an admin person.
+    # In that case just use the nodes the project has access to.
+    #
+    if ($group->IsMember($user, $ignored)) {
+	$query_result =
+	    DBQueryFatal("select distinct type from group_membership as g ".
+			 "left join nodetypeXpid_permissions as p ".
+			 "     on g.pid=p.pid ".
+			 "where uid_idx='$uid_idx' and g.pid_idx='$pid_idx'");
+    }
+    else {
+	$query_result =
+	    DBQueryFatal("select distinct type from nodetypeXpid_permissions ".
+			 "where pid_idx='$pid_idx'");
+    }
+    while ($row = mysql_fetch_array($query_result)) {
+	$perms[$row[0]] = 1;
+    }
+
     # Get free totals by type.
     $query_result =
 	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
 		     "left join node_types as nt on n.type=nt.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
 		     "where (role='testnode') and class='pc' ".
-		     "      and r.pid is null and n.reserved_pid is null ".
+		     "      and r.pid is null and ".
+		     "      (n.reserved_pid is null or ".
+		     "       n.reserved_pid='$pid') ".
 		     "group BY n.eventstate,n.type");
 
+    $freecount = 0;
     while ($row = mysql_fetch_array($query_result)) {
 	$type  = $row[1];
 	$count = $row[2];
@@ -1383,6 +1424,9 @@ function ShowFreeNodes()
 	    ($row[0] == TBDB_NODESTATE_ALWAYSUP) ||
 	    ($row[0] == TBDB_NODESTATE_POWEROFF)) {
 	    $freecounts[$type] = $count;
+	}
+	if ($perms[$type]) {
+	    $freecount++;
 	}
     }
     $output = "";
@@ -1395,7 +1439,7 @@ function ShowFreeNodes()
                  <tr><td nowrap colspan=6 class=usagefreenodes align=center>
  	           <b>$freepcs Free PCs, $reloading reloading</b></td></tr>\n";
 
-    $pccount = count($freecounts);
+    $pccount = $freecount;
     $newrow  = 1;
     $maxcols = (int) ($pccount / 3);
     if ($pccount % 3)
@@ -1403,7 +1447,9 @@ function ShowFreeNodes()
     $cols    = 0;
     foreach($freecounts as $key => $value) {
 	$freecount = $freecounts[$key];
-
+	if (!$perms[$key]) {
+	    continue;
+	}
 	if ($newrow) {
 	    $output .= "<tr>\n";
 	}
