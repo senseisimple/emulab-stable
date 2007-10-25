@@ -9,7 +9,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= pelab
 
-BIN_STUFF	= cloudinfo
+BIN_STUFF	= cloudinfo flexdataclient
 SBIN_STUFF	= flexdatasrv
 
 include $(OBJDIR)/Makeconf
