@@ -153,7 +153,7 @@ class User
     #
     # Class function to change the user profile.
     #
-    function ModUserInfo($target_user, $args, &$errors) {
+    function ModUserInfo($target_user, $uid, $args, &$errors) {
 	global $suexec_output, $suexec_output_array;
 
         #
@@ -184,7 +184,10 @@ class User
 	fclose($fp);
 	chmod($xmlname, 0666);
 
-	$retval = SUEXEC("nobody", "nobody", "webmoduserinfo $xmlname",
+	
+	# Invoke the back-end script as the user if an admin for permissions.
+	$suexec_uid = ISADMIN() ? $uid : "nobody";
+	$retval = SUEXEC($suexec_uid, "nobody", "webmoduserinfo $xmlname",
 			 SUEXEC_ACTION_IGNORE);
 
 	if ($retval) {
