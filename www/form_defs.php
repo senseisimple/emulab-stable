@@ -462,6 +462,7 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
 	    $html .= "</tr>\n";
 	}
 	$html .= "</table><br><br>\n";
+	reset($errors);
     }
 
     $html .= "<table align=center border=1>\n";
@@ -494,7 +495,8 @@ function FormValidateElement($name, &$errors, $attributes, &$submitted)
 	!(isset($submitted[$name]) && $submitted[$name] != "")) {
 	$errors[$attributes['#label']] = "Missing required value";
     }
-    elseif (isset($attributes['#checkslot'])) {
+    elseif (isset($attributes['#checkslot']) &&
+	    isset($submitted[$name]) && $submitted[$name] != "") {
 	$check = $attributes['#checkslot'];
 	
 	if (function_exists($check)) {
