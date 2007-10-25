@@ -1054,15 +1054,18 @@ function pm_shownondata() {
     WRITESUBMENUBUTTON("Search Help","#help");
     # Ugh -- cannot use SUBMENUEND cause it inserts a weird <td></td> combo
     # SUBMENUEND();
-    if (1) {
-        SideBarSubMenuRender();
-    }
-    else {
+    #
+    # XXX: commented out until I can figure this out...
+    #
+    #if (1) {
+    #SideBarSubMenuRender();
+    #}
+    #else {
         echo "    </ul>\n";
         echo "    <!-- end submenu -->\n";
         echo "</td>\n";
         echo "<td class='stealth' halign='left' valign='top' width='99%'>\n";
-    }
+    #}
     if (count($opterrs) > 0) {
 	echo "<span style='color: red'>Errors:<br>\n";
 	foreach ($opterrs as $e) {
