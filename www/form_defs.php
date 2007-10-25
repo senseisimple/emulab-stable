@@ -44,6 +44,29 @@ $footnotes = null;
 #
 # * See form_example.php for a good example usage.
 #
+# 5) A note about javascript. Many existing forms use the convention of
+# naming them with name='myform' which is now deprecated. The new way of
+# doing this is with id='myform' ... but the problem is that name='myform'
+# created a global variable called myform that referenced the javascript
+# object, while id='myform' does not. This is not so terrible, since the
+# changes are simple.
+#
+# Change:
+#	'#javascript' => "onchange=\"SetWikiName(myform);\"",
+# to:
+# 	'#javascript' => "onchange=\"SetWikiName('myform');\"",
+#
+# note that myform is in single quotes. In the function definition, change
+# the prolog from:
+#
+#             function SetWikiName(theform) 
+#             {
+# to:
+#             function SetWikiName(formname) 
+#             {
+#                 var theform = getObjbyName(formname);
+#
+#
 function FormRenderTextField($name, $attrs)
 {
     $type = ($attrs['#type'] == "password" ? "password" : "text");
