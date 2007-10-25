@@ -487,7 +487,7 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
 	$html .= "</table><br><br>\n";
 	reset($errors);
     }
-
+    $html .= "<div align=center>\n";
     $html .= "<table align=center border=1>\n";
     if ($caption)
 	$html .= "<caption>$caption</caption>\n";
@@ -501,12 +501,14 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
     $html .= "</table>\n";
 
     if (count($footnotes)) {
-	$html .= "<div align=center><h4><ol>\n";
+	$html .= "<div style=\"width:90%; margin:auto; text-align: left\">\n";
+	$html .= "<font size=-1><ol>\n";
 	foreach ($footnotes as $i => $note) {
-	    $html .= "<li>$note\n";
+	    $html .= "<li>$note</li>\n";
 	}
-	$html .= "</ol></h4></div>\n";
+	$html .= "</ol></font></div>\n";
     }
+    $html .= "</div>\n";
     
     echo "$html\n";
 }
