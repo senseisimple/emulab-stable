@@ -743,7 +743,9 @@ if ($instance) {
 #
 # Dump the node information.
 #
+echo "<center>\n";
 SHOWNODES($exp_pid, $exp_eid, $sortby, $showclass);
+echo "</center>\n";
 
 if ($isadmin) {
     echo "<center>

@@ -158,12 +158,10 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
     }
     
     if (mysql_num_rows($query_result)) {
-	echo "
-              <center>
+	echo "<div align=center>
               <br>
               <a href=" . $_SERVER["REQUEST_URI"] . "#reserved_nodes>
                 <font size=+1><b>Reserved Nodes</b></font></a>
-              </center>
               <a NAME=reserved_nodes>
               <table id='nodetable' align=center border=1>
               <thead class='sort'>
@@ -340,18 +338,19 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    echo "</tr>\n";
 	}
 	echo "</table>\n";
-	echo "<h4><blockquote><blockquote><blockquote>
-              <ol>
+	echo "<div style=\"width:70%; margin:auto;\">\n";
+	echo "<font size=-1>\n";
+	echo "<ol style=\"text-align: left;\">
 	        <li>A $stalemark indicates that the data is stale, and
 	            the node has not reported on its proper schedule.</li>
                 <li>Exit value of the node startup command. A value of
                         666 indicates a testbed internal error.</li>
               </ol>
-              </blockquote></blockquote></blockquote></h4>\n";
+              </font></div>\n";
+	echo "</div>\n";
 	
-	echo "<script type='text/javascript' language='javascript'>
-	        sorttable.makeSortable(getObjbyName('nodetable'));
-             </script>\n";
+	# Sort initialized later when page fully loaded.
+	AddSortedTable('nodetable');
     }
 }
 

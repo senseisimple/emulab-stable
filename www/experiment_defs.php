@@ -1428,10 +1428,10 @@ function ShowExperimentList_internal($templates_only,
 	    "<td class=stealth align=left><font size=-1><ol>\n".
 	    "<li>Node counts in <font color=green><b>green</b></font>\n".
 	    "show a rough estimate of the minimum number of \n".
-	    "nodes <br>required to swap in.\n".
+	    "nodes required to swap in.\n".
 	    "They account for delay nodes, but not for node types, etc.\n".
 	    "<li>A $stalemark indicates that the data is stale, and ".
-	    "at least one node in the experiment has not <br>reported ".
+	    "at least one node in the experiment has not reported ".
 	    "on its proper schedule.\n"; 
 	if ($parens) {
             # do not show this unless we did it... most users should not ever

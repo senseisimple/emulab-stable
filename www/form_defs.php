@@ -501,7 +501,7 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
     $html .= "</table>\n";
 
     if (count($footnotes)) {
-	$html .= "<div align=left><h4><ol>\n";
+	$html .= "<div align=center><h4><ol>\n";
 	foreach ($footnotes as $i => $note) {
 	    $html .= "<li>$note\n";
 	}
