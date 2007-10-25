@@ -1286,11 +1286,12 @@ function ShowExperimentList_internal($templates_only,
     $class    = "explist";
     $wanthtml = 0;
     $notitle  = FALSE;
+    $html     = null;
     
     if ($tabledefs) {
 	$id    = (isset($tabledefs['#id']) ? $tabledefs['#id'] : $id);
 	$class = (isset($tabledefs['#class']) ? $tabledefs['#class'] : $class);
-	$html  = (isset($tabledefs['#html']) ? $tabledefs['#html'] : $html);
+	$wanthtml = (isset($tabledefs['#html']) ? $tabledefs['#html'] : $html);
 	$notitle = (isset($tabledefs['#notitle']) ?
 		    $tabledefs['#notitle'] : $notitle);
     }
@@ -1352,7 +1353,7 @@ function ShowExperimentList_internal($templates_only,
     }
     
     if (mysql_num_rows($query_result)) {
-	if ($html)
+	if ($wanthtml)
 	    ob_start();
 
 	echo "<center>
@@ -1442,12 +1443,12 @@ function ShowExperimentList_internal($templates_only,
 	# Sort initialized later when page fully loaded.
 	AddSortedTable($id);
 
-	if ($html) {
+	if ($wanthtml) {
 	    $html = ob_get_contents();
 	    ob_end_clean();
-	    return $html;
 	}
     }
+    return $html;
 }
 
     

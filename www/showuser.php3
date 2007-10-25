@@ -93,9 +93,11 @@ list ($html_profile, $button_profile) =
 #
 if ($EXPOSETEMPLATES) {
     $html_templates = SHOWTEMPLATELIST("USER", 0, $uid, $target_uid, "", TRUE);
-    list ($html_templates, $button_templates) =
-	TableWrapUp($html_templates, FALSE, FALSE,
-		    "templates_table", "templates_button");
+    if ($html_templates) {
+	list ($html_templates, $button_templates) =
+	    TableWrapUp($html_templates, FALSE, FALSE,
+			"templates_table", "templates_button");
+    }
 }
 $html_experiments =
     ShowExperimentList_internal(FALSE, "USER", $this_user,
@@ -250,10 +252,15 @@ echo "<script type='text/javascript' language='javascript'>
 
             return false;
         }
-        function Setup() {
+        function Setup(which) {
+            li_current = 'li_' + which;
+            table_current = which + '_table';
 	    li = getObjbyName(li_current);
             li.style.backgroundColor = 'white';
             li.style.borderBottom = '1px solid white';
+
+            table = getObjbyName(table_current);
+            table.style.display = 'block';
         }
       </script>\n";
 
@@ -321,8 +328,10 @@ if ($html_experiments) {
 #
 # Get the active tab to look right.
 #
+$current = ($html_experiments ? "experiments" : "profile");
+
 echo "<script type='text/javascript' language='javascript'>
-      Setup();
+      Setup(\"$current\");
       </script>\n";
 
 #
