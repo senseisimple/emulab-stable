@@ -67,7 +67,7 @@ sub UpdateTable($$$)
 
     my $query_result =
 	DBQueryFatal("select distinct $oldslot from $table ".
-		     "where ${newslot}='0'");
+		     "where ${newslot}='0' or ${newslot} is null");
 
     while (my ($oldvalue) = $query_result->fetchrow_array()) {
 	next
@@ -94,7 +94,8 @@ sub UpdateTable($$$)
 	}
 	
 	DBQueryFatal("update $table set ${newslot}='${idx}' ".
-		     "where ${oldslot}='${oldvalue}' and ${newslot}='0'");
+		     "where ${oldslot}='${oldvalue}' and ".
+		     "      (${newslot}='0' or ${newslot} is null)");
     }
 }
 
