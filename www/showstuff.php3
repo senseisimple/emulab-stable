@@ -105,12 +105,24 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	# for all reserved nodes to re-join with nodelog to extract the latest
 	# log message.
 	#
-	DBQueryFatal("CREATE TEMPORARY TABLE nodelogtemp ".
-		     "SELECT r.node_id, MAX(reported) AS reported ".
-		     "FROM reserved AS r ".
-		     "LEFT JOIN nodelog AS l ON r.node_id=l.node_id ".
-		     "WHERE r.eid='$eid' and r.pid='$pid' ".
-		     "GROUP BY r.node_id");
+	if (!empty($classclause) || !empty($noclassclause)) {
+	    DBQueryFatal("CREATE TEMPORARY TABLE nodelogtemp ".
+			 "SELECT r.node_id, MAX(reported) AS reported ".
+			 "FROM reserved AS r ".
+			 "LEFT JOIN nodelog AS l ON r.node_id=l.node_id ".
+			 "LEFT JOIN nodes AS n ON r.node_id=n.node_id ".
+			 "LEFT JOIN node_types AS nt ON n.type=nt.type ".
+			 "WHERE r.eid='$eid' and r.pid='$pid' ".
+			 "$classclause $noclassclause ".
+			 "GROUP BY r.node_id");
+	} else {
+	    DBQueryFatal("CREATE TEMPORARY TABLE nodelogtemp ".
+			 "SELECT r.node_id, MAX(reported) AS reported ".
+			 "FROM reserved AS r ".
+			 "LEFT JOIN nodelog AS l ON r.node_id=l.node_id ".
+			 "WHERE r.eid='$eid' and r.pid='$pid' ".
+			 "GROUP BY r.node_id");
+	}
 	#
 	# Now join this table and nodelog with the standard set of tables
 	# to get all the info we need.  Note the inner join with the temp
