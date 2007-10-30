@@ -235,7 +235,7 @@ class Project
 	return $newproject;
     }
 
-    function NewNewProject($leader, $args, &$error) {
+    function NewNewProject($args, &$error) {
 	global $suexec_output, $suexec_output_array;
 
         #
@@ -252,9 +252,6 @@ class Project
 	    $error = "Transient error(2); please try again later.";
 	    return null;
 	}
-
-	# Need to say who is going to be leading this project.
-	$args["leader"] = $leader->uid();
 
 	fwrite($fp, "<project>\n");
 	foreach ($args as $name => $value) {
@@ -303,7 +300,7 @@ class Project
 	# We can then create the project by hand from the xmlfile, if desired.
 	unlink($xmlname);
 	return $newproj;
-    }    
+    }
 
     #
     # Class function to return a list of pending (unapproved) projects.

@@ -887,6 +887,7 @@ if (count($errors)) {
 }
 
 #
+# Create the User first, then the Project/Group.
 # Certain of these values must be escaped or otherwise sanitized.
 #
 if (!$returning) {
@@ -923,27 +924,36 @@ if (!$returning) {
 	$args["pubkey"] = file_get_contents($localfile);
     }
 
-    if (! ($leader = User::NewNewUser(TBDB_NEWACCOUNT_PROJLEADER,
-				      $args,
-				      $error)) != 0) {
-	$errors["Error Creating User"] = $error;
+    # Just collect the user XML args here and pass the file to NewNewProject.
+    # Underneath, newproj calls newuser with the XML file.
+    #
+    # Calling newuser down in Perl land makes creation of the leader account
+    # and the project "atomic" from the user's point of view.  This avoids a
+    # problem when the DB is locked for daily backup: in newproject, the call
+    # on NewNewUser would block and then unblock and get done; meanwhile the
+    # PHP thread went away so we never returned here to call NewNewProject.
+    #
+    if (! ($newuser_xml = User::NewNewUserXML($args, $errors)) != 0) {
+	$errors["Error Creating User XML"] = $error;
 	TBERROR("B\n${error}\n\n" . print_r($args, TRUE), 0);
 	SPITFORM($formfields, $returning, $errors);
 	PAGEFOOTER();
 	return;
     }
-    # If null; used below
-    $proj_head_uid = $leader->uid();
-}
-else {
-    $leader = $this_user;
 }
 
 #
 # Now for the new Project
 #
 $args = array();
-$args["name"]              = $formfields["pid"];
+if (isset($newuser_xml)) {
+    $args["newuser_xml"]   = $newuser_xml;
+}
+if ($returning) {
+    # An existing, logged-in user is starting the project.
+    $args["leader"]	   = $this_user->uid();
+}
+$args["name"]		   = $formfields["pid"];
 $args["short description"] = $formfields["proj_name"];
 $args["URL"]               = $formfields["proj_URL"];
 $args["members"]           = $formfields["proj_members"];
@@ -975,7 +985,7 @@ if (isset($formfields["proj_ronpcs"]) &&
     $args["ron"] = 1;
 }
 
-if (! ($project = Project::NewNewProject($leader, $args, $error))) {
+if (! ($project = Project::NewNewProject($args, $error))) {
     $errors["Error Creating Project"] = $error;
     TBERROR("C\n${error}\n\n" . print_r($args, TRUE), 0);
     SPITFORM($formfields, $returning, $errors);
@@ -987,6 +997,8 @@ if (! ($project = Project::NewNewProject($leader, $args, $error))) {
 # Need to do some extra work for the first project; eventually move to backend
 # 
 if ($FirstInitState) {
+    $leader = $project->GetLeader();
+    $proj_head_uid = $leader->uid();
     # Set up the management group (emulab-ops).
     Group::Initialize($proj_head_uid);
     

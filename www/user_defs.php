@@ -500,17 +500,7 @@ class User
 	return $newuser;
     }
 
-    function NewNewUser($flags, $args, &$error) {
-	global $suexec_output, $suexec_output_array;
-	$typearg = "";
-
-	if ($flags & TBDB_NEWACCOUNT_PROJLEADER)
-	    $typearg = "-t leader";
-	elseif ($flags & TBDB_NEWACCOUNT_WIKIONLY)
-	    $typearg = "-t wikionly";
-	elseif ($flags & TBDB_NEWACCOUNT_WEBONLY)
-	    $typearg = "-t webonly";
-
+    function NewNewUserXML($args, &$error) {
         #
         # Generate a temporary file and write in the XML goo.
         #
@@ -535,6 +525,24 @@ class User
 	fwrite($fp, "</user>\n");
 	fclose($fp);
 	chmod($xmlname, 0666);
+
+	return $xmlname;
+    }
+
+    function NewNewUser($flags, $args, &$error) {
+	global $suexec_output, $suexec_output_array;
+	$typearg = "";
+
+	if ($flags & TBDB_NEWACCOUNT_PROJLEADER)
+	    $typearg = "-t leader";
+	elseif ($flags & TBDB_NEWACCOUNT_WIKIONLY)
+	    $typearg = "-t wikionly";
+	elseif ($flags & TBDB_NEWACCOUNT_WEBONLY)
+	    $typearg = "-t webonly";
+
+	if (! ($xmlname = User::NewNewUserXML($args, $error))) {
+	    return null;
+	}
 
 	$retval = SUEXEC("nobody", "nobody", "webnewuser $typearg $xmlname",
 			 SUEXEC_ACTION_IGNORE);

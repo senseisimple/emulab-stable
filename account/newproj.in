@@ -152,7 +152,6 @@ if (! defined($this_user)) {
 # These are the fields that we allow to come in from the XMLfile.
 #
 my %required = ("name"		    => "pid",
-		"leader"	    => "head_uid",
 		"short description" => "name",
 		"URL"		    => "URL",
 		"funders"	    => "funders",
@@ -161,7 +160,9 @@ my %required = ("name"		    => "pid",
 		"num_pcs"	    => "num_pcs",
 		"linkedtous"	    => "linked_to_us");
 		
-my %optional = ("members"	 => "num_members",
+my %optional = ("newuser_xml"    => "newuser_xml",
+		"leader"	 => "head_uid",	# May be chosen by newuser.
+		"members"	 => "num_members",
 		"ron"            => "num_ron",
 		"plab"           => "num_pcplab",
 		"whynotpublic"	 => "public_whynot",
@@ -194,7 +195,7 @@ foreach my $key (keys(%required)) {
 }
 
 #
-# We build up an array of arguments to pass to User->Create() as we check
+# We build up an array of arguments to pass to Project->Create() as we check
 # the attributes.
 #
 my %newproj_args = ();
@@ -243,6 +244,57 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 }
 
 #
+# Create the user if an XML file for newuser was supplied.
+#
+if (exists($newproj_args{'newuser_xml'})) {
+    my $newuser_xml = $newproj_args{'newuser_xml'};
+    delete($newproj_args{'newuser_xml'});
+
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if (! defined($this_user)) {
+	if ($newuser_xml =~ /^([-\w\.\/]+)$/) {
+	    $newuser_xml = $1;
+	}
+	else {
+	    fatal("Bad data in pathname: $newuser_xml");
+	}
+
+	# Use realpath to resolve any symlinks.
+	my $translated = `realpath $newuser_xml`;
+	if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	    $newuser_xml = $1;
+	}
+	else {
+	    fatal("Bad data in translated pathname: $newuser_xml");
+	}
+    }
+
+    #
+    # We can't pass the user type to the newuser script in xml, because it
+    # determines which args are required or optional in the xml data!  The
+    # user type is always "project leader" for new users under newproj.
+    #
+    my $cmd = "newuser -t leader $newuser_xml";
+    print $cmd . "\n"
+	if ($debug);
+    my $cmd_out = `$cmd`;
+    UserError("Transient Error: (3, $?, $cmd) $cmd_out")
+	if ($?);
+
+    #
+    # Parse the last line of output. Ick.
+    #
+    my @out_lines = split(/^/, $cmd_out);
+    if (!( $out_lines[@out_lines-1] =~ /^User\s+(\w+)\/(\d+)\s+/)) {
+	UserError("Transient error: (4, $cmd) $cmd_out");
+    }
+    $newproj_args{'head_uid'} = $2;
+}
+
+#
 # Now do special checks.
 #
 UserError("Project already exists; pick another name!")
@@ -277,6 +329,11 @@ TBGetSiteVar("general/firstinit/state", \$firstinitstate);
 # Send the email notification.
 #
 $newproj->SendNewProjectEmail($firstinitstate eq "createproject");
+
+# Unlink this here, so that the newuser file is left behind in case of error.
+# We can then create the user by hand from the xmlfile, if desired.
+unlink($newuser_xml)
+    if (defined($newuser_xml));
 
 # The web interface requires this line to be printed!
 print "Project $new_pid/$new_idx has been created\n";
