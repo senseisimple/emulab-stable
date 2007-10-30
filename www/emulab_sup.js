@@ -25,7 +25,9 @@ function ClearLoadingIndicators(done_msg)
     var loadingspan = getObjbyName('loading');
     var loadingdiv  = getObjbyName('inner_loaddiv');
 
-    loadingdiv.style.display = "none";
+    if (loadingdiv) {
+        loadingdiv.style.display = "none";
+    }
     busyimg.style.display = "none";
     busyimg.src = "1px.gif";
     loadingspan.innerHTML = done_msg;
