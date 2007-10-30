@@ -5,11 +5,7 @@
  */
 
 body {
-  /* behavior:url("csshover.htc"); IE hack to make :hover work. */
-}
-#maincontent {
-  /*min-width: 950px; */
-  overflow: scroll;
+  background-color: #FFF;
 }
 
 td, th {
@@ -275,9 +271,8 @@ div.midtopcell table#navmenus td#spacer {
 }
 a.midtopcell:link, a.midtopcell:visited { color: #FFF; text-decoration: none;}
 
-div.cbody {
+div#cbody {
   clear: left;
-  overflow: visible;
   padding: 6px;
 }
 
@@ -411,7 +406,9 @@ ul.navmenu li.newgroup {
   position: static;
   font-weight: bold;
   padding: 0px;
-  margin: 0px;
+  # Counteract bottom margin of topcell so that we take less room.
+  margin-top: -3px;
+  margin-bottom: 2px;
   text-align: center;
   font-size: 10pt;
   clear: left;
@@ -444,7 +441,6 @@ ul.navmenu li.newgroup {
 /* Definition for regular pages that have a menu. */
 .content {
   padding-top: 0px;
-  margin-top: 1px;
 }
 .rightcontent {
   position: absolute;
@@ -457,54 +453,62 @@ ul.navmenu li.newgroup {
   margin: 0px;
 }
 
+/*
+ * For fullwidth pages, the content header is under the topcell, all the
+ * way across.
+ */
+#contentheader {
+  background-color: #DDD;
+  color: #000;
+  border: 0;
+  margin: 0;
+  padding: 0px 6px 0px 6px;
+}
+#rightcontentheader {
+  background-color: #000;
+  color: #FFF;
+}
 
 /*   BEGIN Content */
-.contentbody, .fullcontentbody {
+.contentbody, #fullcontentbody {
   background-color: #FFF;
-  border: solid 2px black;
 
   /*
    * XXX Very important.  We float the body so that any tables that are wider
    * than the viewport will cause the div to expand.  This works so long as the
    * wide table is the direct descendent of this div, otherwise, no joy.
    */
-  float: left;
-  margin-bottom: 8px;
-  min-width: 95%; /* XXX Safari doesn't expand the div to fill the viewport. */
-  padding-bottom: 10px;
+  margin-bottom: 0px;
+  padding-bottom: 0px;
 }
 .contentbody {
+  float: left;
+  min-width: 95%; /* XXX Safari doesn't expand the div to fill the viewport. */
+  border: solid 2px black;
   padding-left: 16px;
   padding-right: 16px;
   margin-left: 0px;
   margin-right: 0px;
 }
-.fullcontentbody {
-  padding-left: 0px;
-  padding-right: 0px;
-  margin-left: 8px;
-  margin-right: 8px;
-  margin-top: 4px;
+#fullcontentbody {
+  padding: 6px;
+  margin: 0px;
 }
 
 /* The black bar containing the page title. */
 .contenttitle, .rightcontenttitle {
-  background-color: #000;
-  color: #FFF;
   margin: 0px;
   padding: 0px;
   line-height: 30px;
   clear: none; /* Let the version/login floats share the line.  XXX IE6 */
 }
 .contenttitle {
-  /* Counteract the padding of the contentbody. */
-  margin-left: 0px;
-  margin-right: 0px;
-  margin-bottom: 4px; /* Simulate padding for the actual content. */
   padding-left: 0px;
   padding-bottom: 0px;
 }
 .rightcontenttitle {
+  background-color: #000;
+  color: #FFF;
   margin-left: -16px;
   margin-right: -16px;
   margin-bottom: 16px; /* Simulate padding for the actual content. */
@@ -514,7 +518,7 @@ ul.navmenu li.newgroup {
 .headernotice {
   color: red;
   font-size: 14pt;
-  width: 40%; /* This is how it gets centered */
+  width: 50%; /* This is how it gets centered */
   float: right;
   display: inline;
   margin-right: 10px;
@@ -523,7 +527,7 @@ ul.navmenu li.newgroup {
 }
 
 #versioninfo {
-  color: #FFF;
+/*  color: #FFF; */
   font-size: x-small;
   /* Float the version info and add some space between #logintime. */
   float: right;
@@ -533,7 +537,7 @@ ul.navmenu li.newgroup {
 		     /* vertically centered. */
 }
 #logintime {
-  color: #FFF;
+/*  color: #FFF; */
   /* Also float the login and timestamp to the right. */
   float: right;
   display: inline;
@@ -550,7 +554,7 @@ ul.navmenu li.newgroup {
   content: "'"; /* XXX Doesn't work in IE6. */
 }
 .loggedin {
-  color: #FFF;
+/*  color: #FFF; */
   display: block; /* Break the line between login and timestamp. */
   margin: 0px;
   padding: 0px;
@@ -593,7 +597,7 @@ ul.submenu li.newgroup {
 /* The footer with a list of links, contact, and copyright. */
 .contentfooter {
   background-color: #FFF; 
-  padding: 16px;
+  padding: 8px 16px 8px 16px;
   margin: 0px;
   text-align: center;
   clear: both;
@@ -670,8 +674,6 @@ ul.submenu li.newgroup {
 }
 
 .picture { float: right; margin: 4px; }
-
-body  	{ background-image: url("wallpaper1.png"); }
 
 a { color: #2222BB; text-decoration: underline; }
 
@@ -762,7 +764,7 @@ span.printable {
   color: #667;
 }
 
-# outline property gets rid of the dashed outline after clicking.
+/* outline property gets rid of the dashed outline after clicking. */
 #topnavbar li a.topnavbar:link    { color: #667; background: #DDE}
 #topnavbar li a.topnavbar:active  { color: #667; background: #DDE;
                                    outline: none;}

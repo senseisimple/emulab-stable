@@ -775,10 +775,10 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import url($BASEPATH/style-new.css); -->
+            <!-- @import url($BASEPATH/style.css); -->
             <!-- @import url($BASEPATH/cssmenu.css); -->";
     
-    if (1 && !$MAINPAGE) {
+    if (0 && !$MAINPAGE) {
 	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
     }
     echo "</style>\n";
@@ -801,10 +801,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	echo "<script type='text/javascript'
                       src='${BASEPATH}/js/inline-console.js'></script>\n";
     }
-    echo "</head>
-            <body bgcolor='#FFFFFF' ".
-	($nocontent ? "" : "id='maincontent' ") .
-            "topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>\n";
+    echo "</head><body>\n";
     
     if ($autorefresh) {
 	echo "<meta HTTP-EQUIV=\"Refresh\" content=\"$autorefresh\">\n";
@@ -1032,7 +1029,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	# clear that the web interface is disabled.
 	if (NOLOGINS() && ISADMIN()) {
 	    echo "<div class=webmessage>";
-	    echo "Web Interface Temporarily Unavailable</div\n";
+	    echo "Web Interface Temporarily Unavailable</div>\n";
 	}
 	else {
 	    $message = TBGetSiteVar("web/message");
@@ -1046,10 +1043,11 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
     echo "<!-- content body -->\n";
 
     if ($login_user)
-	echo "<div class='fullcontentbody'>";
-    else
+	echo "<div id='contentheader'>";
+    else {
 	echo "<div class='contentbody'>";
-    echo "<div id=foo>";
+	echo "<div id='rightcontentheader'>";
+    }
     echo "<div id='logintime'>";
     echo "<span class='loggedin'>";
     $now = date("D M d g:ia T");
@@ -1080,25 +1078,16 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
     else
 	echo "<h2 class='rightcontenttitle'>\n";
     echo "$title</h2>";
-    echo "</div>";
-
-    if (0 && $login_user) {
-	echo "<div class=pagenotworking>Page not working properly? ";
-	echo "<a href=pagenotworking.php target=_blank>Click here</a></div>";
+    # Close off 'contentheader' (rightcontentheader);
+    echo "</div>\n";
+    if ($login_user) {
+	# And start the contentbody.
+	echo "<div id='fullcontentbody'>";
     }
-    
-    echo "<div class='cbody'>";
     echo "<!-- begin content -->";
     if (VIEWSET($view, 'show_topbar', "plab")) {
 	WRITEPLABTOPBAR();
     }
-}
-
-#
-# ENDPAGE(): This terminates the div started above.
-# 
-function ENDPAGE() {
-  echo "</div>";
 }
 
 #
@@ -1120,9 +1109,6 @@ function PAGEFOOTER($view = NULL) {
 
     $today = getdate();
     $year  = $today["year"];
-
-    echo "<!-- end content -->\n";
-    echo "</div>\n";
 
     if (VIEWSET($view, 'show_bottombar', "plab")) {
 	WRITEPLABBOTTOMBAR();
@@ -1169,10 +1155,8 @@ function PAGEFOOTER($view = NULL) {
 	echo "<div id='inline-console'></div>\n";
     }
 
-    ENDPAGE();
-
     # Plug the home site from all others.
-    echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
+    echo "\n<a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
     # Prime all the sortable tables.
     if (count($sortedtables)) {
@@ -1188,6 +1172,10 @@ function PAGEFOOTER($view = NULL) {
 	"</script>";
     echo $bodyclosestring;
     echo "\n";
+    if ($login_user) {
+        # This closes the fullcontentbody div.
+	echo "</div>\n";
+    }
     echo "</body></html>\n";
 }
 
