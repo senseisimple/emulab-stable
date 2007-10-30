@@ -1414,7 +1414,6 @@ function ShowFreeNodes($user, $group)
 		     "       n.reserved_pid='$pid') ".
 		     "group BY n.eventstate,n.type");
 
-    $freecount = 0;
     while ($row = mysql_fetch_array($query_result)) {
 	$type  = $row[1];
 	$count = $row[2];
@@ -1425,11 +1424,19 @@ function ShowFreeNodes($user, $group)
 	    ($row[0] == TBDB_NODESTATE_POWEROFF)) {
 	    $freecounts[$type] = $count;
 	}
-	if ($perms[$type]) {
-	    $freecount++;
-	}
     }
     $output = "";
+
+    #
+    # Figure out how many node types are going to be printed out. These
+    # are the nodes to which the user has access, no matter the count.
+    #
+    $pccount = 0;
+    foreach($freecounts as $key => $value) {
+	if ($perms[$key]) {
+	    $pccount++;
+	}
+    }
 
     $freepcs   = TBFreePCs();
     $reloading = TBReloadingPCs();
@@ -1439,7 +1446,6 @@ function ShowFreeNodes($user, $group)
                  <tr><td nowrap colspan=6 class=usagefreenodes align=center>
  	           <b>$freepcs Free PCs, $reloading reloading</b></td></tr>\n";
 
-    $pccount = $freecount;
     $newrow  = 1;
     $maxcols = (int) ($pccount / 3);
     if ($pccount % 3)
