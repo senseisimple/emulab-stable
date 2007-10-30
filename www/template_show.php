@@ -395,6 +395,11 @@ echo "<script type='text/javascript' language='javascript'>
                 visarea.innerHTML = html;
             }
         }
+        function Setup() {
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = 'white';
+            li.style.borderBottom = '1px solid white';
+        }
         function ShowVisInit() {
             ADD_DHTML(\"myvisdiv\");
         }
@@ -455,27 +460,28 @@ echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
           <a href=\"#A\" " .
-               ($show == "vis" ? "style=\"background-color:white\"" : " ") .
+               "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_vis\" onclick=\"Show('vis');\">".
                "Topology</a></li>\n";
 echo "<li>
           <a href=\"#B\" " .
-               ($show == "nsfile" ? "style=\"background-color:white\"" : " ") .
+               "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
                "NS File</a></li>\n";
 echo "<li>
           <a href=\"#C\" " .
-               ($show == "graph" ? "style=\"background-color:white\"" : " ") .
+               "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_graph\" onclick=\"Show('graph');\">".
                "History</a></li>\n";
 echo "</ul>\n";
+echo "</div>\n";
+echo "<div align=center id=topnavbarbottom>&nbsp</div>\n";
 
 #
 # Start out with  ...
 #
 echo "<div align=center width=\"100%\" id=\"showexp_visarea\">\n";
 echo $init_show;
-echo "</div>\n";
 echo "</div>\n";
 
 SUBPAGEEND();
@@ -518,6 +524,13 @@ if ($paramcount || $metacount) {
 echo "</tr>\n";
 echo "</table>\n";
 echo "</center>\n";
+
+#
+# Get the active tab to look right.
+#
+echo "<script type='text/javascript' language='javascript'>
+      Setup();
+      </script>\n";
 
 #
 # Standard Testbed Footer

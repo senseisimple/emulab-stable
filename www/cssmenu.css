@@ -23,6 +23,8 @@
 	background:#111;
         color: #FFF;
 	font:normal 16px arial,Helvetica,sans-serif;
+        /* So that menus are higher then the tooltips from js/wz_tooltip.js */
+        z-index: 1030;
 }
 
 .menu img, img.droparrow {
