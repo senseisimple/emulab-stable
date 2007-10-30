@@ -512,7 +512,7 @@ if (isset($formfields['savesearch']) && $formfields['savesearch']) {
     DBQueryWarn("replace into experiment_template_searches set ".
 		" uid_idx='$uid_idx', created=now(), ".
 		" parent_guid='$guid', ".
-		" parent_vers='" . $template->vers() . "'," .
+		" parent_vers='" . $root->vers() . "'," .
 		" name='" . addslashes($formfields['savename']) . "'," .
 		" expr='" . addslashes(serialize($formfields)) . "'");
     # Indicate that we are using a saved search, so that we get delete button.
