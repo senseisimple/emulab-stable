@@ -127,6 +127,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (@ARGV < 4 && !defined($options{"X"}) ) {
+    usage();
+}
 if (defined($options{"d"})) {
     $debug = 1;
 }
@@ -134,9 +137,9 @@ if (defined($options{"c"})) {
     $compatmode = 1;
 }
 if (!defined($options{"X"})) {
-    my $pid  = shift(@ARGV);
-    my $eid  = shift(@ARGV);
-    my $link = shift(@ARGV);
+    $pid  = shift(@ARGV);
+    $eid  = shift(@ARGV);
+    $link = shift(@ARGV);
 }
 else {
     $xmlfile = $options{"X"};
@@ -196,9 +199,6 @@ if (defined($options{"s"})) {
     else {
 	die("*** Bad srcvnode name: $srcvnode.\n");
     }
-}
-if (@ARGV < 4 && !defined($options{"X"}) ) {
-    usage();
 }
 
 #
