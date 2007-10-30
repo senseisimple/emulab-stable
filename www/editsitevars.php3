@@ -188,7 +188,7 @@ $message = "";
 #
 if (!isset($edit) && 
     !isset($edited) && !isset($defaulted) && !isset($canceled)) {
-    SPITFORM(0, $errors);
+    SPITFORM("", $errors);
     PAGEFOOTER();
     return;
 }
