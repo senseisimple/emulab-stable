@@ -775,10 +775,10 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import url($BASEPATH/style-new.css); -->
+            <!-- @import url($BASEPATH/style.css); -->
             <!-- @import url($BASEPATH/cssmenu-new.css); -->";
     
-    if (0 && !$MAINPAGE) {
+    if (1 && !$MAINPAGE) {
 	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
     }
     echo "</style>\n";
@@ -941,12 +941,15 @@ function FINISHSIDEBAR($nocontent = 0)
 	if ($currentusage && $login_user) {
 	    $class = "navbarusageframe";
 	    echo "<td>\n";
-	    if (1) {
+	    if (0) {
 		echo "<iframe src='$BASEPATH/currentusage.php3' class='$class'
                               scrolling='no' frameborder='0'></iframe>\n";
 	    }
 	    else {
-		echo "No Stats";
+		echo "<div onclick=\"ToggleUsageTable();\" ".
+		     "onmouseover='return escape(\"Click to toggle mode\")' ".
+		     "id=usagefreenodes>\n";
+		echo "</div>\n";
 	    }
 	    echo "</td></tr></table>\n";
 	}
@@ -1163,6 +1166,38 @@ function PAGEFOOTER($view = NULL) {
     # Plug the home site from all others.
     echo "\n<a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
+    if ($login_user) {
+	echo "<script>\n";
+	sajax_show_javascript();
+	?>
+	    var cookieresults =
+		document.cookie.match('usagetablemode=(.*?)(;|$)');
+	    var usagetablemode =
+		(cookieresults ? cookieresults[1] : "status");
+	    
+	    function x_FreeNodeHtml() {
+		sajax_do_call("<?php echo $TBBASE; ?>/currentusage.php3",
+			      "FreeNodeHtml",
+			      x_FreeNodeHtml.arguments);
+	    }
+	    function FreeNodeHtml_CB(stuff) {
+		getObjbyName('usagefreenodes').innerHTML = stuff;
+		setTimeout('GetFreeNodeHtml()', 60000);
+	    }
+	    function GetFreeNodeHtml() {
+		x_FreeNodeHtml(usagetablemode, FreeNodeHtml_CB);
+	    }
+            function ToggleUsageTable() {
+		usagetablemode =
+		    (usagetablemode == "status" ? "freenodes" : "status");
+		document.cookie = "usagetablemode=" + usagetablemode;
+		GetFreeNodeHtml();
+            }
+	    GetFreeNodeHtml();
+	<?php
+	echo "</script>\n";
+    }
+    
     # Prime all the sortable tables.
     if (count($sortedtables)) {
 	echo "<script type='text/javascript' language='javascript'>\n";

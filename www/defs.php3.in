@@ -489,5 +489,6 @@ require("tbauth.php3");
 #
 # Okay, this is what checks the login and spits out the menu.
 #
+require("Sajax.php");
 require("menu.php3");
 ?>

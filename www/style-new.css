@@ -127,11 +127,6 @@ div#usage table {
     /* Force the same height as the banner */
     height: 100px;
 }
-div#usagefreenodes table {
-  background-color: #666666;
-  /* Force the same height as the banner */
-  height: 54px;  /* must match usageframe size */
-}
 div#showexpusagefreenodes {
   border: solid 2px black;
 }
@@ -152,24 +147,6 @@ div#showexpusagefreenodes table td a {
   background-color: #222222;
   text-align: center;
   font-size: 10pt;
-}
-
-td.menuoptusage, td.usagefreenodes {
-  font:bold 8pt arial,Helvetica,sans-serif;
-  border: solid 0px #666;
-  background-color: #000;
-  color: #ffffff;
-  padding-left: 1px;
-  padding-right: 1px;
-  padding-top: 0px; 
-  padding-bottom: 0px;
-  margin: 0px; 
-  border: 0px;
-  line-height: 12px;
-}
-td.menuoptusage, td.usagefreenodes a {
-    /* Change link color to be more visible on a dark background */
-    color: #ccccff;
 }
 
 /* END Banner */
@@ -200,8 +177,8 @@ td.menuoptusage, td.usagefreenodes a {
 div.topcell {
   /* Border for the entire group of menus. Put the border only on the top and
     bottom so that setting the width to 100% doesn't force a scrollbar. */
-  border-top: solid 2px black;
-  border-bottom: solid 2px black;
+  border-top: solid 1px black;
+  border-bottom: solid 1px black;
 
   background-image: url("fancy-header-background-short.jpg");
   background-position: 0px 0px;
@@ -217,7 +194,7 @@ div.topcell {
   /* So we goto a scroll bar before the top nav menus go to hell */
   min-width: 800px;
   clear: both;
-  height: 54px;
+/*  height: 54px; */
 }
 table#topcelltable, table#topcelltable tr, table#topcelltable tr td {
   background-color: #111;
@@ -252,7 +229,7 @@ div.midtopcell table#navmenus, div.midtopcell table#navmenus td {
 div.midtopcell table#navmenus {
   padding-left: 4px;
   padding-right: 4px;
-  height: 54px;
+/*  height: 54px; */
   width: 520px;
 }
 div.midtopcell table#navmenus tr {
@@ -265,9 +242,40 @@ div.midtopcell table#navmenus td {
 }
 div.midtopcell table#navmenus tr#spacer,
 div.midtopcell table#navmenus td#spacer {
-  height: 14px;
+  height: 10px;
 }
 a.midtopcell:link, a.midtopcell:visited { color: #FFF; text-decoration: none;}
+
+/* This lives in the topcell table. */
+div#usagefreenodes table {
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  background-color: #666666;
+}
+td.menuoptusage,
+div#showexpusagefreenodes table tr td.usagefreenodes,
+div#usagefreenodes table tr td.usagefreenodes {
+  font:bold 8pt arial,Helvetica,sans-serif;
+  border: solid 0px #666;
+  padding-left: 1px;
+  padding-right: 1px;
+  padding-top: 0px; 
+  padding-bottom: 0px;
+  margin: 0px; 
+  border: 0px;
+  line-height: 12px;
+}
+td.menuoptusage,
+div#usagefreenodes table tr td.usagefreenodes {
+  background-color: #000;
+  color: #ffffff;
+}
+td.menuoptusage,
+div#usagefreenodes table tr td.usagefreenodes a {
+    /* Change link color to be more visible on a dark background */
+    color: #ccccff;
+}
 
 div#cbody {
   clear: left;

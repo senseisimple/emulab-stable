@@ -16,3 +16,6 @@ table { border: 0px; background-color: #9A9; }
 table.nogrid { border: solid 1px #696; background-color:#9A9; } 
 
 span.topbaroption { background-color:#E1EAE1; }
+
+#contentheader {  background-color: pink; }
+

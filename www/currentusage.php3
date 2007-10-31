@@ -163,8 +163,8 @@ function SHOWFREENODES()
 
     $pccount = count($freecounts);
     $newrow  = 1;
-    $maxcols = (int) ($pccount / 2);
-    if ($pccount % 2)
+    $maxcols = (int) ($pccount / 3);
+    if ($pccount % 3)
 	$maxcols++;
     $cols    = 0;
     foreach($freecounts as $key => $value) {
@@ -181,7 +181,7 @@ function SHOWFREENODES()
 
 	$cols++;
 	$newrow = 0;
-	if ($cols == $maxcols || $pccount <= 4) {
+	if ($cols == $maxcols || $pccount <= 3) {
 	    $cols   = 0;
 	    $newrow = 1;
 	}
@@ -198,9 +198,9 @@ function SHOWFREENODES()
 	}
 	$output .= "</tr>\n";
     }
-    # Fill in up to 2 rows.
-    if ($pccount < 2) {
-	for ($i = $pccount + 1; $i <= 2; $i++) {
+    # Fill in up to 3 rows.
+    if ($pccount < 3) {
+	for ($i = $pccount + 1; $i <= 3; $i++) {
 	    $output .= "<tr><td class=usagefreenodes>&nbsp</td>
                             <td class=usagefreenodes>&nbsp</td></tr>\n";
 	}
@@ -213,11 +213,16 @@ function SHOWFREENODES()
 #
 # This is for the Sajax request.
 #
-function FreeNodeHtml() {
+function FreeNodeHtml($usagemode = null) {
     global $this_user;
 
     if ($this_user) {
-	return ShowStatus();
+	if ($usagemode == null || $usagemode == "status") {
+	    return ShowStatus();
+	}
+	else {
+	    return SHOWFREENODES();
+	}
     }
     else {
 	return SHOWSTATS();
