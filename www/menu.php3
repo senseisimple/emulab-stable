@@ -775,8 +775,8 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import url($BASEPATH/style.css); -->
-            <!-- @import url($BASEPATH/cssmenu.css); -->";
+            <!-- @import url($BASEPATH/style-new.css); -->
+            <!-- @import url($BASEPATH/cssmenu-new.css); -->";
     
     if (0 && !$MAINPAGE) {
 	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
@@ -941,8 +941,13 @@ function FINISHSIDEBAR($nocontent = 0)
 	if ($currentusage && $login_user) {
 	    $class = "navbarusageframe";
 	    echo "<td>\n";
-	    echo "<iframe src='$BASEPATH/currentusage.php3' class='$class'
+	    if (1) {
+		echo "<iframe src='$BASEPATH/currentusage.php3' class='$class'
                               scrolling='no' frameborder='0'></iframe>\n";
+	    }
+	    else {
+		echo "No Stats";
+	    }
 	    echo "</td></tr></table>\n";
 	}
 	echo "<!-- sidebar ends -->

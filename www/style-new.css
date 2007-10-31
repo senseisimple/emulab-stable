@@ -104,7 +104,6 @@ iframe.navbarusageframe {
   background-color: #444444;
   width: 90px;
   height: 54px;
-  z-index: 1;
 }
 iframe.outputframe {
   width: 98%;
@@ -219,7 +218,6 @@ div.topcell {
   min-width: 800px;
   clear: both;
   height: 54px;
-  z-index: 1;
 }
 table#topcelltable, table#topcelltable tr, table#topcelltable tr td {
   background-color: #111;
@@ -245,7 +243,6 @@ div.midtopcell {
 }
 div.midtopcell table#navmenus, div.midtopcell table#navmenus td {
   background-color: #111;
-  /* The height allows for extra separation between upper/lower row */
   border: 0px;
   margin: 0px;
   padding: 0px;
@@ -256,6 +253,7 @@ div.midtopcell table#navmenus {
   padding-left: 4px;
   padding-right: 4px;
   height: 54px;
+  width: 520px;
 }
 div.midtopcell table#navmenus tr {
   /* The height allows for extra separation between upper/lower row */
@@ -406,7 +404,7 @@ ul.navmenu li.newgroup {
   position: static;
   font-weight: bold;
   padding: 0px;
-  # Counteract bottom margin of topcell so that we take less room.
+  /* Counteract bottom margin of topcell so that we take less room. */
   margin-top: -3px;
   margin-bottom: 2px;
   text-align: center;
