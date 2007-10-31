@@ -224,7 +224,9 @@ if (!isset($submit)) {
 
 # Form submitted. Make sure we have a formfields array.
 if (!isset($formfields)) {
-    PAGEARGERROR("Invalid form arguments.");
+    # The only thing in formfields in this page is "password", which
+    # is skipped for admins.  But we have to re-spit the page below.
+    $formfields = array();
 }
 
 #
@@ -295,7 +297,7 @@ if (isset($keyfile) && $keyfile != "") {
 # parsable. If it is, then do it for real.
 #
 $args["verify"] = 1;
-if (! ($result = NewPubKey($args, $errors))) {
+if (! ($result = NewPubKey($uid, $args, $errors))) {
     $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
 
     # Always respit the form so that the form fields are not lost.
@@ -309,7 +311,7 @@ if (! ($result = NewPubKey($args, $errors))) {
 # Insert key, update authkeys files and nodes if appropriate.
 #
 $args["verify"] = 0;
-if (! ($result = NewPubKey($args, $errors))) {
+if (! ($result = NewPubKey($uid, $args, $errors))) {
     # Always respit the form so that the form fields are not lost.
     # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
@@ -325,7 +327,7 @@ header("Location: ". CreateURL("showpubkeys", $target_user));
 #
 # When there's a PubKeys class, this will be a Class function to edit them...
 #
-function NewPubKey($args, &$errors) {
+function NewPubKey($uid, $args, &$errors) {
     global $suexec_output, $suexec_output_array, $TBADMINGROUP;
 
     #
@@ -353,7 +355,9 @@ function NewPubKey($args, &$errors) {
     fclose($fp);
     chmod($xmlname, 0666);
 
-    $retval = SUEXEC("nobody", "nobody", "webaddpubkey -X $xmlname",
+    # Invoke the back-end script as the user if an admin for permissions.
+    $suexec_uid = ISADMIN() ? $uid : "nobody";
+    $retval = SUEXEC($suexec_uid, "nobody", "webaddpubkey -X $xmlname",
 		     SUEXEC_ACTION_IGNORE);
 
     if ($retval) {
