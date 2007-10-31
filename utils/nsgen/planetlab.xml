@@ -132,10 +132,13 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
 
 #
 # This makes "the Internet" an addressable object in your topology - it will,
-# for example, enable you to set up automatic tcpdump on it.
+# for example, enable you to set up automatic tcpdump on it.  However, you
+# must have more than one node in your experiment!
 #
-set internet [$ns make-lan "$inet_string" 100Mbps 0ms]
-tb-set-lan-protocol $internet "ipv4"
+if { $num_nodes > 1 } {
+    set internet [$ns make-lan "$inet_string" 100Mbps 0ms]
+    tb-set-lan-protocol $internet "ipv4"
+}
 
 #
 # Boilerplate
