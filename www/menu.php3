@@ -1,4 +1,4 @@
-a<?php
+<?php
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2007 University of Utah and the Flux Group.
