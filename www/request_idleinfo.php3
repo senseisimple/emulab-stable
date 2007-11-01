@@ -29,7 +29,8 @@ if (!$isadmin) {
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
-$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+$optargs = OptionalPageArguments("message",    PAGEARG_STRING,
+				 "canceled",   PAGEARG_STRING,
 				 "confirmed",  PAGEARG_STRING);
 
 #
@@ -64,7 +65,7 @@ if (isset($canceled) && $canceled) {
 
 if (!isset($confirmed)) {
     echo "<br><center><h3>
-          Are your <b>SURE</b> you want to send an Idle Info request
+          Are you <b>SURE</b> you want to send an Idle Info request
           email message to the swapper of $pid/$eid?
           </h3>\n";
 
@@ -74,10 +75,19 @@ if (!isset($confirmed)) {
     $experiment->Show();
 
     $url = CreateURL("request_idleinfo", $experiment);
-    
-    echo "<form action='$url' method=post>";
-    echo "<input type=submit name=confirmed value=Confirm>\n";
-    echo "<input type=submit name=canceled value=Cancel>\n";
+   
+    echo "<br>\n";
+    echo "<form action='$url' method=post>\n";
+    echo "<table align=center border=1>\n";
+    echo "  <tr><td><center>Additional message to user?</center></td></tr>
+	    <tr><td><textarea rows=2 cols=50 name=message></textarea>
+	      </td></tr>
+	    <tr><td><center>\n";
+    echo "    <input type=submit name=confirmed value=Confirm>\n";
+    echo "    &nbsp; &nbsp;\n";
+    echo "    <input type=submit name=canceled value=Cancel>\n";
+    echo "    </center></td></tr>\n";
+    echo "</table>\n";
     echo "</form>\n";
     echo "</center>\n";
 
@@ -117,7 +127,7 @@ TBMAIL("$swapper_name <$swapper_email>",
        "\n".
        "Such long running experiments are unusual so we want to make sure\n".
        "this experiment is still doing useful work.\n".
-       "\n".
+       (isset($message) && $message !== "" ? "\n$message\n\n" : "\n").
        "Please respond to this message letting us know; if we do not hear\n".
        "from you within a couple of hours, we will be forced to swap your\n".
        "experiment out so that others can use the nodes.\n\n".
