@@ -291,7 +291,7 @@ else {
 	}
 	elseif (strcmp($inout, "pause") == 0) {
 	    echo "Your experiment has been dequeued.
-		  experiment at any time.\n";
+		  You may requeue your experiment at any time.\n";
 	}
 	STARTWATCHER($experiment);
     }
