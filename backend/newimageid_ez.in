@@ -517,6 +517,13 @@ exit(0)
 #
 delete($newimageid_args{"imagename"});
 
+#
+# XXX note that osid "path" is not the same as imageid "path".  The former
+# is for multiboot (aka OSKit) kernels.  So we remove the path arg temporary.
+#
+my $ipath = $newimageid_args{"path"};
+delete($newimageid_args{"path"});
+
 # Cross-connect: Make the os descriptor first with the imagename, then take
 # the osid index and use it as the imageid index as well.
 $newimageid_args{"ezid"} = 1;
@@ -527,6 +534,8 @@ UserError($usrerr)
     if (defined($usrerr));
 fatal("Could not create new OSID!")
     if (!defined($new_osinfo));
+
+$newimageid_args{"path"} = $ipath;
 
 my $osid = $new_osinfo->osid();
 
