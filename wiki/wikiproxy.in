@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -475,7 +475,7 @@ sub AddWikiProject(@)
     system("chown ${WIKIUSER}:${WIKIGROUP} *.txt")
 	== 0 or fatal("Could not chown *.txt to ${WIKIUSER}:${WIKIGROUP}");
 
-    system("sudo -u nobody ci -l '-mInitial Revision by wikiproxy:\n".
+    system("sudo -u nobody ci -u '-mInitial Revision by wikiproxy:\n".
 	   "AddWikiProject $pid $wikiname' ".
 	   "      '-t-Initial Revision by wikiproxy' *.txt") == 0
         or fatal("Could not create new RCS control files.");
