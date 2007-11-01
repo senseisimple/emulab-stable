@@ -1,4 +1,4 @@
-<?php
+a<?php
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2007 University of Utah and the Flux Group.
@@ -136,7 +136,8 @@ function NavMenuButtonNew($text, $link = null, $divider = FALSE)
     global $navmenu, $login_user;
 
     if ($login_user)
-	NavMenuButton($text, $link, "&nbsp;<img src=\"/new.gif\">", $divider);
+	NavMenuButton($text, $link, "&nbsp;<img src=\"/new.gif\">",
+		      null, $divider);
     else
 	WRITESIDEBARBUTTON($text, $link, "&nbsp;<img src=\"/new.gif\" />");
 }
@@ -1491,15 +1492,16 @@ class menuBar
 		echo "<ul>\n";
 
 		foreach ($menu['#links'] as $h => $item) {
-		    $link = $item['#link'];
-		    $text = $item['#text'];
-		    $div  = "";
+		    $link  = $item['#link'];
+		    $text  = $item['#text'];
+		    $extra = $item['#extratext'];
+		    $div   = "";
 
                     # The divider comes before the item.
 		    if ($item['#divider'])
 			$div = "class=divider";
 
-		    echo "<li $div><a href=\"$link\">$text</a></li>\n";
+		    echo "<li $div><a href=\"$link\">$text $extra</a></li>\n";
 		}
 		echo "</ul>";
 #		echo "</td></tr></table></a>";
