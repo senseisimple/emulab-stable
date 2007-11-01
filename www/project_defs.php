@@ -600,9 +600,6 @@ class Project
 	$proj_members		= $this->num_members();
 	$proj_pcs		= $this->num_pcs();
         # These are now booleans, not actual counts.
-	$proj_ronpcs		= YesNo(
-            strpos($this->pcremote_ok(), "pcron") !== false);
-	$proj_plabpcs		= YesNo($this->num_pcplab());
 	$proj_linked		= YesNo($this->linked_to_us());
 	$proj_why		= nl2br($this->why());
 	$approved		= YesNo($this->approved());
@@ -611,6 +608,18 @@ class Project
 	$wikiname		= $group->wikiname();
 	$cvsrepo_public		= $this->cvsrepo_public();
 	$allow_workbench	= $this->allow_workbench();
+
+	# Before project approval, display ron/plab request status.
+	if ($approved) {
+	    $proj_ronpcs   =
+		YesNo(strpos($this->pcremote_ok(), "pcron") !== false);
+	    $proj_plabpcs  = 
+		YesNo(strpos($this->pcremote_ok(), "pcplabphys") !== false);
+	}
+	else {
+	    $proj_ronpcs   = YesNo($this->num_ron());
+	    $proj_plabpcs  = YesNo($this->num_pcplab());
+	}
 
 	if (! ($head_user = User::Lookup($proj_head_idx))) {
 	    TBERROR("Could not lookup object for user $proj_head_idx", 1);
