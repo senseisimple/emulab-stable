@@ -58,7 +58,7 @@ else {
     $target_dbuid = $uid;
 }
 
-SUBPAGESTART()
+SUBPAGESTART();
 SUBMENUSTART("Mail List Options");
 WRITESUBMENUBUTTON("Create a Mailman List", "newmmlist.php3");
 
