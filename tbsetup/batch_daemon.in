@@ -512,7 +512,8 @@ sub startexp($)
 	    if ($canceled == EXPTCANCEL_TERM) {
 		cancelexp($exphash);
 	    }
-	    elsif ($canceled == EXPTCANCEL_SWAP) {
+	    elsif ($canceled == EXPTCANCEL_SWAP ||
+		   $canceled == EXPTCANCEL_DEQUEUE) {
 		swapexp($exphash);
 	    }
 	    else {
