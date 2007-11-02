@@ -970,7 +970,7 @@ sub osload_setupswapinfo($$;@)
 	# them below.  This is the only reason we are doing this here rather
 	# than as part of the above query.
 	#
-	if ($savedisk == 0 || $erole ne "node") {
+	if (!defined($savedisk) || $savedisk == 0 || $erole ne "node") {
 	    delete $nodeinfo{$node};
 	    next;
 	}
