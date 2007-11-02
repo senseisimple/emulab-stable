@@ -23,7 +23,9 @@ $reqargs = RequiredPageArguments("project",  PAGEARG_PROJECT,
 $optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
 				 "user_interface", PAGEARG_STRING,
 				 "message", PAGEARG_ANYTHING,
-				 "silent", PAGEARG_BOOLEAN);
+				 "silent", PAGEARG_BOOLEAN,
+				 "pcplab_okay", PAGEARG_BOOLEAN,
+				 "ron_okay", PAGEARG_BOOLEAN);
 $sendemail = 1;
 if (isset($silent) && $silent) {
     $sendemail = 0;
