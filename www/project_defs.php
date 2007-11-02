@@ -610,7 +610,7 @@ class Project
 	$allow_workbench	= $this->allow_workbench();
 
 	# Before project approval, display ron/plab request status.
-	if ($approved) {
+	if ($this->approved()) {
 	    $proj_ronpcs   =
 		YesNo(strpos($this->pcremote_ok(), "pcron") !== false);
 	    $proj_plabpcs  = 
