@@ -60,8 +60,42 @@ if ($isadmin) {
     WRITESUBMENUBUTTON("Resend Approval Message",
 		       "resendapproval.php?pid=$pid");
 }
-
 SUBMENUEND();
+
+# Gather up the html sections.
+ob_start();
+$project->Show();
+$profile_html = ob_get_contents();
+ob_end_clean();
+
+ob_start();
+$group->ShowMembers();
+$members_html = ob_get_contents();
+ob_end_clean();
+
+ob_start();
+$project->ShowGroupList();
+$groups_html = ob_get_contents();
+ob_end_clean();
+
+# Project wide Templates.
+$template_html = null;
+if ($EXPOSETEMPLATES) {
+    $templates_html = SHOWTEMPLATELIST("PROJ", 0, $uid, $pid, "", TRUE);
+}
+
+ob_start();
+ShowExperimentList("PROJ", $this_user, $project);
+$experiments_html = ob_get_contents();
+ob_end_clean();
+
+$stats_html = null;
+if ($isadmin) {
+    ob_start();
+    $project->ShowStats();
+    $stats_html = ob_get_contents();
+    ob_end_clean();
+}
 
 #
 # Show number of PCS
@@ -71,48 +105,111 @@ $numpcs = $project->PCsInUse();
 if ($numpcs) {
     echo "<center><font color=Red size=+2>\n";
     echo "Project $pid is using $numpcs PCs!\n";
-    echo "</font></center>\n";
+    echo "</font></center><br>\n";
 }
 
-$project->Show();
+#
+# Function to change what is being shown.
+#
+echo "<script type='text/javascript' language='javascript'>
+        var li_current = 'li_profile';
+        var div_current = 'div_profile';
+        function Show(which) {
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = '#DDE';
+            li.style.borderBottom = '1px solid #778';
+            div = getObjbyName(div_current);
+            div.style.display = 'none';
+
+            li_current = 'li_' + which;
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = 'white';
+            li.style.borderBottom = '1px solid white';
+            div_current = 'div_' + which;
+            div = getObjbyName(div_current);
+            div.style.display = 'block';
+
+            return false;
+        }
+        function Setup(which) {
+            li_current = 'li_' + which;
+            div_current = 'div_' + which;
+	    li = getObjbyName(li_current);
+            li.style.backgroundColor = 'white';
+            li.style.borderBottom = '1px solid white';
+            div = getObjbyName(div_current);
+            div.style.display = 'block';
+        }
+      </script>\n";
+
+#
+# This is the topbar
+#
+echo "<div width=\"100%\" align=center>\n";
+echo "<ul id=\"topnavbar\">\n";
+if ($templates_html) {
+    echo "<li>
+           <a href=\"#A\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+               "id=\"li_templates\" onclick=\"Show('templates');\">".
+               "Templates</a></li>\n";
+}
+if ($experiments_html) {
+     echo "<li>
+            <a href=\"#B\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+               "id=\"li_experiments\" onclick=\"Show('experiments');\">".
+               "Experiments</a></li>\n";
+}
+if ($groups_html) {
+    echo "<li>
+          <a href=\"#C\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_groups\" onclick=\"Show('groups');\">".
+              "Groups</a></li>\n";
+}
+if ($members_html) {
+    echo "<li>
+          <a href=\"#D\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_members\" onclick=\"Show('members');\">".
+              "Members</a></li>\n";
+}
+echo "<li>
+      <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+           "id=\"li_profile\" onclick=\"Show('profile');\">".
+           "Profile</a></li>\n";
+
+if ($isadmin && $stats_html) {
+    echo "<li>
+          <a href=\"#F\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_stats\" onclick=\"Show('stats');\">".
+              "Project Stats</a></li>\n";
+}
+echo "</ul>\n";
+echo "</div>\n";
+echo "<div align=center id=topnavbarbottom>&nbsp</div>\n";
+
+if ($templates_html) {
+     echo "<div class=invisible id=\"div_templates\">$templates_html</div>";
+}
+if ($experiments_html) {
+     echo "<div class=invisible id=\"div_experiments\">$experiments_html</div>";
+}
+if ($groups_html) {
+     echo "<div class=invisible id=\"div_groups\">$groups_html</div>";
+}
+if ($members_html) {
+     echo "<div class=invisible id=\"div_members\">$members_html</div>";
+}
+echo "<div class=invisible id=\"div_profile\">$profile_html</div>";
+if ($isadmin && $stats_html) {
+    echo "<div class=invisible id=\"div_stats\">$stats_html</div>";
+}
 SUBPAGEEND();
 
-echo "<center>\n";
-echo "<table border=0 bgcolor=#000 color=#000 class=stealth>\n";
-echo "<tr valign=top><td class=stealth align=center>\n";
-
 #
-# A list of project members (from the default group).
+# Get the active tab to look right.
 #
-$group->ShowMembers();
-
-echo "</td><td align=center class=stealth>\n";
-
-#
-# A list of project Groups
-#
-$project->ShowGroupList();
-
-echo "</td></table>\n";
-echo "</center>\n";
-
-# Project wide Templates.
-if ($EXPOSETEMPLATES) {
-    SHOWTEMPLATELIST("PROJ", 0, $uid, $pid);
-}
-
-#
-# A list of project experiments.
-#
-ShowExperimentList("PROJ", $this_user, $project);
-
-if ($isadmin) {
-    echo "<center>
-          <h3>Project Stats</h3>
-         </center>\n";
-
-    $project->ShowStats();
-}
+echo "<script type='text/javascript' language='javascript'>
+      Setup(\"profile\");
+      </script>\n";
 
 #
 # Standard Testbed Footer

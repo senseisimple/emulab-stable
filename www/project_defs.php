@@ -826,7 +826,7 @@ class Project
     function ShowGroupList() {
 	$groups    = $this->SubGroups();
 
-	echo "<h3>Project Groups</h3>\n";
+	echo "<center><h3>Project Groups</h3></center>\n";
 	echo "<table id='grouplist' align=center border=1>\n";
 	echo "<thead class='sort'>";
 	echo "<tr>
