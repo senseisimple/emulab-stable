@@ -510,7 +510,10 @@ sub findVlans($@) {
 		if (defined($mapping{$id})) {
 		    $oldnum = $mapping{$id};
 		    if (defined($num) && ($num != $oldnum))
-			{ warn "incompatible 802.1Q tag assignments for $id\n";}
+			{ warn "Incompatible 802.1Q tag assignments for $id\n" .
+                               "    Saw $num on $device->{NAME}, but had " .
+                               "$oldnum before\n";}
+
 		} else
 		    { $mapping{$id} = $num; }
 	}
