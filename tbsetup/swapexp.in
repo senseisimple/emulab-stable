@@ -528,10 +528,10 @@ else {
 	    # to yank it from the queue.
 	    #
 	    if ($batchstate ne BATCHSTATE_UNLOCKED()) {
-		$experiment->SetState(EXPTSTATE_SWAPPED);
+		$experiment->SetCancelFlag(EXPTCANCEL_DEQUEUE);
 	    }
 	    else {
-		$experiment->SetCancelFlag(EXPTCANCEL_DEQUEUE);
+		$experiment->SetState(EXPTSTATE_SWAPPED);
 	    }
 	}
 	elsif ($inout eq "modify") {
