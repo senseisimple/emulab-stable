@@ -524,8 +524,15 @@ else {
 	    # XXX. The batch daemon might already have the experiment, but
 	    # not have shipped it off to startexp. Use a cancel flag since
 	    # that is the only consistent mechanism to tell the batch daemon
-	    # what it should do.
-	    $experiment->SetCancelFlag(EXPTCANCEL_DEQUEUE);
+	    # what it should do. Otherwise, we can just change its state
+	    # to yank it from the queue.
+	    #
+	    if ($batchstate ne BATCHSTATE_UNLOCKED()) {
+		$experiment->SetState(EXPTSTATE_SWAPPED);
+	    }
+	    else {
+		$experiment->SetCancelFlag(EXPTCANCEL_DEQUEUE);
+	    }
 	}
 	elsif ($inout eq "modify") {
 	    ExitWithStatus(1,
