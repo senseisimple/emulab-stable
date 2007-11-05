@@ -79,7 +79,7 @@ $groups_html = ob_get_contents();
 ob_end_clean();
 
 # Project wide Templates.
-$template_html = null;
+$templates_html = null;
 if ($EXPOSETEMPLATES) {
     $templates_html = SHOWTEMPLATELIST("PROJ", 0, $uid, $pid, "", TRUE);
 }
