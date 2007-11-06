@@ -14,7 +14,8 @@ require 'ctime.pl';
 #
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ();
-my @SYSVARDIRS  = ("lib/dhcp", "lib/dhcp3", "spool/clientmqueue", "log/audit");
+my @SYSVARDIRS  = ("lib/dhcp", "lib/dhcp3", "spool/clientmqueue",
+		   "log/audit", "log/account", "log/mysql", "log/ntpstats");
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my @SOCKETS	= ("/dev/log", "/var/run/acpid.socket");
 my $FSTAB       = "/etc/fstab";
@@ -26,6 +27,7 @@ my $NTPDRIFT    = "/etc/ntp/drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $VARACCTDIR  = "/var/account";
+my $IFTAB       = "/etc/iftab";
 
 #
 # Dead wood in $BINDIR
@@ -220,6 +222,15 @@ print "Removing root's mailfile ...\n";
 if (-f $MAILFILE) {
     unlink($MAILFILE) or
         die("Could not unlink $MAILFILE: $!");
+}
+
+#
+# Remove the iftab file (maps ifaces to mac addrs and renames ifaces according
+# to the map -- screws us up).
+#
+if ( -f $IFTAB ) {
+    unlink($IFTAB);
+    print "Removed $IFTAB.\n";
 }
 
 #
