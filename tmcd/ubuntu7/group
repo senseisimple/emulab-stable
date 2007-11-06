@@ -44,3 +44,4 @@ scanner:x:104:
 nvram:x:105:
 crontab:x:106:
 ssh:x:107:
+ntp:x:112:
