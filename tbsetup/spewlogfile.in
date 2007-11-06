@@ -21,10 +21,11 @@ sub usage()
 {
     print("Usage: spewlogfile -e pid,eid\n".
 	  "       spewlogfile -t guid,vers\n".
+	  "       spewlogfile -i logid\n".
 	  "Spew the logfile for an experiment or template.\n");
     exit(-1);
 }
-my $optlist = "we:t:";
+my $optlist = "we:t:i:";
 my $fromweb = 0;
   
 #
@@ -38,6 +39,7 @@ my $logname;
 my $isopen;
 my $experiment;
 my $template;
+my $logfile;
 
 #
 # Load the Testbed support stuff. 
@@ -48,6 +50,7 @@ use libtestbed;
 use Experiment;
 use Template;
 use User;
+use Logfile;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -81,8 +84,15 @@ elsif (defined($options{"t"})) {
 	    "    No such template in the Emulab Database.\n");
     }
 }
+elsif (defined($options{"i"})) {
+    $logfile = Logfile->Lookup($options{"i"});
+    if (! $logfile) {
+	die("*** $0:\n".
+	    "    No such logfile in the Emulab Database.\n");
+    }
+}
 usage()
-    if (@ARGV || !($experiment || $template));
+    if (@ARGV || !($experiment || $template || $logfile));
 
 #
 # This script is setuid, so please do not run it as root. Hard to track
@@ -118,7 +128,7 @@ if ($experiment) {
 	    "    There is no logfile to view for $experiment!\n");
     }
 }
-else {
+elsif ($template) {
     if (!$template->AccessCheck($this_user, TB_EXPT_READINFO)) {
 	die("*** $0:\n".
 	    "    You do not have permission to view log for $template!\n");
@@ -131,6 +141,14 @@ else {
 	    "    There is no logfile to view for $template!\n");
     }
 }
+else {
+    #
+    # Presently, just knowing the ID grants you access.
+    #
+    $logname = $logfile->filename();
+    $isopen  = $logfile->isopen();
+    
+}
 
 use Fcntl;
 use IO::Handle;
@@ -138,9 +156,11 @@ STDOUT->autoflush(1);
 
 #
 # If not an admin type, flip back to the UID now to enforce normal
-# permissions. 
+# permissions.
 #
-if (!$this_user->IsAdmin()) {
+# XXX For a logfile ID, do not flip back either. 
+#
+if (!$this_user->IsAdmin() || !$logfile) {
     $EUID = $UID;
 }
 
@@ -150,8 +170,9 @@ sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
 
 #
 # If an admin type, flip back to the UID now that the file is open.
+# XXX Ditto for logfile IDs.
 #
-if ($this_user->IsAdmin()) {
+if ($this_user->IsAdmin() || $logfile) {
     $EUID = $UID;
 }
 
@@ -186,10 +207,15 @@ while (1) {
 	    if ($experiment->GetLogFile(\$tmp, \$isopen) ||
 		!$isopen || $tmp ne $logname);
     }
-    else {
+    elsif ($template) {
 	last
 	    if ($template->GetLogFile(\$tmp, \$isopen) ||
 		!$isopen || $tmp ne $logname);
+    }
+    else {
+	last
+	    if ($logfile->Refresh() != 0 || !$logfile->isopen());
+	
     }
     sleep(2);
 }

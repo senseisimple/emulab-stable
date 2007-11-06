@@ -716,7 +716,7 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 
 HIDEBUSY();
 
-if (retval) {
+if ($retval) {
     #
     # Fatal Error. Report to the user, even though there is not much he can
     # do with the error. Also reports to tbops.
@@ -731,10 +731,16 @@ if (retval) {
 }
 
 #
-# We need to locate this for watchlog.
+# We need to locate this instance for STARTLOG() below.
 #
-if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
-    TBERROR("Could not locate experiment object for $pid/$eid", 1);
+if (!preg_match("/^Instance\s+[-\w]+\/[-\w]+\s+\((\d*)\)/",
+		$suexec_output_array[count($suexec_output_array)-1],
+		$matches)) {
+    TBERROR("Could not locate instance object for $pid/$eid", 1);
+}
+$instance = TemplateInstance::LookupByIdx($matches[1]);
+if (!$instance) {
+    TBERROR("Could not map instance idx " . $matches[1] . " to its object!",1);
 }
 
 #
@@ -750,10 +756,10 @@ if ($batchmode) {
           to see how many attempts have been made, and when the
           last attempt was.\n";
   
-    STARTWATCHER($experiment);
+    STARTWATCHER($instance->GetExperiment());
 }
 else {
-    STARTLOG($experiment);
+    STARTLOG($instance->GetLogfile());
 }
 
 #

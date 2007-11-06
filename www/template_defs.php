@@ -1122,25 +1122,29 @@ class TemplateInstance
     var $experiment;
 
     #
-    # Instances are found by their experiment index. 
+    # Instances are found by their index. 
     #
-    function TemplateInstance($exptidx) {
-	$exptidx = addslashes($exptidx);
+    function TemplateInstance($idx) {
+	$idx = addslashes($idx);
 
 	$query_result =
 	    DBQueryFatal("select * ".
 			 "  from experiment_template_instances ".
-			 "where exptidx='$exptidx'");
+			 "where idx='$idx'");
 	
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    $this->template = NULL;
 	    $this->instance = NULL;
 	    return;
 	}
-	$this->instance = mysql_fetch_array($query_result);
-	$this->template = new Template($this->instance['parent_guid'],
-				       $this->instance['parent_vers']);
-	$this->experiment = Experiment::Lookup($exptidx);
+	$this->instance   = mysql_fetch_array($query_result);
+	$this->template   = new Template($this->instance['parent_guid'],
+					 $this->instance['parent_vers']);
+	$this->experiment = null;
+	
+	if ($this->instance['exptidx']) {
+	    $this->experiment = Experiment::Lookup($this->instance['exptidx']);
+	}
     }
     
     # Hmm, how does one cause an error in a php constructor?
@@ -1150,7 +1154,26 @@ class TemplateInstance
 
     # Do class level lookup.
     function LookupByExptidx($exptidx) {
-	$foo = new TemplateInstance($exptidx);
+	$exptidx = addslashes($exptidx);
+	
+	$query_result =
+	    DBQueryWarn("select idx from experiment_template_instances  ".
+			"where exptidx='$exptidx'");
+
+	if (!$query_result || !mysql_num_rows($query_result))
+	    return null;
+	
+	$row = mysql_fetch_array($query_result);
+	$foo = new TemplateInstance($row[0]);
+
+	if ($foo->IsValid())
+	    return $foo;
+	return null;
+    }
+
+    # Do class level lookup.
+    function LookupByIdx($idx) {
+	$foo = new TemplateInstance($idx);
 
 	if ($foo->IsValid())
 	    return $foo;
@@ -1210,6 +1233,10 @@ class TemplateInstance
 	return (is_null($this->instance) ? -1 :
 		$this->instance['description']);
     }
+    function logfileid() {
+	return (is_null($this->instance) ? -1 :
+		$this->instance['logfileid']);
+    }
     function template() {
 	return (is_null($this->instance) ? -1 : $this->template);
     }
@@ -1217,7 +1244,16 @@ class TemplateInstance
 	return $this->template;
     }
     function GetExperiment() {
+	if ($this->experiment)
+	    return $this->experiment;
+
+	if ($this->exptidx()) {
+	    $this->experiment = Experiment::Lookup($this->exptidx());
+	}
 	return $this->experiment;
+    }
+    function GetLogfile() {
+	return Logfile::Lookup($this->logfileid());
     }
 
     #
@@ -1234,7 +1270,7 @@ class TemplateInstance
 
     # Is instance actually running (current experiment).
     function Instantiated() {
-	return ($this->experiment ? 1 : 0);
+	return ($this->GetExperiment() ? 1 : 0);
     }
 
     function AccessCheck($user, $access_type) {

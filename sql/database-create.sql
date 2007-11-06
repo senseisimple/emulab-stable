@@ -772,6 +772,7 @@ CREATE TABLE `experiment_template_instances` (
   `eid` varchar(32) NOT NULL default '',
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `logfileid` varchar(40) default NULL,
   `description` tinytext,
   `start_time` datetime default NULL,
   `stop_time` datetime default NULL,
@@ -1558,6 +1559,19 @@ CREATE TABLE `log` (
   PRIMARY KEY  (`seq`),
   KEY `session` (`session`),
   KEY `stamp` (`stamp`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `logfiles`
+--
+
+DROP TABLE IF EXISTS `logfiles`;
+CREATE TABLE `logfiles` (
+  `logid` varchar(40) NOT NULL default '',
+  `filename` tinytext,
+  `isopen` tinyint(4) NOT NULL default '0',
+  `date_created` datetime default NULL,
+  PRIMARY KEY  (`logid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

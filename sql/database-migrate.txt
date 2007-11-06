@@ -4181,3 +4181,16 @@ last_net_act,last_cpu_act,last_ext_act);
 	  `created` datetime default NULL,
 	  PRIMARY KEY  (`parent_guid`,`parent_vers`,`uid_idx`,`name`)
 	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.134: Start cleaning up logfiles.
+
+	CREATE TABLE `logfiles` (
+	  `logid` varchar(40) NOT NULL default '',
+	  `filename` tinytext,
+	  `isopen` tinyint(4) NOT NULL default '0',
+	  `date_created` datetime default NULL,
+	  PRIMARY KEY  (`logid`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table experiment_template_instances add \
+	    `logfileid` varchar(40) default NULL after uid_idx;

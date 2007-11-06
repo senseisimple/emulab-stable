@@ -26,6 +26,7 @@ use Project;
 use User;
 use Experiment;
 use Group;
+use Logfile;
 use English;
 use HTML::Entities;
 use overload ('""' => 'Stringify');
@@ -2135,6 +2136,7 @@ sub runtime($)       { return field($_[0], 'runtime'); }
 sub locked($)        { return field($_[0], 'locked'); }
 sub locker_pid($)    { return field($_[0], 'locker_pid'); }
 sub description($)   { return field($_[0], 'description'); }
+sub logfileid($)     { return field($_[0], 'logfileid'); }
 sub template($)      { return ((!ref($_[0])) ? -1 : $_[0]->{'TEMPLATE'}); }
 
 # The path is the path of the experiment.
@@ -2444,6 +2446,12 @@ sub Delete($)
     DBQueryWarn("delete from experiment_runs ".
 		"where exptidx='$exptidx'")
 	or return -1;
+
+    # No reason to keep the log entry around.
+    if ($self->logfileid()) {
+	my $logfile = Logfile->Lookup($self->logfileid());
+	$logfile->Delete();
+    }
 
     #
     # Also delete the binding records for the instance.
@@ -3526,12 +3534,12 @@ sub CopyTemplateEvents($)
 #
 # Create a log file for an instance, in the template directory.
 #
-sub CreateLogFile($$$)
+sub CreateLogFile($$)
 {
-    my($self, $token, $ppath) = @_;
+    my ($self, $token) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     my $idx     = $self->idx();
@@ -3539,17 +3547,28 @@ sub CreateLogFile($$$)
     my $logdir  = "$path/logs";
     my $logname = "$logdir/instance${idx}.${token}";
 
-    return -1
+    return undef
 	if (-e $logname);
 
-    return -1
+    return undef
 	if (! -d $logdir && !mkdir($logdir, 0775));
 
     Template::mysystem("touch $logname") == 0
-	    or return -1;
+	    or return undef;
 
-    $$ppath = $logname;
-    return 0;
+    my $logfile = Logfile->Create($logname);
+    if (!defined($logfile)) {
+	unlink($logname);
+	return undef;
+    }
+
+    if ($self->Update(0, {'logfileid' => $logfile->logid()})) {
+	$logfile->Delete();
+	unlink($logname)
+	    if (!defined($logfile));
+	return undef;
+    }
+    return $logfile;
 }
 
 sub WriteEnvVariables($)

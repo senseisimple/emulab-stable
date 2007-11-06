@@ -17,16 +17,20 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
-				 "template",   PAGEARG_TEMPLATE);
+				 "template",   PAGEARG_TEMPLATE,
+				 "logfile",    PAGEARG_LOGFILE);
 
-if (! (isset($experiment) || isset($template))) {
-    PAGEARGERROR("Must provide either an experiment or a template");
+if (! (isset($experiment) || isset($template) || isset($logfile))) {
+    PAGEARGERROR("Must provide either an experiment, template or ID");
 }
 
 #
 # Verify permission and sure there is a logfile.
 #
 if (isset($experiment)) {
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    
     if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view logs for $pid/$eid!", 1);
     }
@@ -34,7 +38,11 @@ if (isset($experiment)) {
 	USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
     }
 }
-else {
+elseif (isset($template)) {
+    $pid  = $template->pid();
+    $guid = $template->guid();
+    $vers = $template->vers();
+
     if (!$template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view logs for ".
 		  "$guid/$vers!", 1);
@@ -42,6 +50,12 @@ else {
     if (! $template->logfile()) {
 	USERERROR("Template $guid/$vers is no longer in transition!", 1);
     }
+}
+else {
+    # Permission is granted just by knowing the ID.
+    $logfileid = $logfile->logid();
+    # Not sure what to do about this yet ...
+    $pid  = "nobody";
 }
 
 #
@@ -65,11 +79,12 @@ register_shutdown_function("SPEWCLEANUP");
 
 if (isset($experiment)) {
     $args = "-e " . $experiment->pid() . "/" . $experiment->eid();
-    $pid  = $experiment->pid();
+}
+elseif (isset($template)) {
+    $args = "-t " . $template->guid() . "/" . $template->vers();
 }
 else {
-    $args = "-t " . $template->guid() . "/" . $template->vers();
-    $pid  = $template->pid();
+    $args = "-i " . escapeshellarg($logfile->logid());
 }
 
 if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $args", "r")) {
@@ -90,8 +105,11 @@ if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $args", "r")) {
 else {
     if (isset($experiment))
 	USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
-    else
+    elseif (isset($template))
 	USERERROR("Template $guid/$vers is no longer in transition!", 1);
+    else {
+	USERERROR("Logfile $logfileid is no longer valid!", 1);
+    }
 }
 
 ?>

@@ -81,7 +81,7 @@ my $EVhandle;
 my $exptidx;
 my $template;
 my $instance;
-my $logname;
+my $logfile;
 my $template_tag;
 my @ExptStates  = ();
 # For the END block below.
@@ -101,6 +101,8 @@ my $swapin      = "$TB/bin/template_swapin";
 my $endexp      = "$TB/bin/endexp";
 my $dbcontrol   = "$TB/sbin/opsdb_control";
 my $archcontrol = "$TB/bin/archive_control";
+my $CVSBIN      = "/usr/bin/cvs";
+my $RLOG        = "/usr/bin/rlog";
 
 # Protos
 sub ParseArgs();
@@ -121,8 +123,8 @@ use User;
 use event;
 use libaudit;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 0;
+# In libdb
+my $projroot = PROJROOT();
 
 #
 # Turn off line buffering on output
@@ -354,11 +356,14 @@ $SIG{TERM} = \&sighandler;
 # Use the logonly option to audit so that we get a record mailed.
 #
 if (! ($foreground || $batchmode)) {
-    if ($instance->CreateLogFile("swapin", \$logname) < 0) {
+    $logfile = $instance->CreateLogFile("swapin");
+    if (!defined($logfile)) {
 	fatal(-1, "Could not create logfile!");
     }
+    # Mark it open, since it exists.
+    $logfile->Open();
 
-    if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
+    if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logfile->filename(),
 			  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
 	#
 	# Parent exits normally, unless in waitmode. We have to set
@@ -367,31 +372,14 @@ if (! ($foreground || $batchmode)) {
 	$justexit = 1;
 
 	if (!$waitmode) {
-	    #
-	    # Before we can actually exit, we need to wait. Totally ick;
-	    # the logfile stuff needs work.
-	    #
-	    while (1) {
-		my ($tmp1, $tmp2);
+	    my $idx = $instance->idx();
 
-		last
-		    if (TBExptGetLogFile($pid, $eid, \$tmp1, \$tmp2));
-
-		sleep(2);
-	    }
-	    if ($batchmode) {
-		print("Experiment $pid/$eid has entered the batch system.\n".
-		      "You will be notified when it is fully instantiated.\n")
-		    if (! $quiet);
-	    }
-	    else {
-		print("Experiment $pid/$eid is now being instantiated.\n".
-		      "You will be notified via email when this is done.\n")
-		    if (! $quiet);
-	    }
+	    # XXX The web interface depends on this line.
+	    print("Instance $pid/$eid ($idx) is now being instantiated.\n")
+		if (! $quiet);
 	    exit(0);
 	}
-	print("Waiting for experiment $eid to fully instantiate.\n")
+	print("Waiting for instance $pid/$eid to fully instantiate.\n")
 	    if (! $quiet);
 	    
 	if (-t STDIN && !$quiet) {
@@ -479,14 +467,6 @@ if ($STAMPS) {
     $instance->Stamp("template_instantiate", "batchexp done");
 }
 
-#
-# Now we can do this ...
-#
-if (defined($logname) && ! ($foreground || $batchmode)) {
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
-}
-
 # Grab the experiment record for below.
 my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
@@ -546,21 +526,46 @@ if ($paramfile) {
 # This is essentially a copy.
 #
 my $instance_path = $userdir;
-my $datastore_tag = $template_tag;
 
 #
-# But if this is a replay, then use the tag corresponding to the run being
-# replayed, so that we get the datastore that was in place when the run was,
-# well, originally run.
+# Using the repository now ... the archive will eventually go away.
+#
+my $cvstag  = "T${guid}-${version}";
+my $cvsdir  = "$projroot/$pid/templates/$guid/cvsrepo";
+
+#
+# But if this is a replay, then use the tag corresponding to the
+# run being replayed, so that we get the datastore that was in
+# place when the run was, well, originally run.
 #
 if (defined($replay_instance)) {
-    $datastore_tag = $replay_run->start_tag();
+    $cvstag = "T${guid}-" . $replay_instance->vers();
 }
+my $revision = `$RLOG -h $cvsdir/setup/.template,v | grep '${cvstag}:'`;
 
-print "Checking out a copy of the template datastore ($datastore_tag)\n";
-$instance->CopyDataStore($datastore_tag,
-			 "$instance_path", $replay_instance) == 0
-    or fatal(-1, "Could not copy datastore to instance");
+if (! $?) {
+    print "Checking out a copy of the template datastore ($cvstag)\n";
+    System("cd $instance_path; $CVSBIN -d $cvsdir ".
+	   "    checkout -r '$cvstag' -d datastore setup/datastore")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+}
+else {
+    my $datastore_tag = $template_tag;
+
+    #
+    # But if this is a replay, then use the tag corresponding to the
+    # run being replayed, so that we get the datastore that was in
+    # place when the run was, well, originally run.
+    #
+    if (defined($replay_instance)) {
+	$datastore_tag = $replay_run->start_tag();
+    }
+
+    print "Checking out a copy of the template datastore ($datastore_tag)\n";
+    $instance->CopyDataStore($datastore_tag,
+			     "$instance_path", $replay_instance) == 0
+        or fatal(-1, "Could not copy datastore to instance");
+}
 
 # Ditto for dynamic events. 
 $instance->CopyTemplateEvents() == 0
@@ -599,8 +604,8 @@ if ($STAMPS) {
 }
 
 # Stop the web interface from spewing.
-TBExptCloseLogFile($pid, $eid)
-    if (defined($logname) && !$batchmode);
+$logfile->Close()
+    if (defined($logfile));
 
 # Email is sent from libaudit at exit ...
 exit(0);
@@ -771,12 +776,16 @@ sub cleanup()
 	$experiment->End("-f") == 0
 	    or exit(-1);
     }
+    # The web interface will stop spewing when the instance is deleted
+    # cause instance Delete removes the logfile entry too.
     $instance->Delete()
 	if (defined($instance));
 
-    # Stop the web interface from spewing.
-    TBExptCloseLogFile($pid, $eid)
-	if (defined($logname) && !$batchmode);
+    #
+    # Cleanup DB state for the experiment now that instance is gone.
+    #
+    $experiment->Delete()
+	if (defined($experiment));
 }
 
 sub fatal($$)

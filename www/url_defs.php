@@ -21,6 +21,7 @@ define("URLARG_OSID",		"__osid");
 define("URLARG_TEMPLATE",	"__template");
 define("URLARG_INSTANCE",	"__instance");
 define("URLARG_METADATA",	"__metadata");
+define("URLARG_LOGFILE",	"__logfile");
 
 define("PAGEARG_USER",		"user");
 define("PAGEARG_PROJECT",	"project");
@@ -41,6 +42,7 @@ define("PAGEARG_VERS",  	"version");
 define("PAGEARG_NODEID",	"nodeid");
 define("PAGEARG_IMAGEID",	"imageid");
 define("PAGEARG_OSID",		"osid");
+define("PAGEARG_LOGFILE",	"logfile");
 define("PAGEARG_BOOLEAN",	"boolean");
 define("PAGEARG_STRING",	"string");
 define("PAGEARG_INTEGER",	"integer");
@@ -56,6 +58,7 @@ define("URL_EXPERIMENT",	"experiment");
 define("URL_TEMPLATE",		"template");
 define("URL_INSTANCE",		"instance");
 define("URL_METADATA",		"metadata");
+define("URL_LOGFILE",		"logfile");
 define("URL_NODE",		"node");
 define("URL_IMAGE",		"image");
 define("URL_OSINFO",		"osinfo");
@@ -192,6 +195,9 @@ function CreateURL($page_id)
 	    case "templatemetadata":
 		$key = URLARG_METADATA;
 		break;
+	    case "logfile":
+		$key = URLARG_LOGFILE;
+		break;
 	    default:
 		TBERROR("CreateURL: ".
 			"Unknown object class - " . get_class($key), 1);
@@ -283,6 +289,13 @@ function CreateURL($page_id)
 		TBERROR("CreateURL: Must provide a TemplateMetadata object",1);
 	    }
 	    $val = $val->guid() . "/" . $val->vers();
+	    break;
+	case URLARG_LOGFILE:
+	    $key = "logfile";
+	    if (is_a($val, 'Logfile')) {
+		$val = $val->logid();
+	    }
+	    $val = rawurlencode($val);
 	    break;
 	default:
             # Use whatever it was we got.
@@ -583,6 +596,17 @@ function VerifyPageArguments($argspec, $required)
 		}
 	    }
 	    break;
+	    
+	case PAGEARG_LOGFILE:
+	    if (isset($_REQUEST[URL_LOGFILE])) {
+		$logid = $_REQUEST[URL_LOGFILE];
+		$yep   = 1;
+
+		if (ValidateArgument(PAGEARG_LOGFILE, $logid)) {
+		    $object = Logfile::Lookup($logid);
+		}
+	    }
+	    break;
 	}
 
 	if (isset($object)) {
@@ -623,6 +647,7 @@ function ValidateArgument($name, $arg)
     case PAGEARG_USER:
     case PAGEARG_EXPERIMENT:
     case PAGEARG_NODE:
+    case PAGEARG_LOGFILE:
 	if (preg_match("/^[-\w]+$/", $arg)) {
 	    return 1;
 	}

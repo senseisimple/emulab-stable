@@ -113,7 +113,7 @@ STARTBUSY("Terminating " . ($instance ? "Instance." : "Experiment."));
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid", $command, SUEXEC_ACTION_IGNORE);
 
-CLEARBUSY();
+HIDEBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -131,17 +131,16 @@ if ($retval < 0) {
 # Exit status >0 means the operation could not proceed.
 # Exit status =0 means the experiment is terminating in the background.
 #
-echo "<br>\n";
 if ($retval) {
-    echo "<h3>Experiment termination could not proceed</h3>";
+    echo "<h3>Termination could not proceed</h3>";
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    echo "<b>Your experiment is terminating!</b> 
-          You will be notified via email when the experiment has been torn
-	  down, and you can reuse the experiment name.
+    echo "<b>Termination has started!</b> 
+          You will be notified via email when termination has completed
+	  and you can reuse the name.
           This typically takes less than two minutes, depending on the
-          number of nodes in the experiment.
+          number of nodes.
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
     echo "<br><br>\n";

@@ -633,6 +633,54 @@ function TBGetUniqueIndex($name)
 }
 
 #
+# Trivial wrapup of Logile table so we can use it in url_defs.
+# 
+class Logfile
+{
+    var	$logfile;
+
+    #
+    # Constructor by lookup on unique index.
+    #
+    function Logfile($logid) {
+	$safe_id = addslashes($logid);
+
+	$query_result =
+	    DBQueryWarn("select * from logfiles ".
+			"where logid='$safe_id'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    $this->logfile = NULL;
+	    return;
+	}
+	$this->logfile   = mysql_fetch_array($query_result);
+    }
+
+    # Hmm, how does one cause an error in a php constructor?
+    function IsValid() {
+	return !is_null($this->logfile);
+    }
+
+    # Lookup by ID
+    function Lookup($logid) {
+	$foo = new Logfile($logid);
+
+	if (!$foo || !$foo->IsValid())
+	    return null;
+
+	return $foo;
+    }
+
+    # accessors
+    function field($name) {
+	return (is_null($this->logfile) ? -1 : $this->logfile[$name]);
+    }
+    function logid()	     { return $this->field("logid"); }
+    function filename()	     { return $this->field("filename"); }
+    function isopen()        { return $this->field("isopen"); }
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
