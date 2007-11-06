@@ -23,7 +23,7 @@ use strict;
 sub usage()
 {
     print(STDERR
-	  "Usage: endexp [-q] [-b | -w] <eid>\n".
+	  "Usage: endexp [-q] [-p] [-b | -w] <eid>\n".
 	  "switches and arguments:\n".
 	  "-w       - wait for non-batchmode experiment terminate\n".
 	  "-q       - be less chatty\n".
@@ -33,10 +33,11 @@ sub usage()
 
 sub fatal($;$);
 
-my $optlist  = "bwqx";
+my $optlist  = "bwqxp";
 my $waitmode = 0;
 my $batch    = 0;
 my $quiet    = 0;
+my $purge    = 0;
 my $template_mode = 0;
 
 #
@@ -113,6 +114,9 @@ if (@ARGV != 1) {
 }
 if (defined($options{"b"})) {
     $batch = 1;
+}
+if (defined($options{"p"})) {
+   $purge = 1;
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
@@ -493,9 +497,10 @@ if (!$template_mode) {
 }
 
 #
-# Cleanup DB state and remove directory.
+# Cleanup DB state and remove directory. Purge flag is optional and generally
+# used by admins for cleaning up bad DB state caused by script errors.
 #
-$experiment->Delete();
+$experiment->Delete($purge);
 
 #
 # In batch mode, exit now. 
