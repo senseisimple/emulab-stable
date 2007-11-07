@@ -293,7 +293,7 @@ function WRITEPLABBOTTOMBAR() {
 function WRITESIDEBAR() {
     global $login_status, $login_user, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
-    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT;
+    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT, $TRACSUPPORT;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
     global $EXPOSETEMPLATES;
@@ -674,6 +674,10 @@ function WRITESIDEBAR() {
 	if ($CHATSUPPORT) {
 	    NavMenuButton("My Chat Buddies",
 			  "$TBBASE/" . CreateURL("mychat", $login_user));
+	}
+	if ($TRACSUPPORT && STUDLY()) {
+	    NavMenuButton("Trac Management",
+			  "$TBBASE/" . CreateURL("gototrac", $login_user));
 	}
     }
 

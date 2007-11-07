@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Initial wiki setup. Create wiki accounts for all users and projects.
+#
+sub usage()
+{
+    print STDOUT "Usage: tracsetup\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TRACSUPPORT = @TRACSUPPORT@;
+my $ADDTRACUSER = "$TB/sbin/tracuser";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# If no trac support, just exit. 
+#
+if (! $TRACSUPPORT) {
+    print "Trac support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Only testbed admins.
+#
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Must be a testbed admin to run this script\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Add all users to the Trac DB.
+#
+$query_result =
+    DBQueryFatal("select distinct uid from group_membership where pid=gid ".
+		 "and (pid='testbed' or pid='tbres' or ".
+		 "     pid='utahstud')" .
+		 "");
+
+while (my ($uid) = $query_result->fetchrow_array()) {
+    system("$ADDTRACUSER $uid") == 0
+	or fatal("Could not add Trac account for $uid");
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

@@ -195,6 +195,7 @@ AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
 AC_SUBST(WINSUPPORT)
 AC_SUBST(CVSSUPPORT)
+AC_SUBST(TRACSUPPORT)
 AC_SUBST(CHATSUPPORT)
 AC_SUBST(STAMPS)
 AC_SUBST(ARCHIVESUPPORT)
@@ -263,6 +264,7 @@ OPSDBSUPPORT=0
 MAILMANSUPPORT=0
 WINSUPPORT=0
 CVSSUPPORT=0
+TRACSUPPORT=0
 CHATSUPPORT=0
 STAMPS=0
 ARCHIVESUPPORT=0
@@ -952,6 +954,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         collab/GNUmakefile \
+        collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \
         collab/mailman/GNUmakefile collab/cvstools/GNUmakefile \
 	collab/mailman/mmlistmembership \

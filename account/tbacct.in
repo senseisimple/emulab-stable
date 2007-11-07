@@ -43,6 +43,7 @@ my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
+my $TRACSUPPORT = @TRACSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 my $CHATSUPPORT = @CHATSUPPORT@;
@@ -66,6 +67,8 @@ my $PBAG	= "$TB/sbin/paperbag";
 my $EXPORTSSETUP= "$TB/sbin/exports_setup";
 my $ADDWIKIUSER = "$TB/sbin/addwikiuser";
 my $DELWIKIUSER = "$TB/sbin/delwikiuser";
+my $ADDTRACUSER = "$TB/sbin/tracuser";
+my $DELTRACUSER = "$TB/sbin/tracuser -r";
 my $ADDBUGDBUSER= "$TB/sbin/addbugdbuser";
 my $DELBUGDBUSER= "$TB/sbin/delbugdbuser";
 my $ADDCHATUSER = "$TB/sbin/addjabberuser";
@@ -432,6 +435,10 @@ sub AddUser()
     system("$ADDMMUSER $user")
 	if ($MAILMANSUPPORT);
     
+    # And to the trac system if enabled.
+    system("$ADDTRACUSER $user")
+	if ($TRACSUPPORT && $user ne $PROTOUSER);
+
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
 
@@ -519,6 +526,10 @@ sub DelUser()
     system("$DELMMUSER $user")
 	if ($MAILMANSUPPORT);
     
+    # And to the trac system if enabled.
+    system("$DELTRACUSER $user")
+	if ($TRACSUPPORT);
+
     $EUID = 0;
 
     $sfsupdate = 1;
@@ -634,6 +645,9 @@ sub UpdatePassword()
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER -m $user")
 	if ($BUGDBSUPPORT && $user ne $PROTOUSER && ! ($wikionly || $webonly));
+
+    system("$ADDTRACUSER -u $user")
+	if ($TRACSUPPORT && $user ne $PROTOUSER && !$webonly);
 
     $EUID = 0;
     

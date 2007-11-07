@@ -1505,6 +1505,7 @@ PLABSUPPORT=0
 PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
 WIKISUPPORT=0
+TRACSUPPORT=0
 BUGDBSUPPORT=0
 OPSDBSUPPORT=0
 MAILMANSUPPORT=0
@@ -2572,6 +2573,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         collab/GNUmakefile \
+        collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \
         collab/mailman/GNUmakefile collab/cvstools/GNUmakefile \
 	collab/mailman/mmlistmembership \
@@ -2802,6 +2804,7 @@ s%@OUTERBOSS_XMLRPCPORT@%$OUTERBOSS_XMLRPCPORT%g
 s%@OUTERBOSS_SSLCERTNAME@%$OUTERBOSS_SSLCERTNAME%g
 s%@PLABSUPPORT@%$PLABSUPPORT%g
 s%@WIKISUPPORT@%$WIKISUPPORT%g
+s%@TRACSUPPORT@%$TRACSUPPORT%g
 s%@MAILMANSUPPORT@%$MAILMANSUPPORT%g
 s%@BUGDBSUPPORT@%$BUGDBSUPPORT%g
 s%@OPSDBSUPPORT@%$OPSDBSUPPORT%g

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ SUBDIR		= collab
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= mailman cvstools jabber
+SUBDIRS	= mailman cvstools jabber trac
 
 all:	all-subdirs
 
@@ -20,6 +20,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 control-install: 
 	@$(MAKE) -C mailman control-install
 	@$(MAKE) -C cvstools control-install
+	@$(MAKE) -C trac control-install
 
 install:	install-subdirs
 clean:		clean-subdirs
@@ -29,6 +30,7 @@ post-install:
 	@$(MAKE) -C mailman post-install
 	@$(MAKE) -C cvstools post-install
 	@$(MAKE) -C jabber post-install
+	@$(MAKE) -C trac post-install
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
