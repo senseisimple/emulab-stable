@@ -610,7 +610,7 @@ REPLACE INTO table_regex VALUES ('users','password2','text','redirect','default:
 REPLACE INTO table_regex VALUES ('users','w_password1','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','w_password2','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','user_interface','text','regex','^(emulab|plab)$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('users','notes','text','redirect','default:text',0,65535,NULL);
+REPLACE INTO table_regex VALUES ('users','notes','text','redirect','default:fulltext',0,65535,NULL);
 
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);
@@ -913,7 +913,7 @@ REPLACE INTO `table_regex` VALUES ('virt_nodes','plab_plcnet','text','regex','^[
 REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
 REPLACE INTO table_regex VALUES ('os_info','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
-REPLACE INTO table_regex VALUES ('os_info','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('os_info','description','text','redirect','default:fulltext',1,256,NULL);
 REPLACE INTO table_regex VALUES ('os_info','OS','text','regex','^[-\\w]*$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('os_info','version','text','regex','^[-\\w\\.]*$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('os_info','path','text','regex','^[-\\w\\.\\/:]*$',1,256,NULL);
