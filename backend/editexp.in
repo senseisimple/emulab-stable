@@ -186,6 +186,9 @@ my %editexp_args = ();
 
 foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
     my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
 
     if ($debug) {
 	print STDERR "User attribute: '$key' -> '$value'\n";

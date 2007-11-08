@@ -226,6 +226,9 @@ my @wildkeys = reverse(sort(keys(%wildcards)));
 
 foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
 
     print STDERR "User attribute: '$key' -> '$value'\n"
 	if ($debug);
