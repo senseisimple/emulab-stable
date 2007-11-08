@@ -44,6 +44,7 @@ ELVIN_COMPAT=1
 # This next group will not work outside of Utah (yet).
 #
 WIKISUPPORT=1
+TRACSUPPORT=1
 BUGDBSUPPORT=1
 MAILMANSUPPORT=1
 SFSSUPPORT=0
