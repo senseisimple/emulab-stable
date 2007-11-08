@@ -28,8 +28,6 @@ my $verify  = 0;	# Check data and return status only.
 my $TB	      = "@prefix@";
 my $TBOPS     = "@TBOPSEMAIL@";
 my $TBAUDIT   = "@TBAUDITEMAIL@";
-my $MKGROUP   = "$TB/sbin/mkgroup";
-my $MODGROUPS = "$TB/sbin/modgroups";
 
 #
 # Untaint the path
@@ -320,7 +318,8 @@ my $group_idx = $new_group->gid_idx();
 # Run the script to make the group directory, set the perms, etc.
 #
 my $cmd = "mkgroup $group_idx";
-##print $cmd . "\n";
+print($cmd . "\n")
+    if ($debug);
 my $cmd_out = `$cmd`;
 UserError("Error: " . $cmd_out)
     if ($?);
@@ -329,8 +328,9 @@ UserError("Error: " . $cmd_out)
 # Now add the group leader to the group.
 # 
 my $safe_id = escapeshellarg($group_id);
-my $cmd = "webmodgroups -a $group_pid:$safe_id:group_root $group_leader",
-##print $cmd . "\n";
+$cmd = "modgroups -a $group_pid:$safe_id:group_root $group_leader",
+print($cmd . "\n")
+    if ($debug);
 $cmd_out = `$cmd`;
 UserError("Error: " . $cmd_out)
     if ($?);
