@@ -363,9 +363,9 @@ function SPITFORM($formfields, $errors)
                     <td class='pad4' class=left>
                         <textarea
                                name=\"formfields[exp_description]\"
-	                       rows=5 cols=50>".
-	                       $formfields['exp_description'] ."
-                        </textarea>
+	                       rows=5 cols=50>" .
+	                       $formfields['exp_description'] .
+                       "</textarea>
                     </td>
                 </tr>\n";
     } else {

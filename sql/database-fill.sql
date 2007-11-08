@@ -731,7 +731,7 @@ REPLACE INTO table_regex VALUES ('experiments','jail_osname','text','redirect','
 REPLACE INTO table_regex VALUES ('experiments','delay_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
-REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:fulltext',1,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','dpdb','int','redirect','default:tinyint',0,1,NULL);
 
 REPLACE INTO table_regex VALUES ('experiments','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);

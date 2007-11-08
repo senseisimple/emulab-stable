@@ -765,7 +765,7 @@ sub ModUserInfo($$$$)
     # any email or external updates for this.
     #
     my $notes = $argref->{"notes"};
-    if ($notes && $isadmin && $target_user->notes() ne $notes) {
+    if (defined($notes) && $isadmin && $target_user->notes() ne $notes) {
 	$target_user->SetNotes($notes);
 	$noreport = 1;
     }
@@ -774,7 +774,7 @@ sub ModUserInfo($$$$)
     # Set the plab bit separately since no need to call out to the backend.
     #
     my $ui = $argref->{"user_interface"};
-    if ($ui && $target_user->user_interface() ne $ui) {
+    if (defined($ui) && $target_user->user_interface() ne $ui) {
 	$target_user->SetUserInterface($ui);
 	$noreport = 1;
     }

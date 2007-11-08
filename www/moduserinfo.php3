@@ -507,7 +507,7 @@ if (isset($formfields["usr_addr"]) && $formfields["usr_addr"] != "" &&
     $formfields["usr_addr"] != $target_user->addr()) {
     $args["usr_addr"]	= $formfields["usr_addr"];
 }
-if (isset($formfields["usr_addr2"]) && $formfields["usr_addr2"] != "" &&
+if (isset($formfields["usr_addr2"]) &&
     $formfields["usr_addr2"] != $target_user->addr2()) {
     $args["usr_addr2"]	= $formfields["usr_addr2"];
 }
@@ -535,7 +535,7 @@ if (isset($formfields["user_interface"]) && $formfields["user_interface"] != "" 
     $formfields["user_interface"] != $target_user->user_interface()) {
     $args["user_interface"]	= $formfields["user_interface"];
 }
-if (isset($formfields["notes"]) && $formfields["notes"] != "" &&
+if (isset($formfields["notes"]) &&
     $formfields["notes"] != $target_user->notes()) {
     $args["notes"]	= $formfields["notes"];
 }
