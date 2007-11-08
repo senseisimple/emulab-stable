@@ -160,7 +160,7 @@ STDOUT->autoflush(1);
 #
 # XXX For a logfile ID, do not flip back either. 
 #
-if (!$this_user->IsAdmin() || !$logfile) {
+if (!$this_user->IsAdmin() && !$logfile) {
     $EUID = $UID;
 }
 
