@@ -246,8 +246,9 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 #
 # Create the user if an XML file for newuser was supplied.
 #
+my $newuser_xml;
 if (exists($newproj_args{'newuser_xml'})) {
-    my $newuser_xml = $newproj_args{'newuser_xml'};
+    $newuser_xml = $newproj_args{'newuser_xml'};
     delete($newproj_args{'newuser_xml'});
 
     #
