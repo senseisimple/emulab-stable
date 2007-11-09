@@ -37,6 +37,8 @@ my $BIGINT = 9999999999;
 my $CLIENT_BIN = "@CLIENT_BINDIR@";
 my $SSH = "@prefix@/bin/sshtb -n";
 my $PLABNODE = "@prefix@/sbin/plabnode";
+my $PLABDIST = "@prefix@/sbin/plabdist";
+my $PLABHTTPD = "@prefix@/sbin/plabhttpd";
 # XXX - testing
 #my $PLABNODE = "/home/kwebb/bin/randsleep.pl";
 
@@ -130,8 +132,33 @@ sub checknextnode($) {
             exit($BADINST);
         }
 
-        exec "$SSH -host $vnode $CLIENT_BIN/vnodesetup -p $vnode" or
-            die "Yike! Can't exec command!\n";
+	# Do this before rootball/httpd to avoid wasted bandwidth/time.
+	# However, wastes resources on boss by not exec'ing this; we have a
+	# whole extra process hanging around just so we can do the rootball 
+	# and httpd stuff after.  XXX!
+	my $vres = TBForkCmd("$SSH -host $vnode $CLIENT_BIN/vnodesetup" . 
+			     " -p $vnode");
+	if ($vres) {
+	    print "*** Vnodesetup failed: $vnode\n";
+	    exit($vres);
+	}
+
+	# Try to dist out the rootball and other files, but don't make
+	# setup conditional on success/failure.
+	if (TBForkCmd("$PLABDIST $vnode")) {
+	    print "*** Could not dist out rootball on $vnode, ignoring.\n";
+	}
+
+	# Try to start the thttpd server in the service sliver, but don't make 
+	# setup conditional on success/failure
+	if (TBForkCmd("$PLABHTTPD $vnode")) {
+	    print "*** Could not start thttpd on $vnode, ignoring.\n";
+	}
+
+	exit($vres);
+
+        #exec "$SSH -host $vnode $CLIENT_BIN/vnodesetup -p $vnode" or
+        #    die "Yike! Can't exec command!\n";
     }
 
     # NOTREACHED

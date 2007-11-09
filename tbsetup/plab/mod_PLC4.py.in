@@ -131,9 +131,11 @@ class NM3agent:
 
 DEF_NM_DELEGATE_ACCT = "utah_nmcontrol"
 DEF_NM_DELEGATE_KEY = "/root/.ssh/id_rsa"
-TRY_SECONDARY_DEL_ACCT = True
+# A hook for connecting to old plab NMs during an upgrade.
+TRY_SECONDARY_DEL_ACCT = False
 SECONDARY_NM_DELEGATE_ACCT = "utah_elab_delegate"
 SECONDARY_NM_DELEGATE_KEY = "/root/.ssh/id_rsa.plabdel"
+
 DEF_NM_SSHCMD = "/usr/bin/ssh -q -o StrictHostKeyChecking=no" \
                 " -o PasswordAuthentication=no -o NumberOfPasswordPrompts=0" \
                 " -l %s -i %s %s"
@@ -346,7 +348,7 @@ class NM4agent:
         return self.__class__
     pass
 
-DEF_NM_LEGACY_AGENT = NM3agent
+DEF_NM_LEGACY_AGENT = None
 DEF_NM_AGENT = NM4agent
 
 class NMagent_wrapper:

@@ -34,7 +34,7 @@ my $REMOTE_SYNC_DIR = "netbed_files";
 # Maximum number of children to run at once - we'll keep this low, since it
 # consumes bandwidth on boss
 #
-my $max_children = 4;
+my $max_children = 10;
 
 #
 # Die unless the rootball exists - this serves two purposes:

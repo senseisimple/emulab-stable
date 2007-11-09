@@ -167,7 +167,8 @@ NODEEXPIREWARN = 2*WEEK+2*DAY  # about two weeks advance warning for slivers.
 #
 from mod_PLC4 import NM4agent
 
-rootball_triggers = { mod_PLC4 : { NM4agent : 'NM4-' } }
+#rootball_triggers = { mod_PLC4 : { NM4agent : 'NM4-' } }
+rootball_triggers = dict({})
 
 #
 # var to track failed renewals
@@ -2152,10 +2153,14 @@ class Node:
                 success = True
             except:
                 if rtries == 0:
+                    print "Warning: perform %s on %s failed after %d tries!" \
+                              % (command,self.nodeid,tries)
                     raise
                 else:
-                    print "Warning: perform %s on %s failed, try %d of %d" \
-                          % (command,self.nodeid,tries-rtries,tries)
+                    if debug:
+                        print "Warning: perform %s on %s failed, try %d of %d" \
+                              % (command,self.nodeid,tries-rtries,tries)
+                        pass
                     try:
                         time.sleep(interval)
                     except:
@@ -2165,7 +2170,7 @@ class Node:
             pass
         return retval
     
-    def __copy(self, localfile, remotefile, tries=1, interval=5):
+    def __copy(self, localfile, remotefile, quiet=False, tries=1, interval=5):
         """
         Copies a file from the local system to the remote node, doing so
         as the slice user.
@@ -2185,11 +2190,15 @@ class Node:
                 success = True
             except:
                 if rtries == 0:
+                    print "Warning: copy %s to %s on %s failed after %d tries!" \
+                              % (localfile,remotefile,self.nodeid,tries)
                     raise
                 else:
-                    print "Warning: copy %s to %s on %s failed, try %d of %d" \
-                          % (localfile,remotefile,self.nodeid,
-                             tries-rtries,tries)
+                    if debug:
+                        print "Warning: copy %s to %s on %s failed, try %d of %d" \
+                              % (localfile,remotefile,self.nodeid,
+                                 tries-rtries,tries)
+                        pass
                     try:
                         time.sleep(interval)
                     except:
