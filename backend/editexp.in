@@ -130,9 +130,9 @@ my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
 #
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
-    ("experiment"	=> ["eid",		$SLOT_REQUIRED],
+    ("experiment"	=> ["eid_idx",		$SLOT_REQUIRED],
 
-     # The rest are optional, so we can skip passing ones that are not changing.
+     # The rest are optional, so we can skip passing ones that are not changing
      "description"	=> ["description",	$SLOT_OPTIONAL],
      "idle_ignore"	=> ["idle_ignore",	$SLOT_OPTIONAL],
      "swappable"	=> ["swappable",	$SLOT_OPTIONAL],
@@ -238,7 +238,7 @@ UserError()
 #
 my $doemail = 0;
 
-my $experiment = Experiment->Lookup($editexp_args{"eid"});
+my $experiment = Experiment->Lookup($editexp_args{"eid_idx"});
 if (!defined($experiment)) {
     UserError("Experiment: No such experiment");
 }
