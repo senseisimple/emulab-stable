@@ -548,6 +548,16 @@ if (! $?) {
     System("cd $instance_path; $CVSBIN -d $cvsdir ".
 	   "    checkout -r '$cvstag' -d datastore setup/datastore")
 	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    System("cd $instance_path; $CVSBIN -d $cvsdir ".
+	   "    checkout -r '$cvstag' -d . setup/.template")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    # Want this file to be a sandbox file.
+    unlink("$instance_path/tbdata/nsfile.ns");
+    System("cd $instance_path; $CVSBIN -d $cvsdir ".
+	   "    checkout -r '$cvstag' -d tbdata setup/tbdata")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
 }
 else {
     my $datastore_tag = $template_tag;
