@@ -368,35 +368,36 @@ for (my $i = 1; $i <= 4; $i++) {
 	$osidclause .= "osid='$foo'";
     }
 }
+if (defined($osidclause)) {
+    DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
+    my $imageid = $image->imageid();
+    my $query_result =
+	DBQueryFatal("select osidtoimageid.*,images.pid,images.imagename ".
+		     " from osidtoimageid ".
+		     "left join images on ".
+		     " images.imageid=osidtoimageid.imageid ".
+		     "where ($osidclause) and ($typeclause) and ".
+		     "      images.imageid!='$imageid'");
+    DBQueryFatal("unlock tables");
+    if ($query_result->numrows) {
 
-DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
-my $imageid = $image->imageid();
-my $query_result =
-    DBQueryFatal("select osidtoimageid.*,images.pid,images.imagename ".
-		 " from osidtoimageid ".
-		 "left join images on ".
-		 " images.imageid=osidtoimageid.imageid ".
-		 "where ($osidclause) and ($typeclause) and ".
-		 "      images.imageid!='$imageid'");
-DBQueryFatal("unlock tables");
-if ($query_result->numrows) {
+	my $msg = 
+	    "There are other image descriptors that specify the same OS".
+	    "descriptors for the same node types.  There must be a unique".
+	    "mapping of OS descriptor to Image descriptor for each node type!".
+	    "Perhaps you need to delete one of the images below, or create a".
+	    "new OS descriptor to use in this new Image descriptor.  \n\n";
+	my $fmt = "%-10s %-15s %-15s %s\n";
+	$msg .= sprintf($fmt, "Image", "OSID", "Type", "ImageID");
+	$msg .= sprintf($fmt, "=====", "====", "====", "=======");
+	while (my ($imageid, $osid, $type, $imagename) = 
+	       $query_result->fetchrow_array()) {
+	    $msg .= sprintf($fmt, $imageid, $osid, $type, $imagename);
+	}
 
-    my $msg = 
-	"There are other image descriptors that specify the same OS".
-	"descriptors for the same node types.  There must be a unique".
-	"mapping of OS descriptor to Image descriptor for each node type!".
-	"Perhaps you need to delete one of the images below, or create a".
-	"new OS descriptor to use in this new Image descriptor.  \n\n";
-    my $fmt = "%-10s %-15s %-15s %s\n";
-    $msg .= sprintf($fmt, "Image", "OSID", "Type", "ImageID");
-    $msg .= sprintf($fmt, "=====", "====", "====", "=======");
-    while (my ($imageid, $osid, $type, $imagename) = 
-	   $query_result->fetchrow_array()) {
-	$msg .= sprintf($fmt, $imageid, $osid, $type, $imagename);
+	UserError("Conflict: Please check the other Image descriptors".
+		  " and make the necessary changes!\n $msg");
     }
-
-    UserError("Conflict: Please check the other Image descriptors".
-	      " and make the necessary changes!\n $msg");
 }
 
 exit(0)

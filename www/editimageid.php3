@@ -423,18 +423,18 @@ for ($i = 1; $i <= 4; $i++) {
 	$osid_array[] = $defaults[$foo];
     }
 }
-    
-DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
-$query_result =
-    DBQueryFatal("select osidtoimageid.*,images.pid,images.imagename ".
-		 " from osidtoimageid ".
-		 "left join images on ".
-		 " images.imageid=osidtoimageid.imageid ".
-		 "where ($osidclause) and ($typeclause) and ".
-		 "      images.imageid!='$imageid'");
-DBQueryFatal("unlock tables");
+if (isset($osidclause)) {
+    DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
+    $query_result =
+	DBQueryFatal("select osidtoimageid.*,images.pid,images.imagename ".
+		     " from osidtoimageid ".
+		     "left join images on ".
+		     " images.imageid=osidtoimageid.imageid ".
+		     "where ($osidclause) and ($typeclause) and ".
+		     "      images.imageid!='$imageid'");
+    DBQueryFatal("unlock tables");
 
-if (mysql_num_rows($query_result)) {
+    if (mysql_num_rows($query_result)) {
 	echo "<center>
               There are other image descriptors that specify the 
 	      same OS descriptors for the same node types.<br>
@@ -470,6 +470,7 @@ if (mysql_num_rows($query_result)) {
     
 	USERERROR("Please check the other Image descriptors and make the ".
 		  "necessary changes!", 1);
+    }
 }
 
 # Send to the backend for more checking, and eventually, to update the DB.
