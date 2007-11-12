@@ -491,7 +491,8 @@ sub AddWikiProject(@)
     while (<PREFS>) {
 	if ($_ =~ /^.* Set (ALLOWWEB.*) = \r$/ ||
 	    $_ =~ /^.* Set (ALLOWWEB.*) = $/) {
-	    $data .= "\t\t* Set $1 = " . "%MAINWEB%.${wikiname}Group\n";
+	    $data .= "\t\t* Set $1 = " .
+		"%MAINWEB%.${wikiname}Group, %MAINWEB%.TWikiAdminGroup\n";
 	}
 	elsif ($_ =~ /^(.* Set ALLOWTOPIC.*)\r$/ ||
 	       $_ =~ /^(.* Set ALLOWTOPIC.*)$/) {
@@ -566,7 +567,7 @@ sub AddWikiGroup(@)
 }
 
 #
-# Fix a wiki group. 
+# Fix a wiki project.
 #
 sub FixWikiProject(@)
 {
@@ -575,13 +576,34 @@ sub FixWikiProject(@)
 
     my ($pid, $wikiname) = @_;
 
-    FixWikiGroup($pid, "${wikiname}Group", "${wikiname}Group");
+    chdir("$WIKIDATADIR/$wikiname") or
+	fatal("Could not chdir to $WIKIDATADIR/$wikiname");
+
+    open(PREFS, "$WIKIDATADIR/_default/WebPreferences.txt") or
+	fatal("Could not open WebPreferences.txt for reading");
+
+    while (<PREFS>) {
+	if ($_ =~ /^.* Set (ALLOWWEB.*) = \r$/ ||
+	    $_ =~ /^.* Set (ALLOWWEB.*) = $/) {
+	    $data .= "\t\t* Set $1 = " .
+		"%MAINWEB%.${wikiname}Group , %MAINWEB%.TWikiAdminGroup\n";
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PREFS);
 
     #
-    # And another group for the project leaders and group roots, who are
-    # allowed to change the preferences for the web.
+    # Now write the file out and check it in.
     #
-    FixWikiGroup("${pid}Root", "${wikiname}RootGroup", "${wikiname}Group");
+    open(PREFS, ">WebPreferences.txt") or
+	fatal("Could not open WebPreferences.txt for writing");
+    print PREFS $data;
+    close(PREFS);
+
+    CI("WebPreferences.txt", "AddWikiProject $pid $wikiname") == 0
+        or fatal("Could not ci WebPreferences.txt");
 
     return 0;
 }
