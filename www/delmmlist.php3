@@ -81,6 +81,7 @@ if (!isset($confirmed)) {
     return;
 }
 
+PAGEHEADER("Delete a Mailman List");
 STARTBUSY("Deleting list $listname");
 SUEXEC($uid, $TBADMINGROUP, "webdelmmlist -u $listname", SUEXEC_ACTION_DIE);
 STOPBUSY();
@@ -90,10 +91,13 @@ STOPBUSY();
 #
 DBQueryFatal("delete from mailman_listnames ".
 	     "where listname='$listname'");
-
+#
+# Back to the lists list.
+# 
+PAGEREPLACE("showmmlists.php3");
 
 #
-# Back to ...
+# Standard Testbed Footer
 # 
-header("Location: showmmlists.php3");
+PAGEFOOTER();
 ?>
