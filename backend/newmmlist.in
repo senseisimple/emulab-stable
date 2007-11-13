@@ -15,7 +15,7 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: newmmlist [-v] <xmlfile>\n");
+    print("Usage: newmmlist [-d] [-v] <xmlfile>\n");
     exit(-1);
 }
 my $optlist = "dv";
@@ -131,7 +131,8 @@ my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
 #
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
-    ("pid"		=> ["pid",		$SLOT_REQUIRED],
+    ("project"		=> ["pid_idx",		$SLOT_REQUIRED],
+
      "password1"	=> ["password1",	$SLOT_REQUIRED],
      "password2"	=> ["password2",	$SLOT_REQUIRED],
      "listname"		=> ["listname",		$SLOT_REQUIRED],
@@ -216,7 +217,7 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 	next;
     }
 
-    $newmmlist_args{$dbslot} = $value;
+    $newmmlist_args{$key} = $value;
 }
 UserError()
     if (keys(%errors));
@@ -224,9 +225,9 @@ UserError()
 #
 # Now do special checks.
 #
-my $project = Project->Lookup($newmmlist_args{"pid"});
+my $project = Project->Lookup($newmmlist_args{"project"});
 if (!defined($project)) {
-    UserError("Project: No such project");
+    UserError("Project: No such project ($project)");
 }
 if (!$project->AccessCheck($this_user, TB_PROJECT_READINFO())) {
     UserError("Project: Not enough permission");

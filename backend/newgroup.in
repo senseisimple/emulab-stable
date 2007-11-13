@@ -130,7 +130,7 @@ my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
 #
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
-    ("project"		=> ["project",		$SLOT_REQUIRED],
+    ("project"		=> ["pid_idx",		$SLOT_REQUIRED],
      "group_id"		=> ["group_id",		$SLOT_REQUIRED],
      "group_leader"	=> ["group_leader",	$SLOT_REQUIRED],
      "group_description"=> ["group_description",$SLOT_OPTIONAL,	   ""]);
@@ -214,7 +214,7 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 	next;
     }
 
-    $newgroup_args{$dbslot} = $value;
+    $newgroup_args{$key} = $value;
 }
 UserError()
     if (keys(%errors));

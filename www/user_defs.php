@@ -172,7 +172,7 @@ class User
 	}
 
 	# Add these. Maybe caller should do this?
-	$args["uid"]  = $target_user->uid();
+	$args["uid"]  = $target_user->uid_idx();
 
 	fwrite($fp, "<userinfo>\n");
 	foreach ($args as $name => $value) {

@@ -15,7 +15,7 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: newosid [-v] <xmlfile>\n");
+    print("Usage: newosid [-d] [-v] <xmlfile>\n");
     exit(-1);
 }
 my $optlist = "dv";
@@ -223,7 +223,7 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 	next;
     }
 
-    $newosid_args{$dbslot} = $value;
+    $newosid_args{$key} = $value;
 }
 UserError()
     if (keys(%errors));
@@ -231,9 +231,9 @@ UserError()
 #
 # Now do special checks.
 #
-my $project = Project->Lookup($newosid_args{"pid"});
+my $project = Project->Lookup($newosid_args{"project"});
 if (!defined($project)) {
-    UserError("Project: No such project");
+    UserError("Project: No such project ($project)");
 }
 if (!$project->AccessCheck($this_user, TB_PROJECT_MAKEOSID())) {
     UserError("Project: Not enough permission");
@@ -279,8 +279,8 @@ exit(0)
 #
 my $osname = $newosid_args{"osname"};
 delete($newosid_args{"osname"});
-# Ditto the pid.
-delete($newosid_args{"pid"});
+# Ditto the project.
+delete($newosid_args{"project"});
 
 my $usrerr;
 my $new_osinfo = OSinfo->Create($project, $this_user, $osname,

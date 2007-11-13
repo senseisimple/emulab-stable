@@ -15,7 +15,7 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print("Usage: moduserinfo [-v] <xmlfile>\n");
+    print("Usage: moduserinfo [-d] [-v] <xmlfile>\n");
     exit(-1);
 }
 my $optlist = "dv";
@@ -130,7 +130,7 @@ my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
 #
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
-    ("uid"		=> ["uid",		$SLOT_REQUIRED],
+    ("uid"		=> ["uid_idx",		$SLOT_REQUIRED],
 
      # The rest are optional, so we can skip passing ones that are not changing.
      "usr_name"		=> ["usr_name",		$SLOT_OPTIONAL],
@@ -231,7 +231,7 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 	next;
     }
 
-    $moduserinfo_args{$dbslot} = $value;
+    $moduserinfo_args{$key} = $value;
 }
 UserError()
     if (keys(%errors));
@@ -242,7 +242,7 @@ UserError()
 my $target_uid = $moduserinfo_args{"uid"};
 my $target_user = User->Lookup($target_uid);
 if (!defined($target_user)) {
-    UserError("uid: No such user name");
+    UserError("uid: No such user ($target_uid)");
 }
 if (!$target_user->AccessCheck($this_user, TB_USERINFO_MODIFYINFO())) {
     UserError("UserInfo: Not enough permission");

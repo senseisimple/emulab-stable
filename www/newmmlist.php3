@@ -329,10 +329,6 @@ if (count($errors)) {
 #
 $args = array();
 
-if (isset($formfields["pid"]) &&
-    $formfields["pid"] != "none" && $formfields["pid"] != "") {
-    $args["pid"]		= $formfields["pid"];
-}
 if (isset($formfields["password1"]) && $formfields["password1"] != "") {
     $args["password1"]	= $formfields["password1"];
 }
@@ -346,7 +342,7 @@ if (isset($formfields["fullname"]) && $formfields["fullname"] != "") {
     $args["fullname"]	= $formfields["fullname"];
 }
 
-if (! ($result = NewMmList($uid, $args, $errors))) {
+if (! ($result = NewMmList($uid, $project, $args, $errors))) {
     # Always respit the form so that the form fields are not lost.
     # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
@@ -362,7 +358,7 @@ header("Location: ${MAILMANURL}/admin/${listname}/?adminpw=${formfields["passwor
 #
 # When there's an MmList class, this will be a Class function to make a new one...
 #
-function NewMmList($uid, $args, &$errors) {
+function NewMmList($uid, $project, $args, &$errors) {
     global $suexec_output, $suexec_output_array, $TBADMINGROUP;
 
     #
@@ -379,6 +375,9 @@ function NewMmList($uid, $args, &$errors) {
 	$errors[] = "Transient error(2); please try again later.";
 	return null;
     }
+
+    # Add these. Maybe caller should do this?
+    $args["project"]  = $project->pid_idx();
 
     fwrite($fp, "<MmList>\n");
     foreach ($args as $name => $value) {

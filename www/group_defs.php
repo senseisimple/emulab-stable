@@ -115,7 +115,7 @@ class Group
 	}
 
 	# Add these. Maybe caller should do this?
-	$args["project"]  = $project->pid();
+	$args["project"]  = $project->pid_idx();
 
 	fwrite($fp, "<group>\n");
 	foreach ($args as $name => $value) {
