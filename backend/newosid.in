@@ -132,7 +132,7 @@ my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
     ("description"	=> ["description",	$SLOT_REQUIRED],
      "osname"		=> ["osname"	,	$SLOT_REQUIRED],
-     "project"		=> ["pid",		$SLOT_REQUIRED],
+     "project"		=> ["pid_idx",		$SLOT_REQUIRED],
      "OS"		=> ["OS",		$SLOT_REQUIRED],
      "version"		=> ["version",		$SLOT_OPTIONAL,	   ""],
      "path"		=> ["path",		$SLOT_OPTIONAL,	   "NULL"],
