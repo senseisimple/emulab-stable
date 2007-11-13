@@ -809,3 +809,4 @@ if ($returning) {
 # See above for conclusion.
 # 
 header("Location: joinproject.php3?finished=1");
+?>
