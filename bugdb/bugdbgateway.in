@@ -153,9 +153,11 @@ else {
     fatal($EX_DATAERR, "Cannot parse User: " . $objects[0]->user());
 }
 
-if ($headers->{"Subject"}[0] =~ / FS\#(\d*) comment /s ||
+if ($headers->{"Subject"}[0] =~ / FS\#(\d*) .* opened$/s ||
+    $headers->{"Subject"}[0] =~ / FS\#(\d*) assigned/s ||
+    $headers->{"Subject"}[0] =~ / FS\#(\d*) comment /s ||
     $headers->{"Subject"}[0] =~ / FS\#(\d*) changed$/s ||
-    $headers->{"Subject"}[0] =~ / FS\#(\d*) .* opened$/s) {
+    $headers->{"Subject"}[0] =~ / FS\#(\d*) closed$/s) {
     $fsid = $1;
 }
 else {
