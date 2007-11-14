@@ -14,6 +14,7 @@ BEGIN {$FAKE_SCRIPTNAME = $ARGV[0];}
 
 use lib "@prefix@/lib";
 use libtblog qw(:DEFAULT dblog *SOUT *SERR);
+use OSinfo;  # To look up OS by idx.
 
 use constant false => 0;
 use constant true  => 1;
@@ -31,6 +32,23 @@ my @err;
 my $obvious_error = 0;
 
 while (<P>) {
+    #
+    # Fix up "No physical nodes have feature OS-335!" errors.  This just means
+    # that the chosen OS image doesn't run on the hardware type.
+    #
+    # Look up the osname from the number here.  Assign is run underneath, but
+    # can't do any better with this message because the OS-id is just a token
+    # in the PTOP files to it, and assign doesn't read the DB to do the Lookup.
+    # Also can't do it back in assign_wrapper, which does read the DB, because
+    # we log the error messages here and want them to be right.
+    #
+    if (/(.*)No physical nodes have feature OS-(\d+)!(.*)/) {
+	my $OS = OSinfo->Lookup($2);
+	my $os_tag =  $OS->pid() . "/" . $OS->osname();
+	$_ = "$1 OS '$os_tag' (OS-$2) does not run on this hardware type!\n$3"
+	    if (defined($OS));
+    }
+
     print SOUT $_;
     push @out, $_;
 }
@@ -167,7 +185,8 @@ sub parse_mapping_precheck_error($) {
 	    } elsif ($line =~ /^Too much bandwidth on emulated links!$/) {
 		$class = 'bandwidth';
 		$count = 1; # Necessary?
-	    } elsif ($line =~ /^No physical nodes have feature (\S+)!$/) {
+	    } elsif ($line =~ /^No physical nodes have feature (\S+)!$/ ||
+		     $line =~ /OS \S+ (\S+) does not run on this hardware type!/) {
 		$type  = $1;
 		$class = 'feature';
 		$count = 0; # Necessary?
