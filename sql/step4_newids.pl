@@ -242,7 +242,7 @@ while (my ($old_imageid, $old_part1, $old_part2,
 DBQueryFatal("alter table temp_images add PRIMARY KEY (`imageid`)");
 
 DBQueryFatal("replace into emulab_indicies (name, idx) ".
-	     "values ('next_osid', $index)");
+	     "values ('next_osid', $index), ('next_imageid',$index)");
 
 # osidtoimageid
 $query_result = DBQueryFatal("select * from osidtoimageid");

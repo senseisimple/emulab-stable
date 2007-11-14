@@ -159,6 +159,25 @@ my $query_result =
 $nextidx += 100000;
 
 $query_result =
+     DBQueryFatal("select e.pid,e.eid,e.idx,r.idx,".
+		 "     e.expt_head_uid,e.creator_idx,e.expt_created ".
+		 "  from experiments as e ".
+		 "left join testbed_stats_new as s on e.idx=s.exptidx ".
+		 "left join experiment_resources_new as r on ".
+		 "     r.exptidx=e.idx ".
+		 "where s.exptidx is null and e.pid='emulab-ops'");
+
+while (my ($pid,$eid,$exptidx,$rsrcidx,$uid,$uid_idx,$created) =
+	$query_result->fetchrow_array()) {
+     print "Adding missing testbed_stats record for $pid,$eid,$exptidx\n";
+     DBQueryFatal("insert into testbed_stats_new ".
+		 "(idx, start_time, end_time, exptidx, rsrcidx, action, ".
+		 " exitcode, uid, uid_idx) values ".
+		 "(NULL, '$created', '$created', $exptidx, $rsrcidx, ".
+		 " 'new', 0, '$uid', '$uid_idx')");
+}
+
+$query_result =
     DBQueryFatal("select s.exptidx,e.state from experiment_stats as s ".
 		 "left join experiments as e on e.idx=s.exptidx ".
 #		 "where s.exptidx=8751 or s.exptidx=30605 or s.exptidx=13307 ".
