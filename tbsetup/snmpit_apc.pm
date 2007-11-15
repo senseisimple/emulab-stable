@@ -62,21 +62,31 @@ sub new($$;$) {
     return $self;
 }
 
+my %CtlOIDS = (
+    default => ["sPDUOutletCtl", "outletOn", "outletOff", "outletReboot"],
+    rPDU    => ["rPDUOutletControlOutletCommand", "immediateOn", "immediateOff",
+		    "immediateReboot"]
+);
+
 sub power {
     my $self = shift;
     my $op = shift;
     my @ports = @_;
+    my $oids = $CtlOIDS{"default"};
+    my $type = SNMP::translateObj($self->{SESS}->get("sysObjectID.0"));
 
-    my $CtlOID = ".1.3.6.1.4.1.318.1.1.4.4.2.1.3";
-    if    ($op eq "on")  { $op = "outletOn";    }
-    elsif ($op eq "off") { $op = "outletOff";   }
-    elsif ($op =~ /cyc/) { $op = "outletReboot";}
+    if ($type eq "masterSwitchrPDU") { $oids = $CtlOIDS{"rPDU"}; }
+
+#   "sPDUOutletCtl" is ".1.3.6.1.4.1.318.1.1.4.4.2.1.3";
+    if    ($op eq "on")  { $op = @$oids[1]; }
+    elsif ($op eq "off") { $op = @$oids[2]; }
+    elsif ($op =~ /cyc/) { $op = @$oids[3]; }
 
     my $errors = 0;
 
     foreach my $port (@ports) {
 	print STDERR "**** Controlling port $port\n" if ($self->{DEBUG} > 1);
-	if ($self->UpdateField($CtlOID,$port,$op)) {
+	if ($self->UpdateField(@$oids[0],$port,$op)) {
 	    print STDERR "Outlet #$port control failed.\n";
 	    $errors++;
 	}
