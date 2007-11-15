@@ -1,0 +1,166 @@
+Some notes on the steps done during a client self-configuration:
+
+Rough order of RC files called [ and tmcc calls used ]:
+
+ * identify boss [ bossinfo ]
+ * rc.{linux,freebsd}
+ * rc.kname
+ * tbshutdown (a daemon)
+
+ Enter TBSETUP state
+
+ * bootsetup [ status ]
+ * get all tmcc info [ fullconfig ]
+ * find node role [ role ]
+ * rc.ipod [ ipodinfo ]
+ * rc.healthd
+ * rc.slothd
+ * watchdog [ watchdoginfo isalive ntpdrift rusage hostkeys ]
+ * rc.config
+   * rc.firewall [ firewallinfo ]
+   * rc.misc [ nodeid creator ]
+   * rc.localize [ localization ]
+   * rc.keys [ keyhash eventkey ]
+   * rc.mounts [ mounts ]
+   * rc.topomap [ topomap (if not over NFS) ]
+   * rc.accounts [ accounts ]
+   * rc.route [ routing ]
+   * rc.tunnels [ tunnel ]
+   * rc.ifconfig [ ifconfig ]
+   * rc.delays [ delay linkdelay ]
+   * rc.hostnames [ hosts (if not over NFS) ]
+   * rc.trace [ traceinfo ]
+   * rc.syncserver [ syncserver ]
+   * rc.trafgen [ traffic ]
+   * rc.tarfiles [ tarball ]
+   * rc.rpms [ rpm ]
+   * rc.progagent [ programs userenv plabconfig ]
+   * rc.linkagent [ ifconfig ]
+ * rc.canaryd
+ * rc.linktest
+
+ Enter ISUP state
+
+ * rc.startcmd [ startup ]
+ * bootvnodes [ vnodelist ]
+
+TMCC calls:
+
+bossinfo:
+    Return info about the "boss" server to which to make TMCC calls.
+
+    <bossnode name> <bossnode IP>
+
+    Obviously, info isn't obtained from boss!  Either compiled in or
+    uses current nameserver or contents of a local file.
+
+status:
+    Return pid/eid of containing experiment (or "free") and user-specified
+    name of the node.
+
+    ALLOCATED=<pid>/<eid> NICKNAME=<vname>
+
+fullconfig:
+    Single call to return the bulk of node-specific TMCC info.  Optimization
+    to avoid numerous calls to boss at node boot time.
+
+    <tons of stuff>
+
+role:
+    Return role of node inside Emulab experiment, usually one of:
+    node, virthost, delaynode.
+
+    <role>
+
+ipodinfo:
+    Return info for configuring the ICMP "ping of death" in the kernel:
+    hostIP, netmask and optional hash code (newly generated on every call).
+
+    HOST=<boss IP> MASK=<boss netmask> HASH=<32-char hash>
+
+topomap:
+    Returns (binary) contents of compressed topology map file.  One of
+    the few non-ascii returns.
+
+    <binary data>
+
+accounts:
+    Returns info about users and groups to setup on the node, one line per
+    user or group.
+
+    ADDGROUP NAME=<UNIX groupname> GID=<numeric UNIX gid>
+
+    ADDUSER LOGIN=<UNIX username> PSWD=<password hash> UID=<UNIX uid>
+      GID=<UNIX gid> ROOT=<1 or 0> NAME=<user full name>
+      HOMEDIR=<homedir path> GLIST=<list of additional UNIX gids>
+      SERIAL=<unique serial #> EMAIL=<email address> SHELL=<login shell>
+
+routing:
+   Return the "type" of IPv4 routing used and possibly a list of route
+   descriptions.  Type is one of: none, ospf, static, manual.  If type
+   is manual, a list of routes is also returned.  If type is ospf, a
+   router daemon is to be run on the node.  If type is static, static
+   route calculation is done on the node.
+
+   ROUTERTYPE=<type>
+
+   ROUTE DEST=<host or net IP> DESTTYPE=<host|net> DESTMASK=<netmask>
+      NEXTHOP=<IP> COST=<metric>
+
+tunnel:
+   Return information about over-IP tunnels to setup.  This command was
+   used for wide-area nodes and has likely bitrotted.
+
+   TUNNEL=<tunneldev?> ISSERVER=<1|0> PEERIP=<IP> PEERPORT=<port #>
+      PASSWORD=<password> ENCRYPT=<??> COMPRESS=<1|0>
+      INET=<IP> MASK=<netmask> PROTO=<tunnel proto>
+
+ifconfig:
+    Return info about IPv4 interfaces to configure, one line per interface.
+    Used for both standard interfaces and "virtual" interfaces.  Interfaces
+    are identified on nodes by their MAC addresses as they have different
+    "names" under Linux, BSD or Windows and may even move around on the
+    same OS.  Some interface types (currently just wireless interfaces)
+    may have additional info specified via INTERFACE_SETTING lines, one
+    line per key/value pair on each such interface.  Virtual interfaces
+    have different info returned.  Such interfaces can be type: veth
+    (Utah-local virtual ethernet interface), vlan (802.1q tagged vlan),
+    or alias (an IP alias on an existing interface).
+
+    INTERFACE IFACETYPE=<typename> INET=<IP> MASK=<netmask> MAC=<MACaddr>
+      SPEED=<100Mbps|1000Mbps> DUPLEX=<half|full> IFACE=<|ixp>
+      RTABID=<route table #> LAN=<link/lan vname>
+
+    INTERFACE IFACETYPE=<veth|vlan|alias> INET=<IP> MASK=<netmask>
+      ID=<iface ID> VMAC=<virtual MAC> PMAC=<associated real MAC>
+      RTABID=<route table #> ENCAPSULATE=<1|0> LAN=<link/lan vname>
+      VTAG=<802.1q VLAN tag>
+
+    INTERFACE_SETTING MAC=<MACaddr> KEY=<attrkey> VAL=<attrval>
+ 
+hostnames:
+    Return host name info for all other hosts in the experiment, one line
+    per host.  Info includes a canonical name, aliases, and the IP.  The
+    canonical name is formed by concatenating the vname of the target host
+    and the vname of the link it is reached over.
+
+    NAME=<canon name> IP=<IP> ALIASES=<list of alias names>
+
+    Used to generate the local /etc/hosts file.  Note that not all of these
+    nodes are necessarily reachable, it depends on whether the topo is
+    fully connected and whether routing has been setup.
+
+tarball:
+    Return a list of tarballs to download and install on the node,
+    one line per tarball.  Tarball path is absolute and typically on a
+    shared NFS filesystem.
+
+    DIR=<dir to "cd" to before install> TARBALL=<tarball filename>
+
+rpm:
+
+    Return a list of RPMs to download and install on the node,
+    one line per RPM.  RPM path is absolute and typically on a
+    shared NFS filesystem.
+
+    RPM=<RPM filename>
