@@ -177,7 +177,14 @@ class InetAclXMLRPCServer(SimpleObjectXMLRPCServer):
         if debug:
             print "request = '" + str(request) + "'"
             print "client_address = '" + str(client_address) + "'"
-        
+            pass
+
+        if self.acllist == None or self.acllist == []:
+            if debug:
+                print "no acls, verify_request returning True"
+                pass
+            return True
+
         (cip,cport) = client_address
         match = False
         clientbits = 0
