@@ -169,23 +169,28 @@ class FlexlabDataServer:
         # this sort of sucks, but we don't have the full map from the boss db.
         # thus, the reverse lookup could potentially give us a "non-official"
         # planetlab hostname.
-        #try:
-        #    (hostname,aliases,addrs) = socket.gethostbyaddr(node_id)
-        #    return [hostname,addrs[0]]
-        #except:
-        #    traceback.print_exc()
-        #    pass
+        try:
+            print "Looking up %s" % node_id
+            (hostname,aliases,addrs) = socket.gethostbyaddr(node_id)
+            return [hostname,addrs[0]]
+        except:
+            traceback.print_exc()
+            pass
         return None
 
     def getNodeInfo(self,node_id):
         retval = [self.nodeidToNodeIdx[node_id],self.nodeidToSiteIdx[node_id],
-                  node_id,None,None]
-        for (k,v) in self.nodeidToHostIPInfo.iteritems():
-            if not v == None and (v[0] == node_id or v[1] == node_id):
-                retval[3] = v[0]
-                retval[4] = v[1]
-                break
+                  node_id]
+        if self.nodeidToHostIPInfo.has_key(node_id) \
+               and not self.nodeidToHostIPInfo[node_id] == None:
+            retval.append(self.nodeidToHostIPInfo[node_id][0])
+            retval.append(self.nodeidToHostIPInfo[node_id][1])
             pass
+        else:
+            retval.append(None)
+            retval.append(None)
+            pass
+
         return retval
 
     def getNodeSiteMap(self):
@@ -341,7 +346,7 @@ class flexlab:
         self.fds = fds
         self.debug = True
 
-        self.MAX_QUERY_INTERVAL = 60*60*12
+        self.MAX_QUERY_INTERVAL = 60*60*24
         
         return
 
