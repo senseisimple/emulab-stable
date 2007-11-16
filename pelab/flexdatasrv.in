@@ -188,6 +188,18 @@ class FlexlabDataServer:
             pass
         return retval
 
+    def getNodeSiteMap(self):
+        retval = []
+
+        for (k,v) in self.nodeidToNodeIdx.iteritems():
+            if not v == None and self.nodeidToSiteIdx.has_key(k):
+                si = self.nodeidToSiteIdx[k]
+                retval.append([self.siteIdxToSiteName[si],si,k,v])
+                pass
+            pass
+
+        return retval
+
     def _cacheMeasurement(self,type,sidx,didx,mval,ts):
         if not self.cache.has_key(type):
             self.cache[type] = dict({})
@@ -332,22 +344,6 @@ class flexlab:
         self.MAX_QUERY_INTERVAL = 60*60*12
         
         return
-
-    # use FORCE INDEX unixstamp or whatever, check in bgmon stuff
-
-    # (t0,t1,[srcnodes_or_sites],[dstnodes_or_sites])
-
-    # function to translate hostnames/IPs to db idxes
-
-    # function to get nodes at a site, or similar
-
-    # hardlimit amount of data to return based on time interval length (i.e.,
-    # we don't want to buffer more than N rows before returning it)
-
-    # think about how to support various "where" options (i.e., all nodes with
-    # bw > X or latency < 20ms
-
-    # look for way to filter query based on IN (x,y,z)
 
     def getMeasurements(self,argdict={}):
         """
@@ -731,6 +727,15 @@ class flexlab:
         retval = self.fds.getNodeInfo(argdict["node"])
 
         return retval
+
+    def getNodeSiteMap(self,argdict={}):
+        """
+        Returns a list of 4-element lists:
+          [site_name,site_idx,emulab_node_id,node_idx]
+
+        Arguments: none
+        """
+        return self.fds.getNodeSiteMap()
     
     def getFullyConnectedSet(self,argdict={}):
         """
