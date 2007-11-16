@@ -1065,7 +1065,8 @@ import getopt
 
 DEF_HOST = '0.0.0.0'
 DEF_PORT = 3993
-DEF_ACLLIST = ['155.98.32.0/20','155.98.60.0/24']
+#DEF_ACLLIST = ['155.98.32.0/20','155.98.60.0/24']
+DEF_ACLLIST = []
 
 def usage(progname):
     print "Usage: %s [-hpa <arg>]" % str(progname)
