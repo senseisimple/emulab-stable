@@ -416,6 +416,11 @@ if ($loadpart < 1 || $loadpart > 4) {
     UserError("DOS Partion: Out of range.");
 } 
 
+# Can't have both a load partition other than 1 specified, and wholedisk checked.
+if ($loadpart != 1 && $newimageid_args{"wholedisk"}) {
+    UserError("Whole disk: Only allowed with a DOS starting partition of 1.");
+}
+
 #
 # Check sanity of node name and that user can create an image from it.
 #
