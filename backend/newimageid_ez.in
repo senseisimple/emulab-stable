@@ -416,7 +416,7 @@ if ($loadpart < 1 || $loadpart > 4) {
     UserError("DOS Partion: Out of range.");
 } 
 
-# Can't have both a load partition other than 1 specified, and wholedisk checked.
+# When wholedisk is checked, can't specify a load partition other than 1.
 if ($loadpart != 1 && $newimageid_args{"wholedisk"}) {
     UserError("Whole disk: Only allowed with a DOS starting partition of 1.");
 }
