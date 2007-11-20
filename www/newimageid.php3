@@ -562,7 +562,7 @@ if (isset($formfields["description"]) && $formfields["description"] != "") {
 }
 
 if (isset($formfields["loadpart"]) &&
-    $formfields["loadpart"] != "none" && $formfields["loadpart"] != "") {
+    $formfields["loadpart"] != "X" && $formfields["loadpart"] != "") {
     $args["loadpart"] = $formfields["loadpart"];
 }
 

@@ -327,7 +327,7 @@ function SPITFORM($formfields, $errors)
 
 	    if (strcmp($formfields["loadpart"], "$i") == 0)
 		$selected = "selected";
-	    
+
 	    echo "        <option $selected value=$i>$i </option>\n";
 	}
 	echo "       </select>";
@@ -746,12 +746,10 @@ if (!isset($submit)) {
     $defaults["gid"]		 = "";
     $defaults["imagename"]	 = "";
     $defaults["description"]	 = "";
-    $defaults["loadpart"]	 = "X";
     $defaults["OS"]	 	 = "";
     $defaults["version"]	 = "";
     $defaults["path"]		 = "$TBPROJ_DIR/";
     $defaults["node_id"]	 = "";
-    $defaults["op_mode"]	 = "";
     $defaults["wholedisk"]	 = "No";
     $defaults["max_concurrent"]	 = "";
     $defaults["shared"]		 = "No";
@@ -765,9 +763,8 @@ if (!isset($submit)) {
 	$defaults["OS"]          = "TinyOS";
 	$defaults["version"]     = "1.1.0";
     } else {
-	# Defaulys for PC-type nodes
+	# Defaults for PC-type nodes
 	$defaults["loadpart"] = "X";
-	$defaults["path"]     = "$TBPROJ_DIR/";
 	$defaults["op_mode"]  = TBDB_DEFAULT_OSID_OPMODE;
 	$defaults["os_feature_ping"]	 = "checked";
 	$defaults["os_feature_ssh"]	 = "checked";
@@ -916,7 +913,7 @@ if (isset($formfields["description"]) && $formfields["description"] != "") {
 }
 
 if (isset($formfields["loadpart"]) &&
-    $formfields["loadpart"] != "none" && $formfields["loadpart"] != "") {
+    $formfields["loadpart"] != "X" && $formfields["loadpart"] != "") {
     $args["loadpart"] = $formfields["loadpart"];
 }
 

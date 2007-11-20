@@ -123,7 +123,7 @@ class Image
         #
         # Generate a temporary file and write in the XML goo.
         #
-	$xmlname = tempnam("/tmp", "newimageid");
+	$xmlname = tempnam("/tmp", $ez ? "newimageid_ez" : "newimageid");
 	if (! $xmlname) {
 	    TBERROR("Could not create temporary filename", 0);
 	    $errors[] = "Transient error(1); please try again later.";
