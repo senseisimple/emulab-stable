@@ -75,10 +75,6 @@ aspects of security, ask Utah, and we can probably help you.
 Since our firewall rules change frequently as we add new services, it's best to
 contact Utah and ask us for the current set.
 
-Note: If you plan to use our control-network firewalling code, you should make
-sure to name the control network 'Control' (case sensitive) so that our code
-can find it.
-
 Note: For compatibility with Emulab's current control-network firewalling
 code, and possible future improvements such as inter-experiment control
 network isolation, you should make sure to name the control network 
