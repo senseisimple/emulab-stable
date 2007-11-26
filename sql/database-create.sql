@@ -1571,7 +1571,6 @@ CREATE TABLE `logfiles` (
   `filename` tinytext,
   `isopen` tinyint(4) NOT NULL default '0',
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `date_created` datetime default NULL,
   PRIMARY KEY  (`logid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
