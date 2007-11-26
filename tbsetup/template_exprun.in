@@ -83,6 +83,7 @@ my $PARAMS      = "parameters.xml";
 my $STAMPS      = @STAMPS@;
 
 # Locals
+my $logfile;
 my $logname;
 my $exptidx;
 my $template;
@@ -377,10 +378,15 @@ $SIG{TERM} = \&sighandler;
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! ($debug || $foreground)) {
-    $logname = TBExptCreateLogFile($pid, $eid, "run");
-
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    $logfile = $experiment->CreateLogFile("run");
+    if (!defined($logfile)) {
+	fatal(-1, "Could not create logfile!");
+    }
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
 
     if (my $childpid = TBBackGround($logname)) {
 	#
@@ -802,7 +808,7 @@ $experiment->CopyLogFiles()
     if (defined($logname));
 
 # Stop the web interface from spewing.
-TBExptCloseLogFile($pid, $eid)
+$experiment->CloseLogFile()
     if (defined($logname));
 
 exit(0);
@@ -1026,7 +1032,7 @@ sub fatal($$)
     tbinfo "Cleaning up and exiting with status $errorstat ...";
 
     # Stop the web interface from spewing.
-    TBExptCloseLogFile($pid, $eid)
+    $experiment->CloseLogFile()
 	if (defined($logname));
 
     #

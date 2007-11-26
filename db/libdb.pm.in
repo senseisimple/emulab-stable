@@ -170,9 +170,8 @@ use vars qw(@ISA @EXPORT);
 	 TBResolveNextOSID TBOsidToPid TBOSIDRebootWaittime
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
 	 TBdbfork TBDBDisconnect VnameToNodeid 
-	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
+	 TBIsNodeRemote 
 	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
-	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
@@ -2393,79 +2392,6 @@ sub MarkPhysNodeDown($)
 }
 
 #
-# Set/Clear the current logfile for an experiment. The idea is to provide
-# a way to look at what is going on from the web interface!
-#
-# usage TBExptSetLogFile(char *pid, char *eid, char *logname)
-#
-sub TBExptSetLogFile($$$)
-{
-    my ($pid, $eid, $logname) = @_;
-
-    DBQueryWarn("update experiments set logfile='$logname' ".
-		 "where pid='$pid' and eid='$eid'");
-}
-
-sub TBExptClearLogFile($$)
-{
-    my ($pid, $eid) = @_;
-
-    DBQueryWarn("update experiments set logfile=NULL,logfile_open=0 ".
-		"where pid='$pid' and eid='$eid'");
-}
-
-#
-# Flag the logfile as either open or closed. This allows the spew code
-# to determine when the log is no longer being appended to. Is there a
-# system oriented way to do this?
-#
-# usage TBExptOpenLogFile(char *pid, char *eid)
-# usage TBExptCloseLogFile(char *pid, char *eid)
-#
-sub TBExptOpenLogFile($$)
-{
-    my ($pid, $eid) = @_;
-
-    DBQueryWarn("update experiments set logfile_open=1 ".
-		 "where pid='$pid' and eid='$eid'");
-}
-
-sub TBExptCloseLogFile($$)
-{
-    my ($pid, $eid) = @_;
-
-    DBQueryWarn("update experiments set logfile_open=0 ".
-		 "where pid='$pid' and eid='$eid'");
-}
-
-#
-# Get the current logfile for an experiment.
-#
-# usage TBExptGetLogFile(char *pid, char *eid, char \*logname, int \isopen)
-#	Return 1 if there is a valid logname, and sets logname.
-#	Return 0 if no logfile or error.
-#
-sub TBExptGetLogFile($$$$)
-{
-    my ($pid, $eid, $logname, $isopen) = @_;
-
-    my $query_result =
-	DBQueryFatal("select logfile,logfile_open from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    if (defined($row[0])) {
-	$$logname = $row[0];
-	$$isopen  = $row[1];
-	return 1;
-    }
-    return 0;
-}
-
-#
 # Return the working directory name for an experiment. This is where
 # the scripts work. The logs are copied over to the user's version of
 # the directory later.
@@ -2533,46 +2459,6 @@ sub TBExptUserDir($$)
     my ($path) = $query_result->fetchrow_array;
 
     return $path;
-}
-
-#
-# Create a temp logfile name for an experiment, create it, and untaint it!
-# The file is created the experiment working directory and moved later
-# to the user visible directory.
-#
-sub TBExptCreateLogFile($$$)
-{
-    my($pid, $eid, $prefix) = @_;
-    my $logdir;
-    my $logname;
-    my $linkname;
-
-    $logdir   = TBExptWorkDir($pid, $eid);
-    $linkname = "$logdir/${prefix}.log";
-    $logname  = `mktemp $logdir/${prefix}.XXXXXX`;
-
-    if ($logname =~ /^([-\@\w\.\/]+)$/) {
-	$logname = $1;
-    }
-    else {
-	die("*** $0:\n".
-	    "    Bad data in logfile name: $logname");
-    }
-
-    chmod(0664, $logname) or
-	die("*** $0:\n".
-	    "    Could not chmod $logname to 0644: $!\n");
-
-    # Link it to $prefix.log so that the most recent is well know.
-    if (-e $linkname) {
-	unlink($linkname);
-    }
-    if (! link($logname, $linkname)) {
-	die("*** $0:\n".
-	    "    CreateLogFile: Cannot link $logname,$linkname: $!\n");
-    }
-
-    return $logname;
 }
 
 #

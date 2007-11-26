@@ -58,6 +58,7 @@ my $STAMPS      = @STAMPS@;
 # Locals
 my $pid;
 my $logname;
+my $logfile;
 my $exptidx;
 my $template;
 my $instance;
@@ -201,9 +202,15 @@ if (! $batchmode) {
     $experiment->CleanLogFiles() == 0
 	or fatal(-1, "Could not clean up logfiles!");
     
-    $logname = TBExptCreateLogFile($pid, $eid, "swapout");
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    $logfile = $experiment->CreateLogFile("swapout");
+    if (!defined($logfile)) {
+	fatal(-1, "Could not create logfile!");
+    }
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
 
     if (my $childpid = TBBackGround($logname)) {
 	#

@@ -412,6 +412,11 @@ sub Delete($)
     DeleteInputFiles($self) == 0
 	or return -1;
 
+    my $logfile = $self->GetLogFile();
+    if (defined($logfile)) {
+	$logfile->Delete();
+    }
+
     # The graph can be removed if this is the last template version.
     my $query_result =
 	DBQueryWarn("select vers from experiment_templates ".
@@ -449,14 +454,14 @@ sub Delete($)
 #
 # Logfiles. This all needs to change.
 #
-# Open a new logfile and return its name.
+# Open a new logfile and return it.
 #
-sub CreateLogFile($$$)
+sub CreateLogFile($$)
 {
-    my ($self, $prefix, $ppath) = @_;
+    my ($self, $prefix) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     my $vers     = $self->vers();
@@ -466,31 +471,37 @@ sub CreateLogFile($$$)
     my $logdir   = "$projroot/$pid/templates/logs";
     my $linkname = "$logdir/$prefix.${guid}-${vers}.log";
 
-    return -1
+    return undef
 	if (! -d $logdir && !mkdir($logdir, 0775));
 
     my $logname  = `mktemp $logdir/$prefix.${guid}-${vers}.XXXXXX`;
+    return undef
+	if ($?);
+    chomp($logname);
 
-    if ($logname =~ /^([-\@\w\.\/]+)$/) {
-	$logname = $1;
+    # Create a Logfile.
+    my $logfile = Logfile->Create($self->gid_idx(), $logname);
+    if (!defined($logfile)) {
+	unlink($logname);
+	return undef;
     }
-    else {
-	return -1;
+    # This is untainted.
+    $logname = $logfile->filename();
+
+    unlink($linkname)
+	if (-e $linkname);
+    if (Template::mysystem("touch $logname")) {
+	$logfile->Delete();
+	unlink($logname);
+	return undef;
     }
-	
-    if (-e $linkname) {
-	return -1
-	    if (! unlink($linkname));
-    }
-    Template::mysystem("touch $logname") == 0
-	    or return -1;
-    
     if (! link($logname, $linkname)) {
 	print STDERR "*** Cannot link $logname,$linkname: $!\n";
-	return -1;
+	$logfile->Delete();
+	unlink($logname);
+	return undef;
     }
-    $$ppath = $linkname;
-    return 0;
+    return $logfile;
 }
 
 #
@@ -498,36 +509,39 @@ sub CreateLogFile($$$)
 #
 sub SetLogFile($$)
 {
-    my ($self, $logname) = @_;
+    my ($self, $logfile) = @_;
 
     # Must be a real reference. 
     return -1
-	if (! ref($self));
+	if (! ref($self) || !ref($logfile));
 
-    return $self->Update({'logfile' => $logname});
+    # Kill the old one. Eventually we will save them.
+    my $oldlogfile = $self->GetLogFile();
+    if (defined($oldlogfile)) {
+	$oldlogfile->Delete();
+    }
+    return $self->Update({'logfile' => $logfile->logid()});
 }
 
 #
 # Get the experiment logfile.
 #
-sub GetLogFile($$$)
+sub GetLogFile($)
 {
-    my ($self, $lognamep, $isopenp) = @_;
+    my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     # Must do this to catch updates to the logfile variables.
-    return -1
+    return undef
 	if ($self->Refresh());
 
-    return -1
+    return undef
 	if (! $self->logfile());
 
-    $$lognamep = $self->logfile();
-    $$isopenp  = $self->logfile_open();
-    return 0;
+    return Logfile->Lookup($self->logfile());
 }
 
 #
@@ -541,7 +555,11 @@ sub OpenLogFile($)
     return -1
 	if (! ref($self));
 
-    return $self->Update({'logfile_open' => 1});
+    my $logfile = $self->GetLogFile();
+    return -1
+	if (!defined($logfile));
+
+    return $logfile->Open();
 }
 
 #
@@ -555,7 +573,11 @@ sub CloseLogFile($)
     return -1
 	if (! ref($self));
 
-    return $self->Update({'logfile_open' => 0});
+    my $logfile = $self->GetLogFile();
+    return -1
+	if (!defined($logfile));
+
+    return $logfile->Close();
 }
 
 #
@@ -569,11 +591,18 @@ sub ClearLogFile($)
     return -1
 	if (! ref($self));
 
+    my $logfile = $self->GetLogFile();
+    return -1
+	if (!defined($logfile));
+
+    $logfile->Delete() == 0
+	or return -1;
+
     my $guid = $self->guid();
     my $vers = $self->vers();
 
     if (!DBQueryWarn("update experiment_templates set ".
-		     "logfile=NULL,logfile_open=0 ".
+		     "    logfile=NULL ".
 		     "where guid='$guid' and vers='$vers'")) {
 	return -1;
     }
@@ -3556,7 +3585,7 @@ sub CreateLogFile($$)
     Template::mysystem("touch $logname") == 0
 	    or return undef;
 
-    my $logfile = Logfile->Create($logname);
+    my $logfile = Logfile->Create($self->template()->gid_idx(), $logname);
     if (!defined($logfile)) {
 	unlink($logname);
 	return undef;

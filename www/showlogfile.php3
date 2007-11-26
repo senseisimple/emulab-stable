@@ -35,15 +35,17 @@ if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 # Check for a logfile. This file is transient, so it could be gone by
 # the time we get to reading it.
 #
-if (! $experiment->logfile()) {
+$logfile = $experiment->GetLogfile();
+if (! $logfile) {
     USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
 }
 
 echo $experiment->PageHeader();
 echo "<br /><br />\n";
 
+STARTWATCHER($experiment);
 # This spits out the frame.
-STARTLOG($experiment);
+STARTLOG($logfile);
 
 #
 # Standard Testbed Footer

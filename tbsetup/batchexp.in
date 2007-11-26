@@ -111,6 +111,7 @@ my $tbbindir    = "$TB/bin/";
 my $RSYNC	= "/usr/local/bin/rsync";
 my $errorstat=-1;
 my $exptidx;
+my $logfile;
 my $logname;
 
 # For the END block below.
@@ -489,12 +490,15 @@ goto skiplog
 # is ready. In waitmode, we hold the parent waiting so that the user
 # can script it. Must protect against async (^C) termination though.
 #
-if ($experiment->CreateLogFile("startexp", \$logname) != 0) {
+$logfile = $experiment->CreateLogFile("startexp");
+if (!defined($logfile)) {
     fatal("Could not create logfile!");
-    
 }
-$experiment->SetLogFile($logname);
-$experiment->OpenLogFile($logname);
+$logname = $logfile->filename();
+# We want it to spew to the web.
+$experiment->SetLogFile($logfile);
+# Mark it open since we are going to start using it right away.
+$logfile->Open();
 
 if (my $childpid = TBBackGround($logname)) {
     #

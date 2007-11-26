@@ -69,6 +69,7 @@ use Experiment;
 use Node;
 use User;
 use Image;
+use Logfile;
 
 #
 # Turn off line buffering on output
@@ -97,7 +98,8 @@ my $devnum;
 my $mereuser    = 0;
 my $debug       = 0;
 my $imagepid    = TB_OPSPID;
-my $logname;
+my $logfile;
+my $oldlogfile;
 my $needcleanup = 0;
 
 #
@@ -326,12 +328,16 @@ else {
 # Go to the background since this is going to take a while.
 # 
 if (!$debug) {
-    $logname = TBMakeLogname("create-image-$pid-$eid");
+    $logfile = Logfile->Create();
+    fatal("Could not create a logfile")
+	if (!defined($logfile));
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
 
-    $experiment->SetLogFile($logname);
-    $experiment->OpenLogFile();
+    # Logfile becomes the current spew, but save off the old spew.
+    $experiment->SetLogFile($logfile, \$oldlogfile);
 
-    if (my $childpid = TBBackGround($logname)) {
+    if (my $childpid = TBBackGround($logfile->filename())) {
 	#
 	# Parent exits normally, except if in waitmode. 
 	#
@@ -475,12 +481,17 @@ SENDMAIL("$user_name <$user_email>",
 	 "$swmsg",
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
-	 defined($logname) ? ($logname) : ());
+	 defined($logfile) ? ($logfile->filename()) : ());
 
-if (defined($logname)) {
+if (defined($logfile)) {
     # Close up the log file so the webpage stops.
-    $experiment->CloseLogFile();
-    unlink("$logname");
+    $logfile->Close();
+    # And restore the original logfile as current spew.
+    $experiment->SetLogFile($oldlogfile)
+	if (defined($oldlogfile));
+    $logfile->Delete();
+    # This was mailed so no longer needed.
+    unlink("$logfile->filename()");
 }
 exit 0;
 
@@ -533,12 +544,17 @@ sub fatal($)
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",
-	     defined($logname) ? ($logname) : ());
+	     defined($logfile) ? ($logfile->filename()) : ());
     
-    if (defined($logname)) {
-        # Close up the log file so the webpage stops.
-	$experiment->CloseLogFile();
-	unlink("$logname");
+    if (defined($logfile)) {
+	# Close up the log file so the webpage stops.
+	$logfile->Close();
+	# And restore the original logfile as current spew.
+	$experiment->SetLogFile($oldlogfile)
+	    if (defined($oldlogfile));
+	$logfile->Delete();
+	# This was mailed so no longer needed.
+	unlink("$logfile->filename()");
     }
     exit(-1);
 }

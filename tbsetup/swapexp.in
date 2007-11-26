@@ -110,6 +110,7 @@ my $robotexp = 0;
 my $template_node = 0;
 
 my $inout;
+my $logfile;
 my $logname;
 my @allnodes;
 my @row;
@@ -783,11 +784,15 @@ if (! $batch && ! $template_mode) {
     $experiment->CleanLogFiles() == 0
 	or fatal("Could not clean up logfiles!");
 
-    if ($experiment->CreateLogFile("swapexp", \$logname) != 0) {
+    $logfile = $experiment->CreateLogFile("swapexp");
+    if (!defined($logfile)) {
 	fatal("Could not create logfile!");
     }
-    $experiment->SetLogFile($logname);
-    $experiment->OpenLogFile($logname);
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
 
     if (my $childpid = TBBackGround($logname)) {
 	#
@@ -1224,7 +1229,7 @@ if ($batch) {
 # Clear the log file so the web page stops spewing. 
 #
 $experiment->CloseLogFile()
-    if (defined($logname));
+    if (defined($logfile));
 
 #
 # Must unlock before exit.
@@ -1388,7 +1393,7 @@ sub cleanup()
     # Clear the log file so the web page stops spewing.
     #
     $experiment->CloseLogFile()
-	if (defined($logname));
+	if (defined($logfile));
 
     # Unlock and reset state to its terminal value.
     $experiment->Unlock();

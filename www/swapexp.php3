@@ -214,11 +214,12 @@ if (!isset($confirmed)) {
     return;
 }
 
+STARTBUSY("Starting");
+
 if ($instance) {
     $guid = $instance->guid();
     $version = $instance->vers();
 
-    STARTBUSY("Template Instance is");
     if ($inout == "pause")
 	$inout = "out";
 }
@@ -244,9 +245,7 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		    "webswapexp -s $inout $pid $eid")),
 		 SUEXEC_ACTION_IGNORE);
 
-if ($instance) {
-    HIDEBUSY();
-}
+HIDEBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -269,7 +268,16 @@ if ($retval) {
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    if ($isbatch) {
+    if ($instance) {
+	if ($isbatch) {
+	    STARTWATCHER($experiment);
+	    STARTLOG($instance);
+	}
+	else {
+	    STARTLOG($experiment);
+	}
+    }
+    elseif ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
 	    echo "Batch Mode experiments will be run when enough resources
                   become available. This might happen immediately, or it
@@ -294,9 +302,6 @@ else {
 		  You may requeue your experiment at any time.\n";
 	}
 	STARTWATCHER($experiment);
-    }
-    elseif ($instance) {
-	STARTLOG($experiment);
     }
     else {
 	echo "<div>";

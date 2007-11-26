@@ -185,6 +185,14 @@ class Template
 	return $project;
     }
 
+    function GetLogfile() {
+	$this->Refresh();
+	
+	if ($this->logfile()) 
+	    return Logfile::Lookup($this->logfile());
+	return null;
+    }
+
     # Return the unixgid for operating on this template.
     function UnixGID() {
 	$experiment = $this->GetExperiment();

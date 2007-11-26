@@ -678,6 +678,8 @@ class Logfile
     function logid()	     { return $this->field("logid"); }
     function filename()	     { return $this->field("filename"); }
     function isopen()        { return $this->field("isopen"); }
+    function uid_idx()       { return $this->field("uid_idx"); }
+    function gid_idx()       { return $this->field("gid_idx"); }
 }
 
 #

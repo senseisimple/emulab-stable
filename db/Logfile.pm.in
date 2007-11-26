@@ -18,6 +18,7 @@ use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use English;
+use Group;
 use Data::Dumper;
 
 # Configure variables
@@ -60,6 +61,7 @@ sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'LOGFILE'}->{$_[1]}); }
 sub logid($)            { return field($_[0], "logid"); }
 sub filename($)         { return field($_[0], "filename"); }
 sub isopen($)           { return field($_[0], "isopen"); }
+sub gid_idx($)          { return field($_[0], "gid_idx"); }
 sub date_created($)     { return field($_[0], "date_created"); }
 
 #
@@ -89,9 +91,9 @@ sub Refresh($)
 # Create a new logfile. We are given the optional filename, otherwise
 # generate one. 
 #
-sub Create($;$)
+sub Create($$;$)
 {
-    my ($class, $filename) = @_;
+    my ($class, $gid_idx, $filename) = @_;
 
     return undef
 	if (ref($class));
@@ -106,6 +108,7 @@ sub Create($;$)
 		     "  logid='$logid', ".
 		     "  isopen=0, ".
 		     "  filename='$filename', ".
+		     "  gid_idx='$gid_idx', ".
 		     "  date_created=now()")) {
 	return undef;
     }
@@ -132,6 +135,33 @@ sub Delete($;$)
     }
     return -1
 	if (!DBQueryWarn("delete from logfiles where logid='$logid'"));
+
+    return 0;
+}
+
+#
+# AccessCheck. The user needs to be a member of the group that the logfile
+# was created in. 
+#
+sub AccessCheck($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    # Admins do whatever they want.
+    return 1
+	if ($user->IsAdmin());
+
+    my $group = Group->Lookup($self->gid_idx());
+    return 0
+	if (!defined($group));
+
+    # Membership in group.
+    return 1
+	if (defined($group->LookupUser($user)));
 
     return 0;
 }

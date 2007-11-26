@@ -104,7 +104,7 @@ function DOIT($instance, $action, $command_options)
 		     "webtemplate_exprun $command_options $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 
-    CLEARBUSY();
+    HIDEBUSY();
 
     if ($deletexmlfile) {
 	unlink($parameter_xmlfile);
@@ -169,7 +169,7 @@ function DOTIME($instance, $action)
 		     "webtemplate_exprun $command_options $guid/$vers",
 		     SUEXEC_ACTION_IGNORE);
 
-    CLEARBUSY();
+    HIDEBUSY();
 
     #
     # Fatal Error. Report to the user, even though there is not much he can

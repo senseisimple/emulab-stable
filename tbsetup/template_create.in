@@ -52,6 +52,7 @@ my $pid;
 my $tid;
 my $gid;
 my $inputfile;
+my $logfile;
 my $logname;
 # For modify.
 my $parent_guid;
@@ -259,10 +260,14 @@ $tmpdir = "$projroot/$pid/templates/$guid/cvstmp.$$";
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
-$template->CreateLogFile("template_create", \$logname) == 0 or
+$logfile = $template->CreateLogFile("template_create");
+if (!defined($logfile)) {
     fatal(-1, "Could not create a logfile");
-$template->SetLogFile($logname) == 0 or
-    fatal(-1, "Could not set the logfile to $logname");
+}
+$logname = $logfile->filename();
+# We want it to spew to the web.
+$template->SetLogFile($logfile) == 0 or
+    fatal(-1, "Could not set the logfile");
 $template->OpenLogFile() == 0 or
     fatal(-1, "Could not open the logfile");
 
@@ -872,7 +877,7 @@ if ($STAMPS) {
 # Clear the log file so the web page stops spewing. 
 #
 $template->CloseLogFile()
-    if (defined($logname));
+    if (defined($logfile));
 
 exit(0);
 

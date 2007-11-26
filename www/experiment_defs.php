@@ -422,6 +422,14 @@ class Experiment
 	return 0;
     }
 
+    function GetLogfile() {
+	$this->Refresh();
+	
+	if ($this->logfile()) 
+	    return Logfile::Lookup($this->logfile());
+	return null;
+    }
+
     #
     # Return the Unix GID (numeric) for an experiments group.
     #

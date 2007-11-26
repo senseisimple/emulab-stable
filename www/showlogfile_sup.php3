@@ -104,11 +104,13 @@ function STARTWATCHER($experiment)
 
 function STARTLOG($object)
 {
-    $url = CreateURL("spewlogfile", $object);
-    
     if (is_a($object, 'Experiment')) {
 	STARTWATCHER($object);
     }
+    if (!is_a($object, 'Logfile')) {
+	$object = $object->GetLogfile();
+    }
+    $url = CreateURL("spewlogfile", $object);
 
     echo "<center>\n";
     echo "<img id='busy' src='busy.gif'>

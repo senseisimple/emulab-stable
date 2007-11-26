@@ -46,6 +46,7 @@ if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 unset($parameter_xmlfile);
 $deletexmlfile = 0;
 $batchmode     = 0;
+$preload       = 0;
 
 #
 # Spit the form out using the array of data.
@@ -642,6 +643,7 @@ if (isset($formfields["batched"]) && $formfields["batched"] == "Yep") {
 #
 if (isset($formfields["preload"]) && $formfields["preload"] == "Yep") {
     $command_options .= " -p";
+    $preload = 1;
 }
 
 #
@@ -746,21 +748,14 @@ if (!$instance) {
 #
 # This does both the log output, and the state change watcher popup
 #
-if ($batchmode) {
+if ($batchmode && !$preload) {
     echo "You template instantation has been queued and will run when
           enough resources become available. This might happen
           immediately, or it may take hours or days; you will be
           notified via email when insantiation is complete, and again when
-          your experiment has completed.  In the meantime, you can check the
-          progress on the <A href='showexp.php3?pid=$pid&eid=$eid'>web page</A>
-          to see how many attempts have been made, and when the
-          last attempt was.\n";
-  
-    STARTWATCHER($instance->GetExperiment());
+          your experiment has completed.\n";
 }
-else {
-    STARTLOG($instance->GetLogfile());
-}
+STARTLOG($instance->GetLogfile());
 
 #
 # Standard Testbed Footer

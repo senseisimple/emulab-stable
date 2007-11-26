@@ -19,10 +19,8 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: spewlogfile -e pid,eid\n".
-	  "       spewlogfile -t guid,vers\n".
-	  "       spewlogfile -i logid\n".
-	  "Spew the logfile for an experiment or template.\n");
+    print("Usage: spewlogfile -i logid\n".
+	  "Spew a logfile to stdout, as for the web interface\n");
     exit(-1);
 }
 my $optlist = "we:t:i:";
@@ -37,8 +35,6 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $logname;
 my $isopen;
-my $experiment;
-my $template;
 my $logfile;
 
 #
@@ -47,8 +43,6 @@ my $logfile;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-use Experiment;
-use Template;
 use User;
 use Logfile;
 
@@ -70,21 +64,7 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"w"})) {
     $fromweb = 1;
 }
-if (defined($options{"e"})) {
-    $experiment = Experiment->Lookup($options{"e"});
-    if (! $experiment) {
-	die("*** $0:\n".
-	    "    No such experiment in the Emulab Database.\n");
-    }
-}
-elsif (defined($options{"t"})) {
-    $template = Template->Lookup($options{"t"});
-    if (! $template) {
-	die("*** $0:\n".
-	    "    No such template in the Emulab Database.\n");
-    }
-}
-elsif (defined($options{"i"})) {
+if (defined($options{"i"})) {
     $logfile = Logfile->Lookup($options{"i"});
     if (! $logfile) {
 	die("*** $0:\n".
@@ -92,7 +72,7 @@ elsif (defined($options{"i"})) {
     }
 }
 usage()
-    if (@ARGV || !($experiment || $template || $logfile));
+    if (@ARGV || !$logfile);
 
 #
 # This script is setuid, so please do not run it as root. Hard to track
@@ -115,73 +95,35 @@ if (! defined($this_user)) {
 #
 # Verify that this person is allowed to do this. 
 #
-if ($experiment) {
-    if (!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
-	die("*** $0:\n".
-	    "    You do not have permission to view log for $experiment!\n");
-    }
-    #
-    # Get the logfile name.
-    #
-    if ($experiment->GetLogFile(\$logname, \$isopen)) {
-	die("*** $0:\n".
-	    "    There is no logfile to view for $experiment!\n");
-    }
+if (!$logfile->AccessCheck($this_user)) {
+    die("*** $0:\n".
+	"    You do not have permission to view logfile!\n");
 }
-elsif ($template) {
-    if (!$template->AccessCheck($this_user, TB_EXPT_READINFO)) {
-	die("*** $0:\n".
-	    "    You do not have permission to view log for $template!\n");
-    }
-    #
-    # Get the logfile name.
-    #
-    if ($template->GetLogFile(\$logname, \$isopen)) {
-	die("*** $0:\n".
-	    "    There is no logfile to view for $template!\n");
-    }
-}
-else {
-    #
-    # Presently, just knowing the ID grants you access.
-    #
-    $logname = $logfile->filename();
-    $isopen  = $logfile->isopen();
-    
-}
+$logname = $logfile->filename();
+$isopen  = $logfile->isopen();
 
 use Fcntl;
 use IO::Handle;
 STDOUT->autoflush(1);
 
 #
-# If not an admin type, flip back to the UID now to enforce normal
-# permissions.
+# Open the file up while still root. We verified permission above, and the
+# added check using the filesystems permissions if more of a pain then it
+# buys us. Well, might revisit this.
 #
-# XXX For a logfile ID, do not flip back either. 
-#
-if (!$this_user->IsAdmin() && !$logfile) {
-    $EUID = $UID;
-}
-
 sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
     die("*** $0:\n".
 	"    Could not open $logname: $!\n");
 
-#
-# If an admin type, flip back to the UID now that the file is open.
-# XXX Ditto for logfile IDs.
-#
-if ($this_user->IsAdmin() || $logfile) {
-    $EUID = $UID;
-}
+# Now flip back to user.
+$EUID = $UID;
 
 my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
     $atime,$mtime,$ctime,$blksize,$blocks) = stat(LOG);
 
 #
 # Icky. If the file is open and less then 1024 bytes, send out some
-# stuff at the beginning to make the browser do something. This terrible,
+# stuff at the beginning to make the browser do something. This is terrible,
 # but not sure what else to do.
 #
 if ($fromweb && $isopen && $size < 1024) {
@@ -202,21 +144,10 @@ while (1) {
     while (sysread(LOG, $buf, 2048)) {
 	print STDOUT "$buf";
     }
-    if ($experiment) {
-	last
-	    if ($experiment->GetLogFile(\$tmp, \$isopen) ||
-		!$isopen || $tmp ne $logname);
-    }
-    elsif ($template) {
-	last
-	    if ($template->GetLogFile(\$tmp, \$isopen) ||
-		!$isopen || $tmp ne $logname);
-    }
-    else {
-	last
-	    if ($logfile->Refresh() != 0 || !$logfile->isopen());
-	
-    }
+    # Stop if the logfile object becomes invalid (deleted by someone).
+    last
+	if ($logfile->Refresh() != 0 || !$logfile->isopen());
+
     sleep(2);
 }
 close(LOG);

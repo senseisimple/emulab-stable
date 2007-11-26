@@ -66,6 +66,7 @@ my $experiment;
 my %parameters;
 my $pid;
 my $run;
+my $logfile;
 my $logname;
 my @ExptStates  = ();
 # For the END block below.
@@ -213,17 +214,28 @@ if (! $foreground) {
     # Cleanup
     $experiment->CleanLogFiles() == 0
 	or fatal(-1, "Could not clean up logfiles!");
-    
-    $logname = TBExptCreateLogFile($pid, $eid, "swapin");
 
-    # The batch daemon is going to set the current log file, so do not do it.
-    if (! $experiment->batchmode()) {
-	TBExptSetLogFile($pid, $eid, $logname);
-	TBExptOpenLogFile($pid, $eid);
+    #
+    # If its a batch experiment, then the daemon will set the spewlog,
+    # so attach it to the instance instead so that we can see both.
+    #
+    if ($experiment->batchmode()) {
+	$logfile = $instance->CreateLogFile("batchswapin");
     }
+    else {
+	$logfile = $experiment->CreateLogFile("swapin");
+	# We want it to spew to the web.
+	$experiment->SetLogFile($logfile);
+	# Mark it open since we are going to start using it right away.
+	$logfile->Open();	
+    }
+    if (!defined($logfile)) {
+	fatal(-1, "Could not create logfile");
+    }
+    $logname = $logfile->filename();
 
     if (my $childpid = AuditStart(LIBAUDIT_DAEMON, $logname,
-				  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
+			  LIBAUDIT_LOGONLY|LIBAUDIT_NODELETE|LIBAUDIT_FANCY)) {
 	#
 	# Parent exits normally, unless in waitmode. We have to set
 	# justexit to make sure the END block below does not run.
@@ -231,18 +243,6 @@ if (! $foreground) {
 	$justexit = 1;
 
 	if (!$waitmode) {
-	    #
-	    # Before we can actually exit, we need to wait. Totally ick;
-	    # the logfile stuff needs work.
-	    #
-	    while (1) {
-		my ($tmp1, $tmp2);
-
-		last
-		    if (TBExptGetLogFile($pid, $eid, \$tmp1, \$tmp2));
-
-		sleep(2);
-	    }
 	    if ($experiment->batchmode()) {
 		print("Experiment $pid/$eid has entered the batch system.\n".
 		      "You will be notified when it is fully instantiated.\n")
@@ -433,8 +433,12 @@ $instance->StartRun(Template::STARTRUN_FLAGS_FIRSTRUN()) == 0
     or fatal(-1, "Could not update start time in instance record!");
 
 # Stop the web interface from spewing.
-TBExptCloseLogFile($pid, $eid)
-    if (defined($logname));
+if ($experiment->batchmode()) {
+    $logfile->Close();
+}
+else {
+    $experiment->CloseLogFile();
+}
 
 # Make sure the most recent version gets copied out.
 $experiment->CopyLogFiles();
@@ -556,7 +560,7 @@ sub cleanup()
 	if (defined($experiment));
 
     if ($exptactive) {
-	$experiment->Swap($Experiment::EXPT_SWAPOUT, "-x -q -w") == 0
+	$experiment->Swap($Experiment::EXPT_SWAPOUT, "-force") == 0
 	    or exit(-1);
     }
 
@@ -564,8 +568,14 @@ sub cleanup()
 	if (defined($run));
 
     # Stop the web interface from spewing.
-    TBExptCloseLogFile($pid, $eid)
-	if (defined($logname));
+    if (defined($logfile)) {
+	if ($experiment->batchmode()) {
+	    $logfile->Close();
+	}
+	else {
+	    $experiment->CloseLogFile();
+	}
+    }
 }
 
 sub fatal($$)

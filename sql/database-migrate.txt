@@ -4188,9 +4188,15 @@ last_net_act,last_cpu_act,last_ext_act);
 	  `logid` varchar(40) NOT NULL default '',
 	  `filename` tinytext,
 	  `isopen` tinyint(4) NOT NULL default '0',
+	  `gid_idx` mediumint(8) unsigned NOT NULL default '0',
 	  `date_created` datetime default NULL,
 	  PRIMARY KEY  (`logid`)
 	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 	alter table experiment_template_instances add \
 	    `logfileid` varchar(40) default NULL after uid_idx;
+
+4.135: Change to previous revision. Run the following script.
+
+        ./logfiles.pl
+	

@@ -355,7 +355,7 @@ $SIG{TERM} = \&sighandler;
 #
 # Use the logonly option to audit so that we get a record mailed.
 #
-if (! ($foreground || $batchmode)) {
+if (! $foreground) {
     $logfile = $instance->CreateLogFile("swapin");
     if (!defined($logfile)) {
 	fatal(-1, "Could not create logfile!");

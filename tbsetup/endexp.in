@@ -89,6 +89,7 @@ my $tbdata      = "tbdata";
 my $archcontrol = "$TB/bin/archive_control";
 my $nextstate;
 my $logname;
+my $logfile;
     
 #
 # Untaint the path
@@ -365,13 +366,17 @@ if (!$batch && !$template_mode) {
     # Cleanup
     $experiment->CleanLogFiles() == 0
 	or fatal("Could not clean up logfiles!");
-    
-    if ($experiment->CreateLogFile("endexp", \$logname) != 0) {
+
+    $logfile = $experiment->CreateLogFile("endexp");
+    if (!defined($logfile)) {
 	fatal("Could not create logfile!");
     }
-    $experiment->SetLogFile($logname);
-    $experiment->OpenLogFile($logname);
-
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
+    
     if (my $childpid = TBBackGround($logname)) {
 	#
 	# Parent exits normally, except if in waitmode. 
@@ -549,7 +554,7 @@ sub fatal($;$)
     # Clear the log file so the web page stops spewing. 
     #
     if (defined($logname)) {
-	$experiment->ClearLogFile();
+	$experiment->CloseLogFile();
     }
 
     #

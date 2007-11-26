@@ -245,6 +245,8 @@ elseif ($specform) {
     chmod($nsfile, 0666);
 }
 
+STARTBUSY("Starting Modify");
+
 #
 # Do an initial parse test.
 #
@@ -252,6 +254,8 @@ $retval = SUEXEC($uid, "$pid,$unix_gid", "webnscheck $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval != 0) {
+    HIDEBUSY();
+    
     if ($tmpfile) {
         unlink($nsfile);
     }
@@ -289,6 +293,7 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 if ($tmpfile) {
     unlink($nsfile);
 }
+HIDEBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can

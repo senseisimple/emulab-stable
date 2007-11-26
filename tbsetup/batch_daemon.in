@@ -365,13 +365,13 @@ sub dosomething($$)
     # we can remove it when the child ends. The child could remove it, but
     # since it is open in the child, it has the tendency to stick around.
     #
-    $logname = TBExptCreateLogFile($pid, $eid, "${dowhat}-batch");
+    my $logfile = $experiment->CreateLogFile("${dowhat}-batch");
+    if (!defined($logfile)) {
+	print "Could not create logfile!\n";
+	return -1;
+    }
+    $logname = $logfile->filename();
 
-    #
-    # If this is a template instantiation, then do not set the logfile.
-    # We still generate the log file, but it is not available via the
-    # web interface. Needs more thought.
-    #
     my $exptidx  = $exphash->{'idx'};
     my $instance = Template::Instance->LookupByExptidx($exptidx);
     if (defined($instance)) {
@@ -400,13 +400,15 @@ sub dosomething($$)
 	# The exp dir might be gone if the batch was killed/canceled.
         #
 	if (-e $userdir) {
-	    TBExptCloseLogFile($pid, $eid);
+	    $experiment->CloseLogFile();
 	}
 	return $status;
     }
     openlog($logname);
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # And mark it as spewing.
+    $experiment->OpenLogFile();
 
     #
     # Get some user information. 

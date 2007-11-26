@@ -21,6 +21,7 @@ use User;
 use Project;
 use Group;
 use Node;
+use Logfile;
 use English;
 use Data::Dumper;
 use File::Basename;
@@ -225,6 +226,7 @@ sub ipassign_args($)    { return field($_[0], 'ipassign_args');}
 sub security_level($)   { return field($_[0], 'security_level');}
 sub linktest_pid($)     { return field($_[0], 'linktest_pid');}
 sub linktest_level($)   { return field($_[0], 'linktest_level');}
+sub logfile($)          { return field($_[0], 'logfile');}
 sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
 sub swapin_count($)	{ return stats($_[0], 'swapin_count'); }
 sub destroyed($)	{ return stats($_[0], 'destroyed'); }
@@ -580,6 +582,7 @@ sub Delete($;$)
     if (defined($userdir) && system("/bin/rm -rf $userdir")) {
 	print "*** WARNING: Not able to remove $userdir\n";
 	print "             Someone will need to do this by hand.\n";
+
 	# NFS errors usually the result. Sometimes its cause there is
 	# someone in the directory, so its being held open.
         libtestbed::SENDMAIL($TBOPS,
@@ -596,6 +599,10 @@ sub Delete($;$)
 	my $eidlink = "$PROJROOT/$pid/exp/$eid";
 	unlink($eidlink)
 	    if (-l $eidlink);
+    }
+    my $logfile = $self->GetLogFile();
+    if (defined($logfile)) {
+	$logfile->Delete();
     }
     libArchive::TBDeleteExperimentArchive($pid, $eid);
 
@@ -1527,20 +1534,60 @@ sub SetState($$)
 #
 # Open a new logfile and return its name.
 #
-sub CreateLogFile($$$)
+sub CreateLogFile($$)
 {
-    my ($self, $prefix, $pref) = @_;
+    my ($self, $prefix) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $pid      = $self->pid();
+    my $eid      = $self->eid();
+    my $gid_idx  = $self->gid_idx();
+    my $logdir   = $self->WorkDir();
+    my $linkname = "$logdir/${prefix}.log";
+    my $logname  = `mktemp $logdir/${prefix}.XXXXXX`;
+    return undef
+	if ($?);
+    
+    # Untaint to avoid silly warnings
+    if ($logname =~ /^([-\w\.\/]+)$/) {
+	$logname = $1;
+    }
+    else {
+	print STDERR "Bad data in filename: $logname\n";
+	return undef;
+    }
 
-    # Need to deal with errors.
-    $$pref = TBExptCreateLogFile($pid, $eid, $prefix);
-    return 0;
+    # Create a Logfile.
+    my $logfile = Logfile->Create($gid_idx, $logname);
+    if (!defined($logfile)) {
+	unlink($logname);
+	return undef;
+    }
+    # This is untainted.
+    $logname = $logfile->filename();
+
+    # So tbops people can read the files ...
+    if (!chmod(0664, $logname)) {
+	print STDERR "Could not chmod $logname to 0644: $!\n";
+	$logfile->Delete();
+	unlink($logname);
+	return undef;
+    }
+
+    # Link it to $prefix.log so that the most recent is well known.
+    if (-e $linkname) {
+	unlink($linkname);
+    }
+    if (! link($logname, $linkname)) {
+	print STDERR "CreateLogFile: Cannot link $logname,$linkname: $!\n";
+	$logfile->Delete();
+	unlink($logname);
+	return undef;
+    }
+    return $logfile;
 }
 
 #
@@ -1578,40 +1625,49 @@ sub GetNSFile($$)
 #
 # Set the experiment to use the logfile. It becomes the "current" spew.
 #
-sub SetLogFile($$)
+sub SetLogFile($$;$)
 {
-    my ($self, $logname) = @_;
+    my ($self, $logfile, $oldlogref) = @_;
 
     # Must be a real reference. 
     return -1
-	if (! ref($self));
+	if (! ref($self) || !ref($logfile));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    if (defined($oldlogref)) {
+	$$oldlogref = $self->GetLogFile();
+    }
+    else  {
+	# Kill the old one. Eventually we will save them.
+	my $oldlogfile = $self->GetLogFile();
+	if (defined($oldlogfile)) {
+	    $oldlogfile->Delete();
+	}
+    }
+    return -1
+	if (! $self->Update({'logfile' => $logfile->logid()}));
 
-    TBExptSetLogFile($pid, $eid, $logname);    
     return 0;
 }
 
 #
 # Get the experiment logfile.
 #
-sub GetLogFile($$$)
+sub GetLogFile($)
 {
-    my ($self, $lognamep, $isopenp) = @_;
+    my ($self) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    # Must do this to catch updates to the logfile variables.
+    return undef
+	if ($self->Refresh());
 
-    $$lognamep = undef;
+    return undef
+	if (! $self->logfile());
 
-    TBExptGetLogFile($pid, $eid, $lognamep, $isopenp)
-	or return -1;
-    return 0;
+    return Logfile->Lookup($self->logfile());
 }
 
 #
@@ -1625,11 +1681,11 @@ sub OpenLogFile($)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $logfile = $self->GetLogFile();
+    return -1
+	if (!defined($logfile));
 
-    TBExptOpenLogFile($pid, $eid);    
-    return 0;
+    return $logfile->Open();
 }
 
 #
@@ -1643,11 +1699,11 @@ sub CloseLogFile($)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $logfile = $self->GetLogFile();
+    return -1
+	if (!defined($logfile));
 
-    TBExptCloseLogFile($pid, $eid);    
-    return 0;
+    return $logfile->Close();
 }
 
 #
@@ -1661,11 +1717,18 @@ sub ClearLogFile($)
     return -1
 	if (! ref($self));
 
-    my $pid = $self->pid();
-    my $eid = $self->eid();
+    my $logfile = $self->GetLogFile();
+    return -1
+	if (!defined($logfile));
 
-    TBExptClearLogFile($pid, $eid);    
-    return 0;
+    $logfile->Delete() == 0
+	or return -1;
+
+    my $exptidx = $self->idx();
+    DBQueryWarn("update experiments set logfile=NULL where idx='$exptidx'")
+	or return -1;
+
+    return $self->Refresh();
 }
 
 #
