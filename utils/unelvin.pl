@@ -18,26 +18,38 @@ my @BSDPKGS = (
 my @BSDFILES = (
     '/usr/local/etc/rc.d/elvind.sh',
     '/usr/local/bin/elvin-config',
+    '/usr/local/bin/ep',
+    '/usr/local/bin/ec',
     '/usr/local/etc/elvind*',
     '/usr/local/include/elvin',
     '/usr/local/info/elvin*',
     '/usr/local/lib/libvin4*',
     '/usr/local/lib/nls/msg/elvin*',
     '/usr/local/man/man*/elvin*',
+    '/usr/local/man/man1/ec.1',
+    '/usr/local/man/man1/ep.1',
+    '/usr/local/man/man8/epf.8',
     '/usr/local/libexec/elvind',
+    '/usr/local/libexec/epf',
     '/var/log/elvind.log'
 );
 
 my @LINUXFILES = (
     '/etc/rc.d/*/*elvin',
     '/usr/local/bin/elvin-config',
+    '/usr/local/bin/ep',
+    '/usr/local/bin/ec',
     '/usr/local/etc/elvind*',
     '/usr/local/include/elvin',
     '/usr/local/info/elvin*',
     '/usr/local/lib/libvin4*',
     '/usr/local/lib/nls/msg/elvin*',
     '/usr/local/man/man*/elvin*',
-    '/usr/local/sbin/elvind'
+    '/usr/local/man/man1/ec.1',
+    '/usr/local/man/man1/ep.1',
+    '/usr/local/man/man8/epf.8',
+    '/usr/local/sbin/elvind',
+    '/usr/local/sbin/epf'
 );
 
 if ($UID ne 0) {
