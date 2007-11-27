@@ -11,6 +11,7 @@ use Getopt::Std;
 #
 # Notes on the dongle boot:
 #
+#  * Check /boot/loader.conf for comconsole or vga.
 #  * Need SSL version of tmcc, emulab.pem and pcwa.pem file.
 #  * Root public ssh key from boss.
 #  * New version of libtmcc with bootwhat def.
@@ -137,7 +138,7 @@ if (!$query_result->numrows) {
 }
 my ($node_id, $known_IP, $machine_type) = $query_result->fetchrow_array();
 
-if (!defined($known_IP)) {
+if (!defined($known_IP) || $IP eq "") {
     my $experiment = Experiment->Lookup($PID_HWDOWN, $EID_HWDOWN);
 
     #
