@@ -15,8 +15,6 @@
  *	make sure handle->status (and error args in general) is correct.
  *	make sure _t types are passed as pointers-to
  *	deal with hmac_traverse
- *	implement async_subscribe/unsubscribe in the pubsub code
- *	implement set_idle_period and set_failover in pubsub code
  */
 
 #include <stdio.h>
@@ -25,6 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
@@ -94,7 +93,8 @@ event_register(char *name, int threaded)
 
 event_handle_t
 event_register_withkeyfile(char *name, int threaded, char *keyfile) {
-  return event_register_withkeyfile_withretry(name, threaded, keyfile, -1);
+  return event_register_withkeyfile_withretry(name,
+					      threaded, keyfile, INT_MAX);
 }
 
 event_handle_t
@@ -133,7 +133,7 @@ event_handle_t
 event_register_withkeydata(char *name, int threaded,
 			   unsigned char *keydata, int keylen){
     return event_register_withkeydata_withretry(name, threaded, keydata,
-						keylen, -1);
+						keylen, INT_MAX);
 
 }
 
@@ -236,9 +236,22 @@ event_register_withkeydata_withretry(char *name, int threaded,
 	    port = atoi(pstr);
     }
 
-    /* Connect to the elvin server: */
+    /* Preallocate a pubsub handle so we can set the retry count */
+    if (pubsub_alloc_handle(&server) != 0) {
+        ERROR("could not allocate event server handle\n");
+	goto bad;
+    }
+
+    /* set connection retries */
+    if (pubsub_set_connection_retries(server,
+				      retrycount, &handle->status) != 0) {
+	ERROR("pubsub_set_connection_retries failed\n");
+	goto bad;
+    }
+
+    /* Connect to the event server */
     if (handle->connect(sstr, port, &server) != 0) {
-        ERROR("could not connect to Elvin server\n");
+        ERROR("could not connect to event server\n");
 	goto bad;
     }
 
@@ -407,7 +420,7 @@ event_main(event_handle_t handle)
 
     handle->do_loop = 1;
     if (handle->mainloop(handle->server, &handle->do_loop, &handle->status)) {
-        ERROR("Elvin mainloop failed: ");
+        ERROR("Event mainloop failed: ");
         pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
@@ -1024,7 +1037,7 @@ struct subscription_callback_arg {
 static void subscription_callback(pubsub_handle_t *server,
 				  int result,
 				  pubsub_subscription_t *subscription,
-				  void *rock);
+				  void *rock, pubsub_error_t *myerror);
 
 #define EXPRESSION_LENGTH 8192
 
@@ -1245,21 +1258,13 @@ event_async_subscribe(event_handle_t handle, event_notify_callback_t callback,
     sarg->data = scb_data;
     sarg->handle = handle;
 
-#if 1
-    ERROR("async_add_subscribe not implemented\n");
-    retval = -1;
-#else
-    retval = pubsub_async_add_subscription(handle->server,
+    retval = pubsub_add_subscription_async(handle->server,
 					   expression,
-					   NULL,
-					   1,
 					   notify_callback,
 					   arg,
 					   subscription_callback,
 					   sarg,
 					   &handle->status);
-#endif
-    
     if (retval != 0) {
       free(arg);
       free(sarg);
@@ -1280,16 +1285,10 @@ event_async_unsubscribe(event_handle_t handle, event_subscription_t es)
 
 /*    free(es->rock);
       es->rock = NULL; */
-#if 1
-    ERROR("async_add_subscribe not implemented\n");
-    retval = -1;
-#else
-    retval = pubsub_async_delete_subscription(handle->server,
-					     es,
-					     NULL,
-					     NULL,
-					     &handle->status);
-#endif
+
+    retval = pubsub_rem_subscription_async(handle->server, es,
+					   NULL, NULL,
+					   &handle->status);
 
     return (retval == 0);
 }
@@ -1371,7 +1370,7 @@ static void
 subscription_callback(pubsub_handle_t *server,
 		      int result,
 		      pubsub_subscription_t *subscription,
-		      void *rock)
+		      void *rock, pubsub_error_t *myerror)
 {
     struct subscription_callback_arg *arg =
 	(struct subscription_callback_arg *) rock;
@@ -2133,18 +2132,11 @@ int event_set_idle_period(event_handle_t handle, int seconds) {
     ERROR("invalid parameter\n");
     return 0;
   }
-
-#if 1
-    ERROR("event_set_idle_period not implemented\n");
-    retval = -1;
-#else
-  retval = pubsub_handle_set_idle_period(handle->server, seconds,
-				     &handle->status);
-  if (retval == 0) {
+  retval = pubsub_set_idle_period(handle->server, seconds, &handle->status);
+  if (retval != 0) {
     ERROR("could not set elvin idle period to %i", seconds);
     pubsub_error_fprintf(stderr, &handle->status);
   }
-#endif
   return retval;
 }
 
@@ -2156,17 +2148,10 @@ int event_set_failover(event_handle_t handle, int dofail) {
     ERROR("invalid parameter\n");
     return 0;
   }
-
-#if 1
-    ERROR("event_set_failover not implemented\n");
-    retval = -1;
-#else
-  retval = pubsub_handle_set_failover(handle->server, dofail,
-				     &handle->status);
-  if (retval == 0) {
+  retval = pubsub_set_failover(handle->server, dofail, &handle->status);
+  if (retval != 0) {
     ERROR("Could not set failover on event handle: ");
     pubsub_error_fprintf(stderr, &handle->status);
   }
-#endif
   return retval;
 }

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2003, 2004, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -14,6 +14,7 @@
 #include <time.h>
 #include <math.h>
 #include <paths.h>
+#include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -57,12 +58,9 @@ sched_callback(event_handle_t handle,
 static void subscribe_callback(event_handle_t handle,  int result,
 			       event_subscription_t es, void *data);
 
-static void async_callback(event_handle_t handle,  int result,
-			   event_subscription_t es, void *data);
-
-static void status_callback(elvin_handle_t handle, char *url, 
-                            elvin_status_event_t event, void *data,
-                            elvin_error_t error);
+static void status_callback(pubsub_handle_t *handle,
+                            pubsub_status_t status, void *data,
+                            pubsub_error_t *error);
 
 static void schedule_updateevent();
 
@@ -120,7 +118,7 @@ main(int argc, char **argv)
 		usage(progname);
 
 	if ((! pnodeid) || (! lport))
-	   fatal("Must provide pnodeid and local elvin port"); 
+	   fatal("Must provide pnodeid and local event server port"); 
 
 
 	if (debug) {
@@ -198,7 +196,7 @@ main(int argc, char **argv)
 	}
 	
         /*
-         * Setup local elvind subscriptions:
+         * Setup local subscriptions:
          */
 	tuple = address_tuple_alloc();
         
@@ -210,7 +208,7 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on local server");
 	}
 
-        info("Successfully connected to local elvind.\n");
+        info("Successfully connected to local pubsubd.\n");
 
 	/*
 	 * Stash the pid away.
@@ -244,13 +242,13 @@ main(int argc, char **argv)
                   "Sleeping for a bit before trying again...\n");
             sleep(10);
           }
-          info("Remote elvind registration complete.\n");
+          info("Remote pubsub registration complete.\n");
           /* Jump into the main event loop. */
           event_main(bosshandle);
           /* 
            * If we drop out of the event loop, it's because there was/is
-           * some kind of problem with the connection to the remote elvind.
-           * So, clean up and re-register (re-subscribe).
+           * some kind of problem with the connection to the remote event
+           * server. So, clean up and re-register (re-subscribe).
            */
           error("exited event_main: retrying remote registration.\n");
           event_unregister(bosshandle);
@@ -289,8 +287,9 @@ int do_remote_register(char *server) {
         event_set_failover(bosshandle, 0);
 
         /* Setup a status callback to watch the remote connection. */
-        if (!elvin_handle_set_status_cb(bosshandle->server, status_callback,
-                                        server, bosshandle->status)) {
+        if (pubsub_set_status_callback(bosshandle->server,
+				       status_callback,
+				       server, &bosshandle->status) != 0) {
           error("Could not register status callback!");
         }
 
@@ -395,24 +394,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      if (! retval) {
 		error("could not subscribe to events on remote server.\n");
 	      }
-
-#if 0
-              /* This stuff is borked right now - part of the pre-staging
-               * enhancement, but the code was failing to properly track
-               * (and hence unsubscribe) from both the standard experiment
-               * path, and the pre-stage path.
-               */
-	      tuple->scheduler = 2;
-		  
-	      retval = event_async_subscribe(bosshandle, 
-					  expt_callback, tuple, NULL,
-					  async_callback, 
-					  NULL, 1);
-	      if (! retval) {
-		error("could not subscribe to events on remote server.\n");
-	      } 
-#endif
-
               info("Subscribing to experiment: %s\n", expt);
 
 	      address_tuple_free(tuple);
@@ -436,7 +417,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      
 	      if (!success) {
 		error("not able to delete the subscription.\n");
-		elvin_error_fprintf(stderr, handle->status);
+		pubsub_error_fprintf(stderr, &handle->status);
 	      } else {
 		exptmap.erase(key);
                 info("Unsubscribing from experiment: %s\n", expt);
@@ -461,7 +442,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      
 	      if (!success) {
 		error("not able to delete the subscription.\n");
-		elvin_error_fprintf(stderr, handle->status);
+		pubsub_error_fprintf(stderr, &handle->status);
 	      }
 	    }
 	      
@@ -486,7 +467,6 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 	char		objecttype[TBDB_FLEN_EVOBJTYPE];
         char		objectname[TBDB_FLEN_EVOBJNAME];
 	char            expt[TBDB_FLEN_PID + TBDB_FLEN_EID + 1];
-	int		plabsched = 0;
 
 	event_notification_get_objtype(handle,
 				       notification, objecttype, sizeof(objecttype));
@@ -499,23 +479,10 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 	}
 
 	if (strcmp(objecttype,TBDB_OBJECTTYPE_EVPROXY) != 0) {
-
-#if 0
-	  /*
-           * Filter <plabsched,1> events, and for rest resend the notification 
-	   * to the local elvind server.
-           */
-	  int ret = event_notification_get_int32(handle, notification,
-						 TBDB_PLABSCHED, &plabsched);
-	  
-	  if ((!ret) || (plabsched != 1)) {
-#endif
-	    
-	    if (! event_notify(localhandle, notification))
-	      error("Failed to deliver notification!\n");
+	  if (! event_notify(localhandle, notification))
+	    error("Failed to deliver notification!\n");
 	}
 }
-
 
 static void
 sched_callback(event_handle_t handle,
@@ -529,7 +496,6 @@ sched_callback(event_handle_t handle,
 
 
 
-
 /* Callback functions for asysn event subscribe */
 
 void subscribe_callback(event_handle_t handle,  int result,
@@ -540,7 +506,7 @@ void subscribe_callback(event_handle_t handle,  int result,
     info("Subscription for %s added successfully.\n", (char *)data);
   } else {
     error("not able to add the subscription.\n");
-    elvin_error_fprintf(stderr, handle->status);
+    pubsub_error_fprintf(stderr, &handle->status);
   }
   
   free(data);
@@ -548,41 +514,25 @@ void subscribe_callback(event_handle_t handle,  int result,
 }
 
 
-/* Callback functions for async event subscribe/unsubscribe */
-
-void async_callback(event_handle_t handle,  int result,
-			event_subscription_t es, void *data) {
-  if (!result) {
-    error("Error in async callback\n");
-    elvin_error_fprintf(stderr, handle->status);
-  }
-  
-
-}
-
 /* Status callback function - tries to maintain remote connection */
-void status_callback(elvin_handle_t handle, char *url, 
-                     elvin_status_event_t event, void *data,
-                     elvin_error_t status) {
+static void status_callback(pubsub_handle_t *handle,
+                            pubsub_status_t status, void *data,
+                            pubsub_error_t *ignored)
+{
+  switch (status) {
 
-  switch(event) {
-
-  case ELVIN_STATUS_CONNECTION_FAILED:
+  case PUBSUB_STATUS_CONNECTION_FAILED:
     /* sleep, and try to connect again. */
     error("Failed to connect to remote server");
     /* XXX: may need to do something more. */
     break;
 
-  case ELVIN_STATUS_CONNECTION_LOST:
-  case ELVIN_STATUS_PROTOCOL_ERROR:
+  case PUBSUB_STATUS_CONNECTION_LOST:
     error("Connection loss/failure, trying to reconnect...\n");
     event_stop_main(bosshandle);
-    //event_unregister(bosshandle);
-    //bosshandle = NULL;
-    //do_remote_register(server);
     break;
 
-  case ELVIN_STATUS_CONNECTION_FOUND:
+  case PUBSUB_STATUS_CONNECTION_FOUND:
     info("Remote connection established.");
     break;
 
@@ -593,7 +543,7 @@ void status_callback(elvin_handle_t handle, char *url,
 
 
 void schedule_updateevent() {
-  /* send a message to elvind on ops */
+  /* send a message to event server on ops */
   address_tuple_t tuple = address_tuple_alloc();
 
   struct timeval now;

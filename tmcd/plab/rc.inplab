@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -121,13 +121,14 @@ sub doboot()
     }
 
     #
-    # Fire up elvin and evproxy if we are the service sliver on this node
+    # Fire up event server and evproxy if we are the service sliver
+    # on this node
     #
-    if (-e $SVCFILE and -x "$BINDIR/runelvin") {
-        print("Starting elvind and evproxy");
-        system("$BINDIR/runelvin");
+    if (-e $SVCFILE and -x "$BINDIR/runevents") {
+        print("Starting event server and evproxy");
+        system("$BINDIR/runevents");
         if ($?) {
-            fatal("Error starting up elvind and/or evproxy!");
+            fatal("Error starting up event server and/or evproxy!");
         }
     }
 

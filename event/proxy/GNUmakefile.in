@@ -10,7 +10,7 @@ OBJDIR		= ../..
 SUBDIR		= event/proxy
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest elvindtest
+PROGRAMS	= evproxy proxytest eventping evproxyplab
 ifneq ($(SYSTEM),Linux)
 PROGRAMS       += 
 endif
@@ -23,6 +23,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 LIBTBDIR    = $(OBJDIR)/lib/libtb
 LIBEVENTDIR = ../lib
+CPPC        = g++
 
 # Rules to make sure that some libraries we need from other directories get
 # built first
@@ -43,10 +44,14 @@ PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 PFLAGS   += -L/usr/local/lib -lpubsub_r -lm
 
+PLDFLAGS += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
+PLIBS     = -levent_r -ltb -lcrypto
+PLIBS    += -L/usr/local/lib -lpubsub_r -lm
+PLDFLAGS += $(LDSTATIC)
+
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
-LIBS     += -levent_r -ltb -lcrypto
-LIBS     += -L/usr/local/lib -lpubsub_r -lm
-CPPC     = g++
+LIBS      = -levent -ltb -lcrypto
+LIBS     += -L/usr/local/lib -lpubsub -lm
 LDFLAGS  += $(LDSTATIC)
 
 # Deal with the presence/absence of kerberos in the linux ssl library
@@ -59,45 +64,30 @@ endif
 ifeq ($(NOKERB),0)
 CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
 LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+PLIBS    += `/usr/kerberos/bin/krb5-config --libs krb5`
 ifneq ($(wildcard /usr/lib/libkrb5support.a),)
 LIBS     += -lkrb5support
+PLIBS    += -lkrb5support
 endif
 endif
 endif
 
 ifeq ($(SYSTEM),Linux)
 LIBS     += -ldl -lz
+PLIBS    += -ldl -lz
 endif
 
-PLDFLAGS  = -pthread
-PLDFLAGS += -L../lib -L${OBJDIR}/lib/libtb
-PLIBS     = -levent_r -ltb
-PLIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lcrypto -lm
-
 evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ -pthread evproxy.o $(LIBS)
-
-evproxyclient-debug:	proxyclient.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ proxyclient.o $(LIBS)
-
-evproxyserver-debug:	proxyserver.o $(LIBTBDIR)/log.o
-	$(CC) $(PLDFLAGS) -o $@ proxyserver.o $(PLIBS)
-
-proxyserver.o:  proxyserver.c
-	$(CC) $(PFLAGS) -c $<
-
-proxytest-debug:	proxytest.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ proxytest.o -pthread $(LIBS)
+	$(CC) $(PLDFLAGS) -o $@ -pthread evproxy.o $(PLIBS)
 
 evproxyplab.o: evproxyplab.cc
 	$(CPPC) $(CFLAGS)  -c $<
 
-evproxyplab:    evproxyplab.o ../lib/libevent.a ../lib/event.h
-	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
+evproxyplab-debug:    evproxyplab.o ../lib/libevent.a ../lib/event.h
+	$(CPPC) $(LDFLAGS) -static -o $@ evproxyplab.o $(LIBS)
 
-elvindtest-debug: elvindtest.o
-	$(CC) $(LDFLAGS) -o $@ elvindtest.o -pthread $(LIBS)
-
+eventping-debug: eventping.o
+	$(CC) $(LDFLAGS) -static -o $@ eventping.o -pthread $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 

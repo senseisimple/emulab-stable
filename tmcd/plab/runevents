@@ -1,30 +1,25 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
 # This script is a wrapper around the program-agent to handle
-# the runtime knowledge of elvind port on local node
-
-
+# the runtime knowledge of the event server port on local node
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 
 # Script specific goo.
-$ELVIN_CONF = "/usr/local/etc/elvind.conf";
-$ELVIN_CONF_ORIG = "/usr/local/etc/elvind.conf.tmpl";
-$ELVIND_BIN = "/usr/local/sbin/elvind";
+$EVENTSERVER  = "/usr/local/libexec/pubsubd";
+$EVENTPING    = "$BINDIR/eventping";
 $PORT_SUMMARY = "/proc/scout/ports/summary";
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself.
-#
-
 use libsetup;
 use libtmcc;
 
@@ -42,8 +37,7 @@ while ($abc = <FP>) {
     }
 }
 
-
-sub start_elvin {
+sub start_eventserver {
     my $port = shift;
 
     # check in the portmap list if it's already active
@@ -51,21 +45,13 @@ sub start_elvin {
 	return 0;
     }
    
-    # update the port in the elvind.conf
-    `cp $ELVIN_CONF_ORIG $ELVIN_CONF`;
-    
-    open(FP, ">>$ELVIN_CONF");
-    print FP "\nprotocol elvin:/tcp,none,xdr/0.0.0.0:$port\n";
-    close FP;
+    system("$EVENTSERVER -p $port");
 
-    system("$ELVIND_BIN");
+    # HACK: allow server to complete the bind/listen, and daemonize.
+    sleep(1);
 
-    # HACK: allow elvind to complete the bind/listen, as 
-    #       elvind daemonize before binding the port
-    sleep 1;    # HACK. arbitary 1 secs.
-
-    # check if elvind is successfully able to bind the port
-    system("$BINDIR/elvindtest -s localhost -p $port");
+    # check if event server is successfully able to bind the port
+    system("$EVENTPING -s localhost -p $port");
     if ($?) {
 	return 0;
     }
@@ -90,23 +76,23 @@ sub start_evproxy {
 	fatal("Not able to start evproxy");
     }
     
-    # make a tmcc call, and let emulab know of elvind-port
+    # make a tmcc call, and let emulab know of event server port
     if (tmcc(TMCCCMD_ELVINDPORT, "$port") < 0) {
-	fatal("Error sending Elvind port to emulab central!");
+	fatal("Error sending event server port to emulab central!");
     }
     
 }
 
 #
-# Start the elvind and evproxy
+# Start the event server and evproxy
 #	
-if ((-x "$ELVIND_BIN") && (-x "$BINDIR/evproxy")) {
-    my $res = start_elvin(2917); # first try 2917
+if ((-x "$EVENTSERVER") && (-x "$BINDIR/evproxy")) {
+    my $res = start_eventserver(16505); # first try 16505
     while ($res == 0) {
 	# select a random port between 10000 and 60000
 	$num = rand(50000);
 	$num = int($num) + 10000;
-	$res = start_elvin($num);
+	$res = start_eventserver($num);
     }
 
     start_evproxy($res);

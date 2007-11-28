@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,7 +17,7 @@ COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
                     libtmcc.pm libsetup.pm libtestbed.pm startcmddone)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
-                    rc.inplab plabrusage runelvin)
+                    rc.inplab plabrusage runevents)
 OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
 		    install-tarfile install-rpm)
 EVSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/event/lib/, \
