@@ -880,15 +880,15 @@ $SIG{QUIT} = 'DEFAULT';
 # Gather stats; start clock ticking
 #
 if ($inout eq "in") {
-    $experiment->PreSwap($this_user, TBDB_STATS_SWAPIN) == 0 or
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPIN, $estate) == 0 or
 	fatal("Preswap failed!");
 }
 elsif ($inout eq "out") {
-    $experiment->PreSwap($this_user, TBDB_STATS_SWAPOUT) == 0 or
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPOUT, $estate) == 0 or
 	fatal("Preswap failed!");
 }
 elsif ($inout eq "modify") {
-    $experiment->PreSwap($this_user, TBDB_STATS_SWAPMODIFY) == 0 or
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPMODIFY, $estate) == 0 or
 	fatal("Preswap failed!");
 }
 

@@ -473,11 +473,11 @@ if (system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
 # Gather statistics; start the clock ticking.
 #
 if ($frontend || $batchmode) {
-    $experiment->PreSwap($this_user, TBDB_STATS_PRELOAD) == 0 or
+    $experiment->PreSwap($this_user, TBDB_STATS_PRELOAD, $exptstate) == 0 or
 	fatal("Preswap failed!");
 }
 else {
-    $experiment->PreSwap($this_user, TBDB_STATS_START) == 0 or
+    $experiment->PreSwap($this_user, TBDB_STATS_START, $exptstate) == 0 or
 	fatal("Preswap failed!");
 }
 

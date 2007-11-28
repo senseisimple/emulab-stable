@@ -1761,9 +1761,9 @@ sub PreRun($;$$)
 #
 # Initialiaize bookkeeping for a swap operation.
 #
-sub PreSwap($$$)
+sub PreSwap($$$$)
 {
-    my ($self, $swapper, $which) = @_;
+    my ($self, $swapper, $which, $estate) = @_;
 
     # Must be a real reference. 
     return -1
@@ -1773,8 +1773,7 @@ sub PreSwap($$$)
     my $rsrcidx  = $self->rsrcidx();
     my $lastrsrc = $rsrcidx;
     my $uid_idx  = $swapper->uid_idx();
-    # XXX state is no longer "active" for swapmod of active experiment.
-    my $isactive = $self->swapin_time(); 
+    my $isactive = ($estate eq EXPTSTATE_ACTIVE);
 
     #
     # We should never get here with a lastrsrc in the stats record; it
