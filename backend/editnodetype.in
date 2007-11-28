@@ -278,7 +278,8 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     }
 	
     # Now check that the value is legal.
-    if (! TBcheck_dbslot($value, "node_types", $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+    if (! TBcheck_dbslot($value, "node_types",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
 	$errors{$key} = TBFieldErrorString();
 	next;
     }

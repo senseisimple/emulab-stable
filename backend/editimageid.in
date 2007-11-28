@@ -138,9 +138,9 @@ my %xmlfields =
      # The rest are optional, so we can skip passing ones that are not changing.
      "description"	=> ["description",	$SLOT_OPTIONAL],
      "path"		=> ["path",		$SLOT_OPTIONAL],
+     "mtype_*"		=> ["mtype",		$SLOT_OPTIONAL],
      "load_address"	=> ["load_address",	$SLOT_ADMINONLY],
      "frisbee_pid"	=> ["frisbee_pid",	$SLOT_ADMINONLY]);
-     # The "mtype_$type" node type booleans are handled below...
 #
 # Need a list of node types. We join this over the nodes table so that
 # we get a list of just the nodes that are currently in the testbed, not
@@ -199,38 +199,60 @@ UserError()
 my %editimageid_args = ();
 my $foo;
 
+#
+# Wildcard keys have one or more *'s in them like simple glob patterns.
+# This allows multiple key instances for categories of attributes, and
+# putting a "type signature" in the key for arg checking, as well.
+#
+# Wildcards are made into regex's by anchoring the ends and changing each * to
+# a "word" (group of alphahumeric.)  A tail * means "the rest", allowing
+# multiple words separated by underscores or dashes.
+#
+my $wordpat = '[a-zA-Z0-9]+';
+my $tailpat = '[-\w]+';
+my %wildcards;
+foreach $key (keys(%xmlfields)) {
+    if (index($key, "*") >= 0) {
+	my $regex = '^' . $key . '$';
+	$regex =~ s/\*\$$/$tailpat/;
+	$regex =~ s/\*/$wordpat/g;
+	$wildcards{$key} = $regex;
+    }
+}
+# Key ordering is lost in a hash.
+# Put longer matching wildcard keys before their prefix.
+my @wildkeys = reverse(sort(keys(%wildcards)));
+
 foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
     if (!defined($value)) {	# Empty string comes from XML as an undef value.
 	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
     }
 
-    if ($debug) {
-	print STDERR "User attribute: '$key' -> '$value'\n";
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $field = $key;
+    my $wild;
+    if (!exists($xmlfields{$key})) {
+
+	# Not a regular key; look for a wildcard regex match.
+        foreach my $wildkey (@wildkeys) {
+	    my $regex = $wildcards{$wildkey};
+	    if ($wild = $key =~ /$regex/) {
+		$field = $wildkey;
+		print STDERR "Wildcard: '$key' matches '$wildkey'\n"
+		    if ($debug);
+		last; # foreach $wildkey
+	    }
+	}
+	if (!$wild) {
+	    $errors{$key} = "Unknown attribute";
+	    next; # foreach $key
+	}
     }
 
-    # XXX Special for mtype_* args, since the keys are dynamically generated.
-    if ($key =~ /^mtype_[\w]+$/) {
-	print STDERR "mtype: '$key' -> '$value'\n"
-	    if ($debug);
-
-	my $type = $key;
-	$type =~ s/^mtype_//;
-	my $match = grep(/^${type}$/, @mtypes_array);
-	$errors{$key} = "Illegal node type."
-	    if ($match == 0);
-
-	$errors{$key} = "Illegal characters in boolean value"
-	    if ($value ne "0" && $value ne "1");
-
-	$editimageid_args{$key} = $value;
-	next;
-    }
-
-    $errors{$key} = "Unknown attribute"
-	if (!exists($xmlfields{$key}));
-
-    my ($dbslot, $required, $default) = @{$xmlfields{$key}};
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
 
     if ($required & $SLOT_REQUIRED) {
 	# A slot that must be provided, so do not allow a null value.
@@ -255,12 +277,13 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     }
 	
     # Now check that the value is legal.
-    if (! TBcheck_dbslot($value, "images", $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+    if (! TBcheck_dbslot($value, "images",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
 	$errors{$key} = TBFieldErrorString();
 	next;
     }
 
-    $editimageid_args{$dbslot} = $value;
+    $editimageid_args{$key} = $value;
 }
 UserError()
     if (keys(%errors));
@@ -320,10 +343,31 @@ if (!$isadmin && exists($editimageid_args{"path"})) {
 
 #
 # See what node types this image will work on. Must be at least one!
-if ($#mtypes_array < 0) {
-    UserError("Node Types: Must have at least one node type");
-}
+#
+UserError("Node Types: Must have at least one node type")
+    if ($#mtypes_array < 0);
 my $typeclause = join(" or ", map("type='$_'", @mtypes_array));
+
+# Check validity of mtype_* args, since the keys are dynamically generated.
+my $node_types_selected = 0;
+my @mtype_keys = grep(/^mtype_/, keys(%editimageid_args));
+foreach $key (@mtype_keys) {
+    my $value = $editimageid_args{$key};
+    print STDERR "mtype: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $type = $key;
+    $type =~ s/^mtype_//;
+    my $match = grep(/^${type}$/, @mtypes_array);
+    if ($match == 0) {
+	$errors{$key} = "Illegal node type."
+    }
+    elsif ($value eq "1") {
+	$node_types_selected++;
+    }
+}
+UserError("Node Types: Must select at least one node type")
+    if ($node_types_selected == 0);
 
 #
 # Only admins can edit the load_address or the frisbee pid.

@@ -128,8 +128,15 @@ my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
 #
 my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
-    ("group"		=> ["gid_idx",		$SLOT_REQUIRED]);
-# And also trust args, see below.
+    ("group"		=> ["gid_idx",		$SLOT_REQUIRED],
+
+     # Trust args, either:
+     #   (change|add)_xxx=permit or
+     #   Uxxx$$trust=(user|local_root|group_root)
+     # where xxx is the uid_idx of a user.
+     "change_*"		=> ["change",		$SLOT_OPTIONAL],     
+     "add_*"		=> ["add",		$SLOT_OPTIONAL],     
+     "U*\\\$\\\$trust"	=> ["trust",		$SLOT_OPTIONAL]);
 
 #
 # Must wrap the parser in eval since it exits on error.
@@ -168,36 +175,60 @@ UserError()
 #
 my %editgroup_args = ();
 
+#
+# Wildcard keys have one or more *'s in them like simple glob patterns.
+# This allows multiple key instances for categories of attributes, and
+# putting a "type signature" in the key for arg checking, as well.
+#
+# Wildcards are made into regex's by anchoring the ends and changing each * to
+# a "word" (group of alphahumeric.)  A tail * means "the rest", allowing
+# multiple words separated by underscores or dashes.
+#
+my $wordpat = '[a-zA-Z0-9]+';
+my $tailpat = '[-\w]+';
+my %wildcards;
+foreach $key (keys(%xmlfields)) {
+    if (index($key, "*") >= 0) {
+	my $regex = '^' . $key . '$';
+	$regex =~ s/\*\$$/$tailpat/;
+	$regex =~ s/\*/$wordpat/g;
+	$wildcards{$key} = $regex;
+    }
+}
+# Key ordering is lost in a hash.
+# Put longer matching wildcard keys before their prefix.
+my @wildkeys = reverse(sort(keys(%wildcards)));
+
 foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
     if (!defined($value)) {	# Empty string comes from XML as an undef value.
 	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
     }
 
-    if ($debug) {
-	print STDERR "User attribute: '$key' -> '$value'\n";
-    }
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
 
-    # XXX Special for trust args.  Either:
-    #   (change|add)_xxx=permit or
-    #   Uxxx$$trust=(user|(local|group)_root)
-    # where xxx is the uid_idx of a user.
-    if (($key =~ /^(change|add)_[0-9]+$/ && 
-	 $value eq "permit") ||
-	($key =~ /^U[0-9]+\$\$trust$/ && 
-	 $value =~ /^(user|(local|group)_root)$/)) {
+    my $field = $key;
+    my $wild;
+    if (!exists($xmlfields{$key})) {
 
-	if ($debug) {
-	    print STDERR "Trust: '$key' -> '$value'\n";
+	# Not a regular key; look for a wildcard regex match.
+        foreach my $wildkey (@wildkeys) {
+	    my $regex = $wildcards{$wildkey};
+	    if ($wild = $key =~ /$regex/) {
+		$field = $wildkey;
+		print STDERR "Wildcard: '$key' matches '$wildkey'\n"
+		    if ($debug);
+		last; # foreach $wildkey
+	    }
 	}
-	$editgroup_args{$key} = $value;
-	next;
+	if (!$wild) {
+	    $errors{$key} = "Unknown attribute";
+	    next; # foreach $key
+	}
     }
 
-    $errors{$key} = "Unknown attribute"
-	if (!exists($xmlfields{$key}));
-
-    my ($dbslot, $required, $default) = @{$xmlfields{$key}};
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
 
     if ($required & $SLOT_REQUIRED) {
 	# A slot that must be provided, so do not allow a null value.
@@ -222,12 +253,13 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     }
 	
     # Now check that the value is legal.
-    if (! TBcheck_dbslot($value, "groups", $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+    if (! TBcheck_dbslot($value, "groups",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
 	$errors{$key} = TBFieldErrorString();
 	next;
     }
 
-    $editgroup_args{$dbslot} = $value;
+    $editgroup_args{$key} = $value;
 }
 UserError()
     if (keys(%errors));
@@ -235,7 +267,7 @@ UserError()
 #
 # Now do special checks.
 #
-my $group = Group->Lookup($editgroup_args{"gid_idx"});
+my $group = Group->Lookup($editgroup_args{"group"});
 if (!defined($group)) {
     UserError("Group: No such group");
 }
@@ -254,7 +286,7 @@ exit(0)
 # We pass the group along as an argument to EditGroup(), so remove it from
 # the argument array.
 #
-delete($editgroup_args{"gid_idx"});
+delete($editgroup_args{"group"});
 
 my $usrerr;
 my $editgroup_val = Group->EditGroup($group, $this_user,

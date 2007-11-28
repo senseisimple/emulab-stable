@@ -268,7 +268,8 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
     }
 	
     # Now check that the value is legal.
-    if (! TBcheck_dbslot($value, "images", $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+    if (! TBcheck_dbslot($value, "images",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
 	$errors{$key} = TBFieldErrorString();
 	next;
     }
@@ -449,7 +450,7 @@ my $typeclause = join(" or ", map("type='$_'", @mtypes_array));
 # Check validity of mtype_* args, since the keys are dynamically generated.
 my $node_types_selected = 0;
 my @mtype_keys = grep(/^mtype_/, keys(%newimageid_args));
-foreach my $key (@mtype_keys) {
+foreach $key (@mtype_keys) {
     my $value = $newimageid_args{$key};
     print STDERR "mtype: '$key' -> '$value'\n"
 	if ($debug);
