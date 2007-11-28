@@ -92,7 +92,7 @@ if (defined($options{"d"})) {
 if (defined($options{"h"})) {
     $hostname = $options{"h"};
 
-    if ($hostname =~ /^([-\w]+)$/) {
+    if ($hostname =~ /^([-\w\.]+)$/) {
 	$hostname = $1;
     }
     else {
