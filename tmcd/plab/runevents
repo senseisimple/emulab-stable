@@ -22,6 +22,7 @@ $PORT_SUMMARY = "/proc/scout/ports/summary";
 # library and initialize itself.
 use libsetup;
 use libtmcc;
+use librc;
 
 # create a list of active ports: using associate arrays
 # for quick serarching.
