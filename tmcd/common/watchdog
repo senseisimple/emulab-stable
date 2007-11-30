@@ -594,14 +594,17 @@ sub runcvsup($)
 	return;
     }
 
-    logmsg("runcvsup: checking for software updates\n");
+    if (-x "$BINDIR/runcvsup.sh") {
+	logmsg("runcvsup: checking for software updates\n");
+	system("$BINDIR/runcvsup.sh");
+	logmsg("runcvsup: software updates done\n");
 
-    system("$BINDIR/runcvsup.sh");
-
-    logmsg("runcvsup: software updates done\n");
-
-    # cvsup can take awhile so update curtime
-    $curtime = time();
+	# cvsup can take awhile so update curtime
+	$curtime = time();
+    } else {
+	logmsg("runcvsup: $BINDIR/runcvsup.sh does not exist, disabled\n");
+	$iv{cvsup} = 0;
+    }
 
     qinsert($curtime + $iv{cvsup}, \&runcvsup)
 	if ($iv{cvsup});
