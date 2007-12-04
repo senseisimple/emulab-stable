@@ -105,6 +105,25 @@ A. Things to understand up front:
      of mii-tool) so that the Emulab software can change link speed/duplex.
      Just install an RPM.
     
+   UPDATE: for a November 2007 install of Ubuntu 7.04 (minimal),
+   I needed to do the following (in addition to pubsub):
+
+     apt-get install gcc
+     apt-get install libc6-dev
+     apt-get install python-dev
+     apt-get install make
+     apt-get install g++
+     apt-get install byacc
+     apt-get install libssl-dev
+     apt-get install flex
+     apt-get install libboost-dev
+     apt-get install libboost-graph-dev
+     apt-get install libpcap-dev
+     apt-get install ntp-simple
+     apt-get install tcsh
+     apt-get install rpm
+     apt-get install perl-suid
+
 5. Another "first time, one time" thing to do is to setup the serial console
    in the OSes (if you are planning on using serial consoles).  We use 115200
    baud as the typical default of 9600 is too painful.
