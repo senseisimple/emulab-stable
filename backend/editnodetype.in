@@ -448,10 +448,12 @@ foreach $attr_name (@attr_names) {
 	    UserError("NodeType OSID Attr: $attr_name is not an osid.")
 		if (!exists($osids->{$attr_value}));
 	}
+	$attr_types{$attr_name} = "integer"; # An idx is an integer attr.
     }
     elsif ($attr_type eq "imageid") {
 	UserError("NodeType Image ID Attr: $attr_name is not an imageid.")
 	    if (!exists($imageids->{$attr_value}));
+	$attr_types{$attr_name} = "integer"; # An idx is an integer attr.
     }
 }
 
