@@ -544,7 +544,7 @@ function WRITESIDEBAR() {
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
 	if ($firstinitstate != null) {    
 	    if ($firstinitstate == "createproject") {
-		NavMenuButton("Create First Project",
+		NavMenuButton("<font color=red> Create First Project </font>&nbsp",
 			      "$TBBASE/newproject.php3");
 	    }
 	    elseif ($firstinitstate == "approveproject") {

@@ -432,7 +432,7 @@ function SPITFORM($formfields, $errors)
     echo "<h4><blockquote><blockquote><blockquote>
           <ol type=1 start=1>
              <li>Only single slices or partial disks are allowed.
-  	         If you specify a non-zero starting load partition, the load
+  	         If you specify a non-zero starting load partition, the
 	         load length must be one. If you specify zero
 	         for the starting load partition, then you can include any or
 	         all of the slices (1-4). Note that '0' means to start at the
