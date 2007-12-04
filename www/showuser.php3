@@ -79,11 +79,83 @@ $mm_result =
 $tabledefs = array('#html' => TRUE);
 
 # The user profile.
-$html_profile = "<center><a href='" .
-                  CreateURL("profile", $target_user) . "'>Edit Profile</a>".
-                  "</center><br>";
-$html_profile .= $target_user->Show(TRUE);
+# Add all the menu stuff. Ick.
+ob_start();
+SUBPAGESTART();
+SUBMENUSTART("Options");
 
+#
+# Permission check not needed; if the user can view this page, they can
+# generally access these subpages, but if not, the subpage will still whine.
+#
+WRITESUBMENUBUTTON("Edit Profile",
+		   CreateURL("moduserinfo", $target_user));
+
+if (!$target_user->wikionly() &&
+    ($isadmin || $target_user->SameUser($this_user))) {
+    WRITESUBMENUBUTTON("Edit SSH Keys",
+		       CreateURL("showpubkeys", $target_user));
+    
+    WRITESUBMENUBUTTON("Edit SFS Keys",
+		       CreateURL("showsfskeys", $target_user));
+
+    WRITESUBMENUBUTTON("Generate SSL Cert",
+		       CreateURL("gensslcert", $target_user));
+
+    if ($MAILMANSUPPORT) {
+        #
+        # See if any mailman lists owned by the user. If so we add a menu item.
+        #
+	$mm_result =
+	    DBQueryFatal("select owner_uid from mailman_listnames ".
+			 "where owner_uid='$target_uid'");
+
+	if (mysql_num_rows($mm_result)) {
+	    WRITESUBMENUBUTTON("Show Mailman Lists",
+			       CreateURL("showmmlists", $target_user));
+	}
+    }
+}
+
+if ($isadmin) {
+   SUBMENUSECTION("Admin Options");
+    
+    if ($target_user->status() == TBDB_USERSTATUS_FROZEN) {
+	WRITESUBMENUBUTTON("Thaw User",
+			     CreateURL("freezeuser", $target_user,
+				       "action", "thaw"));
+    }
+    else {
+	WRITESUBMENUBUTTON("Freeze User",
+			     CreateURL("freezeuser", $target_user,
+				       "action", "freeze"));
+    }
+    WRITESUBMENUBUTTON("Delete User",
+			 CreateURL("deleteuser", $target_user));
+
+    WRITESUBMENUBUTTON("SU as User",
+			 CreateURL("suuser", $target_user));
+
+    if ($target_user->status() == TBDB_USERSTATUS_UNAPPROVED) {
+	WRITESUBMENUBUTTON("Change UID",
+			     CreateURL("changeuid", $target_user));
+    }
+
+    if ($target_user->status() == TBDB_USERSTATUS_NEWUSER ||
+	$target_user->status() == TBDB_USERSTATUS_UNVERIFIED) {
+	WRITESUBMENUBUTTON("Resend Verification Key",
+			     CreateURL("resendkey", $target_user));
+    }
+    else {
+	WRITESUBMENUBUTTON("Send Test Email Message",
+			     CreateURL("sendtestmsg", $target_user));
+    }
+}
+SUBMENUEND();
+$target_user->Show();
+SUBPAGEEND();
+$html_profile = ob_get_contents();
+ob_end_clean();
 list ($html_profile, $button_profile) =
 	TableWrapUp($html_profile, FALSE, FALSE,
 		    "profile_table", "profile_button");
@@ -291,7 +363,7 @@ if ($html_groups) {
     echo "<li>
           <a href=\"#D\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_groups\" onclick=\"Show('groups');\">".
-              "Membership</a></li>\n";
+              "Projects</a></li>\n";
 }
 echo "<li>
       <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
