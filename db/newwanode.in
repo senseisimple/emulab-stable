@@ -287,9 +287,6 @@ for ($i = 1; $i < 9; $i++) {
     my $priority  = ($nextpri * 100) + $i;
     $nodevname = "v${nodename}-${i}";
 
-    if (TBValidNodeName($nodevname)) {
-	next;
-    }
     print "Creating widearea virtual node $nodevname ...\n";
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".

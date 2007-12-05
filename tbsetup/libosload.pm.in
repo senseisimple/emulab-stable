@@ -218,14 +218,15 @@ sub osload ($$) {
 	    tberror "$node: No default imageid defined!";
 	    goto failednode;
 	}
-
+	my $default_image = Image->Lookup($default_imageid);
+	if (!defined($default_image)) {
+	    tberror("Could not map $default_imageid to its object!");
+	    return -1;
+	}
+	
 	if ($usedefault) {
 	    $imageid = $default_imageid;
-	    $image   = Image->Lookup($imageid);
-	    if (!defined($image)) {
-		tberror("Could not map $imageid to its object!");
-		return -1;
-	    }
+	    $image   = $default_image;
 	}
 
 	print STDERR "osload: Using $image for $node\n"
@@ -274,7 +275,7 @@ sub osload ($$) {
 	# another experiment.
 	#
 	if ($imageid ne $default_imageid &&
-	    !TBSetSchedReload($node, $default_imageid)) {
+	    $nodeobject->SetSchedReload($default_image) != 0) {
 	    tberror
 		"$node: Could not schedule default reload";
 	    goto failednode;

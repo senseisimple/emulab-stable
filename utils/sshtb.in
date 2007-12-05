@@ -46,6 +46,7 @@ my $chpid       = 0;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
 
 #
 # Turn off line buffering on output
@@ -88,17 +89,16 @@ if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
 }
 else {
     my $user;
+    my $node = Node->Lookup($hostname);
 
-    if (TBValidNodeName($hostname)) {
-	my ($jailed, $plab, $physhost);
-	if (TBIsNodeVirtual($hostname, \$jailed, \$plab)) {
-	    if ($plab) {
+    if (defined($node)) {
+	if ($node->isvirtnode()) {
+	    if ($node->isplabdslice()) {
 		TBPlabNodeUsername($hostname, \$user);
 	    }
-	    TBPhysNodeID($hostname, \$physhost);
-	    $hostname = $physhost;
+	    $hostname = $node->phys_nodeid();
 	}
-	elsif (TBIsNodeRemote($hostname) && $MAINSITE) {
+	elsif ($node->isremotenode()) {
 	    $user = "emulabman";
 	}
     }

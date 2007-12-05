@@ -318,7 +318,10 @@ foreach my $uid (@userlist) {
     # users can have more unix groups than just the projects/groups they are
     # in. These groups must already exist.
     #
-    my @extragrouplist = TBUnixGroupList($uid);
+    my @extragrouplist = ();
+    if ($user->UnixGroupList(\@extragrouplist) != 0) {
+	fatal("Could not extra group list for $user");
+    }
 
     #
     # Add special admin group. Check to make sure that its not a dup

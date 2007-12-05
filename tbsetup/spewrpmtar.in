@@ -123,6 +123,7 @@ my $pid     = $experiment->pid();
 my $eid     = $experiment->eid();
 my $gid     = $experiment->gid();
 my $creator = $experiment->GetCreator()->uid();
+my $unix_gid= $experiment->GetGroup()->unix_gid();
 my $bytelen = 0;
 
 if (my $retval = VerifyFile()) {
@@ -232,12 +233,7 @@ sub VerifyFile()
     my (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$length,
 	undef,$mtime) = stat($translated);
 
-    my ($unix_uid, $unix_gid, $unix_gname);
-
-    TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
-	fatal("No such group $pid/$gid\n");
-    
-    (undef,undef,$unix_uid) = getpwnam($creator) or
+    my (undef,undef,$unix_uid) = getpwnam($creator) or
 	fatal("No such user $creator\n");
 
     if ($stat_gid != $unix_gid &&

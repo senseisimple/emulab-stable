@@ -331,7 +331,7 @@ while (1) {
 sub dosomething($$)
 {
     my($dowhat,$exphash)   = @_;
-    my($unix_uid, $unix_gid, $unix_gname, $row, $query_result);
+    my($unix_uid, $unix_gid, $row, $query_result);
 
     # Global vars
     $eid     = $exphash->{'eid'};
@@ -425,8 +425,11 @@ sub dosomething($$)
     #
     (undef,undef,$unix_uid) = getpwnam($creator_uid) or
 	fatal("No such user $creator_uid");
-    TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
-	fatal("No such group $pid/$gid");
+    my $group = $experiment->GetGroup();
+    if (!defined($group)) {
+	fatal("Could not get group object for $experiment");
+    }
+    $unix_gid = $group->unix_gid();
 
     #
     # Need the entire group list for the user, cause of subgroups, and cause

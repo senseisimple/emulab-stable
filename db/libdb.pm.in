@@ -158,15 +158,15 @@ use vars qw(@ISA @EXPORT);
 
 	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
 	 TBExptAccessCheck MarkNodeDown
-	 SetNodeBootStatus OSFeatureSupported NodeidToExp NodeidToExpOldReserved
-	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
+	 SetNodeBootStatus OSFeatureSupported NodeidToExp 
+	 DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
 	 DBQuoteSpecial ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
-	 DBDateTime DefaultImageID TBGroupUnixInfo
-	 TBValidNodeName TBSetNodeLogEntry
-	 TBSetSchedReload MapNodeOSID 
-	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
+	 DBDateTime DefaultImageID 
+	 TBSetNodeLogEntry
+	 MapNodeOSID 
+	 TBOSID TBOSMaxConcurrent TBOSCountInstances
 	 TBResolveNextOSID TBOsidToPid TBOSIDRebootWaittime
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
 	 TBdbfork TBDBDisconnect VnameToNodeid 
@@ -177,7 +177,7 @@ use vars qw(@ISA @EXPORT);
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBExptSetSwapUID TBExptSetThumbNail
-	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
+	 TBPlabNodeUsername MarkPhysNodeDown
 	 TBExptIsElabInElab TBExptIsPlabInElab
 	 TBExptPlabInElabPLC TBExptPlabInElabNodes
 	 TBBatchUnLockExp TBExptIsBatchExp
@@ -1057,59 +1057,6 @@ sub TBNodeAccessCheck($$@)
 }
 
 #
-# Determine if a node can be allocated to a project.
-#
-# Usage: TBNodeAllocCheck($pid, $node_id)
-#	 returns 0 if not allowed or error.
-#        returns 1 if allowed.
-#
-sub TBNodeAllocCheck($$)
-{
-    my ($pid, $node_id) = @_;
-
-    #
-    # Admins do whatever they want!
-    #
-    if (TBAdmin()) {
-	return 1;
-    }
-
-    #
-    # Hmm. The point of this join is to find rows in the permissions table
-    # with the corresponding type of the node. If no rows come back, its
-    # a non-existent node! If the values are NULL, then there are no rows
-    # with that type/class, and thus the type/class is free to be allocated
-    # by anyone. Otherwise we get the list of projects that are allowed,
-    # and so we have to look at those.
-    #
-    my $query_result =
-	DBQueryFatal("select distinct p.* from nodes as n ".
-		     "left join node_types as nt on n.type=nt.type ".
-		     "left join nodetypeXpid_permissions as p on ".
-		     "     (p.type=nt.type or p.type=nt.class) ".
-		     "where node_id='$node_id'");
-
-    if (!$query_result->numrows) {
-	print STDERR "TBNodeAllocCheck: No such node $node_id!\n";
-	return 0;
-    }
-    my ($ptype,$ppid) = $query_result->fetchrow_array();
-
-    # No rows, or a pid match.
-    if (!defined($ptype) || $ppid eq $pid) {
-	return 1;
-    }
-
-    # Okay, must be rows in the permissions table. Check each pid for a match.
-    while (my ($ptype,$ppid) = $query_result->fetchrow_array()) {
-	if ($ppid eq $pid) {
-	    return 1;
-	}
-    }
-    return 0;
-}
-
-#
 # Return Experiment state.
 #
 # usage: ExpState(char *pid, char *eid)
@@ -1198,52 +1145,6 @@ sub TBGetCancelFlag($$$)
     }
     ($$flag) = $query_result->fetchrow_array();
     return 1;
-}
-
-#
-# Return a list of all the nodes in an experiment
-# that were moved to OLDRESERVED_PID/OLDRESERVED_EID
-# holding reservation
-#
-# usage: ExpNodesOldReserved(char *pid, char *eid)
-#        returns the list if a valid pid/eid.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub ExpNodesOldReserved($$)
-{
-    my($pid, $eid) = @_;
-    my(@row);
-    my(@nodes);
-
-    my $oldreserved_pid = OLDRESERVED_PID;
-    my $oldreserved_eid = OLDRESERVED_EID;
-    my $query_result =
-	DBQueryWarn("select r.node_id from reserved as r ".
-		    "left join nodes as n on n.node_id=r.node_id ".
-		    "where (r.pid='$oldreserved_pid' and r.old_pid='$pid') ".
-		    "and (r.pid='$oldreserved_eid' and r.old_eid='$eid') ");
-
-    if (! $query_result or
-	$query_result->numrows == 0) {
-	return ();
-    }
-    while (@row = $query_result->fetchrow_array()) {
-	my $node = $row[0];
-
-	#
-	# Taint check. I do not understand this sillyness, but if I
-	# taint check these node names, I avoid warnings throughout.
-	#
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
-
-	    push(@nodes, $node);
-	}
-	else {
-	    print "*** $0: WARNING: Bad node name: $node.\n";
-	}
-    }
-    return @nodes;
 }
 
 #
@@ -1472,34 +1373,6 @@ sub TBBootWhat($;$)
 
     print("*** Warning: node '$node': All boot info was null!\n");
     return undef;
-}
-
-#
-# Map nodeid to its pid/eid in the oldreserved holding reservation
-#
-# usage: NodeidToExpOldReserved(char *nodeid, \$pid, \$eid, \$vname)
-#        returns 1 if the node is reserved.
-#        returns 0 if the node is not reserved.
-#
-sub NodeidToExpOldReserved ($$$) {
-    my($nodeid, $pid, $eid) = @_;
-
-    my $oldreserved_pid = OLDRESERVED_PID;
-    my $oldreserved_eid = OLDRESERVED_EID;
-    my $query_result =
-	DBQueryWarn("select old_pid,old_eid from reserved ".
-		    "where node_id='$nodeid' and pid='$oldreserved_pid' ".
-		    "and eid='$oldreserved_eid'");
-
-    if (! $query_result ||
-	! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    $$pid = $row[0];
-    $$eid = $row[1];
-    return 1;
 }
 
 #
@@ -1883,75 +1756,6 @@ sub TBImageLoadMaxOkay($$;@)
 }
 
 #
-# Map login (db uid) to a user_name and user_email.
-#
-# usage: UserDBInfo(char *dbuid, \$name, \$email)
-#        returns 1 if the UID is okay.
-#        returns 0 if the UID is bogus.
-#
-sub UserDBInfo($$$)
-{
-    my ($dbuid, $username, $useremail) = @_;
-
-    my $target_user = User->Lookup($dbuid);
-    return 0
-	if (! defined($target_user));
-    
-    $$username  = $target_user->name();
-    $$useremail = $target_user->email();
-    return 1;
-}
-
-#
-# Map pid,gid to its unix_gid and unix_name.
-#
-# usage: TBGroupUnixInfo(char $pid, char *gid, \$unix_gid, \$unix_name)
-#        returns 1 if okay.
-#        returns 0 if bogus.
-#
-sub TBGroupUnixInfo ($$$$) {
-    my($pid, $gid, $unix_gid, $unix_name) = @_;
-
-    my $query_result =
-	DBQueryFatal("select unix_gid,unix_name from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    if ($query_result->num_rows < 1) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    $$unix_gid  = $row[0];
-    $$unix_name = $row[1];
-    return 1;
-}
-
-#
-# Return a list of the additional Unix groups a user is in.
-#
-# usage: TBUnixGroupList(char $dbuid)
-#        returns list if there is one.
-#        returns () if failed or no list.
-#
-sub TBUnixGroupList ($) {
-    my($dbuid) = @_;
-    my @glist = ();
-
-    my $query_result =
-	DBQueryFatal("select gid from unixgroup_membership ".
-		     "where uid='$dbuid'");
-
-    if ($query_result->num_rows == 0) {
-	return ();
-    }
-
-    while (my @row = $query_result->fetchrow_array()) {
-	push(@glist, $row[0]);
-    }
-    return @glist;
-}
-
-#
 # Insert a Log entry for a node.
 #
 # usage: TBSetNodeLogEntry(char *node, char *uid, char *type, char *message)
@@ -1968,50 +1772,6 @@ sub TBSetNodeLogEntry($$$$)
 
     return ($node->InsertNodeLogEntry(User->Lookup($dbuid),
 				      $type, $message) == 0 ? 1 : 0);
-}
-
-#
-# Validate a node name.
-#
-# usage: TBValidNodeName(char *name)
-#        Returns 1 if the node is valid.
-#        Returns 0 if not.
-#
-sub TBValidNodeName($)
-{
-    my($node) = @_;
-
-    my $query_result =
-	DBQueryWarn("select node_id from nodes where node_id='$node'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Set the scheduled_reloads for a node. Type is optional and defaults to
-# testbed default load type. See above.
-#
-# usage: TBSetSchedReload(char *node, char *imageid, [char *reload_type])
-#        Returns 1 if okay.
-#        Returns 0 if failed.
-#
-sub TBSetSchedReload($$;$)
-{
-    my ($node, $imageid, $type) = @_;
-
-    if (!defined($type)) {
-	$type = TB_DEFAULT_RELOADTYPE;
-    }
-
-    if (DBQueryWarn("replace into scheduled_reloads ".
-		    "(node_id, image_id, reload_type) values ".
-		    "('$node', '$imageid', '$type')")) {
-	return 1;
-    }
-    return 0;
 }
 
 #

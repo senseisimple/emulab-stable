@@ -13,6 +13,13 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw();
 
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $EVENTSYS    = @EVENTSYS@;
+# XXX stinky hack detection
+my $ISUTAH	= @TBMAINSITE@;
+
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use libdb;
@@ -24,14 +31,11 @@ require OSinfo;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
+if ($EVENTSYS) {
+    require event;
+    import event;
+}
 use vars qw($NODEROLE_TESTNODE @EXPORT_OK);
-
-# Configure variables
-my $TB		= "@prefix@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $EVENTSYS    = @EVENTSYS@;
-# XXX stinky hack detection
-my $ISUTAH	= @TBMAINSITE@;
 
 # Exported defs
 $NODEROLE_TESTNODE	= 'testnode';
@@ -99,6 +103,7 @@ sub eventstate($)    { return field($_[0], 'eventstate'); }
 sub jailflag($)      { return field($_[0], 'jailflag'); }
 sub phys_nodeid($)   { return field($_[0], 'phys_nodeid'); }
 sub def_boot_osid($) { return field($_[0], 'def_boot_osid'); }
+sub pxe_boot_path($) { return field($_[0], 'pxe_boot_path'); }
 
 #
 # Create a new node.
@@ -322,7 +327,7 @@ sub IsReserved($)
 {
     my ($self) = @_;
 
-    return -1
+    return 0
 	if (! ref($self));
 
     if (! defined($self->{"RSRV"})) {
@@ -331,7 +336,7 @@ sub IsReserved($)
 	my $query_result =
 	    DBQueryWarn("select * from reserved " .
 			"where node_id='$nodeid'");
-	return -1
+	return 0
 	    if (!$query_result);
 	return 0
 	    if (!$query_result->numrows);
@@ -340,6 +345,69 @@ sub IsReserved($)
 	return 1;
     }
     return 1;
+}
+
+#
+# Determine if a node can be allocated to a project.
+#
+sub NodeAllocCheck($$)
+{
+    my ($self, $pid) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    #
+    # Hmm. The point of this join is to find rows in the permissions table
+    # with the corresponding type of the node. If no rows come back, its
+    # a non-existent node! If the values are NULL, then there are no rows
+    # with that type/class, and thus the type/class is free to be allocated
+    # by anyone. Otherwise we get the list of projects that are allowed,
+    # and so we have to look at those.
+    #
+    my $query_result =
+	DBQueryFatal("select distinct p.* from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "left join nodetypeXpid_permissions as p on ".
+		     "     (p.type=nt.type or p.type=nt.class) ".
+		     "where node_id='$node_id'");
+
+    if (!$query_result->numrows) {
+	print STDERR "NodeAllocCheck: No such node $node_id!\n";
+	return 0;
+    }
+    my ($ptype,$ppid) = $query_result->fetchrow_array();
+
+    # No rows, or a pid match.
+    if (!defined($ptype) || $ppid eq $pid) {
+	return 1;
+    }
+
+    # Okay, must be rows in the permissions table. Check each pid for a match.
+    while (my ($ptype,$ppid) = $query_result->fetchrow_array()) {
+	if ($ppid eq $pid) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+#
+# Equality test for two experiments.
+# Not strictly necessary in perl, but good form.
+#
+sub SameExperiment($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() == $other->idx();
 }
 
 #
@@ -355,8 +423,206 @@ sub Reservation($)
     return undef
 	if (! $self->IsReserved());
 
-    return Experiment->Lookup($self->{"RSRV"}->{'pid'},
-			      $self->{"RSRV"}->{'eid'});
+    return Experiment->Lookup($self->{"RSRV"}->{'exptidx'});
+}
+
+#
+# Return just the ID of the reservation experiment. Avoids locking problems
+# within nalloc and nfree. 
+#
+sub ReservationID($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return undef
+	if (! $self->IsReserved());
+
+    return $self->{"RSRV"}->{'exptidx'};
+}
+
+#
+# Get the NEXT experiment this node is reserved too, or null.
+#
+sub NextReservation($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+    
+    my $query_result =
+	DBQueryFatal("select pid,eid from next_reserve ".
+		     "where node_id='$node_id'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my ($pid,$eid) = $query_result->fetchrow_array();
+
+    return Experiment->Lookup($pid, $eid);
+}
+
+#
+# Move a node from its experiment to another. Must treat oldreserved special.
+#
+sub MoveReservation($$)
+{
+    my ($self, $newexperiment) = @_;
+    
+    return -1
+	if (! (ref($self) && ref($newexperiment)));
+
+    return -1
+	if (! $self->IsReserved());
+    
+    my $node_id    = $self->node_id();
+    my $newpid     = $newexperiment->pid();
+    my $neweid     = $newexperiment->eid();
+    my $newidx     = $newexperiment->idx();
+    my $oldpid     = "";
+    my $oldeid     = "";
+    my $oldidx     = 0;
+    
+    # Must remember old reservation when moving to new oldreserved.
+    if ($newpid eq OLDRESERVED_PID() && $neweid eq OLDRESERVED_EID()) {
+        #
+	# Cannot do an experiment Lookup cause reserved table may be locked.
+	# IsReserved() will load the reserved table entry only.
+	#
+	return -1
+	    if (!$self->IsReserved());
+	
+	$oldpid     = $self->{"RSRV"}->{'pid'};
+	$oldeid     = $self->{"RSRV"}->{'eid'};
+	$oldidx     = $self->{"RSRV"}->{'exptidx'};
+    }
+    
+    DBQueryWarn("update reserved set " .
+		" vname='$node_id', ".
+		" exptidx=$newidx, ".
+		" pid='$newpid', ".
+		" eid='$neweid', ".
+		" old_exptidx=$oldidx, ".
+		" old_pid='$oldpid', ".
+		" old_eid='$oldeid' ".
+		"where node_id='$node_id'")
+	or return -1;
+    return 0;
+}
+
+#
+# Change reservation table for a node.
+#
+sub ModifyReservation($$)
+{
+    my ($self, $argref) = @_;
+    
+    return -1
+	if (! (ref($self) && ref($argref)));
+
+    return -1
+	if (! $self->IsReserved());
+    
+    my $node_id = $self->node_id();
+
+    my $query = "update reserved set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where node_id='$node_id'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return 0;
+}
+
+#
+# Map nodeid to its pid/eid in the oldreserved holding reservation
+#
+sub OldReservation($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $nodeid          = $self->node_id();
+    my $oldreserved_pid = OLDRESERVED_PID;
+    my $oldreserved_eid = OLDRESERVED_EID;
+    
+    my $query_result =
+	DBQueryWarn("select old_pid,old_eid from reserved ".
+		    "where node_id='$nodeid' and pid='$oldreserved_pid' ".
+		    "and eid='$oldreserved_eid'");
+
+    return undef
+	if (! $query_result || !$query_result->num_rows);
+
+    my ($pid,$eid) = $query_result->fetchrow_array();
+    
+    return Experiment->Lookup($pid, $eid);
+}
+
+sub OldReservationID($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $nodeid          = $self->node_id();
+    my $oldreserved_pid = OLDRESERVED_PID;
+    my $oldreserved_eid = OLDRESERVED_EID;
+    
+    my $query_result =
+	DBQueryWarn("select old_exptidx from reserved ".
+		    "where node_id='$nodeid' and pid='$oldreserved_pid' ".
+		    "and eid='$oldreserved_eid'");
+
+    return undef
+	if (! $query_result || !$query_result->num_rows);
+
+    my ($idx) = $query_result->fetchrow_array();
+    
+    return $idx;
+}
+
+#
+# Return the tip server (and tipname) for a node.
+#
+sub TipServer($$;$)
+{
+    my ($self, $pserver, $ptipname) = @_;
+
+    return -1
+	if (! ref($self));
+
+    $$pserver  = undef;
+    $$ptipname = undef
+	if (defined($ptipname));
+
+    my $nodeid = $self->node_id();
+	
+    my $query_result =
+	DBQueryWarn("select server,tipname from tiplines " .
+		    "where node_id='$nodeid'");
+    return -1
+	if (!$query_result);
+    
+    return 0
+	if (!$query_result->numrows);
+
+    my ($server, $tipname) = $query_result->fetchrow_array();
+    $$pserver  = $server;
+    $$ptipname = $tipname
+	if (defined($ptipname));
+
+    return 0;
 }
 
 #
@@ -373,6 +639,46 @@ sub ReservedTableEntry($)
 	if (! $self->IsReserved());
 
     return $self->{"RSRV"};
+}
+
+#
+# Return a list of virtual nodes on the given physical node.
+#
+sub VirtualNodes($$)
+{
+    my ($self, $plist) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $reservation = $self->Reservation();
+    my $node_id     = $self->node_id();
+    my $exptidx     = $reservation->idx();
+    my @result      = ();
+    @$plist         = ();
+
+    my $query_result = 
+	DBQueryWarn("select r.node_id from reserved as r ".
+		    "left join nodes as n ".
+		    "on r.node_id=n.node_id ".
+		    "where n.phys_nodeid='$node_id' and ".
+		    "      n.node_id!=n.phys_nodeid and exptidx='$exptidx'");
+
+    return -1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($node_id) = $query_result->fetchrow_array()) {
+	my $node = Node->Lookup($node_id);
+	if (!defined($node)) {
+	    print STDERR "*** VirtualNodes: no such virtual node $node_id!\n";
+	    return -1;
+	}
+	push(@result, $node);
+    }
+    @$plist = @result;
+    return 0;
 }
 
 # Need to create a set of access methods for the reservation.
@@ -485,11 +791,17 @@ sub Update($$)
 	if (! ref($self));
 
     my $nodeid = $self->node_id();
+    my @sets   = ();
 
-    my $query = "update nodes set ".
-	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+    foreach my $key (keys(%{$argref})) {
+	my $val = $argref->{$key};
 
-    $query .= " where node_id='$nodeid'";
+	# Treat NULL special.
+	push (@sets, "${key}=" . ($val eq "NULL" ? "NULL" : "'$val'"));
+    }
+
+    my $query = "update nodes set " . join(",", @sets) .
+	" where node_id='$nodeid'";
 
     return -1
 	if (! DBQueryWarn($query));
@@ -521,6 +833,31 @@ sub InsertNodeLogEntry($$$$)
 	if (! DBQueryWarn("insert into nodelog values ".
 			  "('$node_id', NULL, '$type', '$dbuid', '$dbid', ".
 			  " $message, now())"));
+    return 0;
+}
+
+#
+# Clear the experimental interfaces for a node.
+#
+#
+# Insert a Log entry for a node.
+#
+sub ClearInterfaces($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
+		"       rtabid='0',vnode_id=NULL,current_speed='0' ".
+		"where node_id='$node_id' and ".
+		"  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
+	or return -1;
+
     return 0;
 }
 
@@ -622,6 +959,33 @@ sub GetBootLog($$)
     my ($bootlog) = $query_result->fetchrow_array();
     $$pref = $bootlog;
     return 0;
+}
+
+#
+# Set event state for a node.
+#
+sub SetEventState($$)
+{
+    my ($self, $state) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    #
+    # If using the event system, we send out an event for the state daemon to
+    # pick up. Otherwise, we just set the state in the database ourselves
+    #
+    if ($EVENTSYS) {
+	return EventSendFatal(objtype   => TBDB_TBEVENT_NODESTATE,
+			      objname   => $node_id,
+			      eventtype => $state,
+			      host      => $BOSSNODE);
+    }
+    return $self->Update({"eventstate"      => $state,
+			  "state_timestamp" => time()});
 }
 
 #
@@ -987,6 +1351,32 @@ sub SetNodeHistory($$$$)
 		       "  history_id=0, node_id='$nodeid', op='$op', ".
 		       "  uid='$uid', uid_idx='$uid_idx', ".
 		       "  stamp=$now, exptidx=$exptidx");
+}
+
+#
+# Set the scheduled_reloads for a node. Type is optional and defaults to
+# testbed default load type. See above.
+#
+sub SetSchedReload($$;$)
+{
+    my ($self, $image, $type) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+    my $imageid = $image->imageid();
+
+    $type = TB_DEFAULT_RELOADTYPE
+	if (!defined($type));
+
+    return -1
+	if (! DBQueryWarn("replace into scheduled_reloads ".
+			  "(node_id, image_id, reload_type) values ".
+			  "('$node_id', '$imageid', '$type')"));
+
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -48,7 +49,7 @@ my $TB		= "@prefix@";
 my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 
 # Locals
-my $nodes	= ();
+my @nodes	= ();
 
 #
 # Testbed Support libraries
@@ -56,6 +57,9 @@ my $nodes	= ();
 use lib "@prefix@/lib";
 use libdb;
 use libreboot;
+use Experiment;
+use Node;
+use User;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
@@ -63,9 +67,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Turn off line buffering on output
 $| = 1;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
 
 #
 # We don't want to run this script unless its the real version.
@@ -76,10 +77,19 @@ if ($EUID != 0) {
 }
 
 #
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
+}
+
+#
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -103,28 +113,23 @@ if (defined($options{"p"})) {
 }
 if (defined($options{"r"})) {
     $realmode = 1;
-
-    #if ($UID && !TBAdmin($UID)) {
-    #	die("*** You cannot use real mode!\n");
-    #}
 }
 if (defined($options{"c"})) {
     $reconfig = 1;
 }
 
 if (defined($options{"a"})) {
+    usage()
+	if (@ARGV);
+    
     #
     # Reboot all free nodes
     #
-    if ($UID && !TBAdmin($UID)) {
+    if ($UID && !$this_user->IsAdmin()) {
 	die("*** $0:\n".
 	    "    You not have permission to reboot all free nodes!\n");
     }
 
-    if (@ARGV) {
-	usage();
-    }
-    
     my $query_result =
 	DBQueryFatal("select n.node_id from nodes as n ".
 		     "left join reserved as r on r.node_id=n.node_id ".
@@ -145,21 +150,13 @@ elsif (defined($options{"e"})) {
     #
     # Reboot all nodes in an experiment
     #
-    if (@ARGV) {
-	usage();
-    }
+    usage()
+	if (@ARGV);
 
-    my $eidmode = $options{"e"};
-    my $pid;
-    my $eid;
-    
-    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
-	$pid = $1;
-	$eid = $2;
-    }
-    else {
+    my $experiment = Experiment->Lookup($options{"e"});
+    if (!defined($experiment)) {
 	die("*** $0:\n".
-	    "    Invalid argument to -e option: $eidmode\n");
+	    "    Unknown experiment!\n");
     }
 
     #
@@ -167,19 +164,15 @@ elsif (defined($options{"e"})) {
     # permission problems early; the nodes are indvidually checked later
     # in the library.
     #
-    if ($UID && !TBAdmin($UID) &&
-	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    if ($UID && !$this_user->IsAdmin() &&
+	! $experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	die("*** $0:\n".
-	    "    You not have permission to reboot nodes in $pid/$eid!\n");
+	    "    You not have permission to reboot nodes in $experiment!\n");
     }
-
-    my $query_result =
-	DBQueryFatal("select node_id from reserved where ".
-		     "pid='$pid' and eid='$eid'");
-
-    if ($query_result->numrows == 0) {
+    my @nodelist = $experiment->NodeList();
+    if (! @nodelist) {
 	die("*** $0:\n".
-            "    There are no nodes reserved in pid/eid $pid/$eid\n");
+            "    There are no nodes reserved in $experiment\n");
     }
     
     #
@@ -199,36 +192,36 @@ elsif (defined($options{"e"})) {
     # later and reboot all those nodes again.
     #
     my $firewall = "";
-    if (TBExptFirewall($pid, $eid, \$firewall)) {
-	warn("WARNING: NOT rebooting firewall node $firewall\n");
+    if ($experiment->IsFirewalled()) {
+	$experiment->FirewallAndPort(\$firewall, undef) == 0 or
+	    die("*** $0:\n".
+		"    Could not get the firewall node for $experiment\n");
     }
-
-    while (my ($nodeid) = $query_result->fetchrow_array()) {
-	push(@nodes, $nodeid)
-	    if ($nodeid ne $firewall);
+    foreach my $node (@nodelist) {
+	push(@nodes, $node->node_id())
+	    if ($node->node_id() ne $firewall);
     }
 }
 else {
     #
     # Reboot nodes listed on command line.
-    # 
-    if (!@ARGV) {
-	usage();
-    }
+    #
+    usage()
+	if (!@ARGV);
 
-    # Untaint the nodes.
-    foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
-	}
-	else {
-	    die("*** Tainted node name: $node\n");
-	}
-	if (!TBValidNodeName($node)) {
+    foreach my $n (@ARGV) {
+	my $node = Node->Lookup($n);
+	if (!defined($node)) {
 	    die("*** $0:\n".
-		"    Node does not exist: $node\n");
+		"    Node $n does not exist!\n");
 	}
-	push(@nodes, $node);
+
+	if ($UID && !$this_user->IsAdmin() &&
+	    ! $node->AccessCheck($this_user, TB_NODEACCESS_REBOOT)) {
+	    die("*** $0:\n".
+		"    You are not allowed to reboot $node!\n");
+	}
+	push(@nodes, $node->node_id());
     }
 }
 

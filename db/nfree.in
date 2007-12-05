@@ -1,10 +1,10 @@
-#!/usr/bin/perl -wT
-
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -20,14 +20,24 @@ sub usage ()
     die("Usage: nfree [-x] [-o] <pid> <eid> [<node> <node> <...>]\n".
 	"Releases all nodes in the specified experiment.\n".
 	"If nodes are listed, nfree releases only those nodes.\n".
-	" '-x' frees all virtual nodes on any physical node that gets freed.\n".
+	" '-x' frees all virtual nodes on any physical node that is freed.\n".
 	" '-o' Moves nodes into a oldreserved holding experiment.\n"
 	);
 }
+my $optlist = "xo";
+my $freeDependantVirtuals = 0;
+my $moveToOldReserved     = 0;
 
 # Configure variables
 my $TB       = "@prefix@";
 my $TESTMODE = @TESTMODE@;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Untaint the path
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Testbed Support libraries
 use lib "@prefix@/lib";
@@ -36,141 +46,130 @@ use libtestbed;
 use User;
 use Experiment;
 use Node;
+use OSinfo;
 
-my $consetup	= "$TB/libexec/console_setup";
-my $osselect    = "$TB/bin/os_select";
-my $nodereboot  = "$TB/bin/node_reboot";
-my $makeconf    = "$TB/sbin/dhcpd_makeconf";
-my $reloadpid	= "emulab-ops";
-my $pendingeid  = "reloadpending";
-my $rppendingeid= "repositionpending";
+# Local stuff
+my $consetup	    = "$TB/libexec/console_setup";
+my $osselect        = "$TB/bin/os_select";
+my $nodereboot      = "$TB/bin/node_reboot";
+my $makeconf        = "$TB/sbin/dhcpd_makeconf";
+my $reloadpid	    = "emulab-ops";
+my $pendingeid      = "reloadpending";
+my $rppendingeid    = "repositionpending";
 my $oldreserved_pid = OLDRESERVED_PID;
 my $oldreserved_eid = OLDRESERVED_EID;
-my $lockedpid   = NFREELOCKED_PID();
-my $lockedeid   = NFREELOCKED_EID();
-
+my $lockedpid       = NFREELOCKED_PID();
+my $lockedeid       = NFREELOCKED_EID();
 my @nodes;
-my @freed_nodes=();
-my @dynanodes=();
-my $error = 0;
-my %mustzero=();
-
-$| = 1;  # Turn off line buffering on output
-
-# Untaint the path
-$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+my @freed_nodes     = ();
+my @dynanodes       = ();
+my $error           = 0;
+my %mustzero        = ();
+my $mustmakeconf    = 0;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-my  $optlist = "xo";
-
-%options = ();
-
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-
-my $freeDependantVirtuals = 0;
-my $moveToOldReserved = 0;
-
 if (defined($options{"x"})) {
     $freeDependantVirtuals = 1;
 }
 if (defined($options{"o"})) {
     $moveToOldReserved = 1;
 }
-
 if (@ARGV < 2) {
     usage();
 }
-
 my $pid = shift;
 my $eid = shift;
-
-# Untaint args.
-if ($pid =~ /^([-\@\w]+)$/) { $pid = $1; }
-else { die("Bad data in pid: $pid."); }
-if ($eid =~ /^([-\@\w]+)$/) { $eid = $1; }
-else { die("Bad data in eid: $eid."); }
 
 # Make sure that the experiment actually exists
 my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
-    die("There is no experiment '$eid' in project '$pid'.\n");
+    die("*** $0:\n".
+        "    There is no experiment '$eid' in project '$pid'.\n");
 }
-# Need the project index below.
+# Need these below.
 my $pid_idx = $experiment->pid_idx();
 my $exptidx = $experiment->idx();
 
-my $old_exptidx;
-if (!TBExptIDX($oldreserved_pid, $oldreserved_eid, \$old_exptidx)) {
-    die("No such experiment $oldreserved_pid/$oldreserved_eid!\n");
+# Map a bunch of experiments we might need to reserve nodes to.
+my $oldreserved_experiment = Experiment->Lookup($oldreserved_pid,
+						$oldreserved_eid);
+if (!defined($oldreserved_experiment)) {
+    die("*** $0:\n".
+        "    There is no experiment $oldreserved_pid/$oldreserved_eid!\n");
 }
-
-my $locker_exptidx;
-if (!TBExptIDX($lockedpid, $lockedeid, \$locker_exptidx)) {
-    die("No such experiment $lockedpid/$lockedeid!\n");
+my $locker_experiment = Experiment->Lookup($lockedpid, $lockedeid);
+if (!defined($locker_experiment)) {
+    die("*** $0:\n".
+        "    There is no experiment $lockedpid/$lockedeid!\n");
 }
-
-my $reload_exptidx;
-if (!TBExptIDX($reloadpid, $pendingeid, \$reload_exptidx)) {
-    die("No such experiment $reloadpid/$pendingeid!\n");
+my $reloading_experiment = Experiment->Lookup($reloadpid, $pendingeid);
+if (!defined($reloading_experiment)) {
+    die("*** $0:\n".
+        "    There is no experiment $reloadpid/$pendingeid!\n");
 }
 # Only in Utah, see below
-my $rppend_exptidx;
+my $repositioning_experiment;
 
 #
 # Verify user and get his DB uid for later. 
 #
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
-    die("You ($UID) do not exist!\n");
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
 }
 my $user_uid = $this_user->uid();
 
 # Make sure the user has the ability to modify this experiment
 if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
-    die("You do not have permission to modify '$eid' in project '$pid'.\n");
+    die("*** $0:\n".
+	"    You do not have permission to modify $experiment.\n");
 }
 
 # Make a list of nodes given on the command line, or get the whole list from
 # the DB if none provided.
 if (@ARGV) {
     foreach my $n (@ARGV) {
-	# Taint check first! Solves silly perl problems.
-	if ($n =~ /^([-\w]+)$/) { $n = $1; }
-	else { die("*** $0:\n    Bad node name: $n.\n"); }
-
-	push(@nodes, $n);
+	my $node = Node->Lookup($n);
+	if (!defined($node)) {
+	    die("*** $0:\n".
+		"    No such node $n!\n");
+	}
+	push(@nodes, $node);
 
 	# if -x was specified, remove any 
 	# mapping to a node which has a phys_nodeid of $n.
 	if ($freeDependantVirtuals) {
-	    my $result = 
-		DBQueryFatal("SELECT r.node_id FROM reserved AS r ".
-			     "LEFT JOIN nodes AS n ".
-			     "ON r.node_id=n.node_id ".
-			     "WHERE n.phys_nodeid='$n' AND ".
-			     "r.eid='$eid' AND r.pid='$pid'");
-	    while (my ($dependantVirtual) = $result->fetchrow_array()) {
-		if (defined $dependantVirtual && $dependantVirtual ne $n) {
-		    push(@nodes, $dependantVirtual);
-		}
+	    my @virtuals = ();
+	    if ($node->VirtualNodes(\@virtuals) != 0) {
+		die("*** $0:\n".
+		    "    Could not get virtual node list for $node\n");
 	    }
+	    push(@nodes, @virtuals)
+		if (@virtuals);
 	}
     }
-} else {
-    print "Releasing all nodes from experiment '$eid' in project '$pid'.\n";
-    @nodes = ExpNodes($pid, $eid);
-    if (! $moveToOldReserved ) {
-	push( @nodes, ExpNodesOldReserved($pid, $eid) );
+}
+else {
+    print "Releasing all nodes from experiment $experiment.\n";
+    @nodes = $experiment->NodeList(0, 1);
+    if (! $moveToOldReserved) {
+	my @oldnodes = ();
+	if ($experiment->OldReservedNodeList(\@oldnodes) != 0) {
+	    die("*** $0:\n".
+		"    Could not get oldreserved node list for $experiment\n");
+
+	}
+	push(@nodes, @oldnodes);
     }
 }
-
-my $mustmakeconf = 0;
 
 ######################################################################
 # Step 1
@@ -194,13 +193,14 @@ my $mustmakeconf = 0;
 
 DBQueryFatal("lock tables reserved write");
 
-foreach my $n (@nodes) {
-    # Check to make sure they have actually reserved the nodes.
-    my $result =
-	DBQueryFatal("select * from reserved where node_id='$n' ".
-		     "and eid='$eid' and pid='$pid'");
-    if ($result->numrows == 0) {
-	print "Node '$n' is not reserved by your experiment.\n";
+foreach my $node (@nodes) {
+    my $node_id = $node->node_id();
+    
+    # Check to make sure they have actually reserved the nodes, now that
+    # the reserved table is locked.
+    my $rowref = $node->ReservedTableEntry();
+    if (!defined($rowref)) {
+	print STDERR "$node is not reserved by your experiment.\n";
 	$error++;
 	next;
     }
@@ -208,62 +208,46 @@ foreach my $n (@nodes) {
     #
     # Remember if the node's disk must be zeroed
     #
-    my $rowref = $result->fetchrow_hashref();
     if ($rowref->{'mustwipe'}) {
-	$mustzero{$n} = $rowref->{'mustwipe'};
-    } else {
-	$mustzero{$n} = 0;
+	$mustzero{$node_id} = $rowref->{'mustwipe'};
+    }
+    else {
+	$mustzero{$node_id} = 0;
     }
 
-    if ( $moveToOldReserved ) {
+    if ($moveToOldReserved) {
 	# Move to holding reservation. Node is not free, but is no longer
 	# owned by the pid/eid, so cannot be mucked with.
-
-	if (! DBQueryWarn("update reserved " .
-			  "set vname='$n', ".
-			  " exptidx=$exptidx, ".
-			  " pid='$oldreserved_pid', ".
-			  " eid='$oldreserved_eid', ".
-			  " old_exptidx=$old_exptidx, ".
-			  " old_pid='$pid', ".
-			  " old_eid='$eid' where node_id='$n'")) {
-	    print "*** WARNING: Error moving node $n to holding pid/eid: ".
-	          "$oldreserved_pid/$oldreserved_eid\n";
+	if ($node->MoveReservation($oldreserved_experiment) != 0) {
+	    print "*** WARNING: Error moving $node to holding experiment!\n";
 	    next;
 	}
-    } else {
+    }
+    else {
 	# Move to locked reservation. Node is not free, but is no longer
 	# owned by the pid/eid, so cannot be mucked with.
-	
-	if (! DBQueryWarn("update reserved " .
-			  "set vname='$n', exptidx=$locker_exptidx, ".
-			  " pid='$lockedpid', eid='$lockedeid', ".
-			  " old_exptidx=0, old_pid='', old_eid='' ".
-			  "where node_id='$n'")) {
-	    print "*** WARNING: Error locking down node $n!\n";
+	if ($node->MoveReservation($locker_experiment) != 0) {
+	    print "*** WARNING: Error locking down $node!\n";
 	    next;
 	}
 
 	# Any node that was part of an elabinelab or plabinelab experiment
 	# that is freed requires that we remake the dhcpd.conf file.
 	if ($rowref->{'inner_elab_boot'} || $rowref->{'plab_boot'}) {
-	    if (!DBQueryWarn("update reserved " .
-			     "set inner_elab_boot=0, plab_boot=0 " .
-			     "where node_id='$n'")) {
-		print "*** WARNING: Error clearing elab/plab boot on $n!\n";
+	    if ($node->ModifyReservation({"inner_elab_boot" => 0,
+					  "plab_boot"       => 0}) != 0) {
+		print "*** WARNING: Error clearing elab/plab boot for $node\n";
 	    }
 	    $mustmakeconf = 1;
 	}
-
-	push(@freed_nodes, $n);
+	push(@freed_nodes, $node);
     }
 
 }
-
 DBQueryFatal("unlock tables");
 
 # We are done if called with a -o
-if( $moveToOldReserved ) {
+if ($moveToOldReserved) {
     exit($error);
 }
 
@@ -276,22 +260,19 @@ if( $moveToOldReserved ) {
 # Step 2, then nodes might have already been rebooted by the reload
 # daemon.
 #
-######################################################################
-if (@freed_nodes > 0) {
-    my $nodelist = "(" . join(",", map("'$_'", @freed_nodes)) . ")";
-
-    my $result = 
-	DBQueryFatal("select node_id from nodes where ".
-		     "pxe_boot_path is not NULL and node_id in $nodelist");
-    if ($result->num_rows()) {
-	DBQueryFatal("update nodes set pxe_boot_path=NULL where ".
-		     "node_id in $nodelist");
+# NOTE: this does not happen very often. elabinelab, plabinelab?
+#
+foreach my $node (@freed_nodes) {
+    if ($node->pxe_boot_path() && $node->pxe_boot_path() != "") {
+	$node->Update({"pxe_boot_path" => "NULL"}) == 0 or
+	    die("*** $0:\n".
+		"    Could not update pxe_boot_path for $node\n");
 	$mustmakeconf = 1;
     }
 }
 if ($mustmakeconf) {
     system("$makeconf -i -r") == 0 ||
-	print STDERR "WARNING: $makeconf failed!\n";
+	print STDERR "*** WARNING: $makeconf failed!\n";
 }
 
 ######################################################################
@@ -303,33 +284,17 @@ if ($mustmakeconf) {
 #
 ######################################################################
 
-foreach my $n (@freed_nodes) {
-    my $mustclean = 1;
-
-    # Clean out all delays
-    DBQueryWarn("delete from delays where node_id='$n'") || $error++;
-
-    # Find the default values for its node type.
-    my $node = Node->Lookup($n);
-    if (!defined($node)) {
-	print "*** Unable to Lookup node $n\n";
-	$error++;
-	next;
-    }
+foreach my $node (@freed_nodes) {
+    my $node_id       = $node->node_id();
+    my $mustclean     = 1;
     my $estate        = $node->eventstate();
     my $isvirt        = $node->isvirtnode();
     my $isdynamic     = $node->isdynamic();
     my $def_boot_osid = $node->def_boot_osid();
-    my $osid;
-    my $imageable;
+    my $imageable     = $node->imageable();
 
-    if ($node->default_osid(\$osid) ||
-	$node->imageable(\$imageable)) {
-
-	print "*** Unable to get necessary type attributes for $n\n";
-	$error++;
-	next;
-    }
+    # Clean out all delays
+    DBQueryWarn("delete from delays where node_id='$node_id'") || $error++;
 
     #
     # See if the OS it was running was marked as mustclean or not. Basically,
@@ -340,15 +305,18 @@ foreach my $n (@freed_nodes) {
     #
     my $clean;
     if (defined($def_boot_osid)) {
-	my $result = DBQueryFatal("select mustclean from os_info ".
-				  "where osid='$def_boot_osid'");
-	($clean) = $result->fetchrow_array();    
+	my $osinfo = OSinfo->Lookup($def_boot_osid);
+	if (!defined($osinfo)) {
+	    print "*** Unable to lookup OSinfo object for $def_boot_osid\n";
+	    $error++;
+	    next;
+	}
+	$clean = $osinfo->mustclean();
     }
-   
     if ($isvirt || !$imageable) {
 	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
 	$mustclean = 0;
-	$mustzero{$n} = 0;
+	$mustzero{$node_id} = 0;
     }
     elsif (defined($clean)) {
 	# If def_boot_osid set, then $clean is defined. Otherwise not set
@@ -361,21 +329,19 @@ foreach my $n (@freed_nodes) {
     # We will call into the Node library to delete it. 
     #
     if ($isdynamic) {
-	push(@dynanodes, $n);
+	push(@dynanodes, $node);
 	next;
     }
 
     if (! $isvirt) {
         # On real nodes, clean out all interfaces except the control net.
-	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
-		    "       rtabid='0',vnode_id=NULL,current_speed='0' ".
-		    "where node_id='$n' and ".
-		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
-	    || $error++;
+	$node->ClearInterfaces() == 0
+	    or $error++;
+	
 	# And log phys nodes freed from hwdown
 	if ($pid eq NODEDEAD_PID() && $eid eq NODEDEAD_EID() && $user_uid) {
-	    TBSetNodeLogEntry($n, $user_uid, "misc",
-			      "'Moved from hwdown; nfree'");
+	    $node->InsertNodeLogEntry($this_user, "misc",
+				      "Moved from hwdown; nfree");
 	}
     }
 
@@ -386,38 +352,45 @@ foreach my $n (@freed_nodes) {
 		"def_boot_cmd_line='',next_boot_cmd_line='', ".
 		"temp_boot_osid=NULL,next_boot_osid=NULL, ".
 		"update_accounts=0,ipport_next=ipport_low, ".
-		"sfshostid=NULL,allocstate='$allocFreeState',boot_errno=0 ".
-		"where node_id='$n'") || $error++;
+		"sfshostid=NULL,allocstate='$allocFreeState',boot_errno=0, ".
+		"destination_x=NULL,destination_y=NULL, ".
+		"destination_orientation=NULL ".
+		"where node_id='$node_id'") || $error++;
 
     #
     # If the node is a virtnode, force its state to SHUTDOWN. This is mostly
     # to avoid silly stated warnings for nodes that do not have a physical
     # representation most of the time!
     #
-    TBSetNodeEventState($n, TBDB_NODESTATE_SHUTDOWN)
+    $node->SetEventState(TBDB_NODESTATE_SHUTDOWN)
 	if ($isvirt && $estate ne TBDB_NODESTATE_SHUTDOWN());
 
     # Clean out the SFS hostid. What about the other keys?
     DBQueryWarn("update node_hostkeys set ".
 		"  sfshostid=NULL ".
-		"where node_id='$n'") || $error++;
+		"where node_id='$node_id'")
+	or $error++;
 
     # Clean out the current_reloads table (a just in case measure).
-    DBQueryWarn("delete from current_reloads where node_id='$n'") || $error++;
+    DBQueryWarn("delete from current_reloads where node_id='$node_id'")
+	or $error++;
 
     # Reset its port allocation stuff.
-    DBQueryWarn("delete from nodeipportnum where node_id='$n'") || $error++;
+    DBQueryWarn("delete from nodeipportnum where node_id='$node_id'")
+	or $error++;
 
     # Clean the vinterfaces table for this node.
-    DBQueryWarn("delete from vinterfaces where node_id='$n'") || $error++;
+    DBQueryWarn("delete from vinterfaces where node_id='$node_id'")
+	or $error++;
 
     # Clean the interface_settings table for this node.
-    DBQueryWarn("delete from interface_settings where node_id='$n'") || $error++;
+    DBQueryWarn("delete from interface_settings where node_id='$node_id'")
+	or $error++;
 
     # If it's a robot, we need to reset its physical location.
-    $result =
+    my $result =
 	DBQueryFatal("select building,floor,loc_x,loc_y,orientation ".
-		     "from node_startloc where node_id='$n'");
+		     "from node_startloc where node_id='$node_id'");
     if ($result->num_rows()) {
 	while (my ($bldg,$floor,$x,$y,$o) = $result->fetchrow_array()) {
 	    my $subresult = 
@@ -430,7 +403,7 @@ foreach my $n (@freed_nodes) {
 		$y = int($y * $pixels_per_meter);
 		DBQueryWarn("update location_info set ".
 			    "loc_x=$x,loc_y=$y,orientation=$o ".
-			    "where node_id='$n' and building='$bldg' ".
+			    "where node_id='$node_id' and building='$bldg' ".
 			    "and floor=$floor") || $error++;
 	    }
 	    else {
@@ -438,107 +411,94 @@ foreach my $n (@freed_nodes) {
 	    }
 	}
     }
-    DBQueryWarn("update nodes set destination_x=NULL,destination_y=NULL,".
-		"destination_orientation=NULL where node_id='$n'") || $error++;
-
     # Now its safe to change the reservation.
 
     # If the node has a next_reserve entry, change the reservation.
-    $result =
-	DBQueryFatal("select pid,eid from next_reserve ".
-		     "where node_id='$n'");
+    my $next_reservation = $node->NextReservation();
+    if (defined($next_reservation)) {
+	print "Moving $node to $next_reservation\n";
 
-    if ($result->num_rows()) {
-	my ($next_pid, $next_eid) = $result->fetchrow_array();
-	
-	print "Moving $n to $next_pid/$next_eid.\n";
+	if ($node->MoveReservation($next_reservation) == 0) {
+	    $node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, $this_user,
+				  $next_reservation);
+	    
+	    DBQueryWarn("delete from next_reserve where node_id='$node_id'")
+		or $error++;
 
-	my $next_exptidx;
-	if (!TBExptIDX($next_pid, $next_eid, \$next_exptidx)) {
-	    die("No such experiment $next_pid/$next_eid!\n");
+	    # This little sillyness is for disk reloading.
+	    # Kill the last reservation since this path is special.
+	    DBQueryWarn("delete from last_reservation ".
+			"where node_id='$node_id'")
+		or $error++;
 	}
-
-	DBQueryWarn("update reserved set ".
-		    " exptidx=$next_exptidx,pid='$next_pid',eid='$next_eid'," .
-		    " vname='$n' ".
-		    "where node_id='$n'")
-	    || $error++;
-	
-	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
-			 $next_pid, $next_eid);
-	
-	DBQueryWarn("delete from next_reserve where node_id='$n'")
-	    || $error++;
-
-	# This little sillyness is for disk reloading.
-	# Kill the last reservation since this path is special.
-	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
+	else {
 	    $error++;
-
+	}
 	next;
     }
 
     # If the node has a reloads entry, change the reservation so that the
     # reload_daemon will pick it up.
     $result =
-	DBQueryFatal("select node_id,image_id from scheduled_reloads " .
-		     "where node_id='$n'");
+	DBQueryFatal("select image_id from scheduled_reloads " .
+		     "where node_id='$node_id'");
     my $inreloads = $result->numrows();
 
     # XXX
     if ($inreloads && !$imageable) {
-	print "WARNING: non-imageable node $n in scheduled_reloads\n";
+	print "WARNING: non-imageable node $node in scheduled_reloads\n";
 	$inreloads = 0;
     }
 
-    if (TBNodeType($n) eq "garcia") {
-	print "Moving $n to $reloadpid/$rppendingeid.\n";
-
-	if (!defined($rppend_exptidx)) {
-	    if (!TBExptIDX($reloadpid, $rppendingeid, \$rppend_exptidx)) {
-		die("No such experiment $reloadpid/$rppendingeid!\n");
+    #
+    # XXX Robots.
+    #
+    if ($node->type() eq "garcia") {
+	if (!defined($repositioning_experiment)) {
+	    $repositioning_experiment = Experiment->Lookup($reloadpid,
+							   $rppendingeid);
+	    if (!defined($repositioning_experiment)) {
+		print STDERR "*** WARNING: No repositioning experiment!\n";
+		$error++;
+		next;
 	    }
 	}
-	
-	DBQueryWarn("update reserved set ".
-		    " exptidx=$rppend_exptidx, ".
-		    " pid='$reloadpid',".
-		    " eid='$rppendingeid',vname='$n' ".
-		    "where node_id='$n'") ||
+	print "Moving $node to $repositioning_experiment\n";
+
+	if ($node->MoveReservation($repositioning_experiment) == 0) {
+	    $node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, $this_user,
+				  $repositioning_experiment);
+	    
+	    DBQueryWarn("replace into scheduled_reloads ".
+			"set node_id='$node_id'")
+		or $error++;
+
+	    # This little sillyness is for disk reloading.
+	    # Kill the last reservation since this path is special.
+	    DBQueryWarn("delete from last_reservation ".
+			"where node_id='$node_id'")
+		or $error++;
+	}
+	else {
 	    $error++;
-
-	DBQueryWarn("REPLACE INTO scheduled_reloads set node_id='$n'") || 
-	    $error++;
-
-	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
-			 $reloadpid, $rppendingeid);
-
-	# This little sillyness is for disk reloading.
-	# Kill the last reservation since this path is special.
-	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
-	    $error++;
-
+	}
 	next;
     }
     elsif (!$TESTMODE &&
 	   ((!$isvirt && $imageable) || # XXX force reload hack!
-	    $inreloads || $mustzero{$n})) { # XXX Garcia hack
-	print "Moving $n to $reloadpid/$pendingeid.\n";
-	
-	DBQueryWarn("update reserved set ".
-		    " exptidx=$reload_exptidx, ".
-		    " pid='$reloadpid',eid='$pendingeid',".
-		    " vname='$n' ".
-		    "where node_id='$n'") || $error++;
+	    $inreloads || $mustzero{$node_id})) { # XXX Garcia hack
+	print "Moving $node to $reloading_experiment\n";
 
-	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
-			 $reloadpid, $pendingeid);
+	if ($node->MoveReservation($reloading_experiment) == 0) {
+	    $node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, $this_user,
+				  $reloading_experiment);
 
-	# This little sillyness is for disk reloading.
-	# Kill the last reservation since this path is special.
-	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
-	    $error++;
-
+	    # This little sillyness is for disk reloading.
+	    # Kill the last reservation since this path is special.
+	    DBQueryWarn("delete from last_reservation ".
+			"where node_id='$node_id'")
+		or $error++;
+	}
 	next;
     }
 
@@ -550,14 +510,15 @@ foreach my $n (@freed_nodes) {
     # a reload.
     if ($mustclean) {
 	DBQueryWarn("replace into last_reservation (pid_idx,node_id,pid)".
-		    "values ($pid_idx, '$n', '$pid')");
+		    "values ($pid_idx, '$node_id', '$pid')");
     }
 
-    print "Releasing node '$n' ... ";
-    if (DBQueryWarn("delete from reserved where node_id='$n'")) {
+    print "Releasing node '$node_id' ... ";
+    if (DBQueryWarn("delete from reserved where node_id='$node_id'")) {
 	print "Succeeded.\n";
-	
-	TBSetNodeHistory($n, TB_NODEHISTORY_OP_FREE, $UID, $pid, $eid);
+
+	$node->SetNodeHistory(TB_NODEHISTORY_OP_FREE, $this_user,
+			      $experiment);
     }
     else {
 	print "Failed!\n";
@@ -567,7 +528,9 @@ foreach my $n (@freed_nodes) {
 
 # Release dynamic nodes.
 if (@dynanodes) {
-    Node::DeleteVnodes(@dynanodes);
+    my @nodeids = map($_->node_id(), @dynanodes);
+
+    Node::DeleteVnodes(@nodeids);
 }
 
 ######################################################################
@@ -585,8 +548,10 @@ if (@dynanodes) {
 ######################################################################
 
 if (@freed_nodes) {
-    system("$consetup @freed_nodes") == 0 ||
-	print STDERR "WARNING: $consetup @freed_nodes failed!\n";
+    my @nodeids = map($_->node_id(), @freed_nodes);
+    
+    system("$consetup @nodeids") == 0 ||
+	print STDERR "WARNING: $consetup @nodeids failed!\n";
 }
 
 exit($error);

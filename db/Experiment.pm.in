@@ -2345,15 +2345,54 @@ sub LocalNodeListNames($$)
 }
 
 #
-# Return list of experiment nodes (objects or just names)
+# Return list of experiment nodes in the old reserved experiment.
 # 
-sub NodeList($;$)
+sub OldReservedNodeList($$)
 {
-    my ($self, $namesonly) = @_;
-    my @nodenames = ();
+    my ($self, $plist) = @_;
 
     # Must be a real reference. 
     return -1
+	if (! ref($self));
+
+    @$plist     = ();
+    my @result  = ();
+    my $exptidx = $self->idx();
+    my $oldreserved_pid = OLDRESERVED_PID;
+    my $oldreserved_eid = OLDRESERVED_EID;
+
+    my $query_result =
+	DBQueryWarn("select r.node_id from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "where r.pid='$oldreserved_pid' and ".
+		    "      r.eid='$oldreserved_eid' and ".
+		    "      r.old_exptidx='$exptidx'");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($nodeid) = $query_result->fetchrow_array()) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    print STDERR "*** Could not map $nodeid to its object\n";
+	    return -1;
+	}
+	push(@result, $node);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# Return list of experiment nodes (objects or just names)
+# 
+sub NodeList($;$$)
+{
+    my ($self, $namesonly, $includevirtual) = @_;
+    my @nodenames = ();
+
+    # Must be a real reference. 
+    return undef
 	if (! ref($self));
 
     my $pid = $self->pid();
@@ -2373,6 +2412,14 @@ sub NodeList($;$)
 	    return undef;
 	}
 	push(@nodes, $node);
+	if (defined($includevirtual) && $includevirtual) {
+	    my @virtuals = ();
+	    if ($node->VirtualNodes(\@virtuals) != 0) {
+		print STDERR "*** Could not get virtual node list for $node\n";
+	    }
+	    push(@nodes, @virtuals)
+		if (@virtuals);
+	}
     }
     return @nodes;
 }

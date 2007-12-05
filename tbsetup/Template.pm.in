@@ -1915,13 +1915,11 @@ sub CreateDirectory($)
     Refresh($self) == 0
 	or return -1;
 
-    my $unix_gid;
-    my $unix_name;
-    
-    if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
-	print "*** No info for project/group $pid/$gid!\n";
-	return -1;
-    }
+    my $group = Group->LookupByPidGid($pid, $gid);
+    return -1
+	if (!defined($group));
+    my $unix_gid = $group->unix_gid();
+
     if (! -e $guiddir) {
 	if (! mkdir($guiddir, 0770) ||
 	    ! chmod(0770, "$guiddir") ||

@@ -138,6 +138,7 @@ sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
 sub uid_idx($)		{ return field($_[0], "uid_idx"); }
 sub dbid($)		{ return field($_[0], "uid_idx"); }
 sub uid($)		{ return field($_[0], "uid"); }
+sub uuid($)		{ return field($_[0], "uid_uuid"); }
 sub created($)		{ return field($_[0], "usr_created"); }
 sub expires($)		{ return field($_[0], "usr_expires"); }
 sub modified($)		{ return field($_[0], "usr_modified"); }
@@ -1282,6 +1283,37 @@ sub GList($$)
     $glist = $default . " " . $default . " " . $glist;
 
     return $glist;
+}
+
+#
+# Return a list of the additional Unix groups a user is in. These are
+# returned as plain integers.
+#
+sub UnixGroupList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $user_uid = $self->uid();
+    my @glist    = ();
+    @$prval      = ();
+
+    my $query_result =
+	DBQueryWarn("select gid from unixgroup_membership ".
+		    "where uid='$user_uid'");
+    return -1
+	if (!defined($query_result));
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($gid) = $query_result->fetchrow_array()) {
+	push(@glist, $gid)
+    }
+    @$prval = @glist;
+    return 0;
 }
 
 #
