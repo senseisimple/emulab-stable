@@ -395,6 +395,14 @@ sub NodeAllocCheck($$)
     return 0;
 }
 
+# Naming confusion.
+sub AllocCheck($$)
+{
+    my ($self, $pid) = @_;
+
+    return $self->NodeAllocCheck($pid);
+}
+
 #
 # Equality test for two experiments.
 # Not strictly necessary in perl, but good form.
