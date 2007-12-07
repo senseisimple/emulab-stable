@@ -1,0 +1,107 @@
+Abstract:
+---------
+We present a new Internet path emulation model for use in the Emulab testbed.
+This gives the experimenters acccess to load-free and completely controllable 
+host conditions and relistic network conditions. We use a 
+lightweight monitoring system to take periodic snapshots of the network 
+conditions on Planetlab and detect shared bottlenecks. Our system reliably 
+detects bottlenecks due to congestion and measures how the bandwidth available 
+to TCP transfers on Planetlab scales with the number of streams. We use a 
+modified FreeBSD Dummynet network configurator to faithfully reproduce these 
+network conditions in Emulab.Unlike the dynamic Internet model provided by 
+Flexlab, the static model scales reliably and the size of the experiments 
+possible is only limited by the number of available nodes in Emulab.
+Our evaluation suggests that this new static Internet emulation model provides 
+an improved method for setting realistic network characteristics in Emulab 
+while preserving its strengths of repeatibility and host control.
+
+Possible additions/changes to the abstract:
+--------------------------------------------
+- Intro about Emulab & Planetlab:
+    - Network conditions are artificial in Emulab.
+    - Planetlab is overloaded and execution environment(Eg: Kernel) 
+    can't be modified.
+    - Something about Node-caps(&/HTB) and how they might affect experiments?
+    - Reliable experiment setup: For large experiments, some Planetlab nodes
+    always fail to come up. We can eliminate this problem with our static
+    model and Emulab.
+    - More emphasis on repeatability and being able to run experiments
+    against particular snapshots of Internet conditions, useful for debugging.
+    - Mention the changes to Dummynet to enable Backfill, realistic emulation
+    of asymmetric paths and quantifying their prescence/extent on Planetlab.
+
+
+Paper Outline:
+--------------
+
+- High level goal: A better static model in Emulab to emulate the available bandwidth seen
+on Planetlab paths.
+
+- Contributions ?
+    - A new(simpler/less complex/?..) method for emulating Internet conditions 
+    inside Emulab, while providing control over the host environment and non-overloaded
+    host conditions.
+    - The experiments will be repeatable using any snapshot of the static
+    conditions stored in our database - ability to debug the applications while
+    running them under realistic Internet conditions.
+    - Our Dummynet mods ?? - realistic emulation of available bandwidth in case
+    of asymmetric paths.
+    - Quantification of the extent and effect of Node-caps on Planetlab.
+
+- Problems with the existing static model(s):
+    - The cloud model creates independant pipes between each pair
+    of nodes. It fails to take into account potential bottlenecks in
+    the internet.
+    - The LAN model assumes that each node -> all other nodes is a bottleneck.
+    Again, this is an over-simplication.
+    - Hybrid model assumes that only Inet -> everywhere else paths are
+    bottlenecks.
+    - Glean whatever else is possible from the Flexlab paper/Bittorrent results.
+
+
+- What is the new model ?
+    - Detects bottlenecks using Wavelet based Correlation detection. Light-weight
+    UDP probes sent out on all paths of interest and their delays are correlated.
+    - The Wavelet method is based on a SIGCOMM '04 paper(which is an increment over
+        Rubenstein's SIGMETRICS '02 paper) and it has been
+    verified to correctly detect congestion in an Emulab experiment.
+    - Setup the Dummynet pipes with the detected bottlenecks 
+    - The bandwidth for these bottlenecks is currently being set as
+    the maximum bandwidth (as reported by Flexmon) of the paths in
+    question.
+    - Insert about Jon's current work: Instead of doing the above for
+    bottleneck bandwidth, we measure the bandwidth obtained for a given
+    number of streams on Planetlab on these paths. While running
+    the static model in Emulab, we could detect the number of streams
+    going through the bottleneck and vary the amount of available bandwidth
+    to match what we saw earlier in Planetlab according to our snapshot.
+    We don't have the numbers on how well this performs yet.
+
+- Issues in emulating the available bandwidth:
+
+    - ~10% of Planetlab paths have asymmetric links of > 3:1 asymmetry.
+    - Simply setting up dummynet pipes with the available bandwidth values
+    causes problems in the case of asymmetric links( with asymmetry > 3:1 ).
+    - We have experimental proof of this phenomenon(Jon's IPerf mesh runs in Emulab).
+    Its main cause is the large queuing delay caused on the reverse path and
+    the ACKs of the forward path transfer getting stuck there while waiting
+    to be transmitted on the slow link.
+    - This problem can be alleviated if we setup the links as high-capacity, but
+    providing the appropriate amount of available bandwidth. On the Internet,
+    this is accomplished by the cross-traffic from other sources.
+    - We do this by way of our modifications to Dummynet. We add a new parameter
+    called "Backfill" ( background fill ) to restrict the amount of available 
+    bandwidth. This provides better performance in the case of asymmetric links
+    which have TCP transfers going on in both directions. ( we have the numbers for
+    this too).
+    - Our Dummynet modifications do not increase the load on the delay nodes.
+    ( Top numbers available ).
+
+- Evaluation(We don't have any of these numbers yet):
+    - IPerf mesh run in parallel on Planetlab and on Emulab.
+        - We need to show a contrast between how the Cloud/Hybrid models
+        perform against our new static model.
+    - We could run BitTorrent between the same nodes that we put in the 
+    Flexlab NSDI paper and check how the new model does on that set of nodes.
+
+
