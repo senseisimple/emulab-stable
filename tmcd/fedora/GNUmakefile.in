@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -82,7 +82,7 @@ sysetc-onceonly-install:
 	@$(MYINSTALL) $(SRCDIR)/syslog.conf $(SYSETCDIR)/syslog.conf
 
 script-install:	dir-install $(SCRIPTS)
-	@echo "fedora-specific script-install done"
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
 
 sfs-install:
 	@echo "no fedora-specific sfs files"
