@@ -1460,7 +1460,9 @@ def do_sync(args, mode="sync", must_be_active=1, as_root=False):
                         continue
                     else:
                         vos = OSIDS[physical[vhost]["osid"]]
-                        if "ssh" not in vos["osfeatures"]:
+                        if ("osfeatures" not in vos or
+                            not vos["osfeatures"] or
+                            "ssh" not in vos["osfeatures"]):
                             if VERBOSITY > VERBOSITY_HUMAN:
                                 sys.stderr.write("warning: %s OS, %s, does "
                                                  "not support ssh, skipping\n"
