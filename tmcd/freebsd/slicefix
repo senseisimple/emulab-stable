@@ -10,6 +10,7 @@ if [ -r /etc/emulab/paths.sh ]; then
 else
 	BINDIR=/etc/testbed
 	BOOTDIR=/var/emulab/boot
+	ETCDIR=/etc/emulab
 fi
 
 disk="ad0"
@@ -59,10 +60,17 @@ esac
 #
 # ...or the filesystem
 #
-if [ -r /etc/emulab/isflash ]; then
+if [ -r $ETCDIR/isflash ]; then
     FLASHBOOT=1
 else
     FLASHBOOT=0
+fi
+
+if [ -r $ETCDIR/bossnode ]; then
+    bossnode=`cat $ETCDIR/bossnode`;
+    setboss=1
+else
+    setboss=0
 fi
 
 dofreebsd() {
@@ -127,6 +135,13 @@ dofreebsd() {
 	changeacpi=0
 	changeasf=0
 
+	fixit=0
+
+	# Hardwire the boss?
+	if [ $setboss -eq 1 ]; then
+	    fixit=1
+        fi
+
 	# If our disk/part does not appear anywhere in fstab, we need to fix it
 	grep "^/dev/${disk}s${part}" /mnt/etc/fstab >/dev/null 2>&1
 	case $? in
@@ -134,12 +149,14 @@ dofreebsd() {
 	    ;;
 	*)
 	    changedisk=1
+	    fixit=1
 	    ;;
 	esac
 
 	# If there is a /entropy file, we need to update it
 	if [ -f /mnt/entropy -a -c /dev/random ]; then
 		changeentropy=1
+		fixit=1
 	fi
 
 	#
@@ -160,11 +177,13 @@ dofreebsd() {
 		0)
 		    if [ $ACPI = "no" ]; then
 			changeacpi=1
+			fixit=1
 		    fi
 		    ;;
 		*)
 		    if [ $ACPI = "yes" ]; then
 			changeacpi=1
+			fixit=1
 		    fi
 		    ;;
 		esac
@@ -189,22 +208,25 @@ dofreebsd() {
 		0)
 		    if [ $ASF = "no" ]; then
 			changeasf=1
+			fixit=1
 		    fi
 		    ;;
 		*)
 		    if [ $ASF = "yes" ]; then
 			changeasf=1
+			fixit=1
 		    fi
 		    ;;
 		esac
 		;;
 	    *)
 	        changeasf=1
+		fixit=1
 		;;
 	    esac
 	fi
 
-	if [ $changedisk -eq 0 -a $changeentropy -eq 0 -a $changeacpi -eq 0 -a $changeasf -eq 0 ]; then
+	if [ $fixit -eq 0 ]; then
 		echo "  no changes necessary"
 		umount $rootdev
 		return 0
@@ -216,6 +238,16 @@ dofreebsd() {
 		echo "Mount of $rootdev failed"
 		return 1
 	}
+
+	# hardwire the boss node
+	if [ $setboss -eq 1 -a -d /mnt/etc/emulab ]; then
+	    echo "  hardwiring boss to $bossnode"
+	    cp $ETCDIR/bossnode /mnt/etc/emulab/bossnode || {
+	        echo "Failed to create /etc/emulab/bossnode"
+		umount $rootdev
+		return 1
+	    }
+	fi
 
 	if [ $changedisk -eq 1 ]; then
 	    echo "  updating /etc/fstab"
@@ -364,6 +396,16 @@ dolinux() {
 		echo "EXT2FS mount of $rootdev failed"
 		return 1
 	}
+
+	# hardwire the boss node
+	if [ $setboss -eq 1 -a -d /mnt/etc/emulab ]; then
+	    echo "  hardwiring boss to $bossnode"
+	    cp $ETCDIR/bossnode /mnt/etc/emulab/bossnode || {
+	        echo "Failed to create /etc/emulab/bossnode"
+		umount $rootdev
+		return 1
+	    }
+	fi
 
 	# change the swap devices in fstab
 	sed -i .orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${ldisk}\1;" /mnt/etc/fstab || {
