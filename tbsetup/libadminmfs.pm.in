@@ -347,12 +347,14 @@ sub TBAdminMfsSelect($$@)
     # set by the user when we enter admin mode, or those set by us when
     # we leave admin mode.
     #
-    my $cond = "node_id in (" . join(",", map("'$_'", @good)) . ")";
-    if (!DBQueryWarn("update nodes set startupcmd='', startstatus='none' ".
-		     "where $cond")) {
+    if (@good > 0) {
+	my $cond = "node_id in (" . join(",", map("'$_'", @good)) . ")";
+	if (!DBQueryWarn("update nodes set startupcmd='', startstatus='none' ".
+			 "where $cond")) {
 	    print STDERR "*** $me:\n".
 		"    Failed to clear startup state for @good!\n";
 	    push(@bad, @good);
+	}
     }
 
     @{$failedref} = @bad
