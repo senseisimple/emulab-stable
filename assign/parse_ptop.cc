@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -267,8 +267,8 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
       for (int cur = 0;cur<num;++cur) {
 	pedge pe = (add_edge(srcv,dstv,PG)).first;
 	tb_plink *pl = new
-	    tb_plink(name,tb_plink::PLINK_NORMAL,link_type,srcmac,dstmac,
-		     srciface,dstiface);
+	    tb_plink(name,tb_plink::PLINK_NORMAL,link_type,src,dst,
+                    srcmac,dstmac, srciface,dstiface);
 	put(pedge_pmap,pe,pl);
 	pl->delay_info.bandwidth = ibw;
 	pl->delay_info.delay = idelay;

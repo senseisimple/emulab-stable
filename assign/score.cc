@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -59,7 +59,7 @@ extern tb_sgraph SG;		// switch fabric
 void score_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 void unscore_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-                    pedge &out_edge);
+                    pedge &out_edge,bool is_src, bool is_dst);
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
@@ -192,7 +192,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
 
   pedge pe;
   // Direct link
-  if (find_best_link(dest_pv,pv,vlink,pe)) {
+  if (find_best_link(pv,dest_pv,vlink,pe,true,true)) {
     tb_link_info info(tb_link_info::LINK_DIRECT);
     info.plinks.push_back(pe);
     resolutions.push_back(info);
@@ -231,7 +231,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (first_link) {
-        if (!find_best_link(pv,*switch_it,vlink,first)) {
+        if (!find_best_link(pv,*switch_it,vlink,first,true,false)) {
           SDEBUG(cerr << "    intraswitch failed - no link first" <<
               endl;)
             // No link to this switch
@@ -240,7 +240,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (second_link) {
-        if (!find_best_link(dest_pv,*switch_it,vlink,second)) {
+        if (!find_best_link(*switch_it,dest_pv,vlink,second,false,true)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
               endl;)
@@ -306,8 +306,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         }
 
         if (first_link) {
-          if
-            (!find_best_link(pv,*source_switch_it,vlink,first)) {
+          if (!find_best_link(pv,*source_switch_it,vlink,first,true,false)) {
               // No link to this switch
               SDEBUG(cerr << "    interswitch failed - no first link"
                   << endl;)
@@ -316,7 +315,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         }
 
         if (second_link) {
-          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second)) {
+          if (!find_best_link(*dest_switch_it,dest_pv,vlink,second,false,true)) {
             // No link to tshis switch
             SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
               continue;
@@ -446,44 +445,10 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
           vlink,pnode,dest_pnode,flipped);
       
       /*
-       * If they have asked for a specific interface, filter out any
-       * resolutions that don't have it
+       * Note: The fixed interface code has been moved to find_best_link
        */
-      if (vlink->fix_src_iface) {
-	  resolution_vector::iterator rit;
-	  for (rit = resolutions.begin(); rit != resolutions.end();) {
-	      pedge link = (*rit).plinks.front();
-	      tb_plink *plink = get(pedge_pmap,link);
-	      if (plink->srciface != vlink->src_iface) {
-		  // Doesn't match, remove it!
-		   total_weight -= resolution_cost(rit->type_used);
-		   rit = resolutions.erase(rit);
-	       } else {
-		   rit++;
-	       }
-	  }
-      }
-      
-      if (vlink->fix_dst_iface) {
-	  resolution_vector::iterator rit;
-	  for (rit = resolutions.begin(); rit != resolutions.end();) {
-	      pedge link = (*rit).plinks.back();
-	      tb_plink *plink = get(pedge_pmap,link);
-	      // Yes, this really is srciface
-	      // XXX: This only works because we always have the node as the 'source'
-	      // of a plink! Shouldn't depend on this!
-	      if (plink->srciface != vlink->dst_iface) {
-		  // Doesn't match, remove it!
-		  total_weight -= resolution_cost(rit->type_used);
-		  rit = resolutions.erase(rit);
-	      } else {
-		  rit++;
-	      }
-	  }
-      }
       
       int n_resolutions = resolutions.size();
-      //int resolution_index = n_resolutions - 1;
       int resolution_index = n_resolutions;
       
       /*
@@ -1354,7 +1319,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
 }
 
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-			 pedge &out_edge)
+			 pedge &out_edge, bool is_src, bool is_dst)
 {
   pvertex dest_pv;
   double best_distance = 1000.0;
@@ -1373,10 +1338,41 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       dest_pv = source(*pedge_it,PG);
     if (dest_pv == switch_pv) {
       tb_plink *plink = get(pedge_pmap,*pedge_it);
+      tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
 
       // Skip any links whose type is wrong (ie. doesn't match the vlink)
       if (plink->types.find(vlink->type) == plink->types.end()) {
 	  continue;
+      }
+
+      // Skip any links that don't match fixed-interface requirements. We only
+      // do this if we're trying to map the source and/or destination of the
+      // vlink
+      if (is_src && vlink->fix_src_iface) {
+          bool flipped;
+          if (plink->srcnode == pnode->name) {
+              flipped = false;
+          } else {
+              flipped = true;
+          }
+          if ((flipped? plink->dstiface : plink->srciface)
+                  != vlink->src_iface) {
+              continue;
+          }
+      }
+
+      if (is_dst && vlink->fix_dst_iface) {
+          bool flipped;
+          if (plink->dstnode == dest_pnode->name) {
+              flipped = false;
+          } else {
+              flipped = true;
+          }
+          if ((flipped? plink->srciface : plink->dstiface)
+                  != vlink->dst_iface) {
+              continue;
+          }
+          }
       }
 
       // Get delay characteristics - NOTE: Currently does not actually do
