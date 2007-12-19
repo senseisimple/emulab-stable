@@ -160,6 +160,13 @@ foreach my $subnode (keys(%subnodelist)) {
 	    tmcc(TMCCCMD_STATE, "ISUP");
 	    last SWITCH;
 	};
+	/^netfpga$/i && do {
+	    system("netfpgactl $subnode boot");
+	    if ($?) {
+                print STDERR "$subnode boot failed with $?\n";
+            }
+            last SWITCH;
+	};
 	print "Invalid subnode type: $type\n";
     }
     sleep(1);
