@@ -440,7 +440,7 @@ foreach $attr_name (@attr_names) {
     # Check the osid and imageid attribute values against the id lists.
     # Under the web page interface, these come to us from selectors.
     if ($attr_type eq "osid") {
-	if ($attr_name =~ /mfs$/) {
+	if ($attr_name =~ /mfs/) {
 	    UserError("NodeType MFS OSID Attr: $attr_name is not an mfs_osid.")
 		if (!exists($mfsosids->{$attr_value}));
 	}
