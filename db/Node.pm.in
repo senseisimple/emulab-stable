@@ -367,9 +367,12 @@ sub NodeAllocCheck($$)
     # with that type/class, and thus the type/class is free to be allocated
     # by anyone. Otherwise we get the list of projects that are allowed,
     # and so we have to look at those.
+    # Note: nodetypeXpid_permissions has the pid_idx in addition to the pid -
+    # presumably, the Right Thing would be to use that, but this function
+    # is only passed the pid right now.
     #
     my $query_result =
-	DBQueryFatal("select distinct p.* from nodes as n ".
+	DBQueryFatal("select distinct p.type, p.pid_idx from nodes as n ".
 		     "left join node_types as nt on n.type=nt.type ".
 		     "left join nodetypeXpid_permissions as p on ".
 		     "     (p.type=nt.type or p.type=nt.class) ".
@@ -379,16 +382,16 @@ sub NodeAllocCheck($$)
 	print STDERR "NodeAllocCheck: No such node $node_id!\n";
 	return 0;
     }
-    my ($ptype,$ppid) = $query_result->fetchrow_array();
+    my ($ptype,$pid_idx) = $query_result->fetchrow_array();
 
     # No rows, or a pid match.
-    if (!defined($ptype) || $ppid eq $pid) {
+    if (!defined($ptype) || $pid_idx eq $pid->pid_idx()) {
 	return 1;
     }
 
     # Okay, must be rows in the permissions table. Check each pid for a match.
-    while (my ($ptype,$ppid) = $query_result->fetchrow_array()) {
-	if ($ppid eq $pid) {
+    while (my ($ptype,$pid_idx) = $query_result->fetchrow_array()) {
+	if ($pid_idx eq $pid->pid_idx()) {
 	    return 1;
 	}
     }
