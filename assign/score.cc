@@ -1372,7 +1372,6 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
                   != vlink->dst_iface) {
               continue;
           }
-          }
       }
 
       // Get delay characteristics - NOTE: Currently does not actually do
