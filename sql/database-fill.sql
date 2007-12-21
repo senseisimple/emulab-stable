@@ -662,6 +662,7 @@ REPLACE INTO table_regex VALUES ('virt_lans','trace_expr','text','redirect','def
 REPLACE INTO table_regex VALUES ('virt_lans','trace_snaplen','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_endnode','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_db','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','fixed_iface','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','modbase','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','compat','int','redirect','default:boolean',0,0,NULL);
 

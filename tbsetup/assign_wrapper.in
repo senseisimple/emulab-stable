@@ -360,6 +360,10 @@ sub virtlanusevirtiface($) {
 sub virtlanwireless($) {
     return (virtlanprotocol($_[0]) =~ /^(80211|flex900)/);
 }
+# Quick way to get to any fixed iface info for the lan and member.
+sub virtlanfixediface($$) { 
+    return $virt_lans{$_[0]}->{"MEMBERS"}->{$_[1]}->{"fixed_iface"};
+}
 # We don't actually store information about the protocol heirarchy in the
 # database, so we use a simple conventions for now - <basetype>[-subtype]
 sub protocolbasetype($) {
@@ -4900,6 +4904,28 @@ sub CreateTopFile()
 	    my ($top_bw0, $top_rbw0) = virtlantopbw($lan,$nodeport0);
 	    my ($top_bw1, $top_rbw1) = virtlantopbw($lan,$nodeport1);
 
+	    #
+            # Get the fix-interface info for the members and setup the 
+            # fix string.
+            #
+	    my $fixi0 = virtlanfixediface($lan,$nodeport0);
+	    my $fixi1 = virtlanfixediface($lan,$nodeport1);
+	    my ($fixsrc0,$fixdst0,$fixsrc1,$fixdst1,$fixall) = ('','','','','');
+
+	    if (defined($fixi0) && $fixi0 ne '') {
+		$fixsrc0 = "fixsrciface:$fixi0";
+		$fixdst0 = "fixdstiface:$fixi0";
+		$fixall .= "fixsrciface:$fixi0";
+	    }
+	    if (defined($fixi1) && $fixi1 ne '') {
+		if ($fixall ne "") {
+		    $fixall .= " ";
+		}
+		$fixsrc1 = "fixsrciface:$fixi1";
+		$fixdst1 = "fixdstiface:$fixi1";
+		$fixall .= "fixdstiface:$fixi1";
+	    }
+
 	    $top_bw  = &min($top_bw0,$top_rbw1);
 	    $top_rbw = &min($top_rbw0, $top_bw1);
 
@@ -4925,7 +4951,7 @@ sub CreateTopFile()
 		    print(TOPFILE "link $plink $node0 $node1 ".
 			  max($top_bw,$top_rbw) . " 0 0 $protocol " .
 			  ($emulated ? " emulated" : "") .
-			  ($trivial_ok ? " trivial_ok\n" : "\n"));
+			  ($trivial_ok ? " trivial_ok" : "") . " $fixall\n");
 		    
 		    #
 		    # We allow users to oversubscribe by letting them turn
@@ -4955,10 +4981,10 @@ sub CreateTopFile()
 		    print TOPFILE "node $delayname delay $delay_osid_desire\n";
 		    print TOPFILE
 			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
-			"$node0 $delayname $top_bw 0 0 $protocol\n";
+			"$node0 $delayname $top_bw 0 0 $protocol $fixsrc0\n";
 		    print TOPFILE
 			"link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
-			"$node1 $delayname $top_bw 0 0 $protocol\n";
+			"$node1 $delayname $top_bw 0 0 $protocol $fixdst1\n";
 
 		    $delaynodes{$delayname} = $delayname;
 		    
@@ -5002,6 +5028,9 @@ sub CreateTopFile()
 			$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
 					       $nodeport1,$rdelay,$rbw,$rloss,1];
 		    }
+		}
+		if ($fixall ne '') {
+		    print TOPFILE " $fixall";
 		}
 		print TOPFILE "\n";
 	    }
@@ -5072,7 +5101,17 @@ sub CreateTopFile()
 			}
 		    }
 		}
-		
+
+		#
+		# Get the fix-interface info for the member.
+		#
+		my $fixi0 = virtlanfixediface($lan,$member);
+		my ($fixsrc0) = ('');
+
+		if (defined($fixi0) && $fixi0 ne '') {
+		    $fixsrc0 = "fixsrciface:$fixi0";
+		}
+
 		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
 
 		$bandwidth = &getbandwidth($node,$lan,$bw);
@@ -5111,7 +5150,8 @@ sub CreateTopFile()
 			print(TOPFILE "link $plink $node lan/$lan " .
 			      max($top_bw,$top_rbw) . " 0 0 $protocol" .
 			      ($emulated ? " emulated" : "") .
-			      ($trivial_ok ? " trivial_ok\n" : "\n"));
+			      ($trivial_ok ? " trivial_ok" : "") . 
+			      ($fixsrc0 ? " $fixsrc0" : "") . "\n");
 
 			printdb "Delay link $plink = " .
 			    join(" ", @{$delaylinks{$plink}}) . "\n";
@@ -5127,7 +5167,7 @@ sub CreateTopFile()
 			print TOPFILE "node $delayname delay " .
                             "$delay_osid_desire\n";
 			print TOPFILE "link linkdelaysrc/$lan/$member" .
-			    " $node $delayname $top_bw 0 0 $protocol\n";
+			    " $node $delayname $top_bw 0 0 $protocol $fixsrc0\n";
 			print TOPFILE "link linkdelaydst/$lan/$member" .
 			    " lan/$lan $delayname $top_bw 0 0 $protocol\n";
 			
@@ -5170,6 +5210,9 @@ sub CreateTopFile()
 			    $delaylinks{$plink} = [$member,$delay,$bw,$loss,
 					   $member,$rdelay,$rbw,$rloss,1];
 			}
+		    }
+		    if ($fixsrc0) {
+			print TOPFILE " $fixsrc0";
 		    }
 		    print TOPFILE "\n";
 		}

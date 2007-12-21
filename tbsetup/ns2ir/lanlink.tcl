@@ -262,6 +262,7 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar rloss
     $self instvar cost
     $self instvar linkq
+    $self instvar fixed_iface
 
     $self instvar iscloud
     $self set iscloud 0
@@ -278,6 +279,7 @@ LanLink instproc init {s nodes bw d type} {
 	set loss($nodepair) 0
 	set rloss($nodepair) 0
 	set cost($nodepair) 1
+	set fixed_iface($nodepair) 0
 	lappend nodelist $nodepair
 
 	set lq q[incr new_counter]
@@ -646,6 +648,26 @@ LanLink instproc rename_queue {old new} {
     }
 }
 
+LanLink instproc set_fixed_iface {node iface} {
+    $self instvar nodelist
+    $self instvar fixed_iface
+
+    # find this node
+    set found 0
+    foreach nodeport $nodelist {
+	if {$node == [lindex $nodeport 0]} {
+	    set fixed_iface($nodeport) $iface
+	    set found 1
+	    break
+	}
+    }
+
+    if {!$found} {
+	perror "\[set_fixed_iface] $node is not the specified link/lan!"
+    }
+}
+
+
 Link instproc updatedb {DB} {
     $self instvar toqueue
     $self instvar fromqueue
@@ -672,6 +694,7 @@ Link instproc updatedb {DB} {
     $self instvar netmask
     $self instvar protocol
     $self instvar mustdelay
+    $self instvar fixed_iface
 
     $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
@@ -751,6 +774,11 @@ Link instproc updatedb {DB} {
  	    lappend fields "trace_db"
 	}
 
+	# fixing ifaces
+	if {$fixed_iface($nodeport) != 0} {
+	    lappend fields "fixed_iface"
+	}
+
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
@@ -769,6 +797,11 @@ Link instproc updatedb {DB} {
 	    lappend values [$linkqueue set trace_snaplen]
 	    lappend values [$linkqueue set trace_endnode]
 	    lappend values [$linkqueue set trace_mysql]
+	}
+
+	# fixing ifaces
+	if {$fixed_iface($nodeport) != 0} {
+	    lappend values $fixed_iface($nodeport)
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
@@ -804,6 +837,7 @@ Lan instproc updatedb {DB} {
     $self instvar settings
     $self instvar member_settings
     $self instvar mustdelay
+    $self instvar fixed_iface
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
@@ -899,7 +933,12 @@ Lan instproc updatedb {DB} {
  	    lappend fields "trace_endnode"
  	    lappend fields "trace_db"
 	}
-	
+
+	# fixing ifaces
+        if {$fixed_iface($nodeport) != 0} {
+            lappend fields "fixed_iface"
+        }
+
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
@@ -919,6 +958,11 @@ Lan instproc updatedb {DB} {
 	    lappend values [$linkqueue set trace_endnode]
 	    lappend values [$linkqueue set trace_mysql]
 	}
+
+	# fixing ifaces
+        if {$fixed_iface($nodeport) != 0} {
+            lappend values $fixed_iface($nodeport)
+        }
 
 	$sim spitxml_data "virt_lans" $fields $values
 

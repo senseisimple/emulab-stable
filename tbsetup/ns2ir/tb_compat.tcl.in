@@ -1691,3 +1691,19 @@ proc tb-set-node-id {vnode myid} {
     }
     $vnode set_numeric_id $myid
 }
+
+#
+# Fix a particular node interface to a lanlink
+#
+proc tb-fix-interface {vnode lanlink iface} {
+    if {[$vnode info class] != "Node"} {
+        perror "\[tb-fix-interface] $vnode is not a node."
+        return
+    }
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+        perror "\[tb-fix-interface] $lanlink must be a link or lan!"
+        return
+    }
+
+    $lanlink set_fixed_iface $vnode $iface
+}

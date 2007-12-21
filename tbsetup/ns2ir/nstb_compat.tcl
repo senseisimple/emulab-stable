@@ -87,6 +87,7 @@ proc tb-set-node-lan-est-bandwidth {node lan bw} {}
 proc tb-set-node-plab-role {node role} {}
 proc tb-set-node-plab-plcnet {node lanlink} {}
 proc tb-set-dpdb {onoff} {}
+proc tb-fix-interface {vnode lanlink iface} {}
 
 proc tb-set-security-level {level} {
 
