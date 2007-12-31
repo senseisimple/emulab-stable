@@ -634,8 +634,8 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	 if (!gotpipe && !islan) {
 	   link_map[l_index].params[1].q_size =
 		   link_map[l_index].params[0].q_size;
-	   link_map[l_index].params[0].flags_p =
-		   link_map[l_index].params[1].flags_p;
+	   link_map[l_index].params[1].flags_p =
+		   link_map[l_index].params[0].flags_p;
 	 }
        }
 
