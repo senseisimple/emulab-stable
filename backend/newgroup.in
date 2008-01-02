@@ -372,7 +372,7 @@ UserError("Error: " . $cmd_out)
 # Now add the group leader to the group.
 # 
 my $safe_id = escapeshellarg($group_id);
-$cmd = "modgroups -a $group_pid:$safe_id:group_root $group_leader",
+$cmd = "modgroups -a $group_pid:$safe_id:group_root $group_leader";
 print($cmd . "\n")
     if ($debug);
 $cmd_out = `$cmd`;
