@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -298,11 +298,10 @@ if (! $leader) {
 
 #
 # Verify leader. Any user can lead a group, but they must be a member of
-# the project, and we have to avoid an ISADMIN() check in AccessCheck().
+# the project.
 #
 my $proj_leader = $project->GetLeader();
-if (!$leader->SameUser($proj_leader) ||
-    $leader->status() eq USERSTATUS_UNAPPROVED() ||
+if ($leader->status() eq USERSTATUS_UNAPPROVED() ||
     !$project->AccessCheck($leader, TB_PROJECT_LEADGROUP())) {
     UserError("GroupLeader: $group_leader does not have enough permission ".
 	      "to lead a group in project $group_pid!");

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Group;
@@ -706,9 +706,10 @@ sub AccessCheck($$$)
 	print "*** Invalid access type: $access_type!\n";
 	return 0;
     }
-    # Admins do whatever they want.
+    # Admins do whatever they want. Treat leadgroup special though since
+    # the user has to actually be a member of the project, not just an admin.
     return 1
-	if ($user->IsAdmin());
+	if ($user->IsAdmin() && $access_type != TB_PROJECT_LEADGROUP);
 
     if ($access_type == TB_PROJECT_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER;
