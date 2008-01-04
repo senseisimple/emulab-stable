@@ -130,6 +130,8 @@ As with setting up ops, you need to create partitions large enough:
 			be safe and build with at least a million).
 /usr/testbed  - Needs space for testbed software and logs, as well as
 			many disk images. At least 10GB, but more is better!
+                        You may simply make sure this space is available in
+                        /usr, and not make this a separate partition.
 /var          - Holds the database, so at least a few hundred MB. 
 
 
