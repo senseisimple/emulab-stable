@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
+   Copyright (c) 2000-2008 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -250,7 +250,7 @@ recommendations, and outlines the consequences of each choice.
 	to invest some time and effort. The NFS server
 	needs enough space for /users and /proj , as well as a few extra gigs
 	for build trees, logs, and images.  If you have more than 128 nodes,
-	and plan to use Cyclades or RocketPort serial ports, you need one
+	and plan to use the RocketPort serial ports, you need one
 	"tip server" machine per 128 serial lines (other serial muxes may
 	have similar limitations.)  Tip servers do not need to be very
 	powerful, we use old desktop machines that have full-height PCI slots.
@@ -289,7 +289,7 @@ recommendations, and outlines the consequences of each choice.
 		connect to the DB-9 serial ports on the nodes. Unfortunately,
 		the custom pinout is different for different serial mux
 		manufacturers. Contact us to get our custom cable specs
-		for Cyclades or RocketPort.</dd>
+		for RocketPort serial mux.</dd>
 
 	<dt><b>Power controllers</b></dt>
 		<dd>Without them, nodes can not be reliably rebooted. We
@@ -307,25 +307,26 @@ recommendations, and outlines the consequences of each choice.
 		support 7 Dell 2850s per 30A/120V controller.  So we went
 		with 8-port controllers for the latter.</dd>
 
+	<a NAME="SERIALMUX"></a>
 	<dt><b>Serial (console) ports</b></dt>
 		<dd>Custom kernels/OSes (specifically, the OSKit) may not
 		support ssh, etc. Also useful if an experimenter somehow scrogs
-		the network. We have used the <a
-		href="http://cyclades.com">Cyclades</a>
-		Cyclom Ze serial adapters, which allow up to 128 serial ports
-		in a single PC.  But those have been discontinued and they
-		also require a 5V PCI slot.  For our latest round of machines,
-		we use the <a
+		the network. We currently use the <a
 		href="http://www.comtrol.com/products/rocketport.asp">
 		Comtrol RocketPort</a> series of serial muxes.
 		In particular, we use the 32-port RocketPort Universal PCI
 		interfaces (pn 99356-8) and 1U rackmount panels (pn 99380-3).
-		As mentioned, you can only have 4 cards (or 128 ports) per
+		You can only have 4 cards (or 128 ports) per
 		machine, so if you have more than 128 nodes, you will need
 		multiple machines to host the interfaces.
 		Note also that the 32-port RocketPort is a full-height PCI
 		card, so make sure you have a machine with full-height
-		(not low-profile) slots!</dd>
+		(not low-profile) slots. (<em>In the past we have used the
+		<a href="http://cyclades.com">Cyclades</a>
+		Cyclom Ze serial adapters, which allow up to 128 serial ports
+		in a single PC.  But those have been discontinued and they
+		also require a 5V PCI slot</em>)
+		</dd>
 
 	<dt><b>IPMI and ASF support</b></dt>
 		<dd>Most server motherboards, and some desktops, support
