@@ -315,7 +315,7 @@ if (!$project->AccessCheck($this_user, TB_PROJECT_MAKEIMAGEID())) {
 my $group;
 if (exists($newimageid_args{"gid"})) {
     my $gid = $newimageid_args{"gid"};
-    $group = Group->LookupSubgroupByName($gid);
+    $group = Group->LookupByPidGid($project->pid(), $gid);
     if (!defined($group)) {
 	UserError("Group: No such group $gid");
     }
