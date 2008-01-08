@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -313,8 +313,8 @@ if (!$project->AccessCheck($this_user, TB_PROJECT_MAKEIMAGEID())) {
 }
 
 my $group;
-if (exists($newimageid_args{"group"})) {
-    my $gid = $newimageid_args{"group"};
+if (exists($newimageid_args{"gid"})) {
+    my $gid = $newimageid_args{"gid"};
     $group = Group->LookupSubgroupByName($gid);
     if (!defined($group)) {
 	UserError("Group: No such group $gid");
