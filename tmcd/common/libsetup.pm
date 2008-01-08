@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -1207,9 +1207,9 @@ sub gettunnelconfig($)
 	    $tunnel->{"PASSWORD"}   = $5;
 	    $tunnel->{"ENCRYPT"}    = $6;
 	    $tunnel->{"COMPRESS"}   = $7;
-	    $tunnel->{"IPADDR"}     = $9;
-	    $tunnel->{"IPMASK"}     = $10;
-	    $tunnel->{"PROTO"}      = $11;
+	    $tunnel->{"IPADDR"}     = $8;
+	    $tunnel->{"IPMASK"}     = $9;
+	    $tunnel->{"PROTO"}      = $10;
 	    push(@tunnels, $tunnel);
 	}
 	else {
