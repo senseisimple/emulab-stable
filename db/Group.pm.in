@@ -407,7 +407,6 @@ sub EditGroup($$$$)
     #
     # First pass does checks. Second pass does the real thing. 
     #
-
     my $g_pid = $group->pid();
     my $g_gid = $group->gid();
     my $target_user;
@@ -487,7 +486,7 @@ sub EditGroup($$$$)
 	foreach $target_user (@nonmembers) {
 	    $target_uid = $target_user->uid();
 	    $target_idx = $target_user->uid_idx();
-	    $foo        = "add_$target_idx";    
+	    $foo        = "add_$target_idx";
 
 	    if (exists($argref->{$foo}) && $argref->{$foo} eq "permit"){
 		#
@@ -785,7 +784,9 @@ sub AccessCheck($$$)
 	# Only project_root or group_root in default group
 	# may grab (involuntarily add) users into groups.
 	#
-	$gid = $pid;
+	if (! $self->IsProjectGroup()) {
+	    return $self->GetProject()->AccessCheck($user, $access_type);
+	}
 	$mintrust = PROJMEMBERTRUST_GROUPROOT;
     }
     elsif ($access_type == TB_PROJECT_DELUSER) {
