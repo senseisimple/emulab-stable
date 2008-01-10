@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1564,19 +1564,14 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vl.vname,vll.idx,vn.tag "
+			 "       v.type,vll.vname,v.virtlanidx,vn.tag "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
-			 "left join virt_lans as vl on "
-			 "  vl.pid='%s' and vl.eid='%s' and "
-			 "  vl.vnode='%s' and vl.ip=v.IP "
 			 "left join virt_lan_lans as vll on "
-			 "  vll.pid=vl.pid and vll.eid=vl.eid and "
-			 "  vll.vname=vl.vname "
+			 "  vll.idx=v.virtlanidx "
 			 "left join vlans as vn on "
-			 "  vn.pid=vl.pid and vn.eid=vl.eid and "
-			 "  vn.virtual=vl.vname "
+			 "  vn.id=v.vlanid "
 			 "where v.node_id='%s' and %s",
 			 10, reqp->pid, reqp->eid, reqp->nickname,
 			 reqp->pnodeid, buf);

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Anytime you change database-create.sql, but sure to put any special
@@ -4209,3 +4209,20 @@ last_net_act,last_cpu_act,last_ext_act);
        insert into table_regex values \
          ('virt_lans','fixed_iface','text','redirect','default:tinytext',0,0,'');
 
+4.138: Add backpointers from vinterfaces to its virt_lan and underlying vlan to
+       avoid problems upcoming cutover to new lans stuff. Besides, the
+       join hoops we jump through are kinda silly.
+
+       alter table vinterfaces add `virtlanidx` int(11) NOT NULL default '0';
+       alter table vinterfaces add `vlanid` int(11) NOT NULL default '0';
+
+       update vinterfaces as vi left join reserved as r on
+       if(vi.vnode_id is
+       null,r.node_id=vi.node_id,r.node_id=vi.vnode_id) left join
+       virt_lans as vl on vl.exptidx=r.exptidx and vl.vnode=r.vname
+       and vl.ip=vi.IP left join virt_lan_lans as vll on
+       vll.exptidx=vl.exptidx and vll.vname=vl.vname left join vlans
+       as vn on vn.exptidx=vl.exptidx and vn.virtual=vl.vname set
+       vi.virtlanidx=vll.idx,vi.vlanid=vn.id;
+
+       

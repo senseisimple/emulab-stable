@@ -329,6 +329,7 @@ my %virt_lans = ();
 
 sub virtlanexists($)	{ return exists($virt_lans{$_[0]}); }
 sub virtlanname($)	{ return $virt_lans{$_[0]}->{"VNAME"}; }
+sub virtlanidx($)	{ return $virt_lans{$_[0]}->{"IDX"}; }
 sub virtlanmembers($)	{ return @{$virt_lans{$_[0]}->{"MEMBERLIST"}}; }
 sub virtlanmustdelay($)	{ return $virt_lans{$_[0]}->{"MUSTDELAY"}; }
 sub virtlanemulated($)	{ return $virt_lans{$_[0]}->{"EMULATED"}; }
@@ -3142,6 +3143,7 @@ sub nextipportnum($) {
 # Vlan stuff.
 #
 my %vlantable  = ();
+my %lantovlan  = ();
 my $vlanid     = 0;
 
 #
@@ -3158,6 +3160,7 @@ sub AddVlan($$$;$)
 	# Start a list of nodeports in the vlan.
 	if (! defined($vlantable{$lan})) {
 	    $vlantable{$lan} = [$nodeportA];
+	    $lantovlan{$lan} = $lan;
 	    printdb "  $lan, \[" . $nodeportA . "\]\n";
 	    return;
 	}
@@ -3184,6 +3187,7 @@ sub AddVlan($$$;$)
 	my $newid = "s$lan:" . $vlanid++;
 	
 	$vlantable{$newid} = [$nodeportA, $nodeportB];
+	$lantovlan{$lan}   = $newid;
 
 	printdb "  $newid (SVLAN), \[$nodeportA, $nodeportB\]\n";	
     }
@@ -3192,6 +3196,7 @@ sub AddVlan($$$;$)
 	# Generate a new vlan of two members.
 	# 
 	$vlantable{$lan} = [$nodeportA, $nodeportB];
+	$lantovlan{$lan} = $lan;
 
 	printdb "  $lan, \[$nodeportA, $nodeportB\]\n";	
     }
@@ -3231,6 +3236,13 @@ sub UploadVlans()
 				push(@{$vlantable{$keyA}}, $memberB);
 			    }
 			}
+			# Retarget lantovlan since the vlan was merged.
+			foreach my $lan (keys(%lantovlan)) {
+			    my $vlan = $lantovlan{$lan};
+			    if ($vlan eq $keyB) {
+				$lantovlan{$lan} = $keyA;
+			    }
+			}
 			delete($vlantable{$keyB});
 			goto again;
 		    }
@@ -3251,11 +3263,28 @@ sub UploadVlans()
 	my $memberlist = join(" ", @{$vlantable{$lanid}});
     
 	printdb "  $lan - $memberlist\n";
-    
-	DBQueryFatal("insert into vlans (id,exptidx,pid,eid,virtual,members) ".
-		     "values (0, '$experiment_idx', ".
-		     "        '$pid', '$eid', '$lan', '$memberlist')")
-	    if (!$impotent);
+
+	if (!$impotent) {
+	    my $query_result = 
+		DBQueryFatal("insert into vlans ".
+			     "   (id,exptidx,pid,eid,virtual,members) ".
+			     "values (0, '$experiment_idx', ".
+			     "        '$pid', '$eid', '$lan', '$memberlist')");
+	    fatal("Failed to insert new vlan")
+		if (!$query_result);
+
+	    my $newid = $query_result->insertid;
+	    foreach my $virtlan (keys(%lantovlan)) {
+		if ($lantovlan{$virtlan} eq $lanid) {
+		    my $vidx = virtlanidx($virtlan);
+		    printdb("Update vinterfaces on $virtlan: ".
+			    "$vidx -> $newid\n");
+			    
+		    DBQueryFatal("update vinterfaces set vlanid='$newid' ".
+				 "where virtlanidx='$vidx'")
+		}
+	    }
+	}
     }
 }
 
@@ -3319,6 +3348,7 @@ sub NewVirtIface($$$;$)
     my $mask    = virtlannetmask($lan);
     my $rtabid  = getrtabid($vnode, $pnode);
     my $encap   = virtlanencapstyle($lan);
+    my $vllidx  = virtlanidx($lan);
     my $vvnode;
     my $newvif;
     my $isvnode;
@@ -3389,10 +3419,10 @@ sub NewVirtIface($$$;$)
     my $query_result = 
 	DBQueryFatal("insert into vinterfaces ".
 		     "(node_id, unit, mac, IP, mask, type, iface, ".
-		     " rtabid, vnode_id) ".
+		     " rtabid, vnode_id, virtlanidx) ".
 		     "values ('$pnode', 0, '$mac', '$ip', '$mask', '$type', ".
 		     (defined($pport) ? "'$pport'" : "NULL") . ", ".
-		     "'$rtabid', $vvnode)");
+		     "'$rtabid', $vvnode, '$vllidx')");
     
     my $newid = $query_result->insertid;
     $newvif = $type . $newid;
@@ -4054,13 +4084,16 @@ sub LoadVirtLans()
     printdb "Loading virt_lans.\n";
     
     my $query_result =
-	DBQueryFatal("select * from virt_lans ".
-		     "where pid='$pid' and eid='$eid' ".
-		     "order by vname,member");
+	DBQueryFatal("select v.*,vll.idx from virt_lans as v ".
+		     "left join virt_lan_lans as vll on ".
+		     "  vll.exptidx=v.exptidx and vll.vname=v.vname ".
+		     "where v.pid='$pid' and v.eid='$eid' ".
+		     "order by v.vname,v.member");
     
     while (my $rowref = $query_result->fetchrow_hashref()) {
 	my $vname  = $rowref->{"vname"};
 	my $member = $rowref->{"member"};
+	my $vidx   = $rowref->{"idx"};
 	my ($node, $port) = split(":",$member);
 
 	#
@@ -4071,6 +4104,7 @@ sub LoadVirtLans()
 	    $rec->{"MEMBERS"}    = {};
 	    $rec->{"MEMBERLIST"} = [];
 	    $rec->{"VNAME"}      = $vname;
+	    $rec->{"IDX"}        = $vidx;
 	    $virt_lans{$vname}   = $rec;
 	}
 	$virt_lans{$vname}->{"MEMBERS"}->{$member} = $rowref;
