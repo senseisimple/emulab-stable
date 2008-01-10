@@ -1569,12 +1569,11 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lan_lans as vll on "
-			 "  vll.idx=v.virtlanidx "
+			 "  vll.idx=v.virtlanidx and vll.exptidx='%d' "
 			 "left join vlans as vn on "
 			 "  vn.id=v.vlanid "
 			 "where v.node_id='%s' and %s",
-			 10, reqp->pid, reqp->eid, reqp->nickname,
-			 reqp->pnodeid, buf);
+			 10, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
