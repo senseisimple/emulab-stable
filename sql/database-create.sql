@@ -3200,6 +3200,7 @@ CREATE TABLE `vinterfaces` (
   `iface` varchar(10) default NULL,
   `rtabid` smallint(5) unsigned NOT NULL default '0',
   `vnode_id` varchar(32) default NULL,
+  `exptidx` int(11) NOT NULL default '0',
   `virtlanidx` int(11) NOT NULL default '0',
   `vlanid` int(11) NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`unit`),

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -3281,7 +3281,8 @@ sub UploadVlans()
 			    "$vidx -> $newid\n");
 			    
 		    DBQueryFatal("update vinterfaces set vlanid='$newid' ".
-				 "where virtlanidx='$vidx'")
+				 "where virtlanidx='$vidx' and ".
+				 "      exptidx='$experiment_idx'");
 		}
 	    }
 	}

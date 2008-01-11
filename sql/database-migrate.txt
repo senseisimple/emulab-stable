@@ -4213,6 +4213,7 @@ last_net_act,last_cpu_act,last_ext_act);
        avoid problems upcoming cutover to new lans stuff. Besides, the
        join hoops we jump through are kinda silly.
 
+       alter table vinterfaces add `exptidx` int(10) NOT NULL default '0';
        alter table vinterfaces add `virtlanidx` int(11) NOT NULL default '0';
        alter table vinterfaces add `vlanid` int(11) NOT NULL default '0';
 
@@ -4223,6 +4224,7 @@ last_net_act,last_cpu_act,last_ext_act);
        and vl.ip=vi.IP left join virt_lan_lans as vll on
        vll.exptidx=vl.exptidx and vll.vname=vl.vname left join vlans
        as vn on vn.exptidx=vl.exptidx and vn.virtual=vl.vname set
-       vi.virtlanidx=vll.idx,vi.vlanid=vn.id;
+       vi.exptidx=r.exptidx,vi.virtlanidx=vll.idx,vi.vlanid=vn.id;
 
-       
+4.139: Change to previous revision; Skip to next entry.
+
