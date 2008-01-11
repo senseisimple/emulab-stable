@@ -300,3 +300,30 @@ ID  Name                            Members of VLAN
         set port channel 2/9-12 mode on
     ... of course, use the actual ports that your channel runs on.
 
+
+19. Useful commands for debugging high CPU usage on routers (IOS)
+
+    show proc cpu - shows %ages of CPU used by various processes. If CPU usage
+        is high, and process usage doesn't add up to total usage, then the
+        extra time is in interrupt handlers, where 'fast path' forwarding
+        (and other things) take place
+    show ip traffic - show router-wide stats on traffic, including the reasons
+        for dropping packets. 'Encapsulation failed' (for drops) typically
+        means that the router wasn't able to ARP for the destination
+    show ip interface - will tell you more about the options, such as fast
+        switching, enabled on an interface. You definitely want fast switching
+        enabled, probably want CEF switching if your device supports it, and
+        might want 'flow' or 'netflow' if you are using big ACLs (since it
+        effectively caches firewall decisions)
+    show ip cache flow - shows the contents of the 'newflow' per-flow routing
+        cache, including an interesting histogram of packet sizes. If you want
+        to look at entries for a particular host, you can use '| include <IP>'
+    Cisco page about troubleshooting high CPU utilization:
+        http://www.cisco.com/en/US/products/hw/routers/ps133/products_tech_note09186a00800a70f2.shtml
+    If it's from interrupts:
+        http://www.cisco.com/en/US/products/hw/routers/ps359/products_tech_note09186a00801c2af0.shtml
+    More about performance tuning, the various switching paths, etc:
+        http://www.cisco.com/en/US/products/sw/iosswrel/ps1831/products_tech_note09186a00800a7306.shtml
+    Pasting the output of these commands into Cisco's Output Interpreter tool
+        (on the web, registered users only) is very helpful
+    
