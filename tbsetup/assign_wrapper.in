@@ -3423,10 +3423,10 @@ sub NewVirtIface($$$;$)
     my $query_result = 
 	DBQueryFatal("insert into vinterfaces ".
 		     "(node_id, unit, mac, IP, mask, type, iface, ".
-		     " rtabid, vnode_id, virtlanidx) ".
+		     " rtabid, vnode_id, exptidx, virtlanidx) ".
 		     "values ('$pnode', 0, '$mac', '$ip', '$mask', '$type', ".
 		     (defined($pport) ? "'$pport'" : "NULL") . ", ".
-		     "'$rtabid', $vvnode, '$vllidx')");
+		     "'$rtabid', $vvnode, $experiment_idx, '$vllidx')");
     
     my $newid = $query_result->insertid;
     $newvif = $type . $newid;
