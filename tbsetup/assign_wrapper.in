@@ -3275,6 +3275,9 @@ sub UploadVlans()
 
 	    my $newid = $query_result->insertid;
 	    foreach my $virtlan (keys(%lantovlan)) {
+		next
+		    if (!virtlanexists($virtlan));
+		
 		if ($lantovlan{$virtlan} eq $lanid) {
 		    my $vidx = virtlanidx($virtlan);
 		    printdb("Update vinterfaces on $virtlan: ".
