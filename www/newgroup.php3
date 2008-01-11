@@ -210,6 +210,7 @@ if (isset($formfields["group_leader"]) && $formfields["group_leader"] != "") {
 $group_id = $formfields["group_id"];
 ###STARTBUSY("Creating project group $group_id.");
 echo "<br>Creating project group $group_id.<br>\n";
+flush();
 
 if (! ($newgroup = Group::Create($project, $uid, $args, $errors))) {
     # Always respit the form so that the form fields are not lost.
