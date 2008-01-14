@@ -17,5 +17,5 @@ use Lan;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-exit(VLan->Initialize());
+exit(Lan->Initialize());
 
