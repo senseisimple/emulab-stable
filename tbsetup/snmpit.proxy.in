@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -22,9 +22,10 @@ my $debug    = 0;
 my $impotent = 0;
 my $pid;
 my $eid;
-my @inner_ids = ();
-my @outer_ids = ();
-my %mapping   = ();
+my @inner_ids   = ();
+my @outer_ids   = ();
+my %outer_vlans = ();
+my %mapping     = ();
 
 #
 # Configure variables
@@ -46,9 +47,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use Experiment;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 60;
+use Lan;
 
 # Locals
 my $exptidx;
@@ -306,43 +305,32 @@ sub SetupVlans()
 			 "where pid='$pid' and eid='$eid' and inner_id='$id'");
 	if ($query_result->numrows == 1) {
 	    ($outer_id) = $query_result->fetchrow();
-	    $query_result =
-		DBQueryFatal("select members from vlans where id='$outer_id'");
-	    if ($query_result->numrows == 1) {
-		my ($oldstring) = $query_result->fetchrow();
-		my @mlist = split " ",$oldstring;
-		my %mhash = ();
-		foreach my $mem (@mlist) {
-		    $mhash{$mem} = 1;
-		}
-		foreach my $mem (@members) {
-		    $mhash{$mem} = 1;
-		}
-		@mlist = keys(%mhash);
-		$mstring = "@mlist";
-	    }
-	    my $query_result =
-		DBQueryWarn("update vlans set members='$mstring' where " .
-			     "id='$outer_id'");
-	    if (!$query_result) {
+	    my $vlan = VLan->Lookup($outer_id);
+	    if (!defined($vlan)) {
 		print STDERR "*** $0:\n".
-			     "    Could not update vlan table entry for $id\n";
+			     "    Could not lookup vlan for $outer_id\n";
 		$errors++;
 		next;
 	    }
-	} else {
-	    my $query_result =
-		DBQueryWarn("insert into vlans ".
-			    "  (exptidx,id,pid,eid,virtual,members) ".
-			    "values ($exptidx, 0, '$pid', '$eid', '$vtag', ".
-			    "        '$mstring')");
-	    if (!$query_result || !$query_result->numrows) {
+	    foreach my $port (@members) {
+		my ($nodeid, $iface) = split(":", $port);
+		if (!$vlan->IsMember($nodeid, $iface) &&
+		    $vlan->AddMember($nodeid, $iface) != 0) {
+		    print STDERR "*** $0:\n".
+			         "    Could not $port to $vlan\n";
+		    $errors++;
+		}
+	    }
+	}
+	else {
+	    my $newvlan = VLan->Create($experiment, $vtag);
+	    if (!defined($newvlan)) {
 		print STDERR "*** $0:\n".
 			     "    Could not insert vlan table entry for $id\n";
 		$errors++;
 		next;
 	    }
-	    $outer_id = $query_result->insertid;
+	    $outer_id = $newvlan->lanid();
 
 	    # Insert mapping between inner and outer vlan entries.
 	    $query_result = DBQueryWarn("insert into elabinelab_vlans ".
@@ -356,7 +344,7 @@ sub SetupVlans()
 			     "    Could not insert elabinelab_vlans table entry ".
 			     "for $id/$outer_id\n";
 
-		DBQueryFatal("delete from vlans where id='$outer_id'");
+		$newvlan->Destroy();
 		$errors++;
 		next;
 	    }
@@ -368,6 +356,8 @@ sub SetupVlans()
 	$vmaptable{$id} = $outer_id;
 	# Okay, save outer_id up for passing to snmpit below.
 	push(@outer_ids, $outer_id);
+	# And save vlan object for getting the tag.
+	$outer_vlans{$outer_id} = $newvlan;
     }
     # Now call snmpit to create the actual vlans.
     if ($debug) {
@@ -391,21 +381,26 @@ sub SetupVlans()
     }
     my @results = ();
     foreach $id (keys %vmaptable) {
-	my $mapid = $vmaptable{$id};
-	$query_result = DBQuery("select tag from vlans where id='$mapid'");
-	if (!$query_result || $query_result->numrows != 1) {
-	    print STDERR "couldn't retrive vlan 802.1Q number for $mapid \n";
-	     $errors++;
-	} else {
-	    my ($tagnum) = $query_result->fetchrow();
-	    push (@results, "$id#$tagnum");
+	my $outer_vlan = $outer_vlans{$vmaptable{$id}};
+
+	if ($outer_vlan->Refresh() != 0) {
+	    print STDERR "*** Could not refresh $outer_vlan\n";
+	    $errors++;
+	    next;
 	}
+	my $tagnum;
+	if (!$outer_vlan->GetTag(\$tagnum) != 0) {
+	    print STDERR "*** Could not get vlan tag for $outer_vlan\n";
+	    $errors++;
+	    next;
+	}
+	push (@results, "$id#$tagnum");
     }
     print join(",", @results);
     return $errors;
 }
 #
-# This is common to list and destroy
+# This is common to list and destroy and trunk.
 #
 sub Map()
 {
@@ -437,8 +432,16 @@ sub Map()
 		         "    No such elabinelab_vlans table entry: $id\n";
 	    next;
 	}
+
+	my $vlan = VLan->Lookup($mapping{$id});
+	if (!defined($vlan)) {
+	    print STDERR "*** $0:\n".
+		         "    Cannot find vlan object for vlan id: $id\n";
+	    next;
+	}
 	push(@inner_ids, $id);
 	push(@outer_ids, $mapping{$id});
+	$outer_vlans{$mapping{$id}} = $vlan;
     }
     return 0;
 }
@@ -483,10 +486,13 @@ sub DestroyVlans()
     if ($debug) {
 	print STDERR "Removing @outer_ids from vlans table\n";
     }
-    DBQueryFatal("delete from vlans ".
-		 "where pid='$pid' and eid='$eid' and ".
-		 # Join "id='foo'" with ORs
-		 "(" . join(' OR ', map("id='$_'", @outer_ids)) . ")");
+    foreach my $vlan (values(%outer_vlans)) {
+	if ($vlan->Destroy() != 0) {
+	    print STDERR "*** $0:\n".
+		         "    Could not Destroy() $vlan\n";
+	    return -1;
+	}
+    }
 
     #
     # Since the above worked, we can remove the mappings too.

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -68,6 +68,7 @@ require exitonwarn;
 use libdb;
 use libtblog;
 use NodeType;
+use Lan;
 
 tblog_stop_capture('stdout');
 
@@ -863,18 +864,32 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
     #
     # Get a list of all VLANs
     #
-    my $result = DBQueryFatal("SELECT virtual, members FROM vlans");
-    while (my ($virtual, $members) = $result->fetchrow()) {
-	#
-	# Split apart the space-separated list of members
-	#
-	my @members = split /\s+/, $members;
+    my @vlans;
+    if (VLan->AllVLans(\@vlans) != 0) {
+	die("*** $0:\n".
+	    "    Unable to load VLANs for all experiments\n");
+    }
+    foreach my $vlan (@vlans) {
+	my @members;
+
+	if ($vlan->MemberList(\@members) != 0) {
+	    die("*** $0:\n".
+		"    Unable to load members for $vlan\n");
+	}
 	my %switches = ();
 	foreach my $member (@members) {
-	    my ($node,$iface) = split /:/, $member;
-	    my $switch = get_ifaceswitch($node,$iface);
-	    my ($card, $port) = get_ifacecardport($node,$iface);
-	    my $bw = get_ifacebw($node,$card,$port,"ethernet");
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		die("*** $0:\n".
+		    "    Missing attributes for $member in $vlan\n");
+	    }
+	    my $nodeid = $node->node_id();
+	    
+	    my $switch = get_ifaceswitch($nodeid,$iface);
+	    my ($card, $port) = get_ifacecardport($nodeid,$iface);
+	    my $bw = get_ifacebw($nodeid,$card,$port,"ethernet");
 	    $switches{$switch} += $bw;
 	}
 

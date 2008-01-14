@@ -1,24 +1,51 @@
 #!/usr/bin/perl
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-#
-# Configure variables
-#
-use lib '@prefix@/lib';
-use libdb;
+use strict;
 use English;
 
-if (!TBAdmin($UID)) {
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Testbed Libraries.
+use lib '@prefix@/lib';
+use libdb;
+use User;
+use Lan;
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
+}
+if (!$this_user->IsAdmin()) {
     die("*** $0:\n".
 	"    You must be a TB administrator to use this program\n");
 }
 
-my ($virtual,$id,$pideid,$members);
+my ($pid,$eid,$virtual,$id,$pideid,$members);
 print << "END";
 ID     Project/Experiment Link/LAN   Switches (number of members in parens)
 --------------------------------------------------------------------------------
@@ -35,34 +62,52 @@ $FORMAT_NAME = 'vlanlist';
 #
 # Get a list of all VLANs for swapped-in experiments
 #
-my $result = DBQueryFatal("SELECT eid, pid, virtual, members, id FROM vlans " .
-	"ORDER BY eid,pid,virtual");
-my $eid,$pid;
-while (($eid, $pid, $virtual, $members, $id) = $result->fetchrow()) {
+my @vlans;
+if (VLan->AllVLans(\@vlans) != 0) {
+    die("*** $0:\n".
+	"    Unable to load VLANs for all experiments\n");
+}
 
-    #
-    # Split apart the space-separated list of members
-    #
-    my @members = split /\s+/, $members;
+foreach my $vlan (@vlans) {
     my %switches = ();
+    my @members;
+    my $pid = $vlan->pid();
+    my $eid = $vlan->eid();
+
+    $id = $vlan->lanid();
+    $virtual = $vlan->vname();
+
+    if ($vlan->MemberList(\@members) != 0) {
+	die("*** $0:\n".
+	    "    Unable to load members for $vlan\n");
+    }
     foreach my $member (@members) {
-	my ($node,$if) = split /:/, $member;
+	my $node;
+	my $iface;
+
+	if ($member->GetNodeIface(\$node, \$iface) != 0) {
+	    die("*** $0:\n".
+		"    Missing attributes for $member in $vlan\n");
+	}
+	my $nodeid = $node->node_id();
 
 	#
 	# Find out which switch this interface is connected to
 	#
-	my $result2 = DBQueryFatal("SELECT node_id2 FROM wires AS w LEFT JOIN ".
-	    "interfaces AS i ON w.node_id1=i.node_id AND w.card1=i.card " .
-	    "WHERE node_id='$node' and iface='$if'");
+	my $result2 =
+	    DBQueryFatal("select node_id2 from wires as w ".
+			 "left join interfaces as i on ".
+			 "     w.node_id1=i.node_id AND w.card1=i.card " .
+			 "where node_id='$nodeid' and iface='$iface'");
 	# We assume only one response here!
-	my ($switch) = ($result2->fetchrow());
+	my ($switch) = $result2->fetchrow_array();
 	$switches{$switch}++;
     }
 
     #
     # Report if more than one switch was found
     #
-    if ((keys %switches) > 1) {
+    if (scalar(keys(%switches)) > 1) {
 	$pideid = "$pid/$eid";
 	$members = join(" ", map { "$_ ($switches{$_})" } sort keys %switches);
 	write;

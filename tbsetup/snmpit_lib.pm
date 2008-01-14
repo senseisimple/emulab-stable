@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,6 +32,8 @@ use English;
 use libdb;
 use libtestbed;
 use libtblog qw(tbdie tbwarn tbreport SEV_ERROR);
+use Experiment;
+use Lan;
 use strict;
 use SNMP;
 
@@ -144,24 +146,31 @@ sub getVlanPorts (@) {
     if (!@vlans) {
 	return ();
     }
+    my @ports = ();
 
-    my $result = DBQueryFatal("SELECT members FROM vlans WHERE " .
-	join(' OR ', map("id='$_'",@vlans))); # Join "id='foo'" with ORs
-    my @ports;
-    while (my @row = $result->fetchrow()) {
-	my $members = $row[0];
-	# $members is a space-seprated list
-	foreach my $port (split /\s+/,$members) {
-            # XXX: Temp hack - work around another bug which sometimes
-            # puts '(null)' in the table
-            if ($port eq "(null)") {
-                warn "WARNING: (null) found in VLANS table!\n";
-                next;
-            }
-	    push @ports, $port;
+    foreach my $vlanid (@vlans) {
+	my $vlan = VLan->Lookup($vlanid);
+	if (!defined($vlan)) {
+	    die("*** $0:\n".
+		"    No vlanid $vlanid in the DB!\n");
+	}
+	my @members;
+	if ($vlan->MemberList(\@members) != 0) {
+	    die("*** $0:\n".
+		"    Unable to load members for $vlan\n");
+	}
+	foreach my $member (@members) {
+	    my $nodeid;
+	    my $iface;
+
+	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+		$member->GetAttribute("iface", \$iface) != 0) {
+		die("*** $0:\n".
+		    "    Missing attributes for $member in $vlan\n");
+	    }
+	    push(@ports, "$nodeid:$iface");
 	}
     }
-
     # Convert from the DB format to the one used by the snmpit modules
     return convertPortsFromIfaces(@ports);
 }
@@ -192,14 +201,18 @@ sub getExperimentTrunks($$) {
 # Update database to store vlan tag.
 #
 sub setVlanTag ($$) {
-    my ($vlan_id, $vlan_number) = @_;
+    my ($vlan_id, $tag) = @_;
+    
     # Silently exit if they passed us no VLANs
-    if (!$vlan_id || !defined($vlan_number)) {
+    if (!$vlan_id || !defined($tag)) {
 	return ();
     }
 
-    my $result = DBQueryFatal("UPDATE vlans SET tag=$vlan_number " .
-				"WHERE id=$vlan_id");
+    my $vlan = VLan->Lookup($vlan_id);
+    return ()
+	if (!defined($vlan));
+    return ()
+	if ($vlan->SetTag($tag) != 0);
 
     return 0;
 }
@@ -249,18 +262,24 @@ sub convertPortFromIface($) {
 sub getExperimentVlans ($$@) {
     my ($pid, $eid, @optvlans) = @_;
 
-    my $result =
-	DBQueryFatal("SELECT id FROM vlans WHERE pid='$pid' AND eid='$eid' ".
-		     (@optvlans ?
-		      "and (" . join(' OR ', map("id='$_'", @optvlans)) . ")" :
-		      ""));
-    
-    my @vlans = (); 
-    while (my @row = $result->fetchrow()) {
-	push @vlans, $row[0];
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	die("*** $0:\n".
+	    "    getExperimentVlans($pid,$eid) - no such experiment\n");
+    }
+    my @vlans;
+    if (VLan->ExperimentVLans($experiment, \@vlans) != 0) {
+	die("*** $0:\n".
+	    "    Unable to load VLANs for $experiment\n");
     }
 
-    return @vlans;
+    # Convert to how the rest of snmpit wants to see this stuff.
+    my @result = ();
+    foreach my $vlan (@vlans) {
+	push(@result, $vlan->id())
+	    if (!@optvlans || grep {$_ == $vlan->id()} @optvlans);
+    }
+    return @result;
 }
 
 #

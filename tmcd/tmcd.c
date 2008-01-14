@@ -1564,14 +1564,14 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vll.vname,v.virtlanidx,vn.tag "
+			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lan_lans as vll on "
 			 "  vll.idx=v.virtlanidx and vll.exptidx='%d' "
-			 "left join vlans as vn on "
-			 "  vn.id=v.vlanid "
+			 "left join lan_attributes as la on "
+			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
 			 "where v.node_id='%s' and %s",
 			 10, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {

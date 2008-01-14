@@ -113,6 +113,7 @@ use libtestbed;
 use Experiment;
 use Node;
 use NodeType;
+use Lan;
 use libadminctrl;
 use libtblog;
 use libtblog qw(*SOUT *SERR);
@@ -489,6 +490,10 @@ my %plinks = ();
 # virtnodes is the list of subnodes on physnodes.
 my %virtnodes = ();
 my %v2vmap = ();
+
+# for consing up vlan names.
+my $vlanid = 0;
+my %protovlans = ();
 
 # Admission control counts
 my %admission_control = ();
@@ -1813,13 +1818,27 @@ foreach $plink (keys(%plinks)) {
 	    @{$plinks{"linksdelaydst/$lan/$virtC,$virtA"}};
 	($nodeC,$portC) = split(":",$nodeportC);
 	($nodeD,$portD) = split(":",$nodeportD);
+	($vnodeC,$vportC) = split(":",$virtC);
+	($vnodeA,$vportA) = split(":",$virtA);
 	printdb "LINK delay: other end = $nodeportC $nodeportD\n";
 
 	# assert nodeB == nodeD
-
-	printdb "  VLANS:\n";
-	AddVlan("link", "$lan" . "-delaysrc", $nodeportA, $nodeportB);
-	AddVlan("link", "$lan" . "-delaydst", $nodeportC, $nodeportD);
+	my $protolan    = ProtoLan->Create($experiment, "$lan");
+	my $protolansrc = ProtoLan->Create($experiment,
+					   "$lan" . "-delaysrc", $protolan);
+	my $protolandst = ProtoLan->Create($experiment,
+					   "$lan" . "-delaydst", $protolan);
+	$protolansrc->SetType("vlan");
+	$protolandst->SetType("vlan");
+	$protolansrc->SetRole("delay");
+	$protolandst->SetRole("delay");
+	$protolan->SetRole("link/lan");
+	$protolan->AddInterface($nodeC, $vnodeC, $vportC, $portC);
+	$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+	$protolansrc->AddMember($nodeA, $portA);
+	$protolansrc->AddMember($nodeB, $portB);
+	$protolandst->AddMember($nodeC, $portC);
+	$protolandst->AddMember($nodeD, $portD);
 	
 	my ($member0,$delay,$bandwidth,$lossrate,
 	    $member1,$rdelay,$rbandwidth,$rlossrate) = @{$delaylinks{$plink}};
@@ -1860,6 +1879,7 @@ foreach $plink (keys(%plinks)) {
 	($nodeportC,$nodeportD) = @{$plinks{"linkdelaydst/$lan/$virtA"}};
 	($nodeC,$portC) = split(":",$nodeportC);
 	($nodeD,$portD) = split(":",$nodeportD);
+	($vnodeA,$vportA) = split(":",$virtA);
 	printdb "LAN delay src: other end = $nodeportC $nodeportD\n";
 
 	#
@@ -1870,10 +1890,28 @@ foreach $plink (keys(%plinks)) {
 	#
 	my $dlink = $lan . "/dlink/" . (split(":", $virtA))[0];
 
-	printdb "  VLANS:\n";
-	AddVlan("link", $dlink, $nodeportA, $nodeportB);
-	AddVlan("lan",  $lan,   $nodeportD);
+	my $protolan = ProtoLan->Lookup($experiment, $lan);
+	if (!defined($protolan)) {
+	    $protolan = ProtoLan->Create($experiment, "$lan");
+	    $protolan->SetRole("link/lan");
+	}
+	$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+
+	my $protolanlan  = ProtoLan->Lookup($experiment, $lan . "-delaylan");
+	if (!defined($protolanlan)) {
+	    $protolanlan = ProtoLan->Create($experiment, $lan . "-delaylan",
+					    $protolan);
+	    $protolanlan->SetType("vlan");
+	    $protolanlan->SetRole("delay");
+	}
+	$protolanlan->AddMember($nodeD, $portD);
 	
+	my $protolanlink = ProtoLan->Create($experiment, $dlink, $protolan);
+	$protolanlink->SetType("vlan");
+	$protolanlink->SetRole("delay");
+	$protolanlink->AddMember($nodeA, $portA);
+	$protolanlink->AddMember($nodeB, $portB);
+
 	my ($member0,$delay,$bandwidth,$loss,
 	    $member1,$rdelay,$rbandwidth,$rloss) = @{$delaylinks{$plink}};
 	
@@ -1894,6 +1932,10 @@ foreach $plink (keys(%plinks)) {
  	SetUpTracing($lan, $member0, $nodeB, $portB, $portD);
     }
     elsif (($lan,$virtA,$virtB) = ($plink =~ m|^linksimple/(.+)/(.+),(.+)$|)) {
+	my ($vnodeA,$vportA) = split(":",$virtA);
+	my ($vnodeB,$vportB) = split(":",$virtB);
+	my $protolink;
+	
 	#
 	# nodeportA and nodeportB are the only two nodes in the LAN.
 	# If the link is delayed, its with endpoint delays, not a delay node.
@@ -1905,14 +1947,46 @@ foreach $plink (keys(%plinks)) {
 	# virtual interfaces on the same node. 
 	#
 	if (! $trivial) {
-	    AddVlan("link", $lan, $nodeportA, $nodeportB);
-
 	    if (virtlanusevirtiface($lan)) {
+		#
+		# When using virtual interfaces we need to create a
+		# protolan for the underlying vlan, and then another link
+		# for the endpoints that run over that vlan. Note though
+		# that there might be multiple emulated links running on
+		# on this physical link. Once we have everything created
+		# there is a postpass to merge the vlans into a single
+		# supervlan since a nodeport can be in just a single vlan.
+		#
+		my $lanid = "v" . "$lan" . $vlanid++;
+		my $protovlan = ProtoLan->Create($experiment, $lanid);
+		$protovlan->SetRole("encapsulation");
+		$protovlan->SetType("vlan");
+		$protovlan->SetEncapStyle(virtlanencapstyle($lan));
+		$protovlan->SetAttribute("link/lan", $lan);
+
+		$protovlan->AddMember($nodeA, $portA)
+		    if (!$protovlan->IsMember($nodeA, $portA));
+		$protovlan->AddMember($nodeB, $portB)
+		    if (!$protovlan->IsMember($nodeB, $portB));
+
 		#
 		# Create some new virtual devices.
 		#
 		$portA = NewVirtIface($lan, $virtA, $nodeA, $portA);
 		$portB = NewVirtIface($lan, $virtB, $nodeB, $portB);
+
+		$protolink = ProtoLan->Create($experiment, $lan,$protovlan);
+		$protolink->SetType("emulated");
+		$protolink->SetRole("link/lan");
+		$protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+		$protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
+	    }
+	    else {
+		$protolink = ProtoLan->Create($experiment, $lan);
+		$protolink->SetType("vlan");
+		$protolink->SetRole("link/lan");
+		$protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+		$protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 	    }
 	}
 	else {
@@ -1925,11 +1999,17 @@ foreach $plink (keys(%plinks)) {
 		$nodeB = $v2pmap{(split(":", $virtB))[0]};
 		$portA = NewVirtIface($lan, $virtA, $nodeA);
 		$portB = NewVirtIface($lan, $virtB, $nodeB);
-	    } else {
+		$protolink = ProtoLan->Create($experiment, $lan);
+		$protolink->SetRole("link/lan");
+		$protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+		$protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
+	    }
+	    else {
 		# next plink
 		next;
 	    }
 	}
+	
 	#
 	# Setup portmap using virt members in plink name.
 	#
@@ -1975,19 +2055,48 @@ foreach $plink (keys(%plinks)) {
 	# No delays
 	printdb "  LAN:";
 
+	my ($vnodeA,$vportA) = split(":",$virtA);
+	my $protolan;
+
 	#
 	# trivial links do not have physical links, but could be using
 	# virtual interfaces on the same node. 
 	#
 	if (! $trivial) {
-	    AddVlan("lan", $lan, $nodeportA);
-
 	    if (virtlanusevirtiface($lan)) {
 		#
+		# Look for the underlying protovlan for this lan. Create
+		# new one otherwise.
+		#
+		my $protovlan;
+		
+		if (exists($protovlans{$lan})) {
+		    $protovlan = $protovlans{$lan};
+		}
+		else {
+		    my $lanid = "v" . "$lan" . $vlanid++;
+		    $protovlan = ProtoLan->Create($experiment, $lanid);
+		    $protovlan->SetRole("encapsulation");
+		    $protovlan->SetType("vlan");
+		    $protovlan->SetEncapStyle(virtlanencapstyle($lan));
+		    $protovlan->SetAttribute("link/lan", $lan);
+		    $protovlans{$lan} = $protovlan;
+		}
+		$protovlan->AddMember($nodeA, $portA)
+		    if (!$protovlan->IsMember($nodeA, $portA));
+		
+		#
 		# Create new veth device.
-		# 
+		#
 		$portA = NewVirtIface($lan, $virtA, $nodeA, $portA);
 
+		$protolan = ProtoLan->Lookup($experiment, $lan);
+		$protolan = ProtoLan->Create($experiment, $lan, $protovlan)
+		    if (!defined($protolan));
+		$protolan->SetType("emulated");
+		$protolan->SetRole("link/lan");
+		$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+		
 		#
 		# If the "lannode" is placed on a node, and that node is
 		# different than the current node, we have to connect the
@@ -1995,9 +2104,18 @@ foreach $plink (keys(%plinks)) {
 		# switch, and this is not an issue. Rob understands this!
 		#
 		if ($nodeportA ne $nodeportB) {
-		    AddVlan("lan", $lan, $nodeportB);
+		    $protovlan->AddMember($nodeB, $portB)
+			if (!$protovlan->IsMember($nodeB, $portB));
 		    AddVirtPatch($lan, $nodeportB);
 		}
+	    }
+	    else {
+		$protolan = ProtoLan->Lookup($experiment, $lan);
+		$protolan = ProtoLan->Create($experiment, $lan)
+		    if (!defined($protolan));
+		$protolan->SetType("vlan");
+		$protolan->SetRole("link/lan");
+		$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 	    }
 	}
 	else {
@@ -2007,7 +2125,14 @@ foreach $plink (keys(%plinks)) {
 		# No phys mapping. We create a veth, but there is no phys port.
 		$nodeA = $v2pmap{(split(":", $virtA))[0]};
 		$portA = NewVirtIface($lan, $virtA, $nodeA);
-	    } else {
+
+		$protolan = ProtoLan->Lookup($experiment, $lan);
+		$protolan = ProtoLan->Create($experiment, $lan)
+		    if (!defined($protolan));
+		$protolan->SetRole("link/lan");
+		$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+	    }
+	    else {
 		# next plink
 		next;
 	    }
@@ -2045,10 +2170,19 @@ foreach $plink (keys(%plinks)) {
 	# nodeportB is the fake LAN.
 	printdb " FAKELAN:";
 
+	my ($vnodeA,$vportA) = split(":",$virtA);
+
 	#
 	# No trivial links, emulated links, delays, vlans. We do however need
 	# to come up with an ssid?
-	# 
+	#
+	my $protolan = ProtoLan->Lookup($experiment, $lan);
+	$protolan = ProtoLan->Create($experiment, $lan)
+	    if (!defined($protolan));
+	$protolan->SetType("fakelan");
+	$protolan->SetRole("link/lan");
+	$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+	
 	$portmap{$virtA} = $portA;
 	printdb "  Portmap:\n";
 	printdb "    $virtA = $portA\n";
@@ -2534,65 +2668,50 @@ foreach $lan (keys(%virt_lans)) {
     if (@members != 2) {
 	fatal("Too many members for a tunnel!");
     }
-    my $server = $lantotunnelserver{$lan};
-    my $ipport = $rnodetotunnelport{$server};
-    my $mask   = virtlannetmask($lan);
+    my $server    = $lantotunnelserver{$lan};
+    my $ipport    = $rnodetotunnelport{$server};
+    my $mask      = virtlannetmask($lan);
+    my $secretkey = TBGenSecretKey();
 
-    # So we can figure out the peer ip.
     my ($member0,$member1) = @members;
-    my $node0  = (split(":",$member0))[0];
-    my $node1  = (split(":",$member1))[0];
+    my ($vnode0,$vport0)  = split(":",$member0);
+    my ($vnode1,$vport1)  = split(":",$member1);
+    my $vvnode0           = (virtnodeisremote($vnode0) ?
+			     $v2vmap{$vnode0} : $v2pmap{$vnode0});
+    my $vvnode1           = (virtnodeisremote($vnode1) ?
+			     $v2vmap{$vnode1} : $v2pmap{$vnode1});
+    my $ip0               = $ips{$member0};
+    my $ip1               = $ips{$member1};
+    my ($peerip0,$peerip1);
     
-    foreach $member (@members) {
-	my ($vnode,$vport) = split(":",$member);
-	my $isserver  = ($server eq $vnode ? 1 : 0);
-	my $peervnode = ($vnode eq $node0 ? $node1 : $node0);
-	my $vvnode;
-	my $peervvnode;
-	my $ip;
-
-	#
-	# Note, if either side of the tunnel is on the local side, it
-	# is connected to the physical node (pcxxx), even if its talking
-	# to a local virtual node (say, a jail). Obviously, both sides
-	# cannot be local. This is of course inconsistent.
-	#
-	if (virtnodeisremote($vnode)) {
-	    $vvnode= $v2vmap{$vnode};
-	}
-	else {
-	    $vvnode= $v2pmap{$vnode};
-	}
-	if (virtnodeisremote($peervnode)) {
-	    $peervvnode= $v2vmap{$peervnode};
-	}
-	else {
-	    $peervvnode= $v2pmap{$peervnode};
-	}
-
-	#
-	# Need to map the server to the control net interface of the
-	# physical node.
-	#
-	if (! TBControlNetIP($peervvnode, \$ip)) {
-	    fatal("No Control Network IP for $peervvnode!");
-	}
-	
-        printdb "Tunnel: ".
-	        "vnode:$vnode port:$ipport isserver:$isserver peer_ip:$ip ".
-	        "inet:$ips{$member}\n";
-
-	if (!defined($secretkey)) {
-	    $secretkey = TBGenSecretKey();
-	}
-	
-	DBQueryFatal("insert into tunnels ".
-		     " (pid, eid, node_id, vname, isserver, ".
-		     "  port, peer_ip, mask, assigned_ip, password) ".
-		     "values ('$pid', '$eid', '$vvnode', '$lan', $isserver, ".
-		     "         $ipport, '$ip', '$mask', ".
-		     "         '$ips{$member}','$secretkey')");
+    #
+    # Need to map the server to the control net interface of the
+    # physical node.
+    #
+    if (! TBControlNetIP($vvnode0, \$peerip0)) {
+	fatal("No Control Network IP for $vnode0!");
     }
+    if (! TBControlNetIP($vvnode1, \$peerip1)) {
+	fatal("No Control Network IP for $vnode1!");
+    }
+
+    printdb "Tunnel: ".
+	"$vnode0 <-> $vnode1, $ip0 <-> $ip1, $peerip0 <-> $peerip1\n";
+
+    next
+	if ($impotent);
+
+    my $tunnel = Tunnel->Create($experiment, $lan, $secretkey, $mask, $ipport);
+    fatal("Could not create tunnel for $lan")
+	if (!defined($tunnel));
+
+    $tunnel->AddInterface($vvnode0, $vnode0, $vport0, $ip0, $peerip1,
+			  ($server eq $vnode0 ? 1 : 0))
+	or fatal("Could not add $vnode0:$vport0 to $tunnel");
+    
+    $tunnel->AddInterface($vvnode1, $vnode1, $vport1, $ip1, $peerip0,
+			  ($server eq $vnode1 ? 1 : 0))
+	or fatal("Could not add $vnode1:$vport1 to $tunnel");
 }
 
 #
@@ -3140,69 +3259,6 @@ sub nextipportnum($) {
 }
 
 #
-# Vlan stuff.
-#
-my %vlantable  = ();
-my %lantovlan  = ();
-my $vlanid     = 0;
-
-#
-# Add a vlan to the list. We have to watch for duplicates that can result
-# when doing emulated links. There are two kinds of vlans; one for duplex
-# links, which always have two members, and another for lans which can have
-# one or more members. 
-#
-sub AddVlan($$$;$)
-{
-    my ($type, $lan, $nodeportA, $nodeportB) = @_;
-
-    if ($type eq "lan") {
-	# Start a list of nodeports in the vlan.
-	if (! defined($vlantable{$lan})) {
-	    $vlantable{$lan} = [$nodeportA];
-	    $lantovlan{$lan} = $lan;
-	    printdb "  $lan, \[" . $nodeportA . "\]\n";
-	    return;
-	}
-	
-	#
-	# Make sure we add only unique nodeport entries to the lan. 
-	#
-	if (! grep {$_ eq $nodeportA} @{$vlantable{$lan}}) {
-	    push(@{$vlantable{$lan}}, $nodeportA);
-	}
-	printdb "  $lan, \[" . join(" ",@{$vlantable{$lan}}) . "\]\n";
-    }
-    elsif (virtlanexists($lan) && virtlanemulated($lan) &&
-	   virtlanencapstyle($lan) =~ /^veth/) {
-	#
-	# Like above, except that in this case, its a bunch of vlinks
-	# sharing a smaller set of physical links. Just mark it differently
-	# here. See UploadVlans() below; these vlans will be merged to
-	# into one big supervlan since a nodeport can be in just one vlan
-	# at a time.
-	#
-	# Make up a name for the "super" vlan.
-	#
-	my $newid = "s$lan:" . $vlanid++;
-	
-	$vlantable{$newid} = [$nodeportA, $nodeportB];
-	$lantovlan{$lan}   = $newid;
-
-	printdb "  $newid (SVLAN), \[$nodeportA, $nodeportB\]\n";	
-    }
-    else {
-	#
-	# Generate a new vlan of two members.
-	# 
-	$vlantable{$lan} = [$nodeportA, $nodeportB];
-	$lantovlan{$lan} = $lan;
-
-	printdb "  $lan, \[$nodeportA, $nodeportB\]\n";	
-    }
-}
-
-#
 # Write the vlans table to the DB.
 #
 sub UploadVlans()
@@ -3213,37 +3269,50 @@ sub UploadVlans()
     # implemented 802.1q tagged vlans (type "vlan"), this is ok. But for
     # "veth" implemented vlans, we have to merge the overlapping vlans
     # into "supervlans". Must be done iteratively of course.
-    # 
+    #
+    printdb "Dumping vlans before merging.\n";
+    ProtoLan->DumpAll()
+	if ($verbose);
+    
     printdb "Merging vlans.\n";
   again:
-    foreach my $keyA (keys(%vlantable)) {
-	my @membersA = @{$vlantable{$keyA}};
+    foreach my $protolanA (ProtoLan->ProtoLanList()) {
+	my @membersA = $protolanA->MemberList();
+	my $keyA     = $protolanA->vname();
 
-	if (virtlanexists($keyA) && virtlanencapstyle($keyA) eq "vlan") {
-	    next;
-	}
-	foreach my $keyB (keys(%vlantable)) {
-	    my @membersB = @{$vlantable{$keyB}};
+	next
+	    if (! ($protolanA->type() eq "vlan" &&
+		   $protolanA->role() eq "encapsulation" &&
+		   $protolanA->encapstyle() ne "vlan"));
 
-	    if (virtlanexists($keyB) && virtlanencapstyle($keyB) eq "vlan") {
-		next;
-	    }
+	foreach my $protolanB (ProtoLan->ProtoLanList()) {
+	    my @membersB = $protolanB->MemberList();
+	    my $keyB     = $protolanB->vname();
+
+	    next
+		if (! ($protolanB->type() eq "vlan" &&
+		       $protolanB->role() eq "encapsulation" &&
+		       $protolanB->encapstyle() ne "vlan"));
+	    
 	    if ($keyA ne $keyB) {
 		foreach my $memberA (@membersA) {
-		    if (grep {$_ eq $memberA} @membersB) {
+		    if (grep {$_ eq $memberA} $protolanB->MemberList()) {
 			foreach my $memberB (@membersB) {
-			    if (! grep {$_ eq $memberB} @membersA) {
-				push(@{$vlantable{$keyA}}, $memberB);
+			    if (! grep {$_ eq $memberB}
+				$protolanA->MemberList()) {
+				$protolanA->AddMember(split(":", $memberB));
 			    }
 			}
-			# Retarget lantovlan since the vlan was merged.
-			foreach my $lan (keys(%lantovlan)) {
-			    my $vlan = $lantovlan{$lan};
-			    if ($vlan eq $keyB) {
-				$lantovlan{$lan} = $keyA;
+			# Must reset the links before killing the old one.
+			foreach my $protolan (ProtoLan->ProtoLanList()) {
+			    if (defined($protolan->link()) &&
+				$protolan->link()->vname()
+				   eq $protolanB->vname()) {
+				$protolan->SetLink($protolanA);
 			    }
 			}
-			delete($vlantable{$keyB});
+			printdb "Merged $protolanB into $protolanA\n";
+			$protolanB->Destroy();
 			goto again;
 		    }
 		}
@@ -3253,42 +3322,45 @@ sub UploadVlans()
     
     if (!$impotent) {
 	printdb "Uploading vlans table.\n";
+	ProtoLan->DumpAll()
+	    if ($verbose);
+
+	ProtoLan->InstantiateAll() == 0
+	    or fatal("Could not instantiate protolans!");
+
+	# Once the lans are instantiated we have to go back and update the
+	# vinterfaces table. Eventually I want to roll vinterface creation
+	# into lan instantiation.
+	#
+	my @lans;
+	Lan->ExperimentLans($experiment, \@lans) == 0
+	    or fatal("Could not get list of all lans for $experiment");
+	foreach my $lan (@lans) {
+	    # Only care about encapsulated links.
+	    next
+		if ($lan->type() ne "emulated");
+
+	    my $linkedlan = $lan->GetLinkedLan();
+	    fatal("Emulated lan $lan does not have a linked vlan!")
+		if (!defined($linkedlan));
+	    my $virtlanidx  = virtlanidx($lan->vname());
+	    my $linkedlanid = $linkedlan->lanid();
+	    # XXX Fix when installed.
+	    my $vlanid;
+	    $linkedlan->GetAttribute("vlanid", \$vlanid);	    
+	    
+	    printdb("Update vinterfaces on $lan: $virtlanidx -> $vlanid\n");
+	    
+	    DBQueryFatal("update vinterfaces set vlanid='$vlanid' ".
+			 "where virtlanidx='$virtlanidx' and ".
+			 "      exptidx='$experiment_idx'");
+	}
+	
     }
     else {
 	printdb "Dumping vlans table.\n";
-    }
-    
-    foreach my $lanid (keys(%vlantable)) {
-	my $lan        = (split(":", $lanid))[0];
-	my $memberlist = join(" ", @{$vlantable{$lanid}});
-    
-	printdb "  $lan - $memberlist\n";
-
-	if (!$impotent) {
-	    my $query_result = 
-		DBQueryFatal("insert into vlans ".
-			     "   (id,exptidx,pid,eid,virtual,members) ".
-			     "values (0, '$experiment_idx', ".
-			     "        '$pid', '$eid', '$lan', '$memberlist')");
-	    fatal("Failed to insert new vlan")
-		if (!$query_result);
-
-	    my $newid = $query_result->insertid;
-	    foreach my $virtlan (keys(%lantovlan)) {
-		next
-		    if (!virtlanexists($virtlan));
-		
-		if ($lantovlan{$virtlan} eq $lanid) {
-		    my $vidx = virtlanidx($virtlan);
-		    printdb("Update vinterfaces on $virtlan: ".
-			    "$vidx -> $newid\n");
-			    
-		    DBQueryFatal("update vinterfaces set vlanid='$newid' ".
-				 "where virtlanidx='$vidx' and ".
-				 "      exptidx='$experiment_idx'");
-		}
-	    }
-	}
+	ProtoLan->DumpAll()
+	    if ($verbose);
     }
 }
 
@@ -3365,7 +3437,7 @@ sub NewVirtIface($$$;$)
     #
     # Special actions for virtnodes (as opposed to just emulated links).
     #
-    if (virtnodeisjailed($vnode)) {
+    if (virtnodeisvirt($vnode)) {
 	$isvnode = 1;
 
 	#
@@ -4192,6 +4264,10 @@ sub LoadVirtLans()
 		if (virtnodeisremote($node));
 	    next;
 	}
+	elsif (defined($encap) && $encap eq "tunnel") {
+	    $virt_lans{$vname}->{"TUNNEL"}       = 1;
+	    $virt_lans{$vname}->{"ENCAPSTYLE"}   = "default";
+	}
 
 	# Store this stuff as a unit to make it easier to grab later.
 	$virt_lans{$vname}->{"DELAYINFO"}->{$member} =
@@ -4551,8 +4627,9 @@ sub CreateTopFile()
     }
 
     foreach $lan (keys(%virt_lans)) {
+	# XXX Widearea/Tunnels are handled elsewhere.
 	next
-	    if (virtlanwidearea($lan));
+	    if (virtlanwidearea($lan) || virtlantunnel($lan));
 	
 	my @members = virtlanmembers($lan);
 	printdb "$lan - " . join(" ",@members) . "\n";

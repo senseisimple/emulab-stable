@@ -16,6 +16,7 @@ use libdb;
 use libtestbed;
 use Experiment;
 use User;
+use Lan;
 
 #
 # Do things necessary for setting up inner elab experiment. 
@@ -1141,39 +1142,47 @@ sub RemoveNodes()
     # Grab the vlans table. We need to find any ports used by the nodes
     # getting deleted, and move them back to the default vlan. 
     #
-    my %newvlans = ();
-    my @todelete = ();
+    my @delmembers = ();
+    my @todelete   = ();
     
     my $query_result =
-	DBQueryWarn("select v.*,e.inner_id from vlans as v ".
-		    "left join elabinelab_vlans as e on ".
-		    "   e.outer_id=v.id ".
-		    "where v.pid='$pid' and v.eid='$eid'");
+	DBQueryWarn("select inner_id,outer_id from elabinelab_vlans ".
+		    "where pid='$pid' and eid='$eid'");
     return -1
 	if (!$query_result);
 
-    while (my (%row) = $query_result->fetchhash()) {
-	my $members  = $row{"members"};
-	my $id       = $row{"id"};
-	my $inner_id = $row{"inner_id"};
-	my @newports = ();
-	my $changed  = 0;
+    while (my ($inner_id,$outer_id) = $query_result->fetchrow_array()) {
+	my $vlan = VLan->Lookup($outer_id);
+	if (!defined($vlan)) {
+	    print STDERR "*** No such vlan $outer_id ($inner_id)\n";
+	    return -1;
+	}
+	my @members;
 
-	foreach my $port (split(/\s+/, $members)) {
-	    my ($node,$eth) = split(":", $port);
+	if ($vlan->MemberList(\@members) != 0) {
+	    print STDERR "*** Unable to load members for $vlan\n";
+	    return -1;
+	}
+	my $id         = $outer_id;
+	my $changed    = 0;
 
-	    # If this node is not in the list of nodes to be deleted,
-	    # the node:port stays in the port list.
-	    if (! grep {$_ eq $node} @nodes) {
-		push(@newports, $port);
+	foreach my $member (@members) {
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		print STDERR "Missing attributes for $member in $vlan\n";
+		return -1;
 	    }
-	    else {
-		push(@todelete, $port);
+	    my $nodeid = $node->node_id();
+	    
+	    # See if this node is in the list of nodes to be deleted,
+	    if (grep {$_ eq $nodeid} @nodes) {
+		push(@todelete, "$nodeid:$iface");
+		push(@delmembers, $member);
 		$changed = 1;
 	    }
 	}
-	$newvlans{$id} = [ @newports ]
-	    if ($changed);
     }
 
     # Remove ports from the vlans.
@@ -1184,13 +1193,9 @@ sub RemoveNodes()
 	    return -1;
 	}
     }
-
     # Only if the above succeeds, do we update the vlans table.
-    foreach $id (keys(%newvlans)) {
-	my $members = join(" ", @{ $newvlans{$id} });
-
-	DBQueryWarn("update vlans set members='$members' ".
-		    "where id=$id")
+    foreach my $member (@delmembers) {
+	$member->Delete() == 0
 	    or return -1;
     }
     

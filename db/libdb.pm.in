@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -247,6 +247,7 @@ require Group;
 require Node;
 require NodeType;
 require Mysql;
+require Lan;
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG
 	    @EXPORT_OK @virtualTables @physicalTables);
@@ -2449,7 +2450,6 @@ sub TBExptContainsNodeCT($$$)
 		   "ipsubnets");
 
 @physicalTables = ("delays",
-		   "vlans",
 		   "tunnels",
 		   "ipport_ranges",
 		   "v2pmap",
@@ -2647,6 +2647,13 @@ sub TBExptRemovePhysicalState($$)
     my ($pid, $eid) = @_;
     my $errors = 0;
 
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return 1
+	if (!defined($experiment));
+
+    return 1
+	if (Lan->DestroyExperimentLans($experiment) != 0);
+    
     foreach my $table (@physicalTables) {
 	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
 	    or $errors++;
@@ -2697,6 +2704,13 @@ sub TBExptBackupPhysicalState($$)
 	    or return 1;
     }
 
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return 1
+	if (!defined($experiment));
+
+    return 1
+	if (Lan->BackupExperimentLans($experiment, $pstateDir) != 0);
+    
     foreach my $table (@physicalTables) {
 	DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
 		    "INTO OUTFILE '$pstateDir/$table' ")

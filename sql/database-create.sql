@@ -521,7 +521,7 @@ CREATE TABLE `experiment_input_data` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `experiment_template_inputs`
+-- Table structure for table `experiment_inputs`
 --
 
 DROP TABLE IF EXISTS `experiment_inputs`;
@@ -1098,9 +1098,9 @@ CREATE TABLE `firewalls` (
   `fwname` varchar(32) NOT NULL default '',
   `vlan` int(11) default NULL,
   `vlanid` int(11) default NULL,
-  PRIMARY KEY (`exptidx`,`fwname`),
-  KEY `pideid` (`pid`,`eid`,`fwname`),
-  KEY `vlan` (`vlan`)
+  PRIMARY KEY  (`exptidx`,`fwname`),
+  KEY `vlan` (`vlan`),
+  KEY `pideid` (`pid`,`eid`,`fwname`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1293,6 +1293,28 @@ CREATE TABLE `iface_counters` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `ifaces`
+--
+
+DROP TABLE IF EXISTS `ifaces`;
+CREATE TABLE `ifaces` (
+  `lanid` int(11) NOT NULL default '0',
+  `ifaceid` int(11) NOT NULL default '0',
+  `exptidx` int(11) NOT NULL default '0',
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `node_id` varchar(32) NOT NULL default '',
+  `vnode` varchar(32) NOT NULL default '',
+  `vname` varchar(32) NOT NULL default '',
+  `vidx` int(11) NOT NULL default '0',
+  `vport` tinyint(3) NOT NULL default '0',
+  PRIMARY KEY  (`lanid`,`ifaceid`),
+  KEY `pideid` (`pid`,`eid`),
+  KEY `exptidx` (`exptidx`),
+  KEY `lanid` (`lanid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `images`
 --
 
@@ -1456,6 +1478,64 @@ CREATE TABLE `knowledge_base_entries` (
   `archiver_uid` varchar(8) default NULL,
   `archiver_idx` mediumint(8) unsigned NOT NULL default '0',
   PRIMARY KEY  (`idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `lan_attributes`
+--
+
+DROP TABLE IF EXISTS `lan_attributes`;
+CREATE TABLE `lan_attributes` (
+  `lanid` int(11) NOT NULL default '0',
+  `attrkey` varchar(32) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  `attrtype` enum('integer','float','boolean','string') default 'string',
+  PRIMARY KEY  (`lanid`,`attrkey`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `lan_member_attributes`
+--
+
+DROP TABLE IF EXISTS `lan_member_attributes`;
+CREATE TABLE `lan_member_attributes` (
+  `lanid` int(11) NOT NULL default '0',
+  `memberid` int(11) NOT NULL default '0',
+  `attrkey` varchar(32) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  `attrtype` enum('integer','float','boolean','string') default 'string',
+  PRIMARY KEY  (`lanid`,`memberid`,`attrkey`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `lan_members`
+--
+
+DROP TABLE IF EXISTS `lan_members`;
+CREATE TABLE `lan_members` (
+  `lanid` int(11) NOT NULL default '0',
+  `memberid` int(11) NOT NULL auto_increment,
+  PRIMARY KEY  (`lanid`,`memberid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `lans`
+--
+
+DROP TABLE IF EXISTS `lans`;
+CREATE TABLE `lans` (
+  `lanid` int(11) NOT NULL auto_increment,
+  `exptidx` int(11) NOT NULL default '0',
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `vname` varchar(64) NOT NULL default '',
+  `vidx` int(11) NOT NULL default '0',
+  `type` varchar(32) NOT NULL default '',
+  `link` int(11) default NULL,
+  `ready` tinyint(1) default '0',
+  PRIMARY KEY  (`lanid`),
+  KEY `pideid` (`pid`,`eid`),
+  KEY `exptidx` (`exptidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3200,7 +3280,7 @@ CREATE TABLE `vinterfaces` (
   `iface` varchar(10) default NULL,
   `rtabid` smallint(5) unsigned NOT NULL default '0',
   `vnode_id` varchar(32) default NULL,
-  `exptidx` int(11) NOT NULL default '0',
+  `exptidx` int(10) NOT NULL default '0',
   `virtlanidx` int(11) NOT NULL default '0',
   `vlanid` int(11) NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`unit`),
@@ -3333,7 +3413,7 @@ CREATE TABLE `virt_lans` (
   `nobwshaping` tinyint(4) default '0',
   `mustdelay` tinyint(1) default '0',
   `usevethiface` tinyint(4) default '0',
-  `encap_style` enum('alias','veth','veth-ne','vlan','default') NOT NULL default 'default',
+  `encap_style` enum('alias','veth','veth-ne','vlan','tunnel','default') NOT NULL default 'default',
   `trivial_ok` tinyint(4) default '1',
   `protocol` varchar(30) NOT NULL default 'ethernet',
   `is_accesspoint` tinyint(4) default '0',

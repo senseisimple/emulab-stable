@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,6 +21,7 @@ use English;
 use libdb;
 use libtestbed;
 use snmpit_lib;
+use Lan;
 use libxmlrpc;
 
 # Configure variables
@@ -82,42 +83,53 @@ sub commonTail($$)
 #
 sub RemoteDoVlansFromTables(@)
 {
-    my @vlans     = @_;
+    my @vlanids   = @_;
     my $vlantable = {};
+    my %vlans     = ();
 
     return 0
-	if (! @vlans);
+	if (! @vlanids);
 
     my $prefix = "" ;
     TBGetSiteVar("federation/localprefix",\$prefix);
 
-    my $result =
-	DBQueryFatal("select virtual,members,id from vlans where " .
-		     # Join "id='foo'" with ORs
-		     join(' OR ', map("id='$_'",@vlans)));
+    foreach my $vlanid (@vlanids) {
+	my $vlan = VLan->Lookup($vlanid);
+	return -1
+	    if (!defined($vlanid));
+	$vlans{"$vlanid"} = $vlan;
+    }
 
-    return 0
-	if (! $result->numrows);
-    
-    while (my ($virtual,$members,$id) = $result->fetchrow()) {
-	# $members is a space-seprated list
+    foreach my $id (keys(%vlans)) {
+	my $vlan = $vlans{"$id"};
+	my @members;
 
 	$vlantable->{$id} = {};
-	$vlantable->{$id}->{"virtual"} = $virtual;
+	$vlantable->{$id}->{"virtual"} = $vlan->vname();
 	$vlantable->{$id}->{"members"} = {};
-	
-	foreach my $port (split /\s+/,$members) {
-	    # Due to the inconsistent nature of our tables (curses!), we
-	    # have to do some conversion here
-	    $port =~ /^(.+):(.+)/;
-	    my ($node,$iface) = ($1,$2);
+
+	if ($vlan->MemberList(\@members) != 0) {
+	    warn "WARNING: Could not get members for $vlan\n";
+	    return -1;
+	}
+	foreach my $member (@members) {
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		warn "WARNING: Could not get nodeport for $member\n";
+		return -1;
+	    }
 	    if (!defined($node) || !defined($iface)) {
-		warn "WARNING: Bad node in VLAN: $port - skipping\n";
+		warn "WARNING: Bad node in VLAN member: $member - skipping\n";
 		next;
 	    }
+	    my $node_id = $node->node_id();
+	    my $port    = "$node_id:$iface";
+	    
 	    my $result =
 		DBQueryFatal("select current_speed,duplex from interfaces " .
-			     "where node_id='$node' and iface='$iface'");
+			     "where node_id='$node_id' and iface='$iface'");
 	    if (!$result->num_rows()) {
 		warn "WARNING: Bad node/iface pair in VLAN: $port - skipping\n";
 		next;
@@ -141,16 +153,23 @@ sub RemoteDoVlansFromTables(@)
 
     if (defined($xmlback)) {
 	foreach my $vlres (split ',', $xmlback) {
-	    my ($name, $num) = split '#', $vlres;
-	    $result =
-		DBQuery("update vlans set tag=$num where id='" . $name . "'");
-	    if (!defined($result)) {
-		print STDERR "couldn't set vlan tag from returned vlan map " .
-		   "for vlan $name\n";
-		    $errors++;
+	    my ($vlanid, $tag) = split '#', $vlres;
+	    
+	    if (!exists($vlans{$vlanid})) {
+		print STDERR "Ban vlanid $vlanid in returned vlan map\n";
+		$errors++;
+	    }
+	    my $vlan = $vlans{$vlanid};
+
+	    if ($vlan->SetTag($tag) != 0) {
+		print STDERR "could not set vlan tag for $vlan\n";
+		$errors++;
 	    }
 	}
-    } else { $errors = 1; }
+    }
+    else {
+	$errors = 1;
+    }
     return $errors;
 }
 

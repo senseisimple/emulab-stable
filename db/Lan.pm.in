@@ -1,0 +1,2183 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Lan;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use Node;
+use Experiment;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+use vars qw(@EXPORT_OK);
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $CONTROL	= "@USERNODE@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Why, why, why?
+@EXPORT_OK = qw();
+
+# Cache of instances to avoid regenerating them.
+my %lans   = ();
+
+my $debug  = 0;
+sub debugging() {return $debug; }
+
+# Set during initial crossover.
+my $initialize = 0;
+
+#
+# Lookup and create a class instance to return.
+#
+sub Lookup($$;$)
+{
+    my ($class, $arg1, $arg2) = @_;
+    my $lanid;
+    my $experiment;
+
+    #
+    # A single arg is a lanid. Two args is exptidx and vname (lan name).
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $lanid = $1;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (ref($arg1) && ($arg2 =~ /^[-\w]*$/)) {
+	# Assumed to be an experiment object.
+	$experiment = $arg1;
+	$arg1 = $experiment->idx();
+    }
+    elsif (! (($arg1 =~ /^\d*$/) && ($arg2 =~ /^[-\w]*$/))) {
+	return undef;
+    }
+
+    #
+    # Two args means lookup by exptidx,vname.
+    #
+    if (defined($arg2)) {
+	my $result =
+	    DBQueryWarn("select lanid from lans ".
+			"where exptidx='$arg1' and vname='$arg2' and ".
+			"      link is null");
+
+	return undef
+	    if (! $result || !$result->numrows);
+
+	($lanid) = $result->fetchrow_array();
+    }
+
+    # Look in cache first
+    return $lans{"$lanid"}
+        if (exists($lans{"$lanid"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from lans where lanid='$lanid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'LAN'}   = $query_result->fetchrow_hashref();
+    $self->{"ATTRS"} = {};
+    $self->{"EXPT"}  = $experiment;
+
+    #
+    # Grab the attributes for this lan now.
+    #
+    $query_result =
+	DBQueryWarn("select * from lan_attributes where lanid='$lanid'");
+    return undef
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $key = $rowref->{'attrkey'};
+	
+	$self->{"ATTRS"}->{$key} = $rowref;
+    }
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $lans{"$lanid"} = $self;
+
+    return $self;
+}
+
+# accessors
+sub field($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'LAN'}->{$_[1]}); }
+sub pid($)	  { return field($_[0], 'pid'); }
+sub eid($)	  { return field($_[0], 'eid'); }
+sub exptidx($)	  { return field($_[0], 'exptidx'); }
+sub lanid($)	  { return field($_[0], 'lanid'); }
+sub vname($)	  { return field($_[0], 'vname'); }
+sub vidx($)	  { return field($_[0], 'vidx'); }
+sub ready($)	  { return field($_[0], 'ready'); }
+sub link($)	  { return field($_[0], 'link'); }
+sub type($)	  { return field($_[0], 'type'); }
+
+#
+# Create a new (empty) lan. Ready bit is set to zero. 
+#
+sub Create($$$;$$$)
+{
+    my ($class, $experiment, $vname, $type, $id, $link) = @_;
+
+    return undef
+	if (ref($class) || !ref($experiment));
+
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+    my $exptidx = $experiment->idx();
+    my $safe_vname = DBQuoteSpecial($vname);
+    my $linkid  = (defined($link) ? $link->lanid() : "NULL");
+    my $vidx    = 0;
+
+    # Allow for the caller to specify the ID, as when converting from
+    # existing vlans table.
+    $id = "NULL"
+	if (!defined($id));
+
+    # We need the idx from the virt_lan_lans table.
+    my $query_result =
+	DBQueryWarn("select idx from virt_lan_lans ".
+		    "where exptidx=$exptidx and vname='$vname'");
+    return undef
+	if (!$query_result);
+    ($vidx) = $query_result->fetchrow_array()
+	if ($query_result->numrows);
+
+    $query_result =
+	DBQueryWarn("insert into lans set ".
+		    "   lanid=$id, ".
+		    "   exptidx='$exptidx', ".
+		    "   pid='$pid', eid='$eid', ".
+		    "   vname=$safe_vname, ".
+		    "   type='$type', ".
+		    "   vidx='$vidx', ".
+		    "   link='$linkid', ".
+		    "   ready=0");
+    return undef
+	if (!defined($query_result));
+
+    # Need the newly minted ID
+    my $lanid = $query_result->insertid();
+    my $lan   = Lan->Lookup($lanid);
+
+    # Keep the vlans table in sync for now. Will remove later.
+    if ($type eq "vlan" && !$initialize) {
+	$query_result = 
+	    DBQueryWarn("insert into vlans (id,exptidx,pid,eid,virtual) ".
+			"values ".
+			"(0, '$exptidx', '$pid', '$eid', $safe_vname)");
+	if (!$query_result) {
+	    DBQueryWarn("delete from lans where lanid='$lanid'");
+	    return undef;
+	}
+	my $vlanid = $query_result->insertid();
+	$lan->SetAttribute("vlanid", $vlanid);
+    }
+    print "Created lan: $lan\n"
+	if ($debug && $lan);
+    return $lan;
+}
+
+#
+# Destroy a lan and its attributes. 
+#
+sub Destroy($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $lanid = $self->lanid();
+    my $type  = $self->type();
+
+    #
+    # List of members to destroy.
+    #
+    my @members;
+    if ($self->MemberList(\@members) != 0) {
+	print STDERR "Destroy: Could not get member list\n";
+	return -1;
+    }
+    foreach my $member (@members) {
+	#
+	# Delete all members and interfaces and attributes.
+	#
+	my $memberid = $member->memberid();
+
+	return -1
+	    if (!DBQueryWarn("delete from lan_member_attributes ".
+			     "where lanid='$lanid' and memberid='$memberid'"));
+	return -1
+	    if (!DBQueryWarn("delete from ifaces ".
+			     "where lanid='$lanid' and ifaceid='$memberid'"));
+	return -1
+	    if (!DBQueryWarn("delete from lan_members ".
+			     "where lanid='$lanid' and memberid='$memberid'"));
+    }
+
+    # Keep the vlans table in sync for now. Will remove later.
+    if ($type eq "vlan" && !$initialize) {
+	my $vlanid;
+
+	$self->GetAttribute("vlanid", \$vlanid);
+	DBQueryWarn("delete from vlans where id='$vlanid'");
+    }
+    
+    # Must delete attributes after above vlan removal but before lan removal.
+    return -1
+	if (!DBQueryWarn("delete from lan_attributes ".
+			 "where lanid='$lanid'"));
+
+    return -1
+	if (!DBQueryWarn("delete from lans ".
+			 "where lanid='$lanid'"));
+
+    # From the cache. 
+    delete($lans{"$lanid"});
+    
+    return 0;
+}
+
+#
+# Class method to destroy all lans for an experiment.
+#
+sub DestroyExperimentLans($$)
+{
+    my ($class, $experiment) = @_;
+
+    return -1
+	if (! ref($experiment));
+
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select lanid from lans where exptidx='$exptidx'");
+    return -1
+	if (! $query_result);
+
+    while (my ($lanid) = $query_result->fetchrow_array()) {
+	my $lan = Lan->Lookup($lanid);
+	return -1
+	    if (!$lan);
+	$lan->Destroy() == 0 or return -1;
+    }
+    return 0;
+}
+
+#
+# Class method to backup all lans for an experiment.
+#
+sub BackupExperimentLans($$$)
+{
+    my ($class, $experiment, $pstatedir) = @_;
+    my @lanids = ();
+
+    return -1
+	if (! ref($experiment));
+
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select lanid from lans where exptidx='$exptidx'");
+    return -1
+	if (! $query_result);
+
+    while (my ($lanid) = $query_result->fetchrow_array()) {
+	push(@lanids, $lanid);
+    }
+    foreach my $table ("lans", "lan_attributes", "lan_members",
+		       "lan_member_attributes", "ifaces") {
+	DBQueryWarn("select * from $table where ".
+		      join(" or ", map("lanid='$_'", @lanids)) . " " .
+		    "into outfile '$pstatedir/$table'")
+	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+    my $vname = $self->vname();
+    my $id    = $self->lanid();
+
+    return "[Lan ${id}: $pid/$eid/$vname]";
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $newref = Lan->Lookup($self->lanid());
+    return -1
+	if (!defined($newref));
+
+    $self->{'LAN'}   = $newref->{'LAN'};
+    $self->{"ATTRS"} = $newref->{'ATTRS'};
+
+    return 0;
+}
+
+#
+# Get value of an attribute.
+#
+sub GetAttribute($$$;$)
+{
+    my ($self, $key, $pvalue, $ptype) = @_;
+
+    return -1
+	if (!exists($self->{'ATTRS'}->{$key}));
+
+    $$pvalue = $self->{'ATTRS'}->{$key}->{'attrvalue'};
+    $$ptype  = $self->{'ATTRS'}->{$key}->{'attrtype'}
+        if (defined($ptype));
+    
+    return 0;
+}
+
+#
+# Set value of an attribute.
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $key, $value, $type) = @_;
+
+    return -1
+	if (!ref($self));
+
+    $type = "string"
+	if (!defined($type));
+
+    return -1
+	if ($type ne "string" && $type ne "integer" &&
+	    $type ne "float"  && $type ne "boolean");
+
+    my $lanid = $self->lanid();
+    my $safe_key = DBQuoteSpecial($key);
+    my $safe_val = DBQuoteSpecial($value);
+
+    return -1
+	if (!DBQueryWarn("replace into lan_attributes set ".
+			 "  lanid='$lanid', ".
+			 "  attrkey=$safe_key, ".
+			 "  attrvalue=$safe_val, ".
+			 "  attrtype='$type'"));
+
+    $self->{'ATTRS'}->{$key}->{'attrkey'}   = $key;
+    $self->{'ATTRS'}->{$key}->{'attrvalue'} = $value;
+    $self->{'ATTRS'}->{$key}->{'attrtype'}  = $type;
+    
+    return 0;
+}
+
+#
+# Shorthand
+#
+sub SetRole($$)
+{
+    my ($self, $role) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return $self->SetAttribute("role", $role);
+}
+
+#
+# Get the experiment object for a lan.
+#
+sub GetExperiment($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return $self->{"EXPT"}
+        if (defined($self->{"EXPT"}));
+
+    $self->{"EXPT"} = Experiment->Lookup($self->exptidx());
+    return $self->{"EXPT"};
+}
+
+#
+# Get the linked lan as a lan object.
+#
+sub GetLinkedLan($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return Lan->Lookup($self->link());
+}
+
+#
+# Add an Interface to a Lan. This interface always corresponds to a virtual
+# interface on link or lan.
+#
+sub AddInterface($$$$;$$)
+{
+    my ($self, $node, $vnode, $vport, $iface, $member) = @_;
+
+    return undef
+	if (! (ref($self) && ref($node)));
+
+    my $interface = Lan::Interface->Create($self, $node,
+					   $vnode, $vport, $member);
+    return undef
+	if (!defined($interface));
+
+    #print "fee $interface\n";
+    
+    # Set the attribute for the physical interface.
+    if (defined($iface) &&
+	$interface->SetAttribute("iface", $iface) != 0) {
+	$interface->Destroy();
+	return undef;
+    }
+    # And the node
+    if ($interface->SetAttribute("node_id", $node->node_id()) != 0) {
+	$interface->Destroy();
+	return undef;
+    }
+
+    # Keep vlans table in sync for now.
+    if ($self->type() eq "vlan" && !$initialize) {
+	my $nodeiface = $node->node_id() . ":" . $iface;
+	my $vlanid;
+
+	$self->GetAttribute("vlanid", \$vlanid);
+
+	DBQueryWarn("update vlans set ".
+		    " members=CONCAT_WS(' ', members, '$nodeiface') ".
+		    "where id='$vlanid'");
+    }
+    return $interface;
+}
+
+#
+# Add a member to a lan
+#
+sub AddMember($$;$)
+{
+    my ($self, $node, $iface) = @_;
+
+    return undef
+	if (!ref($self));
+
+    return undef
+	if (defined($node) && !ref($node));
+
+    my $member = Lan::Member->Create($self);
+
+    if (defined($node)) {
+	# And the node.
+	if ($member->SetAttribute("node_id", $node->node_id()) != 0) {
+	    $member->Destroy();
+	    return undef;
+	}
+	# Set the attribute for the physical interface.
+	if (defined($iface) &&
+	    $member->SetAttribute("iface", $iface) != 0) {
+	    $member->Destroy();
+	    return undef;
+	}
+
+	# Keep vlans table in sync for now.
+	if ($self->type() eq "vlan" && !$initialize) {
+	    my $member = $node->node_id() . ":" . $iface;
+	    my $vlanid;
+
+	    $self->GetAttribute("vlanid", \$vlanid);
+
+	    DBQueryWarn("update vlans set ".
+			" members=CONCAT_WS(' ', members, '$member') ".
+			"where id='$vlanid'");
+	}
+    }
+    return $member;
+}
+
+#
+# Remove a member from a lan.
+#
+sub DelMember($$)
+{
+    my ($self, $member) = @_;
+
+    #
+    # We do not cache the members, so just delete it.
+    #
+    return $member->Destroy();
+}
+
+#
+# Return a list of members for a lan.
+#
+sub MemberList($$)
+{
+    my ($self, $plist) = @_;
+
+    return -1
+	if (! (ref($self) && ref($plist)));
+
+    my $lanid = $self->lanid();
+
+    my $query_result =
+	DBQueryWarn("select memberid from lan_members where lanid='$lanid'");
+    return -1
+	if (!defined($query_result));
+
+    my @result = ();
+    while (my ($memberid) = $query_result->fetchrow_array()) {
+	my $member = Lan::Member->Lookup($self, $memberid);
+	return -1
+	    if (!defined($member));
+	push(@result, $member);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# List of all experiment lans. This is a class method.
+#
+sub ExperimentLans($$$)
+{
+    my ($class, $experiment, $plist) = @_;
+
+    return -1
+	if (! (ref($plist) && ref($experiment)));
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select l.lanid from lans as l ".
+		    "where l.exptidx='$exptidx'");
+    return -1
+	if (!defined($query_result));
+
+    my @result = ();
+    while (my ($lanid) = $query_result->fetchrow_array()) {
+	my $lan = Lan->Lookup($lanid);
+	return -1
+	    if (!defined($lan));
+	push(@result, $lan);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# Initialize from vlans table. Used when converting from old vlans table.
+#
+# XXX Need to deal with vlan encapsulation ...
+#
+sub Initialize($)
+{
+    my ($self)     = @_;
+    my %delays     = ();
+    my %elabinelab = ();
+    my %vinterfaces= ();
+
+    # Prevent vlan insertion above.
+    $initialize = 1;
+
+    DBQueryFatal("delete from lans");
+    DBQueryFatal("delete from lan_attributes");
+    DBQueryFatal("delete from lan_members");
+    DBQueryFatal("delete from lan_member_attributes");
+    DBQueryFatal("delete from ifaces");
+
+    my $query_result =
+	DBQueryFatal("select node_id,iface0,iface1,vname from delays");
+    while (my ($node_id,$iface0,$iface1,$vname) =
+	   $query_result->fetchrow_array()) {
+	$delays{"$node_id:$iface0"} = $vname;
+	$delays{"$node_id:$iface1"} = $vname;
+
+	print "$node_id:$iface0, $node_id:$iface1\n";
+    }
+
+    $query_result =
+	DBQueryFatal("select exptidx,outer_id from elabinelab_vlans");
+    while (my ($exptidx,$outer_id) = $query_result->fetchrow_array()) {
+	$elabinelab{"$outer_id"} = $exptidx;
+
+	print "$exptidx,$outer_id\n";
+    }
+
+    # vinterfaces
+    $query_result =
+	DBQueryFatal("select node_id,iface,vnode_id from vinterfaces ".
+		     "where iface is not null and iface!=''");
+    while (my ($node_id,$iface,$vnode_id) = $query_result->fetchrow_array()) {
+	$vinterfaces{"$node_id:$iface"} = $vnode_id;
+
+	print "veth: $node_id:$iface,$vnode_id\n";
+    }
+
+    $query_result =
+	DBQueryWarn("select * from vlans");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $exptidx    = $rowref->{'exptidx'};
+	my $experiment = Experiment->Lookup($exptidx);
+	if (!defined($experiment)) {
+	    print STDERR "*** Initialize: No such experiment $exptidx\n";
+	    return -1;
+	}
+
+	my $id      = $rowref->{'id'};
+	my $tag     = $rowref->{'tag'};
+	my $vname   = $rowref->{'virtual'};
+	my $vlan    = VLan->Lookup($id);
+	if ($vlan) {
+	    print STDERR "*** Initialize: ".
+		"Duplicate vlan $vname in $experiment\n";
+	    return -1;
+	}
+
+	print "VLAN: $vname ($id) $experiment\n";
+
+	# Create a new VLAN.
+	$vlan = VLan->Create($experiment, $vname, $id);
+	if (!defined($vlan)) {
+	    print STDERR "*** Initialize: ".
+		"Could not create vlan $vname ($id) in $experiment\n";
+	    return -1;
+	}
+	$vlan->SetTag($tag);
+
+	#
+	# Split apart the space-separated list of members
+	#
+	my @members = split /\s+/, $rowref->{'members'};
+
+	#
+	# See if this vlan is for a delay link or lan.
+	#
+	foreach my $member (@members) {
+	    if (exists($delays{$member})) {
+		if ($vlan->SetRole("delay") != 0) {
+		    print STDERR "*** Initialize: ".
+			"Could not set role to delay on $vlan\n";
+		    return -1;
+		}
+		foreach my $memb (@members) {
+		    my ($nodeid, $iface) = split /:/, $memb;
+		    my $node = Node->Lookup($nodeid);
+		    if (!$node) {
+			print STDERR "*** Initialize: ".
+			    "No such node $nodeid in $vlan in $experiment\n";
+			return -1;
+		    }
+		    print "Delay: $memb\n";
+	    
+		    #
+		    # Instead of interfaces, we just add members to the lan
+		    # since they do not correspond to interfaces in the
+		    # virtual topo.
+		    #
+		    $vlan->AddMember($node, $iface);
+		}
+		goto again;
+	    }
+	}
+
+	#
+	# Or for elabinelab.
+	#
+	if (exists($elabinelab{"$id"})) {
+	    if ($vlan->SetRole("elabinelab") != 0) {
+		print STDERR "*** Initialize: ".
+		    "Could not set role to delay on $vlan\n";
+		return -1;
+	    }
+	    #
+	    # Instead of interfaces, we just add members to the lan since
+	    # they do not correspond to interfaces in the virtual topo.
+	    #
+	    foreach my $member (@members) {
+		my ($nodeid, $iface) = split /:/, $member;
+		my $node = Node->Lookup($nodeid);
+		if (!$node) {
+		    print STDERR "*** Initialize: ".
+			"No such node $nodeid in vlan $vname in $experiment\n";
+		    return -1;
+		}
+		$vlan->AddMember($node, $iface);
+	    }
+	    next;
+	}
+
+	if ($vlan->SetRole("link/lan") != 0) {
+	    print STDERR "*** Initialize: ".
+		"Could not set role to link/lan on $vlan\n";
+	    return -1;
+	}
+	foreach my $member (@members) {
+	    my ($nodeid, $iface) = split /:/, $member;
+	    my $node = Node->Lookup($nodeid);
+	    if (!$node) {
+		print STDERR "*** Initialize: ".
+		    "No such node $nodeid in vlan $vname in $experiment\n";
+		return -1;
+	    }
+
+	    # Look to see if its a multiplexed link (used by veths). If
+	    # so do not create Interfaces, but just members.
+	    if (exists($vinterfaces{"$nodeid:$iface"})) {
+		my $memb = $vlan->AddMember($node, $iface);
+		
+		if (!defined($memb)) {
+		    print STDERR "*** Initialize: ".
+			"Cannot insert multiplexed $member into vlan ".
+			"$vlan in $experiment\n";
+		    return -1;
+		}
+		next;
+	    }
+
+	    # Correlate the interface with the virtual port.
+	    my $iresult =
+		DBQueryWarn("select vl.vnode,vl.vname,vl.vport,vl.ip ".
+			    "  from virt_lans as vl ".
+			    "left join interfaces as i on i.IP=vl.ip and ".
+			    "     i.node_id='$nodeid' ".
+			    "where exptidx='$exptidx' and i.iface='$iface'");
+	    return -1
+		if (!$iresult);
+	    if ($iresult->numrows() != 1) {
+		print STDERR "*** Initialize: ".
+		    "Bad rows for $member in vlan $vlan\n";
+		return -1;
+	    }
+	    my ($vnode,$check_vname,$vport) = $iresult->fetchrow_array();
+
+	    #print "foo: $node, $vnode, $vname, $vport, $iface\n";
+
+	    my $interface = $vlan->AddInterface($node, $vnode, $vport, $iface);
+	    if (!defined($interface)) {
+		print STDERR "*** Initialize: ".
+		    "Cannot insert $member into vlan $vlan in $experiment\n";
+		return -1;
+	    }
+	}
+      again:
+    }
+    return 0;
+}
+
+############################################################################
+#
+# Lan::Member is just a set of attributes in the DB associated with an
+# endpoint of a Lan. It may or may not map one-to-one with an Interface
+# on an an actual node.
+#
+package Lan::Member;
+use libdb;
+use libtestbed;
+use English;
+use overload ('""' => 'Stringify');
+
+# Cache of instances to avoid regenerating them.
+my %members   = ();
+
+#
+# Lookup and create a class instance to return.
+#
+sub Lookup($$$)
+{
+    my ($class, $lan, $memberid) = @_;
+
+    return undef
+	if (!ref($lan));
+
+    return undef
+	if (! ($memberid =~ /^\d*$/));
+    
+    my $lanid = $lan->lanid();
+
+    # Look in cache first
+    return $members{"${lanid}:${memberid}"}
+        if (exists($members{"${lanid}:${memberid}"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from lan_members ".
+		    "where lanid='$lanid' and memberid='$memberid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self             = {};
+    $self->{'LAN'}       = $lan;
+    $self->{'MEMBERID'}  = $memberid;
+    $self->{"ATTRS"}     = {};
+
+    #
+    # Grab the attributes for this member.
+    #
+    $query_result =
+	DBQueryWarn("select * from lan_member_attributes ".
+		    "where lanid='$lanid' and memberid='$memberid'");
+    return undef
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $key = $rowref->{'attrkey'};
+	
+	$self->{"ATTRS"}->{$key} = $rowref;
+    }
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $members{"${lanid}:${memberid}"} = $self;
+    
+    return $self;
+}
+
+# accessors
+sub pid($)	{ return $_[0]->GetLan()->pid(); }
+sub eid($)	{ return $_[0]->GetLan()->eid(); }
+sub exptidx($)	{ return $_[0]->GetLan()->exptidx(); }
+sub lanid($)    { return $_[0]->GetLan()->lanid(); }
+sub vname($)	{ return $_[0]->GetLan()->vname(); }
+sub GetLan($)   { return $_[0]->{'LAN'}; }
+sub memberid($) { return $_[0]->{'MEMBERID'}; }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid      = $self->pid();
+    my $eid      = $self->eid();
+    my $memberid = $self->memberid();
+    my $lanid    = $self->lanid();
+
+    return "[Lan::Member ${memberid}, Lan ${lanid}: $pid/$eid]";
+}
+
+#
+# Create a new Lan::Member object (on a specific lan) and return it.
+#
+sub Create($$)
+{
+    my ($class, $lan) = @_;
+    my $lanid = $lan->lanid();
+
+    my $query_result = 
+	DBQueryWarn("insert into lan_members set ".
+		    "  lanid='$lanid', memberid=NULL");
+    return undef
+	if (!$query_result);
+
+    # Need the newly minted memberid.
+    my $memberid = $query_result->insertid();
+
+    return Lan::Member->Lookup($lan, $memberid);
+}
+
+#
+# Destroy a lan member and its attributes.
+#
+sub Destroy($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $lanid    = $self->lanid();
+    my $memberid = $self->memberid();
+
+    # Must delete attributes first.
+    return -1
+	if (!DBQueryWarn("delete from lan_member_attributes ".
+			 "where lanid='$lanid' and memberid='$memberid'"));
+    
+    return -1
+	if (!DBQueryWarn("delete from lan_members ".
+			 "where lanid='$lanid' and memberid='$memberid'"));
+
+    # Delete from cache too.
+    delete($members{"${lanid}:${memberid}"});
+
+    return 0;
+}
+
+#
+# Called directly to remove a member from its lan and then destroy itself.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return $self->GetLan()->DelMember($self);
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $newref = Lan::Member->Lookup($self->lanid(), $self->memberid());
+    return -1
+	if (!defined($newref));
+
+    $self->{"ATTRS"} = $newref->{'ATTRS'};
+
+    return 0;
+}
+
+#
+# Get value of an attribute.
+#
+sub GetAttribute($$$;$)
+{
+    my ($self, $key, $pvalue, $ptype) = @_;
+
+    return -1
+	if (!exists($self->{'ATTRS'}->{$key}));
+
+    $$pvalue = $self->{'ATTRS'}->{$key}->{'attrvalue'};
+    $$ptype  = $self->{'ATTRS'}->{$key}->{'attrtype'}
+        if (defined($ptype));
+    
+    return 0;
+}
+
+#
+# Set value of an attribute.
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $key, $value, $type) = @_;
+
+    return -1
+	if (!ref($self));
+
+    $type = "string"
+	if (!defined($type));
+
+    return -1
+	if ($type ne "string" && $type ne "integer" &&
+	    $type ne "float"  && $type ne "boolean");
+
+    my $lanid    = $self->lanid();
+    my $memberid = $self->memberid();
+    my $safe_key = DBQuoteSpecial($key);
+    my $safe_val = DBQuoteSpecial($value);
+
+    return -1
+	if (!DBQueryWarn("replace into lan_member_attributes set ".
+			 "  lanid='$lanid', ".
+			 "  memberid='$memberid', ".
+			 "  attrkey=$safe_key, ".
+			 "  attrvalue=$safe_val, ".
+			 "  attrtype='$type'"));
+
+    $self->{'ATTRS'}->{$key}->{'attrkey'}   = $key;
+    $self->{'ATTRS'}->{$key}->{'attrvalue'} = $value;
+    $self->{'ATTRS'}->{$key}->{'attrtype'}  = $type;
+    
+    return 0;
+}
+
+#
+# Return node and iface for a member. Needed all over the place.
+#
+sub GetNodeIface($$$)
+{
+    my ($self, $pnode, $piface) = @_;
+    
+    return -1
+	if (! (ref($self) && ref($pnode) && ref($piface)));
+
+    my $nodeid;
+    my $iface;
+
+    return -1
+	if ($self->GetAttribute("node_id", \$nodeid) != 0 ||
+	    $self->GetAttribute("iface", \$iface) != 0);
+
+    my $node = Node->Lookup($nodeid);
+    return -1
+	if (!defined($node));
+
+    $$pnode  = $node;
+    $$piface = $iface;
+    return 0;
+}
+
+
+############################################################################
+#
+# Interfaces correspond one-to-one with the virtual ports (vports) of the
+# virtual topology, but are really just lan members underneath. The interfaces
+# table stores the mapping between them.
+#
+package Lan::Interface;
+use libdb;
+use libtestbed;
+use English;
+use overload ('""' => 'Stringify');
+
+# Cache of instances to avoid regenerating them.
+my %interfaces   = ();
+
+# accessors
+sub field($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'IFACE'}->{$_[1]}); }
+sub pid($)	  { return field($_[0], 'pid'); }
+sub eid($)	  { return field($_[0], 'eid'); }
+sub exptidx($)	  { return field($_[0], 'exptidx'); }
+sub node_id($)	  { return field($_[0], 'node_id'); }
+sub ifaceid($)	  { return field($_[0], 'ifaceid'); }
+sub vnode($)	  { return field($_[0], 'vnode'); }
+sub vname($)	  { return field($_[0], 'vname'); }
+sub vport($)	  { return field($_[0], 'vport'); }
+sub GetLan($)     { return $_[0]->{'LAN'}; }
+sub GetMember($)  { return $_[0]->{'MEMBER'}; }
+
+#
+# Lookup and create a class instance to return.
+#
+sub Lookup($$$;$)
+{
+    my ($class, $lan, $arg1, $arg2) = @_;
+    my $ifaceid;
+
+    return undef
+	if (!ref($lan));
+    my $lanid = $lan->lanid();
+
+    #
+    # A single arg is an ifaceid. Two args is vnode and vport.
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $ifaceid = $1;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (! (($arg1 =~ /^[-\w]*$/) && ($arg2 =~ /^[-\w]*$/))) {
+	return undef;
+    }
+
+    #
+    # Two args means lookup by vnode,vport
+    #
+    if (defined($arg2)) {
+	my $result =
+	    DBQueryWarn("select ifaceid from ifaces ".
+			"where lanid='$lanid' and vnode='$arg1' and ".
+			"      vport='$arg2'");
+
+	return undef
+	    if (! $result || !$result->numrows);
+
+	($ifaceid) = $result->fetchrow_array();
+    }
+
+    # Look in cache first
+    return $interfaces{"$lanid:$ifaceid"}
+        if (exists($interfaces{"$lanid:$ifaceid"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from ifaces ".
+		    "where lanid='$lanid' and ifaceid='$ifaceid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self          = {};
+    $self->{'IFACE'}  = $query_result->fetchrow_hashref();
+    $self->{'LAN'}    = $lan;
+    $self->{'MEMBER'} = Lan::Member->Lookup($lan, $ifaceid);
+
+    return undef
+	if (!defined($self->{'MEMBER'}));
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $interfaces{"$lanid:$ifaceid"} = $self;
+    
+    return $self;
+}
+
+#
+# Create a new Interface object and return it
+#
+sub Create($$$$$;$)
+{
+    my ($class, $lan, $node, $vnode, $vport, $member) = @_;
+
+    return undef
+	if (! ref($lan));
+
+    my $lanid   = $lan->lanid();
+    my $vname   = $lan->vname();
+    my $pid     = $lan->pid();
+    my $eid     = $lan->eid();
+    my $exptidx = $lan->exptidx();
+    my $node_id = $node->node_id();
+
+    # We need the idx from the virt_lan_lans table.
+    my $query_result =
+	DBQueryWarn("select idx from virt_lan_lans ".
+		    "where exptidx=$exptidx and vname='$vname'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    my ($vidx) = $query_result->fetchrow_array();
+
+    # Use supplied member (which provides the ifaceid) or generate a
+    # new one.
+    if (!defined($member)) {
+	$member = $lan->AddMember();
+	return undef
+	    if (!defined($member));
+    }
+    my $ifaceid = $member->memberid();
+
+    return undef
+	if (!DBQueryWarn("insert into ifaces set ".
+			 "   lanid='$lanid', ".
+			 "   ifaceid='$ifaceid', ".
+			 "   exptidx='$exptidx', ".
+			 "   pid='$pid', ".
+			 "   eid='$eid', ".
+			 "   node_id='$node_id', ".
+			 "   vnode='$vnode', ".
+			 "   vname='$vname', ".
+			 "   vidx='$vidx', ".
+			 "   vport='$vport'"));
+
+    return Lan::Interface->Lookup($lan, $ifaceid);
+}
+
+#
+# Destroy an interface and the underlying lan_member.
+#
+sub Destroy($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $lanid   = $self->lanid();
+    my $ifaceid = $self->ifaceid();
+    
+    # Delete the member first in case of failure.
+    return -1
+	if ($self->GetMember() && !$self->GetMember()->Destroy());
+
+    $self->{'MEMBER'} = undef;
+
+    return -1
+	if (!DBQueryWarn("delete from ifaces ".
+			 "where lanid='$lanid' and ifaceid='$ifaceid'"));
+
+    # Remove from cache. 
+    delete($interfaces{"$lanid:$ifaceid"});
+    
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid     = $self->pid();
+    my $eid     = $self->eid();
+    my $vnode   = $self->vnode();
+    my $vname   = $self->vname();
+    my $vport   = $self->vport();
+    my $ifaceid = $self->ifaceid();
+    my $lanid   = $self->GetLan()->lanid();
+
+    return "[Interface ${ifaceid}, ".
+	"Lan ${lanid}: $pid/$eid/$vnode/$vname/$vport]";
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $newref = Interface->Lookup($self->GetLan(), $self->ifaceid());
+    return -1
+	if (!defined($newref));
+
+    $self->{'IFACE'}  = $newref->{'IFACE'};
+    $self->{'MEMBER'} = $newref->{'MEMBER'};
+
+    return 0;
+}
+
+#
+# Get value of an attribute.
+#
+sub GetAttribute($$$;$)
+{
+    my ($self, $key, $pvalue, $ptype) = @_;
+
+    return $self->GetMember()->GetAttribute($key, $pvalue, $ptype);
+}
+
+#
+# Set value of an attribute.
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $key, $value, $type) = @_;
+
+    return $self->GetMember()->SetAttribute($key, $value, $type);
+}
+
+############################################################################
+#
+# A protolan is for creating a lan without sending it to the DB until
+# later. Used from assign_wraper.
+#
+package ProtoLan;
+use libdb;
+use libtestbed;
+use English;
+use Lan;
+use overload ('""' => 'Stringify');
+
+# Keep track of protolans to prevent duplicates.
+my %protolans = ();
+
+sub Lookup($$$)
+{
+    my ($class, $experiment, $vname) = @_;
+    
+    return undef
+	if (!ref($experiment));
+
+    my $exptidx = $experiment->idx();
+
+    return undef
+	if (! exists($protolans{"$exptidx:$vname"}));
+    
+    return $protolans{"$exptidx:$vname"};
+}
+
+#
+# Create a new ProtoLan object and return it. 
+#
+sub Create($$$;$)
+{
+    my ($class, $experiment, $vname, $link) = @_;
+
+    return undef
+	if (!ref($experiment));
+
+    my $exptidx = $experiment->idx();
+
+    #
+    # Make sure no existing lan ...
+    #
+    if (Lan->Lookup($experiment, $vname)) {
+	print STDERR "*** Protolan Create: ".
+	    "Duplicate lan $vname in $experiment\n";
+	return undef;
+    }
+    # Or protolan ...
+    if (exists($protolans{"$exptidx:$vname"})) {
+	print STDERR "*** Protolan Create: ".
+	    "Duplicate protolan $vname in $experiment\n";
+	return undef;
+    }
+	
+    my $self              = {};
+    $self->{"ATTRS"}      = {};
+    $self->{"MEMBERS"}    = {};
+    $self->{"IFACES"}     = {};
+    $self->{"EXPT"}       = $experiment;
+    $self->{"VNAME"}      = $vname;
+    $self->{"LINK"}       = $link;
+    $self->{"TYPE"}       = '';
+    $self->{"ROLE"}       = '';
+    $self->{"ENCAPSTYLE"} = '';
+    $self->{"INSTANCE"}   = undef;
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $protolans{"$exptidx:$vname"} = $self;
+
+    return $self;
+}
+sub vname($)		{ return $_[0]->{"VNAME"}; }
+sub link($)		{ return $_[0]->{"LINK"}; }
+sub type($)		{ return $_[0]->{"TYPE"}; }
+sub role($)		{ return $_[0]->{"ROLE"}; }
+sub encapstyle($)	{ return $_[0]->{"ENCAPSTYLE"}; }
+
+#
+# Destroy a protolan before it gets instantiated. 
+#
+sub Destroy($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $exptidx = $self->{"EXPT"}->idx();
+    my $vname   = $self->{"VNAME"};
+
+    # Remove from cache. 
+    delete($protolans{"$exptidx:$vname"});
+    return 0;
+}
+
+#
+# Return the list of protolans.
+#
+sub ProtoLanList($)
+{
+    my ($class) = @_;
+
+    return values(%protolans);
+}
+
+#
+# Instantiate into the DB.
+#
+sub Instantiate($)
+{
+    my ($self) = @_;
+
+    my $experiment = $self->{'EXPT'};
+    my $vname      = $self->{'VNAME'};
+    my $type       = $self->{'TYPE'};
+    my $link       = undef;
+
+    # Already created.
+    return 0
+	if (defined($self->{'INSTANCE'}));
+
+    if (defined($self->{'LINK'})) {
+	my $link_protolan = $self->{'LINK'};
+	$link = $link_protolan->{'INSTANCE'};
+	
+	if (!defined($link)) {
+	    $link_protolan->Instantiate();
+	    $link = $link_protolan->{'INSTANCE'};
+	}
+    }
+
+    # The new lan has the 'ready' bit set to zero.
+    my $lan = Lan->Create($experiment, $vname, $type, undef, $link);
+    return -1
+	if (!defined($lan));
+
+    # Insert the attributes.
+    foreach my $key (keys(%{ $self->{"ATTRS"} })) {
+	my $pattr = $self->{"ATTRS"}->{$key};
+
+	if ($lan->SetAttribute($pattr->{'attrkey'}, $pattr->{'attrvalue'},
+			       $pattr->{'attrtype'}) != 0) {
+	    $lan->Destroy();
+	    return -1;
+	}
+    }
+
+    # Members ...
+    foreach my $key (keys(%{ $self->{"MEMBERS"} })) {
+	my $member = $self->{"MEMBERS"}->{$key};
+
+	if (!$lan->AddMember($member->{'node'}, $member->{'iface'})) {
+	    $lan->Destroy();
+	    return -1;
+	}
+    }
+
+    # Interfaces ...
+    foreach my $key (keys(%{ $self->{"IFACES"} })) {
+	my $interface = $self->{"IFACES"}->{$key};
+
+	if (!$lan->AddInterface($interface->{'node'},
+			       $interface->{'vnode'},
+			       $interface->{'vport'},
+			       $interface->{'iface'})) {
+	    $lan->Destroy();
+	    return -1;
+	}
+    }
+    $self->{'INSTANCE'} = $lan;
+    return 0;
+}
+
+#
+# Instantiate all protolans
+#
+sub InstantiateAll($)
+{
+    my ($class) = @_;
+
+    foreach my $protolan (values(%protolans)) {
+	$protolan->Instantiate() == 0
+	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Dump all protolans
+#
+sub DumpAll($)
+{
+    my ($class) = @_;
+
+    foreach my $protolan (values(%protolans)) {
+	print STDERR $protolan->Dump() . "\n";
+    }
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $vname      = $self->{'VNAME'};
+    my $experiment = $self->{'EXPT'};
+
+    return "[Protolan: $vname, $experiment]";
+}
+
+#
+# Display for debug.
+#
+sub Dump($)
+{
+    my ($self) = @_;
+
+    my $vname  = $self->{'VNAME'};
+    my $type   = (defined($self->{'TYPE'}) ? "type:" . $self->{'TYPE'} : "");
+    my $link   = (defined($self->{'LINK'}) ?
+		  "(" . $self->{'LINK'}->vname() . ") " : "");
+    my $string = "ProtoLan: $vname $type,$link";
+
+    foreach my $key (keys(%{ $self->{"ATTRS"} })) {
+	my $pattr = $self->{"ATTRS"}->{$key};
+	my $val   = $pattr->{'attrvalue'};
+
+	$string .= "$key:$val,";
+    }
+    $string .= ", ";
+
+    foreach my $key (keys(%{ $self->{"MEMBERS"} })) {
+	my $member = $self->{"MEMBERS"}->{$key};
+	my $nodeid = $member->{'node'}->node_id();
+	my $iface  = $member->{'iface'};
+
+	$string .= "$nodeid:$iface, ";
+    }
+
+    foreach my $key (keys(%{ $self->{"IFACES"} })) {
+	my $interface = $self->{"IFACES"}->{$key};
+	my $nodeid = $interface->{'node'}->node_id();
+	my $vnode  = $interface->{'vnode'};
+	my $vport  = $interface->{'vport'};
+	my $iface  = $interface->{'iface'};
+
+	$string .= "$vnode:$vport:$nodeid:$iface, ";
+    }
+    return $string;
+}
+
+#
+# Add an interface to a protolan.
+#
+sub AddInterface($$$$$)
+{
+    my ($self, $node, $vnode, $vport, $iface) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return -1
+	    if (!defined($node));
+    }
+
+    if (exists($self->{'IFACES'}->{"$vnode:$vport"})) {
+	print STDERR "*** Protolan AddInterface: ".
+	    "Duplicate $vport ($iface) on $node ($self)\n";
+	return -1;
+    }
+
+    $self->{'IFACES'}->{"$vnode:$vport"} = { "node"  => $node,
+					     "vnode" => $vnode,
+					     "vport" => $vport,
+					     "iface" => $iface
+					    };
+    return 0;
+}
+
+#
+# Add a member to a vlan, as for delay node links and tagged vlans.
+#
+sub AddMember($$$)
+{
+    my ($self, $node, $iface) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return -1
+	    if (!defined($node));
+    }
+    my $nodeid = $node->node_id();
+
+    if (exists($self->{'MEMBERS'}->{"$nodeid:$iface"})) {
+	print STDERR "*** Protolan AddMember: ".
+	    "Duplicate $iface on $node\n";
+	return -1;
+    }
+    
+    $self->{'MEMBERS'}->{"$nodeid:$iface"} = { "node"  => $node,
+					       "iface" => $iface
+					     };
+    return 0;
+}
+
+#
+# Does member already exists in protolan.
+#
+sub IsMember($$$)
+{
+    my ($self, $node, $iface) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return 0
+	    if (!defined($node));
+    }
+    my $nodeid = $node->node_id();
+
+    return exists($self->{'MEMBERS'}->{"$nodeid:$iface"});
+}
+
+#
+# Return the memberlist.
+#
+sub MemberList($)
+{
+    my ($self) = @_;
+
+    return keys(%{ $self->{'MEMBERS'} });
+}
+
+#
+# Set value of an attribute.
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $key, $value, $type) = @_;
+
+    $type = "string"
+	if (!defined($type));
+
+    $self->{"ATTRS"}->{$key} = {"attrkey"   => $key,
+				"attrvalue" => $value,
+				"attrtype"  => $type };
+
+    return 0;
+}
+sub SetRole($$)
+{
+    my ($self, $role) = @_;
+
+    $self->{"ROLE"} = $role;
+    
+    return $self->SetAttribute("role", $role);
+}
+sub SetEncapStyle($$)
+{
+    my ($self, $style) = @_;
+
+    $self->{"ENCAPSTYLE"} = $style;
+    
+    return $self->SetAttribute("encapstyle", $style);
+}
+sub SetType($$)
+{
+    my ($self, $type) = @_;
+
+    $self->{"TYPE"} = $type;
+    return 0;
+}
+sub SetLink($$)
+{
+    my ($self, $link) = @_;
+
+    $self->{"LINK"} = $link;
+    return 0;
+}
+
+############################################################################
+#
+# The most common kind of Lan is a Vlan, so lets create a package/object
+# for it.
+#
+package VLan;
+use libdb;
+use libtestbed;
+use English;
+use Lan;
+use overload ('""' => 'Stringify');
+
+# Cache of instances to avoid regenerating them.
+my %vlans   = ();
+
+#
+# Lookup and create a class instance to return.
+#
+sub Lookup($$;$)
+{
+    my ($class, $arg1, $arg2) = @_;
+
+    my $lan = Lan->Lookup($arg1, $arg2);
+    return undef
+	if (!defined($lan));
+
+    my $lanid = $lan->lanid();
+
+    # Look in cache first
+    return $vlans{"$lanid"}
+        if (exists($vlans{"$lanid"}));
+
+    my $self        = {};
+    $self->{'LAN'}  = $lan;
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $vlans{"$lanid"} = $self;
+    
+    return $self;
+}
+
+# accessors
+sub pid($)	{ return $_[0]->GetLan()->pid(); }
+sub eid($)	{ return $_[0]->GetLan()->eid(); }
+sub exptidx($)	{ return $_[0]->GetLan()->exptidx(); }
+sub lanid($)    { return $_[0]->GetLan()->lanid(); }
+sub id($)       { return $_[0]->GetLan()->lanid(); }
+sub vname($)	{ return $_[0]->GetLan()->vname(); }
+sub ready($)	{ return $_[0]->GetLan()->ready(); }
+sub type($)	{ return $_[0]->GetLan()->type(); }
+sub GetLan($)   { return $_[0]->{'LAN'}; }
+sub GetExperiment($) { return $_[0]->{'EXPT'}; }
+
+#
+# Create a new VLan object and return it. No members yet ... which means
+# it has to be locked so that snmpit does not try to do anything with it.
+# For now lets use a 'ready' bit unless it becomes annoying.
+#
+sub Create($$$;$)
+{
+    my ($class, $experiment, $vname, $id) = @_;
+
+    # The new lan has the 'ready' bit set to zero.
+    my $lan = Lan->Create($experiment, $vname, "vlan", $id);
+    return undef
+	if (!defined($lan));
+
+    return VLan->Lookup($id);
+}
+
+#
+# Destroy.
+#
+sub Destroy($)
+{
+    my ($self) = @_;
+
+    return $self->GetLan()->Destroy();
+}
+
+#
+# Refresh underyling object.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return $self->GetLan()->Refresh();
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    return "V" . $self->GetLan()->Stringify();
+}
+
+#
+# Add an interface to a vlan. Hand this off to Lan->AddInterface().
+# Local lans/links map to vlans directly. 
+#
+sub AddInterface($$$$$)
+{
+    my ($self, $node, $vnode, $vport, $iface) = @_;
+    
+    return $self->GetLan()->AddInterface($node, $vnode, $vport, $iface);
+}
+
+#
+# Add a member to a vlan, as for delay node links and tagged vlans.
+#
+sub AddMember($;$$)
+{
+    my ($self, $node, $iface) = @_;
+    
+    return $self->GetLan()->AddMember($node, $iface);
+}
+
+#
+# Remove a member from a vlan.
+#
+sub DelMember($$)
+{
+    my ($self, $member) = @_;
+    
+    return $self->GetLan()->DelMember($member);
+}
+
+#
+# Return a list of interfaces for a vlan.
+#
+sub InterfaceList($$)
+{
+    my ($self, $plist) = @_;
+
+    return -1
+	if (! (ref($self) && ref($plist)));
+
+    my $lanid = $self->lanid();
+
+    my $query_result =
+	DBQueryWarn("select ifaceid from ifaces where lanid='$lanid'");
+    return -1
+	if (!defined($query_result));
+
+    my @result = ();
+    while (my ($ifaceid) = $query_result->fetchrow_array()) {
+	my $interface = Lan::Interface->Lookup($self->GetLan(), $ifaceid);
+	return -1
+	    if (!defined($interface));
+	push(@result, $interface);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# Return a list of members for a vlan.
+#
+sub MemberList($$)
+{
+    my ($self, $plist) = @_;
+
+    return $self->GetLan()->MemberList($plist);
+}
+
+#
+# Get value of an attribute.
+#
+sub GetAttribute($$$;$)
+{
+    my ($self, $key, $pvalue, $ptype) = @_;
+
+    return $self->GetLan()->GetAttribute($key, $pvalue, $ptype);
+}
+
+#
+# Set value of an attribute.
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $key, $value, $type) = @_;
+
+    return $self->GetLan()->SetAttribute($key, $value, $type);
+}
+sub SetRole($$)
+{
+    my ($self, $role) = @_;
+
+    return $self->GetLan()->SetRole($role);
+}
+sub SetTag($$)
+{
+    my ($self, $tag) = @_;
+
+    # Keep vlans table in sync for now.
+    if (!$initialize) {
+	my $vlanid;
+
+	$self->GetAttribute("vlanid", \$vlanid);
+
+	DBQueryWarn("update vlans set tag='$tag' ".
+		    "where id='$vlanid'");
+    }
+
+    return $self->GetLan()->SetAttribute("vlantag", $tag);
+}
+sub GetTag($$)
+{
+    my ($self, $ptag) = @_;
+
+    return $self->GetAttribute("vlantag", $ptag);
+}
+
+#
+# List of all vlans. This is a class method.
+#
+sub AllVLans($$)
+{
+    my ($class, $plist) = @_;
+
+    return -1
+	if (! ref($plist));
+
+    my $query_result =
+	DBQueryWarn("select l.lanid from lans as l ".
+		    "where l.type='vlan'");
+    return -1
+	if (!defined($query_result));
+
+    my @result = ();
+    while (my ($lanid) = $query_result->fetchrow_array()) {
+	my $vlan = VLan->Lookup($lanid);
+	return -1
+	    if (!defined($vlan));
+	push(@result, $vlan);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+#
+# List of all experiment vlans. This is a class method.
+#
+sub ExperimentVLans($$$)
+{
+    my ($class, $experiment, $plist) = @_;
+
+    return -1
+	if (! (ref($plist) && ref($experiment)));
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select l.lanid from lans as l ".
+		    "where l.type='vlan' and l.exptidx='$exptidx'");
+    return -1
+	if (!defined($query_result));
+
+    my @result = ();
+    while (my ($lanid) = $query_result->fetchrow_array()) {
+	my $vlan = VLan->Lookup($lanid);
+	return -1
+	    if (!defined($vlan));
+	push(@result, $vlan);
+    }
+    @$plist = @result;
+    return 0;
+}
+
+############################################################################
+#
+# The most common kind of Lan is a Vlan, so lets create a package/object
+# for it.
+#
+package Tunnel;
+use libdb;
+use libtestbed;
+use English;
+use Lan;
+use overload ('""' => 'Stringify');
+
+# Cache of instances to avoid regenerating them.
+my %tunnels   = ();
+
+#
+# Lookup and create a class instance to return.
+#
+sub Lookup($$;$)
+{
+    my ($class, $arg1, $arg2) = @_;
+
+    my $lan = Lan->Lookup($arg1, $arg2);
+    return undef
+	if (!defined($lan));
+
+    my $lanid = $lan->lanid();
+
+    # Look in cache first
+    return $tunnels{"$lanid"}
+        if (exists($tunnels{"$lanid"}));
+
+    my $self        = {};
+    $self->{'LAN'}  = $lan;
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $tunnels{"$lanid"} = $self;
+    
+    return $self;
+}
+
+# accessors
+sub pid($)	{ return $_[0]->GetLan()->pid(); }
+sub eid($)	{ return $_[0]->GetLan()->eid(); }
+sub exptidx($)	{ return $_[0]->GetLan()->exptidx(); }
+sub lanid($)    { return $_[0]->GetLan()->lanid(); }
+sub id($)       { return $_[0]->GetLan()->lanid(); }
+sub vname($)	{ return $_[0]->GetLan()->vname(); }
+sub GetLan($)   { return $_[0]->{'LAN'}; }
+sub GetExperiment($) { return $_[0]->{'EXPT'}; }
+
+#
+# Create a new Tunnel object and return it. No members yet ... 
+#
+sub Create($$$$;$$)
+{
+    my ($class, $experiment, $vname, $secretkey, $mask, $port) = @_;
+
+    # The new lan has the 'ready' bit set to zero.
+    my $lan = Lan->Create($experiment, $vname, "tunnel");
+    return undef
+	if (!defined($lan));
+
+    # Set the secret key for the tunnel.
+    if ($lan->SetAttribute("secretkey", $secretkey) != 0) {
+	$lan->Destroy();
+	return undef;
+    }
+    if (defined($port) &&
+	$lan->SetAttribute("serverport", $port) != 0) {
+	$lan->Destroy();
+	return undef;
+    }
+    if (defined($mask) &&
+	$lan->SetAttribute("ipmask", $mask) != 0) {
+	$lan->Destroy();
+	return undef;
+    }
+    return Tunnel->Lookup($lan->lanid());
+}
+
+#
+# Destroy.
+#
+sub Destroy($)
+{
+    my ($self) = @_;
+
+    return $self->GetLan()->Destroy();
+}
+
+#
+# Refresh underyling object.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return $self->GetLan()->Refresh();
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    return "T" . $self->GetLan()->Stringify();
+}
+
+#
+# Add an interface to a tunnel. Hand this off to Lan->AddInterface().
+#
+sub AddInterface($$$$;$$)
+{
+    my ($self, $node, $vnode, $vport, $ip, $peerip, $isserver) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return undef
+	    if (!defined($node));
+    }
+    my $member = $self->AddMember($node, $ip, $peerip, $isserver);
+    return undef
+	if (!defined($member));
+    
+    my $interface = $self->GetLan()->AddInterface($node, $vnode,
+						  $vport, undef, $member);
+    return undef
+	if (!defined($interface));
+
+    return $interface;
+}
+
+#
+# Add a member to a tunnel.
+#
+sub AddMember($$$;$$)
+{
+    my ($self, $node, $ip, $peerip, $isserver) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return undef
+	    if (!defined($node));
+    }
+    my $member = $self->GetLan()->AddMember($node);
+    return undef
+	if (!defined($member));
+
+    if ($member->SetAttribute("ipaddr", $ip) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    if (defined($peerip) && 
+	$member->SetAttribute("peeripaddr", $peerip) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    if (defined($isserver) && $isserver &&
+	$member->SetAttribute("isserver", "1") != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    # I think this table is going to go away.
+    my $pid      = $self->pid();
+    my $eid      = $self->eid();
+    my $exptidx  = $self->exptidx();
+    my $node_id  = $node->node_id();
+    my $lan      = $self->vname();
+    my $secretkey;
+    my $ipmask;
+    my $serverport;
+
+    if ($self->GetAttribute("secretkey", \$secretkey) != 0 ||
+	$self->GetAttribute("ipmask", \$ipmask) != 0 ||
+	$self->GetAttribute("serverport", \$serverport) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    $isserver = (defined($isserver) && $isserver ? 1 : 0);
+    
+    if (!DBQueryWarn("insert into tunnels ".
+		     " (pid, eid, node_id, vname, isserver, port, ".
+		     "  peer_ip, mask, assigned_ip, password) ".
+		     "values ('$pid', '$eid', '$node_id', '$lan', ".
+		     "        $isserver, '$serverport', ".
+		     "        '$peerip', '$ipmask', '$ip','$secretkey')")) {
+	$member->Destroy();
+	return undef;
+    }
+    
+    return $member;
+}
+
+#
+# Get value of an attribute.
+#
+sub GetAttribute($$$;$)
+{
+    my ($self, $key, $pvalue, $ptype) = @_;
+
+    return $self->GetLan()->GetAttribute($key, $pvalue, $ptype);
+}
+
+#
+# Set value of an attribute.
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $key, $value, $type) = @_;
+
+    return $self->GetLan()->SetAttribute($key, $value, $type);
+}
+sub SetRole($$)
+{
+    my ($self, $role) = @_;
+
+    return $self->GetLan()->SetRole($role);
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
