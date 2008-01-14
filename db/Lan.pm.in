@@ -1750,7 +1750,7 @@ sub Create($$$;$)
     return undef
 	if (!defined($lan));
 
-    return VLan->Lookup($id);
+    return VLan->Lookup($lan->lanid());
 }
 
 #
