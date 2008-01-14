@@ -292,6 +292,7 @@ sub SetupVlans()
 	my @members = keys(%{ $vlantable->{$id} });
 	my $mstring = "@members";
 	my $outer_id;
+	my $vlan;
 
 	if ($debug) {
 	    print STDERR "$pid $eid $id $mstring\n";
@@ -305,7 +306,7 @@ sub SetupVlans()
 			 "where pid='$pid' and eid='$eid' and inner_id='$id'");
 	if ($query_result->numrows == 1) {
 	    ($outer_id) = $query_result->fetchrow();
-	    my $vlan = VLan->Lookup($outer_id);
+	    $vlan = VLan->Lookup($outer_id);
 	    if (!defined($vlan)) {
 		print STDERR "*** $0:\n".
 			     "    Could not lookup vlan for $outer_id\n";
@@ -323,14 +324,14 @@ sub SetupVlans()
 	    }
 	}
 	else {
-	    my $newvlan = VLan->Create($experiment, $vtag);
-	    if (!defined($newvlan)) {
+	    $vlan = VLan->Create($experiment, $vtag);
+	    if (!defined($vlan)) {
 		print STDERR "*** $0:\n".
 			     "    Could not insert vlan table entry for $id\n";
 		$errors++;
 		next;
 	    }
-	    $outer_id = $newvlan->lanid();
+	    $outer_id = $vlan->lanid();
 
 	    # Insert mapping between inner and outer vlan entries.
 	    $query_result = DBQueryWarn("insert into elabinelab_vlans ".
@@ -344,7 +345,7 @@ sub SetupVlans()
 			     "    Could not insert elabinelab_vlans table entry ".
 			     "for $id/$outer_id\n";
 
-		$newvlan->Destroy();
+		$vlan->Destroy();
 		$errors++;
 		next;
 	    }
@@ -357,7 +358,7 @@ sub SetupVlans()
 	# Okay, save outer_id up for passing to snmpit below.
 	push(@outer_ids, $outer_id);
 	# And save vlan object for getting the tag.
-	$outer_vlans{$outer_id} = $newvlan;
+	$outer_vlans{$outer_id} = $vlan;
     }
     # Now call snmpit to create the actual vlans.
     if ($debug) {
