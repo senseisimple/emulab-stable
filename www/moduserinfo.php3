@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,7 +17,7 @@ $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
 # Shell options we support. Maybe stick in DB someday.
-$shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
+$shelllist = array( 'tcsh', 'bash', 'csh', 'sh', 'zsh' );
 
 # Used if db slot for user is NULL (should not happen.)
 $defaultshell = 'tcsh';
