@@ -344,12 +344,20 @@ sub Refresh($)
     return -1
 	if (! ref($self));
 
-    my $newref = Lan->Lookup($self->lanid());
+    my $lanid = $self->lanid();
+
+    # Delete from the cache to force lookup.
+    delete($lans{"$lanid"});
+
+    my $newref = Lan->Lookup($lanid);
     return -1
 	if (!defined($newref));
 
     $self->{'LAN'}   = $newref->{'LAN'};
     $self->{"ATTRS"} = $newref->{'ATTRS'};
+
+    # Add back to cache. 
+    $lans{"$lanid"} = $self;
 
     return 0;
 }
@@ -457,9 +465,11 @@ sub AddInterface($$$$;$$)
 {
     my ($self, $node, $vnode, $vport, $iface, $member) = @_;
 
-    return undef
-	if (! (ref($self) && ref($node)));
-
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return undef
+	    if (!defined($node));
+    }
     my $interface = Lan::Interface->Create($self, $node,
 					   $vnode, $vport, $member);
     return undef
@@ -503,9 +513,11 @@ sub AddMember($$;$)
     return undef
 	if (!ref($self));
 
-    return undef
-	if (defined($node) && !ref($node));
-
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return undef
+	    if (!defined($node));
+    }
     my $member = Lan::Member->Create($self);
 
     if (defined($node)) {
@@ -534,6 +546,39 @@ sub AddMember($$;$)
 	}
     }
     return $member;
+}
+
+#
+# Check membership.
+#
+sub IsMember($$$)
+{
+    my ($self, $node, $iface) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return 0
+	    if (!defined($node));
+    }
+    my $nodeid = $node->node_id();
+    my $lanid  = $self->lanid();
+
+    my $query_result =
+	DBQueryWarn("select memberid from ".
+		    "  lan_member_attributes as lma ".
+		    "where lma.lanid='$lanid' and ".
+		    "      ((lma.attrkey='node_id' and ".
+		    "        lma.attrvalue='$nodeid') or ".
+		    "       (lma.attrkey='iface' and ".
+		    "        lma.attrvalue='$iface'))");
+
+    # Must be two rows and those must be the same memberid.
+    return 0
+	if ($query_result->numrows != 2);
+    my ($memberid1) = $query_result->fetchrow_array();
+    my ($memberid2) = $query_result->fetchrow_array();
+
+    return ($memberid1 == $memberid2 ? 1 : 0);
 }
 
 #
@@ -1812,6 +1857,16 @@ sub DelMember($$)
     my ($self, $member) = @_;
     
     return $self->GetLan()->DelMember($member);
+}
+
+#
+# Does member already exists in protolan.
+#
+sub IsMember($$$)
+{
+    my ($self, $node, $iface) = @_;
+
+    return $self->GetLan()->IsMember($node, $iface);
 }
 
 #

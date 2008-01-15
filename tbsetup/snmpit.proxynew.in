@@ -313,15 +313,6 @@ sub SetupVlans()
 		$errors++;
 		next;
 	    }
-	    foreach my $port (@members) {
-		my ($nodeid, $iface) = split(":", $port);
-		if (!$vlan->IsMember($nodeid, $iface) &&
-		    $vlan->AddMember($nodeid, $iface) != 0) {
-		    print STDERR "*** $0:\n".
-			         "    Could not $port to $vlan\n";
-		    $errors++;
-		}
-	    }
 	}
 	else {
 	    $vlan = VLan->Create($experiment, $vtag);
@@ -353,6 +344,15 @@ sub SetupVlans()
 	if ($debug) {
 	    print STDERR "Mapping inner id $id to outer id $outer_id\n";
 	    print STDERR "  $mstring\n";
+	}
+	foreach my $port (@members) {
+	    my ($nodeid, $iface) = split(":", $port);
+	    if (!$vlan->IsMember($nodeid, $iface) &&
+		!$vlan->AddMember($nodeid, $iface)) {
+		print STDERR "*** $0:\n".
+		    "    Could not $port to $vlan\n";
+		$errors++;
+	    }
 	}
 	$vmaptable{$id} = $outer_id;
 	# Okay, save outer_id up for passing to snmpit below.
@@ -390,7 +390,7 @@ sub SetupVlans()
 	    next;
 	}
 	my $tagnum;
-	if (!$outer_vlan->GetTag(\$tagnum) != 0) {
+	if ($outer_vlan->GetTag(\$tagnum) != 0) {
 	    print STDERR "*** Could not get vlan tag for $outer_vlan\n";
 	    $errors++;
 	    next;

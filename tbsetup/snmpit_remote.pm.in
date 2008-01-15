@@ -156,7 +156,7 @@ sub RemoteDoVlansFromTables(@)
 	    my ($vlanid, $tag) = split '#', $vlres;
 	    
 	    if (!exists($vlans{$vlanid})) {
-		print STDERR "Ban vlanid $vlanid in returned vlan map\n";
+		print STDERR "Bad vlanid $vlanid in returned vlan map\n";
 		$errors++;
 	    }
 	    my $vlan = $vlans{$vlanid};
