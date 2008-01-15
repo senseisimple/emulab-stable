@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,6 +19,7 @@ my $ELABINELAB = @ELABINELAB@;
 my $TB = '@prefix@';
 
 use libdb;
+use User;
 use snmpit_lib;
 use snmpit_remote;
 use libtblog;
@@ -159,6 +160,18 @@ my $eid;
 my @ports;
 my @optvlanids = ();
 my $equaltrunking = 0;
+my $this_user;
+
+#
+# Verify user and get his DB uid for later. 
+#
+if ($UID) {
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	die("*** $0:\n".
+	    "    You ($UID) do not exist!\n");
+    }
+}
 
 #
 # Some operations have mandatory agruments - for others, make sure that
@@ -862,18 +875,18 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	my $memberref;
 	($ddep,$memberref) = @{$vlans{$vid}};
 
-	#
-	# Find which, if any, experiment this VLAN belongs to.
-	#
-	my $result = DBQueryFatal("select pid, eid, virtual from " .
-				  "vlans where id='$vid'");
-	my ($eid,$pid);
-	($pid,$eid,$vname) = $result->fetchrow();
+        my $vlan = VLan->Lookup($vlan_id);
+	if (!defined($vlan)) {
+	    &debug("No such VLAN $vlan_id in lans table\n");
+	    next;
+        }
+	$vname         = $vlan->vname();
+	my $experiment = $vlan->GetExperiment();
 
 	#
 	# Permissions check - people only get to see their own VLANs
 	#
-	if ((!$eid) || (!$pid)) {
+	if (!defined($experiment)) {
             # If only printing orphaned VLANs, consider only ones that have IDs
             # that look like the ones we assign in the database
             if ($opt{O} && $vid !~ /^\d+$/) {
@@ -889,8 +902,9 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
             if ($opt{O}) {
                 next;
             }
-            if ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
-                &debug("Failed TBExptAccessCheck($UID,$pid,$eid)\n");
+            if ($UID &&
+		!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
+                &debug("$this_user failed access check to $experiment\n");
                 next;
             }
         }
@@ -914,8 +928,8 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	#
 	# Setup $pideid for a more compact display
 	#
-	if ($eid && $pid) {
-	    $pideid = "$pid/$eid";
+	if (defined($experiment)) {
+	    $pideid = $experiment->pid() . "/" . $experiment->eid();
 	} else {
 	    $pideid = "";
 	}

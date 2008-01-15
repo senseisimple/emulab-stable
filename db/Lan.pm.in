@@ -1785,7 +1785,7 @@ sub vname($)	{ return $_[0]->GetLan()->vname(); }
 sub ready($)	{ return $_[0]->GetLan()->ready(); }
 sub type($)	{ return $_[0]->GetLan()->type(); }
 sub GetLan($)   { return $_[0]->{'LAN'}; }
-sub GetExperiment($) { return $_[0]->{'EXPT'}; }
+sub GetExperiment($) { return $_[0]->GetLan()->GetExperiment(); }
 
 #
 # Create a new VLan object and return it. No members yet ... which means
