@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ use Exporter;
 	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_samba_mount 
+	 os_groupdel os_samba_mount os_islocaldir
 	 os_getnfsmounts os_getnfsmountpoints os_noisycmd
 	 os_fwconfig_line os_fwrouteconfig_line
        );
@@ -727,6 +727,18 @@ sub MapShell($)
        $fullpath = $DEFSHELL;
    }
    return $fullpath;
+}
+
+# Return non-zero if given directory is on a "local" filesystem
+sub os_islocaldir($)
+{
+    my ($dir) = @_;
+
+    # XXX
+    if ($dir =~ /^\/(proj|groups|users|share)/) {
+	return 0;
+    }
+    return 1;
 }
 
 sub os_samba_mount($$$)
