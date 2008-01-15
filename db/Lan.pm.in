@@ -513,14 +513,17 @@ sub AddMember($$;$)
     return undef
 	if (!ref($self));
 
-    if (!ref($node)) {
-	$node = Node->Lookup($node);
-	return undef
-	    if (!defined($node));
-    }
     my $member = Lan::Member->Create($self);
 
     if (defined($node)) {
+	if (!ref($node)) {
+	    $node = Node->Lookup($node);
+	    if (!defined($node)) {
+		$member->Destroy();
+		return undef;
+	    }
+	}
+	
 	# And the node.
 	if ($member->SetAttribute("node_id", $node->node_id()) != 0) {
 	    $member->Destroy();
@@ -1526,8 +1529,11 @@ sub InstantiateAll($)
     my ($class) = @_;
 
     foreach my $protolan (values(%protolans)) {
-	$protolan->Instantiate() == 0
-	    or return -1;
+	if ($protolan->Instantiate() != 0) {
+	    print STDERR "*** Could not instantiate protolan: " .
+		$protolan->Dump() . "\n";
+	    return -1;
+	}
     }
     return 0;
 }
