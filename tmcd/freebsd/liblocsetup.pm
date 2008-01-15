@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,7 +20,7 @@ use Exporter;
 	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_getnfsmounts
+	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line
        );
 
@@ -51,6 +51,7 @@ sub JAILED()	{ return libsetup::JAILED(); }
 # Various programs and things specific to FreeBSD and that we want to export.
 # 
 $CP		= "/bin/cp";
+$DF		= "/bin/df";
 $EGREP		= "/usr/bin/egrep -s -q";
 $NFSMOUNT	= "/sbin/mount -o -b ";
 $LOOPBACKMOUNT	= "/sbin/mount -t null ";
@@ -565,6 +566,19 @@ sub MapShell($)
        $fullpath = $DEFSHELL;
    }
    return $fullpath;
+}
+
+# Return non-zero if given directory is on a "local" filesystem
+sub os_islocaldir($)
+{
+    my ($dir) = @_;
+    my $rv = 0; 
+
+    my @dfoutput = `$DF -l $dir 2>/dev/null`;
+    if (grep(!/^filesystem/i, @dfoutput) > 0) {
+	$rv = 1;
+    }
+    return $rv;
 }
 
 #
