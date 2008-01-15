@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,7 @@ use Exporter;
 	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_getnfsmounts
+	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line
        );
 
@@ -45,6 +45,7 @@ BEGIN
 # Various programs and things specific to Linux and that we want to export.
 # 
 $CP		= "/bin/cp";
+$DF		= "/bin/df";
 $EGREP		= "/bin/egrep -q";
 $NFSMOUNT	= "/bin/mount -o vers=2,udp"; # Force NFS Version 2 over UDP
 $UMOUNT		= "/bin/umount";
@@ -580,27 +581,52 @@ sub os_usermod($$$$$$)
 sub os_useradd($$$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root, $shell) = @_;
+    my $args = "";
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "root");
     }
     if ($glist ne "") {
-	$glist = "-G $glist";
+	$args .= "-G $glist ";
     }
+    # If remote, let it decide where to put the homedir.
+    if (!REMOTE()) {
+	$args .= "-d $homedir ";
+
+	#
+	# -M is Redhat only option?  Overrides default CREATE_HOME.
+	# So we see if CREATE_HOME is set and if so, use -M.
+	#
+	if (!system("grep -q CREATE_HOME /etc/login.defs")) {
+	    $args .= "-M ";
+	}
+    }
+    elsif (!PLAB()) {
+	my $marg = "-m";
+
+	#
+	# XXX DP hack
+	# Only force creation of the homdir if the default homedir base
+	# is on a local FS.  On the DP, all nodes share a homedir base
+	# which is hosted on one of the nodes, so we create the homedir
+	# only on that node.
+	#
+	$defhome = `$USERADD -D 2>/dev/null`;
+	if ($defhome =~ /HOME=(.*)/) {
+	    if (!os_islocaldir($1)) {
+		$marg = "";
+	    }
+	}
+
+	# populate on remote nodes. At some point will tar files over.
+	$args .= $marg;
+    }
+
     # Map the shell into a full path.
     $shell = MapShell($shell);
 
-    #
-    # -M is Redhat only option?  Overrides default CREATE_HOME.
-    # So we see if CREATE_HOME is set and if so, use -M.
-    #
-    my $marg = "";
-    if (!system("grep -q CREATE_HOME /etc/login.defs")) {
-	$marg = "-M";
-    }
-
-    if (system("$USERADD $marg -u $uid -g $gid $glist -p '$pswd' ".
-	       "-d $homedir -s $shell -c \"$gcos\" $login") != 0) {
+    if (system("$USERADD -u $uid -g $gid $args -p '$pswd' ".
+	       "-s $shell -c \"$gcos\" $login") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
     }
@@ -734,6 +760,19 @@ sub MapShell($)
        $fullpath = $DEFSHELL;
    }
    return $fullpath;
+}
+
+# Return non-zero if given directory is on a "local" filesystem
+sub os_islocaldir($)
+{
+    my ($dir) = @_;
+    my $rv = 0; 
+
+    my @dfoutput = `$DF -l $dir 2>/dev/null`;
+    if (grep(!/^filesystem/i, @dfoutput) > 0) {
+	$rv = 1;
+    }
+    return $rv;
 }
 
 sub os_getnfsmounts($)
