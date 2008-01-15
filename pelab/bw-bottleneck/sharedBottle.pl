@@ -62,8 +62,8 @@ my %elabMap = {};
 # from the database, using init-elabnodes.pl
 my $tevc = "/usr/testbed/bin/tevc -e $newProjName/$newExpName now";
 
-`/usr/testbed/bin/tevc -w -e $newProjName/$newExpName now elabc reset`;
-`$tevc elabc create start`;
+#`/usr/testbed/bin/tevc -w -e $newProjName/$newExpName now elabc reset`;
+#`$tevc elabc create start`;
 
 # Create a list of the IP addresses.
 foreach $conditionLine (@initialConditions)
@@ -153,13 +153,13 @@ foreach $sourceName (readdir(logsDirHandle))
                                 push(@destLists,$destOne);
                                 push(@destLists,$destTwo);
 
-                                printf("WARNING: One or more of paths($sourceName -> $destOne, $sourceName -> $destTwo) have low variance(%.3f,%.3f)\n.Considering these paths as uncorrelated\n", $path1Variance, $path2Variance);
+                                printf("@@ WARNING: One or more of paths($sourceName -> $destOne, $sourceName -> $destTwo) have low variance(%.3f,%.3f)\n.Considering these paths as uncorrelated\n", $path1Variance, $path2Variance);
                                 next;
                             }
                         }
                         else
                         {
-                            print "Missing file(delay.log). Cannot process $fullPath\n";
+                            print "@@ Missing file(delay.log). Cannot process $fullPath\n";
                             next;
                         }
                         system("perl delay2dump.pl $fullPath/delay.log $fullPath");
@@ -171,12 +171,12 @@ foreach $sourceName (readdir(logsDirHandle))
 
                         if (!(-r $filterFile1) || !(-r $filterFile2) || !(-r $filterFile3))
                         {
-                            print "Missing file. Cannot process $fullPath\n";
+                            print "@@ WARNING: Missing file. Cannot process $fullPath\n";
                             next;
                         }
                         $sharedBottleneckCheck = $DansScriptPath ." ". $filterFile1." ". $filterFile2 ." ". $filterFile3;
                             
-                        print "EXECUTE: $sharedBottleneckCheck\n";
+                        print "@ EXECUTE: $sharedBottleneckCheck\n";
                         my @scriptOutput = ();
                         @scriptOutput = `$sharedBottleneckCheck | tail -n 2`;
 #system("$sharedBottleneckCheck");
@@ -189,7 +189,7 @@ foreach $sourceName (readdir(logsDirHandle))
 
                         if($scriptOutput[$#scriptOutput - 1] =~ /last CHANGE\s(\w*)\s(\w*)\,[\w\d\W\:\,]*/)
                         {
-                            print "For source $sourceName: Comparing $destOne $destTwo: $scriptOutput[$#scriptOutput]";
+                            print "@ For source $sourceName: Comparing $destOne $destTwo: $scriptOutput[$#scriptOutput]";
                             $corrResult = $2;
                             if($corrResult eq "CORRELATED"
                                     && !($scriptOutput[$#scriptOutput] =~ /nan/))
@@ -197,7 +197,7 @@ foreach $sourceName (readdir(logsDirHandle))
                                 push(@{ $bottleNecks{$sourceName} },$destOne . ":" . $destTwo);
                                 push(@destLists,$destOne);
                                 push(@destLists,$destTwo);
-                                print "CORRELATED\n\n";
+                                print "@ CORRELATED\n\n";
 
                             }
                             elsif($corrResult eq "UNCORRELATED"
@@ -205,19 +205,19 @@ foreach $sourceName (readdir(logsDirHandle))
                             {
                                 push(@destLists,$destOne);
                                 push(@destLists,$destTwo);
-                                print "UNCORRELATED\n\n";
+                                print "@ UNCORRELATED\n\n";
                             }
                             else
                             {
                                 print "ERROR:($sourceName) Something went wrong in pattern matching phase.\n";
-                                print "Skipping this source node\n";
+                                print "ERROR: Skipping this path from the source node\n";
                                 next;
                             }
                         }
                         else
                         {
                             print "ERROR:($sourceName) Output line from Rubenstein's code did not match regular expression.\n";
-                            print "Skipping this source node\n";
+                            print "ERROR: Skipping this path from the source node\n";
                             next;
                         }
                     }
@@ -331,7 +331,7 @@ foreach $sourceName (readdir(logsDirHandle))
                         if($firstDestClassNum != $secondDestClassNum)
                         {
                             print "ERROR($sourceName): Two destinations sharing a bottleneck link are in different equiv. classes $i $j\n";
-                            print "Skipping this source node\n";
+                            print "ERROR: Skipping this source node\n";
                         }
 
                     }
@@ -415,16 +415,18 @@ foreach $sourceName (readdir(logsDirHandle))
 
         if($retVal != 0)
         {
-            print "WARNING:($sourceName) Transitive property has been violated.\n";
+            print "@@ WARNING:($sourceName) Transitive property has been violated.\n";
         }
-	print "(Debugging) Equivalence classes - $sourceName\n";
+	print "@@@ (Debugging) Equivalence classes - $sourceName\n";
+    #######################
 foreach $tmpName (@equivClasses)
 	{
+        print "@@@ ";
     foreach $tmpName2 (@$tmpName)
 	    {
 		print $destSeen[$tmpName2] . " ";
 	    }
-	    print "\n";
+	    print " \n";
 
 	}
 
@@ -442,9 +444,11 @@ for($i = 0; $i < $numDests; $i++)
 
     if($lonerFlag == 0)
     {
-		print $destSeen[$i] . "\n";
+		print "@@@ $destSeen[$i] \n";
     }
 }
+print "@@@ \n";
+    #######################
 
 $nodeClasses{$sourceName} = [ @equivClasses ];
 
@@ -485,12 +489,12 @@ foreach $tmpName (@equivClasses)
                 $delayEventCommand = $delayEventCommand . " " . "DELAY=" . ($delayMap{$addrNodeMapping{$sourceName}}{$addrNodeMapping{$destSeen[$tmpName2]}});
 # Execute the delay event command.
                 print "EXECUTE $delayEventCommand\n";
-                `$delayEventCommand`;
+                #`$delayEventCommand`;
             }
             $bwEventCommand = $bwEventCommand . " " . "BANDWIDTH=" . $maxBw;
 # Execute the event to set the bandwidth for this equivalence class.
             print "EXECUTE $bwEventCommand\n";
-            `$bwEventCommand`;
+            #`$bwEventCommand`;
         }
 
 # Create and send events for all the loner dest nodes reachable from this source node.
@@ -514,7 +518,7 @@ foreach $tmpName (@equivClasses)
 
 # Execute the event to set the bandwidth for this path.
                 print "EXECUTE: $bwEventCommand\n";
-                `$bwEventCommand`;
+                #`$bwEventCommand`;
 
                 my $delayEventCommand = "$tevc ".$elabMap{$addrNodeMapping{$destSeen[$i]}}." modify DEST=" . $addrNodeMapping{$destSeen[$i]}." SRC=".$addrNodeMapping{$sourceName};
 
@@ -522,7 +526,7 @@ foreach $tmpName (@equivClasses)
 
 # Execute the delay event command.
                 print "EXECUTE: $delayEventCommand\n";
-                `$delayEventCommand`;
+                #`$delayEventCommand`;
             }
         }
 
@@ -549,7 +553,10 @@ sub CheckSanity()
                 {
                     if($adjMatrix[$classElement][$secondIter] != 1)
                     {
-                        print "WARNING: $destSeen[$classElement] $destSeen[$secondIter] violates transitive property\n";
+                        if($classElement < $secondIter)
+                        {
+                            print "@@ WARNING: $destSeen[$classElement] $destSeen[$secondIter] violates transitive property\n";
+                        }
                         $adjMatrix[$classElement][$secondIter] = 1;
                         $retVal = -1;
                     }
@@ -612,7 +619,7 @@ sub CheckVariance()
 
     while($line = <HANDLE>)
     {
-        if($line =~ /^(\d*)\s(\d*)\s(\d*)\s(\d*)/)
+        if($line =~ /^(\-?\d*)\s(\d*)\s(\-?\d*)\s(\d*)/)
         {
             push(@delayArray1, $1);
             push(@delayArray2, $3);
