@@ -3144,6 +3144,30 @@ sub TBNodeUpdateAccountsByUID($)
 		     "where node_id='$node_id' and update_accounts<2");
     }
 
+    #
+    # Finally update nodes who are accessible by the user via the 'dp_projects'
+    # node attribute.
+    #
+    # XXX big ugly query alert!
+    #
+    $query_result = 
+	DBQueryFatal("select n.node_id from projects as p, ".
+		     "  groups as g, group_membership as gm, ".
+		     "  nodes as n, node_attributes as na ".
+		     "where p.pid=g.pid and p.approved!=0 ".
+		     "  and g.gid=gm.gid and p.pid=gm.pid ".
+		     "  and n.node_id=na.node_id ".
+		     "  and FIND_IN_SET(g.gid_idx, na.attrvalue) > 0 ".
+		     "  and na.attrkey='dp_projects' ".
+		     "  and gm.uid='$uid'");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $node_id = $row{'node_id'};
+
+	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
+		     "where node_id='$node_id' and update_accounts<2");
+    }
+
     return 1;
 }
 
