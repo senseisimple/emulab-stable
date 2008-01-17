@@ -41,6 +41,10 @@ BEGIN
     }
 }
 
+# Convenience.
+sub REMOTE()	{ return libsetup::REMOTE(); }
+sub PLAB()	{ return libsetup::PLAB(); }
+
 #
 # Various programs and things specific to Linux and that we want to export.
 # 
@@ -746,14 +750,19 @@ sub MapShell($)
        return $DEFSHELL;
    }
 
-   my $fullpath = `grep '/${shell}\$' $SHELLS`;
-
+   #
+   # May be multiple lines (e.g., /bin/sh, /usr/bin/sh, etc.) in /etc/shells.
+   # Just use the first entry.
+   #
+   my @paths = `grep '/${shell}\$' $SHELLS`;
    if ($?) {
        return $DEFSHELL;
    }
+   my $fullpath = $paths[0];
+   chomp($fullpath);
 
-   # Sanity Check
-   if ($fullpath =~ /^([-\w\/]*)$/) {
+   # Sanity Checks
+   if ($fullpath =~ /^([-\w\/]*)$/ && -x $fullpath) {
        $fullpath = $1;
    }
    else {
