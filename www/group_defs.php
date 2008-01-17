@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -741,7 +741,8 @@ class Group
 			 "     g.pid=m.pid and g.gid=m.gid ".
 			 "where m.pid_idx='$pid_idx' and ".
 			 "      m.gid_idx='$gid_idx' and ".
-			 "      m.trust!='$trust_none'");
+			 "      m.trust!='$trust_none' ".
+			 "order by m.uid");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $uid_idx = $row["uid_idx"];
@@ -781,7 +782,8 @@ class Group
 			 "     a.pid_idx=m.pid_idx and a.gid_idx='$gid_idx' ".
 			 "where m.pid_idx='$pid_idx' and ".
 			 "      m.gid_idx=m.pid_idx and a.uid_idx is NULL ".
-			 "      and m.trust!='$trust_none'");
+			 "      and m.trust!='$trust_none' ".
+			 "order by m.uid");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $uid_idx = $row["uid_idx"];

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -149,6 +149,7 @@ function SPITFORM($formfields, $errors)
 	    $target_idx = $target_user->uid_idx();
 	    $trust      = $target_user->GetTempData();
 	    $showurl    = CreateURL("showuser", $target_user);
+	    $longname   = $target_user->name();
 
 	    if ($defaultgroup) {
 		echo "<tr>
@@ -156,7 +157,7 @@ function SPITFORM($formfields, $errors)
 			   <input type=hidden 
 				  name=\"formfields[change_$target_idx]\"
 				  value=permit>
-			      <A href='$showurl'>$target_uid &nbsp</A>
+			      <A href='$showurl'>$target_uid ($longname) &nbsp</A>
 			 </td>\n";
 	    }
 	    else {
@@ -164,7 +165,7 @@ function SPITFORM($formfields, $errors)
 			 <td>   
 			   <input checked type=checkbox value=permit
 				  name=\"formfields[change_$target_idx]\">
-			      <A href='$showurl'>$target_uid &nbsp</A>
+			      <A href='$showurl'>$target_uid ($longname) &nbsp</A>
 			 </td>\n";
 	    }
 
@@ -215,6 +216,7 @@ function SPITFORM($formfields, $errors)
 	foreach ($nonmembers as $target_user) {
 	    $target_uid = $target_user->uid();
 	    $target_idx = $target_user->uid_idx();
+	    $longname   = $target_user->name();
 	    $trust      = $target_user->GetTempData();
 	    $showurl    = CreateURL("showuser", $target_user);
 
@@ -222,7 +224,7 @@ function SPITFORM($formfields, $errors)
 		     <td>
 		       <input type=checkbox value=permit 
 			      name=\"formfields[add_$target_idx]\">
-			  <A href='$showurl'>$target_uid &nbsp</A>
+			  <A href='$showurl'>$target_uid ($longname) &nbsp</A>
 		     </td>\n";
 
 	    echo "   <td align=center>
