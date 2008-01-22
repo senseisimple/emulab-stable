@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2004-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -231,7 +231,7 @@ main(int argc, char **argv)
 	char *cmdline = 0, *progname;
 
 	progname = argv[0];
-	while ((ch = getopt(argc, argv, "c:dn")) != -1)
+	while ((ch = getopt(argc, argv, "p:c:dn")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
