@@ -305,6 +305,8 @@ sub BackupExperimentLans($$$)
 	DBQueryWarn("select lanid from lans where exptidx='$exptidx'");
     return -1
 	if (! $query_result);
+    return 0
+	if (! $query_result->numrows);
 
     while (my ($lanid) = $query_result->fetchrow_array()) {
 	push(@lanids, $lanid);
@@ -315,6 +317,33 @@ sub BackupExperimentLans($$$)
 		      join(" or ", map("lanid='$_'", @lanids)) . " " .
 		    "into outfile '$pstatedir/$table'")
 	    or return -1;
+    }
+    # Keep the vlans table in sync for now. Will remove later.
+    DBQueryWarn("select * from vlans where exptidx='$exptidx' ".
+		"into outfile '$pstatedir/vlans' ")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Class method to restore all lans for an experiment.
+#
+sub RestoreExperimentLans($$$)
+{
+    my ($class, $experiment, $pstatedir) = @_;
+
+    return -1
+	if (! ref($experiment));
+
+    # Keep the vlans table in sync for now. Will remove later.
+    foreach my $table ("lans", "lan_attributes", "lan_members",
+		       "lan_member_attributes", "ifaces", "vlans") {
+	if (-e "$pstatedir/$table") {
+	    DBQueryWarn("load data infile '$pstatedir/$table' ".
+			"into table $table")
+		or return -1;
+	}
     }
     return 0;
 }
