@@ -305,8 +305,6 @@ sub BackupExperimentLans($$$)
 	DBQueryWarn("select lanid from lans where exptidx='$exptidx'");
     return -1
 	if (! $query_result);
-    return 0
-	if (! $query_result->numrows);
 
     while (my ($lanid) = $query_result->fetchrow_array()) {
 	push(@lanids, $lanid);
@@ -317,33 +315,6 @@ sub BackupExperimentLans($$$)
 		      join(" or ", map("lanid='$_'", @lanids)) . " " .
 		    "into outfile '$pstatedir/$table'")
 	    or return -1;
-    }
-    # Keep the vlans table in sync for now. Will remove later.
-    DBQueryWarn("select * from vlans where exptidx='$exptidx' ".
-		"into outfile '$pstatedir/vlans' ")
-	or return -1;
-    
-    return 0;
-}
-
-#
-# Class method to restore all lans for an experiment.
-#
-sub RestoreExperimentLans($$$)
-{
-    my ($class, $experiment, $pstatedir) = @_;
-
-    return -1
-	if (! ref($experiment));
-
-    # Keep the vlans table in sync for now. Will remove later.
-    foreach my $table ("lans", "lan_attributes", "lan_members",
-		       "lan_member_attributes", "ifaces", "vlans") {
-	if (-e "$pstatedir/$table") {
-	    DBQueryWarn("load data infile '$pstatedir/$table' ".
-			"into table $table")
-		or return -1;
-	}
     }
     return 0;
 }
@@ -542,36 +513,40 @@ sub AddMember($$;$)
     return undef
 	if (!ref($self));
 
-    if (!ref($node)) {
-	$node = Node->Lookup($node);
-	if (!defined($node)) {
+    my $member = Lan::Member->Create($self);
+
+    if (defined($node)) {
+	if (!ref($node)) {
+	    $node = Node->Lookup($node);
+	    if (!defined($node)) {
+		$member->Destroy();
+		return undef;
+	    }
+	}
+	
+	# And the node.
+	if ($member->SetAttribute("node_id", $node->node_id()) != 0) {
+	    $member->Destroy();
 	    return undef;
 	}
-    }
+	# Set the attribute for the physical interface.
+	if (defined($iface) &&
+	    $member->SetAttribute("iface", $iface) != 0) {
+	    $member->Destroy();
+	    return undef;
+	}
 
-    my $member = Lan::Member->Create($self, $node);
+	# Keep vlans table in sync for now.
+	if ($self->type() eq "vlan" && !$initialize) {
+	    my $member = $node->node_id() . ":" . $iface;
+	    my $vlanid;
 
-    # And the node attribute
-    if ($member->SetAttribute("node_id", $node->node_id()) != 0) {
-	$member->Destroy();
-	return undef;
-    }
-    # Set the attribute for the physical interface.
-    if (defined($iface) &&
-	$member->SetAttribute("iface", $iface) != 0) {
-	$member->Destroy();
-	return undef;
-    }
-    # Keep vlans table in sync for now.
-    if ($self->type() eq "vlan" && !$initialize) {
-	my $member = $node->node_id() . ":" . $iface;
-	my $vlanid;
+	    $self->GetAttribute("vlanid", \$vlanid);
 
-	$self->GetAttribute("vlanid", \$vlanid);
-
-	DBQueryWarn("update vlans set ".
-		    " members=CONCAT_WS(' ', members, '$member') ".
-		    "where id='$vlanid'");
+	    DBQueryWarn("update vlans set ".
+			" members=CONCAT_WS(' ', members, '$member') ".
+			"where id='$vlanid'");
+	}
     }
     return $member;
 }
@@ -975,21 +950,14 @@ sub Stringify($)
 #
 # Create a new Lan::Member object (on a specific lan) and return it.
 #
-sub Create($$$)
+sub Create($$)
 {
-    my ($class, $lan, $node) = @_;
-
-    if (!ref($node)) {
-	$node = Node->Lookup($node);
-	return 0
-	    if (!defined($node));
-    }
-    my $nodeid = $node->node_id(); 
-    my $lanid  = $lan->lanid();
+    my ($class, $lan) = @_;
+    my $lanid = $lan->lanid();
 
     my $query_result = 
 	DBQueryWarn("insert into lan_members set ".
-		    "  lanid='$lanid', memberid=NULL, node_id='$nodeid'");
+		    "  lanid='$lanid', memberid=NULL");
     return undef
 	if (!$query_result);
 
@@ -1265,7 +1233,7 @@ sub Create($$$$$;$)
     # Use supplied member (which provides the ifaceid) or generate a
     # new one.
     if (!defined($member)) {
-	$member = $lan->AddMember($node);
+	$member = $lan->AddMember();
 	return undef
 	    if (!defined($member));
     }
@@ -2050,7 +2018,8 @@ sub ExperimentVLans($$$)
 
 ############################################################################
 #
-# Another convenience package, for tunnels.
+# The most common kind of Lan is a Vlan, so lets create a package/object
+# for it.
 #
 package Tunnel;
 use libdb;
@@ -2103,9 +2072,9 @@ sub GetExperiment($) { return $_[0]->{'EXPT'}; }
 #
 # Create a new Tunnel object and return it. No members yet ... 
 #
-sub Create($$$$$;$$)
+sub Create($$$$;$$)
 {
-    my ($class, $experiment, $vname, $secretkey, $style, $mask, $port) = @_;
+    my ($class, $experiment, $vname, $secretkey, $mask, $port) = @_;
 
     # The new lan has the 'ready' bit set to zero.
     my $lan = Lan->Create($experiment, $vname, "tunnel");
@@ -2114,10 +2083,6 @@ sub Create($$$$$;$$)
 
     # Set the secret key for the tunnel.
     if ($lan->SetAttribute("secretkey", $secretkey) != 0) {
-	$lan->Destroy();
-	return undef;
-    }
-    if ($lan->SetAttribute("style", $style) != 0) {
 	$lan->Destroy();
 	return undef;
     }
@@ -2169,14 +2134,14 @@ sub Stringify($)
 #
 sub AddInterface($$$$;$$)
 {
-    my ($self, $node, $vnode, $vport) = @_;
+    my ($self, $node, $vnode, $vport, $ip, $peerip, $isserver) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
 	return undef
 	    if (!defined($node));
     }
-    my $member = $self->AddMember($node);
+    my $member = $self->AddMember($node, $ip, $peerip, $isserver);
     return undef
 	if (!defined($member));
     
@@ -2189,11 +2154,11 @@ sub AddInterface($$$$;$$)
 }
 
 #
-# Add a member to a tunnel. The caller needs to a bunch of stuff.
+# Add a member to a tunnel.
 #
-sub AddMember($$)
+sub AddMember($$$;$$)
 {
-    my ($self, $node) = @_;
+    my ($self, $node, $ip, $peerip, $isserver) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -2204,6 +2169,48 @@ sub AddMember($$)
     return undef
 	if (!defined($member));
 
+    if ($member->SetAttribute("ipaddr", $ip) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    if (defined($peerip) && 
+	$member->SetAttribute("peeripaddr", $peerip) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    if (defined($isserver) && $isserver &&
+	$member->SetAttribute("isserver", "1") != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    # I think this table is going to go away.
+    my $pid      = $self->pid();
+    my $eid      = $self->eid();
+    my $exptidx  = $self->exptidx();
+    my $node_id  = $node->node_id();
+    my $lan      = $self->vname();
+    my $secretkey;
+    my $ipmask;
+    my $serverport;
+
+    if ($self->GetAttribute("secretkey", \$secretkey) != 0 ||
+	$self->GetAttribute("ipmask", \$ipmask) != 0 ||
+	$self->GetAttribute("serverport", \$serverport) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    $isserver = (defined($isserver) && $isserver ? 1 : 0);
+    
+    if (!DBQueryWarn("insert into tunnels ".
+		     " (pid, eid, node_id, vname, isserver, port, ".
+		     "  peer_ip, mask, assigned_ip, password) ".
+		     "values ('$pid', '$eid', '$node_id', '$lan', ".
+		     "        $isserver, '$serverport', ".
+		     "        '$peerip', '$ipmask', '$ip','$secretkey')")) {
+	$member->Destroy();
+	return undef;
+    }
+    
     return $member;
 }
 
