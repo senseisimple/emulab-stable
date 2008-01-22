@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -89,7 +89,7 @@ $query_result =
 if (mysql_num_rows($query_result)) {
     echo "<br> <center>
             The following node_types are using this OS Descriptor<br>
-            in the osid and/or delay_osid fields.<br>
+            in the osid, jail_osid and/or delay_osid fields.<br>
             They must be deleted first!
           </center><br>\n";
           
@@ -107,6 +107,34 @@ if (mysql_num_rows($query_result)) {
 	echo "<tr>
                 <td>$class</td>
 	        <td>$type</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+    $conflicts++;
+}
+
+# Ditto for nodes ...
+$query_result =
+    DBQueryFatal("select node_id from nodes where def_boot_osid=$osid");
+
+if (mysql_num_rows($query_result)) {
+    echo "<br> <center>
+            The following nodes are using this OS Descriptor<br>
+            as their default boot OSID.<br>
+            Their def_boot_osid must be changed first!
+          </center><br>\n";
+          
+    echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
+
+    echo "<tr>
+              <td align=center>Node</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$node_id = $row['node_id'];
+
+	echo "<tr>
+                <td>$node_id</td>
               </tr>\n";
     }
     echo "</table>\n";
