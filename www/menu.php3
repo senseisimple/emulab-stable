@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -849,9 +849,6 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
                           scrolling='no' frameborder='0'></iframe>\n";
 	}
 	if ($login_user) {
-	    echo "<table id=topcelltable ".
-		     "cellspacing=0 cellpadding=0 border=0><tr>";
-	    
 	    #
 	    # It is a violation of Emulab licensing restrictions to remove
 	    # this logo!
@@ -864,6 +861,9 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 		    "href='http://www.emulab.net'>";
 		echo "<img src='$BASEPATH/fancy-builtwith.png'></a>\n";
 	    }
+	    echo "<table id=topcelltable ".
+		     "cellspacing=0 cellpadding=0 border=0><tr>";
+	    
 	    echo "<td>\n";
 	    echo "<a id='topcellimage' href='$TBDOCBASE/index.php3'>";
 	    echo "<img border='0' ";
