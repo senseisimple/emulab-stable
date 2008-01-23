@@ -64,7 +64,7 @@ use Node;
 
 # Protos
 sub notify($);
-sub fatal($$);
+sub fatal($$$);
 
 # These error codes must match whats in the client, but of course.
 my $WASTATUS_OKAY		= 0;
@@ -96,7 +96,7 @@ if (defined($options{"h"})) {
 	$hostname = $1;
     }
     else {
-	fatal($WASTATUS_INVALIDARGS, "Bad data in hostname");
+	fatal($WASTATUS_INVALIDARGS, "Bad data in hostname", 0);
     }
 }
 usage
@@ -110,13 +110,13 @@ if ($IP =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) {
     $IP = $1;
 }
 else {
-    fatal($WASTATUS_INVALIDARGS, "Bad data in IP address");
+    fatal($WASTATUS_INVALIDARGS, "Bad data in IP address", 0);
 }
 if ($privkey =~ /^([\w]+)$/) {
     $privkey = $1;
 }
 else {
-    fatal($WASTATUS_INVALIDARGS, "Bad data in private key");
+    fatal($WASTATUS_INVALIDARGS, "Bad data in private key", 1);
 }
 
 #
@@ -127,14 +127,14 @@ my $query_result = DBQueryWarn("select node_id,IP,machine_type ".
 			       "  from widearea_nodeinfo ".
 			       "where privkey='$privkey'");
 if (!$query_result) {
-    fatal($WASTATUS_OTHER, "DB Error getting widearea_nodeinfo table");
+    fatal($WASTATUS_OTHER, "DB Error getting widearea_nodeinfo table", 0);
 }
 if (!$query_result->numrows) {
     #
     # We are not going to do dynamic widearea nodes yet. If the privkey
     # is not in the table, it is not a node we know/care about.
     #
-    fatal($WASTATUS_BADPRIVKEY, "Unknown private key");
+    fatal($WASTATUS_BADPRIVKEY, "Unknown private key", 1);
 }
 my ($node_id, $known_IP, $machine_type) = $query_result->fetchrow_array();
 
@@ -149,7 +149,7 @@ if (!defined($known_IP) || $IP eq "") {
 			    {'type' => $machine_type,
 			     'role' => $Node::NODEROLE_TESTNODE});
     if (!defined($node)) {
-	fatal($WASTATUS_OTHER, "Could not create new node: $node_id");
+	fatal($WASTATUS_OTHER, "Could not create new node: $node_id", 0);
     }
 
     # Initialize the control interface.
@@ -165,13 +165,13 @@ if (!defined($known_IP) || $IP eq "") {
 		      "    role='" . TBDB_IFACEROLE_CONTROL() . "', ".
 		      "    IP='$IP'")) {
 	fatal($WASTATUS_OTHER,
-	      "Failed to insert new WA node into interfaces table");
+	      "Failed to insert new WA node into interfaces table", 0);
     }
 
     if (! DBQueryWarn("update widearea_nodeinfo set IP='$IP' ".
 		      (defined($hostname) ? ",hostname='$hostname' " : "") .
 		      "where node_id='$node_id'")) {
-	fatal($WASTATUS_OTHER, "Failed to update IP in widearea_nodeinfo");
+	fatal($WASTATUS_OTHER, "Failed to update IP in widearea_nodeinfo", 0);
     }
     notify("Widearea node $node_id has checked in for the firstime ".
 	   "with IP $IP");
@@ -196,7 +196,7 @@ else {
 	   DBQueryWarn("update widearea_nodeinfo set IP='$IP' ".
 		       (defined($hostname) ? ",hostname='$hostname' " : "") .
 		       "where node_id='$node_id'"))) {
-	fatal($WASTATUS_OTHER, "Failed to update IP in DB");
+	fatal($WASTATUS_OTHER, "Failed to update IP in DB", 0);
     }
     notify("Widearea node $node_id has changed its IP address from $known_IP ".
 	   "to $IP");
@@ -204,7 +204,7 @@ else {
 
 # Now regen nameserver.
 if (system($NAMED) != 0) {
-    fatal($WASTATUS_OTHER, "Failed to regenerate named files and restart");
+    fatal($WASTATUS_OTHER, "Failed to regenerate named files and restart", 0);
 }
 exit($WASTATUS_OKAY);
 
@@ -219,15 +219,15 @@ sub notify($)
 	     "Widearea Node Checkin",
 	     "\n".
 	     "Widearea Node Checkin.\n".
-	     "IP: $IP, Privkey: $privkey\n\n".
+	     "IP: $IP, Privkey: XXXX\n\n".
 	     "$message",
 	     "$TBOPS");
 }
 
 # Return Error code and send email;
-sub fatal($$)
+sub fatal($$$)
 {
-    my ($status, $message) = @_;
+    my ($status, $message, $reportkey) = @_;
     print STDERR "*** $0:\n".
 	         "    $message\n";
     
@@ -235,7 +235,9 @@ sub fatal($$)
 	     "Failure in Widearea Node Checkin",
 	     "\n".
 	     "Failure in Widearea Node Checkin. Exited with $status.\n".
-	     "IP: $IP, Privkey: $privkey\n\n".
+	     "IP: $IP, Privkey: ".
+	     ($reportkey ? $privkey : "XXXX").
+	     "\n\n".
 	     "$message",
 	     "$TBOPS");
 
