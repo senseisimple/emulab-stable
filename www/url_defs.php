@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -45,6 +45,7 @@ define("PAGEARG_OSID",		"osid");
 define("PAGEARG_LOGFILE",	"logfile");
 define("PAGEARG_BOOLEAN",	"boolean");
 define("PAGEARG_STRING",	"string");
+define("PAGEARG_PASSWORD",	"password");
 define("PAGEARG_INTEGER",	"integer");
 define("PAGEARG_NUMERIC",	"numeric");
 define("PAGEARG_ARRAY",		"array");
@@ -593,6 +594,19 @@ function VerifyPageArguments($argspec, $required)
                 # Pages never get arguments with special chars. Check.
 		if (preg_match("/[\'\"]/", $object)) {
 		    PAGEARGERROR("Invalid characters in '$name': $object");
+		}
+	    }
+	    break;
+	    
+	case PAGEARG_PASSWORD:
+	default:
+	    if (isset($_REQUEST[$name])) {
+		$object = $_REQUEST[$name];
+		$yep = 1;
+
+                # Only printable chars.
+		if (!preg_match("/^[\040-\176]+$/", $object)) {
+		    PAGEARGERROR("Invalid characters in '$name'");
 		}
 	    }
 	    break;

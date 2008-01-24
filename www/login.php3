@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -11,7 +11,7 @@ require("defs.php3");
 #
 $optargs = OptionalPageArguments("login",    PAGEARG_STRING,
 				 "uid",      PAGEARG_STRING,
-				 "password", PAGEARG_STRING,
+				 "password", PAGEARG_PASSWORD,
 				 "key",      PAGEARG_STRING,
 				 "vuid",     PAGEARG_STRING,
 				 "simple",   PAGEARG_BOOLEAN,
