@@ -773,7 +773,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	<html>
 	  <head>
 	    <title>$THISHOMEBASE - $title</title>
-            <link rel=\"shortcut icon\" href=\"favicon.ico\" TYPE=\"image/vnd.microsoft.icon\">
+            <link rel=\"shortcut icon\" href=\"$BASEPATH/favicon.ico\" TYPE=\"image/vnd.microsoft.icon\">
             <link rel=\"search\" type=\"application/opensearchdescription+xml\" title=\"$THISHOMEBASE Search\" href=\"emusearch.xml\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
 	    <link rel='stylesheet' href='$BASEPATH/common-style.css' type='text/css' />
