@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -322,8 +322,12 @@ elsif ($swapop eq "update") {
 	    if ($CanRecover) {
 		print STDERR "Recovering virtual and physical state.\n";
 
+		# It is safe to remove the phystate since we know it was
+		# backed up above, and cause we do not know if assign_wrapper
+		# made it to that point before it failed. 
 		if (TBExptRemoveVirtualState($pid, $eid) ||
 		    TBExptRestoreVirtualState($pid, $eid) ||
+		    TBExptRemovePhysicalState($pid, $eid) ||
 		    TBExptRestorePhysicalState($pid,$eid)) {
 		    print STDERR "Could not restore backed-up state; ";
 		    $CanRecover = 0;
