@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -94,6 +94,7 @@ if ($UID != 0) {
 my $sysname = `uname -s`;
 chomp($sysname);
 if ($sysname eq "Linux") {
+    print "WARNING: no vnodes under Linux (yet)\n";
     exit(0);
 }
 

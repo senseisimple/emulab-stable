@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -97,6 +97,8 @@ sub BootFatal($)
 {
     my ($msg) = @_;
 
+    print "$msg, shutting down\n";
+
     doshutdown();
 
     #
@@ -107,7 +109,7 @@ sub BootFatal($)
 	     ("datafile" => $BOOTLOG, "timeout" => 5));
     }
 
-    if (tmcc(TMCCCMD_BOOTERRNO, "-1") < 0) {
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- -1") < 0) {
 	print "Error sending boot errno to Emulab Control!\n";
     }
     
@@ -135,15 +137,15 @@ sub doboot()
     # Get the boss info for below.
     my ($bossname, $bossip) = tmccbossinfo();
     if (!defined($bossname)) {
-	BootFatal("Could not determine the name of the boss server!");
+	BootFatal("Could not determine the name of the boss server");
     }
     my ($domain) = ($bossname =~ /^[^\.]+\.(.*)$/);
 
     #
-    # Start the elvin proxy.
+    # Start the event proxy.
     #
     if (-x "$BINDIR/evproxy") {
-	print("Starting elvin proxy daemon\n");
+	print("Starting event proxy daemon\n");
 	system("$BINDIR/evproxy -i $EVPIDFILE ".
 	       "   -s event-server.${domain} -e $pid/$eid");
 	if ($?) {
@@ -167,7 +169,7 @@ sub doboot()
 
     print("Informing the testbed that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
-	BootFatal("Error sending ISUP to Emulab Control!");
+	BootFatal("Error sending ISUP to Emulab Control");
     }
 
     #
@@ -185,7 +187,7 @@ sub doboot()
 sub doshutdown()
 {
     print("Running termination scripts\n");
-    system("$RCDIR/rc.config shutdown");
+    system("$RCDIR/rc.config -j $vnodeid shutdown");
 
     if (-e $EVPIDFILE) {
 	my $mpid = `cat $EVPIDFILE`;
