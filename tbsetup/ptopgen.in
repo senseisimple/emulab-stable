@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -80,6 +80,7 @@ my %permissions   = ();
 my %typemap       = ();
 my %auxtypemap    = ();
 my %areamap       = ();
+my %globalcounts  = ();
 
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
@@ -160,6 +161,7 @@ while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
     $map->{'OSID'}     = $typeinfo->default_osid();
     $map->{'IMAGEABLE'}= $typeinfo->imageable();
     $map->{'TRIVSPEED'}= $typeinfo->trivlink_maxspeed();
+    $map->{'TYPEINFO'} = $typeinfo;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
     $typemap{$type} = $map;
@@ -303,6 +305,17 @@ else {
 	print "node $switch switch:1 *lan:*\n";
 	$switches{$switch} = 1;
     }
+}
+
+#
+# Get the global counts.
+#
+$result =
+    DBQueryFatal("select phys_nodeid,count(phys_nodeid) from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "where n.node_id!=n.phys_nodeid group by phys_nodeid");
+while (my ($node_id,$count) = $result->fetchrow_array) {
+    $globalcounts{$node_id} = $count;
 }
 
 # Find available nodes.
@@ -655,6 +668,21 @@ if ($widearea) {
 	my @types;
 	my @features;
 	my @flags;
+	my $maxvnodes;
+
+	#
+	# Grab the global allocation count of vnodes on this pnode (if there
+	# is one). This modifies the counts below.  If the count has already
+	# been reached, then do not put this node into the ptop file.
+	#
+	$maxvnodes =
+	    $typemap{$ptype}->{'TYPEINFO'}->GetAttribute("global_capacity");
+	
+	if (defined($maxvnodes) && exists($globalcounts{$physnode})) {
+	    $maxvnodes -= $globalcounts{$physnode};
+	    next
+		if ($maxvnodes <= 0);
+	}
 
 	#
 	# Mark any nodes that are not up with a feature, so that they won't
@@ -678,6 +706,9 @@ if ($widearea) {
 	#
 	foreach my $auxinfo (@{$auxtypes{$physnode}}) {
 	    my ($auxtype,$count) = split(":", $auxinfo);
+
+	    $count = $maxvnodes
+		if (defined($maxvnodes) && $maxvnodes < $count);
 
 	    if (defined($mfactor) && $mfactor <= $count) {
 		$auxinfo = "$auxtype:$mfactor";
