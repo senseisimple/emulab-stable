@@ -12,6 +12,7 @@
 ! if ( "$expstate" == "swapping" ) then
 ! ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
 ! endif
+! if ( "$expstate" != "swapped" ) then
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&pid=testproj3?post:confirmed='**{swapexp.php3:confirmed}**
 -ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid='**{swapexp.php3:eid}**&inout=out&pid=testproj3?post:confirmed=Confirm
@@ -22,6 +23,7 @@ https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&p
 -ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
 https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&pid=testproj3?post:confirmed=Confirm
 -ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
+! endif
 ! ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
 https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment=$expidx?post:confirmed='**{endexp.php3:confirmed}**
 - $SRCDIR/undo-probe.pl -t -p testproj3 exp testexp3
@@ -32,9 +34,9 @@ https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment=$expidx?post:c
 ! else
 ! echo "*** No experiment testproj3/testexp3! ***"
 ! endif
-https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc120?post:confirmed='**{freenode.php3:confirmed}**
+https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc84?post:confirmed='**{freenode.php3:confirmed}**
 https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id='**{freenode.php3:node_id}**?post:canceled=Cancel
-https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc120?post:canceled=Cancel
+https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc84?post:canceled=Cancel
 !imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
 ! if ( "$imgidx" != "" ) then
 ! else

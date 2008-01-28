@@ -12,7 +12,7 @@ deleteproject.php3
 deletepubkey.php3
 deleteuser.php3
 editexp.php3
-editgroup_form.php3
+editgroup.php3
 editimageid.php3
 editnodetype.php3
 editsitevars.php3
@@ -29,13 +29,13 @@ loadimage.php3
 modifyexp.php3
 modnodeattributes_form.php3
 moduserinfo.php3
-newgroup_form.php3
+newgroup.php3
 newimageid.php3
 newimageid_ez.php3
 newmmlist.php3
 newnodelog_form.php3
 newnodes_list.php3
-newosid_form.php3
+newosid.php3
 newproject.php3
 news.php3
 nodecontrol_form.php3

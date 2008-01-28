@@ -5,3 +5,6 @@ you cannot modify
 experiment in transition
 undefined variable
 uninitialized value
+No tags for experiment testbed/testexp1
+At least one node must be selected!
+Must provide a template or an instance to export

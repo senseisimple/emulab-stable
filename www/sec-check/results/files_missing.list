@@ -5,10 +5,16 @@
 < deletenodelog.php3
 < deletesfskey.php3
 < delmmlist.php3
+< editgroup_form.php3
+> editgroup.php3
 < floormap.php3
 < login.php3
 < menu.php3
+< newgroup_form.php3
+> newgroup.php3
 < newnode_edit.php3
+< newosid_form.php3
+> newosid.php3
 < pagenotworking.php
 < panicbutton.php3
 < password.php3

@@ -12,6 +12,7 @@
      if ( "$expstate" == "swapping" ) then
      ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
      endif
+     if ( "$expstate" != "swapped" ) then
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/swapexp.php3.html --post-data "confirmed='**{swapexp.php3:confirmed}**" "https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&pid=testproj3"
 if ( ! { grep -q -f ../../../testbed/www/sec-check/failure.txt probes.wget/swapexp.php3.html } ) then
     ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
@@ -29,6 +30,7 @@ if ( ! { grep -q -f ../../../testbed/www/sec-check/failure.txt probes.wget/swape
     ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
 endif
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/swapexp.php3.4.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/swapexp.php3?eid=testexp3&inout=out&pid=testproj3"
+     endif
      ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/endexp.php3.html --post-data "confirmed='**{endexp.php3:confirmed}**" "https://myboss.vulnelab.testbed.emulab.net/endexp.php3?experiment=$expidx"
 if ( ! { grep -q -f ../../../testbed/www/sec-check/failure.txt probes.wget/endexp.php3.html } ) then
@@ -42,9 +44,9 @@ wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.
      else
      echo "*** No experiment testproj3/testexp3! ***"
      endif
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/freenode.php3.html --post-data "confirmed='**{freenode.php3:confirmed}**" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc120"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/freenode.php3.html --post-data "confirmed='**{freenode.php3:confirmed}**" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc84"
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/freenode.php3.1.html --post-data "canceled=Cancel" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id='**{freenode.php3:node_id}**"
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/freenode.php3.2.html --post-data "canceled=Cancel" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc120"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O probes.wget/freenode.php3.2.html --post-data "canceled=Cancel" "https://myboss.vulnelab.testbed.emulab.net/freenode.php3?node_id=pc84"
     set imgidx=`echo "select imageid from images where pid='testproj3' and imagename='testimg3'"| ssh $MYBOSS mysql tbdb | tail +2`; echo "    imgidx = $imgidx"
      if ( "$imgidx" != "" ) then
      else

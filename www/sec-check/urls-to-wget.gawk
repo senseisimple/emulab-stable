@@ -117,10 +117,15 @@ function process_url(u) {	# Sets url, url_args, post_args.
 {
     process_url($0);
 
-    # Parse the URL string.  "?args" would be simple, except that
-    # there can be slashes in them, causing the host part to stretch.
-    match(url, "^(http.*)/([^?]*)[?]?(.*)", p);
-    ##printf "URL: [1] %s, [2] %s, [3] %s\n", p[1], p[2], p[3];
+    # Parse the URL string into the host/filename, ignoring optional ?GETargs.
+    # "?GETargs" could be in a simple pattern, except for slashes in the values.
+    u = url; g = "";
+    if ( q = index(u, "?") ) {
+	u = substr(url, 1, q-1);
+	g = substr(url, q+1);
+    }
+    match(u, "^(http.*)/(.*)", p);
+    ##printf "URL: [1-host] %s, [2-file] %s, [3-GETargs] %s\n", p[1], p[2], g;
 
     # Make a local destination file, with a numeric suffix if needed.
     # (We may hit the same page many times when probing.)

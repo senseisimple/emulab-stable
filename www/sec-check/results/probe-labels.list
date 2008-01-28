@@ -1,13 +1,6 @@
-            Probe label: \'**{editexp.php3:formfields[noswap_reason]}**
-            Probe label: \'**{editexp.php3:formfields[noidleswap_reason]}**
-            Probe label: \'**{editexp.php3:formfields[description]}**
-            Probe label: \'**{editimageid.php3:formfields[description]}**
             Probe label: \'**{kb-manage.php3:formfields[xref_tag]}**
             Probe label: \'**{kb-manage.php3:formfields[body]}**
             Probe label: \'**{kb-manage.php3:formfields[new_section]}**
             Probe label: \'**{kb-manage.php3:formfields[title]}**
-            Probe label: \'**{moduserinfo.php3:formfields[usr_country]}**
-            Probe label: \'**{newgroup.php3:group_description}**
-            Probe label: \'**{newimageid.php3:formfields[description]}**
-            Probe label: \'**{newimageid_ez.php3:formfields[description]}**
-            Probe label: \'**{newosid.php3:description}**
+            Probe label: '**{newimageid.php3:formfields[part1_osid]}**
+Probe label: \'**{newproject.php3:formfields[proj_funders]}**

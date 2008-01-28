@@ -33,15 +33,17 @@ See README-FIRST.txt for a top-level outline.
      documented in https://www.emulab.net/tutorial/elabinelab.php3 .
 
      There is a simple ElabInElab experiment ns file in $tws/vulnElab.ns .
+
      Change EinE_proj and EinE_exp in the $tws/GNUmakefile.in to match the
-     Emulab project and experiment names you create.
+     Emulab project and experiment names you create.  Edit the email addresses to
+     match your mailers.  Notice that two *REAL* email addresses are required.
 
 
  - High-level targets
 
    . all: src_forms spider forms_coverage input_coverage normal probe
 
-     Do everything after activation.  Ya gotta activate first!
+     Do everything after activation.  Ya gotta activate below first!
 
          gmake all |& tee all.log
 
@@ -65,8 +67,15 @@ See README-FIRST.txt for a top-level outline.
          gmake src_forms
          gmake src_msg
 
-     - Output goes in $twsr/src_{forms.files}.list, bare filenames and raw
+     - Output goes in $twsr/src_{forms,files}.list, bare filenames and raw
        <form grep lines respectively.
+
+     - gmake src_msg reports something like:
+
+       ** Sources: 107 separate forms are on 89 code pages. **
+       ** (See src_forms.list and src_files.list
+       **  in ../../../testbed/www/sec-check/results .) **
+       **
 
    ----------------
    . activate: activate.wget $(activate_tasks) analyze_activate
@@ -96,6 +105,11 @@ See README-FIRST.txt for a top-level outline.
        security certificates as the inner Elab is swapped in and out over
        time.  Firefox doesn't like the certificate changes.
 
+       Login cookies go stale after a while.  Nothing will work until you have
+       logged in again as admin.  You'll have to repeat this when that happens:
+
+           gmake admin
+
      - Run activate:
 
            gmake activate |& tee activate.wget/activate.log
@@ -112,13 +126,19 @@ See README-FIRST.txt for a top-level outline.
        Results go in $twsr/analyze_activate.txt .
 
            gmake analyze_activate
-
+           ** Activation analysis: success 10, failure 1, problem 1, UNKNOWN 1 **
+           ** (See analyze_activate.txt in ../../../../testbed/www/sec-check/results .) **
+           **
      - The success/failure.txt pattern files are also used action-by-action to
        look at the html results in the wget_post makefile function.  When a
        failure occurs, the make stops.  This is a Good Thing, because there
        are a lot of dependencies in the activation sequence.  Most early
        objects must exist for later ones to be created.  When UNKNOWN results
        occur, browse to the file to see what was returned and update the patterns.
+
+       There's no dependency sequence in the activation tasks in the makefile.
+       If activate fails, fix the problem and make the remaining targets in the
+       activate_tasks list.
 
      - You can browse to the .html files using File/Open, or pop up pages in
        your browser directly from Emacs using this handy keyboard macro:
@@ -133,14 +153,23 @@ See README-FIRST.txt for a top-level outline.
            (setq browse-url-generic-program "opera")
            (global-set-key "\^C\^O" 'browse-url-generic)
 
-       To define it, select the above lines and type M-X eval-region .
+       To define it, select the above lines and type M-X eval-region .  It
+       will take you to buffer "d", so just ^X-b (switch-to-buffer) to return.
+       Remove the *.wget directory suffix if you are in the main directory
+       (setup, show, and teardown actions below.)
 
-       The file path to your current obj-devel directory containing html files
-       is in buffer "d".  Put the cursor on a filename line in an analyze*.txt
-       file and type ^C-^F to pop up the page in the current Opera tab.
+       Usage: The file path to your current obj-devel directory containing
+       html files is in buffer "d".  Put the cursor on a filename line in an
+       analyze*.txt file and type ^C-^F to pop up the page in the current
+       Opera tab.
 
-       Notice that if the resulting .html file contains a javascript PageReplace,
-       you will need to comment that out to see what was returned by PHP.
+       Notice that if the resulting .html file contains a javascript
+       PageReplace, you will need to comment that out to see what was actually
+       returned by PHP, adding "!--" and "--", like this:
+
+           <!-- script type='text/javascript' language='javascript'>
+           PageReplace('shownode.php3?node_id=pc120');
+           </script -->
 
      - Debugging: You can gmake individual activation tasks when things are
        broken, working through the sequence by hand.  The actions should
@@ -156,7 +185,16 @@ See README-FIRST.txt for a top-level outline.
 
      Recursively wget a copy of the ElabInElab site and extract a <forms list.
 
+     Logging in and out is handled automatically, to get both the public and
+     the private (admin) versions of pages.  As with activate, .prev versions
+     of the output directories are kept.
+
          gmake spider |& tee spider.log
+
+     This takes a while to run, since it's getting multiple 10's of megabytes
+     of stuff.  It isn't smart enough to get just one copy of forms that are
+     linked in multiple times, and have GET arg lists that become part of the
+     URL's and hence part of the output filenames as well.
 
      - HTML output goes into public.wget and admin.wget subtrees, with a log
        file at the top and a tree named for the server,
@@ -166,6 +204,13 @@ See README-FIRST.txt for a top-level outline.
      - Grepped forms lines go into $tws/{public,admin,site}_{forms,files}.list,
        similar to the src_forms output above.
 
+     - gmake site_msg reports something like:
+
+       ** Spider: 1814 ( 3 + 1811 ) forms instances are in 55 ( 3 + 55 ) web pages. **
+       ** (See *_{forms,files}.list in ../../../testbed/www/sec-check/results .) **
+       **
+
+
    ----------------
    . forms_coverage: files_missing forms_msg
 
@@ -174,6 +219,12 @@ See README-FIRST.txt for a top-level outline.
          gmake forms_coverage
 
      - Output goes in $twsr/files_missing.list .
+
+     - gmake forms_msg reports src_msg and site_msg, plus something like:
+
+       ** Forms: 40 out of 89 forms files are not covered. **
+       ** (See ../../../testbed/www/sec-check/results/files_missing.list .) **
+       **
 
      - Generally, unlinked forms are a symptom of an object type (or state)
        that is not yet activated.  Iterate on the activation logic.
@@ -199,6 +250,14 @@ See README-FIRST.txt for a top-level outline.
 
          gmake input_coverage
 
+     - This reports something like:
+
+       ** Inputs: 10203 input fields, 331 unique, 127 over-ridden. **
+       ** (See site_inputs.list and input_names.list
+       **  in ../../../testbed/www/sec-check/results,
+       ** and input_values.list in ../../../testbed/www/sec-check .) **
+       **
+
      - This is automatic, but there are a few little special cases in the
        makefile.  It leads into iterating on the input_values.list dictionary.
        See the comments about this in README-concepts.txt .
@@ -207,7 +266,7 @@ See README-FIRST.txt for a top-level outline.
 
      - Output is $twsr/site_inputs.list and $twsr/input_names.list .
 
-       . When the inputs to a form change (fields, names, or defaults) you can
+       . When the inputs to a form are changed (fields, names, or defaults) you can
          edit site_inputs.list rather than having to do another whole spider run.
 
        . input_names.list isn't used directly, but is a source for copying strings
@@ -225,11 +284,13 @@ See README-FIRST.txt for a top-level outline.
 
      - Subtasks:
 
-       "run" subtasks drive the "gen" subtasks by dependencies.
+       "run" subtasks drive the "gen" subtasks by dependencies.  You can
+       also do the "gen"s to get the scripts they make.
 
        . Update the $twsr/{setup,show,teardown}_cases.{urls,wget} files.
 
              gmake gen_all
+         or:
                  gmake gen_setup
                  gmake gen_show
                  gmake gen_teardown
@@ -238,12 +299,23 @@ See README-FIRST.txt for a top-level outline.
            $tws/{setup,teardown}_forms.list are used for separating out the
            setup and teardown case sequences.
 
+         - There are a couple of files mentioned in the teardown_forms.list
+           that aren't actually covered yet, so making teardown_cases.urls
+           will complain a bit:
+             *** Missing: 24 deleteimageid.php3
+             *** Missing: 56 delmmlist.php3
+
        . Run the generated {setup,show,teardown}_cases.wget scripts.
 
-         Setup/teardown are sequences creating/deleting ephemeral objects.
-         Show (other) is separate and works on the activation objects.
+         Setup/teardown are sequences creating/deleting ephemeral objects,
+         typically with a "3" appended to their names.  Teardown undoes setup,
+         and vice-versa of course.
+
+         Show (everything else) is separate and works on the objects made by
+         activation.
 
              gmake run_all |& tee run_all.log
+         or:
                  gmake run_setup |& tee run_setup.log
                  gmake run_show |& tee run_show.log
                  gmake run_teardown |& tee run_teardown.log
@@ -258,6 +330,15 @@ See README-FIRST.txt for a top-level outline.
 
              gmake analyze
 
+         Output, for example, is:
+
+             ** Run analysis: success 16, failure 3, problem 1, UNKNOWN 0 **
+             ** (See analyze_output.txt in ../../../testbed/www/sec-check/results .) **
+             **
+
+         Look into failures and problems, of course.  See the description of
+         browsing to the output files above in the "activate:" section.
+
        . Here, you pretty much iterate on the makefile and all of the scripts
          and control files until everything works smoothly.  (This is a goal
          that is asymptotically approached.)  
@@ -268,7 +349,7 @@ See README-FIRST.txt for a top-level outline.
          copy-paste individual commands into a shell window to "single-step"
          the sequence.
 
-         You can just refresh the browser window as the .html file changes.
+         You can just refresh the browser window as the .html output changes.
 
          Except, when an Emulab "backgrounded" task finishes, the page gets a
          little bit of "PageReplace" Javascript to redirect to the "show"

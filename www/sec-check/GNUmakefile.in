@@ -263,8 +263,11 @@ approve_proj:
 grp1 = testgroup
 new_group:
 	$(call wget_post,,newgroup.php3,,\
-	    project=$(proj1) group_id=$(grp1) group_leader=$(uid) \
-	    group_description=$(proj1)\ subgroup.)
+	    project=$(proj1)\
+	    formfields[group_id]=$(grp1)\
+	    formfields[group_leader]=$(uid)\
+	    formfields[group_description]=$(proj1)\ subgroup.\
+	    submit=Submit)
 
 user_common = $(call fmt_html_args,\
 	    formfields[usr_title]=Tester\
@@ -422,11 +425,11 @@ new_osid:
 	    formfields[OS]=FreeBSD\
 	    formfields[os_feature_linktest]=checked\
 	    formfields[os_feature_mlinks]=checked\
-	    formfields[mustclean]=Yep\
+	    formfields[mustclean]=1\
 	    formfields[op_mode]=NORMALv2\
 	    formfields[description]=Test OS description.\
 	    formfields[reboot_waittime]=150\
-	    formfields[shared]=Yep\
+	    formfields[shared]=1\
 	    formfields[os_feature_linkdelays]=checked\
 	    formfields[os_feature_ssh]=checked\
 	    submit=Submit)
@@ -444,17 +447,12 @@ new_imageid:
 	    formfields[loadlength]=1\
 	    formfields[default_osid]=$$os1_osid\
 	    formfields[part1_osid]=$$os1_osid\
-	    formfields[part2_osid]=X\
-	    formfields[part3_osid]=X\
-	    formfields[part4_osid]=X\
 	    formfields[mtype_pc600]=Yep\
 	    formfields[mtype_pc850]=Yep\
 	    formfields[makedefault]=Yep\
 	    formfields[loadpart]=1\
 	    formfields[node]=\
 	    formfields[description]=Descriptive text.\
-	    formfields[global]=\
-	    formfields[shared]=\
 	    submit=Submit,\
 	    os1_osid=`$(os1_osid_sql)`)
 

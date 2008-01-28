@@ -7,11 +7,9 @@ wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O boot.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/boot.php3?experiment=9"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O delaycontrol.php3.html --post-data "dochange=1" "https://myboss.vulnelab.testbed.emulab.net/delaycontrol.php3?experiment=9"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O editnodetype.php3.html --post-data "formfields[isdynamic]=0&formfields[issubnode]=0&formfields[isplabdslice]=0&formfields[isjailed]=0&formfields[isremotenode]=0&formfields[isvirtnode]=0&submit=Submit&formfields[issimnode]=0&node_type=pctest&formfields[class]=pc" "https://myboss.vulnelab.testbed.emulab.net/editnodetype.php3?node_type=pctest"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O editnodetype.php3.html --post-data "formfields[isdynamic]=0&newattribute_type=integer&formfields[issubnode]=0&formfields[isplabdslice]=0&formfields[isjailed]=0&newattribute_name=testattr&formfields[isremotenode]=0&formfields[isvirtnode]=0&submit=Submit&formfields[issimnode]=0&node_type=pctest&newattribute_value=42&formfields[class]=pc" "https://myboss.vulnelab.testbed.emulab.net/editnodetype.php3?node_type=pctest"
-ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O editsitevars.php3.html --post-data "name=batch/retry_wait&value=" "https://myboss.vulnelab.testbed.emulab.net/editsitevars.php3"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O editsitevars.php3.html --post-data "formfields[name]=batch/retry_wait&formfields[value]=" "https://myboss.vulnelab.testbed.emulab.net/editsitevars.php3"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O feedback.php3.html --post-data "confirmed=Confirm&clear_last=1" "https://myboss.vulnelab.testbed.emulab.net/feedback.php3?mode=clear&experiment=9"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
@@ -19,11 +17,11 @@ wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O linktest.php3.html --post-data "level=1&eid=testexp1&pid=testbed" "https://myboss.vulnelab.testbed.emulab.net/linktest.php3"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O newnodelog.php3.html --post-data "log_type=misc&log_entry=Test log entry.&node_id=pc120" "https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O newnodelog.php3.html --post-data "log_type=misc&log_entry=Test log entry.&node_id=pc84" "https://myboss.vulnelab.testbed.emulab.net/newnodelog.php3"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O newnodes_list.php3.html "https://myboss.vulnelab.testbed.emulab.net/newnodes_list.php3?remap[4]=&remap[5]=&newprefix=&remap[6]=&newtype=&create=Create selected nodes&remap[0]=&remap[1]=&remap[2]=&remap[3]=&addnumber="
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O nodecontrol.php3.html --post-data "rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=" "https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc120"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O nodecontrol.php3.html --post-data "rpms=&next_boot_osid=&def_boot_osid=208&temp_boot_osid=&startupcmd=&tarballs=&next_boot_cmd_line=&def_boot_cmd_line=" "https://myboss.vulnelab.testbed.emulab.net/nodecontrol.php3?node_id=pc84"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O nscheck.php3.html --post-data "MAX_FILE_SIZE=1024&formfields[exp_localnsfile]=/users/fish/shaped-2-nodes.ns" "https://myboss.vulnelab.testbed.emulab.net/nscheck.php3"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
@@ -31,9 +29,9 @@ wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O plab_ez.php3.html "https://myboss.vulnelab.testbed.emulab.net/plab_ez.php3?formfields[rpm]=&formfields[count]=1&formfields[when]=1&formfields[tarball]=&submit=Create it&formfields[nodelist]=&formfields[type]=pcplab&formfields[nodeversion]=Production&formfields[canfail]=Yep&formfields[startupcmd]=&formfields[units]=168&formfields[resusage]=1"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O powertime.php3.html "https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc120&poweron=Yep&confirmed=Confirm"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O powertime.php3.html "https://myboss.vulnelab.testbed.emulab.net/powertime.php3?nodes[]=pc84&poweron=Yep&confirmed=Confirm"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
-wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O prereserve_node.php3.html --post-data "submit=Submit&clear=1&pid=testbed" "https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc120"
+wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O prereserve_node.php3.html --post-data "submit=Submit&clear=1&pid=testbed" "https://myboss.vulnelab.testbed.emulab.net/prereserve_node.php3?node_id=pc84"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
 wget -S -k --keep-session-cookies --no-check-certificate --load-cookies cookies.txt -O replayexp.php3.html --post-data "confirmed=Confirm" "https://myboss.vulnelab.testbed.emulab.net/replayexp.php3?experiment=9"
 ssh myboss.vulnElab.testbed.emulab.net ./waitexp testbed testexp1
