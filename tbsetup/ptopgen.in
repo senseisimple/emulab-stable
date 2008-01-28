@@ -313,7 +313,10 @@ else {
 $result =
     DBQueryFatal("select phys_nodeid,count(phys_nodeid) from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
-		 "where n.node_id!=n.phys_nodeid group by phys_nodeid");
+		 "where n.node_id!=n.phys_nodeid ".
+		 (defined($exempt_eid) ?
+		  "and not (pid='$pid' and eid='$exempt_eid') " : " ") .
+		 "group by phys_nodeid");
 while (my ($node_id,$count) = $result->fetchrow_array) {
     $globalcounts{$node_id} = $count;
 }
