@@ -88,17 +88,6 @@ if ($UID != 0) {
 }
 
 #
-# XXX
-# Do not run the vnode startup on Linux nodes yet.
-#
-my $sysname = `uname -s`;
-chomp($sysname);
-if ($sysname eq "Linux") {
-    print "WARNING: no vnodes under Linux (yet)\n";
-    exit(0);
-}
-
-#
 # Put this into the background and log its output. We *must* do this cause
 # we do not want to halt the boot if the testbed is down!
 # 
@@ -151,7 +140,7 @@ if (defined($action) && !$reconfig) {
     closedir(DIR);
 
     foreach my $file (@files) {
-	if ($file =~ /^(pcvm[-\w]*)$/) {
+	if ($file =~ /^((?:pc|homenet)vm[-\w]*)$/) {
 	    bootvnode($1, $action, (-e "$vndir/$file/fakejail" ? 0 : 1));
 	}
     }
@@ -160,6 +149,7 @@ if (defined($action) && !$reconfig) {
 
 my %newvnodelist = ();
 my %curvnodelist = ();
+my $fakejails = 0;
 
 #
 # Get the current set of vnodes that are supposed to be running on
@@ -173,6 +163,8 @@ if (tmcc(TMCCCMD_VNODELIST, undef, \@tmccresults) < 0) {
 foreach my $str (@tmccresults) {
     if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
 	$newvnodelist{$1} = $2;
+	$fakejails++
+	    if ($2 eq "0");
     }
     else {
 	warn("*** WARNING: Skipping bad subnodeid: '$str'\n");
@@ -190,8 +182,13 @@ if ($reconfig) {
     closedir(DIR);
 
     foreach my $file (@files) {
-	if ($file =~ /^(pcvm[-\w]*)$/) {
-	    $curvnodelist{$1} = (-e "$vndir/$file/fakejail" ? 0 : 1);
+	if ($file =~ /^((?:pc|homenet)vm[-\w]*)$/) {
+	    if (-e "$vndir/$file/fakejail") {
+		$fakejails++;
+		$curvnodelist{$1} = 0;
+	    } else {
+		$curvnodelist{$1} = 1;
+	    }
 	}
     }
 
@@ -215,9 +212,21 @@ if ($reconfig) {
 exit(0)
     if (defined($action) && $action ne "boot");
 
-# Exit if nothing left to do (no new vnodes). 
+# Exit if nothing left to do (no new vnodes).
 exit(0)
     if (! scalar(keys(%newvnodelist)));
+
+#
+# XXX for fake jails, we don't do most of the following,
+# we just start em up.
+#
+if ($fakejails) {
+    foreach my $vnode (sort(keys(%newvnodelist))) {
+	# Blocks until mostly setup. 
+	bootvnode($vnode, "boot", $newvnodelist{$vnode});
+    }
+    exit(0);
+}
 
 #
 # If booting with vnodes, then see about creating the extra FS.
