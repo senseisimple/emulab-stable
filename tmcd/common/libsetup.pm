@@ -47,7 +47,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 27; };
+sub TMCD_VERSION()	{ 28; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -1181,42 +1181,29 @@ sub gettraceconfig($)
 sub gettunnelconfig($)
 {
     my ($rptr)   = @_;
-    my @tunnels = ();
+    my $tunnels  = {};
 
     if (tmcc(TMCCCMD_TUNNEL, undef, \@tmccresults) < 0) {
 	warn("*** WARNING: Could not get tunnel config from server!\n");
 	return -1;
     }
 
-    my $pat  = q(TUNNEL=([-\w.]+) ISSERVER=(\d) PEERIP=([-\w.]+) );
-    $pat    .= q(PEERPORT=(\d+) PASSWORD=([-\w.]+) );
-    $pat    .= q(ENCRYPT=(\d) COMPRESS=(\d) INET=([-\w.]+) );
-    $pat    .= q(MASK=([-\w.]+) PROTO=([-\w.]+));
+    my $pat  = q(TUNNEL=([\w]+) MEMBER=([\w]+) KEY='(.*)' VALUE='(.*)');
 
     foreach my $str (@tmccresults) {
 	if ($str =~ /$pat/) {
-	    my $tunnel = {};
+	    my $tunnel = $1;
+	    my $member = $2;
+	    my $key    = $3;
+	    my $value  = $4;
 
-	    #
-	    # The following is rather specific to vtund!
-	    #
-	    $tunnel->{"NAME"}       = $1;
-	    $tunnel->{"ISSERVER"}   = $2;
-	    $tunnel->{"PEERIPADDR"} = $3;
-	    $tunnel->{"PEERPORT"}   = $4;
-	    $tunnel->{"PASSWORD"}   = $5;
-	    $tunnel->{"ENCRYPT"}    = $6;
-	    $tunnel->{"COMPRESS"}   = $7;
-	    $tunnel->{"IPADDR"}     = $8;
-	    $tunnel->{"IPMASK"}     = $9;
-	    $tunnel->{"PROTO"}      = $10;
-	    push(@tunnels, $tunnel);
+	    $tunnels->{"$tunnel:$member"}->{$key} = $value;
 	}
 	else {
 	    warn("*** WARNING: Bad tunnels line: $str\n");
 	}
     }
-    @$rptr = @tunnels;
+    $$rptr = $tunnels;
     return 0;
 }
 

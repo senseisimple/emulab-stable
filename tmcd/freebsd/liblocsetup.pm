@@ -21,7 +21,7 @@ use Exporter;
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
-	 os_fwconfig_line os_fwrouteconfig_line
+	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
        );
 
 # Must come after package declaration!
@@ -115,9 +115,9 @@ sub os_account_cleanup()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$$;$$%)
+sub os_ifconfig_line($$$$$$$$;$$%)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type,
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type, $lan,
 	$settings, $rtabid, $cookie) = @_;
     my $media    = "";
     my $mediaopt = "";
@@ -182,7 +182,9 @@ sub os_ifconfig_line($$$$$$$;$$%)
 	# Config the interface.
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask,
 			     $media, $mediaopt);
-	$downlines = "$IFCONFIGBIN $iface down";
+	# An interface underlying virtual interfaces does not go down.
+	$downlines = "$IFCONFIGBIN $iface down"
+	    if (defined($lan) && $lan ne "");
     }
     return ($uplines, $downlines);
 }
@@ -830,6 +832,30 @@ sub os_fwrouteconfig_line($$$)
     $downline .= "    done";
 
     return ($upline, $downline);
+}
+
+sub os_config_gre($$$$$$$)
+{
+    my ($name, $unit, $inetip, $peerip, $mask, $srchost, $dsthost) = @_;
+    
+    my $gre = `ifconfig gre create`;
+    if ($?) {
+	warn("*** Could not create a new gre device.\n");
+	return -1;
+    }
+    if ($gre =~ /^(gre\d*)$/) {
+	$gre = $1;
+    }
+    else {
+	warn("*** Cannot parse gre device '$gre'\n");
+	return -1;
+    }
+    if (system("ifconfig $gre $inetip $peerip link1 netmask $mask up") ||
+	system("ifconfig $gre tunnel $srchost $dsthost")) {
+	warn("Could not start tunnel!\n");
+	return -1;
+    }
+    return 0;
 }
 
 1;

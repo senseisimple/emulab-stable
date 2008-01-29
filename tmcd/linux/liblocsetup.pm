@@ -12,14 +12,15 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD $HOSTSFILE
+    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
+	 $HOSTSFILE $LOOPBACKMOUNT
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
-	 os_fwconfig_line os_fwrouteconfig_line
+	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
        );
 
 # Must come after package declaration!
@@ -52,6 +53,7 @@ $CP		= "/bin/cp";
 $DF		= "/bin/df";
 $EGREP		= "/bin/egrep -q";
 $NFSMOUNT	= "/bin/mount -o vers=2,udp"; # Force NFS Version 2 over UDP
+$LOOPBACKMOUNT	= "/sbin/mount --bind ";
 $UMOUNT		= "/bin/umount";
 $TMPASSWD	= "$ETCDIR/passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
@@ -1415,6 +1417,22 @@ sub getCurrentIwconfig($;$) {
     }
      
     return \%r;
+}
+
+sub os_config_gre($$$$$$$)
+{
+    my ($name, $unit, $inetip, $peerip, $mask, $srchost, $dsthost) = @_;
+
+    my $dev = "$name$unit";
+
+    if (system("ip tunnel add $dev mode gre remote $dsthost local $srchost") ||
+	system("ip link set $dev up") ||
+	system("ip addr add $inetip dev $dev") ||
+	system("ifconfig $dev netmask $mask")) {
+	warn("Could not start tunnel!\n");
+	return -1;
+    }
+    return 0;
 }
 
 1;

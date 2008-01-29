@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -131,6 +131,7 @@ sub doboot()
 	    my $aliases  = $ifconfig->{ALIASES};
 	    my $iface    = $ifconfig->{IFACE};
 	    my $settings = $ifconfig->{SETTINGS};
+	    my $lan      = $ifconfig->{LAN};
 	    my $ifrtabid = undef;
 
 	    #
@@ -161,7 +162,8 @@ sub doboot()
 	    my ($upline, $downline) =
 		os_ifconfig_line($iface, $inet, $mask,
 				 $speed, $duplex, $aliases,
-				 $type, $settings, $ifrtabid, \%oscookie);
+				 $type, $lan, $settings,
+				 $ifrtabid, \%oscookie);
 		    
 	    if (defined($upline) && $upline) {
 		$upcmds .= "$upline\n    ";
