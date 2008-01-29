@@ -357,6 +357,10 @@ sub virtlanusevirtiface($) {
     my $encap = virtlanencapstyle($_[0]);
     return ($encap eq "veth" || $encap eq "veth-ne" || $encap eq "vlan");
 }
+sub virtlanusetuniface($) {
+    my $encap = virtlanencapstyle($_[0]);
+    return ($encap eq "gre" || $encap eq "egre" || $encap eq "vtun");
+}
 # We hardcode (for now) the set of LAN/link "protocols" that are wireless.
 # Eventually, this should probably come from the database.
 sub virtlanwireless($) {
@@ -2701,17 +2705,46 @@ foreach $lan (keys(%virt_lans)) {
     next
 	if ($impotent);
 
-    my $tunnel = Tunnel->Create($experiment, $lan, $secretkey, $mask, $ipport);
+    my $tunnel = Tunnel->Create($experiment, $lan, $secretkey, 
+				$mask, $ipport);
     fatal("Could not create tunnel for $lan")
 	if (!defined($tunnel));
 
-    $tunnel->AddInterface($vvnode0, $vnode0, $vport0, $ip0, $peerip1,
-			  ($server eq $vnode0 ? 1 : 0))
+    my $iface0 = $tunnel->AddInterface($vvnode0, $vnode0, $vport0)
 	or fatal("Could not add $vnode0:$vport0 to $tunnel");
     
-    $tunnel->AddInterface($vvnode1, $vnode1, $vport1, $ip1, $peerip0,
-			  ($server eq $vnode1 ? 1 : 0))
+    my $iface1 = $tunnel->AddInterface($vvnode1, $vnode1, $vport1)
 	or fatal("Could not add $vnode1:$vport1 to $tunnel");
+
+    # Need to set a bunch of attributes later returned by tmcd.
+    if ($iface0->SetAttribute("tunnel_ip", $ip0) ||
+	$iface0->SetAttribute("tunnel_peerip", $ip1) ||
+	$iface0->SetAttribute("tunnel_srcip", $peerip0) ||
+	$iface0->SetAttribute("tunnel_dstip", $peerip1) ||
+	$iface0->SetAttribute("tunnel_isserver",
+			       ($server eq $vnode0 ? 1 : 0)) ||
+	$iface0->SetAttribute("tunnel_secretkey", $secretkey) ||
+	$iface0->SetAttribute("tunnel_ipmask", $mask) ||
+	$iface0->SetAttribute("tunnel_serverport", $ipport) ||
+	$iface0->SetAttribute("tunnel_lan", $lan) ||
+	$iface0->SetAttribute("tunnel_unit", $iface0->memberid()) ||
+	$iface0->SetAttribute("tunnel_style", virtlanencapstyle($lan))) {
+	fatal("Could not set attributes for $iface0 in $tunnel");
+    }
+    if ($iface1->SetAttribute("tunnel_ip", $ip1) ||
+	$iface1->SetAttribute("tunnel_peerip", $ip0) ||
+	$iface1->SetAttribute("tunnel_srcip", $peerip1) ||
+	$iface1->SetAttribute("tunnel_dstip", $peerip0) ||
+	$iface1->SetAttribute("tunnel_isserver",
+			       ($server eq $vnode1 ? 1 : 0)) ||
+	$iface1->SetAttribute("tunnel_secretkey", $secretkey) ||
+	$iface1->SetAttribute("tunnel_ipmask", $mask) ||
+	$iface1->SetAttribute("tunnel_serverport", $ipport) ||
+	$iface1->SetAttribute("tunnel_lan", $lan) ||
+	$iface1->SetAttribute("tunnel_unit", $iface1->memberid()) ||
+	$iface1->SetAttribute("tunnel_style", virtlanencapstyle($lan))) {
+	fatal("Could not set attributes for $iface1 in $tunnel");
+    }
 }
 
 #
@@ -4264,9 +4297,10 @@ sub LoadVirtLans()
 		if (virtnodeisremote($node));
 	    next;
 	}
-	elsif (defined($encap) && $encap eq "tunnel") {
-	    $virt_lans{$vname}->{"TUNNEL"}       = 1;
-	    $virt_lans{$vname}->{"ENCAPSTYLE"}   = "default";
+	elsif (defined($encap) &&
+	       ($encap eq "vtun" || $encap eq "gre" || $encap eq "egre")) {
+	    # Just for testing.
+	    $virt_lans{$vname}->{"TUNNEL"} = 1;
 	}
 
 	# Store this stuff as a unit to make it easier to grab later.
