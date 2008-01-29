@@ -55,7 +55,6 @@ $fields = array();
 $fields['pid'] = array('#type'	     => 'select',
 		       '#label'      => 'Project',
 		       '#options'    => $projselection,
-		       '#checkslot'  => 'os_info:pid',
 		       '#required'   => TRUE);
 #
 # OS Name
