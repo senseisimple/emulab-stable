@@ -41,15 +41,6 @@ use libsetup;
 use libtmcc;
 use librc;
 
-#
-# If this is the MFS, hand off to that script.
-#
-if (MFS()) {
-    exec("$RCDIR/rc.mfs", @ARGV);
-    die("*** $0:\n".
-	"    Could not exec $RCDIR/rc.mfs!\n");
-}
-
 # Script specific goo.
 my $RCDIR	= "$BINDIR/rc";
 my $LOGFILE	= "$LOGDIR/bootsetup.debug";
@@ -62,6 +53,15 @@ sub doshutdown();
 sub doreconfig();
 sub docleanup();
 sub BootFatal($$);
+
+#
+# If this is the MFS, hand off to that script.
+#
+if (MFS()) {
+    exec("$RCDIR/rc.mfs", @ARGV);
+    die("*** $0:\n".
+	"    Could not exec $RCDIR/rc.mfs!\n");
+}
 
 # Parse command line.
 if (! getopts($optlist, \%options)) {
