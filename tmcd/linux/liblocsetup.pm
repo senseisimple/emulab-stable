@@ -53,7 +53,7 @@ $CP		= "/bin/cp";
 $DF		= "/bin/df";
 $EGREP		= "/bin/egrep -q";
 $NFSMOUNT	= "/bin/mount -o vers=2,udp"; # Force NFS Version 2 over UDP
-$LOOPBACKMOUNT	= "/sbin/mount --bind ";
+$LOOPBACKMOUNT	= "/bin/mount --bind ";
 $UMOUNT		= "/bin/umount";
 $TMPASSWD	= "$ETCDIR/passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
@@ -116,9 +116,9 @@ sub os_account_cleanup()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$$;$$$)
+sub os_ifconfig_line($$$$$$$$;$$$)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type,
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type, $lan,
 	$settings, $rtabid, $cookie) = @_;
     my ($miirest, $miisleep, $miisetspd, $media);
     my ($uplines, $downlines);
