@@ -5387,7 +5387,8 @@ sub CreateTopFile()
     close(TOPFILE);
 
     # Set estimations
-    $minimum_nodes = $physnode_count + keys(%delaynodes)/$DELAYCAPACITY;
+    $minimum_nodes = $physnode_count +
+	keys(%delaynodes)/($DELAYCAPACITY ? $DELAYCAPACITY : 1);
     $maximum_nodes = $physnode_count + keys(%delaynodes);
     $minimum_nodes = POSIX::ceil($minimum_nodes);
 
