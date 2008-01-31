@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Image;
@@ -234,7 +234,7 @@ sub Create($$$$$$$$)
 	#
 	# Grab unique ID. Table already locked.
 	# 
-	$imageid  = TBGetUniqueIndex("next_imageid", undef, 1);
+	$imageid  = TBGetUniqueIndex("next_osid", undef, 1);
     }
     my $uuid  = NewUUID();
 
