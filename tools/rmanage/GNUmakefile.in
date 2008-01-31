@@ -11,7 +11,7 @@ SUBDIR          = tools/rmanage
 
 include $(OBJDIR)/Makeconf
 
-CFLAGS = -Wall 
+CFLAGS = -Wall -g 
 LDFLAGS = -lssl
 SWIG_INCS = -I/usr/local/lib/perl5/5.8.8/mach/CORE -I$(SRCDIR)
 LIB_STUFF = rmcp.so rmcp.pm 
@@ -31,13 +31,23 @@ swig-wrappers: rmcp.h rmcp.i
 rmcp_wrap.o: $(SRCDIR)/rmcp_wrap.c
 	$(CC) -fpic -c $(CFLAGS) $(SWIG_INCS) $(LDFLAGS) $(SRCDIR)/rmcp_wrap.c
 
-rmanage: GNUmakefile rmanage.o rmcp.o
-	$(CC) $(CFLAGS) $(LDFLAGS) rmanage.o rmcp.o -o rmanage
+rmanage: GNUmakefile rmanage.o rmcp.o \
+		${OBJDIR}/lib/libtb/tbdb.o ${OBJDIR}/lib/libtb/log.o
+	$(CC) $(CFLAGS) $(LDFLAGS)  -L/usr/local/lib/mysql -lmysqlclient \
+		rmanage.o rmcp.o ${OBJDIR}/lib/libtb/tbdb.o \
+		${OBJDIR}/lib/libtb/log.o -o rmanage
 		cp rmanage rmanage.debug
 		strip rmanage
 
+#
+# Here so that we get libtb tbdb stuff.
+#
+${OBJDIR}/lib/libtb/%:
+	cd ${OBJDIR}/lib/tbdb && gmake $<
+
 rmanage.o: rmanage.c rmcp.c
-	$(CC) -c -o rmanage.o $(CFLAGS) $<
+	$(CC) -c -o rmanage.o $(CFLAGS) \
+		-I$(TESTBED_SRCDIR)/lib/libtb -I/usr/local/include $<
 
 rmcp.o: rmcp.c rmcp.h
 	$(CC) -c -o rmcp.o $(CFLAGS) $<
