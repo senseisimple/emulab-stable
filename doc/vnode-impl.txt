@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2004 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -508,10 +508,10 @@ some from inside:
   Destination        Gateway            Flags    Refs      Use  Netif
   default            172.16.0.1         UGSc        2        0   fxp0
   127.0.0.1          127.0.0.1          UH          0        0    lo0
-  155.101.132/22     link#5             UCSc        0        0   fxp0
-  155.101.132.79     127.0.0.1          UGHS        0        0    lo0
+  155.98.36/22       link#5             UCSc        0        0   fxp0
+  155.98.36.79       127.0.0.1          UGHS        0        0    lo0
   172.16/12          link#1             UCSc        1        0   fxp0
-  172.17.79/24       lo0                USc         0        0    lo0
+  172.16.79/24       lo0                USc         0        0    lo0
 
 The "default" route gets out to "the world", which means the testbed
 servers (boss/ops/tipserv).  172.16.0.1 is an alias on the router for
@@ -519,7 +519,7 @@ the physical control net.  Using a virtual control net address for the
 router is not necessary for most applications but was added for gated,
 which checks that next hops are accessible via attached interfaces.
 Since the control net interface appears internal to the jail as
-172.17.x.x/255.255.255.255, this still isn't quite correct, but we use
+172.16.x.x/255.255.255.255, this still isn't quite correct, but we use
 a config file feature of gated to finesse it.  We have to apply more
 finesse when setting up routing, as described below.
 
@@ -531,10 +531,10 @@ from the loopback address to the primary jail address.  However, since
 it still uses the shared loopback device, there are a couple of implications.
 First, any jail can see the traffic with tcpdump.  Second, since the
 interface is not tagged, replies are routed using the primary routing
-table.  Thus there must be a route for reaching 172.17.x.x in that
+table.  Thus there must be a route for reaching 172.16.x.x in that
 routing table.  We ensure this as part of the jail setup process.
 
-The "155.101.132" routes ensure we can reach nodes via their physical
+The "155.98.36" routes ensure we can reach nodes via their physical
 control net addresses (e.g., using the canonical "pcXX" names).  The
 first reaches others hosts, the second is a loopback route for the
 local host.  Strictly speaking, this is a violation of the virtualization,
@@ -547,9 +547,9 @@ replies for ARP requests for the gateway would be rejected as "not on
 local network" since the control net interfaces appears as a /32 net
 and 172.16.0.1 is technically not reachable via it.
 
-Finally, "172.17.x/24" is a loopback route used to reach the set of vnodes
+Finally, "172.16.x/24" is a loopback route used to reach the set of vnodes
 on this pnode.  Note that this includes the virtual alias of the physical
-host (.0).  [ Note also that the .17 would be .16 except for the botched
+host (.0).  [ Note that in the real testbed the .16 is .17 due to the botched
 main/mini-bed naming. ]
 
 
