@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -192,10 +192,10 @@ Node instproc updatedb {DB} {
 	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
-	if {$enforce_user_restrictions && $isvirt} {
-	    perror "You may not specify an OS for virtual nodes ($self)!"
-	    return
-	}
+	#if {$enforce_user_restrictions && $isvirt} {
+	#    perror "You may not specify an OS for virtual nodes ($self)!"
+	#    return
+	#}
 	# Do not allow user to set os for host running virt nodes.
 	if {$enforce_user_restrictions && $virthost} {
 	    perror "You may not specify an OS for hosting virtnodes ($self)!"
