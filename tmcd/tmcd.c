@@ -4273,8 +4273,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=nv.node_id "
 				 "where nv.node_id='%s' and "
-				 " (i.IP='%s' and i.role='ctrl') ",
-				 26, reqp->vnodeid, inet_ntoa(ipaddr));
+				 " ((i.IP='%s' and i.role='ctrl') or "
+				 "  nv.jailip='%s')",
+				 26, reqp->vnodeid,
+				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
