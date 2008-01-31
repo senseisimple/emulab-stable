@@ -395,7 +395,6 @@ sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
 sub nodetypetype($)     { return $node_types{$_[0]}->type(); }
 sub nodetypeclass($)    { return $node_types{$_[0]}->class(); }
 sub nodedelayosid($)    { return $node_types{$_[0]}->delay_osid(); }
-sub nodejailosid($)     { return $node_types{$_[0]}->jail_osid(); }
 sub nodedefaultosid($)  { return $node_types{$_[0]}->default_osid(); }
 sub nodetypeisremote($) { return $node_types{$_[0]}->isremotenode(); }
 sub nodetypeisvirt($)   { return $node_types{$_[0]}->isvirtnode(); }
@@ -411,6 +410,7 @@ sub nodetypesimcap($)   { return $node_types{$_[0]}->simnode_capacity(); }
 my %osids = ();
 
 sub osidpath($)         { return $osids{$_[0]}->{"path"}; }
+sub osidos($)           { return $osids{$_[0]}->{"OS"}; }
 sub osidhaspath($)      { my $path = osidpath($_[0]);
                           return (defined $path) && ($path ne "")};
 sub osidnextosid($)     {
@@ -2985,7 +2985,7 @@ sub InitPnode($$)
 	    $osid = $sim_osid;
 	}
 	else {
-	    $osid = nodejailosid(physnodetype($pnode));
+	    $osid = nodejailosid($pnode);
 	}
 
 	my $cmdline = TBGetOSBootCmd(osidnextosid($osid),
@@ -3048,7 +3048,7 @@ sub InitPnode($$)
 		$osid = $jail_osid;
 	    }
 	    else {
-		$osid = nodejailosid(physnodetype($pnode));
+		$osid = nodejailosid($pnode);
 	    }
 	    $expt_stats{"jailnodes"} += 1;
 	    #
@@ -3058,7 +3058,9 @@ sub InitPnode($$)
 	    $role  = TBDB_RSRVROLE_VIRTHOST;
 	    # XXX Must have routing on jail hosting nodes. Change me.
 	    $routertype = TBDB_ROUTERTYPE_MANUAL;
-	    $cmdline = "/kernel.jail";
+	    if (osidos($osid) eq "FreeBSD") {
+		$cmdline = "/kernel.jail";
+	    }
 	    $cmdline_role = "vnodehost";
 	}
 	fatal("No OSID is defined for internal node $vname!")
@@ -3878,8 +3880,9 @@ sub LoadPhysInfo()
     # Get paths from os_info, so that we can identify OSKit/MFS OSes, basically
     # those which do not load a disk image
     #
-    $query_result = DBQueryFatal("select osid, path, nextosid from os_info");
-    while (my ($osid, $path, $nextosid) = $query_result->fetchrow()) {
+    $query_result =
+	DBQueryFatal("select osid,path,nextosid,OS from os_info");
+    while (my ($osid, $path, $nextosid, $OS) = $query_result->fetchrow()) {
         $osids{$osid} = {};
         if ($path) {
             $osids{$osid}->{"path"} = $path;
@@ -3887,6 +3890,7 @@ sub LoadPhysInfo()
 	if (defined($nextosid)) {
 	    $osids{$osid}->{"nextosid"} = TBResolveNextOSID($osid,$pid,$eid);
 	}
+	$osids{$osid}->{"OS"} = $OS;
     }
 }
 sub interfacespeedmbps($$) {
@@ -5660,4 +5664,27 @@ sub LoadCurrent()
 	if ($reserved_simcount);
     printdb "Old Reserved Nodes: " . join(" ", keys %oldreservednodes) . "\n";
 }
+
+#
+# This is special. Look at the osid of the virtnodes on this pnode and
+# map to a suitable osid using the nextosid field. This overloads nextosid
+# to some extent ...
+#
+sub nodejailosid($)
+{
+    my ($pnode)   = @_;
+    my @vnodelist = @{$virtnodes{$pnode}};
+
+    #
+    # We know at this point that all vnodes on this pnode want the same
+    # osid cause of assign (osid features/desires). So just use the first
+    # one to figure out what osid for the physical node.
+    #
+    my $vnode    = $vnodelist[0];
+    my $osid     = virtnodeosid($vnode);
+    my $nextosid = osidnextosid($osid);
+    printdb "Mapping jail osid to $osid ($nextosid) on $pnode\n";
+    return $nextosid;
+}
+
 

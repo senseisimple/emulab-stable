@@ -87,6 +87,11 @@ if ($UID != 0) {
 	"    Must be root to run this script!\n");
 }
 
+# We need to know this below.
+my $sysname = `uname -s`;
+chomp($sysname);
+my $islinux = ($sysname eq "Linux");
+
 #
 # Put this into the background and log its output. We *must* do this cause
 # we do not want to halt the boot if the testbed is down!
@@ -233,7 +238,7 @@ if ($fakejails) {
 # This will fail if it already exists. Keep going on any failure though.
 #
 if (!REMOTE()) {
-    system("mkextrafs.pl $vndir");
+    system("mkextrafs.pl " . ($islinux ? "/vservers" : $vndir));
 }
 
 #
@@ -243,23 +248,27 @@ if (! -e "/local") {
     system("ln -s " . LOCALROOTFS() . " /local");
 }
 
-#
-# Make sure enough vn devices exist
-#
-for (my $i = 0;
-     $i < scalar(keys(%newvnodelist)) + scalar(keys(%curvnodelist)); $i++) {
-    my $dev = "vn${i}";
-    if (! -e "/dev/${dev}c") {
-        system("(cd /dev; ./MAKEDEV $dev)");
+if (!$islinux) {
+    #
+    # Make sure enough vn devices exist
+    #
+    for (my $i = 0;
+	 $i < scalar(keys(%newvnodelist)) + scalar(keys(%curvnodelist));
+	 $i++) {
+	my $dev = "vn${i}";
+	if (! -e "/dev/${dev}c") {
+	    system("(cd /dev; ./MAKEDEV $dev)");
+	}
     }
-}
 
-#
-# XXX tweak IP interrupt queue size to accomodate up to 8 x 100Mb trivial links
-# XXX turn on local hack to retry on NFS EACCES errors (thanks mountd!)
-#
-system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
-system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
+    #
+    # XXX tweak IP interrupt queue size to accomodate up to 8 x 100Mb
+    # trivial links XXX turn on local hack to retry on NFS EACCES
+    # errors (thanks mountd!)
+    #
+    system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
+    system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
+}
 
 #
 # XXX grossed out yet?  Try this one: the mount command will HUP mountd
@@ -278,11 +287,13 @@ foreach my $vnode (sort(keys(%newvnodelist))) {
     bootvnode($vnode, "boot", $newvnodelist{$vnode});
 }
 
-my $PIDFILE = "/var/run/progagent.pid";
+if (!$islinux) {
+    my $PIDFILE = "/var/run/progagent.pid";
 
-foreach my $vnode (keys(%newvnodelist)) {
-    system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
-	if (-e "$vndir/$vnode/root/$PIDFILE");
+    foreach my $vnode (keys(%newvnodelist)) {
+	system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
+	    if (-e "$vndir/$vnode/root/$PIDFILE");
+    }
 }
 
 exit(0);

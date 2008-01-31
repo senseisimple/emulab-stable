@@ -794,8 +794,16 @@ sub removeconfdir($)
 sub hackwaitandexit()
 {
     my $now   = time();
-    my $goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
+    my $goofy;
     my $count = 60;
+
+    # The first case is for our own (non-plab) vservers.
+    if (-e "/vservers") {
+	$goofy = "/vservers/$vnodeid/var/run/emulab-watchdog.pid";
+    }
+    else {
+	$goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
+    }
 	
     while ($count--) {
 	sleep(1);
