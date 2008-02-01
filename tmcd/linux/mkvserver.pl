@@ -82,6 +82,7 @@ my $JAILCNETMASK   = "255.240.0.0";
 my $JAILPATH	   = "/var/emulab/jails";
 my $ETCVSERVER     = "/usr/local/etc/emulab/vserver";
 my $VSERVER	   = "/usr/sbin/vserver";
+my $TMCC	   = "$BINDIR/tmcc";
 my $VSERVERDIR     = "/vservers";
 my $JAILCONFIG     = "jailconfig";
 my @ROOTCPDIRS     = ("etc", "root");
@@ -93,9 +94,11 @@ my $IP;
 my $IPMASK;
 my $PID;
 my $VDIR;
+my $CDIR;
 my $idnumber;
 my $jailhostname;
 my $jailpid;
+my $tmccpid;
 my $debug	   = 1;
 my @mntpoints      = ();
 my $USEVCNETROUTES = 0;
@@ -237,6 +240,7 @@ print("Setting up jail for $vnodeid using $IP\n")
     if ($debug);
 
 $VDIR = "$VSERVERDIR/$vnodeid";
+$CDIR = "/etc/vservers/$vnodeid";
 
 #
 # Create the vserver.
@@ -256,6 +260,7 @@ else {
     mkvserver("$vnodeid");
 }
 TBDebugTimeStamp("mkjail done with root fs");
+startproxy("$vnodeid");
 
 #
 # Start the vserver. If all goes well, this will exit cleanly, with the
@@ -264,10 +269,10 @@ TBDebugTimeStamp("mkjail done with root fs");
 #
 my $childpid = fork();
 if ($childpid) {
-    local $SIG{ALRM} = sub { kill("TERM", $childpid); };
-    alarm 30;
+    #local $SIG{ALRM} = sub { kill("TERM", $childpid); };
+    #alarm 30;
     waitpid($childpid, 0);
-    alarm 0;
+    #alarm 0;
 
     #
     # If failure then cleanup.
@@ -305,6 +310,11 @@ if ($jailpid) {
 	if ($kidpid == $jailpid) {
 	    undef($jailpid);
 	    last;
+	}
+	if ($kidpid == $tmccpid) {
+	    print("TMCC proxy exited with status $?. Restarting ...\n");
+	    startproxy("$vnodeid");
+	    next;
 	}
 	print("Unknown child $kidpid exited with status $?!\n");
     }
@@ -345,7 +355,7 @@ sub mkvserver($)
     # The filesystem for the vserver lands here.
     my $vdir = $VDIR;
     # The configuration directory is here.
-    my $cdir = "/etc/vservers/$vnodeid";
+    my $cdir = $CDIR;
 
     #
     # Copy in the top level directories. 
@@ -362,7 +372,7 @@ sub mkvserver($)
     mysystem("echo 'NET_BIND_SERVICE' > $cdir/bcapabilities");
 
     #
-    # Clean out some stuff from /eatc.
+    # Clean out some stuff from /etc.
     #
     mysystem("/bin/rm -rf $vdir/etc/rc.d/rc*.d/*");
 
@@ -422,12 +432,18 @@ sub mkvserver($)
     #
     # Now a bunch of stuff to set up a nice environment in the jail.
     #
-#    mysystem("ln -s ../../init.d/syslog $vdir/etc/rc3.d/S80syslog");
+    mysystem("ln -s ../../init.d/syslog $vdir/etc/rc3.d/S80syslog");
     mysystem("ln -s ../../init.d/sshd $vdir/etc/rc3.d/S85sshd");
-#    mysystem("ln -s ../../init.d/syslog $vdir/etc/rc6.d/K85syslog");
+    mysystem("ln -s ../../init.d/syslog $vdir/etc/rc6.d/K85syslog");
     mysystem("ln -s ../../init.d/sshd $vdir/etc/rc6.d/K80sshd");
     mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc3.d/S99invserver");
     mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc6.d/K99invserver");
+
+    # Kill anything that uses /dev/console in syslog; will not work.
+    mysystem("sed -i.bak ".
+	     "-e '/console/d' ".
+	     "-e '/users/d' ".
+	     "$vdir/etc/syslog.conf");
     
     # Premunge the sshd config: no X11 forwarding and get rid of old
     # ListenAddresses.
@@ -562,6 +578,45 @@ sub upvserver($)
 }
 
 #
+# Start the tmcc proxy and insert the unix path into the environment
+# for the jail to pick up.
+#
+sub startproxy($)
+{
+    my ($vnodeid) = @_;
+
+    #
+    # The point of these paths is so that there is a comman path to
+    # the socket both outside and inside the jail.
+    #
+    my $insidepath  = "/var/emulab/tmcc";
+    my $outsidepath = "${VDIR}${insidepath}";
+    my $log         = "$JAILPATH/$vnodeid/tmcc.log";
+
+    $tmccpid = fork();
+    if ($tmccpid) {
+	#
+	# Create a proxypath file so that libtmcc in the jail will know to
+	# use a proxy for all calls; saves having all clients explicitly
+	# use -l for every tmcc call.
+	#
+	mysystem("echo $insidepath > $VDIR/${BOOTDIR}/proxypath");
+	
+	select(undef, undef, undef, 0.2);
+	return 0;
+    }
+    $SIG{TERM} = 'DEFAULT';
+
+    # The -o option will cause the proxy to detach but not fork.
+    # Eventually change this to standard pid file kill.
+    my $cmd = "$TMCC -d -x $outsidepath -n $vnodeid -o $log";
+    print "$cmd\n"
+	if ($debug);
+    exec("$TMCC -d -x $outsidepath -n $vnodeid -o $log");
+    die("Exec of $TMCC failed! $!\n");
+}
+
+#
 # Read in the jail config file. 
 #
 sub getjailconfig($)
@@ -679,6 +734,11 @@ sub cleanup()
 	    "    Oops, already cleaning!\n");
     }
     $cleaning = 1;
+
+    if (defined($tmccpid)) {
+	kill('TERM', $tmccpid);
+	waitpid($tmccpid, 0);
+    }
 
     #
     # A vserver is not killed by sending it a signal.
