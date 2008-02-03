@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -75,6 +75,10 @@ sub usage {
         return 1;
 }
 
+#
+# Continuous ping hack
+#
+my $CONT_THRESHOLD = 2;		# if period < this value (sec), go continuous
 
 #*****************************************
 my $pollPer = 0.1;  #number of seconds to sleep between poll loops
@@ -127,7 +131,7 @@ $status = "anyscheduled_no";
 sub sendOldResults;
 sub spawnTest($$);
 sub getRunningTestsCnt($);
-sub parsedata($$);
+sub parsedata($$$);
 sub printTimeEvents;
 sub saveTestToLocalDB($);
 sub delLocalDBEntry($);
@@ -139,16 +143,20 @@ sub isMsgValid(\%);
 sub updateTestEvent($);
 sub addCmd($$);
 sub updateOutageState($);
+sub updateOutageState_lossCheck($);
 sub initTestEv($$);
+sub getstats;
+sub diffstats($$);
+sub printstats($$);
 #*****************************************
 
 my %opt = ();
-getopts("s:c:a:p:e:d:i:h",\%opt);
+getopts("s:c:a:p:e:d:i:hC",\%opt);
 
 #if ($opt{h}) { exit &usage; }
 #if (@ARGV > 1) { exit &usage; }
 
-my ($server, $cmdport, $cmdackport, $sendport, $ackport,$expid,$workingdir,$iperfport);
+my ($server, $cmdport, $cmdackport, $sendport, $ackport,$expid,$workingdir,$iperfport, $nocontinuous);
 
 if ($opt{s}) { $server = $opt{s}; } else { $server = "ops"; }
 if ($opt{c}) { $cmdport = $opt{c}; } else { $cmdport = 5052; }
@@ -157,6 +165,9 @@ if ($opt{p}) { $sendport = $opt{p}; } else { $sendport = 5051; }
 if ($opt{e}) { $expid = $opt{e}; } else { $expid = "none"; }
 if ($opt{d}) { $workingdir = $opt{d}; chdir $workingdir; }
 if ($opt{i}) { $iperfport = $opt{i}; } else { $iperfport = 5002; }
+if ($opt{C}) { $nocontinuous = 1; }
+
+my $debug = 1;
 
 my $thismonaddr;
 if( defined  $ARGV[0] ){
@@ -210,11 +221,9 @@ sub handleincomingmsgs()
     my $inmsg;
     my $cmdHandle;
 
-
     my @ready = $sel->can_read($pollPer);
     foreach my $handle (@ready){
         my %sockIn;
-        my $cmdHandle;
         if( $handle eq $socket_ack ){
             $handle->recv( $inmsg, $rcvBufferSize );
             %sockIn = %{ deserialize_hash($inmsg) };
@@ -392,28 +401,56 @@ while (1) {
         delete $runningtestPIDs{$pid};  
     } 
 
-    # Check for running tests which are taking too long.
+    #
+    # Check status of running tests.
+    # * if a continuous test has produced more output, sechedule an event
+    # * check for running tests which are taking too long and kill them
+    #
     foreach my $pid (keys %runningtestPIDs){
         my $destaddr = $runningtestPIDs{$pid}[0];
         my $testtype = $runningtestPIDs{$pid}[1];
         my $testev = \%{ $testevents{$destaddr}{$testtype} };
+	my $killit = 0;
 
+	if ($testev->{"continuous"}) {
+	    my $filename = $testev->{"outfile"};
+	    my $fsize = $testev->{"lastsize"};
+	    my $cursize = (stat($filename))[7];
+	    print time_all().": c$testtype test: fn=$filename, fs=$cursize, lastfs=$fsize\n" if ($debug > 1);
+	    if (defined($cursize)) {
+		if ($cursize > $fsize) {
+		    $testev->{"new_results"} = $fsize;
+		    $testev->{"tstamp"} = time_all();
+		} else {
+		    undef $testev->{"new_results"};
+		}
+	    } else {
+		# something is horribly wrong, kill the process
+		$killit = "no output file";
+	    }
+	}
         if( $testtype eq "bw" &&
             time_all() >
             $testev->{"tstamp"} + 
             $iperftimeout )    
         {
             # bw test is running too long, so kill it
+	    $killit = "timeout";
+	}
 
+	if ($killit) {
             kill 'TERM', $pid;
-            print time_all()." bw timeout: killed $destaddr, ".
+            print time_all()." $testtype $killit: killed $destaddr, ".
                 "pid=$pid\n";
 
             $testev->{"timedout"} = 1;
 
             #delete tmp filename
-            my $filename = createtmpfilename($destaddr, $testtype);
+	    my $filename = $testev->{"outfile"};
             unlink($filename) or warn "can't delete temp file";
+	    undef $testev->{"new_results"};
+	    undef $testev->{"lastsize"};
+
             my %results = 
                 ("sourceaddr" => $thismonaddr,
                  "destaddr" => $destaddr,
@@ -438,54 +475,92 @@ while (1) {
             my $testev = \%{ $testevents{$destaddr}{$testtype} };
 
             #check for finished events
-            if( $testev->{"flag_finished"} == 1 ){
+            if( $testev->{"flag_finished"} == 1 ||
+		($testev->{"continuous"} &&
+		 defined($testev->{"new_results"})) ){
+		my @raw_lines;
+
                 #read raw results from temp file
-                my $filename = createtmpfilename($destaddr, $testtype);
-                open FILE, "< $filename"
-                    or warn "can't open file $filename";
-                my @raw_lines = <FILE>;
-                my $raw;
-                foreach my $line (@raw_lines){
-                    $raw = $raw.$line;
-                }
-                close FILE;
-                unlink($filename) or warn "can't delete temp file";
-                #parse raw data
-                my $parsedData = parsedata($testtype,$raw);
-                $testev->{"results_parsed"} = $parsedData;
+		my $filename = $testev->{"outfile"};
+		if (!$testev->{"flag_finished"} ||
+		    !$testev->{"continuous"}) {
+		    open FILE, "< $filename"
+			or warn "can't open file $filename";
+		    if ($testev->{"new_results"}) {
+			seek(FILE, $testev->{"new_results"}, 0);
+		    }
+		    @raw_lines = <FILE>;
+		    if (!$testev->{"flag_finished"}) {
+			$testev->{"lastsize"} = tell(FILE);
+		    }
+		    close FILE;
+		}
 
-                my %results = 
-                    ("sourceaddr" => $thismonaddr,
-                     "destaddr" => $destaddr,
-                     "testtype" => $testtype,
-                     "result" => $parsedData,
-                     "tstamp" => $testev->{tstamp},
-                     "magic"  => "$magic",
-                     "ts_finished" => time()
-                     );
+		if ($testev->{"flag_finished"}) {
+		    unlink($filename) or warn "can't delete temp file";
+		    undef $testev->{"new_results"};
+		    undef $testev->{"lastsize"};
+		} else {
+		    print "c$testtype test: read ", scalar(@raw_lines),
+		    " lines, size=", $testev->{"lastsize"}, "\n" if ($debug > 1);
+		}
 
-                #MARK_RELIABLE
-                #save result to local DB
-                my $index = saveTestToLocalDB(\%results);
+		#
+		# XXX should pass each line individually for a continuous
+		# test as it might represent multiple probes.  However, we
+		# currently don't have per-line timestamps so the multiple
+		# lines would all have the same timestamp and all but one
+		# will be discarded anyway.
+		#
+		if (@raw_lines) {
+		    my $raw;
+		    foreach my $line (@raw_lines){
+			$raw = $raw.$line;
+		    }
 
-                #send result to remote DB
-                sendResults(\%results, $index);
+		    #parse raw data
+		    my $parsedData = parsedata($testtype,
+					       $testev->{"continuous"},
+					       $raw);
+		    $testev->{"results_parsed"} = $parsedData;
+
+		    my %results = 
+			("sourceaddr" => $thismonaddr,
+			 "destaddr" => $destaddr,
+			 "testtype" => $testtype,
+			 "result" => $parsedData,
+			 "tstamp" => $testev->{tstamp},
+			 "magic"  => "$magic",
+			 "ts_finished" => time()
+			 );
+
+		    #MARK_RELIABLE
+		    #save result to local DB
+		    my $index = saveTestToLocalDB(\%results);
+
+		    #send result to remote DB
+		    sendResults(\%results, $index);
+		}
 
                 #reset flags
-                $testev->{"flag_finished"} = 0;
-                $testev->{"flag_scheduled"} = 0;
+		if ($testev->{"flag_finished"}) {
+		    $testev->{"flag_finished"} = 0;
+		    $testev->{"flag_scheduled"} = 0;
+		}
 
-                # Check for outage
-                if( $testtype eq "latency" ){
-                    updateOutageState( $destaddr );
-                }elsif( $testtype eq "outage" ){
-                    updateOutageState_lossCheck( $destaddr );
-                }
+		# XXX avoid for continuous til I understand
+		if (@raw_lines) {
+		    # Check for outage
+		    if( $testtype eq "latency" ){
+			updateOutageState( $destaddr );
+		    }elsif( $testtype eq "outage" ){
+			updateOutageState_lossCheck( $destaddr );
+		    }
+		}
             }
 
             #schedule new tests
             if( $testev->{"flag_scheduled"} == 0 && 
-#               defined $testev->{"testper"} &&
                 $testev->{"testper"} > 0 )
             {
                 
@@ -493,9 +568,16 @@ while (1) {
                     time() >= $testev->{limitTime} )
                 {
                     my $oldper = $testev->{testper};
+		    print time().": Ending test $testtype for $destaddr\n";
+		    $testev->{"end_stats"} = getstats();
+		    printstats("End", $testev->{"end_stats"});
+		    my $diff = diffstats($testev->{"start_stats"},
+					 $testev->{"end_stats"});
+		    printstats("Total", $diff);
                     # Rate increase expired. Get new value from Q
                     $testev->{cmdq}->cleanQueue();  #rid expired values
                     $testev->{testper} = 0;  #reset existing period
+		    undef $testev->{continuous};
                     updateTestEvent($testev);
                     print "resetting period from $oldper";
                     print " to ".$testev->{testper}."\n";
@@ -530,6 +612,9 @@ while (1) {
                 $testev->{"pid"} == 0 )
             {
                 #run test
+		print time().": Starting test $testtype for $destaddr\n";
+		$testev->{"start_stats"} = getstats();
+		printstats("Start", $testev->{"start_stats"});
                 spawnTest( $destaddr, $testtype );
             }
 
@@ -660,19 +745,22 @@ sub spawnTest($$)
     }
     $linkdest = pop @{$waitq{$testtype}};
     my $fpingTimeout = $testevents{$linkdest}{$testtype}{fpingTimeout};
+    my $contin = $testevents{$linkdest}{$testtype}{continuous};
 #    print time()." running $linkdest / $testtype\n";
 
   FORK:{
+      my $filename = createtmpfilename($linkdest,$testtype);
       if( my $pid = fork ){
           #parent
           #save child pid in test event
           $testevents{$linkdest}{$testtype}{"pid"} = $pid;
           $testevents{$linkdest}{$testtype}{"tstamp"} = time_all();
+	  $testevents{$linkdest}{$testtype}{"outfile"} = $filename;
+	  $testevents{$linkdest}{$testtype}{"lastsize"} = 0;
           $runningtestPIDs{$pid} = [$linkdest, $testtype];
           
       }elsif( defined $pid ){
           #child
-          my $filename = createtmpfilename($linkdest,$testtype);
 
           #############################
           ###ADD MORE TEST TYPES HERE###
@@ -680,11 +768,28 @@ sub spawnTest($$)
           if( $testtype eq "latency" ){
               #command line for "LATENCY TEST"
 #             print "##########latTest\n";
-              #one ping, using fping (2 total attempts, 10 sec timeout between)
-              exec "sudo $workingdir".
-                  "fping -t$fpingTimeout -s -r1 $linkdest >& $filename"
-                  or die "can't exec: $!\n";
-          }elsif( $testtype eq "bw" ){
+	      my $duration = 0;
+	      my $period = $testevents{$linkdest}{$testtype}{"testper"};
+	      if ($contin) {
+		  $duration = int($testevents{$linkdest}{$testtype}{"limitTime"}) - time() + 1;
+		  if ($duration < 0 || $duration > (24*60*60)) {
+		      $contin = 0;
+		  }
+	      }
+	      if ($contin) {
+		  # run ping for $duration seconds with the specified interval
+		  open FILE, ">$filename"; close FILE;
+		  exec "sudo ".
+		      "ping -w $duration -i $period $linkdest >$filename 2>&1"
+			  or die "can't exec: $!\n";
+	      } else {
+		  #one ping, using fping
+		  # (2 total attempts, 10 sec timeout between)
+		  exec "sudo $workingdir".
+		      "fping -t$fpingTimeout -s -r1 $linkdest >& $filename"
+			  or die "can't exec: $!\n";
+	      }
+	  }elsif( $testtype eq "bw" ){
               #command line for "BANDWIDTH TEST"
 #             print "###########bwtest\n";
               exec "$workingdir".
@@ -724,10 +829,11 @@ sub getRunningTestsCnt($)
     return $testcount;
 }
 #############################################################################
-sub parsedata($$)
+sub parsedata($$$)
 {
     my $type = $_[0];
-    my $raw = $_[1];
+    my $iscontin = $_[1];
+    my $raw = $_[2];
     my $parsed;
     $_ = $raw;
 
@@ -751,18 +857,30 @@ sub parsedata($$)
             /ICMP Port Unreachable/ ||
             /ICMP Unreachable/
 =cut
-        if( /^ICMP / )
-        {
-            $parsed = $ERRID{ICMPunreachable};
-        }elsif( /address not found/ ){
-            $parsed = $ERRID{unknownhost};
-        }elsif( /2 timeouts/ ){
-            $parsed = $ERRID{timeout};
-        }elsif( /[\s]+([\S]*) ms \(avg round trip time\)/ ){
-            $parsed = "$1" if( $1 ne "0.00" );
-        }else{
-            $parsed = $ERRID{unknown};
-        }
+	if ($iscontin) {
+	    # "traditional" ping output
+	    if( /icmp_seq=\d+ ttl=\d+ time=([\d\.]+) ms/ ) {
+		$parsed = "$1" if ( $1 ne "0.000" );
+	    }elsif( /unknown host/ ){
+		$parsed = $ERRID{unknownhost};
+	    }elsif( /100% packet loss/ ){
+		$parsed = $ERRID{timeout};
+	    }
+	} else {
+	    # fping output
+	    if( /^ICMP / )
+	    {
+		$parsed = $ERRID{ICMPunreachable};
+	    }elsif( /address not found/ ){
+		$parsed = $ERRID{unknownhost};
+	    }elsif( /2 timeouts/ ){
+		$parsed = $ERRID{timeout};
+	    }elsif( /[\s]+([\S]*) ms \(avg round trip time\)/ ){
+		$parsed = "$1" if( $1 ne "0.00" );
+	    }else{
+		$parsed = $ERRID{unknown};
+	    }
+	}
 =pod
         #this section of parsing is for linux ping hosts.
         if(     /100\% packet loss/ ){
@@ -1186,6 +1304,17 @@ sub updateTestEvent($)
         }
         $testev->{flag_scheduled} = 0;
         $testev->{timeOfNextRun} = 0;
+
+	# See if we should change the continuous status
+	print "testper=", $testev->{testper},
+	      ", limit=", $testev->{limitTime}, "\n";
+	if (!$nocontinuous &&
+	    $testev->{limitTime} > 0 && $testev->{testper} < $CONT_THRESHOLD) {
+	    $testev->{continuous} = 1;
+	} else {
+	    undef $testev->{continuous};
+	}
+
         $testev->{managerID} = $head->managerid();
         print $testev->{cmdq}->getQueueInfo();
     }
@@ -1221,4 +1350,43 @@ sub initTestEv($$)
                                      fpingTimeout   => $fpingTimeoutDef
                                      };
     }
+}
+
+sub getstats()
+{
+    my %h;
+
+    my ($utime,$stime,$cutime,$cstime);
+    if (open(FD, "</proc/self/stat")) {
+	($utime,$stime,$cutime,$cstime)	= (split(/\s+/, <FD>))[13..16];
+	close(FD);
+    }
+    $h{utime} = $utime;
+    $h{stime} = $stime;
+    $h{cutime} = $cutime;
+    $h{cstime} = $cstime;
+    return \%h;
+}
+
+sub diffstats($$)
+{
+    my ($rs,$re) = @_;
+
+    my %before = %{$rs};
+    my %after = %{$re};
+    my %diff;
+    foreach my $key (keys(%before)) {
+	$diff{$key} = $after{$key} - $before{$key};
+    }
+    return \%diff;
+}
+
+sub printstats($$)
+{
+    my ($hdr,$stats) = @_;
+
+    print("$hdr: utime=", $stats->{utime},
+	  ", stime=", $stats->{stime},
+	  ", cutime=", $stats->{cutime},
+	  ", cstime=", $stats->{cstime}, "\n");
 }
