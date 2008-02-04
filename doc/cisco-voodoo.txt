@@ -210,6 +210,16 @@ ID  Name                            Members of VLAN
       ifconfig bge0 down
    when I am done.
 
+9a. Span on IOS
+
+      config
+      mointor session 1 dest int gi8/10
+      mointor session 1 source int gi3/3
+
+   If you need to change anything, you should first do:
+
+      no mointor session 1 source int gi3/3
+
 10. Multiple span sessions
    You can setup multiple span sessions on a switch.  Just add 'create'
    to the end of your setup line:
