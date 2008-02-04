@@ -290,10 +290,15 @@ function showsummary ($showby) {
 function showrange ($showby, $range) {
     global $TBOPSPID, $TB_EXPTSTATE_ACTIVE, $debug, $debug2, $debug3;
     global $experiment;
+
+    $ACTIVE   = TBDB_USERSTATUS_ACTIVE;
+    $ARCHIVED = TBDB_USERSTATUS_ARCHIVED;
     
     $now   = time();
     $inactive_swapmods = 0;
     unset($rangematches);
+    $users_created    = 0;
+    $projects_created = 0;
     
     switch ($range) {
         case "day":
@@ -330,6 +335,29 @@ function showrange ($showby, $range) {
     }
     if ($debug)
 	echo "start $spanstart end $spanend<br>\n";
+
+    #
+    # Get users/projects created during that time.
+    #
+    $query_result =
+	DBQueryFatal("select count(uid_idx) from users ".
+		     "where UNIX_TIMESTAMP(usr_created) >= $spanstart and ".
+		     "      UNIX_TIMESTAMP(usr_created) <  $spanend and ".
+		     "      (status='$ACTIVE' or status='$ARCHIVED') and ".
+		     "      usr_email not like '%flux.utah.edu'");
+    if ($query_result && mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	$users_created = $row[0];
+    }
+    $query_result =
+	DBQueryFatal("select count(pid_idx) from projects ".
+		     "where UNIX_TIMESTAMP(created) >= $spanstart and ".
+		     "      UNIX_TIMESTAMP(created) <  $spanend and ".
+		     "      approved=1");
+    if ($query_result && mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	$projects_created = $row[0];
+    }
 
     # Summary info, indexed by pid and uid. Each entry is an array of the
     # summary info.
@@ -618,6 +646,12 @@ function showrange ($showby, $range) {
     echo "<table>
            <tr><td colspan=2 nowrap align=center>
                <b>Totals</b></td>
+           </tr>
+           <tr><td nowrap align=right><b>New Projects</b></td>
+               <td align=left>$projects_created</td>
+           </tr>
+           <tr><td nowrap align=right><b>New Users</b></td>
+               <td align=left>$users_created</td>
            </tr>
            <tr><td nowrap align=right><b>Pnodes</b></td>
                <td align=left>$pnode_total</td>
