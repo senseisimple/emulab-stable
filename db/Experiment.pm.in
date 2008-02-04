@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Experiment;
@@ -1833,7 +1833,7 @@ sub PreSwap($$$$)
     # Update the timestamps in the current resource record to reflect
     # the official start of the operation.
     #
-    if ($which eq $EXPT_SWAPIN) {
+    if ($which eq $EXPT_SWAPIN || $which eq $EXPT_START) {
 	DBQueryWarn("update experiment_resources set ".
 		    "  swapin_time=UNIX_TIMESTAMP(now()) ".
 		    "where idx='$rsrcidx'")
@@ -1925,7 +1925,7 @@ sub SwapFail($$$$)
     # creating a new resource record when doing a swapmod to an inactive
     # experiment, but do not want to tackle that at this time
     #
-    if (! $lastrsrc && $which eq $EXPT_SWAPIN) {
+    if (! $lastrsrc && ($which eq $EXPT_START || $which eq $EXPT_SWAPIN)) {
 	DBQueryWarn("update experiment_resources set swapin_time=0 ".
 		    "where idx='$rsrcidx'")
 	or return -1;
