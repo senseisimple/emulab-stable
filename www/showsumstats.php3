@@ -660,9 +660,10 @@ function showrange ($showby, $range) {
              <th>Pnodes</th>
              <th>Pnode Days</th>
              <th>Expt Days</th>
+             <th>Starts</th>
              <th>Swapins</th>
              <th>Swapmods</th>
-             <th>New</th>
+             <th>Preloaded</th>
              <th>Vnodes</th>
           </tr></thead>\n";
 
@@ -672,7 +673,8 @@ function showrange ($showby, $range) {
 	$vnodes  = $value["vnodes"];
 	$swapins = $value["swapins"];
 	$swapmods= $value["swapmods"];
-	$new     = $value["new"];
+	$preload = $value["preloaded"];
+	$starts  = $value["started"];
 	$current = $value["current"];
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
@@ -687,9 +689,10 @@ function showrange ($showby, $range) {
                 <td>$pnodes</td>
                 <td>$pdays</td>
                 <td>$edays</td>
+                <td>$starts</td>
                 <td>$swapins</td>
                 <td>$swapmods</td>
-                <td>$new</td>
+                <td>$preload</td>
                 <td>$vnodes</td>
               </tr>\n";
     }
