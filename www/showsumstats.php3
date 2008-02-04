@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -30,8 +30,9 @@ if (!$isadmin && !STUDLY()) {
 #
 # Verify page arguments.
 #
-$optargs = OptionalPageArguments("showby", PAGEARG_STRING,
-				 "range",  PAGEARG_STRING);
+$optargs = OptionalPageArguments("showby",     PAGEARG_STRING,
+				 "range",      PAGEARG_STRING,
+				 "experiment", PAGEARG_EXPERIMENT);
 
 # Page args,
 if (! isset($showby)) {
@@ -288,6 +289,8 @@ function showsummary ($showby) {
 
 function showrange ($showby, $range) {
     global $TBOPSPID, $TB_EXPTSTATE_ACTIVE, $debug, $debug2, $debug3;
+    global $experiment;
+    
     $now   = time();
     $inactive_swapmods = 0;
     unset($rangematches);
@@ -381,7 +384,8 @@ function showrange ($showby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 1,
-				       'new'      => 0,
+				       'preloaded'=> 0,
+				       'started'  => 0,
 				       'swapmods' => 0,
 				       'swapins'  => 0);
 	}
@@ -391,7 +395,8 @@ function showrange ($showby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 1,
-				       'new'      => 0,
+				       'preloaded'=> 0,
+				       'started'  => 0,
 				       'swapmods' => 0,
 				       'swapins'  => 0);
 	}
@@ -410,20 +415,17 @@ function showrange ($showby, $range) {
 	DBQueryFatal("select s.exptidx,s.pid,u.uid,r.pnodes,r.vnodes, ".
 		     "   swapin_time,swapout_time,swapmod_time,byswapmod, ".
 		     "   e.eid_uuid,r.idx,r.lastidx,byswapin ".
-		     " from experiment_stats as s ".
-		     "left join experiment_resources as r on ".
+		     " from experiment_resources as r ".
+		     "left join experiment_stats as s on ".
 		     "     r.exptidx=s.exptidx ".
 		     "left join experiments as e on e.idx=s.exptidx ".
 		     "left join users as u on u.uid_idx=r.uid_idx ".
-		     "where (UNIX_TIMESTAMP(r.tstamp) >= $spanstart or ".
-		     "       swapin_time >= $spanstart or ".
-		     "       swapmod_time >= $spanstart or ".
-		     "       swapout_time >= $spanstart) and ".
-		     "      (swapin_time <= $spanend and ".
-		     "       swapmod_time <= $spanend and ".
-		     "       swapout_time <= $spanend) and ".
-		     "    e.pid!='$TBOPSPID' and ".
-		     "      not (e.pid='ron' and e.eid='all') ".
+		     "where (UNIX_TIMESTAMP(r.tstamp) >= $spanstart) and ".
+		     "      (UNIX_TIMESTAMP(r.tstamp) <= $spanend) and ".
+		     "      s.pid!='$TBOPSPID' and ".
+		     "        not (s.pid='ron' and s.eid='all') ".
+		     (isset($experiment) ?
+		      "and r.exptidx=" . $experiment->idx() . " " : " ") .
 		     "order by s.exptidx,UNIX_TIMESTAMP(r.tstamp)");
 
     while ($row = mysql_fetch_assoc($query_result)) {
@@ -457,7 +459,8 @@ function showrange ($showby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 0,
-				       'new'      => 0,
+				       'preloaded'=> 0,
+				       'started'  => 0,
 				       'swapmods' => 0,
 				       'swapins'  => 0);
 	}
@@ -467,14 +470,21 @@ function showrange ($showby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 0,
-				       'new'      => 0,
+				       'preloaded'=> 0,
+				       'started'  => 0,
 				       'swapmods' => 0,
 				       'swapins'  => 0);
 	}
 
 	if (!$lastidx) {
-	    $pid_summary[$pid]["new"]++;
-	    $uid_summary[$uid]["new"]++;
+	    if ($swapin_time) {
+		$pid_summary[$pid]["started"]++;
+		$uid_summary[$uid]["started"]++;
+	    }
+	    else {
+		$pid_summary[$pid]["preloaded"]++;
+		$uid_summary[$uid]["preloaded"]++;
+	    }
 	}
 	if ($byswapin) {
 	    $pid_summary[$pid]["swapins"]++;
@@ -578,14 +588,16 @@ function showrange ($showby, $range) {
     $edays_total  = 0;
     $swapin_total = 0;
     $swapmod_total= 0;
-    $new_total    = 0;
+    $preload_total= 0;
+    $started_total= 0;
 
     foreach ($table as $key => $value) {
 	$pnodes  = $value["pnodes"];
 	$vnodes  = $value["vnodes"];
 	$swapins = $value["swapins"];
 	$swapmods= $value["swapmods"];
-	$new     = $value["new"];
+	$preload = $value["preloaded"];
+	$starts  = $value["started"];
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
@@ -598,7 +610,8 @@ function showrange ($showby, $range) {
 	$edays_total   += $edays;
 	$swapin_total  += $swapins;
 	$swapmod_total += $swapmods;
-	$new_total     += $new;
+	$preload_total += $preload;
+	$started_total += $starts;
     }
 
     SUBPAGESTART();
@@ -618,14 +631,20 @@ function showrange ($showby, $range) {
            <tr><td nowrap align=right><b>Expt Days</b></td>
                <td align=left>$edays_total</td>
            </tr>
+           <tr><td nowrap align=right><b>Starts</b></td>
+               <td align=left>$started_total</td>
+           </tr>
            <tr><td nowrap align=right><b>Swapins</b></td>
                <td align=left>$swapin_total</td>
            </tr>
-           <tr><td nowrap align=right><b>Swapmods</b></td>
-               <td align=left>$swapmod_total ($inactive_swapmods)</td>
+           <tr><td nowrap align=right><b>Total Swapmods</b></td>
+               <td align=left>$swapmod_total</td>
            </tr>
-           <tr><td nowrap align=right><b>New</b></td>
-               <td align=left>$new_total</td>
+           <tr><td nowrap align=right><b>Inactive Swapmods</b></td>
+               <td align=left>$inactive_swapmods</td>
+           </tr>
+           <tr><td nowrap align=right><b>Preloaded</b></td>
+               <td align=left>$preload_total</td>
            </tr>
           </table>\n";
     SUBMENUEND_2B();
