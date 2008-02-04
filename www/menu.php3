@@ -297,7 +297,7 @@ function WRITESIDEBAR() {
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
     global $EXPOSETEMPLATES;
-    global $currentusage, $FANCYBANNER, $ELABINELAB;
+    global $currentusage, $FANCYBANNER, $ELABINELAB, $PLABSUPPORT;
     $firstinitstate = TBGetFirstInitState();
 
     #
@@ -587,10 +587,12 @@ function WRITESIDEBAR() {
 		    NavMenuButton("Create a Template",
 				  "$TBBASE/template_create.php");
 		}
-	
-		# Put _NEW back when Plab is working again.
-		NavMenuButton("Create a PlanetLab Slice",
-			      "$TBBASE/plab_ez.php3");
+
+		if ($PLABSUPPORT) {
+                    # Put _NEW back when Plab is working again.
+		    NavMenuButton("Create a PlanetLab Slice",
+				  "$TBBASE/plab_ez.php3");
+		}
 
 		NavMenuButton("Experiment List", "$TBBASE/showexp_list.php3");
 
