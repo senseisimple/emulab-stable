@@ -556,9 +556,12 @@ my $loadlen  = 1;
 if ($newimageid_args{"wholedisk"}) {
     $loadlen  = 4;
     $loadpart = 0;
+    $newimageid_args{"part1_osid"} = $osid;
+} else {
+    $newimageid_args{"part${loadpart}_osid"} = $osid;
 }
+$newimageid_args{"loadpart"} = $loadpart;
 $newimageid_args{"loadlength"} = $loadlen;
-$newimageid_args{"part${loadpart}_osid"} = $osid;
 $newimageid_args{"default_osid"} = $osid;
 
 # Create the osidtoimageid mapping too.
