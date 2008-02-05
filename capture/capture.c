@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -852,6 +852,7 @@ capture(void)
 				}
 				if (i == 0) {
 #ifdef	USESOCKETS
+					sigprocmask(SIG_SETMASK, &omask, NULL);
 					goto disconnected;
 #else
 					die("%s: write: zero-length", Ptyname);
