@@ -871,7 +871,8 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	    echo "<img border='0' ";
 	    echo "alt='$THISHOMEBASE - the network testbed' ";
 	    if ($FANCYBANNER)
-		echo "src='$BASEPATH/fancy-banner-short.png' ";
+		echo "src='$BASEPATH/fancy-sheader-" .
+		    strtolower($THISHOMEBASE) . ".png' ";
 	    elseif ($ELABINELAB) {
 		echo "height='54' ";
 		echo "src='$BASEPATH/overlay.elabinelab.gif' ";
@@ -887,9 +888,12 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	else {
 	    if ($FANCYBANNER) {
 		echo "<a href='$TBDOCBASE/index.php3'>
-                        <img height='100px' width='365px' border='0'
-                           src='$BASEPATH/fancy-header.png' /></a>\n";
-	    } else {
+                        <img height='100px' width='365px' border='0' ";
+		echo "src='$BASEPATH/fancy-header-" .
+			strtolower($THISHOMEBASE) . ".png' ";
+		echo "></a>\n";
+	    }
+	    else {
 		echo "<map name='overlaymap'>
                          <area shape=\"rect\" coords=\"100,60,339,100\"
                                href='http://www.emulab.net/index.php3'>
