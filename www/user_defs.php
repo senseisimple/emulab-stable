@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -655,6 +655,7 @@ class User
 	$failstamp   = $user->weblogin_failstamp();
 	$wikiname    = $user->wikiname();
 	$cvsweb      = $user->cvsweb();
+	$widearearoot= $user->widearearoot();
 	$wikionly    = $user->wikionly();
 	$stud        = $user->stud();
 	$uuid        = $user->uuid();
@@ -824,6 +825,15 @@ class User
 	    echo "<tr>
                       <td>CVSWeb Access:</td>
                       <td>$cvsweb (<a href='$toggle_url'>Toggle</a>)
+                  </tr>\n";
+
+	    $widearearootflip = ($widearearoot ? 0 : 1);
+	    $toggle_url = CreateURL("toggle", $user,
+				    "type", "widearearoot",
+				    "value", $widearearootflip);
+	    echo "<tr>
+                      <td>Widearearoot:</td>
+                      <td>$widearearoot (<a href='$toggle_url'>Toggle</a>)
                   </tr>\n";
 	
 	    $freezeflip = ($frozen ? 0 : 1);
@@ -1015,6 +1025,17 @@ class User
 			    
 	DBQueryFatal("update users set ".
 		     "   stud='$onoff' ".
+		     "where uid_idx='$idx'");
+	$this->user["stud"] = $onoff;
+	return 0;
+    }
+    function SetWideAreaRoot($onoff) {
+	$idx   = $this->uid_idx();
+
+	$onoff = ($onoff ? 1 : 0);
+			    
+	DBQueryFatal("update users set ".
+		     "   widearearoot='$onoff' ".
 		     "where uid_idx='$idx'");
 	$this->user["stud"] = $onoff;
 	return 0;

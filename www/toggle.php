@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,7 +24,7 @@ $isadmin   = ISADMIN();
 
 # List of valid toggles
 $toggles = array("adminon", "webfreeze", "cvsweb", "lockdown", "stud",
-		 "cvsrepo_public", "workbench", "hiderun");
+		 "cvsrepo_public", "workbench", "hiderun", "widearearoot");
 
 # list of valid values for each toggle
 $values  = array("adminon"        => array(0,1),
@@ -34,6 +34,7 @@ $values  = array("adminon"        => array(0,1),
 		 "lockdown"       => array(0,1),
 		 "cvsrepo_public" => array(0,1),
 		 "workbench"      => array(0,1),
+		 "widearearoot"   => array(0,1),
 		 "hiderun"        => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
@@ -44,6 +45,7 @@ $optargs = array("adminon"        => array(),
 		 "lockdown"       => array("pid" => 1, "eid" => 1),
 		 "cvsrepo_public" => array("pid" => 1),
 		 "workbench"      => array("pid" => 1),
+		 "widearearoot"   => array("user" => 1),
 		 "hiderun"        => array("instance" => 1, "runidx" => 1));
 
 # Mandatory page arguments.
@@ -117,6 +119,17 @@ elseif ($type == "stud") {
     }
     $zapurl = CreateURL("showuser", $target_user);
     $target_user->SetStudly($value);
+}
+elseif ($type == "widearearoot") {
+    # must be admin
+    if (! $isadmin) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    if (! ($target_user = User::Lookup($user))) {
+	PAGEARGERROR("Target user '$user' is not a valid user!");
+    }
+    $zapurl = CreateURL("showuser", $target_user);
+    $target_user->SetWideAreaRoot($value);
 }
 elseif ($type == "lockdown") {
     # must be admin
