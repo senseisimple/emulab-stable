@@ -941,8 +941,14 @@ proc tb-set-link-encap {lanlink style} {
 	"alias" {
 	    set style "alias"
 	}
-	"tunnel" {
-	    set style "tunnel"
+	"gre" {
+	    set style "gre"
+	}
+	"egre" {
+	    set style "egre"
+	}
+	"vtun" {
+	    set style "vtun"
 	}
 	"veth" {
 	    set style "veth"
@@ -1118,8 +1124,14 @@ proc tb-set-vlink-emulation {style} {
 	"alias" {
 	    set style "alias"
 	}
-	"tunnel" {
-	    set style "tunnel"
+	"gre" {
+	    set style "gre"
+	}
+	"egre" {
+	    set style "egre"
+	}
+	"vtun" {
+	    set style "vtun"
 	}
 	"veth" {
 	    set style "veth"
