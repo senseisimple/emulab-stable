@@ -123,6 +123,7 @@ sub PreparePhysNode();
 sub fatal($);
 sub getjailconfig($);
 sub setjailoptions();
+sub startproxy($);
 sub mysystem($);
 sub cleanup();
 
@@ -430,6 +431,12 @@ sub mkvserver($)
 	if (! -e "$vdir/local/logs");
 
     #
+    # Some security stuff; remove files that would enable it to talk to
+    # tmcd directly (only imortant on remote nodes). Must go through proxy.
+    #
+    mysystem("rm -f $vdir/$ETCDIR/*.pem");
+    
+    #
     # Now a bunch of stuff to set up a nice environment in the jail.
     #
     mysystem("ln -s ../../init.d/syslog $vdir/etc/rc3.d/S80syslog");
@@ -522,12 +529,6 @@ sub mkvserver($)
     unlink("$vdir/$BOOTDIR/vrunning")
 	if (-e "$vdir/$BOOTDIR/vrunning");
 
-    #
-    # vserver 2.2 does not support loopback devices inside, so redirect
-    # localhost so that testbed daemons can find the local pubsubd. This
-    # will come out when we have the virtual network stuff.
-    #
-    mysystem("echo '$IP\t\tlocalhost loghost' > $vdir/etc/hosts");
 }
 
 #
